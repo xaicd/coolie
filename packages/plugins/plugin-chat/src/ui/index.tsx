@@ -1,1 +1,1 @@
-export {};
+export { SidebarLink, ChatPage } from "./app.js";

@@ -69,8 +69,77 @@ const plugin = definePlugin({
     store = new ChatStore(ctx.db);
     ctx.data.register("list-conversations", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
-      return { conversations: await requireStore().listConversations(companyId) };
+      const mode = typeof params.mode === "string" && params.mode.trim() !== "" ? params.mode : undefined;
+      return { conversations: await requireStore().listConversations(companyId, mode) };
     });
+
+    // Conversation detail + its messages + the derived context window in one
+    // payload so the chat UI can render a session without extra round-trips.
+    ctx.data.register("conversation-detail", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const conversationId = requireString(params.conversationId, "conversationId");
+      const st = requireStore();
+      const [conversation, messages, context] = await Promise.all([
+        st.getConversation(companyId, conversationId),
+        st.listMessages(companyId, conversationId),
+        st.getContextWindow(companyId, conversationId),
+      ]);
+      return { conversation, messages, context };
+    });
+
+    // Mutating actions backing usePluginAction(...) in the chat UI.
+    ctx.actions.register("create-conversation", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const conversation = await requireStore().createConversation({
+        companyId,
+        conversationKey:
+          typeof params.conversationKey === "string" && params.conversationKey.trim() !== ""
+            ? params.conversationKey
+            : `conv-${Date.now()}`,
+        name: typeof params.name === "string" ? params.name : undefined,
+        mode: typeof params.mode === "string" ? (params.mode as ChatMode) : undefined,
+        systemPrompt: typeof params.systemPrompt === "string" ? params.systemPrompt : undefined,
+      });
+      await ctx.activity.log({
+        companyId,
+        message: `Created chat conversation ${conversation.conversation_key} (${conversation.mode})`,
+        entityType: "chat_conversation",
+        entityId: conversation.id,
+      });
+      return { conversation };
+    });
+
+    ctx.actions.register("append-message", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const conversationId = requireString(params.conversationId, "conversationId");
+      const message = await requireStore().appendMessage({
+        companyId,
+        conversationId,
+        role: typeof params.role === "string" ? (params.role as MessageRole) : undefined,
+        content: requireString(params.content, "content"),
+      });
+      if (!message) throw new Error("Conversation not found");
+      await emitMessageAppended(ctx, companyId, {
+        conversationId: message.conversation_id,
+        messageId: message.id,
+        seq: message.seq,
+        role: message.role,
+        assistantTurnNeeded: message.role === "user",
+      });
+      return { message };
+    });
+
+    ctx.actions.register("transition-conversation", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const conversation = await requireStore().transitionConversation(
+        companyId,
+        requireString(params.conversationId, "conversationId"),
+        requireString(params.to, "to") as ConversationStatus,
+      );
+      if (!conversation) throw new Error("Conversation not found");
+      return { conversation };
+    });
+
     ctx.logger.info("Chat plugin worker started", { namespace: ctx.db.namespace });
   },
 
