@@ -79,6 +79,25 @@ Mapping to plugin tables:
 New API routes: `interfaces` (GET/POST + PATCH `/:interfaceId`) and
 `action-types` (GET/POST + PATCH `/:actionTypeId`).
 
+## O3 (legacy repository cognition) scope
+
+Reverse-engineers a legacy code repository into an ontology-domain draft, then
+publishes the draft as real building blocks. Mirrors the DigitalStaff
+`RepoCognitionJob` model (`ontology_cognition_jobs`):
+
+- **Resumable 9-state pipeline** (state machine enforced): pending → indexing →
+  splitting → ingesting → synthesizing → awaiting_confirm → publishing →
+  completed (or failed). `awaiting_confirm` can loop back to `ingesting`.
+- **Scale tier** (s/m/l/xl), **shard-based resumption** (`shards[]` +
+  `shard_total`/`shard_done`, progress interpolated during ingesting), and
+  **coverage counters** (entities/relations/actions/terms/files).
+- **Draft** (`seed_node_types` / `seed_relation_types` / `seed_actions`) that,
+  on publish, is landed as real Object types / Link types / Action types
+  (reusing the O2 building-block store) into a target domain.
+
+API routes: `cognition-jobs` (GET list / POST create / GET `/:jobId`), plus
+`/:jobId/transition`, `/:jobId/shards`, `/:jobId/draft`, `/:jobId/publish`.
+
 ## O5 (consumption interface) scope
 
 Exposes the ontology to agents as tools via `ctx.tools.register` (requires the

@@ -13,12 +13,19 @@ import type { PluginDatabaseClient } from "@paperclipai/plugin-sdk";
  *  - `db.execute` accepts a single INSERT / UPDATE / DELETE statement.
  * Every object reference must be schema-qualified with `db.namespace`.
  */
-import { isValidDomainTransition } from "../enums.js";
+import {
+  COGNITION_PROGRESS_BY_STATUS,
+  isValidCognitionTransition,
+  isValidDomainTransition,
+} from "../enums.js";
 import type {
   ActionKind,
   ActionTypeStatus,
   AuditEventType,
   BootstrapSource,
+  CognitionJobStatus,
+  CognitionScale,
+  CognitionShardStatus,
   DomainLifecycleState,
   FunctionStatus,
   FunctionType,
@@ -337,6 +344,60 @@ export interface OntologyActionTypeRow {
   status: ActionTypeStatus;
 }
 
+// --- O3: legacy repository cognition (DigitalStaff RepoCognitionJob parity) ---
+
+export interface CognitionShard {
+  shardId: string;
+  rel?: string;
+  kind?: string;
+  status?: CognitionShardStatus;
+  fileCount?: number;
+  loc?: number;
+  error?: string | null;
+  [key: string]: unknown;
+}
+
+export interface CognitionCoverage {
+  entityCount: number;
+  relationCount: number;
+  actionCount: number;
+  termCount: number;
+  sqlFiles: number;
+  apiFiles: number;
+  docFiles: number;
+  officeDocFiles: number;
+}
+
+export interface OntologyCognitionJobInput {
+  companyId: string;
+  jobKey: string;
+  rootPath: string;
+  domainId?: string | null;
+  appName?: string;
+  displayName?: string;
+  description?: string;
+  targetRole?: string;
+  category?: string;
+  scale?: CognitionScale;
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyCognitionJobRow {
+  id: string;
+  company_id: string;
+  job_key: string;
+  domain_id: string | null;
+  root_path: string;
+  app_name: string;
+  scale: CognitionScale;
+  status: CognitionJobStatus;
+  stage_label: string;
+  shard_total: number;
+  shard_done: number;
+  progress_pct: number;
+}
+
 export interface GraphSnapshot {
   domainId: string;
   counts: {
@@ -447,6 +508,51 @@ export interface GraphStore {
     actionTypeId: string,
     update: OntologyActionTypeUpdate,
   ): Promise<OntologyActionTypeRow | null>;
+
+  // O3 — legacy repository cognition (resumable reverse-engineering pipeline)
+  createCognitionJob(input: OntologyCognitionJobInput): Promise<OntologyCognitionJobRow>;
+  getCognitionJob(companyId: string, jobId: string): Promise<OntologyCognitionJobRow | null>;
+  listCognitionJobs(companyId: string, limit?: number): Promise<OntologyCognitionJobRow[]>;
+  transitionCognitionStatus(
+    companyId: string,
+    jobId: string,
+    to: CognitionJobStatus,
+    patch?: { stageLabel?: string; error?: string | null; actor?: string },
+  ): Promise<OntologyCognitionJobRow | null>;
+  updateCognitionShards(
+    companyId: string,
+    jobId: string,
+    shards: CognitionShard[],
+  ): Promise<OntologyCognitionJobRow | null>;
+  recordCognitionCoverage(
+    companyId: string,
+    jobId: string,
+    coverage: Partial<CognitionCoverage>,
+  ): Promise<OntologyCognitionJobRow | null>;
+  setCognitionDraft(
+    companyId: string,
+    jobId: string,
+    draft: {
+      draftPreview?: Record<string, unknown>;
+      seedNodeTypes?: unknown[];
+      seedRelationTypes?: unknown[];
+      seedActions?: unknown[];
+    },
+  ): Promise<OntologyCognitionJobRow | null>;
+  getCognitionDraft(
+    companyId: string,
+    jobId: string,
+  ): Promise<{
+    seedNodeTypes: unknown[];
+    seedRelationTypes: unknown[];
+    seedActions: unknown[];
+    result: Record<string, unknown>;
+  } | null>;
+  setCognitionResult(
+    companyId: string,
+    jobId: string,
+    result: Record<string, unknown>,
+  ): Promise<OntologyCognitionJobRow | null>;
 }
 
 const DEFAULT_MAX_DEPTH = 12;
@@ -1418,5 +1524,221 @@ export class PostgresGraphStore implements GraphStore {
       [companyId, actionTypeId],
     );
     return rows[0] ?? null;
+  }
+
+  // -------------------------------------------------------------------------
+  // O3 — legacy repository cognition
+  // -------------------------------------------------------------------------
+
+  private static readonly COGNITION_COLS =
+    "id, company_id, job_key, domain_id, root_path, app_name, scale, status, " +
+    "stage_label, shard_total, shard_done, progress_pct";
+
+  async createCognitionJob(input: OntologyCognitionJobInput): Promise<OntologyCognitionJobRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_cognition_jobs")}
+         (id, company_id, job_key, domain_id, root_path, app_name, display_name,
+          description, target_role, category, scale, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $12, $13::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.jobKey,
+        input.domainId ?? null,
+        input.rootPath,
+        input.appName ?? "",
+        input.displayName ?? "",
+        input.description ?? "",
+        input.targetRole ?? "",
+        input.category ?? "other",
+        input.scale ?? "s",
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    return (await this.getCognitionJob(input.companyId, id))!;
+  }
+
+  async getCognitionJob(companyId: string, jobId: string): Promise<OntologyCognitionJobRow | null> {
+    const rows = await this.db.query<OntologyCognitionJobRow>(
+      `SELECT ${PostgresGraphStore.COGNITION_COLS}
+         FROM ${this.table("ontology_cognition_jobs")}
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, jobId],
+    );
+    return rows[0] ?? null;
+  }
+
+  async listCognitionJobs(companyId: string, limit = 100): Promise<OntologyCognitionJobRow[]> {
+    const capped = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 500)) : 100;
+    return this.db.query<OntologyCognitionJobRow>(
+      `SELECT ${PostgresGraphStore.COGNITION_COLS}
+         FROM ${this.table("ontology_cognition_jobs")}
+        WHERE company_id = $1 AND is_deleted = false
+        ORDER BY created_at DESC
+        LIMIT $2`,
+      [companyId, capped],
+    );
+  }
+
+  /** Advance a cognition job, enforcing the status transition table. */
+  async transitionCognitionStatus(
+    companyId: string,
+    jobId: string,
+    to: CognitionJobStatus,
+    patch: { stageLabel?: string; error?: string | null; actor?: string } = {},
+  ): Promise<OntologyCognitionJobRow | null> {
+    const current = await this.getCognitionJob(companyId, jobId);
+    if (!current) return null;
+    if (!isValidCognitionTransition(current.status, to)) {
+      throw new Error(`Illegal cognition transition: ${current.status} -> ${to}`);
+    }
+    const progress = COGNITION_PROGRESS_BY_STATUS[to];
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_cognition_jobs")}
+          SET status       = $3,
+              stage_label  = COALESCE($4, stage_label),
+              error        = CASE WHEN $5::boolean THEN $6 ELSE error END,
+              progress_pct = $7,
+              updated_by   = $8,
+              updated_at   = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [
+        companyId,
+        jobId,
+        to,
+        patch.stageLabel ?? null,
+        patch.error !== undefined,
+        patch.error ?? null,
+        progress,
+        patch.actor ?? "system",
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    return this.getCognitionJob(companyId, jobId);
+  }
+
+  /**
+   * Replace the shard set (resumable checkpoint). Recomputes shard_total /
+   * shard_done from the provided shards; when ingesting, interpolates progress.
+   */
+  async updateCognitionShards(
+    companyId: string,
+    jobId: string,
+    shards: CognitionShard[],
+  ): Promise<OntologyCognitionJobRow | null> {
+    const total = shards.length;
+    const done = shards.filter((s) => s.status === "done").length;
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_cognition_jobs")}
+          SET shards       = $3::jsonb,
+              shard_total  = $4,
+              shard_done   = $5,
+              progress_pct = CASE
+                WHEN status = 'ingesting' AND $4 > 0
+                  THEN LEAST(76, 18 + ($5 * 54 / $4))
+                ELSE progress_pct END,
+              updated_at   = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, jobId, JSON.stringify(shards), total, done],
+    );
+    if (res.rowCount === 0) return null;
+    return this.getCognitionJob(companyId, jobId);
+  }
+
+  async recordCognitionCoverage(
+    companyId: string,
+    jobId: string,
+    coverage: Partial<CognitionCoverage>,
+  ): Promise<OntologyCognitionJobRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_cognition_jobs")}
+          SET coverage = coverage || $3::jsonb, updated_at = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, jobId, JSON.stringify(coverage)],
+    );
+    if (res.rowCount === 0) return null;
+    return this.getCognitionJob(companyId, jobId);
+  }
+
+  async setCognitionDraft(
+    companyId: string,
+    jobId: string,
+    draft: {
+      draftPreview?: Record<string, unknown>;
+      seedNodeTypes?: unknown[];
+      seedRelationTypes?: unknown[];
+      seedActions?: unknown[];
+    },
+  ): Promise<OntologyCognitionJobRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_cognition_jobs")}
+          SET draft_preview       = CASE WHEN $3::boolean THEN $4::jsonb ELSE draft_preview END,
+              seed_node_types     = CASE WHEN $5::boolean THEN $6::jsonb ELSE seed_node_types END,
+              seed_relation_types = CASE WHEN $7::boolean THEN $8::jsonb ELSE seed_relation_types END,
+              seed_actions        = CASE WHEN $9::boolean THEN $10::jsonb ELSE seed_actions END,
+              updated_at          = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [
+        companyId,
+        jobId,
+        draft.draftPreview !== undefined,
+        JSON.stringify(draft.draftPreview ?? {}),
+        draft.seedNodeTypes !== undefined,
+        JSON.stringify(draft.seedNodeTypes ?? []),
+        draft.seedRelationTypes !== undefined,
+        JSON.stringify(draft.seedRelationTypes ?? []),
+        draft.seedActions !== undefined,
+        JSON.stringify(draft.seedActions ?? []),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    return this.getCognitionJob(companyId, jobId);
+  }
+
+  async getCognitionDraft(
+    companyId: string,
+    jobId: string,
+  ): Promise<{
+    seedNodeTypes: unknown[];
+    seedRelationTypes: unknown[];
+    seedActions: unknown[];
+    result: Record<string, unknown>;
+  } | null> {
+    const rows = await this.db.query<{
+      seed_node_types: unknown[];
+      seed_relation_types: unknown[];
+      seed_actions: unknown[];
+      result: Record<string, unknown>;
+    }>(
+      `SELECT seed_node_types, seed_relation_types, seed_actions, result
+         FROM ${this.table("ontology_cognition_jobs")}
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, jobId],
+    );
+    const row = rows[0];
+    if (!row) return null;
+    return {
+      seedNodeTypes: Array.isArray(row.seed_node_types) ? row.seed_node_types : [],
+      seedRelationTypes: Array.isArray(row.seed_relation_types) ? row.seed_relation_types : [],
+      seedActions: Array.isArray(row.seed_actions) ? row.seed_actions : [],
+      result: (row.result as Record<string, unknown>) ?? {},
+    };
+  }
+
+  async setCognitionResult(
+    companyId: string,
+    jobId: string,
+    result: Record<string, unknown>,
+  ): Promise<OntologyCognitionJobRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_cognition_jobs")}
+          SET result = $3::jsonb, updated_at = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, jobId, JSON.stringify(result)],
+    );
+    if (res.rowCount === 0) return null;
+    return this.getCognitionJob(companyId, jobId);
   }
 }
