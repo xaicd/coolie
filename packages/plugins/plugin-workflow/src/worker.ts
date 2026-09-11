@@ -67,8 +67,75 @@ const plugin = definePlugin({
     store = new WorkflowStore(ctx.db);
     ctx.data.register("list-configs", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
-      return { configs: await requireStore().listConfigs(companyId) };
+      const category =
+        typeof params.category === "string" && params.category.trim() !== "" ? params.category : undefined;
+      return { configs: await requireStore().listConfigs(companyId, category) };
     });
+
+    ctx.data.register("list-executions", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      return { executions: await requireStore().listExecutions(companyId) };
+    });
+
+    ctx.data.register("execution-detail", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const executionId = requireString(params.executionId, "executionId");
+      return { execution: await requireStore().getExecution(companyId, executionId) };
+    });
+
+    // Mutating actions backing usePluginAction(...) in the workflow UI.
+    ctx.actions.register("create-config", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const config = await requireStore().createConfig({
+        companyId,
+        configKey:
+          typeof params.configKey === "string" && params.configKey.trim() !== ""
+            ? params.configKey
+            : `wf-${Date.now()}`,
+        name: requireString(params.name, "name"),
+        category: typeof params.category === "string" ? params.category : undefined,
+        executionMode:
+          typeof params.executionMode === "string" ? (params.executionMode as WorkflowEngineMode) : undefined,
+      });
+      await ctx.activity.log({
+        companyId,
+        message: `Created workflow config ${config.config_key}`,
+        entityType: "workflow_config",
+        entityId: config.id,
+      });
+      return { config };
+    });
+
+    ctx.actions.register("create-execution", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const execution = await requireStore().createExecution({
+        companyId,
+        executionKey:
+          typeof params.executionKey === "string" && params.executionKey.trim() !== ""
+            ? params.executionKey
+            : `exec-${Date.now()}`,
+        workflowId: typeof params.workflowId === "string" ? params.workflowId : null,
+        workflowName: typeof params.workflowName === "string" ? params.workflowName : undefined,
+      });
+      return { execution };
+    });
+
+    ctx.actions.register("transition-execution", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const executionId = requireString(params.executionId, "executionId");
+      const before = await requireStore().getExecution(companyId, executionId);
+      const to = requireString(params.to, "to") as WorkflowExecutionStatus;
+      const execution = await requireStore().transitionExecution(companyId, executionId, to, {});
+      if (!execution) throw new Error("Execution not found");
+      await emitExecutionStatusChanged(ctx, companyId, {
+        executionId: execution.id,
+        executionKey: execution.execution_key,
+        from: before?.status ?? "",
+        to,
+      });
+      return { execution };
+    });
+
     ctx.logger.info("Workflow plugin worker started", { namespace: ctx.db.namespace });
   },
 

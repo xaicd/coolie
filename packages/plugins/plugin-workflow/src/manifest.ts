@@ -43,6 +43,8 @@ const manifest: PaperclipPluginManifestV1 = {
     "events.emit",
     "plugin.state.read",
     "plugin.state.write",
+    "ui.page.register",
+    "ui.sidebar.register",
   ],
   entrypoints: {
     worker: "./dist/worker.js",
@@ -64,6 +66,24 @@ const manifest: PaperclipPluginManifestV1 = {
     r("transition-execution", "POST", "/executions/:executionId/transition", "body"),
     r("update-node-execution", "POST", "/executions/:executionId/nodes", "body"),
   ],
+  ui: {
+    slots: [
+      {
+        type: "sidebar",
+        id: "workflow-sidebar",
+        displayName: "Workflow",
+        exportName: "SidebarLink",
+        order: 50,
+      },
+      {
+        type: "page",
+        id: "workflow-page",
+        displayName: "Workflow",
+        exportName: "WorkflowPage",
+        routePath: "workflow",
+      },
+    ],
+  },
 };
 
 export default manifest;

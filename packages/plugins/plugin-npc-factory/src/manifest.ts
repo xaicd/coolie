@@ -44,6 +44,8 @@ const manifest: PaperclipPluginManifestV1 = {
     "events.subscribe",
     "plugin.state.read",
     "plugin.state.write",
+    "ui.page.register",
+    "ui.sidebar.register",
   ],
   entrypoints: {
     worker: "./dist/worker.js",
@@ -68,6 +70,24 @@ const manifest: PaperclipPluginManifestV1 = {
     r("register-artifact", "POST", "/artifacts", "body"),
     r("set-artifact-drift", "POST", "/artifacts/:artifactId/drift", "body"),
   ],
+  ui: {
+    slots: [
+      {
+        type: "sidebar",
+        id: "npc-factory-sidebar",
+        displayName: "NPC Factory",
+        exportName: "SidebarLink",
+        order: 55,
+      },
+      {
+        type: "page",
+        id: "npc-factory-page",
+        displayName: "NPC Factory",
+        exportName: "NpcFactoryPage",
+        routePath: "npc-factory",
+      },
+    ],
+  },
 };
 
 export default manifest;
