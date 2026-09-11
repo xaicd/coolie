@@ -141,6 +141,31 @@ optional text external references.
 API routes: `business-systems` (GET list / POST create / GET+PATCH `/:systemId`)
 and `sub-projects` (GET list / POST create / PATCH `/:subProjectId`).
 
+## O4b (LLM evaluation / simulation) scope
+
+Aligned with the DigitalStaff AIP/eval models:
+
+- **Prompt templates** (`ontology_prompt_templates`): versioned, parameterized prompts.
+- **Golden datasets** (`ontology_golden_datasets`): input/expected-output eval sets.
+- **AIP logics** (`ontology_aip_logics`): LLM logic pipelines (steps of type
+  llm_call/transform/condition/output) with context + model config.
+- **Evals** (`ontology_evals`): eval runs (accuracy/latency/token_cost/…) with
+  score + metrics, referencing a prompt template + golden dataset.
+- **Simulation scenarios** (`ontology_simulation_scenarios`): multi-strategy
+  business simulation with results + recommended strategy.
+
+## O6b (UModel unified observability graph) scope
+
+A second graph (Alibaba UModel style), independent of the ontology metamodel:
+
+- **Entities** (`ontology_umodel_entities`): 16 entity types (requirement/task/
+  agent/service/incident/…), state, telemetry bindings, semantic tags.
+- **Links** (`ontology_umodel_links`): 27 relationship types (DECOMPOSES_TO/
+  PRODUCES/DEPENDS_ON/…), direction, strength, discovery provenance.
+- **Entity sets** (`ontology_umodel_entity_sets`): layered grouping
+  (infrastructure/platform/application/business).
+- **Telemetry** (`ontology_umodel_telemetry`): per-entity log/trace/event/metric records.
+
 ## O5 (consumption interface) scope
 
 Exposes the ontology to agents as tools via `ctx.tools.register` (requires the
