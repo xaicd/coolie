@@ -5,5 +5,34 @@
       "description": "通过创建公司开始。",
       "newCompany": "新公司"
     }
+  },
+  "nav": {
+    "newTask": "新建任务",
+    "search": "搜索",
+    "dashboard": "仪表盘",
+    "inbox": "收件箱",
+    "decisions": "决策",
+    "status": "状态",
+    "conferenceRoom": "会议室",
+    "sectionWork": "工作",
+    "tasks": "任务",
+    "projects": "项目",
+    "routines": "例行任务",
+    "artifacts": "产物",
+    "cases": "案例",
+    "pipelines": "流水线",
+    "goals": "目标",
+    "workspaces": "工作区",
+    "sectionOrg": "组织",
+    "agents": "智能体",
+    "skills": "技能",
+    "connectors": "连接器",
+    "audit": "审计",
+    "sectionOrganization": "组织",
+    "org": "组织架构",
+    "timeline": "时间线",
+    "costs": "成本",
+    "activity": "活动",
+    "settings": "设置"
   }
 }

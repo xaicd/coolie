@@ -5,5 +5,34 @@
       "description": "Mulai dengan membuat perusahaan.",
       "newCompany": "Perusahaan Baru"
     }
+  },
+  "nav": {
+    "newTask": "New Task",
+    "search": "Search",
+    "dashboard": "Dashboard",
+    "inbox": "Inbox",
+    "decisions": "Decisions",
+    "status": "Status",
+    "conferenceRoom": "Conference Room",
+    "sectionWork": "Work",
+    "tasks": "Tasks",
+    "projects": "Projects",
+    "routines": "Routines",
+    "artifacts": "Artifacts",
+    "cases": "Cases",
+    "pipelines": "Pipelines",
+    "goals": "Goals",
+    "workspaces": "Workspaces",
+    "sectionOrg": "Org",
+    "agents": "Agents",
+    "skills": "Skills",
+    "connectors": "Connectors",
+    "audit": "Audit",
+    "sectionOrganization": "Organization",
+    "org": "Org",
+    "timeline": "Timeline",
+    "costs": "Costs",
+    "activity": "Activity",
+    "settings": "Settings"
   }
 }
