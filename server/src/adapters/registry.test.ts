@@ -69,6 +69,7 @@ describe("built-in runtime connection tool delivery", () => {
     ["pi_local", "environment"],
     ["process", "environment"],
     ["http", "invocation_context"],
+    ["coolie_native", "invocation_context"],
   ] as const);
 
   it("requires every built-in adapter to declare its expected delivery strategy", () => {
