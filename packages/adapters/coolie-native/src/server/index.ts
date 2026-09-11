@@ -6,13 +6,26 @@ import type {
   AdapterEnvironmentTestResult,
 } from "@paperclipai/adapter-utils";
 import { StubNativeEngine, type NativeEngine } from "../engine.js";
+import { OpenAiCompatibleEngine } from "../openai-compatible-engine.js";
 
 export const COOLIE_NATIVE_ADAPTER_TYPE = "coolie_native";
 
 /**
- * 引擎注入点:骨架阶段用 Stub;将来把真实 native 引擎实现成 NativeEngine 接口后替换这里。
+ * 引擎选择:
+ *  - 默认 StubNativeEngine(确定性、无外部依赖,验证调度闭环)。
+ *  - 当配置了 API key(env COOLIE_NATIVE_API_KEY / OPENAI_API_KEY,或 agent adapterConfig.apiKey)
+ *    时,用 OpenAiCompatibleEngine 直接调 OpenAI 兼容端点(支持 DeepSeek/Qwen/Kimi 等国内模型)。
+ * 将来真实 native ReAct 引擎实现同一 NativeEngine 接口替换即可,adapter 契约不变。
  */
-let engine: NativeEngine = new StubNativeEngine();
+function selectDefaultEngine(): NativeEngine {
+  const hasKey =
+    typeof process.env.COOLIE_NATIVE_API_KEY === "string" && process.env.COOLIE_NATIVE_API_KEY.trim() !== "";
+  const hasOpenAiKey =
+    typeof process.env.OPENAI_API_KEY === "string" && process.env.OPENAI_API_KEY.trim() !== "";
+  return hasKey || hasOpenAiKey ? new OpenAiCompatibleEngine() : new StubNativeEngine();
+}
+
+let engine: NativeEngine = selectDefaultEngine();
 
 /** 供后续替换真实引擎(或测试注入)。 */
 export function setNativeEngine(next: NativeEngine): void {
