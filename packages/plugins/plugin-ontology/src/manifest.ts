@@ -356,6 +356,14 @@ const manifest: PaperclipPluginManifestV1 = {
       companyResolution: { from: "body", key: "companyId" },
     },
     {
+      routeKey: "ingest-cognition-shard",
+      method: "POST",
+      path: "/cognition-jobs/:jobId/ingest-shard",
+      auth: "board",
+      capability: "api.routes.register",
+      companyResolution: { from: "body", key: "companyId" },
+    },
+    {
       routeKey: "list-datasets",
       method: "GET",
       path: "/datasets",

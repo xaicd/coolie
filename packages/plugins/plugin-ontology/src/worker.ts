@@ -11,6 +11,7 @@ import {
   type GraphStore,
   type ImpactDirection,
 } from "./graph/GraphStore.js";
+import { extractRepoDraft } from "./cognition/AstExtractor.js";
 import type {
   ActionKind,
   ActionTypeStatus,
@@ -869,6 +870,34 @@ const plugin = definePlugin({
         });
         if (!job) return { status: 404, body: { error: "Cognition job not found" } };
         return { body: { job } };
+      }
+
+      case "ingest-cognition-shard": {
+        // Scan the shard files with the AST extractor and store the resulting
+        // draft (seed node/relation/action types) + coverage on the job.
+        const body = optionalRecord(input.body) ?? {};
+        const jobId = requireString(input.params.jobId, "jobId");
+        const rawFiles = Array.isArray(body.files) ? body.files : [];
+        const files = rawFiles
+          .map((f) => optionalRecord(f))
+          .filter((f): f is Record<string, unknown> => f !== undefined && typeof f.path === "string")
+          .map((f) => ({ path: String(f.path), content: typeof f.content === "string" ? f.content : "" }));
+        const draft = extractRepoDraft(files);
+        const job = await store.setCognitionDraft(companyId, jobId, {
+          draftPreview: { coverage: draft.coverage },
+          seedNodeTypes: draft.seedNodeTypes,
+          seedRelationTypes: draft.seedRelationTypes,
+          seedActions: draft.seedActions,
+        });
+        if (!job) return { status: 404, body: { error: "Cognition job not found" } };
+        await store.recordCognitionCoverage(companyId, jobId, {
+          entityCount: draft.coverage.entityCount,
+          relationCount: draft.coverage.relationCount,
+          actionCount: draft.coverage.actionCount,
+          sqlFiles: draft.coverage.sqlFiles,
+          apiFiles: draft.coverage.apiFiles,
+        });
+        return { body: { job, coverage: draft.coverage } };
       }
 
       case "publish-cognition-job": {
