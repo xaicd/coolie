@@ -217,3 +217,43 @@ export const COGNITION_PROGRESS_BY_STATUS: Record<CognitionJobStatus, number> = 
   completed: 100,
   failed: 0,
 };
+
+
+// ---------------------------------------------------------------------------
+// O4 — data pipeline (DigitalStaff Dataset / Connector / Transform parity)
+// ---------------------------------------------------------------------------
+
+/** Dataset storage format (DS DatasetFormat). */
+export const DATASET_FORMATS = ["csv", "parquet", "json", "database_table"] as const;
+export type DatasetFormat = (typeof DATASET_FORMATS)[number];
+
+/** Dataset lifecycle (DS DatasetLifecycleState). */
+export const DATASET_LIFECYCLE_STATES = ["draft", "active", "deprecated", "archived"] as const;
+export type DatasetLifecycleState = (typeof DATASET_LIFECYCLE_STATES)[number];
+
+/** Data connector source type (DS ConnectorType). */
+export const CONNECTOR_TYPES = ["mysql", "postgresql", "mongodb", "rest-api", "s3"] as const;
+export type ConnectorType = (typeof CONNECTOR_TYPES)[number];
+
+/** Connector runtime status (DS ConnectorStatus). */
+export const CONNECTOR_STATUSES = [
+  "connected",
+  "disconnected",
+  "error",
+  "reconnecting",
+  "healthy",
+  "unhealthy",
+] as const;
+export type ConnectorStatus = (typeof CONNECTOR_STATUSES)[number];
+
+/** Incremental sync strategy (DS SyncStrategy). */
+export const SYNC_STRATEGIES = ["cdc", "timestamp", "cursor"] as const;
+export type SyncStrategy = (typeof SYNC_STRATEGIES)[number];
+
+/** Transform runtime (DS TransformType). */
+export const TRANSFORM_TYPES = ["sql", "python"] as const;
+export type TransformType = (typeof TRANSFORM_TYPES)[number];
+
+/** Transform lifecycle (DS TransformStatus). */
+export const TRANSFORM_STATUSES = ["draft", "active", "deprecated"] as const;
+export type TransformStatus = (typeof TRANSFORM_STATUSES)[number];

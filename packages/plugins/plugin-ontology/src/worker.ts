@@ -16,10 +16,17 @@ import type {
   ActionTypeStatus,
   CognitionJobStatus,
   CognitionScale,
+  ConnectorStatus,
+  ConnectorType,
+  DatasetFormat,
+  DatasetLifecycleState,
   DomainLifecycleState,
   FunctionStatus,
   FunctionType,
   NodeLayer,
+  SyncStrategy,
+  TransformStatus,
+  TransformType,
 } from "./enums.js";
 
 let activeContext: PluginContext | null = null;
@@ -859,6 +866,173 @@ const plugin = definePlugin({
         } catch (err) {
           return { status: 422, body: { error: String((err as Error)?.message ?? err) } };
         }
+      }
+
+      case "list-datasets": {
+        const datasets = await store.listDatasets(
+          companyId,
+          requireString(queryString(input.query.domainId), "domainId"),
+        );
+        return { body: { datasets } };
+      }
+
+      case "create-dataset": {
+        const body = optionalRecord(input.body) ?? {};
+        const dataset = await store.createDataset({
+          companyId,
+          domainId: requireString(body.domainId, "domainId"),
+          key: requireString(body.key, "key"),
+          name: requireString(body.name, "name"),
+          description: typeof body.description === "string" ? body.description : undefined,
+          format: typeof body.format === "string" ? (body.format as DatasetFormat) : undefined,
+          dataSchema: optionalRecord(body.dataSchema),
+          storageConfig: optionalRecord(body.storageConfig),
+          syncConfig: optionalRecord(body.syncConfig),
+        });
+        return { status: 201, body: { dataset } };
+      }
+
+      case "update-dataset": {
+        const body = optionalRecord(input.body) ?? {};
+        const dataset = await store.updateDataset(
+          companyId,
+          requireString(input.params.datasetId, "datasetId"),
+          {
+            name: typeof body.name === "string" ? body.name : undefined,
+            description: typeof body.description === "string" ? body.description : undefined,
+            format: typeof body.format === "string" ? (body.format as DatasetFormat) : undefined,
+            dataSchema: optionalRecord(body.dataSchema),
+            storageConfig: optionalRecord(body.storageConfig),
+            syncConfig: optionalRecord(body.syncConfig),
+            lifecycleState:
+              typeof body.lifecycleState === "string"
+                ? (body.lifecycleState as DatasetLifecycleState)
+                : undefined,
+            metadata: optionalRecord(body.metadata),
+          },
+        );
+        if (!dataset) return { status: 404, body: { error: "Dataset not found" } };
+        return { body: { dataset } };
+      }
+
+      case "list-connectors": {
+        const connectors = await store.listConnectors(
+          companyId,
+          requireString(queryString(input.query.domainId), "domainId"),
+        );
+        return { body: { connectors } };
+      }
+
+      case "create-connector": {
+        const body = optionalRecord(input.body) ?? {};
+        const connector = await store.createConnector({
+          companyId,
+          domainId: requireString(body.domainId, "domainId"),
+          key: requireString(body.key, "key"),
+          name: requireString(body.name, "name"),
+          connectorType: requireString(body.connectorType, "connectorType") as ConnectorType,
+          datasetId: typeof body.datasetId === "string" ? body.datasetId : null,
+          config: optionalRecord(body.config),
+          syncSchedule: typeof body.syncSchedule === "string" ? body.syncSchedule : null,
+          syncStrategy: typeof body.syncStrategy === "string" ? (body.syncStrategy as SyncStrategy) : null,
+        });
+        return { status: 201, body: { connector } };
+      }
+
+      case "update-connector": {
+        const body = optionalRecord(input.body) ?? {};
+        const connector = await store.updateConnector(
+          companyId,
+          requireString(input.params.connectorId, "connectorId"),
+          {
+            name: typeof body.name === "string" ? body.name : undefined,
+            datasetId: "datasetId" in body ? (body.datasetId as string | null) : undefined,
+            config: optionalRecord(body.config),
+            syncSchedule: "syncSchedule" in body ? (body.syncSchedule as string | null) : undefined,
+            syncStrategy: "syncStrategy" in body ? (body.syncStrategy as SyncStrategy | null) : undefined,
+            status: typeof body.status === "string" ? (body.status as ConnectorStatus) : undefined,
+            syncState: optionalRecord(body.syncState),
+            lastError: "lastError" in body ? (body.lastError as string | null) : undefined,
+            metadata: optionalRecord(body.metadata),
+          },
+        );
+        if (!connector) return { status: 404, body: { error: "Connector not found" } };
+        return { body: { connector } };
+      }
+
+      case "list-transforms": {
+        const transforms = await store.listTransforms(
+          companyId,
+          requireString(queryString(input.query.domainId), "domainId"),
+        );
+        return { body: { transforms } };
+      }
+
+      case "create-transform": {
+        const body = optionalRecord(input.body) ?? {};
+        const transform = await store.createTransform({
+          companyId,
+          domainId: requireString(body.domainId, "domainId"),
+          key: requireString(body.key, "key"),
+          name: requireString(body.name, "name"),
+          description: typeof body.description === "string" ? body.description : undefined,
+          transformType:
+            typeof body.transformType === "string" ? (body.transformType as TransformType) : undefined,
+          inputDatasetIds: Array.isArray(body.inputDatasetIds)
+            ? (body.inputDatasetIds as string[])
+            : undefined,
+          outputDatasetId: typeof body.outputDatasetId === "string" ? body.outputDatasetId : null,
+          code: typeof body.code === "string" ? body.code : undefined,
+          config: optionalRecord(body.config),
+        });
+        return { status: 201, body: { transform } };
+      }
+
+      case "update-transform": {
+        const body = optionalRecord(input.body) ?? {};
+        const transform = await store.updateTransform(
+          companyId,
+          requireString(input.params.transformId, "transformId"),
+          {
+            name: typeof body.name === "string" ? body.name : undefined,
+            description: typeof body.description === "string" ? body.description : undefined,
+            transformType:
+              typeof body.transformType === "string" ? (body.transformType as TransformType) : undefined,
+            inputDatasetIds: Array.isArray(body.inputDatasetIds)
+              ? (body.inputDatasetIds as string[])
+              : undefined,
+            outputDatasetId:
+              "outputDatasetId" in body ? (body.outputDatasetId as string | null) : undefined,
+            code: typeof body.code === "string" ? body.code : undefined,
+            config: optionalRecord(body.config),
+            status: typeof body.status === "string" ? (body.status as TransformStatus) : undefined,
+            markExecuted: body.markExecuted === true,
+            metadata: optionalRecord(body.metadata),
+          },
+        );
+        if (!transform) return { status: 404, body: { error: "Transform not found" } };
+        return { body: { transform } };
+      }
+
+      case "list-package-installs": {
+        const installs = await store.listPackageInstalls(
+          companyId,
+          requireString(queryString(input.query.domainId), "domainId"),
+        );
+        return { body: { packageInstalls: installs } };
+      }
+
+      case "create-package-install": {
+        const body = optionalRecord(input.body) ?? {};
+        const install = await store.createPackageInstall({
+          companyId,
+          domainId: requireString(body.domainId, "domainId"),
+          packageId: requireString(body.packageId, "packageId"),
+          version: typeof body.version === "string" ? body.version : undefined,
+          installedBy: typeof body.installedBy === "string" ? body.installedBy : undefined,
+          result: optionalRecord(body.result),
+        });
+        return { status: 201, body: { packageInstall: install } };
       }
 
       default:

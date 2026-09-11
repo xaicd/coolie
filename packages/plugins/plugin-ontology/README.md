@@ -98,6 +98,26 @@ publishes the draft as real building blocks. Mirrors the DigitalStaff
 API routes: `cognition-jobs` (GET list / POST create / GET `/:jobId`), plus
 `/:jobId/transition`, `/:jobId/shards`, `/:jobId/draft`, `/:jobId/publish`.
 
+## O4 (data pipeline) scope
+
+Foundry-style data integration, aligned with the DigitalStaff data models
+(the ontology data-asset first-class citizens):
+
+- **Datasets** (`ontology_datasets`): typed, versioned data assets — format
+  (csv/parquet/json/database_table), schema, lifecycle (draft/active/deprecated/
+  archived), storage/sync config, stats.
+- **Connectors** (`ontology_connectors`): external source ingestion — type
+  (mysql/postgresql/mongodb/rest-api/s3) bound to a dataset, sync strategy
+  (cdc/timestamp/cursor), status (connected/disconnected/error/reconnecting/
+  healthy/unhealthy), sync-state checkpoint.
+- **Transforms** (`ontology_transforms`): SQL/Python DAG steps with input
+  dataset(s) → output dataset, code, config, status, last-executed.
+- **Package installs** (`ontology_package_installs`): ontology package
+  marketplace install records + result (node types / relations added).
+
+API routes: `datasets`, `connectors`, `transforms` (GET/POST + PATCH `/:id`)
+and `package-installs` (GET/POST).
+
 ## O5 (consumption interface) scope
 
 Exposes the ontology to agents as tools via `ctx.tools.register` (requires the
