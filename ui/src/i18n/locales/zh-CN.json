@@ -68,5 +68,28 @@
     "recentActivity": "近期活动",
     "recentTasks": "近期任务",
     "noTasksYet": "暂无任务。"
+  },
+  "issues": {
+    "breadcrumb": "任务",
+    "selectOrgToView": "请选择一个组织以查看任务。",
+    "selectCompanyToView": "请选择一家公司以查看任务。"
+  },
+  "companies": {
+    "breadcrumb": "组织",
+    "newOrganization": "新建组织",
+    "loading": "正在加载组织…",
+    "rename": "重命名",
+    "unarchive": "取消归档",
+    "deleteOrganization": "删除组织",
+    "agentCount_one": "{{count}} 个智能体",
+    "agentCount_other": "{{count}} 个智能体",
+    "taskCount_one": "{{count}} 个任务",
+    "taskCount_other": "{{count}} 个任务",
+    "unlimitedBudget": "无限预算",
+    "created": "创建于 {{time}}",
+    "deleteConfirm": "删除此组织及其所有数据?此操作无法撤销。",
+    "cancel": "取消",
+    "delete": "删除",
+    "deleting": "删除中…"
   }
 }

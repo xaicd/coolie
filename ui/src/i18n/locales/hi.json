@@ -68,5 +68,28 @@
     "recentActivity": "Recent Activity",
     "recentTasks": "Recent Tasks",
     "noTasksYet": "No tasks yet."
+  },
+  "issues": {
+    "breadcrumb": "Tasks",
+    "selectOrgToView": "Select an organization to view tasks.",
+    "selectCompanyToView": "Select a company to view tasks."
+  },
+  "companies": {
+    "breadcrumb": "Organizations",
+    "newOrganization": "New Organization",
+    "loading": "Loading organizations...",
+    "rename": "Rename",
+    "unarchive": "Unarchive",
+    "deleteOrganization": "Delete Organization",
+    "agentCount_one": "{{count}} agent",
+    "agentCount_other": "{{count}} agents",
+    "taskCount_one": "{{count}} task",
+    "taskCount_other": "{{count}} tasks",
+    "unlimitedBudget": "Unlimited budget",
+    "created": "Created {{time}}",
+    "deleteConfirm": "Delete this organization and all its data? This cannot be undone.",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "deleting": "Deleting…"
   }
 }
