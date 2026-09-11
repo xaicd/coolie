@@ -8,6 +8,7 @@ import { useBreadcrumbs } from "../context/BreadcrumbContext";
 import { useCompany } from "../context/CompanyContext";
 import { queryKeys } from "../lib/queryKeys";
 import { InboxAgentPolicyControl } from "@/components/InboxAgentPolicyControl";
+import { LanguageSwitcher } from "@/components/LanguageSwitcher";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -269,6 +270,16 @@ export function ProfileSettings() {
             </Button>
           </div>
         </form>
+
+        <Card className="space-y-4 rounded-(--rad-24) border-border/70 p-6">
+          <div className="space-y-1">
+            <h2 className="text-base font-semibold">Language</h2>
+            <p className="text-sm text-muted-foreground">
+              Choose the interface language. Your choice is saved on this device.
+            </p>
+          </div>
+          <LanguageSwitcher />
+        </Card>
 
         <InboxAgentPolicyControl companyId={selectedCompanyId} />
       </section>
