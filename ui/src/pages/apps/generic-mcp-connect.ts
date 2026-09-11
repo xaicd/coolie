@@ -109,7 +109,7 @@ export function genericConnectGuidance(
     case "remote_http_private_endpoint":
       return {
         title: "That address is inside a private network",
-        body: "This Paperclip is reachable from the internet, so it won't call addresses on your local network. Use the server's public address instead.",
+        body: "This Coolie is reachable from the internet, so it won't call addresses on your local network. Use the server's public address instead.",
         focus: "url",
       };
     case "remote_http_dns_failed":
@@ -146,7 +146,7 @@ export function genericConnectGuidance(
     case "oauth_redirect_origin_unsupported":
     case "oauth_redirect_uri_invalid":
       return {
-        title: "This Paperclip needs a public HTTPS address first",
+        title: "This Coolie needs a public HTTPS address first",
         body: "Sign-in sends the operator back to Paperclip, so this instance has to be reachable over HTTPS. Ask your Paperclip admin to configure it.",
         focus: "deployment",
       };
