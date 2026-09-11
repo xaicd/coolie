@@ -10,6 +10,7 @@ import {
   type GraphStore,
   type ImpactDirection,
 } from "./graph/GraphStore.js";
+import type { DomainLifecycleState, FunctionStatus, FunctionType } from "./enums.js";
 
 let activeContext: PluginContext | null = null;
 let graphStore: GraphStore | null = null;
@@ -453,6 +454,95 @@ const plugin = definePlugin({
           parseDepth(queryString(input.query.nodeLimit)),
         );
         return { body: { graph } };
+      }
+
+      case "transition-domain": {
+        const body = optionalRecord(input.body) ?? {};
+        try {
+          const domain = await store.transitionDomainLifecycle(
+            companyId,
+            requireString(input.params.domainId, "domainId"),
+            requireString(body.to, "to") as DomainLifecycleState,
+            typeof body.actor === "string" ? body.actor : "system",
+          );
+          if (!domain) return { status: 404, body: { error: "Domain not found" } };
+          return { body: { domain } };
+        } catch (err) {
+          return { status: 422, body: { error: String((err as Error)?.message ?? err) } };
+        }
+      }
+
+      case "snapshot-domain": {
+        const body = optionalRecord(input.body) ?? {};
+        const snapshot = await store.snapshotDomain(
+          companyId,
+          requireString(input.params.domainId, "domainId"),
+          typeof body.description === "string" ? body.description : "",
+          typeof body.createdBy === "string" ? body.createdBy : "system",
+        );
+        if (!snapshot) return { status: 404, body: { error: "Domain not found" } };
+        return { status: 201, body: { snapshot } };
+      }
+
+      case "list-domain-snapshots": {
+        const snapshots = await store.listDomainSnapshots(
+          companyId,
+          requireString(input.params.domainId, "domainId"),
+        );
+        return { body: { snapshots } };
+      }
+
+      case "list-functions": {
+        const functions = await store.listFunctions(
+          companyId,
+          requireString(queryString(input.query.domainId), "domainId"),
+        );
+        return { body: { functions } };
+      }
+
+      case "create-function": {
+        const body = optionalRecord(input.body) ?? {};
+        const fn = await store.createFunction({
+          companyId,
+          domainId: requireString(body.domainId, "domainId"),
+          name: requireString(body.name, "name"),
+          type: typeof body.type === "string" ? (body.type as FunctionType) : undefined,
+          version: typeof body.version === "string" ? body.version : undefined,
+          description: typeof body.description === "string" ? body.description : undefined,
+          inputSchema: optionalRecord(body.inputSchema),
+          outputSchema: optionalRecord(body.outputSchema),
+          implementation: optionalRecord(body.implementation),
+          permissions: optionalRecord(body.permissions),
+        });
+        return { status: 201, body: { function: fn } };
+      }
+
+      case "update-function": {
+        const body = optionalRecord(input.body) ?? {};
+        const fn = await store.updateFunction(
+          companyId,
+          requireString(input.params.functionId, "functionId"),
+          {
+            description: typeof body.description === "string" ? body.description : undefined,
+            inputSchema: optionalRecord(body.inputSchema),
+            outputSchema: optionalRecord(body.outputSchema),
+            implementation: optionalRecord(body.implementation),
+            permissions: optionalRecord(body.permissions),
+            status: typeof body.status === "string" ? (body.status as FunctionStatus) : undefined,
+            metadata: optionalRecord(body.metadata),
+          },
+        );
+        if (!fn) return { status: 404, body: { error: "Function not found" } };
+        return { body: { function: fn } };
+      }
+
+      case "list-audit-logs": {
+        const logs = await store.listAuditLogs(
+          companyId,
+          requireString(queryString(input.query.domainId), "domainId"),
+          parseDepth(queryString(input.query.limit)),
+        );
+        return { body: { auditLogs: logs } };
       }
 
       case "find-path": {
