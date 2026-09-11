@@ -85,7 +85,90 @@ export interface ImpactedNode {
 
 export type ImpactDirection = "downstream" | "upstream";
 
+// ---------------------------------------------------------------------------
+// O1 modeling types (domain / node-type / relation-type management + versions)
+// ---------------------------------------------------------------------------
+
+export interface OntologyDomainUpdate {
+  displayName?: string;
+  description?: string | null;
+  status?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyNodeTypeInput {
+  companyId: string;
+  domainId: string;
+  key: string;
+  displayName: string;
+  description?: string | null;
+  propertiesSchema?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyNodeTypeUpdate {
+  displayName?: string;
+  description?: string | null;
+  propertiesSchema?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyNodeTypeRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  key: string;
+  display_name: string;
+  description: string | null;
+}
+
+export interface OntologyRelationTypeInput {
+  companyId: string;
+  domainId: string;
+  key: string;
+  displayName: string;
+  description?: string | null;
+  directed?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyRelationTypeUpdate {
+  displayName?: string;
+  description?: string | null;
+  directed?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyRelationTypeRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  key: string;
+  display_name: string;
+  description: string | null;
+  directed: boolean;
+}
+
+export interface GraphSnapshot {
+  domainId: string;
+  counts: {
+    nodeTypes: number;
+    relationTypes: number;
+    nodes: number;
+    edges: number;
+  };
+  nodes: Array<{ id: string; key: string; label: string; nodeTypeId: string | null }>;
+  edges: Array<{
+    id: string;
+    sourceNodeId: string;
+    targetNodeId: string;
+    relationKey: string | null;
+    weight: number;
+  }>;
+}
+
 export interface GraphStore {
+  // O0 — instance graph + traversal
   createDomain(input: OntologyDomainInput): Promise<OntologyDomainRow>;
   createNode(input: OntologyNodeInput): Promise<OntologyNodeRow>;
   createEdge(input: OntologyEdgeInput): Promise<OntologyEdgeRow>;
@@ -101,6 +184,33 @@ export interface GraphStore {
     direction?: ImpactDirection;
     maxDepth?: number;
   }): Promise<ImpactedNode[]>;
+
+  // O1 — modeling core (domains / node-types / relation-types + versions)
+  listDomains(companyId: string): Promise<OntologyDomainRow[]>;
+  getDomain(companyId: string, domainId: string): Promise<OntologyDomainRow | null>;
+  updateDomain(
+    companyId: string,
+    domainId: string,
+    update: OntologyDomainUpdate,
+  ): Promise<OntologyDomainRow | null>;
+
+  createNodeType(input: OntologyNodeTypeInput): Promise<OntologyNodeTypeRow>;
+  listNodeTypes(companyId: string, domainId: string): Promise<OntologyNodeTypeRow[]>;
+  updateNodeType(
+    companyId: string,
+    nodeTypeId: string,
+    update: OntologyNodeTypeUpdate,
+  ): Promise<OntologyNodeTypeRow | null>;
+
+  createRelationType(input: OntologyRelationTypeInput): Promise<OntologyRelationTypeRow>;
+  listRelationTypes(companyId: string, domainId: string): Promise<OntologyRelationTypeRow[]>;
+  updateRelationType(
+    companyId: string,
+    relationTypeId: string,
+    update: OntologyRelationTypeUpdate,
+  ): Promise<OntologyRelationTypeRow | null>;
+
+  getGraphSnapshot(companyId: string, domainId: string, nodeLimit?: number): Promise<GraphSnapshot>;
 }
 
 const DEFAULT_MAX_DEPTH = 12;
@@ -294,5 +404,287 @@ export class PostgresGraphStore implements GraphStore {
       [params.companyId, params.rootNodeId, maxDepth],
     );
     return rows.map((row) => ({ nodeId: row.node_id, label: row.label, depth: Number(row.depth) }));
+  }
+
+  // -------------------------------------------------------------------------
+  // O1 — modeling core
+  // -------------------------------------------------------------------------
+
+  private static readonly DOMAIN_COLS =
+    "id, company_id, slug, display_name, description, status, version";
+
+  async listDomains(companyId: string): Promise<OntologyDomainRow[]> {
+    return this.db.query<OntologyDomainRow>(
+      `SELECT ${PostgresGraphStore.DOMAIN_COLS}
+         FROM ${this.table("ontology_domains")}
+        WHERE company_id = $1
+        ORDER BY created_at ASC`,
+      [companyId],
+    );
+  }
+
+  async getDomain(companyId: string, domainId: string): Promise<OntologyDomainRow | null> {
+    const rows = await this.db.query<OntologyDomainRow>(
+      `SELECT ${PostgresGraphStore.DOMAIN_COLS}
+         FROM ${this.table("ontology_domains")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, domainId],
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Update mutable domain fields and bump its schema version. Only provided
+   * fields change; version always increments so consumers can detect edits.
+   */
+  async updateDomain(
+    companyId: string,
+    domainId: string,
+    update: OntologyDomainUpdate,
+  ): Promise<OntologyDomainRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_domains")}
+          SET display_name = COALESCE($3, display_name),
+              description   = CASE WHEN $4::boolean THEN $5 ELSE description END,
+              status        = COALESCE($6, status),
+              metadata      = CASE WHEN $7::boolean THEN $8::jsonb ELSE metadata END,
+              version       = version + 1,
+              updated_at    = now()
+        WHERE company_id = $1 AND id = $2`,
+      [
+        companyId,
+        domainId,
+        update.displayName ?? null,
+        update.description !== undefined,
+        update.description ?? null,
+        update.status ?? null,
+        update.metadata !== undefined,
+        JSON.stringify(update.metadata ?? {}),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    return this.getDomain(companyId, domainId);
+  }
+
+  private static readonly NODE_TYPE_COLS =
+    "id, company_id, domain_id, key, display_name, description";
+
+  async createNodeType(input: OntologyNodeTypeInput): Promise<OntologyNodeTypeRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_node_types")}
+         (id, company_id, domain_id, key, display_name, description, properties_schema, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.key,
+        input.displayName,
+        input.description ?? null,
+        JSON.stringify(input.propertiesSchema ?? {}),
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyNodeTypeRow>(
+      `SELECT ${PostgresGraphStore.NODE_TYPE_COLS}
+         FROM ${this.table("ontology_node_types")}
+        WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listNodeTypes(companyId: string, domainId: string): Promise<OntologyNodeTypeRow[]> {
+    return this.db.query<OntologyNodeTypeRow>(
+      `SELECT ${PostgresGraphStore.NODE_TYPE_COLS}
+         FROM ${this.table("ontology_node_types")}
+        WHERE company_id = $1 AND domain_id = $2
+        ORDER BY created_at ASC`,
+      [companyId, domainId],
+    );
+  }
+
+  async updateNodeType(
+    companyId: string,
+    nodeTypeId: string,
+    update: OntologyNodeTypeUpdate,
+  ): Promise<OntologyNodeTypeRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_node_types")}
+          SET display_name      = COALESCE($3, display_name),
+              description        = CASE WHEN $4::boolean THEN $5 ELSE description END,
+              properties_schema  = CASE WHEN $6::boolean THEN $7::jsonb ELSE properties_schema END,
+              metadata           = CASE WHEN $8::boolean THEN $9::jsonb ELSE metadata END,
+              updated_at         = now()
+        WHERE company_id = $1 AND id = $2`,
+      [
+        companyId,
+        nodeTypeId,
+        update.displayName ?? null,
+        update.description !== undefined,
+        update.description ?? null,
+        update.propertiesSchema !== undefined,
+        JSON.stringify(update.propertiesSchema ?? {}),
+        update.metadata !== undefined,
+        JSON.stringify(update.metadata ?? {}),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    const rows = await this.db.query<OntologyNodeTypeRow>(
+      `SELECT ${PostgresGraphStore.NODE_TYPE_COLS}
+         FROM ${this.table("ontology_node_types")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, nodeTypeId],
+    );
+    return rows[0] ?? null;
+  }
+
+  private static readonly RELATION_TYPE_COLS =
+    "id, company_id, domain_id, key, display_name, description, directed";
+
+  async createRelationType(input: OntologyRelationTypeInput): Promise<OntologyRelationTypeRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_relation_types")}
+         (id, company_id, domain_id, key, display_name, description, directed, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.key,
+        input.displayName,
+        input.description ?? null,
+        input.directed ?? true,
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyRelationTypeRow>(
+      `SELECT ${PostgresGraphStore.RELATION_TYPE_COLS}
+         FROM ${this.table("ontology_relation_types")}
+        WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listRelationTypes(companyId: string, domainId: string): Promise<OntologyRelationTypeRow[]> {
+    return this.db.query<OntologyRelationTypeRow>(
+      `SELECT ${PostgresGraphStore.RELATION_TYPE_COLS}
+         FROM ${this.table("ontology_relation_types")}
+        WHERE company_id = $1 AND domain_id = $2
+        ORDER BY created_at ASC`,
+      [companyId, domainId],
+    );
+  }
+
+  async updateRelationType(
+    companyId: string,
+    relationTypeId: string,
+    update: OntologyRelationTypeUpdate,
+  ): Promise<OntologyRelationTypeRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_relation_types")}
+          SET display_name = COALESCE($3, display_name),
+              description   = CASE WHEN $4::boolean THEN $5 ELSE description END,
+              directed      = COALESCE($6, directed),
+              metadata      = CASE WHEN $7::boolean THEN $8::jsonb ELSE metadata END,
+              updated_at    = now()
+        WHERE company_id = $1 AND id = $2`,
+      [
+        companyId,
+        relationTypeId,
+        update.displayName ?? null,
+        update.description !== undefined,
+        update.description ?? null,
+        typeof update.directed === "boolean" ? update.directed : null,
+        update.metadata !== undefined,
+        JSON.stringify(update.metadata ?? {}),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    const rows = await this.db.query<OntologyRelationTypeRow>(
+      `SELECT ${PostgresGraphStore.RELATION_TYPE_COLS}
+         FROM ${this.table("ontology_relation_types")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, relationTypeId],
+    );
+    return rows[0] ?? null;
+  }
+
+  /**
+   * Read a bounded graph snapshot for one domain: aggregate counts plus a
+   * capped list of nodes/edges for a lightweight visualization. Counts come
+   * from a single grouped query; node/edge lists are separately capped.
+   */
+  async getGraphSnapshot(
+    companyId: string,
+    domainId: string,
+    nodeLimit = 500,
+  ): Promise<GraphSnapshot> {
+    const limit = Number.isFinite(nodeLimit) ? Math.max(1, Math.min(Math.floor(nodeLimit), 2000)) : 500;
+
+    const countRows = await this.db.query<{
+      node_types: number;
+      relation_types: number;
+      nodes: number;
+      edges: number;
+    }>(
+      `SELECT
+         (SELECT count(*) FROM ${this.table("ontology_node_types")} WHERE company_id = $1 AND domain_id = $2) AS node_types,
+         (SELECT count(*) FROM ${this.table("ontology_relation_types")} WHERE company_id = $1 AND domain_id = $2) AS relation_types,
+         (SELECT count(*) FROM ${this.table("ontology_nodes")} WHERE company_id = $1 AND domain_id = $2) AS nodes,
+         (SELECT count(*) FROM ${this.table("ontology_edges")} WHERE company_id = $1 AND domain_id = $2) AS edges`,
+      [companyId, domainId],
+    );
+    const counts = countRows[0] ?? { node_types: 0, relation_types: 0, nodes: 0, edges: 0 };
+
+    const nodeRows = await this.db.query<{
+      id: string;
+      key: string;
+      label: string;
+      node_type_id: string | null;
+    }>(
+      `SELECT id, key, label, node_type_id
+         FROM ${this.table("ontology_nodes")}
+        WHERE company_id = $1 AND domain_id = $2
+        ORDER BY created_at ASC
+        LIMIT $3`,
+      [companyId, domainId, limit],
+    );
+
+    const edgeRows = await this.db.query<{
+      id: string;
+      source_node_id: string;
+      target_node_id: string;
+      relation_key: string | null;
+      weight: number;
+    }>(
+      `SELECT id, source_node_id, target_node_id, relation_key, weight
+         FROM ${this.table("ontology_edges")}
+        WHERE company_id = $1 AND domain_id = $2
+        ORDER BY created_at ASC
+        LIMIT $3`,
+      [companyId, domainId, limit],
+    );
+
+    return {
+      domainId,
+      counts: {
+        nodeTypes: Number(counts.node_types),
+        relationTypes: Number(counts.relation_types),
+        nodes: Number(counts.nodes),
+        edges: Number(counts.edges),
+      },
+      nodes: nodeRows.map((n) => ({ id: n.id, key: n.key, label: n.label, nodeTypeId: n.node_type_id })),
+      edges: edgeRows.map((e) => ({
+        id: e.id,
+        sourceNodeId: e.source_node_id,
+        targetNodeId: e.target_node_id,
+        relationKey: e.relation_key,
+        weight: Number(e.weight),
+      })),
+    };
   }
 }
