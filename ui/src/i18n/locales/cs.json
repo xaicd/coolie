@@ -34,5 +34,39 @@
     "costs": "Costs",
     "activity": "Activity",
     "settings": "Settings"
+  },
+  "common": {
+    "selectOrgFirst": "Select an organization first.",
+    "all": "All"
+  },
+  "approvals": {
+    "breadcrumb": "Approvals",
+    "tabPending": "Pending",
+    "emptyPending": "No pending approvals.",
+    "emptyAll": "No approvals yet.",
+    "failedApprove": "Failed to approve",
+    "failedReject": "Failed to reject"
+  },
+  "dashboard": {
+    "breadcrumb": "Dashboard",
+    "welcomeMessage": "Welcome to Coolie. Set up your first organization and agent to get started.",
+    "getStarted": "Get Started",
+    "selectOrgToView": "Create or select an organization to view the dashboard.",
+    "noAgents": "You have no agents.",
+    "createOneHere": "Create one here",
+    "reviewAgents": "Review agents",
+    "openBudgets": "Open budgets",
+    "metricAgentsEnabled": "Agents Enabled",
+    "metricTasksInProgress": "Tasks In Progress",
+    "metricMonthSpend": "Month Spend",
+    "metricPendingApprovals": "Pending Approvals",
+    "chartRunActivity": "Run Activity",
+    "chartTasksByPriority": "Tasks by Priority",
+    "chartTasksByStatus": "Tasks by Status",
+    "chartSuccessRate": "Success Rate",
+    "chartSubtitleLast14Days": "Last 14 days",
+    "recentActivity": "Recent Activity",
+    "recentTasks": "Recent Tasks",
+    "noTasksYet": "No tasks yet."
   }
 }

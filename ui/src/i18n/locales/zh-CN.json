@@ -34,5 +34,39 @@
     "costs": "成本",
     "activity": "活动",
     "settings": "设置"
+  },
+  "common": {
+    "selectOrgFirst": "请先选择一个组织。",
+    "all": "全部"
+  },
+  "approvals": {
+    "breadcrumb": "审批",
+    "tabPending": "待处理",
+    "emptyPending": "暂无待处理的审批。",
+    "emptyAll": "暂无审批记录。",
+    "failedApprove": "批准失败",
+    "failedReject": "驳回失败"
+  },
+  "dashboard": {
+    "breadcrumb": "仪表盘",
+    "welcomeMessage": "欢迎使用 Coolie。创建您的第一个组织和智能体即可开始。",
+    "getStarted": "开始使用",
+    "selectOrgToView": "创建或选择一个组织以查看仪表盘。",
+    "noAgents": "您还没有智能体。",
+    "createOneHere": "点此创建",
+    "reviewAgents": "查看智能体",
+    "openBudgets": "打开预算",
+    "metricAgentsEnabled": "已启用智能体",
+    "metricTasksInProgress": "进行中的任务",
+    "metricMonthSpend": "本月支出",
+    "metricPendingApprovals": "待处理审批",
+    "chartRunActivity": "运行活动",
+    "chartTasksByPriority": "按优先级分布的任务",
+    "chartTasksByStatus": "按状态分布的任务",
+    "chartSuccessRate": "成功率",
+    "chartSubtitleLast14Days": "最近 14 天",
+    "recentActivity": "近期活动",
+    "recentTasks": "近期任务",
+    "noTasksYet": "暂无任务。"
   }
 }
