@@ -21,6 +21,12 @@ export type {
   OntologyAuditLogInput,
   OntologyAuditLogRow,
   OntologyDomainSnapshotRow,
+  OntologyInterfaceInput,
+  OntologyInterfaceRow,
+  OntologyInterfaceUpdate,
+  OntologyActionTypeInput,
+  OntologyActionTypeRow,
+  OntologyActionTypeUpdate,
   GraphSnapshot,
   PathHop,
   ImpactedNode,
@@ -39,6 +45,10 @@ export {
   NODE_STATE_TRANSITIONS,
   isValidDomainTransition,
   isValidNodeTransition,
+  ONTOLOGY_BUILDING_BLOCKS,
+  ACTION_KINDS,
+  ACTION_TYPE_STATUSES,
+  NODE_LAYERS,
 } from "./enums.js";
 export type {
   DomainLifecycleState,
@@ -49,4 +59,8 @@ export type {
   FunctionRuntime,
   LinkCardinality,
   AuditEventType,
+  OntologyBuildingBlock,
+  ActionKind,
+  ActionTypeStatus,
+  NodeLayer,
 } from "./enums.js";

@@ -86,3 +86,61 @@ export function isValidDomainTransition(from: DomainLifecycleState, to: DomainLi
 export function isValidNodeTransition(from: NodeLifecycleState, to: NodeLifecycleState): boolean {
   return NODE_STATE_TRANSITIONS[from]?.includes(to) ?? false;
 }
+
+
+// ---------------------------------------------------------------------------
+// Palantir Foundry ontology core alignment (O2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Foundry's five primitive ontology building blocks. Mapping to plugin tables:
+ *  - object_type  -> ontology_node_types
+ *  - link_type    -> ontology_relation_types
+ *  - action_type  -> ontology_action_types
+ *  - function     -> ontology_functions
+ *  - interface    -> ontology_interfaces
+ * (Dynamic security is cross-cutting via required_permissions / permissions.)
+ */
+export const ONTOLOGY_BUILDING_BLOCKS = [
+  "object_type",
+  "link_type",
+  "action_type",
+  "function",
+  "interface",
+] as const;
+export type OntologyBuildingBlock = (typeof ONTOLOGY_BUILDING_BLOCKS)[number];
+
+/**
+ * Action type kind — what a governed transaction does (Foundry action types can
+ * create/modify/delete objects, run a function, call an external system, or
+ * notify). `composite` chains several effects.
+ */
+export const ACTION_KINDS = [
+  "create",
+  "modify",
+  "delete",
+  "function",
+  "external",
+  "notify",
+  "composite",
+] as const;
+export type ActionKind = (typeof ACTION_KINDS)[number];
+
+export const ACTION_TYPE_STATUSES = ["draft", "active", "deprecated"] as const;
+export type ActionTypeStatus = (typeof ACTION_TYPE_STATUSES)[number];
+
+/**
+ * Object-type layer — the DigitalStaff living-ontology five-layer classification
+ * folded onto Foundry object types. aggregate_root / child_entity are the entity
+ * mesh; action / state / event capture the kinetic layers when modeled as typed
+ * nodes. `generic` is an unclassified object type.
+ */
+export const NODE_LAYERS = [
+  "aggregate_root",
+  "child_entity",
+  "action",
+  "state",
+  "event",
+  "generic",
+] as const;
+export type NodeLayer = (typeof NODE_LAYERS)[number];
