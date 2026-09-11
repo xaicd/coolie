@@ -43,6 +43,8 @@ const manifest: PaperclipPluginManifestV1 = {
     "events.emit",
     "plugin.state.read",
     "plugin.state.write",
+    "ui.page.register",
+    "ui.sidebar.register",
   ],
   entrypoints: {
     worker: "./dist/worker.js",
@@ -63,6 +65,24 @@ const manifest: PaperclipPluginManifestV1 = {
     r("append-message", "POST", "/conversations/:conversationId/messages", "body"),
     r("get-context", "GET", "/conversations/:conversationId/context", "query"),
   ],
+  ui: {
+    slots: [
+      {
+        type: "sidebar",
+        id: "chat-sidebar",
+        displayName: "Chat",
+        exportName: "SidebarLink",
+        order: 30,
+      },
+      {
+        type: "page",
+        id: "chat-page",
+        displayName: "Chat",
+        exportName: "ChatPage",
+        routePath: "chat",
+      },
+    ],
+  },
 };
 
 export default manifest;
