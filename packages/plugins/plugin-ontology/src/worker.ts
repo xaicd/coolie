@@ -53,6 +53,16 @@ function parseDepth(value: string | undefined): number | undefined {
   return Number.isFinite(parsed) ? parsed : undefined;
 }
 
+/** Coerce an unknown tool-param value to a finite number, or undefined. */
+function toNumber(value: unknown): number | undefined {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value === "string") {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) return parsed;
+  }
+  return undefined;
+}
+
 const plugin = definePlugin({
   async setup(ctx) {
     activeContext = ctx;
@@ -120,6 +130,125 @@ const plugin = definePlugin({
       });
       return { relationType };
     });
+
+    // Agent-facing tools (O5 consumption interface). companyId comes from the
+    // run context, so agents can only ever query their own company's ontology.
+    ctx.tools.register(
+      "queryOntology",
+      {
+        displayName: "Query Ontology",
+        description:
+          "Query the company ontology graph. Modes: 'node', 'nodes', 'path'. Returns structured graph data.",
+        parametersSchema: {
+          type: "object",
+          properties: {
+            mode: { type: "string", enum: ["node", "nodes", "path"] },
+            domainSlug: { type: "string" },
+            nodeKey: { type: "string" },
+            sourceNodeKey: { type: "string" },
+            targetNodeKey: { type: "string" },
+            limit: { type: "number" },
+            maxDepth: { type: "number" },
+          },
+          required: ["mode", "domainSlug"],
+        },
+      },
+      async (params, runCtx) => {
+        const p = optionalRecord(params) ?? {};
+        const companyId = runCtx.companyId;
+        const domainSlug = requireString(p.domainSlug, "domainSlug");
+        const domain = await store.getDomainBySlug(companyId, domainSlug);
+        if (!domain) {
+          return { error: `Ontology domain not found: ${domainSlug}` };
+        }
+        const mode = requireString(p.mode, "mode");
+
+        if (mode === "node") {
+          const key = requireString(p.nodeKey, "nodeKey");
+          const node = await store.getNodeByKey(companyId, domain.id, key);
+          if (!node) return { error: `Node not found: ${key} in ${domainSlug}` };
+          return {
+            content: `Node ${node.key} (${node.label}) in domain ${domainSlug}.`,
+            data: { domain: { id: domain.id, slug: domain.slug }, node },
+          };
+        }
+
+        if (mode === "nodes") {
+          const nodes = await store.listNodes(companyId, domain.id, toNumber(p.limit) ?? 100);
+          return {
+            content: `Domain ${domainSlug} has ${nodes.length} node(s) (capped).`,
+            data: { domain: { id: domain.id, slug: domain.slug }, nodes },
+          };
+        }
+
+        if (mode === "path") {
+          const sourceKey = requireString(p.sourceNodeKey, "sourceNodeKey");
+          const targetKey = requireString(p.targetNodeKey, "targetNodeKey");
+          const [source, target] = await Promise.all([
+            store.getNodeByKey(companyId, domain.id, sourceKey),
+            store.getNodeByKey(companyId, domain.id, targetKey),
+          ]);
+          if (!source) return { error: `Source node not found: ${sourceKey}` };
+          if (!target) return { error: `Target node not found: ${targetKey}` };
+          const path = await store.findPath({
+            companyId,
+            sourceNodeId: source.id,
+            targetNodeId: target.id,
+            maxDepth: toNumber(p.maxDepth),
+          });
+          return {
+            content: path
+              ? `Path ${sourceKey} -> ${targetKey}: ${path.length - 1} hop(s).`
+              : `No directed path from ${sourceKey} to ${targetKey}.`,
+            data: { found: path !== null, path: path ?? [] },
+          };
+        }
+
+        return { error: `Unknown query mode: ${mode}` };
+      },
+    );
+
+    ctx.tools.register(
+      "simulateOntologyImpact",
+      {
+        displayName: "Simulate Ontology Impact",
+        description:
+          "Simulate the blast radius of a node: nodes reachable downstream (affected by) or upstream (depend on) it.",
+        parametersSchema: {
+          type: "object",
+          properties: {
+            domainSlug: { type: "string" },
+            nodeKey: { type: "string" },
+            direction: { type: "string", enum: ["downstream", "upstream"] },
+            maxDepth: { type: "number" },
+          },
+          required: ["domainSlug", "nodeKey"],
+        },
+      },
+      async (params, runCtx) => {
+        const p = optionalRecord(params) ?? {};
+        const companyId = runCtx.companyId;
+        const domainSlug = requireString(p.domainSlug, "domainSlug");
+        const domain = await store.getDomainBySlug(companyId, domainSlug);
+        if (!domain) return { error: `Ontology domain not found: ${domainSlug}` };
+
+        const nodeKey = requireString(p.nodeKey, "nodeKey");
+        const node = await store.getNodeByKey(companyId, domain.id, nodeKey);
+        if (!node) return { error: `Node not found: ${nodeKey} in ${domainSlug}` };
+
+        const direction: ImpactDirection = p.direction === "upstream" ? "upstream" : "downstream";
+        const impacted = await store.findImpact({
+          companyId,
+          rootNodeId: node.id,
+          direction,
+          maxDepth: toNumber(p.maxDepth),
+        });
+        return {
+          content: `${direction} impact of ${nodeKey}: ${impacted.length} node(s).`,
+          data: { direction, count: impacted.length, impacted },
+        };
+      },
+    );
 
     ctx.logger.info("Ontology plugin worker started", { namespace: ctx.db.namespace });
   },

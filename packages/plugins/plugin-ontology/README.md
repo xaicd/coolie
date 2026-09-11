@@ -27,6 +27,21 @@ core tables.
 - Table-driven modeling UI: domain list + domain detail page with metric cards
   and node/relation-type management tables.
 
+## O5 (consumption interface) scope
+
+Exposes the ontology to agents as tools via `ctx.tools.register` (requires the
+`agent.tools.register` capability). The `companyId` comes from the agent run
+context, so an agent can only ever query its own company's ontology.
+
+| Tool | Description |
+|------|-------------|
+| `queryOntology` | Query the graph — modes `node` (by domain slug + node key), `nodes` (list a domain's nodes), `path` (shortest directed hop path between two nodes by key). |
+| `simulateOntologyImpact` | Blast-radius simulation — nodes reachable downstream (affected by) or upstream (depend on) a given node. |
+
+These tools reuse the existing `GraphStore` (`findPath` / `findImpact` /
+`listNodes` / `getNodeByKey`) — no new engine. They are the dependency base for
+domain-6 (NPC factory agents) and domain-1 (ontology-driven workflows).
+
 ## API routes
 
 Mounted under the plugin API prefix:

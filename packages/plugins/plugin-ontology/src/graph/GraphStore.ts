@@ -211,6 +211,11 @@ export interface GraphStore {
   ): Promise<OntologyRelationTypeRow | null>;
 
   getGraphSnapshot(companyId: string, domainId: string, nodeLimit?: number): Promise<GraphSnapshot>;
+
+  // O5 — consumption reads (backing agent tools)
+  getDomainBySlug(companyId: string, slug: string): Promise<OntologyDomainRow | null>;
+  getNodeByKey(companyId: string, domainId: string, key: string): Promise<OntologyNodeRow | null>;
+  listNodes(companyId: string, domainId: string, limit?: number): Promise<OntologyNodeRow[]>;
 }
 
 const DEFAULT_MAX_DEPTH = 12;
@@ -686,5 +691,45 @@ export class PostgresGraphStore implements GraphStore {
         weight: Number(e.weight),
       })),
     };
+  }
+
+  // -------------------------------------------------------------------------
+  // O5 — consumption reads (backing agent tools)
+  // -------------------------------------------------------------------------
+
+  async getDomainBySlug(companyId: string, slug: string): Promise<OntologyDomainRow | null> {
+    const rows = await this.db.query<OntologyDomainRow>(
+      `SELECT ${PostgresGraphStore.DOMAIN_COLS}
+         FROM ${this.table("ontology_domains")}
+        WHERE company_id = $1 AND slug = $2`,
+      [companyId, slug],
+    );
+    return rows[0] ?? null;
+  }
+
+  async getNodeByKey(
+    companyId: string,
+    domainId: string,
+    key: string,
+  ): Promise<OntologyNodeRow | null> {
+    const rows = await this.db.query<OntologyNodeRow>(
+      `SELECT id, company_id, domain_id, node_type_id, key, label
+         FROM ${this.table("ontology_nodes")}
+        WHERE company_id = $1 AND domain_id = $2 AND key = $3`,
+      [companyId, domainId, key],
+    );
+    return rows[0] ?? null;
+  }
+
+  async listNodes(companyId: string, domainId: string, limit = 100): Promise<OntologyNodeRow[]> {
+    const capped = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 1000)) : 100;
+    return this.db.query<OntologyNodeRow>(
+      `SELECT id, company_id, domain_id, node_type_id, key, label
+         FROM ${this.table("ontology_nodes")}
+        WHERE company_id = $1 AND domain_id = $2
+        ORDER BY created_at ASC
+        LIMIT $3`,
+      [companyId, domainId, capped],
+    );
   }
 }
