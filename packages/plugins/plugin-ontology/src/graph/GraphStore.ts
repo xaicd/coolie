@@ -26,6 +26,7 @@ import type {
   CognitionJobStatus,
   CognitionScale,
   CognitionShardStatus,
+  AipLogicStatus,
   BusinessSystemDomain,
   BusinessSystemStatus,
   ConnectorStatus,
@@ -33,9 +34,20 @@ import type {
   DatasetFormat,
   DatasetLifecycleState,
   DomainLifecycleState,
+  EvalMetricType,
+  EvalStatus,
+  GoldenDatasetStatus,
   MicroserviceLayer,
+  SimulationStatus,
   SubProjectStatus,
   SubProjectType,
+  UModelDiscoveredFrom,
+  UModelEntitySetLayer,
+  UModelEntityState,
+  UModelEntityType,
+  UModelLinkDirection,
+  UModelLinkType,
+  UModelTelemetryType,
   FunctionStatus,
   FunctionType,
   LinkCardinality,
@@ -640,6 +652,242 @@ export interface OntologySubProjectRow {
   microservice_layer: MicroserviceLayer | null;
 }
 
+// --- O4b: LLM evaluation / simulation (DS AIPLogic / Eval / GoldenDataset / PromptTemplate / SimulationScenario) ---
+
+export interface OntologyPromptTemplateInput {
+  companyId: string;
+  domainId: string;
+  key: string;
+  name: string;
+  description?: string;
+  template?: string;
+  parameters?: unknown[];
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+export interface OntologyPromptTemplateRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  key: string;
+  name: string;
+  version: number;
+}
+
+export interface OntologyGoldenDatasetInput {
+  companyId: string;
+  domainId: string;
+  key: string;
+  name: string;
+  description?: string;
+  entries?: unknown[];
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+export interface OntologyGoldenDatasetRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  key: string;
+  name: string;
+  status: GoldenDatasetStatus;
+  version: number;
+}
+
+export interface OntologyAipLogicInput {
+  companyId: string;
+  domainId: string;
+  key: string;
+  name: string;
+  description?: string;
+  steps?: unknown[];
+  inputSchema?: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  contextConfig?: Record<string, unknown>;
+  promptTemplateId?: string | null;
+  modelConfig?: Record<string, unknown>;
+  tags?: string[];
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+export interface OntologyAipLogicUpdate {
+  name?: string;
+  description?: string;
+  status?: AipLogicStatus;
+  steps?: unknown[];
+  inputSchema?: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  contextConfig?: Record<string, unknown>;
+  modelConfig?: Record<string, unknown>;
+  tags?: string[];
+  metadata?: Record<string, unknown>;
+}
+export interface OntologyAipLogicRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  key: string;
+  name: string;
+  status: AipLogicStatus;
+  version: string;
+}
+
+export interface OntologyEvalInput {
+  companyId: string;
+  domainId: string;
+  key: string;
+  name: string;
+  description?: string;
+  evalType?: EvalMetricType;
+  inputData?: Record<string, unknown> | null;
+  expectedOutput?: Record<string, unknown> | null;
+  modelId?: string;
+  promptTemplateId?: string | null;
+  goldenDatasetId?: string | null;
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+export interface OntologyEvalUpdate {
+  status?: EvalStatus;
+  actualOutput?: Record<string, unknown> | null;
+  score?: number | null;
+  metrics?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+export interface OntologyEvalRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  key: string;
+  name: string;
+  eval_type: EvalMetricType;
+  status: EvalStatus;
+  score: number | null;
+}
+
+export interface OntologySimulationScenarioInput {
+  companyId: string;
+  domainId: string;
+  key: string;
+  name: string;
+  description?: string;
+  initialContext?: Record<string, unknown>;
+  strategies?: unknown[];
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+export interface OntologySimulationScenarioUpdate {
+  status?: SimulationStatus;
+  results?: Record<string, unknown>;
+  recommendedStrategy?: string | null;
+  recommendationReason?: string;
+  metadata?: Record<string, unknown>;
+}
+export interface OntologySimulationScenarioRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  key: string;
+  name: string;
+  status: SimulationStatus;
+  recommended_strategy: string | null;
+}
+
+// --- O6b: UModel unified observability graph ---
+
+export interface OntologyUModelEntitySetInput {
+  companyId: string;
+  key: string;
+  name: string;
+  description?: string;
+  layer?: UModelEntitySetLayer;
+  parentId?: string | null;
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+export interface OntologyUModelEntitySetRow {
+  id: string;
+  company_id: string;
+  key: string;
+  name: string;
+  layer: UModelEntitySetLayer;
+  parent_id: string | null;
+}
+
+export interface OntologyUModelEntityInput {
+  companyId: string;
+  key: string;
+  type: UModelEntityType;
+  name: string;
+  displayName?: string;
+  description?: string;
+  state?: UModelEntityState;
+  attributes?: Record<string, unknown>;
+  telemetryBindings?: unknown[];
+  semanticTags?: string[];
+  agentDescription?: Record<string, unknown>;
+  entitySetId?: string | null;
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+export interface OntologyUModelEntityUpdate {
+  name?: string;
+  displayName?: string;
+  description?: string;
+  state?: UModelEntityState;
+  attributes?: Record<string, unknown>;
+  semanticTags?: string[];
+  entitySetId?: string | null;
+  metadata?: Record<string, unknown>;
+}
+export interface OntologyUModelEntityRow {
+  id: string;
+  company_id: string;
+  key: string;
+  type: UModelEntityType;
+  name: string;
+  state: UModelEntityState;
+  entity_set_id: string | null;
+}
+
+export interface OntologyUModelLinkInput {
+  companyId: string;
+  fromEntityId: string;
+  toEntityId: string;
+  type: UModelLinkType;
+  direction?: UModelLinkDirection;
+  strength?: number;
+  properties?: Record<string, unknown>;
+  discoveredFrom?: UModelDiscoveredFrom;
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+export interface OntologyUModelLinkRow {
+  id: string;
+  company_id: string;
+  from_entity_id: string;
+  to_entity_id: string;
+  type: UModelLinkType;
+  direction: UModelLinkDirection;
+  strength: number;
+}
+
+export interface OntologyUModelTelemetryInput {
+  companyId: string;
+  entityId: string;
+  type: UModelTelemetryType;
+  payload?: Record<string, unknown>;
+  labels?: Record<string, unknown>;
+  source?: string;
+}
+export interface OntologyUModelTelemetryRow {
+  id: string;
+  company_id: string;
+  entity_id: string;
+  type: UModelTelemetryType;
+  event_at: string;
+}
+
 export interface GraphSnapshot {
   domainId: string;
   counts: {
@@ -841,6 +1089,66 @@ export interface GraphStore {
     subProjectId: string,
     update: OntologySubProjectUpdate,
   ): Promise<OntologySubProjectRow | null>;
+
+  // O4b — LLM evaluation / simulation
+  createPromptTemplate(input: OntologyPromptTemplateInput): Promise<OntologyPromptTemplateRow>;
+  listPromptTemplates(companyId: string, domainId: string): Promise<OntologyPromptTemplateRow[]>;
+
+  createGoldenDataset(input: OntologyGoldenDatasetInput): Promise<OntologyGoldenDatasetRow>;
+  listGoldenDatasets(companyId: string, domainId: string): Promise<OntologyGoldenDatasetRow[]>;
+
+  createAipLogic(input: OntologyAipLogicInput): Promise<OntologyAipLogicRow>;
+  listAipLogics(companyId: string, domainId: string): Promise<OntologyAipLogicRow[]>;
+  updateAipLogic(
+    companyId: string,
+    logicId: string,
+    update: OntologyAipLogicUpdate,
+  ): Promise<OntologyAipLogicRow | null>;
+
+  createEval(input: OntologyEvalInput): Promise<OntologyEvalRow>;
+  listEvals(companyId: string, domainId: string): Promise<OntologyEvalRow[]>;
+  updateEval(
+    companyId: string,
+    evalId: string,
+    update: OntologyEvalUpdate,
+  ): Promise<OntologyEvalRow | null>;
+
+  createSimulationScenario(
+    input: OntologySimulationScenarioInput,
+  ): Promise<OntologySimulationScenarioRow>;
+  listSimulationScenarios(
+    companyId: string,
+    domainId: string,
+  ): Promise<OntologySimulationScenarioRow[]>;
+  updateSimulationScenario(
+    companyId: string,
+    scenarioId: string,
+    update: OntologySimulationScenarioUpdate,
+  ): Promise<OntologySimulationScenarioRow | null>;
+
+  // O6b — UModel unified observability graph
+  createUModelEntitySet(input: OntologyUModelEntitySetInput): Promise<OntologyUModelEntitySetRow>;
+  listUModelEntitySets(companyId: string): Promise<OntologyUModelEntitySetRow[]>;
+
+  createUModelEntity(input: OntologyUModelEntityInput): Promise<OntologyUModelEntityRow>;
+  listUModelEntities(companyId: string, limit?: number): Promise<OntologyUModelEntityRow[]>;
+  updateUModelEntity(
+    companyId: string,
+    entityId: string,
+    update: OntologyUModelEntityUpdate,
+  ): Promise<OntologyUModelEntityRow | null>;
+
+  createUModelLink(input: OntologyUModelLinkInput): Promise<OntologyUModelLinkRow>;
+  listUModelLinks(companyId: string, entityId?: string): Promise<OntologyUModelLinkRow[]>;
+
+  recordUModelTelemetry(
+    input: OntologyUModelTelemetryInput,
+  ): Promise<OntologyUModelTelemetryRow>;
+  listUModelTelemetry(
+    companyId: string,
+    entityId: string,
+    limit?: number,
+  ): Promise<OntologyUModelTelemetryRow[]>;
 }
 
 const DEFAULT_MAX_DEPTH = 12;
@@ -2624,5 +2932,579 @@ export class PostgresGraphStore implements GraphStore {
       [companyId, subProjectId],
     );
     return rows[0] ?? null;
+  }
+
+  // -------------------------------------------------------------------------
+  // O4b — LLM evaluation / simulation
+  // -------------------------------------------------------------------------
+
+  async createPromptTemplate(
+    input: OntologyPromptTemplateInput,
+  ): Promise<OntologyPromptTemplateRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_prompt_templates")}
+         (id, company_id, domain_id, key, name, description, template, parameters, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $9, $10::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.key,
+        input.name,
+        input.description ?? "",
+        input.template ?? "",
+        JSON.stringify(input.parameters ?? []),
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyPromptTemplateRow>(
+      `SELECT id, company_id, domain_id, key, name, version
+         FROM ${this.table("ontology_prompt_templates")} WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listPromptTemplates(
+    companyId: string,
+    domainId: string,
+  ): Promise<OntologyPromptTemplateRow[]> {
+    return this.db.query<OntologyPromptTemplateRow>(
+      `SELECT id, company_id, domain_id, key, name, version
+         FROM ${this.table("ontology_prompt_templates")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId, domainId],
+    );
+  }
+
+  async createGoldenDataset(
+    input: OntologyGoldenDatasetInput,
+  ): Promise<OntologyGoldenDatasetRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_golden_datasets")}
+         (id, company_id, domain_id, key, name, description, entries, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $8, $9::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.key,
+        input.name,
+        input.description ?? "",
+        JSON.stringify(input.entries ?? []),
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyGoldenDatasetRow>(
+      `SELECT id, company_id, domain_id, key, name, status, version
+         FROM ${this.table("ontology_golden_datasets")} WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listGoldenDatasets(
+    companyId: string,
+    domainId: string,
+  ): Promise<OntologyGoldenDatasetRow[]> {
+    return this.db.query<OntologyGoldenDatasetRow>(
+      `SELECT id, company_id, domain_id, key, name, status, version
+         FROM ${this.table("ontology_golden_datasets")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId, domainId],
+    );
+  }
+
+  private static readonly AIP_LOGIC_COLS =
+    "id, company_id, domain_id, key, name, status, version";
+
+  async createAipLogic(input: OntologyAipLogicInput): Promise<OntologyAipLogicRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_aip_logics")}
+         (id, company_id, domain_id, key, name, description, steps, input_schema,
+          output_schema, context_config, prompt_template_id, model_config, tags,
+          created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb,
+               $11, $12::jsonb, $13::jsonb, $14, $14, $15::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.key,
+        input.name,
+        input.description ?? "",
+        JSON.stringify(input.steps ?? []),
+        JSON.stringify(input.inputSchema ?? {}),
+        JSON.stringify(input.outputSchema ?? {}),
+        JSON.stringify(input.contextConfig ?? {}),
+        input.promptTemplateId ?? null,
+        JSON.stringify(input.modelConfig ?? { modelId: "", temperature: 0.7, maxTokens: 4096 }),
+        JSON.stringify(input.tags ?? []),
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyAipLogicRow>(
+      `SELECT ${PostgresGraphStore.AIP_LOGIC_COLS}
+         FROM ${this.table("ontology_aip_logics")} WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listAipLogics(companyId: string, domainId: string): Promise<OntologyAipLogicRow[]> {
+    return this.db.query<OntologyAipLogicRow>(
+      `SELECT ${PostgresGraphStore.AIP_LOGIC_COLS}
+         FROM ${this.table("ontology_aip_logics")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId, domainId],
+    );
+  }
+
+  async updateAipLogic(
+    companyId: string,
+    logicId: string,
+    update: OntologyAipLogicUpdate,
+  ): Promise<OntologyAipLogicRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_aip_logics")}
+          SET name           = COALESCE($3, name),
+              description     = COALESCE($4, description),
+              status          = COALESCE($5, status),
+              steps           = CASE WHEN $6::boolean THEN $7::jsonb ELSE steps END,
+              input_schema    = CASE WHEN $8::boolean THEN $9::jsonb ELSE input_schema END,
+              output_schema   = CASE WHEN $10::boolean THEN $11::jsonb ELSE output_schema END,
+              context_config  = CASE WHEN $12::boolean THEN $13::jsonb ELSE context_config END,
+              model_config    = CASE WHEN $14::boolean THEN $15::jsonb ELSE model_config END,
+              tags            = CASE WHEN $16::boolean THEN $17::jsonb ELSE tags END,
+              metadata        = CASE WHEN $18::boolean THEN $19::jsonb ELSE metadata END,
+              updated_at      = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [
+        companyId,
+        logicId,
+        update.name ?? null,
+        update.description ?? null,
+        update.status ?? null,
+        update.steps !== undefined,
+        JSON.stringify(update.steps ?? []),
+        update.inputSchema !== undefined,
+        JSON.stringify(update.inputSchema ?? {}),
+        update.outputSchema !== undefined,
+        JSON.stringify(update.outputSchema ?? {}),
+        update.contextConfig !== undefined,
+        JSON.stringify(update.contextConfig ?? {}),
+        update.modelConfig !== undefined,
+        JSON.stringify(update.modelConfig ?? {}),
+        update.tags !== undefined,
+        JSON.stringify(update.tags ?? []),
+        update.metadata !== undefined,
+        JSON.stringify(update.metadata ?? {}),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    const rows = await this.db.query<OntologyAipLogicRow>(
+      `SELECT ${PostgresGraphStore.AIP_LOGIC_COLS}
+         FROM ${this.table("ontology_aip_logics")} WHERE company_id = $1 AND id = $2`,
+      [companyId, logicId],
+    );
+    return rows[0] ?? null;
+  }
+
+  private static readonly EVAL_COLS =
+    "id, company_id, domain_id, key, name, eval_type, status, score";
+
+  async createEval(input: OntologyEvalInput): Promise<OntologyEvalRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_evals")}
+         (id, company_id, domain_id, key, name, description, eval_type, input_data,
+          expected_output, model_id, prompt_template_id, golden_dataset_id, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10, $11, $12, $13, $13, $14::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.key,
+        input.name,
+        input.description ?? "",
+        input.evalType ?? "accuracy",
+        input.inputData === undefined || input.inputData === null ? null : JSON.stringify(input.inputData),
+        input.expectedOutput === undefined || input.expectedOutput === null ? null : JSON.stringify(input.expectedOutput),
+        input.modelId ?? "",
+        input.promptTemplateId ?? null,
+        input.goldenDatasetId ?? null,
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyEvalRow>(
+      `SELECT ${PostgresGraphStore.EVAL_COLS}
+         FROM ${this.table("ontology_evals")} WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listEvals(companyId: string, domainId: string): Promise<OntologyEvalRow[]> {
+    return this.db.query<OntologyEvalRow>(
+      `SELECT ${PostgresGraphStore.EVAL_COLS}
+         FROM ${this.table("ontology_evals")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId, domainId],
+    );
+  }
+
+  async updateEval(
+    companyId: string,
+    evalId: string,
+    update: OntologyEvalUpdate,
+  ): Promise<OntologyEvalRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_evals")}
+          SET status         = COALESCE($3, status),
+              actual_output  = CASE WHEN $4::boolean THEN $5::jsonb ELSE actual_output END,
+              score          = CASE WHEN $6::boolean THEN $7 ELSE score END,
+              metrics        = CASE WHEN $8::boolean THEN $9::jsonb ELSE metrics END,
+              metadata       = CASE WHEN $10::boolean THEN $11::jsonb ELSE metadata END,
+              updated_at     = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [
+        companyId,
+        evalId,
+        update.status ?? null,
+        update.actualOutput !== undefined,
+        update.actualOutput === null || update.actualOutput === undefined ? null : JSON.stringify(update.actualOutput),
+        update.score !== undefined,
+        update.score ?? null,
+        update.metrics !== undefined,
+        JSON.stringify(update.metrics ?? {}),
+        update.metadata !== undefined,
+        JSON.stringify(update.metadata ?? {}),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    const rows = await this.db.query<OntologyEvalRow>(
+      `SELECT ${PostgresGraphStore.EVAL_COLS}
+         FROM ${this.table("ontology_evals")} WHERE company_id = $1 AND id = $2`,
+      [companyId, evalId],
+    );
+    return rows[0] ?? null;
+  }
+
+  private static readonly SIMULATION_COLS =
+    "id, company_id, domain_id, key, name, status, recommended_strategy";
+
+  async createSimulationScenario(
+    input: OntologySimulationScenarioInput,
+  ): Promise<OntologySimulationScenarioRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_simulation_scenarios")}
+         (id, company_id, domain_id, key, name, description, initial_context, strategies, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $9, $10::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.key,
+        input.name,
+        input.description ?? "",
+        JSON.stringify(input.initialContext ?? {}),
+        JSON.stringify(input.strategies ?? []),
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologySimulationScenarioRow>(
+      `SELECT ${PostgresGraphStore.SIMULATION_COLS}
+         FROM ${this.table("ontology_simulation_scenarios")} WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listSimulationScenarios(
+    companyId: string,
+    domainId: string,
+  ): Promise<OntologySimulationScenarioRow[]> {
+    return this.db.query<OntologySimulationScenarioRow>(
+      `SELECT ${PostgresGraphStore.SIMULATION_COLS}
+         FROM ${this.table("ontology_simulation_scenarios")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId, domainId],
+    );
+  }
+
+  async updateSimulationScenario(
+    companyId: string,
+    scenarioId: string,
+    update: OntologySimulationScenarioUpdate,
+  ): Promise<OntologySimulationScenarioRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_simulation_scenarios")}
+          SET status                 = COALESCE($3, status),
+              results                = CASE WHEN $4::boolean THEN $5::jsonb ELSE results END,
+              recommended_strategy   = CASE WHEN $6::boolean THEN $7 ELSE recommended_strategy END,
+              recommendation_reason  = COALESCE($8, recommendation_reason),
+              metadata               = CASE WHEN $9::boolean THEN $10::jsonb ELSE metadata END,
+              updated_at             = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [
+        companyId,
+        scenarioId,
+        update.status ?? null,
+        update.results !== undefined,
+        JSON.stringify(update.results ?? {}),
+        update.recommendedStrategy !== undefined,
+        update.recommendedStrategy ?? null,
+        update.recommendationReason ?? null,
+        update.metadata !== undefined,
+        JSON.stringify(update.metadata ?? {}),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    const rows = await this.db.query<OntologySimulationScenarioRow>(
+      `SELECT ${PostgresGraphStore.SIMULATION_COLS}
+         FROM ${this.table("ontology_simulation_scenarios")} WHERE company_id = $1 AND id = $2`,
+      [companyId, scenarioId],
+    );
+    return rows[0] ?? null;
+  }
+
+  // -------------------------------------------------------------------------
+  // O6b — UModel unified observability graph
+  // -------------------------------------------------------------------------
+
+  async createUModelEntitySet(
+    input: OntologyUModelEntitySetInput,
+  ): Promise<OntologyUModelEntitySetRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_umodel_entity_sets")}
+         (id, company_id, key, name, description, layer, parent_id, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.key,
+        input.name,
+        input.description ?? "",
+        input.layer ?? "application",
+        input.parentId ?? null,
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyUModelEntitySetRow>(
+      `SELECT id, company_id, key, name, layer, parent_id
+         FROM ${this.table("ontology_umodel_entity_sets")} WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listUModelEntitySets(companyId: string): Promise<OntologyUModelEntitySetRow[]> {
+    return this.db.query<OntologyUModelEntitySetRow>(
+      `SELECT id, company_id, key, name, layer, parent_id
+         FROM ${this.table("ontology_umodel_entity_sets")}
+        WHERE company_id = $1 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId],
+    );
+  }
+
+  private static readonly UMODEL_ENTITY_COLS =
+    "id, company_id, key, type, name, state, entity_set_id";
+
+  async createUModelEntity(
+    input: OntologyUModelEntityInput,
+  ): Promise<OntologyUModelEntityRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_umodel_entities")}
+         (id, company_id, key, type, name, display_name, description, state, attributes,
+          telemetry_bindings, semantic_tags, agent_description, entity_set_id, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13, $14, $14, $15::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.key,
+        input.type,
+        input.name,
+        input.displayName ?? "",
+        input.description ?? "",
+        input.state ?? "active",
+        JSON.stringify(input.attributes ?? {}),
+        JSON.stringify(input.telemetryBindings ?? []),
+        JSON.stringify(input.semanticTags ?? []),
+        JSON.stringify(input.agentDescription ?? {}),
+        input.entitySetId ?? null,
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyUModelEntityRow>(
+      `SELECT ${PostgresGraphStore.UMODEL_ENTITY_COLS}
+         FROM ${this.table("ontology_umodel_entities")} WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listUModelEntities(companyId: string, limit = 500): Promise<OntologyUModelEntityRow[]> {
+    const capped = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 2000)) : 500;
+    return this.db.query<OntologyUModelEntityRow>(
+      `SELECT ${PostgresGraphStore.UMODEL_ENTITY_COLS}
+         FROM ${this.table("ontology_umodel_entities")}
+        WHERE company_id = $1 AND is_deleted = false
+        ORDER BY created_at ASC
+        LIMIT $2`,
+      [companyId, capped],
+    );
+  }
+
+  async updateUModelEntity(
+    companyId: string,
+    entityId: string,
+    update: OntologyUModelEntityUpdate,
+  ): Promise<OntologyUModelEntityRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_umodel_entities")}
+          SET name          = COALESCE($3, name),
+              display_name   = COALESCE($4, display_name),
+              description     = COALESCE($5, description),
+              state           = COALESCE($6, state),
+              attributes      = CASE WHEN $7::boolean THEN $8::jsonb ELSE attributes END,
+              semantic_tags   = CASE WHEN $9::boolean THEN $10::jsonb ELSE semantic_tags END,
+              entity_set_id   = CASE WHEN $11::boolean THEN $12::uuid ELSE entity_set_id END,
+              metadata        = CASE WHEN $13::boolean THEN $14::jsonb ELSE metadata END,
+              updated_at      = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [
+        companyId,
+        entityId,
+        update.name ?? null,
+        update.displayName ?? null,
+        update.description ?? null,
+        update.state ?? null,
+        update.attributes !== undefined,
+        JSON.stringify(update.attributes ?? {}),
+        update.semanticTags !== undefined,
+        JSON.stringify(update.semanticTags ?? []),
+        update.entitySetId !== undefined,
+        update.entitySetId ?? null,
+        update.metadata !== undefined,
+        JSON.stringify(update.metadata ?? {}),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    const rows = await this.db.query<OntologyUModelEntityRow>(
+      `SELECT ${PostgresGraphStore.UMODEL_ENTITY_COLS}
+         FROM ${this.table("ontology_umodel_entities")} WHERE company_id = $1 AND id = $2`,
+      [companyId, entityId],
+    );
+    return rows[0] ?? null;
+  }
+
+  async createUModelLink(input: OntologyUModelLinkInput): Promise<OntologyUModelLinkRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_umodel_links")}
+         (id, company_id, from_entity_id, to_entity_id, type, direction, strength,
+          properties, discovered_from, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $10, $11::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.fromEntityId,
+        input.toEntityId,
+        input.type,
+        input.direction ?? "forward",
+        input.strength ?? 0.5,
+        JSON.stringify(input.properties ?? {}),
+        input.discoveredFrom ?? "manual",
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyUModelLinkRow>(
+      `SELECT id, company_id, from_entity_id, to_entity_id, type, direction, strength
+         FROM ${this.table("ontology_umodel_links")} WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listUModelLinks(companyId: string, entityId?: string): Promise<OntologyUModelLinkRow[]> {
+    if (entityId) {
+      return this.db.query<OntologyUModelLinkRow>(
+        `SELECT id, company_id, from_entity_id, to_entity_id, type, direction, strength
+           FROM ${this.table("ontology_umodel_links")}
+          WHERE company_id = $1 AND is_deleted = false
+            AND (from_entity_id = $2 OR to_entity_id = $2)
+          ORDER BY created_at ASC`,
+        [companyId, entityId],
+      );
+    }
+    return this.db.query<OntologyUModelLinkRow>(
+      `SELECT id, company_id, from_entity_id, to_entity_id, type, direction, strength
+         FROM ${this.table("ontology_umodel_links")}
+        WHERE company_id = $1 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId],
+    );
+  }
+
+  async recordUModelTelemetry(
+    input: OntologyUModelTelemetryInput,
+  ): Promise<OntologyUModelTelemetryRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_umodel_telemetry")}
+         (id, company_id, entity_id, type, payload, labels, source)
+       VALUES ($1, $2, $3, $4, $5::jsonb, $6::jsonb, $7)`,
+      [
+        id,
+        input.companyId,
+        input.entityId,
+        input.type,
+        JSON.stringify(input.payload ?? {}),
+        JSON.stringify(input.labels ?? {}),
+        input.source ?? "",
+      ],
+    );
+    const rows = await this.db.query<OntologyUModelTelemetryRow>(
+      `SELECT id, company_id, entity_id, type, event_at
+         FROM ${this.table("ontology_umodel_telemetry")} WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listUModelTelemetry(
+    companyId: string,
+    entityId: string,
+    limit = 100,
+  ): Promise<OntologyUModelTelemetryRow[]> {
+    const capped = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 1000)) : 100;
+    return this.db.query<OntologyUModelTelemetryRow>(
+      `SELECT id, company_id, entity_id, type, event_at
+         FROM ${this.table("ontology_umodel_telemetry")}
+        WHERE company_id = $1 AND entity_id = $2
+        ORDER BY event_at DESC
+        LIMIT $3`,
+      [companyId, entityId, capped],
+    );
   }
 }

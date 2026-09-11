@@ -16,6 +16,7 @@ import type {
   ActionTypeStatus,
   CognitionJobStatus,
   CognitionScale,
+  AipLogicStatus,
   BusinessSystemDomain,
   BusinessSystemStatus,
   ConnectorStatus,
@@ -23,15 +24,25 @@ import type {
   DatasetFormat,
   DatasetLifecycleState,
   DomainLifecycleState,
+  EvalMetricType,
+  EvalStatus,
   FunctionStatus,
   FunctionType,
   MicroserviceLayer,
   NodeLayer,
+  SimulationStatus,
   SubProjectStatus,
   SubProjectType,
   SyncStrategy,
   TransformStatus,
   TransformType,
+  UModelDiscoveredFrom,
+  UModelEntitySetLayer,
+  UModelEntityState,
+  UModelEntityType,
+  UModelLinkDirection,
+  UModelLinkType,
+  UModelTelemetryType,
 } from "./enums.js";
 
 let activeContext: PluginContext | null = null;
@@ -1159,6 +1170,220 @@ const plugin = definePlugin({
         );
         if (!subProject) return { status: 404, body: { error: "Sub-project not found" } };
         return { body: { subProject } };
+      }
+
+      case "list-prompt-templates":
+        return { body: { promptTemplates: await store.listPromptTemplates(companyId, requireString(queryString(input.query.domainId), "domainId")) } };
+      case "create-prompt-template": {
+        const b = optionalRecord(input.body) ?? {};
+        const promptTemplate = await store.createPromptTemplate({
+          companyId,
+          domainId: requireString(b.domainId, "domainId"),
+          key: requireString(b.key, "key"),
+          name: requireString(b.name, "name"),
+          description: typeof b.description === "string" ? b.description : undefined,
+          template: typeof b.template === "string" ? b.template : undefined,
+          parameters: Array.isArray(b.parameters) ? b.parameters : undefined,
+        });
+        return { status: 201, body: { promptTemplate } };
+      }
+
+      case "list-golden-datasets":
+        return { body: { goldenDatasets: await store.listGoldenDatasets(companyId, requireString(queryString(input.query.domainId), "domainId")) } };
+      case "create-golden-dataset": {
+        const b = optionalRecord(input.body) ?? {};
+        const goldenDataset = await store.createGoldenDataset({
+          companyId,
+          domainId: requireString(b.domainId, "domainId"),
+          key: requireString(b.key, "key"),
+          name: requireString(b.name, "name"),
+          description: typeof b.description === "string" ? b.description : undefined,
+          entries: Array.isArray(b.entries) ? b.entries : undefined,
+        });
+        return { status: 201, body: { goldenDataset } };
+      }
+
+      case "list-aip-logics":
+        return { body: { aipLogics: await store.listAipLogics(companyId, requireString(queryString(input.query.domainId), "domainId")) } };
+      case "create-aip-logic": {
+        const b = optionalRecord(input.body) ?? {};
+        const aipLogic = await store.createAipLogic({
+          companyId,
+          domainId: requireString(b.domainId, "domainId"),
+          key: requireString(b.key, "key"),
+          name: requireString(b.name, "name"),
+          description: typeof b.description === "string" ? b.description : undefined,
+          steps: Array.isArray(b.steps) ? b.steps : undefined,
+          inputSchema: optionalRecord(b.inputSchema),
+          outputSchema: optionalRecord(b.outputSchema),
+          contextConfig: optionalRecord(b.contextConfig),
+          promptTemplateId: typeof b.promptTemplateId === "string" ? b.promptTemplateId : null,
+          modelConfig: optionalRecord(b.modelConfig),
+          tags: Array.isArray(b.tags) ? (b.tags as string[]) : undefined,
+        });
+        return { status: 201, body: { aipLogic } };
+      }
+      case "update-aip-logic": {
+        const b = optionalRecord(input.body) ?? {};
+        const aipLogic = await store.updateAipLogic(companyId, requireString(input.params.logicId, "logicId"), {
+          name: typeof b.name === "string" ? b.name : undefined,
+          description: typeof b.description === "string" ? b.description : undefined,
+          status: typeof b.status === "string" ? (b.status as AipLogicStatus) : undefined,
+          steps: Array.isArray(b.steps) ? b.steps : undefined,
+          inputSchema: optionalRecord(b.inputSchema),
+          outputSchema: optionalRecord(b.outputSchema),
+          contextConfig: optionalRecord(b.contextConfig),
+          modelConfig: optionalRecord(b.modelConfig),
+          tags: Array.isArray(b.tags) ? (b.tags as string[]) : undefined,
+          metadata: optionalRecord(b.metadata),
+        });
+        if (!aipLogic) return { status: 404, body: { error: "AIP logic not found" } };
+        return { body: { aipLogic } };
+      }
+
+      case "list-evals":
+        return { body: { evals: await store.listEvals(companyId, requireString(queryString(input.query.domainId), "domainId")) } };
+      case "create-eval": {
+        const b = optionalRecord(input.body) ?? {};
+        const evalRun = await store.createEval({
+          companyId,
+          domainId: requireString(b.domainId, "domainId"),
+          key: requireString(b.key, "key"),
+          name: requireString(b.name, "name"),
+          description: typeof b.description === "string" ? b.description : undefined,
+          evalType: typeof b.evalType === "string" ? (b.evalType as EvalMetricType) : undefined,
+          inputData: optionalRecord(b.inputData) ?? null,
+          expectedOutput: optionalRecord(b.expectedOutput) ?? null,
+          modelId: typeof b.modelId === "string" ? b.modelId : undefined,
+          promptTemplateId: typeof b.promptTemplateId === "string" ? b.promptTemplateId : null,
+          goldenDatasetId: typeof b.goldenDatasetId === "string" ? b.goldenDatasetId : null,
+        });
+        return { status: 201, body: { eval: evalRun } };
+      }
+      case "update-eval": {
+        const b = optionalRecord(input.body) ?? {};
+        const evalRun = await store.updateEval(companyId, requireString(input.params.evalId, "evalId"), {
+          status: typeof b.status === "string" ? (b.status as EvalStatus) : undefined,
+          actualOutput: optionalRecord(b.actualOutput) ?? undefined,
+          score: typeof b.score === "number" ? b.score : "score" in b ? null : undefined,
+          metrics: optionalRecord(b.metrics),
+          metadata: optionalRecord(b.metadata),
+        });
+        if (!evalRun) return { status: 404, body: { error: "Eval not found" } };
+        return { body: { eval: evalRun } };
+      }
+
+      case "list-simulation-scenarios":
+        return { body: { simulationScenarios: await store.listSimulationScenarios(companyId, requireString(queryString(input.query.domainId), "domainId")) } };
+      case "create-simulation-scenario": {
+        const b = optionalRecord(input.body) ?? {};
+        const scenario = await store.createSimulationScenario({
+          companyId,
+          domainId: requireString(b.domainId, "domainId"),
+          key: requireString(b.key, "key"),
+          name: requireString(b.name, "name"),
+          description: typeof b.description === "string" ? b.description : undefined,
+          initialContext: optionalRecord(b.initialContext),
+          strategies: Array.isArray(b.strategies) ? b.strategies : undefined,
+        });
+        return { status: 201, body: { simulationScenario: scenario } };
+      }
+      case "update-simulation-scenario": {
+        const b = optionalRecord(input.body) ?? {};
+        const scenario = await store.updateSimulationScenario(companyId, requireString(input.params.scenarioId, "scenarioId"), {
+          status: typeof b.status === "string" ? (b.status as SimulationStatus) : undefined,
+          results: optionalRecord(b.results),
+          recommendedStrategy: "recommendedStrategy" in b ? (b.recommendedStrategy as string | null) : undefined,
+          recommendationReason: typeof b.recommendationReason === "string" ? b.recommendationReason : undefined,
+          metadata: optionalRecord(b.metadata),
+        });
+        if (!scenario) return { status: 404, body: { error: "Simulation scenario not found" } };
+        return { body: { simulationScenario: scenario } };
+      }
+
+      case "list-umodel-entity-sets":
+        return { body: { entitySets: await store.listUModelEntitySets(companyId) } };
+      case "create-umodel-entity-set": {
+        const b = optionalRecord(input.body) ?? {};
+        const entitySet = await store.createUModelEntitySet({
+          companyId,
+          key: requireString(b.key, "key"),
+          name: requireString(b.name, "name"),
+          description: typeof b.description === "string" ? b.description : undefined,
+          layer: typeof b.layer === "string" ? (b.layer as UModelEntitySetLayer) : undefined,
+          parentId: typeof b.parentId === "string" ? b.parentId : null,
+        });
+        return { status: 201, body: { entitySet } };
+      }
+
+      case "list-umodel-entities":
+        return { body: { entities: await store.listUModelEntities(companyId, parseDepth(queryString(input.query.limit))) } };
+      case "create-umodel-entity": {
+        const b = optionalRecord(input.body) ?? {};
+        const entity = await store.createUModelEntity({
+          companyId,
+          key: requireString(b.key, "key"),
+          type: requireString(b.type, "type") as UModelEntityType,
+          name: requireString(b.name, "name"),
+          displayName: typeof b.displayName === "string" ? b.displayName : undefined,
+          description: typeof b.description === "string" ? b.description : undefined,
+          state: typeof b.state === "string" ? (b.state as UModelEntityState) : undefined,
+          attributes: optionalRecord(b.attributes),
+          telemetryBindings: Array.isArray(b.telemetryBindings) ? b.telemetryBindings : undefined,
+          semanticTags: Array.isArray(b.semanticTags) ? (b.semanticTags as string[]) : undefined,
+          agentDescription: optionalRecord(b.agentDescription),
+          entitySetId: typeof b.entitySetId === "string" ? b.entitySetId : null,
+        });
+        return { status: 201, body: { entity } };
+      }
+      case "update-umodel-entity": {
+        const b = optionalRecord(input.body) ?? {};
+        const entity = await store.updateUModelEntity(companyId, requireString(input.params.entityId, "entityId"), {
+          name: typeof b.name === "string" ? b.name : undefined,
+          displayName: typeof b.displayName === "string" ? b.displayName : undefined,
+          description: typeof b.description === "string" ? b.description : undefined,
+          state: typeof b.state === "string" ? (b.state as UModelEntityState) : undefined,
+          attributes: optionalRecord(b.attributes),
+          semanticTags: Array.isArray(b.semanticTags) ? (b.semanticTags as string[]) : undefined,
+          entitySetId: "entitySetId" in b ? (b.entitySetId as string | null) : undefined,
+          metadata: optionalRecord(b.metadata),
+        });
+        if (!entity) return { status: 404, body: { error: "UModel entity not found" } };
+        return { body: { entity } };
+      }
+
+      case "list-umodel-links": {
+        const entityId = queryString(input.query.entityId);
+        return { body: { links: await store.listUModelLinks(companyId, entityId ? String(entityId) : undefined) } };
+      }
+      case "create-umodel-link": {
+        const b = optionalRecord(input.body) ?? {};
+        const link = await store.createUModelLink({
+          companyId,
+          fromEntityId: requireString(b.fromEntityId, "fromEntityId"),
+          toEntityId: requireString(b.toEntityId, "toEntityId"),
+          type: requireString(b.type, "type") as UModelLinkType,
+          direction: typeof b.direction === "string" ? (b.direction as UModelLinkDirection) : undefined,
+          strength: typeof b.strength === "number" ? b.strength : undefined,
+          properties: optionalRecord(b.properties),
+          discoveredFrom: typeof b.discoveredFrom === "string" ? (b.discoveredFrom as UModelDiscoveredFrom) : undefined,
+        });
+        return { status: 201, body: { link } };
+      }
+
+      case "list-umodel-telemetry":
+        return { body: { telemetry: await store.listUModelTelemetry(companyId, requireString(queryString(input.query.entityId), "entityId"), parseDepth(queryString(input.query.limit))) } };
+      case "record-umodel-telemetry": {
+        const b = optionalRecord(input.body) ?? {};
+        const telemetry = await store.recordUModelTelemetry({
+          companyId,
+          entityId: requireString(b.entityId, "entityId"),
+          type: requireString(b.type, "type") as UModelTelemetryType,
+          payload: optionalRecord(b.payload),
+          labels: optionalRecord(b.labels),
+          source: typeof b.source === "string" ? b.source : undefined,
+        });
+        return { status: 201, body: { telemetry } };
       }
 
       default:

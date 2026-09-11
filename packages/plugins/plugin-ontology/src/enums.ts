@@ -358,3 +358,132 @@ export type DependencyType = (typeof DEPENDENCY_TYPES)[number];
 /** API spec HTTP method (DS SubProject.apiSpecs.method). */
 export const API_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const;
 export type ApiMethod = (typeof API_METHODS)[number];
+
+
+// ---------------------------------------------------------------------------
+// O4b — LLM evaluation / simulation (DigitalStaff AIPLogic / Eval / GoldenDataset / etc.)
+// ---------------------------------------------------------------------------
+
+/** AIP Logic lifecycle (DS AIPLogicStatus). */
+export const AIP_LOGIC_STATUSES = ["draft", "active", "deprecated"] as const;
+export type AipLogicStatus = (typeof AIP_LOGIC_STATUSES)[number];
+
+/** AIP Logic step kind (DS LogicStepSchema.type). */
+export const AIP_LOGIC_STEP_TYPES = ["llm_call", "transform", "condition", "output"] as const;
+export type AipLogicStepType = (typeof AIP_LOGIC_STEP_TYPES)[number];
+
+/** Eval run status (DS EvalStatus). */
+export const EVAL_STATUSES = ["pending", "running", "completed", "failed"] as const;
+export type EvalStatus = (typeof EVAL_STATUSES)[number];
+
+/** Eval metric type (DS EvalMetricType). */
+export const EVAL_METRIC_TYPES = [
+  "accuracy",
+  "latency",
+  "token_cost",
+  "user_satisfaction",
+  "custom",
+] as const;
+export type EvalMetricType = (typeof EVAL_METRIC_TYPES)[number];
+
+/** Golden dataset status (DS GoldenDatasetStatus). */
+export const GOLDEN_DATASET_STATUSES = ["draft", "active", "archived"] as const;
+export type GoldenDatasetStatus = (typeof GOLDEN_DATASET_STATUSES)[number];
+
+/** Simulation scenario status (DS SimulationScenario.status). */
+export const SIMULATION_STATUSES = ["draft", "running", "completed", "failed"] as const;
+export type SimulationStatus = (typeof SIMULATION_STATUSES)[number];
+
+// ---------------------------------------------------------------------------
+// O6b — UModel unified observability graph (DigitalStaff UModel*)
+// ---------------------------------------------------------------------------
+
+/** UModel entity type (DS UModelEntity.type). */
+export const UMODEL_ENTITY_TYPES = [
+  "requirement",
+  "task",
+  "agent",
+  "artifact",
+  "codeChange",
+  "vulnerability",
+  "testCase",
+  "knowledge",
+  "service",
+  "deployment",
+  "incident",
+  "UserMessage",
+  "DevTask",
+  "AIAgent",
+  "IDEContainer",
+  "TaskStage",
+] as const;
+export type UModelEntityType = (typeof UMODEL_ENTITY_TYPES)[number];
+
+/** UModel entity state (DS UModelEntity.state). */
+export const UMODEL_ENTITY_STATES = [
+  "active",
+  "inactive",
+  "pending",
+  "completed",
+  "failed",
+  "archived",
+] as const;
+export type UModelEntityState = (typeof UMODEL_ENTITY_STATES)[number];
+
+/** UModel link type — 27 relationship kinds (DS UModelLink.type). */
+export const UMODEL_LINK_TYPES = [
+  "DECOMPOSES_TO",
+  "ASSIGNED_TO",
+  "EXECUTED_BY",
+  "PRODUCES",
+  "CONSUMES",
+  "IMPLEMENTED_BY",
+  "MODIFIES",
+  "VERIFIES",
+  "COVERS",
+  "DETECTS",
+  "TRIGGERS",
+  "DEPENDS_ON",
+  "CALLS",
+  "BLOCKS",
+  "MENTIONS",
+  "REFERENCES",
+  "SIMILAR_TO",
+  "CONTAINS",
+  "BELONGS_TO",
+  "RELATED_TO",
+  "INITIATES",
+  "PROGRESSES_TO",
+  "HAS_STAGE",
+  "RUNS_ON",
+  "CLONES_FROM",
+  "RETRIES",
+  "FAILS_AT",
+] as const;
+export type UModelLinkType = (typeof UMODEL_LINK_TYPES)[number];
+
+/** UModel link direction (DS UModelLink.direction). */
+export const UMODEL_LINK_DIRECTIONS = ["forward", "backward", "bidirectional"] as const;
+export type UModelLinkDirection = (typeof UMODEL_LINK_DIRECTIONS)[number];
+
+/** How a UModel link was discovered (DS UModelLink.discoveredFrom). */
+export const UMODEL_DISCOVERED_FROM = [
+  "manual",
+  "telemetry",
+  "code_analysis",
+  "ai_inference",
+] as const;
+export type UModelDiscoveredFrom = (typeof UMODEL_DISCOVERED_FROM)[number];
+
+/** UModel telemetry binding type (DS UModelTelemetry.type). */
+export const UMODEL_TELEMETRY_TYPES = ["log", "trace", "event", "metric"] as const;
+export type UModelTelemetryType = (typeof UMODEL_TELEMETRY_TYPES)[number];
+
+/** UModel entity-set layer (DS UModelEntitySet.layer). */
+export const UMODEL_ENTITY_SET_LAYERS = [
+  "infrastructure",
+  "platform",
+  "application",
+  "business",
+] as const;
+export type UModelEntitySetLayer = (typeof UMODEL_ENTITY_SET_LAYERS)[number];
