@@ -75,6 +75,16 @@ export type {
   ImpactedNode,
   ImpactDirection,
 } from "./graph/GraphStore.js";
+export { parseSourceFile, extractRepoDraft, extractFile } from "./cognition/AstExtractor.js";
+export type {
+  ExtractedEntity,
+  ExtractedRelation,
+  ExtractedAction,
+  FileExtraction,
+  SourceFile,
+  RepoDraft,
+  RepoDraftCoverage,
+} from "./cognition/AstExtractor.js";
 export {
   DOMAIN_LIFECYCLE_STATES,
   NODE_LIFECYCLE_STATES,

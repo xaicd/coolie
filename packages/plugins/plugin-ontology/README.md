@@ -96,7 +96,21 @@ publishes the draft as real building blocks. Mirrors the DigitalStaff
   (reusing the O2 building-block store) into a target domain.
 
 API routes: `cognition-jobs` (GET list / POST create / GET `/:jobId`), plus
-`/:jobId/transition`, `/:jobId/shards`, `/:jobId/draft`, `/:jobId/publish`.
+`/:jobId/transition`, `/:jobId/shards`, `/:jobId/draft`, `/:jobId/ingest-shard`,
+`/:jobId/publish`.
+
+### AST extractor (domain 5 — reverse engineering)
+
+`src/cognition/AstExtractor.ts` is a clean-room, dependency-light source scanner
+that reverse-engineers a repository into ontology draft material. `parseSourceFile`
+extracts entities / relations / actions per language (TS/JS/Vue, Python, Go,
+Java/Kotlin, and SQL DDL — including columns and foreign-key relations), and
+`extractRepoDraft(files)` folds many files into `{ seedNodeTypes,
+seedRelationTypes, seedActions, coverage }` with source-file provenance — exactly
+the draft shape a cognition job publishes as Object/Link/Action types. The
+`ingest-shard` route wires a shard of files through the extractor into the job
+draft, closing the O3 loop (scan → draft → confirm → publish). A tree-sitter
+backend can replace `parseSourceFile` behind the same interface later.
 
 ## O4 (data pipeline) scope
 
