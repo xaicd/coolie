@@ -7,15 +7,19 @@ import {
 } from "@paperclipai/plugin-sdk";
 import {
   PostgresGraphStore,
+  type CognitionShard,
   type GraphStore,
   type ImpactDirection,
 } from "./graph/GraphStore.js";
 import type {
   ActionKind,
   ActionTypeStatus,
+  CognitionJobStatus,
+  CognitionScale,
   DomainLifecycleState,
   FunctionStatus,
   FunctionType,
+  NodeLayer,
 } from "./enums.js";
 
 let activeContext: PluginContext | null = null;
@@ -68,6 +72,101 @@ function toNumber(value: unknown): number | undefined {
     if (Number.isFinite(parsed)) return parsed;
   }
   return undefined;
+}
+
+function str(value: unknown, fallback = ""): string {
+  return typeof value === "string" && value.trim() !== "" ? value : fallback;
+}
+
+/**
+ * Publish a cognition job draft into a target domain: create Object types from
+ * seed node types, Link types from seed relation types, and Action types from
+ * seed actions (reusing the O2 Foundry building-block store). Transitions the
+ * job publishing -> completed and records a result summary.
+ *
+ * Returns null when the job or target domain does not exist.
+ */
+async function publishCognitionDraft(
+  ctx: PluginContext,
+  store: GraphStore,
+  companyId: string,
+  jobId: string,
+  targetDomainId: string,
+): Promise<{ published: { nodeTypes: number; relationTypes: number; actionTypes: number }; job: unknown } | null> {
+  const draft = await store.getCognitionDraft(companyId, jobId);
+  if (!draft) return null;
+  const domain = await store.getDomain(companyId, targetDomainId);
+  if (!domain) return null;
+
+  // publishing gate (validates the current state allows publishing)
+  await store.transitionCognitionStatus(companyId, jobId, "publishing", { stageLabel: "publishing draft" });
+
+  let nodeTypes = 0;
+  let relationTypes = 0;
+  let actionTypes = 0;
+
+  for (const raw of draft.seedNodeTypes) {
+    const nt = raw as Record<string, unknown>;
+    const key = str(nt.typeName ?? nt.key ?? nt.name);
+    if (!key) continue;
+    await store.createNodeType({
+      companyId,
+      domainId: targetDomainId,
+      key,
+      displayName: str(nt.displayName ?? nt.label ?? key, key),
+      description: str(nt.description) || null,
+      layer: (str(nt.layer) as NodeLayer) || undefined,
+    });
+    nodeTypes += 1;
+  }
+
+  for (const raw of draft.seedRelationTypes) {
+    const rt = raw as Record<string, unknown>;
+    const key = str(rt.relationType ?? rt.key ?? rt.name);
+    if (!key) continue;
+    await store.createRelationType({
+      companyId,
+      domainId: targetDomainId,
+      key,
+      displayName: str(rt.displayName ?? key, key),
+      description: str(rt.description) || null,
+    });
+    relationTypes += 1;
+  }
+
+  for (const raw of draft.seedActions) {
+    const act = raw as Record<string, unknown>;
+    const key = str(act.name ?? act.key ?? act.path);
+    if (!key) continue;
+    await store.createActionType({
+      companyId,
+      domainId: targetDomainId,
+      key,
+      displayName: str(act.displayName ?? act.name ?? key, key),
+      description: str(act.desc ?? act.description),
+      apiContract: {
+        httpMethod: str(act.method, "POST"),
+        routePath: str(act.path),
+      },
+    });
+    actionTypes += 1;
+  }
+
+  const result = { domainId: targetDomainId, nodeTypes, relationTypes, actionTypes };
+  await store.setCognitionResult(companyId, jobId, result);
+  const job = await store.transitionCognitionStatus(companyId, jobId, "completed", {
+    stageLabel: "published",
+  });
+
+  await ctx.activity.log({
+    companyId,
+    message: `Published cognition draft: ${nodeTypes} node types, ${relationTypes} relation types, ${actionTypes} action types`,
+    entityType: "ontology_cognition_job",
+    entityId: jobId,
+    metadata: result,
+  });
+
+  return { published: { nodeTypes, relationTypes, actionTypes }, job };
 }
 
 const plugin = definePlugin({
@@ -670,6 +769,96 @@ const plugin = definePlugin({
           maxDepth: parseDepth(queryString(input.query.maxDepth)),
         });
         return { body: { direction, count: impacted.length, impacted } };
+      }
+
+      case "list-cognition-jobs": {
+        const jobs = await store.listCognitionJobs(companyId, parseDepth(queryString(input.query.limit)));
+        return { body: { jobs } };
+      }
+
+      case "get-cognition-job": {
+        const job = await store.getCognitionJob(companyId, requireString(input.params.jobId, "jobId"));
+        if (!job) return { status: 404, body: { error: "Cognition job not found" } };
+        return { body: { job } };
+      }
+
+      case "create-cognition-job": {
+        const body = optionalRecord(input.body) ?? {};
+        const job = await store.createCognitionJob({
+          companyId,
+          jobKey: requireString(body.jobKey, "jobKey"),
+          rootPath: requireString(body.rootPath, "rootPath"),
+          domainId: typeof body.domainId === "string" ? body.domainId : null,
+          appName: typeof body.appName === "string" ? body.appName : undefined,
+          displayName: typeof body.displayName === "string" ? body.displayName : undefined,
+          description: typeof body.description === "string" ? body.description : undefined,
+          targetRole: typeof body.targetRole === "string" ? body.targetRole : undefined,
+          category: typeof body.category === "string" ? body.category : undefined,
+          scale: typeof body.scale === "string" ? (body.scale as CognitionScale) : undefined,
+        });
+        await ctx.activity.log({
+          companyId,
+          message: `Created cognition job ${job.job_key}`,
+          entityType: "ontology_cognition_job",
+          entityId: job.id,
+        });
+        return { status: 201, body: { job } };
+      }
+
+      case "transition-cognition-job": {
+        const body = optionalRecord(input.body) ?? {};
+        try {
+          const job = await store.transitionCognitionStatus(
+            companyId,
+            requireString(input.params.jobId, "jobId"),
+            requireString(body.to, "to") as CognitionJobStatus,
+            {
+              stageLabel: typeof body.stageLabel === "string" ? body.stageLabel : undefined,
+              error: "error" in body ? (body.error as string | null) : undefined,
+            },
+          );
+          if (!job) return { status: 404, body: { error: "Cognition job not found" } };
+          return { body: { job } };
+        } catch (err) {
+          return { status: 422, body: { error: String((err as Error)?.message ?? err) } };
+        }
+      }
+
+      case "update-cognition-shards": {
+        const body = optionalRecord(input.body) ?? {};
+        const shards = Array.isArray(body.shards) ? (body.shards as CognitionShard[]) : [];
+        const job = await store.updateCognitionShards(
+          companyId,
+          requireString(input.params.jobId, "jobId"),
+          shards,
+        );
+        if (!job) return { status: 404, body: { error: "Cognition job not found" } };
+        return { body: { job } };
+      }
+
+      case "set-cognition-draft": {
+        const body = optionalRecord(input.body) ?? {};
+        const job = await store.setCognitionDraft(companyId, requireString(input.params.jobId, "jobId"), {
+          draftPreview: optionalRecord(body.draftPreview),
+          seedNodeTypes: Array.isArray(body.seedNodeTypes) ? body.seedNodeTypes : undefined,
+          seedRelationTypes: Array.isArray(body.seedRelationTypes) ? body.seedRelationTypes : undefined,
+          seedActions: Array.isArray(body.seedActions) ? body.seedActions : undefined,
+        });
+        if (!job) return { status: 404, body: { error: "Cognition job not found" } };
+        return { body: { job } };
+      }
+
+      case "publish-cognition-job": {
+        const body = optionalRecord(input.body) ?? {};
+        const jobId = requireString(input.params.jobId, "jobId");
+        const targetDomainId = requireString(body.domainId, "domainId");
+        try {
+          const result = await publishCognitionDraft(ctx, store, companyId, jobId, targetDomainId);
+          if (!result) return { status: 404, body: { error: "Cognition job or domain not found" } };
+          return { body: result };
+        } catch (err) {
+          return { status: 422, body: { error: String((err as Error)?.message ?? err) } };
+        }
       }
 
       default:

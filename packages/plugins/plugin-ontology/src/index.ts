@@ -27,6 +27,10 @@ export type {
   OntologyActionTypeInput,
   OntologyActionTypeRow,
   OntologyActionTypeUpdate,
+  OntologyCognitionJobInput,
+  OntologyCognitionJobRow,
+  CognitionShard,
+  CognitionCoverage,
   GraphSnapshot,
   PathHop,
   ImpactedNode,
@@ -49,6 +53,12 @@ export {
   ACTION_KINDS,
   ACTION_TYPE_STATUSES,
   NODE_LAYERS,
+  COGNITION_SCALES,
+  COGNITION_JOB_STATUSES,
+  COGNITION_STATE_TRANSITIONS,
+  COGNITION_SHARD_STATUSES,
+  COGNITION_PROGRESS_BY_STATUS,
+  isValidCognitionTransition,
 } from "./enums.js";
 export type {
   DomainLifecycleState,
@@ -63,4 +73,7 @@ export type {
   ActionKind,
   ActionTypeStatus,
   NodeLayer,
+  CognitionScale,
+  CognitionJobStatus,
+  CognitionShardStatus,
 } from "./enums.js";

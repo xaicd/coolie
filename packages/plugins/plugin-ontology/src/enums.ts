@@ -144,3 +144,76 @@ export const NODE_LAYERS = [
   "generic",
 ] as const;
 export type NodeLayer = (typeof NODE_LAYERS)[number];
+
+
+// ---------------------------------------------------------------------------
+// O3 — legacy repository cognition (DigitalStaff RepoCognitionJob parity)
+// ---------------------------------------------------------------------------
+
+/**
+ * Cognition job scale tier — drives shard/split thresholds (DS RepoCognitionScale).
+ */
+export const COGNITION_SCALES = ["s", "m", "l", "xl"] as const;
+export type CognitionScale = (typeof COGNITION_SCALES)[number];
+
+/**
+ * Cognition job lifecycle (DS RepoCognitionJobStatus): a resumable pipeline that
+ * indexes a legacy repo, splits into shards, ingests/learns per shard,
+ * synthesizes a draft ontology, waits for human confirmation, then publishes.
+ */
+export const COGNITION_JOB_STATUSES = [
+  "pending",
+  "indexing",
+  "splitting",
+  "ingesting",
+  "synthesizing",
+  "awaiting_confirm",
+  "publishing",
+  "completed",
+  "failed",
+] as const;
+export type CognitionJobStatus = (typeof COGNITION_JOB_STATUSES)[number];
+
+/**
+ * Allowed cognition status transitions. The happy path is linear; `failed` is
+ * reachable from any active state; `awaiting_confirm` can loop back to
+ * `ingesting` on rejection/re-run.
+ */
+export const COGNITION_STATE_TRANSITIONS: Record<CognitionJobStatus, CognitionJobStatus[]> = {
+  pending: ["indexing", "failed"],
+  indexing: ["splitting", "failed"],
+  splitting: ["ingesting", "failed"],
+  ingesting: ["synthesizing", "ingesting", "failed"],
+  synthesizing: ["awaiting_confirm", "failed"],
+  awaiting_confirm: ["publishing", "ingesting", "failed"],
+  publishing: ["completed", "failed"],
+  completed: [],
+  failed: ["pending"],
+};
+
+export const COGNITION_SHARD_STATUSES = ["pending", "running", "done", "failed"] as const;
+export type CognitionShardStatus = (typeof COGNITION_SHARD_STATUSES)[number];
+
+/** Return true when `to` is a legal cognition-job transition from `from`. */
+export function isValidCognitionTransition(
+  from: CognitionJobStatus,
+  to: CognitionJobStatus,
+): boolean {
+  return COGNITION_STATE_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
+/**
+ * Progress percent by status (mirrors DS computeProgressPct shape). During
+ * `ingesting`, callers should interpolate with shard progress.
+ */
+export const COGNITION_PROGRESS_BY_STATUS: Record<CognitionJobStatus, number> = {
+  pending: 2,
+  indexing: 8,
+  splitting: 16,
+  ingesting: 40,
+  synthesizing: 78,
+  awaiting_confirm: 90,
+  publishing: 96,
+  completed: 100,
+  failed: 0,
+};
