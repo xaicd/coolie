@@ -17,19 +17,38 @@ core tables.
 - Core tables: `ontology_domains`, `ontology_node_types`, `ontology_relation_types`,
   `ontology_nodes` (instances), `ontology_edges` (instance relations).
 
+## O1 (modeling core) scope
+
+- Domain CRUD-ish management with **schema versioning**: every `updateDomain`
+  bumps the domain `version`.
+- **Node type** and **relation type** modeling: create / list / update per domain.
+- **Graph snapshot**: aggregate counts (node types, relation types, nodes, edges)
+  plus a bounded node/edge list for a lightweight visualization.
+- Table-driven modeling UI: domain list + domain detail page with metric cards
+  and node/relation-type management tables.
+
 ## API routes
 
 Mounted under the plugin API prefix:
 
-| Method | Path        | Route key      | Description |
-|--------|-------------|----------------|-------------|
-| GET    | `/health`   | `health`       | Namespace/health probe |
-| GET    | `/domains`  | `list-domains` | List a company's ontology domains |
-| POST   | `/domains`  | `create-domain`| Create a domain |
-| POST   | `/nodes`    | `create-node`  | Create a node instance |
-| POST   | `/edges`    | `create-edge`  | Create a directed edge |
-| GET    | `/path`     | `find-path`    | Shortest hop path (recursive CTE) |
-| GET    | `/impact`   | `find-impact`  | Impact radius upstream/downstream |
+| Method | Path                          | Route key             | Description |
+|--------|-------------------------------|-----------------------|-------------|
+| GET    | `/health`                     | `health`              | Namespace/health probe |
+| GET    | `/domains`                    | `list-domains`        | List a company's ontology domains |
+| POST   | `/domains`                    | `create-domain`       | Create a domain |
+| GET    | `/domains/:domainId`          | `get-domain`          | Get one domain |
+| PATCH  | `/domains/:domainId`          | `update-domain`       | Update a domain (bumps version) |
+| GET    | `/node-types`                 | `list-node-types`     | List node types for a domain |
+| POST   | `/node-types`                 | `create-node-type`    | Create a node type |
+| PATCH  | `/node-types/:nodeTypeId`     | `update-node-type`    | Update a node type |
+| GET    | `/relation-types`             | `list-relation-types` | List relation types for a domain |
+| POST   | `/relation-types`             | `create-relation-type`| Create a relation type |
+| PATCH  | `/relation-types/:relationTypeId` | `update-relation-type` | Update a relation type |
+| GET    | `/graph`                      | `graph-snapshot`      | Bounded graph snapshot + counts |
+| POST   | `/nodes`                      | `create-node`         | Create a node instance |
+| POST   | `/edges`                      | `create-edge`         | Create a directed edge |
+| GET    | `/path`                       | `find-path`           | Shortest hop path (recursive CTE) |
+| GET    | `/impact`                     | `find-impact`         | Impact radius upstream/downstream |
 
 ## Design reference
 

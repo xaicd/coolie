@@ -58,17 +58,67 @@ const plugin = definePlugin({
     activeContext = ctx;
     graphStore = new PostgresGraphStore(ctx.db);
 
+    const store = requireGraphStore();
+
     // Backs usePluginData("list-domains") in the plugin UI.
     ctx.data.register("list-domains", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
-      const domains = await ctx.db.query(
-        `SELECT id, company_id, slug, display_name, description, status, version
-           FROM "${ctx.db.namespace}".ontology_domains
-          WHERE company_id = $1
-          ORDER BY created_at ASC`,
-        [companyId],
-      );
-      return { domains };
+      return { domains: await store.listDomains(companyId) };
+    });
+
+    // Backs usePluginData("domain-detail", { companyId, domainId }) — domain +
+    // node-types + relation-types + a bounded graph snapshot in one payload.
+    ctx.data.register("domain-detail", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const [domain, nodeTypes, relationTypes, graph] = await Promise.all([
+        store.getDomain(companyId, domainId),
+        store.listNodeTypes(companyId, domainId),
+        store.listRelationTypes(companyId, domainId),
+        store.getGraphSnapshot(companyId, domainId),
+      ]);
+      return { domain, nodeTypes, relationTypes, graph };
+    });
+
+    // Mutating actions backing usePluginAction(...) in the plugin UI.
+    ctx.actions.register("create-domain", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domain = await store.createDomain({
+        companyId,
+        slug: requireString(params.slug, "slug"),
+        displayName: requireString(params.displayName, "displayName"),
+        description: typeof params.description === "string" ? params.description : null,
+      });
+      await ctx.activity.log({
+        companyId,
+        message: `Created ontology domain ${domain.slug}`,
+        entityType: "ontology_domain",
+        entityId: domain.id,
+      });
+      return { domain };
+    });
+
+    ctx.actions.register("create-node-type", async (params) => {
+      const nodeType = await store.createNodeType({
+        companyId: requireString(params.companyId, "companyId"),
+        domainId: requireString(params.domainId, "domainId"),
+        key: requireString(params.key, "key"),
+        displayName: requireString(params.displayName, "displayName"),
+        description: typeof params.description === "string" ? params.description : null,
+      });
+      return { nodeType };
+    });
+
+    ctx.actions.register("create-relation-type", async (params) => {
+      const relationType = await store.createRelationType({
+        companyId: requireString(params.companyId, "companyId"),
+        domainId: requireString(params.domainId, "domainId"),
+        key: requireString(params.key, "key"),
+        displayName: requireString(params.displayName, "displayName"),
+        description: typeof params.description === "string" ? params.description : null,
+        directed: typeof params.directed === "boolean" ? params.directed : undefined,
+      });
+      return { relationType };
     });
 
     ctx.logger.info("Ontology plugin worker started", { namespace: ctx.db.namespace });
@@ -160,6 +210,120 @@ const plugin = definePlugin({
           metadata: optionalRecord(body.metadata),
         });
         return { status: 201, body: { edge } };
+      }
+
+      case "get-domain": {
+        const domain = await store.getDomain(companyId, requireString(input.params.domainId, "domainId"));
+        if (!domain) return { status: 404, body: { error: "Domain not found" } };
+        return { body: { domain } };
+      }
+
+      case "update-domain": {
+        const body = optionalRecord(input.body) ?? {};
+        const domain = await store.updateDomain(
+          companyId,
+          requireString(input.params.domainId, "domainId"),
+          {
+            displayName: typeof body.displayName === "string" ? body.displayName : undefined,
+            description: "description" in body ? (body.description as string | null) : undefined,
+            status: typeof body.status === "string" ? body.status : undefined,
+            metadata: optionalRecord(body.metadata),
+          },
+        );
+        if (!domain) return { status: 404, body: { error: "Domain not found" } };
+        await ctx.activity.log({
+          companyId,
+          message: `Updated ontology domain ${domain.slug} (v${domain.version})`,
+          entityType: "ontology_domain",
+          entityId: domain.id,
+          metadata: { version: domain.version },
+        });
+        return { body: { domain } };
+      }
+
+      case "list-node-types": {
+        const nodeTypes = await store.listNodeTypes(
+          companyId,
+          requireString(queryString(input.query.domainId), "domainId"),
+        );
+        return { body: { nodeTypes } };
+      }
+
+      case "create-node-type": {
+        const body = optionalRecord(input.body) ?? {};
+        const nodeType = await store.createNodeType({
+          companyId,
+          domainId: requireString(body.domainId, "domainId"),
+          key: requireString(body.key, "key"),
+          displayName: requireString(body.displayName, "displayName"),
+          description: typeof body.description === "string" ? body.description : null,
+          propertiesSchema: optionalRecord(body.propertiesSchema),
+          metadata: optionalRecord(body.metadata),
+        });
+        return { status: 201, body: { nodeType } };
+      }
+
+      case "update-node-type": {
+        const body = optionalRecord(input.body) ?? {};
+        const nodeType = await store.updateNodeType(
+          companyId,
+          requireString(input.params.nodeTypeId, "nodeTypeId"),
+          {
+            displayName: typeof body.displayName === "string" ? body.displayName : undefined,
+            description: "description" in body ? (body.description as string | null) : undefined,
+            propertiesSchema: optionalRecord(body.propertiesSchema),
+            metadata: optionalRecord(body.metadata),
+          },
+        );
+        if (!nodeType) return { status: 404, body: { error: "Node type not found" } };
+        return { body: { nodeType } };
+      }
+
+      case "list-relation-types": {
+        const relationTypes = await store.listRelationTypes(
+          companyId,
+          requireString(queryString(input.query.domainId), "domainId"),
+        );
+        return { body: { relationTypes } };
+      }
+
+      case "create-relation-type": {
+        const body = optionalRecord(input.body) ?? {};
+        const relationType = await store.createRelationType({
+          companyId,
+          domainId: requireString(body.domainId, "domainId"),
+          key: requireString(body.key, "key"),
+          displayName: requireString(body.displayName, "displayName"),
+          description: typeof body.description === "string" ? body.description : null,
+          directed: typeof body.directed === "boolean" ? body.directed : undefined,
+          metadata: optionalRecord(body.metadata),
+        });
+        return { status: 201, body: { relationType } };
+      }
+
+      case "update-relation-type": {
+        const body = optionalRecord(input.body) ?? {};
+        const relationType = await store.updateRelationType(
+          companyId,
+          requireString(input.params.relationTypeId, "relationTypeId"),
+          {
+            displayName: typeof body.displayName === "string" ? body.displayName : undefined,
+            description: "description" in body ? (body.description as string | null) : undefined,
+            directed: typeof body.directed === "boolean" ? body.directed : undefined,
+            metadata: optionalRecord(body.metadata),
+          },
+        );
+        if (!relationType) return { status: 404, body: { error: "Relation type not found" } };
+        return { body: { relationType } };
+      }
+
+      case "graph-snapshot": {
+        const graph = await store.getGraphSnapshot(
+          companyId,
+          requireString(queryString(input.query.domainId), "domainId"),
+          parseDepth(queryString(input.query.nodeLimit)),
+        );
+        return { body: { graph } };
       }
 
       case "find-path": {
