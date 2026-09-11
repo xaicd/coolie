@@ -40,6 +40,7 @@ const manifest: PaperclipPluginManifestV1 = {
     "database.namespace.write",
     "companies.read",
     "activity.log.write",
+    "events.emit",
     "plugin.state.read",
     "plugin.state.write",
   ],

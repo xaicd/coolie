@@ -193,6 +193,65 @@ async function publishCognitionDraft(
   return { published: { nodeTypes, relationTypes, actionTypes }, job };
 }
 
+/**
+ * Emit a cross-plugin `domain-lifecycle-changed` event. Best-effort: swallow
+ * emit failures so a domain transition never fails because a subscriber or the
+ * event bus is unavailable.
+ */
+async function emitDomainLifecycleChanged(
+  ctx: PluginContext,
+  companyId: string,
+  payload: { domainId: string; from: string | null; to: string },
+): Promise<void> {
+  try {
+    await ctx.events.emit("domain-lifecycle-changed", companyId, payload);
+  } catch (err) {
+    ctx.logger.warn("Failed to emit domain-lifecycle-changed", {
+      error: String((err as Error)?.message ?? err),
+      domainId: payload.domainId,
+    });
+  }
+}
+
+/**
+ * Emit one `node-stale` event per node in a domain. Used when a domain is
+ * deprecated so downstream plugins can open remediation work. Best-effort per
+ * node; individual failures are logged and skipped.
+ */
+async function emitStaleNodesForDomain(
+  ctx: PluginContext,
+  store: GraphStore,
+  companyId: string,
+  domainId: string,
+): Promise<void> {
+  let nodes: Awaited<ReturnType<GraphStore["listNodes"]>>;
+  try {
+    nodes = await store.listNodes(companyId, domainId, 500);
+  } catch (err) {
+    ctx.logger.warn("Failed to list nodes for node-stale emit", {
+      error: String((err as Error)?.message ?? err),
+      domainId,
+    });
+    return;
+  }
+  for (const node of nodes) {
+    try {
+      await ctx.events.emit("node-stale", companyId, {
+        domainId,
+        nodeId: node.id,
+        nodeKey: node.key,
+        reason: "domain-deprecated",
+      });
+    } catch (err) {
+      ctx.logger.warn("Failed to emit node-stale", {
+        error: String((err as Error)?.message ?? err),
+        domainId,
+        nodeId: node.id,
+      });
+    }
+  }
+}
+
 const plugin = definePlugin({
   async setup(ctx) {
     activeContext = ctx;
@@ -588,13 +647,34 @@ const plugin = definePlugin({
       case "transition-domain": {
         const body = optionalRecord(input.body) ?? {};
         try {
+          const domainId = requireString(input.params.domainId, "domainId");
+          const before = await store.getDomain(companyId, domainId);
+          const to = requireString(body.to, "to") as DomainLifecycleState;
           const domain = await store.transitionDomainLifecycle(
             companyId,
-            requireString(input.params.domainId, "domainId"),
-            requireString(body.to, "to") as DomainLifecycleState,
+            domainId,
+            to,
             typeof body.actor === "string" ? body.actor : "system",
           );
           if (!domain) return { status: 404, body: { error: "Domain not found" } };
+
+          // Cross-plugin event: announce the domain lifecycle change so other
+          // plugins (npc-factory, workflow) can react. Best-effort; a failed
+          // emit must never fail the transition itself.
+          await emitDomainLifecycleChanged(ctx, companyId, {
+            domainId,
+            from: before?.lifecycle_state ?? null,
+            to,
+          });
+
+          // Flagship trigger: when a domain is deprecated, its published nodes
+          // are considered stale. Emit a node-stale event per node so downstream
+          // plugins (npc-factory) can open remediation workflow runs. Mirrors
+          // DigitalStaff domain-6 ontology-node-stale trigger semantics.
+          if (to === "deprecated") {
+            await emitStaleNodesForDomain(ctx, store, companyId, domainId);
+          }
+
           return { body: { domain } };
         } catch (err) {
           return { status: 422, body: { error: String((err as Error)?.message ?? err) } };
