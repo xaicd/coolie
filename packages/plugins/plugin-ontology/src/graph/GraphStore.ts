@@ -15,12 +15,15 @@ import type { PluginDatabaseClient } from "@paperclipai/plugin-sdk";
  */
 import { isValidDomainTransition } from "../enums.js";
 import type {
+  ActionKind,
+  ActionTypeStatus,
   AuditEventType,
   BootstrapSource,
   DomainLifecycleState,
   FunctionStatus,
   FunctionType,
   LinkCardinality,
+  NodeLayer,
   NodeLifecycleState,
 } from "../enums.js";
 
@@ -133,6 +136,11 @@ export interface OntologyNodeTypeInput {
   displayName: string;
   description?: string | null;
   propertiesSchema?: Record<string, unknown>;
+  /** Foundry interface polymorphism: interface keys this object type implements. */
+  implementsInterfaces?: string[];
+  /** DigitalStaff living-ontology layer classification. */
+  layer?: NodeLayer;
+  layerSpec?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
 }
 
@@ -140,6 +148,9 @@ export interface OntologyNodeTypeUpdate {
   displayName?: string;
   description?: string | null;
   propertiesSchema?: Record<string, unknown>;
+  implementsInterfaces?: string[];
+  layer?: NodeLayer;
+  layerSpec?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
 }
 
@@ -150,6 +161,7 @@ export interface OntologyNodeTypeRow {
   key: string;
   display_name: string;
   description: string | null;
+  layer: NodeLayer;
 }
 
 export interface OntologyRelationTypeInput {
@@ -251,6 +263,80 @@ export interface OntologyDomainSnapshotRow {
   created_at: string;
 }
 
+// --- O2: Palantir Foundry core — interfaces + action types ---
+
+export interface OntologyInterfaceInput {
+  companyId: string;
+  domainId: string;
+  key: string;
+  displayName: string;
+  description?: string | null;
+  propertiesSchema?: Record<string, unknown>;
+  extendsInterfaces?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyInterfaceUpdate {
+  displayName?: string;
+  description?: string | null;
+  propertiesSchema?: Record<string, unknown>;
+  extendsInterfaces?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyInterfaceRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  key: string;
+  display_name: string;
+  description: string | null;
+}
+
+export interface OntologyActionTypeInput {
+  companyId: string;
+  domainId: string;
+  key: string;
+  displayName: string;
+  description?: string;
+  kind?: ActionKind;
+  appliesToNodeTypeId?: string | null;
+  apiContract?: Record<string, unknown>;
+  stateTransitions?: unknown[];
+  emitsEvents?: unknown[];
+  requiredPermissions?: unknown[];
+  idempotent?: boolean;
+  metadata?: Record<string, unknown>;
+  createdBy?: string;
+}
+
+export interface OntologyActionTypeUpdate {
+  displayName?: string;
+  description?: string;
+  kind?: ActionKind;
+  appliesToNodeTypeId?: string | null;
+  apiContract?: Record<string, unknown>;
+  stateTransitions?: unknown[];
+  emitsEvents?: unknown[];
+  requiredPermissions?: unknown[];
+  idempotent?: boolean;
+  status?: ActionTypeStatus;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyActionTypeRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  key: string;
+  display_name: string;
+  description: string;
+  kind: ActionKind;
+  applies_to_node_type_id: string | null;
+  idempotent: boolean;
+  status: ActionTypeStatus;
+}
+
 export interface GraphSnapshot {
   domainId: string;
   counts: {
@@ -344,6 +430,23 @@ export interface GraphStore {
 
   writeAuditLog(input: OntologyAuditLogInput): Promise<OntologyAuditLogRow>;
   listAuditLogs(companyId: string, domainId: string, limit?: number): Promise<OntologyAuditLogRow[]>;
+
+  // O2 — Palantir core: interfaces (polymorphism) + action types (governed transactions)
+  createInterface(input: OntologyInterfaceInput): Promise<OntologyInterfaceRow>;
+  listInterfaces(companyId: string, domainId: string): Promise<OntologyInterfaceRow[]>;
+  updateInterface(
+    companyId: string,
+    interfaceId: string,
+    update: OntologyInterfaceUpdate,
+  ): Promise<OntologyInterfaceRow | null>;
+
+  createActionType(input: OntologyActionTypeInput): Promise<OntologyActionTypeRow>;
+  listActionTypes(companyId: string, domainId: string): Promise<OntologyActionTypeRow[]>;
+  updateActionType(
+    companyId: string,
+    actionTypeId: string,
+    update: OntologyActionTypeUpdate,
+  ): Promise<OntologyActionTypeRow | null>;
 }
 
 const DEFAULT_MAX_DEPTH = 12;
@@ -621,14 +724,15 @@ export class PostgresGraphStore implements GraphStore {
   }
 
   private static readonly NODE_TYPE_COLS =
-    "id, company_id, domain_id, key, display_name, description";
+    "id, company_id, domain_id, key, display_name, description, layer";
 
   async createNodeType(input: OntologyNodeTypeInput): Promise<OntologyNodeTypeRow> {
     const id = randomUUID();
     await this.db.execute(
       `INSERT INTO ${this.table("ontology_node_types")}
-         (id, company_id, domain_id, key, display_name, description, properties_schema, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb)`,
+         (id, company_id, domain_id, key, display_name, description, properties_schema,
+          implements_interfaces, layer, layer_spec, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10::jsonb, $11::jsonb)`,
       [
         id,
         input.companyId,
@@ -637,6 +741,9 @@ export class PostgresGraphStore implements GraphStore {
         input.displayName,
         input.description ?? null,
         JSON.stringify(input.propertiesSchema ?? {}),
+        JSON.stringify(input.implementsInterfaces ?? []),
+        input.layer ?? "generic",
+        JSON.stringify(input.layerSpec ?? {}),
         JSON.stringify(input.metadata ?? {}),
       ],
     );
@@ -666,11 +773,14 @@ export class PostgresGraphStore implements GraphStore {
   ): Promise<OntologyNodeTypeRow | null> {
     const res = await this.db.execute(
       `UPDATE ${this.table("ontology_node_types")}
-          SET display_name      = COALESCE($3, display_name),
-              description        = CASE WHEN $4::boolean THEN $5 ELSE description END,
-              properties_schema  = CASE WHEN $6::boolean THEN $7::jsonb ELSE properties_schema END,
-              metadata           = CASE WHEN $8::boolean THEN $9::jsonb ELSE metadata END,
-              updated_at         = now()
+          SET display_name          = COALESCE($3, display_name),
+              description            = CASE WHEN $4::boolean THEN $5 ELSE description END,
+              properties_schema      = CASE WHEN $6::boolean THEN $7::jsonb ELSE properties_schema END,
+              metadata               = CASE WHEN $8::boolean THEN $9::jsonb ELSE metadata END,
+              implements_interfaces  = CASE WHEN $10::boolean THEN $11::jsonb ELSE implements_interfaces END,
+              layer                  = COALESCE($12, layer),
+              layer_spec             = CASE WHEN $13::boolean THEN $14::jsonb ELSE layer_spec END,
+              updated_at             = now()
         WHERE company_id = $1 AND id = $2`,
       [
         companyId,
@@ -682,6 +792,11 @@ export class PostgresGraphStore implements GraphStore {
         JSON.stringify(update.propertiesSchema ?? {}),
         update.metadata !== undefined,
         JSON.stringify(update.metadata ?? {}),
+        update.implementsInterfaces !== undefined,
+        JSON.stringify(update.implementsInterfaces ?? []),
+        update.layer ?? null,
+        update.layerSpec !== undefined,
+        JSON.stringify(update.layerSpec ?? {}),
       ],
     );
     if (res.rowCount === 0) return null;
@@ -1119,5 +1234,189 @@ export class PostgresGraphStore implements GraphStore {
         LIMIT $3`,
       [companyId, domainId, capped],
     );
+  }
+
+  // -------------------------------------------------------------------------
+  // O2 — Palantir core: interfaces (polymorphism) + action types
+  // -------------------------------------------------------------------------
+
+  private static readonly INTERFACE_COLS =
+    "id, company_id, domain_id, key, display_name, description";
+
+  async createInterface(input: OntologyInterfaceInput): Promise<OntologyInterfaceRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_interfaces")}
+         (id, company_id, domain_id, key, display_name, description,
+          properties_schema, extends_interfaces, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.key,
+        input.displayName,
+        input.description ?? null,
+        JSON.stringify(input.propertiesSchema ?? {}),
+        JSON.stringify(input.extendsInterfaces ?? []),
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyInterfaceRow>(
+      `SELECT ${PostgresGraphStore.INTERFACE_COLS}
+         FROM ${this.table("ontology_interfaces")}
+        WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listInterfaces(companyId: string, domainId: string): Promise<OntologyInterfaceRow[]> {
+    return this.db.query<OntologyInterfaceRow>(
+      `SELECT ${PostgresGraphStore.INTERFACE_COLS}
+         FROM ${this.table("ontology_interfaces")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId, domainId],
+    );
+  }
+
+  async updateInterface(
+    companyId: string,
+    interfaceId: string,
+    update: OntologyInterfaceUpdate,
+  ): Promise<OntologyInterfaceRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_interfaces")}
+          SET display_name       = COALESCE($3, display_name),
+              description         = CASE WHEN $4::boolean THEN $5 ELSE description END,
+              properties_schema   = CASE WHEN $6::boolean THEN $7::jsonb ELSE properties_schema END,
+              extends_interfaces  = CASE WHEN $8::boolean THEN $9::jsonb ELSE extends_interfaces END,
+              metadata            = CASE WHEN $10::boolean THEN $11::jsonb ELSE metadata END,
+              updated_at          = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [
+        companyId,
+        interfaceId,
+        update.displayName ?? null,
+        update.description !== undefined,
+        update.description ?? null,
+        update.propertiesSchema !== undefined,
+        JSON.stringify(update.propertiesSchema ?? {}),
+        update.extendsInterfaces !== undefined,
+        JSON.stringify(update.extendsInterfaces ?? []),
+        update.metadata !== undefined,
+        JSON.stringify(update.metadata ?? {}),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    const rows = await this.db.query<OntologyInterfaceRow>(
+      `SELECT ${PostgresGraphStore.INTERFACE_COLS}
+         FROM ${this.table("ontology_interfaces")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, interfaceId],
+    );
+    return rows[0] ?? null;
+  }
+
+  private static readonly ACTION_TYPE_COLS =
+    "id, company_id, domain_id, key, display_name, description, kind, " +
+    "applies_to_node_type_id, idempotent, status";
+
+  async createActionType(input: OntologyActionTypeInput): Promise<OntologyActionTypeRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_action_types")}
+         (id, company_id, domain_id, key, display_name, description, kind,
+          applies_to_node_type_id, api_contract, state_transitions, emits_events,
+          required_permissions, idempotent, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10::jsonb, $11::jsonb, $12::jsonb, $13, $14, $14, $15::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.key,
+        input.displayName,
+        input.description ?? "",
+        input.kind ?? "modify",
+        input.appliesToNodeTypeId ?? null,
+        JSON.stringify(input.apiContract ?? {}),
+        JSON.stringify(input.stateTransitions ?? []),
+        JSON.stringify(input.emitsEvents ?? []),
+        JSON.stringify(input.requiredPermissions ?? []),
+        input.idempotent ?? false,
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyActionTypeRow>(
+      `SELECT ${PostgresGraphStore.ACTION_TYPE_COLS}
+         FROM ${this.table("ontology_action_types")}
+        WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listActionTypes(companyId: string, domainId: string): Promise<OntologyActionTypeRow[]> {
+    return this.db.query<OntologyActionTypeRow>(
+      `SELECT ${PostgresGraphStore.ACTION_TYPE_COLS}
+         FROM ${this.table("ontology_action_types")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId, domainId],
+    );
+  }
+
+  async updateActionType(
+    companyId: string,
+    actionTypeId: string,
+    update: OntologyActionTypeUpdate,
+  ): Promise<OntologyActionTypeRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_action_types")}
+          SET display_name            = COALESCE($3, display_name),
+              description              = COALESCE($4, description),
+              kind                     = COALESCE($5, kind),
+              applies_to_node_type_id  = CASE WHEN $6::boolean THEN $7::uuid ELSE applies_to_node_type_id END,
+              api_contract             = CASE WHEN $8::boolean THEN $9::jsonb ELSE api_contract END,
+              state_transitions        = CASE WHEN $10::boolean THEN $11::jsonb ELSE state_transitions END,
+              emits_events             = CASE WHEN $12::boolean THEN $13::jsonb ELSE emits_events END,
+              required_permissions     = CASE WHEN $14::boolean THEN $15::jsonb ELSE required_permissions END,
+              idempotent               = COALESCE($16, idempotent),
+              status                   = COALESCE($17, status),
+              metadata                 = CASE WHEN $18::boolean THEN $19::jsonb ELSE metadata END,
+              updated_at               = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [
+        companyId,
+        actionTypeId,
+        update.displayName ?? null,
+        update.description ?? null,
+        update.kind ?? null,
+        update.appliesToNodeTypeId !== undefined,
+        update.appliesToNodeTypeId ?? null,
+        update.apiContract !== undefined,
+        JSON.stringify(update.apiContract ?? {}),
+        update.stateTransitions !== undefined,
+        JSON.stringify(update.stateTransitions ?? []),
+        update.emitsEvents !== undefined,
+        JSON.stringify(update.emitsEvents ?? []),
+        update.requiredPermissions !== undefined,
+        JSON.stringify(update.requiredPermissions ?? []),
+        typeof update.idempotent === "boolean" ? update.idempotent : null,
+        update.status ?? null,
+        update.metadata !== undefined,
+        JSON.stringify(update.metadata ?? {}),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    const rows = await this.db.query<OntologyActionTypeRow>(
+      `SELECT ${PostgresGraphStore.ACTION_TYPE_COLS}
+         FROM ${this.table("ontology_action_types")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, actionTypeId],
+    );
+    return rows[0] ?? null;
   }
 }

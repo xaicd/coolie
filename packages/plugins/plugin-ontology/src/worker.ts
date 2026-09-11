@@ -10,7 +10,13 @@ import {
   type GraphStore,
   type ImpactDirection,
 } from "./graph/GraphStore.js";
-import type { DomainLifecycleState, FunctionStatus, FunctionType } from "./enums.js";
+import type {
+  ActionKind,
+  ActionTypeStatus,
+  DomainLifecycleState,
+  FunctionStatus,
+  FunctionType,
+} from "./enums.js";
 
 let activeContext: PluginContext | null = null;
 let graphStore: GraphStore | null = null;
@@ -543,6 +549,105 @@ const plugin = definePlugin({
           parseDepth(queryString(input.query.limit)),
         );
         return { body: { auditLogs: logs } };
+      }
+
+      case "list-interfaces": {
+        const interfaces = await store.listInterfaces(
+          companyId,
+          requireString(queryString(input.query.domainId), "domainId"),
+        );
+        return { body: { interfaces } };
+      }
+
+      case "create-interface": {
+        const body = optionalRecord(input.body) ?? {};
+        const iface = await store.createInterface({
+          companyId,
+          domainId: requireString(body.domainId, "domainId"),
+          key: requireString(body.key, "key"),
+          displayName: requireString(body.displayName, "displayName"),
+          description: typeof body.description === "string" ? body.description : null,
+          propertiesSchema: optionalRecord(body.propertiesSchema),
+          extendsInterfaces: Array.isArray(body.extendsInterfaces)
+            ? (body.extendsInterfaces as string[])
+            : undefined,
+        });
+        return { status: 201, body: { interface: iface } };
+      }
+
+      case "update-interface": {
+        const body = optionalRecord(input.body) ?? {};
+        const iface = await store.updateInterface(
+          companyId,
+          requireString(input.params.interfaceId, "interfaceId"),
+          {
+            displayName: typeof body.displayName === "string" ? body.displayName : undefined,
+            description: "description" in body ? (body.description as string | null) : undefined,
+            propertiesSchema: optionalRecord(body.propertiesSchema),
+            extendsInterfaces: Array.isArray(body.extendsInterfaces)
+              ? (body.extendsInterfaces as string[])
+              : undefined,
+            metadata: optionalRecord(body.metadata),
+          },
+        );
+        if (!iface) return { status: 404, body: { error: "Interface not found" } };
+        return { body: { interface: iface } };
+      }
+
+      case "list-action-types": {
+        const actionTypes = await store.listActionTypes(
+          companyId,
+          requireString(queryString(input.query.domainId), "domainId"),
+        );
+        return { body: { actionTypes } };
+      }
+
+      case "create-action-type": {
+        const body = optionalRecord(input.body) ?? {};
+        const actionType = await store.createActionType({
+          companyId,
+          domainId: requireString(body.domainId, "domainId"),
+          key: requireString(body.key, "key"),
+          displayName: requireString(body.displayName, "displayName"),
+          description: typeof body.description === "string" ? body.description : undefined,
+          kind: typeof body.kind === "string" ? (body.kind as ActionKind) : undefined,
+          appliesToNodeTypeId:
+            typeof body.appliesToNodeTypeId === "string" ? body.appliesToNodeTypeId : null,
+          apiContract: optionalRecord(body.apiContract),
+          stateTransitions: Array.isArray(body.stateTransitions) ? body.stateTransitions : undefined,
+          emitsEvents: Array.isArray(body.emitsEvents) ? body.emitsEvents : undefined,
+          requiredPermissions: Array.isArray(body.requiredPermissions)
+            ? body.requiredPermissions
+            : undefined,
+          idempotent: typeof body.idempotent === "boolean" ? body.idempotent : undefined,
+        });
+        return { status: 201, body: { actionType } };
+      }
+
+      case "update-action-type": {
+        const body = optionalRecord(input.body) ?? {};
+        const actionType = await store.updateActionType(
+          companyId,
+          requireString(input.params.actionTypeId, "actionTypeId"),
+          {
+            displayName: typeof body.displayName === "string" ? body.displayName : undefined,
+            description: typeof body.description === "string" ? body.description : undefined,
+            kind: typeof body.kind === "string" ? (body.kind as ActionKind) : undefined,
+            appliesToNodeTypeId:
+              "appliesToNodeTypeId" in body ? (body.appliesToNodeTypeId as string | null) : undefined,
+            apiContract: optionalRecord(body.apiContract),
+            stateTransitions: Array.isArray(body.stateTransitions) ? body.stateTransitions : undefined,
+            emitsEvents: Array.isArray(body.emitsEvents) ? body.emitsEvents : undefined,
+            requiredPermissions: Array.isArray(body.requiredPermissions)
+              ? body.requiredPermissions
+              : undefined,
+            idempotent: typeof body.idempotent === "boolean" ? body.idempotent : undefined,
+            status: typeof body.status === "string" ? (body.status as ActionTypeStatus) : undefined,
+            metadata: optionalRecord(body.metadata),
+          },
+        );
+        if (!actionType) return { status: 404, body: { error: "Action type not found" } };
+        return { body: { actionType } };
       }
 
       case "find-path": {

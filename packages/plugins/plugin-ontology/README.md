@@ -49,6 +49,36 @@ its field vocabulary (少丢功能):
 
 Enum vocabulary lives in `src/enums.ts`.
 
+## O2 (Palantir Foundry core alignment) scope
+
+Aligns the plugin with the five primitive Foundry ontology **building blocks**.
+Mapping to plugin tables:
+
+| Foundry building block | Plugin table |
+|------------------------|--------------|
+| Object Types           | `ontology_node_types` |
+| Link Types             | `ontology_relation_types` |
+| Action Types           | `ontology_action_types` (added in O2) |
+| Functions              | `ontology_functions` |
+| Interfaces             | `ontology_interfaces` (added in O2) |
+
+- **Properties** are not a separate building block — they live in the
+  `properties_schema` of object types and interfaces (matching Foundry, where
+  properties are part of an object type).
+- **Dynamic security** is cross-cutting via `ontology_action_types.required_permissions`
+  and `ontology_functions.permissions`.
+- **Interfaces** provide object-type polymorphism (shared property shape +
+  `extends_interfaces`); object types declare `implements_interfaces`.
+- **Action Types** are governed transactions carrying an `api_contract`
+  (httpMethod/routePath/in/out), `state_transitions` (state machine),
+  `emits_events` (domain events), `required_permissions`, and `idempotent`.
+- Object types also carry a DigitalStaff living-ontology `layer`
+  (aggregate_root / child_entity / action / state / event / generic) so the
+  DS five-layer model maps cleanly onto Foundry object types.
+
+New API routes: `interfaces` (GET/POST + PATCH `/:interfaceId`) and
+`action-types` (GET/POST + PATCH `/:actionTypeId`).
+
 ## O5 (consumption interface) scope
 
 Exposes the ontology to agents as tools via `ctx.tools.register` (requires the
