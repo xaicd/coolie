@@ -27,6 +27,28 @@ core tables.
 - Table-driven modeling UI: domain list + domain detail page with metric cards
   and node/relation-type management tables.
 
+## O1.5 (DigitalStaff schema parity) scope
+
+Aligns the schema with the DigitalStaff source system so the migration keeps
+its field vocabulary (少丢功能):
+
+- **Audit base columns** on every table: `created_by / updated_by / is_deleted /
+  deleted_at / deleted_by / remark` (soft delete honored by all list/get reads).
+- **Domain**: `icon / category / is_built_in / forked_from / lifecycle_state /
+  governance_policy / bootstrap_source / stats / seed_schema_version`. Lifecycle
+  is a state machine (draft → active → deprecated → archived).
+- **Node instances**: `lifecycle_state` (active → stale → deprecated → archived)
+  + optimistic-lock `version`.
+- **Relation types**: `cardinality` (one_to_one / one_to_many / many_to_one /
+  many_to_many).
+- **Edges**: cross-domain support (`source_domain_id / target_domain_id /
+  is_cross_domain`).
+- **New tables**: `ontology_functions` (versioned/typed functions), 
+  `ontology_domain_snapshots` (immutable schema snapshots for version audit /
+  rollback), `ontology_audit_logs` (change events + before/after state, 23 event types).
+
+Enum vocabulary lives in `src/enums.ts`.
+
 ## O5 (consumption interface) scope
 
 Exposes the ontology to agents as tools via `ctx.tools.register` (requires the
