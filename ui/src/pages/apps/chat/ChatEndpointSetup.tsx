@@ -846,7 +846,7 @@ settings:
         {field("botToken", "Bot token")}
         {!endpoint.setup?.webhookUrl && (
           <p className="text-sm text-destructive">
-            Configure a public HTTPS URL for this Paperclip instance before
+            Configure a public HTTPS URL for this Coolie instance before
             connecting Telegram.
           </p>
         )}
@@ -1059,7 +1059,7 @@ settings:
         </p>
         {!endpoint.setup?.messagingEndpoint && (
           <p className="text-sm text-destructive">
-            Configure a public HTTPS URL for this Paperclip instance before
+            Configure a public HTTPS URL for this Coolie instance before
             connecting Microsoft Teams.
           </p>
         )}
@@ -1298,7 +1298,7 @@ settings:
         </div>
         {!endpoint.setup?.webhookUrl && (
           <p className="text-sm text-destructive">
-            Configure a public HTTPS URL for this Paperclip instance before
+            Configure a public HTTPS URL for this Coolie instance before
             connecting GitHub.
           </p>
         )}
@@ -1434,7 +1434,7 @@ settings:
       {field("signingSecret", "Signing Secret")}
       {!endpoint.setup?.webhookUrl && (
         <p className="text-sm text-destructive">
-          Configure a public HTTPS URL for this Paperclip instance before
+          Configure a public HTTPS URL for this Coolie instance before
           connecting Slack.
         </p>
       )}

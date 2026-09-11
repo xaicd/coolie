@@ -16,7 +16,7 @@ function NoBoardAccessPage() {
         <h1 className="text-xl font-semibold">No organization access</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           This account is signed in, but it does not have an active organization membership or instance-admin access on
-          this Paperclip instance.
+          this Coolie instance.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
           Use an organization invite or sign in with an account that already belongs to this org.

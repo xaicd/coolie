@@ -2418,7 +2418,7 @@ function OnboardingWizardInner({
                   <OnboardingHeading
                     center
                     title="What is the name of your organization?"
-                    lede="Welcome to Paperclip — let's set up your organization."
+                    lede="Welcome to Coolie — let's set up your organization."
                   />
                   {/* The field takes the agent step's measure rather than the
                       column's, so the two questions the wizard asks — name the
