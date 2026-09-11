@@ -16,6 +16,8 @@ import type {
   ActionTypeStatus,
   CognitionJobStatus,
   CognitionScale,
+  BusinessSystemDomain,
+  BusinessSystemStatus,
   ConnectorStatus,
   ConnectorType,
   DatasetFormat,
@@ -23,7 +25,10 @@ import type {
   DomainLifecycleState,
   FunctionStatus,
   FunctionType,
+  MicroserviceLayer,
   NodeLayer,
+  SubProjectStatus,
+  SubProjectType,
   SyncStrategy,
   TransformStatus,
   TransformType,
@@ -1033,6 +1038,127 @@ const plugin = definePlugin({
           result: optionalRecord(body.result),
         });
         return { status: 201, body: { packageInstall: install } };
+      }
+
+      case "list-business-systems": {
+        const systems = await store.listBusinessSystems(companyId, parseDepth(queryString(input.query.limit)));
+        return { body: { businessSystems: systems } };
+      }
+
+      case "get-business-system": {
+        const system = await store.getBusinessSystem(companyId, requireString(input.params.systemId, "systemId"));
+        if (!system) return { status: 404, body: { error: "Business system not found" } };
+        return { body: { businessSystem: system } };
+      }
+
+      case "create-business-system": {
+        const body = optionalRecord(input.body) ?? {};
+        const system = await store.createBusinessSystem({
+          companyId,
+          code: requireString(body.code, "code"),
+          name: requireString(body.name, "name"),
+          description: typeof body.description === "string" ? body.description : undefined,
+          domain: typeof body.domain === "string" ? (body.domain as BusinessSystemDomain) : undefined,
+          tags: Array.isArray(body.tags) ? (body.tags as string[]) : undefined,
+          ontologyDomainId: typeof body.ontologyDomainId === "string" ? body.ontologyDomainId : null,
+          ownerRef: typeof body.ownerRef === "string" ? body.ownerRef : null,
+          targetRole: typeof body.targetRole === "string" ? body.targetRole : undefined,
+          repos: Array.isArray(body.repos) ? body.repos : undefined,
+          ontologyBinding: optionalRecord(body.ontologyBinding),
+          domainCopilotConfig: optionalRecord(body.domainCopilotConfig),
+          domainGovernance: optionalRecord(body.domainGovernance),
+          npcTeamConfig: optionalRecord(body.npcTeamConfig),
+        });
+        await ctx.activity.log({
+          companyId,
+          message: `Created business system ${system.code}`,
+          entityType: "ontology_business_system",
+          entityId: system.id,
+        });
+        return { status: 201, body: { businessSystem: system } };
+      }
+
+      case "update-business-system": {
+        const body = optionalRecord(input.body) ?? {};
+        const system = await store.updateBusinessSystem(
+          companyId,
+          requireString(input.params.systemId, "systemId"),
+          {
+            name: typeof body.name === "string" ? body.name : undefined,
+            description: typeof body.description === "string" ? body.description : undefined,
+            domain: typeof body.domain === "string" ? (body.domain as BusinessSystemDomain) : undefined,
+            status: typeof body.status === "string" ? (body.status as BusinessSystemStatus) : undefined,
+            tags: Array.isArray(body.tags) ? (body.tags as string[]) : undefined,
+            ontologyDomainId: "ontologyDomainId" in body ? (body.ontologyDomainId as string | null) : undefined,
+            targetRole: typeof body.targetRole === "string" ? body.targetRole : undefined,
+            repos: Array.isArray(body.repos) ? body.repos : undefined,
+            serviceMap: optionalRecord(body.serviceMap),
+            npcTeamConfig: optionalRecord(body.npcTeamConfig),
+            ontologyBinding: optionalRecord(body.ontologyBinding),
+            domainCopilotConfig: optionalRecord(body.domainCopilotConfig),
+            domainGovernance: optionalRecord(body.domainGovernance),
+            runtimeStats: optionalRecord(body.runtimeStats),
+            isTemplateSystem: typeof body.isTemplateSystem === "boolean" ? body.isTemplateSystem : undefined,
+            metadata: optionalRecord(body.metadata),
+          },
+        );
+        if (!system) return { status: 404, body: { error: "Business system not found" } };
+        return { body: { businessSystem: system } };
+      }
+
+      case "list-sub-projects": {
+        const subProjects = await store.listSubProjects(
+          companyId,
+          requireString(queryString(input.query.businessSystemId), "businessSystemId"),
+        );
+        return { body: { subProjects } };
+      }
+
+      case "create-sub-project": {
+        const body = optionalRecord(input.body) ?? {};
+        const subProject = await store.createSubProject({
+          companyId,
+          businessSystemId: requireString(body.businessSystemId, "businessSystemId"),
+          name: requireString(body.name, "name"),
+          code: requireString(body.code, "code"),
+          type: typeof body.type === "string" ? (body.type as SubProjectType) : undefined,
+          techStack: Array.isArray(body.techStack) ? (body.techStack as string[]) : undefined,
+          framework: optionalRecord(body.framework),
+          gitRepo: optionalRecord(body.gitRepo),
+          apiSpecs: Array.isArray(body.apiSpecs) ? body.apiSpecs : undefined,
+          dependencies: Array.isArray(body.dependencies) ? body.dependencies : undefined,
+          buildConfig: optionalRecord(body.buildConfig),
+          microserviceLayer:
+            typeof body.microserviceLayer === "string" ? (body.microserviceLayer as MicroserviceLayer) : null,
+          ontologyNodeRef: optionalRecord(body.ontologyNodeRef),
+        });
+        return { status: 201, body: { subProject } };
+      }
+
+      case "update-sub-project": {
+        const body = optionalRecord(input.body) ?? {};
+        const subProject = await store.updateSubProject(
+          companyId,
+          requireString(input.params.subProjectId, "subProjectId"),
+          {
+            name: typeof body.name === "string" ? body.name : undefined,
+            type: typeof body.type === "string" ? (body.type as SubProjectType) : undefined,
+            techStack: Array.isArray(body.techStack) ? (body.techStack as string[]) : undefined,
+            framework: optionalRecord(body.framework),
+            gitRepo: optionalRecord(body.gitRepo),
+            apiSpecs: Array.isArray(body.apiSpecs) ? body.apiSpecs : undefined,
+            dependencies: Array.isArray(body.dependencies) ? body.dependencies : undefined,
+            buildConfig: optionalRecord(body.buildConfig),
+            status: typeof body.status === "string" ? (body.status as SubProjectStatus) : undefined,
+            microserviceLayer:
+              "microserviceLayer" in body ? (body.microserviceLayer as MicroserviceLayer | null) : undefined,
+            ontologyNodeRef: optionalRecord(body.ontologyNodeRef),
+            markActivity: body.markActivity === true,
+            metadata: optionalRecord(body.metadata),
+          },
+        );
+        if (!subProject) return { status: 404, body: { error: "Sub-project not found" } };
+        return { body: { subProject } };
       }
 
       default:

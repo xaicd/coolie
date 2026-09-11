@@ -26,11 +26,16 @@ import type {
   CognitionJobStatus,
   CognitionScale,
   CognitionShardStatus,
+  BusinessSystemDomain,
+  BusinessSystemStatus,
   ConnectorStatus,
   ConnectorType,
   DatasetFormat,
   DatasetLifecycleState,
   DomainLifecycleState,
+  MicroserviceLayer,
+  SubProjectStatus,
+  SubProjectType,
   FunctionStatus,
   FunctionType,
   LinkCardinality,
@@ -539,6 +544,102 @@ export interface OntologyPackageInstallRow {
   installed_by: string;
 }
 
+// --- O6: online application first-class citizens (DS BusinessSystem / SubProject) ---
+
+export interface OntologyBusinessSystemInput {
+  companyId: string;
+  code: string;
+  name: string;
+  description?: string;
+  domain?: BusinessSystemDomain;
+  tags?: string[];
+  ontologyDomainId?: string | null;
+  ownerRef?: string | null;
+  targetRole?: string;
+  repos?: unknown[];
+  ontologyBinding?: Record<string, unknown>;
+  domainCopilotConfig?: Record<string, unknown>;
+  domainGovernance?: Record<string, unknown>;
+  npcTeamConfig?: Record<string, unknown>;
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyBusinessSystemUpdate {
+  name?: string;
+  description?: string;
+  domain?: BusinessSystemDomain;
+  status?: BusinessSystemStatus;
+  tags?: string[];
+  ontologyDomainId?: string | null;
+  targetRole?: string;
+  repos?: unknown[];
+  serviceMap?: Record<string, unknown>;
+  npcTeamConfig?: Record<string, unknown>;
+  ontologyBinding?: Record<string, unknown>;
+  domainCopilotConfig?: Record<string, unknown>;
+  domainGovernance?: Record<string, unknown>;
+  runtimeStats?: Record<string, unknown>;
+  isTemplateSystem?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyBusinessSystemRow {
+  id: string;
+  company_id: string;
+  code: string;
+  name: string;
+  domain: BusinessSystemDomain;
+  status: BusinessSystemStatus;
+  ontology_domain_id: string | null;
+  is_template_system: boolean;
+}
+
+export interface OntologySubProjectInput {
+  companyId: string;
+  businessSystemId: string;
+  name: string;
+  code: string;
+  type?: SubProjectType;
+  techStack?: string[];
+  framework?: Record<string, unknown>;
+  gitRepo?: Record<string, unknown>;
+  apiSpecs?: unknown[];
+  dependencies?: unknown[];
+  buildConfig?: Record<string, unknown>;
+  microserviceLayer?: MicroserviceLayer | null;
+  ontologyNodeRef?: Record<string, unknown>;
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologySubProjectUpdate {
+  name?: string;
+  type?: SubProjectType;
+  techStack?: string[];
+  framework?: Record<string, unknown>;
+  gitRepo?: Record<string, unknown>;
+  apiSpecs?: unknown[];
+  dependencies?: unknown[];
+  buildConfig?: Record<string, unknown>;
+  status?: SubProjectStatus;
+  microserviceLayer?: MicroserviceLayer | null;
+  ontologyNodeRef?: Record<string, unknown>;
+  markActivity?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologySubProjectRow {
+  id: string;
+  company_id: string;
+  business_system_id: string;
+  name: string;
+  code: string;
+  type: SubProjectType;
+  status: SubProjectStatus;
+  microservice_layer: MicroserviceLayer | null;
+}
+
 export interface GraphSnapshot {
   domainId: string;
   counts: {
@@ -722,6 +823,24 @@ export interface GraphStore {
 
   createPackageInstall(input: OntologyPackageInstallInput): Promise<OntologyPackageInstallRow>;
   listPackageInstalls(companyId: string, domainId: string): Promise<OntologyPackageInstallRow[]>;
+
+  // O6 — online application first-class citizens
+  createBusinessSystem(input: OntologyBusinessSystemInput): Promise<OntologyBusinessSystemRow>;
+  getBusinessSystem(companyId: string, systemId: string): Promise<OntologyBusinessSystemRow | null>;
+  listBusinessSystems(companyId: string, limit?: number): Promise<OntologyBusinessSystemRow[]>;
+  updateBusinessSystem(
+    companyId: string,
+    systemId: string,
+    update: OntologyBusinessSystemUpdate,
+  ): Promise<OntologyBusinessSystemRow | null>;
+
+  createSubProject(input: OntologySubProjectInput): Promise<OntologySubProjectRow>;
+  listSubProjects(companyId: string, businessSystemId: string): Promise<OntologySubProjectRow[]>;
+  updateSubProject(
+    companyId: string,
+    subProjectId: string,
+    update: OntologySubProjectUpdate,
+  ): Promise<OntologySubProjectRow | null>;
 }
 
 const DEFAULT_MAX_DEPTH = 12;
@@ -2233,5 +2352,277 @@ export class PostgresGraphStore implements GraphStore {
         ORDER BY created_at ASC`,
       [companyId, domainId],
     );
+  }
+
+  // -------------------------------------------------------------------------
+  // O6 — online application first-class citizens
+  // -------------------------------------------------------------------------
+
+  private static readonly BUSINESS_SYSTEM_COLS =
+    "id, company_id, code, name, domain, status, ontology_domain_id, is_template_system";
+
+  async createBusinessSystem(
+    input: OntologyBusinessSystemInput,
+  ): Promise<OntologyBusinessSystemRow> {
+    const id = randomUUID();
+    const systemId = `sys_${Date.now().toString(36)}`;
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_business_systems")}
+         (id, company_id, code, name, description, domain, tags, system_id, owner_ref,
+          target_role, ontology_domain_id, repos, ontology_binding, domain_copilot_config,
+          domain_governance, npc_team_config, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11, $12::jsonb, $13::jsonb,
+               $14::jsonb, $15::jsonb, $16::jsonb, $17, $17, $18::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.code,
+        input.name,
+        input.description ?? "",
+        input.domain ?? "other",
+        JSON.stringify(input.tags ?? []),
+        systemId,
+        input.ownerRef ?? null,
+        input.targetRole ?? "",
+        input.ontologyDomainId ?? null,
+        JSON.stringify(input.repos ?? []),
+        JSON.stringify(
+          input.ontologyBinding ?? {
+            syncPolicy: "manual",
+            allowedActionIds: [],
+            actionPolicies: [],
+            subscribedEventTypes: [],
+          },
+        ),
+        JSON.stringify(
+          input.domainCopilotConfig ?? {
+            systemPrompt: "",
+            knowledgeBaseIds: [],
+            memoryScope: "domain",
+            temperature: 0.3,
+          },
+        ),
+        JSON.stringify(
+          input.domainGovernance ?? {
+            securityLevel: "L2",
+            auditPolicy: "full",
+            slaStatus: "healthy",
+            telemetrySnapshot: { qps: 0, errorRatePercent: 0, p95LatencyMs: 0 },
+          },
+        ),
+        JSON.stringify(input.npcTeamConfig ?? {}),
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    return (await this.getBusinessSystem(input.companyId, id))!;
+  }
+
+  async getBusinessSystem(
+    companyId: string,
+    systemId: string,
+  ): Promise<OntologyBusinessSystemRow | null> {
+    const rows = await this.db.query<OntologyBusinessSystemRow>(
+      `SELECT ${PostgresGraphStore.BUSINESS_SYSTEM_COLS}
+         FROM ${this.table("ontology_business_systems")}
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, systemId],
+    );
+    return rows[0] ?? null;
+  }
+
+  async listBusinessSystems(
+    companyId: string,
+    limit = 200,
+  ): Promise<OntologyBusinessSystemRow[]> {
+    const capped = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 1000)) : 200;
+    return this.db.query<OntologyBusinessSystemRow>(
+      `SELECT ${PostgresGraphStore.BUSINESS_SYSTEM_COLS}
+         FROM ${this.table("ontology_business_systems")}
+        WHERE company_id = $1 AND is_deleted = false
+        ORDER BY created_at ASC
+        LIMIT $2`,
+      [companyId, capped],
+    );
+  }
+
+  async updateBusinessSystem(
+    companyId: string,
+    systemId: string,
+    update: OntologyBusinessSystemUpdate,
+  ): Promise<OntologyBusinessSystemRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_business_systems")}
+          SET name                  = COALESCE($3, name),
+              description            = COALESCE($4, description),
+              domain                 = COALESCE($5, domain),
+              status                 = COALESCE($6, status),
+              target_role            = COALESCE($7, target_role),
+              ontology_domain_id     = CASE WHEN $8::boolean THEN $9::uuid ELSE ontology_domain_id END,
+              tags                   = CASE WHEN $10::boolean THEN $11::jsonb ELSE tags END,
+              repos                  = CASE WHEN $12::boolean THEN $13::jsonb ELSE repos END,
+              service_map            = CASE WHEN $14::boolean THEN $15::jsonb ELSE service_map END,
+              npc_team_config        = CASE WHEN $16::boolean THEN $17::jsonb ELSE npc_team_config END,
+              ontology_binding       = CASE WHEN $18::boolean THEN $19::jsonb ELSE ontology_binding END,
+              domain_copilot_config  = CASE WHEN $20::boolean THEN $21::jsonb ELSE domain_copilot_config END,
+              domain_governance      = CASE WHEN $22::boolean THEN $23::jsonb ELSE domain_governance END,
+              runtime_stats          = CASE WHEN $24::boolean THEN $25::jsonb ELSE runtime_stats END,
+              is_template_system     = COALESCE($26, is_template_system),
+              metadata               = CASE WHEN $27::boolean THEN $28::jsonb ELSE metadata END,
+              updated_at             = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [
+        companyId,
+        systemId,
+        update.name ?? null,
+        update.description ?? null,
+        update.domain ?? null,
+        update.status ?? null,
+        update.targetRole ?? null,
+        update.ontologyDomainId !== undefined,
+        update.ontologyDomainId ?? null,
+        update.tags !== undefined,
+        JSON.stringify(update.tags ?? []),
+        update.repos !== undefined,
+        JSON.stringify(update.repos ?? []),
+        update.serviceMap !== undefined,
+        JSON.stringify(update.serviceMap ?? {}),
+        update.npcTeamConfig !== undefined,
+        JSON.stringify(update.npcTeamConfig ?? {}),
+        update.ontologyBinding !== undefined,
+        JSON.stringify(update.ontologyBinding ?? {}),
+        update.domainCopilotConfig !== undefined,
+        JSON.stringify(update.domainCopilotConfig ?? {}),
+        update.domainGovernance !== undefined,
+        JSON.stringify(update.domainGovernance ?? {}),
+        update.runtimeStats !== undefined,
+        JSON.stringify(update.runtimeStats ?? {}),
+        typeof update.isTemplateSystem === "boolean" ? update.isTemplateSystem : null,
+        update.metadata !== undefined,
+        JSON.stringify(update.metadata ?? {}),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    return this.getBusinessSystem(companyId, systemId);
+  }
+
+  private static readonly SUB_PROJECT_COLS =
+    "id, company_id, business_system_id, name, code, type, status, microservice_layer";
+
+  async createSubProject(input: OntologySubProjectInput): Promise<OntologySubProjectRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_sub_projects")}
+         (id, company_id, business_system_id, name, code, type, tech_stack, framework,
+          git_repo, api_specs, dependencies, build_config, microservice_layer,
+          ontology_node_ref, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, $10::jsonb,
+               $11::jsonb, $12::jsonb, $13, $14::jsonb, $15, $15, $16::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.businessSystemId,
+        input.name,
+        input.code,
+        input.type ?? "other",
+        JSON.stringify(input.techStack ?? []),
+        JSON.stringify(input.framework ?? {}),
+        JSON.stringify(input.gitRepo ?? {}),
+        JSON.stringify(input.apiSpecs ?? []),
+        JSON.stringify(input.dependencies ?? []),
+        JSON.stringify(
+          input.buildConfig ?? {
+            testCommand: "npm test",
+            buildCommand: "npm run build",
+            startCommand: "",
+            previewPort: 3000,
+            envType: "node22",
+          },
+        ),
+        input.microserviceLayer ?? null,
+        JSON.stringify(input.ontologyNodeRef ?? {}),
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologySubProjectRow>(
+      `SELECT ${PostgresGraphStore.SUB_PROJECT_COLS}
+         FROM ${this.table("ontology_sub_projects")}
+        WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listSubProjects(
+    companyId: string,
+    businessSystemId: string,
+  ): Promise<OntologySubProjectRow[]> {
+    return this.db.query<OntologySubProjectRow>(
+      `SELECT ${PostgresGraphStore.SUB_PROJECT_COLS}
+         FROM ${this.table("ontology_sub_projects")}
+        WHERE company_id = $1 AND business_system_id = $2 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId, businessSystemId],
+    );
+  }
+
+  async updateSubProject(
+    companyId: string,
+    subProjectId: string,
+    update: OntologySubProjectUpdate,
+  ): Promise<OntologySubProjectRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_sub_projects")}
+          SET name                = COALESCE($3, name),
+              type                = COALESCE($4, type),
+              tech_stack          = CASE WHEN $5::boolean THEN $6::jsonb ELSE tech_stack END,
+              framework           = CASE WHEN $7::boolean THEN $8::jsonb ELSE framework END,
+              git_repo            = CASE WHEN $9::boolean THEN $10::jsonb ELSE git_repo END,
+              api_specs           = CASE WHEN $11::boolean THEN $12::jsonb ELSE api_specs END,
+              dependencies        = CASE WHEN $13::boolean THEN $14::jsonb ELSE dependencies END,
+              build_config        = CASE WHEN $15::boolean THEN $16::jsonb ELSE build_config END,
+              status              = COALESCE($17, status),
+              microservice_layer  = CASE WHEN $18::boolean THEN $19 ELSE microservice_layer END,
+              ontology_node_ref   = CASE WHEN $20::boolean THEN $21::jsonb ELSE ontology_node_ref END,
+              last_activity_at    = CASE WHEN $22::boolean THEN now() ELSE last_activity_at END,
+              metadata            = CASE WHEN $23::boolean THEN $24::jsonb ELSE metadata END,
+              updated_at          = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [
+        companyId,
+        subProjectId,
+        update.name ?? null,
+        update.type ?? null,
+        update.techStack !== undefined,
+        JSON.stringify(update.techStack ?? []),
+        update.framework !== undefined,
+        JSON.stringify(update.framework ?? {}),
+        update.gitRepo !== undefined,
+        JSON.stringify(update.gitRepo ?? {}),
+        update.apiSpecs !== undefined,
+        JSON.stringify(update.apiSpecs ?? []),
+        update.dependencies !== undefined,
+        JSON.stringify(update.dependencies ?? []),
+        update.buildConfig !== undefined,
+        JSON.stringify(update.buildConfig ?? {}),
+        update.status ?? null,
+        update.microserviceLayer !== undefined,
+        update.microserviceLayer ?? null,
+        update.ontologyNodeRef !== undefined,
+        JSON.stringify(update.ontologyNodeRef ?? {}),
+        update.markActivity === true,
+        update.metadata !== undefined,
+        JSON.stringify(update.metadata ?? {}),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    const rows = await this.db.query<OntologySubProjectRow>(
+      `SELECT ${PostgresGraphStore.SUB_PROJECT_COLS}
+         FROM ${this.table("ontology_sub_projects")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, subProjectId],
+    );
+    return rows[0] ?? null;
   }
 }

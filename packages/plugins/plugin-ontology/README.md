@@ -118,6 +118,29 @@ Foundry-style data integration, aligned with the DigitalStaff data models
 API routes: `datasets`, `connectors`, `transforms` (GET/POST + PATCH `/:id`)
 and `package-installs` (GET/POST).
 
+## O6 (online application first-class citizens) scope
+
+Aligned with the DigitalStaff `BusinessSystem` / `SubProject` models — the online
+application first-class citizens:
+
+- **Business systems** (`ontology_business_systems`): a complete online
+  application bound to an ontology domain. Status (planning/draft/active/
+  maintenance/archived/deprecated), industry domain (18 values), auto `sys_` id,
+  repos, and nested config stored as jsonb: **ontologyBinding** (syncPolicy +
+  action policies + subscribed events), **domainGovernance** (security level L1–L4,
+  audit policy, SLA status + telemetry), **domainCopilotConfig** (memory scope,
+  temperature), **npcTeamConfig**, **runtimeStats**.
+- **Sub-projects** (`ontology_sub_projects`): a component of a business system
+  (frontend/backend/microservice/mobile-*/...) with tech stack, git repo, **API
+  specs**, **dependencies** (typed), build config, microservice layer (L0–L4),
+  and an ontology node ref.
+
+External platform refs (User/Team/AgentConfig in DigitalStaff) are modeled as
+optional text external references.
+
+API routes: `business-systems` (GET list / POST create / GET+PATCH `/:systemId`)
+and `sub-projects` (GET list / POST create / PATCH `/:subProjectId`).
+
 ## O5 (consumption interface) scope
 
 Exposes the ontology to agents as tools via `ctx.tools.register` (requires the

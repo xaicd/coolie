@@ -257,3 +257,104 @@ export type TransformType = (typeof TRANSFORM_TYPES)[number];
 /** Transform lifecycle (DS TransformStatus). */
 export const TRANSFORM_STATUSES = ["draft", "active", "deprecated"] as const;
 export type TransformStatus = (typeof TRANSFORM_STATUSES)[number];
+
+
+// ---------------------------------------------------------------------------
+// O6 — online application first-class citizens (DigitalStaff BusinessSystem / SubProject)
+// ---------------------------------------------------------------------------
+
+/** Business system lifecycle status (DS BusinessSystem.status). */
+export const BUSINESS_SYSTEM_STATUSES = [
+  "planning",
+  "draft",
+  "active",
+  "maintenance",
+  "archived",
+  "deprecated",
+] as const;
+export type BusinessSystemStatus = (typeof BUSINESS_SYSTEM_STATUSES)[number];
+
+/** Business domain / industry (DS BusinessSystem.domain). */
+export const BUSINESS_SYSTEM_DOMAINS = [
+  "e-commerce",
+  "crm",
+  "erp",
+  "cms",
+  "fintech",
+  "healthcare",
+  "education",
+  "social",
+  "saas",
+  "manufacturing",
+  "logistics",
+  "iot",
+  "ai",
+  "gaming",
+  "media",
+  "government",
+  "real-estate",
+  "other",
+] as const;
+export type BusinessSystemDomain = (typeof BUSINESS_SYSTEM_DOMAINS)[number];
+
+/** Ontology sync policy for a bound domain (DS ontologyBinding.syncPolicy). */
+export const SYNC_POLICIES = ["auto", "manual", "disabled"] as const;
+export type SyncPolicy = (typeof SYNC_POLICIES)[number];
+
+/** Action risk level (DS ontologyBinding.actionPolicies.riskLevel). */
+export const RISK_LEVELS = ["low", "medium", "high", "critical"] as const;
+export type RiskLevel = (typeof RISK_LEVELS)[number];
+
+/** Domain governance security level (DS domainGovernance.securityLevel). */
+export const SECURITY_LEVELS = ["L1", "L2", "L3", "L4"] as const;
+export type SecurityLevel = (typeof SECURITY_LEVELS)[number];
+
+/** Domain governance audit policy (DS domainGovernance.auditPolicy). */
+export const AUDIT_POLICIES = ["full", "sampling", "off"] as const;
+export type AuditPolicy = (typeof AUDIT_POLICIES)[number];
+
+/** SLA status (DS domainGovernance.slaStatus). */
+export const SLA_STATUSES = ["healthy", "warning", "degraded", "down"] as const;
+export type SlaStatus = (typeof SLA_STATUSES)[number];
+
+/** Domain copilot memory scope (DS domainCopilotConfig.memoryScope). */
+export const MEMORY_SCOPES = ["session", "domain", "tenant"] as const;
+export type MemoryScope = (typeof MEMORY_SCOPES)[number];
+
+/** Sub-project component type (DS SubProject.type). */
+export const SUB_PROJECT_TYPES = [
+  "frontend",
+  "backend",
+  "microservice",
+  "library",
+  "mobile-ios",
+  "mobile-android",
+  "mobile-rn",
+  "mobile-flutter",
+  "devops",
+  "docs",
+  "other",
+] as const;
+export type SubProjectType = (typeof SUB_PROJECT_TYPES)[number];
+
+/** Sub-project status (DS SubProject.status). */
+export const SUB_PROJECT_STATUSES = [
+  "active",
+  "development",
+  "staging",
+  "archived",
+  "deprecated",
+] as const;
+export type SubProjectStatus = (typeof SUB_PROJECT_STATUSES)[number];
+
+/** Microservice layer (DS SubProject.microserviceLayer). */
+export const MICROSERVICE_LAYERS = ["L0", "L1", "L2", "L3", "L4"] as const;
+export type MicroserviceLayer = (typeof MICROSERVICE_LAYERS)[number];
+
+/** Sub-project dependency type (DS SubProject.dependencies.type). */
+export const DEPENDENCY_TYPES = ["api-call", "shared-lib", "db-share", "event-bus", "other"] as const;
+export type DependencyType = (typeof DEPENDENCY_TYPES)[number];
+
+/** API spec HTTP method (DS SubProject.apiSpecs.method). */
+export const API_METHODS = ["GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"] as const;
+export type ApiMethod = (typeof API_METHODS)[number];
