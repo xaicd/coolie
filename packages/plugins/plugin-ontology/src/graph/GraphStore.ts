@@ -26,12 +26,19 @@ import type {
   CognitionJobStatus,
   CognitionScale,
   CognitionShardStatus,
+  ConnectorStatus,
+  ConnectorType,
+  DatasetFormat,
+  DatasetLifecycleState,
   DomainLifecycleState,
   FunctionStatus,
   FunctionType,
   LinkCardinality,
   NodeLayer,
   NodeLifecycleState,
+  SyncStrategy,
+  TransformStatus,
+  TransformType,
 } from "../enums.js";
 
 export interface OntologyDomainInput {
@@ -398,6 +405,140 @@ export interface OntologyCognitionJobRow {
   progress_pct: number;
 }
 
+// --- O4: data pipeline (DigitalStaff Dataset / Connector / Transform / PackageInstall) ---
+
+export interface OntologyDatasetInput {
+  companyId: string;
+  domainId: string;
+  key: string;
+  name: string;
+  description?: string;
+  format?: DatasetFormat;
+  dataSchema?: Record<string, unknown>;
+  storageConfig?: Record<string, unknown>;
+  syncConfig?: Record<string, unknown>;
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyDatasetUpdate {
+  name?: string;
+  description?: string;
+  format?: DatasetFormat;
+  dataSchema?: Record<string, unknown>;
+  storageConfig?: Record<string, unknown>;
+  syncConfig?: Record<string, unknown>;
+  lifecycleState?: DatasetLifecycleState;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyDatasetRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  key: string;
+  name: string;
+  format: DatasetFormat;
+  current_version: number;
+  lifecycle_state: DatasetLifecycleState;
+}
+
+export interface OntologyConnectorInput {
+  companyId: string;
+  domainId: string;
+  key: string;
+  name: string;
+  connectorType: ConnectorType;
+  datasetId?: string | null;
+  config?: Record<string, unknown>;
+  syncSchedule?: string | null;
+  syncStrategy?: SyncStrategy | null;
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyConnectorUpdate {
+  name?: string;
+  datasetId?: string | null;
+  config?: Record<string, unknown>;
+  syncSchedule?: string | null;
+  syncStrategy?: SyncStrategy | null;
+  status?: ConnectorStatus;
+  syncState?: Record<string, unknown>;
+  lastError?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyConnectorRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  key: string;
+  name: string;
+  connector_type: ConnectorType;
+  dataset_id: string | null;
+  status: ConnectorStatus;
+}
+
+export interface OntologyTransformInput {
+  companyId: string;
+  domainId: string;
+  key: string;
+  name: string;
+  description?: string;
+  transformType?: TransformType;
+  inputDatasetIds?: string[];
+  outputDatasetId?: string | null;
+  code?: string;
+  config?: Record<string, unknown>;
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyTransformUpdate {
+  name?: string;
+  description?: string;
+  transformType?: TransformType;
+  inputDatasetIds?: string[];
+  outputDatasetId?: string | null;
+  code?: string;
+  config?: Record<string, unknown>;
+  status?: TransformStatus;
+  markExecuted?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyTransformRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  key: string;
+  name: string;
+  transform_type: TransformType;
+  output_dataset_id: string | null;
+  status: TransformStatus;
+  version: number;
+}
+
+export interface OntologyPackageInstallInput {
+  companyId: string;
+  domainId: string;
+  packageId: string;
+  version?: string;
+  installedBy?: string;
+  result?: Record<string, unknown>;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyPackageInstallRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  package_id: string;
+  version: string;
+  installed_by: string;
+}
+
 export interface GraphSnapshot {
   domainId: string;
   counts: {
@@ -553,6 +694,34 @@ export interface GraphStore {
     jobId: string,
     result: Record<string, unknown>,
   ): Promise<OntologyCognitionJobRow | null>;
+
+  // O4 — data pipeline
+  createDataset(input: OntologyDatasetInput): Promise<OntologyDatasetRow>;
+  listDatasets(companyId: string, domainId: string): Promise<OntologyDatasetRow[]>;
+  updateDataset(
+    companyId: string,
+    datasetId: string,
+    update: OntologyDatasetUpdate,
+  ): Promise<OntologyDatasetRow | null>;
+
+  createConnector(input: OntologyConnectorInput): Promise<OntologyConnectorRow>;
+  listConnectors(companyId: string, domainId: string): Promise<OntologyConnectorRow[]>;
+  updateConnector(
+    companyId: string,
+    connectorId: string,
+    update: OntologyConnectorUpdate,
+  ): Promise<OntologyConnectorRow | null>;
+
+  createTransform(input: OntologyTransformInput): Promise<OntologyTransformRow>;
+  listTransforms(companyId: string, domainId: string): Promise<OntologyTransformRow[]>;
+  updateTransform(
+    companyId: string,
+    transformId: string,
+    update: OntologyTransformUpdate,
+  ): Promise<OntologyTransformRow | null>;
+
+  createPackageInstall(input: OntologyPackageInstallInput): Promise<OntologyPackageInstallRow>;
+  listPackageInstalls(companyId: string, domainId: string): Promise<OntologyPackageInstallRow[]>;
 }
 
 const DEFAULT_MAX_DEPTH = 12;
@@ -1740,5 +1909,329 @@ export class PostgresGraphStore implements GraphStore {
     );
     if (res.rowCount === 0) return null;
     return this.getCognitionJob(companyId, jobId);
+  }
+
+  // -------------------------------------------------------------------------
+  // O4 — data pipeline
+  // -------------------------------------------------------------------------
+
+  private static readonly DATASET_COLS =
+    "id, company_id, domain_id, key, name, format, current_version, lifecycle_state";
+
+  async createDataset(input: OntologyDatasetInput): Promise<OntologyDatasetRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_datasets")}
+         (id, company_id, domain_id, key, name, description, format, data_schema,
+          storage_config, sync_config, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9::jsonb, $10::jsonb, $11, $11, $12::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.key,
+        input.name,
+        input.description ?? "",
+        input.format ?? "json",
+        JSON.stringify(input.dataSchema ?? {}),
+        JSON.stringify(input.storageConfig ?? {}),
+        JSON.stringify(input.syncConfig ?? {}),
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyDatasetRow>(
+      `SELECT ${PostgresGraphStore.DATASET_COLS}
+         FROM ${this.table("ontology_datasets")}
+        WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listDatasets(companyId: string, domainId: string): Promise<OntologyDatasetRow[]> {
+    return this.db.query<OntologyDatasetRow>(
+      `SELECT ${PostgresGraphStore.DATASET_COLS}
+         FROM ${this.table("ontology_datasets")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId, domainId],
+    );
+  }
+
+  async updateDataset(
+    companyId: string,
+    datasetId: string,
+    update: OntologyDatasetUpdate,
+  ): Promise<OntologyDatasetRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_datasets")}
+          SET name            = COALESCE($3, name),
+              description      = COALESCE($4, description),
+              format          = COALESCE($5, format),
+              data_schema     = CASE WHEN $6::boolean THEN $7::jsonb ELSE data_schema END,
+              storage_config  = CASE WHEN $8::boolean THEN $9::jsonb ELSE storage_config END,
+              sync_config     = CASE WHEN $10::boolean THEN $11::jsonb ELSE sync_config END,
+              lifecycle_state = COALESCE($12, lifecycle_state),
+              metadata        = CASE WHEN $13::boolean THEN $14::jsonb ELSE metadata END,
+              updated_at      = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [
+        companyId,
+        datasetId,
+        update.name ?? null,
+        update.description ?? null,
+        update.format ?? null,
+        update.dataSchema !== undefined,
+        JSON.stringify(update.dataSchema ?? {}),
+        update.storageConfig !== undefined,
+        JSON.stringify(update.storageConfig ?? {}),
+        update.syncConfig !== undefined,
+        JSON.stringify(update.syncConfig ?? {}),
+        update.lifecycleState ?? null,
+        update.metadata !== undefined,
+        JSON.stringify(update.metadata ?? {}),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    const rows = await this.db.query<OntologyDatasetRow>(
+      `SELECT ${PostgresGraphStore.DATASET_COLS}
+         FROM ${this.table("ontology_datasets")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, datasetId],
+    );
+    return rows[0] ?? null;
+  }
+
+  private static readonly CONNECTOR_COLS =
+    "id, company_id, domain_id, key, name, connector_type, dataset_id, status";
+
+  async createConnector(input: OntologyConnectorInput): Promise<OntologyConnectorRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_connectors")}
+         (id, company_id, domain_id, key, name, connector_type, dataset_id, config,
+          sync_schedule, sync_strategy, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11, $11, $12::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.key,
+        input.name,
+        input.connectorType,
+        input.datasetId ?? null,
+        JSON.stringify(input.config ?? {}),
+        input.syncSchedule ?? null,
+        input.syncStrategy ?? null,
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyConnectorRow>(
+      `SELECT ${PostgresGraphStore.CONNECTOR_COLS}
+         FROM ${this.table("ontology_connectors")}
+        WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listConnectors(companyId: string, domainId: string): Promise<OntologyConnectorRow[]> {
+    return this.db.query<OntologyConnectorRow>(
+      `SELECT ${PostgresGraphStore.CONNECTOR_COLS}
+         FROM ${this.table("ontology_connectors")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId, domainId],
+    );
+  }
+
+  async updateConnector(
+    companyId: string,
+    connectorId: string,
+    update: OntologyConnectorUpdate,
+  ): Promise<OntologyConnectorRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_connectors")}
+          SET name          = COALESCE($3, name),
+              dataset_id     = CASE WHEN $4::boolean THEN $5::uuid ELSE dataset_id END,
+              config         = CASE WHEN $6::boolean THEN $7::jsonb ELSE config END,
+              sync_schedule  = CASE WHEN $8::boolean THEN $9 ELSE sync_schedule END,
+              sync_strategy  = CASE WHEN $10::boolean THEN $11 ELSE sync_strategy END,
+              status         = COALESCE($12, status),
+              sync_state     = CASE WHEN $13::boolean THEN $14::jsonb ELSE sync_state END,
+              last_error     = CASE WHEN $15::boolean THEN $16 ELSE last_error END,
+              metadata       = CASE WHEN $17::boolean THEN $18::jsonb ELSE metadata END,
+              updated_at     = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [
+        companyId,
+        connectorId,
+        update.name ?? null,
+        update.datasetId !== undefined,
+        update.datasetId ?? null,
+        update.config !== undefined,
+        JSON.stringify(update.config ?? {}),
+        update.syncSchedule !== undefined,
+        update.syncSchedule ?? null,
+        update.syncStrategy !== undefined,
+        update.syncStrategy ?? null,
+        update.status ?? null,
+        update.syncState !== undefined,
+        JSON.stringify(update.syncState ?? {}),
+        update.lastError !== undefined,
+        update.lastError ?? null,
+        update.metadata !== undefined,
+        JSON.stringify(update.metadata ?? {}),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    const rows = await this.db.query<OntologyConnectorRow>(
+      `SELECT ${PostgresGraphStore.CONNECTOR_COLS}
+         FROM ${this.table("ontology_connectors")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, connectorId],
+    );
+    return rows[0] ?? null;
+  }
+
+  private static readonly TRANSFORM_COLS =
+    "id, company_id, domain_id, key, name, transform_type, output_dataset_id, status, version";
+
+  async createTransform(input: OntologyTransformInput): Promise<OntologyTransformRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_transforms")}
+         (id, company_id, domain_id, key, name, description, transform_type,
+          input_dataset_ids, output_dataset_id, code, config, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10, $11::jsonb, $12, $12, $13::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.key,
+        input.name,
+        input.description ?? "",
+        input.transformType ?? "sql",
+        JSON.stringify(input.inputDatasetIds ?? []),
+        input.outputDatasetId ?? null,
+        input.code ?? "",
+        JSON.stringify(input.config ?? {}),
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyTransformRow>(
+      `SELECT ${PostgresGraphStore.TRANSFORM_COLS}
+         FROM ${this.table("ontology_transforms")}
+        WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listTransforms(companyId: string, domainId: string): Promise<OntologyTransformRow[]> {
+    return this.db.query<OntologyTransformRow>(
+      `SELECT ${PostgresGraphStore.TRANSFORM_COLS}
+         FROM ${this.table("ontology_transforms")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId, domainId],
+    );
+  }
+
+  async updateTransform(
+    companyId: string,
+    transformId: string,
+    update: OntologyTransformUpdate,
+  ): Promise<OntologyTransformRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_transforms")}
+          SET name              = COALESCE($3, name),
+              description        = COALESCE($4, description),
+              transform_type     = COALESCE($5, transform_type),
+              input_dataset_ids  = CASE WHEN $6::boolean THEN $7::jsonb ELSE input_dataset_ids END,
+              output_dataset_id  = CASE WHEN $8::boolean THEN $9::uuid ELSE output_dataset_id END,
+              code               = COALESCE($10, code),
+              config             = CASE WHEN $11::boolean THEN $12::jsonb ELSE config END,
+              status             = COALESCE($13, status),
+              last_executed_at   = CASE WHEN $14::boolean THEN now() ELSE last_executed_at END,
+              metadata           = CASE WHEN $15::boolean THEN $16::jsonb ELSE metadata END,
+              updated_at         = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [
+        companyId,
+        transformId,
+        update.name ?? null,
+        update.description ?? null,
+        update.transformType ?? null,
+        update.inputDatasetIds !== undefined,
+        JSON.stringify(update.inputDatasetIds ?? []),
+        update.outputDatasetId !== undefined,
+        update.outputDatasetId ?? null,
+        update.code ?? null,
+        update.config !== undefined,
+        JSON.stringify(update.config ?? {}),
+        update.status ?? null,
+        update.markExecuted === true,
+        update.metadata !== undefined,
+        JSON.stringify(update.metadata ?? {}),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    const rows = await this.db.query<OntologyTransformRow>(
+      `SELECT ${PostgresGraphStore.TRANSFORM_COLS}
+         FROM ${this.table("ontology_transforms")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, transformId],
+    );
+    return rows[0] ?? null;
+  }
+
+  private static readonly PACKAGE_INSTALL_COLS =
+    "id, company_id, domain_id, package_id, version, installed_by";
+
+  async createPackageInstall(
+    input: OntologyPackageInstallInput,
+  ): Promise<OntologyPackageInstallRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_package_installs")}
+         (id, company_id, domain_id, package_id, version, installed_by, result, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.packageId,
+        input.version ?? "1.0.0",
+        input.installedBy ?? "",
+        JSON.stringify(
+          input.result ?? { nodeTypesAdded: 0, relationsAdded: 0, schemaPatched: false },
+        ),
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyPackageInstallRow>(
+      `SELECT ${PostgresGraphStore.PACKAGE_INSTALL_COLS}
+         FROM ${this.table("ontology_package_installs")}
+        WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async listPackageInstalls(
+    companyId: string,
+    domainId: string,
+  ): Promise<OntologyPackageInstallRow[]> {
+    return this.db.query<OntologyPackageInstallRow>(
+      `SELECT ${PostgresGraphStore.PACKAGE_INSTALL_COLS}
+         FROM ${this.table("ontology_package_installs")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId, domainId],
+    );
   }
 }
