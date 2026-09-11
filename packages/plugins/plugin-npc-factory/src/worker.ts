@@ -4,6 +4,7 @@ import {
   type PluginApiRequestInput,
   type PluginApiResponse,
   type PluginContext,
+  type PluginEvent,
 } from "@paperclipai/plugin-sdk";
 import { NpcStore, type NpcRunStep } from "./store.js";
 import type {
@@ -17,6 +18,13 @@ import type {
 
 let activeContext: PluginContext | null = null;
 let store: NpcStore | null = null;
+
+/**
+ * Ontology plugin's cross-plugin event stream we subscribe to. The host emits
+ * plugin domain events as `plugin.<pluginId>.<name>`, so a `node-stale` emit
+ * from paperclipai.plugin-ontology arrives on this channel.
+ */
+const ONTOLOGY_NODE_STALE_EVENT = "plugin.paperclipai.plugin-ontology.node-stale" as const;
 
 function requireContext(): PluginContext {
   if (!activeContext) throw new Error("NPC factory plugin worker context is not initialized");
@@ -43,6 +51,89 @@ function parseInt10(value: string | undefined): number | undefined {
   const n = Number.parseInt(value, 10);
   return Number.isFinite(n) ? n : undefined;
 }
+function str(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() !== "" ? value : undefined;
+}
+
+/**
+ * Flagship cross-plugin integration: when the ontology plugin reports a node as
+ * stale, the NPC factory opens a remediation workflow run bound to the ontology
+ * domain. Mirrors DigitalStaff domain-6 `ontology-node-stale` trigger semantics.
+ * Idempotent per (domain, node): a deterministic run_key means a duplicate event
+ * is absorbed by the run_key uniqueness constraint rather than creating dupes.
+ */
+async function handleOntologyNodeStale(ctx: PluginContext, event: PluginEvent): Promise<void> {
+  const payload = optionalRecord(event.payload) ?? {};
+  const companyId = event.companyId;
+  const domainId = str(payload.domainId);
+  const nodeId = str(payload.nodeId);
+  if (!companyId || !domainId || !nodeId) {
+    ctx.logger.warn("Ignoring node-stale event with missing fields", {
+      eventId: event.eventId,
+      hasCompany: Boolean(companyId),
+      hasDomain: Boolean(domainId),
+      hasNode: Boolean(nodeId),
+    });
+    return;
+  }
+  const runKey = `ontology-stale-${domainId}-${nodeId}`;
+  try {
+    const run = await requireStore().createRun({
+      companyId,
+      runKey,
+      jobFamily: null,
+      ontologyDomainRef: domainId,
+      createdBy: "plugin:ontology",
+      metadata: {
+        trigger: "ontology-node-stale",
+        ontologyNodeRef: nodeId,
+        ontologyNodeKey: str(payload.nodeKey) ?? null,
+        reason: str(payload.reason) ?? null,
+        sourceEventId: event.eventId,
+      },
+    });
+    await ctx.activity.log({
+      companyId,
+      message: `Opened remediation run for stale ontology node ${str(payload.nodeKey) ?? nodeId}`,
+      entityType: "npc_workflow_run",
+      entityId: run.id,
+      metadata: { domainId, nodeId, trigger: "ontology-node-stale" },
+    });
+    ctx.logger.info("Created remediation run from ontology node-stale", {
+      runId: run.id,
+      domainId,
+      nodeId,
+    });
+  } catch (err) {
+    // A duplicate run_key (idempotent replay) or transient failure must not
+    // crash the subscriber; log and move on.
+    ctx.logger.warn("Failed to create remediation run for node-stale", {
+      error: String((err as Error)?.message ?? err),
+      domainId,
+      nodeId,
+      runKey,
+    });
+  }
+}
+
+/**
+ * Emit a cross-plugin `run-status-changed` event. Best-effort: an emit failure
+ * must never fail the underlying run transition.
+ */
+async function emitRunStatusChanged(
+  ctx: PluginContext,
+  companyId: string,
+  payload: { runId: string; runKey: string; from: string; to: string },
+): Promise<void> {
+  try {
+    await ctx.events.emit("run-status-changed", companyId, payload);
+  } catch (err) {
+    ctx.logger.warn("Failed to emit run-status-changed", {
+      error: String((err as Error)?.message ?? err),
+      runId: payload.runId,
+    });
+  }
+}
 
 const plugin = definePlugin({
   async setup(ctx) {
@@ -52,6 +143,13 @@ const plugin = definePlugin({
       const companyId = requireString(params.companyId, "companyId");
       return { templates: await requireStore().listTemplates(companyId) };
     });
+
+    // Cross-plugin closed loop: react to ontology node-stale events by opening
+    // a remediation workflow run (ontology -> npc-factory -> workflow).
+    ctx.events.on(ONTOLOGY_NODE_STALE_EVENT, async (event) => {
+      await handleOntologyNodeStale(ctx, event);
+    });
+
     ctx.logger.info("NPC factory plugin worker started", { namespace: ctx.db.namespace });
   },
 
@@ -152,10 +250,18 @@ const plugin = definePlugin({
       case "transition-run": {
         const b = optionalRecord(input.body) ?? {};
         try {
-          const run = await s.transitionRun(companyId, requireString(input.params.runId, "runId"),
-            requireString(b.to, "to") as NpcRunStatus,
+          const runId = requireString(input.params.runId, "runId");
+          const before = await s.getRun(companyId, runId);
+          const to = requireString(b.to, "to") as NpcRunStatus;
+          const run = await s.transitionRun(companyId, runId, to,
             { error: typeof b.error === "string" ? b.error : undefined });
           if (!run) return { status: 404, body: { error: "Run not found" } };
+          await emitRunStatusChanged(ctx, companyId, {
+            runId: run.id,
+            runKey: run.run_key,
+            from: before?.status ?? "",
+            to,
+          });
           return { body: { run } };
         } catch (err) {
           return { status: 422, body: { error: String((err as Error)?.message ?? err) } };

@@ -42,6 +42,25 @@ function parseInt10(value: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+/**
+ * Emit a cross-plugin `execution-status-changed` event. Best-effort: an emit
+ * failure must never fail the underlying execution transition.
+ */
+async function emitExecutionStatusChanged(
+  ctx: PluginContext,
+  companyId: string,
+  payload: { executionId: string; executionKey: string; from: string; to: string },
+): Promise<void> {
+  try {
+    await ctx.events.emit("execution-status-changed", companyId, payload);
+  } catch (err) {
+    ctx.logger.warn("Failed to emit execution-status-changed", {
+      error: String((err as Error)?.message ?? err),
+      executionId: payload.executionId,
+    });
+  }
+}
+
 const plugin = definePlugin({
   async setup(ctx) {
     activeContext = ctx;
@@ -145,10 +164,18 @@ const plugin = definePlugin({
       case "transition-execution": {
         const b = optionalRecord(input.body) ?? {};
         try {
-          const execution = await s.transitionExecution(companyId, requireString(input.params.executionId, "executionId"),
-            requireString(b.to, "to") as WorkflowExecutionStatus,
+          const executionId = requireString(input.params.executionId, "executionId");
+          const before = await s.getExecution(companyId, executionId);
+          const to = requireString(b.to, "to") as WorkflowExecutionStatus;
+          const execution = await s.transitionExecution(companyId, executionId, to,
             { error: typeof b.error === "string" ? b.error : undefined, outputs: optionalRecord(b.outputs) });
           if (!execution) return { status: 404, body: { error: "Execution not found" } };
+          await emitExecutionStatusChanged(ctx, companyId, {
+            executionId: execution.id,
+            executionKey: execution.execution_key,
+            from: before?.status ?? "",
+            to,
+          });
           return { body: { execution } };
         } catch (err) {
           return { status: 422, body: { error: String((err as Error)?.message ?? err) } };

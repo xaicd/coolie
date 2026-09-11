@@ -37,6 +37,32 @@ function parseInt10(value: string | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+/**
+ * Emit a cross-plugin `message-appended` event. A user-role message sets
+ * `assistantTurnNeeded` so an orchestrator can drive the next assistant turn.
+ * Best-effort: an emit failure must never fail the append itself.
+ */
+async function emitMessageAppended(
+  ctx: PluginContext,
+  companyId: string,
+  payload: {
+    conversationId: string;
+    messageId: string;
+    seq: number;
+    role: MessageRole;
+    assistantTurnNeeded: boolean;
+  },
+): Promise<void> {
+  try {
+    await ctx.events.emit("message-appended", companyId, payload);
+  } catch (err) {
+    ctx.logger.warn("Failed to emit message-appended", {
+      error: String((err as Error)?.message ?? err),
+      conversationId: payload.conversationId,
+    });
+  }
+}
+
 const plugin = definePlugin({
   async setup(ctx) {
     activeContext = ctx;
@@ -152,6 +178,13 @@ const plugin = definePlugin({
           metadata: optionalRecord(b.metadata),
         });
         if (!message) return { status: 404, body: { error: "Conversation not found" } };
+        await emitMessageAppended(ctx, companyId, {
+          conversationId: message.conversation_id,
+          messageId: message.id,
+          seq: message.seq,
+          role: message.role,
+          assistantTurnNeeded: message.role === "user",
+        });
         return { status: 201, body: { message } };
       }
 
