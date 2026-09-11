@@ -171,6 +171,49 @@ const plugin = definePlugin({
       const companyId = requireString(params.companyId, "companyId");
       return { channels: await requireStore().listChannels(companyId) };
     });
+
+    ctx.data.register("list-usage", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      return { usage: await requireStore().listUsage(companyId, 50) };
+    });
+
+    ctx.data.register("served-models", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      return { models: await requireStore().listServedModels(companyId) };
+    });
+
+    // Mutating actions backing usePluginAction(...) in the aigw UI.
+    ctx.actions.register("create-channel", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const channel = await requireStore().createChannel({
+        companyId,
+        name: requireString(params.name, "name"),
+        apiUrl: requireString(params.apiUrl, "apiUrl"),
+        provider: typeof params.provider === "string" ? (params.provider as ChannelProvider) : undefined,
+        model: typeof params.model === "string" ? params.model : undefined,
+        apiKeySecretRef: typeof params.apiKeySecretRef === "string" ? params.apiKeySecretRef : null,
+        isDefault: params.isDefault === true,
+      });
+      await ctx.activity.log({
+        companyId,
+        message: `Created aigw channel ${channel.name} (${channel.provider})`,
+        entityType: "aigw_channel",
+        entityId: channel.id,
+      });
+      return { channel };
+    });
+
+    ctx.actions.register("toggle-channel", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const channel = await requireStore().updateChannel(
+        companyId,
+        requireString(params.channelId, "channelId"),
+        { enabled: params.enabled === true },
+      );
+      if (!channel) throw new Error("Channel not found");
+      return { channel };
+    });
+
     ctx.logger.info("AIGW plugin worker started", { namespace: ctx.db.namespace });
   },
 

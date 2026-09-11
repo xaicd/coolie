@@ -28,6 +28,8 @@ const manifest: PaperclipPluginManifestV1 = {
     "activity.log.write",
     "plugin.state.read",
     "plugin.state.write",
+    "ui.page.register",
+    "ui.sidebar.register",
   ],
   entrypoints: {
     worker: "./dist/worker.js",
@@ -96,6 +98,24 @@ const manifest: PaperclipPluginManifestV1 = {
       companyResolution: { from: "query", key: "companyId" },
     },
   ],
+  ui: {
+    slots: [
+      {
+        type: "sidebar",
+        id: "aigw-sidebar",
+        displayName: "AI Gateway",
+        exportName: "SidebarLink",
+        order: 60,
+      },
+      {
+        type: "page",
+        id: "aigw-page",
+        displayName: "AI Gateway",
+        exportName: "AigwPage",
+        routePath: "aigw",
+      },
+    ],
+  },
 };
 
 export default manifest;

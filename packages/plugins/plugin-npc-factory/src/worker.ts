@@ -141,7 +141,90 @@ const plugin = definePlugin({
     store = new NpcStore(ctx.db);
     ctx.data.register("list-templates", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
-      return { templates: await requireStore().listTemplates(companyId) };
+      const jobFamily =
+        typeof params.jobFamily === "string" && params.jobFamily.trim() !== "" ? params.jobFamily : undefined;
+      return { templates: await requireStore().listTemplates(companyId, jobFamily) };
+    });
+
+    ctx.data.register("list-runs", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      return { runs: await requireStore().listRuns(companyId) };
+    });
+
+    ctx.data.register("list-artifacts", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const driftStatus =
+        typeof params.driftStatus === "string" && params.driftStatus.trim() !== ""
+          ? params.driftStatus
+          : undefined;
+      return { artifacts: await requireStore().listArtifacts(companyId, driftStatus) };
+    });
+
+    // Mutating actions backing usePluginAction(...) in the npc-factory UI.
+    ctx.actions.register("create-template", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const template = await requireStore().createTemplate({
+        companyId,
+        templateKey:
+          typeof params.templateKey === "string" && params.templateKey.trim() !== ""
+            ? params.templateKey
+            : `tpl-${Date.now()}`,
+        name: requireString(params.name, "name"),
+        roleType: typeof params.roleType === "string" ? (params.roleType as NpcRoleType) : undefined,
+        jobFamily: typeof params.jobFamily === "string" ? (params.jobFamily as NpcJobFamily) : null,
+        artifactType:
+          typeof params.artifactType === "string" ? (params.artifactType as NpcArtifactType) : undefined,
+      });
+      await ctx.activity.log({
+        companyId,
+        message: `Created NPC template ${template.template_key}`,
+        entityType: "npc_template",
+        entityId: template.id,
+      });
+      return { template };
+    });
+
+    ctx.actions.register("create-run", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const run = await requireStore().createRun({
+        companyId,
+        runKey:
+          typeof params.runKey === "string" && params.runKey.trim() !== ""
+            ? params.runKey
+            : `run-${Date.now()}`,
+        templateId: typeof params.templateId === "string" ? params.templateId : null,
+        jobFamily: typeof params.jobFamily === "string" ? (params.jobFamily as NpcJobFamily) : null,
+        createdBy: "board",
+      });
+      return { run };
+    });
+
+    ctx.actions.register("transition-run", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const runId = requireString(params.runId, "runId");
+      const before = await requireStore().getRun(companyId, runId);
+      const to = requireString(params.to, "to") as NpcRunStatus;
+      const run = await requireStore().transitionRun(companyId, runId, to, {});
+      if (!run) throw new Error("Run not found");
+      await emitRunStatusChanged(ctx, companyId, {
+        runId: run.id,
+        runKey: run.run_key,
+        from: before?.status ?? "",
+        to,
+      });
+      return { run };
+    });
+
+    ctx.actions.register("set-artifact-drift", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const artifact = await requireStore().setArtifactDrift(
+        companyId,
+        requireString(params.artifactId, "artifactId"),
+        requireString(params.driftStatus, "driftStatus") as NpcDriftStatus,
+        typeof params.driftReason === "string" ? params.driftReason : "",
+      );
+      if (!artifact) throw new Error("Artifact not found");
+      return { artifact };
     });
 
     // Cross-plugin closed loop: react to ontology node-stale events by opening
