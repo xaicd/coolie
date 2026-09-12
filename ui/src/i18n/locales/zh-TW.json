@@ -118,5 +118,26 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "deleting": "Deleting…"
+  },
+  "settings": {
+    "backToApp": "返回應用",
+    "ariaSettings": "設定",
+    "general": "一般",
+    "profile": "個人資料",
+    "members": "成員",
+    "invites": "邀請",
+    "secrets": "密鑰",
+    "environments": "環境",
+    "access": "存取權限",
+    "heartbeats": "心跳",
+    "export": "匯出",
+    "import": "匯入",
+    "experimental": "實驗功能",
+    "plugins": "外掛",
+    "adapters": "配接器"
+  },
+  "inboxTidy": {
+    "title": "讓智能體整理我的收件匣",
+    "description": "選擇你管理的智能體是否可以代你歸檔收件匣中的任務。任何歸檔都可復原,且每次智能體歸檔都會記錄在任務屬性中。"
   }
 }

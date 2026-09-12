@@ -118,5 +118,26 @@
     "cancel": "Cancel",
     "delete": "Delete",
     "deleting": "Deleting…"
+  },
+  "settings": {
+    "backToApp": "Back to app",
+    "ariaSettings": "Settings",
+    "general": "General",
+    "profile": "Profile",
+    "members": "Members",
+    "invites": "Invites",
+    "secrets": "Secrets",
+    "environments": "Environments",
+    "access": "Access",
+    "heartbeats": "Heartbeats",
+    "export": "Export",
+    "import": "Import",
+    "experimental": "Experimental",
+    "plugins": "Plugins",
+    "adapters": "Adapters"
+  },
+  "inboxTidy": {
+    "title": "Let agents tidy my inbox",
+    "description": "Choose whether the agents you manage may archive tasks out of your inbox on your behalf. You can undo any archive, and every agent archive is attributed in the task's properties."
   }
 }

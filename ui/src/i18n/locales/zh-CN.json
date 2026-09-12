@@ -118,5 +118,26 @@
     "cancel": "取消",
     "delete": "删除",
     "deleting": "删除中…"
+  },
+  "settings": {
+    "backToApp": "返回应用",
+    "ariaSettings": "设置",
+    "general": "通用",
+    "profile": "个人资料",
+    "members": "成员",
+    "invites": "邀请",
+    "secrets": "密钥",
+    "environments": "环境",
+    "access": "访问权限",
+    "heartbeats": "心跳",
+    "export": "导出",
+    "import": "导入",
+    "experimental": "实验功能",
+    "plugins": "插件",
+    "adapters": "适配器"
+  },
+  "inboxTidy": {
+    "title": "让智能体整理我的收件箱",
+    "description": "选择你管理的智能体是否可以代你归档收件箱中的任务。任何归档都可撤销,且每次智能体归档都会记录在任务属性中。"
   }
 }

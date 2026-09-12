@@ -25,6 +25,7 @@ import { useCompany } from "@/context/CompanyContext";
 import { useCloudInstance } from "@/hooks/useCloudInstance";
 import { useHiddenSettings } from "@/hooks/useHiddenSettings";
 import { usePluginSlots } from "@/plugins/slots";
+import { useTranslation } from "@/i18n";
 import { SidebarNavItem } from "./SidebarNavItem";
 import { ContextualSidebarFrame } from "./ContextualSidebarFrame";
 import { primarySidebarStyles } from "./primary-sidebar-styles";
@@ -42,6 +43,7 @@ function isSandboxProviderOnly(plugin: PluginRecord): boolean {
 }
 
 export function CompanySettingsSidebar() {
+  const { t } = useTranslation();
   const { selectedCompanyId } = useCompany();
   const { hidden: hiddenSettings } = useHiddenSettings();
   const showPage = (pageKey: string) => !hiddenSettings.has(pageKey);
@@ -93,20 +95,20 @@ export function CompanySettingsSidebar() {
         className="flex h-(--sz-60px) shrink-0 items-center px-3"
       >
         <div data-slot="settings-back-group" className={`${primarySidebarStyles.group} w-full`}>
-          <SidebarNavItem to="/dashboard" label="Back to app" icon={ArrowLeft} />
+          <SidebarNavItem to="/dashboard" label={t("settings.backToApp")} icon={ArrowLeft} />
         </div>
       </div>
       <nav
-        aria-label="Settings"
+        aria-label={t("settings.ariaSettings")}
         data-slot="contextual-sidebar-nav"
         className={primarySidebarStyles.nav}
       >
         <div data-slot="contextual-sidebar-group" className={primarySidebarStyles.group}>
-          <SidebarNavItem to="/company/settings" label="General" icon={SlidersHorizontal} end />
+          <SidebarNavItem to="/company/settings" label={t("settings.general")} icon={SlidersHorizontal} end />
           {showPage("instance.profile") && (
             <SidebarNavItem
               to={`${INSTANCE_SETTINGS_PATH_PREFIX}/profile`}
-              label="Profile"
+              label={t("settings.profile")}
               icon={UserRoundPen}
               end
             />
@@ -114,7 +116,7 @@ export function CompanySettingsSidebar() {
           {showPage("company.members") && (
             <SidebarNavItem
               to="/company/settings/members"
-              label="Members"
+              label={t("settings.members")}
               icon={Users}
               badge={badges?.joinRequests ?? 0}
               end
@@ -132,12 +134,12 @@ export function CompanySettingsSidebar() {
               />
             ))}
           {showPage("company.secrets") && (
-            <SidebarNavItem to="/company/settings/secrets" label="Secrets" icon={KeyRound} end />
+            <SidebarNavItem to="/company/settings/secrets" label={t("settings.secrets")} icon={KeyRound} end />
           )}
           {showPage("instance.environments") && (
             <SidebarNavItem
               to={`${INSTANCE_SETTINGS_PATH_PREFIX}/environments`}
-              label="Environments"
+              label={t("settings.environments")}
               icon={MonitorCog}
               end
             />
@@ -145,28 +147,28 @@ export function CompanySettingsSidebar() {
           {showPage("instance.access") && (
             <SidebarNavItem
               to={`${INSTANCE_SETTINGS_PATH_PREFIX}/access`}
-              label="Access"
+              label={t("settings.access")}
               icon={Shield}
               end
             />
           )}
           {showPage("company.export") && (
-            <SidebarNavItem to="/company/export" label="Export" icon={Download} />
+            <SidebarNavItem to="/company/export" label={t("settings.export")} icon={Download} />
           )}
           {!isCloud && showPage("company.import") && (
-            <SidebarNavItem to="/company/import" label="Import" icon={Upload} end />
+            <SidebarNavItem to="/company/import" label={t("settings.import")} icon={Upload} end />
           )}
           {showPage("instance.experimental") && (
             <SidebarNavItem
               to={`${INSTANCE_SETTINGS_PATH_PREFIX}/experimental`}
-              label="Experimental"
+              label={t("settings.experimental")}
               icon={FlaskConical}
             />
           )}
           {showPlugins && (
             <SidebarNavItem
               to={`${INSTANCE_SETTINGS_PATH_PREFIX}/plugins`}
-              label="Plugins"
+              label={t("settings.plugins")}
               icon={Puzzle}
             />
           )}
@@ -194,7 +196,7 @@ export function CompanySettingsSidebar() {
           {showPage("instance.adapters") && (
             <SidebarNavItem
               to={`${INSTANCE_SETTINGS_PATH_PREFIX}/adapters`}
-              label="Adapters"
+              label={t("settings.adapters")}
               icon={Cpu}
             />
           )}
