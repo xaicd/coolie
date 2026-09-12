@@ -8,7 +8,16 @@ import {
   type PluginPageProps,
   type PluginSidebarProps,
 } from "@paperclipai/plugin-sdk/ui";
-import { useCallback, useMemo, useState, type CSSProperties, type ReactElement } from "react";
+import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+  type ReactElement,
+} from "react";
 
 const tokens = {
   border: "var(--border, oklch(0.269 0 0))",
@@ -48,13 +57,13 @@ interface GraphNode {
   id: string;
   key: string;
   label: string;
-  node_type_id: string | null;
+  nodeTypeId: string | null;
 }
 interface GraphEdge {
   id: string;
-  source_node_id: string;
-  target_node_id: string;
-  relation_key: string | null;
+  sourceNodeId: string;
+  targetNodeId: string;
+  relationKey: string | null;
   weight: number;
 }
 interface GraphSnapshot {
@@ -467,15 +476,40 @@ function DomainList({
 }
 
 /**
- * Lightweight force-directed graph view of a domain's instance graph
- * (nodes + edges). Pure SVG + a few iterations of a spring/repulsion layout —
- * no external graph lib (plugin bundles stay lean). Renders the ontology as an
- * actual graph, not just a table.
+ * Interactive force-directed graph view of a domain's instance graph. Pure SVG,
+ * no external graph lib. Beyond rendering, it supports drag-to-model:
+ *  - drag a node to reposition it,
+ *  - click empty canvas to add a node,
+ *  - toggle Connect mode, then click two nodes to create an edge.
+ * New nodes/edges are persisted through create-node / create-edge actions.
  */
-function GraphView({ nodes, edges }: { nodes: GraphNode[]; edges: GraphEdge[] }): ReactElement {
+function GraphView({
+  companyId,
+  domainId,
+  nodes,
+  edges,
+  onChanged,
+}: {
+  companyId: string;
+  domainId: string;
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  onChanged: () => void;
+}): ReactElement {
   const W = 640;
   const H = 380;
-  const positions = useMemo(() => {
+  const createNode = usePluginAction("create-node");
+  const createEdge = usePluginAction("create-edge");
+  const [connectMode, setConnectMode] = useState(false);
+  const [linkFrom, setLinkFrom] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  // Manual position overrides from dragging (id -> {x,y}); layout seeds the rest.
+  const [overrides, setOverrides] = useState<Map<string, { x: number; y: number }>>(new Map());
+  const dragRef = useRef<{ id: string; moved: boolean } | null>(null);
+  const svgRef = useRef<SVGSVGElement | null>(null);
+
+  const layout = useMemo(() => {
     const n = nodes.length;
     if (n === 0) return new Map<string, { x: number; y: number }>();
     // Seed on a circle (deterministic), then relax with repulsion + edge springs.
@@ -486,7 +520,7 @@ function GraphView({ nodes, edges }: { nodes: GraphNode[]; edges: GraphEdge[] })
     });
     const idx = new Map(nodes.map((nd, i) => [nd.id, i]));
     const adj = edges
-      .map((e) => [idx.get(e.source_node_id), idx.get(e.target_node_id)] as const)
+      .map((e) => [idx.get(e.sourceNodeId), idx.get(e.targetNodeId)] as const)
       .filter((p): p is readonly [number, number] => p[0] !== undefined && p[1] !== undefined);
     const arr = nodes.map((nd) => pos.get(nd.id)!);
     for (let iter = 0; iter < 120; iter++) {
@@ -523,46 +557,184 @@ function GraphView({ nodes, edges }: { nodes: GraphNode[]; edges: GraphEdge[] })
     return pos;
   }, [nodes, edges]);
 
-  if (nodes.length === 0) {
-    return (
-      <div style={{ ...cardStyle, color: tokens.muted }}>
-        No graph instances yet. Create nodes and edges to see the graph.
-      </div>
-    );
-  }
+  // Effective positions = layout, with dragged nodes overridden.
+  const positions = useMemo(() => {
+    const m = new Map(layout);
+    for (const [id, p] of overrides) m.set(id, p);
+    return m;
+  }, [layout, overrides]);
+
+  /** Convert a pointer event to SVG-local coordinates. */
+  const toSvgPoint = useCallback((clientX: number, clientY: number): { x: number; y: number } => {
+    const rect = svgRef.current?.getBoundingClientRect();
+    if (!rect) return { x: 0, y: 0 };
+    const sx = W / rect.width;
+    const sy = H / rect.height;
+    return { x: (clientX - rect.left) * sx, y: (clientY - rect.top) * sy };
+  }, []);
+
+  const addNodeAt = useCallback(
+    async (pt: { x: number; y: number }) => {
+      setErr(null);
+      const label = typeof window !== "undefined" ? window.prompt("New node label") : null;
+      if (!label || !label.trim()) return;
+      setBusy(true);
+      try {
+        const key = `n-${Date.now()}`;
+        const res = (await createNode({ companyId, domainId, key, label: label.trim() })) as {
+          node?: { id: string };
+        };
+        // Seed the new node at the click point so it lands where you dropped it.
+        if (res?.node?.id) {
+          setOverrides((prev) => new Map(prev).set(res.node!.id, pt));
+        }
+        onChanged();
+      } catch (e) {
+        setErr(String((e as Error)?.message ?? e));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [companyId, domainId, createNode, onChanged],
+  );
+
+  const connect = useCallback(
+    async (fromId: string, toId: string) => {
+      setErr(null);
+      const relationKey = typeof window !== "undefined" ? window.prompt("Relation key (optional)") ?? "" : "";
+      setBusy(true);
+      try {
+        await createEdge({ companyId, domainId, sourceNodeId: fromId, targetNodeId: toId, relationKey: relationKey.trim() || undefined });
+        onChanged();
+      } catch (e) {
+        setErr(String((e as Error)?.message ?? e));
+      } finally {
+        setBusy(false);
+        setLinkFrom(null);
+      }
+    },
+    [companyId, domainId, createEdge, onChanged],
+  );
+
+  // Left-drag to reposition a node.
+  const onNodePointerDown = useCallback((e: ReactPointerEvent, id: string) => {
+    if (e.button !== 0) return; // left only; right is the context menu
+    e.stopPropagation();
+    dragRef.current = { id, moved: false };
+    (e.target as Element).setPointerCapture?.(e.pointerId);
+  }, []);
+  const onSvgPointerMove = useCallback(
+    (e: ReactPointerEvent) => {
+      const d = dragRef.current;
+      if (!d) return;
+      d.moved = true;
+      const pt = toSvgPoint(e.clientX, e.clientY);
+      setOverrides((prev) => new Map(prev).set(d.id, { x: Math.max(12, Math.min(W - 12, pt.x)), y: Math.max(12, Math.min(H - 12, pt.y)) }));
+    },
+    [toSvgPoint],
+  );
+  const onSvgPointerUp = useCallback(() => {
+    dragRef.current = null;
+  }, []);
+
+  // Right-click node: start/finish a connection (game-style context action).
+  const onNodeContextMenu = useCallback(
+    (e: ReactMouseEvent, id: string) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (linkFrom === null) {
+        setLinkFrom(id);
+      } else if (linkFrom === id) {
+        setLinkFrom(null);
+      } else {
+        void connect(linkFrom, id);
+      }
+    },
+    [linkFrom, connect],
+  );
+
+  // Right-click empty canvas: add a node here.
+  const onCanvasContextMenu = useCallback(
+    (e: ReactMouseEvent) => {
+      e.preventDefault();
+      const pt = toSvgPoint(e.clientX, e.clientY);
+      void addNodeAt(pt);
+    },
+    [toSvgPoint, addNodeAt],
+  );
 
   return (
     <div style={{ ...cardStyle, overflow: "auto" }}>
-      <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>Graph</div>
-      <svg width={W} height={H} style={{ maxWidth: "100%", border: `1px solid ${tokens.border}`, borderRadius: "0.5rem", background: tokens.bg }}>
-        {edges.map((e) => {
-          const a = positions.get(e.source_node_id);
-          const b = positions.get(e.target_node_id);
-          if (!a || !b) return null;
-          return (
-            <g key={e.id}>
-              <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={tokens.border} strokeWidth={1.2} />
-              {e.relation_key && (
-                <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 3} fill={tokens.muted} fontSize={9} textAnchor="middle">
-                  {e.relation_key}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.5rem" }}>
+        <div style={{ fontWeight: 600 }}>Graph</div>
+        <div style={{ color: tokens.muted, fontSize: "0.75rem" }}>
+          {linkFrom
+            ? "Right-click a target node to connect · right-click the source again to cancel"
+            : "Right-click canvas: add node · right-click node: connect · drag: move"}
+          {busy ? " · saving…" : ""}
+        </div>
+      </div>
+      {err && <div style={{ color: tokens.muted, marginBottom: "0.5rem" }}>{err}</div>}
+      {nodes.length === 0 ? (
+        <div
+          onContextMenu={onCanvasContextMenu}
+          style={{ color: tokens.muted, border: `1px dashed ${tokens.border}`, borderRadius: "0.5rem", padding: "2rem", textAlign: "center" }}
+        >
+          No nodes yet. Right-click here to add the first node.
+        </div>
+      ) : (
+        <svg
+          ref={svgRef}
+          width={W}
+          height={H}
+          style={{ maxWidth: "100%", border: `1px solid ${tokens.border}`, borderRadius: "0.5rem", background: tokens.bg, touchAction: "none" }}
+          onContextMenu={onCanvasContextMenu}
+          onPointerMove={onSvgPointerMove}
+          onPointerUp={onSvgPointerUp}
+          onPointerLeave={onSvgPointerUp}
+        >
+          {edges.map((e) => {
+            const a = positions.get(e.sourceNodeId);
+            const b = positions.get(e.targetNodeId);
+            if (!a || !b) return null;
+            return (
+              <g key={e.id}>
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={tokens.border} strokeWidth={1.2} />
+                {e.relationKey && (
+                  <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 3} fill={tokens.muted} fontSize={9} textAnchor="middle">
+                    {e.relationKey}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+          {nodes.map((nd) => {
+            const p = positions.get(nd.id);
+            if (!p) return null;
+            const isLinkSource = linkFrom === nd.id;
+            return (
+              <g
+                key={nd.id}
+                style={{ cursor: "grab" }}
+                onPointerDown={(e) => onNodePointerDown(e, nd.id)}
+                onContextMenu={(e) => onNodeContextMenu(e, nd.id)}
+              >
+                <circle
+                  cx={p.x}
+                  cy={p.y}
+                  r={isLinkSource ? 9 : 7}
+                  fill={isLinkSource ? tokens.fg : tokens.primary}
+                  stroke={isLinkSource ? tokens.primary : "none"}
+                  strokeWidth={isLinkSource ? 2 : 0}
+                />
+                <text x={p.x + 10} y={p.y + 3} fill={tokens.fg} fontSize={11}>
+                  {nd.label || nd.key}
                 </text>
-              )}
-            </g>
-          );
-        })}
-        {nodes.map((nd) => {
-          const p = positions.get(nd.id);
-          if (!p) return null;
-          return (
-            <g key={nd.id}>
-              <circle cx={p.x} cy={p.y} r={7} fill={tokens.primary} />
-              <text x={p.x + 10} y={p.y + 3} fill={tokens.fg} fontSize={11}>
-                {nd.label || nd.key}
-              </text>
-            </g>
-          );
-        })}
-      </svg>
+              </g>
+            );
+          })}
+        </svg>
+      )}
     </div>
   );
 }
@@ -611,7 +783,13 @@ function DomainDetailView({
             <MetricCard label="Edges" value={counts?.edges ?? 0} />
           </div>
 
-          <GraphView nodes={data?.graph?.nodes ?? []} edges={data?.graph?.edges ?? []} />
+          <GraphView
+            companyId={companyId}
+            domainId={domainId}
+            nodes={data?.graph?.nodes ?? []}
+            edges={data?.graph?.edges ?? []}
+            onChanged={refresh}
+          />
 
           <TypeSection
             title="Node types"
