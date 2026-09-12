@@ -337,6 +337,29 @@ const plugin = definePlugin({
       return { relationType };
     });
 
+    // Graph instance authoring — backs drag-to-model in the graph view.
+    ctx.actions.register("create-node", async (params) => {
+      const node = await store.createNode({
+        companyId: requireString(params.companyId, "companyId"),
+        domainId: requireString(params.domainId, "domainId"),
+        key: requireString(params.key, "key"),
+        label: requireString(params.label, "label"),
+        nodeTypeId: typeof params.nodeTypeId === "string" ? params.nodeTypeId : null,
+      });
+      return { node };
+    });
+
+    ctx.actions.register("create-edge", async (params) => {
+      const edge = await store.createEdge({
+        companyId: requireString(params.companyId, "companyId"),
+        domainId: requireString(params.domainId, "domainId"),
+        sourceNodeId: requireString(params.sourceNodeId, "sourceNodeId"),
+        targetNodeId: requireString(params.targetNodeId, "targetNodeId"),
+        relationKey: typeof params.relationKey === "string" ? params.relationKey : null,
+      });
+      return { edge };
+    });
+
     // Capability acquisition — data/action handlers backing the Capabilities UI.
     ctx.data.register("list-capability-gaps", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
