@@ -14,6 +14,21 @@ import {
   type AudioFormat,
 } from "./enums.js";
 
+import { PLUGIN_ID } from "./manifest.js";
+
+/**
+ * Turn recognized speech into an issue title + description. The title is the
+ * first line (or a truncated prefix) so the task list stays scannable; the full
+ * transcript goes into the description.
+ */
+function textToIssueFields(text: string): { title: string; description: string } {
+  const clean = text.trim();
+  const firstLine = clean.split(/\r?\n/, 1)[0]?.trim() ?? "";
+  const base = firstLine || clean;
+  const title = base.length > 80 ? `${base.slice(0, 79)}…` : base || "Voice task";
+  return { title, description: clean };
+}
+
 let activeContext: PluginContext | null = null;
 let store: MultimodalStore | null = null;
 
@@ -177,7 +192,41 @@ const plugin = definePlugin({
               error: String((err as Error)?.message ?? err),
             });
           }
-          return { status: 201, body: { transcription: done } };
+
+          // Voice dispatch: optionally turn the recognized text into a task
+          // (issue). Guarded so an issue-creation failure never fails the
+          // transcription itself. Empty transcripts are not dispatched.
+          let issue: { id: string; title: string } | null = null;
+          if (b.createIssue === true && result.text.trim() !== "") {
+            const { title, description } = textToIssueFields(result.text);
+            try {
+              const created = await ctx.issues.create({
+                companyId,
+                title,
+                description,
+                priority: typeof b.priority === "string" ? (b.priority as never) : undefined,
+                projectId: typeof b.projectId === "string" ? b.projectId : undefined,
+                assigneeAgentId: typeof b.assigneeAgentId === "string" ? b.assigneeAgentId : undefined,
+                originKind: `plugin:${PLUGIN_ID}`,
+                originId: record.id,
+              });
+              issue = { id: created.id, title: created.title };
+              await ctx.activity.log({
+                companyId,
+                message: `Created task from voice: ${title}`,
+                entityType: "issue",
+                entityId: created.id,
+                metadata: { transcriptionId: record.id, via: "voice" },
+              });
+            } catch (err) {
+              ctx.logger.warn("Voice dispatch: failed to create issue from transcription", {
+                error: String((err as Error)?.message ?? err),
+                transcriptionId: record.id,
+              });
+            }
+          }
+
+          return { status: 201, body: { transcription: done, issue } };
         } catch (err) {
           const failed = await s.markFailed(companyId, record.id, {
             error: String((err as Error)?.message ?? err),

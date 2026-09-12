@@ -43,6 +43,8 @@ const manifest: PaperclipPluginManifestV1 = {
     "events.emit",
     "http.outbound",
     "secrets.read-ref",
+    "issues.create",
+    "projects.read",
     "plugin.state.read",
     "plugin.state.write",
     "ui.page.register",
