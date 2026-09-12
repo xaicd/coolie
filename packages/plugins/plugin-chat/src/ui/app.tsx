@@ -2,6 +2,7 @@ import {
   DataTable,
   MetricCard,
   StatusBadge,
+  useHostNavigation,
   usePluginAction,
   usePluginData,
   type PluginPageProps,
@@ -90,8 +91,23 @@ function statusKind(status: ConversationStatus): "ok" | "pending" | "error" {
   return "pending";
 }
 
+const SIDEBAR_ROW_CLASS =
+  "flex items-center gap-2.5 mx-2 rounded-lg px-2 py-1.5 pointer-coarse:py-1 " +
+  "text-(length:--text-compact) font-medium transition-colors no-underline " +
+  "text-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
+
 export function SidebarLink(_props: PluginSidebarProps): ReactElement {
-  return <span>Chat</span>;
+  const nav = useHostNavigation();
+  return (
+    <a {...nav.linkProps("/chat")} className={SIDEBAR_ROW_CLASS}>
+      <span data-slot="sidebar-nav-icon" className="relative shrink-0" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+        </svg>
+      </span>
+      <span className="min-w-0 flex-1 truncate">Chat</span>
+    </a>
+  );
 }
 
 /** Full-page intelligent-chat view: conversation list <-> session detail. */
