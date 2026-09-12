@@ -360,6 +360,42 @@ const plugin = definePlugin({
       return { edge };
     });
 
+    ctx.actions.register("update-node", async (params) => {
+      const node = await store.updateNode(
+        requireString(params.companyId, "companyId"),
+        requireString(params.nodeId, "nodeId"),
+        { label: typeof params.label === "string" ? params.label : undefined },
+      );
+      if (!node) throw new Error("Node not found");
+      return { node };
+    });
+
+    ctx.actions.register("delete-node", async (params) => {
+      const deleted = await store.deleteNode(
+        requireString(params.companyId, "companyId"),
+        requireString(params.nodeId, "nodeId"),
+      );
+      return { deleted };
+    });
+
+    ctx.actions.register("update-edge", async (params) => {
+      const edge = await store.updateEdge(
+        requireString(params.companyId, "companyId"),
+        requireString(params.edgeId, "edgeId"),
+        { relationKey: typeof params.relationKey === "string" ? params.relationKey : null },
+      );
+      if (!edge) throw new Error("Edge not found");
+      return { edge };
+    });
+
+    ctx.actions.register("delete-edge", async (params) => {
+      const deleted = await store.deleteEdge(
+        requireString(params.companyId, "companyId"),
+        requireString(params.edgeId, "edgeId"),
+      );
+      return { deleted };
+    });
+
     // Cognition (AST reverse-engineering) — data/action handlers for the UI:
     // create a job, ingest code files (extract a draft), review, publish to a domain.
     ctx.data.register("list-cognition-jobs", async (params) => {

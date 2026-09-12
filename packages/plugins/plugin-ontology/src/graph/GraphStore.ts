@@ -978,6 +978,10 @@ export interface GraphStore {
   createDomain(input: OntologyDomainInput): Promise<OntologyDomainRow>;
   createNode(input: OntologyNodeInput): Promise<OntologyNodeRow>;
   createEdge(input: OntologyEdgeInput): Promise<OntologyEdgeRow>;
+  updateNode(companyId: string, nodeId: string, update: { label?: string }): Promise<OntologyNodeRow | null>;
+  deleteNode(companyId: string, nodeId: string): Promise<boolean>;
+  updateEdge(companyId: string, edgeId: string, update: { relationKey?: string | null }): Promise<OntologyEdgeRow | null>;
+  deleteEdge(companyId: string, edgeId: string): Promise<boolean>;
   findPath(params: {
     companyId: string;
     sourceNodeId: string;
@@ -1356,6 +1360,67 @@ export class PostgresGraphStore implements GraphStore {
       [input.companyId, id],
     );
     return rows[0]!;
+  }
+
+  /** Rename a graph node (label). Returns the updated row, or null if missing. */
+  async updateNode(
+    companyId: string,
+    nodeId: string,
+    update: { label?: string },
+  ): Promise<OntologyNodeRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_nodes")}
+          SET label = COALESCE($3, label), updated_at = now()
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, nodeId, update.label ?? null],
+    );
+    if (res.rowCount === 0) return null;
+    const rows = await this.db.query<OntologyNodeRow>(
+      `SELECT ${PostgresGraphStore.NODE_COLS} FROM ${this.table("ontology_nodes")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, nodeId],
+    );
+    return rows[0] ?? null;
+  }
+
+  /** Delete a graph node. Its edges cascade (edge FKs are ON DELETE CASCADE). */
+  async deleteNode(companyId: string, nodeId: string): Promise<boolean> {
+    const res = await this.db.execute(
+      `DELETE FROM ${this.table("ontology_nodes")} WHERE company_id = $1 AND id = $2`,
+      [companyId, nodeId],
+    );
+    return res.rowCount > 0;
+  }
+
+  /** Change an edge relation key. Returns the updated row, or null if missing. */
+  async updateEdge(
+    companyId: string,
+    edgeId: string,
+    update: { relationKey?: string | null },
+  ): Promise<OntologyEdgeRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_edges")}
+          SET relation_key = $3, updated_at = now()
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, edgeId, update.relationKey ?? null],
+    );
+    if (res.rowCount === 0) return null;
+    const rows = await this.db.query<OntologyEdgeRow>(
+      `SELECT id, company_id, domain_id, source_node_id, target_node_id, relation_key, weight
+         FROM ${this.table("ontology_edges")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, edgeId],
+    );
+    return rows[0] ?? null;
+  }
+
+  /** Delete a single edge. */
+  async deleteEdge(companyId: string, edgeId: string): Promise<boolean> {
+    const res = await this.db.execute(
+      `DELETE FROM ${this.table("ontology_edges")} WHERE company_id = $1 AND id = $2`,
+      [companyId, edgeId],
+    );
+    return res.rowCount > 0;
   }
 
   /**
