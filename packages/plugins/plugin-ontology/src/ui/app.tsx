@@ -744,7 +744,10 @@ function GraphView({
   const H = 380;
   const createNode = usePluginAction("create-node");
   const createEdge = usePluginAction("create-edge");
-  const [connectMode, setConnectMode] = useState(false);
+  const updateNode = usePluginAction("update-node");
+  const deleteNode = usePluginAction("delete-node");
+  const updateEdge = usePluginAction("update-edge");
+  const deleteEdge = usePluginAction("delete-edge");
   const [linkFrom, setLinkFrom] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -860,6 +863,56 @@ function GraphView({
     [companyId, domainId, createEdge, onChanged],
   );
 
+  // Inline right-click context menu state (game-style).
+  const [menu, setMenu] = useState<
+    | { kind: "node"; id: string; label: string; x: number; y: number }
+    | { kind: "edge"; id: string; label: string; x: number; y: number }
+    | null
+  >(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+
+  const renameNode = useCallback(
+    async (id: string, current: string) => {
+      const label = typeof window !== "undefined" ? window.prompt("Node label", current) : null;
+      if (!label || !label.trim()) return;
+      setBusy(true); setErr(null);
+      try { await updateNode({ companyId, nodeId: id, label: label.trim() }); onChanged(); }
+      catch (e) { setErr(String((e as Error)?.message ?? e)); }
+      finally { setBusy(false); }
+    },
+    [companyId, updateNode, onChanged],
+  );
+  const removeNode = useCallback(
+    async (id: string) => {
+      if (typeof window !== "undefined" && !window.confirm("Delete this node and its edges?")) return;
+      setBusy(true); setErr(null);
+      try { await deleteNode({ companyId, nodeId: id }); onChanged(); }
+      catch (e) { setErr(String((e as Error)?.message ?? e)); }
+      finally { setBusy(false); }
+    },
+    [companyId, deleteNode, onChanged],
+  );
+  const renameEdge = useCallback(
+    async (id: string, current: string) => {
+      const relationKey = typeof window !== "undefined" ? window.prompt("Relation key", current) ?? "" : "";
+      setBusy(true); setErr(null);
+      try { await updateEdge({ companyId, edgeId: id, relationKey: relationKey.trim() || null }); onChanged(); }
+      catch (e) { setErr(String((e as Error)?.message ?? e)); }
+      finally { setBusy(false); }
+    },
+    [companyId, updateEdge, onChanged],
+  );
+  const removeEdge = useCallback(
+    async (id: string) => {
+      if (typeof window !== "undefined" && !window.confirm("Delete this edge?")) return;
+      setBusy(true); setErr(null);
+      try { await deleteEdge({ companyId, edgeId: id }); onChanged(); }
+      catch (e) { setErr(String((e as Error)?.message ?? e)); }
+      finally { setBusy(false); }
+    },
+    [companyId, deleteEdge, onChanged],
+  );
+
   // Left-drag to reposition a node.
   const onNodePointerDown = useCallback((e: ReactPointerEvent, id: string) => {
     if (e.button !== 0) return; // left only; right is the context menu
@@ -881,21 +934,27 @@ function GraphView({
     dragRef.current = null;
   }, []);
 
-  // Right-click node: start/finish a connection (game-style context action).
+  // Right-click node: if a connection is in progress, complete it to this node;
+  // otherwise open a context menu (rename / delete / connect from here).
   const onNodeContextMenu = useCallback(
-    (e: ReactMouseEvent, id: string) => {
+    (e: ReactMouseEvent, id: string, label: string) => {
       e.preventDefault();
       e.stopPropagation();
-      if (linkFrom === null) {
-        setLinkFrom(id);
-      } else if (linkFrom === id) {
-        setLinkFrom(null);
-      } else {
+      if (linkFrom && linkFrom !== id) {
         void connect(linkFrom, id);
+        return;
       }
+      setMenu({ kind: "node", id, label, x: e.clientX, y: e.clientY });
     },
     [linkFrom, connect],
   );
+
+  // Right-click edge: context menu (rename relation / delete).
+  const onEdgeContextMenu = useCallback((e: ReactMouseEvent, id: string, label: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setMenu({ kind: "edge", id, label, x: e.clientX, y: e.clientY });
+  }, []);
 
   // Right-click empty canvas: add a node here.
   const onCanvasContextMenu = useCallback(
@@ -913,8 +972,8 @@ function GraphView({
         <div style={{ fontWeight: 600 }}>Graph</div>
         <div style={{ color: tokens.muted, fontSize: "0.75rem" }}>
           {linkFrom
-            ? "Right-click a target node to connect · right-click the source again to cancel"
-            : "Right-click canvas: add node · right-click node: connect · drag: move"}
+            ? "Connecting… right-click a target node to link, or the source to cancel"
+            : "Right-click: canvas=add · node=menu · edge=menu · drag=move"}
           {busy ? " · saving…" : ""}
         </div>
       </div>
@@ -942,8 +1001,10 @@ function GraphView({
             const b = positions.get(e.targetNodeId);
             if (!a || !b) return null;
             return (
-              <g key={e.id}>
+              <g key={e.id} onContextMenu={(ev) => onEdgeContextMenu(ev, e.id, e.relationKey ?? "")} style={{ cursor: "context-menu" }}>
                 <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={tokens.border} strokeWidth={1.2} />
+                {/* Invisible wide hit-line so the edge is easy to right-click. */}
+                <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke="transparent" strokeWidth={10} />
                 {e.relationKey && (
                   <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 3} fill={tokens.muted} fontSize={9} textAnchor="middle">
                     {e.relationKey}
@@ -961,7 +1022,7 @@ function GraphView({
                 key={nd.id}
                 style={{ cursor: "grab" }}
                 onPointerDown={(e) => onNodePointerDown(e, nd.id)}
-                onContextMenu={(e) => onNodeContextMenu(e, nd.id)}
+                onContextMenu={(e) => onNodeContextMenu(e, nd.id, nd.label || nd.key)}
               >
                 <circle
                   cx={p.x}
@@ -979,7 +1040,67 @@ function GraphView({
           })}
         </svg>
       )}
+
+      {menu && (
+        <>
+          {/* click-catcher to dismiss */}
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 40 }}
+            onClick={closeMenu}
+            onContextMenu={(e) => { e.preventDefault(); closeMenu(); }}
+          />
+          <div
+            style={{
+              position: "fixed",
+              left: menu.x,
+              top: menu.y,
+              zIndex: 41,
+              background: tokens.card,
+              border: `1px solid ${tokens.border}`,
+              borderRadius: "0.5rem",
+              padding: "0.25rem",
+              minWidth: "9rem",
+              boxShadow: "0 4px 16px rgba(0,0,0,0.35)",
+            }}
+          >
+            {menu.kind === "node" ? (
+              <>
+                <MenuItem label="Rename" onClick={() => { const m = menu; closeMenu(); void renameNode(m.id, m.label); }} />
+                <MenuItem label="Connect from here" onClick={() => { setLinkFrom(menu.id); closeMenu(); }} />
+                <MenuItem label="Delete" danger onClick={() => { const m = menu; closeMenu(); void removeNode(m.id); }} />
+              </>
+            ) : (
+              <>
+                <MenuItem label="Rename relation" onClick={() => { const m = menu; closeMenu(); void renameEdge(m.id, m.label); }} />
+                <MenuItem label="Delete" danger onClick={() => { const m = menu; closeMenu(); void removeEdge(m.id); }} />
+              </>
+            )}
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+function MenuItem({ label, onClick, danger }: { label: string; onClick: () => void; danger?: boolean }): ReactElement {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        display: "block",
+        width: "100%",
+        textAlign: "left",
+        background: "transparent",
+        border: "none",
+        color: danger ? "var(--destructive, oklch(0.6 0.2 25))" : tokens.fg,
+        padding: "0.4rem 0.6rem",
+        borderRadius: "0.35rem",
+        cursor: "pointer",
+        fontSize: "0.85rem",
+      }}
+    >
+      {label}
+    </button>
   );
 }
 
