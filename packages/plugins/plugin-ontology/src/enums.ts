@@ -487,3 +487,100 @@ export const UMODEL_ENTITY_SET_LAYERS = [
   "business",
 ] as const;
 export type UModelEntitySetLayer = (typeof UMODEL_ENTITY_SET_LAYERS)[number];
+
+
+// ---------------------------------------------------------------------------
+// Capability acquisition (DS orchestration/capability parity).
+// ---------------------------------------------------------------------------
+
+/** Capability gap lifecycle. */
+export const CAPABILITY_GAP_STATUSES = ["open", "resolving", "resolved", "abandoned"] as const;
+export type CapabilityGapStatus = (typeof CAPABILITY_GAP_STATUSES)[number];
+
+export const CAPABILITY_GAP_TRANSITIONS: Record<CapabilityGapStatus, CapabilityGapStatus[]> = {
+  open: ["resolving", "abandoned"],
+  resolving: ["resolved", "open", "abandoned"],
+  resolved: [],
+  abandoned: [],
+};
+
+export function isValidCapabilityGapTransition(
+  from: CapabilityGapStatus,
+  to: CapabilityGapStatus,
+): boolean {
+  return CAPABILITY_GAP_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
+/** Acquisition resolution stage (DS CapabilityResolutionRecord.status). */
+export const RESOLUTION_STAGES = [
+  "detected",
+  "checking_cache",
+  "searching_online",
+  "installing",
+  "developing",
+  "resolved",
+  "failed",
+] as const;
+export type ResolutionStage = (typeof RESOLUTION_STAGES)[number];
+
+export const RESOLUTION_STAGE_TRANSITIONS: Record<ResolutionStage, ResolutionStage[]> = {
+  detected: ["checking_cache", "searching_online", "resolved", "failed"],
+  checking_cache: ["searching_online", "resolved", "failed"],
+  searching_online: ["installing", "developing", "failed"],
+  installing: ["resolved", "failed"],
+  developing: ["resolved", "failed"],
+  resolved: [],
+  failed: [],
+};
+
+export function isValidResolutionTransition(from: ResolutionStage, to: ResolutionStage): boolean {
+  return RESOLUTION_STAGE_TRANSITIONS[from]?.includes(to) ?? false;
+}
+
+/** Where an acquired capability came from (DS CapabilityResolutionRecord.source). */
+export const RESOLUTION_SOURCES = [
+  "cached-mcp",
+  "curated-catalog",
+  "npm-registry",
+  "autonomous-dev",
+  "none",
+] as const;
+export type ResolutionSource = (typeof RESOLUTION_SOURCES)[number];
+
+/** License gate verdict. */
+export const LICENSE_VERDICTS = ["allowed", "warn", "rejected", "unknown"] as const;
+export type LicenseVerdict = (typeof LICENSE_VERDICTS)[number];
+
+/** Licenses allowed to auto-register (DS ALLOWED_LICENSES). */
+export const ALLOWED_LICENSES = [
+  "MIT",
+  "Apache-2.0",
+  "BSD-3-Clause",
+  "ISC",
+  "0BSD",
+  "BSD-2-Clause",
+] as const;
+
+/** Licenses allowed but flagged (DS WARN_LICENSES). */
+export const WARN_LICENSES = [
+  "GPL-2.0",
+  "GPL-3.0",
+  "LGPL-2.0",
+  "LGPL-2.1",
+  "LGPL-3.0",
+] as const;
+
+/** Package size ceiling for auto-registration (DS MAX_PACKAGE_SIZE_BYTES: 50MB). */
+export const MAX_PACKAGE_SIZE_BYTES = 50 * 1024 * 1024;
+
+/**
+ * Classify a license string against the allow / warn lists. Unknown or empty
+ * licenses are "unknown" (treated as non-registrable by the acquisition gate).
+ */
+export function classifyLicense(license: string | undefined | null): LicenseVerdict {
+  if (!license) return "unknown";
+  const normalized = license.trim();
+  if ((ALLOWED_LICENSES as readonly string[]).includes(normalized)) return "allowed";
+  if ((WARN_LICENSES as readonly string[]).includes(normalized)) return "warn";
+  return "rejected";
+}

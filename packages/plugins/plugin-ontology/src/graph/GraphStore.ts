@@ -17,8 +17,14 @@ import {
   COGNITION_PROGRESS_BY_STATUS,
   isValidCognitionTransition,
   isValidDomainTransition,
+  classifyLicense,
+  MAX_PACKAGE_SIZE_BYTES,
 } from "../enums.js";
 import type {
+  CapabilityGapStatus,
+  ResolutionStage,
+  ResolutionSource,
+  LicenseVerdict,
   ActionKind,
   ActionTypeStatus,
   AuditEventType,
@@ -261,6 +267,67 @@ export interface OntologyFunctionRow {
   version: string;
   description: string;
   status: FunctionStatus;
+}
+
+// --- capability acquisition (DS orchestration/capability parity) ---
+
+export interface CapabilityGapInput {
+  companyId: string;
+  domainId?: string | null;
+  gapKey: string;
+  title: string;
+  description?: string;
+  detectedFrom?: string;
+  intentRef?: string | null;
+  priority?: string;
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CapabilityGapRow {
+  id: string;
+  company_id: string;
+  domain_id: string | null;
+  gap_key: string;
+  title: string;
+  description: string;
+  detected_from: string;
+  intent_ref: string | null;
+  status: CapabilityGapStatus;
+  resolved_function_id: string | null;
+  priority: string;
+}
+
+export interface CapabilityResolutionRow {
+  id: string;
+  company_id: string;
+  gap_id: string;
+  resolution_key: string;
+  stage: ResolutionStage;
+  source: ResolutionSource;
+  candidate: Record<string, unknown>;
+  verification: Record<string, unknown>;
+  license_verdict: LicenseVerdict;
+  error: string;
+}
+
+/** A discovered candidate an acquisition attempt evaluates. */
+export interface CapabilityCandidate {
+  name: string;
+  version?: string;
+  repoUrl?: string;
+  license?: string;
+  sizeBytes?: number;
+  source: ResolutionSource;
+  smokeTestPassed?: boolean;
+}
+
+/** Outcome of one acquireCapability attempt. */
+export interface CapabilityAcquisitionResult {
+  gap: CapabilityGapRow;
+  resolution: CapabilityResolutionRow;
+  functionId: string | null;
+  acquired: boolean;
 }
 
 export interface OntologyAuditLogInput {
@@ -978,6 +1045,21 @@ export interface GraphStore {
     functionId: string,
     update: OntologyFunctionUpdate,
   ): Promise<OntologyFunctionRow | null>;
+
+  // capability acquisition
+  detectCapabilityGap(input: CapabilityGapInput): Promise<CapabilityGapRow>;
+  getCapabilityGap(companyId: string, gapId: string): Promise<CapabilityGapRow | null>;
+  listCapabilityGaps(
+    companyId: string,
+    status?: string,
+    limit?: number,
+  ): Promise<CapabilityGapRow[]>;
+  listCapabilityResolutions(companyId: string, gapId: string): Promise<CapabilityResolutionRow[]>;
+  acquireCapability(
+    companyId: string,
+    gapId: string,
+    candidate: CapabilityCandidate,
+  ): Promise<CapabilityAcquisitionResult | null>;
 
   writeAuditLog(input: OntologyAuditLogInput): Promise<OntologyAuditLogRow>;
   listAuditLogs(companyId: string, domainId: string, limit?: number): Promise<OntologyAuditLogRow[]>;
@@ -3506,5 +3588,230 @@ export class PostgresGraphStore implements GraphStore {
         LIMIT $3`,
       [companyId, entityId, capped],
     );
+  }
+
+  // --- capability acquisition -----------------------------------------------
+
+  private static readonly GAP_COLS =
+    "id, company_id, domain_id, gap_key, title, description, detected_from, intent_ref, status, resolved_function_id, priority";
+
+  private static readonly RESOLUTION_COLS =
+    "id, company_id, gap_id, resolution_key, stage, source, candidate, verification, license_verdict, error";
+
+  async detectCapabilityGap(input: CapabilityGapInput): Promise<CapabilityGapRow> {
+    const id = randomUUID();
+    // Idempotent by (company_id, gap_key): a repeated detect updates the
+    // description/priority but never creates a duplicate gap.
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_capability_gaps")}
+         (id, company_id, domain_id, gap_key, title, description, detected_from,
+          intent_ref, priority, created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $10, $11::jsonb)
+       ON CONFLICT (company_id, gap_key) DO UPDATE
+          SET description = EXCLUDED.description,
+              priority    = EXCLUDED.priority,
+              updated_at  = now()`,
+      [
+        id,
+        input.companyId,
+        input.domainId ?? null,
+        input.gapKey,
+        input.title,
+        input.description ?? "",
+        input.detectedFrom ?? "manual",
+        input.intentRef ?? null,
+        input.priority ?? "medium",
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<CapabilityGapRow>(
+      `SELECT ${PostgresGraphStore.GAP_COLS}
+         FROM ${this.table("ontology_capability_gaps")}
+        WHERE company_id = $1 AND gap_key = $2 AND is_deleted = false`,
+      [input.companyId, input.gapKey],
+    );
+    return rows[0]!;
+  }
+
+  async getCapabilityGap(companyId: string, gapId: string): Promise<CapabilityGapRow | null> {
+    const rows = await this.db.query<CapabilityGapRow>(
+      `SELECT ${PostgresGraphStore.GAP_COLS}
+         FROM ${this.table("ontology_capability_gaps")}
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, gapId],
+    );
+    return rows[0] ?? null;
+  }
+
+  async listCapabilityGaps(
+    companyId: string,
+    status?: string,
+    limit = 200,
+  ): Promise<CapabilityGapRow[]> {
+    const capped = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 1000)) : 200;
+    if (status) {
+      return this.db.query<CapabilityGapRow>(
+        `SELECT ${PostgresGraphStore.GAP_COLS}
+           FROM ${this.table("ontology_capability_gaps")}
+          WHERE company_id = $1 AND is_deleted = false AND status = $2
+          ORDER BY created_at DESC
+          LIMIT $3`,
+        [companyId, status, capped],
+      );
+    }
+    return this.db.query<CapabilityGapRow>(
+      `SELECT ${PostgresGraphStore.GAP_COLS}
+         FROM ${this.table("ontology_capability_gaps")}
+        WHERE company_id = $1 AND is_deleted = false
+        ORDER BY created_at DESC
+        LIMIT $2`,
+      [companyId, capped],
+    );
+  }
+
+  async listCapabilityResolutions(
+    companyId: string,
+    gapId: string,
+  ): Promise<CapabilityResolutionRow[]> {
+    return this.db.query<CapabilityResolutionRow>(
+      `SELECT ${PostgresGraphStore.RESOLUTION_COLS}
+         FROM ${this.table("ontology_capability_resolutions")}
+        WHERE company_id = $1 AND gap_id = $2 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId, gapId],
+    );
+  }
+
+  private async setGapStatus(
+    companyId: string,
+    gapId: string,
+    to: CapabilityGapStatus,
+    resolvedFunctionId?: string | null,
+  ): Promise<void> {
+    await this.db.execute(
+      `UPDATE ${this.table("ontology_capability_gaps")}
+          SET status = $3,
+              resolved_function_id = COALESCE($4, resolved_function_id),
+              updated_at = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, gapId, to, resolvedFunctionId ?? null],
+    );
+  }
+
+  /**
+   * Run one acquisition attempt for a gap given an already-discovered candidate.
+   * Online discovery and sandbox smoke tests happen in the worker (http.outbound
+   * / host ctx.execution); the store owns the resolution state machine, the
+   * license/size gates, and — on success — registering the capability as an
+   * active ontology_function and closing the gap.
+   *
+   * Returns null when the gap does not exist.
+   */
+  async acquireCapability(
+    companyId: string,
+    gapId: string,
+    candidate: CapabilityCandidate,
+  ): Promise<CapabilityAcquisitionResult | null> {
+    const gap = await this.getCapabilityGap(companyId, gapId);
+    if (!gap) return null;
+
+    await this.setGapStatus(companyId, gapId, "resolving");
+
+    const resolutionId = randomUUID();
+    const resolutionKey = `${gap.gap_key}:${resolutionId.slice(0, 8)}`;
+    const now = new Date().toISOString();
+    const history: Array<{ stage: ResolutionStage; at: string; message: string }> = [
+      { stage: "detected", at: now, message: "candidate discovered" },
+      { stage: "searching_online", at: now, message: `source ${candidate.source}` },
+    ];
+
+    // License + size gates.
+    const licenseVerdict = classifyLicense(candidate.license);
+    const sizeOk =
+      candidate.sizeBytes === undefined || candidate.sizeBytes <= MAX_PACKAGE_SIZE_BYTES;
+    const smokeOk = candidate.smokeTestPassed === true;
+
+    let stage: ResolutionStage;
+    let error = "";
+    let functionId: string | null = null;
+    let acquired = false;
+
+    if (licenseVerdict === "rejected" || licenseVerdict === "unknown") {
+      stage = "failed";
+      error = `license not registrable: ${candidate.license ?? "unknown"}`;
+    } else if (!sizeOk) {
+      stage = "failed";
+      error = `package exceeds size ceiling (${candidate.sizeBytes} bytes)`;
+    } else if (!smokeOk) {
+      stage = "failed";
+      error = "smoke test did not pass";
+    } else {
+      // Passed gates: register the capability as an active ontology_function.
+      if (!gap.domain_id) {
+        stage = "failed";
+        error = "gap has no target domain to register the capability in";
+      } else {
+        history.push({ stage: "installing", at: now, message: candidate.name });
+        const fn = await this.createFunction({
+          companyId,
+          domainId: gap.domain_id,
+          name: candidate.name,
+          type: "action",
+          version: candidate.version ?? "1.0.0",
+          description: `Acquired capability for gap ${gap.gap_key}`,
+          implementation: {
+            runtime: "external",
+            source: candidate.source,
+            repoUrl: candidate.repoUrl ?? "",
+          },
+          metadata: { acquiredFromGap: gap.gap_key, license: candidate.license ?? "" },
+        });
+        await this.updateFunction(companyId, fn.id, { status: "active" });
+        functionId = fn.id;
+        acquired = true;
+        stage = "resolved";
+      }
+    }
+
+    history.push({ stage, at: new Date().toISOString(), message: error || "ok" });
+
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_capability_resolutions")}
+         (id, company_id, gap_id, resolution_key, stage, source, candidate,
+          verification, license_verdict, error, stage_history, created_by, updated_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10, $11::jsonb, $12, $12)`,
+      [
+        resolutionId,
+        companyId,
+        gapId,
+        resolutionKey,
+        stage,
+        candidate.source,
+        JSON.stringify(candidate),
+        JSON.stringify({ smokeTestPassed: smokeOk, licenseVerdict, sizeOk }),
+        licenseVerdict,
+        error,
+        JSON.stringify(history),
+        "system",
+      ],
+    );
+
+    // Close or reopen the gap.
+    if (acquired) {
+      await this.setGapStatus(companyId, gapId, "resolved", functionId);
+    } else {
+      await this.setGapStatus(companyId, gapId, "open");
+    }
+
+    const gapAfter = (await this.getCapabilityGap(companyId, gapId))!;
+    const resolutionRows = await this.db.query<CapabilityResolutionRow>(
+      `SELECT ${PostgresGraphStore.RESOLUTION_COLS}
+         FROM ${this.table("ontology_capability_resolutions")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, resolutionId],
+    );
+
+    return { gap: gapAfter, resolution: resolutionRows[0]!, functionId, acquired };
   }
 }

@@ -27,6 +27,7 @@ const manifest: PaperclipPluginManifestV1 = {
     "companies.read",
     "activity.log.write",
     "events.emit",
+    "http.outbound",
     "agent.tools.register",
     "plugin.state.read",
     "plugin.state.write",
@@ -546,6 +547,10 @@ const manifest: PaperclipPluginManifestV1 = {
       capability: "api.routes.register",
       companyResolution: { from: "query", key: "companyId" },
     },
+    { routeKey: "list-capability-gaps", method: "GET", path: "/capability-gaps", auth: "board-or-agent", capability: "api.routes.register", companyResolution: { from: "query", key: "companyId" } },
+    { routeKey: "create-capability-gap", method: "POST", path: "/capability-gaps", auth: "board", capability: "api.routes.register", companyResolution: { from: "body", key: "companyId" } },
+    { routeKey: "acquire-capability", method: "POST", path: "/capability-gaps/:gapId/acquire", auth: "board", capability: "api.routes.register", companyResolution: { from: "body", key: "companyId" } },
+    { routeKey: "list-capability-resolutions", method: "GET", path: "/capability-gaps/:gapId/resolutions", auth: "board-or-agent", capability: "api.routes.register", companyResolution: { from: "query", key: "companyId" } },
   ],
   ui: {
     slots: [
