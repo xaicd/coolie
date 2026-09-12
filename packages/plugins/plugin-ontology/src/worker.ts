@@ -360,6 +360,79 @@ const plugin = definePlugin({
       return { edge };
     });
 
+    // Cognition (AST reverse-engineering) — data/action handlers for the UI:
+    // create a job, ingest code files (extract a draft), review, publish to a domain.
+    ctx.data.register("list-cognition-jobs", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      return { jobs: await store.listCognitionJobs(companyId) };
+    });
+
+    ctx.data.register("cognition-job", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const jobId = requireString(params.jobId, "jobId");
+      const [job, draft] = await Promise.all([
+        store.getCognitionJob(companyId, jobId),
+        store.getCognitionDraft(companyId, jobId),
+      ]);
+      return { job, draft };
+    });
+
+    ctx.actions.register("create-cognition-job", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const job = await store.createCognitionJob({
+        companyId,
+        jobKey:
+          typeof params.jobKey === "string" && params.jobKey.trim() !== ""
+            ? params.jobKey
+            : `cog-${Date.now()}`,
+        rootPath: requireString(params.rootPath, "rootPath"),
+        domainId: typeof params.domainId === "string" ? params.domainId : null,
+        appName: typeof params.appName === "string" ? params.appName : undefined,
+      });
+      await ctx.activity.log({
+        companyId,
+        message: `Created cognition job ${job.job_key}`,
+        entityType: "ontology_cognition_job",
+        entityId: job.id,
+      });
+      return { job };
+    });
+
+    ctx.actions.register("ingest-cognition-files", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const jobId = requireString(params.jobId, "jobId");
+      const rawFiles = Array.isArray(params.files) ? params.files : [];
+      const files = rawFiles
+        .map((f) => optionalRecord(f))
+        .filter((f): f is Record<string, unknown> => f !== undefined && typeof f.path === "string")
+        .map((f) => ({ path: String(f.path), content: typeof f.content === "string" ? f.content : "" }));
+      const draft = extractRepoDraft(files);
+      const job = await store.setCognitionDraft(companyId, jobId, {
+        draftPreview: { coverage: draft.coverage },
+        seedNodeTypes: draft.seedNodeTypes,
+        seedRelationTypes: draft.seedRelationTypes,
+        seedActions: draft.seedActions,
+      });
+      if (!job) throw new Error("Cognition job not found");
+      await store.recordCognitionCoverage(companyId, jobId, {
+        entityCount: draft.coverage.entityCount,
+        relationCount: draft.coverage.relationCount,
+        actionCount: draft.coverage.actionCount,
+        sqlFiles: draft.coverage.sqlFiles,
+        apiFiles: draft.coverage.apiFiles,
+      });
+      return { job, coverage: draft.coverage };
+    });
+
+    ctx.actions.register("publish-cognition-job", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const jobId = requireString(params.jobId, "jobId");
+      const targetDomainId = requireString(params.domainId, "domainId");
+      const result = await publishCognitionDraft(ctx, store, companyId, jobId, targetDomainId);
+      if (!result) throw new Error("Cognition job or domain not found");
+      return result;
+    });
+
     // Capability acquisition — data/action handlers backing the Capabilities UI.
     ctx.data.register("list-capability-gaps", async (params) => {
       const companyId = requireString(params.companyId, "companyId");

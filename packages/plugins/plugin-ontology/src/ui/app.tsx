@@ -133,7 +133,7 @@ const ghostBtn: CSSProperties = { ...btnStyle, background: "transparent", color:
 /** Full-page ontology view: Domains modeling + Capabilities acquisition. */
 export function OntologyPage({ context }: PluginPageProps): ReactElement {
   const companyId = context.companyId ?? undefined;
-  const [tab, setTab] = useState<"domains" | "capabilities">("domains");
+  const [tab, setTab] = useState<"domains" | "cognition" | "capabilities">("domains");
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
 
   if (!companyId) {
@@ -155,14 +155,20 @@ export function OntologyPage({ context }: PluginPageProps): ReactElement {
           Domains
         </button>
         <button
+          style={{ ...btnStyle, background: tab === "cognition" ? tokens.primary : "transparent", color: tab === "cognition" ? tokens.primaryFg : tokens.primary }}
+          onClick={() => setTab("cognition")}
+        >
+          Cognition
+        </button>
+        <button
           style={{ ...btnStyle, background: tab === "capabilities" ? tokens.primary : "transparent", color: tab === "capabilities" ? tokens.primaryFg : tokens.primary }}
           onClick={() => setTab("capabilities")}
         >
           Capabilities
         </button>
       </div>
-      {tab === "domains" ? (
-        selectedDomainId ? (
+      {tab === "domains" &&
+        (selectedDomainId ? (
           <DomainDetailView
             companyId={companyId}
             domainId={selectedDomainId}
@@ -170,10 +176,248 @@ export function OntologyPage({ context }: PluginPageProps): ReactElement {
           />
         ) : (
           <DomainList companyId={companyId} onOpen={setSelectedDomainId} />
-        )
-      ) : (
-        <CapabilitiesTab companyId={companyId} />
+        ))}
+      {tab === "cognition" && <CognitionTab companyId={companyId} />}
+      {tab === "capabilities" && <CapabilitiesTab companyId={companyId} />}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Cognition (AST reverse-engineering): feed code -> auto-draft an ontology.
+// ---------------------------------------------------------------------------
+
+interface CognitionJob {
+  id: string;
+  job_key: string;
+  domain_id: string | null;
+  root_path: string;
+  app_name: string;
+  status: string;
+  stage_label: string;
+  progress_pct: number;
+}
+interface CognitionCoverage {
+  entityCount: number;
+  relationCount: number;
+  actionCount: number;
+  sqlFiles: number;
+  apiFiles: number;
+}
+interface CognitionDraft {
+  seedNodeTypes: unknown[];
+  seedRelationTypes: unknown[];
+  seedActions: unknown[];
+}
+
+function cognitionStatusKind(s: string): "ok" | "pending" | "error" | "info" {
+  if (s === "completed") return "ok";
+  if (s === "failed") return "error";
+  if (s === "awaiting_confirm") return "info";
+  return "pending";
+}
+
+function CognitionTab({ companyId }: { companyId: string }): ReactElement {
+  const { data, loading, error, refresh } = usePluginData<{ jobs: CognitionJob[] }>(
+    "list-cognition-jobs",
+    { companyId },
+  );
+  const createJob = usePluginAction("create-cognition-job");
+  const [appName, setAppName] = useState("");
+  const [rootPath, setRootPath] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [openJobId, setOpenJobId] = useState<string | null>(null);
+
+  const submit = useCallback(async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = (await createJob({ companyId, appName: appName || undefined, rootPath: rootPath || "." })) as {
+        job?: CognitionJob;
+      };
+      setAppName("");
+      setRootPath("");
+      refresh();
+      if (res?.job?.id) setOpenJobId(res.job.id);
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }, [companyId, appName, rootPath, createJob, refresh]);
+
+  const jobs = data?.jobs ?? [];
+
+  return (
+    <>
+      <div style={cardStyle}>
+        <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>New cognition job</div>
+        <div style={{ color: tokens.muted, fontSize: "0.8rem", marginBottom: "0.5rem" }}>
+          Reverse-engineer an ontology draft from source code (TS/JS/Vue/Py/Go/Java/SQL).
+        </div>
+        <input style={inputStyle} placeholder="app name (optional)" value={appName} onChange={(e) => setAppName(e.target.value)} />
+        <input style={inputStyle} placeholder="root path (e.g. .)" value={rootPath} onChange={(e) => setRootPath(e.target.value)} />
+        <button style={btnStyle} disabled={busy} onClick={submit}>
+          {busy ? "…" : "Create"}
+        </button>
+        {err && <div style={{ color: tokens.muted, marginTop: "0.5rem" }}>{err}</div>}
+      </div>
+
+      <DataTable
+        loading={loading}
+        emptyMessage={error ? `Failed: ${error.message}` : "No cognition jobs yet."}
+        rows={jobs as unknown as Record<string, unknown>[]}
+        columns={[
+          {
+            key: "app_name",
+            header: "Job",
+            render: (_v, row) => (
+              <button style={ghostBtn} onClick={() => setOpenJobId((row as unknown as CognitionJob).id)}>
+                {(row as unknown as CognitionJob).app_name || (row as unknown as CognitionJob).job_key}
+              </button>
+            ),
+          },
+          { key: "progress_pct", header: "%", width: "70px" },
+          {
+            key: "status",
+            header: "Status",
+            width: "140px",
+            render: (_v, row) => {
+              const s = (row as unknown as CognitionJob).status;
+              return <StatusBadge label={s} status={cognitionStatusKind(s)} />;
+            },
+          },
+        ]}
+      />
+
+      {openJobId && (
+        <CognitionJobDetail
+          companyId={companyId}
+          jobId={openJobId}
+          onClose={() => setOpenJobId(null)}
+          onChanged={refresh}
+        />
       )}
+    </>
+  );
+}
+
+function CognitionJobDetail({
+  companyId,
+  jobId,
+  onClose,
+  onChanged,
+}: {
+  companyId: string;
+  jobId: string;
+  onClose: () => void;
+  onChanged: () => void;
+}): ReactElement {
+  const { data, loading, refresh } = usePluginData<{ job: CognitionJob | null; draft: CognitionDraft | null }>(
+    "cognition-job",
+    { companyId, jobId },
+  );
+  const ingest = usePluginAction("ingest-cognition-files");
+  const publish = usePluginAction("publish-cognition-job");
+  const { data: domainsData } = usePluginData<{ domains: OntologyDomain[] }>("list-domains", { companyId });
+  const [code, setCode] = useState("");
+  const [filePath, setFilePath] = useState("app.ts");
+  const [targetDomain, setTargetDomain] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+
+  const job = data?.job;
+  const draft = data?.draft;
+
+  const runIngest = useCallback(async () => {
+    if (!code.trim()) return;
+    setBusy(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      const res = (await ingest({ companyId, jobId, files: [{ path: filePath || "app.ts", content: code }] })) as {
+        coverage?: CognitionCoverage;
+      };
+      const c = res?.coverage;
+      setMsg(c ? `Extracted ${c.entityCount} entities, ${c.relationCount} relations, ${c.actionCount} actions.` : "Ingested.");
+      refresh();
+      onChanged();
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }, [companyId, jobId, code, filePath, ingest, refresh, onChanged]);
+
+  const runPublish = useCallback(async () => {
+    if (!targetDomain) return;
+    setBusy(true);
+    setErr(null);
+    setMsg(null);
+    try {
+      await publish({ companyId, jobId, domainId: targetDomain });
+      setMsg("Published draft to the domain.");
+      refresh();
+      onChanged();
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }, [companyId, jobId, targetDomain, publish, refresh, onChanged]);
+
+  const nt = draft?.seedNodeTypes?.length ?? 0;
+  const rt = draft?.seedRelationTypes?.length ?? 0;
+  const at = draft?.seedActions?.length ?? 0;
+
+  return (
+    <div style={{ ...cardStyle, borderColor: tokens.primary }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontWeight: 600 }}>{job?.app_name || job?.job_key || "Cognition job"}</div>
+        <button style={ghostBtn} onClick={onClose}>Close</button>
+      </div>
+      {loading && <p style={{ color: tokens.muted }}>Loading…</p>}
+      {job && (
+        <div style={{ color: tokens.muted, fontSize: "0.8rem", marginBottom: "0.75rem" }}>
+          {job.status} · {job.stage_label || "—"} · {job.progress_pct}%
+        </div>
+      )}
+
+      <div style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.4rem" }}>1 · Ingest code</div>
+      <input style={{ ...inputStyle, marginBottom: "0.4rem" }} placeholder="file path (e.g. src/order.ts)" value={filePath} onChange={(e) => setFilePath(e.target.value)} />
+      <textarea
+        style={{ ...inputStyle, width: "100%", minHeight: "8rem", marginRight: 0, boxSizing: "border-box", resize: "vertical", fontFamily: "monospace", fontSize: "0.8rem" }}
+        placeholder="Paste source code to reverse-engineer…"
+        value={code}
+        onChange={(e) => setCode(e.target.value)}
+      />
+      <div style={{ marginTop: "0.5rem" }}>
+        <button style={btnStyle} disabled={busy || !code.trim()} onClick={runIngest}>
+          {busy ? "…" : "Extract draft"}
+        </button>
+      </div>
+
+      <div style={{ display: "flex", gap: "0.75rem", margin: "0.75rem 0", flexWrap: "wrap" }}>
+        <MetricCard label="Node types" value={nt} />
+        <MetricCard label="Relation types" value={rt} />
+        <MetricCard label="Action types" value={at} />
+      </div>
+
+      <div style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.4rem" }}>2 · Publish to a domain</div>
+      <select style={inputStyle} value={targetDomain} onChange={(e) => setTargetDomain(e.target.value)}>
+        <option value="">select target domain…</option>
+        {(domainsData?.domains ?? []).map((d) => (
+          <option key={d.id} value={d.id}>{d.display_name}</option>
+        ))}
+      </select>
+      <button style={btnStyle} disabled={busy || !targetDomain || nt + rt + at === 0} onClick={runPublish}>
+        {busy ? "…" : "Publish draft"}
+      </button>
+
+      {msg && <div style={{ color: tokens.fg, fontSize: "0.85rem", marginTop: "0.5rem" }}>✓ {msg}</div>}
+      {err && <div style={{ color: tokens.muted, marginTop: "0.5rem" }}>{err}</div>}
     </div>
   );
 }
