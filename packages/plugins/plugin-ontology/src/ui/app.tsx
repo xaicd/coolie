@@ -79,6 +79,24 @@ interface DomainDetail {
   graph: GraphSnapshot;
 }
 
+interface EvalRow {
+  id: string;
+  key: string;
+  name: string;
+  eval_type: string;
+  status: string;
+  score: number | null;
+}
+interface SimulationRow {
+  id: string;
+  key: string;
+  name: string;
+  status: string;
+  recommended_strategy: string | null;
+}
+
+const EVAL_METRIC_TYPES = ["accuracy", "latency", "token_cost", "user_satisfaction", "custom"] as const;
+
 const page: CSSProperties = { padding: "1.5rem", background: tokens.bg, color: tokens.fg, minHeight: "100%" };
 const cardStyle: CSSProperties = {
   border: `1px solid ${tokens.border}`,
@@ -1104,6 +1122,99 @@ function MenuItem({ label, onClick, danger }: { label: string; onClick: () => vo
   );
 }
 
+/** Evaluation + simulation dashboard for a domain (DS OntologyEval / Simulation). */
+function EvaluationSection({ companyId, domainId }: { companyId: string; domainId: string }): ReactElement {
+  const { data, loading, error, refresh } = usePluginData<{ evals: EvalRow[]; simulations: SimulationRow[] }>(
+    "domain-evaluation",
+    { companyId, domainId },
+  );
+  const createEval = usePluginAction("create-eval");
+  const createSim = usePluginAction("create-simulation-scenario");
+  const [evalName, setEvalName] = useState("");
+  const [evalType, setEvalType] = useState<(typeof EVAL_METRIC_TYPES)[number]>("accuracy");
+  const [simName, setSimName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const addEval = useCallback(async () => {
+    if (!evalName.trim()) return;
+    setBusy(true); setErr(null);
+    try { await createEval({ companyId, domainId, name: evalName.trim(), evalType }); setEvalName(""); refresh(); }
+    catch (e) { setErr(String((e as Error)?.message ?? e)); } finally { setBusy(false); }
+  }, [companyId, domainId, evalName, evalType, createEval, refresh]);
+
+  const addSim = useCallback(async () => {
+    if (!simName.trim()) return;
+    setBusy(true); setErr(null);
+    try { await createSim({ companyId, domainId, name: simName.trim() }); setSimName(""); refresh(); }
+    catch (e) { setErr(String((e as Error)?.message ?? e)); } finally { setBusy(false); }
+  }, [companyId, domainId, simName, createSim, refresh]);
+
+  const evals = data?.evals ?? [];
+  const sims = data?.simulations ?? [];
+  const passed = evals.filter((e) => e.status === "completed").length;
+  const avgScore = evals.filter((e) => e.score != null);
+  const avg = avgScore.length ? (avgScore.reduce((s, e) => s + (e.score ?? 0), 0) / avgScore.length).toFixed(2) : "—";
+
+  return (
+    <div style={cardStyle}>
+      <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>Evaluation &amp; simulation</div>
+
+      <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+        <MetricCard label="Evals" value={evals.length} />
+        <MetricCard label="Completed" value={passed} />
+        <MetricCard label="Avg score" value={avg} />
+        <MetricCard label="Scenarios" value={sims.length} />
+      </div>
+
+      <div style={{ marginBottom: "0.5rem" }}>
+        <input style={inputStyle} placeholder="new eval name" value={evalName} onChange={(e) => setEvalName(e.target.value)} />
+        <select style={inputStyle} value={evalType} onChange={(e) => setEvalType(e.target.value as (typeof EVAL_METRIC_TYPES)[number])}>
+          {EVAL_METRIC_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <button style={btnStyle} disabled={busy || !evalName.trim()} onClick={addEval}>{busy ? "…" : "Add eval"}</button>
+      </div>
+      <DataTable
+        loading={loading}
+        emptyMessage={error ? `Failed: ${error.message}` : "No evals yet."}
+        rows={evals as unknown as Record<string, unknown>[]}
+        columns={[
+          { key: "name", header: "Eval" },
+          { key: "eval_type", header: "Metric", width: "130px" },
+          { key: "score", header: "Score", width: "80px", render: (v) => (v == null ? "—" : String(v)) },
+          {
+            key: "status",
+            header: "Status",
+            width: "110px",
+            render: (v) => <StatusBadge label={String(v)} status={v === "completed" ? "ok" : v === "failed" ? "error" : v === "running" ? "info" : "pending"} />,
+          },
+        ]}
+      />
+
+      <div style={{ margin: "0.75rem 0 0.5rem" }}>
+        <input style={inputStyle} placeholder="new scenario name" value={simName} onChange={(e) => setSimName(e.target.value)} />
+        <button style={btnStyle} disabled={busy || !simName.trim()} onClick={addSim}>{busy ? "…" : "Add scenario"}</button>
+      </div>
+      <DataTable
+        loading={loading}
+        emptyMessage="No simulation scenarios yet."
+        rows={sims as unknown as Record<string, unknown>[]}
+        columns={[
+          { key: "name", header: "Scenario" },
+          { key: "recommended_strategy", header: "Recommended", render: (v) => (v ? String(v) : "—") },
+          {
+            key: "status",
+            header: "Status",
+            width: "110px",
+            render: (v) => <StatusBadge label={String(v)} status={v === "completed" ? "ok" : v === "failed" ? "error" : v === "running" ? "info" : "pending"} />,
+          },
+        ]}
+      />
+      {err && <div style={{ color: tokens.muted, marginTop: "0.5rem" }}>{err}</div>}
+    </div>
+  );
+}
+
 function DomainDetailView({
   companyId,
   domainId,
@@ -1188,6 +1299,8 @@ function DomainDetailView({
               refresh();
             }}
           />
+
+          <EvaluationSection companyId={companyId} domainId={domainId} />
         </>
       )}
     </>

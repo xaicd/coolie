@@ -396,6 +396,42 @@ const plugin = definePlugin({
       return { deleted };
     });
 
+    // Evaluation / simulation — domain-scoped data/action handlers for the UI.
+    ctx.data.register("domain-evaluation", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const [evals, simulations] = await Promise.all([
+        store.listEvals(companyId, domainId),
+        store.listSimulationScenarios(companyId, domainId),
+      ]);
+      return { evals, simulations };
+    });
+
+    ctx.actions.register("create-eval", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const evalRun = await store.createEval({
+        companyId,
+        domainId,
+        key: typeof params.key === "string" && params.key.trim() !== "" ? params.key : `eval-${Date.now()}`,
+        name: requireString(params.name, "name"),
+        evalType: typeof params.evalType === "string" ? (params.evalType as EvalMetricType) : undefined,
+      });
+      return { eval: evalRun };
+    });
+
+    ctx.actions.register("create-simulation-scenario", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const scenario = await store.createSimulationScenario({
+        companyId,
+        domainId,
+        key: typeof params.key === "string" && params.key.trim() !== "" ? params.key : `sim-${Date.now()}`,
+        name: requireString(params.name, "name"),
+      });
+      return { scenario };
+    });
+
     // Cognition (AST reverse-engineering) — data/action handlers for the UI:
     // create a job, ingest code files (extract a draft), review, publish to a domain.
     ctx.data.register("list-cognition-jobs", async (params) => {
