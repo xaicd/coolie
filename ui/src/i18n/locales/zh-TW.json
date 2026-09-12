@@ -139,5 +139,32 @@
   "inboxTidy": {
     "title": "讓智能體整理我的收件匣",
     "description": "選擇你管理的智能體是否可以代你歸檔收件匣中的任務。任何歸檔都可復原,且每次智能體歸檔都會記錄在任務屬性中。"
+  },
+  "plugins": {
+    "breadcrumbSettings": "設定",
+    "breadcrumbPlugins": "外掛",
+    "managerTitle": "外掛管理",
+    "available": "可用外掛",
+    "firstParty": "官方",
+    "example": "範例",
+    "experimental": "實驗",
+    "notInstalled": "未安裝",
+    "install": "安裝",
+    "installing": "安裝中…",
+    "uninstall": "解除安裝",
+    "uninstalling": "解除安裝中…",
+    "enable": "啟用",
+    "disable": "停用",
+    "openSettings": "開啟設定",
+    "review": "檢視",
+    "noDescription": "暫無描述。",
+    "installed": "外掛安裝成功",
+    "uninstalled": "外掛解除安裝成功",
+    "enabled": "外掛已啟用",
+    "disabled": "外掛已停用",
+    "failedInstall": "安裝外掛失敗",
+    "failedUninstall": "解除安裝外掛失敗",
+    "failedEnable": "啟用外掛失敗",
+    "failedDisable": "停用外掛失敗"
   }
 }

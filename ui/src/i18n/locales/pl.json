@@ -139,5 +139,32 @@
   "inboxTidy": {
     "title": "Let agents tidy my inbox",
     "description": "Choose whether the agents you manage may archive tasks out of your inbox on your behalf. You can undo any archive, and every agent archive is attributed in the task's properties."
+  },
+  "plugins": {
+    "breadcrumbSettings": "Settings",
+    "breadcrumbPlugins": "Plugins",
+    "managerTitle": "Plugin Manager",
+    "available": "Available Plugins",
+    "firstParty": "First-party",
+    "example": "Example",
+    "experimental": "Experimental",
+    "notInstalled": "Not installed",
+    "install": "Install",
+    "installing": "Installing…",
+    "uninstall": "Uninstall",
+    "uninstalling": "Uninstalling…",
+    "enable": "Enable",
+    "disable": "Disable",
+    "openSettings": "Open Settings",
+    "review": "Review",
+    "noDescription": "No description provided.",
+    "installed": "Plugin installed successfully",
+    "uninstalled": "Plugin uninstalled successfully",
+    "enabled": "Plugin enabled",
+    "disabled": "Plugin disabled",
+    "failedInstall": "Failed to install plugin",
+    "failedUninstall": "Failed to uninstall plugin",
+    "failedEnable": "Failed to enable plugin",
+    "failedDisable": "Failed to disable plugin"
   }
 }

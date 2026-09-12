@@ -139,5 +139,32 @@
   "inboxTidy": {
     "title": "让智能体整理我的收件箱",
     "description": "选择你管理的智能体是否可以代你归档收件箱中的任务。任何归档都可撤销,且每次智能体归档都会记录在任务属性中。"
+  },
+  "plugins": {
+    "breadcrumbSettings": "设置",
+    "breadcrumbPlugins": "插件",
+    "managerTitle": "插件管理",
+    "available": "可用插件",
+    "firstParty": "官方",
+    "example": "示例",
+    "experimental": "实验",
+    "notInstalled": "未安装",
+    "install": "安装",
+    "installing": "安装中…",
+    "uninstall": "卸载",
+    "uninstalling": "卸载中…",
+    "enable": "启用",
+    "disable": "停用",
+    "openSettings": "打开设置",
+    "review": "查看",
+    "noDescription": "暂无描述。",
+    "installed": "插件安装成功",
+    "uninstalled": "插件卸载成功",
+    "enabled": "插件已启用",
+    "disabled": "插件已停用",
+    "failedInstall": "安装插件失败",
+    "failedUninstall": "卸载插件失败",
+    "failedEnable": "启用插件失败",
+    "failedDisable": "停用插件失败"
   }
 }
