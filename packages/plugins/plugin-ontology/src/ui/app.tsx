@@ -11,9 +11,7 @@ import {
 import {
   useCallback,
   useMemo,
-  useRef,
   useState,
-  type CSSProperties,
   type ReactElement,
 } from "react";
 import { GraphView, type GraphNode, type GraphEdge } from "./graph-view.js";
@@ -38,16 +36,6 @@ function isZh(): boolean {
 function t(zh: string, en: string): string {
   return isZh() ? zh : en;
 }
-
-const tokens = {
-  border: "var(--border, oklch(0.269 0 0))",
-  card: "var(--card, oklch(0.205 0 0))",
-  bg: "var(--background, oklch(0.145 0 0))",
-  fg: "var(--foreground, oklch(0.985 0 0))",
-  muted: "var(--muted-foreground, oklch(0.708 0 0))",
-  primary: "var(--primary, oklch(0.985 0 0))",
-  primaryFg: "var(--primary-foreground, oklch(0.205 0 0))",
-};
 
 interface OntologyDomain {
   id: string;
@@ -131,30 +119,24 @@ interface TransformRow {
   status: string;
 }
 
-const page: CSSProperties = { padding: "1.5rem", background: tokens.bg, color: tokens.fg, minHeight: "100%" };
-const cardStyle: CSSProperties = {
-  border: `1px solid ${tokens.border}`,
-  background: tokens.card,
-  borderRadius: "0.75rem",
-  padding: "1rem",
-  marginBottom: "0.75rem",
-};
-const inputStyle: CSSProperties = {
-  border: `1px solid ${tokens.border}`,
-  background: tokens.bg,
-  color: tokens.fg,
-  borderRadius: "0.5rem",
-  padding: "0.4rem 0.6rem",
-  marginRight: "0.5rem",
-};
-const btnStyle: CSSProperties = {
-  border: "none",
-  background: tokens.primary,
-  color: tokens.primaryFg,
-  borderRadius: "0.5rem",
-  padding: "0.4rem 0.9rem",
-  cursor: "pointer",
-};
+// Token-class styling (host design system). Kept as string constants so the
+// existing components can swap `className={CARD}` -> `className={CARD}` without
+// a full rewrite, giving the whole page the host's dark-card look.
+const PAGE = "p-6 bg-background text-foreground min-h-full";
+const CARD = "mb-3 rounded-xl border border-border bg-card p-4";
+const INPUT =
+  "mr-2 rounded-md border border-border bg-background px-2.5 py-1.5 text-(length:--text-compact) " +
+  "text-foreground outline-none placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-ring";
+const BTN =
+  "rounded-md bg-primary px-3 py-1.5 text-(length:--text-compact) font-medium text-primary-foreground " +
+  "transition-colors hover:opacity-90 disabled:opacity-50";
+const GHOST_BTN =
+  "rounded-md px-0 py-0 text-(length:--text-compact) font-medium text-primary transition-colors hover:underline";
+const TAB_ON = "rounded-md bg-primary px-3 py-1.5 text-(length:--text-compact) font-medium text-primary-foreground";
+const TAB_OFF =
+  "rounded-md px-3 py-1.5 text-(length:--text-compact) font-medium text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/50";
+const SECTION_TITLE = "mb-2 text-(length:--text-compact) font-semibold";
+const MUTED = "text-(length:--text-nano) text-muted-foreground";
 
 /** Shared sidebar-row styling matching the host SidebarNavItem pill. */
 const SIDEBAR_ROW_CLASS =
@@ -180,7 +162,7 @@ export function SidebarLink(_props: PluginSidebarProps): ReactElement {
   );
 }
 
-const ghostBtn: CSSProperties = { ...btnStyle, background: "transparent", color: tokens.primary, padding: 0 };
+
 
 /** Full-page ontology view: Domains modeling + Capabilities acquisition. */
 export function OntologyPage({ context }: PluginPageProps): ReactElement {
@@ -190,30 +172,30 @@ export function OntologyPage({ context }: PluginPageProps): ReactElement {
 
   if (!companyId) {
     return (
-      <div style={page}>
-        <p style={{ color: tokens.muted }}>{t("请选择公司以建模其本体。", "Select a company to model its ontology.")}</p>
+      <div className={PAGE}>
+        <p className="text-muted-foreground">{t("请选择公司以建模其本体。", "Select a company to model its ontology.")}</p>
       </div>
     );
   }
 
   return (
-    <div style={page}>
-      <h1 style={{ fontSize: "1.25rem", marginBottom: "0.75rem" }}>{t("本体", "Ontology")}</h1>
-      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+    <div className={PAGE}>
+      <h1 className="mb-3 text-xl">{t("本体", "Ontology")}</h1>
+      <div className="mb-4 flex gap-2">
         <button
-          style={{ ...btnStyle, background: tab === "domains" ? tokens.primary : "transparent", color: tab === "domains" ? tokens.primaryFg : tokens.primary }}
+          className={tab === "domains" ? TAB_ON : TAB_OFF}
           onClick={() => setTab("domains")}
         >
           {t("域", "Domains")}
         </button>
         <button
-          style={{ ...btnStyle, background: tab === "cognition" ? tokens.primary : "transparent", color: tab === "cognition" ? tokens.primaryFg : tokens.primary }}
+          className={tab === "cognition" ? TAB_ON : TAB_OFF}
           onClick={() => setTab("cognition")}
         >
           {t("认知", "Cognition")}
         </button>
         <button
-          style={{ ...btnStyle, background: tab === "capabilities" ? tokens.primary : "transparent", color: tab === "capabilities" ? tokens.primaryFg : tokens.primary }}
+          className={tab === "capabilities" ? TAB_ON : TAB_OFF}
           onClick={() => setTab("capabilities")}
         >
           {t("能力", "Capabilities")}
@@ -303,17 +285,17 @@ function CognitionTab({ companyId }: { companyId: string }): ReactElement {
 
   return (
     <>
-      <div style={cardStyle}>
-        <div style={{ fontWeight: 600, marginBottom: "0.25rem" }}>New cognition job</div>
-        <div style={{ color: tokens.muted, fontSize: "0.8rem", marginBottom: "0.5rem" }}>
+      <div className={CARD}>
+        <div className="mb-1 font-semibold">New cognition job</div>
+        <div className="mb-2 text-xs text-muted-foreground">
           Reverse-engineer an ontology draft from source code (TS/JS/Vue/Py/Go/Java/SQL).
         </div>
-        <input style={inputStyle} placeholder="app name (optional)" value={appName} onChange={(e) => setAppName(e.target.value)} />
-        <input style={inputStyle} placeholder="root path (e.g. .)" value={rootPath} onChange={(e) => setRootPath(e.target.value)} />
-        <button style={btnStyle} disabled={busy} onClick={submit}>
+        <input className={INPUT} placeholder="app name (optional)" value={appName} onChange={(e) => setAppName(e.target.value)} />
+        <input className={INPUT} placeholder="root path (e.g. .)" value={rootPath} onChange={(e) => setRootPath(e.target.value)} />
+        <button className={BTN} disabled={busy} onClick={submit}>
           {busy ? "…" : t("创建","Create")}
         </button>
-        {err && <div style={{ color: tokens.muted, marginTop: "0.5rem" }}>{err}</div>}
+        {err && <div className="mt-2 text-sm text-muted-foreground">{err}</div>}
       </div>
 
       <DataTable
@@ -325,7 +307,7 @@ function CognitionTab({ companyId }: { companyId: string }): ReactElement {
             key: "app_name",
             header: "Job",
             render: (_v, row) => (
-              <button style={ghostBtn} onClick={() => setOpenJobId((row as unknown as CognitionJob).id)}>
+              <button className={GHOST_BTN} onClick={() => setOpenJobId((row as unknown as CognitionJob).id)}>
                 {(row as unknown as CognitionJob).app_name || (row as unknown as CognitionJob).job_key}
               </button>
             ),
@@ -425,51 +407,51 @@ function CognitionJobDetail({
   const at = draft?.seedActions?.length ?? 0;
 
   return (
-    <div style={{ ...cardStyle, borderColor: tokens.primary }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ fontWeight: 600 }}>{job?.app_name || job?.job_key || "Cognition job"}</div>
-        <button style={ghostBtn} onClick={onClose}>Close</button>
+    <div className="mb-3 rounded-xl border border-primary bg-card p-4">
+      <div className="flex items-center justify-between">
+        <div className="font-semibold">{job?.app_name || job?.job_key || "Cognition job"}</div>
+        <button className={GHOST_BTN} onClick={onClose}>Close</button>
       </div>
-      {loading && <p style={{ color: tokens.muted }}>Loading…</p>}
+      {loading && <p className="text-muted-foreground">Loading…</p>}
       {job && (
-        <div style={{ color: tokens.muted, fontSize: "0.8rem", marginBottom: "0.75rem" }}>
+        <div className="mb-3 text-xs text-muted-foreground">
           {job.status} · {job.stage_label || "—"} · {job.progress_pct}%
         </div>
       )}
 
-      <div style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.4rem" }}>1 · Ingest code</div>
-      <input style={{ ...inputStyle, marginBottom: "0.4rem" }} placeholder="file path (e.g. src/order.ts)" value={filePath} onChange={(e) => setFilePath(e.target.value)} />
+      <div className="mb-1 text-xs font-semibold">1 · Ingest code</div>
+      <input className={INPUT + " mb-1"} placeholder="file path (e.g. src/order.ts)" value={filePath} onChange={(e) => setFilePath(e.target.value)} />
       <textarea
-        style={{ ...inputStyle, width: "100%", minHeight: "8rem", marginRight: 0, boxSizing: "border-box", resize: "vertical", fontFamily: "monospace", fontSize: "0.8rem" }}
+        className={INPUT + " mr-0 w-full min-h-32 resize-y font-mono"}
         placeholder="Paste source code to reverse-engineer…"
         value={code}
         onChange={(e) => setCode(e.target.value)}
       />
-      <div style={{ marginTop: "0.5rem" }}>
-        <button style={btnStyle} disabled={busy || !code.trim()} onClick={runIngest}>
+      <div className="mt-2">
+        <button className={BTN} disabled={busy || !code.trim()} onClick={runIngest}>
           {busy ? "…" : "Extract draft"}
         </button>
       </div>
 
-      <div style={{ display: "flex", gap: "0.75rem", margin: "0.75rem 0", flexWrap: "wrap" }}>
+      <div className="my-3 flex flex-wrap gap-3">
         <MetricCard label={t("节点类型","Node types")} value={nt} />
         <MetricCard label={t("关系类型","Relation types")} value={rt} />
         <MetricCard label={t("动作类型","Action types")} value={at} />
       </div>
 
-      <div style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.4rem" }}>2 · Publish to a domain</div>
-      <select style={inputStyle} value={targetDomain} onChange={(e) => setTargetDomain(e.target.value)}>
+      <div className="mb-1 text-xs font-semibold">2 · Publish to a domain</div>
+      <select className={INPUT} value={targetDomain} onChange={(e) => setTargetDomain(e.target.value)}>
         <option value="">select target domain…</option>
         {(domainsData?.domains ?? []).map((d) => (
           <option key={d.id} value={d.id}>{d.display_name}</option>
         ))}
       </select>
-      <button style={btnStyle} disabled={busy || !targetDomain || nt + rt + at === 0} onClick={runPublish}>
+      <button className={BTN} disabled={busy || !targetDomain || nt + rt + at === 0} onClick={runPublish}>
         {busy ? "…" : "Publish draft"}
       </button>
 
-      {msg && <div style={{ color: tokens.fg, fontSize: "0.85rem", marginTop: "0.5rem" }}>✓ {msg}</div>}
-      {err && <div style={{ color: tokens.muted, marginTop: "0.5rem" }}>{err}</div>}
+      {msg && <div className="mt-2 text-sm text-foreground">✓ {msg}</div>}
+      {err && <div className="mt-2 text-sm text-muted-foreground">{err}</div>}
     </div>
   );
 }
@@ -532,18 +514,18 @@ function CapabilitiesTab({ companyId }: { companyId: string }): ReactElement {
 
   return (
     <>
-      <div style={cardStyle}>
-        <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>New capability gap</div>
+      <div className={CARD}>
+        <div className="mb-2 font-semibold">New capability gap</div>
         <input
-          style={{ ...inputStyle, minWidth: "20rem" }}
+          className={INPUT + " min-w-80"}
           placeholder="what capability is missing?"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
         />
-        <button style={btnStyle} disabled={busy || !title.trim()} onClick={submit}>
+        <button className={BTN} disabled={busy || !title.trim()} onClick={submit}>
           {busy ? "…" : "Detect"}
         </button>
-        {err && <div style={{ color: tokens.muted, marginTop: "0.5rem" }}>{err}</div>}
+        {err && <div className="mt-2 text-sm text-muted-foreground">{err}</div>}
       </div>
 
       <DataTable
@@ -555,7 +537,7 @@ function CapabilitiesTab({ companyId }: { companyId: string }): ReactElement {
             key: "title",
             header: t("能力缺口","Capability gap"),
             render: (_v, row) => (
-              <button style={ghostBtn} onClick={() => setOpenGapId((row as unknown as CapabilityGap).id)}>
+              <button className={GHOST_BTN} onClick={() => setOpenGapId((row as unknown as CapabilityGap).id)}>
                 {(row as unknown as CapabilityGap).title}
               </button>
             ),
@@ -632,33 +614,33 @@ function CapabilityGapDetail({
   if (!gap) return <></>;
 
   return (
-    <div style={{ ...cardStyle, borderColor: tokens.primary }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <div style={{ fontWeight: 600 }}>{gap.title}</div>
-        <button style={ghostBtn} onClick={onClose}>Close</button>
+    <div className="mb-3 rounded-xl border border-primary bg-card p-4">
+      <div className="flex items-center justify-between">
+        <div className="font-semibold">{gap.title}</div>
+        <button className={GHOST_BTN} onClick={onClose}>Close</button>
       </div>
-      <div style={{ color: tokens.muted, fontSize: "0.8rem", marginBottom: "0.75rem" }}>
+      <div className="mb-3 text-xs text-muted-foreground">
         {gap.gap_key} · {gap.status}
         {gap.resolved_function_id ? " · resolved to a function" : ""}
       </div>
 
       {gap.status !== "resolved" && (
-        <div style={{ marginBottom: "0.75rem", display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
-          <input style={inputStyle} placeholder="candidate name" value={name} onChange={(e) => setName(e.target.value)} />
-          <input style={inputStyle} placeholder="license" value={license} onChange={(e) => setLicense(e.target.value)} />
-          <select style={inputStyle} value={source} onChange={(e) => setSource(e.target.value as (typeof CAPABILITY_SOURCES)[number])}>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <input className={INPUT} placeholder="candidate name" value={name} onChange={(e) => setName(e.target.value)} />
+          <input className={INPUT} placeholder="license" value={license} onChange={(e) => setLicense(e.target.value)} />
+          <select className={INPUT} value={source} onChange={(e) => setSource(e.target.value as (typeof CAPABILITY_SOURCES)[number])}>
             {CAPABILITY_SOURCES.map((s) => (
               <option key={s} value={s}>{s}</option>
             ))}
           </select>
-          <button style={btnStyle} disabled={busy || !name.trim()} onClick={runAcquire}>
+          <button className={BTN} disabled={busy || !name.trim()} onClick={runAcquire}>
             {busy ? "…" : "Acquire"}
           </button>
-          {err && <span style={{ color: tokens.muted }}>{err}</span>}
+          {err && <span className="text-muted-foreground">{err}</span>}
         </div>
       )}
 
-      <div style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.4rem" }}>Resolution trail</div>
+      <div className="mb-1 text-xs font-semibold">Resolution trail</div>
       <DataTable
         loading={loading}
         emptyMessage="No acquisition attempts yet."
@@ -680,7 +662,7 @@ function CapabilityGapDetail({
           {
             key: "error",
             header: "Detail",
-            render: (v) => (v ? <span style={{ color: tokens.muted }}>{String(v)}</span> : "—"),
+            render: (v) => (v ? <span className="text-muted-foreground">{String(v)}</span> : "—"),
           },
         ]}
       />
@@ -722,19 +704,19 @@ function DomainList({
 
   return (
     <>
-      <div style={cardStyle}>
-        <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>{t("新建域", "New domain")}</div>
-        <input style={inputStyle} placeholder={t("标识 (slug)", "slug")} value={slug} onChange={(e) => setSlug(e.target.value)} />
+      <div className={CARD}>
+        <div className="mb-2 font-semibold">{t("新建域", "New domain")}</div>
+        <input className={INPUT} placeholder={t("标识 (slug)", "slug")} value={slug} onChange={(e) => setSlug(e.target.value)} />
         <input
-          style={inputStyle}
+          className={INPUT}
           placeholder={t("显示名称", "display name")}
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
         />
-        <button style={btnStyle} disabled={busy || !slug || !displayName} onClick={submit}>
+        <button className={BTN} disabled={busy || !slug || !displayName} onClick={submit}>
           {busy ? "…" : t("创建","Create")}
         </button>
-        {formError && <div style={{ color: tokens.muted, marginTop: "0.5rem" }}>{formError}</div>}
+        {formError && <div className="mt-2 text-sm text-muted-foreground">{formError}</div>}
       </div>
 
       <DataTable
@@ -747,7 +729,7 @@ function DomainList({
             header: t("域","Domain"),
             render: (_v, row) => (
               <button
-                style={{ ...btnStyle, background: "transparent", color: tokens.primary, padding: 0 }}
+                className={GHOST_BTN}
                 onClick={() => onOpen((row as unknown as OntologyDomain).id)}
               >
                 {(row as unknown as OntologyDomain).display_name}
@@ -806,22 +788,22 @@ function EvaluationSection({ companyId, domainId }: { companyId: string; domainI
   const avg = avgScore.length ? (avgScore.reduce((s, e) => s + (e.score ?? 0), 0) / avgScore.length).toFixed(2) : "—";
 
   return (
-    <div style={cardStyle}>
-      <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>{t("评估与模拟", "Evaluation & simulation")}</div>
+    <div className={CARD}>
+      <div className="mb-2 font-semibold">{t("评估与模拟", "Evaluation & simulation")}</div>
 
-      <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+      <div className="mb-3 flex flex-wrap gap-3">
         <MetricCard label={t("评估","Evals")} value={evals.length} />
         <MetricCard label={t("已完成","Completed")} value={passed} />
         <MetricCard label={t("平均分","Avg score")} value={avg} />
         <MetricCard label={t("场景","Scenarios")} value={sims.length} />
       </div>
 
-      <div style={{ marginBottom: "0.5rem" }}>
-        <input style={inputStyle} placeholder="new eval name" value={evalName} onChange={(e) => setEvalName(e.target.value)} />
-        <select style={inputStyle} value={evalType} onChange={(e) => setEvalType(e.target.value as (typeof EVAL_METRIC_TYPES)[number])}>
+      <div className="mb-2">
+        <input className={INPUT} placeholder="new eval name" value={evalName} onChange={(e) => setEvalName(e.target.value)} />
+        <select className={INPUT} value={evalType} onChange={(e) => setEvalType(e.target.value as (typeof EVAL_METRIC_TYPES)[number])}>
           {EVAL_METRIC_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
-        <button style={btnStyle} disabled={busy || !evalName.trim()} onClick={addEval}>{busy ? "…" : t("添加评估","Add eval")}</button>
+        <button className={BTN} disabled={busy || !evalName.trim()} onClick={addEval}>{busy ? "…" : t("添加评估","Add eval")}</button>
       </div>
       <DataTable
         loading={loading}
@@ -840,9 +822,9 @@ function EvaluationSection({ companyId, domainId }: { companyId: string; domainI
         ]}
       />
 
-      <div style={{ margin: "0.75rem 0 0.5rem" }}>
-        <input style={inputStyle} placeholder="new scenario name" value={simName} onChange={(e) => setSimName(e.target.value)} />
-        <button style={btnStyle} disabled={busy || !simName.trim()} onClick={addSim}>{busy ? "…" : t("添加场景","Add scenario")}</button>
+      <div className="mb-2 mt-3">
+        <input className={INPUT} placeholder="new scenario name" value={simName} onChange={(e) => setSimName(e.target.value)} />
+        <button className={BTN} disabled={busy || !simName.trim()} onClick={addSim}>{busy ? "…" : t("添加场景","Add scenario")}</button>
       </div>
       <DataTable
         loading={loading}
@@ -859,7 +841,7 @@ function EvaluationSection({ companyId, domainId }: { companyId: string; domainI
           },
         ]}
       />
-      {err && <div style={{ color: tokens.muted, marginTop: "0.5rem" }}>{err}</div>}
+      {err && <div className="mt-2 text-sm text-muted-foreground">{err}</div>}
     </div>
   );
 }
@@ -905,20 +887,20 @@ function PipelineSection({ companyId, domainId }: { companyId: string; domainId:
   const transforms = data?.transforms ?? [];
 
   return (
-    <div style={cardStyle}>
-      <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>{t("数据管道", "Data pipeline")}</div>
-      <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+    <div className={CARD}>
+      <div className="mb-2 font-semibold">{t("数据管道", "Data pipeline")}</div>
+      <div className="mb-3 flex flex-wrap gap-3">
         <MetricCard label={t("数据集","Datasets")} value={datasets.length} />
         <MetricCard label={t("连接器","Connectors")} value={connectors.length} />
         <MetricCard label={t("转换","Transforms")} value={transforms.length} />
       </div>
 
-      <div style={{ marginBottom: "0.4rem" }}>
-        <input style={inputStyle} placeholder="dataset name" value={dsName} onChange={(e) => setDsName(e.target.value)} />
-        <select style={inputStyle} value={dsFormat} onChange={(e) => setDsFormat(e.target.value as (typeof DATASET_FORMATS)[number])}>
+      <div className="mb-1">
+        <input className={INPUT} placeholder="dataset name" value={dsName} onChange={(e) => setDsName(e.target.value)} />
+        <select className={INPUT} value={dsFormat} onChange={(e) => setDsFormat(e.target.value as (typeof DATASET_FORMATS)[number])}>
           {DATASET_FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
         </select>
-        <button style={btnStyle} disabled={busy || !dsName.trim()} onClick={() => run(async () => { await createDataset({ companyId, domainId, name: dsName.trim(), format: dsFormat }); setDsName(""); })}>{t("添加数据集","Add dataset")}</button>
+        <button className={BTN} disabled={busy || !dsName.trim()} onClick={() => run(async () => { await createDataset({ companyId, domainId, name: dsName.trim(), format: dsFormat }); setDsName(""); })}>{t("添加数据集","Add dataset")}</button>
       </div>
       <DataTable
         loading={loading}
@@ -932,12 +914,12 @@ function PipelineSection({ companyId, domainId }: { companyId: string; domainId:
         ]}
       />
 
-      <div style={{ margin: "0.75rem 0 0.4rem" }}>
-        <input style={inputStyle} placeholder="connector name" value={connName} onChange={(e) => setConnName(e.target.value)} />
-        <select style={inputStyle} value={connType} onChange={(e) => setConnType(e.target.value as (typeof CONNECTOR_TYPES)[number])}>
+      <div className="mb-1 mt-3">
+        <input className={INPUT} placeholder="connector name" value={connName} onChange={(e) => setConnName(e.target.value)} />
+        <select className={INPUT} value={connType} onChange={(e) => setConnType(e.target.value as (typeof CONNECTOR_TYPES)[number])}>
           {CONNECTOR_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
-        <button style={btnStyle} disabled={busy || !connName.trim()} onClick={() => run(async () => { await createConnector({ companyId, domainId, name: connName.trim(), connectorType: connType }); setConnName(""); })}>{t("添加连接器","Add connector")}</button>
+        <button className={BTN} disabled={busy || !connName.trim()} onClick={() => run(async () => { await createConnector({ companyId, domainId, name: connName.trim(), connectorType: connType }); setConnName(""); })}>{t("添加连接器","Add connector")}</button>
       </div>
       <DataTable
         loading={loading}
@@ -950,12 +932,12 @@ function PipelineSection({ companyId, domainId }: { companyId: string; domainId:
         ]}
       />
 
-      <div style={{ margin: "0.75rem 0 0.4rem" }}>
-        <input style={inputStyle} placeholder="transform name" value={tfName} onChange={(e) => setTfName(e.target.value)} />
-        <select style={inputStyle} value={tfType} onChange={(e) => setTfType(e.target.value as (typeof TRANSFORM_TYPES)[number])}>
+      <div className="mb-1 mt-3">
+        <input className={INPUT} placeholder="transform name" value={tfName} onChange={(e) => setTfName(e.target.value)} />
+        <select className={INPUT} value={tfType} onChange={(e) => setTfType(e.target.value as (typeof TRANSFORM_TYPES)[number])}>
           {TRANSFORM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
         </select>
-        <button style={btnStyle} disabled={busy || !tfName.trim()} onClick={() => run(async () => { await createTransform({ companyId, domainId, name: tfName.trim(), transformType: tfType }); setTfName(""); })}>{t("添加转换","Add transform")}</button>
+        <button className={BTN} disabled={busy || !tfName.trim()} onClick={() => run(async () => { await createTransform({ companyId, domainId, name: tfName.trim(), transformType: tfType }); setTfName(""); })}>{t("添加转换","Add transform")}</button>
       </div>
       <DataTable
         loading={loading}
@@ -967,7 +949,7 @@ function PipelineSection({ companyId, domainId }: { companyId: string; domainId:
           { key: "status", header: t("状态","Status"), width: "110px", render: (v) => <StatusBadge label={String(v)} status={pipelineStatusKind(String(v))} /> },
         ]}
       />
-      {err && <div style={{ color: tokens.muted, marginTop: "0.5rem" }}>{err}</div>}
+      {err && <div className="mt-2 text-sm text-muted-foreground">{err}</div>}
     </div>
   );
 }
@@ -993,23 +975,23 @@ function DomainDetailView({
 
   return (
     <>
-      <button style={{ ...btnStyle, background: "transparent", color: tokens.primary, padding: 0, marginBottom: "0.75rem" }} onClick={onBack}>
+      <button className={GHOST_BTN + " mb-3"} onClick={onBack}>
         {t("← 返回","← Back")}
       </button>
 
-      {loading && <p style={{ color: tokens.muted }}>Loading…</p>}
-      {error && <p style={{ color: tokens.muted }}>Failed: {error.message}</p>}
+      {loading && <p className="text-muted-foreground">Loading…</p>}
+      {error && <p className="text-muted-foreground">Failed: {error.message}</p>}
 
       {domain && (
         <>
-          <div style={cardStyle}>
-            <div style={{ fontSize: "1.1rem", fontWeight: 600 }}>{domain.display_name}</div>
-            <div style={{ color: tokens.muted, fontSize: "0.85rem" }}>
+          <div className={CARD}>
+            <div className="text-lg font-semibold">{domain.display_name}</div>
+            <div className="text-sm text-muted-foreground">
               {domain.slug} · v{domain.version} · {domain.status}
             </div>
           </div>
 
-          <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+          <div className="mb-3 flex flex-wrap gap-3">
             <MetricCard label={t("节点类型","Node types")} value={counts?.nodeTypes ?? 0} />
             <MetricCard label={t("关系类型","Relation types")} value={counts?.relationTypes ?? 0} />
             <MetricCard label={t("节点","Nodes")} value={counts?.nodes ?? 0} />
@@ -1103,20 +1085,20 @@ function TypeSection({
   }, [key, displayName, onCreate]);
 
   return (
-    <div style={cardStyle}>
-      <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>{title}</div>
-      <div style={{ marginBottom: "0.75rem" }}>
-        <input style={inputStyle} placeholder="key" value={key} onChange={(e) => setKey(e.target.value)} />
+    <div className={CARD}>
+      <div className="mb-2 font-semibold">{title}</div>
+      <div className="mb-3">
+        <input className={INPUT} placeholder="key" value={key} onChange={(e) => setKey(e.target.value)} />
         <input
-          style={inputStyle}
+          className={INPUT}
           placeholder={t("显示名称", "display name")}
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
         />
-        <button style={btnStyle} disabled={busy || !key || !displayName} onClick={submit}>
+        <button className={BTN} disabled={busy || !key || !displayName} onClick={submit}>
           {busy ? "…" : t("添加","Add")}
         </button>
-        {err && <div style={{ color: tokens.muted, marginTop: "0.5rem" }}>{err}</div>}
+        {err && <div className="mt-2 text-sm text-muted-foreground">{err}</div>}
       </div>
       <DataTable rows={rows} columns={columns} emptyMessage="None yet." />
     </div>
