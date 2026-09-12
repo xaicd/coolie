@@ -114,6 +114,8 @@ export function VoicePage({ context }: PluginPageProps): ReactElement {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [lastText, setLastText] = useState<string | null>(null);
+  const [lastIssue, setLastIssue] = useState<{ id: string; title: string } | null>(null);
+  const [createTask, setCreateTask] = useState(true);
 
   const onFile = useCallback(async (file: File | undefined) => {
     setErr(null);
@@ -135,13 +137,16 @@ export function VoicePage({ context }: PluginPageProps): ReactElement {
     setBusy(true);
     setErr(null);
     setLastText(null);
+    setLastIssue(null);
     try {
-      const res = (await createTranscription({ companyId, audioBase64, format })) as {
+      const res = (await createTranscription({ companyId, audioBase64, format, createIssue: createTask })) as {
         transcription?: TranscriptionRow;
+        issue?: { id: string; title: string } | null;
         error?: string;
       };
       if (res?.transcription?.status === "done") setLastText(res.transcription.text);
       else if (res?.error) setErr(res.error);
+      if (res?.issue) setLastIssue(res.issue);
       setAudioBase64("");
       setFileName("");
       refresh();
@@ -150,7 +155,7 @@ export function VoicePage({ context }: PluginPageProps): ReactElement {
     } finally {
       setBusy(false);
     }
-  }, [companyId, audioBase64, format, createTranscription, refresh]);
+  }, [companyId, audioBase64, format, createTask, createTranscription, refresh]);
 
   if (!companyId) {
     return (
@@ -164,7 +169,8 @@ export function VoicePage({ context }: PluginPageProps): ReactElement {
     <div style={page}>
       <h1 style={{ fontSize: "1.25rem", marginBottom: "0.25rem" }}>Voice</h1>
       <p style={{ color: tokens.muted, fontSize: "0.85rem", marginBottom: "1rem" }}>
-        Speech-to-text via Tencent Cloud ASR (one-sentence recognition, ≤60s, ≤3MB).
+        Speech-to-text via Tencent Cloud ASR (one-sentence recognition, ≤60s, ≤3MB). With
+        “Create task” on, the recognized speech is dispatched as a new task.
       </p>
 
       <div style={cardStyle}>
@@ -183,8 +189,12 @@ export function VoicePage({ context }: PluginPageProps): ReactElement {
               </option>
             ))}
           </select>
+          <label style={{ display: "flex", alignItems: "center", gap: "0.35rem", color: tokens.fg, fontSize: "0.85rem" }}>
+            <input type="checkbox" checked={createTask} onChange={(e) => setCreateTask(e.target.checked)} />
+            Create task
+          </label>
           <button style={btnStyle} disabled={busy || !audioBase64} onClick={submit}>
-            {busy ? "Transcribing…" : "Transcribe"}
+            {busy ? "Transcribing…" : createTask ? "Transcribe & dispatch" : "Transcribe"}
           </button>
         </div>
         {fileName && <div style={{ color: tokens.muted, fontSize: "0.8rem", marginTop: "0.5rem" }}>{fileName}</div>}
@@ -192,6 +202,11 @@ export function VoicePage({ context }: PluginPageProps): ReactElement {
           <div style={{ marginTop: "0.75rem", padding: "0.6rem", border: `1px solid ${tokens.border}`, borderRadius: "0.5rem" }}>
             <div style={{ fontSize: "0.72rem", color: tokens.muted, marginBottom: "0.25rem" }}>Recognized text</div>
             <div style={{ whiteSpace: "pre-wrap", wordBreak: "break-word" }}>{lastText || "(empty)"}</div>
+          </div>
+        )}
+        {lastIssue && (
+          <div style={{ marginTop: "0.5rem", color: tokens.fg, fontSize: "0.85rem" }}>
+            ✓ Task created: <span style={{ fontWeight: 600 }}>{lastIssue.title}</span>
           </div>
         )}
         {err && <div style={{ color: tokens.muted, marginTop: "0.5rem" }}>{err}</div>}
