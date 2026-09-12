@@ -1,0 +1,23 @@
+{
+  "expo": {
+    "name": "Coolie",
+    "slug": "coolie",
+    "scheme": "coolie",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "automatic",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "cloud.coolie.app",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Coolie uses the microphone to dispatch tasks by voice."
+      }
+    },
+    "android": {
+      "package": "cloud.coolie.app",
+      "permissions": ["RECORD_AUDIO"]
+    },
+    "plugins": ["expo-av", "expo-secure-store"]
+  }
+}
