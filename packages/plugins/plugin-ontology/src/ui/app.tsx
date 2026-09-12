@@ -8,7 +8,7 @@ import {
   type PluginPageProps,
   type PluginSidebarProps,
 } from "@paperclipai/plugin-sdk/ui";
-import { useCallback, useState, type CSSProperties, type ReactElement } from "react";
+import { useCallback, useMemo, useState, type CSSProperties, type ReactElement } from "react";
 
 const tokens = {
   border: "var(--border, oklch(0.269 0 0))",
@@ -44,8 +44,23 @@ interface OntologyRelationType {
   directed: boolean;
 }
 
+interface GraphNode {
+  id: string;
+  key: string;
+  label: string;
+  node_type_id: string | null;
+}
+interface GraphEdge {
+  id: string;
+  source_node_id: string;
+  target_node_id: string;
+  relation_key: string | null;
+  weight: number;
+}
 interface GraphSnapshot {
   counts: { nodeTypes: number; relationTypes: number; nodes: number; edges: number };
+  nodes?: GraphNode[];
+  edges?: GraphEdge[];
 }
 
 interface DomainDetail {
@@ -451,6 +466,107 @@ function DomainList({
   );
 }
 
+/**
+ * Lightweight force-directed graph view of a domain's instance graph
+ * (nodes + edges). Pure SVG + a few iterations of a spring/repulsion layout —
+ * no external graph lib (plugin bundles stay lean). Renders the ontology as an
+ * actual graph, not just a table.
+ */
+function GraphView({ nodes, edges }: { nodes: GraphNode[]; edges: GraphEdge[] }): ReactElement {
+  const W = 640;
+  const H = 380;
+  const positions = useMemo(() => {
+    const n = nodes.length;
+    if (n === 0) return new Map<string, { x: number; y: number }>();
+    // Seed on a circle (deterministic), then relax with repulsion + edge springs.
+    const pos = new Map<string, { x: number; y: number }>();
+    nodes.forEach((node, i) => {
+      const a = (2 * Math.PI * i) / n;
+      pos.set(node.id, { x: W / 2 + (Math.cos(a) * W) / 3, y: H / 2 + (Math.sin(a) * H) / 3 });
+    });
+    const idx = new Map(nodes.map((nd, i) => [nd.id, i]));
+    const adj = edges
+      .map((e) => [idx.get(e.source_node_id), idx.get(e.target_node_id)] as const)
+      .filter((p): p is readonly [number, number] => p[0] !== undefined && p[1] !== undefined);
+    const arr = nodes.map((nd) => pos.get(nd.id)!);
+    for (let iter = 0; iter < 120; iter++) {
+      // Repulsion.
+      for (let i = 0; i < arr.length; i++) {
+        for (let j = i + 1; j < arr.length; j++) {
+          let dx = arr[i].x - arr[j].x;
+          let dy = arr[i].y - arr[j].y;
+          let d2 = dx * dx + dy * dy || 0.01;
+          const f = 1400 / d2;
+          const d = Math.sqrt(d2);
+          dx /= d; dy /= d;
+          arr[i].x += dx * f; arr[i].y += dy * f;
+          arr[j].x -= dx * f; arr[j].y -= dy * f;
+        }
+      }
+      // Edge springs.
+      for (const [a, b] of adj) {
+        let dx = arr[b].x - arr[a].x;
+        let dy = arr[b].y - arr[a].y;
+        const d = Math.sqrt(dx * dx + dy * dy) || 0.01;
+        const f = (d - 90) * 0.02;
+        dx /= d; dy /= d;
+        arr[a].x += dx * f; arr[a].y += dy * f;
+        arr[b].x -= dx * f; arr[b].y -= dy * f;
+      }
+    }
+    // Clamp into the viewbox.
+    nodes.forEach((nd, i) => {
+      arr[i].x = Math.max(24, Math.min(W - 24, arr[i].x));
+      arr[i].y = Math.max(24, Math.min(H - 24, arr[i].y));
+      pos.set(nd.id, arr[i]);
+    });
+    return pos;
+  }, [nodes, edges]);
+
+  if (nodes.length === 0) {
+    return (
+      <div style={{ ...cardStyle, color: tokens.muted }}>
+        No graph instances yet. Create nodes and edges to see the graph.
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ ...cardStyle, overflow: "auto" }}>
+      <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>Graph</div>
+      <svg width={W} height={H} style={{ maxWidth: "100%", border: `1px solid ${tokens.border}`, borderRadius: "0.5rem", background: tokens.bg }}>
+        {edges.map((e) => {
+          const a = positions.get(e.source_node_id);
+          const b = positions.get(e.target_node_id);
+          if (!a || !b) return null;
+          return (
+            <g key={e.id}>
+              <line x1={a.x} y1={a.y} x2={b.x} y2={b.y} stroke={tokens.border} strokeWidth={1.2} />
+              {e.relation_key && (
+                <text x={(a.x + b.x) / 2} y={(a.y + b.y) / 2 - 3} fill={tokens.muted} fontSize={9} textAnchor="middle">
+                  {e.relation_key}
+                </text>
+              )}
+            </g>
+          );
+        })}
+        {nodes.map((nd) => {
+          const p = positions.get(nd.id);
+          if (!p) return null;
+          return (
+            <g key={nd.id}>
+              <circle cx={p.x} cy={p.y} r={7} fill={tokens.primary} />
+              <text x={p.x + 10} y={p.y + 3} fill={tokens.fg} fontSize={11}>
+                {nd.label || nd.key}
+              </text>
+            </g>
+          );
+        })}
+      </svg>
+    </div>
+  );
+}
+
 function DomainDetailView({
   companyId,
   domainId,
@@ -494,6 +610,8 @@ function DomainDetailView({
             <MetricCard label="Nodes" value={counts?.nodes ?? 0} />
             <MetricCard label="Edges" value={counts?.edges ?? 0} />
           </div>
+
+          <GraphView nodes={data?.graph?.nodes ?? []} edges={data?.graph?.edges ?? []} />
 
           <TypeSection
             title="Node types"
