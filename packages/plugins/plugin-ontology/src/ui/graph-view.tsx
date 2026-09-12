@@ -49,7 +49,7 @@ export interface GraphNodeType {
  * semantic classification (DS colors nodes by type too), so tones are computed
  * at runtime rather than drawn from the host's fixed design tokens.
  */
-function toneFor(id: string | null | undefined): string {
+export function toneFor(id: string | null | undefined): string {
   if (!id) return "var(--muted-foreground)";
   let h = 0;
   for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
@@ -83,7 +83,7 @@ function t(zh: string, en: string): string {
   return isZh() ? zh : en;
 }
 
-type OntologyNodeData = { label: string; nodeKey: string; tone: string; typeName: string | null };
+type OntologyNodeData = { label: string; nodeKey: string; tone: string; typeName: string | null; dimmed?: boolean };
 
 /**
  * Custom node: rounded card with a type-colored left accent bar and a type dot,
@@ -97,9 +97,10 @@ function OntologyNode({ data, selected }: NodeProps): ReactElement {
     <div
       title={tip}
       className={[
-        "relative rounded-lg border px-3 py-2 pl-3.5 min-w-[128px] max-w-[220px] shadow-sm transition-colors",
+        "relative rounded-lg border px-3 py-2 pl-3.5 min-w-[128px] max-w-[220px] shadow-sm transition-all",
         "bg-card text-foreground",
         selected ? "border-primary ring-1 ring-primary" : "border-border",
+        d.dimmed ? "opacity-30" : "",
       ].join(" ")}
     >
       <span
@@ -137,6 +138,10 @@ function GraphCanvas({
   edges: rawEdges,
   nodeTypes: rawNodeTypes,
   onChanged,
+  selectedNodeId,
+  onSelectNode,
+  focusNodeTypeId,
+  fill,
 }: {
   companyId: string;
   domainId: string;
@@ -144,6 +149,10 @@ function GraphCanvas({
   edges: GraphEdge[];
   nodeTypes: GraphNodeType[];
   onChanged: () => void;
+  selectedNodeId?: string | null;
+  onSelectNode?: (nodeId: string | null) => void;
+  focusNodeTypeId?: string | null;
+  fill?: boolean;
 }): ReactElement {
   useReactFlowCss();
   const createNode = usePluginAction("create-node");
@@ -170,19 +179,22 @@ function GraphCanvas({
     return rawNodes.map((nd, i) => {
       const a = (2 * Math.PI * i) / n;
       const nt = nd.nodeTypeId ? typeById.get(nd.nodeTypeId) : undefined;
+      const dimmed = focusNodeTypeId != null && nd.nodeTypeId !== focusNodeTypeId;
       return {
         id: nd.id,
         type: "ontology",
         position: { x: 320 + Math.cos(a) * 220, y: 220 + Math.sin(a) * 170 },
+        selected: selectedNodeId != null && nd.id === selectedNodeId,
         data: {
           label: nd.label || nd.key,
           nodeKey: nd.key,
           tone: toneFor(nd.nodeTypeId),
           typeName: nt ? (nt.display_name || nt.key) : null,
+          dimmed,
         },
       } satisfies Node;
     });
-  }, [rawNodes, typeById]);
+  }, [rawNodes, typeById, selectedNodeId, focusNodeTypeId]);
 
   const flowEdges: Edge[] = useMemo(
     () =>
@@ -240,7 +252,13 @@ function GraphCanvas({
   );
 
   return (
-    <div ref={wrapRef} className="relative h-[420px] w-full overflow-hidden rounded-lg border border-border bg-background">
+    <div
+      ref={wrapRef}
+      className={[
+        "relative w-full overflow-hidden border border-border bg-background",
+        fill ? "h-full rounded-none border-0" : "h-[420px] rounded-lg",
+      ].join(" ")}
+    >
       <ReactFlow
         nodes={flowNodes}
         edges={flowEdges}
@@ -248,13 +266,14 @@ function GraphCanvas({
         onConnect={onConnect}
         fitView
         proOptions={{ hideAttribution: true }}
+        onNodeClick={(_e, node) => onSelectNode?.(node.id)}
+        onPaneClick={() => { closeMenu(); onSelectNode?.(null); }}
         onPaneContextMenu={(e) => {
           const p = screenToFlowPosition({ x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY });
           openMenu(e as unknown as ReactMouseEvent, { kind: "canvas", flowX: p.x, flowY: p.y });
         }}
         onNodeContextMenu={(e, node) => openMenu(e, { kind: "node", id: node.id, label: (node.data as OntologyNodeData).label })}
         onEdgeContextMenu={(e, edge) => openMenu(e, { kind: "edge", id: edge.id, label: String(edge.label ?? "") })}
-        onClick={closeMenu}
       >
         <Background gap={16} />
         <Controls showInteractive={false} />
@@ -353,6 +372,15 @@ interface GraphViewProps {
   nodeTypes?: GraphNodeType[];
   relationTypes?: GraphNodeType[];
   onChanged: () => void;
+  /** Lift node selection to a host workbench inspector (optional). */
+  selectedNodeId?: string | null;
+  onSelectNode?: (nodeId: string | null) => void;
+  /** Optional: filter/highlight to a single node type (from a type tree). */
+  focusNodeTypeId?: string | null;
+  /** Control which view is shown; if omitted GraphView owns its own tab state. */
+  mode?: GraphViewMode;
+  /** Hide the internal graph/table/schema tab bar (when host renders tabs). */
+  hideTabs?: boolean;
 }
 
 /**
@@ -363,7 +391,9 @@ interface GraphViewProps {
  */
 export function GraphView(props: GraphViewProps): ReactElement {
   useReactFlowCss();
-  const [mode, setMode] = useState<GraphViewMode>("graph");
+  const [ownMode, setOwnMode] = useState<GraphViewMode>("graph");
+  const mode = props.mode ?? ownMode;
+  const setMode = props.mode != null ? () => {} : setOwnMode;
   const nodeTypeDefs = props.nodeTypes ?? [];
   const relationTypeDefs = props.relationTypes ?? [];
 
@@ -372,6 +402,30 @@ export function GraphView(props: GraphViewProps): ReactElement {
     { id: "table", label: t("表格", "Table") },
     { id: "schema", label: "Schema" },
   ];
+
+  // When embedded in the workbench (hideTabs) OR when `mode` is host-controlled,
+  // render flush with no card chrome and no internal tab bar (the host owns the
+  // tabs), so the no-op setMode can never be reached from a visible control.
+  const embedded = props.hideTabs || props.mode != null;
+
+  const body = (
+    <>
+      {mode === "graph" &&
+        (props.nodes.length === 0 ? (
+          <EmptyGraph {...props} />
+        ) : (
+          <ReactFlowProvider>
+            <GraphCanvas {...props} nodeTypes={nodeTypeDefs} fill={embedded} />
+          </ReactFlowProvider>
+        ))}
+
+      {mode === "table" && <TableView nodes={props.nodes} edges={props.edges} nodeTypes={nodeTypeDefs} />}
+
+      {mode === "schema" && <SchemaView nodeTypes={nodeTypeDefs} relationTypes={relationTypeDefs} />}
+    </>
+  );
+
+  if (embedded) return <div className="h-full min-h-0">{body}</div>;
 
   return (
     <div className="mb-3 rounded-xl border border-border bg-card p-4">
@@ -391,19 +445,7 @@ export function GraphView(props: GraphViewProps): ReactElement {
           </button>
         ))}
       </div>
-
-      {mode === "graph" &&
-        (props.nodes.length === 0 ? (
-          <EmptyGraph {...props} />
-        ) : (
-          <ReactFlowProvider>
-            <GraphCanvas {...props} nodeTypes={nodeTypeDefs} />
-          </ReactFlowProvider>
-        ))}
-
-      {mode === "table" && <TableView nodes={props.nodes} edges={props.edges} nodeTypes={nodeTypeDefs} />}
-
-      {mode === "schema" && <SchemaView nodeTypes={nodeTypeDefs} relationTypes={relationTypeDefs} />}
+      {body}
     </div>
   );
 }
