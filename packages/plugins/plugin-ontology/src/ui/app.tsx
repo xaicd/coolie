@@ -1003,6 +1003,8 @@ function DomainDetailView({
             domainId={domainId}
             nodes={data?.graph?.nodes ?? []}
             edges={data?.graph?.edges ?? []}
+            nodeTypes={data?.nodeTypes ?? []}
+            relationTypes={data?.relationTypes ?? []}
             onChanged={refresh}
           />
 

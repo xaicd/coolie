@@ -38,6 +38,24 @@ export interface GraphEdge {
   relationKey: string | null;
   weight: number;
 }
+export interface GraphNodeType {
+  id: string;
+  key: string;
+  display_name?: string | null;
+}
+
+/**
+ * Derive a stable, well-spread hue for a node type id. Node-type coloring is a
+ * semantic classification (DS colors nodes by type too), so tones are computed
+ * at runtime rather than drawn from the host's fixed design tokens.
+ */
+function toneFor(id: string | null | undefined): string {
+  if (!id) return "var(--muted-foreground)";
+  let h = 0;
+  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) >>> 0;
+  const hue = h % 360;
+  return `hsl(${hue} 65% 55%)`;
+}
 
 /** Inject the ReactFlow stylesheet once (plugin loader serves only index.js). */
 let cssInjected = false;
@@ -65,21 +83,35 @@ function t(zh: string, en: string): string {
   return isZh() ? zh : en;
 }
 
-type OntologyNodeData = { label: string; nodeKey: string };
+type OntologyNodeData = { label: string; nodeKey: string; tone: string; typeName: string | null };
 
-/** Custom node: rounded card, primary accent, source/target handles for linking. */
+/**
+ * Custom node: rounded card with a type-colored left accent bar and a type dot,
+ * source/target handles for linking, and a native title tooltip showing the key
+ * and type on hover.
+ */
 function OntologyNode({ data, selected }: NodeProps): ReactElement {
   const d = data as OntologyNodeData;
+  const tip = d.typeName ? `${d.label} · ${d.nodeKey} · ${d.typeName}` : `${d.label} · ${d.nodeKey}`;
   return (
     <div
+      title={tip}
       className={[
-        "rounded-lg border px-3 py-2 min-w-[128px] max-w-[220px] shadow-sm transition-colors",
+        "relative rounded-lg border px-3 py-2 pl-3.5 min-w-[128px] max-w-[220px] shadow-sm transition-colors",
         "bg-card text-foreground",
         selected ? "border-primary ring-1 ring-primary" : "border-border",
       ].join(" ")}
     >
+      <span
+        aria-hidden
+        className="absolute left-0 top-0 h-full w-1 rounded-l-lg"
+        style={{ background: d.tone }}
+      />
       <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border !border-border !bg-muted-foreground" />
-      <div className="truncate text-(length:--text-compact) font-medium">{d.label}</div>
+      <div className="flex items-center gap-1.5">
+        <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: d.tone }} />
+        <span className="truncate text-(length:--text-compact) font-medium">{d.label}</span>
+      </div>
       <div className="truncate text-(length:--text-nano) text-muted-foreground">{d.nodeKey}</div>
       <Handle type="source" position={Position.Right} className="!h-2 !w-2 !border !border-border !bg-muted-foreground" />
     </div>
@@ -103,12 +135,14 @@ function GraphCanvas({
   domainId,
   nodes: rawNodes,
   edges: rawEdges,
+  nodeTypes: rawNodeTypes,
   onChanged,
 }: {
   companyId: string;
   domainId: string;
   nodes: GraphNode[];
   edges: GraphEdge[];
+  nodeTypes: GraphNodeType[];
   onChanged: () => void;
 }): ReactElement {
   useReactFlowCss();
@@ -124,19 +158,31 @@ function GraphCanvas({
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
+  const typeById = useMemo(() => {
+    const m = new Map<string, GraphNodeType>();
+    for (const nt of rawNodeTypes) m.set(nt.id, nt);
+    return m;
+  }, [rawNodeTypes]);
+
   // Deterministic circular seed layout (positions are view-only; not persisted).
   const flowNodes: Node[] = useMemo(() => {
     const n = rawNodes.length || 1;
     return rawNodes.map((nd, i) => {
       const a = (2 * Math.PI * i) / n;
+      const nt = nd.nodeTypeId ? typeById.get(nd.nodeTypeId) : undefined;
       return {
         id: nd.id,
         type: "ontology",
         position: { x: 320 + Math.cos(a) * 220, y: 220 + Math.sin(a) * 170 },
-        data: { label: nd.label || nd.key, nodeKey: nd.key },
+        data: {
+          label: nd.label || nd.key,
+          nodeKey: nd.key,
+          tone: toneFor(nd.nodeTypeId),
+          typeName: nt ? (nt.display_name || nt.key) : null,
+        },
       } satisfies Node;
     });
-  }, [rawNodes]);
+  }, [rawNodes, typeById]);
 
   const flowEdges: Edge[] = useMemo(
     () =>
@@ -219,6 +265,17 @@ function GraphCanvas({
         {t("右键:画布=加节点 · 节点/边=菜单 · 拖手柄=连线", "Right-click: canvas=add · node/edge=menu · drag handle=connect")}
         {busy ? ` · ${t("保存中…", "saving…")}` : ""}
       </div>
+
+      {rawNodeTypes.length > 0 && (
+        <div className="pointer-events-none absolute bottom-2 left-2 z-10 flex max-w-[60%] flex-wrap gap-x-3 gap-y-1 rounded-md bg-card/80 px-2 py-1 text-(length:--text-nano) text-muted-foreground">
+          {rawNodeTypes.map((nt) => (
+            <span key={nt.id} className="flex items-center gap-1">
+              <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: toneFor(nt.id) }} />
+              {nt.display_name || nt.key}
+            </span>
+          ))}
+        </div>
+      )}
       {err && <div className="absolute left-2 top-2 z-10 rounded-md bg-card/80 px-2 py-1 text-(length:--text-nano) text-muted-foreground">{err}</div>}
 
       {menu && (
@@ -286,24 +343,199 @@ function MenuItem({ label, onClick, danger }: { label: string; onClick: () => vo
   );
 }
 
-/** ReactFlow-based ontology graph. Empty state prompts the first node. */
-export function GraphView(props: {
+type GraphViewMode = "graph" | "table" | "schema";
+
+interface GraphViewProps {
   companyId: string;
   domainId: string;
   nodes: GraphNode[];
   edges: GraphEdge[];
+  nodeTypes?: GraphNodeType[];
+  relationTypes?: GraphNodeType[];
   onChanged: () => void;
-}): ReactElement {
+}
+
+/**
+ * Ontology workbench with three views (DS parity):
+ *  - Graph:  ReactFlow canvas with type-colored nodes
+ *  - Table:  flat node/edge listings
+ *  - Schema: node-type and relation-type definitions
+ */
+export function GraphView(props: GraphViewProps): ReactElement {
   useReactFlowCss();
+  const [mode, setMode] = useState<GraphViewMode>("graph");
+  const nodeTypeDefs = props.nodeTypes ?? [];
+  const relationTypeDefs = props.relationTypes ?? [];
+
+  const tabs: { id: GraphViewMode; label: string }[] = [
+    { id: "graph", label: t("图谱", "Graph") },
+    { id: "table", label: t("表格", "Table") },
+    { id: "schema", label: "Schema" },
+  ];
+
   return (
     <div className="mb-3 rounded-xl border border-border bg-card p-4">
-      <div className="mb-2 text-(length:--text-compact) font-semibold">{t("图谱", "Graph")}</div>
-      {props.nodes.length === 0 ? (
-        <EmptyGraph {...props} />
+      <div className="mb-3 flex items-center gap-1 border-b border-border">
+        {tabs.map((tb) => (
+          <button
+            key={tb.id}
+            onClick={() => setMode(tb.id)}
+            className={[
+              "-mb-px border-b-2 px-3 py-1.5 text-(length:--text-compact) font-medium transition-colors",
+              mode === tb.id
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            ].join(" ")}
+          >
+            {tb.label}
+          </button>
+        ))}
+      </div>
+
+      {mode === "graph" &&
+        (props.nodes.length === 0 ? (
+          <EmptyGraph {...props} />
+        ) : (
+          <ReactFlowProvider>
+            <GraphCanvas {...props} nodeTypes={nodeTypeDefs} />
+          </ReactFlowProvider>
+        ))}
+
+      {mode === "table" && <TableView nodes={props.nodes} edges={props.edges} nodeTypes={nodeTypeDefs} />}
+
+      {mode === "schema" && <SchemaView nodeTypes={nodeTypeDefs} relationTypes={relationTypeDefs} />}
+    </div>
+  );
+}
+
+/** Flat node/edge listing. Read-only; editing stays in the graph + type sections. */
+function TableView({
+  nodes,
+  edges,
+  nodeTypes,
+}: {
+  nodes: GraphNode[];
+  edges: GraphEdge[];
+  nodeTypes: GraphNodeType[];
+}): ReactElement {
+  const typeById = useMemo(() => {
+    const m = new Map<string, GraphNodeType>();
+    for (const nt of nodeTypes) m.set(nt.id, nt);
+    return m;
+  }, [nodeTypes]);
+  const labelById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const n of nodes) m.set(n.id, n.label || n.key);
+    return m;
+  }, [nodes]);
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div>
+        <div className="mb-1 text-(length:--text-nano) font-semibold text-muted-foreground">
+          {t("节点", "Nodes")} · {nodes.length}
+        </div>
+        {nodes.length === 0 ? (
+          <div className="text-(length:--text-compact) text-muted-foreground">{t("暂无节点。", "No nodes.")}</div>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-border">
+            <table className="w-full text-(length:--text-compact)">
+              <thead className="bg-muted/40 text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("标签", "Label")}</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("键", "Key")}</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("类型", "Type")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {nodes.map((n) => {
+                  const nt = n.nodeTypeId ? typeById.get(n.nodeTypeId) : undefined;
+                  return (
+                    <tr key={n.id} className="border-t border-border">
+                      <td className="px-2 py-1.5">
+                        <span className="flex items-center gap-1.5">
+                          <span aria-hidden className="h-2 w-2 rounded-full" style={{ background: toneFor(n.nodeTypeId) }} />
+                          {n.label || n.key}
+                        </span>
+                      </td>
+                      <td className="px-2 py-1.5 text-muted-foreground">{n.key}</td>
+                      <td className="px-2 py-1.5 text-muted-foreground">{nt ? (nt.display_name || nt.key) : "—"}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <div>
+        <div className="mb-1 text-(length:--text-nano) font-semibold text-muted-foreground">
+          {t("边", "Edges")} · {edges.length}
+        </div>
+        {edges.length === 0 ? (
+          <div className="text-(length:--text-compact) text-muted-foreground">{t("暂无边。", "No edges.")}</div>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-border">
+            <table className="w-full text-(length:--text-compact)">
+              <thead className="bg-muted/40 text-muted-foreground">
+                <tr>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("源", "Source")}</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("关系", "Relation")}</th>
+                  <th className="px-2 py-1.5 text-left font-medium">{t("目标", "Target")}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {edges.map((e) => (
+                  <tr key={e.id} className="border-t border-border">
+                    <td className="px-2 py-1.5">{labelById.get(e.sourceNodeId) ?? e.sourceNodeId}</td>
+                    <td className="px-2 py-1.5 text-muted-foreground">{e.relationKey ?? "—"}</td>
+                    <td className="px-2 py-1.5">{labelById.get(e.targetNodeId) ?? e.targetNodeId}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/** Schema definitions: node types + relation types. */
+function SchemaView({
+  nodeTypes,
+  relationTypes,
+}: {
+  nodeTypes: GraphNodeType[];
+  relationTypes: GraphNodeType[];
+}): ReactElement {
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <SchemaColumn title={t("节点类型", "Node types")} items={nodeTypes} />
+      <SchemaColumn title={t("关系类型", "Relation types")} items={relationTypes} />
+    </div>
+  );
+}
+
+function SchemaColumn({ title, items }: { title: string; items: GraphNodeType[] }): ReactElement {
+  return (
+    <div>
+      <div className="mb-1 text-(length:--text-nano) font-semibold text-muted-foreground">
+        {title} · {items.length}
+      </div>
+      {items.length === 0 ? (
+        <div className="text-(length:--text-compact) text-muted-foreground">—</div>
       ) : (
-        <ReactFlowProvider>
-          <GraphCanvas {...props} />
-        </ReactFlowProvider>
+        <div className="flex flex-col gap-1">
+          {items.map((it) => (
+            <div key={it.id} className="flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5">
+              <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: toneFor(it.id) }} />
+              <span className="text-(length:--text-compact) font-medium">{it.display_name || it.key}</span>
+              <span className="text-(length:--text-nano) text-muted-foreground">{it.key}</span>
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );
