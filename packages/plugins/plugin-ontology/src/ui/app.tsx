@@ -104,9 +104,12 @@ export function SidebarLink(_props: PluginSidebarProps): ReactElement {
   );
 }
 
-/** Full-page ontology modeling view (O1). */
+const ghostBtn: CSSProperties = { ...btnStyle, background: "transparent", color: tokens.primary, padding: 0 };
+
+/** Full-page ontology view: Domains modeling + Capabilities acquisition. */
 export function OntologyPage({ context }: PluginPageProps): ReactElement {
   const companyId = context.companyId ?? undefined;
+  const [tab, setTab] = useState<"domains" | "capabilities">("domains");
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
 
   if (!companyId) {
@@ -119,16 +122,248 @@ export function OntologyPage({ context }: PluginPageProps): ReactElement {
 
   return (
     <div style={page}>
-      <h1 style={{ fontSize: "1.25rem", marginBottom: "1rem" }}>Ontology Modeling</h1>
-      {selectedDomainId ? (
-        <DomainDetailView
-          companyId={companyId}
-          domainId={selectedDomainId}
-          onBack={() => setSelectedDomainId(null)}
-        />
+      <h1 style={{ fontSize: "1.25rem", marginBottom: "0.75rem" }}>Ontology</h1>
+      <div style={{ display: "flex", gap: "0.5rem", marginBottom: "1rem" }}>
+        <button
+          style={{ ...btnStyle, background: tab === "domains" ? tokens.primary : "transparent", color: tab === "domains" ? tokens.primaryFg : tokens.primary }}
+          onClick={() => setTab("domains")}
+        >
+          Domains
+        </button>
+        <button
+          style={{ ...btnStyle, background: tab === "capabilities" ? tokens.primary : "transparent", color: tab === "capabilities" ? tokens.primaryFg : tokens.primary }}
+          onClick={() => setTab("capabilities")}
+        >
+          Capabilities
+        </button>
+      </div>
+      {tab === "domains" ? (
+        selectedDomainId ? (
+          <DomainDetailView
+            companyId={companyId}
+            domainId={selectedDomainId}
+            onBack={() => setSelectedDomainId(null)}
+          />
+        ) : (
+          <DomainList companyId={companyId} onOpen={setSelectedDomainId} />
+        )
       ) : (
-        <DomainList companyId={companyId} onOpen={setSelectedDomainId} />
+        <CapabilitiesTab companyId={companyId} />
       )}
+    </div>
+  );
+}
+
+const CAPABILITY_SOURCES = ["cached-mcp", "curated-catalog", "npm-registry", "autonomous-dev"] as const;
+
+interface CapabilityGap {
+  id: string;
+  gap_key: string;
+  title: string;
+  description: string;
+  status: string;
+  domain_id: string | null;
+  resolved_function_id: string | null;
+  priority: string;
+}
+
+interface CapabilityResolution {
+  id: string;
+  stage: string;
+  source: string;
+  license_verdict: string;
+  error: string;
+}
+
+function gapStatusKind(s: string): "ok" | "pending" | "error" | "info" {
+  if (s === "resolved") return "ok";
+  if (s === "abandoned") return "error";
+  if (s === "resolving") return "info";
+  return "pending";
+}
+
+/** Capability acquisition: gaps list + trigger acquisition + resolution trail. */
+function CapabilitiesTab({ companyId }: { companyId: string }): ReactElement {
+  const { data, loading, error, refresh } = usePluginData<{ gaps: CapabilityGap[] }>(
+    "list-capability-gaps",
+    { companyId },
+  );
+  const createGap = usePluginAction("create-capability-gap");
+  const [title, setTitle] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [openGapId, setOpenGapId] = useState<string | null>(null);
+
+  const submit = useCallback(async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await createGap({ companyId, title });
+      setTitle("");
+      refresh();
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }, [companyId, title, createGap, refresh]);
+
+  const gaps = data?.gaps ?? [];
+
+  return (
+    <>
+      <div style={cardStyle}>
+        <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>New capability gap</div>
+        <input
+          style={{ ...inputStyle, minWidth: "20rem" }}
+          placeholder="what capability is missing?"
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+        />
+        <button style={btnStyle} disabled={busy || !title.trim()} onClick={submit}>
+          {busy ? "…" : "Detect"}
+        </button>
+        {err && <div style={{ color: tokens.muted, marginTop: "0.5rem" }}>{err}</div>}
+      </div>
+
+      <DataTable
+        loading={loading}
+        emptyMessage={error ? `Failed: ${error.message}` : "No capability gaps yet."}
+        rows={gaps as unknown as Record<string, unknown>[]}
+        columns={[
+          {
+            key: "title",
+            header: "Capability gap",
+            render: (_v, row) => (
+              <button style={ghostBtn} onClick={() => setOpenGapId((row as unknown as CapabilityGap).id)}>
+                {(row as unknown as CapabilityGap).title}
+              </button>
+            ),
+          },
+          { key: "priority", header: "Priority", width: "90px" },
+          {
+            key: "status",
+            header: "Status",
+            width: "110px",
+            render: (_v, row) => {
+              const s = (row as unknown as CapabilityGap).status;
+              return <StatusBadge label={s} status={gapStatusKind(s)} />;
+            },
+          },
+        ]}
+      />
+
+      {openGapId && (
+        <CapabilityGapDetail
+          companyId={companyId}
+          gap={gaps.find((g) => g.id === openGapId) ?? null}
+          onClose={() => setOpenGapId(null)}
+          onChanged={refresh}
+        />
+      )}
+    </>
+  );
+}
+
+function CapabilityGapDetail({
+  companyId,
+  gap,
+  onClose,
+  onChanged,
+}: {
+  companyId: string;
+  gap: CapabilityGap | null;
+  onClose: () => void;
+  onChanged: () => void;
+}): ReactElement {
+  const { data, loading, refresh } = usePluginData<{ resolutions: CapabilityResolution[] }>(
+    "capability-resolutions",
+    gap ? { companyId, gapId: gap.id } : undefined,
+  );
+  const acquire = usePluginAction("acquire-capability");
+  const [name, setName] = useState("");
+  const [license, setLicense] = useState("MIT");
+  const [source, setSource] = useState<(typeof CAPABILITY_SOURCES)[number]>("npm-registry");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const runAcquire = useCallback(async () => {
+    if (!gap) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      // A UI-driven attempt marks smokeTestPassed true (operator asserts the
+      // candidate; the license/size gates still apply server-side).
+      await acquire({
+        companyId,
+        gapId: gap.id,
+        candidate: { name, license, source, smokeTestPassed: true },
+      });
+      setName("");
+      refresh();
+      onChanged();
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }, [companyId, gap, name, license, source, acquire, refresh, onChanged]);
+
+  if (!gap) return <></>;
+
+  return (
+    <div style={{ ...cardStyle, borderColor: tokens.primary }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{ fontWeight: 600 }}>{gap.title}</div>
+        <button style={ghostBtn} onClick={onClose}>Close</button>
+      </div>
+      <div style={{ color: tokens.muted, fontSize: "0.8rem", marginBottom: "0.75rem" }}>
+        {gap.gap_key} · {gap.status}
+        {gap.resolved_function_id ? " · resolved to a function" : ""}
+      </div>
+
+      {gap.status !== "resolved" && (
+        <div style={{ marginBottom: "0.75rem", display: "flex", flexWrap: "wrap", gap: "0.5rem", alignItems: "center" }}>
+          <input style={inputStyle} placeholder="candidate name" value={name} onChange={(e) => setName(e.target.value)} />
+          <input style={inputStyle} placeholder="license" value={license} onChange={(e) => setLicense(e.target.value)} />
+          <select style={inputStyle} value={source} onChange={(e) => setSource(e.target.value as (typeof CAPABILITY_SOURCES)[number])}>
+            {CAPABILITY_SOURCES.map((s) => (
+              <option key={s} value={s}>{s}</option>
+            ))}
+          </select>
+          <button style={btnStyle} disabled={busy || !name.trim()} onClick={runAcquire}>
+            {busy ? "…" : "Acquire"}
+          </button>
+          {err && <span style={{ color: tokens.muted }}>{err}</span>}
+        </div>
+      )}
+
+      <div style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: "0.4rem" }}>Resolution trail</div>
+      <DataTable
+        loading={loading}
+        emptyMessage="No acquisition attempts yet."
+        rows={(data?.resolutions ?? []) as unknown as Record<string, unknown>[]}
+        columns={[
+          { key: "source", header: "Source", width: "140px" },
+          {
+            key: "stage",
+            header: "Stage",
+            width: "110px",
+            render: (v) => <StatusBadge label={String(v)} status={v === "resolved" ? "ok" : v === "failed" ? "error" : "pending"} />,
+          },
+          {
+            key: "license_verdict",
+            header: "License",
+            width: "100px",
+            render: (v) => <StatusBadge label={String(v)} status={v === "allowed" ? "ok" : v === "warn" ? "warning" : "error"} />,
+          },
+          {
+            key: "error",
+            header: "Detail",
+            render: (v) => (v ? <span style={{ color: tokens.muted }}>{String(v)}</span> : "—"),
+          },
+        ]}
+      />
     </div>
   );
 }

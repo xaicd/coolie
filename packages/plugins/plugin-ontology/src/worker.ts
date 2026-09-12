@@ -337,6 +337,74 @@ const plugin = definePlugin({
       return { relationType };
     });
 
+    // Capability acquisition — data/action handlers backing the Capabilities UI.
+    ctx.data.register("list-capability-gaps", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const status =
+        typeof params.status === "string" && params.status.trim() !== "" ? params.status : undefined;
+      return { gaps: await store.listCapabilityGaps(companyId, status) };
+    });
+
+    ctx.data.register("capability-resolutions", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const gapId = requireString(params.gapId, "gapId");
+      return { resolutions: await store.listCapabilityResolutions(companyId, gapId) };
+    });
+
+    ctx.actions.register("create-capability-gap", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const gap = await store.detectCapabilityGap({
+        companyId,
+        domainId: typeof params.domainId === "string" ? params.domainId : null,
+        gapKey:
+          typeof params.gapKey === "string" && params.gapKey.trim() !== ""
+            ? params.gapKey
+            : `gap-${Date.now()}`,
+        title: requireString(params.title, "title"),
+        description: typeof params.description === "string" ? params.description : undefined,
+        detectedFrom: "manual",
+      });
+      await emitCapabilityEvent(ctx, "capability-gap-detected", companyId, {
+        gapId: gap.id,
+        domainId: gap.domain_id,
+        title: gap.title,
+      });
+      return { gap };
+    });
+
+    ctx.actions.register("acquire-capability", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const cand = optionalRecord(params.candidate) ?? {};
+      const result = await store.acquireCapability(
+        companyId,
+        requireString(params.gapId, "gapId"),
+        {
+          name: requireString(cand.name, "candidate.name"),
+          version: typeof cand.version === "string" ? cand.version : undefined,
+          repoUrl: typeof cand.repoUrl === "string" ? cand.repoUrl : undefined,
+          license: typeof cand.license === "string" ? cand.license : undefined,
+          sizeBytes: typeof cand.sizeBytes === "number" ? cand.sizeBytes : undefined,
+          source: (typeof cand.source === "string" ? cand.source : "none") as CapabilityCandidate["source"],
+          smokeTestPassed: cand.smokeTestPassed === true,
+        },
+      );
+      if (!result) throw new Error("Capability gap not found");
+      await emitCapabilityEvent(ctx, "capability-resolution-advanced", companyId, {
+        gapId: result.gap.id,
+        resolutionId: result.resolution.id,
+        stage: result.resolution.stage,
+        source: result.resolution.source,
+      });
+      if (result.acquired && result.functionId) {
+        await emitCapabilityEvent(ctx, "capability-acquired", companyId, {
+          gapId: result.gap.id,
+          functionId: result.functionId,
+          domainId: result.gap.domain_id,
+        });
+      }
+      return result;
+    });
+
     // Agent-facing tools (O5 consumption interface). companyId comes from the
     // run context, so agents can only ever query their own company's ontology.
     ctx.tools.register(
