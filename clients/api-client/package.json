@@ -1,0 +1,16 @@
+{
+  "name": "@coolie/api-client",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "description": "Framework-agnostic TypeScript client for the Coolie REST API (auth, tasks, voice dispatch).",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "license": "MIT"
+}
