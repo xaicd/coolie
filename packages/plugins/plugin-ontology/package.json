@@ -41,6 +41,9 @@
     "typescript": "^7.0.2",
     "vitest": "^4.1.11"
   },
+  "dependencies": {
+    "@xyflow/react": "^12.3.5"
+  },
   "peerDependencies": {
     "react": ">=18"
   },
