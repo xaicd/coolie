@@ -2,6 +2,7 @@ import {
   DataTable,
   MetricCard,
   StatusBadge,
+  useHostNavigation,
   usePluginAction,
   usePluginData,
   type PluginPageProps,
@@ -78,8 +79,25 @@ const btnStyle: CSSProperties = {
 };
 const ghostBtn: CSSProperties = { ...btnStyle, background: "transparent", color: tokens.primary, padding: 0 };
 
+const SIDEBAR_ROW_CLASS =
+  "flex items-center gap-2.5 mx-2 rounded-lg px-2 py-1.5 pointer-coarse:py-1 " +
+  "text-(length:--text-compact) font-medium transition-colors no-underline " +
+  "text-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
+
 export function SidebarLink(_props: PluginSidebarProps): ReactElement {
-  return <span>AI Gateway</span>;
+  const nav = useHostNavigation();
+  return (
+    <a {...nav.linkProps("/aigw")} className={SIDEBAR_ROW_CLASS}>
+      <span data-slot="sidebar-nav-icon" className="relative shrink-0" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="3" y="4" width="18" height="6" rx="1.5" />
+          <rect x="3" y="14" width="18" height="6" rx="1.5" />
+          <path d="M7 7h.01M7 17h.01" />
+        </svg>
+      </span>
+      <span className="min-w-0 flex-1 truncate">AI Gateway</span>
+    </a>
+  );
 }
 
 export function AigwPage({ context }: PluginPageProps): ReactElement {

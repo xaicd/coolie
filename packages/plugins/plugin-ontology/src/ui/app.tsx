@@ -2,6 +2,7 @@ import {
   DataTable,
   MetricCard,
   StatusBadge,
+  useHostNavigation,
   usePluginAction,
   usePluginData,
   type PluginPageProps,
@@ -79,8 +80,28 @@ const btnStyle: CSSProperties = {
   cursor: "pointer",
 };
 
+/** Shared sidebar-row styling matching the host SidebarNavItem pill. */
+const SIDEBAR_ROW_CLASS =
+  "flex items-center gap-2.5 mx-2 rounded-lg px-2 py-1.5 pointer-coarse:py-1 " +
+  "text-(length:--text-compact) font-medium transition-colors no-underline " +
+  "text-foreground/80 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground";
+
+/** Sidebar entry: a real host-router link styled like native nav rows, with an icon. */
 export function SidebarLink(_props: PluginSidebarProps): ReactElement {
-  return <span>Ontology</span>;
+  const nav = useHostNavigation();
+  return (
+    <a {...nav.linkProps("/ontology")} className={SIDEBAR_ROW_CLASS}>
+      <span data-slot="sidebar-nav-icon" className="relative shrink-0" aria-hidden="true">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="5" r="2.5" />
+          <circle cx="5" cy="19" r="2.5" />
+          <circle cx="19" cy="19" r="2.5" />
+          <path d="M12 7.5v4M12 11.5 6.5 17M12 11.5 17.5 17" />
+        </svg>
+      </span>
+      <span className="min-w-0 flex-1 truncate">Ontology</span>
+    </a>
+  );
 }
 
 /** Full-page ontology modeling view (O1). */
