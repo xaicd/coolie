@@ -1,0 +1,10 @@
+# Recorded replay script — minimal starter for Expo app on iOS
+# Replace refs/paths as needed. This script is intentionally minimal so CI can run a deterministic replay.
+
+open cloud.coolie.app --platform ios --session ci-e2e --save-script
+snapshot -i
+# wait until UI stabilizes (milliseconds)
+wait stable 2000
+# capture screenshot evidence (path relative to repo root during CI run)
+screenshot ./evidence/coolie-evidence.png
+close
