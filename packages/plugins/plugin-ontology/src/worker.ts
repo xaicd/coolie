@@ -7,6 +7,7 @@ import {
 } from "@paperclipai/plugin-sdk";
 import {
   PostgresGraphStore,
+  type CapabilityCandidate,
   type CognitionShard,
   type GraphStore,
   type ImpactDirection,
@@ -249,6 +250,22 @@ async function emitStaleNodesForDomain(
         nodeId: node.id,
       });
     }
+  }
+}
+
+/** Best-effort cross-plugin emit for a capability-domain event. */
+async function emitCapabilityEvent(
+  ctx: PluginContext,
+  name: string,
+  companyId: string,
+  payload: Record<string, unknown>,
+): Promise<void> {
+  try {
+    await ctx.events.emit(name, companyId, payload);
+  } catch (err) {
+    ctx.logger.warn(`Failed to emit ${name}`, {
+      error: String((err as Error)?.message ?? err),
+    });
   }
 }
 
@@ -1493,6 +1510,85 @@ const plugin = definePlugin({
           source: typeof b.source === "string" ? b.source : undefined,
         });
         return { status: 201, body: { telemetry } };
+      }
+
+      // --- capability acquisition ---------------------------------------
+      case "list-capability-gaps": {
+        const gaps = await store.listCapabilityGaps(
+          companyId,
+          queryString(input.query.status),
+          parseDepth(queryString(input.query.limit)),
+        );
+        return { body: { gaps } };
+      }
+
+      case "create-capability-gap": {
+        const body = optionalRecord(input.body) ?? {};
+        const gap = await store.detectCapabilityGap({
+          companyId,
+          domainId: typeof body.domainId === "string" ? body.domainId : null,
+          gapKey: requireString(body.gapKey, "gapKey"),
+          title: requireString(body.title, "title"),
+          description: typeof body.description === "string" ? body.description : undefined,
+          detectedFrom: typeof body.detectedFrom === "string" ? body.detectedFrom : undefined,
+          intentRef: typeof body.intentRef === "string" ? body.intentRef : null,
+          priority: typeof body.priority === "string" ? body.priority : undefined,
+        });
+        await emitCapabilityEvent(ctx, "capability-gap-detected", companyId, {
+          gapId: gap.id,
+          domainId: gap.domain_id,
+          title: gap.title,
+        });
+        return { status: 201, body: { gap } };
+      }
+
+      case "list-capability-resolutions": {
+        const resolutions = await store.listCapabilityResolutions(
+          companyId,
+          requireString(input.params.gapId, "gapId"),
+        );
+        return { body: { resolutions } };
+      }
+
+      case "acquire-capability": {
+        const body = optionalRecord(input.body) ?? {};
+        const cand = optionalRecord(body.candidate) ?? {};
+        const candidate: CapabilityCandidate = {
+          name: requireString(cand.name, "candidate.name"),
+          version: typeof cand.version === "string" ? cand.version : undefined,
+          repoUrl: typeof cand.repoUrl === "string" ? cand.repoUrl : undefined,
+          license: typeof cand.license === "string" ? cand.license : undefined,
+          sizeBytes: typeof cand.sizeBytes === "number" ? cand.sizeBytes : undefined,
+          source: (typeof cand.source === "string" ? cand.source : "none") as CapabilityCandidate["source"],
+          smokeTestPassed: cand.smokeTestPassed === true,
+        };
+        const result = await store.acquireCapability(
+          companyId,
+          requireString(input.params.gapId, "gapId"),
+          candidate,
+        );
+        if (!result) return { status: 404, body: { error: "Capability gap not found" } };
+        await emitCapabilityEvent(ctx, "capability-resolution-advanced", companyId, {
+          gapId: result.gap.id,
+          resolutionId: result.resolution.id,
+          stage: result.resolution.stage,
+          source: result.resolution.source,
+        });
+        if (result.acquired && result.functionId) {
+          await emitCapabilityEvent(ctx, "capability-acquired", companyId, {
+            gapId: result.gap.id,
+            functionId: result.functionId,
+            domainId: result.gap.domain_id,
+          });
+          await ctx.activity.log({
+            companyId,
+            message: `Acquired capability ${candidate.name} for gap ${result.gap.gap_key}`,
+            entityType: "ontology_function",
+            entityId: result.functionId,
+            metadata: { gapId: result.gap.id, source: candidate.source },
+          });
+        }
+        return { body: result };
       }
 
       default:
