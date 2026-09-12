@@ -432,6 +432,59 @@ const plugin = definePlugin({
       return { scenario };
     });
 
+    // Data pipeline — domain-scoped datasets / connectors / transforms.
+    ctx.data.register("domain-pipeline", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const [datasets, connectors, transforms] = await Promise.all([
+        store.listDatasets(companyId, domainId),
+        store.listConnectors(companyId, domainId),
+        store.listTransforms(companyId, domainId),
+      ]);
+      return { datasets, connectors, transforms };
+    });
+
+    ctx.actions.register("create-dataset", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const dataset = await store.createDataset({
+        companyId,
+        domainId,
+        key: typeof params.key === "string" && params.key.trim() !== "" ? params.key : `ds-${Date.now()}`,
+        name: requireString(params.name, "name"),
+        format: typeof params.format === "string" ? (params.format as DatasetFormat) : undefined,
+      });
+      return { dataset };
+    });
+
+    ctx.actions.register("create-connector", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const connector = await store.createConnector({
+        companyId,
+        domainId,
+        key: typeof params.key === "string" && params.key.trim() !== "" ? params.key : `conn-${Date.now()}`,
+        name: requireString(params.name, "name"),
+        connectorType: requireString(params.connectorType, "connectorType") as ConnectorType,
+        datasetId: typeof params.datasetId === "string" ? params.datasetId : null,
+      });
+      return { connector };
+    });
+
+    ctx.actions.register("create-transform", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const transform = await store.createTransform({
+        companyId,
+        domainId,
+        key: typeof params.key === "string" && params.key.trim() !== "" ? params.key : `tf-${Date.now()}`,
+        name: requireString(params.name, "name"),
+        transformType: typeof params.transformType === "string" ? (params.transformType as TransformType) : undefined,
+        outputDatasetId: typeof params.outputDatasetId === "string" ? params.outputDatasetId : null,
+      });
+      return { transform };
+    });
+
     // Cognition (AST reverse-engineering) — data/action handlers for the UI:
     // create a job, ingest code files (extract a draft), review, publish to a domain.
     ctx.data.register("list-cognition-jobs", async (params) => {

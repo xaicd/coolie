@@ -97,6 +97,33 @@ interface SimulationRow {
 
 const EVAL_METRIC_TYPES = ["accuracy", "latency", "token_cost", "user_satisfaction", "custom"] as const;
 
+const DATASET_FORMATS = ["csv", "parquet", "json", "database_table"] as const;
+const CONNECTOR_TYPES = ["mysql", "postgresql", "mongodb", "rest-api", "s3"] as const;
+const TRANSFORM_TYPES = ["sql", "python"] as const;
+
+interface DatasetRow {
+  id: string;
+  key: string;
+  name: string;
+  format: string;
+  current_version: number;
+  lifecycle_state: string;
+}
+interface ConnectorRow {
+  id: string;
+  key: string;
+  name: string;
+  connector_type: string;
+  status: string;
+}
+interface TransformRow {
+  id: string;
+  key: string;
+  name: string;
+  transform_type: string;
+  status: string;
+}
+
 const page: CSSProperties = { padding: "1.5rem", background: tokens.bg, color: tokens.fg, minHeight: "100%" };
 const cardStyle: CSSProperties = {
   border: `1px solid ${tokens.border}`,
@@ -1215,6 +1242,114 @@ function EvaluationSection({ companyId, domainId }: { companyId: string; domainI
   );
 }
 
+function pipelineStatusKind(s: string): "ok" | "pending" | "error" | "info" {
+  if (s === "active" || s === "connected" || s === "succeeded") return "ok";
+  if (s === "failed" || s === "error") return "error";
+  if (s === "running" || s === "syncing") return "info";
+  return "pending";
+}
+
+/** Data pipeline for a domain: datasets, connectors, transforms (DS data pipeline). */
+function PipelineSection({ companyId, domainId }: { companyId: string; domainId: string }): ReactElement {
+  const { data, loading, error, refresh } = usePluginData<{
+    datasets: DatasetRow[];
+    connectors: ConnectorRow[];
+    transforms: TransformRow[];
+  }>("domain-pipeline", { companyId, domainId });
+  const createDataset = usePluginAction("create-dataset");
+  const createConnector = usePluginAction("create-connector");
+  const createTransform = usePluginAction("create-transform");
+  const [dsName, setDsName] = useState("");
+  const [dsFormat, setDsFormat] = useState<(typeof DATASET_FORMATS)[number]>("csv");
+  const [connName, setConnName] = useState("");
+  const [connType, setConnType] = useState<(typeof CONNECTOR_TYPES)[number]>("postgresql");
+  const [tfName, setTfName] = useState("");
+  const [tfType, setTfType] = useState<(typeof TRANSFORM_TYPES)[number]>("sql");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const run = useCallback(
+    async (fn: () => Promise<unknown>) => {
+      setBusy(true); setErr(null);
+      try { await fn(); refresh(); }
+      catch (e) { setErr(String((e as Error)?.message ?? e)); }
+      finally { setBusy(false); }
+    },
+    [refresh],
+  );
+
+  const datasets = data?.datasets ?? [];
+  const connectors = data?.connectors ?? [];
+  const transforms = data?.transforms ?? [];
+
+  return (
+    <div style={cardStyle}>
+      <div style={{ fontWeight: 600, marginBottom: "0.5rem" }}>Data pipeline</div>
+      <div style={{ display: "flex", gap: "0.75rem", marginBottom: "0.75rem", flexWrap: "wrap" }}>
+        <MetricCard label="Datasets" value={datasets.length} />
+        <MetricCard label="Connectors" value={connectors.length} />
+        <MetricCard label="Transforms" value={transforms.length} />
+      </div>
+
+      <div style={{ marginBottom: "0.4rem" }}>
+        <input style={inputStyle} placeholder="dataset name" value={dsName} onChange={(e) => setDsName(e.target.value)} />
+        <select style={inputStyle} value={dsFormat} onChange={(e) => setDsFormat(e.target.value as (typeof DATASET_FORMATS)[number])}>
+          {DATASET_FORMATS.map((f) => <option key={f} value={f}>{f}</option>)}
+        </select>
+        <button style={btnStyle} disabled={busy || !dsName.trim()} onClick={() => run(async () => { await createDataset({ companyId, domainId, name: dsName.trim(), format: dsFormat }); setDsName(""); })}>Add dataset</button>
+      </div>
+      <DataTable
+        loading={loading}
+        emptyMessage={error ? `Failed: ${error.message}` : "No datasets."}
+        rows={datasets as unknown as Record<string, unknown>[]}
+        columns={[
+          { key: "name", header: "Dataset" },
+          { key: "format", header: "Format", width: "120px" },
+          { key: "current_version", header: "Ver", width: "70px" },
+          { key: "lifecycle_state", header: "State", width: "110px", render: (v) => <StatusBadge label={String(v)} status={pipelineStatusKind(String(v))} /> },
+        ]}
+      />
+
+      <div style={{ margin: "0.75rem 0 0.4rem" }}>
+        <input style={inputStyle} placeholder="connector name" value={connName} onChange={(e) => setConnName(e.target.value)} />
+        <select style={inputStyle} value={connType} onChange={(e) => setConnType(e.target.value as (typeof CONNECTOR_TYPES)[number])}>
+          {CONNECTOR_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <button style={btnStyle} disabled={busy || !connName.trim()} onClick={() => run(async () => { await createConnector({ companyId, domainId, name: connName.trim(), connectorType: connType }); setConnName(""); })}>Add connector</button>
+      </div>
+      <DataTable
+        loading={loading}
+        emptyMessage="No connectors."
+        rows={connectors as unknown as Record<string, unknown>[]}
+        columns={[
+          { key: "name", header: "Connector" },
+          { key: "connector_type", header: "Type", width: "120px" },
+          { key: "status", header: "Status", width: "110px", render: (v) => <StatusBadge label={String(v)} status={pipelineStatusKind(String(v))} /> },
+        ]}
+      />
+
+      <div style={{ margin: "0.75rem 0 0.4rem" }}>
+        <input style={inputStyle} placeholder="transform name" value={tfName} onChange={(e) => setTfName(e.target.value)} />
+        <select style={inputStyle} value={tfType} onChange={(e) => setTfType(e.target.value as (typeof TRANSFORM_TYPES)[number])}>
+          {TRANSFORM_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+        </select>
+        <button style={btnStyle} disabled={busy || !tfName.trim()} onClick={() => run(async () => { await createTransform({ companyId, domainId, name: tfName.trim(), transformType: tfType }); setTfName(""); })}>Add transform</button>
+      </div>
+      <DataTable
+        loading={loading}
+        emptyMessage="No transforms."
+        rows={transforms as unknown as Record<string, unknown>[]}
+        columns={[
+          { key: "name", header: "Transform" },
+          { key: "transform_type", header: "Type", width: "100px" },
+          { key: "status", header: "Status", width: "110px", render: (v) => <StatusBadge label={String(v)} status={pipelineStatusKind(String(v))} /> },
+        ]}
+      />
+      {err && <div style={{ color: tokens.muted, marginTop: "0.5rem" }}>{err}</div>}
+    </div>
+  );
+}
+
 function DomainDetailView({
   companyId,
   domainId,
@@ -1301,6 +1436,7 @@ function DomainDetailView({
           />
 
           <EvaluationSection companyId={companyId} domainId={domainId} />
+          <PipelineSection companyId={companyId} domainId={domainId} />
         </>
       )}
     </>
