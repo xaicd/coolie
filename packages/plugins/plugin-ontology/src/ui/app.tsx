@@ -14,7 +14,8 @@ import {
   useState,
   type ReactElement,
 } from "react";
-import { GraphView, type GraphNode, type GraphEdge } from "./graph-view.js";
+import { type GraphNode, type GraphEdge } from "./graph-view.js";
+import { Workbench } from "./workbench.js";
 
 /**
  * Minimal plugin-side i18n. Plugin UI runs sandboxed and does not receive the
@@ -998,54 +999,75 @@ function DomainDetailView({
             <MetricCard label={t("边","Edges")} value={counts?.edges ?? 0} />
           </div>
 
-          <GraphView
-            companyId={companyId}
-            domainId={domainId}
-            nodes={data?.graph?.nodes ?? []}
-            edges={data?.graph?.edges ?? []}
-            nodeTypes={data?.nodeTypes ?? []}
-            relationTypes={data?.relationTypes ?? []}
-            onChanged={refresh}
-          />
+          <div className="mb-3">
+            <Workbench
+              companyId={companyId}
+              domainId={domainId}
+              nodes={data?.graph?.nodes ?? []}
+              edges={data?.graph?.edges ?? []}
+              nodeTypes={data?.nodeTypes ?? []}
+              relationTypes={data?.relationTypes ?? []}
+              onChanged={refresh}
+            />
+          </div>
 
-          <TypeSection
-            title={t("节点类型","Node types")}
-            rows={(data?.nodeTypes ?? []) as unknown as Record<string, unknown>[]}
-            columns={[
-              { key: "key", header: t("键","Key") },
-              { key: "display_name", header: t("显示名称","Display name") },
-              { key: "description", header: t("描述","Description") },
-            ]}
-            onCreate={async (key, displayName) => {
-              await createNodeType({ companyId, domainId, key, displayName });
-              refresh();
-            }}
-          />
+          <CollapsibleSection title={t("管理 Schema 与数据管道", "Manage schema & pipeline")}>
+            <TypeSection
+              title={t("节点类型","Node types")}
+              rows={(data?.nodeTypes ?? []) as unknown as Record<string, unknown>[]}
+              columns={[
+                { key: "key", header: t("键","Key") },
+                { key: "display_name", header: t("显示名称","Display name") },
+                { key: "description", header: t("描述","Description") },
+              ]}
+              onCreate={async (key, displayName) => {
+                await createNodeType({ companyId, domainId, key, displayName });
+                refresh();
+              }}
+            />
 
-          <TypeSection
-            title={t("关系类型","Relation types")}
-            rows={(data?.relationTypes ?? []) as unknown as Record<string, unknown>[]}
-            columns={[
-              { key: "key", header: t("键","Key") },
-              { key: "display_name", header: t("显示名称","Display name") },
-              {
-                key: "directed",
-                header: "Directed",
-                width: "100px",
-                render: (v: unknown) => (v ? "yes" : "no"),
-              },
-            ]}
-            onCreate={async (key, displayName) => {
-              await createRelationType({ companyId, domainId, key, displayName });
-              refresh();
-            }}
-          />
+            <TypeSection
+              title={t("关系类型","Relation types")}
+              rows={(data?.relationTypes ?? []) as unknown as Record<string, unknown>[]}
+              columns={[
+                { key: "key", header: t("键","Key") },
+                { key: "display_name", header: t("显示名称","Display name") },
+                {
+                  key: "directed",
+                  header: "Directed",
+                  width: "100px",
+                  render: (v: unknown) => (v ? "yes" : "no"),
+                },
+              ]}
+              onCreate={async (key, displayName) => {
+                await createRelationType({ companyId, domainId, key, displayName });
+                refresh();
+              }}
+            />
 
-          <EvaluationSection companyId={companyId} domainId={domainId} />
-          <PipelineSection companyId={companyId} domainId={domainId} />
+            <EvaluationSection companyId={companyId} domainId={domainId} />
+            <PipelineSection companyId={companyId} domainId={domainId} />
+          </CollapsibleSection>
         </>
       )}
     </>
+  );
+}
+
+/** Collapsible container so the schema/pipeline forms don't clutter the workbench. */
+function CollapsibleSection({ title, children }: { title: string; children: ReactElement | ReactElement[] }): ReactElement {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="mb-3">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="mb-2 flex w-full items-center gap-2 rounded-lg border border-border bg-card px-3 py-2 text-(length:--text-compact) font-medium text-foreground transition-colors hover:bg-accent/40"
+      >
+        <span className="text-muted-foreground">{open ? "▾" : "▸"}</span>
+        {title}
+      </button>
+      {open && <div>{children}</div>}
+    </div>
   );
 }
 
