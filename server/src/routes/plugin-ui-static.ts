@@ -248,11 +248,18 @@ export function pluginUiStaticRoutes(db: Db, options: PluginUiStaticRouteOptions
     try {
       plugin = await registry.getById(pluginId);
     } catch (error) {
-      const maybeCode =
-        typeof error === "object" && error !== null && "code" in error
-          ? (error as { code?: unknown }).code
+      // Check both the error itself and its cause for the Postgres invalid-UUID
+      // error code (22P02). Drizzle wraps the raw PostgresError in a
+      // DrizzleQueryError, so the code lives on error.cause, not on error
+      // directly. If either layer carries 22P02 we know the caller passed a
+      // plugin key (not a UUID) and we should fall through to getByKey instead
+      // of propagating a 500.
+      const getCode = (e: unknown): unknown =>
+        typeof e === "object" && e !== null && "code" in e
+          ? (e as { code?: unknown }).code
           : undefined;
-      if (maybeCode !== "22P02") {
+      const code = getCode(error) ?? getCode((error as { cause?: unknown } | null)?.cause);
+      if (code !== "22P02") {
         throw error;
       }
     }
@@ -494,6 +501,16 @@ export function pluginUiStaticRoutes(db: Db, options: PluginUiStaticRouteOptions
     // not found. We already enforce traversal safety above, so allow dot paths.
     res.sendFile(resolvedFilePath, { dotfiles: "allow" }, (err) => {
       if (err) {
+        // Client disconnected before the transfer completed — not a server
+        // error, nothing to respond to.
+        const code = (err as NodeJS.ErrnoException).code;
+        if (code === "ECONNABORTED" || code === "ECONNRESET") {
+          log.debug(
+            { pluginId: plugin.id, code },
+            "plugin-ui-static: client disconnected during file transfer",
+          );
+          return;
+        }
         log.error(
           { err, pluginId: plugin.id, filePath: resolvedFilePath },
           "plugin-ui-static: error sending file",

@@ -500,7 +500,9 @@ async function loadPluginModule(contribution: PluginUiContribution): Promise<voi
     try {
       // Dynamic ESM import of the plugin's UI entry module with
       // bare-specifier rewriting for host-provided dependencies.
+      console.debug(`[plugin-loader] loading "${pluginKey}" from ${url}`);
       const mod: Record<string, unknown> = await importPluginModule(url);
+      console.debug(`[plugin-loader] loaded "${pluginKey}", exports:`, Object.keys(mod));
 
       // Collect the set of export names declared across all UI contributions so
       // we only register what the manifest advertises (ignore extra exports).
