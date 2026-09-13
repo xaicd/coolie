@@ -20,16 +20,45 @@ import {
   useMemo,
   useRef,
   useState,
+  type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
 } from "react";
 import { usePluginAction } from "@paperclipai/plugin-sdk/ui";
+
+export type NodeLifecycle = "active" | "stale" | "deprecated" | "archived";
 
 export interface GraphNode {
   id: string;
   key: string;
   label: string;
   nodeTypeId: string | null;
+  lifecycleState?: NodeLifecycle;
+}
+
+/** Tailwind bg class for a node lifecycle health dot (matches DS's dot colors). */
+export function lifecycleDot(state: NodeLifecycle | undefined): string {
+  switch (state) {
+    case "active": return "bg-emerald-400";
+    case "stale": return "bg-amber-400";
+    case "deprecated": return "bg-orange-400";
+    case "archived": return "bg-muted-foreground";
+    default: return "bg-emerald-400";
+  }
+}
+
+/** Localized label for a node lifecycle state. */
+export function lifecycleLabel(state: NodeLifecycle | undefined): string {
+  const zh = { active: "活跃", stale: "陈旧", deprecated: "弃用", archived: "归档" };
+  const en = { active: "Active", stale: "Stale", deprecated: "Deprecated", archived: "Archived" };
+  const key = state ?? "active";
+  const isZhLocale = (() => {
+    try {
+      const v = typeof localStorage !== "undefined" ? localStorage.getItem("coolie.locale") : null;
+      return (v || (typeof navigator !== "undefined" ? navigator.language : "") || "en").toLowerCase().startsWith("zh");
+    } catch { return false; }
+  })();
+  return isZhLocale ? zh[key] : en[key];
 }
 export interface GraphEdge {
   id: string;
@@ -142,6 +171,7 @@ function GraphCanvas({
   onSelectNode,
   focusNodeTypeId,
   fill,
+  nodeTypeDragMime,
 }: {
   companyId: string;
   domainId: string;
@@ -153,6 +183,7 @@ function GraphCanvas({
   onSelectNode?: (nodeId: string | null) => void;
   focusNodeTypeId?: string | null;
   fill?: boolean;
+  nodeTypeDragMime?: string;
 }): ReactElement {
   useReactFlowCss();
   const createNode = usePluginAction("create-node");
@@ -251,9 +282,26 @@ function GraphCanvas({
     [companyId, domainId, createNode, run],
   );
 
+  // Drop a node type dragged from the host tree -> create a node of that type.
+  const onDrop = useCallback(
+    (e: ReactDragEvent) => {
+      if (!nodeTypeDragMime) return;
+      const nodeTypeId = e.dataTransfer.getData(nodeTypeDragMime);
+      if (!nodeTypeId) return;
+      e.preventDefault();
+      const typeName = typeById.get(nodeTypeId)?.display_name || typeById.get(nodeTypeId)?.key || t("节点", "Node");
+      const label = typeof window !== "undefined" ? window.prompt(t("节点标签", "Node label"), typeName) : null;
+      if (!label || !label.trim()) return;
+      void run(() => createNode({ companyId, domainId, key: `n-${Date.now()}`, label: label.trim(), nodeTypeId }));
+    },
+    [companyId, domainId, createNode, run, nodeTypeDragMime, typeById],
+  );
+
   return (
     <div
       ref={wrapRef}
+      onDragOver={nodeTypeDragMime ? (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "copy"; } : undefined}
+      onDrop={nodeTypeDragMime ? onDrop : undefined}
       className={[
         "relative w-full overflow-hidden border border-border bg-background",
         fill ? "h-full rounded-none border-0" : "h-[420px] rounded-lg",
@@ -281,7 +329,9 @@ function GraphCanvas({
       </ReactFlow>
 
       <div className="pointer-events-none absolute right-2 top-2 z-10 rounded-md bg-card/80 px-2 py-1 text-(length:--text-nano) text-muted-foreground">
-        {t("右键:画布=加节点 · 节点/边=菜单 · 拖手柄=连线", "Right-click: canvas=add · node/edge=menu · drag handle=connect")}
+        {nodeTypeDragMime
+          ? t("拖类型到此=按类型建节点 · 右键=菜单 · 拖手柄=连线", "Drop a type here=typed node · right-click=menu · drag handle=connect")
+          : t("右键:画布=加节点 · 节点/边=菜单 · 拖手柄=连线", "Right-click: canvas=add · node/edge=menu · drag handle=connect")}
         {busy ? ` · ${t("保存中…", "saving…")}` : ""}
       </div>
 
@@ -381,6 +431,8 @@ interface GraphViewProps {
   mode?: GraphViewMode;
   /** Hide the internal graph/table/schema tab bar (when host renders tabs). */
   hideTabs?: boolean;
+  /** MIME key used to drag a node type from a host tree onto the canvas. */
+  nodeTypeDragMime?: string;
 }
 
 /**

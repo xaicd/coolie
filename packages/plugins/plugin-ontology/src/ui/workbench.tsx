@@ -19,6 +19,8 @@ import { usePluginAction } from "@paperclipai/plugin-sdk/ui";
 import {
   GraphView,
   toneFor,
+  lifecycleDot,
+  lifecycleLabel,
   type GraphNode,
   type GraphEdge,
   type GraphNodeType,
@@ -148,6 +150,7 @@ export function Workbench(props: WorkbenchProps): ReactElement {
             selectedNodeId={selectedNodeId}
             onSelectNode={(id) => { setSelectedNodeId(id); if (id) setRightOpen(true); }}
             focusNodeTypeId={realTypeId(focusTypeId)}
+            nodeTypeDragMime="application/x-ontology-node-type"
           />
         </div>
 
@@ -255,9 +258,16 @@ function WorkbenchSidebar({
           return (
             <div key={tr.id}>
               <button
+                draggable={tr.id !== UNTYPED}
+                onDragStart={(e) => {
+                  e.dataTransfer.setData("application/x-ontology-node-type", tr.id);
+                  e.dataTransfer.effectAllowed = "copy";
+                }}
                 onClick={() => { toggle(tr.id); onFocusType(tr.id); }}
+                title={tr.id !== UNTYPED ? t("拖到画布以新建此类型的节点", "Drag onto the canvas to add a node of this type") : undefined}
                 className={[
                   "group flex w-full items-center gap-1.5 rounded-md px-2 py-1.5 text-left transition-colors",
+                  tr.id !== UNTYPED ? "cursor-grab active:cursor-grabbing" : "",
                   isFocused ? "bg-primary/10 text-foreground" : "text-foreground/80 hover:bg-accent/50",
                 ].join(" ")}
               >
@@ -283,7 +293,11 @@ function WorkbenchSidebar({
                           selectedNodeId === n.id ? "bg-primary/10 text-foreground" : "text-muted-foreground hover:bg-accent/50 hover:text-foreground",
                         ].join(" ")}
                       >
-                        <span aria-hidden className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                        <span
+                          aria-hidden
+                          title={lifecycleLabel(n.lifecycleState)}
+                          className={`h-1.5 w-1.5 shrink-0 rounded-full ${lifecycleDot(n.lifecycleState)}`}
+                        />
                         <span className="truncate text-(length:--text-compact)">{n.label || n.key}</span>
                       </button>
                     ))
@@ -387,6 +401,13 @@ function WorkbenchInspector({
           <Field label={t("标签", "Label")} value={node.label || node.key} />
           <Field label={t("键", "Key")} value={node.key} mono />
           <Field label={t("类型", "Type")} value={typeName ?? t("未分类", "Untyped")} />
+          <div className="mb-2">
+            <div className="text-(length:--text-nano) uppercase tracking-wider text-muted-foreground">{t("状态", "State")}</div>
+            <div className="flex items-center gap-1.5 text-(length:--text-compact) text-foreground">
+              <span aria-hidden className={`h-2 w-2 rounded-full ${lifecycleDot(node.lifecycleState)}`} />
+              {lifecycleLabel(node.lifecycleState)}
+            </div>
+          </div>
 
           <div className="mb-1 mt-4 text-(length:--text-nano) font-semibold uppercase tracking-wider text-muted-foreground">
             {t("关系", "Relations")} ({related.length})
