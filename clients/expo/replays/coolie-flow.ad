@@ -2,7 +2,9 @@
 # Use: agent-device replay ./clients/expo/replays/coolie-flow.ad --session <name> --keep-session
 # The 'open' command accepts only <app|url> [url]; session/flags belong on the replay CLI.
 
-open cloud.coolie.app
+# Open the local Expo dev server web UI (start it with `npx expo start` in clients/expo)
+# Agent-device will open the URL in the simulator's browser / dev client. Replace host/port if your dev server differs.
+open http://127.0.0.1:19002
 snapshot -i
 # wait until UI stabilizes (milliseconds)
 wait stable 2000
