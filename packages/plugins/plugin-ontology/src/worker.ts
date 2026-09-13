@@ -396,6 +396,107 @@ const plugin = definePlugin({
       return { deleted };
     });
 
+    // One-click sample seed: populate an empty domain with a small, coherent
+    // "software delivery" ontology so the graph is immediately meaningful.
+    // Idempotent: no-ops if the domain already has nodes.
+    ctx.actions.register("seed-samples", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+
+      const existing = await store.getGraphSnapshot(companyId, domainId);
+      if (existing.counts.nodes > 0) {
+        return { seeded: false, reason: "domain-not-empty", counts: existing.counts };
+      }
+
+      // ── Node types ──
+      const nodeTypeDefs: Array<{ key: string; displayName: string }> = [
+        { key: "team", displayName: "Team" },
+        { key: "person", displayName: "Person" },
+        { key: "service", displayName: "Service" },
+        { key: "repository", displayName: "Repository" },
+        { key: "project", displayName: "Project" },
+        { key: "task", displayName: "Task" },
+      ];
+      const typeIdByKey = new Map<string, string>();
+      for (const def of nodeTypeDefs) {
+        const nt = await store.createNodeType({ companyId, domainId, key: def.key, displayName: def.displayName, description: null });
+        typeIdByKey.set(def.key, nt.id);
+      }
+
+      // ── Relation types ──
+      const relationTypeDefs: Array<{ key: string; displayName: string }> = [
+        { key: "member_of", displayName: "Member of" },
+        { key: "owns", displayName: "Owns" },
+        { key: "depends_on", displayName: "Depends on" },
+        { key: "assigned_to", displayName: "Assigned to" },
+        { key: "part_of", displayName: "Part of" },
+      ];
+      for (const def of relationTypeDefs) {
+        await store.createRelationType({ companyId, domainId, key: def.key, displayName: def.displayName, description: null });
+      }
+
+      // ── Nodes ──
+      const nodeDefs: Array<{ key: string; label: string; type: string }> = [
+        { key: "team-platform", label: "Platform Team", type: "team" },
+        { key: "team-growth", label: "Growth Team", type: "team" },
+        { key: "person-alice", label: "Alice (Lead)", type: "person" },
+        { key: "person-bob", label: "Bob (Engineer)", type: "person" },
+        { key: "person-carol", label: "Carol (Engineer)", type: "person" },
+        { key: "svc-auth", label: "Auth Service", type: "service" },
+        { key: "svc-billing", label: "Billing Service", type: "service" },
+        { key: "svc-gateway", label: "API Gateway", type: "service" },
+        { key: "repo-auth", label: "auth-service (repo)", type: "repository" },
+        { key: "repo-billing", label: "billing-service (repo)", type: "repository" },
+        { key: "proj-q3", label: "Q3 Platform Hardening", type: "project" },
+        { key: "task-mfa", label: "Add MFA to Auth", type: "task" },
+        { key: "task-invoices", label: "Invoice export", type: "task" },
+      ];
+      const nodeIdByKey = new Map<string, string>();
+      for (const def of nodeDefs) {
+        const node = await store.createNode({
+          companyId,
+          domainId,
+          key: def.key,
+          label: def.label,
+          nodeTypeId: typeIdByKey.get(def.type) ?? null,
+        });
+        nodeIdByKey.set(def.key, node.id);
+      }
+
+      // ── Edges ──
+      const edgeDefs: Array<{ from: string; to: string; rel: string }> = [
+        { from: "person-alice", to: "team-platform", rel: "member_of" },
+        { from: "person-bob", to: "team-platform", rel: "member_of" },
+        { from: "person-carol", to: "team-growth", rel: "member_of" },
+        { from: "team-platform", to: "svc-auth", rel: "owns" },
+        { from: "team-platform", to: "svc-gateway", rel: "owns" },
+        { from: "team-growth", to: "svc-billing", rel: "owns" },
+        { from: "svc-auth", to: "repo-auth", rel: "owns" },
+        { from: "svc-billing", to: "repo-billing", rel: "owns" },
+        { from: "svc-gateway", to: "svc-auth", rel: "depends_on" },
+        { from: "svc-billing", to: "svc-auth", rel: "depends_on" },
+        { from: "task-mfa", to: "proj-q3", rel: "part_of" },
+        { from: "task-invoices", to: "proj-q3", rel: "part_of" },
+        { from: "task-mfa", to: "person-bob", rel: "assigned_to" },
+        { from: "task-invoices", to: "person-carol", rel: "assigned_to" },
+      ];
+      let edgeCount = 0;
+      for (const def of edgeDefs) {
+        const sourceNodeId = nodeIdByKey.get(def.from);
+        const targetNodeId = nodeIdByKey.get(def.to);
+        if (!sourceNodeId || !targetNodeId) continue;
+        await store.createEdge({ companyId, domainId, sourceNodeId, targetNodeId, relationKey: def.rel });
+        edgeCount++;
+      }
+
+      const counts = (await store.getGraphSnapshot(companyId, domainId)).counts;
+      return {
+        seeded: true,
+        counts,
+        created: { nodeTypes: nodeTypeDefs.length, relationTypes: relationTypeDefs.length, nodes: nodeDefs.length, edges: edgeCount },
+      };
+    });
+
     // Evaluation / simulation — domain-scoped data/action handlers for the UI.
     ctx.data.register("domain-evaluation", async (params) => {
       const companyId = requireString(params.companyId, "companyId");

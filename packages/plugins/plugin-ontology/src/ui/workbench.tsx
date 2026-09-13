@@ -66,11 +66,28 @@ export function Workbench(props: WorkbenchProps): ReactElement {
   const [rightOpen, setRightOpen] = useState(true);
 
   const createNode = usePluginAction("create-node");
+  const seedSamples = usePluginAction("seed-samples");
+  const [seeding, setSeeding] = useState(false);
+  const [seedErr, setSeedErr] = useState<string | null>(null);
 
   const selectedNode = useMemo(
     () => nodes.find((n) => n.id === selectedNodeId) ?? null,
     [nodes, selectedNodeId],
   );
+
+  const runSeed = useCallback(async () => {
+    setSeeding(true); setSeedErr(null);
+    try {
+      await seedSamples({ companyId, domainId });
+      onChanged();
+    } catch (e) {
+      setSeedErr(String((e as Error)?.message ?? e));
+    } finally {
+      setSeeding(false);
+    }
+  }, [seedSamples, companyId, domainId, onChanged]);
+
+  const isEmpty = nodes.length === 0;
 
   const addNode = useCallback(async () => {
     const label = typeof window !== "undefined" ? window.prompt(t("节点标签", "Node label")) : null;
@@ -107,6 +124,14 @@ export function Workbench(props: WorkbenchProps): ReactElement {
         </div>
         <div className="flex items-center gap-2">
           <button
+            onClick={runSeed}
+            disabled={seeding}
+            title={t("一键注入一套示例本体(仅在空图谱时)", "Seed a sample ontology (only when the graph is empty)")}
+            className="rounded-md border border-border px-2.5 py-1 text-(length:--text-compact) font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+          >
+            {seeding ? "…" : `✨ ${t("补全样例", "Seed samples")}`}
+          </button>
+          <button
             onClick={addNode}
             className="rounded-md bg-primary px-2.5 py-1 text-(length:--text-compact) font-medium text-primary-foreground transition-colors hover:opacity-90"
           >
@@ -121,6 +146,17 @@ export function Workbench(props: WorkbenchProps): ReactElement {
           </button>
         </div>
       </div>
+
+      {seedErr && (
+        <div className="shrink-0 border-b border-border bg-destructive/10 px-3 py-1.5 text-(length:--text-nano) text-destructive">
+          {seedErr}
+        </div>
+      )}
+      {isEmpty && !seedErr && (
+        <div className="shrink-0 border-b border-border bg-primary/5 px-3 py-1.5 text-(length:--text-compact) text-muted-foreground">
+          {t("这个域还是空的 — 点右上角「补全样例」快速生成一套示例本体。", "This domain is empty — click “Seed samples” (top-right) to generate a starter ontology.")}
+        </div>
+      )}
 
       {/* ── three columns ── */}
       <div className="flex min-h-[460px]">
