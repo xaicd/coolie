@@ -1712,6 +1712,67 @@ export function pluginLoader(
       const discovered = await fetchAndValidate(installOptions);
       const manifest = discovered.manifest!;
 
+      // Local-path re-install: if the plugin is already installed (not soft-
+      // deleted) and we're installing from a local filesystem path, treat it as
+      // an in-place refresh instead of throwing "already installed". This lets a
+      // self-hosted operator update the on-disk build (new UI bundle + manifest)
+      // by re-running `plugin install ./path` — the registry.update bumps
+      // updated_at, which changes the frontend cache key so the new UI bundle is
+      // re-fetched, and the install route then re-runs lifecycle.load +
+      // publishes plugin.ui.updated (no server restart needed).
+      //
+      // Registry/npm re-installs still hit the conflict below, and capability
+      // escalation is still blocked with the same guard used by upgradePlugin.
+      if (discovered.source === "local-filesystem") {
+        const existing = await registry.getByKey(manifest.id);
+        if (existing && existing.status !== "uninstalled") {
+          const oldManifest = existing.manifestJson;
+          if (oldManifest.id !== manifest.id) {
+            throw new Error(
+              `Local re-install id mismatch: existing "${oldManifest.id}" vs new "${manifest.id}".`,
+            );
+          }
+          const oldCaps = new Set(oldManifest.capabilities ?? []);
+          const escalated = (manifest.capabilities ?? []).filter((c) => !oldCaps.has(c));
+          if (escalated.length > 0) {
+            log.warn(
+              { pluginId: manifest.id, escalated, oldVersion: oldManifest.version, newVersion: manifest.version },
+              "plugin-loader: local re-install introduces new capabilities — requires admin approval",
+            );
+            throw new Error(
+              `Re-install for "${manifest.id}" introduces new capabilities that require approval: ${escalated.join(", ")}. ` +
+                `The previous version declared [${[...oldCaps].join(", ")}]. ` +
+                `Please review and approve the capability escalation before re-installing.`,
+            );
+          }
+
+          // Refresh manifest/version/apiVersion/categories and bump updated_at.
+          await registry.update(existing.id, {
+            packageName: discovered.packageName,
+            version: discovered.version,
+            manifest,
+          });
+
+          // Re-apply plugin-owned schema migrations (idempotent — the migration
+          // ledger skips already-applied migrations) so a new migration in the
+          // updated build lands on re-install too.
+          if (manifest.database) {
+            await pluginDatabaseService(migrationDb).applyMigrations(
+              existing.id,
+              manifest,
+              discovered.packagePath,
+              { persistFailure: false },
+            );
+          }
+
+          log.info(
+            { pluginId: manifest.id, packageName: discovered.packageName, version: discovered.version },
+            "plugin-loader: local plugin re-installed in place (manifest/UI refreshed)",
+          );
+          return discovered;
+        }
+      }
+
       // Step 6: Persist install record and apply plugin-owned schema migrations
       // in one database transaction. If migration validation fails, the plugin
       // row, namespace record, migration ledger, and created schema all roll back.
