@@ -963,7 +963,13 @@ export interface GraphSnapshot {
     nodes: number;
     edges: number;
   };
-  nodes: Array<{ id: string; key: string; label: string; nodeTypeId: string | null }>;
+  nodes: Array<{
+    id: string;
+    key: string;
+    label: string;
+    nodeTypeId: string | null;
+    lifecycleState: NodeLifecycleState;
+  }>;
   edges: Array<{
     id: string;
     sourceNodeId: string;
@@ -1766,8 +1772,9 @@ export class PostgresGraphStore implements GraphStore {
       key: string;
       label: string;
       node_type_id: string | null;
+      lifecycle_state: NodeLifecycleState;
     }>(
-      `SELECT id, key, label, node_type_id
+      `SELECT id, key, label, node_type_id, lifecycle_state
          FROM ${this.table("ontology_nodes")}
         WHERE company_id = $1 AND domain_id = $2
         ORDER BY created_at ASC
@@ -1798,7 +1805,13 @@ export class PostgresGraphStore implements GraphStore {
         nodes: Number(counts.nodes),
         edges: Number(counts.edges),
       },
-      nodes: nodeRows.map((n) => ({ id: n.id, key: n.key, label: n.label, nodeTypeId: n.node_type_id })),
+      nodes: nodeRows.map((n) => ({
+        id: n.id,
+        key: n.key,
+        label: n.label,
+        nodeTypeId: n.node_type_id,
+        lifecycleState: n.lifecycle_state,
+      })),
       edges: edgeRows.map((e) => ({
         id: e.id,
         sourceNodeId: e.source_node_id,
