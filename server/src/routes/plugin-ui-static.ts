@@ -115,16 +115,29 @@ export function resolvePluginUiDir(
   packagePath?: string | null,
 ): string | null {
   // For local-path installs, prefer the persisted package path.
+  //
+  // We try the stored path first, then a couple of forgiving fallbacks so a
+  // slightly-wrong stored packagePath (e.g. one that picked up an extra `cli/`
+  // segment because the install CLI resolved a relative path from a nested
+  // working directory) still serves the UI instead of blanking the plugin.
+  const packagePathCandidates: string[] = [];
   if (packagePath) {
-    const resolvedPackagePath = path.resolve(packagePath);
-    if (fs.existsSync(resolvedPackagePath)) {
-      const uiDirFromPackagePath = path.resolve(resolvedPackagePath, entrypointsUi);
-      if (
-        uiDirFromPackagePath.startsWith(resolvedPackagePath)
-        && fs.existsSync(uiDirFromPackagePath)
-      ) {
-        return uiDirFromPackagePath;
-      }
+    const resolved = path.resolve(packagePath);
+    packagePathCandidates.push(resolved);
+    // Repair a stray "/cli/" segment that a nested-cwd install could inject
+    // (".../coolie/cli/packages/plugins/x" -> ".../coolie/packages/plugins/x").
+    if (resolved.includes(`${path.sep}cli${path.sep}`)) {
+      packagePathCandidates.push(resolved.replace(`${path.sep}cli${path.sep}`, path.sep));
+    }
+  }
+  for (const candidate of packagePathCandidates) {
+    if (!fs.existsSync(candidate)) continue;
+    const uiDirFromPackagePath = path.resolve(candidate, entrypointsUi);
+    if (
+      uiDirFromPackagePath.startsWith(candidate)
+      && fs.existsSync(uiDirFromPackagePath)
+    ) {
+      return uiDirFromPackagePath;
     }
   }
 
@@ -495,32 +508,28 @@ export function pluginUiStaticRoutes(db: Db, options: PluginUiStaticRouteOptions
     // Step 9: Set CORS headers (plugin UI may be loaded from different origin in dev)
     res.set("Access-Control-Allow-Origin", "*");
 
-    // Step 10: Send the file
-    // The plugin source can live in Git worktrees (e.g. ".worktrees/...").
-    // `send` defaults to dotfiles:"ignore", which treats dot-directories as
-    // not found. We already enforce traversal safety above, so allow dot paths.
-    res.sendFile(resolvedFilePath, { dotfiles: "allow" }, (err) => {
-      if (err) {
-        // Client disconnected before the transfer completed — not a server
-        // error, nothing to respond to.
-        const code = (err as NodeJS.ErrnoException).code;
-        if (code === "ECONNABORTED" || code === "ECONNRESET") {
-          log.debug(
-            { pluginId: plugin.id, code },
-            "plugin-ui-static: client disconnected during file transfer",
-          );
-          return;
-        }
-        log.error(
-          { err, pluginId: plugin.id, filePath: resolvedFilePath },
-          "plugin-ui-static: error sending file",
-        );
-        // Only send error if headers haven't been sent yet
-        if (!res.headersSent) {
-          res.status(500).json({ error: "Failed to serve file" });
-        }
+    // Step 10: Read the file into memory and send it.
+    //
+    // We deliberately use readFileSync + res.send instead of res.sendFile:
+    // res.sendFile streams from disk and reports failures through an async
+    // callback, and any such failure (a broken symlink target, a permission
+    // quirk, a Git-worktree dotfile edge case, the file changing between stat
+    // and send, etc.) surfaced as an HTTP 500 that broke the whole plugin UI.
+    // Plugin UI bundles are small static assets, so a synchronous read wrapped
+    // in try/catch is safe and lets us degrade any read failure to a clean 404
+    // instead of a 500 that blanks the plugin.
+    try {
+      const contents = fs.readFileSync(resolvedFilePath);
+      res.send(contents);
+    } catch (err) {
+      log.error(
+        { err, pluginId: plugin.id, filePath: resolvedFilePath },
+        "plugin-ui-static: error reading plugin UI file",
+      );
+      if (!res.headersSent) {
+        res.status(404).json({ error: "File not found" });
       }
-    });
+    }
   });
 
   return router;
