@@ -1,10 +1,15 @@
 # Recorded replay script — minimal starter for Expo app on iOS
-# Replace refs/paths as needed. This script is intentionally minimal so CI can run a deterministic replay.
+# Use: (in clients/expo) run `npx expo start` then on another shell:
+# agent-device replay ./clients/expo/replays/coolie-flow.ad --session <name> --keep-session
+# The 'open' command accepts only <app|url> [url]; session/flags belong on the replay CLI.
 
-open cloud.coolie.app --platform ios --session ci-e2e --save-script
+# Open the local Expo dev server web UI (Expo devtools or Dev Client). Replace host/port if your dev server differs.
+open http://127.0.0.1:19002
+
 snapshot -i
 # wait until UI stabilizes (milliseconds)
 wait stable 2000
 # capture screenshot evidence (path relative to repo root during CI run)
+mkdir -p ./evidence || true
 screenshot ./evidence/coolie-evidence.png
 close
