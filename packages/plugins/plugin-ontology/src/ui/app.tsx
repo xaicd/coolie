@@ -14,7 +14,7 @@ import {
   useState,
   type ReactElement,
 } from "react";
-import { type GraphNode, type GraphEdge } from "./graph-view.js";
+import { type GraphNode, type GraphEdge, type GraphNodeType, GraphView, toneFor } from "./graph-view.js";
 import { Workbench } from "./workbench.js";
 
 /**
@@ -36,6 +36,23 @@ function isZh(): boolean {
 /** Pick a localized string: t(chinese, english). Evaluated at render time. */
 function t(zh: string, en: string): string {
   return isZh() ? zh : en;
+}
+
+/**
+ * Derive a URL-safe slug from a display name. ASCII letters/digits are kept
+ * (lowercased, spaces → hyphens); any name that reduces to empty (e.g. a
+ * purely-CJK name) falls back to a short timestamp-based slug so the user
+ * never has to type a slug by hand.
+ */
+function slugify(name: string): string {
+  const base = name
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  if (base) return base;
+  // CJK / non-ASCII names: fall back to a stable short id.
+  return `domain-${Date.now().toString(36)}`;
 }
 
 interface OntologyDomain {
@@ -165,55 +182,518 @@ export function SidebarLink(_props: PluginSidebarProps): ReactElement {
 
 
 
-/** Full-page ontology view: Domains modeling + Capabilities acquisition. */
+/** Full-page ontology workbench — three-column layout matching DS's ontology workbench. */
 export function OntologyPage({ context }: PluginPageProps): ReactElement {
   const companyId = context.companyId ?? undefined;
-  const [tab, setTab] = useState<"domains" | "cognition" | "capabilities">("domains");
-  const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
 
   if (!companyId) {
     return (
-      <div className={PAGE}>
-        <p className="text-muted-foreground">{t("请选择公司以建模其本体。", "Select a company to model its ontology.")}</p>
+      <div className="flex h-full items-center justify-center text-muted-foreground">
+        {t("请选择公司以建模其本体。", "Select a company to model its ontology.")}
       </div>
     );
   }
 
+  return <OntologyWorkbench companyId={companyId} />;
+}
+
+type WorkbenchView = "graph" | "table" | "schema" | "cognition" | "capabilities";
+
+const DRAG_MIME = "application/x-ontology-node-type-id";
+
+function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
+  const { data: domainsData, loading: domainsLoading, refresh: refreshDomains } = usePluginData<{ domains: OntologyDomain[] }>(
+    "list-domains", { companyId }
+  );
+  const domains = domainsData?.domains ?? [];
+
+  const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
+  const [view, setView] = useState<WorkbenchView>("graph");
+  const [rightOpen, setRightOpen] = useState(true);
+  const [showNewDomain, setShowNewDomain] = useState(false);
+
+  // Auto-select first domain
+  const activeDomainId = selectedDomainId ?? domains[0]?.id ?? null;
+  const activeDomain = domains.find(d => d.id === activeDomainId) ?? null;
+
+  const views: { id: WorkbenchView; label: string; icon: string }[] = [
+    { id: "graph", label: t("图谱", "Graph"), icon: "⬡" },
+    { id: "table", label: t("表格", "Table"), icon: "⊞" },
+    { id: "schema", label: "Schema", icon: "⊙" },
+    { id: "cognition", label: t("认知", "Cognition"), icon: "⚡" },
+    { id: "capabilities", label: t("能力", "Capabilities"), icon: "◈" },
+  ];
+
   return (
-    <div className={PAGE}>
-      <h1 className="mb-3 text-xl">{t("本体", "Ontology")}</h1>
-      <div className="mb-4 flex gap-2">
-        <button
-          className={tab === "domains" ? TAB_ON : TAB_OFF}
-          onClick={() => setTab("domains")}
-        >
-          {t("域", "Domains")}
-        </button>
-        <button
-          className={tab === "cognition" ? TAB_ON : TAB_OFF}
-          onClick={() => setTab("cognition")}
-        >
-          {t("认知", "Cognition")}
-        </button>
-        <button
-          className={tab === "capabilities" ? TAB_ON : TAB_OFF}
-          onClick={() => setTab("capabilities")}
-        >
-          {t("能力", "Capabilities")}
-        </button>
-      </div>
-      {tab === "domains" &&
-        (selectedDomainId ? (
-          <DomainDetailView
-            companyId={companyId}
-            domainId={selectedDomainId}
-            onBack={() => setSelectedDomainId(null)}
-          />
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+      {/* ── Top bar ── */}
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
+        {domainsLoading ? (
+          <span className="text-(length:--text-compact) text-muted-foreground">…</span>
         ) : (
-          <DomainList companyId={companyId} onOpen={setSelectedDomainId} />
+          <div className="flex items-center gap-1.5 rounded-md border border-border bg-card px-1.5 py-0.5">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-muted-foreground" aria-hidden>
+              <circle cx="12" cy="5" r="2" /><circle cx="5" cy="19" r="2" /><circle cx="19" cy="19" r="2" />
+              <path d="M12 7v3M12 10 6.5 17M12 10 17.5 17" />
+            </svg>
+            <select
+              value={activeDomainId ?? ""}
+              onChange={e => { setSelectedDomainId(e.target.value || null); }}
+              className="h-6 bg-transparent pr-1 text-(length:--text-compact) font-medium text-foreground outline-none"
+            >
+              {domains.length === 0 && <option value="">{t("无域", "No domains")}</option>}
+              {domains.map(d => (
+                <option key={d.id} value={d.id}>{d.display_name} · v{d.version}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
+        {activeDomain && (
+          <span className={[
+            "rounded-full px-2 py-0.5 text-(length:--text-nano) font-medium",
+            activeDomain.status === "active" ? "bg-emerald-500/15 text-emerald-500" : "bg-muted text-muted-foreground",
+          ].join(" ")}>
+            {activeDomain.status}
+          </span>
+        )}
+
+        {/* New domain button — always visible so a second ontology is easy to add */}
+        <button
+          onClick={() => setShowNewDomain(true)}
+          title={t("新建本体域", "Create a new ontology domain")}
+          className="flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-(length:--text-compact) font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+        >
+          <span className="text-[13px] leading-none">＋</span>
+          {t("新建域", "New domain")}
+        </button>
+
+        <div className="mx-2 h-5 w-px bg-border" />
+
+        <div className="flex items-center gap-0.5">
+          {views.map(v => (
+            <button
+              key={v.id}
+              onClick={() => setView(v.id)}
+              className={[
+                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-(length:--text-compact) font-medium transition-colors",
+                view === v.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground",
+              ].join(" ")}
+            >
+              <span className="text-[13px]">{v.icon}</span>
+              {v.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => setRightOpen(o => !o)}
+            title={t("切换右侧面板", "Toggle right panel")}
+            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M15 3v18" />
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Body ── */}
+      {!activeDomainId ? (
+        <div className="flex min-h-0 flex-1">
+          <NoDomainState companyId={companyId} onCreated={refreshDomains} />
+        </div>
+      ) : (
+        // Keyed on domainId so switching domains remounts the workspace with a
+        // valid, non-null domainId — the hook inside never runs with undefined.
+        <DomainWorkspace
+          key={activeDomainId}
+          companyId={companyId}
+          domainId={activeDomainId}
+          domain={activeDomain}
+          view={view}
+          rightOpen={rightOpen}
+          onDomainsChanged={refreshDomains}
+        />
+      )}
+
+      {showNewDomain && (
+        <NewDomainModal
+          companyId={companyId}
+          onClose={() => setShowNewDomain(false)}
+          onCreated={(newDomainId) => {
+            setShowNewDomain(false);
+            refreshDomains();
+            if (newDomainId) setSelectedDomainId(newDomainId);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/** Centered modal for creating a new ontology domain; auto-selects it on success. */
+function NewDomainModal({
+  companyId,
+  onClose,
+  onCreated,
+}: {
+  companyId: string;
+  onClose: () => void;
+  onCreated: (newDomainId: string | null) => void;
+}): ReactElement {
+  const createDomain = usePluginAction("create-domain");
+  const [slug, setSlug] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = useCallback(async () => {
+    if (!slug.trim() || !displayName.trim()) return;
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = (await createDomain({ companyId, slug: slug.trim(), displayName: displayName.trim() })) as {
+        domain?: { id?: string };
+        id?: string;
+      };
+      const newId = res?.domain?.id ?? res?.id ?? null;
+      onCreated(newId);
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }, [companyId, slug, displayName, createDomain, onCreated]);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}
+    >
+      <div
+        className="w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-4 shadow-2xl"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between">
+          <span className="text-(length:--text-base) font-semibold">{t("新建本体域", "New ontology domain")}</span>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
+        </div>
+        <div className="space-y-2">
+          <div>
+            <label className="mb-1 block text-(length:--text-nano) text-muted-foreground">{t("标识 (slug)", "Slug")}</label>
+            <input
+              autoFocus
+              className={INPUT + " mr-0 w-full"}
+              placeholder="e.g. orders, ecommerce"
+              value={slug}
+              onChange={e => setSlug(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") void submit(); }}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-(length:--text-nano) text-muted-foreground">{t("显示名称", "Display name")}</label>
+            <input
+              className={INPUT + " mr-0 w-full"}
+              placeholder={t("如：订单域、电商平台", "e.g. Orders, E-commerce")}
+              value={displayName}
+              onChange={e => setDisplayName(e.target.value)}
+              onKeyDown={e => { if (e.key === "Enter") void submit(); }}
+            />
+          </div>
+          {err && <div className="text-(length:--text-compact) text-muted-foreground">{err}</div>}
+          <div className="mt-1 flex justify-end gap-2">
+            <button onClick={onClose} className="rounded-md border border-border px-3 py-1.5 text-(length:--text-compact) text-muted-foreground hover:bg-accent">
+              {t("取消", "Cancel")}
+            </button>
+            <button className={BTN} disabled={busy || !slug.trim() || !displayName.trim()} onClick={() => void submit()}>
+              {busy ? "…" : t("创建", "Create")}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * DS "影响推演" (impact simulation): compute the blast radius of a node —
+ * which nodes it reaches downstream (affects) and which reach it upstream
+ * (depend on it) — via BFS over the already-loaded edges. Client-side so it
+ * runs instantly without an extra round trip.
+ */
+function ImpactSimulationModal({
+  companyId: _companyId,
+  domainId: _domainId,
+  node,
+  onClose,
+}: {
+  companyId: string;
+  domainId: string;
+  node: GraphNode;
+  onClose: () => void;
+}): ReactElement {
+  const { data } = usePluginData<DomainDetail>("domain-detail", { companyId: _companyId, domainId: _domainId });
+  const edges = data?.graph?.edges ?? [];
+  const nodes = data?.graph?.nodes ?? [];
+  const labelById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const n of nodes) m.set(n.id, n.label || n.key);
+    return m;
+  }, [nodes]);
+
+  const bfs = useCallback((direction: "downstream" | "upstream") => {
+    const reached = new Map<string, number>(); // id -> hop depth
+    reached.set(node.id, 0);
+    let frontier = [node.id];
+    let depth = 0;
+    while (frontier.length > 0) {
+      depth++;
+      const next: string[] = [];
+      for (const e of edges) {
+        const [from, to] = direction === "downstream"
+          ? [e.sourceNodeId, e.targetNodeId]
+          : [e.targetNodeId, e.sourceNodeId];
+        if (frontier.includes(from) && !reached.has(to)) {
+          reached.set(to, depth);
+          next.push(to);
+        }
+      }
+      frontier = next;
+    }
+    reached.delete(node.id);
+    return reached;
+  }, [edges, node.id]);
+
+  const downstream = useMemo(() => bfs("downstream"), [bfs]);
+  const upstream = useMemo(() => bfs("upstream"), [bfs]);
+
+  const renderList = (m: Map<string, number>) => {
+    const rows = Array.from(m.entries()).sort((a, b) => a[1] - b[1]);
+    if (rows.length === 0) return <div className="text-(length:--text-nano) text-muted-foreground">{t("无", "None")}</div>;
+    return (
+      <div className="space-y-0.5">
+        {rows.map(([id, hop]) => (
+          <div key={id} className="flex items-center justify-between gap-2 rounded-md bg-muted/30 px-2 py-1 text-(length:--text-nano)">
+            <span className="truncate">{labelById.get(id) ?? id}</span>
+            <span className="shrink-0 text-muted-foreground">{hop} {t("跳", "hop")}</span>
+          </div>
         ))}
-      {tab === "cognition" && <CognitionTab companyId={companyId} />}
-      {tab === "capabilities" && <CapabilitiesTab companyId={companyId} />}
+      </div>
+    );
+  };
+
+  return (
+    <div className="absolute inset-0 z-40 flex items-center justify-center bg-black/40" onClick={onClose}>
+      <div className="w-[min(34rem,calc(100%-2rem))] rounded-xl border border-border bg-card p-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div className="mb-3 flex items-center justify-between">
+          <div>
+            <div className="text-(length:--text-base) font-semibold">{t("影响推演", "Impact simulation")}</div>
+            <div className="text-(length:--text-nano) text-muted-foreground">{node.label || node.key}</div>
+          </div>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
+        </div>
+        <div className="mb-3 flex gap-3">
+          <div className="flex-1 rounded-lg border border-border bg-background p-2 text-center">
+            <div className="text-lg font-semibold text-amber-500">{downstream.size}</div>
+            <div className="text-(length:--text-nano) text-muted-foreground">{t("下游受影响", "Affected downstream")}</div>
+          </div>
+          <div className="flex-1 rounded-lg border border-border bg-background p-2 text-center">
+            <div className="text-lg font-semibold text-sky-500">{upstream.size}</div>
+            <div className="text-(length:--text-nano) text-muted-foreground">{t("上游依赖", "Upstream dependencies")}</div>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <div className="mb-1 text-(length:--text-compact) font-medium">→ {t("下游 (受此节点影响)", "Downstream (affected by)")}</div>
+            {renderList(downstream)}
+          </div>
+          <div>
+            <div className="mb-1 text-(length:--text-compact) font-medium">← {t("上游 (此节点依赖)", "Upstream (depends on)")}</div>
+            {renderList(upstream)}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function DomainWorkspace({
+  companyId,
+  domainId,
+  domain,
+  view,
+  rightOpen,
+  onDomainsChanged,
+}: {
+  companyId: string;
+  domainId: string;
+  domain: OntologyDomain | null;
+  view: WorkbenchView;
+  rightOpen: boolean;
+  onDomainsChanged: () => void;
+}): ReactElement {
+  const { data: domainData, refresh: refreshDomain } = usePluginData<DomainDetail>(
+    "domain-detail", { companyId, domainId }
+  );
+
+  const counts = domainData?.graph?.counts;
+  const nodes = domainData?.graph?.nodes ?? [];
+  const edges = domainData?.graph?.edges ?? [];
+  const nodeTypes = domainData?.nodeTypes ?? [];
+  const relationTypes = domainData?.relationTypes ?? [];
+
+  const [focusNodeTypeId, setFocusNodeTypeId] = useState<string | null>(null);
+  const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
+  const selectedNode = nodes.find(n => n.id === selectedNodeId) ?? null;
+  const [simulateNode, setSimulateNode] = useState<GraphNode | null>(null);
+
+  const showTree = view === "graph" || view === "table" || view === "schema";
+
+  return (
+    <div className="flex min-h-0 flex-1 overflow-hidden">
+      {/* Left: node type tree */}
+      {showTree && (
+        <div className="flex w-48 shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/20 p-2">
+          <div className="mb-1 px-1 text-(length:--text-nano) font-semibold text-muted-foreground uppercase tracking-wide">
+            {t("节点类型", "Node types")} · {nodeTypes.length}
+          </div>
+          {nodeTypes.length === 0 ? (
+            <div className="px-1 text-(length:--text-nano) text-muted-foreground">{t("暂无", "None yet")}</div>
+          ) : (
+            nodeTypes.map(nt => (
+              <div
+                key={nt.id}
+                draggable
+                onDragStart={e => { e.dataTransfer.setData(DRAG_MIME, nt.id); e.dataTransfer.effectAllowed = "copy"; }}
+                onClick={() => setFocusNodeTypeId(f => f === nt.id ? null : nt.id)}
+                title={t("拖到图谱=按类型建节点 · 点击=过滤", "Drag to canvas to create typed node · click to filter")}
+                className={[
+                  "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-(length:--text-compact) transition-colors select-none",
+                  focusNodeTypeId === nt.id ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent",
+                ].join(" ")}
+              >
+                <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: toneFor(nt.id) }} />
+                <span className="flex-1 truncate">{nt.display_name || nt.key}</span>
+              </div>
+            ))
+          )}
+
+          {relationTypes.length > 0 && (
+            <>
+              <div className="mb-1 mt-3 px-1 text-(length:--text-nano) font-semibold text-muted-foreground uppercase tracking-wide">
+                {t("关系类型", "Relation types")} · {relationTypes.length}
+              </div>
+              {relationTypes.map(rt => (
+                <div key={rt.id} className="flex items-center gap-2 rounded-md px-2 py-1 text-(length:--text-compact) text-muted-foreground">
+                  <span aria-hidden className="h-2 w-2 shrink-0 rounded-full border border-border" style={{ background: toneFor(rt.id) }} />
+                  <span className="flex-1 truncate">{rt.display_name || rt.key}</span>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* Center: main view */}
+      <div className="relative min-w-0 flex-1 overflow-hidden">
+        {showTree && (
+          <GraphView
+            companyId={companyId}
+            domainId={domainId}
+            nodes={nodes}
+            edges={edges}
+            nodeTypes={nodeTypes}
+            relationTypes={relationTypes}
+            onChanged={refreshDomain}
+            selectedNodeId={selectedNodeId}
+            onSelectNode={setSelectedNodeId}
+            focusNodeTypeId={focusNodeTypeId}
+            mode={view === "graph" ? "graph" : view === "table" ? "table" : "schema"}
+            hideTabs
+            nodeTypeDragMime={DRAG_MIME}
+            onViewNodeDetail={(nodeId) => setSelectedNodeId(nodeId)}
+            onSimulateImpact={(node) => setSimulateNode(node)}
+          />
+        )}
+        {view === "cognition" && <CognitionTab companyId={companyId} />}
+        {view === "capabilities" && <CapabilitiesTab companyId={companyId} />}
+
+        {simulateNode && (
+          <ImpactSimulationModal
+            companyId={companyId}
+            domainId={domainId}
+            node={simulateNode}
+            onClose={() => setSimulateNode(null)}
+          />
+        )}
+      </div>
+
+      {/* Right: stats panel */}
+      {rightOpen && domain && (
+        <div className="flex w-64 shrink-0 flex-col gap-3 overflow-y-auto border-l border-border bg-muted/10 p-3">
+          <div>
+            <div className="mb-2 text-(length:--text-compact) font-semibold">{t("域概览", "Domain overview")}</div>
+            <div className="space-y-1 rounded-lg border border-border bg-card p-2.5 text-(length:--text-nano)">
+              <InfoRow label={t("域 ID", "Domain ID")} value={domain.slug} mono />
+              <InfoRow label={t("名称", "Name")} value={domain.display_name} />
+              <InfoRow label={t("版本", "Version")} value={`v${domain.version}`} />
+              <InfoRow label={t("状态", "Status")} value={domain.status}
+                valueClass={domain.status === "active" ? "text-emerald-500" : "text-muted-foreground"} />
+            </div>
+          </div>
+
+          {counts && (
+            <div>
+              <div className="mb-2 text-(length:--text-compact) font-semibold">{t("统计", "Statistics")}</div>
+              <div className="grid grid-cols-2 gap-2">
+                <StatCard label={t("节点数", "Nodes")} value={counts.nodes} />
+                <StatCard label={t("关系数", "Edges")} value={counts.edges} />
+                <StatCard label={t("类型数", "Node types")} value={counts.nodeTypes} />
+                <StatCard label={t("关系类型", "Rel types")} value={counts.relationTypes} />
+              </div>
+            </div>
+          )}
+
+          {nodeTypes.length > 0 && (
+            <div>
+              <div className="mb-1 text-(length:--text-compact) font-semibold">{t("对象类型", "Object types")} ({nodeTypes.length})</div>
+              <div className="space-y-0.5">
+                {nodeTypes.map(nt => (
+                  <button
+                    key={nt.id}
+                    onClick={() => setFocusNodeTypeId(f => f === nt.id ? null : nt.id)}
+                    className={[
+                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-(length:--text-compact) text-left transition-colors",
+                      focusNodeTypeId === nt.id ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent",
+                    ].join(" ")}
+                  >
+                    <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: toneFor(nt.id) }} />
+                    <span className="flex-1 truncate">{nt.display_name || nt.key}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {selectedNode && (
+            <NodeInspector
+              companyId={companyId}
+              domainId={domainId}
+              node={selectedNode}
+              nodeTypes={nodeTypes}
+              edges={edges}
+              nodes={nodes}
+              onChanged={refreshDomain}
+              onDeselect={() => setSelectedNodeId(null)}
+            />
+          )}
+
+          <NewDomainForm companyId={companyId} onCreated={onDomainsChanged} />
+        </div>
+      )}
     </div>
   );
 }
@@ -846,6 +1326,274 @@ function EvaluationSection({ companyId, domainId }: { companyId: string; domainI
     </div>
   );
 }
+
+// ─── Workbench helper components ──────────────────────────────────────────────
+
+function InfoRow({ label, value, mono, valueClass }: { label: string; value: string; mono?: boolean; valueClass?: string }): ReactElement {
+  return (
+    <div className="flex items-baseline justify-between gap-2">
+      <span className="shrink-0 text-muted-foreground">{label}</span>
+      <span className={["truncate text-right", mono ? "font-mono" : "", valueClass ?? ""].join(" ")}>{value}</span>
+    </div>
+  );
+}
+
+function StatCard({ label, value }: { label: string; value: number }): ReactElement {
+  return (
+    <div className="rounded-lg border border-border bg-card p-2 text-center">
+      <div className="text-lg font-semibold leading-none">{value}</div>
+      <div className="mt-0.5 text-(length:--text-nano) text-muted-foreground">{label}</div>
+    </div>
+  );
+}
+
+function NodeInspector({
+  companyId,
+  domainId,
+  node,
+  nodeTypes,
+  edges,
+  nodes,
+  onChanged,
+  onDeselect,
+}: {
+  companyId: string;
+  domainId: string;
+  node: GraphNode;
+  nodeTypes: OntologyNodeType[];
+  edges: GraphEdge[];
+  nodes: GraphNode[];
+  onChanged: () => void;
+  onDeselect: () => void;
+}): ReactElement {
+  const updateNode = usePluginAction("update-node");
+  const deleteNode = usePluginAction("delete-node");
+  const [busy, setBusy] = useState(false);
+
+  const nt = nodeTypes.find(t => t.id === node.nodeTypeId);
+  const outEdges = edges.filter(e => e.sourceNodeId === node.id);
+  const inEdges = edges.filter(e => e.targetNodeId === node.id);
+  const labelById = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const n of nodes) m.set(n.id, n.label || n.key);
+    return m;
+  }, [nodes]);
+
+  const run = useCallback(async (fn: () => Promise<unknown>) => {
+    setBusy(true);
+    try { await fn(); onChanged(); } finally { setBusy(false); }
+  }, [onChanged]);
+
+  return (
+    <div className="rounded-lg border border-primary/30 bg-card p-2.5">
+      <div className="mb-2 flex items-center justify-between">
+        <span className="text-(length:--text-compact) font-semibold">{t("节点详情", "Node detail")}</span>
+        <button onClick={onDeselect} className="text-(length:--text-nano) text-muted-foreground hover:text-foreground">✕</button>
+      </div>
+      <div className="space-y-1 text-(length:--text-nano)">
+        <InfoRow label={t("标签", "Label")} value={node.label || node.key} />
+        <InfoRow label={t("键", "Key")} value={node.key} mono />
+        {nt && <InfoRow label={t("类型", "Type")} value={nt.display_name || nt.key} />}
+      </div>
+      {(outEdges.length > 0 || inEdges.length > 0) && (
+        <div className="mt-2 space-y-1">
+          {outEdges.map(e => (
+            <div key={e.id} className="flex items-center gap-1 text-(length:--text-nano) text-muted-foreground">
+              <span className="text-primary">→</span>
+              <span className="truncate">{e.relationKey ?? "—"}</span>
+              <span className="truncate font-medium text-foreground">{labelById.get(e.targetNodeId) ?? "?"}</span>
+            </div>
+          ))}
+          {inEdges.map(e => (
+            <div key={e.id} className="flex items-center gap-1 text-(length:--text-nano) text-muted-foreground">
+              <span className="text-muted-foreground">←</span>
+              <span className="truncate font-medium text-foreground">{labelById.get(e.sourceNodeId) ?? "?"}</span>
+              <span className="truncate">{e.relationKey ?? "—"}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      <div className="mt-2 flex gap-1">
+        <button
+          disabled={busy}
+          onClick={() => {
+            const label = window.prompt(t("节点标签", "Node label"), node.label);
+            if (label?.trim()) void run(() => updateNode({ companyId, nodeId: node.id, label: label.trim() }));
+          }}
+          className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-(length:--text-nano) transition-colors hover:bg-accent"
+        >
+          {t("重命名", "Rename")}
+        </button>
+        <button
+          disabled={busy}
+          onClick={() => {
+            if (window.confirm(t("删除该节点及其边?", "Delete this node and its edges?"))) {
+              void run(() => deleteNode({ companyId, nodeId: node.id }));
+              onDeselect();
+            }
+          }}
+          className="flex-1 rounded-md border border-destructive/30 bg-background px-2 py-1 text-(length:--text-nano) text-destructive transition-colors hover:bg-destructive/10"
+        >
+          {t("删除", "Delete")}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function NoDomainState({ companyId, onCreated }: { companyId: string; onCreated: () => void }): ReactElement {
+  const createDomain = usePluginAction("create-domain");
+  const [displayName, setDisplayName] = useState("");
+  const [slugOverride, setSlugOverride] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const effectiveSlug = slugOverride ?? slugify(displayName);
+
+  const submit = async () => {
+    setBusy(true); setErr(null);
+    try { await createDomain({ companyId, slug: effectiveSlug, displayName: displayName.trim() }); onCreated(); setDisplayName(""); setSlugOverride(null); }
+    catch (e) { setErr(String((e as Error)?.message ?? e)); }
+    finally { setBusy(false); }
+  };
+
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 text-muted-foreground">
+      <div className="text-(length:--text-compact)">{t("还没有本体域，先创建一个。", "No ontology domains yet. Create one to get started.")}</div>
+      <div className="flex w-80 flex-col gap-2">
+        <div className="flex gap-2">
+          <input
+            className={INPUT + " flex-1"}
+            placeholder={t("域名称（如：电商平台）", "Domain name (e.g. E-commerce)")}
+            value={displayName}
+            onChange={e => setDisplayName(e.target.value)}
+            onKeyDown={e => { if (e.key === "Enter" && displayName.trim() && !busy) void submit(); }}
+            autoFocus
+          />
+          <button className={BTN} disabled={busy || !displayName.trim()} onClick={submit}>
+            {busy ? "…" : t("创建", "Create")}
+          </button>
+        </div>
+        {displayName.trim() && (
+          <div className="flex items-center gap-1.5 px-0.5 text-(length:--text-nano)">
+            <span>{t("标识", "Slug")}:</span>
+            <span className="font-mono text-foreground">{effectiveSlug}</span>
+            <button
+              type="button"
+              onClick={() => { setShowAdvanced(v => !v); if (!showAdvanced && slugOverride == null) setSlugOverride(effectiveSlug); }}
+              className="ml-auto text-primary hover:underline"
+            >
+              {showAdvanced ? t("自动", "Auto") : t("自定义", "Edit")}
+            </button>
+          </div>
+        )}
+        {showAdvanced && (
+          <input
+            className={INPUT + " w-full font-mono"}
+            placeholder="slug"
+            value={slugOverride ?? effectiveSlug}
+            onChange={e => setSlugOverride(slugify(e.target.value) || e.target.value.toLowerCase())}
+          />
+        )}
+      </div>
+      {err && <div className="text-(length:--text-nano) text-muted-foreground">{err}</div>}
+    </div>
+  );
+}
+
+function NewDomainForm({ companyId, onCreated }: { companyId: string; onCreated: () => void }): ReactElement {
+  const createDomain = usePluginAction("create-domain");
+  const [open, setOpen] = useState(false);
+  const [displayName, setDisplayName] = useState("");
+  const [slugOverride, setSlugOverride] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  // slug auto-derives from the display name unless the user has typed a custom one.
+  const effectiveSlug = slugOverride ?? slugify(displayName);
+
+  const reset = () => {
+    setDisplayName("");
+    setSlugOverride(null);
+    setShowAdvanced(false);
+    setErr(null);
+  };
+
+  if (!open) {
+    return (
+      <button
+        onClick={() => setOpen(true)}
+        className="mt-auto flex items-center gap-2 rounded-md border border-dashed border-border px-2 py-1.5 text-(length:--text-compact) text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+      >
+        <span>＋</span> {t("新建域", "New domain")}
+      </button>
+    );
+  }
+
+  return (
+    <div className="mt-auto rounded-lg border border-border bg-card p-2.5">
+      <div className="mb-2 text-(length:--text-compact) font-semibold">{t("新建域", "New domain")}</div>
+      <div className="space-y-1.5">
+        <input
+          className={INPUT + " w-full"}
+          placeholder={t("域名称（如：电商平台）", "Domain name (e.g. E-commerce)")}
+          value={displayName}
+          onChange={e => setDisplayName(e.target.value)}
+          autoFocus
+        />
+        {/* Live slug preview — auto-generated, editable via advanced toggle */}
+        {displayName.trim() && (
+          <div className="flex items-center gap-1.5 px-0.5 text-(length:--text-nano) text-muted-foreground">
+            <span>{t("标识", "Slug")}:</span>
+            <span className="font-mono text-foreground">{effectiveSlug}</span>
+            <button
+              type="button"
+              onClick={() => { setShowAdvanced(v => !v); if (!showAdvanced && slugOverride == null) setSlugOverride(effectiveSlug); }}
+              className="ml-auto text-primary hover:underline"
+            >
+              {showAdvanced ? t("自动", "Auto") : t("自定义", "Edit")}
+            </button>
+          </div>
+        )}
+        {showAdvanced && (
+          <input
+            className={INPUT + " w-full font-mono"}
+            placeholder="slug"
+            value={slugOverride ?? effectiveSlug}
+            onChange={e => setSlugOverride(slugify(e.target.value) || e.target.value.toLowerCase())}
+          />
+        )}
+        <div className="flex gap-1.5">
+          <button
+            className={BTN + " flex-1"}
+            disabled={busy || !displayName.trim()}
+            onClick={async () => {
+              setBusy(true); setErr(null);
+              try {
+                await createDomain({ companyId, slug: effectiveSlug, displayName: displayName.trim() });
+                onCreated();
+                setOpen(false);
+                reset();
+              }
+              catch (e) { setErr(String((e as Error)?.message ?? e)); }
+              finally { setBusy(false); }
+            }}
+          >
+            {busy ? "…" : t("创建", "Create")}
+          </button>
+          <button onClick={() => { setOpen(false); reset(); }} className="rounded-md border border-border px-3 py-1.5 text-(length:--text-compact) text-muted-foreground hover:bg-accent">
+            {t("取消", "Cancel")}
+          </button>
+        </div>
+        {err && <div className="text-(length:--text-nano) text-muted-foreground">{err}</div>}
+      </div>
+    </div>
+  );
+}
+
+// ─── End workbench helpers ─────────────────────────────────────────────────────
 
 function pipelineStatusKind(s: string): "ok" | "pending" | "error" | "info" {
   if (s === "active" || s === "connected" || s === "succeeded") return "ok";

@@ -74,6 +74,8 @@ export function serviceWorkerBuildIdPlugin(
     closeBundle() {
       const swPath = path.resolve(outDir, serviceWorkerFileName);
       const source = fs.readFileSync(swPath, "utf8");
+      // Already stamped (closeBundle called twice in some rolldown builds) — skip.
+      if (!source.includes(SERVICE_WORKER_BUILD_ID_PLACEHOLDER)) return;
       const stamped = stampServiceWorkerBuildId(source, buildId ?? "build");
       fs.writeFileSync(swPath, stamped);
     },

@@ -23,6 +23,7 @@ import {
   type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
+  type ReactNode,
 } from "react";
 import { usePluginAction } from "@paperclipai/plugin-sdk/ui";
 
@@ -158,6 +159,13 @@ interface ContextMenuState {
   label?: string;
   flowX?: number;
   flowY?: number;
+  nodeKey?: string;
+  nodeTypeId?: string | null;
+  lifecycle?: NodeLifecycle;
+  relationKey?: string | null;
+  weight?: number;
+  sourceNodeId?: string;
+  targetNodeId?: string;
 }
 
 function GraphCanvas({
@@ -172,6 +180,8 @@ function GraphCanvas({
   focusNodeTypeId,
   fill,
   nodeTypeDragMime,
+  onViewNodeDetail,
+  onSimulateImpact,
 }: {
   companyId: string;
   domainId: string;
@@ -184,6 +194,10 @@ function GraphCanvas({
   focusNodeTypeId?: string | null;
   fill?: boolean;
   nodeTypeDragMime?: string;
+  /** DS "view detail" — open the node inspector for this node. */
+  onViewNodeDetail?: (nodeId: string) => void;
+  /** DS "impact simulation" — run blast-radius for this node. */
+  onSimulateImpact?: (node: GraphNode) => void;
 }): ReactElement {
   useReactFlowCss();
   const createNode = usePluginAction("create-node");
@@ -192,11 +206,17 @@ function GraphCanvas({
   const deleteNode = usePluginAction("delete-node");
   const updateEdge = usePluginAction("update-edge");
   const deleteEdge = usePluginAction("delete-edge");
-  const { screenToFlowPosition } = useReactFlow();
+  const { screenToFlowPosition, fitView } = useReactFlow();
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // DS "关系过滤" — show only edges of one relation key (null = all).
+  const [relationFilter, setRelationFilter] = useState<string | null>(null);
+  // DS layout modes: radial / layered (by graph depth) / grid.
+  const [layout, setLayout] = useState<"radial" | "layered" | "grid">("radial");
+  // Connect mode toggle — surfaces node handles for drag-to-link.
+  const [connectMode, setConnectMode] = useState(false);
 
   const typeById = useMemo(() => {
     const m = new Map<string, GraphNodeType>();
@@ -204,17 +224,69 @@ function GraphCanvas({
     return m;
   }, [rawNodeTypes]);
 
-  // Deterministic circular seed layout (positions are view-only; not persisted).
-  const flowNodes: Node[] = useMemo(() => {
+  // View-only layout positions (not persisted). Three strategies:
+  //  - radial:  even circle (good for small dense graphs)
+  //  - layered: topological depth by incoming edges (DAG-ish flows)
+  //  - grid:    fixed grid (predictable scanning)
+  const positions = useMemo(() => {
+    const pos = new Map<string, { x: number; y: number }>();
     const n = rawNodes.length || 1;
-    return rawNodes.map((nd, i) => {
-      const a = (2 * Math.PI * i) / n;
+
+    if (layout === "radial") {
+      rawNodes.forEach((nd, i) => {
+        const a = (2 * Math.PI * i) / n;
+        pos.set(nd.id, { x: 360 + Math.cos(a) * 260, y: 260 + Math.sin(a) * 200 });
+      });
+    } else if (layout === "grid") {
+      const cols = Math.ceil(Math.sqrt(n));
+      rawNodes.forEach((nd, i) => {
+        pos.set(nd.id, { x: 80 + (i % cols) * 240, y: 60 + Math.floor(i / cols) * 130 });
+      });
+    } else {
+      // layered: compute depth = longest incoming path (BFS from roots)
+      const incoming = new Map<string, string[]>();
+      const outgoing = new Map<string, string[]>();
+      for (const nd of rawNodes) { incoming.set(nd.id, []); outgoing.set(nd.id, []); }
+      for (const e of rawEdges) {
+        if (incoming.has(e.targetNodeId)) incoming.get(e.targetNodeId)!.push(e.sourceNodeId);
+        if (outgoing.has(e.sourceNodeId)) outgoing.get(e.sourceNodeId)!.push(e.targetNodeId);
+      }
+      const depth = new Map<string, number>();
+      const visiting = new Set<string>();
+      const computeDepth = (id: string): number => {
+        if (depth.has(id)) return depth.get(id)!;
+        if (visiting.has(id)) return 0; // cycle guard
+        visiting.add(id);
+        const parents = incoming.get(id) ?? [];
+        const d = parents.length === 0 ? 0 : 1 + Math.max(...parents.map(computeDepth));
+        visiting.delete(id);
+        depth.set(id, d);
+        return d;
+      };
+      for (const nd of rawNodes) computeDepth(nd.id);
+      const byLevel = new Map<number, string[]>();
+      for (const nd of rawNodes) {
+        const d = depth.get(nd.id) ?? 0;
+        if (!byLevel.has(d)) byLevel.set(d, []);
+        byLevel.get(d)!.push(nd.id);
+      }
+      for (const [level, ids] of byLevel) {
+        ids.forEach((id, i) => {
+          pos.set(id, { x: 100 + i * 220, y: 60 + level * 140 });
+        });
+      }
+    }
+    return pos;
+  }, [rawNodes, rawEdges, layout]);
+
+  const flowNodes: Node[] = useMemo(() => {
+    return rawNodes.map((nd) => {
       const nt = nd.nodeTypeId ? typeById.get(nd.nodeTypeId) : undefined;
       const dimmed = focusNodeTypeId != null && nd.nodeTypeId !== focusNodeTypeId;
       return {
         id: nd.id,
         type: "ontology",
-        position: { x: 320 + Math.cos(a) * 220, y: 220 + Math.sin(a) * 170 },
+        position: positions.get(nd.id) ?? { x: 0, y: 0 },
         selected: selectedNodeId != null && nd.id === selectedNodeId,
         data: {
           label: nd.label || nd.key,
@@ -225,18 +297,27 @@ function GraphCanvas({
         },
       } satisfies Node;
     });
-  }, [rawNodes, typeById, selectedNodeId, focusNodeTypeId]);
+  }, [rawNodes, typeById, selectedNodeId, focusNodeTypeId, positions]);
+
+  // Distinct relation keys present on edges (for the filter dropdown).
+  const relationKeys = useMemo(() => {
+    const set = new Set<string>();
+    for (const e of rawEdges) if (e.relationKey) set.add(e.relationKey);
+    return Array.from(set).sort();
+  }, [rawEdges]);
 
   const flowEdges: Edge[] = useMemo(
     () =>
-      rawEdges.map((e) => ({
-        id: e.id,
-        source: e.sourceNodeId,
-        target: e.targetNodeId,
-        label: e.relationKey ?? undefined,
-        markerEnd: { type: MarkerType.ArrowClosed },
-      })),
-    [rawEdges],
+      rawEdges
+        .filter((e) => relationFilter == null || e.relationKey === relationFilter)
+        .map((e) => ({
+          id: e.id,
+          source: e.sourceNodeId,
+          target: e.targetNodeId,
+          label: e.relationKey ?? undefined,
+          markerEnd: { type: MarkerType.ArrowClosed },
+        })),
+    [rawEdges, relationFilter],
   );
 
   const run = useCallback(
@@ -268,7 +349,17 @@ function GraphCanvas({
   const openMenu = useCallback((e: ReactMouseEvent, state: Omit<ContextMenuState, "x" | "y">) => {
     e.preventDefault();
     const rect = wrapRef.current?.getBoundingClientRect();
-    setMenu({ ...state, x: e.clientX - (rect?.left ?? 0), y: e.clientY - (rect?.top ?? 0) });
+    const MENU_W = 200;
+    const MENU_H = 340;
+    let x = e.clientX - (rect?.left ?? 0);
+    let y = e.clientY - (rect?.top ?? 0);
+    // Flip the menu left/up when it would overflow the canvas bounds so it
+    // never renders under the right stats panel or below the viewport.
+    if (rect) {
+      if (x + MENU_W > rect.width) x = Math.max(4, x - MENU_W);
+      if (y + MENU_H > rect.height) y = Math.max(4, rect.height - MENU_H - 4);
+    }
+    setMenu({ ...state, x, y });
   }, []);
 
   const closeMenu = useCallback(() => setMenu(null), []);
@@ -312,6 +403,7 @@ function GraphCanvas({
         edges={flowEdges}
         nodeTypes={nodeTypes}
         onConnect={onConnect}
+        nodesConnectable={connectMode}
         fitView
         proOptions={{ hideAttribution: true }}
         onNodeClick={(_e, node) => onSelectNode?.(node.id)}
@@ -320,13 +412,105 @@ function GraphCanvas({
           const p = screenToFlowPosition({ x: (e as MouseEvent).clientX, y: (e as MouseEvent).clientY });
           openMenu(e as unknown as ReactMouseEvent, { kind: "canvas", flowX: p.x, flowY: p.y });
         }}
-        onNodeContextMenu={(e, node) => openMenu(e, { kind: "node", id: node.id, label: (node.data as OntologyNodeData).label })}
-        onEdgeContextMenu={(e, edge) => openMenu(e, { kind: "edge", id: edge.id, label: String(edge.label ?? "") })}
+        onNodeContextMenu={(e, node) => {
+          const raw = rawNodes.find((n) => n.id === node.id);
+          openMenu(e, {
+            kind: "node",
+            id: node.id,
+            label: (node.data as OntologyNodeData).label,
+            nodeKey: raw?.key,
+            nodeTypeId: raw?.nodeTypeId,
+            lifecycle: raw?.lifecycleState,
+          });
+        }}
+        onEdgeContextMenu={(e, edge) => {
+          const raw = rawEdges.find((ed) => ed.id === edge.id);
+          openMenu(e, {
+            kind: "edge",
+            id: edge.id,
+            label: String(edge.label ?? ""),
+            relationKey: raw?.relationKey,
+            weight: raw?.weight,
+            sourceNodeId: raw?.sourceNodeId,
+            targetNodeId: raw?.targetNodeId,
+          });
+        }}
       >
         <Background gap={16} />
         <Controls showInteractive={false} />
         <MiniMap pannable zoomable className="!bg-card" />
       </ReactFlow>
+
+      {/* ── Bottom floating toolbar (DS parity: layout / cluster-filter / edit / simulate) ── */}
+      <div className="pointer-events-none absolute inset-x-0 bottom-3 z-20 flex justify-center">
+        <div className="pointer-events-auto flex items-stretch gap-2 rounded-xl border border-border bg-card/95 p-1.5 shadow-lg backdrop-blur">
+          {/* Layout group */}
+          <div className="flex items-center gap-0.5 rounded-lg bg-muted/40 p-0.5">
+            <ToolbarBtn
+              active={layout === "layered"}
+              onClick={() => { setLayout("layered"); setTimeout(() => fitView({ duration: 300 }), 60); }}
+              title={t("层级布局", "Layered layout")}
+            >⤨ {t("层级", "Layered")}</ToolbarBtn>
+            <ToolbarBtn
+              active={layout === "radial"}
+              onClick={() => { setLayout("radial"); setTimeout(() => fitView({ duration: 300 }), 60); }}
+              title={t("环形布局", "Radial layout")}
+            >◎ {t("环形", "Radial")}</ToolbarBtn>
+            <ToolbarBtn
+              active={layout === "grid"}
+              onClick={() => { setLayout("grid"); setTimeout(() => fitView({ duration: 300 }), 60); }}
+              title={t("网格布局", "Grid layout")}
+            >▦ {t("网格", "Grid")}</ToolbarBtn>
+          </div>
+
+          {/* Relation filter */}
+          {relationKeys.length > 0 && (
+            <div className="flex items-center rounded-lg bg-muted/40 px-1">
+              <select
+                value={relationFilter ?? ""}
+                onChange={(e) => setRelationFilter(e.target.value || null)}
+                title={t("按关系过滤", "Filter by relation")}
+                className="h-7 bg-transparent px-1 text-(length:--text-nano) text-foreground outline-none"
+              >
+                <option value="">{t("全部关系", "All relations")}</option>
+                {relationKeys.map((rk) => <option key={rk} value={rk}>{rk}</option>)}
+              </select>
+            </div>
+          )}
+
+          <div className="w-px bg-border" />
+
+          {/* Edit group */}
+          <ToolbarBtn
+            onClick={() => addNode(360, 260)}
+            title={t("新增节点", "Add node")}
+          >＋ {t("新增节点", "Add node")}</ToolbarBtn>
+          <ToolbarBtn
+            active={connectMode}
+            onClick={() => setConnectMode((c) => !c)}
+            title={t("连线模式:拖拽节点手柄连线", "Connect mode: drag node handles to link")}
+          >⟿ {t("连线", "Connect")}</ToolbarBtn>
+
+          <div className="w-px bg-border" />
+
+          {/* Simulate — reachability highlight from selected node */}
+          <ToolbarBtn
+            onClick={() => {
+              if (!selectedNodeId) { window.alert(t("请先选中一个节点", "Select a node first")); return; }
+              const reachable = new Set<string>([selectedNodeId]);
+              let changed = true;
+              while (changed) {
+                changed = false;
+                for (const e of rawEdges) {
+                  if (reachable.has(e.sourceNodeId) && !reachable.has(e.targetNodeId)) { reachable.add(e.targetNodeId); changed = true; }
+                }
+              }
+              window.alert(t(`从此节点可达 ${reachable.size} 个节点（含自身）`, `${reachable.size} nodes reachable downstream (incl. self)`));
+            }}
+            title={t("模拟演练:计算下游可达范围", "Simulate: compute downstream reachability")}
+          >⚡ {t("模拟演练", "Simulate")}</ToolbarBtn>
+        </div>
+      </div>
 
       <div className="pointer-events-none absolute right-2 top-2 z-10 rounded-md bg-card/80 px-2 py-1 text-(length:--text-nano) text-muted-foreground">
         {nodeTypeDragMime
@@ -355,10 +539,65 @@ function GraphCanvas({
             style={{ left: menu.x, top: menu.y }}
           >
             {menu.kind === "canvas" && (
-              <MenuItem label={t("新建节点", "Add node")} onClick={() => { const m = menu; closeMenu(); addNode(m.flowX ?? 0, m.flowY ?? 0); }} />
+              <>
+                <MenuItem label={t("新建节点", "Add node")} onClick={() => { const m = menu; closeMenu(); addNode(m.flowX ?? 0, m.flowY ?? 0); }} />
+                {rawNodeTypes.length > 0 && (
+                  <>
+                    <MenuLabel>{t("按类型新建", "New by type")}</MenuLabel>
+                    {rawNodeTypes.map((nt) => (
+                      <MenuItem
+                        key={nt.id}
+                        label={nt.display_name || nt.key}
+                        dot={toneFor(nt.id)}
+                        onClick={() => {
+                          closeMenu();
+                          const label = window.prompt(t("节点标签", "Node label"), nt.display_name || nt.key);
+                          if (label && label.trim()) void run(() => createNode({ companyId, domainId, key: `n-${Date.now()}`, label: label.trim(), nodeTypeId: nt.id }));
+                        }}
+                      />
+                    ))}
+                  </>
+                )}
+                <MenuDivider />
+                <MenuItem label={t("适应视图", "Fit view")} onClick={() => { closeMenu(); fitView({ duration: 300 }); }} />
+              </>
             )}
             {menu.kind === "node" && (
               <>
+                {/* DS-style header: node label + type */}
+                <div className="border-b border-border px-2.5 pb-1.5 pt-1">
+                  <div className="truncate text-(length:--text-compact) font-semibold">{menu.label}</div>
+                  <div className="truncate text-(length:--text-nano) text-muted-foreground">
+                    {menu.nodeKey ?? ""}
+                    {menu.nodeTypeId ? ` · ${(typeById.get(menu.nodeTypeId)?.display_name || typeById.get(menu.nodeTypeId)?.key) ?? ""}` : ""}
+                  </div>
+                </div>
+                <MenuItem
+                  label={t("查看详情", "View detail")}
+                  icon="◉"
+                  onClick={() => { const m = menu; closeMenu(); onSelectNode?.(m.id ?? null); onViewNodeDetail?.(m.id!); }}
+                />
+                <MenuItem
+                  label={t("影响推演", "Impact simulation")}
+                  icon="⚡"
+                  onClick={() => {
+                    const m = menu; closeMenu();
+                    const raw = rawNodes.find((n) => n.id === m.id);
+                    if (raw) onSimulateImpact?.(raw);
+                    else {
+                      const reachable = new Set<string>([m.id!]);
+                      let changed = true;
+                      while (changed) {
+                        changed = false;
+                        for (const e of rawEdges) {
+                          if (reachable.has(e.sourceNodeId) && !reachable.has(e.targetNodeId)) { reachable.add(e.targetNodeId); changed = true; }
+                        }
+                      }
+                      window.alert(t(`下游可达 ${reachable.size - 1} 个节点`, `${reachable.size - 1} downstream nodes reachable`));
+                    }
+                  }}
+                />
+                <MenuDivider />
                 <MenuItem
                   label={t("重命名", "Rename")}
                   onClick={() => {
@@ -367,6 +606,48 @@ function GraphCanvas({
                     if (label && label.trim()) void run(() => updateNode({ companyId, nodeId: m.id, label: label.trim() }));
                   }}
                 />
+                <MenuItem
+                  label={t("从此节点连线…", "Connect from here…")}
+                  onClick={() => {
+                    const m = menu; closeMenu();
+                    // Pick a target node by label via prompt (numbered list).
+                    const others = rawNodes.filter((n) => n.id !== m.id);
+                    if (others.length === 0) { window.alert(t("没有其他节点可连", "No other nodes to connect")); return; }
+                    const list = others.map((n, i) => `${i + 1}. ${n.label || n.key}`).join("\n");
+                    const pick = window.prompt(t(`连接到哪个节点? 输入编号:\n${list}`, `Connect to which node? Enter number:\n${list}`));
+                    const idx = pick ? parseInt(pick, 10) - 1 : -1;
+                    const target = others[idx];
+                    if (!target) return;
+                    const relationKey = window.prompt(t("关系名(可选)", "Relation key (optional)")) ?? "";
+                    void run(() => createEdge({ companyId, domainId, sourceNodeId: m.id, targetNodeId: target.id, relationKey: relationKey.trim() || undefined }));
+                  }}
+                />
+                <MenuItem
+                  label={t("下游影响…", "Downstream impact…")}
+                  onClick={() => {
+                    const m = menu; closeMenu();
+                    const reachable = new Set<string>([m.id!]);
+                    let changed = true;
+                    while (changed) {
+                      changed = false;
+                      for (const e of rawEdges) {
+                        if (reachable.has(e.sourceNodeId) && !reachable.has(e.targetNodeId)) { reachable.add(e.targetNodeId); changed = true; }
+                      }
+                    }
+                    window.alert(t(`下游可达 ${reachable.size - 1} 个节点`, `${reachable.size - 1} downstream nodes reachable`));
+                  }}
+                />
+                <MenuItem
+                  label={t("复制键", "Copy key")}
+                  onClick={() => {
+                    const m = menu; closeMenu();
+                    if (m.nodeKey && typeof navigator !== "undefined" && navigator.clipboard) {
+                      void navigator.clipboard.writeText(m.nodeKey);
+                    }
+                  }}
+                />
+                <MenuItem label={t("聚焦选中", "Focus & select")} onClick={() => { const m = menu; closeMenu(); onSelectNode?.(m.id ?? null); }} />
+                <MenuDivider />
                 <MenuItem
                   label={t("删除", "Delete")}
                   danger
@@ -380,10 +661,23 @@ function GraphCanvas({
                   label={t("重命名关系", "Rename relation")}
                   onClick={() => {
                     const m = menu; closeMenu();
-                    const rk = window.prompt(t("关系名", "Relation key"), m.label) ?? "";
+                    const rk = window.prompt(t("关系名", "Relation key"), m.relationKey ?? m.label) ?? "";
                     void run(() => updateEdge({ companyId, edgeId: m.id, relationKey: rk.trim() || null }));
                   }}
                 />
+                <MenuItem
+                  label={t("反转方向", "Reverse direction")}
+                  onClick={() => {
+                    const m = menu; closeMenu();
+                    if (!m.sourceNodeId || !m.targetNodeId) return;
+                    // Delete + recreate reversed (store has no direction-swap op).
+                    void run(async () => {
+                      await deleteEdge({ companyId, edgeId: m.id });
+                      await createEdge({ companyId, domainId, sourceNodeId: m.targetNodeId, targetNodeId: m.sourceNodeId, relationKey: m.relationKey ?? undefined });
+                    });
+                  }}
+                />
+                <MenuDivider />
                 <MenuItem
                   label={t("删除", "Delete")}
                   danger
@@ -398,18 +692,55 @@ function GraphCanvas({
   );
 }
 
-function MenuItem({ label, onClick, danger }: { label: string; onClick: () => void; danger?: boolean }): ReactElement {
+function ToolbarBtn({
+  children,
+  onClick,
+  active,
+  title,
+}: {
+  children: ReactNode;
+  onClick: () => void;
+  active?: boolean;
+  title?: string;
+}): ReactElement {
+  return (
+    <button
+      onClick={onClick}
+      title={title}
+      className={[
+        "flex items-center gap-1 whitespace-nowrap rounded-md px-2.5 py-1.5 text-(length:--text-nano) font-medium transition-colors",
+        active
+          ? "bg-primary text-primary-foreground"
+          : "text-muted-foreground hover:bg-accent hover:text-foreground",
+      ].join(" ")}
+    >
+      {children}
+    </button>
+  );
+}
+
+function MenuItem({ label, onClick, danger, dot, icon }: { label: string; onClick: () => void; danger?: boolean; dot?: string; icon?: string }): ReactElement {
   return (
     <button
       onClick={onClick}
       className={[
-        "block w-full rounded-md px-2.5 py-1.5 text-left text-(length:--text-compact) transition-colors hover:bg-accent",
+        "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-(length:--text-compact) transition-colors hover:bg-accent",
         danger ? "text-destructive" : "text-foreground",
       ].join(" ")}
     >
-      {label}
+      {dot && <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: dot }} />}
+      {icon && <span aria-hidden className="w-4 shrink-0 text-center text-muted-foreground">{icon}</span>}
+      <span className="truncate">{label}</span>
     </button>
   );
+}
+
+function MenuLabel({ children }: { children: ReactNode }): ReactElement {
+  return <div className="px-2.5 pb-0.5 pt-1.5 text-(length:--text-nano) font-semibold uppercase tracking-wide text-muted-foreground">{children}</div>;
+}
+
+function MenuDivider(): ReactElement {
+  return <div className="my-1 h-px bg-border" />;
 }
 
 type GraphViewMode = "graph" | "table" | "schema";
@@ -433,6 +764,10 @@ interface GraphViewProps {
   hideTabs?: boolean;
   /** MIME key used to drag a node type from a host tree onto the canvas. */
   nodeTypeDragMime?: string;
+  /** DS "view detail" — open the node inspector for this node. */
+  onViewNodeDetail?: (nodeId: string) => void;
+  /** DS "impact simulation" — run blast-radius for this node. */
+  onSimulateImpact?: (node: GraphNode) => void;
 }
 
 /**

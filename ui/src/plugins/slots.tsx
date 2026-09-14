@@ -274,7 +274,7 @@ function buildPluginUiUrl(contribution: PluginUiContribution): string {
  * This approach is compatible with all modern browsers and avoids import map
  * ordering issues.
  */
-const shimBlobUrls: Record<string, string> = {};
+const shimDataUrls: Record<string, string> = {};
 
 function applyJsxRuntimeKey(
   props: Record<string, unknown> | null | undefined,
@@ -283,6 +283,15 @@ function applyJsxRuntimeKey(
   if (key === undefined) return props ?? {};
   return { ...(props ?? {}), key };
 }
+
+/**
+ * Indirect dynamic import — bypasses Vite/rolldown's modulepreload wrapper.
+ *
+ * Vite rewrites `import(expr)` into a preload helper that calls
+ * `new URL(specifier, import.meta.url)`, which throws for data: and blob: URIs.
+ * Using `new Function` prevents the bundler from touching this call at build time.
+ */
+const rawImport = new Function("u", "return import(u)") as (u: string) => Promise<Record<string, unknown>>;
 
 function createReactShimSource(reactModule: object): string {
   const exportNames = Object.keys(reactModule)
@@ -302,8 +311,8 @@ ${namedExports}
       `;
 }
 
-function getShimBlobUrl(specifier: "react" | "react-dom" | "react-dom/client" | "react/jsx-runtime" | "sdk-ui"): string {
-  if (shimBlobUrls[specifier]) return shimBlobUrls[specifier];
+function getShimDataUrl(specifier: "react" | "react-dom" | "react-dom/client" | "react/jsx-runtime" | "sdk-ui"): string {
+  if (shimDataUrls[specifier]) return shimDataUrls[specifier];
 
   let source: string;
   switch (specifier) {
@@ -366,9 +375,8 @@ function getShimBlobUrl(specifier: "react" | "react-dom" | "react-dom/client" | 
       break;
   }
 
-  const blob = new Blob([source], { type: "application/javascript" });
-  const url = URL.createObjectURL(blob);
-  shimBlobUrls[specifier] = url;
+  const url = `data:text/javascript;charset=utf-8,${encodeURIComponent(source)}`;
+  shimDataUrls[specifier] = url;
   return url;
 }
 
@@ -385,30 +393,43 @@ function getShimBlobUrl(specifier: "react" | "react-dom" | "react-dom/client" | 
  * - `export { ... } from "react";`
  */
 function rewriteBareSpecifiers(source: string): string {
-  // Build a mapping of bare specifiers to blob URLs.
+  // Build a mapping of bare specifiers to data: URIs.
   const rewrites: Record<string, string> = {
-    '"@paperclipai/plugin-sdk/ui"': `"${getShimBlobUrl("sdk-ui")}"`,
-    "'@paperclipai/plugin-sdk/ui'": `'${getShimBlobUrl("sdk-ui")}'`,
-    '"@paperclipai/plugin-sdk/ui/hooks"': `"${getShimBlobUrl("sdk-ui")}"`,
-    "'@paperclipai/plugin-sdk/ui/hooks'": `'${getShimBlobUrl("sdk-ui")}'`,
-    '"react/jsx-runtime"': `"${getShimBlobUrl("react/jsx-runtime")}"`,
-    "'react/jsx-runtime'": `'${getShimBlobUrl("react/jsx-runtime")}'`,
-    '"react-dom/client"': `"${getShimBlobUrl("react-dom/client")}"`,
-    "'react-dom/client'": `'${getShimBlobUrl("react-dom/client")}'`,
-    '"react-dom"': `"${getShimBlobUrl("react-dom")}"`,
-    "'react-dom'": `'${getShimBlobUrl("react-dom")}'`,
-    '"react"': `"${getShimBlobUrl("react")}"`,
-    "'react'": `'${getShimBlobUrl("react")}'`,
+    '"@paperclipai/plugin-sdk/ui"': `"${getShimDataUrl("sdk-ui")}"`,
+    "'@paperclipai/plugin-sdk/ui'": `'${getShimDataUrl("sdk-ui")}'`,
+    '"@paperclipai/plugin-sdk/ui/hooks"': `"${getShimDataUrl("sdk-ui")}"`,
+    "'@paperclipai/plugin-sdk/ui/hooks'": `'${getShimDataUrl("sdk-ui")}'`,
+    '"react/jsx-runtime"': `"${getShimDataUrl("react/jsx-runtime")}"`,
+    "'react/jsx-runtime'": `'${getShimDataUrl("react/jsx-runtime")}'`,
+    '"react-dom/client"': `"${getShimDataUrl("react-dom/client")}"`,
+    "'react-dom/client'": `'${getShimDataUrl("react-dom/client")}'`,
+    '"react-dom"': `"${getShimDataUrl("react-dom")}"`,
+    "'react-dom'": `'${getShimDataUrl("react-dom")}'`,
+    '"react"': `"${getShimDataUrl("react")}"`,
+    "'react'": `'${getShimDataUrl("react")}'`,
   };
 
   let result = source;
   for (const [from, to] of Object.entries(rewrites)) {
     // Only rewrite in import/export from contexts, not in arbitrary strings.
-    // The regex matches `from "..."` or `from '...'` patterns.
     result = result.replaceAll(` from ${from}`, ` from ${to}`);
     // Also handle `import "..."` (side-effect imports)
     result = result.replaceAll(`import ${from}`, `import ${to}`);
   }
+
+  // esbuild bundles CJS dependencies (e.g. use-sync-external-store) with a
+  // __require() shim that calls `require("react")` at runtime. In a browser
+  // ESM context there is no `require`, so these calls throw
+  // "Dynamic require of X is not supported". Replace them with a direct
+  // reference to the bridge-provided React object so the CJS shim works.
+  result = result.replaceAll(
+    `__require("react")`,
+    `(globalThis.__paperclipPluginBridge__?.react ?? (() => { throw new Error("Plugin bridge not initialized"); })())`,
+  );
+  result = result.replaceAll(
+    `__require('react')`,
+    `(globalThis.__paperclipPluginBridge__?.react ?? (() => { throw new Error("Plugin bridge not initialized"); })())`,
+  );
 
   return result;
 }
@@ -424,7 +445,7 @@ async function importPluginModule(url: string): Promise<Record<string, unknown>>
   // import (which will fail on bare specifiers but won't crash the loader).
   if (!globalThis.__paperclipPluginBridge__) {
     console.warn("[plugin-loader] Bridge registry not initialized, falling back to direct import");
-    return import(/* @vite-ignore */ url);
+    return rawImport(url);
   }
 
   // Fetch the module source text
@@ -438,16 +459,21 @@ async function importPluginModule(url: string): Promise<Record<string, unknown>>
   // Rewrite bare specifier imports to blob URLs
   const rewritten = rewriteBareSpecifiers(source);
 
-  // Create a blob URL from the rewritten source and import it
-  const blob = new Blob([rewritten], { type: "application/javascript" });
-  const blobUrl = URL.createObjectURL(blob);
+  // Create a data: URI from the rewritten source and import it.
+  // data: URIs share the page origin so cross-module imports work
+  // without the null-origin restrictions that affect blob: URLs.
+  const dataUri = `data:text/javascript;charset=utf-8,${encodeURIComponent(rewritten)}`;
 
+  // Use the module-level rawImport thunk (bypasses Vite preload wrapper).
   try {
-    const mod = await import(/* @vite-ignore */ blobUrl);
+    const mod = await rawImport(dataUri);
     return mod;
-  } finally {
-    // Clean up the blob URL after import (the module is already loaded)
-    URL.revokeObjectURL(blobUrl);
+  } catch (importErr) {
+    console.error(
+      "[plugin-loader] data: import failed. Rewritten source (first 500 chars):",
+      rewritten.slice(0, 500),
+    );
+    throw importErr;
   }
 }
 
@@ -500,9 +526,7 @@ async function loadPluginModule(contribution: PluginUiContribution): Promise<voi
     try {
       // Dynamic ESM import of the plugin's UI entry module with
       // bare-specifier rewriting for host-provided dependencies.
-      console.debug(`[plugin-loader] loading "${pluginKey}" from ${url}`);
       const mod: Record<string, unknown> = await importPluginModule(url);
-      console.debug(`[plugin-loader] loaded "${pluginKey}", exports:`, Object.keys(mod));
 
       // Collect the set of export names declared across all UI contributions so
       // we only register what the manifest advertises (ignore extra exports).
@@ -549,7 +573,11 @@ async function loadPluginModule(contribution: PluginUiContribution): Promise<voi
       pluginLoadStates.set(moduleKey, "loaded");
     } catch (err) {
       pluginLoadStates.set(moduleKey, "error");
-      console.error(`Failed to load UI module for plugin "${pluginKey}"`, err);
+      console.error(
+        `[plugin-loader] Failed to load UI module for plugin "${pluginKey}" (url: ${url})`,
+        err,
+        err instanceof Error ? err.stack : "",
+      );
     } finally {
       inflightImports.delete(pluginId);
     }
@@ -947,13 +975,9 @@ export function _resetPluginModuleLoader(): void {
   pluginLoadStates.clear();
   inflightImports.clear();
   registry.clear();
-  if (typeof URL.revokeObjectURL === "function") {
-    for (const url of Object.values(shimBlobUrls)) {
-      URL.revokeObjectURL(url);
-    }
-  }
-  for (const key of Object.keys(shimBlobUrls)) {
-    delete shimBlobUrls[key];
+  // data: URIs don't need revoking — just clear the cache map.
+  for (const key of Object.keys(shimDataUrls)) {
+    delete shimDataUrls[key];
   }
 }
 
