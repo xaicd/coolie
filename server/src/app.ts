@@ -137,6 +137,10 @@ import {
   createPluginWorkerManager,
   type PluginWorkerManager,
 } from "./services/plugin-worker-manager.js";
+import {
+  createPluginStreamBus,
+  type PluginStreamBus,
+} from "./services/plugin-stream-bus.js";
 import { createPluginJobScheduler } from "./services/plugin-job-scheduler.js";
 import { pluginJobStore } from "./services/plugin-job-store.js";
 import { createPluginToolDispatcher } from "./services/plugin-tool-dispatcher.js";
@@ -570,7 +574,32 @@ export async function createApp(
   app.use(llmRoutes(db));
 
   const hostServicesDisposers = new Map<string, () => void>();
-  const workerManager = opts.pluginWorkerManager ?? createPluginWorkerManager();
+  // The stream bus fans worker stream notifications out to every SSE client
+  // subscribed to the same (pluginId, channel, companyId) triple. Without
+  // it the /plugins/:pluginId/bridge/stream/:channel route returns 501 and
+  // usePluginStream in plugin UI never sees events. We always create one
+  // ourselves (the pluginWorkerManager option is for tests that want to
+  // inject their own worker manager without losing the stream bus).
+  const streamBus: PluginStreamBus = createPluginStreamBus();
+  const workerManager = opts.pluginWorkerManager ?? createPluginWorkerManager({
+    onStreamNotification: (pluginId, method, params) => {
+      const channel = String(params.channel ?? "");
+      const companyId = String(params.companyId ?? "");
+      if (!channel || !companyId) return;
+      if (method === "streams.open") {
+        // The route auto-sends an :ok SSE comment on subscribe; we only
+        // surface 'open' here so a client can know the worker formally
+        // announced a channel. Skip for now to avoid noise.
+        return;
+      }
+      if (method === "streams.close") {
+        streamBus.publish(pluginId, channel, companyId, { channel }, "close");
+        return;
+      }
+      // streams.emit — the payload is whatever the worker sent.
+      streamBus.publish(pluginId, channel, companyId, params.event ?? null, "message");
+    },
+  });
   const connectionIntentHeartbeat = heartbeatService(db, {
     pluginWorkerManager: workerManager,
   });
@@ -910,7 +939,7 @@ export async function createApp(
       { scheduler, jobStore },
       { workerManager },
       { toolDispatcher },
-      { workerManager },
+      { workerManager, streamBus },
       { toolGateway },
     ),
   );

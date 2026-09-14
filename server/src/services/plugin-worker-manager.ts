@@ -3540,6 +3540,23 @@ export interface PluginWorkerManagerOptions {
     willRestart?: boolean;
   }) => void;
   /**
+   * Optional callback invoked when a worker emits a stream notification
+   * (`streams.open` / `streams.emit` / `streams.close`). The host wires this
+   * to the PluginStreamBus so SSE clients (usePluginStream in plugin UI) can
+   * receive tokens, errors, and lifecycle events from worker code in real
+   * time. Unlike the per-handle `WorkerStartOptions.onStreamNotification`,
+   * this callback receives the `pluginId` as its first argument because the
+   * bus needs it to fan out to per-plugin SSE subscribers.
+   *
+   * @see createPluginStreamBus in services/plugin-stream-bus.ts
+   * @see PLUGIN_SPEC.md §19.8 — Real-Time Streaming
+   */
+  onStreamNotification?: (
+    pluginId: string,
+    method: "streams.open" | "streams.emit" | "streams.close",
+    params: Record<string, unknown>,
+  ) => void;
+  /**
    * The process-scoped aggregate ceiling for concurrent duplex channel routes,
    * across every worker in the process. The manager builds one shared slot
    * controller from it and injects it into every worker handle, so one tenant can
@@ -3659,6 +3676,21 @@ export function createPluginWorkerManager(
         // Inject the shared process-scoped route-slot controller, unless the
         // caller already supplied its own (a test may inject its own).
         duplexRouteSlots,
+        // If the caller registered a manager-level stream notifier, wrap it
+        // so the per-handle callback gets the pluginId closure. Per-call
+        // options.onStreamNotification (if any) still wins — tests that need
+        // to inject a custom stream handler shouldn't be surprised.
+        ...(managerOptions?.onStreamNotification && !options.onStreamNotification
+          ? {
+              onStreamNotification: (method, params) => {
+                managerOptions.onStreamNotification!(
+                  pluginId,
+                  method as "streams.open" | "streams.emit" | "streams.close",
+                  params,
+                );
+              },
+            }
+          : {}),
         ...options,
       });
       workers.set(pluginId, handle);
