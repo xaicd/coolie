@@ -184,65 +184,19 @@ export function SandboxTab({
   const [clearing, setClearing] = useState(false);
   const seenTokenKeysRef = useRef<Set<string>>(new Set());
 
-  // Reset local state when switching domains so we never render another
-  // domain's tokens against the current channel.
-  useEffect(() => {
-    seenTokenKeysRef.current = new Set();
-    setMessages([]);
-    setDraft("");
-    setSending(false);
-    setClearing(false);
-  }, [companyId, domainId]);
-
-  // Auto-submit a pre-prompt when one is provided (e.g. from right-click
-  // "AI 解释这个节点"). We deliberately set the draft + schedule a microtask
-  // submit rather than calling askAide directly, so the composer still goes
-  // through its normal lifecycle and the user can edit / abort if needed.
-  const prePromptFiredRef = useRef<string | null>(null);
-  useEffect(() => {
-    if (!prePrompt || prePrompt.trim().length === 0) return;
-    if (prePromptFiredRef.current === prePrompt) return;
-    prePromptFiredRef.current = prePrompt;
-    setDraft(prePrompt);
-    queueMicrotask(() => { void onSubmit(); });
-    onConsumePrePrompt?.();
-  }, [prePrompt, onConsumePrePrompt]);
-
-  // Seed messages from persisted history once it lands.
-  useEffect(() => {
-    if (!history.data) return;
-    setMessages(
-      history.data.messages.map((m) => ({
-        id: `history-${m.id}`,
-        role: m.role,
-        content: m.content,
-        streaming: false,
-        citations: m.citations,
-        createdAt: m.createdAt,
-      })),
-    );
-  }, [history.data]);
-
-  // Apply each stream event to local state. The worker emits a stable stream
-  // for the whole `(company, domain)` so we always act on the last assistant
-  // message (the one we just optimistically inserted when the user sent).
-  useEffect(() => {
-    const events = stream.events;
-    if (events.length === 0) return;
-
-    setMessages((prev) => applyEvents(prev, events, seenTokenKeysRef.current));
-  }, [stream.events]);
-
-  const onSubmit = useCallback(
-    async (e?: React.SyntheticEvent) => {
-      e?.preventDefault();
-      const text = draft.trim();
-      if (text.length === 0 || sending) return;
+  // Submit a specific text without relying on the `draft` state — used by
+  // the pre-prompt auto-submit path where the controlled input's draft
+  // hasn't been re-rendered yet when the queued submit runs. Defined before
+  // any effect that references it so the deps array can resolve cleanly.
+  const submitText = useCallback(
+    async (text: string) => {
+      const trimmed = text.trim();
+      if (trimmed.length === 0 || sending) return;
       setSending(true);
       const userMsg: LocalMessage = {
         id: `local-user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         role: "user",
-        content: text,
+        content: trimmed,
         streaming: false,
         citations: [],
         createdAt: new Date().toISOString(),
@@ -259,7 +213,7 @@ export function SandboxTab({
       seenTokenKeysRef.current = new Set();
       setDraft("");
       try {
-        await askAide({ companyId, domainId, message: text });
+        await askAide({ companyId, domainId, message: trimmed });
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         setMessages((prev) =>
@@ -273,7 +227,66 @@ export function SandboxTab({
         setSending(false);
       }
     },
-    [askAide, companyId, domainId, draft, sending],
+    [askAide, companyId, domainId, sending],
+  );
+
+  // Local state is scoped to the (companyId, domainId) pair: the parent
+// remounts this component via `<DomainWorkspace key={activeDomainId}>`, so
+// we don't need to reset state on dep change here. The previous reset
+// effect clobbered messages that a right-click pre-prompt submitted during
+// the initial mount cycle (StrictMode dev double-invocation made it worse).
+  useEffect(() => {
+    seenTokenKeysRef.current = new Set();
+  }, [companyId, domainId]);
+
+  // Auto-submit a pre-prompt when one is provided (e.g. from right-click
+  // "AI 解释这个节点"). We set the draft so the user can see/edit it in the
+  // composer, but we also fire `submitText(prePrompt)` directly so the
+  // submit doesn't have to wait for the controlled-input re-render.
+  const prePromptFiredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!prePrompt || prePrompt.trim().length === 0) return;
+    if (prePromptFiredRef.current === prePrompt) return;
+    prePromptFiredRef.current = prePrompt;
+    setDraft(prePrompt);
+    void submitText(prePrompt);
+    onConsumePrePrompt?.();
+  }, [prePrompt, onConsumePrePrompt, submitText]);
+
+  useEffect(() => {
+    if (!history.data) return;
+    setMessages((prev) => {
+      if (prev.length > 0) return prev;
+      return history.data!.messages.map((m) => ({
+        id: `history-${m.id}`,
+        role: m.role,
+        content: m.content,
+        streaming: false,
+        citations: m.citations,
+        createdAt: m.createdAt,
+      }));
+    });
+  }, [history.data]);
+
+  // Apply each stream event to local state. The worker emits a stable stream
+  // for the whole `(company, domain)` so we always act on the last assistant
+  // message (the one we just optimistically inserted when the user sent).
+  useEffect(() => {
+    const events = stream.events;
+    if (events.length === 0) return;
+
+    setMessages((prev) => applyEvents(prev, events, seenTokenKeysRef.current));
+  }, [stream.events]);
+
+  // Composer submit — reads the controlled draft. The pre-prompt path uses
+  // `submitText` directly to avoid the stale-closure trap.
+  const onSubmit = useCallback(
+    async (e?: React.SyntheticEvent) => {
+      e?.preventDefault();
+      if (draft.trim().length === 0 || sending) return;
+      void submitText(draft);
+    },
+    [draft, sending, submitText],
   );
 
   const onClear = useCallback(async () => {
@@ -364,11 +377,10 @@ export function SandboxTab({
             loading={loading && messages.length === 0}
             onPickPrompt={(prompt) => {
               setDraft(prompt);
-              // Submit on the next microtask so the textarea's React state
-              // has a chance to commit before the action call captures the
-              // current draft — without this we'd sometimes send a stale
-              // empty string because setDraft is async.
-              queueMicrotask(() => { void onSubmit(); });
+              // Fire submitText directly with the prompt text — the
+              // controlled-input draft hasn't been re-rendered yet so
+              // reading draft in a queued closure would give a stale "".
+              void submitText(prompt);
             }}
           />
           <Composer

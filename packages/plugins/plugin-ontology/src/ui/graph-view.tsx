@@ -979,11 +979,9 @@ export function GraphView(props: GraphViewProps): ReactElement {
 
   const body = (
     <>
-      {mode === "graph" &&
-        (props.nodes.length === 0 ? (
-          <EmptyGraph {...props} />
-        ) : (
-          <ReactFlowProvider>
+      {mode === "graph" && (
+        <ReactFlowProvider>
+          <div className={embedded ? "relative h-full" : "relative"}>
             <GraphCanvas
               {...props}
               nodeTypes={nodeTypeDefs}
@@ -991,8 +989,15 @@ export function GraphView(props: GraphViewProps): ReactElement {
               isDomainEmpty={props.isDomainEmpty}
               onAskAideAboutNode={props.onAskAideAboutNode}
             />
-          </ReactFlowProvider>
-        ))}
+            {/* Empty-state overlay — sits ABOVE the ReactFlow canvas so the
+                underlying pane still receives contextmenu events and the
+                canvas menu (including "AI 初始化此域") stays reachable. */}
+            {props.nodes.length === 0 && (
+              <EmptyGraphOverlay {...props} />
+            )}
+          </div>
+        </ReactFlowProvider>
+      )}
 
       {mode === "table" && <TableView nodes={props.nodes} edges={props.edges} nodeTypes={nodeTypeDefs} />}
 
@@ -1158,8 +1163,11 @@ function SchemaColumn({ title, items }: { title: string; items: GraphNodeType[] 
   );
 }
 
-/** Empty state: still allows adding the first node (no flow coordinates needed). */
-function EmptyGraph({
+/** Empty state overlay: shown above the canvas when the domain has no nodes.
+ *  Pointer events are limited to the inner card so right-clicks on the empty
+ *  area still fall through to the ReactFlow pane and open the canvas menu
+ *  (which is the only place the "AI 初始化此域" entry lives). */
+function EmptyGraphOverlay({
   companyId,
   domainId,
   onChanged,
@@ -1185,15 +1193,23 @@ function EmptyGraph({
   }, [companyId, domainId, createNode, onChanged]);
 
   return (
-    <div className="flex h-[220px] flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-background text-muted-foreground">
-      <div className="text-(length:--text-compact)">{t("还没有节点。", "No nodes yet.")}</div>
-      <button
-        onClick={add}
-        disabled={busy}
-        className="rounded-lg bg-primary px-3 py-1.5 text-(length:--text-compact) font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-50"
+    // Outer wrapper is transparent to pointer events so the ReactFlow pane
+    // underneath still receives contextmenu / click events.
+    <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
+      <div
+        // Only the card itself intercepts pointer events — the button needs
+        // to be clickable.
+        className="pointer-events-auto flex flex-col items-center gap-3 rounded-lg border border-dashed border-border bg-background/95 px-6 py-4 text-muted-foreground backdrop-blur-sm"
       >
-        {busy ? "…" : t("新建第一个节点", "Add the first node")}
-      </button>
+        <div className="text-(length:--text-compact)">{t("还没有节点。", "No nodes yet.")}</div>
+        <button
+          onClick={add}
+          disabled={busy}
+          className="rounded-lg bg-primary px-3 py-1.5 text-(length:--text-compact) font-medium text-primary-foreground transition-colors hover:opacity-90 disabled:opacity-50"
+        >
+          {busy ? "…" : t("新建第一个节点", "Add the first node")}
+        </button>
+      </div>
     </div>
   );
 }
