@@ -22,13 +22,15 @@ import {
   LayoutGrid,
   Users,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { SidebarSection } from "./SidebarSection";
 import { SidebarNavItem } from "./SidebarNavItem";
 import { SidebarAgents } from "./SidebarAgents";
 import { SidebarProjects } from "./SidebarProjects";
 import { SidebarStarredProjects } from "./SidebarStarredProjects";
+import { SidebarAgentChats } from "./SidebarAgentChats";
+import { useAgentChatEnabled } from "@/hooks/useAgentChatEnabled";
 import { SidebarRecentTasks } from "./SidebarRecentTasks";
 import { useDialogActions } from "../context/DialogContext";
 import { useCompany } from "../context/CompanyContext";
@@ -49,9 +51,9 @@ import { SidebarCompanyMenu } from "./SidebarCompanyMenu";
 import { primarySidebarStyles } from "./primary-sidebar-styles";
 import { useTranslation } from "@/i18n";
 
-export function Sidebar() {
-  const { t } = useTranslation();
+export function Sidebar({ children }: { children?: ReactNode }) {
   const { openNewIssue } = useDialogActions();
+  const { enabled: agentChatEnabled } = useAgentChatEnabled();
   // Every labeled section is collapsible (session-scoped, default open) —
   // one policy across static nav groups and the data-driven sections.
   const [workOpen, setWorkOpen] = useState(true);
@@ -245,6 +247,9 @@ export function Sidebar() {
             <SidebarNavItem to="/activity" label={t("nav.audit")} icon={History} />
           </SidebarSection>
         ) : null}
+
+        {children}
+        {agentChatEnabled && !children && <SidebarAgentChats />}
 
         {streamlinedUiEnabled ? (
           <SidebarRecentTasks companyId={selectedCompanyId} liveIssueIds={liveIssueIds} />
