@@ -140,6 +140,9 @@ export interface OntologyEdgeRow {
   target_node_id: string;
   relation_key: string | null;
   weight: number;
+  source_domain_id: string | null;
+  target_domain_id: string | null;
+  is_cross_domain: boolean;
 }
 
 export interface PathHop {
@@ -199,6 +202,7 @@ export interface OntologyNodeTypeRow {
   display_name: string;
   description: string | null;
   layer: NodeLayer;
+  properties_schema: Record<string, unknown> | null;
 }
 
 export interface OntologyRelationTypeInput {
@@ -962,6 +966,10 @@ export interface GraphSnapshot {
     relationTypes: number;
     nodes: number;
     edges: number;
+    /** Per-node-type node count. Key is nodeTypeId; the empty string groups nodes whose type is null. */
+    byNodeType: Record<string, number>;
+    /** Edges whose endpoints cross domain boundaries (one or both endpoints live in another domain). */
+    crossDomainEdges: number;
   };
   nodes: Array<{
     id: string;
@@ -969,6 +977,7 @@ export interface GraphSnapshot {
     label: string;
     nodeTypeId: string | null;
     lifecycleState: NodeLifecycleState;
+    properties: Record<string, unknown> | null;
   }>;
   edges: Array<{
     id: string;
@@ -976,6 +985,9 @@ export interface GraphSnapshot {
     targetNodeId: string;
     relationKey: string | null;
     weight: number;
+    sourceDomainId: string | null;
+    targetDomainId: string | null;
+    isCrossDomain: boolean;
   }>;
 }
 
@@ -984,7 +996,15 @@ export interface GraphStore {
   createDomain(input: OntologyDomainInput): Promise<OntologyDomainRow>;
   createNode(input: OntologyNodeInput): Promise<OntologyNodeRow>;
   createEdge(input: OntologyEdgeInput): Promise<OntologyEdgeRow>;
-  updateNode(companyId: string, nodeId: string, update: { label?: string }): Promise<OntologyNodeRow | null>;
+  updateNode(
+    companyId: string,
+    nodeId: string,
+    update: {
+      label?: string;
+      /** Replace the whole properties blob (empty object clears it). Undefined leaves the column alone. */
+      properties?: Record<string, unknown>;
+    },
+  ): Promise<OntologyNodeRow | null>;
   deleteNode(companyId: string, nodeId: string): Promise<boolean>;
   updateEdge(companyId: string, edgeId: string, update: { relationKey?: string | null }): Promise<OntologyEdgeRow | null>;
   deleteEdge(companyId: string, edgeId: string): Promise<boolean>;
@@ -1027,6 +1047,9 @@ export interface GraphStore {
   ): Promise<OntologyRelationTypeRow | null>;
 
   getGraphSnapshot(companyId: string, domainId: string, nodeLimit?: number): Promise<GraphSnapshot>;
+
+  // O10 — 数字副手 context aggregation
+  describeDomain(companyId: string, domainId: string): Promise<DescribeDomainResult>;
 
   // O5 — consumption reads (backing agent tools)
   getDomainBySlug(companyId: string, slug: string): Promise<OntologyDomainRow | null>;
@@ -1360,25 +1383,36 @@ export class PostgresGraphStore implements GraphStore {
       ],
     );
     const rows = await this.db.query<OntologyEdgeRow>(
-      `SELECT id, company_id, domain_id, source_node_id, target_node_id, relation_key, weight
-         FROM ${this.table("ontology_edges")}
+      `SELECT ${PostgresGraphStore.EDGE_COLS} FROM ${this.table("ontology_edges")}
         WHERE company_id = $1 AND id = $2`,
       [input.companyId, id],
     );
     return rows[0]!;
   }
 
-  /** Rename a graph node (label). Returns the updated row, or null if missing. */
+  /** Rename a graph node (label) and/or replace its properties blob. Returns the updated row, or null if missing. */
   async updateNode(
     companyId: string,
     nodeId: string,
-    update: { label?: string },
+    update: {
+      label?: string;
+      properties?: Record<string, unknown>;
+    },
   ): Promise<OntologyNodeRow | null> {
+    const propertiesProvided = update.properties !== undefined;
     const res = await this.db.execute(
       `UPDATE ${this.table("ontology_nodes")}
-          SET label = COALESCE($3, label), updated_at = now()
+          SET label       = COALESCE($3, label),
+              properties  = CASE WHEN $4::boolean THEN $5::jsonb ELSE properties END,
+              updated_at  = now()
         WHERE company_id = $1 AND id = $2`,
-      [companyId, nodeId, update.label ?? null],
+      [
+        companyId,
+        nodeId,
+        update.label ?? null,
+        propertiesProvided,
+        JSON.stringify(update.properties ?? {}),
+      ],
     );
     if (res.rowCount === 0) return null;
     const rows = await this.db.query<OntologyNodeRow>(
@@ -1412,8 +1446,7 @@ export class PostgresGraphStore implements GraphStore {
     );
     if (res.rowCount === 0) return null;
     const rows = await this.db.query<OntologyEdgeRow>(
-      `SELECT id, company_id, domain_id, source_node_id, target_node_id, relation_key, weight
-         FROM ${this.table("ontology_edges")}
+      `SELECT ${PostgresGraphStore.EDGE_COLS} FROM ${this.table("ontology_edges")}
         WHERE company_id = $1 AND id = $2`,
       [companyId, edgeId],
     );
@@ -1523,7 +1556,11 @@ export class PostgresGraphStore implements GraphStore {
     "is_built_in, forked_from, lifecycle_state, bootstrap_source, seed_schema_version";
 
   private static readonly NODE_COLS =
-    "id, company_id, domain_id, node_type_id, key, label, lifecycle_state, version";
+    "id, company_id, domain_id, node_type_id, key, label, lifecycle_state, version, properties";
+
+  private static readonly EDGE_COLS =
+    "id, company_id, source_domain_id, target_domain_id, source_node_id, target_node_id, " +
+    "relation_type_id, relation_key, weight, is_cross_domain";
 
   async listDomains(companyId: string): Promise<OntologyDomainRow[]> {
     return this.db.query<OntologyDomainRow>(
@@ -1579,7 +1616,7 @@ export class PostgresGraphStore implements GraphStore {
   }
 
   private static readonly NODE_TYPE_COLS =
-    "id, company_id, domain_id, key, display_name, description, layer";
+    "id, company_id, domain_id, key, display_name, description, layer, properties_schema";
 
   async createNodeType(input: OntologyNodeTypeInput): Promise<OntologyNodeTypeRow> {
     const id = randomUUID();
@@ -1773,8 +1810,9 @@ export class PostgresGraphStore implements GraphStore {
       label: string;
       node_type_id: string | null;
       lifecycle_state: NodeLifecycleState;
+      properties: Record<string, unknown> | null;
     }>(
-      `SELECT id, key, label, node_type_id, lifecycle_state
+      `SELECT id, key, label, node_type_id, lifecycle_state, properties
          FROM ${this.table("ontology_nodes")}
         WHERE company_id = $1 AND domain_id = $2
         ORDER BY created_at ASC
@@ -1788,14 +1826,40 @@ export class PostgresGraphStore implements GraphStore {
       target_node_id: string;
       relation_key: string | null;
       weight: number;
+      source_domain_id: string | null;
+      target_domain_id: string | null;
+      is_cross_domain: boolean;
     }>(
-      `SELECT id, source_node_id, target_node_id, relation_key, weight
+      `SELECT id, source_node_id, target_node_id, relation_key, weight,
+              source_domain_id, target_domain_id, is_cross_domain
          FROM ${this.table("ontology_edges")}
         WHERE company_id = $1 AND domain_id = $2
         ORDER BY created_at ASC
         LIMIT $3`,
       [companyId, domainId, limit],
     );
+
+    // Per-node-type counts are aggregated against the whole domain (not the
+    // bounded nodeRows slice) so they stay accurate regardless of the
+    // nodeLimit the snapshot was taken at.
+    const byNodeTypeRows = await this.db.query<{
+      node_type_id: string | null;
+      c: number;
+    }>(
+      `SELECT node_type_id, COUNT(*) AS c
+         FROM ${this.table("ontology_nodes")}
+        WHERE company_id = $1 AND domain_id = $2
+        GROUP BY node_type_id`,
+      [companyId, domainId],
+    );
+    const byNodeType: Record<string, number> = {};
+    for (const row of byNodeTypeRows) {
+      byNodeType[row.node_type_id ?? ""] = Number(row.c);
+    }
+
+    // Cross-domain edges are counted from the full edge set so the number
+    // matches what getGraphSnapshot already returned for total edges.
+    const crossDomainEdges = edgeRows.filter((e) => e.is_cross_domain).length;
 
     return {
       domainId,
@@ -1804,6 +1868,8 @@ export class PostgresGraphStore implements GraphStore {
         relationTypes: Number(counts.relation_types),
         nodes: Number(counts.nodes),
         edges: Number(counts.edges),
+        byNodeType,
+        crossDomainEdges,
       },
       nodes: nodeRows.map((n) => ({
         id: n.id,
@@ -1811,6 +1877,7 @@ export class PostgresGraphStore implements GraphStore {
         label: n.label,
         nodeTypeId: n.node_type_id,
         lifecycleState: n.lifecycle_state,
+        properties: n.properties,
       })),
       edges: edgeRows.map((e) => ({
         id: e.id,
@@ -1818,6 +1885,9 @@ export class PostgresGraphStore implements GraphStore {
         targetNodeId: e.target_node_id,
         relationKey: e.relation_key,
         weight: Number(e.weight),
+        sourceDomainId: e.source_domain_id,
+        targetDomainId: e.target_domain_id,
+        isCrossDomain: e.is_cross_domain,
       })),
     };
   }
@@ -3892,4 +3962,264 @@ export class PostgresGraphStore implements GraphStore {
 
     return { gap: gapAfter, resolution: resolutionRows[0]!, functionId, acquired };
   }
+
+  // -------------------------------------------------------------------------
+  // O10 — 数字副手 (Digital Aide) context aggregation
+  // -------------------------------------------------------------------------
+
+  /**
+   * Aggregate everything a domain-aware LLM would need to ground its answers
+   * for the 数字副手: the domain row, every node/relation type with its current
+   * instance count, the most recently mutated nodes, the business systems +
+   * sub-projects + action types bound to this domain, and aggregate counts.
+   *
+   * Kept inside PostgresGraphStore so all SQL stays namespaced and
+   * restricted-statement compliant with the host validator. UI consumes this
+   * via `usePluginData("describe-domain", { companyId, domainId })`.
+   */
+  async describeDomain(companyId: string, domainId: string): Promise<DescribeDomainResult> {
+    const [domain, nodeTypes, relationTypes, recentNodes, aggregate] = await Promise.all([
+      this.getDomain(companyId, domainId),
+      this.db.query<OntologyNodeTypeRow & { instance_count: string }>(
+        `SELECT ${PostgresGraphStore.NODE_TYPE_COLS},
+                (SELECT COUNT(*) FROM ${this.table("ontology_nodes")} n
+                  WHERE n.company_id = $1 AND n.domain_id = $2 AND n.node_type_id = nt.id) AS instance_count
+           FROM ${this.table("ontology_node_types")} nt
+          WHERE nt.company_id = $1 AND nt.domain_id = $2
+          ORDER BY nt.display_name ASC`,
+        [companyId, domainId],
+      ),
+      this.db.query<OntologyRelationTypeRow & { instance_count: string }>(
+        `SELECT ${PostgresGraphStore.RELATION_TYPE_COLS},
+                (SELECT COUNT(*) FROM ${this.table("ontology_edges")} e
+                  WHERE e.company_id = $1 AND e.domain_id = $2 AND e.relation_type_id = rt.id) AS instance_count
+           FROM ${this.table("ontology_relation_types")} rt
+          WHERE rt.company_id = $1 AND rt.domain_id = $2
+          ORDER BY rt.display_name ASC`,
+        [companyId, domainId],
+      ),
+      this.db.query<OntologyNodeRow & { node_type_key: string | null }>(
+        `SELECT n.id, n.company_id, n.domain_id, n.node_type_id, n.key, n.label,
+                n.lifecycle_state, n.version,
+                nt.key AS node_type_key
+           FROM ${this.table("ontology_nodes")} n
+           LEFT JOIN ${this.table("ontology_node_types")} nt
+             ON nt.company_id = n.company_id AND nt.id = n.node_type_id
+          WHERE n.company_id = $1 AND n.domain_id = $2
+          ORDER BY n.updated_at DESC, n.created_at DESC
+          LIMIT 20`,
+        [companyId, domainId],
+      ),
+      this.db.query<{
+        total_nodes: string;
+        total_edges: string;
+        business_systems: string;
+        sub_projects: string;
+        action_types: string;
+      }>(
+        `SELECT
+           (SELECT COUNT(*) FROM ${this.table("ontology_nodes")} n
+             WHERE n.company_id = $1 AND n.domain_id = $2) AS total_nodes,
+           (SELECT COUNT(*) FROM ${this.table("ontology_edges")} e
+             WHERE e.company_id = $1 AND e.domain_id = $2) AS total_edges,
+           (SELECT COUNT(*) FROM ${this.table("ontology_business_systems")} bs
+             WHERE bs.company_id = $1 AND bs.ontology_domain_id = $2 AND bs.is_deleted = false) AS business_systems,
+           (SELECT COUNT(*) FROM ${this.table("ontology_sub_projects")} sp
+             JOIN ${this.table("ontology_business_systems")} bs
+               ON bs.company_id = sp.company_id AND bs.id = sp.business_system_id
+            WHERE sp.company_id = $1 AND bs.ontology_domain_id = $2 AND sp.is_deleted = false) AS sub_projects,
+           (SELECT COUNT(*) FROM ${this.table("ontology_action_types")} at
+             WHERE at.company_id = $1 AND at.domain_id = $2 AND at.is_deleted = false) AS action_types`,
+        [companyId, domainId],
+      ),
+    ]);
+
+    if (!domain) {
+      throw new Error(`Domain not found: company=${companyId} domain=${domainId}`);
+    }
+
+    const businessSystems = await this.db.query<{
+      id: string;
+      code: string;
+      name: string;
+      status: string;
+    }>(
+      `SELECT id, code, name, status
+         FROM ${this.table("ontology_business_systems")}
+        WHERE company_id = $1 AND ontology_domain_id = $2 AND is_deleted = false
+        ORDER BY name ASC`,
+      [companyId, domainId],
+    );
+
+    const subProjects = businessSystems.length
+      ? await this.db.query<{
+          id: string;
+          business_system_id: string;
+          code: string;
+          name: string;
+          status: string;
+          type: string;
+        }>(
+          `SELECT sp.id, sp.business_system_id, sp.code, sp.name, sp.status, sp.type
+             FROM ${this.table("ontology_sub_projects")} sp
+             JOIN ${this.table("ontology_business_systems")} bs
+               ON bs.company_id = sp.company_id AND bs.id = sp.business_system_id
+            WHERE sp.company_id = $1
+              AND bs.ontology_domain_id = $2
+              AND sp.is_deleted = false
+            ORDER BY bs.name ASC, sp.name ASC`,
+          [companyId, domainId],
+        )
+      : [];
+
+    const actionTypes = await this.db.query<{
+      id: string;
+      key: string;
+      display_name: string;
+      kind: string;
+      status: string;
+    }>(
+      `SELECT id, key, display_name, kind, status
+         FROM ${this.table("ontology_action_types")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+        ORDER BY display_name ASC`,
+      [companyId, domainId],
+    );
+
+    const agg = aggregate[0] ?? {
+      total_nodes: "0",
+      total_edges: "0",
+      business_systems: "0",
+      sub_projects: "0",
+      action_types: "0",
+    };
+
+    return {
+      domain,
+      nodeTypes: nodeTypes.map((row) => ({
+        id: row.id,
+        key: row.key,
+        displayName: row.display_name,
+        description: row.description,
+        layer: row.layer,
+        propertiesSchema: row.properties_schema,
+        instanceCount: Number(row.instance_count),
+      })),
+      relationTypes: relationTypes.map((row) => ({
+        id: row.id,
+        key: row.key,
+        displayName: row.display_name,
+        description: row.description,
+        directed: row.directed,
+        cardinality: row.cardinality,
+        instanceCount: Number(row.instance_count),
+      })),
+      recentNodes: recentNodes.map((row) => ({
+        id: row.id,
+        key: row.key,
+        label: row.label,
+        nodeTypeKey: row.node_type_key,
+      })),
+      counts: {
+        totalNodes: Number(agg.total_nodes),
+        totalEdges: Number(agg.total_edges),
+        businessSystems: Number(agg.business_systems),
+        subProjects: Number(agg.sub_projects),
+        actionTypes: Number(agg.action_types),
+      },
+      businessSystems: businessSystems.map((row) => ({
+        id: row.id,
+        code: row.code,
+        name: row.name,
+        status: row.status,
+      })),
+      subProjects: subProjects.map((row) => ({
+        id: row.id,
+        businessSystemId: row.business_system_id,
+        code: row.code,
+        name: row.name,
+        status: row.status,
+        type: row.type,
+      })),
+      actionTypes: actionTypes.map((row) => ({
+        id: row.id,
+        key: row.key,
+        displayName: row.display_name,
+        kind: row.kind,
+        status: row.status,
+      })),
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// O10 — describeDomain() result shape
+// ---------------------------------------------------------------------------
+
+export interface DescribeDomainNodeType {
+  id: string;
+  key: string;
+  displayName: string;
+  description: string | null;
+  layer: NodeLayer;
+  propertiesSchema: Record<string, unknown> | null;
+  instanceCount: number;
+}
+
+export interface DescribeDomainRelationType {
+  id: string;
+  key: string;
+  displayName: string;
+  description: string | null;
+  directed: boolean;
+  cardinality: LinkCardinality;
+  instanceCount: number;
+}
+
+export interface DescribeDomainRecentNode {
+  id: string;
+  key: string;
+  label: string;
+  nodeTypeKey: string | null;
+}
+
+export interface DescribeDomainBusinessSystem {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+}
+
+export interface DescribeDomainSubProject {
+  id: string;
+  businessSystemId: string;
+  code: string;
+  name: string;
+  status: string;
+  type: string;
+}
+
+export interface DescribeDomainActionType {
+  id: string;
+  key: string;
+  displayName: string;
+  kind: string;
+  status: string;
+}
+
+export interface DescribeDomainResult {
+  domain: OntologyDomainRow;
+  nodeTypes: DescribeDomainNodeType[];
+  relationTypes: DescribeDomainRelationType[];
+  recentNodes: DescribeDomainRecentNode[];
+  counts: {
+    totalNodes: number;
+    totalEdges: number;
+    businessSystems: number;
+    subProjects: number;
+    actionTypes: number;
+  };
+  businessSystems: DescribeDomainBusinessSystem[];
+  subProjects: DescribeDomainSubProject[];
+  actionTypes: DescribeDomainActionType[];
 }

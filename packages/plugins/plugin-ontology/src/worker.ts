@@ -9,10 +9,20 @@ import {
   PostgresGraphStore,
   type CapabilityCandidate,
   type CognitionShard,
+  type DescribeDomainResult,
   type GraphStore,
   type ImpactDirection,
 } from "./graph/GraphStore.js";
 import { extractRepoDraft } from "./cognition/AstExtractor.js";
+import { AideStore, type AideCitation } from "./aide/AideStore.js";
+import {
+  AideConfigError,
+  getClient,
+  getModel,
+  loadClaudeConfig,
+  probeClaudeConfig,
+} from "./aide/ClaudeClient.js";
+import { extractCitations, stripCitationTrailer } from "./aide/citations.js";
 import type {
   ActionKind,
   ActionTypeStatus,
@@ -49,6 +59,7 @@ import type {
 
 let activeContext: PluginContext | null = null;
 let graphStore: GraphStore | null = null;
+let aideStore: AideStore | null = null;
 
 function requireContext(): PluginContext {
   if (!activeContext) {
@@ -63,6 +74,104 @@ function requireGraphStore(): GraphStore {
   }
   return graphStore;
 }
+
+function requireAideStore(): AideStore {
+  if (!aideStore) {
+    aideStore = new AideStore(requireContext().db);
+  }
+  return aideStore;
+}
+
+// ---------------------------------------------------------------------------
+// O10 — 数字副手 prompt helper (citation parsing lives in ./aide/citations)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build the system prompt for the digital-aide chat. We deliberately stay
+ * terse and put the schema directly inline so the model cannot invent objects
+ * that do not exist. The hard cap is the worker's `describeDomain()` payload;
+ * anything not listed there must be answered as "未建模".
+ */
+function buildAideSystemPrompt(snapshot: DescribeDomainResult): string {
+  const lines: string[] = [];
+  lines.push(
+    `你是「数字副手」,专门回答关于本体域 ${snapshot.domain.slug} (id=${snapshot.domain.id}, name=${snapshot.domain.display_name}, v${snapshot.domain.version}) 的问题。`,
+  );
+  lines.push("");
+  lines.push(
+    "你只能引用以下本体数据回答问题,不要编造对象、关系、属性或数值。如果用户问到本体内未建模的信息,直接说「本体内未建模此字段」,不要瞎猜。",
+  );
+  lines.push("");
+  lines.push(`## 1. 对象类型 (共 ${snapshot.nodeTypes.length} 个)`);
+  if (snapshot.nodeTypes.length === 0) {
+    lines.push("  (无)");
+  }
+  for (const nt of snapshot.nodeTypes) {
+    const propCount = nt.propertiesSchema && typeof nt.propertiesSchema === "object"
+      ? Object.keys(nt.propertiesSchema).length
+      : 0;
+    lines.push(
+      `  - ${nt.key} | ${nt.displayName} | 实例=${nt.instanceCount} | 属性=${propCount}`,
+    );
+  }
+  lines.push("");
+  lines.push(`## 2. 关系类型 (共 ${snapshot.relationTypes.length} 个)`);
+  if (snapshot.relationTypes.length === 0) {
+    lines.push("  (无)");
+  }
+  for (const rt of snapshot.relationTypes) {
+    lines.push(
+      `  - ${rt.key} | ${rt.displayName} | 方向=${rt.directed ? "directed" : "undirected"} | 实例=${rt.instanceCount}`,
+    );
+  }
+  lines.push("");
+  lines.push(`## 3. 最近修改节点 (展示 ${snapshot.recentNodes.length} 条)`);
+  if (snapshot.recentNodes.length === 0) {
+    lines.push("  (无)");
+  }
+  for (const n of snapshot.recentNodes) {
+    lines.push(`  - ${n.key} | ${n.label} | 类型=${n.nodeTypeKey ?? "(未分类)"}`);
+  }
+  lines.push("");
+  lines.push(
+    `## 4. 真实应用系统 (共 ${snapshot.businessSystems.length} 个,绑定到本域)`,
+  );
+  if (snapshot.businessSystems.length === 0) {
+    lines.push("  (无)");
+  }
+  for (const bs of snapshot.businessSystems) {
+    lines.push(`  - ${bs.code} | ${bs.name} | status=${bs.status}`);
+  }
+  lines.push("");
+  lines.push(`## 5. 业务子项目 (共 ${snapshot.subProjects.length} 个)`);
+  if (snapshot.subProjects.length === 0) {
+    lines.push("  (无)");
+  }
+  for (const sp of snapshot.subProjects) {
+    lines.push(`  - ${sp.code} | ${sp.name} | type=${sp.type} | status=${sp.status}`);
+  }
+  lines.push("");
+  lines.push(`## 6. Action / API 类型 (共 ${snapshot.actionTypes.length} 个)`);
+  if (snapshot.actionTypes.length === 0) {
+    lines.push("  (无)");
+  }
+  for (const at of snapshot.actionTypes) {
+    lines.push(`  - ${at.key} | ${at.displayName} | kind=${at.kind} | status=${at.status}`);
+  }
+  lines.push("");
+  lines.push("回答要求:");
+  lines.push("1. 用中文回答,除非用户用英文提问。");
+  lines.push(
+    "2. 每条回答末尾必须添加一行引用,格式:`[cite:kind:id,kind:id,...]`(逗号分隔)。kind 只能取: node-type | relation-type | node | sub-project | action-type | business-system。",
+  );
+  lines.push("3. 引用行必须独占一行,放在回答末尾,不要嵌在正文中。");
+  lines.push("4. 没有可引用的本体数据时,引用行可以为空:`[cite:]`。");
+  return lines.join("\n");
+}
+
+/** Parse the trailing `[cite:kind:id,...]` line from an LLM response. The
+ *  shared implementation lives in ./aide/citations so unit tests can import
+ *  it without dragging in the whole worker module. */
 
 /** Read the first value of a query parameter that may arrive as string[]. */
 function queryString(value: string | string[] | undefined): string | undefined {
@@ -345,6 +454,7 @@ const plugin = definePlugin({
         key: requireString(params.key, "key"),
         label: requireString(params.label, "label"),
         nodeTypeId: typeof params.nodeTypeId === "string" ? params.nodeTypeId : null,
+        properties: optionalRecord(params.properties),
       });
       return { node };
     });
@@ -361,13 +471,31 @@ const plugin = definePlugin({
     });
 
     ctx.actions.register("update-node", async (params) => {
+      const updates: { label?: string; properties?: Record<string, unknown> } = {};
+      if (typeof params.label === "string") updates.label = params.label;
+      const props = optionalRecord(params.properties);
+      if (props !== undefined) updates.properties = props;
       const node = await store.updateNode(
         requireString(params.companyId, "companyId"),
         requireString(params.nodeId, "nodeId"),
-        { label: typeof params.label === "string" ? params.label : undefined },
+        updates,
       );
       if (!node) throw new Error("Node not found");
       return { node };
+    });
+
+    // Mirror of the snapshot-domain HTTP route so the plugin UI's top status
+    // pill can trigger a snapshot via usePluginAction without round-tripping
+    // through the HTTP layer.
+    ctx.actions.register("snapshot-domain", async (params) => {
+      const snapshot = await store.snapshotDomain(
+        requireString(params.companyId, "companyId"),
+        requireString(params.domainId, "domainId"),
+        typeof params.description === "string" ? params.description : "",
+        typeof params.createdBy === "string" ? params.createdBy : "system",
+      );
+      if (!snapshot) throw new Error("Domain not found");
+      return { snapshot };
     });
 
     ctx.actions.register("delete-node", async (params) => {
@@ -845,6 +973,122 @@ const plugin = definePlugin({
         };
       },
     );
+
+    // -----------------------------------------------------------------------
+    // O10 — 数字副手 (Digital Aide) chat surface
+    // -----------------------------------------------------------------------
+
+    // Eagerly probe the aide config so any missing ~/.claude/settings.json env
+    // surfaces in the worker log at startup rather than as a confusing 500
+    // mid-conversation. The actual SDK client is built lazily on first use.
+    try {
+      const cfg = loadClaudeConfig();
+      ctx.logger.info("数字副手 ready", {
+        model: cfg.model,
+        baseURL: cfg.baseURL,
+      });
+    } catch (err) {
+      if (err instanceof AideConfigError) {
+        ctx.logger.warn("数字副手 disabled: " + err.reason, {
+          hint: "Add ANTHROPIC_AUTH_TOKEN / ANTHROPIC_BASE_URL / ANTHROPIC_MODEL to ~/.claude/settings.json env",
+        });
+      } else {
+        throw err;
+      }
+    }
+
+    // Backs usePluginData("describe-domain", { companyId, domainId }) — the
+    // payload the worker feeds into the LLM system prompt, plus a non-throwing
+    // config probe so the UI can render a setup card if Claude is unconfigured.
+    ctx.data.register("describe-domain", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const probe = probeClaudeConfig();
+      const result = await store.describeDomain(companyId, domainId);
+      return { ...result, configured: probe.configured, configReason: probe.reason };
+    });
+
+    // Backs usePluginData("aide-history", { companyId, domainId }) — full chat
+    // transcript in chronological order for the current domain. The worker
+    // trims this list to the most recent 50 turns before sending to the LLM.
+    ctx.data.register("aide-history", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const messages = await requireAideStore().loadHistory(companyId, domainId);
+      return { messages };
+    });
+
+    // Backs usePluginAction("ask-aide", { companyId, domainId, message }).
+    // Streams Claude tokens to `ontology.aide.stream.${companyId}.${domainId}`
+    // and persists the final assistant message (with parsed citations) when
+    // the stream completes. Errors are propagated through the same channel.
+    ctx.actions.register("ask-aide", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const userMessage = requireString(params.message, "message");
+      const aide = requireAideStore();
+      const streamChannel = `ontology.aide.stream.${companyId}.${domainId}`;
+
+      await aide.appendMessage(companyId, domainId, "user", userMessage, []);
+
+      const [snapshot, history] = await Promise.all([
+        store.describeDomain(companyId, domainId),
+        aide.loadHistory(companyId, domainId, 500),
+      ]);
+
+      const systemPrompt = buildAideSystemPrompt(snapshot);
+      const recentHistory = history.slice(-50);
+      const llmMessages: Array<{ role: "user" | "assistant"; content: string }> = [
+        ...recentHistory
+          .filter((m) => m.role === "user" || m.role === "assistant")
+          .map((m) => ({ role: m.role, content: m.content })),
+        { role: "user", content: userMessage },
+      ];
+
+      ctx.streams.open(streamChannel, companyId);
+      let acc = "";
+      try {
+        const client = getClient();
+        const stream = client.messages.stream({
+          model: getModel(),
+          max_tokens: 2048,
+          system: systemPrompt,
+          messages: llmMessages,
+        });
+        stream.on("text", (delta: string) => {
+          acc += delta;
+          ctx.streams.emit(streamChannel, { type: "token", text: delta });
+        });
+        await stream.finalMessage();
+        const citations = extractCitations(acc);
+        const cleanContent = stripCitationTrailer(acc);
+        await aide.appendMessage(
+          companyId,
+          domainId,
+          "assistant",
+          cleanContent,
+          citations,
+        );
+        ctx.streams.emit(streamChannel, { type: "done", citations });
+        return { ok: true, citations };
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        ctx.streams.emit(streamChannel, { type: "error", message });
+        throw err;
+      } finally {
+        ctx.streams.close(streamChannel);
+      }
+    });
+
+    // Hard-clear the persisted session — backs the "清空会话" button. We
+    // intentionally do not throw if the channel is mid-stream; the UI just
+    // stops showing those tokens after a page reload.
+    ctx.actions.register("aide-clear-session", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const result = await requireAideStore().clearSession(companyId, domainId);
+      return result;
+    });
 
     ctx.logger.info("Ontology plugin worker started", { namespace: ctx.db.namespace });
   },

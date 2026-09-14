@@ -1,0 +1,607 @@
+import {
+  StatusBadge,
+  usePluginAction,
+  usePluginData,
+  usePluginStream,
+} from "@paperclipai/plugin-sdk/ui";
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactElement,
+} from "react";
+import { t } from "./isZh.js";
+
+// ---------------------------------------------------------------------------
+// Types — mirror what the worker returns so we don't have to share a module.
+// ---------------------------------------------------------------------------
+
+interface DescribeDomainNodeType {
+  id: string;
+  key: string;
+  displayName: string;
+  description: string | null;
+  layer: string;
+  propertiesSchema: Record<string, unknown> | null;
+  instanceCount: number;
+}
+
+interface DescribeDomainRelationType {
+  id: string;
+  key: string;
+  displayName: string;
+  description: string | null;
+  directed: boolean;
+  cardinality: string;
+  instanceCount: number;
+}
+
+interface DescribeDomainRecentNode {
+  id: string;
+  key: string;
+  label: string;
+  nodeTypeKey: string | null;
+}
+
+interface DescribeDomainBusinessSystem {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+}
+
+interface DescribeDomainSubProject {
+  id: string;
+  businessSystemId: string;
+  code: string;
+  name: string;
+  status: string;
+  type: string;
+}
+
+interface DescribeDomainActionType {
+  id: string;
+  key: string;
+  displayName: string;
+  kind: string;
+  status: string;
+}
+
+interface DescribeDomainDomain {
+  id: string;
+  slug: string;
+  display_name: string;
+  version: number;
+}
+
+interface DescribeDomainResult {
+  domain: DescribeDomainDomain;
+  nodeTypes: DescribeDomainNodeType[];
+  relationTypes: DescribeDomainRelationType[];
+  recentNodes: DescribeDomainRecentNode[];
+  counts: {
+    totalNodes: number;
+    totalEdges: number;
+    businessSystems: number;
+    subProjects: number;
+    actionTypes: number;
+  };
+  businessSystems: DescribeDomainBusinessSystem[];
+  subProjects: DescribeDomainSubProject[];
+  actionTypes: DescribeDomainActionType[];
+  configured: boolean;
+  configReason?: string;
+}
+
+type AideCitation =
+  | { kind: "node-type"; id: string }
+  | { kind: "relation-type"; id: string }
+  | { kind: "node"; id: string }
+  | { kind: "sub-project"; id: string }
+  | { kind: "action-type"; id: string }
+  | { kind: "business-system"; id: string };
+
+interface AideHistoryMessage {
+  id: number;
+  role: "user" | "assistant";
+  content: string;
+  citations: AideCitation[];
+  createdAt: string;
+}
+
+type AideStreamEvent =
+  | { type: "token"; text: string }
+  | { type: "done"; citations: AideCitation[] }
+  | { type: "error"; message: string };
+
+interface LocalMessage {
+  id: string;
+  role: "user" | "assistant";
+  content: string;
+  streaming: boolean;
+  citations: AideCitation[];
+  createdAt: string;
+  error?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Component
+// ---------------------------------------------------------------------------
+
+/**
+ * 数字副手 (Digital Aide) tab — real Claude-backed chat against the current
+ * ontology domain. Replaces the earlier placeholder card with a working
+ * surface that streams tokens, persists history, and renders structured
+ * citation chips per assistant message.
+ *
+ * One session per (companyId, domainId); opening this tab always resumes the
+ * previous conversation for that domain. The worker manages persistence in
+ * `ontology_aide_sessions` / `ontology_aide_messages`; the UI just keeps a
+ * working copy in component state and replays history on mount.
+ */
+export function SandboxTab({
+  companyId,
+  domainId,
+  domainVersion,
+}: {
+  companyId: string;
+  domainId: string;
+  domainVersion: number;
+}): ReactElement {
+  const streamChannel = `ontology.aide.stream.${companyId}.${domainId}`;
+  const stream = usePluginStream<AideStreamEvent>(streamChannel);
+
+  const describe = usePluginData<DescribeDomainResult>("describe-domain", {
+    companyId,
+    domainId,
+  });
+  const history = usePluginData<{ messages: AideHistoryMessage[] }>("aide-history", {
+    companyId,
+    domainId,
+  });
+  const askAide = usePluginAction("ask-aide");
+  const clearSession = usePluginAction("aide-clear-session");
+
+  const [messages, setMessages] = useState<LocalMessage[]>([]);
+  const [draft, setDraft] = useState("");
+  const [sending, setSending] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const seenTokenKeysRef = useRef<Set<string>>(new Set());
+
+  // Reset local state when switching domains so we never render another
+  // domain's tokens against the current channel.
+  useEffect(() => {
+    seenTokenKeysRef.current = new Set();
+    setMessages([]);
+    setDraft("");
+    setSending(false);
+    setClearing(false);
+  }, [companyId, domainId]);
+
+  // Seed messages from persisted history once it lands.
+  useEffect(() => {
+    if (!history.data) return;
+    setMessages(
+      history.data.messages.map((m) => ({
+        id: `history-${m.id}`,
+        role: m.role,
+        content: m.content,
+        streaming: false,
+        citations: m.citations,
+        createdAt: m.createdAt,
+      })),
+    );
+  }, [history.data]);
+
+  // Apply each stream event to local state. The worker emits a stable stream
+  // for the whole `(company, domain)` so we always act on the last assistant
+  // message (the one we just optimistically inserted when the user sent).
+  useEffect(() => {
+    const events = stream.events;
+    if (events.length === 0) return;
+
+    setMessages((prev) => applyEvents(prev, events, seenTokenKeysRef.current));
+  }, [stream.events]);
+
+  const onSubmit = useCallback(
+    async (e?: React.SyntheticEvent) => {
+      e?.preventDefault();
+      const text = draft.trim();
+      if (text.length === 0 || sending) return;
+      setSending(true);
+      const userMsg: LocalMessage = {
+        id: `local-user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        role: "user",
+        content: text,
+        streaming: false,
+        citations: [],
+        createdAt: new Date().toISOString(),
+      };
+      const assistantMsg: LocalMessage = {
+        id: `local-assistant-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        role: "assistant",
+        content: "",
+        streaming: true,
+        citations: [],
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, userMsg, assistantMsg]);
+      seenTokenKeysRef.current = new Set();
+      setDraft("");
+      try {
+        await askAide({ companyId, domainId, message: text });
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err);
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMsg.id
+              ? { ...m, streaming: false, error: reason }
+              : m,
+          ),
+        );
+      } finally {
+        setSending(false);
+      }
+    },
+    [askAide, companyId, domainId, draft, sending],
+  );
+
+  const onClear = useCallback(async () => {
+    if (clearing) return;
+    setClearing(true);
+    try {
+      await clearSession({ companyId, domainId });
+      seenTokenKeysRef.current = new Set();
+      setMessages([]);
+      await history.refresh();
+    } finally {
+      setClearing(false);
+    }
+  }, [clearSession, clearing, companyId, domainId, history]);
+
+  const onKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
+        e.preventDefault();
+        void onSubmit();
+      }
+    },
+    [onSubmit],
+  );
+
+  const configured = describe.data?.configured ?? false;
+  const configReason = describe.data?.configReason;
+  const loading = describe.loading || history.loading;
+
+  return (
+    <div className="flex h-full flex-col gap-3 p-4">
+      <header className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card/70 px-4 py-3">
+        <div className="min-w-0">
+          <div className="truncate text-(length:--text-base) font-semibold">
+            {t("数字副手", "Digital Aide")}
+          </div>
+          <div className="mt-0.5 truncate text-(length:--text-nano) text-muted-foreground">
+            {t("域", "Domain")} {domainId} · v{domainVersion}
+          </div>
+        </div>
+        <div className="flex items-center gap-2">
+          <StatusBadge
+            label={configured ? t("已配置", "Configured") : t("未配置", "Not configured")}
+            status={configured ? "ok" : "warning"}
+          />
+          <button
+            type="button"
+            disabled={clearing || messages.length === 0}
+            onClick={() => { void onClear(); }}
+            className="rounded-full border border-border bg-background px-3 py-1 text-(length:--text-nano) font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {clearing ? t("清空中…", "Clearing…") : t("清空会话", "Clear session")}
+          </button>
+        </div>
+      </header>
+
+      {!configured ? (
+        <SetupCard reason={configReason ?? t("数字副手尚未配置", "Digital aide is not configured")} />
+      ) : (
+        <>
+          <MessageList
+            messages={messages}
+            describe={describe.data ?? null}
+            loading={loading && messages.length === 0}
+          />
+          <Composer
+            value={draft}
+            disabled={sending}
+            onChange={setDraft}
+            onKeyDown={onKeyDown}
+            onSubmit={() => { void onSubmit(); }}
+          />
+        </>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function SetupCard({ reason }: { reason: string }): ReactElement {
+  return (
+    <div className="flex flex-1 items-center justify-center p-6">
+      <div className="w-[min(28rem,calc(100%-2rem))] rounded-xl border border-dashed border-border bg-card/60 p-5">
+        <div className="mb-2 text-(length:--text-base) font-semibold">
+          {t("需要配置 Claude", "Claude configuration required")}
+        </div>
+        <p className="text-(length:--text-compact) text-muted-foreground">
+          {t(
+            "数字副手依赖 Claude API。 请在 ~/.claude/settings.json 的 env 段配置 ANTHROPIC_AUTH_TOKEN / ANTHROPIC_BASE_URL / ANTHROPIC_MODEL 三个键,然后重启 worker。",
+            "Digital Aide depends on the Claude API. Configure ANTHROPIC_AUTH_TOKEN, ANTHROPIC_BASE_URL, and ANTHROPIC_MODEL under the env block in ~/.claude/settings.json, then restart the worker.",
+          )}
+        </p>
+        <div className="mt-3 rounded-md border border-border bg-background px-2 py-1 font-mono text-(length:--text-nano) text-muted-foreground">
+          {reason}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MessageList({
+  messages,
+  describe,
+  loading,
+}: {
+  messages: LocalMessage[];
+  describe: DescribeDomainResult | null;
+  loading: boolean;
+}): ReactElement {
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll on every new token / message so the user always sees the
+  // tail of the assistant response as it streams.
+  useLayoutEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollTop = el.scrollHeight;
+  }, [messages]);
+
+  if (loading) {
+    return (
+      <div className="flex flex-1 items-center justify-center rounded-xl border border-border bg-card/40 text-(length:--text-compact) text-muted-foreground">
+        {t("正在加载历史…", "Loading history…")}
+      </div>
+    );
+  }
+
+  if (messages.length === 0) {
+    return (
+      <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card/40 p-6 text-center">
+        <div className="text-(length:--text-base) font-semibold">
+          {t("开始与副手对话", "Start a conversation")}
+        </div>
+        <p className="max-w-md text-(length:--text-compact) text-muted-foreground">
+          {describe
+            ? t(
+                `本域共 ${describe.nodeTypes.length} 个对象类型、${describe.relationTypes.length} 个关系类型、${describe.counts.businessSystems} 个真实应用系统。问点什么 — 比如「这个域有哪些对象类型?」或「列出所有 Action」。`,
+                `This domain has ${describe.nodeTypes.length} node types, ${describe.relationTypes.length} relation types, ${describe.counts.businessSystems} business systems. Ask anything — e.g. "What object types are in this domain?" or "List all Actions".`,
+              )
+            : t("问点什么吧。", "Ask anything.")}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      ref={scrollRef}
+      className="flex-1 overflow-y-auto rounded-xl border border-border bg-card/30 p-3"
+    >
+      <ul className="flex flex-col gap-3">
+        {messages.map((m) => (
+          <li key={m.id}>
+            <Bubble message={m} describe={describe} />
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
+}
+
+function Bubble({
+  message,
+  describe,
+}: {
+  message: LocalMessage;
+  describe: DescribeDomainResult | null;
+}): ReactElement {
+  const isUser = message.role === "user";
+  return (
+    <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
+      <div
+        className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-(length:--text-compact) shadow-sm ${
+          isUser
+            ? "bg-primary text-primary-foreground"
+            : "bg-card text-foreground border border-border"
+        }`}
+      >
+        {message.content.length === 0 && message.streaming ? (
+          <BouncingDots />
+        ) : (
+          <div>{message.content}</div>
+        )}
+        {!isUser && !message.streaming && message.citations.length > 0 && (
+          <CitationChips citations={message.citations} describe={describe} />
+        )}
+        {message.error ? (
+          <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-(length:--text-nano) text-destructive">
+            {t("流式中断: ", "Stream interrupted: ")}
+            {message.error}
+          </div>
+        ) : null}
+      </div>
+    </div>
+  );
+}
+
+function BouncingDots(): ReactElement {
+  return (
+    <div className="flex items-center gap-1 py-1">
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.3s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60 [animation-delay:-0.15s]" />
+      <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted-foreground/60" />
+    </div>
+  );
+}
+
+function CitationChips({
+  citations,
+  describe,
+}: {
+  citations: AideCitation[];
+  describe: DescribeDomainResult | null;
+}): ReactElement {
+  const labelByKey = useMemo(() => {
+    const out = new Map<string, string>();
+    if (!describe) return out;
+    for (const nt of describe.nodeTypes) out.set(`node-type:${nt.id}`, nt.displayName);
+    for (const rt of describe.relationTypes) out.set(`relation-type:${rt.id}`, rt.displayName);
+    for (const n of describe.recentNodes) out.set(`node:${n.id}`, n.label);
+    for (const bs of describe.businessSystems) out.set(`business-system:${bs.id}`, bs.name);
+    for (const sp of describe.subProjects) out.set(`sub-project:${sp.id}`, sp.name);
+    for (const at of describe.actionTypes) out.set(`action-type:${at.id}`, at.displayName);
+    return out;
+  }, [describe]);
+
+  return (
+    <div className="mt-2 flex flex-wrap gap-1.5">
+      {citations.map((c, idx) => {
+        const label = labelByKey.get(`${c.kind}:${c.id}`) ?? c.id;
+        return (
+          <span
+            key={`${c.kind}-${c.id}-${idx}`}
+            title={`${c.kind}: ${c.id}`}
+            className="rounded-full bg-muted px-2 py-0.5 text-(length:--text-nano) text-muted-foreground"
+          >
+            <span className="mr-1 font-medium text-foreground/70">{kindLabel(c.kind)}</span>
+            {label}
+          </span>
+        );
+      })}
+    </div>
+  );
+}
+
+function kindLabel(kind: AideCitation["kind"]): string {
+  switch (kind) {
+    case "node-type":
+      return t("对象类型", "NodeType");
+    case "relation-type":
+      return t("关系类型", "RelType");
+    case "node":
+      return t("节点", "Node");
+    case "sub-project":
+      return t("子项目", "SubProject");
+    case "action-type":
+      return t("Action", "Action");
+    case "business-system":
+      return t("应用系统", "System");
+  }
+}
+
+function Composer({
+  value,
+  disabled,
+  onChange,
+  onKeyDown,
+  onSubmit,
+}: {
+  value: string;
+  disabled: boolean;
+  onChange: (next: string) => void;
+  onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
+  onSubmit: () => void;
+}): ReactElement {
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        onSubmit();
+      }}
+      className="flex items-end gap-2 rounded-xl border border-border bg-card/70 p-2"
+    >
+      <textarea
+        value={value}
+        disabled={disabled}
+        onChange={(e) => onChange(e.target.value)}
+        onKeyDown={onKeyDown}
+        placeholder={t(
+          "问点什么…Enter 发送,Shift+Enter 换行",
+          "Ask anything… Enter to send, Shift+Enter for newline",
+        )}
+        rows={2}
+        className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-(length:--text-compact) text-foreground outline-none focus:border-primary disabled:opacity-60"
+      />
+      <button
+        type="submit"
+        disabled={disabled || value.trim().length === 0}
+        className="rounded-md bg-primary px-3 py-2 text-(length:--text-compact) font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        {disabled ? t("发送中…", "Sending…") : t("发送", "Send")}
+      </button>
+    </form>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Stream event reducer
+// ---------------------------------------------------------------------------
+
+/**
+ * Fold an incoming batch of stream events into the local message list.
+ * Tokens/done/errors always apply to the last assistant message; we use the
+ * `seenKeys` set to make this idempotent across React strict-mode double
+ * renders and dependency refreshes.
+ */
+function applyEvents(
+  prev: LocalMessage[],
+  events: AideStreamEvent[],
+  _seenKeys: Set<string>,
+): LocalMessage[] {
+  if (prev.length === 0) return prev;
+  const next = prev.slice();
+  for (const ev of events) {
+    const lastIdx = lastAssistantIndex(next);
+    if (lastIdx < 0) continue;
+    const last = next[lastIdx];
+    if (!last) continue;
+    if (ev.type === "token") {
+      if (last.streaming) {
+        next[lastIdx] = { ...last, content: last.content + ev.text };
+      }
+    } else if (ev.type === "done") {
+      next[lastIdx] = {
+        ...last,
+        streaming: false,
+        citations: ev.citations,
+      };
+    } else if (ev.type === "error") {
+      next[lastIdx] = {
+        ...last,
+        streaming: false,
+        error: ev.message,
+      };
+    }
+  }
+  return next;
+}
+
+function lastAssistantIndex(messages: LocalMessage[]): number {
+  for (let i = messages.length - 1; i >= 0; i -= 1) {
+    if (messages[i]?.role === "assistant") return i;
+  }
+  return -1;
+}

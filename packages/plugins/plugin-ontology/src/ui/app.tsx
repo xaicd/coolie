@@ -16,6 +16,10 @@ import {
 } from "react";
 import { type GraphNode, type GraphEdge, type GraphNodeType, GraphView, toneFor } from "./graph-view.js";
 import { Workbench } from "./workbench.js";
+import { ChatTab } from "./ChatTab.js";
+import { SandboxTab } from "./SandboxTab.js";
+import { TopStatusBar } from "./TopStatusBar.js";
+import { NodePropertyEditor } from "./NodePropertyEditor.js";
 
 /**
  * Minimal plugin-side i18n. Plugin UI runs sandboxed and does not receive the
@@ -24,19 +28,7 @@ import { Workbench } from "./workbench.js";
  * We read that and pick Chinese vs English. `zh`, `zh-CN`, `zh-TW` all count as
  * Chinese; everything else falls back to English.
  */
-function isZh(): boolean {
-  try {
-    const v = typeof localStorage !== "undefined" ? localStorage.getItem("coolie.locale") : null;
-    const lang = (v || (typeof navigator !== "undefined" ? navigator.language : "") || "en").toLowerCase();
-    return lang.startsWith("zh");
-  } catch {
-    return false;
-  }
-}
-/** Pick a localized string: t(chinese, english). Evaluated at render time. */
-function t(zh: string, en: string): string {
-  return isZh() ? zh : en;
-}
+import { t } from "./isZh.js";
 
 /**
  * Derive a URL-safe slug from a display name. ASCII letters/digits are kept
@@ -80,7 +72,14 @@ interface OntologyRelationType {
 }
 
 interface GraphSnapshot {
-  counts: { nodeTypes: number; relationTypes: number; nodes: number; edges: number };
+  counts: {
+    nodeTypes: number;
+    relationTypes: number;
+    nodes: number;
+    edges: number;
+    byNodeType?: Record<string, number>;
+    crossDomainEdges?: number;
+  };
   nodes?: GraphNode[];
   edges?: GraphEdge[];
 }
@@ -197,7 +196,7 @@ export function OntologyPage({ context }: PluginPageProps): ReactElement {
   return <OntologyWorkbench companyId={companyId} />;
 }
 
-type WorkbenchView = "graph" | "table" | "schema" | "cognition" | "capabilities";
+type WorkbenchView = "graph" | "table" | "schema" | "cognition" | "capabilities" | "dialogue" | "sandbox";
 
 const DRAG_MIME = "application/x-ontology-node-type-id";
 
@@ -222,6 +221,8 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
     { id: "schema", label: "Schema", icon: "⊙" },
     { id: "cognition", label: t("认知", "Cognition"), icon: "⚡" },
     { id: "capabilities", label: t("能力", "Capabilities"), icon: "◈" },
+    { id: "dialogue", label: t("对话", "Dialogue"), icon: "💬" },
+    { id: "sandbox", label: t("数字副手", "Digital Aide"), icon: "🤝" },
   ];
 
   return (
@@ -287,6 +288,7 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          <TopStatusBar companyId={companyId} domain={activeDomain} onSnapshot={refreshDomains} />
           <button
             onClick={() => setRightOpen(o => !o)}
             title={t("切换右侧面板", "Toggle right panel")}
@@ -577,6 +579,11 @@ function DomainWorkspace({
               >
                 <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: toneFor(nt.id) }} />
                 <span className="flex-1 truncate">{nt.display_name || nt.key}</span>
+                {(counts?.byNodeType?.[nt.id] ?? 0) > 0 && (
+                  <span className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-(length:--text-nano) tabular-nums text-muted-foreground">
+                    {counts!.byNodeType![nt.id]}
+                  </span>
+                )}
               </div>
             ))
           )}
@@ -620,6 +627,14 @@ function DomainWorkspace({
         )}
         {view === "cognition" && <CognitionTab companyId={companyId} />}
         {view === "capabilities" && <CapabilitiesTab companyId={companyId} />}
+        {view === "dialogue" && <ChatTab />}
+        {view === "sandbox" && domain && (
+          <SandboxTab
+            companyId={companyId}
+            domainId={domain.id}
+            domainVersion={domain.version}
+          />
+        )}
 
         {simulateNode && (
           <ImpactSimulationModal
@@ -653,6 +668,11 @@ function DomainWorkspace({
                 <StatCard label={t("关系数", "Edges")} value={counts.edges} />
                 <StatCard label={t("类型数", "Node types")} value={counts.nodeTypes} />
                 <StatCard label={t("关系类型", "Rel types")} value={counts.relationTypes} />
+                <StatCard
+                  label={t("跨域关系", "Cross-domain")}
+                  value={counts.crossDomainEdges ?? 0}
+                />
+                <StatCard label={t("类型节点", "Typed nodes")} value={Object.values(counts.byNodeType ?? {}).reduce((s, n) => s + n, 0)} />
               </div>
             </div>
           )}
@@ -672,6 +692,11 @@ function DomainWorkspace({
                   >
                     <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: toneFor(nt.id) }} />
                     <span className="flex-1 truncate">{nt.display_name || nt.key}</span>
+                    {(counts?.byNodeType?.[nt.id] ?? 0) > 0 && (
+                      <span className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-(length:--text-nano) tabular-nums text-muted-foreground">
+                        {counts!.byNodeType![nt.id]}
+                      </span>
+                    )}
                   </button>
                 ))}
               </div>
@@ -1413,6 +1438,12 @@ function NodeInspector({
           ))}
         </div>
       )}
+
+      <NodePropertyEditor
+        initial={(node.properties as Record<string, unknown> | null) ?? {}}
+        busy={busy}
+        onSave={(properties) => run(() => updateNode({ companyId, nodeId: node.id, properties }))}
+      />
       <div className="mt-2 flex gap-1">
         <button
           disabled={busy}
