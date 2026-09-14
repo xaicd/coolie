@@ -311,6 +311,14 @@ export function SandboxTab({
             messages={messages}
             describe={describe.data ?? null}
             loading={loading && messages.length === 0}
+            onPickPrompt={(prompt) => {
+              setDraft(prompt);
+              // Submit on the next microtask so the textarea's React state
+              // has a chance to commit before the action call captures the
+              // current draft — without this we'd sometimes send a stale
+              // empty string because setDraft is async.
+              queueMicrotask(() => { void onSubmit(); });
+            }}
           />
           <Composer
             value={draft}
@@ -354,10 +362,12 @@ function MessageList({
   messages,
   describe,
   loading,
+  onPickPrompt,
 }: {
   messages: LocalMessage[];
   describe: DescribeDomainResult | null;
   loading: boolean;
+  onPickPrompt: (prompt: string) => void;
 }): ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -378,19 +388,34 @@ function MessageList({
   }
 
   if (messages.length === 0) {
+    const prompts = describe ? buildExamplePrompts(describe) : [];
     return (
-      <div className="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border bg-card/40 p-6 text-center">
+      <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/40 p-6 text-center">
         <div className="text-(length:--text-base) font-semibold">
           {t("开始与副手对话", "Start a conversation")}
         </div>
         <p className="max-w-md text-(length:--text-compact) text-muted-foreground">
           {describe
             ? t(
-                `本域共 ${describe.nodeTypes.length} 个对象类型、${describe.relationTypes.length} 个关系类型、${describe.counts.businessSystems} 个真实应用系统。问点什么 — 比如「这个域有哪些对象类型?」或「列出所有 Action」。`,
-                `This domain has ${describe.nodeTypes.length} node types, ${describe.relationTypes.length} relation types, ${describe.counts.businessSystems} business systems. Ask anything — e.g. "What object types are in this domain?" or "List all Actions".`,
+                `本域共 ${describe.nodeTypes.length} 个对象类型、${describe.relationTypes.length} 个关系类型、${describe.counts.businessSystems} 个真实应用系统。挑一个示例问题开始,或者直接输入。`,
+                `This domain has ${describe.nodeTypes.length} node types, ${describe.relationTypes.length} relation types, ${describe.counts.businessSystems} business systems. Pick an example to start, or just type your own.`,
               )
             : t("问点什么吧。", "Ask anything.")}
         </p>
+        {prompts.length > 0 && (
+          <div className="mt-2 flex w-full max-w-2xl flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-center">
+            {prompts.map((p, i) => (
+              <button
+                key={i}
+                type="button"
+                onClick={() => onPickPrompt(p)}
+                className="rounded-lg border border-border bg-background px-3 py-2 text-(length:--text-compact) text-left text-foreground transition-colors hover:border-primary hover:bg-primary/5 sm:flex-1 sm:min-w-0"
+              >
+                {p}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -604,4 +629,42 @@ function lastAssistantIndex(messages: LocalMessage[]): number {
     if (messages[i]?.role === "assistant") return i;
   }
   return -1;
+}
+
+/**
+ * Build the 3 example prompts shown in the empty state. We try to keep each
+ * one concrete — using the actual counts from the describe payload — so they
+ * look like real questions about this domain rather than generic lorem ipsum.
+ * If a count is 0 we drop the prompt that hinges on it, so the buttons are
+ * never misleading.
+ */
+function buildExamplePrompts(describe: DescribeDomainResult): string[] {
+  const prompts: string[] = [];
+  if (describe.nodeTypes.length > 0) {
+    prompts.push(t("这个域有哪些对象类型?各负责什么?", "What object types are in this domain and what does each represent?"));
+  }
+  if (describe.relationTypes.length > 0) {
+    prompts.push(
+      t(
+        `列出所有 ${describe.relationTypes.length} 个关系类型,说明哪些是有向的。`,
+        `List all ${describe.relationTypes.length} relation types and call out which ones are directed.`,
+      ),
+    );
+  }
+  if (describe.counts.businessSystems > 0) {
+    prompts.push(
+      t(
+        `本域关联了 ${describe.counts.businessSystems} 个真实应用系统,请逐个介绍。`,
+        `This domain links to ${describe.counts.businessSystems} business systems — describe each one.`,
+      ),
+    );
+  } else if (describe.actionTypes.length > 0) {
+    prompts.push(
+      t(
+        `本域有哪些 Action?它们的种类和状态如何?`,
+        `What Actions are in this domain, and what are their kinds and statuses?`,
+      ),
+    );
+  }
+  return prompts.slice(0, 3);
 }
