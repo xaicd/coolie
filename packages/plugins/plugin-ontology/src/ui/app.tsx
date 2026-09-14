@@ -20,6 +20,7 @@ import { ChatTab } from "./ChatTab.js";
 import { SandboxTab } from "./SandboxTab.js";
 import { TopStatusBar } from "./TopStatusBar.js";
 import { NodePropertyEditor } from "./NodePropertyEditor.js";
+import { BootstrapPanel } from "./BootstrapPanel.js";
 
 /**
  * Minimal plugin-side i18n. Plugin UI runs sandboxed and does not receive the
@@ -351,6 +352,7 @@ function NewDomainModal({
   const createDomain = usePluginAction("create-domain");
   const [slug, setSlug] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
 
@@ -359,7 +361,12 @@ function NewDomainModal({
     setBusy(true);
     setErr(null);
     try {
-      const res = (await createDomain({ companyId, slug: slug.trim(), displayName: displayName.trim() })) as {
+      const res = (await createDomain({
+        companyId,
+        slug: slug.trim(),
+        displayName: displayName.trim(),
+        description: description.trim() || undefined,
+      })) as {
         domain?: { id?: string };
         id?: string;
       };
@@ -370,7 +377,7 @@ function NewDomainModal({
     } finally {
       setBusy(false);
     }
-  }, [companyId, slug, displayName, createDomain, onCreated]);
+  }, [companyId, slug, displayName, description, createDomain, onCreated]);
 
   return (
     <div
@@ -405,6 +412,18 @@ function NewDomainModal({
               value={displayName}
               onChange={e => setDisplayName(e.target.value)}
               onKeyDown={e => { if (e.key === "Enter") void submit(); }}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-(length:--text-nano) text-muted-foreground">
+              {t("描述 (可选 — 让 AI 初始化补全效果更好)", "Description (optional — improves AI bootstrap quality)")}
+            </label>
+            <textarea
+              className={INPUT + " mr-0 w-full resize-none"}
+              rows={2}
+              placeholder={t("例：本域建模银行核心系统,涵盖账户、交易、风控三类实体", "e.g. This domain models our banking core: accounts, transactions, risk")}
+              value={description}
+              onChange={e => setDescription(e.target.value)}
             />
           </div>
           {err && <div className="text-(length:--text-compact) text-muted-foreground">{err}</div>}
@@ -669,6 +688,17 @@ function DomainWorkspace({
                 valueClass={domain.status === "active" ? "text-emerald-500" : "text-muted-foreground"} />
             </div>
           </div>
+
+          {/* AI 初始化 — only on empty domains. Above Statistics so it's the
+              most prominent thing in the panel when the user lands here. */}
+          {counts && counts.nodes === 0 && (
+            <BootstrapPanel
+              companyId={companyId}
+              domainId={domainId}
+              description={domain?.description ?? null}
+              onCompleted={() => refreshDomain()}
+            />
+          )}
 
           {counts && (
             <div>
@@ -1208,6 +1238,7 @@ function DomainList({
   const createDomain = usePluginAction("create-domain");
   const [slug, setSlug] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -1215,16 +1246,17 @@ function DomainList({
     setBusy(true);
     setFormError(null);
     try {
-      await createDomain({ companyId, slug, displayName });
+      await createDomain({ companyId, slug, displayName, description: description.trim() || undefined });
       setSlug("");
       setDisplayName("");
+      setDescription("");
       refresh();
     } catch (err) {
       setFormError(String((err as Error)?.message ?? err));
     } finally {
       setBusy(false);
     }
-  }, [companyId, slug, displayName, createDomain, refresh]);
+  }, [companyId, slug, displayName, description, createDomain, refresh]);
 
   return (
     <>
@@ -1236,6 +1268,13 @@ function DomainList({
           placeholder={t("显示名称", "display name")}
           value={displayName}
           onChange={(e) => setDisplayName(e.target.value)}
+        />
+        <textarea
+          className={INPUT + " resize-none"}
+          rows={2}
+          placeholder={t("描述 (可选)", "Description (optional)")}
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
         />
         <button className={BTN} disabled={busy || !slug || !displayName} onClick={submit}>
           {busy ? "…" : t("创建","Create")}
@@ -1493,6 +1532,7 @@ function NodeInspector({
 function NoDomainState({ companyId, onCreated }: { companyId: string; onCreated: () => void }): ReactElement {
   const createDomain = usePluginAction("create-domain");
   const [displayName, setDisplayName] = useState("");
+  const [description, setDescription] = useState("");
   const [slugOverride, setSlugOverride] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1502,7 +1542,18 @@ function NoDomainState({ companyId, onCreated }: { companyId: string; onCreated:
 
   const submit = async () => {
     setBusy(true); setErr(null);
-    try { await createDomain({ companyId, slug: effectiveSlug, displayName: displayName.trim() }); onCreated(); setDisplayName(""); setSlugOverride(null); }
+    try {
+      await createDomain({
+        companyId,
+        slug: effectiveSlug,
+        displayName: displayName.trim(),
+        description: description.trim() || undefined,
+      });
+      onCreated();
+      setDisplayName("");
+      setDescription("");
+      setSlugOverride(null);
+    }
     catch (e) { setErr(String((e as Error)?.message ?? e)); }
     finally { setBusy(false); }
   };
@@ -1524,6 +1575,13 @@ function NoDomainState({ companyId, onCreated }: { companyId: string; onCreated:
             {busy ? "…" : t("创建", "Create")}
           </button>
         </div>
+        <textarea
+          className={INPUT + " resize-none"}
+          rows={2}
+          placeholder={t("描述 (可选 — 让 AI 初始化补全效果更好)", "Description (optional — improves AI bootstrap)")}
+          value={description}
+          onChange={e => setDescription(e.target.value)}
+        />
         {displayName.trim() && (
           <div className="flex items-center gap-1.5 px-0.5 text-(length:--text-nano)">
             <span>{t("标识", "Slug")}:</span>
@@ -1555,6 +1613,7 @@ function NewDomainForm({ companyId, onCreated }: { companyId: string; onCreated:
   const createDomain = usePluginAction("create-domain");
   const [open, setOpen] = useState(false);
   const [displayName, setDisplayName] = useState("");
+  const [description, setDescription] = useState("");
   const [slugOverride, setSlugOverride] = useState<string | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -1565,6 +1624,7 @@ function NewDomainForm({ companyId, onCreated }: { companyId: string; onCreated:
 
   const reset = () => {
     setDisplayName("");
+    setDescription("");
     setSlugOverride(null);
     setShowAdvanced(false);
     setErr(null);
@@ -1591,6 +1651,13 @@ function NewDomainForm({ companyId, onCreated }: { companyId: string; onCreated:
           value={displayName}
           onChange={e => setDisplayName(e.target.value)}
           autoFocus
+        />
+        <textarea
+          className={INPUT + " w-full resize-none"}
+          rows={2}
+          placeholder={t("描述 (可选)", "Description (optional)")}
+          value={description}
+          onChange={e => setDescription(e.target.value)}
         />
         {/* Live slug preview — auto-generated, editable via advanced toggle */}
         {displayName.trim() && (
@@ -1621,7 +1688,12 @@ function NewDomainForm({ companyId, onCreated }: { companyId: string; onCreated:
             onClick={async () => {
               setBusy(true); setErr(null);
               try {
-                await createDomain({ companyId, slug: effectiveSlug, displayName: displayName.trim() });
+                await createDomain({
+                  companyId,
+                  slug: effectiveSlug,
+                  displayName: displayName.trim(),
+                  description: description.trim() || undefined,
+                });
                 onCreated();
                 setOpen(false);
                 reset();
