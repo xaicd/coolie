@@ -115,7 +115,8 @@ interface AideHistoryMessage {
 type AideStreamEvent =
   | { type: "token"; text: string }
   | { type: "done"; citations: AideCitation[] }
-  | { type: "error"; message: string };
+  | { type: "error"; message: string }
+  | { type: "aborted" };
 
 interface LocalMessage {
   id: string;
@@ -125,6 +126,7 @@ interface LocalMessage {
   citations: AideCitation[];
   createdAt: string;
   error?: string;
+  aborted?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,11 +165,13 @@ export function SandboxTab({
     domainId,
   });
   const askAide = usePluginAction("ask-aide");
+  const abortAide = usePluginAction("aide-abort");
   const clearSession = usePluginAction("aide-clear-session");
 
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
+  const [aborting, setAborting] = useState(false);
   const [clearing, setClearing] = useState(false);
   const seenTokenKeysRef = useRef<Set<string>>(new Set());
 
@@ -262,6 +266,30 @@ export function SandboxTab({
     }
   }, [clearSession, clearing, companyId, domainId, history]);
 
+  // Cancel the in-flight answer. The worker flips the bubble out of
+  // streaming state via the `aborted` event — we mirror that locally so the
+  // UI updates immediately even if the next event tick is slow.
+  const onStop = useCallback(async () => {
+    if (aborting || !sending) return;
+    setAborting(true);
+    try {
+      await abortAide({ companyId, domainId });
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.streaming && m.role === "assistant"
+            ? { ...m, streaming: false, aborted: true }
+            : m,
+        ),
+      );
+    } catch {
+      // Best-effort: even if the abort action itself throws, the server-side
+      // cancellation will still land within a second or two and clean up.
+    } finally {
+      setAborting(false);
+      setSending(false);
+    }
+  }, [abortAide, aborting, sending, companyId, domainId]);
+
   const onKeyDown = useCallback(
     (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
       if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
@@ -323,9 +351,12 @@ export function SandboxTab({
           <Composer
             value={draft}
             disabled={sending}
+            sending={sending}
+            aborting={aborting}
             onChange={setDraft}
             onKeyDown={onKeyDown}
             onSubmit={() => { void onSubmit(); }}
+            onStop={() => { void onStop(); }}
           />
         </>
       )}
@@ -466,6 +497,10 @@ function Bubble({
             {t("流式中断: ", "Stream interrupted: ")}
             {message.error}
           </div>
+        ) : message.aborted ? (
+          <div className="mt-2 rounded-md border border-border bg-muted/40 px-2 py-1 text-(length:--text-nano) text-muted-foreground">
+            {t("已停止", "Stopped")}
+          </div>
         ) : null}
       </div>
     </div>
@@ -540,15 +575,21 @@ function kindLabel(kind: AideCitation["kind"]): string {
 function Composer({
   value,
   disabled,
+  sending,
+  aborting,
   onChange,
   onKeyDown,
   onSubmit,
+  onStop,
 }: {
   value: string;
   disabled: boolean;
+  sending: boolean;
+  aborting: boolean;
   onChange: (next: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onSubmit: () => void;
+  onStop: () => void;
 }): ReactElement {
   return (
     <form
@@ -570,13 +611,25 @@ function Composer({
         rows={2}
         className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-(length:--text-compact) text-foreground outline-none focus:border-primary disabled:opacity-60"
       />
-      <button
-        type="submit"
-        disabled={disabled || value.trim().length === 0}
-        className="rounded-md bg-primary px-3 py-2 text-(length:--text-compact) font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        {disabled ? t("发送中…", "Sending…") : t("发送", "Send")}
-      </button>
+      {sending ? (
+        <button
+          type="button"
+          onClick={onStop}
+          disabled={aborting}
+          title={t("停止生成", "Stop generation")}
+          className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-(length:--text-compact) font-medium text-destructive transition-opacity hover:bg-destructive/20 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {aborting ? t("停止中…", "Stopping…") : t("停止", "Stop")}
+        </button>
+      ) : (
+        <button
+          type="submit"
+          disabled={disabled || value.trim().length === 0}
+          className="rounded-md bg-primary px-3 py-2 text-(length:--text-compact) font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {t("发送", "Send")}
+        </button>
+      )}
     </form>
   );
 }
@@ -612,6 +665,12 @@ function applyEvents(
         ...last,
         streaming: false,
         citations: ev.citations,
+      };
+    } else if (ev.type === "aborted") {
+      next[lastIdx] = {
+        ...last,
+        streaming: false,
+        aborted: true,
       };
     } else if (ev.type === "error") {
       next[lastIdx] = {

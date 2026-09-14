@@ -61,6 +61,28 @@ let activeContext: PluginContext | null = null;
 let graphStore: GraphStore | null = null;
 let aideStore: AideStore | null = null;
 
+/**
+ * Registry of in-flight `ask-aide` streams, keyed by their stream channel.
+ * The UI calls the `aide-abort` action with a (companyId, domainId) pair; we
+ * look up the running stream, call its `controller.abort()` (the Anthropic SDK
+ * exposes it on `MessageStream`), and emit a `done` marker with an empty
+ * citations array so the UI can flip the bubble out of "streaming" state.
+ *
+ * We don't try to be clever about partial state — abort just cancels the HTTP
+ * request; the worker has not yet persisted the assistant message at the
+ * point of abort, so there's nothing to roll back. If a stream races with a
+ * successful finalMessage() (very tight timing), the registry entry is gone
+ * by then and abort becomes a no-op.
+ */
+const aideStreamRegistry = new Map<
+  string,
+  { controller: { abort(): void }; aborted: boolean }
+>();
+
+function aideChannelKey(companyId: string, domainId: string): string {
+  return `${companyId}::${domainId}`;
+}
+
 function requireContext(): PluginContext {
   if (!activeContext) {
     throw new Error("Ontology plugin worker context is not initialized");
@@ -1067,6 +1089,9 @@ const plugin = definePlugin({
 
       ctx.streams.open(streamChannel, companyId);
       let acc = "";
+      const registryKey = aideChannelKey(companyId, domainId);
+      const registryEntry = { controller: { abort() {} }, aborted: false };
+      aideStreamRegistry.set(registryKey, registryEntry);
       try {
         const client = getClient();
         const stream = client.messages.stream({
@@ -1075,29 +1100,67 @@ const plugin = definePlugin({
           system: systemPrompt,
           messages: llmMessages,
         });
+        // The Anthropic SDK exposes an AbortController-shaped handle on the
+        // MessageStream; re-point our registry entry at it so a later
+        // aide-abort call actually cancels the HTTP request.
+        registryEntry.controller = stream.controller;
         stream.on("text", (delta: string) => {
           acc += delta;
-          ctx.streams.emit(streamChannel, { type: "token", text: delta });
+          if (!registryEntry.aborted) {
+            ctx.streams.emit(streamChannel, { type: "token", text: delta });
+          }
         });
         await stream.finalMessage();
         const citations = extractCitations(acc);
         const cleanContent = stripCitationTrailer(acc);
-        await aide.appendMessage(
-          companyId,
-          domainId,
-          "assistant",
-          cleanContent,
-          citations,
-        );
-        ctx.streams.emit(streamChannel, { type: "done", citations });
-        return { ok: true, citations };
+        // Don't persist partial output if the user aborted mid-flight — the
+        // bubble will show a localised "已停止" hint instead of a half answer.
+        if (!registryEntry.aborted) {
+          await aide.appendMessage(
+            companyId,
+            domainId,
+            "assistant",
+            cleanContent,
+            citations,
+          );
+          ctx.streams.emit(streamChannel, { type: "done", citations });
+        } else {
+          ctx.streams.emit(streamChannel, { type: "aborted" });
+        }
+        return { ok: true, citations, aborted: registryEntry.aborted };
       } catch (err) {
+        // AbortController.abort() resolves with an APIUserAbortError — the SDK
+        // converts it into a thrown error. Treat that case as a clean cancel
+        // rather than a real failure so the UI doesn't show an error chip.
+        if (registryEntry.aborted) {
+          ctx.streams.emit(streamChannel, { type: "aborted" });
+          return { ok: false, aborted: true };
+        }
         const message = err instanceof Error ? err.message : String(err);
         ctx.streams.emit(streamChannel, { type: "error", message });
         throw err;
       } finally {
+        aideStreamRegistry.delete(registryKey);
         ctx.streams.close(streamChannel);
       }
+    });
+
+    // Cancel the currently streaming aide answer for (companyId, domainId),
+    // if any. No-op if no stream is in flight. Backs the "停止生成" button
+    // in the sandbox tab composer.
+    ctx.actions.register("aide-abort", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const entry = aideStreamRegistry.get(aideChannelKey(companyId, domainId));
+      if (!entry) return { ok: true, aborted: false };
+      entry.aborted = true;
+      try {
+        entry.controller.abort();
+      } catch {
+        // controller.abort() shouldn't throw, but if it does we still want
+        // to report that we tried.
+      }
+      return { ok: true, aborted: true };
     });
 
     // Hard-clear the persisted session — backs the "清空会话" button. We
