@@ -385,6 +385,26 @@ const plugin = definePlugin({
 
     const store = requireGraphStore();
 
+    // Heartbeat on the `ontology.health` stream so the host's SSE link has a
+    // live producer. The UI's TopStatusBar reflects the connection state via
+    // `usePluginStream("ontology.health").connected`; without any emissions the
+    // link technically opens, but emitting periodic pings lets future widgets
+    // surface worker-side liveness (e.g. a degraded Postgres) and exercises the
+    // channel for streaming tests.
+    const HEALTH_CHANNEL = "ontology.health";
+    const HEALTH_INTERVAL_MS = 15_000;
+    const healthTimer = setInterval(() => {
+      try {
+        ctx.streams.emit(HEALTH_CHANNEL, {
+          type: "ping",
+          ts: Date.now(),
+        });
+      } catch {
+        // Streams may be torn down on shutdown; ignore.
+      }
+    }, HEALTH_INTERVAL_MS);
+    healthTimer.unref?.();
+
     // Backs usePluginData("list-domains") in the plugin UI.
     ctx.data.register("list-domains", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
@@ -2229,7 +2249,16 @@ const plugin = definePlugin({
         return { status: 404, body: { error: `Unknown ontology route: ${input.routeKey}` } };
     }
   },
+
+  async onShutdown() {
+    if (healthTimer) {
+      clearInterval(healthTimer);
+      healthTimer = null;
+    }
+  },
 });
+
+let healthTimer: NodeJS.Timeout | null = null;
 
 export default plugin;
 runWorker(plugin, import.meta.url);

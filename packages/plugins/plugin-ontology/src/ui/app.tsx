@@ -61,6 +61,8 @@ interface OntologyNodeType {
   key: string;
   display_name: string;
   description: string | null;
+  /** JSON Schema describing the per-instance properties this type allows. */
+  propertiesSchema: Record<string, unknown> | null;
 }
 
 interface OntologyRelationType {
@@ -579,8 +581,16 @@ function DomainWorkspace({
               >
                 <span aria-hidden className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: toneFor(nt.id) }} />
                 <span className="flex-1 truncate">{nt.display_name || nt.key}</span>
+                {nt.propertiesSchema && typeof nt.propertiesSchema === "object" && Object.keys(nt.propertiesSchema).length > 0 && (
+                  <span
+                    title={t("该对象类型的属性 schema 字段数", "Number of property schema fields for this object type")}
+                    className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-(length:--text-nano) tabular-nums text-muted-foreground"
+                  >
+                    {Object.keys(nt.propertiesSchema).length} {t("属性", "props")}
+                  </span>
+                )}
                 {(counts?.byNodeType?.[nt.id] ?? 0) > 0 && (
-                  <span className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-(length:--text-nano) tabular-nums text-muted-foreground">
+                  <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-(length:--text-nano) tabular-nums text-primary">
                     {counts!.byNodeType![nt.id]}
                   </span>
                 )}
@@ -692,8 +702,16 @@ function DomainWorkspace({
                   >
                     <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: toneFor(nt.id) }} />
                     <span className="flex-1 truncate">{nt.display_name || nt.key}</span>
+                    {nt.propertiesSchema && typeof nt.propertiesSchema === "object" && Object.keys(nt.propertiesSchema).length > 0 && (
+                      <span
+                        title={t("该对象类型的属性 schema 字段数", "Number of property schema fields for this object type")}
+                        className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-(length:--text-nano) tabular-nums text-muted-foreground"
+                      >
+                        {Object.keys(nt.propertiesSchema).length} {t("属性", "props")}
+                      </span>
+                    )}
                     {(counts?.byNodeType?.[nt.id] ?? 0) > 0 && (
-                      <span className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-(length:--text-nano) tabular-nums text-muted-foreground">
+                      <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-(length:--text-nano) tabular-nums text-primary">
                         {counts!.byNodeType![nt.id]}
                       </span>
                     )}
