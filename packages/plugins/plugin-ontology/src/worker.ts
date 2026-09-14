@@ -23,6 +23,10 @@ import {
   probeClaudeConfig,
 } from "./aide/ClaudeClient.js";
 import { extractCitations, stripCitationTrailer } from "./aide/citations.js";
+import {
+  buildBootstrapSystemPrompt,
+  parseBootstrapDraft,
+} from "./aide/bootstrap.js";
 import type {
   ActionKind,
   ActionTypeStatus,
@@ -80,6 +84,23 @@ const aideStreamRegistry = new Map<
 >();
 
 function aideChannelKey(companyId: string, domainId: string): string {
+  return `${companyId}::${domainId}`;
+}
+
+/**
+ * Registry of in-flight `ai-bootstrap-plan` streams. Same shape as
+ * `aideStreamRegistry` so the abort action reads from a single contract.
+ * Each entry binds the running MessageStream's controller; the plan loops
+ * `store.createNodeType / RelationType / Node / Edge` after `finalMessage()`
+ * succeeds, so partial writes (after a stream finishes but before all rows
+ * are inserted) cannot be aborted — only the LLM call itself is cancellable.
+ */
+const bootstrapStreamRegistry = new Map<
+  string,
+  { controller: { abort(): void }; aborted: boolean }
+>();
+
+function bootstrapChannelKey(companyId: string, domainId: string): string {
   return `${companyId}::${domainId}`;
 }
 
@@ -1161,6 +1182,321 @@ const plugin = definePlugin({
         // to report that we tried.
       }
       return { ok: true, aborted: true };
+    });
+
+    // -----------------------------------------------------------------------
+    // AI 初始化补全 — LLM-driven draft + direct-write to the live domain.
+    //
+    // Stream shape (matches SandboxTab's pattern but uses a different channel
+    // prefix so the UI doesn't conflate bootstrap progress with chat tokens):
+    //   { type: "start", totalSteps }
+    //   { type: "progress", step, kind: "node-type"|"relation-type"|"node"|"edge", label }
+    //   { type: "done", counts: { nodeTypes, relationTypes, nodes, edges } }
+    //   { type: "error", message }
+    //   { type: "aborted" }
+    //
+    // The action registers its MessageStream with `bootstrapStreamRegistry` so
+    // the UI can cancel mid-LLM-call via `ai-bootstrap-abort`. Once the model
+    // returns, we parse + filter + insert in a straight loop — there is no
+    // transaction, so a partial failure leaves whatever rows already wrote.
+    // -----------------------------------------------------------------------
+    ctx.actions.register("ai-bootstrap-plan", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const description = typeof params.description === "string" ? params.description : "";
+      const streamChannel = `ontology.bootstrap.stream.${companyId}.${domainId}`;
+      const bKey = bootstrapChannelKey(companyId, domainId);
+
+      const existing = await store.getGraphSnapshot(companyId, domainId);
+      if (existing.counts.nodes > 0) {
+        ctx.streams.open(streamChannel, companyId);
+        ctx.streams.emit(streamChannel, { type: "error", message: "域已存在节点,无法 AI 初始化" });
+        ctx.streams.close(streamChannel);
+        return { ok: false, reason: "domain-not-empty" };
+      }
+
+      const snapshot = await store.describeDomain(companyId, domainId);
+      const systemPrompt = buildBootstrapSystemPrompt({
+        domain: snapshot,
+        description: description || null,
+      });
+
+      ctx.streams.open(streamChannel, companyId);
+      const registryEntry = { controller: { abort() {} }, aborted: false };
+      bootstrapStreamRegistry.set(bKey, registryEntry);
+      try {
+        const client = getClient();
+        const stream = client.messages.stream({
+          model: getModel(),
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [{ role: "user", content: description || "请为本域生成一组对象类型、关系类型、节点和边。" }],
+        });
+        registryEntry.controller = stream.controller;
+        let acc = "";
+        stream.on("text", (delta: string) => {
+          acc += delta;
+        });
+        await stream.finalMessage();
+
+        if (registryEntry.aborted) {
+          ctx.streams.emit(streamChannel, { type: "aborted" });
+          return { ok: false, aborted: true };
+        }
+
+        const parsed = parseBootstrapDraft(acc);
+        if (!parsed.ok) {
+          ctx.streams.emit(streamChannel, { type: "error", message: parsed.error });
+          return { ok: false, reason: "parse-failed", error: parsed.error };
+        }
+        const draft = parsed.draft;
+        const totalSteps = draft.nodeTypes.length + draft.relationTypes.length + draft.nodes.length + draft.edges.length;
+        ctx.streams.emit(streamChannel, { type: "start", totalSteps });
+
+        const typeIdByKey = new Map<string, string>();
+        let step = 0;
+        for (const nt of draft.nodeTypes) {
+          try {
+            const created = await store.createNodeType({
+              companyId,
+              domainId,
+              key: nt.key,
+              displayName: nt.displayName,
+              description: nt.description ?? null,
+              propertiesSchema: nt.properties,
+            });
+            typeIdByKey.set(nt.key, created.id);
+          } catch (err) {
+            ctx.logger.warn("AI bootstrap: createNodeType failed", { key: nt.key, error: String((err as Error)?.message ?? err) });
+          }
+          step += 1;
+          ctx.streams.emit(streamChannel, { type: "progress", step, kind: "node-type", label: nt.displayName });
+        }
+
+        for (const rt of draft.relationTypes) {
+          try {
+            await store.createRelationType({
+              companyId,
+              domainId,
+              key: rt.key,
+              displayName: rt.displayName,
+              description: rt.description ?? null,
+              directed: rt.directed,
+            });
+          } catch (err) {
+            ctx.logger.warn("AI bootstrap: createRelationType failed", { key: rt.key, error: String((err as Error)?.message ?? err) });
+          }
+          step += 1;
+          ctx.streams.emit(streamChannel, { type: "progress", step, kind: "relation-type", label: rt.displayName });
+        }
+
+        const nodeIdByKey = new Map<string, string>();
+        for (const nd of draft.nodes) {
+          try {
+            const created = await store.createNode({
+              companyId,
+              domainId,
+              key: nd.key,
+              label: nd.label,
+              nodeTypeId: typeIdByKey.get(nd.nodeTypeKey) ?? null,
+            });
+            nodeIdByKey.set(nd.key, created.id);
+          } catch (err) {
+            ctx.logger.warn("AI bootstrap: createNode failed", { key: nd.key, error: String((err as Error)?.message ?? err) });
+          }
+          step += 1;
+          ctx.streams.emit(streamChannel, { type: "progress", step, kind: "node", label: nd.label });
+        }
+
+        let edgeCount = 0;
+        for (const e of draft.edges) {
+          const sourceNodeId = nodeIdByKey.get(e.sourceKey);
+          const targetNodeId = nodeIdByKey.get(e.targetKey);
+          if (!sourceNodeId || !targetNodeId) continue;
+          try {
+            await store.createEdge({ companyId, domainId, sourceNodeId, targetNodeId, relationKey: e.relationKey });
+            edgeCount += 1;
+          } catch (err) {
+            ctx.logger.warn("AI bootstrap: createEdge failed", { error: String((err as Error)?.message ?? err) });
+          }
+          step += 1;
+          ctx.streams.emit(streamChannel, { type: "progress", step, kind: "edge", label: `${e.sourceKey} → ${e.targetKey}` });
+        }
+
+        ctx.streams.emit(streamChannel, {
+          type: "done",
+          counts: {
+            nodeTypes: typeIdByKey.size,
+            relationTypes: draft.relationTypes.length,
+            nodes: nodeIdByKey.size,
+            edges: edgeCount,
+          },
+        });
+        await ctx.activity.log({
+          companyId,
+          message: `AI bootstrap: ${typeIdByKey.size} node types, ${draft.relationTypes.length} relation types, ${nodeIdByKey.size} nodes, ${edgeCount} edges`,
+          entityType: "ontology_domain",
+          entityId: domainId,
+        });
+        return { ok: true, counts: { nodeTypes: typeIdByKey.size, relationTypes: draft.relationTypes.length, nodes: nodeIdByKey.size, edges: edgeCount } };
+      } catch (err) {
+        if (registryEntry.aborted) {
+          ctx.streams.emit(streamChannel, { type: "aborted" });
+          return { ok: false, aborted: true };
+        }
+        const message = err instanceof Error ? err.message : String(err);
+        ctx.streams.emit(streamChannel, { type: "error", message });
+        throw err;
+      } finally {
+        bootstrapStreamRegistry.delete(bKey);
+        ctx.streams.close(streamChannel);
+      }
+    });
+
+    // Cancel a running `ai-bootstrap-plan`. Same contract as `aide-abort` —
+    // looks up the registry entry, flips its `aborted` flag, then aborts the
+    // underlying Anthropic stream. Once the LLM call returns and the worker
+    // starts inserting rows, abort becomes a no-op (partial writes stay).
+    ctx.actions.register("ai-bootstrap-abort", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const entry = bootstrapStreamRegistry.get(bootstrapChannelKey(companyId, domainId));
+      if (!entry) return { ok: true, aborted: false };
+      entry.aborted = true;
+      try {
+        entry.controller.abort();
+      } catch {
+        // Same swallowing rationale as `aide-abort`: a misbehaving controller
+        // should not propagate — the registry entry will be cleared by the
+        // running action's `finally` block.
+      }
+      return { ok: true, aborted: true };
+    });
+
+    // Synchronously suggest new nodes + edges from a focal node. Two modes:
+    //   - "related": free-form suggestions of 2-5 nodes that connect to this
+    //     one (any direction). Reuses existing node + relation types.
+    //   - "extend": one layer of nodes downstream, following this node's
+    //     outgoing relation keys.
+    //
+    // The LLM call here is bounded (max 5 nodes, 6 edges) so the action
+    // should comfortably complete inside the 30s RPC timeout. We still stream
+    // from Anthropic so the user gets partial results if the model is slow,
+    // but we DO NOT relay the stream to the UI — the action returns the
+    // final structured result via the action response.
+    ctx.actions.register("ai-extend-from-node", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const nodeId = requireString(params.nodeId, "nodeId");
+      const kind: "related" | "extend" = params.kind === "extend" ? "extend" : "related";
+
+      const snapshot = await store.describeDomain(companyId, domainId);
+      const allNodes = await store.listNodes(companyId, domainId, 500);
+      const focal = allNodes.find((n) => n.id === nodeId);
+      if (!focal) throw new Error("Node not found");
+
+      // Build the focal-node context: which relation keys appear on its
+      // outgoing / incoming edges in the live graph. This is the most useful
+      // shape to feed the LLM because it grounds "where to extend" in real
+      // data rather than just the static schema.
+      const graph = await store.getGraphSnapshot(companyId, domainId, 500);
+      const outgoingRelationKeys = Array.from(new Set(
+        graph.edges
+          .filter((e) => e.sourceNodeId === focal.id && e.relationKey)
+          .map((e) => e.relationKey as string),
+      ));
+      const incomingRelationKeys = Array.from(new Set(
+        graph.edges
+          .filter((e) => e.targetNodeId === focal.id && e.relationKey)
+          .map((e) => e.relationKey as string),
+      ));
+
+      const focalNodeType = snapshot.nodeTypes.find((nt) => nt.id === focal.node_type_id);
+      const focalTypeKey = focalNodeType?.key ?? null;
+      const systemPrompt = buildBootstrapSystemPrompt({
+        domain: snapshot,
+        description: null,
+        focalNode: {
+          key: focal.key,
+          label: focal.label,
+          nodeTypeKey: focalTypeKey,
+          outgoingRelationKeys,
+          incomingRelationKeys,
+        },
+        caps: { nodes: 5, edges: 6 },
+      });
+
+      const userPrompt = kind === "extend"
+        ? `请沿着 ${focal.key} 的出向关系,生成 1-3 个下游节点及对应边。`
+        : `请基于 ${focal.key} 在本域的角色,推荐 2-5 个可能相关的新节点(任何方向)及对应边。`;
+
+      const client = getClient();
+      const stream = client.messages.stream({
+        model: getModel(),
+        max_tokens: 2048,
+        system: systemPrompt,
+        messages: [{ role: "user", content: userPrompt }],
+      });
+      let acc = "";
+      stream.on("text", (delta: string) => { acc += delta; });
+      await stream.finalMessage();
+      const parsed = parseBootstrapDraft(acc);
+      if (!parsed.ok) {
+        throw new Error(parsed.error);
+      }
+
+      // Resolve node-type keys: the model may invent keys we already have, but
+      // we restrict to types that exist in the domain (extend mode shouldn't
+      // create new types).
+      const typeKeyByModelKey = new Map<string, string>();
+      for (const nt of snapshot.nodeTypes) typeKeyByModelKey.set(nt.key, nt.id);
+
+      const newNodes: Array<{ key: string; label: string; nodeTypeKey: string }> = [];
+      const createdNodeIds = new Map<string, string>();
+      for (const nd of parsed.draft.nodes) {
+        const typeKey = nd.nodeTypeKey || focalTypeKey || "";
+        const resolvedTypeId = typeKeyByModelKey.get(typeKey);
+        if (!resolvedTypeId) continue; // skip nodes with unknown types
+        try {
+          const created = await store.createNode({
+            companyId,
+            domainId,
+            key: nd.key,
+            label: nd.label,
+            nodeTypeId: resolvedTypeId,
+          });
+          createdNodeIds.set(nd.key, created.id);
+          newNodes.push({ key: nd.key, label: nd.label, nodeTypeKey: typeKey });
+        } catch (err) {
+          ctx.logger.warn("AI extend: createNode failed", { key: nd.key, error: String((err as Error)?.message ?? err) });
+        }
+      }
+
+      const newEdges: Array<{ sourceKey: string; targetKey: string; relationKey: string }> = [];
+      // Edges may reference either a freshly-created node or the focal node.
+      // For extend mode we allow self-references back to focal.
+      const resolveNodeId = (key: string): string | null => {
+        if (key === focal.key) return focal.id;
+        return createdNodeIds.get(key) ?? null;
+      };
+      for (const e of parsed.draft.edges) {
+        const sourceId = resolveNodeId(e.sourceKey);
+        const targetId = resolveNodeId(e.targetKey);
+        if (!sourceId || !targetId) continue;
+        try {
+          await store.createEdge({ companyId, domainId, sourceNodeId: sourceId, targetNodeId: targetId, relationKey: e.relationKey });
+          newEdges.push({ sourceKey: e.sourceKey, targetKey: e.targetKey, relationKey: e.relationKey });
+        } catch (err) {
+          ctx.logger.warn("AI extend: createEdge failed", { error: String((err as Error)?.message ?? err) });
+        }
+      }
+
+      return {
+        ok: true,
+        kind,
+        focalKey: focal.key,
+        created: { nodes: newNodes, edges: newEdges },
+      };
     });
 
     // Hard-clear the persisted session — backs the "清空会话" button. We
