@@ -52,6 +52,7 @@ import { primarySidebarStyles } from "./primary-sidebar-styles";
 import { useTranslation } from "@/i18n";
 
 export function Sidebar({ children }: { children?: ReactNode }) {
+  const { t } = useTranslation();
   const { openNewIssue } = useDialogActions();
   const { enabled: agentChatEnabled } = useAgentChatEnabled();
   // Every labeled section is collapsible (session-scoped, default open) —
