@@ -143,15 +143,24 @@ interface LocalMessage {
  * previous conversation for that domain. The worker manages persistence in
  * `ontology_aide_sessions` / `ontology_aide_messages`; the UI just keeps a
  * working copy in component state and replays history on mount.
+ *
+ * Optional `prePrompt` / `onConsumePrePrompt` let the host workbench inject
+ * a prompt before the user has typed anything (e.g. right-clicking a node
+ * and choosing "AI 解释这个节点"). When a pre-prompt is supplied, we auto-
+ * submit it on mount and notify the host so it doesn't re-fire on remount.
  */
 export function SandboxTab({
   companyId,
   domainId,
   domainVersion,
+  prePrompt,
+  onConsumePrePrompt,
 }: {
   companyId: string;
   domainId: string;
   domainVersion: number;
+  prePrompt?: string | null;
+  onConsumePrePrompt?: () => void;
 }): ReactElement {
   const streamChannel = `ontology.aide.stream.${companyId}.${domainId}`;
   const stream = usePluginStream<AideStreamEvent>(streamChannel);
@@ -184,6 +193,20 @@ export function SandboxTab({
     setSending(false);
     setClearing(false);
   }, [companyId, domainId]);
+
+  // Auto-submit a pre-prompt when one is provided (e.g. from right-click
+  // "AI 解释这个节点"). We deliberately set the draft + schedule a microtask
+  // submit rather than calling askAide directly, so the composer still goes
+  // through its normal lifecycle and the user can edit / abort if needed.
+  const prePromptFiredRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!prePrompt || prePrompt.trim().length === 0) return;
+    if (prePromptFiredRef.current === prePrompt) return;
+    prePromptFiredRef.current = prePrompt;
+    setDraft(prePrompt);
+    queueMicrotask(() => { void onSubmit(); });
+    onConsumePrePrompt?.();
+  }, [prePrompt, onConsumePrePrompt]);
 
   // Seed messages from persisted history once it lands.
   useEffect(() => {

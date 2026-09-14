@@ -321,6 +321,7 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
           view={view}
           rightOpen={rightOpen}
           onDomainsChanged={refreshDomains}
+          onRequestView={setView}
         />
       )}
 
@@ -550,6 +551,7 @@ function DomainWorkspace({
   view,
   rightOpen,
   onDomainsChanged,
+  onRequestView,
 }: {
   companyId: string;
   domainId: string;
@@ -557,6 +559,8 @@ function DomainWorkspace({
   view: WorkbenchView;
   rightOpen: boolean;
   onDomainsChanged: () => void;
+  /** Bridge to switch the host workbench's tab (e.g. graph → sandbox). */
+  onRequestView?: (view: WorkbenchView) => void;
 }): ReactElement {
   const { data: domainData, refresh: refreshDomain } = usePluginData<DomainDetail>(
     "domain-detail", { companyId, domainId }
@@ -572,6 +576,9 @@ function DomainWorkspace({
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const selectedNode = nodes.find(n => n.id === selectedNodeId) ?? null;
   const [simulateNode, setSimulateNode] = useState<GraphNode | null>(null);
+  // Pre-filled ask-aide prompt set by right-click "AI 解释这个节点". Cleared
+  // by SandboxTab after it consumes the draft.
+  const [aidePrePrompt, setAidePrePrompt] = useState<string | null>(null);
 
   const showTree = view === "graph" || view === "table" || view === "schema";
 
@@ -652,6 +659,11 @@ function DomainWorkspace({
             nodeTypeDragMime={DRAG_MIME}
             onViewNodeDetail={(nodeId) => setSelectedNodeId(nodeId)}
             onSimulateImpact={(node) => setSimulateNode(node)}
+            isDomainEmpty={(counts?.nodes ?? 0) === 0}
+            onAskAideAboutNode={(node) => {
+              onRequestView?.("sandbox");
+              setAidePrePrompt(`请介绍节点 ${node.key} (${node.label}) 在本域里扮演什么角色,以及它的上下游关系。`);
+            }}
           />
         )}
         {view === "cognition" && <CognitionTab companyId={companyId} />}
@@ -662,6 +674,8 @@ function DomainWorkspace({
             companyId={companyId}
             domainId={domain.id}
             domainVersion={domain.version}
+            prePrompt={aidePrePrompt}
+            onConsumePrePrompt={() => setAidePrePrompt(null)}
           />
         )}
 

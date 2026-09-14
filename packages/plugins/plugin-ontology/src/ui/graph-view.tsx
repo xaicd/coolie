@@ -26,6 +26,7 @@ import {
   type ReactNode,
 } from "react";
 import { usePluginAction } from "@paperclipai/plugin-sdk/ui";
+import { BootstrapDraftPreview, type DraftPreview } from "./BootstrapDraftPreview.js";
 
 export type NodeLifecycle = "active" | "stale" | "deprecated" | "archived";
 
@@ -183,6 +184,8 @@ function GraphCanvas({
   nodeTypeDragMime,
   onViewNodeDetail,
   onSimulateImpact,
+  isDomainEmpty,
+  onAskAideAboutNode,
 }: {
   companyId: string;
   domainId: string;
@@ -199,6 +202,12 @@ function GraphCanvas({
   onViewNodeDetail?: (nodeId: string) => void;
   /** DS "impact simulation" — run blast-radius for this node. */
   onSimulateImpact?: (node: GraphNode) => void;
+  /** When true, the canvas right-click menu shows "AI 初始化此域". */
+  isDomainEmpty?: boolean;
+  /** Ask-aide about a specific node — opens the SandboxTab with a pre-filled
+   *  prompt. The parent (DomainWorkspace) owns the SandboxTab, so it must
+   *  implement this bridge. */
+  onAskAideAboutNode?: (node: { id: string; key: string; label: string }) => void;
 }): ReactElement {
   useReactFlowCss();
   const createNode = usePluginAction("create-node");
@@ -207,11 +216,20 @@ function GraphCanvas({
   const deleteNode = usePluginAction("delete-node");
   const updateEdge = usePluginAction("update-edge");
   const deleteEdge = usePluginAction("delete-edge");
+  const extendFromNode = usePluginAction("ai-extend-from-node");
   const { screenToFlowPosition, fitView } = useReactFlow();
   const wrapRef = useRef<HTMLDivElement | null>(null);
   const [menu, setMenu] = useState<ContextMenuState | null>(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  // Result of `ai-extend-from-node` — kept here so we can render a preview
+  // modal and let the user deselect rows before applying. The worker already
+  // wrote the rows; the modal is review-only.
+  const [extendPreview, setExtendPreview] = useState<{
+    focalKey: string;
+    focalLabel: string;
+    preview: DraftPreview;
+  } | null>(null);
   // DS "关系过滤" — show only edges of one relation key (null = all).
   const [relationFilter, setRelationFilter] = useState<string | null>(null);
   // DS layout modes: radial / layered (by graph depth) / grid.
@@ -372,6 +390,46 @@ function GraphCanvas({
       }
     },
     [onChanged],
+  );
+
+  // Ask-aide about a specific node — pre-fills a prompt that the parent
+  // SandboxTab will surface. We do not call ask-aide directly here because
+  // the chat lives in a sibling tab; the parent bridges by switching views.
+  const askAideAboutNode = useCallback(
+    (nodeId: string, key: string, label: string) => {
+      onAskAideAboutNode?.({ id: nodeId, key, label });
+    },
+    [onAskAideAboutNode],
+  );
+
+  // Run `ai-extend-from-node` (synchronous LLM + write). The action returns
+  // the rows it wrote; we surface them in a preview modal so the user can
+  // see what was created before the canvas redraws.
+  const aiExtend = useCallback(
+    async (nodeId: string, kind: "related" | "extend") => {
+      setBusy(true);
+      setErr(null);
+      try {
+        const focal = rawNodes.find((n) => n.id === nodeId);
+        const res = (await extendFromNode({ companyId, domainId, nodeId, kind })) as {
+          ok: boolean;
+          kind: string;
+          focalKey: string;
+          created: { nodes: Array<{ key: string; label: string; nodeTypeKey: string }>; edges: Array<{ sourceKey: string; targetKey: string; relationKey: string }> };
+        };
+        setExtendPreview({
+          focalKey: res.focalKey,
+          focalLabel: focal?.label ?? res.focalKey,
+          preview: { nodes: res.created.nodes, edges: res.created.edges },
+        });
+        onChanged();
+      } catch (e) {
+        setErr(String((e as Error)?.message ?? e));
+      } finally {
+        setBusy(false);
+      }
+    },
+    [rawNodes, extendFromNode, companyId, domainId, onChanged],
   );
 
   // Drag a handle from one node to another -> create an edge.
@@ -586,6 +644,23 @@ function GraphCanvas({
       )}
       {err && <div className="absolute left-2 top-2 z-10 rounded-md bg-card/80 px-2 py-1 text-(length:--text-nano) text-muted-foreground">{err}</div>}
 
+      {extendPreview && (
+        <BootstrapDraftPreview
+          focalKey={extendPreview.focalKey}
+          focalLabel={extendPreview.focalLabel}
+          preview={extendPreview.preview}
+          onApply={async () => {
+            // Worker already wrote the rows; closing the modal just refreshes
+            // the local view. We could delete unselected rows here, but that
+            // adds complexity for marginal value — users can right-click
+            // delete them.
+            setExtendPreview(null);
+            onChanged();
+          }}
+          onCancel={() => setExtendPreview(null)}
+        />
+      )}
+
       {menu && (
         <>
           <div className="fixed inset-0 z-40" onClick={closeMenu} onContextMenu={(e) => { e.preventDefault(); closeMenu(); }} />
@@ -614,6 +689,24 @@ function GraphCanvas({
                   </>
                 )}
                 <MenuDivider />
+                {/* AI 初始化 — only on empty domains. Triggers the right-panel
+                    BootstrapPanel via the parent's onRequestBootstrap hook. */}
+                {isDomainEmpty && (
+                  <MenuItem
+                    label={t("AI 初始化此域", "AI bootstrap this domain")}
+                    icon="✨"
+                    onClick={() => {
+                      closeMenu();
+                      // The bootstrap lives in the right panel; ask the
+                      // parent to focus / scroll to it. We don't start the
+                      // bootstrap here so the user sees the description
+                      // textarea + start button one more time.
+                      if (typeof window !== "undefined") {
+                        window.dispatchEvent(new CustomEvent("paperclip-ontology:focus-bootstrap-panel"));
+                      }
+                    }}
+                  />
+                )}
                 <MenuItem label={t("适应视图", "Fit view")} onClick={() => { closeMenu(); fitView({ duration: 300 }); }} />
               </>
             )}
@@ -702,6 +795,34 @@ function GraphCanvas({
                   }}
                 />
                 <MenuItem label={t("聚焦选中", "Focus & select")} onClick={() => { const m = menu; closeMenu(); onSelectNode?.(m.id ?? null); }} />
+                <MenuDivider />
+                {/* AI actions on a node. We keep these just above "Delete" so
+                    they're discoverable but not in the way of editing. */}
+                <MenuLabel>{t("AI", "AI")}</MenuLabel>
+                <MenuItem
+                  label={t("AI 解释这个节点", "AI explain this node")}
+                  icon="💬"
+                  onClick={() => {
+                    const m = menu; closeMenu();
+                    if (m.id && m.nodeKey && m.label) askAideAboutNode(m.id, m.nodeKey, m.label);
+                  }}
+                />
+                <MenuItem
+                  label={t("AI 推荐相关节点", "AI suggest related nodes")}
+                  icon="✨"
+                  onClick={() => {
+                    const m = menu; closeMenu();
+                    if (m.id) void aiExtend(m.id, "related");
+                  }}
+                />
+                <MenuItem
+                  label={t("AI 扩展此节点", "AI extend this node")}
+                  icon="→"
+                  onClick={() => {
+                    const m = menu; closeMenu();
+                    if (m.id) void aiExtend(m.id, "extend");
+                  }}
+                />
                 <MenuDivider />
                 <MenuItem
                   label={t("删除", "Delete")}
@@ -823,6 +944,12 @@ interface GraphViewProps {
   onViewNodeDetail?: (nodeId: string) => void;
   /** DS "impact simulation" — run blast-radius for this node. */
   onSimulateImpact?: (node: GraphNode) => void;
+  /** True when the domain has no nodes yet — enables the canvas "AI 初始化此域"
+   *  right-click item and gates the right-panel BootstrapPanel. */
+  isDomainEmpty?: boolean;
+  /** Bridge to switch the host workbench to the SandboxTab with a pre-filled
+   *  ask-aide prompt for the given node. */
+  onAskAideAboutNode?: (node: { id: string; key: string; label: string }) => void;
 }
 
 /**
@@ -857,7 +984,13 @@ export function GraphView(props: GraphViewProps): ReactElement {
           <EmptyGraph {...props} />
         ) : (
           <ReactFlowProvider>
-            <GraphCanvas {...props} nodeTypes={nodeTypeDefs} fill={embedded} />
+            <GraphCanvas
+              {...props}
+              nodeTypes={nodeTypeDefs}
+              fill={embedded}
+              isDomainEmpty={props.isDomainEmpty}
+              onAskAideAboutNode={props.onAskAideAboutNode}
+            />
           </ReactFlowProvider>
         ))}
 
