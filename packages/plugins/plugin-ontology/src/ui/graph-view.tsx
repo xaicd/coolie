@@ -35,6 +35,7 @@ export interface GraphNode {
   label: string;
   nodeTypeId: string | null;
   lifecycleState?: NodeLifecycle;
+  properties?: Record<string, unknown> | null;
 }
 
 /** Tailwind bg class for a node lifecycle health dot (matches DS's dot colors). */
@@ -67,11 +68,16 @@ export interface GraphEdge {
   targetNodeId: string;
   relationKey: string | null;
   weight: number;
+  sourceDomainId?: string | null;
+  targetDomainId?: string | null;
+  isCrossDomain?: boolean;
 }
 export interface GraphNodeType {
   id: string;
   key: string;
   display_name?: string | null;
+  /** JSON Schema describing the per-instance properties this type allows. */
+  propertiesSchema?: Record<string, unknown> | null;
 }
 
 /**
@@ -100,20 +106,9 @@ function useReactFlowCss(): void {
   }, []);
 }
 
-function isZh(): boolean {
-  try {
-    const v = typeof localStorage !== "undefined" ? localStorage.getItem("coolie.locale") : null;
-    const lang = (v || (typeof navigator !== "undefined" ? navigator.language : "") || "en").toLowerCase();
-    return lang.startsWith("zh");
-  } catch {
-    return false;
-  }
-}
-function t(zh: string, en: string): string {
-  return isZh() ? zh : en;
-}
+import { t } from "./isZh.js";
 
-type OntologyNodeData = { label: string; nodeKey: string; tone: string; typeName: string | null; dimmed?: boolean };
+type OntologyNodeData = { label: string; nodeKey: string; tone: string; typeName: string | null; dimmed?: boolean; fill?: string | null };
 
 /**
  * Custom node: rounded card with a type-colored left accent bar and a type dot,
@@ -123,6 +118,11 @@ type OntologyNodeData = { label: string; nodeKey: string; tone: string; typeName
 function OntologyNode({ data, selected }: NodeProps): ReactElement {
   const d = data as OntologyNodeData;
   const tip = d.typeName ? `${d.label} · ${d.nodeKey} · ${d.typeName}` : `${d.label} · ${d.nodeKey}`;
+  // Cluster mode paints a tinted background behind the card so nodes of the
+  // same type visually cluster even when their positions are layout-driven.
+  const fillStyle = d.fill
+    ? { background: `linear-gradient(180deg, ${d.fill}26, ${d.fill}10)` }
+    : undefined;
   return (
     <div
       title={tip}
@@ -132,6 +132,7 @@ function OntologyNode({ data, selected }: NodeProps): ReactElement {
         selected ? "border-primary ring-1 ring-primary" : "border-border",
         d.dimmed ? "opacity-30" : "",
       ].join(" ")}
+      style={fillStyle}
     >
       <span
         aria-hidden
@@ -217,6 +218,10 @@ function GraphCanvas({
   const [layout, setLayout] = useState<"radial" | "layered" | "grid">("radial");
   // Connect mode toggle — surfaces node handles for drag-to-link.
   const [connectMode, setConnectMode] = useState(false);
+  // Soft cluster by nodeType — off / group nodes of the same type together in
+  // a deterministic grid / paint them with a per-type tint. Client-side only;
+  // no algorithm, no dep. Works on top of whatever `layout` is active.
+  const [clusterMode, setClusterMode] = useState<"off" | "byType" | "colorByType">("off");
 
   const typeById = useMemo(() => {
     const m = new Map<string, GraphNodeType>();
@@ -276,13 +281,45 @@ function GraphCanvas({
         });
       }
     }
+
+    // Soft cluster: when active, snap each node's x/y into a deterministic
+    // 4×6 cell indexed by a stable hash of its nodeTypeId so nodes of the
+    // same type end up visually grouped. Nodes with null type keep their
+    // layout-computed position. The per-cell offset is small so the existing
+    // layout's overall shape stays recognizable.
+    if (clusterMode === "byType") {
+      const cols = 6;
+      const cellW = 220;
+      const cellH = 130;
+      const xOff = 80;
+      const yOff = 60;
+      for (const nd of rawNodes) {
+        if (!nd.nodeTypeId) continue;
+        let h = 0;
+        for (let i = 0; i < nd.nodeTypeId.length; i++) h = (h * 31 + nd.nodeTypeId.charCodeAt(i)) >>> 0;
+        const cell = h % (cols * 4);
+        const col = cell % cols;
+        const row = Math.floor(cell / cols);
+        // Small jitter inside the cell so neighbouring nodes don't perfectly overlap.
+        const jx = ((h >> 7) % 60) - 30;
+        const jy = ((h >> 13) % 50) - 25;
+        pos.set(nd.id, { x: xOff + col * cellW + jx, y: yOff + row * cellH + jy });
+      }
+    }
+
     return pos;
-  }, [rawNodes, rawEdges, layout]);
+  }, [rawNodes, rawEdges, layout, clusterMode]);
 
   const flowNodes: Node[] = useMemo(() => {
     return rawNodes.map((nd) => {
       const nt = nd.nodeTypeId ? typeById.get(nd.nodeTypeId) : undefined;
       const dimmed = focusNodeTypeId != null && nd.nodeTypeId !== focusNodeTypeId;
+      // Cluster coloring: when clusterMode is "colorByType" (and even "byType"
+      // for extra clarity), replace the node's border tone with a slightly
+      // desaturated fill so different types stand out without losing shape.
+      const clusterTint = clusterMode !== "off" && nd.nodeTypeId
+        ? toneFor(`fill:${nd.nodeTypeId}`)
+        : null;
       return {
         id: nd.id,
         type: "ontology",
@@ -294,10 +331,11 @@ function GraphCanvas({
           tone: toneFor(nd.nodeTypeId),
           typeName: nt ? (nt.display_name || nt.key) : null,
           dimmed,
+          fill: clusterTint,
         },
       } satisfies Node;
     });
-  }, [rawNodes, typeById, selectedNodeId, focusNodeTypeId, positions]);
+  }, [rawNodes, typeById, selectedNodeId, focusNodeTypeId, positions, clusterMode]);
 
   // Distinct relation keys present on edges (for the filter dropdown).
   const relationKeys = useMemo(() => {
@@ -461,6 +499,23 @@ function GraphCanvas({
               onClick={() => { setLayout("grid"); setTimeout(() => fitView({ duration: 300 }), 60); }}
               title={t("网格布局", "Grid layout")}
             >▦ {t("网格", "Grid")}</ToolbarBtn>
+            <ToolbarBtn
+              active={clusterMode !== "off"}
+              onClick={() => {
+                setClusterMode((c) => (c === "off" ? "byType" : c === "byType" ? "colorByType" : "off"));
+                setTimeout(() => fitView({ duration: 300 }), 80);
+              }}
+              title={t(
+                "聚类: 按类型分组 / 着色 / 关",
+                "Cluster: group by type / colour / off",
+              )}
+            >
+              ⊛ {clusterMode === "off"
+                ? t("聚类", "Cluster")
+                : clusterMode === "byType"
+                  ? t("聚类:分组", "Cluster: grouped")
+                  : t("聚类:着色", "Cluster: coloured")}
+            </ToolbarBtn>
           </div>
 
           {/* Relation filter */}
