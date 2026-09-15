@@ -470,8 +470,10 @@ function Step4Body({
           domainId,
           key: rt.key,
           displayName: rt.displayName,
-          sourceNodeTypeKey: rt.sourceNodeTypeKey,
-          targetNodeTypeKey: rt.targetNodeTypeKey,
+          metadata: {
+            sourceNodeTypeKey: rt.sourceNodeTypeKey,
+            targetNodeTypeKey: rt.targetNodeTypeKey,
+          },
         });
       }
       await createBusinessSystem({

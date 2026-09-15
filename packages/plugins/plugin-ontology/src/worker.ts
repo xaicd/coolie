@@ -1558,6 +1558,7 @@ const plugin = definePlugin({
           slug: requireString(body.slug, "slug"),
           displayName: requireString(body.displayName, "displayName"),
           description: typeof body.description === "string" ? body.description : null,
+          category: typeof body.category === "string" ? body.category : undefined,
           metadata: optionalRecord(body.metadata),
         });
         await ctx.activity.log({
@@ -2301,6 +2302,7 @@ const plugin = definePlugin({
           domainCopilotConfig: optionalRecord(body.domainCopilotConfig),
           domainGovernance: optionalRecord(body.domainGovernance),
           npcTeamConfig: optionalRecord(body.npcTeamConfig),
+          metadata: optionalRecord(body.metadata),
         });
         await ctx.activity.log({
           companyId,
