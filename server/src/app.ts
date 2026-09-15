@@ -578,28 +578,49 @@ export async function createApp(
   // subscribed to the same (pluginId, channel, companyId) triple. Without
   // it the /plugins/:pluginId/bridge/stream/:channel route returns 501 and
   // usePluginStream in plugin UI never sees events. We always create one
-  // ourselves (the pluginWorkerManager option is for tests that want to
-  // inject their own worker manager without losing the stream bus).
+  // ourselves, and we wire it up to whichever worker manager ends up being
+  // used — whether it came in via `opts.pluginWorkerManager` (the index.ts
+  // path passes one in pre-constructed) or whether we created it here. The
+  // pre-e0f9d34d3 wiring only attached the callback when we constructed the
+  // manager ourselves, so the production index.ts path silently bypassed it
+  // and every plugin stream (数字副手 chat, AI bootstrap, top status bar)
+  // never reached the SSE bridge.
   const streamBus: PluginStreamBus = createPluginStreamBus();
-  const workerManager = opts.pluginWorkerManager ?? createPluginWorkerManager({
-    onStreamNotification: (pluginId, method, params) => {
-      const channel = String(params.channel ?? "");
-      const companyId = String(params.companyId ?? "");
-      if (!channel || !companyId) return;
-      if (method === "streams.open") {
-        // The route auto-sends an :ok SSE comment on subscribe; we only
-        // surface 'open' here so a client can know the worker formally
-        // announced a channel. Skip for now to avoid noise.
-        return;
-      }
-      if (method === "streams.close") {
-        streamBus.publish(pluginId, channel, companyId, { channel }, "close");
-        return;
-      }
-      // streams.emit — the payload is whatever the worker sent.
-      streamBus.publish(pluginId, channel, companyId, params.event ?? null, "message");
+  const handleStreamNotification = (pluginId: string, method: "streams.open" | "streams.emit" | "streams.close", params: Record<string, unknown>) => {
+    const channel = String(params.channel ?? "");
+    const companyId = String(params.companyId ?? "");
+    if (!channel || !companyId) return;
+    if (method === "streams.open") {
+      return;
+    }
+    if (method === "streams.close") {
+      streamBus.publish(pluginId, channel, companyId, { channel }, "close");
+      return;
+    }
+    streamBus.publish(pluginId, channel, companyId, params.event ?? null, "message");
+  };
+  const baseWorkerManager = opts.pluginWorkerManager ?? createPluginWorkerManager();
+  // Wrap startWorker so the per-handle `onStreamNotification` always feeds
+  // our bus, regardless of whether the caller constructed the manager. Tests
+  // that pass their own worker manager can still inject a custom
+  // onStreamNotification per-call and it will take precedence.
+  const workerManager: typeof baseWorkerManager = {
+    ...baseWorkerManager,
+    async startWorker(pluginId, options) {
+      const handle = await baseWorkerManager.startWorker(pluginId, {
+        ...options,
+        onStreamNotification: options.onStreamNotification
+          ? options.onStreamNotification
+          : (method, params) =>
+              handleStreamNotification(
+                pluginId,
+                method as "streams.open" | "streams.emit" | "streams.close",
+                params,
+              ),
+      });
+      return handle;
     },
-  });
+  };
   const connectionIntentHeartbeat = heartbeatService(db, {
     pluginWorkerManager: workerManager,
   });
