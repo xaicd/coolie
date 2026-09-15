@@ -27,6 +27,7 @@ import {
   buildBootstrapSystemPrompt,
   parseBootstrapDraft,
 } from "./aide/bootstrap.js";
+import { EDIT_SYSTEM_PROMPT_SUFFIX, parseEditResponse } from "./aide/editOps.js";
 import type {
   ActionKind,
   ActionTypeStatus,
@@ -1089,6 +1090,7 @@ const plugin = definePlugin({
       const companyId = requireString(params.companyId, "companyId");
       const domainId = requireString(params.domainId, "domainId");
       const userMessage = requireString(params.message, "message");
+      const mode = params.mode === "edit" ? "edit" : "qa";
       const aide = requireAideStore();
       const streamChannel = `ontology.aide.stream.${companyId}.${domainId}`;
 
@@ -1099,7 +1101,10 @@ const plugin = definePlugin({
         aide.loadHistory(companyId, domainId, 500),
       ]);
 
-      const systemPrompt = buildAideSystemPrompt(snapshot);
+      const baseSystemPrompt = buildAideSystemPrompt(snapshot);
+      const systemPrompt = mode === "edit"
+        ? baseSystemPrompt + EDIT_SYSTEM_PROMPT_SUFFIX
+        : baseSystemPrompt;
       const recentHistory = history.slice(-50);
       const llmMessages: Array<{ role: "user" | "assistant"; content: string }> = [
         ...recentHistory
@@ -1115,9 +1120,12 @@ const plugin = definePlugin({
       aideStreamRegistry.set(registryKey, registryEntry);
       try {
         const client = getClient();
+        // Edit-mode responses are pure JSON, so we don't need the long
+        // prose budget that QA mode uses.
+        const maxTokens = mode === "edit" ? 4096 : 2048;
         const stream = client.messages.stream({
           model: getModel(),
-          max_tokens: 2048,
+          max_tokens: maxTokens,
           system: systemPrompt,
           messages: llmMessages,
         });
@@ -1132,6 +1140,34 @@ const plugin = definePlugin({
           }
         });
         await stream.finalMessage();
+
+        if (mode === "edit") {
+          // Edit-mode does not use citations. We parse the final buffer
+          // as JSON and emit a structured `edit_result` event the UI
+          // renders as an EditCard. The full JSON also goes into the
+          // assistant message column so the user can scroll back to it.
+          const parsed = parseEditResponse(acc);
+          if (!registryEntry.aborted) {
+            await aide.appendMessage(
+              companyId,
+              domainId,
+              "assistant",
+              acc,
+              [],
+            );
+            if (parsed.ok) {
+              ctx.streams.emit(streamChannel, { type: "edit_result", result: parsed.result });
+              ctx.streams.emit(streamChannel, { type: "done", citations: [] });
+            } else {
+              ctx.streams.emit(streamChannel, { type: "edit_error", error: parsed.error });
+              ctx.streams.emit(streamChannel, { type: "done", citations: [] });
+            }
+          } else {
+            ctx.streams.emit(streamChannel, { type: "aborted" });
+          }
+          return { ok: true, mode, aborted: registryEntry.aborted };
+        }
+
         const citations = extractCitations(acc);
         const cleanContent = stripCitationTrailer(acc);
         // Don't persist partial output if the user aborted mid-flight — the

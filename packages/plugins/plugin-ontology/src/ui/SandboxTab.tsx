@@ -16,6 +16,8 @@ import {
 import { t } from "./isZh.js";
 import { MarkdownContent } from "./MarkdownContent.js";
 import { CitationPreview, kindLabel } from "./CitationPreview.js";
+import { EditCard } from "./EditCard.js";
+import { type CockpitEditResult, type MutationCall } from "../aide/editOps.js";
 
 // ---------------------------------------------------------------------------
 // Types — mirror what the worker returns so we don't have to share a module.
@@ -121,7 +123,9 @@ type AideStreamEvent =
   | { type: "token"; text: string }
   | { type: "done"; citations: AideCitation[] }
   | { type: "error"; message: string }
-  | { type: "aborted" };
+  | { type: "aborted" }
+  | { type: "edit_result"; result: CockpitEditResult }
+  | { type: "edit_error"; error: string };
 
 interface LocalMessage {
   id: string;
@@ -132,6 +136,13 @@ interface LocalMessage {
   createdAt: string;
   error?: string;
   aborted?: boolean;
+  /** Set when the assistant turn came back in Edit mode — the UI
+   *  surfaces this as an EditCard instead of (or alongside) the JSON
+   *  blob in `content`. */
+  editResult?: CockpitEditResult;
+  /** Set when Edit-mode JSON parse failed; the UI shows a localised
+   *  hint instead of an EditCard so the user can retry or report. */
+  editError?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -183,12 +194,22 @@ export function SandboxTab({
   const askAide = usePluginAction("ask-aide");
   const abortAide = usePluginAction("aide-abort");
   const clearSession = usePluginAction("aide-clear-session");
+  const createNodeType = usePluginAction("create-node-type");
+  const updateNodeType = usePluginAction("update-node-type");
+  const deleteNodeType = usePluginAction("delete-node-type");
+  const createRelationType = usePluginAction("create-relation-type");
+  const updateRelationType = usePluginAction("update-relation-type");
+  const deleteRelationType = usePluginAction("delete-relation-type");
 
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [sending, setSending] = useState(false);
   const [aborting, setAborting] = useState(false);
   const [clearing, setClearing] = useState(false);
+  /** Edit-mode switch — when "edit", every assistant turn comes back as
+   *  a structured CockpitEditResult instead of free-text prose. The
+   *  selected mode is sticky per session, not persisted across reloads. */
+  const [mode, setMode] = useState<"qa" | "edit">("qa");
   const seenTokenKeysRef = useRef<Set<string>>(new Set());
   // Which citation chip is currently expanded across the message list.
   // Key format: `${messageId}:${chipIdx}` so each chip is independent and
@@ -205,9 +226,10 @@ export function SandboxTab({
   // hasn't been re-rendered yet when the queued submit runs. Defined before
   // any effect that references it so the deps array can resolve cleanly.
   const submitText = useCallback(
-    async (text: string) => {
+    async (text: string, overrideMode?: "qa" | "edit") => {
       const trimmed = text.trim();
       if (trimmed.length === 0 || sending) return;
+      const useMode = overrideMode ?? mode;
       setSending(true);
       const userMsg: LocalMessage = {
         id: `local-user-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -229,7 +251,7 @@ export function SandboxTab({
       seenTokenKeysRef.current = new Set();
       setDraft("");
       try {
-        await askAide({ companyId, domainId, message: trimmed });
+        await askAide({ companyId, domainId, message: trimmed, mode: useMode });
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err);
         setMessages((prev) =>
@@ -243,7 +265,7 @@ export function SandboxTab({
         setSending(false);
       }
     },
-    [askAide, companyId, domainId, sending],
+    [askAide, companyId, domainId, sending, mode],
   );
 
   // Local state is scoped to the (companyId, domainId) pair: the parent
@@ -352,6 +374,41 @@ export function SandboxTab({
     [onSubmit],
   );
 
+  // Dispatch a single mutation from an EditCard. EditOps.applyOperations()
+  // already resolved keys → ids, so the worker just needs the right
+  // action name, body, and (where applicable) params.
+  const dispatchMutation = useCallback(
+    async (call: MutationCall): Promise<unknown> => {
+      switch (call.action) {
+        case "create-node-type":
+          return createNodeType({ body: call.body });
+        case "update-node-type":
+          return updateNodeType({ params: call.params, body: call.body });
+        case "delete-node-type":
+          return deleteNodeType({ params: call.params });
+        case "create-relation-type":
+          return createRelationType({ body: call.body });
+        case "update-relation-type":
+          return updateRelationType({ params: call.params, body: call.body });
+        case "delete-relation-type":
+          return deleteRelationType({ params: call.params });
+      }
+    },
+    [
+      createNodeType,
+      createRelationType,
+      deleteNodeType,
+      deleteRelationType,
+      updateNodeType,
+      updateRelationType,
+    ],
+  );
+
+  const onEditApplied = useCallback(() => {
+    // Refresh the snapshot so the schema pane / citations stay accurate.
+    void describe.refresh();
+  }, [describe]);
+
   const configured = describe.data?.configured ?? false;
   const configReason = describe.data?.configReason;
   const loading = describe.loading || history.loading;
@@ -373,6 +430,7 @@ export function SandboxTab({
               label={configured ? t("已配置", "Configured") : t("未配置", "Not configured")}
               status={configured ? "ok" : "warning"}
             />
+            <ModeToggle mode={mode} onChange={setMode} disabled={sending} />
             <button
               type="button"
               disabled={clearing || messages.length === 0}
@@ -400,6 +458,7 @@ export function SandboxTab({
           <MessageList
             messages={messages}
             describe={describe.data ?? null}
+            domainId={domainId}
             loading={loading && messages.length === 0}
             openCitationKey={openCitationKey}
             onToggleCitation={toggleCitation}
@@ -410,12 +469,15 @@ export function SandboxTab({
               // reading draft in a queued closure would give a stale "".
               void submitText(prompt);
             }}
+            dispatchMutation={dispatchMutation}
+            onEditApplied={onEditApplied}
           />
           <Composer
             value={draft}
             disabled={sending}
             sending={sending}
             aborting={aborting}
+            mode={mode}
             onChange={setDraft}
             onKeyDown={onKeyDown}
             onSubmit={() => { void onSubmit(); }}
@@ -455,19 +517,25 @@ function SetupCard({ reason }: { reason: string }): ReactElement {
 function MessageList({
   messages,
   describe,
+  domainId,
   loading,
   openCitationKey,
   onToggleCitation,
   onPickPrompt,
+  dispatchMutation,
+  onEditApplied,
 }: {
   messages: LocalMessage[];
   describe: DescribeDomainResult | null;
+  domainId: string;
   loading: boolean;
   /** Key of the currently-open citation chip, or null. */
   openCitationKey: string | null;
   /** Toggle which chip is open; passing the same key closes it. */
   onToggleCitation: (key: string) => void;
   onPickPrompt: (prompt: string) => void;
+  dispatchMutation: (call: MutationCall) => Promise<unknown>;
+  onEditApplied: () => void;
 }): ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -531,8 +599,11 @@ function MessageList({
             <Bubble
               message={m}
               describe={describe}
+              domainId={domainId}
               openCitationKey={openCitationKey}
               onToggleCitation={onToggleCitation}
+              dispatchMutation={dispatchMutation}
+              onEditApplied={onEditApplied}
             />
           </li>
         ))}
@@ -544,15 +615,25 @@ function MessageList({
 function Bubble({
   message,
   describe,
+  domainId,
   openCitationKey,
   onToggleCitation,
+  dispatchMutation,
+  onEditApplied,
 }: {
   message: LocalMessage;
   describe: DescribeDomainResult | null;
+  domainId: string;
   openCitationKey: string | null;
   onToggleCitation: (key: string) => void;
+  dispatchMutation: (call: MutationCall) => Promise<unknown>;
+  onEditApplied: () => void;
 }): ReactElement {
   const isUser = message.role === "user";
+  // Edit-mode assistant turns are pure JSON. The EditCard is the user-
+  // facing surface; we still render the raw JSON underneath inside a
+  // collapsed <details> so a curious user can copy-paste it.
+  const showEditCard = !isUser && !!message.editResult;
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
@@ -562,14 +643,34 @@ function Bubble({
             : "bg-card text-foreground border border-border"
         }`}
       >
-        {message.content.length === 0 && message.streaming ? (
+        {showEditCard ? (
+          message.editResult ? (
+            <EditCard
+              result={message.editResult}
+              snapshot={describe}
+              domainId={domainId}
+              dispatch={dispatchMutation}
+              onApplied={onEditApplied}
+            />
+          ) : null
+        ) : message.content.length === 0 && message.streaming ? (
           <BouncingDots />
         ) : isUser ? (
           <div>{message.content}</div>
         ) : (
           <MarkdownContent source={message.content} />
         )}
-        {!isUser && !message.streaming && message.citations.length > 0 && (
+        {showEditCard && message.content.length > 0 && (
+          <details className="mt-2 text-(length:--text-nano) text-muted-foreground">
+            <summary className="cursor-pointer">
+              {t("查看原始 JSON", "Show raw JSON")}
+            </summary>
+            <pre className="mt-1 overflow-x-auto rounded-md bg-muted/40 p-2 text-(length:--text-nano)">
+              {message.content}
+            </pre>
+          </details>
+        )}
+        {!isUser && !message.streaming && !showEditCard && message.citations.length > 0 && (
           <CitationChips
             citations={message.citations}
             describe={describe}
@@ -578,7 +679,12 @@ function Bubble({
             onToggleCitation={onToggleCitation}
           />
         )}
-        {message.error ? (
+        {message.editError ? (
+          <div className="mt-2 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-(length:--text-nano) text-amber-700 dark:text-amber-300">
+            {t("无法解析编辑结果: ", "Failed to parse edit result: ")}
+            {message.editError}
+          </div>
+        ) : message.error ? (
           <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-(length:--text-nano) text-destructive">
             {t("流式中断: ", "Stream interrupted: ")}
             {message.error}
@@ -678,6 +784,7 @@ function Composer({
   disabled,
   sending,
   aborting,
+  mode,
   onChange,
   onKeyDown,
   onSubmit,
@@ -687,11 +794,21 @@ function Composer({
   disabled: boolean;
   sending: boolean;
   aborting: boolean;
+  mode: "qa" | "edit";
   onChange: (next: string) => void;
   onKeyDown: (e: React.KeyboardEvent<HTMLTextAreaElement>) => void;
   onSubmit: () => void;
   onStop: () => void;
 }): ReactElement {
+  const placeholder = mode === "edit"
+    ? t(
+        "想改 schema?说出修改意图,LLM 会返回结构化编辑提案…",
+        "Describe the schema change you want. LLM returns structured ops…",
+      )
+    : t(
+        "问点什么…Enter 发送,Shift+Enter 换行",
+        "Ask anything… Enter to send, Shift+Enter for newline",
+      );
   return (
     <form
       onSubmit={(e) => {
@@ -705,10 +822,7 @@ function Composer({
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={onKeyDown}
-        placeholder={t(
-          "问点什么…Enter 发送,Shift+Enter 换行",
-          "Ask anything… Enter to send, Shift+Enter for newline",
-        )}
+        placeholder={placeholder}
         rows={2}
         className="flex-1 resize-none rounded-md border border-border bg-background px-3 py-2 text-(length:--text-compact) text-foreground outline-none focus:border-primary disabled:opacity-60"
       />
@@ -728,7 +842,7 @@ function Composer({
           disabled={disabled || value.trim().length === 0}
           className="rounded-md bg-primary px-3 py-2 text-(length:--text-compact) font-medium text-primary-foreground transition-opacity disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {t("发送", "Send")}
+          {mode === "edit" ? t("提议编辑", "Propose edit") : t("发送", "Send")}
         </button>
       )}
     </form>
@@ -766,6 +880,22 @@ function applyEvents(
         ...last,
         streaming: false,
         citations: ev.citations,
+      };
+    } else if (ev.type === "edit_result") {
+      // Edit mode: the LLM's whole reply was the JSON. Replace the
+      // streaming content with a tiny placeholder so the bubble doesn't
+      // render the raw JSON twice — the EditCard is the source of truth.
+      next[lastIdx] = {
+        ...last,
+        streaming: false,
+        content: "",
+        editResult: ev.result,
+      };
+    } else if (ev.type === "edit_error") {
+      next[lastIdx] = {
+        ...last,
+        streaming: false,
+        editError: ev.error,
       };
     } else if (ev.type === "aborted") {
       next[lastIdx] = {
@@ -892,4 +1022,73 @@ function statusClass(status: string): string {
     default:
       return "bg-muted text-muted-foreground";
   }
+}
+
+/**
+ * Two-state mode switch in the cockpit header. Drives the `ask-aide`
+ * payload's `mode` parameter and which sub-component (Bubble prose vs
+ * EditCard) the assistant turn renders as. Disabled mid-stream so the
+ * user can't silently switch mid-flight and confuse the worker's
+ * expectations.
+ */
+function ModeToggle({
+  mode,
+  onChange,
+  disabled,
+}: {
+  mode: "qa" | "edit";
+  onChange: (next: "qa" | "edit") => void;
+  disabled: boolean;
+}): ReactElement {
+  return (
+    <div
+      role="radiogroup"
+      aria-label={t("对话模式", "Conversation mode")}
+      className="inline-flex items-center rounded-full border border-border bg-background p-0.5 text-(length:--text-nano)"
+    >
+      <ModeToggleOption
+        active={mode === "qa"}
+        disabled={disabled}
+        onClick={() => onChange("qa")}
+        ariaLabel={t("问 Q&A", "Q&A")}
+      />
+      <ModeToggleOption
+        active={mode === "edit"}
+        disabled={disabled}
+        onClick={() => onChange("edit")}
+        ariaLabel={t("编辑 schema", "Edit schema")}
+      />
+    </div>
+  );
+}
+
+function ModeToggleOption({
+  active,
+  disabled,
+  onClick,
+  ariaLabel,
+}: {
+  active: boolean;
+  disabled: boolean;
+  onClick: () => void;
+  ariaLabel: string;
+}): ReactElement {
+  const baseCls =
+    "rounded-full px-2.5 py-0.5 transition-colors font-medium";
+  const stateCls = active
+    ? "bg-primary text-primary-foreground"
+    : "text-muted-foreground hover:text-foreground";
+  return (
+    <button
+      type="button"
+      role="radio"
+      aria-checked={active}
+      aria-label={ariaLabel}
+      disabled={disabled}
+      onClick={onClick}
+      className={`${baseCls} ${stateCls} disabled:cursor-not-allowed disabled:opacity-50`}
+    >
+      {ariaLabel}
+    </button>
+  );
 }
