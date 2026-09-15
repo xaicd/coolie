@@ -25,6 +25,7 @@ export function EditCard({
   domainId,
   dispatch,
   onApplied,
+  onHover,
 }: {
   result: CockpitEditResult;
   snapshot: DescribeDomainResult | null;
@@ -36,6 +37,11 @@ export function EditCard({
   /**Called after a successful apply so the parent can refresh the
    *  snapshot and clear the bubble's "pending" affordance. */
   onApplied: () => void;
+  /**Fired with the EditCard's result when the user hovers the card,
+   *  null when they leave. The parent (SandboxTab) feeds this into the
+   *  SchemaPreviewPane so the right-side tree lights up with the rows
+   *  this op set would touch. */
+  onHover?: (result: CockpitEditResult | null) => void;
 }): ReactElement {
   const [applying, setApplying] = useState(false);
   const [discarded, setDiscarded] = useState(false);
@@ -86,7 +92,11 @@ export function EditCard({
   }
 
   return (
-    <div className="mt-2 space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3">
+    <div
+      className="mt-2 space-y-2 rounded-lg border border-primary/40 bg-primary/5 p-3"
+      onMouseEnter={onHover ? () => onHover(result) : undefined}
+      onMouseLeave={onHover ? () => onHover(null) : undefined}
+    >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <div className="min-w-0">
           <div className="text-(length:--text-compact) font-semibold text-foreground">

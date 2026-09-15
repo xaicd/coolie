@@ -17,6 +17,7 @@ import { t } from "./isZh.js";
 import { MarkdownContent } from "./MarkdownContent.js";
 import { CitationPreview, kindLabel } from "./CitationPreview.js";
 import { EditCard } from "./EditCard.js";
+import { SchemaPreviewPane } from "./SchemaPreviewPane.js";
 import { type CockpitEditResult, type MutationCall } from "../aide/editOps.js";
 
 // ---------------------------------------------------------------------------
@@ -210,6 +211,44 @@ export function SandboxTab({
    *  a structured CockpitEditResult instead of free-text prose. The
    *  selected mode is sticky per session, not persisted across reloads. */
   const [mode, setMode] = useState<"qa" | "edit">("qa");
+  /** Schema preview pane visibility. Read once at mount from localStorage
+   *  (SWR-style — we don't want to re-read on every keystroke). Defaults
+   *  to true so first-time users see the pane right away. */
+  const [previewVisible, setPreviewVisible] = useState<boolean>(() => {
+    try {
+      const v = window.localStorage.getItem("ontology.cockpit.previewVisible");
+      return v == null ? true : v !== "false";
+    } catch {
+      return true;
+    }
+  });
+  /** Result of the EditCard currently under the mouse — drives the right
+   *  pane's diff coloring. null when no card is hovered (or the user
+   *  isn't in edit mode). Sticky on leave so the user can mouse over
+   *  the pane without losing the diff overlay. */
+  const [hoveredEditResult, setHoveredEditResult] = useState<CockpitEditResult | null>(null);
+
+  // Persist the preview-pane toggle so it survives reloads. Wrapped in
+  // try/catch because localStorage can throw in private windows / when
+  // site data is blocked — we just silently fall back to in-memory.
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        "ontology.cockpit.previewVisible",
+        String(previewVisible),
+      );
+    } catch {
+      // best-effort
+    }
+  }, [previewVisible]);
+
+  // Clear the hover overlay when the user explicitly applies or discards
+  // a card — the EditCard itself disappears (or shows "已丢弃"), so the
+  // pane would otherwise dangle on a stale result.
+  const onEditApplied = useCallback(() => {
+    setHoveredEditResult(null);
+    void describe.refresh();
+  }, [describe]);
   const seenTokenKeysRef = useRef<Set<string>>(new Set());
   // Which citation chip is currently expanded across the message list.
   // Key format: `${messageId}:${chipIdx}` so each chip is independent and
@@ -404,11 +443,6 @@ export function SandboxTab({
     ],
   );
 
-  const onEditApplied = useCallback(() => {
-    // Refresh the snapshot so the schema pane / citations stay accurate.
-    void describe.refresh();
-  }, [describe]);
-
   const configured = describe.data?.configured ?? false;
   const configReason = describe.data?.configReason;
   const loading = describe.loading || history.loading;
@@ -431,6 +465,7 @@ export function SandboxTab({
               status={configured ? "ok" : "warning"}
             />
             <ModeToggle mode={mode} onChange={setMode} disabled={sending} />
+            <PaneToggle visible={previewVisible} onChange={setPreviewVisible} />
             <button
               type="button"
               disabled={clearing || messages.length === 0}
@@ -454,36 +489,45 @@ export function SandboxTab({
       {!configured ? (
         <SetupCard reason={configReason ?? t("数字副手尚未配置", "Digital aide is not configured")} />
       ) : (
-        <>
-          <MessageList
-            messages={messages}
-            describe={describe.data ?? null}
-            domainId={domainId}
-            loading={loading && messages.length === 0}
-            openCitationKey={openCitationKey}
-            onToggleCitation={toggleCitation}
-            onPickPrompt={(prompt) => {
-              setDraft(prompt);
-              // Fire submitText directly with the prompt text — the
-              // controlled-input draft hasn't been re-rendered yet so
-              // reading draft in a queued closure would give a stale "".
-              void submitText(prompt);
-            }}
-            dispatchMutation={dispatchMutation}
-            onEditApplied={onEditApplied}
-          />
-          <Composer
-            value={draft}
-            disabled={sending}
-            sending={sending}
-            aborting={aborting}
-            mode={mode}
-            onChange={setDraft}
-            onKeyDown={onKeyDown}
-            onSubmit={() => { void onSubmit(); }}
-            onStop={() => { void onStop(); }}
-          />
-        </>
+        <div className="flex min-h-0 flex-1 gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-3">
+            <MessageList
+              messages={messages}
+              describe={describe.data ?? null}
+              domainId={domainId}
+              loading={loading && messages.length === 0}
+              openCitationKey={openCitationKey}
+              onToggleCitation={toggleCitation}
+              onPickPrompt={(prompt) => {
+                setDraft(prompt);
+                // Fire submitText directly with the prompt text — the
+                // controlled-input draft hasn't been re-rendered yet so
+                // reading draft in a queued closure would give a stale "".
+                void submitText(prompt);
+              }}
+              dispatchMutation={dispatchMutation}
+              onEditApplied={onEditApplied}
+              onHoverEditResult={setHoveredEditResult}
+            />
+            <Composer
+              value={draft}
+              disabled={sending}
+              sending={sending}
+              aborting={aborting}
+              mode={mode}
+              onChange={setDraft}
+              onKeyDown={onKeyDown}
+              onSubmit={() => { void onSubmit(); }}
+              onStop={() => { void onStop(); }}
+            />
+          </div>
+          {previewVisible && (
+            <SchemaPreviewPane
+              describe={describe.data ?? null}
+              hoveredEditResult={hoveredEditResult}
+            />
+          )}
+        </div>
       )}
     </div>
   );
@@ -524,6 +568,7 @@ function MessageList({
   onPickPrompt,
   dispatchMutation,
   onEditApplied,
+  onHoverEditResult,
 }: {
   messages: LocalMessage[];
   describe: DescribeDomainResult | null;
@@ -536,6 +581,9 @@ function MessageList({
   onPickPrompt: (prompt: string) => void;
   dispatchMutation: (call: MutationCall) => Promise<unknown>;
   onEditApplied: () => void;
+  /**Bubble → EditCard mouse-enter/leave signal. Drives the right-side
+   *  schema pane's diff coloring. */
+  onHoverEditResult: (result: CockpitEditResult | null) => void;
 }): ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null);
 
@@ -604,6 +652,7 @@ function MessageList({
               onToggleCitation={onToggleCitation}
               dispatchMutation={dispatchMutation}
               onEditApplied={onEditApplied}
+              onHoverEditResult={onHoverEditResult}
             />
           </li>
         ))}
@@ -620,6 +669,7 @@ function Bubble({
   onToggleCitation,
   dispatchMutation,
   onEditApplied,
+  onHoverEditResult,
 }: {
   message: LocalMessage;
   describe: DescribeDomainResult | null;
@@ -628,6 +678,7 @@ function Bubble({
   onToggleCitation: (key: string) => void;
   dispatchMutation: (call: MutationCall) => Promise<unknown>;
   onEditApplied: () => void;
+  onHoverEditResult: (result: CockpitEditResult | null) => void;
 }): ReactElement {
   const isUser = message.role === "user";
   // Edit-mode assistant turns are pure JSON. The EditCard is the user-
@@ -651,6 +702,7 @@ function Bubble({
               domainId={domainId}
               dispatch={dispatchMutation}
               onApplied={onEditApplied}
+              onHover={onHoverEditResult}
             />
           ) : null
         ) : message.content.length === 0 && message.streaming ? (
@@ -1089,6 +1141,34 @@ function ModeToggleOption({
       className={`${baseCls} ${stateCls} disabled:cursor-not-allowed disabled:opacity-50`}
     >
       {ariaLabel}
+    </button>
+  );
+}
+
+/**
+ * Right-side schema preview pane toggle. Uses emoji (👁 / 🚫) instead of
+ * lucide icons to stay consistent with the rest of the plugin which
+ * doesn't pull lucide-react. State persists via localStorage in the
+ * parent so reloads remember the user's choice.
+ */
+function PaneToggle({
+  visible,
+  onChange,
+}: {
+  visible: boolean;
+  onChange: (next: boolean) => void;
+}): ReactElement {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={visible}
+      aria-label={visible ? t("隐藏 Schema 预览", "Hide schema preview") : t("显示 Schema 预览", "Show schema preview")}
+      title={visible ? t("隐藏 Schema 预览", "Hide schema preview") : t("显示 Schema 预览", "Show schema preview")}
+      onClick={() => onChange(!visible)}
+      className="rounded-full border border-border bg-background px-2 py-1 text-(length:--text-base) leading-none transition-colors hover:bg-muted"
+    >
+      {visible ? "👁" : "🚫"}
     </button>
   );
 }

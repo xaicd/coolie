@@ -633,6 +633,119 @@ export function applyOperations(
 /* ------------------------------------------------------------------ */
 /*  System prompt suffix — appended in edit mode                       */
 /* ------------------------------------------------------------------ */
+/*  affectedKeys — for diff coloring in the schema preview pane       */
+/* ------------------------------------------------------------------ */
+
+/** Diff kinds the preview pane can paint. Matches the three DS uses
+ *  (add / remove / update); each maps to a Tailwind color family. */
+export type AffectedKind = "add" | "remove" | "update";
+
+/** A single row the preview pane will color. The `kind` decides the
+ *  color, the `target` carries enough identifier to look up the row
+ *  in the DescribeDomainResult snapshot. */
+export type AffectedKey =
+  | { kind: AffectedKind; target: "nodeType"; typeKey: string }
+  | { kind: AffectedKind; target: "relationType"; typeKey: string }
+  | { kind: AffectedKind; target: "property"; typeKey: string; propertyName: string };
+
+/**
+ * Project an op list onto the rows the schema tree will visibly touch.
+ *
+ * Per-row kind rules (matches the visual story the EditCard apply flow
+ * tells the user):
+ *
+ *   - `addNodeType`          → nodeType add
+ *   - `updateNodeType`       → nodeType update
+ *   - `removeNodeType`       → nodeType remove
+ *   - `addRelationType`      → relationType add
+ *   - `updateRelationType`   → relationType update
+ *   - `removeRelationType`   → relationType remove
+ *   - `addProperty`          → nodeType update + property add
+ *   - `removeProperty`       → nodeType update + property remove
+ *   - `updateProperty`       → nodeType update + property update
+ *
+ * Property ops always tag the parent nodeType as `update` because the
+ * apply path is "compute new full propertiesSchema → update-node-type
+ * with the merged schema" — the whole schema gets rewritten, so the
+ * row band is the update color, not the property's individual color.
+ * The inner property line still gets its own add/remove/update color.
+ *
+ * Multiple ops targeting the same row collapse into one entry; the
+ * latest kind wins (so `addProperty` then `removeProperty` for the
+ * same field yields a single remove). Callers don't need the full
+ * ordering — they just need "is this row colored, and how".
+ */
+export function affectedKeys(operations: EditOperation[]): AffectedKey[] {
+  // Use a Map keyed by `${target}:${typeKey}[:${propertyName}]` so we
+  // collapse repeats and keep the latest kind for each row.
+  const map = new Map<string, AffectedKey>();
+  const set = (key: string, value: AffectedKey) => {
+    map.set(key, value);
+  };
+  for (const op of operations) {
+    switch (op.op) {
+      case "addNodeType":
+        set(`nodeType:${op.typeKey}`, { kind: "add", target: "nodeType", typeKey: op.typeKey });
+        break;
+      case "updateNodeType":
+        set(`nodeType:${op.typeKey}`, { kind: "update", target: "nodeType", typeKey: op.typeKey });
+        break;
+      case "removeNodeType":
+        set(`nodeType:${op.typeKey}`, { kind: "remove", target: "nodeType", typeKey: op.typeKey });
+        break;
+      case "addRelationType":
+        set(`relationType:${op.typeKey}`, { kind: "add", target: "relationType", typeKey: op.typeKey });
+        break;
+      case "updateRelationType":
+        set(`relationType:${op.typeKey}`, { kind: "update", target: "relationType", typeKey: op.typeKey });
+        break;
+      case "removeRelationType":
+        set(`relationType:${op.typeKey}`, { kind: "remove", target: "relationType", typeKey: op.typeKey });
+        break;
+      case "addProperty":
+        set(`nodeType:${op.typeKey}`, { kind: "update", target: "nodeType", typeKey: op.typeKey });
+        set(
+          `property:${op.typeKey}:${op.property.name}`,
+          { kind: "add", target: "property", typeKey: op.typeKey, propertyName: op.property.name },
+        );
+        break;
+      case "removeProperty":
+        set(`nodeType:${op.typeKey}`, { kind: "update", target: "nodeType", typeKey: op.typeKey });
+        set(
+          `property:${op.typeKey}:${op.propertyName}`,
+          { kind: "remove", target: "property", typeKey: op.typeKey, propertyName: op.propertyName },
+        );
+        break;
+      case "updateProperty":
+        set(`nodeType:${op.typeKey}`, { kind: "update", target: "nodeType", typeKey: op.typeKey });
+        set(
+          `property:${op.typeKey}:${op.propertyName}`,
+          { kind: "update", target: "property", typeKey: op.typeKey, propertyName: op.propertyName },
+        );
+        break;
+    }
+  }
+  return Array.from(map.values());
+}
+
+/** Convenience: count the affected rows by kind. Used by the pane's
+ *  DiffSummary header (mirrors DS's "+N / ~N / −N" counter). */
+export function affectedCounts(operations: EditOperation[]): {
+  add: number;
+  update: number;
+  remove: number;
+} {
+  const list = affectedKeys(operations);
+  let add = 0, update = 0, remove = 0;
+  for (const k of list) {
+    if (k.kind === "add") add++;
+    else if (k.kind === "remove") remove++;
+    else update++;
+  }
+  return { add, update, remove };
+}
+
+/* ------------------------------------------------------------------ */
 
 /** Append this to the regular aide system prompt when `mode === "edit"`.
  *  Tells the LLM to return a single JSON object (no markdown prose) with
