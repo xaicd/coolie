@@ -855,41 +855,40 @@ function Step4Body({
 /* ------------------------------------------------------------------ */
 
 async function parseAndPreview(text: string): Promise<ParsedSource> {
-  // Dynamic import keeps this file independent of the extraction module's
-  // surface — if the parser's API changes, this is the only call site.
+  // Phase 1 ships this via parseSourceFile (the existing public
+  // entry point in AstExtractor that dispatches by extension).
+  // The function is dynamic-imported so the modal's import graph
+  // stays lean for users who land on a different step.
   const mod = await import("../cognition/AstExtractor.js").catch(() => null);
   const nodeTypes: ParsedSource["nodeTypes"] = [];
   const relationTypes: ParsedSource["relationTypes"] = [];
 
-  if (mod && typeof (mod as { parseSqlDdl?: unknown }).parseSqlDdl === "function") {
+  if (mod && typeof (mod as { parseSourceFile?: unknown }).parseSourceFile === "function") {
     const result = (mod as unknown as {
-      parseSqlDdl: (t: string) => Array<{
-        tableName: string;
-        columns: Array<{ name: string; type: string; references?: { table: string; column: string } | null }>;
-      }>;
-    }).parseSqlDdl(text);
+      parseSourceFile: (path: string, content: string) => {
+        entities: Array<{ typeName: string; displayName?: string; properties?: Array<{ name: string; type: string }> }>;
+        relations: Array<{ sourceType: string; targetType: string; relationType: string }>;
+      };
+    }).parseSourceFile("wizard.sql", text);
     const seen = new Set<string>();
-    for (const tbl of result) {
-      const key = tbl.tableName.replace(/^t_/, "");
-      if (seen.has(key)) continue;
-      seen.add(key);
+    for (const ent of result.entities) {
+      if (seen.has(ent.typeName)) continue;
+      seen.add(ent.typeName);
       nodeTypes.push({
-        key: tbl.tableName,
-        displayName: tbl.tableName,
+        key: ent.typeName,
+        displayName: ent.displayName ?? ent.typeName,
         properties: Object.fromEntries(
-          tbl.columns.map((c) => [c.name, { type: c.type }]),
+          (ent.properties ?? []).map((p) => [p.name, { type: p.type }]),
         ),
       });
-      for (const col of tbl.columns) {
-        if (col.references) {
-          relationTypes.push({
-            key: `${tbl.tableName}_${col.references.table}`,
-            displayName: `${tbl.tableName} → ${col.references.table}`,
-            sourceNodeTypeKey: tbl.tableName,
-            targetNodeTypeKey: col.references.table,
-          });
-        }
-      }
+    }
+    for (const rel of result.relations) {
+      relationTypes.push({
+        key: `${rel.sourceType}_${rel.targetType}`,
+        displayName: `${rel.sourceType} → ${rel.targetType}`,
+        sourceNodeTypeKey: rel.sourceType,
+        targetNodeTypeKey: rel.targetType,
+      });
     }
   }
   return { nodeTypes, relationTypes };
