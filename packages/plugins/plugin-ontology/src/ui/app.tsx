@@ -279,7 +279,12 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
   // single source of truth for *which* view mounts — the group is just a
   // affordance for surfacing its children as a sub-tab strip.
   const [activeGroup, setActiveGroup] = useState<WorkbenchGroup | null>(null);
-  const [rightOpen, setRightOpen] = useState(true);
+  // Right stats panel. Off by default so the canvas gets the full width; the
+  // panel is forced open while a node is selected because that is the only
+  // time its inspector is the thing the user is looking at (DS does the same).
+  const [rightOpen, setRightOpen] = useState(false);
+  // Left object-type tree. Collapsible so the canvas can go full-bleed.
+  const [treeOpen, setTreeOpen] = useState(true);
   const [showNewDomain, setShowNewDomain] = useState(false);
   // When the graph node right-click menu dispatches "动作", DomainWorkspace
   // catches the window CustomEvent and writes the captured nodeTypeId here
@@ -389,6 +394,21 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
             <span className="text-[13px] leading-none">＋</span>
             {t("新建", "New")}
           </button>
+          {/* Collapse the object-type tree — reclaims 192px for the canvas. */}
+          {(view === "graph" || view === "table" || view === "schema") && (
+            <button
+              onClick={() => setTreeOpen(o => !o)}
+              title={treeOpen
+                ? t("收起类型树", "Collapse type tree")
+                : t("展开类型树", "Expand type tree")}
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M9 3v18" />
+              </svg>
+            </button>
+          )}
           {/* The cockpit has no right panel to toggle — see DomainWorkspace. */}
           {view !== "sandbox" && (
             <button
@@ -478,6 +498,7 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
           domain={activeDomain}
           view={view}
           rightOpen={rightOpen}
+          treeOpen={treeOpen}
           activeGroup={activeGroup}
           onSelectView={selectView}
           actionFormPrefill={actionFormPrefill}
@@ -734,6 +755,7 @@ function DomainWorkspace({
   domain,
   view,
   rightOpen,
+  treeOpen,
   activeGroup,
   onSelectView,
   actionFormPrefill,
@@ -747,6 +769,9 @@ function DomainWorkspace({
   domain: OntologyDomain | null;
   view: WorkbenchView;
   rightOpen: boolean;
+  /** Whether the left object-type tree is expanded. Collapsing it gives the
+      canvas the full width. */
+  treeOpen: boolean;
   /** Which group menu is expanded in row 2 of the toolbar. When set,
       we render a sub-tab strip below the toolbar showing the group's
       leaf views. Null = no group active (user is on a primary view). */
@@ -860,7 +885,7 @@ function DomainWorkspace({
   return (
     <div className="flex min-h-0 flex-1 overflow-hidden">
       {/* Left: node type tree */}
-      {showTree && (
+      {showTree && treeOpen && (
         <div className="flex w-48 shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/20 p-2">
           <div
             className="mb-1 px-1 text-(length:--text-nano) font-semibold text-muted-foreground uppercase tracking-wide"
@@ -1214,10 +1239,10 @@ function DomainWorkspace({
         />
       </div>
 
-      {/* Right: stats panel. Skipped on the cockpit — that view is a chat
-          surface, and the domain summary + statistics chrome next to it is
-          noise the user has to read past. */}
-      {rightOpen && domain && view !== "sandbox" && (
+      {/* Right: stats panel. Skipped on the cockpit (a chat surface that needs
+          no stats chrome beside it) and only shown when the user asked for it
+          or a node is selected — otherwise the canvas keeps the full width. */}
+      {domain && view !== "sandbox" && (rightOpen || selectedNode !== null) && (
         <div className="flex w-64 shrink-0 flex-col gap-3 overflow-y-auto border-l border-border bg-muted/10 p-3">
           <div>
             <div className="mb-2 text-(length:--text-compact) font-semibold">{t("域概览", "Domain overview")}</div>

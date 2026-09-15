@@ -471,6 +471,33 @@ function GraphCanvas({
 
   const closeMenu = useCallback(() => setMenu(null), []);
 
+  // Re-fit whenever the canvas box changes size — collapsing a side panel,
+  // resizing the window, or the host chrome reflowing. Without this the graph
+  // keeps its old viewport transform and ends up anchored in a corner of the
+  // new space instead of filling it.
+  useEffect(() => {
+    const el = wrapRef.current;
+    if (!el || typeof ResizeObserver === "undefined") return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let lastW = el.clientWidth;
+    let lastH = el.clientHeight;
+    const observer = new ResizeObserver(() => {
+      const w = el.clientWidth;
+      const h = el.clientHeight;
+      // Ignore scrollbar/sub-pixel jitter; only react to real layout changes.
+      if (Math.abs(w - lastW) < 2 && Math.abs(h - lastH) < 2) return;
+      lastW = w;
+      lastH = h;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => { void fitView({ padding: 0.12, duration: 200 }); }, 120);
+    });
+    observer.observe(el);
+    return () => {
+      if (timer) clearTimeout(timer);
+      observer.disconnect();
+    };
+  }, [fitView]);
+
   const addNode = useCallback(
     (flowX: number, flowY: number) => {
       const label = typeof window !== "undefined" ? window.prompt(t("节点标签", "Node label")) : null;
