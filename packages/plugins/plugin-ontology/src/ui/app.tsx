@@ -214,6 +214,12 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
   const [view, setView] = useState<WorkbenchView>("graph");
   const [rightOpen, setRightOpen] = useState(true);
   const [showNewDomain, setShowNewDomain] = useState(false);
+  // When the graph node right-click menu dispatches "动作", DomainWorkspace
+  // catches the window CustomEvent and writes the captured nodeTypeId here
+  // via the setter we thread down as a prop. ActionsTab consumes the prefill
+  // on mount (cleared via onConsumePrefill) so a second visit without a new
+  // dispatch doesn't keep stale form state.
+  const [actionFormPrefill, setActionFormPrefill] = useState<{ nodeTypeId: string } | null>(null);
 
   // Auto-select first domain
   const activeDomainId = selectedDomainId ?? domains[0]?.id ?? null;
@@ -228,6 +234,7 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
     { id: "dialogue", label: t("对话", "Dialogue"), icon: "💬" },
     { id: "sandbox", label: t("数字副手", "Digital Aide"), icon: "🤝" },
     { id: "actions", label: t("动作", "Actions"), icon: "⚙" },
+    { id: "functions", label: t("函数", "Functions"), icon: "λ" },
   ];
 
   return (
@@ -335,6 +342,8 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
           domain={activeDomain}
           view={view}
           rightOpen={rightOpen}
+          actionFormPrefill={actionFormPrefill}
+          setActionFormPrefill={setActionFormPrefill}
           onDomainsChanged={refreshDomains}
           onRequestView={setView}
         />
@@ -570,6 +579,8 @@ function DomainWorkspace({
   domain,
   view,
   rightOpen,
+  actionFormPrefill,
+  setActionFormPrefill,
   onDomainsChanged,
   onRequestView,
 }: {
@@ -578,6 +589,10 @@ function DomainWorkspace({
   domain: OntologyDomain | null;
   view: WorkbenchView;
   rightOpen: boolean;
+  /** When the graph node right-click menu dispatches "动作", the parent
+      sets this prefill and we hand it to ActionsTab on mount. */
+  actionFormPrefill?: { nodeTypeId: string } | null;
+  setActionFormPrefill?: (v: { nodeTypeId: string } | null) => void;
   onDomainsChanged: () => void;
   /** Bridge to switch the host workbench's tab (e.g. graph → sandbox). */
   onRequestView?: (view: WorkbenchView) => void;
@@ -605,6 +620,9 @@ function DomainWorkspace({
   const { data: actionTypesData } = usePluginData<{ actionTypes: unknown[] }>(
     "list-action-types", { companyId, domainId },
   );
+  const { data: functionsData } = usePluginData<{ functions: unknown[] }>(
+    "list-functions", { companyId, domainId },
+  );
 
   const [focusNodeTypeId, setFocusNodeTypeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
@@ -613,12 +631,6 @@ function DomainWorkspace({
   // Pre-filled ask-aide prompt set by right-click "AI 解释这个节点". Cleared
   // by SandboxTab after it consumes the draft.
   const [aidePrePrompt, setAidePrePrompt] = useState<string | null>(null);
-  // When the graph-view node right-click menu triggers "动作", it dispatches
-  // a window CustomEvent that the parent listens for; we capture the nodeTypeId
-  // here so ActionsTab can prefill its appliesToNodeTypeId field. The tab
-  // consumes the prefill on mount (cleared via onConsumePrefill) so a second
-  // visit without a new dispatch doesn't keep stale form state.
-  const [actionFormPrefill, setActionFormPrefill] = useState<{ nodeTypeId: string } | null>(null);
   // BootstrapPanel lifecycle. The panel itself holds the "running" /
   // "completed" UI state, but the parent must keep the panel mounted across
   // the counts-nodes transition (0 -> N) so the user can see the progress
@@ -634,12 +646,12 @@ function DomainWorkspace({
     const handler = (e: Event) => {
       const detail = (e as CustomEvent<{ domainId: string; nodeTypeId: string }>).detail;
       if (!detail?.nodeTypeId) return;
-      setActionFormPrefill({ nodeTypeId: detail.nodeTypeId });
-      setView("actions");
+      setActionFormPrefill?.({ nodeTypeId: detail.nodeTypeId });
+      onRequestView?.("actions");
     };
     window.addEventListener("paperclip-ontology:open-action-form", handler);
     return () => window.removeEventListener("paperclip-ontology:open-action-form", handler);
-  }, []);
+  }, [onRequestView, setActionFormPrefill]);
 
   const showTree = view === "graph" || view === "table" || view === "schema";
 
@@ -747,8 +759,11 @@ function DomainWorkspace({
             companyId={companyId}
             domainId={domainId}
             initialPrefill={actionFormPrefill}
-            onConsumePrefill={() => setActionFormPrefill(null)}
+            onConsumePrefill={() => setActionFormPrefill?.(null)}
           />
+        )}
+        {view === "functions" && (
+          <FunctionsTab companyId={companyId} domainId={domainId} />
         )}
 
         {simulateNode && (
@@ -804,45 +819,7 @@ function DomainWorkspace({
                 />
                 <StatCard label={t("类型节点", "Typed nodes")} value={Object.values(counts.byNodeType ?? {}).reduce((s, n) => s + n, 0)} />
                 <StatCard label={t("动作数", "Actions")} value={actionTypesData?.actionTypes.length ?? 0} />
-              </div>
-            </div>
-          )}
-
-          {nodeTypes.length > 0 && (
-            <div>
-              <div
-                className="mb-1 text-(length:--text-compact) font-semibold"
-                title={t("对象类型 = Palantir Object Type,本域中所有节点的分类", "Object types — Palantir Object Types; the classification of every node in this domain")}
-              >
-                {t("类型", "Types")} ({nodeTypes.length})
-              </div>
-              <div className="space-y-0.5">
-                {nodeTypes.map(nt => (
-                  <button
-                    key={nt.id}
-                    onClick={() => setFocusNodeTypeId(f => f === nt.id ? null : nt.id)}
-                    className={[
-                      "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-(length:--text-compact) text-left transition-colors",
-                      focusNodeTypeId === nt.id ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent",
-                    ].join(" ")}
-                  >
-                    <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: toneFor(nt.id) }} />
-                    <span className="flex-1 truncate">{nt.display_name || nt.key}</span>
-                    {nt.propertiesSchema && typeof nt.propertiesSchema === "object" && Object.keys(nt.propertiesSchema).length > 0 && (
-                      <span
-                        title={t("该对象类型的属性 schema 字段数", "Number of property schema fields for this object type")}
-                        className="shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-(length:--text-nano) tabular-nums text-muted-foreground"
-                      >
-                        {Object.keys(nt.propertiesSchema).length} {t("属性", "props")}
-                      </span>
-                    )}
-                    {(counts?.byNodeType?.[nt.id] ?? 0) > 0 && (
-                      <span className="shrink-0 rounded bg-primary/10 px-1.5 py-0.5 text-(length:--text-nano) tabular-nums text-primary">
-                        {counts!.byNodeType![nt.id]}
-                      </span>
-                    )}
-                  </button>
-                ))}
+                <StatCard label={t("函数数", "Functions")} value={functionsData?.functions.length ?? 0} />
               </div>
             </div>
           )}
@@ -1134,6 +1111,15 @@ function gapStatusKind(s: string): "ok" | "pending" | "error" | "info" {
   return "pending";
 }
 
+// Generic status kind for the new Palantir-style primitives (Action /
+// Function / Interface). All three share the same status vocabulary:
+// "draft" / "active" / "deprecated".
+function primitiveStatusKind(s: string): "ok" | "pending" | "info" {
+  if (s === "active") return "ok";
+  if (s === "deprecated") return "info";
+  return "pending";
+}
+
 /** Capability acquisition: gaps list + trigger acquisition + resolution trail. */
 function CapabilitiesTab({ companyId }: { companyId: string }): ReactElement {
   const { data, loading, error, refresh } = usePluginData<{ gaps: CapabilityGap[] }>(
@@ -1385,7 +1371,7 @@ function ActionsTab({
             key: "status",
             header: t("状态", "Status"),
             width: "100px",
-            render: (_v, row) => <StatusBadge label={(row as unknown as ActionTypeRow).status} />,
+            render: (_v, row) => <StatusBadge label={(row as unknown as ActionTypeRow).status} status={primitiveStatusKind((row as unknown as ActionTypeRow).status)} />,
           },
           {
             key: "_del",
@@ -1399,6 +1385,148 @@ function ActionsTab({
                   setBusy(true);
                   try {
                     await deleteAction({ companyId, actionTypeId: (row as unknown as ActionTypeRow).id });
+                    refresh();
+                  } catch (e) {
+                    setErr(String((e as Error)?.message ?? e));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {t("删除", "Del")}
+              </button>
+            ),
+          },
+        ]}
+      />
+    </>
+  );
+}
+
+interface FunctionRow {
+  id: string;
+  name: string;
+  type: string;
+  version: string;
+  description: string | null;
+  status: string;
+}
+
+/**
+ * Tab for browsing and editing Palantir-style ontology functions (queries,
+ * actions, webhooks). Same shape as ActionsTab but the row uses `name`
+ * instead of `key` (ontology_functions has no key column — identity is
+ * (domain_id, name, version) per the migration's UNIQUE constraint). No
+ * cross-tab navigation; functions are not directly tied to a node type
+ * the way actions are.
+ */
+function FunctionsTab({
+  companyId,
+  domainId,
+}: {
+  companyId: string;
+  domainId: string;
+}): ReactElement {
+  const { data, loading, error, refresh } = usePluginData<{ functions: FunctionRow[] }>(
+    "list-functions",
+    { companyId, domainId },
+  );
+  const createFn = usePluginAction("create-function");
+  const deleteFn = usePluginAction("delete-function");
+  const [name, setName] = useState("");
+  const [type, setType] = useState<string>("query");
+  const [version, setVersion] = useState("1.0.0");
+  const [description, setDescription] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = useCallback(async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await createFn({
+        companyId,
+        domainId,
+        name: name.trim(),
+        type,
+        version: version.trim() || "1.0.0",
+        description: description.trim() || undefined,
+      });
+      setName("");
+      setDescription("");
+      refresh();
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }, [companyId, domainId, name, type, version, description, createFn, refresh]);
+
+  const rows = data?.functions ?? [];
+
+  return (
+    <>
+      <div className={CARD}>
+        <div className="mb-2 font-semibold">{t("新建函数", "New function")}</div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <input
+            className={INPUT + " w-44"}
+            placeholder={t("函数名", "Function name")}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <select className={INPUT + " w-24"} value={type} onChange={(e) => setType(e.target.value)}>
+            <option value="query">query</option>
+            <option value="action">action</option>
+            <option value="webhook">webhook</option>
+          </select>
+          <input
+            className={INPUT + " w-24"}
+            placeholder="version"
+            value={version}
+            onChange={(e) => setVersion(e.target.value)}
+          />
+          <input
+            className={INPUT + " min-w-60 flex-1"}
+            placeholder={t("描述", "Description")}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+          <button className={BTN} disabled={busy || !name.trim()} onClick={submit}>
+            {busy ? "…" : t("新建", "Create")}
+          </button>
+        </div>
+        {err && <div className="mt-2 text-(length:--text-compact) text-muted-foreground">{err}</div>}
+      </div>
+
+      <DataTable
+        loading={loading}
+        emptyMessage={error ? `Failed: ${error.message}` : t("暂无函数", "No functions yet")}
+        rows={rows as unknown as Record<string, unknown>[]}
+        columns={[
+          { key: "name", header: t("名称", "Name"), width: "180px", render: (_v, row) => (
+            <span className="font-mono">{(row as unknown as FunctionRow).name}</span>
+          ) },
+          { key: "type", header: t("类型", "Type"), width: "90px" },
+          { key: "version", header: t("版本", "Version"), width: "90px" },
+          {
+            key: "status",
+            header: t("状态", "Status"),
+            width: "100px",
+            render: (_v, row) => <StatusBadge label={(row as unknown as FunctionRow).status} status={primitiveStatusKind((row as unknown as FunctionRow).status)} />,
+          },
+          {
+            key: "_del",
+            header: "",
+            width: "60px",
+            render: (_v, row) => (
+              <button
+                className={GHOST_BTN}
+                onClick={async () => {
+                  if (!window.confirm(t("删除该函数?", "Delete this function?"))) return;
+                  setBusy(true);
+                  try {
+                    await deleteFn({ companyId, functionId: (row as unknown as FunctionRow).id });
                     refresh();
                   } catch (e) {
                     setErr(String((e as Error)?.message ?? e));
