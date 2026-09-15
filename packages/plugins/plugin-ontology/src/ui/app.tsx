@@ -613,6 +613,18 @@ function DomainWorkspace({
   const nodeTypes = domainData?.nodeTypes ?? [];
   const relationTypes = domainData?.relationTypes ?? [];
 
+  // Right-click on a node type in the left tree opens this menu. We keep it
+  // local to DomainWorkspace (rather than the parent) because the actions
+  // here depend on companyId + domainId + the active domain — all of which
+  // the parent already routes in via props.
+  const [nodeTypeMenu, setNodeTypeMenu] = useState<{
+    x: number;
+    y: number;
+    nodeType: { id: string; key: string; display_name: string; properties_schema?: Record<string, unknown> | null };
+  } | null>(null);
+  const deleteNodeType = usePluginAction("delete-node-type");
+  const createNode = usePluginAction("create-node");
+
   // Action / Function / Interface counts are not in the graph snapshot; we
   // pull them separately for the right-side Statistics panel. The first usePluginData
   // call below gives us the action count for the StatCard; the next two will
@@ -675,7 +687,15 @@ function DomainWorkspace({
                 draggable
                 onDragStart={e => { e.dataTransfer.setData(DRAG_MIME, nt.id); e.dataTransfer.effectAllowed = "copy"; }}
                 onClick={() => setFocusNodeTypeId(f => f === nt.id ? null : nt.id)}
-                title={t("拖到图谱=按类型建节点 · 点击=过滤", "Drag to canvas to create typed node · click to filter")}
+                onContextMenu={e => {
+                  e.preventDefault();
+                  setNodeTypeMenu({
+                    x: e.clientX,
+                    y: e.clientY,
+                    nodeType: { id: nt.id, key: nt.key, display_name: nt.display_name, properties_schema: nt.propertiesSchema },
+                  });
+                }}
+                title={t("拖到图谱=按类型建节点 · 点击=过滤 · 右键=功能菜单", "Drag to canvas to create typed node · click to filter · right-click for actions")}
                 className={[
                   "flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-(length:--text-compact) transition-colors select-none",
                   focusNodeTypeId === nt.id ? "bg-primary/10 text-primary" : "text-foreground hover:bg-accent",
@@ -773,6 +793,97 @@ function DomainWorkspace({
             node={simulateNode}
             onClose={() => setSimulateNode(null)}
           />
+        )}
+
+        {/* Right-click on a node type in the left tree opens this menu.
+            Anchored at the cursor (clientX/clientY); backdrop click closes.
+            Items mirror the canvas right-click ("按型" submenu) plus copy /
+            action / delete. The delete item is disabled when this type
+            still has nodes referencing it — the hard-delete would orphan
+            them (their node_type_id becomes NULL). We surface this through
+            counts.byNodeType which already tracks live instance counts. */}
+        {nodeTypeMenu && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setNodeTypeMenu(null)}
+              onContextMenu={(e) => { e.preventDefault(); setNodeTypeMenu(null); }}
+            />
+            <div
+              className="fixed z-50 min-w-[8rem] rounded-lg border border-border bg-card p-1 shadow-lg"
+              style={{ left: nodeTypeMenu.x, top: nodeTypeMenu.y }}
+            >
+              <MenuItem2
+                label={t("新建", "New")}
+                icon="＋"
+                onClick={() => {
+                  const m = nodeTypeMenu; setNodeTypeMenu(null);
+                  const label = window.prompt(t("节点标签", "Node label"), m.nodeType.display_name);
+                  if (label && label.trim()) {
+                    void (async () => {
+                      try {
+                        await createNode({ companyId, domainId, key: `n-${Date.now()}`, label: label.trim(), nodeTypeId: m.nodeType.id });
+                        refreshDomain();
+                      } catch (e) {
+                        window.alert(String((e as Error)?.message ?? e));
+                      }
+                    })();
+                  }
+                }}
+              />
+              <MenuItem2
+                label={t("动作", "Action")}
+                icon="⚙"
+                onClick={() => {
+                  const m = nodeTypeMenu; setNodeTypeMenu(null);
+                  setActionFormPrefill?.({ nodeTypeId: m.nodeType.id });
+                  onRequestView?.("actions");
+                }}
+              />
+              <MenuItem2
+                label={t("复制", "Copy")}
+                icon="⎘"
+                onClick={() => {
+                  const m = nodeTypeMenu; setNodeTypeMenu(null);
+                  if (m.nodeType.key && typeof navigator !== "undefined" && navigator.clipboard) {
+                    void navigator.clipboard.writeText(m.nodeType.key);
+                  }
+                }}
+              />
+              <MenuItem2
+                label={t("聚焦", "Focus")}
+                icon="◉"
+                onClick={() => {
+                  const m = nodeTypeMenu; setNodeTypeMenu(null);
+                  setFocusNodeTypeId(m.nodeType.id);
+                }}
+              />
+              <MenuDivider2 />
+              <MenuItem2
+                label={t("删除", "Delete")}
+                icon="✕"
+                danger
+                disabled={(counts?.byNodeType?.[nodeTypeMenu.nodeType.id] ?? 0) > 0}
+                disabledReason={t("该类型下还有节点,先删除节点", "Has nodes referencing it; delete them first")}
+                onClick={() => {
+                  const m = nodeTypeMenu; setNodeTypeMenu(null);
+                  const remaining = counts?.byNodeType?.[m.nodeType.id] ?? 0;
+                  const confirmMsg = remaining > 0
+                    ? t(`该类型下还有 ${remaining} 个节点,删除后这些节点会失去分类。继续?`, `${remaining} nodes reference this type. Delete the type anyway? Nodes will lose their classification but survive.`)
+                    : t("删除该类型?", "Delete this type?");
+                  if (!window.confirm(confirmMsg)) return;
+                  void (async () => {
+                    try {
+                      await deleteNodeType({ companyId, nodeTypeId: m.nodeType.id });
+                      refreshDomain();
+                    } catch (e) {
+                      window.alert(String((e as Error)?.message ?? e));
+                    }
+                  })();
+                }}
+              />
+            </div>
+          </>
         )}
       </div>
 
@@ -1543,6 +1654,53 @@ function FunctionsTab({
       />
     </>
   );
+}
+
+/**
+ * Local MenuItem used by the node-type right-click menu in DomainWorkspace.
+ * Duplicates graph-view's MenuItem shape so we don't have to thread that
+ * component through the public ui/ boundary just for this one menu.
+ * `disabled` greys the row out and short-circuits the click handler; the
+ * optional `disabledReason` becomes the button title so hover explains why.
+ */
+function MenuItem2({
+  label,
+  onClick,
+  danger,
+  icon,
+  disabled,
+  disabledReason,
+}: {
+  label: string;
+  onClick: () => void;
+  danger?: boolean;
+  icon?: string;
+  disabled?: boolean;
+  disabledReason?: string;
+}): ReactElement {
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={disabled ? undefined : onClick}
+      title={disabled ? disabledReason : undefined}
+      className={[
+        "flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left text-(length:--text-compact) transition-colors",
+        disabled
+          ? "cursor-not-allowed text-muted-foreground opacity-50"
+          : danger
+            ? "text-destructive hover:bg-accent"
+            : "text-foreground hover:bg-accent",
+      ].join(" ")}
+    >
+      {icon && <span aria-hidden className="w-4 shrink-0 text-center text-muted-foreground">{icon}</span>}
+      <span className="truncate">{label}</span>
+    </button>
+  );
+}
+
+function MenuDivider2(): ReactElement {
+  return <div className="my-1 h-px bg-border" />;
 }
 
 function CapabilityGapDetail({
