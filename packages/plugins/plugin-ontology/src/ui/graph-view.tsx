@@ -670,10 +670,10 @@ function GraphCanvas({
           >
             {menu.kind === "canvas" && (
               <>
-                <MenuItem label={t("新建节点", "Add node")} onClick={() => { const m = menu; closeMenu(); addNode(m.flowX ?? 0, m.flowY ?? 0); }} />
+                <MenuItem label={t("新建", "New")} onClick={() => { const m = menu; closeMenu(); addNode(m.flowX ?? 0, m.flowY ?? 0); }} />
                 {rawNodeTypes.length > 0 && (
                   <>
-                    <MenuLabel>{t("按类型新建", "New by type")}</MenuLabel>
+                    <MenuLabel>{t("按型", "By type")}</MenuLabel>
                     {rawNodeTypes.map((nt) => (
                       <MenuItem
                         key={nt.id}
@@ -693,7 +693,7 @@ function GraphCanvas({
                     BootstrapPanel via the parent's onRequestBootstrap hook. */}
                 {isDomainEmpty && (
                   <MenuItem
-                    label={t("AI 初始化此域", "AI bootstrap this domain")}
+                    label={t("AI 初始", "AI bootstrap")}
                     icon="✨"
                     onClick={() => {
                       closeMenu();
@@ -707,7 +707,7 @@ function GraphCanvas({
                     }}
                   />
                 )}
-                <MenuItem label={t("适应视图", "Fit view")} onClick={() => { closeMenu(); fitView({ duration: 300 }); }} />
+                <MenuItem label={t("适应", "Fit")} onClick={() => { closeMenu(); fitView({ duration: 300 }); }} />
               </>
             )}
             {menu.kind === "node" && (
@@ -721,12 +721,12 @@ function GraphCanvas({
                   </div>
                 </div>
                 <MenuItem
-                  label={t("查看详情", "View detail")}
+                  label={t("详情", "Detail")}
                   icon="◉"
                   onClick={() => { const m = menu; closeMenu(); onSelectNode?.(m.id ?? null); onViewNodeDetail?.(m.id!); }}
                 />
                 <MenuItem
-                  label={t("影响推演", "Impact simulation")}
+                  label={t("推演", "Simulate")}
                   icon="⚡"
                   onClick={() => {
                     const m = menu; closeMenu();
@@ -747,7 +747,7 @@ function GraphCanvas({
                 />
                 <MenuDivider />
                 <MenuItem
-                  label={t("重命名", "Rename")}
+                  label={t("改名", "Rename")}
                   onClick={() => {
                     const m = menu; closeMenu();
                     const label = window.prompt(t("节点标签", "Node label"), m.label);
@@ -755,7 +755,7 @@ function GraphCanvas({
                   }}
                 />
                 <MenuItem
-                  label={t("从此节点连线…", "Connect from here…")}
+                  label={t("连线", "Connect")}
                   onClick={() => {
                     const m = menu; closeMenu();
                     // Pick a target node by label via prompt (numbered list).
@@ -771,7 +771,7 @@ function GraphCanvas({
                   }}
                 />
                 <MenuItem
-                  label={t("下游影响…", "Downstream impact…")}
+                  label={t("影响", "Impact")}
                   onClick={() => {
                     const m = menu; closeMenu();
                     const reachable = new Set<string>([m.id!]);
@@ -786,7 +786,7 @@ function GraphCanvas({
                   }}
                 />
                 <MenuItem
-                  label={t("复制键", "Copy key")}
+                  label={t("复制", "Copy")}
                   onClick={() => {
                     const m = menu; closeMenu();
                     if (m.nodeKey && typeof navigator !== "undefined" && navigator.clipboard) {
@@ -794,13 +794,13 @@ function GraphCanvas({
                     }
                   }}
                 />
-                <MenuItem label={t("聚焦选中", "Focus & select")} onClick={() => { const m = menu; closeMenu(); onSelectNode?.(m.id ?? null); }} />
+                <MenuItem label={t("聚焦", "Focus")} onClick={() => { const m = menu; closeMenu(); onSelectNode?.(m.id ?? null); }} />
                 <MenuDivider />
                 {/* AI actions on a node. We keep these just above "Delete" so
                     they're discoverable but not in the way of editing. */}
                 <MenuLabel>{t("AI", "AI")}</MenuLabel>
                 <MenuItem
-                  label={t("AI 解释这个节点", "AI explain this node")}
+                  label={t("解释", "Explain")}
                   icon="💬"
                   onClick={() => {
                     const m = menu; closeMenu();
@@ -808,7 +808,7 @@ function GraphCanvas({
                   }}
                 />
                 <MenuItem
-                  label={t("AI 推荐相关节点", "AI suggest related nodes")}
+                  label={t("推荐", "Suggest")}
                   icon="✨"
                   onClick={() => {
                     const m = menu; closeMenu();
@@ -816,7 +816,7 @@ function GraphCanvas({
                   }}
                 />
                 <MenuItem
-                  label={t("AI 扩展此节点", "AI extend this node")}
+                  label={t("扩展", "Extend")}
                   icon="→"
                   onClick={() => {
                     const m = menu; closeMenu();
@@ -834,7 +834,7 @@ function GraphCanvas({
             {menu.kind === "edge" && (
               <>
                 <MenuItem
-                  label={t("重命名关系", "Rename relation")}
+                  label={t("改键", "Rename key")}
                   onClick={() => {
                     const m = menu; closeMenu();
                     const rk = window.prompt(t("关系名", "Relation key"), m.relationKey ?? m.label) ?? "";
@@ -842,7 +842,7 @@ function GraphCanvas({
                   }}
                 />
                 <MenuItem
-                  label={t("反转方向", "Reverse direction")}
+                  label={t("反转", "Reverse")}
                   onClick={() => {
                     const m = menu; closeMenu();
                     if (!m.sourceNodeId || !m.targetNodeId) return;
