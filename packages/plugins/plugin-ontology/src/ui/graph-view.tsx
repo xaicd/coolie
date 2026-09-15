@@ -27,6 +27,7 @@ import {
 } from "react";
 import { usePluginAction } from "@paperclipai/plugin-sdk/ui";
 import { BootstrapDraftPreview, type DraftPreview } from "./BootstrapDraftPreview.js";
+import { NodePropertyEditor } from "./NodePropertyEditor.js";
 
 export type NodeLifecycle = "active" | "stale" | "deprecated" | "archived";
 
@@ -240,6 +241,16 @@ function GraphCanvas({
   // a deterministic grid / paint them with a per-type tint. Client-side only;
   // no algorithm, no dep. Works on top of whatever `layout` is active.
   const [clusterMode, setClusterMode] = useState<"off" | "byType" | "colorByType">("off");
+
+  // Node-level properties editor — opened from the node right-click menu.
+  // We model it as inline popup state rather than reusing the right-inspector
+  // because the right-click menu is the primary place a user editing the graph
+  // is going to look, and going off to the side panel breaks their flow.
+  const [propEditorNodeId, setPropEditorNodeId] = useState<string | null>(null);
+  const propEditorNode = useMemo(
+    () => (propEditorNodeId ? rawNodes.find((n) => n.id === propEditorNodeId) ?? null : null),
+    [propEditorNodeId, rawNodes],
+  );
 
   const typeById = useMemo(() => {
     const m = new Map<string, GraphNodeType>();
@@ -661,6 +672,54 @@ function GraphCanvas({
         />
       )}
 
+      {propEditorNode && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setPropEditorNodeId(null)}
+          onContextMenu={(e) => { e.preventDefault(); setPropEditorNodeId(null); }}
+        >
+          <div
+            className="absolute left-1/2 top-1/2 z-50 w-[26rem] max-w-[90vw] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-3 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-2 flex items-center justify-between">
+              <div className="min-w-0">
+                <div className="truncate text-(length:--text-compact) font-semibold">
+                  {t("节点属性", "Node properties")}
+                </div>
+                <div className="truncate text-(length:--text-nano) text-muted-foreground">
+                  {propEditorNode.label || propEditorNode.key}
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPropEditorNodeId(null)}
+                className="rounded px-2 py-0.5 text-(length:--text-nano) text-muted-foreground hover:bg-accent hover:text-foreground"
+                title={t("关闭", "Close")}
+              >
+                ×
+              </button>
+            </div>
+            <NodePropertyEditor
+              initial={(propEditorNode.properties ?? {}) as Record<string, unknown>}
+              busy={busy}
+              onSave={async (next) => {
+                setBusy(true);
+                try {
+                  await updateNode({ companyId, nodeId: propEditorNode.id, properties: next });
+                  setPropEditorNodeId(null);
+                  onChanged();
+                } catch (e) {
+                  setErr(e instanceof Error ? e.message : String(e));
+                } finally {
+                  setBusy(false);
+                }
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {menu && (
         <>
           <div className="fixed inset-0 z-40" onClick={closeMenu} onContextMenu={(e) => { e.preventDefault(); closeMenu(); }} />
@@ -746,6 +805,14 @@ function GraphCanvas({
                   }}
                 />
                 <MenuDivider />
+                <MenuItem
+                  label={t("属性", "Props")}
+                  icon="◐"
+                  onClick={() => {
+                    const m = menu; closeMenu();
+                    if (m.id) setPropEditorNodeId(m.id);
+                  }}
+                />
                 <MenuItem
                   label={t("改名", "Rename")}
                   onClick={() => {
