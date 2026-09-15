@@ -984,9 +984,9 @@ function DomainWorkspace({
         {/* Properties-schema editor. Lives on the type, not the instance —
             this is the canonical place to define "what fields does a
             Customer carry?". Default UI is a structured row form
-            (name / type / description / required), with a JSON toggle for
-            power users who need keywords like $ref, enum, format. Save
-            sends a PATCH update-node-type with the parsed payload. */}
+            (name + type), with a JSON link for the rare case where you
+            need $ref / enum / format / nested objects. Save sends a
+            PATCH update-node-type with the parsed payload. */}
         <PropertiesSchemaEditor
           editor={propSchemaEditor}
           onClose={() => setPropSchemaEditor(null)}
@@ -1821,23 +1821,18 @@ function MenuDivider2(): ReactElement {
 }
 
 /**
- * Modal for editing a node type's properties schema (JSON Schema). Lets
- * the user paste / write the schema as JSON and validate it parses to
- * an object before saving. The editor holds local string state so users
- * can edit without us round-tripping on every keystroke.
+ * Modal for editing a node type's properties schema. Default UI is a
+ * simple row list (key + type + delete) — covers 95% of the cases where
+ * you just want to declare "this type has these fields". A "JSON" link
+ * in the footer opens a raw textarea for the rare cases where you need
+ * enum / $ref / format / nested objects. Two separate entry points, no
+ * round-trip syncing.
  */
 type SchemaRow = {
-  /** Property key (the JSON field name on instances). */
   key: string;
-  /** JSON Schema primitive type. */
   type: "string" | "number" | "boolean" | "integer" | "array" | "object";
-  /** Human-readable description. */
-  description: string;
-  /** Whether this property appears in the JSON Schema `required` array. */
-  required: boolean;
 };
 
-/** Type options surfaced in the row-type dropdown. */
 const SCHEMA_TYPE_OPTIONS: SchemaRow["type"][] = [
   "string",
   "number",
@@ -1848,97 +1843,52 @@ const SCHEMA_TYPE_OPTIONS: SchemaRow["type"][] = [
 ];
 
 /**
- * Pull the editor rows out of whatever shape the stored schema uses. The
- * worker treats `properties_schema` as opaque jsonb, so legacy data can be:
- *   - a flat map:           { name: "alice", age: 30 }
- *   - JSON Schema:          { type: "object", properties: { ... }, required: [ ... ] }
- *   - anything else (fall back to advanced JSON mode)
+ * Read stored schema back into rows. Tolerates two storage shapes the
+ * worker might hold: a flat map (`{ name: "alice", age: 30 }`) or a real
+ * JSON Schema document (`{ type: "object", properties: {...} }`).
  */
-function rowsFromSchema(schema: unknown): {
-  rows: SchemaRow[];
-  /** True when the shape isn't a structured map / JSON Schema — caller
-   *  should switch to advanced JSON mode instead of the row form. */
-  fallback: boolean;
-} {
-  if (!schema || typeof schema !== "object" || Array.isArray(schema)) {
-    return { rows: [], fallback: true };
-  }
+function rowsFromSchema(schema: unknown): SchemaRow[] {
+  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return [];
   const obj = schema as Record<string, unknown>;
 
-  // JSON Schema shape — read out `properties` and `required`.
-  if (
-    obj.properties &&
-    typeof obj.properties === "object" &&
-    !Array.isArray(obj.properties)
-  ) {
+  if (obj.properties && typeof obj.properties === "object" && !Array.isArray(obj.properties)) {
     const props = obj.properties as Record<string, unknown>;
-    const required = Array.isArray(obj.required)
-      ? new Set(obj.required.filter((x): x is string => typeof x === "string"))
-      : new Set<string>();
-    const rows: SchemaRow[] = [];
-    for (const [key, def] of Object.entries(props)) {
+    return Object.entries(props).map(([key, def]) => {
       if (def && typeof def === "object" && !Array.isArray(def)) {
-        const d = def as Record<string, unknown>;
-        const t = d.type;
-        rows.push({
+        const t = (def as Record<string, unknown>).type;
+        return {
           key,
           type: typeof t === "string" && (SCHEMA_TYPE_OPTIONS as string[]).includes(t)
             ? (t as SchemaRow["type"])
             : "string",
-          description: typeof d.description === "string" ? d.description : "",
-          required: required.has(key),
-        });
-      } else {
-        // Primitive value stored as the property definition itself.
-        rows.push({
-          key,
-          type: "string",
-          description: "",
-          required: required.has(key),
-        });
+        };
       }
-    }
-    return { rows, fallback: false };
-  }
-
-  // Flat-map shape — treat each top-level entry as a string property. The
-  // most common pre-existing shape in this codebase, and the one
-  // NodePropertyEditor uses for per-instance values.
-  const rows: SchemaRow[] = [];
-  for (const [key, value] of Object.entries(obj)) {
-    if (key === "type") continue; // skip the JSON Schema wrapper, if any
-    rows.push({
-      key,
-      type: typeof value === "number"
-        ? "number"
-        : typeof value === "boolean"
-        ? "boolean"
-        : "string",
-      description: "",
-      required: false,
+      return { key, type: "string" as const };
     });
   }
-  return { rows, fallback: false };
+
+  // Flat-map shape — top-level keys only.
+  return Object.entries(obj)
+    .filter(([k]) => k !== "type")
+    .map(([key, value]) => ({
+      key,
+      type: typeof value === "number"
+        ? ("number" as const)
+        : typeof value === "boolean"
+        ? ("boolean" as const)
+        : ("string" as const),
+    }));
 }
 
-/**
- * Build the JSON payload we save back to `properties_schema`. We always
- * emit a proper JSON Schema document — it's the most general shape, the
- * worker stores it as opaque jsonb, and downstream consumers can still
- * treat it as a flat map if they only read top-level keys.
- */
+/** Build a JSON Schema object from the row list. Empty keys are skipped. */
 function schemaFromRows(rows: SchemaRow[]): Record<string, unknown> {
   const properties: Record<string, unknown> = {};
-  const required: string[] = [];
   for (const r of rows) {
     const key = r.key.trim();
     if (!key) continue;
-    const def: Record<string, unknown> = { type: r.type };
-    if (r.description.trim()) def.description = r.description.trim();
-    properties[key] = def;
-    if (r.required) required.push(key);
+    properties[key] = { type: r.type };
   }
-  return { type: "object", properties, required };
+  return { type: "object", properties };
 }
 
 function PropertiesSchemaEditor({
@@ -1955,20 +1905,18 @@ function PropertiesSchemaEditor({
   onSave: (parsed: Record<string, unknown>) => Promise<void>;
 }): ReactElement | null {
   const [rows, setRows] = useState<SchemaRow[]>([]);
-  const [advanced, setAdvanced] = useState(false);
-  const [advancedText, setAdvancedText] = useState("");
-  const [advancedErr, setAdvancedErr] = useState<string | null>(null);
+  const [showJson, setShowJson] = useState(false);
+  const [jsonText, setJsonText] = useState("");
+  const [err, setErr] = useState<string | null>(null);
   const [seeded, setSeeded] = useState<{ nodeTypeId: string } | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Re-seed when the editor opens with a new target.
   useEffect(() => {
     if (editor && (!seeded || seeded.nodeTypeId !== editor.nodeTypeId)) {
-      const { rows: r, fallback } = rowsFromSchema(editor.initialSchema);
-      setRows(r.length > 0 ? r : [{ key: "", type: "string", description: "", required: false }]);
-      setAdvanced(fallback);
-      setAdvancedText(JSON.stringify(editor.initialSchema ?? {}, null, 2));
-      setAdvancedErr(null);
+      setRows(rowsFromSchema(editor.initialSchema));
+      setJsonText(JSON.stringify(editor.initialSchema ?? {}, null, 2));
+      setShowJson(false);
+      setErr(null);
       setBusy(false);
       setSeeded({ nodeTypeId: editor.nodeTypeId });
     }
@@ -1980,24 +1928,25 @@ function PropertiesSchemaEditor({
     setRows((r) => r.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
   };
   const removeRow = (i: number) => {
-    setRows((r) => (r.length <= 1 ? r : r.filter((_, idx) => idx !== i)));
+    setRows((r) => r.filter((_, idx) => idx !== i));
   };
   const addRow = () => {
-    setRows((r) => [...r, { key: "", type: "string", description: "", required: false }]);
+    setRows((r) => [...r, { key: "", type: "string" }]);
   };
 
   const save = async () => {
+    setErr(null);
     let payload: Record<string, unknown>;
-    if (advanced) {
+    if (showJson) {
       let parsed: unknown;
       try {
-        parsed = JSON.parse(advancedText);
+        parsed = JSON.parse(jsonText);
       } catch (e) {
-        setAdvancedErr(`${t("JSON 解析失败", "JSON parse failed")}: ${(e as Error).message}`);
+        setErr(`${t("JSON 解析失败", "JSON parse failed")}: ${(e as Error).message}`);
         return;
       }
       if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-        setAdvancedErr(t("schema 必须是 object", "schema must be an object"));
+        setErr(t("schema 必须是 object", "schema must be an object"));
         return;
       }
       payload = parsed as Record<string, unknown>;
@@ -2009,19 +1958,9 @@ function PropertiesSchemaEditor({
       await onSave(payload);
     } catch (e) {
       setBusy(false);
-      setAdvancedErr(String((e as Error)?.message ?? e));
+      setErr(String((e as Error)?.message ?? e));
     }
   };
-
-  // Validate row keys for inline feedback — duplicates and empty names are
-  // allowed (you might be mid-edit) but flagged.
-  const keyCount = new Map<string, number>();
-  for (const r of rows) {
-    const k = r.key.trim();
-    if (!k) continue;
-    keyCount.set(k, (keyCount.get(k) ?? 0) + 1);
-  }
-  const dupKeys = new Set(Array.from(keyCount.entries()).filter(([, n]) => n > 1).map(([k]) => k));
 
   return (
     <div
@@ -2030,152 +1969,79 @@ function PropertiesSchemaEditor({
       onContextMenu={(e) => { e.preventDefault(); onClose(); }}
     >
       <div
-        className="absolute left-1/2 top-1/2 z-50 flex max-h-[85vh] w-[40rem] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-border bg-card shadow-xl"
+        className="absolute left-1/2 top-1/2 z-50 flex max-h-[85vh] w-[28rem] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 flex-col rounded-lg border border-border bg-card shadow-xl"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between border-b border-border px-3 py-2">
           <div className="min-w-0">
             <div className="truncate text-(length:--text-compact) font-semibold">
-              {t("类型属性 schema", "Type property schema")}
+              {t("属性", "Properties")}
             </div>
             <div className="truncate text-(length:--text-nano) text-muted-foreground">
               {editor.nodeTypeLabel}
             </div>
           </div>
-          <div className="flex items-center gap-1.5">
-            <button
-              type="button"
-              onClick={() => {
-                const next = !advanced;
-                if (next) {
-                  // Going INTO advanced — sync the textarea with the
-                  // current row-built schema so the round-trip is lossless.
-                  setAdvancedText(JSON.stringify(schemaFromRows(rows), null, 2));
-                  setAdvancedErr(null);
-                } else {
-                  // Coming OUT of advanced — re-parse into rows if possible.
-                  try {
-                    const parsed = JSON.parse(advancedText);
-                    const { rows: r, fallback } = rowsFromSchema(parsed);
-                    if (!fallback) {
-                      setRows(r);
-                      setAdvancedErr(null);
-                    } else {
-                      // Stay in advanced if the JSON isn't structured.
-                      setAdvancedErr(t(
-                        "JSON 不是结构化的 schema — 留在高级模式",
-                        "JSON isn't a structured schema — staying in advanced mode",
-                      ));
-                      return;
-                    }
-                  } catch (e) {
-                    setAdvancedErr(`${t("JSON 解析失败", "JSON parse failed")}: ${(e as Error).message}`);
-                    return;
-                  }
-                }
-                setAdvanced(next);
-              }}
-              className="rounded px-2 py-0.5 text-(length:--text-nano) text-muted-foreground hover:bg-accent hover:text-foreground"
-              title={t("切换 JSON 高级模式", "Toggle advanced JSON mode")}
-            >
-              {advanced ? t("表单", "Form") : t("JSON", "JSON")}
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="rounded px-2 py-0.5 text-(length:--text-nano) text-muted-foreground hover:bg-accent hover:text-foreground"
-              title={t("关闭", "Close")}
-            >
-              ×
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded px-2 py-0.5 text-(length:--text-nano) text-muted-foreground hover:bg-accent hover:text-foreground"
+            title={t("关闭", "Close")}
+          >
+            ×
+          </button>
         </div>
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-3">
-          {advanced ? (
-            <>
-              <div className="mb-1.5 text-(length:--text-nano) text-muted-foreground">
-                {t(
-                  "高级模式:直接编辑 JSON Schema,支持 $ref / enum / format 等所有关键字。",
-                  "Advanced: edit the JSON Schema directly — supports $ref, enum, format, etc.",
-                )}
-              </div>
-              <textarea
-                value={advancedText}
-                onChange={(e) => setAdvancedText(e.target.value)}
-                spellCheck={false}
-                className="h-72 w-full resize-none rounded-md border border-border bg-background px-2 py-1.5 font-mono text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring"
-              />
-              {advancedErr && (
-                <div className="mt-2 text-(length:--text-nano) text-destructive">{advancedErr}</div>
-              )}
-            </>
+          {showJson ? (
+            <textarea
+              value={jsonText}
+              onChange={(e) => setJsonText(e.target.value)}
+              spellCheck={false}
+              className="h-72 w-full resize-none rounded-md border border-border bg-background px-2 py-1.5 font-mono text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring"
+            />
           ) : (
             <>
-              {/* Column header */}
-              <div className="mb-1.5 grid grid-cols-[1.4fr_0.8fr_2fr_auto_auto] gap-1.5 px-1 text-(length:--text-nano) font-medium text-muted-foreground">
+              <div className="mb-1.5 grid grid-cols-[1fr_5rem_1.5rem] gap-1.5 px-1 text-(length:--text-nano) font-medium text-muted-foreground">
                 <div>{t("字段名", "Key")}</div>
                 <div>{t("类型", "Type")}</div>
-                <div>{t("描述", "Description")}</div>
-                <div title={t("必填", "Required")}>必填</div>
                 <div></div>
               </div>
               <div className="space-y-1">
-                {rows.map((row, i) => {
-                  const dup = dupKeys.has(row.key.trim());
-                  return (
-                    <div
-                      key={i}
-                      className="grid grid-cols-[1.4fr_0.8fr_2fr_auto_auto] items-center gap-1.5"
+                {rows.map((row, i) => (
+                  <div
+                    key={i}
+                    className="grid grid-cols-[1fr_5rem_1.5rem] items-center gap-1.5"
+                  >
+                    <input
+                      type="text"
+                      value={row.key}
+                      placeholder={t("name", "name")}
+                      onChange={(e) => updateRow(i, { key: e.target.value })}
+                      className="rounded-md border border-border bg-background px-2 py-1 text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring"
+                    />
+                    <select
+                      value={row.type}
+                      onChange={(e) =>
+                        updateRow(i, { type: e.target.value as SchemaRow["type"] })
+                      }
+                      className="rounded-md border border-border bg-background px-1.5 py-1 text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring"
                     >
-                      <input
-                        type="text"
-                        value={row.key}
-                        placeholder={t("name", "name")}
-                        onChange={(e) => updateRow(i, { key: e.target.value })}
-                        className={`rounded-md border bg-background px-2 py-1 text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring ${
-                          dup ? "border-destructive" : "border-border"
-                        }`}
-                      />
-                      <select
-                        value={row.type}
-                        onChange={(e) =>
-                          updateRow(i, { type: e.target.value as SchemaRow["type"] })
-                        }
-                        className="rounded-md border border-border bg-background px-1.5 py-1 text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring"
-                      >
-                        {SCHEMA_TYPE_OPTIONS.map((opt) => (
-                          <option key={opt} value={opt}>{opt}</option>
-                        ))}
-                      </select>
-                      <input
-                        type="text"
-                        value={row.description}
-                        placeholder={t("可选描述", "optional description")}
-                        onChange={(e) => updateRow(i, { description: e.target.value })}
-                        className="rounded-md border border-border bg-background px-2 py-1 text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring"
-                      />
-                      <input
-                        type="checkbox"
-                        checked={row.required}
-                        onChange={(e) => updateRow(i, { required: e.target.checked })}
-                        className="h-4 w-4 cursor-pointer rounded border-border"
-                        title={t("必填字段", "Required field")}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeRow(i)}
-                        disabled={rows.length <= 1}
-                        className="rounded px-1.5 py-1 text-(length:--text-nano) text-muted-foreground hover:bg-accent hover:text-destructive disabled:opacity-30"
-                        title={t("删除字段", "Remove field")}
-                      >
-                        ✕
-                      </button>
-                    </div>
-                  );
-                })}
+                      {SCHEMA_TYPE_OPTIONS.map((opt) => (
+                        <option key={opt} value={opt}>{opt}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => removeRow(i)}
+                      className="rounded px-1 py-1 text-(length:--text-nano) text-muted-foreground hover:bg-accent hover:text-destructive"
+                      title={t("删除字段", "Remove field")}
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
               </div>
               <button
                 type="button"
@@ -2184,33 +2050,38 @@ function PropertiesSchemaEditor({
               >
                 + {t("字段", "field")}
               </button>
-              {dupKeys.size > 0 && (
-                <div className="mt-2 text-(length:--text-nano) text-destructive">
-                  {t("重名字段:", "Duplicate keys:")} {Array.from(dupKeys).join(", ")}
-                </div>
-              )}
             </>
           )}
+          {err && <div className="mt-2 text-(length:--text-nano) text-destructive">{err}</div>}
         </div>
 
         {/* Footer */}
-        <div className="flex items-center justify-end gap-1.5 border-t border-border px-3 py-2">
+        <div className="flex items-center justify-between border-t border-border px-3 py-2">
           <button
             type="button"
-            onClick={onClose}
-            disabled={busy}
-            className="rounded-md px-2 py-1 text-(length:--text-nano) text-muted-foreground hover:bg-accent"
+            onClick={() => setShowJson((s) => !s)}
+            className="text-(length:--text-nano) text-muted-foreground hover:text-foreground hover:underline"
           >
-            {t("取消", "Cancel")}
+            {showJson ? t("← 表单", "← Form") : t("高级 JSON →", "Advanced JSON →")}
           </button>
-          <button
-            type="button"
-            onClick={() => { void save(); }}
-            disabled={busy}
-            className="rounded-md bg-primary px-2 py-1 text-(length:--text-nano) font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
-          >
-            {busy ? "…" : t("保存", "Save")}
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={busy}
+              className="rounded-md px-2 py-1 text-(length:--text-nano) text-muted-foreground hover:bg-accent"
+            >
+              {t("取消", "Cancel")}
+            </button>
+            <button
+              type="button"
+              onClick={() => { void save(); }}
+              disabled={busy}
+              className="rounded-md bg-primary px-2 py-1 text-(length:--text-nano) font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {busy ? "…" : t("保存", "Save")}
+            </button>
+          </div>
         </div>
       </div>
     </div>
