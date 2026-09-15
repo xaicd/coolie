@@ -2276,6 +2276,90 @@ const plugin = definePlugin({
         return { body: { result } };
       }
 
+      case "extract-document": {
+        // LLM-driven entity/relation extraction from free-form text
+        // (PRD, Word, PDF, meeting notes). Phase 6 ships the surface
+        // only — the wizard's "文档" sub-tab wires this up so the
+        // user can drop a doc and see the LLM's proposed node types
+        // and relation types before publishing the domain.
+        const body = optionalRecord(input.body) ?? {};
+        const documentText = requireString(body.documentText, "documentText");
+        const filename = typeof body.filename === "string" ? body.filename : "(unnamed)";
+        const client = getClient();
+        const systemPrompt = [
+          "You are an ontology extractor. Given a free-form document,",
+          "return a JSON object with `nodeTypes`, `relationTypes`, and",
+          "`actions`. Each node type: `{ key, displayName, description, properties: { name: { type, description } } }`.",
+          "Each relation type: `{ key, displayName, sourceNodeTypeKey, targetNodeTypeKey }`.",
+          "Each action: `{ key, method, endpoint, description }`.",
+          "Use only types that are explicitly named or unambiguously",
+          "implied by the document. Output JSON only — no prose, no markdown.",
+        ].join(" ");
+        const response = await client.messages.create({
+          model: getModel(),
+          max_tokens: 4096,
+          system: systemPrompt,
+          messages: [
+            {
+              role: "user",
+              content: `Document filename: ${filename}\n\n${documentText}`,
+            },
+          ],
+        });
+        const text = response.content
+          .filter((block) => block.type === "text")
+          .map((block) => (block.type === "text" ? block.text : ""))
+          .join("");
+        // The LLM sometimes wraps the JSON in ```json fences. Strip
+        // them so JSON.parse doesn't have to.
+        const cleaned = text
+          .trim()
+          .replace(/^```(?:json)?/i, "")
+          .replace(/```$/, "")
+          .trim();
+        let parsed: {
+          nodeTypes?: Array<{
+            key: string;
+            displayName?: string;
+            description?: string;
+            properties?: Record<string, { type?: string; description?: string }>;
+          }>;
+          relationTypes?: Array<{
+            key: string;
+            displayName?: string;
+            sourceNodeTypeKey: string;
+            targetNodeTypeKey: string;
+          }>;
+          actions?: Array<{
+            key: string;
+            method: string;
+            endpoint: string;
+            description?: string;
+          }>;
+        } = {};
+        try {
+          parsed = JSON.parse(cleaned);
+        } catch {
+          // The LLM sometimes returns partial JSON or includes prose.
+          // Return the raw text so the wizard can show "模型输出无法
+          // 解析为 JSON,是否手动编辑?" instead of failing silently.
+          return {
+            status: 422,
+            body: {
+              error: "Model output is not valid JSON",
+              raw: text,
+            },
+          };
+        }
+        return {
+          body: {
+            nodeTypes: parsed.nodeTypes ?? [],
+            relationTypes: parsed.relationTypes ?? [],
+            actions: parsed.actions ?? [],
+          },
+        };
+      }
+
       case "list-package-installs": {
         const installs = await store.listPackageInstalls(
           companyId,

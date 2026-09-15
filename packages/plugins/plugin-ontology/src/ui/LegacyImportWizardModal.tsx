@@ -39,6 +39,15 @@ export type ParsedSource = {
     sourceNodeTypeKey: string;
     targetNodeTypeKey: string;
   }>;
+  /** Action metadata — OpenAPI/code/document sources can surface
+   *  these. Phase 6 surfaces them in the publish chain as bridge
+   *  actions attached to the business system's metadata. */
+  actions?: Array<{
+    key: string;
+    method: string;
+    endpoint: string;
+    description?: string;
+  }>;
 };
 
 export type WizardStep = 1 | 2 | 3 | 4;
@@ -155,6 +164,7 @@ export function LegacyImportWizardModal({
             <Step1Body
               onParsed={(p) => setParsed(p)}
               parsed={parsed}
+              companyId={companyId}
             />
           )}
           {step === 2 && <Step2Body />}
@@ -211,14 +221,18 @@ export function LegacyImportWizardModal({
 function Step1Body({
   parsed,
   onParsed,
+  companyId,
 }: {
   parsed: ParsedSource | null;
   onParsed: (p: ParsedSource) => void;
+  companyId: string;
 }): ReactElement {
+  const [tab, setTab] = useState<"data" | "openapi" | "code" | "doc">("data");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const extractDocument = usePluginAction("extract-document");
 
-  const handleFile = async (file: File) => {
+  const handleSqlFile = async (file: File) => {
     setBusy(true);
     setErr(null);
     try {
@@ -232,27 +246,202 @@ function Step1Body({
     }
   };
 
+  const handleOpenApiFile = async (file: File) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const text = await file.text();
+      const { parseOpenAPI } = await import("../legacy/openapiParser.js");
+      const result = parseOpenAPI(text);
+      onParsed({
+        nodeTypes: result.nodeTypes,
+        relationTypes: result.relationTypes,
+        actions: result.actions,
+      });
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDirectoryScan = async (files: FileList) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const { extractRoutesFromSource } = await import("../legacy/codeScanner.js");
+      const actions: ParsedSource["actions"] = [];
+      const seen = new Set<string>();
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i]!;
+        if (!/\.(js|ts|jsx|tsx)$/i.test(f.name)) continue;
+        const src = await f.text();
+        const acts = extractRoutesFromSource(src);
+        for (const a of acts) {
+          const k = `${a.method} ${a.endpoint}`;
+          if (seen.has(k)) continue;
+          seen.add(k);
+          actions.push(a);
+        }
+      }
+      // A pure code scan produces no node types — but the wizard still
+      // needs *something* parsed for the "next" button to enable.
+      // Synthesise a placeholder node type "ApiAction" so the publish
+      // chain runs and the user can refine in the type editor.
+      onParsed({
+        nodeTypes: [
+          {
+            key: "ApiAction",
+            displayName: "API Action",
+            properties: {
+              key: { type: "string" },
+              method: { type: "string" },
+              endpoint: { type: "string" },
+            },
+          },
+        ],
+        relationTypes: [],
+        actions,
+      });
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDocumentText = async (text: string, filename: string) => {
+    setBusy(true);
+    setErr(null);
+    try {
+      const res = (await extractDocument({ companyId, documentText: text, filename })) as {
+        data?: {
+          nodeTypes?: Array<{ key: string; displayName?: string; properties?: Record<string, { type?: string }> }>;
+          relationTypes?: Array<{ key: string; displayName?: string; sourceNodeTypeKey: string; targetNodeTypeKey: string }>;
+          actions?: Array<{ key: string; method: string; endpoint: string; description?: string }>;
+          error?: string;
+        };
+      };
+      const d = res?.data;
+      if (d?.error) {
+        setErr(`${d.error} — 请在 Step 3 手动编辑`);
+        return;
+      }
+      onParsed({
+        nodeTypes: (d?.nodeTypes ?? []).map((n) => ({
+          key: n.key,
+          displayName: n.displayName ?? n.key,
+          properties: Object.fromEntries(
+            Object.entries(n.properties ?? {}).map(([k, v]) => [k, { type: v.type ?? "string" }]),
+          ),
+        })),
+        relationTypes: (d?.relationTypes ?? []).map((r) => ({
+          key: r.key,
+          displayName: r.displayName ?? r.key,
+          sourceNodeTypeKey: r.sourceNodeTypeKey,
+          targetNodeTypeKey: r.targetNodeTypeKey,
+        })),
+        actions: d?.actions ?? [],
+      });
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
   return (
     <div className="flex flex-col gap-3">
-      <div className="text-(length:--text-nano) text-muted-foreground">
-        {t(
-          "上传一份 .sql DDL 脚本,系统会从中提取表结构与外键关系。",
-          "Upload a .sql DDL file — the system extracts tables and FK relations.",
-        )}
+      <div className="flex items-center gap-1 border-b border-border">
+        {([
+          { id: "data", label: t("数据", "Data"), icon: "🗄" },
+          { id: "openapi", label: "OpenAPI", icon: "🌐" },
+          { id: "code", label: t("代码", "Code"), icon: "💻" },
+          { id: "doc", label: t("文档", "Doc"), icon: "📄" },
+        ] as const).map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            onClick={() => setTab(t.id)}
+            className={`px-2.5 py-1 text-(length:--text-nano) font-medium ${
+              tab === t.id
+                ? "border-b-2 border-primary text-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            {t.icon} {t.label}
+          </button>
+        ))}
       </div>
 
-      <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border bg-background px-3 py-2 text-(length:--text-nano) hover:bg-accent">
-        <span>📁 {t("选择 SQL 文件", "Choose .sql file")}</span>
-        <input
-          type="file"
-          accept=".sql"
-          className="hidden"
-          onChange={(e) => {
-            const f = e.target?.files?.[0];
-            if (f) void handleFile(f);
-          }}
-        />
-      </label>
+      {tab === "data" && (
+        <div className="flex flex-col gap-2">
+          <div className="text-(length:--text-nano) text-muted-foreground">
+            {t("上传 .sql DDL 脚本。", "Upload a .sql DDL file.")}
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border bg-background px-3 py-2 text-(length:--text-nano) hover:bg-accent">
+            <span>📁 {t("选择 SQL 文件", "Choose .sql file")}</span>
+            <input
+              type="file"
+              accept=".sql"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target?.files?.[0];
+                if (f) void handleSqlFile(f);
+              }}
+            />
+          </label>
+        </div>
+      )}
+
+      {tab === "openapi" && (
+        <div className="flex flex-col gap-2">
+          <div className="text-(length:--text-nano) text-muted-foreground">
+            {t("上传 OpenAPI / Swagger JSON。", "Upload an OpenAPI / Swagger JSON file.")}
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border bg-background px-3 py-2 text-(length:--text-nano) hover:bg-accent">
+            <span>📁 {t("选择 JSON 文件", "Choose .json file")}</span>
+            <input
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target?.files?.[0];
+                if (f) void handleOpenApiFile(f);
+              }}
+            />
+          </label>
+        </div>
+      )}
+
+      {tab === "code" && (
+        <div className="flex flex-col gap-2">
+          <div className="text-(length:--text-nano) text-muted-foreground">
+            {t(
+              "选择源码目录(支持 js/ts/tsx/jsx)。 系统通过正则扫描 Express / Fastify / Koa 路由声明。",
+              "Pick a source directory. Regex scanner recognises Express / Fastify / Koa routes.",
+            )}
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border bg-background px-3 py-2 text-(length:--text-nano) hover:bg-accent">
+            <span>📁 {t("选择目录", "Choose directory")}</span>
+            <input
+              type="file"
+              /* @ts-expect-error webkitdirectory is not in the standard React types */
+              webkitdirectory=""
+              multiple
+              className="hidden"
+              onChange={(e) => {
+                const fl = e.target?.files;
+                if (fl && fl.length > 0) void handleDirectoryScan(fl);
+              }}
+            />
+          </label>
+        </div>
+      )}
+
+      {tab === "doc" && (
+        <DocTabBody busy={busy} onExtract={handleDocumentText} />
+      )}
 
       {busy && <div className="text-(length:--text-nano) text-muted-foreground">…</div>}
       {err && <div className="text-(length:--text-nano) text-destructive">{err}</div>}
@@ -262,6 +451,7 @@ function Step1Body({
           <div className="mb-1.5 font-medium text-foreground">
             ✓ {parsed.nodeTypes.length} {t("对象类型", "object types")},{" "}
             {parsed.relationTypes.length} {t("关系类型", "relation types")}
+            {parsed.actions && parsed.actions.length > 0 && `, ${parsed.actions.length} actions`}
           </div>
           <ul className="space-y-0.5">
             {parsed.nodeTypes.slice(0, 8).map((nt) => (
@@ -274,6 +464,11 @@ function Step1Body({
                 · … {parsed.nodeTypes.length - 8} more
               </li>
             )}
+            {(parsed.actions ?? []).slice(0, 6).map((a) => (
+              <li key={a.key} className="text-muted-foreground">
+                · {a.method} {a.endpoint} ({a.key})
+              </li>
+            ))}
           </ul>
         </div>
       )}
@@ -283,6 +478,57 @@ function Step1Body({
           {t("尚无预览", "No preview yet")}
         </div>
       )}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  DocTabBody — a small inline form for Phase 6's LLM extraction.   */
+/*  The user pastes plain text (or the contents of a docx/pdf that   */
+/*  they pre-converted). We don't ship a docx/pdf parser in Phase 6   */
+/*  — the LLM call is the surface; complex parsing is Phase 8+ work.  */
+/* ------------------------------------------------------------------ */
+
+function DocTabBody({
+  busy,
+  onExtract,
+}: {
+  busy: boolean;
+  onExtract: (text: string, filename: string) => Promise<void> | void;
+}): ReactElement {
+  const [text, setText] = useState("");
+  const [filename, setFilename] = useState("");
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="text-(length:--text-nano) text-muted-foreground">
+        {t(
+          "粘贴文档文本(PRD / Word / PDF / 会议纪要)。 系统会通过 Claude 抽取业务模型。",
+          "Paste document text (PRD / Word / PDF / meeting notes). Claude extracts the business model.",
+        )}
+      </div>
+      <input
+        className="rounded-md border border-border bg-background px-2 py-1 text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring"
+        placeholder={t("文件名(可选)", "Filename (optional)")}
+        value={filename}
+        onChange={(e) => setFilename(e.target.value)}
+      />
+      <textarea
+        className="rounded-md border border-border bg-background px-2 py-1.5 font-mono text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring"
+        rows={6}
+        placeholder={t("在此粘贴文档内容…", "Paste document content here…")}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+      />
+      <div className="flex justify-end">
+        <button
+          type="button"
+          disabled={busy || text.trim().length === 0}
+          onClick={() => void onExtract(text, filename || "(unnamed)")}
+          className="rounded-md bg-primary px-3 py-1 text-(length:--text-nano) font-medium text-primary-foreground hover:opacity-90 disabled:opacity-40"
+        >
+          {busy ? "…" : t("抽取", "Extract")}
+        </button>
+      </div>
     </div>
   );
 }
@@ -439,6 +685,15 @@ function Step4Body({
     setBusy(true);
     setErr(null);
     try {
+      // Merge parser-sourced actions (from OpenAPI / code scan / doc
+      // extraction) with the user-edited list in Step 4. The user's
+      // list wins on key collision.
+      const userActions = actions.filter((a) => a.key.trim() && a.endpoint.trim());
+      const parserActions = (parsed.actions ?? []).filter((a) => a.key && a.endpoint);
+      const merged = [
+        ...userActions,
+        ...parserActions.filter((pa) => !userActions.some((ua) => ua.key === pa.key)),
+      ];
       const dom = (await createDomain({
         companyId,
         slug,
@@ -447,7 +702,7 @@ function Step4Body({
         metadata: {
           pipelineMode: "virtualization",
           baseApiUrl,
-          bridgeActions: actions.filter((a) => a.key.trim() && a.endpoint.trim()),
+          bridgeActions: merged,
           sourceNodeTypeKeys: parsed.nodeTypes.map((n) => n.key),
         },
       })) as { data?: { domain?: { id?: string } } } | undefined;
@@ -485,7 +740,7 @@ function Step4Body({
         metadata: {
           pipelineMode: "virtualization",
           baseApiUrl,
-          bridgeActions: actions.filter((a) => a.key.trim() && a.endpoint.trim()),
+          bridgeActions: merged,
           sourceNodeTypeKeys: parsed.nodeTypes.map((n) => n.key),
         },
       });
