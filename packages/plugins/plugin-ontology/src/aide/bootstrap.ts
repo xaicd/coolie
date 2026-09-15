@@ -176,6 +176,48 @@ export function buildBootstrapSystemPrompt(input: BuildBootstrapPromptInput): st
       "- 块内结构: { \"nodeTypes\": [...], \"relationTypes\": [...], \"nodes\": [...], \"edges\": [...] }",
     );
     lines.push("- properties 字段是 JSON Schema 风格的 object,可选。");
+    lines.push("");
+    lines.push("参考样例(键名 / 形状按此输出,内容按域调整):");
+    lines.push("```json");
+    lines.push("{");
+    lines.push('  "nodeTypes": [');
+    lines.push("    {");
+    lines.push('      "key": "customer",');
+    lines.push('      "displayName": "客户",');
+    lines.push('      "description": "在本域里下单或持有账户的自然人或法人",');
+    lines.push('      "properties": {');
+    lines.push('        "name": { "type": "string", "required": true },');
+    lines.push('        "email": { "type": "string", "format": "email" },');
+    lines.push('        "riskRating": { "type": "string", "enum": ["low", "medium", "high"] }');
+    lines.push("      }");
+    lines.push("    }");
+    lines.push("  ],");
+    lines.push('  "relationTypes": [');
+    lines.push("    {");
+    lines.push('      "key": "owns-account",');
+    lines.push('      "displayName": "持有账户",');
+    lines.push('      "description": "客户对一个或多个账户的持有关系",');
+    lines.push('      "directed": true');
+    lines.push("    }");
+    lines.push("  ],");
+    lines.push('  "nodes": [');
+    lines.push("    {");
+    lines.push('      "key": "customer-1",');
+    lines.push('      "label": "Alice Chen",');
+    lines.push('      "nodeTypeKey": "customer",');
+    lines.push('      "description": "VIP 客户"');
+    lines.push("    }");
+    lines.push("  ],");
+    lines.push('  "edges": [');
+    lines.push("    {");
+    lines.push('      "sourceKey": "customer-1",');
+    lines.push('      "targetKey": "account-1",');
+    lines.push('      "relationKey": "owns-account"');
+    lines.push("    }");
+    lines.push("  ]");
+    lines.push("}");
+    lines.push("```");
+    lines.push("- 每个对象类型都必须有 properties(至少 2-3 个该域里核心的字段),不要省略。");
   }
 
   return lines.join("\n");

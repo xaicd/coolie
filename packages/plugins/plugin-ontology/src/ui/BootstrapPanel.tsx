@@ -56,6 +56,12 @@ interface BootstrapPanelProps {
     nodes: number;
     edges: number;
   }) => void;
+  /** Notifies the parent whenever the panel should stay mounted (i.e. while
+   *  a bootstrap is in flight or has just completed and the user hasn't
+   *  dismissed the result yet). The parent uses this so it doesn't unmount
+   *  the panel the moment counts.nodes flips from 0 to N, which would
+   *  discard the progress lines + completion summary. */
+  onActiveChange?: (active: boolean) => void;
 }
 
 /**
@@ -76,6 +82,7 @@ export function BootstrapPanel({
   description,
   collapsed,
   onCompleted,
+  onActiveChange,
 }: BootstrapPanelProps): ReactElement {
   const streamChannel = `ontology.bootstrap.stream.${companyId}.${domainId}`;
   const stream = usePluginStream<BootstrapStreamEvent>(streamChannel);
@@ -102,11 +109,31 @@ export function BootstrapPanel({
     setCompletedCounts(null);
     setErr(null);
     setRunning(false);
+    onActiveChange?.(false);
+    // onActiveChange is intentionally omitted from deps — the effect must
+    // fire on domain switch regardless of the parent's identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, domainId]);
+
+  // While the panel has visible content (running, has a completion summary,
+  // or has shown an error worth reading) tell the parent to keep us mounted
+  // so the data we just rendered doesn't get blown away when counts changes.
+  useEffect(() => {
+    onActiveChange?.(running || completedCounts !== null || err !== null);
+  }, [running, completedCounts, err, onActiveChange]);
 
   // Apply stream events. Like SandboxTab, we treat the channel as stable
   // for the (company, domain) pair and accumulate into the local lines
   // list, idempotent across React strict-mode double renders.
+  //
+  // Note: we deliberately do NOT put `onCompleted` in the deps array. The
+  // parent passes a fresh arrow each render (`() => refreshDomain()`) so a
+  // naive deps list would re-fire this effect on every parent re-render,
+  // calling onCompleted -> refreshDomain -> re-render -> infinite loop.
+  // Instead we keep the latest onCompleted in a ref and call it only when
+  // a new `done` event actually arrives.
+  const onCompletedRef = useRef(onCompleted);
+  useEffect(() => { onCompletedRef.current = onCompleted; }, [onCompleted]);
   useEffect(() => {
     const events = stream.events;
     if (events.length === 0) return;
@@ -116,7 +143,7 @@ export function BootstrapPanel({
       if (ev.type === "done") {
         setRunning(false);
         setCompletedCounts(ev.counts);
-        onCompleted?.(ev.counts);
+        onCompletedRef.current?.(ev.counts);
       } else if (ev.type === "error") {
         setRunning(false);
         setErr(ev.message);
@@ -124,7 +151,7 @@ export function BootstrapPanel({
         setRunning(false);
       }
     }
-  }, [stream.events, onCompleted]);
+  }, [stream.events]);
 
   const onStart = useCallback(async () => {
     if (running) return;
