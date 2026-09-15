@@ -1923,6 +1923,15 @@ const plugin = definePlugin({
         return { body: { actionType } };
       }
 
+      case "delete-action-type": {
+        // Soft-delete: marks is_deleted + deleted_at so audit/lineage keeps
+        // resolving. Subsequent list calls skip the row.
+        const body = optionalRecord(input.body) ?? {};
+        const id = requireString(input.params?.actionTypeId ?? body.actionTypeId, "actionTypeId");
+        const ok = await store.deleteActionType(companyId, id);
+        return { status: ok ? 204 : 404, body: ok ? {} : { error: "Action type not found" } };
+      }
+
       case "find-path": {
         const path = await store.findPath({
           companyId,

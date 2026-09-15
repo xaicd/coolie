@@ -1113,6 +1113,7 @@ export interface GraphStore {
     actionTypeId: string,
     update: OntologyActionTypeUpdate,
   ): Promise<OntologyActionTypeRow | null>;
+  deleteActionType(companyId: string, actionTypeId: string): Promise<boolean>;
 
   // O3 — legacy repository cognition (resumable reverse-engineering pipeline)
   createCognitionJob(input: OntologyCognitionJobInput): Promise<OntologyCognitionJobRow>;
@@ -2350,6 +2351,23 @@ export class PostgresGraphStore implements GraphStore {
       [companyId, actionTypeId],
     );
     return rows[0] ?? null;
+  }
+
+  /**
+   * Soft-delete an action type. The row stays in the table with
+   * `is_deleted = true` + `deleted_at = now()` so audit/lineage still
+   * resolves. Subsequent `listActionTypes` calls skip it. Returns true if
+   * a row was actually marked deleted (i.e. existed and wasn't already
+   * deleted), false if the id wasn't found in this company.
+   */
+  async deleteActionType(companyId: string, actionTypeId: string): Promise<boolean> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_action_types")}
+          SET is_deleted = true, deleted_at = now(), updated_at = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, actionTypeId],
+    );
+    return res.rowCount > 0;
   }
 
   // -------------------------------------------------------------------------

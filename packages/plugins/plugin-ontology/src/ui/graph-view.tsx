@@ -891,6 +891,25 @@ function GraphCanvas({
                   }}
                 />
                 <MenuDivider />
+                {/* "动作" — Palantir Action Type on the node's ObjectType. We
+                    jump to the actions tab with appliesToNodeTypeId prefilled
+                    so the user can immediately create an Action tied to this
+                    type. The dispatch is window-scoped CustomEvent because the
+                    actions tab is rendered by a different React tree (the
+                    workbench parent) than this graph view, and we want this
+                    component to stay agnostic of the parent's layout. */}
+                <MenuItem
+                  label={t("动作", "Action")}
+                  icon="⚙"
+                  onClick={() => {
+                    const m = menu; closeMenu();
+                    if (!m.nodeTypeId) return;
+                    window.dispatchEvent(new CustomEvent("paperclip-ontology:open-action-form", {
+                      detail: { domainId, nodeTypeId: m.nodeTypeId },
+                    }));
+                  }}
+                />
+                <MenuDivider />
                 <MenuItem
                   label={t("删除", "Delete")}
                   danger

@@ -10,6 +10,7 @@ import {
 } from "@paperclipai/plugin-sdk/ui";
 import {
   useCallback,
+  useEffect,
   useMemo,
   useState,
   type ReactElement,
@@ -199,7 +200,7 @@ export function OntologyPage({ context }: PluginPageProps): ReactElement {
   return <OntologyWorkbench companyId={companyId} />;
 }
 
-type WorkbenchView = "graph" | "table" | "schema" | "cognition" | "capabilities" | "dialogue" | "sandbox";
+type WorkbenchView = "graph" | "table" | "schema" | "cognition" | "capabilities" | "dialogue" | "sandbox" | "actions" | "functions" | "interfaces";
 
 const DRAG_MIME = "application/x-ontology-node-type-id";
 
@@ -226,6 +227,7 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
     { id: "capabilities", label: t("能力", "Capabilities"), icon: "◈" },
     { id: "dialogue", label: t("对话", "Dialogue"), icon: "💬" },
     { id: "sandbox", label: t("数字副手", "Digital Aide"), icon: "🤝" },
+    { id: "actions", label: t("动作", "Actions"), icon: "⚙" },
   ];
 
   return (
@@ -596,6 +598,14 @@ function DomainWorkspace({
   const nodeTypes = domainData?.nodeTypes ?? [];
   const relationTypes = domainData?.relationTypes ?? [];
 
+  // Action / Function / Interface counts are not in the graph snapshot; we
+  // pull them separately for the right-side Statistics panel. The first usePluginData
+  // call below gives us the action count for the StatCard; the next two will
+  // be added by the Functions and Interfaces commits.
+  const { data: actionTypesData } = usePluginData<{ actionTypes: unknown[] }>(
+    "list-action-types", { companyId, domainId },
+  );
+
   const [focusNodeTypeId, setFocusNodeTypeId] = useState<string | null>(null);
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const selectedNode = nodes.find(n => n.id === selectedNodeId) ?? null;
@@ -603,12 +613,33 @@ function DomainWorkspace({
   // Pre-filled ask-aide prompt set by right-click "AI 解释这个节点". Cleared
   // by SandboxTab after it consumes the draft.
   const [aidePrePrompt, setAidePrePrompt] = useState<string | null>(null);
+  // When the graph-view node right-click menu triggers "动作", it dispatches
+  // a window CustomEvent that the parent listens for; we capture the nodeTypeId
+  // here so ActionsTab can prefill its appliesToNodeTypeId field. The tab
+  // consumes the prefill on mount (cleared via onConsumePrefill) so a second
+  // visit without a new dispatch doesn't keep stale form state.
+  const [actionFormPrefill, setActionFormPrefill] = useState<{ nodeTypeId: string } | null>(null);
   // BootstrapPanel lifecycle. The panel itself holds the "running" /
   // "completed" UI state, but the parent must keep the panel mounted across
   // the counts-nodes transition (0 -> N) so the user can see the progress
   // lines and the completion summary. Once the user dismisses the panel, we
   // unmount it (and the next re-render will re-evaluate from `counts`).
   const [bootstrapActive, setBootstrapActive] = useState(false);
+
+  // Listen for the "open action form" custom event dispatched by the graph
+  // node right-click menu ("动作"). We switch view to the actions tab and
+  // hand off the source nodeTypeId so ActionsTab can prefill appliesToNodeTypeId.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent<{ domainId: string; nodeTypeId: string }>).detail;
+      if (!detail?.nodeTypeId) return;
+      setActionFormPrefill({ nodeTypeId: detail.nodeTypeId });
+      setView("actions");
+    };
+    window.addEventListener("paperclip-ontology:open-action-form", handler);
+    return () => window.removeEventListener("paperclip-ontology:open-action-form", handler);
+  }, []);
 
   const showTree = view === "graph" || view === "table" || view === "schema";
 
@@ -617,8 +648,11 @@ function DomainWorkspace({
       {/* Left: node type tree */}
       {showTree && (
         <div className="flex w-48 shrink-0 flex-col gap-1 overflow-y-auto border-r border-border bg-muted/20 p-2">
-          <div className="mb-1 px-1 text-(length:--text-nano) font-semibold text-muted-foreground uppercase tracking-wide">
-            {t("节点类型", "Node types")} · {nodeTypes.length}
+          <div
+            className="mb-1 px-1 text-(length:--text-nano) font-semibold text-muted-foreground uppercase tracking-wide"
+            title={t("对象类型 = Palantir Object Type,本域中所有节点的分类", "Object types — Palantir Object Types; the classification of every node in this domain")}
+          >
+            {t("类型", "Types")} · {nodeTypes.length}
           </div>
           {nodeTypes.length === 0 ? (
             <div className="px-1 text-(length:--text-nano) text-muted-foreground">{t("暂无", "None yet")}</div>
@@ -708,6 +742,14 @@ function DomainWorkspace({
             onConsumePrePrompt={() => setAidePrePrompt(null)}
           />
         )}
+        {view === "actions" && (
+          <ActionsTab
+            companyId={companyId}
+            domainId={domainId}
+            initialPrefill={actionFormPrefill}
+            onConsumePrefill={() => setActionFormPrefill(null)}
+          />
+        )}
 
         {simulateNode && (
           <ImpactSimulationModal
@@ -761,13 +803,19 @@ function DomainWorkspace({
                   value={counts.crossDomainEdges ?? 0}
                 />
                 <StatCard label={t("类型节点", "Typed nodes")} value={Object.values(counts.byNodeType ?? {}).reduce((s, n) => s + n, 0)} />
+                <StatCard label={t("动作数", "Actions")} value={actionTypesData?.actionTypes.length ?? 0} />
               </div>
             </div>
           )}
 
           {nodeTypes.length > 0 && (
             <div>
-              <div className="mb-1 text-(length:--text-compact) font-semibold">{t("对象类型", "Object types")} ({nodeTypes.length})</div>
+              <div
+                className="mb-1 text-(length:--text-compact) font-semibold"
+                title={t("对象类型 = Palantir Object Type,本域中所有节点的分类", "Object types — Palantir Object Types; the classification of every node in this domain")}
+              >
+                {t("类型", "Types")} ({nodeTypes.length})
+              </div>
               <div className="space-y-0.5">
                 {nodeTypes.map(nt => (
                   <button
@@ -1165,6 +1213,206 @@ function CapabilitiesTab({ companyId }: { companyId: string }): ReactElement {
           onChanged={refresh}
         />
       )}
+    </>
+  );
+}
+
+interface ActionTypeRow {
+  id: string;
+  key: string;
+  display_name: string;
+  description: string | null;
+  kind: string;
+  applies_to_node_type_id: string | null;
+  idempotent: boolean;
+  status: string;
+}
+
+/**
+ * Tab for browsing and editing Palantir-style action types attached to
+ * this ontology domain. Mirrors the CapabilitiesTab pattern: a top card
+ * with a "new" form, a DataTable of existing rows, a soft-delete button
+ * per row, and (when launched from the graph node right-click) a prefill
+ * on the appliesToNodeTypeId field. The prefill is consumed on mount so
+ * the form doesn't keep stale state on a second visit.
+ */
+function ActionsTab({
+  companyId,
+  domainId,
+  initialPrefill,
+  onConsumePrefill,
+}: {
+  companyId: string;
+  domainId: string;
+  initialPrefill?: { nodeTypeId: string } | null;
+  onConsumePrefill?: () => void;
+}): ReactElement {
+  const { data, loading, error, refresh } = usePluginData<{ actionTypes: ActionTypeRow[] }>(
+    "list-action-types",
+    { companyId, domainId },
+  );
+  const createAction = usePluginAction("create-action-type");
+  const deleteAction = usePluginAction("delete-action-type");
+  const [keyInput, setKeyInput] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [kind, setKind] = useState<string>("create");
+  const [description, setDescription] = useState("");
+  const [appliesToNodeTypeId, setAppliesToNodeTypeId] = useState<string>("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Node types are exposed via the list-node-types route keyed on domainId.
+  // We only need key/displayName here, but reading the full row is fine — the
+  // data is already in the parent's usePluginData cache for graph rendering.
+  const { data: ntData } = usePluginData<{ nodeTypes: { id: string; key: string; display_name: string }[] }>(
+    "list-node-types",
+    { companyId, domainId },
+  );
+  const nodeTypes = ntData?.nodeTypes ?? [];
+
+  // Apply prefill from the graph right-click menu (the "动作" item dispatches
+  // a window CustomEvent that the parent routes here). Consume on first
+  // effect so a subsequent manual visit doesn't see stale state.
+  useEffect(() => {
+    if (!initialPrefill?.nodeTypeId) return;
+    setAppliesToNodeTypeId(initialPrefill.nodeTypeId);
+    onConsumePrefill?.();
+  }, [initialPrefill?.nodeTypeId, onConsumePrefill]);
+
+  const submit = useCallback(async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await createAction({
+        companyId,
+        domainId,
+        key: keyInput.trim(),
+        displayName: displayName.trim() || keyInput.trim(),
+        description: description.trim() || undefined,
+        kind,
+        appliesToNodeTypeId: appliesToNodeTypeId || null,
+      });
+      setKeyInput("");
+      setDisplayName("");
+      setDescription("");
+      setAppliesToNodeTypeId("");
+      refresh();
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }, [companyId, domainId, keyInput, displayName, description, kind, appliesToNodeTypeId, createAction, refresh]);
+
+  const rows = data?.actionTypes ?? [];
+  const ntById = useMemo(() => {
+    const m = new Map<string, { id: string; key: string; display_name: string }>();
+    for (const nt of nodeTypes) m.set(nt.id, nt);
+    return m;
+  }, [nodeTypes]);
+
+  return (
+    <>
+      <div className={CARD}>
+        <div className="mb-2 font-semibold">{t("新建动作", "New action")}</div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <input
+            className={INPUT + " w-32"}
+            placeholder="key"
+            value={keyInput}
+            onChange={(e) => setKeyInput(e.target.value)}
+          />
+          <input
+            className={INPUT + " w-44"}
+            placeholder={t("显示名", "Display name")}
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+          />
+          <select className={INPUT + " w-28"} value={kind} onChange={(e) => setKind(e.target.value)}>
+            <option value="create">create</option>
+            <option value="modify">modify</option>
+            <option value="delete">delete</option>
+            <option value="function">function</option>
+            <option value="external">external</option>
+            <option value="notify">notify</option>
+            <option value="composite">composite</option>
+          </select>
+          <select
+            className={INPUT + " w-40"}
+            value={appliesToNodeTypeId}
+            onChange={(e) => setAppliesToNodeTypeId(e.target.value)}
+          >
+            <option value="">{t("适用所有类型", "(any type)")}</option>
+            {nodeTypes.map((nt) => (
+              <option key={nt.id} value={nt.id}>
+                {nt.display_name || nt.key}
+              </option>
+            ))}
+          </select>
+          <input
+            className={INPUT + " min-w-60 flex-1"}
+            placeholder={t("描述", "Description")}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+          <button className={BTN} disabled={busy || !keyInput.trim()} onClick={submit}>
+            {busy ? "…" : t("新建", "Create")}
+          </button>
+        </div>
+        {err && <div className="mt-2 text-(length:--text-compact) text-muted-foreground">{err}</div>}
+      </div>
+
+      <DataTable
+        loading={loading}
+        emptyMessage={error ? `Failed: ${error.message}` : t("暂无动作", "No actions yet")}
+        rows={rows as unknown as Record<string, unknown>[]}
+        columns={[
+          { key: "key", header: "key", width: "140px", render: (_v, row) => (
+            <span className="font-mono">{(row as unknown as ActionTypeRow).key}</span>
+          ) },
+          { key: "display_name", header: t("名称", "Name") },
+          { key: "kind", header: t("类型", "Kind"), width: "90px" },
+          {
+            key: "applies_to_node_type_id",
+            header: t("适用", "Applies"),
+            width: "140px",
+            render: (_v, row) => {
+              const nt = ntById.get((row as unknown as ActionTypeRow).applies_to_node_type_id ?? "");
+              return nt ? (nt.display_name || nt.key) : "—";
+            },
+          },
+          {
+            key: "status",
+            header: t("状态", "Status"),
+            width: "100px",
+            render: (_v, row) => <StatusBadge label={(row as unknown as ActionTypeRow).status} />,
+          },
+          {
+            key: "_del",
+            header: "",
+            width: "60px",
+            render: (_v, row) => (
+              <button
+                className={GHOST_BTN}
+                onClick={async () => {
+                  if (!window.confirm(t("删除该动作?", "Delete this action?"))) return;
+                  setBusy(true);
+                  try {
+                    await deleteAction({ companyId, actionTypeId: (row as unknown as ActionTypeRow).id });
+                    refresh();
+                  } catch (e) {
+                    setErr(String((e as Error)?.message ?? e));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {t("删除", "Del")}
+              </button>
+            ),
+          },
+        ]}
+      />
     </>
   );
 }

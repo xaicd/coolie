@@ -302,6 +302,14 @@ const manifest: PaperclipPluginManifestV1 = {
       companyResolution: { from: "body", key: "companyId" },
     },
     {
+      routeKey: "delete-action-type",
+      method: "DELETE",
+      path: "/action-types/:actionTypeId",
+      auth: "board",
+      capability: "api.routes.register",
+      companyResolution: { from: "body", key: "companyId" },
+    },
+    {
       routeKey: "list-cognition-jobs",
       method: "GET",
       path: "/cognition-jobs",
