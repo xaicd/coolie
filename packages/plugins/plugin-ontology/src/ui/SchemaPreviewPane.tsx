@@ -286,15 +286,20 @@ function NodeTypeRow({
     ? Object.entries(nodeType.propertiesSchema)
     : [];
 
+  // The header is a real <button>; properties are siblings (HTML
+  // doesn't allow <ul> inside <button>). The whole row visually reads
+  // as one unit because of the wrapper's hover / ring styling.
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full rounded-md px-2 py-1 text-left transition-colors hover:bg-muted/40 ${
+    <div
+      className={`rounded-md transition-colors hover:bg-muted/40 ${
         selected ? "ring-1 ring-primary" : ""
       } ${diffClass || ""}`}
     >
-      <div className={`flex items-baseline gap-1 ${diffText}`}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={`flex w-full items-baseline gap-1 rounded-md px-2 py-1 text-left ${diffText}`}
+      >
         <span className="w-3 shrink-0 text-(length:--text-nano)">{glyph}</span>
         <span className="font-mono font-semibold">{nodeType.key}</span>
         {nodeType.displayName && nodeType.displayName !== nodeType.key && (
@@ -305,14 +310,14 @@ function NodeTypeRow({
         <span className="ml-auto rounded bg-muted px-1 py-0.5 text-(length:--text-nano) tabular-nums text-muted-foreground">
           {nodeType.instanceCount}
         </span>
-      </div>
+      </button>
       {nodeType.layer && (
         <div className="ml-4 mt-0.5 text-(length:--text-nano) text-muted-foreground">
           {t("层", "layer")} {nodeType.layer}
         </div>
       )}
       {props.length > 0 && (
-        <ul className="ml-4 mt-1 space-y-0.5">
+        <ul className="ml-4 mt-1 space-y-0.5 pb-1">
           {props.map(([propName, propSchema]) => {
             const propKind = propertyKinds.get(`${nodeType.key}.${propName}`) ?? null;
             const cls = propKind ? rowTextClass(propKind) : "text-foreground/70";
@@ -331,11 +336,11 @@ function NodeTypeRow({
         </ul>
       )}
       {props.length === 0 && (
-        <div className="ml-4 mt-0.5 text-(length:--text-nano) italic text-muted-foreground">
+        <div className="ml-4 mt-0.5 pb-1 text-(length:--text-nano) italic text-muted-foreground">
           {t("尚未配置属性", "No properties defined")}
         </div>
       )}
-    </button>
+    </div>
   );
 }
 
@@ -358,14 +363,16 @@ function RelationTypeRow({
   const diffText = kind ? rowTextClass(kind) : "text-foreground/80";
   const glyph = kind ? glyphFor(kind) : " ";
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full rounded-md px-2 py-1 text-left transition-colors hover:bg-muted/40 ${
+    <div
+      className={`rounded-md transition-colors hover:bg-muted/40 ${
         selected ? "ring-1 ring-primary" : ""
       } ${diffClass || ""}`}
     >
-      <div className={`flex items-baseline gap-1 ${diffText}`}>
+      <button
+        type="button"
+        onClick={onClick}
+        className={`flex w-full items-baseline gap-1 rounded-md px-2 py-1 text-left ${diffText}`}
+      >
         <span className="w-3 shrink-0 text-(length:--text-nano)">{glyph}</span>
         <span className="font-mono font-semibold">{relationType.key}</span>
         {relationType.displayName && relationType.displayName !== relationType.key && (
@@ -376,11 +383,11 @@ function RelationTypeRow({
         <span className="ml-auto text-(length:--text-nano) text-muted-foreground">
           {relationType.directed ? t("有向", "directed") : t("无向", "undirected")} · {relationType.cardinality || "1..N"}
         </span>
-      </div>
-      <div className="ml-4 mt-0.5 text-(length:--text-nano) text-muted-foreground tabular-nums">
+      </button>
+      <div className="ml-4 mt-0.5 pb-1 text-(length:--text-nano) text-muted-foreground tabular-nums">
         {relationType.instanceCount} {t("实例", "instances")}
       </div>
-    </button>
+    </div>
   );
 }
 
@@ -442,14 +449,16 @@ function ActionTypeRow({
   onClick: () => void;
 }): ReactElement {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`w-full rounded-md px-2 py-1 text-left transition-colors hover:bg-muted/40 ${
+    <div
+      className={`rounded-md transition-colors hover:bg-muted/40 ${
         selected ? "ring-1 ring-primary" : ""
       }`}
     >
-      <div className="flex items-baseline gap-1 text-foreground/80">
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex w-full items-baseline gap-1 rounded-md px-2 py-1 text-left text-foreground/80"
+      >
         <span className="w-3 shrink-0 text-(length:--text-nano)"> </span>
         <span className="font-mono font-semibold">{actionType.key}</span>
         {actionType.displayName && actionType.displayName !== actionType.key && (
@@ -460,11 +469,11 @@ function ActionTypeRow({
         <span className="ml-auto text-(length:--text-nano) text-muted-foreground">
           {actionType.kind}
         </span>
-      </div>
-      <div className="ml-4 mt-0.5 flex items-center gap-1.5 text-(length:--text-nano) text-muted-foreground">
+      </button>
+      <div className="ml-4 mt-0.5 flex items-center gap-1.5 pb-1 text-(length:--text-nano) text-muted-foreground">
         <span className="rounded bg-muted px-1 py-0.5">{actionType.status}</span>
       </div>
-    </button>
+    </div>
   );
 }
 
