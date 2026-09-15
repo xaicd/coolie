@@ -70,6 +70,8 @@ tests/storybook-visual/.cache/
 tests/storybook-visual/.snapshots/
 tests/storybook-visual/baseline-review/
 tests/storybook-visual/test-results/
+tests/plugin-ontology-ai/playwright-report/
+tests/plugin-ontology-ai/test-results/
 tests/storybook-visual/playwright-report/
 .superset/
 .superpowers/
@@ -78,3 +80,4 @@ tests/storybook-visual/playwright-report/
 .vercel/
 .env.local
 test-results/
+screenshots/ds-workbench/
