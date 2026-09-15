@@ -51,6 +51,8 @@ interface DescribeDomainBusinessSystem {
   code: string;
   name: string;
   status: string;
+  description: string | null;
+  targetRole: string | null;
 }
 
 interface DescribeDomainSubProject {
@@ -60,6 +62,7 @@ interface DescribeDomainSubProject {
   name: string;
   status: string;
   type: string;
+  description: string | null;
 }
 
 interface DescribeDomainActionType {
@@ -155,12 +158,14 @@ export function SandboxTab({
   domainVersion,
   prePrompt,
   onConsumePrePrompt,
+  onImportLegacy,
 }: {
   companyId: string;
   domainId: string;
   domainVersion: number;
   prePrompt?: string | null;
   onConsumePrePrompt?: () => void;
+  onImportLegacy?: () => void;
 }): ReactElement {
   const streamChannel = `ontology.aide.stream.${companyId}.${domainId}`;
   const stream = usePluginStream<AideStreamEvent>(streamChannel);
@@ -342,29 +347,39 @@ export function SandboxTab({
 
   return (
     <div className="flex h-full flex-col gap-3 p-4">
-      <header className="flex items-center justify-between gap-3 rounded-xl border border-border bg-card/70 px-4 py-3">
-        <div className="min-w-0">
-          <div className="truncate text-(length:--text-base) font-semibold">
-            {t("数字副手", "Digital Aide")}
+      <header className="flex flex-col gap-2 rounded-xl border border-border bg-card/70 px-4 py-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <div className="truncate text-(length:--text-base) font-semibold">
+              {t("数字副手", "Digital Aide")}
+            </div>
+            <div className="mt-0.5 truncate text-(length:--text-nano) text-muted-foreground">
+              {t("域", "Domain")} {domainId} · v{domainVersion}
+            </div>
           </div>
-          <div className="mt-0.5 truncate text-(length:--text-nano) text-muted-foreground">
-            {t("域", "Domain")} {domainId} · v{domainVersion}
+          <div className="flex items-center gap-2">
+            <StatusBadge
+              label={configured ? t("已配置", "Configured") : t("未配置", "Not configured")}
+              status={configured ? "ok" : "warning"}
+            />
+            <button
+              type="button"
+              disabled={clearing || messages.length === 0}
+              onClick={() => { void onClear(); }}
+              className="rounded-full border border-border bg-background px-3 py-1 text-(length:--text-nano) font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {clearing ? t("清空中…", "Clearing…") : t("清空会话", "Clear session")}
+            </button>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <StatusBadge
-            label={configured ? t("已配置", "Configured") : t("未配置", "Not configured")}
-            status={configured ? "ok" : "warning"}
-          />
-          <button
-            type="button"
-            disabled={clearing || messages.length === 0}
-            onClick={() => { void onClear(); }}
-            className="rounded-full border border-border bg-background px-3 py-1 text-(length:--text-nano) font-medium transition-colors hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {clearing ? t("清空中…", "Clearing…") : t("清空会话", "Clear session")}
-          </button>
-        </div>
+        {/* Bound-business-systems chip row. Shows real systems the cockpit
+            should know about (any domain can have ≥1). The right-side
+            affordance reuses the workbench-level wizard so the user can
+            ingest a legacy system without leaving the chat. */}
+        <BusinessSystemChips
+          systems={describe.data?.businessSystems ?? []}
+          onImportLegacy={onImportLegacy}
+        />
       </header>
 
       {!configured ? (
@@ -732,8 +747,7 @@ function lastAssistantIndex(messages: LocalMessage[]): number {
  * If a count is 0 we drop the prompt that hinges on it, so the buttons are
  * never misleading.
  */
-function buildExamplePrompts(describe: DescribeDomainResult): string[] {
-  const prompts: string[] = [];
+function buildExamplePrompts(describe: DescribeDomainResult): string[] {  const prompts: string[] = [];
   if (describe.nodeTypes.length > 0) {
     prompts.push(t("这个域有哪些对象类型?各负责什么?", "What object types are in this domain and what does each represent?"));
   }
@@ -761,4 +775,70 @@ function buildExamplePrompts(describe: DescribeDomainResult): string[] {
     );
   }
   return prompts.slice(0, 3);
+}
+
+/* ------------------------------------------------------------------ */
+/*  BusinessSystemChips — chip row at the top of the cockpit. Shows    */
+/*  every business system bound to the current domain, plus an "接入"   */
+/*  affordance that opens the legacy-import wizard (re-used from the   */
+/*  workbench). When no systems are bound, the row is hidden so an     */
+/*  empty domain doesn't get a lonely "+" button.                      */
+/* ------------------------------------------------------------------ */
+
+function BusinessSystemChips({
+  systems,
+  onImportLegacy,
+}: {
+  systems: DescribeDomainBusinessSystem[];
+  onImportLegacy?: () => void;
+}): ReactElement | null {
+  if (systems.length === 0 && !onImportLegacy) return null;
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 border-t border-border pt-2">
+      <span className="text-(length:--text-nano) text-muted-foreground">
+        {t("已绑定", "Bound:")}
+      </span>
+      {systems.map((bs) => (
+        <span
+          key={bs.id}
+          title={
+            bs.description ??
+            (bs.targetRole ? `targetRole: ${bs.targetRole}` : `${bs.code} · ${bs.status}`)
+          }
+          className="inline-flex items-center gap-1 rounded-full border border-border bg-background px-2 py-0.5 text-(length:--text-nano) text-foreground"
+        >
+          <span className="font-mono text-muted-foreground">{bs.code}</span>
+          <span>·</span>
+          <span>{bs.name}</span>
+          <span className={`rounded-full px-1 text-(length:--text-tiny) ${statusClass(bs.status)}`}>
+            {bs.status}
+          </span>
+        </span>
+      ))}
+      {onImportLegacy && (
+        <button
+          type="button"
+          onClick={onImportLegacy}
+          className="inline-flex items-center gap-0.5 rounded-full border border-dashed border-border bg-card px-2 py-0.5 text-(length:--text-nano) text-muted-foreground hover:border-primary hover:text-primary"
+        >
+          ⚡ {t("接入", "Import")}
+        </button>
+      )}
+    </div>
+  );
+}
+
+function statusClass(status: string): string {
+  switch (status) {
+    case "running":
+    case "active":
+      return "bg-green-500/15 text-green-700 dark:text-green-300";
+    case "planning":
+      return "bg-amber-500/15 text-amber-700 dark:text-amber-300";
+    case "deprecated":
+    case "retired":
+      return "bg-zinc-500/15 text-zinc-600 dark:text-zinc-400";
+    default:
+      return "bg-muted text-muted-foreground";
+  }
 }

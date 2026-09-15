@@ -4140,8 +4140,10 @@ export class PostgresGraphStore implements GraphStore {
       code: string;
       name: string;
       status: string;
+      description: string | null;
+      target_role: string | null;
     }>(
-      `SELECT id, code, name, status
+      `SELECT id, code, name, status, description, target_role
          FROM ${this.table("ontology_business_systems")}
         WHERE company_id = $1 AND ontology_domain_id = $2 AND is_deleted = false
         ORDER BY name ASC`,
@@ -4156,8 +4158,9 @@ export class PostgresGraphStore implements GraphStore {
           name: string;
           status: string;
           type: string;
+          description: string | null;
         }>(
-          `SELECT sp.id, sp.business_system_id, sp.code, sp.name, sp.status, sp.type
+          `SELECT sp.id, sp.business_system_id, sp.code, sp.name, sp.status, sp.type, sp.description
              FROM ${this.table("ontology_sub_projects")} sp
              JOIN ${this.table("ontology_business_systems")} bs
                ON bs.company_id = sp.company_id AND bs.id = sp.business_system_id
@@ -4229,6 +4232,8 @@ export class PostgresGraphStore implements GraphStore {
         code: row.code,
         name: row.name,
         status: row.status,
+        description: row.description,
+        targetRole: row.target_role,
       })),
       subProjects: subProjects.map((row) => ({
         id: row.id,
@@ -4237,6 +4242,7 @@ export class PostgresGraphStore implements GraphStore {
         name: row.name,
         status: row.status,
         type: row.type,
+        description: row.description,
       })),
       actionTypes: actionTypes.map((row) => ({
         id: row.id,
@@ -4285,6 +4291,8 @@ export interface DescribeDomainBusinessSystem {
   code: string;
   name: string;
   status: string;
+  description: string | null;
+  targetRole: string | null;
 }
 
 export interface DescribeDomainSubProject {
@@ -4294,6 +4302,7 @@ export interface DescribeDomainSubProject {
   name: string;
   status: string;
   type: string;
+  description: string | null;
 }
 
 export interface DescribeDomainActionType {

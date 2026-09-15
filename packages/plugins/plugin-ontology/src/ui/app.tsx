@@ -365,6 +365,7 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
           setActionFormPrefill={setActionFormPrefill}
           onDomainsChanged={refreshDomains}
           onRequestView={setView}
+          onImportLegacy={() => setWizardOpen(true)}
         />
       )}
 
@@ -618,6 +619,7 @@ function DomainWorkspace({
   setActionFormPrefill,
   onDomainsChanged,
   onRequestView,
+  onImportLegacy,
 }: {
   companyId: string;
   domainId: string;
@@ -631,6 +633,8 @@ function DomainWorkspace({
   onDomainsChanged: () => void;
   /** Bridge to switch the host workbench's tab (e.g. graph → sandbox). */
   onRequestView?: (view: WorkbenchView) => void;
+  /** Bridge to open the legacy-system import wizard from inside the cockpit. */
+  onImportLegacy?: () => void;
 }): ReactElement {
   const { data: domainData, refresh: refreshDomain } = usePluginData<DomainDetail>(
     "domain-detail", { companyId, domainId }
@@ -837,6 +841,7 @@ function DomainWorkspace({
             domainVersion={domain.version}
             prePrompt={aidePrePrompt}
             onConsumePrePrompt={() => setAidePrePrompt(null)}
+            onImportLegacy={onImportLegacy}
           />
         )}
         {view === "actions" && (
