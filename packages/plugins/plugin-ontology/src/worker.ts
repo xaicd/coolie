@@ -1667,6 +1667,15 @@ const plugin = definePlugin({
         return { body: { nodeType } };
       }
 
+      case "delete-node-type": {
+        // Hard-delete: see GraphStore.deleteNodeType for ON DELETE SET NULL
+        // semantics on referencing nodes.
+        const body = optionalRecord(input.body) ?? {};
+        const id = requireString(input.params?.nodeTypeId ?? body.nodeTypeId, "nodeTypeId");
+        const ok = await store.deleteNodeType(companyId, id);
+        return { status: ok ? 204 : 404, body: ok ? {} : { error: "Node type not found" } };
+      }
+
       case "list-relation-types": {
         const relationTypes = await store.listRelationTypes(
           companyId,

@@ -166,6 +166,14 @@ const manifest: PaperclipPluginManifestV1 = {
       companyResolution: { from: "body", key: "companyId" },
     },
     {
+      routeKey: "delete-node-type",
+      method: "DELETE",
+      path: "/node-types/:nodeTypeId",
+      auth: "board",
+      capability: "api.routes.register",
+      companyResolution: { from: "body", key: "companyId" },
+    },
+    {
       routeKey: "list-relation-types",
       method: "GET",
       path: "/relation-types",

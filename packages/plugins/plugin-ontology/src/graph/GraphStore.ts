@@ -1037,6 +1037,14 @@ export interface GraphStore {
     nodeTypeId: string,
     update: OntologyNodeTypeUpdate,
   ): Promise<OntologyNodeTypeRow | null>;
+  /**
+   * Hard-delete a node type. The migration's `node_type_id ... ON DELETE
+   * SET NULL` reference means nodes that pointed at this type will lose
+   * their classification but stay alive. We use hard-delete (rather than
+   * the soft-delete we use for action/function/interface) because the UI
+   * surfaces a confirmation dialog warning the user about this side effect.
+   */
+  deleteNodeType(companyId: string, nodeTypeId: string): Promise<boolean>;
 
   createRelationType(input: OntologyRelationTypeInput): Promise<OntologyRelationTypeRow>;
   listRelationTypes(companyId: string, domainId: string): Promise<OntologyRelationTypeRow[]>;
@@ -1701,6 +1709,20 @@ export class PostgresGraphStore implements GraphStore {
       [companyId, nodeTypeId],
     );
     return rows[0] ?? null;
+  }
+
+  /**
+   * Hard-delete a node type. ON DELETE SET NULL on ontology_nodes.node_type_id
+   * means referencing nodes survive but lose their classification. Returns
+   * true iff a row was actually deleted in this company.
+   */
+  async deleteNodeType(companyId: string, nodeTypeId: string): Promise<boolean> {
+    const res = await this.db.execute(
+      `DELETE FROM ${this.table("ontology_node_types")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, nodeTypeId],
+    );
+    return res.rowCount > 0;
   }
 
   private static readonly RELATION_TYPE_COLS =
