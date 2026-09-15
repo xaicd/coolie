@@ -25,6 +25,8 @@ let store: NpcStore | null = null;
  * from paperclipai.plugin-ontology arrives on this channel.
  */
 const ONTOLOGY_NODE_STALE_EVENT = "plugin.paperclipai.plugin-ontology.node-stale" as const;
+const ONTOLOGY_BUSINESS_SYSTEM_CREATED_EVENT =
+  "plugin.paperclipai.plugin-ontology.business-system-created" as const;
 
 function requireContext(): PluginContext {
   if (!activeContext) throw new Error("NPC factory plugin worker context is not initialized");
@@ -233,6 +235,15 @@ const plugin = definePlugin({
       await handleOntologyNodeStale(ctx, event);
     });
 
+    // Phase 7: when ontology ingests a new business system (typically
+    // via the legacy-import wizard), open a discovery run so an NPC
+    // team can be auto-spawned against it. Mirrors DS
+    // `hatchOntologyAppTeam`. Idempotent on (businessSystemId) — replay
+    // events are absorbed by the run_key uniqueness constraint.
+    ctx.events.on(ONTOLOGY_BUSINESS_SYSTEM_CREATED_EVENT, async (event) => {
+      await handleOntologyBusinessSystemCreated(ctx, event);
+    });
+
     ctx.logger.info("NPC factory plugin worker started", { namespace: ctx.db.namespace });
   },
 
@@ -403,6 +414,74 @@ const plugin = definePlugin({
     }
   },
 });
+
+/**
+ * Phase 7 — react to a freshly-created business system by opening a
+ * discovery run so an NPC team can be auto-spawned against it.
+ *
+ * The handler is best-effort: a duplicate run_key from a replayed
+ * event is absorbed by the uniqueness constraint rather than
+ * failing the subscriber. Other errors are logged so a transient
+ * store hiccup doesn't blow up the cross-plugin loop.
+ *
+ * Why a discovery run rather than auto-creating the team directly:
+ * a run gives the user a single place to inspect / abort / re-run
+ * the spawn, and it ties the spawn to the activity log so the
+ * cockpit's per-domain panel surfaces it.
+ */
+async function handleOntologyBusinessSystemCreated(
+  ctx: PluginContext,
+  event: PluginEvent,
+): Promise<void> {
+  const payload = optionalRecord(event.payload) ?? {};
+  const companyId = event.companyId;
+  const businessSystemId = str(payload.businessSystemId);
+  const domainId = str(payload.ontologyDomainId);
+  if (!companyId || !businessSystemId) {
+    ctx.logger.warn("Ignoring business-system-created event with missing fields", {
+      eventId: event.eventId,
+      hasCompany: Boolean(companyId),
+      hasBusinessSystem: Boolean(businessSystemId),
+    });
+    return;
+  }
+  const runKey = `ontology-bs-${businessSystemId}`;
+  try {
+    const run = await requireStore().createRun({
+      companyId,
+      runKey,
+      jobFamily: null,
+      ontologyDomainRef: domainId,
+      createdBy: "plugin:ontology",
+      metadata: {
+        trigger: "ontology-business-system-created",
+        businessSystemRef: businessSystemId,
+        code: str(payload.code) ?? null,
+        name: str(payload.name) ?? null,
+        targetRole: str(payload.targetRole) ?? null,
+        sourceEventId: event.eventId,
+      },
+    });
+    await ctx.activity.log({
+      companyId,
+      message: `Opened discovery run for new business system ${str(payload.code) ?? businessSystemId}`,
+      entityType: "npc_workflow_run",
+      entityId: run.id,
+      metadata: { businessSystemId, trigger: "ontology-business-system-created" },
+    });
+    ctx.logger.info("Created discovery run from ontology business-system-created", {
+      runId: run.id,
+      businessSystemId,
+      domainId,
+    });
+  } catch (err) {
+    ctx.logger.warn("Failed to create discovery run for business-system-created", {
+      error: String((err as Error)?.message ?? err),
+      businessSystemId,
+      runKey,
+    });
+  }
+}
 
 export default plugin;
 runWorker(plugin, import.meta.url);

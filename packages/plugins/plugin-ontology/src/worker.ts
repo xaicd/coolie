@@ -2417,6 +2417,23 @@ const plugin = definePlugin({
           entityType: "ontology_business_system",
           entityId: system.id,
         });
+        // Cross-plugin NPC bridge — phase 7. The npc-factory plugin
+        // listens for this and can spawn an NPC team tailored to the
+        // new business system (DS does this via hatchOntologyAppTeam).
+        // Best-effort: an emit failure must not roll back the create.
+        try {
+          await ctx.events.emit("business-system-created", companyId, {
+            businessSystemId: system.id,
+            code: system.code,
+            name: system.name,
+            ontologyDomainId: system.ontology_domain_id,
+          });
+        } catch (err) {
+          ctx.logger.warn("Failed to emit business-system-created", {
+            error: String((err as Error)?.message ?? err),
+            businessSystemId: system.id,
+          });
+        }
         return { status: 201, body: { businessSystem: system } };
       }
 

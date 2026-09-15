@@ -22,6 +22,7 @@
 
 import { useEffect, useState, type ReactElement } from "react";
 import { usePluginAction } from "@paperclipai/plugin-sdk/ui";
+import { inferModuleFromText } from "../legacy/modulePrefixMap.js";
 
 /** What the modal currently knows about the user's source material. Filled
  *  in by Step 1; consumed by Steps 2-4 to label and pre-populate. */
@@ -646,6 +647,24 @@ function Step3Body({ parsed }: { parsed: ParsedSource | null }): ReactElement {
           <div>· {parsed.nodeTypes.length} {t("对象类型", "object types")}</div>
           <div>· {parsed.relationTypes.length} {t("关系类型", "relation types")}</div>
           <div>· 1 {t("业务系统", "business system")} (SYS_{(slug || "x").toUpperCase()})</div>
+          {(() => {
+            // Phase 7 — show inferred module groups so the user can
+            // sanity-check the auto-grouping before publishing.
+            const buckets = new Map<string, number>();
+            for (const nt of parsed.nodeTypes) {
+              const m = inferModuleFromText(nt.key);
+              buckets.set(m, (buckets.get(m) ?? 0) + 1);
+            }
+            if (buckets.size === 0) return null;
+            return (
+              <div className="mt-1">
+                · {t("推断模块", "Inferred modules")}:{" "}
+                {Array.from(buckets.entries())
+                  .map(([m, c]) => `${m} (${c})`)
+                  .join(", ")}
+              </div>
+            );
+          })()}
         </div>
       )}
     </div>
