@@ -308,7 +308,20 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
       {/* ── Body ── */}
       {!activeDomainId ? (
         <div className="flex min-h-0 flex-1">
-          <NoDomainState companyId={companyId} onCreated={refreshDomains} />
+          <NoDomainState
+            companyId={companyId}
+            onCreated={(newId) => {
+              // Land the user on the freshly-created domain with the graph
+              // view mounted. Without setView("graph") here, a user who was
+              // last on Cognition/Capabilities/Dialogue would create a domain
+              // and find themselves on a tab that has no canvas — so the
+              // right-click context menu would silently do nothing because
+              // the ReactFlow pane is unmounted.
+              if (newId) setSelectedDomainId(newId);
+              setView("graph");
+              refreshDomains();
+            }}
+          />
         </div>
       ) : (
         // Keyed on domainId so switching domains remounts the workspace with a
@@ -331,6 +344,11 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
           onClose={() => setShowNewDomain(false)}
           onCreated={(newDomainId) => {
             setShowNewDomain(false);
+            // Always land on graph view so the canvas is mounted and
+            // right-click works. If we left the user on Cognition /
+            // Capabilities / Dialogue, the ReactFlow pane wouldn't render
+            // and the right-click menu would silently do nothing.
+            setView("graph");
             refreshDomains();
             if (newDomainId) setSelectedDomainId(newDomainId);
           }}
@@ -565,6 +583,12 @@ function DomainWorkspace({
   const { data: domainData, refresh: refreshDomain } = usePluginData<DomainDetail>(
     "domain-detail", { companyId, domainId }
   );
+  // Stable callback identity so child effects keyed on it don't fire on every
+  // parent re-render. refreshDomain from the SDK is already stable but
+  // wrapping it here keeps the call site explicit and future-proof.
+  const handleBootstrapCompleted = useCallback(() => {
+    refreshDomain();
+  }, [refreshDomain]);
 
   const counts = domainData?.graph?.counts;
   const nodes = domainData?.graph?.nodes ?? [];
@@ -579,6 +603,12 @@ function DomainWorkspace({
   // Pre-filled ask-aide prompt set by right-click "AI 解释这个节点". Cleared
   // by SandboxTab after it consumes the draft.
   const [aidePrePrompt, setAidePrePrompt] = useState<string | null>(null);
+  // BootstrapPanel lifecycle. The panel itself holds the "running" /
+  // "completed" UI state, but the parent must keep the panel mounted across
+  // the counts-nodes transition (0 -> N) so the user can see the progress
+  // lines and the completion summary. Once the user dismisses the panel, we
+  // unmount it (and the next re-render will re-evaluate from `counts`).
+  const [bootstrapActive, setBootstrapActive] = useState(false);
 
   const showTree = view === "graph" || view === "table" || view === "schema";
 
@@ -704,13 +734,17 @@ function DomainWorkspace({
           </div>
 
           {/* AI 初始化 — only on empty domains. Above Statistics so it's the
-              most prominent thing in the panel when the user lands here. */}
-          {counts && counts.nodes === 0 && (
+              most prominent thing in the panel when the user lands here. We
+              keep the panel mounted across the bootstrap itself so the
+              progress lines + completion summary don't disappear the moment
+              counts.nodes flips from 0 to N. */}
+          {counts && (counts.nodes === 0 || bootstrapActive) && (
             <BootstrapPanel
               companyId={companyId}
               domainId={domainId}
               description={domain?.description ?? null}
-              onCompleted={() => refreshDomain()}
+              onActiveChange={setBootstrapActive}
+              onCompleted={handleBootstrapCompleted}
             />
           )}
 
@@ -1543,7 +1577,7 @@ function NodeInspector({
   );
 }
 
-function NoDomainState({ companyId, onCreated }: { companyId: string; onCreated: () => void }): ReactElement {
+function NoDomainState({ companyId, onCreated }: { companyId: string; onCreated: (domainId: string) => void }): ReactElement {
   const createDomain = usePluginAction("create-domain");
   const [displayName, setDisplayName] = useState("");
   const [description, setDescription] = useState("");
@@ -1557,13 +1591,18 @@ function NoDomainState({ companyId, onCreated }: { companyId: string; onCreated:
   const submit = async () => {
     setBusy(true); setErr(null);
     try {
-      await createDomain({
+      const res = (await createDomain({
         companyId,
         slug: effectiveSlug,
         displayName: displayName.trim(),
         description: description.trim() || undefined,
-      });
-      onCreated();
+      })) as { data?: { domain?: { id: string } } } | undefined;
+      const newId = res?.data?.domain?.id;
+      if (newId) {
+        onCreated(newId);
+      } else {
+        onCreated("");
+      }
       setDisplayName("");
       setDescription("");
       setSlugOverride(null);
