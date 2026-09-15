@@ -1085,7 +1085,14 @@ export function GraphView(props: GraphViewProps): ReactElement {
         </ReactFlowProvider>
       )}
 
-      {mode === "table" && <TableView nodes={props.nodes} edges={props.edges} nodeTypes={nodeTypeDefs} />}
+      {mode === "table" && (
+        <TableView
+          nodes={props.nodes}
+          edges={props.edges}
+          nodeTypes={nodeTypeDefs}
+          focusNodeTypeId={props.focusNodeTypeId}
+        />
+      )}
 
       {mode === "schema" && <SchemaView nodeTypes={nodeTypeDefs} relationTypes={relationTypeDefs} />}
     </>
@@ -1116,15 +1123,43 @@ export function GraphView(props: GraphViewProps): ReactElement {
   );
 }
 
-/** Flat node/edge listing. Read-only; editing stays in the graph + type sections. */
+export const MAX_TABLE_PROPERTY_COLUMNS = 4;
+
+/** Compact `name: type` rendering for a schema descriptor (DS shows `status: enum`). */
+export function summarizePropertyType(descriptor: unknown): string {
+  if (!descriptor || typeof descriptor !== "object") return String(descriptor ?? "");
+  const obj = descriptor as { type?: string; format?: string; enum?: unknown[] };
+  const base = obj.type ?? "any";
+  if (Array.isArray(obj.enum) && obj.enum.length > 0) {
+    return `${base} (${obj.enum.map((v) => String(v)).join(" | ")})`;
+  }
+  if (obj.format) return `${base} (${obj.format})`;
+  return base;
+}
+
+/** Render one instance property for a table cell; mirrors DS's `cellValue`. */
+function propertyCellValue(value: unknown): string {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "object") return JSON.stringify(value);
+  return String(value);
+}
+
+/**
+ * Instance listing. Mirrors the DS table view: columns are derived from the
+ * selected object type's `propertiesSchema`, rows are filtered to that type,
+ * and the header reports the row count. With no type selected it falls back to
+ * the identity columns — the same default DS shows (NAME | NODETYPE | STATE).
+ */
 function TableView({
   nodes,
   edges,
   nodeTypes,
+  focusNodeTypeId,
 }: {
   nodes: GraphNode[];
   edges: GraphEdge[];
   nodeTypes: GraphNodeType[];
+  focusNodeTypeId?: string | null;
 }): ReactElement {
   const typeById = useMemo(() => {
     const m = new Map<string, GraphNodeType>();
@@ -1137,26 +1172,60 @@ function TableView({
     return m;
   }, [nodes]);
 
+  const focusedType = focusNodeTypeId ? typeById.get(focusNodeTypeId) : undefined;
+
+  // Cap the property columns so a wide object type cannot push the identity
+  // columns off screen; the full list stays available in the schema view.
+  const propertyColumns = useMemo(() => {
+    const schema = focusedType?.propertiesSchema;
+    if (!schema || typeof schema !== "object") return [] as string[];
+    return Object.keys(schema).slice(0, MAX_TABLE_PROPERTY_COLUMNS);
+  }, [focusedType]);
+
+  const visibleNodes = useMemo(
+    () => (focusNodeTypeId ? nodes.filter((n) => n.nodeTypeId === focusNodeTypeId) : nodes),
+    [nodes, focusNodeTypeId],
+  );
+
   return (
     <div className="flex flex-col gap-4">
       <div>
-        <div className="mb-1 text-(length:--text-nano) font-semibold text-muted-foreground">
-          {t("节点", "Nodes")} · {nodes.length}
+        <div className="mb-1 flex items-baseline gap-1.5 text-(length:--text-nano) font-semibold text-muted-foreground">
+          <span>
+            {t("共", "Total")} {visibleNodes.length} {t("条记录", "records")}
+          </span>
+          {focusedType && (
+            <span className="font-normal">· {focusedType.display_name || focusedType.key}</span>
+          )}
+          {!focusedType && propertyColumns.length === 0 && (
+            <span className="font-normal">
+              · {t("选中左侧对象类型以显示其属性列", "Select an object type to show its property columns")}
+            </span>
+          )}
         </div>
-        {nodes.length === 0 ? (
-          <div className="text-(length:--text-compact) text-muted-foreground">{t("暂无节点。", "No nodes.")}</div>
+        {visibleNodes.length === 0 ? (
+          <div className="text-(length:--text-compact) text-muted-foreground">
+            {focusedType
+              ? t("该类型暂无实例。", "No instances of this type.")
+              : t("暂无节点。", "No nodes.")}
+          </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-border">
+          <div className="overflow-x-auto rounded-lg border border-border">
             <table className="w-full text-(length:--text-compact)">
               <thead className="bg-muted/40 text-muted-foreground">
                 <tr>
                   <th className="px-2 py-1.5 text-left font-medium">{t("标签", "Label")}</th>
                   <th className="px-2 py-1.5 text-left font-medium">{t("键", "Key")}</th>
                   <th className="px-2 py-1.5 text-left font-medium">{t("类型", "Type")}</th>
+                  {propertyColumns.map((col) => (
+                    <th key={col} className="px-2 py-1.5 text-left font-medium whitespace-nowrap">
+                      {col}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
-                {nodes.map((n) => {
+                {visibleNodes.map((n) => {
                   const nt = n.nodeTypeId ? typeById.get(n.nodeTypeId) : undefined;
                   return (
                     <tr key={n.id} className="border-t border-border">
@@ -1168,6 +1237,11 @@ function TableView({
                       </td>
                       <td className="px-2 py-1.5 text-muted-foreground">{n.key}</td>
                       <td className="px-2 py-1.5 text-muted-foreground">{nt ? (nt.display_name || nt.key) : "—"}</td>
+                      {propertyColumns.map((col) => (
+                        <td key={col} className="px-2 py-1.5 text-muted-foreground">
+                          {propertyCellValue(n.properties?.[col])}
+                        </td>
+                      ))}
                     </tr>
                   );
                 })}
@@ -1210,7 +1284,11 @@ function TableView({
   );
 }
 
-/** Schema definitions: node types + relation types. */
+/**
+ * Schema definitions. Object types list their properties inline (`name: type`)
+ * with a count badge, mirroring the DS model view; relation types have no
+ * property schema, so they render as a plain identity row.
+ */
 function SchemaView({
   nodeTypes,
   relationTypes,
@@ -1220,13 +1298,21 @@ function SchemaView({
 }): ReactElement {
   return (
     <div className="grid gap-4 sm:grid-cols-2">
-      <SchemaColumn title={t("节点类型", "Node types")} items={nodeTypes} />
+      <SchemaColumn title={t("对象类型", "Object types")} items={nodeTypes} showProperties />
       <SchemaColumn title={t("关系类型", "Relation types")} items={relationTypes} />
     </div>
   );
 }
 
-function SchemaColumn({ title, items }: { title: string; items: GraphNodeType[] }): ReactElement {
+function SchemaColumn({
+  title,
+  items,
+  showProperties = false,
+}: {
+  title: string;
+  items: GraphNodeType[];
+  showProperties?: boolean;
+}): ReactElement {
   return (
     <div>
       <div className="mb-1 text-(length:--text-nano) font-semibold text-muted-foreground">
@@ -1236,13 +1322,42 @@ function SchemaColumn({ title, items }: { title: string; items: GraphNodeType[] 
         <div className="text-(length:--text-compact) text-muted-foreground">—</div>
       ) : (
         <div className="flex flex-col gap-1">
-          {items.map((it) => (
-            <div key={it.id} className="flex items-center gap-2 rounded-lg border border-border bg-background px-2.5 py-1.5">
-              <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: toneFor(it.id) }} />
-              <span className="text-(length:--text-compact) font-medium">{it.display_name || it.key}</span>
-              <span className="text-(length:--text-nano) text-muted-foreground">{it.key}</span>
-            </div>
-          ))}
+          {items.map((it) => {
+            const schema = it.propertiesSchema && typeof it.propertiesSchema === "object"
+              ? Object.entries(it.propertiesSchema)
+              : [];
+            return (
+              <div key={it.id} className="rounded-lg border border-border bg-background px-2.5 py-1.5">
+                <div className="flex items-center gap-2">
+                  <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: toneFor(it.id) }} />
+                  <span className="text-(length:--text-compact) font-medium">{it.display_name || it.key}</span>
+                  <span className="text-(length:--text-nano) text-muted-foreground">{it.key}</span>
+                  {showProperties && schema.length > 0 && (
+                    <span className="ml-auto shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-(length:--text-nano) tabular-nums text-muted-foreground">
+                      {schema.length} {t("属性", "props")}
+                    </span>
+                  )}
+                </div>
+                {showProperties && (
+                  schema.length > 0 ? (
+                    <ul className="mt-1 space-y-0.5 pl-4">
+                      {schema.map(([name, descriptor]) => (
+                        <li key={name} className="flex items-baseline gap-1 text-(length:--text-nano)">
+                          <span className="font-mono text-foreground/80">{name}</span>
+                          <span className="text-muted-foreground">:</span>
+                          <span className="text-muted-foreground">{summarizePropertyType(descriptor)}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="mt-0.5 pl-4 text-(length:--text-nano) italic text-muted-foreground">
+                      {t("尚未配置属性", "No properties defined")}
+                    </div>
+                  )
+                )}
+              </div>
+            );
+          })}
         </div>
       )}
     </div>
