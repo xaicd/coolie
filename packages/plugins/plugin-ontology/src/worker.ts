@@ -422,6 +422,490 @@ async function emitCapabilityEvent(
   }
 }
 
+// ---------------------------------------------------------------------------
+// Mutation bridge — one implementation, two surfaces
+// ---------------------------------------------------------------------------
+//
+// The plugin exposes mutations on two different surfaces:
+//
+//   A. `ctx.actions.register(key, fn)` — reached by `usePluginAction(key)` in
+//      the plugin UI via `POST /api/plugins/:id/actions/:key`. The host spreads
+//      the hook argument into the handler's params and adds `companyId`
+//      (server/src/routes/plugins.ts — actionParamsWithAuthorizedCompanyScope).
+//   B. `onApiRequest(input)` — reached through the manifest `apiRoutes`, which
+//      hands over separate `params` (path) and `body` (JSON) objects.
+//
+// The UI calls mutations in BOTH shapes, so every handler normalises through
+// `readMutationCall` instead of reading raw params. Keeping a single handler
+// per mutation means the two surfaces cannot drift apart again — which is
+// exactly how `update-node-type` and friends ended up registered on B but not
+// on A, leaving the cockpit's "确认应用" with nothing to call.
+
+interface MutationCall {
+  companyId: string;
+  /**
+   * Merged field bag. Nested `{ params, body }` calls (cockpit dispatch) and
+   * flat calls (import wizard, seed actions) both land here, so handlers read
+   * `call.fields.<field>` regardless of which surface invoked them.
+   */
+  fields: Record<string, unknown>;
+}
+
+interface MutationOutcome {
+  status: number;
+  payload: Record<string, unknown>;
+}
+
+type MutationHandler = (
+  store: GraphStore,
+  ctx: PluginContext,
+  call: MutationCall,
+) => Promise<MutationOutcome>;
+
+function readMutationCall(params: Record<string, unknown>): MutationCall {
+  const companyId = requireString(params.companyId, "companyId");
+  // Presence of the envelope keys decides the shape; an empty `body: {}` must
+  // not fall back to the raw params or the real fields get lost.
+  const isNested = "params" in params || "body" in params;
+  const fields = isNested
+    ? { ...optionalRecord(params.params), ...optionalRecord(params.body) }
+    : { ...params };
+  return { companyId, fields };
+}
+
+/** Same normalisation for the manifest `apiRoutes` surface. */
+function httpMutationCall(companyId: string, input: PluginApiRequestInput): MutationCall {
+  return {
+    companyId,
+    fields: { ...optionalRecord(input.params), ...optionalRecord(input.body) },
+  };
+}
+
+const ok = (payload: Record<string, unknown>): MutationOutcome => ({ status: 200, payload });
+const created = (payload: Record<string, unknown>): MutationOutcome => ({ status: 201, payload });
+const noContent = (): MutationOutcome => ({ status: 204, payload: {} });
+const notFound = (error: string): MutationOutcome => ({ status: 404, payload: { error } });
+const badRequest = (error: string): MutationOutcome => ({ status: 400, payload: { error } });
+
+function optionalString(value: unknown): string | undefined {
+  return typeof value === "string" ? value : undefined;
+}
+
+function optionalStringOrNull(value: unknown): string | null | undefined {
+  return typeof value === "string" || value === null ? (value as string | null) : undefined;
+}
+
+/** `propertiesSchema` must be an object; anything else is a caller bug. */
+function requireRecordOrThrow(value: unknown, field: string): Record<string, unknown> {
+  if (value === undefined || value === null) return {};
+  const record = optionalRecord(value);
+  if (!record) throw new Error(`${field} must be a JSON object`);
+  return record;
+}
+
+const updateNodeTypeMutation: MutationHandler = async (store, _ctx, call) => {
+  const nodeType = await store.updateNodeType(
+    call.companyId,
+    requireString(call.fields.nodeTypeId, "nodeTypeId"),
+    {
+      displayName: optionalString(call.fields.displayName),
+      description: "description" in call.fields
+        ? optionalStringOrNull(call.fields.description)
+        : undefined,
+      propertiesSchema: call.fields.propertiesSchema === undefined
+        ? undefined
+        : requireRecordOrThrow(call.fields.propertiesSchema, "propertiesSchema"),
+      metadata: optionalRecord(call.fields.metadata),
+    },
+  );
+  if (!nodeType) return notFound("Node type not found");
+  return ok({ nodeType });
+};
+
+const deleteNodeTypeMutation: MutationHandler = async (store, _ctx, call) => {
+  // Hard-delete: see GraphStore.deleteNodeType for ON DELETE SET NULL
+  // semantics on referencing nodes.
+  const okDeleted = await store.deleteNodeType(
+    call.companyId,
+    requireString(call.fields.nodeTypeId, "nodeTypeId"),
+  );
+  return okDeleted ? noContent() : notFound("Node type not found");
+};
+
+const updateRelationTypeMutation: MutationHandler = async (store, _ctx, call) => {
+  const relationType = await store.updateRelationType(
+    call.companyId,
+    requireString(call.fields.relationTypeId, "relationTypeId"),
+    {
+      displayName: optionalString(call.fields.displayName),
+      description: "description" in call.fields
+        ? optionalStringOrNull(call.fields.description)
+        : undefined,
+      directed: typeof call.fields.directed === "boolean" ? call.fields.directed : undefined,
+      metadata: optionalRecord(call.fields.metadata),
+    },
+  );
+  if (!relationType) return notFound("Relation type not found");
+  return ok({ relationType });
+};
+
+const deleteRelationTypeMutation: MutationHandler = async (store, _ctx, call) => {
+  // Hard-delete: see GraphStore.deleteRelationType for ON DELETE SET NULL
+  // semantics on referencing edges.
+  const okDeleted = await store.deleteRelationType(
+    call.companyId,
+    requireString(call.fields.relationTypeId, "relationTypeId"),
+  );
+  return okDeleted ? noContent() : notFound("Relation type not found");
+};
+
+const createFunctionMutation: MutationHandler = async (store, _ctx, call) => {
+  const fn = await store.createFunction({
+    companyId: call.companyId,
+    domainId: requireString(call.fields.domainId, "domainId"),
+    name: requireString(call.fields.name, "name"),
+    type: optionalString(call.fields.type) as FunctionType | undefined,
+    version: optionalString(call.fields.version),
+    description: optionalString(call.fields.description),
+    inputSchema: optionalRecord(call.fields.inputSchema),
+    outputSchema: optionalRecord(call.fields.outputSchema),
+    implementation: optionalRecord(call.fields.implementation),
+    permissions: optionalRecord(call.fields.permissions),
+  });
+  return created({ function: fn });
+};
+
+const deleteFunctionMutation: MutationHandler = async (store, _ctx, call) => {
+  // Soft-delete: see deleteActionType for rationale.
+  const okDeleted = await store.deleteFunction(
+    call.companyId,
+    requireString(call.fields.functionId, "functionId"),
+  );
+  return okDeleted ? noContent() : notFound("Function not found");
+};
+
+const createInterfaceMutation: MutationHandler = async (store, _ctx, call) => {
+  const iface = await store.createInterface({
+    companyId: call.companyId,
+    domainId: requireString(call.fields.domainId, "domainId"),
+    key: requireString(call.fields.key, "key"),
+    displayName: requireString(call.fields.displayName, "displayName"),
+    description: typeof call.fields.description === "string" ? call.fields.description : null,
+    propertiesSchema: call.fields.propertiesSchema === undefined
+      ? undefined
+      : requireRecordOrThrow(call.fields.propertiesSchema, "propertiesSchema"),
+    extendsInterfaces: Array.isArray(call.fields.extendsInterfaces)
+      ? (call.fields.extendsInterfaces as string[])
+      : undefined,
+  });
+  return created({ interface: iface });
+};
+
+const deleteInterfaceMutation: MutationHandler = async (store, _ctx, call) => {
+  // Soft-delete: see deleteActionType for rationale.
+  const okDeleted = await store.deleteInterface(
+    call.companyId,
+    requireString(call.fields.interfaceId, "interfaceId"),
+  );
+  return okDeleted ? noContent() : notFound("Interface not found");
+};
+
+const createActionTypeMutation: MutationHandler = async (store, _ctx, call) => {
+  const actionType = await store.createActionType({
+    companyId: call.companyId,
+    domainId: requireString(call.fields.domainId, "domainId"),
+    key: requireString(call.fields.key, "key"),
+    displayName: requireString(call.fields.displayName, "displayName"),
+    description: optionalString(call.fields.description),
+    kind: optionalString(call.fields.kind) as ActionKind | undefined,
+    appliesToNodeTypeId:
+      typeof call.fields.appliesToNodeTypeId === "string" ? call.fields.appliesToNodeTypeId : null,
+    apiContract: optionalRecord(call.fields.apiContract),
+    stateTransitions: Array.isArray(call.fields.stateTransitions)
+      ? call.fields.stateTransitions
+      : undefined,
+    emitsEvents: Array.isArray(call.fields.emitsEvents) ? call.fields.emitsEvents : undefined,
+    requiredPermissions: Array.isArray(call.fields.requiredPermissions)
+      ? call.fields.requiredPermissions
+      : undefined,
+    idempotent:
+      typeof call.fields.idempotent === "boolean" ? call.fields.idempotent : undefined,
+  });
+  return created({ actionType });
+};
+
+const deleteActionTypeMutation: MutationHandler = async (store, _ctx, call) => {
+  // Soft-delete: marks is_deleted + deleted_at so audit/lineage keeps
+  // resolving. Subsequent list calls skip the row.
+  const okDeleted = await store.deleteActionType(
+    call.companyId,
+    requireString(call.fields.actionTypeId, "actionTypeId"),
+  );
+  return okDeleted ? noContent() : notFound("Action type not found");
+};
+
+const runTransformMutation: MutationHandler = async (store, ctx, call) => {
+  const { runTransform } = await import("./transform/TransformRunner.js");
+  // Accept transformId/domainId from either the path args or the body.
+  const transformId =
+    (optionalString(call.fields.transformId) ?? "").trim();
+  const domainId = (optionalString(call.fields.domainId) ?? "").trim();
+  if (!transformId || !domainId) {
+    return badRequest("run-transform requires transformId and domainId");
+  }
+  const result = await runTransform(store, ctx.db, call.companyId, domainId, transformId);
+  return ok({ result });
+};
+
+/**
+ * LLM-driven entity/relation extraction from free-form text (PRD, Word, PDF,
+ * meeting notes). The import wizard's "文档" sub-tab calls this to show the
+ * model's proposed node types / relation types before publishing the domain.
+ */
+const extractDocumentMutation: MutationHandler = async (_store, _ctx, call) => {
+  const documentText = requireString(call.fields.documentText, "documentText");
+  const filename = typeof call.fields.filename === "string" ? call.fields.filename : "(unnamed)";
+  const client = getClient();
+  const systemPrompt = [
+    "You are an ontology extractor. Given a free-form document,",
+    "return a JSON object with `nodeTypes`, `relationTypes`, and",
+    "`actions`. Each node type: `{ key, displayName, description, properties: { name: { type, description } } }`.",
+    "Each relation type: `{ key, displayName, sourceNodeTypeKey, targetNodeTypeKey }`.",
+    "Each action: `{ key, method, endpoint, description }`.",
+    "Use only types that are explicitly named or unambiguously",
+    "implied by the document. Output JSON only — no prose, no markdown.",
+  ].join(" ");
+  const response = await client.messages.create({
+    model: getModel(),
+    max_tokens: 4096,
+    system: systemPrompt,
+    messages: [
+      {
+        role: "user",
+        content: `Document filename: ${filename}\n\n${documentText}`,
+      },
+    ],
+  });
+  const text = response.content
+    .filter((block) => block.type === "text")
+    .map((block) => (block.type === "text" ? block.text : ""))
+    .join("");
+  // The LLM sometimes wraps the JSON in ```json fences. Strip
+  // them so JSON.parse doesn't have to.
+  const cleaned = text
+    .trim()
+    .replace(/^```(?:json)?/i, "")
+    .replace(/```$/, "")
+    .trim();
+  let parsed: {
+    nodeTypes?: Array<{
+      key: string;
+      displayName?: string;
+      description?: string;
+      properties?: Record<string, { type?: string; description?: string }>;
+    }>;
+    relationTypes?: Array<{
+      key: string;
+      displayName?: string;
+      sourceNodeTypeKey: string;
+      targetNodeTypeKey: string;
+    }>;
+    actions?: Array<{
+      key: string;
+      method: string;
+      endpoint: string;
+      description?: string;
+    }>;
+  } = {};
+  try {
+    parsed = JSON.parse(cleaned);
+  } catch {
+    // The LLM sometimes returns partial JSON or includes prose.
+    // Return the raw text so the wizard can show "模型输出无法
+    // 解析为 JSON,是否手动编辑?" instead of failing silently.
+    return {
+      status: 422,
+      payload: {
+        error: "Model output is not valid JSON",
+        raw: text,
+      },
+    };
+  }
+  return ok({
+    nodeTypes: parsed.nodeTypes ?? [],
+    relationTypes: parsed.relationTypes ?? [],
+    actions: parsed.actions ?? [],
+  });
+};
+
+const createBusinessSystemMutation: MutationHandler = async (store, ctx, call) => {
+  const system = await store.createBusinessSystem({
+    companyId: call.companyId,
+    code: requireString(call.fields.code, "code"),
+    name: requireString(call.fields.name, "name"),
+    description: optionalString(call.fields.description),
+    domain: optionalString(call.fields.domain) as BusinessSystemDomain | undefined,
+    tags: Array.isArray(call.fields.tags) ? (call.fields.tags as string[]) : undefined,
+    ontologyDomainId:
+      typeof call.fields.ontologyDomainId === "string" ? call.fields.ontologyDomainId : null,
+    ownerRef: typeof call.fields.ownerRef === "string" ? call.fields.ownerRef : null,
+    targetRole: optionalString(call.fields.targetRole),
+    repos: Array.isArray(call.fields.repos) ? call.fields.repos : undefined,
+    ontologyBinding: optionalRecord(call.fields.ontologyBinding),
+    domainCopilotConfig: optionalRecord(call.fields.domainCopilotConfig),
+    domainGovernance: optionalRecord(call.fields.domainGovernance),
+    npcTeamConfig: optionalRecord(call.fields.npcTeamConfig),
+    metadata: optionalRecord(call.fields.metadata),
+  });
+  await ctx.activity.log({
+    companyId: call.companyId,
+    message: `Created business system ${system.code}`,
+    entityType: "ontology_business_system",
+    entityId: system.id,
+  });
+  // Cross-plugin NPC bridge — phase 7. The npc-factory plugin
+  // listens for this and can spawn an NPC team tailored to the
+  // new business system (DS does this via hatchOntologyAppTeam).
+  // Best-effort: an emit failure must not roll back the create.
+  try {
+    await ctx.events.emit("business-system-created", call.companyId, {
+      businessSystemId: system.id,
+      code: system.code,
+      name: system.name,
+      ontologyDomainId: system.ontology_domain_id,
+    });
+  } catch (err) {
+    ctx.logger.warn("Failed to emit business-system-created", {
+      error: String((err as Error)?.message ?? err),
+      businessSystemId: system.id,
+    });
+  }
+  return created({ businessSystem: system });
+};
+
+/**
+ * Mutations the plugin UI reaches through `usePluginAction(key)` and that the
+ * manifest `apiRoutes` also expose. Both surfaces dispatch into these same
+ * handlers. `tests/action-parity.spec.ts` asserts every `usePluginAction` key
+ * in `src/ui/**` is reachable, so this table is the single source of truth.
+ */
+const MUTATION_HANDLERS: Record<string, MutationHandler> = {
+  "update-node-type": updateNodeTypeMutation,
+  "delete-node-type": deleteNodeTypeMutation,
+  "update-relation-type": updateRelationTypeMutation,
+  "delete-relation-type": deleteRelationTypeMutation,
+  "create-function": createFunctionMutation,
+  "delete-function": deleteFunctionMutation,
+  "create-interface": createInterfaceMutation,
+  "delete-interface": deleteInterfaceMutation,
+  "create-action-type": createActionTypeMutation,
+  "delete-action-type": deleteActionTypeMutation,
+  "run-transform": runTransformMutation,
+  "extract-document": extractDocumentMutation,
+  "create-business-system": createBusinessSystemMutation,
+};
+
+/** Wraps a shared handler as a `ctx.actions` handler: payload out, throw on error. */
+function registerMutationAction(
+  ctx: PluginContext,
+  store: GraphStore,
+  key: string,
+  handler: MutationHandler,
+): void {
+  ctx.actions.register(key, async (params) => {
+    const outcome = await handler(store, ctx, readMutationCall(params));
+    if (outcome.status >= 400) {
+      const message = typeof outcome.payload.error === "string"
+        ? outcome.payload.error
+        : `Action "${key}" failed`;
+      throw new Error(message);
+    }
+    return outcome.payload;
+  });
+}
+
+/**
+ * Object types planted by `seed-samples`, each with a real `propertiesSchema`.
+ *
+ * These used to be inserted as bare `{ key, displayName }` shells, so a freshly
+ * seeded domain rendered as a set of object types with zero attributes —
+ * "连 UML 都不如". Exported so the seed tests can assert the schema actually
+ * reaches the store.
+ */
+export const SAMPLE_NODE_TYPE_DEFS: Array<{
+  key: string;
+  displayName: string;
+  propertiesSchema: Record<string, unknown>;
+}> = [
+  {
+    key: "team",
+    displayName: "Team",
+    propertiesSchema: {
+      name: { type: "string" },
+      description: { type: "string" },
+      costCenter: { type: "string" },
+      headcount: { type: "number" },
+    },
+  },
+  {
+    key: "person",
+    displayName: "Person",
+    propertiesSchema: {
+      name: { type: "string" },
+      email: { type: "string" },
+      title: { type: "string" },
+      role: { type: "string", enum: ["individual_contributor", "lead", "manager"] },
+      joinedAt: { type: "string", format: "date-time" },
+    },
+  },
+  {
+    key: "service",
+    displayName: "Service",
+    propertiesSchema: {
+      name: { type: "string" },
+      repoUrl: { type: "string" },
+      language: { type: "string" },
+      tier: { type: "number", enum: [1, 2, 3] },
+      status: { type: "string", enum: ["active", "deprecated", "planned"] },
+      ownerTeamKey: { type: "string" },
+    },
+  },
+  {
+    key: "repository",
+    displayName: "Repository",
+    propertiesSchema: {
+      name: { type: "string" },
+      url: { type: "string" },
+      language: { type: "string" },
+      defaultBranch: { type: "string" },
+      lastCommitAt: { type: "string", format: "date-time" },
+      archived: { type: "boolean" },
+    },
+  },
+  {
+    key: "project",
+    displayName: "Project",
+    propertiesSchema: {
+      name: { type: "string" },
+      status: { type: "string", enum: ["planned", "active", "done", "cancelled"] },
+      owner: { type: "string" },
+      startDate: { type: "string", format: "date" },
+      dueDate: { type: "string", format: "date" },
+    },
+  },
+  {
+    key: "task",
+    displayName: "Task",
+    propertiesSchema: {
+      title: { type: "string" },
+      status: { type: "string", enum: ["todo", "in_progress", "done"] },
+      priority: { type: "string", enum: ["low", "medium", "high"] },
+      estimateDays: { type: "number" },
+      dueDate: { type: "string", format: "date" },
+    },
+  },
+];
+
 const plugin = definePlugin({
   async setup(ctx) {
     activeContext = ctx;
@@ -488,27 +972,43 @@ const plugin = definePlugin({
     });
 
     ctx.actions.register("create-node-type", async (params) => {
+      // `propertiesSchema` used to be dropped here, which is why every object
+      // type created from the cockpit/import wizard persisted as `{}` and the
+      // UI rendered "No properties defined".
+      const call = readMutationCall(params);
       const nodeType = await store.createNodeType({
-        companyId: requireString(params.companyId, "companyId"),
-        domainId: requireString(params.domainId, "domainId"),
-        key: requireString(params.key, "key"),
-        displayName: requireString(params.displayName, "displayName"),
-        description: typeof params.description === "string" ? params.description : null,
+        companyId: call.companyId,
+        domainId: requireString(call.fields.domainId, "domainId"),
+        key: requireString(call.fields.key, "key"),
+        displayName: requireString(call.fields.displayName, "displayName"),
+        description: typeof call.fields.description === "string" ? call.fields.description : null,
+        propertiesSchema: call.fields.propertiesSchema === undefined
+          ? undefined
+          : requireRecordOrThrow(call.fields.propertiesSchema, "propertiesSchema"),
       });
       return { nodeType };
     });
 
     ctx.actions.register("create-relation-type", async (params) => {
+      const call = readMutationCall(params);
       const relationType = await store.createRelationType({
-        companyId: requireString(params.companyId, "companyId"),
-        domainId: requireString(params.domainId, "domainId"),
-        key: requireString(params.key, "key"),
-        displayName: requireString(params.displayName, "displayName"),
-        description: typeof params.description === "string" ? params.description : null,
-        directed: typeof params.directed === "boolean" ? params.directed : undefined,
+        companyId: call.companyId,
+        domainId: requireString(call.fields.domainId, "domainId"),
+        key: requireString(call.fields.key, "key"),
+        displayName: requireString(call.fields.displayName, "displayName"),
+        description:
+          typeof call.fields.description === "string" ? call.fields.description : null,
+        directed: typeof call.fields.directed === "boolean" ? call.fields.directed : undefined,
       });
       return { relationType };
     });
+
+    // Type/asset mutations that the UI reaches through `usePluginAction` and
+    // that the manifest `apiRoutes` expose too. Registered here so the action
+    // surface and the HTTP surface share one implementation.
+    for (const [key, handler] of Object.entries(MUTATION_HANDLERS)) {
+      registerMutationAction(ctx, store, key, handler);
+    }
 
     // Graph instance authoring — backs drag-to-model in the graph view.
     ctx.actions.register("create-node", async (params) => {
@@ -590,28 +1090,49 @@ const plugin = definePlugin({
 
     // One-click sample seed: populate an empty domain with a small, coherent
     // "software delivery" ontology so the graph is immediately meaningful.
-    // Idempotent: no-ops if the domain already has nodes.
+    //
+    // Also repairs domains that were seeded before the sample types carried a
+    // `propertiesSchema` — those inserted bare type shells, which the cockpit
+    // renders as "尚未配置属性". The repair is idempotent and only touches
+    // sample keys whose schema is still empty, so user-authored types and
+    // hand-edited schemas are never overwritten.
     ctx.actions.register("seed-samples", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
       const domainId = requireString(params.domainId, "domainId");
 
+      const backfilled: string[] = [];
+      const existingTypes = await store.listNodeTypes(companyId, domainId);
+      const existingTypeByKey = new Map(existingTypes.map((row) => [row.key, row]));
+      for (const def of SAMPLE_NODE_TYPE_DEFS) {
+        const current = existingTypeByKey.get(def.key);
+        if (!current) continue;
+        const schema = current.properties_schema;
+        const hasProperties =
+          schema !== null && typeof schema === "object" && Object.keys(schema).length > 0;
+        if (hasProperties) continue;
+        await store.updateNodeType(companyId, current.id, {
+          propertiesSchema: def.propertiesSchema,
+        });
+        backfilled.push(def.key);
+      }
+
       const existing = await store.getGraphSnapshot(companyId, domainId);
       if (existing.counts.nodes > 0) {
-        return { seeded: false, reason: "domain-not-empty", counts: existing.counts };
+        return { seeded: false, reason: "domain-not-empty", counts: existing.counts, backfilled };
       }
 
       // ── Node types ──
-      const nodeTypeDefs: Array<{ key: string; displayName: string }> = [
-        { key: "team", displayName: "Team" },
-        { key: "person", displayName: "Person" },
-        { key: "service", displayName: "Service" },
-        { key: "repository", displayName: "Repository" },
-        { key: "project", displayName: "Project" },
-        { key: "task", displayName: "Task" },
-      ];
+      const nodeTypeDefs = SAMPLE_NODE_TYPE_DEFS;
       const typeIdByKey = new Map<string, string>();
       for (const def of nodeTypeDefs) {
-        const nt = await store.createNodeType({ companyId, domainId, key: def.key, displayName: def.displayName, description: null });
+        const nt = await store.createNodeType({
+          companyId,
+          domainId,
+          key: def.key,
+          displayName: def.displayName,
+          description: null,
+          propertiesSchema: def.propertiesSchema,
+        });
         typeIdByKey.set(def.key, nt.id);
       }
 
@@ -1750,28 +2271,13 @@ const plugin = definePlugin({
       }
 
       case "update-node-type": {
-        const body = optionalRecord(input.body) ?? {};
-        const nodeType = await store.updateNodeType(
-          companyId,
-          requireString(input.params.nodeTypeId, "nodeTypeId"),
-          {
-            displayName: typeof body.displayName === "string" ? body.displayName : undefined,
-            description: "description" in body ? (body.description as string | null) : undefined,
-            propertiesSchema: optionalRecord(body.propertiesSchema),
-            metadata: optionalRecord(body.metadata),
-          },
-        );
-        if (!nodeType) return { status: 404, body: { error: "Node type not found" } };
-        return { body: { nodeType } };
+        const outcome = await updateNodeTypeMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "delete-node-type": {
-        // Hard-delete: see GraphStore.deleteNodeType for ON DELETE SET NULL
-        // semantics on referencing nodes.
-        const body = optionalRecord(input.body) ?? {};
-        const id = requireString(input.params?.nodeTypeId ?? body.nodeTypeId, "nodeTypeId");
-        const ok = await store.deleteNodeType(companyId, id);
-        return { status: ok ? 204 : 404, body: ok ? {} : { error: "Node type not found" } };
+        const outcome = await deleteNodeTypeMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "list-relation-types": {
@@ -1797,28 +2303,21 @@ const plugin = definePlugin({
       }
 
       case "update-relation-type": {
-        const body = optionalRecord(input.body) ?? {};
-        const relationType = await store.updateRelationType(
-          companyId,
-          requireString(input.params.relationTypeId, "relationTypeId"),
-          {
-            displayName: typeof body.displayName === "string" ? body.displayName : undefined,
-            description: "description" in body ? (body.description as string | null) : undefined,
-            directed: typeof body.directed === "boolean" ? body.directed : undefined,
-            metadata: optionalRecord(body.metadata),
-          },
+        const outcome = await updateRelationTypeMutation(
+          store,
+          ctx,
+          httpMutationCall(companyId, input),
         );
-        if (!relationType) return { status: 404, body: { error: "Relation type not found" } };
-        return { body: { relationType } };
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "delete-relation-type": {
-        // Hard-delete: see GraphStore.deleteRelationType for ON DELETE SET NULL
-        // semantics on referencing edges.
-        const body = optionalRecord(input.body) ?? {};
-        const id = requireString(input.params?.relationTypeId ?? body.relationTypeId, "relationTypeId");
-        const ok = await store.deleteRelationType(companyId, id);
-        return { status: ok ? 204 : 404, body: ok ? {} : { error: "Relation type not found" } };
+        const outcome = await deleteRelationTypeMutation(
+          store,
+          ctx,
+          httpMutationCall(companyId, input),
+        );
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "graph-snapshot": {
@@ -1896,20 +2395,8 @@ const plugin = definePlugin({
       }
 
       case "create-function": {
-        const body = optionalRecord(input.body) ?? {};
-        const fn = await store.createFunction({
-          companyId,
-          domainId: requireString(body.domainId, "domainId"),
-          name: requireString(body.name, "name"),
-          type: typeof body.type === "string" ? (body.type as FunctionType) : undefined,
-          version: typeof body.version === "string" ? body.version : undefined,
-          description: typeof body.description === "string" ? body.description : undefined,
-          inputSchema: optionalRecord(body.inputSchema),
-          outputSchema: optionalRecord(body.outputSchema),
-          implementation: optionalRecord(body.implementation),
-          permissions: optionalRecord(body.permissions),
-        });
-        return { status: 201, body: { function: fn } };
+        const outcome = await createFunctionMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "update-function": {
@@ -1932,11 +2419,8 @@ const plugin = definePlugin({
       }
 
       case "delete-function": {
-        // Soft-delete: see deleteActionType for rationale.
-        const body = optionalRecord(input.body) ?? {};
-        const id = requireString(input.params?.functionId ?? body.functionId, "functionId");
-        const ok = await store.deleteFunction(companyId, id);
-        return { status: ok ? 204 : 404, body: ok ? {} : { error: "Function not found" } };
+        const outcome = await deleteFunctionMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "list-audit-logs": {
@@ -1957,19 +2441,8 @@ const plugin = definePlugin({
       }
 
       case "create-interface": {
-        const body = optionalRecord(input.body) ?? {};
-        const iface = await store.createInterface({
-          companyId,
-          domainId: requireString(body.domainId, "domainId"),
-          key: requireString(body.key, "key"),
-          displayName: requireString(body.displayName, "displayName"),
-          description: typeof body.description === "string" ? body.description : null,
-          propertiesSchema: optionalRecord(body.propertiesSchema),
-          extendsInterfaces: Array.isArray(body.extendsInterfaces)
-            ? (body.extendsInterfaces as string[])
-            : undefined,
-        });
-        return { status: 201, body: { interface: iface } };
+        const outcome = await createInterfaceMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "update-interface": {
@@ -1992,11 +2465,8 @@ const plugin = definePlugin({
       }
 
       case "delete-interface": {
-        // Soft-delete: see deleteActionType for rationale.
-        const body = optionalRecord(input.body) ?? {};
-        const id = requireString(input.params?.interfaceId ?? body.interfaceId, "interfaceId");
-        const ok = await store.deleteInterface(companyId, id);
-        return { status: ok ? 204 : 404, body: ok ? {} : { error: "Interface not found" } };
+        const outcome = await deleteInterfaceMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "list-action-types": {
@@ -2008,25 +2478,8 @@ const plugin = definePlugin({
       }
 
       case "create-action-type": {
-        const body = optionalRecord(input.body) ?? {};
-        const actionType = await store.createActionType({
-          companyId,
-          domainId: requireString(body.domainId, "domainId"),
-          key: requireString(body.key, "key"),
-          displayName: requireString(body.displayName, "displayName"),
-          description: typeof body.description === "string" ? body.description : undefined,
-          kind: typeof body.kind === "string" ? (body.kind as ActionKind) : undefined,
-          appliesToNodeTypeId:
-            typeof body.appliesToNodeTypeId === "string" ? body.appliesToNodeTypeId : null,
-          apiContract: optionalRecord(body.apiContract),
-          stateTransitions: Array.isArray(body.stateTransitions) ? body.stateTransitions : undefined,
-          emitsEvents: Array.isArray(body.emitsEvents) ? body.emitsEvents : undefined,
-          requiredPermissions: Array.isArray(body.requiredPermissions)
-            ? body.requiredPermissions
-            : undefined,
-          idempotent: typeof body.idempotent === "boolean" ? body.idempotent : undefined,
-        });
-        return { status: 201, body: { actionType } };
+        const outcome = await createActionTypeMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "update-action-type": {
@@ -2056,12 +2509,8 @@ const plugin = definePlugin({
       }
 
       case "delete-action-type": {
-        // Soft-delete: marks is_deleted + deleted_at so audit/lineage keeps
-        // resolving. Subsequent list calls skip the row.
-        const body = optionalRecord(input.body) ?? {};
-        const id = requireString(input.params?.actionTypeId ?? body.actionTypeId, "actionTypeId");
-        const ok = await store.deleteActionType(companyId, id);
-        return { status: ok ? 204 : 404, body: ok ? {} : { error: "Action type not found" } };
+        const outcome = await deleteActionTypeMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "find-path": {
@@ -2351,110 +2800,13 @@ const plugin = definePlugin({
       }
 
       case "run-transform": {
-        const { runTransform } = await import("./transform/TransformRunner.js");
-        const body = optionalRecord(input.body) ?? {};
-        // Accept transformId from either the path params (RESTful) or
-        // the body (action-call convenience). Same for domainId.
-        const transformId =
-          (typeof input.params?.transformId === "string" && input.params.transformId) ||
-          (typeof body.transformId === "string" && body.transformId) ||
-          "";
-        const domainId =
-          (typeof input.params?.domainId === "string" && input.params.domainId) ||
-          (typeof body.domainId === "string" && body.domainId) ||
-          "";
-        if (!transformId || !domainId) {
-          return {
-            status: 400,
-            body: { error: "run-transform requires transformId and domainId" },
-          };
-        }
-        const result = await runTransform(store, ctx.db, companyId, domainId, transformId);
-        return { body: { result } };
+        const outcome = await runTransformMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "extract-document": {
-        // LLM-driven entity/relation extraction from free-form text
-        // (PRD, Word, PDF, meeting notes). Phase 6 ships the surface
-        // only — the wizard's "文档" sub-tab wires this up so the
-        // user can drop a doc and see the LLM's proposed node types
-        // and relation types before publishing the domain.
-        const body = optionalRecord(input.body) ?? {};
-        const documentText = requireString(body.documentText, "documentText");
-        const filename = typeof body.filename === "string" ? body.filename : "(unnamed)";
-        const client = getClient();
-        const systemPrompt = [
-          "You are an ontology extractor. Given a free-form document,",
-          "return a JSON object with `nodeTypes`, `relationTypes`, and",
-          "`actions`. Each node type: `{ key, displayName, description, properties: { name: { type, description } } }`.",
-          "Each relation type: `{ key, displayName, sourceNodeTypeKey, targetNodeTypeKey }`.",
-          "Each action: `{ key, method, endpoint, description }`.",
-          "Use only types that are explicitly named or unambiguously",
-          "implied by the document. Output JSON only — no prose, no markdown.",
-        ].join(" ");
-        const response = await client.messages.create({
-          model: getModel(),
-          max_tokens: 4096,
-          system: systemPrompt,
-          messages: [
-            {
-              role: "user",
-              content: `Document filename: ${filename}\n\n${documentText}`,
-            },
-          ],
-        });
-        const text = response.content
-          .filter((block) => block.type === "text")
-          .map((block) => (block.type === "text" ? block.text : ""))
-          .join("");
-        // The LLM sometimes wraps the JSON in ```json fences. Strip
-        // them so JSON.parse doesn't have to.
-        const cleaned = text
-          .trim()
-          .replace(/^```(?:json)?/i, "")
-          .replace(/```$/, "")
-          .trim();
-        let parsed: {
-          nodeTypes?: Array<{
-            key: string;
-            displayName?: string;
-            description?: string;
-            properties?: Record<string, { type?: string; description?: string }>;
-          }>;
-          relationTypes?: Array<{
-            key: string;
-            displayName?: string;
-            sourceNodeTypeKey: string;
-            targetNodeTypeKey: string;
-          }>;
-          actions?: Array<{
-            key: string;
-            method: string;
-            endpoint: string;
-            description?: string;
-          }>;
-        } = {};
-        try {
-          parsed = JSON.parse(cleaned);
-        } catch {
-          // The LLM sometimes returns partial JSON or includes prose.
-          // Return the raw text so the wizard can show "模型输出无法
-          // 解析为 JSON,是否手动编辑?" instead of failing silently.
-          return {
-            status: 422,
-            body: {
-              error: "Model output is not valid JSON",
-              raw: text,
-            },
-          };
-        }
-        return {
-          body: {
-            nodeTypes: parsed.nodeTypes ?? [],
-            relationTypes: parsed.relationTypes ?? [],
-            actions: parsed.actions ?? [],
-          },
-        };
+        const outcome = await extractDocumentMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "list-package-installs": {
@@ -2490,48 +2842,12 @@ const plugin = definePlugin({
       }
 
       case "create-business-system": {
-        const body = optionalRecord(input.body) ?? {};
-        const system = await store.createBusinessSystem({
-          companyId,
-          code: requireString(body.code, "code"),
-          name: requireString(body.name, "name"),
-          description: typeof body.description === "string" ? body.description : undefined,
-          domain: typeof body.domain === "string" ? (body.domain as BusinessSystemDomain) : undefined,
-          tags: Array.isArray(body.tags) ? (body.tags as string[]) : undefined,
-          ontologyDomainId: typeof body.ontologyDomainId === "string" ? body.ontologyDomainId : null,
-          ownerRef: typeof body.ownerRef === "string" ? body.ownerRef : null,
-          targetRole: typeof body.targetRole === "string" ? body.targetRole : undefined,
-          repos: Array.isArray(body.repos) ? body.repos : undefined,
-          ontologyBinding: optionalRecord(body.ontologyBinding),
-          domainCopilotConfig: optionalRecord(body.domainCopilotConfig),
-          domainGovernance: optionalRecord(body.domainGovernance),
-          npcTeamConfig: optionalRecord(body.npcTeamConfig),
-          metadata: optionalRecord(body.metadata),
-        });
-        await ctx.activity.log({
-          companyId,
-          message: `Created business system ${system.code}`,
-          entityType: "ontology_business_system",
-          entityId: system.id,
-        });
-        // Cross-plugin NPC bridge — phase 7. The npc-factory plugin
-        // listens for this and can spawn an NPC team tailored to the
-        // new business system (DS does this via hatchOntologyAppTeam).
-        // Best-effort: an emit failure must not roll back the create.
-        try {
-          await ctx.events.emit("business-system-created", companyId, {
-            businessSystemId: system.id,
-            code: system.code,
-            name: system.name,
-            ontologyDomainId: system.ontology_domain_id,
-          });
-        } catch (err) {
-          ctx.logger.warn("Failed to emit business-system-created", {
-            error: String((err as Error)?.message ?? err),
-            businessSystemId: system.id,
-          });
-        }
-        return { status: 201, body: { businessSystem: system } };
+        const outcome = await createBusinessSystemMutation(
+          store,
+          ctx,
+          httpMutationCall(companyId, input),
+        );
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "update-business-system": {

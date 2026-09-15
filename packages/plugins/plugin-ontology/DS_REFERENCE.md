@@ -60,10 +60,47 @@
 
 - [ ] 顶部「实时已连接 / 保存 / 应用▾」状态区（DS 有，我们暂无）。
 - [ ] 「对话」「沙盘」视图（DS 有，我们用 认知/能力 替代）。
-- [ ] 对象类型显示「N 属性」计数（需后端补 nodeType 的属性 schema）。
+- [x] 对象类型显示「N 属性」计数 —— worker 已透传 `propertiesSchema`
+      （`describeDomain` 一直有返回，是写入链路丢字段；2026-09-15 修复）。
 - [ ] 跨域关系统计（我们目前只统计域内）。
 - [ ] 节点属性面板编辑（DS 点节点可编辑属性；我们的 NodeInspector 目前只读+改名/删）。
 - [ ] 底部「聚类」按钮（DS 有，我们暂用类型过滤代替）。
+
+## 2026-09-15 实测补充（Playwright 截图 + DOM dump）
+
+抓取方式：`node scripts/capture-ds-workbench.mjs`（截图落在 `screenshots/ds-workbench/`）。
+该脚本已处理 DS 的两个坑：登录页要 **前端 MD5** 后的密码，且 headless 必须隐藏
+`navigator.webdriver`、使用真实 UA，否则 `/api/auth/login` 返回 `ACCESS_DENIED`。
+
+以 DS 的 `ecommerce` 域为基准实测：
+
+- **对象类型 16 个，每个 8–15 个属性**：Product 15、Review 14、Order 14、Customer 14、
+  Coupon 13、SKU 12、Promotion 12、Address 12、OrderItem 11、Category 10、Refund 10、
+  Warehouse 10、Inventory 10、Payment 9、Brand 8、Shipment 8。
+  → 对照：修好之前我们的对象类型 **属性全为 0**（SAA 域 6/6 空壳），这是「连 UML 都不如」的来源。
+- **实例规模**：19 个节点 / 22 条关系 / 18 个关系类型 / 0 跨域关系。
+- **表格视图**：默认列 `NAME | NODETYPE | LIFECYCLESTATE`，顶部显示「共 N 条记录」；
+  按左侧选中的对象类型过滤。右侧「域概览 → 对象类型」对每个类型显示「**N 属性**」。
+- **模型视图**：标题「SCHEMA 结构规范 / 16 类型」；左树分 NodeTypes(16) / RelationTypes(18)，
+  提示「点击或右键左侧 Schema 项查看与编辑规范；右键包含：添加属性、定义 Action 动作、
+  AI 自动补全字段等功能」。
+- **对话视图**：标题「AI 对话式精准 Schema 编辑 / Foundry AI Copilot Engine」；顶栏有
+  **治理审批开关**、**快照历史**、**目标选择器**（`全局（AI 自动定位）`）、「隐藏 Schema 对比」；
+  内置 3 条示例指令；右侧「Schema 模型实时 Diff 预览」逐属性列出 `name: type`
+  （如 `productId: string`、`status: enum`）。
+- **沙盘视图**：4 张演练卡（业务事件风暴 / 动作与影响演练 / AI Agent 决策竞技场 /
+  实体遥测与全网监控）+ 「沙箱实时运行日志（● LIVE）」+ 4 个 KPI 卡
+  （实体节点覆盖度 19/16、拓扑关联连通度 22 条、已注册业务动作集 7 个、实体运行态健康度 100.0%）。
+- **顶栏**：`本体工坊 | 域选择器 v1.0.0 | 图谱 表格 模型 对话 沙盘 | 实时已连接 | 保存 | 应用▾`。
+
+### 属性这份差距的根因（已修）
+
+我们的对象类型属性为空**不是渲染问题**，而是写入链路断了：插件有两套写入面，
+`usePluginAction()` 只走 `ctx.actions.register`，但 13 个 UI 调用的 action key
+（含 `update-node-type` / `delete-node-type` / `run-transform` / `extract-document` 等）
+只注册在 `manifest.apiRoutes` 的 `onApiRequest` 面上；且 `create-node-type` 会静默丢弃
+`propertiesSchema`。现已改为两面共用同一份 handler，并加了
+`tests/action-parity.spec.ts` 做「UI key ↔ worker 注册」一致性防线。
 
 ## 构建 / 验证要点
 
