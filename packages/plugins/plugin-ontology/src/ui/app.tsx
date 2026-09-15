@@ -389,16 +389,19 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
             <span className="text-[13px] leading-none">＋</span>
             {t("新建", "New")}
           </button>
-          <button
-            onClick={() => setRightOpen(o => !o)}
-            title={t("切换右侧面板", "Toggle right panel")}
-            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="18" height="18" rx="2" />
-              <path d="M15 3v18" />
-            </svg>
-          </button>
+          {/* The cockpit has no right panel to toggle — see DomainWorkspace. */}
+          {view !== "sandbox" && (
+            <button
+              onClick={() => setRightOpen(o => !o)}
+              title={t("切换右侧面板", "Toggle right panel")}
+              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" />
+                <path d="M15 3v18" />
+              </svg>
+            </button>
+          )}
         </div>
       </div>
 
@@ -1211,8 +1214,10 @@ function DomainWorkspace({
         />
       </div>
 
-      {/* Right: stats panel */}
-      {rightOpen && domain && (
+      {/* Right: stats panel. Skipped on the cockpit — that view is a chat
+          surface, and the domain summary + statistics chrome next to it is
+          noise the user has to read past. */}
+      {rightOpen && domain && view !== "sandbox" && (
         <div className="flex w-64 shrink-0 flex-col gap-3 overflow-y-auto border-l border-border bg-muted/10 p-3">
           <div>
             <div className="mb-2 text-(length:--text-compact) font-semibold">{t("域概览", "Domain overview")}</div>

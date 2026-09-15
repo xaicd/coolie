@@ -25,6 +25,13 @@ import { type CockpitEditResult, type MutationCall } from "../aide/editOps.js";
 // Types — mirror what the worker returns so we don't have to share a module.
 // ---------------------------------------------------------------------------
 
+/**
+ * Storage key for the schema-preview pane toggle. Deliberately a new key: the
+ * previous build wrote `"true"` on first mount, so reusing it would keep the
+ * pane open for everyone who ever loaded the cockpit.
+ */
+const PREVIEW_PANE_STORAGE_KEY = "ontology.cockpit.previewPaneOpen";
+
 interface DescribeDomainNodeType {
   id: string;
   key: string;
@@ -218,14 +225,17 @@ export function SandboxTab({
    *  selected mode is sticky per session, not persisted across reloads. */
   const [mode, setMode] = useState<"qa" | "edit">("qa");
   /** Schema preview pane visibility. Read once at mount from localStorage
-   *  (SWR-style — we don't want to re-read on every keystroke). Defaults
-   *  to true so first-time users see the pane right away. */
+   *  (SWR-style — we don't want to re-read on every keystroke).
+   *
+   *  Hidden by default: the cockpit is a chat surface, and mounting a 360px
+   *  schema pane (plus the snapshot drawer under it) beside the conversation
+   *  pushed the chat into a narrow column. The pane is an opt-in inspection
+   *  tool, so only an explicit toggle turns it on. */
   const [previewVisible, setPreviewVisible] = useState<boolean>(() => {
     try {
-      const v = window.localStorage.getItem("ontology.cockpit.previewVisible");
-      return v == null ? true : v !== "false";
+      return window.localStorage.getItem(PREVIEW_PANE_STORAGE_KEY) === "true";
     } catch {
-      return true;
+      return false;
     }
   });
   /** Result of the EditCard currently under the mouse — drives the right
@@ -247,7 +257,7 @@ export function SandboxTab({
   useEffect(() => {
     try {
       window.localStorage.setItem(
-        "ontology.cockpit.previewVisible",
+        PREVIEW_PANE_STORAGE_KEY,
         String(previewVisible),
       );
     } catch {
