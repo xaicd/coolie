@@ -2253,6 +2253,29 @@ const plugin = definePlugin({
         return { body: { transform } };
       }
 
+      case "run-transform": {
+        const { runTransform } = await import("./transform/TransformRunner.js");
+        const body = optionalRecord(input.body) ?? {};
+        // Accept transformId from either the path params (RESTful) or
+        // the body (action-call convenience). Same for domainId.
+        const transformId =
+          (typeof input.params?.transformId === "string" && input.params.transformId) ||
+          (typeof body.transformId === "string" && body.transformId) ||
+          "";
+        const domainId =
+          (typeof input.params?.domainId === "string" && input.params.domainId) ||
+          (typeof body.domainId === "string" && body.domainId) ||
+          "";
+        if (!transformId || !domainId) {
+          return {
+            status: 400,
+            body: { error: "run-transform requires transformId and domainId" },
+          };
+        }
+        const result = await runTransform(store, ctx.db, companyId, domainId, transformId);
+        return { body: { result } };
+      }
+
       case "list-package-installs": {
         const installs = await store.listPackageInstalls(
           companyId,

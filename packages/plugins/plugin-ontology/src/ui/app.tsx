@@ -32,6 +32,9 @@ import { BootstrapPanel } from "./BootstrapPanel.js";
  */
 import { t } from "./isZh.js";
 import { LegacyImportWizardModal } from "./LegacyImportWizardModal.js";
+import { DatasetsTab } from "./DatasetsTab.js";
+import { ConnectorsTab } from "./ConnectorsTab.js";
+import { TransformsTab } from "./TransformsTab.js";
 
 /**
  * Derive a URL-safe slug from a display name. ASCII letters/digits are kept
@@ -201,7 +204,7 @@ export function OntologyPage({ context }: PluginPageProps): ReactElement {
   return <OntologyWorkbench companyId={companyId} />;
 }
 
-type WorkbenchView = "graph" | "table" | "schema" | "cognition" | "capabilities" | "dialogue" | "sandbox" | "actions" | "functions" | "interfaces";
+type WorkbenchView = "graph" | "table" | "schema" | "cognition" | "capabilities" | "dialogue" | "sandbox" | "actions" | "functions" | "interfaces" | "datasets" | "connectors" | "transforms";
 
 const DRAG_MIME = "application/x-ontology-node-type-id";
 
@@ -242,6 +245,9 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
     { id: "actions", label: t("动作", "Actions"), icon: "⚙" },
     { id: "functions", label: t("函数", "Functions"), icon: "λ" },
     { id: "interfaces", label: t("接口", "Interfaces"), icon: "⌘" },
+    { id: "datasets", label: t("数据集", "Datasets"), icon: "📊" },
+    { id: "connectors", label: t("连接器", "Connectors"), icon: "🔌" },
+    { id: "transforms", label: t("转换", "Transforms"), icon: "⚙" },
   ];
 
   return (
@@ -857,6 +863,15 @@ function DomainWorkspace({
         )}
         {view === "interfaces" && (
           <InterfacesTab companyId={companyId} domainId={domainId} />
+        )}
+        {view === "datasets" && domainId && (
+          <DatasetsTab companyId={companyId} domainId={domainId} />
+        )}
+        {view === "connectors" && domainId && (
+          <ConnectorsTab companyId={companyId} domainId={domainId} />
+        )}
+        {view === "transforms" && domainId && (
+          <TransformsTab companyId={companyId} domainId={domainId} />
         )}
 
         {simulateNode && (

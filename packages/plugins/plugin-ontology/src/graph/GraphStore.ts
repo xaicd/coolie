@@ -992,6 +992,10 @@ export interface GraphSnapshot {
 }
 
 export interface GraphStore {
+  /** Resolve a logical table name to its prefixed physical name. Public
+   *  so TransformRunner (Phase 4) can issue single-row queries against
+   *  ontology_transforms without re-implementing the prefix logic. */
+  table(name: string): string;
   // O0 — instance graph + traversal
   createDomain(input: OntologyDomainInput): Promise<OntologyDomainRow>;
   createNode(input: OntologyNodeInput): Promise<OntologyNodeRow>;
@@ -1312,7 +1316,11 @@ export class PostgresGraphStore implements GraphStore {
     this.ns = db.namespace;
   }
 
-  private table(name: string): string {
+  /** Resolve a logical table name to the prefixed physical name.
+   *  Public so TransformRunner (Phase 4) can issue single-row queries
+   *  against ontology_transforms without re-implementing the prefix
+   *  logic. Read-only callers — don't mutate through this. */
+  table(name: string): string {
     // namespace is host-derived and identifier-validated; name is a fixed literal.
     return `"${this.ns}".${name}`;
   }
