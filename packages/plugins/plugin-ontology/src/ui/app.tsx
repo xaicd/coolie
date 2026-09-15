@@ -222,7 +222,7 @@ const PRIMARY_VIEWS: { id: WorkbenchView; label: string; icon: string }[] = [
   { id: "graph", label: t("图谱", "Graph"), icon: "⬡" },
   { id: "table", label: t("表格", "Table"), icon: "⊞" },
   { id: "schema", label: "Schema", icon: "⊙" },
-  { id: "sandbox", label: t("副手", "Aide"), icon: "🤝" },
+  { id: "sandbox", label: t("驾驶舱", "Cockpit"), icon: "🤝" },
 ];
 
 const VIEW_GROUPS: {
