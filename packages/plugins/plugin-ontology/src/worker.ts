@@ -1714,6 +1714,15 @@ const plugin = definePlugin({
         return { body: { relationType } };
       }
 
+      case "delete-relation-type": {
+        // Hard-delete: see GraphStore.deleteRelationType for ON DELETE SET NULL
+        // semantics on referencing edges.
+        const body = optionalRecord(input.body) ?? {};
+        const id = requireString(input.params?.relationTypeId ?? body.relationTypeId, "relationTypeId");
+        const ok = await store.deleteRelationType(companyId, id);
+        return { status: ok ? 204 : 404, body: ok ? {} : { error: "Relation type not found" } };
+      }
+
       case "graph-snapshot": {
         const graph = await store.getGraphSnapshot(
           companyId,
@@ -1882,6 +1891,14 @@ const plugin = definePlugin({
         );
         if (!iface) return { status: 404, body: { error: "Interface not found" } };
         return { body: { interface: iface } };
+      }
+
+      case "delete-interface": {
+        // Soft-delete: see deleteActionType for rationale.
+        const body = optionalRecord(input.body) ?? {};
+        const id = requireString(input.params?.interfaceId ?? body.interfaceId, "interfaceId");
+        const ok = await store.deleteInterface(companyId, id);
+        return { status: ok ? 204 : 404, body: ok ? {} : { error: "Interface not found" } };
       }
 
       case "list-action-types": {

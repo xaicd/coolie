@@ -198,6 +198,14 @@ const manifest: PaperclipPluginManifestV1 = {
       companyResolution: { from: "body", key: "companyId" },
     },
     {
+      routeKey: "delete-relation-type",
+      method: "DELETE",
+      path: "/relation-types/:relationTypeId",
+      auth: "board",
+      capability: "api.routes.register",
+      companyResolution: { from: "body", key: "companyId" },
+    },
+    {
       routeKey: "graph-snapshot",
       method: "GET",
       path: "/graph",
@@ -288,6 +296,14 @@ const manifest: PaperclipPluginManifestV1 = {
     {
       routeKey: "update-interface",
       method: "PATCH",
+      path: "/interfaces/:interfaceId",
+      auth: "board",
+      capability: "api.routes.register",
+      companyResolution: { from: "body", key: "companyId" },
+    },
+    {
+      routeKey: "delete-interface",
+      method: "DELETE",
       path: "/interfaces/:interfaceId",
       auth: "board",
       capability: "api.routes.register",

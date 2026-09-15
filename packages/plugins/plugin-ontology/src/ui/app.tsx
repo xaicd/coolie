@@ -235,6 +235,7 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
     { id: "sandbox", label: t("数字副手", "Digital Aide"), icon: "🤝" },
     { id: "actions", label: t("动作", "Actions"), icon: "⚙" },
     { id: "functions", label: t("函数", "Functions"), icon: "λ" },
+    { id: "interfaces", label: t("接口", "Interfaces"), icon: "⌘" },
   ];
 
   return (
@@ -624,16 +625,34 @@ function DomainWorkspace({
   } | null>(null);
   const deleteNodeType = usePluginAction("delete-node-type");
   const createNode = usePluginAction("create-node");
+  const updateNodeType = usePluginAction("update-node-type");
+  // Properties-schema editor modal — opened from the type right-click "属性"
+  // item. Independent of nodeTypeMenu so the menu can dismiss while the
+  // editor stays open. The user picks "save" or "cancel".
+  const [propSchemaEditor, setPropSchemaEditor] = useState<{
+    nodeTypeId: string;
+    nodeTypeLabel: string;
+    initialJson: string;
+  } | null>(null);
+  // Right-click on a relation type in the left tree. Same UX as
+  // nodeTypeMenu but for the edges' classification.
+  const [relationTypeMenu, setRelationTypeMenu] = useState<{
+    x: number;
+    y: number;
+    relationType: { id: string; key: string; display_name: string };
+  } | null>(null);
+  const deleteRelationType = usePluginAction("delete-relation-type");
 
   // Action / Function / Interface counts are not in the graph snapshot; we
-  // pull them separately for the right-side Statistics panel. The first usePluginData
-  // call below gives us the action count for the StatCard; the next two will
-  // be added by the Functions and Interfaces commits.
+  // pull them separately for the right-side Statistics panel.
   const { data: actionTypesData } = usePluginData<{ actionTypes: unknown[] }>(
     "list-action-types", { companyId, domainId },
   );
   const { data: functionsData } = usePluginData<{ functions: unknown[] }>(
     "list-functions", { companyId, domainId },
+  );
+  const { data: interfacesData } = usePluginData<{ interfaces: unknown[] }>(
+    "list-interfaces", { companyId, domainId },
   );
 
   const [focusNodeTypeId, setFocusNodeTypeId] = useState<string | null>(null);
@@ -726,7 +745,19 @@ function DomainWorkspace({
                 {t("关系类型", "Relation types")} · {relationTypes.length}
               </div>
               {relationTypes.map(rt => (
-                <div key={rt.id} className="flex items-center gap-2 rounded-md px-2 py-1 text-(length:--text-compact) text-muted-foreground">
+                <div
+                  key={rt.id}
+                  onContextMenu={(e) => {
+                    e.preventDefault();
+                    setRelationTypeMenu({
+                      x: e.clientX,
+                      y: e.clientY,
+                      relationType: { id: rt.id, key: rt.key, display_name: rt.display_name },
+                    });
+                  }}
+                  title={t("右键=功能菜单", "Right-click for actions")}
+                  className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 text-(length:--text-compact) text-muted-foreground hover:bg-accent"
+                >
                   <span aria-hidden className="h-2 w-2 shrink-0 rounded-full border border-border" style={{ background: toneFor(rt.id) }} />
                   <span className="flex-1 truncate">{rt.display_name || rt.key}</span>
                 </div>
@@ -784,6 +815,9 @@ function DomainWorkspace({
         )}
         {view === "functions" && (
           <FunctionsTab companyId={companyId} domainId={domainId} />
+        )}
+        {view === "interfaces" && (
+          <InterfacesTab companyId={companyId} domainId={domainId} />
         )}
 
         {simulateNode && (
@@ -858,6 +892,26 @@ function DomainWorkspace({
                   setFocusNodeTypeId(m.nodeType.id);
                 }}
               />
+              <MenuItem2
+                label={t("属性", "Schema")}
+                icon="◐"
+                onClick={() => {
+                  const m = nodeTypeMenu; setNodeTypeMenu(null);
+                  // Pretty-print the existing schema, or seed an empty JSON
+                  // Schema skeleton so users have a starting shape.
+                  const initial = m.nodeType.properties_schema
+                    ? JSON.stringify(m.nodeType.properties_schema, null, 2)
+                    : JSON.stringify({
+                        type: "object",
+                        properties: {},
+                      }, null, 2);
+                  setPropSchemaEditor({
+                    nodeTypeId: m.nodeType.id,
+                    nodeTypeLabel: m.nodeType.display_name,
+                    initialJson: initial,
+                  });
+                }}
+              />
               <MenuDivider2 />
               <MenuItem2
                 label={t("删除", "Delete")}
@@ -885,6 +939,80 @@ function DomainWorkspace({
             </div>
           </>
         )}
+
+        {/* Right-click on a relation type in the left tree. Smaller menu
+            than nodeTypeMenu — no "create node" / "动作" affordance (those
+            make sense for object types, not link types). We expose copy
+            and delete; delete is hard-delete (same ON DELETE SET NULL on
+            ontology_edges.relation_type_id as deleteNodeType). */}
+        {relationTypeMenu && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setRelationTypeMenu(null)}
+              onContextMenu={(e) => { e.preventDefault(); setRelationTypeMenu(null); }}
+            />
+            <div
+              className="fixed z-50 min-w-[8rem] rounded-lg border border-border bg-card p-1 shadow-lg"
+              style={{ left: relationTypeMenu.x, top: relationTypeMenu.y }}
+            >
+              <MenuItem2
+                label={t("复制", "Copy")}
+                icon="⎘"
+                onClick={() => {
+                  const m = relationTypeMenu; setRelationTypeMenu(null);
+                  if (m.relationType.key && typeof navigator !== "undefined" && navigator.clipboard) {
+                    void navigator.clipboard.writeText(m.relationType.key);
+                  }
+                }}
+              />
+              <MenuDivider2 />
+              <MenuItem2
+                label={t("删除", "Delete")}
+                icon="✕"
+                danger
+                onClick={() => {
+                  const m = relationTypeMenu; setRelationTypeMenu(null);
+                  const confirmMsg = t("删除该关系类型? 该关系下的边会失去分类但保留。", "Delete this relation type? Edges using it will lose classification but survive.");
+                  if (!window.confirm(confirmMsg)) return;
+                  void (async () => {
+                    try {
+                      await deleteRelationType({ companyId, relationTypeId: m.relationType.id });
+                      refreshDomain();
+                    } catch (e) {
+                      window.alert(String((e as Error)?.message ?? e));
+                    }
+                  })();
+                }}
+              />
+            </div>
+          </>
+        )}
+
+        {/* Properties-schema editor. JSON Schema lives on the type, not
+            the instance, so this is the canonical place to define "what
+            fields does a Customer carry?". The editor is intentionally
+            a JSON textarea (not a structured form) because:
+            (a) JSON Schema is recursive — a structured form would have
+                to invent UI for every keyword;
+            (b) the existing NodePropertyEditor covers per-instance values
+                already, so this only needs to cover the shape definition.
+            The user pastes / writes JSON, we parse, validate it's an
+            object, then PATCH update-node-type with the parsed payload. */}
+        <PropertiesSchemaEditor
+          editor={propSchemaEditor}
+          onClose={() => setPropSchemaEditor(null)}
+          onSave={async (parsed) => {
+            if (!propSchemaEditor) return;
+            await updateNodeType({
+              companyId,
+              nodeTypeId: propSchemaEditor.nodeTypeId,
+              propertiesSchema: parsed,
+            });
+            setPropSchemaEditor(null);
+            refreshDomain();
+          }}
+        />
       </div>
 
       {/* Right: stats panel */}
@@ -931,6 +1059,7 @@ function DomainWorkspace({
                 <StatCard label={t("类型节点", "Typed nodes")} value={Object.values(counts.byNodeType ?? {}).reduce((s, n) => s + n, 0)} />
                 <StatCard label={t("动作数", "Actions")} value={actionTypesData?.actionTypes.length ?? 0} />
                 <StatCard label={t("函数数", "Functions")} value={functionsData?.functions.length ?? 0} />
+                <StatCard label={t("接口数", "Interfaces")} value={interfacesData?.interfaces.length ?? 0} />
               </div>
             </div>
           )}
@@ -1701,6 +1830,243 @@ function MenuItem2({
 
 function MenuDivider2(): ReactElement {
   return <div className="my-1 h-px bg-border" />;
+}
+
+/**
+ * Modal for editing a node type's properties schema (JSON Schema). Lets
+ * the user paste / write the schema as JSON and validate it parses to
+ * an object before saving. The editor holds local string state so users
+ * can edit without us round-tripping on every keystroke.
+ */
+function PropertiesSchemaEditor({
+  editor,
+  onClose,
+  onSave,
+}: {
+  editor: { nodeTypeId: string; nodeTypeLabel: string; initialJson: string } | null;
+  onClose: () => void;
+  onSave: (parsed: Record<string, unknown>) => Promise<void>;
+}): ReactElement | null {
+  const [text, setText] = useState("");
+  const [err, setErr] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  // Re-seed local text when the editor opens with a new target.
+  useEffect(() => {
+    if (editor) {
+      setText(editor.initialJson);
+      setErr(null);
+      setBusy(false);
+    }
+  }, [editor]);
+  if (!editor) return null;
+  const save = async () => {
+    setErr(null);
+    let parsed: unknown;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      setErr(`${t("JSON 解析失败", "JSON parse failed")}: ${(e as Error).message}`);
+      return;
+    }
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      setErr(t("schema 必须是 object", "schema must be an object"));
+      return;
+    }
+    setBusy(true);
+    try {
+      await onSave(parsed as Record<string, unknown>);
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+      setBusy(false);
+    }
+  };
+  return (
+    <div
+      className="fixed inset-0 z-40"
+      onClick={onClose}
+      onContextMenu={(e) => { e.preventDefault(); onClose(); }}
+    >
+      <div
+        className="absolute left-1/2 top-1/2 z-50 w-[36rem] max-w-[92vw] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-3 shadow-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-2 flex items-center justify-between">
+          <div className="min-w-0">
+            <div className="truncate text-(length:--text-compact) font-semibold">
+              {t("类型属性 schema", "Type property schema")}
+            </div>
+            <div className="truncate text-(length:--text-nano) text-muted-foreground">
+              {editor.nodeTypeLabel}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded px-2 py-0.5 text-(length:--text-nano) text-muted-foreground hover:bg-accent hover:text-foreground"
+            title={t("关闭", "Close")}
+          >
+            ×
+          </button>
+        </div>
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          spellCheck={false}
+          className="h-72 w-full resize-none rounded-md border border-border bg-background px-2 py-1.5 font-mono text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring"
+        />
+        {err && <div className="mt-2 text-(length:--text-nano) text-destructive">{err}</div>}
+        <div className="mt-2 flex items-center justify-end gap-1.5">
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={busy}
+            className="rounded-md px-2 py-1 text-(length:--text-nano) text-muted-foreground hover:bg-accent"
+          >
+            {t("取消", "Cancel")}
+          </button>
+          <button
+            type="button"
+            onClick={() => { void save(); }}
+            disabled={busy}
+            className="rounded-md bg-primary px-2 py-1 text-(length:--text-nano) font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            {busy ? "…" : t("保存", "Save")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface InterfaceRow {
+  id: string;
+  key: string;
+  display_name: string;
+  description: string | null;
+}
+
+/**
+ * Tab for browsing and editing Palantir-style ontology interfaces (shared
+ * property schemas that object types can implement — Foundry's
+ * InterfaceType primitive). Mirrors FunctionsTab shape but with the
+ * interface-specific fields: key / displayName / description. The
+ * extends_interfaces list is editable later if needed.
+ */
+function InterfacesTab({
+  companyId,
+  domainId,
+}: {
+  companyId: string;
+  domainId: string;
+}): ReactElement {
+  const { data, loading, error, refresh } = usePluginData<{ interfaces: InterfaceRow[] }>(
+    "list-interfaces",
+    { companyId, domainId },
+  );
+  const createIface = usePluginAction("create-interface");
+  const deleteIface = usePluginAction("delete-interface");
+  const [keyInput, setKeyInput] = useState("");
+  const [displayName, setDisplayName] = useState("");
+  const [description, setDescription] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = useCallback(async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      await createIface({
+        companyId,
+        domainId,
+        key: keyInput.trim(),
+        displayName: displayName.trim() || keyInput.trim(),
+        description: description.trim() || undefined,
+      });
+      setKeyInput("");
+      setDisplayName("");
+      setDescription("");
+      refresh();
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  }, [companyId, domainId, keyInput, displayName, description, createIface, refresh]);
+
+  const rows = data?.interfaces ?? [];
+
+  return (
+    <>
+      <div className={CARD}>
+        <div className="mb-2 font-semibold">{t("新建接口", "New interface")}</div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <input
+            className={INPUT + " w-32"}
+            placeholder="key"
+            value={keyInput}
+            onChange={(e) => setKeyInput(e.target.value)}
+          />
+          <input
+            className={INPUT + " w-44"}
+            placeholder={t("显示名", "Display name")}
+            value={displayName}
+            onChange={(e) => setDisplayName(e.target.value)}
+          />
+          <input
+            className={INPUT + " min-w-60 flex-1"}
+            placeholder={t("描述", "Description")}
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+          />
+          <button className={BTN} disabled={busy || !keyInput.trim()} onClick={submit}>
+            {busy ? "…" : t("新建", "Create")}
+          </button>
+        </div>
+        {err && <div className="mt-2 text-(length:--text-compact) text-muted-foreground">{err}</div>}
+      </div>
+
+      <DataTable
+        loading={loading}
+        emptyMessage={error ? `Failed: ${error.message}` : t("暂无接口", "No interfaces yet")}
+        rows={rows as unknown as Record<string, unknown>[]}
+        columns={[
+          { key: "key", header: "key", width: "180px", render: (_v, row) => (
+            <span className="font-mono">{(row as unknown as InterfaceRow).key}</span>
+          ) },
+          { key: "display_name", header: t("名称", "Name") },
+          { key: "description", header: t("描述", "Description"), render: (_v, row) => (
+            <span className="truncate text-(length:--text-nano) text-muted-foreground">
+              {(row as unknown as InterfaceRow).description ?? ""}
+            </span>
+          ) },
+          {
+            key: "_del",
+            header: "",
+            width: "60px",
+            render: (_v, row) => (
+              <button
+                className={GHOST_BTN}
+                onClick={async () => {
+                  if (!window.confirm(t("删除该接口?", "Delete this interface?"))) return;
+                  setBusy(true);
+                  try {
+                    await deleteIface({ companyId, interfaceId: (row as unknown as InterfaceRow).id });
+                    refresh();
+                  } catch (e) {
+                    setErr(String((e as Error)?.message ?? e));
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                {t("删除", "Del")}
+              </button>
+            ),
+          },
+        ]}
+      />
+    </>
+  );
 }
 
 function CapabilityGapDetail({

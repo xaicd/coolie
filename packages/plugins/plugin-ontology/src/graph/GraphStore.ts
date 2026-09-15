@@ -1053,6 +1053,12 @@ export interface GraphStore {
     relationTypeId: string,
     update: OntologyRelationTypeUpdate,
   ): Promise<OntologyRelationTypeRow | null>;
+  /**
+   * Hard-delete a relation type. Same ON DELETE SET NULL story as
+   * deleteNodeType: ontology_edges.relation_type_id resolves to NULL on
+   * referencing edges so the graph stays connected, just untyped.
+   */
+  deleteRelationType(companyId: string, relationTypeId: string): Promise<boolean>;
 
   getGraphSnapshot(companyId: string, domainId: string, nodeLimit?: number): Promise<GraphSnapshot>;
 
@@ -1114,6 +1120,12 @@ export interface GraphStore {
     interfaceId: string,
     update: OntologyInterfaceUpdate,
   ): Promise<OntologyInterfaceRow | null>;
+  /**
+   * Soft-delete an interface. Mirrors deleteActionType / deleteFunction:
+   * the row stays for audit, subsequent list calls skip it. Returns true
+   * iff a row was actually marked deleted in this company.
+   */
+  deleteInterface(companyId: string, interfaceId: string): Promise<boolean>;
 
   createActionType(input: OntologyActionTypeInput): Promise<OntologyActionTypeRow>;
   listActionTypes(companyId: string, domainId: string): Promise<OntologyActionTypeRow[]>;
@@ -1802,6 +1814,20 @@ export class PostgresGraphStore implements GraphStore {
   }
 
   /**
+   * Hard-delete a relation type. See deleteNodeType for the rationale
+   * (ON DELETE SET NULL on ontology_edges.relation_type_id keeps edges
+   * alive but untyped). Returns true iff a row was actually deleted.
+   */
+  async deleteRelationType(companyId: string, relationTypeId: string): Promise<boolean> {
+    const res = await this.db.execute(
+      `DELETE FROM ${this.table("ontology_relation_types")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, relationTypeId],
+    );
+    return res.rowCount > 0;
+  }
+
+  /**
    * Read a bounded graph snapshot for one domain: aggregate counts plus a
    * capped list of nodes/edges for a lightweight visualization. Counts come
    * from a single grouped query; node/edge lists are separately capped.
@@ -2288,6 +2314,21 @@ export class PostgresGraphStore implements GraphStore {
       [companyId, interfaceId],
     );
     return rows[0] ?? null;
+  }
+
+  /**
+   * Soft-delete an interface. See deleteActionType for the rationale
+   * (audit trail + lineagability). Returns true iff a row was actually
+   * marked deleted.
+   */
+  async deleteInterface(companyId: string, interfaceId: string): Promise<boolean> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_interfaces")}
+          SET is_deleted = true, deleted_at = now(), updated_at = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, interfaceId],
+    );
+    return res.rowCount > 0;
   }
 
   private static readonly ACTION_TYPE_COLS =
