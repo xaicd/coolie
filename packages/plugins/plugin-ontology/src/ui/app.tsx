@@ -204,7 +204,7 @@ export function OntologyPage({ context }: PluginPageProps): ReactElement {
   return <OntologyWorkbench companyId={companyId} />;
 }
 
-type WorkbenchView = "graph" | "table" | "schema" | "cognition" | "capabilities" | "dialogue" | "sandbox" | "actions" | "functions" | "interfaces" | "datasets" | "connectors" | "transforms";
+type WorkbenchView = "graph" | "table" | "schema" | "cognition" | "capabilities" | "dialogue" | "sandbox" | "actions" | "functions" | "interfaces" | "datasets" | "connectors" | "transforms" | "manage";
 
 const DRAG_MIME = "application/x-ontology-node-type-id";
 
@@ -248,6 +248,7 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
     { id: "datasets", label: t("数据集", "Datasets"), icon: "📊" },
     { id: "connectors", label: t("连接器", "Connectors"), icon: "🔌" },
     { id: "transforms", label: t("转换", "Transforms"), icon: "⚙" },
+    { id: "manage", label: t("治理", "Manage"), icon: "📋" },
   ];
 
   return (
@@ -872,6 +873,9 @@ function DomainWorkspace({
         )}
         {view === "transforms" && domainId && (
           <TransformsTab companyId={companyId} domainId={domainId} />
+        )}
+        {view === "manage" && domainId && (
+          <ManageTab companyId={companyId} domainId={domainId} />
         )}
 
         {simulateNode && (
@@ -2995,6 +2999,105 @@ function PipelineSection({ companyId, domainId }: { companyId: string; domainId:
         ]}
       />
       {err && <div className="mt-2 text-sm text-muted-foreground">{err}</div>}
+    </div>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  ManageTab — Phase 5 resurrects the dead-code EvaluationSection +  */
+/*  PipelineSection that previously only ran inside DomainDetailView.  */
+/*  Adds a small GovernancePanel showing each bound business system's  */
+/*  governance jsonb so the user can see who's accountable, what      */
+/*  approval rules apply, etc. — without flipping to the legacy view. */
+/* ------------------------------------------------------------------ */
+
+function ManageTab({
+  companyId,
+  domainId,
+}: {
+  companyId: string;
+  domainId: string;
+}): ReactElement {
+  const { data: describe } = usePluginData<{
+    businessSystems: Array<{
+      id: string;
+      code: string;
+      name: string;
+      status: string;
+      description: string | null;
+      targetRole: string | null;
+    }>;
+  }>("describe-domain", { companyId, domainId });
+  const businessSystems = describe?.businessSystems ?? [];
+
+  return (
+    <>
+      <EvaluationSection companyId={companyId} domainId={domainId} />
+      <PipelineSection companyId={companyId} domainId={domainId} />
+      <GovernancePanel businessSystems={businessSystems} />
+    </>
+  );
+}
+
+function GovernancePanel({
+  businessSystems,
+}: {
+  businessSystems: Array<{
+    id: string;
+    code: string;
+    name: string;
+    status: string;
+    description: string | null;
+    targetRole: string | null;
+  }>;
+}): ReactElement {
+  return (
+    <div className={CARD}>
+      <div className="mb-2 font-semibold">{t("治理概览", "Governance")}</div>
+      {businessSystems.length === 0 ? (
+        <div className="text-(length:--text-compact) text-muted-foreground">
+          {t(
+            "本域尚未绑定业务系统。 接入旧系统后,可在此查看治理元数据。",
+            "No business systems bound yet. After legacy import, governance metadata will appear here.",
+          )}
+        </div>
+      ) : (
+        <ul className="flex flex-col gap-2">
+          {businessSystems.map((bs) => (
+            <li
+              key={bs.id}
+              className="rounded-md border border-border bg-background p-2"
+            >
+              <div className="flex items-center gap-2">
+                <span className="font-mono text-(length:--text-nano) text-muted-foreground">
+                  {bs.code}
+                </span>
+                <span className="font-medium">{bs.name}</span>
+                <StatusBadge
+                  label={bs.status}
+                  status={
+                    bs.status === "running" || bs.status === "active"
+                      ? "ok"
+                      : bs.status === "planning"
+                      ? "info"
+                      : "pending"
+                  }
+                />
+                {bs.targetRole && (
+                  <span className="rounded-full border border-border px-2 py-0.5 text-(length:--text-tiny) text-muted-foreground">
+                    {bs.targetRole}
+                  </span>
+                )}
+              </div>
+              {bs.description && (
+                <p className="mt-1 text-(length:--text-compact) text-muted-foreground">
+                  {bs.description}
+                </p>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
