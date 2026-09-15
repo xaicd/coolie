@@ -14,6 +14,8 @@ import {
   type ReactElement,
 } from "react";
 import { t } from "./isZh.js";
+import { MarkdownContent } from "./MarkdownContent.js";
+import { CitationPreview, kindLabel } from "./CitationPreview.js";
 
 // ---------------------------------------------------------------------------
 // Types — mirror what the worker returns so we don't have to share a module.
@@ -188,6 +190,15 @@ export function SandboxTab({
   const [aborting, setAborting] = useState(false);
   const [clearing, setClearing] = useState(false);
   const seenTokenKeysRef = useRef<Set<string>>(new Set());
+  // Which citation chip is currently expanded across the message list.
+  // Key format: `${messageId}:${chipIdx}` so each chip is independent and
+  // opening a chip in one message doesn't disturb another message's open
+  // chip. null = none open.
+  const [openCitationKey, setOpenCitationKey] = useState<string | null>(null);
+
+  const toggleCitation = useCallback((key: string) => {
+    setOpenCitationKey((cur) => (cur === key ? null : key));
+  }, []);
 
   // Submit a specific text without relying on the `draft` state — used by
   // the pre-prompt auto-submit path where the controlled input's draft
@@ -390,6 +401,8 @@ export function SandboxTab({
             messages={messages}
             describe={describe.data ?? null}
             loading={loading && messages.length === 0}
+            openCitationKey={openCitationKey}
+            onToggleCitation={toggleCitation}
             onPickPrompt={(prompt) => {
               setDraft(prompt);
               // Fire submitText directly with the prompt text — the
@@ -443,11 +456,17 @@ function MessageList({
   messages,
   describe,
   loading,
+  openCitationKey,
+  onToggleCitation,
   onPickPrompt,
 }: {
   messages: LocalMessage[];
   describe: DescribeDomainResult | null;
   loading: boolean;
+  /** Key of the currently-open citation chip, or null. */
+  openCitationKey: string | null;
+  /** Toggle which chip is open; passing the same key closes it. */
+  onToggleCitation: (key: string) => void;
   onPickPrompt: (prompt: string) => void;
 }): ReactElement {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -509,7 +528,12 @@ function MessageList({
       <ul className="flex flex-col gap-3">
         {messages.map((m) => (
           <li key={m.id}>
-            <Bubble message={m} describe={describe} />
+            <Bubble
+              message={m}
+              describe={describe}
+              openCitationKey={openCitationKey}
+              onToggleCitation={onToggleCitation}
+            />
           </li>
         ))}
       </ul>
@@ -520,27 +544,39 @@ function MessageList({
 function Bubble({
   message,
   describe,
+  openCitationKey,
+  onToggleCitation,
 }: {
   message: LocalMessage;
   describe: DescribeDomainResult | null;
+  openCitationKey: string | null;
+  onToggleCitation: (key: string) => void;
 }): ReactElement {
   const isUser = message.role === "user";
   return (
     <div className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-(length:--text-compact) shadow-sm ${
+        className={`max-w-[85%] rounded-2xl px-3 py-2 text-(length:--text-compact) shadow-sm ${
           isUser
-            ? "bg-primary text-primary-foreground"
+            ? "whitespace-pre-wrap bg-primary text-primary-foreground"
             : "bg-card text-foreground border border-border"
         }`}
       >
         {message.content.length === 0 && message.streaming ? (
           <BouncingDots />
-        ) : (
+        ) : isUser ? (
           <div>{message.content}</div>
+        ) : (
+          <MarkdownContent source={message.content} />
         )}
         {!isUser && !message.streaming && message.citations.length > 0 && (
-          <CitationChips citations={message.citations} describe={describe} />
+          <CitationChips
+            citations={message.citations}
+            describe={describe}
+            messageId={message.id}
+            openCitationKey={openCitationKey}
+            onToggleCitation={onToggleCitation}
+          />
         )}
         {message.error ? (
           <div className="mt-2 rounded-md border border-destructive/40 bg-destructive/10 px-2 py-1 text-(length:--text-nano) text-destructive">
@@ -570,9 +606,15 @@ function BouncingDots(): ReactElement {
 function CitationChips({
   citations,
   describe,
+  messageId,
+  openCitationKey,
+  onToggleCitation,
 }: {
   citations: AideCitation[];
   describe: DescribeDomainResult | null;
+  messageId: string;
+  openCitationKey: string | null;
+  onToggleCitation: (key: string) => void;
 }): ReactElement {
   const labelByKey = useMemo(() => {
     const out = new Map<string, string>();
@@ -590,36 +632,45 @@ function CitationChips({
     <div className="mt-2 flex flex-wrap gap-1.5">
       {citations.map((c, idx) => {
         const label = labelByKey.get(`${c.kind}:${c.id}`) ?? c.id;
+        const chipKey = `${messageId}:${idx}`;
+        const isOpen = openCitationKey === chipKey;
         return (
-          <span
+          <button
             key={`${c.kind}-${c.id}-${idx}`}
+            type="button"
+            onClick={() => onToggleCitation(chipKey)}
+            aria-expanded={isOpen}
             title={`${c.kind}: ${c.id}`}
-            className="rounded-full bg-muted px-2 py-0.5 text-(length:--text-nano) text-muted-foreground"
+            className={`rounded-full px-2 py-0.5 text-(length:--text-nano) transition-colors ${
+              isOpen
+                ? "bg-primary/15 text-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/70 hover:text-foreground"
+            }`}
           >
             <span className="mr-1 font-medium text-foreground/70">{kindLabel(c.kind)}</span>
             {label}
-          </span>
+          </button>
         );
       })}
+      {openCitationKey &&
+        (() => {
+          const match = /^(.+):(\d+)$/.exec(openCitationKey);
+          if (!match) return null;
+          const [, msgId, idxStr] = match;
+          if (msgId !== messageId) return null;
+          const idx = Number(idxStr);
+          const cite = citations[idx];
+          if (!cite) return null;
+          return (
+            <CitationPreview
+              citation={cite}
+              describe={describe}
+              onClose={() => onToggleCitation(openCitationKey)}
+            />
+          );
+        })()}
     </div>
   );
-}
-
-function kindLabel(kind: AideCitation["kind"]): string {
-  switch (kind) {
-    case "node-type":
-      return t("对象类型", "NodeType");
-    case "relation-type":
-      return t("关系类型", "RelType");
-    case "node":
-      return t("节点", "Node");
-    case "sub-project":
-      return t("子项目", "SubProject");
-    case "action-type":
-      return t("Action", "Action");
-    case "business-system":
-      return t("应用系统", "System");
-  }
 }
 
 function Composer({
