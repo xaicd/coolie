@@ -205,6 +205,64 @@ export function OntologyPage({ context }: PluginPageProps): ReactElement {
 }
 
 type WorkbenchView = "graph" | "table" | "schema" | "cognition" | "capabilities" | "dialogue" | "sandbox" | "actions" | "functions" | "interfaces" | "datasets" | "connectors" | "transforms" | "manage";
+type WorkbenchGroup = "data-flow" | "assets" | "ops";
+
+/**
+ * View layout — split into primary (always visible in the top row) and
+ * groups (collapsed into 3 chip-style menus: 数据流 / 资产 / 运维).
+ *
+ * The original 14-tab horizontal strip overflowed a 1280px viewport on
+ * this plugin's cockpit; users reported it as "太密集". Grouping keeps
+ * the top bar under 6 chrome elements and pushes the long tail into a
+ * sub-tab strip that renders *inside* the content area when a group
+ * is active. Selecting a primary view also closes any open group so
+ * only one mode is visible at a time.
+ */
+const PRIMARY_VIEWS: { id: WorkbenchView; label: string; icon: string }[] = [
+  { id: "graph", label: t("图谱", "Graph"), icon: "⬡" },
+  { id: "table", label: t("表格", "Table"), icon: "⊞" },
+  { id: "schema", label: "Schema", icon: "⊙" },
+  { id: "sandbox", label: t("副手", "Aide"), icon: "🤝" },
+];
+
+const VIEW_GROUPS: {
+  id: WorkbenchGroup;
+  label: string;
+  icon: string;
+  views: { id: WorkbenchView; label: string; icon: string }[];
+}[] = [
+  {
+    id: "data-flow",
+    label: t("数据流", "Data flow"),
+    icon: "≣",
+    views: [
+      { id: "datasets", label: t("数据集", "Datasets"), icon: "📊" },
+      { id: "connectors", label: t("连接器", "Connectors"), icon: "🔌" },
+      { id: "transforms", label: t("转换", "Transforms"), icon: "⚙" },
+    ],
+  },
+  {
+    id: "assets",
+    label: t("资产", "Assets"),
+    icon: "◈",
+    views: [
+      { id: "cognition", label: t("认知", "Cognition"), icon: "⚡" },
+      { id: "capabilities", label: t("能力", "Capabilities"), icon: "◈" },
+      { id: "actions", label: t("动作", "Actions"), icon: "⚙" },
+      { id: "functions", label: t("函数", "Functions"), icon: "λ" },
+      { id: "interfaces", label: t("接口", "Interfaces"), icon: "⌘" },
+      { id: "dialogue", label: t("对话", "Dialogue"), icon: "💬" },
+    ],
+  },
+  {
+    id: "ops",
+    label: t("运维", "Ops"),
+    icon: "🛠",
+    views: [
+      { id: "manage", label: t("治理", "Manage"), icon: "📋" },
+    ],
+  },
+];
 
 const DRAG_MIME = "application/x-ontology-node-type-id";
 
@@ -216,6 +274,11 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
 
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   const [view, setView] = useState<WorkbenchView>("graph");
+  // Which group menu is expanded. null = no group active; user is on a
+  // primary view OR has dismissed the group strip. We keep `view` as the
+  // single source of truth for *which* view mounts — the group is just a
+  // affordance for surfacing its children as a sub-tab strip.
+  const [activeGroup, setActiveGroup] = useState<WorkbenchGroup | null>(null);
   const [rightOpen, setRightOpen] = useState(true);
   const [showNewDomain, setShowNewDomain] = useState(false);
   // When the graph node right-click menu dispatches "动作", DomainWorkspace
@@ -234,26 +297,25 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
   const activeDomainId = selectedDomainId ?? domains[0]?.id ?? null;
   const activeDomain = domains.find(d => d.id === activeDomainId) ?? null;
 
-  const views: { id: WorkbenchView; label: string; icon: string }[] = [
-    { id: "graph", label: t("图谱", "Graph"), icon: "⬡" },
-    { id: "table", label: t("表格", "Table"), icon: "⊞" },
-    { id: "schema", label: "Schema", icon: "⊙" },
-    { id: "cognition", label: t("认知", "Cognition"), icon: "⚡" },
-    { id: "capabilities", label: t("能力", "Capabilities"), icon: "◈" },
-    { id: "dialogue", label: t("对话", "Dialogue"), icon: "💬" },
-    { id: "sandbox", label: t("数字副手", "Digital Aide"), icon: "🤝" },
-    { id: "actions", label: t("动作", "Actions"), icon: "⚙" },
-    { id: "functions", label: t("函数", "Functions"), icon: "λ" },
-    { id: "interfaces", label: t("接口", "Interfaces"), icon: "⌘" },
-    { id: "datasets", label: t("数据集", "Datasets"), icon: "📊" },
-    { id: "connectors", label: t("连接器", "Connectors"), icon: "🔌" },
-    { id: "transforms", label: t("转换", "Transforms"), icon: "⚙" },
-    { id: "manage", label: t("治理", "Manage"), icon: "📋" },
-  ];
+  // View selection rules:
+  //  - Clicking a primary view (graph/table/schema/sandbox) clears the
+  //    active group so only the primary view is mounted.
+  //  - Clicking a group toggles the sub-tab strip; if the group was
+  //    already active, it closes. If a different group was open, switch.
+  //  - The right-click menu / canvas dispatch can jump straight to a
+  //    group member (e.g. "actions"); we map that back to its group so
+  //    the sub-tab strip stays visible while the user is on the leaf.
+  const groupForView = (v: WorkbenchView): WorkbenchGroup | null =>
+    VIEW_GROUPS.find(g => g.views.some(child => child.id === v))?.id ?? null;
+  const selectView = (v: WorkbenchView) => {
+    setView(v);
+    const g = groupForView(v);
+    setActiveGroup(g);
+  };
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-      {/* ── Top bar ── */}
+      {/* ── Row 1 — primary chrome: domain · primary views · actions ── */}
       <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
         {domainsLoading ? (
           <span className="text-(length:--text-compact) text-muted-foreground">…</span>
@@ -285,26 +347,18 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
           </span>
         )}
 
-        {/* New domain button — always visible so a second ontology is easy to add */}
-        <button
-          onClick={() => setShowNewDomain(true)}
-          title={t("新建本体域", "Create a new ontology domain")}
-          className="flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-(length:--text-compact) font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-        >
-          <span className="text-[13px] leading-none">＋</span>
-          {t("新建域", "New domain")}
-        </button>
+        <div className="mx-1 h-5 w-px bg-border" />
 
-        <div className="mx-2 h-5 w-px bg-border" />
-
+        {/* Primary view strip — the four views users land on 90% of the
+            time. Group menus (data-flow / assets / ops) sit on row 2. */}
         <div className="flex items-center gap-0.5">
-          {views.map(v => (
+          {PRIMARY_VIEWS.map(v => (
             <button
               key={v.id}
-              onClick={() => setView(v.id)}
+              onClick={() => selectView(v.id)}
               className={[
                 "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-(length:--text-compact) font-medium transition-colors",
-                view === v.id ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                view === v.id && activeGroup === null ? "bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent hover:text-foreground",
               ].join(" ")}
             >
               <span className="text-[13px]">{v.icon}</span>
@@ -314,17 +368,26 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
-          <TopStatusBar companyId={companyId} domain={activeDomain} onSnapshot={refreshDomains} />
-          {/* 接入 — open the legacy-system import wizard. Always reachable so a
-              user with an active domain can also ingest a second legacy
-              system without leaving the workbench. The wizard decides whether
-              to create a new domain or attach to the active one. */}
+          {/* 接入 — opens the legacy-system import wizard. Reachable from
+              any view so the user doesn't have to back out to start one. */}
           <button
             onClick={() => setWizardOpen(true)}
             title={t("4 步接入存量旧系统", "4-step legacy import wizard")}
-            className="rounded-md border border-border bg-card px-2 py-1 text-(length:--text-nano) font-medium text-foreground hover:border-primary hover:text-primary"
+            className="flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-(length:--text-compact) font-medium text-foreground hover:border-primary hover:text-primary"
           >
-            ⚡ {t("接入", "Import")}
+            <span className="text-[13px] leading-none">⚡</span>
+            {t("接入", "Import")}
+          </button>
+          {/* New domain — secondary affordance; primary "create a domain"
+              flows through NoDomainState / OnlineAppsPortal so we keep it
+              light here. Border-dashed signals "container, not action". */}
+          <button
+            onClick={() => setShowNewDomain(true)}
+            title={t("新建本体域", "Create a new ontology domain")}
+            className="flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-(length:--text-compact) font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+          >
+            <span className="text-[13px] leading-none">＋</span>
+            {t("新建", "New")}
           </button>
           <button
             onClick={() => setRightOpen(o => !o)}
@@ -336,6 +399,50 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
               <path d="M15 3v18" />
             </svg>
           </button>
+        </div>
+      </div>
+
+      {/* ── Row 2 — group menus + status. Compact (h-9), same surface so
+          the two rows read as one continuous toolbar but the long tail
+          stays out of the way until the user picks a group. */}
+      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-3 text-(length:--text-compact)">
+        <div className="flex items-center gap-0.5">
+          {VIEW_GROUPS.map(g => {
+            const isOn = activeGroup === g.id;
+            return (
+              <button
+                key={g.id}
+                onClick={() => {
+                  if (isOn) {
+                    // Toggling the same group off — return to whichever
+                    // primary view the user was last on (default: graph).
+                    setActiveGroup(null);
+                    if (!PRIMARY_VIEWS.some(p => p.id === view)) setView("graph");
+                  } else {
+                    setActiveGroup(g.id);
+                    // If we're landing on the group from a primary view,
+                    // also flip `view` to the group's first child so the
+                    // content area doesn't go blank.
+                    if (activeGroup === null) setView(g.views[0]!.id);
+                  }
+                }}
+                className={[
+                  "flex items-center gap-1.5 rounded-md px-2 py-1 font-medium transition-colors",
+                  isOn
+                    ? "bg-primary/15 text-primary"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                ].join(" ")}
+              >
+                <span className="text-[13px]">{g.icon}</span>
+                {g.label}
+                <span className="text-(length:--text-nano) text-muted-foreground/70">{g.views.length}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="ml-auto flex items-center gap-2">
+          <TopStatusBar companyId={companyId} domain={activeDomain} onSnapshot={refreshDomains} />
         </div>
       </div>
 
@@ -368,10 +475,12 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
           domain={activeDomain}
           view={view}
           rightOpen={rightOpen}
+          activeGroup={activeGroup}
+          onSelectView={selectView}
           actionFormPrefill={actionFormPrefill}
           setActionFormPrefill={setActionFormPrefill}
           onDomainsChanged={refreshDomains}
-          onRequestView={setView}
+          onRequestView={selectView}
           onImportLegacy={() => setWizardOpen(true)}
         />
       )}
@@ -622,6 +731,8 @@ function DomainWorkspace({
   domain,
   view,
   rightOpen,
+  activeGroup,
+  onSelectView,
   actionFormPrefill,
   setActionFormPrefill,
   onDomainsChanged,
@@ -633,6 +744,13 @@ function DomainWorkspace({
   domain: OntologyDomain | null;
   view: WorkbenchView;
   rightOpen: boolean;
+  /** Which group menu is expanded in row 2 of the toolbar. When set,
+      we render a sub-tab strip below the toolbar showing the group's
+      leaf views. Null = no group active (user is on a primary view). */
+  activeGroup: WorkbenchGroup | null;
+  /** Selects a view and updates the toolbar's group/primary state in
+      one go. Same contract as the parent's internal selectView. */
+  onSelectView: (v: WorkbenchView) => void;
   /** When the graph node right-click menu dispatches "动作", the parent
       sets this prefill and we hand it to ActionsTab on mount. */
   actionFormPrefill?: { nodeTypeId: string } | null;
@@ -643,6 +761,11 @@ function DomainWorkspace({
   /** Bridge to open the legacy-system import wizard from inside the cockpit. */
   onImportLegacy?: () => void;
 }): ReactElement {
+  // The group currently expanded (mirrors parent's activeGroup). Used to
+  // render the sub-tab strip just inside the content area.
+  const currentGroup = activeGroup
+    ? VIEW_GROUPS.find(g => g.id === activeGroup) ?? null
+    : null;
   const { data: domainData, refresh: refreshDomain } = usePluginData<DomainDetail>(
     "domain-detail", { companyId, domainId }
   );
@@ -814,6 +937,33 @@ function DomainWorkspace({
 
       {/* Center: main view */}
       <div className="relative min-w-0 flex-1 overflow-hidden">
+        {/* Sub-tab strip — only when a group menu is active. Renders the
+            group's leaf views as a thin horizontal strip just below the
+            toolbar so the user can switch between siblings (e.g. between
+            动作 ↔ 函数 ↔ 接口 inside 资产) without going back up to row 2. */}
+        {currentGroup && (
+          <div className="flex h-8 shrink-0 items-center gap-1 border-b border-border bg-muted/20 px-3">
+            <span className="text-(length:--text-nano) font-medium text-muted-foreground">
+              {currentGroup.icon} {currentGroup.label}
+            </span>
+            <div className="mx-2 h-4 w-px bg-border" />
+            {currentGroup.views.map(child => (
+              <button
+                key={child.id}
+                onClick={() => onSelectView(child.id)}
+                className={[
+                  "flex items-center gap-1 rounded-md px-2 py-0.5 text-(length:--text-compact) font-medium transition-colors",
+                  view === child.id
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                ].join(" ")}
+              >
+                <span className="text-[12px]">{child.icon}</span>
+                {child.label}
+              </button>
+            ))}
+          </div>
+        )}
         {showTree && (
           <GraphView
             companyId={companyId}
