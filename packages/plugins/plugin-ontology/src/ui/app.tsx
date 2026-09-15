@@ -31,6 +31,7 @@ import { BootstrapPanel } from "./BootstrapPanel.js";
  * Chinese; everything else falls back to English.
  */
 import { t } from "./isZh.js";
+import { LegacyImportWizardModal } from "./LegacyImportWizardModal.js";
 
 /**
  * Derive a URL-safe slug from a display name. ASCII letters/digits are kept
@@ -220,6 +221,11 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
   // on mount (cleared via onConsumePrefill) so a second visit without a new
   // dispatch doesn't keep stale form state.
   const [actionFormPrefill, setActionFormPrefill] = useState<{ nodeTypeId: string } | null>(null);
+  // Legacy-system import wizard. Independent of showNewDomain so the user
+  // can layer them — "新建" still goes through NewDomainModal, "接入" opens
+  // the multi-step wizard below. The wizard is the entry to ingest a real
+  // legacy app's schema into ontology (SQL DDL / OpenAPI / code / docs).
+  const [wizardOpen, setWizardOpen] = useState(false);
 
   // Auto-select first domain
   const activeDomainId = selectedDomainId ?? domains[0]?.id ?? null;
@@ -302,6 +308,17 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
 
         <div className="ml-auto flex items-center gap-2">
           <TopStatusBar companyId={companyId} domain={activeDomain} onSnapshot={refreshDomains} />
+          {/* 接入 — open the legacy-system import wizard. Always reachable so a
+              user with an active domain can also ingest a second legacy
+              system without leaving the workbench. The wizard decides whether
+              to create a new domain or attach to the active one. */}
+          <button
+            onClick={() => setWizardOpen(true)}
+            title={t("4 步接入存量旧系统", "4-step legacy import wizard")}
+            className="rounded-md border border-border bg-card px-2 py-1 text-(length:--text-nano) font-medium text-foreground hover:border-primary hover:text-primary"
+          >
+            ⚡ {t("接入", "Import")}
+          </button>
           <button
             onClick={() => setRightOpen(o => !o)}
             title={t("切换右侧面板", "Toggle right panel")}
@@ -331,6 +348,7 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
               setView("graph");
               refreshDomains();
             }}
+            onImportLegacy={() => setWizardOpen(true)}
           />
         </div>
       ) : (
@@ -360,6 +378,22 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
             // right-click works. If we left the user on Cognition /
             // Capabilities / Dialogue, the ReactFlow pane wouldn't render
             // and the right-click menu would silently do nothing.
+            setView("graph");
+            refreshDomains();
+            if (newDomainId) setSelectedDomainId(newDomainId);
+          }}
+        />
+      )}
+
+      {/* Legacy-system import wizard. Independent modal — when the user
+          finishes, refresh domains and select the freshly-created one so the
+          workbench lands on graph view of the new domain. */}
+      {wizardOpen && (
+        <LegacyImportWizardModal
+          companyId={companyId}
+          onClose={() => setWizardOpen(false)}
+          onPublished={(newDomainId) => {
+            setWizardOpen(false);
             setView("graph");
             refreshDomains();
             if (newDomainId) setSelectedDomainId(newDomainId);
@@ -2627,7 +2661,15 @@ function NodeInspector({
   );
 }
 
-function NoDomainState({ companyId, onCreated }: { companyId: string; onCreated: (domainId: string) => void }): ReactElement {
+function NoDomainState({
+  companyId,
+  onCreated,
+  onImportLegacy,
+}: {
+  companyId: string;
+  onCreated: (domainId: string) => void;
+  onImportLegacy?: () => void;
+}): ReactElement {
   const createDomain = usePluginAction("create-domain");
   const [displayName, setDisplayName] = useState("");
   const [description, setDescription] = useState("");
@@ -2707,6 +2749,16 @@ function NoDomainState({ companyId, onCreated }: { companyId: string; onCreated:
           />
         )}
       </div>
+      {onImportLegacy && (
+        <button
+          type="button"
+          onClick={onImportLegacy}
+          className="rounded-md border border-border bg-card px-3 py-1.5 text-(length:--text-nano) font-medium text-foreground hover:border-primary hover:text-primary"
+          title={t("4 步渐进式接入存量旧系统 (Zero-ETL 虚拟化)", "4-step wizard to ingest a legacy system")}
+        >
+          ⚡ {t("接入旧系统", "Import legacy")}
+        </button>
+      )}
       {err && <div className="text-(length:--text-nano) text-muted-foreground">{err}</div>}
     </div>
   );
