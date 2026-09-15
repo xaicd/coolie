@@ -227,6 +227,13 @@ export function SandboxTab({
    *  isn't in edit mode). Sticky on leave so the user can mouse over
    *  the pane without losing the diff overlay. */
   const [hoveredEditResult, setHoveredEditResult] = useState<CockpitEditResult | null>(null);
+  /** Currently inspected type on the right pane's Detail tab. Driven by
+   *  clicks on the schema tree; cleared when the user goes Back or
+   *  closes the pane. null = no selection = stay on Schema tab. */
+  const [selectedTypeKey, setSelectedTypeKey] = useState<string | null>(null);
+  const [selectedTarget, setSelectedTarget] = useState<
+    "nodeType" | "relationType" | "actionType" | null
+  >(null);
 
   // Persist the preview-pane toggle so it survives reloads. Wrapped in
   // try/catch because localStorage can throw in private windows / when
@@ -249,6 +256,21 @@ export function SandboxTab({
     setHoveredEditResult(null);
     void describe.refresh();
   }, [describe]);
+
+  // Selection handlers for the right pane. Clicking a row sets both
+  // target + key; the pane owns its own tab state so we only need to
+  // supply the data here.
+  const onSelectType = useCallback(
+    (kind: "nodeType" | "relationType" | "actionType", key: string) => {
+      setSelectedTarget(kind);
+      setSelectedTypeKey(key);
+    },
+    [],
+  );
+  const onClearSelection = useCallback(() => {
+    setSelectedTarget(null);
+    setSelectedTypeKey(null);
+  }, []);
   const seenTokenKeysRef = useRef<Set<string>>(new Set());
   // Which citation chip is currently expanded across the message list.
   // Key format: `${messageId}:${chipIdx}` so each chip is independent and
@@ -525,6 +547,10 @@ export function SandboxTab({
             <SchemaPreviewPane
               describe={describe.data ?? null}
               hoveredEditResult={hoveredEditResult}
+              selectedTypeKey={selectedTypeKey}
+              selectedTarget={selectedTarget}
+              onSelectType={onSelectType}
+              onClearSelection={onClearSelection}
             />
           )}
         </div>
