@@ -1545,6 +1545,67 @@ const plugin = definePlugin({
       return result;
     });
 
+    // Backs usePluginData("aide-snapshots", { companyId, domainId }) —
+    // schema history list for the right-side snapshot drawer. Returns
+    // newest-first so the drawer shows the most recent edit at the top.
+    ctx.data.register("aide-snapshots", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const snapshots = await requireAideStore().listSnapshots(companyId, domainId);
+      return { snapshots };
+    });
+
+    // Captures the *pre-edit* ontology schema as a snapshot row. The
+    // EditCard's "Apply" success path calls this immediately before
+    // dispatching mutations so the drawer always shows the state
+    // immediately before the most recent edit.
+    ctx.actions.register("aide-create-snapshot", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const intent = requireString(params.intent, "intent");
+      const summary = typeof params.summary === "string" ? params.summary : "";
+      const opCount = Number.isFinite(params.opCount) ? Number(params.opCount) : 0;
+      const createdBy =
+        typeof params.createdBy === "string" ? params.createdBy : "user";
+      const label =
+        typeof params.label === "string" && params.label.length > 0
+          ? params.label
+          : intent.slice(0, 60);
+      const snapshot = await store.describeDomain(companyId, domainId);
+      const schema = requireAideStore().buildSchemaSnapshot(snapshot);
+      const meta = await requireAideStore().createSnapshot({
+        companyId,
+        domainId,
+        label,
+        intent,
+        summary,
+        opCount,
+        schema,
+        createdBy,
+      });
+      return { snapshot: meta };
+    });
+
+    // Restore a previously-saved snapshot by computing the inverse op
+    // set against the live schema and dispatching them through the
+    // existing create-* / update-* / delete-* actions.
+    ctx.actions.register("aide-restore-snapshot", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const version = Number(params.version);
+      if (!Number.isInteger(version) || version < 1) {
+        throw new Error("version must be a positive integer");
+      }
+      const aide = requireAideStore();
+      const target = await aide.getSnapshot(companyId, domainId, version);
+      if (!target) throw new Error(`snapshot v${version} not found`);
+      // The restore logic lives in the UI side (it has the applyOperations
+      // helper + dispatch glue). We just hand the snapshot back; the UI
+      // computes the inverse ops and applies them through the same
+      // mutation actions it uses for edit-mode Apply.
+      return { snapshot: target };
+    });
+
     ctx.logger.info("Ontology plugin worker started", { namespace: ctx.db.namespace });
   },
 

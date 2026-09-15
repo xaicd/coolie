@@ -18,6 +18,7 @@ import { MarkdownContent } from "./MarkdownContent.js";
 import { CitationPreview, kindLabel } from "./CitationPreview.js";
 import { EditCard } from "./EditCard.js";
 import { SchemaPreviewPane } from "./SchemaPreviewPane.js";
+import { SnapshotDrawer } from "./SnapshotDrawer.js";
 import { type CockpitEditResult, type MutationCall } from "../aide/editOps.js";
 
 // ---------------------------------------------------------------------------
@@ -201,6 +202,11 @@ export function SandboxTab({
   const createRelationType = usePluginAction("create-relation-type");
   const updateRelationType = usePluginAction("update-relation-type");
   const deleteRelationType = usePluginAction("delete-relation-type");
+  const createSnapshot = usePluginAction("aide-create-snapshot");
+  const snapshots = usePluginData<{ snapshots: unknown }>("aide-snapshots", {
+    companyId,
+    domainId,
+  });
 
   const [messages, setMessages] = useState<LocalMessage[]>([]);
   const [draft, setDraft] = useState("");
@@ -255,7 +261,26 @@ export function SandboxTab({
   const onEditApplied = useCallback(() => {
     setHoveredEditResult(null);
     void describe.refresh();
-  }, [describe]);
+    void snapshots.refresh();
+  }, [describe, snapshots]);
+
+  // Captures a pre-edit snapshot row. Wired to EditCard.onWillApply so
+  // the snapshot drawer has a permanent record of every successful
+  // Apply. Best-effort — the EditCard swallows failures so the user
+  // still gets their mutations through.
+  const onWillApply = useCallback(
+    async (params: { intent: string; summary: string; opCount: number }) => {
+      await createSnapshot({
+        companyId,
+        domainId,
+        intent: params.intent,
+        summary: params.summary,
+        opCount: params.opCount,
+        createdBy: "user",
+      });
+    },
+    [createSnapshot, companyId, domainId],
+  );
 
   // Selection handlers for the right pane. Clicking a row sets both
   // target + key; the pane owns its own tab state so we only need to
@@ -529,6 +554,7 @@ export function SandboxTab({
               }}
               dispatchMutation={dispatchMutation}
               onEditApplied={onEditApplied}
+              onWillApply={onWillApply}
               onHoverEditResult={setHoveredEditResult}
             />
             <Composer
@@ -551,6 +577,14 @@ export function SandboxTab({
               selectedTarget={selectedTarget}
               onSelectType={onSelectType}
               onClearSelection={onClearSelection}
+            />
+          )}
+          {previewVisible && (
+            <SnapshotDrawer
+              describe={describe.data ?? null}
+              onAfterRestore={() => describe.refresh()}
+              companyId={companyId}
+              domainId={domainId}
             />
           )}
         </div>
@@ -594,6 +628,7 @@ function MessageList({
   onPickPrompt,
   dispatchMutation,
   onEditApplied,
+  onWillApply,
   onHoverEditResult,
 }: {
   messages: LocalMessage[];
@@ -607,6 +642,11 @@ function MessageList({
   onPickPrompt: (prompt: string) => void;
   dispatchMutation: (call: MutationCall) => Promise<unknown>;
   onEditApplied: () => void;
+  /** Captures a pre-edit snapshot row via `aide-create-snapshot` before
+   *  the first mutation fires. Fire-and-forget at the EditCard level —
+   *  the worker swallows errors so Apply proceeds even if the snapshot
+   *  write fails. */
+  onWillApply: (params: { intent: string; summary: string; opCount: number }) => void | Promise<void>;
   /**Bubble → EditCard mouse-enter/leave signal. Drives the right-side
    *  schema pane's diff coloring. */
   onHoverEditResult: (result: CockpitEditResult | null) => void;
@@ -678,6 +718,7 @@ function MessageList({
               onToggleCitation={onToggleCitation}
               dispatchMutation={dispatchMutation}
               onEditApplied={onEditApplied}
+              onWillApply={onWillApply}
               onHoverEditResult={onHoverEditResult}
             />
           </li>
@@ -695,6 +736,7 @@ function Bubble({
   onToggleCitation,
   dispatchMutation,
   onEditApplied,
+  onWillApply,
   onHoverEditResult,
 }: {
   message: LocalMessage;
@@ -704,6 +746,7 @@ function Bubble({
   onToggleCitation: (key: string) => void;
   dispatchMutation: (call: MutationCall) => Promise<unknown>;
   onEditApplied: () => void;
+  onWillApply: (params: { intent: string; summary: string; opCount: number }) => void | Promise<void>;
   onHoverEditResult: (result: CockpitEditResult | null) => void;
 }): ReactElement {
   const isUser = message.role === "user";
@@ -727,6 +770,7 @@ function Bubble({
               snapshot={describe}
               domainId={domainId}
               dispatch={dispatchMutation}
+              onWillApply={onWillApply}
               onApplied={onEditApplied}
               onHover={onHoverEditResult}
             />

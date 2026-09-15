@@ -24,6 +24,7 @@ export function EditCard({
   snapshot,
   domainId,
   dispatch,
+  onWillApply,
   onApplied,
   onHover,
 }: {
@@ -34,6 +35,17 @@ export function EditCard({
   /**Dispatch a single mutation. Returns the resolved result from the
    *  worker so the UI can show inline per-call errors. */
   dispatch: (call: MutationCall) => Promise<unknown>;
+  /**Fired before the first mutation is dispatched, with the live
+   *  snapshot. The parent can use this to capture a pre-edit snapshot
+   *  row so the user can later restore the schema. Receives the
+   *  resolved EditCard metadata so the snapshot row carries intent +
+   *  op count without having to re-read state. If omitted, no snapshot
+   *  is created (regression-safe for older callers). */
+  onWillApply?: (params: {
+    intent: string;
+    summary: string;
+    opCount: number;
+  }) => void | Promise<void>;
   /**Called after a successful apply so the parent can refresh the
    *  snapshot and clear the bubble's "pending" affordance. */
   onApplied: () => void;
@@ -62,6 +74,21 @@ export function EditCard({
     if (!snapshot) return;
     setApplying(true);
     setErrors([]);
+    // Capture the pre-edit snapshot before touching any state. If the
+    // call fails (e.g. transient DB error) we still proceed with the
+    // mutations — the user has confirmed Apply and getting their edit
+    // through is more important than the history drawer being in sync.
+    if (onWillApply) {
+      try {
+        await onWillApply({
+          intent: result.intent,
+          summary: result.summary,
+          opCount,
+        });
+      } catch {
+        // best-effort — swallow and continue
+      }
+    }
     const collected: ApplyError[] = [];
     for (let i = 0; i < outcome.calls.length; i++) {
       const call = outcome.calls[i];
