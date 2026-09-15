@@ -1078,6 +1078,7 @@ export interface GraphStore {
     functionId: string,
     update: OntologyFunctionUpdate,
   ): Promise<OntologyFunctionRow | null>;
+  deleteFunction(companyId: string, functionId: string): Promise<boolean>;
 
   // capability acquisition
   detectCapabilityGap(input: CapabilityGapInput): Promise<CapabilityGapRow>;
@@ -2120,6 +2121,21 @@ export class PostgresGraphStore implements GraphStore {
       [companyId, functionId],
     );
     return rows[0] ?? null;
+  }
+
+  /**
+   * Soft-delete a function. Mirrors deleteActionType: row stays for audit,
+   * subsequent list calls skip it. Returns true iff a row was actually
+   * marked deleted in this company.
+   */
+  async deleteFunction(companyId: string, functionId: string): Promise<boolean> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_functions")}
+          SET is_deleted = true, deleted_at = now(), updated_at = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, functionId],
+    );
+    return res.rowCount > 0;
   }
 
   async writeAuditLog(input: OntologyAuditLogInput): Promise<OntologyAuditLogRow> {

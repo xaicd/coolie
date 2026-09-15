@@ -1815,6 +1815,14 @@ const plugin = definePlugin({
         return { body: { function: fn } };
       }
 
+      case "delete-function": {
+        // Soft-delete: see deleteActionType for rationale.
+        const body = optionalRecord(input.body) ?? {};
+        const id = requireString(input.params?.functionId ?? body.functionId, "functionId");
+        const ok = await store.deleteFunction(companyId, id);
+        return { status: ok ? 204 : 404, body: ok ? {} : { error: "Function not found" } };
+      }
+
       case "list-audit-logs": {
         const logs = await store.listAuditLogs(
           companyId,

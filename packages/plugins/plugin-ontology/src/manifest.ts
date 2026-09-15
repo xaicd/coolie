@@ -246,6 +246,14 @@ const manifest: PaperclipPluginManifestV1 = {
       companyResolution: { from: "body", key: "companyId" },
     },
     {
+      routeKey: "delete-function",
+      method: "DELETE",
+      path: "/functions/:functionId",
+      auth: "board",
+      capability: "api.routes.register",
+      companyResolution: { from: "body", key: "companyId" },
+    },
+    {
       routeKey: "list-audit-logs",
       method: "GET",
       path: "/audit-logs",
