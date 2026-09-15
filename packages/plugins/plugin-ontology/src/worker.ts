@@ -906,6 +906,179 @@ export const SAMPLE_NODE_TYPE_DEFS: Array<{
   },
 ];
 
+/**
+ * Instance rows planted by `seed-samples`. Each carries values for its type's
+ * schema so the table view actually has something to show — seeding bare nodes
+ * produced a "实例数据列表" of empty cells, which is what made the model look
+ * like it had no substance.
+ */
+export const SAMPLE_NODE_DEFS: Array<{
+  key: string;
+  label: string;
+  type: string;
+  properties: Record<string, unknown>;
+}> = [
+  {
+    key: "team-platform",
+    label: "Platform Team",
+    type: "team",
+    properties: {
+      name: "Platform Team",
+      description: "Runs the shared platform services",
+      costCenter: "CC-1001",
+      headcount: 12,
+    },
+  },
+  {
+    key: "team-growth",
+    label: "Growth Team",
+    type: "team",
+    properties: {
+      name: "Growth Team",
+      description: "Owns billing and growth experiments",
+      costCenter: "CC-1002",
+      headcount: 7,
+    },
+  },
+  {
+    key: "person-alice",
+    label: "Alice (Lead)",
+    type: "person",
+    properties: {
+      name: "Alice Chen",
+      email: "alice@example.com",
+      title: "Engineering Lead",
+      role: "lead",
+      joinedAt: "2021-03-15T09:00:00Z",
+    },
+  },
+  {
+    key: "person-bob",
+    label: "Bob (Engineer)",
+    type: "person",
+    properties: {
+      name: "Bob Liu",
+      email: "bob@example.com",
+      title: "Senior Engineer",
+      role: "individual_contributor",
+      joinedAt: "2022-07-01T09:00:00Z",
+    },
+  },
+  {
+    key: "person-carol",
+    label: "Carol (Engineer)",
+    type: "person",
+    properties: {
+      name: "Carol Wang",
+      email: "carol@example.com",
+      title: "Engineer",
+      role: "individual_contributor",
+      joinedAt: "2023-01-09T09:00:00Z",
+    },
+  },
+  {
+    key: "svc-auth",
+    label: "Auth Service",
+    type: "service",
+    properties: {
+      name: "Auth Service",
+      repoUrl: "https://git.example.com/platform/auth-service",
+      language: "TypeScript",
+      tier: 1,
+      status: "active",
+      ownerTeamKey: "team-platform",
+    },
+  },
+  {
+    key: "svc-billing",
+    label: "Billing Service",
+    type: "service",
+    properties: {
+      name: "Billing Service",
+      repoUrl: "https://git.example.com/growth/billing-service",
+      language: "Go",
+      tier: 1,
+      status: "active",
+      ownerTeamKey: "team-growth",
+    },
+  },
+  {
+    key: "svc-gateway",
+    label: "API Gateway",
+    type: "service",
+    properties: {
+      name: "API Gateway",
+      repoUrl: "https://git.example.com/platform/api-gateway",
+      language: "Rust",
+      tier: 1,
+      status: "active",
+      ownerTeamKey: "team-platform",
+    },
+  },
+  {
+    key: "repo-auth",
+    label: "auth-service (repo)",
+    type: "repository",
+    properties: {
+      name: "auth-service",
+      url: "https://git.example.com/platform/auth-service",
+      language: "TypeScript",
+      defaultBranch: "main",
+      lastCommitAt: "2026-09-12T10:24:00Z",
+      archived: false,
+    },
+  },
+  {
+    key: "repo-billing",
+    label: "billing-service (repo)",
+    type: "repository",
+    properties: {
+      name: "billing-service",
+      url: "https://git.example.com/growth/billing-service",
+      language: "Go",
+      defaultBranch: "main",
+      lastCommitAt: "2026-09-10T16:02:00Z",
+      archived: false,
+    },
+  },
+  {
+    key: "proj-q3",
+    label: "Q3 Platform Hardening",
+    type: "project",
+    properties: {
+      name: "Q3 Platform Hardening",
+      status: "active",
+      owner: "Alice Chen",
+      startDate: "2026-07-01",
+      dueDate: "2026-09-30",
+    },
+  },
+  {
+    key: "task-mfa",
+    label: "Add MFA to Auth",
+    type: "task",
+    properties: {
+      title: "Add MFA to Auth",
+      status: "in_progress",
+      priority: "high",
+      estimateDays: 5,
+      dueDate: "2026-09-20",
+    },
+  },
+  {
+    key: "task-invoices",
+    label: "Invoice export",
+    type: "task",
+    properties: {
+      title: "Invoice export",
+      status: "todo",
+      priority: "medium",
+      estimateDays: 3,
+      dueDate: "2026-09-26",
+    },
+  },
+];
+
 const plugin = definePlugin({
   async setup(ctx) {
     activeContext = ctx;
@@ -950,7 +1123,18 @@ const plugin = definePlugin({
         store.listRelationTypes(companyId, domainId),
         store.getGraphSnapshot(companyId, domainId),
       ]);
-      return { domain, nodeTypes, relationTypes, graph };
+      // The workbench reads `propertiesSchema` (camelCase, the same shape
+      // `describe-domain` emits), but `listNodeTypes` hands back the raw row
+      // keyed `properties_schema`. Without this mapping the UI sees `undefined`
+      // and renders every object type as having no properties — the table view
+      // shows no property columns and the schema view shows no fields, no
+      // matter what is actually stored.
+      return {
+        domain,
+        nodeTypes: nodeTypes.map((nt) => ({ ...nt, propertiesSchema: nt.properties_schema })),
+        relationTypes,
+        graph,
+      };
     });
 
     // Mutating actions backing usePluginAction(...) in the plugin UI.
@@ -1116,9 +1300,32 @@ const plugin = definePlugin({
         backfilled.push(def.key);
       }
 
-      const existing = await store.getGraphSnapshot(companyId, domainId);
-      if (existing.counts.nodes > 0) {
-        return { seeded: false, reason: "domain-not-empty", counts: existing.counts, backfilled };
+      // Nodes seeded before `properties` was forwarded carry an empty bag, so
+      // the instance table had no attributes to show. Fill them from the same
+      // catalog — only sample keys whose properties are still empty, so any
+      // value a user has since written is preserved.
+      const snapshot = await store.getGraphSnapshot(companyId, domainId);
+      const nodeDefByKey = new Map(SAMPLE_NODE_DEFS.map((def) => [def.key, def]));
+      const backfilledNodes: string[] = [];
+      for (const node of snapshot.nodes) {
+        const def = nodeDefByKey.get(node.key);
+        if (!def) continue;
+        const props = node.properties;
+        const hasProperties =
+          props !== null && typeof props === "object" && Object.keys(props).length > 0;
+        if (hasProperties) continue;
+        await store.updateNode(companyId, node.id, { properties: def.properties });
+        backfilledNodes.push(node.key);
+      }
+
+      if (snapshot.counts.nodes > 0) {
+        return {
+          seeded: false,
+          reason: "domain-not-empty",
+          counts: snapshot.counts,
+          backfilled,
+          backfilledNodes,
+        };
       }
 
       // ── Node types ──
@@ -1149,21 +1356,7 @@ const plugin = definePlugin({
       }
 
       // ── Nodes ──
-      const nodeDefs: Array<{ key: string; label: string; type: string }> = [
-        { key: "team-platform", label: "Platform Team", type: "team" },
-        { key: "team-growth", label: "Growth Team", type: "team" },
-        { key: "person-alice", label: "Alice (Lead)", type: "person" },
-        { key: "person-bob", label: "Bob (Engineer)", type: "person" },
-        { key: "person-carol", label: "Carol (Engineer)", type: "person" },
-        { key: "svc-auth", label: "Auth Service", type: "service" },
-        { key: "svc-billing", label: "Billing Service", type: "service" },
-        { key: "svc-gateway", label: "API Gateway", type: "service" },
-        { key: "repo-auth", label: "auth-service (repo)", type: "repository" },
-        { key: "repo-billing", label: "billing-service (repo)", type: "repository" },
-        { key: "proj-q3", label: "Q3 Platform Hardening", type: "project" },
-        { key: "task-mfa", label: "Add MFA to Auth", type: "task" },
-        { key: "task-invoices", label: "Invoice export", type: "task" },
-      ];
+      const nodeDefs = SAMPLE_NODE_DEFS;
       const nodeIdByKey = new Map<string, string>();
       for (const def of nodeDefs) {
         const node = await store.createNode({
@@ -1172,6 +1365,7 @@ const plugin = definePlugin({
           key: def.key,
           label: def.label,
           nodeTypeId: typeIdByKey.get(def.type) ?? null,
+          properties: def.properties,
         });
         nodeIdByKey.set(def.key, node.id);
       }

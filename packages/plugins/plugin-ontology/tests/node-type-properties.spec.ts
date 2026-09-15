@@ -17,7 +17,7 @@
 import { describe, expect, it } from "vitest";
 import { createTestHarness } from "@paperclipai/plugin-sdk/testing";
 import manifest from "../src/manifest.js";
-import plugin, { SAMPLE_NODE_TYPE_DEFS } from "../src/worker.js";
+import plugin, { SAMPLE_NODE_DEFS, SAMPLE_NODE_TYPE_DEFS } from "../src/worker.js";
 
 const COMPANY_ID = "company-1";
 const DOMAIN_ID = "domain-1";
@@ -38,6 +38,12 @@ async function boot(): Promise<Harness> {
 function nodeTypeInserts(harness: Harness) {
   return harness.dbExecutes.filter(
     (entry) => entry.sql.includes("INSERT INTO") && entry.sql.includes("ontology_node_types"),
+  );
+}
+
+function nodeInserts(harness: Harness) {
+  return harness.dbExecutes.filter(
+    (entry) => entry.sql.includes("INSERT INTO") && entry.sql.includes("ontology_nodes"),
   );
 }
 
@@ -180,6 +186,36 @@ describe("update-node-type accepts both call shapes", () => {
   });
 });
 
+describe("domain-detail exposes propertiesSchema for the workbench", () => {
+  it("maps the store's properties_schema onto propertiesSchema", async () => {
+    const harness = await boot();
+
+    // `listNodeTypes` returns the raw row; the workbench reads the camelCase
+    // field. A rename regression here makes every object type look empty in the
+    // UI even though the data is stored.
+    harness.ctx.db.query = (async (sql: string) => {
+      if (sql.includes("ontology_node_types")) {
+        return [
+          {
+            id: "nt-1",
+            key: "customer",
+            display_name: "Customer",
+            properties_schema: CUSTOMER_SCHEMA,
+          },
+        ];
+      }
+      return [];
+    }) as typeof harness.ctx.db.query;
+
+    const detail = await harness.getData<{ nodeTypes: Array<Record<string, unknown>> }>(
+      "domain-detail",
+      { companyId: COMPANY_ID, domainId: DOMAIN_ID },
+    );
+
+    expect(detail.nodeTypes[0]!.propertiesSchema).toEqual(CUSTOMER_SCHEMA);
+  });
+});
+
 describe("seed-samples ships object types with real attributes", () => {
   it("declares a non-empty propertiesSchema for every sample type", () => {
     expect(SAMPLE_NODE_TYPE_DEFS.length).toBeGreaterThan(0);
@@ -187,6 +223,16 @@ describe("seed-samples ships object types with real attributes", () => {
       expect(
         Object.keys(def.propertiesSchema).length,
         `${def.key} must ship attributes`,
+      ).toBeGreaterThan(0);
+    }
+  });
+
+  it("declares instance values for every sample node", () => {
+    expect(SAMPLE_NODE_DEFS.length).toBeGreaterThan(0);
+    for (const def of SAMPLE_NODE_DEFS) {
+      expect(
+        Object.keys(def.properties).length,
+        `${def.key} must ship instance properties`,
       ).toBeGreaterThan(0);
     }
   });
@@ -210,6 +256,18 @@ describe("seed-samples ships object types with real attributes", () => {
         schemaByKey.get(def.key),
         `${def.key} was seeded without its propertiesSchema`,
       ).toBe(JSON.stringify(def.propertiesSchema));
+    }
+
+    // The node INSERT binds `properties` as $7 → params index 6, and `key` as $5.
+    const propsByKey = new Map(
+      nodeInserts(harness).map((entry) => [entry.params![4], entry.params![6]]),
+    );
+    expect(propsByKey.size).toBe(SAMPLE_NODE_DEFS.length);
+    for (const def of SAMPLE_NODE_DEFS) {
+      expect(
+        propsByKey.get(def.key),
+        `${def.key} was seeded without instance properties`,
+      ).toBe(JSON.stringify(def.properties));
     }
   });
 });
