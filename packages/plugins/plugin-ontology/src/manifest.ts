@@ -25,6 +25,9 @@ const manifest: PaperclipPluginManifestV1 = {
     "database.namespace.read",
     "database.namespace.write",
     "companies.read",
+    // Read-only project metadata, so a project page can be linked to a domain
+    // and the suggestion pass can use real project / workspace names.
+    "projects.read",
     "activity.log.write",
     "events.emit",
     "http.outbound",

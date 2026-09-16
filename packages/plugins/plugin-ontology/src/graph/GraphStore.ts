@@ -680,6 +680,51 @@ export interface OntologyBusinessSystemRow {
   is_template_system: boolean;
 }
 
+/**
+ * What an ontology domain can be attached to.
+ *   project           — host entity (Paperclip project)
+ *   project_workspace — host entity (one repo/workspace of a project)
+ *   business_system   — our own ontology_business_systems row
+ */
+export type OntologyResourceKind = "project" | "project_workspace" | "business_system";
+
+/** owner defines the domain; consumer reads it. */
+export type OntologyResourceRole = "owner" | "consumer";
+
+export interface OntologyResourceLinkRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  resource_kind: OntologyResourceKind;
+  resource_id: string;
+  resource_label: string;
+  role: OntologyResourceRole;
+  is_deleted: boolean;
+}
+
+export interface OntologyResourceLinkInput {
+  companyId: string;
+  domainId: string;
+  resourceKind: OntologyResourceKind;
+  resourceId: string;
+  resourceLabel?: string;
+  role?: OntologyResourceRole;
+  createdBy?: string;
+  metadata?: Record<string, unknown>;
+}
+
+/** A domain as seen from a project/application. */
+export interface LinkedDomainRow {
+  linkId: string;
+  role: OntologyResourceRole;
+  resource_kind: OntologyResourceKind;
+  domain_id: string;
+  slug: string;
+  display_name: string;
+  version: number;
+  status: string;
+}
+
 export interface OntologySubProjectInput {
   companyId: string;
   businessSystemId: string;
@@ -1224,6 +1269,31 @@ export interface GraphStore {
     systemId: string,
     update: OntologyBusinessSystemUpdate,
   ): Promise<OntologyBusinessSystemRow | null>;
+
+  // Resource links — what a domain is attached to (project / application).
+  // Idempotent on (company, kind, resourceId, domain): linking twice updates
+  // the label/role instead of failing, so re-running a link is safe.
+  linkResource(input: OntologyResourceLinkInput): Promise<OntologyResourceLinkRow>;
+  unlinkResource(
+    companyId: string,
+    resourceKind: OntologyResourceKind,
+    resourceId: string,
+    domainId: string,
+  ): Promise<boolean>;
+  /** Everything attached to one domain. */
+  listLinksForDomain(companyId: string, domainId: string): Promise<OntologyResourceLinkRow[]>;
+  /** Everything one resource is attached to. */
+  listLinksForResource(
+    companyId: string,
+    resourceKind: OntologyResourceKind,
+    resourceId: string,
+  ): Promise<OntologyResourceLinkRow[]>;
+  /** The domains one resource is attached to, with display fields joined in. */
+  listDomainsForResource(
+    companyId: string,
+    resourceKind: OntologyResourceKind,
+    resourceId: string,
+  ): Promise<LinkedDomainRow[]>;
 
   createSubProject(input: OntologySubProjectInput): Promise<OntologySubProjectRow>;
   listSubProjects(companyId: string, businessSystemId: string): Promise<OntologySubProjectRow[]>;
@@ -3060,7 +3130,37 @@ export class PostgresGraphStore implements GraphStore {
         JSON.stringify(input.metadata ?? {}),
       ],
     );
-    return (await this.getBusinessSystem(input.companyId, id))!;
+    const created = (await this.getBusinessSystem(input.companyId, id))!;
+    await this.syncBusinessSystemLink(created);
+    return created;
+  }
+
+  /**
+   * Keep `ontology_resource_links` in step with
+   * `ontology_business_systems.ontology_domain_id`.
+   *
+   * That column stays the source of truth — it carries the governance, copilot
+   * and NPC configuration — and the link row is a read-only mirror written only
+   * from here, so the two cannot disagree. Having the mirror is what lets one
+   * query answer "which domains does this application use" without a second
+   * pass over the business-system table.
+   */
+  private async syncBusinessSystemLink(system: OntologyBusinessSystemRow): Promise<void> {
+    const existing = await this.listLinksForResource(system.company_id, "business_system", system.id);
+    for (const link of existing) {
+      if (link.domain_id === system.ontology_domain_id) continue;
+      await this.unlinkResource(system.company_id, "business_system", system.id, link.domain_id);
+    }
+    if (!system.ontology_domain_id) return;
+    await this.linkResource({
+      companyId: system.company_id,
+      domainId: system.ontology_domain_id,
+      resourceKind: "business_system",
+      resourceId: system.id,
+      resourceLabel: system.name,
+      role: "consumer",
+      createdBy: "system",
+    });
   }
 
   async getBusinessSystem(
@@ -3148,7 +3248,147 @@ export class PostgresGraphStore implements GraphStore {
       ],
     );
     if (res.rowCount === 0) return null;
-    return this.getBusinessSystem(companyId, systemId);
+    const updated = await this.getBusinessSystem(companyId, systemId);
+    if (updated) await this.syncBusinessSystemLink(updated);
+    return updated;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Resource links (project / application ↔ ontology domain)
+  // ---------------------------------------------------------------------------
+
+  private static readonly RESOURCE_LINK_COLS =
+    "id, company_id, domain_id, resource_kind, resource_id, resource_label, role, is_deleted";
+
+  /**
+   * Attach a resource to a domain. Idempotent: re-linking the same
+   * (company, kind, resourceId, domain) updates the label/role and un-deletes
+   * the row rather than failing on the unique constraint, so a repeated import
+   * is safe.
+   */
+  async linkResource(input: OntologyResourceLinkInput): Promise<OntologyResourceLinkRow> {
+    const existing = await this.db.query<{ id: string }>(
+      `SELECT id FROM ${this.table("ontology_resource_links")}
+        WHERE company_id = $1 AND resource_kind = $2 AND resource_id = $3 AND domain_id = $4`,
+      [input.companyId, input.resourceKind, input.resourceId, input.domainId],
+    );
+
+    if (existing[0]) {
+      await this.db.execute(
+        `UPDATE ${this.table("ontology_resource_links")}
+            SET resource_label = $2, role = $3, is_deleted = false, deleted_at = NULL,
+                updated_by = $4, updated_at = now()
+          WHERE company_id = $5 AND id = $1`,
+        [
+          existing[0].id,
+          input.resourceLabel ?? "",
+          input.role ?? "consumer",
+          input.createdBy ?? "system",
+          input.companyId,
+        ],
+      );
+      const rows = await this.db.query<OntologyResourceLinkRow>(
+        `SELECT ${PostgresGraphStore.RESOURCE_LINK_COLS}
+           FROM ${this.table("ontology_resource_links")}
+          WHERE company_id = $1 AND id = $2`,
+        [input.companyId, existing[0].id],
+      );
+      return rows[0]!;
+    }
+
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_resource_links")}
+         (id, company_id, domain_id, resource_kind, resource_id, resource_label, role,
+          created_by, updated_by, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $8, $9::jsonb)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.resourceKind,
+        input.resourceId,
+        input.resourceLabel ?? "",
+        input.role ?? "consumer",
+        input.createdBy ?? "system",
+        JSON.stringify(input.metadata ?? {}),
+      ],
+    );
+    const rows = await this.db.query<OntologyResourceLinkRow>(
+      `SELECT ${PostgresGraphStore.RESOURCE_LINK_COLS}
+         FROM ${this.table("ontology_resource_links")}
+        WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  /** Detach a resource from a domain. Soft-delete; safe to call when absent. */
+  async unlinkResource(
+    companyId: string,
+    resourceKind: OntologyResourceKind,
+    resourceId: string,
+    domainId: string,
+  ): Promise<boolean> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_resource_links")}
+          SET is_deleted = true, deleted_at = now(), updated_at = now()
+        WHERE company_id = $1 AND resource_kind = $2 AND resource_id = $3
+          AND domain_id = $4 AND is_deleted = false`,
+      [companyId, resourceKind, resourceId, domainId],
+    );
+    return (res.rowCount ?? 0) > 0;
+  }
+
+  /** Everything attached to one domain. */
+  async listLinksForDomain(companyId: string, domainId: string): Promise<OntologyResourceLinkRow[]> {
+    return this.db.query<OntologyResourceLinkRow>(
+      `SELECT ${PostgresGraphStore.RESOURCE_LINK_COLS}
+         FROM ${this.table("ontology_resource_links")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+        ORDER BY resource_kind ASC, resource_label ASC`,
+      [companyId, domainId],
+    );
+  }
+
+  /** Everything one resource is attached to. */
+  async listLinksForResource(
+    companyId: string,
+    resourceKind: OntologyResourceKind,
+    resourceId: string,
+  ): Promise<OntologyResourceLinkRow[]> {
+    return this.db.query<OntologyResourceLinkRow>(
+      `SELECT ${PostgresGraphStore.RESOURCE_LINK_COLS}
+         FROM ${this.table("ontology_resource_links")}
+        WHERE company_id = $1 AND resource_kind = $2 AND resource_id = $3 AND is_deleted = false
+        ORDER BY created_at ASC`,
+      [companyId, resourceKind, resourceId],
+    );
+  }
+
+  /** The domains one resource is attached to, with display fields joined in. */
+  async listDomainsForResource(
+    companyId: string,
+    resourceKind: OntologyResourceKind,
+    resourceId: string,
+  ): Promise<LinkedDomainRow[]> {
+    return this.db.query<LinkedDomainRow>(
+      `SELECT l.id            AS "linkId",
+              l.role          AS "role",
+              l.resource_kind AS "resource_kind",
+              d.id            AS "domain_id",
+              d.slug          AS "slug",
+              d.display_name  AS "display_name",
+              d.version       AS "version",
+              d.status        AS "status"
+         FROM ${this.table("ontology_resource_links")} l
+         JOIN ${this.table("ontology_domains")} d
+           ON d.id = l.domain_id AND d.company_id = l.company_id
+        WHERE l.company_id = $1 AND l.resource_kind = $2 AND l.resource_id = $3
+          AND l.is_deleted = false
+        ORDER BY d.display_name ASC`,
+      [companyId, resourceKind, resourceId],
+    );
   }
 
   private static readonly SUB_PROJECT_COLS =

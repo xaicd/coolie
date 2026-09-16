@@ -12,7 +12,9 @@ import {
   type DescribeDomainResult,
   type GraphStore,
   type ImpactDirection,
+  type OntologyResourceKind,
 } from "./graph/GraphStore.js";
+import { scoreDomainCandidates } from "./graph/linkSuggestions.js";
 import { extractRepoDraft } from "./cognition/AstExtractor.js";
 import { AideStore, type AideCitation } from "./aide/AideStore.js";
 import {
@@ -1090,6 +1092,46 @@ export const SAMPLE_NODE_DEFS: Array<{
   },
 ];
 
+/**
+ * Signals used to guess which domain a project belongs to: whatever the UI
+ * passed, plus the project's own name/ref and its workspace names when the
+ * `projects.read` capability is granted. Best-effort — a missing capability
+ * must not break the tab.
+ */
+async function collectProjectSignals(
+  ctx: PluginContext,
+  companyId: string,
+  fields: Record<string, unknown>,
+): Promise<string[]> {
+  const signals: string[] = [];
+  for (const key of ["projectName", "projectRef", "repoName"]) {
+    const value = fields[key];
+    if (typeof value === "string" && value.trim() !== "") signals.push(value.trim());
+  }
+  const projectId = typeof fields.projectId === "string" ? fields.projectId : "";
+  if (projectId !== "") {
+    try {
+      const project = await ctx.projects.get(projectId, companyId);
+      if (project) {
+        const raw = project as unknown as Record<string, unknown>;
+        for (const key of ["name", "key", "slug"]) {
+          if (typeof raw[key] === "string") signals.push(raw[key] as string);
+        }
+      }
+      const workspaces = await ctx.projects.listWorkspaces(projectId, companyId);
+      for (const workspace of workspaces) {
+        const raw = workspace as unknown as Record<string, unknown>;
+        for (const key of ["name", "path", "repoUrl"]) {
+          if (typeof raw[key] === "string") signals.push(raw[key] as string);
+        }
+      }
+    } catch {
+      // `projects.read` not granted — fall back to what the UI supplied.
+    }
+  }
+  return [...new Set(signals.filter((s) => s.trim() !== ""))];
+}
+
 const plugin = definePlugin({
   async setup(ctx) {
     activeContext = ctx;
@@ -1434,6 +1476,96 @@ const plugin = definePlugin({
       }
 
       return { updates, report };
+    });
+
+    // ── Resource links (project / application ↔ ontology domain) ──
+    //
+    // A domain is the anchor; projects and applications reference it. `link`
+    // is idempotent so a re-run (or a repeated import) is safe.
+    ctx.actions.register("link-ontology-resource", async (params) => {
+      const call = readMutationCall(params);
+      const resourceKind = requireString(call.fields.resourceKind, "resourceKind") as OntologyResourceKind;
+      const resourceId = requireString(call.fields.resourceId, "resourceId");
+      let label = optionalString(call.fields.resourceLabel) ?? "";
+      if (label === "" && resourceKind === "project") {
+        const project = await ctx.projects
+          .get(resourceId, call.companyId)
+          .catch(() => null);
+        label = str((project as unknown as Record<string, unknown> | null)?.name) || "";
+      }
+      const link = await store.linkResource({
+        companyId: call.companyId,
+        domainId: requireString(call.fields.domainId, "domainId"),
+        resourceKind,
+        resourceId,
+        resourceLabel: label,
+        role: call.fields.role === "owner" ? "owner" : "consumer",
+        createdBy: "board",
+      });
+      await ctx.activity.log({
+        companyId: call.companyId,
+        message: `Linked ${resourceKind} ${resourceId} to ontology domain ${link.domain_id}`,
+        entityType: "ontology_resource_link",
+        entityId: link.id,
+      });
+      return { link };
+    });
+
+    ctx.actions.register("unlink-ontology-resource", async (params) => {
+      const call = readMutationCall(params);
+      const removed = await store.unlinkResource(
+        call.companyId,
+        requireString(call.fields.resourceKind, "resourceKind") as OntologyResourceKind,
+        requireString(call.fields.resourceId, "resourceId"),
+        requireString(call.fields.domainId, "domainId"),
+      );
+      return { removed };
+    });
+
+    ctx.actions.register("suggest-ontology-domains", async (params) => {
+      const call = readMutationCall(params);
+      const signals = await collectProjectSignals(ctx, call.companyId, call.fields);
+      const domains = await store.listDomains(call.companyId);
+      return {
+        signals,
+        candidates: scoreDomainCandidates(
+          domains.map((d) => ({ id: d.id, slug: d.slug, display_name: d.display_name })),
+          signals,
+        ),
+      };
+    });
+
+    ctx.data.register("resource-links", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      return { links: await store.listLinksForDomain(companyId, domainId) };
+    });
+
+    /** Backs the project page's 「本体域」 tab. */
+    ctx.data.register("project-ontology", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const projectId = requireString(params.projectId, "projectId");
+
+      const linked = await store.listDomainsForResource(companyId, "project", projectId);
+      // Scale per linked domain, so the tab can say what each one actually holds.
+      const domains = await Promise.all(
+        linked.map(async (row) => ({
+          ...row,
+          counts: (await store.getGraphSnapshot(companyId, row.domain_id, 1)).counts,
+        })),
+      );
+
+      const signals = await collectProjectSignals(ctx, companyId, { ...params, projectId });
+      const all = await store.listDomains(companyId);
+      const linkedIds = new Set(linked.map((row) => row.domain_id));
+      const candidates = scoreDomainCandidates(
+        all
+          .filter((d) => !linkedIds.has(d.id))
+          .map((d) => ({ id: d.id, slug: d.slug, display_name: d.display_name })),
+        signals,
+      );
+
+      return { domains, candidates, signals };
     });
 
     // 对话式编辑 — turn a plain-language request into concrete schema
