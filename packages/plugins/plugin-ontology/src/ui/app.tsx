@@ -35,6 +35,13 @@ import { LegacyImportWizardModal } from "./LegacyImportWizardModal.js";
 import { DatasetsTab } from "./DatasetsTab.js";
 import { ConnectorsTab } from "./ConnectorsTab.js";
 import { TransformsTab } from "./TransformsTab.js";
+import { applyOperations, type MutationCall } from "../aide/editOps.js";
+import {
+  rowsFromSchema,
+  schemaFromRows,
+  typeOptionsFor,
+  type SchemaRow,
+} from "./schemaRows.js";
 
 /**
  * Derive a URL-safe slug from a display name. ASCII letters/digits are kept
@@ -820,6 +827,7 @@ function DomainWorkspace({
     nodeType: { id: string; key: string; display_name: string; properties_schema?: Record<string, unknown> | null };
   } | null>(null);
   const deleteNodeType = usePluginAction("delete-node-type");
+  const createNodeType = usePluginAction("create-node-type");
   const createNode = usePluginAction("create-node");
   const updateNodeType = usePluginAction("update-node-type");
   const createRelationType = usePluginAction("create-relation-type");
@@ -844,6 +852,76 @@ function DomainWorkspace({
     relationType: { id: string; key: string; display_name: string };
   } | null>(null);
   const deleteRelationType = usePluginAction("delete-relation-type");
+  const updateRelationType = usePluginAction("update-relation-type");
+  const aiEditSchema = usePluginAction("ai-edit-schema");
+
+  /**
+   * Dispatch one resolved edit call. Same shape the cockpit's Edit mode uses,
+   * so a conversational change applies through exactly one code path.
+   */
+  const dispatchEditCall = useCallback(
+    async (call: MutationCall): Promise<unknown> => {
+      switch (call.action) {
+        case "create-node-type":
+          return createNodeType({ body: call.body });
+        case "update-node-type":
+          return updateNodeType({ params: call.params, body: call.body });
+        case "delete-node-type":
+          return deleteNodeType({ params: call.params });
+        case "create-relation-type":
+          return createRelationType({ body: call.body });
+        case "update-relation-type":
+          return updateRelationType({ params: call.params, body: call.body });
+        case "delete-relation-type":
+          return deleteRelationType({ params: call.params });
+      }
+    },
+    [createNodeType, updateNodeType, deleteNodeType, createRelationType, updateRelationType, deleteRelationType],
+  );
+
+  /** Inline property-table save (add / edit / delete a field). */
+  const saveNodeTypeSchema = useCallback(
+    async (nodeTypeId: string, schema: Record<string, unknown>) => {
+      await updateNodeType({ companyId, nodeTypeId, propertiesSchema: schema });
+      refreshDomain();
+    },
+    [companyId, updateNodeType, refreshDomain],
+  );
+
+  /**
+   * 对话式编辑 — hand a plain-language request to the model, then apply the
+   * operations it returns. `applyOperations` only reads
+   * `nodeTypes[].{key,id,propertiesSchema}` and `relationTypes[].{key,id}`, all
+   * of which `domain-detail` already carries.
+   */
+  const runAiEdit = useCallback(
+    async (instruction: string, typeKey: string): Promise<string> => {
+      const res = (await aiEditSchema({ companyId, domainId, instruction, typeKey })) as {
+        error?: string;
+        summary?: string;
+        operations?: unknown[];
+      };
+      if (res?.error) throw new Error(res.error);
+
+      const operations = (res?.operations ?? []) as Parameters<typeof applyOperations>[0];
+      if (operations.length === 0) return t("模型没有给出任何改动", "The model proposed no changes");
+
+      const outcome = applyOperations(
+        operations,
+        { nodeTypes: nodeTypes, relationTypes: relationTypes } as never,
+        domainId,
+      );
+      for (const call of outcome.calls) await dispatchEditCall(call);
+      refreshDomain();
+
+      const applied = t(`已应用 ${outcome.calls.length} 项`, `${outcome.calls.length} applied`);
+      const skipped = outcome.skipped.length > 0
+        ? t(`,跳过 ${outcome.skipped.length} 项`, `, ${outcome.skipped.length} skipped`)
+        : "";
+      return res?.summary ? `${res.summary}(${applied}${skipped})` : `${applied}${skipped}`;
+    },
+    [aiEditSchema, companyId, domainId, nodeTypes, relationTypes, dispatchEditCall, refreshDomain],
+  );
 
   // Action / Function / Interface counts are not in the graph snapshot; we
   // pull them separately for the right-side Statistics panel.
@@ -1011,6 +1089,8 @@ function DomainWorkspace({
             onSelectNode={setSelectedNodeId}
             focusNodeTypeId={focusNodeTypeId}
             onSelectNodeType={setFocusNodeTypeId}
+            onSaveNodeTypeSchema={saveNodeTypeSchema}
+            onAiEdit={runAiEdit}
             mode={view === "graph" ? "graph" : view === "table" ? "table" : "schema"}
             hideTabs
             nodeTypeDragMime={DRAG_MIME}
@@ -2136,69 +2216,12 @@ function MenuDivider2(): ReactElement {
  * in the footer opens a raw textarea for the rare cases where you need
  * enum / $ref / format / nested objects. Two separate entry points, no
  * round-trip syncing.
+ *
+ * Row parsing/serialisation is shared with the schema tab's inline editor
+ * (`./schemaRows.js`) so both surfaces preserve the descriptor keys this form
+ * does not expose — previously saving here rewrote every field as `{ type }`
+ * and silently dropped `enum` / `format` / `required`.
  */
-type SchemaRow = {
-  key: string;
-  type: "string" | "number" | "boolean" | "integer" | "array" | "object";
-};
-
-const SCHEMA_TYPE_OPTIONS: SchemaRow["type"][] = [
-  "string",
-  "number",
-  "boolean",
-  "integer",
-  "array",
-  "object",
-];
-
-/**
- * Read stored schema back into rows. Tolerates two storage shapes the
- * worker might hold: a flat map (`{ name: "alice", age: 30 }`) or a real
- * JSON Schema document (`{ type: "object", properties: {...} }`).
- */
-function rowsFromSchema(schema: unknown): SchemaRow[] {
-  if (!schema || typeof schema !== "object" || Array.isArray(schema)) return [];
-  const obj = schema as Record<string, unknown>;
-
-  if (obj.properties && typeof obj.properties === "object" && !Array.isArray(obj.properties)) {
-    const props = obj.properties as Record<string, unknown>;
-    return Object.entries(props).map(([key, def]) => {
-      if (def && typeof def === "object" && !Array.isArray(def)) {
-        const t = (def as Record<string, unknown>).type;
-        return {
-          key,
-          type: typeof t === "string" && (SCHEMA_TYPE_OPTIONS as string[]).includes(t)
-            ? (t as SchemaRow["type"])
-            : "string",
-        };
-      }
-      return { key, type: "string" as const };
-    });
-  }
-
-  // Flat-map shape — top-level keys only.
-  return Object.entries(obj)
-    .filter(([k]) => k !== "type")
-    .map(([key, value]) => ({
-      key,
-      type: typeof value === "number"
-        ? ("number" as const)
-        : typeof value === "boolean"
-        ? ("boolean" as const)
-        : ("string" as const),
-    }));
-}
-
-/** Build a JSON Schema object from the row list. Empty keys are skipped. */
-function schemaFromRows(rows: SchemaRow[]): Record<string, unknown> {
-  const properties: Record<string, unknown> = {};
-  for (const r of rows) {
-    const key = r.key.trim();
-    if (!key) continue;
-    properties[key] = { type: r.type };
-  }
-  return { type: "object", properties };
-}
 
 function PropertiesSchemaEditor({
   editor,
@@ -2240,7 +2263,7 @@ function PropertiesSchemaEditor({
     setRows((r) => r.filter((_, idx) => idx !== i));
   };
   const addRow = () => {
-    setRows((r) => [...r, { key: "", type: "string" }]);
+    setRows((r) => [...r, { key: "", type: "string", description: "", rest: {} }]);
   };
 
   const save = async () => {
@@ -2336,11 +2359,11 @@ function PropertiesSchemaEditor({
                     <select
                       value={row.type}
                       onChange={(e) =>
-                        updateRow(i, { type: e.target.value as SchemaRow["type"] })
+                        updateRow(i, { type: e.target.value })
                       }
                       className="rounded-md border border-border bg-background px-1.5 py-1 text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring"
                     >
-                      {SCHEMA_TYPE_OPTIONS.map((opt) => (
+                      {typeOptionsFor(row.type).map((opt) => (
                         <option key={opt} value={opt}>{opt}</option>
                       ))}
                     </select>

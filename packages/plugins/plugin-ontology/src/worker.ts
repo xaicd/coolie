@@ -1250,6 +1250,47 @@ const plugin = definePlugin({
       registerMutationAction(ctx, store, key, handler);
     }
 
+    // 对话式编辑 — turn a plain-language request into concrete schema
+    // operations. Read-only here: the UI runs the returned ops through the same
+    // `applyOperations` → mutation path the cockpit's Edit mode uses, so both
+    // conversational surfaces share one apply implementation.
+    ctx.actions.register("ai-edit-schema", async (params) => {
+      const call = readMutationCall(params);
+      const domainId = requireString(call.fields.domainId, "domainId");
+      const instruction = requireString(call.fields.instruction, "instruction");
+      const focusTypeKey = optionalString(call.fields.typeKey) ?? null;
+
+      const described = await store.describeDomain(call.companyId, domainId);
+      const client = getClient();
+      const response = await client.messages.create({
+        model: getModel(),
+        max_tokens: 4096,
+        system: buildAideSystemPrompt(described) + EDIT_SYSTEM_PROMPT_SUFFIX,
+        messages: [
+          {
+            role: "user",
+            content: focusTypeKey
+              ? `当前聚焦对象类型:${focusTypeKey}。请处理以下需求(不需要跨类型时只改这个类型):\n${instruction}`
+              : instruction,
+          },
+        ],
+      });
+      const text = response.content
+        .filter((block) => block.type === "text")
+        .map((block) => (block.type === "text" ? block.text : ""))
+        .join("");
+
+      const parsed = parseEditResponse(text);
+      if (!parsed.ok) return { error: parsed.error, raw: text };
+      return {
+        intent: parsed.result.intent,
+        summary: parsed.result.summary,
+        confidence: parsed.result.confidence,
+        warnings: parsed.result.warnings,
+        operations: parsed.result.operations,
+      };
+    });
+
     // 智能补全 — propose standard fields for an object type.
     //
     // Read-only on purpose: the proposal is merged into the existing schema

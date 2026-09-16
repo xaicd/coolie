@@ -112,6 +112,13 @@ function useReactFlowCss(): void {
 }
 
 import { t } from "./isZh.js";
+import {
+  rowsFromSchema,
+  schemaFromRows,
+  schemasEqual,
+  typeOptionsFor,
+  type SchemaRow,
+} from "./schemaRows.js";
 
 type OntologyNodeData = { label: string; nodeKey: string; tone: string; typeName: string | null; dimmed?: boolean; fill?: string | null };
 
@@ -1052,6 +1059,10 @@ interface GraphViewProps {
   focusNodeTypeId?: string | null;
   /** Lets the schema view's own list drive the same selection the left tree uses. */
   onSelectNodeType?: (id: string | null) => void;
+  /** Persist an edited property schema for one object type. */
+  onSaveNodeTypeSchema?: (nodeTypeId: string, schema: Record<string, unknown>) => Promise<void> | void;
+  /** Apply a plain-language schema change; resolves with a human summary. */
+  onAiEdit?: (instruction: string, typeKey: string) => Promise<string>;
   /** Control which view is shown; if omitted GraphView owns its own tab state. */
   mode?: GraphViewMode;
   /** Hide the internal graph/table/schema tab bar (when host renders tabs). */
@@ -1132,6 +1143,8 @@ export function GraphView(props: GraphViewProps): ReactElement {
           relationTypes={relationTypeDefs}
           focusNodeTypeId={props.focusNodeTypeId}
           onSelectNodeType={props.onSelectNodeType}
+          onSaveNodeTypeSchema={props.onSaveNodeTypeSchema}
+          onAiEdit={props.onAiEdit}
         />
       )}
     </>
@@ -1163,18 +1176,6 @@ export function GraphView(props: GraphViewProps): ReactElement {
 }
 
 export const MAX_TABLE_PROPERTY_COLUMNS = 4;
-
-/** Compact `name: type` rendering for a schema descriptor (DS shows `status: enum`). */
-export function summarizePropertyType(descriptor: unknown): string {
-  if (!descriptor || typeof descriptor !== "object") return String(descriptor ?? "");
-  const obj = descriptor as { type?: string; format?: string; enum?: unknown[] };
-  const base = obj.type ?? "any";
-  if (Array.isArray(obj.enum) && obj.enum.length > 0) {
-    return `${base} (${obj.enum.map((v) => String(v)).join(" | ")})`;
-  }
-  if (obj.format) return `${base} (${obj.format})`;
-  return base;
-}
 
 /** Render one instance property for a table cell; mirrors DS's `cellValue`. */
 function propertyCellValue(value: unknown): string {
@@ -1343,11 +1344,15 @@ function SchemaView({
   relationTypes,
   focusNodeTypeId,
   onSelectNodeType,
+  onSaveNodeTypeSchema,
+  onAiEdit,
 }: {
   nodeTypes: GraphNodeType[];
   relationTypes: GraphNodeType[];
   focusNodeTypeId?: string | null;
   onSelectNodeType?: (id: string | null) => void;
+  onSaveNodeTypeSchema?: (nodeTypeId: string, schema: Record<string, unknown>) => Promise<void> | void;
+  onAiEdit?: (instruction: string, typeKey: string) => Promise<string>;
 }): ReactElement {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<
@@ -1470,7 +1475,11 @@ function SchemaView({
       {/* Detail — only the selected item's fields */}
       <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-background p-3">
         {selectedNodeType ? (
-          <SchemaTypeDetail nodeType={selectedNodeType} />
+          <SchemaTypeDetail
+            nodeType={selectedNodeType}
+            onSaveSchema={onSaveNodeTypeSchema}
+            onAiEdit={onAiEdit}
+          />
         ) : selectedRelationType ? (
           <SchemaRelationDetail relationType={selectedRelationType} />
         ) : (
@@ -1499,56 +1508,217 @@ function SchemaGroupHeader({ label }: { label: string }): ReactElement {
   );
 }
 
-function SchemaTypeDetail({ nodeType }: { nodeType: GraphNodeType }): ReactElement {
-  const entries = nodeType.propertiesSchema && typeof nodeType.propertiesSchema === "object"
-    ? Object.entries(nodeType.propertiesSchema)
-    : [];
+/**
+ * One object type's fields, edited in place.
+ *
+ * Three ways to change it, all writing through the same `propertiesSchema`:
+ * edit a row (name / type / note), add or delete a row and save, or describe
+ * the change in plain language and let the model emit the operations.
+ */
+function SchemaTypeDetail({
+  nodeType,
+  onSaveSchema,
+  onAiEdit,
+}: {
+  nodeType: GraphNodeType;
+  onSaveSchema?: (nodeTypeId: string, schema: Record<string, unknown>) => Promise<void> | void;
+  onAiEdit?: (instruction: string, typeKey: string) => Promise<string>;
+}): ReactElement {
+  const initialRows = useMemo(
+    () => rowsFromSchema(nodeType.propertiesSchema),
+    [nodeType.id, nodeType.propertiesSchema],
+  );
+  const [rows, setRows] = useState<SchemaRow[]>(initialRows);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [note, setNote] = useState<string | null>(null);
+  const [instruction, setInstruction] = useState("");
+
+  // Re-seed whenever the stored schema changes underneath us (a save, an AI
+  // edit, or a domain refresh).
+  useEffect(() => {
+    setRows(initialRows);
+    setErr(null);
+    setNote(null);
+  }, [initialRows]);
+
+  const dirty = !schemasEqual(rows, initialRows);
+  const update = (i: number, patch: Partial<SchemaRow>) =>
+    setRows((rs) => rs.map((row, idx) => (idx === i ? { ...row, ...patch } : row)));
+  const removeRow = (i: number) => setRows((rs) => rs.filter((_, idx) => idx !== i));
+  const addRow = () =>
+    setRows((rs) => [...rs, { key: "", type: "string", description: "", rest: {} }]);
+
+  const save = async () => {
+    if (!onSaveSchema) return;
+    setBusy(true); setErr(null); setNote(null);
+    try {
+      await onSaveSchema(nodeType.id, schemaFromRows(rows));
+      setNote(t("已保存", "Saved"));
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runEdit = async () => {
+    const text = instruction.trim();
+    if (!text || !onAiEdit) return;
+    setBusy(true); setErr(null); setNote(null);
+    try {
+      const summary = await onAiEdit(text, nodeType.key);
+      setInstruction("");
+      setNote(summary);
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   return (
-    <div className="flex flex-col gap-2">
+    <div className="flex flex-col gap-3">
       <div className="flex items-baseline gap-2">
         <span aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ background: toneFor(nodeType.id) }} />
         <span className="text-(length:--text-compact) font-semibold">{nodeType.display_name || nodeType.key}</span>
         <span className="font-mono text-(length:--text-nano) text-muted-foreground">{nodeType.key}</span>
         <span className="ml-auto rounded bg-muted/60 px-1.5 py-0.5 text-(length:--text-nano) tabular-nums text-muted-foreground">
-          {entries.length} {t("属性", "props")}
+          {rows.filter((r) => r.key.trim() !== "").length} {t("属性", "props")}
         </span>
       </div>
       {nodeType.description && (
         <div className="text-(length:--text-nano) text-muted-foreground">{nodeType.description}</div>
       )}
 
-      {entries.length === 0 ? (
+      {/* Conversational edit — describe the change and it is applied. */}
+      {onAiEdit && (
+        <div className="flex items-center gap-1.5 rounded-md border border-dashed border-border bg-muted/20 p-1.5">
+          <span aria-hidden className="pl-1 text-(length:--text-nano) text-muted-foreground">✨</span>
+          <input
+            type="text"
+            value={instruction}
+            onChange={(e) => setInstruction(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Enter") void runEdit(); }}
+            disabled={busy}
+            placeholder={t(
+              `描述要改成什么,例如「给 ${nodeType.key} 加上 email 和 phone 两个字段」`,
+              `Describe the change, e.g. "add email and phone to ${nodeType.key}"`,
+            )}
+            className="min-w-0 flex-1 bg-transparent px-1 py-0.5 text-(length:--text-nano) text-foreground outline-none placeholder:text-muted-foreground"
+          />
+          <button
+            type="button"
+            onClick={() => { void runEdit(); }}
+            disabled={busy || instruction.trim() === ""}
+            className="shrink-0 rounded-md bg-primary px-2 py-0.5 text-(length:--text-nano) font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+          >
+            {busy ? "…" : t("执行", "Apply")}
+          </button>
+        </div>
+      )}
+
+      {/* Field table — every cell editable. */}
+      <table className="w-full text-(length:--text-nano)">
+        <thead className="text-muted-foreground">
+          <tr className="border-b border-border">
+            <th className="px-1 py-1 text-left font-medium">{t("字段", "Field")}</th>
+            <th className="w-24 px-1 py-1 text-left font-medium">{t("类型", "Type")}</th>
+            <th className="px-1 py-1 text-left font-medium">{t("说明", "Description")}</th>
+            <th className="w-6"></th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row, i) => (
+            <tr key={i} className="border-b border-border/60 last:border-b-0">
+              <td className="px-0.5 py-0.5">
+                <input
+                  type="text"
+                  value={row.key}
+                  onChange={(e) => update(i, { key: e.target.value })}
+                  placeholder="fieldName"
+                  className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 font-mono text-foreground/90 outline-none hover:border-border focus:border-ring focus:bg-background"
+                />
+              </td>
+              <td className="px-0.5 py-0.5">
+                <select
+                  value={row.type}
+                  onChange={(e) => update(i, { type: e.target.value })}
+                  className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-muted-foreground outline-none hover:border-border focus:border-ring focus:bg-background"
+                >
+                  {typeOptionsFor(row.type).map((opt) => (
+                    <option key={opt} value={opt}>{opt}</option>
+                  ))}
+                </select>
+              </td>
+              <td className="px-0.5 py-0.5">
+                <input
+                  type="text"
+                  value={row.description}
+                  onChange={(e) => update(i, { description: e.target.value })}
+                  placeholder={t("说明", "note")}
+                  className="w-full rounded border border-transparent bg-transparent px-1 py-0.5 text-muted-foreground outline-none hover:border-border focus:border-ring focus:bg-background"
+                />
+              </td>
+              <td className="px-0.5 py-0.5 text-center">
+                <button
+                  type="button"
+                  onClick={() => removeRow(i)}
+                  title={t("删除字段", "Remove field")}
+                  className="rounded px-1 text-muted-foreground hover:bg-accent hover:text-destructive"
+                >
+                  ✕
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {rows.length === 0 && (
         <div className="rounded-md border border-dashed border-border px-2 py-3 text-center text-(length:--text-nano) italic text-muted-foreground">
           {t("尚未配置属性", "No properties defined")}
         </div>
-      ) : (
-        <table className="w-full text-(length:--text-nano)">
-          <thead className="text-muted-foreground">
-            <tr className="border-b border-border">
-              <th className="px-1 py-1 text-left font-medium">{t("字段", "Field")}</th>
-              <th className="px-1 py-1 text-left font-medium">{t("类型", "Type")}</th>
-              <th className="px-1 py-1 text-left font-medium">{t("说明", "Description")}</th>
-            </tr>
-          </thead>
-          <tbody>
-            {entries.map(([name, descriptor]) => {
-              const obj = (descriptor && typeof descriptor === "object"
-                ? descriptor
-                : {}) as { description?: unknown };
-              return (
-                <tr key={name} className="border-b border-border/60 last:border-b-0">
-                  <td className="px-1 py-1 font-mono text-foreground/90">{name}</td>
-                  <td className="px-1 py-1 text-muted-foreground">{summarizePropertyType(descriptor)}</td>
-                  <td className="px-1 py-1 text-muted-foreground">
-                    {typeof obj.description === "string" ? obj.description : ""}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
       )}
+
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={addRow}
+          disabled={busy}
+          className="rounded-md border border-dashed border-border px-2 py-1 text-(length:--text-nano) text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-50"
+        >
+          + {t("字段", "field")}
+        </button>
+        {dirty && (
+          <>
+            <button
+              type="button"
+              onClick={() => { setRows(initialRows); setErr(null); setNote(null); }}
+              disabled={busy}
+              className="rounded-md px-2 py-1 text-(length:--text-nano) text-muted-foreground hover:bg-accent"
+            >
+              {t("撤销", "Discard")}
+            </button>
+            <button
+              type="button"
+              onClick={() => { void save(); }}
+              disabled={busy}
+              className="rounded-md bg-primary px-2 py-1 text-(length:--text-nano) font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+            >
+              {busy ? "…" : t("保存", "Save")}
+            </button>
+            <span className="text-(length:--text-nano) text-amber-600 dark:text-amber-400">
+              {t("有未保存的改动", "Unsaved changes")}
+            </span>
+          </>
+        )}
+        {!dirty && note && (
+          <span className="text-(length:--text-nano) text-emerald-600 dark:text-emerald-400">{note}</span>
+        )}
+      </div>
+
+      {err && <div className="text-(length:--text-nano) text-destructive">{err}</div>}
     </div>
   );
 }
