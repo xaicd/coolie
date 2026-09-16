@@ -25,7 +25,10 @@ export interface ModulePrefixEntry {
 
 const ENTRIES: ModulePrefixEntry[] = [
   // 订单 / 交易 / 支付 / 退款
-  { pattern: "订单", module: "order", en: ["order", "orders", "purchase", "trade"] },
+  { pattern: "订单", module: "order", en: ["order", "orders", "trade"] },
+  // 采购 — its own module in every ERP (Kingdee K3/PU, SAP MM). It used to be
+  // swallowed by 订单's synonyms, so procurement tables grouped under orders.
+  { pattern: "采购", module: "purchase", en: ["purchase", "procurement", "po"] },
   { pattern: "交易", module: "trade", en: ["transaction", "trading"] },
   { pattern: "支付", module: "payment", en: ["payment", "pay", "billing"] },
   { pattern: "退款", module: "refund", en: ["refund"] },
@@ -113,6 +116,34 @@ const ENTRIES: ModulePrefixEntry[] = [
   { pattern: "租约", module: "lease", en: ["lease"] },
 ];
 
+export interface ModuleMatch {
+  module: ModulePrefix;
+  /** The Chinese keyword that matched — also usable as a display label. */
+  pattern: string;
+}
+
+/**
+ * Like `inferModuleFromText`, but reports whether anything matched at all.
+ * Grouping a large type index needs that distinction: the `"core"` fallback
+ * would otherwise drop every unmatched type into one meaningless bucket.
+ */
+export function matchModuleFromText(text: string): ModuleMatch | null {
+  const lower = text.toLowerCase();
+  for (const entry of ENTRIES) {
+    if (lower.includes(entry.pattern.toLowerCase())) {
+      return { module: entry.module, pattern: entry.pattern };
+    }
+    if (entry.en) {
+      for (const syn of entry.en) {
+        if (lower.includes(syn.toLowerCase())) {
+          return { module: entry.module, pattern: entry.pattern };
+        }
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Infer a module name from arbitrary text — DDL table names, column
  * comments, OpenAPI schema descriptions, or extracted document
@@ -120,16 +151,7 @@ const ENTRIES: ModulePrefixEntry[] = [
  * (matching the codeScanner default) when nothing matches.
  */
 export function inferModuleFromText(text: string): ModulePrefix {
-  const lower = text.toLowerCase();
-  for (const entry of ENTRIES) {
-    if (lower.includes(entry.pattern.toLowerCase())) return entry.module;
-    if (entry.en) {
-      for (const syn of entry.en) {
-        if (lower.includes(syn.toLowerCase())) return entry.module;
-      }
-    }
-  }
-  return "core";
+  return matchModuleFromText(text)?.module ?? "core";
 }
 
 /** Lookup the canonical module name for a single keyword. */

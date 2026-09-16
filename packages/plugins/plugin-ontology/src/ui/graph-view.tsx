@@ -119,6 +119,7 @@ import {
   typeOptionsFor,
   type SchemaRow,
 } from "./schemaRows.js";
+import { groupTypesForIndex } from "./typeGroups.js";
 
 type OntologyNodeData = { label: string; nodeKey: string; tone: string; typeName: string | null; dimmed?: boolean; fill?: string | null };
 
@@ -1348,6 +1349,16 @@ function TableView({
  */
 const MAX_SCHEMA_ROWS = 300;
 
+/**
+ * Types rendered inside one expanded group. The group index keeps the top level
+ * short, but a single group can still hold thousands of types (`其他` on an
+ * unclassifiable legacy schema), so each group is individually capped.
+ */
+const MAX_TYPES_PER_GROUP = 200;
+
+/** Domains at or below this size open every group — collapsing adds nothing. */
+const AUTO_EXPAND_BELOW = 40;
+
 function SchemaView({
   nodeTypes,
   relationTypes,
@@ -1421,6 +1432,41 @@ function SchemaView({
       ? Object.keys(nt.propertiesSchema).length
       : 0;
 
+  // --- Drill-down index -----------------------------------------------------
+  // Thousands of types (a Kingdee K3-sized schema) cannot be read as one list,
+  // so the index is grouped and collapsed, and you descend group → type →
+  // field the way a map app shows progressively finer detail as you zoom in.
+  const groups = useMemo(() => groupTypesForIndex(visibleNodeTypes), [visibleNodeTypes]);
+  const [expanded, setExpanded] = useState<Set<string>>(() => new Set());
+
+  // Seed the default from the whole domain, not the filtered list, so typing in
+  // the search box never resets what the user opened.
+  const domainSignature = useMemo(() => nodeTypes.map((nt) => nt.id).join("|"), [nodeTypes]);
+  useEffect(() => {
+    const small = nodeTypes.length <= AUTO_EXPAND_BELOW;
+    setExpanded(new Set(small ? groupTypesForIndex(nodeTypes).map((g) => g.key) : []));
+  }, [domainSignature, nodeTypes]);
+
+  // A type picked anywhere else (the graph, the left tree) must be reachable
+  // here too, so open whichever group holds it.
+  useEffect(() => {
+    if (!focusNodeTypeId) return;
+    const owner = groups.find((g) => g.types.some((nt) => nt.id === focusNodeTypeId));
+    if (!owner) return;
+    setExpanded((prev) => (prev.has(owner.key) ? prev : new Set(prev).add(owner.key)));
+  }, [focusNodeTypeId, groups]);
+
+  /** While searching, matches are always visible — search bypasses the index. */
+  const isOpen = (key: string): boolean => needle !== "" || expanded.has(key);
+  const toggleGroup = (key: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+  const allOpen = groups.length > 0 && groups.every((g) => expanded.has(g.key));
+
   return (
     <div className="flex min-h-0 gap-3">
       {/* Index */}
@@ -1433,36 +1479,82 @@ function SchemaView({
           className="rounded-md border border-border bg-background px-2 py-1 text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring"
         />
         <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border">
-          <SchemaGroupHeader
-            label={`${t("对象类型", "Object types")} · ${visibleNodeTypes.length}`}
-          />
-          {visibleNodeTypes.slice(0, MAX_SCHEMA_ROWS).map((nt) => (
-            <button
-              key={nt.id}
-              type="button"
-              onClick={() => pickNodeType(nt.id)}
-              className={[
-                "flex w-full items-center gap-2 border-b border-border/60 px-2 py-1 text-left transition-colors last:border-b-0",
-                selectedNodeType?.id === nt.id ? "bg-primary/10 text-primary" : "hover:bg-accent",
-              ].join(" ")}
-            >
-              <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: toneFor(nt.id) }} />
-              <span className="min-w-0 flex-1 truncate text-(length:--text-compact)">
-                {nt.display_name || nt.key}
-              </span>
-              <span className="shrink-0 tabular-nums text-(length:--text-nano) text-muted-foreground">
-                {propertyCount(nt)}
-              </span>
-            </button>
-          ))}
-          {visibleNodeTypes.length > MAX_SCHEMA_ROWS && (
-            <div className="px-2 py-1 text-(length:--text-nano) text-muted-foreground">
-              {t(
-                `仅显示前 ${MAX_SCHEMA_ROWS} 个,还有 ${visibleNodeTypes.length - MAX_SCHEMA_ROWS} 个,请用搜索缩小范围`,
-                `Showing first ${MAX_SCHEMA_ROWS} of ${visibleNodeTypes.length} — search to narrow`,
-              )}
-            </div>
-          )}
+          <div className="flex items-center gap-2 border-b border-border px-2 py-1">
+            <span className="min-w-0 flex-1 truncate text-(length:--text-nano) font-medium text-muted-foreground">
+              {t("对象类型", "Object types")} · {visibleNodeTypes.length}
+              {groups.length > 1 && ` · ${groups.length} ${t("组", "groups")}`}
+            </span>
+            {groups.length > 1 && needle === "" && (
+              <button
+                type="button"
+                onClick={() =>
+                  setExpanded(allOpen ? new Set() : new Set(groups.map((g) => g.key)))
+                }
+                className="shrink-0 text-(length:--text-nano) text-muted-foreground hover:text-foreground"
+              >
+                {allOpen ? t("全部折叠", "Collapse all") : t("全部展开", "Expand all")}
+              </button>
+            )}
+          </div>
+
+          {groups.map((group) => {
+            const open = isOpen(group.key);
+            const shown = open ? group.types.slice(0, MAX_TYPES_PER_GROUP) : [];
+            return (
+              <div key={group.key}>
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.key)}
+                  className="flex w-full items-center gap-1.5 border-b border-border/60 bg-muted/30 px-2 py-1 text-left transition-colors hover:bg-accent"
+                >
+                  <span
+                    aria-hidden
+                    className="w-2 shrink-0 text-(length:--text-nano) text-muted-foreground"
+                  >
+                    {open ? "▾" : "▸"}
+                  </span>
+                  <span className="min-w-0 flex-1 truncate text-(length:--text-nano) font-medium text-foreground/90">
+                    {group.label}
+                  </span>
+                  {group.kind === "layer" && (
+                    <span className="shrink-0 text-(length:--text-nano) text-muted-foreground">
+                      {t("层", "layer")}
+                    </span>
+                  )}
+                  <span className="shrink-0 tabular-nums text-(length:--text-nano) text-muted-foreground">
+                    {group.types.length}
+                  </span>
+                </button>
+                {shown.map((nt) => (
+                  <button
+                    key={nt.id}
+                    type="button"
+                    onClick={() => pickNodeType(nt.id)}
+                    className={[
+                      "flex w-full items-center gap-2 border-b border-border/60 py-1 pr-2 pl-5 text-left transition-colors last:border-b-0",
+                      selectedNodeType?.id === nt.id ? "bg-primary/10 text-primary" : "hover:bg-accent",
+                    ].join(" ")}
+                  >
+                    <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: toneFor(nt.id) }} />
+                    <span className="min-w-0 flex-1 truncate text-(length:--text-compact)">
+                      {nt.display_name || nt.key}
+                    </span>
+                    <span className="shrink-0 tabular-nums text-(length:--text-nano) text-muted-foreground">
+                      {propertyCount(nt)}
+                    </span>
+                  </button>
+                ))}
+                {open && group.types.length > MAX_TYPES_PER_GROUP && (
+                  <div className="border-b border-border/60 px-2 py-1 pl-5 text-(length:--text-nano) text-muted-foreground">
+                    {t(
+                      `仅显示前 ${MAX_TYPES_PER_GROUP} 个,还有 ${group.types.length - MAX_TYPES_PER_GROUP} 个,请用搜索缩小范围`,
+                      `Showing first ${MAX_TYPES_PER_GROUP} of ${group.types.length} — search to narrow`,
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
           {visibleNodeTypes.length === 0 && (
             <div className="px-2 py-1 text-(length:--text-nano) text-muted-foreground">—</div>
           )}
