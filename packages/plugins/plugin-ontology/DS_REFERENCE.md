@@ -67,9 +67,16 @@
 - [x] 表格视图按 schema 推导列 —— 2026-09-15 对齐：选中对象类型后按 `propertiesSchema`
       生成属性列（上限 4 列）+ 「共 N 条记录」表头 + 按类型过滤。
 - [x] 模型视图展示属性 —— 2026-09-15 对齐：对象类型卡片内联列出 `name: type` + 「N 属性」徽章。
+- [x] 对象类型右键菜单 —— 2026-09-15 对齐并**做成真写库**：属性 / 智能补全 / 建立关系 /
+      动作 / 删除。DS 的 `SchemaTypeContextMenu`（添加属性 / 定义动作 / 智能补全 / 建立关系 /
+      移除类型）在两个调用点（`SchemaOverviewPanel.tsx`、`WorkbenchSidebar.tsx`）都只传了
+      `onClose`，5 个回调全是 undefined —— 每项只弹 prompt/confirm + 成功 toast，**不落库**；
+      「智能补全」更是直接 toast 一句写死的文案。我们这几项都走真实的 `update-node-type` /
+      `create-relation-type` / `delete-node-type`。
 - [ ] **沙盘（Playground）视图** —— DS 有：4 张演练卡 + 实时运行日志 + 4 个 KPI 卡。
       我们的对应能力分散在别处（图谱右键「影响推演」、右侧统计面板），没有聚合页。
-- [ ] 底部「聚类」按钮 —— DS 有；我们暂用左侧类型过滤代替。
+- [ ] 底部「聚类」按钮 —— DS 有；我们暂用左侧类型过滤代替（`graph-view.tsx` 的
+      `clusterMode` 已支持 off / byType / colorByType，只是没有 DS 那个按钮形态）。
 
 ## 2026-09-15 实测补充（Playwright 截图 + DOM dump）
 

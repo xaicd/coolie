@@ -822,6 +822,12 @@ function DomainWorkspace({
   const deleteNodeType = usePluginAction("delete-node-type");
   const createNode = usePluginAction("create-node");
   const updateNodeType = usePluginAction("update-node-type");
+  const createRelationType = usePluginAction("create-relation-type");
+  // 智能补全 — asks the model for standard fields on a type. Read-only: the
+  // merged result opens in the schema editor so the user still confirms.
+  const aiSuggestFields = usePluginAction("ai-suggest-fields");
+  /** Type whose fields are currently being generated (menu item shows a busy state). */
+  const [suggestingFieldsFor, setSuggestingFieldsFor] = useState<string | null>(null);
   // Properties-schema editor modal — opened from the type right-click "属性"
   // item. Independent of nodeTypeMenu so the menu can dismiss while the
   // editor stays open. The user picks "save" or "cancel".
@@ -1138,6 +1144,70 @@ function DomainWorkspace({
                     nodeTypeLabel: m.nodeType.display_name,
                     initialSchema: (m.nodeType.properties_schema as Record<string, unknown> | null | undefined) ?? null,
                   });
+                }}
+              />
+              <MenuItem2
+                label={suggestingFieldsFor
+                  ? t("生成中…", "Generating…")
+                  : t("智能补全", "AI fields")}
+                icon="✨"
+                disabled={suggestingFieldsFor !== null}
+                onClick={() => {
+                  const m = nodeTypeMenu; setNodeTypeMenu(null);
+                  setSuggestingFieldsFor(m.nodeType.id);
+                  void (async () => {
+                    try {
+                      const res = await aiSuggestFields({
+                        companyId,
+                        domainId,
+                        typeKey: m.nodeType.key,
+                      }) as { error?: string; merged?: Record<string, unknown> };
+                      if (res?.error) {
+                        window.alert(res.error);
+                        return;
+                      }
+                      // The model only proposes — the merge opens in the schema
+                      // editor so the user still reviews before saving.
+                      setPropSchemaEditor({
+                        nodeTypeId: m.nodeType.id,
+                        nodeTypeLabel: m.nodeType.display_name,
+                        initialSchema: res?.merged ?? null,
+                      });
+                    } catch (e) {
+                      window.alert(String((e as Error)?.message ?? e));
+                    } finally {
+                      setSuggestingFieldsFor(null);
+                    }
+                  })();
+                }}
+              />
+              <MenuItem2
+                label={t("建立关系", "New relation")}
+                icon="⇄"
+                onClick={() => {
+                  const m = nodeTypeMenu; setNodeTypeMenu(null);
+                  const input = window.prompt(
+                    t(
+                      `从「${m.nodeType.display_name}」出发的关联关系 key(如 belongs_to、references):`,
+                      `Relation key from "${m.nodeType.display_name}" (e.g. belongs_to):`,
+                    ),
+                  );
+                  if (!input || !input.trim()) return;
+                  const relationKey = input.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "_");
+                  void (async () => {
+                    try {
+                      await createRelationType({
+                        companyId,
+                        domainId,
+                        key: relationKey,
+                        displayName: relationKey,
+                        directed: true,
+                      });
+                      refreshDomain();
+                    } catch (e) {
+                      window.alert(String((e as Error)?.message ?? e));
+                    }
+                  })();
                 }}
               />
               <MenuDivider2 />

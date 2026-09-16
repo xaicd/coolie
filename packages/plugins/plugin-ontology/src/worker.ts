@@ -30,6 +30,7 @@ import {
 import { EDIT_SYSTEM_PROMPT_SUFFIX, parseEditResponse } from "./aide/editOps.js";
 import { AIDE_TOOL_SPECS, executeAideTool } from "./aide/agentTools.js";
 import { runAideAgent, type AideLoopMessage } from "./aide/agentLoop.js";
+import { buildSuggestFieldsPrompt, parseSuggestedFields } from "./aide/suggestFields.js";
 import type {
   ActionKind,
   ActionTypeStatus,
@@ -1190,6 +1191,59 @@ const plugin = definePlugin({
     for (const [key, handler] of Object.entries(MUTATION_HANDLERS)) {
       registerMutationAction(ctx, store, key, handler);
     }
+
+    // 智能补全 — propose standard fields for an object type.
+    //
+    // Read-only on purpose: the proposal is merged into the existing schema
+    // editor and the user saves it through the same `update-node-type` path as
+    // a manual edit. (The reference workbench's version of this menu item only
+    // fires a toast with a hardcoded field list and writes nothing.)
+    ctx.actions.register("ai-suggest-fields", async (params) => {
+      const call = readMutationCall(params);
+      const domainId = requireString(call.fields.domainId, "domainId");
+      const typeKey = requireString(call.fields.typeKey, "typeKey");
+
+      const described = await store.describeDomain(call.companyId, domainId);
+      const nodeType = described.nodeTypes.find((nt) => nt.key === typeKey);
+      if (!nodeType) return { error: `对象类型「${typeKey}」不存在` };
+
+      const existingProperties =
+        nodeType.propertiesSchema && typeof nodeType.propertiesSchema === "object"
+          ? nodeType.propertiesSchema
+          : {};
+
+      const client = getClient();
+      const response = await client.messages.create({
+        model: getModel(),
+        max_tokens: 2048,
+        system: buildSuggestFieldsPrompt({
+          domainSlug: described.domain.slug,
+          domainName: described.domain.display_name,
+          typeKey: nodeType.key,
+          displayName: nodeType.displayName,
+          description: nodeType.description,
+          existingProperties,
+          siblingTypeKeys: described.nodeTypes
+            .filter((nt) => nt.key !== typeKey)
+            .map((nt) => nt.key),
+        }),
+        messages: [{ role: "user", content: `请为对象类型 ${typeKey} 补充标准字段。` }],
+      });
+      const text = response.content
+        .filter((block) => block.type === "text")
+        .map((block) => (block.type === "text" ? block.text : ""))
+        .join("");
+
+      const parsed = parseSuggestedFields(text, Object.keys(existingProperties));
+      if (!parsed.ok) return { error: parsed.error, raw: text };
+
+      return {
+        typeKey: nodeType.key,
+        fields: parsed.fields,
+        merged: { ...existingProperties, ...parsed.fields },
+        addedCount: Object.keys(parsed.fields).length,
+      };
+    });
 
     // Graph instance authoring — backs drag-to-model in the graph view.
     ctx.actions.register("create-node", async (params) => {
