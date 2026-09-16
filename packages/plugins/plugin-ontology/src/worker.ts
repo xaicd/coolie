@@ -31,6 +31,15 @@ import { EDIT_SYSTEM_PROMPT_SUFFIX, parseEditResponse } from "./aide/editOps.js"
 import { AIDE_TOOL_SPECS, executeAideTool } from "./aide/agentTools.js";
 import { runAideAgent, type AideLoopMessage } from "./aide/agentLoop.js";
 import { buildSuggestFieldsPrompt, parseSuggestedFields } from "./aide/suggestFields.js";
+import { buildEnrichPrompt, parseEnrichResponse, type EnrichTarget } from "./aide/enrichDescriptions.js";
+import { parseSqlDdl } from "./cognition/AstExtractor.js";
+import { parseOpenAPI } from "./legacy/openapiParser.js";
+import {
+  buildSourceIndex,
+  matchDescriptions,
+  type SourceEntity,
+  type SourceKind,
+} from "./legacy/descriptionMatcher.js";
 import type {
   ActionKind,
   ActionTypeStatus,
@@ -1249,6 +1258,174 @@ const plugin = definePlugin({
     for (const [key, handler] of Object.entries(MUTATION_HANDLERS)) {
       registerMutationAction(ctx, store, key, handler);
     }
+
+    // 属性说明补全 — fill in Chinese property descriptions from a legacy
+    // source: DDL comments and OpenAPI field descriptions first (verbatim), then
+    // one batched model call to translate or infer whatever is left.
+    //
+    // Read-only: it returns the merged schemas and a report; the UI persists
+    // them through `update-node-type` like every other edit path.
+    ctx.actions.register("enrich-property-descriptions", async (params) => {
+      const call = readMutationCall(params);
+      const domainId = requireString(call.fields.domainId, "domainId");
+      const sourceText = optionalString(call.fields.sourceText) ?? "";
+      const requestedKind = optionalString(call.fields.sourceKind) ?? "auto";
+      const typeKeyFilter = optionalString(call.fields.typeKey) ?? null;
+      const overwrite = call.fields.overwrite === true;
+      const useAi = call.fields.useAi !== false;
+
+      const described = await store.describeDomain(call.companyId, domainId);
+
+      // ── 1. Mine the source, if one was supplied ──
+      let entities: SourceEntity[] = [];
+      let kind: SourceKind = "ddl";
+      if (sourceText.trim() !== "") {
+        const looksLikeJson = /^[\s]*[{[]/.test(sourceText);
+        const resolved: SourceKind = requestedKind === "auto"
+          ? (looksLikeJson ? "openapi" : "ddl")
+          : (requestedKind as SourceKind);
+        kind = resolved;
+        if (resolved === "openapi") {
+          const parsed = parseOpenAPI(sourceText);
+          entities = parsed.nodeTypes.map((nt) => ({
+            typeName: nt.key,
+            displayName: nt.displayName,
+            properties: Object.entries(nt.properties).map(([name, def]) => ({
+              name,
+              description: def.description,
+            })),
+          }));
+        } else {
+          entities = parseSqlDdl(sourceText, "source.sql").entities.map((e) => ({
+            typeName: e.typeName,
+            description: e.description,
+            properties: (e.properties ?? []).map((p) => ({ name: p.name, description: p.description })),
+          }));
+        }
+      }
+
+      const inScope = typeKeyFilter
+        ? described.nodeTypes.filter((nt) => nt.key === typeKeyFilter)
+        : described.nodeTypes;
+      if (inScope.length === 0) return { error: `对象类型「${typeKeyFilter}」不存在`, updates: [] };
+
+      const index = buildSourceIndex(entities, kind);
+      const matched = matchDescriptions({
+        nodeTypes: inScope.map((nt) => ({
+          key: nt.key,
+          fields: Object.keys(nt.propertiesSchema ?? {}),
+        })),
+        index,
+      });
+
+      // ── 2. Decide what each field gets ──
+      const report = {
+        ddl: 0,
+        openapi: 0,
+        ai: 0,
+        keptExisting: 0,
+        unmatched: 0,
+        weakMatches: 0,
+        sourceEntities: entities.length,
+      };
+      const plan = new Map<string, Record<string, string>>(); // typeKey -> field -> description
+      const aiTargets: EnrichTarget[] = [];
+
+      for (const nodeType of inScope) {
+        const schema = nodeType.propertiesSchema ?? {};
+        const perType: Record<string, string> = {};
+        for (const [field, rawDescriptor] of Object.entries(schema)) {
+          const descriptor = rawDescriptor && typeof rawDescriptor === "object"
+            ? (rawDescriptor as Record<string, unknown>)
+            : {};
+          const existing = typeof descriptor.description === "string"
+            ? descriptor.description.trim()
+            : "";
+
+          if (existing !== "" && !overwrite) {
+            report.keptExisting += 1;
+            continue;
+          }
+
+          const hit = matched.matched.get(`${nodeType.key}.${field}`);
+          if (hit) {
+            perType[field] = hit.description;
+            if (hit.from === "openapi") report.openapi += 1;
+            else report.ddl += 1;
+            if (hit.weak) report.weakMatches += 1;
+            continue;
+          }
+
+          if (useAi && aiTargets.length < 200) {
+            aiTargets.push({
+              typeKey: nodeType.key,
+              typeDisplayName: nodeType.displayName,
+              field,
+              ...(existing !== "" ? { existing } : {}),
+            });
+          } else {
+            report.unmatched += 1;
+          }
+        }
+        if (Object.keys(perType).length > 0) plan.set(nodeType.key, perType);
+      }
+
+      // ── 3. One batched model call for the leftovers ──
+      if (useAi && aiTargets.length > 0) {
+        const client = getClient();
+        const response = await client.messages.create({
+          model: getModel(),
+          max_tokens: 4096,
+          system: buildEnrichPrompt({
+            domainSlug: described.domain.slug,
+            domainName: described.domain.display_name,
+            typeKeys: described.nodeTypes.map((nt) => nt.key),
+            targets: aiTargets,
+          }),
+          messages: [{ role: "user", content: "请给出这些属性的中文说明。" }],
+        });
+        const text = response.content
+          .filter((block) => block.type === "text")
+          .map((block) => (block.type === "text" ? block.text : ""))
+          .join("");
+        const parsed = parseEnrichResponse(
+          text,
+          aiTargets.map((target) => `${target.typeKey}.${target.field}`),
+        );
+        if (parsed.ok) {
+          for (const [key, description] of Object.entries(parsed.descriptions)) {
+            const dot = key.indexOf(".");
+            const typeKey = key.slice(0, dot);
+            const field = key.slice(dot + 1);
+            const perType = plan.get(typeKey) ?? {};
+            perType[field] = description;
+            plan.set(typeKey, perType);
+            report.ai += 1;
+          }
+        } else {
+          report.unmatched += aiTargets.length;
+        }
+      }
+
+      // ── 4. Merge onto the stored schema, preserving every other descriptor key ──
+      const updates = [];
+      for (const nodeType of inScope) {
+        const perType = plan.get(nodeType.key);
+        if (!perType || Object.keys(perType).length === 0) continue;
+        const schema = nodeType.propertiesSchema ?? {};
+        const next: Record<string, unknown> = {};
+        for (const [field, rawDescriptor] of Object.entries(schema)) {
+          const descriptor = rawDescriptor && typeof rawDescriptor === "object"
+            ? { ...(rawDescriptor as Record<string, unknown>) }
+            : {};
+          if (perType[field] !== undefined) descriptor.description = perType[field];
+          next[field] = descriptor;
+        }
+        updates.push({ nodeTypeId: nodeType.id, key: nodeType.key, propertiesSchema: next });
+      }
+
+      return { updates, report };
+    });
 
     // 对话式编辑 — turn a plain-language request into concrete schema
     // operations. Read-only here: the UI runs the returned ops through the same

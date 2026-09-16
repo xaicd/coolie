@@ -16,11 +16,15 @@
 export interface ExtractedProperty {
   name: string;
   type?: string;
+  /** Column comment, when the source carried one. */
+  description?: string;
 }
 
 export interface ExtractedEntity {
   typeName: string;
   displayName?: string;
+  /** Table comment, when the source carried one. */
+  description?: string;
   properties?: ExtractedProperty[];
   sourceFile?: string;
 }
@@ -147,22 +151,117 @@ function parseJava(content: string, file: string): FileExtraction {
   return { entities, actions, relations: [] };
 }
 
-function parseSqlDdl(content: string, file: string): FileExtraction {
+/**
+ * Pull a quoted string out of a fragment, tolerating both quote styles.
+ * Returns undefined for empty/absent values.
+ */
+function firstQuoted(text: string | undefined): string | undefined {
+  if (!text) return undefined;
+  const m = /'((?:[^']|'')*)'|"((?:[^"]|"")*)"|`([^`]*)`/.exec(text);
+  if (!m) return undefined;
+  const raw = m[1] ?? m[2] ?? m[3] ?? "";
+  const unescaped = raw.replace(/''/g, "'").replace(/""/g, '"').trim();
+  return unescaped === "" ? undefined : unescaped;
+}
+
+/**
+ * Collect comments that are not part of a column definition line:
+ *   COMMENT ON TABLE  orders      IS '订单主表';
+ *   COMMENT ON COLUMN orders.total IS '订单总额';
+ * Keyed by `table` (lowercased) and `table.column` (lowercased).
+ */
+function collectStandaloneComments(content: string): {
+  tables: Map<string, string>;
+  columns: Map<string, string>;
+} {
+  const tables = new Map<string, string>();
+  const columns = new Map<string, string>();
+  const re = /COMMENT\s+ON\s+(TABLE|COLUMN)\s+([`"\[]?[\w.]+[`"\]]?)\s+IS\s+('(?:[^']|'')*'|"(?:[^"]|"")*")/gi;
+  for (let m; (m = re.exec(content)); ) {
+    const kind = m[1]!.toUpperCase();
+    const target = m[2]!.replace(/[`"\[\]]/g, "").toLowerCase();
+    const text = firstQuoted(m[3]);
+    if (!text) continue;
+    if (kind === "TABLE") {
+      // `schema.table` → key on the table segment alone.
+      tables.set(target.split(".").pop() ?? target, text);
+    } else {
+      const parts = target.split(".");
+      const col = parts.pop();
+      const table = parts.pop();
+      if (col && table) columns.set(`${table}.${col}`, text);
+    }
+  }
+  return { tables, columns };
+}
+
+/**
+ * Column comments written on the column's own line:
+ *   `total` decimal(10,2) NOT NULL COMMENT '订单总额',   -- MySQL / ClickHouse
+ *   total  decimal(10,2) NOT NULL,                        -- 订单总额
+ */
+function inlineColumnComment(columnLine: string): string | undefined {
+  const commentClause = /\bCOMMENT\s+('(?:[^']|'')*'|"(?:[^"]|"")*")/i.exec(columnLine);
+  if (commentClause) return firstQuoted(commentClause[1]);
+  const dash = /(?:--|#)\s*([^-\n][^\n]*)$/.exec(columnLine);
+  if (dash) {
+    const text = dash[1]!.trim();
+    return text === "" ? undefined : text;
+  }
+  return undefined;
+}
+
+/** Table-level comment on the CREATE TABLE line: `) COMMENT='订单主表';` */
+function tableCommentFrom(content: string, table: string): string | undefined {
+  const re = new RegExp(
+    `CREATE\\s+TABLE\\s+(?:IF\\s+NOT\\s+EXISTS\\s+)?[\`"]?${table}[\`"]?[\\s\\S]*?\\)\\s*[\\s\\S]{0,80}?COMMENT\\s*=?\\s*('(?:[^']|'')*'|"(?:[^"]|"")*")`,
+    "i",
+  );
+  return firstQuoted(re.exec(content)?.[1]);
+}
+
+/**
+ * Parse `CREATE TABLE` statements, including comments.
+ *
+ * Comments used to be dropped entirely, which is why imported legacy schemas
+ * arrived with no field documentation at all — and why the property-description
+ * enrichment had nothing to match against.
+ *
+ * Exported (it used to be reachable only through `parseSourceFile`'s extension
+ * dispatch) so the description matcher and its tests can call it directly.
+ */
+export function parseSqlDdl(content: string, file: string): FileExtraction {
   const entities: ExtractedEntity[] = [];
   const relations: ExtractedRelation[] = [];
+  const standalone = collectStandaloneComments(content);
   // CREATE TABLE <name> ( ... )
-  const tableRe = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?([A-Za-z_][A-Za-z0-9_]*)[`"]?\s*\(([\s\S]*?)\)\s*;/gi;
+  const tableRe = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?([A-Za-z_][A-Za-z0-9_]*)[`"]?\s*\(([\s\S]*?)\)\s*[^\n;]*;/gi;
   for (let m; (m = tableRe.exec(content)); ) {
     const table = m[1]!;
     const body = m[2] ?? "";
+    const tableKey = table.toLowerCase();
     const props: ExtractedProperty[] = [];
-    const colRe = /^\s*[`"]?([A-Za-z_][A-Za-z0-9_]*)[`"]?\s+([A-Za-z][A-Za-z0-9_]*)/gm;
+    const colRe = /^[ \t]*[`"]?([A-Za-z_][A-Za-z0-9_]*)[`"]?[ \t]+([A-Za-z][A-Za-z0-9_]*)/gm;
     for (let c; (c = colRe.exec(body)); ) {
       const col = c[1]!.toLowerCase();
       if (["primary", "foreign", "unique", "constraint", "key", "index", "check"].includes(col)) continue;
-      props.push({ name: c[1]!, type: c[2]!.toLowerCase() });
+      // The comment can sit on the column's own line…
+      const lineEnd = body.indexOf("\n", colRe.lastIndex);
+      const line = body.slice(c.index, lineEnd === -1 ? body.length : lineEnd);
+      const description =
+        inlineColumnComment(line)
+        // …or in a standalone COMMENT ON COLUMN statement.
+        ?? standalone.columns.get(`${tableKey}.${col}`);
+      props.push({ name: c[1]!, type: c[2]!.toLowerCase(), ...(description ? { description } : {}) });
     }
-    entities.push({ typeName: table, displayName: table, properties: props, sourceFile: file });
+    const tableDescription = standalone.tables.get(tableKey) ?? tableCommentFrom(content, table);
+    entities.push({
+      typeName: table,
+      displayName: table,
+      properties: props,
+      sourceFile: file,
+      ...(tableDescription ? { description: tableDescription } : {}),
+    });
     // FOREIGN KEY (..) REFERENCES other(..)
     const fkRe = /REFERENCES\s+[`"]?([A-Za-z_][A-Za-z0-9_]*)[`"]?/gi;
     for (let f; (f = fkRe.exec(body)); )

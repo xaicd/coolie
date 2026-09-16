@@ -854,6 +854,7 @@ function DomainWorkspace({
   const deleteRelationType = usePluginAction("delete-relation-type");
   const updateRelationType = usePluginAction("update-relation-type");
   const aiEditSchema = usePluginAction("ai-edit-schema");
+  const enrichDescriptions = usePluginAction("enrich-property-descriptions");
 
   /**
    * Dispatch one resolved edit call. Same shape the cockpit's Edit mode uses,
@@ -886,6 +887,57 @@ function DomainWorkspace({
       refreshDomain();
     },
     [companyId, updateNodeType, refreshDomain],
+  );
+
+  /**
+   * 补全属性说明 — the worker mines DDL comments / interface descriptions and
+   * asks the model for whatever is left; we persist the merged schemas through
+   * the same `update-node-type` path as every other edit.
+   */
+  const runEnrichDescriptions = useCallback(
+    async (opts: {
+      sourceText: string;
+      overwrite: boolean;
+      useAi: boolean;
+      scope: "type" | "domain";
+      typeKey: string;
+    }): Promise<string> => {
+      const res = (await enrichDescriptions({
+        companyId,
+        domainId,
+        sourceText: opts.sourceText,
+        sourceKind: "auto",
+        overwrite: opts.overwrite,
+        useAi: opts.useAi,
+        ...(opts.scope === "type" ? { typeKey: opts.typeKey } : {}),
+      })) as {
+        error?: string;
+        updates?: Array<{ nodeTypeId: string; key: string; propertiesSchema: Record<string, unknown> }>;
+        report?: {
+          ddl: number; openapi: number; ai: number;
+          keptExisting: number; unmatched: number; weakMatches: number;
+        };
+      };
+      if (res?.error) throw new Error(res.error);
+
+      for (const update of res.updates ?? []) {
+        await updateNodeType({
+          companyId,
+          nodeTypeId: update.nodeTypeId,
+          propertiesSchema: update.propertiesSchema,
+        });
+      }
+      refreshDomain();
+
+      const r = res.report ?? { ddl: 0, openapi: 0, ai: 0, keptExisting: 0, unmatched: 0, weakMatches: 0 };
+      return t(
+        `DDL ${r.ddl} · 接口 ${r.openapi} · AI ${r.ai} · 保留已有 ${r.keptExisting} · 未匹配 ${r.unmatched}` +
+          (r.weakMatches > 0 ? ` · 弱匹配 ${r.weakMatches}(请复核)` : ""),
+        `DDL ${r.ddl} · API ${r.openapi} · AI ${r.ai} · kept ${r.keptExisting} · unmatched ${r.unmatched}` +
+          (r.weakMatches > 0 ? ` · weak ${r.weakMatches} (review)` : ""),
+      );
+    },
+    [enrichDescriptions, companyId, domainId, updateNodeType, refreshDomain],
   );
 
   /**
@@ -1091,6 +1143,7 @@ function DomainWorkspace({
             onSelectNodeType={setFocusNodeTypeId}
             onSaveNodeTypeSchema={saveNodeTypeSchema}
             onAiEdit={runAiEdit}
+            onEnrichDescriptions={runEnrichDescriptions}
             mode={view === "graph" ? "graph" : view === "table" ? "table" : "schema"}
             hideTabs
             nodeTypeDragMime={DRAG_MIME}

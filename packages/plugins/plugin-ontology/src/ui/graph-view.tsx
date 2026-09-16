@@ -1063,6 +1063,14 @@ interface GraphViewProps {
   onSaveNodeTypeSchema?: (nodeTypeId: string, schema: Record<string, unknown>) => Promise<void> | void;
   /** Apply a plain-language schema change; resolves with a human summary. */
   onAiEdit?: (instruction: string, typeKey: string) => Promise<string>;
+  /** Fill missing Chinese descriptions from a legacy source; resolves with a report. */
+  onEnrichDescriptions?: (opts: {
+    sourceText: string;
+    overwrite: boolean;
+    useAi: boolean;
+    scope: "type" | "domain";
+    typeKey: string;
+  }) => Promise<string>;
   /** Control which view is shown; if omitted GraphView owns its own tab state. */
   mode?: GraphViewMode;
   /** Hide the internal graph/table/schema tab bar (when host renders tabs). */
@@ -1145,6 +1153,7 @@ export function GraphView(props: GraphViewProps): ReactElement {
           onSelectNodeType={props.onSelectNodeType}
           onSaveNodeTypeSchema={props.onSaveNodeTypeSchema}
           onAiEdit={props.onAiEdit}
+          onEnrichDescriptions={props.onEnrichDescriptions}
         />
       )}
     </>
@@ -1346,6 +1355,7 @@ function SchemaView({
   onSelectNodeType,
   onSaveNodeTypeSchema,
   onAiEdit,
+  onEnrichDescriptions,
 }: {
   nodeTypes: GraphNodeType[];
   relationTypes: GraphNodeType[];
@@ -1353,6 +1363,13 @@ function SchemaView({
   onSelectNodeType?: (id: string | null) => void;
   onSaveNodeTypeSchema?: (nodeTypeId: string, schema: Record<string, unknown>) => Promise<void> | void;
   onAiEdit?: (instruction: string, typeKey: string) => Promise<string>;
+  onEnrichDescriptions?: (opts: {
+    sourceText: string;
+    overwrite: boolean;
+    useAi: boolean;
+    scope: "type" | "domain";
+    typeKey: string;
+  }) => Promise<string>;
 }): ReactElement {
   const [query, setQuery] = useState("");
   const [selected, setSelected] = useState<
@@ -1479,6 +1496,7 @@ function SchemaView({
             nodeType={selectedNodeType}
             onSaveSchema={onSaveNodeTypeSchema}
             onAiEdit={onAiEdit}
+            onEnrichDescriptions={onEnrichDescriptions}
           />
         ) : selectedRelationType ? (
           <SchemaRelationDetail relationType={selectedRelationType} />
@@ -1519,10 +1537,18 @@ function SchemaTypeDetail({
   nodeType,
   onSaveSchema,
   onAiEdit,
+  onEnrichDescriptions,
 }: {
   nodeType: GraphNodeType;
   onSaveSchema?: (nodeTypeId: string, schema: Record<string, unknown>) => Promise<void> | void;
   onAiEdit?: (instruction: string, typeKey: string) => Promise<string>;
+  onEnrichDescriptions?: (opts: {
+    sourceText: string;
+    overwrite: boolean;
+    useAi: boolean;
+    scope: "type" | "domain";
+    typeKey: string;
+  }) => Promise<string>;
 }): ReactElement {
   const initialRows = useMemo(
     () => rowsFromSchema(nodeType.propertiesSchema),
@@ -1533,14 +1559,26 @@ function SchemaTypeDetail({
   const [err, setErr] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
   const [instruction, setInstruction] = useState("");
+  const [enrichOpen, setEnrichOpen] = useState(false);
+  const [enrichSource, setEnrichSource] = useState("");
+  const [enrichScope, setEnrichScope] = useState<"type" | "domain">("type");
+  const [enrichOverwrite, setEnrichOverwrite] = useState(false);
 
   // Re-seed whenever the stored schema changes underneath us (a save, an AI
-  // edit, or a domain refresh).
+  // edit, or a domain refresh). Deliberately does NOT clear `note`: a save or an
+  // enrich refreshes the domain, and wiping the report then would mean the user
+  // never sees the "DDL 2 · AI 1 …" summary they just triggered.
   useEffect(() => {
     setRows(initialRows);
     setErr(null);
-    setNote(null);
   }, [initialRows]);
+
+  // A different type is a different context — reset the transient bits.
+  useEffect(() => {
+    setNote(null);
+    setInstruction("");
+    setErr(null);
+  }, [nodeType.id]);
 
   const dirty = !schemasEqual(rows, initialRows);
   const update = (i: number, patch: Partial<SchemaRow>) =>
@@ -1570,6 +1608,26 @@ function SchemaTypeDetail({
       const summary = await onAiEdit(text, nodeType.key);
       setInstruction("");
       setNote(summary);
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const runEnrich = async () => {
+    if (!onEnrichDescriptions) return;
+    setBusy(true); setErr(null); setNote(null);
+    try {
+      const report = await onEnrichDescriptions({
+        sourceText: enrichSource,
+        overwrite: enrichOverwrite,
+        useAi: true,
+        scope: enrichScope,
+        typeKey: nodeType.key,
+      });
+      setEnrichSource("");
+      setNote(report);
     } catch (e) {
       setErr(String((e as Error)?.message ?? e));
     } finally {
@@ -1615,6 +1673,62 @@ function SchemaTypeDetail({
           >
             {busy ? "…" : t("执行", "Apply")}
           </button>
+        </div>
+      )}
+
+      {/* 补全说明 — mine DDL comments / interface descriptions, then let the
+          model translate or infer whatever is left. */}
+      {onEnrichDescriptions && (
+        <div className="rounded-md border border-dashed border-border bg-muted/20">
+          <button
+            type="button"
+            onClick={() => setEnrichOpen((o) => !o)}
+            className="flex w-full items-center gap-1.5 px-2 py-1 text-left text-(length:--text-nano) text-muted-foreground hover:text-foreground"
+          >
+            <span aria-hidden>📖</span>
+            {t("补全属性说明(DDL 注释 / 接口描述)", "Fill descriptions (DDL / API doc)")}
+            <span className="ml-auto">{enrichOpen ? "▾" : "▸"}</span>
+          </button>
+          {enrichOpen && (
+            <div className="flex flex-col gap-1.5 border-t border-border p-2">
+              <textarea
+                value={enrichSource}
+                onChange={(e) => setEnrichSource(e.target.value)}
+                spellCheck={false}
+                placeholder={t(
+                  "粘贴带注释的 CREATE TABLE 语句,或 OpenAPI/Swagger 片段。留空则只按领域语境推断。",
+                  "Paste annotated CREATE TABLE statements or an OpenAPI/Swagger fragment. Leave blank to infer from domain context only.",
+                )}
+                className="h-24 w-full resize-none rounded-md border border-border bg-background px-2 py-1.5 font-mono text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring"
+              />
+              <div className="flex flex-wrap items-center gap-2 text-(length:--text-nano) text-muted-foreground">
+                <select
+                  value={enrichScope}
+                  onChange={(e) => setEnrichScope(e.target.value as "type" | "domain")}
+                  className="rounded-md border border-border bg-background px-1.5 py-1 text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring"
+                >
+                  <option value="type">{t(`仅 ${nodeType.key}`, `Only ${nodeType.key}`)}</option>
+                  <option value="domain">{t("整个域", "Whole domain")}</option>
+                </select>
+                <label className="flex items-center gap-1">
+                  <input
+                    type="checkbox"
+                    checked={enrichOverwrite}
+                    onChange={(e) => setEnrichOverwrite(e.target.checked)}
+                  />
+                  {t("覆盖已有说明", "Overwrite existing")}
+                </label>
+                <button
+                  type="button"
+                  onClick={() => { void runEnrich(); }}
+                  disabled={busy}
+                  className="ml-auto rounded-md bg-primary px-2 py-1 font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                >
+                  {busy ? "…" : t("补全", "Fill")}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
