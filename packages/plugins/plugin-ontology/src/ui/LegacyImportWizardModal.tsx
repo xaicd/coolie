@@ -24,6 +24,10 @@ import { useEffect, useState, type ReactElement } from "react";
 import { usePluginAction } from "@paperclipai/plugin-sdk/ui";
 import { inferModuleFromText } from "../legacy/modulePrefixMap.js";
 import { readOrigin } from "../provenance.js";
+// Type-only: erased at build time, and it keeps the preview honest about what
+// the scanner actually produced.
+import type { ScannedService } from "../cognition/projectScanner.js";
+import type { DetectedDependency } from "../architecture/index.js";
 
 /** What the modal currently knows about the user's source material. Filled
  *  in by Step 1; consumed by Steps 2-4 to label and pre-populate. */
@@ -58,18 +62,14 @@ export type ParsedSource = {
   repos?: string[];
   /**
    * Deployable units the scan identified — Maven/Gradle modules, `services/*`
-   * layouts, Spring apps named by `spring.application.name`. This is what makes
-   * a 400-file monolith readable as structure instead of a flat type list.
+   * layouts, Spring apps named by `spring.application.name` — each with its
+   * layer, stack, deploy config and evidence. This is what makes a 400-file
+   * monolith readable as structure instead of a flat type list, and it is what
+   * the run/deploy views render. Forwarded verbatim to `import-architecture`.
    */
-  services?: Array<{
-    key: string;
-    name: string;
-    path: string;
-    type: string;
-    layer: string;
-    typeCount: number;
-    fileCount: number;
-  }>;
+  services?: ScannedService[];
+  /** Service→service edges the scan derived, forwarded with `services`. */
+  dependencies?: DetectedDependency[];
   /**
    * Per-type provenance as the `ontology_node_types.metadata` bag — package,
    * service, mapped table, stereotype, and the files the type came from. Keyed
@@ -358,6 +358,7 @@ function Step1Body({
         })),
         repos: [...repos],
         services: scan.services,
+        dependencies: scan.dependencies,
         provenance,
         scanCoverage: {
           byExtension: scan.byExtension,
@@ -810,6 +811,7 @@ function Step4Body({
   const createNodeType = usePluginAction("create-node-type");
   const createRelationType = usePluginAction("create-relation-type");
   const createBusinessSystem = usePluginAction("create-business-system");
+  const importArchitecture = usePluginAction("import-architecture");
 
   const submit = async () => {
     if (!parsed || parsed.nodeTypes.length === 0) {
@@ -887,7 +889,9 @@ function Step4Body({
           throw new Error(`关系类型「${rt.key}」创建失败: ${String((e as Error)?.message ?? e)}`);
         }
       }
-      await createBusinessSystem({
+      const scanServices = parsed.services;
+      const scanDependencies = parsed.dependencies;
+      const system = (await createBusinessSystem({
         companyId,
         code: `SYS_${slug.toUpperCase()}`,
         name: displayName,
@@ -903,7 +907,34 @@ function Step4Body({
           bridgeActions: merged,
           sourceNodeTypeKeys: parsed.nodeTypes.map((n) => n.key),
         },
-      });
+      })) as
+        | { businessSystem?: { id?: string }; id?: string; data?: { businessSystem?: { id?: string } } }
+        | undefined;
+      const businessSystemId =
+        system?.businessSystem?.id ?? system?.id ?? system?.data?.businessSystem?.id;
+
+      // The architecture material (services, layers, stacks, deployment facts and
+      // the dependency graph) used to die with this modal. Losing it is why
+      // nothing could render a run/deploy view; and it is reported rather than
+      // swallowed, because a half-imported domain is worse than a loud failure.
+      if (businessSystemId && scanServices && scanServices.length > 0) {
+        try {
+          await importArchitecture({
+            companyId,
+            businessSystemId,
+            services: scanServices,
+            dependencies: scanDependencies ?? [],
+          });
+        } catch (e) {
+          setErr(
+            t(
+              `对象类型已导入,但架构原料导入失败: ${String((e as Error)?.message ?? e)}`,
+              `Object types imported, but the architecture import failed: ${String((e as Error)?.message ?? e)}`,
+            ),
+          );
+          return;
+        }
+      }
       onPublished(domainId);
     } catch (e) {
       setErr(String((e as Error)?.message ?? e));

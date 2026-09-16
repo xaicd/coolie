@@ -3364,14 +3364,152 @@ function ManageTab({
     <>
       <EvaluationSection companyId={companyId} domainId={domainId} />
       <PipelineSection companyId={companyId} domainId={domainId} />
-      <GovernancePanel businessSystems={businessSystems} />
+      <GovernancePanel companyId={companyId} businessSystems={businessSystems} />
     </>
   );
 }
 
+/* ------------------------------------------------------------------ */
+/*  ServiceList — the architecture material an import persisted.       */
+/*                                                                     */
+/*  Layer, stack, deployment and the outgoing dependency edges are the  */
+/*  raw material the run/deploy perspectives render. Rendered one line  */
+/*  per service with the detail collapsed, because a monolith scan      */
+/*  yields dozens and a full dump would bury the panel.                */
+/* ------------------------------------------------------------------ */
+
+interface SubProjectView {
+  id: string;
+  name: string;
+  code: string;
+  type: string;
+  microservice_layer: string | null;
+  tech_stack: string[] | null;
+  dependencies: Array<{ toServiceKey: string | null; targetHint: string; type: string }> | null;
+  build_config: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+}
+
+const LAYER_MEANING: Record<string, string> = {
+  L0: "边缘 / 入口",
+  L1: "网关 / 编排",
+  L2: "业务服务",
+  L3: "共享能力",
+  L4: "数据 / 基础设施",
+};
+
+function ServiceList({
+  companyId,
+  businessSystemId,
+}: {
+  companyId: string;
+  businessSystemId: string;
+}): ReactElement | null {
+  const { data } = usePluginData<{ subProjects: SubProjectView[] }>("list-sub-projects", {
+    companyId,
+    businessSystemId,
+  });
+  const [open, setOpen] = useState<Set<string>>(new Set());
+  const services = data?.subProjects ?? [];
+  if (services.length === 0) return null;
+
+  const deployOf = (s: SubProjectView): Record<string, unknown> => {
+    const fromMeta = s.metadata?.deploy;
+    if (fromMeta && typeof fromMeta === "object") return fromMeta as Record<string, unknown>;
+    const fromBuild = s.build_config?.deploy;
+    return fromBuild && typeof fromBuild === "object" ? (fromBuild as Record<string, unknown>) : {};
+  };
+
+  return (
+    <div className="mt-1.5 border-t border-border/60 pt-1.5">
+      <div className="mb-0.5 text-(length:--text-nano) font-medium text-muted-foreground">
+        {t("服务 / 模块", "Services")} · {services.length}
+      </div>
+      <ul className="space-y-0.5">
+        {services.map((s) => {
+          const expanded = open.has(s.id);
+          const deploy = deployOf(s);
+          const ports = Array.isArray(deploy.ports) ? (deploy.ports as number[]) : [];
+          const envs = Array.isArray(deploy.envs) ? (deploy.envs as string[]) : [];
+          const deps = s.dependencies ?? [];
+          return (
+            <li key={s.id}>
+              <button
+                type="button"
+                onClick={() =>
+                  setOpen((prev) => {
+                    const next = new Set(prev);
+                    if (next.has(s.id)) next.delete(s.id);
+                    else next.add(s.id);
+                    return next;
+                  })
+                }
+                className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left text-(length:--text-nano) transition-colors hover:bg-accent"
+              >
+                <span aria-hidden className="w-2 shrink-0 text-muted-foreground">
+                  {expanded ? "▾" : "▸"}
+                </span>
+                <span className="truncate text-foreground/90">{s.name}</span>
+                {s.microservice_layer && (
+                  <span
+                    className="shrink-0 rounded bg-primary/10 px-1 text-primary"
+                    title={LAYER_MEANING[s.microservice_layer] ?? s.microservice_layer}
+                  >
+                    {s.microservice_layer}
+                  </span>
+                )}
+                <span className="ml-auto shrink-0 text-muted-foreground">
+                  {(s.tech_stack ?? []).slice(0, 2).join(" · ")}
+                  {deps.length > 0 && ` · ↦${deps.length}`}
+                </span>
+              </button>
+              {expanded && (
+                <div className="ml-4 space-y-0.5 pb-1 text-(length:--text-nano) text-muted-foreground">
+                  <div>
+                    {t("类型", "type")}: {s.type}
+                    {s.microservice_layer && ` · ${LAYER_MEANING[s.microservice_layer] ?? ""}`}
+                  </div>
+                  {(s.tech_stack ?? []).length > 0 && (
+                    <div>{t("技术栈", "stack")}: {(s.tech_stack ?? []).join(" · ")}</div>
+                  )}
+                  {(ports.length > 0 || envs.length > 0 || deploy.replicas !== undefined) && (
+                    <div>
+                      {t("部署", "deploy")}:{" "}
+                      {[
+                        ports.length > 0 ? `${t("端口", "port")} ${ports.join(",")}` : null,
+                        envs.length > 0 ? envs.join("/") : null,
+                        typeof deploy.replicas === "number" ? `×${deploy.replicas}` : null,
+                        typeof deploy.namespace === "string" ? deploy.namespace : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </div>
+                  )}
+                  {deps.length > 0 && (
+                    <div>
+                      {t("依赖", "calls")}:{" "}
+                      {deps
+                        .slice(0, 6)
+                        .map((d) => `${d.toServiceKey ?? d.targetHint} [${d.type}]`)
+                        .join(", ")}
+                      {deps.length > 6 && ` … +${deps.length - 6}`}
+                    </div>
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
 function GovernancePanel({
+  companyId,
   businessSystems,
 }: {
+  companyId: string;
   businessSystems: Array<{
     id: string;
     code: string;
@@ -3424,6 +3562,7 @@ function GovernancePanel({
                   {bs.description}
                 </p>
               )}
+              <ServiceList companyId={companyId} businessSystemId={bs.id} />
             </li>
           ))}
         </ul>

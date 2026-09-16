@@ -147,7 +147,58 @@ function parseDockerfile(content: string): { ports: number[]; baseImage: string 
   return { ports: [...new Set(ports)], baseImage, envs: [...new Set(envs)] };
 }
 
-export function detectStack(files: SourceFile[], root: string): DetectedStack {
+/**
+ * The `services:` block a root compose file declares for one service.
+ *
+ * A compose file normally sits at the repository root and describes *every*
+ * service, so it belongs to no single service directory — and reading it only
+ * from a service's own tree silently dropped the ports, image and replica count
+ * of an entire monorepo. Matching the block by name is what makes those facts
+ * land on the right service.
+ */
+export function composeBlockFor(content: string, serviceName: string): string | null {
+  const lines = content.split("\n");
+  const wanted = serviceName.toLowerCase();
+
+  let servicesAt = -1;
+  let servicesIndent = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    const m = /^(\s*)services\s*:/.exec(lines[i]!);
+    if (m) {
+      servicesAt = i;
+      servicesIndent = m[1]!.length;
+      break;
+    }
+  }
+  if (servicesAt === -1) return null;
+
+  let entryIndent: number | null = null;
+  let start = -1;
+  let end = lines.length;
+  for (let i = servicesAt + 1; i < lines.length; i += 1) {
+    const line = lines[i]!;
+    if (line.trim() === "" || /^\s*#/.test(line)) continue;
+    const key = /^(\s*)([\w.-]+)\s*:/.exec(line);
+    if (!key) continue;
+    const indent = key[1]!.length;
+    // At or above the `services:` indent, the map is over.
+    if (indent <= servicesIndent) {
+      end = i;
+      break;
+    }
+    if (entryIndent === null) entryIndent = indent;
+    // Deeper than an entry name: a property of whichever entry is open.
+    if (indent > entryIndent) continue;
+    if (key[2]!.toLowerCase() === wanted) start = i;
+    else if (start !== -1) {
+      end = i;
+      break;
+    }
+  }
+  return start === -1 ? null : lines.slice(start, end).join("\n");
+}
+
+export function detectStack(files: SourceFile[], root: string, serviceName?: string): DetectedStack {
   const owned = root === "" ? files : files.filter((f) => f.path.startsWith(`${root}/`) || f.path === root);
   const names = new Set(owned.map((f) => f.path.split("/").pop() ?? ""));
   const packageJson = readPackageJson(files, root);
@@ -185,17 +236,33 @@ export function detectStack(files: SourceFile[], root: string): DetectedStack {
     deploy.evidence.push(`Dockerfile:${dockerfile.path}`);
   }
 
-  const compose = owned.find((f) => /docker-compose\.ya?ml$/.test(f.path));
-  if (compose) {
-    for (const match of compose.content.matchAll(/^\s{4}(\w[\w-]*):/gm)) {
+  const composeOwned = owned.find((f) => /docker-compose\.ya?ml$/.test(f.path));
+  // A compose file at the repository root describes every service, so it is not
+  // "owned" by any one of them. Reading only the owned copy dropped the ports,
+  // image and replica count of a whole monorepo; the block is matched by name.
+  //
+  // The shallowest match wins, because a picked directory prefixes every path
+  // with the folder's own name (`my-repo/docker-compose.yml`), so anchoring on
+  // `^docker-compose` finds nothing at all.
+  const rootCompose = files
+    .filter((f) => /(^|\/)docker-compose\.ya?ml$/.test(f.path))
+    .sort((a, b) => a.path.split("/").length - b.path.split("/").length)[0];
+  const compose = composeOwned ?? rootCompose;
+  const composeBody = compose
+    ? composeOwned || !serviceName
+      ? compose.content
+      : composeBlockFor(compose.content, serviceName)
+    : null;
+  if (compose && composeBody) {
+    for (const match of composeBody.matchAll(/^\s{4}(\w[\w-]*):/gm)) {
       const match2 = ENV_TOKEN.exec((match[1] ?? "").toLowerCase());
       if (match2) deploy.envs.push(match2[1]!);
     }
-    for (const match of compose.content.matchAll(/"(\d{2,5}):(\d{2,5})"/g)) {
+    for (const match of composeBody.matchAll(/"(\d{2,5}):(\d{2,5})"/g)) {
       const port = Number.parseInt(match[1] ?? "", 10);
       if (Number.isFinite(port)) deploy.ports.push(port);
     }
-    const replicas = /replicas:\s*(\d+)/.exec(compose.content);
+    const replicas = /replicas:\s*(\d+)/.exec(composeBody);
     if (replicas) deploy.replicas = Number.parseInt(replicas[1]!, 10);
     deploy.evidence.push(`compose:${compose.path}`);
   }

@@ -138,7 +138,9 @@ export function analyzeArchitecture(
   for (const dependency of dependencies) byType[dependency.type] += 1;
 
   const enriched: ServiceArchitecture[] = services.map((service) => {
-    const { stack, buildConfig, deploy } = detectStack(limited, service.path);
+    // The name matters: a root compose file describes every service, and only the
+    // service's own name says which `services:` block is its.
+    const { stack, buildConfig, deploy } = detectStack(limited, service.path, service.name);
     const verdict: LayerVerdict = layers[service.key] ?? { layer: "L2", reason: "未分层" };
     return {
       key: service.key,

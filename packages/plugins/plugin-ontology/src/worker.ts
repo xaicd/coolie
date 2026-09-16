@@ -36,6 +36,7 @@ import { buildSuggestFieldsPrompt, parseSuggestedFields } from "./aide/suggestFi
 import { buildEnrichPrompt, parseEnrichResponse, type EnrichTarget } from "./aide/enrichDescriptions.js";
 import { parseSqlDdl } from "./cognition/AstExtractor.js";
 import { buildTypeProvenance } from "./provenance.js";
+import { subProjectsFromArchitecture } from "./architecture/subProjectMapping.js";
 import { parseOpenAPI } from "./legacy/openapiParser.js";
 import {
   buildSourceIndex,
@@ -513,6 +514,11 @@ function optionalString(value: unknown): string | undefined {
 
 function optionalStringOrNull(value: unknown): string | null | undefined {
   return typeof value === "string" || value === null ? (value as string | null) : undefined;
+}
+
+/** A JSON array field, or an empty list — a missing scan is not an error. */
+function optionalArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
 }
 
 /** `propertiesSchema` must be an object; anything else is a caller bug. */
@@ -1278,6 +1284,62 @@ const plugin = definePlugin({
       return { domain };
     });
 
+    /**
+     * Persist the architecture material a scan produced.
+     *
+     * The scanner has always derived services, layers, stacks, deployment facts
+     * and the dependency graph, but the wizard only ever *previewed* them — so
+     * the views that are supposed to render "运行架构 / 部署架构" had nothing to
+     * read. Re-importing the same project updates by `code` instead of stacking
+     * up duplicates, because a scan is expected to be re-run as the tree moves.
+     */
+    ctx.actions.register("import-architecture", async (params) => {
+      const call = readMutationCall(params);
+      const businessSystemId = requireString(call.fields.businessSystemId, "businessSystemId");
+      const drafts = subProjectsFromArchitecture(
+        optionalArray(call.fields.services) as never,
+        optionalArray(call.fields.dependencies) as never,
+      );
+
+      const prior = new Map(
+        (await store.listSubProjects(call.companyId, businessSystemId)).map((s) => [s.code, s]),
+      );
+      let createdCount = 0;
+      let updatedCount = 0;
+      for (const draft of drafts) {
+        const existing = prior.get(draft.code);
+        if (existing) {
+          await store.updateSubProject(call.companyId, existing.id, {
+            name: draft.name,
+            type: draft.type,
+            techStack: draft.techStack,
+            framework: draft.framework,
+            gitRepo: draft.gitRepo,
+            dependencies: draft.dependencies,
+            buildConfig: draft.buildConfig,
+            microserviceLayer: draft.microserviceLayer,
+            metadata: draft.metadata,
+          });
+          updatedCount += 1;
+        } else {
+          await store.createSubProject({
+            companyId: call.companyId,
+            businessSystemId,
+            ...draft,
+          });
+          createdCount += 1;
+        }
+      }
+
+      await ctx.activity.log({
+        companyId: call.companyId,
+        message: `Imported architecture: ${createdCount} new service(s), ${updatedCount} updated`,
+        entityType: "ontology_sub_project",
+        entityId: businessSystemId,
+      });
+      return { created: createdCount, updated: updatedCount, total: drafts.length };
+    });
+
     ctx.actions.register("create-node-type", async (params) => {
       // `propertiesSchema` used to be dropped here, which is why every object
       // type created from the cockpit/import wizard persisted as `{}` and the
@@ -1974,6 +2036,12 @@ const plugin = definePlugin({
 
     // Cognition (AST reverse-engineering) — data/action handlers for the UI:
     // create a job, ingest code files (extract a draft), review, publish to a domain.
+    ctx.data.register("list-sub-projects", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const businessSystemId = requireString(params.businessSystemId, "businessSystemId");
+      return { subProjects: await store.listSubProjects(companyId, businessSystemId) };
+    });
+
     ctx.data.register("list-cognition-jobs", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
       return { jobs: await store.listCognitionJobs(companyId) };

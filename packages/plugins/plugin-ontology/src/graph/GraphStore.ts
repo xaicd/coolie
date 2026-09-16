@@ -774,6 +774,18 @@ export interface OntologySubProjectRow {
   type: SubProjectType;
   status: SubProjectStatus;
   microservice_layer: MicroserviceLayer | null;
+  /** Architecture material an import recorded. */
+  tech_stack: string[] | null;
+  framework: Record<string, unknown> | null;
+  git_repo: Record<string, unknown> | null;
+  api_specs: unknown[] | null;
+  /** Outgoing edges: `{ toServiceKey, targetHint, type, evidence }`. */
+  dependencies: unknown[] | null;
+  /** `build_config` plus an importer-added `deploy` block. */
+  build_config: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
 // --- O4b: LLM evaluation / simulation (DS AIPLogic / Eval / GoldenDataset / PromptTemplate / SimulationScenario) ---
@@ -3406,8 +3418,17 @@ export class PostgresGraphStore implements GraphStore {
     );
   }
 
+  /**
+   * All three uses are single-table, so these need no alias qualification.
+   *
+   * The stack, deployment config, dependency edges and metadata are what the
+   * architecture views render — selecting only the identity columns wrote them
+   * to the database and then reported a service with nothing in it.
+   */
   private static readonly SUB_PROJECT_COLS =
-    "id, company_id, business_system_id, name, code, type, status, microservice_layer";
+    "id, company_id, business_system_id, name, code, type, status, microservice_layer, " +
+    "tech_stack, framework, git_repo, api_specs, dependencies, build_config, metadata, " +
+    "created_at, updated_at";
 
   async createSubProject(input: OntologySubProjectInput): Promise<OntologySubProjectRow> {
     const id = randomUUID();
@@ -4424,8 +4445,16 @@ export class PostgresGraphStore implements GraphStore {
           status: string;
           type: string;
           description: string | null;
+          microservice_layer: MicroserviceLayer | null;
         }>(
-          `SELECT sp.id, sp.business_system_id, sp.code, sp.name, sp.status, sp.type, sp.description
+          // `ontology_sub_projects` has no `description` column — it has `remark`
+          // (the `description` in migration 006 belongs to the business-systems
+          // table next to it). Selecting `sp.description` made this a guaranteed
+          // SQL error for every domain with a business system, which took out
+          // `describeDomain` entirely: the assistant's context, the governance
+          // panel and the sub-project list all read from it.
+          `SELECT sp.id, sp.business_system_id, sp.code, sp.name, sp.status, sp.type,
+                  sp.remark AS description, sp.microservice_layer
              FROM ${this.table("ontology_sub_projects")} sp
              JOIN ${this.table("ontology_business_systems")} bs
                ON bs.company_id = sp.company_id AND bs.id = sp.business_system_id
@@ -4508,6 +4537,7 @@ export class PostgresGraphStore implements GraphStore {
         status: row.status,
         type: row.type,
         description: row.description,
+        microserviceLayer: row.microservice_layer,
       })),
       actionTypes: actionTypes.map((row) => ({
         id: row.id,
@@ -4567,7 +4597,9 @@ export interface DescribeDomainSubProject {
   name: string;
   status: string;
   type: string;
+  /** The row's `remark`; sub-projects have no `description` column. */
   description: string | null;
+  microserviceLayer: MicroserviceLayer | null;
 }
 
 export interface DescribeDomainActionType {

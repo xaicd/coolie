@@ -25,7 +25,13 @@
 
 import type { RepoDraft, SourceFile } from "./AstExtractor.js";
 import { extractRepoDraft } from "./AstExtractor.js";
-import { analyzeArchitecture, applyLimits } from "../architecture/index.js";
+import {
+  analyzeArchitecture,
+  applyLimits,
+  type ArchitectureAnalysis,
+  type DetectedDependency,
+  type ServiceArchitecture,
+} from "../architecture/index.js";
 import { MANIFEST_FILES } from "../architecture/serviceDetector.js";
 
 /** Extensions at least one parser understands. */
@@ -47,13 +53,7 @@ export const IGNORED_EXTENSIONS = new Set([
   ".woff", ".woff2", ".ttf", ".eot", ".map", ".min.js", ".mp4", ".mp3",
 ]);
 
-export interface ScannedService {
-  key: string;
-  name: string;
-  path: string;
-  /** Sub-project type and microservice layer, from the architecture pass. */
-  type: string;
-  layer: string;
+export interface ScannedService extends ServiceArchitecture {
   /** Types discovered inside this service. */
   typeCount: number;
   fileCount: number;
@@ -62,6 +62,11 @@ export interface ScannedService {
 export interface ProjectScanResult {
   draft: RepoDraft;
   services: ScannedService[];
+  /** The rest of the architecture material: what depends on what. */
+  dependencies: DetectedDependency[];
+  /** References seen but not tieable to a service. Surfaced, not dropped. */
+  unresolved: DetectedDependency[];
+  architectureCoverage: ArchitectureAnalysis["coverage"];
   /** Extension → files read. */
   byExtension: Record<string, number>;
   /** Extension → files seen but unreadable by any parser. Surfaced, not dropped. */
@@ -142,15 +147,23 @@ export function scanProject(
     if (service) typesPerService.set(service, (typesPerService.get(service) ?? 0) + 1);
   }
 
+  // The full architecture service — layer, stack, deploy config, evidence — plus
+  // what this scan found inside it. The wizard persists all of it; a summary
+  // alone would have to be recomputed later from files nobody kept.
   const services: ScannedService[] = architecture.services.map((service) => ({
-    key: service.key,
-    name: service.name,
-    path: service.path,
-    type: service.type,
-    layer: service.layer,
+    ...service,
     typeCount: typesPerService.get(service.name) ?? 0,
     fileCount: filesPerService.get(service.name) ?? 0,
   }));
 
-  return { draft, services, byExtension, unsupported, truncationNote: note };
+  return {
+    draft,
+    services,
+    dependencies: architecture.dependencies,
+    unresolved: architecture.unresolved,
+    architectureCoverage: architecture.coverage,
+    byExtension,
+    unsupported,
+    truncationNote: note,
+  };
 }
