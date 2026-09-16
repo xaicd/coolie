@@ -55,6 +55,28 @@ export type ParsedSource = {
    * the business system the import creates.
    */
   repos?: string[];
+  /**
+   * Deployable units the scan identified — Maven/Gradle modules, `services/*`
+   * layouts, Spring apps named by `spring.application.name`. This is what makes
+   * a 400-file monolith readable as structure instead of a flat type list.
+   */
+  services?: Array<{
+    key: string;
+    name: string;
+    path: string;
+    type: string;
+    layer: string;
+    typeCount: number;
+    fileCount: number;
+  }>;
+  /** Per-type provenance (package / service / mapped table / stereotype). */
+  origins?: Record<string, Record<string, unknown>>;
+  /** What the scan read, and what it had no parser for. Shown, never silent. */
+  scanCoverage?: {
+    byExtension: Record<string, number>;
+    unsupported: Record<string, number>;
+    truncationNote: string | null;
+  };
 };
 
 export type WizardStep = 1 | 2 | 3 | 4;
@@ -272,50 +294,68 @@ function Step1Body({
     }
   };
 
+  /**
+   * Scan a whole project directory.
+   *
+   * The old version kept only `.js/.ts/.jsx/.tsx` and ran a route regex, so
+   * pointing it at a Java, Kotlin, proto or SQL codebase produced nothing. Now
+   * every file the scanner understands is read and routed to its own parser —
+   * Spring/JPA annotations, `.proto` messages and services, DDL — and each type
+   * comes back stamped with the module it ships in.
+   */
   const handleDirectoryScan = async (files: FileList) => {
     setBusy(true);
     setErr(null);
     try {
-      const { extractRoutesFromSource } = await import("../legacy/codeScanner.js");
-      const actions: ParsedSource["actions"] = [];
-      const seen = new Set<string>();
-      // The directory picker gives each file a `webkitRelativePath` like
-      // `my-repo/services/order/src/index.ts`; the first segment is the repo.
+      const { scanProject, IGNORED_EXTENSIONS } = await import("../cognition/projectScanner.js");
+      const inputs: Array<{ path: string; content: string }> = [];
       const repos = new Set<string>();
+      // A picker hands over every asset in the tree. Reading a 40MB image as
+      // text would stall the tab for nothing, so skip what cannot be source.
+      const MAX_FILE_BYTES = 1024 * 1024;
       for (let i = 0; i < files.length; i++) {
         const f = files[i]!;
-        const relative = (f as File & { webkitRelativePath?: string }).webkitRelativePath;
-        const root = relative?.split("/").filter(Boolean)[0];
+        const relative =
+          (f as File & { webkitRelativePath?: string }).webkitRelativePath ?? f.name;
+        const root = relative.split("/").filter(Boolean)[0];
         if (root) repos.add(root);
-        if (!/\.(js|ts|jsx|tsx)$/i.test(f.name)) continue;
-        const src = await f.text();
-        const acts = extractRoutesFromSource(src);
-        for (const a of acts) {
-          const k = `${a.method} ${a.endpoint}`;
-          if (seen.has(k)) continue;
-          seen.add(k);
-          actions.push(a);
-        }
+        const ext = /(\.[A-Za-z0-9]+)$/.exec(relative)?.[1]?.toLowerCase() ?? "";
+        if (IGNORED_EXTENSIONS.has(ext)) continue;
+        if (f.size > MAX_FILE_BYTES) continue;
+        inputs.push({ path: relative, content: await f.text() });
       }
-      // A pure code scan produces no node types — but the wizard still
-      // needs *something* parsed for the "next" button to enable.
-      // Synthesise a placeholder node type "ApiAction" so the publish
-      // chain runs and the user can refine in the type editor.
+
+      const scan = scanProject(inputs);
+      const origins: Record<string, Record<string, unknown>> = {};
+      for (const seed of scan.draft.seedNodeTypes) {
+        if (seed.origin) origins[seed.typeName] = seed.origin as unknown as Record<string, unknown>;
+      }
+
       onParsed({
-        nodeTypes: [
-          {
-            key: "ApiAction",
-            displayName: "API Action",
-            properties: {
-              key: { type: "string" },
-              method: { type: "string" },
-              endpoint: { type: "string" },
-            },
-          },
-        ],
-        relationTypes: [],
-        actions,
-        ...(repos.size > 0 ? { repos: [...repos] } : {}),
+        nodeTypes: scan.draft.seedNodeTypes.map((n) => ({
+          key: n.typeName,
+          displayName: n.displayName,
+          properties: n.properties ?? {},
+        })),
+        relationTypes: scan.draft.seedRelationTypes.map((r) => ({
+          key: `${r.sourceType}_${r.relationType}_${r.targetType}`,
+          displayName: r.displayName,
+          sourceNodeTypeKey: r.sourceType,
+          targetNodeTypeKey: r.targetType,
+        })),
+        actions: scan.draft.seedActions.map((a) => ({
+          key: `${a.method} ${a.path}`,
+          method: a.method,
+          endpoint: a.path,
+        })),
+        repos: [...repos],
+        services: scan.services,
+        origins,
+        scanCoverage: {
+          byExtension: scan.byExtension,
+          unsupported: scan.unsupported,
+          truncationNote: scan.truncationNote,
+        },
       });
     } catch (e) {
       setErr(String((e as Error)?.message ?? e));
@@ -432,8 +472,8 @@ function Step1Body({
         <div className="flex flex-col gap-2">
           <div className="text-(length:--text-nano) text-muted-foreground">
             {t(
-              "选择源码目录(支持 js/ts/tsx/jsx)。 系统通过正则扫描 Express / Fastify / Koa 路由声明。",
-              "Pick a source directory. Regex scanner recognises Express / Fastify / Koa routes.",
+              "选择工程目录。支持 Java/Kotlin(Spring、JPA、MyBatis-Plus 注解)、.proto(gRPC message/service)、SQL DDL、以及 js/ts/py/go。会识别 Maven/Gradle 模块与 spring.application.name 作为服务边界。",
+              "Pick a project directory. Reads Java/Kotlin (Spring, JPA, MyBatis-Plus annotations), .proto message/service, SQL DDL, and js/ts/py/go. Detects Maven/Gradle modules and spring.application.name as service boundaries.",
             )}
           </div>
           <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border bg-background px-3 py-2 text-(length:--text-nano) hover:bg-accent">
@@ -467,12 +507,68 @@ function Step1Body({
             {parsed.relationTypes.length} {t("关系类型", "relation types")}
             {parsed.actions && parsed.actions.length > 0 && `, ${parsed.actions.length} actions`}
           </div>
+
+          {parsed.services && parsed.services.length > 0 && (
+            <div className="mb-2 rounded border border-border/60 bg-muted/30 px-2 py-1.5">
+              <div className="mb-0.5 font-medium text-foreground/90">
+                {t("服务 / 模块", "Services / modules")} · {parsed.services.length}
+              </div>
+              <ul className="space-y-0.5">
+                {parsed.services.slice(0, 6).map((s) => (
+                  <li key={s.key} className="text-muted-foreground">
+                    · <span className="text-foreground/80">{s.name}</span>
+                    <span className="ml-1 opacity-70">
+                      ({s.layer} · {s.typeCount} {t("类型", "types")} / {s.fileCount}{" "}
+                      {t("文件", "files")})
+                    </span>
+                  </li>
+                ))}
+                {parsed.services.length > 6 && (
+                  <li className="text-muted-foreground">· … {parsed.services.length - 6} more</li>
+                )}
+              </ul>
+            </div>
+          )}
+
+          {parsed.scanCoverage && (
+            <div className="mb-2 text-muted-foreground">
+              {t("已读取", "Read")}{" "}
+              {Object.entries(parsed.scanCoverage.byExtension)
+                .sort((a, b) => b[1] - a[1])
+                .slice(0, 8)
+                .map(([ext, n]) => `${ext}×${n}`)
+                .join(" ")}
+              {Object.keys(parsed.scanCoverage.unsupported).length > 0 && (
+                <div className="text-amber-600 dark:text-amber-500">
+                  {t("暂不支持", "No parser yet")}:{" "}
+                  {Object.entries(parsed.scanCoverage.unsupported)
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 6)
+                    .map(([ext, n]) => `${ext}×${n}`)
+                    .join(" ")}
+                </div>
+              )}
+              {parsed.scanCoverage.truncationNote && (
+                <div className="text-amber-600 dark:text-amber-500">
+                  {parsed.scanCoverage.truncationNote}
+                </div>
+              )}
+            </div>
+          )}
+
           <ul className="space-y-0.5">
-            {parsed.nodeTypes.slice(0, 8).map((nt) => (
-              <li key={nt.key} className="text-muted-foreground">
-                · {nt.key} ({nt.displayName})
-              </li>
-            ))}
+            {parsed.nodeTypes.slice(0, 8).map((nt) => {
+              const origin = parsed.origins?.[nt.key];
+              const table = typeof origin?.table === "string" ? origin.table : undefined;
+              const stereotype = typeof origin?.stereotype === "string" ? origin.stereotype : undefined;
+              return (
+                <li key={nt.key} className="text-muted-foreground">
+                  · {nt.key} ({nt.displayName})
+                  {stereotype && <span className="ml-1 opacity-70">[{stereotype}]</span>}
+                  {table && <span className="ml-1 opacity-70">→ {table}</span>}
+                </li>
+              );
+            })}
             {parsed.nodeTypes.length > 8 && (
               <li className="text-muted-foreground">
                 · … {parsed.nodeTypes.length - 8} more
@@ -726,6 +822,12 @@ function Step4Body({
         ...userActions,
         ...parserActions.filter((pa) => !userActions.some((ua) => ua.key === pa.key)),
       ];
+      // `usePluginAction` already unwraps the transport's `data` envelope, so
+      // the domain arrives as `{ domain }`. Reading `dom.data.domain.id` — one
+      // unwrap too many — always yielded undefined, which threw right here and
+      // skipped the whole type-creation loop below. The result was the worst
+      // possible failure: a domain existed, the wizard said it failed, and no
+      // object types were ever imported.
       const dom = (await createDomain({
         companyId,
         slug,
@@ -737,31 +839,43 @@ function Step4Body({
           bridgeActions: merged,
           sourceNodeTypeKeys: parsed.nodeTypes.map((n) => n.key),
         },
-      })) as { data?: { domain?: { id?: string } } } | undefined;
-      const domainId = dom?.data?.domain?.id;
+      })) as
+        | { domain?: { id?: string }; id?: string; data?: { domain?: { id?: string } } }
+        | undefined;
+      const domainId = dom?.domain?.id ?? dom?.id ?? dom?.data?.domain?.id;
       if (!domainId) {
         throw new Error("create-domain returned no domain id");
       }
+      // Name the failing item: a bare "…failed" leaves the user with a
+      // half-built domain and no idea which type broke.
       for (const nt of parsed.nodeTypes) {
-        await createNodeType({
-          companyId,
-          domainId,
-          key: nt.key,
-          displayName: nt.displayName,
-          propertiesSchema: nt.properties,
-        });
+        try {
+          await createNodeType({
+            companyId,
+            domainId,
+            key: nt.key,
+            displayName: nt.displayName,
+            propertiesSchema: nt.properties,
+          });
+        } catch (e) {
+          throw new Error(`对象类型「${nt.key}」创建失败: ${String((e as Error)?.message ?? e)}`);
+        }
       }
       for (const rt of parsed.relationTypes) {
-        await createRelationType({
-          companyId,
-          domainId,
-          key: rt.key,
-          displayName: rt.displayName,
-          metadata: {
-            sourceNodeTypeKey: rt.sourceNodeTypeKey,
-            targetNodeTypeKey: rt.targetNodeTypeKey,
-          },
-        });
+        try {
+          await createRelationType({
+            companyId,
+            domainId,
+            key: rt.key,
+            displayName: rt.displayName,
+            metadata: {
+              sourceNodeTypeKey: rt.sourceNodeTypeKey,
+              targetNodeTypeKey: rt.targetNodeTypeKey,
+            },
+          });
+        } catch (e) {
+          throw new Error(`关系类型「${rt.key}」创建失败: ${String((e as Error)?.message ?? e)}`);
+        }
       }
       await createBusinessSystem({
         companyId,

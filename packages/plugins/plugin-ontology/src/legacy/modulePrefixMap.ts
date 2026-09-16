@@ -7,10 +7,10 @@
  * a flat array of `[pattern, module]` pairs; the first matching
  * pattern wins. Patterns are matched against the lower-cased input.
  *
- * The wizard runs this when a domain has no `modules/` prefix path
- * (the typical case for non-code ingest — SQL DDL, OpenAPI, doc
- * extraction). For code ingest, `codeScanner.inferModulePrefix`
- * takes the path-based prefix instead.
+ * The wizard runs this when a domain carries no structural provenance of its
+ * own (the typical case for SQL DDL, OpenAPI and doc ingest). When a scan *did*
+ * record structure — a Java package, a proto package, a Maven module — that
+ * beats a keyword guess and is used instead.
  */
 
 export type ModulePrefix = string;
@@ -148,7 +148,7 @@ export function matchModuleFromText(text: string): ModuleMatch | null {
  * Infer a module name from arbitrary text — DDL table names, column
  * comments, OpenAPI schema descriptions, or extracted document
  * language. The first matching pattern wins. Falls back to "core"
- * (matching the codeScanner default) when nothing matches.
+ * when nothing matches at all — the caller decides what that means.
  */
 export function inferModuleFromText(text: string): ModulePrefix {
   return matchModuleFromText(text)?.module ?? "core";

@@ -13,47 +13,30 @@
  * Pure functions only (no DB, no I/O) so they are trivially testable.
  */
 
-export interface ExtractedProperty {
-  name: string;
-  type?: string;
-  /** Column comment, when the source carried one. */
-  description?: string;
-}
+import { firstQuoted } from "./extractionText.js";
+import { parseJavaFile } from "./javaParser.js";
+import { parseProtoFile } from "./protoParser.js";
+import type {
+  ExtractedAction,
+  ExtractedEntity,
+  ExtractedOrigin,
+  ExtractedProperty,
+  ExtractedRelation,
+  FileExtraction,
+  SourceFile,
+} from "./extractionTypes.js";
 
-export interface ExtractedEntity {
-  typeName: string;
-  displayName?: string;
-  /** Table comment, when the source carried one. */
-  description?: string;
-  properties?: ExtractedProperty[];
-  sourceFile?: string;
-}
-
-export interface ExtractedRelation {
-  sourceType: string;
-  targetType: string;
-  relationType: string;
-  sourceFile?: string;
-}
-
-export interface ExtractedAction {
-  name: string;
-  httpMethod?: string;
-  routePath?: string;
-  targetEntity?: string;
-  sourceFile?: string;
-}
-
-export interface FileExtraction {
-  entities: ExtractedEntity[];
-  relations: ExtractedRelation[];
-  actions: ExtractedAction[];
-}
-
-export interface SourceFile {
-  path: string;
-  content: string;
-}
+export type {
+  ExtractedAction,
+  ExtractedEntity,
+  ExtractedOrigin,
+  ExtractedProperty,
+  ExtractedRelation,
+  ExtractionKind,
+  FileExtraction,
+  SourceFile,
+  SourceStereotype,
+} from "./extractionTypes.js";
 
 export interface RepoDraftCoverage {
   entityCount: number;
@@ -72,10 +55,19 @@ export interface RepoDraft {
     sourceFiles: string[];
     /** Table/class comment, when the source carried one. */
     description?: string;
-    /** Flat `field -> descriptor` map (only SQL carries these today). */
+    /** Flat `field -> descriptor` map. */
     properties?: Record<string, unknown>;
+    /** Where the type came from: package, service, mapped table, stereotype. */
+    origin?: ExtractedOrigin;
   }>;
-  seedRelationTypes: Array<{ relationType: string; displayName: string; sourceFiles: string[] }>;
+  seedRelationTypes: Array<{
+    relationType: string;
+    displayName: string;
+    /** Endpoints, so a caller can publish the relation without re-parsing the key. */
+    sourceType: string;
+    targetType: string;
+    sourceFiles: string[];
+  }>;
   seedActions: Array<{ name: string; method: string; path: string; sourceFiles: string[] }>;
   coverage: RepoDraftCoverage;
 }
@@ -147,30 +139,39 @@ function parseGo(content: string, file: string): FileExtraction {
   return { entities, actions, relations: [] };
 }
 
-function parseJava(content: string, file: string): FileExtraction {
-  const entities: ExtractedEntity[] = [];
-  const actions: ExtractedAction[] = [];
-  // classes (Spring entities/controllers)
-  const classRe = /\b(?:public\s+)?(?:final\s+)?class\s+([A-Z][A-Za-z0-9_]*)/g;
-  for (let m; (m = classRe.exec(content)); ) entities.push({ typeName: m[1]!, displayName: m[1]!, sourceFile: file });
-  // Spring: @GetMapping("/path") / @RequestMapping(method=..., value="/path")
-  const mapRe = /@(Get|Post|Put|Patch|Delete)Mapping\s*\(\s*(?:value\s*=\s*)?["']([^"']*)["']/g;
-  for (let m; (m = mapRe.exec(content)); )
-    actions.push({ name: `${m[1]!.toUpperCase()} ${m[2]}`, httpMethod: m[1]!.toUpperCase(), routePath: m[2], sourceFile: file });
-  return { entities, actions, relations: [] };
-}
-
 /**
- * Pull a quoted string out of a fragment, tolerating both quote styles.
- * Returns undefined for empty/absent values.
+ * Parse one source file into entities/relations/actions by extension.
+ *
+ * Java/Kotlin and `.proto` delegate to their own modules — a real Spring project
+ * or a gRPC contract says far more than a regex over `class X` can capture, and
+ * those parsers need to be readable on their own.
  */
-function firstQuoted(text: string | undefined): string | undefined {
-  if (!text) return undefined;
-  const m = /'((?:[^']|'')*)'|"((?:[^"]|"")*)"|`([^`]*)`/.exec(text);
-  if (!m) return undefined;
-  const raw = m[1] ?? m[2] ?? m[3] ?? "";
-  const unescaped = raw.replace(/''/g, "'").replace(/""/g, '"').trim();
-  return unescaped === "" ? undefined : unescaped;
+export function parseSourceFile(path: string, content: string): FileExtraction {
+  if (!content || typeof content !== "string") return { entities: [], relations: [], actions: [] };
+  const ext = extFromPath(path);
+  switch (ext) {
+    case ".ts":
+    case ".tsx":
+    case ".js":
+    case ".jsx":
+    case ".mjs":
+    case ".cjs":
+    case ".vue":
+      return parseTsJs(content, path);
+    case ".py":
+      return parsePython(content, path);
+    case ".go":
+      return parseGo(content, path);
+    case ".java":
+    case ".kt":
+      return parseJavaFile(content, path);
+    case ".proto":
+      return parseProtoFile(content, path);
+    case ".sql":
+      return parseSqlDdl(content, path);
+    default:
+      return { entities: [], relations: [], actions: [] };
+  }
 }
 
 /**
@@ -279,33 +280,6 @@ export function parseSqlDdl(content: string, file: string): FileExtraction {
   return { entities, actions: [], relations };
 }
 
-/** Parse one source file into entities/relations/actions by extension. */
-export function parseSourceFile(path: string, content: string): FileExtraction {
-  if (!content || typeof content !== "string") return { entities: [], relations: [], actions: [] };
-  const ext = extFromPath(path);
-  switch (ext) {
-    case ".ts":
-    case ".tsx":
-    case ".js":
-    case ".jsx":
-    case ".mjs":
-    case ".cjs":
-    case ".vue":
-      return parseTsJs(content, path);
-    case ".py":
-      return parsePython(content, path);
-    case ".go":
-      return parseGo(content, path);
-    case ".java":
-    case ".kt":
-      return parseJava(content, path);
-    case ".sql":
-      return parseSqlDdl(content, path);
-    default:
-      return { entities: [], relations: [], actions: [] };
-  }
-}
-
 /**
  * Fold multiple source files into an O3 cognition draft. Entities become seed
  * node types (layer aggregate_root for tables/classes), FK/relations become seed
@@ -320,6 +294,9 @@ export function extractRepoDraft(files: SourceFile[]): RepoDraft {
       description?: string;
       /** Flat `field -> descriptor` map, the plugin's canonical schema shape. */
       properties?: Record<string, unknown>;
+      /** Field -> the type it referenced, for relation derivation. */
+      references: Array<{ field: string; target: string }>;
+      origin?: ExtractedOrigin;
       sourceFiles: Set<string>;
     }
   >();
@@ -335,20 +312,30 @@ export function extractRepoDraft(files: SourceFile[]): RepoDraft {
 
     for (const e of ex.entities) {
       const cur = entityMap.get(e.typeName)
-        ?? { displayName: e.displayName ?? e.typeName, sourceFiles: new Set<string>() };
+        ?? { displayName: e.displayName ?? e.typeName, references: [], sourceFiles: new Set<string>() };
       cur.sourceFiles.add(f.path);
       // Only SQL carries fields and table comments today, but the fold is
       // generic: the first entity that has them wins, later duplicates do not
       // overwrite. Dropping them here is what made imported tables arrive with
       // no columns at all.
       if (!cur.description && e.description) cur.description = e.description;
+      if (!cur.origin && e.origin) cur.origin = e.origin;
       if (!cur.properties && e.properties && e.properties.length > 0) {
         cur.properties = Object.fromEntries(
           e.properties.map((p) => [
             p.name,
-            { type: p.type ?? "string", ...(p.description ? { description: p.description } : {}) },
+            {
+              type: p.type ?? "string",
+              ...(p.description ? { description: p.description } : {}),
+              ...(p.column ? { column: p.column } : {}),
+            },
           ]),
         );
+        // `declaredType` is dropped from the stored descriptor: it is a means to
+        // derive relations, not part of the object's shape.
+        for (const p of e.properties) {
+          if (p.declaredType) cur.references.push({ field: p.name, target: p.declaredType });
+        }
       }
       entityMap.set(e.typeName, cur);
     }
@@ -366,6 +353,23 @@ export function extractRepoDraft(files: SourceFile[]): RepoDraft {
     }
   }
 
+  // A field typed as another scanned type is a relation — that is how a
+  // monolith or a gRPC contract actually expresses its object graph
+  // (`private SysDept dept;`, `repeated OrderItem items = 2;`). Only types that
+  // exist in this same scan count, so a `String` or a JDK type never becomes one.
+  const known = new Set(entityMap.keys());
+  for (const [typeName, entity] of entityMap) {
+    for (const ref of entity.references) {
+      const target = ref.target.replace(/<[\s\S]*>/, "").replace(/\[\s*\]/g, "").split(".").pop() ?? "";
+      if (target === typeName || !known.has(target)) continue;
+      const key = `${typeName}::references::${target}`;
+      const cur = relationMap.get(key)
+        ?? { displayName: `${typeName} references ${target}`, sourceFiles: new Set<string>() };
+      for (const file of entity.sourceFiles) cur.sourceFiles.add(file);
+      relationMap.set(key, cur);
+    }
+  }
+
   const seedNodeTypes = [...entityMap.entries()].map(([typeName, v]) => ({
     typeName,
     displayName: v.displayName,
@@ -373,10 +377,13 @@ export function extractRepoDraft(files: SourceFile[]): RepoDraft {
     sourceFiles: [...v.sourceFiles],
     ...(v.description ? { description: v.description } : {}),
     ...(v.properties ? { properties: v.properties } : {}),
+    ...(v.origin ? { origin: v.origin } : {}),
   }));
   const seedRelationTypes = [...relationMap.entries()].map(([key, v]) => ({
     relationType: key.split("::")[1] ?? "related",
     displayName: v.displayName,
+    sourceType: key.split("::")[0] ?? "",
+    targetType: key.split("::")[2] ?? "",
     sourceFiles: [...v.sourceFiles],
   }));
   const seedActions = [...actionMap.entries()].map(([name, v]) => ({

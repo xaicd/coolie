@@ -66,8 +66,12 @@ export interface ArchitectureAnalysis {
  * Structural files go first (manifests, container files): losing one of those
  * loses an entire service, whereas losing a source file only loses a detail.
  * The note is returned so the caller can say what was dropped.
+ *
+ * Exported so the project scanner applies the *same* ceilings to object-type
+ * extraction. They used to live only here, in a module nothing called, which
+ * meant no reachable import path enforced any limit at all.
  */
-function applyLimits(files: SourceFile[]): { files: SourceFile[]; note: string | null } {
+export function applyLimits(files: SourceFile[]): { files: SourceFile[]; note: string | null } {
   const weight = (path: string): number => {
     const base = path.split("/").pop() ?? "";
     // A workspace declaration defines where the services ARE — dropping it

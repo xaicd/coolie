@@ -316,6 +316,73 @@ function inferType(
   return { type: "backend", evidence };
 }
 
+const SPRING_CONFIG_RE = /(^|\/)(application|bootstrap)(-[\w.]+)?\.(ya?ml|properties)$/i;
+
+/**
+ * `spring.application.name` — the authoritative service name for a Spring Cloud
+ * system, and the only place a Spring Boot app states it. The name used to come
+ * from `package.json` or the directory, which for a Java module meant the
+ * folder happened to be named right (`ruoyi-system`), not that anything had
+ * declared the service.
+ */
+export function parseSpringAppName(content: string, path: string): string | undefined {
+  const strip = (value: string): string | undefined => {
+    const cleaned = value.trim().replace(/^["']|["']$/g, "").replace(/\s+#.*$/, "").trim();
+    return cleaned === "" ? undefined : cleaned;
+  };
+
+  if (/\.properties$/i.test(path)) {
+    const match = /^\s*spring\.application\.name\s*[:=]\s*(.+)$/m.exec(content);
+    return match ? strip(match[1]!) : undefined;
+  }
+
+  // YAML: indentation decides nesting, so walk it rather than regex the tree.
+  let springIndent: number | null = null;
+  let appIndent: number | null = null;
+  for (const line of content.split("\n")) {
+    if (line.trim() === "" || /^\s*#/.test(line)) continue;
+    const match = /^(\s*)([\w.\-]+)\s*:\s*(.*)$/.exec(line);
+    if (!match) continue;
+    const indent = match[1]!.length;
+    const key = match[2]!;
+    const value = match[3]!;
+
+    if (key === "spring.application.name") return strip(value);
+
+    if (springIndent !== null && indent <= springIndent && key !== "spring") {
+      springIndent = null;
+      appIndent = null;
+    }
+    if (springIndent === null) {
+      if (key === "spring") springIndent = indent;
+      continue;
+    }
+    if (appIndent !== null && indent <= appIndent) appIndent = null;
+    if (appIndent === null) {
+      if (key === "application") appIndent = indent;
+      continue;
+    }
+    if (key === "name") return strip(value);
+  }
+  return undefined;
+}
+
+/** The Spring-declared app name for a service root, when it declares one. */
+export function readSpringAppName(files: SourceFile[], root: string): string | undefined {
+  const configs = filesUnder(files, root)
+    .filter((file) => SPRING_CONFIG_RE.test(file.path))
+    // `src/main/resources` is the real config; test/profile files are secondary.
+    .sort((a, b) => {
+      const rank = (path: string) => (path.includes("/src/main/resources/") ? 0 : 1);
+      return rank(a.path) - rank(b.path) || a.path.length - b.path.length;
+    });
+  for (const config of configs) {
+    const name = parseSpringAppName(config.content, config.path);
+    if (name) return name;
+  }
+  return undefined;
+}
+
 /**
  * Identify the services in a set of scanned files.
  *
@@ -342,9 +409,13 @@ export function detectServices(files: SourceFile[]): DetectedService[] {
     const packageJson = readPackageJson(files, root);
     const { type, evidence } = inferType(root, owned, packageJson, multiService);
     const gitRepoName = root.split("/").filter(Boolean).pop() ?? "repository";
+    // A JS package names itself in package.json; a Spring app names itself in
+    // application.yml. Falling back to the directory is a last resort.
+    const springName = packageJson ? undefined : readSpringAppName(files, root);
+    if (springName) evidence.push(`spring.application.name = ${springName}`);
     services.push({
-      key: slug(packageJson?.name ?? gitRepoName),
-      name: packageJson?.name ?? gitRepoName,
+      key: slug(packageJson?.name ?? springName ?? gitRepoName),
+      name: packageJson?.name ?? springName ?? gitRepoName,
       path: root,
       type,
       evidence,

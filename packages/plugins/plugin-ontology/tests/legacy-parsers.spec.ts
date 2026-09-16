@@ -4,7 +4,6 @@
  */
 import { describe, expect, it } from "vitest";
 import { parseOpenAPI } from "../src/legacy/openapiParser.js";
-import { extractRoutesFromSource } from "../src/legacy/codeScanner.js";
 import { parseSourceFile } from "../src/cognition/AstExtractor.js";
 import {
   inferModuleFromText,
@@ -72,37 +71,6 @@ describe("parseOpenAPI", () => {
   });
 });
 
-describe("extractRoutesFromSource", () => {
-  it("captures Express router routes", () => {
-    const src = `
-      const router = express.Router();
-      router.get("/users", listUsers);
-      router.post("/users", createUser);
-      app.delete("/users/:id", deleteUser);
-    `;
-    const acts = extractRoutesFromSource(src);
-    expect(acts.length).toBe(3);
-    expect(acts.map((a) => a.method)).toEqual(["GET", "POST", "DELETE"]);
-    expect(acts.every((a) => a.endpoint.startsWith("/api/core"))).toBe(true);
-  });
-
-  it("respects an explicit /api prefix", () => {
-    const src = `app.get("/api/orders", listOrders);`;
-    const acts = extractRoutesFromSource(src);
-    expect(acts[0]!.endpoint).toBe("/api/orders");
-  });
-
-  it("uses file-path modules/<x>/ prefix when provided", () => {
-    const src = `app.get("/items", listItems);`;
-    const acts = extractRoutesFromSource(src, "core", "/repo/modules/inventory/routes.ts");
-    expect(acts[0]!.endpoint).toBe("/api/inventory/items");
-    expect(acts[0]!.module).toBe("inventory");
-  });
-
-  it("returns no actions for source with no route declarations", () => {
-    expect(extractRoutesFromSource("const x = 1;")).toEqual([]);
-  });
-});
 
 describe("parseSourceFile (SQL path)", () => {
   // Smoke coverage for the wizard's "数据" tab — the same surface
