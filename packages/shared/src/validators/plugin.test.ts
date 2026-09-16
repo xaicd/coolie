@@ -185,6 +185,33 @@ describe("plugin managed skill validators", () => {
 });
 
 describe("plugin UI slot validators", () => {
+  it("accepts a fill layout on a page slot", () => {
+    const parsed = pluginUiSlotDeclarationSchema.parse({
+      type: "page",
+      id: "ontology-page",
+      displayName: "Ontology",
+      exportName: "OntologyPage",
+      routePath: "ontology",
+      layout: "fill",
+    });
+
+    expect(parsed.layout).toBe("fill");
+  });
+
+  it("rejects a fill layout outside page slots", () => {
+    const parsed = pluginUiSlotDeclarationSchema.safeParse({
+      type: "globalToolbarButton",
+      id: "wiki-toolbar",
+      displayName: "Wiki",
+      exportName: "WikiButton",
+      layout: "fill",
+    });
+
+    expect(parsed.success).toBe(false);
+    if (parsed.success) return;
+    expect(parsed.error.issues[0]?.message).toBe("layout is only supported for page slots");
+  });
+
   it("accepts route-scoped sidebar slots with a routePath", () => {
     const parsed = pluginUiSlotDeclarationSchema.parse({
       type: "routeSidebar",

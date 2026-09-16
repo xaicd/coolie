@@ -607,6 +607,10 @@ const manifest: PaperclipPluginManifestV1 = {
         displayName: "Ontology",
         exportName: "OntologyPage",
         routePath: "ontology",
+        // The workbench is a full-bleed canvas surface: it needs a definite
+        // height from the host so its `h-full` chain resolves instead of
+        // collapsing to content height.
+        layout: "fill",
       },
     ],
   },

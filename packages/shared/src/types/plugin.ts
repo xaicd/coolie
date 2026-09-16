@@ -492,6 +492,13 @@ export interface PluginUiSlotDeclaration {
    */
   routePath?: string;
   /**
+   * Page slots only. `"fill"` hands the slot a definite height equal to the
+   * content area, so a full-bleed surface (canvas, board, workbench) can size
+   * itself with `h-full` instead of collapsing to its content height.
+   * Defaults to `"auto"`, which keeps the historical content-height behaviour.
+   */
+  layout?: "auto" | "fill";
+  /**
    * Optional ordering hint within a slot surface. Lower numbers appear first.
    * Defaults to host-defined ordering if omitted.
    */

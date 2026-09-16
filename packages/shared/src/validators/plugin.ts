@@ -387,6 +387,7 @@ export const pluginUiSlotDeclarationSchema = z.object({
   routePath: z.string().regex(/^[a-z0-9][a-z0-9-]*$/, {
     message: "routePath must be a lowercase single-segment slug (letters, numbers, hyphens)",
   }).optional(),
+  layout: z.enum(["auto", "fill"]).optional(),
   order: z.number().int().optional(),
 }).superRefine((value, ctx) => {
   // context-sensitive slots require explicit entity targeting.
@@ -444,6 +445,13 @@ export const pluginUiSlotDeclarationSchema = z.object({
       code: z.ZodIssueCode.custom,
       message: "companySettingsPage slots require routePath",
       path: ["routePath"],
+    });
+  }
+  if (value.layout && value.type !== "page") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "layout is only supported for page slots",
+      path: ["layout"],
     });
   }
   if (value.routePath && PLUGIN_RESERVED_COMPANY_ROUTE_SEGMENTS.includes(value.routePath as (typeof PLUGIN_RESERVED_COMPANY_ROUTE_SEGMENTS)[number])) {

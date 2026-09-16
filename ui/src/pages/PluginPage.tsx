@@ -163,8 +163,14 @@ export function PluginPage() {
     return <Navigate to={settingsPath} replace />;
   }
 
+  // A `layout: "fill"` page slot sizes itself against the content area. Without
+  // the host handing it a definite height, its `h-full` resolves against an
+  // auto-height wrapper and the surface collapses to its content height — a
+  // canvas or board then floats in a short band with dead space below it.
+  const fillsViewport = pageSlot.layout === "fill";
+
   return (
-    <div className="space-y-4">
+    <div className={fillsViewport ? "flex h-full min-h-0 flex-col gap-4" : "space-y-4"}>
       {!routeSidebarActive && (
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" asChild>
@@ -178,7 +184,7 @@ export function PluginPage() {
       <PluginSlotMount
         slot={pageSlot}
         context={context}
-        className="min-h-(--sz-200px)"
+        className={fillsViewport ? "min-h-0 flex-1" : "min-h-(--sz-200px)"}
         missingBehavior="placeholder"
       />
     </div>
