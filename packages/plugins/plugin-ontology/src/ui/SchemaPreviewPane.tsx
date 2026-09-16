@@ -114,7 +114,7 @@ export function SchemaPreviewPane({
           }}
         />
       ) : (
-      <div className="flex-1 overflow-y-auto p-3 space-y-3 font-mono text-(length:--text-nano)">
+      <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-3 font-mono text-(length:--text-nano)">
         {counts && (
           <DiffSummary
             add={counts.add}
@@ -542,7 +542,7 @@ function DetailView({
   const actionType = describe?.actionTypes.find((at) => at.key === typeKey) ?? null;
 
   return (
-    <div className="flex-1 overflow-y-auto p-3 space-y-3 font-mono text-(length:--text-nano)">
+    <div className="min-h-0 flex-1 overflow-y-auto p-3 space-y-3 font-mono text-(length:--text-nano)">
       <div className="flex items-center gap-2">
         <button
           type="button"

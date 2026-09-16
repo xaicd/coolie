@@ -78,6 +78,9 @@ export interface GraphNodeType {
   id: string;
   key: string;
   display_name?: string | null;
+  description?: string | null;
+  /** Relation types only. */
+  directed?: boolean;
   /** JSON Schema describing the per-instance properties this type allows. */
   propertiesSchema?: Record<string, unknown> | null;
 }
@@ -1047,6 +1050,8 @@ interface GraphViewProps {
   onSelectNode?: (nodeId: string | null) => void;
   /** Optional: filter/highlight to a single node type (from a type tree). */
   focusNodeTypeId?: string | null;
+  /** Lets the schema view's own list drive the same selection the left tree uses. */
+  onSelectNodeType?: (id: string | null) => void;
   /** Control which view is shown; if omitted GraphView owns its own tab state. */
   mode?: GraphViewMode;
   /** Hide the internal graph/table/schema tab bar (when host renders tabs). */
@@ -1121,7 +1126,14 @@ export function GraphView(props: GraphViewProps): ReactElement {
         />
       )}
 
-      {mode === "schema" && <SchemaView nodeTypes={nodeTypeDefs} relationTypes={relationTypeDefs} />}
+      {mode === "schema" && (
+        <SchemaView
+          nodeTypes={nodeTypeDefs}
+          relationTypes={relationTypeDefs}
+          focusNodeTypeId={props.focusNodeTypeId}
+          onSelectNodeType={props.onSelectNodeType}
+        />
+      )}
     </>
   );
 
@@ -1312,81 +1324,255 @@ function TableView({
 }
 
 /**
- * Schema definitions. Object types list their properties inline (`name: type`)
- * with a count badge, mirroring the DS model view; relation types have no
- * property schema, so they render as a plain identity row.
+ * Model / schema view — master-detail, filtered by the current selection.
+ *
+ * The previous version rendered every object type with all of its properties
+ * expanded inline. That ignored the selection entirely (picking `customer`
+ * still listed every other type's fields) and made the tab unusable on a real
+ * domain: with a few thousand types the page was thousands of rows of fields
+ * nobody asked for.
+ *
+ * Now the left column is a compact, searchable index — name, key and a field
+ * count, nothing expanded — and the right pane renders the fields of the
+ * selected item only.
  */
+const MAX_SCHEMA_ROWS = 300;
+
 function SchemaView({
   nodeTypes,
   relationTypes,
+  focusNodeTypeId,
+  onSelectNodeType,
 }: {
   nodeTypes: GraphNodeType[];
   relationTypes: GraphNodeType[];
+  focusNodeTypeId?: string | null;
+  onSelectNodeType?: (id: string | null) => void;
 }): ReactElement {
+  const [query, setQuery] = useState("");
+  const [selected, setSelected] = useState<
+    { kind: "nodeType" | "relationType"; id: string } | null
+  >(null);
+
+  // The host's left tree is the primary selector; mirror it here so choosing a
+  // type over there also drives this tab's detail pane.
+  useEffect(() => {
+    if (focusNodeTypeId) setSelected({ kind: "nodeType", id: focusNodeTypeId });
+  }, [focusNodeTypeId]);
+
+  const needle = query.trim().toLowerCase();
+  const visibleNodeTypes = useMemo(
+    () =>
+      nodeTypes.filter(
+        (nt) =>
+          needle === ""
+          || nt.key.toLowerCase().includes(needle)
+          || (nt.display_name ?? "").toLowerCase().includes(needle),
+      ),
+    [nodeTypes, needle],
+  );
+  const visibleRelationTypes = useMemo(
+    () =>
+      relationTypes.filter(
+        (rt) =>
+          needle === ""
+          || rt.key.toLowerCase().includes(needle)
+          || (rt.display_name ?? "").toLowerCase().includes(needle),
+      ),
+    [relationTypes, needle],
+  );
+
+  const selectedNodeType = selected?.kind === "nodeType"
+    ? nodeTypes.find((nt) => nt.id === selected.id) ?? null
+    : null;
+  const selectedRelationType = selected?.kind === "relationType"
+    ? relationTypes.find((rt) => rt.id === selected.id) ?? null
+    : null;
+
+  const pickNodeType = (id: string) => {
+    setSelected({ kind: "nodeType", id });
+    onSelectNodeType?.(id);
+  };
+
+  const propertyCount = (nt: GraphNodeType): number =>
+    nt.propertiesSchema && typeof nt.propertiesSchema === "object"
+      ? Object.keys(nt.propertiesSchema).length
+      : 0;
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
-      <SchemaColumn title={t("对象类型", "Object types")} items={nodeTypes} showProperties />
-      <SchemaColumn title={t("关系类型", "Relation types")} items={relationTypes} />
+    <div className="flex min-h-0 gap-3">
+      {/* Index */}
+      <div className="flex w-64 shrink-0 flex-col gap-2">
+        <input
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder={t("搜索类型…", "Search types…")}
+          className="rounded-md border border-border bg-background px-2 py-1 text-(length:--text-nano) text-foreground outline-none focus:ring-1 focus:ring-ring"
+        />
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border">
+          <SchemaGroupHeader
+            label={`${t("对象类型", "Object types")} · ${visibleNodeTypes.length}`}
+          />
+          {visibleNodeTypes.slice(0, MAX_SCHEMA_ROWS).map((nt) => (
+            <button
+              key={nt.id}
+              type="button"
+              onClick={() => pickNodeType(nt.id)}
+              className={[
+                "flex w-full items-center gap-2 border-b border-border/60 px-2 py-1 text-left transition-colors last:border-b-0",
+                selectedNodeType?.id === nt.id ? "bg-primary/10 text-primary" : "hover:bg-accent",
+              ].join(" ")}
+            >
+              <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: toneFor(nt.id) }} />
+              <span className="min-w-0 flex-1 truncate text-(length:--text-compact)">
+                {nt.display_name || nt.key}
+              </span>
+              <span className="shrink-0 tabular-nums text-(length:--text-nano) text-muted-foreground">
+                {propertyCount(nt)}
+              </span>
+            </button>
+          ))}
+          {visibleNodeTypes.length > MAX_SCHEMA_ROWS && (
+            <div className="px-2 py-1 text-(length:--text-nano) text-muted-foreground">
+              {t(
+                `仅显示前 ${MAX_SCHEMA_ROWS} 个,还有 ${visibleNodeTypes.length - MAX_SCHEMA_ROWS} 个,请用搜索缩小范围`,
+                `Showing first ${MAX_SCHEMA_ROWS} of ${visibleNodeTypes.length} — search to narrow`,
+              )}
+            </div>
+          )}
+          {visibleNodeTypes.length === 0 && (
+            <div className="px-2 py-1 text-(length:--text-nano) text-muted-foreground">—</div>
+          )}
+
+          <SchemaGroupHeader
+            label={`${t("关系类型", "Relation types")} · ${visibleRelationTypes.length}`}
+          />
+          {visibleRelationTypes.slice(0, MAX_SCHEMA_ROWS).map((rt) => (
+            <button
+              key={rt.id}
+              type="button"
+              onClick={() => setSelected({ kind: "relationType", id: rt.id })}
+              className={[
+                "flex w-full items-center gap-2 border-b border-border/60 px-2 py-1 text-left transition-colors last:border-b-0",
+                selectedRelationType?.id === rt.id ? "bg-primary/10 text-primary" : "hover:bg-accent",
+              ].join(" ")}
+            >
+              <span aria-hidden className="h-2 w-2 shrink-0 rounded-full border border-border" style={{ background: toneFor(rt.id) }} />
+              <span className="min-w-0 flex-1 truncate text-(length:--text-compact)">
+                {rt.display_name || rt.key}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Detail — only the selected item's fields */}
+      <div className="min-h-0 flex-1 overflow-y-auto rounded-lg border border-border bg-background p-3">
+        {selectedNodeType ? (
+          <SchemaTypeDetail nodeType={selectedNodeType} />
+        ) : selectedRelationType ? (
+          <SchemaRelationDetail relationType={selectedRelationType} />
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-1 text-center text-muted-foreground">
+            <div className="text-(length:--text-compact)">
+              {t("选择左侧的一个类型查看它的字段", "Select a type on the left to see its fields")}
+            </div>
+            <div className="text-(length:--text-nano)">
+              {t(
+                "也可以直接在左侧类型树里点一个类型",
+                "Picking a type in the left tree selects it here too",
+              )}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
 
-function SchemaColumn({
-  title,
-  items,
-  showProperties = false,
-}: {
-  title: string;
-  items: GraphNodeType[];
-  showProperties?: boolean;
-}): ReactElement {
+function SchemaGroupHeader({ label }: { label: string }): ReactElement {
   return (
-    <div>
-      <div className="mb-1 text-(length:--text-nano) font-semibold text-muted-foreground">
-        {title} · {items.length}
+    <div className="sticky top-0 z-10 bg-muted/60 px-2 py-1 text-(length:--text-nano) font-semibold text-muted-foreground backdrop-blur">
+      {label}
+    </div>
+  );
+}
+
+function SchemaTypeDetail({ nodeType }: { nodeType: GraphNodeType }): ReactElement {
+  const entries = nodeType.propertiesSchema && typeof nodeType.propertiesSchema === "object"
+    ? Object.entries(nodeType.propertiesSchema)
+    : [];
+
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline gap-2">
+        <span aria-hidden className="h-2.5 w-2.5 rounded-full" style={{ background: toneFor(nodeType.id) }} />
+        <span className="text-(length:--text-compact) font-semibold">{nodeType.display_name || nodeType.key}</span>
+        <span className="font-mono text-(length:--text-nano) text-muted-foreground">{nodeType.key}</span>
+        <span className="ml-auto rounded bg-muted/60 px-1.5 py-0.5 text-(length:--text-nano) tabular-nums text-muted-foreground">
+          {entries.length} {t("属性", "props")}
+        </span>
       </div>
-      {items.length === 0 ? (
-        <div className="text-(length:--text-compact) text-muted-foreground">—</div>
-      ) : (
-        <div className="flex flex-col gap-1">
-          {items.map((it) => {
-            const schema = it.propertiesSchema && typeof it.propertiesSchema === "object"
-              ? Object.entries(it.propertiesSchema)
-              : [];
-            return (
-              <div key={it.id} className="rounded-lg border border-border bg-background px-2.5 py-1.5">
-                <div className="flex items-center gap-2">
-                  <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: toneFor(it.id) }} />
-                  <span className="text-(length:--text-compact) font-medium">{it.display_name || it.key}</span>
-                  <span className="text-(length:--text-nano) text-muted-foreground">{it.key}</span>
-                  {showProperties && schema.length > 0 && (
-                    <span className="ml-auto shrink-0 rounded bg-muted/60 px-1.5 py-0.5 text-(length:--text-nano) tabular-nums text-muted-foreground">
-                      {schema.length} {t("属性", "props")}
-                    </span>
-                  )}
-                </div>
-                {showProperties && (
-                  schema.length > 0 ? (
-                    <ul className="mt-1 space-y-0.5 pl-4">
-                      {schema.map(([name, descriptor]) => (
-                        <li key={name} className="flex items-baseline gap-1 text-(length:--text-nano)">
-                          <span className="font-mono text-foreground/80">{name}</span>
-                          <span className="text-muted-foreground">:</span>
-                          <span className="text-muted-foreground">{summarizePropertyType(descriptor)}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  ) : (
-                    <div className="mt-0.5 pl-4 text-(length:--text-nano) italic text-muted-foreground">
-                      {t("尚未配置属性", "No properties defined")}
-                    </div>
-                  )
-                )}
-              </div>
-            );
-          })}
-        </div>
+      {nodeType.description && (
+        <div className="text-(length:--text-nano) text-muted-foreground">{nodeType.description}</div>
       )}
+
+      {entries.length === 0 ? (
+        <div className="rounded-md border border-dashed border-border px-2 py-3 text-center text-(length:--text-nano) italic text-muted-foreground">
+          {t("尚未配置属性", "No properties defined")}
+        </div>
+      ) : (
+        <table className="w-full text-(length:--text-nano)">
+          <thead className="text-muted-foreground">
+            <tr className="border-b border-border">
+              <th className="px-1 py-1 text-left font-medium">{t("字段", "Field")}</th>
+              <th className="px-1 py-1 text-left font-medium">{t("类型", "Type")}</th>
+              <th className="px-1 py-1 text-left font-medium">{t("说明", "Description")}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {entries.map(([name, descriptor]) => {
+              const obj = (descriptor && typeof descriptor === "object"
+                ? descriptor
+                : {}) as { description?: unknown };
+              return (
+                <tr key={name} className="border-b border-border/60 last:border-b-0">
+                  <td className="px-1 py-1 font-mono text-foreground/90">{name}</td>
+                  <td className="px-1 py-1 text-muted-foreground">{summarizePropertyType(descriptor)}</td>
+                  <td className="px-1 py-1 text-muted-foreground">
+                    {typeof obj.description === "string" ? obj.description : ""}
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      )}
+    </div>
+  );
+}
+
+function SchemaRelationDetail({ relationType }: { relationType: GraphNodeType }): ReactElement {
+  const directed = (relationType as { directed?: boolean }).directed;
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline gap-2">
+        <span aria-hidden className="h-2.5 w-2.5 rounded-full border border-border" style={{ background: toneFor(relationType.id) }} />
+        <span className="text-(length:--text-compact) font-semibold">
+          {relationType.display_name || relationType.key}
+        </span>
+        <span className="font-mono text-(length:--text-nano) text-muted-foreground">{relationType.key}</span>
+      </div>
+      {relationType.description && (
+        <div className="text-(length:--text-nano) text-muted-foreground">{relationType.description}</div>
+      )}
+      <div className="text-(length:--text-nano) text-muted-foreground">
+        {t("方向", "Direction")}: {directed === false ? t("无向", "undirected") : t("有向", "directed")}
+      </div>
+      <div className="text-(length:--text-nano) italic text-muted-foreground">
+        {t("关系类型没有属性 schema。", "Relation types carry no property schema.")}
+      </div>
     </div>
   );
 }

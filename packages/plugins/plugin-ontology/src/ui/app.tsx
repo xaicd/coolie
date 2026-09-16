@@ -1010,6 +1010,7 @@ function DomainWorkspace({
             selectedNodeId={selectedNodeId}
             onSelectNode={setSelectedNodeId}
             focusNodeTypeId={focusNodeTypeId}
+            onSelectNodeType={setFocusNodeTypeId}
             mode={view === "graph" ? "graph" : view === "table" ? "table" : "schema"}
             hideTabs
             nodeTypeDragMime={DRAG_MIME}
@@ -2281,7 +2282,7 @@ function PropertiesSchemaEditor({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border px-3 py-2">
+        <div className="flex shrink-0 items-center justify-between border-b border-border px-3 py-2">
           <div className="min-w-0">
             <div className="truncate text-(length:--text-compact) font-semibold">
               {t("属性", "Properties")}
@@ -2300,8 +2301,11 @@ function PropertiesSchemaEditor({
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-3">
+        {/* Body — `min-h-0` is load-bearing: without it a flex child keeps
+            `min-height: auto`, refuses to shrink below its content, and pushes
+            the footer out of the max-h box (the Save / Cancel buttons become
+            unreachable once the field list is long — e.g. after 智能补全). */}
+        <div className="min-h-0 flex-1 overflow-y-auto p-3">
           {showJson ? (
             <textarea
               value={jsonText}
@@ -2363,8 +2367,8 @@ function PropertiesSchemaEditor({
           {err && <div className="mt-2 text-(length:--text-nano) text-destructive">{err}</div>}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-between border-t border-border px-3 py-2">
+        {/* Footer — must never be squeezed or scrolled away. */}
+        <div className="flex shrink-0 items-center justify-between border-t border-border px-3 py-2">
           <button
             type="button"
             onClick={() => setShowJson((s) => !s)}

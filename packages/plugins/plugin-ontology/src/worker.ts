@@ -1135,6 +1135,64 @@ const plugin = definePlugin({
       };
     });
 
+    // List handlers the workbench reaches through `usePluginData`.
+    //
+    // These keys previously existed ONLY on the manifest `apiRoutes` surface
+    // (`onApiRequest`), so every call from the UI came back 502 "No data handler
+    // registered for key …" and the tabs that read them — 数据集 / 连接器 /
+    // 转换 / 动作 / 函数 / 接口 — rendered as empty lists.
+    ctx.data.register("list-node-types", async (params) => {
+      const nodeTypes = await store.listNodeTypes(
+        requireString(params.companyId, "companyId"),
+        requireString(params.domainId, "domainId"),
+      );
+      return {
+        nodeTypes: nodeTypes.map((nt) => ({ ...nt, propertiesSchema: nt.properties_schema })),
+      };
+    });
+
+    ctx.data.register("list-action-types", async (params) => ({
+      actionTypes: await store.listActionTypes(
+        requireString(params.companyId, "companyId"),
+        requireString(params.domainId, "domainId"),
+      ),
+    }));
+
+    ctx.data.register("list-functions", async (params) => ({
+      functions: await store.listFunctions(
+        requireString(params.companyId, "companyId"),
+        requireString(params.domainId, "domainId"),
+      ),
+    }));
+
+    ctx.data.register("list-interfaces", async (params) => ({
+      interfaces: await store.listInterfaces(
+        requireString(params.companyId, "companyId"),
+        requireString(params.domainId, "domainId"),
+      ),
+    }));
+
+    ctx.data.register("list-datasets", async (params) => ({
+      datasets: await store.listDatasets(
+        requireString(params.companyId, "companyId"),
+        requireString(params.domainId, "domainId"),
+      ),
+    }));
+
+    ctx.data.register("list-connectors", async (params) => ({
+      connectors: await store.listConnectors(
+        requireString(params.companyId, "companyId"),
+        requireString(params.domainId, "domainId"),
+      ),
+    }));
+
+    ctx.data.register("list-transforms", async (params) => ({
+      transforms: await store.listTransforms(
+        requireString(params.companyId, "companyId"),
+        requireString(params.domainId, "domainId"),
+      ),
+    }));
+
     // Mutating actions backing usePluginAction(...) in the plugin UI.
     ctx.actions.register("create-domain", async (params) => {
       const companyId = requireString(params.companyId, "companyId");

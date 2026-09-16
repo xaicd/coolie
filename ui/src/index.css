@@ -1,6 +1,16 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/*
+ * Plugin UI bundles are loaded into this page and style themselves with the
+ * host's compiled Tailwind CSS — they ship no stylesheet of their own. Tailwind
+ * v4 only auto-detects sources under the project root (`ui/`), so without this
+ * directive every utility a plugin invents is missing from the stylesheet and
+ * fails silently: `max-h-[85vh]` did nothing, so a modal grew to its content
+ * height and pushed its Save/Cancel footer off screen.
+ */
+@source "../../packages/plugins/**/src/**/*.{ts,tsx}";
+
 @font-face {
   font-family: "InterVariable";
   src: url("/fonts/InterVariable.woff2") format("woff2");

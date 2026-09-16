@@ -720,7 +720,9 @@ function MessageList({
   return (
     <div
       ref={scrollRef}
-      className="flex-1 overflow-y-auto rounded-xl border border-border bg-card/30 p-3"
+      // `min-h-0` keeps the transcript scrollable instead of letting a long
+      // conversation push the composer out of the column.
+      className="min-h-0 flex-1 overflow-y-auto rounded-xl border border-border bg-card/30 p-3"
     >
       <ul className="flex flex-col gap-3">
         {messages.map((m) => (
