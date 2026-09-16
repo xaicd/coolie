@@ -134,7 +134,10 @@ type AideStreamEvent =
   | { type: "error"; message: string }
   | { type: "aborted" }
   | { type: "edit_result"; result: CockpitEditResult }
-  | { type: "edit_error"; error: string };
+  | { type: "edit_error"; error: string }
+  /** The QA agent is calling a read-only lookup tool. Purely informational —
+   *  it never contributes to the answer text. */
+  | { type: "tool"; name: string; phase: "start" | "done" };
 
 interface LocalMessage {
   id: string;
@@ -152,6 +155,8 @@ interface LocalMessage {
   /** Set when Edit-mode JSON parse failed; the UI shows a localised
    *  hint instead of an EditCard so the user can retry or report. */
   editError?: string;
+  /** Name of the lookup tool the agent is currently running, if any. */
+  toolStatus?: string | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -786,11 +791,25 @@ function Bubble({
             />
           ) : null
         ) : message.content.length === 0 && message.streaming ? (
-          <BouncingDots />
+          <div className="flex items-center gap-2">
+            <BouncingDots />
+            {message.toolStatus && (
+              <span className="text-(length:--text-nano) text-muted-foreground">
+                🔍 {t("正在查询", "Looking up")} {toolLabel(message.toolStatus)}…
+              </span>
+            )}
+          </div>
         ) : isUser ? (
           <div>{message.content}</div>
         ) : (
           <MarkdownContent source={message.content} />
+        )}
+        {/* The agent may narrate, look something up, then keep writing — show
+            the lookup inline so a pause reads as work, not a stall. */}
+        {!isUser && message.streaming && message.toolStatus && message.content.length > 0 && (
+          <div className="mt-1 text-(length:--text-nano) text-muted-foreground">
+            🔍 {t("正在查询", "Looking up")} {toolLabel(message.toolStatus)}…
+          </div>
         )}
         {showEditCard && message.content.length > 0 && (
           <details className="mt-2 text-(length:--text-nano) text-muted-foreground">
@@ -829,6 +848,21 @@ function Bubble({
       </div>
     </div>
   );
+}
+
+/** Human label for a lookup tool, shown while the agent is running it. */
+function toolLabel(name: string): string {
+  switch (name) {
+    case "domain_overview": return t("域总览", "domain overview");
+    case "list_object_types": return t("对象类型清单", "object types");
+    case "get_object_type": return t("对象类型字段", "object type fields");
+    case "list_instances": return t("实例数据", "instances");
+    case "get_instance": return t("实例详情", "instance detail");
+    case "list_relation_types": return t("关系类型清单", "relation types");
+    case "find_path": return t("路径", "path");
+    case "find_impact": return t("影响范围", "impact");
+    default: return name;
+  }
 }
 
 function BouncingDots(): ReactElement {
@@ -1007,11 +1041,19 @@ function applyEvents(
       if (last.streaming) {
         next[lastIdx] = { ...last, content: last.content + ev.text };
       }
+    } else if (ev.type === "tool") {
+      // Informational only — the answer text is unaffected. Cleared by any
+      // terminal event so a finished turn never keeps a stale "looking up…".
+      next[lastIdx] = {
+        ...last,
+        toolStatus: ev.phase === "start" ? ev.name : null,
+      };
     } else if (ev.type === "done") {
       next[lastIdx] = {
         ...last,
         streaming: false,
         citations: ev.citations,
+        toolStatus: null,
       };
     } else if (ev.type === "edit_result") {
       // Edit mode: the LLM's whole reply was the JSON. Replace the
@@ -1022,24 +1064,28 @@ function applyEvents(
         streaming: false,
         content: "",
         editResult: ev.result,
+        toolStatus: null,
       };
     } else if (ev.type === "edit_error") {
       next[lastIdx] = {
         ...last,
         streaming: false,
         editError: ev.error,
+        toolStatus: null,
       };
     } else if (ev.type === "aborted") {
       next[lastIdx] = {
         ...last,
         streaming: false,
         aborted: true,
+        toolStatus: null,
       };
     } else if (ev.type === "error") {
       next[lastIdx] = {
         ...last,
         streaming: false,
         error: ev.message,
+        toolStatus: null,
       };
     }
   }

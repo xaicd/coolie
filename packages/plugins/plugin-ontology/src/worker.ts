@@ -28,6 +28,8 @@ import {
   parseBootstrapDraft,
 } from "./aide/bootstrap.js";
 import { EDIT_SYSTEM_PROMPT_SUFFIX, parseEditResponse } from "./aide/editOps.js";
+import { AIDE_TOOL_SPECS, executeAideTool } from "./aide/agentTools.js";
+import { runAideAgent, type AideLoopMessage } from "./aide/agentLoop.js";
 import type {
   ActionKind,
   ActionTypeStatus,
@@ -138,78 +140,73 @@ function requireAideStore(): AideStore {
  */
 function buildAideSystemPrompt(snapshot: DescribeDomainResult): string {
   const lines: string[] = [];
+
+  // ── Identity. The previous prompt opened straight into six sections of
+  // schema dump with no statement of who the aide was, so "你是谁" had no
+  // answer available and the model recited the dump instead.
   lines.push(
-    `你是「数字副手」,专门回答关于本体域 ${snapshot.domain.slug} (id=${snapshot.domain.id}, name=${snapshot.domain.display_name}, v${snapshot.domain.version}) 的问题。`,
+    `你是本体域「${snapshot.domain.display_name}」(slug=${snapshot.domain.slug}, v${snapshot.domain.version})的「数字副手」(Digital Aide)。`,
+  );
+  lines.push(
+    "你的职责是帮助使用者理解并运用这个本体域:它建模了什么业务、有哪些对象类型与关系、某个概念是如何建模的、实例数据长什么样。",
   );
   lines.push("");
+
+  // ── Behaviour. This is the part that was missing outright.
+  lines.push("## 回答方式");
+  lines.push("1. 先用一两句话直接回答用户**实际问的那个问题**。用户问什么就答什么。");
   lines.push(
-    "你只能引用以下本体数据回答问题,不要编造对象、关系、属性或数值。如果用户问到本体内未建模的信息,直接说「本体内未建模此字段」,不要瞎猜。",
+    "2. 只有用户明确要「概览」「有哪些类型」「这个域建模了什么」时,才展开下面的目录。其他问题不要拿目录当答案。",
   );
+  lines.push(
+    "3. 凡是涉及**具体字段、具体实例、实例之间的关系**,必须先用工具查真实数据再下结论。目录只有名字和计数,不足以支撑任何结论。",
+  );
+  lines.push(
+    "4. 查不到就说查不到,并说明「本体内未建模此项」;不要编造字段名、实例或数值。",
+  );
+  lines.push("5. 用中文回答,除非用户用英文提问。");
   lines.push("");
-  lines.push(`## 1. 对象类型 (共 ${snapshot.nodeTypes.length} 个)`);
-  if (snapshot.nodeTypes.length === 0) {
-    lines.push("  (无)");
+
+  lines.push("## 可用工具");
+  for (const spec of AIDE_TOOL_SPECS) {
+    lines.push(`- ${spec.name} — ${spec.description}`);
   }
+  lines.push("");
+
+  // ── Compact index. Details deliberately stay behind the tools so the model
+  // cannot satisfy a data question without actually looking.
+  lines.push("## 本域索引(仅索引,细节请用工具查)");
+  lines.push(`对象类型 (${snapshot.nodeTypes.length}):`);
+  if (snapshot.nodeTypes.length === 0) lines.push("  (无)");
   for (const nt of snapshot.nodeTypes) {
     const propCount = nt.propertiesSchema && typeof nt.propertiesSchema === "object"
       ? Object.keys(nt.propertiesSchema).length
       : 0;
-    lines.push(
-      `  - ${nt.key} | ${nt.displayName} | 实例=${nt.instanceCount} | 属性=${propCount}`,
-    );
+    lines.push(`  - ${nt.key} | ${nt.displayName} | 属性=${propCount} | 实例=${nt.instanceCount} | id=${nt.id}`);
   }
-  lines.push("");
-  lines.push(`## 2. 关系类型 (共 ${snapshot.relationTypes.length} 个)`);
-  if (snapshot.relationTypes.length === 0) {
-    lines.push("  (无)");
-  }
+  lines.push(`关系类型 (${snapshot.relationTypes.length}):`);
+  if (snapshot.relationTypes.length === 0) lines.push("  (无)");
   for (const rt of snapshot.relationTypes) {
     lines.push(
-      `  - ${rt.key} | ${rt.displayName} | 方向=${rt.directed ? "directed" : "undirected"} | 实例=${rt.instanceCount}`,
+      `  - ${rt.key} | ${rt.displayName} | ${rt.directed ? "有向" : "无向"} | 实例=${rt.instanceCount} | id=${rt.id}`,
     );
   }
-  lines.push("");
-  lines.push(`## 3. 最近修改节点 (展示 ${snapshot.recentNodes.length} 条)`);
-  if (snapshot.recentNodes.length === 0) {
-    lines.push("  (无)");
-  }
-  for (const n of snapshot.recentNodes) {
-    lines.push(`  - ${n.key} | ${n.label} | 类型=${n.nodeTypeKey ?? "(未分类)"}`);
-  }
-  lines.push("");
   lines.push(
-    `## 4. 真实应用系统 (共 ${snapshot.businessSystems.length} 个,绑定到本域)`,
+    `节点总数=${snapshot.counts.totalNodes} | 关系总数=${snapshot.counts.totalEdges} | 业务系统=${snapshot.counts.businessSystems} | 子项目=${snapshot.counts.subProjects} | 动作类型=${snapshot.counts.actionTypes}`,
   );
-  if (snapshot.businessSystems.length === 0) {
-    lines.push("  (无)");
-  }
-  for (const bs of snapshot.businessSystems) {
-    lines.push(`  - ${bs.code} | ${bs.name} | status=${bs.status}`);
-  }
   lines.push("");
-  lines.push(`## 5. 业务子项目 (共 ${snapshot.subProjects.length} 个)`);
-  if (snapshot.subProjects.length === 0) {
-    lines.push("  (无)");
-  }
-  for (const sp of snapshot.subProjects) {
-    lines.push(`  - ${sp.code} | ${sp.name} | type=${sp.type} | status=${sp.status}`);
-  }
-  lines.push("");
-  lines.push(`## 6. Action / API 类型 (共 ${snapshot.actionTypes.length} 个)`);
-  if (snapshot.actionTypes.length === 0) {
-    lines.push("  (无)");
-  }
-  for (const at of snapshot.actionTypes) {
-    lines.push(`  - ${at.key} | ${at.displayName} | kind=${at.kind} | status=${at.status}`);
-  }
-  lines.push("");
-  lines.push("回答要求:");
-  lines.push("1. 用中文回答,除非用户用英文提问。");
+
+  // ── Citation contract — unchanged; `extractCitations` depends on it.
+  lines.push("## 引用");
   lines.push(
-    "2. 每条回答末尾必须添加一行引用,格式:`[cite:kind:id,kind:id,...]`(逗号分隔)。kind 只能取: node-type | relation-type | node | sub-project | action-type | business-system。",
+    "回答末尾另起一行附引用,格式:`[cite:kind:id,...]`(逗号分隔)。kind 只能取: node-type | relation-type | node | sub-project | action-type | business-system。",
   );
-  lines.push("3. 引用行必须独占一行,放在回答末尾,不要嵌在正文中。");
-  lines.push("4. 没有可引用的本体数据时,引用行可以为空:`[cite:]`。");
+  lines.push("引用行必须独占一行,放在回答末尾,不要嵌在正文中。");
+  lines.push(
+    "**只要本轮提到了具体的对象类型、关系类型或实例(包括工具返回的),就必须附上对应的引用行** —— 引用来自工具结果里的 `id` 字段。",
+  );
+  lines.push("只有整轮回答没有涉及任何具体对象时,才省略引用行(不要输出空的 `[cite:]`)。");
+
   return lines.join("\n");
 }
 
@@ -1835,28 +1832,28 @@ const plugin = definePlugin({
       aideStreamRegistry.set(registryKey, registryEntry);
       try {
         const client = getClient();
-        // Edit-mode responses are pure JSON, so we don't need the long
-        // prose budget that QA mode uses.
-        const maxTokens = mode === "edit" ? 4096 : 2048;
-        const stream = client.messages.stream({
-          model: getModel(),
-          max_tokens: maxTokens,
-          system: systemPrompt,
-          messages: llmMessages,
-        });
-        // The Anthropic SDK exposes an AbortController-shaped handle on the
-        // MessageStream; re-point our registry entry at it so a later
-        // aide-abort call actually cancels the HTTP request.
-        registryEntry.controller = stream.controller;
-        stream.on("text", (delta: string) => {
-          acc += delta;
-          if (!registryEntry.aborted) {
-            ctx.streams.emit(streamChannel, { type: "token", text: delta });
-          }
-        });
-        await stream.finalMessage();
 
         if (mode === "edit") {
+          // Edit stays a single-shot JSON-patch call: it is a generation task,
+          // not a retrieval one, so it gets no tools and no loop.
+          const stream = client.messages.stream({
+            model: getModel(),
+            max_tokens: 4096,
+            system: systemPrompt,
+            messages: llmMessages,
+          });
+          // The Anthropic SDK exposes an AbortController-shaped handle on the
+          // MessageStream; re-point our registry entry at it so a later
+          // aide-abort call actually cancels the HTTP request.
+          registryEntry.controller = stream.controller;
+          stream.on("text", (delta: string) => {
+            acc += delta;
+            if (!registryEntry.aborted) {
+              ctx.streams.emit(streamChannel, { type: "token", text: delta });
+            }
+          });
+          await stream.finalMessage();
+
           // Edit-mode does not use citations. We parse the final buffer
           // as JSON and emit a structured `edit_result` event the UI
           // renders as an EditCard. The full JSON also goes into the
@@ -1881,6 +1878,66 @@ const plugin = definePlugin({
             ctx.streams.emit(streamChannel, { type: "aborted" });
           }
           return { ok: true, mode, aborted: registryEntry.aborted };
+        }
+
+        // QA runs as an agent: the model can look up real domain data with the
+        // read-only tools before answering. `acc` accumulates everything
+        // streamed (intermediate narration included) so the citation trailer at
+        // the very end still parses the same way it always did.
+        const agentMessages: AideLoopMessage[] = llmMessages.map((m) => ({
+          role: m.role,
+          content: m.content,
+        }));
+        const runOnce = async (withTools: boolean) => {
+          const accBefore = acc;
+          try {
+            return await runAideAgent({
+              createStream: ({ system, messages, tools }) =>
+                client.messages.stream({
+                  model: getModel(),
+                  max_tokens: 2048,
+                  system,
+                  messages: messages as never,
+                  ...(withTools ? { tools: tools as never } : {}),
+                }) as never,
+              systemPrompt,
+              tools: AIDE_TOOL_SPECS,
+              messages: agentMessages,
+              executeTool: (name, input) =>
+                executeAideTool(store, companyId, domainId, name, input),
+              onToken: (delta) => {
+                acc += delta;
+                if (!registryEntry.aborted) {
+                  ctx.streams.emit(streamChannel, { type: "token", text: delta });
+                }
+              },
+              onTool: (name, phase) => {
+                if (!registryEntry.aborted) {
+                  ctx.streams.emit(streamChannel, { type: "tool", name, phase });
+                }
+              },
+              onController: (controller) => {
+                registryEntry.controller = controller;
+              },
+              isAborted: () => registryEntry.aborted,
+            });
+          } catch (err) {
+            // Drop anything streamed before the failure so a retry doesn't
+            // duplicate it in the bubble.
+            acc = accBefore;
+            throw err;
+          }
+        };
+
+        try {
+          await runOnce(true);
+        } catch (err) {
+          const message = String((err as Error)?.message ?? err);
+          const toolUnsupported =
+            /tool/i.test(message) && /(not supported|unsupported|unexpected|invalid|unknown)/i.test(message);
+          if (!toolUnsupported) throw err;
+          ctx.logger.warn("Aide model rejected tools — falling back to single-shot", { message });
+          await runOnce(false);
         }
 
         const citations = extractCitations(acc);

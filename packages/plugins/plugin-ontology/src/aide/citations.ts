@@ -47,7 +47,15 @@ export function extractCitations(text: string): AideCitation[] {
 /**
  * Strip the trailing `[cite:...]` line so the persisted content column is
  * citation-free. Idempotent — running it twice has the same effect as once.
+ *
+ * A truncated model response can leave a dangling `[cite` with no closing
+ * bracket, which the documented shape does not match. That fragment is never
+ * legitimate output, so it is dropped too rather than leaking into the answer.
  */
 export function stripCitationTrailer(text: string): string {
-  return text.replace(/\s*\[cite:[^\]]*\]\s*$/u, "").trimEnd();
+  const complete = text.replace(/\s*\[cite:[^\]]*\]\s*$/u, "");
+  if (complete !== text) return complete.trimEnd();
+  // `\[cite` must not swallow prose like "[citation needed]": the optional
+  // group has to start with the colon.
+  return text.replace(/\s*\[cite(?::[^\]]*)?$/u, "").trimEnd();
 }

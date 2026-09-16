@@ -87,4 +87,18 @@ describe("stripCitationTrailer", () => {
     const twice = stripCitationTrailer(once);
     expect(once).toBe(twice);
   });
+
+  // A live run produced an answer ending in a bare `[cite:` — the model emitted
+  // an empty trailer without the closing bracket, so the documented shape did
+  // not match and the fragment was persisted straight into the visible answer.
+  it("drops a truncated trailer that never closed its bracket", () => {
+    expect(stripCitationTrailer("body\n\n[cite:")).toBe("body");
+    expect(stripCitationTrailer("body\n\n[cite:node:x")).toBe("body");
+    expect(stripCitationTrailer("body[cite")).toBe("body");
+  });
+
+  it("does not swallow prose that merely starts with [cite", () => {
+    expect(stripCitationTrailer("see [citation needed")).toBe("see [citation needed");
+    expect(stripCitationTrailer("the [cited] source")).toBe("the [cited] source");
+  });
 });

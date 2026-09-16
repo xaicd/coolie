@@ -115,6 +115,8 @@ export interface OntologyNodeRow {
   label: string;
   lifecycle_state: NodeLifecycleState;
   version: number;
+  /** Selected by NODE_COLS; the per-instance attribute bag. */
+  properties?: Record<string, unknown> | null;
 }
 
 export interface OntologyEdgeInput {
