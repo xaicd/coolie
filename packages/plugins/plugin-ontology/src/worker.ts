@@ -294,6 +294,9 @@ async function publishCognitionDraft(
     const nt = raw as Record<string, unknown>;
     const key = str(nt.typeName ?? nt.key ?? nt.name);
     if (!key) continue;
+    // `propertiesSchema` was dropped here even though `parseSqlDdl` had already
+    // extracted the columns and their comments — so a table imported through the
+    // cognition path arrived with no fields at all.
     await store.createNodeType({
       companyId,
       domainId: targetDomainId,
@@ -301,6 +304,7 @@ async function publishCognitionDraft(
       displayName: str(nt.displayName ?? nt.label ?? key, key),
       description: str(nt.description) || null,
       layer: (str(nt.layer) as NodeLayer) || undefined,
+      propertiesSchema: optionalRecord(nt.properties ?? nt.propertiesSchema),
     });
     nodeTypes += 1;
   }
@@ -1204,15 +1208,20 @@ const plugin = definePlugin({
 
     // Mutating actions backing usePluginAction(...) in the plugin UI.
     ctx.actions.register("create-domain", async (params) => {
-      const companyId = requireString(params.companyId, "companyId");
+      // `category` and `metadata` used to be dropped here. The import wizard
+      // folds the routes / actions it mined into that metadata blob, so losing
+      // it meant the whole non-DDL import produced nothing but type names.
+      const call = readMutationCall(params);
       const domain = await store.createDomain({
-        companyId,
-        slug: requireString(params.slug, "slug"),
-        displayName: requireString(params.displayName, "displayName"),
-        description: typeof params.description === "string" ? params.description : null,
+        companyId: call.companyId,
+        slug: requireString(call.fields.slug, "slug"),
+        displayName: requireString(call.fields.displayName, "displayName"),
+        description: typeof call.fields.description === "string" ? call.fields.description : null,
+        category: typeof call.fields.category === "string" ? call.fields.category : undefined,
+        metadata: optionalRecord(call.fields.metadata),
       });
       await ctx.activity.log({
-        companyId,
+        companyId: call.companyId,
         message: `Created ontology domain ${domain.slug}`,
         entityType: "ontology_domain",
         entityId: domain.id,

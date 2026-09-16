@@ -49,6 +49,12 @@ export type ParsedSource = {
     endpoint: string;
     description?: string;
   }>;
+  /**
+   * Repository roots seen by the directory scan, derived from each file's
+   * `webkitRelativePath`. Real material from the source, carried through to
+   * the business system the import creates.
+   */
+  repos?: string[];
 };
 
 export type WizardStep = 1 | 2 | 3 | 4;
@@ -273,8 +279,14 @@ function Step1Body({
       const { extractRoutesFromSource } = await import("../legacy/codeScanner.js");
       const actions: ParsedSource["actions"] = [];
       const seen = new Set<string>();
+      // The directory picker gives each file a `webkitRelativePath` like
+      // `my-repo/services/order/src/index.ts`; the first segment is the repo.
+      const repos = new Set<string>();
       for (let i = 0; i < files.length; i++) {
         const f = files[i]!;
+        const relative = (f as File & { webkitRelativePath?: string }).webkitRelativePath;
+        const root = relative?.split("/").filter(Boolean)[0];
+        if (root) repos.add(root);
         if (!/\.(js|ts|jsx|tsx)$/i.test(f.name)) continue;
         const src = await f.text();
         const acts = extractRoutesFromSource(src);
@@ -303,6 +315,7 @@ function Step1Body({
         ],
         relationTypes: [],
         actions,
+        ...(repos.size > 0 ? { repos: [...repos] } : {}),
       });
     } catch (e) {
       setErr(String((e as Error)?.message ?? e));
@@ -756,6 +769,10 @@ function Step4Body({
         name: displayName,
         ontologyDomainId: domainId,
         status: "planning",
+        // Repository roots the directory scan actually saw.
+        ...(parsed.repos && parsed.repos.length > 0
+          ? { repos: parsed.repos.map((name) => ({ name })) }
+          : {}),
         metadata: {
           pipelineMode: "virtualization",
           baseApiUrl,

@@ -65,7 +65,16 @@ export interface RepoDraftCoverage {
 }
 
 export interface RepoDraft {
-  seedNodeTypes: Array<{ typeName: string; displayName: string; layer?: string; sourceFiles: string[] }>;
+  seedNodeTypes: Array<{
+    typeName: string;
+    displayName: string;
+    layer?: string;
+    sourceFiles: string[];
+    /** Table/class comment, when the source carried one. */
+    description?: string;
+    /** Flat `field -> descriptor` map (only SQL carries these today). */
+    properties?: Record<string, unknown>;
+  }>;
   seedRelationTypes: Array<{ relationType: string; displayName: string; sourceFiles: string[] }>;
   seedActions: Array<{ name: string; method: string; path: string; sourceFiles: string[] }>;
   coverage: RepoDraftCoverage;
@@ -304,7 +313,16 @@ export function parseSourceFile(path: string, content: string): FileExtraction {
  * source files it was derived from (provenance).
  */
 export function extractRepoDraft(files: SourceFile[]): RepoDraft {
-  const entityMap = new Map<string, { displayName: string; sourceFiles: Set<string> }>();
+  const entityMap = new Map<
+    string,
+    {
+      displayName: string;
+      description?: string;
+      /** Flat `field -> descriptor` map, the plugin's canonical schema shape. */
+      properties?: Record<string, unknown>;
+      sourceFiles: Set<string>;
+    }
+  >();
   const relationMap = new Map<string, { displayName: string; sourceFiles: Set<string> }>();
   const actionMap = new Map<string, { method: string; path: string; sourceFiles: Set<string> }>();
   let sqlFiles = 0;
@@ -316,8 +334,22 @@ export function extractRepoDraft(files: SourceFile[]): RepoDraft {
     if (ex.actions.length > 0) apiFiles += 1;
 
     for (const e of ex.entities) {
-      const cur = entityMap.get(e.typeName) ?? { displayName: e.displayName ?? e.typeName, sourceFiles: new Set<string>() };
+      const cur = entityMap.get(e.typeName)
+        ?? { displayName: e.displayName ?? e.typeName, sourceFiles: new Set<string>() };
       cur.sourceFiles.add(f.path);
+      // Only SQL carries fields and table comments today, but the fold is
+      // generic: the first entity that has them wins, later duplicates do not
+      // overwrite. Dropping them here is what made imported tables arrive with
+      // no columns at all.
+      if (!cur.description && e.description) cur.description = e.description;
+      if (!cur.properties && e.properties && e.properties.length > 0) {
+        cur.properties = Object.fromEntries(
+          e.properties.map((p) => [
+            p.name,
+            { type: p.type ?? "string", ...(p.description ? { description: p.description } : {}) },
+          ]),
+        );
+      }
       entityMap.set(e.typeName, cur);
     }
     for (const r of ex.relations) {
@@ -339,6 +371,8 @@ export function extractRepoDraft(files: SourceFile[]): RepoDraft {
     displayName: v.displayName,
     layer: "aggregate_root",
     sourceFiles: [...v.sourceFiles],
+    ...(v.description ? { description: v.description } : {}),
+    ...(v.properties ? { properties: v.properties } : {}),
   }));
   const seedRelationTypes = [...relationMap.entries()].map(([key, v]) => ({
     relationType: key.split("::")[1] ?? "related",
