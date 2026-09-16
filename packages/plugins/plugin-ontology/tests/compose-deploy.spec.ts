@@ -102,6 +102,17 @@ describe("analyzeArchitecture deployment facts", () => {
     expect(payment.deploy.replicas).toBeNull();
   });
 
+  it("reads the environment list form, which is the common one", () => {
+    //     environment:
+    //       - SPRING_PROFILES_ACTIVE=prod
+    // Only the mapping form used to be read, so every service fell into one
+    // "no environment declared" bucket — the question the deployment view asks.
+    const analysis = analyzeArchitecture(files);
+    const order = analysis.services.find((s) => s.name === "order-service")!;
+    expect(order.deploy.envs).toContain("prod");
+    expect(analysis.services.find((s) => s.name === "payment-service")!.deploy.envs).toEqual([]);
+  });
+
   it("still finds the root compose when the scan is prefixed by the picked folder", () => {
     // The wizard sends `webkitRelativePath`, so every path carries the chosen
     // directory's name — `my-repo/docker-compose.yml`. Anchoring the lookup on

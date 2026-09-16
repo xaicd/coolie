@@ -1183,11 +1183,14 @@ const plugin = definePlugin({
     ctx.data.register("domain-detail", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
       const domainId = requireString(params.domainId, "domainId");
-      const [domain, nodeTypes, relationTypes, graph] = await Promise.all([
+      const [domain, nodeTypes, relationTypes, graph, services] = await Promise.all([
         store.getDomain(companyId, domainId),
         store.listNodeTypes(companyId, domainId),
         store.listRelationTypes(companyId, domainId),
         store.getGraphSnapshot(companyId, domainId),
+        // The architecture an import recorded — the runtime and deployment
+        // perspectives draw from these, and they are not part of the type graph.
+        store.listDomainSubProjects(companyId, domainId),
       ]);
       // The workbench reads `propertiesSchema` (camelCase, the same shape
       // `describe-domain` emits), but `listNodeTypes` hands back the raw row
@@ -1198,7 +1201,10 @@ const plugin = definePlugin({
       return {
         domain,
         nodeTypes: nodeTypes.map((nt) => ({ ...nt, propertiesSchema: nt.properties_schema })),
+        // Relation-type rows carry their endpoints in `metadata`; the views read
+        // them through `relationEndpoints`, so the bag is forwarded as-is.
         relationTypes,
+        services,
         graph,
       };
     });
@@ -1372,6 +1378,11 @@ const plugin = definePlugin({
         description:
           typeof call.fields.description === "string" ? call.fields.description : null,
         directed: typeof call.fields.directed === "boolean" ? call.fields.directed : undefined,
+        // The endpoints an importer derived live here. The HTTP surface has always
+        // forwarded this and the action surface did not, so a relation type
+        // created by the import wizard arrived with no endpoints and the
+        // structure view had nothing to draw between the two types.
+        metadata: optionalRecord(call.fields.metadata),
       });
       return { relationType };
     });

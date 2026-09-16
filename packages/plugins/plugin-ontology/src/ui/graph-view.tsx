@@ -122,6 +122,13 @@ import {
   type SchemaRow,
 } from "./schemaRows.js";
 import { groupTypesForIndex } from "./typeGroups.js";
+import {
+  PERSPECTIVES,
+  resolvePerspective,
+  type PerspectiveId,
+  type PerspectiveService,
+} from "./perspectives.js";
+import { relationEndpoints } from "../relationEndpoints.js";
 import { describeProvenance, readSourceFiles } from "../provenance.js";
 
 type OntologyNodeData = { label: string; nodeKey: string; tone: string; typeName: string | null; dimmed?: boolean; fill?: string | null };
@@ -201,6 +208,7 @@ function GraphCanvas({
   onSimulateImpact,
   isDomainEmpty,
   onAskAideAboutNode,
+  structural,
 }: {
   companyId: string;
   domainId: string;
@@ -219,6 +227,13 @@ function GraphCanvas({
   onSimulateImpact?: (node: GraphNode) => void;
   /** When true, the canvas right-click menu shows "AI 初始化此域". */
   isDomainEmpty?: boolean;
+  /**
+   * True when the canvas is drawing a *structural* perspective (the object model,
+   * the services) rather than instances. The nodes are then synthesised from the
+   * material — they have no database rows — so the affordances that create or
+   * link instances are hidden: a click there could only write garbage.
+   */
+  structural?: boolean;
   /** Ask-aide about a specific node — opens the SandboxTab with a pre-filled
    *  prompt. The parent (DomainWorkspace) owns the SandboxTab, so it must
    *  implement this bridge. */
@@ -643,20 +658,22 @@ function GraphCanvas({
             </div>
           )}
 
-          <div className="w-px bg-border" />
-
-          {/* Edit group */}
-          <ToolbarBtn
-            onClick={() => addNode(360, 260)}
-            title={t("新增节点", "Add node")}
-          >＋ {t("新增节点", "Add node")}</ToolbarBtn>
-          <ToolbarBtn
-            active={connectMode}
-            onClick={() => setConnectMode((c) => !c)}
-            title={t("连线模式:拖拽节点手柄连线", "Connect mode: drag node handles to link")}
-          >⟿ {t("连线", "Connect")}</ToolbarBtn>
-
-          <div className="w-px bg-border" />
+          {/* Instance-only: a structural perspective has no rows to write. */}
+          {!structural && (
+            <>
+              <div className="w-px bg-border" />
+              <ToolbarBtn
+                onClick={() => addNode(360, 260)}
+                title={t("新增节点", "Add node")}
+              >＋ {t("新增节点", "Add node")}</ToolbarBtn>
+              <ToolbarBtn
+                active={connectMode}
+                onClick={() => setConnectMode((c) => !c)}
+                title={t("连线模式:拖拽节点手柄连线", "Connect mode: drag node handles to link")}
+              >⟿ {t("连线", "Connect")}</ToolbarBtn>
+              <div className="w-px bg-border" />
+            </>
+          )}
 
           {/* Simulate — reachability highlight from selected node */}
           <ToolbarBtn
@@ -770,8 +787,10 @@ function GraphCanvas({
           >
             {menu.kind === "canvas" && (
               <>
-                <MenuItem label={t("新建", "New")} onClick={() => { const m = menu; closeMenu(); addNode(m.flowX ?? 0, m.flowY ?? 0); }} />
-                {rawNodeTypes.length > 0 && (
+                {!structural && (
+                  <MenuItem label={t("新建", "New")} onClick={() => { const m = menu; closeMenu(); addNode(m.flowX ?? 0, m.flowY ?? 0); }} />
+                )}
+                {!structural && rawNodeTypes.length > 0 && (
                   <>
                     <MenuLabel>{t("按型", "By type")}</MenuLabel>
                     {rawNodeTypes.map((nt) => (
@@ -1085,6 +1104,9 @@ interface GraphViewProps {
   onViewNodeDetail?: (nodeId: string) => void;
   /** DS "impact simulation" — run blast-radius for this node. */
   onSimulateImpact?: (node: GraphNode) => void;
+  /** The architecture an import recorded; the runtime/deployment views draw it.
+   *  Raw store rows, as `domain-detail` returns them. */
+  services?: ServiceRowView[];
   /** True when the domain has no nodes yet — enables the canvas "AI 初始化此域"
    *  right-click item and gates the right-panel BootstrapPanel. */
   isDomainEmpty?: boolean;
@@ -1099,6 +1121,36 @@ interface GraphViewProps {
  *  - Table:  flat node/edge listings
  *  - Schema: node-type and relation-type definitions
  */
+type ViewChoice = PerspectiveId | "instances";
+
+/** A service row as the store returns it — the shape `domain-detail` forwards. */
+export interface ServiceRowView {
+  id: string;
+  name: string;
+  code: string;
+  microservice_layer?: string | null;
+  tech_stack?: string[] | null;
+  build_config?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
+  dependencies?: unknown[] | null;
+}
+
+const VIEW_CHOICES: Array<{ id: ViewChoice; label: string; hint: string }> = [
+  ...PERSPECTIVES.map((perspective) => ({
+    id: perspective.id as ViewChoice,
+    label: t(perspective.label.zh, perspective.label.en),
+    hint: t(perspective.audience.zh, perspective.audience.en),
+  })),
+  {
+    id: "instances",
+    label: t("实例数据", "Instances"),
+    hint: t(
+      "节点与关系的实际数据。数据量大时先选一个对象类型再进来。",
+      "Actual nodes and edges. With a large graph, pick an object type first.",
+    ),
+  },
+];
+
 export function GraphView(props: GraphViewProps): ReactElement {
   useReactFlowCss();
   const [ownMode, setOwnMode] = useState<GraphViewMode>("graph");
@@ -1106,6 +1158,51 @@ export function GraphView(props: GraphViewProps): ReactElement {
   const setMode = props.mode != null ? () => {} : setOwnMode;
   const nodeTypeDefs = props.nodeTypes ?? [];
   const relationTypeDefs = props.relationTypes ?? [];
+
+  /**
+   * Which picture of the domain to draw. Defaults to the object model rather
+   * than instance data: an imported domain has types immediately and instances
+   * rarely, so opening on the instance graph was showing an empty canvas for a
+   * domain that was in fact full.
+   */
+  const [choice, setChoice] = useState<ViewChoice>("product");
+  const structural = choice !== "instances";
+
+  const perspectiveGraph = useMemo(() => {
+    if (!structural) return null;
+    return resolvePerspective(choice, {
+      nodeTypes: nodeTypeDefs.map((type) => ({
+        id: type.id,
+        key: type.key,
+        display_name: type.display_name,
+        description: type.description,
+        metadata: type.metadata,
+      })),
+      relationTypes: relationTypeDefs.map((relation) => ({
+        id: relation.id,
+        key: relation.key,
+        display_name: relation.display_name,
+        ...relationEndpoints(relation.metadata),
+      })),
+      services: (props.services ?? []).map((service) => ({
+        id: service.id,
+        name: service.name,
+        code: service.code,
+        microserviceLayer: service.microservice_layer,
+        techStack: service.tech_stack,
+        buildConfig: service.build_config,
+        metadata: service.metadata,
+        dependencies: (service.dependencies ?? []) as PerspectiveService["dependencies"],
+      })),
+    });
+  }, [choice, structural, nodeTypeDefs, relationTypeDefs, props.services]);
+
+  // A type selected in the left tree dims every node whose type differs, which
+  // in a structural view would dim the whole picture — clear it on the switch.
+  const selectChoice = (next: ViewChoice) => {
+    setChoice(next);
+    if (next !== "instances") props.onSelectNodeType?.(null);
+  };
 
   const tabs: { id: GraphViewMode; label: string }[] = [
     { id: "graph", label: t("图谱", "Graph") },
@@ -1125,15 +1222,66 @@ export function GraphView(props: GraphViewProps): ReactElement {
           <div className={embedded ? "relative h-full" : "relative"}>
             <GraphCanvas
               {...props}
-              nodeTypes={nodeTypeDefs}
+              nodes={structural ? perspectiveGraph!.nodes : props.nodes}
+              edges={structural ? perspectiveGraph!.edges : props.edges}
+              nodeTypes={structural ? perspectiveGraph!.legend : nodeTypeDefs}
               fill={embedded}
+              structural={structural}
               isDomainEmpty={props.isDomainEmpty}
               onAskAideAboutNode={props.onAskAideAboutNode}
             />
+
+            {/* The switch itself, plus what the picture does not show. */}
+            <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-col items-start gap-1">
+              <div className="pointer-events-auto flex items-center gap-0.5 rounded-lg border border-border bg-card/95 p-0.5 shadow-sm backdrop-blur">
+                {VIEW_CHOICES.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => selectChoice(option.id)}
+                    title={option.hint}
+                    className={[
+                      "rounded-md px-2 py-0.5 text-(length:--text-nano) transition-colors",
+                      choice === option.id
+                        ? "bg-primary/10 font-medium text-primary"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    ].join(" ")}
+                  >
+                    {option.label}
+                  </button>
+                ))}
+              </div>
+              {/* Colouring by layer or environment is opaque without a key. */}
+              {structural && perspectiveGraph && perspectiveGraph.legend.length > 1 && (
+                <div className="pointer-events-auto flex max-w-[22rem] flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md border border-border bg-card/95 px-2 py-0.5 text-(length:--text-nano) text-muted-foreground shadow-sm backdrop-blur">
+                  {perspectiveGraph.legend.map((entry) => (
+                    <span key={entry.id} className="flex items-center gap-1">
+                      <span
+                        aria-hidden
+                        className="h-2 w-2 shrink-0 rounded-full"
+                        style={{ background: toneFor(entry.id) }}
+                      />
+                      {entry.display_name || entry.key}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {structural && perspectiveGraph?.note && (
+                <div className="pointer-events-auto max-w-[22rem] rounded-md border border-border bg-card/95 px-2 py-0.5 text-(length:--text-nano) text-amber-600 shadow-sm backdrop-blur dark:text-amber-500">
+                  {perspectiveGraph.note}
+                </div>
+              )}
+              {structural && perspectiveGraph?.emptyReason && (
+                <div className="pointer-events-auto max-w-[22rem] rounded-md border border-border bg-card/95 px-2 py-1 text-(length:--text-nano) text-muted-foreground shadow-sm backdrop-blur">
+                  {perspectiveGraph.emptyReason}
+                </div>
+              )}
+            </div>
+
             {/* Empty-state overlay — sits ABOVE the ReactFlow canvas so the
                 underlying pane still receives contextmenu events and the
                 canvas menu (including "AI 初始化此域") stays reachable. */}
-            {props.nodes.length === 0 && (
+            {props.nodes.length === 0 && !structural && (
               <EmptyGraphOverlay {...props} />
             )}
           </div>

@@ -15,7 +15,14 @@ import {
   useState,
   type ReactElement,
 } from "react";
-import { type GraphNode, type GraphEdge, type GraphNodeType, GraphView, toneFor } from "./graph-view.js";
+import {
+  type GraphNode,
+  type GraphEdge,
+  type GraphNodeType,
+  type ServiceRowView,
+  GraphView,
+  toneFor,
+} from "./graph-view.js";
 import { Workbench } from "./workbench.js";
 import { ChatTab } from "./ChatTab.js";
 import { SandboxTab } from "./SandboxTab.js";
@@ -103,6 +110,8 @@ interface DomainDetail {
   domain: OntologyDomain | null;
   nodeTypes: OntologyNodeType[];
   relationTypes: OntologyRelationType[];
+  /** Services an import recorded — the runtime/deployment views draw these. */
+  services: ServiceRowView[];
   graph: GraphSnapshot;
 }
 
@@ -1134,6 +1143,7 @@ function DomainWorkspace({
             domainId={domainId}
             nodes={nodes}
             edges={edges}
+            services={domainData?.services ?? []}
             nodeTypes={nodeTypes}
             relationTypes={relationTypes}
             onChanged={refreshDomain}

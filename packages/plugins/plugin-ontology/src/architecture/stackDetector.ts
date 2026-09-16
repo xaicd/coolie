@@ -258,6 +258,18 @@ export function detectStack(files: SourceFile[], root: string, serviceName?: str
       const match2 = ENV_TOKEN.exec((match[1] ?? "").toLowerCase());
       if (match2) deploy.envs.push(match2[1]!);
     }
+    // The list form is the common one in a generated compose file:
+    //   environment:
+    //     - SPRING_PROFILES_ACTIVE=prod
+    // Reading only the mapping form left every service in one "no environment
+    // declared" bucket, which is exactly the question the deployment view exists
+    // to answer.
+    for (const match of composeBody.matchAll(/^\s*-\s*([A-Za-z_][\w]*)\s*=\s*([^\s#]+)/gm)) {
+      const key = ENV_TOKEN.exec(match[1]!.toLowerCase());
+      const value = ENV_TOKEN.exec(match[2]!.toLowerCase());
+      if (key) deploy.envs.push(key[1]!);
+      else if (value) deploy.envs.push(value[1]!);
+    }
     for (const match of composeBody.matchAll(/"(\d{2,5}):(\d{2,5})"/g)) {
       const port = Number.parseInt(match[1] ?? "", 10);
       if (Number.isFinite(port)) deploy.ports.push(port);

@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { relationEndpoints } from "../relationEndpoints.js";
 import type { PluginDatabaseClient } from "@paperclipai/plugin-sdk";
 
 /**
@@ -241,6 +242,8 @@ export interface OntologyRelationTypeRow {
   description: string | null;
   directed: boolean;
   cardinality: LinkCardinality;
+  /** Carries the endpoints an importer derived; see `relationEndpoints`. */
+  metadata?: Record<string, unknown> | null;
 }
 
 // --- O1.5: functions / audit / snapshots (DigitalStaff parity) ---
@@ -1315,6 +1318,8 @@ export interface GraphStore {
 
   createSubProject(input: OntologySubProjectInput): Promise<OntologySubProjectRow>;
   listSubProjects(companyId: string, businessSystemId: string): Promise<OntologySubProjectRow[]>;
+  /** Every service bound to a domain, across its business systems. */
+  listDomainSubProjects(companyId: string, domainId: string): Promise<OntologySubProjectRow[]>;
   updateSubProject(
     companyId: string,
     subProjectId: string,
@@ -1844,8 +1849,19 @@ export class PostgresGraphStore implements GraphStore {
     return res.rowCount > 0;
   }
 
+  /**
+   * `metadata` carries the endpoints an importer derived
+   * (`sourceNodeTypeKey` / `targetNodeTypeKey`). Without it a type-level
+   * structure graph cannot be drawn: relation *types* have no endpoint columns,
+   * so their edges exist only in this bag — which was being written and never
+   * read back.
+   */
   private static readonly RELATION_TYPE_COLS =
-    "id, company_id, domain_id, key, display_name, description, directed, cardinality";
+    "id, company_id, domain_id, key, display_name, description, directed, cardinality, metadata";
+
+  /** The same list qualified with the `rt` alias (see `NODE_TYPE_COLS_NT`). */
+  private static readonly RELATION_TYPE_COLS_RT =
+    "rt.id, rt.company_id, rt.domain_id, rt.key, rt.display_name, rt.description, rt.directed, rt.cardinality, rt.metadata";
 
   async createRelationType(input: OntologyRelationTypeInput): Promise<OntologyRelationTypeRow> {
     const id = randomUUID();
@@ -3475,6 +3491,30 @@ export class PostgresGraphStore implements GraphStore {
     return rows[0]!;
   }
 
+  /**
+   * Every service bound to a domain, across however many business systems are
+   * attached to it. The workbench's graph needs them to draw the runtime and
+   * deployment perspectives.
+   */
+  async listDomainSubProjects(
+    companyId: string,
+    domainId: string,
+  ): Promise<OntologySubProjectRow[]> {
+    return this.db.query<OntologySubProjectRow>(
+      `SELECT sp.id, sp.company_id, sp.business_system_id, sp.name, sp.code, sp.type, sp.status,
+              sp.microservice_layer, sp.tech_stack, sp.framework, sp.git_repo, sp.api_specs,
+              sp.dependencies, sp.build_config, sp.metadata, sp.created_at, sp.updated_at
+         FROM ${this.table("ontology_sub_projects")} sp
+         JOIN ${this.table("ontology_business_systems")} bs
+           ON bs.company_id = sp.company_id AND bs.id = sp.business_system_id
+        WHERE sp.company_id = $1
+          AND bs.ontology_domain_id = $2
+          AND sp.is_deleted = false
+        ORDER BY sp.name ASC`,
+      [companyId, domainId],
+    );
+  }
+
   async listSubProjects(
     companyId: string,
     businessSystemId: string,
@@ -4373,7 +4413,7 @@ export class PostgresGraphStore implements GraphStore {
         [companyId, domainId],
       ),
       this.db.query<OntologyRelationTypeRow & { instance_count: string }>(
-        `SELECT ${PostgresGraphStore.RELATION_TYPE_COLS},
+        `SELECT ${PostgresGraphStore.RELATION_TYPE_COLS_RT},
                 (SELECT COUNT(*) FROM ${this.table("ontology_edges")} e
                   WHERE e.company_id = $1 AND e.domain_id = $2 AND e.relation_type_id = rt.id) AS instance_count
            FROM ${this.table("ontology_relation_types")} rt
@@ -4507,6 +4547,9 @@ export class PostgresGraphStore implements GraphStore {
         directed: row.directed,
         cardinality: row.cardinality,
         instanceCount: Number(row.instance_count),
+        // Where the edge runs, for a type-level structure view. Relation types
+        // have no endpoint columns; importers put them in `metadata`.
+        ...relationEndpoints(row.metadata),
       })),
       recentNodes: recentNodes.map((row) => ({
         id: row.id,
