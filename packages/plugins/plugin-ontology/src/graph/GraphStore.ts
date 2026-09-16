@@ -205,6 +205,12 @@ export interface OntologyNodeTypeRow {
   description: string | null;
   layer: NodeLayer;
   properties_schema: Record<string, unknown> | null;
+  /**
+   * Free-form, and the only place an importer can record where a type came
+   * from — the table has no provenance columns. Importers write
+   * `{ origin, sourceFiles }` here; see `src/provenance.ts`.
+   */
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface OntologyRelationTypeInput {
@@ -1718,7 +1724,16 @@ export class PostgresGraphStore implements GraphStore {
   }
 
   private static readonly NODE_TYPE_COLS =
-    "id, company_id, domain_id, key, display_name, description, layer, properties_schema";
+    "id, company_id, domain_id, key, display_name, description, layer, properties_schema, metadata";
+
+  /**
+   * The same list qualified with the `nt` alias.
+   *
+   * `ontology_nodes` also has a `metadata` column, so the unqualified list is
+   * ambiguous in any query that joins the two — and `describeDomain` does.
+   */
+  private static readonly NODE_TYPE_COLS_NT =
+    "nt.id, nt.company_id, nt.domain_id, nt.key, nt.display_name, nt.description, nt.layer, nt.properties_schema, nt.metadata";
 
   async createNodeType(input: OntologyNodeTypeInput): Promise<OntologyNodeTypeRow> {
     const id = randomUUID();
@@ -4328,7 +4343,7 @@ export class PostgresGraphStore implements GraphStore {
     const [domain, nodeTypes, relationTypes, recentNodes, aggregate] = await Promise.all([
       this.getDomain(companyId, domainId),
       this.db.query<OntologyNodeTypeRow & { instance_count: string }>(
-        `SELECT ${PostgresGraphStore.NODE_TYPE_COLS},
+        `SELECT ${PostgresGraphStore.NODE_TYPE_COLS_NT},
                 (SELECT COUNT(*) FROM ${this.table("ontology_nodes")} n
                   WHERE n.company_id = $1 AND n.domain_id = $2 AND n.node_type_id = nt.id) AS instance_count
            FROM ${this.table("ontology_node_types")} nt

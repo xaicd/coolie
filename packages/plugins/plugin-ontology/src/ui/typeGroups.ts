@@ -5,35 +5,48 @@
  * index is grouped and collapsed by default and you descend group → type →
  * field.
  *
- * Group precedence, most specific signal first:
+ * Group precedence, most trustworthy signal first:
  *
- *   1. `prefix` — the leading token of a legacy-style key (`t_sale_order` →
+ *   0. `service` — the deployable unit an importer actually recorded (a Maven
+ *      module, a Spring app, a gRPC service). This is a fact read out of the
+ *      source, so it beats every heuristic below.
+ *   1. `module` — the business module an importer recorded from a Java package
+ *      (`org.jeecg.modules.system.entity` → `system`). Also a fact.
+ *   2. `prefix` — the leading token of a legacy-style key (`t_sale_order` →
  *      `sale`), when several types share it. In a prefix-structured schema this
  *      is the module family and it is *authoritative*, which is why it outranks
  *      the keyword match: `t_ic_order` is an inventory table even though it
  *      contains "order". Labelled by the prefix code — see `familyLabel`.
- *   2. `module` — a confident business-keyword match against the key or display
- *      name (66 entries, Chinese and English).
- *   3. `layer`  — the living-ontology layer, when the type is not `generic`
+ *   3. `module` (keyword) — a confident business-keyword match against the key
+ *      or display name (66 entries, Chinese and English), for sources that
+ *      record no structure at all.
+ *   4. `layer`  — the living-ontology layer, when the type is not `generic`
  *      (`aggregate_root | child_entity | action | state | event`).
- *   4. `other`  — everything left.
+ *   5. `other`  — everything left.
+ *
+ * An axis is used only when it *carries information*: if every type belongs to
+ * the same service, grouping by service would reproduce the flat list this
+ * function exists to avoid, so the axis is skipped and the next one is tried.
  *
  * A keyword match is a heuristic: a short English synonym can catch an
  * unrelated key. That is tolerable here because the group label is visible and
  * search always bypasses grouping entirely.
  */
 import { matchModuleFromText } from "../legacy/modulePrefixMap.js";
+import { readOrigin } from "../provenance.js";
 
 export interface IndexableType {
   key: string;
   display_name?: string | null;
   layer?: string | null;
+  /** Node-type metadata; provenance lives in `metadata.origin`. */
+  metadata?: unknown;
 }
 
 export interface TypeGroup<T> {
   key: string;
   label: string;
-  kind: "module" | "layer" | "prefix" | "other";
+  kind: "service" | "module" | "layer" | "prefix" | "other";
   types: T[];
 }
 
@@ -85,6 +98,16 @@ export function groupTypesForIndex<T extends IndexableType>(types: T[]): TypeGro
     families.set(prefix, (families.get(prefix) ?? 0) + 1);
   }
 
+  // A structural axis is only worth using when it splits the set. With one
+  // service (a monolith, or a single-app import) grouping by it would hand back
+  // one giant group — exactly the flat list this exists to avoid.
+  const originOf = (type: T): { service?: string; module?: string } =>
+    readOrigin(type.metadata) ?? {};
+  const distinct = (pick: (t: T) => string | undefined): number =>
+    new Set(types.map(pick).filter((v): v is string => Boolean(v))).size;
+  const serviceAxis = distinct((t) => originOf(t).service) > 1;
+  const moduleAxis = !serviceAxis && distinct((t) => originOf(t).module) > 1;
+
   const groups = new Map<string, TypeGroup<T>>();
   const push = (
     key: string,
@@ -98,6 +121,16 @@ export function groupTypesForIndex<T extends IndexableType>(types: T[]): TypeGro
   };
 
   for (const type of types) {
+    const origin = originOf(type);
+    if (serviceAxis && origin.service) {
+      push(`service:${origin.service}`, origin.service, "service", type);
+      continue;
+    }
+    if (moduleAxis && origin.module) {
+      push(`origin:${origin.module}`, origin.module, "module", type);
+      continue;
+    }
+
     const prefix = legacyPrefix(type.key);
     // A prefix shared by one type is noise, not a family.
     if (prefix && (families.get(prefix) ?? 0) > 1) {
@@ -121,10 +154,11 @@ export function groupTypesForIndex<T extends IndexableType>(types: T[]): TypeGro
   }
 
   const order: Record<TypeGroup<T>["kind"], number> = {
-    module: 0,
-    layer: 1,
-    prefix: 2,
-    other: 3,
+    service: 0,
+    module: 1,
+    layer: 2,
+    prefix: 3,
+    other: 4,
   };
   const layerRank = (group: TypeGroup<T>): number =>
     group.kind !== "layer"

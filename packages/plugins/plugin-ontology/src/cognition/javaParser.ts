@@ -435,11 +435,13 @@ export function parseJavaFile(content: string, file: string): FileExtraction {
   const actions: ExtractedAction[] = [];
 
   const namespace = /^\s*package\s+([\w.]+)\s*;/m.exec(source)?.[1];
-  const service = namespace ? moduleFromJavaPackage(namespace) : undefined;
+  // The package names a business module, not a deployable unit — a monolith has
+  // many of these but ships as one service. The project scanner fills `service`.
+  const module = namespace ? moduleFromJavaPackage(namespace) : undefined;
   const originBase: ExtractedOrigin = {
     kind: "java",
     ...(namespace ? { namespace } : {}),
-    ...(service ? { service } : {}),
+    ...(module ? { module } : {}),
   };
 
   TYPE_DECL.lastIndex = 0;

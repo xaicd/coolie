@@ -23,6 +23,7 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { usePluginAction } from "@paperclipai/plugin-sdk/ui";
 import { inferModuleFromText } from "../legacy/modulePrefixMap.js";
+import { readOrigin } from "../provenance.js";
 
 /** What the modal currently knows about the user's source material. Filled
  *  in by Step 1; consumed by Steps 2-4 to label and pre-populate. */
@@ -69,8 +70,13 @@ export type ParsedSource = {
     typeCount: number;
     fileCount: number;
   }>;
-  /** Per-type provenance (package / service / mapped table / stereotype). */
-  origins?: Record<string, Record<string, unknown>>;
+  /**
+   * Per-type provenance as the `ontology_node_types.metadata` bag — package,
+   * service, mapped table, stereotype, and the files the type came from. Keyed
+   * by object-type key and forwarded verbatim on publish, so the row can be
+   * grouped by real structure instead of a guessed name.
+   */
+  provenance?: Record<string, Record<string, unknown>>;
   /** What the scan read, and what it had no parser for. Shown, never silent. */
   scanCoverage?: {
     byExtension: Record<string, number>;
@@ -308,6 +314,7 @@ function Step1Body({
     setErr(null);
     try {
       const { scanProject, IGNORED_EXTENSIONS } = await import("../cognition/projectScanner.js");
+      const { buildTypeProvenance } = await import("../provenance.js");
       const inputs: Array<{ path: string; content: string }> = [];
       const repos = new Set<string>();
       // A picker hands over every asset in the tree. Reading a 40MB image as
@@ -326,9 +333,10 @@ function Step1Body({
       }
 
       const scan = scanProject(inputs);
-      const origins: Record<string, Record<string, unknown>> = {};
+      const provenance: Record<string, Record<string, unknown>> = {};
       for (const seed of scan.draft.seedNodeTypes) {
-        if (seed.origin) origins[seed.typeName] = seed.origin as unknown as Record<string, unknown>;
+        const bag = buildTypeProvenance(seed.origin, seed.sourceFiles);
+        if (bag) provenance[seed.typeName] = bag;
       }
 
       onParsed({
@@ -350,7 +358,7 @@ function Step1Body({
         })),
         repos: [...repos],
         services: scan.services,
-        origins,
+        provenance,
         scanCoverage: {
           byExtension: scan.byExtension,
           unsupported: scan.unsupported,
@@ -558,14 +566,15 @@ function Step1Body({
 
           <ul className="space-y-0.5">
             {parsed.nodeTypes.slice(0, 8).map((nt) => {
-              const origin = parsed.origins?.[nt.key];
-              const table = typeof origin?.table === "string" ? origin.table : undefined;
-              const stereotype = typeof origin?.stereotype === "string" ? origin.stereotype : undefined;
+              const origin = readOrigin(parsed.provenance?.[nt.key]);
               return (
                 <li key={nt.key} className="text-muted-foreground">
                   · {nt.key} ({nt.displayName})
-                  {stereotype && <span className="ml-1 opacity-70">[{stereotype}]</span>}
-                  {table && <span className="ml-1 opacity-70">→ {table}</span>}
+                  {origin?.stereotype && (
+                    <span className="ml-1 opacity-70">[{origin.stereotype}]</span>
+                  )}
+                  {origin?.table && <span className="ml-1 opacity-70">→ {origin.table}</span>}
+                  {origin?.service && <span className="ml-1 opacity-70">@{origin.service}</span>}
                 </li>
               );
             })}
@@ -856,6 +865,7 @@ function Step4Body({
             key: nt.key,
             displayName: nt.displayName,
             propertiesSchema: nt.properties,
+            metadata: parsed.provenance?.[nt.key],
           });
         } catch (e) {
           throw new Error(`对象类型「${nt.key}」创建失败: ${String((e as Error)?.message ?? e)}`);

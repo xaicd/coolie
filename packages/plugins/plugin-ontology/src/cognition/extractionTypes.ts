@@ -26,7 +26,13 @@ export interface ExtractedOrigin {
   kind: ExtractionKind;
   /** Java package, proto package, or DB schema the type lives in. */
   namespace?: string;
-  /** Microservice / Maven module / proto service this type belongs to. */
+  /**
+   * Business module *within* a deployable unit — the meaningful segment of a
+   * Java package (`org.jeecg.modules.system.entity` → `system`). Distinct from
+   * `service`: a monolith has many modules but ships as one service.
+   */
+  module?: string;
+  /** The deployable unit: a Maven/Gradle module, a Spring app, a proto service. */
   service?: string;
   /** Physical table this type maps to, when the framework declares one. */
   table?: string;

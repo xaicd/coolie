@@ -98,7 +98,7 @@ describe("parseJavaFile — a MyBatis-Plus / JEECGBoot entity", () => {
     expect(entity.origin).toMatchObject({
       kind: "java",
       namespace: "org.jeecg.modules.system.entity",
-      service: "system",
+      module: "system",
       table: "sys_user",
       stereotype: "entity",
     });
@@ -145,7 +145,7 @@ describe("parseJavaFile — a RuoYi / JPA entity", () => {
 
   it("reads @Table(name = …)", () => {
     expect(entity.origin?.table).toBe("sys_dept");
-    expect(entity.origin?.service).toBe("system");
+    expect(entity.origin?.module).toBe("system");
   });
 
   it("reads @Column(name = …) and numeric types", () => {
@@ -281,7 +281,7 @@ describe("extractRepoDraft over a Java scan", () => {
 
   it("carries origin through into the seed types", () => {
     const user = draft.seedNodeTypes.find((n) => n.typeName === "SysUser")!;
-    expect(user.origin).toMatchObject({ kind: "java", table: "sys_user", service: "system" });
+    expect(user.origin).toMatchObject({ kind: "java", table: "sys_user", module: "system" });
   });
 
   it("persists fields, Chinese labels and column names", () => {

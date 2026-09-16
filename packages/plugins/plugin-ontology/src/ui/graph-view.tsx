@@ -83,6 +83,8 @@ export interface GraphNodeType {
   directed?: boolean;
   /** JSON Schema describing the per-instance properties this type allows. */
   propertiesSchema?: Record<string, unknown> | null;
+  /** Where the type came from, when an importer recorded it. See `provenance.ts`. */
+  metadata?: Record<string, unknown> | null;
 }
 
 /**
@@ -120,6 +122,7 @@ import {
   type SchemaRow,
 } from "./schemaRows.js";
 import { groupTypesForIndex } from "./typeGroups.js";
+import { describeProvenance, readSourceFiles } from "../provenance.js";
 
 type OntologyNodeData = { label: string; nodeKey: string; tone: string; typeName: string | null; dimmed?: boolean; fill?: string | null };
 
@@ -1521,6 +1524,11 @@ function SchemaView({
                       {t("层", "layer")}
                     </span>
                   )}
+                  {group.kind === "service" && (
+                    <span className="shrink-0 rounded bg-primary/10 px-1 text-(length:--text-nano) text-primary">
+                      {t("服务", "service")}
+                    </span>
+                  )}
                   <span className="shrink-0 tabular-nums text-(length:--text-nano) text-muted-foreground">
                     {group.types.length}
                   </span>
@@ -1740,6 +1748,29 @@ function SchemaTypeDetail({
       {nodeType.description && (
         <div className="text-(length:--text-nano) text-muted-foreground">{nodeType.description}</div>
       )}
+
+      {/* Provenance: which source system this type came from. Imported types
+          carry it; hand-created ones have nothing to show. */}
+      {(() => {
+        const source = describeProvenance(nodeType.metadata);
+        if (!source) return null;
+        const files = readSourceFiles(nodeType.metadata);
+        const more = files.length > 1 ? `  +${files.length - 1}` : "";
+        return (
+          <div
+            className="truncate text-(length:--text-nano) text-muted-foreground/80"
+            title={files.join("\n")}
+          >
+            ⌘ {source}
+            {files[0] && (
+              <span className="ml-1 opacity-70">
+                ← {files[0].split("/").pop()}
+                {more}
+              </span>
+            )}
+          </div>
+        );
+      })()}
 
       {/* Conversational edit — describe the change and it is applied. */}
       {onAiEdit && (

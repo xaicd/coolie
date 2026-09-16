@@ -35,6 +35,7 @@ import { runAideAgent, type AideLoopMessage } from "./aide/agentLoop.js";
 import { buildSuggestFieldsPrompt, parseSuggestedFields } from "./aide/suggestFields.js";
 import { buildEnrichPrompt, parseEnrichResponse, type EnrichTarget } from "./aide/enrichDescriptions.js";
 import { parseSqlDdl } from "./cognition/AstExtractor.js";
+import { buildTypeProvenance } from "./provenance.js";
 import { parseOpenAPI } from "./legacy/openapiParser.js";
 import {
   buildSourceIndex,
@@ -298,7 +299,9 @@ async function publishCognitionDraft(
     if (!key) continue;
     // `propertiesSchema` was dropped here even though `parseSqlDdl` had already
     // extracted the columns and their comments — so a table imported through the
-    // cognition path arrived with no fields at all.
+    // cognition path arrived with no fields at all. `origin` and `sourceFiles`
+    // were dropped the same way, which is why the schema index could only sort
+    // these types by name.
     await store.createNodeType({
       companyId,
       domainId: targetDomainId,
@@ -307,6 +310,10 @@ async function publishCognitionDraft(
       description: str(nt.description) || null,
       layer: (str(nt.layer) as NodeLayer) || undefined,
       propertiesSchema: optionalRecord(nt.properties ?? nt.propertiesSchema),
+      metadata: buildTypeProvenance(
+        optionalRecord(nt.origin) as never,
+        Array.isArray(nt.sourceFiles) ? (nt.sourceFiles as string[]) : undefined,
+      ),
     });
     nodeTypes += 1;
   }
@@ -1274,7 +1281,9 @@ const plugin = definePlugin({
     ctx.actions.register("create-node-type", async (params) => {
       // `propertiesSchema` used to be dropped here, which is why every object
       // type created from the cockpit/import wizard persisted as `{}` and the
-      // UI rendered "No properties defined".
+      // UI rendered "No properties defined". `metadata` was dropped the same
+      // way, so the provenance an importer had just extracted never reached the
+      // row and the schema index had nothing but names to group by.
       const call = readMutationCall(params);
       const nodeType = await store.createNodeType({
         companyId: call.companyId,
@@ -1282,9 +1291,11 @@ const plugin = definePlugin({
         key: requireString(call.fields.key, "key"),
         displayName: requireString(call.fields.displayName, "displayName"),
         description: typeof call.fields.description === "string" ? call.fields.description : null,
+        layer: typeof call.fields.layer === "string" ? (call.fields.layer as NodeLayer) : undefined,
         propertiesSchema: call.fields.propertiesSchema === undefined
           ? undefined
           : requireRecordOrThrow(call.fields.propertiesSchema, "propertiesSchema"),
+        metadata: optionalRecord(call.fields.metadata),
       });
       return { nodeType };
     });
