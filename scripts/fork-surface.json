@@ -1,0 +1,47 @@
+{
+  "_comment": "Upstream-owned files this fork intentionally changes. Anything not listed here fails scripts/check-fork-surface.mjs; the fix is to move the change into one of our own trees, or to add it here deliberately. Budgets are the most this fork may change in one commit — they catch creep, not a single honest edit. maxNetLines is the most one commit may change; maxTotalLines is the most this fork may have changed in total.",
+  "entries": [
+    {
+      "path": "ui/src/index.css",
+      "maxNetLines": 30,
+      "reason": "Tailwind v4 @source directive for plugin bundles. Plugin UI ships no stylesheet and is styled by the host's compiled Tailwind, and v4 only auto-detects sources under ui/, so without this every utility a plugin invents is silently missing. Cannot live elsewhere: the directive is only read from the CSS entry.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "packages/shared/src/types/plugin.ts",
+      "maxNetLines": 40,
+      "reason": "Page-slot layout option (full-height), so a plugin page can opt out of the host's default scroll container.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "packages/shared/src/validators/plugin.ts",
+      "maxNetLines": 40,
+      "reason": "Validator half of the page-slot layout option above.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "packages/shared/src/validators/plugin.test.ts",
+      "maxNetLines": 40,
+      "reason": "Test for the page-slot layout option above.",
+      "maxTotalLines": 80
+    },
+    {
+      "path": "ui/src/pages/PluginPage.tsx",
+      "maxNetLines": 40,
+      "reason": "Honour the page-slot layout option when rendering a plugin page.",
+      "maxTotalLines": 80
+    },
+    {
+      "path": "packages/plugins/plugin-npc-factory/src/worker.ts",
+      "maxNetLines": 60,
+      "reason": "Bridge from the ontology's business-system events into npc-factory. A plugin package, but not one we own.",
+      "maxTotalLines": 120
+    },
+    {
+      "path": "package.json",
+      "maxNetLines": 30,
+      "reason": "Entry points for the repo gates (test:defenses and friends). A gate nobody can run is not a gate.",
+      "maxTotalLines": 100
+    }
+  ]
+}

@@ -49,6 +49,7 @@
     "test:check-testing-defenses": "node --test scripts/check-testing-defenses.test.mjs",
     "test:defenses": "node scripts/check-testing-defenses.mjs",
     "test:defenses:full": "node scripts/check-testing-defenses.mjs --instance --e2e",
+    "test:fork-surface": "node scripts/check-fork-surface.mjs --cumulative",
     "test:install-sh-docker": "./scripts/test-install-sh-docker.sh",
     "test:hermes-gateway-smoke": "node --test scripts/smoke/hermes-gateway-smoke.test.mjs",
     "docs:dev": "cd docs && npx mintlify dev",

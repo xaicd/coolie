@@ -52,7 +52,12 @@ const LINES = [
     runs: true,
     commands: [
       { label: "typecheck (0 errors, undeclared variables stopped before commit)", cmd: scoped("pnpm -r typecheck", "typecheck") },
-      { label: "guard specs: layering, action parity, schema columns, migration comments", cmd: scoped("pnpm test:run", "test")  + " tests/layering.spec.ts tests/action-parity.spec.ts tests/schema-columns.spec.ts tests/migration-comments.spec.ts" },
+      // Always through the plugin's own package: these specs resolve the core
+      // through its workspace alias, which the root vitest config does not know.
+      { label: "guard specs: layering, action parity, schema columns, migration comments", cmd: "pnpm --filter @paperclipai/plugin-ontology test tests/layering.spec.ts tests/action-parity.spec.ts tests/schema-columns.spec.ts tests/migration-comments.spec.ts" },
+      // Repo-wide, so it runs unscoped: how much of this change lands on files
+      // upstream also owns, and therefore has to be reconciled at the next merge.
+      { label: "fork surface: upstream-owned files this fork changes", cmd: "node --test scripts/check-fork-surface.test.mjs && node scripts/check-fork-surface.mjs --cumulative" },
     ],
   },
   {
