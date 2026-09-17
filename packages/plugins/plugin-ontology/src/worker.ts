@@ -1312,11 +1312,78 @@ const deleteDomainMutation: MutationHandler = async (store, ctx, call) => {
   return noContent();
 };
 
+/**
+ * Rename / re-describe / re-status a domain.
+ *
+ * Lived only on the HTTP surface until now, which is why the UI could not reach
+ * it: `usePluginAction` goes through the action surface and there was nothing
+ * registered there. The HTTP case now delegates here, so there is one
+ * implementation rather than two that drift.
+ */
+const updateDomainMutation: MutationHandler = async (store, ctx, call) => {
+  const domainId = requireString(call.fields.domainId, "domainId");
+  const domain = await store.updateDomain(call.companyId, domainId, {
+    displayName: typeof call.fields.displayName === "string" ? call.fields.displayName : undefined,
+    description: "description" in call.fields ? (call.fields.description as string | null) : undefined,
+    status: typeof call.fields.status === "string" ? call.fields.status : undefined,
+    metadata: optionalRecord(call.fields.metadata),
+  });
+  if (!domain) return notFound("Domain not found");
+  await ctx.activity.log({
+    companyId: call.companyId,
+    message: `Updated ontology domain ${domain.slug} (v${domain.version})`,
+    entityType: "ontology_domain",
+    entityId: domain.id,
+    metadata: { version: domain.version },
+  });
+  return ok({ domain });
+};
+
+/**
+ * Move a domain along its lifecycle: draft -> active -> deprecated -> archived.
+ *
+ * The side effects are the reason this is not a thin store call: deprecating a
+ * domain marks its published nodes stale (a remediation trigger other plugins
+ * subscribe to) and every transition is announced cross-plugin. Both were on the
+ * HTTP path only before.
+ */
+const transitionDomainMutation: MutationHandler = async (store, ctx, call) => {
+  const domainId = requireString(call.fields.domainId, "domainId");
+  const to = requireString(call.fields.to, "to") as DomainLifecycleState;
+  try {
+    const before = await store.getDomain(call.companyId, domainId);
+    const domain = await store.transitionDomainLifecycle(
+      call.companyId,
+      domainId,
+      to,
+      typeof call.fields.actor === "string" ? call.fields.actor : "system",
+    );
+    if (!domain) return notFound("Domain not found");
+
+    // Best-effort: a failed emit must never fail the transition itself.
+    await emitDomainLifecycleChanged(ctx, call.companyId, {
+      domainId,
+      from: before?.lifecycle_state ?? null,
+      to,
+    });
+
+    if (to === "deprecated") {
+      await emitStaleNodesForDomain(ctx, store, call.companyId, domainId);
+    }
+
+    return ok({ domain });
+  } catch (err) {
+    return { status: 422, payload: { error: String((err as Error)?.message ?? err) } };
+  }
+};
+
 const MUTATION_HANDLERS: Record<string, MutationHandler> = {
   "update-node-type": updateNodeTypeMutation,
   "create-proposal": createProposalMutation,
   "decide-proposal": decideProposalMutation,
   "delete-domain": deleteDomainMutation,
+  "update-domain": updateDomainMutation,
+  "transition-domain": transitionDomainMutation,
   "delete-node-type": deleteNodeTypeMutation,
   "update-relation-type": updateRelationTypeMutation,
   "delete-relation-type": deleteRelationTypeMutation,
@@ -3521,14 +3588,13 @@ const plugin = definePlugin({
       }
 
       case "list-domains": {
-        const rows = await ctx.db.query(
-          `SELECT id, company_id, slug, display_name, description, status, version
-             FROM "${ctx.db.namespace}".ontology_domains
-            WHERE company_id = $1
-            ORDER BY created_at ASC`,
-          [companyId],
-        );
-        return { body: { domains: rows } };
+        // Through the store, like the data face does. The hand-written projection
+        // this replaces selected straight from `ontology_domains` with no
+        // `is_deleted` filter, so the route kept returning retired domains once
+        // retiring became possible — visible only to this path, which is the
+        // worst kind of difference. It also dropped `lifecycle_state`, which the
+        // same rows carry everywhere else.
+        return { body: { domains: await store.listDomains(companyId) } };
       }
 
       // --- who may act ------------------------------------------------------
@@ -3767,26 +3833,8 @@ const plugin = definePlugin({
       }
 
       case "update-domain": {
-        const body = optionalRecord(input.body) ?? {};
-        const domain = await store.updateDomain(
-          companyId,
-          requireString(input.params.domainId, "domainId"),
-          {
-            displayName: typeof body.displayName === "string" ? body.displayName : undefined,
-            description: "description" in body ? (body.description as string | null) : undefined,
-            status: typeof body.status === "string" ? body.status : undefined,
-            metadata: optionalRecord(body.metadata),
-          },
-        );
-        if (!domain) return { status: 404, body: { error: "Domain not found" } };
-        await ctx.activity.log({
-          companyId,
-          message: `Updated ontology domain ${domain.slug} (v${domain.version})`,
-          entityType: "ontology_domain",
-          entityId: domain.id,
-          metadata: { version: domain.version },
-        });
-        return { body: { domain } };
+        const outcome = await updateDomainMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "list-node-types": {
@@ -3884,40 +3932,8 @@ const plugin = definePlugin({
       }
 
       case "transition-domain": {
-        const body = optionalRecord(input.body) ?? {};
-        try {
-          const domainId = requireString(input.params.domainId, "domainId");
-          const before = await store.getDomain(companyId, domainId);
-          const to = requireString(body.to, "to") as DomainLifecycleState;
-          const domain = await store.transitionDomainLifecycle(
-            companyId,
-            domainId,
-            to,
-            typeof body.actor === "string" ? body.actor : "system",
-          );
-          if (!domain) return { status: 404, body: { error: "Domain not found" } };
-
-          // Cross-plugin event: announce the domain lifecycle change so other
-          // plugins (npc-factory, workflow) can react. Best-effort; a failed
-          // emit must never fail the transition itself.
-          await emitDomainLifecycleChanged(ctx, companyId, {
-            domainId,
-            from: before?.lifecycle_state ?? null,
-            to,
-          });
-
-          // Flagship trigger: when a domain is deprecated, its published nodes
-          // are considered stale. Emit a node-stale event per node so downstream
-          // plugins (npc-factory) can open remediation workflow runs. Mirrors
-          // DigitalStaff domain-6 ontology-node-stale trigger semantics.
-          if (to === "deprecated") {
-            await emitStaleNodesForDomain(ctx, store, companyId, domainId);
-          }
-
-          return { body: { domain } };
-        } catch (err) {
-          return { status: 422, body: { error: String((err as Error)?.message ?? err) } };
-        }
+        const outcome = await transitionDomainMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "snapshot-domain": {

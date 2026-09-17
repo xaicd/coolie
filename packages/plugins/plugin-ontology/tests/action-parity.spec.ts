@@ -107,6 +107,13 @@ function collectStaticRegistrations(kind: "actions" | "data"): Set<string> {
  * `actions.register("key", …)` call, so the static scan cannot see them.
  */
 const MUTATION_HANDLER_KEYS = new Set([
+  // Domain management. These three were HTTP-only routes until the domain list
+  // panel needed to call them; registering them in the handler table is what put
+  // them on the bridge, and this list is what records that. Leaving them out is
+  // not a false alarm — it is the trap this file exists for.
+  "update-domain",
+  "transition-domain",
+  "delete-domain",
   "update-node-type",
   "delete-node-type",
   "update-relation-type",

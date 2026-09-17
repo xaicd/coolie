@@ -16,6 +16,10 @@ import {
   type ReactElement,
 } from "react";
 import {
+  DOMAIN_STATE_TRANSITIONS,
+  type DomainLifecycleState,
+} from "@paperclipai/ontology-core/enums.js";
+import {
   type GraphNode,
   type GraphEdge,
   type GraphNodeType,
@@ -74,6 +78,8 @@ interface OntologyDomain {
   description: string | null;
   status: string;
   version: number;
+  /** draft -> active -> deprecated -> archived. Distinct from `status`. */
+  lifecycle_state: string;
 }
 
 interface OntologyNodeType {
@@ -173,6 +179,15 @@ const BTN =
   "transition-colors hover:opacity-90 disabled:opacity-50";
 const GHOST_BTN =
   "rounded-md px-0 py-0 text-(length:--text-compact) font-medium text-primary transition-colors hover:underline";
+/** Row-level action in a table: outline, nano-sized. */
+const ROW_BTN =
+  "rounded-md border border-border bg-background px-2 py-1 text-(length:--text-nano) " +
+  "text-foreground transition-colors hover:bg-accent disabled:opacity-50";
+/** Row-level destructive action: same shape, destructive tone. */
+const ROW_DANGER_BTN =
+  "rounded-md border border-destructive/30 bg-background px-2 py-1 text-(length:--text-nano) " +
+  "text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50";
+
 const TAB_ON = "rounded-md bg-primary px-3 py-1.5 text-(length:--text-compact) font-medium text-primary-foreground";
 const TAB_OFF =
   "rounded-md px-3 py-1.5 text-(length:--text-compact) font-medium text-muted-foreground transition-colors hover:text-foreground hover:bg-accent/50";
@@ -220,7 +235,7 @@ export function OntologyPage({ context }: PluginPageProps): ReactElement {
   return <OntologyWorkbench companyId={companyId} />;
 }
 
-type WorkbenchView = "graph" | "table" | "schema" | "cognition" | "capabilities" | "dialogue" | "sandbox" | "actions" | "functions" | "interfaces" | "datasets" | "connectors" | "transforms" | "manage";
+type WorkbenchView = "graph" | "table" | "schema" | "cognition" | "capabilities" | "dialogue" | "sandbox" | "actions" | "functions" | "interfaces" | "datasets" | "connectors" | "transforms" | "domains" | "manage";
 type WorkbenchGroup = "data-flow" | "assets" | "ops";
 
 /**
@@ -275,6 +290,9 @@ const VIEW_GROUPS: {
     label: t("运维", "Ops"),
     icon: "🛠",
     views: [
+      // Listed before 治理: this is the view you reach for when a domain is in the
+      // way, and it used to require the API.
+      { id: "domains", label: t("本体域", "Domains"), icon: "◫" },
       { id: "manage", label: t("治理", "Manage"), icon: "📋" },
     ],
   },
@@ -574,6 +592,10 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
           setActionFormPrefill={setActionFormPrefill}
           onDomainsChanged={refreshDomains}
           onRequestView={selectView}
+          onOpenDomain={(id) => {
+            setSelectedDomainId(id);
+            selectView("graph");
+          }}
           onImportLegacy={() => setWizardOpen(true)}
         />
       )}
@@ -831,6 +853,7 @@ function DomainWorkspace({
   setActionFormPrefill,
   onDomainsChanged,
   onRequestView,
+  onOpenDomain,
   onImportLegacy,
 }: {
   companyId: string;
@@ -855,6 +878,9 @@ function DomainWorkspace({
   onDomainsChanged: () => void;
   /** Bridge to switch the host workbench's tab (e.g. graph → sandbox). */
   onRequestView?: (view: WorkbenchView) => void;
+  /** Select a different domain and land on its graph. The domain picker lives in
+      the parent, so the bridge is the only way a panel in here can move it. */
+  onOpenDomain?: (domainId: string) => void;
   /** Bridge to open the legacy-system import wizard from inside the cockpit. */
   onImportLegacy?: () => void;
 }): ReactElement {
@@ -1273,6 +1299,13 @@ function DomainWorkspace({
         )}
         {view === "transforms" && domainId && (
           <TransformsTab companyId={companyId} domainId={domainId} />
+        )}
+        {view === "domains" && (
+          <DomainList
+            companyId={companyId}
+            activeDomainId={domainId}
+            onOpen={(id) => onOpenDomain?.(id)}
+          />
         )}
         {view === "manage" && domainId && (
           <ManageTab companyId={companyId} domainId={domainId} />
@@ -1869,6 +1902,15 @@ function gapStatusKind(s: string): "ok" | "pending" | "error" | "info" {
 function primitiveStatusKind(s: string): "ok" | "pending" | "info" {
   if (s === "active") return "ok";
   if (s === "deprecated") return "info";
+  return "pending";
+}
+
+// Domain lifecycle, which is a different axis from the domain's free-text
+// `status`. "archived" reads as neutral rather than pending: nothing is waiting.
+function domainLifecycleKind(s: string): "ok" | "pending" | "info" | "warning" {
+  if (s === "active") return "ok";
+  if (s === "deprecated") return "warning";
+  if (s === "archived") return "info";
   return "pending";
 }
 
@@ -2792,11 +2834,23 @@ function CapabilityGapDetail({
   );
 }
 
+/**
+ * Domain list management: every ontology domain in the company, and what can be
+ * done to one.
+ *
+ * This component already existed and was never rendered — it was written for a
+ * domain-picker entry point that the header `<select>` ended up covering, so it
+ * sat as dead code while the only thing the UI could do with a domain was look at
+ * it. The create form and the table below are reused as they were; the lifecycle
+ * and action columns are what make it management rather than a listing.
+ */
 function DomainList({
   companyId,
+  activeDomainId,
   onOpen,
 }: {
   companyId: string;
+  activeDomainId: string | null;
   onOpen: (domainId: string) => void;
 }): ReactElement {
   const { data, loading, error, refresh } = usePluginData<{ domains: OntologyDomain[] }>(
@@ -2804,11 +2858,17 @@ function DomainList({
     { companyId },
   );
   const createDomain = usePluginAction("create-domain");
+  const updateDomain = usePluginAction("update-domain");
+  const transitionDomain = usePluginAction("transition-domain");
+  const deleteDomain = usePluginAction("delete-domain");
   const [slug, setSlug] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  /** Which row has work in flight, and what went wrong on it. */
+  const [busyRowId, setBusyRowId] = useState<string | null>(null);
+  const [rowError, setRowError] = useState<string | null>(null);
 
   const submit = useCallback(async () => {
     setBusy(true);
@@ -2826,10 +2886,55 @@ function DomainList({
     }
   }, [companyId, slug, displayName, description, createDomain, refresh]);
 
+  /**
+   * Run one row's mutation, then re-read the list. Refreshing beats patching the
+   * row in place: retiring a domain changes what the picker should offer, and the
+   * list is short enough that a re-read costs nothing.
+   */
+  const runOnRow = useCallback(
+    async (domainId: string, fn: () => Promise<unknown>) => {
+      setBusyRowId(domainId);
+      setRowError(null);
+      try {
+        await fn();
+        refresh();
+      } catch (e) {
+        setRowError(String((e as Error)?.message ?? e));
+      } finally {
+        setBusyRowId(null);
+      }
+    },
+    [refresh],
+  );
+
+  const rename = (d: OntologyDomain) => {
+    const next = window.prompt(t("显示名称", "Display name"), d.display_name);
+    if (next === null) return;
+    const name = next.trim();
+    if (!name || name === d.display_name) return;
+    void runOnRow(d.id, () => updateDomain({ companyId, domainId: d.id, displayName: name }));
+  };
+
+  const advance = (d: OntologyDomain, to: DomainLifecycleState) => {
+    if (!window.confirm(t(`把「${d.display_name}」推进到 ${to}?`, `Move "${d.display_name}" to ${to}?`))) return;
+    void runOnRow(d.id, () => transitionDomain({ companyId, domainId: d.id, to }));
+  };
+
+  const retire = (d: OntologyDomain) => {
+    // The message says the data is kept, because it is: this is a soft delete and
+    // an operator who believes otherwise plans a different recovery.
+    const message = t(
+      `注销「${d.display_name}」?它会从所有列表消失,数据保留、可恢复。`,
+      `Retire "${d.display_name}"? It disappears from every list; the row is kept and can be restored.`,
+    );
+    if (!window.confirm(message)) return;
+    void runOnRow(d.id, () => deleteDomain({ companyId, domainId: d.id }));
+  };
+
   return (
     <>
       <div className={CARD}>
-        <div className="mb-2 font-semibold">{t("新建域", "New domain")}</div>
+        <div className={SECTION_TITLE}>{t("新建域", "New domain")}</div>
         <input className={INPUT} placeholder={t("标识 (slug)", "slug")} value={slug} onChange={(e) => setSlug(e.target.value)} />
         <input
           className={INPUT}
@@ -2847,8 +2952,10 @@ function DomainList({
         <button className={BTN} disabled={busy || !slug || !displayName} onClick={submit}>
           {busy ? "…" : t("创建","Create")}
         </button>
-        {formError && <div className="mt-2 text-sm text-muted-foreground">{formError}</div>}
+        {formError && <div className={MUTED + " mt-2"}>{formError}</div>}
       </div>
+
+      {rowError && <div className={CARD + " text-destructive"}>{rowError}</div>}
 
       <DataTable
         loading={loading}
@@ -2858,24 +2965,60 @@ function DomainList({
           {
             key: "display_name",
             header: t("域","Domain"),
-            render: (_v, row) => (
-              <button
-                className={GHOST_BTN}
-                onClick={() => onOpen((row as unknown as OntologyDomain).id)}
-              >
-                {(row as unknown as OntologyDomain).display_name}
-              </button>
-            ),
+            render: (_v, row) => {
+              const d = row as unknown as OntologyDomain;
+              return (
+                <div className="flex items-center gap-2">
+                  <button className={GHOST_BTN} onClick={() => onOpen(d.id)}>
+                    {d.display_name}
+                  </button>
+                  {d.id === activeDomainId && <span className={MUTED}>{t("当前","current")}</span>}
+                </div>
+              );
+            },
           },
           { key: "slug", header: t("标识","Slug") },
-          { key: "version", header: t("版本","Version"), width: "90px" },
+          { key: "version", header: t("版本","Version"), width: "80px" },
+          {
+            key: "lifecycle_state",
+            header: t("生命周期","Lifecycle"),
+            width: "120px",
+            render: (v) => <StatusBadge label={String(v)} status={domainLifecycleKind(String(v))} />,
+          },
           {
             key: "status",
             header: t("状态","Status"),
-            width: "110px",
+            width: "100px",
             render: (_v, row) => {
               const status = (row as unknown as OntologyDomain).status;
               return <StatusBadge label={status} status={status === "active" ? "ok" : "pending"} />;
+            },
+          },
+          {
+            key: "actions",
+            header: t("操作","Actions"),
+            width: "240px",
+            render: (_v, row) => {
+              const d = row as unknown as OntologyDomain;
+              const rowBusy = busyRowId === d.id;
+              // The transitions the core allows from here, so the panel cannot
+              // offer a move the store would refuse.
+              const next = DOMAIN_STATE_TRANSITIONS[d.lifecycle_state as DomainLifecycleState] ?? [];
+              return (
+                <div className="flex flex-wrap items-center gap-1">
+                  <button className={ROW_BTN} disabled={rowBusy} onClick={() => rename(d)}>
+                    {t("改名","Rename")}
+                  </button>
+                  {next.map((state) => (
+                    <button key={state} className={ROW_BTN} disabled={rowBusy} onClick={() => advance(d, state)}>
+                      {state}
+                    </button>
+                  ))}
+                  <button className={ROW_DANGER_BTN} disabled={rowBusy} onClick={() => retire(d)}>
+                    {t("注销","Retire")}
+                  </button>
+                </div>
+              );
             },
           },
         ]}
