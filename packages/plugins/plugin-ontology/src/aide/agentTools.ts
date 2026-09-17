@@ -18,7 +18,7 @@ import type {
   DescribeDomainResult,
   GraphStore,
   ImpactDirection,
-} from "../graph/GraphStore.js";
+} from "@paperclipai/ontology-core/graph/GraphStore.js";
 
 /** Anthropic tool definition. */
 export interface AideToolSpec {

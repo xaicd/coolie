@@ -17,7 +17,7 @@
  * have their own CRUD action — we compute the new full `propertiesSchema`
  * via `propertiesSchemaFor` and emit a single `update-node-type` call.
  */
-import type { DescribeDomainResult } from "../graph/GraphStore.js";
+import type { DescribeDomainResult } from "@paperclipai/ontology-core/graph/GraphStore.js";
 
 /* ------------------------------------------------------------------ */
 /*  Op schema — what the LLM is asked to return                        */

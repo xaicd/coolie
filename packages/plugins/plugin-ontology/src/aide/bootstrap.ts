@@ -18,7 +18,7 @@
  * defence.
  */
 
-import type { DescribeDomainResult } from "../graph/GraphStore.js";
+import type { DescribeDomainResult } from "@paperclipai/ontology-core/graph/GraphStore.js";
 
 export interface BootstrapNodeTypeDraft {
   key: string;

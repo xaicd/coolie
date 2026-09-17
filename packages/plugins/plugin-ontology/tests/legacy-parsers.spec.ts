@@ -4,7 +4,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { parseOpenAPI } from "../src/legacy/openapiParser.js";
-import { parseSourceFile } from "../src/cognition/AstExtractor.js";
+import { parseSourceFile } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 import {
   inferModuleFromText,
   MODULE_PREFIX_COUNT,

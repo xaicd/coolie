@@ -1,5 +1,5 @@
 export { default as manifest, PLUGIN_ID, ONTOLOGY_NAMESPACE_SCHEMA } from "./manifest.js";
-export { PostgresGraphStore } from "./graph/GraphStore.js";
+export { PostgresGraphStore } from "@paperclipai/ontology-core/graph/GraphStore.js";
 export type {
   GraphStore,
   OntologyDomainInput,
@@ -74,8 +74,8 @@ export type {
   PathHop,
   ImpactedNode,
   ImpactDirection,
-} from "./graph/GraphStore.js";
-export { parseSourceFile, extractRepoDraft, extractFile } from "./cognition/AstExtractor.js";
+} from "@paperclipai/ontology-core/graph/GraphStore.js";
+export { parseSourceFile, extractRepoDraft, extractFile } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 export type {
   ExtractedEntity,
   ExtractedRelation,
@@ -84,7 +84,7 @@ export type {
   SourceFile,
   RepoDraft,
   RepoDraftCoverage,
-} from "./cognition/AstExtractor.js";
+} from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 export {
   DOMAIN_LIFECYCLE_STATES,
   NODE_LIFECYCLE_STATES,
@@ -141,7 +141,7 @@ export {
   UMODEL_DISCOVERED_FROM,
   UMODEL_TELEMETRY_TYPES,
   UMODEL_ENTITY_SET_LAYERS,
-} from "./enums.js";
+} from "@paperclipai/ontology-core/enums.js";
 export type {
   DomainLifecycleState,
   NodeLifecycleState,
@@ -191,4 +191,4 @@ export type {
   UModelDiscoveredFrom,
   UModelTelemetryType,
   UModelEntitySetLayer,
-} from "./enums.js";
+} from "@paperclipai/ontology-core/enums.js";

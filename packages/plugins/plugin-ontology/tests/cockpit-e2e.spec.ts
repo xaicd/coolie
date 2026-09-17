@@ -33,7 +33,7 @@ import {
   serializeDomain,
   type SchemaSnapshot,
 } from "../src/aide/snapshots.js";
-import type { DescribeDomainResult } from "../src/graph/GraphStore.js";
+import type { DescribeDomainResult } from "@paperclipai/ontology-core/graph/GraphStore.js";
 
 /**
  * A small but realistic starting schema — one node type with two

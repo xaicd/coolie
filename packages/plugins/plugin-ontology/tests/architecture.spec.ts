@@ -7,8 +7,8 @@
  * an invented edge.
  */
 import { describe, expect, it } from "vitest";
-import { analyzeArchitecture, type SourceFile } from "../src/architecture/index.js";
-import { detectServices } from "../src/architecture/serviceDetector.js";
+import { analyzeArchitecture, type SourceFile } from "@paperclipai/ontology-core/architecture/index.js";
+import { detectServices } from "@paperclipai/ontology-core/architecture/serviceDetector.js";
 
 function file(path: string, content: string): SourceFile {
   return { path, content };

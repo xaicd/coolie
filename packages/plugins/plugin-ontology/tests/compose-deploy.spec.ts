@@ -8,9 +8,9 @@
  * tree the whole time.
  */
 import { describe, expect, it } from "vitest";
-import { analyzeArchitecture } from "../src/architecture/index.js";
-import { composeBlockFor } from "../src/architecture/stackDetector.js";
-import type { SourceFile } from "../src/architecture/index.js";
+import { analyzeArchitecture } from "@paperclipai/ontology-core/architecture/index.js";
+import { composeBlockFor } from "@paperclipai/ontology-core/architecture/stackDetector.js";
+import type { SourceFile } from "@paperclipai/ontology-core/architecture/index.js";
 
 const COMPOSE = `version: "3"
 services:

@@ -14,7 +14,7 @@ import {
   readOrigin,
   readSourceFiles,
   readTypeProvenance,
-} from "../src/provenance.js";
+} from "@paperclipai/ontology-core/provenance.js";
 import { groupTypesForIndex } from "../src/ui/typeGroups.js";
 
 describe("buildTypeProvenance", () => {

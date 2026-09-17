@@ -24,7 +24,10 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
-const SRC = new URL("../src/", import.meta.url);
+/** The host-free core, now its own package. */
+const SRC = new URL("../../../ontology-core/src/", import.meta.url);
+/** The plugin's own sources — the assistant layer and the UI still live here. */
+const PLUGIN_SRC = new URL("../src/", import.meta.url);
 const MIGRATIONS_DIR = new URL("../migrations/", import.meta.url);
 
 /**
@@ -72,7 +75,8 @@ function filesIn(trees: string[], names: string[] = []): string[] {
 }
 
 const coreFiles = (): string[] => filesIn(CORE_TREES, CORE_FILES);
-const assistantFiles = (): string[] => filesIn(ASSISTANT_TREES);
+const assistantFiles = (): string[] =>
+  ASSISTANT_TREES.flatMap((tree) => collect(new URL(`${tree}/`, PLUGIN_SRC)));
 
 /** Every module specifier an import statement names. */
 function importsOf(path: string): string[] {

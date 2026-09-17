@@ -8,10 +8,10 @@
  * directory picker could read.
  */
 import { describe, expect, it } from "vitest";
-import { parseSpringAppName, readSpringAppName } from "../src/architecture/serviceDetector.js";
-import { scanProject } from "../src/cognition/projectScanner.js";
-import { MAX_FILES } from "../src/architecture/index.js";
-import type { SourceFile } from "../src/cognition/AstExtractor.js";
+import { parseSpringAppName, readSpringAppName } from "@paperclipai/ontology-core/architecture/serviceDetector.js";
+import { scanProject } from "@paperclipai/ontology-core/cognition/projectScanner.js";
+import { MAX_FILES } from "@paperclipai/ontology-core/architecture/index.js";
+import type { SourceFile } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 
 const POM = `<project><artifactId>mod</artifactId></project>`;
 

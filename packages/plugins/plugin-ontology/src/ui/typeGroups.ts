@@ -33,7 +33,7 @@
  * search always bypasses grouping entirely.
  */
 import { matchModuleFromText } from "../legacy/modulePrefixMap.js";
-import { readOrigin } from "../provenance.js";
+import { readOrigin } from "@paperclipai/ontology-core/provenance.js";
 
 export interface IndexableType {
   key: string;

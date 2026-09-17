@@ -13,9 +13,9 @@ import {
   type GraphStore,
   type ImpactDirection,
   type OntologyResourceKind,
-} from "./graph/GraphStore.js";
-import { scoreDomainCandidates } from "./graph/linkSuggestions.js";
-import { extractRepoDraft } from "./cognition/AstExtractor.js";
+} from "@paperclipai/ontology-core/graph/GraphStore.js";
+import { scoreDomainCandidates } from "@paperclipai/ontology-core/graph/linkSuggestions.js";
+import { extractRepoDraft } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 import { AideStore, type AideCitation } from "./aide/AideStore.js";
 import {
   AideConfigError,
@@ -34,9 +34,9 @@ import { AIDE_TOOL_SPECS, executeAideTool } from "./aide/agentTools.js";
 import { runAideAgent, type AideLoopMessage } from "./aide/agentLoop.js";
 import { buildSuggestFieldsPrompt, parseSuggestedFields } from "./aide/suggestFields.js";
 import { buildEnrichPrompt, parseEnrichResponse, type EnrichTarget } from "./aide/enrichDescriptions.js";
-import { parseSqlDdl } from "./cognition/AstExtractor.js";
-import { buildTypeProvenance } from "./provenance.js";
-import { subProjectsFromArchitecture } from "./architecture/subProjectMapping.js";
+import { parseSqlDdl } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
+import { buildTypeProvenance } from "@paperclipai/ontology-core/provenance.js";
+import { subProjectsFromArchitecture } from "@paperclipai/ontology-core/architecture/subProjectMapping.js";
 import { parseOpenAPI } from "./legacy/openapiParser.js";
 import {
   buildSourceIndex,
@@ -77,7 +77,7 @@ import type {
   UModelLinkDirection,
   UModelLinkType,
   UModelTelemetryType,
-} from "./enums.js";
+} from "@paperclipai/ontology-core/enums.js";
 
 let activeContext: PluginContext | null = null;
 let graphStore: GraphStore | null = null;
@@ -802,7 +802,7 @@ const deleteActionTypeMutation: MutationHandler = async (store, _ctx, call) => {
 };
 
 const runTransformMutation: MutationHandler = async (store, ctx, call) => {
-  const { runTransform } = await import("./transform/TransformRunner.js");
+  const { runTransform } = await import("@paperclipai/ontology-core/transform/TransformRunner.js");
   // Accept transformId/domainId from either the path args or the body.
   const transformId =
     (optionalString(call.fields.transformId) ?? "").trim();

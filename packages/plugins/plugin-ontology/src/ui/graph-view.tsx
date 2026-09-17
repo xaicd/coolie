@@ -128,8 +128,8 @@ import {
   type PerspectiveId,
   type PerspectiveService,
 } from "./perspectives.js";
-import { relationEndpoints } from "../relationEndpoints.js";
-import { describeProvenance, readSourceFiles } from "../provenance.js";
+import { relationEndpoints } from "@paperclipai/ontology-core/relationEndpoints.js";
+import { describeProvenance, readSourceFiles } from "@paperclipai/ontology-core/provenance.js";
 
 type OntologyNodeData = { label: string; nodeKey: string; tone: string; typeName: string | null; dimmed?: boolean; fill?: string | null };
 

@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 import { createTestHarness } from "@paperclipai/plugin-sdk/testing";
 import manifest from "../src/manifest.js";
 import plugin from "../src/worker.js";
-import { extractRepoDraft, type SourceFile } from "../src/cognition/AstExtractor.js";
+import { extractRepoDraft, type SourceFile } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 
 const DDL: SourceFile = {
   path: "schema/orders.sql",

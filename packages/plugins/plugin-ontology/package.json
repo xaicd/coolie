@@ -44,7 +44,8 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.32.0",
     "@xyflow/react": "^12.3.5",
-    "marked": "^18.0.13"
+    "marked": "^18.0.13",
+    "@paperclipai/ontology-core": "workspace:*"
   },
   "peerDependencies": {
     "react": ">=18"

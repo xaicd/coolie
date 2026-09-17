@@ -6,8 +6,8 @@
  * render. This pins the mapping that puts them in `ontology_sub_projects`.
  */
 import { describe, expect, it } from "vitest";
-import { subProjectsFromArchitecture } from "../src/architecture/subProjectMapping.js";
-import type { DetectedDependency, ServiceArchitecture } from "../src/architecture/index.js";
+import { subProjectsFromArchitecture } from "@paperclipai/ontology-core/architecture/subProjectMapping.js";
+import type { DetectedDependency, ServiceArchitecture } from "@paperclipai/ontology-core/architecture/index.js";
 
 const service = (over: Partial<ServiceArchitecture> = {}): ServiceArchitecture => ({
   key: "order-service",

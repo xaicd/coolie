@@ -23,7 +23,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 const MIGRATIONS_DIR = new URL("../migrations/", import.meta.url);
-const STORE = new URL("../src/graph/GraphStore.ts", import.meta.url);
+const STORE = new URL("../../../ontology-core/src/graph/GraphStore.ts", import.meta.url);
 
 /** Clause keywords that lead a CREATE TABLE body line without being columns. */
 const NON_COLUMN_KEYWORDS = new Set([

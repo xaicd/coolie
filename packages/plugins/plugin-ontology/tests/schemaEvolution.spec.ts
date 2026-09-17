@@ -10,7 +10,7 @@ import {
   describeOrphans,
   diffPropertySchemas,
   planPropertyRenames,
-} from "../src/schemaEvolution.js";
+} from "@paperclipai/ontology-core/schemaEvolution.js";
 
 const schema = (...keys: string[]) =>
   Object.fromEntries(keys.map((key) => [key, { type: "string" }]));

@@ -8,7 +8,7 @@
  * bad argument instead of failing the turn.
  */
 import { describe, expect, it, vi } from "vitest";
-import type { DescribeDomainResult, GraphStore } from "../src/graph/GraphStore.js";
+import type { DescribeDomainResult, GraphStore } from "@paperclipai/ontology-core/graph/GraphStore.js";
 import { AIDE_TOOL_SPECS, executeAideTool } from "../src/aide/agentTools.js";
 
 const COMPANY = "company-1";

@@ -7,7 +7,7 @@
  * DDL dialect writes comments differently, so the cases are grouped by form.
  */
 import { describe, expect, it } from "vitest";
-import { parseSqlDdl } from "../src/cognition/AstExtractor.js";
+import { parseSqlDdl } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 
 const props = (sql: string) => {
   const [entity] = parseSqlDdl(sql, "schema.sql").entities;

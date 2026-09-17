@@ -1,4 +1,4 @@
-import type { SqlClient } from "../graph/SqlClient.js";
+import type { SqlClient } from "@paperclipai/ontology-core/graph/SqlClient.js";
 import {
   type SchemaSnapshot,
   serializeDomain,

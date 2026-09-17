@@ -10,8 +10,8 @@
  * mapper type must merge with the Java one rather than shadowing it.
  */
 import { describe, expect, it } from "vitest";
-import { parseMyBatisMapper } from "../src/cognition/mybatisParser.js";
-import { extractRepoDraft, parseSourceFile } from "../src/cognition/AstExtractor.js";
+import { parseMyBatisMapper } from "@paperclipai/ontology-core/cognition/mybatisParser.js";
+import { extractRepoDraft, parseSourceFile } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 
 const MAPPER = `<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">

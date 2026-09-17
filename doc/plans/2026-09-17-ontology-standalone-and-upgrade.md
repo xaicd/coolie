@@ -13,15 +13,23 @@ gaps are stated as facts with the place they live, not as impressions.
 
 ## 1. Current state
 
-**The three-layer split exists and is enforced.** `tests/layering.spec.ts` fails
-if the core imports the plugin SDK, React, or any outer layer.
+**The three-layer split exists and is enforced twice over.** The core is a
+workspace package, so the compiler refuses a host import across the boundary;
+`tests/layering.spec.ts` additionally catches what the compiler cannot (React, a
+reach into a UI file).
 
 | Layer | Paths | May import the host |
 | --- | --- | --- |
-| Ontology-Core | `src/graph/`, `src/architecture/`, `src/cognition/`, `src/transform/`, `src/provenance.ts`, `src/relationEndpoints.ts`, `src/enums.ts` | no |
-| Ontology-API | `src/api/contract.ts`, `src/manifest.ts`, `src/worker.ts` | yes |
-| Ontology-UI | `src/ui/` | yes |
-| Assistant (above the core) | `src/aide/` | yes, but not the UI |
+| Ontology-Core | `packages/ontology-core/src/` — `graph/`, `architecture/`, `cognition/`, `transform/`, `provenance.ts`, `relationEndpoints.ts`, `schemaEvolution.ts`, `enums.ts` | no |
+| Ontology-API | the plugin's `src/api/contract.ts`, `src/manifest.ts`, `src/worker.ts` | yes |
+| Ontology-UI | the plugin's `src/ui/` | yes |
+| Assistant (above the core) | the plugin's `src/aide/` | yes, but not the UI |
+
+The core declares its own `exports` (`.` and `./*.js`), so a consumer imports
+`@paperclipai/ontology-core/graph/GraphStore.js` — the `.js`-suffixed form keeps
+the NodeNext specifiers the plugin already used, which is what made the move a
+prefix change rather than a rewrite. The plugin bundles it, so the shipped
+artefact is unchanged: one file, with the core inlined.
 
 The core reaches the database through the `SqlClient` port
 (`src/graph/SqlClient.ts`) — `namespace`, `query`, `execute` — which any

@@ -23,11 +23,11 @@
 import { useEffect, useState, type ReactElement } from "react";
 import { usePluginAction } from "@paperclipai/plugin-sdk/ui";
 import { inferModuleFromText } from "../legacy/modulePrefixMap.js";
-import { readOrigin } from "../provenance.js";
+import { readOrigin } from "@paperclipai/ontology-core/provenance.js";
 // Type-only: erased at build time, and it keeps the preview honest about what
 // the scanner actually produced.
-import type { ScannedService } from "../cognition/projectScanner.js";
-import type { DetectedDependency } from "../architecture/index.js";
+import type { ScannedService } from "@paperclipai/ontology-core/cognition/projectScanner.js";
+import type { DetectedDependency } from "@paperclipai/ontology-core/architecture/index.js";
 
 /** What the modal currently knows about the user's source material. Filled
  *  in by Step 1; consumed by Steps 2-4 to label and pre-populate. */
@@ -313,8 +313,8 @@ function Step1Body({
     setBusy(true);
     setErr(null);
     try {
-      const { scanProject, IGNORED_EXTENSIONS } = await import("../cognition/projectScanner.js");
-      const { buildTypeProvenance } = await import("../provenance.js");
+      const { scanProject, IGNORED_EXTENSIONS } = await import("@paperclipai/ontology-core/cognition/projectScanner.js");
+      const { buildTypeProvenance } = await import("@paperclipai/ontology-core/provenance.js");
       const inputs: Array<{ path: string; content: string }> = [];
       const repos = new Set<string>();
       // A picker hands over every asset in the tree. Reading a 40MB image as
@@ -1031,7 +1031,7 @@ async function parseAndPreview(text: string): Promise<ParsedSource> {
   // entry point in AstExtractor that dispatches by extension).
   // The function is dynamic-imported so the modal's import graph
   // stays lean for users who land on a different step.
-  const mod = await import("../cognition/AstExtractor.js").catch(() => null);
+  const mod = await import("@paperclipai/ontology-core/cognition/AstExtractor.js").catch(() => null);
   const nodeTypes: ParsedSource["nodeTypes"] = [];
   const relationTypes: ParsedSource["relationTypes"] = [];
 

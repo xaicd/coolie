@@ -12,8 +12,8 @@ import {
   moduleFromJavaPackage,
   parseJavaFile,
   stripJavaComments,
-} from "../src/cognition/javaParser.js";
-import { extractRepoDraft, parseSourceFile } from "../src/cognition/AstExtractor.js";
+} from "@paperclipai/ontology-core/cognition/javaParser.js";
+import { extractRepoDraft, parseSourceFile } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 
 const JEECG_ENTITY = `
 package org.jeecg.modules.system.entity;

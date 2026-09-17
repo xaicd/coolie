@@ -22,7 +22,7 @@ import type {
   DescribeDomainRelationType as CoreDescribeDomainRelationType,
   DescribeDomainSubProject as CoreDescribeDomainSubProject,
   DescribeDomainResult as CoreDescribeDomainResult,
-} from "../graph/GraphStore.js";
+} from "@paperclipai/ontology-core/graph/GraphStore.js";
 import { MarkdownContent } from "./MarkdownContent.js";
 import { CitationPreview, kindLabel } from "./CitationPreview.js";
 import { EditCard } from "./EditCard.js";

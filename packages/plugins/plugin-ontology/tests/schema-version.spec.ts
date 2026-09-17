@@ -16,8 +16,8 @@ import { describe, expect, it } from "vitest";
 import { createTestHarness, type TestHarness } from "@paperclipai/plugin-sdk/testing";
 import manifest from "../src/manifest.js";
 import plugin from "../src/worker.js";
-import { PostgresGraphStore } from "../src/graph/GraphStore.js";
-import type { SqlClient } from "../src/graph/SqlClient.js";
+import { PostgresGraphStore } from "@paperclipai/ontology-core/graph/GraphStore.js";
+import type { SqlClient } from "@paperclipai/ontology-core/graph/SqlClient.js";
 
 const COMPANY_ID = "11111111-1111-4111-8111-111111111111";
 const DOMAIN_ID = "22222222-2222-4222-8222-222222222222";

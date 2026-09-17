@@ -10,7 +10,7 @@ import {
   RECOMMEND_THRESHOLD,
   scoreDomain,
   scoreDomainCandidates,
-} from "../src/graph/linkSuggestions.js";
+} from "@paperclipai/ontology-core/graph/linkSuggestions.js";
 
 const DOMAINS = [
   { id: "d1", slug: "order", display_name: "订单中心" },

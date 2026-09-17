@@ -8,8 +8,8 @@ import {
   parseProtoFile,
   protoTypeToSchemaType,
   serviceFromProtoPackage,
-} from "../src/cognition/protoParser.js";
-import { extractRepoDraft, parseSourceFile } from "../src/cognition/AstExtractor.js";
+} from "@paperclipai/ontology-core/cognition/protoParser.js";
+import { extractRepoDraft, parseSourceFile } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 
 const ORDER_PROTO = `
 syntax = "proto3";

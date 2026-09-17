@@ -14,7 +14,7 @@ import {
   propertiesSchemaFor,
   type EditOperation,
 } from "../src/aide/editOps.js";
-import type { DescribeDomainResult } from "../src/graph/GraphStore.js";
+import type { DescribeDomainResult } from "@paperclipai/ontology-core/graph/GraphStore.js";
 
 const SAMPLE_DOMAIN: DescribeDomainResult = {
   domain: {

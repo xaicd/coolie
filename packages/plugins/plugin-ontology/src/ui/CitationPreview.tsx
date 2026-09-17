@@ -18,7 +18,7 @@ import type {
   DescribeDomainRelationType,
   DescribeDomainSubProject,
   DescribeDomainResult as CoreDescribeDomainResult,
-} from "../graph/GraphStore.js";
+} from "@paperclipai/ontology-core/graph/GraphStore.js";
 
 export type AideCitation =
   | { kind: "node-type"; id: string }
