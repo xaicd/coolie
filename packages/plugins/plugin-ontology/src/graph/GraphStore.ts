@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { relationEndpoints } from "../relationEndpoints.js";
-import type { PluginDatabaseClient } from "@paperclipai/plugin-sdk";
+import type { SqlClient } from "./SqlClient.js";
 
 /**
  * GraphStore isolates all ontology graph persistence and traversal behind one
@@ -1403,10 +1403,10 @@ function clampDepth(value: number | undefined, fallback: number): number {
  * namespace so every statement stays inside the plugin's own schema.
  */
 export class PostgresGraphStore implements GraphStore {
-  private readonly db: PluginDatabaseClient;
+  private readonly db: SqlClient;
   private readonly ns: string;
 
-  constructor(db: PluginDatabaseClient) {
+  constructor(db: SqlClient) {
     this.db = db;
     this.ns = db.namespace;
   }

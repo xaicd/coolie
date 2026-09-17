@@ -33,7 +33,7 @@ import {
   serializeDomain,
   type SchemaSnapshot,
 } from "../src/aide/snapshots.js";
-import type { DescribeDomainResult } from "../src/ui/CitationPreview.js";
+import type { DescribeDomainResult } from "../src/graph/GraphStore.js";
 
 /**
  * A small but realistic starting schema — one node type with two
@@ -42,14 +42,29 @@ import type { DescribeDomainResult } from "../src/ui/CitationPreview.js";
  */
 function buildStartingSchema(): DescribeDomainResult {
   return {
-    domain: { id: "d1", slug: "orders", display_name: "Orders", version: 1 },
+    domain: {
+      id: "d1",
+      company_id: "c1",
+      slug: "orders",
+      display_name: "Orders",
+      description: null,
+      status: "active",
+      version: 1,
+      icon: "📦",
+      category: "other",
+      is_built_in: false,
+      forked_from: null,
+      lifecycle_state: "draft",
+      bootstrap_source: "manual",
+      seed_schema_version: 0,
+    },
     nodeTypes: [
       {
         id: "nt-customer",
         key: "customer",
         displayName: "Customer",
         description: null,
-        layer: "concept",
+        layer: "aggregate_root",
         propertiesSchema: {
           name: { type: "string" },
           email: { type: "string", format: "email" },
@@ -64,7 +79,7 @@ function buildStartingSchema(): DescribeDomainResult {
         displayName: "placed",
         description: null,
         directed: true,
-        cardinality: "1..N",
+        cardinality: "one_to_many",
         instanceCount: 0,
       },
     ],
@@ -73,8 +88,7 @@ function buildStartingSchema(): DescribeDomainResult {
     businessSystems: [],
     subProjects: [],
     actionTypes: [],
-    configured: true,
-  };
+  } as DescribeDomainResult;
 }
 
 /** Inverse-op computation, mirroring `SnapshotDrawer.handleRestore`.
@@ -182,7 +196,7 @@ describe("E2E — edit mode round-trip (parse → apply → snapshot → restore
       "op": "addNodeType",
       "typeKey": "invoice",
       "displayName": "Invoice",
-      "layer": "concept",
+      "layer": "aggregate_root",
       "propertiesSchema": { "amount": { "type": "number" } }
     }
   ]
@@ -232,7 +246,7 @@ describe("E2E — edit mode round-trip (parse → apply → snapshot → restore
           key: "invoice",
           displayName: "Invoice",
           description: null,
-          layer: "concept",
+          layer: "aggregate_root",
           propertiesSchema: { amount: { type: "number" } },
           instanceCount: 0,
         },
@@ -337,7 +351,7 @@ describe("E2E — snapshot diff is order-stable across mutation order", () => {
           key: "alpha",
           displayName: "Alpha",
           description: null,
-          layer: "concept",
+          layer: "aggregate_root",
           propertiesSchema: null,
           instanceCount: 0,
         },
@@ -346,7 +360,7 @@ describe("E2E — snapshot diff is order-stable across mutation order", () => {
           key: "bravo",
           displayName: "Bravo",
           description: null,
-          layer: "concept",
+          layer: "aggregate_root",
           propertiesSchema: null,
           instanceCount: 0,
         },

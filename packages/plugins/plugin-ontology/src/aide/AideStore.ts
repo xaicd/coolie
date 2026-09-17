@@ -1,4 +1,4 @@
-import type { PluginDatabaseClient } from "@paperclipai/plugin-sdk";
+import type { SqlClient } from "../graph/SqlClient.js";
 import {
   type SchemaSnapshot,
   serializeDomain,
@@ -41,7 +41,7 @@ export interface AideSessionSummary {
 }
 
 export class AideStore {
-  constructor(private readonly db: PluginDatabaseClient) {}
+  constructor(private readonly db: SqlClient) {}
 
   private ns(): string {
     return this.db.namespace;

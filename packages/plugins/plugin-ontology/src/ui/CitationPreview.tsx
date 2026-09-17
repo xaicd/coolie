@@ -10,6 +10,15 @@
  */
 import { type ReactElement, useMemo } from "react";
 import { t } from "./isZh.js";
+import type {
+  DescribeDomainActionType,
+  DescribeDomainBusinessSystem,
+  DescribeDomainNodeType,
+  DescribeDomainRecentNode,
+  DescribeDomainRelationType,
+  DescribeDomainSubProject,
+  DescribeDomainResult as CoreDescribeDomainResult,
+} from "../graph/GraphStore.js";
 
 export type AideCitation =
   | { kind: "node-type"; id: string }
@@ -21,78 +30,27 @@ export type AideCitation =
 
 // ---- Describe-domain payload shape (mirrors SandboxTab) ----
 
-export interface DescribeNodeType {
-  id: string;
-  key: string;
-  displayName: string;
-  description: string | null;
-  layer: string;
-  propertiesSchema: Record<string, unknown> | null;
-  instanceCount: number;
-}
-
-export interface DescribeRelationType {
-  id: string;
-  key: string;
-  displayName: string;
-  description: string | null;
-  directed: boolean;
-  cardinality: string;
-  instanceCount: number;
-}
-
-export interface DescribeRecentNode {
-  id: string;
-  key: string;
-  label: string;
-  nodeTypeKey: string | null;
-}
-
-export interface DescribeBusinessSystem {
-  id: string;
-  code: string;
-  name: string;
-  status: string;
-  description: string | null;
-  targetRole: string | null;
-}
-
-export interface DescribeSubProject {
-  id: string;
-  businessSystemId: string;
-  code: string;
-  name: string;
-  status: string;
-  type: string;
-  description: string | null;
-}
-
-export interface DescribeActionType {
-  id: string;
-  key: string;
-  displayName: string;
-  kind: string;
-  status: string;
-}
-
-export interface DescribeDomainResult {
-  domain: { id: string; slug: string; display_name: string; version: number };
-  nodeTypes: DescribeNodeType[];
-  relationTypes: DescribeRelationType[];
-  recentNodes: DescribeRecentNode[];
-  counts: {
-    totalNodes: number;
-    totalEdges: number;
-    businessSystems: number;
-    subProjects: number;
-    actionTypes: number;
-  };
-  businessSystems: DescribeBusinessSystem[];
-  subProjects: DescribeSubProject[];
-  actionTypes: DescribeActionType[];
+/**
+ * The describe payload is a *core* contract: the store produces it and the
+ * worker adds the config probe on top. The UI used to keep its own copy of every
+ * shape, which made a UI file the owner of a cross-layer type — the aide modules
+ * imported `DescribeDomainResult` from here, i.e. an application layer reaching
+ * into the view layer for a contract the core already declared.
+ *
+ * Named aliases keep the local vocabulary while the definitions live where they
+ * belong.
+ */
+export type DescribeNodeType = DescribeDomainNodeType;
+export type DescribeRelationType = DescribeDomainRelationType;
+export type DescribeRecentNode = DescribeDomainRecentNode;
+export type DescribeBusinessSystem = DescribeDomainBusinessSystem;
+export type DescribeSubProject = DescribeDomainSubProject;
+export type DescribeActionType = DescribeDomainActionType;
+/** The store's result plus the config probe the worker appends. */
+export type DescribeDomainResult = CoreDescribeDomainResult & {
   configured: boolean;
   configReason?: string;
-}
+};
 
 /* ------------------------------------------------------------------ */
 /*  Lookup                                                              */

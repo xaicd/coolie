@@ -21,7 +21,7 @@
  * no streams. Long-running transforms should move to a background
  * job runner in a later phase.
  */
-import type { PluginDatabaseClient } from "@paperclipai/plugin-sdk";
+import type { SqlClient } from "../graph/SqlClient.js";
 import type { GraphStore } from "../graph/GraphStore.js";
 
 export interface TransformRunResult {
@@ -37,7 +37,7 @@ const MAX_SAMPLE_ROWS = 5;
 
 export async function runTransform(
   store: GraphStore,
-  db: PluginDatabaseClient,
+  db: SqlClient,
   companyId: string,
   domainId: string,
   transformId: string,

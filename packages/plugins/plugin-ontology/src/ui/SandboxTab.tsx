@@ -14,6 +14,15 @@ import {
   type ReactElement,
 } from "react";
 import { t } from "./isZh.js";
+import type {
+  DescribeDomainActionType as CoreDescribeDomainActionType,
+  DescribeDomainBusinessSystem as CoreDescribeDomainBusinessSystem,
+  DescribeDomainNodeType as CoreDescribeDomainNodeType,
+  DescribeDomainRecentNode as CoreDescribeDomainRecentNode,
+  DescribeDomainRelationType as CoreDescribeDomainRelationType,
+  DescribeDomainSubProject as CoreDescribeDomainSubProject,
+  DescribeDomainResult as CoreDescribeDomainResult,
+} from "../graph/GraphStore.js";
 import { MarkdownContent } from "./MarkdownContent.js";
 import { CitationPreview, kindLabel } from "./CitationPreview.js";
 import { EditCard } from "./EditCard.js";
@@ -32,85 +41,22 @@ import { type CockpitEditResult, type MutationCall } from "../aide/editOps.js";
  */
 const PREVIEW_PANE_STORAGE_KEY = "ontology.cockpit.previewPaneOpen";
 
-interface DescribeDomainNodeType {
-  id: string;
-  key: string;
-  displayName: string;
-  description: string | null;
-  layer: string;
-  propertiesSchema: Record<string, unknown> | null;
-  instanceCount: number;
-}
-
-interface DescribeDomainRelationType {
-  id: string;
-  key: string;
-  displayName: string;
-  description: string | null;
-  directed: boolean;
-  cardinality: string;
-  instanceCount: number;
-}
-
-interface DescribeDomainRecentNode {
-  id: string;
-  key: string;
-  label: string;
-  nodeTypeKey: string | null;
-}
-
-interface DescribeDomainBusinessSystem {
-  id: string;
-  code: string;
-  name: string;
-  status: string;
-  description: string | null;
-  targetRole: string | null;
-}
-
-interface DescribeDomainSubProject {
-  id: string;
-  businessSystemId: string;
-  code: string;
-  name: string;
-  status: string;
-  type: string;
-  description: string | null;
-}
-
-interface DescribeDomainActionType {
-  id: string;
-  key: string;
-  displayName: string;
-  kind: string;
-  status: string;
-}
-
-interface DescribeDomainDomain {
-  id: string;
-  slug: string;
-  display_name: string;
-  version: number;
-}
-
-interface DescribeDomainResult {
-  domain: DescribeDomainDomain;
-  nodeTypes: DescribeDomainNodeType[];
-  relationTypes: DescribeDomainRelationType[];
-  recentNodes: DescribeDomainRecentNode[];
-  counts: {
-    totalNodes: number;
-    totalEdges: number;
-    businessSystems: number;
-    subProjects: number;
-    actionTypes: number;
-  };
-  businessSystems: DescribeDomainBusinessSystem[];
-  subProjects: DescribeDomainSubProject[];
-  actionTypes: DescribeDomainActionType[];
+/**
+ * Taken from the core rather than re-declared. There were three copies of this
+ * contract (here, in CitationPreview, and in the store) and they had drifted:
+ * this one described `domain` with four fields while the worker sends the whole
+ * row, so the type actively misled about the payload.
+ */
+type DescribeDomainNodeType = CoreDescribeDomainNodeType;
+type DescribeDomainRelationType = CoreDescribeDomainRelationType;
+type DescribeDomainRecentNode = CoreDescribeDomainRecentNode;
+type DescribeDomainBusinessSystem = CoreDescribeDomainBusinessSystem;
+type DescribeDomainSubProject = CoreDescribeDomainSubProject;
+type DescribeDomainActionType = CoreDescribeDomainActionType;
+type DescribeDomainResult = CoreDescribeDomainResult & {
   configured: boolean;
   configReason?: string;
-}
+};
 
 type AideCitation =
   | { kind: "node-type"; id: string }

@@ -18,9 +18,19 @@ function buildResult(
   return {
     domain: {
       id: "d1",
+      company_id: "c1",
       slug: "test",
       display_name: "Test",
+      description: null,
+      status: "active",
       version: 1,
+      icon: "📦",
+      category: "other",
+      is_built_in: false,
+      forked_from: null,
+      lifecycle_state: "draft",
+      bootstrap_source: "manual",
+      seed_schema_version: 0,
     },
     nodeTypes: [],
     relationTypes: [],
@@ -46,7 +56,7 @@ function nt(key: string, props: Record<string, unknown> = {}): DescribeDomainRes
     key,
     displayName: key,
     description: null,
-    layer: "concept",
+    layer: "aggregate_root",
     propertiesSchema: Object.keys(props).length > 0 ? props : null,
     instanceCount: 0,
   };
@@ -62,7 +72,7 @@ function rt(
     displayName: key,
     description: null,
     directed: true,
-    cardinality: "1..N",
+    cardinality: "one_to_many",
     instanceCount: 0,
     ...overrides,
   };
@@ -71,7 +81,22 @@ function rt(
 describe("serializeDomain — round trip", () => {
   it("drops the envelope (domain, counts, recentNodes)", () => {
     const result = buildResult({
-      domain: { id: "d1", slug: "x", display_name: "X", version: 9 },
+      domain: {
+      id: "d1",
+      company_id: "c1",
+      slug: "x",
+      display_name: "X",
+      description: null,
+      status: "active",
+      version: 9,
+      icon: "📦",
+      category: "other",
+      is_built_in: false,
+      forked_from: null,
+      lifecycle_state: "draft",
+      bootstrap_source: "manual",
+      seed_schema_version: 0,
+    },
       nodeTypes: [nt("a")],
       relationTypes: [rt("r")],
       actionTypes: [],
@@ -131,7 +156,7 @@ describe("diffDomain — node type diffs", () => {
         {
           ...nt("a", { name: { type: "string" } }),
           displayName: "A Renamed",
-          layer: "physical",
+          layer: "child_entity",
         },
       ],
       relationTypes: [],
@@ -214,7 +239,7 @@ describe("diffDomain — relation type diffs", () => {
     };
     const b: SchemaSnapshot = {
       nodeTypes: [],
-      relationTypes: [rt("placed", { directed: false, cardinality: "0..N" })],
+      relationTypes: [rt("placed", { directed: false, cardinality: "many_to_many" })],
       actionTypes: [],
     };
     const out = diffDomain(a, b);

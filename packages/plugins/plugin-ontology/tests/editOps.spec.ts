@@ -14,17 +14,32 @@ import {
   propertiesSchemaFor,
   type EditOperation,
 } from "../src/aide/editOps.js";
-import type { DescribeDomainResult } from "../src/ui/CitationPreview.js";
+import type { DescribeDomainResult } from "../src/graph/GraphStore.js";
 
 const SAMPLE_DOMAIN: DescribeDomainResult = {
-  domain: { id: "d1", slug: "acme", display_name: "ACME", version: 1 },
+  domain: {
+      id: "d1",
+      company_id: "c1",
+      slug: "acme",
+      display_name: "ACME",
+      description: null,
+      status: "active",
+      version: 1,
+      icon: "📦",
+      category: "other",
+      is_built_in: false,
+      forked_from: null,
+      lifecycle_state: "draft",
+      bootstrap_source: "manual",
+      seed_schema_version: 0,
+    },
   nodeTypes: [
     {
       id: "nt-customer",
       key: "customer",
       displayName: "客户",
       description: "已签约的客户",
-      layer: "core",
+      layer: "aggregate_root",
       propertiesSchema: { name: { type: "string" }, tier: { type: "string", enum: ["gold", "silver"] } },
       instanceCount: 12,
     },
@@ -33,7 +48,7 @@ const SAMPLE_DOMAIN: DescribeDomainResult = {
       key: "order",
       displayName: "订单",
       description: null,
-      layer: "core",
+      layer: "aggregate_root",
       propertiesSchema: null,
       instanceCount: 0,
     },
@@ -45,7 +60,7 @@ const SAMPLE_DOMAIN: DescribeDomainResult = {
       displayName: "下单",
       description: null,
       directed: true,
-      cardinality: "1..N",
+      cardinality: "one_to_many",
       instanceCount: 8,
     },
   ],
@@ -54,8 +69,7 @@ const SAMPLE_DOMAIN: DescribeDomainResult = {
   businessSystems: [],
   subProjects: [],
   actionTypes: [],
-  configured: true,
-};
+} as DescribeDomainResult;
 
 /* ------------------------------------------------------------------ */
 /*  parseEditResponse — fence stripping                                */

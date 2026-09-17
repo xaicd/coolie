@@ -29,7 +29,7 @@ function describeFixture(): DescribeDomainResult {
         key: "team",
         displayName: "Team",
         description: "A delivery team",
-        layer: "concept",
+        layer: "aggregate_root",
         propertiesSchema: {
           name: { type: "string" },
           headcount: { type: "number" },
@@ -41,7 +41,7 @@ function describeFixture(): DescribeDomainResult {
         key: "person",
         displayName: "Person",
         description: null,
-        layer: "concept",
+        layer: "aggregate_root",
         propertiesSchema: { name: { type: "string" }, role: { type: "string", enum: ["lead", "ic"] } },
         instanceCount: 1,
       },

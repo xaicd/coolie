@@ -25,7 +25,7 @@
  *  `DescribeDomainResult`) so worker-side code can pass the narrower
  *  GraphStore shape — which omits the `configured` envelope that the
  *  UI's data handler adds on top. */
-import type { DescribeDomainResult } from "../ui/CitationPreview.js";
+import type { DescribeDomainResult } from "../graph/GraphStore.js";
 
 export interface DescribeDomainLike {
   nodeTypes: DescribeDomainResult["nodeTypes"];
