@@ -21,6 +21,7 @@ import { knownRoles } from "@paperclipai/ontology-core/auth/members.js";
 import { scoreDomainCandidates } from "@paperclipai/ontology-core/graph/linkSuggestions.js";
 import { extractRepoDraft } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 import { AideStore, type AideCitation } from "./aide/AideStore.js";
+import { SAMPLE_SOURCE, seedSampleDomains } from "./samples/seed.js";
 import {
   AideConfigError,
   getClient,
@@ -2442,6 +2443,25 @@ const plugin = definePlugin({
         counts,
         created: { nodeTypes: nodeTypeDefs.length, relationTypes: relationTypeDefs.length, nodes: nodeDefs.length, edges: edgeCount },
       };
+    });
+
+    /**
+     * Plant the built-in sample domains (Retail, Healthcare, Finance, …).
+     *
+     * Distinct from `seed-samples` above, which fills *one* domain the caller
+     * already created and refuses to touch a non-empty one. This one creates the
+     * domains themselves, because the point is that a new instance does not open
+     * on a blank page. Both are idempotent: a domain whose slug already exists is
+     * skipped rather than rewritten, so calling this twice is not a data-loss
+     * event. `only` narrows it to a subset of sample keys.
+     */
+    ctx.actions.register("seed-sample-domains", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const only = Array.isArray(params.only)
+        ? params.only.filter((key): key is string => typeof key === "string")
+        : undefined;
+      const report = await seedSampleDomains(companyId, store, only ? { only } : {});
+      return { ...report, sampleSource: SAMPLE_SOURCE };
     });
 
     // Evaluation / simulation — domain-scoped data/action handlers for the UI.

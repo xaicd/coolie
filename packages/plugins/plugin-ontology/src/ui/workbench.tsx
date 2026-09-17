@@ -67,8 +67,10 @@ export function Workbench(props: WorkbenchProps): ReactElement {
 
   const createNode = usePluginAction("create-node");
   const seedSamples = usePluginAction("seed-samples");
+  const seedSampleDomains = usePluginAction("seed-sample-domains");
   const [seeding, setSeeding] = useState(false);
   const [seedErr, setSeedErr] = useState<string | null>(null);
+  const [seedDomainsMsg, setSeedDomainsMsg] = useState<string | null>(null);
 
   const selectedNode = useMemo(
     () => nodes.find((n) => n.id === selectedNodeId) ?? null,
@@ -86,6 +88,32 @@ export function Workbench(props: WorkbenchProps): ReactElement {
       setSeeding(false);
     }
   }, [seedSamples, companyId, domainId, onChanged]);
+
+  const runSeedDomains = useCallback(async () => {
+    setSeeding(true); setSeedErr(null); setSeedDomainsMsg(null);
+    try {
+      const report = (await seedSampleDomains({ companyId })) as {
+        created?: number;
+        skipped?: number;
+        failed?: number;
+      };
+      setSeedDomainsMsg(
+        t(
+          `已创建 ${report.created ?? 0} 个样例域,跳过 ${report.skipped ?? 0} 个(已存在)${
+            report.failed ? `,失败 ${report.failed} 个` : ""
+          }`,
+          `Created ${report.created ?? 0} sample domains, skipped ${
+            report.skipped ?? 0
+          } already present${report.failed ? `, ${report.failed} failed` : ""}`,
+        ),
+      );
+      onChanged();
+    } catch (e) {
+      setSeedErr(String((e as Error)?.message ?? e));
+    } finally {
+      setSeeding(false);
+    }
+  }, [seedSampleDomains, companyId, onChanged]);
 
   const isEmpty = nodes.length === 0;
 
@@ -152,9 +180,30 @@ export function Workbench(props: WorkbenchProps): ReactElement {
           {seedErr}
         </div>
       )}
+      {seedDomainsMsg && (
+        <div className="shrink-0 border-b border-border bg-primary/5 px-3 py-1.5 text-(length:--text-nano) text-muted-foreground">
+          {seedDomainsMsg}
+        </div>
+      )}
       {isEmpty && !seedErr && (
-        <div className="shrink-0 border-b border-border bg-primary/5 px-3 py-1.5 text-(length:--text-compact) text-muted-foreground">
-          {t("这个域还是空的 — 点右上角「补全样例」快速生成一套示例本体。", "This domain is empty — click “Seed samples” (top-right) to generate a starter ontology.")}
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-primary/5 px-3 py-1.5 text-(length:--text-compact) text-muted-foreground">
+          <span>
+            {t(
+              "这个域还是空的 — 可以快速生成一套示例本体,或载入一套完整的行业样例域(零售、医疗、金融、制造、教育…)。",
+              "This domain is empty — generate a starter ontology here, or load a complete industry sample domain (retail, healthcare, finance, manufacturing, education…).",
+            )}
+          </span>
+          <button
+            onClick={runSeedDomains}
+            disabled={seeding}
+            title={t(
+              "从上游目录转换而来的内置样例域,已存在的会被跳过而不是覆盖",
+              "Built-in sample domains converted from the upstream catalogue; existing ones are skipped, never overwritten",
+            )}
+            className="shrink-0 rounded-md border border-border px-2.5 py-1 text-(length:--text-compact) font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+          >
+            {t("载入行业样例域", "Load sample domains")}
+          </button>
         </div>
       )}
 
