@@ -186,12 +186,19 @@ service OrderService {
 
 describe("scanProject — reporting", () => {
   it("reports formats it cannot read instead of dropping them", () => {
+    // A MyBatis mapper used to land here — the preview said "No parser yet:
+    // .xml". It is read now, so this has to use a format that genuinely has no
+    // parser, or the guard would stop guarding anything.
     const result = scanProject([
-      { path: "src/main/resources/mapper/SysUserMapper.xml", content: "<mapper/>" },
+      { path: "api/service.thrift", content: "service Foo {}" },
       { path: "src/main/java/A.java", content: "public class A { private String x; }" },
+      { path: "src/main/resources/mapper/SysUserMapper.xml", content: "<mapper/>" },
     ]);
-    expect(result.unsupported[".xml"]).toBe(1);
+    expect(result.unsupported[".thrift"]).toBe(1);
     expect(result.byExtension[".java"]).toBe(1);
+    // A mapper is read now, even one that declares nothing.
+    expect(result.byExtension[".xml"]).toBe(1);
+    expect(result.unsupported[".xml"]).toBeUndefined();
   });
 
   it("applies the file ceiling and says so", () => {

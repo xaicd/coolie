@@ -24,7 +24,7 @@ import type { ExtractedOrigin, ExtractionKind, SourceStereotype } from "./cognit
  */
 export const MAX_SOURCE_FILES = 20;
 
-const KINDS: readonly string[] = ["ddl", "java", "proto", "openapi", "source"];
+const KINDS: readonly string[] = ["ddl", "java", "proto", "mybatis", "openapi", "source"];
 const STEREOTYPES: readonly string[] = ["entity", "dto", "controller", "enum", "message", "service"];
 
 /** Provenance as read back, with every field validated. */
@@ -106,6 +106,7 @@ export function describeProvenance(metadata: unknown): string | undefined {
     ddl: "SQL DDL",
     java: "Java/Kotlin",
     proto: "gRPC proto",
+    mybatis: "MyBatis XML",
     openapi: "OpenAPI",
     source: "源码",
   };

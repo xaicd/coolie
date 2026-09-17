@@ -16,6 +16,7 @@
 import { firstQuoted } from "./extractionText.js";
 import { parseJavaFile } from "./javaParser.js";
 import { parseProtoFile } from "./protoParser.js";
+import { parseMyBatisMapper } from "./mybatisParser.js";
 import type {
   ExtractedAction,
   ExtractedEntity,
@@ -167,6 +168,10 @@ export function parseSourceFile(path: string, content: string): FileExtraction {
       return parseJavaFile(content, path);
     case ".proto":
       return parseProtoFile(content, path);
+    case ".xml":
+      // Only a mapper yields anything; every other XML in a Java project is
+      // configuration, and guessing at it would invent object types.
+      return parseMyBatisMapper(content, path);
     case ".sql":
       return parseSqlDdl(content, path);
     default:
@@ -320,22 +325,31 @@ export function extractRepoDraft(files: SourceFile[]): RepoDraft {
       // no columns at all.
       if (!cur.description && e.description) cur.description = e.description;
       if (!cur.origin && e.origin) cur.origin = e.origin;
-      if (!cur.properties && e.properties && e.properties.length > 0) {
-        cur.properties = Object.fromEntries(
-          e.properties.map((p) => [
-            p.name,
-            {
-              type: p.type ?? "string",
-              ...(p.description ? { description: p.description } : {}),
-              ...(p.column ? { column: p.column } : {}),
-            },
-          ]),
-        );
-        // `declaredType` is dropped from the stored descriptor: it is a means to
-        // derive relations, not part of the object's shape.
+      if (e.properties && e.properties.length > 0) {
+        // Merge per *field*, not per file. A Java entity and its mapper know
+        // different things about the same field — the annotation has the type,
+        // the resultMap has the column — and taking the first source whole threw
+        // the other half away. Later sources fill in what is still missing and
+        // never overwrite what is already known.
+        const merged: Record<string, unknown> = cur.properties ?? {};
         for (const p of e.properties) {
+          const prior = (merged[p.name] ?? {}) as Record<string, unknown>;
+          merged[p.name] = {
+            // Only SQL states a column type; everywhere else the language type
+            // is the best we have, and a mapper states neither.
+            type: prior.type ?? p.type ?? "string",
+            ...(prior.description ?? p.description
+              ? { description: (prior.description ?? p.description) as string }
+              : {}),
+            ...(prior.column ?? p.column
+              ? { column: (prior.column ?? p.column) as string }
+              : {}),
+          };
+          // `declaredType` is dropped from the stored descriptor: it is a means
+          // to derive relations, not part of the object's shape.
           if (p.declaredType) cur.references.push({ field: p.name, target: p.declaredType });
         }
+        cur.properties = merged;
       }
       entityMap.set(e.typeName, cur);
     }

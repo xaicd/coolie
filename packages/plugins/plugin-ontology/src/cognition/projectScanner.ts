@@ -36,7 +36,7 @@ import { MANIFEST_FILES } from "../architecture/serviceDetector.js";
 
 /** Extensions at least one parser understands. */
 export const PARSED_EXTENSIONS = new Set([
-  ".java", ".kt", ".proto", ".sql",
+  ".java", ".kt", ".proto", ".sql", ".xml",
   ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".vue",
   ".py", ".go",
 ]);

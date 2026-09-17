@@ -13,7 +13,7 @@
  */
 
 /** How a type was discovered. */
-export type ExtractionKind = "ddl" | "java" | "proto" | "openapi" | "source";
+export type ExtractionKind = "ddl" | "java" | "proto" | "mybatis" | "openapi" | "source";
 
 /**
  * What role a Java/proto type plays in its own codebase. Kept separate from the
