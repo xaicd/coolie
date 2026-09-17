@@ -18,6 +18,19 @@ description: 用于系统测试、单元测试、本地脱机沙箱测试、E2E 
 
 ### 防线一：编译期与静态契约门禁
 
+**四道防线已聚合成一个可执行入口**（`scripts/check-testing-defenses.mjs`）：
+
+```bash
+pnpm test:defenses                       # 防线 1+2（脱机、默认）
+pnpm test:defenses --scope=plugin-ontology   # 收窄到单个包
+pnpm test:defenses:full                  # 四道全跑（需实例 + 浏览器）
+pnpm test:check-testing-defenses         # 门禁自身的诚实性测试
+```
+
+它的关键性质：**跑了一部分绝不打印「通过」**。未开启的行报 `NOT VERIFIED`，
+因上游失败而没跑的行报 `NOT RUN`，失败的行**不会**同时出现在「已验证」里，
+只有四行全跑才输出 `all 4 lines verified`。
+
 ```bash
 pnpm -r typecheck                        # 全工作区 0 报错，未声明变量在提交前就被拦下
 pnpm check:module-boundaries             # 依赖方向：核心层不得依赖宿主，工具层不得依赖界面层
@@ -133,6 +146,27 @@ pnpm test:e2e                            # Playwright（tests/e2e/）
 反之，声明了却不可达的路由若无人报错，那条守卫就只是摆设。
 
 **新守卫入库时附上这次「故意破坏 → 变红」的记录**，否则不要假装它有效。
+
+### 另一条同等重要的判定：退出码 0 不等于做过事
+
+守卫和门禁最常见的第二种死法更隐蔽：**它跑了，但什么也没检查，然后报告通过。**
+
+本仓实证（构建四道门禁聚合入口时踩到）：`pnpm --filter <不存在的包> typecheck`
+打印一句 `No projects matched the filters` 然后**以 0 退出**。于是 `--scope` 打错一个字母时，
+聚合门禁把**全部四行都报成「已验证」**，而实际上一条命令都没跑。
+
+因此聚合门禁不能只看退出码，必须校验**输出哨兵**：
+
+```js
+const output = `${result.stdout ?? ""}${result.stderr ?? ""}`;
+const matchedNothing = /No projects matched the filters/.test(output);
+if (matchedNothing) fail("matched no project — check --scope");
+if (result.status !== 0) fail(`exit ${result.status}`);
+```
+
+同类哨兵按工具补齐（空测试集、跳过全部用例、`0 tests`、`no files found`）。
+**判定方法**：给出一个必定无匹配的输入（错的包名、不存在的路径），
+门禁必须**变红**；如果它变绿，那么它在正常输入下的绿也没有意义。
 
 ### 防线 ↔ 角色的归属
 
