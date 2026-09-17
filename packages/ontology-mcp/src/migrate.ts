@@ -51,10 +51,12 @@ async function main(): Promise<void> {
   const client = createPgSqlClient({ pool, namespace });
   try {
     const gate = await preflight(client);
-    if (!gate.ok) {
-      for (const problem of gate.problems) process.stderr.write(`${problem}\n`);
-      process.exitCode = 1;
-      return;
+    if (!gate.hostTenantTablePresent) {
+      // Standalone. Applying migrations will create the anchor table the object
+      // model points at, so this is information rather than a warning.
+      process.stdout.write(
+        "No host company table: applying to a standalone database, will create the isolation anchor.\n",
+      );
     }
 
     if (checkOnly) {

@@ -146,17 +146,24 @@ export async function appliedMigrations(
 }
 
 export interface MigrationPreflight {
-  ok: boolean;
-  /** Things that must exist before the migrations can run. */
-  problems: string[];
+  /**
+   * Whether the isolation anchor is already here.
+   *
+   * False means a deployment with no host: applyMigrations will create the table
+   * the object model points at. It is reported rather than acted on so an
+   * operator can see which of the two situations they are in.
+   */
+  hostTenantTablePresent: boolean;
 }
 
 /**
- * What the migrations need from the database before they can run.
+ * Whether the database has what the migrations need before they run.
  *
- * The tables created before the ontology owned its tenancy reference the host
- * tenant table. Failing there with a foreign key error halfway through a file is
- * how an operator learns it, which is the wrong moment.
+ * This used to be a hard stop, and it was right to be one: the object model keys
+ * its rows to an anchor table named companies, so a deployment without a host
+ * could not create its schema at all. The runner now creates that table when it
+ * is missing, so there is nothing to refuse. What is left answers the question an
+ * operator actually has: is this a hosted database or a standalone one.
  */
 export async function preflight(client: SqlClient): Promise<MigrationPreflight> {
   const rows = await client.query<{ present: boolean }>(
@@ -165,16 +172,29 @@ export async function preflight(client: SqlClient): Promise<MigrationPreflight> 
         WHERE table_schema = 'public' AND table_name = 'companies'
      ) AS present`,
   );
-  const present = rows[0]?.present === true;
-  return present
-    ? { ok: true, problems: [] }
-    : {
-        ok: false,
-        problems: [
-          "The ontology's tables up to 014 reference public.companies (the host tenant table). " +
-            "Create a tenants table, or apply the tenancy cutover, before migrating.",
-        ],
-      };
+  return { hostTenantTablePresent: rows[0]?.present === true };
+}
+
+/**
+ * Create the isolation anchor the object model points at, when there is no host.
+ *
+ * Every table in the ontology carries a company_id, and declares it as a foreign
+ * key into public.companies. Inside Paperclip that is the host's company table
+ * and the key is what keeps a company's ontology to itself. A deployment with no
+ * host has no such table, and the migrations are frozen (the host checksums
+ * them), so the deployment is given one with the same shape.
+ *
+ * The name is the host's, and that is deliberate. The ontology needs a table of
+ * isolation anchors and nothing more; calling it tenants would mean a second
+ * identity to keep in step with the first, in a system where the company already
+ * is the boundary.
+ *
+ * IF NOT EXISTS, so a hosted deployment keeps its real table and this is a no-op.
+ */
+async function ensureHostTenantStub(client: SqlClient): Promise<void> {
+  await client.execute(
+    "CREATE TABLE IF NOT EXISTS public.companies (id uuid PRIMARY KEY, name text)",
+  );
 }
 
 export async function applyMigrations(
@@ -184,6 +204,7 @@ export async function applyMigrations(
 ): Promise<MigrationResult> {
   const namespace = options.namespace ?? client.namespace;
   await ensureLedger(client, namespace);
+  await ensureHostTenantStub(client);
 
   const ledger = await client.query<{ name: string; checksum: string }>(
     `SELECT name, checksum FROM "${namespace}".ontology_schema_migrations`,

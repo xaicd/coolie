@@ -345,10 +345,14 @@ Still missing, in the order it hurts:
    - the migrations name the plugin's schema (`plugin_ontology_…`), so a
      standalone deployment either keeps that name or the migrations need a
      parameter — it works, but nobody decided it;
-   - **every ontology table references `public.companies`**, the host's tenant
-     table. A standalone deployment must ship a tenants table, or the foreign
-     keys need relaxing. The test creates a minimal one, which is the smallest
-     statement of what §6.1 has to build.
+   - **every ontology table references `public.companies`**, the host's company
+     table. This is not a defect and it is not a cutover waiting to happen.
+     Paperclip has no tenant entity: the company *is* the isolation boundary, so
+     a `companies`-shaped anchor table is all the object model needs, and a
+     standalone deployment gets one from `applyMigrations`
+     (`ensureHostTenantStub`). A tenants table would have meant a second identity
+     to keep in step with the first, in a system where environments are separated
+     by running separate agents and instances. Settled: no tenant concept.
 3. ~~**Saved views.**~~ **Done** (`migrations/015_views.sql`). A view records the
    *reading* — which perspective, what it focuses on — never facts, so losing one
    costs a reading and never the model. Opening one applies that reading.

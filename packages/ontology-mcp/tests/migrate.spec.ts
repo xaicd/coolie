@@ -88,7 +88,8 @@ describePostgres("applying them to a database the ontology owns", () => {
       await pool.query("CREATE TABLE IF NOT EXISTS public.companies (id uuid PRIMARY KEY, name text NOT NULL)");
       const client = createPgSqlClient({ pool, namespace: "ontology" });
 
-      expect((await preflight(client)).ok).toBe(true);
+      // The host table is there, so the runner will not create one.
+      expect((await preflight(client)).hostTenantTablePresent).toBe(true);
 
       const result = await applyMigrations(client, migrations, { namespace: "ontology" });
       expect(result.applied).toHaveLength(migrations.length);
@@ -155,21 +156,34 @@ describePostgres("applying them to a database the ontology owns", () => {
     }
   }, 120_000);
 
-  it("refuses before starting when the tenant table is missing", async () => {
-    // Failing halfway through a foreign key is how an operator would otherwise
-    // find out, which is the wrong moment.
-    const database = await startEmbeddedPostgresTestDatabase("ontology-migrate-preflight-");
+  it("runs on a database that has no host company table", async () => {
+    // The standalone case. The object model keys its rows to a table named
+    // companies, so without one there is no schema to create: the runner supplies
+    // it, with the shape the migrations declare, and the migration proceeds.
+    // Environments are separated by running separate agents and instances, not by
+    // teaching the schema about tenants.
+    const database = await startEmbeddedPostgresTestDatabase("ontology-migrate-standalone-");
     const pool = new Pool({ connectionString: database.connectionString });
     try {
       const client = createPgSqlClient({ pool, namespace: "ontology" });
-      // The embedded test database is built from a template that already has the
-      // host schema, so the absence this checks for has to be created: the
-      // ontology's older tables reference this table and a standalone database
-      // would not have it.
       await pool.query("DROP TABLE IF EXISTS public.companies CASCADE");
+
       const gate = await preflight(client);
-      expect(gate.ok).toBe(false);
-      expect(gate.problems.join(" ")).toContain("public.companies");
+      expect(gate.hostTenantTablePresent).toBe(false);
+
+      const result = await applyMigrations(client, migrations, { namespace: "ontology" });
+      expect(result.applied).toHaveLength(migrations.length);
+
+      // The anchor the model points at is there, and the schema is usable.
+      const anchor = await pool.query(
+        `SELECT 1 FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'companies'`,
+      );
+      expect(anchor.rowCount).toBe(1);
+      const keys = await pool.query<{ count: string }>(
+        `SELECT count(*)::text AS count FROM pg_constraint
+          WHERE contype = 'f' AND confrelid = 'public.companies'::regclass`,
+      );
+      expect(Number(keys.rows[0]!.count)).toBe(31);
     } finally {
       await pool.end();
       await database.cleanup();
