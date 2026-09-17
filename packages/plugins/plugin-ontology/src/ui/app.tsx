@@ -3393,7 +3393,7 @@ function ManageTab({
     <>
       <EvaluationSection companyId={companyId} domainId={domainId} />
       <PipelineSection companyId={companyId} domainId={domainId} />
-      <GovernancePanel companyId={companyId} businessSystems={businessSystems} />
+      <GovernancePanel companyId={companyId} domainId={domainId} businessSystems={businessSystems} />
     </>
   );
 }
@@ -3429,15 +3429,19 @@ const LAYER_MEANING: Record<string, string> = {
 
 function ServiceList({
   companyId,
+  domainId,
   businessSystemId,
 }: {
   companyId: string;
+  domainId: string;
   businessSystemId: string;
 }): ReactElement | null {
   const { data } = usePluginData<{ subProjects: SubProjectView[] }>("list-sub-projects", {
     companyId,
     businessSystemId,
   });
+  const buildDiagram = usePluginAction("architecture-diagram");
+  const [diagramBusy, setDiagramBusy] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const services = data?.subProjects ?? [];
   if (services.length === 0) return null;
@@ -3451,8 +3455,44 @@ function ServiceList({
 
   return (
     <div className="mt-1.5 border-t border-border/60 pt-1.5">
-      <div className="mb-0.5 text-(length:--text-nano) font-medium text-muted-foreground">
-        {t("服务 / 模块", "Services")} · {services.length}
+      <div className="mb-0.5 flex items-center gap-2 text-(length:--text-nano) font-medium text-muted-foreground">
+        <span>
+          {t("服务 / 模块", "Services")} · {services.length}
+        </span>
+        {/* The diagram is the ontology's *product*: nothing is stored, and the
+            same document is what an agent renders with the Archify skill. */}
+        <button
+          type="button"
+          disabled={diagramBusy}
+          onClick={() => {
+            setDiagramBusy(true);
+            void (async () => {
+              try {
+                const res = (await buildDiagram({ companyId, domainId })) as {
+                  diagram?: unknown;
+                };
+                const blob = new Blob([JSON.stringify(res?.diagram ?? {}, null, 2)], {
+                  type: "application/json",
+                });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `architecture-diagram-${domainId.slice(0, 8)}.json`;
+                link.click();
+                URL.revokeObjectURL(url);
+              } finally {
+                setDiagramBusy(false);
+              }
+            })();
+          }}
+          className="rounded border border-border px-1.5 py-0.5 text-(length:--text-nano) text-muted-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+          title={t(
+            "导出 Archify 架构图 IR(可交给 Archify 渲染成可分享的 HTML/SVG)",
+            "Export the Archify diagram IR (render it with Archify into a shareable HTML/SVG)",
+          )}
+        >
+          {diagramBusy ? "…" : t("导出架构图", "Export diagram")}
+        </button>
       </div>
       <ul className="space-y-0.5">
         {services.map((s) => {
@@ -3536,9 +3576,11 @@ function ServiceList({
 
 function GovernancePanel({
   companyId,
+  domainId,
   businessSystems,
 }: {
   companyId: string;
+  domainId: string;
   businessSystems: Array<{
     id: string;
     code: string;
@@ -3591,7 +3633,7 @@ function GovernancePanel({
                   {bs.description}
                 </p>
               )}
-              <ServiceList companyId={companyId} businessSystemId={bs.id} />
+              <ServiceList companyId={companyId} domainId={domainId} businessSystemId={bs.id} />
             </li>
           ))}
         </ul>

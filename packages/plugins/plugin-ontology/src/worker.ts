@@ -36,6 +36,7 @@ import { buildSuggestFieldsPrompt, parseSuggestedFields } from "./aide/suggestFi
 import { buildEnrichPrompt, parseEnrichResponse, type EnrichTarget } from "./aide/enrichDescriptions.js";
 import { parseSqlDdl } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 import { buildTypeProvenance } from "@paperclipai/ontology-core/provenance.js";
+import { architectureToArchifyIr } from "@paperclipai/ontology-core/export/archify.js";
 import { subProjectsFromArchitecture } from "@paperclipai/ontology-core/architecture/subProjectMapping.js";
 import { parseOpenAPI } from "./legacy/openapiParser.js";
 import {
@@ -578,6 +579,66 @@ async function currentSchemaVersion(
 ): Promise<number> {
   const domain = await store.getDomain(companyId, domainId);
   return domain?.schema_version ?? 0;
+}
+
+/**
+ * Load a domain's architecture and turn it into an Archify diagram.
+ *
+ * The views are derived from the material rather than authored: "which services
+ * run where" is a question the data answers, and a view that named services the
+ * domain does not have would be a lie in the tab bar.
+ */
+async function buildArchitectureDiagram(
+  store: GraphStore,
+  companyId: string,
+  domainId: string,
+): Promise<Record<string, unknown>> {
+  const [domain, rows] = await Promise.all([
+    store.getDomain(companyId, domainId),
+    store.listDomainSubProjects(companyId, domainId),
+  ]);
+
+  const services = rows.map((row) => ({
+    code: row.code,
+    name: row.name,
+    microserviceLayer: row.microservice_layer,
+    type: row.type,
+    techStack: row.tech_stack,
+    buildConfig: row.build_config,
+    metadata: row.metadata,
+    dependencies: Array.isArray(row.dependencies)
+      ? (row.dependencies as Array<{ toServiceKey?: string | null; targetHint?: string; type?: string }>)
+      : [],
+  }));
+
+  const byLayer = new Map<string, string[]>();
+  for (const service of services) {
+    const layer = service.microserviceLayer ?? "未分层";
+    byLayer.set(layer, [...(byLayer.get(layer) ?? []), service.code]);
+  }
+  const byEnv = new Map<string, string[]>();
+  for (const service of services) {
+    const deploy = (service.metadata?.deploy ?? service.buildConfig?.deploy ?? {}) as Record<string, unknown>;
+    const envs = Array.isArray(deploy.envs) ? (deploy.envs as string[]) : [];
+    const key = envs[0] ?? "未声明环境";
+    byEnv.set(key, [...(byEnv.get(key) ?? []), service.code]);
+  }
+
+  const views = [
+    { id: "runtime", label: "运行架构", focus: services.map((s) => s.code), note: "谁调用谁" },
+    ...[...byEnv.entries()]
+      .filter(([env]) => env !== "未声明环境")
+      .map(([env, focus]) => ({ id: `env-${env}`, label: `部署架构 · ${env}`, focus, note: "声明部署在该环境的服务" })),
+    ...[...byLayer.entries()]
+      .sort()
+      .map(([layer, focus]) => ({ id: `layer-${layer}`, label: `分层 · ${layer}`, focus, note: "该层的服务" })),
+  ];
+
+  return architectureToArchifyIr(services, {
+    title: `${domain?.display_name ?? "本体域"} · 运行架构`,
+    subtitle: "由本体域的架构原料生成(服务 + 依赖 + 部署事实)",
+    views,
+  }) as unknown as Record<string, unknown>;
 }
 
 /** A `string -> string` map, or undefined; anything else is a caller bug. */
@@ -2264,6 +2325,20 @@ const plugin = definePlugin({
       return { proposals: await store.listProposals(companyId, domainId, status) };
     });
 
+    /**
+     * The architecture as an Archify diagram IR.
+     *
+     * One name on both surfaces: a bridge action so the workbench can hand the
+     * user a file, and a GET route so an agent can fetch the same document and
+     * render it with the Archify skill. The translation itself is pure and lives
+     * in the core — what happens here is loading the material and naming the
+     * views.
+     */
+    ctx.actions.register("architecture-diagram", async (params) => {
+      const call = readMutationCall(params);
+      return { diagram: await buildArchitectureDiagram(store, call.companyId, requireString(call.fields.domainId, "domainId")) };
+    });
+
     ctx.data.register("list-sub-projects", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
       const businessSystemId = requireString(params.businessSystemId, "businessSystemId");
@@ -3854,6 +3929,18 @@ const plugin = definePlugin({
       case "decide-proposal": {
         const outcome = await decideProposalMutation(store, ctx, httpMutationCall(companyId, input));
         return { status: outcome.status, body: outcome.payload };
+      }
+
+      case "architecture-diagram": {
+        return {
+          body: {
+            diagram: await buildArchitectureDiagram(
+              store,
+              companyId,
+              requireString(queryString(input.query.domainId), "domainId"),
+            ),
+          },
+        };
       }
 
       case "list-proposals": {

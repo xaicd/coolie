@@ -114,5 +114,16 @@ export {
   planPropertyRenames,
 } from "./schemaEvolution.js";
 export type { PropertySchemaDiff, RenamePlan } from "./schemaEvolution.js";
+export {
+  ARCHIFY_CARD_DOTS,
+  architectureToArchifyIr,
+} from "./export/archify.js";
+export type {
+  ArchifyComponentType,
+  ArchifyIr,
+  ArchifyIrOptions,
+  ArchifyServiceInput,
+  ArchifyVariant,
+} from "./export/archify.js";
 export { runTransform } from "./transform/TransformRunner.js";
 export type { TransformRunResult } from "./transform/TransformRunner.js";

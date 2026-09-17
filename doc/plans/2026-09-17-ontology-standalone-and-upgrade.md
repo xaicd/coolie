@@ -296,3 +296,104 @@ point at, and the review path needs something worth gating.
 What is left before a split is mostly the test the split was meant to pass: an
 agent must still get its business map when Paperclip is down. Every piece above
 makes that possible; none of them proves it yet.
+
+## 6. What the workshop needs when it runs on its own
+
+§2 is about *deploying* the core separately. This is about the feature surface:
+the moment the workshop stops being a plugin, everything Paperclip was providing
+disappears, and the question becomes which of those things it must now provide
+itself. The list below is grouped by what breaks if it is missing.
+
+### 6.1 Platform — without these it is not a product
+
+| Missing today | Where it comes from now | What it needs |
+| --- | --- | --- |
+| HTTP service | the plugin's worker, one route surface | the contract already exists (88 operations, `CORE_API_VERSION = 1`); this is a server around it |
+| **Authentication** | the host authenticates, then the manifest says `board` / `board-or-agent` | its own actor model: human sessions, and **agent API keys** (scoped, hashed) — a standalone service cannot inherit a host's auth |
+| **Tenant** | `company_id` on every table, validated by the host | its own workspace/tenant concept and its own access checks; the data model is already scoped correctly |
+| **Migrations** | the host applies `migrations/` | to own migration plus an upgrade path — which is what `schema_version` (§4.2 A) was groundwork for |
+| UI shell | rendered into the host's page slot, sidebar and modals | login, navigation, domain switcher, and the settings surfaces the host supplied |
+| Observability | nothing | health, metrics, logging |
+
+### 6.2 Semantic base — what makes it an ontology rather than a CRUD app
+
+Already present: the schema editor; facts and instances; relation types with
+traversal (`find-path`, `find-impact`); provenance and evidence; versioning and a
+change history; proposals with a review gate; perspectives; ingestion from DDL,
+OpenAPI, Java, MyBatis, proto and a scanned directory.
+
+Still missing, in the order it hurts:
+
+1. **Fact proposals.** The table and the review path exist; the second payload
+   kind does not. "An agent proposes a fact" is half the rule in §3.
+2. **`ontology-mcp`.** The 16 agent-visible operations exist as HTTP routes and
+   nothing exposes them as tools. This is how a semantic base gets *used* — until
+   it exists, agents can reach the ontology only by being wired to it by hand.
+3. **Saved views.** A perspective is computed, never persisted. A user who
+   arranges a view cannot name it, return to it, or share it — and 6.4 depends on
+   views being addressable.
+4. **Connectors that pull.** Mapping is a one-shot import today. "持续数据映射、
+   批量校验、异步同步" — one of the user's own split triggers — needs mapping to be
+   a repeatable job, not a wizard that runs once.
+5. **Cross-domain query.** `find-path` and `find-impact` stay inside one domain,
+   while the model already supports cross-domain edges.
+
+### 6.3 Agent surface — the reason a semantic base exists
+
+- `ontology-mcp`, from 6.2.2.
+- Scoped agent keys, from 6.1.
+- **Proposal-only writes**: already enforced — the contract pins the one
+  operation an agent may write, and `decide-proposal` is asserted out of reach.
+- An audit of what agents *read*, not only what they changed. Today a change is
+  recorded and a read is not, so "which model did that answer come from" is
+  answerable only if the caller asked for the version.
+
+### 6.4 Collaboration and governance — where Palantir's value actually is
+
+1. **Roles.** The workshop has two actor classes (board, agent). A modelling tool
+   needs at least modeler / reviewer / viewer, and the actor has to be a real
+   identity rather than a host-supplied string.
+2. **Per-view visibility.** "针对不同角色用户 可以显示 不同视图" was an explicit
+   requirement, and views are exactly where it lands: the same material, different
+   audiences. Today a perspective has no permission attached, so 6.2.3 (saved
+   views) is the prerequisite.
+3. **Approval rules.** `governance_policy` and proposals exist; what is missing is
+   a rule that says *which* changes need *whose* approval, instead of the single
+   blanket gate for destructive schema edits.
+4. **Why a change was made.** The audit has who, when and what (with before/after);
+   a proposal carries a summary. There is no decision record — the reasoning
+   behind an accepted change is lost the moment the proposal is applied.
+
+### 6.5 Operations and delivery
+
+1. **Export/import a whole ontology as one file.** Snapshots cover the schema;
+   there is no portable package for a domain, which is what a customer instance
+   migration or a support handoff needs.
+2. **Per-customer deployment** (`Docker Compose` / `Helm`) — the delivery model,
+   unchanged from the Paperclip layer.
+3. **Backup and restore** at the instance level, distinct from schema versioning.
+
+### 6.6 The boundary with Archify
+
+Archify renders; the ontology is the source of truth. The generated IR is a
+**product** — discardable and rebuildable — and an adapter that makes it a second
+place where the architecture is described would bypass the versioning, the audit
+and the proposals. `architecture-diagram` returns the same document to the
+workbench (as a file) and to an agent (as a route, agent-visible), and stores
+nothing.
+
+Two limits found by running the generated IR through Archify's own validator:
+evidence nodes (`sources`) require a git checkout pinned to a commit, which a
+picked directory has not got; and layers have no vocabulary there (`boundaries`
+is `region` / `security-group`), so they are expressed as grid rows.
+
+### 6.7 Order
+
+1. **Authentication and tenant** (6.1) — nothing else can be a product without them.
+2. **`ontology-mcp`** (6.2.2) — the cheapest way to make the semantic base
+   actually used.
+3. **Saved views, then per-view roles** (6.2.3 → 6.4.2) — the requirement the user
+   stated most concretely.
+4. **Migration ownership** (6.1) — reconnect the host's migration step to our own
+   version and change-set work.
+5. **Fact proposals** (6.2.1) — finish the rule.

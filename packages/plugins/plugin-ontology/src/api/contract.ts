@@ -149,6 +149,7 @@ export const CORE_API: CoreApiRoute[] = [
   r("create-business-system", "governance", false, "新建业务系统"),
   r("update-business-system", "governance", false, "改业务系统"),
   r("list-sub-projects", "governance", true, "列出服务/子项目(含分层与部署)"),
+  r("architecture-diagram", "governance", true, "架构图 IR(交给 Archify 渲染成 HTML/SVG)"),
   r("create-sub-project", "governance", false, "新建服务/子项目"),
   r("update-sub-project", "governance", false, "改服务/子项目"),
   r("list-capability-gaps", "governance", true, "列出能力缺口"),

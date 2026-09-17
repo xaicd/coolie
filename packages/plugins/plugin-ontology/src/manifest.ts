@@ -527,6 +527,18 @@ const manifest: PaperclipPluginManifestV1 = {
       companyResolution: { from: "body", key: "companyId" },
     },
     {
+      // The diagram as data. An agent fetches this and renders it with the
+      // Archify skill; the workbench hands the same document to the user as a
+      // file. Nothing is stored — a diagram is a product of the ontology, and
+      // keeping it would make a second place where the architecture is described.
+      routeKey: "architecture-diagram",
+      method: "GET",
+      path: "/architecture-diagram",
+      auth: "board-or-agent",
+      capability: "api.routes.register",
+      companyResolution: { from: "query", key: "companyId" },
+    },
+    {
       routeKey: "decide-proposal",
       method: "POST",
       path: "/proposals/:proposalId/decision",
