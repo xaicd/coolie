@@ -32,6 +32,7 @@ const SAMPLE_DOMAIN: DescribeDomainResult = {
       lifecycle_state: "draft",
       bootstrap_source: "manual",
       seed_schema_version: 0,
+      schema_version: 0,
     },
   nodeTypes: [
     {

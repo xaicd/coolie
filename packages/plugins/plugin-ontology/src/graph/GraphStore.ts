@@ -94,7 +94,16 @@ export interface OntologyDomainRow {
   forked_from: string | null;
   lifecycle_state: DomainLifecycleState;
   bootstrap_source: BootstrapSource;
+  /** The seeded template this domain came from. Never written; see `schema_version`. */
   seed_schema_version: number;
+  /**
+   * Which version of the ontology this is.
+   *
+   * Bumped by every accepted schema change, so a caller can tell that the model
+   * moved under it and an answer can name the model it came from. `0` means no
+   * change has been recorded yet.
+   */
+  schema_version: number;
 }
 
 export interface OntologyNodeInput {
@@ -1066,6 +1075,13 @@ export interface GraphStore {
   table(name: string): string;
   // O0 — instance graph + traversal
   createDomain(input: OntologyDomainInput): Promise<OntologyDomainRow>;
+  /**
+   * Record that the domain's model changed, and return the new version.
+   *
+   * A single atomic increment, because two concurrent schema edits must not land
+   * on the same version — the counter is what tells consumers the model moved.
+   */
+  bumpSchemaVersion(companyId: string, domainId: string): Promise<number>;
   createNode(input: OntologyNodeInput): Promise<OntologyNodeRow>;
   createEdge(input: OntologyEdgeInput): Promise<OntologyEdgeRow>;
   updateNode(
@@ -1453,6 +1469,58 @@ export class PostgresGraphStore implements GraphStore {
     return rows[0]!;
   }
 
+  /**
+   * The model changed: move the version and record what it was before and after.
+   *
+   * Both jobs live here, in the store, for two reasons. A caller that could bump
+   * the version without recording the change would eventually do exactly that.
+   * And the record goes to the plugin's *own* audit table, not the host's
+   * activity feed — the host feed is an integration that disappears when the
+   * core is deployed on its own, while this history is the ontology's.
+   */
+  private async markModelChanged(input: {
+    companyId: string;
+    domainId: string;
+    eventType: Extract<
+      AuditEventType,
+      "schema_type_created" | "schema_type_updated" | "schema_type_deleted"
+    >;
+    entityId: string;
+    entityKind: "node_type" | "relation_type";
+    before?: Record<string, unknown> | null;
+    after?: Record<string, unknown> | null;
+  }): Promise<void> {
+    await this.bumpSchemaVersion(input.companyId, input.domainId);
+    await this.writeAuditLog({
+      companyId: input.companyId,
+      domainId: input.domainId,
+      eventType: input.eventType,
+      entityId: input.entityId,
+      beforeState: input.before ?? null,
+      afterState: input.after ?? null,
+      metadata: { entityKind: input.entityKind },
+    });
+  }
+
+  async bumpSchemaVersion(companyId: string, domainId: string): Promise<number> {
+    // Two statements, because the host's client does not allow it any other way:
+    // `query` is SELECT-only and rejects mutation keywords, while `execute` takes
+    // the UPDATE but drops RETURNING rows. The increment is atomic regardless;
+    // only reading the resulting number back is a second round trip.
+    await this.db.execute(
+      `UPDATE ${this.table("ontology_domains")}
+          SET schema_version = schema_version + 1, updated_at = now()
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, domainId],
+    );
+    const rows = await this.db.query<{ schema_version: number }>(
+      `SELECT schema_version FROM ${this.table("ontology_domains")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, domainId],
+    );
+    return Number(rows[0]?.schema_version ?? 0);
+  }
+
   async createNode(input: OntologyNodeInput): Promise<OntologyNodeRow> {
     const id = randomUUID();
     await this.db.execute(
@@ -1678,7 +1746,8 @@ export class PostgresGraphStore implements GraphStore {
 
   private static readonly DOMAIN_COLS =
     "id, company_id, slug, display_name, description, status, version, icon, category, " +
-    "is_built_in, forked_from, lifecycle_state, bootstrap_source, seed_schema_version";
+    "is_built_in, forked_from, lifecycle_state, bootstrap_source, seed_schema_version, " +
+    "schema_version";
 
   private static readonly NODE_COLS =
     "id, company_id, domain_id, node_type_id, key, label, lifecycle_state, version, properties";
@@ -1779,6 +1848,14 @@ export class PostgresGraphStore implements GraphStore {
         WHERE company_id = $1 AND id = $2`,
       [input.companyId, id],
     );
+    await this.markModelChanged({
+      companyId: input.companyId,
+      domainId: input.domainId,
+      eventType: "schema_type_created",
+      entityId: id,
+      entityKind: "node_type",
+      after: rows[0] as unknown as Record<string, unknown>,
+    });
     return rows[0]!;
   }
 
@@ -1797,6 +1874,14 @@ export class PostgresGraphStore implements GraphStore {
     nodeTypeId: string,
     update: OntologyNodeTypeUpdate,
   ): Promise<OntologyNodeTypeRow | null> {
+    // The before-state is what makes this a change history rather than a list of
+    // timestamps, and schema edits are rare enough to afford the read.
+    const prior = await this.db.query<OntologyNodeTypeRow>(
+      `SELECT ${PostgresGraphStore.NODE_TYPE_COLS}
+         FROM ${this.table("ontology_node_types")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, nodeTypeId],
+    );
     const res = await this.db.execute(
       `UPDATE ${this.table("ontology_node_types")}
           SET display_name          = COALESCE($3, display_name),
@@ -1832,7 +1917,18 @@ export class PostgresGraphStore implements GraphStore {
         WHERE company_id = $1 AND id = $2`,
       [companyId, nodeTypeId],
     );
-    return rows[0] ?? null;
+    const row = rows[0];
+    if (!row) return null;
+    await this.markModelChanged({
+      companyId,
+      domainId: row.domain_id,
+      eventType: "schema_type_updated",
+      entityId: row.id,
+      entityKind: "node_type",
+      before: (prior[0] ?? null) as unknown as Record<string, unknown> | null,
+      after: row as unknown as Record<string, unknown>,
+    });
+    return row;
   }
 
   /**
@@ -1841,11 +1937,29 @@ export class PostgresGraphStore implements GraphStore {
    * true iff a row was actually deleted in this company.
    */
   async deleteNodeType(companyId: string, nodeTypeId: string): Promise<boolean> {
+    // Read the row first: the delete cannot hand it back (the host's client drops
+    // RETURNING) and both the version bump and the audit entry need it.
+    const prior = await this.db.query<OntologyNodeTypeRow>(
+      `SELECT ${PostgresGraphStore.NODE_TYPE_COLS}
+         FROM ${this.table("ontology_node_types")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, nodeTypeId],
+    );
     const res = await this.db.execute(
       `DELETE FROM ${this.table("ontology_node_types")}
         WHERE company_id = $1 AND id = $2`,
       [companyId, nodeTypeId],
     );
+    if (res.rowCount > 0 && prior[0]?.domain_id) {
+      await this.markModelChanged({
+        companyId,
+        domainId: prior[0].domain_id,
+        eventType: "schema_type_deleted",
+        entityId: nodeTypeId,
+        entityKind: "node_type",
+        before: prior[0] as unknown as Record<string, unknown>,
+      });
+    }
     return res.rowCount > 0;
   }
 
@@ -1887,6 +2001,14 @@ export class PostgresGraphStore implements GraphStore {
         WHERE company_id = $1 AND id = $2`,
       [input.companyId, id],
     );
+    await this.markModelChanged({
+      companyId: input.companyId,
+      domainId: input.domainId,
+      eventType: "schema_type_created",
+      entityId: id,
+      entityKind: "relation_type",
+      after: rows[0] as unknown as Record<string, unknown>,
+    });
     return rows[0]!;
   }
 
@@ -1905,6 +2027,12 @@ export class PostgresGraphStore implements GraphStore {
     relationTypeId: string,
     update: OntologyRelationTypeUpdate,
   ): Promise<OntologyRelationTypeRow | null> {
+    const prior = await this.db.query<OntologyRelationTypeRow>(
+      `SELECT ${PostgresGraphStore.RELATION_TYPE_COLS}
+         FROM ${this.table("ontology_relation_types")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, relationTypeId],
+    );
     const res = await this.db.execute(
       `UPDATE ${this.table("ontology_relation_types")}
           SET display_name = COALESCE($3, display_name),
@@ -1933,7 +2061,18 @@ export class PostgresGraphStore implements GraphStore {
         WHERE company_id = $1 AND id = $2`,
       [companyId, relationTypeId],
     );
-    return rows[0] ?? null;
+    const row = rows[0];
+    if (!row) return null;
+    await this.markModelChanged({
+      companyId,
+      domainId: row.domain_id,
+      eventType: "schema_type_updated",
+      entityId: row.id,
+      entityKind: "relation_type",
+      before: (prior[0] ?? null) as unknown as Record<string, unknown> | null,
+      after: row as unknown as Record<string, unknown>,
+    });
+    return row;
   }
 
   /**
@@ -1942,11 +2081,28 @@ export class PostgresGraphStore implements GraphStore {
    * alive but untyped). Returns true iff a row was actually deleted.
    */
   async deleteRelationType(companyId: string, relationTypeId: string): Promise<boolean> {
+    // Row first, for the same reason as deleteNodeType.
+    const prior = await this.db.query<OntologyRelationTypeRow>(
+      `SELECT ${PostgresGraphStore.RELATION_TYPE_COLS}
+         FROM ${this.table("ontology_relation_types")}
+        WHERE company_id = $1 AND id = $2`,
+      [companyId, relationTypeId],
+    );
     const res = await this.db.execute(
       `DELETE FROM ${this.table("ontology_relation_types")}
         WHERE company_id = $1 AND id = $2`,
       [companyId, relationTypeId],
     );
+    if (res.rowCount > 0 && prior[0]?.domain_id) {
+      await this.markModelChanged({
+        companyId,
+        domainId: prior[0].domain_id,
+        eventType: "schema_type_deleted",
+        entityId: relationTypeId,
+        entityKind: "relation_type",
+        before: prior[0] as unknown as Record<string, unknown>,
+      });
+    }
     return res.rowCount > 0;
   }
 

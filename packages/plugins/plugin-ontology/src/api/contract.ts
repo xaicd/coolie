@@ -20,6 +20,11 @@
  *
  * `tests/api-contract.spec.ts` binds this to the manifest and to the worker's
  * dispatch table, so a route cannot be added to one and forgotten in the others.
+ *
+ * One field every reader should look at: the domain's `schemaVersion`, bumped by
+ * every accepted change to the object model. An answer that names the model
+ * version it came from is reproducible; one that does not is a rumour. The
+ * versioning contract itself is `doc/plans/2026-09-17-ontology-standalone-and-upgrade.md` §4.
  */
 
 /** Bump when an existing route's shape changes in a way a caller must handle. */
@@ -76,7 +81,7 @@ export const CORE_API: CoreApiRoute[] = [
   // --- schema: the object model ---------------------------------------------
   r("list-domains", "schema", true, "列出本体域"),
   r("create-domain", "schema", false, "新建本体域"),
-  r("get-domain", "schema", true, "单个本体域"),
+  r("get-domain", "schema", true, "单个本体域,含 schema_version(模型版本)"),
   r("update-domain", "schema", false, "改本体域元数据"),
   r("transition-domain", "schema", false, "推进本体域生命周期"),
   r("snapshot-domain", "schema", false, "给当前 schema 存快照"),

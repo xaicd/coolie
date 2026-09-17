@@ -55,6 +55,12 @@ export const AUDIT_EVENT_TYPES = [
   "domain_state_changed",
   "domain_unregistered",
   "schema_migrated",
+  // Precise schema-change events. `schema_migrated` alone would make the audit
+  // log unfilterable: every model change would read the same. The entity kind
+  // (node type vs relation type) is carried in `metadata`.
+  "schema_type_created",
+  "schema_type_updated",
+  "schema_type_deleted",
   "node_created",
   "node_updated",
   "node_deleted",

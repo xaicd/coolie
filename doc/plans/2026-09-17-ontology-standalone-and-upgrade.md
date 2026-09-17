@@ -134,15 +134,30 @@ Two different things travel under this name and they need different mechanisms.
 
 ### 4.1 Verified gaps
 
-1. **No schema version is ever recorded.** `ontology_domains.seed_schema_version`
-   exists (`migrations/002_schema_parity.sql:63`) and is selected
-   (`GraphStore.ts:1681`), but nothing writes it — it is `0` forever. A consumer
-   cannot ask "which version of this ontology did I just read?", which is
-   precisely what an agent needs for a reproducible answer or a cache key.
-2. **A schema edit is not recorded as a change.** `update-node-type` writes the
-   new descriptor and **no audit event** (the mutation handler does not log).
-   `list-audit-logs` exists; schema changes do not appear in it. So "who changed
-   the model, and when" is unanswerable.
+1. ~~**No schema version is ever recorded.**~~ **Done**
+   (`migrations/013_schema_version.sql`). `ontology_domains.schema_version` is
+   bumped by the store's own mutators, so every path that changes the object
+   model goes through it, and it reaches callers through the domain that every
+   read already returns. (`seed_schema_version` is a different thing — the
+   seeded template — and stays unwritten.)
+2. ~~**A schema edit is not recorded as a change.**~~ **Done.** Creating, editing
+   and deleting object and relation types now writes both records, because while
+   the core is incubated there are two places a change can be recorded and they
+   are not interchangeable:
+
+   - `ctx.activity.log` — the **host's** activity feed. An integration, and it
+     disappears when the core stops being a plugin.
+   - `ontology_audit_logs` — the **ontology's own** history, with before/after
+     state, read by `list-audit-logs`. Portable, which is why it matters.
+
+   The store writes the second one (in `markModelChanged`, alongside the version
+   bump, so neither can happen without the other); the worker keeps writing the
+   first, so the change also shows up in Paperclip while it lives there. A failed
+   activity write warns and does not fail the change it describes.
+
+   Worth flagging: using only the host API would have looked like it worked —
+   the unit tests saw the entry — and the plugin's own audit view stayed empty.
+   It read as 0 entries until it was checked against a running instance.
 3. **Renaming a property does not migrate its data.** Changing a key in
    `properties_schema` leaves every existing instance's `properties` under the
    old key. Nothing renames, coerces or reports the divergence — the instances
@@ -162,11 +177,23 @@ Two different things travel under this name and they need different mechanisms.
 
 The shape that fits what already exists, in the order it becomes useful:
 
-**A. Schema versions are recorded, always.** Every accepted schema mutation
-bumps the domain's version and writes a snapshot row (the table is already
-built for it). `get-domain` returns it; `graph-snapshot` and every query response
-carry it, so a caller always knows which ontology it read. *This is cheap: the
-storage exists, the write just has to happen.*
+**A. Schema versions are recorded, always.** Implemented to this shape:
+`ontology_domains.schema_version` is bumped by the store's mutators
+(`createNodeType`, `updateNodeType`, `deleteNodeType` and the relation-type
+equivalents), which is what makes it impossible for a caller to forget — the
+bridge, the HTTP surface and any future MCP path all go through them.
+
+Two implementation notes worth keeping: the increment is done in SQL
+(`schema_version = schema_version + 1`) rather than read-then-write, so two edits
+landing together cannot share a version; and it takes two statements, because the
+host's client allows only SELECT through `query` and drops `RETURNING` through
+`execute`. Snapshots stay named milestones — writing a full schema snapshot on
+every edit would flood the snapshot drawer — so the counter tracks change and a
+snapshot captures content.
+
+Still open: `graph-snapshot` and the query responses do not carry the version
+yet, because they are handed a domain id rather than a domain. That belongs with
+the change-set work, where a change set names the version it produced.
 
 **B. A change set is the unit of change.** A rename is one change set containing
 the schema edit *and* the data migration, applied together or not at all:

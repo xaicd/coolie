@@ -211,6 +211,7 @@ function stubDescribe() {
       lifecycle_state: "active" as const,
       bootstrap_source: "manual" as const,
       seed_schema_version: 1,
+      schema_version: 0,
     },
     nodeTypes: [],
     relationTypes: [],
