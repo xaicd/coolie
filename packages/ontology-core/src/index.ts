@@ -123,6 +123,24 @@ export {
 } from "./api/contract.js";
 export type { CoreApiDoc, CoreApiGroup, CoreApiRoute } from "./api/contract.js";
 export { ONTOLOGY_TOOLS, callOntologyTool, ontologyToolByName } from "./mcp/tools.js";
+export {
+  VIEW_KINDS,
+  VIEW_ROLES,
+  VIEW_VISIBILITIES,
+  canOpenView,
+  normaliseView,
+  validateView,
+  visibleViews,
+  withheldViews,
+} from "./views.js";
+export type {
+  ViewAudience,
+  ViewKind,
+  ViewRecord,
+  ViewRole,
+  ViewValidation,
+  ViewVisibility,
+} from "./views.js";
 export type { OntologyTool } from "./mcp/tools.js";
 
 export {

@@ -6,6 +6,7 @@ import {
   type RenamePlan,
 } from "../schemaEvolution.js";
 import type { ProposalAuthorKind, ProposalKind, ProposalStatus } from "../enums.js";
+import type { ViewKind, ViewRole, ViewVisibility } from "../views.js";
 import type { SqlClient } from "./SqlClient.js";
 
 /**
@@ -856,6 +857,46 @@ export interface OntologySubProjectUpdate {
   metadata?: Record<string, unknown>;
 }
 
+export interface OntologyViewInput {
+  companyId: string;
+  domainId: string;
+  key: string;
+  name: string;
+  description?: string;
+  /** The perspective the view opens. */
+  kind?: ViewKind;
+  /** That perspective's own settings (focus keys, filters). */
+  config?: Record<string, unknown>;
+  visibility?: ViewVisibility;
+  roles?: ViewRole[];
+  createdBy?: string;
+}
+
+export interface OntologyViewUpdate {
+  name?: string;
+  description?: string;
+  kind?: ViewKind;
+  config?: Record<string, unknown>;
+  visibility?: ViewVisibility;
+  roles?: ViewRole[];
+}
+
+export interface OntologyViewRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  key: string;
+  name: string;
+  description: string;
+  kind: ViewKind;
+  config: Record<string, unknown>;
+  visibility: ViewVisibility;
+  roles: ViewRole[];
+  created_by: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface OntologyProposalInput {
   companyId: string;
   domainId: string;
@@ -1455,6 +1496,23 @@ export interface GraphStore {
     resourceKind: OntologyResourceKind,
     resourceId: string,
   ): Promise<LinkedDomainRow[]>;
+
+  /**
+   * Saved views: the arrangements of the model, and who may open them.
+   *
+   * A view holds no facts — it records a reading (which perspective, what it
+   * focuses on) — so these are ordinary CRUD with one rule on top, which lives
+   * in `views.ts` and is applied by the caller that knows the actor.
+   */
+  createView(input: OntologyViewInput): Promise<OntologyViewRow>;
+  getView(companyId: string, viewId: string): Promise<OntologyViewRow | null>;
+  listViews(companyId: string, domainId: string): Promise<OntologyViewRow[]>;
+  updateView(
+    companyId: string,
+    viewId: string,
+    update: OntologyViewUpdate,
+  ): Promise<OntologyViewRow | null>;
+  deleteView(companyId: string, viewId: string): Promise<boolean>;
 
   createProposal(input: OntologyProposalInput): Promise<OntologyProposalRow>;
   getProposal(companyId: string, proposalId: string): Promise<OntologyProposalRow | null>;
@@ -3846,6 +3904,103 @@ export class PostgresGraphStore implements GraphStore {
     "id, company_id, business_system_id, name, code, type, status, microservice_layer, " +
     "tech_stack, framework, git_repo, api_specs, dependencies, build_config, metadata, " +
     "created_at, updated_at";
+
+  private static readonly VIEW_COLS =
+    "id, company_id, domain_id, key, name, description, kind, config, visibility, roles, " +
+    "created_by, created_at, updated_at";
+
+  async createView(input: OntologyViewInput): Promise<OntologyViewRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_views")}
+         (id, company_id, domain_id, key, name, description, kind, config, visibility, roles, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb, $11)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.key,
+        input.name,
+        input.description ?? "",
+        input.kind ?? "runtime",
+        JSON.stringify(input.config ?? {}),
+        input.visibility ?? "shared",
+        JSON.stringify(input.roles ?? []),
+        input.createdBy ?? "system",
+      ],
+    );
+    const rows = await this.db.query<OntologyViewRow>(
+      `SELECT ${PostgresGraphStore.VIEW_COLS}
+         FROM ${this.table("ontology_views")}
+        WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async getView(companyId: string, viewId: string): Promise<OntologyViewRow | null> {
+    const rows = await this.db.query<OntologyViewRow>(
+      `SELECT ${PostgresGraphStore.VIEW_COLS}
+         FROM ${this.table("ontology_views")}
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, viewId],
+    );
+    return rows[0] ?? null;
+  }
+
+  async listViews(companyId: string, domainId: string): Promise<OntologyViewRow[]> {
+    return this.db.query<OntologyViewRow>(
+      `SELECT ${PostgresGraphStore.VIEW_COLS}
+         FROM ${this.table("ontology_views")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+        ORDER BY name ASC`,
+      [companyId, domainId],
+    );
+  }
+
+  async updateView(
+    companyId: string,
+    viewId: string,
+    update: OntologyViewUpdate,
+  ): Promise<OntologyViewRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_views")}
+          SET name = COALESCE($3, name),
+              description = COALESCE($4, description),
+              kind = COALESCE($5, kind),
+              config = CASE WHEN $6 THEN $7::jsonb ELSE config END,
+              visibility = COALESCE($8, visibility),
+              roles = CASE WHEN $9 THEN $10::jsonb ELSE roles END,
+              updated_at = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [
+        companyId,
+        viewId,
+        update.name ?? null,
+        update.description ?? null,
+        update.kind ?? null,
+        update.config !== undefined,
+        JSON.stringify(update.config ?? {}),
+        update.visibility ?? null,
+        update.roles !== undefined,
+        JSON.stringify(update.roles ?? []),
+      ],
+    );
+    if (res.rowCount === 0) return null;
+    return this.getView(companyId, viewId);
+  }
+
+  async deleteView(companyId: string, viewId: string): Promise<boolean> {
+    // Soft delete: a view is cheap to restore and its absence is not a fact about
+    // the model, so losing one by accident should not be permanent.
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_views")}
+          SET is_deleted = true, deleted_at = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, viewId],
+    );
+    return res.rowCount > 0;
+  }
 
   private static readonly PROPOSAL_COLS =
     "id, company_id, domain_id, kind, status, title, summary, payload, blast_radius, author, " +

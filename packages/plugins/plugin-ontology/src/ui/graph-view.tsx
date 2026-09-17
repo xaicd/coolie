@@ -25,7 +25,7 @@ import {
   type ReactElement,
   type ReactNode,
 } from "react";
-import { usePluginAction } from "@paperclipai/plugin-sdk/ui";
+import { usePluginAction, usePluginData } from "@paperclipai/plugin-sdk/ui";
 import { BootstrapDraftPreview, type DraftPreview } from "./BootstrapDraftPreview.js";
 import { NodePropertyEditor } from "./NodePropertyEditor.js";
 
@@ -129,6 +129,7 @@ import {
   type PerspectiveService,
 } from "./perspectives.js";
 import { relationEndpoints } from "@paperclipai/ontology-core/relationEndpoints.js";
+import { VIEW_ROLES } from "@paperclipai/ontology-core/views.js";
 import { describeProvenance, readSourceFiles } from "@paperclipai/ontology-core/provenance.js";
 
 type OntologyNodeData = { label: string; nodeKey: string; tone: string; typeName: string | null; dimmed?: boolean; fill?: string | null };
@@ -1168,6 +1169,39 @@ export function GraphView(props: GraphViewProps): ReactElement {
   const [choice, setChoice] = useState<ViewChoice>("product");
   const structural = choice !== "instances";
 
+  /**
+   * Saved views: a named arrangement of what is on screen.
+   *
+   * A view records a *reading* — which perspective, what it focuses on — so
+   * opening one is applying that reading, never loading different facts. The
+   * list is what the caller is allowed to see; the withheld half comes back too,
+   * because a view someone cannot find should read as restricted, not imagined.
+   */
+  const savedViews = usePluginData<{
+    views: Array<{
+      id: string;
+      key: string;
+      name: string;
+      description: string;
+      kind: ViewChoice;
+      config: { focus?: string[] };
+      visibility: string;
+      roles: string[];
+      created_by: string;
+    }>;
+    withheld: Array<{ id: string; key: string; name: string }>;
+  }>("list-views", { companyId: props.companyId, domainId: props.domainId });
+  const saveView = usePluginAction("create-view");
+  const [viewPanelOpen, setViewPanelOpen] = useState(false);
+  const [viewDraft, setViewDraft] = useState({
+    name: "",
+    visibility: "shared" as "shared" | "restricted",
+    roles: [] as string[],
+  });
+  const [viewBusy, setViewBusy] = useState(false);
+  const [viewErr, setViewErr] = useState<string | null>(null);
+  const savedList = savedViews.data?.views ?? [];
+
   const perspectiveGraph = useMemo(() => {
     if (!structural) return null;
     return resolvePerspective(choice, {
@@ -1234,6 +1268,37 @@ export function GraphView(props: GraphViewProps): ReactElement {
             {/* The switch itself, plus what the picture does not show. */}
             <div className="pointer-events-none absolute left-2 top-2 z-10 flex flex-col items-start gap-1">
               <div className="pointer-events-auto flex items-center gap-0.5 rounded-lg border border-border bg-card/95 p-0.5 shadow-sm backdrop-blur">
+                {savedList.length > 0 && (
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      const picked = savedList.find((view) => view.id === e.target.value);
+                      if (!picked) return;
+                      setChoice(picked.kind);
+                      // Focus keys are the services/types the view is about; the
+                      // canvas reads them through the same filter the tree uses.
+                      props.onSelectNodeType?.(null);
+                    }}
+                    title={t("打开已保存的视图", "Open a saved view")}
+                    className="h-6 rounded-md bg-transparent px-1 text-(length:--text-nano) text-muted-foreground outline-none"
+                  >
+                    <option value="">{t("视图…", "Views…")}</option>
+                    {savedList.map((view) => (
+                      <option key={view.id} value={view.id}>
+                        {view.name}
+                        {view.visibility === "restricted" ? " 🔒" : ""}
+                      </option>
+                    ))}
+                  </select>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setViewPanelOpen((open) => !open)}
+                  title={t("把当前视图存下来", "Save the current view")}
+                  className="rounded-md px-1.5 py-0.5 text-(length:--text-nano) text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  ＋ {t("视图", "View")}
+                </button>
                 {VIEW_CHOICES.map((option) => (
                   <button
                     key={option.id}
@@ -1252,6 +1317,105 @@ export function GraphView(props: GraphViewProps): ReactElement {
                 ))}
               </div>
               {/* Colouring by layer or environment is opaque without a key. */}
+              {viewPanelOpen && (
+                <div className="pointer-events-auto flex w-[19rem] flex-col gap-1.5 rounded-md border border-border bg-card/95 p-2 text-(length:--text-nano) shadow-sm backdrop-blur">
+                  <div className="font-medium text-foreground/90">{t("保存当前视图", "Save this view")}</div>
+                  <input
+                    value={viewDraft.name}
+                    onChange={(e) => setViewDraft((d) => ({ ...d, name: e.target.value }))}
+                    placeholder={t("视图名称,例如 运行架构总览", "Name, e.g. Runtime overview")}
+                    className="rounded border border-border bg-background px-1.5 py-0.5 text-foreground outline-none focus:ring-1 focus:ring-ring"
+                  />
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={viewDraft.visibility}
+                      onChange={(e) =>
+                        setViewDraft((d) => ({ ...d, visibility: e.target.value as "shared" | "restricted" }))
+                      }
+                      className="rounded border border-border bg-background px-1 py-0.5 text-foreground outline-none"
+                    >
+                      <option value="shared">{t("所有人可见", "Everyone")}</option>
+                      <option value="restricted">{t("仅指定角色", "Only these roles")}</option>
+                    </select>
+                    {viewDraft.visibility === "restricted" && (
+                      <div className="flex flex-wrap gap-1">
+                        {VIEW_ROLES.map((role) => (
+                          <label key={role} className="flex items-center gap-0.5 text-muted-foreground">
+                            <input
+                              type="checkbox"
+                              checked={viewDraft.roles.includes(role)}
+                              onChange={(e) =>
+                                setViewDraft((d) => ({
+                                  ...d,
+                                  roles: e.target.checked
+                                    ? [...d.roles, role]
+                                    : d.roles.filter((r) => r !== role),
+                                }))
+                              }
+                            />
+                            {role}
+                          </label>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  {viewDraft.visibility === "restricted" && viewDraft.roles.length === 0 && (
+                    <div className="text-amber-600 dark:text-amber-500">
+                      {t("未选角色=仅你自己可见", "No roles = only you can open it")}
+                    </div>
+                  )}
+                  {viewErr && <div className="text-destructive">{viewErr}</div>}
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      disabled={viewBusy || viewDraft.name.trim() === ""}
+                      onClick={() => {
+                        setViewBusy(true);
+                        setViewErr(null);
+                        void (async () => {
+                          try {
+                            await saveView({
+                              companyId: props.companyId,
+                              domainId: props.domainId,
+                              key: `view-${Date.now().toString(36)}`,
+                              name: viewDraft.name.trim(),
+                              kind: choice,
+                              config: {},
+                              visibility: viewDraft.visibility,
+                              roles: viewDraft.roles,
+                            });
+                            setViewDraft({ name: "", visibility: "shared", roles: [] });
+                            setViewPanelOpen(false);
+                            savedViews.refresh();
+                          } catch (e) {
+                            setViewErr(String((e as Error)?.message ?? e));
+                          } finally {
+                            setViewBusy(false);
+                          }
+                        })();
+                      }}
+                      className="rounded bg-primary px-2 py-0.5 font-medium text-primary-foreground hover:opacity-90 disabled:opacity-50"
+                    >
+                      {viewBusy ? "…" : t("保存", "Save")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setViewPanelOpen(false)}
+                      className="rounded px-1.5 py-0.5 text-muted-foreground hover:text-foreground"
+                    >
+                      {t("取消", "Cancel")}
+                    </button>
+                    {(savedViews.data?.withheld ?? []).length > 0 && (
+                      <span className="ml-auto text-muted-foreground/70">
+                        {t(
+                          `${(savedViews.data?.withheld ?? []).length} 个视图受角色限制`,
+                          `${(savedViews.data?.withheld ?? []).length} restricted`,
+                        )}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
               {structural && perspectiveGraph && perspectiveGraph.legend.length > 1 && (
                 <div className="pointer-events-auto flex max-w-[22rem] flex-wrap items-center gap-x-2 gap-y-0.5 rounded-md border border-border bg-card/95 px-2 py-0.5 text-(length:--text-nano) text-muted-foreground shadow-sm backdrop-blur">
                   {perspectiveGraph.legend.map((entry) => (

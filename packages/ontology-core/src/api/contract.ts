@@ -95,6 +95,14 @@ export const CORE_API: CoreApiRoute[] = [
   r("create-proposal", "governance", true, "提交一份变更提案(不生效)"),
   r("decide-proposal", "governance", false, "批准/驳回提案,批准即执行"),
   r("list-proposals", "governance", true, "列出提案及待审队列"),
+  // A saved view is a shared articulation of the model, so an agent may read
+  // them — it is how "show me the runtime view" resolves to the same picture the
+  // team looks at. Deciding which views exist and who may open them stays
+  // board-only: a view is a governance artifact, not a scratch pad.
+  r("list-views", "governance", true, "列出已保存的视图(按角色过滤)"),
+  r("create-view", "governance", false, "保存当前视图"),
+  r("update-view", "governance", false, "改视图的名称/配置/可见性"),
+  r("delete-view", "governance", false, "删除视图"),
   r("delete-node-type", "schema", false, "删对象类型"),
   r("list-relation-types", "schema", true, "列出关系类型"),
   r("create-relation-type", "schema", false, "新建关系类型"),

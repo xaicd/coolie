@@ -25,6 +25,7 @@
 
 import type { GraphStore } from "../graph/GraphStore.js";
 import { architectureToArchifyIr, type ArchifyServiceInput } from "../export/archify.js";
+import { visibleViews, withheldViews } from "../views.js";
 
 export interface OntologyTool {
   /** Tool name as an agent sees it. */
@@ -431,6 +432,34 @@ export const ONTOLOGY_TOOLS: OntologyTool[] = [
           domainId,
           status as Parameters<GraphStore["listProposals"]>[2],
         ),
+      };
+    },
+  },
+  {
+    name: "ontology_list_views",
+    routeKey: "list-views",
+    displayName: "列出已保存的视图",
+    description:
+      "The saved views of a domain: named arrangements of the model, such as a runtime or deployment reading. Use one when a question refers to a view by name, so you and the team look at the same picture. Views you cannot open are reported too.",
+    parametersSchema: domainParams({
+      actor: { type: "string", description: "调用方身份,用于按角色过滤(可选)" },
+    }),
+    invoke: async (store, companyId, args) => {
+      const domainId = await resolveDomain(store, companyId, args);
+      const views = await store.listViews(companyId, domainId);
+      // This tool is reached by an agent, so the agent role is what it holds.
+      // A view restricted to human roles is one the agent must not read.
+      const audience = {
+        roles: ["agent"],
+        ...(str(args, "actor") ? { actor: str(args, "actor") } : {}),
+      };
+      return {
+        views: visibleViews(views, audience),
+        withheld: withheldViews(views, audience).map((view) => ({
+          key: view.key,
+          name: view.name,
+          visibility: view.visibility,
+        })),
       };
     },
   },

@@ -344,9 +344,9 @@ Still missing, in the order it hurts:
      table. A standalone deployment must ship a tenants table, or the foreign
      keys need relaxing. The test creates a minimal one, which is the smallest
      statement of what §6.1 has to build.
-3. **Saved views.** A perspective is computed, never persisted. A user who
-   arranges a view cannot name it, return to it, or share it — and 6.4 depends on
-   views being addressable.
+3. ~~**Saved views.**~~ **Done** (`migrations/015_views.sql`). A view records the
+   *reading* — which perspective, what it focuses on — never facts, so losing one
+   costs a reading and never the model. Opening one applies that reading.
 4. **Connectors that pull.** Mapping is a one-shot import today. "持续数据映射、
    批量校验、异步同步" — one of the user's own split triggers — needs mapping to be
    a repeatable job, not a wizard that runs once.
@@ -368,10 +368,18 @@ Still missing, in the order it hurts:
 1. **Roles.** The workshop has two actor classes (board, agent). A modelling tool
    needs at least modeler / reviewer / viewer, and the actor has to be a real
    identity rather than a host-supplied string.
-2. **Per-view visibility.** "针对不同角色用户 可以显示 不同视图" was an explicit
-   requirement, and views are exactly where it lands: the same material, different
-   audiences. Today a perspective has no permission attached, so 6.2.3 (saved
-   views) is the prerequisite.
+2. ~~**Per-view visibility.**~~ **Done.** A view is either shared or restricted to
+   a list of roles (`modeler | reviewer | viewer | agent`), and the actor class the
+   host reports maps onto those roles: a board actor holds the human roles, an
+   agent holds `agent`. The rule is deliberately small — no inheritance, no
+   per-view exceptions — because a permission model nobody can hold in their head
+   is one people work around instead of with.
+
+   Two details that make it honest rather than decorative: a view an actor cannot
+   open comes back **as withheld**, so someone who was told a view exists learns
+   it is restricted instead of concluding they imagined it; and an empty role list
+   on a restricted view means the creator only, which is how someone says "not
+   ready to share yet" — and it stays usable by the person who just made it.
 3. **Approval rules.** `governance_policy` and proposals exist; what is missing is
    a rule that says *which* changes need *whose* approval, instead of the single
    blanket gate for destructive schema edits.

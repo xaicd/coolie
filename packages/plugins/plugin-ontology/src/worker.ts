@@ -38,6 +38,13 @@ import { parseSqlDdl } from "@paperclipai/ontology-core/cognition/AstExtractor.j
 import { buildTypeProvenance } from "@paperclipai/ontology-core/provenance.js";
 import { architectureToArchifyIr } from "@paperclipai/ontology-core/export/archify.js";
 import { ONTOLOGY_TOOLS, callOntologyTool, type OntologyTool } from "@paperclipai/ontology-core/mcp/tools.js";
+import {
+  normaliseView,
+  validateView,
+  visibleViews,
+  withheldViews,
+} from "@paperclipai/ontology-core/views.js";
+import type { OntologyViewRow } from "@paperclipai/ontology-core/graph/GraphStore.js";
 import { subProjectsFromArchitecture } from "@paperclipai/ontology-core/architecture/subProjectMapping.js";
 import { parseOpenAPI } from "./legacy/openapiParser.js";
 import {
@@ -662,6 +669,73 @@ function summariseToolResult(tool: OntologyTool, data: unknown): string {
     }
   }
   return tool.displayName;
+}
+
+/**
+ * What an actor may open, and what they may not.
+ *
+ * Reporting the withheld half matters: a user who cannot find a view someone
+ * mentioned should learn it exists and is restricted, not conclude they imagined
+ * it. The actor defaults to the board, which sees everything shared.
+ */
+function describeViewsFor(
+  rows: OntologyViewRow[],
+  actorKind: "board" | "agent",
+  actor: string | undefined,
+): {
+  views: OntologyViewRow[];
+  withheld: Array<{ id: string; key: string; name: string }>;
+} {
+  // The roles an actor holds come from what the host says they are, not from a
+  // blanket grant: giving both actor classes every role would make a restricted
+  // view visible to everyone, which is a restriction in name only.
+  const audience = {
+    roles: actorKind === "agent" ? ["agent"] : ["modeler", "reviewer", "viewer"],
+    ...(actor ? { actor } : {}),
+  };
+  return {
+    views: visibleViews(rows, audience),
+    withheld: withheldViews(rows, audience).map((view) => ({
+      id: view.id,
+      key: view.key,
+      name: view.name,
+    })),
+  };
+}
+
+/** The HTTP half of `create-view`, sharing the validation with the bridge half. */
+async function createViewFromHttp(
+  store: GraphStore,
+  ctx: PluginContext,
+  companyId: string,
+  input: PluginApiRequestInput,
+): Promise<OntologyViewRow> {
+  const body = optionalRecord(input.body) ?? {};
+  const candidate = normaliseView({
+    key: requireString(body.key, "key"),
+    name: requireString(body.name, "name"),
+    description: optionalString(body.description),
+    kind: optionalString(body.kind) as never,
+    config: optionalRecord(body.config),
+    visibility: optionalString(body.visibility) as never,
+    roles: Array.isArray(body.roles) ? (body.roles as never) : [],
+    created_by: optionalString(body.actor) ?? "user",
+  });
+  const validation = validateView(candidate);
+  if (!validation.ok) throw new Error(validation.errors.join("; "));
+  const view = await store.createView({
+    companyId,
+    domainId: requireString(input.params.domainId ?? body.domainId, "domainId"),
+    ...candidate,
+    createdBy: candidate.created_by,
+  });
+  await ctx.activity.log({
+    companyId,
+    message: `Saved view ${view.key} (${view.visibility})`,
+    entityType: "ontology_view",
+    entityId: view.id,
+  });
+  return view;
 }
 
 /** A `string -> string` map, or undefined; anything else is a caller bug. */
@@ -2341,6 +2415,93 @@ const plugin = definePlugin({
 
     // Cognition (AST reverse-engineering) — data/action handlers for the UI:
     // create a job, ingest code files (extract a draft), review, publish to a domain.
+    /**
+     * Saved views.
+     *
+     * The rules live in the core (`views.ts`) and are applied here, where the
+     * actor is known: the list is filtered for the caller, and what was withheld
+     * is reported alongside it rather than dropped — a view somebody cannot see
+     * is a fact about their access, not an absence.
+     *
+     * Saving is board-only: a view is how the team agrees to look at the model,
+     * and an agent that could rewrite that agreement would be editing the shared
+     * picture rather than contributing to it.
+     */
+    ctx.actions.register("create-view", async (params) => {
+      const call = readMutationCall(params);
+      const candidate = normaliseView({
+        key: requireString(call.fields.key, "key"),
+        name: requireString(call.fields.name, "name"),
+        description: optionalString(call.fields.description),
+        kind: optionalString(call.fields.kind) as never,
+        config: optionalRecord(call.fields.config),
+        visibility: optionalString(call.fields.visibility) as never,
+        roles: Array.isArray(call.fields.roles) ? (call.fields.roles as never) : [],
+        created_by: optionalString(call.fields.actor) ?? "user",
+      });
+      const validation = validateView(candidate);
+      if (!validation.ok) throw new Error(validation.errors.join("; "));
+      const view = await store.createView({
+        companyId: call.companyId,
+        domainId: requireString(call.fields.domainId, "domainId"),
+        ...candidate,
+        createdBy: candidate.created_by,
+      });
+      await ctx.activity.log({
+        companyId: call.companyId,
+        message: `Saved view ${view.key} (${view.visibility})`,
+        entityType: "ontology_view",
+        entityId: view.id,
+      });
+      return { view };
+    });
+
+    ctx.actions.register("update-view", async (params) => {
+      const call = readMutationCall(params);
+      const viewId = requireString(call.fields.viewId, "viewId");
+      const update: Record<string, unknown> = {};
+      if (call.fields.name !== undefined) update.name = requireString(call.fields.name, "name");
+      if (call.fields.description !== undefined) update.description = optionalString(call.fields.description) ?? "";
+      if (call.fields.kind !== undefined) update.kind = optionalString(call.fields.kind);
+      if (call.fields.config !== undefined) update.config = optionalRecord(call.fields.config) ?? {};
+      if (call.fields.visibility !== undefined) update.visibility = optionalString(call.fields.visibility);
+      if (call.fields.roles !== undefined) {
+        update.roles = Array.isArray(call.fields.roles) ? (call.fields.roles as never) : [];
+      }
+      const validation = validateView({
+        key: "unchanged",
+        name: update.name === undefined ? "unchanged" : (update.name as string),
+        kind: update.kind as never,
+        visibility: update.visibility as never,
+        roles: update.roles as never,
+        config: update.config as never,
+      });
+      if (!validation.ok) throw new Error(validation.errors.join("; "));
+      const view = await store.updateView(call.companyId, viewId, update);
+      if (!view) return notFound("View not found");
+      return ok({ view });
+    });
+
+    ctx.actions.register("delete-view", async (params) => {
+      const call = readMutationCall(params);
+      const deleted = await store.deleteView(call.companyId, requireString(call.fields.viewId, "viewId"));
+      return deleted ? noContent() : notFound("View not found");
+    });
+
+    // The UI reads the list declaratively; an agent reaches the same data over
+    // the `list-views` route. Registering it as an action too would be a handler
+    // nothing calls.
+    ctx.data.register("list-views", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const rows = await store.listViews(companyId, domainId);
+      return describeViewsFor(
+        rows,
+        params.actorKind === "agent" ? "agent" : "board",
+        optionalString(params.actor),
+      );
+    });
+
     ctx.data.register("list-proposals", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
       const domainId = requireString(params.domainId, "domainId");
@@ -3865,6 +4026,53 @@ const plugin = definePlugin({
       case "decide-proposal": {
         const outcome = await decideProposalMutation(store, ctx, httpMutationCall(companyId, input));
         return { status: outcome.status, body: outcome.payload };
+      }
+
+      case "list-views": {
+        const rows = await store.listViews(
+          companyId,
+          requireString(queryString(input.query.domainId), "domainId"),
+        );
+        return {
+          body: describeViewsFor(
+            rows,
+            queryString(input.query.actorKind) === "agent" ? "agent" : "board",
+            queryString(input.query.actor),
+          ),
+        };
+      }
+
+      case "create-view": {
+        const view = await createViewFromHttp(store, ctx, companyId, input);
+        return { status: 201, body: { view } };
+      }
+
+      case "update-view": {
+        const body = optionalRecord(input.body) ?? {};
+        const view = await store.updateView(
+          companyId,
+          requireString(input.params.viewId, "viewId"),
+          {
+            ...(typeof body.name === "string" ? { name: body.name } : {}),
+            ...(typeof body.description === "string" ? { description: body.description } : {}),
+            ...(typeof body.kind === "string" ? { kind: body.kind as never } : {}),
+            ...(body.config !== undefined ? { config: optionalRecord(body.config) ?? {} } : {}),
+            ...(typeof body.visibility === "string" ? { visibility: body.visibility as never } : {}),
+            ...(Array.isArray(body.roles) ? { roles: body.roles as never } : {}),
+          },
+        );
+        if (!view) return { status: 404, body: { error: "View not found" } };
+        return { body: { view } };
+      }
+
+      case "delete-view": {
+        const deleted = await store.deleteView(
+          companyId,
+          requireString(input.params.viewId, "viewId"),
+        );
+        return deleted
+          ? { status: 204, body: {} }
+          : { status: 404, body: { error: "View not found" } };
       }
 
       case "architecture-diagram": {
