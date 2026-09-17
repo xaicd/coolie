@@ -16,11 +16,23 @@
  */
 
 import type { SqlClient } from "@paperclipai/ontology-core/graph/SqlClient.js";
+import type { TransactionalSqlClient } from "@paperclipai/ontology-core/migrate/runner.js";
 
 /** The slice of a `pg` pool this module uses. */
 export interface PgQueryable {
   query(sql: string, params?: unknown[]): Promise<{ rows: unknown[]; rowCount: number | null }>;
   end(): Promise<void>;
+  /**
+   * A dedicated connection, for the one caller that needs one: `pg` checks out a
+   * connection per query, so `BEGIN` through the pool would land on a different
+   * connection than the statements it is meant to wrap.
+   */
+  connect?(): Promise<PgConnection>;
+}
+
+export interface PgConnection {
+  query(sql: string, params?: unknown[]): Promise<{ rows: unknown[]; rowCount: number | null }>;
+  release(): void;
 }
 
 export interface PgSqlClientOptions {
@@ -30,17 +42,44 @@ export interface PgSqlClientOptions {
   namespace?: string;
 }
 
-export function createPgSqlClient(options: PgSqlClientOptions): SqlClient & { close(): Promise<void> } {
+export function createPgSqlClient(
+  options: PgSqlClientOptions,
+): TransactionalSqlClient & { close(): Promise<void> } {
   const namespace = options.namespace ?? "public";
-  return {
+  const on = (target: PgQueryable | PgConnection): SqlClient => ({
     namespace,
     async query<T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> {
-      const result = await options.pool.query(sql, params);
+      const result = await target.query(sql, params);
       return result.rows as T[];
     },
     async execute(sql: string, params: unknown[] = []): Promise<{ rowCount: number }> {
-      const result = await options.pool.query(sql, params);
+      const result = await target.query(sql, params);
       return { rowCount: result.rowCount ?? 0 };
+    },
+  });
+
+  return {
+    ...on(options.pool),
+    /**
+     * Run `fn` on one connection inside a transaction.
+     *
+     * Migrations are the caller: a half-applied file is worse than a failed one,
+     * and a pool hands each statement its own connection unless asked not to.
+     */
+    async withTransaction<T>(fn: (client: SqlClient) => Promise<T>): Promise<T> {
+      if (!options.pool.connect) return fn(on(options.pool));
+      const connection = await options.pool.connect();
+      try {
+        await connection.query("BEGIN");
+        const result = await fn(on(connection));
+        await connection.query("COMMIT");
+        return result;
+      } catch (error) {
+        await connection.query("ROLLBACK").catch(() => undefined);
+        throw error;
+      } finally {
+        connection.release();
+      }
     },
     close: () => options.pool.end(),
   };

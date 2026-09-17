@@ -128,6 +128,22 @@ export {
 export type { CoreApiDoc, CoreApiGroup, CoreApiRoute } from "./api/contract.js";
 export { ONTOLOGY_TOOLS, callOntologyTool, ontologyToolByName } from "./mcp/tools.js";
 export {
+  SCHEMA_TOKEN,
+  appliedMigrations,
+  applyMigrations,
+  checksum,
+  preflight,
+  splitStatements,
+  withNamespace,
+} from "./migrate/runner.js";
+export type {
+  MigrationFile,
+  MigrationPreflight,
+  MigrationResult,
+  TransactionalSqlClient,
+} from "./migrate/runner.js";
+
+export {
   API_KEY_ROLES,
   API_KEY_SCOPES,
   apiKeyPrefix,

@@ -11,5 +11,9 @@ declare module "pg" {
     constructor(config?: { connectionString?: string; max?: number });
     query(sql: string, params?: unknown[]): Promise<{ rows: unknown[]; rowCount: number | null }>;
     end(): Promise<void>;
+    connect(): Promise<{
+      query(sql: string, params?: unknown[]): Promise<{ rows: unknown[]; rowCount: number | null }>;
+      release(): void;
+    }>;
   }
 }

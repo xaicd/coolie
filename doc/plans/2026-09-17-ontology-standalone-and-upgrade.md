@@ -311,7 +311,7 @@ itself. The list below is grouped by what breaks if it is missing.
 | HTTP service | the plugin's worker, one route surface | the contract already exists (88 operations, `CORE_API_VERSION = 1`); this is a server around it |
 | **Authentication** | the host authenticates, then the manifest says `board` / `board-or-agent` | its own actor model: human sessions, and **agent API keys** (scoped, hashed) — a standalone service cannot inherit a host's auth |
 | **Tenant** | `company_id` on every table, validated by the host | its own workspace/tenant concept and its own access checks; the data model is already scoped correctly |
-| **Migrations** | the host applies `migrations/` | to own migration plus an upgrade path — which is what `schema_version` (§4.2 A) was groundwork for |
+| **Migrations** | the host applies `migrations/` | **Done** — `ontology-migrate` applies them itself, records what it applied and the checksum of each file, installs into a **chosen schema** (the files carry the plugin schema name because the host applies them verbatim; the runner substitutes it), and preflights the tenant-table requirement instead of failing halfway through a foreign key |
 | UI shell | rendered into the host's page slot, sidebar and modals | login, navigation, domain switcher, and the settings surfaces the host supplied |
 | Observability | nothing | health, metrics, logging |
 
@@ -417,6 +417,8 @@ is `region` / `security-group`), so they are expressed as grid rows.
 2. ~~**`ontology-mcp`** (6.2.2)~~ **Done**, including the standalone server.
 3. **Saved views, then per-view roles** (6.2.3 → 6.4.2) — the requirement the user
    stated most concretely.
-4. **Migration ownership** (6.1) — reconnect the host's migration step to our own
-   version and change-set work.
+4. ~~**Migration ownership** (6.1)~~ **Done** — with one cutover left: the tables
+   created before the ontology owned its tenancy still reference the host tenant
+   table, which the preflight now reports rather than leaving to a foreign key
+   error.
 5. **Fact proposals** (6.2.1) — finish the rule.

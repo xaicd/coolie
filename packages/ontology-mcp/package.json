@@ -5,7 +5,8 @@
   "type": "module",
   "description": "Standalone MCP server for the ontology: the agent tools, served straight from the database with no application in front of them.",
   "bin": {
-    "ontology-mcp": "./dist/stdio.js"
+    "ontology-mcp": "./dist/stdio.js",
+    "ontology-migrate": "./dist/migrate.js"
   },
   "exports": {
     ".": "./src/index.ts",

@@ -4,8 +4,8 @@ import esbuild from "esbuild";
 // has native bindings and must stay a real require; the core is TypeScript
 // source in this workspace, so it has to be compiled in.
 await esbuild.build({
-  entryPoints: ["src/stdio.ts"],
-  outfile: "dist/stdio.js",
+  entryPoints: ["src/stdio.ts", "src/migrate.ts"],
+  outdir: "dist",
   bundle: true,
   platform: "node",
   format: "esm",
