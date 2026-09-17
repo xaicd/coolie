@@ -1,0 +1,28 @@
+{
+  "name": "@paperclipai/ontology-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone MCP server for the ontology: the agent tools, served straight from the database with no application in front of them.",
+  "bin": {
+    "ontology-mcp": "./dist/stdio.js"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./*.js": "./src/*.ts",
+    "./*": "./src/*.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "node ./esbuild.config.mjs",
+    "test": "vitest run --config ./vitest.config.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "@paperclipai/ontology-core": "workspace:*",
+    "pg": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3"
+  }
+}

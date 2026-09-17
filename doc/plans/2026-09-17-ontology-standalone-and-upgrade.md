@@ -326,9 +326,24 @@ Still missing, in the order it hurts:
 
 1. **Fact proposals.** The table and the review path exist; the second payload
    kind does not. "An agent proposes a fact" is half the rule in §3.
-2. **`ontology-mcp`.** The 16 agent-visible operations exist as HTTP routes and
-   nothing exposes them as tools. This is how a semantic base gets *used* — until
-   it exists, agents can reach the ontology only by being wired to it by hand.
+2. ~~**`ontology-mcp`.**~~ **Done** — and it runs on its own.
+   `@paperclipai/ontology-mcp` serves the core's tool catalogue over MCP/stdio
+   against a PostgreSQL it connects to directly, so an agent gets the business
+   map with no Paperclip process involved. The catalogue is shared with the
+   plugin's `ctx.tools`, so the two cannot describe the domain differently.
+
+   `packages/ontology-mcp/tests/standalone.spec.ts` is the proof the whole plan
+   was for: a real embedded PostgreSQL, the ontology's own migrations, the core
+   over a plain `pg` pool, and an MCP client listing 20 tools and calling them.
+   **No host.** It also made two prerequisites visible rather than theoretical:
+
+   - the migrations name the plugin's schema (`plugin_ontology_…`), so a
+     standalone deployment either keeps that name or the migrations need a
+     parameter — it works, but nobody decided it;
+   - **every ontology table references `public.companies`**, the host's tenant
+     table. A standalone deployment must ship a tenants table, or the foreign
+     keys need relaxing. The test creates a minimal one, which is the smallest
+     statement of what §6.1 has to build.
 3. **Saved views.** A perspective is computed, never persisted. A user who
    arranges a view cannot name it, return to it, or share it — and 6.4 depends on
    views being addressable.
@@ -389,9 +404,10 @@ is `region` / `security-group`), so they are expressed as grid rows.
 
 ### 6.7 Order
 
-1. **Authentication and tenant** (6.1) — nothing else can be a product without them.
-2. **`ontology-mcp`** (6.2.2) — the cheapest way to make the semantic base
-   actually used.
+1. **Authentication and tenant** (6.1) — nothing else can be a product without
+   them, and the standalone proof now shows exactly what the tenant half means:
+   the ontology borrows the host's `public.companies` table and has to own it.
+2. ~~**`ontology-mcp`** (6.2.2)~~ **Done**, including the standalone server.
 3. **Saved views, then per-view roles** (6.2.3 → 6.4.2) — the requirement the user
    stated most concretely.
 4. **Migration ownership** (6.1) — reconnect the host's migration step to our own
