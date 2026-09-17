@@ -21,6 +21,24 @@ export interface SourceFile {
   content: string;
 }
 
+/**
+ * The database a service connects to, out of its Spring `datasource.url`.
+ *
+ * Worth reading for one reason: a legacy "distributed" system very often turns
+ * out to be several services on **one** database, and nothing in the code says
+ * so. Two services that touch different tables of the same schema are invisible
+ * to a table-name match; the connection string is where it is stated.
+ */
+export interface SpringDatasource {
+  database: string;
+  host?: string;
+  port?: number;
+  /** `mysql`, `postgresql`, `oracle`… out of the JDBC url. */
+  vendor?: string;
+  /** `<file>:<key>` — the edge an architecture finding points back at. */
+  evidence: string;
+}
+
 export interface DetectedService {
   /** Stable slug used as the sub-project code. */
   key: string;
@@ -29,6 +47,8 @@ export interface DetectedService {
   path: string;
   type: SubProjectType;
   evidence: string[];
+  /** Absent when the service declares no datasource this parser can resolve. */
+  datasource?: SpringDatasource;
 }
 
 /** Files whose presence marks a directory as a buildable unit. */
@@ -325,20 +345,39 @@ const SPRING_CONFIG_RE = /(^|\/)(application|bootstrap)(-[\w.]+)?\.(ya?ml|proper
  * folder happened to be named right (`ruoyi-system`), not that anything had
  * declared the service.
  */
-export function parseSpringAppName(content: string, path: string): string | undefined {
-  const strip = (value: string): string | undefined => {
-    const cleaned = value.trim().replace(/^["']|["']$/g, "").replace(/\s+#.*$/, "").trim();
-    return cleaned === "" ? undefined : cleaned;
-  };
+/** A value the way Spring writes it: quoted, with a trailing comment allowed. */
+function stripConfigValue(value: string): string | undefined {
+  const cleaned = value.trim().replace(/^["']|["']$/g, "").replace(/\s+#.*$/, "").trim();
+  return cleaned === "" ? undefined : cleaned;
+}
 
+function springConfigs(files: SourceFile[], root: string): SourceFile[] {
+  return filesUnder(files, root)
+    .filter((file) => SPRING_CONFIG_RE.test(file.path))
+    // `src/main/resources` is the real config; test/profile files are secondary.
+    .sort((a, b) => {
+      const rank = (path: string) => (path.includes("/src/main/resources/") ? 0 : 1);
+      return rank(a.path) - rank(b.path) || a.path.length - b.path.length;
+    });
+}
+
+/**
+ * Read `a.b.c` out of a Spring config file, whichever way it is written.
+ *
+ * YAML's nesting is indentation, so it is walked rather than regexed; the
+ * flattened `a.b.c: value` form is one key and is read directly. Properties files
+ * say it on one line either way. Both `parseSpringAppName` and the datasource
+ * reader go through here, so the two cannot disagree about what the file says.
+ */
+function springConfigValue(content: string, path: string, keys: string[]): string | undefined {
+  const flat = keys.join(".");
   if (/\.properties$/i.test(path)) {
-    const match = /^\s*spring\.application\.name\s*[:=]\s*(.+)$/m.exec(content);
-    return match ? strip(match[1]!) : undefined;
+    const match = new RegExp(`^\\s*${flat.replace(/\./g, "\\.")}\\s*[:=]\\s*(.+)$`, "m").exec(content);
+    return match ? stripConfigValue(match[1]!) : undefined;
   }
 
-  // YAML: indentation decides nesting, so walk it rather than regex the tree.
-  let springIndent: number | null = null;
-  let appIndent: number | null = null;
+  // One entry per level already descended; its value is that level's indentation.
+  const open: number[] = [];
   for (const line of content.split("\n")) {
     if (line.trim() === "" || /^\s*#/.test(line)) continue;
     const match = /^(\s*)([\w.\-]+)\s*:\s*(.*)$/.exec(line);
@@ -347,36 +386,84 @@ export function parseSpringAppName(content: string, path: string): string | unde
     const key = match[2]!;
     const value = match[3]!;
 
-    if (key === "spring.application.name") return strip(value);
+    if (key === flat) return stripConfigValue(value);
 
-    if (springIndent !== null && indent <= springIndent && key !== "spring") {
-      springIndent = null;
-      appIndent = null;
-    }
-    if (springIndent === null) {
-      if (key === "spring") springIndent = indent;
-      continue;
-    }
-    if (appIndent !== null && indent <= appIndent) appIndent = null;
-    if (appIndent === null) {
-      if (key === "application") appIndent = indent;
-      continue;
-    }
-    if (key === "name") return strip(value);
+    // A sibling or shallower key closes every level it is not nested under.
+    while (open.length > 0 && indent <= open[open.length - 1]!) open.pop();
+    if (key !== keys[open.length]) continue;
+    if (open.length === keys.length - 1) return stripConfigValue(value);
+    open.push(indent);
+  }
+  return undefined;
+}
+
+export function parseSpringAppName(content: string, path: string): string | undefined {
+  return springConfigValue(content, path, ["spring", "application", "name"]);
+}
+
+/**
+ * The database out of a JDBC url, or undefined — including when the url is a
+ * placeholder (`${MYSQL_URL}`) or a shape this reader does not know. A database
+ * name guessed out of the wrong part of the string is worse than none: it would
+ * pair two services that share nothing.
+ */
+function parseJdbcUrl(url: string): Omit<SpringDatasource, "evidence"> | undefined {
+  // jdbc:mysql://db:3306/ruoyi?useUnicode=true
+  const uri = /^jdbc:([a-z0-9]+):\/\/([^/?;]*)(?:\/([^?;]+))?/i.exec(url);
+  if (uri) {
+    const [host, port] = (uri[2] ?? "").split(":");
+    // jdbc:sqlserver://db:1433;databaseName=ruoyi
+    const named = /(?:^|;)databaseName=([^;]+)/i.exec(url);
+    const database = (named?.[1] ?? uri[3])?.trim();
+    if (!database) return undefined;
+    return {
+      vendor: uri[1]!.toLowerCase(),
+      ...(host ? { host } : {}),
+      ...(port && /^\d+$/.test(port) ? { port: Number(port) } : {}),
+      database,
+    };
+  }
+  // jdbc:oracle:thin:@db:1521:ORCL
+  const sid = /^jdbc:(oracle):[a-z]+:@([^:]+)(?::(\d+))?:(\w+)/i.exec(url);
+  if (sid) {
+    return {
+      vendor: sid[1]!.toLowerCase(),
+      host: sid[2]!,
+      ...(sid[3] ? { port: Number(sid[3]) } : {}),
+      database: sid[4]!,
+    };
+  }
+  return undefined;
+}
+
+/** The datasource a Spring config states, if it states one this parser can read. */
+export function parseSpringDatasource(content: string, path: string): SpringDatasource | undefined {
+  for (const keys of [
+    ["spring", "datasource", "url"],
+    ["spring", "datasource", "druid", "url"],
+    ["spring", "datasource", "master", "url"],
+    ["spring", "datasource", "slave", "url"],
+  ]) {
+    const url = springConfigValue(content, path, keys);
+    if (!url) continue;
+    const parsed = parseJdbcUrl(url);
+    if (parsed) return { ...parsed, evidence: `${path}:${keys.join(".")}` };
+  }
+  return undefined;
+}
+
+/** The datasource for a service root, from the same configs the name comes from. */
+export function readSpringDatasource(files: SourceFile[], root: string): SpringDatasource | undefined {
+  for (const config of springConfigs(files, root)) {
+    const datasource = parseSpringDatasource(config.content, config.path);
+    if (datasource) return datasource;
   }
   return undefined;
 }
 
 /** The Spring-declared app name for a service root, when it declares one. */
 export function readSpringAppName(files: SourceFile[], root: string): string | undefined {
-  const configs = filesUnder(files, root)
-    .filter((file) => SPRING_CONFIG_RE.test(file.path))
-    // `src/main/resources` is the real config; test/profile files are secondary.
-    .sort((a, b) => {
-      const rank = (path: string) => (path.includes("/src/main/resources/") ? 0 : 1);
-      return rank(a.path) - rank(b.path) || a.path.length - b.path.length;
-    });
-  for (const config of configs) {
+  for (const config of springConfigs(files, root)) {
     const name = parseSpringAppName(config.content, config.path);
     if (name) return name;
   }
@@ -413,12 +500,17 @@ export function detectServices(files: SourceFile[]): DetectedService[] {
     // application.yml. Falling back to the directory is a last resort.
     const springName = packageJson ? undefined : readSpringAppName(files, root);
     if (springName) evidence.push(`spring.application.name = ${springName}`);
+    // Read even when `package.json` named the service: a JS service can point at
+    // the same database as a Java one, and that is the coupling the edge is for.
+    const datasource = readSpringDatasource(owned, root);
+    if (datasource) evidence.push(`datasource.url → ${datasource.database}`);
     services.push({
       key: slug(packageJson?.name ?? springName ?? gitRepoName),
       name: packageJson?.name ?? springName ?? gitRepoName,
       path: root,
       type,
       evidence,
+      ...(datasource ? { datasource } : {}),
     });
   }
 

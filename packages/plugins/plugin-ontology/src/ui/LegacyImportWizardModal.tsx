@@ -27,6 +27,7 @@ import { readOrigin } from "@paperclipai/ontology-core/provenance.js";
 // Type-only: erased at build time, and it keeps the preview honest about what
 // the scanner actually produced.
 import type { ScannedService } from "@paperclipai/ontology-core/cognition/projectScanner.js";
+import type { SharedDatabase } from "@paperclipai/ontology-core/architecture/index.js";
 import type { DetectedDependency } from "@paperclipai/ontology-core/architecture/index.js";
 
 /** What the modal currently knows about the user's source material. Filled
@@ -71,6 +72,13 @@ export type ParsedSource = {
   /** Service→service edges the scan derived, forwarded with `services`. */
   dependencies?: DetectedDependency[];
   /**
+   * Databases more than one service connects to. A finding rather than an edge:
+   * a shared database is symmetric, so there is no direction to draw — but it is
+   * the coupling a legacy tree most often hides, because two services reading
+   * different tables of one schema match no table name.
+   */
+  sharedDatabases?: SharedDatabase[];
+  /**
    * Per-type provenance as the `ontology_node_types.metadata` bag — package,
    * service, mapped table, stereotype, and the files the type came from. Keyed
    * by object-type key and forwarded verbatim on publish, so the row can be
@@ -81,6 +89,8 @@ export type ParsedSource = {
   scanCoverage?: {
     byExtension: Record<string, number>;
     unsupported: Record<string, number>;
+    /** Read for service/deploy/datasource facts; yields no object type. */
+    architectureOnly?: Record<string, number>;
     truncationNote: string | null;
   };
 };
@@ -359,10 +369,12 @@ function Step1Body({
         repos: [...repos],
         services: scan.services,
         dependencies: scan.dependencies,
+        sharedDatabases: scan.sharedDatabases,
         provenance,
         scanCoverage: {
           byExtension: scan.byExtension,
           unsupported: scan.unsupported,
+          architectureOnly: scan.architectureOnly,
           truncationNote: scan.truncationNote,
         },
       });
@@ -530,10 +542,38 @@ function Step1Body({
                       ({s.layer} · {s.typeCount} {t("类型", "types")} / {s.fileCount}{" "}
                       {t("文件", "files")})
                     </span>
+                    {s.datasource && (
+                      <span className="ml-1 opacity-70" title={s.datasource.evidence}>
+                        · {t("库", "db")} <span className="text-foreground/80">{s.datasource.database}</span>
+                      </span>
+                    )}
                   </li>
                 ))}
                 {parsed.services.length > 6 && (
                   <li className="text-muted-foreground">· … {parsed.services.length - 6} more</li>
+                )}
+              </ul>
+            </div>
+          )}
+
+          {parsed.sharedDatabases && parsed.sharedDatabases.length > 0 && (
+            // A finding, not a dependency edge: the database is shared, and
+            // neither service owns it, so there is no direction to draw.
+            <div className="mb-2 rounded border border-border/60 bg-muted/30 px-2 py-1.5">
+              <div className="mb-0.5 font-medium text-amber-600 dark:text-amber-500">
+                {t("共享数据库", "Shared databases")} · {parsed.sharedDatabases.length}
+              </div>
+              <ul className="space-y-0.5">
+                {parsed.sharedDatabases.slice(0, 4).map((db) => (
+                  <li key={`${db.where}/${db.database}`} className="text-muted-foreground">
+                    · <span className="text-foreground/80">{db.database}</span>
+                    <span className="ml-1 opacity-70">
+                      @{db.where} · {db.services.join(" + ")}
+                    </span>
+                  </li>
+                ))}
+                {parsed.sharedDatabases.length > 4 && (
+                  <li className="text-muted-foreground">· … {parsed.sharedDatabases.length - 4} more</li>
                 )}
               </ul>
             </div>
@@ -547,6 +587,16 @@ function Step1Body({
                 .slice(0, 8)
                 .map(([ext, n]) => `${ext}×${n}`)
                 .join(" ")}
+              {Object.keys(parsed.scanCoverage.architectureOnly ?? {}).length > 0 && (
+                <div className="text-muted-foreground">
+                  {t("仅用于架构事实", "Architecture facts only")}:{" "}
+                  {Object.entries(parsed.scanCoverage.architectureOnly ?? {})
+                    .sort((a, b) => b[1] - a[1])
+                    .slice(0, 6)
+                    .map(([ext, n]) => `${ext}×${n}`)
+                    .join(" ")}
+                </div>
+              )}
               {Object.keys(parsed.scanCoverage.unsupported).length > 0 && (
                 <div className="text-amber-600 dark:text-amber-500">
                   {t("暂不支持", "No parser yet")}:{" "}

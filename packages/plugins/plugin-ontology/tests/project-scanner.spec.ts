@@ -201,6 +201,22 @@ describe("scanProject — reporting", () => {
     expect(result.unsupported[".xml"]).toBeUndefined();
   });
 
+  it("does not call a config file unread when it is read for architecture facts", () => {
+    // The preview reads a service's name, deploy block and datasource out of
+    // these very files, so listing them under "No parser yet" made one screen
+    // contradict itself. A file nothing opens is a gap; a file read for
+    // something else is not.
+    const result = scanProject([
+      { path: "svc/pom.xml", content: "<project/>" },
+      { path: "svc/src/main/resources/application.yml", content: "spring:\n  application:\n    name: svc\n" },
+      { path: "api/service.thrift", content: "service Foo {}" },
+    ]);
+    expect(result.architectureOnly[".yml"]).toBe(1);
+    expect(result.unsupported[".yml"]).toBeUndefined();
+    expect(result.unsupported[".thrift"]).toBe(1);
+    expect(result.architectureOnly[".thrift"]).toBeUndefined();
+  });
+
   it("applies the file ceiling and says so", () => {
     const files: SourceFile[] = Array.from({ length: MAX_FILES + 5 }, (_, i) => ({
       path: `src/A${i}.java`,

@@ -28,9 +28,11 @@ import { extractRepoDraft } from "./AstExtractor.js";
 import {
   analyzeArchitecture,
   applyLimits,
+  isArchitectureRelevant,
   type ArchitectureAnalysis,
   type DetectedDependency,
   type ServiceArchitecture,
+  type SharedDatabase,
 } from "../architecture/index.js";
 import { MANIFEST_FILES } from "../architecture/serviceDetector.js";
 
@@ -66,11 +68,20 @@ export interface ProjectScanResult {
   dependencies: DetectedDependency[];
   /** References seen but not tieable to a service. Surfaced, not dropped. */
   unresolved: DetectedDependency[];
+  /** Databases more than one service connects to. Surfaced, not dropped. */
+  sharedDatabases: SharedDatabase[];
   architectureCoverage: ArchitectureAnalysis["coverage"];
   /** Extension → files read. */
   byExtension: Record<string, number>;
   /** Extension → files seen but unreadable by any parser. Surfaced, not dropped. */
   unsupported: Record<string, number>;
+  /**
+   * Extension → files read only for architecture facts (service name, deploy
+   * config, datasource), contributing no object types. Kept apart from
+   * `unsupported` so the report does not call a file unread on the same screen it
+   * shows a fact read out of it.
+   */
+  architectureOnly: Record<string, number>;
   /** Set when the ceilings dropped material. */
   truncationNote: string | null;
 }
@@ -127,6 +138,7 @@ export function scanProject(
 
   const byExtension: Record<string, number> = {};
   const unsupported: Record<string, number> = {};
+  const architectureOnly: Record<string, number> = {};
   const filesPerService = new Map<string, number>();
   for (const file of limited) {
     const base = basenameOf(file.path);
@@ -136,7 +148,17 @@ export function scanProject(
     if ((MANIFEST_FILES as readonly string[]).includes(base)) continue;
     const ext = extensionOf(file.path);
     if (IGNORED_EXTENSIONS.has(ext)) continue;
-    tally(PARSED_EXTENSIONS.has(ext) ? byExtension : unsupported, ext === "" ? "(none)" : ext);
+    // Three buckets, because two made the report contradict itself: a
+    // `application.yml` yields no object type but the architecture pass reads its
+    // service name, deploy block and datasource out of it, so the preview could
+    // show `db ruoyi` mined from a file it listed as having no parser. A file
+    // nothing opens is a gap; a file read for something else is not.
+    const bucket = PARSED_EXTENSIONS.has(ext)
+      ? byExtension
+      : isArchitectureRelevant(file.path)
+        ? architectureOnly
+        : unsupported;
+    tally(bucket, ext === "" ? "(none)" : ext);
     const service = serviceForPath(file.path, serviceNames);
     if (service) filesPerService.set(service, (filesPerService.get(service) ?? 0) + 1);
   }
@@ -161,9 +183,11 @@ export function scanProject(
     services,
     dependencies: architecture.dependencies,
     unresolved: architecture.unresolved,
+    sharedDatabases: architecture.sharedDatabases,
     architectureCoverage: architecture.coverage,
     byExtension,
     unsupported,
+    architectureOnly,
     truncationNote: note,
   };
 }

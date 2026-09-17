@@ -15,13 +15,13 @@ import type {
   MicroserviceLayer,
   SubProjectType,
 } from "../enums.js";
-import type { SourceFile } from "./serviceDetector.js";
+import type { SourceFile, SpringDatasource } from "./serviceDetector.js";
 import { detectServices, MANIFEST_FILES } from "./serviceDetector.js";
 import { detectStack, type DeployInfo, type StackInfo } from "./stackDetector.js";
 import { extractDependencies, type DetectedDependency } from "./dependencyExtractor.js";
 import { classifyLayers, type LayerVerdict } from "./layerClassifier.js";
 
-export type { SourceFile, DetectedService } from "./serviceDetector.js";
+export type { SourceFile, DetectedService, SpringDatasource } from "./serviceDetector.js";
 export type { DetectedDependency } from "./dependencyExtractor.js";
 export type { LayerVerdict } from "./layerClassifier.js";
 export type { StackInfo, DeployInfo } from "./stackDetector.js";
@@ -42,11 +42,35 @@ export interface ServiceArchitecture {
   /** Ready for `ontology_sub_projects.build_config`. */
   buildConfig: Record<string, unknown>;
   evidence: string[];
+  /** The database it connects to, when its config states one. */
+  datasource?: SpringDatasource;
+}
+
+/**
+ * Several services connecting to one database.
+ *
+ * This is the coupling a legacy map most needs and the least likely to be written
+ * down: two services on one schema are invisible to a table-name match when they
+ * touch different tables. Reported as a *finding* rather than a dependency edge,
+ * because a shared database is symmetric — neither service owns it the way a
+ * table's declaring service owns the table, so a directed edge would be inventing
+ * which end depends on which.
+ */
+export interface SharedDatabase {
+  database: string;
+  /** `host:port` as declared; "" when the url named no host. */
+  where: string;
+  /** Service keys connecting to it, in scan order. */
+  services: string[];
+  /** The config files that declared it. */
+  evidence: string[];
 }
 
 export interface ArchitectureAnalysis {
   services: ServiceArchitecture[];
   dependencies: DetectedDependency[];
+  /** Databases more than one service connects to. Empty when none are shared. */
+  sharedDatabases: SharedDatabase[];
   /** References we saw but could not tie to a service. Surfaced, not dropped. */
   unresolved: DetectedDependency[];
   coverage: {
@@ -128,6 +152,22 @@ export function analyzeArchitecture(
   const { dependencies, unresolved } = extractDependencies(limited, services, tablesByService);
   const layers = classifyLayers(services, dependencies, overrides);
 
+  // Grouped on `where/database`, not on the database name alone: `ruoyi` on two
+  // different hosts is two databases, and calling that a shared schema would put
+  // a coupling in the map that nobody could act on.
+  const byDatabase = new Map<string, SharedDatabase>();
+  for (const service of services) {
+    const datasource = service.datasource;
+    if (!datasource) continue;
+    const where = `${datasource.host ?? ""}${datasource.port ? `:${datasource.port}` : ""}`;
+    const found = byDatabase.get(`${where}/${datasource.database}`)
+      ?? { database: datasource.database, where, services: [], evidence: [] };
+    found.services.push(service.key);
+    found.evidence.push(datasource.evidence);
+    byDatabase.set(`${where}/${datasource.database}`, found);
+  }
+  const sharedDatabases = [...byDatabase.values()].filter((entry) => entry.services.length > 1);
+
   const byType: Record<DependencyType, number> = {
     "api-call": 0,
     "shared-lib": 0,
@@ -153,12 +193,14 @@ export function analyzeArchitecture(
       deploy,
       buildConfig,
       evidence: service.evidence,
+      ...(service.datasource ? { datasource: service.datasource } : {}),
     };
   });
 
   return {
     services: enriched,
     dependencies,
+    sharedDatabases,
     unresolved,
     coverage: {
       fileCount: limited.length,
