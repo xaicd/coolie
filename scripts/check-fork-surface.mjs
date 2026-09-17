@@ -45,6 +45,7 @@ export const OWNED_PREFIXES = [
   "scripts/check-fork-surface",
   "scripts/check-testing-defenses",
   "scripts/check-ontology",
+  "scripts/convert-ontology-playground",
 ];
 
 /** Regenerated, not authored — it cannot be resolved by hand anyway. */
