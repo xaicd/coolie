@@ -2,11 +2,24 @@
 
 Date: 2026-09-17. Baseline: 20e10fc2697ccfb02634264e3bd75a6c9931613e.
 
-The ontology is being incubated inside a Paperclip plugin. The plan is that it
-becomes its own service later, without a rewrite, and that it is the layer DSH's
-`ontology-mcp` talks to. This document records where that stands, what is still
-missing to be deployable on its own, and — the part with no design yet — how the
-ontology itself evolves when the model changes.
+**Settled, 2026-09-17: the ontology is not being split out.** The plan this
+document was written around — that the ontology becomes its own service later,
+without a rewrite, with DSH's `ontology-mcp` talking to it — was called off
+("别搞独立了"). Sections 2 and 6.1 below are therefore a record of what was built
+and what a standalone deployment would have taken, **not a queue of work**: do not
+resume them on the strength of this document. The trigger has to come from the
+user again.
+
+What survives is the boundary, as an *internal* one. `packages/ontology-core/` is
+a real workspace package, but the plugin still bundles it and nothing about how
+the plugin starts, deploys or is invoked changed; the boundary earns its keep by
+being checkable — the core may not depend on the host (no React, no Paperclip
+types), which `tests/layering.spec.ts` enforces. Declaring the split finished
+would have been the same mistake in the other direction, so: the package stays,
+the deployment does not.
+
+Everything that was never about deployment still holds, and is what §3 (standard
+shape) and §4 (upgrading the ontology) are for.
 
 Everything in "current state" was checked against the code at the baseline; the
 gaps are stated as facts with the place they live, not as impressions.
@@ -444,3 +457,52 @@ is `region` / `security-group`), so they are expressed as grid rows.
    table, which the preflight now reports rather than leaving to a foreign key
    error.
 5. **Fact proposals** (6.2.1) — finish the rule.
+
+**Stopped with the direction:** `2.3 What is still missing` (its own actor model,
+own migration ownership) and the rest of §6.1. The `ontology-mcp` standalone
+server that was already built stays where it is — it is not load-bearing for
+anything, and nothing points at it.
+
+**Landed since the baseline**, from the scan-fidelity threads rather than the
+deployment ones:
+
+- ~~**Domain list management**~~ **Done** — `DomainList` had been written for a
+  domain-picker entry point that a header `<select>` ended up covering, so it sat
+  unrendered while the only thing the UI could do with a domain was look at it.
+  It is rendered now under 运维 → 本体域, with rename, lifecycle transition and
+  retire per row, and the transitions offered are the ones `DOMAIN_STATE_TRANSITIONS`
+  permits rather than a hand-copied list. Two operations had to move surfaces to
+  make it reachable: `update-domain` and `transition-domain` were HTTP-only routes
+  with no `ctx.actions.register`, so `usePluginAction` could not see them. Both are
+  mutation handlers now and the routes delegate to them. Building the panel also
+  closed a leak that retiring domains had opened — `GET /domains` hand-wrote a
+  projection with no `is_deleted` filter and returned retired domains, which only
+  whoever used that one path could see. It reads through the store now, like the
+  data face, and both return the same rows.
+- ~~**MyBatis XML statements**~~ **Done, and deliberately not as actions.** A
+  mapper's statements now yield the *tables* they name, keyed exactly as written so
+  they merge with what a DDL `CREATE TABLE` produced — for a plain RuoYi project
+  with no DDL in the repository, the mapper is the only artifact that states a
+  table at all. The class-to-table edge is emitted only when the mapper leaves one
+  candidate on each side; two classes and two tables would make three of the four
+  pairings wrong. Statements are still not actions (see `mybatisParser.ts`), and
+  a SQL-only table still gets no columns.
+- ~~**DDL statement shapes**~~ **Done** — found while testing the merge above, both
+  of them silent: the column regex was anchored to the start of a line, so
+  `create table t (a bigint, b varchar(64));` imported with **one** column whatever
+  the types were; and the statement had to end in `;`, so a dump whose last
+  statement has no terminator lost that table entirely. Both are pinned in
+  `tests/sql-ddl-shapes.spec.ts`, and both were confirmed fixed on a live import
+  rather than only in the suite.
+
+**Still open, stated as facts:**
+
+- `.properties` and `.yml` are consumed only for `spring.application.name` and
+  deploy facts; the object-model scan reports them as unreadable.
+- `propertiesSchema` field order does not survive Postgres `jsonb`, so the Schema
+  page cannot present the source's order as the source's (see the ordering rule in
+  §3).
+- The `SAA` legacy domain's five relation types have no endpoints. Each spans more
+  than one endpoint pair, so this needs a decision — pick a primary pair, or split
+  into several relation types — and is deliberately not patched over.
+
