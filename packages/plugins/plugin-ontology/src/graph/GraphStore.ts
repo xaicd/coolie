@@ -1,5 +1,10 @@
 import { randomUUID } from "node:crypto";
 import { relationEndpoints } from "../relationEndpoints.js";
+import {
+  diffPropertySchemas,
+  planPropertyRenames,
+  type RenamePlan,
+} from "../schemaEvolution.js";
 import type { SqlClient } from "./SqlClient.js";
 
 /**
@@ -204,6 +209,44 @@ export interface OntologyNodeTypeUpdate {
   layer?: NodeLayer;
   layerSpec?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
+  /**
+   * `oldKey -> newKey`, for a schema edit that renames a property.
+   *
+   * A diff cannot tell a rename from a delete plus an add, so the author has to
+   * say which it is. Declaring it is what makes the existing instances follow:
+   * without it their values keep the old key and the instances quietly stop
+   * matching the type they belong to.
+   */
+  propertyRenames?: Record<string, string>;
+}
+
+/**
+ * Whether a schema edit touched the data at all.
+ *
+ * An edit that only adds a field has no data consequences, and recording an
+ * empty outcome for it would bury the edits that do under a field nobody can
+ * tell apart from noise.
+ */
+export function schemaEditHasEffect(outcome: SchemaEditOutcome): boolean {
+  return (
+    outcome.migrated.length > 0 ||
+    outcome.orphaned.length > 0 ||
+    outcome.ignoredRenames.length > 0
+  );
+}
+
+/** What a schema edit did to the data underneath it. */
+export interface SchemaEditOutcome {
+  /** Renames applied to instance values. */
+  migrated: Array<{ from: string; to: string }>;
+  /** Instances whose values were moved. */
+  migratedInstances: number;
+  /** Removed keys with no declared destination: their values are now unreachable. */
+  orphaned: string[];
+  /** Instances still holding those keys. */
+  orphanedInstances: number;
+  /** Declared renames the schema diff did not support. A caller bug. */
+  ignoredRenames: Array<{ from: string; to: string }>;
 }
 
 export interface OntologyNodeTypeRow {
@@ -373,6 +416,12 @@ export interface OntologyAuditLogRow {
   entity_id: string;
   actor: string;
   event_at: string;
+  /**
+   * Context for the event. A schema change puts `migrated` / `orphaned` /
+   * `orphanedInstances` here, which is how a caller sees that an edit left
+   * instance values unreachable.
+   */
+  metadata?: Record<string, unknown> | null;
 }
 
 export interface OntologyDomainSnapshotRow {
@@ -1120,6 +1169,15 @@ export interface GraphStore {
 
   createNodeType(input: OntologyNodeTypeInput): Promise<OntologyNodeTypeRow>;
   listNodeTypes(companyId: string, domainId: string): Promise<OntologyNodeTypeRow[]>;
+  /**
+   * Rewrite a type's schema, migrating the instance data the edit implies.
+   *
+   * `update.propertyRenames` is applied to existing instances in the same call,
+   * so a rename cannot land without its data following. Removals the caller did
+   * not account for are counted and written into the change record rather than
+   * blocked: dropping a field on purpose is legitimate, and the review gate for
+   * destructive changes belongs to proposals, which do not exist yet.
+   */
   updateNodeType(
     companyId: string,
     nodeTypeId: string,
@@ -1489,6 +1547,8 @@ export class PostgresGraphStore implements GraphStore {
     entityKind: "node_type" | "relation_type";
     before?: Record<string, unknown> | null;
     after?: Record<string, unknown> | null;
+    /** Recorded alongside the change; e.g. what the data migration did. */
+    metadata?: Record<string, unknown>;
   }): Promise<void> {
     await this.bumpSchemaVersion(input.companyId, input.domainId);
     await this.writeAuditLog({
@@ -1498,8 +1558,78 @@ export class PostgresGraphStore implements GraphStore {
       entityId: input.entityId,
       beforeState: input.before ?? null,
       afterState: input.after ?? null,
-      metadata: { entityKind: input.entityKind },
+      metadata: { entityKind: input.entityKind, ...(input.metadata ?? {}) },
     });
+  }
+
+  /**
+   * Move existing instance values when a schema edit renames a property.
+   *
+   * Runs before the schema is written, while the old key is still the one the
+   * data uses. Declared renames are applied; removals the caller did not account
+   * for are counted, so the change record can say that N instances are holding
+   * values nothing can reach any more.
+   */
+  private async migratePropertyRenames(
+    companyId: string,
+    nodeTypeId: string,
+    before: Record<string, unknown> | null,
+    after: Record<string, unknown>,
+    renames: Record<string, string> | undefined,
+  ): Promise<SchemaEditOutcome> {
+    const diff = diffPropertySchemas(before, after);
+    if (diff.removed.length === 0) {
+      return {
+        migrated: [],
+        migratedInstances: 0,
+        orphaned: [],
+        orphanedInstances: 0,
+        ignoredRenames: [],
+      };
+    }
+
+    const plan: RenamePlan = planPropertyRenames(diff, renames);
+    let migratedInstances = 0;
+    for (const rename of plan.applied) {
+      // `- old || new: old` moves the value, and the `?` guard keeps the
+      // statement to the instances that actually have it.
+      const result = await this.db.execute(
+        `UPDATE ${this.table("ontology_nodes")}
+            SET properties = (properties - $3::text) || jsonb_build_object($4::text, properties -> $3::text),
+                updated_at = now()
+          WHERE company_id = $1 AND node_type_id = $2 AND properties ? $3::text`,
+        [companyId, nodeTypeId, rename.from, rename.to],
+      );
+      migratedInstances += result.rowCount;
+    }
+
+    // One `?` per key with a scalar parameter, rather than jsonb's `?|` with an
+    // array: the host binds parameters as scalars, so an array never reaches
+    // PostgreSQL as a `text[]` and the statement fails at runtime. A fake db in a
+    // unit test does not parse the SQL, so only a real instance caught this.
+    const orphanClause = plan.orphaned
+      .map((_key, index) => `properties ? $${index + 3}::text`)
+      .join(" OR ");
+    const orphanedInstances =
+      plan.orphaned.length === 0
+        ? 0
+        : Number(
+            (
+              await this.db.query<{ count: string }>(
+                `SELECT COUNT(*) AS count FROM ${this.table("ontology_nodes")}
+                  WHERE company_id = $1 AND node_type_id = $2 AND (${orphanClause})`,
+                [companyId, nodeTypeId, ...plan.orphaned],
+              )
+            )[0]?.count ?? 0,
+          );
+
+    return {
+      migrated: plan.applied,
+      migratedInstances,
+      orphaned: plan.orphaned,
+      orphanedInstances,
+      ignoredRenames: plan.ignored,
+    };
   }
 
   async bumpSchemaVersion(companyId: string, domainId: string): Promise<number> {
@@ -1882,6 +2012,16 @@ export class PostgresGraphStore implements GraphStore {
         WHERE company_id = $1 AND id = $2`,
       [companyId, nodeTypeId],
     );
+    const migration =
+      update.propertiesSchema === undefined
+        ? null
+        : await this.migratePropertyRenames(
+            companyId,
+            nodeTypeId,
+            prior[0]?.properties_schema ?? null,
+            update.propertiesSchema,
+            update.propertyRenames,
+          );
     const res = await this.db.execute(
       `UPDATE ${this.table("ontology_node_types")}
           SET display_name          = COALESCE($3, display_name),
@@ -1927,6 +2067,9 @@ export class PostgresGraphStore implements GraphStore {
       entityKind: "node_type",
       before: (prior[0] ?? null) as unknown as Record<string, unknown> | null,
       after: row as unknown as Record<string, unknown>,
+      // The change history has to carry what happened to the data, not just to
+      // the schema — an orphaned value is invisible everywhere else.
+      ...(migration && schemaEditHasEffect(migration) ? { metadata: { ...migration } } : {}),
     });
     return row;
   }
@@ -2502,8 +2645,13 @@ export class PostgresGraphStore implements GraphStore {
     limit = 100,
   ): Promise<OntologyAuditLogRow[]> {
     const capped = Number.isFinite(limit) ? Math.max(1, Math.min(Math.floor(limit), 1000)) : 100;
+    // `metadata` is selected because it is where a schema change records what
+    // happened to the data (renames applied, values orphaned). Writing it and
+    // not reading it would leave the migration outcome unreachable — the same
+    // mistake in a smaller place. `before_state`/`after_state` stay out: they are
+    // whole rows, and a list endpoint should not carry them by default.
     return this.db.query<OntologyAuditLogRow>(
-      `SELECT id, company_id, domain_id, event_type, entity_id, actor, event_at
+      `SELECT id, company_id, domain_id, event_type, entity_id, actor, event_at, metadata
          FROM ${this.table("ontology_audit_logs")}
         WHERE company_id = $1 AND domain_id = $2
         ORDER BY event_at DESC

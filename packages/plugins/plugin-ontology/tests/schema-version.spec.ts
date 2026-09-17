@@ -49,6 +49,31 @@ async function boot(): Promise<TestHarness> {
   return harness;
 }
 
+/** Statements that move instance values from one property key to another. */
+function renames(harness: TestHarness) {
+  return harness.dbExecutes.filter(
+    (entry: { sql: string }) =>
+      /UPDATE/i.test(entry.sql)
+      && entry.sql.includes("ontology_nodes")
+      && /properties\s*-/.test(entry.sql),
+  );
+}
+
+/**
+ * The metadata of the audit row written for the last schema change.
+ *
+ * `before_state` and `after_state` are JSON strings too, so the metadata is the
+ * *last* one — taking the first would read the before-state and look like a
+ * missing field.
+ */
+function lastAuditMetadata(harness: TestHarness): Record<string, unknown> {
+  const row = auditInserts(harness).at(-1);
+  const raw = row?.params
+    ?.filter((p): p is string => typeof p === "string" && p.trimStart().startsWith("{"))
+    .at(-1);
+  return raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+}
+
 /** The version-bump statements the store issued. */
 function bumps(harness: TestHarness) {
   return harness.dbExecutes.filter(
@@ -209,6 +234,116 @@ describe("the change is recorded in the ontology's own history", () => {
     const entry = auditInserts(harness)[0]!;
     expect(entry.params).toContain("schema_type_deleted");
     expect(entry.params!.some((p) => typeof p === "string" && p.includes("relation_type"))).toBe(true);
+  });
+});
+
+describe("a renamed property takes its data with it", () => {
+  /** The type starts with `code`; the edit renames it to `orderNo`. */
+  const bootWithSchema = async (): Promise<TestHarness> => {
+    const harness = createTestHarness({ manifest });
+    const priorSchema = JSON.stringify({ code: { type: "string" }, total: { type: "number" } });
+    const originalQuery = harness.ctx.db.query.bind(harness.ctx.db);
+    harness.ctx.db.query = (async (sql: string, params?: unknown[]) => {
+      await originalQuery(sql, params);
+      if (sql.includes("ontology_node_types") && /SELECT/i.test(sql)) {
+        return [
+          {
+            id: NODE_TYPE_ID,
+            key: "order",
+            domain_id: DOMAIN_ID,
+            properties_schema: JSON.parse(priorSchema),
+          },
+        ] as never;
+      }
+      if (sql.includes("COUNT(*)")) return [{ count: "3" }] as never;
+      return [] as never;
+    }) as typeof harness.ctx.db.query;
+    const originalExecute = harness.ctx.db.execute.bind(harness.ctx.db);
+    harness.ctx.db.execute = (async (sql: string, params?: unknown[]) => {
+      const result = await originalExecute(sql, params);
+      return { rowCount: Math.max(result.rowCount, 2) };
+    }) as typeof harness.ctx.db.execute;
+    await plugin.definition.setup(harness.ctx);
+    return harness;
+  };
+
+  const edit = (harness: TestHarness, extra: Record<string, unknown>) =>
+    harness.performAction(
+      "update-node-type",
+      {
+        nodeTypeId: NODE_TYPE_ID,
+        propertiesSchema: { orderNo: { type: "string" }, total: { type: "number" } },
+        ...extra,
+      },
+      { companyId: COMPANY_ID },
+    );
+
+  it("moves the values when the rename is declared", async () => {
+    const harness = await bootWithSchema();
+    await edit(harness, { propertyRenames: { code: "orderNo" } });
+    const moved = renames(harness);
+    expect(moved).toHaveLength(1);
+    // The old key is dropped and the new one receives its value, in one statement.
+    expect(moved[0]!.sql).toContain("jsonb_build_object");
+    expect(moved[0]!.params).toEqual([COMPANY_ID, NODE_TYPE_ID, "code", "orderNo"]);
+  });
+
+  it("records what the migration did in the change history", async () => {
+    const harness = await bootWithSchema();
+    await edit(harness, { propertyRenames: { code: "orderNo" } });
+    const metadata = lastAuditMetadata(harness);
+    expect(metadata.migrated).toEqual([{ from: "code", to: "orderNo" }]);
+    expect(metadata.orphaned).toEqual([]);
+  });
+
+  it("moves nothing when the caller declares no rename", async () => {
+    const harness = await bootWithSchema();
+    await edit(harness, {});
+    expect(renames(harness)).toEqual([]);
+  });
+
+  it("counts orphans with scalar parameters, not an array", async () => {
+    // The host binds parameters as scalars, so jsonb's `?|` with a text[] never
+    // reaches PostgreSQL. Only a real instance caught that; a fake db does not
+    // parse SQL, so this asserts the shape the binder can actually send.
+    const harness = await bootWithSchema();
+    await edit(harness, {});
+    const count = harness.dbQueries.find((entry: { sql: string }) => entry.sql.includes("COUNT(*)"));
+    expect(count?.sql).not.toContain("?|");
+    expect(count?.sql).toContain("properties ? $3::text");
+    expect(count?.params).toEqual([COMPANY_ID, NODE_TYPE_ID, "code"]);
+  });
+
+  it("counts the instances whose values the edit orphaned", async () => {
+    // Dropping a field on purpose is legitimate; doing it silently is not.
+    const harness = await bootWithSchema();
+    await edit(harness, {});
+    const metadata = lastAuditMetadata(harness);
+    expect(metadata.orphaned).toEqual(["code"]);
+    expect(metadata.orphanedInstances).toBe(3);
+  });
+
+  it("ignores a rename the schema diff does not support", async () => {
+    const harness = await bootWithSchema();
+    await edit(harness, { propertyRenames: { code: "somethingElse" } });
+    expect(renames(harness)).toEqual([]);
+    const metadata = lastAuditMetadata(harness);
+    expect(metadata.ignoredRenames).toEqual([{ from: "code", to: "somethingElse" }]);
+    expect(metadata.orphaned).toEqual(["code"]);
+  });
+
+  it("stays quiet when the edit removes nothing", async () => {
+    const harness = await bootWithSchema();
+    await harness.performAction(
+      "update-node-type",
+      {
+        nodeTypeId: NODE_TYPE_ID,
+        propertiesSchema: { code: { type: "string" }, total: { type: "number" }, note: { type: "string" } },
+      },
+      { companyId: COMPANY_ID },
+    );
+    expect(renames(harness)).toEqual([]);
+    expect(lastAuditMetadata(harness).orphaned).toBeUndefined();
   });
 });
 

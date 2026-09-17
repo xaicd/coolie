@@ -158,10 +158,24 @@ Two different things travel under this name and they need different mechanisms.
    Worth flagging: using only the host API would have looked like it worked —
    the unit tests saw the entry — and the plugin's own audit view stayed empty.
    It read as 0 entries until it was checked against a running instance.
-3. **Renaming a property does not migrate its data.** Changing a key in
-   `properties_schema` leaves every existing instance's `properties` under the
-   old key. Nothing renames, coerces or reports the divergence — the instances
-   silently stop matching their type.
+3. ~~**Renaming a property does not migrate its data.**~~ **Half done — the data
+   movement and the reporting, not the review gate.** `updateNodeType` takes
+   `propertyRenames` (`oldKey -> newKey`) and applies it to the existing instances
+   in the same call, so a declared rename cannot land without its data following.
+   A removal the caller did not account for is counted and written into the change
+   record (`orphaned`, `orphanedInstances`) instead of passing silently.
+
+   What is deliberately *not* done is blocking: dropping a field on purpose is
+   legitimate, and refusing it would need a UI that can declare the mapping and
+   confirm the loss — which is the proposal/review work in §4.2 D, not this step.
+   Until then the outcome is recorded and readable, not prevented.
+
+   Note for anyone re-reading this: three separate bugs in this feature were
+   found only against a running instance, never by the unit tests — the host
+   binds parameters as scalars so jsonb's `?|` with a `text[]` fails; the audit
+   metadata was written but not selected back; and the audit entries were going
+   to the host's activity feed rather than the ontology's own table. A fake db
+   does not parse SQL, so it cannot see any of them.
 4. **Snapshots are real but manual.** `ontology_aide_snapshots`
    (`migrations/011_aide_snapshots.sql`) already has a per-domain `version`
    sequence, `schema_snapshot` jsonb, `created_by`, and
@@ -195,8 +209,10 @@ Still open: `graph-snapshot` and the query responses do not carry the version
 yet, because they are handed a domain id rather than a domain. That belongs with
 the change-set work, where a change set names the version it produced.
 
-**B. A change set is the unit of change.** A rename is one change set containing
-the schema edit *and* the data migration, applied together or not at all:
+**B. A change set is the unit of change.** The rename case is now handled inside
+one call (§4.1.3), which is the substance of this step. What a change set adds on
+top is a *record* of that unit — the schema edit and its data migration as one
+reviewable, replayable object — and a status to move it through review:
 
 ```
 change_set { id, domainId, version, ops[], dataMigration[], author, intent, status }

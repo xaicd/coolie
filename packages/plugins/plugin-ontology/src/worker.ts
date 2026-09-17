@@ -516,6 +516,17 @@ function optionalStringOrNull(value: unknown): string | null | undefined {
   return typeof value === "string" || value === null ? (value as string | null) : undefined;
 }
 
+/** A `string -> string` map, or undefined; anything else is a caller bug. */
+function optionalStringMap(value: unknown): Record<string, string> | undefined {
+  const record = optionalRecord(value);
+  if (!record) return undefined;
+  const out: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(record)) {
+    if (typeof raw === "string") out[key] = raw;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
+}
+
 /** A JSON array field, or an empty list — a missing scan is not an error. */
 function optionalArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
@@ -571,6 +582,10 @@ const updateNodeTypeMutation: MutationHandler = async (store, _ctx, call) => {
         ? undefined
         : requireRecordOrThrow(call.fields.propertiesSchema, "propertiesSchema"),
       metadata: optionalRecord(call.fields.metadata),
+      // Stating which removed field became which added one is what makes the
+      // existing instance values follow the rename. A diff cannot tell a rename
+      // from a delete plus an add, so only the caller can say.
+      propertyRenames: optionalStringMap(call.fields.propertyRenames),
     },
   );
   if (!nodeType) return notFound("Node type not found");
