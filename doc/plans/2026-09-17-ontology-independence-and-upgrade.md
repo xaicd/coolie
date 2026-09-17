@@ -197,7 +197,85 @@ RDF 侧是「无 `rdfs:domain` 的 `DatatypeProperty` + `ont:relationshipAttribu
 - **定期 fork 注意影响面** —— 全部新增落在 `packages/ontology-core` 与我们自己的
   `scripts/`,`ui/**` 与宿主零改动。
 
+## 7. 实测:线上站点与真机数据库
+
+### 7.1 线上站点(`microsoft.github.io/Ontology-Playground/`)
+
+Playwright 实看的结果,补上了源码里读不到的东西:
+
+- **命令面板(⌘K)** 是全部目的地的入口:Catalogue / Designer / Ontology School /
+  Import-Export / Summary / Data Sources。路由是 hash:`#/catalogue`(=「Ontology Gallery」)、
+  `#/learn`、`#/designer`、`#/import-export`、`#/summary`、`#/about`。
+- **Ontology School 是两条产品线**:PATH(4 篇)与 LAB(5–7 步)。而且
+  **每条学习路径与一个样例域一一对应** —— Fourth Coffee / E-Commerce / Banking /
+  Healthcare / Manufacturing / University / Zava,正是我们转换的那 7 个目录。
+  **样例域应当带着它的解说内容一起出现**,而不是只有 schema。
+- 主页把模型呈现为:**洞察统计(6 实体 / 7 关系 / 33 属性)、实体列表、关系列表
+  (显示为 `places customer → order`,端点可见)、Inspector、NL2Ontology 查询框**。
+  我们对应的是工作台的结构图 + 侧栏。
+
+### 7.2 设计模式文章里的规则比授权指南更硬
+
+`#/learn/ontology-fundamentals/ontology-design-patterns` 全文已取。除命名规范外,
+有两条**直接落在本仓库的默认行为上**:
+
+> **反模式「过度建模」:Every internal table becomes an entity。
+> Model what users will query, not your schema.**
+
+我们的扫描 + fold 管线**按设计就是把表和类变成对象类型** —— 也就是说,
+一个从遗留系统导入的本体,**默认就是过度建模的**,直到有人类说不是。
+
+> **「Model relationships, not foreign keys」**
+> `orders.customer_id → customers.id` 应当表达为 `Order → placedBy → Customer`。
+
+我们读 DDL,所以**忠实复现了这个丢失**:`customer_id` 变成一个属性,
+它作为关系时携带的语义就没了。
+
+还有:god entity(30+ 属性)、循环一对一(A→B 与 B→A 都是 1:1,通常是同一个实体画了两遍)、
+复合标识符(多数工具只认单个标识符)、代理键(`uuid` 不如业务键)、
+模糊关系名(`relatedTo`/`hasLink`)、缩写(`qty`/`amt`/`dt`)。
+
+**这些已落成可执行检查** `packages/ontology-core/src/document/lintDocument.ts`,
+与 `validateDocument` 分开:**后者回答「能不能导入」,前者回答「这个模型好不好」**。
+lint 只出 warning 与 info,从不出 error —— 建议不能变成闸门。
+
+### 7.3 真机发现:活跃实例上,结构图一条线都画不出来
+
+从实例的自动备份 SQL dump 直接读(不碰活跃库):
+
+- 活跃实例有 **3 个本体域、18 个对象类型、15 个关系类型**。
+- **全库 `sourceNodeTypeKey` / `targetNodeTypeKey` 出现 0 次。** 15 个关系类型
+  **全部 `metadata = {}`** —— 所以**结构图画不出任何一条类型级连线**。
+- 域只有 `111/SAA` 等 3 个,**没有一个是样例域** —— 说明
+  **我写的样例域种子从未在这个实例上跑过**。
+
+也就是说:上一轮我修的是**种子路径**,而活跃实例走的还是旧的 `seed-samples` 路径,
+所以**表面上什么都没变**。这正是「单测绿了、真库没变」的又一例。
+
+### 7.4 真 Postgres 上的验证(容器,不碰活跃实例)
+
+一次性 `pgvector/pgvector:pg14` 容器 + 独立 schema:
+
+- `ontology-migrate` 独立跑通:**17 个迁移全部应用**,并正确识别
+  「无宿主 company 表 → 独立库,创建隔离锚点」。
+- 种子:`created=7 skipped=0 failed=0`,**43 对象类型 / 49 关系类型**,
+  **49/49 端点穿过 jsonb 存活**,**悬空端点 0**。
+- 文档导出:0 问题;`orderSource: sorted`(对 jsonb 无法保序这件事是诚实的);lint 0 发现。
+
+已固化成集成测试 `packages/ontology-mcp/tests/seed-real-postgres.spec.ts`:
+自建 schema、自清理、**无 `ONTOLOGY_DATABASE_URL` 时报告为 skipped 而不是 passed**
+(绿的、但什么都没跑的运行,比跳过更糟)。
+
+## 8. 还欠着的
+
+- 活跃实例上那 **15 个无端点关系类型**仍在。它们来自旧 `seed-samples`,
+  且每个被用于多组端点 —— **这是要决策的事,不是打补丁的事**。
+- 样例域种子**必须在活跃实例上真跑一次**才算这件事完成。
+- 样例域应当带上它的解说内容(见 7.1)。
+
 ## 已落地
 
-- `packages/ontology-core/src/document/` —— 文档格式、规范化、校验、往返。
-- 序数、端点、关系属性的处理见该目录的模块注释。
+- `packages/ontology-core/src/document/OntologyDocument.ts` —— 文档格式、规范化、校验、指纹、往返。
+- `packages/ontology-core/src/document/lintDocument.ts` —— 建模 lint(第 7.2 节的规则)。
+- `packages/ontology-mcp/tests/seed-real-postgres.spec.ts` —— 真 Postgres 集成验证。
+- 序数、端点、关系属性的处理见上述模块注释。
