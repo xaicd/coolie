@@ -16,11 +16,19 @@
 export type ExtractionKind = "ddl" | "java" | "proto" | "mybatis" | "openapi" | "source";
 
 /**
- * What role a Java/proto type plays in its own codebase. Kept separate from the
+ * What role the source gives a type in its own codebase. Kept separate from the
  * ontology's own `layer` (aggregate_root/child_entity/…) because they answer
- * different questions: `stereotype` is what the *source* called it.
+ * different questions: `stereotype` is what the *source* called it, and `table`
+ * is here because a mapper's SQL is a source that calls something a table.
  */
-export type SourceStereotype = "entity" | "dto" | "controller" | "enum" | "message" | "service";
+export type SourceStereotype =
+  | "entity"
+  | "dto"
+  | "controller"
+  | "enum"
+  | "message"
+  | "service"
+  | "table";
 
 export interface ExtractedOrigin {
   kind: ExtractionKind;

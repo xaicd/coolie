@@ -24,8 +24,34 @@ import type { ExtractedOrigin, ExtractionKind, SourceStereotype } from "./cognit
  */
 export const MAX_SOURCE_FILES = 20;
 
-const KINDS: readonly string[] = ["ddl", "java", "proto", "mybatis", "openapi", "source"];
-const STEREOTYPES: readonly string[] = ["entity", "dto", "controller", "enum", "message", "service"];
+/**
+ * The closed sets, each an exhaustive `Record` over its union — so adding a value
+ * to `ExtractionKind` or `SourceStereotype` without listing it here does not
+ * compile. That matters more than it looks: both are validated on read-back, and
+ * a value missing from these lists is silently dropped, which is the "written but
+ * unreadable" failure in miniature. Derived with `Object.keys` so the record and
+ * the list cannot disagree.
+ */
+const KIND_COVERAGE: Record<ExtractionKind, true> = {
+  ddl: true,
+  java: true,
+  proto: true,
+  mybatis: true,
+  openapi: true,
+  source: true,
+};
+const STEREOTYPE_COVERAGE: Record<SourceStereotype, true> = {
+  entity: true,
+  dto: true,
+  controller: true,
+  enum: true,
+  message: true,
+  service: true,
+  table: true,
+};
+
+const KINDS = Object.keys(KIND_COVERAGE);
+const STEREOTYPES = Object.keys(STEREOTYPE_COVERAGE);
 
 /** Provenance as read back, with every field validated. */
 export interface TypeProvenance {
@@ -102,7 +128,7 @@ export function buildTypeProvenance(
 export function describeProvenance(metadata: unknown): string | undefined {
   const { origin } = readTypeProvenance(metadata);
   if (!origin) return undefined;
-  const kindLabels: Record<string, string> = {
+  const kindLabels: Record<ExtractionKind, string> = {
     ddl: "SQL DDL",
     java: "Java/Kotlin",
     proto: "gRPC proto",
@@ -110,13 +136,14 @@ export function describeProvenance(metadata: unknown): string | undefined {
     openapi: "OpenAPI",
     source: "源码",
   };
-  const stereotypeLabels: Record<string, string> = {
+  const stereotypeLabels: Record<SourceStereotype, string> = {
     entity: "实体",
     dto: "DTO",
     controller: "控制器",
     enum: "枚举",
     message: "消息",
     service: "服务",
+    table: "表",
   };
   const parts = [
     kindLabels[origin.kind] ?? origin.kind,
