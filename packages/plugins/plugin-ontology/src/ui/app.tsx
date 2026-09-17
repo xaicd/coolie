@@ -182,11 +182,11 @@ const GHOST_BTN =
 /** Row-level action in a table: outline, nano-sized. */
 const ROW_BTN =
   "rounded-md border border-border bg-background px-2 py-1 text-(length:--text-nano) " +
-  "text-foreground transition-colors hover:bg-accent disabled:opacity-50";
+  "whitespace-nowrap text-foreground transition-colors hover:bg-accent disabled:opacity-50";
 /** Row-level destructive action: same shape, destructive tone. */
 const ROW_DANGER_BTN =
   "rounded-md border border-destructive/30 bg-background px-2 py-1 text-(length:--text-nano) " +
-  "text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50";
+  "whitespace-nowrap text-destructive transition-colors hover:bg-destructive/10 disabled:opacity-50";
 
 const TAB_ON = "rounded-md bg-primary px-3 py-1.5 text-(length:--text-compact) font-medium text-primary-foreground";
 const TAB_OFF =
@@ -2997,7 +2997,9 @@ function DomainList({
           {
             key: "actions",
             header: t("操作","Actions"),
-            width: "240px",
+            // Four buttons at nano size; 240px clipped the last one against the
+            // table edge.
+            width: "330px",
             render: (_v, row) => {
               const d = row as unknown as OntologyDomain;
               const rowBusy = busyRowId === d.id;
@@ -3005,13 +3007,15 @@ function DomainList({
               // offer a move the store would refuse.
               const next = DOMAIN_STATE_TRANSITIONS[d.lifecycle_state as DomainLifecycleState] ?? [];
               return (
-                <div className="flex flex-wrap items-center gap-1">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <button className={ROW_BTN} disabled={rowBusy} onClick={() => rename(d)}>
                     {t("改名","Rename")}
                   </button>
                   {next.map((state) => (
                     <button key={state} className={ROW_BTN} disabled={rowBusy} onClick={() => advance(d, state)}>
-                      {state}
+                      {/* Arrow prefix: the label is the state it moves *to*, so on
+                          its own it reads as a status rather than an action. */}
+                      →{state}
                     </button>
                   ))}
                   <button className={ROW_DANGER_BTN} disabled={rowBusy} onClick={() => retire(d)}>
