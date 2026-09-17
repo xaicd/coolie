@@ -245,28 +245,101 @@ function tableCommentFrom(content: string, table: string): string | undefined {
  * Exported (it used to be reachable only through `parseSourceFile`'s extension
  * dispatch) so the description matcher and its tests can call it directly.
  */
+/**
+ * Index of the `)` that closes the `(` at `openIndex`, or -1. Quoted strings and
+ * backticked identifiers are skipped so a `)` inside them does not count.
+ */
+function matchingParen(text: string, openIndex: number): number {
+  if (text[openIndex] !== "(") return -1;
+  let depth = 0;
+  for (let i = openIndex; i < text.length; i += 1) {
+    const ch = text[i]!;
+    if (ch === "'" || ch === '"' || ch === "`") {
+      const quote = ch;
+      i += 1;
+      while (i < text.length && text[i] !== quote) i += text[i] === "\\" ? 2 : 1;
+      continue;
+    }
+    if (ch === "(") depth += 1;
+    else if (ch === ")") {
+      depth -= 1;
+      if (depth === 0) return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Split on `separator` at paren depth 0, with each part's offset in the original
+ * text — offsets because a column's inline comment is read from its own line.
+ */
+function splitTopLevel(text: string, separator: string): Array<{ text: string; start: number }> {
+  const parts: Array<{ text: string; start: number }> = [];
+  let depth = 0;
+  let start = 0;
+  for (let i = 0; i < text.length; i += 1) {
+    const ch = text[i]!;
+    if (ch === "(") depth += 1;
+    else if (ch === ")") depth -= 1;
+    else if (ch === separator && depth === 0) {
+      parts.push({ text: text.slice(start, i), start });
+      start = i + 1;
+    }
+  }
+  parts.push({ text: text.slice(start), start });
+  return parts;
+}
+
 export function parseSqlDdl(content: string, file: string): FileExtraction {
   const entities: ExtractedEntity[] = [];
   const relations: ExtractedRelation[] = [];
   const standalone = collectStandaloneComments(content);
   // CREATE TABLE <name> ( ... )
-  const tableRe = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?([A-Za-z_][A-Za-z0-9_]*)[`"]?\s*\(([\s\S]*?)\)\s*[^\n;]*;/gi;
-  for (let m; (m = tableRe.exec(content)); ) {
-    const table = m[1]!;
-    const body = m[2] ?? "";
+  //
+  // The body is found by walking to the `)` that balances the opening one, not by
+  // matching to the next `)`. Two shapes were being read wrong without it:
+  //
+  //   create table t (a bigint, b varchar(64));   -- body ended at the `)` of varchar
+  //   create table t (a bigint, b bigint)         -- no `;` at all: table dropped
+  //
+  // The first gave the table one column whenever the columns were on one line;
+  // the second is a dump whose last statement has no terminator.
+  const headRe = /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?[`"]?([A-Za-z_][A-Za-z0-9_]*)[`"]?\s*\(/gi;
+  for (const head of content.matchAll(headRe)) {
+    const bodyStart = (head.index ?? 0) + head[0].length;
+    const bodyEnd = matchingParen(content, bodyStart - 1);
+    if (bodyEnd === -1) continue;
+    const table = head[1]!;
+    const body = content.slice(bodyStart, bodyEnd);
     const tableKey = table.toLowerCase();
     const props: ExtractedProperty[] = [];
-    const colRe = /^[ \t]*[`"]?([A-Za-z_][A-Za-z0-9_]*)[`"]?[ \t]+([A-Za-z][A-Za-z0-9_]*)/gm;
-    for (let c; (c = colRe.exec(body)); ) {
-      const col = c[1]!.toLowerCase();
-      if (["primary", "foreign", "unique", "constraint", "key", "index", "check"].includes(col)) continue;
-      // The comment can sit on the column's own line…
-      const lineEnd = body.indexOf("\n", colRe.lastIndex);
-      const line = body.slice(c.index, lineEnd === -1 ? body.length : lineEnd);
+    // Comma-separated at depth 0 — a type's own parentheses (`decimal(10,2)`) hold
+    // commas that do not separate columns. Columns used to be found by anchoring a
+    // regex to the start of each *line*, which silently read one column from any
+    // single-line `create table`.
+    for (const col of splitTopLevel(body, ",")) {
+      // A trailing comment sits between the comma and the newline, so the next
+      // column's part opens with the *previous* column's `-- 订单总额`. Skipping
+      // those comment lines is what keeps the column that follows them: the
+      // column regex stopped at the `--` and dropped the column entirely.
+      const leadingComments = /^(?:[ \t]*(?:--|#)[^\n]*\n)*/.exec(col.text)?.[0] ?? "";
+      const definition = col.text.slice(leadingComments.length);
+      const c = /^\s*[`"]?([A-Za-z_][A-Za-z0-9_]*)[`"]?\s+([A-Za-z][A-Za-z0-9_]*)/.exec(definition);
+      if (!c) continue;
+      const name = c[1]!.toLowerCase();
+      if (["primary", "foreign", "unique", "constraint", "key", "index", "check"].includes(name)) continue;
+      // The comment can sit on the column's own line… Reading from where the
+      // column *name* starts, not where its comma-separated part starts: a part
+      // begins with the newline that followed the previous comma, and a line that
+      // ends at its own first character is empty.
+      const nameAt =
+        col.start + leadingComments.length + (definition.length - definition.trimStart().length);
+      const lineEnd = body.indexOf("\n", nameAt);
+      const line = body.slice(nameAt, lineEnd === -1 ? body.length : lineEnd);
       const description =
         inlineColumnComment(line)
         // …or in a standalone COMMENT ON COLUMN statement.
-        ?? standalone.columns.get(`${tableKey}.${col}`);
+        ?? standalone.columns.get(`${tableKey}.${name}`);
       props.push({ name: c[1]!, type: c[2]!.toLowerCase(), ...(description ? { description } : {}) });
     }
     const tableDescription = standalone.tables.get(tableKey) ?? tableCommentFrom(content, table);
