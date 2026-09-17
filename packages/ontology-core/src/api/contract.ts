@@ -79,6 +79,22 @@ export const CORE_API: CoreApiRoute[] = [
   r("create-package-install", "ops", false, "登记一次包安装"),
 
   // --- schema: the object model ---------------------------------------------
+  // --- who may act --------------------------------------------------------
+  //
+  // Identity used to be a string array on a credential with no way to manage
+  // either. None of these are agent-visible: who the tenant's people are, and
+  // which keys exist, is operator knowledge, not domain knowledge.
+  r("create-tenant", "ops", false, "注册租户"),
+  r("list-tenants", "ops", false, "列出本实例的租户"),
+  // The secret is returned once, at creation. Every later read shows the prefix.
+  r("create-api-key", "ops", false, "签发 API 密钥(仅此一次返回明文)"),
+  r("list-api-keys", "ops", false, "列出密钥(仅前缀,无明文)"),
+  r("revoke-api-key", "ops", false, "吊销密钥(时间戳,不删除)"),
+  r("create-member", "ops", false, "新增成员(人/服务)"),
+  r("list-members", "ops", false, "列出成员及其角色与状态"),
+  r("update-member", "ops", false, "改成员角色或停用/恢复"),
+  r("remove-member", "ops", false, "移除成员(软删除,保留历史)"),
+
   r("list-domains", "schema", true, "列出本体域"),
   r("create-domain", "schema", false, "新建本体域"),
   r("get-domain", "schema", true, "单个本体域,含 schema_version(模型版本)"),

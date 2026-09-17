@@ -14,6 +14,10 @@ import {
   type ImpactDirection,
   type OntologyResourceKind,
 } from "@paperclipai/ontology-core/graph/GraphStore.js";
+import type { SqlClient } from "@paperclipai/ontology-core/graph/SqlClient.js";
+import { generateApiKey } from "@paperclipai/ontology-core/auth/credentials.js";
+import { createMemberStore } from "@paperclipai/ontology-core/auth/memberStore.js";
+import { knownRoles } from "@paperclipai/ontology-core/auth/members.js";
 import { scoreDomainCandidates } from "@paperclipai/ontology-core/graph/linkSuggestions.js";
 import { extractRepoDraft } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 import { AideStore, type AideCitation } from "./aide/AideStore.js";
@@ -242,6 +246,38 @@ function buildAideSystemPrompt(snapshot: DescribeDomainResult): string {
 function queryString(value: string | string[] | undefined): string | undefined {
   if (Array.isArray(value)) return value[0];
   return value ?? undefined;
+}
+
+/** Who acted, as the host reports it. Identity comes from the caller, not a body. */
+function actorRefOf(actor: { actorType?: string; actorId?: string } | undefined): string {
+  if (!actor?.actorId) return actor?.actorType === "agent" ? "agent" : "board";
+  const kind = actor.actorType === "agent" ? "agent" : actor.actorType === "system" ? "system" : "user";
+  return `${kind}:${actor.actorId}`;
+}
+
+function optionalStringArray(value: unknown): string[] | undefined {
+  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : undefined;
+}
+
+/**
+ * Members live next to the credential rules they serve, not in the graph store:
+ * they are read on every authenticated request and never take part in a domain.
+ */
+function memberStore(ctx: PluginContext) {
+  return createMemberStore(ctx.db as unknown as SqlClient);
+}
+
+/**
+ * The pepper that salts key hashes.
+ *
+ * Required rather than defaulted: a built-in pepper would make every deployment's
+ * hashes alike, which is the exact property the salt exists to prevent. Absent
+ * means the operator has not opted into issuing keys from here.
+ */
+async function keyPepper(ctx: PluginContext, companyId: string): Promise<string | undefined> {
+  const config = await ctx.config.get(companyId);
+  const pepper = config.keyPepper ?? config.ONTOLOGY_KEY_PEPPER;
+  return typeof pepper === "string" && pepper.length > 0 ? pepper : undefined;
 }
 
 function requireString(value: unknown, field: string): string {
@@ -3454,6 +3490,185 @@ const plugin = definePlugin({
           [companyId],
         );
         return { body: { domains: rows } };
+      }
+
+      // --- who may act ------------------------------------------------------
+      //
+      // The caller identity comes from the host for every other route. These are
+      // the routes that create identity, so they are the one place where a body
+      // names an actor — and they are board-only, which is what keeps that from
+      // being a way in.
+      case "create-tenant": {
+        const body = optionalRecord(input.body) ?? {};
+        const tenant = await store.createTenant({
+          slug: requireString(body.slug, "slug"),
+          name: requireString(body.name, "name"),
+          createdBy: actorRefOf(input.actor),
+        });
+        await ctx.activity.log({
+          companyId,
+          message: `Created ontology tenant ${tenant.slug}`,
+          entityType: "ontology_tenant",
+          entityId: tenant.id,
+          metadata: { slug: tenant.slug },
+        });
+        return { status: 201, body: { tenant } };
+      }
+
+      case "list-tenants": {
+        const tenants = await store.listTenants();
+        return { status: 200, body: { tenants } };
+      }
+
+      case "create-api-key": {
+        const body = optionalRecord(input.body) ?? {};
+        const tenantId = requireString(body.tenantId, "tenantId");
+        const member = typeof body.memberId === "string"
+          ? await memberStore(ctx).getById(tenantId, body.memberId)
+          : null;
+        if (typeof body.memberId === "string" && !member) {
+          // Binding a key to a member that is not there would silently produce a
+          // key with no roles, which looks like a permission bug later.
+          return { status: 404, body: { error: "Member not found in this tenant" } };
+        }
+        const roleSource = member ? member.roles : optionalStringArray(body.roles) ?? [];
+        // The company, not the tenant: plugin configuration is read in the
+        // company the call was invoked for, which is not the ontology tenant.
+        const pepper = await keyPepper(ctx, companyId);
+        if (!pepper) {
+          return {
+            status: 422,
+            body: {
+              error:
+                "No key pepper configured, so this deployment cannot issue keys. Set the plugin setting keyPepper (the standalone server reads ONTOLOGY_KEY_PEPPER) to the same value the verifier uses.",
+            },
+          };
+        }
+        const generated = generateApiKey({ pepper });
+        const key = await store.createApiKey({
+          tenantId,
+          prefix: generated.prefix,
+          keyHash: generated.hash,
+          label: optionalString(body.label) ?? "",
+          scope: body.scope === "board" ? "board" : "agent",
+          roles: knownRoles(roleSource) as never,
+          ...(member ? { memberId: member.id } : {}),
+          createdBy: actorRefOf(input.actor),
+        });
+        await ctx.activity.log({
+          companyId,
+          message: `Issued ontology API key ${key.prefix}${member ? ` for ${member.actor_ref}` : ""}`,
+          entityType: "ontology_api_key",
+          entityId: key.id,
+          metadata: { prefix: key.prefix, memberId: member?.id ?? null },
+        });
+        // The only time the secret exists outside the caller's hands.
+        return { status: 201, body: { key, secret: generated.secret } };
+      }
+
+      case "list-api-keys": {
+        const keys = await store.listApiKeys(requireString((optionalRecord(input.body) ?? {}).tenantId ?? input.query.tenantId, "tenantId"));
+        // Projected, so a future column cannot leak the hash into a listing.
+        return {
+          status: 200,
+          body: {
+            keys: keys.map((key) => ({
+              prefix: key.prefix,
+              label: key.label,
+              scope: key.scope,
+              roles: key.roles,
+              memberId: key.member_id,
+              revokedAt: key.revoked_at,
+              lastUsedAt: key.last_used_at,
+            })),
+          },
+        };
+      }
+
+      case "revoke-api-key": {
+        const body = optionalRecord(input.body) ?? {};
+        const ok = await store.revokeApiKey(
+          requireString(body.tenantId, "tenantId"),
+          requireString(body.prefix, "prefix"),
+          actorRefOf(input.actor),
+        );
+        if (!ok) return { status: 404, body: { error: "No such active key" } };
+        await ctx.activity.log({
+          companyId,
+          message: `Revoked ontology API key ${String(body.prefix)}`,
+          entityType: "ontology_api_key",
+          entityId: String(body.prefix),
+        });
+        return { status: 200, body: { revoked: true } };
+      }
+
+      case "create-member": {
+        const body = optionalRecord(input.body) ?? {};
+        const roles = knownRoles(optionalStringArray(body.roles) ?? []);
+        if (roles.length === 0 && body.roles !== undefined) {
+          // Refusing is better than storing a member who can do nothing while the
+          // caller believes they granted something.
+          return { status: 422, body: { error: `No known role in: ${JSON.stringify(body.roles)}` } };
+        }
+        const member = await memberStore(ctx).create({
+          tenantId: requireString(body.tenantId, "tenantId"),
+          actorRef: requireString(body.actorRef, "actorRef"),
+          displayName: optionalString(body.displayName) ?? "",
+          roles,
+          status: body.status === "suspended" ? "suspended" : "active",
+          createdBy: actorRefOf(input.actor),
+        });
+        await ctx.activity.log({
+          companyId,
+          message: `Added ontology member ${member.actor_ref}`,
+          entityType: "ontology_member",
+          entityId: member.id,
+          metadata: { roles: member.roles },
+        });
+        return { status: 201, body: { member } };
+      }
+
+      case "list-members": {
+        const members = await memberStore(ctx).list(requireString((optionalRecord(input.body) ?? {}).tenantId ?? input.query.tenantId, "tenantId"));
+        return { status: 200, body: { members } };
+      }
+
+      case "update-member": {
+        const body = optionalRecord(input.body) ?? {};
+        const member = await memberStore(ctx).update(
+          requireString(body.tenantId, "tenantId"),
+          requireString(body.memberId, "memberId"),
+          {
+            ...(body.roles === undefined ? {} : { roles: knownRoles(optionalStringArray(body.roles) ?? []) }),
+            ...(body.status === undefined ? {} : { status: body.status === "suspended" ? "suspended" : "active" }),
+            ...(body.displayName === undefined ? {} : { displayName: optionalString(body.displayName) ?? "" }),
+          },
+        );
+        if (!member) return { status: 404, body: { error: "Member not found" } };
+        await ctx.activity.log({
+          companyId,
+          message: `Updated ontology member ${member.actor_ref} (${member.status})`,
+          entityType: "ontology_member",
+          entityId: member.id,
+          metadata: { roles: member.roles, status: member.status },
+        });
+        return { status: 200, body: { member } };
+      }
+
+      case "remove-member": {
+        const body = optionalRecord(input.body) ?? {};
+        const ok = await memberStore(ctx).remove(
+          requireString(body.tenantId, "tenantId"),
+          requireString(body.memberId, "memberId"),
+        );
+        if (!ok) return { status: 404, body: { error: "Member not found" } };
+        await ctx.activity.log({
+          companyId,
+          message: `Removed ontology member ${String(body.memberId)}`,
+          entityType: "ontology_member",
+          entityId: String(body.memberId),
+        });
+        return { status: 200, body: { removed: true } };
       }
 
       case "create-domain": {

@@ -879,6 +879,8 @@ export interface OntologyApiKeyInput {
   label?: string;
   scope?: ApiKeyScope;
   roles?: ApiKeyRole[];
+  /** Bind the credential to a member, so the member owns the roles. */
+  memberId?: string | null;
   createdBy?: string;
 }
 
@@ -890,6 +892,8 @@ export interface OntologyApiKeyRow {
   label: string;
   scope: ApiKeyScope;
   roles: ApiKeyRole[];
+  /** The member that owns the roles, when the key belongs to one. */
+  member_id: string | null;
   revoked_at: string | null;
   last_used_at: string | null;
 }
@@ -1554,6 +1558,8 @@ export interface GraphStore {
   /** Look a key up by the half that is safe to store in an index. */
   findApiKeyByPrefix(prefix: string): Promise<OntologyApiKeyRow | null>;
   createApiKey(input: OntologyApiKeyInput): Promise<OntologyApiKeyRow>;
+  listApiKeys(tenantId: string): Promise<OntologyApiKeyRow[]>;
+  listTenants(): Promise<OntologyTenantRow[]>;
   revokeApiKey(tenantId: string, prefix: string, revokedBy?: string): Promise<boolean>;
   /** Record that a key was used, so a credential can be inventoried and withdrawn. */
   touchApiKey(prefix: string): Promise<void>;
@@ -3961,7 +3967,7 @@ export class PostgresGraphStore implements GraphStore {
 
   private static readonly TENANT_COLS = "id, slug, name, created_at";
   private static readonly API_KEY_COLS =
-    "id, tenant_id, prefix, key_hash, label, scope, roles, revoked_at, last_used_at";
+    "id, tenant_id, prefix, key_hash, label, scope, roles, member_id, revoked_at, last_used_at";
 
   async createTenant(input: OntologyTenantInput): Promise<OntologyTenantRow> {
     const id = randomUUID();
@@ -3999,6 +4005,24 @@ export class PostgresGraphStore implements GraphStore {
     return rows[0] ?? null;
   }
 
+  async listTenants(): Promise<OntologyTenantRow[]> {
+    return this.db.query<OntologyTenantRow>(
+      `SELECT ${PostgresGraphStore.TENANT_COLS} FROM ${this.table("ontology_tenants")} ORDER BY slug`,
+    );
+  }
+
+  async listApiKeys(tenantId: string): Promise<OntologyApiKeyRow[]> {
+    // Revoked keys stay listed: a credential you can no longer see is one you
+    // cannot prove you withdrew.
+    return this.db.query<OntologyApiKeyRow>(
+      `SELECT ${PostgresGraphStore.API_KEY_COLS}
+         FROM ${this.table("ontology_api_keys")}
+        WHERE tenant_id = $1
+        ORDER BY revoked_at NULLS FIRST, prefix`,
+      [tenantId],
+    );
+  }
+
   async findApiKeyByPrefix(prefix: string): Promise<OntologyApiKeyRow | null> {
     const rows = await this.db.query<OntologyApiKeyRow>(
       `SELECT ${PostgresGraphStore.API_KEY_COLS}
@@ -4013,8 +4037,8 @@ export class PostgresGraphStore implements GraphStore {
     const id = randomUUID();
     await this.db.execute(
       `INSERT INTO ${this.table("ontology_api_keys")}
-         (id, tenant_id, prefix, key_hash, label, scope, roles, created_by)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)`,
+         (id, tenant_id, prefix, key_hash, label, scope, roles, member_id, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9)`,
       [
         id,
         input.tenantId,
@@ -4023,6 +4047,7 @@ export class PostgresGraphStore implements GraphStore {
         input.label ?? "",
         input.scope ?? "agent",
         JSON.stringify(input.roles ?? []),
+        input.memberId ?? null,
         input.createdBy ?? "system",
       ],
     );

@@ -66,6 +66,14 @@ export interface ApiKeyRecord {
   roles: ApiKeyRole[];
   tenant_id: string;
   revoked_at?: string | null;
+  /**
+   * The member this credential belongs to, when it belongs to one.
+   *
+   * Present means the member owns the roles and the key is only a credential, so
+   * changing a role does not require re-minting a key and the same person is one
+   * actor in the audit trail however many keys they hold.
+   */
+  member_id?: string | null;
 }
 
 export interface AuthenticatedCaller {
@@ -144,15 +152,29 @@ export function verifyApiKey(
 export interface Identity {
   scope: ApiKeyScope;
   roles: readonly string[];
+  /**
+   * Set when the member behind this identity is suspended or gone.
+   *
+   * It has to defeat the scope and not only the roles: a suspended operator who
+   * could still write and decide would have lost their view rights and kept the
+   * ability to change the thing they can no longer see.
+   */
+  suspended?: boolean;
+  /**
+   * The credential that acted, when the caller authenticated with one. Identity
+   * and credential are different questions: a person may hold several keys, and
+   * the audit trail wants both the person and the key.
+   */
+  prefix?: string;
 }
 
 export function canWrite(identity: Identity): boolean {
-  return identity.scope === "board";
+  return identity.scope === "board" && identity.suspended !== true;
 }
 
 /** Deciding a proposal is the one act that publishes; an agent may not. */
 export function canDecide(identity: Identity): boolean {
-  return identity.scope === "board";
+  return identity.scope === "board" && identity.suspended !== true;
 }
 
 /**

@@ -144,6 +144,18 @@ export type {
 } from "./migrate/runner.js";
 
 export {
+  MEMBER_STATUSES,
+  isValidScope,
+  isValidStatus,
+  knownRoles,
+  resolveIdentity,
+  rolesFromMember,
+} from "./auth/members.js";
+export type { MemberRecord, MemberStatus, ResolvedIdentity } from "./auth/members.js";
+export { createMemberStore } from "./auth/memberStore.js";
+export type { MemberStore } from "./auth/memberStore.js";
+
+export {
   API_KEY_ROLES,
   API_KEY_SCOPES,
   apiKeyPrefix,

@@ -14,6 +14,8 @@
 import { Pool } from "pg";
 import { PostgresGraphStore } from "@paperclipai/ontology-core/graph/GraphStore.js";
 import { apiKeyPrefix, verifyApiKey } from "@paperclipai/ontology-core/auth/credentials.js";
+import { createMemberStore } from "@paperclipai/ontology-core/auth/memberStore.js";
+import { resolveIdentity } from "@paperclipai/ontology-core/auth/members.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { readOntologyMcpConfig } from "./config.js";
 import { createOntologyMcpServer } from "./server.js";
@@ -39,16 +41,36 @@ async function main(): Promise<void> {
   }
   await store.touchApiKey(caller.prefix);
 
+  // The key may name the person it belongs to, in which case the person owns the
+  // roles. Resolved here rather than per request because a long-lived session
+  // must not keep acting on a role somebody has since taken away.
+  if (!record) throw new Error("The ontology API key is not valid: unknown, revoked, or the wrong pepper.");
+  const memberStore = createMemberStore(client);
+  const member = record.member_id ? await memberStore.getById(caller.tenantId, record.member_id) : null;
+  const identity = resolveIdentity(record, member);
+  if (!identity) {
+    throw new Error("This credential belongs to a member of another tenant and cannot act.");
+  }
+  if (identity.suspended) {
+    // Loud at startup: a suspended member should not get a session that appears
+    // to work and refuses every call the model makes.
+    throw new Error(
+      "The member behind this credential is suspended or removed. Access is stopped until they are reinstated.",
+    );
+  }
+
   const { server, tools } = createOntologyMcpServer({
     store,
     companyId: caller.tenantId,
-    identity: { scope: caller.scope, roles: caller.roles },
+    identity: { scope: identity.scope, roles: identity.roles, suspended: identity.suspended },
   });
 
   // To stderr: stdout is the MCP channel, and anything written there is protocol
   // noise that breaks the session.
   process.stderr.write(
-    `ontology-mcp ready — ${tools.length} tools as ${caller.scope} (${caller.prefix}) ` +
+    `ontology-mcp ready — ${tools.length} tools as ${identity.scope} (${caller.prefix}) ` +
+      `${identity.actorRef ? `for ${identity.actorRef} ` : ""}` +
+      `roles [${identity.roles.join(", ")}] ` +
       `for tenant ${caller.tenantId}, schema "${config.namespace}"\n`,
   );
 

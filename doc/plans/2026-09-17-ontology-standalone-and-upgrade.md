@@ -370,9 +370,22 @@ Still missing, in the order it hurts:
 
 ### 6.4 Collaboration and governance — where Palantir's value actually is
 
-1. **Roles.** The workshop has two actor classes (board, agent). A modelling tool
-   needs at least modeler / reviewer / viewer, and the actor has to be a real
-   identity rather than a host-supplied string.
+1. ~~**Roles.**~~ **Done.** Roles used to be a string array on an API key, which
+   answers what a *credential* may do and not what a *person* may do. A **member**
+   now holds the roles and a status, and a key may name the member it belongs to:
+   a role change is a row update instead of a new credential, suspension defeats
+   the scope and not only the roles, and one person is one actor however many keys
+   they hold. A key that names nobody keeps its own roles, which is the machine
+   case and must stay possible. The standalone server resolves the identity
+   through the member at startup and refuses to open a session for a suspended
+   one, rather than serving a session in which every call fails.
+
+   Management is nine board-only routes (`create-tenant`, `list-tenants`,
+   `create-api-key`, `list-api-keys`, `revoke-api-key`, `create-member`,
+   `list-members`, `update-member`, `remove-member`) on the scoped HTTP face. The
+   action face does not register them yet: no UI manages members, and the action
+   registry takes a different input shape, so that wiring belongs with the panel
+   that needs it.
 2. ~~**Per-view visibility.**~~ **Done.** A view is either shared or restricted to
    a list of roles (`modeler | reviewer | viewer | agent`), and the actor class the
    host reports maps onto those roles: a board actor holds the human roles, an

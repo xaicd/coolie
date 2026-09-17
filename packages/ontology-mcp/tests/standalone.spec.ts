@@ -24,6 +24,8 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import { PostgresGraphStore } from "@paperclipai/ontology-core/graph/GraphStore.js";
 import { generateApiKey, verifyApiKey } from "@paperclipai/ontology-core/auth/credentials.js";
+import { createMemberStore } from "@paperclipai/ontology-core/auth/memberStore.js";
+import { resolveIdentity } from "@paperclipai/ontology-core/auth/members.js";
 import { describe, expect, it } from "vitest";
 import {
   getEmbeddedPostgresTestSupport,
@@ -248,4 +250,77 @@ describePostgres("the ontology, standalone", () => {
       await database.cleanup();
     }
   }, 120_000);
+});
+
+/**
+ * A key that belongs to a person.
+ *
+ * This is the part that only a real database can prove: the member columns exist
+ * where the migration put them, the key reads its member back, and the roles the
+ * identity resolves to come from the member rather than from the key. The
+ * "written but unreadable" failures in this codebase have all been narrow column
+ * projections, so it is checked against PostgreSQL and not a double.
+ */
+describePostgres("a credential belonging to a member", () => {
+  it("takes its roles from the member, and loses them when the member is suspended", async () => {
+    const database = await startEmbeddedPostgresTestDatabase("ontology-member-");
+    const pool = new Pool({ connectionString: database.connectionString });
+    try {
+      await pool.query(TENANTS_DDL);
+      await applyMigrations(pool);
+
+      const sql = createPgSqlClient({ pool, namespace: ONTOLOGY_SCHEMA });
+      const store = new PostgresGraphStore(sql);
+      const members = createMemberStore(sql);
+
+      const tenant = await store.createTenant({ slug: "member-co", name: "Member Co" });
+      const member = await members.create({
+        tenantId: tenant.id,
+        actorRef: "user:alice",
+        displayName: "Alice",
+        roles: ["modeler", "reviewer"],
+      });
+      // Nonsense roles are dropped rather than stored: a grant that looks real in
+      // a list and is never checked is worse than a refusal.
+      expect(member.roles).toEqual(["modeler", "reviewer"]);
+
+      const PEPPER = "member-pepper";
+      const minted = generateApiKey({ pepper: PEPPER });
+      await store.createApiKey({
+        tenantId: tenant.id,
+        prefix: minted.prefix,
+        keyHash: minted.hash,
+        scope: "board",
+        // Deliberately not the member roles: the member has to win.
+        roles: ["viewer"],
+        memberId: member.id,
+        label: "alice laptop",
+      });
+
+      // The column has to survive the projection, which is where this class of
+      // bug lives: an INSERT that names a column no SELECT ever returns.
+      const record = await store.findApiKeyByPrefix(minted.prefix);
+      expect(record!.member_id).toBe(member.id);
+
+      const caller = verifyApiKey(minted.secret, record, PEPPER)!;
+      const resolved = resolveIdentity(record!, await members.getById(tenant.id, member.id))!;
+      expect(resolved.roles).toEqual(["modeler", "reviewer"]);
+
+      // Suspension is a status, not a deletion, and it defeats the scope.
+      await members.update(tenant.id, member.id, { status: "suspended" });
+      const suspended = resolveIdentity(record!, await members.getById(tenant.id, member.id))!;
+      expect(suspended.roles).toEqual([]);
+      expect(suspended.suspended).toBe(true);
+      void caller;
+
+      // Removing keeps the row, so the audit trail still resolves who acted.
+      expect(await members.remove(tenant.id, member.id)).toBe(true);
+      expect(await members.getById(tenant.id, member.id)).toBeNull();
+      const rows = await pool.query(`SELECT count(*)::int AS n FROM "${ONTOLOGY_SCHEMA}".ontology_members`);
+      expect(rows.rows[0]!.n).toBe(1);
+    } finally {
+      await pool.end();
+      await database.cleanup();
+    }
+  }, 180_000);
 });
