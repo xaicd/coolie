@@ -1,3 +1,4 @@
+import { ONTOLOGY_TOOLS } from "@paperclipai/ontology-core/mcp/tools.js";
 import type { PaperclipPluginManifestV1 } from "@paperclipai/plugin-sdk";
 
 export const PLUGIN_ID = "paperclipai.plugin-ontology";
@@ -46,47 +47,15 @@ const manifest: PaperclipPluginManifestV1 = {
     migrationsDir: "migrations",
     coreReadTables: ["companies"],
   },
-  tools: [
-    {
-      name: "queryOntology",
-      displayName: "Query Ontology",
-      description:
-        "Query the company ontology graph. Modes: 'node' (look up one node by domain slug + node key), 'nodes' (list nodes in a domain), 'path' (shortest directed hop path between two nodes by key). Returns structured graph data an agent can reason over.",
-      parametersSchema: {
-        type: "object",
-        properties: {
-          mode: { type: "string", enum: ["node", "nodes", "path"] },
-          domainSlug: { type: "string", description: "Ontology domain slug (e.g. 'orders')." },
-          nodeKey: { type: "string", description: "Node key for mode 'node'." },
-          sourceNodeKey: { type: "string", description: "Source node key for mode 'path'." },
-          targetNodeKey: { type: "string", description: "Target node key for mode 'path'." },
-          limit: { type: "number", description: "Max nodes for mode 'nodes' (default 100)." },
-          maxDepth: { type: "number", description: "Max hops for mode 'path'." },
-        },
-        required: ["mode", "domainSlug"],
-      },
-    },
-    {
-      name: "simulateOntologyImpact",
-      displayName: "Simulate Ontology Impact",
-      description:
-        "Simulate the blast radius of a node in the ontology graph: which nodes are reachable downstream (affected by) or upstream (depend on) a given node. Use before changing an entity to understand what it impacts.",
-      parametersSchema: {
-        type: "object",
-        properties: {
-          domainSlug: { type: "string", description: "Ontology domain slug." },
-          nodeKey: { type: "string", description: "The node whose impact radius to compute." },
-          direction: {
-            type: "string",
-            enum: ["downstream", "upstream"],
-            description: "downstream = nodes affected by this node; upstream = nodes this node depends on.",
-          },
-          maxDepth: { type: "number", description: "Max traversal depth." },
-        },
-        required: ["domainSlug", "nodeKey"],
-      },
-    },
-  ],
+  // Derived from the core's catalogue rather than maintained here: a tool
+  // declared but not handled, or handled but not declared, is a call an agent
+  // cannot make. `tests/mcp-tools.spec.ts` binds the catalogue to the contract.
+  tools: ONTOLOGY_TOOLS.map((tool) => ({
+    name: tool.name,
+    displayName: tool.displayName,
+    description: tool.description,
+    parametersSchema: tool.parametersSchema,
+  })) as NonNullable<PaperclipPluginManifestV1["tools"]>,
   apiRoutes: [
     {
       routeKey: "health",

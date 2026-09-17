@@ -115,6 +115,17 @@ export {
 } from "./schemaEvolution.js";
 export type { PropertySchemaDiff, RenamePlan } from "./schemaEvolution.js";
 export {
+  CORE_API,
+  CORE_API_VERSION,
+  agentApiRoutes,
+  coreApiRoute,
+  describeCoreApi,
+} from "./api/contract.js";
+export type { CoreApiDoc, CoreApiGroup, CoreApiRoute } from "./api/contract.js";
+export { ONTOLOGY_TOOLS, callOntologyTool, ontologyToolByName } from "./mcp/tools.js";
+export type { OntologyTool } from "./mcp/tools.js";
+
+export {
   ARCHIFY_CARD_DOTS,
   architectureToArchifyIr,
 } from "./export/archify.js";

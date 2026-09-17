@@ -37,6 +37,7 @@ import { buildEnrichPrompt, parseEnrichResponse, type EnrichTarget } from "./aid
 import { parseSqlDdl } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 import { buildTypeProvenance } from "@paperclipai/ontology-core/provenance.js";
 import { architectureToArchifyIr } from "@paperclipai/ontology-core/export/archify.js";
+import { ONTOLOGY_TOOLS, callOntologyTool, type OntologyTool } from "@paperclipai/ontology-core/mcp/tools.js";
 import { subProjectsFromArchitecture } from "@paperclipai/ontology-core/architecture/subProjectMapping.js";
 import { parseOpenAPI } from "./legacy/openapiParser.js";
 import {
@@ -639,6 +640,28 @@ async function buildArchitectureDiagram(
     subtitle: "由本体域的架构原料生成(服务 + 依赖 + 部署事实)",
     views,
   }) as unknown as Record<string, unknown>;
+}
+
+/**
+ * A one-line human summary of a tool result, for the agent's transcript.
+ *
+ * The structured payload is what the model reasons over; this is what makes the
+ * call readable in a log or in the chat. It counts collections rather than
+ * dumping them.
+ */
+function summariseToolResult(tool: OntologyTool, data: unknown): string {
+  if (data && typeof data === "object") {
+    const entries = Object.entries(data as Record<string, unknown>);
+    const counted = entries
+      .filter(([, value]) => Array.isArray(value))
+      .map(([key, value]) => `${key}: ${(value as unknown[]).length}`);
+    if (counted.length > 0) return `${tool.displayName} — ${counted.join(", ")}`;
+    if ("path" in data) {
+      const path = (data as { path: unknown[] | null }).path;
+      return path === null ? `${tool.displayName} — 无路径` : `${tool.displayName} — ${path.length} 跳`;
+    }
+  }
+  return tool.displayName;
 }
 
 /** A `string -> string` map, or undefined; anything else is a caller bug. */
@@ -2484,124 +2507,37 @@ const plugin = definePlugin({
       return result;
     });
 
-    // Agent-facing tools (O5 consumption interface). companyId comes from the
-    // run context, so agents can only ever query their own company's ontology.
-    ctx.tools.register(
-      "queryOntology",
-      {
-        displayName: "Query Ontology",
-        description:
-          "Query the company ontology graph. Modes: 'node', 'nodes', 'path'. Returns structured graph data.",
-        parametersSchema: {
-          type: "object",
-          properties: {
-            mode: { type: "string", enum: ["node", "nodes", "path"] },
-            domainSlug: { type: "string" },
-            nodeKey: { type: "string" },
-            sourceNodeKey: { type: "string" },
-            targetNodeKey: { type: "string" },
-            limit: { type: "number" },
-            maxDepth: { type: "number" },
-          },
-          required: ["mode", "domainSlug"],
+    /**
+     * Agent-facing tools, from the core's catalogue.
+     *
+     * The catalogue is derived from the API contract, so the tool surface cannot
+     * drift from what agents are allowed to reach — and the one write an agent
+     * may perform is the proposal, whose schema demands a reason.
+     *
+     * `companyId` comes from the run context, never from the model's arguments:
+     * an agent can only ever touch its own company's ontology.
+     */
+    for (const tool of ONTOLOGY_TOOLS) {
+      ctx.tools.register(
+        tool.name,
+        {
+          displayName: tool.displayName,
+          description: tool.description,
+          parametersSchema: tool.parametersSchema,
         },
-      },
-      async (params, runCtx) => {
-        const p = optionalRecord(params) ?? {};
-        const companyId = runCtx.companyId;
-        const domainSlug = requireString(p.domainSlug, "domainSlug");
-        const domain = await store.getDomainBySlug(companyId, domainSlug);
-        if (!domain) {
-          return { error: `Ontology domain not found: ${domainSlug}` };
-        }
-        const mode = requireString(p.mode, "mode");
-
-        if (mode === "node") {
-          const key = requireString(p.nodeKey, "nodeKey");
-          const node = await store.getNodeByKey(companyId, domain.id, key);
-          if (!node) return { error: `Node not found: ${key} in ${domainSlug}` };
-          return {
-            content: `Node ${node.key} (${node.label}) in domain ${domainSlug}.`,
-            data: { domain: { id: domain.id, slug: domain.slug }, node },
-          };
-        }
-
-        if (mode === "nodes") {
-          const nodes = await store.listNodes(companyId, domain.id, toNumber(p.limit) ?? 100);
-          return {
-            content: `Domain ${domainSlug} has ${nodes.length} node(s) (capped).`,
-            data: { domain: { id: domain.id, slug: domain.slug }, nodes },
-          };
-        }
-
-        if (mode === "path") {
-          const sourceKey = requireString(p.sourceNodeKey, "sourceNodeKey");
-          const targetKey = requireString(p.targetNodeKey, "targetNodeKey");
-          const [source, target] = await Promise.all([
-            store.getNodeByKey(companyId, domain.id, sourceKey),
-            store.getNodeByKey(companyId, domain.id, targetKey),
-          ]);
-          if (!source) return { error: `Source node not found: ${sourceKey}` };
-          if (!target) return { error: `Target node not found: ${targetKey}` };
-          const path = await store.findPath({
-            companyId,
-            sourceNodeId: source.id,
-            targetNodeId: target.id,
-            maxDepth: toNumber(p.maxDepth),
-          });
-          return {
-            content: path
-              ? `Path ${sourceKey} -> ${targetKey}: ${path.length - 1} hop(s).`
-              : `No directed path from ${sourceKey} to ${targetKey}.`,
-            data: { found: path !== null, path: path ?? [] },
-          };
-        }
-
-        return { error: `Unknown query mode: ${mode}` };
-      },
-    );
-
-    ctx.tools.register(
-      "simulateOntologyImpact",
-      {
-        displayName: "Simulate Ontology Impact",
-        description:
-          "Simulate the blast radius of a node: nodes reachable downstream (affected by) or upstream (depend on) it.",
-        parametersSchema: {
-          type: "object",
-          properties: {
-            domainSlug: { type: "string" },
-            nodeKey: { type: "string" },
-            direction: { type: "string", enum: ["downstream", "upstream"] },
-            maxDepth: { type: "number" },
-          },
-          required: ["domainSlug", "nodeKey"],
+        async (params, runCtx) => {
+          try {
+            const args = (params ?? {}) as Record<string, unknown>;
+            const data = await callOntologyTool(store, runCtx.companyId, tool.name, args);
+            return { content: summariseToolResult(tool, data), data };
+          } catch (err) {
+            // Say what was wrong. An empty result would read as "this domain
+            // holds nothing", which is how an agent ends up confidently wrong.
+            return { error: String((err as Error)?.message ?? err) };
+          }
         },
-      },
-      async (params, runCtx) => {
-        const p = optionalRecord(params) ?? {};
-        const companyId = runCtx.companyId;
-        const domainSlug = requireString(p.domainSlug, "domainSlug");
-        const domain = await store.getDomainBySlug(companyId, domainSlug);
-        if (!domain) return { error: `Ontology domain not found: ${domainSlug}` };
-
-        const nodeKey = requireString(p.nodeKey, "nodeKey");
-        const node = await store.getNodeByKey(companyId, domain.id, nodeKey);
-        if (!node) return { error: `Node not found: ${nodeKey} in ${domainSlug}` };
-
-        const direction: ImpactDirection = p.direction === "upstream" ? "upstream" : "downstream";
-        const impacted = await store.findImpact({
-          companyId,
-          rootNodeId: node.id,
-          direction,
-          maxDepth: toNumber(p.maxDepth),
-        });
-        return {
-          content: `${direction} impact of ${nodeKey}: ${impacted.length} node(s).`,
-          data: { direction, count: impacted.length, impacted },
-        };
-      },
-    );
+      );
+    }
 
     // -----------------------------------------------------------------------
     // O10 — 数字副手 (Digital Aide) chat surface

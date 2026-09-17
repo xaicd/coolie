@@ -22,7 +22,7 @@ import {
   agentApiRoutes,
   coreApiRoute,
   describeCoreApi,
-} from "../src/api/contract.js";
+} from "@paperclipai/ontology-core/api/contract.js";
 
 const WORKER = new URL("../src/worker.ts", import.meta.url);
 const workerSource = readFileSync(WORKER, "utf8");
