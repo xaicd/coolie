@@ -290,6 +290,44 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
 
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   const [view, setView] = useState<WorkbenchView>("graph");
+
+  /**
+   * Planting the built-in sample domains lives here, in the header, because it
+   * creates domains — and this bar is the only thing on screen whether or not a
+   * domain exists yet. It used to sit in the workbench's "this domain is empty"
+   * banner, which meant it was reachable only while a domain happened to be
+   * empty: on an instance that already had domains the feature was invisible.
+   */
+  const seedSampleDomains = usePluginAction("seed-sample-domains");
+  const [seedMsg, setSeedMsg] = useState<string | null>(null);
+  const [seeding, setSeeding] = useState(false);
+
+  const runSeedDomains = useCallback(async () => {
+    setSeeding(true);
+    setSeedMsg(null);
+    try {
+      const report = (await seedSampleDomains({ companyId })) as {
+        created?: number;
+        skipped?: number;
+        failed?: number;
+      };
+      setSeedMsg(
+        t(
+          `已创建 ${report.created ?? 0} 个,跳过 ${report.skipped ?? 0} 个(已存在)${
+            report.failed ? `,失败 ${report.failed} 个` : ""
+          }`,
+          `Created ${report.created ?? 0}, skipped ${report.skipped ?? 0} already present${
+            report.failed ? `, ${report.failed} failed` : ""
+          }`,
+        ),
+      );
+      await refreshDomains();
+    } catch (e) {
+      setSeedMsg(String((e as Error)?.message ?? e));
+    } finally {
+      setSeeding(false);
+    }
+  }, [seedSampleDomains, companyId, refreshDomains]);
   // Which group menu is expanded. null = no group active; user is on a
   // primary view OR has dismissed the group strip. We keep `view` as the
   // single source of truth for *which* view mounts — the group is just a
@@ -391,6 +429,21 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
         <div className="ml-auto flex items-center gap-2">
           {/* 接入 — opens the legacy-system import wizard. Reachable from
               any view so the user doesn't have to back out to start one. */}
+          <button
+            onClick={runSeedDomains}
+            disabled={seeding}
+            title={t(
+              "载入内置行业样例域(零售、电商、金融、医疗、制造、教育、供应链)。已存在的域会被跳过,不会覆盖。",
+              "Load the built-in industry sample domains (retail, e-commerce, finance, healthcare, manufacturing, education, supply chain). Existing domains are skipped, never overwritten.",
+            )}
+            className="flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-(length:--text-compact) font-medium text-foreground hover:border-primary hover:text-primary disabled:opacity-50"
+          >
+            <span className="text-[13px] leading-none">✨</span>
+            {t("样例域", "Samples")}
+          </button>
+          {seedMsg && (
+            <span className="text-(length:--text-nano) text-muted-foreground">{seedMsg}</span>
+          )}
           <button
             onClick={() => setWizardOpen(true)}
             title={t("4 步接入存量旧系统", "4-step legacy import wizard")}
