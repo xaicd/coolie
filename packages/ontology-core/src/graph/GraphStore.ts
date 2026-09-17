@@ -1309,6 +1309,7 @@ export interface GraphStore {
   // O1 — modeling core (domains / node-types / relation-types + versions)
   listDomains(companyId: string): Promise<OntologyDomainRow[]>;
   getDomain(companyId: string, domainId: string): Promise<OntologyDomainRow | null>;
+  deleteDomain(companyId: string, domainId: string): Promise<boolean>;
   updateDomain(
     companyId: string,
     domainId: string,
@@ -2114,6 +2115,60 @@ export class PostgresGraphStore implements GraphStore {
       [companyId, domainId],
     );
     return rows[0] ?? null;
+  }
+
+  /**
+   * Retire a domain. Soft-delete, like every other entity here: the row stays so
+   * the audit trail and anything pointing at it still resolves, and
+   * `listDomains` skips it from then on.
+   *
+   * This was the one entity in the model with no removal path at all. The parts
+   * were all present and unwired: `is_deleted` has 82 readers in this file,
+   * `domain_unregistered` was already in the event vocabulary, and
+   * `deleteActionType`/`deleteFunction` established the shape. So a domain could
+   * be created and never removed, which is exactly the state a seeder that plants
+   * seven sample domains walks you into.
+   *
+   * Archiving is not a substitute: `listDomains` filters `is_deleted`, not
+   * `status`, so an archived domain still appears in the picker. Retirement and
+   * lifecycle are different axes and this is the one that removes it.
+   *
+   * No schema-version bump: the version is a property of the domain, and there is
+   * no longer a live domain for it to describe. The audit entry carries the
+   * before-state instead.
+   *
+   * Returns false when no live row matched, so a second call reports that nothing
+   * happened rather than claiming success.
+   */
+  async deleteDomain(companyId: string, domainId: string): Promise<boolean> {
+    // Read first: the host's client drops RETURNING, and the audit entry needs
+    // what the domain looked like at the moment it was retired.
+    const prior = await this.db.query<OntologyDomainRow>(
+      `SELECT ${PostgresGraphStore.DOMAIN_COLS}
+         FROM ${this.table("ontology_domains")}
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, domainId],
+    );
+    if (!prior[0]) return false;
+
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_domains")}
+          SET is_deleted = true, deleted_at = now(), updated_at = now()
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, domainId],
+    );
+    if (res.rowCount === 0) return false;
+
+    await this.writeAuditLog({
+      companyId,
+      domainId,
+      eventType: "domain_unregistered",
+      entityId: domainId,
+      beforeState: prior[0] as unknown as Record<string, unknown>,
+      afterState: null,
+      metadata: { entityKind: "domain" },
+    });
+    return true;
   }
 
   /**

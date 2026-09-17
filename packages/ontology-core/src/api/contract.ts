@@ -99,6 +99,7 @@ export const CORE_API: CoreApiRoute[] = [
   r("create-domain", "schema", false, "新建本体域"),
   r("get-domain", "schema", true, "单个本体域,含 schema_version(模型版本)"),
   r("update-domain", "schema", false, "改本体域元数据"),
+  r("delete-domain", "schema", false, "注销本体域(软删除,保留审计与血缘)"),
   r("transition-domain", "schema", false, "推进本体域生命周期"),
   r("snapshot-domain", "schema", false, "给当前 schema 存快照"),
   r("list-domain-snapshots", "schema", true, "schema 历史版本"),

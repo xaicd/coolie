@@ -417,3 +417,71 @@ describe("the change is audited", () => {
     expect(bumps(harness)).toHaveLength(1);
   });
 });
+
+describe("retiring a domain", () => {
+  // `is_deleted` had 82 readers in this store and, for domains, no writer: a
+  // domain could be created and never removed. These cover the writer.
+
+  /** Records every statement and answers the way the store expects. */
+  function storeWith(liveRow: Record<string, unknown> | null, rowCount = 1) {
+    const issued: { sql: string; params?: unknown[] }[] = [];
+    const db: SqlClient = {
+      namespace: "ns",
+      query: async (sql, params) => {
+        issued.push({ sql, params });
+        return (liveRow ? [liveRow] : []) as never;
+      },
+      execute: async (sql, params) => {
+        issued.push({ sql, params });
+        return { rowCount };
+      },
+    };
+    return { store: new PostgresGraphStore(db), issued };
+  }
+
+  it("keeps the row so the audit trail still resolves, rather than deleting it", async () => {
+    const { store, issued } = storeWith({
+      id: DOMAIN_ID,
+      slug: "gone",
+      display_name: "Gone",
+      schema_version: 3,
+    });
+
+    await expect(store.deleteDomain(COMPANY_ID, DOMAIN_ID)).resolves.toBe(true);
+
+    const update = issued.find(
+      (s) => /UPDATE/i.test(s.sql) && s.sql.includes("ontology_domains"),
+    );
+    expect(update?.sql).toContain("is_deleted = true");
+    expect(update?.sql).toContain("deleted_at = now()");
+    // A hard delete would orphan every row that points at this domain.
+    expect(issued.some((s) => /DELETE\s+FROM/i.test(s.sql))).toBe(false);
+
+    // The before-state is what makes the entry worth keeping.
+    const audit = issued.find((s) => s.sql.includes("ontology_audit_logs"));
+    const auditParams = JSON.stringify(audit?.params ?? []);
+    expect(auditParams).toContain("domain_unregistered");
+    expect(auditParams).toContain("Gone");
+  });
+
+  it("does not bump the schema version of a domain it is removing", async () => {
+    // The version describes a live model. Once the domain is retired there is
+    // nothing for it to describe, so the bump would be a version nobody can read.
+    const { store, issued } = storeWith({ id: DOMAIN_ID, slug: "gone" });
+
+    await store.deleteDomain(COMPANY_ID, DOMAIN_ID);
+
+    expect(issued.filter((s) => /schema_version\s*=\s*schema_version/.test(s.sql))).toEqual([]);
+  });
+
+  it("answers false, and writes nothing, when no live domain matched", async () => {
+    // A second call, or an id from another company. Reporting success here would
+    // make "deleted" and "there was nothing there" indistinguishable.
+    const { store, issued } = storeWith(null);
+
+    await expect(store.deleteDomain(COMPANY_ID, DOMAIN_ID)).resolves.toBe(false);
+
+    expect(issued.some((s) => /UPDATE/i.test(s.sql))).toBe(false);
+    expect(issued.some((s) => s.sql.includes("ontology_audit_logs"))).toBe(false);
+  });
+});

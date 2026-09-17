@@ -1294,10 +1294,29 @@ const decideProposalMutation: MutationHandler = async (store, ctx, call) => {
   return ok({ proposal: done ?? reviewed, applied: true, schemaVersion: applied.schemaVersion });
 };
 
+/**
+ * Retire a domain. Soft-delete, so the audit trail still resolves; `listDomains`
+ * stops returning it.
+ *
+ * No `allowOrphaned`-style flag and no confirmation count, deliberately: the
+ * domain row is what disappears, the object types and instances under it keep
+ * their own rows and are simply no longer reachable through the picker. Refusing
+ * the call when the domain holds data would mean the sample seeder's output could
+ * not be cleared, which is the case that produced this.
+ */
+const deleteDomainMutation: MutationHandler = async (store, ctx, call) => {
+  const domainId = requireString(call.fields.domainId, "domainId");
+  const okDeleted = await store.deleteDomain(call.companyId, domainId);
+  if (!okDeleted) return notFound("Domain not found");
+  await logSchemaChange(ctx, call.companyId, `注销本体域 ${domainId}`, "ontology_domain", domainId);
+  return noContent();
+};
+
 const MUTATION_HANDLERS: Record<string, MutationHandler> = {
   "update-node-type": updateNodeTypeMutation,
   "create-proposal": createProposalMutation,
   "decide-proposal": decideProposalMutation,
+  "delete-domain": deleteDomainMutation,
   "delete-node-type": deleteNodeTypeMutation,
   "update-relation-type": updateRelationTypeMutation,
   "delete-relation-type": deleteRelationTypeMutation,
@@ -3795,6 +3814,11 @@ const plugin = definePlugin({
 
       case "update-node-type": {
         const outcome = await updateNodeTypeMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
+      }
+
+      case "delete-domain": {
+        const outcome = await deleteDomainMutation(store, ctx, httpMutationCall(companyId, input));
         return { status: outcome.status, body: outcome.payload };
       }
 
