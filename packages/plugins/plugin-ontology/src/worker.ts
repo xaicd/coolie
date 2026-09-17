@@ -542,7 +542,7 @@ async function applyProposalOperation(
   domainId: string,
   operation: string,
   op: Record<string, unknown>,
-): Promise<{ schemaVersion: number }> {
+): Promise<{ schemaVersion: number; entityId?: string }> {
   const nodeTypeId = optionalString(op.nodeTypeId);
   const propertiesSchema = optionalRecord(op.propertiesSchema);
   const propertyRenames = optionalStringMap(op.propertyRenames);
@@ -573,10 +573,83 @@ async function applyProposalOperation(
       });
       return { schemaVersion: await currentSchemaVersion(store, companyId, created.domain_id) };
     }
+    // --- facts ------------------------------------------------------------
+    //
+    // A fact change does not move the schema version, and that is the point:
+    // the version answers "which model did I read", so publishing an instance
+    // must not make it look as though the model changed. The proposal still goes
+    // through the same gate and the same audit trail as a schema change.
+    case "create-node": {
+      const type = await requireNodeTypeByKey(store, companyId, domainId, requireString(op.nodeTypeKey, "payload.nodeTypeKey"));
+      const key = requireString(op.key, "payload.key");
+      const node = await store.createNode({
+        companyId,
+        domainId,
+        key,
+        label: optionalString(op.label) ?? key,
+        nodeTypeId: type.id,
+        properties: optionalRecord(op.properties),
+      });
+      return { schemaVersion: await currentSchemaVersion(store, companyId, domainId), entityId: node.id };
+    }
+    case "update-node": {
+      const node = await requireNodeByKey(store, companyId, domainId, requireString(op.nodeKey, "payload.nodeKey"));
+      const updated = await store.updateNode(companyId, node.id, {
+        ...(optionalString(op.label) === undefined ? {} : { label: optionalString(op.label)! }),
+        ...(op.properties === undefined ? {} : { properties: optionalRecord(op.properties) ?? {} }),
+      });
+      if (!updated) throw new Error("Node not found");
+      return { schemaVersion: await currentSchemaVersion(store, companyId, domainId), entityId: updated.id };
+    }
+    case "create-edge": {
+      const source = await requireNodeByKey(store, companyId, domainId, requireString(op.sourceKey, "payload.sourceKey"));
+      const target = await requireNodeByKey(store, companyId, domainId, requireString(op.targetKey, "payload.targetKey"));
+      const relationKey = optionalString(op.relationKey);
+      if (relationKey) {
+        // A relation key that does not exist would create an untyped edge and
+        // look, to everyone reading the graph, like the relation was known.
+        const relations = await store.listRelationTypes(companyId, domainId);
+        if (!relations.some((relation) => relation.key === relationKey)) {
+          throw new Error(`No such relation type in this domain: ${relationKey}`);
+        }
+      }
+      const edge = await store.createEdge({
+        companyId,
+        domainId,
+        sourceNodeId: source.id,
+        targetNodeId: target.id,
+        relationKey: relationKey ?? null,
+      });
+      return { schemaVersion: await currentSchemaVersion(store, companyId, domainId), entityId: edge.id };
+    }
     default:
       void ctx;
       throw new Error(`Unsupported proposal operation: ${operation}`);
   }
+}
+
+/** A node type by key: a caller names keys, never internal ids. */
+async function requireNodeTypeByKey(
+  store: GraphStore,
+  companyId: string,
+  domainId: string,
+  key: string,
+): Promise<{ id: string }> {
+  const types = await store.listNodeTypes(companyId, domainId);
+  const found = types.find((type) => type.key === key);
+  if (!found) throw new Error(`No such object type in this domain: ${key}`);
+  return found;
+}
+
+async function requireNodeByKey(
+  store: GraphStore,
+  companyId: string,
+  domainId: string,
+  key: string,
+): Promise<{ id: string }> {
+  const node = await store.getNodeByKey(companyId, domainId, key);
+  if (!node) throw new Error(`No such node in this domain: ${key}`);
+  return node;
 }
 
 /** The domain's version as the store currently reports it. */
@@ -1127,6 +1200,7 @@ const createProposalMutation: MutationHandler = async (store, ctx, call) => {
   const proposal = await store.createProposal({
     companyId: call.companyId,
     domainId,
+    kind: call.fields.kind === "fact_change" ? "fact_change" : "schema_change",
     title: requireString(call.fields.title, "title"),
     summary: optionalString(call.fields.summary),
     payload: requireRecordOrThrow(call.fields.payload, "payload"),

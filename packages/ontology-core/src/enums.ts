@@ -91,10 +91,14 @@ export const PROPOSAL_STATUSES = ["proposed", "approved", "rejected", "applied"]
 export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
 
 /**
- * What a proposal would change. Only `schema_change` is implemented; the column
- * exists so a fact proposal can reuse this table rather than a second one.
+ * What a proposal would change.
+ *
+ * `schema_change` moves the model; `fact_change` publishes instances and
+ * relations against it. Both go through the same review, and a fact change
+ * deliberately does not move the schema version — that number answers which
+ * model was read, and publishing an instance is not a model change.
  */
-export const PROPOSAL_KINDS = ["schema_change"] as const;
+export const PROPOSAL_KINDS = ["schema_change", "fact_change"] as const;
 export type ProposalKind = (typeof PROPOSAL_KINDS)[number];
 
 /** Who wrote a proposal. An agent proposal is a suggestion, never a change. */

@@ -85,15 +85,30 @@ describe("what a model needs to choose a tool", () => {
     }
   });
 
-  it("keeps the mutation reachable only through the proposal tool", () => {
-    // `ontology_propose_change` is the one write, and its schema demands a reason.
-    const writer = ontologyToolByName("ontology_propose_change")!;
-    const required = (writer.parametersSchema.required as string[] | undefined) ?? [];
-    expect(required).toContain("title");
-    const declaringOperation = ONTOLOGY_TOOLS.filter((tool) =>
+  /**
+   * Every write an agent may perform is a proposal, and the list is pinned so a
+   * third one is a decision somebody has to make on purpose rather than a tool
+   * that quietly appeared.
+   */
+  const AGENT_WRITES = ["ontology_propose_change", "ontology_propose_fact"];
+
+  it("keeps every agent write a proposal, and the list closed", () => {
+    const writers = ONTOLOGY_TOOLS.filter((tool) =>
       ((tool.parametersSchema.required as string[] | undefined) ?? []).includes("operation"),
-    );
-    expect(declaringOperation).toHaveLength(1);
+    ).map((tool) => tool.name);
+    expect(writers.sort()).toEqual([...AGENT_WRITES].sort());
+    for (const name of writers) {
+      expect(name, `${name} must be a proposal`).toContain("propose");
+    }
+  });
+
+  it("demands a reason for every proposal", () => {
+    // A reviewer publishes on the strength of the summary; without one the
+    // proposal is a command with a review step in front of it.
+    for (const name of AGENT_WRITES) {
+      const required = (ontologyToolByName(name)!.parametersSchema.required as string[]) ?? [];
+      expect(required, name).toContain("title");
+    }
   });
 });
 
@@ -275,3 +290,4 @@ describe("calling a tool", () => {
     expect(ONTOLOGY_TOOLS.some((t) => /decide|approve|apply/i.test(t.name))).toBe(false);
   });
 });
+

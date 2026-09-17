@@ -132,8 +132,12 @@ expose. It is deliberately reads-only. That exposes a real gap:
 > an agent may write is pinned in `tests/api-contract.spec.ts` rather than
 > derived, so adding a second is a decision somebody has to make on purpose.
 >
-> Still open: fact proposals. The table's `kind` column exists for them and only
-> `schema_change` is implemented.
+> ~~Still open: fact proposals.~~ **Done.** A `fact_change` proposal publishes an
+> instance (`create-node`, `update-node`) or a relation (`create-edge`), through
+> the same gate and audit trail as a schema change — and deliberately **without
+> moving the schema version**, because that number answers which model was read
+> and publishing an instance is not a model change. An agent could previously
+> propose a schema change and nothing else.
 
 ## 4. Upgrading the ontology itself
 
@@ -285,8 +289,9 @@ Cheapest first, each one independently useful:
    work, and the one that stops silent divergence.
 4. ~~**Proposal objects + the proposal API** (§4.2 D).~~ **Done** for schema
    changes, with the destructive-change gate that makes it necessary.
-5. **Fact proposals** (§4.2 D, second payload kind). The table and the review
-   path are in place; this is the "an agent proposes a fact" half.
+5. ~~**Fact proposals** (§4.2 D, second payload kind).~~ **Done.** The rule from
+   §3 now holds on both sides of the model: an agent may propose a schema change
+   or a fact, and may decide neither.
 6. **Package the core and split when a trigger fires** (§2.4).
 
 Steps 1–2 were additive and landed without deciding anything about §4.2 B–D;

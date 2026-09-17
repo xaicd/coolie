@@ -436,6 +436,75 @@ export const ONTOLOGY_TOOLS: OntologyTool[] = [
     },
   },
   {
+    name: "ontology_propose_fact",
+    routeKey: "create-proposal",
+    displayName: "提交事实提案",
+    description:
+      "Propose an instance or a relation: create a node, update one, or connect two. Like a schema proposal it changes nothing until a human or a rule decides it, and it does not move the schema version. State the evidence in the summary — a reviewer publishes a fact on the strength of it.",
+    parametersSchema: domainParams(
+      {
+        title: { type: "string", description: "一句话说明这条事实" },
+        summary: { type: "string", description: "依据:你在哪个系统、哪份数据里看到它" },
+        operation: {
+          type: "string",
+          enum: ["create-node", "update-node", "create-edge"],
+          description: "要执行的事实操作",
+        },
+        nodeTypeKey: { type: "string", description: "create-node 必填:对象类型的 key" },
+        key: { type: "string", description: "create-node 必填:新节点的 key" },
+        label: { type: "string", description: "create-node 缺省用 key;update-node 可选新标签" },
+        properties: { type: "object", description: "节点属性(create-node / update-node)" },
+        nodeKey: { type: "string", description: "update-node 必填:现有节点 key" },
+        sourceKey: { type: "string", description: "create-edge 必填:起点节点 key" },
+        targetKey: { type: "string", description: "create-edge 必填:终点节点 key" },
+        relationKey: { type: "string", description: "create-edge 可选:关系类型的 key" },
+      },
+      ["title", "operation"],
+    ),
+    invoke: async (store, companyId, args) => {
+      const domainId = await resolveDomain(store, companyId, args);
+      const operation = required(args, "operation");
+      const proposal = await store.createProposal({
+        companyId,
+        domainId,
+        kind: "fact_change",
+        title: required(args, "title"),
+        summary: str(args, "summary") ?? "",
+        authorKind: "agent",
+        author: str(args, "author") ?? "agent",
+        payload: {
+          operation,
+          // Only the fields the chosen operation reads, so a proposal cannot
+          // carry a nodeTypeKey it does not use and mislead its reviewer.
+          ...(operation === "create-node"
+            ? {
+                ...(str(args, "nodeTypeKey") ? { nodeTypeKey: str(args, "nodeTypeKey") } : {}),
+                ...(str(args, "key") ? { key: str(args, "key") } : {}),
+                ...(str(args, "label") ? { label: str(args, "label") } : {}),
+                ...(args.properties ? { properties: args.properties } : {}),
+              }
+            : {}),
+          ...(operation === "update-node"
+            ? {
+                ...(str(args, "nodeKey") ? { nodeKey: str(args, "nodeKey") } : {}),
+                ...(str(args, "label") ? { label: str(args, "label") } : {}),
+                ...(args.properties ? { properties: args.properties } : {}),
+              }
+            : {}),
+          ...(operation === "create-edge"
+            ? {
+                ...(str(args, "sourceKey") ? { sourceKey: str(args, "sourceKey") } : {}),
+                ...(str(args, "targetKey") ? { targetKey: str(args, "targetKey") } : {}),
+                ...(str(args, "relationKey") ? { relationKey: str(args, "relationKey") } : {}),
+              }
+            : {}),
+        },
+        blastRadius: { proposedBy: "agent", kind: "fact_change" },
+      });
+      return { proposal };
+    },
+  },
+  {
     name: "ontology_list_views",
     routeKey: "list-views",
     displayName: "列出已保存的视图",
