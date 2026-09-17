@@ -481,6 +481,25 @@ const manifest: PaperclipPluginManifestV1 = {
       companyResolution: { from: "body", key: "companyId" },
     },
     {
+      // Both handlers existed in the worker's dispatch with no declaration, so
+      // they answered the bridge but returned "Unknown ontology route" over
+      // HTTP — reachable from the workbench, invisible to any API consumer.
+      routeKey: "run-transform",
+      method: "POST",
+      path: "/transforms/:transformId/run",
+      auth: "board",
+      capability: "api.routes.register",
+      companyResolution: { from: "body", key: "companyId" },
+    },
+    {
+      routeKey: "extract-document",
+      method: "POST",
+      path: "/documents/extract",
+      auth: "board",
+      capability: "api.routes.register",
+      companyResolution: { from: "body", key: "companyId" },
+    },
+    {
       routeKey: "list-package-installs",
       method: "GET",
       path: "/package-installs",
