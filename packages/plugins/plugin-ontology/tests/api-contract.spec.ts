@@ -109,18 +109,37 @@ describe("what an agent may see", () => {
     expect(wrong, `exposed to agents but board-only: ${wrong.join(", ")}`).toEqual([]);
   });
 
-  it("exposes no mutation", () => {
-    // "AI 是提案者,人+规则是发布者": publishing a fact is not an agent call, and
-    // there is no proposal API yet — so a write here would be a write with no
-    // gate in front of it.
+  /**
+   * The only writes an agent may perform are *requests*: a proposal changes
+   * nothing until a human or a rule decides it, which is the whole point of
+   * "AI 是提案者,人+规则是发布者".
+   *
+   * Pinned rather than derived, so adding a second agent-writable operation is a
+   * decision somebody has to make on purpose and defend in review.
+   */
+  const AGENT_INTENTS = ["create-proposal"];
+
+  it("hands an agent no write except a request for review", () => {
     const byKey = new Map((manifest.apiRoutes ?? []).map((route) => [route.routeKey, route]));
-    const writers = agentApiRoutes()
+    const writes = agentApiRoutes()
       .filter((route) => {
         const method = byKey.get(route.routeKey)?.method;
         return method !== undefined && method !== "GET";
       })
-      .map((route) => route.routeKey);
-    expect(writers, `agents must not be handed writes: ${writers.join(", ")}`).toEqual([]);
+      .map((route) => route.routeKey)
+      .sort();
+    expect(
+      writes,
+      "a write reachable by an agent must be a proposal, and the list is pinned: " +
+        writes.join(", "),
+    ).toEqual([...AGENT_INTENTS].sort());
+  });
+
+  it("keeps the decision itself out of an agent's reach", () => {
+    // Approving is what publishes; an agent that could approve its own proposal
+    // would be publishing, with the proposal step as decoration.
+    const exposed = new Set(agentApiRoutes().map((route) => route.routeKey));
+    expect(exposed.has("decide-proposal")).toBe(false);
   });
 
   it("covers the reads that carry the domain's knowledge", () => {

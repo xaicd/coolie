@@ -516,6 +516,33 @@ const manifest: PaperclipPluginManifestV1 = {
       companyResolution: { from: "body", key: "companyId" },
     },
     {
+      // The proposal path. An agent may write a *proposal* — which changes
+      // nothing until it is decided — so this one is open to `board-or-agent`
+      // while deciding it is not.
+      routeKey: "create-proposal",
+      method: "POST",
+      path: "/proposals",
+      auth: "board-or-agent",
+      capability: "api.routes.register",
+      companyResolution: { from: "body", key: "companyId" },
+    },
+    {
+      routeKey: "decide-proposal",
+      method: "POST",
+      path: "/proposals/:proposalId/decision",
+      auth: "board",
+      capability: "api.routes.register",
+      companyResolution: { from: "body", key: "companyId" },
+    },
+    {
+      routeKey: "list-proposals",
+      method: "GET",
+      path: "/proposals",
+      auth: "board-or-agent",
+      capability: "api.routes.register",
+      companyResolution: { from: "query", key: "companyId" },
+    },
+    {
       routeKey: "list-business-systems",
       method: "GET",
       path: "/business-systems",

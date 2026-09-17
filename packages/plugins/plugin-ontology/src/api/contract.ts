@@ -88,7 +88,13 @@ export const CORE_API: CoreApiRoute[] = [
   r("list-domain-snapshots", "schema", true, "schema 历史版本"),
   r("list-node-types", "schema", true, "列出对象类型"),
   r("create-node-type", "schema", false, "新建对象类型"),
-  r("update-node-type", "schema", false, "改对象类型(含字段)"),
+  r("update-node-type", "schema", false, "改对象类型(含字段,可声明字段改名)"),
+  // The only writes an agent may make are requests. A proposal changes nothing
+  // until someone decides it, so `create-proposal` is agent-visible while
+  // `decide-proposal` is not — that is the whole "AI 提案、人发布" rule, in code.
+  r("create-proposal", "governance", true, "提交一份变更提案(不生效)"),
+  r("decide-proposal", "governance", false, "批准/驳回提案,批准即执行"),
+  r("list-proposals", "governance", true, "列出提案及待审队列"),
   r("delete-node-type", "schema", false, "删对象类型"),
   r("list-relation-types", "schema", true, "列出关系类型"),
   r("create-relation-type", "schema", false, "新建关系类型"),

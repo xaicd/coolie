@@ -892,7 +892,26 @@ function DomainWorkspace({
   /** Inline property-table save (add / edit / delete a field). */
   const saveNodeTypeSchema = useCallback(
     async (nodeTypeId: string, schema: Record<string, unknown>) => {
-      await updateNodeType({ companyId, nodeTypeId, propertiesSchema: schema });
+      try {
+        await updateNodeType({ companyId, nodeTypeId, propertiesSchema: schema });
+      } catch (e) {
+        // Removing a field leaves the values already stored on instances
+        // unreachable through the type — not deleted, which is what makes it
+        // easy to miss. The store refuses unless the loss is accepted, so ask:
+        // naming what will be orphaned is the difference between a decision and
+        // an accident.
+        const message = String((e as Error)?.message ?? e);
+        const isOrphanRefusal = /allowOrphaned|orphan/i.test(message);
+        if (!isOrphanRefusal) throw e;
+        const proceed = window.confirm(
+          `${message}\n\n${t(
+            "确认删除这些字段并留下孤立数据吗?(值不会被删除,但在类型上已不可达)",
+            "Remove these fields and leave the values orphaned? (Values are not deleted, but become unreachable through the type.)",
+          )}`,
+        );
+        if (!proceed) return;
+        await updateNodeType({ companyId, nodeTypeId, propertiesSchema: schema, allowOrphaned: true });
+      }
       refreshDomain();
     },
     [companyId, updateNodeType, refreshDomain],

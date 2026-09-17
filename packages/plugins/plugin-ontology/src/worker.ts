@@ -63,6 +63,7 @@ import type {
   FunctionType,
   MicroserviceLayer,
   NodeLayer,
+  ProposalStatus,
   SimulationStatus,
   SubProjectStatus,
   SubProjectType,
@@ -516,6 +517,69 @@ function optionalStringOrNull(value: unknown): string | null | undefined {
   return typeof value === "string" || value === null ? (value as string | null) : undefined;
 }
 
+/**
+ * Carry out what a proposal asked for.
+ *
+ * Deliberately a small, closed set of operations routed through the same store
+ * methods a direct edit uses — the point of the proposal is the gate in front of
+ * the write, not a second implementation of it. An operation the applier does not
+ * know how to perform is an error rather than a no-op, so a proposal cannot be
+ * marked applied without anything having happened.
+ */
+async function applyProposalOperation(
+  store: GraphStore,
+  ctx: PluginContext,
+  companyId: string,
+  domainId: string,
+  operation: string,
+  op: Record<string, unknown>,
+): Promise<{ schemaVersion: number }> {
+  const nodeTypeId = optionalString(op.nodeTypeId);
+  const propertiesSchema = optionalRecord(op.propertiesSchema);
+  const propertyRenames = optionalStringMap(op.propertyRenames);
+  const displayName = optionalString(op.displayName);
+  const description = typeof op.description === "string" ? op.description : undefined;
+
+  switch (operation) {
+    case "update-node-type": {
+      if (!nodeTypeId) throw new Error("update-node-type needs nodeTypeId");
+      const nodeType = await store.updateNodeType(companyId, nodeTypeId, {
+        ...(displayName === undefined ? {} : { displayName }),
+        ...(description === undefined ? {} : { description }),
+        ...(propertiesSchema === undefined ? {} : { propertiesSchema }),
+        ...(propertyRenames === undefined ? {} : { propertyRenames }),
+      });
+      if (!nodeType) throw new Error("Node type not found");
+      // `updateNodeType` bumps the domain, so the version is the one it produced.
+      return { schemaVersion: await currentSchemaVersion(store, companyId, domainId) };
+    }
+    case "create-node-type": {
+      const created = await store.createNodeType({
+        companyId,
+        domainId,
+        key: requireString(op.key, "payload.key"),
+        displayName: requireString(op.displayName, "payload.displayName"),
+        description: optionalString(op.description) ?? null,
+        propertiesSchema,
+      });
+      return { schemaVersion: await currentSchemaVersion(store, companyId, created.domain_id) };
+    }
+    default:
+      void ctx;
+      throw new Error(`Unsupported proposal operation: ${operation}`);
+  }
+}
+
+/** The domain's version as the store currently reports it. */
+async function currentSchemaVersion(
+  store: GraphStore,
+  companyId: string,
+  domainId: string,
+): Promise<number> {
+  const domain = await store.getDomain(companyId, domainId);
+  return domain?.schema_version ?? 0;
+}
+
 /** A `string -> string` map, or undefined; anything else is a caller bug. */
 function optionalStringMap(value: unknown): Record<string, string> | undefined {
   const record = optionalRecord(value);
@@ -586,6 +650,9 @@ const updateNodeTypeMutation: MutationHandler = async (store, _ctx, call) => {
       // existing instance values follow the rename. A diff cannot tell a rename
       // from a delete plus an add, so only the caller can say.
       propertyRenames: optionalStringMap(call.fields.propertyRenames),
+      // The explicit "I know values will be orphaned" — without it the store
+      // refuses the edit rather than leaving values unreachable.
+      allowOrphaned: call.fields.allowOrphaned === true,
     },
   );
   if (!nodeType) return notFound("Node type not found");
@@ -879,8 +946,79 @@ const createBusinessSystemMutation: MutationHandler = async (store, ctx, call) =
  * handlers. `tests/action-parity.spec.ts` asserts every `usePluginAction` key
  * in `src/ui/**` is reachable, so this table is the single source of truth.
  */
+/**
+ * Write a proposal. Changes nothing until it is decided.
+ *
+ * This is the operation an agent is allowed to perform: a request for review is
+ * not a change, and without it "AI 是提案者" had no path through the API — an
+ * agent could only read, and the UI was the only proposer.
+ */
+const createProposalMutation: MutationHandler = async (store, ctx, call) => {
+  const domainId = requireString(call.fields.domainId, "domainId");
+  const authorKind = call.fields.authorKind === "agent" ? "agent" : "human";
+  const proposal = await store.createProposal({
+    companyId: call.companyId,
+    domainId,
+    title: requireString(call.fields.title, "title"),
+    summary: optionalString(call.fields.summary),
+    payload: requireRecordOrThrow(call.fields.payload, "payload"),
+    blastRadius: optionalRecord(call.fields.blastRadius),
+    author: optionalString(call.fields.author) ?? (authorKind === "agent" ? "agent" : "user"),
+    authorKind,
+  });
+  await ctx.activity.log({
+    companyId: call.companyId,
+    message: `Proposed ${proposal.kind}: ${proposal.title}`,
+    entityType: "ontology_proposal",
+    entityId: proposal.id,
+  });
+  return created({ proposal });
+};
+
+/**
+ * Decide a proposal, and carry it out if approved.
+ *
+ * Applying rides on the same call deliberately: a proposal marked applied with
+ * nothing performed would be a lie in the review queue, and a separate step
+ * invites exactly that. The change goes through the ordinary store methods, so it
+ * takes the same version bump, audit entry and property migration as a direct
+ * edit — a proposal is a gate in front of the write, not a second way to write.
+ */
+const decideProposalMutation: MutationHandler = async (store, ctx, call) => {
+  const proposalId = requireString(call.fields.proposalId, "proposalId");
+  const decision = call.fields.decision === "rejected" ? "rejected" : "approved";
+  const proposal = await store.getProposal(call.companyId, proposalId);
+  if (!proposal) return notFound("Proposal not found");
+  if (proposal.status !== "proposed") {
+    return badRequest(`Proposal is ${proposal.status}; only a proposed one can be decided`);
+  }
+
+  const reviewed = await store.reviewProposal(
+    call.companyId,
+    proposalId,
+    decision,
+    optionalString(call.fields.reviewedBy) ?? "user",
+    optionalString(call.fields.note) ?? "",
+  );
+  if (!reviewed) return badRequest("Proposal could not be decided");
+  if (decision === "rejected") return ok({ proposal: reviewed, applied: false });
+
+  const applied = await applyProposalOperation(
+    store,
+    ctx,
+    call.companyId,
+    reviewed.domain_id,
+    requireString(reviewed.payload.operation, "payload.operation"),
+    reviewed.payload,
+  );
+  const done = await store.markProposalApplied(call.companyId, proposalId, applied.schemaVersion);
+  return ok({ proposal: done ?? reviewed, applied: true, schemaVersion: applied.schemaVersion });
+};
+
 const MUTATION_HANDLERS: Record<string, MutationHandler> = {
   "update-node-type": updateNodeTypeMutation,
+  "create-proposal": createProposalMutation,
+  "decide-proposal": decideProposalMutation,
   "delete-node-type": deleteNodeTypeMutation,
   "update-relation-type": updateRelationTypeMutation,
   "delete-relation-type": deleteRelationTypeMutation,
@@ -2119,6 +2257,13 @@ const plugin = definePlugin({
 
     // Cognition (AST reverse-engineering) — data/action handlers for the UI:
     // create a job, ingest code files (extract a draft), review, publish to a domain.
+    ctx.data.register("list-proposals", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const status = typeof params.status === "string" ? (params.status as ProposalStatus) : undefined;
+      return { proposals: await store.listProposals(companyId, domainId, status) };
+    });
+
     ctx.data.register("list-sub-projects", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
       const businessSystemId = requireString(params.businessSystemId, "businessSystemId");
@@ -3699,6 +3844,25 @@ const plugin = definePlugin({
       case "extract-document": {
         const outcome = await extractDocumentMutation(store, ctx, httpMutationCall(companyId, input));
         return { status: outcome.status, body: outcome.payload };
+      }
+
+      case "create-proposal": {
+        const outcome = await createProposalMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
+      }
+
+      case "decide-proposal": {
+        const outcome = await decideProposalMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
+      }
+
+      case "list-proposals": {
+        const proposals = await store.listProposals(
+          companyId,
+          requireString(queryString(input.query.domainId), "domainId"),
+          typeof input.query.status === "string" ? (input.query.status as ProposalStatus) : undefined,
+        );
+        return { body: { proposals } };
       }
 
       case "list-package-installs": {

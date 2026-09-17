@@ -83,6 +83,24 @@ export const AUDIT_EVENT_TYPES = [
 ] as const;
 export type AuditEventType = (typeof AUDIT_EVENT_TYPES)[number];
 
+/**
+ * A proposal moves proposed -> approved -> applied, or proposed -> rejected.
+ * `applied` is terminal and records the schema version it produced.
+ */
+export const PROPOSAL_STATUSES = ["proposed", "approved", "rejected", "applied"] as const;
+export type ProposalStatus = (typeof PROPOSAL_STATUSES)[number];
+
+/**
+ * What a proposal would change. Only `schema_change` is implemented; the column
+ * exists so a fact proposal can reuse this table rather than a second one.
+ */
+export const PROPOSAL_KINDS = ["schema_change"] as const;
+export type ProposalKind = (typeof PROPOSAL_KINDS)[number];
+
+/** Who wrote a proposal. An agent proposal is a suggestion, never a change. */
+export const PROPOSAL_AUTHOR_KINDS = ["human", "agent"] as const;
+export type ProposalAuthorKind = (typeof PROPOSAL_AUTHOR_KINDS)[number];
+
 /** Return true when `to` is a legal domain lifecycle transition from `from`. */
 export function isValidDomainTransition(from: DomainLifecycleState, to: DomainLifecycleState): boolean {
   return DOMAIN_STATE_TRANSITIONS[from]?.includes(to) ?? false;

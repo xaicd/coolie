@@ -267,6 +267,7 @@ describe("a renamed property takes its data with it", () => {
     return harness;
   };
 
+  /** An edit that renames `code` to `orderNo`; both schemas differ. */
   const edit = (harness: TestHarness, extra: Record<string, unknown>) =>
     harness.performAction(
       "update-node-type",
@@ -277,6 +278,9 @@ describe("a renamed property takes its data with it", () => {
       },
       { companyId: COMPANY_ID },
     );
+
+  /** The same edit, with the loss of the removed field accepted. */
+  const editAcceptingLoss = (harness: TestHarness) => edit(harness, { allowOrphaned: true });
 
   it("moves the values when the rename is declared", async () => {
     const harness = await bootWithSchema();
@@ -298,7 +302,7 @@ describe("a renamed property takes its data with it", () => {
 
   it("moves nothing when the caller declares no rename", async () => {
     const harness = await bootWithSchema();
-    await edit(harness, {});
+    await editAcceptingLoss(harness);
     expect(renames(harness)).toEqual([]);
   });
 
@@ -307,7 +311,7 @@ describe("a renamed property takes its data with it", () => {
     // reaches PostgreSQL. Only a real instance caught that; a fake db does not
     // parse SQL, so this asserts the shape the binder can actually send.
     const harness = await bootWithSchema();
-    await edit(harness, {});
+    await editAcceptingLoss(harness);
     const count = harness.dbQueries.find((entry: { sql: string }) => entry.sql.includes("COUNT(*)"));
     expect(count?.sql).not.toContain("?|");
     expect(count?.sql).toContain("properties ? $3::text");
@@ -317,7 +321,7 @@ describe("a renamed property takes its data with it", () => {
   it("counts the instances whose values the edit orphaned", async () => {
     // Dropping a field on purpose is legitimate; doing it silently is not.
     const harness = await bootWithSchema();
-    await edit(harness, {});
+    await editAcceptingLoss(harness);
     const metadata = lastAuditMetadata(harness);
     expect(metadata.orphaned).toEqual(["code"]);
     expect(metadata.orphanedInstances).toBe(3);
@@ -325,11 +329,34 @@ describe("a renamed property takes its data with it", () => {
 
   it("ignores a rename the schema diff does not support", async () => {
     const harness = await bootWithSchema();
-    await edit(harness, { propertyRenames: { code: "somethingElse" } });
+    await edit(harness, { propertyRenames: { code: "somethingElse" }, allowOrphaned: true });
     expect(renames(harness)).toEqual([]);
     const metadata = lastAuditMetadata(harness);
     expect(metadata.ignoredRenames).toEqual([{ from: "code", to: "somethingElse" }]);
     expect(metadata.orphaned).toEqual(["code"]);
+  });
+
+  it("refuses an edit that would orphan values, before writing anything", async () => {
+    // The values are not deleted — they simply stop being reachable through the
+    // type, which is the kind of damage that goes unnoticed for months.
+    const harness = await bootWithSchema();
+    await expect(edit(harness, {})).rejects.toThrow(/allowOrphaned|proposal/);
+    // Nothing was written: no schema update, no version bump.
+    expect(bumps(harness)).toEqual([]);
+    expect(renames(harness)).toEqual([]);
+  });
+
+  it("proceeds when the caller accepts the loss explicitly", async () => {
+    const harness = await bootWithSchema();
+    await expect(editAcceptingLoss(harness)).resolves.toBeTruthy();
+    expect(bumps(harness)).toHaveLength(1);
+  });
+
+  it("does not refuse when the rename accounts for every removal", async () => {
+    // Declaring where the values went is the alternative to accepting the loss.
+    const harness = await bootWithSchema();
+    await expect(edit(harness, { propertyRenames: { code: "orderNo" } })).resolves.toBeTruthy();
+    expect(renames(harness)).toHaveLength(1);
   });
 
   it("stays quiet when the edit removes nothing", async () => {

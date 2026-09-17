@@ -5,6 +5,7 @@ import {
   planPropertyRenames,
   type RenamePlan,
 } from "../schemaEvolution.js";
+import type { ProposalAuthorKind, ProposalKind, ProposalStatus } from "../enums.js";
 import type { SqlClient } from "./SqlClient.js";
 
 /**
@@ -210,6 +211,15 @@ export interface OntologyNodeTypeUpdate {
   layerSpec?: Record<string, unknown>;
   metadata?: Record<string, unknown>;
   /**
+   * Accept the loss of values for removed properties.
+   *
+   * Without it, an edit that would orphan instance values is refused: the
+   * values are not deleted, they simply stop being reachable through the type,
+   * which is the kind of damage that goes unnoticed for months. Declaring the
+   * renames moves the values instead; a proposal takes it through review.
+   */
+  allowOrphaned?: boolean;
+  /**
    * `oldKey -> newKey`, for a schema edit that renames a property.
    *
    * A diff cannot tell a rename from a delete plus an add, so the author has to
@@ -218,6 +228,26 @@ export interface OntologyNodeTypeUpdate {
    * matching the type they belong to.
    */
   propertyRenames?: Record<string, string>;
+}
+
+/**
+ * A schema edit that would leave instance values unreachable, and that nobody
+ * has accepted.
+ *
+ * Thrown rather than returned because the caller must decide what kind of change
+ * this is: `allowOrphaned` states that the loss is intended, and a proposal is
+ * the path for one that needs review. Proceeding by default is what made the
+ * divergence silent in the first place.
+ */
+export class SchemaChangeNeedsReview extends Error {
+  constructor(readonly outcome: SchemaEditOutcome) {
+    super(
+      `Removing ${outcome.orphaned.join(", ")} would leave values on ` +
+        `${outcome.orphanedInstances} instance(s); pass allowOrphaned to accept, ` +
+        `declare propertyRenames to move them, or raise a proposal`,
+    );
+    this.name = "SchemaChangeNeedsReview";
+  }
 }
 
 /**
@@ -826,6 +856,42 @@ export interface OntologySubProjectUpdate {
   metadata?: Record<string, unknown>;
 }
 
+export interface OntologyProposalInput {
+  companyId: string;
+  domainId: string;
+  kind?: ProposalKind;
+  title: string;
+  summary?: string;
+  /** What applying this proposal would do, in the shape the applier expects. */
+  payload: Record<string, unknown>;
+  /** What it would touch — computed at creation so a reviewer sees it first. */
+  blastRadius?: Record<string, unknown>;
+  author?: string;
+  authorKind?: ProposalAuthorKind;
+}
+
+export interface OntologyProposalRow {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  kind: ProposalKind;
+  status: ProposalStatus;
+  title: string;
+  summary: string;
+  payload: Record<string, unknown>;
+  blast_radius: Record<string, unknown>;
+  author: string;
+  author_kind: ProposalAuthorKind;
+  reviewed_by: string | null;
+  reviewed_at: string | null;
+  review_note: string;
+  applied_at: string | null;
+  /** The schema version the apply produced; null until applied. */
+  schema_version: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
 export interface OntologySubProjectRow {
   id: string;
   company_id: string;
@@ -1389,6 +1455,32 @@ export interface GraphStore {
     resourceKind: OntologyResourceKind,
     resourceId: string,
   ): Promise<LinkedDomainRow[]>;
+
+  createProposal(input: OntologyProposalInput): Promise<OntologyProposalRow>;
+  getProposal(companyId: string, proposalId: string): Promise<OntologyProposalRow | null>;
+  listProposals(
+    companyId: string,
+    domainId: string,
+    status?: ProposalStatus,
+  ): Promise<OntologyProposalRow[]>;
+  /**
+   * Move a proposal through review. `applied` is not reachable this way —
+   * applying is a separate call that also performs the change, so a proposal
+   * cannot be marked done without anything having happened.
+   */
+  reviewProposal(
+    companyId: string,
+    proposalId: string,
+    decision: "approved" | "rejected",
+    reviewedBy: string,
+    note?: string,
+  ): Promise<OntologyProposalRow | null>;
+  /** Record that an approved proposal was carried out, and the version it made. */
+  markProposalApplied(
+    companyId: string,
+    proposalId: string,
+    schemaVersion: number,
+  ): Promise<OntologyProposalRow | null>;
 
   createSubProject(input: OntologySubProjectInput): Promise<OntologySubProjectRow>;
   listSubProjects(companyId: string, businessSystemId: string): Promise<OntologySubProjectRow[]>;
@@ -2022,6 +2114,11 @@ export class PostgresGraphStore implements GraphStore {
             update.propertiesSchema,
             update.propertyRenames,
           );
+    // Refuse before writing anything: an edit that orphans values is either
+    // declared (renames), accepted (allowOrphaned), or reviewed (a proposal).
+    if (migration && migration.orphanedInstances > 0 && update.allowOrphaned !== true) {
+      throw new SchemaChangeNeedsReview(migration);
+    }
     const res = await this.db.execute(
       `UPDATE ${this.table("ontology_node_types")}
           SET display_name          = COALESCE($3, display_name),
@@ -3749,6 +3846,100 @@ export class PostgresGraphStore implements GraphStore {
     "id, company_id, business_system_id, name, code, type, status, microservice_layer, " +
     "tech_stack, framework, git_repo, api_specs, dependencies, build_config, metadata, " +
     "created_at, updated_at";
+
+  private static readonly PROPOSAL_COLS =
+    "id, company_id, domain_id, kind, status, title, summary, payload, blast_radius, author, " +
+    "author_kind, reviewed_by, reviewed_at, review_note, applied_at, schema_version, " +
+    "created_at, updated_at";
+
+  async createProposal(input: OntologyProposalInput): Promise<OntologyProposalRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_proposals")}
+         (id, company_id, domain_id, kind, status, title, summary, payload, blast_radius,
+          author, author_kind)
+       VALUES ($1, $2, $3, $4, 'proposed', $5, $6, $7::jsonb, $8::jsonb, $9, $10)`,
+      [
+        id,
+        input.companyId,
+        input.domainId,
+        input.kind ?? "schema_change",
+        input.title,
+        input.summary ?? "",
+        JSON.stringify(input.payload ?? {}),
+        JSON.stringify(input.blastRadius ?? {}),
+        input.author ?? "system",
+        input.authorKind ?? "human",
+      ],
+    );
+    const rows = await this.db.query<OntologyProposalRow>(
+      `SELECT ${PostgresGraphStore.PROPOSAL_COLS}
+         FROM ${this.table("ontology_proposals")}
+        WHERE company_id = $1 AND id = $2`,
+      [input.companyId, id],
+    );
+    return rows[0]!;
+  }
+
+  async getProposal(companyId: string, proposalId: string): Promise<OntologyProposalRow | null> {
+    const rows = await this.db.query<OntologyProposalRow>(
+      `SELECT ${PostgresGraphStore.PROPOSAL_COLS}
+         FROM ${this.table("ontology_proposals")}
+        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+      [companyId, proposalId],
+    );
+    return rows[0] ?? null;
+  }
+
+  async listProposals(
+    companyId: string,
+    domainId: string,
+    status?: ProposalStatus,
+  ): Promise<OntologyProposalRow[]> {
+    return this.db.query<OntologyProposalRow>(
+      `SELECT ${PostgresGraphStore.PROPOSAL_COLS}
+         FROM ${this.table("ontology_proposals")}
+        WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
+          ${status ? "AND status = $3" : ""}
+        ORDER BY created_at DESC`,
+      status ? [companyId, domainId, status] : [companyId, domainId],
+    );
+  }
+
+  async reviewProposal(
+    companyId: string,
+    proposalId: string,
+    decision: "approved" | "rejected",
+    reviewedBy: string,
+    note = "",
+  ): Promise<OntologyProposalRow | null> {
+    // Only a `proposed` row can be decided: re-deciding an applied proposal
+    // would silently rewrite the history of a change that already happened.
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_proposals")}
+          SET status = $3, reviewed_by = $4, reviewed_at = now(), review_note = $5,
+              updated_at = now()
+        WHERE company_id = $1 AND id = $2 AND status = 'proposed'`,
+      [companyId, proposalId, decision, reviewedBy, note],
+    );
+    if (res.rowCount === 0) return null;
+    return this.getProposal(companyId, proposalId);
+  }
+
+  async markProposalApplied(
+    companyId: string,
+    proposalId: string,
+    schemaVersion: number,
+  ): Promise<OntologyProposalRow | null> {
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_proposals")}
+          SET status = 'applied', applied_at = now(), schema_version = $3, updated_at = now()
+        WHERE company_id = $1 AND id = $2 AND status = 'approved'`,
+      [companyId, proposalId, schemaVersion],
+    );
+    if (res.rowCount === 0) return null;
+    return this.getProposal(companyId, proposalId);
+  }
 
   async createSubProject(input: OntologySubProjectInput): Promise<OntologySubProjectRow> {
     const id = randomUUID();

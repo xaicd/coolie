@@ -116,10 +116,16 @@ it, and only reviewed facts become trusted.
 **MCP surface.** `agentApiRoutes()` is the enumeration `ontology-mcp` should
 expose. It is deliberately reads-only. That exposes a real gap:
 
-> **There is no proposal API.** The rule is "AI 是提案者,人+规则是发布者", but the
-> contract has no operation for an agent to *propose* a schema change or a fact.
-> Today an agent can only read; the writing paths are board-only and the UI is the
-> only proposer. This is the single largest missing piece of the standard shape.
+> ~~**There is no proposal API.**~~ **Done** (`migrations/014_proposals.sql`).
+> `create-proposal` is open to an agent; `decide-proposal` is not. Approving
+> applies the change through the ordinary store path, so it takes the same
+> version bump, audit entry and property migration as a direct edit — a proposal
+> is a gate in front of the write, not a second way to write. The one operation
+> an agent may write is pinned in `tests/api-contract.spec.ts` rather than
+> derived, so adding a second is a decision somebody has to make on purpose.
+>
+> Still open: fact proposals. The table's `kind` column exists for them and only
+> `schema_change` is implemented.
 
 ## 4. Upgrading the ontology itself
 
@@ -165,10 +171,12 @@ Two different things travel under this name and they need different mechanisms.
    A removal the caller did not account for is counted and written into the change
    record (`orphaned`, `orphanedInstances`) instead of passing silently.
 
-   What is deliberately *not* done is blocking: dropping a field on purpose is
-   legitimate, and refusing it would need a UI that can declare the mapping and
-   confirm the loss — which is the proposal/review work in §4.2 D, not this step.
-   Until then the outcome is recorded and readable, not prevented.
+   **Now blocked, once the review path existed.** An edit that would orphan
+   instance values is refused — nothing is written — unless the caller either
+   declares `propertyRenames` (move the values) or passes `allowOrphaned`
+   (accept the loss on purpose), or raises a proposal. The schema editor asks
+   before accepting, naming what would be orphaned. The gate is what makes the
+   proposal path necessary rather than optional.
 
    Note for anyone re-reading this: three separate bugs in this feature were
    found only against a running instance, never by the unit tests — the host
@@ -234,10 +242,14 @@ cannot be fixed — a rename has nowhere to carry its migration.
 The point is that a destructive change cannot be applied without its migration,
 because the migration is part of the same change set.
 
-**D. Proposals for both schema and facts, with the same shape.** One proposal
-object, two payload kinds, one review path. This is what closes the
-no-proposal-API gap in §3, and it is what makes "AI proposes, a human or a rule
-publishes" real rather than aspirational.
+**D. Proposals for both schema and facts, with the same shape.** Implemented for
+schema changes: one proposal object, a status ladder
+(`proposed → approved → applied`, or `rejected`), a blast radius recorded when the
+proposal is written so a reviewer sees what it touches *before* deciding, and an
+applier that routes to the same store methods a direct edit uses. An unknown
+operation is an error rather than a no-op, so a proposal cannot be marked applied
+with nothing having happened. Fact proposals reuse the table and are not
+implemented.
 
 **E. Rollback is a version pointer, not a restore.** Restore-by-copy already
 exists in the UI; a version pointer makes "what was in effect at 14:02" precise
@@ -263,8 +275,16 @@ Cheapest first, each one independently useful:
    answerable before it gets complicated.
 3. **Change sets with data migration** (§4.2 B, C). The first piece that is real
    work, and the one that stops silent divergence.
-4. **Proposal objects + the proposal API** (§4.2 D). Delivers the rule the
-   architecture already assumes.
-5. **Package the core and split when a trigger fires** (§2.4).
+4. ~~**Proposal objects + the proposal API** (§4.2 D).~~ **Done** for schema
+   changes, with the destructive-change gate that makes it necessary.
+5. **Fact proposals** (§4.2 D, second payload kind). The table and the review
+   path are in place; this is the "an agent proposes a fact" half.
+6. **Package the core and split when a trigger fires** (§2.4).
 
-Steps 1–2 are additive and can land without deciding anything about §4.2 B–D.
+Steps 1–2 were additive and landed without deciding anything about §4.2 B–D;
+3 and 4 turned out to be one piece of work — the gate needs a review path to
+point at, and the review path needs something worth gating.
+
+What is left before a split is mostly the test the split was meant to pass: an
+agent must still get its business map when Paperclip is down. Every piece above
+makes that possible; none of them proves it yet.
