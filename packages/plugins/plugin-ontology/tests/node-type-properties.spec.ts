@@ -31,6 +31,11 @@ type Harness = ReturnType<typeof createTestHarness>;
 
 async function boot(): Promise<Harness> {
   const harness = createTestHarness({ manifest });
+  // The fake db returns no rows, while the store's contract is that an insert
+  // reads its row back (`return rows[0]!`) — so anything the store does with the
+  // returned row (reading `key` to audit the change, say) would see undefined.
+  // Hand back a synthetic row so the double behaves like PostgreSQL.
+  harness.ctx.db.query = (async () => [{ id: "synthetic-id", key: "synthetic" }]) as typeof harness.ctx.db.query;
   await plugin.definition.setup(harness.ctx);
   return harness;
 }

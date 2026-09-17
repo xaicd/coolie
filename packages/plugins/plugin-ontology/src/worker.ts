@@ -529,6 +529,35 @@ function requireRecordOrThrow(value: unknown, field: string): Record<string, unk
   return record;
 }
 
+/**
+ * Record a change to the ontology's own model.
+ *
+ * Schema changes are the ontology's history, and "who changed the model, and
+ * when" has to be answerable — all the more so once an external consumer pins a
+ * schema version and reasons over what it read. Only business-system creation
+ * used to log, so creating, editing and deleting object and relation types left
+ * no trace at all: a property could be renamed and nothing recorded it.
+ */
+async function logSchemaChange(
+  ctx: PluginContext,
+  companyId: string,
+  message: string,
+  entityType: string,
+  entityId: string,
+): Promise<void> {
+  try {
+    await ctx.activity.log({ companyId, message, entityType, entityId });
+  } catch (err) {
+    // The change itself already succeeded. Losing the audit line must not fail
+    // it, but it must not disappear silently either.
+    ctx.logger.warn("Failed to write schema audit entry", {
+      error: String((err as Error)?.message ?? err),
+      entityType,
+      entityId,
+    });
+  }
+}
+
 const updateNodeTypeMutation: MutationHandler = async (store, _ctx, call) => {
   const nodeType = await store.updateNodeType(
     call.companyId,
@@ -545,17 +574,24 @@ const updateNodeTypeMutation: MutationHandler = async (store, _ctx, call) => {
     },
   );
   if (!nodeType) return notFound("Node type not found");
+  await logSchemaChange(
+    _ctx,
+    call.companyId,
+    `更新对象类型 ${nodeType.key}`,
+    "ontology_node_type",
+    nodeType.id,
+  );
   return ok({ nodeType });
 };
 
 const deleteNodeTypeMutation: MutationHandler = async (store, _ctx, call) => {
   // Hard-delete: see GraphStore.deleteNodeType for ON DELETE SET NULL
   // semantics on referencing nodes.
-  const okDeleted = await store.deleteNodeType(
-    call.companyId,
-    requireString(call.fields.nodeTypeId, "nodeTypeId"),
-  );
-  return okDeleted ? noContent() : notFound("Node type not found");
+  const nodeTypeId = requireString(call.fields.nodeTypeId, "nodeTypeId");
+  const okDeleted = await store.deleteNodeType(call.companyId, nodeTypeId);
+  if (!okDeleted) return notFound("Node type not found");
+  await logSchemaChange(_ctx, call.companyId, `删除对象类型 ${nodeTypeId}`, "ontology_node_type", nodeTypeId);
+  return noContent();
 };
 
 const updateRelationTypeMutation: MutationHandler = async (store, _ctx, call) => {
@@ -572,17 +608,30 @@ const updateRelationTypeMutation: MutationHandler = async (store, _ctx, call) =>
     },
   );
   if (!relationType) return notFound("Relation type not found");
+  await logSchemaChange(
+    _ctx,
+    call.companyId,
+    `更新关系类型 ${relationType.key}`,
+    "ontology_relation_type",
+    relationType.id,
+  );
   return ok({ relationType });
 };
 
 const deleteRelationTypeMutation: MutationHandler = async (store, _ctx, call) => {
   // Hard-delete: see GraphStore.deleteRelationType for ON DELETE SET NULL
   // semantics on referencing edges.
-  const okDeleted = await store.deleteRelationType(
+  const relationTypeId = requireString(call.fields.relationTypeId, "relationTypeId");
+  const okDeleted = await store.deleteRelationType(call.companyId, relationTypeId);
+  if (!okDeleted) return notFound("Relation type not found");
+  await logSchemaChange(
+    _ctx,
     call.companyId,
-    requireString(call.fields.relationTypeId, "relationTypeId"),
+    `删除关系类型 ${relationTypeId}`,
+    "ontology_relation_type",
+    relationTypeId,
   );
-  return okDeleted ? noContent() : notFound("Relation type not found");
+  return noContent();
 };
 
 const createFunctionMutation: MutationHandler = async (store, _ctx, call) => {
@@ -1365,6 +1414,7 @@ const plugin = definePlugin({
           : requireRecordOrThrow(call.fields.propertiesSchema, "propertiesSchema"),
         metadata: optionalRecord(call.fields.metadata),
       });
+      await logSchemaChange(ctx, call.companyId, `新建对象类型 ${nodeType.key}`, "ontology_node_type", nodeType.id);
       return { nodeType };
     });
 
@@ -1384,6 +1434,13 @@ const plugin = definePlugin({
         // structure view had nothing to draw between the two types.
         metadata: optionalRecord(call.fields.metadata),
       });
+      await logSchemaChange(
+        ctx,
+        call.companyId,
+        `新建关系类型 ${relationType.key}`,
+        "ontology_relation_type",
+        relationType.id,
+      );
       return { relationType };
     });
 
@@ -3079,6 +3136,7 @@ const plugin = definePlugin({
           propertiesSchema: optionalRecord(body.propertiesSchema),
           metadata: optionalRecord(body.metadata),
         });
+        await logSchemaChange(ctx, companyId, `新建对象类型 ${nodeType.key}`, "ontology_node_type", nodeType.id);
         return { status: 201, body: { nodeType } };
       }
 
@@ -3111,6 +3169,13 @@ const plugin = definePlugin({
           directed: typeof body.directed === "boolean" ? body.directed : undefined,
           metadata: optionalRecord(body.metadata),
         });
+        await logSchemaChange(
+          ctx,
+          companyId,
+          `新建关系类型 ${relationType.key}`,
+          "ontology_relation_type",
+          relationType.id,
+        );
         return { status: 201, body: { relationType } };
       }
 
