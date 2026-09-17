@@ -914,6 +914,20 @@ function DomainWorkspace({
     y: number;
     nodeType: { id: string; key: string; display_name: string; properties_schema?: Record<string, unknown> | null };
   } | null>(null);
+  /**
+   * Naming a new node or relation happens in this small panel, next to the type
+   * it belongs to, rather than in `window.prompt`. A browser modal takes the
+   * whole page away for a one-word answer, and it cannot show why the answer was
+   * refused — an error here leaves the panel open with the text still in it.
+   */
+  const [nodeTypeAsk, setNodeTypeAsk] = useState<{
+    kind: "node" | "relation";
+    nodeType: { id: string; key: string; display_name: string };
+    x: number;
+    y: number;
+    value: string;
+    error?: string;
+  } | null>(null);
   const deleteNodeType = usePluginAction("delete-node-type");
   const createNodeType = usePluginAction("create-node-type");
   const createNode = usePluginAction("create-node");
@@ -922,6 +936,33 @@ function DomainWorkspace({
   // 智能补全 — asks the model for standard fields on a type. Read-only: the
   // merged result opens in the schema editor so the user still confirms.
   const aiSuggestFields = usePluginAction("ai-suggest-fields");
+
+  const submitNodeTypeAsk = () => {
+    const ask = nodeTypeAsk;
+    if (!ask || !ask.value.trim()) return;
+    void (async () => {
+      try {
+        if (ask.kind === "node") {
+          await createNode({
+            companyId,
+            domainId,
+            key: `n-${Date.now()}`,
+            label: ask.value.trim(),
+            nodeTypeId: ask.nodeType.id,
+          });
+        } else {
+          // The key is what the model reads, so it is slugged rather than kept
+          // as typed; the panel shows the slug it will use before submitting.
+          const relationKey = ask.value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "_");
+          await createRelationType({ companyId, domainId, key: relationKey, displayName: relationKey, directed: true });
+        }
+        setNodeTypeAsk(null);
+        refreshDomain();
+      } catch (e) {
+        setNodeTypeAsk({ ...ask, error: String((e as Error)?.message ?? e) });
+      }
+    })();
+  };
   /** Type whose fields are currently being generated (menu item shows a busy state). */
   const [suggestingFieldsFor, setSuggestingFieldsFor] = useState<string | null>(null);
   // Properties-schema editor modal — opened from the type right-click "属性"
@@ -1327,6 +1368,70 @@ function DomainWorkspace({
             still has nodes referencing it — the hard-delete would orphan
             them (their node_type_id becomes NULL). We surface this through
             counts.byNodeType which already tracks live instance counts. */}
+        {nodeTypeAsk && (
+          <>
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setNodeTypeAsk(null)}
+              onContextMenu={(e) => { e.preventDefault(); setNodeTypeAsk(null); }}
+            />
+            <div
+              className="fixed z-50 w-72 rounded-lg border border-border bg-card p-2 shadow-lg"
+              style={{ left: nodeTypeAsk.x, top: nodeTypeAsk.y }}
+            >
+              <div className="mb-1.5 text-(length:--text-nano) text-muted-foreground">
+                {nodeTypeAsk.kind === "node"
+                  ? t(
+                      `在「${nodeTypeAsk.nodeType.display_name}」下新建节点`,
+                      `New node under "${nodeTypeAsk.nodeType.display_name}"`,
+                    )
+                  : t(
+                      `从「${nodeTypeAsk.nodeType.display_name}」出发的关系 key`,
+                      `Relation key from "${nodeTypeAsk.nodeType.display_name}"`,
+                    )}
+              </div>
+              <input
+                autoFocus
+                value={nodeTypeAsk.value}
+                placeholder={nodeTypeAsk.kind === "relation" ? "belongs_to" : ""}
+                onChange={(e) => setNodeTypeAsk({ ...nodeTypeAsk, value: e.target.value })}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") submitNodeTypeAsk();
+                  if (e.key === "Escape") setNodeTypeAsk(null);
+                }}
+                className="w-full rounded border border-border bg-background px-2 py-1 text-(length:--text-nano) text-foreground outline-none"
+              />
+              {nodeTypeAsk.kind === "relation" && (
+                <div className="mt-1 text-(length:--text-nano) text-muted-foreground">
+                  key:{" "}
+                  <span className="text-foreground/80">
+                    {nodeTypeAsk.value.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "_") || "…"}
+                  </span>
+                </div>
+              )}
+              {nodeTypeAsk.error && (
+                <div className="mt-1 text-(length:--text-nano) text-destructive">{nodeTypeAsk.error}</div>
+              )}
+              <div className="mt-1.5 flex justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setNodeTypeAsk(null)}
+                  className="rounded px-2 py-0.5 text-(length:--text-nano) text-muted-foreground hover:bg-accent"
+                >
+                  {t("取消", "Cancel")}
+                </button>
+                <button
+                  type="button"
+                  onClick={submitNodeTypeAsk}
+                  className="rounded bg-accent px-2 py-0.5 text-(length:--text-nano) text-foreground"
+                >
+                  {t("确定", "OK")}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
         {nodeTypeMenu && (
           <>
             <div
@@ -1343,17 +1448,13 @@ function DomainWorkspace({
                 icon="＋"
                 onClick={() => {
                   const m = nodeTypeMenu; setNodeTypeMenu(null);
-                  const label = window.prompt(t("节点标签", "Node label"), m.nodeType.display_name);
-                  if (label && label.trim()) {
-                    void (async () => {
-                      try {
-                        await createNode({ companyId, domainId, key: `n-${Date.now()}`, label: label.trim(), nodeTypeId: m.nodeType.id });
-                        refreshDomain();
-                      } catch (e) {
-                        window.alert(String((e as Error)?.message ?? e));
-                      }
-                    })();
-                  }
+                  setNodeTypeAsk({
+                    kind: "node",
+                    nodeType: m.nodeType,
+                    x: m.x,
+                    y: m.y,
+                    value: m.nodeType.display_name,
+                  });
                 }}
               />
               <MenuItem2
@@ -1435,28 +1536,7 @@ function DomainWorkspace({
                 icon="⇄"
                 onClick={() => {
                   const m = nodeTypeMenu; setNodeTypeMenu(null);
-                  const input = window.prompt(
-                    t(
-                      `从「${m.nodeType.display_name}」出发的关联关系 key(如 belongs_to、references):`,
-                      `Relation key from "${m.nodeType.display_name}" (e.g. belongs_to):`,
-                    ),
-                  );
-                  if (!input || !input.trim()) return;
-                  const relationKey = input.trim().toLowerCase().replace(/[^a-z0-9_-]+/g, "_");
-                  void (async () => {
-                    try {
-                      await createRelationType({
-                        companyId,
-                        domainId,
-                        key: relationKey,
-                        displayName: relationKey,
-                        directed: true,
-                      });
-                      refreshDomain();
-                    } catch (e) {
-                      window.alert(String((e as Error)?.message ?? e));
-                    }
-                  })();
+                  setNodeTypeAsk({ kind: "relation", nodeType: m.nodeType, x: m.x, y: m.y, value: "" });
                 }}
               />
               <MenuDivider2 />
@@ -2868,6 +2948,13 @@ function DomainList({
   const [formError, setFormError] = useState<string | null>(null);
   /** Which row has work in flight, and what went wrong on it. */
   const [busyRowId, setBusyRowId] = useState<string | null>(null);
+  /**
+   * Renaming happens in the row, not in `window.prompt`: the name belongs beside
+   * the row it names, and a browser modal would take the list away to ask for one
+   * string. Only one row is ever open at a time.
+   */
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
   const [rowError, setRowError] = useState<string | null>(null);
 
   const submit = useCallback(async () => {
@@ -2908,9 +2995,14 @@ function DomainList({
   );
 
   const rename = (d: OntologyDomain) => {
-    const next = window.prompt(t("显示名称", "Display name"), d.display_name);
-    if (next === null) return;
-    const name = next.trim();
+    setRenamingId(d.id);
+    setRenameValue(d.display_name);
+  };
+
+  const submitRename = (d: OntologyDomain) => {
+    const name = renameValue.trim();
+    setRenamingId(null);
+    // Clearing the box, or retyping the same name, is a cancel — not an error.
     if (!name || name === d.display_name) return;
     void runOnRow(d.id, () => updateDomain({ companyId, domainId: d.id, displayName: name }));
   };
@@ -3008,9 +3100,31 @@ function DomainList({
               const next = DOMAIN_STATE_TRANSITIONS[d.lifecycle_state as DomainLifecycleState] ?? [];
               return (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <button className={ROW_BTN} disabled={rowBusy} onClick={() => rename(d)}>
-                    {t("改名","Rename")}
-                  </button>
+                  {renamingId === d.id ? (
+                    <>
+                      <input
+                        autoFocus
+                        value={renameValue}
+                        placeholder={t("显示名称", "Display name")}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") submitRename(d);
+                          if (e.key === "Escape") setRenamingId(null);
+                        }}
+                        className="w-40 rounded border border-border bg-background px-1.5 py-0.5 text-(length:--text-nano) text-foreground outline-none"
+                      />
+                      <button className={ROW_BTN} disabled={rowBusy} onClick={() => submitRename(d)}>
+                        {t("保存","Save")}
+                      </button>
+                      <button className={ROW_BTN} disabled={rowBusy} onClick={() => setRenamingId(null)}>
+                        {t("取消","Cancel")}
+                      </button>
+                    </>
+                  ) : (
+                    <button className={ROW_BTN} disabled={rowBusy} onClick={() => rename(d)}>
+                      {t("改名","Rename")}
+                    </button>
+                  )}
                   {next.map((state) => (
                     <button key={state} className={ROW_BTN} disabled={rowBusy} onClick={() => advance(d, state)}>
                       {/* Arrow prefix: the label is the state it moves *to*, so on
@@ -3176,6 +3290,18 @@ function NodeInspector({
     return m;
   }, [nodes]);
 
+  const [editingLabel, setEditingLabel] = useState(false);
+  const [labelDraft, setLabelDraft] = useState("");
+
+  // Clearing the box is a cancel, not a node with no label — `node.label || key`
+  // is what the row falls back to, so an empty label is already represented.
+  const saveLabel = () => {
+    const label = labelDraft.trim();
+    setEditingLabel(false);
+    if (!label || label === node.label) return;
+    void run(() => updateNode({ companyId, nodeId: node.id, label }));
+  };
+
   const run = useCallback(async (fn: () => Promise<unknown>) => {
     setBusy(true);
     try { await fn(); onChanged(); } finally { setBusy(false); }
@@ -3188,7 +3314,46 @@ function NodeInspector({
         <button onClick={onDeselect} className="text-(length:--text-nano) text-muted-foreground hover:text-foreground">✕</button>
       </div>
       <div className="space-y-1 text-(length:--text-nano)">
-        <InfoRow label={t("标签", "Label")} value={node.label || node.key} />
+        {/* Edited in place, next to the key it labels — a detail view is where
+            a field gets changed, not a browser modal over the top of it. */}
+        <div className="flex items-baseline justify-between gap-2">
+          <span className="shrink-0 text-muted-foreground">{t("标签", "Label")}</span>
+          {editingLabel ? (
+            <span className="flex min-w-0 items-center gap-1">
+              <input
+                autoFocus
+                value={labelDraft}
+                onChange={(e) => setLabelDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveLabel();
+                  if (e.key === "Escape") setEditingLabel(false);
+                }}
+                className="w-32 rounded border border-border bg-background px-1.5 py-0.5 text-(length:--text-nano) text-foreground outline-none"
+              />
+              <button className="text-muted-foreground hover:text-foreground" onClick={saveLabel}>
+                {t("保存", "Save")}
+              </button>
+              <button className="text-muted-foreground hover:text-foreground" onClick={() => setEditingLabel(false)}>
+                {t("取消", "Cancel")}
+              </button>
+            </span>
+          ) : (
+            <span className="flex min-w-0 items-center gap-1">
+              <span className="truncate text-right">{node.label || node.key}</span>
+              <button
+                title={t("重命名", "Rename")}
+                aria-label={t("重命名", "Rename")}
+                onClick={() => {
+                  setLabelDraft(node.label ?? "");
+                  setEditingLabel(true);
+                }}
+                className="shrink-0 text-muted-foreground hover:text-foreground"
+              >
+                ✎
+              </button>
+            </span>
+          )}
+        </div>
         <InfoRow label={t("键", "Key")} value={node.key} mono />
         {nt && <InfoRow label={t("类型", "Type")} value={nt.display_name || nt.key} />}
       </div>
@@ -3217,16 +3382,6 @@ function NodeInspector({
         onSave={(properties) => run(() => updateNode({ companyId, nodeId: node.id, properties }))}
       />
       <div className="mt-2 flex gap-1">
-        <button
-          disabled={busy}
-          onClick={() => {
-            const label = window.prompt(t("节点标签", "Node label"), node.label);
-            if (label?.trim()) void run(() => updateNode({ companyId, nodeId: node.id, label: label.trim() }));
-          }}
-          className="flex-1 rounded-md border border-border bg-background px-2 py-1 text-(length:--text-nano) transition-colors hover:bg-accent"
-        >
-          {t("重命名", "Rename")}
-        </button>
         <button
           disabled={busy}
           onClick={() => {

@@ -495,10 +495,32 @@ deployment ones:
   `tests/sql-ddl-shapes.spec.ts`, and both were confirmed fixed on a live import
   rather than only in the suite.
 
+- ~~**Service datasource, and shared databases**~~ **Done** — the connection
+  string in `application.yml` is the only place a legacy system states that two
+  services are on one database, and it is where a table-name match is blind (two
+  services on one schema that touch different tables match nothing). Reported as a
+  *finding*, not a `db-share` edge: a shared database is symmetric and neither
+  service owns it, so a directed edge would be inventing which end depends on
+  which. Grouped on `host:port/database`, so the same name on two hosts is not
+  joined — checked live with a three-service fixture where exactly the right pair
+  was reported.
+- ~~**`window.prompt`**~~ **Done** — naming happened in a browser modal in three
+  places (domain rename, node label, relation key). Naming is now edited where the
+  name is shown: the domain list row, the node detail panel's label, and a small
+  panel beside the type it belongs to. An error leaves the panel open with the
+  text still in it, which the modal could not do. `window.confirm` on the
+  destructive actions was left alone — the recorded preference names naming, and a
+  confirmation for a retire is a different question; say so if it should go too.
+- ~~**The scan report contradicted itself**~~ **Done** — it showed `db ruoyi`
+  mined from an `application.yml` on the same screen as "No parser yet: .yml×3".
+  Three buckets now: read, read-for-architecture-facts-only, and nothing opens it.
+
 **Still open, stated as facts:**
 
-- `.properties` and `.yml` are consumed only for `spring.application.name` and
-  deploy facts; the object-model scan reports them as unreadable.
+- `.properties` and `.yml` are consumed for `spring.application.name`, deploy
+  facts and the datasource url, and yield no object type — which the report now
+  says instead of calling them unread (see below). A datasource written as
+  `${…}` is left alone: its effective value is not knowable from the file.
 - `propertiesSchema` field order does not survive Postgres `jsonb`, so the Schema
   page cannot present the source's order as the source's (see the ordering rule in
   §3).
