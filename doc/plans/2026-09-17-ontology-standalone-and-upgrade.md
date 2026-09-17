@@ -412,9 +412,8 @@ is `region` / `security-group`), so they are expressed as grid rows.
 
 ### 6.7 Order
 
-1. **Authentication and tenant** (6.1) — nothing else can be a product without
-   them, and the standalone proof now shows exactly what the tenant half means:
-   the ontology borrows the host's `public.companies` table and has to own it.
+1. ~~**Authentication and tenant** (6.1)~~ **Done**, with one cutover left: the
+   pre-existing tables still point at the host tenant table.
 2. ~~**`ontology-mcp`** (6.2.2)~~ **Done**, including the standalone server.
 3. **Saved views, then per-view roles** (6.2.3 → 6.4.2) — the requirement the user
    stated most concretely.

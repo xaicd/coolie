@@ -7,6 +7,7 @@ import {
 } from "../schemaEvolution.js";
 import type { ProposalAuthorKind, ProposalKind, ProposalStatus } from "../enums.js";
 import type { ViewKind, ViewRole, ViewVisibility } from "../views.js";
+import type { ApiKeyRole, ApiKeyScope } from "../auth/credentials.js";
 import type { SqlClient } from "./SqlClient.js";
 
 /**
@@ -857,6 +858,42 @@ export interface OntologySubProjectUpdate {
   metadata?: Record<string, unknown>;
 }
 
+export interface OntologyTenantInput {
+  slug: string;
+  name: string;
+  createdBy?: string;
+}
+
+export interface OntologyTenantRow {
+  id: string;
+  slug: string;
+  name: string;
+  created_at?: string;
+}
+
+export interface OntologyApiKeyInput {
+  tenantId: string;
+  prefix: string;
+  /** The salted hash. The secret itself is never passed here. */
+  keyHash: string;
+  label?: string;
+  scope?: ApiKeyScope;
+  roles?: ApiKeyRole[];
+  createdBy?: string;
+}
+
+export interface OntologyApiKeyRow {
+  id: string;
+  tenant_id: string;
+  prefix: string;
+  key_hash: string;
+  label: string;
+  scope: ApiKeyScope;
+  roles: ApiKeyRole[];
+  revoked_at: string | null;
+  last_used_at: string | null;
+}
+
 export interface OntologyViewInput {
   companyId: string;
   domainId: string;
@@ -1504,6 +1541,23 @@ export interface GraphStore {
    * focuses on) — so these are ordinary CRUD with one rule on top, which lives
    * in `views.ts` and is applied by the caller that knows the actor.
    */
+  /**
+   * Tenancy and credentials the ontology owns.
+   *
+   * Until now both were borrowed: the tables referenced the host tenant table and
+   * the host decided who the caller was. These are the two rows a deployment
+   * without Paperclip cannot do without.
+   */
+  createTenant(input: OntologyTenantInput): Promise<OntologyTenantRow>;
+  getTenant(tenantId: string): Promise<OntologyTenantRow | null>;
+  getTenantBySlug(slug: string): Promise<OntologyTenantRow | null>;
+  /** Look a key up by the half that is safe to store in an index. */
+  findApiKeyByPrefix(prefix: string): Promise<OntologyApiKeyRow | null>;
+  createApiKey(input: OntologyApiKeyInput): Promise<OntologyApiKeyRow>;
+  revokeApiKey(tenantId: string, prefix: string, revokedBy?: string): Promise<boolean>;
+  /** Record that a key was used, so a credential can be inventoried and withdrawn. */
+  touchApiKey(prefix: string): Promise<void>;
+
   createView(input: OntologyViewInput): Promise<OntologyViewRow>;
   getView(companyId: string, viewId: string): Promise<OntologyViewRow | null>;
   listViews(companyId: string, domainId: string): Promise<OntologyViewRow[]>;
@@ -3904,6 +3958,101 @@ export class PostgresGraphStore implements GraphStore {
     "id, company_id, business_system_id, name, code, type, status, microservice_layer, " +
     "tech_stack, framework, git_repo, api_specs, dependencies, build_config, metadata, " +
     "created_at, updated_at";
+
+  private static readonly TENANT_COLS = "id, slug, name, created_at";
+  private static readonly API_KEY_COLS =
+    "id, tenant_id, prefix, key_hash, label, scope, roles, revoked_at, last_used_at";
+
+  async createTenant(input: OntologyTenantInput): Promise<OntologyTenantRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_tenants")} (id, slug, name, created_by)
+       VALUES ($1, $2, $3, $4)`,
+      [id, input.slug, input.name, input.createdBy ?? "system"],
+    );
+    const rows = await this.db.query<OntologyTenantRow>(
+      `SELECT ${PostgresGraphStore.TENANT_COLS}
+         FROM ${this.table("ontology_tenants")}
+        WHERE id = $1`,
+      [id],
+    );
+    return rows[0]!;
+  }
+
+  async getTenant(tenantId: string): Promise<OntologyTenantRow | null> {
+    const rows = await this.db.query<OntologyTenantRow>(
+      `SELECT ${PostgresGraphStore.TENANT_COLS}
+         FROM ${this.table("ontology_tenants")}
+        WHERE id = $1 AND is_deleted = false`,
+      [tenantId],
+    );
+    return rows[0] ?? null;
+  }
+
+  async getTenantBySlug(slug: string): Promise<OntologyTenantRow | null> {
+    const rows = await this.db.query<OntologyTenantRow>(
+      `SELECT ${PostgresGraphStore.TENANT_COLS}
+         FROM ${this.table("ontology_tenants")}
+        WHERE slug = $1 AND is_deleted = false`,
+      [slug],
+    );
+    return rows[0] ?? null;
+  }
+
+  async findApiKeyByPrefix(prefix: string): Promise<OntologyApiKeyRow | null> {
+    const rows = await this.db.query<OntologyApiKeyRow>(
+      `SELECT ${PostgresGraphStore.API_KEY_COLS}
+         FROM ${this.table("ontology_api_keys")}
+        WHERE prefix = $1`,
+      [prefix],
+    );
+    return rows[0] ?? null;
+  }
+
+  async createApiKey(input: OntologyApiKeyInput): Promise<OntologyApiKeyRow> {
+    const id = randomUUID();
+    await this.db.execute(
+      `INSERT INTO ${this.table("ontology_api_keys")}
+         (id, tenant_id, prefix, key_hash, label, scope, roles, created_by)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8)`,
+      [
+        id,
+        input.tenantId,
+        input.prefix,
+        input.keyHash,
+        input.label ?? "",
+        input.scope ?? "agent",
+        JSON.stringify(input.roles ?? []),
+        input.createdBy ?? "system",
+      ],
+    );
+    const rows = await this.db.query<OntologyApiKeyRow>(
+      `SELECT ${PostgresGraphStore.API_KEY_COLS}
+         FROM ${this.table("ontology_api_keys")}
+        WHERE id = $1`,
+      [id],
+    );
+    return rows[0]!;
+  }
+
+  async revokeApiKey(tenantId: string, prefix: string, revokedBy = "system"): Promise<boolean> {
+    // Withdrawal, not deletion: a revoked key has to stay visible in the list,
+    // or nobody can tell whether it was ever issued.
+    const res = await this.db.execute(
+      `UPDATE ${this.table("ontology_api_keys")}
+          SET revoked_at = now(), revoked_by = $3
+        WHERE tenant_id = $1 AND prefix = $2 AND revoked_at IS NULL`,
+      [tenantId, prefix, revokedBy],
+    );
+    return res.rowCount > 0;
+  }
+
+  async touchApiKey(prefix: string): Promise<void> {
+    await this.db.execute(
+      `UPDATE ${this.table("ontology_api_keys")} SET last_used_at = now() WHERE prefix = $1`,
+      [prefix],
+    );
+  }
 
   private static readonly VIEW_COLS =
     "id, company_id, domain_id, key, name, description, kind, config, visibility, roles, " +

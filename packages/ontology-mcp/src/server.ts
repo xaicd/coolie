@@ -19,12 +19,19 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { GraphStore } from "@paperclipai/ontology-core/graph/GraphStore.js";
+import { rolesOf, type Identity } from "@paperclipai/ontology-core/auth/credentials.js";
 import { ONTOLOGY_TOOLS, callOntologyTool, type OntologyTool } from "@paperclipai/ontology-core/mcp/tools.js";
 
 export interface OntologyMcpOptions {
   store: GraphStore;
   /** The tenant this server answers for. Not overridable by a tool call. */
   companyId: string;
+  /**
+   * Who authenticated, from the credential. The role set decides which saved
+   * views the caller may open, so it must come from the key rather than from the
+   * server's opinion of the caller.
+   */
+  identity?: Identity;
   name?: string;
   version?: string;
 }
@@ -67,12 +74,11 @@ export function createOntologyMcpServer(options: OntologyMcpOptions): OntologyMc
       };
     }
     try {
-      const data = await callOntologyTool(
-        options.store,
-        options.companyId,
-        tool.name,
-        (request.params.arguments ?? {}) as Record<string, unknown>,
-      );
+      const args = { ...((request.params.arguments ?? {}) as Record<string, unknown>) };
+      // The caller's roles come from the credential, and the arguments cannot
+      // override them — the same reason the tenant cannot.
+      if (options.identity) args.roles = rolesOf(options.identity);
+      const data = await callOntologyTool(options.store, options.companyId, tool.name, args);
       return {
         content: [{ type: "text" as const, text: summarise(tool, data) }],
         structuredContent: (data ?? {}) as Record<string, unknown>,

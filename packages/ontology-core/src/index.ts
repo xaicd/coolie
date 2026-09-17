@@ -40,6 +40,10 @@ export type {
   OntologySubProjectInput,
   OntologySubProjectRow,
   OntologySubProjectUpdate,
+  OntologyTenantInput,
+  OntologyTenantRow,
+  OntologyApiKeyInput,
+  OntologyApiKeyRow,
   LinkedDomainRow,
   SchemaEditOutcome,
 } from "./graph/GraphStore.js";
@@ -123,6 +127,26 @@ export {
 } from "./api/contract.js";
 export type { CoreApiDoc, CoreApiGroup, CoreApiRoute } from "./api/contract.js";
 export { ONTOLOGY_TOOLS, callOntologyTool, ontologyToolByName } from "./mcp/tools.js";
+export {
+  API_KEY_ROLES,
+  API_KEY_SCOPES,
+  apiKeyPrefix,
+  canDecide,
+  canWrite,
+  generateApiKey,
+  hashApiKey,
+  rolesOf,
+  verifyApiKey,
+} from "./auth/credentials.js";
+export type {
+  ApiKeyRecord,
+  ApiKeyRole,
+  ApiKeyScope,
+  AuthenticatedCaller,
+  GeneratedApiKey,
+  Identity,
+} from "./auth/credentials.js";
+
 export {
   VIEW_KINDS,
   VIEW_ROLES,

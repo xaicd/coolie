@@ -442,15 +442,20 @@ export const ONTOLOGY_TOOLS: OntologyTool[] = [
     description:
       "The saved views of a domain: named arrangements of the model, such as a runtime or deployment reading. Use one when a question refers to a view by name, so you and the team look at the same picture. Views you cannot open are reported too.",
     parametersSchema: domainParams({
-      actor: { type: "string", description: "调用方身份,用于按角色过滤(可选)" },
+      actor: { type: "string", description: "调用方身份,用于创建者判断(可选)。角色由凭证决定,不接受调用方声明。" },
     }),
     invoke: async (store, companyId, args) => {
       const domainId = await resolveDomain(store, companyId, args);
       const views = await store.listViews(companyId, domainId);
-      // This tool is reached by an agent, so the agent role is what it holds.
-      // A view restricted to human roles is one the agent must not read.
+      // The caller's roles are supplied by whatever authenticated them — the
+      // host for the plugin, the key for a standalone server. Defaulting to the
+      // agent role here would be the safe guess, but a server that knows better
+      // passes it in.
+      const supplied = Array.isArray(args.roles)
+        ? (args.roles as unknown[]).filter((role): role is string => typeof role === "string")
+        : ["agent"];
       const audience = {
-        roles: ["agent"],
+        roles: supplied,
         ...(str(args, "actor") ? { actor: str(args, "actor") } : {}),
       };
       return {

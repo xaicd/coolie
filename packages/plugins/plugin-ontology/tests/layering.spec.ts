@@ -201,7 +201,14 @@ describe("the ontology belongs to a tenant, not to a work item", () => {
     ).toEqual([]);
   });
 
-  it("scopes every table to the tenant", () => {
+  /**
+   * The tenant registry is the one table that does not carry a tenant column: it
+   * *is* the tenant. Named rather than pattern-matched, so a new table has to be
+   * added here on purpose to escape the check.
+   */
+  const TENANT_REGISTRY = ["ontology_tenants"];
+
+  it("scopes every table that holds domain data to the tenant", () => {
     // Every ontology table carries `company_id`; a table without one could not
     // be isolated per customer.
     const missing: string[] = [];
@@ -209,7 +216,14 @@ describe("the ontology belongs to a tenant, not to a work item", () => {
       for (const m of file.sql.matchAll(
         /CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?([\w."`[\]]+)\s*\(([\s\S]*?)\n\s*\);/gi,
       )) {
-        if (!/\bcompany_id\b/.test(m[2] ?? "")) missing.push(m[1]!);
+        const table = m[1]!.split(".").pop()!.replace(/["`\[\]]/g, "");
+        if (TENANT_REGISTRY.includes(table)) continue;
+        // Scoped to a tenant, however the tenant is named: the existing tables
+        // reference the host table (`company_id`) and the ones the ontology now
+        // owns reference `ontology_tenants` (`tenant_id`). A table with neither
+        // is the failure this looks for.
+        const body = m[2] ?? "";
+        if (!/\b(company_id|tenant_id)\b/.test(body)) missing.push(m[1]!);
       }
     }
     expect(missing, `tables without a tenant column: ${missing.join(", ")}`).toEqual([]);

@@ -678,6 +678,15 @@ function summariseToolResult(tool: OntologyTool, data: unknown): string {
  * mentioned should learn it exists and is restricted, not conclude they imagined
  * it. The actor defaults to the board, which sees everything shared.
  */
+/**
+ * The two actor classes the host reports, mapped to the roles this workshop
+ * understands. A `user` is board context and holds the human roles; an `agent`
+ * holds the agent role. Nothing else is trusted as identity.
+ */
+function actorKindOf(actor: { actorType?: string } | undefined): "board" | "agent" {
+  return actor?.actorType === "agent" ? "agent" : "board";
+}
+
 function describeViewsFor(
   rows: OntologyViewRow[],
   actorKind: "board" | "agent",
@@ -719,7 +728,8 @@ async function createViewFromHttp(
     config: optionalRecord(body.config),
     visibility: optionalString(body.visibility) as never,
     roles: Array.isArray(body.roles) ? (body.roles as never) : [],
-    created_by: optionalString(body.actor) ?? "user",
+    // The creator is the authenticated actor, not a field the caller supplies.
+    created_by: input.actor.actorId || "user",
   });
   const validation = validateView(candidate);
   if (!validation.ok) throw new Error(validation.errors.join("; "));
@@ -2429,6 +2439,8 @@ const plugin = definePlugin({
      */
     ctx.actions.register("create-view", async (params) => {
       const call = readMutationCall(params);
+      // The bridge surface is the board UI: the host has already authenticated
+      // it as full-control operator context.
       const candidate = normaliseView({
         key: requireString(call.fields.key, "key"),
         name: requireString(call.fields.name, "name"),
@@ -4033,12 +4045,11 @@ const plugin = definePlugin({
           companyId,
           requireString(queryString(input.query.domainId), "domainId"),
         );
+        // The actor class comes from the authenticated request, never from a
+        // query parameter: a caller that could say "I am the board" would see
+        // every restricted view, which makes the restriction decoration.
         return {
-          body: describeViewsFor(
-            rows,
-            queryString(input.query.actorKind) === "agent" ? "agent" : "board",
-            queryString(input.query.actor),
-          ),
+          body: describeViewsFor(rows, actorKindOf(input.actor), input.actor.actorId),
         };
       }
 

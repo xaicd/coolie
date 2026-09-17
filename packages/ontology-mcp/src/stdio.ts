@@ -2,13 +2,18 @@
 /**
  * The standalone entry point.
  *
- *   ONTOLOGY_DATABASE_URL=postgres://… ONTOLOGY_COMPANY_ID=<uuid> ontology-mcp
+ *   ONTOLOGY_DATABASE_URL=postgres://… \
+ *   ONTOLOGY_KEY_PEPPER=<pepper> \
+ *   ONTOLOGY_API_KEY=oc_… \
+ *   ontology-mcp
  *
  * No Paperclip, no plugin host, no HTTP layer in between: an agent harness starts
- * this process, and the ontology answers from its own database.
+ * this process, presents a key, and the ontology answers from its own database
+ * for the tenant that key names.
  */
 import { Pool } from "pg";
 import { PostgresGraphStore } from "@paperclipai/ontology-core/graph/GraphStore.js";
+import { apiKeyPrefix, verifyApiKey } from "@paperclipai/ontology-core/auth/credentials.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { readOntologyMcpConfig } from "./config.js";
 import { createOntologyMcpServer } from "./server.js";
@@ -19,18 +24,32 @@ async function main(): Promise<void> {
   const pool = new Pool({ connectionString: config.databaseUrl });
   const client = createPgSqlClient({ pool, namespace: config.namespace });
   const store = new PostgresGraphStore(client);
-  // Probe the database before serving. The pool connects lazily, so without
-  // this a wrong URL is reported as a broken *tool call* — an agent gets "cannot
-  // connect" while asking a business question, which reads as the ontology being
-  // empty rather than the server being misconfigured.
+
+  // Probe before serving: the pool connects lazily, so without this a wrong URL
+  // surfaces as a broken tool call while the agent is asking a business question.
   await pool.query("SELECT 1");
 
-  const { server, tools } = createOntologyMcpServer({ store, companyId: config.companyId });
+  // The credential decides the tenant. A key that does not resolve is fatal at
+  // startup — not a tool error the model might try to work around.
+  const prefix = apiKeyPrefix(config.apiKey);
+  const record = prefix ? await store.findApiKeyByPrefix(prefix) : null;
+  const caller = verifyApiKey(config.apiKey, record, config.keyPepper);
+  if (!caller) {
+    throw new Error("The ontology API key is not valid: unknown, revoked, or the wrong pepper.");
+  }
+  await store.touchApiKey(caller.prefix);
+
+  const { server, tools } = createOntologyMcpServer({
+    store,
+    companyId: caller.tenantId,
+    identity: { scope: caller.scope, roles: caller.roles },
+  });
 
   // To stderr: stdout is the MCP channel, and anything written there is protocol
   // noise that breaks the session.
   process.stderr.write(
-    `ontology-mcp ready — ${tools.length} tools, schema "${config.namespace}", company ${config.companyId}\n`,
+    `ontology-mcp ready — ${tools.length} tools as ${caller.scope} (${caller.prefix}) ` +
+      `for tenant ${caller.tenantId}, schema "${config.namespace}"\n`,
   );
 
   const shutdown = async () => {
