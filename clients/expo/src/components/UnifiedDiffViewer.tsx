@@ -8,31 +8,26 @@ import {
   type ListRenderItemInfo,
   type ViewStyle,
 } from "react-native";
+import { C } from "../coolie";
 
-// ── 品牌高对比色板 ────────────────────────────────────────────────
-const C = {
-  bg: "#0B1023",          // 页面底色
-  card: "#151B36",        // 卡片底色
-  cardHi: "#1B2347",      // 聚焦底色
-  line: "#27305C",        // 分隔线
-  ink: "#EEF2FF",         // 主文字
-  inkDim: "#8A93B8",      // 次文字
-  accent: "#22D3EE",      // 亮青
-  // 高对比 Diff 专用色彩
-  addBg: "rgba(16, 185, 129, 0.18)",
-  addBorder: "#10B981",
-  addInk: "#86EFAC",
-  addNum: "#34D399",
-  delBg: "rgba(239, 68, 68, 0.18)",
-  delBorder: "#EF4444",
+// ── Linear Diff 语法高亮色 (DESIGN.md 第6节) ──────────────────────────
+const DIFF_THEME = {
+  // 新增行: bg #27A644@8%, 行号/文字偏 #6EE7A0
+  addBg: "rgba(39, 166, 68, 0.08)",
+  addBorder: "rgba(39, 166, 68, 0.4)",
+  addInk: "#6EE7A0",
+  // 删除行: bg #EF4444@8%, 文字偏 #FCA5A5
+  delBg: "rgba(239, 68, 68, 0.08)",
+  delBorder: "rgba(239, 68, 68, 0.4)",
   delInk: "#FCA5A5",
-  delNum: "#F87171",
-  hunkBg: "#1C244B",
-  hunkBorder: "#6366F1",
-  hunkInk: "#38BDF8",
-  contextInk: "#CBD5E1",
-  numDim: "#64748B",
-  numGutterBg: "#0F142A",
+  // Hunk 片段头: @@
+  hunkBg: "rgba(94, 106, 210, 0.08)",
+  hunkBorder: "rgba(94, 106, 210, 0.4)",
+  hunkInk: C.accent,
+  // 上下文与行号槽
+  contextInk: C.ink2,
+  numDim: C.ink4,
+  numGutterBg: C.panel,
 } as const;
 
 export const MONO_FONT = Platform.select({
@@ -58,7 +53,10 @@ export interface ParsedDiffLine {
  * 快速统一 Diff 补丁解析器
  * 将 Git 标准 patch 文本转换为适合 FlatList 虚拟滚动的行数组
  */
-export function parsePatchToLines(patchText: string | null | undefined, fileId = "file"): ParsedDiffLine[] {
+export function parsePatchToLines(
+  patchText: string | null | undefined,
+  fileId = "file",
+): ParsedDiffLine[] {
   if (!patchText || !patchText.trim()) return [];
 
   const rawLines = patchText.split("\n");
@@ -155,31 +153,35 @@ export function parsePatchToLines(patchText: string | null | undefined, fileId =
 /**
  * 单行 Diff 渲染组件 (使用 React.memo 防止长列表重新渲染时重绘已渲染行)
  */
-export const DiffLineRow = memo(function DiffLineRow({ item }: { item: ParsedDiffLine }) {
+export const DiffLineRow = memo(function DiffLineRow({
+  item,
+}: {
+  item: ParsedDiffLine;
+}) {
   const { type, oldNum, newNum, sign, content } = item;
 
   let rowBg: string = "transparent";
   let borderLeftColor: string = "transparent";
-  let textColor: string = C.contextInk;
-  let numColor: string = C.numDim;
+  let textColor: string = DIFF_THEME.contextInk;
+  let numColor: string = DIFF_THEME.numDim;
 
   if (type === "add") {
-    rowBg = C.addBg;
-    borderLeftColor = C.addBorder;
-    textColor = C.addInk;
-    numColor = C.addNum;
+    rowBg = DIFF_THEME.addBg;
+    borderLeftColor = DIFF_THEME.addBorder;
+    textColor = DIFF_THEME.addInk;
+    numColor = DIFF_THEME.addInk;
   } else if (type === "delete") {
-    rowBg = C.delBg;
-    borderLeftColor = C.delBorder;
-    textColor = C.delInk;
-    numColor = C.delNum;
+    rowBg = DIFF_THEME.delBg;
+    borderLeftColor = DIFF_THEME.delBorder;
+    textColor = DIFF_THEME.delInk;
+    numColor = DIFF_THEME.delInk;
   } else if (type === "header") {
-    rowBg = C.hunkBg;
-    borderLeftColor = C.hunkBorder;
-    textColor = C.hunkInk;
-    numColor = C.hunkInk;
+    rowBg = DIFF_THEME.hunkBg;
+    borderLeftColor = DIFF_THEME.hunkBorder;
+    textColor = DIFF_THEME.hunkInk;
+    numColor = DIFF_THEME.hunkInk;
   } else if (type === "meta") {
-    textColor = C.inkDim;
+    textColor = C.ink3;
   }
 
   return (
@@ -221,7 +223,7 @@ export interface UnifiedDiffViewerProps {
 }
 
 /**
- * 移动端单列高对比虚拟滚动 Diff 渲染器
+ * 移动端单列高对比虚拟滚动 Diff 渲染器 (DESIGN.md 第6节)
  * 针对 2500+ 行大 Diff 优化:采用 FlatList + getItemLayout 虚拟滚动，维持 60fps
  */
 export function UnifiedDiffViewer({
@@ -290,7 +292,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   emptyText: {
-    color: C.inkDim,
+    color: C.ink3,
     fontSize: 13,
     fontFamily: MONO_FONT,
   },
@@ -298,13 +300,13 @@ const styles = StyleSheet.create({
     height: DIFF_LINE_HEIGHT,
     flexDirection: "row",
     alignItems: "center",
-    borderLeftWidth: 3,
+    borderLeftWidth: 2,
   },
   gutter: {
     width: 68,
     height: DIFF_LINE_HEIGHT,
     flexDirection: "row",
-    backgroundColor: C.numGutterBg,
+    backgroundColor: DIFF_THEME.numGutterBg,
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 4,
@@ -317,6 +319,7 @@ const styles = StyleSheet.create({
     fontFamily: MONO_FONT,
     fontSize: 10,
     lineHeight: DIFF_LINE_HEIGHT,
+    fontVariant: ["tabular-nums"],
   },
   signBox: {
     width: 18,
@@ -326,7 +329,7 @@ const styles = StyleSheet.create({
   signText: {
     fontFamily: MONO_FONT,
     fontSize: 12,
-    fontWeight: "700",
+    fontWeight: "600",
     lineHeight: DIFF_LINE_HEIGHT,
   },
   codeBox: {

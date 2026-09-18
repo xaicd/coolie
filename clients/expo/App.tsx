@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Pressable,
+  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
@@ -19,6 +20,7 @@ import {
   type IssueWorkProduct,
 } from "@coolie/api-client";
 import {
+  C,
   classifyToken,
   coolie,
   credentialCompanies,
@@ -28,45 +30,51 @@ import {
   signOutEverywhere,
   type Credential,
 } from "./src/coolie";
+import { StatusDot } from "./src/components/StatusDot";
 import { useRecorder } from "./src/useRecorder";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
 
 /**
- * Coolie mobile client — 品牌版界面。
+ * Coolie mobile client — Linear 设计系统重构版。
  *
- * 深靛蓝品牌底 + 亮青强调色(与 App 图标同源),卡片式布局、中文文案。
- * 凭据流程与数据层不变:邮箱会话或粘贴 API key,公司按成员关系解析
- * (见 `credentialCompanies`),零公司账号会得到明确说明。
- * 仍无导航库:屏幕由状态决定,没有返回栈与深链——刻意保持轻量。
+ * 遵循 DESIGN.md 规范:
+ * - 近黑三档背景 (bg #08090A / panel #0F1011 / surface #191A1B)
+ * - 四级文字亮度分层 (ink / ink2 / ink3 / ink4, 禁纯白 #FFF)
+ * - 品牌紫蓝 #5E6AD2 作为唯一彩色 CTA
+ * - 半透明卡片 bg rgba(255,255,255,0.02) + 半透明白边 line
+ * - 字重三档 400 / 500 / 600 (禁 700/800)
+ * - 数字 tabularNum 对齐
+ * - 状态点呼吸灯
  */
 
-// ── 品牌色板(与图标一致的靛蓝→亮青体系) ────────────────────────────
-const C = {
-  bg: "#0B1023",        // 页面深底
-  card: "#151B36",      // 卡片
-  cardHi: "#1B2347",    // 卡片高亮/输入框
-  line: "#27305C",      // 分隔线
-  ink: "#EEF2FF",       // 主文字
-  inkDim: "#8A93B8",    // 次文字
-  accent: "#22D3EE",    // 亮青(按钮/激活)
-  accentDeep: "#0E7490",
-  danger: "#F87171",
-  ok: "#34D399",
-  warn: "#FBBF24",
-} as const;
-
 const PRIORITY_LABEL: Record<IssuePriority, string> = {
-  low: "低", medium: "中", high: "高", critical: "紧急",
+  low: "低",
+  medium: "中",
+  high: "高",
+  critical: "紧急",
 };
-const PRIORITY_COLOR: Record<IssuePriority, string> = {
-  low: C.inkDim, medium: C.accent, high: C.warn, critical: C.danger,
+
+// 胶囊内前缀色点 (DESIGN.md 第3节: P0 #EF4444 / P1 #F59E0B / P2 #8A8F98)
+const PRIORITY_DOT_COLOR: Record<IssuePriority, string> = {
+  critical: C.err,
+  high: C.warn,
+  medium: C.ink3,
+  low: C.ink4,
 };
+
 const STATUS_LABEL: Record<string, string> = {
-  open: "待处理", in_progress: "进行中", blocked: "受阻", done: "已完成",
+  open: "待处理",
+  in_progress: "进行中",
+  blocked: "受阻",
+  done: "已完成",
 };
-const STATUS_COLOR: Record<string, string> = {
-  open: C.inkDim, in_progress: C.accent, blocked: C.danger, done: C.ok,
+
+const STATUS_DOT_COLOR: Record<string, string> = {
+  open: C.ink3,
+  in_progress: C.accent,
+  blocked: C.err,
+  done: C.ok,
 };
 
 export default function App() {
@@ -82,11 +90,12 @@ export default function App() {
 
   if (credential === undefined) {
     return (
-      <View style={[styles.center, { backgroundColor: C.bg }]}>
+      <SafeAreaView style={[styles.center, { backgroundColor: C.bg }]}>
         <ActivityIndicator color={C.accent} />
-      </View>
+      </SafeAreaView>
     );
   }
+
   return credential ? (
     <CompanyGate credential={credential} onSignOut={signOut} />
   ) : (
@@ -101,8 +110,7 @@ function whoamiFor(credential: Credential): string {
 }
 
 /**
- * 解析要进入的公司:只有一个就自动进入,多个让用户选,零公司给出解释
- * ——零公司是真实状态而不是错误。
+ * 解析要进入的公司: 只有一个就自动进入，多个让用户选，零公司给出解释。
  */
 function CompanyGate({
   credential,
@@ -142,8 +150,8 @@ function CompanyGate({
     <Surface>
       <View style={styles.rowBetween}>
         <Text style={styles.h1}>Coolie</Text>
-        <Pressable onPress={onSignOut} hitSlop={12}>
-          <Text style={styles.link}>退出</Text>
+        <Pressable onPress={onSignOut} hitSlop={12} style={styles.btnGhost}>
+          <Text style={styles.btnGhostText}>退出</Text>
         </Pressable>
       </View>
 
@@ -161,10 +169,17 @@ function CompanyGate({
           {companies.map((company) => (
             <Pressable
               key={company.id}
-              style={styles.cardBtn}
+              style={({ pressed }) => [
+                styles.cardBtn,
+                pressed && styles.cardBtnPressed,
+              ]}
               onPress={() => setChosen(company)}
             >
-              <Text style={styles.cardBtnTitle}>{company.name}</Text>
+              <View style={styles.rowAlignCenterGap}>
+                <StatusDot status="ok" size={6} />
+                <Text style={styles.cardBtnTitle}>{company.name}</Text>
+              </View>
+              <Text style={styles.chevron}>›</Text>
             </Pressable>
           ))}
         </>
@@ -175,10 +190,15 @@ function CompanyGate({
 
 function Surface({ children }: { children: React.ReactNode }) {
   return (
-    <ScrollView style={{ backgroundColor: C.bg, flex: 1 }} contentContainerStyle={styles.screen}>
+    <SafeAreaView style={{ backgroundColor: C.bg, flex: 1 }}>
       <StatusBar style="light" />
-      {children}
-    </ScrollView>
+      <ScrollView
+        style={{ backgroundColor: C.bg, flex: 1 }}
+        contentContainerStyle={styles.screen}
+      >
+        {children}
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
@@ -195,7 +215,6 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (credential: Credential) => 
     setError(null);
     try {
       if (useToken) {
-        // 先验证 key 再存储。先存后失败会表现为空任务列表,读起来像"没数据"而不是"key 错了"。
         const candidate = token.trim();
         const credential = await classifyToken(candidate);
         await saveAuthToken(candidate);
@@ -225,12 +244,12 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (credential: Credential) => 
       {useToken ? (
         <>
           <Text style={styles.muted}>
-            粘贴智能体 API Key 或管理 Key,应用会自动识别类型。
+            粘贴智能体 API Key 或管理 Key，应用会自动识别类型。
           </Text>
           <TextInput
             style={styles.input}
             placeholder="API Key"
-            placeholderTextColor={C.inkDim}
+            placeholderTextColor={C.ink3}
             autoCapitalize="none"
             autoCorrect={false}
             secureTextEntry
@@ -243,7 +262,7 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (credential: Credential) => 
           <TextInput
             style={styles.input}
             placeholder="邮箱"
-            placeholderTextColor={C.inkDim}
+            placeholderTextColor={C.ink3}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="email-address"
@@ -254,7 +273,7 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (credential: Credential) => 
           <TextInput
             style={styles.input}
             placeholder="密码"
-            placeholderTextColor={C.inkDim}
+            placeholderTextColor={C.ink3}
             secureTextEntry
             textContentType="password"
             value={password}
@@ -266,16 +285,22 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (credential: Credential) => 
       {error !== null && <Text style={styles.error}>{error}</Text>}
 
       <Pressable
-        style={[styles.btn, (!ready || busy) && styles.btnDisabled]}
+        style={[styles.btnPrimary, (!ready || busy) && styles.btnDisabled]}
         disabled={!ready || busy}
         onPress={submit}
       >
-        <Text style={styles.btnText}>
+        <Text style={styles.btnPrimaryText}>
           {busy ? "验证中…" : useToken ? "连接" : "登录"}
         </Text>
       </Pressable>
 
-      <Pressable onPress={() => { setUseToken(!useToken); setError(null); }}>
+      <Pressable
+        onPress={() => {
+          setUseToken(!useToken);
+          setError(null);
+        }}
+        style={styles.linkWrapper}
+      >
         <Text style={styles.link}>
           {useToken ? "改用邮箱密码登录" : "改用 API Key 登录"}
         </Text>
@@ -296,7 +321,10 @@ function HomeScreen({
   const [tab, setTab] = useState<"tasks" | "dashboard" | "diff">("tasks");
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selected, setSelected] = useState<Issue | null>(null);
-  const [diffContext, setDiffContext] = useState<{ issue?: Issue | null; workProduct?: IssueWorkProduct | null } | null>(null);
+  const [diffContext, setDiffContext] = useState<{
+    issue?: Issue | null;
+    workProduct?: IssueWorkProduct | null;
+  } | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<IssuePriority>("medium");
@@ -350,13 +378,17 @@ function HomeScreen({
       }
       const { base64, format } = await stop();
       setBusy(true);
-      const res = await coolie.voiceDispatch({ companyId, audioBase64: base64, format });
+      const res = await coolie.voiceDispatch({
+        companyId,
+        audioBase64: base64,
+        format,
+      });
       if (res.issue) Alert.alert("任务已创建", res.issue.title);
       else Alert.alert("转写结果", res.transcription.text || "(空)");
       await loadIssues();
     } catch (e) {
       if (isAsrNotConfigured(e)) {
-        Alert.alert("语音未配置", "该实例尚未配置腾讯 ASR 凭据,请改用文字输入。");
+        Alert.alert("语音未配置", "该实例尚未配置腾讯 ASR 凭据，请改用文字输入。");
       } else {
         Alert.alert("语音派发失败", String((e as Error)?.message ?? e));
       }
@@ -390,7 +422,9 @@ function HomeScreen({
         issue={selected}
         company={company}
         onBack={() => setSelected(null)}
-        onOpenDiff={(issueItem, wp) => setDiffContext({ issue: issueItem, workProduct: wp })}
+        onOpenDiff={(issueItem, wp) =>
+          setDiffContext({ issue: issueItem, workProduct: wp })
+        }
       />
     );
   }
@@ -399,19 +433,24 @@ function HomeScreen({
 
   return (
     <Surface>
+      {/* 顶部标题与身份胶囊 */}
       <View style={styles.rowBetween}>
         <View style={{ flex: 1 }}>
           <Text style={styles.h1}>工坊控制台</Text>
-          <Text style={styles.muted} numberOfLines={1}>
-            {company.name} · {whoami}
-          </Text>
+          <View style={styles.companyCapsule}>
+            <StatusDot status="ok" size={6} />
+            <Text style={styles.companyCapsuleText} numberOfLines={1}>
+              {company.name}
+            </Text>
+            <Text style={styles.companyCapsuleSubText}>· {whoami}</Text>
+          </View>
         </View>
-        <Pressable onPress={onSignOut} hitSlop={12}>
-          <Text style={styles.link}>退出</Text>
+        <Pressable onPress={onSignOut} hitSlop={12} style={styles.btnGhost}>
+          <Text style={styles.btnGhostText}>退出</Text>
         </Pressable>
       </View>
 
-      {/* 顶部标签切换 */}
+      {/* 顶部标签切换分段器 */}
       <View style={styles.tabSwitcher}>
         <Pressable
           style={[styles.tabBtn, styles.tabBtnActive]}
@@ -421,29 +460,19 @@ function HomeScreen({
             任务工单 ({issues.length})
           </Text>
         </Pressable>
-        <Pressable
-          style={styles.tabBtn}
-          onPress={() => setTab("dashboard")}
-        >
-          <Text style={styles.tabBtnText}>
-            效能驾驶舱
-          </Text>
+        <Pressable style={styles.tabBtn} onPress={() => setTab("dashboard")}>
+          <Text style={styles.tabBtnText}>效能驾驶舱</Text>
         </Pressable>
-        <Pressable
-          style={styles.tabBtn}
-          onPress={() => setTab("diff")}
-        >
-          <Text style={styles.tabBtnText}>
-            代码审查
-          </Text>
+        <Pressable style={styles.tabBtn} onPress={() => setTab("diff")}>
+          <Text style={styles.tabBtnText}>代码审查</Text>
         </Pressable>
       </View>
 
-      {/* 概览条 */}
+      {/* 概览统计卡片 (tabularNum + 亮度分层) */}
       <View style={styles.statRow}>
         <View style={styles.statCard}>
           <Text style={styles.statNum}>{issues.length}</Text>
-          <Text style={styles.statLabel}>全部</Text>
+          <Text style={styles.statLabel}>全部任务</Text>
         </View>
         <View style={styles.statCard}>
           <Text style={[styles.statNum, { color: C.accent }]}>{open}</Text>
@@ -455,53 +484,79 @@ function HomeScreen({
         </View>
       </View>
 
+      {/* 创建任务输入框区域 */}
       <View style={styles.composer}>
         <TextInput
           style={styles.input}
           placeholder="新任务标题…"
-          placeholderTextColor={C.inkDim}
+          placeholderTextColor={C.ink3}
           value={title}
           onChangeText={setTitle}
         />
         <TextInput
           style={[styles.input, styles.inputMultiline]}
-          placeholder="描述(可选)"
-          placeholderTextColor={C.inkDim}
+          placeholder="描述 (可选)"
+          placeholderTextColor={C.ink3}
           multiline
           value={description}
           onChangeText={setDescription}
         />
+
+        {/* 优先级徽标胶囊 (前缀色点) */}
         <View style={styles.chips}>
-          {(["low", "medium", "high", "urgent"] as IssuePriority[]).map((p) => (
-            <Pressable
-              key={p}
-              onPress={() => setPriority(p)}
-              style={[styles.chip, priority === p && styles.chipActive]}
-            >
-              <Text style={priority === p ? styles.chipTextActive : styles.chipText}>
-                {PRIORITY_LABEL[p]}
-              </Text>
-            </Pressable>
-          ))}
+          {(["low", "medium", "high", "critical"] as IssuePriority[]).map((p) => {
+            const isSelected = priority === p;
+            return (
+              <Pressable
+                key={p}
+                onPress={() => setPriority(p)}
+                style={[styles.priorityChip, isSelected && styles.priorityChipActive]}
+              >
+                <View
+                  style={[
+                    styles.priorityDot,
+                    { backgroundColor: PRIORITY_DOT_COLOR[p] },
+                  ]}
+                />
+                <Text
+                  style={isSelected ? styles.chipTextActive : styles.chipText}
+                >
+                  {PRIORITY_LABEL[p]}
+                </Text>
+              </Pressable>
+            );
+          })}
         </View>
+
         <View style={styles.rowGap}>
           <Pressable
-            style={[styles.btn, styles.btnFlex, (!title.trim() || busy) && styles.btnDisabled]}
+            style={[
+              styles.btnPrimary,
+              styles.btnFlex,
+              (!title.trim() || busy) && styles.btnDisabled,
+            ]}
             disabled={!title.trim() || busy}
             onPress={createTask}
           >
-            <Text style={styles.btnText}>添加任务</Text>
+            <Text style={styles.btnPrimaryText}>添加任务</Text>
           </Pressable>
           <Pressable
-            style={[styles.btnVoice, busy && styles.btnDisabled]}
+            style={[
+              styles.btnVoice,
+              recording && styles.btnVoiceRecording,
+              busy && styles.btnDisabled,
+            ]}
             disabled={busy}
             onPress={voiceDispatch}
           >
-            <Text style={styles.btnVoiceText}>{recording ? "■ 停止并派发" : "🎤 语音"}</Text>
+            <Text style={[styles.btnVoiceText, recording && { color: C.err }]}>
+              {recording ? "■ 停止并派发" : "🎤 语音派发"}
+            </Text>
           </Pressable>
         </View>
       </View>
 
+      {/* 任务列表 (规范行高 56，状态点呼吸灯) */}
       {loading ? (
         <ActivityIndicator color={C.accent} style={{ marginTop: 24 }} />
       ) : (
@@ -511,33 +566,81 @@ function HomeScreen({
           keyExtractor={(i) => i.id}
           ListEmptyComponent={
             <View style={styles.emptyCard}>
+              <Text style={styles.emptyIcon}>📋</Text>
               <Text style={styles.emptyTitle}>还没有任务</Text>
-              <Text style={styles.muted}>在上方输入标题创建第一个任务,或用语音派发。</Text>
+              <Text style={styles.muted}>
+                在上方输入标题创建第一个任务，或用语音派发。
+              </Text>
             </View>
           }
-          renderItem={({ item }) => (
-            <Pressable style={styles.taskCard} onPress={() => setSelected(item)}>
-              <Text style={styles.taskTitle} numberOfLines={2}>{item.title}</Text>
-              <View style={styles.taskMeta}>
-                <View style={[styles.badge, {
-                  backgroundColor: `${STATUS_COLOR[item.status] ?? C.inkDim}22`,
-                  borderColor: `${STATUS_COLOR[item.status] ?? C.inkDim}55`,
-                }]}>
-                  <Text style={{ color: STATUS_COLOR[item.status] ?? C.inkDim, fontSize: 11, fontWeight: "600" }}>
-                    {STATUS_LABEL[item.status] ?? item.status}
-                  </Text>
+          renderItem={({ item }) => {
+            const isRunning = item.status === "in_progress";
+            const dotStatus = isRunning
+              ? "ok"
+              : item.status === "blocked"
+              ? "err"
+              : "idle";
+
+            return (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.taskCard,
+                  pressed && styles.taskCardPressed,
+                ]}
+                onPress={() => setSelected(item)}
+              >
+                <View style={styles.taskCardMain}>
+                  <View style={styles.taskTitleRow}>
+                    <StatusDot
+                      status={dotStatus}
+                      color={STATUS_DOT_COLOR[item.status]}
+                      pulse={isRunning}
+                      size={8}
+                    />
+                    <Text style={styles.taskTitle} numberOfLines={2}>
+                      {item.title}
+                    </Text>
+                  </View>
+
+                  <View style={styles.taskMeta}>
+                    {/* 状态徽标胶囊 */}
+                    <View style={styles.capsuleBadge}>
+                      <View
+                        style={[
+                          styles.capsuleDot,
+                          {
+                            backgroundColor:
+                              STATUS_DOT_COLOR[item.status] ?? C.ink3,
+                          },
+                        ]}
+                      />
+                      <Text style={styles.capsuleText}>
+                        {STATUS_LABEL[item.status] ?? item.status}
+                      </Text>
+                    </View>
+
+                    {/* 优先级徽标胶囊 */}
+                    <View style={styles.capsuleBadge}>
+                      <View
+                        style={[
+                          styles.capsuleDot,
+                          {
+                            backgroundColor:
+                              PRIORITY_DOT_COLOR[item.priority] ?? C.ink3,
+                          },
+                        ]}
+                      />
+                      <Text style={styles.capsuleText}>
+                        {PRIORITY_LABEL[item.priority] ?? item.priority}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
-                <View style={[styles.badge, {
-                  backgroundColor: `${PRIORITY_COLOR[item.priority] ?? C.inkDim}22`,
-                  borderColor: `${PRIORITY_COLOR[item.priority] ?? C.inkDim}55`,
-                }]}>
-                  <Text style={{ color: PRIORITY_COLOR[item.priority] ?? C.inkDim, fontSize: 11, fontWeight: "600" }}>
-                    {PRIORITY_LABEL[item.priority] ?? item.priority}
-                  </Text>
-                </View>
-              </View>
-            </Pressable>
-          )}
+
+                <Text style={styles.chevron}>›</Text>
+              </Pressable>
+            );
+          }}
         />
       )}
     </Surface>
@@ -546,7 +649,6 @@ function HomeScreen({
 
 function TaskDetail({
   issue,
-  company,
   onBack,
   onOpenDiff,
 }: {
@@ -574,45 +676,58 @@ function TaskDetail({
 
   return (
     <Surface>
-      <Pressable onPress={onBack} hitSlop={12}>
-        <Text style={styles.link}>‹ 返回</Text>
+      <Pressable onPress={onBack} hitSlop={12} style={styles.backLinkRow}>
+        <Text style={styles.link}>‹ 返回任务列表</Text>
       </Pressable>
+
       <Text style={styles.detailTitle}>{issue.title}</Text>
+
       <View style={styles.detailCard}>
         <DetailRow
           label="状态"
           value={STATUS_LABEL[issue.status] ?? issue.status}
-          valueColor={STATUS_COLOR[issue.status] ?? C.ink}
+          valueColor={STATUS_DOT_COLOR[issue.status] ?? C.ink}
         />
         <DetailRow
           label="优先级"
           value={PRIORITY_LABEL[issue.priority] ?? issue.priority}
-          valueColor={PRIORITY_COLOR[issue.priority] ?? C.ink}
+          valueColor={PRIORITY_DOT_COLOR[issue.priority] ?? C.ink}
         />
-        {issue.description ? <DetailRow label="描述" value={issue.description} /> : null}
-        <DetailRow label="编号" value={issue.id} valueColor={C.inkDim} />
+        {issue.description ? (
+          <DetailRow label="描述" value={issue.description} />
+        ) : null}
+        <DetailRow label="编号" value={issue.id} valueColor={C.ink3} isMono />
       </View>
 
-      {/* 核心动作: 查看代码 Diff */}
+      {/* 核心动作: 查看代码 Diff (Linear 幽灵边框按钮) */}
       <Pressable
         style={styles.btnDiffAction}
         onPress={() => onOpenDiff(issue)}
       >
-        <Text style={styles.btnDiffActionText}>🔍 查看工作区代码变更 (Diff)</Text>
+        <Text style={styles.btnDiffActionText}>
+          🔍 查看工作区代码变更 (Diff)
+        </Text>
       </Pressable>
 
       {/* 关联交付产物列表 */}
       {workProducts.length > 0 && (
         <View style={styles.wpSection}>
-          <Text style={styles.sectionHeader}>关联交付产物 ({workProducts.length})</Text>
+          <Text style={styles.sectionHeader}>
+            关联交付产物 ({workProducts.length})
+          </Text>
           {workProducts.map((wp) => (
             <Pressable
               key={wp.id}
-              style={styles.wpCard}
+              style={({ pressed }) => [
+                styles.wpCard,
+                pressed && styles.cardBtnPressed,
+              ]}
               onPress={() => onOpenDiff(issue, wp)}
             >
-              <View style={{ flex: 1 }}>
-                <Text style={styles.wpTitle} numberOfLines={1}>{wp.title}</Text>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={styles.wpTitle} numberOfLines={1}>
+                  {wp.title}
+                </Text>
                 <Text style={styles.wpType}>
                   类型: {wp.type} {wp.executionWorkspaceId ? "· 关联工作区" : ""}
                 </Text>
@@ -633,15 +748,23 @@ function DetailRow({
   label,
   value,
   valueColor,
+  isMono = false,
 }: {
   label: string;
   value: string;
   valueColor?: string;
+  isMono?: boolean;
 }) {
   return (
     <View style={styles.detailRow}>
-      <Text style={styles.muted}>{label}</Text>
-      <Text style={[styles.detailValue, valueColor ? { color: valueColor } : null]}>
+      <Text style={styles.detailLabel}>{label}</Text>
+      <Text
+        style={[
+          styles.detailValue,
+          valueColor ? { color: valueColor } : null,
+          isMono ? styles.monoText : null,
+        ]}
+      >
         {value}
       </Text>
     </View>
@@ -649,139 +772,436 @@ function DetailRow({
 }
 
 const styles = StyleSheet.create({
-  center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  screen: { padding: 20, paddingTop: 64, gap: 12, backgroundColor: C.bg },
-  hero: { alignItems: "center", gap: 6, marginVertical: 28 },
-  h1: { fontSize: 26, fontWeight: "800", color: C.ink, letterSpacing: 0.4 },
-  brandBig: { fontSize: 36, fontWeight: "800", color: C.ink, letterSpacing: 0.6 },
-  tagline: { fontSize: 13, color: C.inkDim },
-  muted: { color: C.inkDim, fontSize: 13 },
-  error: { color: C.danger, fontSize: 13 },
-  link: { color: C.accent, fontWeight: "600" },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  screen: {
+    padding: 16,
+    paddingTop: 16,
+    paddingBottom: 32,
+    gap: 16,
+    backgroundColor: C.bg,
+  },
+  hero: {
+    alignItems: "center",
+    gap: 8,
+    marginVertical: 32,
+  },
+  h1: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: C.ink,
+    letterSpacing: -0.4,
+  },
+  brandBig: {
+    fontSize: 32,
+    fontWeight: "600",
+    color: C.ink,
+    letterSpacing: -0.4,
+  },
+  tagline: {
+    fontSize: 13,
+    color: C.ink3,
+    fontWeight: "400",
+  },
+  muted: {
+    color: C.ink3,
+    fontSize: 13,
+    fontWeight: "400",
+    lineHeight: 18,
+  },
+  error: {
+    color: C.err,
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  linkWrapper: {
+    paddingVertical: 8,
+    alignItems: "center",
+  },
+  link: {
+    color: C.accent,
+    fontWeight: "500",
+    fontSize: 13,
+  },
+  backLinkRow: {
+    alignSelf: "flex-start",
+    paddingVertical: 4,
+  },
+  // 输入框 (DESIGN.md 第3节: bg 0.02, border line, radius 8, padding 12×14, text ink, placeholder ink3)
   input: {
-    backgroundColor: C.cardHi, borderColor: C.line, borderWidth: 1,
-    borderRadius: 12, padding: 13, fontSize: 15, color: C.ink,
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderColor: C.line,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    fontSize: 15,
+    color: C.ink,
   },
-  inputMultiline: { minHeight: 64, textAlignVertical: "top" },
-  btn: {
-    backgroundColor: C.accent, borderRadius: 12,
-    paddingVertical: 13, paddingHorizontal: 16, alignItems: "center",
-    shadowColor: C.accent, shadowOpacity: 0.35, shadowRadius: 10,
-    shadowOffset: { width: 0, height: 4 }, elevation: 6,
+  inputMultiline: {
+    minHeight: 72,
+    textAlignVertical: "top",
   },
-  btnFlex: { flex: 1 },
+  // 主按钮 (DESIGN.md 第3节: bg #5E6AD2, text ink, radius 8, padding 12×16, weight 500)
+  btnPrimary: {
+    backgroundColor: C.brand,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnPrimaryText: {
+    color: C.ink,
+    fontWeight: "500",
+    fontSize: 15,
+  },
+  btnFlex: {
+    flex: 1,
+  },
+  // 幽灵按钮 (DESIGN.md 第3节: bg 0.02, border line, text ink2, radius 8)
+  btnGhost: {
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderColor: C.line,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnGhostText: {
+    color: C.ink2,
+    fontWeight: "500",
+    fontSize: 13,
+  },
+  // 语音按钮 (幽灵半透明微调)
   btnVoice: {
-    backgroundColor: "#1E2A5E", borderColor: C.accentDeep, borderWidth: 1,
-    borderRadius: 12, paddingVertical: 13, paddingHorizontal: 18, alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderColor: C.line,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  btnVoiceText: { color: C.accent, fontWeight: "700" },
-  btnDisabled: { opacity: 0.45 },
-  btnText: { color: "#06202B", fontWeight: "800", fontSize: 15 },
+  btnVoiceRecording: {
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderColor: "rgba(239, 68, 68, 0.3)",
+  },
+  btnVoiceText: {
+    color: C.ink2,
+    fontWeight: "500",
+    fontSize: 13,
+  },
+  btnDisabled: {
+    opacity: 0.4,
+  },
+  // 卡片 (DESIGN.md 第3节: bg 0.02, border 1px line, radius 12, 按压 0.05)
   cardBtn: {
-    backgroundColor: C.card, borderRadius: 14, padding: 16, gap: 4,
-    borderColor: C.line, borderWidth: 1,
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: C.line,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
-  cardBtnTitle: { color: C.ink, fontSize: 16, fontWeight: "700" },
+  cardBtnPressed: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  cardBtnTitle: {
+    color: C.ink,
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  chevron: {
+    color: C.ink4,
+    fontSize: 16,
+    fontWeight: "400",
+  },
   composer: {
-    gap: 8, backgroundColor: C.card, padding: 14,
-    borderRadius: 16, borderWidth: 1, borderColor: C.line,
+    gap: 12,
+    backgroundColor: "rgba(255,255,255,0.02)",
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.line,
   },
-  rowGap: { flexDirection: "row", gap: 8 },
+  rowGap: {
+    flexDirection: "row",
+    gap: 8,
+  },
   rowBetween: {
-    flexDirection: "row", justifyContent: "space-between",
-    alignItems: "center", gap: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: 12,
+  },
+  rowAlignCenterGap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  companyCapsule: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,255,255,0.05)",
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 999,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+    marginTop: 6,
+    gap: 6,
+  },
+  companyCapsuleText: {
+    fontSize: 11,
+    color: C.ink2,
+    fontWeight: "500",
+    maxWidth: 160,
+  },
+  companyCapsuleSubText: {
+    fontSize: 11,
+    color: C.ink4,
+    fontWeight: "400",
   },
   tabSwitcher: {
     flexDirection: "row",
-    backgroundColor: C.card,
-    borderRadius: 12,
-    padding: 3,
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderRadius: 8,
+    padding: 2,
     borderWidth: 1,
-    borderColor: C.line,
+    borderColor: C.lineSubtle,
   },
   tabBtn: {
     flex: 1,
     paddingVertical: 8,
     alignItems: "center",
-    borderRadius: 9,
+    borderRadius: 6,
   },
   tabBtnActive: {
-    backgroundColor: C.cardHi,
+    backgroundColor: "rgba(255,255,255,0.08)",
     borderWidth: 1,
-    borderColor: C.accent,
+    borderColor: C.line,
   },
   tabBtnText: {
-    fontSize: 13,
-    color: C.inkDim,
-    fontWeight: "600",
+    fontSize: 12,
+    color: C.ink3,
+    fontWeight: "400",
   },
   tabBtnTextActive: {
-    color: C.accent,
-    fontWeight: "800",
+    color: C.ink,
+    fontWeight: "500",
   },
-  chips: { flexGrow: 0, flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  chip: {
-    borderWidth: 1, borderColor: C.line, borderRadius: 999,
-    paddingVertical: 5, paddingHorizontal: 14, backgroundColor: C.cardHi,
+  chips: {
+    flexGrow: 0,
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
   },
-  chipActive: { backgroundColor: C.accent, borderColor: C.accent },
-  chipText: { color: C.inkDim, fontSize: 13 },
-  chipTextActive: { color: "#06202B", fontSize: 13, fontWeight: "700" },
-  statRow: { flexDirection: "row", gap: 10 },
-  statCard: {
-    flex: 1, backgroundColor: C.card, borderRadius: 14, paddingVertical: 14,
-    alignItems: "center", borderWidth: 1, borderColor: C.line, gap: 2,
-  },
-  statNum: { color: C.ink, fontSize: 22, fontWeight: "800" },
-  statLabel: { color: C.inkDim, fontSize: 12 },
-  taskCard: {
-    backgroundColor: C.card, borderRadius: 14, padding: 14, gap: 8,
-    borderWidth: 1, borderColor: C.line,
-  },
-  taskTitle: { color: C.ink, fontSize: 15, fontWeight: "600" },
-  taskMeta: { flexDirection: "row", gap: 8 },
-  badge: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3, borderWidth: 1 },
-  emptyCard: {
-    backgroundColor: C.card, borderRadius: 14, padding: 22, alignItems: "center",
-    gap: 6, borderWidth: 1, borderColor: C.line, borderStyle: "dashed",
-  },
-  emptyTitle: { color: C.ink, fontSize: 15, fontWeight: "700" },
-  detailTitle: { fontSize: 22, fontWeight: "800", color: C.ink },
-  detailCard: {
-    backgroundColor: C.card, borderRadius: 14, borderWidth: 1,
-    borderColor: C.line, padding: 14, gap: 12,
-  },
-  detailRow: { gap: 2 },
-  detailValue: { fontSize: 15, color: C.ink },
-  btnDiffAction: {
-    backgroundColor: C.cardHi,
+  priorityChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     borderWidth: 1,
-    borderColor: C.accent,
+    borderColor: C.line,
+    borderRadius: 999,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  priorityChipActive: {
+    backgroundColor: "rgba(94, 106, 210, 0.18)",
+    borderColor: C.brand,
+  },
+  priorityDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  chipText: {
+    color: C.ink2,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  chipTextActive: {
+    color: C.ink,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  statRow: {
+    flexDirection: "row",
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: "rgba(255,255,255,0.02)",
     borderRadius: 12,
-    paddingVertical: 13,
+    paddingVertical: 14,
+    paddingHorizontal: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: C.line,
+    gap: 4,
+  },
+  statNum: {
+    color: C.ink,
+    fontSize: 24,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+  },
+  statLabel: {
+    color: C.ink3,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  // 列表 (DESIGN.md 第4节: 行高 56, 右侧 chevron ink4)
+  taskCard: {
+    minHeight: 56,
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: C.line,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+    gap: 10,
+  },
+  taskCardPressed: {
+    backgroundColor: "rgba(255,255,255,0.05)",
+  },
+  taskCardMain: {
+    flex: 1,
+    gap: 6,
+  },
+  taskTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  taskTitle: {
+    color: C.ink,
+    fontSize: 15,
+    fontWeight: "500",
+    flex: 1,
+  },
+  taskMeta: {
+    flexDirection: "row",
+    gap: 8,
+    marginLeft: 16,
+  },
+  capsuleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: "rgba(255,255,255,0.05)",
+    gap: 4,
+  },
+  capsuleDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  capsuleText: {
+    color: C.ink2,
+    fontSize: 11,
+    fontWeight: "500",
+    fontVariant: ["tabular-nums"],
+  },
+  emptyCard: {
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderRadius: 12,
+    padding: 32,
+    alignItems: "center",
+    gap: 8,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+  },
+  emptyIcon: {
+    fontSize: 28,
+  },
+  emptyTitle: {
+    color: C.ink,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  detailTitle: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: C.ink,
+    letterSpacing: -0.4,
+  },
+  detailCard: {
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.line,
+    padding: 16,
+    gap: 12,
+  },
+  detailRow: {
+    gap: 2,
+  },
+  detailLabel: {
+    color: C.ink3,
+    fontSize: 11,
+    fontWeight: "400",
+  },
+  detailValue: {
+    fontSize: 15,
+    color: C.ink,
+    fontWeight: "500",
+    fontVariant: ["tabular-nums"],
+  },
+  monoText: {
+    fontVariant: ["tabular-nums"],
+    color: C.ink3,
+    fontSize: 13,
+  },
+  btnDiffAction: {
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
+    borderWidth: 1,
+    borderColor: C.brand,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     alignItems: "center",
     marginTop: 4,
   },
   btnDiffActionText: {
     color: C.accent,
     fontSize: 14,
-    fontWeight: "700",
+    fontWeight: "500",
   },
   wpSection: {
     marginTop: 8,
     gap: 8,
   },
   sectionHeader: {
-    color: C.inkDim,
+    color: C.ink3,
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: "500",
+    fontVariant: ["tabular-nums"],
   },
   wpCard: {
-    backgroundColor: C.card,
-    borderRadius: 10,
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: C.line,
-    padding: 12,
+    padding: 14,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -789,17 +1209,16 @@ const styles = StyleSheet.create({
   wpTitle: {
     color: C.ink,
     fontSize: 13,
-    fontWeight: "600",
+    fontWeight: "500",
   },
   wpType: {
-    color: C.inkDim,
+    color: C.ink4,
     fontSize: 11,
-    marginTop: 2,
   },
   wpLink: {
     color: C.accent,
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "500",
     marginLeft: 8,
   },
 });
