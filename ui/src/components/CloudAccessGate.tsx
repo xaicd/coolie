@@ -1,4 +1,5 @@
-import { Navigate, Outlet, useLocation } from "@/lib/router";
+import { useState, type FormEvent } from "react";
+import { Navigate, Outlet, useLocation, useNavigate } from "@/lib/router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { accessApi } from "@/api/access";
 import { ApiError } from "@/api/client";
@@ -8,9 +9,43 @@ import { queryKeys } from "@/lib/queryKeys";
 import { useSignOut } from "@/hooks/useSignOut";
 import { BootstrapPendingPage } from "@/components/BootstrapPendingPage";
 import { PaperclipLoading } from "@/components/AnimatedPaperclipIcon";
+import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 
-function NoBoardAccessPage() {
+/**
+ * Accepts either a raw invite code or a full invite URL pasted from an
+ * administrator's message. Everything up to and including the last `/invite/`
+ * segment is stripped, along with any query string, fragment, or trailing
+ * slash, so both shapes land on the `/invite/:token` route the landing page
+ * expects.
+ */
+export function inviteTokenFromInput(value: string): string {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) return "";
+  const withoutFragment = trimmed.split(/[?#]/)[0] ?? "";
+  const marker = "/invite/";
+  const markerIndex = withoutFragment.lastIndexOf(marker);
+  const candidate = markerIndex >= 0 ? withoutFragment.slice(markerIndex + marker.length) : withoutFragment;
+  return candidate.replace(/\/+$/, "").trim();
+}
+
+function NoBoardAccessPage({
+  onSignOut,
+  isSigningOut,
+}: {
+  onSignOut: () => void;
+  isSigningOut: boolean;
+}) {
+  const navigate = useNavigate();
+  const [inviteInput, setInviteInput] = useState("");
+  const inviteToken = inviteTokenFromInput(inviteInput);
+
+  const handleJoin = (event: FormEvent) => {
+    event.preventDefault();
+    if (inviteToken.length === 0) return;
+    navigate(`/invite/${encodeURIComponent(inviteToken)}`);
+  };
+
   return (
     <div className="mx-auto max-w-xl py-10">
       <Card className="block p-6">
@@ -20,8 +55,36 @@ function NoBoardAccessPage() {
           this Coolie instance.
         </p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Use an organization invite or sign in with an account that already belongs to this org.
+          Join an organization with the invite link or code an admin sent you, or ask an admin to invite this email
+          address.
         </p>
+        <form className="mt-6 space-y-3" noValidate onSubmit={handleJoin}>
+          <label htmlFor="organization-invite" className="text-xs text-muted-foreground mb-1 block">
+            Organization invite link or code
+          </label>
+          <input
+            id="organization-invite"
+            name="organization-invite"
+            className="w-full rounded-md border border-border bg-transparent px-3 py-2 text-sm outline-none focus:ring-1 focus:ring-ring placeholder:text-muted-foreground/50"
+            value={inviteInput}
+            onChange={(event) => setInviteInput(event.target.value)}
+            placeholder="https://…/invite/… or invite code"
+            autoComplete="off"
+          />
+          <Button type="submit" disabled={inviteToken.length === 0} className="w-full">
+            Join organization
+          </Button>
+        </form>
+        <div className="mt-5 text-sm text-muted-foreground">
+          <button
+            type="button"
+            className="font-medium text-foreground underline underline-offset-2 disabled:opacity-50"
+            onClick={onSignOut}
+            disabled={isSigningOut}
+          >
+            {isSigningOut ? "Signing out…" : "Sign out"}
+          </button>
+        </div>
       </Card>
     </div>
   );
@@ -131,7 +194,12 @@ export function CloudAccessGate() {
     !boardAccessQuery.data?.isInstanceAdmin &&
     (boardAccessQuery.data?.companyIds.length ?? 0) === 0
   ) {
-    return <NoBoardAccessPage />;
+    return (
+      <NoBoardAccessPage
+        onSignOut={() => signOutMutation.mutate()}
+        isSigningOut={signOutMutation.isPending}
+      />
+    );
   }
 
   return <Outlet />;

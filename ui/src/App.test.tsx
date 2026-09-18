@@ -41,6 +41,7 @@ vi.mock("@/lib/router", () => ({
   Route: ({ children }: { children?: ReactNode }) => <>{children}</>,
   Routes: ({ children }: { children?: ReactNode }) => <>{children}</>,
   useLocation: () => ({ pathname: "/instance/settings/general", search: "", hash: "" }),
+  useNavigate: () => vi.fn(),
   useParams: () => ({}),
 }));
 
