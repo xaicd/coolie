@@ -1,6 +1,7 @@
 import {
   ASR_NOT_CONFIGURED,
   MULTIMODAL_PLUGIN_ID,
+  type AgentIdentity,
   type Company,
   type CreateIssueInput,
   type Issue,
@@ -93,22 +94,51 @@ export class CoolieClient {
     return this.request("GET", "/api/auth/get-session");
   }
 
+  /**
+   * Identity of the agent the current key belongs to. This is the right
+   * agent-key health check: it is the agent-authenticated call that states which
+   * company the key is scoped to.
+   */
+  getAgentIdentity(): Promise<AgentIdentity> {
+    return this.request<AgentIdentity>("GET", "/api/agents/me");
+  }
+
   // --- companies ----------------------------------------------------------
+  /**
+   * Board/session only. An **agent** key gets 403 here (host-enforced), so an
+   * agent-key app must take its company from `getAgentIdentity()` instead.
+   */
   async listCompanies(): Promise<Company[]> {
     const body = await this.request<{ companies?: Company[] } | Company[]>("GET", "/api/companies");
     return Array.isArray(body) ? body : (body.companies ?? []);
   }
 
+  getCompany(companyId: string): Promise<Company> {
+    return this.request<Company>("GET", `/api/companies/${encodeURIComponent(companyId)}`);
+  }
+
   // --- tasks (issues) -----------------------------------------------------
+  // Issues are company-scoped in the path. `/api/issues?companyId=…` does not
+  // exist and answers 400 — this called it, so every task call used to fail.
   async listIssues(companyId: string, opts?: { status?: string; limit?: number }): Promise<Issue[]> {
-    const q = new URLSearchParams({ companyId });
+    const q = new URLSearchParams();
     if (opts?.status) q.set("status", opts.status);
     if (opts?.limit) q.set("limit", String(opts.limit));
-    const body = await this.request<{ issues?: Issue[] } | Issue[]>("GET", `/api/issues?${q.toString()}`);
+    const suffix = q.size > 0 ? `?${q.toString()}` : "";
+    const body = await this.request<{ issues?: Issue[] } | Issue[]>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/issues${suffix}`,
+    );
     return Array.isArray(body) ? body : (body.issues ?? []);
   }
+
   async createIssue(input: CreateIssueInput): Promise<Issue> {
-    const body = await this.request<{ issue?: Issue } | Issue>("POST", "/api/issues", input);
+    const { companyId, ...fields } = input;
+    const body = await this.request<{ issue?: Issue } | Issue>(
+      "POST",
+      `/api/companies/${encodeURIComponent(companyId)}/issues`,
+      fields,
+    );
     return isRecord(body) && "issue" in body ? (body.issue as Issue) : (body as Issue);
   }
 

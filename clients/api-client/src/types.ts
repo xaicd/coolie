@@ -9,6 +9,20 @@ export interface Company {
   name: string;
 }
 
+/**
+ * What an agent API key can see about itself (`GET /api/agents/me`). A key is
+ * scoped to exactly one company, and `companyId` here is how a client learns
+ * which — an agent key cannot list companies (that route is board-only).
+ */
+export interface AgentIdentity {
+  id: string;
+  companyId: string;
+  name: string;
+  role?: string;
+  title?: string | null;
+  status?: string;
+}
+
 export interface Issue {
   id: string;
   title: string;

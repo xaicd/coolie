@@ -45,15 +45,19 @@ EXPO_PUBLIC_COOLIE_BASE_URL=http://my-instance:3100 pnpm start
 - ✅ Installs, typechecks and bundles from a clean checkout (`pnpm typecheck`,
   `pnpm bundle` — 574 modules, ~1.65 MB Hermes bundle).
 - ✅ Auth via agent API key (bearer), stored in `expo-secure-store`. The key is
-  **validated with a real call before it is stored**, so a bad key reports the reason
-  instead of showing up later as an empty task list.
-- ✅ Company picker, task list, **task detail** (tap a row), create task with title,
-  optional description and priority.
-- ⚠️ **Voice dispatch does not work yet with the auth this app uses.** The route it
-  calls (`POST /api/plugins/paperclipai.plugin-multimodal/api/transcriptions`) is
-  declared with the manifest default `auth: "board"`, and the host enforces
-  `assertBoard` on it — while the app sends an **agent** API key, so the call is
-  rejected 403. Fix either by relaxing that route to `board-or-agent` or by signing in
+  **validated with `GET /api/agents/me` before it is stored**, so a bad key reports the
+  reason instead of showing up later as an empty task list. A key revoked since last
+  launch sends you back to the sign-in screen rather than into a screen of errors.
+- ✅ The key names its own company, so the task list and the company header come from it.
+  **There is no company picker on purpose** — an agent key is scoped to one company and
+  cannot even list companies (that route is board-only and answers 403).
+- ✅ Task list, **task detail** (tap a row), create task with title, optional description
+  and priority.
+- ❌ **Voice dispatch fails, and it is not a bug in this app.** The route it calls
+  (`POST /api/plugins/paperclipai.plugin-multimodal/api/transcriptions`) is declared
+  with the manifest default `auth: "board"` and the host enforces `assertBoard` on it,
+  while the app sends an **agent** key: measured `403 Board access required` against the
+  live instance. Fix either by relaxing that route to `board-or-agent` or by signing in
   as a session. Recording itself (`expo-av` → base64) is wired but has never been
   exercised on a device.
 - ⏳ TODO: **navigation library** (the screen is chosen from state, so there is no back
@@ -62,5 +66,23 @@ EXPO_PUBLIC_COOLIE_BASE_URL=http://my-instance:3100 pnpm start
   (≤60s / ≤3 MB) client-side, editing or transitioning a task from the detail screen,
   error/empty state polish.
 
-> "Cannot be verified on a device from CI" is not the same as verified. The checks above
-> are what has actually been run; the device path is still unverified.
+## How the above was checked
+
+Every API call the app makes was run against the live local instance with a real agent
+key, using `@coolie/api-client` directly (it is framework-agnostic) rather than a
+simulator:
+
+| call | result |
+| --- | --- |
+| `getAgentIdentity()` | pass — the key resolved to its agent and company |
+| `getCompany()` | pass — the company name for the header |
+| `listIssues()` | pass — read the real task list |
+| `createIssue()` | pass — created a task (then deleted it) |
+| `voiceDispatch()` | **403 Board access required** |
+
+This is how the four route bugs fixed in `@coolie/api-client` were found: the client
+had been calling `/api/issues` and `/api/companies`, which either do not exist or are
+board-only, so nothing but the sign-in screen would ever have worked.
+
+Still unverified: anything on a device. The recorder has never run on real hardware, and
+"cannot be verified from CI" is not the same as verified.

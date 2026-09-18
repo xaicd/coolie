@@ -7,6 +7,7 @@ export {
 export type {
   IssuePriority,
   IssueStatus,
+  AgentIdentity,
   Company,
   Issue,
   SessionUser,

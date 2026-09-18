@@ -11,40 +11,71 @@ import {
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { isAsrNotConfigured, type Company, type Issue, type IssuePriority } from "@coolie/api-client";
-import { clearAuthToken, coolie, getAuthToken, saveAuthToken, validateAuthToken } from "./src/coolie";
+import {
+  isAsrNotConfigured,
+  type AgentIdentity,
+  type Company,
+  type Issue,
+  type IssuePriority,
+} from "@coolie/api-client";
+import {
+  clearAuthToken,
+  coolie,
+  getAuthToken,
+  getSignInState,
+  saveAuthToken,
+  validateAuthToken,
+} from "./src/coolie";
 import { useRecorder } from "./src/useRecorder";
 
 /**
- * Coolie mobile client: sign in (bearer token) -> pick company -> list tasks,
- * open one, create a task, and voice-dispatch (record -> ASR -> task).
+ * Coolie mobile client: sign in with an agent API key -> the key names its company
+ * -> list tasks, open one, create a task, and voice-dispatch.
  *
- * Still no navigation library: the screen is chosen from state. That is a real
- * limitation — there is no back stack — but it keeps the surface small until the
- * product decides on a router.
+ * There is no company picker on purpose: an agent key is scoped to exactly one
+ * company by the host, so selecting among companies is not a thing this credential
+ * can do. `/api/agents/me` is what says which company that is.
+ *
+ * Still no navigation library: the screen is chosen from state. That means no back
+ * stack and no deep linking — a real limitation, kept small until a router lands.
  */
 export default function App() {
-  const [token, setToken] = useState<string | null | undefined>(undefined);
+  const [identity, setIdentity] = useState<AgentIdentity | null | undefined>(undefined);
 
   useEffect(() => {
-    void getAuthToken().then(setToken);
+    void (async () => {
+      const token = await getAuthToken();
+      if (!token) {
+        setIdentity(null);
+        return;
+      }
+      // A stored key can have been revoked since last launch; verifying it here
+      // turns that into the sign-in screen instead of a screen full of errors.
+      const current = await getSignInState();
+      if (!current) await clearAuthToken();
+      setIdentity(current);
+    })();
   }, []);
 
-  if (token === undefined) {
+  const signOut = useCallback(() => {
+    void clearAuthToken().then(() => setIdentity(null));
+  }, []);
+
+  if (identity === undefined) {
     return (
       <View style={styles.center}>
         <ActivityIndicator />
       </View>
     );
   }
-  return token ? (
-    <HomeScreen onSignOut={() => { void clearAuthToken().then(() => setToken(null)); }} />
+  return identity ? (
+    <HomeScreen identity={identity} onSignOut={signOut} />
   ) : (
-    <SignInScreen onSignedIn={(t) => setToken(t)} />
+    <SignInScreen onSignedIn={setIdentity} />
   );
 }
 
-function SignInScreen({ onSignedIn }: { onSignedIn: (token: string) => void }) {
+function SignInScreen({ onSignedIn }: { onSignedIn: (identity: AgentIdentity) => void }) {
   const [apiKey, setApiKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -54,12 +85,11 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (token: string) => void }) {
     setBusy(true);
     setError(null);
     try {
-      // Prove the credential before storing it. Storing first and failing later
-      // shows up as an empty task list, which reads as "no data" rather than
-      // "your key is wrong" — the kind of failure that wastes an afternoon.
-      await validateAuthToken(candidate);
+      // Prove the key before storing it. Storing first and failing later shows up
+      // as an empty task list, which reads as "no data" rather than "bad key".
+      const next = await validateAuthToken(candidate);
       await saveAuthToken(candidate);
-      onSignedIn(candidate);
+      onSignedIn(next);
     } catch (e) {
       setError(String((e as Error)?.message ?? e));
     } finally {
@@ -72,8 +102,8 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (token: string) => void }) {
       <StatusBar style="auto" />
       <Text style={styles.h1}>Coolie</Text>
       <Text style={styles.muted}>
-        Paste an agent API key to connect. (Session sign-in with email/password is also
-        supported by the API — see clients/README.md.)
+        Paste an agent API key to connect. The key is scoped to one company; create it
+        in the board under the agent it belongs to.
       </Text>
       <TextInput
         style={styles.input}
@@ -85,16 +115,19 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (token: string) => void }) {
         onChangeText={setApiKey}
       />
       {error !== null && <Text style={styles.error}>{error}</Text>}
-      <Pressable style={[styles.btn, (!apiKey.trim() || busy) && styles.btnDisabled]} disabled={!apiKey.trim() || busy} onPress={submit}>
+      <Pressable
+        style={[styles.btn, (!apiKey.trim() || busy) && styles.btnDisabled]}
+        disabled={!apiKey.trim() || busy}
+        onPress={submit}
+      >
         <Text style={styles.btnText}>{busy ? "Checking…" : "Connect"}</Text>
       </Pressable>
     </View>
   );
 }
 
-function HomeScreen({ onSignOut }: { onSignOut: () => void }) {
-  const [companies, setCompanies] = useState<Company[]>([]);
-  const [companyId, setCompanyId] = useState<string | null>(null);
+function HomeScreen({ identity, onSignOut }: { identity: AgentIdentity; onSignOut: () => void }) {
+  const [company, setCompany] = useState<Company | null>(null);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selected, setSelected] = useState<Issue | null>(null);
   const [title, setTitle] = useState("");
@@ -104,18 +137,9 @@ function HomeScreen({ onSignOut }: { onSignOut: () => void }) {
   const [busy, setBusy] = useState(false);
   const { recording, start, stop } = useRecorder();
 
-  const loadCompanies = useCallback(async () => {
-    try {
-      const list = await coolie.listCompanies();
-      setCompanies(list);
-      if (list[0] && !companyId) setCompanyId(list[0].id);
-    } catch (e) {
-      Alert.alert("Failed to load companies", String((e as Error)?.message ?? e));
-    }
-  }, [companyId]);
+  const companyId = identity.companyId;
 
   const loadIssues = useCallback(async () => {
-    if (!companyId) return;
     setLoading(true);
     try {
       setIssues(await coolie.listIssues(companyId, { limit: 50 }));
@@ -126,11 +150,14 @@ function HomeScreen({ onSignOut }: { onSignOut: () => void }) {
     }
   }, [companyId]);
 
-  useEffect(() => { void loadCompanies(); }, [loadCompanies]);
+  useEffect(() => {
+    void coolie.getCompany(companyId).then(setCompany).catch(() => setCompany(null));
+  }, [companyId]);
+
   useEffect(() => { void loadIssues(); }, [loadIssues]);
 
   const createTask = useCallback(async () => {
-    if (!companyId || !title.trim()) return;
+    if (!title.trim()) return;
     setBusy(true);
     try {
       await coolie.createIssue({
@@ -151,7 +178,6 @@ function HomeScreen({ onSignOut }: { onSignOut: () => void }) {
   }, [companyId, title, description, priority, loadIssues]);
 
   const voiceDispatch = useCallback(async () => {
-    if (!companyId) return;
     try {
       if (!recording) {
         await start();
@@ -182,19 +208,12 @@ function HomeScreen({ onSignOut }: { onSignOut: () => void }) {
     <ScrollView contentContainerStyle={styles.screen}>
       <StatusBar style="auto" />
       <View style={styles.rowBetween}>
-        <Text style={styles.h1}>Tasks</Text>
+        <View>
+          <Text style={styles.h1}>Tasks</Text>
+          <Text style={styles.muted}>{company?.name ?? companyId} · {identity.name}</Text>
+        </View>
         <Pressable onPress={onSignOut}><Text style={styles.link}>Sign out</Text></Pressable>
       </View>
-
-      {companies.length > 1 && (
-        <ScrollView horizontal style={styles.chips} showsHorizontalScrollIndicator={false}>
-          {companies.map((c) => (
-            <Pressable key={c.id} onPress={() => setCompanyId(c.id)} style={[styles.chip, companyId === c.id && styles.chipActive]}>
-              <Text style={companyId === c.id ? styles.chipTextActive : styles.chipText}>{c.name}</Text>
-            </Pressable>
-          ))}
-        </ScrollView>
-      )}
 
       <View style={styles.composer}>
         <TextInput style={styles.input} placeholder="New task…" value={title} onChangeText={setTitle} />
@@ -220,8 +239,8 @@ function HomeScreen({ onSignOut }: { onSignOut: () => void }) {
             <Text style={styles.btnText}>{recording ? "◼ Stop & dispatch" : "🎤 Voice task"}</Text>
           </Pressable>
         </View>
-        {/* Known gap: the route this calls is declared `auth: "board"` and the app
-            sends an agent key, so it is rejected 403 until one side changes. */}
+        {/* The route this calls is declared `auth: "board"` on the plugin, so an
+            agent key is rejected 403 until one side changes. */}
         <Text style={styles.muted}>Voice dispatch needs a board session today — see README.</Text>
       </View>
 

@@ -1,5 +1,5 @@
 import * as SecureStore from "expo-secure-store";
-import { CoolieClient, type Company } from "@coolie/api-client";
+import { CoolieClient, type AgentIdentity } from "@coolie/api-client";
 
 /**
  * Instance base URL. Override per build with `EXPO_PUBLIC_COOLIE_BASE_URL`
@@ -32,19 +32,29 @@ export async function getAuthToken(): Promise<string | null> {
 }
 
 /**
- * Validate a candidate token before storing it, by making one authenticated call
- * with it. Returns the companies it can see, so sign-in can both prove the
- * credential works and warm the first screen; throws `CoolieApiError` otherwise.
+ * Validate a candidate key before storing it, by making one authenticated call
+ * with it, and return what the key is. The probe is `/api/agents/me` — an agent
+ * key cannot read `/api/companies` (that is board-only and answers 403), so
+ * probing there would reject perfectly good keys.
  *
  * Storing first and discovering a bad key later is what the app did before, and it
  * presents as an empty task list rather than as "your key is wrong".
  */
-export async function validateAuthToken(token: string): Promise<Company[]> {
+export async function validateAuthToken(token: string): Promise<AgentIdentity> {
   const probe = new CoolieClient({
     baseUrl: COOLIE_BASE_URL,
     getAuthHeader: () => ({ Authorization: `Bearer ${token}` }),
   });
-  return probe.listCompanies();
+  return probe.getAgentIdentity();
+}
+
+/** The identity of the currently stored key, or null when it no longer works. */
+export async function getSignInState(): Promise<AgentIdentity | null> {
+  try {
+    return await coolie.getAgentIdentity();
+  } catch {
+    return null;
+  }
 }
 
 /**

@@ -6,8 +6,13 @@ dispatch** (speak a task, Tencent ASR transcribes it, a task/issue is created).
 
 - [`api-client/`](./api-client) — framework-agnostic TypeScript client for the
   Coolie REST API (auth, tasks, voice dispatch).
-- [`expo-app/`](./expo-app) — Expo app skeleton: sign in, list tasks, create a
+- [`expo/`](./expo) — Expo (React Native) app: sign in, list tasks, open one, create a
   task, and voice dispatch.
+- [`h5/`](./h5) — browser client.
+
+Neither client package is a pnpm workspace member (the workspace globs are
+`packages/*`, `server`, `ui`, `cli`), so `pnpm -r typecheck` does **not** cover them.
+Run their own `pnpm typecheck`; `clients/expo` also has `pnpm bundle`.
 
 ## Backend it talks to
 
@@ -37,9 +42,16 @@ Coolie authenticates requests two ways; the middleware accepts either on the
 
 2. **Agent API key (bearer).** A hashed API key scoped to a company, sent as
    `Authorization: Bearer <key>`. Best for programmatic / device clients.
-   Keys are minted from the board (Settings → Members / access) or claimed via a
+   Keys are minted from the board (`POST /api/agents/{id}/keys`) or claimed via a
    join-request `claim-api-key` flow. Agent keys are company-scoped and cannot
    cross companies.
+
+   Two consequences an agent-key client must live with, both measured:
+
+   - `GET /api/agents/me` returns the key's own identity **including `companyId`** —
+     that is how such a client learns its company. Use it as the health check.
+   - `GET /api/companies` is **board-only** and answers `403 Board access required` to
+     an agent key, so an agent-key client cannot offer a company picker.
 
 The bundled client is transport-agnostic: you give it a `baseUrl` and a
 `getAuthHeader()` callback, so it works with either scheme.
@@ -47,14 +59,18 @@ The bundled client is transport-agnostic: you give it a `baseUrl` and a
 ## Creating a task
 
 ```
-POST /api/issues
+POST /api/companies/{companyId}/issues
 {
-  "companyId": "<uuid>",
   "title": "Fix the login crash",     // required, min length 1
   "description": "…",                  // optional
   "priority": "medium"                 // critical | high | medium | low
 }
+-> 201 <issue>
 ```
+
+Issues are **company-scoped in the path**; there is no `POST /api/issues`, and
+`GET /api/issues?companyId=…` answers `400 Missing companyId in path`. Listing is
+`GET /api/companies/{companyId}/issues`.
 
 ## Voice dispatch (speak a task)
 
