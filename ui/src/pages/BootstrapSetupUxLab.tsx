@@ -10,7 +10,8 @@ type LabFixtureKey =
   | "claiming"
   | "claim-error"
   | "claim-success"
-  | "public-invite-only";
+  | "public-invite-only"
+  | "public-signed-in";
 
 const FIXTURE_LABELS: Record<LabFixtureKey, string> = {
   "signed-out-private": "1 · authenticated/private — signed out (browser claim available)",
@@ -18,7 +19,8 @@ const FIXTURE_LABELS: Record<LabFixtureKey, string> = {
   claiming: "3 · authenticated/private — claim in flight",
   "claim-error": "4 · authenticated/private — claim error (e.g. 409 already claimed)",
   "claim-success": "5 · authenticated/private — claim succeeded, redirect pending",
-  "public-invite-only": "6 · authenticated/public — invite-only (no browser claim)",
+  "public-invite-only": "6 · authenticated/public — invite-only, signed out (no browser claim)",
+  "public-signed-in": "7 · authenticated/public — invite-only, already signed in (sign out to claim)",
 };
 
 const FIXTURE_ORDER: LabFixtureKey[] = [
@@ -28,6 +30,7 @@ const FIXTURE_ORDER: LabFixtureKey[] = [
   "claim-error",
   "claim-success",
   "public-invite-only",
+  "public-signed-in",
 ];
 
 function CliFallback({ hasActiveInvite }: { hasActiveInvite: boolean }) {
@@ -207,6 +210,32 @@ function PublicInviteOnly() {
   );
 }
 
+function PublicSignedIn() {
+  return (
+    <StateChrome>
+      <h1 className="text-xl font-semibold">This Coolie is waiting on its first admin</h1>
+      <p className="mt-2 text-sm text-muted-foreground">
+        This instance is reachable from the network, so the first admin cannot be claimed by whoever opens
+        the page first. The host decides instead, by pinning an admin email on the server.
+      </p>
+      <p className="mt-3 text-sm text-muted-foreground">
+        You are already signed in as{" "}
+        <span className="font-medium text-foreground">jane@appliance.local</span>. If that is the address the
+        host pinned, sign out and sign in again &mdash; the admin role is granted during sign-in, so it cannot
+        be handed out while a session is already open.
+      </p>
+      <div className="mt-5">
+        <Button>Sign out to claim</Button>
+      </div>
+      <CliFallback hasActiveInvite />
+      <p className="mt-4 text-xs text-muted-foreground">
+        Browser-based claim is intentionally disabled in public mode so anyone on the network can&rsquo;t
+        promote themselves.
+      </p>
+    </StateChrome>
+  );
+}
+
 const FIXTURE_BODIES: Record<LabFixtureKey, ReactElement> = {
   "signed-out-private": <SignedOutPrivate />,
   "signed-in-private": <SignedInPrivate />,
@@ -214,6 +243,7 @@ const FIXTURE_BODIES: Record<LabFixtureKey, ReactElement> = {
   "claim-error": <ClaimErrorPrivate />,
   "claim-success": <ClaimSuccess />,
   "public-invite-only": <PublicInviteOnly />,
+  "public-signed-in": <PublicSignedIn />,
 };
 
 export function BootstrapSetupUxLab() {

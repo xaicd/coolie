@@ -5,6 +5,7 @@ import { ApiError } from "@/api/client";
 import { authApi } from "@/api/auth";
 import { healthApi } from "@/api/health";
 import { queryKeys } from "@/lib/queryKeys";
+import { useSignOut } from "@/hooks/useSignOut";
 import { BootstrapPendingPage } from "@/components/BootstrapPendingPage";
 import { PaperclipLoading } from "@/components/AnimatedPaperclipIcon";
 import { Card } from "@/components/ui/card";
@@ -69,6 +70,11 @@ export function CloudAccessGate() {
       await queryClient.invalidateQueries({ queryKey: queryKeys.access.currentBoardAccess });
     },
   });
+  // Public instances need this one: with no browser claim, the pinned address is the
+  // only way in, and the grant fires at sign-in — so a signed-in visitor is one
+  // sign-out away from admin and has no other move. Signing out here resets the
+  // session query, which brings the signed-out state below back on its own.
+  const signOutMutation = useSignOut();
 
   if (
     healthQuery.isLoading ||
@@ -108,6 +114,8 @@ export function CloudAccessGate() {
         claimState={claimMutation.isSuccess ? "success" : claimMutation.isPending ? "claiming" : "idle"}
         claimError={claimError}
         onClaim={() => claimMutation.mutate()}
+        onSignOut={() => signOutMutation.mutate()}
+        isSigningOut={signOutMutation.isPending}
       />
     );
   }

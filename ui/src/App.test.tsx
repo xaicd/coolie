@@ -14,6 +14,7 @@ const mockHealthApi = vi.hoisted(() => ({
 
 const mockAuthApi = vi.hoisted(() => ({
   getSession: vi.fn(),
+  signOut: vi.fn(),
 }));
 
 const mockAccessApi = vi.hoisted(() => ({
@@ -204,7 +205,31 @@ describe("CloudAccessGate", () => {
     unmountRoot(root);
   });
 
-  it("points public bootstrap-pending instances at the host instead of a browser claim", async () => {
+  it("points signed-out public bootstrap-pending instances at the host instead of a browser claim", async () => {
+    mockHealthApi.get.mockResolvedValue({
+      status: "ok",
+      deploymentMode: "authenticated",
+      deploymentExposure: "public",
+      bootstrapStatus: "bootstrap_pending",
+      bootstrapInviteActive: true,
+    });
+    mockAuthApi.getSession.mockResolvedValue(null);
+
+    const root = renderGate(container);
+    await waitForText(container, "This Coolie is waiting on its first admin");
+
+    expect(container.textContent).toContain("This Coolie is waiting on its first admin");
+    expect(container.textContent).toContain("PAPERCLIP_BOOTSTRAP_ADMIN_EMAIL");
+    expect(container.textContent).toContain("npx paperclipai auth bootstrap-ceo");
+    expect(container.textContent).toContain("Sign in / Create account");
+    expect(container.textContent).not.toContain("Sign out to claim");
+    expect(container.textContent).not.toContain("Claim this instance");
+    expect(mockAccessApi.claimBootstrapAdmin).not.toHaveBeenCalled();
+
+    unmountRoot(root);
+  });
+
+  it("offers a sign-out rather than a sign-in when a public instance is already signed in", async () => {
     mockHealthApi.get.mockResolvedValue({
       status: "ok",
       deploymentMode: "authenticated",
@@ -216,16 +241,29 @@ describe("CloudAccessGate", () => {
       session: { id: "session-1", userId: "user-1" },
       user: { id: "user-1", email: "user@example.com", name: "User", image: null },
     });
+    mockAuthApi.signOut.mockResolvedValue(null);
 
     const root = renderGate(container);
-    await waitForText(container, "This Coolie is waiting on its first admin");
+    await waitForText(container, "Sign out to claim");
 
-    expect(container.textContent).toContain("This Coolie is waiting on its first admin");
-    expect(container.textContent).toContain("PAPERCLIP_BOOTSTRAP_ADMIN_EMAIL");
-    expect(container.textContent).toContain("npx paperclipai auth bootstrap-ceo");
-    expect(container.textContent).toContain("Sign in / Create account");
-    expect(container.textContent).not.toContain("Claim this instance");
+    // The defect this replaces: a live session sent "Sign in / Create account" to
+    // AuthPage, whose effect redirects any session-bearing request back to `/` —
+    // i.e. straight back to this screen. A signed-in visitor had no way to progress,
+    // because the admin role is granted at sign-in and a session already existed.
+    expect(container.textContent).toContain("already signed in as user@example.com");
+    expect(container.textContent).toContain("Sign out to claim");
+    expect(container.textContent).not.toContain("Sign in / Create account");
     expect(mockAccessApi.claimBootstrapAdmin).not.toHaveBeenCalled();
+    expect(mockAuthApi.signOut).not.toHaveBeenCalled();
+
+    const button = Array.from(container.querySelectorAll("button")).find((candidate) =>
+      candidate.textContent?.includes("Sign out to claim"),
+    );
+    expect(button).toBeTruthy();
+    flushSync(() => {
+      button?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await vi.waitFor(() => expect(mockAuthApi.signOut).toHaveBeenCalledTimes(1));
 
     unmountRoot(root);
   });

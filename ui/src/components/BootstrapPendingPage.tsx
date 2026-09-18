@@ -13,6 +13,8 @@ type BootstrapPendingPageProps = {
   claimState: "idle" | "claiming" | "success";
   claimError?: { status?: number; message?: string } | null;
   onClaim: () => void;
+  onSignOut: () => void;
+  isSigningOut: boolean;
 };
 
 function CliFallback({ hasActiveInvite = false }: { hasActiveInvite?: boolean }) {
@@ -77,8 +79,44 @@ export function BootstrapPendingPage({
   claimState,
   claimError,
   onClaim,
+  onSignOut,
+  isSigningOut,
 }: BootstrapPendingPageProps) {
   if (!claimAvailable) {
+    // Signed in already: "Sign in / Create account" is no offer at all here, and it
+    // is worse than useless — `AuthPage` redirects any request that carries a live
+    // session straight back to `/`, which lands on this same screen. Clicking it
+    // looks like nothing happened, forever. The one thing that actually helps is a
+    // sign-out, because the role is granted at sign-in (and at sign-up): the grant
+    // hook runs when a session is created, and a session already exists.
+    if (session) {
+      return (
+        <StateChrome>
+          <h1 className="text-xl font-semibold">This Coolie is waiting on its first admin</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            This instance is reachable from the network, so the first admin cannot be claimed by whoever opens
+            the page first. The host decides instead, by pinning an admin email on the server.
+          </p>
+          <p className="mt-3 text-sm text-muted-foreground">
+            You are already signed in as{" "}
+            <span className="font-medium text-foreground">{displayIdentity(session)}</span>. If that is the
+            address the host pinned, sign out and sign in again — the admin role is granted during sign-in, so
+            it cannot be handed out while a session is already open.
+          </p>
+          <div className="mt-5">
+            <Button onClick={onSignOut} disabled={isSigningOut}>
+              {isSigningOut ? "Signing out..." : "Sign out to claim"}
+            </Button>
+          </div>
+          <CliFallback hasActiveInvite={hasActiveInvite} />
+          <p className="mt-4 text-xs text-muted-foreground">
+            Browser-based claim is intentionally disabled in public mode so anyone on the network can't promote
+            themselves.
+          </p>
+        </StateChrome>
+      );
+    }
+
     return (
       <StateChrome>
         <h1 className="text-xl font-semibold">This Coolie is waiting on its first admin</h1>
