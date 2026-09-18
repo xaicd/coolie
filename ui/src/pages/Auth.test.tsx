@@ -6,7 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { MemoryRouter, Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { queryKeys } from "../lib/queryKeys";
-import { AuthPage } from "./Auth";
+import { AuthPage, validateCredentials } from "./Auth";
 
 const getSessionMock = vi.hoisted(() => vi.fn());
 const signInEmailMock = vi.hoisted(() => vi.fn());
@@ -252,5 +252,40 @@ describe("AuthPage", () => {
     await act(async () => {
       root.unmount();
     });
+  });
+});
+
+describe("validateCredentials", () => {
+  it("accepts a complete sign-in payload", () => {
+    expect(
+      validateCredentials({ mode: "sign_in", name: "", email: "jane@example.com", password: "secret" }),
+    ).toBeNull();
+  });
+
+  it("accepts a complete sign-up payload", () => {
+    expect(
+      validateCredentials({ mode: "sign_up", name: "Jane", email: "jane@example.com", password: "supersecret" }),
+    ).toBeNull();
+  });
+
+  it("explains a missing email instead of blocking the submit", () => {
+    expect(
+      validateCredentials({ mode: "sign_in", name: "", email: "   ", password: "secret" }),
+    ).toBe("Enter your email address.");
+  });
+
+  it("explains a missing password", () => {
+    expect(
+      validateCredentials({ mode: "sign_in", name: "", email: "jane@example.com", password: "" }),
+    ).toBe("Enter your password.");
+  });
+
+  it("enforces the sign-up name and minimum password length", () => {
+    expect(
+      validateCredentials({ mode: "sign_up", name: "", email: "jane@example.com", password: "supersecret" }),
+    ).toBe("Enter your name.");
+    expect(
+      validateCredentials({ mode: "sign_up", name: "Jane", email: "jane@example.com", password: "short" }),
+    ).toBe("Password must be at least 8 characters.");
   });
 });

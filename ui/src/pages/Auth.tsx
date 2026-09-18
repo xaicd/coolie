@@ -12,6 +12,27 @@ import { CoolieLockup } from "../components/CoolieLockup";
 
 type AuthMode = "sign_in" | "sign_up";
 
+/**
+ * Returns a message describing the first problem with the submitted
+ * credentials, or null when the form is ready to send. The form runs with
+ * `noValidate` so this is the single source of validation truth and the user
+ * always gets a reason instead of a submit that silently does nothing.
+ */
+export function validateCredentials(input: {
+  mode: AuthMode;
+  name: string;
+  email: string;
+  password: string;
+}): string | null {
+  if (input.mode === "sign_up" && input.name.trim().length === 0) return "Enter your name.";
+  if (input.email.trim().length === 0) return "Enter your email address.";
+  if (input.password.trim().length === 0) return "Enter your password.";
+  if (input.mode === "sign_up" && input.password.trim().length < 8) {
+    return "Password must be at least 8 characters.";
+  }
+  return null;
+}
+
 export function AuthPage() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -67,11 +88,6 @@ export function AuthPage() {
     },
   });
 
-  const canSubmit =
-    email.trim().length > 0 &&
-    password.trim().length > 0 &&
-    (mode === "sign_in" || (name.trim().length > 0 && password.trim().length >= 8));
-
   if (isSessionLoading) {
     return (
       <div className="fixed inset-0 flex items-center justify-center">
@@ -105,11 +121,13 @@ export function AuthPage() {
             className="mt-6 space-y-4"
             method="post"
             action={mode === "sign_up" ? "/api/auth/sign-up/email" : "/api/auth/sign-in/email"}
+            noValidate
             onSubmit={(event) => {
               event.preventDefault();
               if (mutation.isPending) return;
-              if (!canSubmit) {
-                setError("Please fill in all required fields.");
+              const validationError = validateCredentials({ mode, name, email, password });
+              if (validationError) {
+                setError(validationError);
                 return;
               }
               mutation.mutate();
@@ -174,8 +192,7 @@ export function AuthPage() {
             <Button
               type="submit"
               disabled={mutation.isPending}
-              aria-disabled={!canSubmit || mutation.isPending}
-              className={`w-full ${!canSubmit && !mutation.isPending ? "opacity-50" : ""}`}
+              className="w-full"
             >
               {mutation.isPending
                 ? "Working…"
