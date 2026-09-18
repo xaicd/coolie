@@ -153,7 +153,9 @@ export const ONTOLOGY_TOOLS: OntologyTool[] = [
     routeKey: "list-node-types",
     displayName: "列出对象类型",
     description:
-      "The object types ( entities ) in a domain, each with its fields. This is the business vocabulary — use it before writing anything that names entities.",
+      "The object types ( entities ) in a domain, each with its fields. This is the business vocabulary — use it before writing anything that names entities. " +
+      "Read fields in `property_order`: `properties_schema` is stored as jsonb, so its key order is not meaningful and does not reflect the source. " +
+      "An empty `property_order` means the order was never recorded.",
     parametersSchema: domainParams({
       withFields: { type: "boolean", description: "是否附带字段定义(默认 true)" },
     }),
@@ -171,7 +173,8 @@ export const ONTOLOGY_TOOLS: OntologyTool[] = [
     routeKey: "list-node-types",
     displayName: "单个对象类型",
     description:
-      "One object type by key, with its fields and where it came from (source files, mapped table). Use it to answer 'what fields does X have'.",
+      "One object type by key, with its fields and where it came from (source files, mapped table). Use it to answer 'what fields does X have'. " +
+      "Read the fields in `property_order`, not in the key order of `properties_schema` — that column is jsonb and its key order is not meaningful.",
     parametersSchema: domainParams({
       key: { type: "string", description: "对象类型的 key,例如 SysUser" },
     }),

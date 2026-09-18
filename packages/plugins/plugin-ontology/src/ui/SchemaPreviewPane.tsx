@@ -28,6 +28,7 @@ import {
   type CockpitEditResult,
 } from "../aide/editOps.js";
 import type { DescribeDomainResult } from "./CitationPreview.js";
+import { orderPropertyEntries } from "@paperclipai/ontology-core/propertyOrder.js";
 import { t } from "./isZh.js";
 
 export function SchemaPreviewPane({
@@ -283,7 +284,7 @@ function NodeTypeRow({
   const diffText = kind ? rowTextClass(kind) : "text-foreground/80";
   const glyph = kind ? glyphFor(kind) : " ";
   const props = nodeType.propertiesSchema && typeof nodeType.propertiesSchema === "object"
-    ? Object.entries(nodeType.propertiesSchema)
+    ? orderPropertyEntries(nodeType.propertiesSchema, nodeType.propertyOrder ?? [])
     : [];
 
   // The header is a real <button>; properties are siblings (HTML
@@ -597,7 +598,7 @@ function NodeTypeDetail({
   propertyKinds: Map<string, AffectedKey["kind"]>;
 }): ReactElement {
   const props = nodeType.propertiesSchema && typeof nodeType.propertiesSchema === "object"
-    ? Object.entries(nodeType.propertiesSchema)
+    ? orderPropertyEntries(nodeType.propertiesSchema, nodeType.propertyOrder ?? [])
     : [];
   return (
     <div className="space-y-3">

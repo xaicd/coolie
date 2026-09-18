@@ -89,6 +89,11 @@ interface OntologyNodeType {
   description: string | null;
   /** JSON Schema describing the per-instance properties this type allows. */
   propertiesSchema: Record<string, unknown> | null;
+  /**
+   * The declared field order, beside the schema map because jsonb cannot keep an
+   * object's key order. `[]` means it was never recorded.
+   */
+  propertyOrder?: string[] | null;
 }
 
 interface OntologyRelationType {
@@ -1011,9 +1016,9 @@ function DomainWorkspace({
 
   /** Inline property-table save (add / edit / delete a field). */
   const saveNodeTypeSchema = useCallback(
-    async (nodeTypeId: string, schema: Record<string, unknown>) => {
+    async (nodeTypeId: string, schema: Record<string, unknown>, propertyOrder: string[]) => {
       try {
-        await updateNodeType({ companyId, nodeTypeId, propertiesSchema: schema });
+        await updateNodeType({ companyId, nodeTypeId, propertiesSchema: schema, propertyOrder });
       } catch (e) {
         // Removing a field leaves the values already stored on instances
         // unreachable through the type — not deleted, which is what makes it
@@ -1030,7 +1035,13 @@ function DomainWorkspace({
           )}`,
         );
         if (!proceed) return;
-        await updateNodeType({ companyId, nodeTypeId, propertiesSchema: schema, allowOrphaned: true });
+        await updateNodeType({
+          companyId,
+          nodeTypeId,
+          propertiesSchema: schema,
+          propertyOrder,
+          allowOrphaned: true,
+        });
       }
       refreshDomain();
     },
@@ -1631,6 +1642,10 @@ function DomainWorkspace({
               companyId,
               nodeTypeId: propSchemaEditor.nodeTypeId,
               propertiesSchema: parsed,
+              // The order the user wrote in the JSON payload. Anything that is not
+              // a property name is pruned by the store, so a wrapped document
+              // degrades to "unknown" rather than declaring a false order.
+              propertyOrder: Object.keys(parsed),
             });
             setPropSchemaEditor(null);
             refreshDomain();

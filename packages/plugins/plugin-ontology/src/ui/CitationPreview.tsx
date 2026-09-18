@@ -9,6 +9,7 @@
  * pulling in the preview component itself.
  */
 import { type ReactElement, useMemo } from "react";
+import { orderPropertyEntries } from "@paperclipai/ontology-core/propertyOrder.js";
 import { t } from "./isZh.js";
 import type {
   DescribeDomainActionType,
@@ -189,7 +190,7 @@ function renderBody(result: CitationLookupResult): ReactElement {
 
 function NodeTypePreview({ data }: { data: DescribeNodeType }): ReactElement {
   const props = (data.propertiesSchema && typeof data.propertiesSchema === "object"
-    ? Object.entries(data.propertiesSchema)
+    ? orderPropertyEntries(data.propertiesSchema, data.propertyOrder ?? [])
     : []) as [string, unknown][];
   return (
     <div className="space-y-1.5 text-(length:--text-compact)">

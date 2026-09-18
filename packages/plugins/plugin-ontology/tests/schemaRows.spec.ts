@@ -8,6 +8,7 @@
  */
 import { describe, expect, it } from "vitest";
 import {
+  propertyOrderFromRows,
   rowsFromSchema,
   schemaFromRows,
   schemasEqual,
@@ -38,11 +39,18 @@ describe("rowsFromSchema", () => {
 
   it("reads a flat map, inferring primitive types", () => {
     const rows = rowsFromSchema({ name: "alice", age: 30, active: true });
+    // With no declared order the rows come back sorted, not in map order: the
+    // schema arrives from a jsonb column, whose key order is nobody's.
     expect(rows.map((r) => [r.key, r.type])).toEqual([
-      ["name", "string"],
-      ["age", "number"],
       ["active", "boolean"],
+      ["age", "number"],
+      ["name", "string"],
     ]);
+  });
+
+  it("follows the declared order and sorts only what it does not cover", () => {
+    const rows = rowsFromSchema({ name: "alice", age: 30, active: true }, ["name"]);
+    expect(rows.map((r) => r.key)).toEqual(["name", "active", "age"]);
   });
 
   it("returns [] for anything that is not a schema", () => {
@@ -93,6 +101,26 @@ describe("schemaFromRows", () => {
     rows.splice(0, 1);
     rows.push({ key: "c", type: "boolean", description: "", rest: {} });
     expect(schemaFromRows(rows)).toEqual({ b: { type: "string" }, c: { type: "boolean" } });
+  });
+});
+
+describe("propertyOrderFromRows", () => {
+  it("declares the order the rows are shown in, trimmed like the map's keys", () => {
+    // The map and the order have to be derived the same way, or a save writes a
+    // key the order does not name and the row silently drops to the sorted tail.
+    expect(
+      propertyOrderFromRows([
+        { key: " name ", type: "string", description: "", rest: {} },
+        { key: "   ", type: "string", description: "", rest: {} },
+        { key: "tier", type: "string", description: "", rest: {} },
+      ]),
+    ).toEqual(["name", "tier"]);
+  });
+
+  it("round-trips a declared order through a save", () => {
+    const rows = rowsFromSchema({ a: { type: "string" }, b: { type: "string" } }, ["b", "a"]);
+    const saved = rowsFromSchema(schemaFromRows(rows), propertyOrderFromRows(rows));
+    expect(saved.map((r) => r.key)).toEqual(["b", "a"]);
   });
 });
 

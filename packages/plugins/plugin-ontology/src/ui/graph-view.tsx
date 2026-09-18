@@ -83,6 +83,12 @@ export interface GraphNodeType {
   directed?: boolean;
   /** JSON Schema describing the per-instance properties this type allows. */
   propertiesSchema?: Record<string, unknown> | null;
+  /**
+   * The field order the source declared. The schema map arrives from a `jsonb`
+   * column, which does not keep object key order, so this is what makes the
+   * declared order displayable at all.
+   */
+  propertyOrder?: string[] | null;
   /** Where the type came from, when an importer recorded it. See `provenance.ts`. */
   metadata?: Record<string, unknown> | null;
 }
@@ -114,7 +120,9 @@ function useReactFlowCss(): void {
 }
 
 import { t } from "./isZh.js";
+import { orderPropertyNames } from "@paperclipai/ontology-core/propertyOrder.js";
 import {
+  propertyOrderFromRows,
   rowsFromSchema,
   schemaFromRows,
   schemasEqual,
@@ -1084,7 +1092,11 @@ interface GraphViewProps {
   /** Lets the schema view's own list drive the same selection the left tree uses. */
   onSelectNodeType?: (id: string | null) => void;
   /** Persist an edited property schema for one object type. */
-  onSaveNodeTypeSchema?: (nodeTypeId: string, schema: Record<string, unknown>) => Promise<void> | void;
+  onSaveNodeTypeSchema?: (
+    nodeTypeId: string,
+    schema: Record<string, unknown>,
+    propertyOrder: string[],
+  ) => Promise<void> | void;
   /** Apply a plain-language schema change; resolves with a human summary. */
   onAiEdit?: (instruction: string, typeKey: string) => Promise<string>;
   /** Fill missing Chinese descriptions from a legacy source; resolves with a report. */
@@ -1544,7 +1556,10 @@ function TableView({
   const propertyColumns = useMemo(() => {
     const schema = focusedType?.propertiesSchema;
     if (!schema || typeof schema !== "object") return [] as string[];
-    return Object.keys(schema).slice(0, MAX_TABLE_PROPERTY_COLUMNS);
+    // The declared order first, so the table's columns read the way the source
+    // wrote them rather than in the order jsonb happened to return.
+    return orderPropertyNames(Object.keys(schema), focusedType?.propertyOrder ?? [])
+      .slice(0, MAX_TABLE_PROPERTY_COLUMNS);
   }, [focusedType]);
 
   const visibleNodes = useMemo(
@@ -1687,7 +1702,11 @@ function SchemaView({
   relationTypes: GraphNodeType[];
   focusNodeTypeId?: string | null;
   onSelectNodeType?: (id: string | null) => void;
-  onSaveNodeTypeSchema?: (nodeTypeId: string, schema: Record<string, unknown>) => Promise<void> | void;
+  onSaveNodeTypeSchema?: (
+    nodeTypeId: string,
+    schema: Record<string, unknown>,
+    propertyOrder: string[],
+  ) => Promise<void> | void;
   onAiEdit?: (instruction: string, typeKey: string) => Promise<string>;
   onEnrichDescriptions?: (opts: {
     sourceText: string;
@@ -1952,7 +1971,11 @@ function SchemaTypeDetail({
   onEnrichDescriptions,
 }: {
   nodeType: GraphNodeType;
-  onSaveSchema?: (nodeTypeId: string, schema: Record<string, unknown>) => Promise<void> | void;
+  onSaveSchema?: (
+    nodeTypeId: string,
+    schema: Record<string, unknown>,
+    propertyOrder: string[],
+  ) => Promise<void> | void;
   onAiEdit?: (instruction: string, typeKey: string) => Promise<string>;
   onEnrichDescriptions?: (opts: {
     sourceText: string;
@@ -1963,8 +1986,8 @@ function SchemaTypeDetail({
   }) => Promise<string>;
 }): ReactElement {
   const initialRows = useMemo(
-    () => rowsFromSchema(nodeType.propertiesSchema),
-    [nodeType.id, nodeType.propertiesSchema],
+    () => rowsFromSchema(nodeType.propertiesSchema, nodeType.propertyOrder ?? []),
+    [nodeType.id, nodeType.propertiesSchema, nodeType.propertyOrder],
   );
   const [rows, setRows] = useState<SchemaRow[]>(initialRows);
   const [busy, setBusy] = useState(false);
@@ -2003,7 +2026,9 @@ function SchemaTypeDetail({
     if (!onSaveSchema) return;
     setBusy(true); setErr(null); setNote(null);
     try {
-      await onSaveSchema(nodeType.id, schemaFromRows(rows));
+      // The row order the user is looking at is what a save declares, so the
+      // next read comes back in this same order instead of jsonb's.
+      await onSaveSchema(nodeType.id, schemaFromRows(rows), propertyOrderFromRows(rows));
       setNote(t("已保存", "Saved"));
     } catch (e) {
       setErr(String((e as Error)?.message ?? e));

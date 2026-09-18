@@ -10,6 +10,8 @@
  * and only the fields the user actually edited are rewritten.
  */
 
+import { orderPropertyNames } from "@paperclipai/ontology-core/propertyOrder.js";
+
 export const SCHEMA_TYPE_OPTIONS = [
   "string",
   "number",
@@ -46,13 +48,19 @@ export function typeOptionsFor(current: string): string[] {
  * wild: a JSON-Schema document (`{ type: "object", properties: {...} }`) and a
  * flat `{ field: descriptor }` map. A descriptor that is a bare primitive is
  * mapped to the matching type rather than discarded.
+ *
+ * `declared` is the stored field order. Without it the map is walked in a
+ * deterministic sort rather than in map order: the schema arrives from a `jsonb`
+ * column, which returns object keys in an order of its own, and showing that as
+ * if it were the source's is the thing this parameter exists to avoid.
  */
-export function rowsFromSchema(schema: unknown): SchemaRow[] {
+export function rowsFromSchema(schema: unknown, declared: readonly string[] = []): SchemaRow[] {
   if (!isPlainObject(schema)) return [];
   const source = isPlainObject(schema.properties) ? schema.properties : schema;
 
   const rows: SchemaRow[] = [];
-  for (const [key, value] of Object.entries(source)) {
+  for (const key of orderPropertyNames(Object.keys(source), declared)) {
+    const value = source[key];
     if (key === "type" && !isPlainObject(value)) continue;
     if (isPlainObject(value)) {
       const { type, description, ...rest } = value;
@@ -101,6 +109,17 @@ export function schemaFromRows(rows: SchemaRow[]): Record<string, unknown> {
     properties[key] = descriptor;
   }
   return properties;
+}
+
+/**
+ * The order a save should declare, derived the same way `schemaFromRows` derives
+ * its keys — so the map and the order it is written with cannot disagree.
+ *
+ * The editor's row order *is* the order the user is looking at, so saving is what
+ * turns it from unknown into declared.
+ */
+export function propertyOrderFromRows(rows: SchemaRow[]): string[] {
+  return rows.map((row) => row.key.trim()).filter((key) => key !== "");
 }
 
 /** Stable comparison for the "unsaved changes" state. */
