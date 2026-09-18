@@ -1,6 +1,8 @@
 # Coolie 本地启动笔记 (M-A 验证记录)
 
-> 定开分支：`coolie/customization`（fork 自 paperclip，MIT）
+> 定开分支：**`main`**（fork 自 paperclip，MIT）。`master` 是官方上游镜像，只用于同步官方功能，
+> 不要在上面提交或推送我们的东西——完整规范见 `docs-coolie/BRANCHING.md`。
+> （本行原先写的是 `coolie/customization`，那个分支并不存在，已按实测更正。）
 > 本文件是新增笔记，未改动 paperclip 核心代码。
 
 ## 环境要求
