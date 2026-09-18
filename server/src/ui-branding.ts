@@ -1,7 +1,12 @@
+import { escapeHtmlAttribute } from "./html-escape.js";
+import { renderIcpFooterHtml, resolveIcpInfo } from "./icp-footer.js";
+
 const FAVICON_BLOCK_START = "<!-- PAPERCLIP_FAVICON_START -->";
 const FAVICON_BLOCK_END = "<!-- PAPERCLIP_FAVICON_END -->";
 const RUNTIME_BRANDING_BLOCK_START = "<!-- PAPERCLIP_RUNTIME_BRANDING_START -->";
 const RUNTIME_BRANDING_BLOCK_END = "<!-- PAPERCLIP_RUNTIME_BRANDING_END -->";
+const ICP_FOOTER_BLOCK_START = "<!-- PAPERCLIP_ICP_FOOTER_START -->";
+const ICP_FOOTER_BLOCK_END = "<!-- PAPERCLIP_ICP_FOOTER_END -->";
 
 const DEFAULT_FAVICON_LINKS = [
   '<link rel="icon" href="/favicon.ico" sizes="48x48" />',
@@ -129,14 +134,6 @@ function pickReadableTextColor(background: string): string {
   return whiteContrast >= blackContrast ? "#f8fafc" : "#111827";
 }
 
-function escapeHtmlAttribute(value: string): string {
-  return value
-    .replaceAll("&", "&amp;")
-    .replaceAll('"', "&quot;")
-    .replaceAll("<", "&lt;")
-    .replaceAll(">", "&gt;");
-}
-
 function createFaviconDataUrl(background: string, foreground: string): string {
   const svg = [
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none">',
@@ -221,10 +218,16 @@ function replaceMarkedBlock(html: string, startMarker: string, endMarker: string
 export function applyUiBranding(html: string, env: NodeJS.ProcessEnv = process.env): string {
   const branding = getWorktreeUiBranding(env);
   const withFavicon = replaceMarkedBlock(html, FAVICON_BLOCK_START, FAVICON_BLOCK_END, renderFaviconLinks(branding));
-  return replaceMarkedBlock(
+  const withRuntimeBranding = replaceMarkedBlock(
     withFavicon,
     RUNTIME_BRANDING_BLOCK_START,
     RUNTIME_BRANDING_BLOCK_END,
     renderRuntimeBrandingMeta(branding),
+  );
+  return replaceMarkedBlock(
+    withRuntimeBranding,
+    ICP_FOOTER_BLOCK_START,
+    ICP_FOOTER_BLOCK_END,
+    renderIcpFooterHtml(resolveIcpInfo(env)),
   );
 }

@@ -42,10 +42,12 @@ export const OWNED_PREFIXES = [
   "packages/plugins/plugin-ontology/",
   "doc/plans/",
   ".agents/",
+  "docs-coolie/",
   "scripts/check-fork-surface",
   "scripts/check-testing-defenses",
   "scripts/check-ontology",
   "scripts/convert-ontology-playground",
+  "scripts/deploy-coolie",
 ];
 
 /** Regenerated, not authored — it cannot be resolved by hand anyway. */

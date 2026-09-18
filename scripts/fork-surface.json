@@ -51,9 +51,63 @@
     },
     {
       "path": "scripts/fork-surface.json",
-      "maxNetLines": 120,
+      "maxNetLines": 200,
       "reason": "This manifest itself, and entirely ours — it does not exist upstream. It sits under scripts/ only because that is where the gate is wired (package.json and check-testing-defenses.mjs call it), and that path prefix is the only reason the gate asks about it. The budget is loose on purpose: the file grows by one entry per upstream file we intentionally change, and that growth is the file working, not creep.",
-      "maxTotalLines": 160
+      "maxTotalLines": 320
+    },
+    {
+      "path": "ui/index.html",
+      "maxNetLines": 10,
+      "reason": "Marker block for the ICP filing footer, plus lang=\"zh-CN\" for a zh-CN deployment. Markers only — the block stays empty unless an operator configures a filing, so upstream behaviour is unchanged without one. The injection lives on the server because the filing number is deployment config and must not be baked into a UI build.",
+      "maxTotalLines": 20
+    },
+    {
+      "path": "server/src/app.ts",
+      "maxNetLines": 30,
+      "reason": "Serves the optional public landing page at `/` in static mode. It has to be here rather than in our own tree because this file is what owns route order: `/` is claimed before the SPA fallback registers, and `/index.html` and every other route keep returning the app shell. Off unless PAPERCLIP_LANDING_ENABLED is set.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "server/src/ui-branding.ts",
+      "maxNetLines": 30,
+      "reason": "Fills the ICP footer marker block. This file already owns the one other place the server rewrites its own index.html (favicon and runtime branding), and the escaping helper it used to keep privately now comes from server/src/html-escape.ts so the footer and landing page share one implementation.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "server/src/icp-footer.ts",
+      "maxNetLines": 90,
+      "reason": "New file: resolves and renders the ICP/公安 filing footer. No upstream counterpart, so there is nothing to reconcile at a merge. Its own tree by origin, but it must sit beside the two callers (ui-branding and landing-page) rather than in a package of its own.",
+      "maxTotalLines": 110
+    },
+    {
+      "path": "server/src/html-escape.ts",
+      "maxNetLines": 20,
+      "reason": "New file: the HTML escaping shared by the injected footer and the landing page. No upstream counterpart. Three callers is why it is a module rather than a copy.",
+      "maxTotalLines": 30
+    },
+    {
+      "path": "server/src/landing-page.ts",
+      "maxNetLines": 560,
+      "reason": "New file: the public landing page. No upstream counterpart. The line count is dominated by two things that are content rather than logic — the built-in catalogue of what this deployment has built, and the inline stylesheet — which is also why the operator can override the catalogue from a JSON file without a rebuild.",
+      "maxTotalLines": 640
+    },
+    {
+      "path": "server/src/__tests__/icp-footer.test.ts",
+      "maxNetLines": 80,
+      "reason": "New file: tests for the filing footer, including the escaping of a filing number. No upstream counterpart.",
+      "maxTotalLines": 100
+    },
+    {
+      "path": "server/src/__tests__/landing-page.test.ts",
+      "maxNetLines": 220,
+      "reason": "New file: tests for the landing page — the enable switch, the catalogue override and its fallbacks, and the refusal to link anything but http(s). No upstream counterpart.",
+      "maxTotalLines": 260
+    },
+    {
+      "path": "server/src/__tests__/static-index-html.test.ts",
+      "maxNetLines": 45,
+      "reason": "Covers the filing footer reaching the app shell, and staying out of it when no filing is configured. Added here rather than in a new file because this suite already owns the SPA fallback HTML that the footer is injected into.",
+      "maxTotalLines": 90
     }
   ]
 }

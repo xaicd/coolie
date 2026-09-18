@@ -121,6 +121,7 @@ import { remoteAgentProfileRoutes } from "./routes/remote-agent-profiles.js";
 import { pluginUiStaticRoutes } from "./routes/plugin-ui-static.js";
 import { injectCloudUiSnippet } from "./cloud-ui-snippet.js";
 import { readBrandedStaticIndexHtml } from "./static-index-html.js";
+import { isLandingEnabled, renderLandingPage } from "./landing-page.js";
 import { staticUiCacheControl } from "./static-ui-cache.js";
 import { applyUiBranding } from "./ui-branding.js";
 import { logger } from "./middleware/logger.js";
@@ -1014,6 +1015,14 @@ export async function createApp(
           immutable: true,
         }),
       );
+      // An opt-in public landing page owns `/` alone. `/index.html` and every
+      // other route keep serving the app shell above, so the SPA's entry
+      // points are untouched.
+      if (isLandingEnabled()) {
+        app.get("/", (_req, res) => {
+          res.type("html").set("Cache-Control", "no-cache").send(renderLandingPage());
+        });
+      }
       // Serve root/index through the same runtime HTML transform as SPA routes.
       app.get(["/", "/index.html"], (_req, res) => {
         res.type("html").set("Cache-Control", "no-cache").send(readBrandedStaticIndexHtml(uiDist));
