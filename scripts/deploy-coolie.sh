@@ -18,6 +18,7 @@
 #   COOLIE_DIR           deploy directory       (default: /opt/coolie)
 #   COOLIE_SERVICE       systemd unit           (default: coolie)
 #   COOLIE_PUBLIC_URL    public base URL        (default: https://xrobinai.cn)
+#   COOLIE_LEGACY_PATHS  retired paths to assert, space-separated (default: none)
 
 set -euo pipefail
 
@@ -59,6 +60,13 @@ BUILT_PACKAGES=(shared db adapter-utils plugins/sdk skills-catalog teams-catalog
 
 step() { printf '\n=== %s ===\n' "$1"; }
 die() { printf '\nFAIL: %s\n' "$1" >&2; exit 1; }
+
+# Paths this deployment has retired and must never serve again, space-separated.
+# Empty by default, because a retired path is a fact about one deployment and
+# not about this repo: hard-coding one here would fail a correct deploy on any
+# other instance, where the SPA fallback legitimately answers 200 for a path
+# nobody ever retired.
+COOLIE_LEGACY_PATHS="${COOLIE_LEGACY_PATHS:-}"
 
 step "preflight"
 SHA="$(git rev-parse --short HEAD)"
@@ -164,15 +172,21 @@ else
   echo "  WARN no ICP filing number configured on the host; skipping that check"
 fi
 
-# A path that used to host the retired app must stay gone, and must not silently
-# fall through to the SPA shell (which answers 200 for unknown routes). Probed
-# over the public scheme on purpose: over plain HTTP every path answers 308,
-# because Caddy's redirect to HTTPS runs before the site's own routes.
-LEGACY_CODE="$(curl -sS -m 20 -o /dev/null -w '%{http_code}' "${COOLIE_PUBLIC_URL}/digstaff/" || true)"
-case "$LEGACY_CODE" in
-  410|404) echo "  ok   legacy /digstaff/ returns ${LEGACY_CODE}" ;;
-  *) die "legacy /digstaff/ returned ${LEGACY_CODE}; it must be 410 or 404, not the app shell" ;;
-esac
+# Retired paths, when this deployment has declared any. Probed over the public
+# scheme on purpose: over plain HTTP every path answers 308, because Caddy's
+# redirect to HTTPS runs before the site's own routes, so an HTTP probe would
+# assert nothing about the route it names.
+if [ -n "$COOLIE_LEGACY_PATHS" ]; then
+  for retired in $COOLIE_LEGACY_PATHS; do
+    code="$(curl -sS -m 20 -o /dev/null -w '%{http_code}' "${COOLIE_PUBLIC_URL}${retired}" || true)"
+    case "$code" in
+      410|404) echo "  ok   retired ${retired} returns ${code}" ;;
+      *) die "retired ${retired} returned ${code}; it must be 404 or 410, not the app shell" ;;
+    esac
+  done
+else
+  echo "  skip no retired paths declared (set COOLIE_LEGACY_PATHS to assert some)"
+fi
 
 # www is a separate certificate and a separate site block; a regression there is
 # invisible unless something asks for it explicitly.
