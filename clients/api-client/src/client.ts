@@ -6,10 +6,14 @@ import {
   type Company,
   type CreateIssueInput,
   type DashboardSummary,
+  type ExecutionWorkspace,
+  type GetWorkspaceDiffParams,
   type Issue,
+  type IssueWorkProduct,
   type SessionUser,
   type VoiceDispatchInput,
   type VoiceDispatchResult,
+  type WorkspaceDiffResponse,
 } from "./types";
 
 export interface CoolieClientOptions {
@@ -40,14 +44,21 @@ export interface CoolieClientOptions {
 }
 
 export class CoolieApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly body?: unknown;
+
   constructor(
-    public readonly status: number,
+    status: number,
     message: string,
-    public readonly code?: string,
-    public readonly body?: unknown,
+    code?: string,
+    body?: unknown,
   ) {
     super(message);
     this.name = "CoolieApiError";
+    this.status = status;
+    this.code = code;
+    this.body = body;
   }
 }
 
@@ -208,6 +219,80 @@ export class CoolieClient {
         priority: input.priority,
       },
     );
+  }
+
+  // --- workspace diff (Top2 代码审查需求④) --------------------------------
+  /**
+   * 获取指定工作区的 Git Diff 差异 (支持 working-tree 或 head 视图)
+   */
+  async getWorkspaceDiff(params: GetWorkspaceDiffParams): Promise<WorkspaceDiffResponse> {
+    const { companyId, workspaceId, ...rest } = params;
+    try {
+      const res = await this.request<{ data?: WorkspaceDiffResponse } | WorkspaceDiffResponse>(
+        "POST",
+        `/api/plugins/paperclip.workspace-diff/data/workspace-diff`,
+        {
+          companyId,
+          params: {
+            companyId,
+            workspaceId,
+            ...rest,
+          },
+        },
+      );
+      if (isRecord(res) && "data" in res && res.data) {
+        return res.data as WorkspaceDiffResponse;
+      }
+      return res as WorkspaceDiffResponse;
+    } catch (err) {
+      if (err instanceof CoolieApiError && (err.status === 404 || err.status === 405)) {
+        // Fallback to /api/workspace-diff if routed through plugin scoped API
+        const res = await this.request<{ data?: WorkspaceDiffResponse } | WorkspaceDiffResponse>(
+          "POST",
+          `/api/plugins/paperclip.workspace-diff/api/workspace-diff`,
+          {
+            companyId,
+            workspaceId,
+            ...rest,
+          },
+        );
+        if (isRecord(res) && "data" in res && res.data) {
+          return res.data as WorkspaceDiffResponse;
+        }
+        return res as WorkspaceDiffResponse;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * 查询执行工作区列表 (可按 issueId 或 projectId 过滤)
+   */
+  async listExecutionWorkspaces(
+    companyId: string,
+    opts?: { issueId?: string; projectId?: string; status?: string },
+  ): Promise<ExecutionWorkspace[]> {
+    const q = new URLSearchParams();
+    if (opts?.issueId) q.set("issueId", opts.issueId);
+    if (opts?.projectId) q.set("projectId", opts.projectId);
+    if (opts?.status) q.set("status", opts.status);
+    const suffix = q.size > 0 ? `?${q.toString()}` : "";
+    const body = await this.request<ExecutionWorkspace[]>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/execution-workspaces${suffix}`,
+    );
+    return Array.isArray(body) ? body : [];
+  }
+
+  /**
+   * 查询指定工单的交付产物列表 (包含代码库工作区、原型、附件等)
+   */
+  async listWorkProducts(issueId: string): Promise<IssueWorkProduct[]> {
+    const body = await this.request<IssueWorkProduct[]>(
+      "GET",
+      `/api/issues/${encodeURIComponent(issueId)}/work-products`,
+    );
+    return Array.isArray(body) ? body : [];
   }
 }
 
