@@ -8,7 +8,7 @@
 
 ## 0. 一句话结论
 
-控制面的闭环、租户隔离、审批/预算闸门、本地与 sandbox 执行平面、本体的模型层与治理闸门、
+控制面的闭环、公司隔离、审批/预算闸门、本地与 sandbox 执行平面、本体的模型层与治理闸门、
 以及本体自治迁移——**这些是真的，有机制、有测试**。但三件事会让第一次真实交付失败：
 
 1. **灾难恢复不可操作**：备份能跑，恢复没有任何支持的路径；
@@ -152,7 +152,7 @@
   （`GraphStore.ts:2966-2970`），也没有 UI 消费它。
 - 视图的 focus 不往返：`saveView` 永远发 `config: {}`（`graph-view.tsx:1395`），
   打开时也只 `setChoice(picked.kind)`（`:1289`）。
-- **交换文档完整但没接出口**：`OntologyDocument.ts` 有规范化、指纹、租户解耦校验、
+- **交换文档完整但没接出口**：`OntologyDocument.ts` 有规范化、指纹、公司/身份解耦校验、
   显式属性顺序、一等端点，但 `src/` 里对它**零引用**——没有 export/import 路由、没有 viewer。
   "模型能不能离开实例"目前不能。
 - 缺：as-of 查询（`schema_version` 只是计数器，没有按版本读模型）、per-asset 信任/权威等级、
@@ -238,7 +238,7 @@
 
 - **控制面闭环**：公司/目标/组织树/任务单一 assignee + 原子 checkout/心跳/成本与硬停/审批
   （hire 审批、tool-action 人类专属裁定 `tool-action-review.ts:33-34`、issue review policy）。
-- **租户隔离是被机制强制的**：agent key 哈希存在、绑公司、跨公司硬拒
+- **公司隔离是被机制强制的**：agent key 哈希存在、绑公司、跨公司硬拒
   （`middleware/auth.ts:439`、`authorization.ts:1858-1863`）、可吊销、吊销后不参与查找。
 - **本地与 sandbox 执行平面成熟**（驱动契约、能力快照、同步语义、duplex 桥、调度都有测试）；
   SSH 的凭据即连契约有真 sshd fixture 测过。
@@ -424,7 +424,7 @@ experimental/plugins/adapters）、公司设置（members/access/invites/secrets
 2. **实例运维页**：备份列表与**恢复**（备份现在只有触发端点，**没有 restore**）、迁移已应用状态、
    后台作业/调度器状态、遥测开关、健康详情、日志保留。这一块和 §2.4 是同一批缺口，
    但没有页面把它们聚起来。
-3. **租户生命周期**：按**模板**开客户（现成的 `CompanyExport` / `CompanyImport` 就是底子）、
+3. **公司生命周期**：按**模板**开客户（现成的 `CompanyExport` / `CompanyImport` 就是底子）、
    暂停（不删）/归档/配额。**注意**：不能直接用删公司来实现"退租"——那会连带删掉该公司的
    activity log（`services/companies.ts:539`），该先归档。
 4. **跨客户审计与读审计**：审计中枢是**按公司**的；没有跨客户视图；"谁读了什么"完全不存在
