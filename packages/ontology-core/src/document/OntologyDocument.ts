@@ -35,6 +35,7 @@
  */
 import { createHash } from "node:crypto";
 import { LINK_CARDINALITIES, type LinkCardinality } from "../enums.js";
+import { orderPropertyNames, propertyOrderSource } from "../propertyOrder.js";
 
 export const DOCUMENT_FORMAT = "paperclip.ontology/1";
 
@@ -357,16 +358,9 @@ function orderProperties(
   problems: DocumentProblem[],
   typeKey: string,
 ): DocumentObjectType["properties"] {
-  const names = Object.keys(schema);
-  // A partial declaration is honoured as a prefix and the remainder is SORTED,
-  // not left in map order: `jsonb` returns keys in no particular order, so leaving
-  // them as-is would present an arbitrary sequence as if it were the source's.
-  const ordered = declared
-    ? [
-        ...declared.filter((name) => names.includes(name)),
-        ...names.filter((name) => !declared.includes(name)).sort(),
-      ]
-    : [...names].sort();
+  // The sequencing rule lives in `propertyOrder.ts`, shared with the workbench,
+  // so the document and the Schema page cannot order the same schema differently.
+  const ordered = orderPropertyNames(Object.keys(schema), declared ?? []);
 
   return ordered.map((name) => {
     const raw = schema[name];
@@ -428,7 +422,7 @@ export function documentFromRows(rows: DocumentSourceRows): RowsResult {
         ...(type.description ? { description: type.description } : {}),
         // Storage is jsonb, which does not preserve key order. Saying "sorted"
         // is honest; presenting the map's arbitrary order as the source's would not be.
-        orderSource: declared ? ("declared" as const) : ("sorted" as const),
+        orderSource: propertyOrderSource(declared ?? []),
         properties: orderProperties(schema, declared, problems, type.key),
       };
     }),
