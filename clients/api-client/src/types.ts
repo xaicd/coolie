@@ -68,3 +68,152 @@ export interface VoiceDispatchResult {
 export const ASR_NOT_CONFIGURED = "ASR_NOT_CONFIGURED";
 
 export const MULTIMODAL_PLUGIN_ID = "paperclipai.plugin-multimodal";
+
+// --- Cockpit Efficiency Metrics (需求②⑥⑦⑧⑨⑩) ---
+
+/** 额度指标: budget_monthly_cents vs spent_monthly_cents (需求②) */
+export interface QuotaMetric {
+  budgetMonthlyCents: number;
+  spentMonthlyCents: number;
+  costEventsSpendCents: number;
+  utilizationPercent: number;
+  remainingCents: number;
+}
+
+/** 任务进度与状态分布 (需求⑥) */
+export interface ProgressMetric {
+  total: number;
+  open: number;
+  inProgress: number;
+  blocked: number;
+  done: number;
+  cancelled: number;
+  byStatus: Record<string, number>;
+  completionRatePercent: number;
+}
+
+/** 智能体心跳与空闲明细 (需求⑦) */
+export interface AgentHeartbeatInfo {
+  id: string;
+  name: string;
+  role: string;
+  title: string | null;
+  status: string;
+  lastHeartbeatAt: string | null;
+  idleSeconds: number | null;
+}
+
+/** 空闲度指标: agent last_heartbeat距今 (需求⑦) */
+export interface IdleMetric {
+  totalAgents: number;
+  activeCount: number;
+  idleCount: number;
+  pausedCount: number;
+  errorCount: number;
+  agents: AgentHeartbeatInfo[];
+}
+
+/** 交付周期耗时分桶 (需求⑧) */
+export interface DeliveryCycleBucket {
+  label: string;
+  minSec: number;
+  maxSec: number | null;
+  count: number;
+  percent: number;
+}
+
+/** 交付周期指标: issue创建到done时长分布 (需求⑧) */
+export interface DeliveryCycleMetric {
+  count: number;
+  avgSeconds: number;
+  medianSeconds: number;
+  p90Seconds: number;
+  minSeconds: number;
+  maxSeconds: number;
+  buckets: DeliveryCycleBucket[];
+}
+
+export interface DailyThroughput {
+  date: string;
+  completed: number;
+  created: number;
+}
+
+/** 车间效率指标: 吞吐速率与产出 (需求⑨) */
+export interface EfficiencyMetric {
+  completedTasks24h: number;
+  completedTasks7d: number;
+  completedTasks30d: number;
+  createdTasks24h: number;
+  createdTasks7d: number;
+  createdTasks30d: number;
+  velocityPerDay: number;
+  dailyThroughput: DailyThroughput[];
+}
+
+/** 失败率指标: cancelled + error 占比 (需求⑩) */
+export interface FailureRateMetric {
+  totalTasks: number;
+  cancelledTasks: number;
+  taskFailureRatePercent: number;
+  totalRuns: number;
+  failedRuns: number;
+  recoveredRuns: number;
+  runFailureRatePercent: number;
+  overallFailureRatePercent: number;
+}
+
+/** 驾驶舱六大效能指标集合 */
+export interface CockpitDashboardMetrics {
+  quota: QuotaMetric;
+  progress: ProgressMetric;
+  idle: IdleMetric;
+  deliveryCycle: DeliveryCycleMetric;
+  efficiency: EfficiencyMetric;
+  failureRate: FailureRateMetric;
+}
+
+/** 服务端 /api/companies/:companyId/dashboard 聚合响应 */
+export interface DashboardSummary {
+  companyId: string;
+  agents: {
+    active: number;
+    running: number;
+    paused: number;
+    error: number;
+  };
+  tasks: {
+    open: number;
+    inProgress: number;
+    blocked: number;
+    done: number;
+  };
+  costs: {
+    monthSpendCents: number;
+    monthBudgetCents: number;
+    monthUtilizationPercent: number;
+  };
+  pendingApprovals: number;
+  budgets: {
+    activeIncidents: number;
+    pendingApprovals: number;
+    pausedAgents: number;
+    pausedProjects: number;
+  };
+  runActivity: Array<{
+    date: string;
+    succeeded: number;
+    failed: number;
+    recovered: number;
+    other: number;
+    total: number;
+    failedByErrorCode: Record<string, number>;
+  }>;
+  quota: QuotaMetric;
+  progress: ProgressMetric;
+  idle: IdleMetric;
+  deliveryCycle: DeliveryCycleMetric;
+  efficiency: EfficiencyMetric;
+  failureRate: FailureRateMetric;
+  metrics: CockpitDashboardMetrics;
+}

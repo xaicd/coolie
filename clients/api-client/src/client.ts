@@ -2,8 +2,10 @@ import {
   ASR_NOT_CONFIGURED,
   MULTIMODAL_PLUGIN_ID,
   type AgentIdentity,
+  type CockpitDashboardMetrics,
   type Company,
   type CreateIssueInput,
+  type DashboardSummary,
   type Issue,
   type SessionUser,
   type VoiceDispatchInput,
@@ -165,6 +167,27 @@ export class CoolieClient {
       fields,
     );
     return isRecord(body) && "issue" in body ? (body.issue as Issue) : (body as Issue);
+  }
+
+  // --- dashboard & efficiency telemetry (Top1 驾驶舱) --------------------
+  /**
+   * 获取公司效能大盘摘要，内含六大指标 (额度/进度/空闲度/交付周期/车间效率/失败率)
+   */
+  getDashboard(companyId: string): Promise<DashboardSummary> {
+    return this.request<DashboardSummary>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/dashboard`,
+    );
+  }
+
+  /**
+   * 获取公司驾驶舱专用六大指标卡片数据包
+   */
+  getCockpitMetrics(companyId: string): Promise<CockpitDashboardMetrics> {
+    return this.request<CockpitDashboardMetrics>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/metrics/cockpit`,
+    );
   }
 
   // --- voice dispatch -----------------------------------------------------
