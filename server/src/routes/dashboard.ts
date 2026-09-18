@@ -31,6 +31,13 @@ export function dashboardRoutes(db: Db) {
     res.json(summary);
   });
 
+  router.get("/companies/:companyId/metrics/cockpit", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    assertCompanyAccess(req, companyId);
+    const summary = await svc.summary(companyId);
+    res.json(summary.metrics);
+  });
+
   router.get("/companies/:companyId/recovery-observability", async (req, res) => {
     const companyId = req.params.companyId as string;
     assertCompanyAccess(req, companyId);

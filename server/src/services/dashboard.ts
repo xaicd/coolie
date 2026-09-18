@@ -185,6 +185,284 @@ export function dashboardService(db: Db) {
           : 0;
       const budgetOverview = await budgets.overview(companyId);
 
+      // --- Top1 驾驶舱效能指标 (需求②⑥⑦⑧⑨⑩) ---
+      // 1. 员工空闲度 (需求⑦: agent last_heartbeat距今)
+      const companyAgentList = await db
+        .select({
+          id: agents.id,
+          name: agents.name,
+          role: agents.role,
+          title: agents.title,
+          status: agents.status,
+          lastHeartbeatAt: agents.lastHeartbeatAt,
+        })
+        .from(agents)
+        .where(eq(agents.companyId, companyId));
+
+      let activeAgentsCount = 0;
+      let idleAgentsCount = 0;
+      let pausedAgentsCount = 0;
+      let errorAgentsCount = 0;
+
+      const agentDetails = companyAgentList.map((ag) => {
+        const lastHb = ag.lastHeartbeatAt ? new Date(ag.lastHeartbeatAt) : null;
+        const idleSec =
+          lastHb ? Math.max(0, Math.floor((now.getTime() - lastHb.getTime()) / 1000)) : null;
+
+        if (ag.status === "paused") {
+          pausedAgentsCount++;
+        } else if (ag.status === "error") {
+          errorAgentsCount++;
+        } else if (ag.status === "running" || (idleSec !== null && idleSec < 300)) {
+          activeAgentsCount++;
+        } else {
+          idleAgentsCount++;
+        }
+
+        return {
+          id: ag.id,
+          name: ag.name,
+          role: ag.role,
+          title: ag.title ?? null,
+          status: ag.status,
+          lastHeartbeatAt: ag.lastHeartbeatAt ? ag.lastHeartbeatAt.toISOString() : null,
+          idleSeconds: idleSec,
+        };
+      });
+
+      // 2. 工单进度 & 状态分布 (需求⑥)
+      const tasksByStatus: Record<string, number> = {
+        backlog: 0,
+        todo: 0,
+        in_progress: 0,
+        in_review: 0,
+        blocked: 0,
+        done: 0,
+        cancelled: 0,
+      };
+      let totalTasks = 0;
+      for (const row of taskRows) {
+        const count = Number(row.count);
+        tasksByStatus[row.status] = (tasksByStatus[row.status] ?? 0) + count;
+        totalTasks += count;
+      }
+      const cancelledTasks = tasksByStatus.cancelled ?? 0;
+
+      // 3. 交付周期 (需求⑧: issue创建到done时长分布)
+      const doneIssueRows = await db
+        .select({
+          id: issues.id,
+          createdAt: issues.createdAt,
+          completedAt: issues.completedAt,
+          updatedAt: issues.updatedAt,
+        })
+        .from(issues)
+        .where(
+          and(
+            eq(issues.companyId, companyId),
+            eq(issues.status, "done"),
+            executionIssueCondition(),
+          ),
+        );
+
+      const nowMs = now.getTime();
+      const ms24h = 24 * 3600 * 1000;
+      const ms7d = 7 * 24 * 3600 * 1000;
+      const ms30d = 30 * 24 * 3600 * 1000;
+
+      const leadTimesSec: number[] = [];
+      const dailyCompletedMap: Record<string, number> = {};
+      let completedPast24h = 0;
+      let completedPast7d = 0;
+      let completedPast30d = 0;
+
+      for (const row of doneIssueRows) {
+        const finishDate = row.completedAt ? new Date(row.completedAt) : new Date(row.updatedAt);
+        const finishMs = finishDate.getTime();
+        const createMs = new Date(row.createdAt).getTime();
+        const diffSec = Math.max(0, Math.floor((finishMs - createMs) / 1000));
+        leadTimesSec.push(diffSec);
+
+        const ageMs = nowMs - finishMs;
+        if (ageMs <= ms24h && ageMs >= 0) completedPast24h++;
+        if (ageMs <= ms7d && ageMs >= 0) completedPast7d++;
+        if (ageMs <= ms30d && ageMs >= 0) completedPast30d++;
+
+        const dateKey = formatUtcDateKey(finishDate);
+        dailyCompletedMap[dateKey] = (dailyCompletedMap[dateKey] ?? 0) + 1;
+      }
+
+      leadTimesSec.sort((a, b) => a - b);
+      const doneCount = leadTimesSec.length;
+      let avgLeadSec = 0;
+      let medianLeadSec = 0;
+      let p90LeadSec = 0;
+      let minLeadSec = 0;
+      let maxLeadSec = 0;
+
+      if (doneCount > 0) {
+        avgLeadSec = Math.round(leadTimesSec.reduce((a, b) => a + b, 0) / doneCount);
+        minLeadSec = leadTimesSec[0];
+        maxLeadSec = leadTimesSec[doneCount - 1];
+        medianLeadSec = leadTimesSec[Math.floor(doneCount * 0.5)];
+        p90LeadSec = leadTimesSec[Math.floor(doneCount * 0.9)];
+      }
+
+      const bucketSpecs: Array<{ label: string; minSec: number; maxSec: number | null }> = [
+        { label: "< 1小时", minSec: 0, maxSec: 3600 },
+        { label: "1-4小时", minSec: 3600, maxSec: 14400 },
+        { label: "4-24小时", minSec: 14400, maxSec: 86400 },
+        { label: "1-3天", minSec: 86400, maxSec: 259200 },
+        { label: "> 3天", minSec: 259200, maxSec: null },
+      ];
+
+      const deliveryBuckets = bucketSpecs.map((spec) => {
+        const count = leadTimesSec.filter((sec) => {
+          if (spec.maxSec === null) return sec >= spec.minSec;
+          return sec >= spec.minSec && sec < spec.maxSec;
+        }).length;
+        const percent = doneCount > 0 ? Number(((count / doneCount) * 100).toFixed(1)) : 0;
+        return {
+          label: spec.label,
+          minSec: spec.minSec,
+          maxSec: spec.maxSec,
+          count,
+          percent,
+        };
+      });
+
+      // 4. 车间效率 (需求⑨: 吞吐速率与产出)
+      const createdIssueRows = await db
+        .select({
+          createdAt: issues.createdAt,
+        })
+        .from(issues)
+        .where(
+          and(
+            eq(issues.companyId, companyId),
+            gte(issues.createdAt, runActivityStart),
+            executionIssueCondition(),
+          ),
+        );
+
+      const dailyCreatedMap: Record<string, number> = {};
+      let createdPast24h = 0;
+      let createdPast7d = 0;
+      let createdPast30d = 0;
+
+      for (const row of createdIssueRows) {
+        const createdDate = new Date(row.createdAt);
+        const dateKey = formatUtcDateKey(createdDate);
+        dailyCreatedMap[dateKey] = (dailyCreatedMap[dateKey] ?? 0) + 1;
+        const ageMs = nowMs - createdDate.getTime();
+        if (ageMs <= ms24h && ageMs >= 0) createdPast24h++;
+        if (ageMs <= ms7d && ageMs >= 0) createdPast7d++;
+        if (ageMs <= ms30d && ageMs >= 0) createdPast30d++;
+      }
+
+      const dailyThroughput = runActivityDays.map((dateKey) => ({
+        date: dateKey,
+        completed: dailyCompletedMap[dateKey] ?? 0,
+        created: dailyCreatedMap[dateKey] ?? 0,
+      }));
+
+      // 5. 失败率 (需求⑩: cancelled+error 占比)
+      const taskFailureRatePercent =
+        totalTasks > 0 ? Number(((cancelledTasks / totalTasks) * 100).toFixed(1)) : 0;
+
+      let totalRuns = 0;
+      let failedRuns = 0;
+      let recoveredRuns = 0;
+      for (const b of runActivity.values()) {
+        totalRuns += b.total;
+        failedRuns += b.failed;
+        recoveredRuns += b.recovered;
+      }
+      const runFailureRatePercent =
+        totalRuns > 0 ? Number(((failedRuns / totalRuns) * 100).toFixed(1)) : 0;
+
+      const totalOperations = totalTasks + totalRuns;
+      const failureOperations = cancelledTasks + failedRuns;
+      const overallFailureRatePercent =
+        totalOperations > 0 ? Number(((failureOperations / totalOperations) * 100).toFixed(1)) : 0;
+
+      // 6. 额度 (需求②: budget_monthly_cents vs spent_monthly_cents)
+      const quota = {
+        budgetMonthlyCents: company.budgetMonthlyCents ?? 0,
+        spentMonthlyCents: company.spentMonthlyCents ?? 0,
+        costEventsSpendCents: monthSpendCents,
+        utilizationPercent:
+          company.budgetMonthlyCents > 0
+            ? Number(((company.spentMonthlyCents / company.budgetMonthlyCents) * 100).toFixed(1))
+            : 0,
+        remainingCents: Math.max(
+          0,
+          (company.budgetMonthlyCents ?? 0) - (company.spentMonthlyCents ?? 0),
+        ),
+      };
+
+      const progress = {
+        total: totalTasks,
+        open: taskCounts.open,
+        inProgress: taskCounts.inProgress,
+        blocked: taskCounts.blocked,
+        done: taskCounts.done,
+        cancelled: cancelledTasks,
+        byStatus: tasksByStatus,
+        completionRatePercent:
+          totalTasks > 0 ? Number(((taskCounts.done / totalTasks) * 100).toFixed(1)) : 0,
+      };
+
+      const idle = {
+        totalAgents: companyAgentList.length,
+        activeCount: activeAgentsCount,
+        idleCount: idleAgentsCount,
+        pausedCount: pausedAgentsCount,
+        errorCount: errorAgentsCount,
+        agents: agentDetails,
+      };
+
+      const deliveryCycle = {
+        count: doneCount,
+        avgSeconds: avgLeadSec,
+        medianSeconds: medianLeadSec,
+        p90Seconds: p90LeadSec,
+        minSeconds: minLeadSec,
+        maxSeconds: maxLeadSec,
+        buckets: deliveryBuckets,
+      };
+
+      const efficiency = {
+        completedTasks24h: completedPast24h,
+        completedTasks7d: completedPast7d,
+        completedTasks30d: completedPast30d,
+        createdTasks24h: createdPast24h,
+        createdTasks7d: createdPast7d,
+        createdTasks30d: createdPast30d,
+        velocityPerDay: Number((completedPast7d / 7).toFixed(1)),
+        dailyThroughput,
+      };
+
+      const failureRate = {
+        totalTasks,
+        cancelledTasks,
+        taskFailureRatePercent,
+        totalRuns,
+        failedRuns,
+        recoveredRuns,
+        runFailureRatePercent,
+        overallFailureRatePercent,
+      };
+
+      const metrics = {
+        quota,
+        progress,
+        idle,
+        deliveryCycle,
+        efficiency,
+        failureRate,
+      };
+
       return {
         companyId,
         agents: {
@@ -207,6 +485,13 @@ export function dashboardService(db: Db) {
           pausedProjects: budgetOverview.pausedProjectCount,
         },
         runActivity: Array.from(runActivity.values()),
+        quota,
+        progress,
+        idle,
+        deliveryCycle,
+        efficiency,
+        failureRate,
+        metrics,
       };
     },
   };

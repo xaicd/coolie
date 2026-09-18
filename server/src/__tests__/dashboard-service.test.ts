@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { agents, companies, createDb, heartbeatRuns } from "@paperclipai/db";
+import { agents, companies, createDb, heartbeatRuns, issues } from "@paperclipai/db";
 import {
   getEmbeddedPostgresTestSupport,
   startEmbeddedPostgresTestDatabase,
@@ -48,6 +48,7 @@ describeEmbeddedPostgres("dashboard service", () => {
 
   afterEach(async () => {
     await db.delete(heartbeatRuns);
+    await db.delete(issues);
     await db.delete(agents);
     await db.delete(companies);
   });
@@ -236,5 +237,105 @@ describeEmbeddedPostgres("dashboard service", () => {
     });
     // process_lost kills that recovered must not leak into the failed breakdown.
     expect(bucket?.failedByErrorCode.process_lost).toBeUndefined();
+  });
+
+  it("computes cockpit efficiency metrics: quota, progress, idle, deliveryCycle, efficiency, failureRate", async () => {
+    const companyId = randomUUID();
+    const agentId = randomUUID();
+    const now = new Date();
+    const twoHoursAgo = new Date(now.getTime() - 2 * 3600 * 1000);
+    const threeHoursAgo = new Date(now.getTime() - 3 * 3600 * 1000);
+
+    await db.insert(companies).values({
+      id: companyId,
+      name: "Cockpit Corp",
+      issuePrefix: `C${companyId.replace(/-/g, "").slice(0, 5).toUpperCase()}`,
+      budgetMonthlyCents: 50000,
+      spentMonthlyCents: 12500,
+      requireBoardApprovalForNewAgents: false,
+    });
+
+    await db.insert(agents).values({
+      id: agentId,
+      companyId,
+      name: "PilotAgent",
+      role: "specialist",
+      status: "running",
+      lastHeartbeatAt: twoHoursAgo,
+      adapterType: "codex_local",
+      adapterConfig: {},
+      runtimeConfig: {},
+      permissions: {},
+    });
+
+    await db.insert(issues).values([
+      {
+        id: randomUUID(),
+        companyId,
+        title: "Done Task 1",
+        status: "done",
+        createdAt: threeHoursAgo,
+        completedAt: twoHoursAgo,
+      },
+      {
+        id: randomUUID(),
+        companyId,
+        title: "Cancelled Task 2",
+        status: "cancelled",
+        createdAt: threeHoursAgo,
+      },
+      {
+        id: randomUUID(),
+        companyId,
+        title: "In Progress Task 3",
+        status: "in_progress",
+        createdAt: threeHoursAgo,
+      },
+    ]);
+
+    const summary = await dashboardService(db).summary(companyId);
+
+    // 1. Quota
+    expect(summary.quota).toMatchObject({
+      budgetMonthlyCents: 50000,
+      spentMonthlyCents: 12500,
+      utilizationPercent: 25,
+      remainingCents: 37500,
+    });
+
+    // 2. Progress
+    expect(summary.progress).toMatchObject({
+      total: 3,
+      done: 1,
+      cancelled: 1,
+      inProgress: 1,
+      completionRatePercent: 33.3,
+    });
+
+    // 3. Idle
+    expect(summary.idle.totalAgents).toBe(1);
+    expect(summary.idle.agents[0]).toMatchObject({
+      name: "PilotAgent",
+      status: "running",
+    });
+    expect(summary.idle.agents[0].idleSeconds).toBeGreaterThan(7000);
+
+    // 4. Delivery cycle (1 done task, 1 hour = 3600 sec)
+    expect(summary.deliveryCycle.count).toBe(1);
+    expect(summary.deliveryCycle.avgSeconds).toBe(3600);
+    expect(summary.deliveryCycle.buckets.find((b) => b.label === "1-4小时")?.count).toBe(1);
+
+    // 5. Efficiency
+    expect(summary.efficiency.completedTasks24h).toBe(1);
+
+    // 6. Failure rate (1 cancelled out of 3 total)
+    expect(summary.failureRate.totalTasks).toBe(3);
+    expect(summary.failureRate.cancelledTasks).toBe(1);
+    expect(summary.failureRate.taskFailureRatePercent).toBe(33.3);
+
+    // 7. Metrics object bundle
+    expect(summary.metrics).toBeDefined();
+    expect(summary.metrics.quota).toEqual(summary.quota);
+    expect(summary.metrics.deliveryCycle).toEqual(summary.deliveryCycle);
   });
 });

@@ -53,7 +53,7 @@
       "path": "scripts/fork-surface.json",
       "maxNetLines": 200,
       "reason": "This manifest itself, and entirely ours — it does not exist upstream. It sits under scripts/ only because that is where the gate is wired (package.json and check-testing-defenses.mjs call it), and that path prefix is the only reason the gate asks about it. The budget is loose on purpose: the file grows by one entry per upstream file we intentionally change, and that growth is the file working, not creep.",
-      "maxTotalLines": 320
+      "maxTotalLines": 360
     },
     {
       "path": "ui/index.html",
@@ -210,6 +210,24 @@
       "maxNetLines": 0,
       "reason": "Screenshot evidence for the Expo sign-in screen. A binary, so it counts zero lines; it is declared only because upstream owns the `screenshots/` directory. New evidence should go under `docs-coolie/` instead, which is ours, rather than growing this entry list one image at a time.",
       "maxTotalLines": 0
+    },
+    {
+      "path": "server/src/services/dashboard.ts",
+      "maxNetLines": 320,
+      "reason": "Expand dashboard service with cockpit efficiency metrics: lead time distribution, task progress & failure rate, agent idle duration, workshop throughput, and budget vs monthly spend telemetry.",
+      "maxTotalLines": 350
+    },
+    {
+      "path": "server/src/routes/dashboard.ts",
+      "maxNetLines": 20,
+      "reason": "Expose GET /api/companies/:companyId/metrics/cockpit returning dedicated cockpit metrics bundle.",
+      "maxTotalLines": 30
+    },
+    {
+      "path": "server/src/__tests__/dashboard-service.test.ts",
+      "maxNetLines": 120,
+      "reason": "Unit tests covering cockpit efficiency metrics: quota, progress, idle, deliveryCycle, efficiency, and failureRate.",
+      "maxTotalLines": 140
     }
   ]
 }
