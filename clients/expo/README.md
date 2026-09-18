@@ -40,6 +40,37 @@ editing code:
 EXPO_PUBLIC_COOLIE_BASE_URL=http://my-instance:3100 pnpm start
 ```
 
+## Install it on a device
+
+Builds run locally; no EAS project is configured.
+
+```sh
+cd clients/expo
+npx expo prebuild --platform ios   # generates ios/ (gitignored — never edit it by hand)
+npx expo run:ios                   # build + install + launch on a simulator
+npx expo run:ios --device          # same, on a plugged-in iPhone
+```
+
+- **Simulator:** needs only Xcode and CocoaPods.
+- **Physical iPhone:** needs a signing identity. This machine has
+  `Apple Development: wei chen (M8BJTC24K4)`, and the phone must be registered in that
+  profile — plug it in and let Xcode resolve signing once. An install that does not go
+  through a cable (or a shared device) needs an ad-hoc/IPA export with the distribution
+  identity instead.
+- **Android:** not set up on this machine (no JDK, no Android SDK), so no APK is produced.
+
+### Plain HTTP and iOS App Transport Security
+
+Prebuild writes `NSAllowsArbitraryLoads=false` with `NSAllowsLocalNetworking=true`: plain
+HTTP to a **private LAN address** is allowed (`192.168.x.x` — this machine is
+`192.168.3.85`), but that is not promised for a Tailscale address, because `100.x` is
+CGNAT rather than RFC1918. So:
+
+- phone on the same Wi-Fi: `EXPO_PUBLIC_COOLIE_BASE_URL=http://192.168.3.85:3100`
+- phone on the tailnet over plain HTTP: may fail at sign-in with a network error. Give the
+  instance HTTPS (which production needs anyway) rather than weakening ATS in a build that
+  reaches a customer.
+
 ## What works / TODO
 
 - ✅ Installs, typechecks and bundles from a clean checkout (`pnpm typecheck`,
@@ -53,13 +84,15 @@ EXPO_PUBLIC_COOLIE_BASE_URL=http://my-instance:3100 pnpm start
   cannot even list companies (that route is board-only and answers 403).
 - ✅ Task list, **task detail** (tap a row), create task with title, optional description
   and priority.
-- ❌ **Voice dispatch fails, and it is not a bug in this app.** The route it calls
-  (`POST /api/plugins/paperclipai.plugin-multimodal/api/transcriptions`) is declared
-  with the manifest default `auth: "board"` and the host enforces `assertBoard` on it,
-  while the app sends an **agent** key: measured `403 Board access required` against the
-  live instance. Fix either by relaxing that route to `board-or-agent` or by signing in
-  as a session. Recording itself (`expo-av` → base64) is wired but has never been
-  exercised on a device.
+- ⚠️ **Voice dispatch is wired end to end; it needs the instance's ASR credentials.**
+  The route it calls (`POST /api/plugins/paperclipai.plugin-multimodal/api/transcriptions`)
+  used to answer `403 Board access required` to an agent key — the plugin declared it with
+  the manifest's POST default of `auth: "board"` while the clients authenticate with agent
+  keys. That declaration is now `board-or-agent`, and the same request from the same key
+  answers **`501 ASR_NOT_CONFIGURED`**: authentication and company access pass, and what
+  remains is that the instance has no Tencent Cloud ASR credentials configured for the
+  company. Once an operator sets them, this returns a transcription and a created task.
+  Recording itself (`expo-av` → base64) is wired but has never been exercised on a device.
 - ⏳ TODO: **navigation library** (the screen is chosen from state, so there is no back
   stack and no deep linking, and `app.json`'s `coolie` scheme is declared but unused),
   email/password session sign-in, push/live updates, enforcing the Tencent limits
