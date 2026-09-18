@@ -31,6 +31,11 @@ export function useStreamlinedUiEnabled(): { enabled: boolean; loaded: boolean }
       queryKey: queryKeys.instance.experimentalSettings,
       queryFn: () => instanceSettingsApi.getExperimental(),
       enabled: contextClient != null,
+      // A signed-out visitor on a protected route gets 401/403 here. Without
+      // this, the default retry backoff keeps `loaded` false for seconds and
+      // the shell holds on a loading state; the endpoint is read-only and the
+      // resolver already fails open, so one attempt is enough.
+      retry: false,
     },
     contextClient ?? getDetachedClient(),
   );
