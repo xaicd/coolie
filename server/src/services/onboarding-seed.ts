@@ -33,9 +33,54 @@ const SEEDED_AGENT_ROLE = "ceo";
  */
 const FALLBACK_SEEDED_AGENT_ADAPTER_TYPE = "claude_local";
 
-function seededAgentAdapterType() {
+/**
+ * Probe order for first-run environment detection. Hermes comes first for the
+ * fork's China-route deployment (zai/kimi/minimax-cn/deepseek keys live in
+ * ~/.hermes/.env and need no OpenAI/Anthropic credentials at all); the
+ * upstream locals follow. Each candidate is probed with its own
+ * `testEnvironment` so a probe pass means the CLI + model + API key are all
+ * already working on this machine.
+ */
+const SEED_ADAPTER_PROBE_ORDER = [
+  "hermes_local",
+  "claude_local",
+  "codex_local",
+  "gemini_local",
+  "kimi_local",
+  "opencode_local",
+] as const;
+
+/**
+ * Detect an already-installed, already-authenticated local agent CLI to seed
+ * the first agent with. Returns null when no candidate passes its environment
+ * test (caller falls back to FALLBACK_SEEDED_AGENT_ADAPTER_TYPE).
+ *
+ * A `warn` result still means the CLI is installed and usable (warnings are
+ * advisory, e.g. "model not set"); only `fail` means unusable. First hit in
+ * probe order wins, so an explicit operator override stays authoritative.
+ */
+export async function detectSeedAdapterType(): Promise<string | null> {
+  for (const type of SEED_ADAPTER_PROBE_ORDER) {
+    const adapter = findActiveServerAdapter(type);
+    if (!adapter?.testEnvironment) continue;
+    try {
+      const result = await adapter.testEnvironment({
+        companyId: "onboarding-seed-probe",
+        adapterType: type,
+        config: {},
+      });
+      if (result.status !== "fail") return type;
+    } catch {
+      // Adapter probe threw — treat as unusable and keep probing.
+    }
+  }
+  return null;
+}
+
+function seededAgentAdapterType(detected?: string | null) {
   const configured = process.env.PAPERCLIP_ONBOARDING_SEED_ADAPTER_TYPE?.trim()
     || process.env.PAPERCLIP_TEAMS_CATALOG_DEFAULT_ADAPTER_TYPE?.trim()
+    || detected
     || FALLBACK_SEEDED_AGENT_ADAPTER_TYPE;
   // Server-seeded onboarding deliberately stays on a direct adapter. Native
   // runner rollout is an explicit post-onboarding configuration choice.
@@ -243,7 +288,18 @@ export function onboardingSeedService(db: Db) {
       if (agentId) {
         await agentSvc.update(agentId, { name: agentName, title: agentRole });
       } else {
-        const adapterType = seededAgentAdapterType();
+        // First-run detection: if an operator did not pin an adapter type,
+        // probe the host for an already-installed agent CLI (Hermes first —
+        // China route) and seed the first agent with whichever local runtime
+        // is already authenticated on this machine.
+        let detected: string | null = null;
+        const overridePresent =
+          !!process.env.PAPERCLIP_ONBOARDING_SEED_ADAPTER_TYPE?.trim()
+          || !!process.env.PAPERCLIP_TEAMS_CATALOG_DEFAULT_ADAPTER_TYPE?.trim();
+        if (!overridePresent) {
+          detected = await detectSeedAdapterType();
+        }
+        const adapterType = seededAgentAdapterType(detected);
         const created = await agentSvc.create(companyId, {
           name: agentName,
           role: SEEDED_AGENT_ROLE,

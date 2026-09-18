@@ -13,6 +13,7 @@ import type {
 
 import { execFile } from "node:child_process";
 import { readFileSync } from "node:fs";
+import { realpathSync } from "node:fs";
 import { promisify } from "node:util";
 
 import { HERMES_CLI, DEFAULT_MODEL, ADAPTER_TYPE, VALID_PROVIDERS } from "../shared/constants.js";
@@ -34,7 +35,7 @@ async function checkCliInstalled(
 ): Promise<AdapterEnvironmentCheck | null> {
   try {
     // Try to run the command to see if it exists
-    await execFileAsync(command, ["--version"], { timeout: 10_000 });
+    await execFileAsync(await resolveCommandPath(command), ["--version"], { timeout: 10_000 });
     return null; // OK — it ran successfully
   } catch (err: unknown) {
     const e = err as NodeJS.ErrnoException;
@@ -56,7 +57,7 @@ async function checkCliVersion(
   command: string,
 ): Promise<AdapterEnvironmentCheck | null> {
   try {
-    const { stdout } = await execFileAsync(command, ["--version"], {
+    const { stdout } = await execFileAsync(await resolveCommandPath(command), ["--version"], {
       timeout: 10_000,
     });
     const version = stdout.trim();
@@ -83,9 +84,74 @@ async function checkCliVersion(
   }
 }
 
-async function checkPython(): Promise<AdapterEnvironmentCheck | null> {
+/**
+ * Resolve the Python interpreter the Hermes launcher actually uses, before
+ * falling back to a bare `python3` PATH lookup.
+ *
+ * Hermes's supported install is a launcher script that execs the Python
+ * bundled in its own venv (e.g. ~/.hermes/hermes-agent/venv/bin/python,
+ * currently 3.11.x) — which is frequently newer than the system python3
+ * (macOS still ships 3.9). Probing bare `python3` therefore reports a false
+ * `hermes_python_old` error on healthy installs. Parse the launcher's exec
+ * line instead, and only fall back to PATH when that fails.
+ */
+/**
+ * Resolve a bare command name (e.g. "hermes") to an absolute path via
+ * `which`, so the launcher script can be read even when it lives outside the
+ * server process PATH (systemd units see /usr/bin:/bin only; hermes installs
+ * to ~/.local/bin).
+ */
+async function resolveCommandPath(command: string): Promise<string> {
+  if (command.includes("/")) return command;
   try {
-    const { stdout } = await execFileAsync("python3", ["--version"], {
+    const { stdout } = await execFileAsync("which", [command], {
+      timeout: 5_000,
+      env: {
+        ...process.env,
+        // Include the common user-local bin dirs that systemd units miss.
+        PATH: `${process.env.PATH ?? ""}:${[
+          process.env.HOME,
+          "/root",
+          "/home/ubuntu",
+        ]
+          .filter(Boolean)
+          .map((h) => `${h}/.local/bin`)
+          .join(":")}`,
+      },
+    });
+    const resolved = stdout.trim().split("\n")[0];
+    return resolved || command;
+  } catch {
+    return command;
+  }
+}
+
+async function resolveHermesPython(
+  command: string,
+): Promise<{ python: string; source: "launcher" | "path" }> {
+  try {
+    const launcherPath = await resolveCommandPath(command);
+    const launcher = readFileSync(launcherPath, "utf-8");
+    const execMatch = launcher.match(
+      /^\s*exec\s+("[^"]*python[^"]*"|'[^']*python[^']*'|\S*python\S*)\s/gm,
+    );
+    const quoted = execMatch?.[0]?.match(/["']?([^"'\s]*python[^"'\s]*)["']?/);
+    const candidate = quoted?.[1];
+    if (candidate) {
+      return { python: candidate, source: "launcher" };
+    }
+  } catch {
+    // Not a readable script (binary shim, wrapper, alias) — fall through.
+  }
+  return { python: "python3", source: "path" };
+}
+
+async function checkPython(
+  command: string,
+): Promise<AdapterEnvironmentCheck | null> {
+  const { python } = await resolveHermesPython(command);
+  try {
+    const { stdout } = await execFileAsync(python, ["--version"], {
       timeout: 5_000,
     });
     const version = stdout.trim();
@@ -171,20 +237,24 @@ async function checkApiKeys(
   const has = (key: string): boolean =>
     !!(resolvedEnv[key] ?? process.env[key] ?? hermesEnvKeys[key]);
 
-  const hasAnthropic = has("ANTHROPIC_API_KEY");
-  const hasOpenRouter = has("OPENROUTER_API_KEY");
-  const hasOpenAI = has("OPENAI_API_KEY");
-  const hasZai = has("ZAI_API_KEY");
-  const hasKimi = has("KIMI_API_KEY");
-  const hasMiniMax = has("MINIMAX_API_KEY");
+  // Env keys mirror hermes_cli/auth.py aliases so China-route keys are
+  // recognized exactly the way the real Hermes runtime resolves them:
+  // zai accepts GLM_API_KEY/ZAI_API_KEY/Z_AI_API_KEY, kimi accepts
+  // KIMI_API_KEY/KIMI_CODING_API_KEY/KIMI_CN_API_KEY, minimax-cn is
+  // MINIMAX_CN_API_KEY, deepseek is DEEPSEEK_API_KEY.
+  const providerEnvAliases: [label: string, keys: string[]][] = [
+    ["Anthropic", ["ANTHROPIC_API_KEY"]],
+    ["OpenRouter", ["OPENROUTER_API_KEY"]],
+    ["OpenAI", ["OPENAI_API_KEY"]],
+    ["Z.AI", ["ZAI_API_KEY", "GLM_API_KEY", "Z_AI_API_KEY"]],
+    ["Kimi", ["KIMI_API_KEY", "KIMI_CODING_API_KEY", "KIMI_CN_API_KEY"]],
+    ["MiniMax", ["MINIMAX_API_KEY", "MINIMAX_CN_API_KEY"]],
+    ["DeepSeek", ["DEEPSEEK_API_KEY"]],
+  ];
 
-  const providers: string[] = [];
-  if (hasAnthropic) providers.push("Anthropic");
-  if (hasOpenRouter) providers.push("OpenRouter");
-  if (hasOpenAI) providers.push("OpenAI");
-  if (hasZai) providers.push("Z.AI");
-  if (hasKimi) providers.push("Kimi");
-  if (hasMiniMax) providers.push("MiniMax");
+  const providers = providerEnvAliases
+    .filter(([, keys]) => keys.some((key) => has(key)))
+    .map(([label]) => label);
 
   if (providers.length > 0) {
     return {
@@ -237,7 +307,7 @@ async function checkApiKeys(
   return {
     level: "warn",
     message: "No LLM API keys found in environment",
-    hint: "Set API keys in the agent's env secrets or ~/.hermes/.env. Hermes supports: ANTHROPIC_API_KEY, OPENROUTER_API_KEY, OPENAI_API_KEY, ZAI_API_KEY, KIMI_API_KEY, MINIMAX_API_KEY",
+    hint: "Set API keys in the agent's env secrets or ~/.hermes/.env. Hermes supports: ANTHROPIC_API_KEY, OPENROUTER_API_KEY, OPENAI_API_KEY, ZAI_API_KEY/GLM_API_KEY, KIMI_API_KEY, MINIMAX_API_KEY/MINIMAX_CN_API_KEY, DEEPSEEK_API_KEY",
     code: "hermes_no_api_keys",
   };
 }
@@ -351,7 +421,7 @@ export async function testEnvironment(
   if (versionCheck) checks.push(versionCheck);
 
   // 3. Python available?
-  const pythonCheck = await checkPython();
+  const pythonCheck = await checkPython(command);
   if (pythonCheck) checks.push(pythonCheck);
 
   // 4. Model config

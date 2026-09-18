@@ -22,9 +22,14 @@ test("testEnvironment accepts config.command when hermesCommand is absent", asyn
   const cliPath = path.join(tempDir, "fake-hermes");
 
   try {
+    // A realistic launcher: exec a bundled fake Python so the check never
+    // depends on the host system python3 version (macOS ships 3.9).
+    const fakePython = path.join(tempDir, "fake-python");
+    await writeFile(fakePython, "#!/bin/sh\necho 'Python 3.11.16'\n", "utf8");
+    await chmod(fakePython, 0o755);
     await writeFile(
       cliPath,
-      "#!/bin/sh\necho fake-hermes 1.2.3\n",
+      `#!/usr/bin/env bash\necho "fake-hermes 1.2.3"\nexec "${fakePython}" "$@"\n`,
       "utf8",
     );
     await chmod(cliPath, 0o755);

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
@@ -100,6 +100,18 @@ async function withHermesHomeConfig(
 
   await mkdir(hermesDir, { recursive: true });
   await writeFile(configPath, `${configLines.join("\n")}\n`, "utf8");
+  // Pin a fake launcher that execs a modern fake Python, so the environment
+  // test never depends on the host's system python3 (macOS still ships 3.9).
+  const fakePython = join(tempHome, "fake-python");
+  await writeFile(fakePython, "#!/bin/sh\necho 'Python 3.11.16'\n", "utf8");
+  await chmod(fakePython, 0o755);
+  const fakeHermes = join(tempHome, "fake-hermes");
+  await writeFile(
+    fakeHermes,
+    `#!/usr/bin/env bash\nexec "${fakePython}" "${fakeHermes}.py" "$@"\n`,
+    "utf8",
+  );
+  await chmod(fakeHermes, 0o755);
   process.env.HOME = tempHome;
   process.env.USERPROFILE = tempHome;
   delete process.env.HOMEDRIVE;
@@ -107,10 +119,12 @@ async function withHermesHomeConfig(
   for (const key of providerEnvKeys) {
     delete process.env[key];
   }
+  process.env.HERMES_TEST_FAKE_CLI = fakeHermes;
 
   try {
     await fn();
   } finally {
+    delete process.env.HERMES_TEST_FAKE_CLI;
     await rm(tempHome, { recursive: true, force: true });
   }
 }
@@ -126,7 +140,7 @@ test("testEnvironment does not warn about missing API keys when Hermes config pr
       companyId: "company-test",
       adapterType: "hermes_local",
       config: {
-        hermesCommand: "python3",
+        hermesCommand: process.env.HERMES_TEST_FAKE_CLI!,
         model: "openrouter/gpt-4.1-mini",
       },
     });
@@ -149,7 +163,7 @@ test("testEnvironment describes provider-omitted runtime config without inventin
       companyId: "company-test",
       adapterType: "hermes_local",
       config: {
-        hermesCommand: "python3",
+        hermesCommand: process.env.HERMES_TEST_FAKE_CLI!,
         model: "oca/gpt-5.4",
       },
     });
@@ -173,7 +187,7 @@ test("testEnvironment does not warn about missing API keys when Hermes config pr
       companyId: "company-test",
       adapterType: "hermes_local",
       config: {
-        hermesCommand: "python3",
+        hermesCommand: process.env.HERMES_TEST_FAKE_CLI!,
         model: "oca/gpt-5.4",
       },
     });
