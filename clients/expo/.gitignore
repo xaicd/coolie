@@ -1,0 +1,11 @@
+# Expo and Metro local state, and the bundle output.
+# Local to this package rather than added to the repo root, so the root
+# .gitignore stays as upstream has it.
+.expo/
+dist/
+web-build/
+*.log
+
+# Standalone install: this package is deliberately not a pnpm workspace member
+# (see clients/expo/README.md), so its lockfile and modules live here.
+node_modules/

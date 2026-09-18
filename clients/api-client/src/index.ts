@@ -1,9 +1,9 @@
-export { CoolieClient, CoolieApiError, isAsrNotConfigured } from "./client.js";
-export type { CoolieClientOptions } from "./client.js";
+export { CoolieClient, CoolieApiError, isAsrNotConfigured } from "./client";
+export type { CoolieClientOptions } from "./client";
 export {
   ASR_NOT_CONFIGURED,
   MULTIMODAL_PLUGIN_ID,
-} from "./types.js";
+} from "./types";
 export type {
   IssuePriority,
   IssueStatus,
@@ -14,4 +14,4 @@ export type {
   AudioFormat,
   VoiceDispatchInput,
   VoiceDispatchResult,
-} from "./types.js";
+} from "./types";

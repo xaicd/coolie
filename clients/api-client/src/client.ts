@@ -7,7 +7,7 @@ import {
   type SessionUser,
   type VoiceDispatchInput,
   type VoiceDispatchResult,
-} from "./types.js";
+} from "./types";
 
 export interface CoolieClientOptions {
   /** Instance base URL, e.g. "http://100.84.124.71:3100". No trailing slash. */

@@ -2,11 +2,18 @@ import * as SecureStore from "expo-secure-store";
 import { CoolieClient } from "@coolie/api-client";
 
 /**
- * Instance base URL. Point at your Coolie instance. In a real build read this
- * from app config / env; hardcoded here for the skeleton.
- * TODO: move to expo-constants / EAS env.
+ * Instance base URL. Override per build with `EXPO_PUBLIC_COOLIE_BASE_URL`
+ * (Expo inlines `EXPO_PUBLIC_*` at bundle time), so a device build can point at a
+ * different instance without editing code.
+ *
+ * The default is this machine's Tailscale address — how a phone on the tailnet
+ * reaches the local dev instance — kept as the default so the skeleton works out
+ * of the box.
  */
-export const COOLIE_BASE_URL = "http://100.84.124.71:3100";
+declare const process: { env?: Record<string, string | undefined> } | undefined;
+
+export const COOLIE_BASE_URL =
+  process?.env?.EXPO_PUBLIC_COOLIE_BASE_URL ?? "http://100.84.124.71:3100";
 
 const AUTH_KEY = "coolie.authToken";
 
@@ -31,7 +38,9 @@ export async function getAuthToken(): Promise<string | null> {
  */
 export const coolie = new CoolieClient({
   baseUrl: COOLIE_BASE_URL,
-  getAuthHeader: async () => {
+  // Explicit return type: without it the unauth branch infers as
+  // `{ Authorization?: undefined }`, which is not a `Record<string, string>`.
+  getAuthHeader: async (): Promise<Record<string, string>> => {
     const token = await getAuthToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   },
