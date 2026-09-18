@@ -3,6 +3,13 @@
 日期:2026-09-17
 状态:方案(第一步已实现,见文末「已落地」)
 
+> **术语(2026-09-18,只作说明,不改本文结论)**:本文里的「租户」按
+> `docs-coolie/TERMINOLOGY.md` 一律读作**公司(company)** —— 平台唯一的隔离与归属单元,
+> `companies` 就是边界。本文第 4 节写的"不含租户、不含 company id"也正是这个意思。
+> 本体自己的 `ontology_tenants` / `tenant_id`(`migrations/016_tenants_and_keys.sql`、
+> `017_members.sql`)是当初为独立部署准备的身份模型,插件模式下**惰性**;
+> 它是本体内部的残留概念,**不是**平台的一层。
+
 ## 1. 为什么是现在,以及为什么从「文档」开始
 
 用户提出:**独立运行刚好从这里开始,Paperclip / DSH / ontology 三方。**
