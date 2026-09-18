@@ -158,16 +158,52 @@
       "maxTotalLines": 80
     },
     {
+      "path": "ui/src/hooks/useStreamlinedUiEnabled.ts",
+      "maxNetLines": 15,
+      "reason": "Adds `retry: false` to the pre-auth experimental-settings read. The default backoff left the shell's loading gate closed for seconds after a 401/403 and hit the endpoint four times before giving up; the resolver already fails open, so a single attempt is the correct behaviour. Cannot live elsewhere: this hook is the only reader and it owns the query options.",
+      "maxTotalLines": 20
+    },
+    {
+      "path": "ui/src/adapters/use-adapter-capabilities.ts",
+      "maxNetLines": 20,
+      "reason": "Adds an `enabled` option so the globally-mounted onboarding wizard can hold the protected adapter listing until it is actually open. Matches the sibling useDisabledAdaptersSync/useAdapterRegistryLoaded lookups; without it a signed-out visitor fetches /api/adapters on every route. The default keeps every other caller unchanged.",
+      "maxTotalLines": 25
+    },
+    {
+      "path": "ui/src/components/OnboardingWizard.tsx",
+      "maxNetLines": 10,
+      "reason": "Passes `enabled: effectiveOnboardingOpen` to the capability lookup above, exactly as its two sibling global lookups already do. One call site plus the comment saying why.",
+      "maxTotalLines": 15
+    },
+    {
+      "path": "ui/src/pages/Auth.tsx",
+      "maxNetLines": 50,
+      "reason": "Replaces the `canSubmit` boolean with `validateCredentials`, so a submit either sends or shows the first reason it did not. The button carried `aria-disabled` while staying clickable and the native `required` attributes meant the JS error branch was unreachable; the form is now `noValidate` and JSDOM-safe. Also adds the email shape check that `type=\"email\"` was assumed to provide.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "ui/src/pages/Auth.test.tsx",
+      "maxNetLines": 55,
+      "reason": "Covers `validateCredentials`: the accept cases plus the missing-email, malformed-email, missing-password and short-sign-up-password messages, which is the behaviour that replaced the unreachable 'Please fill in all required fields.' branch.",
+      "maxTotalLines": 70
+    },
+    {
       "path": "ui/src/App.test.tsx",
       "maxNetLines": 80,
-      "reason": "The public bootstrap-pending coverage: the old case asserted the defect (it passed a session and expected 'Sign in / Create account'), so it became two — signed out keeps the sign-in offer, signed in gets the sign-out — plus the assertions that each state does not render the other's affordance.",
-      "maxTotalLines": 120
+      "reason": "The public bootstrap-pending coverage: the old case asserted the defect (it passed a session and expected 'Sign in / Create account'), so it became two — signed out keeps the sign-in offer, signed in gets the sign-out — plus the assertions that each state does not render the other's affordance. Also supplies `useNavigate` in the router mock, now that the no-organization screen routes to an invite.",
+      "maxTotalLines": 130
     },
     {
       "path": "ui/src/components/CloudAccessGate.tsx",
-      "maxNetLines": 20,
-      "reason": "Wires useSignOut into the pending screen. It belongs here because this component owns the session query the sign-out has to reset: signing out there is what brings the signed-out branch back, with no navigation and no way to loop.",
-      "maxTotalLines": 30
+      "maxNetLines": 90,
+      "reason": "Wires useSignOut into the pending screen, and gives the no-organization screen a way forward: it accepts an invite link or code and routes to /invite/:token, so a signed-in account with no membership is no longer a copy-only dead end. The budget covers the invite form, the exported token parser, and the sign-out wiring.",
+      "maxTotalLines": 110
+    },
+    {
+      "path": "ui/src/components/CloudAccessGate.test.ts",
+      "maxNetLines": 35,
+      "reason": "New file: unit coverage for `inviteTokenFromInput` — a raw code, a full invite URL, a trailing slash, a query string, a fragment, surrounding whitespace, and blank input. No upstream counterpart, so nothing to reconcile at a merge.",
+      "maxTotalLines": 40
     },
     {
       "path": "screenshots/expo-signin-email.png",
