@@ -65,11 +65,27 @@ SHA="$(git rev-parse --short HEAD)"
 BRANCH="$(git branch --show-current)"
 DIRTY="$(git status --porcelain --untracked-files=no)"
 if [ -n "$DIRTY" ] && [ "$ALLOW_DIRTY" -eq 0 ]; then
-  echo "working tree has uncommitted changes; commit them, or pass --allow-dirty" >&2
-  echo "$DIRTY" >&2
+  cat >&2 <<MSG
+refusing to deploy: the working tree has uncommitted changes.
+
+This is deliberate. The deploy copies the working tree, so a dirty tree means
+what lands on the host matches no commit and cannot be reproduced or rolled
+back to. In a repo with more than one writer that is usually not even your
+change — check who owns the files below before deciding.
+
+  $DIRTY
+
+Either commit them, or deploy the tree as-is with:
+
+  $0 --allow-dirty
+
+MSG
   exit 1
 fi
-[ -z "$DIRTY" ] || echo "WARNING: deploying a dirty tree (--allow-dirty)"
+if [ -n "$DIRTY" ]; then
+  echo "WARNING: deploying a dirty tree; what lands on the host matches no commit:"
+  echo "$DIRTY" | sed 's/^/  /'
+fi
 ssh -o BatchMode=yes -o ConnectTimeout=15 "$COOLIE_HOST" true \
   || die "cannot reach $COOLIE_HOST over ssh"
 echo "deploying ${BRANCH}@${SHA} to ${COOLIE_HOST}:${COOLIE_DIR}"
@@ -149,8 +165,10 @@ else
 fi
 
 # A path that used to host the retired app must stay gone, and must not silently
-# fall through to the SPA shell (which answers 200 for unknown routes).
-LEGACY_CODE="$(curl -sS -m 20 -o /dev/null -w '%{http_code}' "http://${PUBLIC_HOST}/digstaff/" || true)"
+# fall through to the SPA shell (which answers 200 for unknown routes). Probed
+# over the public scheme on purpose: over plain HTTP every path answers 308,
+# because Caddy's redirect to HTTPS runs before the site's own routes.
+LEGACY_CODE="$(curl -sS -m 20 -o /dev/null -w '%{http_code}' "${COOLIE_PUBLIC_URL}/digstaff/" || true)"
 case "$LEGACY_CODE" in
   410|404) echo "  ok   legacy /digstaff/ returns ${LEGACY_CODE}" ;;
   *) die "legacy /digstaff/ returned ${LEGACY_CODE}; it must be 410 or 404, not the app shell" ;;
