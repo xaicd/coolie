@@ -22,6 +22,19 @@ export interface CoolieClientOptions {
   getAuthHeader?: () => Promise<Record<string, string>> | Record<string, string>;
   /** Injectable fetch (RN/Expo and browsers both provide global fetch). */
   fetchImpl?: typeof fetch;
+  /**
+   * Value for the `Origin` request header, e.g. the instance's own origin.
+   *
+   * Browsers set this themselves and forbid code from overriding it, so web
+   * clients should leave it unset. A **native** client is not a browser: it sends
+   * no Origin at all, and the host then refuses cookie-authenticated mutations
+   * with "Board mutation requires trusted browser origin" (measured: a session
+   * cookie POSTing an issue without this header gets 403; with it, 201). The
+   * value the host accepts is the instance's own origin — the same host this
+   * client is already talking to — so deriving it from `baseUrl` is both correct
+   * and the minimum it can be.
+   */
+  originHeader?: string;
 }
 
 export class CoolieApiError extends Error {
@@ -45,11 +58,13 @@ export class CoolieClient {
   private readonly baseUrl: string;
   private readonly getAuthHeader: NonNullable<CoolieClientOptions["getAuthHeader"]>;
   private readonly fetchImpl: typeof fetch;
+  private readonly originHeader?: string;
 
   constructor(opts: CoolieClientOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/+$/, "");
     this.getAuthHeader = opts.getAuthHeader ?? (() => ({}));
     this.fetchImpl = opts.fetchImpl ?? globalThis.fetch;
+    this.originHeader = opts.originHeader;
     if (!this.fetchImpl) throw new Error("No fetch available; pass fetchImpl");
   }
 
@@ -61,6 +76,7 @@ export class CoolieClient {
   ): Promise<T> {
     const headers: Record<string, string> = { Accept: "application/json" };
     if (body !== undefined) headers["Content-Type"] = "application/json";
+    if (this.originHeader) headers.Origin = this.originHeader;
     if (opts?.auth !== false) Object.assign(headers, await this.getAuthHeader());
 
     const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
@@ -92,6 +108,15 @@ export class CoolieClient {
   }
   async getSession(): Promise<{ user: SessionUser } | null> {
     return this.request("GET", "/api/auth/get-session");
+  }
+  /**
+   * Drops the session server-side. Requires `originHeader`: Better Auth guards
+   * this one with "Missing or null Origin" (measured 403 without it), even though
+   * sign-in itself needs no Origin — there is no session cookie to protect yet at
+   * that point, which is exactly the difference.
+   */
+  signOut(): Promise<unknown> {
+    return this.request("POST", "/api/auth/sign-out");
   }
 
   /**

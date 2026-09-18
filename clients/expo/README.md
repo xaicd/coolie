@@ -32,13 +32,48 @@ Two config files exist for reasons worth keeping:
 
 ## Point it at an instance
 
-`EXPO_PUBLIC_COOLIE_BASE_URL` overrides the base URL at bundle time; the default is this
-machine's Tailscale address, so a phone on the tailnet reaches the dev instance without
-editing code:
+`EXPO_PUBLIC_COOLIE_BASE_URL` overrides the base URL at bundle time. The default is the
+live HTTPS instance, so a build handed to someone works out of the box:
 
 ```sh
-EXPO_PUBLIC_COOLIE_BASE_URL=http://my-instance:3100 pnpm start
+# default: https://xrobinai.cn
+EXPO_PUBLIC_COOLIE_BASE_URL=http://192.168.3.85:3100 npx expo run:ios --device   # local dev
 ```
+
+## Signing in
+
+Two ways in, for two different people:
+
+- **Email and password (what the sign-in screen shows)**, a normal session. Use this for
+  anyone who was handed the app. The session cookie lives in the platform's own cookie
+  jar, so it survives relaunches.
+- **A bearer key**, behind "Use an API key instead" — an **agent** key (scoped to exactly
+  one company) or a **board** key (company memberships). For scripted use and for driving
+  the app as an agent. Both kinds arrive as `Authorization: Bearer`, and the host prefers
+  board keys, so the app tells them apart by using them: `GET /api/agents/me` answers 200
+  only for an agent key. A key that fails both probes is reported as rejected rather than
+  showing an empty task list.
+
+Which companies you get is then resolved, not configured — an agent key's single company,
+or the memberships of a board key or session. **Zero memberships is a real state** and the
+app says so instead of showing an empty board; one company is entered directly; several
+are a list to pick from.
+
+### The `Origin` header, which native clients must send
+
+A native app is not a browser and sends no `Origin`. The host's CSRF guard
+(`server/src/middleware/board-mutation-guard.ts`) then refuses **cookie-authenticated
+mutations** with `403 Board mutation requires trusted browser origin` — measured on this
+repo's own route: the same session cookie POSTing an issue is 403 without the header and
+201 with it. Reads are unaffected, which is why the failure looks like "sign-in worked,
+but nothing can be created".
+
+So the app declares `Origin: <its own instance origin>` on every request
+(`COOLIE_ORIGIN` in `src/coolie.ts`, derived from the base URL rather than configured, so
+it cannot drift). Better Auth's `sign-out` needs the same header — `403 Missing or null
+Origin` without it — even though `sign-in` does not, because at sign-in there is no
+session cookie to protect yet. Web clients leave this unset: browsers set the header
+themselves and forbid code from overriding it.
 
 ## Install it on a device
 
@@ -75,13 +110,13 @@ CGNAT rather than RFC1918. So:
 
 - ✅ Installs, typechecks and bundles from a clean checkout (`pnpm typecheck`,
   `pnpm bundle` — 574 modules, ~1.65 MB Hermes bundle).
-- ✅ Auth via agent API key (bearer), stored in `expo-secure-store`. The key is
-  **validated with `GET /api/agents/me` before it is stored**, so a bad key reports the
-  reason instead of showing up later as an empty task list. A key revoked since last
-  launch sends you back to the sign-in screen rather than into a screen of errors.
-- ✅ The key names its own company, so the task list and the company header come from it.
-  **There is no company picker on purpose** — an agent key is scoped to one company and
-  cannot even list companies (that route is board-only and answers 403).
+- ✅ **Sign in with email and password (session), or paste a bearer key** — agent or board.
+  A stored key is **validated before it is stored**, so a bad key reports the reason instead
+  of showing up later as an empty task list, and a key revoked since last launch sends you
+  back to the sign-in screen rather than into a screen of errors.
+- ✅ **The company is resolved from the credential, not chosen up front**: an agent key's one
+  company, a board key's or session's memberships. Zero, one and many are all handled — an
+  account with no membership is told so, rather than shown an empty board.
 - ✅ Task list, **task detail** (tap a row), create task with title, optional description
   and priority.
 - ⚠️ **Voice dispatch is wired end to end; it needs the instance's ASR credentials.**
@@ -95,9 +130,10 @@ CGNAT rather than RFC1918. So:
   Recording itself (`expo-av` → base64) is wired but has never been exercised on a device.
 - ⏳ TODO: **navigation library** (the screen is chosen from state, so there is no back
   stack and no deep linking, and `app.json`'s `coolie` scheme is declared but unused),
-  email/password session sign-in, push/live updates, enforcing the Tencent limits
+  push/live updates, enforcing the Tencent limits
   (≤60s / ≤3 MB) client-side, editing or transitioning a task from the detail screen,
-  error/empty state polish.
+  error/empty state polish, strings for the people who will actually use this (the UI is
+  English today).
 
 ## How the above was checked
 
@@ -111,7 +147,20 @@ simulator:
 | `getCompany()` | pass — the company name for the header |
 | `listIssues()` | pass — read the real task list |
 | `createIssue()` | pass — created a task (then deleted it) |
-| `voiceDispatch()` | **403 Board access required** |
+| `voiceDispatch()` | **501 ASR_NOT_CONFIGURED** — past auth, needs the instance's ASR keys |
+
+The session and key paths were checked the same way, against the live instance, from a
+non-browser client (curl, so no cookie jar magic to hide behind): `sign-in/email` returns
+200 with no `Origin` and sets the session cookie; `get-session` and `GET /api/companies`
+then work with **only** that cookie; a new account correctly lists **no** companies. The
+CSRF guard was measured with and without `Origin` on a real mutation, which is where the
+`originHeader` option comes from.
+
+The app itself was built, installed and launched on an iPhone 17 Pro simulator
+(`npx expo run:ios`), and the sign-in screen of this change is in
+`screenshots/expo-signin-email.png`. What that does **not** cover: nobody has typed
+credentials into it, so the app-side wiring of sign-in (cookie jar, `Origin` header through
+RN's fetch) is reasoned-plus-measured-elsewhere rather than observed in the app.
 
 This is how the four route bugs fixed in `@coolie/api-client` were found: the client
 had been calling `/api/issues` and `/api/companies`, which either do not exist or are
