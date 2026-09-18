@@ -48,6 +48,12 @@
       "maxNetLines": 30,
       "reason": "Points at this fork's own conventions (docs-coolie/*, .agents/skills, doc/plans). AGENTS.md is the one file every AGENTS.md-reading tool loads, so the pointers cannot live in our own tree; they are written as plain paths rather than @imports, because an import is inlined into the system prompt on every request and would be paid on every turn.",
       "maxTotalLines": 30
+    },
+    {
+      "path": "scripts/fork-surface.json",
+      "maxNetLines": 120,
+      "reason": "This manifest itself, and entirely ours — it does not exist upstream. It sits under scripts/ only because that is where the gate is wired (package.json and check-testing-defenses.mjs call it), and that path prefix is the only reason the gate asks about it. The budget is loose on purpose: the file grows by one entry per upstream file we intentionally change, and that growth is the file working, not creep.",
+      "maxTotalLines": 160
     }
   ]
 }
