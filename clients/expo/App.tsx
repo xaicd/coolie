@@ -16,6 +16,7 @@ import {
   type Company,
   type Issue,
   type IssuePriority,
+  type IssueWorkProduct,
 } from "@coolie/api-client";
 import {
   classifyToken,
@@ -29,6 +30,7 @@ import {
 } from "./src/coolie";
 import { useRecorder } from "./src/useRecorder";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
+import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
 
 /**
  * Coolie mobile client — 品牌版界面。
@@ -291,9 +293,10 @@ function HomeScreen({
   whoami: string;
   onSignOut: () => void;
 }) {
-  const [tab, setTab] = useState<"tasks" | "dashboard">("tasks");
+  const [tab, setTab] = useState<"tasks" | "dashboard" | "diff">("tasks");
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selected, setSelected] = useState<Issue | null>(null);
+  const [diffContext, setDiffContext] = useState<{ issue?: Issue | null; workProduct?: IssueWorkProduct | null } | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<IssuePriority>("medium");
@@ -362,12 +365,34 @@ function HomeScreen({
     }
   }, [companyId, recording, start, stop, loadIssues]);
 
+  if (diffContext) {
+    return (
+      <CodeDiffScreen
+        company={company}
+        issue={diffContext.issue}
+        workProduct={diffContext.workProduct}
+        onBack={() => setDiffContext(null)}
+      />
+    );
+  }
+
+  if (tab === "diff") {
+    return <CodeDiffScreen company={company} onBack={() => setTab("tasks")} />;
+  }
+
   if (tab === "dashboard") {
     return <DashboardScreen company={company} onBack={() => setTab("tasks")} />;
   }
 
   if (selected) {
-    return <TaskDetail issue={selected} onBack={() => setSelected(null)} />;
+    return (
+      <TaskDetail
+        issue={selected}
+        company={company}
+        onBack={() => setSelected(null)}
+        onOpenDiff={(issueItem, wp) => setDiffContext({ issue: issueItem, workProduct: wp })}
+      />
+    );
   }
 
   const open = issues.filter((i) => i.status !== "done").length;
@@ -402,6 +427,14 @@ function HomeScreen({
         >
           <Text style={styles.tabBtnText}>
             效能驾驶舱
+          </Text>
+        </Pressable>
+        <Pressable
+          style={styles.tabBtn}
+          onPress={() => setTab("diff")}
+        >
+          <Text style={styles.tabBtnText}>
+            代码审查
           </Text>
         </Pressable>
       </View>
@@ -511,7 +544,34 @@ function HomeScreen({
   );
 }
 
-function TaskDetail({ issue, onBack }: { issue: Issue; onBack: () => void }) {
+function TaskDetail({
+  issue,
+  company,
+  onBack,
+  onOpenDiff,
+}: {
+  issue: Issue;
+  company: Company;
+  onBack: () => void;
+  onOpenDiff: (issue: Issue, workProduct?: IssueWorkProduct) => void;
+}) {
+  const [workProducts, setWorkProducts] = useState<IssueWorkProduct[]>([]);
+  const [loadingWp, setLoadingWp] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      setLoadingWp(true);
+      try {
+        const list = await coolie.listWorkProducts(issue.id);
+        setWorkProducts(list);
+      } catch {
+        // silently ignore if endpoint unavailable
+      } finally {
+        setLoadingWp(false);
+      }
+    })();
+  }, [issue.id]);
+
   return (
     <Surface>
       <Pressable onPress={onBack} hitSlop={12}>
@@ -532,6 +592,39 @@ function TaskDetail({ issue, onBack }: { issue: Issue; onBack: () => void }) {
         {issue.description ? <DetailRow label="描述" value={issue.description} /> : null}
         <DetailRow label="编号" value={issue.id} valueColor={C.inkDim} />
       </View>
+
+      {/* 核心动作: 查看代码 Diff */}
+      <Pressable
+        style={styles.btnDiffAction}
+        onPress={() => onOpenDiff(issue)}
+      >
+        <Text style={styles.btnDiffActionText}>🔍 查看工作区代码变更 (Diff)</Text>
+      </Pressable>
+
+      {/* 关联交付产物列表 */}
+      {workProducts.length > 0 && (
+        <View style={styles.wpSection}>
+          <Text style={styles.sectionHeader}>关联交付产物 ({workProducts.length})</Text>
+          {workProducts.map((wp) => (
+            <Pressable
+              key={wp.id}
+              style={styles.wpCard}
+              onPress={() => onOpenDiff(issue, wp)}
+            >
+              <View style={{ flex: 1 }}>
+                <Text style={styles.wpTitle} numberOfLines={1}>{wp.title}</Text>
+                <Text style={styles.wpType}>
+                  类型: {wp.type} {wp.executionWorkspaceId ? "· 关联工作区" : ""}
+                </Text>
+              </View>
+              <Text style={styles.wpLink}>看 Diff ›</Text>
+            </Pressable>
+          ))}
+        </View>
+      )}
+      {loadingWp && (
+        <ActivityIndicator color={C.accent} style={{ marginTop: 8 }} />
+      )}
     </Surface>
   );
 }
@@ -660,4 +753,53 @@ const styles = StyleSheet.create({
   },
   detailRow: { gap: 2 },
   detailValue: { fontSize: 15, color: C.ink },
+  btnDiffAction: {
+    backgroundColor: C.cardHi,
+    borderWidth: 1,
+    borderColor: C.accent,
+    borderRadius: 12,
+    paddingVertical: 13,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  btnDiffActionText: {
+    color: C.accent,
+    fontSize: 14,
+    fontWeight: "700",
+  },
+  wpSection: {
+    marginTop: 8,
+    gap: 8,
+  },
+  sectionHeader: {
+    color: C.inkDim,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  wpCard: {
+    backgroundColor: C.card,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.line,
+    padding: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  wpTitle: {
+    color: C.ink,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  wpType: {
+    color: C.inkDim,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  wpLink: {
+    color: C.accent,
+    fontSize: 12,
+    fontWeight: "600",
+    marginLeft: 8,
+  },
 });
