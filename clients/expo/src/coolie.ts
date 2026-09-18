@@ -1,5 +1,5 @@
 import * as SecureStore from "expo-secure-store";
-import { CoolieClient } from "@coolie/api-client";
+import { CoolieClient, type Company } from "@coolie/api-client";
 
 /**
  * Instance base URL. Override per build with `EXPO_PUBLIC_COOLIE_BASE_URL`
@@ -29,6 +29,22 @@ export async function clearAuthToken(): Promise<void> {
 }
 export async function getAuthToken(): Promise<string | null> {
   return SecureStore.getItemAsync(AUTH_KEY);
+}
+
+/**
+ * Validate a candidate token before storing it, by making one authenticated call
+ * with it. Returns the companies it can see, so sign-in can both prove the
+ * credential works and warm the first screen; throws `CoolieApiError` otherwise.
+ *
+ * Storing first and discovering a bad key later is what the app did before, and it
+ * presents as an empty task list rather than as "your key is wrong".
+ */
+export async function validateAuthToken(token: string): Promise<Company[]> {
+  const probe = new CoolieClient({
+    baseUrl: COOLIE_BASE_URL,
+    getAuthHeader: () => ({ Authorization: `Bearer ${token}` }),
+  });
+  return probe.listCompanies();
 }
 
 /**

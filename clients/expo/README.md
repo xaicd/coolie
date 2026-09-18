@@ -43,9 +43,12 @@ EXPO_PUBLIC_COOLIE_BASE_URL=http://my-instance:3100 pnpm start
 ## What works / TODO
 
 - ✅ Installs, typechecks and bundles from a clean checkout (`pnpm typecheck`,
-  `pnpm bundle` — 574 modules, ~1.6 MB Hermes bundle).
-- ✅ Auth via agent API key (bearer), stored in `expo-secure-store`.
-- ✅ Company picker, task list, create task (title only).
+  `pnpm bundle` — 574 modules, ~1.65 MB Hermes bundle).
+- ✅ Auth via agent API key (bearer), stored in `expo-secure-store`. The key is
+  **validated with a real call before it is stored**, so a bad key reports the reason
+  instead of showing up later as an empty task list.
+- ✅ Company picker, task list, **task detail** (tap a row), create task with title,
+  optional description and priority.
 - ⚠️ **Voice dispatch does not work yet with the auth this app uses.** The route it
   calls (`POST /api/plugins/paperclipai.plugin-multimodal/api/transcriptions`) is
   declared with the manifest default `auth: "board"`, and the host enforces
@@ -53,9 +56,11 @@ EXPO_PUBLIC_COOLIE_BASE_URL=http://my-instance:3100 pnpm start
   rejected 403. Fix either by relaxing that route to `board-or-agent` or by signing in
   as a session. Recording itself (`expo-av` → base64) is wired but has never been
   exercised on a device.
-- ⏳ TODO: task detail screen (list rows are not tappable), fields beyond title on
-  create, email/password session sign-in, navigation library, push/live updates,
-  enforcing the Tencent limits (≤60s / ≤3 MB) client-side, error/empty states.
+- ⏳ TODO: **navigation library** (the screen is chosen from state, so there is no back
+  stack and no deep linking, and `app.json`'s `coolie` scheme is declared but unused),
+  email/password session sign-in, push/live updates, enforcing the Tencent limits
+  (≤60s / ≤3 MB) client-side, editing or transitioning a task from the detail screen,
+  error/empty state polish.
 
 > "Cannot be verified on a device from CI" is not the same as verified. The checks above
 > are what has actually been run; the device path is still unverified.
