@@ -10,22 +10,40 @@ This repo is a **public fork** of Paperclip. `main` is ours and is pushed to
 `origin`. `master` is the **upstream mirror** and is reserved for syncing official
 work — never commit or push to it. Full rules: `docs-coolie/BRANCHING.md`.
 
-The conflict map (which files actually diverge, and how far) is
-`docs-coolie/FORK-SURFACE-AUDIT.md`. Read it before resolving anything: **91
-upstream files / 9295 lines diverge, and only 6 are registered in the budget
-manifest**, so the budget gate's PASS says nothing about the rest.
+The conflict map (which files actually diverge, how far, and how each class is
+resolved) is `docs-coolie/FORK-SURFACE-AUDIT.md`. Read it before resolving anything.
+The short version: roughly a hundred upstream-owned files diverge, while only a
+handful are registered in `scripts/fork-surface.json`, so the budget gate's PASS says
+nothing about the rest. **Take the exact number from the report, not from prose** —
+it moves with every upstream commit.
 
-## 1. Compute the conflicts before merging (read-only)
+## 1. Start with the report (read-only)
+
+```sh
+node .agents/skills/fork-sync/scripts/sync-report.mjs
+```
+
+It fetches upstream and prints: how far behind/ahead we are, the upstream tip,
+**whether the merge would conflict**, and how much of our divergence is
+upstream-owned (the part a merge has to reconcile). Exit code 1 means conflicts are
+expected. `--no-fetch` reports on what is already fetched.
+
+The raw step it runs, when you want it alone:
 
 ```sh
 git fetch upstream                                   # one-time: git remote add upstream https://github.com/paperclipai/paperclip.git
 git merge-tree --write-tree --messages main upstream/master
 ```
 
-No conflicts prints a single tree hash and exits 0. This never touches the working
-tree, so run it **first** — it is much cheaper than discovering conflicts after a
+No conflicts prints a single tree hash and exits 0. Neither command touches the
+working tree, so run them **first** — much cheaper than discovering conflicts after a
 merge. Without an `upstream` remote, compute against the snapshot:
 `git merge-tree --write-tree --messages main origin/master`.
+
+**Merge while it is clean.** A fork that syncs often pays a small boring merge; a fork
+that waits pays an archaeology project. If the report says CLEAN and you are behind,
+that is the moment to merge — and the working tree has to be committed or stashed
+first, because a merge will refuse to overwrite uncommitted files it touches.
 
 ## 2. Merge (never rebase, never `-X ours`)
 

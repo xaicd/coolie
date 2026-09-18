@@ -112,15 +112,26 @@ pnpm test:defenses
 
 ## 7. 同步官方与冲突处置
 
-**先算,不要等撞上。** 这两条都是只读的,不动工作区:
+**先算,不要等撞上。** 一条命令就够(只读,不动工作区):
+
+```sh
+node .agents/skills/fork-sync/scripts/sync-report.mjs
+```
+
+它会拉取官方并打印:落后/领先多少、官方尖端、**合并会不会冲突**、以及我们的分歧里
+**有多少属于上游文件**(那部分才是合并要处理的)。退出码 1 = 预计有冲突。`--no-fetch` 则只报已取到的。
+
+底层那两步(想单独跑时):
 
 ```sh
 git fetch upstream
 git merge-tree --write-tree --messages main upstream/master   # 打印冲突,不动工作区(git ≥2.38)
-git merge-tree --write-tree --messages main origin/master     # 没加 upstream 前,先对快照算
 ```
 
-无冲突时它只打印一个 tree hash、退出码 0。**每次同步前先跑它**,比合完再发现便宜得多。
+无冲突时只打印一个 tree hash、退出码 0。**每次同步前先跑它**,比合完再发现便宜得多。
+
+**报告说 CLEAN 且落后时就该合** —— 常同步的 fork 每次付一次小而无聊的合并,等着的 fork 付一次考古。
+前提是工作区先提交或 stash:合并会拒绝覆盖它要碰的未提交文件。
 
 **冲突分四类,解法不同**(各类的实际规模见
 [`FORK-SURFACE-AUDIT.md`](./FORK-SURFACE-AUDIT.md)):
