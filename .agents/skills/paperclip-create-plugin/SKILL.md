@@ -79,6 +79,21 @@ Notes:
 - `paperclipai plugin install` auto-detects local paths (absolute, `./`, `../`, `~`, or an existing relative folder) and forwards `isLocalPath: true` to the server. Pass `--local` to force local mode if the heuristic is ambiguous.
 - Paths are resolved to absolute paths before being sent to the server.
 - The server watches built outputs (`dist/`) for local-path plugins and restarts the plugin worker on rebuild — you do not need to reinstall after every edit.
+- **Confirm the restart actually happened before trusting a probe.** Observed
+  2026-09-18 on a local-path plugin: after a rebuild (with a new migration added)
+  the *previous* worker was still serving — the probe came back with the old
+  column set, which looks like your change did nothing — and only a disable/enable
+  cycle made the new worker and the migration live. Treat the watch-restart as a
+  convenience, not a guarantee: probe something the change altered, and if it
+  still shows the old behaviour, reload explicitly before debugging further:
+
+  ```bash
+  # The id is the plugin record's UUID from `GET /api/plugins`, not the plugin key.
+  curl -X POST -H "Origin: $BASE" -b cookies.txt "$BASE/api/plugins/$ID/disable"
+  curl -X POST -H "Origin: $BASE" -b cookies.txt "$BASE/api/plugins/$ID/enable"
+  ```
+
+  A new migration in particular is applied by activation, not by a rebuild.
 - UI hot reload via the SDK dev server (`pnpm dev:ui`, port `4177`) is optional and template-dependent; only mention it if the template wires `devUiUrl` and you verified it works end to end.
 - `--version` only applies to npm package installs. Combining it with a local path is an error.
 
