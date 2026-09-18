@@ -1,9 +1,20 @@
 name: e2e: agent-device replay (iOS)
 
+# Manual only, deliberately.
+#
+# This job could never pass on its own triggers, and it never has:
+#   - the replay script (clients/expo/replays/coolie-flow.ad) is a starter that opens
+#     the Expo devtools URL in a browser; it does not drive the app, and nothing here
+#     starts a dev server for it to open;
+#   - the build failed before that, because `clients/expo` is not a pnpm workspace
+#     member, so the root `pnpm install` never installed `expo` for `expo prebuild`;
+#     `|| true` hid exactly that, and the swallowed replay failure hid the rest.
+#
+# So it is kept runnable on purpose (workflow_dispatch) and honest about what it does
+# and does not prove. Re-enabling per-push triggers requires a replay script that
+# actually exercises the app, and a green run of this job.
 on:
-  push:
-    branches: [ main ]
-  pull_request:
+  workflow_dispatch:
 
 jobs:
   replay-ios:
@@ -25,21 +36,27 @@ jobs:
       - name: Install repo dependencies
         run: pnpm install --frozen-lockfile
 
+      # clients/expo is not a workspace member (see clients/README.md): it has its own
+      # lockfile and installs standalone, with dev dependencies, because the hoisted
+      # linker and babel-preset-expo are needed to prebuild.
+      - name: Install app dependencies
+        working-directory: clients/expo
+        env:
+          NODE_ENV: development
+        run: pnpm install --ignore-workspace --frozen-lockfile
+
       - name: Install agent-device CLI
         run: npm install -g agent-device@latest
 
       - name: Open Simulator app
-        run: |
-          open -a Simulator || true
+        run: open -a Simulator
 
       - name: Ensure simulator available
         env:
           SIM_NAME: "iPhone 14"
         run: |
           xcrun simctl list devices
-          # Boot the simulator if not booted
           xcrun simctl boot "$SIM_NAME" || true
-          # Wait until booted
           n=0
           until xcrun simctl getenv booted SIMULATOR_RUNTIME 2>/dev/null || [ $n -gt 30 ]; do
             sleep 2
@@ -49,25 +66,26 @@ jobs:
       - name: Prebuild iOS (Expo managed -> native)
         working-directory: clients/expo
         run: |
-          # If using bare/native iOS, skip this step. For Expo managed, prebuild creates ios/ Xcode project.
-          npx expo prebuild --platform ios --no-install || true
+          # No `|| true`: a prebuild that fails must fail this job, since every later
+          # step depends on the Xcode project it produces. Pods are installed here so
+          # the .xcworkspace that xcodebuild needs actually exists.
+          npx expo prebuild --platform ios
 
       - name: Build iOS simulator app
         working-directory: clients/expo
         env:
-          # Adjust these if your scheme/workspace differ
           WORKSPACE: ios/Coolie.xcworkspace
           SCHEME: Coolie
           SIMULATOR: 'iPhone 14'
         run: |
-          # Build for the iOS simulator
           xcodebuild -workspace "$WORKSPACE" -scheme "$SCHEME" -sdk iphonesimulator -configuration Debug -destination "platform=iOS Simulator,name=$SIMULATOR" BUILD_DIR=build clean build
 
       - name: Find built .app
+        id: find_built_app
         working-directory: clients/expo
         run: |
           APP_PATH=$(find build -name "*.app" | head -n 1 || true)
-          echo "app_path=$APP_PATH" >> $GITHUB_OUTPUT
+          echo "app_path=$APP_PATH" >> "$GITHUB_OUTPUT"
           if [ -z "$APP_PATH" ]; then
             echo "Built .app not found. Adjust workspace/scheme or prebuild steps." && exit 1
           fi
@@ -76,32 +94,29 @@ jobs:
         working-directory: clients/expo
         run: |
           echo "Installing ${{ steps.find_built_app.outputs.app_path }}"
-          xcrun simctl install booted $(find build -name "*.app" | head -n 1)
+          xcrun simctl install booted "${{ steps.find_built_app.outputs.app_path }}"
 
       - name: Wait for device
         run: xcrun simctl bootstatus booted -b
 
       - name: Run agent-device replay
         working-directory: clients/expo
-        env:
-          # Optional: set AGENT_DEVICE_DAEMON_BASE_URL to target remote daemon
-          # AGENT_DEVICE_DAEMON_BASE_URL: ${{ secrets.AGENT_DEVICE_DAEMON_BASE_URL || '' }}
         run: |
-          mkdir -p ../evidence || true
-          # Ensure replay script path exists in repo (adjust path if needed)
+          mkdir -p ../evidence
           REPLAY=./replays/coolie-flow.ad
           if [ ! -f "$REPLAY" ]; then
             echo "Replay script $REPLAY not found — ensure you committed it." && exit 1
           fi
-          agent-device replay "$REPLAY" --session ci-e2e-ios --keep-session || echo "replay command exited with non-zero"
+          # No `|| echo`: a replay that fails must fail this job. Note what the current
+          # script does — it opens the devtools URL in a browser, so it exercises the
+          # app not at all; see the header of this file.
+          agent-device replay "$REPLAY" --session ci-e2e-ios --keep-session
 
       - name: Collect simulator logs and artifacts
         working-directory: clients/expo
         run: |
           mkdir -p ../../artifacts/agent-device || true
-          # copy evidence directories that scripts produce (adjust as needed)
           cp -R ./evidence ../../artifacts/agent-device || true
-          # capture system logs
           xcrun simctl get_log booted > ../../artifacts/agent-device/simulator.log || true
 
       - name: Upload artifacts
