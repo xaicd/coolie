@@ -61,7 +61,13 @@ const manifest: PaperclipPluginManifestV1 = {
   },
   apiRoutes: [
     r("list-transcriptions", "GET", "/transcriptions", "query"),
-    r("create-transcription", "POST", "/transcriptions", "body"),
+    // Explicit, not the POST default of "board": the mobile clients that record and
+    // dispatch a voice task authenticate with an agent key, so a board-only route made
+    // voice dispatch impossible for them (measured: 403 Board access required). The
+    // company boundary does not depend on this flag — the host runs assertCompanyAccess
+    // on the resolved companyId whatever the route's auth is, so an agent key still
+    // cannot transcribe into another company.
+    r("create-transcription", "POST", "/transcriptions", "body", "board-or-agent"),
     r("get-transcription", "GET", "/transcriptions/:transcriptionId", "query"),
   ],
   ui: {
