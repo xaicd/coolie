@@ -25,6 +25,13 @@ export interface BootstrapNodeTypeDraft {
   displayName: string;
   description?: string;
   properties?: Record<string, unknown>;
+  /**
+   * The field order the draft declared (its JSON key order, which has not been
+   * through a jsonb column). Stored beside the schema because the map cannot
+   * carry it, so the workbench shows the order the model wrote rather than an
+   * alphabetical one.
+   */
+  propertyOrder?: string[];
 }
 
 export interface BootstrapRelationTypeDraft {
@@ -324,7 +331,8 @@ function normaliseNodeType(raw: unknown): BootstrapNodeTypeDraft {
   const properties = (typeof r.properties === "object" && r.properties !== null && !Array.isArray(r.properties))
     ? (r.properties as Record<string, unknown>)
     : undefined;
-  return { key, displayName, description, properties };
+  const propertyOrder = properties ? Object.keys(properties) : undefined;
+  return { key, displayName, description, properties, propertyOrder };
 }
 
 function normaliseRelationType(raw: unknown): BootstrapRelationTypeDraft {

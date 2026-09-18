@@ -39,6 +39,14 @@ describe("extractRepoDraft carries fields and comments", () => {
     });
   });
 
+  it("keeps the column order the table declared", () => {
+    // Sorted would be total_amount, order_id, status. The declared order is real
+    // information the fold used to drop along with the array it arrived in.
+    const draft = extractRepoDraft([DDL]);
+    const order = draft.seedNodeTypes.find((nt) => nt.typeName === "t_order");
+    expect(order!.propertyOrder).toEqual(["order_id", "total_amount", "status"]);
+  });
+
   it("keeps the table comment as the type description", () => {
     const draft = extractRepoDraft([DDL]);
     const order = draft.seedNodeTypes.find((nt) => nt.typeName === "t_order");
@@ -113,13 +121,25 @@ describe("publishCognitionJob forwards propertiesSchema", () => {
 
     expect(insert, "expected an INSERT into ontology_node_types").toBeTruthy();
     // createNodeType binds: 0 id, 1 company, 2 domain, 3 key, 4 display_name,
-    // 5 description, 6 properties_schema, 7 interfaces, 8 layer.
+    // 5 description, 6 properties_schema, 7 property_order, 8 interfaces, 9 layer.
     expect(insert!.params![3]).toBe("t_order");
     expect(insert!.params![5]).toBe("订单主表");
     expect(JSON.parse(String(insert!.params![6]))).toEqual({
       order_id: { type: "bigint", description: "订单号" },
     });
-    expect(insert!.params![8]).toBe("aggregate_root");
+    expect(insert!.params![9]).toBe("aggregate_root");
+  });
+
+  it("carries the declared field order into the row", async () => {
+    // The map the draft carries cannot keep the order, so the publish path has to
+    // forward it separately or the schema page falls back to an alphabetical one.
+    const insert = await publish({
+      typeName: "t_order",
+      displayName: "t_order",
+      properties: { order_id: { type: "bigint" }, amount: { type: "number" } },
+      propertyOrder: ["amount", "order_id"],
+    });
+    expect(JSON.parse(String(insert!.params![7]))).toEqual(["amount", "order_id"]);
   });
 
   it("accepts the propertiesSchema key too", async () => {

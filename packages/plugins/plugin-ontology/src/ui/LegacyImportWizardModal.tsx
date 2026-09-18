@@ -38,6 +38,14 @@ export type ParsedSource = {
     key: string;
     displayName: string;
     properties: Record<string, unknown>;
+    /**
+     * The field order the source declared, when it is known.
+     *
+     * The schema map cannot carry it once it reaches a jsonb column, so it
+     * travels beside the map and is stored in its own column. Absent means the
+     * order is unknown, and the reader sorts rather than inventing one.
+     */
+    propertyOrder?: string[];
   }>;
   /** relationType keys (source → target) inferred from foreign keys */
   relationTypes: Array<{
@@ -354,6 +362,7 @@ function Step1Body({
           key: n.typeName,
           displayName: n.displayName,
           properties: n.properties ?? {},
+          propertyOrder: n.propertyOrder,
         })),
         relationTypes: scan.draft.seedRelationTypes.map((r) => ({
           key: `${r.sourceType}_${r.relationType}_${r.targetType}`,
@@ -403,13 +412,20 @@ function Step1Body({
         return;
       }
       onParsed({
-        nodeTypes: (d?.nodeTypes ?? []).map((n) => ({
-          key: n.key,
-          displayName: n.displayName ?? n.key,
-          properties: Object.fromEntries(
-            Object.entries(n.properties ?? {}).map(([k, v]) => [k, { type: v.type ?? "string" }]),
-          ),
-        })),
+        nodeTypes: (d?.nodeTypes ?? []).map((n) => {
+          // The extractor's own field order, straight out of its JSON. It has not
+          // been near a jsonb column, so this is information the extractor stated
+          // rather than the database's opinion of it.
+          const fields = Object.entries(n.properties ?? {});
+          return {
+            key: n.key,
+            displayName: n.displayName ?? n.key,
+            properties: Object.fromEntries(
+              fields.map(([k, v]) => [k, { type: v.type ?? "string" }]),
+            ),
+            propertyOrder: fields.map(([k]) => k),
+          };
+        }),
         relationTypes: (d?.relationTypes ?? []).map((r) => ({
           key: r.key,
           displayName: r.displayName ?? r.key,
@@ -917,6 +933,7 @@ function Step4Body({
             key: nt.key,
             displayName: nt.displayName,
             propertiesSchema: nt.properties,
+            propertyOrder: nt.propertyOrder,
             metadata: parsed.provenance?.[nt.key],
           });
         } catch (e) {
@@ -1102,6 +1119,9 @@ async function parseAndPreview(text: string): Promise<ParsedSource> {
         properties: Object.fromEntries(
           (ent.properties ?? []).map((p) => [p.name, { type: p.type }]),
         ),
+        // The parser hands back an ordered array, so the declared order is known
+        // here even though the map it becomes cannot keep it.
+        propertyOrder: (ent.properties ?? []).map((p) => p.name),
       });
     }
     for (const rel of result.relations) {

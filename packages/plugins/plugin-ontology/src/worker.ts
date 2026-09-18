@@ -41,6 +41,7 @@ import { buildSuggestFieldsPrompt, parseSuggestedFields } from "./aide/suggestFi
 import { buildEnrichPrompt, parseEnrichResponse, type EnrichTarget } from "./aide/enrichDescriptions.js";
 import { parseSqlDdl } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
 import { buildTypeProvenance } from "@paperclipai/ontology-core/provenance.js";
+import { readPropertyOrder } from "@paperclipai/ontology-core/propertyOrder.js";
 import { architectureToArchifyIr } from "@paperclipai/ontology-core/export/archify.js";
 import { ONTOLOGY_TOOLS, callOntologyTool, type OntologyTool } from "@paperclipai/ontology-core/mcp/tools.js";
 import {
@@ -358,6 +359,9 @@ async function publishCognitionDraft(
       description: str(nt.description) || null,
       layer: (str(nt.layer) as NodeLayer) || undefined,
       propertiesSchema: optionalRecord(nt.properties ?? nt.propertiesSchema),
+      // The order the scan declared. Without it the type is `sorted`, which is
+      // how the source order was being lost on the way to the schema page.
+      propertyOrder: optionalStringArray(nt.propertyOrder),
       metadata: buildTypeProvenance(
         optionalRecord(nt.origin) as never,
         Array.isArray(nt.sourceFiles) ? (nt.sourceFiles as string[]) : undefined,
@@ -582,6 +586,7 @@ async function applyProposalOperation(
 ): Promise<{ schemaVersion: number; entityId?: string }> {
   const nodeTypeId = optionalString(op.nodeTypeId);
   const propertiesSchema = optionalRecord(op.propertiesSchema);
+  const propertyOrder = optionalStringArray(op.propertyOrder);
   const propertyRenames = optionalStringMap(op.propertyRenames);
   const displayName = optionalString(op.displayName);
   const description = typeof op.description === "string" ? op.description : undefined;
@@ -593,6 +598,7 @@ async function applyProposalOperation(
         ...(displayName === undefined ? {} : { displayName }),
         ...(description === undefined ? {} : { description }),
         ...(propertiesSchema === undefined ? {} : { propertiesSchema }),
+        ...(propertyOrder === undefined ? {} : { propertyOrder }),
         ...(propertyRenames === undefined ? {} : { propertyRenames }),
       });
       if (!nodeType) throw new Error("Node type not found");
@@ -607,6 +613,7 @@ async function applyProposalOperation(
         displayName: requireString(op.displayName, "payload.displayName"),
         description: optionalString(op.description) ?? null,
         propertiesSchema,
+        propertyOrder,
       });
       return { schemaVersion: await currentSchemaVersion(store, companyId, created.domain_id) };
     }
@@ -923,6 +930,7 @@ const updateNodeTypeMutation: MutationHandler = async (store, _ctx, call) => {
       propertiesSchema: call.fields.propertiesSchema === undefined
         ? undefined
         : requireRecordOrThrow(call.fields.propertiesSchema, "propertiesSchema"),
+      propertyOrder: optionalStringArray(call.fields.propertyOrder),
       metadata: optionalRecord(call.fields.metadata),
       // Stating which removed field became which added one is what makes the
       // existing instance values follow the rename. A diff cannot tell a rename
@@ -1767,7 +1775,14 @@ const plugin = definePlugin({
       // matter what is actually stored.
       return {
         domain,
-        nodeTypes: nodeTypes.map((nt) => ({ ...nt, propertiesSchema: nt.properties_schema })),
+        nodeTypes: nodeTypes.map((nt) => ({
+          ...nt,
+          propertiesSchema: nt.properties_schema,
+          // The declared order travels beside the schema map, because jsonb keeps
+          // an array's order and not an object's. Absent means unknown, and the
+          // reader falls back to a deterministic sort rather than map order.
+          propertyOrder: readPropertyOrder(nt),
+        })),
         // Relation-type rows carry their endpoints in `metadata`; the views read
         // them through `relationEndpoints`, so the bag is forwarded as-is.
         relationTypes,
@@ -1788,7 +1803,14 @@ const plugin = definePlugin({
         requireString(params.domainId, "domainId"),
       );
       return {
-        nodeTypes: nodeTypes.map((nt) => ({ ...nt, propertiesSchema: nt.properties_schema })),
+        nodeTypes: nodeTypes.map((nt) => ({
+          ...nt,
+          propertiesSchema: nt.properties_schema,
+          // The declared order travels beside the schema map, because jsonb keeps
+          // an array's order and not an object's. Absent means unknown, and the
+          // reader falls back to a deterministic sort rather than map order.
+          propertyOrder: readPropertyOrder(nt),
+        })),
       };
     });
 
@@ -2423,6 +2445,9 @@ const plugin = definePlugin({
         if (hasProperties) continue;
         await store.updateNodeType(companyId, current.id, {
           propertiesSchema: def.propertiesSchema,
+          // The catalogue states its fields in a deliberate order; declare it
+          // rather than leaving the page to alphabetise them.
+          propertyOrder: Object.keys(def.propertiesSchema),
         });
         backfilled.push(def.key);
       }
@@ -2466,6 +2491,7 @@ const plugin = definePlugin({
           displayName: def.displayName,
           description: null,
           propertiesSchema: def.propertiesSchema,
+          propertyOrder: Object.keys(def.propertiesSchema),
         });
         typeIdByKey.set(def.key, nt.id);
       }
@@ -3250,6 +3276,7 @@ const plugin = definePlugin({
               displayName: nt.displayName,
               description: nt.description ?? null,
               propertiesSchema: nt.properties,
+              propertyOrder: optionalStringArray(nt.propertyOrder),
             });
             typeIdByKey.set(nt.key, created.id);
           } catch (err) {
@@ -3854,6 +3881,7 @@ const plugin = definePlugin({
           displayName: requireString(body.displayName, "displayName"),
           description: typeof body.description === "string" ? body.description : null,
           propertiesSchema: optionalRecord(body.propertiesSchema),
+          propertyOrder: optionalStringArray(body.propertyOrder),
           metadata: optionalRecord(body.metadata),
         });
         await logSchemaChange(ctx, companyId, `新建对象类型 ${nodeType.key}`, "ontology_node_type", nodeType.id);

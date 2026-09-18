@@ -58,6 +58,11 @@ export interface RepoDraft {
     description?: string;
     /** Flat `field -> descriptor` map. */
     properties?: Record<string, unknown>;
+    /**
+     * The field order this type declared, kept beside the map because the map
+     * cannot carry it once it reaches a jsonb column.
+     */
+    propertyOrder?: string[];
     /** Where the type came from: package, service, mapped table, stereotype. */
     origin?: ExtractedOrigin;
   }>;
@@ -372,6 +377,12 @@ export function extractRepoDraft(files: SourceFile[]): RepoDraft {
       description?: string;
       /** Flat `field -> descriptor` map, the plugin's canonical schema shape. */
       properties?: Record<string, unknown>;
+      /**
+       * First-seen field order. A field an earlier source already placed keeps
+       * its position; a field only a later source knows about is appended, which
+       * is the same rule the per-field merge below follows.
+       */
+      propertyOrder: string[];
       /** Field -> the type it referenced, for relation derivation. */
       references: Array<{ field: string; target: string }>;
       origin?: ExtractedOrigin;
@@ -390,7 +401,12 @@ export function extractRepoDraft(files: SourceFile[]): RepoDraft {
 
     for (const e of ex.entities) {
       const cur = entityMap.get(e.typeName)
-        ?? { displayName: e.displayName ?? e.typeName, references: [], sourceFiles: new Set<string>() };
+        ?? {
+          displayName: e.displayName ?? e.typeName,
+          references: [],
+          propertyOrder: [],
+          sourceFiles: new Set<string>(),
+        };
       cur.sourceFiles.add(f.path);
       // Only SQL carries fields and table comments today, but the fold is
       // generic: the first entity that has them wins, later duplicates do not
@@ -406,6 +422,7 @@ export function extractRepoDraft(files: SourceFile[]): RepoDraft {
         // never overwrite what is already known.
         const merged: Record<string, unknown> = cur.properties ?? {};
         for (const p of e.properties) {
+          if (!cur.propertyOrder.includes(p.name)) cur.propertyOrder.push(p.name);
           const prior = (merged[p.name] ?? {}) as Record<string, unknown>;
           merged[p.name] = {
             // Only SQL states a column type; everywhere else the language type
@@ -464,6 +481,7 @@ export function extractRepoDraft(files: SourceFile[]): RepoDraft {
     sourceFiles: [...v.sourceFiles],
     ...(v.description ? { description: v.description } : {}),
     ...(v.properties ? { properties: v.properties } : {}),
+    ...(v.propertyOrder.length > 0 ? { propertyOrder: v.propertyOrder } : {}),
     ...(v.origin ? { origin: v.origin } : {}),
   }));
   const seedRelationTypes = [...relationMap.entries()].map(([key, v]) => ({
