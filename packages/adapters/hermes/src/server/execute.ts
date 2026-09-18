@@ -342,7 +342,11 @@ export async function execute(
 
   // ── Resolve configuration ──────────────────────────────────────────────
   const hermesCmd = resolveHermesCommand(config);
-  const model = cfgString(config.model) || DEFAULT_MODEL;
+  // No explicit model → leave `model` empty so no -m flag is passed and
+  // Hermes uses its own ~/.hermes/config.yaml default. Forcing "auto" here
+  // used to override the configured default with a literal model name that
+  // China-route endpoints (e.g. bigmodel glmcode) reject with "模型不存在".
+  const model = cfgString(config.model) || "";
   const timeoutSec = cfgNumber(config.timeoutSec) || DEFAULT_TIMEOUT_SEC;
   const graceSec = cfgNumber(config.graceSec) || DEFAULT_GRACE_SEC;
   const maxTurns = cfgNumber(config.maxTurnsPerRun);
