@@ -1,3 +1,7 @@
+import { join } from "node:path";
+import { claudeNativeSkillPrompt } from "./native-skill-prompt.js";
+import { nativeMcpLaunchBinding } from "../native-mcp.js";
+
 import type {
   AcpElicitationHandler,
   AcpRuntimeEvent,
@@ -5,6 +9,11 @@ import type {
 } from "acpx/runtime";
 
 import type { NativeAcpxPermissionMode } from "../../contracts/native-execution.js";
+import type { NativeRuntimeContextSnapshot } from "../../contracts/runtime-context.js";
+import {
+  materializeNativeRuntimeSkills,
+  releaseMaterializedNativeRuntimeSkills,
+} from "../runtime-context-materializer.js";
 import {
   startRunnerToolBridge,
   type RunnerToolBridge,
@@ -195,6 +204,7 @@ export interface OpenAcpxRuntimeHostOptions {
   model: string;
   permissionMode: NativeAcpxPermissionMode;
   systemInstructions?: string;
+  runtimeContext?: NativeRuntimeContextSnapshot | null;
   environment?: NodeJS.ProcessEnv;
   managedCodexCredentialSourcePath?: string;
   expectedIdentity?: AcpxExpectedSessionIdentity;
@@ -246,6 +256,7 @@ export class AcpxRuntimeHost {
   readonly #credential: AcpxProviderLifetimeLease | null;
   readonly #command: VerifiedAcpxCommandLease;
   readonly #toolBridge: RunnerToolBridge | null;
+  readonly #claudeSkillNames: readonly string[];
   #activeTurn: AcpxRuntimeTurn | null = null;
   #closingStarted = false;
   #closePromise: Promise<void> | null = null;
@@ -259,6 +270,7 @@ export class AcpxRuntimeHost {
     credential: AcpxProviderLifetimeLease | null;
     command: VerifiedAcpxCommandLease;
     toolBridge: RunnerToolBridge | null;
+    claudeSkillNames: readonly string[];
   }) {
     this.#runtime = input.runtime;
     this.#binding = input.binding;
@@ -267,6 +279,7 @@ export class AcpxRuntimeHost {
     this.#credential = input.credential;
     this.#command = input.command;
     this.#toolBridge = input.toolBridge;
+    this.#claudeSkillNames = [...input.claudeSkillNames];
   }
 
   static async open(
@@ -278,6 +291,13 @@ export class AcpxRuntimeHost {
       throw new Error(
         "ACPX pi is unavailable until its runtime has descriptor-confined verified launch",
       );
+    }
+    const nativeMcp = nativeMcpLaunchBinding(options.environment);
+    if (nativeMcp?.name === "paperclip") {
+      throw new Error("assigned native MCP name conflicts with the task bridge");
+    }
+    if (options.runtimeContext?.mcp.bindingId && !nativeMcp) {
+      throw new Error("assigned native MCP launch binding is unavailable");
     }
     const profile = resolveQualifiedAcpxProfile(options.agent, options.model);
     const binding = await runAbortableAdmissionStage(
@@ -366,6 +386,7 @@ export class AcpxRuntimeHost {
             binding,
             agent: options.agent,
             environment: options.environment,
+            tools: options.semanticTools?.tools,
           }),
         dependencies.retainAdmissionCleanup,
       );
@@ -395,6 +416,18 @@ export class AcpxRuntimeHost {
           reportFailure: (failure) =>
             dependencies.reportRetainedCleanupFailure(failure),
         });
+      }
+      if (options.agent === "claude") {
+        // The lifetime lease proves the previous provider has stopped. Refresh
+        // the assigned snapshot before every launch, including durable resume;
+        // Claude discovers user skills beneath its isolated CLAUDE_CONFIG_DIR.
+        const skillsHome = join(sandbox.agentHomeDirectory, "skills");
+        await releaseMaterializedNativeRuntimeSkills(skillsHome);
+        await materializeNativeRuntimeSkills(
+          options.runtimeContext ?? null,
+          skillsHome,
+        );
+        options.signal?.throwIfAborted();
       }
       command = await acquireAbortableAdmissionResource({
         signal: options.signal,
@@ -447,16 +480,14 @@ export class AcpxRuntimeHost {
               ? {}
               : { assertWorkspaceHeld: options.assertWorkspaceHeld }),
             ...(options.signal === undefined ? {} : { signal: options.signal }),
-            mcpServers: toolBridge
-              ? [
-                  {
-                    name: "paperclip",
-                    url: toolBridge.url,
-                    bearerToken: toolBridge.secret,
-                    runnerOwned: true,
-                  },
-                ]
-              : [],
+            mcpServers: [
+              ...(toolBridge ? [{ name: "paperclip", url: toolBridge.url,
+                bearerToken: toolBridge.secret, runnerOwned: true }] : []),
+              // This is Paperclip's authenticated gateway, not a direct upstream
+              // binding. Its existing grants and approval checks remain authoritative.
+              ...(nativeMcp ? [{ name: nativeMcp.name, url: nativeMcp.url,
+                bearerToken: nativeMcp.token, runnerOwned: true }] : []),
+            ],
             ...(options.onGoalUpdate === undefined
               ? {}
               : { onGoalUpdate: options.onGoalUpdate }),
@@ -519,6 +550,9 @@ export class AcpxRuntimeHost {
         credential,
         command,
         toolBridge,
+        claudeSkillNames: options.agent === "claude"
+          ? (options.runtimeContext?.skills.map((skill) => skill.runtimeName) ?? [])
+          : [],
       });
     } catch (error) {
       const cleanup = cleanupRuntimeResources(
@@ -615,7 +649,12 @@ export class AcpxRuntimeHost {
       throw new Error("ACPX runtime host already has an active turn");
     }
     const requestId = boundedRequestId(input.requestId);
-    const text = boundedTurnText(input.text);
+    // Bound caller input before adding the provider's assigned-skill command.
+    // The command is internal framing; it must not consume the envelope's
+    // allowance or cause an otherwise valid envelope to be truncated/rejected.
+    const text = claudeNativeSkillPrompt(
+      boundedTurnText(input.text), this.#claudeSkillNames,
+    );
     const turn = this.#runtime.startTurn({
       text,
       requestId,

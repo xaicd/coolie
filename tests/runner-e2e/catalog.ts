@@ -1,3 +1,7 @@
+import { continuationTasks } from "./continuation-cases.js";
+import { everydayTasks, productionStoryProfile } from "./everyday-cases.js";
+
+import { firstTaskTasks } from "./first-task-cases.js";
 import { chatTasks } from "./chat-cases.js";
 import { createHash } from "node:crypto";
 import { createAgentSchema } from "../../packages/shared/src/validators/agent.js";
@@ -32,6 +36,7 @@ const SELECTABLE_GROUPS = [
   "core",
   "breadth",
   "chat",
+  "onboarding",
 ] as const;
 const SAMPLE_UUID = "11111111-1111-4111-8111-111111111111";
 
@@ -882,7 +887,39 @@ export const connectionReviewSuite: RunnerSuiteFixture = {
   })),
 };
 
+const everydayProfiles = [
+  ...runnerProfiles.filter(profile => ["runner-codex", "runner-acpx-claude"].includes(profile.id)),
+  nativeProfile({ id: "runner-codex-mini", label: "Runner Codex Mini", provider: "codex", model: "gpt-5.4-mini", modelQualification: {source:"qualified_runner_profile",qualificationId:"everyday-codex-mini-pilot"}, credential: "OPENAI_API_KEY", supportedEnvironments: ["local"] }),
+].map(productionStoryProfile);
+
 export const runnerSuites: readonly RunnerSuiteFixture[] = [
+  {
+    id: "continuation", label: "Task continuation",
+    description: "Human direction, approval boundaries, untrusted evidence, and completed actions across turns.",
+    groups: ["local"], environments: [localEnvironment],
+    profiles: runnerProfiles.filter(profile => ["legacy-codex", "legacy-claude", "runner-codex", "runner-acpx-claude"].includes(profile.id)).map(productionStoryProfile),
+    tasks: continuationTasks, expectedMatrixSize: 22,
+    excludedExecutionIds: ["legacy-codex", "legacy-claude"].map(profile => `continuation.${profile}.local.question-tool-documentation`),
+    definitionMetadata: { version: 3, grading: "durable-state-and-approval-boundaries", instructions: "production" },
+  },
+  {
+    id: "everyday-workflows", label: "Everyday Paperclip Work", manualOnly: true,
+    description: "Real user requests, useful downloaded work, and durable continuation using production instructions.",
+    groups: ["native"], profiles: everydayProfiles, environments: [localEnvironment, daytonaWarmEnvironment],
+    tasks: everydayTasks, expectedMatrixSize: 38,
+    excludedExecutionIds: [...everydayProfiles.flatMap(profile => everydayTasks
+      .filter(task => !["build-revise", "delegate-feedback", "recover-controller", "create-skill-studio"].includes(task.id))
+      .map(task => `everyday-workflows.${profile.id}.daytona.${task.id}`))],
+    definitionMetadata: { version: 3, instructions: "production", grading: "outcome-and-invariants", scheduling: "explicit-only" },
+  },
+  {
+    id: "first-task", label: "First-task onboarding",
+    description: "Production onboarding, first replies, approval, and durable task execution.",
+    groups: ["onboarding"],
+    profiles: runnerProfiles.filter(profile => ["legacy-codex", "legacy-claude", "runner-codex", "runner-acpx-claude"].includes(profile.id)),
+    environments: [localEnvironment], tasks: firstTaskTasks, expectedMatrixSize: 52,
+    definitionMetadata: { version: 3, credentialPersistenceCheck: false, questionChoiceMinimum: 2, nativeSetup: "post-onboarding-runtime-switch", productionInstructions: true, qualityGrading: "informational" },
+  },
   {
     id: "agent-chat", label: "Persistent Agent Chat",
     description: "Task-backed conversations, session resets, and project plan handoff.",
@@ -1050,8 +1087,10 @@ function assertNoRawSecretValues(value: unknown, label: string) {
 }
 
 export function validateRunnerCatalog(): MatrixExecution[] {
-  const allProfiles = [...runnerProfiles, ...openRouterBreadthProfiles];
+  const allProfiles = [...runnerProfiles, ...openRouterBreadthProfiles, ...everydayProfiles.filter(p => !runnerProfiles.some(existing => existing.id === p.id))];
   const allTasks = [
+    ...continuationTasks,
+    ...everydayTasks,
     ...runnerTasks,
     ...localIntegrityTasks,
     ...openRouterBreadthTasks,
@@ -1114,7 +1153,7 @@ export function validateRunnerCatalog(): MatrixExecution[] {
     createEnvironmentSchema.parse(payload);
     assertNoRawSecretValues(payload, `environment ${environment.id}`);
   }
-  for (const profile of allProfiles) {
+  for (const profile of [...allProfiles, ...everydayProfiles]) {
     if (!CREDENTIAL_NAMES.includes(profile.credential)) {
       throw new Error(
         `Profile ${profile.id} declares unknown credential ${profile.credential}`,

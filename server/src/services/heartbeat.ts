@@ -1,3 +1,4 @@
+import { readQueuedInteractionResponse } from "./queued-interaction-response.js";
 import { AGENT_CHAT_DIRECTIVE, conversationReplay, isConversation, isConversationExecutionWake, isWaitingConversation, prepareConversationTurn, settleConversationTurn } from "./agent-conversations.js";
 import { PROCESS_IDENTITY_RECORDED, recordNativeLocalProcessStop } from "./native-local-process-stop.js";
 import { hasAcknowledgedNativeStopIntent, isAcknowledgedNativeStop, acknowledgedNativeStopExecutionHasStopped } from "./acknowledged-native-stop.js";
@@ -7,11 +8,14 @@ import { hasRemoteTerminationReceipt, remoteExecutionHasStopped, remoteTerminati
 import { applyConnectorSkills, prepareConnectorSkillDelivery, resolveConnectorAssignments } from "./connector-runtime.js";
 import { admitExplicitNativeContinuation, undeliveredLegacyUserCommentIds } from "./explicit-native-continuation.js";
 import { connectionIntentService } from "./connection-intents.js";
-import { prepareManagedAiRuntime, assertManagedAiProjectAuth, stripAiAuthBindings, AI_AUTH_ENV_KEYS } from "./ai-connection-runtime.js";
+import { prepareManagedAiRuntime, assertManagedAiProjectAuth, stripAiAuthBindings, isAiConnectionBusy, AI_AUTH_ENV_KEYS } from "./ai-connection-runtime.js";
 import { aiConnectionBindingSchema } from "@paperclipai/shared";
 import { executionBlockerPredicate, getExecutionBlocker } from "./execution-blocker.js";
 import { CONVERSATION_CONTINUATION_POLICY, claimedAdapterType, runUsedConversationAdapter, hasConversationContinuationPolicy, isConversationAdapter } from "./conversation-continuation.js";
 import { recordExecutionWait } from "./execution-wait.js";
+import { getNativeReviewAssignment, readNativeReviewAssignmentContext } from "./native-runtime/native-review-participant.js";
+import { claimQueuedNativeReviewRun } from "./native-runtime/native-review-dispatch.js";
+import { buildNativeReviewRequest } from "./native-runtime/native-review-prompt.js";
 import {
   legacyExecutionNeedsReconciliation,
   terminalizeLegacyExecution,
@@ -28,6 +32,9 @@ import { buildHeartbeatRunStatusLiveEventPayload } from "./heartbeat-run-status-
 export { buildHeartbeatRunStatusLiveEventPayload } from "./heartbeat-run-status-payload.js";
 import { buildExecutionContinuation } from "./execution-continuation.js";
 import { renderPaperclipWakePrompt } from "@paperclipai/adapter-utils/server-utils";
+import { PROJECT_REPOSITORIES_DIR, readGitWorkspaceSnapshot } from "@paperclipai/adapter-utils/git-workspace-sync";
+import { isWorkspaceGitScanError, WorkspaceGitScanError, WORKSPACE_GIT_SCAN_ERROR_CODES } from "./workspace-git-operation-scheduler.js";
+import { captureDirectorySnapshot, mergeDirectoryWithBaseline } from "@paperclipai/adapter-utils/workspace-restore-merge";
 import { initializeRunIdentity, explicitOperatorRunIdentity } from "./run-identity.js";
 import {
   assertDurableChatWakeupReceipt,
@@ -174,6 +181,7 @@ import { publishLiveEvent } from "./live-events.js";
 import {
   allocateHeartbeatRunEventSeq,
   appendHeartbeatRunEvent,
+  type AppendHeartbeatRunEventInput,
 } from "./heartbeat-run-events.js";
 import {
   queuedCommentIdsFromWakePayload,
@@ -294,6 +302,7 @@ import {
   emitAgentTaskRun,
   emitAgentTaskRunById,
 } from "./agent-task-run-telemetry.js";
+import { reportRunFailure } from "./run-failure-report.js";
 import { companySkillService } from "./company-skills.js";
 import { budgetService, type BudgetEnforcementScope } from "./budgets.js";
 import { secretService, type MissingRuntimeBinding } from "./secrets.js";
@@ -434,6 +443,7 @@ import {
   type HeartbeatRunScratch,
 } from "./run-scratch.js";
 import {
+  applyDefaultIsolatedExecutionWorkspacePolicy,
   buildExecutionWorkspaceAdapterConfig,
   gateProjectExecutionWorkspacePolicy,
   issueExecutionWorkspaceModeForPersistedWorkspace,
@@ -491,6 +501,7 @@ import {
   type PostCommitEffect,
   MAX_TURN_CONTINUATION_RETRY_REASON,
   WORKSPACE_BUSY_RETRY_REASON,
+  AI_CONNECTION_BUSY_RETRY_REASON,
   INTERACTION_CONTINUATION_INFRA_RETRY_REASON,
   INTERACTION_CONTINUATION_INFRA_WAKE_REASON,
   WAKE_COMMENT_IDS_KEY,
@@ -650,11 +661,14 @@ const NATIVE_OWNERSHIP_UNVERIFIED_MESSAGE =
   "Native execution ownership could not be verified; automatic recovery is blocked";
 // The reaper sweeps at most this many pending_cleanup leases per tick.
 const PENDING_CLEANUP_SWEEP_PAGE_SIZE = 20;
-// The reaper stops retrying a pending_cleanup lease after this many attempts.
+const pendingCleanupAttemptsInFlight = new Set<string>();
+// Escalate and slow cleanup after this many attempts; never abandon a live lease.
 const PENDING_CLEANUP_SWEEP_ATTEMPT_CAP = 5;
 // The reaper stores its retry state under these keys in the lease metadata.
 const PENDING_CLEANUP_ATTEMPTS_METADATA_KEY = "pendingCleanupRetryAttempts";
 const PENDING_CLEANUP_CAP_WARNED_METADATA_KEY = "pendingCleanupRetryCapWarned";
+// The reaper sweeps at most this many orphaned active leases per tick.
+const ORPHANED_ACTIVE_LEASE_SWEEP_PAGE_SIZE = 20;
 
 // A provider or plugin destroy rejection can carry a bearer credential, a
 // signed URL, or provider response detail in its name, code, message, cause, or
@@ -663,6 +677,7 @@ const PENDING_CLEANUP_CAP_WARNED_METADATA_KEY = "pendingCleanupRetryCapWarned";
 // catch site logs a constant, locally generated `errorKind` instead.
 const PENDING_CLEANUP_RETRY_ERROR_KIND = "destroy_failed";
 const PENDING_CLEANUP_SWEEP_ERROR_KIND = "sweep_failed";
+const ORPHANED_ACTIVE_LEASE_SWEEP_ERROR_KIND = "orphaned_active_lease_sweep_failed";
 
 // Read the stored retry attempt count as a safe value, directly in SQL. A
 // provider can write a malformed value under the attempts key. The type guard
@@ -686,6 +701,23 @@ function pendingCleanupAttemptsSql() {
         )
       else 0
     end`;
+}
+
+function pendingCleanupRetryDueSql(explicitRetry = false) {
+  // Ownership renewal and retry cooldown are separate clocks. A late renewal
+  // cannot change when a completed attempt may retry. Older claims used the
+  // retry field for both clocks, so retain that fallback until they settle.
+  const deadline = sql`case
+    when ${environmentLeases.metadata}->>'pendingCleanupInFlight' = 'true'
+      and ${environmentLeases.metadata} ? 'pendingCleanupLeaseExpiresAtMs'
+      then ${environmentLeases.metadata}->'pendingCleanupLeaseExpiresAtMs'
+    else ${environmentLeases.metadata}->'pendingCleanupRetryAfterMs' end`;
+  return sql`case
+    when ${explicitRetry} and coalesce(${environmentLeases.metadata}->>'pendingCleanupInFlight', 'false') != 'true' then true
+    when jsonb_typeof(${deadline}) = 'number'
+      then (${deadline})::numeric <= ${Date.now()}
+        or (${deadline})::numeric > ${Date.now() + 30 * 60_000 + 1_000}
+    else true end`;
 }
 
 // Choose the `jsonb_set` target root. A provider can write a scalar or array
@@ -755,6 +787,9 @@ export const BOUNDED_TRANSIENT_HEARTBEAT_RETRY_DELAYS_MS = [
 const BOUNDED_TRANSIENT_HEARTBEAT_RETRY_JITTER_RATIO = 0;
 const BOUNDED_TRANSIENT_HEARTBEAT_RETRY_REASON = "transient_failure";
 const BOUNDED_TRANSIENT_HEARTBEAT_RETRY_WAKE_REASON = "transient_failure_retry";
+function isTransientWorkspaceGitScanCode(code: string | null | undefined): boolean {
+  return code === WORKSPACE_GIT_SCAN_ERROR_CODES.timeout || code === WORKSPACE_GIT_SCAN_ERROR_CODES.saturated;
+}
 const BOUNDED_TRANSIENT_HEARTBEAT_RETRY_MAX_ATTEMPTS =
   BOUNDED_TRANSIENT_HEARTBEAT_RETRY_DELAYS_MS.length;
 export {
@@ -2371,24 +2406,49 @@ export async function ensureManagedProjectWorkspace(input: {
   /** Optional git credential source for cloning private repos; null/absent preserves ambient behavior. */
   resolveGitAuth?: GitRemoteAuthProvider | null;
 }): Promise<{ cwd: string; warning: string | null }> {
-  const cwd = resolveManagedProjectWorkspaceDir({
+  const defaultCwd = resolveManagedProjectWorkspaceDir({
     companyId: input.companyId,
     projectId: input.projectId,
     repoName: deriveRepoNameFromRepoUrl(input.repoUrl),
   });
+  let cwd = defaultCwd;
+  if (input.repoUrl && await fs.stat(path.join(cwd, ".git")).catch(() => null)) {
+    const origin = await execFile("git", ["-C", cwd, "remote", "get-url", "origin"], { timeout: 10_000 })
+      .then((result) => result.stdout.trim()).catch(() => null);
+    if (origin && origin !== input.repoUrl) {
+      cwd = `${cwd}-${createHash("sha256").update(input.repoUrl).digest("hex").slice(0, 12)}`;
+    }
+  }
   const inFlight = managedCheckoutMaterializations.get(cwd);
-  if (inFlight) return inFlight;
+  if (inFlight) {
+    await inFlight;
+    // The winner may have cloned a different repository with the same basename.
+    return ensureManagedProjectWorkspace(input);
+  }
   const attempt = materializeManagedProjectWorkspace(cwd, input).finally(() => {
     managedCheckoutMaterializations.delete(cwd);
   });
   managedCheckoutMaterializations.set(cwd, attempt);
-  return attempt;
+  const result = await attempt;
+  if (input.repoUrl) {
+    // A different server process can publish a same-name checkout between the
+    // initial origin check and the atomic rename. Never adopt its other repo.
+    const origin = await execFile("git", ["-C", cwd, "remote", "get-url", "origin"], { timeout: 10_000 })
+      .then((value) => value.stdout.trim()).catch(() => null);
+    if (origin && origin !== input.repoUrl) {
+      if (cwd !== defaultCwd) throw new Error("Managed checkout origin does not match the requested repository");
+      return ensureManagedProjectWorkspace(input);
+    }
+  }
+  return result;
 }
 
 async function materializeManagedProjectWorkspace(
   cwd: string,
   input: {
     repoUrl: string | null;
+    repoRef?: string | null;
+    localSource?: string | null;
     resolveGitAuth?: GitRemoteAuthProvider | null;
   },
 ): Promise<{ cwd: string; warning: string | null }> {
@@ -2426,14 +2486,14 @@ async function materializeManagedProjectWorkspace(
   // is never created in a partial state and never removed on failure, so a concurrent
   // materialization (another process, or a run racing this one) can neither adopt a broken
   // checkout nor lose its own completed one.
-  const auth = input.resolveGitAuth
+  const auth = input.resolveGitAuth && !input.localSource
     ? await input.resolveGitAuth(input.repoUrl)
     : null;
   const cloneTmpDir = await fs.mkdtemp(`${cwd}.clone-`);
   try {
     await execFile(
       "git",
-      [...(auth?.configArgs ?? []), "clone", input.repoUrl, cloneTmpDir],
+      [...(auth?.configArgs ?? []), "clone", "--no-hardlinks", "--", input.localSource ?? input.repoUrl, cloneTmpDir],
       {
         env: {
           // Spread order matters: the sanitizer strips PAPERCLIP_*, which would remove the
@@ -2447,6 +2507,15 @@ async function materializeManagedProjectWorkspace(
         timeout: MANAGED_WORKSPACE_GIT_CLONE_TIMEOUT_MS,
       },
     );
+    if (input.localSource) {
+      const snapshot = await readGitWorkspaceSnapshot(input.localSource, false);
+      if (!snapshot) throw new Error("Configured repository folder is not a Git checkout");
+      const baseline = await captureDirectorySnapshot(cloneTmpDir, { exclude: [".git", ".paperclip-runtime", PROJECT_REPOSITORIES_DIR, ...snapshot.ignoredPaths] });
+      await mergeDirectoryWithBaseline({ baseline, sourceDir: input.localSource, targetDir: cloneTmpDir });
+      await execFile("git", ["-C", cloneTmpDir, "remote", "set-url", "origin", input.repoUrl], { timeout: 10_000 });
+    } else if (input.repoRef) {
+      await execFile("git", ["-C", cloneTmpDir, "checkout", input.repoRef], { timeout: MANAGED_WORKSPACE_GIT_CLONE_TIMEOUT_MS });
+    }
   } catch (error) {
     await fs
       .rm(cloneTmpDir, { recursive: true, force: true })
@@ -2456,11 +2525,13 @@ async function materializeManagedProjectWorkspace(
       error: reason,
       used: auth ? { source: auth.source, secretName: auth.secretName } : null,
     });
-    throw new Error(
-      scrubGitCredentialText(
-        `Failed to prepare managed checkout for "${input.repoUrl}" at "${cwd}": ${reason}${authNote ? ` ${authNote}` : ""}`,
-      ),
+    const message = scrubGitCredentialText(
+      `Failed to prepare managed checkout for "${input.repoUrl}" at "${cwd}": ${reason}${authNote ? ` ${authNote}` : ""}`,
     );
+    // Preserve the closed failure code without copying subprocess output or
+    // credentials into the durable run. Setup recovery needs the actual cause.
+    if (isWorkspaceGitScanError(error)) throw new WorkspaceGitScanError(error.code, message);
+    throw new Error(message);
   }
 
   try {
@@ -2481,6 +2552,59 @@ async function materializeManagedProjectWorkspace(
     );
   }
   return { cwd, warning: null };
+}
+
+/** Keep every distinct project repository inside the task's writable/synced root. */
+export async function prepareProjectRepositoryWorkspaces(input: {
+  cwd: string;
+  anchorRepoUrl: string | null;
+  workspaces: Array<Pick<typeof projectWorkspaces.$inferSelect, "id" | "repoUrl" | "repoRef"> & { cwd?: string | null }>;
+  resolveGitAuth?: GitRemoteAuthProvider | null;
+}): Promise<Array<{ workspaceId: string; cwd: string; repoUrl: string; repoRef: string | null }>> {
+  const identity = (url: string) => url.trim().replace(/\.git\/?$/, "").replace(/\/$/, "");
+  const seen = new Set(input.anchorRepoUrl ? [identity(input.anchorRepoUrl)] : []);
+  const selected = input.workspaces.filter((workspace) => {
+    if (!workspace.repoUrl || seen.has(identity(workspace.repoUrl))) return false;
+    seen.add(identity(workspace.repoUrl));
+    return true;
+  });
+  const root = path.join(input.cwd, PROJECT_REPOSITORIES_DIR);
+  if (selected.length === 0 && !(await fs.lstat(root).catch(() => null))) return [];
+  await fs.mkdir(root, { recursive: true });
+  if (await fs.realpath(root) !== path.join(await fs.realpath(input.cwd), PROJECT_REPOSITORIES_DIR)) {
+    throw new Error("Project repositories directory escapes the task workspace");
+  }
+  const excludePath = await execFile("git", ["-C", input.cwd, "rev-parse", "--git-path", "info/exclude"], { timeout: 10_000 })
+    .then((result) => path.resolve(input.cwd, result.stdout.trim()));
+  const exclude = await fs.readFile(excludePath, "utf8").catch(() => "");
+  if (!exclude.split(/\r?\n/).includes(`/${PROJECT_REPOSITORIES_DIR}/`)) {
+    await fs.mkdir(path.dirname(excludePath), { recursive: true });
+    await fs.appendFile(excludePath, `\n/${PROJECT_REPOSITORIES_DIR}/\n`);
+  }
+  const results = [];
+  for (const workspace of selected) {
+    const repoUrl = workspace.repoUrl!;
+    const name = (deriveRepoNameFromRepoUrl(repoUrl) ?? "repo").replace(/[^a-zA-Z0-9_-]/g, "-");
+    const key = `${name}-${createHash("sha256").update(JSON.stringify([workspace.id, identity(repoUrl), workspace.repoRef, workspace.cwd ?? null])).digest("hex").slice(0, 12)}`;
+    const cwd = path.join(root, key);
+    const existing = await fs.lstat(cwd).catch(() => null);
+    if (existing && (!existing.isDirectory() || existing.isSymbolicLink())) throw new Error("Invalid project repository checkout path");
+    const localSource = workspace.cwd && workspace.cwd !== REPO_ONLY_CWD_SENTINEL
+      && await fs.stat(workspace.cwd).then((entry) => entry.isDirectory()).catch(() => false)
+      ? workspace.cwd : null;
+    const result = await materializeManagedProjectWorkspace(cwd, { repoUrl, repoRef: workspace.repoRef, localSource, resolveGitAuth: input.resolveGitAuth });
+    if (result.warning) throw new Error(result.warning);
+    results.push({ workspaceId: workspace.id, cwd, repoUrl, repoRef: workspace.repoRef });
+  }
+  // Retain detached checkout work outside the synchronized repository set.
+  const active = new Set(results.map((repo) => path.basename(repo.cwd)));
+  for (const entry of await fs.readdir(root)) {
+    if (active.has(entry) || entry.includes(".clone-")) continue;
+    const retained = path.join(input.cwd, ".paperclip-runtime", "detached-repositories", randomUUID());
+    await fs.mkdir(path.dirname(retained), { recursive: true });
+    await fs.rename(path.join(root, entry), retained);
+  }
+  return results;
 }
 
 /**
@@ -8470,7 +8594,7 @@ export function buildPaperclipTaskMarkdown(input: {
     lines.push(
       "",
       "External chat file delivery:",
-      "When asked to send an image or file back to this chat, use the bundled Paperclip artifact helper `scripts/paperclip-upload-artifact.sh --chat-comment <caption>` with the local file. Resolve the helper from the installed skill location, not the task workspace. This selects the uploaded file for Paperclip's final-response delivery; an upload or artifact record alone does not. For ordinary file handoffs the helper is the direct path; consult the skill's artifact reference for advanced options, missing tooling, failures, or ambiguous results. Do not search for a separate provider tool connection or fetch a CLI with `npx` to send chat files. Bind only the files the user asked to share, and do not claim provider delivery merely because binding succeeded. GitHub uses task links/notices rather than native file uploads.",
+      "When asked to send an image or file back to this chat, use the bundled Paperclip artifact helper `bash scripts/paperclip-upload-artifact.sh --chat-comment <caption>` with the local file. Resolve the helper from the installed skill location, not the task workspace. This selects the uploaded file for Paperclip's final-response delivery; an upload or artifact record alone does not. For ordinary file handoffs the helper is the direct path; consult the skill's artifact reference for advanced options, missing tooling, failures, or ambiguous results. Do not search for a separate provider tool connection or fetch a CLI with `npx` to send chat files. Bind only the files the user asked to share, and do not claim provider delivery merely because binding succeeded. GitHub uses task links/notices rather than native file uploads.",
       "Prepare and validate the requested files together. Batch independent file preparation and one helper command per file into as few tool calls as practical. Use the same caption for files in one reply so their helper calls share one handoff comment. After a helper reports success, its attachment, artifact, and comment binding are already recorded: do not manually bind the same file again, re-list those records, or add a second handoff comment just to confirm success. Complete the required final-response protocol using the successful receipts. Retry or investigate only a failed or ambiguous step; never repeat a successful upload merely to confirm it.",
     );
   }
@@ -10037,7 +10161,7 @@ export function heartbeatService(
             state: "acknowledged", acknowledgedAt: new Date().toISOString(),
             proof: "provider_termination_receipt" },
           conversationContinuation: CONVERSATION_CONTINUATION_POLICY,
-        })}::jsonb`,
+                 })}::jsonb`,
         updatedAt: new Date(),
       }).where(and(eq(heartbeatRuns.id, runId), eq(heartbeatRuns.companyId, companyId),
         eq(heartbeatRuns.status, "cancelled")));
@@ -10154,7 +10278,13 @@ export function heartbeatService(
     let actorId = readNonEmptyString(parseObject(payload.queuedCommentInterrupt).actorId);
     let commentIds = queuedCommentIdsFromWakePayload(payload);
     const issueId = readNonEmptyString(payload.issueId);
-    if (!issueId || !commentIds.length || wake.idempotencyKey?.startsWith("chat-inbound:")) return;
+    if (!issueId || wake.idempotencyKey?.startsWith("chat-inbound:")) return;
+    const response = await readQueuedInteractionResponse(db, companyId, issueId, payload);
+    if (!commentIds.length && !response) return;
+    // Resolved cards are immutable input. Only an explicit Interrupt click can
+    // authorize continuation across a stopped execution; ordinary completion
+    // uses normal deferred-wake promotion.
+    if (response && !interrupted) return;
     if (!interrupted) {
       commentIds = await undeliveredLegacyUserCommentIds(db, companyId, issueId, wake.agentId, commentIds);
       if (!commentIds.length) return;
@@ -10170,7 +10300,7 @@ export function heartbeatService(
     }
     if (!actorId) return;
     const agent = await getAgent(wake.agentId);
-    if (!agent || agent.companyId !== companyId || agent.adapterType === "paperclip_runner") return;
+    if (!agent || agent.companyId !== companyId || (agent.adapterType === "paperclip_runner" && !response?.source.requiresFreshSession)) return;
     const [active] = await db.select({ id: heartbeatRuns.id }).from(heartbeatRuns).where(and(
       eq(heartbeatRuns.companyId, companyId),
       eq(heartbeatRuns.agentId, wake.agentId),
@@ -10192,7 +10322,8 @@ export function heartbeatService(
           sql`${agentWakeupRequests.payload}->'queuedCommentInterrupt'->>'actorId' = ${actorId}`,
         ));
         if (!task || task.assigneeAgentId !== wake.agentId || ["done", "cancelled"].includes(task.status) ||
-            !current || !queuedCommentIdsFromWakePayload(current.payload).length) return null;
+            !current || (!queuedCommentIdsFromWakePayload(current.payload).length &&
+              !await readQueuedInteractionResponse(tx as unknown as Db, companyId, issueId, current.payload))) return null;
         const [successor] = await tx.select({ id: heartbeatRuns.id }).from(heartbeatRuns).where(and(
           eq(heartbeatRuns.companyId, companyId),
           eq(heartbeatRuns.agentId, wake.agentId),
@@ -10236,13 +10367,16 @@ export function heartbeatService(
         companyId, runId: sourceRun.id, actorId, reason: "queued_comment_interrupt",
       } });
     }
-    const deliveryPayload = withQueuedCommentIdsInWakePayload(payload, commentIds);
+    const deliveryPayload = response ? { ...payload } : withQueuedCommentIdsInWakePayload(payload, commentIds);
     delete deliveryPayload.queuedCommentInterrupt;
     await enqueueWakeup(wake.agentId, {
       source: "on_demand", triggerDetail: "manual", reason: "issue_commented",
-      payload: deliveryPayload, contextSnapshot: withQueuedCommentIdsInRunContext({
-        issueId, triggeredBy: "board", actorId, responsibleUserId: actorId,
-      }, commentIds),
+      payload: deliveryPayload, contextSnapshot: response
+        ? { ...parseObject(payload._paperclipWakeContext), issueId, triggeredBy: "board", actorId,
+            responsibleUserId: actorId }
+        : withQueuedCommentIdsInRunContext({
+            issueId, triggeredBy: "board", actorId, responsibleUserId: actorId,
+          }, commentIds),
       requestedByActorType: "user", requestedByActorId: actorId,
       ...(interrupted ? { queuedCommentInterruptId: queueId } : { queuedCommentRequestId: queueId }),
       issueStateGuard: { assigneeAgentId: wake.agentId, statuses: ["todo", "in_progress", "in_review", "blocked"] },
@@ -12507,6 +12641,7 @@ export function heartbeatService(
     if (previousStatus === updated.status) return;
     clearHeartbeatRunRuntimeStatus(updated.id);
     void emitAgentTaskRun(db, updated);
+    void reportRunFailure(db, updated);
   }
 
   async function setRunStatus(
@@ -13503,6 +13638,7 @@ export function heartbeatService(
       color?: string;
       message?: string;
       payload?: Record<string, unknown>;
+      retryExhaustion?: AppendHeartbeatRunEventInput["retryExhaustion"];
     },
   ) {
     const eventAt = new Date();
@@ -13541,7 +13677,9 @@ export function heartbeatService(
       color: event.color,
       message: sanitizedMessage,
       payload: sanitizedPayload,
+      retryExhaustion: event.retryExhaustion,
     });
+    if (persistedEvent.disposition === "duplicate") return;
     const seq = persistedEvent.row.seq;
 
     publishLiveEvent({
@@ -15018,6 +15156,7 @@ export function heartbeatService(
     );
     const nextAttempt =
       (retryReason === WORKSPACE_BUSY_RETRY_REASON ||
+      retryReason === AI_CONNECTION_BUSY_RETRY_REASON ||
       retryReason === MAX_TURN_CONTINUATION_RETRY_REASON
         ? (run.scheduledRetryAttempt ?? 0)
         : executionFailureRetryCount(run)) + 1;
@@ -15058,16 +15197,18 @@ export function heartbeatService(
     const issueId = readNonEmptyString(contextSnapshot.issueId);
 
     if (!baseSchedule) {
+      const exhaustion = {
+        retryReason,
+        scheduledRetryAttempt: run.scheduledRetryAttempt ?? 0,
+        maxAttempts,
+      };
       await appendRunEvent(run, {
         eventType: "lifecycle",
         stream: "system",
         level: "warn",
         message: `Bounded retry exhausted after ${run.scheduledRetryAttempt ?? 0} scheduled attempts; no further automatic retry will be queued`,
-        payload: {
-          retryReason,
-          scheduledRetryAttempt: run.scheduledRetryAttempt ?? 0,
-          maxAttempts,
-        },
+        payload: exhaustion,
+        retryExhaustion: exhaustion,
       });
       if (retryReason === INTERACTION_CONTINUATION_INFRA_RETRY_REASON) {
         await escalatePlanApprovalResumeFailureNeedsAttention({
@@ -15143,7 +15284,9 @@ export function heartbeatService(
         : baseSchedule;
 
     const requiresIssueGate =
+      isTransientWorkspaceGitScanCode(run.errorCode) ||
       hasConversationContinuationPolicy(run.resultJson) ||
+      retryReason === AI_CONNECTION_BUSY_RETRY_REASON ||
       retryReason === MAX_TURN_CONTINUATION_RETRY_REASON ||
       retryReason === INTERACTION_CONTINUATION_INFRA_RETRY_REASON;
     if (requiresIssueGate) {
@@ -15211,6 +15354,9 @@ export function heartbeatService(
               failureRetriesBeforeWorkspaceWait:
                 executionFailureRetryCount(run),
             }
+          : {}),
+        ...(retryReason === AI_CONNECTION_BUSY_RETRY_REASON
+          ? { failureRetriesBeforeAiConnectionWait: executionFailureRetryCount(run) }
           : {}),
         ...(shouldQuarantineWorkspaceForRetry
           ? {
@@ -15531,6 +15677,23 @@ export function heartbeatService(
                 },
               };
             }
+          }
+        }
+
+        if (
+          retryReason === AI_CONNECTION_BUSY_RETRY_REASON && issueId &&
+          !isNonAssigneeWorkspaceBusyRetry(retryReason, contextSnapshot)
+        ) {
+          // The issue row is locked above. Recheck after the preflight gate so
+          // cancellation or recovery cannot leave a successor without its lock.
+          const [lockedIssue] = await tx.select({ executionRunId: issues.executionRunId })
+            .from(issues).where(and(eq(issues.id, issueId), eq(issues.companyId, run.companyId)));
+          if (lockedIssue?.executionRunId !== run.id) {
+            return {
+              outcome: "not_scheduled", issueId, errorCode: "issue_execution_lock_changed",
+              reason: "Subscription retry suppressed because the task execution lock changed",
+              details: { issueId, expectedExecutionRunId: run.id, currentExecutionRunId: lockedIssue?.executionRunId ?? null },
+            };
           }
         }
 
@@ -15914,6 +16077,51 @@ export function heartbeatService(
       .orderBy(asc(heartbeatRuns.createdAt), asc(heartbeatRuns.id))
       .limit(1)
       .then((rows) => rows[0] ?? null);
+  }
+
+  // No code path raises the `ai_connection_busy` error any more. This
+  // function stays because a stored run row can still carry that error code
+  // from an earlier release.
+  async function finalizeAiConnectionBusyDeferral(
+    run: typeof heartbeatRuns.$inferSelect,
+    error: HttpError,
+    wasIssueAssignee: boolean,
+  ) {
+    const now = new Date();
+    const cancelled = await setRunStatusIfRunning(run.id, "cancelled", {
+      error: error.message, errorCode: AI_CONNECTION_BUSY_RETRY_REASON, finishedAt: now,
+      resultJson: { executionRecovery: { kind: "ai_connection_wait", providerWorkStarted: false } },
+      contextSnapshot: {
+        ...parseObject(run.contextSnapshot),
+        aiConnectionBusyDeferredWhileAssignee: wasIssueAssignee,
+      },
+    });
+    if (!cancelled.updated) return;
+    await setWakeupStatus(run.wakeupRequestId, "cancelled", { finishedAt: now, error: error.message }).catch(() => undefined);
+    const cancelledRun = cancelled.run ?? await getRun(run.id);
+    const agent = await getAgent(run.agentId);
+    let scheduled = false;
+    try {
+      if (cancelledRun && agent) {
+        const retry = await scheduleBoundedRetryForRun(cancelledRun, agent, {
+          now, retryReason: AI_CONNECTION_BUSY_RETRY_REASON, wakeReason: "ai_connection_busy_retry",
+          maxAttempts: (cancelledRun.scheduledRetryAttempt ?? 0) + 1,
+          delayMs: computeWorkspaceBusyRetryDelayMs(),
+        });
+        scheduled = retry.outcome === "scheduled";
+        await appendRunEvent(cancelledRun, {
+          eventType: "lifecycle", stream: "system", level: "info",
+          message: scheduled ? "Waiting for the shared AI subscription. This task will retry automatically." : "The AI subscription is busy; this task can no longer retry automatically.",
+          payload: { retryScheduled: scheduled },
+        });
+      }
+    } finally {
+      try {
+        if (cancelledRun && !scheduled) await releaseIssueExecutionAndPromote(cancelledRun);
+      } finally {
+        await finalizeAgentStatus(run.agentId, "cancelled", null, { wasFirstHeartbeat: timerClaimWasFirstHeartbeat(run) });
+      }
+    }
   }
 
   // Terminal handling for a WorkspaceBusyDeferral thrown by the pre-dispatch
@@ -17019,6 +17227,7 @@ export function heartbeatService(
         responsibleUserId: null,
       },
     });
+    const nativeReviewContext = readNativeReviewAssignmentContext(context);
     const queuedCommentIds = queuedCommentIdsFromRunContext(context);
     if (
       issueId &&
@@ -17031,7 +17240,7 @@ export function heartbeatService(
         stage: "claim",
       });
     const queuedCommentClaim =
-      issueId && run.wakeupRequestId && queuedCommentIds.length > 0
+      !nativeReviewContext && issueId && run.wakeupRequestId && queuedCommentIds.length > 0
         ? await db
             .transaction(async (tx) => {
               // Match the queue-edit lock order: issue, wake, then run. Once the
@@ -17346,26 +17555,25 @@ export function heartbeatService(
     }
     const claimed = queuedCommentClaim
       ? queuedCommentClaim.run
-      : await withChatControlRecoveryGate(run, "claim", async (tx) =>
-          tx
-            .update(heartbeatRuns)
-            .set({
-              status: "running",
-              runnerProfileJson: sql`(case when jsonb_typeof(${heartbeatRuns.runnerProfileJson}) = 'object' then ${heartbeatRuns.runnerProfileJson} else '{}'::jsonb end) || ${JSON.stringify({ adapterDispatch: { adapterType: agent.adapterType } })}::jsonb`,
-                    ...legacyControllerClaim(run.runtimeMode),
-              responsibleUserId,
-              startedAt: run.startedAt ?? claimedAt,
-              updatedAt: claimedAt,
-            })
-            .where(
-              and(
-                eq(heartbeatRuns.id, run.id),
-                eq(heartbeatRuns.status, "queued"),
-              ),
-            )
-            .returning()
-            .then((rows) => rows[0] ?? null),
-        );
+      : await withChatControlRecoveryGate(run, "claim", async (tx) => {
+          const claimValues = {
+            status: "running",
+            runnerProfileJson: sql`(case when jsonb_typeof(${heartbeatRuns.runnerProfileJson}) = 'object' then ${heartbeatRuns.runnerProfileJson} else '{}'::jsonb end) || ${JSON.stringify({ adapterDispatch: { adapterType: agent.adapterType } })}::jsonb`,
+            ...legacyControllerClaim(run.runtimeMode),
+            responsibleUserId,
+            startedAt: run.startedAt ?? claimedAt,
+            updatedAt: claimedAt,
+          };
+          if (nativeReviewContext) {
+            return claimQueuedNativeReviewRun(tx, {
+              run, claimedAt, claimValues,
+              agentNameKey: normalizeAgentNameKey(agent.name),
+            });
+          }
+          return tx.update(heartbeatRuns).set(claimValues).where(and(
+            eq(heartbeatRuns.id, run.id), eq(heartbeatRuns.status, "queued"),
+          )).returning().then((rows) => rows[0] ?? null);
+        });
     if (!claimed) return null;
 
     publishLiveEvent({
@@ -17389,7 +17597,9 @@ export function heartbeatService(
     });
     publishRunLifecyclePluginEvent(claimed);
 
-    await setWakeupStatus(claimed.wakeupRequestId, "claimed", { claimedAt });
+    if (!nativeReviewContext) {
+      await setWakeupStatus(claimed.wakeupRequestId, "claimed", { claimedAt });
+    }
 
     // Fix A (lazy locking): stamp executionRunId now that the run is actually running,
     // not at queue time. Guard is idempotent — safe if called more than once.
@@ -17397,7 +17607,7 @@ export function heartbeatService(
     const claimedIssueId = readNonEmptyString(claimedContext.issueId);
     const claimedWakeReason = readNonEmptyString(claimedContext.wakeReason);
     if (
-      claimedIssueId &&
+      !nativeReviewContext && claimedIssueId &&
       claimedWakeReason !== "source_scoped_recovery_action"
     ) {
       const claimedAgent = await getAgent(claimed.agentId);
@@ -17904,25 +18114,29 @@ export function heartbeatService(
   // only matches when the lease is still pending_cleanup and its stored attempt
   // count still equals `expectedAttempts`. Two concurrent sweeps read the same
   // count, but Postgres serializes the two updates on the row and only the first
-  // matches the guard. The loser gets zero rows and skips the lease. This bounds
-  // the retries to the cap and stops a second destroy of the same lease.
-  // Returns true only for the sweep that won the claim.
+  // matches the guard. The loser gets zero rows and skips the lease. The persisted in-flight deadline also prevents a later tick
+  // from starting another attempt while this one is still running.
+  // Returns the attempt identity only for the sweep that won the claim.
   //
-  // The update writes only the attempts key with `jsonb_set`. It never writes a
-  // copied metadata object, so a concurrent write to an unrelated metadata key
+  // The update patches cleanup ownership fields without writing a copied
+  // metadata object, so a concurrent write to an unrelated metadata key
   // survives. The guard reads the stored count through the safe SQL reader, so a
   // malformed value never throws.
   async function claimPendingCleanupRetryAttempt(
     leaseId: string,
     expectedAttempts: number,
     manualAttempt?: { previousId: unknown },
-  ): Promise<boolean> {
+  ): Promise<string | null> {
     const now = new Date();
+    const attemptId = randomUUID();
     const claimed = await db
       .update(environmentLeases)
       .set({
         metadata: sql`jsonb_set(${pendingCleanupMetadataObjectSql()}, array[${PENDING_CLEANUP_ATTEMPTS_METADATA_KEY}], to_jsonb(${expectedAttempts + 1}::int), true)
-          || ${JSON.stringify(manualAttempt ? { pendingCleanupManualAttemptId: randomUUID() } : {})}::jsonb`,
+          || ${JSON.stringify({ ...(manualAttempt ? { pendingCleanupManualAttemptId: randomUUID() } : {}),
+            pendingCleanupAttemptId: attemptId, pendingCleanupInFlight: true,
+            pendingCleanupLeaseExpiresAtMs: Date.now() + 15 * 60_000,
+          })}::jsonb`,
         lastUsedAt: now,
         updatedAt: now,
       })
@@ -17932,10 +18146,11 @@ export function heartbeatService(
           eq(environmentLeases.status, "pending_cleanup"),
           sql`${pendingCleanupAttemptsSql()} = ${expectedAttempts}`,
           manualAttempt ? sql`coalesce(${environmentLeases.metadata}->'pendingCleanupManualAttemptId', 'null'::jsonb) is not distinct from ${JSON.stringify(manualAttempt.previousId ?? null)}::jsonb` : undefined,
+          pendingCleanupRetryDueSql(Boolean(manualAttempt)),
         ),
       )
       .returning({ id: environmentLeases.id });
-    return claimed.length > 0;
+    return claimed.length > 0 ? attemptId : null;
   }
 
   // Atomically claim the one-time cap warning for a lease. The update only
@@ -17993,17 +18208,131 @@ export function heartbeatService(
       );
   }
 
+  // Move a guarded orphan candidate to the back of the sweep order. The
+  // shared-resource guard below can skip a row on every tick as long as the
+  // other owner stays live, retained, or pending cleanup. The select orders
+  // by `updatedAt` ascending and takes only the oldest page, so an untouched
+  // skipped row keeps refilling that same page and blocks every row behind
+  // it. The bump pushes the row past the fixed-size page, so the next tick
+  // reaches the rows behind it. It costs the row one extra backoff wait,
+  // which is safe because the guard means a physical sandbox still exists.
+  async function deferOrphanedActiveLease(leaseId: string): Promise<void> {
+    const now = new Date();
+    await db
+      .update(environmentLeases)
+      .set({ updatedAt: now })
+      .where(
+        and(
+          eq(environmentLeases.id, leaseId),
+          eq(environmentLeases.status, "active"),
+        ),
+      );
+  }
+
+  // An active lease is reachable only while its heartbeat run keeps the
+  // running status. The reaper writes the run status and the lease release as
+  // two separate statements, so a restart between them can leave a terminal
+  // run and an active lease. `releaseRunLeases` also skips a lease whose
+  // environment row is gone, so that lease stays active too. No later query
+  // finds either lease, because every production query selects an active
+  // lease by its environment or by its heartbeat run id, never by age. This
+  // sweep finds both stranded classes and moves each lease to pending_cleanup,
+  // so the existing pending_cleanup sweep tears the sandbox down from the
+  // data already on the lease row.
+  async function sweepOrphanedActiveLeases(opts: {
+    backoffMs: number;
+  }): Promise<{ recovered: number }> {
+    const cutoff = new Date(Date.now() - opts.backoffMs);
+
+    const rows = await db
+      .select({ lease: environmentLeases })
+      .from(environmentLeases)
+      .leftJoin(
+        heartbeatRuns,
+        eq(environmentLeases.heartbeatRunId, heartbeatRuns.id),
+      )
+      .where(
+        and(
+          eq(environmentLeases.status, "active"),
+          or(
+            isNull(environmentLeases.heartbeatRunId),
+            inArray(heartbeatRuns.status, [
+              ...HEARTBEAT_RUN_TERMINAL_STATUSES,
+            ]),
+          ),
+          lte(environmentLeases.updatedAt, cutoff),
+        ),
+      )
+      .orderBy(asc(environmentLeases.updatedAt))
+      .limit(ORPHANED_ACTIVE_LEASE_SWEEP_PAGE_SIZE);
+
+    let recovered = 0;
+    for (const { lease } of rows) {
+      // A provider resource id names one physical sandbox. A different lease
+      // row can still hold that same resource in a live status, so this sweep
+      // must not tear down a sandbox that a different lease still owns.
+      if (lease.provider && lease.providerLeaseId) {
+        const [otherOwner] = await db
+          .select({ id: environmentLeases.id })
+          .from(environmentLeases)
+          .where(
+            and(
+              ne(environmentLeases.id, lease.id),
+              eq(environmentLeases.provider, lease.provider),
+              eq(environmentLeases.providerLeaseId, lease.providerLeaseId),
+              inArray(environmentLeases.status, [
+                "active",
+                "retained",
+                "pending_cleanup",
+              ]),
+            ),
+          )
+          .limit(1);
+        if (otherOwner) {
+          // Defer this row so the fixed-size page reaches the rows behind
+          // it next tick, instead of re-selecting the same guarded rows
+          // forever.
+          await deferOrphanedActiveLease(lease.id);
+          continue;
+        }
+      }
+
+      // Keep the row's existing updatedAt value. The select above already
+      // proved the row is older than the backoff cutoff, so the
+      // pending_cleanup sweep can accept the same row in this same tick. A
+      // fresh timestamp here would push the row inside that sweep's own
+      // backoff window and delay the teardown by one full tick.
+      const flipped = await db
+        .update(environmentLeases)
+        .set({
+          status: "pending_cleanup",
+          failureReason: "orphaned_active_lease_recovered",
+        })
+        .where(
+          and(
+            eq(environmentLeases.id, lease.id),
+            eq(environmentLeases.status, "active"),
+          ),
+        )
+        .returning({ id: environmentLeases.id });
+      if (flipped.length > 0) recovered += 1;
+    }
+
+    return { recovered };
+  }
+
   // Retry the leases stranded in "pending_cleanup". A failed destroy leaves a
   // lease in that state forever without this sweep. The reaper tick runs the
   // sweep. The backoff equals the reaper staleness threshold, so a lease waits
   // for that period between attempts. The sweep reads and writes the attempt
   // count in the lease metadata. It warns once when a lease reaches the attempt
-  // cap and then stops the retries for that lease.
+  // threshold, then continues with slower retries. Live attempts renew their
+  // cleanup claim; after controller loss, exact-resource destruction may repeat.
   async function sweepPendingCleanupLeases(opts?: {
     backoffMs?: number;
     /** One cleanup attempt per explicit user Retry, for this failed run only.
-     * A later user Retry may try again after a provider failure; automatic
-     * sweeps retain their exhausted budget and never gain extra attempts.
+     * A later user Retry may bypass the cooldown after a provider failure,
+     * but cannot take over an in-flight cleanup attempt.
      */
     explicitRetry?: { companyId: string; runId: string; actorId: string; reason?: "retry_failed_run" | "queued_comment_interrupt" };
   }): Promise<{
@@ -18046,6 +18375,7 @@ export function heartbeatService(
           eq(environmentLeases.status, "pending_cleanup"),
           opts?.explicitRetry ? eq(environmentLeases.companyId, opts.explicitRetry.companyId) : undefined,
           opts?.explicitRetry ? eq(environmentLeases.heartbeatRunId, opts.explicitRetry.runId) : undefined,
+          pendingCleanupRetryDueSql(Boolean(opts?.explicitRetry)),
           backoffMs > 0 ? lte(environmentLeases.updatedAt, cutoff) : undefined,
         ),
       )
@@ -18055,24 +18385,9 @@ export function heartbeatService(
     let destroyed = 0;
     let capped = 0;
     for (const row of rows) {
+      if (pendingCleanupAttemptsInFlight.has(row.id)) continue;
       const metadata = { ...(row.metadata ?? {}) } as Record<string, unknown>;
       const attempts = readPendingCleanupRetryAttempts(metadata);
-
-      if (attempts >= PENDING_CLEANUP_SWEEP_ATTEMPT_CAP && !opts?.explicitRetry) {
-        capped += 1;
-        // Warn once, then leave the lease for manual cleanup. The atomic claim
-        // keeps the warning to one log line even when two sweeps overlap.
-        if (metadata[PENDING_CLEANUP_CAP_WARNED_METADATA_KEY] !== true) {
-          const warned = await claimPendingCleanupCapWarning(row.id);
-          if (warned) {
-            logger.warn(
-              { leaseId: row.id, environmentId: row.environmentId, attempts },
-              "environment lease reached the pending_cleanup retry cap; left for manual cleanup",
-            );
-          }
-        }
-        continue;
-      }
 
       const environment = row.environmentId
         ? await environmentsSvc.getById(row.environmentId)
@@ -18126,19 +18441,34 @@ export function heartbeatService(
 
       // Atomically claim the attempt before the retry. Only the winning sweep
       // increments the count and tears the sandbox down, so an overlapping sweep
-      // never tears the same sandbox down twice or exceeds the attempt cap. The
-      // claim records the attempt before the retry, so a thrown driver error
-      // still counts against the cap.
+      // cannot start another attempt while this one holds the cleanup lease.
+      // The deadline survives a server restart; the counter saturates at the
+      // escalation threshold while attempt identities remain unique.
       const claimed = await claimPendingCleanupRetryAttempt(row.id, attempts,
         opts?.explicitRetry ? { previousId: metadata.pendingCleanupManualAttemptId } : undefined);
       if (!claimed) continue;
-      if (opts?.explicitRetry) await logActivity(db, {
-        companyId: row.companyId, actorType: "user", actorId: opts.explicitRetry.actorId,
-        action: "environment_lease.cleanup_retried", entityType: "environment_lease", entityId: row.id,
-        runId: opts.explicitRetry.runId, details: { attempt: attempts + 1, reason: opts.explicitRetry.reason ?? "retry_failed_run" },
-      });
+      pendingCleanupAttemptsInFlight.add(row.id);
+      lease.metadata = { ...lease.metadata, pendingCleanupAttemptId: claimed };
+      let activeRenewal: Promise<void> | null = null;
+      const renewal = setInterval(() => {
+        if (activeRenewal) return;
+        activeRenewal = db.update(environmentLeases).set({
+          metadata: sql`jsonb_set(${pendingCleanupMetadataObjectSql()}, '{pendingCleanupLeaseExpiresAtMs}', to_jsonb(${Date.now() + 15 * 60_000}::bigint))`,
+        }).where(and(eq(environmentLeases.id, row.id), eq(environmentLeases.status, "pending_cleanup"),
+          sql`${environmentLeases.metadata}->>'pendingCleanupAttemptId' = ${claimed}`,
+          sql`${environmentLeases.metadata}->>'pendingCleanupInFlight' = 'true'`))
+          .then(() => {})
+          .catch(() => logger.warn({ leaseId: row.id }, "cleanup ownership renewal failed"))
+          .finally(() => { activeRenewal = null; });
+      }, 30_000);
+      renewal.unref();
 
       try {
+        if (opts?.explicitRetry) await logActivity(db, {
+          companyId: row.companyId, actorType: "user", actorId: opts.explicitRetry.actorId,
+          action: "environment_lease.cleanup_retried", entityType: "environment_lease", entityId: row.id,
+          runId: opts.explicitRetry.runId, details: { attempt: attempts + 1, reason: opts.explicitRetry.reason ?? "retry_failed_run" },
+        });
         if (useRecordedTeardown) {
           // Tear the sandbox down from the recorded provider config and the
           // cleanup-authorized secret versions. Preserve any provider receipt;
@@ -18147,12 +18477,13 @@ export function heartbeatService(
             environment,
             lease,
           });
-          await environmentsSvc.releaseLease(lease.id, "expired", {
+          const released = await environmentsSvc.releaseLease(lease.id, "expired", {
+            expectedPendingCleanupAttemptId: claimed,
             cleanupStatus: "success",
             failureReason: "pending_cleanup_retry",
             remoteExecutionTermination: remoteTerminationReceipt(lease, receipt),
           });
-          destroyed += 1;
+          if (released) destroyed += 1;
         } else if (environment) {
           const result = await environmentRuntime.destroyRunLease({
             environment,
@@ -18166,11 +18497,12 @@ export function heartbeatService(
       } catch {
         // The recorded-data teardown throws on failure, so revert the lease to
         // pending_cleanup for a later sweep. The claimed attempt still counts
-        // against the cap, so the retries stay bounded. The `destroyRunLease`
+        // for backoff, so requests stay bounded. The `destroyRunLease`
         // path reverts the lease itself, so this revert only runs for the
         // recorded-data teardown path.
         if (useRecordedTeardown) {
           await environmentsSvc.releaseLease(lease.id, "pending_cleanup", {
+            expectedPendingCleanupAttemptId: claimed,
             cleanupStatus: "failed",
             failureReason: "pending_cleanup_retry",
           });
@@ -18186,7 +18518,36 @@ export function heartbeatService(
           },
           "pending_cleanup lease retry failed",
         );
+      } finally {
+        clearInterval(renewal);
+        // A hung renewal must not retain process-local cleanup ownership.
+        // Late renewals are attempt-fenced and never write the retry cooldown.
+        pendingCleanupAttemptsInFlight.delete(row.id);
       }
+      if (attempts + 1 >= PENDING_CLEANUP_SWEEP_ATTEMPT_CAP) {
+        capped += 1;
+        // Warn once, then continue automatic cleanup with backoff. The atomic claim
+        // keeps the warning to one log line even when two sweeps overlap.
+        if (metadata[PENDING_CLEANUP_CAP_WARNED_METADATA_KEY] !== true) {
+          const warned = await claimPendingCleanupCapWarning(row.id);
+          if (warned) {
+            logger.warn(
+              { leaseId: row.id, environmentId: row.environmentId, attempts },
+              "environment lease needs operator attention; automatic cleanup continues with backoff",
+            );
+          }
+        }
+      }
+      // Persist the cooldown independently of process memory. A crash before
+      // this write leaves the bounded in-flight lease for a later sweep.
+      await db.update(environmentLeases).set({
+        metadata: sql`${pendingCleanupMetadataObjectSql()} || ${JSON.stringify({
+          pendingCleanupInFlight: false,
+          pendingCleanupRetryAfterMs: Date.now() + (attempts + 1 >= PENDING_CLEANUP_SWEEP_ATTEMPT_CAP
+            ? 30 * 60_000 : Math.min(30 * 60_000, Math.max(30_000, backoffMs))),
+        })}::jsonb`,
+      }).where(and(eq(environmentLeases.id, lease.id),
+        sql`${environmentLeases.metadata}->>'pendingCleanupAttemptId' = ${claimed}`));
       if (lease.heartbeatRunId) {
         // Delivery failure must not revert successful provider cleanup. A new
         // message can still use the persisted receipt on its next admission.
@@ -18814,6 +19175,28 @@ export function heartbeatService(
       );
     }
 
+    // Recover an active lease whose run already ended before the same-tick
+    // pending_cleanup sweep, so this tick can stop the recovered sandbox.
+    // Isolate the sweep so its failure never hides the reaper result.
+    try {
+      const orphanedActiveLeaseSweep = await sweepOrphanedActiveLeases({
+        backoffMs: staleThresholdMs,
+      });
+      if (orphanedActiveLeaseSweep.recovered > 0) {
+        logger.warn(
+          { recovered: orphanedActiveLeaseSweep.recovered },
+          "recovered orphaned active environment leases",
+        );
+      }
+    } catch {
+      // Log a constant errorKind only. The exception can carry a credential in
+      // its name, code, message, cause, or stack, so the sweep never reads it.
+      logger.error(
+        { errorKind: ORPHANED_ACTIVE_LEASE_SWEEP_ERROR_KIND },
+        "orphaned active environment lease sweep failed",
+      );
+    }
+
     // Retry stranded pending_cleanup leases on the same tick. Isolate the sweep
     // so its failure never hides the reaper result. The backoff equals the
     // reaper staleness threshold.
@@ -18874,13 +19257,16 @@ export function heartbeatService(
       .innerJoin(companies, and(eq(companies.id, issues.companyId), eq(companies.status, "active")))
       .where(and(eq(agentWakeupRequests.status, "deferred_issue_execution"),
         isNull(issues.executionRunId),
-        sql`jsonb_typeof(${agentWakeupRequests.payload} #> '{_paperclipWakeContext,wakeCommentIds}') = 'array'`,
-        sql`${agentWakeupRequests.payload} #> '{_paperclipWakeContext,wakeCommentIds}' <> '[]'::jsonb`,
+        or(and(
+          sql`jsonb_typeof(${agentWakeupRequests.payload} #> '{_paperclipWakeContext,wakeCommentIds}') = 'array'`,
+          sql`${agentWakeupRequests.payload} #> '{_paperclipWakeContext,wakeCommentIds}' <> '[]'::jsonb`,
+        ), sql`${agentWakeupRequests.payload}->>'mutation' = 'interaction'`),
         sql`${agentWakeupRequests.payload}->'queuedCommentInterrupt' is null`,
         cutoff ? gte(agentWakeupRequests.requestedAt, cutoff) : undefined))
       .orderBy(asc(agentWakeupRequests.updatedAt)).limit(50);
     for (const { wake } of strandedQueues) {
-      if (!queuedCommentIdsFromWakePayload(wake.payload).length) continue;
+      if (!queuedCommentIdsFromWakePayload(wake.payload).length &&
+          !await readQueuedInteractionResponse(db, wake.companyId, String(wake.payload?.issueId), wake.payload)) continue;
       const [latest] = await db.select().from(heartbeatRuns).where(and(
         eq(heartbeatRuns.companyId, wake.companyId), eq(heartbeatRuns.agentId, wake.agentId),
         sql`${heartbeatRuns.contextSnapshot}->>'issueId' = ${String(wake.payload?.issueId)}`,
@@ -19891,6 +20277,12 @@ export function heartbeatService(
         await instanceSettings.getExperimental();
       const isolatedWorkspacesEnabled =
         experimentalInstanceSettings.enableIsolatedWorkspaces;
+      // Inert on its own: the operator default only reaches the resolver when
+      // isolated workspaces are enabled at all, so a stack that has one flag
+      // without the other keeps its current behavior.
+      const defaultIsolatedWorkspacesEnabled =
+        isolatedWorkspacesEnabled &&
+        experimentalInstanceSettings.enableIsolatedWorkspacesByDefault;
       const parsedIssueExecutionWorkspaceSettings =
         parseIssueExecutionWorkspaceSettings(
           issueContext?.executionWorkspaceSettings,
@@ -20035,10 +20427,17 @@ export function heartbeatService(
           projectContext?.executionWorkspacePolicy,
         );
       const projectExecutionWorkspacePolicy =
-        gateProjectExecutionWorkspacePolicy(
-          parsedProjectExecutionWorkspacePolicy,
-          isolatedWorkspacesEnabled,
-        );
+        applyDefaultIsolatedExecutionWorkspacePolicy({
+          projectPolicy: gateProjectExecutionWorkspacePolicy(
+            parsedProjectExecutionWorkspacePolicy,
+            isolatedWorkspacesEnabled,
+          ),
+          defaultIsolatedWorkspacesEnabled,
+          // A resolved project row, not the issue's raw `projectId`: the
+          // substituted policy must only reach a task whose repository the
+          // worktree can actually be cut from.
+          hasProject: Boolean(projectContext),
+        });
       const retainedTrust = await resolveAndRetainRunTrustPreset(db, {
         companyId: agent.companyId,
         agentId: agent.id,
@@ -20571,8 +20970,9 @@ export function heartbeatService(
       });
       // A live holder is always consulted for shared workspaces. Depending on policy and the final
       // execution target it either remains the existing deferral gate or becomes dispatch context.
-      // Holder staleness and the workspace_busy retry ladder are intentionally unchanged for every
-      // path that serializes.
+      // Local/SSH folders never take an exclusive workspace lock, including when older
+      // project or issue settings request serialization. Sandbox protection still uses
+      // the existing holder staleness and workspace_busy retry ladder.
       if (
         issueRef?.projectWorkspaceId &&
         effectiveExecutionWorkspaceMode === "shared_workspace"
@@ -20588,11 +20988,10 @@ export function heartbeatService(
           const environmentDriver =
             selectedEnvironmentForConfig?.driver ?? null;
           const shouldSerialize =
-            sharedWorkspaceConcurrency === "serialize" ||
-            (sharedWorkspaceConcurrency === "auto" &&
-              (executionForcedToKubernetes ||
-                (environmentDriver !== "local" &&
-                  environmentDriver !== "ssh")));
+            sharedWorkspaceConcurrency !== "allow" &&
+            (executionForcedToKubernetes ||
+              (environmentDriver !== "local" &&
+                environmentDriver !== "ssh"));
           if (shouldSerialize) {
             throw new WorkspaceBusyDeferral({
               holder: workspaceHolder,
@@ -20711,6 +21110,18 @@ export function heartbeatService(
         try {
           managedAiRuntime = await prepareManagedAiRuntime(db, { companyId: agent.companyId, agentId: agent.id, responsibleUserId, adapterType: agent.adapterType, binding: aiBinding, config: resolvedConfig });
         } catch (error) {
+          // Only fresh executions can receive a pre-provider wait receipt. A
+          // persisted native input may already have provider effects to recover.
+          if (isAiConnectionBusy(error) && !persistedNativeExecutionInput) {
+            // Use the authority recorded by the locked admission gate, never
+            // the issue's mutable assignee observed during runtime preparation.
+            const authorizedNonAssigneeWake =
+              parseObject(run.runnerProfileJson).aiConnectionNonAssigneeCommentWake === true ||
+              (run.scheduledRetryReason === AI_CONNECTION_BUSY_RETRY_REASON &&
+                isNonAssigneeWorkspaceBusyRetry(run.scheduledRetryReason, parseObject(run.contextSnapshot)));
+            await finalizeAiConnectionBusyDeferral(run, error, !authorizedNonAssigneeWake);
+            return;
+          }
           if (responsibleUserId && issueId && aiBinding.mode === "responsible_user") {
             await connectionIntentService(db).request({ sub: agent.id, company_id: agent.companyId, run_id: run.id, responsible_user_id: responsibleUserId }, aiBinding.provider, { purpose: "ai" }).catch(() => {
               logger.warn({ runId: run.id, agentId: agent.id }, "Could not attach AI connection request; runtime configuration action remains available");
@@ -21495,6 +21906,25 @@ export function heartbeatService(
         );
       }
       await bindIssueToPersistedExecutionWorkspace(persistedExecutionWorkspace);
+      const projectRepositoryPaths: string[] = [];
+      if (executionWorkspace.projectId && resolvedWorkspace.source === "project_primary" && !resolvedWorkspace.baseCwdFallback) {
+        const repositoryRows = await db.select().from(projectWorkspaces).where(and(
+          eq(projectWorkspaces.companyId, agent.companyId),
+          eq(projectWorkspaces.projectId, executionWorkspace.projectId),
+        )).orderBy(asc(projectWorkspaces.createdAt), asc(projectWorkspaces.id));
+        const repositories = await prepareProjectRepositoryWorkspaces({
+          cwd: executionWorkspace.cwd,
+          anchorRepoUrl: executionWorkspace.repoUrl,
+          workspaces: repositoryRows,
+          resolveGitAuth: workspaceGitAuthProvider,
+        });
+        const paths = new Map(repositories.map((repo) => [repo.workspaceId, repo.cwd]));
+        projectRepositoryPaths.push(...repositories.map((repo) => path.relative(executionWorkspace.cwd, repo.cwd)));
+        if (resolvedWorkspace.workspaceId) paths.set(resolvedWorkspace.workspaceId, executionWorkspace.cwd);
+        resolvedWorkspace.workspaceHints = resolvedWorkspace.workspaceHints.map((hint) => ({
+          ...hint, cwd: paths.get(hint.workspaceId) ?? hint.cwd,
+        }));
+      }
       if (persistedExecutionWorkspace) {
         context.executionWorkspaceId = persistedExecutionWorkspace.id;
         await db
@@ -22443,6 +22873,19 @@ export function heartbeatService(
           }
           const nativeExecutionWorkspaceId =
             persistedExecutionWorkspace?.id ?? run.id;
+          const nativeReviewContext = readNativeReviewAssignmentContext(context);
+          const nativeReview = nativeReviewContext ? await getNativeReviewAssignment(db, {
+            companyId: agent.companyId, issueId: issueRef.id, agentId: agent.id,
+            contextSnapshot: nativeReviewContext,
+          }) : null;
+          if (nativeReviewContext && !nativeReview) throw new Error("native_review_assignment_no_longer_available");
+          const nativeReviewRequest = nativeReview
+            ? buildNativeReviewRequest({
+                title: nativeReview.interaction.title,
+                summary: nativeReview.interaction.summary,
+                payload: nativeReview.interaction.payload,
+              })
+            : null;
           const persistedContract = run.completionContractId
             ? await db
                 .select()
@@ -22472,10 +22915,11 @@ export function heartbeatService(
                   issue: issueRef,
                   actorId: agent.id,
                   immediateRequest:
-                    executionContinuation?.objective ??
+                    nativeReviewRequest ?? executionContinuation?.objective ??
                     safeWakeCommentContext?.body ??
                     null,
                   immediateRequests: (() => {
+                    if (nativeReviewRequest) return [nativeReviewRequest];
                     const requests = nativeCompletionRequestsForComments(
                       safeWakeComments.length > 0
                         ? safeWakeComments
@@ -22831,14 +23275,18 @@ export function heartbeatService(
                   buildNativeExecutionInput({
                     companyId: agent.companyId,
                     runId: run.id,
-                    issue: issueRef,
-                    taskPrompt:
-                      readNonEmptyString(
+                    issue: nativeReviewRequest ? { ...issueRef, title: `Review: ${issueRef.title}`, description: nativeReviewRequest } : issueRef,
+                    taskPrompt: [
+                      nativeReviewRequest ?? readNonEmptyString(
                         selectPaperclipTaskMarkdown(context, {
                           resumedSession,
                         }),
                       ) ??
                       `# ${issueRef.identifier ?? issueRef.id}: ${issueRef.title}`,
+                      projectRepositoryPaths.length > 0
+                        ? `## Project repositories\nThe task workspace also contains these editable Git repositories:\n${projectRepositoryPaths.map((repo) => `- ${repo}`).join("\n")}`
+                        : null,
+                    ].filter(Boolean).join("\n\n"),
                     wakePayload: context.paperclipWake,
                     resumedSession,
                     conversationMode: context.conversationMode === true,
@@ -25068,7 +25516,9 @@ export function heartbeatService(
           );
         const nonRetryablePreflightCode =
           nonRetryablePreflightFailureCode(outerErr);
+        const workspaceGitScanFailure = isWorkspaceGitScanError(outerErr) ? outerErr : null;
         const setupFailureErrorCode =
+          workspaceGitScanFailure?.code ??
           workspaceValidationSetupFailure?.code ??
           configurationIncompleteSetupFailure?.code ??
           (unresolvedBaseRefSetupFailure ||
@@ -25087,6 +25537,13 @@ export function heartbeatService(
         // action, so it is persisted even when the agent lookup failed and the
         // agent-scoped stop metadata cannot be merged in.
         const setupFailureDetails =
+          (workspaceGitScanFailure ? {
+            workspaceGitScan: {
+              code: workspaceGitScanFailure.code,
+              phase: "workspace_setup",
+              retryable: isTransientWorkspaceGitScanCode(workspaceGitScanFailure.code),
+            },
+          } : null) ??
           workspaceValidationSetupFailure?.resultJson ??
           configurationIncompleteSetupFailure?.resultJson ??
           (unresolvedBaseRefSetupFailure
@@ -25189,9 +25646,12 @@ export function heartbeatService(
                 () => undefined,
               );
             }
-            await scheduleInteractionContinuationInfrastructureRetryIfEligible(
-              livenessRun,
-              failedAgent,
+            // No provider work began. Retry temporary host scan failures with
+            // the existing durable failure budget, before releasing execution.
+            // Generic recovery must not grant a second budget on exhaustion.
+            await (isTransientWorkspaceGitScanCode(livenessRun.errorCode)
+              ? scheduleBoundedRetryForRun(livenessRun, failedAgent)
+              : scheduleInteractionContinuationInfrastructureRetryIfEligible(livenessRun, failedAgent)
             ).catch((retryError) => {
               logger.warn(
                 { err: retryError, runId: livenessRun.id },
@@ -26030,13 +26490,15 @@ export function heartbeatService(
             ));
             // The issue lock serializes cleanup callbacks and periodic workers.
             // An adopted, discarded, or edited receipt is no longer authority.
-            if (!pending || !wakeCommentId || !queuedCommentIdsFromWakePayload(pending.payload).includes(wakeCommentId)) {
+            if (!pending || (!(wakeCommentId && queuedCommentIdsFromWakePayload(pending.payload).includes(wakeCommentId)) &&
+                !(opts.queuedCommentInterruptId && await readQueuedInteractionResponse(tx as unknown as Db,
+                  agent.companyId, issueId, pending.payload)))) {
               return { kind: "deferred" as const };
             }
             if (opts.queuedCommentRequestId) {
               const ids = await undeliveredLegacyUserCommentIds(tx as unknown as Db,
                 agent.companyId, issueId, agentId, queuedCommentIdsFromWakePayload(pending.payload));
-              if (!ids.includes(wakeCommentId)) return { kind: "deferred" as const };
+              if (!wakeCommentId || !ids.includes(wakeCommentId)) return { kind: "deferred" as const };
               pending.payload = withQueuedCommentIdsInWakePayload(parseObject(pending.payload), ids);
               await tx.update(agentWakeupRequests).set({ payload: pending.payload }).where(and(
                 eq(agentWakeupRequests.id, pending.id), eq(agentWakeupRequests.companyId, agent.companyId),
@@ -26390,7 +26852,9 @@ export function heartbeatService(
               }).where(eq(agentWakeupRequests.id, executionWaitRequestId));
               return { kind: "deferred" as const };
             }
-            if (durableRequest || wakeCommentId || hasInteractionContinuationWakeContext(enrichedContextSnapshot)) {
+            if (durableRequest || wakeCommentId ||
+                hasInteractionContinuationWakeContext(enrichedContextSnapshot) ||
+                readNonEmptyString(enrichedContextSnapshot.nativeStatusWakeIntentId)) {
               await tx.insert(agentWakeupRequests).values({
                 ...durableReceiptFields,
                 companyId: agent.companyId, agentId, source, triggerDetail, reason,
@@ -27669,12 +28133,15 @@ export function heartbeatService(
         .then((rows) => rows[0] ?? null);
 
       if (existingDispatch) {
+        const recoveredStatus = existingDispatch.runId
+          ? "coalesced"
+          : existingDispatch.status === "deferred_issue_execution"
+            ? "coalesced"
+            : existingDispatch.status;
         await db
           .update(agentWakeupRequests)
           .set({
-            status: existingDispatch.runId
-              ? "coalesced"
-              : existingDispatch.status,
+            status: recoveredStatus,
             runId: existingDispatch.runId,
             finishedAt:
               (existingDispatch.runId ?? existingDispatch.finishedAt)
@@ -27730,7 +28197,7 @@ export function heartbeatService(
         readNonEmptyString(wakeContext.issueId) ??
         null;
       const scopeKey = issueId
-        ? `${candidate.companyId}:${candidate.agentId}:${issueId}`
+        ? `${candidate.companyId}:${candidate.agentId}:${issueId}:${readNativeReviewAssignmentContext(wakeContext)?.nativeReviewInteractionId ?? ""}`
         : null;
       const priorDelivery = scopeKey
         ? deliveredByIssueScope.get(scopeKey)
@@ -27765,10 +28232,17 @@ export function heartbeatService(
           )
           .limit(1)
           .then((rows) => rows[0] ?? null);
+        const nativeReview = candidate.reason === "native_completion_review"
+          ? await getNativeReviewAssignment(db, {
+              companyId: candidate.companyId, issueId, agentId: candidate.agentId,
+              contextSnapshot: wakeContext,
+            })
+          : null;
         if (
           !targetIssue ||
           ["done", "cancelled"].includes(targetIssue.status) ||
-          targetIssue.assigneeAgentId !== candidate.agentId
+          (targetIssue.assigneeAgentId !== candidate.agentId && !nativeReview) ||
+          (candidate.reason === "native_completion_review" && !nativeReview)
         ) {
           await db
             .update(agentWakeupRequests)
@@ -27822,10 +28296,18 @@ export function heartbeatService(
           .limit(1)
           .then((rows) => rows[0] ?? null);
 
+        // The committer intent is the durable outbox entry. When admission is
+        // blocked, enqueueWakeup creates a separate deferred dispatch receipt;
+        // leave the original intent coalesced so the release drain cannot
+        // promote both rows (the original has no nativeStatusWakeIntentId
+        // provenance and would otherwise run once before the dispatch receipt).
+        const deliveredStatus = delivered?.status ?? "queued";
         await db
           .update(agentWakeupRequests)
           .set({
-            status: wakeRun ? "coalesced" : (delivered?.status ?? "queued"),
+            status: wakeRun || deliveredStatus === "deferred_issue_execution"
+              ? "coalesced"
+              : deliveredStatus,
             runId: wakeRun?.id ?? delivered?.runId ?? null,
             finishedAt:
               wakeRun || delivered?.finishedAt
@@ -28800,6 +29282,7 @@ export function heartbeatService(
     reconcileHotRestartAdoption,
     recoverNativeRunsAfterRestart,
     reapOrphanedRuns,
+    sweepOrphanedActiveLeases,
     sweepPendingCleanupLeases,
     // Override-aware scheduling-suppression check (honors the worktree
     // run-execution experimental setting). Callers outside the service that

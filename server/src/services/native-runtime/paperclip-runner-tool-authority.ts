@@ -1,3 +1,4 @@
+import { callCreateSkillTool } from "../skill-tools.js";
 import { callProjectTool } from "../project-tools.js";
 import { isConnectorTool, executeConnectorTool, type ConnectorAssignment } from "../connector-runtime.js";
 import { resolveNativeRuntimeMcpSnapshot } from "./runtime-context.js";
@@ -41,6 +42,8 @@ import { approvalService } from "../approvals.js";
 import { documentService } from "../documents.js";
 import { issueService } from "../issues.js";
 import { issueThreadInteractionService } from "../issue-thread-interactions.js";
+import { getNativeReviewAssignment, readNativeReviewAssignmentContext, type NativeReviewAssignmentContext } from "./native-review-participant.js";
+import { childReviewOutcomes } from "./child-review-outcomes.js";
 import { persistActivity, publishActivity } from "../activity-log.js";
 import { captureRunIdentity } from "../run-identity.js";
 import { prepareNativeRunnerFileHandoff, type RemoteWorkspaceFileReader } from "./native-runner-file-handoff.js";
@@ -72,12 +75,18 @@ const IMPLEMENTED_OPERATIONS = new Set([
   "search_api", "call_api",
   "get_task_context", "get_task_history", "search_tasks", "report_progress",
   "request_human_input",
-  "create_task", "set_dependencies", "create_project", "list_project_repositories", "list_projects", "register_deliverable",
+  "create_skill", "create_task", "set_dependencies", "create_project", "list_project_repositories", "list_projects", "register_deliverable",
   "list_documents", "read_document", "list_document_revisions", "write_document",
   "list_agents", "get_agent", "list_approvals", "get_approval", "get_approval_context",
 ]);
 
+const NATIVE_REVIEW_READ_TOOLS = new Set([
+  "get_task_context", "get_task_history", "list_documents", "read_document", "list_document_revisions",
+]);
+
 type Binding = {
+  /** Server-derived scope for one addressed native completion review. */
+  nativeReview?: NativeReviewAssignmentContext;
   companyId: string;
   issueId: string;
   runId: string;
@@ -134,6 +143,27 @@ export class PaperclipRunnerToolAuthority {
   constructor(readonly db: Db, readonly binding: Binding) {}
 
   definitions(): Array<Record<string, unknown>> {
+    if (this.binding.nativeReview) {
+      // Scope Paperclip control-plane actions. Provider file and shell access
+      // still follow the configured agent/environment policy, including tests.
+      return [
+        ...CAPABILITY_SEMANTIC_TOOL_CATALOG
+          .filter((tool) => NATIVE_REVIEW_READ_TOOLS.has(tool.operationId))
+          .map((tool) => ({ name: tool.operationId, description: tool.description, inputSchema: tool.inputSchema })),
+        {
+          name: "resolve_review",
+          description: "Record your decision on the one completion review assigned to this run. Inspect the submitted work first. Accept only if it meets the request; otherwise reject with specific changes. This does not change task ownership. After recording the decision, report your review complete with paperclip_finish. Do not redo the worker's task or wait for your own parent task to become runnable.",
+          inputSchema: {
+            type: "object", additionalProperties: false,
+            properties: {
+              decision: { type: "string", enum: ["accept", "reject"] },
+              reason: { type: "string", description: "Required when rejecting: the specific changes the worker must make." },
+            },
+            required: ["decision"],
+          },
+        },
+      ];
+    }
     const workMode = this.binding.workMode ?? "standard";
     const definitions: Array<Record<string, unknown>> =
       CAPABILITY_SEMANTIC_TOOL_CATALOG.filter(
@@ -153,9 +183,7 @@ export class PaperclipRunnerToolAuthority {
         description:
           descriptor.operationId === "register_deliverable"
             ? "Prepare one verified workspace file for Paperclip's final task or external-chat response. This records the attachment, work product, and explicit same-run selection; it does not confirm provider delivery."
-            : descriptor.operationId === "request_human_input"
-              ? "Create a typed, durable human-input interaction on the current Paperclip task bound to this run. For structured questions and choices, use interactionKind 'questions' with payload.questions as described by the payload schema. Paperclip renders the interaction in its UI and, for connected chats, uses supported provider question controls or a safe fallback. Normal task permissions and review gates still apply."
-              : descriptor.description,
+            : descriptor.description,
         inputSchema:
           descriptor.operationId === "register_deliverable"
             ? {
@@ -196,6 +224,12 @@ export class PaperclipRunnerToolAuthority {
     callId: string;
     arguments: unknown;
   }): Promise<unknown> {
+    if (this.binding.nativeReview) {
+      if (call.tool === "resolve_review") return this.#resolveReview(call.arguments);
+      if (!NATIVE_REVIEW_READ_TOOLS.has(call.tool)) {
+        throw forbidden("This review run may only inspect the assigned task and resolve its review.");
+      }
+    }
     if (isConnectorTool(call.tool)) {
       if (!(this.binding.connectorAssignments ?? []).some((assignment) => assignment.tools.some((tool) => tool.name === call.tool))) throw forbidden("Connector tool is not available to this run");
       const { run } = await this.#boundContext();
@@ -309,6 +343,12 @@ export class PaperclipRunnerToolAuthority {
       throw new Error("paperclip_runner_tool_mode_denied");
     }
     switch (call.tool) {
+      case "create_skill": {
+        const apiUrl = this.binding.apiUrl ?? process.env.PAPERCLIP_API_URL;
+        const token = createLocalAgentJwt(this.binding.agentId, this.binding.companyId, context.actor.adapterType, this.binding.runId, context.run.responsibleUserId);
+        if (!apiUrl || !token) throw new Error("Skill tool authentication is unavailable");
+        return callCreateSkillTool({ arguments: input, apiUrl, token, companyId: this.binding.companyId });
+      }
       case "create_project":
       case "list_project_repositories":
       case "list_projects": {
@@ -320,7 +360,13 @@ export class PaperclipRunnerToolAuthority {
           conversation: Boolean(context.issue.conversationAgentId) });
       }
       case "search_api": return searchRunnerApi(call.arguments);
-      case "call_api": return this.#callApi(call.callId, call.arguments);
+      case "call_api": {
+        // PRP reserves operationId/callId for semantic result identity. The
+        // HTTP operation is metadata, including in previously saved receipts;
+        // exposing it as operationId makes the runner reject a valid response.
+        const { operationId, ...response } = record(await this.#callApi(call.callId, call.arguments));
+        return { ...response, apiOperationId: operationId };
+      }
       case "get_task_context": return {
         company: { id: this.binding.companyId },
         actor: redactedActor(context.actor),
@@ -332,6 +378,13 @@ export class PaperclipRunnerToolAuthority {
         },
         connectionGuidance: CONNECTION_INTENT_AGENT_GUIDANCE,
         acceptedPlan: await this.#acceptedPlan(context.run.contextSnapshot),
+        childReviewOutcomes: await childReviewOutcomes(this.db, this.binding.companyId, this.binding.issueId),
+        ...(this.binding.nativeReview ? {
+          assignedReview: (await getNativeReviewAssignment(this.db, {
+            ...this.binding, contextSnapshot: this.binding.nativeReview,
+            allowResolvedByRunId: this.binding.runId,
+          }))?.interaction,
+        } : {}),
       };
       case "get_task_history": {
         const limit = boundedLimit(input.limit);
@@ -528,8 +581,10 @@ export class PaperclipRunnerToolAuthority {
         eq(heartbeatRuns.agentId, this.binding.agentId),
         eq(heartbeatRuns.nativeIssueId, this.binding.issueId),
         eq(issues.companyId, this.binding.companyId),
-        eq(issues.assigneeAgentId, this.binding.agentId),
-        eq(issues.executionRunId, this.binding.runId),
+        ...(this.binding.nativeReview ? [] : [
+          eq(issues.assigneeAgentId, this.binding.agentId),
+          eq(issues.executionRunId, this.binding.runId),
+        ]),
         eq(agents.companyId, this.binding.companyId),
       ))
       .limit(1);
@@ -541,7 +596,55 @@ export class PaperclipRunnerToolAuthority {
     ) {
       throw new Error("paperclip_runner_tool_binding_not_authorized");
     }
+    if (this.binding.nativeReview) {
+      const admitted = readNativeReviewAssignmentContext(row.run.contextSnapshot);
+      if (!admitted || admitted.nativeReviewInteractionId !== this.binding.nativeReview.nativeReviewInteractionId
+        || admitted.nativeReviewDecisionId !== this.binding.nativeReview.nativeReviewDecisionId) {
+        throw forbidden("The run was not admitted for this review.");
+      }
+      const review = await getNativeReviewAssignment(this.db, {
+        ...this.binding, contextSnapshot: this.binding.nativeReview,
+        allowResolvedByRunId: this.binding.runId,
+      });
+      if (!review || (review.interaction.status === "pending" && row.issue.executionRunId !== this.binding.runId)) {
+        throw forbidden("The assigned review is no longer available to this run.");
+      }
+    }
     return row;
+  }
+
+  async #resolveReview(value: unknown) {
+    const input = record(value);
+    if (Object.keys(input).some((key) => !["decision", "reason"].includes(key))
+      || !["accept", "reject"].includes(String(input.decision))) {
+      throw badRequest("Choose accept or reject for this run's assigned review.");
+    }
+    const reason = typeof input.reason === "string" ? input.reason.trim() : "";
+    if (input.decision === "reject" && !reason) throw badRequest("Explain the changes required before rejecting the review.");
+    const context = await this.#boundContext();
+    const review = await getNativeReviewAssignment(this.db, {
+      ...this.binding, contextSnapshot: this.binding.nativeReview,
+      allowResolvedByRunId: this.binding.runId,
+    });
+    if (!review) throw forbidden("Review is no longer assigned to this run.");
+    const expectedStatus = input.decision === "accept" ? "accepted" : "rejected";
+    if (review.interaction.status !== "pending") {
+      if (review.interaction.status !== expectedStatus) throw badRequest("This review already has a different decision.");
+      return { interactionId: review.interaction.id, status: expectedStatus, deduplicated: true };
+    }
+    const apiUrl = this.binding.apiUrl ?? process.env.PAPERCLIP_API_URL;
+    const token = createLocalAgentJwt(this.binding.agentId, this.binding.companyId,
+      context.actor.adapterType, this.binding.runId, context.run.responsibleUserId);
+    if (!apiUrl || !token) throw new Error("Review tool authentication is unavailable");
+    // Use the existing resolution route so authorization, activity, dependency
+    // wakes and request-changes continuation have one implementation.
+    const response = await fetch(`${apiUrl.replace(/\/$/, "")}/api/issues/${this.binding.issueId}/interactions/${review.interaction.id}/${input.decision}`, {
+      method: "POST", redirect: "error", signal: AbortSignal.timeout(30_000),
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", "X-Paperclip-Run-Id": this.binding.runId },
+      body: JSON.stringify(input.decision === "reject" ? { reason } : {}),
+    });
+    if (!response.ok) throw new Error(`Review decision was not accepted (${response.status}): ${(await response.text()).slice(0, 2_000)}`);
+    return { interactionId: review.interaction.id, status: expectedStatus };
   }
 
   async #reportProgress(input: Record<string, unknown>): Promise<unknown> {

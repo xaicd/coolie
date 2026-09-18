@@ -3027,22 +3027,15 @@ function authorizedToolSet(
   };
 }
 
-const ACPX_RESERVED_TERMINAL_TOOLS = new Set([
-  "paperclip_finish",
-  "paperclip_block",
-]);
-
 export function authorizedToolSetForProvider(
-  provider: CapabilityRunnerdCodexTransportOptions["provider"],
+  _provider: CapabilityRunnerdCodexTransportOptions["provider"],
   tools: readonly Readonly<Record<string, unknown>>[],
 ): Record<string, unknown> {
-  return authorizedToolSet(
-    provider === "acpx"
-      ? tools.filter(
-          (tool) => !ACPX_RESERVED_TERMINAL_TOOLS.has(String(tool.name ?? "")),
-        )
-      : tools,
-  );
+  // ACPX terminal calls are resolved through the authenticated semantic
+  // bridge before the provider receives a result. Keep them in the provider
+  // authority catalog so the sidecar can project the call and await
+  // server-side completion feedback.
+  return authorizedToolSet(tools);
 }
 
 /**
@@ -3098,7 +3091,14 @@ export function createCapabilityRunnerdProviderEnvironment(input: {
       input.options.acpxSidecarPath ??
       resolve(packageRoot, "dist", "cli", "acpx-runtime-sidecar.cjs");
     const providerPackageAuthority = acpxProviderPackageAuthority(sidecarPath);
+    // This is the trusted runner/sidecar boundary. The provider sandbox still
+    // uses createSanitizedAcpxSpawnInput and does not inherit gateway tokens.
+    const assignedGateway = input.options.acpxAgent === "pi"
+      ? null : nativeMcpLaunchBinding(input.options.environment ?? {});
     return {
+      ...(assignedGateway ? {
+        PAPERCLIP_NATIVE_MCP_TOKEN: assignedGateway.token,
+      } : {}),
       ...createSanitizedAcpxSpawnInput(
         input.options.environment,
         input.options.acpxAgent ?? "codex",
@@ -4626,8 +4626,9 @@ class DurablePrpCodexTransport implements CodexAppServerTransport {
                       : "default",
                   includeCollaborationModeInstructions:
                     includeCodexCollaborationInstructions,
-                  includeSkillInstructions:
-                    provider === "codex" && runtimeContext !== null,
+                  ...(provider === "codex"
+                    ? { includeSkillInstructions: runtimeContext !== null }
+                    : {}),
                   runtimeContext,
                 },
     };
@@ -5480,8 +5481,17 @@ class DurablePrpCodexTransport implements CodexAppServerTransport {
     const commandDeadline = Date.now() + turnStartTimeoutMs;
     const input = Array.isArray(params.input) ? params.input.map(record) : [];
     const message = input
+      .filter((item) => item.type !== "skill")
       .map((item) => (typeof item.text === "string" ? item.text : ""))
       .join("\n");
+    const skills = resolveRunnerdCodexSkillInputs(
+      input.filter((item) => item.type === "skill"),
+      this.options.runtimeContext ?? null,
+      resolve(this.options.runnerFilesystemRoot ?? this.#root, "codex-home"),
+    );
+    if (skills.length && (this.options.provider ?? "codex") !== "codex") {
+      throw new Error("Explicit skill inputs are supported only by Codex");
+    }
     const pendingTurnId = `turn_lab_${randomUUID().replaceAll("-", "")}`;
     this.#turnId = pendingTurnId;
     const responseEpoch = ++this.#turnStartResponseEpoch;
@@ -5507,6 +5517,7 @@ class DurablePrpCodexTransport implements CodexAppServerTransport {
         "turn.start",
         {
           text: message,
+          ...(skills.length ? { skills } : {}),
           turnId: pendingTurnId,
         },
         commandDeadline,
@@ -6601,3 +6612,30 @@ export const runnerdRecoveryInternals = Object.freeze({
   turnStartNotificationDisposition,
   turnStartResponseReady,
 });
+
+
+/** Map controller asset paths to the assigned copy on the provider filesystem. */
+export function resolveRunnerdCodexSkillInputs(
+  inputs: Record<string, unknown>[],
+  context: NativeRuntimeContextSnapshot | null,
+  codexHome: string,
+): Array<{ type: "skill"; name: string; path: string }> {
+  if (inputs.length > 64) throw new Error("Too many explicit skill inputs");
+  const seen = new Set<string>();
+  return inputs.map((input) => {
+    const assigned = context?.skills.find((skill) => skill.runtimeName === input.name);
+    if (
+      !assigned || !/^[a-zA-Z0-9_-]+$/.test(assigned.runtimeName)
+      || input.path !== resolve(assigned.bundle.rootPath, "SKILL.md")
+      || seen.has(assigned.runtimeName)
+    ) {
+      throw new Error("Explicit skill input must reference a unique assigned runtime skill");
+    }
+    seen.add(assigned.runtimeName);
+    return {
+      type: "skill",
+      name: assigned.runtimeName,
+      path: resolve(codexHome, "skills", assigned.runtimeName, "SKILL.md"),
+    };
+  });
+}

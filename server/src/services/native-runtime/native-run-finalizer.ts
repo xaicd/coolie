@@ -1,4 +1,5 @@
 import { dismissAutomaticCompletionReviews } from "./automatic-completion-reviews.js";
+import { getNativeReviewAssignment, readNativeReviewAssignmentContext } from "./native-review-participant.js";
 import { conversationNativeDecision, isConversation } from "../agent-conversations.js";
 import { randomUUID } from "node:crypto";
 import { and, eq, inArray, isNotNull, isNull, or, sql } from "drizzle-orm";
@@ -40,6 +41,7 @@ import {
   readNativeBoardResponseWaitSource,
 } from "./native-board-response-wait.js";
 import { emitAgentTaskRun } from "../agent-task-run-telemetry.js";
+import { reportRunFailure } from "../run-failure-report.js";
 import { resolveExternalChatResponseWaitAuthorization } from "./chat-attachment-reuse.js";
 import {
   authorizeNativeChatReviewPresentation,
@@ -486,7 +488,10 @@ async function recordRetryableFailure(input: {
       nextAttemptAt: supersededByNewerRun || exhausted ? null : nextAttemptAt,
     };
   });
-  if (terminalRunToEmit) await emitAgentTaskRun(input.db, terminalRunToEmit);
+  if (terminalRunToEmit) {
+    await emitAgentTaskRun(input.db, terminalRunToEmit);
+    void reportRunFailure(input.db, terminalRunToEmit);
+  }
   return {
     ...input.coordinator,
     ...outcome,
@@ -627,6 +632,7 @@ async function projectCommittedRun(input: {
   // committed terminal result.
   if (updatedRun && updatedRun.status !== input.run.status) {
     await emitAgentTaskRun(input.db, updatedRun);
+    void reportRunFailure(input.db, updatedRun);
   }
 }
 
@@ -1164,7 +1170,15 @@ export async function finalizeNativeRun(input: {
         runId: run.id,
       }),
     ]);
+    const reviewContext = readNativeReviewAssignmentContext(run.contextSnapshot);
+    const nativeReview = reviewContext ? await getNativeReviewAssignment(input.db, {
+      companyId: run.companyId, issueId: authoritativeIssue.id, agentId: run.agentId,
+      contextSnapshot: reviewContext, allowResolvedByRunId: run.id,
+    }) : null;
     const proposedDecision = resolveNativeFinalizerStatus({
+      ...(reviewContext ? { nativeReviewOutcome: nativeReview
+        ? nativeReview.interaction.status === "pending" ? "pending" as const : "resolved" as const
+        : "stale" as const } : {}),
       assessment,
       terminalState: terminalState as "succeeded" | "failed" | "cancelled",
       workspaceFinalizeStatus: input.workspaceFinalizeStatus,
@@ -1331,6 +1345,7 @@ export async function finalizeNativeRun(input: {
         updatedRun
       ) {
         await emitAgentTaskRun(input.db, updatedRun);
+        void reportRunFailure(input.db, updatedRun);
       }
       if (input.projectRunStatus)
         await materializeCommittedReviewResponse(input.db, input.runId);

@@ -1,5 +1,6 @@
 import type { ActivityEvent } from "@paperclipai/shared";
 import { useProjectCreatedItems } from "@/hooks/useProjectCreatedItems";
+import { skillCreatedItems } from "@/components/task-chat/skill-created-items";
 import { requiresExecutionReconciliation } from "@paperclipai/shared";
 import { TaskChatExpansionState } from "@/components/task-chat/expansion-state";
 import { TaskChatScrollReady } from "@/components/task-chat/scroll-navigation";
@@ -401,6 +402,7 @@ export type TaskChatThreadProps = ComponentProps<typeof IssueChatThread> & {
   initialHistoryPending?: boolean;
   initialHistoryError?: boolean;
   onRetryInitialHistory?: () => void;
+  onOpenSkill?: (skillId: string, name: string) => void;
 };
 
 type PendingComposerInput =
@@ -539,6 +541,7 @@ export function TaskChatThread(props: TaskChatThreadProps) {
     liveIssueIds,
     onResumeAssignee,
     resumeAssigneePending = false,
+    onOpenSkill,
   } = props;
   const retryFailedRunHandler =
     isTerminalIssueStatus(issueStatus) ||
@@ -574,6 +577,7 @@ export function TaskChatThread(props: TaskChatThreadProps) {
   const canRetryFailedRun = Boolean(retryFailedRunHandler);
   const queryClient = useQueryClient();
   const createdProjectItems = useProjectCreatedItems(props.creationActivity ?? [], companyId);
+  const createdSkillItems = useMemo(() => skillCreatedItems(props.creationActivity ?? []), [props.creationActivity]);
   const [pendingComposerAssignee, setPendingComposerAssignee] = useState<
     string | null
   >(null);
@@ -1308,11 +1312,15 @@ export function TaskChatThread(props: TaskChatThreadProps) {
     for (const item of createdProjectItems) {
       entries.push({ id: item.id, item, ms: toMs(item.timestamp), order: 2 });
     }
+    for (const item of createdSkillItems) {
+      entries.push({ id: item.id, item, ms: toMs(item.timestamp), order: 2 });
+    }
     return entries.sort(
       (a, b) => a.ms - b.ms || a.order - b.order || a.id.localeCompare(b.id),
     );
   }, [
     createdProjectItems,
+    createdSkillItems,
     comments,
     projectedComments,
     commentItems,
@@ -1558,7 +1566,9 @@ export function TaskChatThread(props: TaskChatThreadProps) {
             ? "native_runner_timed_out"
             : "native_runner_process_exited");
         const label =
-          code === "native_provider_usage_limit" && source.status === "failed"
+          code === "native_provider_approval_required" && source.status === "failed"
+            ? "Approval required"
+            : code === "native_provider_usage_limit" && source.status === "failed"
             ? "Usage limit reached"
             : source.status === "cancelled"
               ? "Run cancelled"
@@ -1575,7 +1585,9 @@ export function TaskChatThread(props: TaskChatThreadProps) {
             ? `The run was cancelled ${responseBoundary}.`
             : source.status === "interrupted"
               ? `The run was interrupted ${responseBoundary}.`
-              : code === "native_provider_model_rejected"
+              : code === "native_provider_approval_required"
+                ? "This operation requires approval, but this runner has no interactive approval handler. Review the operation and update the agent's permission setting before retrying."
+                : code === "native_provider_model_rejected"
                 ? "The provider rejected the selected model. Check the model ID and your account's access, save the agent configuration, then retry. View the run for the provider's full error."
                 : code === "native_provider_usage_limit" &&
                     source.status === "failed"
@@ -1684,6 +1696,8 @@ export function TaskChatThread(props: TaskChatThreadProps) {
                 : "Execution was stopped before returning an answer."
               : code === "provider_frame_too_large"
               ? `Provider output exceeded the safe limit. ${retryDetail}`
+              : code.startsWith("workspace_git_scan_")
+              ? `Workspace setup failed before the agent started. ${retryDetail}`
               : `The runner stopped before returning an answer (${code}). ${retryDetail}`;
           const id = `${source.id}:failure`;
           entriesWithFailures.push({
@@ -2670,6 +2684,8 @@ export function TaskChatThread(props: TaskChatThreadProps) {
     initialHistoryPending ||
     planLoading ||
     initialRuns.some((run) => {
+      // A scheduled retry has not started and has no log to hydrate yet.
+      if (run.status === "scheduled_retry") return false;
       if (
         run.runtimeMode === "native" &&
         (hydratedNativeRunIds
@@ -2826,6 +2842,7 @@ export function TaskChatThread(props: TaskChatThreadProps) {
                     }
                     onRetryFailedRun={retryFailedRunHandler}
                     retryFailedRunId={retryFailedRunId}
+                    onOpenSkill={onOpenSkill}
                     tail={
                       tailRunId ||
                       optimisticRunnerStartup ||
@@ -2886,7 +2903,9 @@ export function TaskChatThread(props: TaskChatThreadProps) {
                                             ? liveRun.currentStatusMessage
                                             : null) ||
                                           (tailStatus === "failed"
-                                            ? "This run stopped before a response was available. Review the task’s connection or recovery action below."
+                                            ? linkedRunMetaById.get(tailRunId ?? "")?.errorCode?.startsWith("workspace_git_scan_")
+                                              ? "Workspace setup failed before the agent started."
+                                              : "This run stopped before a response was available. Review the task’s connection or recovery action below."
                                             : "Waiting for transcript...")
                                     }
                                   />

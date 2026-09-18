@@ -20,10 +20,12 @@ import type { HeartbeatRunEvent } from "@paperclipai/shared";
 const transcriptState = vi.hoisted(() => ({
   transcriptByRun: new Map(),
   isInitialHydrating: false,
+  hydratedRunIds: undefined as Set<string> | undefined,
 }));
 const nativeTranscriptState = vi.hoisted(() => ({
   transcriptByRun: new Map(),
   errorsByRun: new Map(),
+  hydratedRunIds: undefined as Set<string> | undefined,
 }));
 const transcriptHookRuns = vi.hoisted(() => ({
   legacy: [] as unknown[][],
@@ -47,6 +49,7 @@ vi.mock("@/components/transcript/useLiveRunTranscripts", () => ({
     return {
       transcriptByRun: new Map(transcriptState.transcriptByRun),
       isInitialHydrating: transcriptState.isInitialHydrating,
+      hydratedRunIds: transcriptState.hydratedRunIds,
     };
   },
 }));
@@ -56,6 +59,7 @@ vi.mock("@/components/transcript/useNativeRunTranscripts", () => ({
     return {
       transcriptByRun: new Map(nativeTranscriptState.transcriptByRun),
       errorsByRun: new Map(nativeTranscriptState.errorsByRun),
+      hydratedRunIds: nativeTranscriptState.hydratedRunIds,
     };
   },
 }));
@@ -106,8 +110,10 @@ beforeEach(() => {
   localStorage.clear();
   transcriptState.transcriptByRun.clear();
   transcriptState.isInitialHydrating = false;
+  transcriptState.hydratedRunIds = undefined;
   nativeTranscriptState.transcriptByRun.clear();
   nativeTranscriptState.errorsByRun.clear();
+  nativeTranscriptState.hydratedRunIds = undefined;
   transcriptHookRuns.legacy.length = 0;
   transcriptHookRuns.native.length = 0;
   sidebarState.isMobile = false;
@@ -164,6 +170,80 @@ it("coordinates first reveal while keeping the composer and visible history moun
     container.querySelector('[data-testid="task-chat-history-loading"]'),
   ).toBeNull();
   expect(container.querySelector('[data-testid="mock-editor"]')).toBe(composer);
+});
+
+describe.each(["legacy", "native"] as const)("%s task history readiness", (runtimeMode) => {
+  const retryRun = {
+    runId: "scheduled-run",
+    runtimeMode,
+    status: "scheduled_retry",
+    agentId: "agent-1",
+    adapterType: runtimeMode === "native" ? "paperclip_runner" : "codex_local",
+    createdAt: "2026-08-25T18:00:00.000Z",
+    startedAt: null,
+  };
+
+  beforeEach(() => {
+    transcriptState.hydratedRunIds = new Set();
+    nativeTranscriptState.hydratedRunIds = new Set();
+  });
+
+  it("reveals comments while a scheduled retry has no transcript to hydrate", () => {
+    render(
+      <TaskChatThread
+        issueId="issue-1"
+        comments={createLongThreadComments()}
+        onAdd={async () => {}}
+        linkedRuns={[retryRun]}
+      />,
+    );
+
+    expect(container.querySelector('[aria-busy="false"]')).not.toBeNull();
+    expect(
+      container.querySelector('[data-testid="task-chat-history-loading"]'),
+    ).toBeNull();
+    expect(
+      container.querySelector('[data-thread-anchor="comment-1"]')?.closest("[inert]"),
+    ).toBeNull();
+    expect(container.textContent).toContain("Thread message 1");
+  });
+
+  it.each(["running", "succeeded"])(
+    "waits for a %s run to hydrate even when a scheduled retry is present",
+    async (status) => {
+      const props = {
+        issueId: "issue-1",
+        comments: createLongThreadComments(),
+        onAdd: async () => {},
+        linkedRuns: [
+          retryRun,
+          {
+            ...retryRun,
+            runId: "started-run",
+            status,
+            startedAt: "2026-08-25T18:00:00.000Z",
+          },
+        ],
+      };
+      render(<TaskChatThread {...props} />);
+      expect(container.querySelector('[aria-busy="true"]')).not.toBeNull();
+      expect(
+        container.querySelector('[data-testid="task-chat-history-loading"]'),
+      ).not.toBeNull();
+
+      transcriptState.hydratedRunIds = new Set(["started-run"]);
+      nativeTranscriptState.hydratedRunIds = new Set(["started-run"]);
+      render(<TaskChatThread {...props} />);
+      await act(async () => {
+        await new Promise((resolve) => requestAnimationFrame(resolve));
+      });
+
+      expect(container.querySelector('[aria-busy="false"]')).not.toBeNull();
+      expect(
+        container.querySelector('[data-testid="task-chat-history-loading"]'),
+      ).toBeNull();
+    },
+  );
 });
 
 it("keeps an acknowledged optimistic bubble mounted with its canonical comment target", () => {
@@ -1280,6 +1360,21 @@ describe("TaskChatThread runtime transcript selection", () => {
       );
     },
   );
+
+  it("shows an actionable approval-required reason for a stopped native run", () => {
+    render(<TaskChatThread comments={[]} onAdd={async () => {}} linkedRuns={[{
+      runId: "approval-required", runtimeMode: "native", status: "failed",
+      errorCode: "native_provider_approval_required",
+      agentId: "agent-1", agentName: "Runner", adapterType: "paperclip_runner",
+      startedAt: "2026-09-14T15:00:00.000Z", createdAt: "2026-09-14T15:00:00.000Z",
+      finishedAt: "2026-09-14T15:00:02.000Z",
+    }]} />);
+    const marker = container.querySelector('[data-testid="task-chat-collapsible-marker"]');
+    expect(marker?.textContent).toContain("Approval required");
+    flushSync(() => marker!.querySelector<HTMLButtonElement>('button[aria-expanded="false"]')!.click());
+    expect(container.textContent).toContain("Review the operation and update the agent's permission setting before retrying");
+    expect(container.textContent).not.toContain("The runner stopped");
+  });
 
   it("keeps workspace contention out of the conversation's cancellation markers", () => {
     render(<TaskChatThread comments={[]} onAdd={async () => {}} linkedRuns={[{
@@ -3375,6 +3470,18 @@ describe("TaskChatThread live transcript", () => {
     expect(tail2!.textContent).toContain("Waiting for transcript...");
   });
 
+  it("does not send a workspace bootstrap failure to connection settings", () => {
+    const run = { id: "workspace-prep", status: "running" as const, invocationSource: "issue", triggerDetail: null,
+      startedAt: "2026-09-15T10:00:00Z", finishedAt: null, createdAt: "2026-09-15T10:00:00Z",
+      agentId: "agent-1", agentName: "Worker", adapterType: "process" };
+    render(<TaskChatThread comments={[]} onAdd={async () => {}} issueStatus="in_progress" activeRun={run} />);
+    render(<TaskChatThread comments={[]} onAdd={async () => {}} issueStatus="in_progress" linkedRuns={[
+      { ...run, runId: run.id, status: "failed", errorCode: "workspace_git_scan_timeout", finishedAt: "2026-09-15T10:00:10Z" },
+    ]} />);
+    expect(container.textContent).toContain("Workspace setup failed before the agent started.");
+    expect(container.textContent).not.toContain("Review the task’s connection");
+  });
+
   it("renders in-flight output through TaskChatLiveTail, dropping the debug plumbing (PAP-463 C1)", () => {
     // Interleave the exact noise the old RunTranscriptView tail surfaced (init
     // row, stdout/stderr/system dumps) with real content. Only the streamed
@@ -3444,9 +3551,9 @@ describe("TaskChatThread live transcript", () => {
       "Streaming through the shared renderer",
     );
     const phaseSummary = tail!.querySelector<HTMLButtonElement>(
-      '[data-testid="task-chat-phase-summary"]',
+      '[data-testid="task-chat-activity-phase-toggle"]',
     );
-    expect(phaseSummary?.getAttribute("aria-expanded")).toBe("true");
+    expect(phaseSummary?.getAttribute("aria-expanded")).toBe("false");
     expect(tail!.textContent).toContain("src/app.ts");
     // None of the debug plumbing reaches the thread.
     for (const noise of [
