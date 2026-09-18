@@ -110,6 +110,37 @@ pnpm test:defenses
 - 旧的 `COOLIE-LOCAL-DEV.md` 里写过"定开分支 `coolie/customization`" —— **那个分支不存在**,
   以本页为准(该文件已就地更正)。
 
+## 7. 同步官方与冲突处置
+
+**先算,不要等撞上。** 这两条都是只读的,不动工作区:
+
+```sh
+git fetch upstream
+git merge-tree --write-tree --messages main upstream/master   # 打印冲突,不动工作区(git ≥2.38)
+git merge-tree --write-tree --messages main origin/master     # 没加 upstream 前,先对快照算
+```
+
+无冲突时它只打印一个 tree hash、退出码 0。**每次同步前先跑它**,比合完再发现便宜得多。
+
+**冲突分四类,解法不同**(各类的实际规模见
+[`FORK-SURFACE-AUDIT.md`](./FORK-SURFACE-AUDIT.md)):
+
+| 类别 | 例子 | 怎么解 |
+| --- | --- | --- |
+| **生成物 / 锁定文件** | `pnpm-lock.yaml`(几乎每次必冲突) | **取上游的,再重新生成**(`pnpm install`);不要手改 |
+| **交织改动**(我们的行插在上游文件里) | `ui/src/plugins/slots.tsx`、`server/src/app.ts`、`ui/src/i18n/locales/*.json` | 保留上游逻辑,把我们的增量重放上去。能"移进我们自己的文件、只留一行 import"的就移——把复发冲突塌成一行 |
+| **我们新增的文件**(上游没有) | `scripts/check-fork-surface.mjs`、`server/src/icp-footer.ts` | 正常**不冲突**。风险是上游以后**也**加同名 → 名字带 `coolie-` 前缀,或放进我们自己的子目录 |
+| **上游重命名/移动了我们改过的文件** | —— | 最烦的一类(git 认成"他们删、我们改"),只能按语义手工并。所以文件里"**为什么改这里**"的注释值钱——`fork-surface.json` 的 `reason` 就是干这个的 |
+
+**让同步可重复的三个设置**:
+
+1. **`git config rerere.enabled true`** —— 冲突解决被记住,下次同样的冲突自动复用。周期性同步的 fork 这是标准做法。
+2. **用 merge,不要 rebase**:`main` 已公开推送,rebase 会重写历史。`git merge master` 进 `main`,每次同步留一个 merge commit,冲突只解一次。
+3. **不要用 `-X ours`** —— 它会默默吞掉上游改动。只对第一类(生成物/锁定文件)例外。
+
+**同步后按顺序跑**:`node scripts/check-fork-surface.mjs --range=origin/master..main`(注意 `--range=` **要带值**;
+它能看见**新增**的上游文件,`--cumulative` 看不见,后者只核对清单里已登记的那几个)→ `pnpm -r typecheck && pnpm test:run`。
+
 ---
 
 *本页与(上游的)`CONTRIBUTING.md` 不冲突:那份讲怎么给 Paperclip 提 PR,本页讲这个 fork 怎么运转。*

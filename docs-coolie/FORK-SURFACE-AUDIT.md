@@ -1,0 +1,100 @@
+# 分歧面审计 (FORK-SURFACE-AUDIT)
+
+日期:2026-09-18。基线:`origin/master`(上游快照,2026-09-13)。
+方法:`git diff origin/master...main --numstat --diff-filter=AM`,按上游拥有的前缀过滤。
+
+**为什么要这份**:`scripts/fork-surface.json` 是**预算**清单,不是**地图**。它只登记了 7 个文件,
+而实际分歧是 91 个 / 9295 行 —— 也就是说 `check-fork-surface --cumulative` 的 PASS
+**只对清单里那几个成立**。上游一动,冲突大概率落在**没登记、也没记理由**的那些文件里。
+这份文档就是那份缺掉的地图,用来把分歧面**收敛**掉。
+
+## 1. 总量
+
+| | 文件 | 改动行 | 其中删除 | 已登记 |
+| --- | --- | --- | --- | --- |
+| **合计** | **91** | **9295** | 259 | **6** |
+
+`main` 完全包含 `origin/master`(`0 ahead / 231 behind`),所以**今天合并是空操作**——
+冲突只会在上游有新提交之后出现。现在正是做收敛的时机。
+
+## 2. 六个桶,六种处置
+
+| 桶 | 文件 | 行 | 删 | 已登记 | 处置 |
+| --- | --- | --- | --- | --- | --- |
+| **A 锁定文件(生成)** | 1 | 436 | 4 | 0 | 无脑:取上游 + `pnpm install` 重生成 |
+| **B i18n 语言包** | 40 | 6446 | 3 | 0 | **最大的一桶(69%)**,见 §3 |
+| **C `scripts/` 我们新增的工具** | 7 | 1425 | 0 | 0 | 上游没有同名 → 现在不冲突;考虑搬进我们自己的目录 |
+| **D 交织改动(有删除)** | 28 | 711 | 252 | **1** | **真正会冲突的那批**,见 §4 |
+| **E 上游文件只做追加** | 12 | 156 | 0 | 5 | 上游在附近改动时会冲突;改动小,逐个人工解即可 |
+| **F 我们新增的文件** | 3 | 121 | 0 | 0 | 不冲突 |
+
+## 3. B 桶:i18n 是最大且会**反复**冲突的一桶
+
+40 个 `ui/src/i18n/locales/*.json`,每个约 161 行,合计 6446 行(占全部分歧的 69%)。
+上游每加一个界面字符串,这 40 个文件都会变 ⇒ 每次都可能在 40 个文件里冲突。
+
+机制(`ui/src/i18n/locales.ts`,上游文件):它用
+`import.meta.glob("./locales/*.json", { eager: true })` **把目录下每个 json 当一个 locale**,
+并校验、要求 `en` 必须存在。所以**在同一个目录里放"我们的覆盖文件"是行不通的**——
+它会被当成一个语言代码。要覆盖,只能把我们的词条放在该目录**之外**,再合并进 `i18nextResources`,
+那是 `locales.ts` 或 `i18n/index.ts` 里的一次性改动(几行)。
+
+三条路,按推荐排序:
+
+1. **往上贡献**:这 40 个文件里大多是**上游界面的翻译**,上游大概率愿意收。PR 一旦合并,
+   它们就不再是分歧,冲突面直接消失。**长期最便宜。**
+2. **停止增长**:新词条不再写进上游的 locale 文件,改为我们自己的覆盖层(一次性改 `locales.ts`,
+   之后 40 个文件保持干净)。这正是"把复发冲突塌成一行"那条原则。
+3. **接受现状 + `rerere`**:已有 6446 行当作"已花掉的分歧",靠 `git config rerere.enabled true`
+   让同样的冲突解决被记住、自动复用。省事,但每次仍会有 40 个文件冒冲突。
+
+## 4. D 桶:交织改动 —— 按意图解的那 28 个
+
+这些文件里有我们的**删除行**,git 无法自动判断意图(±4 行的小改也一样),
+解冲突时必须知道"当初为什么改"。当前**只有 1 个**有登记(`ui/src/pages/PluginPage.tsx`)。
+
+```
++62  -36  ui/src/plugins/slots.tsx
++32  -30  ui/src/components/Sidebar.tsx
++54  -28  server/src/routes/plugin-ui-static.ts
++28  -25  ui/src/pages/PluginManager.tsx
++35  -22  ui/src/pages/ProfileSettings.tsx
++22  -20  ui/src/pages/Dashboard.tsx
++16  -14  ui/src/pages/Companies.tsx
++15  -13  ui/src/components/CompanySettingsSidebar.production.tsx
++15  -13  ui/src/components/CompanySettingsSidebar.tsx
++10  -8   ui/src/pages/Approvals.tsx
++8   -6   ui/src/pages/Issues.tsx
++5   -5   ui/src/pages/BootstrapSetupUxLab.tsx
++4   -4   ui/src/App.test.tsx
++5   -4   ui/src/components/InboxAgentPolicyControl.tsx
++4   -4   ui/src/pages/apps/chat/ChatEndpointSetup.tsx
++3   -3   ui/src/components/BootstrapPendingPage.tsx
++52  -2   server/src/app.ts
++2   -2   ui/index.html
++2   -2   ui/public/site.webmanifest
++8   -2   ui/src/pages/PluginPage.tsx        ← 唯一已登记
++2   -2   ui/src/pages/apps/generic-mcp-connect.ts
++1   -1   ui/src/components/CloudAccessGate.tsx
++1   -1   ui/src/components/OnboardingWizard.tsx
++1   -1   ui/src/components/StandaloneBrowserControls.tsx
++3   -1   ui/src/context/BreadcrumbContext.tsx
++67  -1   ui/src/i18n/index.ts
++1   -1   ui/src/pages/InstanceGeneralSettings.tsx
++1   -1   ui/src/pages/apps/AppsConnect.test.tsx
+```
+
+其中 `ui/src/plugins/slots.tsx`、`ui/src/components/Sidebar.tsx`、`server/src/routes/plugin-ui-static.ts`
+是插件 UI 的宿主接缝——**改动量最大、上游也在活跃开发**,同步时最可能真冲突。
+
+## 5. 收敛动作(建议顺序)
+
+1. **i18n**:先决定走上游 PR,还是做覆盖层;不管哪条,先**停止**继续往上游 locale 文件里加词条。
+2. **D 桶 28 个**:每个要么补进 `scripts/fork-surface.json`(`maxNetLines` + `reason`,写清为什么),
+   要么把改动缩回一行 re-export。做完之后,冲突文件能与清单对得上,**解决靠意图而不是靠猜**。
+3. **C 桶 7 个 `scripts/`**:考虑移进我们自己的目录(它们是我们的门禁工具,不是上游的),
+   顺手消除"上游将来加同名脚本"的风险。
+4. **把 `--range=` 用起来**:`node scripts/check-fork-surface.mjs --range=origin/master..main`
+   能看见新增的上游文件,是这份地图下次刷新时的一致性检查。
+
+> 这份文档是**地图**,不是预算。`scripts/fork-surface.json` 才是预算;两者的差值就是待收敛的工作量。
