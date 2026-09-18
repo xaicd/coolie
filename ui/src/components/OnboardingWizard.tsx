@@ -909,7 +909,9 @@ function OnboardingWizardInner({
     // Models are picked on step 4 (Connect a model).
     enabled: Boolean(createdCompanyId) && effectiveOnboardingOpen && step === 4
   });
-  const getCapabilities = useAdapterCapabilities();
+  // Like the disabled-adapters and registry lookups above, only fetch while
+  // the wizard is visible: it is mounted globally, including on /auth.
+  const getCapabilities = useAdapterCapabilities({ enabled: effectiveOnboardingOpen });
   const adapterCaps = getCapabilities(adapterType);
 
   // Resolve the login environment at render time, so the wizard can decide

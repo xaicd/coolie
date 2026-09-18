@@ -38,11 +38,19 @@ const KNOWN_DEFAULTS: Record<string, AdapterCapabilities> = {
  * Capabilities are fetched from the server adapter listing API and cached
  * via react-query. Before the data loads, known built-in adapter types
  * return correct synchronous defaults to avoid cold-load regressions.
+ *
+ * Callers that are mounted globally can pass `enabled: false` while they are
+ * not visible, so a signed-out visitor does not hit the protected adapter
+ * listing on every route.
  */
-export function useAdapterCapabilities(): (type: string) => AdapterCapabilities {
+export function useAdapterCapabilities(
+  options: { enabled?: boolean } = {},
+): (type: string) => AdapterCapabilities {
+  const enabled = options.enabled ?? true;
   const { data: adapters } = useQuery({
     queryKey: queryKeys.adapters.all,
     queryFn: () => adaptersApi.list(),
+    enabled,
     staleTime: 5 * 60 * 1000,
   });
 
