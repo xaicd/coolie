@@ -1,7 +1,13 @@
 # 分歧面审计 (FORK-SURFACE-AUDIT)
 
-日期:2026-09-18。基线:`origin/master`(上游快照,2026-09-13)。
-方法:`git diff origin/master...main --numstat --diff-filter=AM`,按上游拥有的前缀过滤。
+日期:2026-09-18。方法:`git diff <基线>...main --numstat --diff-filter=AM`,按上游拥有的前缀过滤。
+
+> **2026-09-18 已同步,本页需按新基线读。** 当天开了 `upstream` remote(之前**根本没有通道**,
+> `origin/master` 只是 9-13 的快照),预演 CLEAN,合并了 **71 个官方提交**(merge `b50f028d4`),
+> 现在 **0 behind / 236 ahead**。重新以 `upstream/master` 为基线实测:
+> **92 个上游文件 / 9316 行**(同步前是 91 / 9295)。
+> 下表的分桶是**同步前**那次测量,桶间比例不变;**当天数字一律用报告取**:
+> `node .agents/skills/fork-sync/scripts/sync-report.mjs`。
 
 **为什么要这份**:`scripts/fork-surface.json` 是**预算**清单,不是**地图**。它只登记了 7 个文件,
 而实际分歧是 91 个 / 9295 行 —— 也就是说 `check-fork-surface --cumulative` 的 PASS
