@@ -42,6 +42,7 @@ const SAMPLE_DOMAIN: DescribeDomainResult = {
       description: "已签约的客户",
       layer: "aggregate_root",
       propertiesSchema: { name: { type: "string" }, tier: { type: "string", enum: ["gold", "silver"] } },
+      propertyOrder: [],
       instanceCount: 12,
     },
     {
@@ -51,6 +52,7 @@ const SAMPLE_DOMAIN: DescribeDomainResult = {
       description: null,
       layer: "aggregate_root",
       propertiesSchema: null,
+      propertyOrder: [],
       instanceCount: 0,
     },
   ],

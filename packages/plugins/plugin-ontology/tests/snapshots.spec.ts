@@ -59,6 +59,7 @@ function nt(key: string, props: Record<string, unknown> = {}): DescribeDomainRes
     description: null,
     layer: "aggregate_root",
     propertiesSchema: Object.keys(props).length > 0 ? props : null,
+    propertyOrder: [],
     instanceCount: 0,
   };
 }
@@ -131,6 +132,18 @@ describe("serializeDomain — round trip", () => {
     const result = buildResult({ nodeTypes: [nt("a")] });
     const snap = serializeDomain(result);
     expect(snap.nodeTypes[0].propertiesSchema).toBeNull();
+  });
+
+  it("carries the declared property order into the snapshot", () => {
+    // Without this, restoring a snapshot would write the schema back and let
+    // jsonb pick the order again — the same loss, one layer over.
+    const result = buildResult({ nodeTypes: [nt("a", { name: { type: "string" } })] });
+    result.nodeTypes[0].propertyOrder = ["name"];
+    const snap = serializeDomain(result);
+    expect(snap.nodeTypes[0].propertyOrder).toEqual(["name"]);
+    // A copy, so mutating the snapshot cannot reach back into the live result.
+    snap.nodeTypes[0].propertyOrder.push("other");
+    expect(result.nodeTypes[0].propertyOrder).toEqual(["name"]);
   });
 });
 

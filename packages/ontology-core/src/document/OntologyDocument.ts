@@ -35,7 +35,7 @@
  */
 import { createHash } from "node:crypto";
 import { LINK_CARDINALITIES, type LinkCardinality } from "../enums.js";
-import { orderPropertyNames, propertyOrderSource } from "../propertyOrder.js";
+import { orderPropertyNames, propertyOrderSource, readPropertyOrder } from "../propertyOrder.js";
 
 export const DOCUMENT_FORMAT = "paperclip.ontology/1";
 
@@ -323,6 +323,11 @@ export interface DocumentSourceRows {
     description?: string | null;
     properties_schema?: Record<string, unknown> | null;
     propertiesSchema?: Record<string, unknown> | null;
+    /**
+     * The stored order column. Read here so a caller that has the rows does not
+     * have to restate the order — that restatement is what this column replaced.
+     */
+    property_order?: string[] | null;
   }>;
   relationTypes: Array<{
     key: string;
@@ -415,7 +420,9 @@ export function documentFromRows(rows: DocumentSourceRows): RowsResult {
     },
     objectTypes: rows.nodeTypes.map((type) => {
       const schema = type.properties_schema ?? type.propertiesSchema ?? {};
-      const declared = declarations[type.key];
+      // The stored column is the truth; `rows.propertyOrder` is a caller telling
+      // us what storage cannot know (an older row, or a document being written).
+      const declared = declarations[type.key] ?? readPropertyOrder(type);
       return {
         key: type.key,
         displayName: type.display_name ?? type.displayName ?? type.key,

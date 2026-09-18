@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { relationEndpoints } from "../relationEndpoints.js";
+import { prunePropertyOrder, readPropertyOrder, renameInPropertyOrder } from "../propertyOrder.js";
 import {
   diffPropertySchemas,
   planPropertyRenames,
@@ -196,6 +197,15 @@ export interface OntologyNodeTypeInput {
   displayName: string;
   description?: string | null;
   propertiesSchema?: Record<string, unknown>;
+  /**
+   * The order the source declared its fields in.
+   *
+   * `properties_schema` is jsonb, which re-sorts an object's keys, so the order
+   * cannot live in it. Names not present in `propertiesSchema` are dropped, and
+   * an absent or empty order means "unknown" — readers report that as sorted
+   * rather than presenting the map's arbitrary order as the source's.
+   */
+  propertyOrder?: string[];
   /** Foundry interface polymorphism: interface keys this object type implements. */
   implementsInterfaces?: string[];
   /** DigitalStaff living-ontology layer classification. */
@@ -208,6 +218,14 @@ export interface OntologyNodeTypeUpdate {
   displayName?: string;
   description?: string | null;
   propertiesSchema?: Record<string, unknown>;
+  /**
+   * The new declared order, when the caller has one.
+   *
+   * Optional: a schema edit maintains the stored order by itself (following a
+   * rename and dropping removed names), so a caller that only changes the schema
+   * cannot leave the order naming a property that no longer exists.
+   */
+  propertyOrder?: string[];
   implementsInterfaces?: string[];
   layer?: NodeLayer;
   layerSpec?: Record<string, unknown>;
@@ -290,6 +308,14 @@ export interface OntologyNodeTypeRow {
   description: string | null;
   layer: NodeLayer;
   properties_schema: Record<string, unknown> | null;
+  /**
+   * The declared field order, or `[]` when it was never recorded.
+   *
+   * A jsonb **array**, deliberately: jsonb reorders an object's keys but keeps
+   * an array's element order, which is the whole reason the order can live here
+   * when it cannot live in `properties_schema`.
+   */
+  property_order: string[] | null;
   /**
    * Free-form, and the only place an importer can record where a type came
    * from — the table has no provenance columns. Importers write
@@ -2205,7 +2231,7 @@ export class PostgresGraphStore implements GraphStore {
   }
 
   private static readonly NODE_TYPE_COLS =
-    "id, company_id, domain_id, key, display_name, description, layer, properties_schema, metadata";
+    "id, company_id, domain_id, key, display_name, description, layer, properties_schema, property_order, metadata";
 
   /**
    * The same list qualified with the `nt` alias.
@@ -2214,15 +2240,15 @@ export class PostgresGraphStore implements GraphStore {
    * ambiguous in any query that joins the two — and `describeDomain` does.
    */
   private static readonly NODE_TYPE_COLS_NT =
-    "nt.id, nt.company_id, nt.domain_id, nt.key, nt.display_name, nt.description, nt.layer, nt.properties_schema, nt.metadata";
+    "nt.id, nt.company_id, nt.domain_id, nt.key, nt.display_name, nt.description, nt.layer, nt.properties_schema, nt.property_order, nt.metadata";
 
   async createNodeType(input: OntologyNodeTypeInput): Promise<OntologyNodeTypeRow> {
     const id = randomUUID();
     await this.db.execute(
       `INSERT INTO ${this.table("ontology_node_types")}
          (id, company_id, domain_id, key, display_name, description, properties_schema,
-          implements_interfaces, layer, layer_spec, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9, $10::jsonb, $11::jsonb)`,
+          property_order, implements_interfaces, layer, layer_spec, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8::jsonb, $9::jsonb, $10, $11::jsonb, $12::jsonb)`,
       [
         id,
         input.companyId,
@@ -2231,6 +2257,9 @@ export class PostgresGraphStore implements GraphStore {
         input.displayName,
         input.description ?? null,
         JSON.stringify(input.propertiesSchema ?? {}),
+        // Pruned on the way in so the order can never name a property the schema
+        // does not have, whatever an importer hands us.
+        JSON.stringify(prunePropertyOrder(input.propertyOrder ?? [], input.propertiesSchema ?? {})),
         JSON.stringify(input.implementsInterfaces ?? []),
         input.layer ?? "generic",
         JSON.stringify(input.layerSpec ?? {}),
@@ -2292,6 +2321,22 @@ export class PostgresGraphStore implements GraphStore {
     if (migration && migration.orphanedInstances > 0 && update.allowOrphaned !== true) {
       throw new SchemaChangeNeedsReview(migration);
     }
+    // The order has to follow a rename and can never name a property the schema
+    // no longer has, so a schema edit maintains it even when the caller sent no
+    // order. A caller that does send one is authoritative for the *sequence*, but
+    // not for whether its names exist — hence prune either way.
+    const schemaAfter = update.propertiesSchema ?? prior[0]?.properties_schema ?? {};
+    const maintainsOrder =
+      update.propertyOrder !== undefined || update.propertiesSchema !== undefined;
+    const nextOrder = maintainsOrder
+      ? prunePropertyOrder(
+          renameInPropertyOrder(
+            update.propertyOrder ?? readPropertyOrder(prior[0] ?? null),
+            update.propertyRenames,
+          ),
+          schemaAfter,
+        )
+      : null;
     const res = await this.db.execute(
       `UPDATE ${this.table("ontology_node_types")}
           SET display_name          = COALESCE($3, display_name),
@@ -2301,6 +2346,7 @@ export class PostgresGraphStore implements GraphStore {
               implements_interfaces  = CASE WHEN $10::boolean THEN $11::jsonb ELSE implements_interfaces END,
               layer                  = COALESCE($12, layer),
               layer_spec             = CASE WHEN $13::boolean THEN $14::jsonb ELSE layer_spec END,
+              property_order         = CASE WHEN $15::boolean THEN $16::jsonb ELSE property_order END,
               updated_at             = now()
         WHERE company_id = $1 AND id = $2`,
       [
@@ -2318,6 +2364,8 @@ export class PostgresGraphStore implements GraphStore {
         update.layer ?? null,
         update.layerSpec !== undefined,
         JSON.stringify(update.layerSpec ?? {}),
+        nextOrder !== null,
+        JSON.stringify(nextOrder ?? []),
       ],
     );
     if (res.rowCount === 0) return null;
@@ -5416,6 +5464,9 @@ export class PostgresGraphStore implements GraphStore {
         description: row.description,
         layer: row.layer,
         propertiesSchema: row.properties_schema,
+        // The declared order, beside the map rather than inside it — jsonb keeps
+        // an array's element order but re-sorts an object's keys.
+        propertyOrder: readPropertyOrder(row),
         instanceCount: Number(row.instance_count),
       })),
       relationTypes: relationTypes.map((row) => ({
@@ -5483,6 +5534,8 @@ export interface DescribeDomainNodeType {
   description: string | null;
   layer: NodeLayer;
   propertiesSchema: Record<string, unknown> | null;
+  /** Declared property order; `[]` when storage never recorded one. */
+  propertyOrder: string[];
   instanceCount: number;
 }
 

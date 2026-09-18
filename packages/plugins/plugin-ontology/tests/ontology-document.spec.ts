@@ -283,6 +283,33 @@ describe("documentFromRows", () => {
     ]);
   });
 
+  it("reads the stored order column when the caller did not restate it", () => {
+    // The column exists so a caller holding the rows does not have to restate the
+    // order. Before it, omitting `propertyOrder` silently fell back to sorted.
+    const document = documentFromRows({
+      ...rows,
+      nodeTypes: [{ ...rows.nodeTypes[0], property_order: ["totalSpend", "customerId"] }],
+    }).document;
+    expect(document.objectTypes[0].orderSource).toBe("declared");
+    expect(document.objectTypes[0].properties.map((p) => p.name)).toEqual([
+      "totalSpend",
+      "customerId",
+      "joinedAt",
+      "loyaltyTier",
+    ]);
+  });
+
+  it("lets an explicit declaration win over the stored column", () => {
+    // A caller writing a document is telling us something storage cannot know,
+    // so it outranks the column rather than the other way round.
+    const document = documentFromRows({
+      ...rows,
+      propertyOrder: { customer: ["joinedAt"] },
+      nodeTypes: [{ ...rows.nodeTypes[0], property_order: ["totalSpend"] }],
+    }).document;
+    expect(document.objectTypes[0].properties.map((p) => p.name)[0]).toBe("joinedAt");
+  });
+
   it("carries the schema version as provenance, not as identity", () => {
     expect(documentFromRows(rows).document.source?.schemaVersion).toBe(7);
   });

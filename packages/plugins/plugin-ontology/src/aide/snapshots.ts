@@ -75,6 +75,9 @@ export function serializeDomain(domain: DescribeDomainLike): SchemaSnapshot {
         nt.propertiesSchema && typeof nt.propertiesSchema === "object"
           ? { ...nt.propertiesSchema }
           : null,
+      // Carried into the snapshot, or restoring one would drop the field order
+      // back to whatever jsonb returns — the same loss, one layer over.
+      propertyOrder: [...(nt.propertyOrder ?? [])],
       instanceCount: nt.instanceCount,
     })),
     relationTypes: domain.relationTypes.map((rt) => ({
