@@ -28,23 +28,45 @@ import {
   type Credential,
 } from "./src/coolie";
 import { useRecorder } from "./src/useRecorder";
+import { DashboardScreen } from "./src/screens/DashboardScreen";
 
 /**
- * Coolie mobile client.
+ * Coolie mobile client — 品牌版界面。
  *
- * Sign in with an email and password (a session), or paste a bearer key for
- * scripted and agent use — the two are deliberately different affordances,
- * because a person who is handed this app is not going to paste a key.
- *
- * Which companies you then see differs by credential and is not a preference: a
- * session sees its memberships, a board key the same, an agent key exactly one
- * company it cannot even list. So the company is resolved rather than configured
- * (see `credentialCompanies`), and zero-company accounts are told so plainly.
- *
- * Still no navigation library: the screen is chosen from state, so there is no
- * back stack and no deep linking — a real limitation, kept small until a router
- * earns its place.
+ * 深靛蓝品牌底 + 亮青强调色(与 App 图标同源),卡片式布局、中文文案。
+ * 凭据流程与数据层不变:邮箱会话或粘贴 API key,公司按成员关系解析
+ * (见 `credentialCompanies`),零公司账号会得到明确说明。
+ * 仍无导航库:屏幕由状态决定,没有返回栈与深链——刻意保持轻量。
  */
+
+// ── 品牌色板(与图标一致的靛蓝→亮青体系) ────────────────────────────
+const C = {
+  bg: "#0B1023",        // 页面深底
+  card: "#151B36",      // 卡片
+  cardHi: "#1B2347",    // 卡片高亮/输入框
+  line: "#27305C",      // 分隔线
+  ink: "#EEF2FF",       // 主文字
+  inkDim: "#8A93B8",    // 次文字
+  accent: "#22D3EE",    // 亮青(按钮/激活)
+  accentDeep: "#0E7490",
+  danger: "#F87171",
+  ok: "#34D399",
+  warn: "#FBBF24",
+} as const;
+
+const PRIORITY_LABEL: Record<IssuePriority, string> = {
+  low: "低", medium: "中", high: "高", critical: "紧急",
+};
+const PRIORITY_COLOR: Record<IssuePriority, string> = {
+  low: C.inkDim, medium: C.accent, high: C.warn, critical: C.danger,
+};
+const STATUS_LABEL: Record<string, string> = {
+  open: "待处理", in_progress: "进行中", blocked: "受阻", done: "已完成",
+};
+const STATUS_COLOR: Record<string, string> = {
+  open: C.inkDim, in_progress: C.accent, blocked: C.danger, done: C.ok,
+};
+
 export default function App() {
   const [credential, setCredential] = useState<Credential | null | undefined>(undefined);
 
@@ -58,8 +80,8 @@ export default function App() {
 
   if (credential === undefined) {
     return (
-      <View style={styles.center}>
-        <ActivityIndicator />
+      <View style={[styles.center, { backgroundColor: C.bg }]}>
+        <ActivityIndicator color={C.accent} />
       </View>
     );
   }
@@ -71,15 +93,14 @@ export default function App() {
 }
 
 function whoamiFor(credential: Credential): string {
-  if (credential.kind === "agent") return `${credential.identity.name} · agent key`;
-  if (credential.kind === "board") return "board key";
-  return credential.user.name ?? credential.user.email ?? "signed in";
+  if (credential.kind === "agent") return `${credential.identity.name} · 智能体`;
+  if (credential.kind === "board") return "管理密钥";
+  return credential.user.name ?? credential.user.email ?? "已登录";
 }
 
 /**
- * Resolve the company to work in before showing the board: auto-enter the one
- * company, ask when there are several, and explain the empty case — an account
- * with no membership is a real state here, not an error.
+ * 解析要进入的公司:只有一个就自动进入,多个让用户选,零公司给出解释
+ * ——零公司是真实状态而不是错误。
  */
 function CompanyGate({
   credential,
@@ -116,40 +137,45 @@ function CompanyGate({
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.screen}>
-      <StatusBar style="auto" />
+    <Surface>
       <View style={styles.rowBetween}>
         <Text style={styles.h1}>Coolie</Text>
-        <Pressable onPress={onSignOut}>
-          <Text style={styles.link}>Sign out</Text>
+        <Pressable onPress={onSignOut} hitSlop={12}>
+          <Text style={styles.link}>退出</Text>
         </Pressable>
       </View>
 
       {companies === null ? (
-        <ActivityIndicator style={{ marginTop: 24 }} />
+        <ActivityIndicator color={C.accent} style={{ marginTop: 24 }} />
       ) : error !== null ? (
         <Text style={styles.error}>{error}</Text>
       ) : companies.length === 0 ? (
         <Text style={styles.muted}>
-          {whoamiFor(credential)} is not a member of any company on this instance. An
-          administrator can add the account to one in the board, under the company's
-          people. Nothing is wrong with the app or your sign-in.
+          {whoamiFor(credential)} 还不是任何公司的成员。请管理员在后台把账号加入公司。
         </Text>
       ) : (
         <>
-          <Text style={styles.muted}>Choose a company to work in.</Text>
+          <Text style={styles.muted}>选择要进入的公司</Text>
           {companies.map((company) => (
             <Pressable
               key={company.id}
-              style={styles.taskRow}
+              style={styles.cardBtn}
               onPress={() => setChosen(company)}
             >
-              <Text style={styles.taskTitle}>{company.name}</Text>
-              <Text style={styles.muted}>{company.id}</Text>
+              <Text style={styles.cardBtnTitle}>{company.name}</Text>
             </Pressable>
           ))}
         </>
       )}
+    </Surface>
+  );
+}
+
+function Surface({ children }: { children: React.ReactNode }) {
+  return (
+    <ScrollView style={{ backgroundColor: C.bg, flex: 1 }} contentContainerStyle={styles.screen}>
+      <StatusBar style="light" />
+      {children}
     </ScrollView>
   );
 }
@@ -167,8 +193,7 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (credential: Credential) => 
     setError(null);
     try {
       if (useToken) {
-        // Prove the key before storing it. Storing first and failing later shows
-        // up as an empty task list, which reads as "no data" rather than "bad key".
+        // 先验证 key 再存储。先存后失败会表现为空任务列表,读起来像"没数据"而不是"key 错了"。
         const candidate = token.trim();
         const credential = await classifyToken(candidate);
         await saveAuthToken(candidate);
@@ -189,20 +214,21 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (credential: Credential) => 
     : email.trim().length > 0 && password.length > 0;
 
   return (
-    <View style={styles.screen}>
-      <StatusBar style="auto" />
-      <Text style={styles.h1}>Coolie</Text>
+    <Surface>
+      <View style={styles.hero}>
+        <Text style={styles.brandBig}>Coolie</Text>
+        <Text style={styles.tagline}>把 AI 智能体当成一支团队来管理</Text>
+      </View>
 
       {useToken ? (
         <>
           <Text style={styles.muted}>
-            Paste an agent API key, or a board API key. The app works out which one it
-            is: an agent key is scoped to a single company, a board key sees the
-            companies its owner belongs to.
+            粘贴智能体 API Key 或管理 Key,应用会自动识别类型。
           </Text>
           <TextInput
             style={styles.input}
-            placeholder="API key"
+            placeholder="API Key"
+            placeholderTextColor={C.inkDim}
             autoCapitalize="none"
             autoCorrect={false}
             secureTextEntry
@@ -212,13 +238,10 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (credential: Credential) => 
         </>
       ) : (
         <>
-          <Text style={styles.muted}>
-            Sign in with your account on this instance. Which companies you can reach
-            is decided by that account's memberships.
-          </Text>
           <TextInput
             style={styles.input}
-            placeholder="Email"
+            placeholder="邮箱"
+            placeholderTextColor={C.inkDim}
             autoCapitalize="none"
             autoCorrect={false}
             keyboardType="email-address"
@@ -228,7 +251,8 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (credential: Credential) => 
           />
           <TextInput
             style={styles.input}
-            placeholder="Password"
+            placeholder="密码"
+            placeholderTextColor={C.inkDim}
             secureTextEntry
             textContentType="password"
             value={password}
@@ -245,16 +269,16 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (credential: Credential) => 
         onPress={submit}
       >
         <Text style={styles.btnText}>
-          {busy ? "Checking…" : useToken ? "Connect" : "Sign in"}
+          {busy ? "验证中…" : useToken ? "连接" : "登录"}
         </Text>
       </Pressable>
 
       <Pressable onPress={() => { setUseToken(!useToken); setError(null); }}>
         <Text style={styles.link}>
-          {useToken ? "Use email and password instead" : "Use an API key instead"}
+          {useToken ? "改用邮箱密码登录" : "改用 API Key 登录"}
         </Text>
       </Pressable>
-    </View>
+    </Surface>
   );
 }
 
@@ -267,6 +291,7 @@ function HomeScreen({
   whoami: string;
   onSignOut: () => void;
 }) {
+  const [tab, setTab] = useState<"tasks" | "dashboard">("tasks");
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selected, setSelected] = useState<Issue | null>(null);
   const [title, setTitle] = useState("");
@@ -283,7 +308,7 @@ function HomeScreen({
     try {
       setIssues(await coolie.listIssues(companyId, { limit: 50 }));
     } catch (e) {
-      Alert.alert("Failed to load tasks", String((e as Error)?.message ?? e));
+      Alert.alert("加载失败", String((e as Error)?.message ?? e));
     } finally {
       setLoading(false);
     }
@@ -308,7 +333,7 @@ function HomeScreen({
       setPriority("medium");
       await loadIssues();
     } catch (e) {
-      Alert.alert("Failed to create task", String((e as Error)?.message ?? e));
+      Alert.alert("创建失败", String((e as Error)?.message ?? e));
     } finally {
       setBusy(false);
     }
@@ -323,158 +348,316 @@ function HomeScreen({
       const { base64, format } = await stop();
       setBusy(true);
       const res = await coolie.voiceDispatch({ companyId, audioBase64: base64, format });
-      if (res.issue) Alert.alert("Task created", res.issue.title);
-      else Alert.alert("Transcribed", res.transcription.text || "(empty)");
+      if (res.issue) Alert.alert("任务已创建", res.issue.title);
+      else Alert.alert("转写结果", res.transcription.text || "(空)");
       await loadIssues();
     } catch (e) {
       if (isAsrNotConfigured(e)) {
-        Alert.alert(
-          "Voice not configured",
-          "This instance has no Tencent ASR credentials for the company yet. Type the task instead.",
-        );
+        Alert.alert("语音未配置", "该实例尚未配置腾讯 ASR 凭据,请改用文字输入。");
       } else {
-        Alert.alert("Voice dispatch failed", String((e as Error)?.message ?? e));
+        Alert.alert("语音派发失败", String((e as Error)?.message ?? e));
       }
     } finally {
       setBusy(false);
     }
   }, [companyId, recording, start, stop, loadIssues]);
 
+  if (tab === "dashboard") {
+    return <DashboardScreen company={company} onBack={() => setTab("tasks")} />;
+  }
+
   if (selected) {
     return <TaskDetail issue={selected} onBack={() => setSelected(null)} />;
   }
 
+  const open = issues.filter((i) => i.status !== "done").length;
+
   return (
-    <ScrollView contentContainerStyle={styles.screen}>
-      <StatusBar style="auto" />
+    <Surface>
       <View style={styles.rowBetween}>
-        <View>
-          <Text style={styles.h1}>Tasks</Text>
-          <Text style={styles.muted}>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.h1}>工坊控制台</Text>
+          <Text style={styles.muted} numberOfLines={1}>
             {company.name} · {whoami}
           </Text>
         </View>
-        <Pressable onPress={onSignOut}>
-          <Text style={styles.link}>Sign out</Text>
+        <Pressable onPress={onSignOut} hitSlop={12}>
+          <Text style={styles.link}>退出</Text>
         </Pressable>
+      </View>
+
+      {/* 顶部标签切换 */}
+      <View style={styles.tabSwitcher}>
+        <Pressable
+          style={[styles.tabBtn, styles.tabBtnActive]}
+          onPress={() => setTab("tasks")}
+        >
+          <Text style={[styles.tabBtnText, styles.tabBtnTextActive]}>
+            任务工单 ({issues.length})
+          </Text>
+        </Pressable>
+        <Pressable
+          style={styles.tabBtn}
+          onPress={() => setTab("dashboard")}
+        >
+          <Text style={styles.tabBtnText}>
+            效能驾驶舱
+          </Text>
+        </Pressable>
+      </View>
+
+      {/* 概览条 */}
+      <View style={styles.statRow}>
+        <View style={styles.statCard}>
+          <Text style={styles.statNum}>{issues.length}</Text>
+          <Text style={styles.statLabel}>全部</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNum, { color: C.accent }]}>{open}</Text>
+          <Text style={styles.statLabel}>进行中</Text>
+        </View>
+        <View style={styles.statCard}>
+          <Text style={[styles.statNum, { color: C.ok }]}>{issues.length - open}</Text>
+          <Text style={styles.statLabel}>已完成</Text>
+        </View>
       </View>
 
       <View style={styles.composer}>
         <TextInput
           style={styles.input}
-          placeholder="New task…"
+          placeholder="新任务标题…"
+          placeholderTextColor={C.inkDim}
           value={title}
           onChangeText={setTitle}
         />
         <TextInput
           style={[styles.input, styles.inputMultiline]}
-          placeholder="Description (optional)"
+          placeholder="描述(可选)"
+          placeholderTextColor={C.inkDim}
           multiline
           value={description}
           onChangeText={setDescription}
         />
         <View style={styles.chips}>
-          {(["low", "medium", "high"] as IssuePriority[]).map((p) => (
+          {(["low", "medium", "high", "urgent"] as IssuePriority[]).map((p) => (
             <Pressable
               key={p}
               onPress={() => setPriority(p)}
               style={[styles.chip, priority === p && styles.chipActive]}
             >
-              <Text style={priority === p ? styles.chipTextActive : styles.chipText}>{p}</Text>
+              <Text style={priority === p ? styles.chipTextActive : styles.chipText}>
+                {PRIORITY_LABEL[p]}
+              </Text>
             </Pressable>
           ))}
         </View>
         <View style={styles.rowGap}>
           <Pressable
-            style={[styles.btn, (!title.trim() || busy) && styles.btnDisabled]}
+            style={[styles.btn, styles.btnFlex, (!title.trim() || busy) && styles.btnDisabled]}
             disabled={!title.trim() || busy}
             onPress={createTask}
           >
-            <Text style={styles.btnText}>Add</Text>
+            <Text style={styles.btnText}>添加任务</Text>
           </Pressable>
           <Pressable
-            style={[styles.btn, styles.btnAlt, busy && styles.btnDisabled]}
+            style={[styles.btnVoice, busy && styles.btnDisabled]}
             disabled={busy}
             onPress={voiceDispatch}
           >
-            <Text style={styles.btnText}>{recording ? "◼ Stop & dispatch" : "🎤 Voice task"}</Text>
+            <Text style={styles.btnVoiceText}>{recording ? "■ 停止并派发" : "🎤 语音"}</Text>
           </Pressable>
         </View>
       </View>
 
       {loading ? (
-        <ActivityIndicator style={{ marginTop: 24 }} />
+        <ActivityIndicator color={C.accent} style={{ marginTop: 24 }} />
       ) : (
         <FlatList
           scrollEnabled={false}
           data={issues}
           keyExtractor={(i) => i.id}
-          ListEmptyComponent={<Text style={styles.muted}>No tasks yet.</Text>}
+          ListEmptyComponent={
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>还没有任务</Text>
+              <Text style={styles.muted}>在上方输入标题创建第一个任务,或用语音派发。</Text>
+            </View>
+          }
           renderItem={({ item }) => (
-            <Pressable style={styles.taskRow} onPress={() => setSelected(item)}>
-              <Text style={styles.taskTitle}>{item.title}</Text>
-              <Text style={styles.muted}>
-                {item.status} · {item.priority}
-              </Text>
+            <Pressable style={styles.taskCard} onPress={() => setSelected(item)}>
+              <Text style={styles.taskTitle} numberOfLines={2}>{item.title}</Text>
+              <View style={styles.taskMeta}>
+                <View style={[styles.badge, {
+                  backgroundColor: `${STATUS_COLOR[item.status] ?? C.inkDim}22`,
+                  borderColor: `${STATUS_COLOR[item.status] ?? C.inkDim}55`,
+                }]}>
+                  <Text style={{ color: STATUS_COLOR[item.status] ?? C.inkDim, fontSize: 11, fontWeight: "600" }}>
+                    {STATUS_LABEL[item.status] ?? item.status}
+                  </Text>
+                </View>
+                <View style={[styles.badge, {
+                  backgroundColor: `${PRIORITY_COLOR[item.priority] ?? C.inkDim}22`,
+                  borderColor: `${PRIORITY_COLOR[item.priority] ?? C.inkDim}55`,
+                }]}>
+                  <Text style={{ color: PRIORITY_COLOR[item.priority] ?? C.inkDim, fontSize: 11, fontWeight: "600" }}>
+                    {PRIORITY_LABEL[item.priority] ?? item.priority}
+                  </Text>
+                </View>
+              </View>
             </Pressable>
           )}
         />
       )}
-    </ScrollView>
+    </Surface>
   );
 }
 
 function TaskDetail({ issue, onBack }: { issue: Issue; onBack: () => void }) {
   return (
-    <ScrollView contentContainerStyle={styles.screen}>
-      <StatusBar style="auto" />
-      <Pressable onPress={onBack}>
-        <Text style={styles.link}>‹ Back</Text>
+    <Surface>
+      <Pressable onPress={onBack} hitSlop={12}>
+        <Text style={styles.link}>‹ 返回</Text>
       </Pressable>
-      <Text style={styles.h1}>{issue.title}</Text>
-      <View style={styles.detailRows}>
-        <DetailRow label="Status" value={issue.status} />
-        <DetailRow label="Priority" value={issue.priority} />
-        {issue.description ? <DetailRow label="Description" value={issue.description} /> : null}
-        <DetailRow label="ID" value={issue.id} />
+      <Text style={styles.detailTitle}>{issue.title}</Text>
+      <View style={styles.detailCard}>
+        <DetailRow
+          label="状态"
+          value={STATUS_LABEL[issue.status] ?? issue.status}
+          valueColor={STATUS_COLOR[issue.status] ?? C.ink}
+        />
+        <DetailRow
+          label="优先级"
+          value={PRIORITY_LABEL[issue.priority] ?? issue.priority}
+          valueColor={PRIORITY_COLOR[issue.priority] ?? C.ink}
+        />
+        {issue.description ? <DetailRow label="描述" value={issue.description} /> : null}
+        <DetailRow label="编号" value={issue.id} valueColor={C.inkDim} />
       </View>
-    </ScrollView>
+    </Surface>
   );
 }
 
-function DetailRow({ label, value }: { label: string; value: string }) {
+function DetailRow({
+  label,
+  value,
+  valueColor,
+}: {
+  label: string;
+  value: string;
+  valueColor?: string;
+}) {
   return (
     <View style={styles.detailRow}>
       <Text style={styles.muted}>{label}</Text>
-      <Text style={styles.detailValue}>{value}</Text>
+      <Text style={[styles.detailValue, valueColor ? { color: valueColor } : null]}>
+        {value}
+      </Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   center: { flex: 1, alignItems: "center", justifyContent: "center" },
-  screen: { padding: 20, paddingTop: 64, gap: 12 },
-  h1: { fontSize: 24, fontWeight: "700" },
-  muted: { color: "#888", fontSize: 13 },
-  error: { color: "#b91c1c", fontSize: 13 },
-  link: { color: "#2563eb", fontWeight: "600" },
-  input: { borderWidth: 1, borderColor: "#ddd", borderRadius: 10, padding: 12, fontSize: 15 },
+  screen: { padding: 20, paddingTop: 64, gap: 12, backgroundColor: C.bg },
+  hero: { alignItems: "center", gap: 6, marginVertical: 28 },
+  h1: { fontSize: 26, fontWeight: "800", color: C.ink, letterSpacing: 0.4 },
+  brandBig: { fontSize: 36, fontWeight: "800", color: C.ink, letterSpacing: 0.6 },
+  tagline: { fontSize: 13, color: C.inkDim },
+  muted: { color: C.inkDim, fontSize: 13 },
+  error: { color: C.danger, fontSize: 13 },
+  link: { color: C.accent, fontWeight: "600" },
+  input: {
+    backgroundColor: C.cardHi, borderColor: C.line, borderWidth: 1,
+    borderRadius: 12, padding: 13, fontSize: 15, color: C.ink,
+  },
   inputMultiline: { minHeight: 64, textAlignVertical: "top" },
-  btn: { backgroundColor: "#111", borderRadius: 10, paddingVertical: 12, paddingHorizontal: 16, alignItems: "center" },
-  btnAlt: { backgroundColor: "#2563eb" },
-  btnDisabled: { opacity: 0.5 },
-  btnText: { color: "#fff", fontWeight: "600" },
-  composer: { gap: 8 },
+  btn: {
+    backgroundColor: C.accent, borderRadius: 12,
+    paddingVertical: 13, paddingHorizontal: 16, alignItems: "center",
+    shadowColor: C.accent, shadowOpacity: 0.35, shadowRadius: 10,
+    shadowOffset: { width: 0, height: 4 }, elevation: 6,
+  },
+  btnFlex: { flex: 1 },
+  btnVoice: {
+    backgroundColor: "#1E2A5E", borderColor: C.accentDeep, borderWidth: 1,
+    borderRadius: 12, paddingVertical: 13, paddingHorizontal: 18, alignItems: "center",
+  },
+  btnVoiceText: { color: C.accent, fontWeight: "700" },
+  btnDisabled: { opacity: 0.45 },
+  btnText: { color: "#06202B", fontWeight: "800", fontSize: 15 },
+  cardBtn: {
+    backgroundColor: C.card, borderRadius: 14, padding: 16, gap: 4,
+    borderColor: C.line, borderWidth: 1,
+  },
+  cardBtnTitle: { color: C.ink, fontSize: 16, fontWeight: "700" },
+  composer: {
+    gap: 8, backgroundColor: C.card, padding: 14,
+    borderRadius: 16, borderWidth: 1, borderColor: C.line,
+  },
   rowGap: { flexDirection: "row", gap: 8 },
-  rowBetween: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
-  chips: { flexGrow: 0, flexDirection: "row" },
-  chip: { borderWidth: 1, borderColor: "#ddd", borderRadius: 999, paddingVertical: 6, paddingHorizontal: 12, marginRight: 8 },
-  chipActive: { backgroundColor: "#111", borderColor: "#111" },
-  chipText: { color: "#111" },
-  chipTextActive: { color: "#fff" },
-  taskRow: { borderBottomWidth: 1, borderBottomColor: "#eee", paddingVertical: 12 },
-  taskTitle: { fontSize: 15, fontWeight: "500" },
-  detailRows: { gap: 10, marginTop: 4 },
+  rowBetween: {
+    flexDirection: "row", justifyContent: "space-between",
+    alignItems: "center", gap: 12,
+  },
+  tabSwitcher: {
+    flexDirection: "row",
+    backgroundColor: C.card,
+    borderRadius: 12,
+    padding: 3,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  tabBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    alignItems: "center",
+    borderRadius: 9,
+  },
+  tabBtnActive: {
+    backgroundColor: C.cardHi,
+    borderWidth: 1,
+    borderColor: C.accent,
+  },
+  tabBtnText: {
+    fontSize: 13,
+    color: C.inkDim,
+    fontWeight: "600",
+  },
+  tabBtnTextActive: {
+    color: C.accent,
+    fontWeight: "800",
+  },
+  chips: { flexGrow: 0, flexDirection: "row", flexWrap: "wrap", gap: 8 },
+  chip: {
+    borderWidth: 1, borderColor: C.line, borderRadius: 999,
+    paddingVertical: 5, paddingHorizontal: 14, backgroundColor: C.cardHi,
+  },
+  chipActive: { backgroundColor: C.accent, borderColor: C.accent },
+  chipText: { color: C.inkDim, fontSize: 13 },
+  chipTextActive: { color: "#06202B", fontSize: 13, fontWeight: "700" },
+  statRow: { flexDirection: "row", gap: 10 },
+  statCard: {
+    flex: 1, backgroundColor: C.card, borderRadius: 14, paddingVertical: 14,
+    alignItems: "center", borderWidth: 1, borderColor: C.line, gap: 2,
+  },
+  statNum: { color: C.ink, fontSize: 22, fontWeight: "800" },
+  statLabel: { color: C.inkDim, fontSize: 12 },
+  taskCard: {
+    backgroundColor: C.card, borderRadius: 14, padding: 14, gap: 8,
+    borderWidth: 1, borderColor: C.line,
+  },
+  taskTitle: { color: C.ink, fontSize: 15, fontWeight: "600" },
+  taskMeta: { flexDirection: "row", gap: 8 },
+  badge: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3, borderWidth: 1 },
+  emptyCard: {
+    backgroundColor: C.card, borderRadius: 14, padding: 22, alignItems: "center",
+    gap: 6, borderWidth: 1, borderColor: C.line, borderStyle: "dashed",
+  },
+  emptyTitle: { color: C.ink, fontSize: 15, fontWeight: "700" },
+  detailTitle: { fontSize: 22, fontWeight: "800", color: C.ink },
+  detailCard: {
+    backgroundColor: C.card, borderRadius: 14, borderWidth: 1,
+    borderColor: C.line, padding: 14, gap: 12,
+  },
   detailRow: { gap: 2 },
-  detailValue: { fontSize: 15 },
+  detailValue: { fontSize: 15, color: C.ink },
 });
