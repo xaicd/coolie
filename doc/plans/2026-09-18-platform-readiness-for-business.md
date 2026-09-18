@@ -360,4 +360,91 @@ public-hosted path"。而 `packages/ontology-mcp` **是个 stdio 服务器**。
 3. **本体对客户是"可见交付物"还是"我们内部的资产"**：决定交换文档是外部交付面（要 viewer）
    还是内部导入导出（先要 route）。
 
+## 7. 一套实例开多公司（形态修正第 3 次，2026-09-18）
+
+形态再次修正：**公网入口只有一套实例**，客户不是一个一个的实例，而是这套实例里的**多个公司**
+（他们是软件交付公司，一个客户 = 一个 company）。这正好是 V1 合同写明的模型
+（`doc/SPEC-implementation.md:36`："Single-tenant deployment, multi-company data model"）。
+所以"能不能开多公司"——**能**，而且这就是设计意图。问题变成：**company 是不是客户之间的安全边界**。
+
+**是真的边界（有机制）**：路由授权（`assertCompanyAccess` 要求目标 companyId 在 actor 的活动成员集里，
+agent 被钉死在一个公司，`routes/authz.ts:75-121,157-162`）；actor 的可见公司集每次请求都从
+`company_memberships` 重算（`middleware/auth.ts:278-288,307-326`）；121/136 张表带 `company_id`；
+对象存储按 `${companyId}/…` 分前缀并**强制校验**（`storage/service.ts:53-63,100-140`）；
+agent API key 绑公司（`agent_api_keys.companyId`）；外部/不存在都返回 404，关掉了存在性探测；
+成本与预算按公司归集（可对客户计费）；工具/MCP 连接/配置/运行时槽都带 companyId。
+
+**不是边界的地方（按风险）**：
+
+1. **插件是实例级、且能读所有客户的核心表。** `plugins` 没有 `company_id`；插件 worker 可对白名单表
+   （companies/projects/agents/issues/heartbeat_runs/cost_events/approvals…，
+   `packages/shared/src/constants.ts:1439-1453`）执行 SELECT，而校验器**只查表名、不注入 company 条件**
+   （`services/plugin-database.ts`）。⇒ 一个第三方插件能读全部客户的 issue/评论/成本。隔离靠"插件可信"。
+2. **本地执行没有 OS 隔离。** 标准信任的 run 默认走 `local` driver，在宿主文件系统上跑
+   （`environment-driver-traits.ts:59-61,133-140`）；每个公司有目录，但那是**约定**
+   （`native-chat-workspace.ts:69-78`）。只有低信任 run 被强制 sandbox
+   （`low-trust-runtime-containment.ts:82-85`）。⇒ A 客户的 run 能读 B 客户的 workspace/资产/run log。
+3. **board API key 永远不绑公司。** `board_api_keys` 只有 `userId`；每次用都按"该用户当前全部成员身份"
+   重算范围。⇒ 你把自己（同时在 A、B 两个公司里的）一把 key 或一个会话交给客户，就同时交出了 A 和 B，
+   以及你以后加入的任何公司。**今天做不到"把 key 限制在一个公司"。**
+4. **`environments` 是实例级单例**（没有 `company_id`，只有一个 `local` 行），共享 config/envVars/
+   secret 绑定——A 客户的环境里绑的密钥，任何公司的 run 都能用；B 客户也没法有独立环境配置。
+
+另外两条属于"设计如此，但要讲清楚"：实例管理员**按设计**能看到所有客户——公司目录不过滤
+（`routes/companies.ts:391-393`）、可自我授予公司访问（`routes/access.ts:4746-4753`）、权限引擎对
+instance admin 短路（`authorization.ts:1657-1667`）、能整库备份（`routes/instance-database-backups.ts:25`）。
+而遥测是**整个实例一个 installId**：载荷里没有公司名/slug/id，但 `agent.*` 事件带**原始 agent UUID**、
+`company.imported` 带**原始导入来源路径/GitHub URL**——即"对客户身份是匿名的，对 agent 身份和导入来源不是"。
+
+## 8. 运营台的缺口（补：这比多数技术项更挡路）
+
+**先把边界说准**：后台页面**不少**——实例设置（profile/general/heartbeats/environments/access/
+experimental/plugins/adapters）、公司设置（members/access/invites/secrets/tools）、
+审计中枢（`/audit/{activity,runs,costs,budgets,timeline}`）、`/costs`、`/budgets`、`/activity`、
+`/runs`、`/approvals`、`/review-queue`、`InstanceAccess`、`CompanyAccess`、`Companies`、
+公司导出/导入。**所以"缺运营后台"不成立**；成立的是：**没有"一套实例多客户"的运营台。**
+
+证据：
+
+- **主侧边栏没有任何 Companies / Instance / Ops 入口**（`ui/src/components/Sidebar.tsx` 的链接里没有）。
+  多公司在导航里只以 **CompanySwitcher 下拉**存在（`CompanySwitcher.tsx`、`SidebarCompanyMenu.production.tsx`）——
+  也就是"切换器"，不是"控制台"。
+- **实例级设置被藏在公司路由下面**：`/company/settings/instance/*`（`ui/src/App.tsx:233-255`），
+  另有 `/instance/settings/*`。这个 IA 本身就会让人以为没有实例后台。
+- `/companies` 页面存在但**不在导航里**。
+- **跨公司驾驶舱的后端只有个零头**：`GET /api/companies/stats` 对实例管理员返回**全部公司**、
+  不过滤（`routes/companies.ts:398-410`），但内容只有 `{agentCount, issueCount}`
+  （`services/companies.ts:575-598`）——**没有成本、预算燃烧、在跑 run、待批审批、最后活动、最近失败**，
+  而且没有任何页面消费它。
+
+对交付公司真正缺的四块：
+
+1. **跨客户驾驶舱**：每个客户一行——本月成本/预算、agent 数与状态、在跑 run、未结 issue、
+   待批审批、最后活动、最近一次失败。没有它，10~20 个客户只能一个一个切进去看。
+2. **实例运维页**：备份列表与**恢复**（备份现在只有触发端点，**没有 restore**）、迁移已应用状态、
+   后台作业/调度器状态、遥测开关、健康详情、日志保留。这一块和 §2.4 是同一批缺口，
+   但没有页面把它们聚起来。
+3. **租户生命周期**：按**模板**开客户（现成的 `CompanyExport` / `CompanyImport` 就是底子）、
+   暂停（不删）/归档/配额。**注意**：不能直接用删公司来实现"退租"——那会连带删掉该公司的
+   activity log（`services/companies.ts:539`），该先归档。
+4. **跨客户审计与读审计**：审计中枢是**按公司**的；没有跨客户视图；"谁读了什么"完全不存在
+   （§2.1）；而 **instance-admin 升降级不记日志**（`routes/access.ts:4655-4737`）——
+   在运营台里这是必须先补的。另外需要一条**受审计的"以客户身份查看"**路径
+   （现在实例管理员能自我授予访问，但没有任何支持态入口与留痕）。
+
+**建在哪（架构建议）**：做成**插件**，不要往 host UI 加页面。理由：`ui/src/pages/**` 是上游文件，
+加页面就是抬 fork surface；而插件有 sidebar + page slot，`plugin-ontology` 已经这么干过
+（它自带一个"运维"菜单）。**但必须写下来的一个对称性**：跨公司运营台需要**跨公司读**，
+而这正是 §7 里被标为**泄露风险**的那条能力（插件 DB 白名单只校验 SELECT 的表名、不注入 company 过滤）。
+所以用它是有意识的决定，边界要明确：**只给我们自己作者写的插件、只对 instance-admin 开放**，
+并把这条依赖写在插件的文档与测试里，而不是默认所有插件都能这么读。
+
+**最小第一版**：一个页面 = 全部公司 × {本月成本、预算、agent、在跑 run、未结 issue、待批审批、
+最后活动}，每行可进入 / 暂停 / 归档；数据源 `/api/companies` + 我们自己的一条聚合查询
+（现有 `stats` 太薄，不足以当驾驶舱）。
+
+**优先级**：在"一套实例多客户"这个形态下，运营台的缺位**比 §2 里多数技术项更挡路**——
+没有它，日常运营不可行。但它**不替代**两条事故级风险：**没有恢复路径**（§1.1 / §6.1）
+与**没有密码找回**（§6.2）。这两条是"会出事"，运营台是"每天都在挡路"。
+
 **未做**：本文件只评估，没有修改任何代码。
