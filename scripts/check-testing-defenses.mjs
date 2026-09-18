@@ -55,6 +55,12 @@ const LINES = [
       // Always through the plugin's own package: these specs resolve the core
       // through its workspace alias, which the root vitest config does not know.
       { label: "guard specs: layering, action parity, schema columns, migration comments", cmd: "pnpm --filter @paperclipai/plugin-ontology test tests/layering.spec.ts tests/action-parity.spec.ts tests/schema-columns.spec.ts tests/migration-comments.spec.ts" },
+      // Same reason as the line above: the ops console reads core tables through
+      // the plugin namespace, so its guards live in the plugin package and the
+      // root vitest config would not pick them up. Its two load-bearing
+      // assertions are that the instance-wide read fails closed when a company
+      // is supplied, and that no query it issues writes.
+      { label: "guard specs: ops console scope and read shape", cmd: "pnpm --filter @paperclipai/plugin-ops-console test" },
       // Repo-wide, so it runs unscoped: how much of this change lands on files
       // upstream also owns, and therefore has to be reconciled at the next merge.
       { label: "fork surface: upstream-owned files this fork changes", cmd: "node --test scripts/check-fork-surface.test.mjs && node scripts/check-fork-surface.mjs --cumulative" },
