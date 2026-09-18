@@ -12,6 +12,11 @@ import { CoolieLockup } from "../components/CoolieLockup";
 
 type AuthMode = "sign_in" | "sign_up";
 
+// `type="email"` on the input is the browser's own hint, but a form that runs
+// with `noValidate` (needed so every field reports a reason) would otherwise
+// submit an address with no shape check at all.
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
  * Returns a message describing the first problem with the submitted
  * credentials, or null when the form is ready to send. The form runs with
@@ -25,7 +30,9 @@ export function validateCredentials(input: {
   password: string;
 }): string | null {
   if (input.mode === "sign_up" && input.name.trim().length === 0) return "Enter your name.";
-  if (input.email.trim().length === 0) return "Enter your email address.";
+  const email = input.email.trim();
+  if (email.length === 0) return "Enter your email address.";
+  if (!EMAIL_PATTERN.test(email)) return "Enter a valid email address.";
   if (input.password.trim().length === 0) return "Enter your password.";
   if (input.mode === "sign_up" && input.password.trim().length < 8) {
     return "Password must be at least 8 characters.";

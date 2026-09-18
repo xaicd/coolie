@@ -274,6 +274,12 @@ describe("validateCredentials", () => {
     ).toBe("Enter your email address.");
   });
 
+  it("rejects an email that is not shaped like one", () => {
+    expect(
+      validateCredentials({ mode: "sign_in", name: "", email: "not-an-email", password: "secret" }),
+    ).toBe("Enter a valid email address.");
+  });
+
   it("explains a missing password", () => {
     expect(
       validateCredentials({ mode: "sign_in", name: "", email: "jane@example.com", password: "" }),
