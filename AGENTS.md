@@ -215,6 +215,26 @@ A change is done when all are true:
 4. Docs updated when behavior or commands change
 5. PR description follows the [PR template](.github/PULL_REQUEST_TEMPLATE.md) with all sections filled in (including Model Used)
 
+## This fork's own conventions
+
+This repository is a fork of Paperclip. The rules above are upstream's; these are ours.
+They are **pointers, not copies** — open the file when it matters, so nothing here has to
+be kept in sync twice.
+
+- `docs-coolie/BRANCHING.md` — which branch is ours (`main`), what `master` is for
+  (syncing upstream), push discipline, and how to resolve merge conflicts.
+- `docs-coolie/TERMINOLOGY.md` — the names we use. In particular: the platform's only
+  isolation unit is a **company**; "tenant" is not a concept here, and the ontology's
+  own `ontology_tenants` is an inert leftover of the cancelled standalone deployment.
+- `docs-coolie/FORK-SURFACE-AUDIT.md` — how far this fork actually diverges from
+  upstream, and which resolution each part needs.
+- `doc/plans/*.md` — dated plan and design records.
+- `.agents/skills/` — our skill library (`fork-sync` is the upstream-sync playbook).
+
+Before changing a file upstream also owns, read the fork-surface audit: every
+intentional change to one needs an entry with a reason in `scripts/fork-surface.json`,
+because the gate it feeds only checks the files listed there.
+
 ## Design system
 
 `DESIGN.md` at the repo root is the source of truth for UI design decisions. The token-only rule applies to all `ui/` changes: every color, spacing, radius, type, shadow, and motion value in `ui/src/components/**` and `ui/src/pages/**` comes from the token layer in `ui/src/index.css` — no hex, raw px, arbitrary Tailwind bracket values, or raw `font-size`/`fontSize` declarations in components, outside the documented allowlist in `ui/src/index.css`. Run `pnpm check:token-gates` (`scripts/check-token-gates.mjs`) before committing UI changes — it fails on any violation not covered by that allowlist.

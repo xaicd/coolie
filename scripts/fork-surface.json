@@ -42,6 +42,12 @@
       "maxNetLines": 30,
       "reason": "Entry points for the repo gates (test:defenses and friends). A gate nobody can run is not a gate.",
       "maxTotalLines": 100
+    },
+    {
+      "path": "AGENTS.md",
+      "maxNetLines": 30,
+      "reason": "Points at this fork's own conventions (docs-coolie/*, .agents/skills, doc/plans). AGENTS.md is the one file every AGENTS.md-reading tool loads, so the pointers cannot live in our own tree; they are written as plain paths rather than @imports, because an import is inlined into the system prompt on every request and would be paid on every turn.",
+      "maxTotalLines": 30
     }
   ]
 }
