@@ -272,7 +272,7 @@ function ModelSourceMark({
 // Exported so tests write/read the exact key the component uses, instead of
 // duplicating the literal and silently drifting from it if it's ever renamed.
 export const ONBOARDING_STORAGE_KEY = "paperclip-onboarding-state";
-const DEFAULT_TASK_TITLE = "Paperclip onboarding";
+const DEFAULT_TASK_TITLE = "Coolie onboarding";
 /**
  * The onboarding draft in `localStorage`, via a browser that is allowed to say
  * no.
@@ -1998,7 +1998,7 @@ function OnboardingWizardInner({
     if (adapterType === "paperclip_runner") {
       setAdapterType("claude_local");
       setModel("");
-      setError("Paperclip Runner is not available during onboarding. Choose a legacy adapter.");
+      setError("Coolie Runner is not available during onboarding. Choose a legacy adapter.");
       return;
     }
     if (createdAgentId) {
@@ -2513,7 +2513,7 @@ function OnboardingWizardInner({
                       // sentence restating it only pushes the fields down.
                       lede={
                         step === 3 ? undefined : step === 4 ? (
-                          <>Paperclip works with your subscription or API keys.</>
+                          <>Coolie works with your subscription or API keys.</>
                         ) : (
                           <>{agentName.trim() || "Your first agent"} is ready to work!</>
                         )

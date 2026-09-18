@@ -592,7 +592,7 @@ function Access({
       <div>
         <h2 className="text-lg font-semibold">External identity access</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Linked identities act as their current Paperclip user. Unlinked
+          Linked identities act as their current Coolie user. Unlinked
           people, when allowed, receive a fixed restricted profile.
         </p>
       </div>

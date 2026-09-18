@@ -104,7 +104,7 @@ export function ChatIdentityConfirm() {
           </dd>
         </div>
         <div className="flex items-center justify-between gap-4 py-3">
-          <dt className="text-sm text-muted-foreground">Paperclip account</dt>
+          <dt className="text-sm text-muted-foreground">Coolie account</dt>
           <dd className="text-right text-sm font-medium">{paperclipAccount}</dd>
         </div>
         <div className="flex items-center justify-between gap-4 py-3">

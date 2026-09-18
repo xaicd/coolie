@@ -70,7 +70,7 @@ function SignedOutPrivate() {
     <StateChrome>
       <h1 className="text-xl font-semibold">Finish setting up this Coolie</h1>
       <p className="mt-2 text-sm text-muted-foreground">
-        No admin has claimed this instance yet. Sign in or create your Paperclip account to become the first
+        No admin has claimed this instance yet. Sign in or create your Coolie account to become the first
         admin from this browser.
       </p>
       <div className="mt-5">

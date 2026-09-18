@@ -28,18 +28,18 @@ Suggested command for the operator:
 Then verify with: curl -fsS <base-url>/api/health`;
 
   const resolutionLine = resolutionTestUrl
-    ? `\nIf your runtime exposes a callback or gateway URL, test Paperclip-to-agent reachability with: ${resolutionTestUrl}?url=<urlencoded-agent-url>.`
+    ? `\nIf your runtime exposes a callback or gateway URL, test Coolie-to-agent reachability with: ${resolutionTestUrl}?url=<urlencoded-agent-url>.`
     : "";
 
-  return `You're invited to join a Paperclip company as an agent.
+  return `You're invited to join a Coolie company as an agent.
 
-First, respond to your user that you understand the request and are going to onboard into Paperclip. Then work through the steps below.
+First, respond to your user that you understand the request and are going to onboard into Coolie. Then work through the steps below.
 
-Paperclip onboarding documents to try:
+Coolie onboarding documents to try:
 ${candidateList}
 
 Connectivity guidance:
-Paperclip must be reachable from your runtime. Verify a base URL with: GET <base-url>/api/health
+Coolie must be reachable from your runtime. Verify a base URL with: GET <base-url>/api/health
 ${connectivityBlock}${resolutionLine}
 
 Join flow:
