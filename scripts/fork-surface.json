@@ -147,20 +147,26 @@
     },
     {
       "path": "ui/src/components/BootstrapPendingPage.tsx",
-      "maxNetLines": 35,
-      "reason": "The public-instance branch used to offer the host CLI as the way to finish setup, which is not a path a product can ask a customer to take. It now leads with the pinned email and offers sign-in, since signing in is what triggers the grant.",
-      "maxTotalLines": 50
+      "maxNetLines": 60,
+      "reason": "The public-instance branch used to offer the host CLI as the way to finish setup, which is not a path a product can ask a customer to take. It now leads with the pinned email, and splits on whether a session already exists: signed out it offers sign-in, signed in it can only offer a sign-out, because `AuthPage` bounces any session-bearing request back to `/` and the grant fires when a session is created. The budget covers both halves of that branch, since they are one screen and one decision.",
+      "maxTotalLines": 100
     },
     {
       "path": "ui/src/pages/BootstrapSetupUxLab.tsx",
-      "maxNetLines": 30,
-      "reason": "The design-lab fixture keeps its own copy of the pending screens; leaving it on the old wording would make the lab document a design the app no longer ships.",
-      "maxTotalLines": 45
+      "maxNetLines": 55,
+      "reason": "The design-lab fixture keeps its own copy of the pending screens; leaving it on the old wording, or missing the public-signed-in state, would make the lab document a design the app no longer ships. Fixture copy is most of the growth here, which is the point of the file.",
+      "maxTotalLines": 80
     },
     {
       "path": "ui/src/App.test.tsx",
+      "maxNetLines": 80,
+      "reason": "The public bootstrap-pending coverage: the old case asserted the defect (it passed a session and expected 'Sign in / Create account'), so it became two — signed out keeps the sign-in offer, signed in gets the sign-out — plus the assertions that each state does not render the other's affordance.",
+      "maxTotalLines": 120
+    },
+    {
+      "path": "ui/src/components/CloudAccessGate.tsx",
       "maxNetLines": 20,
-      "reason": "The public bootstrap-pending assertions move from 'invite-only' wording to the host-decided one, including the sign-in affordance that the pinned-email path needs. Same intent, current copy.",
+      "reason": "Wires useSignOut into the pending screen. It belongs here because this component owns the session query the sign-out has to reset: signing out there is what brings the signed-out branch back, with no navigation and no way to loop.",
       "maxTotalLines": 30
     },
     {
