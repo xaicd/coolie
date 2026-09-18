@@ -19,6 +19,11 @@
 #   COOLIE_SERVICE       systemd unit           (default: coolie)
 #   COOLIE_PUBLIC_URL    public base URL        (default: https://xrobinai.cn)
 #   COOLIE_LEGACY_PATHS  retired paths to assert, space-separated (default: none)
+#
+# A freshly deployed authenticated instance has no admin yet, and a public one
+# cannot hand the role to whoever opens the page first. Pin the operator's email
+# (PAPERCLIP_BOOTSTRAP_ADMIN_EMAIL) instead, and close sign-up while you are
+# there: docs-coolie/FIRST-RUN-SETUP.md.
 
 set -euo pipefail
 

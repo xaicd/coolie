@@ -13,6 +13,10 @@ import {
 import type { Config } from "../config.js";
 import { resolvePaperclipInstanceId } from "../home-paths.js";
 import {
+  readAuthUserEmail,
+  tryClaimBootstrapAdminByEmail,
+} from "../bootstrap-admin-email.js";
+import {
   workspaceLoginHandoffPlugin,
   type WorkspaceHandoffExpectedIdentity,
 } from "./workspace-login-handoff-plugin.js";
@@ -275,6 +279,40 @@ export function createBetterAuthInstance(db: Db, config: Config, trustedOrigins:
       requireEmailVerification: false,
       disableSignUp: config.authDisableSignUp,
     },
+    // A public instance cannot offer the browser first-admin claim (it is gated
+    // on deploymentExposure === "private"), which used to leave the host CLI as
+    // the only way to mint the first admin. Pinning the operator's email makes
+    // that first sign-in the grant, without opening the claim to whoever asks.
+    ...(config.bootstrapAdminEmail
+      ? {
+          databaseHooks: {
+            user: {
+              create: {
+                after: async (user: { id: string; email?: string | null }) => {
+                  await tryClaimBootstrapAdminByEmail(db, {
+                    configuredEmail: config.bootstrapAdminEmail,
+                    deploymentMode: config.deploymentMode,
+                    userId: user.id,
+                    email: user.email ?? null,
+                  });
+                },
+              },
+            },
+            session: {
+              create: {
+                after: async (session: { userId: string }) => {
+                  await tryClaimBootstrapAdminByEmail(db, {
+                    configuredEmail: config.bootstrapAdminEmail,
+                    deploymentMode: config.deploymentMode,
+                    userId: session.userId,
+                    email: await readAuthUserEmail(db, session.userId),
+                  });
+                },
+              },
+            },
+          },
+        }
+      : {}),
     rateLimit: buildBetterAuthRateLimitOptions({
       deploymentMode: config.deploymentMode,
       deploymentExposure: config.deploymentExposure,

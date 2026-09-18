@@ -108,6 +108,66 @@
       "maxNetLines": 45,
       "reason": "Covers the filing footer reaching the app shell, and staying out of it when no filing is configured. Added here rather than in a new file because this suite already owns the SPA fallback HTML that the footer is injected into.",
       "maxTotalLines": 90
+    },
+    {
+      "path": "server/src/config.ts",
+      "maxNetLines": 12,
+      "reason": "Reads PAPERCLIP_BOOTSTRAP_ADMIN_EMAIL into Config.bootstrapAdminEmail. Env-only rather than also a paperclip.json key: the pin is a property of the deployment an operator sets once, and a file-config key would mean touching the config schema that the CLI and shared packages also compile against.",
+      "maxTotalLines": 20
+    },
+    {
+      "path": "server/src/auth/better-auth.ts",
+      "maxNetLines": 50,
+      "reason": "Two databaseHooks that call the pinned-email bootstrap on user create and on session create. This is the only place that sees a credential sign-up and sign-in as they happen, and it is added conditionally, so an instance without the pin keeps upstream's options object byte for byte.",
+      "maxTotalLines": 70
+    },
+    {
+      "path": "server/src/bootstrap-admin-email.ts",
+      "maxNetLines": 110,
+      "reason": "New file: decides whether a sign-up or sign-in should grant the first instance admin, and reuses server/src/first-admin-claim.ts for the locked, once-only insert rather than writing a second claim path. No upstream counterpart.",
+      "maxTotalLines": 110
+    },
+    {
+      "path": "server/src/__tests__/bootstrap-admin-email.test.ts",
+      "maxNetLines": 220,
+      "reason": "New file: the matching rules, the config parse, and the claim outcomes against a real Postgres (including the negative case — an address the operator did not pin never gets admin). No upstream counterpart.",
+      "maxTotalLines": 220
+    },
+    {
+      "path": "server/src/__tests__/better-auth-pinned-bootstrap.integration.test.ts",
+      "maxNetLines": 190,
+      "reason": "New file: drives the real Better Auth mount so the hooks are proven to fire on sign-up and on sign-in. The sign-in case is the one operators hit (register first, pin after), and it is the only coverage of the session hook's email lookup. No upstream counterpart.",
+      "maxTotalLines": 190
+    },
+    {
+      "path": "ui/src/bootstrapSetup.ts",
+      "maxNetLines": 10,
+      "reason": "Names the environment variable the pending page tells an operator to set, next to the CLI fallback it already exported. One source for both, so the page cannot drift from the variable the server reads.",
+      "maxTotalLines": 15
+    },
+    {
+      "path": "ui/src/components/BootstrapPendingPage.tsx",
+      "maxNetLines": 35,
+      "reason": "The public-instance branch used to offer the host CLI as the way to finish setup, which is not a path a product can ask a customer to take. It now leads with the pinned email and offers sign-in, since signing in is what triggers the grant.",
+      "maxTotalLines": 50
+    },
+    {
+      "path": "ui/src/pages/BootstrapSetupUxLab.tsx",
+      "maxNetLines": 30,
+      "reason": "The design-lab fixture keeps its own copy of the pending screens; leaving it on the old wording would make the lab document a design the app no longer ships.",
+      "maxTotalLines": 45
+    },
+    {
+      "path": "ui/src/App.test.tsx",
+      "maxNetLines": 20,
+      "reason": "The public bootstrap-pending assertions move from 'invite-only' wording to the host-decided one, including the sign-in affordance that the pinned-email path needs. Same intent, current copy.",
+      "maxTotalLines": 30
+    },
+    {
+      "path": "screenshots/expo-signin-email.png",
+      "maxNetLines": 0,
+      "reason": "Screenshot evidence for the Expo sign-in screen. A binary, so it counts zero lines; it is declared only because upstream owns the `screenshots/` directory. New evidence should go under `docs-coolie/` instead, which is ours, rather than growing this entry list one image at a time.",
+      "maxTotalLines": 0
     }
   ]
 }

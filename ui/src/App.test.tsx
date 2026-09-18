@@ -204,7 +204,7 @@ describe("CloudAccessGate", () => {
     unmountRoot(root);
   });
 
-  it("keeps public bootstrap-pending instances invite-only", async () => {
+  it("points public bootstrap-pending instances at the host instead of a browser claim", async () => {
     mockHealthApi.get.mockResolvedValue({
       status: "ok",
       deploymentMode: "authenticated",
@@ -221,9 +221,10 @@ describe("CloudAccessGate", () => {
     await waitForText(container, "This Coolie is waiting on its first admin");
 
     expect(container.textContent).toContain("This Coolie is waiting on its first admin");
-    expect(container.textContent).toContain("invite-only mode");
+    expect(container.textContent).toContain("PAPERCLIP_BOOTSTRAP_ADMIN_EMAIL");
+    expect(container.textContent).toContain("npx paperclipai auth bootstrap-ceo");
+    expect(container.textContent).toContain("Sign in / Create account");
     expect(container.textContent).not.toContain("Claim this instance");
-    expect(container.textContent).not.toContain("Sign in / Create account");
     expect(mockAccessApi.claimBootstrapAdmin).not.toHaveBeenCalled();
 
     unmountRoot(root);

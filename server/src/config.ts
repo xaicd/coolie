@@ -67,6 +67,7 @@ export interface Config {
   authPublicBaseUrl: string | undefined;
   chatWebhookPublicBaseUrl: string | undefined;
   authDisableSignUp: boolean;
+  bootstrapAdminEmail: string | undefined;
   databaseMode: DatabaseMode;
   databaseUrl: string | undefined;
   databaseMigrationUrl: string | undefined;
@@ -227,6 +228,8 @@ export function loadConfig(): Config {
     disableSignUpFromEnv !== undefined
       ? disableSignUpFromEnv === "true"
       : (fileConfig?.auth?.disableSignUp ?? false);
+  const bootstrapAdminEmail =
+    process.env.PAPERCLIP_BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase() || undefined;
   const allowedHostnamesFromEnvRaw = process.env.PAPERCLIP_ALLOWED_HOSTNAMES;
   const allowedHostnamesFromEnv = allowedHostnamesFromEnvRaw
     ? allowedHostnamesFromEnvRaw
@@ -328,6 +331,7 @@ export function loadConfig(): Config {
       process.env.PAPERCLIP_CHAT_WEBHOOK_PUBLIC_URL,
     ),
     authDisableSignUp,
+    bootstrapAdminEmail,
     databaseMode: fileDatabaseMode,
     databaseUrl: process.env.DATABASE_URL ?? fileDbUrl,
     databaseMigrationUrl: process.env.DATABASE_MIGRATION_URL,

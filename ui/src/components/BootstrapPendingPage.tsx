@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Loader2, ShieldCheck, Terminal, TriangleAlert } from "lucide-react";
 import { Link } from "@/lib/router";
 import { Button } from "@/components/ui/button";
-import { BOOTSTRAP_FALLBACK_COMMAND } from "@/bootstrapSetup";
+import { BOOTSTRAP_ADMIN_EMAIL_ENV, BOOTSTRAP_FALLBACK_COMMAND } from "@/bootstrapSetup";
 import type { AuthSession } from "@paperclipai/shared";
 import { Card } from "@/components/ui/card";
 
@@ -20,12 +20,17 @@ function CliFallback({ hasActiveInvite = false }: { hasActiveInvite?: boolean })
     <div className="mt-6 border-t border-border pt-5">
       <div className="flex items-center gap-2 text-sm font-medium">
         <Terminal className="size-4 text-muted-foreground" aria-hidden />
-        <span>Prefer to finish setup from the host?</span>
+        <span>Finishing setup from the host</span>
       </div>
       <p className="mt-2 text-sm text-muted-foreground">
+        If <code className="font-mono text-xs">{BOOTSTRAP_ADMIN_EMAIL_ENV}</code> is set on the host, sign in
+        — or create the account — with that email address: the admin role is granted on that sign-in, and no
+        command is needed.
+      </p>
+      <p className="mt-3 text-sm text-muted-foreground">
         {hasActiveInvite
-          ? "A bootstrap invite is already active. Check your Paperclip startup logs for the first-admin URL, or run this command on the host to rotate it:"
-          : "Run this command on the host that runs Paperclip to print a one-time first-admin invite URL:"}
+          ? "A one-time first-admin invite is already active. Open its URL from this browser, or run this command on the host to rotate it:"
+          : "Otherwise run this command on the host to print a one-time first-admin invite URL, then open that URL from this browser:"}
       </p>
       <pre className="mt-3 overflow-x-auto rounded-md border border-border bg-muted/30 p-3 font-mono text-xs">
 {BOOTSTRAP_FALLBACK_COMMAND}
@@ -78,9 +83,15 @@ export function BootstrapPendingPage({
       <StateChrome>
         <h1 className="text-xl font-semibold">This Coolie is waiting on its first admin</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          This instance runs in invite-only mode. The operator must generate a one-time first-admin invite URL
-          from the host. Once you have the link, open it from this browser to finish setup.
+          This instance is reachable from the network, so the first admin cannot be claimed by whoever opens
+          the page first. The host decides instead, either by pinning an admin email or by handing out a
+          one-time invite link.
         </p>
+        <div className="mt-5">
+          <Button asChild>
+            <Link to="/auth?next=/">Sign in / Create account</Link>
+          </Button>
+        </div>
         <CliFallback hasActiveInvite={hasActiveInvite} />
         <p className="mt-4 text-xs text-muted-foreground">
           Browser-based claim is intentionally disabled in public mode so anyone on the network can't promote

@@ -43,6 +43,11 @@ export const OWNED_PREFIXES = [
   "doc/plans/",
   ".agents/",
   "docs-coolie/",
+  // Our own client tree: the API client, the Expo app and the H5 app. Upstream
+  // has no `clients/` at all — `git ls-tree upstream/master` comes back empty —
+  // so nothing in it can conflict, and every file in it used to be reported as
+  // an undeclared upstream file.
+  "clients/",
   "scripts/check-fork-surface",
   "scripts/check-testing-defenses",
   "scripts/check-ontology",
