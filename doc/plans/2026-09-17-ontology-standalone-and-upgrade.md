@@ -342,8 +342,11 @@ OpenAPI, Java, MyBatis, proto and a scanned directory.
 
 Still missing, in the order it hurts:
 
-1. **Fact proposals.** The table and the review path exist; the second payload
-   kind does not. "An agent proposes a fact" is half the rule in §3.
+1. ~~**Fact proposals.**~~ **Done** — struck because this list was written before
+   it landed, and §4.1 below already records it: the second payload kind exists
+   (`create-node`, `update-node`, `create-edge`, applied through the same review
+   gate and audit trail), and a fact change deliberately does not move the schema
+   version. "An agent proposes a fact" is no longer half the rule in §3.
 2. ~~**`ontology-mcp`.**~~ **Done** — and it runs on its own.
    `@paperclipai/ontology-mcp` serves the core's tool catalogue over MCP/stdio
    against a PostgreSQL it connects to directly, so an agent gets the business
@@ -456,7 +459,7 @@ is `region` / `security-group`), so they are expressed as grid rows.
    created before the ontology owned its tenancy still reference the host tenant
    table, which the preflight now reports rather than leaving to a foreign key
    error.
-5. **Fact proposals** (6.2.1) — finish the rule.
+5. ~~**Fact proposals** (6.2.1)~~ **Done** — see §4.1.
 
 **Stopped with the direction:** `2.3 What is still missing` (its own actor model,
 own migration ownership) and the rest of §6.1. The `ontology-mcp` standalone
@@ -514,6 +517,39 @@ deployment ones:
 - ~~**The scan report contradicted itself**~~ **Done** — it showed `db ruoyi`
   mined from an `application.yml` on the same screen as "No parser yet: .yml×3".
   Three buckets now: read, read-for-architecture-facts-only, and nothing opens it.
+- ~~**The source's field order survives storage**~~ **Done** — `properties_schema`
+  is `jsonb`, which re-sorts the keys of an object, so the Schema page showed the
+  order the database returned and never the order the source declared. This was
+  the last piece of the mechanism `OntologyDocument` had already written down and
+  left dangling: it carries `propertyOrder` and an `orderSource: declared |
+  sorted`, and its write bridge emitted the order with a note that callers could
+  persist it "until that lands". Nothing ever did.
+
+  `ontology_node_types.property_order` (migration 018) holds it now — a jsonb
+  **array**, deliberately: jsonb reorders the keys of an object but preserves the
+  element order of an array, which is the only reason the order can live there
+  when it cannot live in the schema map. It is a column and not a `metadata` key
+  because it belongs to the model, not to the importer: the same two mutators that
+  write `properties_schema` maintain it, so a rename moves the order entry and a
+  removal drops it and the order can never name a property the schema does not
+  have. Not `text[]`, for a runtime reason worth keeping: the host binds
+  parameters as scalars, so a JS array never reaches PostgreSQL as a `text[]` —
+  the same trap `migratePropertyRenames` already records for the jsonb `?|`
+  operator.
+
+  `[]` means "never recorded", and the reader reports `sorted` for those rather
+  than presenting the map order as the source's. Every surface orders through one
+  pure module (`propertyOrder.ts`), so the document exporter and the workbench
+  cannot sequence the same schema differently; the editor's save declares the row
+  order it is showing, so a user's order survives the round trip.
+
+  Verified on the running instance, not only in the suite: a type declaring
+  `bbbb, zz, aaa` renders in exactly that order, where sorting would give
+  `aaa, bbbb, zz` and the jsonb column returned `zz, aaa, bbbb`; a type with no
+  recorded order renders sorted rather than in the column's order; and saving an
+  edited row order back stored `["alpha2","zeta"]` while jsonb kept returning
+  `["zeta","alpha2"]`. Design and decisions in
+  [`2026-09-18-property-order-through-storage.md`](./2026-09-18-property-order-through-storage.md).
 
 **Still open, stated as facts:**
 
@@ -521,9 +557,6 @@ deployment ones:
   facts and the datasource url, and yield no object type — which the report now
   says instead of calling them unread (see below). A datasource written as
   `${…}` is left alone: its effective value is not knowable from the file.
-- `propertiesSchema` field order does not survive Postgres `jsonb`, so the Schema
-  page cannot present the source's order as the source's (see the ordering rule in
-  §3).
 - The `SAA` legacy domain's five relation types have no endpoints. Each spans more
   than one endpoint pair, so this needs a decision — pick a primary pair, or split
   into several relation types — and is deliberately not patched over.

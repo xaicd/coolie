@@ -2,6 +2,9 @@
 
 Date: 2026-09-18. Baseline: 27f4040194ddf244091c4f1267835b0fb2d798b5.
 
+**Landed, 2026-09-18** — every section below is implemented. §5 records the
+verification that actually ran, including on a live instance.
+
 This closes the still-open item on
 [`2026-09-17-ontology-standalone-and-upgrade.md`](./2026-09-17-ontology-standalone-and-upgrade.md):
 
@@ -36,8 +39,18 @@ dangling.
 
 ## 2. Decision: order gets its own column
 
-`ontology_node_types.property_order text[] NOT NULL DEFAULT '{}'` (migration
-018). `text[]` preserves element order; a `jsonb` **object** cannot.
+`ontology_node_types.property_order jsonb NOT NULL DEFAULT '[]'::jsonb`
+(migration 018). The distinction that makes this work, and that is easy to get
+backwards: jsonb does not preserve the order of the **keys of an object**, which
+is the whole problem, but it does preserve the **element order of an array** — so
+an array is exactly the shape that can carry the order.
+
+The column is jsonb rather than `text[]`, which was the first choice, for a
+runtime reason this repo has already been bitten by: the host's SqlClient binds
+each parameter as a **scalar**, so a JS array never reaches PostgreSQL as a
+`text[]` and the statement fails at runtime. `GraphStore.migratePropertyRenames`
+records the same trap for the jsonb `?|` operator. A jsonb parameter binds as a
+string.
 
 Rejected alternative: carrying it in the existing `metadata` jsonb bag, which is
 where `provenance.ts` put `origin` and `sourceFiles`, on the argument that
@@ -61,10 +74,10 @@ The precedent is already in the repo for model-shape data: `layer`,
 metadata keys. `metadata` is reserved for provenance.
 
 `orderSource` is **derived, not stored**: a non-empty `property_order` means
-`declared`; an empty one means `sorted` (we never knew, and we say so). Default
-`'{}'` backfills every existing row as `sorted`, which is the honest answer — no
-order has ever been recorded, and claiming one would be inventing history. This
-is the same ruling as `013`'s `schema_version DEFAULT 0`.
+`declared`; an empty one means `sorted` (we never knew, and we say so). The
+default is an empty array, so every existing row backfills as `sorted` — the
+honest answer, since no order has ever been recorded and claiming one would be
+inventing history. Same ruling as `013`'s `schema_version DEFAULT 0`.
 
 ## 3. Where the meaning is decided
 
@@ -76,7 +89,10 @@ decides meaning" is pulled out of the I/O method):
   prefix, then the remainder **sorted**. A partial or stale declaration is
   therefore honoured as far as it goes and never presents map order as the
   source's.
-- `orderSource(order)` — `declared` when the vector is non-empty, else `sorted`.
+- `orderPropertyEntries(schema, declared)` — the same order, keeping each field's
+  descriptor with it, which is what every rendering surface wants.
+- `propertyOrderSource(order)` — `declared` when the vector is non-empty, else
+  `sorted`.
 - `renameInPropertyOrder(order, renames)` — applies `oldKey -> newKey`, in place
   of the old name, so the order survives the rename that moved the data.
 - `prunePropertyOrder(order, schema)` — drops names no longer in the schema, so a
@@ -106,25 +122,49 @@ schema differently. The UI reads through the same function.
    user-authored order survives the round trip rather than reverting to jsonb
    order. `SchemaPreviewPane`, the graph view's schema tab and `CitationPreview`
    all read the ordered rows.
-6. **MCP** — the tool results carry `propertyOrder`, so an agent sees the same
-   order a human does.
+6. **MCP** — the tool results are the raw rows, so they carry `property_order`
+   already; the tool descriptions now say to read it, because an agent reading
+   `properties_schema` has exactly the same chance of trusting the map's key order
+   that the UI did.
 
 ## 5. Verification
 
 Not unit tests alone. The failure mode this feature exists to catch is invisible
 to a fake db: a double returns whatever it was given, so it "preserves" order
-trivially. So:
+trivially. Three lines ran:
 
-- a **real-Postgres** test in `packages/ontology-mcp/tests/` that writes a type
-  with a declared order, re-reads it, and asserts the order came back — and that
-  a type with no declared order reads as `sorted`;
-- a store round-trip test for `createNodeType` -> `describeDomain`;
-- a rename test asserting the order vector follows the rename and drops the old
-  name;
-- **live**: import a fixture whose DDL declares columns in a non-alphabetical
-  order, then read the type back through the running instance and confirm the
-  Schema page shows the source's order; confirm the dump shows `property_order`
-  populated. If the UI cannot be driven to the end, say exactly where it stopped.
+**Pure module** (`tests/propertyOrder.spec.ts`, 12 cases) — the prefix rule, a
+stale declared name that must not resurrect, rename-follows-order including the
+duplicate it would otherwise make, prune, and a row from before the column
+existed.
+
+**Real PostgreSQL** (`packages/ontology-mcp/tests/property-order-real-postgres.spec.ts`)
+— on a disposable embedded cluster, in its own database, through the ontology's
+own migrations: a declared order comes back exactly (with the schema map written
+in a *different* sequence, so echoing insertion order fails); a type with no
+declared order reads `[]`; a name the schema does not have is pruned on the way
+in; and a rename moves the order entry while a removal leaves no ghost.
+
+**Live instance** — the running dev instance, driven through the real surfaces:
+
+| what | result |
+| --- | --- |
+| create a type declaring `bbbb, zz, aaa` (HTTP `create-node-type`), read back | stored order exactly `["bbbb","zz","aaa"]` |
+| the same type on the Schema page (browser, field inputs in DOM order) | rendered `bbbb, zz, aaa` |
+| its jsonb column's key order, for contrast | `zz, aaa, bbbb` — the denominator: sorted would be `aaa, bbbb, zz`, so neither coincidence can produce the rendered order |
+| a type with no order, on the Schema page | rendered `alpha, zeta` — sorted, while the column returned `zeta, alpha` |
+| a name the schema does not have, sent live | pruned to `["a","b"]` |
+| edit a field in the editor and press Save | stored order became `["alpha2","zeta"]` — the row order shown — while jsonb went on returning `["zeta","alpha2"]` |
+
+Two things this needed that are worth keeping for the next run: the plugin has to
+be **rebuilt and reloaded** (disable/enable) before a new worker or migration is
+live — the first probe returned no `property_order` at all until then; and the
+Schema view is master–detail, with the type selected from the button list and its
+fields rendered as `<input>` values, not text — reading text nodes finds nothing
+and looks like a failure.
+
+The throwaway domain was retired afterwards (`204`), the seven sample domains are
+intact, and the plugin reports `ready` with no error.
 
 ## 6. Risks and boundaries
 
