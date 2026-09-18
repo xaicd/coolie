@@ -36,6 +36,16 @@ function git(args, { allowFailure = false } = {}) {
   }
 }
 
+/** Exit-status answer, which the stdout helper cannot express. */
+function isAncestor(branch, of) {
+  try {
+    execFileSync("git", ["merge-base", "--is-ancestor", branch, of], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function main() {
   const remotes = git(["remote"]).split("\n").filter(Boolean);
   if (!remotes.includes("upstream")) {
@@ -88,6 +98,22 @@ function main() {
   console.log(`  of which upstream-owned : ${upstreamFiles} files / ${upstreamLines} lines` +
     `   ← these are what a merge has to reconcile`);
   console.log("  budget map: scripts/fork-surface.json · full map: docs-coolie/FORK-SURFACE-AUDIT.md");
+
+  // 3b. Branch hygiene: our code belongs on `main` and nowhere else. A branch
+  // that is already contained in main is a fossil — deleting it loses nothing,
+  // because the commits stay reachable from main. A branch that is NOT contained
+  // is our code sitting outside main, which is the thing to fix.
+  const SKIP = new Set(["main", "master", "origin/main", "origin/master", "origin/HEAD"]);
+  const branches = git(["for-each-ref", "--format=%(refname:short)", "refs/heads", "refs/remotes/origin"], { allowFailure: true })
+    .split("\n").filter(Boolean).filter((b) => !SKIP.has(b));
+  const strays = branches.filter((b) => !isAncestor(b, "main"));
+  const fossils = branches.length - strays.length;
+  console.log(`\nbranches outside main           : ${branches.length} total — ` +
+    `${fossils} already contained in main (safe to delete), ${strays.length} carrying work main does not have`);
+  for (const branch of strays) {
+    const n = git(["rev-list", "--count", `main..${branch}`], { allowFailure: true }).trim();
+    console.log(`  STRAY  ${branch}  (${n} commit(s) not in main)  ← our code is meant to live on main`);
+  }
 
   // 4. What to do after merging.
   console.log("\nafter merging (see docs-coolie/BRANCHING.md §7):");
