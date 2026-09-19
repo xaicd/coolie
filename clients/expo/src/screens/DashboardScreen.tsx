@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Text,
   View,
+  Platform,
+  StatusBar as RNStatusBar,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import type { Company, DashboardSummary } from "@coolie/api-client";
@@ -88,7 +90,7 @@ export function DashboardScreen({ company, onBack }: DashboardScreenProps) {
 
   if (loading && !data) {
     return (
-      <SafeAreaView style={[styles.center, { backgroundColor: C.bg }]}>
+      <SafeAreaView style={[styles.center, { backgroundColor: C.bg, paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
         <ActivityIndicator size="large" color={C.accent} />
         <Text style={[styles.muted, { marginTop: 12 }]}>正在汇聚工坊效能大盘…</Text>
       </SafeAreaView>
@@ -97,7 +99,7 @@ export function DashboardScreen({ company, onBack }: DashboardScreenProps) {
 
   if (error && !data) {
     return (
-      <SafeAreaView style={[styles.center, { backgroundColor: C.bg, padding: 16 }]}>
+      <SafeAreaView style={[styles.center, { backgroundColor: C.bg, padding: 16, paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) + 16 : 16 }]}>
         <Text style={styles.errorText}>加载大盘失败: {error}</Text>
         <Pressable
           style={[styles.btnPrimary, { marginTop: 16 }]}
@@ -132,7 +134,7 @@ export function DashboardScreen({ company, onBack }: DashboardScreenProps) {
   const healthColor = failurePct <= 5 ? C.ok : failurePct <= 15 ? C.warn : C.err;
 
   return (
-    <SafeAreaView style={{ backgroundColor: C.bg, flex: 1 }}>
+    <SafeAreaView style={{ backgroundColor: C.bg, flex: 1, paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }}>
       <StatusBar style="light" />
       <ScrollView
         style={{ backgroundColor: C.bg, flex: 1 }}

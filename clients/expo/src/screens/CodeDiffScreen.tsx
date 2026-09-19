@@ -8,6 +8,8 @@ import {
   StyleSheet,
   Text,
   View,
+  Platform,
+  StatusBar as RNStatusBar,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import type {
@@ -641,10 +643,12 @@ function generate2500LineBenchmarkDiff(
 
 const styles = StyleSheet.create({
   container: {
+    paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0,
     flex: 1,
     backgroundColor: C.bg,
   },
   fullScreen: {
+    paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0,
     flex: 1,
     backgroundColor: C.bg,
   },

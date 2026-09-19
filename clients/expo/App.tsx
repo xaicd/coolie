@@ -10,6 +10,8 @@ import {
   Text,
   TextInput,
   View,
+  Platform,
+  StatusBar as RNStatusBar,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -155,7 +157,7 @@ export default function App() {
 
   if (credential === undefined) {
     return (
-      <SafeAreaView style={[styles.center, { backgroundColor: C.bg }]}>
+      <SafeAreaView style={[styles.center, { backgroundColor: C.bg, paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
         <ActivityIndicator color={C.accent} />
       </SafeAreaView>
     );
@@ -255,7 +257,7 @@ function CompanyGate({
 
 function Surface({ children }: { children: React.ReactNode }) {
   return (
-    <SafeAreaView style={{ backgroundColor: C.bg, flex: 1 }}>
+    <SafeAreaView style={{ backgroundColor: C.bg, flex: 1, paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }}>
       <StatusBar style="light" />
       <ScrollView
         style={{ backgroundColor: C.bg, flex: 1 }}
@@ -511,7 +513,7 @@ function HomeScreen({
   const open = issues.filter((i) => i.status !== "done").length;
 
   return (
-    <SafeAreaView style={styles.shell}>
+    <SafeAreaView style={[styles.shell, { paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
       <StatusBar style="light" />
       <View style={styles.shellContent}>
         {tab === "chat" ? (

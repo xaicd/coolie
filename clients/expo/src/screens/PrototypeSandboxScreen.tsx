@@ -10,6 +10,8 @@ import {
   Text,
   TextInput,
   View,
+  Platform,
+  StatusBar as RNStatusBar,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { WebView, type WebViewNavigation } from "react-native-webview";
@@ -494,6 +496,7 @@ export function PrototypeSandboxScreen({
 
 const styles = StyleSheet.create({
   safeArea: {
+    paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0,
     flex: 1,
     backgroundColor: C.bg,
   },

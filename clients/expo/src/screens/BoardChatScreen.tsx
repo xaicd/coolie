@@ -12,6 +12,7 @@ import {
   Text,
   TextInput,
   View,
+  StatusBar as RNStatusBar,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import type { BoardChatMessage, Company } from "@coolie/api-client";
