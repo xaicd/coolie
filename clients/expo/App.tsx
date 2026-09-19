@@ -34,6 +34,7 @@ import { StatusDot } from "./src/components/StatusDot";
 import { useRecorder } from "./src/useRecorder";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
+import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen";
 import { setupOTAListener } from "./src/OTA";
 
 /**
@@ -323,7 +324,7 @@ function HomeScreen({
   whoami: string;
   onSignOut: () => void;
 }) {
-  const [tab, setTab] = useState<"tasks" | "dashboard" | "diff">("tasks");
+  const [tab, setTab] = useState<"tasks" | "dashboard" | "diff" | "ontology">("tasks");
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selected, setSelected] = useState<Issue | null>(null);
   const [diffContext, setDiffContext] = useState<{
@@ -421,6 +422,16 @@ function HomeScreen({
     return <DashboardScreen company={company} onBack={() => setTab("tasks")} />;
   }
 
+  if (tab === "ontology") {
+    return (
+      <OntologyDomainListScreen
+        company={company}
+        whoami={whoami}
+        onBack={() => setTab("tasks")}
+      />
+    );
+  }
+
   if (selected) {
     return (
       <TaskDetail
@@ -470,6 +481,9 @@ function HomeScreen({
         </Pressable>
         <Pressable style={styles.tabBtn} onPress={() => setTab("diff")}>
           <Text style={styles.tabBtnText}>代码审查</Text>
+        </Pressable>
+        <Pressable style={styles.tabBtn} onPress={() => setTab("ontology")}>
+          <Text style={styles.tabBtnText}>业务本体</Text>
         </Pressable>
       </View>
 

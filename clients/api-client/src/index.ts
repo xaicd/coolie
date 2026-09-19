@@ -3,6 +3,7 @@ export type { CoolieClientOptions } from "./client";
 export {
   ASR_NOT_CONFIGURED,
   MULTIMODAL_PLUGIN_ID,
+  ONTOLOGY_PLUGIN_ID,
 } from "./types";
 export type {
   IssuePriority,
@@ -39,4 +40,12 @@ export type {
   GetWorkspaceDiffParams,
   ExecutionWorkspace,
   IssueWorkProduct,
+  OntologyDomainLifecycleState,
+  OntologyDomain,
+  OntologyGraphCounts,
+  OntologyGraphNode,
+  OntologyGraphEdge,
+  OntologyGraphSnapshot,
+  SetDomainLifecycleOptions,
 } from "./types";
+

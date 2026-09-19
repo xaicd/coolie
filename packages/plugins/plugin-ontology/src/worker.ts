@@ -1357,14 +1357,19 @@ const updateDomainMutation: MutationHandler = async (store, ctx, call) => {
  */
 const transitionDomainMutation: MutationHandler = async (store, ctx, call) => {
   const domainId = requireString(call.fields.domainId, "domainId");
-  const to = requireString(call.fields.to, "to") as DomainLifecycleState;
+  const rawTo = requireString(
+    call.fields.to ?? call.fields.state ?? call.fields.lifecycleState ?? call.fields.lifecycle_state,
+    "to",
+  );
+  const to = (rawTo === "locked" || rawTo === "lock" ? "archived" : rawTo) as DomainLifecycleState;
   try {
     const before = await store.getDomain(call.companyId, domainId);
+    const actor = typeof call.fields.actor === "string" ? call.fields.actor : "system";
     const domain = await store.transitionDomainLifecycle(
       call.companyId,
       domainId,
       to,
-      typeof call.fields.actor === "string" ? call.fields.actor : "system",
+      actor,
     );
     if (!domain) return notFound("Domain not found");
 
@@ -1377,6 +1382,23 @@ const transitionDomainMutation: MutationHandler = async (store, ctx, call) => {
 
     if (to === "deprecated") {
       await emitStaleNodesForDomain(ctx, store, call.companyId, domainId);
+    }
+
+    if (rawTo === "locked" || rawTo === "lock" || call.fields.reason || call.fields.deviceInfo) {
+      await store.writeAuditLog({
+        companyId: call.companyId,
+        domainId,
+        eventType: "domain_state_changed",
+        entityId: domainId,
+        actor,
+        beforeState: { lifecycle_state: before?.lifecycle_state ?? null },
+        afterState: { lifecycle_state: to, rawTo },
+        metadata: {
+          action: "emergency_kill_switch",
+          reason: typeof call.fields.reason === "string" ? call.fields.reason : "Emergency kill switch triggered",
+          deviceInfo: typeof call.fields.deviceInfo === "string" ? call.fields.deviceInfo : "mobile",
+        },
+      });
     }
 
     return ok({ domain });
@@ -1392,6 +1414,7 @@ const MUTATION_HANDLERS: Record<string, MutationHandler> = {
   "delete-domain": deleteDomainMutation,
   "update-domain": updateDomainMutation,
   "transition-domain": transitionDomainMutation,
+  "set-domain-lifecycle": transitionDomainMutation,
   "delete-node-type": deleteNodeTypeMutation,
   "update-relation-type": updateRelationTypeMutation,
   "delete-relation-type": deleteRelationTypeMutation,
@@ -3950,15 +3973,20 @@ const plugin = definePlugin({
         return { status: outcome.status, body: outcome.payload };
       }
 
+      case "get-domain-snapshot":
       case "graph-snapshot": {
+        const domainId =
+          optionalString(input.params?.domainId) ||
+          requireString(queryString(input.query.domainId), "domainId");
         const graph = await store.getGraphSnapshot(
           companyId,
-          requireString(queryString(input.query.domainId), "domainId"),
+          domainId,
           parseDepth(queryString(input.query.nodeLimit)),
         );
-        return { body: { graph } };
+        return { body: { graph, snapshot: graph } };
       }
 
+      case "set-domain-lifecycle":
       case "transition-domain": {
         const outcome = await transitionDomainMutation(store, ctx, httpMutationCall(companyId, input));
         return { status: outcome.status, body: outcome.payload };

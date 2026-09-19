@@ -362,3 +362,83 @@ export interface IssueWorkProduct {
   summary?: string | null;
   metadata?: Record<string, unknown> | null;
 }
+
+// --- Business Ontology Plugin (Top3 业务本体域与紧急熔断 需求⑪) ---
+
+export const ONTOLOGY_PLUGIN_ID = "paperclipai.plugin-ontology";
+
+export type OntologyDomainLifecycleState =
+  | "draft"
+  | "active"
+  | "deprecated"
+  | "archived"
+  | "locked";
+
+export interface OntologyDomain {
+  id: string;
+  company_id?: string;
+  companyId?: string;
+  slug: string;
+  display_name?: string;
+  displayName?: string;
+  description?: string | null;
+  status: string;
+  version: number;
+  icon?: string;
+  category?: string;
+  is_built_in?: boolean;
+  isBuiltIn?: boolean;
+  forked_from?: string | null;
+  forkedFrom?: string | null;
+  lifecycle_state: OntologyDomainLifecycleState;
+  lifecycleState?: OntologyDomainLifecycleState;
+  bootstrap_source?: string;
+  seed_schema_version?: number;
+  schema_version?: number;
+  schemaVersion?: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface OntologyGraphCounts {
+  nodeTypes: number;
+  relationTypes: number;
+  nodes: number;
+  edges: number;
+  byNodeType?: Record<string, number>;
+  crossDomainEdges?: number;
+}
+
+export interface OntologyGraphNode {
+  id: string;
+  key: string;
+  label: string;
+  nodeTypeId?: string | null;
+  lifecycleState?: string;
+  properties?: Record<string, unknown> | null;
+}
+
+export interface OntologyGraphEdge {
+  id: string;
+  sourceNodeId: string;
+  targetNodeId: string;
+  relationKey?: string | null;
+  weight?: number;
+  sourceDomainId?: string | null;
+  targetDomainId?: string | null;
+  isCrossDomain?: boolean;
+}
+
+export interface OntologyGraphSnapshot {
+  domainId: string;
+  counts: OntologyGraphCounts;
+  nodes: OntologyGraphNode[];
+  edges: OntologyGraphEdge[];
+}
+
+export interface SetDomainLifecycleOptions {
+  actor?: string;
+  reason?: string;
+  deviceInfo?: string;
+}
+

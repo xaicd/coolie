@@ -1,6 +1,7 @@
 import {
   ASR_NOT_CONFIGURED,
   MULTIMODAL_PLUGIN_ID,
+  ONTOLOGY_PLUGIN_ID,
   type AgentIdentity,
   type CockpitDashboardMetrics,
   type Company,
@@ -10,7 +11,11 @@ import {
   type GetWorkspaceDiffParams,
   type Issue,
   type IssueWorkProduct,
+  type OntologyDomain,
+  type OntologyDomainLifecycleState,
+  type OntologyGraphSnapshot,
   type SessionUser,
+  type SetDomainLifecycleOptions,
   type VoiceDispatchInput,
   type VoiceDispatchResult,
   type WorkspaceDiffResponse,
@@ -293,6 +298,107 @@ export class CoolieClient {
       `/api/issues/${encodeURIComponent(issueId)}/work-products`,
     );
     return Array.isArray(body) ? body : [];
+  }
+
+  /**
+   * 查询业务本体域列表 (需求⑪)
+   * 对应 GET /api/plugins/paperclipai.plugin-ontology/api/domains
+   */
+  async listOntologyDomains(companyId: string): Promise<OntologyDomain[]> {
+    const q = new URLSearchParams({ companyId });
+    const res = await this.request<{ domains?: OntologyDomain[] } | OntologyDomain[]>(
+      "GET",
+      `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/domains?${q.toString()}`,
+    );
+    if (Array.isArray(res)) return res;
+    if (isRecord(res) && Array.isArray(res.domains)) return res.domains;
+    return [];
+  }
+
+  /**
+   * 查询本体域详情与图快照摘要 (需求⑪)
+   * 支持 /domains/:id/snapshot 与 /graph 回退
+   */
+  async getOntologySnapshot(
+    companyId: string,
+    domainId: string,
+    nodeLimit = 200,
+  ): Promise<OntologyGraphSnapshot> {
+    const q = new URLSearchParams({
+      companyId,
+      domainId,
+      nodeLimit: String(nodeLimit),
+    });
+    try {
+      const res = await this.request<{ snapshot?: OntologyGraphSnapshot; graph?: OntologyGraphSnapshot } | OntologyGraphSnapshot>(
+        "GET",
+        `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/domains/${encodeURIComponent(domainId)}/snapshot?${q.toString()}`,
+      );
+      if (isRecord(res)) {
+        if ("snapshot" in res && res.snapshot) return res.snapshot as OntologyGraphSnapshot;
+        if ("graph" in res && res.graph) return res.graph as OntologyGraphSnapshot;
+        if ("counts" in res) return res as unknown as OntologyGraphSnapshot;
+      }
+      return res as unknown as OntologyGraphSnapshot;
+    } catch (err) {
+      if (err instanceof CoolieApiError && (err.status === 404 || err.status === 405)) {
+        const res = await this.request<{ graph?: OntologyGraphSnapshot } | OntologyGraphSnapshot>(
+          "GET",
+          `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/graph?${q.toString()}`,
+        );
+        if (isRecord(res) && "graph" in res && res.graph) {
+          return res.graph as OntologyGraphSnapshot;
+        }
+        return res as unknown as OntologyGraphSnapshot;
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * 变更本体域生命周期状态 / 紧急熔断 (需求⑪)
+   * 支持 /domains/:id/lifecycle 与 /domains/:id/transition 回退
+   */
+  async setDomainLifecycle(
+    companyId: string,
+    domainId: string,
+    state: OntologyDomainLifecycleState,
+    opts?: SetDomainLifecycleOptions,
+  ): Promise<OntologyDomain> {
+    const targetState = state === "locked" ? "archived" : state;
+    const body = {
+      companyId,
+      domainId,
+      to: targetState,
+      state: targetState,
+      actor: opts?.actor ?? "cockpit-mobile",
+      reason: opts?.reason ?? (state === "locked" ? "Emergency kill switch triggered" : undefined),
+      deviceInfo: opts?.deviceInfo,
+    };
+    try {
+      const res = await this.request<{ domain?: OntologyDomain } | OntologyDomain>(
+        "POST",
+        `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/domains/${encodeURIComponent(domainId)}/lifecycle`,
+        body,
+      );
+      if (isRecord(res) && "domain" in res && res.domain) {
+        return res.domain as OntologyDomain;
+      }
+      return res as unknown as OntologyDomain;
+    } catch (err) {
+      if (err instanceof CoolieApiError && (err.status === 404 || err.status === 405)) {
+        const res = await this.request<{ domain?: OntologyDomain } | OntologyDomain>(
+          "POST",
+          `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/domains/${encodeURIComponent(domainId)}/transition`,
+          body,
+        );
+        if (isRecord(res) && "domain" in res && res.domain) {
+          return res.domain as OntologyDomain;
+        }
+        return res as unknown as OntologyDomain;
+      }
+      throw err;
+    }
   }
 }
 
