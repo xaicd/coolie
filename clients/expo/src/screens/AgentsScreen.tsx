@@ -12,10 +12,16 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import { C, coolie, type AgentRow } from "../coolie";
+import { C, coolie, type AgentRow, type AgentCostRow } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
 
 
+
+function fmtTok(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
 
 const STATUS_LABEL: Record<string, string> = {
   active: "在线",
@@ -33,6 +39,7 @@ const STATUS_DOT: Record<string, "ok" | "idle" | "err"> = {
 
 export function AgentsScreen({ company }: { company: { id: string; name: string } }) {
   const [agents, setAgents] = useState<AgentRow[]>([]);
+  const [costs, setCosts] = useState<Record<string, AgentCostRow>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -142,6 +149,12 @@ export function AgentsScreen({ company }: { company: { id: string; name: string 
                   {STATUS_LABEL[item.status] ?? item.status}
                   {item.adapterType ? ` · ${item.adapterType}` : ""}
                 </Text>
+                {costs[item.id] ? (
+                  <Text style={styles.tokenMeta} numberOfLines={1}>
+                    Tokens 入 {fmtTok(costs[item.id].inputTokens)} · 缓存 {fmtTok(costs[item.id].cachedInputTokens)} · 出 {fmtTok(costs[item.id].outputTokens)}
+                    {costs[item.id].costCents > 0 ? ` · $${(costs[item.id].costCents / 100).toFixed(2)}` : ""}
+                  </Text>
+                ) : null}
               </View>
             </View>
           )}
@@ -203,6 +216,7 @@ const styles = StyleSheet.create({
   name: { color: C.ink, fontSize: 15, fontWeight: "600" },
   titleTag: { color: C.ink3, fontSize: 12, flexShrink: 1 },
   meta: { color: C.ink3, fontSize: 12, marginTop: 3 },
+  tokenMeta: { color: C.ink4, fontSize: 11, marginTop: 2 },
   emptyCard: {
     alignItems: "center",
     gap: 8,

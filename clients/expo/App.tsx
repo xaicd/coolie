@@ -33,6 +33,7 @@ import {
   signInWithEmail,
   signOutEverywhere,
   type Credential,
+  type IssueCostSummary,
 } from "./src/coolie";
 import { StatusDot } from "./src/components/StatusDot";
 import { useRecorder } from "./src/useRecorder";
@@ -938,6 +939,25 @@ function TaskDetail({
         <ActivityIndicator color={C.accent} style={{ marginTop: 8 }} />
       )}
     </Surface>
+  );
+}
+
+function IssueCostRow({ issueId }: { issueId: string }) {
+  const [summary, setSummary] = useState<IssueCostSummary | null>(null);
+  useEffect(() => {
+    coolie.issueCostSummary(issueId).then(setSummary).catch(() => setSummary(null));
+  }, [issueId]);
+  if (!summary) return null;
+  const fmt = (n: number) =>
+    n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : String(n);
+  return (
+    <DetailRow
+      label="消耗"
+      value={`tokens 入${fmt(summary.inputTokens)} 出${fmt(summary.outputTokens)} · 运行${summary.runCount}次${
+        summary.costCents > 0 ? ` · $${(summary.costCents / 100).toFixed(2)}` : ""
+      }`}
+      valueColor={C.ink3}
+    />
   );
 }
 

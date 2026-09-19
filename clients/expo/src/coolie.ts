@@ -95,7 +95,48 @@ export interface AgentRow {
   adapterType?: string | null;
 }
 
+/** 按智能体聚合的消耗行 — GET /costs/by-agent */
+export interface AgentCostRow {
+  agentId: string;
+  agentName: string;
+  agentStatus?: string;
+  costCents: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  subscriptionRunCount?: number;
+  apiRunCount?: number;
+}
+
+/** 任务树消耗汇总 — GET /issues/:id/cost-summary */
+export interface IssueCostSummary {
+  issueId: string;
+  issueCount: number;
+  costCents: number;
+  inputTokens: number;
+  cachedInputTokens: number;
+  outputTokens: number;
+  runCount: number;
+  runtimeMs: number;
+}
+
 export class CoolieClient extends BaseCoolieClient {
+  /** GET /api/companies/:id/costs/by-agent — 按智能体聚合 token/花费 */
+  async costsByAgent(companyId: string): Promise<AgentCostRow[]> {
+    return this.request<AgentCostRow[]>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/costs/by-agent`,
+    );
+  }
+
+  /** GET /api/issues/:id/cost-summary — 单任务(含子任务)消耗 */
+  async issueCostSummary(issueId: string): Promise<IssueCostSummary> {
+    return this.request<IssueCostSummary>(
+      "GET",
+      `/api/issues/${encodeURIComponent(issueId)}/cost-summary`,
+    );
+  }
+
   /** GET /api/companies/:id/agents — 员工(智能体)列表 */
   async listAgents(companyId: string): Promise<AgentRow[]> {
     return this.request<AgentRow[]>(
