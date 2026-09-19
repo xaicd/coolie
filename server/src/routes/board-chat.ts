@@ -18,6 +18,38 @@ function stripActionSignals(response: string): string {
 }
 
 /**
+ * Clean a plain-text line emitted by the spawned CLI when it is *not* talking
+ * in JSON (older Hermes builds, or any fallback path). Two jobs: drop ANSI
+ * escape sequences, and drop the CLI's own chrome — the "Resume this session
+ * with:" footer, retry notices, box rules — so none of it is streamed to the
+ * room or persisted as part of the concierge reply.
+ */
+function stripCliNoise(line: string): string {
+  // eslint-disable-next-line no-control-regex
+  const noAnsi = line.replace(/\u001b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r/g, "");
+  const trimmed = noAnsi.trim();
+  if (!trimmed) return "";
+  const NOISE = [
+    /^Query:\s/,
+    /^Initializing agent/,
+    /^Resume this session with:/,
+    /^hermes --resume/,
+    /^Session:\s/,
+    /^Duration:\s/,
+    /^Messages:\s/,
+    /^Model:\s/,
+    /^Provider:\s/,
+    /^Tokens:\s/,
+    /^Rate limited/,
+    /^API call failed/,
+    /^Auxiliary title generation failed/,
+    /^[─═━\-_=]{4,}$/,
+  ];
+  if (NOISE.some((re) => re.test(trimmed))) return "";
+  return noAnsi.endsWith("\n") ? noAnsi : `${noAnsi}\n`;
+}
+
+/**
  * Board Concierge Chat routes.
  *
  * Implements `POST /board/chat/stream` (mounted under `/api`): a lightweight
@@ -222,20 +254,20 @@ export function boardChatRoutes(
     const serverPort = req.socket?.localPort ?? 3100;
     const apiUrl = `http://${serverAddr}:${serverPort}`;
 
+    // Flag set kept version-tolerant on purpose: the CLI on the production
+    // box may predate `--format stream-json`, and an unsupported flag makes
+    // hermes exit before answering (the room just shows nothing). Everything
+    // here exists on both the old and new CLI; `--quiet` keeps banners and
+    // tool previews out of stdout.
     const args = [
-      "-p",
+      "--oneshot",
+      "--quiet",
+      // Prompt arrives on stdin (safe for arbitrary text — no shell parsing).
+      "--query-file",
       "-",
-      "--output-format",
-      "stream-json",
-      // Emit content_block_delta events so the UI renders token-by-token
-      // rather than a single block once the whole turn completes.
-      "--include-partial-messages",
-      "--verbose",
-      "--append-system-prompt",
-      systemPrompt,
-      "--model",
-      "sonnet",
-      "--dangerously-skip-permissions",
+      "--yolo",
+      "--max-turns",
+      "40",
     ];
 
     liveBoardChats += 1;
@@ -313,10 +345,21 @@ export function boardChatRoutes(
       for (const line of lines) {
         if (!line.trim()) continue;
         let event: any;
-        try {
-          event = JSON.parse(line);
-        } catch {
-          continue; // Not JSON — skip.
+        if (line.trimStart().startsWith("{")) {
+          try {
+            event = JSON.parse(line);
+          } catch {
+            event = undefined; // Truncated/pretty JSON — fall through to text.
+          }
+        }
+
+        if (!event) {
+          // Plain-text CLI output. Strip ANSI escape sequences and drop the
+          // CLI's own chrome (session footer, retry noise) so it never lands
+          // in the concierge reply we persist.
+          const text = stripCliNoise(line);
+          if (text) writeChunk(text);
+          continue;
         }
 
         // Hermes stream-json: one {"type":"text","text":...} per delta.
@@ -382,7 +425,7 @@ export function boardChatRoutes(
           `data: ${JSON.stringify({
             type: "error",
             message:
-              "Could not start the board assistant. Is the `claude` CLI installed and on PATH?",
+              "Could not start the board assistant. Is the `hermes` CLI installed and on PATH?",
           })}\n\n`,
         );
         res.end();
