@@ -13,6 +13,7 @@ import { StatusBar } from "expo-status-bar";
 import type { Company, DashboardSummary } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
+import { useOTA } from "../OTA";
 
 function formatMoney(cents: number): string {
   const yuan = (cents / 100).toFixed(2);
@@ -61,6 +62,7 @@ export function DashboardScreen({ company, onBack }: DashboardScreenProps) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { isChecking: otaChecking, checkUpdate: checkOTA } = useOTA();
 
   const fetchDashboard = useCallback(
     async (isRefresh = false) => {
@@ -165,13 +167,31 @@ export function DashboardScreen({ company, onBack }: DashboardScreenProps) {
             </View>
           </View>
 
-          <Pressable
-            style={styles.refreshBtn}
-            onPress={() => fetchDashboard(true)}
-            hitSlop={12}
-          >
-            <Text style={styles.refreshBtnText}>刷新</Text>
-          </Pressable>
+          <View style={styles.headerActions}>
+            <Pressable
+              style={styles.otaBtn}
+              onPress={() => void checkOTA(true)}
+              hitSlop={12}
+              disabled={otaChecking}
+            >
+              {otaChecking ? (
+                <ActivityIndicator
+                  size="small"
+                  color={C.accent}
+                  style={{ transform: [{ scale: 0.7 }] }}
+                />
+              ) : (
+                <Text style={styles.otaBtnText}>检查更新</Text>
+              )}
+            </Pressable>
+            <Pressable
+              style={styles.refreshBtn}
+              onPress={() => fetchDashboard(true)}
+              hitSlop={12}
+            >
+              <Text style={styles.refreshBtnText}>刷新</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* ── 六指标卡 2 列网格 (DESIGN.md 第4节规范) ── */}
@@ -667,6 +687,29 @@ const styles = StyleSheet.create({
     color: C.ink4,
     fontWeight: "400",
   },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  otaBtn: {
+    backgroundColor: "rgba(255,255,255,0.02)",
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.line,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 70,
+    height: 32,
+  },
+  otaBtnText: {
+    color: C.ink2,
+    fontSize: 13,
+    fontWeight: "500",
+  },
   refreshBtn: {
     backgroundColor: "rgba(255,255,255,0.02)",
     paddingVertical: 6,
@@ -674,6 +717,9 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: C.line,
+    height: 32,
+    justifyContent: "center",
+    alignItems: "center",
   },
   refreshBtnText: {
     color: C.ink2,

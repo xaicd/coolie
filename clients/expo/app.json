@@ -7,6 +7,18 @@
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
+    "updates": {
+      "url": "https://xrobinai.cn/ota/manifest",
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "requestHeaders": {
+        "expo-channel-name": "production"
+      }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "cloud.coolie.app",
@@ -18,6 +30,6 @@
       "package": "cloud.coolie.app",
       "permissions": ["RECORD_AUDIO"]
     },
-    "plugins": ["expo-av", "expo-secure-store"]
+    "plugins": ["expo-av", "expo-secure-store", "expo-updates"]
   }
 }

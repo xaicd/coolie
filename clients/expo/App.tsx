@@ -34,6 +34,7 @@ import { StatusDot } from "./src/components/StatusDot";
 import { useRecorder } from "./src/useRecorder";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
+import { setupOTAListener } from "./src/OTA";
 
 /**
  * Coolie mobile client — Linear 设计系统重构版。
@@ -82,6 +83,10 @@ export default function App() {
 
   useEffect(() => {
     void restoreCredential().then(setCredential);
+    const unsub = setupOTAListener();
+    return () => {
+      unsub();
+    };
   }, []);
 
   const signOut = useCallback(() => {

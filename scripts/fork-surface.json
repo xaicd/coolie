@@ -228,6 +228,12 @@
       "maxNetLines": 120,
       "reason": "Unit tests covering cockpit efficiency metrics: quota, progress, idle, deliveryCycle, efficiency, and failureRate.",
       "maxTotalLines": 140
+    },
+    {
+      "path": "scripts/publish-ota.sh",
+      "maxNetLines": 30,
+      "reason": "Forwarder script for mobile Expo app OTA publishing, delegating to clients/expo/scripts/publish-ota.sh to export and sync bundles to tc-coolie-claw.",
+      "maxTotalLines": 40
     }
   ]
 }

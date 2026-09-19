@@ -106,10 +106,51 @@ CGNAT rather than RFC1918. So:
   instance HTTPS (which production needs anyway) rather than weakening ATS in a build that
   reaches a customer.
 
+## OTA 增量热更新 (expo-updates)
+
+本项目集成了 `expo-updates` 实现了针对 JS/React Native 层的免重新发版增量热更新。
+
+### 1. 更新源与策略配置 (`app.json`)
+
+- **自建更新源 URL**: `https://xrobinai.cn/ota/manifest`
+- **更新渠道**: `production` (通过 `requestHeaders["expo-channel-name"]` 声明)
+- **检查策略**: `checkAutomatically: "ON_LOAD"` (启动时自动在后台请求更新源检查新版本)
+- **缓存回退与启动耗时**: `fallbackToCacheTimeout: 0` (避免等待网络请求阻塞应用启动，首屏先载入本地缓存 bundle，后台静默下载更新)
+- **运行时版本控制**: `runtimeVersion.policy: "appVersion"` (严格基于原生 App 版本号匹配，保障原生模块兼容性)
+
+### 2. 客户端监听与手动检查 (`src/OTA.ts`)
+
+- **全局事件监听**: 在 `App.tsx` 根部挂载 `setupOTAListener()`，当后台静默下载完毕新版本 (`isUpdatePending`) 时，主动弹出系统原生弹窗提示用户立即重启生效。
+- **手动检查更新**: 驾驶舱效能页 (`DashboardScreen`) 右上角集成「检查更新」按钮，通过 `useOTA()` hook 提供即时查询反馈。
+- **安全与审计**:
+  - 请求中自动注入客户端唯一标识 (`deviceId` 来自 `Constants.installationId` / `sessionId`)，便于服务端访问日志分析与灰度追踪。
+  - *TODO (生产加固)*: 后续可接入 Expo Code Signing 公钥数字签名校验机制 (`updates.codeSigningCertificate`)，实现端到端防篡改验签。
+
+### 3. 发布 OTA 更新包流程 (`scripts/publish-ota.sh`)
+
+服务端由 Caddy 直接提供静态文件服务，映射路径为：
+`https://xrobinai.cn/ota/` 对应服务器目录 `/opt/coolie/ui/ota/`。
+
+**一键发布命令**:
+```sh
+# 方式 1: 在 clients/expo 目录执行
+bash scripts/publish-ota.sh [all|ios|android]
+
+# 方式 2: 在仓库根目录执行
+bash scripts/publish-ota.sh [all|ios|android]
+```
+
+**发布脚本执行逻辑**:
+1. 执行 `expo export --platform all --output-dir dist`，编译生成离线 JS Bundle 和资产映射文件。
+2. 自动解析 `app.json` 和 `dist/metadata.json`，生成符合 Expo Updates Protocol v0 规范的 `dist/manifest`、`dist/manifest.json` 及平台专属清单。
+3. 通过 rsync 经 SSH (`tc-coolie-claw`) 安全推送到生产服务器 `/opt/coolie/ui/ota/`。
+4. 校验远端 manifest 文件可读性，完成秒级无缝热更发布。
+
 ## What works / TODO
 
 - ✅ Installs, typechecks and bundles from a clean checkout (`pnpm typecheck`,
   `pnpm bundle` — 574 modules, ~1.65 MB Hermes bundle).
+- ✅ **OTA 增量热更新支持**: 自建更新源 `https://xrobinai.cn/ota/manifest`、后台静默拉取、下载完成弹窗重启、效能大盘右上角手动检查更新。
 - ✅ **Sign in with email and password (session), or paste a bearer key** — agent or board.
   A stored key is **validated before it is stored**, so a bad key reports the reason instead
   of showing up later as an empty task list, and a key revoked since last launch sends you
