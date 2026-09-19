@@ -205,6 +205,25 @@ export interface IssueAttachment {
   downloadPath?: string;
 }
 
+/** 示例域骨架注入的逐域结果 — POST .../actions/seed-sample-domains */
+export interface SeededDomainSummary {
+  slug: string;
+  displayName: string;
+  status: "created" | "skipped-existing" | "failed";
+  nodeTypes?: number;
+  relationTypes?: number;
+  withEndpoints?: number;
+  reason?: string;
+}
+
+/** 示例域骨架注入报告 — POST .../actions/seed-sample-domains */
+export interface SeedSampleDomainsReport {
+  domains: SeededDomainSummary[];
+  created: number;
+  skipped: number;
+  failed: number;
+}
+
 export class CoolieClient extends BaseCoolieClient {
   /** GET /api/companies/:id/costs/by-agent — 按智能体聚合 token/花费 */
   async costsByAgent(companyId: string): Promise<AgentCostRow[]> {
@@ -323,13 +342,30 @@ export class CoolieClient extends BaseCoolieClient {
     );
   }
 
-  /** POST /api/plugins/paperclipai.plugin-ontology/actions/seed-sample-domains — 注入示例本体域 */
-  async seedSampleDomains(companyId: string): Promise<unknown> {
-    return this.request<unknown>(
+  /**
+   * POST /api/plugins/paperclipai.plugin-ontology/actions/seed-sample-domains
+   *
+   * 注入示例本体域——只建骨架(对象类型 + 关系类型),**不含实例节点/边**。
+   * 返回逐域报告,调用方靠 `status === "created"` 分辨这次真正建了哪些域,
+   * 再拿 slug 去 `seedDomainSamples` 补实例。
+   */
+  async seedSampleDomains(companyId: string): Promise<SeedSampleDomainsReport> {
+    const res = await this.request<{ data?: SeedSampleDomainsReport }>(
       "POST",
       "/api/plugins/paperclipai.plugin-ontology/actions/seed-sample-domains",
       { companyId },
     );
+    return res.data ?? { domains: [], created: 0, skipped: 0, failed: 0 };
+  }
+
+  /**
+   * POST /api/plugins/paperclipai.plugin-ontology/actions/seed-samples
+   *
+   * 为单个域补种实例节点与关系。参数走 `params` 下(见基类说明),平铺会被
+   * 路由拒绝。
+   */
+  seedDomainSamples(companyId: string, domainId: string) {
+    return super.seedDomainSamples(companyId, domainId);
   }
 }
 

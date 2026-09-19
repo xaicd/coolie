@@ -17,6 +17,7 @@ import {
   type IssueWorkProduct,
   type OntologyDomain,
   type OntologyDomainLifecycleState,
+  type OntologyGraphCounts,
   type OntologyGraphSnapshot,
   type SessionUser,
   type SetDomainLifecycleOptions,
@@ -78,6 +79,28 @@ export class CoolieApiError extends Error {
     this.code = code;
     this.body = body;
   }
+}
+
+/**
+ * Result of the `seed-samples` plugin action — the instance nodes/edges planted
+ * in one ontology domain. The route wraps the worker's return value as
+ * `{ data }`; `seedDomainSamples` unwraps it before handing this back.
+ */
+export interface SeedDomainSamplesResult {
+  /**
+   * True when the domain was empty and the samples were planted. False when the
+   * domain already had nodes, in which case nothing was written — the action
+   * never overwrites existing data.
+   */
+  seeded: boolean;
+  reason?: string;
+  counts?: OntologyGraphCounts;
+  created?: {
+    nodeTypes: number;
+    relationTypes: number;
+    nodes: number;
+    edges: number;
+  };
 }
 
 /**
@@ -515,6 +538,30 @@ export class CoolieClient {
       }
       throw err;
     }
+  }
+
+  /**
+   * Plant the instance data (nodes + edges) of one ontology domain.
+   *
+   * Complementary to `seedSampleDomains`: that action builds the *skeleton*
+   * (object types and relation types), while the instance rows come from this
+   * one. Calling only the skeleton action is why an instance could show seven
+   * domains whose graphs were all empty.
+   *
+   * The action parameters must sit under `params`: the route forwards only
+   * `body.params` to the worker, so flattening `companyId`/`domainId` to the top
+   * level answers 502 `Missing required field: domainId`.
+   */
+  async seedDomainSamples(
+    companyId: string,
+    domainId: string,
+  ): Promise<SeedDomainSamplesResult> {
+    const res = await this.request<{ data?: SeedDomainSamplesResult }>(
+      "POST",
+      `/api/plugins/${ONTOLOGY_PLUGIN_ID}/actions/seed-samples`,
+      { companyId, params: { companyId, domainId } },
+    );
+    return res.data ?? { seeded: false };
   }
 
   // ── Board Chat & Concierge Streaming (需求⑫ 驾驶舱问答) ────────────

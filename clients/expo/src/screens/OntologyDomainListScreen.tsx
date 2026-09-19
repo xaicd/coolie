@@ -171,13 +171,41 @@ export function OntologyDomainListScreen({
     [companyId],
   );
 
-  // 一键注入官方示例本体域
+  // 一键注入官方示例本体域:骨架接口只建域,实例节点/边要逐个域补种
   const handleSeedSample = useCallback(async () => {
     setSeedingSample(true);
     try {
-      await coolie.seedSampleDomains(companyId);
-      Alert.alert("注入成功", "已成功注入示例业务本体域！");
+      const report = await coolie.seedSampleDomains(companyId);
+      const createdDomains = report.domains.filter((d) => d.status === "created");
+
+      // 骨架报告里只有 slug,没有 domainId:刷新一次列表把 slug 映射回 id
+      const idBySlug = new Map(
+        createdDomains.length > 0
+          ? (await coolie.listOntologyDomains(companyId)).map((d) => [d.slug, d.id])
+          : [],
+      );
+
+      let injectedDomains = 0;
+      let injectedNodes = 0;
+      for (const created of createdDomains) {
+        const domainId = idBySlug.get(created.slug);
+        if (!domainId) continue;
+        try {
+          const result = await coolie.seedDomainSamples(companyId, domainId);
+          if (result.seeded) {
+            injectedDomains += 1;
+            injectedNodes += result.created?.nodes ?? result.counts?.nodes ?? 0;
+          }
+        } catch {
+          // 单个域失败跳过,不影响其余域
+        }
+      }
+
       await loadDomains();
+      Alert.alert(
+        "注入完成",
+        `已注入 ${injectedDomains} 个域 · ${injectedNodes} 个实例节点`,
+      );
     } catch (e) {
       Alert.alert("注入失败", String((e as Error)?.message ?? e));
     } finally {
@@ -799,6 +827,18 @@ export function OntologyDomainListScreen({
               </Pressable>
             ) : null}
             <Pressable
+              onPress={handleSeedSample}
+              disabled={seedingSample}
+              hitSlop={12}
+              style={[styles.refreshBtn, styles.seedBtn]}
+            >
+              {seedingSample ? (
+                <ActivityIndicator size="small" color={C.accent} />
+              ) : (
+                <Text style={styles.seedBtnText}>注入示例域</Text>
+              )}
+            </Pressable>
+            <Pressable
               onPress={onRefresh}
               hitSlop={12}
               style={styles.refreshBtn}
@@ -1060,6 +1100,15 @@ const styles = StyleSheet.create({
   },
   refreshBtnText: {
     color: C.ink2,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  seedBtn: {
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
+    borderColor: "rgba(94, 106, 210, 0.35)",
+  },
+  seedBtnText: {
+    color: C.accent,
     fontSize: 12,
     fontWeight: "500",
   },
