@@ -6,9 +6,11 @@ import {
   Text,
   View,
   type ListRenderItemInfo,
+  type StyleProp,
   type ViewStyle,
 } from "react-native";
 import { C } from "../coolie";
+import { CodeViewerWebView } from "./CodeViewerWebView";
 
 // ── Linear Diff 语法高亮色 (DESIGN.md 第6节) ──────────────────────────
 const DIFF_THEME = {
@@ -216,15 +218,18 @@ export interface UnifiedDiffViewerProps {
   lines?: ParsedDiffLine[];
   fileId?: string;
   emptyMessage?: string;
-  style?: ViewStyle;
+  style?: StyleProp<ViewStyle>;
   header?: React.ReactNode;
   footer?: React.ReactNode;
   scrollEnabled?: boolean;
+  /** 渲染引擎模式："cm6" (CodeMirror 6，默认) 或 "flatlist" (纯原生虚拟滚动) */
+  mode?: "cm6" | "flatlist";
 }
 
 /**
- * 移动端单列高对比虚拟滚动 Diff 渲染器 (DESIGN.md 第6节)
- * 针对 2500+ 行大 Diff 优化:采用 FlatList + getItemLayout 虚拟滚动，维持 60fps
+ * 移动端单列高对比 Diff 渲染器 (DESIGN.md 第6节)
+ * - 默认采用 CodeMirror 6 嵌入式引擎渲染 (支持语法与行高亮)
+ * - 可切换至 FlatList 极速虚拟滚动
  */
 export function UnifiedDiffViewer({
   patch,
@@ -235,21 +240,22 @@ export function UnifiedDiffViewer({
   header,
   footer,
   scrollEnabled = true,
+  mode = "cm6",
 }: UnifiedDiffViewerProps) {
   const data = useMemo(() => {
     if (customLines) return customLines;
     return parsePatchToLines(patch, fileId);
   }, [customLines, patch, fileId]);
 
-  const renderItem = ({ item }: ListRenderItemInfo<ParsedDiffLine>) => (
-    <DiffLineRow item={item} />
-  );
-
-  const getItemLayout = (_: unknown, index: number) => ({
-    length: DIFF_LINE_HEIGHT,
-    offset: DIFF_LINE_HEIGHT * index,
-    index,
-  });
+  const patchString = useMemo(() => {
+    if (patch) return patch;
+    if (customLines && customLines.length > 0) {
+      return customLines
+        .map((l) => (l.type === "header" ? l.content : (l.sign === "+" || l.sign === "-" ? l.sign : " ") + l.content))
+        .join("\n");
+    }
+    return "";
+  }, [patch, customLines]);
 
   if (data.length === 0) {
     return (
@@ -260,6 +266,35 @@ export function UnifiedDiffViewer({
       </View>
     );
   }
+
+  // 默认模式: 统一走 CodeMirror 6 嵌入式渲染
+  if (mode === "cm6") {
+    return (
+      <View style={[styles.container, style]}>
+        {header ? <View>{header}</View> : null}
+        <CodeViewerWebView
+          code={patchString}
+          diff={patchString}
+          isDiff={true}
+          language="diff"
+          lineNumbers={true}
+          readOnly={true}
+          style={styles.cmViewer}
+        />
+        {footer ? <View>{footer}</View> : null}
+      </View>
+    );
+  }
+
+  const renderItem = ({ item }: ListRenderItemInfo<ParsedDiffLine>) => (
+    <DiffLineRow item={item} />
+  );
+
+  const getItemLayout = (_: unknown, index: number) => ({
+    length: DIFF_LINE_HEIGHT,
+    offset: DIFF_LINE_HEIGHT * index,
+    index,
+  });
 
   return (
     <View style={[styles.container, style]}>
@@ -285,6 +320,10 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: C.bg,
+  },
+  cmViewer: {
+    flex: 1,
+    minHeight: 200,
   },
   emptyContainer: {
     padding: 24,

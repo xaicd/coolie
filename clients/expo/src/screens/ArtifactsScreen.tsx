@@ -22,6 +22,7 @@ import type {
   WorkspaceRuntimeService,
 } from "@coolie/api-client";
 import { C, COOLIE_BASE_URL, coolie, getAuthToken } from "../coolie";
+import { CodeViewerWebView } from "../components/CodeViewerWebView";
 
 export interface ArtifactsScreenProps {
   company: Company;
@@ -248,8 +249,12 @@ export function ArtifactsScreen({
           },
           null,
         );
+        return;
       }
     }
+
+    // 文档、文本与代码产物：唤起 CodeViewerWebView 弹窗预览
+    setPreviewArtifact(artifact);
   };
 
   const imageSourceHeaders = useMemo(() => {
@@ -529,23 +534,45 @@ export function ArtifactsScreen({
 
           <View style={styles.modalImageWrapper}>
             {previewArtifact && (
-              <Image
-                source={{
-                  uri: resolveMediaUrl(
-                    previewArtifact.contentPath || previewArtifact.openPath,
-                  ) || "",
-                  headers: imageSourceHeaders,
-                }}
-                style={styles.modalFullImage}
-                contentFit="contain"
-                transition={300}
-              />
+              previewArtifact.mediaKind === "image" ? (
+                <Image
+                  source={{
+                    uri: resolveMediaUrl(
+                      previewArtifact.contentPath || previewArtifact.openPath,
+                    ) || "",
+                    headers: imageSourceHeaders,
+                  }}
+                  style={styles.modalFullImage}
+                  contentFit="contain"
+                  transition={300}
+                />
+              ) : (
+                <CodeViewerWebView
+                  code={
+                    previewArtifact.previewText ||
+                    `// 交付资产：${previewArtifact.title}\n// 来源：${previewArtifact.source}\n// 路径：${previewArtifact.openPath || previewArtifact.contentPath || "无固定路径"}\n// 类型：${previewArtifact.contentType || "纯文本"}`
+                  }
+                  language={
+                    previewArtifact.contentType?.includes("json")
+                      ? "json"
+                      : previewArtifact.contentType?.includes("javascript")
+                      ? "javascript"
+                      : previewArtifact.contentType?.includes("diff")
+                      ? "diff"
+                      : "typescript"
+                  }
+                  isDiff={previewArtifact.contentType?.includes("diff")}
+                  readOnly={true}
+                  lineNumbers={true}
+                  style={styles.modalCodeViewer}
+                />
+              )
             )}
           </View>
 
           <View style={styles.modalFooter}>
             <Text style={styles.modalFooterText}>
-              {previewArtifact?.contentType || "image/png"} · 双指捏合缩放
+              {previewArtifact?.contentType || (previewArtifact?.mediaKind === "image" ? "image/png" : "text/plain")} · {previewArtifact?.mediaKind === "image" ? "双指捏合缩放" : "CodeMirror 6 嵌入渲染"}
             </Text>
           </View>
         </SafeAreaView>
@@ -906,6 +933,12 @@ const styles = StyleSheet.create({
   modalFullImage: {
     width: "100%",
     height: "100%",
+  },
+  modalCodeViewer: {
+    width: "100%",
+    height: "100%",
+    borderRadius: 8,
+    overflow: "hidden",
   },
   modalFooter: {
     paddingHorizontal: 16,

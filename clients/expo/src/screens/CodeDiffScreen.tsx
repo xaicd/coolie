@@ -25,6 +25,7 @@ import {
   UnifiedDiffViewer,
   parsePatchToLines,
 } from "../components/UnifiedDiffViewer";
+import { CodeViewerWebView } from "../components/CodeViewerWebView";
 
 const STATUS_LABELS: Record<string, string> = {
   added: "新增",
@@ -236,12 +237,13 @@ export function CodeDiffScreen({
     return { adds, dels, fileCount };
   }, [diffData]);
 
-  // 全屏独立查看模式
+  // 全屏独立查看模式 (文件详情页: CodeMirror 6 驱动)
   if (selectedFileForFullView && diffData) {
     const file = diffData.files.find((f) => f.path === selectedFileForFullView);
     if (file) {
       const combinedPatch = file.patches.map((p) => p.patch).filter(Boolean).join("\n");
       const lines = parsePatchToLines(combinedPatch, file.path);
+      const lineCount = lines.length;
       return (
         <SafeAreaView style={styles.fullScreen}>
           <StatusBar style="light" />
@@ -258,7 +260,7 @@ export function CodeDiffScreen({
                 {getFileName(file.path)}
               </Text>
               <Text style={styles.fullScreenFilePath} numberOfLines={1}>
-                {file.path} ({lines.length} 行)
+                {file.path} ({lineCount} 行)
               </Text>
             </View>
             <View style={styles.pillRow}>
@@ -266,16 +268,19 @@ export function CodeDiffScreen({
               <Text style={styles.statDel}>-{file.deletions}</Text>
             </View>
           </View>
-          <UnifiedDiffViewer
-            lines={lines}
-            fileId={file.path}
-            header={
-              <View style={styles.virtualNoticeBar}>
-                <Text style={styles.virtualNoticeText}>
-                  ⚡ FlatList 虚拟滚动中 · 共 {lines.length} 行 Diff
-                </Text>
-              </View>
-            }
+          <View style={styles.virtualNoticeBar}>
+            <Text style={styles.virtualNoticeText}>
+              ⚡ CodeMirror 6 渲染 · Linear 暗色 (#0F1011) · 共 {lineCount} 行 Diff
+            </Text>
+          </View>
+          <CodeViewerWebView
+            code={combinedPatch}
+            diff={combinedPatch}
+            isDiff={true}
+            language="diff"
+            lineNumbers={true}
+            readOnly={true}
+            style={styles.fullScreenWebView}
           />
         </SafeAreaView>
       );
@@ -642,6 +647,10 @@ const styles = StyleSheet.create({
   fullScreen: {
     flex: 1,
     backgroundColor: C.bg,
+  },
+  fullScreenWebView: {
+    flex: 1,
+    backgroundColor: "#0F1011",
   },
   fullScreenHeader: {
     paddingVertical: 12,

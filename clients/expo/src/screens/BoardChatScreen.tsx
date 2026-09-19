@@ -18,6 +18,7 @@ import type { BoardChatMessage, Company } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
 import { QuickApprovalCard } from "../components/QuickApprovalCard";
+import { CodeViewerWebView } from "../components/CodeViewerWebView";
 
 export interface BoardChatScreenProps {
   company: Company;
@@ -233,6 +234,45 @@ export function BoardChatScreen({
     }
   };
 
+  interface MessageSegment {
+    type: "text" | "code";
+    content: string;
+    language?: string;
+  }
+
+  function parseMessageSegments(rawText: string): MessageSegment[] {
+    const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```/g;
+    const parts: MessageSegment[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = codeBlockRegex.exec(rawText)) !== null) {
+      if (match.index > lastIndex) {
+        const textChunk = rawText.slice(lastIndex, match.index);
+        if (textChunk.trim()) {
+          parts.push({ type: "text", content: textChunk });
+        }
+      }
+      const lang = match[1]?.trim() || "typescript";
+      const code = match[2]?.trimEnd() || "";
+      parts.push({
+        type: "code",
+        content: code,
+        language: lang,
+      });
+      lastIndex = match.index + match[0].length;
+    }
+
+    if (lastIndex < rawText.length) {
+      const trailing = rawText.slice(lastIndex);
+      if (trailing.trim() || parts.length === 0) {
+        parts.push({ type: "text", content: trailing });
+      }
+    }
+
+    return parts.length > 0 ? parts : [{ type: "text", content: rawText }];
+  }
+
   const renderMessageItem = ({ item }: { item: BoardChatMessage }) => {
     const isUser = item.role === "user";
 
@@ -245,6 +285,8 @@ export function BoardChatScreen({
         </View>
       );
     }
+
+    const segments = parseMessageSegments(item.text);
 
     return (
       <View style={styles.assistantRow}>
@@ -261,7 +303,38 @@ export function BoardChatScreen({
               })}
             </Text>
           </View>
-          <Text style={styles.assistantText}>{item.text}</Text>
+          {segments.length === 1 && segments[0].type === "text" ? (
+            <Text style={styles.assistantText}>{item.text}</Text>
+          ) : (
+            <View style={styles.chatSegmentsBox}>
+              {segments.map((seg, idx) => {
+                if (seg.type === "text") {
+                  return (
+                    <Text key={`txt-${idx}`} style={styles.assistantText}>
+                      {seg.content}
+                    </Text>
+                  );
+                }
+                const lineCount = seg.content.split("\n").length;
+                const blockHeight = Math.min(Math.max(lineCount * 21 + 24, 90), 320);
+                return (
+                  <View key={`code-${idx}`} style={styles.chatCodeCard}>
+                    <View style={styles.chatCodeHeader}>
+                      <Text style={styles.chatCodeLang}>{seg.language || "code"}</Text>
+                      <Text style={styles.chatCodeLines}>{lineCount} 行</Text>
+                    </View>
+                    <CodeViewerWebView
+                      code={seg.content}
+                      language={seg.language}
+                      readOnly={true}
+                      lineNumbers={true}
+                      style={{ height: blockHeight }}
+                    />
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </View>
       </View>
     );
@@ -726,5 +799,37 @@ const styles = StyleSheet.create({
     height: 12,
     backgroundColor: C.err,
     borderRadius: 2,
+  },
+  chatSegmentsBox: {
+    gap: 8,
+    width: "100%",
+  },
+  chatCodeCard: {
+    borderRadius: 8,
+    overflow: "hidden",
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: "#0F1011",
+    marginVertical: 4,
+  },
+  chatCodeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: C.lineSubtle,
+  },
+  chatCodeLang: {
+    color: C.accent,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  chatCodeLines: {
+    color: C.ink4,
+    fontSize: 10,
+    fontVariant: ["tabular-nums"],
   },
 });
