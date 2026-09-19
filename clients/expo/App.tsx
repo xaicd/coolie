@@ -12,6 +12,7 @@ import {
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { Ionicons } from "@expo/vector-icons";
 import {
   isAsrNotConfigured,
   type Company,
@@ -83,6 +84,59 @@ const STATUS_DOT_COLOR: Record<string, string> = {
   blocked: C.err,
   done: C.ok,
 };
+
+type TabKey = "tasks" | "dashboard" | "ontology" | "artifacts" | "chat";
+
+type BottomTab = {
+  key: TabKey;
+  label: string;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  activeIcon: React.ComponentProps<typeof Ionicons>["name"];
+};
+
+const BOTTOM_TABS: BottomTab[] = [
+  { key: "tasks", label: "任务", icon: "list-outline", activeIcon: "list" },
+  { key: "chat", label: "问答", icon: "chatbubbles-outline", activeIcon: "chatbubbles" },
+  { key: "dashboard", label: "驾驶舱", icon: "speedometer-outline", activeIcon: "speedometer" },
+  { key: "ontology", label: "本体", icon: "git-network-outline", activeIcon: "git-network" },
+  { key: "artifacts", label: "产物", icon: "cube-outline", activeIcon: "cube" },
+];
+
+function BottomTabBar({
+  tab,
+  onChange,
+}: {
+  tab: TabKey;
+  onChange: (t: TabKey) => void;
+}) {
+  return (
+    <View style={styles.bottomBar}>
+      {BOTTOM_TABS.map((t) => {
+        const active = tab === t.key;
+        return (
+          <Pressable
+            key={t.key}
+            style={styles.bottomTab}
+            onPress={() => onChange(t.key)}
+            hitSlop={4}
+          >
+            <Ionicons
+              name={active ? t.activeIcon : t.icon}
+              size={22}
+              color={active ? C.accent : C.ink3}
+            />
+            <Text
+              style={[styles.bottomTabLabel, active && styles.bottomTabLabelActive]}
+            >
+              {t.label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
+}
+
 
 export default function App() {
   const [credential, setCredential] = useState<Credential | null | undefined>(undefined);
@@ -330,7 +384,7 @@ function HomeScreen({
   onSignOut: () => void;
 }) {
   const [tab, setTab] = useState<
-    "tasks" | "dashboard" | "diff" | "ontology" | "artifacts" | "chat"
+    "tasks" | "dashboard" | "ontology" | "artifacts" | "chat"
   >("tasks");
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selected, setSelected] = useState<Issue | null>(null);
@@ -438,50 +492,6 @@ function HomeScreen({
     );
   }
 
-  if (tab === "diff") {
-    return <CodeDiffScreen company={company} onBack={() => setTab("tasks")} />;
-  }
-
-  if (tab === "dashboard") {
-    return <DashboardScreen company={company} onBack={() => setTab("tasks")} />;
-  }
-
-  if (tab === "ontology") {
-    return (
-      <OntologyDomainListScreen
-        company={company}
-        whoami={whoami}
-        onBack={() => setTab("tasks")}
-      />
-    );
-  }
-
-  if (tab === "artifacts") {
-    return (
-      <ArtifactsScreen
-        company={company}
-        whoami={whoami}
-        onBack={() => setTab("tasks")}
-        onOpenSandbox={(url, service, wp) =>
-          setSandboxContext({ url, service, workProduct: wp })
-        }
-        onOpenDiff={(issueItem, wp) =>
-          setDiffContext({ issue: issueItem, workProduct: wp })
-        }
-      />
-    );
-  }
-
-  if (tab === "chat") {
-    return (
-      <BoardChatScreen
-        company={company}
-        whoami={whoami}
-        onBack={() => setTab("tasks")}
-      />
-    );
-  }
-
   if (selected) {
     return (
       <TaskDetail
@@ -501,56 +511,49 @@ function HomeScreen({
   const open = issues.filter((i) => i.status !== "done").length;
 
   return (
-    <Surface>
-      {/* 顶部标题与身份胶囊 */}
-      <View style={styles.rowBetween}>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.h1}>工坊控制台</Text>
-          <View style={styles.companyCapsule}>
-            <StatusDot status="ok" size={6} />
-            <Text style={styles.companyCapsuleText} numberOfLines={1}>
-              {company.name}
-            </Text>
-            <Text style={styles.companyCapsuleSubText}>· {whoami}</Text>
-          </View>
-        </View>
-        <Pressable onPress={onSignOut} hitSlop={12} style={styles.btnGhost}>
-          <Text style={styles.btnGhostText}>退出</Text>
-        </Pressable>
-      </View>
+    <SafeAreaView style={styles.shell}>
+      <StatusBar style="light" />
+      <View style={styles.shellContent}>
+        {tab === "chat" ? (
+          <BoardChatScreen company={company} whoami={whoami} />
+        ) : tab === "dashboard" ? (
+          <DashboardScreen company={company} />
+        ) : tab === "ontology" ? (
+          <OntologyDomainListScreen company={company} whoami={whoami} />
+        ) : tab === "artifacts" ? (
+          <ArtifactsScreen
+            company={company}
+            whoami={whoami}
+            onOpenSandbox={(url, service, wp) =>
+              setSandboxContext({ url, service, workProduct: wp })
+            }
+            onOpenDiff={(issueItem, wp) =>
+              setDiffContext({ issue: issueItem, workProduct: wp })
+            }
+          />
+        ) : (
+          <ScrollView
+            style={{ flex: 1, backgroundColor: C.bg }}
+            contentContainerStyle={styles.screen}
+          >
+            {/* 顶部标题与身份胶囊 */}
+            <View style={styles.rowBetween}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.h1}>工坊控制台</Text>
+                <View style={styles.companyCapsule}>
+                  <StatusDot status="ok" size={6} />
+                  <Text style={styles.companyCapsuleText} numberOfLines={1}>
+                    {company.name}
+                  </Text>
+                  <Text style={styles.companyCapsuleSubText}>· {whoami}</Text>
+                </View>
+              </View>
+              <Pressable onPress={onSignOut} hitSlop={12} style={styles.btnGhost}>
+                <Text style={styles.btnGhostText}>退出</Text>
+              </Pressable>
+            </View>
 
-      {/* 顶部标签切换分段器 */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.tabSwitcher}
-      >
-        <Pressable
-          style={[styles.tabBtn, styles.tabBtnActive]}
-          onPress={() => setTab("tasks")}
-        >
-          <Text style={[styles.tabBtnText, styles.tabBtnTextActive]}>
-            任务工单 ({issues.length})
-          </Text>
-        </Pressable>
-        <Pressable style={styles.tabBtn} onPress={() => setTab("chat")}>
-          <Text style={styles.tabBtnText}>驾驶舱问答</Text>
-        </Pressable>
-        <Pressable style={styles.tabBtn} onPress={() => setTab("dashboard")}>
-          <Text style={styles.tabBtnText}>效能驾驶舱</Text>
-        </Pressable>
-        <Pressable style={styles.tabBtn} onPress={() => setTab("diff")}>
-          <Text style={styles.tabBtnText}>代码审查</Text>
-        </Pressable>
-        <Pressable style={styles.tabBtn} onPress={() => setTab("ontology")}>
-          <Text style={styles.tabBtnText}>业务本体</Text>
-        </Pressable>
-        <Pressable style={styles.tabBtn} onPress={() => setTab("artifacts")}>
-          <Text style={styles.tabBtnText}>产物与原型</Text>
-        </Pressable>
-      </ScrollView>
-
-      {/* 概览统计卡片 (tabularNum + 亮度分层) */}
+            {/* 概览统计卡片 (tabularNum + 亮度分层) */}
       <View style={styles.statRow}>
         <View style={styles.statCard}>
           <Text style={styles.statNum}>{issues.length}</Text>
@@ -726,7 +729,11 @@ function HomeScreen({
         />
       )}
       <QuickApprovalCard companyId={companyId} floating={true} />
-    </Surface>
+            </ScrollView>
+          )}
+      </View>
+      <BottomTabBar tab={tab} onChange={setTab} />
+    </SafeAreaView>
   );
 }
 
@@ -905,6 +912,37 @@ const styles = StyleSheet.create({
     paddingBottom: 32,
     gap: 16,
     backgroundColor: C.bg,
+  },
+  shell: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  shellContent: {
+    flex: 1,
+  },
+  bottomBar: {
+    flexDirection: "row",
+    borderTopWidth: 1,
+    borderTopColor: C.lineSubtle,
+    backgroundColor: C.panel,
+    paddingTop: 6,
+    paddingBottom: 8,
+    paddingHorizontal: 8,
+  },
+  bottomTab: {
+    flex: 1,
+    alignItems: "center",
+    gap: 3,
+    paddingVertical: 2,
+  },
+  bottomTabLabel: {
+    fontSize: 10,
+    color: C.ink3,
+    fontWeight: "400",
+  },
+  bottomTabLabelActive: {
+    color: C.accent,
+    fontWeight: "500",
   },
   hero: {
     alignItems: "center",

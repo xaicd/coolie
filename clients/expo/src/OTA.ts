@@ -207,6 +207,5 @@ export function useOTA() {
     error: error || (nativeUpdates.checkError ? nativeUpdates.checkError.message : null),
     checkUpdate: triggerCheck,
     reload,
-    downloadProgress: nativeUpdates.downloadProgress ?? 0,
   };
 }
