@@ -3,7 +3,7 @@
     "name": "Coolie工坊",
     "slug": "coolie",
     "scheme": "coolie",
-    "version": "0.2.0",
+    "version": "0.3.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -28,8 +28,14 @@
     },
     "android": {
       "package": "cloud.coolie.app",
-      "permissions": ["RECORD_AUDIO"]
+      "permissions": [
+        "RECORD_AUDIO"
+      ]
     },
-    "plugins": ["expo-av", "expo-secure-store", "expo-updates"]
+    "plugins": [
+      "expo-av",
+      "expo-secure-store",
+      "expo-updates"
+    ]
   }
 }
