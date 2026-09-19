@@ -12,6 +12,7 @@ import {
   StatusBar as RNStatusBar,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { Ionicons } from "@expo/vector-icons";
 import type { Company, DashboardSummary } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
@@ -48,6 +49,7 @@ function formatIdleTime(seconds: number | null): string {
 }
 
 interface DashboardScreenProps {
+  onOpenSettings?: () => void;
   company: Company;
   onBack?: () => void;
 }
@@ -59,7 +61,7 @@ interface DashboardScreenProps {
  * - 智能体状态点 8px 呼吸灯扩散
  * - 半透明卡片 bg 0.02 + 半透明白边 line
  */
-export function DashboardScreen({ company, onBack }: DashboardScreenProps) {
+export function DashboardScreen({ company, onBack, onOpenSettings }: DashboardScreenProps) {
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -170,6 +172,11 @@ export function DashboardScreen({ company, onBack }: DashboardScreenProps) {
           </View>
 
           <View style={styles.headerActions}>
+              {onOpenSettings ? (
+                <Pressable onPress={onOpenSettings} hitSlop={12} style={styles.otaBtn}>
+                  <Ionicons name="settings-outline" size={18} color="#8A8F98" />
+                </Pressable>
+              ) : null}
             <Pressable
               style={styles.otaBtn}
               onPress={() => void checkOTA(true)}

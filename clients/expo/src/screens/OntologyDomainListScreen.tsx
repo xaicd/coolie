@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Alert,
@@ -25,6 +26,7 @@ import { StatusDot } from "../components/StatusDot";
 import { EmergencyKillSwitch } from "../components/EmergencyKillSwitch";
 
 interface OntologyDomainListScreenProps {
+  onOpenSettings?: () => void;
   company: Company;
   whoami?: string;
   onBack?: () => void;
@@ -75,6 +77,7 @@ export function OntologyDomainListScreen({
   company,
   whoami = "管理员",
   onBack,
+  onOpenSettings,
 }: OntologyDomainListScreenProps) {
   const [domains, setDomains] = useState<OntologyDomain[]>([]);
   const [loading, setLoading] = useState(true);
@@ -516,13 +519,20 @@ export function OntologyDomainListScreen({
             </View>
           </View>
 
-          <Pressable
-            onPress={onRefresh}
-            hitSlop={12}
-            style={styles.refreshBtn}
-          >
-            <Text style={styles.refreshBtnText}>刷新</Text>
-          </Pressable>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            {onOpenSettings ? (
+              <Pressable onPress={onOpenSettings} hitSlop={12} style={styles.refreshBtn}>
+                <Ionicons name="settings-outline" size={17} color="#8A8F98" />
+              </Pressable>
+            ) : null}
+            <Pressable
+              onPress={onRefresh}
+              hitSlop={12}
+              style={styles.refreshBtn}
+            >
+              <Text style={styles.refreshBtnText}>刷新</Text>
+            </Pressable>
+          </View>
         </View>
 
         {/* 顶部过滤切换器 */}

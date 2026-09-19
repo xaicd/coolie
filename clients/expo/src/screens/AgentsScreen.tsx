@@ -185,7 +185,7 @@ function AgentDetailSheet({
   );
 }
 
-export function AgentsScreen({ company }: { company: { id: string; name: string } }) {
+export function AgentsScreen({ company, onOpenSettings }: { company: { id: string; name: string }; onOpenSettings?: () => void }) {
   const [agents, setAgents] = useState<AgentRow[]>([]);
   const [costs, setCosts] = useState<Record<string, AgentCostRow>>({});
   const [loading, setLoading] = useState(true);
@@ -240,6 +240,11 @@ export function AgentsScreen({ company }: { company: { id: string; name: string 
             </Text>
           </View>
         </View>
+        {onOpenSettings ? (
+          <Pressable onPress={onOpenSettings} hitSlop={12}>
+            <Ionicons name="settings-outline" size={20} color={C.ink3} />
+          </Pressable>
+        ) : null}
       </View>
 
       {loading ? (

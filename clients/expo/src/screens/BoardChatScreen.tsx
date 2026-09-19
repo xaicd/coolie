@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Alert,
@@ -22,6 +23,7 @@ import { QuickApprovalCard } from "../components/QuickApprovalCard";
 import { CodeViewerWebView } from "../components/CodeViewerWebView";
 
 export interface BoardChatScreenProps {
+  onOpenSettings?: () => void;
   company: Company;
   whoami?: string;
   onBack?: () => void;
@@ -54,6 +56,7 @@ export function BoardChatScreen({
   company,
   whoami: _whoami,
   onBack,
+  onOpenSettings,
 }: BoardChatScreenProps) {
   const [messages, setMessages] = useState<BoardChatMessage[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
@@ -373,6 +376,11 @@ export function BoardChatScreen({
           </View>
 
           <View style={styles.topRight}>
+            {onOpenSettings ? (
+              <Pressable hitSlop={12} onPress={onOpenSettings} style={styles.backBtn}>
+                <Ionicons name="settings-outline" size={19} color="#8A8F98" />
+              </Pressable>
+            ) : null}
             <Pressable
               hitSlop={12}
               onPress={() => void loadHistory()}

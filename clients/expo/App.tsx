@@ -45,7 +45,42 @@ import { PrototypeSandboxScreen } from "./src/screens/PrototypeSandboxScreen";
 import { BoardChatScreen } from "./src/screens/BoardChatScreen";
 import { AgentsScreen } from "./src/screens/AgentsScreen";
 import { useOTA } from "./src/OTA";
-import { checkAppVersion, downloadApk, type RemoteVersionInfo } from "./src/AppVersion";
+import { checkAppVersion, downloadApk, localVersion, type RemoteVersionInfo } from "./src/AppVersion";
+
+/** 统计并清理 App 缓存目录，返回可读大小 */
+async function clearAppCache(): Promise<string> {
+  try {
+    const FS = await import("expo-file-system");
+    const cacheDir = FS.cacheDirectory;
+    if (!cacheDir) return "0 KB";
+    await FS.deleteAsync(cacheDir, { idempotent: true });
+    return "已全部清理";
+  } catch {
+    return "清理失败";
+  }
+}
+
+async function measureCache(): Promise<string> {
+  try {
+    const FS = await import("expo-file-system");
+    const cacheDir = FS.cacheDirectory;
+    if (!cacheDir) return "0 KB";
+    let total = 0;
+    const walk = async (dir: string) => {
+      const items = await FS.readDirectoryAsync(dir);
+      for (const name of items) {
+        const full = dir.endsWith("/") ? dir + name : `${dir}/${name}`;
+        const info = await FS.getInfoAsync(full);
+        if (info.exists && !info.isDirectory) total += info.size ?? 0;
+        else if (info.exists && info.isDirectory) await walk(full + "/");
+      }
+    };
+    await walk(cacheDir);
+    return total > 1048576 ? `${(total / 1048576).toFixed(1)} MB` : `${Math.ceil(total / 1024)} KB`;
+  } catch {
+    return "-";
+  }
+}
 import { QuickApprovalCard } from "./src/components/QuickApprovalCard";
 import { setupOTAListener } from "./src/OTA";
 
@@ -219,32 +254,68 @@ function SettingsSheet({
   onClose: () => void;
   onSignOut: () => void;
 }) {
+  const [cacheSize, setCacheSize] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
+  const appVer = localVersion();
+
+  useEffect(() => {
+    void measureCache().then(setCacheSize);
+  }, []);
+
   return (
     <View style={styles.settingsBackdrop}>
       <Pressable style={{ flex: 1 }} onPress={onClose} />
       <View style={styles.settingsSheet}>
         <View style={styles.settingsHandle} />
         <Text style={styles.settingsTitle}>设置</Text>
-        <View style={styles.settingsRow}>
-          <Ionicons name="person-circle-outline" size={20} color={C.ink3} />
-          <Text style={styles.settingsRowLabel} numberOfLines={1}>
-            当前身份
-          </Text>
-          <Text style={styles.settingsRowValue} numberOfLines={1}>
-            {whoami}
-          </Text>
+
+        {/* 我的名片 */}
+        <View style={styles.profileCard}>
+          <View style={styles.profileAvatar}>
+            <Text style={styles.profileAvatarText}>{whoami.slice(0, 1).toUpperCase()}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.profileName} numberOfLines={1}>
+              {whoami}
+            </Text>
+            <Text style={styles.profileMeta}>Coolie工坊 · 管理员</Text>
+          </View>
+          <View style={styles.versionChip}>
+            <Text style={styles.versionChipText}>v{appVer}</Text>
+          </View>
         </View>
+
+        {/* App 设置分组 */}
+        <Text style={styles.settingsGroup}>应用</Text>
         <Pressable
           style={styles.settingsRow}
           disabled={ota.isChecking}
           onPress={() => void ota.checkUpdate(true)}
         >
           <Ionicons name="cloud-download-outline" size={20} color={C.ink3} />
-          <Text style={styles.settingsRowLabel}>检查更新</Text>
+          <Text style={styles.settingsRowLabel}>版本与更新 (OTA)</Text>
           <Text style={styles.settingsRowValue}>
-            {ota.isChecking ? "检查中…" : ota.runtimeVersion ?? "-"}
+            {ota.isChecking ? "检查中…" : (ota.runtimeVersion ?? appVer)}
           </Text>
         </Pressable>
+        <Pressable
+          style={styles.settingsRow}
+          disabled={clearing}
+          onPress={async () => {
+            setClearing(true);
+            const size = await clearAppCache();
+            setCacheSize(size);
+            setClearing(false);
+            Alert.alert("缓存已清理", `释放 ${size}`);
+          }}
+        >
+          <Ionicons name="trash-outline" size={20} color={C.ink3} />
+          <Text style={styles.settingsRowLabel}>清理缓存</Text>
+          <Text style={styles.settingsRowValue}>
+            {clearing ? "清理中…" : (cacheSize ?? "计算中…")}
+          </Text>
+        </Pressable>
+
         <Pressable style={styles.settingsSignOut} onPress={onSignOut}>
           <Text style={styles.settingsSignOutText}>退出登录</Text>
         </Pressable>
@@ -674,13 +745,13 @@ function HomeScreen({
       <StatusBar style="light" />
       <View style={styles.shellContent}>
         {tab === "dashboard" ? (
-          <DashboardScreen company={company} />
+          <DashboardScreen company={company} onOpenSettings={() => setSettingsOpen(true)} />
         ) : tab === "agents" ? (
-          <AgentsScreen company={company} />
+          <AgentsScreen company={company} onOpenSettings={() => setSettingsOpen(true)} />
         ) : tab === "chat" ? (
-          <BoardChatScreen company={company} whoami={whoami} />
+          <BoardChatScreen company={company} whoami={whoami} onOpenSettings={() => setSettingsOpen(true)} />
         ) : tab === "ontology" ? (
-          <OntologyDomainListScreen company={company} whoami={whoami} />
+          <OntologyDomainListScreen company={company} whoami={whoami} onOpenSettings={() => setSettingsOpen(true)} />
         ) : tab === "artifacts" ? (
           <ArtifactsScreen
             company={company}
@@ -1214,6 +1285,41 @@ const styles = StyleSheet.create({
     borderRadius: 2,
     backgroundColor: C.surfaceHover,
     marginBottom: 10,
+  },
+  profileCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 6,
+  },
+  profileAvatar: {
+    width: 44,
+    height: 44,
+    borderRadius: 12,
+    backgroundColor: C.brand,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileAvatarText: { color: C.ink, fontSize: 18, fontWeight: "700" },
+  profileName: { color: C.ink, fontSize: 16, fontWeight: "700" },
+  profileMeta: { color: C.ink3, fontSize: 12, marginTop: 2 },
+  versionChip: {
+    backgroundColor: C.panel,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  versionChipText: { color: C.accent, fontSize: 11, fontWeight: "600" },
+  settingsGroup: {
+    color: C.ink4,
+    fontSize: 11,
+    fontWeight: "700",
+    marginTop: 14,
+    marginBottom: 4,
+    textTransform: "uppercase",
   },
   settingsTitle: {
     color: C.ink,
