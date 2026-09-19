@@ -259,6 +259,7 @@ export function boardChatRoutes(
     // hermes exit before answering (the room just shows nothing). Everything
     // here exists on both the old and new CLI; `--quiet` keeps banners and
     // tool previews out of stdout.
+    const boardModel = process.env.BOARD_CHAT_MODEL ?? "glm-5.3-flash";
     const args = [
       "--oneshot",
       "--quiet",
@@ -268,6 +269,8 @@ export function boardChatRoutes(
       "--yolo",
       "--max-turns",
       "40",
+      "-m",
+      boardModel,
     ];
 
     liveBoardChats += 1;
