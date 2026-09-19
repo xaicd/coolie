@@ -17,7 +17,7 @@ EXPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$EXPO_DIR"
 
 SSH_TARGET="${SSH_TARGET:-tc-coolie-claw}"
-REMOTE_OTA_DIR="${REMOTE_OTA_DIR:-/opt/coolie/ui/ota}"
+REMOTE_OTA_DIR="${REMOTE_OTA_DIR:-/opt/coolie/ui/dist/ota}"
 OTA_BASE_URL="${OTA_BASE_URL:-https://xrobinai.cn/ota}"
 PLATFORMS="${1:-all}"
 DIST_DIR="$EXPO_DIR/dist"
