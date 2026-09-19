@@ -99,7 +99,8 @@ export class CoolieClient {
     if (!this.fetchImpl) throw new Error("No fetch available; pass fetchImpl");
   }
 
-  private async request<T>(
+  /** @internal expo 壳层需要直接打杂项 API */
+  async request<T>(
     method: string,
     path: string,
     body?: unknown,

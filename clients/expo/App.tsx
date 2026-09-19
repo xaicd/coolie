@@ -42,6 +42,8 @@ import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen
 import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
 import { PrototypeSandboxScreen } from "./src/screens/PrototypeSandboxScreen";
 import { BoardChatScreen } from "./src/screens/BoardChatScreen";
+import { AgentsScreen } from "./src/screens/AgentsScreen";
+import { useOTA } from "./src/OTA";
 import { QuickApprovalCard } from "./src/components/QuickApprovalCard";
 import { setupOTAListener } from "./src/OTA";
 
@@ -87,7 +89,7 @@ const STATUS_DOT_COLOR: Record<string, string> = {
   done: C.ok,
 };
 
-type TabKey = "tasks" | "dashboard" | "ontology" | "artifacts" | "chat";
+type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "artifacts" | "ontology";
 
 type BottomTab = {
   key: TabKey;
@@ -97,12 +99,58 @@ type BottomTab = {
 };
 
 const BOTTOM_TABS: BottomTab[] = [
+  { key: "dashboard", label: "汇览", icon: "stats-chart-outline", activeIcon: "stats-chart" },
+  { key: "agents", label: "员工", icon: "people-outline", activeIcon: "people" },
+  { key: "chat", label: "工坊", icon: "hammer-outline", activeIcon: "hammer" },
   { key: "tasks", label: "任务", icon: "list-outline", activeIcon: "list" },
-  { key: "chat", label: "问答", icon: "chatbubbles-outline", activeIcon: "chatbubbles" },
-  { key: "dashboard", label: "驾驶舱", icon: "speedometer-outline", activeIcon: "speedometer" },
-  { key: "ontology", label: "本体", icon: "git-network-outline", activeIcon: "git-network" },
   { key: "artifacts", label: "产物", icon: "cube-outline", activeIcon: "cube" },
+  { key: "ontology", label: "本体", icon: "git-network-outline", activeIcon: "git-network" },
 ];
+
+function SettingsSheet({
+  whoami,
+  ota,
+  onClose,
+  onSignOut,
+}: {
+  whoami: string;
+  ota: ReturnType<typeof useOTA>;
+  onClose: () => void;
+  onSignOut: () => void;
+}) {
+  return (
+    <View style={styles.settingsBackdrop}>
+      <Pressable style={{ flex: 1 }} onPress={onClose} />
+      <View style={styles.settingsSheet}>
+        <View style={styles.settingsHandle} />
+        <Text style={styles.settingsTitle}>设置</Text>
+        <View style={styles.settingsRow}>
+          <Ionicons name="person-circle-outline" size={20} color={C.ink3} />
+          <Text style={styles.settingsRowLabel} numberOfLines={1}>
+            当前身份
+          </Text>
+          <Text style={styles.settingsRowValue} numberOfLines={1}>
+            {whoami}
+          </Text>
+        </View>
+        <Pressable
+          style={styles.settingsRow}
+          disabled={ota.isChecking}
+          onPress={() => void ota.checkUpdate(true)}
+        >
+          <Ionicons name="cloud-download-outline" size={20} color={C.ink3} />
+          <Text style={styles.settingsRowLabel}>检查更新</Text>
+          <Text style={styles.settingsRowValue}>
+            {ota.isChecking ? "检查中…" : ota.runtimeVersion ?? "-"}
+          </Text>
+        </Pressable>
+        <Pressable style={styles.settingsSignOut} onPress={onSignOut}>
+          <Text style={styles.settingsSignOutText}>退出登录</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
 
 function BottomTabBar({
   tab,
@@ -385,9 +433,9 @@ function HomeScreen({
   whoami: string;
   onSignOut: () => void;
 }) {
-  const [tab, setTab] = useState<
-    "tasks" | "dashboard" | "ontology" | "artifacts" | "chat"
-  >("tasks");
+  const [tab, setTab] = useState<TabKey>("dashboard");
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const ota = useOTA();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selected, setSelected] = useState<Issue | null>(null);
   const [diffContext, setDiffContext] = useState<{
@@ -516,10 +564,12 @@ function HomeScreen({
     <SafeAreaView style={[styles.shell, { paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
       <StatusBar style="light" />
       <View style={styles.shellContent}>
-        {tab === "chat" ? (
-          <BoardChatScreen company={company} whoami={whoami} />
-        ) : tab === "dashboard" ? (
+        {tab === "dashboard" ? (
           <DashboardScreen company={company} />
+        ) : tab === "agents" ? (
+          <AgentsScreen company={company} />
+        ) : tab === "chat" ? (
+          <BoardChatScreen company={company} whoami={whoami} />
         ) : tab === "ontology" ? (
           <OntologyDomainListScreen company={company} whoami={whoami} />
         ) : tab === "artifacts" ? (
@@ -550,8 +600,8 @@ function HomeScreen({
                   <Text style={styles.companyCapsuleSubText}>· {whoami}</Text>
                 </View>
               </View>
-              <Pressable onPress={onSignOut} hitSlop={12} style={styles.btnGhost}>
-                <Text style={styles.btnGhostText}>退出</Text>
+              <Pressable onPress={() => setSettingsOpen(true)} hitSlop={12} style={styles.btnGhost}>
+                <Ionicons name="settings-outline" size={20} color={C.ink2} />
               </Pressable>
             </View>
 
@@ -734,6 +784,14 @@ function HomeScreen({
             </ScrollView>
           )}
       </View>
+      {settingsOpen ? (
+        <SettingsSheet
+          whoami={whoami}
+          ota={ota}
+          onClose={() => setSettingsOpen(false)}
+          onSignOut={onSignOut}
+        />
+      ) : null}
       <BottomTabBar tab={tab} onChange={setTab} />
     </SafeAreaView>
   );
@@ -922,6 +980,51 @@ const styles = StyleSheet.create({
   shellContent: {
     flex: 1,
   },
+  settingsBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "flex-end",
+    zIndex: 100,
+  },
+  settingsSheet: {
+    backgroundColor: C.panel,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    paddingHorizontal: 18,
+    paddingBottom: 34,
+    paddingTop: 10,
+    gap: 4,
+  },
+  settingsHandle: {
+    alignSelf: "center",
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.surfaceHover,
+    marginBottom: 10,
+  },
+  settingsTitle: {
+    color: C.ink,
+    fontSize: 17,
+    fontWeight: "700",
+    marginBottom: 10,
+  },
+  settingsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 13,
+  },
+  settingsRowLabel: { color: C.ink2, fontSize: 15, flex: 1 },
+  settingsRowValue: { color: C.ink3, fontSize: 13, flexShrink: 1 },
+  settingsSignOut: {
+    marginTop: 10,
+    backgroundColor: C.surface,
+    borderRadius: 10,
+    paddingVertical: 13,
+    alignItems: "center",
+  },
+  settingsSignOutText: { color: C.err, fontSize: 15, fontWeight: "600" },
   bottomBar: {
     flexDirection: "row",
     borderTopWidth: 1,

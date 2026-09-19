@@ -702,8 +702,7 @@ export function OntologyDomainListScreen({
 
 const styles = StyleSheet.create({
   safeArea: {
-    paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0,
-    flex: 1,
+        flex: 1,
     backgroundColor: C.bg,
   },
   container: {

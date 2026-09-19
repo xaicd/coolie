@@ -234,6 +234,11 @@
       "maxNetLines": 30,
       "reason": "Forwarder script for mobile Expo app OTA publishing, delegating to clients/expo/scripts/publish-ota.sh to export and sync bundles to tc-coolie-claw.",
       "maxTotalLines": 40
+    },
+    {
+      "path": "server/src/services/bundled-plugins.ts",
+      "maxNetLines": 30,
+      "reason": "Fork ships ontology, chat, and workspace-diff plugins as self-hosted auto-installs so the mobile cockpit's ontology/chat/code-review tabs work out of the box."
     }
   ]
 }

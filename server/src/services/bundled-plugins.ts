@@ -102,6 +102,21 @@ export const BUNDLED_PLUGIN_CATALOG: readonly BundledPluginCatalogEntry[] = [
     pluginKey: "paperclip.novita-sandbox-provider",
     relativePath: "sandbox-providers/novita",
   },
+  {
+    key: "ontology",
+    pluginKey: "paperclipai.plugin-ontology",
+    relativePath: "plugin-ontology",
+  },
+  {
+    key: "chat",
+    pluginKey: "paperclipai.plugin-chat",
+    relativePath: "plugin-chat",
+  },
+  {
+    key: "workspace-diff",
+    pluginKey: "paperclip.workspace-diff",
+    relativePath: "plugin-workspace-diff",
+  },
 ];
 
 /**
@@ -109,7 +124,12 @@ export const BUNDLED_PLUGIN_CATALOG: readonly BundledPluginCatalogEntry[] = [
  * Exactly the pre-refactor behavior: the kubernetes sandbox provider is
  * auto-installed when its bundle is present, nothing else.
  */
-export const SELF_HOSTED_AUTO_INSTALL_KEYS: readonly string[] = ["kubernetes"];
+export const SELF_HOSTED_AUTO_INSTALL_KEYS: readonly string[] = [
+  "kubernetes",
+  "ontology",
+  "chat",
+  "workspace-diff",
+];
 
 export function resolveBundledCatalogRoot(
   env: Record<string, string | undefined>,

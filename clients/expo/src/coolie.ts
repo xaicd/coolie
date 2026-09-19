@@ -1,7 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import {
   CoolieApiError,
-  CoolieClient,
+  CoolieClient as BaseCoolieClient,
   type AgentIdentity,
   type Company,
   type SessionUser,
@@ -85,6 +85,26 @@ export async function getAuthToken(): Promise<string | null> {
  * session cookie the platform's own cookie jar holds after sign-in; both travel
  * in the same `Authorization`/`Cookie` headers RN already manages.
  */
+/** 员工(agents)行的最小字段 */
+export interface AgentRow {
+  id: string;
+  name: string;
+  title?: string | null;
+  role?: string | null;
+  status: string;
+  adapterType?: string | null;
+}
+
+export class CoolieClient extends BaseCoolieClient {
+  /** GET /api/companies/:id/agents — 员工(智能体)列表 */
+  async listAgents(companyId: string): Promise<AgentRow[]> {
+    return this.request<AgentRow[]>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/agents`,
+    );
+  }
+}
+
 export const coolie = new CoolieClient({
   baseUrl: COOLIE_BASE_URL,
   originHeader: COOLIE_ORIGIN,
