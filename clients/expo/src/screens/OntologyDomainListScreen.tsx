@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
@@ -73,6 +73,9 @@ const LIFECYCLE_CONFIG: Record<
   },
 };
 
+export type DomainFilter = "all" | "active" | "draft" | "archived" | "locked";
+export type OntologyViewMode = "list" | "detail" | "graph";
+
 export function OntologyDomainListScreen({
   company,
   whoami = "管理员",
@@ -83,7 +86,10 @@ export function OntologyDomainListScreen({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<"all" | "active" | "locked">("all");
+  const [filter, setFilter] = useState<DomainFilter>("all");
+  const [viewMode, setViewMode] = useState<OntologyViewMode>("list");
+  const [seedingSample, setSeedingSample] = useState(false);
+  const [selectedNodeTypeKey, setSelectedNodeTypeKey] = useState<string | null>(null);
 
   // 快照详情视图
   const [selectedDomain, setSelectedDomain] = useState<OntologyDomain | null>(null);
@@ -141,6 +147,7 @@ export function OntologyDomainListScreen({
   const openDomainDetail = useCallback(
     async (domain: OntologyDomain) => {
       setSelectedDomain(domain);
+      setViewMode("detail");
       setSnapshot(null);
       setSnapshotLoading(true);
       try {
@@ -163,6 +170,20 @@ export function OntologyDomainListScreen({
     },
     [companyId],
   );
+
+  // 一键注入官方示例本体域
+  const handleSeedSample = useCallback(async () => {
+    setSeedingSample(true);
+    try {
+      await coolie.seedSampleDomains(companyId);
+      Alert.alert("注入成功", "已成功注入示例业务本体域！");
+      await loadDomains();
+    } catch (e) {
+      Alert.alert("注入失败", String((e as Error)?.message ?? e));
+    } finally {
+      setSeedingSample(false);
+    }
+  }, [companyId, loadDomains]);
 
   // 执行熔断
   const triggerKillSwitch = useCallback(
@@ -244,19 +265,246 @@ export function OntologyDomainListScreen({
   );
 
   // 过滤显示
+  const activeCount = domains.filter((d) => d.lifecycle_state === "active").length;
+  const lockedCount = domains.filter((d) => (d as any).lifecycle === "locked" || (d as any).status === "locked").length;
+  const draftCount = domains.filter((d) => d.lifecycle_state === "draft").length;
+  const archivedCount = domains.filter(
+    (d) =>
+      d.lifecycle_state === "archived" ||
+      d.lifecycle_state === "deprecated" ||
+      d.lifecycle_state === "locked",
+  ).length;
+
   const filteredDomains = domains.filter((d) => {
-    const isLocked = d.lifecycle_state === "archived" || d.lifecycle_state === "deprecated";
     if (filter === "active") return d.lifecycle_state === "active";
-    if (filter === "locked") return isLocked;
+    if (filter === "draft") return d.lifecycle_state === "draft";
+    if (filter === "archived")
+      return (
+        d.lifecycle_state === "archived" ||
+        d.lifecycle_state === "deprecated" ||
+        d.lifecycle_state === "locked"
+      );
     return true;
   });
 
-  const activeCount = domains.filter((d) => d.lifecycle_state === "active").length;
-  const lockedCount = domains.filter(
-    (d) => d.lifecycle_state === "archived" || d.lifecycle_state === "deprecated",
-  ).length;
+  // 第三层: 关系图谱交互浏览 (Graph View)
+  if (viewMode === "graph" && selectedDomain) {
+    const nodeTypesList = (() => {
+      const map = new Map<
+        string,
+        {
+          key: string;
+          label: string;
+          count: number;
+          sampleProperties: Record<string, unknown>;
+        }
+      >();
+      if (snapshot?.counts?.byNodeType) {
+        for (const [k, count] of Object.entries(snapshot.counts.byNodeType)) {
+          if (k) map.set(k, { key: k, label: k, count, sampleProperties: {} });
+        }
+      }
+      for (const n of snapshot?.nodes || []) {
+        const typeKey = n.nodeTypeId || n.label || n.key;
+        if (!map.has(typeKey)) {
+          map.set(typeKey, {
+            key: typeKey,
+            label: n.label || typeKey,
+            count: 1,
+            sampleProperties: (n.properties as Record<string, unknown>) || {},
+          });
+        } else {
+          const item = map.get(typeKey)!;
+          if (n.properties && Object.keys(item.sampleProperties).length === 0) {
+            item.sampleProperties = n.properties as Record<string, unknown>;
+          }
+        }
+      }
+      if (map.size === 0) {
+        map.set(selectedDomain.slug, {
+          key: selectedDomain.slug,
+          label: selectedDomain.display_name || selectedDomain.displayName || selectedDomain.slug,
+          count: snapshot?.counts?.nodes ?? 0,
+          sampleProperties: {
+            domainId: selectedDomain.id,
+            slug: selectedDomain.slug,
+            category: selectedDomain.category || "业务本体",
+            version: selectedDomain.schema_version ?? 1,
+          },
+        });
+      }
+      return Array.from(map.values());
+    })();
 
-  // 如果选中了某个域，展示详情与快照摘要 (Snapshot Summary View)
+    const activeSelectedKey = selectedNodeTypeKey || nodeTypesList[0]?.key;
+    const selectedNt =
+      nodeTypesList.find((nt) => nt.key === activeSelectedKey) || nodeTypesList[0];
+
+    const N = nodeTypesList.length;
+    const canvasSize = 320;
+    const cx = canvasSize / 2;
+    const cy = canvasSize / 2;
+    const R = Math.min(105, 55 + N * 10);
+
+    const positions = nodeTypesList.map((nt, idx) => {
+      const angle = (2 * Math.PI * idx) / Math.max(N, 1) - Math.PI / 2;
+      return {
+        key: nt.key,
+        x: cx + R * Math.cos(angle),
+        y: cy + R * Math.sin(angle),
+      };
+    });
+
+    return (
+      <SafeAreaView style={styles.safeArea}>
+        <StatusBar style="light" />
+        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+          {/* 顶部返回条 */}
+          <View style={styles.detailNav}>
+            <Pressable
+              onPress={() => setViewMode("detail")}
+              hitSlop={12}
+              style={styles.backBtn}
+            >
+              <Text style={styles.backBtnText}>‹ 返回域详情</Text>
+            </Pressable>
+            <Text style={styles.graphNavTitle}>
+              {selectedDomain.display_name || selectedDomain.displayName || selectedDomain.slug} · 关系图谱
+            </Text>
+          </View>
+
+          {/* 拓扑画布容器 */}
+          <View style={styles.graphCanvasCard}>
+            <View style={styles.graphCanvasHeader}>
+              <View>
+                <Text style={styles.graphCanvasTitle}>实体关系环形拓扑</Text>
+                <Text style={styles.graphCanvasSub}>
+                  {nodeTypesList.length} 个实体类型 · 点击节点查看 Properties Schema
+                </Text>
+              </View>
+              <View style={styles.graphLegend}>
+                <View style={[styles.graphLegendDot, { backgroundColor: C.accent }]} />
+                <Text style={styles.graphLegendText}>实体类型</Text>
+              </View>
+            </View>
+
+            <View style={[styles.graphCanvas, { width: canvasSize, height: canvasSize, alignSelf: "center" }]}>
+              {/* 连线 */}
+              {positions.map((posA, i) => {
+                if (positions.length <= 1) return null;
+                const posB = positions[(i + 1) % positions.length];
+                const dx = posB.x - posA.x;
+                const dy = posB.y - posA.y;
+                const length = Math.sqrt(dx * dx + dy * dy);
+                const angle = Math.atan2(dy, dx);
+                const midX = (posA.x + posB.x) / 2;
+                const midY = (posA.y + posB.y) / 2;
+                const isEdgeActive =
+                  posA.key === activeSelectedKey || posB.key === activeSelectedKey;
+
+                return (
+                  <View
+                    key={`edge-${posA.key}-${posB.key}`}
+                    style={[
+                      styles.graphEdgeLine,
+                      {
+                        left: midX - length / 2,
+                        top: midY,
+                        width: length,
+                        backgroundColor: isEdgeActive ? C.accent : C.line,
+                        opacity: isEdgeActive ? 0.8 : 0.3,
+                        transform: [{ rotate: `${angle}rad` }],
+                      },
+                    ]}
+                  />
+                );
+              })}
+
+              {/* 节点气泡 */}
+              {positions.map((pos) => {
+                const nt = nodeTypesList.find((n) => n.key === pos.key)!;
+                const isSelected = nt.key === activeSelectedKey;
+                const nodeRadius = 26;
+
+                return (
+                  <Pressable
+                    key={`node-${pos.key}`}
+                    style={[
+                      styles.graphNodeCircle,
+                      {
+                        left: pos.x - nodeRadius,
+                        top: pos.y - nodeRadius,
+                        width: nodeRadius * 2,
+                        height: nodeRadius * 2,
+                        borderRadius: nodeRadius,
+                        borderColor: isSelected ? C.accent : C.line,
+                        backgroundColor: isSelected ? C.surfaceHover : C.panel,
+                      },
+                    ]}
+                    onPress={() => setSelectedNodeTypeKey(nt.key)}
+                  >
+                    <Text
+                      style={[
+                        styles.graphNodeCircleText,
+                        isSelected && { color: C.ink, fontWeight: "700" },
+                      ]}
+                      numberOfLines={1}
+                    >
+                      {nt.label.slice(0, 5)}
+                    </Text>
+                    <Text style={styles.graphNodeCountText}>{nt.count}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          {/* Properties Schema 属性检视卡片 */}
+          {Boolean(selectedNt) && (
+            <View style={styles.schemaCard}>
+              <View style={styles.schemaCardHeader}>
+                <View style={styles.schemaTitleRow}>
+                  <Ionicons name="cube-outline" size={16} color={C.accent} style={{ marginRight: 6 }} />
+                  <Text style={styles.schemaCardTitle}>
+                    {selectedNt.label} ({selectedNt.key})
+                  </Text>
+                </View>
+                <View style={styles.schemaBadge}>
+                  <Text style={styles.schemaBadgeText}>{selectedNt.count} 实例</Text>
+                </View>
+              </View>
+
+              <Text style={styles.schemaSectionTitle}>属性定义 (Properties Schema)</Text>
+              {Object.keys(selectedNt.sampleProperties).length === 0 ? (
+                <Text style={styles.schemaEmptyText}>
+                  暂无自定义属性字段，该类型由系统缺省元数据驱动。
+                </Text>
+              ) : (
+                <View style={styles.schemaPropsList}>
+                  {Object.entries(selectedNt.sampleProperties).map(([propKey, propVal]) => (
+                    <View key={propKey} style={styles.schemaPropRow}>
+                      <Text style={styles.schemaPropKey}>{propKey}</Text>
+                      <Text style={styles.schemaPropType}>
+                        {typeof propVal === "object"
+                          ? "object"
+                          : typeof propVal === "number"
+                          ? "number"
+                          : typeof propVal === "boolean"
+                          ? "boolean"
+                          : "string"}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              )}
+            </View>
+          )}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
+  // 第二层: 域详情与快照摘要 (Snapshot Summary View)
   if (selectedDomain) {
     const isLocked =
       selectedDomain.lifecycle_state === "archived" ||
@@ -283,7 +531,10 @@ export function OntologyDomainListScreen({
           {/* 顶部返回条 */}
           <View style={styles.detailNav}>
             <Pressable
-              onPress={() => setSelectedDomain(null)}
+              onPress={() => {
+                setViewMode("list");
+                setSelectedDomain(null);
+              }}
               hitSlop={12}
               style={styles.backBtn}
             >
@@ -333,6 +584,28 @@ export function OntologyDomainListScreen({
               </View>
             </View>
           </View>
+
+          {/* 关系图谱交互入口 */}
+          <Pressable
+            style={styles.graphEntryBtn}
+            onPress={() => setViewMode("graph")}
+          >
+            <View style={styles.graphEntryLeft}>
+              <Ionicons
+                name="git-network-outline"
+                size={20}
+                color={C.accent}
+                style={{ marginRight: 10 }}
+              />
+              <View>
+                <Text style={styles.graphEntryTitle}>关系图谱拓扑</Text>
+                <Text style={styles.graphEntrySub}>
+                  实体对象类型与关系连线交互浏览
+                </Text>
+              </View>
+            </View>
+            <Text style={styles.graphEntryArrow}>›</Text>
+          </Pressable>
 
           {/* 高危熔断控制闸门区 */}
           <View style={styles.sectionBlock}>
@@ -1202,4 +1475,89 @@ const styles = StyleSheet.create({
     fontFamily: "monospace",
     marginTop: 2,
   },
+
+  // ── 关系图谱 (graph view) ──
+  graphNavTitle: {
+    color: C.ink3,
+    fontSize: 13,
+    flex: 1,
+    textAlign: "right",
+  },
+  graphEntryBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  graphEntryLeft: { flex: 1 },
+  graphEntryTitle: { color: C.ink, fontSize: 15, fontWeight: "600" },
+  graphEntrySub: { color: C.ink3, fontSize: 12, marginTop: 3 },
+  graphEntryArrow: { color: C.ink4, fontSize: 22 },
+  graphCanvasCard: {
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+  },
+  graphCanvasHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  graphCanvasTitle: { color: C.ink, fontSize: 15, fontWeight: "600" },
+  graphCanvasSub: { color: C.ink3, fontSize: 11, marginTop: 2 },
+  graphLegend: { flexDirection: "row", alignItems: "center", gap: 4 },
+  graphLegendDot: { width: 8, height: 8, borderRadius: 4 },
+  graphLegendText: { color: C.ink3, fontSize: 11 },
+  graphCanvas: { position: "relative" },
+  graphEdgeLine: {
+    position: "absolute",
+    height: 1,
+  },
+  graphNodeCircle: {
+    position: "absolute",
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  graphNodeCircleText: { color: C.ink2, fontSize: 10 },
+  graphNodeCountText: { color: C.ink4, fontSize: 9 },
+  schemaCard: {
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    padding: 14,
+    marginTop: 12,
+  },
+  schemaCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  schemaTitleRow: { flexDirection: "row", alignItems: "center" },
+  schemaCardTitle: { color: C.ink, fontSize: 14, fontWeight: "600" },
+  schemaBadge: {
+    backgroundColor: C.panel,
+    borderRadius: 999,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+  },
+  schemaBadgeText: { color: C.accent, fontSize: 10, fontWeight: "600" },
+  schemaSectionTitle: { color: C.ink3, fontSize: 12, marginTop: 12, marginBottom: 8 },
+  schemaEmptyText: { color: C.ink4, fontSize: 12 },
+  schemaPropsList: { gap: 6 },
+  schemaPropRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.panel,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  schemaPropKey: { color: C.ink2, fontSize: 12, fontWeight: "600", flex: 1 },
+  schemaPropType: { color: C.ink4, fontSize: 11 },
 });

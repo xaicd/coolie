@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Alert,
+  Clipboard,
   FlatList,
   KeyboardAvoidingView,
   Platform,
@@ -14,6 +15,7 @@ import {
   TextInput,
   View,
   StatusBar as RNStatusBar,
+  Modal,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import type { BoardChatMessage, Company } from "@coolie/api-client";
@@ -30,10 +32,10 @@ export interface BoardChatScreenProps {
 }
 
 const QUICK_PROMPTS = [
-  "工坊今日花销与额度？",
-  "车间各智能体现状如何？",
-  "有哪些待审批任务需要裁决？",
-  "总结近期的任务产出与交付",
+  "工坊今日花销",
+  "员工都在忙啥",
+  "有哪些待审批",
+  "本周交付了什么",
 ];
 
 const WELCOME_MESSAGE: BoardChatMessage = {
@@ -68,6 +70,11 @@ export function BoardChatScreen({
   const [boardIssueId, setBoardIssueId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [cursorVisible, setCursorVisible] = useState(true);
+
+  const [showHistory, setShowHistory] = useState(false);
+  const [sessions, setSessions] = useState<Array<{ id: string; title: string }>>([]);
+  const [sessionsLoading, setSessionsLoading] = useState(false);
+  const [sessionsError, setSessionsError] = useState<string | null>(null);
 
   const flatListRef = useRef<FlatList<BoardChatMessage>>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -106,6 +113,43 @@ export function BoardChatScreen({
   useEffect(() => {
     void loadHistory();
   }, [loadHistory]);
+
+  const loadSessions = useCallback(async () => {
+    setSessionsLoading(true);
+    setSessionsError(null);
+    try {
+      const issues = await coolie.listIssues(company.id, { limit: 30 });
+      const mapped = issues.map((i) => ({ id: i.id, title: i.title }));
+      setSessions(mapped);
+    } catch (e) {
+      setSessionsError(String((e as Error)?.message ?? e));
+    } finally {
+      setSessionsLoading(false);
+    }
+  }, [company.id]);
+
+  const switchSession = useCallback(
+    async (targetTaskId?: string) => {
+      setShowHistory(false);
+      setLoadingHistory(true);
+      setErrorText(null);
+      try {
+        const history = await coolie.getBoardChatHistory(company.id, targetTaskId);
+        setBoardIssueId(history.issueId);
+        setMessages(history.messages.length > 0 ? history.messages : [WELCOME_MESSAGE]);
+      } catch (e) {
+        Alert.alert("切换会话失败", String((e as Error)?.message ?? e));
+      } finally {
+        setLoadingHistory(false);
+      }
+    },
+    [company.id],
+  );
+
+  const copyToClipboard = useCallback((text: string) => {
+    Clipboard.setString(text);
+    Alert.alert("已复制", "消息已复制到剪贴板");
+  }, []);
 
   const scrollToBottom = useCallback((animated = true) => {
     setTimeout(() => {
@@ -283,9 +327,13 @@ export function BoardChatScreen({
     if (isUser) {
       return (
         <View style={styles.userRow}>
-          <View style={styles.userBubble}>
+          <Pressable
+            style={styles.userBubble}
+            onLongPress={() => copyToClipboard(item.text)}
+            delayLongPress={300}
+          >
             <Text style={styles.userText}>{item.text}</Text>
-          </View>
+          </Pressable>
         </View>
       );
     }
@@ -297,7 +345,11 @@ export function BoardChatScreen({
         <View style={styles.avatarBox}>
           <Text style={styles.avatarText}>🤖</Text>
         </View>
-        <View style={styles.assistantBubble}>
+        <Pressable
+          style={styles.assistantBubble}
+          onLongPress={() => copyToClipboard(item.text)}
+          delayLongPress={300}
+        >
           <View style={styles.assistantHeader}>
             <Text style={styles.assistantName}>数字总办</Text>
             <Text style={styles.timestamp}>
@@ -339,7 +391,7 @@ export function BoardChatScreen({
               })}
             </View>
           )}
-        </View>
+        </Pressable>
       </View>
     );
   };
@@ -370,12 +422,23 @@ export function BoardChatScreen({
                 />
               </View>
               <Text style={styles.topSubTitle}>
-                {sending ? "Claude Concierge 思考中…" : "全双工双向流式对话"}
+                {sending ? "Hermes Concierge 思考中…" : "全双工双向流式对话"}
               </Text>
             </View>
           </View>
 
           <View style={styles.topRight}>
+            <Pressable
+              hitSlop={12}
+              onPress={() => {
+                setShowHistory(true);
+                void loadSessions();
+              }}
+              style={styles.historyBtn}
+            >
+              <Ionicons name="time-outline" size={15} color={C.ink2} />
+              <Text style={styles.historyBtnText}>历史</Text>
+            </Pressable>
             {onOpenSettings ? (
               <Pressable hitSlop={12} onPress={onOpenSettings} style={styles.backBtn}>
                 <Ionicons name="settings-outline" size={19} color="#8A8F98" />
@@ -414,6 +477,30 @@ export function BoardChatScreen({
           onLayout={() => scrollToBottom(false)}
           ListFooterComponent={
             <>
+              {/* 空状态快捷提问气泡 (无历史或仅有欢迎消息时展示) */}
+              {messages.length <= 1 && !sending && (
+                <View style={styles.emptyPromptSection}>
+                  <Text style={styles.emptyPromptTitle}>您可以尝试这样提问：</Text>
+                  <View style={styles.emptyPromptGrid}>
+                    {QUICK_PROMPTS.map((prompt) => (
+                      <Pressable
+                        key={prompt}
+                        style={styles.emptyPromptCard}
+                        onPress={() => void handleSend(prompt)}
+                      >
+                        <Ionicons
+                          name="sparkles-outline"
+                          size={14}
+                          color={C.accent}
+                          style={{ marginRight: 6 }}
+                        />
+                        <Text style={styles.emptyPromptCardText}>{prompt}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              )}
+
               {/* 实时流式打字机气泡 */}
               {sending && (
                 <View style={styles.assistantRow}>
@@ -515,6 +602,101 @@ export function BoardChatScreen({
             </Pressable>
           )}
         </View>
+
+        {/* 会话历史侧拉 / 抽屉 Modal */}
+        <Modal
+          visible={showHistory}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setShowHistory(false)}
+        >
+          <View style={styles.historyModalBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setShowHistory(false)}
+            />
+            <View style={styles.historyDrawerSheet}>
+              <View style={styles.historyDrawerHandle} />
+              <View style={styles.historyDrawerHeader}>
+                <View style={styles.historyDrawerTitleRow}>
+                  <Ionicons name="time-outline" size={18} color={C.ink} style={{ marginRight: 6 }} />
+                  <Text style={styles.historyDrawerTitle}>会话历史</Text>
+                </View>
+                <Pressable
+                  hitSlop={10}
+                  onPress={() => setShowHistory(false)}
+                  style={styles.historyCloseBtn}
+                >
+                  <Ionicons name="close" size={20} color={C.ink2} />
+                </Pressable>
+              </View>
+
+              <Pressable
+                style={styles.newChatBtn}
+                onPress={() => void switchSession(undefined)}
+              >
+                <Ionicons name="add-circle-outline" size={18} color={C.accent} style={{ marginRight: 6 }} />
+                <Text style={styles.newChatBtnText}>开启新总办会话</Text>
+              </Pressable>
+
+              {sessionsLoading && (
+                <View style={styles.historyLoadingBox}>
+                  <ActivityIndicator size="small" color={C.accent} />
+                  <Text style={styles.historyLoadingText}>加载历史会话…</Text>
+                </View>
+              )}
+
+              {Boolean(sessionsError) && (
+                <View style={styles.historyErrorBox}>
+                  <Text style={styles.historyErrorText}>⚠️ {sessionsError}</Text>
+                  <Pressable onPress={() => void loadSessions()} style={styles.historyRetryBtn}>
+                    <Text style={styles.historyRetryBtnText}>重试</Text>
+                  </Pressable>
+                </View>
+              )}
+
+              {!sessionsLoading && !sessionsError && (
+                <ScrollView style={styles.sessionList} showsVerticalScrollIndicator={false}>
+                  {sessions.length === 0 ? (
+                    <Text style={styles.sessionEmptyText}>暂无历史会话记录</Text>
+                  ) : (
+                    sessions.map((sess) => {
+                      const isActive = sess.id === boardIssueId;
+                      return (
+                        <Pressable
+                          key={sess.id}
+                          style={[styles.sessionCard, isActive && styles.sessionCardActive]}
+                          onPress={() => void switchSession(sess.id)}
+                        >
+                          <Ionicons
+                            name={isActive ? "chatbubble" : "chatbubble-outline"}
+                            size={16}
+                            color={isActive ? C.accent : C.ink3}
+                            style={{ marginRight: 10, marginTop: 2 }}
+                          />
+                          <View style={{ flex: 1 }}>
+                            <Text
+                              style={[styles.sessionCardTitle, isActive && styles.sessionCardTitleActive]}
+                              numberOfLines={2}
+                            >
+                              {sess.title}
+                            </Text>
+                            <Text style={styles.sessionCardId}>ID: {sess.id.slice(0, 8)}</Text>
+                          </View>
+                          {isActive && (
+                            <View style={styles.sessionActiveBadge}>
+                              <Text style={styles.sessionActiveBadgeText}>当前</Text>
+                            </View>
+                          )}
+                        </Pressable>
+                      );
+                    })
+                  )}
+                </ScrollView>
+              )}
+            </View>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -574,6 +756,22 @@ const styles = StyleSheet.create({
   topRight: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 8,
+  },
+  historyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  historyBtnText: {
+    color: C.ink2,
+    fontSize: 12,
   },
   refreshBtn: {
     paddingHorizontal: 10,
@@ -840,5 +1038,177 @@ const styles = StyleSheet.create({
     color: C.ink4,
     fontSize: 10,
     fontVariant: ["tabular-nums"],
+  },
+  emptyPromptSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginTop: 8,
+  },
+  emptyPromptTitle: {
+    color: C.ink3,
+    fontSize: 12,
+    fontWeight: "500",
+    marginBottom: 8,
+  },
+  emptyPromptGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  emptyPromptCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.panel,
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    maxWidth: "48%",
+    flexGrow: 1,
+  },
+  emptyPromptCardText: {
+    color: C.ink2,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  historyModalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    justifyContent: "flex-end",
+  },
+  historyDrawerSheet: {
+    backgroundColor: C.panel,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    borderTopWidth: 1,
+    borderColor: C.line,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 28,
+    maxHeight: "80%",
+  },
+  historyDrawerHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.line,
+    alignSelf: "center",
+    marginBottom: 12,
+  },
+  historyDrawerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  historyDrawerTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  historyDrawerTitle: {
+    color: C.ink,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  historyCloseBtn: {
+    padding: 4,
+  },
+  newChatBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 8,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  newChatBtnText: {
+    color: C.accent,
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  historyLoadingBox: {
+    paddingVertical: 24,
+    alignItems: "center",
+    gap: 8,
+  },
+  historyLoadingText: {
+    color: C.ink3,
+    fontSize: 13,
+  },
+  historyErrorBox: {
+    paddingVertical: 16,
+    alignItems: "center",
+    gap: 8,
+  },
+  historyErrorText: {
+    color: C.err,
+    fontSize: 13,
+  },
+  historyRetryBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    backgroundColor: C.surface,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  historyRetryBtnText: {
+    color: C.ink,
+    fontSize: 12,
+  },
+  sessionList: {
+    maxHeight: 360,
+  },
+  sessionEmptyText: {
+    color: C.ink4,
+    fontSize: 13,
+    textAlign: "center",
+    paddingVertical: 24,
+  },
+  sessionCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  sessionCardActive: {
+    borderColor: C.accent,
+    backgroundColor: C.surfaceHover,
+  },
+  sessionCardTitle: {
+    color: C.ink2,
+    fontSize: 13,
+    fontWeight: "500",
+    lineHeight: 18,
+  },
+  sessionCardTitleActive: {
+    color: C.ink,
+    fontWeight: "600",
+  },
+  sessionCardId: {
+    color: C.ink4,
+    fontSize: 11,
+    marginTop: 4,
+    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
+  },
+  sessionActiveBadge: {
+    backgroundColor: "rgba(113, 112, 255, 0.15)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    marginLeft: 6,
+  },
+  sessionActiveBadgeText: {
+    color: C.accent,
+    fontSize: 11,
+    fontWeight: "500",
   },
 });

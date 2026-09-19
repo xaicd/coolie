@@ -120,6 +120,91 @@ export interface IssueCostSummary {
   runtimeMs: number;
 }
 
+export type { BoardChatMessage } from "@coolie/api-client";
+
+/** 实时运行行 — GET /api/companies/:id/live-runs */
+export interface LiveRunRow {
+  id: string;
+  agentId: string;
+  agentName: string;
+  status: string;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  createdAt?: string | null;
+  adapterType?: string | null;
+}
+
+/** 事件时间线活动者 */
+export interface WorkTimelineActor {
+  id: string;
+  type: string;
+  name: string;
+  avatar?: string | null;
+}
+
+/** 事件时间线单条事件 */
+export interface WorkTimelineEvent {
+  actorId: string;
+  kind: string;
+  issueId: string;
+  at: string;
+}
+
+/** 最近时间线结果 — GET /api/companies/:id/timeline */
+export interface WorkTimelineResult {
+  actors: WorkTimelineActor[];
+  events: WorkTimelineEvent[];
+  pagination?: {
+    limit: number;
+    offset: number;
+    totalIssues: number;
+    hasMore: boolean;
+  };
+}
+
+/** 员工技能快照 — GET /api/agents/:id/skills */
+export interface AgentSkillsSnapshot {
+  adapterType?: string;
+  supported?: boolean;
+  desiredSkills?: string[];
+  entries?: Array<{ key: string; name?: string; description?: string }>;
+  skills?: Array<{ key: string; name?: string; description?: string }>;
+}
+
+/** 员工配置详情 — GET /api/agents/:id/configuration */
+export interface AgentConfiguration {
+  id: string;
+  companyId: string;
+  name: string;
+  adapterType: string;
+  status: string;
+  role?: string | null;
+  title?: string | null;
+  adapterConfig?: Record<string, unknown>;
+  updatedAt?: string | null;
+}
+
+/** 任务评论 — GET /api/issues/:id/comments */
+export interface IssueComment {
+  id: string;
+  body: string;
+  createdAt: string;
+  authorUserId?: string | null;
+  authorAgentId?: string | null;
+}
+
+/** 任务附件 — GET /api/issues/:id/attachments */
+export interface IssueAttachment {
+  id: string;
+  originalFilename?: string | null;
+  filename?: string | null;
+  contentType?: string | null;
+  byteSize?: number | null;
+  contentPath?: string;
+  openPath?: string;
+  downloadPath?: string;
+}
+
 export class CoolieClient extends BaseCoolieClient {
   /** GET /api/companies/:id/costs/by-agent — 按智能体聚合 token/花费 */
   async costsByAgent(companyId: string): Promise<AgentCostRow[]> {
@@ -163,6 +248,87 @@ export class CoolieClient extends BaseCoolieClient {
     return this.request<AgentRow[]>(
       "GET",
       `/api/companies/${encodeURIComponent(companyId)}/agents`,
+    );
+  }
+
+  /** GET /api/companies/:id/live-runs — 正在运行的 run 数 + agent 名 */
+  async getLiveRuns(companyId: string): Promise<LiveRunRow[]> {
+    return this.request<LiveRunRow[]>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/live-runs`,
+    );
+  }
+
+  /** GET /api/companies/:id/timeline — 最近事件流 */
+  async getTimeline(
+    companyId: string,
+    limit: number = 8,
+  ): Promise<WorkTimelineResult> {
+    return this.request<WorkTimelineResult>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/timeline?limit=${limit}`,
+    );
+  }
+
+  /** GET /api/agents/:id/skills — 员工配置与技能 */
+  async getAgentSkills(agentId: string): Promise<AgentSkillsSnapshot> {
+    return this.request<AgentSkillsSnapshot>(
+      "GET",
+      `/api/agents/${encodeURIComponent(agentId)}/skills`,
+    );
+  }
+
+  /** GET /api/agents/:id/configuration — 员工详细配置 */
+  async getAgentConfiguration(agentId: string): Promise<AgentConfiguration> {
+    return this.request<AgentConfiguration>(
+      "GET",
+      `/api/agents/${encodeURIComponent(agentId)}/configuration`,
+    );
+  }
+
+  /** POST /api/issues/:id/comments — 新增任务评论 */
+  async addIssueComment(issueId: string, body: string): Promise<IssueComment> {
+    return this.request<IssueComment>(
+      "POST",
+      `/api/issues/${encodeURIComponent(issueId)}/comments`,
+      { body },
+    );
+  }
+
+  /** GET /api/issues/:id/comments — 获取任务评论列表 */
+  async getIssueComments(issueId: string): Promise<IssueComment[]> {
+    return this.request<IssueComment[]>(
+      "GET",
+      `/api/issues/${encodeURIComponent(issueId)}/comments?order=asc`,
+    );
+  }
+
+  /** GET /api/issues/:id/attachments — 获取任务附件列表 */
+  async getIssueAttachments(issueId: string): Promise<IssueAttachment[]> {
+    return this.request<IssueAttachment[]>(
+      "GET",
+      `/api/issues/${encodeURIComponent(issueId)}/attachments`,
+    );
+  }
+
+  /** PATCH /api/issues/:id — 修改任务优先级 */
+  async updateIssuePriority(
+    issueId: string,
+    priority: string,
+  ): Promise<unknown> {
+    return this.request<unknown>(
+      "PATCH",
+      `/api/issues/${encodeURIComponent(issueId)}`,
+      { priority },
+    );
+  }
+
+  /** POST /api/plugins/paperclipai.plugin-ontology/actions/seed-sample-domains — 注入示例本体域 */
+  async seedSampleDomains(companyId: string): Promise<unknown> {
+    return this.request<unknown>(
+      "POST",
+      "/api/plugins/paperclipai.plugin-ontology/actions/seed-sample-domains",
+      { companyId },
     );
   }
 }

@@ -13,8 +13,13 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import type { Company, DashboardSummary } from "@coolie/api-client";
-import { C, coolie } from "../coolie";
+import type { Approval, Company, DashboardSummary } from "@coolie/api-client";
+import {
+  C,
+  coolie,
+  type LiveRunRow,
+  type WorkTimelineResult,
+} from "../coolie";
 import { StatusDot } from "../components/StatusDot";
 import { useOTA } from "../OTA";
 
@@ -48,10 +53,31 @@ function formatIdleTime(seconds: number | null): string {
   return `离线 ${Math.floor(seconds / 86400)} 天`;
 }
 
+function formatRelativeTime(isoString: string): string {
+  try {
+    const diff = Math.floor((Date.now() - new Date(isoString).getTime()) / 1000);
+    if (diff < 60) return "刚刚";
+    if (diff < 3600) return `${Math.floor(diff / 60)}分钟前`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)}小时前`;
+    return `${Math.floor(diff / 86400)}天前`;
+  } catch {
+    return isoString;
+  }
+}
+
+const EVENT_KIND_LABEL: Record<string, string> = {
+  created: "创建了工单",
+  assigned: "被指派任务",
+  delegated: "委派了任务",
+  commented: "发表了评论",
+  approved: "完成审批/裁决",
+};
+
 interface DashboardScreenProps {
   onOpenSettings?: () => void;
   company: Company;
   onBack?: () => void;
+  onOpenApprovals?: () => void;
 }
 
 /**
@@ -61,18 +87,77 @@ interface DashboardScreenProps {
  * - 智能体状态点 8px 呼吸灯扩散
  * - 半透明卡片 bg 0.02 + 半透明白边 line
  */
-export function DashboardScreen({ company, onBack, onOpenSettings }: DashboardScreenProps) {
+export function DashboardScreen({
+  company,
+  onBack,
+  onOpenSettings,
+  onOpenApprovals,
+}: DashboardScreenProps) {
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { isChecking: otaChecking, checkUpdate: checkOTA } = useOTA();
 
+  const [approvals, setApprovals] = useState<Approval[]>([]);
+  const [approvalsLoading, setApprovalsLoading] = useState(false);
+  const [approvalsError, setApprovalsError] = useState<string | null>(null);
+
+  const [liveRuns, setLiveRuns] = useState<LiveRunRow[]>([]);
+  const [liveRunsLoading, setLiveRunsLoading] = useState(false);
+  const [liveRunsError, setLiveRunsError] = useState<string | null>(null);
+
+  const [timeline, setTimeline] = useState<WorkTimelineResult | null>(null);
+  const [timelineLoading, setTimelineLoading] = useState(false);
+  const [timelineError, setTimelineError] = useState<string | null>(null);
+
+  const fetchApprovals = useCallback(async () => {
+    setApprovalsLoading(true);
+    setApprovalsError(null);
+    try {
+      const list = await coolie.listApprovals(company.id, { status: "pending" });
+      setApprovals(list.filter((a) => a.status === "pending"));
+    } catch (e) {
+      setApprovalsError(String((e as Error)?.message ?? e));
+    } finally {
+      setApprovalsLoading(false);
+    }
+  }, [company.id]);
+
+  const fetchLiveRuns = useCallback(async () => {
+    setLiveRunsLoading(true);
+    setLiveRunsError(null);
+    try {
+      const runs = await coolie.getLiveRuns(company.id);
+      setLiveRuns(runs);
+    } catch (e) {
+      setLiveRunsError(String((e as Error)?.message ?? e));
+    } finally {
+      setLiveRunsLoading(false);
+    }
+  }, [company.id]);
+
+  const fetchTimeline = useCallback(async () => {
+    setTimelineLoading(true);
+    setTimelineError(null);
+    try {
+      const res = await coolie.getTimeline(company.id, 8);
+      setTimeline(res);
+    } catch (e) {
+      setTimelineError(String((e as Error)?.message ?? e));
+    } finally {
+      setTimelineLoading(false);
+    }
+  }, [company.id]);
+
   const fetchDashboard = useCallback(
     async (isRefresh = false) => {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
       setError(null);
+      void fetchApprovals();
+      void fetchLiveRuns();
+      void fetchTimeline();
       try {
         const summary = await coolie.getDashboard(company.id);
         setData(summary);
@@ -83,7 +168,7 @@ export function DashboardScreen({ company, onBack, onOpenSettings }: DashboardSc
         setRefreshing(false);
       }
     },
-    [company.id],
+    [company.id, fetchApprovals, fetchLiveRuns, fetchTimeline],
   );
 
   useEffect(() => {
@@ -201,6 +286,88 @@ export function DashboardScreen({ company, onBack, onOpenSettings }: DashboardSc
               <Text style={styles.refreshBtnText}>刷新</Text>
             </Pressable>
           </View>
+        </View>
+
+        {/* ── 待办审批卡 (有 pending 时展示，红点角标，点击跳任务tab) ── */}
+        {approvalsError ? (
+          <View style={styles.errorInlineBox}>
+            <Text style={styles.errorInlineText}>待办审批加载失败: {approvalsError}</Text>
+            <Pressable style={styles.retryBtnSmall} onPress={() => void fetchApprovals()}>
+              <Text style={styles.retryBtnSmallText}>重试</Text>
+            </Pressable>
+          </View>
+        ) : approvals.length > 0 ? (
+          <Pressable
+            style={styles.approvalsCard}
+            onPress={() => onOpenApprovals?.()}
+          >
+            <View style={styles.cardHeader}>
+              <View style={styles.rowAlignCenter}>
+                <StatusDot status="err" size={7} pulse />
+                <Text style={[styles.cardTitle, { marginLeft: 6 }]}>待办审批</Text>
+                <View style={styles.redBadge}>
+                  <Text style={styles.redBadgeText}>{approvals.length}</Text>
+                </View>
+              </View>
+              <Text style={styles.linkText}>前往处理 ›</Text>
+            </View>
+            <View style={styles.approvalItemsList}>
+              {approvals.slice(0, 3).map((item, idx) => (
+                <View key={item.id ?? idx} style={styles.approvalItemRow}>
+                  <Text style={styles.approvalBullet}>•</Text>
+                  <Text style={styles.approvalItemTitle} numberOfLines={1}>
+                    {item.title || (typeof item.payload?.title === "string" ? item.payload.title : null) || (typeof item.payload?.name === "string" ? item.payload.name : null) || item.type || "待审事项"}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </Pressable>
+        ) : null}
+
+        {/* ── 实时运行卡 ── */}
+        <View style={styles.liveRunCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.rowAlignCenter}>
+              <StatusDot
+                status={liveRuns.filter((r) => r.status === "running" || r.status === "queued").length > 0 ? "ok" : "idle"}
+                size={7}
+                pulse={liveRuns.filter((r) => r.status === "running" || r.status === "queued").length > 0}
+              />
+              <Text style={[styles.cardTitle, { marginLeft: 6 }]}>车间实时运行</Text>
+            </View>
+            <View style={styles.capsuleBadgeSmall}>
+              <Text style={styles.capsuleBadgeSmallText}>
+                {liveRuns.filter((r) => r.status === "running" || r.status === "queued").length > 0
+                  ? `${liveRuns.filter((r) => r.status === "running" || r.status === "queued").length} 轮进行中`
+                  : "空闲"}
+              </Text>
+            </View>
+          </View>
+          {liveRunsLoading && liveRuns.length === 0 ? (
+            <ActivityIndicator size="small" color={C.accent} style={{ marginVertical: 6 }} />
+          ) : liveRunsError ? (
+            <View style={styles.errorInlineBox}>
+              <Text style={styles.errorInlineText}>实时运行加载失败: {liveRunsError}</Text>
+              <Pressable style={styles.retryBtnSmall} onPress={() => void fetchLiveRuns()}>
+                <Text style={styles.retryBtnSmallText}>重试</Text>
+              </Pressable>
+            </View>
+          ) : liveRuns.filter((r) => r.status === "running" || r.status === "queued").length === 0 ? (
+            <Text style={styles.emptyLiveRunText}>车间空闲</Text>
+          ) : (
+            <View style={styles.runningAgentsWrap}>
+              <Text style={styles.runningAgentsSummary}>
+                运行中:{" "}
+                <Text style={{ color: C.ink }}>
+                  {liveRuns
+                    .filter((r) => r.status === "running" || r.status === "queued")
+                    .map((r) => r.agentName || "智能体")
+                    .filter((v, i, a) => a.indexOf(v) === i)
+                    .join("、")}
+                </Text>
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* ── 六指标卡 2 列网格 (DESIGN.md 第4节规范) ── */}
@@ -624,6 +791,54 @@ export function DashboardScreen({ company, onBack, onOpenSettings }: DashboardSc
           <Text style={styles.cardFootnote}>
             已接入自动重试自愈机制 · 重试成功的运行不计入失败指标
           </Text>
+        </View>
+
+        {/* ── 最近时间线 (最近8条事件流) ── */}
+        <View style={styles.detailCard}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>最近时间线</Text>
+            <Text style={styles.cardHeaderMeta}>
+              {timeline?.events ? `最新 ${Math.min(timeline.events.length, 8)} 条动态` : "事件动态"}
+            </Text>
+          </View>
+          {timelineLoading && !timeline ? (
+            <ActivityIndicator size="small" color={C.accent} style={{ marginVertical: 12 }} />
+          ) : timelineError ? (
+            <View style={styles.errorInlineBox}>
+              <Text style={styles.errorInlineText}>时间线加载失败: {timelineError}</Text>
+              <Pressable style={styles.retryBtnSmall} onPress={() => void fetchTimeline()}>
+                <Text style={styles.retryBtnSmallText}>重试</Text>
+              </Pressable>
+            </View>
+          ) : !timeline?.events || timeline.events.length === 0 ? (
+            <Text style={styles.cardFootnote}>暂无最近流转事件记录</Text>
+          ) : (
+            <View style={styles.timelineEventList}>
+              {timeline.events.slice(0, 8).map((evt, idx) => {
+                const actorObj = timeline.actors?.find((a) => a.id === evt.actorId);
+                const actorName = actorObj?.name || (evt.actorId.includes(":") ? evt.actorId.split(":")[1] : "智能体");
+                const actionDesc = EVENT_KIND_LABEL[evt.kind] ?? evt.kind;
+                const isLast = idx === Math.min(timeline.events.length, 8) - 1;
+                return (
+                  <View key={`${evt.issueId}-${idx}`} style={styles.timelineEventRow}>
+                    <View style={styles.timelineDotCol}>
+                      <View style={styles.timelineEventDot} />
+                      {!isLast && <View style={styles.timelineEventLine} />}
+                    </View>
+                    <View style={styles.timelineEventContent}>
+                      <View style={styles.timelineEventHeader}>
+                        <Text style={styles.timelineActorText} numberOfLines={1}>{actorName}</Text>
+                        <Text style={styles.timelineTimeText}>{formatRelativeTime(evt.at)}</Text>
+                      </View>
+                      <Text style={styles.timelineDescText} numberOfLines={2}>
+                        {actionDesc} {evt.issueId ? `· 工单 #${evt.issueId.slice(0, 6)}` : ""}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -1100,5 +1315,146 @@ const styles = StyleSheet.create({
     color: C.ink,
     fontWeight: "500",
     fontSize: 15,
+  },
+  approvalsCard: {
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.28)",
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
+  },
+  redBadge: {
+    backgroundColor: C.err,
+    borderRadius: 999,
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    marginLeft: 6,
+  },
+  redBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
+  approvalItemsList: {
+    gap: 6,
+  },
+  approvalItemRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  approvalBullet: {
+    color: C.err,
+    fontSize: 14,
+  },
+  approvalItemTitle: {
+    color: C.ink,
+    fontSize: 13,
+    fontWeight: "500",
+    flex: 1,
+  },
+  liveRunCard: {
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
+  },
+  emptyLiveRunText: {
+    color: C.ink3,
+    fontSize: 13,
+  },
+  runningAgentsWrap: {
+    backgroundColor: "rgba(39, 166, 68, 0.08)",
+    borderRadius: 8,
+    padding: 10,
+    borderWidth: 1,
+    borderColor: "rgba(39, 166, 68, 0.2)",
+  },
+  runningAgentsSummary: {
+    color: C.ok,
+    fontSize: 12,
+    fontWeight: "500",
+    lineHeight: 18,
+  },
+  errorInlineBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.25)",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    gap: 8,
+  },
+  errorInlineText: {
+    color: C.err,
+    fontSize: 12,
+    flex: 1,
+  },
+  retryBtnSmall: {
+    backgroundColor: "rgba(239, 68, 68, 0.2)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  retryBtnSmallText: {
+    color: C.err,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  timelineEventList: {
+    gap: 0,
+  },
+  timelineEventRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  timelineDotCol: {
+    alignItems: "center",
+    width: 14,
+  },
+  timelineEventDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: C.accent,
+    marginTop: 4,
+  },
+  timelineEventLine: {
+    width: 1,
+    flex: 1,
+    backgroundColor: C.line,
+    marginVertical: 2,
+  },
+  timelineEventContent: {
+    flex: 1,
+    paddingBottom: 14,
+    gap: 3,
+  },
+  timelineEventHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  timelineActorText: {
+    color: C.ink,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  timelineTimeText: {
+    color: C.ink4,
+    fontSize: 11,
+    fontVariant: ["tabular-nums"],
+  },
+  timelineDescText: {
+    color: C.ink3,
+    fontSize: 12,
+    lineHeight: 16,
   },
 });

@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Linking,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -25,6 +26,7 @@ import {
 } from "@coolie/api-client";
 import {
   C,
+  COOLIE_BASE_URL,
   classifyToken,
   coolie,
   credentialCompanies,
@@ -33,6 +35,8 @@ import {
   signInWithEmail,
   signOutEverywhere,
   type Credential,
+  type IssueAttachment,
+  type IssueComment,
   type IssueCostSummary,
 } from "./src/coolie";
 import { StatusDot } from "./src/components/StatusDot";
@@ -157,11 +161,42 @@ function IssueBoardView({
   issues,
   onMove,
   onOpen,
+  onChangePriority,
 }: {
   issues: Issue[];
   onMove: (id: string, status: string) => Promise<void>;
   onOpen: (issue: Issue) => void;
+  onChangePriority: (id: string, priority: string) => Promise<void>;
 }) {
+  const handleCardLongPress = (it: Issue) => {
+    Alert.alert(
+      "修改优先级",
+      `任务：${it.title}`,
+      [
+        {
+          text: "低 (low)",
+          onPress: () => void onChangePriority(it.id, "low"),
+        },
+        {
+          text: "中 (medium)",
+          onPress: () => void onChangePriority(it.id, "medium"),
+        },
+        {
+          text: "高 (high)",
+          onPress: () => void onChangePriority(it.id, "high"),
+        },
+        {
+          text: "查看详情",
+          onPress: () => onOpen(it),
+        },
+        {
+          text: "取消",
+          style: "cancel",
+        },
+      ],
+    );
+  };
+
   return (
     <ScrollView
       horizontal
@@ -186,7 +221,7 @@ function IssueBoardView({
                     key={it.id}
                     style={styles.boardCard}
                     onPress={() => void onMove(it.id, col.next)}
-                    onLongPress={() => onOpen(it)}
+                    onLongPress={() => handleCardLongPress(it)}
                   >
                     <Text style={styles.boardCardTitle} numberOfLines={3}>
                       {it.title}
@@ -198,7 +233,7 @@ function IssueBoardView({
                           { backgroundColor: PRIORITY_DOT_COLOR[it.priority] ?? C.ink3 },
                         ]}
                       />
-                      <Text style={styles.boardCardHint}>点按→{BOARD_COLUMNS.find((c) => c.status === col.next)?.label}</Text>
+                      <Text style={styles.boardCardHint}>点按→{BOARD_COLUMNS.find((c) => c.status === col.next)?.label} · 长按改优先级</Text>
                     </View>
                   </Pressable>
                 ))
@@ -745,9 +780,20 @@ function HomeScreen({
       <StatusBar style="light" />
       <View style={styles.shellContent}>
         {tab === "dashboard" ? (
-          <DashboardScreen company={company} onOpenSettings={() => setSettingsOpen(true)} />
+          <DashboardScreen
+            company={company}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenApprovals={() => setTab("tasks")}
+          />
         ) : tab === "agents" ? (
-          <AgentsScreen company={company} onOpenSettings={() => setSettingsOpen(true)} />
+          <AgentsScreen
+            company={company}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenIssue={(issue) => {
+              setTab("tasks");
+              setSelected(issue);
+            }}
+          />
         ) : tab === "chat" ? (
           <BoardChatScreen company={company} whoami={whoami} onOpenSettings={() => setSettingsOpen(true)} />
         ) : tab === "ontology" ? (
@@ -903,6 +949,14 @@ function HomeScreen({
               Alert.alert("状态更新失败", String((e as Error)?.message ?? e));
             }
           }}
+          onChangePriority={async (id, prio) => {
+            try {
+              await coolie.updateIssuePriority(id, prio);
+              await loadIssues();
+            } catch (e) {
+              Alert.alert("优先级更新失败", String((e as Error)?.message ?? e));
+            }
+          }}
           onOpen={(it) => setSelected(it)}
         />
       ) : loading ? (
@@ -1011,6 +1065,7 @@ function HomeScreen({
 
 function TaskDetail({
   issue,
+  company: _company,
   onBack,
   onOpenDiff,
   onOpenSandbox,
@@ -1028,6 +1083,18 @@ function TaskDetail({
   const [workProducts, setWorkProducts] = useState<IssueWorkProduct[]>([]);
   const [loadingWp, setLoadingWp] = useState(false);
 
+  // 评论流状态
+  const [comments, setComments] = useState<IssueComment[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [commentsError, setCommentsError] = useState<string | null>(null);
+  const [commentInput, setCommentInput] = useState("");
+  const [submittingComment, setSubmittingComment] = useState(false);
+
+  // 附件列表状态
+  const [attachments, setAttachments] = useState<IssueAttachment[]>([]);
+  const [loadingAttachments, setLoadingAttachments] = useState(false);
+  const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
+
   useEffect(() => {
     void (async () => {
       setLoadingWp(true);
@@ -1041,6 +1108,52 @@ function TaskDetail({
       }
     })();
   }, [issue.id]);
+
+  const loadComments = useCallback(async () => {
+    setLoadingComments(true);
+    setCommentsError(null);
+    try {
+      const list = await coolie.getIssueComments(issue.id);
+      setComments(list);
+    } catch (e) {
+      setCommentsError(String((e as Error)?.message ?? e));
+    } finally {
+      setLoadingComments(false);
+    }
+  }, [issue.id]);
+
+  const loadAttachments = useCallback(async () => {
+    setLoadingAttachments(true);
+    setAttachmentsError(null);
+    try {
+      const list = await coolie.getIssueAttachments(issue.id);
+      setAttachments(list);
+    } catch (e) {
+      setAttachmentsError(String((e as Error)?.message ?? e));
+    } finally {
+      setLoadingAttachments(false);
+    }
+  }, [issue.id]);
+
+  useEffect(() => {
+    void loadComments();
+    void loadAttachments();
+  }, [loadComments, loadAttachments]);
+
+  const handleAddComment = useCallback(async () => {
+    const text = commentInput.trim();
+    if (!text || submittingComment) return;
+    setSubmittingComment(true);
+    try {
+      await coolie.addIssueComment(issue.id, text);
+      setCommentInput("");
+      await loadComments();
+    } catch (e) {
+      Alert.alert("评论发送失败", String((e as Error)?.message ?? e));
+    } finally {
+      setSubmittingComment(false);
+    }
+  }, [commentInput, issue.id, loadComments, submittingComment]);
 
   const prototypeWp = workProducts.find(
     (wp) => wp.url || wp.type === "prototype" || wp.runtimeServiceId,
@@ -1069,6 +1182,7 @@ function TaskDetail({
           <DetailRow label="描述" value={issue.description} />
         ) : null}
         <DetailRow label="编号" value={issue.id} valueColor={C.ink3} isMono />
+        <IssueCostRow issueId={issue.id} />
       </View>
 
       {/* 核心动作: 查看代码 Diff 与 打开原型沙箱 */}
@@ -1141,6 +1255,178 @@ function TaskDetail({
       {loadingWp && (
         <ActivityIndicator color={C.accent} style={{ marginTop: 8 }} />
       )}
+
+      {/* 任务附件列表 */}
+      <View style={styles.detailSection}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionHeader}>
+            任务附件 ({attachments.length})
+          </Text>
+          <Pressable
+            hitSlop={8}
+            onPress={() => void loadAttachments()}
+            disabled={loadingAttachments}
+            style={styles.sectionRefreshBtn}
+          >
+            {loadingAttachments ? (
+              <ActivityIndicator size="small" color={C.accent} />
+            ) : (
+              <Ionicons name="refresh" size={14} color={C.ink3} />
+            )}
+          </Pressable>
+        </View>
+
+        {loadingAttachments && attachments.length === 0 ? (
+          <ActivityIndicator color={C.accent} style={{ marginVertical: 12 }} />
+        ) : Boolean(attachmentsError) ? (
+          <View style={styles.sectionErrorBox}>
+            <Text style={styles.sectionErrorText}>⚠️ {attachmentsError}</Text>
+            <Pressable
+              onPress={() => void loadAttachments()}
+              style={styles.sectionRetryBtn}
+            >
+              <Text style={styles.sectionRetryBtnText}>重试</Text>
+            </Pressable>
+          </View>
+        ) : attachments.length === 0 ? (
+          <Text style={styles.sectionEmptyText}>暂无附件</Text>
+        ) : (
+          attachments.map((att) => {
+            const fileName = att.filename || att.originalFilename || "未命名附件";
+            const sizeStr =
+              typeof att.byteSize === "number"
+                ? att.byteSize >= 1048576
+                  ? `${(att.byteSize / 1048576).toFixed(1)} MB`
+                  : `${(att.byteSize / 1024).toFixed(1)} KB`
+                : "未知大小";
+            const targetUrl = att.contentPath
+              ? (att.contentPath.startsWith("http") ? att.contentPath : `${COOLIE_BASE_URL}${att.contentPath}`)
+              : null;
+
+            return (
+              <Pressable
+                key={att.id}
+                style={styles.attachmentItem}
+                onPress={() => {
+                  if (targetUrl) {
+                    void Linking.openURL(targetUrl).catch(() => {
+                      Alert.alert("无法打开附件链接", targetUrl);
+                    });
+                  }
+                }}
+              >
+                <Ionicons name="document-attach-outline" size={18} color={C.accent} style={{ marginRight: 10 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.attachmentName} numberOfLines={1}>
+                    {fileName}
+                  </Text>
+                  <Text style={styles.attachmentSize}>{sizeStr}</Text>
+                </View>
+                {Boolean(targetUrl) && (
+                  <Ionicons name="open-outline" size={16} color={C.ink3} />
+                )}
+              </Pressable>
+            );
+          })
+        )}
+      </View>
+
+      {/* 评论流 */}
+      <View style={styles.detailSection}>
+        <View style={styles.sectionHeaderRow}>
+          <Text style={styles.sectionHeader}>
+            评论流 ({comments.length})
+          </Text>
+          <Pressable
+            hitSlop={8}
+            onPress={() => void loadComments()}
+            disabled={loadingComments}
+            style={styles.sectionRefreshBtn}
+          >
+            {loadingComments ? (
+              <ActivityIndicator size="small" color={C.accent} />
+            ) : (
+              <Ionicons name="refresh" size={14} color={C.ink3} />
+            )}
+          </Pressable>
+        </View>
+
+        {loadingComments && comments.length === 0 ? (
+          <ActivityIndicator color={C.accent} style={{ marginVertical: 12 }} />
+        ) : Boolean(commentsError) ? (
+          <View style={styles.sectionErrorBox}>
+            <Text style={styles.sectionErrorText}>⚠️ {commentsError}</Text>
+            <Pressable
+              onPress={() => void loadComments()}
+              style={styles.sectionRetryBtn}
+            >
+              <Text style={styles.sectionRetryBtnText}>重试</Text>
+            </Pressable>
+          </View>
+        ) : comments.length === 0 ? (
+          <Text style={styles.sectionEmptyText}>暂无跟进评论</Text>
+        ) : (
+          <View style={styles.commentsList}>
+            {comments.map((comment) => {
+              const isUser = Boolean(comment.authorUserId);
+              const authorName = isUser
+                ? "掌柜"
+                : comment.authorAgentId
+                ? `员工 ${comment.authorAgentId.slice(0, 8)}`
+                : "系统";
+              const timeStr = comment.createdAt
+                ? new Date(comment.createdAt).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : "";
+
+              return (
+                <View
+                  key={comment.id}
+                  style={[
+                    styles.commentBubble,
+                    isUser ? styles.commentBubbleUser : styles.commentBubbleAgent,
+                  ]}
+                >
+                  <View style={styles.commentHeader}>
+                    <Text style={styles.commentAuthor}>{authorName}</Text>
+                    <Text style={styles.commentTime}>{timeStr}</Text>
+                  </View>
+                  <Text style={styles.commentBody}>{comment.body}</Text>
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        {/* 评论输入区域 */}
+        <View style={styles.commentInputRow}>
+          <TextInput
+            style={styles.commentTextInput}
+            placeholder="添加跟进评论…"
+            placeholderTextColor={C.ink3}
+            value={commentInput}
+            onChangeText={setCommentInput}
+            multiline
+            editable={!submittingComment}
+          />
+          <Pressable
+            style={[
+              styles.commentSubmitBtn,
+              (!commentInput.trim() || submittingComment) && styles.btnDisabled,
+            ]}
+            disabled={!commentInput.trim() || submittingComment}
+            onPress={() => void handleAddComment()}
+          >
+            {submittingComment ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.commentSubmitBtnText}>发送</Text>
+            )}
+          </Pressable>
+        </View>
+      </View>
     </Surface>
   );
 }
@@ -1803,5 +2089,138 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
     marginLeft: 8,
+  },
+  detailSection: {
+    marginTop: 16,
+    gap: 8,
+  },
+  sectionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sectionRefreshBtn: {
+    padding: 4,
+  },
+  sectionErrorBox: {
+    padding: 12,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.err,
+    borderRadius: 8,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  sectionErrorText: {
+    color: C.err,
+    fontSize: 12,
+    flex: 1,
+  },
+  sectionRetryBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    backgroundColor: C.surfaceHover,
+    borderRadius: 4,
+  },
+  sectionRetryBtnText: {
+    color: C.ink,
+    fontSize: 12,
+  },
+  sectionEmptyText: {
+    color: C.ink4,
+    fontSize: 12,
+    paddingVertical: 8,
+  },
+  attachmentItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 8,
+    padding: 10,
+  },
+  attachmentName: {
+    color: C.ink,
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  attachmentSize: {
+    color: C.ink4,
+    fontSize: 11,
+    marginTop: 2,
+    fontVariant: ["tabular-nums"],
+  },
+  commentsList: {
+    gap: 8,
+  },
+  commentBubble: {
+    padding: 10,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.line,
+    gap: 4,
+  },
+  commentBubbleUser: {
+    backgroundColor: C.surface,
+    borderLeftWidth: 3,
+    borderLeftColor: C.accent,
+  },
+  commentBubbleAgent: {
+    backgroundColor: C.panel,
+    borderLeftWidth: 3,
+    borderLeftColor: C.ok,
+  },
+  commentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  commentAuthor: {
+    color: C.ink2,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  commentTime: {
+    color: C.ink4,
+    fontSize: 10,
+    fontVariant: ["tabular-nums"],
+  },
+  commentBody: {
+    color: C.ink,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  commentInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+  },
+  commentTextInput: {
+    flex: 1,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: C.ink,
+    fontSize: 13,
+    maxHeight: 80,
+  },
+  commentSubmitBtn: {
+    backgroundColor: C.brand,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  commentSubmitBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
   },
 });
