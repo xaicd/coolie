@@ -1,6 +1,6 @@
 # Coolie App 版本记录
 
-Coolie 移动驾驶舱 App（React Native + Expo）版本流水。
+Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
