@@ -137,6 +137,27 @@ export class CoolieClient extends BaseCoolieClient {
     );
   }
 
+  /** PATCH /api/agents/:id — 改员工(状态/头衔等) */
+  async updateAgent(
+    agentId: string,
+    fields: { status?: string; title?: string | null; name?: string },
+  ): Promise<AgentRow> {
+    return this.request<AgentRow>(
+      "PATCH",
+      `/api/agents/${encodeURIComponent(agentId)}`,
+      fields,
+    );
+  }
+
+  /** PATCH /api/issues/:id — 改任务状态 */
+  async updateIssueStatus(issueId: string, status: string): Promise<unknown> {
+    return this.request<unknown>(
+      "PATCH",
+      `/api/issues/${encodeURIComponent(issueId)}`,
+      { status },
+    );
+  }
+
   /** GET /api/companies/:id/agents — 员工(智能体)列表 */
   async listAgents(companyId: string): Promise<AgentRow[]> {
     return this.request<AgentRow[]>(
