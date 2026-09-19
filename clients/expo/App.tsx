@@ -103,9 +103,10 @@ const BOTTOM_TABS: BottomTab[] = [
   { key: "agents", label: "员工", icon: "people-outline", activeIcon: "people" },
   { key: "chat", label: "工坊", icon: "hammer-outline", activeIcon: "hammer" },
   { key: "tasks", label: "任务", icon: "list-outline", activeIcon: "list" },
-  { key: "artifacts", label: "产物", icon: "cube-outline", activeIcon: "cube" },
   { key: "ontology", label: "本体", icon: "git-network-outline", activeIcon: "git-network" },
 ];
+/** 产物不占底部栏，从任务页右上角进入 */
+const HIDDEN_TABS = new Set<TabKey>(["artifacts"]);
 
 function SettingsSheet({
   whoami,
@@ -161,7 +162,7 @@ function BottomTabBar({
 }) {
   return (
     <View style={styles.bottomBar}>
-      {BOTTOM_TABS.map((t) => {
+      {BOTTOM_TABS.filter((t) => !HIDDEN_TABS.has(t.key)).map((t) => {
         const active = tab === t.key;
         return (
           <Pressable
@@ -600,6 +601,13 @@ function HomeScreen({
                   <Text style={styles.companyCapsuleSubText}>· {whoami}</Text>
                 </View>
               </View>
+              <Pressable
+                onPress={() => setTab("artifacts")}
+                hitSlop={12}
+                style={styles.btnGhost}
+              >
+                <Ionicons name="cube-outline" size={20} color={C.ink2} />
+              </Pressable>
               <Pressable onPress={() => setSettingsOpen(true)} hitSlop={12} style={styles.btnGhost}>
                 <Ionicons name="settings-outline" size={20} color={C.ink2} />
               </Pressable>
