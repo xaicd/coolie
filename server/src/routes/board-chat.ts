@@ -395,14 +395,22 @@ export function boardChatRoutes(
 
       // Persist the board's reply under the "board-concierge" sentinel so the
       // UI renders it as an assistant bubble (see BoardChat `isUser` check).
+      // The sentinel is not a real `user` table row, so pass authorType
+      // "system" — `addComment` derives "user" from actor.userId otherwise,
+      // and the FK-validating insert would fail (swallowed by the catch,
+      // leaving the reply streamed but never persisted → empty room on
+      // reload).
       const cleanedResponse = stripActionSignals(fullResponse);
       if (cleanedResponse) {
         try {
-          await issueSvc.addComment(resolvedIssueId, cleanedResponse, {
-            userId: "board-concierge",
-          });
-        } catch {
-          /* best effort */
+          await issueSvc.addComment(
+            resolvedIssueId,
+            cleanedResponse,
+            { userId: "board-concierge" },
+            { authorType: "system" },
+          );
+        } catch (e) {
+          console.error("[board-chat] failed to persist concierge reply:", e);
         }
       }
 
