@@ -45,6 +45,7 @@ import { PrototypeSandboxScreen } from "./src/screens/PrototypeSandboxScreen";
 import { BoardChatScreen } from "./src/screens/BoardChatScreen";
 import { AgentsScreen } from "./src/screens/AgentsScreen";
 import { useOTA } from "./src/OTA";
+import { checkAppVersion, downloadApk, type RemoteVersionInfo } from "./src/AppVersion";
 import { QuickApprovalCard } from "./src/components/QuickApprovalCard";
 import { setupOTAListener } from "./src/OTA";
 
@@ -172,6 +173,38 @@ function IssueBoardView({
         );
       })}
     </ScrollView>
+  );
+}
+
+/** 应用升级卡片：新版本提示 + 一键下载 APK */
+function AppUpdateCard({ info, onClose }: { info: RemoteVersionInfo; onClose: () => void }) {
+  const [downloading, setDownloading] = useState(false);
+  return (
+    <View style={styles.updateBanner}>
+      <View style={{ flex: 1 }}>
+        <Text style={styles.updateTitle}>📦 新版本 v{info.version}</Text>
+        {info.releaseNotes ? (
+          <Text style={styles.updateNotes} numberOfLines={2}>
+            {info.releaseNotes}
+          </Text>
+        ) : null}
+      </View>
+      <Pressable
+        style={[styles.updateBtn, downloading && styles.btnDisabled]}
+        disabled={downloading}
+        onPress={async () => {
+          setDownloading(true);
+          const ok = await downloadApk(info.downloadUrl);
+          setDownloading(false);
+          if (!ok) Alert.alert("下载失败", "请稍后重试");
+        }}
+      >
+        <Text style={styles.updateBtnText}>{downloading ? "拉起中…" : "升级"}</Text>
+      </Pressable>
+      <Pressable onPress={onClose} hitSlop={8}>
+        <Ionicons name="close" size={18} color={C.ink4} />
+      </Pressable>
+    </View>
   );
 }
 
@@ -504,7 +537,14 @@ function HomeScreen({
   const [tab, setTab] = useState<TabKey>("dashboard");
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [boardView, setBoardView] = useState(false);
+  const [appUpdate, setAppUpdate] = useState<RemoteVersionInfo | null>(null);
   const ota = useOTA();
+
+  useEffect(() => {
+    void checkAppVersion().then((r) => {
+      if (r.updateAvailable && r.info) setAppUpdate(r.info);
+    });
+  }, []);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selected, setSelected] = useState<Issue | null>(null);
   const [diffContext, setDiffContext] = useState<{
@@ -884,6 +924,7 @@ function HomeScreen({
             </ScrollView>
           )}
       </View>
+      {appUpdate ? <AppUpdateCard info={appUpdate} onClose={() => setAppUpdate(null)} /> : null}
       {settingsOpen ? (
         <SettingsSheet
           whoami={whoami}
@@ -1127,6 +1168,30 @@ const styles = StyleSheet.create({
   boardCardMeta: { flexDirection: "row", alignItems: "center", gap: 6 },
   boardPrioDot: { width: 6, height: 6, borderRadius: 3 },
   boardCardHint: { color: C.ink4, fontSize: 10 },
+  updateBanner: {
+    position: "absolute",
+    top: 8,
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    backgroundColor: C.surface,
+    borderRadius: 12,
+    padding: 12,
+    borderWidth: 1,
+    borderColor: C.brand,
+    zIndex: 90,
+  },
+  updateTitle: { color: C.ink, fontSize: 14, fontWeight: "700" },
+  updateNotes: { color: C.ink3, fontSize: 11, marginTop: 2 },
+  updateBtn: {
+    backgroundColor: C.brand,
+    borderRadius: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+  updateBtnText: { color: C.ink, fontSize: 13, fontWeight: "600" },
   settingsBackdrop: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: "rgba(0,0,0,0.55)",
