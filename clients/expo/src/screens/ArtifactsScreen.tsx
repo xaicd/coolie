@@ -1,0 +1,921 @@
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  Modal,
+  Pressable,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from "react-native";
+import { StatusBar } from "expo-status-bar";
+import { Image } from "expo-image";
+import type {
+  Company,
+  CompanyArtifact,
+  CompanyArtifactMediaKind,
+  Issue,
+  IssueWorkProduct,
+  WorkspaceRuntimeService,
+} from "@coolie/api-client";
+import { C, COOLIE_BASE_URL, coolie, getAuthToken } from "../coolie";
+
+export interface ArtifactsScreenProps {
+  company: Company;
+  whoami?: string;
+  onBack?: () => void;
+  onOpenSandbox?: (
+    url: string,
+    service?: WorkspaceRuntimeService | null,
+    workProduct?: IssueWorkProduct | null,
+  ) => void;
+  onOpenDiff?: (issue: Issue, workProduct?: IssueWorkProduct | null) => void;
+}
+
+type FilterKind = "all" | "image" | "document" | "work_product";
+
+const FILTER_TABS: Array<{ key: FilterKind; label: string }> = [
+  { key: "all", label: "全部" },
+  { key: "image", label: "图片" },
+  { key: "document", label: "文档" },
+  { key: "work_product", label: "代码/原型" },
+];
+
+function resolveMediaUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+  const cleanPath = path.startsWith("/") ? path : `/${path}`;
+  return `${COOLIE_BASE_URL}${cleanPath}`;
+}
+
+function formatTime(isoString: string): string {
+  try {
+    const d = new Date(isoString);
+    if (Number.isNaN(d.getTime())) return isoString;
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    const h = String(d.getHours()).padStart(2, "0");
+    const min = String(d.getMinutes()).padStart(2, "0");
+    return `${m}-${day} ${h}:${min}`;
+  } catch {
+    return isoString;
+  }
+}
+
+function getMediaKindBadge(kind: CompanyArtifactMediaKind, source: string) {
+  if (source === "work_product") {
+    return {
+      icon: "⚡",
+      label: "交付物",
+      color: C.accent,
+      bg: "rgba(113, 112, 255, 0.12)",
+      border: "rgba(113, 112, 255, 0.3)",
+    };
+  }
+  switch (kind) {
+    case "image":
+      return {
+        icon: "🖼️",
+        label: "图片",
+        color: C.ok,
+        bg: "rgba(39, 166, 68, 0.12)",
+        border: "rgba(39, 166, 68, 0.3)",
+      };
+    case "document":
+      return {
+        icon: "📄",
+        label: "文档",
+        color: C.warn,
+        bg: "rgba(245, 158, 11, 0.12)",
+        border: "rgba(245, 158, 11, 0.3)",
+      };
+    case "text":
+      return {
+        icon: "📝",
+        label: "文本",
+        color: C.ink2,
+        bg: "rgba(255, 255, 255, 0.05)",
+        border: C.line,
+      };
+    case "video":
+      return {
+        icon: "🎬",
+        label: "视频",
+        color: "#38BDF8",
+        bg: "rgba(56, 189, 248, 0.12)",
+        border: "rgba(56, 189, 248, 0.3)",
+      };
+    default:
+      return {
+        icon: "📎",
+        label: "文件",
+        color: C.ink3,
+        bg: "rgba(255, 255, 255, 0.04)",
+        border: C.lineSubtle,
+      };
+  }
+}
+
+function getSourceLabel(source: string): string {
+  switch (source) {
+    case "work_product":
+      return "工单产物";
+    case "attachment":
+      return "任务附件";
+    case "document":
+      return "文档资产";
+    default:
+      return "交付资源";
+  }
+}
+
+export function ArtifactsScreen({
+  company,
+  onBack,
+  onOpenSandbox,
+  onOpenDiff,
+}: ArtifactsScreenProps) {
+  const [artifacts, setArtifacts] = useState<CompanyArtifact[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [filter, setFilter] = useState<FilterKind>("all");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [previewArtifact, setPreviewArtifact] = useState<CompanyArtifact | null>(null);
+
+  const companyId = company.id;
+
+  useEffect(() => {
+    void getAuthToken().then(setAuthToken);
+  }, []);
+
+  const loadArtifacts = useCallback(async () => {
+    try {
+      const kindParam: CompanyArtifactMediaKind | "all" | undefined =
+        filter === "work_product"
+          ? undefined
+          : filter === "all"
+          ? "all"
+          : (filter as CompanyArtifactMediaKind);
+
+      const res = await coolie.listArtifacts(companyId, {
+        kind: kindParam,
+        q: searchQuery.trim() || undefined,
+        limit: 50,
+      });
+
+      let items = res.artifacts;
+      if (filter === "work_product") {
+        items = items.filter((a) => a.source === "work_product");
+      }
+      setArtifacts(items);
+    } catch {
+      // 容错: 如果端点暂无数据，保留空数组
+      setArtifacts([]);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  }, [companyId, filter, searchQuery]);
+
+  useEffect(() => {
+    setLoading(true);
+    void loadArtifacts();
+  }, [loadArtifacts]);
+
+  const onRefresh = useCallback(() => {
+    setRefreshing(true);
+    void loadArtifacts();
+  }, [loadArtifacts]);
+
+  // 统计各分类数量
+  const counts = useMemo(() => {
+    let images = 0;
+    let documents = 0;
+    let workProducts = 0;
+    for (const a of artifacts) {
+      if (a.source === "work_product") workProducts += 1;
+      if (a.mediaKind === "image") images += 1;
+      if (a.mediaKind === "document" || a.mediaKind === "text") documents += 1;
+    }
+    return {
+      all: artifacts.length,
+      image: images,
+      document: documents,
+      work_product: workProducts,
+    };
+  }, [artifacts]);
+
+  const filteredList = useMemo(() => {
+    if (filter === "all") return artifacts;
+    if (filter === "work_product") {
+      return artifacts.filter((a) => a.source === "work_product");
+    }
+    if (filter === "document") {
+      return artifacts.filter(
+        (a) => a.mediaKind === "document" || a.mediaKind === "text",
+      );
+    }
+    return artifacts.filter((a) => a.mediaKind === filter);
+  }, [artifacts, filter]);
+
+  const handleCardPress = (artifact: CompanyArtifact) => {
+    if (artifact.mediaKind === "image") {
+      setPreviewArtifact(artifact);
+      return;
+    }
+
+    // 若为代码/原型产物，且包含 URL 或原型特征，可引导前往沙箱或 Diff
+    if (artifact.source === "work_product") {
+      if (artifact.openPath?.startsWith("http") || artifact.contentPath?.startsWith("http")) {
+        const url = artifact.openPath || artifact.contentPath || "";
+        onOpenSandbox?.(url, null, null);
+        return;
+      }
+      if (onOpenDiff) {
+        onOpenDiff(
+          {
+            id: artifact.issue.id,
+            title: artifact.issue.title,
+            status: "done",
+            priority: "medium",
+            companyId,
+          },
+          null,
+        );
+      }
+    }
+  };
+
+  const imageSourceHeaders = useMemo(() => {
+    return authToken ? { Authorization: `Bearer ${authToken}` } : undefined;
+  }, [authToken]);
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="light" />
+
+      {/* 顶部导航与操作栏 */}
+      <View style={styles.headerBar}>
+        <View style={styles.headerLeft}>
+          {onBack && (
+            <Pressable onPress={onBack} hitSlop={12} style={styles.backBtn}>
+              <Text style={styles.backText}>‹ 返回</Text>
+            </Pressable>
+          )}
+          <View>
+            <Text style={styles.headerTitle}>产物交付中心</Text>
+            <Text style={styles.headerSubtitle}>
+              {company.name} · PRD 需求③看产物、⑤看原型
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {/* 搜索与过滤分段器 */}
+      <View style={styles.filterSection}>
+        <View style={styles.searchBox}>
+          <Text style={styles.searchIcon}>🔍</Text>
+          <TextInput
+            style={styles.searchInput}
+            placeholder="搜索产物名称、任务编号或关联..."
+            placeholderTextColor={C.ink3}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            returnKeyType="search"
+            onSubmitEditing={loadArtifacts}
+          />
+          {searchQuery.length > 0 && (
+            <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
+              <Text style={styles.clearText}>✕</Text>
+            </Pressable>
+          )}
+        </View>
+
+        {/* 分类胶囊标签 */}
+        <View style={styles.tabSwitcher}>
+          {FILTER_TABS.map((tab) => {
+            const isActive = filter === tab.key;
+            const count = counts[tab.key];
+            return (
+              <Pressable
+                key={tab.key}
+                style={[styles.tabBtn, isActive && styles.tabBtnActive]}
+                onPress={() => setFilter(tab.key)}
+              >
+                <Text
+                  style={[
+                    styles.tabBtnText,
+                    isActive && styles.tabBtnTextActive,
+                  ]}
+                >
+                  {tab.label}
+                  {count > 0 ? ` (${count})` : ""}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      {/* 产物卡片流列表 */}
+      {loading ? (
+        <View style={styles.centerContainer}>
+          <ActivityIndicator color={C.accent} size="large" />
+          <Text style={styles.loadingText}>加载交付产物中…</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={filteredList}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={C.accent}
+              colors={[C.accent]}
+            />
+          }
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>📦</Text>
+              <Text style={styles.emptyTitle}>暂无匹配的交付产物</Text>
+              <Text style={styles.emptyDescription}>
+                AI 员工执行任务产出的设计图、文档或原型将在此实时展示。
+              </Text>
+            </View>
+          }
+          renderItem={({ item }) => {
+            const badge = getMediaKindBadge(item.mediaKind, item.source);
+            const imageUrl = resolveMediaUrl(item.contentPath || item.openPath);
+            const isImage = item.mediaKind === "image" && Boolean(imageUrl);
+            const isWorkProduct = item.source === "work_product";
+
+            return (
+              <Pressable
+                style={({ pressed }) => [
+                  styles.artifactCard,
+                  pressed && styles.artifactCardPressed,
+                ]}
+                onPress={() => handleCardPress(item)}
+              >
+                {/* 卡片顶部元数据行 */}
+                <View style={styles.cardHeader}>
+                  <View style={styles.badgeRow}>
+                    <View
+                      style={[
+                        styles.kindBadge,
+                        {
+                          backgroundColor: badge.bg,
+                          borderColor: badge.border,
+                        },
+                      ]}
+                    >
+                      <Text style={styles.kindIcon}>{badge.icon}</Text>
+                      <Text style={[styles.kindLabel, { color: badge.color }]}>
+                        {badge.label}
+                      </Text>
+                    </View>
+                    <View style={styles.sourceTag}>
+                      <Text style={styles.sourceTagText}>
+                        {getSourceLabel(item.source)}
+                      </Text>
+                    </View>
+                  </View>
+
+                  <Text style={styles.cardTime}>
+                    {formatTime(item.updatedAt)}
+                  </Text>
+                </View>
+
+                {/* 产物主标题 */}
+                <Text style={styles.cardTitle} numberOfLines={2}>
+                  {item.title}
+                </Text>
+
+                {/* 关联任务与智能体信息 */}
+                <View style={styles.metaRow}>
+                  <View style={styles.taskTag}>
+                    <Text style={styles.taskIdentifier}>
+                      #{item.issue.identifier || item.issue.id.slice(0, 6)}
+                    </Text>
+                    <Text style={styles.taskTitle} numberOfLines={1}>
+                      {item.issue.title}
+                    </Text>
+                  </View>
+                  {item.createdByAgent?.name && (
+                    <Text style={styles.agentTag} numberOfLines={1}>
+                      🤖 {item.createdByAgent.name}
+                    </Text>
+                  )}
+                </View>
+
+                {/* 图片缩略图预览 (expo-image) */}
+                {isImage && imageUrl && (
+                  <View style={styles.thumbnailContainer}>
+                    <Image
+                      source={{
+                        uri: imageUrl,
+                        headers: imageSourceHeaders,
+                      }}
+                      style={styles.thumbnailImage}
+                      contentFit="cover"
+                      transition={200}
+                    />
+                    <View style={styles.thumbnailOverlay}>
+                      <Text style={styles.thumbnailHint}>点开全屏预览 ↗</Text>
+                    </View>
+                  </View>
+                )}
+
+                {/* 文本/文档摘要预览 */}
+                {!isImage && item.previewText && (
+                  <View style={styles.previewTextBox}>
+                    <Text style={styles.previewTextContent} numberOfLines={3}>
+                      {item.previewText}
+                    </Text>
+                  </View>
+                )}
+
+                {/* 卡片底端快捷交互 */}
+                <View style={styles.cardFooter}>
+                  {isImage ? (
+                    <Pressable
+                      style={styles.actionBtnSecondary}
+                      onPress={() => setPreviewArtifact(item)}
+                    >
+                      <Text style={styles.actionBtnTextSecondary}>
+                        🔍 预览大图
+                      </Text>
+                    </Pressable>
+                  ) : isWorkProduct ? (
+                    <View style={styles.actionGroup}>
+                      <Pressable
+                        style={styles.actionBtnPrimary}
+                        onPress={() => {
+                          const targetUrl =
+                            item.openPath || item.contentPath || "";
+                          onOpenSandbox?.(targetUrl, null, null);
+                        }}
+                      >
+                        <Text style={styles.actionBtnTextPrimary}>
+                          🎮 交互原型沙箱 ›
+                        </Text>
+                      </Pressable>
+                      {onOpenDiff && (
+                        <Pressable
+                          style={styles.actionBtnGhost}
+                          onPress={() =>
+                            onOpenDiff({
+                              id: item.issue.id,
+                              title: item.issue.title,
+                              status: "done",
+                              priority: "medium",
+                              companyId,
+                            })
+                          }
+                        >
+                          <Text style={styles.actionBtnTextGhost}>
+                            审查代码 Diff
+                          </Text>
+                        </Pressable>
+                      )}
+                    </View>
+                  ) : (
+                    <View style={styles.fileInfoRow}>
+                      <Text style={styles.fileInfoText}>
+                        {item.contentType || "标准交付资产"}
+                      </Text>
+                    </View>
+                  )}
+                </View>
+              </Pressable>
+            );
+          }}
+        />
+      )}
+
+      {/* 图片全屏查看 Modal (expo-image 驱动) */}
+      <Modal
+        visible={!!previewArtifact}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setPreviewArtifact(null)}
+      >
+        <SafeAreaView style={styles.modalBackdrop}>
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1, paddingRight: 16 }}>
+              <Text style={styles.modalTitle} numberOfLines={1}>
+                {previewArtifact?.title}
+              </Text>
+              <Text style={styles.modalSubtitle} numberOfLines={1}>
+                #{previewArtifact?.issue.identifier} · {previewArtifact?.issue.title}
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => setPreviewArtifact(null)}
+              hitSlop={12}
+              style={styles.modalCloseBtn}
+            >
+              <Text style={styles.modalCloseText}>✕ 关闭</Text>
+            </Pressable>
+          </View>
+
+          <View style={styles.modalImageWrapper}>
+            {previewArtifact && (
+              <Image
+                source={{
+                  uri: resolveMediaUrl(
+                    previewArtifact.contentPath || previewArtifact.openPath,
+                  ) || "",
+                  headers: imageSourceHeaders,
+                }}
+                style={styles.modalFullImage}
+                contentFit="contain"
+                transition={300}
+              />
+            )}
+          </View>
+
+          <View style={styles.modalFooter}>
+            <Text style={styles.modalFooterText}>
+              {previewArtifact?.contentType || "image/png"} · 双指捏合缩放
+            </Text>
+          </View>
+        </SafeAreaView>
+      </Modal>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  headerBar: {
+    paddingHorizontal: 16,
+    paddingTop: 12,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.lineSubtle,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  backBtn: {
+    paddingVertical: 4,
+    paddingRight: 8,
+  },
+  backText: {
+    color: C.accent,
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  headerTitle: {
+    color: C.ink,
+    fontSize: 18,
+    fontWeight: "600",
+    letterSpacing: -0.4,
+  },
+  headerSubtitle: {
+    color: C.ink3,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  filterSection: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: C.lineSubtle,
+  },
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    height: 38,
+  },
+  searchIcon: {
+    fontSize: 14,
+    marginRight: 8,
+    color: C.ink3,
+  },
+  searchInput: {
+    flex: 1,
+    color: C.ink,
+    fontSize: 13,
+    paddingVertical: 0,
+  },
+  clearText: {
+    color: C.ink3,
+    fontSize: 14,
+    padding: 4,
+  },
+  tabSwitcher: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  tabBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+  },
+  tabBtnActive: {
+    backgroundColor: "rgba(94, 106, 210, 0.15)",
+    borderColor: "rgba(94, 106, 210, 0.4)",
+  },
+  tabBtnText: {
+    color: C.ink3,
+    fontSize: 12,
+    fontWeight: "500",
+    fontVariant: ["tabular-nums"],
+  },
+  tabBtnTextActive: {
+    color: C.accent,
+  },
+  centerContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 12,
+  },
+  loadingText: {
+    color: C.ink3,
+    fontSize: 13,
+  },
+  listContent: {
+    padding: 16,
+    paddingBottom: 40,
+    gap: 12,
+  },
+  emptyContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 64,
+    gap: 8,
+  },
+  emptyIcon: {
+    fontSize: 36,
+    marginBottom: 4,
+  },
+  emptyTitle: {
+    color: C.ink,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  emptyDescription: {
+    color: C.ink3,
+    fontSize: 13,
+    textAlign: "center",
+    maxWidth: 260,
+  },
+  artifactCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 12,
+    padding: 14,
+    gap: 10,
+  },
+  artifactCardPressed: {
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  badgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  kindBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 999,
+    borderWidth: 1,
+  },
+  kindIcon: {
+    fontSize: 11,
+  },
+  kindLabel: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  sourceTag: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  sourceTagText: {
+    color: C.ink4,
+    fontSize: 10,
+  },
+  cardTime: {
+    color: C.ink4,
+    fontSize: 11,
+    fontVariant: ["tabular-nums"],
+  },
+  cardTitle: {
+    color: C.ink,
+    fontSize: 15,
+    fontWeight: "600",
+    letterSpacing: -0.3,
+  },
+  metaRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  taskTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    flex: 1,
+  },
+  taskIdentifier: {
+    color: C.accent,
+    fontSize: 12,
+    fontWeight: "500",
+    fontVariant: ["tabular-nums"],
+  },
+  taskTitle: {
+    color: C.ink3,
+    fontSize: 12,
+    flex: 1,
+  },
+  agentTag: {
+    color: C.ink3,
+    fontSize: 11,
+  },
+  thumbnailContainer: {
+    width: "100%",
+    height: 180,
+    borderRadius: 8,
+    overflow: "hidden",
+    backgroundColor: C.panel,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+    position: "relative",
+  },
+  thumbnailImage: {
+    width: "100%",
+    height: "100%",
+  },
+  thumbnailOverlay: {
+    position: "absolute",
+    bottom: 6,
+    right: 8,
+    backgroundColor: "rgba(8, 9, 10, 0.75)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+  },
+  thumbnailHint: {
+    color: C.ink2,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  previewTextBox: {
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+    borderRadius: 6,
+    padding: 10,
+  },
+  previewTextContent: {
+    color: C.ink2,
+    fontSize: 12,
+    lineHeight: 18,
+  },
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    paddingTop: 4,
+  },
+  actionGroup: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  actionBtnPrimary: {
+    backgroundColor: C.brand,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  actionBtnTextPrimary: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  actionBtnSecondary: {
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderWidth: 1,
+    borderColor: C.line,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+  },
+  actionBtnTextSecondary: {
+    color: C.ink2,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  actionBtnGhost: {
+    paddingHorizontal: 8,
+    paddingVertical: 6,
+  },
+  actionBtnTextGhost: {
+    color: C.ink3,
+    fontSize: 12,
+  },
+  fileInfoRow: {
+    paddingVertical: 2,
+  },
+  fileInfoText: {
+    color: C.ink4,
+    fontSize: 11,
+  },
+  // Modal styles
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "#050607",
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.lineSubtle,
+  },
+  modalTitle: {
+    color: C.ink,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  modalSubtitle: {
+    color: C.ink3,
+    fontSize: 12,
+    marginTop: 2,
+  },
+  modalCloseBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: "rgba(255,255,255,0.06)",
+  },
+  modalCloseText: {
+    color: C.ink2,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  modalImageWrapper: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 8,
+  },
+  modalFullImage: {
+    width: "100%",
+    height: "100%",
+  },
+  modalFooter: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: C.lineSubtle,
+  },
+  modalFooterText: {
+    color: C.ink4,
+    fontSize: 12,
+  },
+});

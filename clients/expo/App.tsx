@@ -18,6 +18,7 @@ import {
   type Issue,
   type IssuePriority,
   type IssueWorkProduct,
+  type WorkspaceRuntimeService,
 } from "@coolie/api-client";
 import {
   C,
@@ -35,6 +36,8 @@ import { useRecorder } from "./src/useRecorder";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
 import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen";
+import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
+import { PrototypeSandboxScreen } from "./src/screens/PrototypeSandboxScreen";
 import { setupOTAListener } from "./src/OTA";
 
 /**
@@ -324,11 +327,16 @@ function HomeScreen({
   whoami: string;
   onSignOut: () => void;
 }) {
-  const [tab, setTab] = useState<"tasks" | "dashboard" | "diff" | "ontology">("tasks");
+  const [tab, setTab] = useState<"tasks" | "dashboard" | "diff" | "ontology" | "artifacts">("tasks");
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selected, setSelected] = useState<Issue | null>(null);
   const [diffContext, setDiffContext] = useState<{
     issue?: Issue | null;
+    workProduct?: IssueWorkProduct | null;
+  } | null>(null);
+  const [sandboxContext, setSandboxContext] = useState<{
+    url?: string | null;
+    service?: WorkspaceRuntimeService | null;
     workProduct?: IssueWorkProduct | null;
   } | null>(null);
   const [title, setTitle] = useState("");
@@ -403,6 +411,18 @@ function HomeScreen({
     }
   }, [companyId, recording, start, stop, loadIssues]);
 
+  if (sandboxContext) {
+    return (
+      <PrototypeSandboxScreen
+        company={company}
+        initialUrl={sandboxContext.url}
+        service={sandboxContext.service}
+        workProduct={sandboxContext.workProduct}
+        onBack={() => setSandboxContext(null)}
+      />
+    );
+  }
+
   if (diffContext) {
     return (
       <CodeDiffScreen
@@ -432,6 +452,22 @@ function HomeScreen({
     );
   }
 
+  if (tab === "artifacts") {
+    return (
+      <ArtifactsScreen
+        company={company}
+        whoami={whoami}
+        onBack={() => setTab("tasks")}
+        onOpenSandbox={(url, service, wp) =>
+          setSandboxContext({ url, service, workProduct: wp })
+        }
+        onOpenDiff={(issueItem, wp) =>
+          setDiffContext({ issue: issueItem, workProduct: wp })
+        }
+      />
+    );
+  }
+
   if (selected) {
     return (
       <TaskDetail
@@ -440,6 +476,9 @@ function HomeScreen({
         onBack={() => setSelected(null)}
         onOpenDiff={(issueItem, wp) =>
           setDiffContext({ issue: issueItem, workProduct: wp })
+        }
+        onOpenSandbox={(url, service, wp) =>
+          setSandboxContext({ url, service, workProduct: wp })
         }
       />
     );
@@ -467,7 +506,11 @@ function HomeScreen({
       </View>
 
       {/* 顶部标签切换分段器 */}
-      <View style={styles.tabSwitcher}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.tabSwitcher}
+      >
         <Pressable
           style={[styles.tabBtn, styles.tabBtnActive]}
           onPress={() => setTab("tasks")}
@@ -485,7 +528,10 @@ function HomeScreen({
         <Pressable style={styles.tabBtn} onPress={() => setTab("ontology")}>
           <Text style={styles.tabBtnText}>业务本体</Text>
         </Pressable>
-      </View>
+        <Pressable style={styles.tabBtn} onPress={() => setTab("artifacts")}>
+          <Text style={styles.tabBtnText}>产物与原型</Text>
+        </Pressable>
+      </ScrollView>
 
       {/* 概览统计卡片 (tabularNum + 亮度分层) */}
       <View style={styles.statRow}>
@@ -670,11 +716,17 @@ function TaskDetail({
   issue,
   onBack,
   onOpenDiff,
+  onOpenSandbox,
 }: {
   issue: Issue;
   company: Company;
   onBack: () => void;
   onOpenDiff: (issue: Issue, workProduct?: IssueWorkProduct) => void;
+  onOpenSandbox?: (
+    url: string,
+    service?: WorkspaceRuntimeService | null,
+    workProduct?: IssueWorkProduct | null,
+  ) => void;
 }) {
   const [workProducts, setWorkProducts] = useState<IssueWorkProduct[]>([]);
   const [loadingWp, setLoadingWp] = useState(false);
@@ -692,6 +744,10 @@ function TaskDetail({
       }
     })();
   }, [issue.id]);
+
+  const prototypeWp = workProducts.find(
+    (wp) => wp.url || wp.type === "prototype" || wp.runtimeServiceId,
+  );
 
   return (
     <Surface>
@@ -718,15 +774,33 @@ function TaskDetail({
         <DetailRow label="编号" value={issue.id} valueColor={C.ink3} isMono />
       </View>
 
-      {/* 核心动作: 查看代码 Diff (Linear 幽灵边框按钮) */}
-      <Pressable
-        style={styles.btnDiffAction}
-        onPress={() => onOpenDiff(issue)}
-      >
-        <Text style={styles.btnDiffActionText}>
-          🔍 查看工作区代码变更 (Diff)
-        </Text>
-      </Pressable>
+      {/* 核心动作: 查看代码 Diff 与 打开原型沙箱 */}
+      <View style={styles.rowGap}>
+        <Pressable
+          style={[styles.btnDiffAction, { flex: 1 }]}
+          onPress={() => onOpenDiff(issue)}
+        >
+          <Text style={styles.btnDiffActionText}>
+            🔍 代码 Diff
+          </Text>
+        </Pressable>
+        {onOpenSandbox && (
+          <Pressable
+            style={[
+              styles.btnPrimary,
+              { flex: 1, paddingVertical: 12 },
+              !prototypeWp && { backgroundColor: "rgba(94, 106, 210, 0.2)" },
+            ]}
+            onPress={() =>
+              onOpenSandbox(prototypeWp?.url || "", null, prototypeWp || null)
+            }
+          >
+            <Text style={styles.btnPrimaryText}>
+              🎮 原型沙箱
+            </Text>
+          </Pressable>
+        )}
+      </View>
 
       {/* 关联交付产物列表 */}
       {workProducts.length > 0 && (
@@ -734,26 +808,37 @@ function TaskDetail({
           <Text style={styles.sectionHeader}>
             关联交付产物 ({workProducts.length})
           </Text>
-          {workProducts.map((wp) => (
-            <Pressable
-              key={wp.id}
-              style={({ pressed }) => [
-                styles.wpCard,
-                pressed && styles.cardBtnPressed,
-              ]}
-              onPress={() => onOpenDiff(issue, wp)}
-            >
-              <View style={{ flex: 1, gap: 2 }}>
-                <Text style={styles.wpTitle} numberOfLines={1}>
-                  {wp.title}
+          {workProducts.map((wp) => {
+            const hasPrototype = Boolean(wp.url || wp.type === "prototype" || wp.runtimeServiceId);
+            return (
+              <Pressable
+                key={wp.id}
+                style={({ pressed }) => [
+                  styles.wpCard,
+                  pressed && styles.cardBtnPressed,
+                ]}
+                onPress={() => {
+                  if (hasPrototype && onOpenSandbox) {
+                    onOpenSandbox(wp.url || "", null, wp);
+                  } else {
+                    onOpenDiff(issue, wp);
+                  }
+                }}
+              >
+                <View style={{ flex: 1, gap: 2 }}>
+                  <Text style={styles.wpTitle} numberOfLines={1}>
+                    {wp.title}
+                  </Text>
+                  <Text style={styles.wpType}>
+                    类型: {wp.type} {wp.executionWorkspaceId ? "· 关联工作区" : ""}
+                  </Text>
+                </View>
+                <Text style={styles.wpLink}>
+                  {hasPrototype ? "看原型 🎮 ›" : "看 Diff ›"}
                 </Text>
-                <Text style={styles.wpType}>
-                  类型: {wp.type} {wp.executionWorkspaceId ? "· 关联工作区" : ""}
-                </Text>
-              </View>
-              <Text style={styles.wpLink}>看 Diff ›</Text>
-            </Pressable>
-          ))}
+              </Pressable>
+            );
+          })}
         </View>
       )}
       {loadingWp && (

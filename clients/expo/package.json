@@ -21,7 +21,9 @@
     "react": "18.3.1",
     "react-native": "0.76.5",
     "expo-updates": "~57.0.23",
-    "expo-constants": "~57.0.19"
+    "expo-constants": "~57.0.19",
+    "react-native-webview": "~14.0.1",
+    "expo-image": "~57.0.5"
   },
   "devDependencies": {
     "@types/react": "~18.3.12",

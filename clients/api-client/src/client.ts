@@ -5,11 +5,15 @@ import {
   type AgentIdentity,
   type CockpitDashboardMetrics,
   type Company,
+  type CompanyArtifact,
+  type CompanyArtifactsQuery,
+  type CompanyArtifactsResponse,
   type CreateIssueInput,
   type DashboardSummary,
   type ExecutionWorkspace,
   type GetWorkspaceDiffParams,
   type Issue,
+  type IssueAttachment,
   type IssueWorkProduct,
   type OntologyDomain,
   type OntologyDomainLifecycleState,
@@ -19,6 +23,7 @@ import {
   type VoiceDispatchInput,
   type VoiceDispatchResult,
   type WorkspaceDiffResponse,
+  type WorkspaceRuntimeService,
 } from "./types";
 
 export interface CoolieClientOptions {
@@ -291,13 +296,115 @@ export class CoolieClient {
 
   /**
    * 查询指定工单的交付产物列表 (包含代码库工作区、原型、附件等)
+   * 对应 GET /api/issues/:id/work-products
    */
-  async listWorkProducts(issueId: string): Promise<IssueWorkProduct[]> {
+  async listWorkProducts(
+    issueId: string,
+    opts?: { refreshPullRequests?: boolean },
+  ): Promise<IssueWorkProduct[]> {
+    const q = new URLSearchParams();
+    if (opts?.refreshPullRequests) q.set("refreshPullRequests", "true");
+    const suffix = q.size > 0 ? `?${q.toString()}` : "";
     const body = await this.request<IssueWorkProduct[]>(
       "GET",
-      `/api/issues/${encodeURIComponent(issueId)}/work-products`,
+      `/api/issues/${encodeURIComponent(issueId)}/work-products${suffix}`,
     );
     return Array.isArray(body) ? body : [];
+  }
+
+  /**
+   * 查询公司产物中心投影列表 (需求③看产物)
+   * 聚合工单交付物(work products)、附件(attachments)与文档(documents)
+   * 对应 GET /api/companies/:companyId/artifacts
+   */
+  async listArtifacts(
+    companyId: string,
+    query?: CompanyArtifactsQuery,
+  ): Promise<CompanyArtifactsResponse> {
+    const q = new URLSearchParams();
+    if (query?.kind && query.kind !== "all") q.set("kind", query.kind);
+    if (query?.projectId) q.set("projectId", query.projectId);
+    if (query?.q) q.set("q", query.q);
+    if (query?.groupBy && query.groupBy !== "none") q.set("groupBy", query.groupBy);
+    if (query?.groupIssueId) q.set("groupIssueId", query.groupIssueId);
+    if (query?.starred !== undefined) q.set("starred", String(query.starred));
+    if (query?.limit !== undefined) q.set("limit", String(query.limit));
+    if (query?.cursor) q.set("cursor", query.cursor);
+
+    const suffix = q.size > 0 ? `?${q.toString()}` : "";
+    const res = await this.request<CompanyArtifactsResponse | { artifacts?: CompanyArtifact[] }>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/artifacts${suffix}`,
+    );
+
+    if (isRecord(res) && Array.isArray(res.artifacts)) {
+      return {
+        artifacts: res.artifacts,
+        groups: Array.isArray((res as CompanyArtifactsResponse).groups)
+          ? (res as CompanyArtifactsResponse).groups
+          : undefined,
+        selectedGroup: (res as CompanyArtifactsResponse).selectedGroup ?? null,
+        nextCursor: typeof (res as CompanyArtifactsResponse).nextCursor === "string"
+          ? (res as CompanyArtifactsResponse).nextCursor
+          : null,
+      };
+    }
+    if (Array.isArray(res)) {
+      return { artifacts: res, nextCursor: null };
+    }
+    return { artifacts: [], nextCursor: null };
+  }
+
+  /**
+   * 查询指定工单的附件列表 (需求③)
+   * 对应 GET /api/issues/:issueId/attachments
+   */
+  async listAttachments(
+    issueId: string,
+    companyId?: string,
+  ): Promise<IssueAttachment[]> {
+    try {
+      const body = await this.request<IssueAttachment[]>(
+        "GET",
+        `/api/issues/${encodeURIComponent(issueId)}/attachments`,
+      );
+      return Array.isArray(body) ? body : [];
+    } catch (err) {
+      if (companyId && err instanceof CoolieApiError && (err.status === 404 || err.status === 405)) {
+        const body = await this.request<IssueAttachment[]>(
+          "GET",
+          `/api/companies/${encodeURIComponent(companyId)}/issues/${encodeURIComponent(issueId)}/attachments`,
+        );
+        return Array.isArray(body) ? body : [];
+      }
+      throw err;
+    }
+  }
+
+  /**
+   * 查询执行工作区内运行中的服务暴露地址与状态 (需求⑤看原型)
+   * 遍历 execution-workspaces 获取 workspace_runtime_services
+   */
+  async listRuntimeServices(
+    companyId: string,
+    opts?: { issueId?: string; projectId?: string; status?: string },
+  ): Promise<WorkspaceRuntimeService[]> {
+    const workspaces = await this.listExecutionWorkspaces(companyId, opts);
+    const services: WorkspaceRuntimeService[] = [];
+    for (const ws of workspaces) {
+      if (Array.isArray(ws.runtimeServices)) {
+        for (const s of ws.runtimeServices) {
+          if (!s.executionWorkspaceId && ws.id) {
+            s.executionWorkspaceId = ws.id;
+          }
+          if (opts?.status && s.status !== opts.status) {
+            continue;
+          }
+          services.push(s);
+        }
+      }
+    }
+    return services;
   }
 
   /**

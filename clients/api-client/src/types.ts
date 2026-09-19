@@ -342,6 +342,7 @@ export interface ExecutionWorkspace {
   repoUrl?: string | null;
   baseRef?: string | null;
   branchName?: string | null;
+  runtimeServices?: WorkspaceRuntimeService[];
   createdAt?: string;
   updatedAt?: string;
 }
@@ -440,5 +441,145 @@ export interface SetDomainLifecycleOptions {
   actor?: string;
   reason?: string;
   deviceInfo?: string;
+}
+
+// --- Artifacts Hub (需求③看产物) ---
+
+export type CompanyArtifactSource = "document" | "attachment" | "work_product";
+
+export type CompanyArtifactMediaKind =
+  | "image"
+  | "video"
+  | "text"
+  | "document"
+  | "file"
+  | "empty";
+
+export type CompanyArtifactGroupBy = "none" | "task" | "parent_task";
+
+export interface CompanyArtifactIssueSummary {
+  id: string;
+  identifier: string;
+  title: string;
+}
+
+export interface CompanyArtifactProjectSummary {
+  id: string;
+  name: string;
+}
+
+export interface CompanyArtifactAgentSummary {
+  id: string;
+  name: string;
+}
+
+export interface CompanyArtifact {
+  id: string;
+  source: CompanyArtifactSource;
+  mediaKind: CompanyArtifactMediaKind;
+  title: string;
+  previewText: string | null;
+  contentType: string | null;
+  contentPath: string | null;
+  openPath: string | null;
+  downloadPath: string | null;
+  issue: CompanyArtifactIssueSummary;
+  project: CompanyArtifactProjectSummary | null;
+  createdByAgent: CompanyArtifactAgentSummary | null;
+  updatedAt: string;
+  href: string;
+}
+
+export interface CompanyArtifactGroup {
+  id: string;
+  groupBy: Exclude<CompanyArtifactGroupBy, "none">;
+  issue: CompanyArtifactIssueSummary;
+  title: string;
+  count: number;
+  mediaKinds: CompanyArtifactMediaKind[];
+  previewArtifacts: CompanyArtifact[];
+  updatedAt: string;
+  href: string;
+}
+
+export interface CompanyArtifactsResponse {
+  artifacts: CompanyArtifact[];
+  groups?: CompanyArtifactGroup[];
+  selectedGroup?: CompanyArtifactGroup | null;
+  nextCursor: string | null;
+}
+
+export interface CompanyArtifactsQuery {
+  kind?: CompanyArtifactMediaKind | "all";
+  projectId?: string;
+  q?: string;
+  groupBy?: CompanyArtifactGroupBy;
+  groupIssueId?: string;
+  starred?: boolean;
+  limit?: number;
+  cursor?: string;
+}
+
+export interface IssueAttachment {
+  id: string;
+  companyId: string;
+  issueId: string;
+  issueCommentId?: string | null;
+  assetId: string;
+  provider: string;
+  objectKey: string;
+  contentType: string;
+  byteSize: number;
+  sha256: string;
+  originalFilename: string | null;
+  createdByAgentId?: string | null;
+  createdByUserId?: string | null;
+  createdAt: string | Date;
+  updatedAt: string | Date;
+  contentPath: string;
+  openPath?: string;
+}
+
+// --- Workspace Runtime Services & Prototype Sandbox (需求⑤看原型) ---
+
+export interface RuntimeExposureStatus {
+  type?: string;
+  hostname?: string;
+  port?: number;
+  url?: string;
+  state?: string;
+  [key: string]: unknown;
+}
+
+export interface WorkspaceRuntimeService {
+  id: string;
+  companyId: string;
+  projectId?: string | null;
+  projectWorkspaceId?: string | null;
+  executionWorkspaceId?: string | null;
+  issueId?: string | null;
+  scopeType?: "project_workspace" | "execution_workspace" | "run" | "agent" | string;
+  scopeId?: string | null;
+  serviceName: string;
+  status: "provisioning" | "starting" | "running" | "stopped" | "failed" | string;
+  lifecycle?: "shared" | "ephemeral" | string;
+  reuseKey?: string | null;
+  command?: string | null;
+  cwd?: string | null;
+  port?: number | null;
+  url?: string | null;
+  provider?: "local_process" | "adapter_managed" | string;
+  providerRef?: string | null;
+  ownerAgentId?: string | null;
+  startedByRunId?: string | null;
+  lastUsedAt?: string | Date;
+  startedAt?: string | Date;
+  stoppedAt?: string | Date | null;
+  stopPolicy?: Record<string, unknown> | null;
+  healthStatus?: "unknown" | "healthy" | "unhealthy" | string;
+  exposure?: RuntimeExposureStatus | null;
+  configIndex?: number | null;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 }
 

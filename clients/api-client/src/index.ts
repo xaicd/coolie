@@ -47,5 +47,18 @@ export type {
   OntologyGraphEdge,
   OntologyGraphSnapshot,
   SetDomainLifecycleOptions,
+  CompanyArtifactSource,
+  CompanyArtifactMediaKind,
+  CompanyArtifactGroupBy,
+  CompanyArtifactIssueSummary,
+  CompanyArtifactProjectSummary,
+  CompanyArtifactAgentSummary,
+  CompanyArtifact,
+  CompanyArtifactGroup,
+  CompanyArtifactsResponse,
+  CompanyArtifactsQuery,
+  IssueAttachment,
+  RuntimeExposureStatus,
+  WorkspaceRuntimeService,
 } from "./types";
 
