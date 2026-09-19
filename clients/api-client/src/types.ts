@@ -583,3 +583,80 @@ export interface WorkspaceRuntimeService {
   updatedAt?: string | Date;
 }
 
+// --- Board Chat & Concierge Streaming (需求⑫ 驾驶舱问答) ---
+
+export interface BoardChatMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  text: string;
+  createdAt: string | Date;
+  status?: string;
+  pending?: boolean;
+}
+
+export interface BoardChatStreamInput {
+  companyId: string;
+  message: string;
+  taskId?: string;
+  signal?: AbortSignal;
+}
+
+export type BoardChatStreamEvent =
+  | { type: "start"; issueId: string }
+  | { type: "status"; text: string }
+  | { type: "chunk"; text: string }
+  | { type: "done"; issueId: string; exitCode?: number; timedOut?: boolean }
+  | { type: "error"; message: string };
+
+export interface BoardChatStreamCallbacks {
+  onStart?: (issueId: string) => void;
+  onStatus?: (text: string) => void;
+  onChunk?: (text: string) => void;
+  onDone?: (event: { issueId: string; exitCode?: number; timedOut?: boolean }) => void;
+  onError?: (error: Error | string) => void;
+  onEvent?: (event: BoardChatStreamEvent) => void;
+}
+
+// --- Approvals & Governance (快捷审批闭环) ---
+
+export type ApprovalStatus =
+  | "pending"
+  | "approved"
+  | "rejected"
+  | "revision_requested";
+
+export interface Approval {
+  id: string;
+  companyId: string;
+  type: string;
+  status: ApprovalStatus;
+  payload: Record<string, unknown>;
+  requestedByAgentId?: string | null;
+  requestedByUserId?: string | null;
+  decisionNote?: string | null;
+  decidedByUserId?: string | null;
+  decidedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  title?: string | null;
+  description?: string | null;
+}
+
+export interface ApprovalComment {
+  id: string;
+  approvalId: string;
+  authorUserId?: string | null;
+  authorAgentId?: string | null;
+  body: string;
+  createdAt: string;
+}
+
+export interface ResolveApprovalOptions {
+  decision: "approve" | "reject";
+  decisionNote?: string;
+}
+
+export interface ListApprovalsOptions {
+  status?: string;
+}
+

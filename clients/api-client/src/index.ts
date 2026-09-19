@@ -60,5 +60,14 @@ export type {
   IssueAttachment,
   RuntimeExposureStatus,
   WorkspaceRuntimeService,
+  BoardChatMessage,
+  BoardChatStreamInput,
+  BoardChatStreamEvent,
+  BoardChatStreamCallbacks,
+  ApprovalStatus,
+  Approval,
+  ApprovalComment,
+  ResolveApprovalOptions,
+  ListApprovalsOptions,
 } from "./types";
 

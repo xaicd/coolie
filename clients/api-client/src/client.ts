@@ -24,6 +24,14 @@ import {
   type VoiceDispatchResult,
   type WorkspaceDiffResponse,
   type WorkspaceRuntimeService,
+  type Approval,
+  type ApprovalComment,
+  type BoardChatMessage,
+  type BoardChatStreamCallbacks,
+  type BoardChatStreamEvent,
+  type BoardChatStreamInput,
+  type ListApprovalsOptions,
+  type ResolveApprovalOptions,
 } from "./types";
 
 export interface CoolieClientOptions {
@@ -506,6 +514,268 @@ export class CoolieClient {
       }
       throw err;
     }
+  }
+
+  // ── Board Chat & Concierge Streaming (需求⑫ 驾驶舱问答) ────────────
+
+  /**
+   * 驾驶舱流式问答 (POST /api/board/chat/stream)
+   * 消费 SSE text/event-stream 事件流 (start, status, chunk, done, error)
+   */
+  async streamBoardChat(
+    input: BoardChatStreamInput,
+    callbacks?: BoardChatStreamCallbacks,
+  ): Promise<{ fullText: string; issueId?: string }> {
+    const headers: Record<string, string> = {
+      Accept: "text/event-stream",
+      "Content-Type": "application/json",
+    };
+    if (this.originHeader) headers.Origin = this.originHeader;
+    Object.assign(headers, await this.getAuthHeader());
+
+    const res = await this.fetchImpl(`${this.baseUrl}/api/board/chat/stream`, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        companyId: input.companyId,
+        message: input.message,
+        taskId: input.taskId,
+      }),
+      signal: input.signal,
+      credentials: "include",
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      const parsed = text ? safeJson(text) : null;
+      const code =
+        isRecord(parsed) && typeof parsed.code === "string"
+          ? parsed.code
+          : isRecord(parsed) && typeof parsed.error === "string"
+            ? parsed.error
+            : undefined;
+      const message =
+        (isRecord(parsed) && typeof parsed.message === "string" && parsed.message) ||
+        (isRecord(parsed) && typeof parsed.error === "string" && parsed.error) ||
+        `Board chat stream request failed: ${res.status}`;
+      const err = new CoolieApiError(res.status, message, code, parsed);
+      callbacks?.onError?.(err);
+      throw err;
+    }
+
+    let buffer = "";
+    let fullText = "";
+    let resolvedIssueId: string | undefined = input.taskId;
+
+    const dispatchLine = (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed.startsWith("data:")) return;
+      const jsonStr = trimmed.replace(/^data:\s*/, "");
+      if (!jsonStr) return;
+      try {
+        const event = JSON.parse(jsonStr) as BoardChatStreamEvent;
+        callbacks?.onEvent?.(event);
+        if (event.type === "start") {
+          resolvedIssueId = event.issueId;
+          callbacks?.onStart?.(event.issueId);
+        } else if (event.type === "status") {
+          callbacks?.onStatus?.(event.text);
+        } else if (event.type === "chunk") {
+          fullText += event.text;
+          callbacks?.onChunk?.(event.text);
+        } else if (event.type === "done") {
+          if (event.issueId) resolvedIssueId = event.issueId;
+          callbacks?.onDone?.(event);
+        } else if (event.type === "error") {
+          callbacks?.onError?.(event.message);
+        }
+      } catch {
+        // Ignore partial/unparseable SSE lines
+      }
+    };
+
+    if (res.body && typeof (res.body as any).getReader === "function") {
+      const reader = (res.body as any).getReader();
+      const decoder = typeof TextDecoder !== "undefined" ? new TextDecoder() : null;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          const chunk = decoder
+            ? decoder.decode(value, { stream: true })
+            : typeof value === "string"
+              ? value
+              : String.fromCharCode(...value);
+          buffer += chunk;
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            dispatchLine(line);
+          }
+        }
+      } catch (err: any) {
+        if (input.signal?.aborted) {
+          return { fullText, issueId: resolvedIssueId };
+        }
+        callbacks?.onError?.(err instanceof Error ? err : String(err));
+        throw err;
+      }
+    } else if (res.body && Symbol.asyncIterator in (res.body as any)) {
+      const decoder = typeof TextDecoder !== "undefined" ? new TextDecoder() : null;
+      try {
+        for await (const value of res.body as any) {
+          const chunk = decoder
+            ? decoder.decode(value, { stream: true })
+            : typeof value === "string"
+              ? value
+              : String.fromCharCode(...value);
+          buffer += chunk;
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+          for (const line of lines) {
+            dispatchLine(line);
+          }
+        }
+      } catch (err: any) {
+        if (input.signal?.aborted) {
+          return { fullText, issueId: resolvedIssueId };
+        }
+        callbacks?.onError?.(err instanceof Error ? err : String(err));
+        throw err;
+      }
+    } else {
+      const text = await res.text();
+      for (const line of text.split("\n")) {
+        dispatchLine(line);
+      }
+    }
+
+    if (buffer.trim()) {
+      dispatchLine(buffer);
+    }
+
+    return { fullText, issueId: resolvedIssueId };
+  }
+
+  /**
+   * 获取任务评论列表 (GET /api/issues/:id/comments)
+   */
+  async listIssueComments(issueId: string): Promise<
+    Array<{
+      id: string;
+      body: string;
+      createdAt: string;
+      authorUserId?: string | null;
+      authorAgentId?: string | null;
+    }>
+  > {
+    return this.request(
+      "GET",
+      `/api/issues/${encodeURIComponent(issueId)}/comments?order=asc`,
+    );
+  }
+
+  /**
+   * 获取驾驶舱问答历史会话 (基于常驻 "Board Operations" Issue)
+   */
+  async getBoardChatHistory(
+    companyId: string,
+    taskId?: string,
+  ): Promise<{ issueId: string | null; messages: BoardChatMessage[] }> {
+    let issueId = taskId;
+    if (!issueId) {
+      const issues = await this.listIssues(companyId, { limit: 50 });
+      const boardIssue = issues.find(
+        (i) =>
+          i.title === "Board Operations" &&
+          i.status !== "done" &&
+          i.status !== "cancelled",
+      );
+      if (boardIssue) {
+        issueId = boardIssue.id;
+      }
+    }
+
+    if (!issueId) {
+      return { issueId: null, messages: [] };
+    }
+
+    try {
+      const comments = await this.listIssueComments(issueId);
+      const messages: BoardChatMessage[] = comments.map((c) => ({
+        id: c.id,
+        role: !c.authorAgentId && c.authorUserId === "board-concierge" ? "assistant" : "user",
+        text: c.body,
+        createdAt: c.createdAt,
+      }));
+      return { issueId, messages };
+    } catch {
+      return { issueId, messages: [] };
+    }
+  }
+
+  // ── Approvals & Governance (快捷审批闭环) ───────────────────────────
+
+  /**
+   * 查询公司审批列表 (GET /api/companies/:companyId/approvals)
+   */
+  async listApprovals(
+    companyId: string,
+    opts?: string | ListApprovalsOptions,
+  ): Promise<Approval[]> {
+    const status = typeof opts === "string" ? opts : opts?.status;
+    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+    return this.request<Approval[]>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/approvals${query}`,
+    );
+  }
+
+  /**
+   * 查询审批单详情 (GET /api/approvals/:id)
+   */
+  async getApproval(id: string): Promise<Approval> {
+    return this.request<Approval>("GET", `/api/approvals/${encodeURIComponent(id)}`);
+  }
+
+  /**
+   * 同意/批准审批 (POST /api/approvals/:id/approve)
+   */
+  async approveApproval(id: string, decisionNote?: string): Promise<Approval> {
+    return this.request<Approval>(
+      "POST",
+      `/api/approvals/${encodeURIComponent(id)}/approve`,
+      { decisionNote },
+    );
+  }
+
+  /**
+   * 驳回审批 (POST /api/approvals/:id/reject)
+   */
+  async rejectApproval(id: string, decisionNote?: string): Promise<Approval> {
+    return this.request<Approval>(
+      "POST",
+      `/api/approvals/${encodeURIComponent(id)}/reject`,
+      { decisionNote },
+    );
+  }
+
+  /**
+   * 裁决审批 (一键同意或驳回，兼容 resolve / approve / reject 语义)
+   */
+  async resolveApproval(
+    id: string,
+    decisionOrOpts: "approve" | "reject" | ResolveApprovalOptions,
+    decisionNote?: string,
+  ): Promise<Approval> {
+    const decision =
+      typeof decisionOrOpts === "object" ? decisionOrOpts.decision : decisionOrOpts;
+    const note =
+      typeof decisionOrOpts === "object" ? decisionOrOpts.decisionNote : decisionNote;
+    if (decision === "approve") {
+      return this.approveApproval(id, note);
+    }
+    return this.rejectApproval(id, note);
   }
 }
 

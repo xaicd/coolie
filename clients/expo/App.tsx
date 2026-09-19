@@ -38,6 +38,8 @@ import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
 import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen";
 import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
 import { PrototypeSandboxScreen } from "./src/screens/PrototypeSandboxScreen";
+import { BoardChatScreen } from "./src/screens/BoardChatScreen";
+import { QuickApprovalCard } from "./src/components/QuickApprovalCard";
 import { setupOTAListener } from "./src/OTA";
 
 /**
@@ -327,7 +329,9 @@ function HomeScreen({
   whoami: string;
   onSignOut: () => void;
 }) {
-  const [tab, setTab] = useState<"tasks" | "dashboard" | "diff" | "ontology" | "artifacts">("tasks");
+  const [tab, setTab] = useState<
+    "tasks" | "dashboard" | "diff" | "ontology" | "artifacts" | "chat"
+  >("tasks");
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selected, setSelected] = useState<Issue | null>(null);
   const [diffContext, setDiffContext] = useState<{
@@ -468,6 +472,16 @@ function HomeScreen({
     );
   }
 
+  if (tab === "chat") {
+    return (
+      <BoardChatScreen
+        company={company}
+        whoami={whoami}
+        onBack={() => setTab("tasks")}
+      />
+    );
+  }
+
   if (selected) {
     return (
       <TaskDetail
@@ -518,6 +532,9 @@ function HomeScreen({
           <Text style={[styles.tabBtnText, styles.tabBtnTextActive]}>
             任务工单 ({issues.length})
           </Text>
+        </Pressable>
+        <Pressable style={styles.tabBtn} onPress={() => setTab("chat")}>
+          <Text style={styles.tabBtnText}>驾驶舱问答</Text>
         </Pressable>
         <Pressable style={styles.tabBtn} onPress={() => setTab("dashboard")}>
           <Text style={styles.tabBtnText}>效能驾驶舱</Text>
@@ -708,6 +725,7 @@ function HomeScreen({
           }}
         />
       )}
+      <QuickApprovalCard companyId={companyId} floating={true} />
     </Surface>
   );
 }
