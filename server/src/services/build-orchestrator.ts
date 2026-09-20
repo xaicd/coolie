@@ -1,4 +1,7 @@
 import { spawn } from "node:child_process";
+import { readFileSync, statSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Db } from "@paperclipai/db";
 import {
   getAgentWorkEligibility,
@@ -103,6 +106,9 @@ export interface BuildPlanStepIssue extends BuildPlanStep {
   identifier: string | null;
   status: string;
   assigneeAgentId: string | null;
+  /** How this step's first dispatch was paced. Null when nothing was dispatched,
+   * which is the case for every step that is still waiting on its predecessor. */
+  pacing: BuildStepPacing | null;
 }
 
 export interface BuildActor {
@@ -332,16 +338,477 @@ export async function generateBuildPlan(input: {
 }
 
 /**
+ * Dispatch pacing.
+ *
+ * A step is dispatched by waking its assignee, and that wake is what makes an
+ * adapter spawn its CLI. Firing those wakes back-to-back is what trips a
+ * provider's per-minute rate limit, so each dispatch is gated by a per-worker
+ * cool-down: a worker that dispatched too recently parks the step until its next
+ * eligible slot instead of failing the build request.
+ *
+ * The policy lives in `server/src/config/build-orchestrator.json` so the
+ * cool-downs can be tuned without a rebuild. The loader re-reads that file on
+ * every dispatch and degrades to the built-in defaults when it is missing or
+ * malformed. A worker's class comes from its `adapterType`, because that is what
+ * decides which CLI is actually spawned.
+ *
+ * Pacing state is process-local. It is a cool-down between two dispatches, not
+ * durability-relevant data, so it is deliberately not a table.
+ */
+
+export interface BuildWorkerClassPolicy {
+  /** Shown in the log line and in the build-start response. */
+  label: string;
+  minIntervalSeconds: number;
+}
+
+export interface BuildOrchestratorConfig {
+  version: number;
+  /** `false` disables pacing entirely; every step dispatches immediately. */
+  enabled: boolean;
+  defaultClass: string;
+  classes: Record<string, BuildWorkerClassPolicy>;
+  /** `agent.adapterType` -> a key of `classes`. */
+  adapterClass: Record<string, string>;
+}
+
+/** Mirrors `server/src/config/build-orchestrator.json` for the no-file case. */
+export const DEFAULT_BUILD_ORCHESTRATOR_CONFIG: BuildOrchestratorConfig = {
+  version: 1,
+  enabled: true,
+  defaultClass: "cmd",
+  classes: {
+    cmd: { label: "cmd 型", minIntervalSeconds: 180 },
+    claude: { label: "claude 型", minIntervalSeconds: 30 },
+  },
+  adapterClass: {
+    process: "cmd",
+    hermes_local: "cmd",
+    hermes_gateway: "cmd",
+    claude_local: "claude",
+  },
+};
+
+/** A typo in the config must not park a step for a day. */
+const MIN_INTERVAL_CEILING_SECONDS = 3_600;
+const CONFIG_FILE_NAME = "build-orchestrator.json";
+
+export interface BuildPacingDecision {
+  allowed: boolean;
+  workerClass: string;
+  classLabel: string;
+  minIntervalSeconds: number;
+  /** Milliseconds until the next eligible slot; 0 when already allowed. */
+  waitMs: number;
+  /** Epoch ms of the next eligible slot; null when already allowed. */
+  retryAtMs: number | null;
+}
+
+/** Cool-down snapshot for one step, surfaced in the build-start response. */
+export interface BuildStepPacing {
+  state: "dispatched" | "waiting";
+  workerClass: string;
+  classLabel: string;
+  minIntervalSeconds: number;
+  /** Remaining cool-down at the instant this snapshot was taken. */
+  waitMs: number;
+  /** Epoch ms when the parked step becomes eligible; null when dispatched. */
+  waitUntilMs: number | null;
+}
+
+function isReadableFile(candidate: string): boolean {
+  try {
+    return statSync(candidate).isFile();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Where the policy file is, or null when there is no file to read. An explicit
+ * `BUILD_ORCHESTRATOR_CONFIG` is honoured on its own: the operator named a file,
+ * so silently reading a different one would hide the typo.
+ */
+export function resolveBuildOrchestratorConfigPath(): string | null {
+  const override = process.env.BUILD_ORCHESTRATOR_CONFIG?.trim();
+  if (override) return path.resolve(override);
+
+  const moduleDir = path.dirname(fileURLToPath(import.meta.url));
+  const candidates = [
+    // Dev (tsx runs from src) and a packaged install that ships `config` next to
+    // the compiled module.
+    path.join(moduleDir, "..", "config", CONFIG_FILE_NAME),
+    // A build run out of a checkout: dist/services -> src/config.
+    path.join(moduleDir, "..", "..", "src", "config", CONFIG_FILE_NAME),
+    path.join(process.cwd(), "server", "src", "config", CONFIG_FILE_NAME),
+    path.join(process.cwd(), "src", "config", CONFIG_FILE_NAME),
+  ];
+  return candidates.find(isReadableFile) ?? null;
+}
+
+function normalizeClassPolicy(value: unknown): BuildWorkerClassPolicy | null {
+  if (!value || typeof value !== "object") return null;
+  const record = value as Record<string, unknown>;
+  const seconds = record.minIntervalSeconds;
+  if (typeof seconds !== "number" || !Number.isFinite(seconds) || seconds < 0) {
+    return null;
+  }
+  return {
+    label: typeof record.label === "string" ? record.label.trim() : "",
+    minIntervalSeconds: Math.min(Math.round(seconds), MIN_INTERVAL_CEILING_SECONDS),
+  };
+}
+
+/**
+ * A partly-valid file is rejected whole rather than merged with the defaults: a
+ * policy that is half the operator's and half the built-in one is harder to
+ * reason about than one that is wholly either, and the log line says which.
+ */
+function normalizeBuildOrchestratorConfig(
+  raw: unknown,
+  configPath: string,
+): BuildOrchestratorConfig {
+  const record =
+    raw && typeof raw === "object" ? (raw as Record<string, unknown>) : null;
+
+  const classes: Record<string, BuildWorkerClassPolicy> = {};
+  const rawClasses = record?.classes;
+  if (rawClasses && typeof rawClasses === "object") {
+    for (const [name, value] of Object.entries(
+      rawClasses as Record<string, unknown>,
+    )) {
+      const policy = normalizeClassPolicy(value);
+      if (policy) classes[name] = policy;
+    }
+  }
+
+  const defaultClass =
+    typeof record?.defaultClass === "string" ? record.defaultClass : "";
+  if (!classes[defaultClass]) {
+    logger.warn(
+      { configPath, defaultClass },
+      "build orchestrator config has no usable `classes`/`defaultClass`; using the built-in pacing defaults",
+    );
+    return DEFAULT_BUILD_ORCHESTRATOR_CONFIG;
+  }
+
+  const adapterClass: Record<string, string> = {};
+  const rawAdapterClass = record?.adapterClass;
+  if (rawAdapterClass && typeof rawAdapterClass === "object") {
+    for (const [adapterType, className] of Object.entries(
+      rawAdapterClass as Record<string, unknown>,
+    )) {
+      if (typeof className === "string" && classes[className]) {
+        adapterClass[adapterType] = className;
+      }
+    }
+  }
+
+  return {
+    version: typeof record?.version === "number" ? record.version : 1,
+    enabled: record?.enabled !== false,
+    defaultClass,
+    classes,
+    adapterClass,
+  };
+}
+
+let configCache: {
+  configPath: string;
+  raw: string;
+  config: BuildOrchestratorConfig;
+} | null = null;
+
+/**
+ * The active policy. Reading the file on every dispatch is what lets the boss
+ * retune a cool-down without restarting the server; the raw text is the cache
+ * key, so an unchanged file is parsed once.
+ */
+export function loadBuildOrchestratorConfig(): BuildOrchestratorConfig {
+  const configPath = resolveBuildOrchestratorConfigPath();
+  if (!configPath) return DEFAULT_BUILD_ORCHESTRATOR_CONFIG;
+
+  try {
+    const raw = readFileSync(configPath, "utf8");
+    if (configCache?.configPath === configPath && configCache.raw === raw) {
+      return configCache.config;
+    }
+    const config = normalizeBuildOrchestratorConfig(JSON.parse(raw), configPath);
+    configCache = { configPath, raw, config };
+    return config;
+  } catch (error) {
+    logger.warn(
+      { err: error, configPath },
+      "build orchestrator config is unreadable; using the built-in pacing defaults",
+    );
+    return DEFAULT_BUILD_ORCHESTRATOR_CONFIG;
+  }
+}
+
+/**
+ * The class and cool-down for one worker. Normalization guarantees every
+ * `adapterClass` value and `defaultClass` names an existing class, so the lookup
+ * below cannot miss.
+ */
+export function resolveWorkerPolicy(
+  config: BuildOrchestratorConfig,
+  adapterType: string | null | undefined,
+): { workerClass: string; policy: BuildWorkerClassPolicy } {
+  const workerClass =
+    (adapterType ? config.adapterClass[adapterType] : undefined) ??
+    config.defaultClass;
+  return { workerClass, policy: config.classes[workerClass]! };
+}
+
+/** Last dispatch per worker, keyed by agent id. */
+const workerLastDispatchAtMs = new Map<string, number>();
+
+export function decideBuildDispatchPacing(input: {
+  agentId: string;
+  adapterType: string | null | undefined;
+  nowMs: number;
+  config?: BuildOrchestratorConfig;
+}): BuildPacingDecision {
+  const config = input.config ?? loadBuildOrchestratorConfig();
+  const { workerClass, policy } = resolveWorkerPolicy(config, input.adapterType);
+  const base = {
+    workerClass,
+    classLabel: policy.label,
+    minIntervalSeconds: policy.minIntervalSeconds,
+  };
+
+  const intervalMs = policy.minIntervalSeconds * 1000;
+  const lastDispatchAtMs = workerLastDispatchAtMs.get(input.agentId);
+  if (!config.enabled || intervalMs <= 0 || lastDispatchAtMs === undefined) {
+    return { ...base, allowed: true, waitMs: 0, retryAtMs: null };
+  }
+
+  const retryAtMs = lastDispatchAtMs + intervalMs;
+  const waitMs = retryAtMs - input.nowMs;
+  if (waitMs <= 0) {
+    return { ...base, allowed: true, waitMs: 0, retryAtMs: null };
+  }
+  return { ...base, allowed: false, waitMs, retryAtMs };
+}
+
+interface ParkedBuildStep {
+  deps: BuildOrchestratorDeps;
+  heartbeat: IssueAssignmentWakeupDeps;
+  buildId: string;
+  kind: BuildStepKind;
+  actor: BuildActor;
+  issue: { id: string; assigneeAgentId: string; status: string };
+  adapterType: string | null;
+  retryAtMs: number;
+  parkedAtMs: number;
+}
+
+const parkedBuildSteps = new Map<string, ParkedBuildStep>();
+const parkedBuildStepTimers = new Map<string, NodeJS.Timeout>();
+
+function clearParkedTimer(issueId: string): void {
+  const timer = parkedBuildStepTimers.get(issueId);
+  if (!timer) return;
+  clearTimeout(timer);
+  parkedBuildStepTimers.delete(issueId);
+}
+
+function scheduleParkedRelease(issueId: string, delayMs: number): void {
+  clearParkedTimer(issueId);
+  const timer = setTimeout(() => {
+    void releaseParkedBuildStep(issueId);
+  }, Math.max(0, delayMs));
+  // A parked step must never hold the process open.
+  timer.unref();
+  parkedBuildStepTimers.set(issueId, timer);
+}
+
+/**
+ * Wake the assignee of a step that was parked on its worker's rate limit.
+ * Nothing here assumes the cool-down elapsed cleanly: an earlier parked step for
+ * the same worker may have taken the slot, and the step itself may have closed
+ * or been reassigned while it waited.
+ */
+async function releaseParkedBuildStep(issueId: string): Promise<void> {
+  parkedBuildStepTimers.delete(issueId);
+  const parked = parkedBuildSteps.get(issueId);
+  if (!parked) return;
+
+  const nowMs = Date.now();
+  const decision = decideBuildDispatchPacing({
+    agentId: parked.issue.assigneeAgentId,
+    adapterType: parked.adapterType,
+    nowMs,
+  });
+  if (!decision.allowed) {
+    parked.retryAtMs = decision.retryAtMs ?? nowMs + 1_000;
+    scheduleParkedRelease(issueId, parked.retryAtMs - nowMs);
+    return;
+  }
+
+  parkedBuildSteps.delete(issueId);
+
+  let current: { status: string; assigneeAgentId: string | null };
+  try {
+    const row = await issueService(parked.deps.db).getById(issueId);
+    if (!row) {
+      logger.warn(
+        { issueId, buildId: parked.buildId },
+        "parked build step no longer exists; dropping the wake",
+      );
+      return;
+    }
+    current = { status: row.status, assigneeAgentId: row.assigneeAgentId ?? null };
+  } catch (error) {
+    logger.warn(
+      { err: error, issueId },
+      "could not re-read a parked build step; dispatching on the parked snapshot",
+    );
+    current = {
+      status: parked.issue.status,
+      assigneeAgentId: parked.issue.assigneeAgentId,
+    };
+  }
+
+  if (current.status === "done" || current.status === "cancelled") {
+    logger.info(
+      { issueId, status: current.status },
+      "parked build step closed while cooling down; dropping the wake",
+    );
+    return;
+  }
+  if (!current.assigneeAgentId) {
+    logger.info(
+      { issueId },
+      "parked build step lost its assignee while cooling down; dropping the wake",
+    );
+    return;
+  }
+
+  workerLastDispatchAtMs.set(current.assigneeAgentId, nowMs);
+  await queueIssueAssignmentWakeup({
+    heartbeat: parked.heartbeat,
+    issue: {
+      id: issueId,
+      assigneeAgentId: current.assigneeAgentId,
+      status: current.status,
+    },
+    reason: "build_step_rate_limit_released",
+    mutation: "build_step_assigned",
+    contextSource: "build.plan.rate_limit_released",
+    requestedByActorType: parked.actor.actorType,
+    requestedByActorId: parked.actor.actorId,
+  });
+  logger.info(
+    {
+      issueId,
+      buildId: parked.buildId,
+      kind: parked.kind,
+      agentId: current.assigneeAgentId,
+      workerClass: decision.workerClass,
+      waitedMs: nowMs - parked.parkedAtMs,
+    },
+    "released a parked build step on the worker's next eligible slot",
+  );
+}
+
+/**
+ * Dispatch one runnable step, or park it when its worker is still cooling down.
+ * The caller gets a snapshot either way, so the board shows a wait instead of a
+ * step that looks stuck.
+ */
+async function dispatchBuildStep(input: {
+  deps: BuildOrchestratorDeps;
+  heartbeat: IssueAssignmentWakeupDeps;
+  buildId: string;
+  kind: BuildStepKind;
+  actor: BuildActor;
+  issue: { id: string; assigneeAgentId: string; status: string };
+  adapterType: string | null;
+}): Promise<BuildStepPacing> {
+  const { heartbeat, issue } = input;
+  const nowMs = Date.now();
+  const decision = decideBuildDispatchPacing({
+    agentId: issue.assigneeAgentId,
+    adapterType: input.adapterType,
+    nowMs,
+  });
+
+  if (!decision.allowed) {
+    const retryAtMs = decision.retryAtMs ?? nowMs;
+    parkedBuildSteps.set(issue.id, {
+      deps: input.deps,
+      heartbeat,
+      buildId: input.buildId,
+      kind: input.kind,
+      actor: input.actor,
+      issue,
+      adapterType: input.adapterType,
+      retryAtMs,
+      parkedAtMs: nowMs,
+    });
+    scheduleParkedRelease(issue.id, retryAtMs - nowMs);
+    logger.info(
+      {
+        issueId: issue.id,
+        buildId: input.buildId,
+        agentId: issue.assigneeAgentId,
+        workerClass: decision.workerClass,
+        waitMs: decision.waitMs,
+      },
+      "build step parked until its worker's next eligible dispatch slot",
+    );
+    return {
+      state: "waiting",
+      workerClass: decision.workerClass,
+      classLabel: decision.classLabel,
+      minIntervalSeconds: decision.minIntervalSeconds,
+      waitMs: decision.waitMs,
+      waitUntilMs: retryAtMs,
+    };
+  }
+
+  workerLastDispatchAtMs.set(issue.assigneeAgentId, nowMs);
+  await queueIssueAssignmentWakeup({
+    heartbeat,
+    issue,
+    reason: "build_step_assigned",
+    mutation: "build_step_assigned",
+    contextSource: "build.plan.created",
+    requestedByActorType: input.actor.actorType,
+    requestedByActorId: input.actor.actorId,
+  });
+  return {
+    state: "dispatched",
+    workerClass: decision.workerClass,
+    classLabel: decision.classLabel,
+    minIntervalSeconds: decision.minIntervalSeconds,
+    waitMs: 0,
+    waitUntilMs: null,
+  };
+}
+
+export interface BuildStaffing {
+  byAgentType: Map<BuildAgentType, string>;
+  /** `agentId` -> `adapterType`, which is what the pacing rules classify on. */
+  adapterTypeByAgentId: Map<string, string>;
+}
+
+/**
  * Staff each phase owner with an eligible agent. Eligibility is resolved the same
  * way `issueService.create` will judge the assignment, so a step is only assigned
  * to an agent the create call would accept — an ineligible assignee would fail the
- * whole chain rather than one step.
+ * whole chain rather than one step. Each assignee's adapter type comes back with
+ * it, because that is what the pacing rules classify the worker by.
  */
-export async function resolveBuildAssignees(
+export async function resolveBuildStaffing(
   db: Db,
   companyId: string,
-): Promise<Map<BuildAgentType, string>> {
+): Promise<BuildStaffing> {
   const rows = await agentService(db).list(companyId);
+  const adapterTypeByAgentId = new Map(
+    rows.map((row) => [row.id, row.adapterType] as const),
+  );
   const eligibilityAgents: AgentEligibilityAgent[] = rows.map((row) => ({
     id: row.id,
     companyId: row.companyId,
@@ -363,7 +830,7 @@ export async function resolveBuildAssignees(
       }).assignable,
   );
 
-  const resolved = new Map<BuildAgentType, string>();
+  const byAgentType = new Map<BuildAgentType, string>();
   const taken = new Set<string>();
   for (const agentType of BUILD_AGENT_TYPES) {
     for (const role of BUILD_AGENT_TYPE_ROLE_CHAIN[agentType]) {
@@ -373,13 +840,13 @@ export async function resolveBuildAssignees(
         eligible.find((row) => row.role === role && !taken.has(row.id)) ??
         eligible.find((row) => row.role === role);
       if (match) {
-        resolved.set(agentType, match.id);
+        byAgentType.set(agentType, match.id);
         taken.add(match.id);
         break;
       }
     }
   }
-  return resolved;
+  return { byAgentType, adapterTypeByAgentId };
 }
 
 export async function createBuildPlanIssues(
@@ -398,7 +865,7 @@ export async function createBuildPlanIssues(
   const { db, heartbeat } = deps;
   const issueSvc = issueService(db);
   const subject = buildPromptSubject(input.prompt);
-  const assignees = await resolveBuildAssignees(db, input.companyId);
+  const staffing = await resolveBuildStaffing(db, input.companyId);
 
   const actorFields = {
     createdByAgentId: input.actor.agentId,
@@ -425,7 +892,7 @@ export async function createBuildPlanIssues(
 
   const created: BuildPlanStepIssue[] = [];
   for (const step of input.plan) {
-    const assigneeAgentId = assignees.get(step.assignedAgentType) ?? null;
+    const assigneeAgentId = staffing.byAgentType.get(step.assignedAgentType) ?? null;
     const blockerIssueIds = step.dependsOn
       .map((index) => created[index]?.issueId)
       .filter((id): id is string => Boolean(id));
@@ -449,36 +916,43 @@ export async function createBuildPlanIssues(
       ...actorFields,
     });
 
+    // Only steps with no unresolved blocker are runnable now; the rest are woken
+    // by the existing blocker-resolution path when their predecessor closes. A
+    // runnable step still has to clear its worker's cool-down, and parks when it
+    // does not.
+    const pacing =
+      heartbeat && blockerIssueIds.length === 0 && issue.assigneeAgentId
+        ? await dispatchBuildStep({
+            deps,
+            heartbeat,
+            buildId,
+            kind: step.kind,
+            actor: input.actor,
+            issue: {
+              id: issue.id,
+              assigneeAgentId: issue.assigneeAgentId,
+              status: issue.status,
+            },
+            adapterType:
+              staffing.adapterTypeByAgentId.get(issue.assigneeAgentId) ?? null,
+          })
+        : null;
+
     created.push({
       ...step,
       issueId: issue.id,
       identifier: issue.identifier ?? null,
       status: issue.status,
       assigneeAgentId: issue.assigneeAgentId ?? null,
+      pacing,
     });
-
-    // Only steps with no unresolved blocker are runnable now; the rest are woken
-    // by the existing blocker-resolution path when their predecessor closes.
-    if (heartbeat && blockerIssueIds.length === 0 && issue.assigneeAgentId) {
-      await queueIssueAssignmentWakeup({
-        heartbeat,
-        issue: {
-          id: issue.id,
-          assigneeAgentId: issue.assigneeAgentId,
-          status: issue.status,
-        },
-        reason: "build_step_assigned",
-        mutation: "build_step_assigned",
-        contextSource: "build.plan.created",
-        requestedByActorType: input.actor.actorType,
-        requestedByActorId: input.actor.actorId,
-      });
-    }
   }
 
   return {
     buildId,
     plan: created,
-    unassignedAgentTypes: BUILD_AGENT_TYPES.filter((type) => !assignees.has(type)),
+    unassignedAgentTypes: BUILD_AGENT_TYPES.filter(
+      (type) => !staffing.byAgentType.has(type),
+    ),
   };
 }
