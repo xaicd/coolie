@@ -3,7 +3,7 @@
     "name": "Coolie工坊",
     "slug": "coolie",
     "scheme": "coolie",
-    "version": "0.3.5",
+    "version": "0.5.0",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
