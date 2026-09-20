@@ -27,6 +27,11 @@ import {
   formatApprovalTitle,
 } from "../components/QuickApprovalCard";
 import { CodeViewerWebView } from "../components/CodeViewerWebView";
+import {
+  BuildProgressCard,
+  isBuildPrompt,
+  type BuildProgressStep,
+} from "../components/BuildProgressCard";
 import { AppCard } from "../ui/AppCard";
 import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
@@ -86,6 +91,23 @@ function drainBoardEchoQueue(): BoardChatMessage[] {
 interface ApprovalFeedItem {
   approval: Approval;
   decision: "approve" | "reject" | null;
+}
+
+/** 构建进度卡状态 —— 一次构建计划在聊天流内的生命周期 */
+interface BuildCardState {
+  prompt: string;
+  steps: BuildProgressStep[];
+  loading: boolean;
+  error: string | null;
+  planSource: "hermes" | "template" | null;
+}
+
+/** POST /api/build/start 响应 (见 server/src/routes/build.ts) */
+interface BuildStartResponse {
+  buildId: string;
+  plan: BuildProgressStep[];
+  planSource: "hermes" | "template";
+  unassignedAgentTypes: string[];
 }
 
 interface InlineApprovalBubbleProps {
@@ -268,11 +290,14 @@ export function BoardChatScreen({
     Record<string, Issue | null>
   >({});
   const linkedIssueCache = useRef<Record<string, Issue | null>>({});
+  /** 构建环节 issueId -> Issue, 点击环节跳详情时补齐 */
+  const buildIssueCache = useRef<Record<string, Issue | null>>({});
 
   const [showHistory, setShowHistory] = useState(false);
   const [sessions, setSessions] = useState<Array<{ id: string; title: string }>>([]);
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
+  const [buildCard, setBuildCard] = useState<BuildCardState | null>(null);
 
   const flatListRef = useRef<FlatList<BoardChatMessage>>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -455,6 +480,45 @@ export function BoardChatScreen({
     [approvalBusy, appendEcho],
   );
 
+  /**
+   * 构建模式: "build xxx" 触发一张构建计划卡 (五步链) 进聊天流。
+   * 计划创建与总办问答相互独立 —— 聊天流照常回答, 这里只追加进度卡。
+   */
+  const startBuild = useCallback(
+    async (prompt: string) => {
+      setBuildCard({
+        prompt,
+        steps: [],
+        loading: true,
+        error: null,
+        planSource: null,
+      });
+      try {
+        const result = await coolie.request<BuildStartResponse>(
+          "POST",
+          "/api/build/start",
+          { companyId: company.id, prompt },
+        );
+        setBuildCard({
+          prompt,
+          steps: result.plan,
+          loading: false,
+          error: null,
+          planSource: result.planSource,
+        });
+      } catch (e) {
+        setBuildCard({
+          prompt,
+          steps: [],
+          loading: false,
+          error: String((e as Error)?.message ?? e ?? "构建计划创建失败"),
+          planSource: null,
+        });
+      }
+    },
+    [company.id],
+  );
+
   const handleSend = useCallback(
     async (textToSend?: string) => {
       const prompt = (textToSend ?? input).trim();
@@ -477,6 +541,9 @@ export function BoardChatScreen({
       };
       setMessages((prev) => [...prev, userMsg]);
       scrollToBottom();
+
+      // "build xxx" 追加构建计划卡, 与总办回答并行推进
+      if (isBuildPrompt(prompt)) void startBuild(prompt);
 
       const controller = new AbortController();
       abortControllerRef.current = controller;
@@ -550,7 +617,7 @@ export function BoardChatScreen({
         scrollToBottom();
       }
     },
-    [input, sending, company.id, boardIssueId, scrollToBottom],
+    [input, sending, company.id, boardIssueId, scrollToBottom, startBuild],
   );
 
   const handleRetry = () => {
@@ -579,6 +646,31 @@ export function BoardChatScreen({
       setStatusText("");
     }
   };
+
+  /**
+   * 构建进度卡点击某环节 -> 打开对应任务详情。
+   * 卡片只给出 issueId, 这里从任务列表补齐 Issue 再交给上层深链,
+   * 与审批卡的「关联任务」走同一条 onOpenIssue 通道。
+   */
+  const handleOpenBuildIssue = useCallback(
+    async (issueId: string) => {
+      if (!onOpenIssue) return;
+      const cached = buildIssueCache.current[issueId];
+      if (cached) {
+        onOpenIssue(cached);
+        return;
+      }
+      try {
+        const issues = await coolie.listIssues(company.id, { limit: 100 });
+        const found = issues.find((issue) => issue.id === issueId) ?? null;
+        buildIssueCache.current[issueId] = found;
+        if (found) onOpenIssue(found);
+      } catch {
+        // 打不开就不跳, 与审批卡关联任务的行为一致
+      }
+    },
+    [company.id, onOpenIssue],
+  );
 
   interface MessageSegment {
     type: "text" | "code";
@@ -823,6 +915,18 @@ export function BoardChatScreen({
                     ))}
                   </View>
                 </View>
+              )}
+
+              {/* 构建计划进度卡 (由 "build xxx" 触发) */}
+              {buildCard && (
+                <BuildProgressCard
+                  prompt={buildCard.prompt}
+                  steps={buildCard.steps}
+                  loading={buildCard.loading}
+                  error={buildCard.error}
+                  planSource={buildCard.planSource}
+                  onOpenIssue={(issueId) => void handleOpenBuildIssue(issueId)}
+                />
               )}
 
               {/* 实时流式打字机气泡 */}
