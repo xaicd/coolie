@@ -18,6 +18,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import {
   isAsrNotConfigured,
+  type Approval,
   type Company,
   type Issue,
   type IssuePriority,
@@ -46,7 +47,7 @@ import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
 import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen";
 import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
 import { PrototypeSandboxScreen } from "./src/screens/PrototypeSandboxScreen";
-import { BoardChatScreen } from "./src/screens/BoardChatScreen";
+import { BoardChatScreen, exportBoardEcho } from "./src/screens/BoardChatScreen";
 import { AgentsScreen } from "./src/screens/AgentsScreen";
 import { useOTA } from "./src/OTA";
 import { checkAppVersion, downloadApk, localVersion, type RemoteVersionInfo } from "./src/AppVersion";
@@ -653,6 +654,7 @@ function HomeScreen({
   }, []);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selected, setSelected] = useState<Issue | null>(null);
+  const [focusedApprovalId, setFocusedApprovalId] = useState<string | null>(null);
   const [diffContext, setDiffContext] = useState<{
     issue?: Issue | null;
     workProduct?: IssueWorkProduct | null;
@@ -757,6 +759,16 @@ function HomeScreen({
     );
   }
 
+  if (focusedApprovalId) {
+    return (
+      <ApprovalFocusDetail
+        companyId={companyId}
+        approvalId={focusedApprovalId}
+        onBack={() => setFocusedApprovalId(null)}
+      />
+    );
+  }
+
   if (selected) {
     return (
       <TaskDetail
@@ -784,6 +796,7 @@ function HomeScreen({
             company={company}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenApprovals={() => setTab("tasks")}
+            onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
           />
         ) : tab === "agents" ? (
           <AgentsScreen
@@ -1060,6 +1073,102 @@ function HomeScreen({
       ) : null}
       <BottomTabBar tab={tab} onChange={setTab} />
     </SafeAreaView>
+  );
+}
+
+function approvalLabel(approval: Approval): string {
+  if (approval.title) return approval.title;
+  const payload = approval.payload ?? {};
+  if (typeof payload.title === "string" && payload.title) return payload.title;
+  if (typeof payload.name === "string" && payload.name) return payload.name;
+  return approval.type;
+}
+
+/**
+ * 审批裁决页 (驾驶舱待审批卡单条点入)
+ * 复用 QuickApprovalCard 就地裁决，并把结果/取消写入工坊聊天流。
+ */
+function ApprovalFocusDetail({
+  companyId,
+  approvalId,
+  onBack,
+}: {
+  companyId: string;
+  approvalId: string;
+  onBack: () => void;
+}) {
+  const [approval, setApproval] = useState<Approval | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setApproval(await coolie.getApproval(approvalId));
+    } catch (e) {
+      setError(String((e as Error)?.message ?? e));
+    } finally {
+      setLoading(false);
+    }
+  }, [approvalId]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const handleResolved = useCallback(
+    (resolvedId: string, decision: "approve" | "reject") => {
+      const label = approval ? approvalLabel(approval) : resolvedId.slice(0, 8);
+      exportBoardEcho(
+        decision === "approve"
+          ? `✅ 审批已批准：${label}`
+          : `⛔ 审批已驳回：${label}`,
+      );
+      onBack();
+    },
+    [approval, onBack],
+  );
+
+  const handleDismiss = useCallback(() => {
+    exportBoardEcho("↩️ 已取消审批处理，该审批单仍待裁决。");
+    onBack();
+  }, [onBack]);
+
+  return (
+    <Surface>
+      <Pressable onPress={onBack} hitSlop={12} style={styles.backLinkRow}>
+        <Text style={styles.link}>‹ 返回驾驶舱</Text>
+      </Pressable>
+
+      <Text style={styles.detailTitle}>审批裁决</Text>
+
+      {loading && !approval ? (
+        <ActivityIndicator color={C.accent} style={{ marginVertical: 24 }} />
+      ) : error ? (
+        <View style={styles.sectionErrorBox}>
+          <Text style={styles.sectionErrorText}>⚠️ {error}</Text>
+          <Pressable onPress={() => void load()} style={styles.sectionRetryBtn}>
+            <Text style={styles.sectionRetryBtnText}>重试</Text>
+          </Pressable>
+        </View>
+      ) : approval ? (
+        <>
+          <QuickApprovalCard
+            companyId={companyId}
+            approval={approval}
+            floating={false}
+            onResolved={handleResolved}
+            onDismiss={handleDismiss}
+          />
+          {approval.status !== "pending" ? (
+            <Text style={styles.sectionEmptyText}>
+              该审批单已处理完毕（当前状态: {approval.status}）。
+            </Text>
+          ) : null}
+        </>
+      ) : null}
+    </Surface>
   );
 }
 

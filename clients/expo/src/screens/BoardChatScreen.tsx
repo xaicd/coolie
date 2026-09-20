@@ -38,6 +38,36 @@ const QUICK_PROMPTS = [
   "本周交付了什么",
 ];
 
+type BoardEchoListener = (message: BoardChatMessage) => void;
+
+const boardEchoListeners = new Set<BoardEchoListener>();
+const boardEchoQueue: BoardChatMessage[] = [];
+
+/**
+ * 从其它屏幕 (如审批裁决页) 向工坊聊天流追加一条系统提示气泡。
+ * 聊天屏未挂载时先入队，等其挂载并完成历史加载后再回灌。
+ */
+export function exportBoardEcho(text: string): void {
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  const message: BoardChatMessage = {
+    id: `system-echo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    role: "system",
+    text: trimmed,
+    createdAt: new Date().toISOString(),
+  };
+  if (boardEchoListeners.size > 0) {
+    boardEchoListeners.forEach((listener) => listener(message));
+  } else {
+    boardEchoQueue.push(message);
+  }
+}
+
+function drainBoardEchoQueue(): BoardChatMessage[] {
+  if (boardEchoQueue.length === 0) return [];
+  return boardEchoQueue.splice(0, boardEchoQueue.length);
+}
+
 const WELCOME_MESSAGE: BoardChatMessage = {
   id: "welcome-init",
   role: "assistant",
@@ -69,6 +99,7 @@ export function BoardChatScreen({
   const [lastPrompt, setLastPrompt] = useState<string | null>(null);
   const [boardIssueId, setBoardIssueId] = useState<string | null>(null);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyReady, setHistoryReady] = useState(false);
   const [cursorVisible, setCursorVisible] = useState(true);
 
   const [showHistory, setShowHistory] = useState(false);
@@ -107,6 +138,7 @@ export function BoardChatScreen({
       // 保持当前显示
     } finally {
       setLoadingHistory(false);
+      setHistoryReady(true);
     }
   }, [company.id]);
 
@@ -156,6 +188,28 @@ export function BoardChatScreen({
       flatListRef.current?.scrollToEnd({ animated });
     }, 80);
   }, []);
+
+  // 外部系统提示气泡: 历史加载完成后再回灌队列并订阅实时推送
+  const appendEcho = useCallback(
+    (message: BoardChatMessage) => {
+      setMessages((prev) => [...prev, message]);
+      scrollToBottom();
+    },
+    [scrollToBottom],
+  );
+
+  useEffect(() => {
+    if (!historyReady) return;
+    const queued = drainBoardEchoQueue();
+    if (queued.length > 0) {
+      setMessages((prev) => [...prev, ...queued]);
+      scrollToBottom();
+    }
+    boardEchoListeners.add(appendEcho);
+    return () => {
+      boardEchoListeners.delete(appendEcho);
+    };
+  }, [historyReady, appendEcho, scrollToBottom]);
 
   const handleSend = useCallback(
     async (textToSend?: string) => {
@@ -323,6 +377,16 @@ export function BoardChatScreen({
 
   const renderMessageItem = ({ item }: { item: BoardChatMessage }) => {
     const isUser = item.role === "user";
+
+    if (item.role === "system") {
+      return (
+        <View style={styles.systemRow}>
+          <View style={styles.systemBubble}>
+            <Text style={styles.systemText}>{item.text}</Text>
+          </View>
+        </View>
+      );
+    }
 
     if (isUser) {
       return (
@@ -792,6 +856,25 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 12,
     gap: 12,
+  },
+  systemRow: {
+    alignItems: "center",
+    marginVertical: 2,
+  },
+  systemBubble: {
+    maxWidth: "92%",
+    backgroundColor: C.panel,
+    borderColor: C.lineSubtle,
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  systemText: {
+    color: C.ink3,
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: "center",
   },
   userRow: {
     flexDirection: "row",

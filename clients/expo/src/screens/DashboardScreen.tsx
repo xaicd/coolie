@@ -78,6 +78,7 @@ interface DashboardScreenProps {
   company: Company;
   onBack?: () => void;
   onOpenApprovals?: () => void;
+  onOpenApproval?: (approvalId: string) => void;
 }
 
 /**
@@ -92,6 +93,7 @@ export function DashboardScreen({
   onBack,
   onOpenSettings,
   onOpenApprovals,
+  onOpenApproval,
 }: DashboardScreenProps) {
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -288,7 +290,7 @@ export function DashboardScreen({
           </View>
         </View>
 
-        {/* ── 待办审批卡 (有 pending 时展示，红点角标，点击跳任务tab) ── */}
+        {/* ── 待办审批卡 (有 pending 时展示，红点角标，单条点进审批裁决) ── */}
         {approvalsError ? (
           <View style={styles.errorInlineBox}>
             <Text style={styles.errorInlineText}>待办审批加载失败: {approvalsError}</Text>
@@ -313,12 +315,18 @@ export function DashboardScreen({
             </View>
             <View style={styles.approvalItemsList}>
               {approvals.slice(0, 3).map((item, idx) => (
-                <View key={item.id ?? idx} style={styles.approvalItemRow}>
+                <Pressable
+                  key={item.id ?? idx}
+                  style={styles.approvalItemRow}
+                  hitSlop={6}
+                  onPress={() => onOpenApproval?.(item.id)}
+                >
                   <Text style={styles.approvalBullet}>•</Text>
                   <Text style={styles.approvalItemTitle} numberOfLines={1}>
                     {item.title || (typeof item.payload?.title === "string" ? item.payload.title : null) || (typeof item.payload?.name === "string" ? item.payload.name : null) || item.type || "待审事项"}
                   </Text>
-                </View>
+                  <Text style={styles.approvalItemChevron}>›</Text>
+                </Pressable>
               ))}
             </View>
           </Pressable>
@@ -1354,6 +1362,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
     flex: 1,
+  },
+  approvalItemChevron: {
+    color: C.err,
+    fontSize: 14,
+    fontWeight: "600",
   },
   liveRunCard: {
     backgroundColor: "rgba(255,255,255,0.02)",
