@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  Modal,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -24,12 +23,15 @@ import {
   type AgentConfiguration,
 } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
-
-function fmtTok(n: number): string {
-  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
-  return String(n);
-}
+import { AppCard } from "../ui/AppCard";
+import { EmptyState } from "../ui/EmptyState";
+import { ErrorRetry } from "../ui/ErrorRetry";
+import { LoadingState } from "../ui/LoadingState";
+import { SegmentedControl } from "../ui/SegmentedControl";
+import { Sheet } from "../ui/Sheet";
+import { StatTile } from "../ui/StatTile";
+import { KeyValueRow } from "../ui/KeyValueRow";
+import { formatMoney, formatTokens } from "../utils/format";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "在线",
@@ -163,200 +165,181 @@ function AgentDetailSheet({
   }, [agent.id, title, onChanged]);
 
   return (
-    <Modal transparent animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <Pressable style={{ flex: 1 }} onPress={onClose} />
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
-          <ScrollView
-            showsVerticalScrollIndicator={false}
-            contentContainerStyle={{ gap: 10, paddingBottom: 16 }}
-            style={{ maxHeight: 540 }}
-          >
-            <View style={styles.headRow}>
-              <View style={styles.avatar}>
-                <Text style={styles.avatarText}>{agent.name.slice(0, 1).toUpperCase()}</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.name}>{agent.name}</Text>
-                <Text style={styles.meta}>
-                  {STATUS_LABEL[agent.status] ?? agent.status}
-                  {agent.adapterType ? ` · ${agent.adapterType}` : ""}
-                  {agent.role ? ` · ${agent.role}` : ""}
-                </Text>
-              </View>
-              <StatusDot
-                status={STATUS_DOT[agent.status] ?? "idle"}
-                size={9}
-                pulse={agent.status === "active"}
-              />
-            </View>
-
-            {cost ? (
-              <View style={styles.costCard}>
-                <Text style={styles.costTitle}>Token 用量（累计）</Text>
-                <View style={styles.costRow}>
-                  <View style={styles.costCell}>
-                    <Text style={styles.costNum}>{fmtTok(cost.inputTokens)}</Text>
-                    <Text style={styles.costLabel}>输入</Text>
-                  </View>
-                  <View style={styles.costCell}>
-                    <Text style={styles.costNum}>{fmtTok(cost.cachedInputTokens)}</Text>
-                    <Text style={styles.costLabel}>缓存</Text>
-                  </View>
-                  <View style={styles.costCell}>
-                    <Text style={styles.costNum}>{fmtTok(cost.outputTokens)}</Text>
-                    <Text style={styles.costLabel}>输出</Text>
-                  </View>
-                  <View style={styles.costCell}>
-                    <Text style={[styles.costNum, { color: C.accent }]}>
-                      {cost.costCents > 0 ? `$${(cost.costCents / 100).toFixed(2)}` : "订阅"}
-                    </Text>
-                    <Text style={styles.costLabel}>计费</Text>
-                  </View>
-                </View>
-              </View>
-            ) : null}
-
-            {/* 配置 / 技能行 */}
-            <View style={styles.infoCard}>
-              <View style={styles.infoCardHeader}>
-                <Text style={styles.sectionLabelNoMargin}>配置与技能</Text>
-                {infoLoading && <ActivityIndicator size="small" color={C.accent} />}
-              </View>
-
-              {infoError ? (
-                <View style={styles.errorInlineBox}>
-                  <Text style={styles.errorInlineText}>配置加载失败: {infoError}</Text>
-                  <Pressable style={styles.retryBtnSmall} onPress={() => void fetchAgentInfo()}>
-                    <Text style={styles.retryBtnSmallText}>重试</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <View style={styles.infoCardBody}>
-                  <View style={styles.infoPropRow}>
-                    <Text style={styles.infoPropLabel}>适配器</Text>
-                    <Text style={styles.infoPropValue}>
-                      {config?.adapterType || agent.adapterType || "通用"}
-                    </Text>
-                  </View>
-                  <View style={styles.infoPropRow}>
-                    <Text style={styles.infoPropLabel}>心跳状态</Text>
-                    <View style={styles.rowAlignCenter}>
-                      <StatusDot status={STATUS_DOT[agent.status] ?? "idle"} size={6} />
-                      <Text style={[styles.infoPropValue, { marginLeft: 6 }]}>
-                        {STATUS_LABEL[agent.status] ?? agent.status}
-                      </Text>
-                    </View>
-                  </View>
-                  <View style={[styles.infoPropRow, { alignItems: "flex-start" }]}>
-                    <Text style={[styles.infoPropLabel, { marginTop: 4 }]}>技能清单</Text>
-                    <View style={styles.skillsChipsWrap}>
-                      {skillNames.length === 0 ? (
-                        <Text style={styles.infoEmptyText}>未挂载额外技能</Text>
-                      ) : (
-                        skillNames.map((s, idx) => (
-                          <View key={idx} style={styles.skillChip}>
-                            <Text style={styles.skillChipText}>{s}</Text>
-                          </View>
-                        ))
-                      )}
-                    </View>
-                  </View>
-                </View>
-              )}
-            </View>
-
-            {/* 最近分配任务 (最多5条，点击跳任务tab) */}
-            <View style={styles.infoCard}>
-              <View style={styles.infoCardHeader}>
-                <Text style={styles.sectionLabelNoMargin}>
-                  最近指派任务 {recentTasks.length > 0 ? `(${recentTasks.length})` : ""}
-                </Text>
-                {tasksLoading && <ActivityIndicator size="small" color={C.accent} />}
-              </View>
-
-              {tasksError ? (
-                <View style={styles.errorInlineBox}>
-                  <Text style={styles.errorInlineText}>任务加载失败: {tasksError}</Text>
-                  <Pressable style={styles.retryBtnSmall} onPress={() => void fetchRecentTasks()}>
-                    <Text style={styles.retryBtnSmallText}>重试</Text>
-                  </Pressable>
-                </View>
-              ) : recentTasks.length === 0 ? (
-                <Text style={styles.infoEmptyText}>暂无分配的任务</Text>
-              ) : (
-                <View style={styles.tasksListWrap}>
-                  {recentTasks.map((t) => (
-                    <Pressable
-                      key={t.id}
-                      style={styles.taskItemRow}
-                      onPress={() => {
-                        onClose();
-                        onOpenIssue?.(t);
-                      }}
-                    >
-                      <StatusDot
-                        status={t.status === "done" ? "ok" : t.status === "in_progress" ? "ok" : t.status === "blocked" ? "err" : "idle"}
-                        size={6}
-                      />
-                      <Text style={styles.taskItemTitle} numberOfLines={1}>
-                        {t.title}
-                      </Text>
-                      <Text style={styles.taskItemChevron}>›</Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-            </View>
-
-            <Text style={styles.sectionLabel}>头衔 / 职责</Text>
-            <View style={styles.inputRow}>
-              <TextInput
-                style={styles.input}
-                placeholder="如: 全栈工匠"
-                placeholderTextColor={C.ink3}
-                value={title}
-                onChangeText={setTitle}
-              />
-              <Pressable
-                style={[styles.saveBtn, busy && styles.btnDisabled]}
-                disabled={busy}
-                onPress={saveTitle}
-              >
-                <Text style={styles.saveBtnText}>保存</Text>
-              </Pressable>
-            </View>
-
-            <Text style={styles.sectionLabel}>运行状态</Text>
-            <View style={styles.statusRow}>
-              {agent.status === "paused" || agent.status === "disabled" ? (
-                <Pressable
-                  style={[styles.statusBtn, styles.statusActivate]}
-                  disabled={busy}
-                  onPress={() => void setStatus("active")}
-                >
-                  <Ionicons name="play" size={16} color={C.done} />
-                  <Text style={[styles.statusBtnText, { color: C.done }]}>启用</Text>
-                </Pressable>
-              ) : (
-                <Pressable
-                  style={[styles.statusBtn, styles.statusPause]}
-                  disabled={busy}
-                  onPress={() => void setStatus("paused")}
-                >
-                  <Ionicons name="pause" size={16} color={C.warn} />
-                  <Text style={[styles.statusBtnText, { color: C.warn }]}>暂停</Text>
-                </Pressable>
-              )}
-            </View>
-            <Text style={styles.hint}>
-              暂停后员工不再接新任务；当前: {STATUS_LABEL[agent.status] ?? agent.status}
+    <Sheet onClose={onClose} maxHeight={540} contentStyle={{ gap: 0 }}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ gap: 10, paddingBottom: 16 }}
+        style={{ flexShrink: 1 }}
+      >
+        <View style={styles.headRow}>
+          <View style={styles.avatar}>
+            <Text style={styles.avatarText}>{agent.name.slice(0, 1).toUpperCase()}</Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.name}>{agent.name}</Text>
+            <Text style={styles.meta}>
+              {STATUS_LABEL[agent.status] ?? agent.status}
+              {agent.adapterType ? ` · ${agent.adapterType}` : ""}
+              {agent.role ? ` · ${agent.role}` : ""}
             </Text>
-          </ScrollView>
+          </View>
+          <StatusDot
+            status={STATUS_DOT[agent.status] ?? "idle"}
+            size={9}
+            pulse={agent.status === "active"}
+          />
         </View>
-      </View>
-    </Modal>
+
+        {cost ? (
+          <AppCard variant="surface" style={{ marginBottom: 6 }}>
+            <Text style={styles.costTitle}>Token 用量（累计）</Text>
+            <View style={styles.costRow}>
+              <StatTile value={formatTokens(cost.inputTokens)} label="输入" />
+              <StatTile value={formatTokens(cost.cachedInputTokens)} label="缓存" />
+              <StatTile value={formatTokens(cost.outputTokens)} label="输出" />
+              <StatTile
+                value={cost.costCents > 0 ? formatMoney(cost.costCents, "$") : "订阅"}
+                label="计费"
+                valueColor={C.accent}
+              />
+            </View>
+          </AppCard>
+        ) : null}
+
+        {/* 配置 / 技能行 */}
+        <View style={styles.infoCard}>
+          <View style={styles.infoCardHeader}>
+            <Text style={styles.sectionLabelNoMargin}>配置与技能</Text>
+            {infoLoading && <ActivityIndicator size="small" color={C.accent} />}
+          </View>
+
+          {infoError ? (
+            <ErrorRetry
+              variant="inline"
+              message={`配置加载失败: ${infoError}`}
+              onRetry={() => void fetchAgentInfo()}
+            />
+          ) : (
+            <View style={styles.infoCardBody}>
+              <KeyValueRow
+                layout="inline"
+                label="适配器"
+                value={config?.adapterType || agent.adapterType || "通用"}
+              />
+              <View style={styles.infoPropRow}>
+                <Text style={styles.infoPropLabel}>心跳状态</Text>
+                <View style={styles.rowAlignCenter}>
+                  <StatusDot status={STATUS_DOT[agent.status] ?? "idle"} size={6} />
+                  <Text style={[styles.infoPropValue, { marginLeft: 6 }]}>
+                    {STATUS_LABEL[agent.status] ?? agent.status}
+                  </Text>
+                </View>
+              </View>
+              <View style={[styles.infoPropRow, { alignItems: "flex-start" }]}>
+                <Text style={[styles.infoPropLabel, { marginTop: 4 }]}>技能清单</Text>
+                <View style={styles.skillsChipsWrap}>
+                  {skillNames.length === 0 ? (
+                    <Text style={styles.infoEmptyText}>未挂载额外技能</Text>
+                  ) : (
+                    skillNames.map((s, idx) => (
+                      <View key={idx} style={styles.skillChip}>
+                        <Text style={styles.skillChipText}>{s}</Text>
+                      </View>
+                    ))
+                  )}
+                </View>
+              </View>
+            </View>
+          )}
+        </View>
+
+        {/* 最近分配任务 (最多5条，点击跳任务tab) */}
+        <View style={styles.infoCard}>
+          <View style={styles.infoCardHeader}>
+            <Text style={styles.sectionLabelNoMargin}>
+              最近指派任务 {recentTasks.length > 0 ? `(${recentTasks.length})` : ""}
+            </Text>
+            {tasksLoading && <ActivityIndicator size="small" color={C.accent} />}
+          </View>
+
+          {tasksError ? (
+            <ErrorRetry
+              variant="inline"
+              message={`任务加载失败: ${tasksError}`}
+              onRetry={() => void fetchRecentTasks()}
+            />
+          ) : recentTasks.length === 0 ? (
+            <Text style={styles.infoEmptyText}>暂无分配的任务</Text>
+          ) : (
+            <View style={styles.tasksListWrap}>
+              {recentTasks.map((t) => (
+                <Pressable
+                  key={t.id}
+                  style={styles.taskItemRow}
+                  onPress={() => {
+                    onClose();
+                    onOpenIssue?.(t);
+                  }}
+                >
+                  <StatusDot
+                    status={t.status === "done" ? "ok" : t.status === "in_progress" ? "ok" : t.status === "blocked" ? "err" : "idle"}
+                    size={6}
+                  />
+                  <Text style={styles.taskItemTitle} numberOfLines={1}>
+                    {t.title}
+                  </Text>
+                  <Text style={styles.taskItemChevron}>›</Text>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </View>
+
+        <Text style={styles.sectionLabel}>头衔 / 职责</Text>
+        <View style={styles.inputRow}>
+          <TextInput
+            style={styles.input}
+            placeholder="如: 全栈工匠"
+            placeholderTextColor={C.ink3}
+            value={title}
+            onChangeText={setTitle}
+          />
+          <Pressable
+            style={[styles.saveBtn, busy && styles.btnDisabled]}
+            disabled={busy}
+            onPress={saveTitle}
+          >
+            <Text style={styles.saveBtnText}>保存</Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.sectionLabel}>运行状态</Text>
+        <View style={styles.statusRow}>
+          {agent.status === "paused" || agent.status === "disabled" ? (
+            <Pressable
+              style={[styles.statusBtn, styles.statusActivate]}
+              disabled={busy}
+              onPress={() => void setStatus("active")}
+            >
+              <Ionicons name="play" size={16} color={C.done} />
+              <Text style={[styles.statusBtnText, { color: C.done }]}>启用</Text>
+            </Pressable>
+          ) : (
+            <Pressable
+              style={[styles.statusBtn, styles.statusPause]}
+              disabled={busy}
+              onPress={() => void setStatus("paused")}
+            >
+              <Ionicons name="pause" size={16} color={C.warn} />
+              <Text style={[styles.statusBtnText, { color: C.warn }]}>暂停</Text>
+            </Pressable>
+          )}
+        </View>
+        <Text style={styles.hint}>
+          暂停后员工不再接新任务；当前: {STATUS_LABEL[agent.status] ?? agent.status}
+        </Text>
+      </ScrollView>
+    </Sheet>
   );
 }
 
@@ -431,48 +414,16 @@ export function AgentsScreen({
           </View>
 
           {/* 列表头部员工筛选：全部/在线/异常 三个胶囊 */}
-          <View style={styles.filterBar}>
-            <Pressable
-              style={[styles.filterCapsule, filter === "all" && styles.filterCapsuleActive]}
-              onPress={() => setFilter("all")}
-            >
-              <Text
-                style={[
-                  styles.filterCapsuleText,
-                  filter === "all" && styles.filterCapsuleTextActive,
-                ]}
-              >
-                全部 ({agents.length})
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.filterCapsule, filter === "online" && styles.filterCapsuleActive]}
-              onPress={() => setFilter("online")}
-            >
-              <Text
-                style={[
-                  styles.filterCapsuleText,
-                  filter === "online" && styles.filterCapsuleTextActive,
-                ]}
-              >
-                在线 ({online})
-              </Text>
-            </Pressable>
-            <Pressable
-              style={[styles.filterCapsule, filter === "error" && styles.filterCapsuleActive]}
-              onPress={() => setFilter("error")}
-            >
-              <Text
-                style={[
-                  styles.filterCapsuleText,
-                  filter === "error" && styles.filterCapsuleTextActive,
-                  errCount > 0 && { color: C.err },
-                ]}
-              >
-                异常 ({errCount})
-              </Text>
-            </Pressable>
-          </View>
+          <SegmentedControl
+            style={{ marginTop: 10 }}
+            value={filter}
+            onChange={(key) => setFilter(key as "all" | "online" | "error")}
+            options={[
+              { key: "all", label: `全部 (${agents.length})` },
+              { key: "online", label: `在线 (${online})` },
+              { key: "error", label: `异常 (${errCount})`, color: errCount > 0 ? C.err : undefined },
+            ]}
+          />
         </View>
         {onOpenSettings ? (
           <Pressable onPress={onOpenSettings} hitSlop={12}>
@@ -482,16 +433,15 @@ export function AgentsScreen({
       </View>
 
       {loading ? (
-        <ActivityIndicator color={C.accent} style={{ marginTop: 32 }} />
+        <LoadingState mode="spinner" size="small" style={{ flex: 0, marginTop: 32, padding: 0 }} />
       ) : error ? (
-        <View style={styles.emptyCard}>
-          <Text style={styles.emptyIcon}>⚠️</Text>
-          <Text style={styles.emptyTitle}>员工列表加载失败</Text>
-          <Text style={styles.muted}>{error}</Text>
-          <Pressable style={styles.retryBtn} onPress={() => void load()}>
-            <Text style={styles.retryBtnText}>重试</Text>
-          </Pressable>
-        </View>
+        <ErrorRetry
+          variant="card"
+          title="员工列表加载失败"
+          message={error}
+          onRetry={() => void load()}
+          style={{ marginTop: 16, backgroundColor: C.surface, borderRadius: 14, borderWidth: 0 }}
+        />
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 10 }}
@@ -507,20 +457,25 @@ export function AgentsScreen({
           }
         >
           {filteredAgents.length === 0 ? (
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyIcon}>👥</Text>
-              <Text style={styles.emptyTitle}>
-                {filter === "all" ? "还没有员工" : "暂无匹配员工"}
-              </Text>
-              <Text style={styles.muted}>
-                {filter === "all"
+            <EmptyState
+              icon="👥"
+              title={filter === "all" ? "还没有员工" : "暂无匹配员工"}
+              subtitle={
+                filter === "all"
                   ? "在控制台 Web 端创建智能体员工后，这里会展示。"
-                  : "当前筛选分类下暂无对应状态的员工。"}
-              </Text>
-            </View>
+                  : "当前筛选分类下暂无对应状态的员工。"
+              }
+              style={{ marginTop: 16, backgroundColor: C.surface, borderRadius: 14, borderWidth: 0 }}
+            />
           ) : (
             filteredAgents.map((item) => (
-              <Pressable key={item.id} style={styles.card} onPress={() => setSelected(item)}>
+              <AppCard
+                key={item.id}
+                variant="surface"
+                row
+                style={{ gap: 12 }}
+                onPress={() => setSelected(item)}
+              >
                 <View style={styles.avatar}>
                   <Text style={styles.avatarText}>{item.name.slice(0, 1).toUpperCase()}</Text>
                 </View>
@@ -546,16 +501,17 @@ export function AgentsScreen({
                   </Text>
                   {costs[item.id] ? (
                     <Text style={styles.tokenMeta} numberOfLines={1}>
-                      Tokens 入 {fmtTok(costs[item.id].inputTokens)} · 缓存{" "}
-                      {fmtTok(costs[item.id].cachedInputTokens)} · 出 {fmtTok(costs[item.id].outputTokens)}
+                      Tokens 入 {formatTokens(costs[item.id].inputTokens)} · 缓存{" "}
+                      {formatTokens(costs[item.id].cachedInputTokens)} · 出{" "}
+                      {formatTokens(costs[item.id].outputTokens)}
                       {costs[item.id].costCents > 0
-                        ? ` · $${(costs[item.id].costCents / 100).toFixed(2)}`
+                        ? ` · ${formatMoney(costs[item.id].costCents, "$")}`
                         : ""}
                     </Text>
                   ) : null}
                 </View>
                 <Text style={styles.chevron}>›</Text>
-              </Pressable>
+              </AppCard>
             ))
           )}
         </ScrollView>
@@ -594,14 +550,6 @@ const styles = StyleSheet.create({
   },
   capsuleText: { color: C.ink2, fontSize: 12 },
   capsuleSub: { color: C.ink3, fontSize: 12 },
-  card: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    padding: 14,
-  },
   avatar: {
     width: 38,
     height: 38,
@@ -617,49 +565,9 @@ const styles = StyleSheet.create({
   meta: { color: C.ink3, fontSize: 12, marginTop: 3 },
   tokenMeta: { color: C.ink4, fontSize: 11, marginTop: 2 },
   chevron: { color: C.ink4, fontSize: 22 },
-  emptyCard: {
-    alignItems: "center",
-    gap: 8,
-    backgroundColor: C.surface,
-    borderRadius: 14,
-    padding: 28,
-    marginTop: 16,
-  },
-  emptyIcon: { fontSize: 34 },
-  emptyTitle: { color: C.ink, fontSize: 16, fontWeight: "600" },
-  muted: { color: C.ink3, fontSize: 13, textAlign: "center" },
-  retryBtn: {
-    marginTop: 8,
-    backgroundColor: C.brand,
-    borderRadius: 8,
-    paddingVertical: 8,
-    paddingHorizontal: 22,
-  },
-  retryBtnText: { color: C.ink, fontSize: 13, fontWeight: "600" },
-  backdrop: { flex: 1, backgroundColor: "rgba(0,0,0,0.55)", justifyContent: "flex-end" },
-  sheet: {
-    backgroundColor: C.panel,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    paddingHorizontal: 18,
-    paddingBottom: 34,
-    paddingTop: 10,
-  },
-  handle: {
-    alignSelf: "center",
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: C.surfaceHover,
-    marginBottom: 12,
-  },
   headRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 14 },
-  costCard: { backgroundColor: C.surface, borderRadius: 12, padding: 14, marginBottom: 6 },
   costTitle: { color: C.ink2, fontSize: 12, marginBottom: 10 },
   costRow: { flexDirection: "row", gap: 8 },
-  costCell: { flex: 1, alignItems: "center", gap: 3 },
-  costNum: { color: C.ink, fontSize: 16, fontWeight: "700" },
-  costLabel: { color: C.ink4, fontSize: 11 },
   sectionLabel: { color: C.ink3, fontSize: 12, marginTop: 12, marginBottom: 6 },
   inputRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   input: {
@@ -689,31 +597,6 @@ const styles = StyleSheet.create({
   statusBtnText: { fontSize: 14, fontWeight: "600" },
   hint: { color: C.ink4, fontSize: 11, marginTop: 8 },
   btnDisabled: { opacity: 0.5 },
-  filterBar: {
-    flexDirection: "row",
-    gap: 8,
-    marginTop: 10,
-  },
-  filterCapsule: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 999,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.lineSubtle,
-  },
-  filterCapsuleActive: {
-    backgroundColor: "rgba(113, 112, 255, 0.15)",
-    borderColor: "rgba(113, 112, 255, 0.4)",
-  },
-  filterCapsuleText: {
-    fontSize: 12,
-    color: C.ink3,
-    fontWeight: "500",
-  },
-  filterCapsuleTextActive: {
-    color: C.accent,
-  },
   infoCard: {
     backgroundColor: C.surface,
     borderRadius: 12,
@@ -795,33 +678,5 @@ const styles = StyleSheet.create({
   taskItemChevron: {
     color: C.ink4,
     fontSize: 16,
-  },
-  errorInlineBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.25)",
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    gap: 8,
-  },
-  errorInlineText: {
-    color: C.err,
-    fontSize: 11,
-    flex: 1,
-  },
-  retryBtnSmall: {
-    backgroundColor: "rgba(239, 68, 68, 0.2)",
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 4,
-  },
-  retryBtnSmallText: {
-    color: C.err,
-    fontSize: 11,
-    fontWeight: "600",
   },
 });

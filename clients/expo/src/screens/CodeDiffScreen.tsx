@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -28,6 +27,12 @@ import {
   parsePatchToLines,
 } from "../components/UnifiedDiffViewer";
 import { CodeViewerWebView } from "../components/CodeViewerWebView";
+import { AppCard } from "../ui/AppCard";
+import { EmptyState } from "../ui/EmptyState";
+import { ErrorRetry } from "../ui/ErrorRetry";
+import { LoadingState } from "../ui/LoadingState";
+import { Pill } from "../ui/Pill";
+import { ScreenHeader } from "../ui/ScreenHeader";
 
 const STATUS_LABELS: Record<string, string> = {
   added: "新增",
@@ -249,27 +254,23 @@ export function CodeDiffScreen({
       return (
         <SafeAreaView style={styles.fullScreen}>
           <StatusBar style="light" />
-          <View style={styles.fullScreenHeader}>
-            <Pressable
-              onPress={() => setSelectedFileForFullView(null)}
-              hitSlop={12}
-              style={styles.backBtn}
-            >
-              <Text style={styles.linkText}>‹ 返回列表</Text>
-            </Pressable>
-            <View style={styles.fullScreenTitleBox}>
-              <Text style={styles.fullScreenFileName} numberOfLines={1}>
-                {getFileName(file.path)}
-              </Text>
+          <ScreenHeader
+            onBack={() => setSelectedFileForFullView(null)}
+            backLabel="返回列表"
+            title={getFileName(file.path)}
+            subtitle={
               <Text style={styles.fullScreenFilePath} numberOfLines={1}>
                 {file.path} ({lineCount} 行)
               </Text>
-            </View>
-            <View style={styles.pillRow}>
-              <Text style={styles.statAdd}>+{file.additions}</Text>
-              <Text style={styles.statDel}>-{file.deletions}</Text>
-            </View>
-          </View>
+            }
+            right={
+              <View style={styles.pillRow}>
+                <Text style={styles.statAdd}>+{file.additions}</Text>
+                <Text style={styles.statDel}>-{file.deletions}</Text>
+              </View>
+            }
+            style={styles.fullScreenHeader}
+          />
           <View style={styles.virtualNoticeBar}>
             <Text style={styles.virtualNoticeText}>
               ⚡ CodeMirror 6 渲染 · Linear 暗色 (#0F1011) · 共 {lineCount} 行 Diff
@@ -294,20 +295,22 @@ export function CodeDiffScreen({
       <StatusBar style="light" />
 
       {/* 顶部主导航栏 */}
-      <View style={styles.navBar}>
-        <Pressable onPress={onBack} hitSlop={12} style={styles.backBtn}>
-          <Text style={styles.linkText}>‹ {issue ? "返回工单" : "返回"}</Text>
-        </Pressable>
-        <Text style={styles.navTitle}>代码审查</Text>
-        <Pressable
-          onPress={toggleBenchmark}
-          style={[styles.benchmarkBadge, isBenchmarkMode && styles.benchmarkBadgeActive]}
-        >
-          <Text style={[styles.benchmarkText, isBenchmarkMode && styles.benchmarkTextActive]}>
-            {isBenchmarkMode ? "退出基准" : "⚡ 2500行基准"}
-          </Text>
-        </Pressable>
-      </View>
+      <ScreenHeader
+        title="代码审查"
+        onBack={onBack}
+        backLabel={issue ? "返回工单" : "返回"}
+        right={
+          <Pressable
+            onPress={toggleBenchmark}
+            style={[styles.benchmarkBadge, isBenchmarkMode && styles.benchmarkBadgeActive]}
+          >
+            <Text style={[styles.benchmarkText, isBenchmarkMode && styles.benchmarkTextActive]}>
+              {isBenchmarkMode ? "退出基准" : "⚡ 2500行基准"}
+            </Text>
+          </Pressable>
+        }
+        style={styles.navBar}
+      />
 
       <ScrollView
         style={styles.scroll}
@@ -322,11 +325,9 @@ export function CodeDiffScreen({
       >
         {/* 工单上下文胶囊卡片 */}
         {issue && (
-          <View style={styles.contextCard}>
+          <AppCard style={styles.contextCard}>
             <View style={styles.contextHeader}>
-              <View style={styles.contextCapsule}>
-                <Text style={styles.contextTag}>工单上下文</Text>
-              </View>
+              <Pill label="工单上下文" size="sm" textStyle={styles.contextTag} />
               <Text style={styles.contextId}>#{issue.id.slice(0, 8)}</Text>
             </View>
             <Text style={styles.contextTitle} numberOfLines={2}>
@@ -337,11 +338,11 @@ export function CodeDiffScreen({
                 关联产物: {workProduct.title} ({workProduct.type})
               </Text>
             )}
-          </View>
+          </AppCard>
         )}
 
         {/* 差异概览与视图切换控制条 */}
-        <View style={styles.controlCard}>
+        <AppCard style={styles.controlCard}>
           {/* 视图模式分段选择器 */}
           <View style={styles.viewModeSwitcher}>
             <Pressable
@@ -416,24 +417,21 @@ export function CodeDiffScreen({
               ⚠️ 暂未检测到活动的执行工作区
             </Text>
           )}
-        </View>
+        </AppCard>
 
         {/* 错误提示 (极简幽灵红，非实色厚边) */}
         {error && (
-          <View style={styles.errorBox}>
-            <Text style={styles.errorText}>获取 Diff 失败: {error}</Text>
-            <Pressable style={styles.retryBtn} onPress={loadDiff}>
-              <Text style={styles.retryBtnText}>重试</Text>
-            </Pressable>
-          </View>
+          <ErrorRetry
+            message={`获取 Diff 失败: ${error}`}
+            onRetry={loadDiff}
+            variant="inline"
+            style={styles.errorInline}
+          />
         )}
 
         {/* 加载中状态 */}
         {loading && !refreshing ? (
-          <View style={styles.loadingBox}>
-            <ActivityIndicator color={C.accent} size="large" />
-            <Text style={styles.loadingText}>正在分析代码仓库 Git Diff…</Text>
-          </View>
+          <LoadingState text="正在分析代码仓库 Git Diff…" style={styles.loadingBox} />
         ) : null}
 
         {/* 单列高对比折叠 Diff 文件列表 */}
@@ -446,7 +444,7 @@ export function CodeDiffScreen({
               const lineCount = combinedPatch ? combinedPatch.split("\n").length : 0;
 
               return (
-                <View key={file.path} style={styles.fileCard}>
+                <AppCard key={file.path} padding={0} style={styles.fileCard}>
                   {/* 文件项头部 (DESIGN.md 第6节: 等宽字重 500, 折叠 chevron) */}
                   <Pressable
                     style={styles.fileHeader}
@@ -456,19 +454,12 @@ export function CodeDiffScreen({
                       <Text style={styles.collapseArrow}>
                         {isExpanded ? "▼" : "▶"}
                       </Text>
-                      <View
-                        style={[
-                          styles.statusBadge,
-                          {
-                            backgroundColor: statusCfg.bg,
-                            borderColor: statusCfg.border,
-                          },
-                        ]}
-                      >
-                        <Text style={[styles.statusBadgeText, { color: statusCfg.text }]}>
-                          {STATUS_LABELS[file.status] ?? file.status}
-                        </Text>
-                      </View>
+                      <Pill
+                        label={STATUS_LABELS[file.status] ?? file.status}
+                        size="sm"
+                        style={{ backgroundColor: statusCfg.bg, borderColor: statusCfg.border }}
+                        textStyle={{ color: statusCfg.text }}
+                      />
                       <View style={styles.fileNameBox}>
                         <Text style={styles.fileNameText} numberOfLines={1}>
                           {getFileName(file.path)}
@@ -513,22 +504,25 @@ export function CodeDiffScreen({
                       />
                     </View>
                   )}
-                </View>
+                </AppCard>
               );
             })}
           </View>
         ) : !loading ? (
-          <View style={styles.emptyBox}>
-            <Text style={styles.emptyTitle}>暂无代码差异</Text>
-            <Text style={styles.emptySub}>
-              {viewMode === "working-tree"
+          <EmptyState
+            title="暂无代码差异"
+            subtitle={
+              viewMode === "working-tree"
                 ? "当前工作树干净，没有未提交的代码变动。"
-                : "当前 HEAD 与基准分支一致，无提交级差异。"}
-            </Text>
-            <Pressable style={styles.benchBtn} onPress={toggleBenchmark}>
-              <Text style={styles.benchBtnText}>⚡ 运行 2500 行虚拟滚动基准测试</Text>
-            </Pressable>
-          </View>
+                : "当前 HEAD 与基准分支一致，无提交级差异。"
+            }
+            action={
+              <Pressable style={styles.benchBtn} onPress={toggleBenchmark}>
+                <Text style={styles.benchBtnText}>⚡ 运行 2500 行虚拟滚动基准测试</Text>
+              </Pressable>
+            }
+            style={styles.emptyBox}
+          />
         ) : null}
       </ScrollView>
     </SafeAreaView>
@@ -667,15 +661,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 12,
   },
-  fullScreenTitleBox: {
-    flex: 1,
-  },
-  fullScreenFileName: {
-    color: C.ink,
-    fontSize: 13,
-    fontWeight: "500",
-    fontFamily: MONO_FONT,
-  },
   fullScreenFilePath: {
     color: C.ink4,
     fontSize: 10,
@@ -706,21 +691,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  navTitle: {
-    color: C.ink,
-    fontSize: 17,
-    fontWeight: "600",
-    letterSpacing: -0.4,
-  },
-  backBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 2,
-  },
-  linkText: {
-    color: C.accent,
-    fontSize: 13,
-    fontWeight: "500",
-  },
   benchmarkBadge: {
     backgroundColor: "rgba(255,255,255,0.02)",
     paddingHorizontal: 8,
@@ -749,11 +719,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   contextCard: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: C.line,
     gap: 6,
   },
   contextHeader: {
@@ -761,18 +726,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
   },
-  contextCapsule: {
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-    borderColor: C.line,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
   contextTag: {
     color: C.accent,
-    fontSize: 11,
-    fontWeight: "500",
   },
   contextId: {
     color: C.ink4,
@@ -790,11 +745,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   controlCard: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: C.line,
     gap: 12,
   },
   viewModeSwitcher: {
@@ -869,52 +819,20 @@ const styles = StyleSheet.create({
     fontFamily: MONO_FONT,
     fontVariant: ["tabular-nums"],
   },
-  errorBox: {
+  errorInline: {
     backgroundColor: "rgba(239, 68, 68, 0.08)",
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.25)",
-    borderRadius: 8,
-    padding: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 8,
-  },
-  errorText: {
-    color: C.err,
-    fontSize: 12,
-    flex: 1,
-  },
-  retryBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    backgroundColor: "rgba(239, 68, 68, 0.15)",
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.3)",
-    borderRadius: 6,
-  },
-  retryBtnText: {
-    color: C.err,
-    fontSize: 11,
-    fontWeight: "500",
+    paddingHorizontal: 12,
+    paddingVertical: 12,
   },
   loadingBox: {
+    flex: 0,
     paddingVertical: 32,
-    alignItems: "center",
-    gap: 8,
-  },
-  loadingText: {
-    color: C.ink3,
-    fontSize: 13,
+    paddingHorizontal: 0,
   },
   fileList: {
     gap: 12,
   },
   fileCard: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.line,
     overflow: "hidden",
   },
   fileHeader: {
@@ -934,16 +852,6 @@ const styles = StyleSheet.create({
     color: C.ink4,
     fontSize: 11,
     width: 14,
-  },
-  statusBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 999,
-    borderWidth: 1,
-  },
-  statusBadgeText: {
-    fontSize: 10,
-    fontWeight: "500",
   },
   fileNameBox: {
     flex: 1,
@@ -1014,24 +922,8 @@ const styles = StyleSheet.create({
     fontVariant: ["tabular-nums"],
   },
   emptyBox: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: 12,
     padding: 24,
-    alignItems: "center",
-    gap: 8,
-    borderWidth: 1,
     borderColor: C.line,
-  },
-  emptyTitle: {
-    color: C.ink,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  emptySub: {
-    color: C.ink3,
-    fontSize: 12,
-    textAlign: "center",
-    lineHeight: 18,
   },
   benchBtn: {
     marginTop: 8,

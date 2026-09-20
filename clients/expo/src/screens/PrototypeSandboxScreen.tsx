@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   Dimensions,
   Pressable,
@@ -22,6 +21,11 @@ import type {
 } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
+import { EmptyState } from "../ui/EmptyState";
+import { ErrorRetry } from "../ui/ErrorRetry";
+import { LoadingState } from "../ui/LoadingState";
+import { Pill } from "../ui/Pill";
+import { ScreenHeader } from "../ui/ScreenHeader";
 
 const SafeWebView = WebView as unknown as React.ComponentType<any>;
 
@@ -263,9 +267,7 @@ export function PrototypeSandboxScreen({
       {/* 顶部主控制条 */}
       <View style={styles.topBar}>
         <View style={styles.topLeft}>
-          <Pressable onPress={onBack} hitSlop={12} style={styles.backBtn}>
-            <Text style={styles.backBtnText}>‹ 返回</Text>
-          </Pressable>
+          <ScreenHeader onBack={onBack} backLabel="返回" style={styles.backBar} />
 
           <View style={styles.titleInfo}>
             <View style={styles.titleRow}>
@@ -353,25 +355,25 @@ export function PrototypeSandboxScreen({
               return (
                 <Pressable
                   key={srv.id}
-                  style={[
-                    styles.serviceChip,
-                    isSelected && styles.serviceChipActive,
-                  ]}
                   onPress={() => handleSelectService(srv)}
                 >
-                  <StatusDot
-                    status={isRunning ? "ok" : "idle"}
-                    size={6}
-                    pulse={isRunning}
-                  />
-                  <Text
-                    style={[
-                      styles.serviceChipText,
-                      isSelected && styles.serviceChipTextActive,
-                    ]}
+                  <Pill
+                    style={isSelected ? styles.serviceChipActive : styles.serviceChip}
                   >
-                    {srv.serviceName} ({srv.port ?? "N/A"})
-                  </Text>
+                    <StatusDot
+                      status={isRunning ? "ok" : "idle"}
+                      size={6}
+                      pulse={isRunning}
+                    />
+                    <Text
+                      style={[
+                        styles.serviceChipText,
+                        isSelected && styles.serviceChipTextActive,
+                      ]}
+                    >
+                      {srv.serviceName} ({srv.port ?? "N/A"})
+                    </Text>
+                  </Pill>
                 </Pressable>
               );
             })}
@@ -449,43 +451,46 @@ export function PrototypeSandboxScreen({
       {/* 原型预览区域 (支持手机外框或全屏) */}
       <View style={styles.sandboxContainer}>
         {!activeUrl ? (
-          <View style={styles.emptyPrompt}>
-            <Text style={styles.emptyPromptIcon}>⚡</Text>
-            <Text style={styles.emptyPromptTitle}>未检测到正在运行的原型服务</Text>
-            <Text style={styles.emptyPromptDesc}>
-              AI 智能体在工作区中启动 Web 服务（如 Vite / Next.js）后，地址将自动投影至此。
-              也可直接输入预览地址即时查看。
-            </Text>
-            <View style={styles.emptyInputRow}>
-              <TextInput
-                style={styles.emptyInput}
-                value={urlInput}
-                onChangeText={setUrlInput}
-                placeholder="输入预览地址 (http://…)"
-                placeholderTextColor={C.ink3}
-                autoCapitalize="none"
-                autoCorrect={false}
-                keyboardType="url"
-                returnKeyType="go"
-                onSubmitEditing={handleApplyUrl}
-              />
-              <Pressable
-                style={[
-                  styles.emptyInputBtn,
-                  !urlInput.trim() && styles.emptyInputBtnDisabled,
-                ]}
-                onPress={handleApplyUrl}
-                disabled={!urlInput.trim()}
-              >
-                <Text style={styles.emptyInputBtnText}>打开</Text>
-              </Pressable>
-            </View>
-            <Pressable style={styles.emptyRefreshBtn} onPress={loadServices}>
-              <Text style={styles.emptyRefreshBtnText}>
-                {loadingServices ? "扫描中…" : "刷新服务列表"}
-              </Text>
-            </Pressable>
-          </View>
+          <EmptyState
+            variant="standalone"
+            icon={<Text style={styles.emptyPromptIcon}>⚡</Text>}
+            title="未检测到正在运行的原型服务"
+            subtitle="AI 智能体在工作区中启动 Web 服务（如 Vite / Next.js）后，地址将自动投影至此。也可直接输入预览地址即时查看。"
+            action={
+              <>
+                <View style={styles.emptyInputRow}>
+                  <TextInput
+                    style={styles.emptyInput}
+                    value={urlInput}
+                    onChangeText={setUrlInput}
+                    placeholder="输入预览地址 (http://…)"
+                    placeholderTextColor={C.ink3}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    keyboardType="url"
+                    returnKeyType="go"
+                    onSubmitEditing={handleApplyUrl}
+                  />
+                  <Pressable
+                    style={[
+                      styles.emptyInputBtn,
+                      !urlInput.trim() && styles.emptyInputBtnDisabled,
+                    ]}
+                    onPress={handleApplyUrl}
+                    disabled={!urlInput.trim()}
+                  >
+                    <Text style={styles.emptyInputBtnText}>打开</Text>
+                  </Pressable>
+                </View>
+                <Pressable style={styles.emptyRefreshBtn} onPress={loadServices}>
+                  <Text style={styles.emptyRefreshBtnText}>
+                    {loadingServices ? "扫描中…" : "刷新服务列表"}
+                  </Text>
+                </Pressable>
+              </>
+            }
+            style={styles.emptyPrompt}
+          />
         ) : (
           <View
             style={[
@@ -504,24 +509,22 @@ export function PrototypeSandboxScreen({
 
             <View style={styles.webviewWrapper}>
               {webLoading && (
-                <View style={styles.webviewLoader}>
-                  <ActivityIndicator color={C.accent} size="small" />
-                  <Text style={styles.loaderText}>加载原型环境中…</Text>
-                </View>
+                <LoadingState
+                  mode="spinner"
+                  size="small"
+                  text="加载原型环境中…"
+                  style={styles.webviewLoader}
+                />
               )}
 
               {webError ? (
-                <View style={styles.errorContainer}>
-                  <Text style={styles.errorIcon}>⚠️</Text>
-                  <Text style={styles.errorTitle}>无法连接到原型服务</Text>
-                  <Text style={styles.errorDetails}>{webError}</Text>
-                  <Text style={styles.errorHint}>
-                    请确认工作区内的开发服务器是否已启动并正常暴露端口。
-                  </Text>
-                  <Pressable style={styles.retryBtn} onPress={handleReload}>
-                    <Text style={styles.retryBtnText}>重新连接</Text>
-                  </Pressable>
-                </View>
+                <ErrorRetry
+                  variant="card"
+                  title="无法连接到原型服务"
+                  message={`${webError}\n请确认工作区内的开发服务器是否已启动并正常暴露端口。`}
+                  onRetry={handleReload}
+                  style={styles.errorContainer}
+                />
               ) : (
                 <SafeWebView
                   ref={webViewRef}
@@ -593,14 +596,8 @@ const styles = StyleSheet.create({
     gap: 10,
     flex: 1,
   },
-  backBtn: {
-    paddingVertical: 4,
-    paddingRight: 6,
-  },
-  backBtnText: {
-    color: C.accent,
-    fontSize: 15,
-    fontWeight: "500",
+  backBar: {
+    alignSelf: "center",
   },
   titleInfo: {
     flex: 1,
@@ -663,17 +660,12 @@ const styles = StyleSheet.create({
     marginRight: 2,
   },
   serviceChip: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: 6,
     backgroundColor: "rgba(255,255,255,0.02)",
-    borderWidth: 1,
     borderColor: C.lineSubtle,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: 999,
   },
   serviceChipActive: {
+    gap: 6,
     backgroundColor: "rgba(94, 106, 210, 0.12)",
     borderColor: "rgba(94, 106, 210, 0.35)",
   },
@@ -802,11 +794,6 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: "rgba(255,255,255,0.15)",
     backgroundColor: "#000000",
-    shadowColor: "#000000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 16,
-    elevation: 10,
     marginVertical: 12,
   },
   mobileFrameHeader: {
@@ -849,73 +836,21 @@ const styles = StyleSheet.create({
     bottom: 0,
     backgroundColor: "rgba(8, 9, 10, 0.7)",
     zIndex: 10,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
-  loaderText: {
-    color: C.ink3,
-    fontSize: 12,
   },
   errorContainer: {
     flex: 1,
-    alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 24,
     backgroundColor: C.bg,
-    gap: 8,
-  },
-  errorIcon: {
-    fontSize: 32,
-  },
-  errorTitle: {
-    color: C.ink,
-    fontSize: 15,
-    fontWeight: "600",
-  },
-  errorDetails: {
-    color: C.err,
-    fontSize: 12,
-    textAlign: "center",
-  },
-  errorHint: {
-    color: C.ink4,
-    fontSize: 11,
-    textAlign: "center",
-    marginTop: 4,
-  },
-  retryBtn: {
-    marginTop: 12,
-    backgroundColor: C.brand,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  retryBtnText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "500",
+    borderWidth: 0,
   },
   emptyPrompt: {
-    alignItems: "center",
-    justifyContent: "center",
     paddingHorizontal: 32,
     gap: 10,
   },
   emptyPromptIcon: {
     fontSize: 40,
     marginBottom: 4,
-  },
-  emptyPromptTitle: {
-    color: C.ink,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  emptyPromptDesc: {
-    color: C.ink3,
-    fontSize: 13,
-    textAlign: "center",
-    lineHeight: 18,
   },
   emptyInputRow: {
     flexDirection: "row",

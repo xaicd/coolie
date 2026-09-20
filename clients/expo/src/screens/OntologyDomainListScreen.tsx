@@ -11,19 +11,26 @@ import {
   StyleSheet,
   Text,
   View,
-  Platform,
-  StatusBar as RNStatusBar,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import type {
   Company,
   OntologyDomain,
-  OntologyDomainLifecycleState,
   OntologyGraphSnapshot,
 } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
 import { EmergencyKillSwitch } from "../components/EmergencyKillSwitch";
+import { AppCard } from "../ui/AppCard";
+import { EmptyState } from "../ui/EmptyState";
+import { ErrorRetry } from "../ui/ErrorRetry";
+import { LoadingState } from "../ui/LoadingState";
+import { Pill } from "../ui/Pill";
+import { ScreenHeader } from "../ui/ScreenHeader";
+import { SectionHeader } from "../ui/SectionHeader";
+import { SegmentedControl } from "../ui/SegmentedControl";
+import { StatTile } from "../ui/StatTile";
+import { StatusBadge } from "../ui/StatusBadge";
 
 interface OntologyDomainListScreenProps {
   onOpenSettings?: () => void;
@@ -294,9 +301,7 @@ export function OntologyDomainListScreen({
 
   // 过滤显示
   const activeCount = domains.filter((d) => d.lifecycle_state === "active").length;
-  const lockedCount = domains.filter((d) => (d as any).lifecycle === "locked" || (d as any).status === "locked").length;
-  const draftCount = domains.filter((d) => d.lifecycle_state === "draft").length;
-  const archivedCount = domains.filter(
+  const lockedCount = domains.filter(
     (d) =>
       d.lifecycle_state === "archived" ||
       d.lifecycle_state === "deprecated" ||
@@ -307,6 +312,12 @@ export function OntologyDomainListScreen({
     if (filter === "active") return d.lifecycle_state === "active";
     if (filter === "draft") return d.lifecycle_state === "draft";
     if (filter === "archived")
+      return (
+        d.lifecycle_state === "archived" ||
+        d.lifecycle_state === "deprecated" ||
+        d.lifecycle_state === "locked"
+      );
+    if (filter === "locked")
       return (
         d.lifecycle_state === "archived" ||
         d.lifecycle_state === "deprecated" ||
@@ -388,21 +399,19 @@ export function OntologyDomainListScreen({
         <StatusBar style="light" />
         <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
           {/* 顶部返回条 */}
-          <View style={styles.detailNav}>
-            <Pressable
-              onPress={() => setViewMode("detail")}
-              hitSlop={12}
-              style={styles.backBtn}
-            >
-              <Text style={styles.backBtnText}>‹ 返回域详情</Text>
-            </Pressable>
-            <Text style={styles.graphNavTitle}>
-              {selectedDomain.display_name || selectedDomain.displayName || selectedDomain.slug} · 关系图谱
-            </Text>
-          </View>
+          <ScreenHeader
+            onBack={() => setViewMode("detail")}
+            backLabel="返回域详情"
+            style={styles.detailNav}
+            right={
+              <Text style={styles.graphNavTitle}>
+                {selectedDomain.display_name || selectedDomain.displayName || selectedDomain.slug} · 关系图谱
+              </Text>
+            }
+          />
 
           {/* 拓扑画布容器 */}
-          <View style={styles.graphCanvasCard}>
+          <AppCard variant="surface" style={styles.graphCanvasCard}>
             <View style={styles.graphCanvasHeader}>
               <View>
                 <Text style={styles.graphCanvasTitle}>实体关系环形拓扑</Text>
@@ -485,11 +494,11 @@ export function OntologyDomainListScreen({
                 );
               })}
             </View>
-          </View>
+          </AppCard>
 
           {/* Properties Schema 属性检视卡片 */}
           {Boolean(selectedNt) && (
-            <View style={styles.schemaCard}>
+            <AppCard variant="surface" style={styles.schemaCard}>
               <View style={styles.schemaCardHeader}>
                 <View style={styles.schemaTitleRow}>
                   <Ionicons name="cube-outline" size={16} color={C.accent} style={{ marginRight: 6 }} />
@@ -497,9 +506,7 @@ export function OntologyDomainListScreen({
                     {selectedNt.label} ({selectedNt.key})
                   </Text>
                 </View>
-                <View style={styles.schemaBadge}>
-                  <Text style={styles.schemaBadgeText}>{selectedNt.count} 实例</Text>
-                </View>
+                <Pill label={`${selectedNt.count} 实例`} tone="brand" size="sm" />
               </View>
 
               <Text style={styles.schemaSectionTitle}>属性定义 (Properties Schema)</Text>
@@ -525,7 +532,7 @@ export function OntologyDomainListScreen({
                   ))}
                 </View>
               )}
-            </View>
+            </AppCard>
           )}
         </ScrollView>
       </SafeAreaView>
@@ -557,32 +564,26 @@ export function OntologyDomainListScreen({
           }
         >
           {/* 顶部返回条 */}
-          <View style={styles.detailNav}>
-            <Pressable
-              onPress={() => {
-                setViewMode("list");
-                setSelectedDomain(null);
-              }}
-              hitSlop={12}
-              style={styles.backBtn}
-            >
-              <Text style={styles.backBtnText}>‹ 返回本体域列表</Text>
-            </Pressable>
-            <View
-              style={[
-                styles.badgePill,
-                { backgroundColor: cfg.bg, borderColor: cfg.border },
-              ]}
-            >
-              <StatusDot status={cfg.status} color={cfg.color} size={6} />
-              <Text style={[styles.badgeText, { color: cfg.color }]}>
-                {cfg.label}
-              </Text>
-            </View>
-          </View>
+          <ScreenHeader
+            onBack={() => {
+              setViewMode("list");
+              setSelectedDomain(null);
+            }}
+            backLabel="返回本体域列表"
+            style={styles.detailNav}
+            right={
+              <StatusBadge
+                label={cfg.label}
+                color={cfg.color}
+                bg={cfg.bg}
+                border={cfg.border}
+                dotStatus={cfg.status}
+              />
+            }
+          />
 
           {/* 域基础信息卡片 */}
-          <View style={styles.heroCard}>
+          <AppCard padding={16} style={styles.heroCard}>
             <Text style={styles.heroTitle}>
               {selectedDomain.display_name || selectedDomain.displayName || selectedDomain.slug}
             </Text>
@@ -611,12 +612,14 @@ export function OntologyDomainListScreen({
                 </Text>
               </View>
             </View>
-          </View>
+          </AppCard>
 
           {/* 关系图谱交互入口 */}
-          <Pressable
-            style={styles.graphEntryBtn}
+          <AppCard
+            variant="surface"
+            row
             onPress={() => setViewMode("graph")}
+            style={styles.graphEntryBtn}
           >
             <View style={styles.graphEntryLeft}>
               <Ionicons
@@ -633,14 +636,16 @@ export function OntologyDomainListScreen({
               </View>
             </View>
             <Text style={styles.graphEntryArrow}>›</Text>
-          </Pressable>
+          </AppCard>
 
           {/* 高危熔断控制闸门区 */}
           <View style={styles.sectionBlock}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>高危安全闸门</Text>
-              <Text style={styles.sectionHint}>PRD 需求⑪ 熔断通道</Text>
-            </View>
+            <SectionHeader
+              emphasis
+              title="高危安全闸门"
+              hint="PRD 需求⑪ 熔断通道"
+              style={styles.sectionHeaderMargin}
+            />
 
             {isLocked ? (
               <View style={styles.lockedNoticeCard}>
@@ -685,40 +690,46 @@ export function OntologyDomainListScreen({
 
           {/* 快照摘要统计 (Snapshot Counts) */}
           <View style={styles.sectionBlock}>
-            <View style={styles.sectionHeaderRow}>
-              <Text style={styles.sectionTitle}>图谱快照摘要</Text>
-              {snapshotLoading ? (
-                <ActivityIndicator size="small" color={C.accent} />
-              ) : (
-                <Text style={styles.sectionHint}>实时拓扑数据</Text>
-              )}
-            </View>
+            <SectionHeader
+              emphasis
+              title="图谱快照摘要"
+              style={styles.sectionHeaderMargin}
+              right={
+                snapshotLoading ? (
+                  <ActivityIndicator size="small" color={C.accent} />
+                ) : (
+                  <Text style={styles.sectionHint}>实时拓扑数据</Text>
+                )
+              }
+            />
 
             <View style={styles.statsGrid}>
-              <View style={styles.metricCard}>
-                <Text style={styles.metricNum}>
-                  {snapshot?.counts?.nodes ?? stats?.nodes ?? "0"}
-                </Text>
-                <Text style={styles.metricLabel}>实体节点数</Text>
-              </View>
-              <View style={styles.metricCard}>
-                <Text style={[styles.metricNum, { color: C.accent }]}>
-                  {snapshot?.counts?.edges ?? stats?.edges ?? "0"}
-                </Text>
-                <Text style={styles.metricLabel}>关系连线数</Text>
-              </View>
-              <View style={styles.metricCard}>
-                <Text style={styles.metricNum}>
-                  {snapshot?.counts?.nodeTypes ?? "0"}
-                </Text>
-                <Text style={styles.metricLabel}>节点类型数</Text>
-              </View>
-              <View style={styles.metricCard}>
-                <Text style={[styles.metricNum, { color: C.warn }]}>
-                  {snapshot?.counts?.crossDomainEdges ?? "0"}
-                </Text>
-                <Text style={styles.metricLabel}>跨域依赖数</Text>
-              </View>
+              <StatTile
+                flex={false}
+                style={styles.metricCard}
+                value={snapshot?.counts?.nodes ?? stats?.nodes ?? "0"}
+                label="实体节点数"
+              />
+              <StatTile
+                flex={false}
+                style={styles.metricCard}
+                value={snapshot?.counts?.edges ?? stats?.edges ?? "0"}
+                valueColor={C.accent}
+                label="关系连线数"
+              />
+              <StatTile
+                flex={false}
+                style={styles.metricCard}
+                value={snapshot?.counts?.nodeTypes ?? "0"}
+                label="节点类型数"
+              />
+              <StatTile
+                flex={false}
+                style={styles.metricCard}
+                value={snapshot?.counts?.crossDomainEdges ?? "0"}
+                valueColor={C.warn}
+                label="跨域依赖数"
+              />
             </View>
           </View>
 
@@ -726,7 +737,7 @@ export function OntologyDomainListScreen({
           {snapshot?.counts?.byNodeType &&
           Object.keys(snapshot.counts.byNodeType).length > 0 ? (
             <View style={styles.sectionBlock}>
-              <Text style={styles.sectionTitle}>实体类型分布</Text>
+              <SectionHeader emphasis title="实体类型分布" />
               <View style={styles.cardList}>
                 {Object.entries(snapshot.counts.byNodeType).map(
                   ([typeKey, count]) => (
@@ -734,9 +745,7 @@ export function OntologyDomainListScreen({
                       <Text style={styles.subItemKey}>
                         {typeKey ? typeKey : "(未归类对象)"}
                       </Text>
-                      <View style={styles.subItemBadge}>
-                        <Text style={styles.subItemCount}>{count} 实体</Text>
-                      </View>
+                      <Pill label={`${count} 实体`} tone="brand" size="sm" />
                     </View>
                   ),
                 )}
@@ -747,20 +756,16 @@ export function OntologyDomainListScreen({
           {/* 实体样本预览 */}
           {snapshot?.nodes && snapshot.nodes.length > 0 ? (
             <View style={styles.sectionBlock}>
-              <Text style={styles.sectionTitle}>
-                实体节点抽样 ({Math.min(snapshot.nodes.length, 10)} /{" "}
-                {snapshot.counts.nodes})
-              </Text>
+              <SectionHeader
+                emphasis
+                title={`实体节点抽样 (${Math.min(snapshot.nodes.length, 10)} / ${snapshot.counts.nodes})`}
+              />
               <View style={styles.cardList}>
                 {snapshot.nodes.slice(0, 8).map((node) => (
                   <View key={node.id} style={styles.nodeItem}>
                     <View style={styles.nodeHeader}>
                       <Text style={styles.nodeLabel}>{node.label}</Text>
-                      <View style={styles.nodeBadge}>
-                        <Text style={styles.nodeBadgeText}>
-                          {node.lifecycleState || "active"}
-                        </Text>
-                      </View>
+                      <Pill label={node.lifecycleState || "active"} size="sm" />
                     </View>
                     <Text style={styles.nodeKey}>{node.key}</Text>
                   </View>
@@ -772,10 +777,10 @@ export function OntologyDomainListScreen({
           {/* 关系样本预览 */}
           {snapshot?.edges && snapshot.edges.length > 0 ? (
             <View style={styles.sectionBlock}>
-              <Text style={styles.sectionTitle}>
-                关系连线抽样 ({Math.min(snapshot.edges.length, 6)} /{" "}
-                {snapshot.counts.edges})
-              </Text>
+              <SectionHeader
+                emphasis
+                title={`关系连线抽样 (${Math.min(snapshot.edges.length, 6)} / ${snapshot.counts.edges})`}
+              />
               <View style={styles.cardList}>
                 {snapshot.edges.slice(0, 6).map((edge) => (
                   <View key={edge.id} style={styles.edgeItem}>
@@ -801,124 +806,72 @@ export function OntologyDomainListScreen({
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
       <View style={styles.header}>
-        <View style={styles.headerRow}>
-          <View style={{ flex: 1 }}>
-            <View style={styles.titleRow}>
-              {onBack ? (
-                <Pressable onPress={onBack} hitSlop={12} style={styles.backBtn}>
-                  <Text style={styles.backBtnText}>‹</Text>
-                </Pressable>
-              ) : null}
-              <Text style={styles.h1}>业务本体域</Text>
-            </View>
-            <View style={styles.companyCapsule}>
+        <ScreenHeader
+          onBack={onBack}
+          title="业务本体域"
+          subtitle={
+            <Pill style={styles.companyCapsule}>
               <StatusDot status="ok" size={6} />
               <Text style={styles.companyCapsuleText} numberOfLines={1}>
                 {company.name}
               </Text>
               <Text style={styles.companyCapsuleSubText}>· 资产底座</Text>
-            </View>
-          </View>
-
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            {onOpenSettings ? (
-              <Pressable onPress={onOpenSettings} hitSlop={12} style={styles.refreshBtn}>
-                <Ionicons name="settings-outline" size={17} color="#8A8F98" />
+            </Pill>
+          }
+          right={
+            <>
+              {onOpenSettings ? (
+                <Pressable onPress={onOpenSettings} hitSlop={12} style={styles.refreshBtn}>
+                  <Ionicons name="settings-outline" size={17} color={C.ink3} />
+                </Pressable>
+              ) : null}
+              <Pressable
+                onPress={handleSeedSample}
+                disabled={seedingSample}
+                hitSlop={12}
+                style={[styles.refreshBtn, styles.seedBtn]}
+              >
+                {seedingSample ? (
+                  <ActivityIndicator size="small" color={C.accent} />
+                ) : (
+                  <Text style={styles.seedBtnText}>注入示例域</Text>
+                )}
               </Pressable>
-            ) : null}
-            <Pressable
-              onPress={handleSeedSample}
-              disabled={seedingSample}
-              hitSlop={12}
-              style={[styles.refreshBtn, styles.seedBtn]}
-            >
-              {seedingSample ? (
-                <ActivityIndicator size="small" color={C.accent} />
-              ) : (
-                <Text style={styles.seedBtnText}>注入示例域</Text>
-              )}
-            </Pressable>
-            <Pressable
-              onPress={onRefresh}
-              hitSlop={12}
-              style={styles.refreshBtn}
-            >
-              <Text style={styles.refreshBtnText}>刷新</Text>
-            </Pressable>
-          </View>
-        </View>
+              <Pressable onPress={onRefresh} hitSlop={12} style={styles.refreshBtn}>
+                <Text style={styles.refreshBtnText}>刷新</Text>
+              </Pressable>
+            </>
+          }
+        />
 
         {/* 顶部过滤切换器 */}
-        <View style={styles.filterSwitcher}>
-          <Pressable
-            style={[styles.filterBtn, filter === "all" && styles.filterBtnActive]}
-            onPress={() => setFilter("all")}
-          >
-            <Text
-              style={[
-                styles.filterBtnText,
-                filter === "all" && styles.filterBtnTextActive,
-              ]}
-            >
-              全部 ({domains.length})
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.filterBtn,
-              filter === "active" && styles.filterBtnActive,
-            ]}
-            onPress={() => setFilter("active")}
-          >
-            <Text
-              style={[
-                styles.filterBtnText,
-                filter === "active" && styles.filterBtnTextActive,
-              ]}
-            >
-              运行中 ({activeCount})
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.filterBtn,
-              filter === "locked" && styles.filterBtnActive,
-            ]}
-            onPress={() => setFilter("locked")}
-          >
-            <Text
-              style={[
-                styles.filterBtnText,
-                filter === "locked" && styles.filterBtnTextActive,
-                lockedCount > 0 && { color: C.err },
-              ]}
-            >
-              已锁定 ({lockedCount})
-            </Text>
-          </Pressable>
-        </View>
+        <SegmentedControl
+          value={filter}
+          onChange={(key) => setFilter(key as DomainFilter)}
+          options={[
+            { key: "all", label: `全部 (${domains.length})` },
+            { key: "active", label: `运行中 (${activeCount})` },
+            {
+              key: "locked",
+              label: `已锁定 (${lockedCount})`,
+              color: lockedCount > 0 ? C.err : undefined,
+            },
+          ]}
+          style={styles.filterSwitcher}
+        />
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={C.accent} />
-          <Text style={styles.loadingText}>正在加载业务本体域拓扑…</Text>
-        </View>
+        <LoadingState text="正在加载业务本体域拓扑…" />
       ) : error ? (
-        <View style={styles.center}>
-          <Text style={styles.errorText}>{error}</Text>
-          <Pressable style={styles.retryBtn} onPress={loadDomains}>
-            <Text style={styles.retryBtnText}>重试</Text>
-          </Pressable>
-        </View>
+        <ErrorRetry message={error} onRetry={loadDomains} />
       ) : filteredDomains.length === 0 ? (
-        <View style={styles.center}>
-          <Text style={styles.emptyIcon}>🌐</Text>
-          <Text style={styles.emptyTitle}>暂无匹配的业务本体域</Text>
-          <Text style={styles.emptySub}>
-            插件已挂载于 @paperclipai/plugin-ontology，可在后台创建电商、文旅等域。
-          </Text>
-        </View>
+        <EmptyState
+          variant="standalone"
+          icon="🌐"
+          title="暂无匹配的业务本体域"
+          subtitle="插件已挂载于 @paperclipai/plugin-ontology，可在后台创建电商、文旅等域。"
+        />
       ) : (
         <FlatList
           data={filteredDomains}
@@ -941,12 +894,8 @@ export function OntologyDomainListScreen({
             const stats = domainStats[item.id];
 
             return (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.domainCard,
-                  pressed && styles.domainCardPressed,
-                  isLocked && styles.domainCardLocked,
-                ]}
+              <AppCard
+                style={[styles.domainCard, isLocked && styles.domainCardLocked]}
                 onPress={() => openDomainDetail(item)}
               >
                 {/* 头部标题与状态徽标 */}
@@ -957,17 +906,13 @@ export function OntologyDomainListScreen({
                     </Text>
                     <Text style={styles.domainSlug}>标识: {item.slug}</Text>
                   </View>
-                  <View
-                    style={[
-                      styles.badgePill,
-                      { backgroundColor: cfg.bg, borderColor: cfg.border },
-                    ]}
-                  >
-                    <StatusDot status={cfg.status} color={cfg.color} size={6} />
-                    <Text style={[styles.badgeText, { color: cfg.color }]}>
-                      {cfg.label}
-                    </Text>
-                  </View>
+                  <StatusBadge
+                    label={cfg.label}
+                    color={cfg.color}
+                    bg={cfg.bg}
+                    border={cfg.border}
+                    dotStatus={cfg.status}
+                  />
                 </View>
 
                 {/* 描述文案 */}
@@ -980,23 +925,22 @@ export function OntologyDomainListScreen({
                 {/* 指标与标签卡脚 */}
                 <View style={styles.cardFooter}>
                   <View style={styles.footerPills}>
-                    <View style={styles.statPill}>
-                      <Text style={styles.statPillLabel}>节点</Text>
-                      <Text style={styles.statPillValue}>
-                        {stats ? stats.nodes : "--"}
-                      </Text>
-                    </View>
-                    <View style={styles.statPill}>
-                      <Text style={styles.statPillLabel}>关系</Text>
-                      <Text style={styles.statPillValue}>
-                        {stats ? stats.edges : "--"}
-                      </Text>
-                    </View>
-                    <View style={styles.tagPill}>
-                      <Text style={styles.tagPillText}>
-                        v{item.schema_version ?? item.version ?? 1}
-                      </Text>
-                    </View>
+                    <Pill
+                      label="节点"
+                      value={stats ? String(stats.nodes) : "--"}
+                      size="sm"
+                      mono
+                    />
+                    <Pill
+                      label="关系"
+                      value={stats ? String(stats.edges) : "--"}
+                      size="sm"
+                      mono
+                    />
+                    <Pill
+                      label={`v${item.schema_version ?? item.version ?? 1}`}
+                      size="sm"
+                    />
                   </View>
 
                   <Text style={styles.enterChevron}>快照摘要 ›</Text>
@@ -1014,7 +958,7 @@ export function OntologyDomainListScreen({
                     />
                   </View>
                 ) : null}
-              </Pressable>
+              </AppCard>
             );
           }}
         />
@@ -1043,41 +987,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: C.lineSubtle,
   },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  h1: {
-    color: C.ink,
-    fontSize: 20,
-    fontWeight: "600",
-    letterSpacing: -0.4,
-  },
-  backBtn: {
-    paddingVertical: 4,
-    paddingRight: 6,
-  },
-  backBtnText: {
-    color: C.accent,
-    fontSize: 14,
-    fontWeight: "500",
-  },
   companyCapsule: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
-    borderColor: C.line,
-    borderWidth: 1,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
     marginTop: 6,
     gap: 6,
   },
@@ -1113,45 +1023,14 @@ const styles = StyleSheet.create({
     fontWeight: "500",
   },
   filterSwitcher: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255, 255, 255, 0.02)",
-    borderColor: C.line,
-    borderWidth: 1,
-    borderRadius: 8,
-    padding: 2,
     marginTop: 12,
-  },
-  filterBtn: {
-    flex: 1,
-    alignItems: "center",
-    paddingVertical: 6,
-    borderRadius: 6,
-  },
-  filterBtnActive: {
-    backgroundColor: "rgba(255, 255, 255, 0.06)",
-  },
-  filterBtnText: {
-    color: C.ink3,
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  filterBtnTextActive: {
-    color: C.ink,
   },
   listContent: {
     padding: 16,
     paddingBottom: 32,
   },
   domainCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.02)",
-    borderColor: C.line,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
     marginBottom: 12,
-  },
-  domainCardPressed: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
   },
   domainCardLocked: {
     borderColor: "rgba(239, 68, 68, 0.22)",
@@ -1173,19 +1052,6 @@ const styles = StyleSheet.create({
     fontFamily: "monospace",
     marginTop: 2,
   },
-  badgePill: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 999,
-    borderWidth: 1,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    gap: 5,
-  },
-  badgeText: {
-    fontSize: 11,
-    fontWeight: "500",
-  },
   domainDesc: {
     color: C.ink3,
     fontSize: 13,
@@ -1206,35 +1072,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  statPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
-    borderRadius: 6,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    gap: 4,
-  },
-  statPillLabel: {
-    color: C.ink4,
-    fontSize: 10,
-  },
-  statPillValue: {
-    color: C.ink2,
-    fontSize: 11,
-    fontWeight: "600",
-    fontVariant: ["tabular-nums"],
-  },
-  tagPill: {
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
-    borderRadius: 6,
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-  },
-  tagPillText: {
-    color: C.ink3,
-    fontSize: 10,
-  },
   enterChevron: {
     color: C.accent,
     fontSize: 12,
@@ -1243,63 +1080,10 @@ const styles = StyleSheet.create({
   cardKillSwitchWrap: {
     marginTop: 10,
   },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 24,
-  },
-  loadingText: {
-    color: C.ink3,
-    fontSize: 13,
-    marginTop: 12,
-  },
-  errorText: {
-    color: C.err,
-    fontSize: 13,
-    textAlign: "center",
-    marginBottom: 12,
-  },
-  retryBtn: {
-    backgroundColor: C.brand,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  retryBtnText: {
-    color: C.ink,
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  emptyIcon: {
-    fontSize: 36,
-    marginBottom: 12,
-  },
-  emptyTitle: {
-    color: C.ink,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  emptySub: {
-    color: C.ink4,
-    fontSize: 12,
-    textAlign: "center",
-    marginTop: 6,
-    lineHeight: 18,
-    maxWidth: 280,
-  },
   detailNav: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     marginBottom: 16,
   },
   heroCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.02)",
-    borderColor: C.line,
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 16,
     marginBottom: 16,
   },
   heroTitle: {
@@ -1344,17 +1128,8 @@ const styles = StyleSheet.create({
   sectionBlock: {
     marginBottom: 20,
   },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+  sectionHeaderMargin: {
     marginBottom: 10,
-  },
-  sectionTitle: {
-    color: C.ink,
-    fontSize: 15,
-    fontWeight: "600",
-    letterSpacing: -0.2,
   },
   sectionHint: {
     color: C.ink4,
@@ -1425,23 +1200,6 @@ const styles = StyleSheet.create({
   },
   metricCard: {
     width: "48%",
-    backgroundColor: "rgba(255, 255, 255, 0.02)",
-    borderColor: C.line,
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-  },
-  metricNum: {
-    color: C.ink,
-    fontSize: 22,
-    fontWeight: "600",
-    fontVariant: ["tabular-nums"],
-    letterSpacing: -0.4,
-  },
-  metricLabel: {
-    color: C.ink3,
-    fontSize: 11,
-    marginTop: 4,
   },
   cardList: {
     backgroundColor: "rgba(255, 255, 255, 0.02)",
@@ -1463,18 +1221,6 @@ const styles = StyleSheet.create({
     color: C.ink2,
     fontSize: 12,
   },
-  subItemBadge: {
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    borderRadius: 6,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-  },
-  subItemCount: {
-    color: C.accent,
-    fontSize: 11,
-    fontWeight: "600",
-    fontVariant: ["tabular-nums"],
-  },
   nodeItem: {
     paddingVertical: 8,
     paddingHorizontal: 8,
@@ -1490,16 +1236,6 @@ const styles = StyleSheet.create({
     color: C.ink,
     fontSize: 13,
     fontWeight: "500",
-  },
-  nodeBadge: {
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-  },
-  nodeBadgeText: {
-    color: C.ink3,
-    fontSize: 10,
   },
   nodeKey: {
     color: C.ink4,
@@ -1529,17 +1265,11 @@ const styles = StyleSheet.create({
   graphNavTitle: {
     color: C.ink3,
     fontSize: 13,
-    flex: 1,
     textAlign: "right",
+    flexShrink: 1,
   },
   graphEntryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: 10,
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    padding: 14,
-    borderWidth: 1,
     borderColor: C.line,
   },
   graphEntryLeft: { flex: 1 },
@@ -1547,9 +1277,6 @@ const styles = StyleSheet.create({
   graphEntrySub: { color: C.ink3, fontSize: 12, marginTop: 3 },
   graphEntryArrow: { color: C.ink4, fontSize: 22 },
   graphCanvasCard: {
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    padding: 14,
     marginTop: 12,
   },
   graphCanvasHeader: {
@@ -1577,9 +1304,6 @@ const styles = StyleSheet.create({
   graphNodeCircleText: { color: C.ink2, fontSize: 10 },
   graphNodeCountText: { color: C.ink4, fontSize: 9 },
   schemaCard: {
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    padding: 14,
     marginTop: 12,
   },
   schemaCardHeader: {
@@ -1589,13 +1313,6 @@ const styles = StyleSheet.create({
   },
   schemaTitleRow: { flexDirection: "row", alignItems: "center" },
   schemaCardTitle: { color: C.ink, fontSize: 14, fontWeight: "600" },
-  schemaBadge: {
-    backgroundColor: C.panel,
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-  },
-  schemaBadgeText: { color: C.accent, fontSize: 10, fontWeight: "600" },
   schemaSectionTitle: { color: C.ink3, fontSize: 12, marginTop: 12, marginBottom: 8 },
   schemaEmptyText: { color: C.ink4, fontSize: 12 },
   schemaPropsList: { gap: 6 },

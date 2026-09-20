@@ -27,6 +27,13 @@ import {
   formatApprovalTitle,
 } from "../components/QuickApprovalCard";
 import { CodeViewerWebView } from "../components/CodeViewerWebView";
+import { AppCard } from "../ui/AppCard";
+import { ErrorRetry } from "../ui/ErrorRetry";
+import { LoadingState } from "../ui/LoadingState";
+import { Pill } from "../ui/Pill";
+import { ScreenHeader } from "../ui/ScreenHeader";
+import { StatusBadge } from "../ui/StatusBadge";
+import { formatTime } from "../utils/format";
 
 export interface BoardChatScreenProps {
   onOpenSettings?: () => void;
@@ -143,11 +150,12 @@ function InlineApprovalBubble({
         <View style={styles.approvalHeader}>
           <StatusDot status="running" color={C.warn} size={7} />
           <Text style={styles.approvalHeaderText}>待办审批</Text>
-          <View style={styles.approvalTypeBadge}>
-            <Text style={styles.approvalTypeBadgeText}>
-              {approvalTypeLabel(approval.type)}
-            </Text>
-          </View>
+          <Pill
+            label={approvalTypeLabel(approval.type)}
+            size="sm"
+            textStyle={{ color: C.warn }}
+            style={styles.approvalTypeBadge}
+          />
         </View>
 
         <Text style={styles.approvalTitle} numberOfLines={2}>
@@ -652,12 +660,7 @@ export function BoardChatScreen({
         >
           <View style={styles.assistantHeader}>
             <Text style={styles.assistantName}>数字总办</Text>
-            <Text style={styles.timestamp}>
-              {new Date(item.createdAt).toLocaleTimeString([], {
-                hour: "2-digit",
-                minute: "2-digit",
-              })}
-            </Text>
+            <Text style={styles.timestamp}>{formatTime(item.createdAt)}</Text>
           </View>
           {segments.length === 1 && segments[0].type === "text" ? (
             <Text style={styles.assistantText}>{item.text}</Text>
@@ -708,9 +711,11 @@ export function BoardChatScreen({
         <View style={styles.topBar}>
           <View style={styles.topLeft}>
             {Boolean(onBack) && (
-              <Pressable hitSlop={12} onPress={onBack} style={styles.backBtn}>
-                <Text style={styles.backBtnText}>‹ 返回</Text>
-              </Pressable>
+              <ScreenHeader
+                onBack={onBack}
+                backLabel="返回"
+                style={styles.headerBack}
+              />
             )}
             <View>
               <View style={styles.titleRow}>
@@ -799,10 +804,13 @@ export function BoardChatScreen({
                   <Text style={styles.emptyPromptTitle}>您可以尝试这样提问：</Text>
                   <View style={styles.emptyPromptGrid}>
                     {QUICK_PROMPTS.map((prompt) => (
-                      <Pressable
+                      <AppCard
                         key={prompt}
-                        style={styles.emptyPromptCard}
+                        row
+                        radius={8}
+                        padding={8}
                         onPress={() => void handleSend(prompt)}
+                        style={styles.emptyPromptCard}
                       >
                         <Ionicons
                           name="sparkles-outline"
@@ -811,7 +819,7 @@ export function BoardChatScreen({
                           style={{ marginRight: 6 }}
                         />
                         <Text style={styles.emptyPromptCardText}>{prompt}</Text>
-                      </Pressable>
+                      </AppCard>
                     ))}
                   </View>
                 </View>
@@ -827,10 +835,15 @@ export function BoardChatScreen({
                     <View style={styles.assistantHeader}>
                       <Text style={styles.assistantName}>数字总办</Text>
                       {Boolean(statusText) && (
-                        <View style={styles.statusPill}>
-                          <StatusDot status="running" size={5} color={C.accent} />
-                          <Text style={styles.statusPillText}>{statusText}</Text>
-                        </View>
+                        <StatusBadge
+                          label={statusText}
+                          color={C.accent}
+                          bg="rgba(113, 112, 255, 0.12)"
+                          border="transparent"
+                          dotStatus="running"
+                          size={5}
+                          style={styles.statusPill}
+                        />
                       )}
                     </View>
 
@@ -860,12 +873,12 @@ export function BoardChatScreen({
 
               {/* 异常或中断提示条 */}
               {Boolean(errorText) && (
-                <View style={styles.errorBanner}>
-                  <Text style={styles.errorBannerText}>⚠️ {errorText}</Text>
-                  <Pressable onPress={handleRetry} style={styles.retryBtn}>
-                    <Text style={styles.retryBtnText}>重试</Text>
-                  </Pressable>
-                </View>
+                <ErrorRetry
+                  variant="inline"
+                  message={`⚠️ ${errorText}`}
+                  onRetry={handleRetry}
+                  style={styles.errorBanner}
+                />
               )}
             </>
           }
@@ -956,19 +969,20 @@ export function BoardChatScreen({
               </Pressable>
 
               {sessionsLoading && (
-                <View style={styles.historyLoadingBox}>
-                  <ActivityIndicator size="small" color={C.accent} />
-                  <Text style={styles.historyLoadingText}>加载历史会话…</Text>
-                </View>
+                <LoadingState
+                  size="small"
+                  text="加载历史会话…"
+                  style={styles.historyLoadingBox}
+                />
               )}
 
               {Boolean(sessionsError) && (
-                <View style={styles.historyErrorBox}>
-                  <Text style={styles.historyErrorText}>⚠️ {sessionsError}</Text>
-                  <Pressable onPress={() => void loadSessions()} style={styles.historyRetryBtn}>
-                    <Text style={styles.historyRetryBtnText}>重试</Text>
-                  </Pressable>
-                </View>
+                <ErrorRetry
+                  variant="section"
+                  message={`⚠️ ${sessionsError}`}
+                  onRetry={() => void loadSessions()}
+                  style={styles.historyErrorBox}
+                />
               )}
 
               {!sessionsLoading && !sessionsError && (
@@ -979,10 +993,13 @@ export function BoardChatScreen({
                     sessions.map((sess) => {
                       const isActive = sess.id === boardIssueId;
                       return (
-                        <Pressable
+                        <AppCard
                           key={sess.id}
-                          style={[styles.sessionCard, isActive && styles.sessionCardActive]}
+                          row
+                          radius={8}
+                          padding={12}
                           onPress={() => void switchSession(sess.id)}
+                          style={[styles.sessionCard, isActive && styles.sessionCardActive]}
                         >
                           <Ionicons
                             name={isActive ? "chatbubble" : "chatbubble-outline"}
@@ -1000,11 +1017,15 @@ export function BoardChatScreen({
                             <Text style={styles.sessionCardId}>ID: {sess.id.slice(0, 8)}</Text>
                           </View>
                           {isActive && (
-                            <View style={styles.sessionActiveBadge}>
-                              <Text style={styles.sessionActiveBadgeText}>当前</Text>
-                            </View>
+                            <Pill
+                              label="当前"
+                              tone="accent"
+                              size="sm"
+                              textStyle={{ color: C.accent }}
+                              style={styles.sessionActiveBadge}
+                            />
                           )}
-                        </Pressable>
+                        </AppCard>
                       );
                     })
                   )}
@@ -1048,10 +1069,8 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: "rgba(255, 255, 255, 0.04)",
   },
-  backBtnText: {
-    color: C.ink2,
-    fontSize: 13,
-    fontWeight: "500",
+  headerBack: {
+    alignSelf: "center",
   },
   titleRow: {
     flexDirection: "row",
@@ -1128,15 +1147,10 @@ const styles = StyleSheet.create({
   approvalTypeBadge: {
     backgroundColor: "rgba(245, 158, 11, 0.12)",
     borderColor: "rgba(245, 158, 11, 0.3)",
-    borderWidth: 1,
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 1,
-  },
-  approvalTypeBadgeText: {
-    color: C.warn,
-    fontSize: 11,
-    fontWeight: "500",
+    alignSelf: "center",
   },
   approvalTitle: {
     color: C.ink,
@@ -1325,17 +1339,9 @@ const styles = StyleSheet.create({
     lineHeight: 21,
   },
   statusPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(113, 112, 255, 0.12)",
+    borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
-  },
-  statusPillText: {
-    color: C.accent,
-    fontSize: 11,
   },
   cursorText: {
     color: C.accent,
@@ -1356,33 +1362,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
   },
   errorBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
     backgroundColor: "rgba(239, 68, 68, 0.12)",
     borderColor: "rgba(239, 68, 68, 0.28)",
-    borderWidth: 1,
-    borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginVertical: 6,
-  },
-  errorBannerText: {
-    color: C.err,
-    fontSize: 12,
-    flex: 1,
-  },
-  retryBtn: {
-    backgroundColor: "rgba(239, 68, 68, 0.2)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 4,
-    marginLeft: 8,
-  },
-  retryBtnText: {
-    color: C.err,
-    fontSize: 12,
-    fontWeight: "600",
   },
   promptChipsContainer: {
     paddingVertical: 6,
@@ -1514,14 +1498,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   emptyPromptCard: {
-    flexDirection: "row",
-    alignItems: "center",
     backgroundColor: C.panel,
-    borderWidth: 1,
-    borderColor: C.line,
-    borderRadius: 8,
     paddingHorizontal: 10,
-    paddingVertical: 8,
     maxWidth: "48%",
     flexGrow: 1,
   },
@@ -1590,33 +1568,17 @@ const styles = StyleSheet.create({
   },
   historyLoadingBox: {
     paddingVertical: 24,
+    paddingHorizontal: 0,
     alignItems: "center",
-    gap: 8,
-  },
-  historyLoadingText: {
-    color: C.ink3,
-    fontSize: 13,
+    gap: 0,
+    flex: 0,
   },
   historyErrorBox: {
-    paddingVertical: 16,
-    alignItems: "center",
     gap: 8,
-  },
-  historyErrorText: {
-    color: C.err,
-    fontSize: 13,
-  },
-  historyRetryBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    backgroundColor: C.surface,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: C.line,
-  },
-  historyRetryBtnText: {
-    color: C.ink,
-    fontSize: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 0,
+    borderWidth: 0,
+    backgroundColor: "transparent",
   },
   sessionList: {
     maxHeight: 360,
@@ -1628,13 +1590,8 @@ const styles = StyleSheet.create({
     paddingVertical: 24,
   },
   sessionCard: {
-    flexDirection: "row",
     alignItems: "flex-start",
     backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.line,
-    borderRadius: 8,
-    padding: 12,
     marginBottom: 8,
   },
   sessionCardActive: {
@@ -1659,14 +1616,10 @@ const styles = StyleSheet.create({
   },
   sessionActiveBadge: {
     backgroundColor: "rgba(113, 112, 255, 0.15)",
+    borderColor: "transparent",
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
     marginLeft: 6,
-  },
-  sessionActiveBadgeText: {
-    color: C.accent,
-    fontSize: 11,
-    fontWeight: "500",
   },
 });

@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
   FlatList,
   Modal,
   Pressable,
@@ -25,6 +24,12 @@ import type {
 } from "@coolie/api-client";
 import { C, COOLIE_BASE_URL, coolie, getAuthToken } from "../coolie";
 import { CodeViewerWebView } from "../components/CodeViewerWebView";
+import { AppCard } from "../ui/AppCard";
+import { EmptyState } from "../ui/EmptyState";
+import { LoadingState } from "../ui/LoadingState";
+import { Pill } from "../ui/Pill";
+import { ScreenHeader } from "../ui/ScreenHeader";
+import { SegmentedControl } from "../ui/SegmentedControl";
 
 export interface ArtifactsScreenProps {
   company: Company;
@@ -268,21 +273,18 @@ export function ArtifactsScreen({
       <StatusBar style="light" />
 
       {/* 顶部导航与操作栏 */}
-      <View style={styles.headerBar}>
-        <View style={styles.headerLeft}>
-          {onBack && (
-            <Pressable onPress={onBack} hitSlop={12} style={styles.backBtn}>
-              <Text style={styles.backText}>‹ 返回</Text>
-            </Pressable>
-          )}
-          <View>
-            <Text style={styles.headerTitle}>产物交付中心</Text>
-            <Text style={styles.headerSubtitle}>
-              {company.name} · PRD 需求③看产物、⑤看原型
-            </Text>
-          </View>
-        </View>
-      </View>
+      <ScreenHeader
+        title="产物交付中心"
+        subtitle={
+          <Text style={styles.headerSubtitle}>
+            {company.name} · PRD 需求③看产物、⑤看原型
+          </Text>
+        }
+        onBack={onBack}
+        backLabel="返回"
+        divider
+        style={styles.headerBar}
+      />
 
       {/* 搜索与过滤分段器 */}
       <View style={styles.filterSection}>
@@ -304,38 +306,23 @@ export function ArtifactsScreen({
           )}
         </View>
 
-        {/* 分类胶囊标签 */}
-        <View style={styles.tabSwitcher}>
-          {FILTER_TABS.map((tab) => {
-            const isActive = filter === tab.key;
+        {/* 分类分段筛选器 */}
+        <SegmentedControl
+          options={FILTER_TABS.map((tab) => {
             const count = counts[tab.key];
-            return (
-              <Pressable
-                key={tab.key}
-                style={[styles.tabBtn, isActive && styles.tabBtnActive]}
-                onPress={() => setFilter(tab.key)}
-              >
-                <Text
-                  style={[
-                    styles.tabBtnText,
-                    isActive && styles.tabBtnTextActive,
-                  ]}
-                >
-                  {tab.label}
-                  {count > 0 ? ` (${count})` : ""}
-                </Text>
-              </Pressable>
-            );
+            return {
+              key: tab.key,
+              label: `${tab.label}${count > 0 ? ` (${count})` : ""}`,
+            };
           })}
-        </View>
+          value={filter}
+          onChange={(key) => setFilter(key as FilterKind)}
+        />
       </View>
 
       {/* 产物卡片流列表 */}
       {loading ? (
-        <View style={styles.centerContainer}>
-          <ActivityIndicator color={C.accent} size="large" />
-          <Text style={styles.loadingText}>加载交付产物中…</Text>
-        </View>
+        <LoadingState text="加载交付产物中…" />
       ) : (
         <FlatList
           data={filteredList}
@@ -350,13 +337,13 @@ export function ArtifactsScreen({
             />
           }
           ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>📦</Text>
-              <Text style={styles.emptyTitle}>暂无匹配的交付产物</Text>
-              <Text style={styles.emptyDescription}>
-                AI 员工执行任务产出的设计图、文档或原型将在此实时展示。
-              </Text>
-            </View>
+            <EmptyState
+              icon={<Text style={styles.emptyIcon}>📦</Text>}
+              title="暂无匹配的交付产物"
+              subtitle="AI 员工执行任务产出的设计图、文档或原型将在此实时展示。"
+              variant="standalone"
+              style={styles.emptyContainer}
+            />
           }
           renderItem={({ item }) => {
             const badge = getMediaKindBadge(item.mediaKind, item.source);
@@ -365,17 +352,15 @@ export function ArtifactsScreen({
             const isWorkProduct = item.source === "work_product";
 
             return (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.artifactCard,
-                  pressed && styles.artifactCardPressed,
-                ]}
+              <AppCard
+                style={styles.artifactCard}
                 onPress={() => handleCardPress(item)}
               >
                 {/* 卡片顶部元数据行 */}
                 <View style={styles.cardHeader}>
                   <View style={styles.badgeRow}>
-                    <View
+                    <Pill
+                      size="sm"
                       style={[
                         styles.kindBadge,
                         {
@@ -388,12 +373,13 @@ export function ArtifactsScreen({
                       <Text style={[styles.kindLabel, { color: badge.color }]}>
                         {badge.label}
                       </Text>
-                    </View>
-                    <View style={styles.sourceTag}>
-                      <Text style={styles.sourceTagText}>
-                        {getSourceLabel(item.source)}
-                      </Text>
-                    </View>
+                    </Pill>
+                    <Pill
+                      label={getSourceLabel(item.source)}
+                      size="sm"
+                      style={styles.sourceTag}
+                      textStyle={styles.sourceTagText}
+                    />
                   </View>
 
                   <Text style={styles.cardTime}>
@@ -502,7 +488,7 @@ export function ArtifactsScreen({
                     </View>
                   )}
                 </View>
-              </Pressable>
+              </AppCard>
             );
           }}
         />
@@ -591,29 +577,6 @@ const styles = StyleSheet.create({
   headerBar: {
     paddingHorizontal: 16,
     paddingTop: 12,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: C.lineSubtle,
-  },
-  headerLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  backBtn: {
-    paddingVertical: 4,
-    paddingRight: 8,
-  },
-  backText: {
-    color: C.accent,
-    fontSize: 15,
-    fontWeight: "500",
-  },
-  headerTitle: {
-    color: C.ink,
-    fontSize: 18,
-    fontWeight: "600",
-    letterSpacing: -0.4,
   },
   headerSubtitle: {
     color: C.ink3,
@@ -653,77 +616,25 @@ const styles = StyleSheet.create({
     fontSize: 14,
     padding: 4,
   },
-  tabSwitcher: {
-    flexDirection: "row",
-    gap: 8,
-  },
-  tabBtn: {
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderWidth: 1,
-    borderColor: C.lineSubtle,
-  },
-  tabBtnActive: {
-    backgroundColor: "rgba(94, 106, 210, 0.15)",
-    borderColor: "rgba(94, 106, 210, 0.4)",
-  },
-  tabBtnText: {
-    color: C.ink3,
-    fontSize: 12,
-    fontWeight: "500",
-    fontVariant: ["tabular-nums"],
-  },
-  tabBtnTextActive: {
-    color: C.accent,
-  },
-  centerContainer: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 12,
-  },
-  loadingText: {
-    color: C.ink3,
-    fontSize: 13,
-  },
   listContent: {
     padding: 16,
     paddingBottom: 40,
     gap: 12,
   },
   emptyContainer: {
+    flex: 0,
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 64,
+    paddingHorizontal: 0,
     gap: 8,
   },
   emptyIcon: {
     fontSize: 36,
     marginBottom: 4,
   },
-  emptyTitle: {
-    color: C.ink,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  emptyDescription: {
-    color: C.ink3,
-    fontSize: 13,
-    textAlign: "center",
-    maxWidth: 260,
-  },
   artifactCard: {
-    backgroundColor: "rgba(255, 255, 255, 0.02)",
-    borderWidth: 1,
-    borderColor: C.line,
-    borderRadius: 12,
-    padding: 14,
     gap: 10,
-  },
-  artifactCardPressed: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
   },
   cardHeader: {
     flexDirection: "row",
@@ -736,13 +647,8 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   kindBadge: {
-    flexDirection: "row",
-    alignItems: "center",
     gap: 4,
-    paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: 999,
-    borderWidth: 1,
   },
   kindIcon: {
     fontSize: 11,
@@ -753,6 +659,7 @@ const styles = StyleSheet.create({
   },
   sourceTag: {
     backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 0,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 4,
@@ -760,6 +667,7 @@ const styles = StyleSheet.create({
   sourceTagText: {
     color: C.ink4,
     fontSize: 10,
+    fontWeight: "400",
   },
   cardTime: {
     color: C.ink4,

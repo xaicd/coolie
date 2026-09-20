@@ -22,6 +22,14 @@ import {
 } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
 import { useOTA } from "../OTA";
+import { AppCard } from "../ui/AppCard";
+import { EmptyState } from "../ui/EmptyState";
+import { ErrorRetry } from "../ui/ErrorRetry";
+import { KeyValueRow } from "../ui/KeyValueRow";
+import { LoadingState } from "../ui/LoadingState";
+import { Pill } from "../ui/Pill";
+import { ScreenHeader } from "../ui/ScreenHeader";
+import { StatTile } from "../ui/StatTile";
 
 function formatMoney(cents: number): string {
   const yuan = (cents / 100).toFixed(2);
@@ -179,9 +187,8 @@ export function DashboardScreen({
 
   if (loading && !data) {
     return (
-      <SafeAreaView style={[styles.center, { backgroundColor: C.bg }]}>
-        <ActivityIndicator size="large" color={C.accent} />
-        <Text style={[styles.muted, { marginTop: 12 }]}>正在汇聚工坊效能大盘…</Text>
+      <SafeAreaView style={{ backgroundColor: C.bg, flex: 1 }}>
+        <LoadingState text="正在汇聚工坊效能大盘…" />
       </SafeAreaView>
     );
   }
@@ -189,13 +196,12 @@ export function DashboardScreen({
   if (error && !data) {
     return (
       <SafeAreaView style={[styles.center, { backgroundColor: C.bg, padding: 16 }]}>
-        <Text style={styles.errorText}>加载大盘失败: {error}</Text>
-        <Pressable
-          style={[styles.btnPrimary, { marginTop: 16 }]}
-          onPress={() => fetchDashboard()}
-        >
-          <Text style={styles.btnPrimaryText}>重新加载</Text>
-        </Pressable>
+        <ErrorRetry
+          variant="fullscreen"
+          message={`加载大盘失败: ${error}`}
+          onRetry={() => fetchDashboard()}
+          style={styles.errorRetryCentered}
+        />
         {onBack ? (
           <Pressable style={{ marginTop: 16 }} onPress={onBack}>
             <Text style={styles.linkText}>‹ 返回任务列表</Text>
@@ -237,18 +243,12 @@ export function DashboardScreen({
         }
       >
         {/* 顶部操作与公司选择器胶囊 */}
-        <View style={styles.header}>
-          <View style={{ flex: 1 }}>
-            <View style={styles.headerRow}>
-              {onBack ? (
-                <Pressable onPress={onBack} hitSlop={12} style={styles.backBtn}>
-                  <Text style={styles.backBtnText}>‹ 任务</Text>
-                </Pressable>
-              ) : null}
-              <Text style={styles.title}>驾驶舱效能</Text>
-            </View>
-
-            {/* 顶部公司选择器胶囊 (DESIGN.md 第4节) */}
+        <ScreenHeader
+          title="驾驶舱效能"
+          onBack={onBack}
+          backLabel="任务"
+          subtitle={
+            /* 顶部公司选择器胶囊 (DESIGN.md 第4节) */
             <View style={styles.companyCapsule}>
               <StatusDot status="ok" size={6} />
               <Text style={styles.companyCapsuleText} numberOfLines={1}>
@@ -256,50 +256,51 @@ export function DashboardScreen({
               </Text>
               <Text style={styles.companyCapsuleTag}>六大核心运转指标</Text>
             </View>
-          </View>
-
-          <View style={styles.headerActions}>
+          }
+          right={
+            <>
               {onOpenSettings ? (
                 <Pressable onPress={onOpenSettings} hitSlop={12} style={styles.otaBtn}>
                   <Ionicons name="settings-outline" size={18} color="#8A8F98" />
                 </Pressable>
               ) : null}
-            <Pressable
-              style={styles.otaBtn}
-              onPress={() => void checkOTA(true)}
-              hitSlop={12}
-              disabled={otaChecking}
-            >
-              {otaChecking ? (
-                <ActivityIndicator
-                  size="small"
-                  color={C.accent}
-                  style={{ transform: [{ scale: 0.7 }] }}
-                />
-              ) : (
-                <Text style={styles.otaBtnText}>检查更新</Text>
-              )}
-            </Pressable>
-            <Pressable
-              style={styles.refreshBtn}
-              onPress={() => fetchDashboard(true)}
-              hitSlop={12}
-            >
-              <Text style={styles.refreshBtnText}>刷新</Text>
-            </Pressable>
-          </View>
-        </View>
+              <Pressable
+                style={styles.otaBtn}
+                onPress={() => void checkOTA(true)}
+                hitSlop={12}
+                disabled={otaChecking}
+              >
+                {otaChecking ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={C.accent}
+                    style={{ transform: [{ scale: 0.7 }] }}
+                  />
+                ) : (
+                  <Text style={styles.otaBtnText}>检查更新</Text>
+                )}
+              </Pressable>
+              <Pressable
+                style={styles.refreshBtn}
+                onPress={() => fetchDashboard(true)}
+                hitSlop={12}
+              >
+                <Text style={styles.refreshBtnText}>刷新</Text>
+              </Pressable>
+            </>
+          }
+        />
 
         {/* ── 待办审批卡 (有 pending 时展示，红点角标，单条点进审批裁决) ── */}
         {approvalsError ? (
-          <View style={styles.errorInlineBox}>
-            <Text style={styles.errorInlineText}>待办审批加载失败: {approvalsError}</Text>
-            <Pressable style={styles.retryBtnSmall} onPress={() => void fetchApprovals()}>
-              <Text style={styles.retryBtnSmallText}>重试</Text>
-            </Pressable>
-          </View>
+          <ErrorRetry
+            variant="inline"
+            message={`待办审批加载失败: ${approvalsError}`}
+            onRetry={() => void fetchApprovals()}
+            style={styles.errorInlineBar}
+          />
         ) : approvals.length > 0 ? (
-          <Pressable
+          <AppCard
             style={styles.approvalsCard}
             onPress={() => onOpenApprovals?.()}
           >
@@ -307,9 +308,12 @@ export function DashboardScreen({
               <View style={styles.rowAlignCenter}>
                 <StatusDot status="err" size={7} pulse />
                 <Text style={[styles.cardTitle, { marginLeft: 6 }]}>待办审批</Text>
-                <View style={styles.redBadge}>
-                  <Text style={styles.redBadgeText}>{approvals.length}</Text>
-                </View>
+                <Pill
+                  label={String(approvals.length)}
+                  mono
+                  style={styles.redBadge}
+                  textStyle={styles.redBadgeText}
+                />
               </View>
               <Text style={styles.linkText}>前往处理 ›</Text>
             </View>
@@ -329,11 +333,11 @@ export function DashboardScreen({
                 </Pressable>
               ))}
             </View>
-          </Pressable>
+          </AppCard>
         ) : null}
 
         {/* ── 实时运行卡 ── */}
-        <View style={styles.liveRunCard}>
+        <AppCard style={styles.liveRunCard}>
           <View style={styles.cardHeader}>
             <View style={styles.rowAlignCenter}>
               <StatusDot
@@ -343,23 +347,26 @@ export function DashboardScreen({
               />
               <Text style={[styles.cardTitle, { marginLeft: 6 }]}>车间实时运行</Text>
             </View>
-            <View style={styles.capsuleBadgeSmall}>
-              <Text style={styles.capsuleBadgeSmallText}>
-                {liveRuns.filter((r) => r.status === "running" || r.status === "queued").length > 0
+            <Pill
+              label={
+                liveRuns.filter((r) => r.status === "running" || r.status === "queued").length > 0
                   ? `${liveRuns.filter((r) => r.status === "running" || r.status === "queued").length} 轮进行中`
-                  : "空闲"}
-              </Text>
-            </View>
+                  : "空闲"
+              }
+              size="sm"
+              style={styles.capsuleBadgeSmall}
+              textStyle={styles.capsuleBadgeSmallText}
+            />
           </View>
           {liveRunsLoading && liveRuns.length === 0 ? (
             <ActivityIndicator size="small" color={C.accent} style={{ marginVertical: 6 }} />
           ) : liveRunsError ? (
-            <View style={styles.errorInlineBox}>
-              <Text style={styles.errorInlineText}>实时运行加载失败: {liveRunsError}</Text>
-              <Pressable style={styles.retryBtnSmall} onPress={() => void fetchLiveRuns()}>
-                <Text style={styles.retryBtnSmallText}>重试</Text>
-              </Pressable>
-            </View>
+            <ErrorRetry
+              variant="inline"
+              message={`实时运行加载失败: ${liveRunsError}`}
+              onRetry={() => void fetchLiveRuns()}
+              style={styles.errorInlineBar}
+            />
           ) : liveRuns.filter((r) => r.status === "running" || r.status === "queued").length === 0 ? (
             <Text style={styles.emptyLiveRunText}>车间空闲</Text>
           ) : (
@@ -376,13 +383,13 @@ export function DashboardScreen({
               </Text>
             </View>
           )}
-        </View>
+        </AppCard>
 
         {/* ── 六指标卡 2 列网格 (DESIGN.md 第4节规范) ── */}
         <View style={styles.gridSection}>
           <View style={styles.gridContainer}>
             {/* 卡片 1: 预算消耗 */}
-            <View style={styles.gridCard}>
+            <AppCard style={styles.gridCard}>
               <Text style={styles.gridCardTitle}>月度预算水位</Text>
               <Text style={[styles.gridCardValue, { color: quotaBarColor }]}>
                 {q?.utilizationPercent ?? 0}%
@@ -392,10 +399,10 @@ export function DashboardScreen({
                   已用 {formatMoney(q?.spentMonthlyCents ?? 0)}
                 </Text>
               </View>
-            </View>
+            </AppCard>
 
             {/* 卡片 2: 工单完成率 */}
-            <View style={styles.gridCard}>
+            <AppCard style={styles.gridCard}>
               <Text style={styles.gridCardTitle}>工单交付完成率</Text>
               <Text style={[styles.gridCardValue, { color: C.ok }]}>
                 {p?.completionRatePercent ?? 0}%
@@ -405,10 +412,10 @@ export function DashboardScreen({
                   已交付 {p?.done ?? 0} / {p?.total ?? 0}
                 </Text>
               </View>
-            </View>
+            </AppCard>
 
             {/* 卡片 3: 活跃员工 */}
-            <View style={styles.gridCard}>
+            <AppCard style={styles.gridCard}>
               <Text style={styles.gridCardTitle}>智能体活跃度</Text>
               <Text style={[styles.gridCardValue, { color: C.accent }]}>
                 {idle?.activeCount ?? 0}/{idle?.totalAgents ?? 0}
@@ -419,10 +426,10 @@ export function DashboardScreen({
                   {idle?.activeCount ?? 0} 活跃 · {idle?.idleCount ?? 0} 就绪
                 </Text>
               </View>
-            </View>
+            </AppCard>
 
             {/* 卡片 4: 交付周期 */}
-            <View style={styles.gridCard}>
+            <AppCard style={styles.gridCard}>
               <Text style={styles.gridCardTitle}>平均交付耗时</Text>
               <Text style={styles.gridCardValue}>
                 {formatDuration(dc?.avgSeconds ?? 0)}
@@ -432,10 +439,10 @@ export function DashboardScreen({
                   P50 {formatDuration(dc?.medianSeconds ?? 0)} · 样本 {dc?.count ?? 0}
                 </Text>
               </View>
-            </View>
+            </AppCard>
 
             {/* 卡片 5: 车间效率 */}
-            <View style={styles.gridCard}>
+            <AppCard style={styles.gridCard}>
               <Text style={styles.gridCardTitle}>车间交付速度</Text>
               <View style={styles.valueWithUnit}>
                 <Text style={[styles.gridCardValue, { color: C.ok }]}>
@@ -448,10 +455,10 @@ export function DashboardScreen({
                   24h完成 {eff?.completedTasks24h ?? 0} · 7d {eff?.completedTasks7d ?? 0}
                 </Text>
               </View>
-            </View>
+            </AppCard>
 
             {/* 卡片 6: 综合异常率 */}
-            <View style={styles.gridCard}>
+            <AppCard style={styles.gridCard}>
               <Text style={styles.gridCardTitle}>综合异常率</Text>
               <Text style={[styles.gridCardValue, { color: healthColor }]}>
                 {fr?.overallFailureRatePercent ?? 0}%
@@ -461,19 +468,20 @@ export function DashboardScreen({
                   工坊状态: {healthLabel}
                 </Text>
               </View>
-            </View>
+            </AppCard>
           </View>
         </View>
 
         {/* ── 深度细分区块 1: 额度与预算水位 ── */}
-        <View style={styles.detailCard}>
+        <AppCard padding={16} style={styles.detailCard}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>额度与预算水位</Text>
-            <View style={styles.capsuleBadge}>
-              <Text style={[styles.capsuleBadgeText, { color: quotaBarColor }]}>
-                {q?.utilizationPercent ?? 0}% 水位
-              </Text>
-            </View>
+            <Pill
+              label={`${q?.utilizationPercent ?? 0}% 水位`}
+              mono
+              style={styles.capsuleBadge}
+              textStyle={{ color: quotaBarColor }}
+            />
           </View>
 
           <View style={styles.metricRow}>
@@ -510,56 +518,60 @@ export function DashboardScreen({
           <Text style={styles.cardFootnote}>
             成本事件累计花费: {formatMoney(q?.costEventsSpendCents ?? 0)} · 达 100% 触发工坊自动熔断
           </Text>
-        </View>
+        </AppCard>
 
         {/* ── 深度细分区块 2: 任务进展分布 ── */}
-        <View style={styles.detailCard}>
+        <AppCard padding={16} style={styles.detailCard}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>工单流转分布</Text>
-            <View style={styles.capsuleBadge}>
-              <Text style={[styles.capsuleBadgeText, { color: C.ok }]}>
-                交付完成率 {p?.completionRatePercent ?? 0}%
-              </Text>
-            </View>
+            <Pill
+              label={`交付完成率 ${p?.completionRatePercent ?? 0}%`}
+              mono
+              style={styles.capsuleBadge}
+              textStyle={{ color: C.ok }}
+            />
           </View>
 
           <View style={styles.statGrid2Col}>
-            <View style={styles.subStatBox}>
-              <Text style={styles.subStatNum}>{p?.total ?? 0}</Text>
-              <Text style={styles.subStatLabel}>全部工单</Text>
-            </View>
-            <View style={styles.subStatBox}>
-              <Text style={[styles.subStatNum, { color: C.accent }]}>{p?.inProgress ?? 0}</Text>
-              <Text style={styles.subStatLabel}>执行中</Text>
-            </View>
-            <View style={styles.subStatBox}>
-              <Text style={[styles.subStatNum, { color: C.ok }]}>{p?.done ?? 0}</Text>
-              <Text style={styles.subStatLabel}>已交付</Text>
-            </View>
-            <View style={styles.subStatBox}>
-              <Text style={[styles.subStatNum, { color: C.err }]}>{p?.blocked ?? 0}</Text>
-              <Text style={styles.subStatLabel}>卡点阻塞</Text>
-            </View>
+            <StatTile
+              value={p?.total ?? 0}
+              label="全部工单"
+              flex={false}
+              style={styles.subStatBox}
+            />
+            <StatTile
+              value={p?.inProgress ?? 0}
+              label="执行中"
+              valueColor={C.accent}
+              flex={false}
+              style={styles.subStatBox}
+            />
+            <StatTile
+              value={p?.done ?? 0}
+              label="已交付"
+              valueColor={C.ok}
+              flex={false}
+              style={styles.subStatBox}
+            />
+            <StatTile
+              value={p?.blocked ?? 0}
+              label="卡点阻塞"
+              valueColor={C.err}
+              flex={false}
+              style={styles.subStatBox}
+            />
           </View>
 
           <View style={styles.capsuleTagWrap}>
-            <View style={styles.capsuleBadge}>
-              <Text style={styles.capsuleBadgeText}>待办池: {p?.byStatus?.todo ?? 0}</Text>
-            </View>
-            <View style={styles.capsuleBadge}>
-              <Text style={styles.capsuleBadgeText}>积压: {p?.byStatus?.backlog ?? 0}</Text>
-            </View>
-            <View style={styles.capsuleBadge}>
-              <Text style={styles.capsuleBadgeText}>评审中: {p?.byStatus?.in_review ?? 0}</Text>
-            </View>
-            <View style={styles.capsuleBadge}>
-              <Text style={styles.capsuleBadgeText}>已取消: {p?.cancelled ?? 0}</Text>
-            </View>
+            <Pill label={`待办池: ${p?.byStatus?.todo ?? 0}`} mono style={styles.capsuleBadge} />
+            <Pill label={`积压: ${p?.byStatus?.backlog ?? 0}`} mono style={styles.capsuleBadge} />
+            <Pill label={`评审中: ${p?.byStatus?.in_review ?? 0}`} mono style={styles.capsuleBadge} />
+            <Pill label={`已取消: ${p?.cancelled ?? 0}`} mono style={styles.capsuleBadge} />
           </View>
-        </View>
+        </AppCard>
 
         {/* ── 深度细分区块 3: 智能体空闲与活跃度 (规范列表: 行高56, 头像圆32, 呼吸状态点) ── */}
-        <View style={styles.detailCard}>
+        <AppCard padding={16} style={styles.detailCard}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>智能体员工团队</Text>
             <View style={styles.rowAlignCenter}>
@@ -609,26 +621,28 @@ export function DashboardScreen({
                       >
                         {formatIdleTime(ag.idleSeconds)}
                       </Text>
-                      <View style={styles.capsuleBadgeSmall}>
-                        <Text style={styles.capsuleBadgeSmallText}>
-                          {ag.status}
-                        </Text>
-                      </View>
+                      <Pill
+                        label={ag.status}
+                        size="sm"
+                        style={styles.capsuleBadgeSmall}
+                        textStyle={styles.capsuleBadgeSmallText}
+                      />
                     </View>
                   </View>
                 );
               })}
             </View>
           ) : (
-            <View style={styles.emptyCardBox}>
-              <Text style={styles.emptyIcon}>🤖</Text>
-              <Text style={styles.emptyText}>当前公司暂未登记任何智能体员工</Text>
-            </View>
+            <EmptyState
+              icon={<Text style={styles.emptyIcon}>🤖</Text>}
+              subtitle="当前公司暂未登记任何智能体员工"
+              style={styles.emptyCardBox}
+            />
           )}
-        </View>
+        </AppCard>
 
         {/* ── 深度细分区块 4: 交付周期分布 ── */}
-        <View style={styles.detailCard}>
+        <AppCard padding={16} style={styles.detailCard}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>交付周期分析 (Lead Time)</Text>
             <Text style={styles.cardHeaderMeta}>
@@ -637,24 +651,23 @@ export function DashboardScreen({
           </View>
 
           <View style={styles.leadTimeGrid}>
-            <View style={styles.leadTimeBox}>
-              <Text style={styles.metricMuted}>平均交付耗时</Text>
-              <Text style={[styles.leadTimeValue, { color: C.accent }]}>
-                {formatDuration(dc?.avgSeconds ?? 0)}
-              </Text>
-            </View>
-            <View style={styles.leadTimeBox}>
-              <Text style={styles.metricMuted}>P50 中位数耗时</Text>
-              <Text style={styles.leadTimeValue}>
-                {formatDuration(dc?.medianSeconds ?? 0)}
-              </Text>
-            </View>
-            <View style={styles.leadTimeBox}>
-              <Text style={styles.metricMuted}>P90 交付时长</Text>
-              <Text style={[styles.leadTimeValue, { color: C.warn }]}>
-                {formatDuration(dc?.p90Seconds ?? 0)}
-              </Text>
-            </View>
+            <KeyValueRow
+              label="平均交付耗时"
+              value={formatDuration(dc?.avgSeconds ?? 0)}
+              valueColor={C.accent}
+              style={styles.leadTimeBox}
+            />
+            <KeyValueRow
+              label="P50 中位数耗时"
+              value={formatDuration(dc?.medianSeconds ?? 0)}
+              style={styles.leadTimeBox}
+            />
+            <KeyValueRow
+              label="P90 交付时长"
+              value={formatDuration(dc?.p90Seconds ?? 0)}
+              valueColor={C.warn}
+              style={styles.leadTimeBox}
+            />
           </View>
 
           <Text style={[styles.subSectionTitle, { marginTop: 16 }]}>
@@ -678,17 +691,18 @@ export function DashboardScreen({
               </View>
             ))}
           </View>
-        </View>
+        </AppCard>
 
         {/* ── 深度细分区块 5: 车间效率与交付走势 ── */}
-        <View style={styles.detailCard}>
+        <AppCard padding={16} style={styles.detailCard}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>车间交付速度</Text>
-            <View style={styles.capsuleBadge}>
-              <Text style={[styles.capsuleBadgeText, { color: C.ok }]}>
-                {eff?.velocityPerDay ?? 0} 单/日
-              </Text>
-            </View>
+            <Pill
+              label={`${eff?.velocityPerDay ?? 0} 单/日`}
+              mono
+              style={styles.capsuleBadge}
+              textStyle={{ color: C.ok }}
+            />
           </View>
 
           <View style={styles.metricRow}>
@@ -737,17 +751,18 @@ export function DashboardScreen({
               </View>
             ))}
           </ScrollView>
-        </View>
+        </AppCard>
 
         {/* ── 深度细分区块 6: 失败率监控 ── */}
-        <View style={styles.detailCard}>
+        <AppCard padding={16} style={styles.detailCard}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>异常与失败率监控</Text>
-            <View style={styles.capsuleBadge}>
-              <Text style={[styles.capsuleBadgeText, { color: healthColor }]}>
-                {healthLabel}
-              </Text>
-            </View>
+            <Pill
+              label={healthLabel}
+              mono
+              style={styles.capsuleBadge}
+              textStyle={{ color: healthColor }}
+            />
           </View>
 
           <View style={styles.metricRow}>
@@ -799,10 +814,10 @@ export function DashboardScreen({
           <Text style={styles.cardFootnote}>
             已接入自动重试自愈机制 · 重试成功的运行不计入失败指标
           </Text>
-        </View>
+        </AppCard>
 
         {/* ── 最近时间线 (最近8条事件流) ── */}
-        <View style={styles.detailCard}>
+        <AppCard padding={16} style={styles.detailCard}>
           <View style={styles.cardHeader}>
             <Text style={styles.cardTitle}>最近时间线</Text>
             <Text style={styles.cardHeaderMeta}>
@@ -812,12 +827,12 @@ export function DashboardScreen({
           {timelineLoading && !timeline ? (
             <ActivityIndicator size="small" color={C.accent} style={{ marginVertical: 12 }} />
           ) : timelineError ? (
-            <View style={styles.errorInlineBox}>
-              <Text style={styles.errorInlineText}>时间线加载失败: {timelineError}</Text>
-              <Pressable style={styles.retryBtnSmall} onPress={() => void fetchTimeline()}>
-                <Text style={styles.retryBtnSmallText}>重试</Text>
-              </Pressable>
-            </View>
+            <ErrorRetry
+              variant="inline"
+              message={`时间线加载失败: ${timelineError}`}
+              onRetry={() => void fetchTimeline()}
+              style={styles.errorInlineBar}
+            />
           ) : !timeline?.events || timeline.events.length === 0 ? (
             <Text style={styles.cardFootnote}>暂无最近流转事件记录</Text>
           ) : (
@@ -847,7 +862,7 @@ export function DashboardScreen({
               })}
             </View>
           )}
-        </View>
+        </AppCard>
       </ScrollView>
     </SafeAreaView>
   );
@@ -864,36 +879,6 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-  },
-  header: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: 12,
-  },
-  headerRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  backBtn: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: C.line,
-  },
-  backBtnText: {
-    color: C.accent,
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: C.ink,
-    letterSpacing: -0.4,
   },
   companyCapsule: {
     flexDirection: "row",
@@ -918,11 +903,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: C.ink4,
     fontWeight: "400",
-  },
-  headerActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
   },
   otaBtn: {
     backgroundColor: "rgba(255,255,255,0.02)",
@@ -966,14 +946,10 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 12,
   },
+  // AppCard supplies the shell (0.02 bg + C.line border + radius 12 + padding 14)
   gridCard: {
     flexBasis: "48%",
     flexGrow: 1,
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderWidth: 1,
-    borderColor: C.line,
-    borderRadius: 12,
-    padding: 14,
     gap: 4,
   },
   gridCardTitle: {
@@ -1008,12 +984,8 @@ const styles = StyleSheet.create({
     color: C.ink4,
     fontVariant: ["tabular-nums"],
   },
+  // AppCard (padding={16}) supplies the shell
   detailCard: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderWidth: 1,
-    borderColor: C.line,
-    borderRadius: 12,
-    padding: 16,
     gap: 12,
   },
   cardHeader: {
@@ -1032,27 +1004,17 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     fontVariant: ["tabular-nums"],
   },
+  // Pill 提供 radius 999 / 0.05 底 / C.line 边 / 11px 500 文字 (mono=tabular-nums)
   capsuleBadge: {
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-    borderColor: C.line,
     paddingHorizontal: 8,
     paddingVertical: 3,
+    alignSelf: "auto",
   },
-  capsuleBadgeText: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: C.ink2,
-    fontVariant: ["tabular-nums"],
-  },
+  // Pill 提供 radius 999 / 0.05 底 / C.line 边
   capsuleBadgeSmall: {
-    borderRadius: 999,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-    borderColor: C.line,
     paddingHorizontal: 6,
     paddingVertical: 2,
+    alignSelf: "auto",
   },
   capsuleBadgeSmallText: {
     fontSize: 10,
@@ -1106,28 +1068,14 @@ const styles = StyleSheet.create({
     flexWrap: "wrap",
     gap: 8,
   },
+  // StatTile 提供 0.02 底 / 1px 边 / 居中 value+label, 这里覆盖为原 subStatBox 的尺寸
   subStatBox: {
     flexBasis: "48%",
     flexGrow: 1,
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderWidth: 1,
     borderColor: C.lineSubtle,
     borderRadius: 8,
     paddingVertical: 10,
-    paddingHorizontal: 12,
-    alignItems: "center",
     gap: 2,
-  },
-  subStatNum: {
-    fontSize: 20,
-    fontWeight: "600",
-    color: C.ink,
-    fontVariant: ["tabular-nums"],
-  },
-  subStatLabel: {
-    fontSize: 11,
-    color: C.ink3,
-    fontWeight: "400",
   },
   capsuleTagWrap: {
     flexDirection: "row",
@@ -1196,24 +1144,22 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     fontVariant: ["tabular-nums"],
   },
+  // EmptyState 提供居中 icon+subtitle; 这里去掉它内置的卡片壳, 还原原来的纯文本空态
   emptyCardBox: {
+    backgroundColor: "transparent",
+    borderWidth: 0,
     paddingVertical: 24,
-    alignItems: "center",
-    justifyContent: "center",
+    paddingHorizontal: 0,
     gap: 6,
   },
   emptyIcon: {
     fontSize: 24,
   },
-  emptyText: {
-    fontSize: 13,
-    color: C.ink3,
-    textAlign: "center",
-  },
   leadTimeGrid: {
     flexDirection: "row",
     gap: 8,
   },
+  // KeyValueRow (layout="stacked") 提供 label+value, 这里保留原来的方框外观
   leadTimeBox: {
     flex: 1,
     backgroundColor: "rgba(255,255,255,0.02)",
@@ -1222,12 +1168,6 @@ const styles = StyleSheet.create({
     gap: 4,
     borderWidth: 1,
     borderColor: C.lineSubtle,
-  },
-  leadTimeValue: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: C.ink,
-    fontVariant: ["tabular-nums"],
   },
   subSectionTitle: {
     fontSize: 13,
@@ -1304,40 +1244,31 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     fontSize: 13,
   },
-  muted: {
-    color: C.ink3,
-    fontSize: 13,
+  // ErrorRetry variant="fullscreen" 自带居中容器; 这里让它按内容收缩, 与下方返回链接同列居中
+  errorRetryCentered: {
+    flex: 0,
+    padding: 0,
   },
-  errorText: {
-    color: C.err,
-    fontSize: 13,
-    textAlign: "center",
+  // ErrorRetry variant="inline" 默认内边距比本页原有样式略小, 这里还原原值
+  errorInlineBar: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
   },
-  btnPrimary: {
-    backgroundColor: C.brand,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  btnPrimaryText: {
-    color: C.ink,
-    fontWeight: "500",
-    fontSize: 15,
-  },
+  // AppCard supplies the shell; 原样保留告警配色与行间距
   approvalsCard: {
     backgroundColor: "rgba(239, 68, 68, 0.08)",
-    borderWidth: 1,
     borderColor: "rgba(239, 68, 68, 0.28)",
-    borderRadius: 12,
-    padding: 14,
     gap: 10,
   },
+  // Pill 提供 radius 999 / 11px 文字; 这里还原原来的实心红底与内边距
   redBadge: {
     backgroundColor: C.err,
-    borderRadius: 999,
+    borderColor: C.err,
+    borderWidth: 0,
     paddingHorizontal: 7,
     paddingVertical: 2,
     marginLeft: 6,
+    alignSelf: "auto",
   },
   redBadgeText: {
     color: "#FFFFFF",
@@ -1368,12 +1299,8 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
   },
+  // AppCard supplies the shell (padding 14 默认值)
   liveRunCard: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderWidth: 1,
-    borderColor: C.line,
-    borderRadius: 12,
-    padding: 14,
     gap: 10,
   },
   emptyLiveRunText: {
@@ -1392,34 +1319,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: "500",
     lineHeight: 18,
-  },
-  errorInlineBox: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
-    borderWidth: 1,
-    borderColor: "rgba(239, 68, 68, 0.25)",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    gap: 8,
-  },
-  errorInlineText: {
-    color: C.err,
-    fontSize: 12,
-    flex: 1,
-  },
-  retryBtnSmall: {
-    backgroundColor: "rgba(239, 68, 68, 0.2)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-  },
-  retryBtnSmallText: {
-    color: C.err,
-    fontSize: 12,
-    fontWeight: "600",
   },
   timelineEventList: {
     gap: 0,
