@@ -19,6 +19,7 @@ export function useRecorder() {
     await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
     const { recording: rec } = await Audio.Recording.createAsync(
       Audio.RecordingOptionsPresets.HIGH_QUALITY,
+      { progressUpdateIntervalMillis: 1000 } as never,
     );
     recRef.current = rec;
     setRecording(true);
@@ -28,7 +29,15 @@ export function useRecorder() {
   const stop = useCallback(async (): Promise<{ base64: string; format: "m4a" }> => {
     const rec = recRef.current;
     if (!rec) throw new Error("Not recording");
-    await rec.stopAndUnloadAsync();
+    recRef.current = null;
+    setRecording(false);
+    // Android 上 stopAndUnloadAsync 偶发挂起: race 一个 5s 超时,超时强制 unload
+    await Promise.race([
+      rec.stopAndUnloadAsync(),
+      new Promise((r) => setTimeout(r, 5000)),
+    ]).catch(async () => {
+      try { await rec.stopAndUnloadAsync(); } catch { /* 已经卸载 */ }
+    });
     const uri = rec.getURI();
     recRef.current = null;
     setRecording(false);

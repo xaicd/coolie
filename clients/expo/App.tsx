@@ -712,7 +712,12 @@ function HomeScreen({
   const voiceDispatch = useCallback(async () => {
     try {
       if (!recording) {
-        await start();
+        setBusy(true);
+        try {
+          await start();
+        } finally {
+          setBusy(false);
+        }
         return;
       }
       const { base64, format } = await stop();
@@ -949,7 +954,7 @@ function HomeScreen({
               recording && styles.btnVoiceRecording,
               busy && styles.btnDisabled,
             ]}
-            disabled={busy}
+            disabled={busy && !recording}
             onPress={voiceDispatch}
           >
             <Text style={[styles.btnVoiceText, recording && { color: C.err }]}>
