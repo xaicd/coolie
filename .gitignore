@@ -81,3 +81,19 @@ tests/storybook-visual/playwright-report/
 .env.local
 test-results/
 screenshots/ds-workbench/
+
+# A crash dump is not an artifact: `core` was 1.3 GB of one here. `coscli` writes
+# its log and output beside the checkout, and both are run output, not source.
+core
+coscli.log
+coscli_output/
+
+# Command Code's own state. The shared halves of it — `.commandcode/agents/` and
+# `.commandcode/skills/` — are tracked, because they mirror `.claude/agents/` and
+# `.claude/skills/`, which this repo already tracks. These three are not shared:
+# `settings.json` holds machine-specific permission allows (absolute paths,
+# one-off commands), `taste/` is rewritten by the preference learner, and
+# `import-report.md` is a one-off migration report.
+.commandcode/settings.json
+.commandcode/import-report.md
+.commandcode/taste/
