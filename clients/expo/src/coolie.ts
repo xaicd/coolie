@@ -4,6 +4,7 @@ import {
   CoolieClient as BaseCoolieClient,
   type AgentIdentity,
   type Company,
+  type Issue,
   type SessionUser,
 } from "@coolie/api-client";
 
@@ -250,6 +251,14 @@ export class CoolieClient extends BaseCoolieClient {
       "PATCH",
       `/api/agents/${encodeURIComponent(agentId)}`,
       fields,
+    );
+  }
+
+  /** GET /api/approvals/:id/issues — 审批单关联的任务 (详情深链 / 气泡关联任务链接) */
+  async getApprovalIssues(approvalId: string): Promise<Issue[]> {
+    return this.request<Issue[]>(
+      "GET",
+      `/api/approvals/${encodeURIComponent(approvalId)}/issues`,
     );
   }
 

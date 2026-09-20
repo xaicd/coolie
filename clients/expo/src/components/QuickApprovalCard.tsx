@@ -59,7 +59,11 @@ const TYPE_CONFIG: Record<
   },
 };
 
-function formatApprovalTitle(approval: Approval): string {
+export function approvalTypeLabel(type: string): string {
+  return TYPE_CONFIG[type]?.label ?? type;
+}
+
+export function formatApprovalTitle(approval: Approval): string {
   if (approval.title) return approval.title;
   const payload = approval.payload ?? {};
   if (typeof payload.title === "string" && payload.title) return payload.title;
@@ -78,7 +82,7 @@ function formatApprovalTitle(approval: Approval): string {
   return `${typeLabel} 审批申请`;
 }
 
-function formatApprovalSummary(approval: Approval): string {
+export function formatApprovalSummary(approval: Approval): string {
   if (approval.description) return approval.description;
   const payload = approval.payload ?? {};
   if (typeof payload.reason === "string" && payload.reason) return payload.reason;

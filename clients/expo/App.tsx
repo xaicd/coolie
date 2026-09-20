@@ -808,7 +808,16 @@ function HomeScreen({
             }}
           />
         ) : tab === "chat" ? (
-          <BoardChatScreen company={company} whoami={whoami} onOpenSettings={() => setSettingsOpen(true)} />
+          <BoardChatScreen
+            company={company}
+            whoami={whoami}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
+            onOpenIssue={(issue) => {
+              setTab("tasks");
+              setSelected(issue);
+            }}
+          />
         ) : tab === "ontology" ? (
           <OntologyDomainListScreen company={company} whoami={whoami} onOpenSettings={() => setSettingsOpen(true)} />
         ) : tab === "artifacts" ? (

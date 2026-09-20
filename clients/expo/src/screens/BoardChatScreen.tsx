@@ -18,10 +18,14 @@ import {
   Modal,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import type { BoardChatMessage, Company } from "@coolie/api-client";
+import type { BoardChatMessage, Company, Approval, Issue } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
-import { QuickApprovalCard } from "../components/QuickApprovalCard";
+import {
+  approvalTypeLabel,
+  formatApprovalSummary,
+  formatApprovalTitle,
+} from "../components/QuickApprovalCard";
 import { CodeViewerWebView } from "../components/CodeViewerWebView";
 
 export interface BoardChatScreenProps {
@@ -29,6 +33,10 @@ export interface BoardChatScreenProps {
   company: Company;
   whoami?: string;
   onBack?: () => void;
+  /** 气泡「查看详情」深链: 打开审批裁决页 (companyId + approvalId) */
+  onOpenApproval?: (approvalId: string) => void;
+  /** 气泡「关联任务」链接: 打开任务详情页 */
+  onOpenIssue?: (issue: Issue) => void;
 }
 
 const QUICK_PROMPTS = [
@@ -68,6 +76,146 @@ function drainBoardEchoQueue(): BoardChatMessage[] {
   return boardEchoQueue.splice(0, boardEchoQueue.length);
 }
 
+interface ApprovalFeedItem {
+  approval: Approval;
+  decision: "approve" | "reject" | null;
+}
+
+interface InlineApprovalBubbleProps {
+  approval: Approval;
+  decision: "approve" | "reject" | null;
+  busy: "approve" | "reject" | null;
+  linkedIssue: Issue | null;
+  onApprove: () => void;
+  onReject: () => void;
+  onOpenDetail: () => void;
+  onOpenIssue: (issue: Issue) => void;
+}
+
+/**
+ * 审批快照气泡 (默认快批)
+ * 内嵌 标题 + 简要原因 + 关联任务链接 + 两个 44pt 内嵌按钮;
+ * 长按或「查看详情」深链到审批裁决页弹完整卡。
+ * 裁决完成后整条气泡就地替换为终结态。
+ */
+function InlineApprovalBubble({
+  approval,
+  decision,
+  busy,
+  linkedIssue,
+  onApprove,
+  onReject,
+  onOpenDetail,
+  onOpenIssue,
+}: InlineApprovalBubbleProps) {
+  if (decision) {
+    return (
+      <View style={styles.approvalRow}>
+        <View
+          style={[
+            styles.approvalTerminalBubble,
+            decision === "approve"
+              ? styles.approvalTerminalOk
+              : styles.approvalTerminalErr,
+          ]}
+        >
+          <Text
+            style={[
+              styles.approvalTerminalText,
+              { color: decision === "approve" ? C.ok : C.err },
+            ]}
+          >
+            {decision === "approve" ? "✅ 已批准 " : "❌ 已驳回 "}
+            {formatApprovalTitle(approval)}
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.approvalRow}>
+      <Pressable
+        style={styles.approvalBubble}
+        onLongPress={onOpenDetail}
+        delayLongPress={300}
+      >
+        <View style={styles.approvalHeader}>
+          <StatusDot status="running" color={C.warn} size={7} />
+          <Text style={styles.approvalHeaderText}>待办审批</Text>
+          <View style={styles.approvalTypeBadge}>
+            <Text style={styles.approvalTypeBadgeText}>
+              {approvalTypeLabel(approval.type)}
+            </Text>
+          </View>
+        </View>
+
+        <Text style={styles.approvalTitle} numberOfLines={2}>
+          {formatApprovalTitle(approval)}
+        </Text>
+        <Text style={styles.approvalReason} numberOfLines={3}>
+          {formatApprovalSummary(approval)}
+        </Text>
+
+        {linkedIssue ? (
+          <Pressable
+            hitSlop={6}
+            style={styles.approvalIssueLink}
+            onPress={() => onOpenIssue(linkedIssue)}
+          >
+            <Ionicons name="link-outline" size={12} color={C.accent} />
+            <Text style={styles.approvalIssueLinkText} numberOfLines={1}>
+              关联任务 #{linkedIssue.id.slice(0, 6)} · {linkedIssue.title}
+            </Text>
+          </Pressable>
+        ) : null}
+
+        <View style={styles.approvalButtonsRow}>
+          <Pressable
+            style={[
+              styles.approvalApproveBtn,
+              Boolean(busy) && styles.approvalBtnDisabled,
+            ]}
+            disabled={Boolean(busy)}
+            onPress={onApprove}
+          >
+            {busy === "approve" ? (
+              <ActivityIndicator size="small" color={C.ok} />
+            ) : (
+              <Text style={styles.approvalApproveText}>批准</Text>
+            )}
+          </Pressable>
+
+          <Pressable
+            style={[
+              styles.approvalRejectBtn,
+              Boolean(busy) && styles.approvalBtnDisabled,
+            ]}
+            disabled={Boolean(busy)}
+            onPress={onReject}
+          >
+            {busy === "reject" ? (
+              <ActivityIndicator size="small" color={C.err} />
+            ) : (
+              <Text style={styles.approvalRejectText}>驳回</Text>
+            )}
+          </Pressable>
+        </View>
+
+        <Pressable
+          hitSlop={8}
+          delayLongPress={300}
+          style={styles.approvalDetailLink}
+          onPress={onOpenDetail}
+          onLongPress={onOpenDetail}
+        >
+          <Text style={styles.approvalDetailLinkText}>查看详情 ›</Text>
+        </Pressable>
+      </Pressable>
+    </View>
+  );
+}
+
 const WELCOME_MESSAGE: BoardChatMessage = {
   id: "welcome-init",
   role: "assistant",
@@ -82,13 +230,15 @@ const WELCOME_MESSAGE: BoardChatMessage = {
  * - 打字机逐字渐显效果 + 状态指示条
  * - SSE 断线重连与优雅降级
  * - 历史记录滚动与输入法避让
- * - 集成快捷审批悬浮卡片
+ * - 集成审批快照气泡 (内嵌快批按钮 + 详情深链)
  */
 export function BoardChatScreen({
   company,
   whoami: _whoami,
   onBack,
   onOpenSettings,
+  onOpenApproval,
+  onOpenIssue,
 }: BoardChatScreenProps) {
   const [messages, setMessages] = useState<BoardChatMessage[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
@@ -101,6 +251,15 @@ export function BoardChatScreen({
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyReady, setHistoryReady] = useState(false);
   const [cursorVisible, setCursorVisible] = useState(true);
+
+  const [approvalFeed, setApprovalFeed] = useState<ApprovalFeedItem[]>([]);
+  const [approvalBusy, setApprovalBusy] = useState<
+    Record<string, "approve" | "reject">
+  >({});
+  const [approvalIssues, setApprovalIssues] = useState<
+    Record<string, Issue | null>
+  >({});
+  const linkedIssueCache = useRef<Record<string, Issue | null>>({});
 
   const [showHistory, setShowHistory] = useState(false);
   const [sessions, setSessions] = useState<Array<{ id: string; title: string }>>([]);
@@ -210,6 +369,83 @@ export function BoardChatScreen({
       boardEchoListeners.delete(appendEcho);
     };
   }, [historyReady, appendEcho, scrollToBottom]);
+
+  // 拉取待办审批快照 + 各自关联任务 (气泡内嵌快批 + 关联任务链接)
+  const fetchPendingApprovals = useCallback(async () => {
+    try {
+      const list = await coolie.listApprovals(company.id, { status: "pending" });
+      const pending = list.filter((a) => a.status === "pending");
+
+      setApprovalFeed((prev) => {
+        const decided = prev.filter((item) => item.decision !== null);
+        const decidedIds = new Set(decided.map((item) => item.approval.id));
+        const fresh: ApprovalFeedItem[] = pending
+          .filter((a) => !decidedIds.has(a.id))
+          .map((a) => ({ approval: a, decision: null }));
+        return [...fresh, ...decided].slice(-8);
+      });
+
+      const missing = pending.filter((a) => !(a.id in linkedIssueCache.current));
+      if (missing.length > 0) {
+        const resolved = await Promise.all(
+          missing.map(async (a) => {
+            try {
+              const issues = await coolie.getApprovalIssues(a.id);
+              return [a.id, issues[0] ?? null] as const;
+            } catch {
+              return [a.id, null] as const;
+            }
+          }),
+        );
+        resolved.forEach(([id, issue]) => {
+          linkedIssueCache.current[id] = issue;
+        });
+        setApprovalIssues({ ...linkedIssueCache.current });
+      }
+    } catch {
+      // 忽略未登录或网络临时抖动报错
+    }
+  }, [company.id]);
+
+  useEffect(() => {
+    void fetchPendingApprovals();
+    const timer = setInterval(() => {
+      void fetchPendingApprovals();
+    }, 8000);
+    return () => clearInterval(timer);
+  }, [fetchPendingApprovals]);
+
+  // 气泡内嵌快批: 裁决成功即就地终结 + 向 chat 流追加系统提示气泡
+  const handleApprovalDecision = useCallback(
+    async (approval: Approval, decision: "approve" | "reject") => {
+      if (approvalBusy[approval.id]) return;
+      setApprovalBusy((prev) => ({ ...prev, [approval.id]: decision }));
+      try {
+        await coolie.resolveApproval(approval.id, decision);
+        setApprovalFeed((prev) =>
+          prev.map((item) =>
+            item.approval.id === approval.id ? { ...item, decision } : item,
+          ),
+        );
+        const label = formatApprovalTitle(approval);
+        appendEcho({
+          id: `system-echo-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          role: "system",
+          text: decision === "approve" ? `✅ 已批准 ${label}` : `❌ 已驳回 ${label}`,
+          createdAt: new Date().toISOString(),
+        });
+      } catch (e) {
+        Alert.alert("审批操作失败", String((e as Error)?.message ?? "请稍后重试"));
+      } finally {
+        setApprovalBusy((prev) => {
+          const next = { ...prev };
+          delete next[approval.id];
+          return next;
+        });
+      }
+    },
+    [approvalBusy, appendEcho],
+  );
 
   const handleSend = useCallback(
     async (textToSend?: string) => {
@@ -523,13 +759,6 @@ export function BoardChatScreen({
           </View>
         </View>
 
-        {/* 悬浮快捷审批卡片 (内联嵌入) */}
-        <QuickApprovalCard
-          companyId={company.id}
-          floating={false}
-          style={styles.inlineApprovalCard}
-        />
-
         {/* 问答对话列表 */}
         <FlatList
           ref={flatListRef}
@@ -539,6 +768,29 @@ export function BoardChatScreen({
           contentContainerStyle={styles.messageList}
           onContentSizeChange={() => scrollToBottom(false)}
           onLayout={() => scrollToBottom(false)}
+          ListHeaderComponent={
+            approvalFeed.length > 0 ? (
+              <View style={styles.approvalStack}>
+                {approvalFeed.map((item) => (
+                  <InlineApprovalBubble
+                    key={item.approval.id}
+                    approval={item.approval}
+                    decision={item.decision}
+                    busy={approvalBusy[item.approval.id] ?? null}
+                    linkedIssue={approvalIssues[item.approval.id] ?? null}
+                    onApprove={() =>
+                      void handleApprovalDecision(item.approval, "approve")
+                    }
+                    onReject={() =>
+                      void handleApprovalDecision(item.approval, "reject")
+                    }
+                    onOpenDetail={() => onOpenApproval?.(item.approval.id)}
+                    onOpenIssue={(issue) => onOpenIssue?.(issue)}
+                  />
+                ))}
+              </View>
+            ) : null
+          }
           ListFooterComponent={
             <>
               {/* 空状态快捷提问气泡 (无历史或仅有欢迎消息时展示) */}
@@ -847,10 +1099,133 @@ const styles = StyleSheet.create({
     color: C.ink3,
     fontSize: 12,
   },
-  inlineApprovalCard: {
-    marginHorizontal: 12,
-    marginTop: 8,
-    marginBottom: 2,
+  approvalStack: {
+    gap: 10,
+    marginBottom: 12,
+  },
+  approvalRow: {
+    alignItems: "stretch",
+  },
+  approvalBubble: {
+    backgroundColor: C.surface,
+    borderColor: "rgba(245, 158, 11, 0.32)",
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  approvalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  approvalHeaderText: {
+    color: C.ink,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  approvalTypeBadge: {
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    borderColor: "rgba(245, 158, 11, 0.3)",
+    borderWidth: 1,
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+  },
+  approvalTypeBadgeText: {
+    color: C.warn,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  approvalTitle: {
+    color: C.ink,
+    fontSize: 14,
+    fontWeight: "600",
+    lineHeight: 20,
+  },
+  approvalReason: {
+    color: C.ink2,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  approvalIssueLink: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 2,
+  },
+  approvalIssueLinkText: {
+    color: C.accent,
+    fontSize: 12,
+    flex: 1,
+  },
+  approvalButtonsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 2,
+  },
+  approvalApproveBtn: {
+    flex: 1,
+    minHeight: 44,
+    backgroundColor: "rgba(39, 166, 68, 0.16)",
+    borderColor: "rgba(39, 166, 68, 0.38)",
+    borderWidth: 1,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  approvalApproveText: {
+    color: C.ok,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  approvalRejectBtn: {
+    flex: 1,
+    minHeight: 44,
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
+    borderColor: "rgba(239, 68, 68, 0.3)",
+    borderWidth: 1,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  approvalRejectText: {
+    color: C.err,
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  approvalBtnDisabled: {
+    opacity: 0.5,
+  },
+  approvalDetailLink: {
+    alignSelf: "flex-start",
+    paddingVertical: 2,
+  },
+  approvalDetailLinkText: {
+    color: C.ink3,
+    fontSize: 12,
+  },
+  approvalTerminalBubble: {
+    alignSelf: "center",
+    maxWidth: "92%",
+    borderWidth: 1,
+    borderRadius: 999,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+  },
+  approvalTerminalOk: {
+    backgroundColor: "rgba(39, 166, 68, 0.1)",
+    borderColor: "rgba(39, 166, 68, 0.28)",
+  },
+  approvalTerminalErr: {
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    borderColor: "rgba(239, 68, 68, 0.28)",
+  },
+  approvalTerminalText: {
+    fontSize: 12,
+    lineHeight: 16,
+    textAlign: "center",
   },
   messageList: {
     paddingHorizontal: 14,
