@@ -4,11 +4,15 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.3.3（未发布）
+## v0.3.3
+
+> Released: 2026-09-20 · Android release APK
 
 ### 更新
 
-- 原型沙箱新增轻量直开模式（无容器时直接预览 URL）
+- 原型沙箱: 轻量直开模式(无容器时直接预览 URL + 手填地址)
+- 重构: 抽取 12 个共享 UI 组件(AppCard/EmptyState/ErrorRetry/LoadingState/ScreenHeader/SectionHeader/Pill/StatusBadge/SegmentedControl/Sheet/StatTile/KeyValueRow)与 useAsync hook
+- 修复: 审批卡点击正确切到任务页(审计 bug 1)
 
 ---
 
