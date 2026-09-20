@@ -28,7 +28,7 @@
     },
     "android": {
       "package": "cloud.coolie.app",
-      "versionCode": 304,
+      "versionCode": 305,
       "permissions": [
         "RECORD_AUDIO"
       ]

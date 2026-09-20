@@ -19,7 +19,8 @@ export function useRecorder() {
     await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
     const { recording: rec } = await Audio.Recording.createAsync(
       Audio.RecordingOptionsPresets.HIGH_QUALITY,
-      { progressUpdateIntervalMillis: 1000 } as never,
+      undefined,
+      1000,
     );
     recRef.current = rec;
     setRecording(true);
