@@ -97,3 +97,14 @@ coscli_output/
 .commandcode/settings.json
 .commandcode/import-report.md
 .commandcode/taste/
+
+# Playwright scratch that accumulated beside the evidence under
+# `screenshots/ontplay/`: login scripts carrying a hardcoded password, an
+# `auth-state.json` holding a live session token, and console logs. Only the
+# images are evidence; the rest is how they were taken, and it must not be
+# committed. The images themselves stay tracked, because a committed plan cites
+# one of them (`doc/plans/2026-09-18-ops-console-plugin.md`).
+screenshots/ontplay/*.cjs
+screenshots/ontplay/*.ts
+screenshots/ontplay/*.json
+screenshots/ontplay/*.txt
