@@ -207,9 +207,9 @@
     },
     {
       "path": "screenshots/expo-signin-email.png",
-      "maxNetLines": 0,
-      "reason": "Screenshot evidence for the Expo sign-in screen. A binary, so it counts zero lines; it is declared only because upstream owns the `screenshots/` directory. New evidence should go under `docs-coolie/` instead, which is ours, rather than growing this entry list one image at a time.",
-      "maxTotalLines": 0
+      "maxNetLines": 1,
+      "reason": "Screenshot evidence for the Expo sign-in screen, referenced by clients/expo/README.md. A binary, so it contributes no line count — the budget is a nominal 1 because every entry must state a positive one (scripts/check-fork-surface.test.mjs). It is declared only because upstream owns the `screenshots/` directory. New evidence should go under `docs-coolie/` instead, which is ours, rather than growing this entry list one image at a time.",
+      "maxTotalLines": 1
     },
     {
       "path": "server/src/services/dashboard.ts",
@@ -238,7 +238,20 @@
     {
       "path": "server/src/services/bundled-plugins.ts",
       "maxNetLines": 30,
-      "reason": "Fork ships ontology, chat, and workspace-diff plugins as self-hosted auto-installs so the mobile cockpit's ontology/chat/code-review tabs work out of the box."
+      "reason": "Fork ships ontology, chat, and workspace-diff plugins as self-hosted auto-installs so the mobile cockpit's ontology/chat/code-review tabs work out of the box.",
+      "maxTotalLines": 40
+    },
+    {
+      "path": "server/src/routes/board-chat.ts",
+      "maxNetLines": 60,
+      "reason": "Board chat runs on `hermes` (the operator's own agent) instead of `claude`, and its deployment gate admits `authenticated` as well as `local_trusted`, because this fork's install is single-operator (one boss) rather than an upstream multi-tenant deployment. Registered so the next upstream merge resolves this file by intent: keep upstream's relay logic, re-apply the hermes spawn and the widened gate.",
+      "maxTotalLines": 160
+    },
+    {
+      "path": "server/src/__tests__/board-chat-route-feature-flag.test.ts",
+      "maxNetLines": 60,
+      "reason": "Upstream's version of this test asserted `authenticated` is refused. This fork allows it, and `DEPLOYMENT_MODES` holds only `local_trusted` and `authenticated`, so that assertion cannot hold: rewritten to assert `authenticated` is admitted, with the refusal branch kept for a mode outside today's union. Its correctness depends on the board-chat.ts entry above, so the two are read together.",
+      "maxTotalLines": 80
     }
   ]
 }

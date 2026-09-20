@@ -55,9 +55,38 @@ describe("POST /api/board/chat/stream feature flag guard (PAP-137)", () => {
     expect(mockIssueService.create).not.toHaveBeenCalled();
   });
 
-  it("returns 403 DEPLOYMENT_MODE_UNSUPPORTED outside local_trusted even with the flag on", async () => {
+  /**
+   * Coolie fork divergence, stated the other way round from upstream.
+   *
+   * Upstream's version of this test asserted that `authenticated` is refused.
+   * This fork's board chat deliberately allows it — the deployment is
+   * single-operator (one boss), and `board-chat.ts` says so at its gate. Since
+   * `DEPLOYMENT_MODES` contains exactly `local_trusted` and `authenticated`, that
+   * assertion cannot hold here: with both modes allowed the guard admits every
+   * legal value.
+   *
+   * The refusal branch is still covered, one case down, because the guard's real
+   * job is forward compatibility — it must not let a mode added to the union
+   * later inherit board chat by default.
+   */
+  it("admits authenticated mode, which this fork allows", async () => {
     mockGetExperimental.mockResolvedValue({ enableConferenceRoomChat: true });
     const app = await createApp("authenticated");
+
+    // Stops at validation rather than at the guard, which is what "admitted"
+    // means here.
+    const res = await request(app).post("/api/board/chat/stream").send({});
+
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: "companyId and message are required" });
+  });
+
+  it("returns 403 DEPLOYMENT_MODE_UNSUPPORTED for a mode outside the single-operator set", async () => {
+    mockGetExperimental.mockResolvedValue({ enableConferenceRoomChat: true });
+    // Not a member of `DEPLOYMENT_MODES` today. Written this way on purpose: the
+    // guard is about modes that do not exist yet, so the test names one that does
+    // not exist yet rather than mislabelling a real mode as refused.
+    const app = await createApp("hosted" as never);
 
     const res = await request(app)
       .post("/api/board/chat/stream")
