@@ -55,7 +55,7 @@ import { formatTime, formatTokens } from "./src/utils/format";
 import { useRecorder } from "./src/useRecorder";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
-import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen";
+import { OntologyDomainListScreen } from "./src/screens/ontology/OntologyDomainListScreen";
 import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
 import { PrototypeSandboxScreen } from "./src/screens/PrototypeSandboxScreen";
 import { BoardChatScreen, exportBoardEcho } from "./src/screens/BoardChatScreen";
