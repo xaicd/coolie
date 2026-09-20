@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "enabled": true,
+  "defaultClass": "cmd",
+  "classes": {
+    "cmd": {
+      "label": "cmd 型",
+      "minIntervalSeconds": 180
+    },
+    "claude": {
+      "label": "claude 型",
+      "minIntervalSeconds": 30
+    }
+  },
+  "adapterClass": {
+    "process": "cmd",
+    "hermes_local": "cmd",
+    "hermes_gateway": "cmd",
+    "claude_local": "claude"
+  }
+}

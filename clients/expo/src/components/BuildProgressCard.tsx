@@ -36,6 +36,21 @@ export const BUILD_AGENT_TYPE_LABELS: Record<string, string> = {
   pm: "产品",
 };
 
+/**
+ * 该环节的首次派发是否被限流冷却挡住 (见 server/src/services/build-orchestrator.ts
+ * 的 dispatchBuildStep)。仅无阻塞的环节会被派发, 因此其余环节的 pacing 为 null。
+ */
+export interface BuildStepPacing {
+  state: "dispatched" | "waiting";
+  workerClass: string;
+  classLabel: string;
+  minIntervalSeconds: number;
+  /** 快照时刻的剩余冷却时长 */
+  waitMs: number;
+  /** 解冻时刻 (epoch ms), 已派发时为 null */
+  waitUntilMs: number | null;
+}
+
 export interface BuildProgressStep {
   step: number;
   kind: string;
@@ -45,6 +60,55 @@ export interface BuildProgressStep {
   issueId?: string;
   status?: string;
   assigneeAgentId?: string | null;
+  pacing?: BuildStepPacing | null;
+}
+
+/**
+ * 冷却剩余时长: 3m 20s / 42s。以毫秒为单位自减, 秒是最细的可读粒度。
+ */
+export function formatCooldown(ms: number): string {
+  const totalSeconds = Math.max(0, Math.ceil(ms / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return minutes > 0 ? `${minutes}m ${seconds}s` : `${seconds}s`;
+}
+
+/** 限流等待中: 已停机 (done/cancelled) 的环节不再显示冷却 */
+function isCoolingDown(step: BuildProgressStep): boolean {
+  return (
+    step.pacing?.state === "waiting" &&
+    step.status !== "done" &&
+    step.status !== "cancelled"
+  );
+}
+
+/**
+ * 限流冷却倒计时。基准取响应里的 waitMs (相对毫秒) 而非 waitUntilMs,
+ * 这样设备与服务端的时钟偏差不会影响倒计时。
+ */
+function CooldownLine({ pacing }: { pacing: BuildStepPacing }) {
+  const [remainingMs, setRemainingMs] = React.useState(pacing.waitMs);
+
+  React.useEffect(() => {
+    setRemainingMs(pacing.waitMs);
+    if (pacing.waitMs <= 0) return;
+    const deadline = Date.now() + pacing.waitMs;
+    const timer = setInterval(() => {
+      setRemainingMs(Math.max(0, deadline - Date.now()));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [pacing.waitMs, pacing.waitUntilMs]);
+
+  return (
+    <View style={styles.cooldownRow}>
+      <Ionicons name="time-outline" size={12} color={C.warn} />
+      <Text style={styles.cooldownText} numberOfLines={1}>
+        {remainingMs > 0
+          ? `等待限流冷却 · 剩余 ${formatCooldown(remainingMs)}`
+          : "等待限流冷却 · 即将派发"}
+      </Text>
+    </View>
+  );
 }
 
 export interface BuildProgressCardProps {
@@ -67,6 +131,9 @@ interface StepVisual {
 function stepVisual(step: BuildProgressStep): StepVisual {
   if (!step.assigneeAgentId) {
     return { label: "未指派", tone: "warn", dot: "idle", done: false };
+  }
+  if (isCoolingDown(step)) {
+    return { label: "限流冷却", tone: "warn", dot: "idle", done: false };
   }
   switch (step.status) {
     case "done":
@@ -184,6 +251,9 @@ export function BuildProgressCard({
                       }
                     />
                   </View>
+                  {isCoolingDown(step) && step.pacing ? (
+                    <CooldownLine pacing={step.pacing} />
+                  ) : null}
                 </View>
               </Pressable>
             );
@@ -298,5 +368,15 @@ const styles = StyleSheet.create({
   stepKind: {
     color: C.ink4,
     fontSize: FONT_SIZE.meta,
+  },
+  cooldownRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.xs,
+  },
+  cooldownText: {
+    color: C.warn,
+    fontSize: FONT_SIZE.meta,
+    flexShrink: 1,
   },
 });
