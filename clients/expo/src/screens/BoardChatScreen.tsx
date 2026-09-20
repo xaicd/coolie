@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
@@ -34,6 +34,7 @@ import { Pill } from "../ui/Pill";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { StatusBadge } from "../ui/StatusBadge";
 import { formatTime } from "../utils/format";
+import { useIssues } from "../providers/IssuesProvider";
 
 export interface BoardChatScreenProps {
   onOpenSettings?: () => void;
@@ -270,9 +271,18 @@ export function BoardChatScreen({
   const linkedIssueCache = useRef<Record<string, Issue | null>>({});
 
   const [showHistory, setShowHistory] = useState(false);
-  const [sessions, setSessions] = useState<Array<{ id: string; title: string }>>([]);
-  const [sessionsLoading, setSessionsLoading] = useState(false);
-  const [sessionsError, setSessionsError] = useState<string | null>(null);
+
+  // 会话列表 = 任务列表的投影, 不再自己打一次 listIssues
+  const {
+    issues,
+    loading: sessionsLoading,
+    error: sessionsError,
+    refresh: refreshIssues,
+  } = useIssues();
+  const sessions = useMemo(
+    () => issues.map((i) => ({ id: i.id, title: i.title })),
+    [issues],
+  );
 
   const flatListRef = useRef<FlatList<BoardChatMessage>>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -312,20 +322,6 @@ export function BoardChatScreen({
   useEffect(() => {
     void loadHistory();
   }, [loadHistory]);
-
-  const loadSessions = useCallback(async () => {
-    setSessionsLoading(true);
-    setSessionsError(null);
-    try {
-      const issues = await coolie.listIssues(company.id, { limit: 30 });
-      const mapped = issues.map((i) => ({ id: i.id, title: i.title }));
-      setSessions(mapped);
-    } catch (e) {
-      setSessionsError(String((e as Error)?.message ?? e));
-    } finally {
-      setSessionsLoading(false);
-    }
-  }, [company.id]);
 
   const switchSession = useCallback(
     async (targetTaskId?: string) => {
@@ -737,7 +733,7 @@ export function BoardChatScreen({
               hitSlop={12}
               onPress={() => {
                 setShowHistory(true);
-                void loadSessions();
+                void refreshIssues();
               }}
               style={styles.historyBtn}
             >
@@ -980,7 +976,7 @@ export function BoardChatScreen({
                 <ErrorRetry
                   variant="section"
                   message={`⚠️ ${sessionsError}`}
-                  onRetry={() => void loadSessions()}
+                  onRetry={() => void refreshIssues()}
                   style={styles.historyErrorBox}
                 />
               )}

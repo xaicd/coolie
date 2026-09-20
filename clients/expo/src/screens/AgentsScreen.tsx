@@ -32,6 +32,7 @@ import { Sheet } from "../ui/Sheet";
 import { StatTile } from "../ui/StatTile";
 import { KeyValueRow } from "../ui/KeyValueRow";
 import { formatMoney, formatTokens } from "../utils/format";
+import { useIssues } from "../providers/IssuesProvider";
 
 const STATUS_LABEL: Record<string, string> = {
   active: "在线",
@@ -54,14 +55,12 @@ const STATUS_DOT: Record<string, "ok" | "idle" | "err"> = {
 
 /** 员工详情浮层：改状态(启停)、改头衔、看 token 用量、看技能/配置、看最近任务 */
 function AgentDetailSheet({
-  companyId,
   agent,
   cost,
   onClose,
   onChanged,
   onOpenIssue,
 }: {
-  companyId: string;
   agent: AgentRow;
   cost?: AgentCostRow;
   onClose: () => void;
@@ -76,9 +75,24 @@ function AgentDetailSheet({
   const [infoLoading, setInfoLoading] = useState(true);
   const [infoError, setInfoError] = useState<string | null>(null);
 
-  const [recentTasks, setRecentTasks] = useState<Issue[]>([]);
-  const [tasksLoading, setTasksLoading] = useState(true);
-  const [tasksError, setTasksError] = useState<string | null>(null);
+  // 最近指派任务来自共享任务列表, 不再自己打一次 listIssues
+  const {
+    issues,
+    loading: tasksLoading,
+    error: tasksError,
+    refresh: refreshIssues,
+  } = useIssues();
+  const recentTasks = useMemo(
+    () =>
+      issues
+        .filter(
+          (i) =>
+            (i as any).assigneeAgentId === agent.id ||
+            (i as any).assignee?.id === agent.id,
+        )
+        .slice(0, 5),
+    [issues, agent.id],
+  );
 
   const fetchAgentInfo = useCallback(async () => {
     setInfoLoading(true);
@@ -97,30 +111,9 @@ function AgentDetailSheet({
     }
   }, [agent.id]);
 
-  const fetchRecentTasks = useCallback(async () => {
-    setTasksLoading(true);
-    setTasksError(null);
-    try {
-      const issues = await coolie.listIssues(companyId, { limit: 50 });
-      const assigned = issues
-        .filter(
-          (i) =>
-            (i as any).assigneeAgentId === agent.id ||
-            (i as any).assignee?.id === agent.id,
-        )
-        .slice(0, 5);
-      setRecentTasks(assigned);
-    } catch (e) {
-      setTasksError(String((e as Error)?.message ?? e));
-    } finally {
-      setTasksLoading(false);
-    }
-  }, [companyId, agent.id]);
-
   useEffect(() => {
     void fetchAgentInfo();
-    void fetchRecentTasks();
-  }, [fetchAgentInfo, fetchRecentTasks]);
+  }, [fetchAgentInfo]);
 
   const skillNames = useMemo(() => {
     const list: string[] = [];
@@ -266,7 +259,7 @@ function AgentDetailSheet({
             <ErrorRetry
               variant="inline"
               message={`任务加载失败: ${tasksError}`}
-              onRetry={() => void fetchRecentTasks()}
+              onRetry={() => void refreshIssues()}
             />
           ) : recentTasks.length === 0 ? (
             <Text style={styles.infoEmptyText}>暂无分配的任务</Text>
@@ -519,7 +512,6 @@ export function AgentsScreen({
 
       {selected ? (
         <AgentDetailSheet
-          companyId={company.id}
           agent={selected}
           cost={costs[selected.id]}
           onClose={() => setSelected(null)}
