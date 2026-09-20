@@ -41,6 +41,17 @@ import {
   type IssueCostSummary,
 } from "./src/coolie";
 import { StatusDot } from "./src/components/StatusDot";
+import { AppCard } from "./src/ui/AppCard";
+import { EmptyState } from "./src/ui/EmptyState";
+import { ErrorRetry } from "./src/ui/ErrorRetry";
+import { KeyValueRow } from "./src/ui/KeyValueRow";
+import { LoadingState } from "./src/ui/LoadingState";
+import { Pill } from "./src/ui/Pill";
+import { ScreenHeader } from "./src/ui/ScreenHeader";
+import { SectionHeader } from "./src/ui/SectionHeader";
+import { Sheet } from "./src/ui/Sheet";
+import { StatTile } from "./src/ui/StatTile";
+import { formatTime, formatTokens } from "./src/utils/format";
 import { useRecorder } from "./src/useRecorder";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
@@ -299,64 +310,58 @@ function SettingsSheet({
   }, []);
 
   return (
-    <View style={styles.settingsBackdrop}>
-      <Pressable style={{ flex: 1 }} onPress={onClose} />
-      <View style={styles.settingsSheet}>
-        <View style={styles.settingsHandle} />
-        <Text style={styles.settingsTitle}>设置</Text>
-
-        {/* 我的名片 */}
-        <View style={styles.profileCard}>
-          <View style={styles.profileAvatar}>
-            <Text style={styles.profileAvatarText}>{whoami.slice(0, 1).toUpperCase()}</Text>
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.profileName} numberOfLines={1}>
-              {whoami}
-            </Text>
-            <Text style={styles.profileMeta}>Coolie工坊 · 管理员</Text>
-          </View>
-          <View style={styles.versionChip}>
-            <Text style={styles.versionChipText}>v{appVer}</Text>
-          </View>
+    <Sheet onClose={onClose} modal={false} title="设置" style={styles.settingsBackdrop}>
+      {/* 我的名片 */}
+      <View style={styles.profileCard}>
+        <View style={styles.profileAvatar}>
+          <Text style={styles.profileAvatarText}>{whoami.slice(0, 1).toUpperCase()}</Text>
         </View>
-
-        {/* App 设置分组 */}
-        <Text style={styles.settingsGroup}>应用</Text>
-        <Pressable
-          style={styles.settingsRow}
-          disabled={ota.isChecking}
-          onPress={() => void ota.checkUpdate(true)}
-        >
-          <Ionicons name="cloud-download-outline" size={20} color={C.ink3} />
-          <Text style={styles.settingsRowLabel}>版本与更新 (OTA)</Text>
-          <Text style={styles.settingsRowValue}>
-            {ota.isChecking ? "检查中…" : (ota.runtimeVersion ?? appVer)}
+        <View style={{ flex: 1 }}>
+          <Text style={styles.profileName} numberOfLines={1}>
+            {whoami}
           </Text>
-        </Pressable>
-        <Pressable
-          style={styles.settingsRow}
-          disabled={clearing}
-          onPress={async () => {
-            setClearing(true);
-            const size = await clearAppCache();
-            setCacheSize(size);
-            setClearing(false);
-            Alert.alert("缓存已清理", `释放 ${size}`);
-          }}
-        >
-          <Ionicons name="trash-outline" size={20} color={C.ink3} />
-          <Text style={styles.settingsRowLabel}>清理缓存</Text>
-          <Text style={styles.settingsRowValue}>
-            {clearing ? "清理中…" : (cacheSize ?? "计算中…")}
-          </Text>
-        </Pressable>
-
-        <Pressable style={styles.settingsSignOut} onPress={onSignOut}>
-          <Text style={styles.settingsSignOutText}>退出登录</Text>
-        </Pressable>
+          <Text style={styles.profileMeta}>Coolie工坊 · 管理员</Text>
+        </View>
+        <View style={styles.versionChip}>
+          <Text style={styles.versionChipText}>v{appVer}</Text>
+        </View>
       </View>
-    </View>
+
+      {/* App 设置分组 */}
+      <Text style={styles.settingsGroup}>应用</Text>
+      <Pressable
+        style={styles.settingsRow}
+        disabled={ota.isChecking}
+        onPress={() => void ota.checkUpdate(true)}
+      >
+        <Ionicons name="cloud-download-outline" size={20} color={C.ink3} />
+        <Text style={styles.settingsRowLabel}>版本与更新 (OTA)</Text>
+        <Text style={styles.settingsRowValue}>
+          {ota.isChecking ? "检查中…" : (ota.runtimeVersion ?? appVer)}
+        </Text>
+      </Pressable>
+      <Pressable
+        style={styles.settingsRow}
+        disabled={clearing}
+        onPress={async () => {
+          setClearing(true);
+          const size = await clearAppCache();
+          setCacheSize(size);
+          setClearing(false);
+          Alert.alert("缓存已清理", `释放 ${size}`);
+        }}
+      >
+        <Ionicons name="trash-outline" size={20} color={C.ink3} />
+        <Text style={styles.settingsRowLabel}>清理缓存</Text>
+        <Text style={styles.settingsRowValue}>
+          {clearing ? "清理中…" : (cacheSize ?? "计算中…")}
+        </Text>
+      </Pressable>
+
+      <Pressable style={styles.settingsSignOut} onPress={onSignOut}>
+        <Text style={styles.settingsSignOutText}>退出登录</Text>
+      </Pressable>
+    </Sheet>
   );
 }
 
@@ -414,7 +419,7 @@ export default function App() {
   if (credential === undefined) {
     return (
       <SafeAreaView style={[styles.center, { backgroundColor: C.bg, paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
-        <ActivityIndicator color={C.accent} />
+        <LoadingState size="small" />
       </SafeAreaView>
     );
   }
@@ -490,20 +495,19 @@ function CompanyGate({
         <>
           <Text style={styles.muted}>选择要进入的公司</Text>
           {companies.map((company) => (
-            <Pressable
+            <AppCard
               key={company.id}
-              style={({ pressed }) => [
-                styles.cardBtn,
-                pressed && styles.cardBtnPressed,
-              ]}
               onPress={() => setChosen(company)}
+              row
+              padding={16}
+              style={styles.cardBetween}
             >
               <View style={styles.rowAlignCenterGap}>
                 <StatusDot status="ok" size={6} />
                 <Text style={styles.cardBtnTitle}>{company.name}</Text>
               </View>
               <Text style={styles.chevron}>›</Text>
-            </Pressable>
+            </AppCard>
           ))}
         </>
       )}
@@ -800,8 +804,23 @@ function HomeScreen({
           <DashboardScreen
             company={company}
             onOpenSettings={() => setSettingsOpen(true)}
-            onOpenApprovals={() => setTab("tasks")}
-            onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
+            onOpenApprovals={() => {
+              // 审计 bug 1: 审批卡点击原先只 setTab("tasks")。tab 分支上方还有 selected /
+              // diffContext / sandboxContext / focusedApprovalId 四个 early-return 浮层,
+              // 只要有一个残留,tab 改了屏幕上仍是原页面。先清浮层再切 tab,保证任务页渲染。
+              setSelected(null);
+              setDiffContext(null);
+              setSandboxContext(null);
+              setFocusedApprovalId(null);
+              setTab("tasks");
+            }}
+            onOpenApproval={(approvalId) => {
+              // 审计 bug 1: 审批行自带 Pressable,会抢占手势响应,父卡片的 onPress 不会触发,
+              // 所以行内点击原先从不切 tab —— 从审批详情返回时退回汇览页(tab 仍是 dashboard)。
+              // 与下面 agents/chat 的 onOpenIssue 保持一致:先切 tab 再压入详情。
+              setTab("tasks");
+              setFocusedApprovalId(approvalId);
+            }}
           />
         ) : tab === "agents" ? (
           <AgentsScreen
@@ -836,7 +855,7 @@ function HomeScreen({
               setDiffContext({ issue: issueItem, workProduct: wp })
             }
           />
-        ) : (
+        ) : tab === "tasks" ? (
           <ScrollView
             style={{ flex: 1, backgroundColor: C.bg }}
             contentContainerStyle={styles.screen}
@@ -845,13 +864,13 @@ function HomeScreen({
             <View style={styles.rowBetween}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.h1}>工坊控制台</Text>
-                <View style={styles.companyCapsule}>
+                <Pill style={styles.companyCapsule}>
                   <StatusDot status="ok" size={6} />
                   <Text style={styles.companyCapsuleText} numberOfLines={1}>
                     {company.name}
                   </Text>
                   <Text style={styles.companyCapsuleSubText}>· {whoami}</Text>
-                </View>
+                </Pill>
               </View>
               <Pressable
                 onPress={() => setBoardView((v) => !v)}
@@ -878,18 +897,9 @@ function HomeScreen({
 
             {/* 概览统计卡片 (tabularNum + 亮度分层) */}
       <View style={styles.statRow}>
-        <View style={styles.statCard}>
-          <Text style={styles.statNum}>{issues.length}</Text>
-          <Text style={styles.statLabel}>全部任务</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statNum, { color: C.accent }]}>{open}</Text>
-          <Text style={styles.statLabel}>进行中</Text>
-        </View>
-        <View style={styles.statCard}>
-          <Text style={[styles.statNum, { color: C.ok }]}>{issues.length - open}</Text>
-          <Text style={styles.statLabel}>已完成</Text>
-        </View>
+        <StatTile value={issues.length} label="全部任务" />
+        <StatTile value={open} label="进行中" valueColor={C.accent} />
+        <StatTile value={issues.length - open} label="已完成" valueColor={C.ok} />
       </View>
 
       {/* 创建任务输入框区域 */}
@@ -912,28 +922,15 @@ function HomeScreen({
 
         {/* 优先级徽标胶囊 (前缀色点) */}
         <View style={styles.chips}>
-          {(["low", "medium", "high", "critical"] as IssuePriority[]).map((p) => {
-            const isSelected = priority === p;
-            return (
-              <Pressable
-                key={p}
-                onPress={() => setPriority(p)}
-                style={[styles.priorityChip, isSelected && styles.priorityChipActive]}
-              >
-                <View
-                  style={[
-                    styles.priorityDot,
-                    { backgroundColor: PRIORITY_DOT_COLOR[p] },
-                  ]}
-                />
-                <Text
-                  style={isSelected ? styles.chipTextActive : styles.chipText}
-                >
-                  {PRIORITY_LABEL[p]}
-                </Text>
-              </Pressable>
-            );
-          })}
+          {(["low", "medium", "high", "critical"] as IssuePriority[]).map((p) => (
+            <Pill
+              key={p}
+              label={PRIORITY_LABEL[p]}
+              dotColor={PRIORITY_DOT_COLOR[p]}
+              active={priority === p}
+              onPress={() => setPriority(p)}
+            />
+          ))}
         </View>
 
         <View style={styles.rowGap}>
@@ -987,20 +984,18 @@ function HomeScreen({
           onOpen={(it) => setSelected(it)}
         />
       ) : loading ? (
-        <ActivityIndicator color={C.accent} style={{ marginTop: 24 }} />
+        <LoadingState style={styles.listLoader} />
       ) : (
         <FlatList
           scrollEnabled={false}
           data={issues}
           keyExtractor={(i) => i.id}
           ListEmptyComponent={
-            <View style={styles.emptyCard}>
-              <Text style={styles.emptyIcon}>📋</Text>
-              <Text style={styles.emptyTitle}>还没有任务</Text>
-              <Text style={styles.muted}>
-                在上方输入标题创建第一个任务，或用语音派发。
-              </Text>
-            </View>
+            <EmptyState
+              icon="📋"
+              title="还没有任务"
+              subtitle="在上方输入标题创建第一个任务，或用语音派发。"
+            />
           }
           renderItem={({ item }) => {
             const isRunning = item.status === "in_progress";
@@ -1011,12 +1006,11 @@ function HomeScreen({
               : "idle";
 
             return (
-              <Pressable
-                style={({ pressed }) => [
-                  styles.taskCard,
-                  pressed && styles.taskCardPressed,
-                ]}
+              <AppCard
                 onPress={() => setSelected(item)}
+                row
+                padding={12}
+                style={styles.taskCard}
               >
                 <View style={styles.taskCardMain}>
                   <View style={styles.taskTitleRow}>
@@ -1033,48 +1027,32 @@ function HomeScreen({
 
                   <View style={styles.taskMeta}>
                     {/* 状态徽标胶囊 */}
-                    <View style={styles.capsuleBadge}>
-                      <View
-                        style={[
-                          styles.capsuleDot,
-                          {
-                            backgroundColor:
-                              STATUS_DOT_COLOR[item.status] ?? C.ink3,
-                          },
-                        ]}
-                      />
-                      <Text style={styles.capsuleText}>
-                        {STATUS_LABEL[item.status] ?? item.status}
-                      </Text>
-                    </View>
+                    <Pill
+                      label={STATUS_LABEL[item.status] ?? item.status}
+                      dotColor={STATUS_DOT_COLOR[item.status] ?? C.ink3}
+                      mono
+                      size="sm"
+                    />
 
                     {/* 优先级徽标胶囊 */}
-                    <View style={styles.capsuleBadge}>
-                      <View
-                        style={[
-                          styles.capsuleDot,
-                          {
-                            backgroundColor:
-                              PRIORITY_DOT_COLOR[item.priority] ?? C.ink3,
-                          },
-                        ]}
-                      />
-                      <Text style={styles.capsuleText}>
-                        {PRIORITY_LABEL[item.priority] ?? item.priority}
-                      </Text>
-                    </View>
+                    <Pill
+                      label={PRIORITY_LABEL[item.priority] ?? item.priority}
+                      dotColor={PRIORITY_DOT_COLOR[item.priority] ?? C.ink3}
+                      mono
+                      size="sm"
+                    />
                   </View>
                 </View>
 
                 <Text style={styles.chevron}>›</Text>
-              </Pressable>
+              </AppCard>
             );
           }}
         />
       )}
       <QuickApprovalCard companyId={companyId} floating={true} />
             </ScrollView>
-          )}
+          ) : null}
       </View>
       {appUpdate ? <AppUpdateCard info={appUpdate} onClose={() => setAppUpdate(null)} /> : null}
       {settingsOpen ? (
@@ -1151,21 +1129,14 @@ function ApprovalFocusDetail({
 
   return (
     <Surface>
-      <Pressable onPress={onBack} hitSlop={12} style={styles.backLinkRow}>
-        <Text style={styles.link}>‹ 返回驾驶舱</Text>
-      </Pressable>
+      <ScreenHeader onBack={onBack} backLabel="返回驾驶舱" />
 
       <Text style={styles.detailTitle}>审批裁决</Text>
 
       {loading && !approval ? (
-        <ActivityIndicator color={C.accent} style={{ marginVertical: 24 }} />
+        <LoadingState style={styles.inlineLoader} />
       ) : error ? (
-        <View style={styles.sectionErrorBox}>
-          <Text style={styles.sectionErrorText}>⚠️ {error}</Text>
-          <Pressable onPress={() => void load()} style={styles.sectionRetryBtn}>
-            <Text style={styles.sectionRetryBtnText}>重试</Text>
-          </Pressable>
-        </View>
+        <ErrorRetry variant="section" message={`⚠️ ${error}`} onRetry={() => void load()} />
       ) : approval ? (
         <>
           <QuickApprovalCard
@@ -1284,29 +1255,27 @@ function TaskDetail({
 
   return (
     <Surface>
-      <Pressable onPress={onBack} hitSlop={12} style={styles.backLinkRow}>
-        <Text style={styles.link}>‹ 返回任务列表</Text>
-      </Pressable>
+      <ScreenHeader onBack={onBack} backLabel="返回任务列表" />
 
       <Text style={styles.detailTitle}>{issue.title}</Text>
 
-      <View style={styles.detailCard}>
-        <DetailRow
+      <AppCard padding={16} style={styles.detailCard}>
+        <KeyValueRow
           label="状态"
           value={STATUS_LABEL[issue.status] ?? issue.status}
           valueColor={STATUS_DOT_COLOR[issue.status] ?? C.ink}
         />
-        <DetailRow
+        <KeyValueRow
           label="优先级"
           value={PRIORITY_LABEL[issue.priority] ?? issue.priority}
           valueColor={PRIORITY_DOT_COLOR[issue.priority] ?? C.ink}
         />
         {issue.description ? (
-          <DetailRow label="描述" value={issue.description} />
+          <KeyValueRow label="描述" value={issue.description} />
         ) : null}
-        <DetailRow label="编号" value={issue.id} valueColor={C.ink3} isMono />
+        <KeyValueRow label="编号" value={issue.id} valueColor={C.ink3} mono />
         <IssueCostRow issueId={issue.id} />
-      </View>
+      </AppCard>
 
       {/* 核心动作: 查看代码 Diff 与 打开原型沙箱 */}
       <View style={styles.rowGap}>
@@ -1339,18 +1308,12 @@ function TaskDetail({
       {/* 关联交付产物列表 */}
       {workProducts.length > 0 && (
         <View style={styles.wpSection}>
-          <Text style={styles.sectionHeader}>
-            关联交付产物 ({workProducts.length})
-          </Text>
+          <SectionHeader title="关联交付产物" count={workProducts.length} />
           {workProducts.map((wp) => {
             const hasPrototype = Boolean(wp.url || wp.type === "prototype" || wp.runtimeServiceId);
             return (
-              <Pressable
+              <AppCard
                 key={wp.id}
-                style={({ pressed }) => [
-                  styles.wpCard,
-                  pressed && styles.cardBtnPressed,
-                ]}
                 onPress={() => {
                   if (hasPrototype && onOpenSandbox) {
                     onOpenSandbox(wp.url || "", null, wp);
@@ -1358,6 +1321,8 @@ function TaskDetail({
                     onOpenDiff(issue, wp);
                   }
                 }}
+                row
+                style={styles.cardBetween}
               >
                 <View style={{ flex: 1, gap: 2 }}>
                   <Text style={styles.wpTitle} numberOfLines={1}>
@@ -1370,7 +1335,7 @@ function TaskDetail({
                 <Text style={styles.wpLink}>
                   {hasPrototype ? "看原型 🎮 ›" : "看 Diff ›"}
                 </Text>
-              </Pressable>
+              </AppCard>
             );
           })}
         </View>
@@ -1381,36 +1346,21 @@ function TaskDetail({
 
       {/* 任务附件列表 */}
       <View style={styles.detailSection}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionHeader}>
-            任务附件 ({attachments.length})
-          </Text>
-          <Pressable
-            hitSlop={8}
-            onPress={() => void loadAttachments()}
-            disabled={loadingAttachments}
-            style={styles.sectionRefreshBtn}
-          >
-            {loadingAttachments ? (
-              <ActivityIndicator size="small" color={C.accent} />
-            ) : (
-              <Ionicons name="refresh" size={14} color={C.ink3} />
-            )}
-          </Pressable>
-        </View>
+        <SectionHeader
+          title="任务附件"
+          count={attachments.length}
+          onRefresh={() => void loadAttachments()}
+          refreshing={loadingAttachments}
+        />
 
         {loadingAttachments && attachments.length === 0 ? (
-          <ActivityIndicator color={C.accent} style={{ marginVertical: 12 }} />
+          <LoadingState style={styles.sectionLoader} />
         ) : Boolean(attachmentsError) ? (
-          <View style={styles.sectionErrorBox}>
-            <Text style={styles.sectionErrorText}>⚠️ {attachmentsError}</Text>
-            <Pressable
-              onPress={() => void loadAttachments()}
-              style={styles.sectionRetryBtn}
-            >
-              <Text style={styles.sectionRetryBtnText}>重试</Text>
-            </Pressable>
-          </View>
+          <ErrorRetry
+            variant="section"
+            message={`⚠️ ${attachmentsError}`}
+            onRetry={() => void loadAttachments()}
+          />
         ) : attachments.length === 0 ? (
           <Text style={styles.sectionEmptyText}>暂无附件</Text>
         ) : (
@@ -1456,36 +1406,21 @@ function TaskDetail({
 
       {/* 评论流 */}
       <View style={styles.detailSection}>
-        <View style={styles.sectionHeaderRow}>
-          <Text style={styles.sectionHeader}>
-            评论流 ({comments.length})
-          </Text>
-          <Pressable
-            hitSlop={8}
-            onPress={() => void loadComments()}
-            disabled={loadingComments}
-            style={styles.sectionRefreshBtn}
-          >
-            {loadingComments ? (
-              <ActivityIndicator size="small" color={C.accent} />
-            ) : (
-              <Ionicons name="refresh" size={14} color={C.ink3} />
-            )}
-          </Pressable>
-        </View>
+        <SectionHeader
+          title="评论流"
+          count={comments.length}
+          onRefresh={() => void loadComments()}
+          refreshing={loadingComments}
+        />
 
         {loadingComments && comments.length === 0 ? (
-          <ActivityIndicator color={C.accent} style={{ marginVertical: 12 }} />
+          <LoadingState style={styles.sectionLoader} />
         ) : Boolean(commentsError) ? (
-          <View style={styles.sectionErrorBox}>
-            <Text style={styles.sectionErrorText}>⚠️ {commentsError}</Text>
-            <Pressable
-              onPress={() => void loadComments()}
-              style={styles.sectionRetryBtn}
-            >
-              <Text style={styles.sectionRetryBtnText}>重试</Text>
-            </Pressable>
-          </View>
+          <ErrorRetry
+            variant="section"
+            message={`⚠️ ${commentsError}`}
+            onRetry={() => void loadComments()}
+          />
         ) : comments.length === 0 ? (
           <Text style={styles.sectionEmptyText}>暂无跟进评论</Text>
         ) : (
@@ -1498,10 +1433,7 @@ function TaskDetail({
                 ? `员工 ${comment.authorAgentId.slice(0, 8)}`
                 : "系统";
               const timeStr = comment.createdAt
-                ? new Date(comment.createdAt).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
+                ? formatTime(comment.createdAt)
                 : "";
 
               return (
@@ -1560,43 +1492,14 @@ function IssueCostRow({ issueId }: { issueId: string }) {
     coolie.issueCostSummary(issueId).then(setSummary).catch(() => setSummary(null));
   }, [issueId]);
   if (!summary) return null;
-  const fmt = (n: number) =>
-    n >= 1_000_000 ? `${(n / 1_000_000).toFixed(1)}M` : n >= 1_000 ? `${(n / 1_000).toFixed(1)}k` : String(n);
   return (
-    <DetailRow
+    <KeyValueRow
       label="消耗"
-      value={`tokens 入${fmt(summary.inputTokens)} 出${fmt(summary.outputTokens)} · 运行${summary.runCount}次${
+      value={`tokens 入${formatTokens(summary.inputTokens)} 出${formatTokens(summary.outputTokens)} · 运行${summary.runCount}次${
         summary.costCents > 0 ? ` · $${(summary.costCents / 100).toFixed(2)}` : ""
       }`}
       valueColor={C.ink3}
     />
-  );
-}
-
-function DetailRow({
-  label,
-  value,
-  valueColor,
-  isMono = false,
-}: {
-  label: string;
-  value: string;
-  valueColor?: string;
-  isMono?: boolean;
-}) {
-  return (
-    <View style={styles.detailRow}>
-      <Text style={styles.detailLabel}>{label}</Text>
-      <Text
-        style={[
-          styles.detailValue,
-          valueColor ? { color: valueColor } : null,
-          isMono ? styles.monoText : null,
-        ]}
-      >
-        {value}
-      </Text>
-    </View>
   );
 }
 
@@ -1674,26 +1577,7 @@ const styles = StyleSheet.create({
   updateBtnText: { color: C.ink, fontSize: 13, fontWeight: "600" },
   settingsBackdrop: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: "rgba(0,0,0,0.55)",
-    justifyContent: "flex-end",
     zIndex: 100,
-  },
-  settingsSheet: {
-    backgroundColor: C.panel,
-    borderTopLeftRadius: 18,
-    borderTopRightRadius: 18,
-    paddingHorizontal: 18,
-    paddingBottom: 34,
-    paddingTop: 10,
-    gap: 4,
-  },
-  settingsHandle: {
-    alignSelf: "center",
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: C.surfaceHover,
-    marginBottom: 10,
   },
   profileCard: {
     flexDirection: "row",
@@ -1729,12 +1613,6 @@ const styles = StyleSheet.create({
     marginTop: 14,
     marginBottom: 4,
     textTransform: "uppercase",
-  },
-  settingsTitle: {
-    color: C.ink,
-    fontSize: 17,
-    fontWeight: "700",
-    marginBottom: 10,
   },
   settingsRow: {
     flexDirection: "row",
@@ -1818,9 +1696,15 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     fontSize: 13,
   },
-  backLinkRow: {
-    alignSelf: "flex-start",
-    paddingVertical: 4,
+  listLoader: {
+    flex: 0,
+    marginTop: 24,
+    paddingVertical: 0,
+  },
+  inlineLoader: {
+    flex: 0,
+    marginVertical: 24,
+    paddingVertical: 0,
   },
   // 输入框 (DESIGN.md 第3节: bg 0.02, border line, radius 8, padding 12×14, text ink, placeholder ink3)
   input: {
@@ -1893,19 +1777,9 @@ const styles = StyleSheet.create({
   btnDisabled: {
     opacity: 0.4,
   },
-  // 卡片 (DESIGN.md 第3节: bg 0.02, border 1px line, radius 12, 按压 0.05)
-  cardBtn: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: 12,
-    padding: 16,
-    borderWidth: 1,
-    borderColor: C.line,
-    flexDirection: "row",
-    alignItems: "center",
+  // 卡片 (DESIGN.md 第3节: 卡片外壳统一由 ui/AppCard 提供)
+  cardBetween: {
     justifyContent: "space-between",
-  },
-  cardBtnPressed: {
-    backgroundColor: "rgba(255,255,255,0.05)",
   },
   cardBtnTitle: {
     color: C.ink,
@@ -1941,15 +1815,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   companyCapsule: {
-    flexDirection: "row",
-    alignItems: "center",
-    alignSelf: "flex-start",
-    backgroundColor: "rgba(255,255,255,0.05)",
-    borderWidth: 1,
-    borderColor: C.line,
-    borderRadius: 999,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
     marginTop: 6,
     gap: 6,
   },
@@ -1964,112 +1829,21 @@ const styles = StyleSheet.create({
     color: C.ink4,
     fontWeight: "400",
   },
-  tabSwitcher: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: 8,
-    padding: 2,
-    borderWidth: 1,
-    borderColor: C.lineSubtle,
-  },
-  tabBtn: {
-    flex: 1,
-    paddingVertical: 8,
-    alignItems: "center",
-    borderRadius: 6,
-  },
-  tabBtnActive: {
-    backgroundColor: "rgba(255,255,255,0.08)",
-    borderWidth: 1,
-    borderColor: C.line,
-  },
-  tabBtnText: {
-    fontSize: 12,
-    color: C.ink3,
-    fontWeight: "400",
-  },
-  tabBtnTextActive: {
-    color: C.ink,
-    fontWeight: "500",
-  },
   chips: {
     flexGrow: 0,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
   },
-  priorityChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    borderWidth: 1,
-    borderColor: C.line,
-    borderRadius: 999,
-    paddingVertical: 5,
-    paddingHorizontal: 12,
-    backgroundColor: "rgba(255,255,255,0.05)",
-  },
-  priorityChipActive: {
-    backgroundColor: "rgba(94, 106, 210, 0.18)",
-    borderColor: C.brand,
-  },
-  priorityDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  chipText: {
-    color: C.ink2,
-    fontSize: 11,
-    fontWeight: "500",
-  },
-  chipTextActive: {
-    color: C.ink,
-    fontSize: 11,
-    fontWeight: "500",
-  },
   statRow: {
     flexDirection: "row",
     gap: 12,
   },
-  statCard: {
-    flex: 1,
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: 12,
-    paddingVertical: 14,
-    paddingHorizontal: 12,
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: C.line,
-    gap: 4,
-  },
-  statNum: {
-    color: C.ink,
-    fontSize: 24,
-    fontWeight: "600",
-    fontVariant: ["tabular-nums"],
-  },
-  statLabel: {
-    color: C.ink3,
-    fontSize: 11,
-    fontWeight: "500",
-  },
-  // 列表 (DESIGN.md 第4节: 行高 56, 右侧 chevron ink4)
   taskCard: {
     minHeight: 56,
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: C.line,
-    flexDirection: "row",
-    alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 8,
     gap: 10,
-  },
-  taskCardPressed: {
-    backgroundColor: "rgba(255,255,255,0.05)",
   },
   taskCardMain: {
     flex: 1,
@@ -2091,45 +1865,6 @@ const styles = StyleSheet.create({
     gap: 8,
     marginLeft: 16,
   },
-  capsuleBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 999,
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderWidth: 1,
-    borderColor: C.line,
-    backgroundColor: "rgba(255,255,255,0.05)",
-    gap: 4,
-  },
-  capsuleDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-  },
-  capsuleText: {
-    color: C.ink2,
-    fontSize: 11,
-    fontWeight: "500",
-    fontVariant: ["tabular-nums"],
-  },
-  emptyCard: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: 12,
-    padding: 32,
-    alignItems: "center",
-    gap: 8,
-    borderWidth: 1,
-    borderColor: C.lineSubtle,
-  },
-  emptyIcon: {
-    fontSize: 28,
-  },
-  emptyTitle: {
-    color: C.ink,
-    fontSize: 15,
-    fontWeight: "600",
-  },
   detailTitle: {
     fontSize: 20,
     fontWeight: "600",
@@ -2137,31 +1872,7 @@ const styles = StyleSheet.create({
     letterSpacing: -0.4,
   },
   detailCard: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.line,
-    padding: 16,
     gap: 12,
-  },
-  detailRow: {
-    gap: 2,
-  },
-  detailLabel: {
-    color: C.ink3,
-    fontSize: 11,
-    fontWeight: "400",
-  },
-  detailValue: {
-    fontSize: 15,
-    color: C.ink,
-    fontWeight: "500",
-    fontVariant: ["tabular-nums"],
-  },
-  monoText: {
-    fontVariant: ["tabular-nums"],
-    color: C.ink3,
-    fontSize: 13,
   },
   btnDiffAction: {
     backgroundColor: "rgba(94, 106, 210, 0.12)",
@@ -2182,22 +1893,6 @@ const styles = StyleSheet.create({
     marginTop: 8,
     gap: 8,
   },
-  sectionHeader: {
-    color: C.ink3,
-    fontSize: 13,
-    fontWeight: "500",
-    fontVariant: ["tabular-nums"],
-  },
-  wpCard: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.line,
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
   wpTitle: {
     color: C.ink,
     fontSize: 13,
@@ -2217,38 +1912,10 @@ const styles = StyleSheet.create({
     marginTop: 16,
     gap: 8,
   },
-  sectionHeaderRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  sectionRefreshBtn: {
-    padding: 4,
-  },
-  sectionErrorBox: {
-    padding: 12,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.err,
-    borderRadius: 8,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  sectionErrorText: {
-    color: C.err,
-    fontSize: 12,
-    flex: 1,
-  },
-  sectionRetryBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: C.surfaceHover,
-    borderRadius: 4,
-  },
-  sectionRetryBtnText: {
-    color: C.ink,
-    fontSize: 12,
+  sectionLoader: {
+    flex: 0,
+    marginVertical: 12,
+    paddingVertical: 0,
   },
   sectionEmptyText: {
     color: C.ink4,
