@@ -143,19 +143,13 @@ export async function generateOntologySpec(
 
   const document = specDocumentForValidation(normalized, input.origin);
 
-  let validation: SpecValidation;
-  try {
-    validation = await input.validate(document);
-  } catch (error) {
-    // A validator that cannot be reached is not a document that is wrong. Refuse
-    // the spec rather than storing one nobody checked — the whole point of the
-    // gate is that nothing reaches the database unvalidated.
-    logger.warn(
-      { err: error, companyId: input.companyId },
-      "ontology spec validation unavailable; refusing the spec rather than storing it unvalidated",
-    );
-    return { spec: null, source: "rejected", problems: [] };
-  }
+  // A validator that cannot be reached is not a document that is wrong, and the
+  // two need different answers: an unusable document is the requester's to
+  // rephrase, while an unreachable ontology is a retry. So this does not catch —
+  // the caller surfaces the failure as "not available" instead of reporting a
+  // possibly fine model as "rejected". Nothing is stored either way, which is the
+  // property that actually matters.
+  const validation = await input.validate(document);
 
   const errors = validation.problems.filter((problem) => problem.severity === "error");
   if (errors.length) {
