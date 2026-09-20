@@ -59,6 +59,45 @@ function extractOrigin(url: string): string | null {
   }
 }
 
+const HTTP_URL_PATTERN = /https?:\/\/[^\s"'<>()[\]{},;，。]+/i;
+
+/**
+ * 从任意字符串中取首个 http(s) URL
+ */
+function firstHttpUrl(value: unknown): string | null {
+  if (typeof value !== "string") return null;
+  const match = HTTP_URL_PATTERN.exec(value);
+  return match ? match[0] : null;
+}
+
+/**
+ * 轻量直开回退：从传入的 workProduct / artifact 中提取可直连预览的 http(s) 地址。
+ * 优先级: work product url → metadata.previewUrl → metadata.resourceRef.url
+ *        → 内容文本中的首个 URL → metadata 其余字符串字段中的首个 URL
+ */
+function extractPreviewUrl(workProduct: IssueWorkProduct | null | undefined): string | null {
+  if (!workProduct) return null;
+  const metadata = (workProduct.metadata ?? {}) as Record<string, unknown>;
+  const resourceRef = (metadata.resourceRef ?? {}) as Record<string, unknown>;
+  const candidates: unknown[] = [
+    workProduct.url,
+    metadata.previewUrl,
+    metadata.previewURL,
+    resourceRef.url,
+    metadata.url,
+    workProduct.summary,
+  ];
+  for (const candidate of candidates) {
+    const url = firstHttpUrl(candidate);
+    if (url) return url;
+  }
+  for (const value of Object.values(metadata)) {
+    const url = firstHttpUrl(value);
+    if (url) return url;
+  }
+  return null;
+}
+
 export function PrototypeSandboxScreen({
   company,
   initialUrl,
@@ -71,7 +110,7 @@ export function PrototypeSandboxScreen({
     initialService ?? null,
   );
   const [activeUrl, setActiveUrl] = useState<string>(
-    initialUrl || initialService?.url || workProduct?.url || "",
+    initialUrl || initialService?.url || extractPreviewUrl(workProduct) || "",
   );
   const [urlInput, setUrlInput] = useState<string>(activeUrl);
   const [loadingServices, setLoadingServices] = useState(false);
@@ -84,6 +123,10 @@ export function PrototypeSandboxScreen({
 
   const webViewRef = useRef<WebView>(null);
   const companyId = company.id;
+
+  // 轻量直开模式：无可用 runtime service 时，直接以 URL 预览（不依赖容器/K8s）
+  const isLightweightPreview =
+    !selectedService && services.length === 0 && Boolean(activeUrl);
 
   // 加载当前公司所有可用的 runtime services
   const loadServices = useCallback(async () => {
@@ -286,6 +329,15 @@ export function PrototypeSandboxScreen({
         </View>
       </View>
 
+      {/* 轻量直开提示条 (无容器回退) */}
+      {isLightweightPreview && (
+        <View style={styles.lightweightBanner}>
+          <Text style={styles.lightweightBannerText} numberOfLines={1}>
+            ⚡ 轻量预览（直连 URL）· 未检测到容器服务，直接打开产物地址
+          </Text>
+        </View>
+      )}
+
       {/* 运行中服务选择器胶囊条 (如有多个服务) */}
       {services.length > 0 && (
         <View style={styles.serviceSelectorBar}>
@@ -402,7 +454,32 @@ export function PrototypeSandboxScreen({
             <Text style={styles.emptyPromptTitle}>未检测到正在运行的原型服务</Text>
             <Text style={styles.emptyPromptDesc}>
               AI 智能体在工作区中启动 Web 服务（如 Vite / Next.js）后，地址将自动投影至此。
+              也可直接输入预览地址即时查看。
             </Text>
+            <View style={styles.emptyInputRow}>
+              <TextInput
+                style={styles.emptyInput}
+                value={urlInput}
+                onChangeText={setUrlInput}
+                placeholder="输入预览地址 (http://…)"
+                placeholderTextColor={C.ink3}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="url"
+                returnKeyType="go"
+                onSubmitEditing={handleApplyUrl}
+              />
+              <Pressable
+                style={[
+                  styles.emptyInputBtn,
+                  !urlInput.trim() && styles.emptyInputBtnDisabled,
+                ]}
+                onPress={handleApplyUrl}
+                disabled={!urlInput.trim()}
+              >
+                <Text style={styles.emptyInputBtnText}>打开</Text>
+              </Pressable>
+            </View>
             <Pressable style={styles.emptyRefreshBtn} onPress={loadServices}>
               <Text style={styles.emptyRefreshBtnText}>
                 {loadingServices ? "扫描中…" : "刷新服务列表"}
@@ -695,6 +772,17 @@ const styles = StyleSheet.create({
     fontSize: 12,
     paddingLeft: 8,
   },
+  lightweightBanner: {
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
+    borderBottomWidth: 1,
+    borderBottomColor: "rgba(94, 106, 210, 0.3)",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+  },
+  lightweightBannerText: {
+    color: C.accent,
+    fontSize: 11,
+  },
   sandboxContainer: {
     flex: 1,
     alignItems: "center",
@@ -828,6 +916,40 @@ const styles = StyleSheet.create({
     fontSize: 13,
     textAlign: "center",
     lineHeight: 18,
+  },
+  emptyInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 8,
+    width: "100%",
+    maxWidth: 360,
+  },
+  emptyInput: {
+    flex: 1,
+    height: 34,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 8,
+    paddingHorizontal: 10,
+    color: C.ink,
+    fontSize: 12,
+    fontVariant: ["tabular-nums"],
+  },
+  emptyInputBtn: {
+    backgroundColor: C.brand,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  emptyInputBtnDisabled: {
+    opacity: 0.4,
+  },
+  emptyInputBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "500",
   },
   emptyRefreshBtn: {
     marginTop: 8,
