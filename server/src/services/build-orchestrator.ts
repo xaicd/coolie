@@ -1,4 +1,3 @@
-import { spawn } from "node:child_process";
 import { readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -9,6 +8,7 @@ import {
   type AgentRole,
 } from "@paperclipai/shared";
 import { logger } from "../middleware/logger.js";
+import { extractJsonObject, requestHermesOneShot } from "./hermes-oneshot.js";
 import { agentService, issueService } from "./index.js";
 import {
   queueIssueAssignmentWakeup,
@@ -127,6 +127,26 @@ export function detectBuildTrigger(text: string): boolean {
   return BUILD_TRIGGER_PATTERN.test(text.trim());
 }
 
+/**
+ * "建域 xxx" / "建模 xxx" / "domain xxx" — build a *domain*, not an application.
+ *
+ * A separate family from `BUILD_TRIGGER_PATTERN` because it starts a different
+ * chain: an application build ends in shipped code, a domain build ends in a
+ * model change that has to be approved before anything is written. Keeping them
+ * distinct here lets each route own its own gate rather than branching on the
+ * subject halfway through.
+ */
+export const DOMAIN_TRIGGER_PATTERN = /^(?:建域|建模|domain)\s+/i;
+
+export function detectDomainTrigger(text: string): boolean {
+  return DOMAIN_TRIGGER_PATTERN.test(text.trim());
+}
+
+/** The domain request with the trigger word stripped: "建域 电商" -> "电商". */
+export function domainPromptSubject(prompt: string): string {
+  return prompt.trim().replace(DOMAIN_TRIGGER_PATTERN, "").trim();
+}
+
 /** The build request with the trigger word stripped: "build 登录页" -> "登录页". */
 export function buildPromptSubject(prompt: string): string {
   return prompt.trim().replace(BUILD_TRIGGER_PATTERN, "").trim();
@@ -178,19 +198,7 @@ const PLANNER_SYSTEM_PROMPT = [
 
 /** Outermost JSON object in the planner's output, tolerating a fenced block. */
 export function extractPlanJson(raw: string): unknown {
-  const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(raw);
-  for (const candidate of [fenced?.[1], raw]) {
-    if (!candidate) continue;
-    const start = candidate.indexOf("{");
-    const end = candidate.lastIndexOf("}");
-    if (start === -1 || end <= start) continue;
-    try {
-      return JSON.parse(candidate.slice(start, end + 1));
-    } catch {
-      // Try the next candidate.
-    }
-  }
-  return null;
+  return extractJsonObject(raw);
 }
 
 function planEntries(value: unknown): unknown[] | null {
@@ -243,70 +251,16 @@ async function requestPlanFromHermes(input: {
   prompt: string;
   apiUrl?: string;
 }): Promise<string> {
-  const model = process.env.BUILD_PLAN_MODEL ?? DEFAULT_PLANNER_MODEL;
-  const query =
-    `[SYSTEM]\n${PLANNER_SYSTEM_PROMPT}\n[/SYSTEM]\n\n` +
-    `[BUILD REQUEST]\n${input.prompt}\n[/BUILD REQUEST]`;
-
-  return await new Promise<string>((resolve, reject) => {
-    const proc = spawn(
-      "hermes",
-      ["chat", "--oneshot", "--quiet", "--query-file", "-", "-m", model],
-      {
-        stdio: ["pipe", "pipe", "pipe"],
-        cwd: "/tmp",
-        env: {
-          ...process.env,
-          ...(input.apiUrl ? { PAPERCLIP_API_URL: input.apiUrl } : {}),
-          PAPERCLIP_COMPANY_ID: input.companyId,
-        },
-      },
-    );
-
-    let stdout = "";
-    let stderr = "";
-    let settled = false;
-    let overflowed = false;
-
-    const finish = (error: Error | null, value = "") => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(timer);
-      if (error) reject(error);
-      else resolve(value);
-    };
-
-    const timer = setTimeout(() => {
-      proc.kill("SIGTERM");
-      finish(new Error(`build planner timed out after ${PLAN_TIMEOUT_MS}ms`));
-    }, PLAN_TIMEOUT_MS);
-
-    proc.stdout.on("data", (data: Buffer) => {
-      if (overflowed) return;
-      stdout += data.toString();
-      if (stdout.length > PLAN_MAX_OUTPUT_BYTES) {
-        overflowed = true;
-        proc.kill("SIGTERM");
-        finish(new Error("build planner produced more output than expected"));
-      }
-    });
-    proc.stderr.on("data", (data: Buffer) => {
-      stderr += data.toString();
-    });
-    proc.on("error", (err) => finish(err));
-    proc.on("close", (code) => {
-      if (code === 0) return finish(null, stdout);
-      finish(
-        new Error(
-          `build planner exited with code ${code ?? "unknown"}${
-            stderr.trim() ? `: ${stderr.trim().slice(0, 500)}` : ""
-          }`,
-        ),
-      );
-    });
-
-    proc.stdin.write(query);
-    proc.stdin.end();
+  return await requestHermesOneShot({
+    companyId: input.companyId,
+    apiUrl: input.apiUrl,
+    systemPrompt: PLANNER_SYSTEM_PROMPT,
+    requestLabel: "BUILD REQUEST",
+    requestBody: input.prompt,
+    model: process.env.BUILD_PLAN_MODEL ?? DEFAULT_PLANNER_MODEL,
+    timeoutMs: PLAN_TIMEOUT_MS,
+    maxOutputBytes: PLAN_MAX_OUTPUT_BYTES,
+    label: "build planner",
   });
 }
 
@@ -716,8 +670,13 @@ async function releaseParkedBuildStep(issueId: string): Promise<void> {
  * Dispatch one runnable step, or park it when its worker is still cooling down.
  * The caller gets a snapshot either way, so the board shows a wait instead of a
  * step that looks stuck.
+ *
+ * Exported because a domain build's chain (see `ontology-spec-decomposition.ts`)
+ * has the same problem this solves: it creates more issues at once than a
+ * provider's rate limit tolerates, so it must dispatch through the same pacing
+ * rather than wake them directly.
  */
-async function dispatchBuildStep(input: {
+export async function dispatchBuildStep(input: {
   deps: BuildOrchestratorDeps;
   heartbeat: IssueAssignmentWakeupDeps;
   buildId: string;

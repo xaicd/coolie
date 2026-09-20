@@ -208,3 +208,39 @@ export type {
 } from "./export/archify.js";
 export { runTransform } from "./transform/TransformRunner.js";
 export type { TransformRunResult } from "./transform/TransformRunner.js";
+
+/**
+ * The ontology document — the unit of exchange, plus its validator and lint.
+ *
+ * Exported from the barrel (rather than only reachable by deep subpath) because
+ * the document is the package's public contract: a host that plans a model
+ * needs to validate it before it is written, and a plugin that receives one
+ * needs to validate it again at the boundary. Both are clients of this.
+ */
+export {
+  DOCUMENT_FORMAT,
+  DOCUMENT_PROPERTY_TYPES,
+  canonicalize,
+  documentFromRows,
+  documentToWritePlan,
+  fingerprintDocument,
+  parseDocument,
+  serializeDocument,
+  validateDocument,
+} from "./document/OntologyDocument.js";
+export type {
+  DocumentObjectType,
+  DocumentProblem,
+  DocumentProperty,
+  DocumentPropertyType,
+  DocumentRelationAttribute,
+  DocumentRelationType,
+  DocumentSourceRows,
+  DocumentWritePlan,
+  OntologyDocument,
+  OntologyDocumentSource,
+  ParseResult,
+  RowsResult,
+} from "./document/OntologyDocument.js";
+export { lintDocument } from "./document/lintDocument.js";
+export type { LintFinding } from "./document/lintDocument.js";

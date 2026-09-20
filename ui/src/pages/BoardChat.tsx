@@ -30,6 +30,12 @@ import {
   agentBubbleDateLabel,
 } from "../components/AgentBubbleActionRow";
 import { AgentIcon } from "../components/AgentIconPicker";
+import {
+  SpecDiffCard,
+  isDomainPrompt,
+  type SpecDocumentPayload,
+  type SpecProblem,
+} from "../components/SpecDiffCard";
 import { cn, formatDateTime } from "../lib/utils";
 import type { FeedbackVoteValue } from "@paperclipai/shared";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -98,6 +104,28 @@ function TypingBubble() {
       </div>
     </div>
   );
+}
+
+/** The spec card's lifecycle for one "建域 xxx" ask. */
+interface SpecCardState {
+  prompt: string;
+  loading: boolean;
+  error: string | null;
+  planSource: "hermes" | "rejected" | null;
+  document: SpecDocumentPayload | null;
+  problems: SpecProblem[];
+  approvalId: string | null;
+  approvalStatus: string | null;
+  domainId: string | null;
+}
+
+/** `POST /api/build/spec/start` response (see server/src/routes/build.ts). */
+interface SpecStartResponse {
+  specId: string | null;
+  planSource: "hermes" | "rejected";
+  spec: { document?: SpecDocumentPayload } | null;
+  problems?: SpecProblem[];
+  approvalId?: string;
 }
 
 export function BoardChat() {
@@ -189,6 +217,12 @@ export function BoardChat() {
   const [streamingText, setStreamingText] = useState("");
   const [statusText, setStatusText] = useState("");
   const [errorText, setErrorText] = useState("");
+  /**
+   * The domain-spec card for the current "建域 xxx" ask. One at a time, like the
+   * app's: the card is about the request in flight, and history is the approval
+   * and the issue it produced, not a list of cards.
+   */
+  const [specCard, setSpecCard] = useState<SpecCardState | null>(null);
   const [boardIssueId, setBoardIssueId] = useState<string | null>(null);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [optimisticMessage, setOptimisticMessage] = useState<string | null>(null);
@@ -544,6 +578,66 @@ export function BoardChat() {
     };
   }, [sending]);
 
+  /**
+   * Plan a domain from a "建域 xxx" ask and show the spec for review.
+   *
+   * Nothing is written by this call — the server plans, has the ontology plugin
+   * validate, and parks the spec behind an approval. So this card never offers an
+   * "apply": the only way to move it forward is to decide the approval.
+   */
+  const startSpec = useCallback(
+    async (prompt: string) => {
+      if (!selectedCompanyId) return;
+      setSpecCard({
+        prompt,
+        loading: true,
+        error: null,
+        planSource: null,
+        document: null,
+        problems: [],
+        approvalId: null,
+        approvalStatus: null,
+        domainId: null,
+      });
+      try {
+        const res = await fetch("/api/build/spec/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ companyId: selectedCompanyId, prompt }),
+        });
+        if (!res.ok) {
+          const detail = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(detail?.error ?? `规范生成失败 (${res.status})`);
+        }
+        const result = (await res.json()) as SpecStartResponse;
+        setSpecCard({
+          prompt,
+          loading: false,
+          error: null,
+          planSource: result.planSource,
+          document: result.spec?.document ?? null,
+          problems: result.problems ?? [],
+          approvalId: result.approvalId ?? null,
+          approvalStatus: result.planSource === "hermes" ? "pending" : null,
+          domainId: null,
+        });
+      } catch (e) {
+        setSpecCard({
+          prompt,
+          loading: false,
+          error: e instanceof Error ? e.message : "规范生成失败",
+          planSource: null,
+          document: null,
+          problems: [],
+          approvalId: null,
+          approvalStatus: null,
+          domainId: null,
+        });
+      }
+    },
+    [selectedCompanyId],
+  );
+
   const sendMessage = useCallback(
     async (body: string) => {
       const trimmed = body.trim();
@@ -556,6 +650,11 @@ export function BoardChat() {
       setStreamingText("");
       setErrorText("");
       setStatusText("Connecting...");
+
+      // "建域 xxx" additionally plans an ontology spec. The room's answer and the
+      // card are independent: the concierge still replies, and the card reports
+      // what could be approved. Trigger words do not overlap with the app build.
+      if (isDomainPrompt(trimmed)) void startSpec(trimmed);
 
       try {
         const controller = new AbortController();
@@ -901,6 +1000,21 @@ export function BoardChat() {
                    alongside the user's optimistic bubble to make the
                    turn-taking feel alive. */}
               {sending && !streamingText && <TypingBubble />}
+
+              {/* Ontology spec card — planned by "建域 xxx", written only after
+                  its approval is decided. */}
+              {specCard && (
+                <SpecDiffCard
+                  prompt={specCard.prompt}
+                  loading={specCard.loading}
+                  error={specCard.error}
+                  planSource={specCard.planSource}
+                  document={specCard.document}
+                  problems={specCard.problems}
+                  approvalStatus={specCard.approvalStatus}
+                  domainId={specCard.domainId}
+                />
+              )}
 
               {/* Status bar — always visible while sending, independent from the chat bubble */}
               {sending && (

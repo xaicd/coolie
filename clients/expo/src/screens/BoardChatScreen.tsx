@@ -32,6 +32,12 @@ import {
   isBuildPrompt,
   type BuildProgressStep,
 } from "../components/BuildProgressCard";
+import {
+  SpecDiffCard,
+  isDomainPrompt,
+  type DomainSpecPayload,
+  type SpecProblemPayload,
+} from "../components/SpecDiffCard";
 import { AppCard } from "../ui/AppCard";
 import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
@@ -108,6 +114,29 @@ interface BuildStartResponse {
   plan: BuildProgressStep[];
   planSource: "hermes" | "template";
   unassignedAgentTypes: string[];
+}
+
+/** 本体规范卡状态 —— 一次「建域 xxx」在聊天流内的生命周期 */
+interface SpecCardState {
+  prompt: string;
+  loading: boolean;
+  error: string | null;
+  planSource: "hermes" | "rejected" | null;
+  spec: DomainSpecPayload | null;
+  problems: SpecProblemPayload[];
+  approvalId: string | null;
+  approvalStatus: string | null;
+  domainId: string | null;
+}
+
+/** POST /api/build/spec/start 响应 */
+interface SpecStartResponse {
+  specId: string | null;
+  planSource: "hermes" | "rejected";
+  spec: DomainSpecPayload | null;
+  problems?: SpecProblemPayload[];
+  approvalId?: string;
+  documentId?: string;
 }
 
 interface InlineApprovalBubbleProps {
@@ -298,7 +327,7 @@ export function BoardChatScreen({
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [buildCard, setBuildCard] = useState<BuildCardState | null>(null);
-
+  const [specCard, setSpecCard] = useState<SpecCardState | null>(null);
   const flatListRef = useRef<FlatList<BoardChatMessage>>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const accumulatedRef = useRef("");
@@ -519,6 +548,61 @@ export function BoardChatScreen({
     [company.id],
   );
 
+  /**
+   * 本体规范: "建域 xxx" 触发一张规范预览卡进聊天流。
+   *
+   * 与服务端的契约是「规划 + 校验」, 不含写入 —— 这一步只在控制面留下一个
+   * issue 和一条待审批, 本体里什么都没有。落库要等审批通过后调
+   * `/api/build/spec/:specId/instantiate`, 这里不做, 也不该做。
+   */
+  const startSpec = useCallback(
+    async (prompt: string) => {
+      setSpecCard({
+        prompt,
+        loading: true,
+        error: null,
+        planSource: null,
+        spec: null,
+        problems: [],
+        approvalId: null,
+        approvalStatus: null,
+        domainId: null,
+      });
+      try {
+        const result = await coolie.request<SpecStartResponse>(
+          "POST",
+          "/api/build/spec/start",
+          { companyId: company.id, prompt },
+        );
+        setSpecCard({
+          prompt,
+          loading: false,
+          error: null,
+          planSource: result.planSource,
+          spec: result.spec,
+          problems: result.problems ?? [],
+          approvalId: result.approvalId ?? null,
+          // 服务端刚建的就是 pending; 不是 pending 才需要重新拉取。
+          approvalStatus: result.planSource === "hermes" ? "pending" : null,
+          domainId: null,
+        });
+      } catch (e) {
+        setSpecCard({
+          prompt,
+          loading: false,
+          error: String((e as Error)?.message ?? e ?? "本体规范生成失败"),
+          planSource: null,
+          spec: null,
+          problems: [],
+          approvalId: null,
+          approvalStatus: null,
+          domainId: null,
+        });
+      }
+    },
+    [company.id],
+  );
+
   const handleSend = useCallback(
     async (textToSend?: string) => {
       const prompt = (textToSend ?? input).trim();
@@ -542,8 +626,10 @@ export function BoardChatScreen({
       setMessages((prev) => [...prev, userMsg]);
       scrollToBottom();
 
-      // "build xxx" 追加构建计划卡, 与总办回答并行推进
-      if (isBuildPrompt(prompt)) void startBuild(prompt);
+      // "build xxx" 追加构建计划卡, "建域 xxx" 追加本体规范卡;
+      // 两者与总办回答并行推进, 且触发词不重叠。
+      if (isDomainPrompt(prompt)) void startSpec(prompt);
+      else if (isBuildPrompt(prompt)) void startBuild(prompt);
 
       const controller = new AbortController();
       abortControllerRef.current = controller;
@@ -926,6 +1012,23 @@ export function BoardChatScreen({
                   error={buildCard.error}
                   planSource={buildCard.planSource}
                   onOpenIssue={(issueId) => void handleOpenBuildIssue(issueId)}
+                />
+              )}
+
+              {/* 本体规范预览卡 (由 "建域 xxx" 触发) */}
+              {specCard && (
+                <SpecDiffCard
+                  prompt={specCard.prompt}
+                  loading={specCard.loading}
+                  error={specCard.error}
+                  planSource={specCard.planSource}
+                  document={specCard.spec?.document ?? null}
+                  problems={specCard.problems}
+                  approvalStatus={specCard.approvalStatus}
+                  domainId={specCard.domainId}
+                  onOpenApproval={() => {
+                    if (specCard.approvalId) onOpenApproval?.(specCard.approvalId);
+                  }}
                 />
               )}
 

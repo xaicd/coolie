@@ -570,6 +570,31 @@ const manifest: PaperclipPluginManifestV1 = {
       companyResolution: { from: "body", key: "companyId" },
     },
     {
+      // Answers "would this document load, and is it any good" without writing
+      // anything. The control plane's build-spec planner calls this before it
+      // lets a human approve a spec, so an unresolvable model is caught while it
+      // is still a proposal. `validateDocument` is the single authority on the
+      // vocabulary; the host does not restate it.
+      routeKey: "validate-document",
+      method: "POST",
+      path: "/documents/validate",
+      auth: "board",
+      capability: "api.routes.register",
+      companyResolution: { from: "body", key: "companyId" },
+    },
+    {
+      // The write side of the same document: an approved spec becomes a domain,
+      // its object types and its relation types. Idempotent on the document's
+      // slug, and it refuses a slug that a hand-made domain already holds rather
+      // than overwriting it.
+      routeKey: "import-document",
+      method: "POST",
+      path: "/documents/import",
+      auth: "board",
+      capability: "api.routes.register",
+      companyResolution: { from: "body", key: "companyId" },
+    },
+    {
       routeKey: "list-package-installs",
       method: "GET",
       path: "/package-installs",

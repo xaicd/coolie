@@ -691,6 +691,11 @@ export const APPROVAL_TYPES = [
   "approve_ceo_strategy",
   "budget_override_required",
   "request_board_approval",
+  // Approving a build spec is what lets an ontology model be written. It is a
+  // governed action like the others: nothing reaches the ontology's tables until
+  // this is approved, so the approval is the control point rather than a record
+  // of one.
+  "ontology_spec",
 ] as const;
 export type ApprovalType = (typeof APPROVAL_TYPES)[number];
 

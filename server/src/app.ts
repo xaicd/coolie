@@ -809,6 +809,10 @@ export async function createApp(
     buildRoutes(db, {
       deploymentMode: opts.deploymentMode,
       heartbeat: connectionIntentHeartbeat,
+      // The domain-spec routes reach the ontology through its plugin, in-process.
+      // Same reason `approvalRoutes` takes it: the caller owns the authz, and the
+      // plugin owns what happens inside its own namespace.
+      pluginWorkerManager: workerManager,
     }),
   );
   api.use(approvalRoutes(db, { pluginWorkerManager: workerManager }));

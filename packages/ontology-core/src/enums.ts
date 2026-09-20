@@ -26,8 +26,21 @@ export const NODE_STATE_TRANSITIONS: Record<NodeLifecycleState, NodeLifecycleSta
   archived: [],
 };
 
-// How a domain was bootstrapped.
-export const BOOTSTRAP_SOURCES = ["manual", "natural-language", "migration", "system-seed"] as const;
+/**
+ * How a domain was bootstrapped.
+ *
+ * `build_spec` is a domain created from an approved build spec — the control
+ * plane planned it (`build-orchestrator`), a human approved it, and the
+ * provisioner wrote it here. It is distinct from `natural-language` (the plugin
+ * bootstrapped itself from a description, no approval) and from `migration`
+ * (a legacy system was imported), because the audit trail answers "who decided
+ * this model should exist" differently in each case.
+ *
+ * The `bootstrap_source` column is free text (`migrations/002_schema_parity.sql`),
+ * so this is a type-level widening only — no migration, and the applied migration
+ * file is deliberately left untouched so its checksum stays valid.
+ */
+export const BOOTSTRAP_SOURCES = ["manual", "natural-language", "migration", "system-seed", "build_spec"] as const;
 export type BootstrapSource = (typeof BOOTSTRAP_SOURCES)[number];
 
 // Function type / status / runtime (DigitalStaff OntologyFunction).

@@ -101,8 +101,10 @@ export const CORE_API: CoreApiRoute[] = [
   r("update-domain", "schema", false, "改本体域元数据"),
   r("delete-domain", "schema", false, "注销本体域(软删除,保留审计与血缘)"),
   r("transition-domain", "schema", false, "推进本体域生命周期"),
+  r("set-domain-lifecycle", "schema", false, "直接设定本体域生命周期(受状态机约束)"),
   r("snapshot-domain", "schema", false, "给当前 schema 存快照"),
   r("list-domain-snapshots", "schema", true, "schema 历史版本"),
+  r("get-domain-snapshot", "schema", false, "单个快照的内容"),
   r("list-node-types", "schema", true, "列出对象类型"),
   r("create-node-type", "schema", false, "新建对象类型"),
   r("update-node-type", "schema", false, "改对象类型(含字段,可声明字段改名)"),
@@ -167,6 +169,12 @@ export const CORE_API: CoreApiRoute[] = [
   r("update-transform", "mapping", false, "改转换"),
   r("run-transform", "mapping", false, "执行一次转换"),
   r("extract-document", "mapping", false, "从文档文本里抽取对象类型"),
+  // The document boundary the control plane's build-spec gate talks to:
+  // validate answers "would this load, and is it any good" without writing,
+  // import is the only place an approved spec becomes rows. Both board-only —
+  // the second one is a model change, and the first one exists to gate it.
+  r("validate-document", "mapping", false, "校验本体文档(只读,不落库)"),
+  r("import-document", "mapping", false, "由本体文档建域/对象类型/关系类型(幂等)"),
 
   // --- governance: who owns what --------------------------------------------
   r("list-business-systems", "governance", true, "列出业务系统"),

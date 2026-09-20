@@ -52,6 +52,15 @@ import {
 } from "@paperclipai/ontology-core/views.js";
 import type { OntologyViewRow } from "@paperclipai/ontology-core/graph/GraphStore.js";
 import { subProjectsFromArchitecture } from "@paperclipai/ontology-core/architecture/subProjectMapping.js";
+import {
+  buildRelationMetadata,
+  documentToWritePlan,
+  lintDocument,
+  parseDocument,
+  validateDocument,
+  type DocumentProblem,
+  type OntologyDocument,
+} from "@paperclipai/ontology-core";
 import { parseOpenAPI } from "./legacy/openapiParser.js";
 import {
   buildSourceIndex,
@@ -4433,6 +4442,180 @@ const plugin = definePlugin({
       case "extract-document": {
         const outcome = await extractDocumentMutation(store, ctx, httpMutationCall(companyId, input));
         return { status: outcome.status, body: outcome.payload };
+      }
+
+      // Read-only: answers whether a document would load, and what a modeller
+      // would want to fix, without touching a row. Split from `import-document`
+      // so the control plane can gate on it — a spec that cannot load is rejected
+      // while it is still a proposal, and never becomes an approval someone has
+      // to reason about.
+      case "validate-document": {
+        const body = optionalRecord(input.body) ?? {};
+        const document = optionalRecord(body.document);
+        if (!document) return { status: 400, body: { error: "document is required" } };
+
+        let problems: DocumentProblem[];
+        try {
+          problems = validateDocument(document as unknown as OntologyDocument);
+        } catch (err) {
+          // `validateDocument` assumes our shape. A caller that hands us
+          // something else gets a 400 rather than a thrown 500: the boundary is
+          // where a malformed payload stops.
+          return {
+            status: 400,
+            body: { error: `document is not a well-formed ontology document: ${(err as Error).message}` },
+          };
+        }
+
+        const parsed = parseDocument(JSON.stringify(document));
+        return {
+          status: 200,
+          body: {
+            problems,
+            // Modelling quality, which is a separate question from loadability —
+            // a document can import perfectly and still be unusable.
+            lint: parsed.document ? lintDocument(parsed.document) : [],
+            loadable: !problems.some((problem) => problem.severity === "error"),
+            ...(parsed.document?.fingerprint ? { fingerprint: parsed.document.fingerprint } : {}),
+          },
+        };
+      }
+
+      // Write side. Everything above this line in the request lifecycle was a
+      // proposal; this is the only place a build spec becomes rows.
+      case "import-document": {
+        const body = optionalRecord(input.body) ?? {};
+        const document = optionalRecord(body.document);
+        if (!document) return { status: 400, body: { error: "document is required" } };
+
+        let problems: DocumentProblem[];
+        try {
+          problems = validateDocument(document as unknown as OntologyDocument);
+        } catch (err) {
+          return {
+            status: 400,
+            body: { error: `document is not a well-formed ontology document: ${(err as Error).message}` },
+          };
+        }
+        if (problems.some((problem) => problem.severity === "error")) {
+          // Validate before write, and refuse the whole thing: a document that
+          // half applies leaves a domain nobody can describe.
+          return { status: 422, body: { error: "document failed validation", problems } };
+        }
+
+        const parsed = parseDocument(JSON.stringify(document));
+        if (!parsed.document) {
+          return { status: 422, body: { error: "document failed validation", problems: parsed.problems } };
+        }
+
+        const slug = parsed.document.source?.domainSlug;
+        if (!slug) {
+          return { status: 400, body: { error: "document.source.domainSlug is required" } };
+        }
+
+        // Idempotency, and the reason it is by slug: `ontology_domain_snapshots`
+        // and the schema-change audit both key off the domain, so "same spec
+        // twice" has to resolve to "same domain". A retried instantiate must not
+        // produce a second model.
+        const existing = await store.getDomainBySlug(companyId, slug);
+        if (existing) {
+          if (existing.bootstrap_source !== "build_spec") {
+            // The slug is held by a model a human made (or one imported from a
+            // legacy system). Reusing it would overwrite work nobody offered to
+            // replace, so this is a conflict for the caller to resolve, not a
+            // merge we perform.
+            return {
+              status: 409,
+              body: {
+                error: `domain "${slug}" already exists and was not created from a build spec`,
+                code: "DOMAIN_SLUG_TAKEN",
+                domainId: existing.id,
+              },
+            };
+          }
+          return {
+            status: 200,
+            body: {
+              domainId: existing.id,
+              slug,
+              reused: true,
+              created: { nodeTypes: 0, relationTypes: 0 },
+            },
+          };
+        }
+
+        const plan = documentToWritePlan(parsed.document);
+        const domain = await store.createDomain({
+          companyId,
+          slug,
+          displayName: parsed.document.name,
+          description: parsed.document.description ?? null,
+          bootstrapSource: "build_spec",
+          bootstrapDescription: parsed.document.source?.origin ?? "",
+          metadata: {
+            buildSpec: {
+              format: parsed.document.format,
+              origin: parsed.document.source?.origin ?? null,
+              fingerprint: parsed.document.fingerprint ?? null,
+            },
+          },
+        });
+
+        for (const type of plan.objectTypes) {
+          await store.createNodeType({
+            companyId,
+            domainId: domain.id,
+            key: type.key,
+            displayName: type.displayName,
+            description: type.description ?? null,
+            propertiesSchema: type.propertiesSchema,
+            propertyOrder: type.propertyOrder,
+          });
+        }
+
+        for (const relation of plan.relationTypes) {
+          await store.createRelationType({
+            companyId,
+            domainId: domain.id,
+            key: relation.key,
+            displayName: relation.displayName,
+            description: relation.description ?? null,
+            cardinality: relation.cardinality,
+            // Relation types store their endpoints in `metadata`; the builder is
+            // the one writer, so the type-level graph can read them back.
+            metadata: buildRelationMetadata(relation.sourceNodeTypeKey, relation.targetNodeTypeKey),
+          });
+        }
+
+        // A named restore point for what the import produced. A *first* import
+        // has no prior state to return to — its undo is deleting the domain — so
+        // this is what a later edit rolls back to, not a "before" image. Saying
+        // so matters: calling it a pre-import snapshot would promise an undo this
+        // path cannot provide.
+        await store.snapshotDomain(
+          companyId,
+          domain.id,
+          `构建规范导入: ${parsed.document.source?.origin ?? slug}`,
+          "build_spec",
+        );
+
+        await logSchemaChange(
+          ctx,
+          companyId,
+          `从构建规范创建本体域 ${slug}（${plan.objectTypes.length} 对象类型 / ${plan.relationTypes.length} 关系类型）`,
+          "ontology_domain",
+          domain.id,
+        );
+
+        return {
+          status: 201,
+          body: {
+            domainId: domain.id,
+            slug,
+            reused: false,
+            created: { nodeTypes: plan.objectTypes.length, relationTypes: plan.relationTypes.length },
+          },
+        };
       }
 
       case "create-proposal": {
