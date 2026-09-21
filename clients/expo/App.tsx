@@ -58,6 +58,7 @@ import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
 import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen";
 import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
 import { PrototypeSandboxScreen } from "./src/screens/PrototypeSandboxScreen";
+import { WorkspaceScreen } from "./src/screens/workspace/WorkspaceScreen";
 import { BoardChatScreen, exportBoardEcho } from "./src/screens/BoardChatScreen";
 import { AgentsScreen } from "./src/screens/AgentsScreen";
 import { useOTA } from "./src/OTA";
@@ -647,6 +648,7 @@ function HomeScreen({
 }) {
   const [tab, setTab] = useState<TabKey>("dashboard");
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [boardView, setBoardView] = useState(false);
   const [appUpdate, setAppUpdate] = useState<RemoteVersionInfo | null>(null);
   const ota = useOTA();
@@ -836,6 +838,7 @@ function HomeScreen({
             company={company}
             whoami={whoami}
             onOpenSettings={() => setSettingsOpen(true)}
+            onOpenWorkspace={() => setWorkspaceOpen(true)}
             onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
             onOpenIssue={(issue) => {
               setTab("tasks");
@@ -1061,6 +1064,24 @@ function HomeScreen({
           ota={ota}
           onClose={() => setSettingsOpen(false)}
           onSignOut={onSignOut}
+        />
+      ) : null}
+      {/* 工作空间: 对话 / 预览 / 文件 / 终端 四 Tab (Modal slide) */}
+      {workspaceOpen ? (
+        <WorkspaceScreen
+          visible={workspaceOpen}
+          company={company}
+          whoami={whoami}
+          onClose={() => setWorkspaceOpen(false)}
+          onOpenIssue={(issue) => {
+            setWorkspaceOpen(false);
+            setTab("tasks");
+            setSelected(issue);
+          }}
+          onOpenApproval={(approvalId) => {
+            setWorkspaceOpen(false);
+            setFocusedApprovalId(approvalId);
+          }}
         />
       ) : null}
       <BottomTabBar tab={tab} onChange={setTab} />

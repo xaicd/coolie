@@ -45,6 +45,8 @@ import { Pill } from "../ui/Pill";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { StatusBadge } from "../ui/StatusBadge";
 import { formatTime } from "../utils/format";
+import { parseInlineTags } from "../components/board-inline/tagParser";
+import { InlinePreviewPanel } from "../components/board-inline/InlinePreviewPanel";
 
 export interface BoardChatScreenProps {
   onOpenSettings?: () => void;
@@ -55,6 +57,10 @@ export interface BoardChatScreenProps {
   onOpenApproval?: (approvalId: string) => void;
   /** 气泡「关联任务」链接: 打开任务详情页 */
   onOpenIssue?: (issue: Issue) => void;
+  /** 嵌入模式: 工作空间「对话」Tab 里复用本屏内容区, 不套整屏页头 */
+  embedded?: boolean;
+  /** 顶部右上角 [Workspace] 入口, 由 App.tsx 注入 (拉起工作空间 Modal) */
+  onOpenWorkspace?: () => void;
 }
 
 const QUICK_PROMPTS = [
@@ -298,6 +304,8 @@ export function BoardChatScreen({
   onOpenSettings,
   onOpenApproval,
   onOpenIssue,
+  embedded = false,
+  onOpenWorkspace,
 }: BoardChatScreenProps) {
   const [messages, setMessages] = useState<BoardChatMessage[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
@@ -824,7 +832,9 @@ export function BoardChatScreen({
       );
     }
 
-    const segments = parseMessageSegments(item.text);
+    // 摘出总办回复里夹带的内嵌预览标签, 正文只留 cleanText
+    const { cleanText, previews } = parseInlineTags(item.text, item.id);
+    const segments = parseMessageSegments(cleanText);
 
     return (
       <View style={styles.assistantRow}>
@@ -841,7 +851,7 @@ export function BoardChatScreen({
             <Text style={styles.timestamp}>{formatTime(item.createdAt)}</Text>
           </View>
           {segments.length === 1 && segments[0].type === "text" ? (
-            <Text style={styles.assistantText}>{item.text}</Text>
+            <Text style={styles.assistantText}>{cleanText}</Text>
           ) : (
             <View style={styles.chatSegmentsBox}>
               {segments.map((seg, idx) => {
@@ -872,13 +882,30 @@ export function BoardChatScreen({
               })}
             </View>
           )}
+
+          {/* 内嵌预览: 就地渲染, 不切屏 (对齐 ChatHome 的对话流内嵌预览) */}
+          {previews.length > 0 ? (
+            <View style={styles.inlinePreviewStack}>
+              {previews.map((p) => (
+                <InlinePreviewPanel
+                  key={p.id}
+                  url={p.url}
+                  imageUrl={p.imageUrl}
+                  title={p.title ?? (p.kind === "url" ? p.url : "MVP 预览")}
+                />
+              ))}
+            </View>
+          ) : null}
         </Pressable>
       </View>
     );
   };
 
+  // 嵌入模式 (工作空间「对话」Tab) 下不套 SafeAreaView, 避免双重安全区留白
+  const Root: React.ComponentType<any> = embedded ? View : SafeAreaView;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <Root style={styles.safeArea}>
       <StatusBar style="light" />
       <KeyboardAvoidingView
         style={styles.container}
@@ -911,6 +938,16 @@ export function BoardChatScreen({
           </View>
 
           <View style={styles.topRight}>
+            {onOpenWorkspace && !embedded ? (
+              <Pressable
+                hitSlop={12}
+                onPress={onOpenWorkspace}
+                style={styles.workspaceBtn}
+              >
+                <Ionicons name="grid-outline" size={14} color={C.accent} />
+                <Text style={styles.workspaceBtnText}>Workspace</Text>
+              </Pressable>
+            ) : null}
             <Pressable
               hitSlop={12}
               onPress={() => {
@@ -1242,7 +1279,7 @@ export function BoardChatScreen({
           </View>
         </Modal>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </Root>
   );
 }
 
@@ -1314,6 +1351,22 @@ const styles = StyleSheet.create({
   historyBtnText: {
     color: C.ink2,
     fontSize: 12,
+  },
+  workspaceBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: "rgba(94,106,210,0.14)",
+    borderWidth: 1,
+    borderColor: C.brand,
+  },
+  workspaceBtnText: {
+    color: C.accent,
+    fontSize: 12,
+    fontWeight: "500",
   },
   refreshBtn: {
     paddingHorizontal: 10,
@@ -1659,6 +1712,10 @@ const styles = StyleSheet.create({
   chatSegmentsBox: {
     gap: 8,
     width: "100%",
+  },
+  inlinePreviewStack: {
+    gap: 10,
+    marginTop: 10,
   },
   chatCodeCard: {
     borderRadius: 8,
