@@ -83,6 +83,9 @@ npx vitest run --config ./vitest.config.ts tests/members.spec.ts   # 定向
 
 做法（本仓已验证的一次性实例流程）：
 
+> 前置条件：先确认**靶机跑的就是要验的那一版**，否则后面每条证据都是对旧版本的证据
+> （指纹握手见 3.7）。
+
 ```bash
 # 起一次性实例（独立 HOME + 独立端口，绝不复用开发实例）
 PAPERCLIP_HOME=/tmp/verify PAPERCLIP_INSTANCE_ID=verify PORT=3211 \
@@ -118,6 +121,7 @@ pnpm test:e2e                            # Playwright（tests/e2e/）
 
 - **死交互与假按钮** —— 排版像按钮、点了没有任何反应。所有技术测试都会放过它
   （DOM 存在、无异常、无 4xx），只有「真点一次并检查世界是否改变」能抓到。
+  「世界是否改变」的可执行判据是四维状态流转（见 3.6）。
 - **业务语义隔离违规** —— 技术上跑通、语义上荒谬（类目混装、单位串了、无权角色能审批）。
 - **物理遮挡** —— 元素存在但被浮动层挡住，`getBoundingClientRect` + `elementFromPoint`
   几何判定（见 3.2）。
@@ -287,6 +291,62 @@ const isObstructed = await page.evaluate((selector) => {
    - 严禁产生 `ReferenceError`、`TypeError` 或服务端 500 页面崩溃。
 4. **弹窗排版几何约束**:
    - 模态弹窗外层必须具备 `max-h-[90vh]` + `flex flex-col`，内容主体必须 `overflow-y-auto`，严禁超出屏幕视口导致“确定”按钮不可见。
+
+### 3.5 分段器与横向 Tab 穷举（FDSE 强约束）
+
+**痛点**：一个页面有 6 个 Tab，只测了默认那个。其余 Tab 里的条件分支（沉浸模式、未登录态、
+空数据态）从未渲染过，`showBanner is not defined` 这类未捕获异常就活在里面。
+
+**执行标准**（在 `tests/e2e/` 的旅程里循环，不要只断言 Tab 数量）：
+
+1. 遍历页面上全部 Tab / 分段器，逐个点击；
+2. 每次点击后等待渲染，断言 `page.on("pageerror")` 计数为 0（见 3.4 第 3 条）；
+3. 带直链参数的 Tab（`?tab=city`）要**双向**验证：直接访问命中，跨 Tab 点击也命中。
+
+**本仓现状（诚实标注）**：尚无通用的 Tab 遍历 helper，`pnpm test:e2e` 里只有
+`chat-adapters-ui-providers.spec.ts` 断言了 `getByRole("tab")` 的数量为 4 ——
+**数量对不等于内容对**，4 个 Tab 里 3 个白屏时这条断言依然是绿的。
+新增带多 Tab 的界面时，遍历要写进该旅程的 spec，而不是靠这条数量断言代劳。
+
+### 3.6 假交互与死穴按钮嗅探（DS 强约束）
+
+**痛点**：排版完全像按钮（有边框、有 hover、有字号对比），点下去没有任何反应。
+这类缺陷所有技术测试都会放过：DOM 存在、无异常、无 4xx。这也是**防线四唯一能抓而其余三条防线都抓不到**的东西。
+
+**嗅探范围**：`button`、`[role="button"]`、`a[href]`、带 `cursor-pointer` 或 `active:scale-*` 的容器。
+
+**判定标准 —— 四维状态流转，至少命中其一**：
+
+1. 路由变化（URL path / hash / query 改变）；
+2. 发起并完成至少一次 API 请求；
+3. 唤起 Modal / Drawer / Toast；
+4. DOM 产生可观测的数据变化（选中高亮、数字增减、展开收起）。
+
+四项全为 0 ⇒ 判定为 `SUSPECTED_DEAD_CLICK`，按缺陷处理。
+
+**注意判定边界**：`onClick` 只 `console.log`、只 `toast("开发中")`、或渲染了却指向未定义函数，
+都属于命中第 3 维之外的空转 —— 这类要按「按钮出现即代表动作存在」（见 `palantir-role-engineering` §2.1）
+判为不合格，不要因为「点下去有 Toast」就放过。
+
+### 3.7 靶机环境版本指纹握手（PRE 强约束）
+
+**痛点**：本地 `main` 已经修了，但被测实例还跑着旧构建 —— 于是**全部验证都是对旧版本的验证**，
+而所有人都以为验过了。这条专治这个幻觉。
+
+**本仓可用的探针**：`GET /api/health` 已经返回 `commit`（git full SHA）与 `version`
+（见 `server/src/routes/health.ts`；该 SHA 是公开仓库的提交号，故允许未鉴权读取）。
+
+**握手标准**：
+
+1. 执行 line 3 / line 4 之前，先取靶机 `/api/health` 的 `commit`；
+2. 与本地 `git rev-parse HEAD` 比对；
+3. 不一致 ⇒ 打 `ENV_DRIFT` 并**阻断出具结论**，而不是打个警告继续跑。
+
+**本仓现状（诚实标注）**：指纹**已经在线上返回**，但 `scripts/check-testing-defenses.mjs`
+的 `--probe-instance` 目前只断言 `health.status === "ok"`，**没有读取 `commit`** ——
+所以它现在能证明「有东西在服务」，**不能**证明「是这一版在服务」。
+把 3.7 落成机制，就是在那个探针里补上 `commit` 比对（比对不过即 `exit 1`），
+按本仓既有规矩**先给一个必定失败的输入验证它会变红**，再依赖它在正常输入下的绿。
 
 ---
 
