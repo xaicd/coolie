@@ -1,0 +1,17 @@
+# Expo and Metro local state, and the bundle output.
+# Local to this package rather than added to the repo root, so the root
+# .gitignore stays as upstream has it.
+.expo/
+dist/
+web-build/
+*.log
+
+# `expo prebuild` output. It is generated from app.json, so it is regenerated
+# rather than reviewed — 2577 files of it for iOS alone. Never edit these by
+# hand: change app.json and prebuild again.
+ios/
+android/
+
+# Standalone install: this package is deliberately not a pnpm workspace member
+# (see clients/README.md), so its lockfile and modules live here.
+node_modules/

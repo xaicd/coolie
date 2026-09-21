@@ -1,0 +1,26 @@
+{
+  "name": "@coolie/expo-paperclip-web",
+  "version": "0.6.0",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo run:android",
+    "typecheck": "tsc --noEmit",
+    "bundle": "expo export --platform android --output-dir dist"
+  },
+  "dependencies": {
+    "expo": "~52.0.0",
+    "expo-constants": "~17.0.8",
+    "expo-status-bar": "~2.0.0",
+    "expo-updates": "~0.27.5",
+    "react": "18.3.1",
+    "react-native": "0.76.5",
+    "react-native-webview": "~14.0.1"
+  },
+  "devDependencies": {
+    "@types/react": "~18.3.12",
+    "babel-preset-expo": "~12.0.0",
+    "typescript": "~5.6.0"
+  }
+}
