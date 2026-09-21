@@ -65,14 +65,21 @@ Boss 看 Coolie Web 0.6.2 Tasks 页（截图：appBar 「Coolie Web」 + 「任�
 
 新建 `clients/h5/src/screens/TasksScreen.tsx` (镜像).
 
-### 3.3 创建任务表单 (CreateTaskModal)
+### 3.3 创建任务表单 (CreateTaskModal) — 跟 Coolie Web NewTaskDialog 同款
 
 新建 `clients/expo/src/components/CreateTaskModal.tsx`:
-- 标题 (必填)
-- 描述 (可选)
-- 优先级: 低/中/高/紧急 (下拉)
-- 指派给 agent (下拉, 默认「自动派发」)
-- [创建] 按钮 → POST `/api/issues` → 关闭 modal + toast
+
+```
+弹窗标题: 「XROA › New task」 + 全屏 ↗ + ✕ 关闭
+- "Task title" 大输入框 (placeholder)
+- For [Assignee] in [Project] + ⋯ 更多
+- "Add description..." 大文本区
+- 状态 row: ● Todo (橙红圈) / ⋯ 切换
+- Upload 附件 + Auto mode (智能) + ⋯ 更多
+- 底部: 灰色 "Discard Draft" + 黑底 "Create Task"
+```
+
+[创建] → POST `/api/issues` → 关闭 modal + toast + 列表新增
 
 ### 3.4 语音按钮接 dispatch
 
