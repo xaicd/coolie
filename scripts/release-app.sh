@@ -277,6 +277,9 @@ with open(path, "w", encoding="utf-8") as handle:
 PY
   cat "$TMP_JSON"
   scp "$TMP_JSON" "$SSH_TARGET:$REMOTE_VERSION_JSON"
+  # Caddy 以 caddy 用户读这个文件直出 /version.json。scp 落盘的 mode 受远端
+  # umask 影响（实测 600），会让直出变成 403、App 静默判定「无更新」。显式放开读权限。
+  ssh "$SSH_TARGET" "chmod 644 '$REMOTE_VERSION_JSON'"
 fi
 rm -f "$TMP_JSON"
 echo "   ✓ 升级检测地址: $VERSION_JSON_URL"
