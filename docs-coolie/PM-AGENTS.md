@@ -198,3 +198,11 @@ ls scripts/e2e-local.sh           # 文件存在
 ```sh
 ls -la clients/expo/replays/evidence/   # 5 张真图
 ```
+
+### wave1 验收结果（2026-09-21，cmd 跑）
+
+- 报告：`docs-coolie/feature-acceptance-2026-09-21-wave1.md`
+- 红表：`docs-coolie/TEST-FAILURES-2026-09-21.md`
+- 结论：h5 面 §2 六项 PASS（13/14/17/18/19/20），三项真红未实现（15 CodeDiff / 16 CM6 / 14 的 meta 行）；
+  §1 spot-check：#5 PASS，#2/#11 在 h5 面未实现（board UI `:3100` 面 #11 本体 7 域 PASS）。
+- 证据：`clients/h5/replays/evidence/`（本地，不入 git）。
