@@ -60,7 +60,7 @@ export async function initOTASecurity(): Promise<void> {
       (Constants as Record<string, any>).installationId ??
       Constants.sessionId ??
       "coolie-mobile-client";
-    await Updates.setExtraParamAsync("deviceId", String(deviceId));
+    await Updates.setExtraParamAsync("device_id", String(deviceId));
   } catch (e) {
     // 开发模式或部分非生产宿主环境不支持 setExtraParamAsync，忽略异常
     console.warn("[OTA] Failed to set security device ID header/extraParam:", e);

@@ -123,7 +123,7 @@ CGNAT rather than RFC1918. So:
 - **全局事件监听**: 在 `App.tsx` 根部挂载 `setupOTAListener()`，当后台静默下载完毕新版本 (`isUpdatePending`) 时，主动弹出系统原生弹窗提示用户立即重启生效。
 - **手动检查更新**: 驾驶舱效能页 (`DashboardScreen`) 右上角集成「检查更新」按钮，通过 `useOTA()` hook 提供即时查询反馈。
 - **安全与审计**:
-  - 请求中自动注入客户端唯一标识 (`deviceId` 来自 `Constants.installationId` / `sessionId`)，便于服务端访问日志分析与灰度追踪。
+  - 请求中自动注入客户端唯一标识 (`device_id` extra param 来自 `Constants.installationId` / `sessionId`)，便于服务端访问日志分析与灰度追踪。
   - *TODO (生产加固)*: 后续可接入 Expo Code Signing 公钥数字签名校验机制 (`updates.codeSigningCertificate`)，实现端到端防篡改验签。
 
 ### 3. 发布 OTA 更新包流程 (`scripts/publish-ota.sh`)

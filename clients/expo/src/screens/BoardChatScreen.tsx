@@ -18,8 +18,10 @@ import {
   Modal,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { isAsrNotConfigured } from "@coolie/api-client";
 import type { BoardChatMessage, Company, Approval, Issue } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
+import { useRecorder } from "../useRecorder";
 import { StatusDot } from "../components/StatusDot";
 import {
   approvalTypeLabel,
@@ -356,6 +358,11 @@ export function BoardChatScreen({
   const abortControllerRef = useRef<AbortController | null>(null);
   const accumulatedRef = useRef("");
 
+  // 语音派发: 录音 -> 腾讯 ASR 转写 -> 建任务 (见 useRecorder / plugin-multimodal)
+  const { recording, start: startRecording, stop: stopRecording } = useRecorder();
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
+
   // 光标闪烁定时器
   useEffect(() => {
     if (!sending) return;
@@ -442,6 +449,73 @@ export function BoardChatScreen({
     },
     [scrollToBottom],
   );
+
+  const pushSystemEcho = useCallback(
+    (text: string) => {
+      appendEcho({
+        id: `voice-echo-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        role: "system",
+        text,
+        createdAt: new Date().toISOString(),
+      });
+    },
+    [appendEcho],
+  );
+
+  /**
+   * 语音派发 (PRD 语音派发): 点击麦克风开始录音, 再次点击停止并把录音交给
+   * 多模态插件。插件走腾讯一句话识别转文字, 且 (createIssue 默认 true) 直接
+   * 把文字建成任务。转写结果与新建任务都作为系统气泡追加进聊天流 —— 派活
+   * 与回执同屏可见。
+   */
+  const handleVoiceDispatch = useCallback(async () => {
+    if (voiceBusy) return;
+
+    if (!recording) {
+      try {
+        await startRecording();
+        setVoiceStatus("录音中… 再次点击麦克风结束并派发");
+      } catch (e) {
+        Alert.alert("录音失败", String((e as Error)?.message ?? e));
+      }
+      return;
+    }
+
+    setVoiceBusy(true);
+    setVoiceStatus("识别中… 正在派发任务");
+    try {
+      const { base64, format } = await stopRecording();
+      const res = await coolie.voiceDispatch({
+        companyId: company.id,
+        audioBase64: base64,
+        format,
+      });
+
+      const text = res.transcription.text.trim();
+      pushSystemEcho(text ? `🎤 ${text}` : "🎤 没听清这段语音, 请再说一次。");
+      if (res.issue) {
+        pushSystemEcho(
+          `✅ 已派发任务 #${res.issue.id.slice(0, 6)} · ${res.issue.title}`,
+        );
+      }
+    } catch (e) {
+      if (isAsrNotConfigured(e)) {
+        Alert.alert("语音未配置", "该实例尚未配置腾讯 ASR 凭据, 请改用文字输入。");
+      } else {
+        Alert.alert("语音派发失败", String((e as Error)?.message ?? e));
+      }
+    } finally {
+      setVoiceBusy(false);
+      setVoiceStatus(null);
+    }
+  }, [
+    voiceBusy,
+    recording,
+    startRecording,
+    stopRecording,
+    company.id,
+    pushSystemEcho,
+  ]);
 
   useEffect(() => {
     if (!historyReady) return;
@@ -1173,8 +1247,39 @@ export function BoardChatScreen({
           </ScrollView>
         </View>
 
+        {/* 语音派发状态条 */}
+        {voiceStatus ? (
+          <View style={styles.voiceStatusBar}>
+            <StatusDot
+              status="running"
+              color={recording ? C.err : C.accent}
+              size={6}
+            />
+            <Text style={styles.voiceStatusText}>{voiceStatus}</Text>
+          </View>
+        ) : null}
+
         {/* 底部输入框区域 */}
         <View style={styles.inputContainer}>
+          <Pressable
+            onPress={() => void handleVoiceDispatch()}
+            disabled={sending || voiceBusy}
+            style={[
+              styles.micBtn,
+              recording && styles.micBtnRecording,
+              (sending || voiceBusy) && styles.micBtnDisabled,
+            ]}
+          >
+            {voiceBusy && !recording ? (
+              <ActivityIndicator size="small" color={C.accent} />
+            ) : (
+              <Ionicons
+                name={recording ? "mic" : "mic-outline"}
+                size={20}
+                color={recording ? C.err : C.ink2}
+              />
+            )}
+          </Pressable>
           <TextInput
             style={styles.textInput}
             placeholder="询问工坊运行、额度、员工负荷或审批…"
@@ -1674,6 +1779,37 @@ const styles = StyleSheet.create({
   chipText: {
     color: C.ink2,
     fontSize: 12,
+  },
+  voiceStatusBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    backgroundColor: C.panel,
+    borderTopWidth: 1,
+    borderTopColor: C.lineSubtle,
+  },
+  voiceStatusText: {
+    color: C.ink2,
+    fontSize: 12,
+  },
+  micBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: C.surface,
+    borderColor: C.line,
+    borderWidth: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  micBtnRecording: {
+    backgroundColor: "rgba(239, 68, 68, 0.16)",
+    borderColor: "rgba(239, 68, 68, 0.4)",
+  },
+  micBtnDisabled: {
+    opacity: 0.4,
   },
   inputContainer: {
     flexDirection: "row",
