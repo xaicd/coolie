@@ -26,6 +26,9 @@ export interface Company {
   budgetMonthlyCents: number;
   spentMonthlyCents: number;
   defaultResponsibleUserId: string | null;
+  // Coolie fork: the built-in template this company was created from, or null
+  // when none was chosen. Additive — existing rows stay null.
+  templateId: string | null;
   requireBoardApprovalForNewAgents: boolean;
   interactionResolverGovernance: InteractionResolverGovernance;
   feedbackDataSharingEnabled: boolean;

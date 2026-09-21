@@ -70,6 +70,7 @@
     "@paperclipai/plugin-sdk": "workspace:*",
     "@paperclipai/shared": "workspace:*",
     "@paperclipai/skills-catalog": "workspace:*",
+    "@paperclipai/templates": "workspace:*",
     "@photon-ai/advanced-imessage": "2.1.0",
     "@vercel/connect": "0.6.1",
     "acorn": "8.18.0",

@@ -61,7 +61,10 @@ import {
   companyPortabilityService,
   companyService,
   feedbackService,
+  listCompanyTemplates,
   logActivity,
+  resolveCompanyTemplate,
+  serializeCompanyTemplate,
   workTimelineService,
 } from "../services/index.js";
 import { isCloudManagedInstance } from "../services/cloud-instance.js";
@@ -394,6 +397,14 @@ export function companyRoutes(db: Db, storage?: StorageService, options?: Compan
     }
     const allowed = new Set(req.actor.companyIds ?? []);
     res.json(result.filter((company) => allowed.has(company.id)));
+  });
+
+  // Registered before `/:companyId` so "templates" is not read as a company id.
+  // Board-only: the create wizard is a board surface, and the catalogue is
+  // instance-level data, not company data.
+  router.get("/templates", async (req, res) => {
+    assertBoard(req);
+    res.json(listCompanyTemplates().map(serializeCompanyTemplate));
   });
 
   router.get("/stats", async (req, res) => {
@@ -1204,8 +1215,16 @@ export function companyRoutes(db: Db, storage?: StorageService, options?: Compan
       throw forbidden("Instance admin required");
     }
     const ownerPrincipalId = req.actor.userId ?? "local-board";
+    // An explicitly requested template is validated up front, so a typo is a
+    // 422 here rather than a company created without its roles. A request with
+    // no template field keeps the previous behaviour byte for byte: no
+    // template stamped, no description injected.
+    const requestedTemplateId = req.body.templateId ?? null;
+    const template = resolveCompanyTemplate(requestedTemplateId);
     const company = await svc.create({
       ...req.body,
+      templateId: requestedTemplateId,
+      description: req.body.description ?? (requestedTemplateId ? template.description : undefined),
       defaultResponsibleUserId: req.body.defaultResponsibleUserId ?? ownerPrincipalId,
     });
     await access.ensureMembership(company.id, "user", ownerPrincipalId, "owner", "active");
@@ -1222,7 +1241,7 @@ export function companyRoutes(db: Db, storage?: StorageService, options?: Compan
       action: "company.created",
       entityType: "company",
       entityId: company.id,
-      details: { name: company.name },
+      details: { name: company.name, templateId: company.templateId },
     });
     if (company.budgetMonthlyCents > 0) {
       await budgets.upsertPolicy(

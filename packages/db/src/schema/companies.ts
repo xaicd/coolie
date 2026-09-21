@@ -15,6 +15,11 @@ export const companies = pgTable(
     budgetMonthlyCents: integer("budget_monthly_cents").notNull().default(0),
     spentMonthlyCents: integer("spent_monthly_cents").notNull().default(0),
     defaultResponsibleUserId: text("default_responsible_user_id"),
+    // Coolie fork: the company template a company was created from
+    // ("template-palantir-5-role", ...), so the 5-role agent registration can
+    // read the role set back off the company. Nullable: a company created
+    // before this column, or without a template, has no template.
+    templateId: text("template_id"),
     requireBoardApprovalForNewAgents: boolean("require_board_approval_for_new_agents")
       .notNull()
       .default(false),

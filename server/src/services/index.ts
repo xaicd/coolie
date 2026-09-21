@@ -1,4 +1,14 @@
 export { companyService } from "./companies.js";
+export {
+  DEFAULT_COMPANY_TEMPLATE_ID,
+  getCompanyTemplate,
+  listCompanyTemplates,
+  resolveCompanyTemplate,
+  serializeCompanyTemplate,
+  templateRoleBindings,
+  templateRoles,
+  type CompanyTemplateSummary,
+} from "./company-template.js";
 export { companyArtifactsService } from "./company-artifacts.js";
 export { companySearchService } from "./company-search.js";
 export { companySearchExtractService } from "./company-search-extract.js";

@@ -26,6 +26,11 @@ export const createCompanySchema = z.object({
   description: z.string().optional().nullable(),
   budgetMonthlyCents: z.number().int().nonnegative().optional().default(0),
   defaultResponsibleUserId: z.string().min(1).nullable().optional(),
+  // Coolie fork: the built-in company template to create from. Optional — a
+  // request without it behaves exactly as before. The value is validated
+  // against the template catalogue in the route, not here, so an unknown id
+  // is a 422 rather than a generic body-validation error.
+  templateId: z.string().min(1).nullable().optional(),
 });
 
 export type CreateCompany = z.infer<typeof createCompanySchema>;
