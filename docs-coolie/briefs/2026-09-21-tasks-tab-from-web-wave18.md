@@ -139,47 +139,24 @@ Boss 看 Coolie Web 0.6.2 Tasks 页（截图：appBar 「Coolie Web」 + 「任�
 Coolie工坊 0.5.8: https://dls.xrobinai.cn/coolie/app/0.5.8/coolie-release.apk
 ```
 
-## 7. Coolie Web 0.6.3 同步发 (boss 09-21 22:36 OOB 「两个都学过来」)
+## 7. Coolie Web 0.6.3 暂不发 (boss 09-21 22:38 OOB 「web不用改了」)
 
-Boss 要求 Coolie工坊 App + Coolie Web App **两个 App 都学** (Coolie Web 这套 NewTaskDialog UI + Tasks tab + 语音按钮). 当前 Coolie Web 0.6.2 paperclip 上游没改,但 i18n 字典要扩展 11 条覆盖 NewTaskDialog.
+Boss 撤回双 App 同步 — Coolie Web 0.6.2 不动,只 Coolie工坊 0.5.8 抄 NewTaskDialog.
 
 ### 7.1 Coolie Web 端动作
 
-```
-1. clients/expo-paperclip-web/App.tsx 里 I18N_PATCH 字典加 11 条 (NewTaskDialog 中文):
-   'New task' → '新建任务'
-   'Task title' → '任务标题'
-   'For' → '指派给'
-   'Assignee' → '被指派人'
-   'in' → '在'
-   'Project' → '项目中'
-   'Add description...' → '添加任务描述...'
-   'Todo' → '待办'
-   'Upload' → '上传'
-   'Auto mode' → '智能模式'
-   'Discard Draft' → '放弃草稿'
-   'Create Task' → '创建任务'
+**不需要任何动作.**
 
-2. bump Coolie Web 0.6.2 → 0.6.3 (versionCode 3 → 4)
+Coolie Web 0.6.2 仍在线 (boss 截图所见版本), 不要 bump, 不要发版.
 
-3. Build Coolie Web APK (paperclip-web 套壳 + i18n patch2 注入)
+i18n 字典扩展 11 条**不做** — Coolie Web 0.6.2 paperclip-web 套壳不动.
 
-4. adb install + 模拟器验证:
-   - 装 Coolie Web 0.6.3
-   - 启动 → 进 Tasks 页 (/)
-   - 点 [+] New Task → 弹窗出现
-   - 期望: 「新建任务」/「任务标题」/「指派给」/「被指派人」/「在」/「项目中」/「添加任务描述...」/「待办」/「上传」/「智能模式」/「放弃草稿」/「创建任务」(12/12 中文)
-
-5. Commit + push + 发版 0.6.3 + 上 COS:
-   https://dls.xrobinai.cn/coolie/app/0.6.3-paperclip-web/coolie-release.apk
-```
-
-### 7.2 双 App 同步验证
+### 7.2 单 App 发版
 
 ```
-装机链接 (boss 09-21 22:36 后):
-- Coolie工坊 0.5.8:   https://dls.xrobinai.cn/coolie/app/0.5.8/coolie-release.apk
-- Coolie Web 0.6.3:   https://dls.xrobinai.cn/coolie/app/0.6.3-paperclip-web/coolie-release.apk
+装机链接 (boss 09-21 22:38 后):
+- Coolie工坊 0.5.8:   https://dls.xrobinai.cn/coolie/app/0.5.8/coolie-release.apk (新)
+- Coolie Web 0.6.2:   https://dls.xrobinai.cn/coolie/app/0.6.2-paperclip-web/coolie-release.apk (不变)
 ```
 
-两个 App 都学 NewTaskDialog UI + 语音按钮 + i18n 字典扩展。
+只 Coolie工坊 抄 NewTaskDialog UI + 语音按钮 + i18n 字典扩展 11 条 (i18n patch2 在 App 端用, 不上 Coolie Web).
