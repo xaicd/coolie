@@ -79,11 +79,11 @@ require_ds_approval() {
   [ -n "${COOLIE_API_TOKEN:-}" ] && args+=(-H "authorization: Bearer $COOLIE_API_TOKEN")
   local body
   if ! body="$(curl "${args[@]}")"; then
-    echo "   ✗ DS gate 查询失败（company_id=$company_id, API=$api_base）" >&2
+    echo "   ✗ DS gate 查询失败（company_id=${company_id}, API=${api_base}）" >&2
     return 1
   fi
   if printf '%s' "$body" | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("approved") else 1)'; then
-    echo "   ✓ DS 已签 go（company_id=$company_id）"
+    echo "   ✓ DS 已签 go（company_id=${company_id}）"
     return 0
   fi
   echo "   ✗ RELEASE_REJECTED_NEEDS_DS: DS 未签 go，拒绝发版" >&2

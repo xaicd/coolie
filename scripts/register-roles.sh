@@ -40,7 +40,7 @@ ARGS+=(-d "$(python3 -c 'import json,sys; print(json.dumps({"roles":sys.argv[1:]
 
 echo "register-roles: company_id=$COMPANY_ID roles=${ROLES[*]}"
 RESPONSE="$(curl "${ARGS[@]}")" \
-  || { echo "失败: 注册 agent 请求被拒绝（company_id=$COMPANY_ID, API=$API_BASE）" >&2; exit 1; }
+  || { echo "失败: 注册 agent 请求被拒绝（company_id=${COMPANY_ID}, API=${API_BASE}）" >&2; exit 1; }
 
 printf '%s' "$RESPONSE" | python3 -c '
 import json, sys
@@ -49,10 +49,10 @@ payload = json.load(sys.stdin)
 created = payload.get("created", [])
 skipped = payload.get("skipped", [])
 for agent in created:
-    print(f"created  {agent[\"id\"]}  {agent[\"role\"]:<9} {agent[\"name\"]}")
+    print("created  %s  %-9s %s" % (agent["id"], agent["role"], agent["name"]))
 for entry in skipped:
-    print(f"skipped  {entry[\"agentId\"]}  {entry[\"role\"]:<9} (已存在)")
+    print("skipped  %s  %-9s (已存在)" % (entry["agentId"], entry["role"]))
 if not created and not skipped:
     sys.exit("失败: 响应里既没有 created 也没有 skipped")
-print(f"共 {len(created)} 个新建 / {len(skipped)} 个已存在", file=sys.stderr)
+print("共 %d 个新建 / %d 个已存在" % (len(created), len(skipped)), file=sys.stderr)
 '

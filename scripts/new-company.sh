@@ -60,7 +60,7 @@ echo "========================================================"
 step "[1/4] 建平台公司 (POST /api/companies)"
 COMPANY_BODY="$(python3 -c 'import json,sys; print(json.dumps({"name":sys.argv[1],"templateId":sys.argv[2]}))' "$NAME" "$TEMPLATE")"
 COMPANY_JSON="$(api POST /api/companies "$COMPANY_BODY")" \
-  || die "建公司失败：Coolie API 不可达或拒绝（$API_BASE）。检查服务是否在跑、COOLIE_API_TOKEN 是否正确。"
+  || die "建公司失败：Coolie API 不可达或拒绝（${API_BASE}）。检查服务是否在跑、COOLIE_API_TOKEN 是否正确。"
 COMPANY_ID="$(printf '%s' "$COMPANY_JSON" | json_get '["id"]')"
 [[ -n "$COMPANY_ID" ]] || die "建公司响应里没有 id: $COMPANY_JSON"
 echo "   ✓ company_id = $COMPANY_ID"
@@ -69,15 +69,15 @@ echo "   ✓ template   = $(printf '%s' "$COMPANY_JSON" | json_get '.get("templa
 step "[2/4] 注册 5 角色 agent (POST /api/companies/$COMPANY_ID/agents/bulk)"
 ROLES_BODY="$(python3 -c 'import json,sys; print(json.dumps({"roles":sys.argv[1:]}))' "${ROLES[@]}")"
 AGENTS_JSON="$(api POST "/api/companies/$COMPANY_ID/agents/bulk" "$ROLES_BODY")" \
-  || die "注册 agent 失败（company_id=$COMPANY_ID）"
+  || die "注册 agent 失败（company_id=${COMPANY_ID}）"
 
 AGENT_LINES="$(printf '%s' "$AGENTS_JSON" | python3 -c '
 import json, sys
 payload = json.load(sys.stdin)
 for agent in payload.get("created", []):
-    print(f"   ✓ {agent[\"id\"]}  {agent[\"role\"]:<9} {agent[\"name\"]}")
+    print("   ✓ %s  %-9s %s" % (agent["id"], agent["role"], agent["name"]))
 for entry in payload.get("skipped", []):
-    print(f"   · {entry[\"agentId\"]}  {entry[\"role\"]:<9} (已存在，跳过)")
+    print("   · %s  %-9s (已存在，跳过)" % (entry["agentId"], entry["role"]))
 ')"
 [[ -n "$AGENT_LINES" ]] || die "没有创建任何 agent: $AGENTS_JSON"
 printf '%s\n' "$AGENT_LINES"
