@@ -10,25 +10,34 @@ Boss: "新任务支持语音方式, 先用腾讯ASR"
 
 PRD #1 语音派发 — 0.5.5 装机没有真链路, 必须现在打通.
 
-## 1. 已知现状 (PM 09-21 实查)
+## 1. 已知现状 (PM 09-21 真查)
 
 ```
-✅ useRecorder.ts (90 行, expo-av) 录音组件存在, 但注释说"skeleton"
-✅ plugin-multimodal dist 存在 (manifest.js + worker.js + ui/index.js)
-✅ plugin-multimodal 在 server 已 symlink + 加载
-❓ Tencent ASR key 是否配: 不确认
-❓ useRecorder 是否接 dispatch: 注释说"skeleton", 没接通
-❓ transcribed text 是否真创建 issue + 触发 ChatHome 派活: 未验证
-❓ mobile App 录音后能否一键派活: 未验证
+✅ plugin-multimodal symlink 在 server + dist 真加载 (wave12)
+✅ /api/multimodal/transcriptions 端点真存在 (PM 验 403 = 同源策略, 不是 404)
+✅ Tencent ASR 凭据真配了:
+   - company_secrets 表里有:
+     8192d441 Tencent ASR SecretId  (active, 2026-09-21 11:32:13)
+     175943da Tencent ASR SecretKey (active, 2026-09-21 11:32:13)
+   - plugin_config 表里有 (company 4cafeb9a = smoke 公司):
+     tencentSecretIdRef → 8192d441
+     tencentSecretKeyRef → 175943da
+✅ server worker.ts 真用 ctx.secrets.resolve() 解 key
+✅ ASR API 调用代码完整 (TC3-HMAC-SHA256 + SentenceRecognition + 60s/3MB 限制)
+✅ 转 text → issue title/desc 自动逻辑 (textToIssueFields)
+❌ App useRecorder (90 行 expo-av) 注释说 "skeleton", 没接 dispatch
+❌ BoardChatScreen toolbar 没 mic 按钮 (或 mic 按钮没接通真录音)
 ```
+
+**唯一卡点 = App 端录音接通 dispatch.**
 
 ## 2. 目标
 
-**Coolie工坊 0.5.5 App** 录音按钮 → 录音 → POST 到 Tencent ASR → transcribed text
-→ 自动创建 issue 标题 = transcribed text → ChatHome 派活
+**Coolie工坊 0.5.6 App** (新版本 bump) 录音按钮 → 录音 → POST /api/multimodal/transcriptions
+→ server 调 Tencent ASR (已配 secret refs) → transcribed text
+→ 自动创建 issue title = transcribed text → ChatHome 派活
 
-**优先用腾讯云 ASR** (one-sentence recognition, ≤60s, ≤3MB audio)
-如果腾讯 ASR 不可用 → fall back to OpenAI whisper → 不允许降级到本地
+**优先用腾讯云 ASR** (不动, 已配 key), 不要 OpenAI whisper / 不要本地
 
 ## 3. 任务 (5 步)
 
