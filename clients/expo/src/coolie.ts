@@ -22,11 +22,25 @@ export { C } from "./theme";
  * box for anyone with an account on it. Local development points elsewhere:
  *
  *   EXPO_PUBLIC_COOLIE_BASE_URL=http://192.168.3.85:3100 npx expo run:ios --device
+ *
+ * The access below MUST stay a plain `process.env.EXPO_PUBLIC_COOLIE_BASE_URL`
+ * member expression. babel-preset-expo inlines only that exact form; an optional
+ * chain (`process?.env?.X`) compiles to an OptionalMemberExpression the inliner
+ * does not match, so the value stayed a runtime lookup that resolves to
+ * undefined in a release build. Every installed APK then silently fell back to
+ * the default and could not reach the instance at all (measured on a 0.5.6 APK:
+ * requests to 127.0.0.1 died with "Network request failed"). The `typeof` guard
+ * keeps it safe in a host without a `process` global, and being a ternary does
+ * not stop the inliner from matching the member expression.
  */
 declare const process: { env?: Record<string, string | undefined> } | undefined;
 
-export const COOLIE_BASE_URL =
-  process?.env?.EXPO_PUBLIC_COOLIE_BASE_URL ?? "http://127.0.0.1:3100";
+const inlinedBaseUrl =
+  typeof process !== "undefined" && process.env
+    ? process.env.EXPO_PUBLIC_COOLIE_BASE_URL
+    : undefined;
+
+export const COOLIE_BASE_URL = inlinedBaseUrl ?? "https://xrobinai.cn";
 
 /**
  * The origin this native client declares on every request.
