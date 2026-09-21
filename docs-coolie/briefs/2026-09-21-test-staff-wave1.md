@@ -1,10 +1,12 @@
 # Brief: Coolie 功能验收（按 FEATURE-ACCEPTANCE-LIST.md 跑 §1-2）
 
-Test staff: **claude**（铁匠，claude-glm + claude-mm 都行）
+Test staff: **cmd**（门神，1.58.1，已稳定跑过 h5 wave1）
 Spec: `docs-coolie/FEATURE-ACCEPTANCE-LIST.md`（**先读 §0-2**）
 Repo: `~/workspace/xaicd/coolie` (main)
 PM: Hermes
-Wave: 1 of N — 验收第一波，跑 PRD §1 + ChatHome §2 全部 20 条。
+Wave: 1 of N — 验收第一波，跑 PRD §1 + ChatHome §2 全部 11 项。
+
+> ⚠️ **Do NOT use `claude` CLI for this run** — `MiniMax-M3` model catalog is not registered in Claude Code's build, so any `claude -p` invocation will fail with `[claude-code:unrecognized_model]` and waste the entire turn budget. `cmd` is the verified path here.
 
 ## 0. 不要做的事
 
