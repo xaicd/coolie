@@ -25,7 +25,7 @@
 
 - `packages/plugins/plugin-ontology/` (807+5131 行) —— **本体驱动**
 - `packages/plugins/plugin-multimodal/` —— 语音/图像
-- `packages/plugins/plugin-chat/` —— 工坊对话
+- `packages/plugins/_deprecated/plugin-chat/` —— 工坊对话(**已废弃**:默认走 ChatHome,`COOLIE_USE_PLUGIN_CHAT=true` 才启用。见 `CHATHOME-DEFAULT.md`)
 - `packages/plugins/plugin-workflow/` —— 工作流
 - `packages/plugins/plugin-npc-factory/` —— NPC
 - `packages/plugins/plugin-ops-console/` —— 运维控制台
