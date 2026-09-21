@@ -38,8 +38,20 @@ export type BetterAuthSessionResult = {
   user: BetterAuthSessionUser | null;
 };
 
+type BetterAuthSignUpEndpoint = (input: {
+  body: { email: string; password: string; name: string };
+  headers?: Headers;
+  asResponse?: boolean;
+}) => Promise<unknown>;
+
 type BetterAuthGetSessionApi = {
   getSession?: (input: { headers: Headers }) => Promise<unknown>;
+  /**
+   * Declared so a live `BetterAuthInstance` carries the sign-up endpoint in its
+   * type: `/api/auth/register` calls it in-process. Optional because the
+   * resolver only ever needs `getSession`.
+   */
+  signUpEmail?: BetterAuthSignUpEndpoint;
 };
 
 type BetterAuthHandlerTarget = Extract<Parameters<typeof toNodeHandler>[0], { handler: Auth["handler"] }>;
@@ -434,4 +446,80 @@ export async function resolveBetterAuthSession(
   req: Request,
 ): Promise<BetterAuthSessionResult | null> {
   return resolveBetterAuthSessionFromHeaders(auth, headersFromExpressRequest(req));
+}
+
+/**
+ * The email/password sign-up endpoint, reached through `auth.api`. Declared
+ * separately (and all-optional) so a `BetterAuthInstance` is structurally
+ * assignable to it without widening the session-resolver type this file
+ * already exports.
+ */
+export type BetterAuthEmailSignUp = {
+  api?: { signUpEmail?: BetterAuthSignUpEndpoint };
+};
+
+export type EmailSignUpOutcome =
+  | { ok: true; user: BetterAuthSessionUser; setCookies: string[] }
+  | { ok: false; status: number; message: string };
+
+function readSetCookies(headers: Headers): string[] {
+  // Node exposes `getSetCookie()`; fall back to the folded header elsewhere.
+  const getSetCookie = (headers as { getSetCookie?: () => string[] }).getSetCookie;
+  if (typeof getSetCookie === "function") {
+    const values = getSetCookie.call(headers);
+    if (Array.isArray(values) && values.length > 0) return values;
+  }
+  const raw = headers.get("set-cookie");
+  return raw ? [raw] : [];
+}
+
+/**
+ * Create an email/password account through the same Better Auth instance that
+ * serves `POST /api/auth/sign-up/email`, returning the session cookies Better
+ * Auth minted for the new user.
+ *
+ * A native client cannot rely on Better Auth's own route alone: it must also
+ * bootstrap the account's first company, which has to happen server-side after
+ * the user row exists. Calling the endpoint in-process (rather than re-issuing
+ * an HTTP request) keeps the two steps atomic from the caller's point of view
+ * and reuses the exact provider logic — password hashing, account rows, the
+ * session cookie — instead of reimplementing it here.
+ */
+export async function signUpWithEmailPassword(
+  auth: BetterAuthEmailSignUp,
+  input: { email: string; password: string; name: string; headers: Headers },
+): Promise<EmailSignUpOutcome> {
+  const endpoint = auth.api?.signUpEmail;
+  if (!endpoint) {
+    return { ok: false, status: 501, message: "Email sign-up is unavailable on this instance" };
+  }
+
+  const response = await endpoint({
+    body: { email: input.email, password: input.password, name: input.name },
+    headers: input.headers,
+    asResponse: true,
+  });
+  if (!(response instanceof Response)) {
+    return { ok: false, status: 502, message: "Unexpected sign-up response from the auth handler" };
+  }
+
+  const payload = (await response.json().catch(() => null)) as
+    | { user?: { id?: unknown; email?: unknown; name?: unknown }; message?: unknown }
+    | null;
+  if (!response.ok || typeof payload?.user?.id !== "string") {
+    const message = typeof payload?.message === "string" && payload.message
+      ? payload.message
+      : `Sign-up failed (${response.status})`;
+    return { ok: false, status: response.status, message };
+  }
+
+  return {
+    ok: true,
+    user: {
+      id: payload.user.id,
+      email: typeof payload.user.email === "string" ? payload.user.email : null,
+      name: typeof payload.user.name === "string" ? payload.user.name : null,
+    },
+    setCookies: readSetCookies(response.headers),
+  };
 }

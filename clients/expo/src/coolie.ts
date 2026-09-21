@@ -163,6 +163,101 @@ export interface WorkTimelineResult {
   };
 }
 
+/** 收件箱一条待审批 — GET /api/inbox */
+export interface InboxApprovalItem {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  createdAt: string;
+}
+
+/** 收件箱一条受阻任务 — GET /api/inbox */
+export interface InboxFailureItem {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  updatedAt: string;
+}
+
+/** 收件箱一条 @提及 — GET /api/inbox */
+export interface InboxMentionItem {
+  id: string;
+  issueId: string;
+  issueTitle: string;
+  body: string;
+  authorName: string;
+  createdAt: string;
+}
+
+/** 收件箱三段聚合 — GET /api/inbox */
+export interface InboxFeed {
+  pendingApprovals: InboxApprovalItem[];
+  failures: InboxFailureItem[];
+  mentionedBy: InboxMentionItem[];
+}
+
+export type NotificationKind = "approval" | "failure" | "mention" | "activity";
+
+/** 通知中心一条 — GET /api/notifications */
+export interface NotificationItem {
+  id: string;
+  type: NotificationKind;
+  title: string;
+  body: string | null;
+  target: { kind: "issue" | "approval"; id: string } | null;
+  createdAt: string;
+  read: boolean;
+}
+
+export interface NotificationFeed {
+  notifications: NotificationItem[];
+  unreadCount: number;
+}
+
+export interface SearchAgentResult {
+  id: string;
+  name: string;
+  role: string;
+  status: string;
+}
+
+export interface SearchTaskResult {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  updatedAt: string;
+}
+
+export interface SearchDocumentResult {
+  id: string;
+  title: string;
+  updatedAt: string;
+}
+
+/** 全局搜索结果 — GET /api/search */
+export interface SearchResults {
+  query: string;
+  agents: SearchAgentResult[];
+  tasks: SearchTaskResult[];
+  documents: SearchDocumentResult[];
+}
+
+/** 注册输入 — POST /api/auth/register */
+export interface RegisterInput {
+  email: string;
+  password: string;
+  name: string;
+  companyName: string;
+}
+
+export interface RegisterResult {
+  user: SessionUser;
+  company: Company;
+}
+
 /** 员工技能快照 — GET /api/agents/:id/skills */
 export interface AgentSkillsSnapshot {
   adapterType?: string;
@@ -375,6 +470,48 @@ export class CoolieClient extends BaseCoolieClient {
    */
   seedDomainSamples(companyId: string, domainId: string) {
     return super.seedDomainSamples(companyId, domainId);
+  }
+
+  /**
+   * POST /api/auth/register — 自助注册。
+   *
+   * 服务端经 Better Auth 建账号并顺带建首个公司,响应已带会话 cookie,
+   * 所以注册成功即是登录成功(用返回的 user 直接进主页)。
+   */
+  async register(input: RegisterInput): Promise<RegisterResult> {
+    return this.request<RegisterResult>("POST", "/api/auth/register", input, { auth: false });
+  }
+
+  /** GET /api/inbox — 收件箱三段聚合 (待审批/受阻/@我) */
+  async getInbox(companyId: string, limit = 20): Promise<InboxFeed> {
+    return this.request<InboxFeed>(
+      "GET",
+      `/api/inbox?companyId=${encodeURIComponent(companyId)}&limit=${limit}`,
+    );
+  }
+
+  /** GET /api/notifications — 通知中心列表 + 未读数 */
+  async listNotifications(companyId: string, limit = 20): Promise<NotificationFeed> {
+    return this.request<NotificationFeed>(
+      "GET",
+      `/api/notifications?companyId=${encodeURIComponent(companyId)}&limit=${limit}`,
+    );
+  }
+
+  /** PATCH /api/notifications/:id/read — 标记单条已读 */
+  async markNotificationRead(id: string, companyId: string): Promise<{ id: string; read: boolean }> {
+    return this.request<{ id: string; read: boolean }>(
+      "PATCH",
+      `/api/notifications/${encodeURIComponent(id)}/read?companyId=${encodeURIComponent(companyId)}`,
+    );
+  }
+
+  /** GET /api/search — 全局搜索 (员工/任务/文档) */
+  async search(companyId: string, q: string): Promise<SearchResults> {
+    return this.request<SearchResults>(
+      "GET",
+      `/api/search?companyId=${encodeURIComponent(companyId)}&q=${encodeURIComponent(q)}`,
+    );
   }
 }
 

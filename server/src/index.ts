@@ -132,6 +132,7 @@ import type {
   InstanceDatabaseBackupRunResult,
   InstanceDatabaseBackupTrigger,
 } from "./routes/instance-database-backups.js";
+import type { BetterAuthEmailSignUp } from "./auth/better-auth.js";
 
 type BetterAuthSessionUser = {
   id: string;
@@ -687,6 +688,7 @@ async function startServerWithDatabaseTeardown(
   
   let authReady = config.deploymentMode === "local_trusted";
   let betterAuthHandler: RequestHandler | undefined;
+  let betterAuthInstance: BetterAuthEmailSignUp | undefined;
   let resolveSession:
     | ((req: ExpressRequest) => Promise<BetterAuthSessionResult | null>)
     | undefined;
@@ -737,6 +739,7 @@ async function startServerWithDatabaseTeardown(
     );
     const auth = createBetterAuthInstance(db as any, config, effectiveTrustedOrigins);
     betterAuthHandler = createBetterAuthHandler(auth);
+    betterAuthInstance = auth;
     resolveSession = (req) => resolveBetterAuthSession(auth, req);
     resolveSessionFromHeaders = (headers) => resolveBetterAuthSessionFromHeaders(auth, headers);
     await initializeBoardClaimChallenge(db as any, { deploymentMode: config.deploymentMode });
@@ -915,6 +918,7 @@ async function startServerWithDatabaseTeardown(
     announcements: { enabled: config.announcementsEnabled, feedUrl: config.announcementsFeedUrl },
     pluginMigrationDb: pluginMigrationDb as any,
     betterAuthHandler,
+    betterAuth: betterAuthInstance,
     resolveSession,
     pluginWorkerManager,
     decisionServiceOptions,

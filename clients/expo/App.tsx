@@ -35,29 +35,32 @@ import {
   saveAuthToken,
   signInWithEmail,
   signOutEverywhere,
+  type AgentRow,
   type Credential,
-  type IssueAttachment,
-  type IssueComment,
-  type IssueCostSummary,
+  type SearchAgentResult,
 } from "./src/coolie";
 import { StatusDot } from "./src/components/StatusDot";
 import { AppCard } from "./src/ui/AppCard";
 import { EmptyState } from "./src/ui/EmptyState";
 import { ErrorRetry } from "./src/ui/ErrorRetry";
-import { KeyValueRow } from "./src/ui/KeyValueRow";
 import { LoadingState } from "./src/ui/LoadingState";
 import { Pill } from "./src/ui/Pill";
 import { ScreenHeader } from "./src/ui/ScreenHeader";
-import { SectionHeader } from "./src/ui/SectionHeader";
 import { Sheet } from "./src/ui/Sheet";
 import { StatTile } from "./src/ui/StatTile";
-import { formatTime, formatTokens } from "./src/utils/format";
 import { useRecorder } from "./src/useRecorder";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
 import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen";
 import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
 import { PrototypeSandboxScreen } from "./src/screens/PrototypeSandboxScreen";
+import { InboxScreen } from "./src/screens/InboxScreen";
+import { NotificationsScreen } from "./src/screens/NotificationsScreen";
+import { SearchScreen } from "./src/screens/SearchScreen";
+import { RegisterScreen } from "./src/screens/RegisterScreen";
+import { AgentDetailScreen } from "./src/screens/AgentDetailScreen";
+import { TaskDetailScreen } from "./src/screens/TaskDetailScreen";
+import { useNotificationsStore } from "./src/stores/notifications";
 import { WorkspaceScreen } from "./src/screens/workspace/WorkspaceScreen";
 import { BoardChatScreen, exportBoardEcho, exportBoardPrompt } from "./src/screens/BoardChatScreen";
 import { AgentsScreen } from "./src/screens/AgentsScreen";
@@ -148,7 +151,7 @@ const STATUS_DOT_COLOR: Record<string, string> = {
   done: C.ok,
 };
 
-type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "artifacts" | "ontology";
+type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "inbox" | "artifacts" | "ontology";
 
 type BottomTab = {
   key: TabKey;
@@ -162,6 +165,7 @@ const BOTTOM_TABS: BottomTab[] = [
   { key: "agents", label: "员工", icon: "people-outline", activeIcon: "people" },
   { key: "chat", label: "工坊", icon: "hammer-outline", activeIcon: "hammer" },
   { key: "tasks", label: "任务", icon: "list-outline", activeIcon: "list" },
+  { key: "inbox", label: "收件箱", icon: "mail-unread-outline", activeIcon: "mail-unread" },
   { key: "ontology", label: "本体", icon: "git-network-outline", activeIcon: "git-network" },
 ];
 /** 产物不占底部栏，从任务页右上角进入 */
@@ -409,6 +413,7 @@ function BottomTabBar({
 
 export default function App() {
   const [credential, setCredential] = useState<Credential | null | undefined>(undefined);
+  const [registering, setRegistering] = useState(false);
 
   useEffect(() => {
     void restoreCredential().then(setCredential);
@@ -430,11 +435,20 @@ export default function App() {
     );
   }
 
-  return credential ? (
-    <CompanyGate credential={credential} onSignOut={signOut} />
-  ) : (
-    <SignInScreen onSignedIn={setCredential} />
-  );
+  if (credential) {
+    return <CompanyGate credential={credential} onSignOut={signOut} />;
+  }
+
+  if (registering) {
+    return (
+      <RegisterScreen
+        onRegistered={(user) => setCredential({ kind: "session", user })}
+        onBack={() => setRegistering(false)}
+      />
+    );
+  }
+
+  return <SignInScreen onSignedIn={setCredential} onRegister={() => setRegistering(true)} />;
 }
 
 function whoamiFor(credential: Credential): string {
@@ -535,7 +549,13 @@ function Surface({ children }: { children: React.ReactNode }) {
   );
 }
 
-function SignInScreen({ onSignedIn }: { onSignedIn: (credential: Credential) => void }) {
+function SignInScreen({
+  onSignedIn,
+  onRegister,
+}: {
+  onSignedIn: (credential: Credential) => void;
+  onRegister?: () => void;
+}) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [token, setToken] = useState("");
@@ -627,6 +647,12 @@ function SignInScreen({ onSignedIn }: { onSignedIn: (credential: Credential) => 
         </Text>
       </Pressable>
 
+      {!useToken && onRegister ? (
+        <Pressable style={styles.btnOutline} onPress={onRegister}>
+          <Text style={styles.btnOutlineText}>注册新账号</Text>
+        </Pressable>
+      ) : null}
+
       <Pressable
         onPress={() => {
           setUseToken(!useToken);
@@ -656,13 +682,23 @@ function HomeScreen({
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [boardView, setBoardView] = useState(false);
   const [appUpdate, setAppUpdate] = useState<RemoteVersionInfo | null>(null);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [agentDetail, setAgentDetail] = useState<AgentRow | null>(null);
   const ota = useOTA();
+  const unreadCount = useNotificationsStore((s) => s.unreadCount);
+  const loadNotifications = useNotificationsStore((s) => s.load);
 
   useEffect(() => {
     void checkAppVersion().then((r) => {
       if (r.updateAvailable && r.info) setAppUpdate(r.info);
     });
   }, []);
+
+  // 顶部铃铛红点：进主界面先静默拉一次通知，之后由通知屏自身刷新。
+  useEffect(() => {
+    void loadNotifications(company.id, { silent: true });
+  }, [company.id, loadNotifications]);
 
   // ── 装机自检 (What's New) + 深链 ──────────────────────────────────────
   // 新版首次启动弹一次说明屏；「查看演示」把用户送到工作空间并投一条示例 prompt。
@@ -836,18 +872,79 @@ function HomeScreen({
     );
   }
 
+  if (searchOpen) {
+    return (
+      <SearchScreen
+        company={company}
+        onBack={() => setSearchOpen(false)}
+        onOpenIssue={(issueItem) => {
+          setSearchOpen(false);
+          setTab("tasks");
+          setSelected(issueItem);
+        }}
+        onOpenAgent={(agent: SearchAgentResult) => {
+          setSearchOpen(false);
+          setAgentDetail(agent);
+        }}
+      />
+    );
+  }
+
+  if (notificationsOpen) {
+    return (
+      <NotificationsScreen
+        company={company}
+        onBack={() => setNotificationsOpen(false)}
+        onOpenIssue={(issueItem) => {
+          setNotificationsOpen(false);
+          setTab("tasks");
+          setSelected(issueItem);
+        }}
+        onOpenApproval={(approvalId) => {
+          setNotificationsOpen(false);
+          setFocusedApprovalId(approvalId);
+        }}
+      />
+    );
+  }
+
+  if (agentDetail) {
+    return (
+      <AgentDetailScreen
+        company={company}
+        agent={agentDetail}
+        onBack={() => setAgentDetail(null)}
+        onOpenIssue={(issueItem) => {
+          setAgentDetail(null);
+          setTab("tasks");
+          setSelected(issueItem);
+        }}
+      />
+    );
+  }
+
   if (selected) {
     return (
-      <TaskDetail
+      <TaskDetailScreen
         issue={selected}
         company={company}
         onBack={() => setSelected(null)}
-        onOpenDiff={(issueItem, wp) =>
-          setDiffContext({ issue: issueItem, workProduct: wp })
-        }
-        onOpenSandbox={(url, service, wp) =>
-          setSandboxContext({ url, service, workProduct: wp })
-        }
+        onOpenDiff={(issueItem) => setDiffContext({ issue: issueItem })}
+        onOpenSandbox={(issueItem) => {
+          void (async () => {
+            const workProducts = await coolie
+              .listWorkProducts(issueItem.id)
+              .catch(() => [] as IssueWorkProduct[]);
+            const prototype = workProducts.find(
+              (wp) => wp.url || wp.type === "prototype" || wp.runtimeServiceId,
+            );
+            setSandboxContext({
+              url: prototype?.url ?? null,
+              service: null,
+              workProduct: prototype ?? null,
+            });
+          })();
+        }}
       />
     );
   }
@@ -858,6 +955,39 @@ function HomeScreen({
     <SafeAreaView style={[styles.shell, { paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
       <StatusBar style="light" />
       <View style={styles.shellContent}>
+        {/* 全局顶栏: 铃铛(未读红点) + 全局搜索 */}
+        <View style={styles.topBar}>
+          <View style={styles.topBarBrand}>
+            <Text style={styles.topBarBrandText}>Coolie</Text>
+            <Text style={styles.topBarCompany} numberOfLines={1}>
+              {company.name}
+            </Text>
+          </View>
+          <View style={styles.topBarActions}>
+            <Pressable
+              style={styles.topBarBtn}
+              hitSlop={10}
+              onPress={() => setNotificationsOpen(true)}
+            >
+              <Ionicons name="notifications-outline" size={20} color={C.ink2} />
+              {unreadCount > 0 ? (
+                <View style={styles.topBarBadge}>
+                  <Text style={styles.topBarBadgeText}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+            <Pressable
+              style={styles.topBarBtn}
+              hitSlop={10}
+              onPress={() => setSearchOpen(true)}
+            >
+              <Ionicons name="search-outline" size={20} color={C.ink2} />
+            </Pressable>
+          </View>
+        </View>
+
         {tab === "dashboard" ? (
           <DashboardScreen
             company={company}
@@ -900,6 +1030,16 @@ function HomeScreen({
               setTab("tasks");
               setSelected(issue);
             }}
+          />
+        ) : tab === "inbox" ? (
+          <InboxScreen
+            company={company}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenIssue={(issue) => {
+              setTab("tasks");
+              setSelected(issue);
+            }}
+            onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
           />
         ) : tab === "ontology" ? (
           <OntologyDomainListScreen company={company} whoami={whoami} onOpenSettings={() => setSettingsOpen(true)} />
@@ -1240,352 +1380,6 @@ function ApprovalFocusDetail({
   );
 }
 
-function TaskDetail({
-  issue,
-  company: _company,
-  onBack,
-  onOpenDiff,
-  onOpenSandbox,
-}: {
-  issue: Issue;
-  company: Company;
-  onBack: () => void;
-  onOpenDiff: (issue: Issue, workProduct?: IssueWorkProduct) => void;
-  onOpenSandbox?: (
-    url: string,
-    service?: WorkspaceRuntimeService | null,
-    workProduct?: IssueWorkProduct | null,
-  ) => void;
-}) {
-  const [workProducts, setWorkProducts] = useState<IssueWorkProduct[]>([]);
-  const [loadingWp, setLoadingWp] = useState(false);
-
-  // 评论流状态
-  const [comments, setComments] = useState<IssueComment[]>([]);
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [commentsError, setCommentsError] = useState<string | null>(null);
-  const [commentInput, setCommentInput] = useState("");
-  const [submittingComment, setSubmittingComment] = useState(false);
-
-  // 附件列表状态
-  const [attachments, setAttachments] = useState<IssueAttachment[]>([]);
-  const [loadingAttachments, setLoadingAttachments] = useState(false);
-  const [attachmentsError, setAttachmentsError] = useState<string | null>(null);
-
-  useEffect(() => {
-    void (async () => {
-      setLoadingWp(true);
-      try {
-        const list = await coolie.listWorkProducts(issue.id);
-        setWorkProducts(list);
-      } catch {
-        // silently ignore if endpoint unavailable
-      } finally {
-        setLoadingWp(false);
-      }
-    })();
-  }, [issue.id]);
-
-  const loadComments = useCallback(async () => {
-    setLoadingComments(true);
-    setCommentsError(null);
-    try {
-      const list = await coolie.getIssueComments(issue.id);
-      setComments(list);
-    } catch (e) {
-      setCommentsError(String((e as Error)?.message ?? e));
-    } finally {
-      setLoadingComments(false);
-    }
-  }, [issue.id]);
-
-  const loadAttachments = useCallback(async () => {
-    setLoadingAttachments(true);
-    setAttachmentsError(null);
-    try {
-      const list = await coolie.getIssueAttachments(issue.id);
-      setAttachments(list);
-    } catch (e) {
-      setAttachmentsError(String((e as Error)?.message ?? e));
-    } finally {
-      setLoadingAttachments(false);
-    }
-  }, [issue.id]);
-
-  useEffect(() => {
-    void loadComments();
-    void loadAttachments();
-  }, [loadComments, loadAttachments]);
-
-  const handleAddComment = useCallback(async () => {
-    const text = commentInput.trim();
-    if (!text || submittingComment) return;
-    setSubmittingComment(true);
-    try {
-      await coolie.addIssueComment(issue.id, text);
-      setCommentInput("");
-      await loadComments();
-    } catch (e) {
-      Alert.alert("评论发送失败", String((e as Error)?.message ?? e));
-    } finally {
-      setSubmittingComment(false);
-    }
-  }, [commentInput, issue.id, loadComments, submittingComment]);
-
-  const prototypeWp = workProducts.find(
-    (wp) => wp.url || wp.type === "prototype" || wp.runtimeServiceId,
-  );
-
-  return (
-    <Surface>
-      <ScreenHeader onBack={onBack} backLabel="返回任务列表" />
-
-      <Text style={styles.detailTitle}>{issue.title}</Text>
-
-      <AppCard padding={16} style={styles.detailCard}>
-        <KeyValueRow
-          label="状态"
-          value={STATUS_LABEL[issue.status] ?? issue.status}
-          valueColor={STATUS_DOT_COLOR[issue.status] ?? C.ink}
-        />
-        <KeyValueRow
-          label="优先级"
-          value={PRIORITY_LABEL[issue.priority] ?? issue.priority}
-          valueColor={PRIORITY_DOT_COLOR[issue.priority] ?? C.ink}
-        />
-        {issue.description ? (
-          <KeyValueRow label="描述" value={issue.description} />
-        ) : null}
-        <KeyValueRow label="编号" value={issue.id} valueColor={C.ink3} mono />
-        <IssueCostRow issueId={issue.id} />
-      </AppCard>
-
-      {/* 核心动作: 查看代码 Diff 与 打开原型沙箱 */}
-      <View style={styles.rowGap}>
-        <Pressable
-          style={[styles.btnDiffAction, { flex: 1 }]}
-          onPress={() => onOpenDiff(issue)}
-        >
-          <Text style={styles.btnDiffActionText}>
-            🔍 代码 Diff
-          </Text>
-        </Pressable>
-        {onOpenSandbox && (
-          <Pressable
-            style={[
-              styles.btnPrimary,
-              { flex: 1, paddingVertical: 12 },
-              !prototypeWp && { backgroundColor: "rgba(94, 106, 210, 0.2)" },
-            ]}
-            onPress={() =>
-              onOpenSandbox(prototypeWp?.url || "", null, prototypeWp || null)
-            }
-          >
-            <Text style={styles.btnPrimaryText}>
-              🎮 原型沙箱
-            </Text>
-          </Pressable>
-        )}
-      </View>
-
-      {/* 关联交付产物列表 */}
-      {workProducts.length > 0 && (
-        <View style={styles.wpSection}>
-          <SectionHeader title="关联交付产物" count={workProducts.length} />
-          {workProducts.map((wp) => {
-            const hasPrototype = Boolean(wp.url || wp.type === "prototype" || wp.runtimeServiceId);
-            return (
-              <AppCard
-                key={wp.id}
-                onPress={() => {
-                  if (hasPrototype && onOpenSandbox) {
-                    onOpenSandbox(wp.url || "", null, wp);
-                  } else {
-                    onOpenDiff(issue, wp);
-                  }
-                }}
-                row
-                style={styles.cardBetween}
-              >
-                <View style={{ flex: 1, gap: 2 }}>
-                  <Text style={styles.wpTitle} numberOfLines={1}>
-                    {wp.title}
-                  </Text>
-                  <Text style={styles.wpType}>
-                    类型: {wp.type} {wp.executionWorkspaceId ? "· 关联工作区" : ""}
-                  </Text>
-                </View>
-                <Text style={styles.wpLink}>
-                  {hasPrototype ? "看原型 🎮 ›" : "看 Diff ›"}
-                </Text>
-              </AppCard>
-            );
-          })}
-        </View>
-      )}
-      {loadingWp && (
-        <ActivityIndicator color={C.accent} style={{ marginTop: 8 }} />
-      )}
-
-      {/* 任务附件列表 */}
-      <View style={styles.detailSection}>
-        <SectionHeader
-          title="任务附件"
-          count={attachments.length}
-          onRefresh={() => void loadAttachments()}
-          refreshing={loadingAttachments}
-        />
-
-        {loadingAttachments && attachments.length === 0 ? (
-          <LoadingState style={styles.sectionLoader} />
-        ) : Boolean(attachmentsError) ? (
-          <ErrorRetry
-            variant="section"
-            message={`⚠️ ${attachmentsError}`}
-            onRetry={() => void loadAttachments()}
-          />
-        ) : attachments.length === 0 ? (
-          <Text style={styles.sectionEmptyText}>暂无附件</Text>
-        ) : (
-          attachments.map((att) => {
-            const fileName = att.filename || att.originalFilename || "未命名附件";
-            const sizeStr =
-              typeof att.byteSize === "number"
-                ? att.byteSize >= 1048576
-                  ? `${(att.byteSize / 1048576).toFixed(1)} MB`
-                  : `${(att.byteSize / 1024).toFixed(1)} KB`
-                : "未知大小";
-            const targetUrl = att.contentPath
-              ? (att.contentPath.startsWith("http") ? att.contentPath : `${COOLIE_BASE_URL}${att.contentPath}`)
-              : null;
-
-            return (
-              <Pressable
-                key={att.id}
-                style={styles.attachmentItem}
-                onPress={() => {
-                  if (targetUrl) {
-                    void Linking.openURL(targetUrl).catch(() => {
-                      Alert.alert("无法打开附件链接", targetUrl);
-                    });
-                  }
-                }}
-              >
-                <Ionicons name="document-attach-outline" size={18} color={C.accent} style={{ marginRight: 10 }} />
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.attachmentName} numberOfLines={1}>
-                    {fileName}
-                  </Text>
-                  <Text style={styles.attachmentSize}>{sizeStr}</Text>
-                </View>
-                {Boolean(targetUrl) && (
-                  <Ionicons name="open-outline" size={16} color={C.ink3} />
-                )}
-              </Pressable>
-            );
-          })
-        )}
-      </View>
-
-      {/* 评论流 */}
-      <View style={styles.detailSection}>
-        <SectionHeader
-          title="评论流"
-          count={comments.length}
-          onRefresh={() => void loadComments()}
-          refreshing={loadingComments}
-        />
-
-        {loadingComments && comments.length === 0 ? (
-          <LoadingState style={styles.sectionLoader} />
-        ) : Boolean(commentsError) ? (
-          <ErrorRetry
-            variant="section"
-            message={`⚠️ ${commentsError}`}
-            onRetry={() => void loadComments()}
-          />
-        ) : comments.length === 0 ? (
-          <Text style={styles.sectionEmptyText}>暂无跟进评论</Text>
-        ) : (
-          <View style={styles.commentsList}>
-            {comments.map((comment) => {
-              const isUser = Boolean(comment.authorUserId);
-              const authorName = isUser
-                ? "掌柜"
-                : comment.authorAgentId
-                ? `员工 ${comment.authorAgentId.slice(0, 8)}`
-                : "系统";
-              const timeStr = comment.createdAt
-                ? formatTime(comment.createdAt)
-                : "";
-
-              return (
-                <View
-                  key={comment.id}
-                  style={[
-                    styles.commentBubble,
-                    isUser ? styles.commentBubbleUser : styles.commentBubbleAgent,
-                  ]}
-                >
-                  <View style={styles.commentHeader}>
-                    <Text style={styles.commentAuthor}>{authorName}</Text>
-                    <Text style={styles.commentTime}>{timeStr}</Text>
-                  </View>
-                  <Text style={styles.commentBody}>{comment.body}</Text>
-                </View>
-              );
-            })}
-          </View>
-        )}
-
-        {/* 评论输入区域 */}
-        <View style={styles.commentInputRow}>
-          <TextInput
-            style={styles.commentTextInput}
-            placeholder="添加跟进评论…"
-            placeholderTextColor={C.ink3}
-            value={commentInput}
-            onChangeText={setCommentInput}
-            multiline
-            editable={!submittingComment}
-          />
-          <Pressable
-            style={[
-              styles.commentSubmitBtn,
-              (!commentInput.trim() || submittingComment) && styles.btnDisabled,
-            ]}
-            disabled={!commentInput.trim() || submittingComment}
-            onPress={() => void handleAddComment()}
-          >
-            {submittingComment ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={styles.commentSubmitBtnText}>发送</Text>
-            )}
-          </Pressable>
-        </View>
-      </View>
-    </Surface>
-  );
-}
-
-function IssueCostRow({ issueId }: { issueId: string }) {
-  const [summary, setSummary] = useState<IssueCostSummary | null>(null);
-  useEffect(() => {
-    coolie.issueCostSummary(issueId).then(setSummary).catch(() => setSummary(null));
-  }, [issueId]);
-  if (!summary) return null;
-  return (
-    <KeyValueRow
-      label="消耗"
-      value={`tokens 入${formatTokens(summary.inputTokens)} 出${formatTokens(summary.outputTokens)} · 运行${summary.runCount}次${
-        summary.costCents > 0 ? ` · $${(summary.costCents / 100).toFixed(2)}` : ""
-      }`}
-      valueColor={C.ink3}
-    />
-  );
-}
-
 const styles = StyleSheet.create({
   center: {
     flex: 1,
@@ -1605,6 +1399,63 @@ const styles = StyleSheet.create({
   },
   shellContent: {
     flex: 1,
+  },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 12,
+    paddingHorizontal: 16,
+    paddingTop: 8,
+    paddingBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.lineSubtle,
+    backgroundColor: C.bg,
+  },
+  topBarBrand: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flex: 1,
+  },
+  topBarBrandText: {
+    color: C.ink,
+    fontSize: 16,
+    fontWeight: "600",
+    letterSpacing: -0.3,
+  },
+  topBarCompany: {
+    color: C.ink3,
+    fontSize: 12,
+    flexShrink: 1,
+  },
+  topBarActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  topBarBtn: {
+    padding: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  topBarBadge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    backgroundColor: C.err,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  topBarBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
   },
   boardCol: {
     width: 168,
@@ -1836,6 +1687,22 @@ const styles = StyleSheet.create({
     color: C.ink2,
     fontWeight: "500",
     fontSize: 13,
+  },
+  // 注册按钮: 与主按钮并列的描边按钮 (DESIGN.md 第3节 ghost 变体)
+  btnOutline: {
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderColor: C.line,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  btnOutlineText: {
+    color: C.ink2,
+    fontWeight: "500",
+    fontSize: 15,
   },
   // 语音按钮 (幽灵半透明微调)
   btnVoice: {

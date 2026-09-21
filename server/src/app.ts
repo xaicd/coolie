@@ -85,6 +85,9 @@ import { costRoutes } from "./routes/costs.js";
 import { activityRoutes } from "./routes/activity.js";
 import { dashboardRoutes } from "./routes/dashboard.js";
 import { attentionRoutes } from "./routes/attention.js";
+import { inboxRoutes } from "./routes/inbox.js";
+import { notificationRoutes } from "./routes/notifications.js";
+import { searchRoutes } from "./routes/search.js";
 import { decisionTrainingRoutes } from "./routes/decision-training.js";
 import { decisionRoutes } from "./routes/decisions.js";
 import { decisionQueueRoutes } from "./routes/decision-queues.js";
@@ -172,7 +175,7 @@ import { createPluginDevWatcher } from "./services/plugin-dev-watcher.js";
 import { createPluginHostServiceCleanup } from "./services/plugin-host-service-cleanup.js";
 import { pluginRegistryService } from "./services/plugin-registry.js";
 import { createHostClientHandlers } from "@paperclipai/plugin-sdk";
-import type { BetterAuthSessionResult } from "./auth/better-auth.js";
+import type { BetterAuthEmailSignUp, BetterAuthSessionResult } from "./auth/better-auth.js";
 import { createCachedViteHtmlRenderer } from "./vite-html-renderer.js";
 import {
   DEFAULT_JSON_BODY_LIMIT,
@@ -491,6 +494,12 @@ export async function createApp(
     pluginWorkerManager?: PluginWorkerManager;
     decisionServiceOptions: DecisionServiceOptions;
     betterAuthHandler?: express.RequestHandler;
+    /**
+     * The live Better Auth instance. Exposed so `/api/auth/register` can create
+     * an account in-process (reusing Better Auth's own sign-up logic) before it
+     * bootstraps the new user's first company.
+     */
+    betterAuth?: BetterAuthEmailSignUp;
     resolveSession?: (
       req: ExpressRequest,
     ) => Promise<BetterAuthSessionResult | null>;
@@ -573,7 +582,7 @@ export async function createApp(
   // REPLACES whatever actor the request otherwise resolved to, and only on
   // the one endpoint it authorizes (see the middleware for the contract).
   app.use(cloudControlMiddleware());
-  app.use("/api/auth", authRoutes(db));
+  app.use("/api/auth", authRoutes(db, { betterAuth: opts.betterAuth }));
   if (opts.betterAuthHandler) {
     app.all("/api/auth/{*authPath}", opts.betterAuthHandler);
   }
@@ -847,6 +856,9 @@ export async function createApp(
   api.use(activityRoutes(db));
   api.use(dashboardRoutes(db));
   api.use(attentionRoutes(db));
+  api.use(inboxRoutes(db));
+  api.use(notificationRoutes(db));
+  api.use(searchRoutes(db));
   api.use(decisionTrainingRoutes(db));
   api.use(decisionRoutes(db, opts.decisionServiceOptions));
   api.use(decisionQueueRoutes(db));
