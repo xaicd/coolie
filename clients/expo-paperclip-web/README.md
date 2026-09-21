@@ -9,8 +9,8 @@ App，用 `react-native-webview` 装 `https://www.xrobinai.cn/XROA`，商店名
 | | 驾驶舱 (`clients/expo/`) | Coolie Web (本目录) |
 | --- | --- | --- |
 | 包名 | `cloud.coolie.app` | `cloud.coolie.app.web` |
-| versionName | `0.5.2` | `0.6.0-paperclip-web` |
-| OTA runtimeVersion | `0.5.2` | `0.6.0` |
+| versionName | `0.5.2` | `0.6.1-paperclip-web` |
+| OTA runtimeVersion | `0.5.2` | `0.6.1` |
 | OTA 更新源 | `https://xrobinai.cn/ota/manifest` | `https://xrobinai.cn/ota/paperclip-web/manifest` |
 
 两个 App 的 `runtimeVersion` 不同，所以一方的 OTA bundle 不会被另一方装上。
@@ -67,7 +67,7 @@ cd android && ./gradlew assembleRelease -x lint
 ```sh
 # APK 上传 COS（老板装机直链）
 no_proxy=.myqcloud.com coscli cp android/app/build/outputs/apk/release/app-release.apk \
-  cos://gzbucket/coolie/app/0.6.0-paperclip-web/coolie-release.apk
+  cos://gzbucket/coolie/app/0.6.1-paperclip-web/coolie-release.apk
 
 # OTA 增量更新（独立于驾驶舱的流）
 bash scripts/publish-ota.sh android

@@ -55,6 +55,27 @@ try {
 } catch (e) {}
 `;
 
+/**
+ * Android 兜底：`injectedJavaScriptBeforeContentLoaded` 在 Android 上是在
+ * 导航提交前求值的，此时 `localStorage` 还属于 about:blank 上下文，写入会抛错
+ * 并被上面的 try/catch 吞掉（实测 0.6.0 装机后界面仍是英文）。
+ * 这里在页面加载完成后（此时 origin 已提交）再补一次：仅当用户从未显式选过语言
+ * （`coolie.locale` 不存在）时写入默认 zh-CN 并 reload 一次 —— reload 后该键已
+ * 持久化，paperclip 的 i18n 初始化即可读到中文，且不会陷入循环，也不会覆盖
+ * 用户在设置里手动选择的语言。
+ */
+const ZH_CN_ENSURE = `
+(function () {
+  try {
+    if (!localStorage.getItem("coolie.locale")) {
+      localStorage.setItem("coolie.locale", "zh-CN");
+      window.location.reload();
+    }
+  } catch (e) {}
+})();
+true;
+`;
+
 /** 驾驶舱 App 的深链 scheme (cloud.coolie.app，见 clients/expo/app.json)。 */
 const COCKPIT_DEEP_LINK = "coolie://";
 
@@ -240,6 +261,7 @@ export default function App() {
           // —— wave 9 spec §3.5 配置 ——
           // 老板 (2026-09-21) 要求默认中文：页面脚本执行前注入 zh-CN locale
           injectedJavaScriptBeforeContentLoaded={ZH_CN_INJECTION}
+          injectedJavaScript={ZH_CN_ENSURE}
           mixedContentMode="compatibility"
           allowsBackForwardNavigationGestures
           javaScriptEnabled
