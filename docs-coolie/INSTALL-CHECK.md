@@ -32,8 +32,9 @@
 
 | 版本号 | 含义 |
 |---|---|
-| 0.5.1 (501) | ✅ 装对了 |
-| 0.5.0 (500) | ✅ 是 0.5.0 真版本（OTAv0.5.1 patch 之后应该看到 Workspace） |
+| 0.5.2 (502) | ✅ 最新；首屏应弹「装机自检」说明屏 |
+| 0.5.1 (501) | ✅ 装对了（但没有装机自检屏） |
+| 0.5.0 (500) | ✅ 是 0.5.0 真版本（OTA patch 之后应该看到 Workspace） |
 | 0.5.0 (304) | ❌ OTA 修复前的版本，重装 |
 | 0.3.x | ❌ 老的太多，重装 |
 
@@ -53,19 +54,19 @@
 1. 设置 → 应用 → Coolie → 卸载
 2. 浏览器「无痕模式」(Chrome: 新建无痕标签页)
 3. 地址栏输入:
- https://dls.xrobinai.cn/coolie/app/0.5.1/coolie-release.apk
-4. 下载 (77 MB)
+ https://dls.xrobinai.cn/coolie/app/0.5.2/coolie-release.apk
+4. 下载 (74 MB)
 5. 下载完点开 APK → 装
-6. 打开 App → 设置 → 关于 → 版本号 = 0.5.1 (501)
+6. 打开 App → 首屏应弹「Coolie 0.5.2 已就绪」装机自检屏 → 版本号 = 0.5.2
 ```
 
 ## 5. 直链（确认有效）
 
 ```
-https://drobinai.cn/coolie/app/0.5.1/coolie-release.apk
+https://dls.xrobinai.cn/coolie/app/0.5.2/coolie-release.apk
 ```
 
-Last-Modified: 2026-09-21 04:47 GMT (CST 12:47)
-Content-Length: 77,616,962 字节 (74 MB)
+Last-Modified: 2026-09-21 05:41 GMT (CST 13:41)
+Content-Length: 77,620,770 字节 (74 MB)
 
 **包名必须是:** `cloud.coolie.app`
