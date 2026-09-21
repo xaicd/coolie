@@ -1,0 +1,21 @@
+# Flow 1 — Ontology page: the domain list renders, with every seeded sample
+# domain present in the workbench's domain picker.
+#
+# The seven names below are the sample domains this instance ships with. The
+# assertion is "the domain list renders and lists at least these seven" — one
+# presence check per domain, which is how a replay expresses "count >= 7"
+# (the replay grammar has no counting primitive). scripts/e2e-local.sh runs
+# the exact numeric count (`E2E_MIN_DOMAINS`, default 7) and prints it.
+#
+# Runs signed in, in the session left behind by local-auth.ad.
+
+open ${E2E_BASE_URL}/${E2E_COMPANY_PREFIX}/ontology
+wait role="combobox" 120000
+find text "Fourth Coffee" exists
+find text "E-Commerce Platform" exists
+find text "Banking & Finance" exists
+find text "Healthcare System" exists
+find text "Smart Manufacturing" exists
+find text "University System" exists
+find text "Zava Grove-to-Shelf" exists
+screenshot clients/expo/replays/evidence/ontology-domains-01-domain-list.png

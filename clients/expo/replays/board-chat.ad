@@ -1,0 +1,31 @@
+# Flow 3 — Board chat ("Conference Room"): send one text message and assert a
+# reply actually arrives.
+#
+# The assertion is real, not a screenshot: the message asks for the result of
+# 137 + 251, and the replay waits for "388" to appear. "388" is computed by the
+# assistant — it appears nowhere in the message we type, so a match can only
+# come from a reply the agent produced. (A marker echoed from the prompt would
+# match the user's own bubble and pass for free.)
+#
+# KNOWN FAILING ON THIS STACK (2026-09-21). The reply streams server-side but
+# never reaches the room: the concierge comment fails to persist
+# (`Comment authorType must match authenticated actor`) and the served UI build
+# renders no reply bubble. scripts/e2e-local.sh reports this as a real failure
+# with evidence rather than weakening the assertion. See docs-coolie/LOCAL-E2E.md.
+#
+# Runs signed in, in the session left behind by local-auth.ad.
+
+open ${E2E_BASE_URL}/${E2E_COMPANY_PREFIX}/board-chat
+wait text "Conference Room" 120000
+screenshot clients/expo/replays/evidence/board-chat-01-room.png
+# The composer is targeted by role, not by its long placeholder label: a
+# multi-word selector is fine on its own (see the Send click below) but the
+# script grammar splits it when a second argument follows, as `fill` needs.
+fill role="textbox" "What is 137 + 251? Reply with only the number and nothing else."
+click label="Send message"
+# Evidence for the failure window: message sent, room showing whatever the
+# app actually rendered in reply. Taken before the assertion because a
+# diverging replay stops at the failing step and cannot screenshot after it.
+screenshot clients/expo/replays/evidence/board-chat-02-message-sent.png
+wait text "388" 60000
+screenshot clients/expo/replays/evidence/board-chat-03-reply.png

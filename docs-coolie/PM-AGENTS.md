@@ -69,6 +69,24 @@ ps aux | grep -E "[c]md -p|[c]laude -p" | grep -v grep | head -5
 
 如果某条卡住，立刻告诉老板。
 
+### 2.1 本地验收（App E2E，一条命令）
+
+上线前想知道「App 主链路还活着吗」，在开发机跑：
+
+```bash
+scripts/e2e-local.sh            # 全量：健康检查 + 登录 + 本体/任务/工坊 3 条链路
+echo $?                         # 非 0 = 有断言没过
+```
+
+它用 `agent-device --platform web` 驱动 `localhost:3100` 的看板 UI，跑完打印
+「断言清单 + 通过/失败计数 + 每个证据截图的绝对路径」。**没有设备也能出真信号**。
+
+- 断言是真的：本体域数量 ≥7、任务列表非空、工坊发消息后**收到回复**
+  （要求助手算出 `388`，所以用户自己那条消息不会让它误过）。
+- 详细说明、覆盖边界、已知限制、一次性 bootstrap：`docs-coolie/LOCAL-E2E.md`。
+- 2026-09-21 首次实跑结果：**7 通过 / 1 失败**——工坊回复流到了服务端但没进聊天室。
+  结论与证据见 `LOCAL-E2E.md`。这条红是它该有的样子，不要为了变绿去改断言。
+
 ---
 
 ## 3. 派单纪律
@@ -149,3 +167,34 @@ ps aux | grep -E "[c]md -p|[c]laude -p" | grep -v grep | head -5
 - 验收有真信号（tsc / curl / 用户实测）不止 commit message
 - 没 bug 不硬压发版
 - 老板严重要求 PM 不写代码（例外清单在 `PM-DISPATCH-RULES.md`）
+
+---
+
+## 10. 本地 App 验收（老板指定路径）
+
+老板原话：「测试就在开发机器本地跑就行」。
+
+入口：
+
+```sh
+bash scripts/e2e-local.sh         # 跑断言 + 截图证据 + 非零退出
+echo $?                           # 0=全过, 1=有失败
+```
+
+详情：`docs-coolie/LOCAL-E2E.md`（覆盖/前置/限制/故障排查/故意改错自证/演进路径）。
+
+当前已知：8 断言 7 PASS / 1 FAIL（**R3 工坊对话真红**，本地服务不连生产后端——不掩盖）。
+
+跑前确认：
+
+```sh
+agent-device web doctor           # healthy
+curl -s http://localhost:3100/api/health   # 200
+ls scripts/e2e-local.sh           # 文件存在
+```
+
+跑后：
+
+```sh
+ls -la clients/expo/replays/evidence/   # 5 张真图
+```

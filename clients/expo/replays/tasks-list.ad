@@ -1,0 +1,14 @@
+# Flow 2 — Tasks page: the task list renders and is non-empty.
+#
+# Non-empty is asserted by matching the identifier prefix every task row link
+# carries ("Open <PREFIX>-N: <title>"). On an instance with no tasks the page
+# renders the explicit empty state "No tasks match the current filters or
+# search." instead, and this replay fails — the list going empty is a real
+# change the harness should surface, not something to paper over.
+#
+# Runs signed in, in the session left behind by local-auth.ad.
+
+open ${E2E_BASE_URL}/${E2E_COMPANY_PREFIX}/issues
+wait text "New Task" 120000
+find text "Open ${E2E_COMPANY_PREFIX}-" exists
+screenshot clients/expo/replays/evidence/tasks-list-01-task-list.png

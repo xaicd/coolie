@@ -1,0 +1,22 @@
+# Sign in to the LOCAL Coolie stack so the flow replays that follow this one
+# inherit the browser session.
+#
+# Run through scripts/e2e-local.sh, which supplies ${E2E_BASE_URL},
+# ${E2E_EMAIL} and ${E2E_PASSWORD} via --env. No credential is stored here;
+# the harness defaults to the local-only fixture account it also provisions.
+#
+# The harness owns session teardown, so this script deliberately does NOT
+# close: every later replay in the same run reuses the signed-in cookie.
+#
+# Manual equivalent:
+#   scripts/e2e-local.sh
+
+open ${E2E_BASE_URL}/auth
+wait text "Sign in to Coolie" 60000
+fill label="Email" ${E2E_EMAIL}
+fill label="Password" ${E2E_PASSWORD}
+click label="Sign In"
+# The SPA redirects to the unprefixed board route and hydrates the sidebar
+# last; "Ontology" is the plugin nav label and is English in every locale.
+wait text "Ontology" 120000
+screenshot clients/expo/replays/evidence/local-auth-01-signed-in.png

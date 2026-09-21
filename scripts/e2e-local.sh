@@ -1,0 +1,253 @@
+#!/usr/bin/env bash
+#
+# scripts/e2e-local.sh — local, one-command E2E acceptance for the Coolie app.
+#
+# Drives the Coolie board UI on this Mac with `agent-device --platform web`
+# and prints an assertion summary plus the absolute path of every evidence
+# file. Exits non-zero if any assertion fails.
+#
+#   scripts/e2e-local.sh
+#
+# What it assumes
+#   * The local stack is already up on $E2E_BASE_URL (default localhost:3100).
+#     If it is not, the script fails loudly with the exact start command —
+#     it never runs against a stale or half-up server.
+#   * `agent-device` is installed and its managed web backend is set up
+#     (`agent-device web setup`); preflight verifies this.
+#   * A local board account exists that is a member of the company under
+#     test. See docs-coolie/LOCAL-E2E.md for the one-time bootstrap.
+#
+# What it does NOT do
+#   * It does not start, restart, or reconfigure the server.
+#   * It does not touch any version number, the APK, OTA, COS, or prod config.
+#
+# Scope and known limitations: docs-coolie/LOCAL-E2E.md
+
+set -uo pipefail
+
+REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+cd "$REPO_ROOT" || exit 1
+
+BASE_URL="${E2E_BASE_URL:-http://localhost:3100}"
+E2E_EMAIL="${E2E_EMAIL:-e2e-harness@coolie.local}"
+E2E_PASSWORD="${E2E_PASSWORD:-e2e-harness-local-2026}"
+MIN_DOMAINS="${E2E_MIN_DOMAINS:-7}"
+CHAT_TIMEOUT_MS="${E2E_CHAT_TIMEOUT_MS:-60000}"
+STATE_DIR="${AGENT_DEVICE_STATE_DIR:-$HOME/.agent-device}"
+EVIDENCE_DIR="$REPO_ROOT/clients/expo/replays/evidence"
+REPLAY_DIR="clients/expo/replays"
+# A per-run session name gives a fresh browser profile, so the run always
+# starts logged out and the sign-in replay is deterministic.
+SESSION="coolie-e2e-$(date +%s)-$$"
+
+export AGENT_DEVICE_STATE_DIR="$STATE_DIR"
+
+COOKIE_JAR="$(mktemp -t coolie-e2e-cookies.XXXXXX)"
+EVIDENCE_FILES=()
+A_NAME=(); A_STATUS=(); A_DETAIL=()
+
+cleanup() {
+  agent-device close --session "$SESSION" >/dev/null 2>&1
+  rm -f "$COOKIE_JAR"
+}
+trap cleanup EXIT
+
+# ── reporting ────────────────────────────────────────────────────────────────
+
+record() {
+  A_NAME+=("$1"); A_STATUS+=("$2"); A_DETAIL+=("$3")
+  if [ "$2" = "PASS" ]; then
+    printf '  \033[32mPASS\033[0m  %-28s %s\n' "$1" "$3"
+  elif [ "$2" = "FAIL" ]; then
+    printf '  \033[31mFAIL\033[0m  %-28s %s\n' "$1" "$3"
+  else
+    printf '  \033[33mSKIP\033[0m  %-28s %s\n' "$1" "$3"
+  fi
+}
+
+die() {
+  printf '\n\033[31m%s\033[0m\n' "$1" >&2
+  shift
+  for line in "$@"; do printf '%s\n' "$line" >&2; done
+  exit 2
+}
+
+# ── preflight ────────────────────────────────────────────────────────────────
+
+printf '\nCoolie local E2E — %s\n\n' "$BASE_URL"
+
+if [ ! -x "$(command -v agent-device)" ] && [ ! -x /opt/homebrew/bin/agent-device ]; then
+  die "agent-device is not installed." "Install it, then run: agent-device web setup"
+fi
+
+doctor_out="$(agent-device web doctor 2>&1)"
+if printf '%s' "$doctor_out" | grep -q 'TOOL_MISSING' \
+   || printf '%s' "$doctor_out" | grep -qi 'backend is not installed' \
+   || printf '%s' "$doctor_out" | grep -qE '[1-9][0-9]* fail'; then
+  die "agent-device web backend is not healthy." \
+      "Fix: agent-device web setup" \
+      "Then re-run: scripts/e2e-local.sh" \
+      "" \
+      "$doctor_out"
+fi
+record "web-backend" PASS "$(printf '%s' "$doctor_out" | head -1)"
+
+health_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$BASE_URL/api/health" || true)"
+health_body="$(curl -s --max-time 5 "$BASE_URL/api/health" || true)"
+if [ "$health_code" != "200" ] || ! printf '%s' "$health_body" | grep -q '"status":"ok"'; then
+  die "The local stack is not healthy at $BASE_URL (health HTTP ${health_code:-000})." \
+      "" \
+      "Start it, then re-run this script:" \
+      "" \
+      "  # pm2 (this repo's long-running local setup)" \
+      "  pm2 start ecosystem.config.cjs        # or: pm2 restart coolie" \
+      "" \
+      "  # or the repo dev server" \
+      "  pnpm dev" \
+      "" \
+      "Last health response: ${health_body:-<none>}"
+fi
+record "stack-health" PASS "$(printf '%s' "$health_body" | python3 -c 'import json,sys; d=json.load(sys.stdin); print("".join([d.get("status","?")," @ ",d.get("deploymentMode","?")," commit ",d.get("commit","?")[:8]]))' 2>/dev/null || echo ok)"
+
+mkdir -p "$EVIDENCE_DIR"
+
+# ── auth + company resolution (for the API-level assertions) ─────────────────
+
+signin_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 \
+  -c "$COOKIE_JAR" -X POST "$BASE_URL/api/auth/sign-in/email" \
+  -H 'Content-Type: application/json' -H "Origin: $BASE_URL" \
+  -d "{\"email\":\"$E2E_EMAIL\",\"password\":\"$E2E_PASSWORD\"}" || true)"
+
+if [ "$signin_code" != "200" ]; then
+  record "board-auth" FAIL "sign-in for $E2E_EMAIL returned HTTP $signin_code"
+  die "Could not sign in to the local stack as the E2E board account." \
+      "" \
+      "One-time bootstrap (see docs-coolie/LOCAL-E2E.md):" \
+      "  1. create the account:  curl -sX POST $BASE_URL/api/auth/sign-up/email \\" \
+      "       -H 'Content-Type: application/json' -H 'Origin: $BASE_URL' \\" \
+      "       -d '{\"email\":\"$E2E_EMAIL\",\"password\":\"$E2E_PASSWORD\",\"name\":\"E2E Harness\"}'" \
+      "  2. grant it company membership (the script prints the exact command)." \
+      "" \
+      "If the account exists but this fails, the credentials are wrong:" \
+      "  E2E_PASSWORD=<password> scripts/e2e-local.sh"
+fi
+
+company_json="$(curl -s --max-time 10 -b "$COOKIE_JAR" "$BASE_URL/api/companies?scope=accessible" || echo '[]')"
+read -r COMPANY_ID COMPANY_PREFIX COMPANY_NAME <<<"$(E2E_COMPANY_PREFIX="${E2E_COMPANY_PREFIX:-}" python3 -c '
+import json, os, sys
+want = os.environ.get("E2E_COMPANY_PREFIX", "").strip()
+rows = json.load(sys.stdin)
+if want:
+    rows = [c for c in rows if c.get("issuePrefix") == want]
+if not rows:
+    print(""); raise SystemExit
+c = rows[0]
+print(c.get("id",""), c.get("issuePrefix",""), (c.get("name","") or "").replace(" ", "_"))
+' <<<"$company_json" 2>/dev/null || echo '')"
+
+if [ -z "$COMPANY_ID" ] || [ -z "$COMPANY_PREFIX" ]; then
+  record "board-auth" FAIL "$E2E_EMAIL is not a member of any company"
+  die "Signed in, but $E2E_EMAIL has no company membership." \
+      "" \
+      "The board API is company-scoped: without a membership the tasks and" \
+      "ontology pages render empty, so every flow here would fail for the" \
+      "wrong reason. Grant membership once, then re-run:" \
+      "" \
+      "  node -e \"const s=require('postgres')('postgres://paperclip:paperclip@localhost:54329/paperclip');\" \\" \
+      "    -e \"s\\\`INSERT INTO company_memberships (company_id, principal_type, principal_id, status, membership_role) SELECT id, 'user', '<user-id>', 'active', 'member' FROM companies LIMIT 1 RETURNING id\\\`.then(r=>{console.log(r);process.exit(0)})\"" \
+      "" \
+      "docs-coolie/LOCAL-E2E.md has the full one-time bootstrap and how the" \
+      "user id is found."
+fi
+record "board-auth" PASS "$E2E_EMAIL → ${COMPANY_PREFIX} (${COMPANY_ID:0:8})"
+
+# ── replays ──────────────────────────────────────────────────────────────────
+
+LAST_STATUS=""
+run_replay() {
+  local label="$1" file="$2"
+  local out rc
+  out="$(agent-device replay "$REPLAY_DIR/$file" --platform web --session "$SESSION" \
+    --env "E2E_BASE_URL=$BASE_URL" \
+    --env "E2E_COMPANY_PREFIX=$COMPANY_PREFIX" \
+    --env "E2E_EMAIL=$E2E_EMAIL" \
+    --env "E2E_PASSWORD=$E2E_PASSWORD" 2>&1)"
+  rc=$?
+  if [ $rc -eq 0 ]; then
+    LAST_STATUS="PASS"
+    record "$label" PASS "$(printf '%s' "$out" | head -1 | sed 's/ This session.s daemon was kept alive.*//')"
+  else
+    LAST_STATUS="FAIL"
+    record "$label" FAIL "$file → $(printf '%s' "$out" | head -1 | sed 's/^Error ([A-Z_]*): //')"
+    printf '\n----- %s stdout -----\n%s\n---------------------\n' "$file" "$out"
+  fi
+  return $rc
+}
+
+run_replay "R0-sign-in"         "local-auth.ad"        || true
+run_replay "R1-ontology-page"   "ontology-domains.ad"  || true
+
+# Numeric domain-count assertion. The replay grammar has no counting
+# primitive, so the count is taken from the same accessibility snapshot
+# agent-device produces and asserted here.
+if [ "$LAST_STATUS" = "PASS" ]; then
+  snapshot_json="$(agent-device snapshot --json --platform web --session "$SESSION" 2>/dev/null || echo '')"
+  domain_count="$(printf '%s' "$snapshot_json" | python3 -c '
+import json, re, sys
+try:
+    nodes = json.load(sys.stdin)["data"]["nodes"]
+except Exception:
+    print(-1); raise SystemExit
+# The workbench renders two comboboxes: the domain picker (options look like
+# "Display Name · v3") and the relation filter (raw relation names). Match the
+# domain-picker option shape only.
+pat = re.compile(r" · v\d+$")
+print(sum(1 for n in nodes if n.get("type") == "option" and pat.search(n.get("label") or "")))
+' 2>/dev/null || echo -1)"
+  if [ "${domain_count:- -1}" -ge "$MIN_DOMAINS" ] 2>/dev/null; then
+    record "A3-ontology-domain-count" PASS "$domain_count domain options (>= $MIN_DOMAINS)"
+  else
+    record "A3-ontology-domain-count" FAIL "found ${domain_count:-?} domain options, expected >= $MIN_DOMAINS"
+  fi
+else
+  record "A3-ontology-domain-count" SKIP "R1-ontology-page did not pass"
+fi
+
+run_replay "R2-tasks-page"      "tasks-list.ad"        || true
+run_replay "R3-board-chat-reply" "board-chat.ad"       || true
+
+# ── evidence + summary ───────────────────────────────────────────────────────
+
+cleanup
+trap - EXIT
+
+while IFS= read -r f; do EVIDENCE_FILES+=("$f"); done < <(find "$EVIDENCE_DIR" -maxdepth 1 -type f -name '*.png' | sort)
+
+passed=0; failed=0; skipped=0
+for i in "${!A_NAME[@]}"; do
+  case "${A_STATUS[$i]}" in
+    PASS) passed=$((passed + 1)) ;;
+    FAIL) failed=$((failed + 1)) ;;
+    *)    skipped=$((skipped + 1)) ;;
+  esac
+done
+
+printf '\nEvidence (absolute paths):\n'
+if [ "${#EVIDENCE_FILES[@]}" -eq 0 ]; then
+  printf '  (none)\n'
+else
+  for f in "${EVIDENCE_FILES[@]}"; do printf '  %s\n' "$f"; done
+fi
+
+printf '\nAssertions: %d passed, %d failed, %d skipped (of %d)\n' \
+  "$passed" "$failed" "$skipped" "${#A_NAME[@]}"
+if [ "$failed" -gt 0 ]; then
+  printf 'Failing:\n'
+  for i in "${!A_NAME[@]}"; do
+    [ "${A_STATUS[$i]}" = "FAIL" ] && printf '  - %s: %s\n' "${A_NAME[$i]}" "${A_DETAIL[$i]}"
+  done
+fi
+printf '\n'
+
+[ "$failed" -eq 0 ] || exit 1
+exit 0
