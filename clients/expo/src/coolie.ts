@@ -305,6 +305,25 @@ export interface SeededDomainSummary {
   reason?: string;
 }
 
+/**
+ * 一条 pipeline 列表行 — GET /api/companies/:id/pipelines
+ * (paperclip 上游路由, 只读复用; 这里只取列表要展示的字段)
+ */
+export interface PipelineListRow {
+  id: string;
+  key: string;
+  name: string;
+  description?: string | null;
+  archivedAt?: string | null;
+  stageCount: number;
+  openCaseCount?: number;
+  inMotionCount?: number;
+  attentionCount?: number;
+  lastActivityAt?: string | null;
+  createdAt?: string | null;
+  updatedAt?: string | null;
+}
+
 /** 示例域骨架注入报告 — POST .../actions/seed-sample-domains */
 export interface SeedSampleDomainsReport {
   domains: SeededDomainSummary[];
@@ -497,6 +516,29 @@ export class CoolieClient extends BaseCoolieClient {
       "PATCH",
       `/api/notifications/${encodeURIComponent(id)}/read?companyId=${encodeURIComponent(companyId)}`,
     );
+  }
+
+  /**
+   * GET /api/companies/:id/pipelines — 公司全部 pipeline (只读)。
+   *
+   * 直接复用 paperclip 上游列表路由 (server/src/routes/pipelines.ts); 创建/编辑仍在
+   * Coolie Web 的 PipelineEditor 里做, App 只列 + 深链过去, 不在这边重发明编辑器。
+   */
+  async listPipelines(companyId: string): Promise<PipelineListRow[]> {
+    return this.request<PipelineListRow[]>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/pipelines`,
+    );
+  }
+
+  /**
+   * plan 任务列表 — 服务端没有 plans 端点 (见 BoardChatScreen.startPlan)。
+   * wave19 起 plan 以标题 `Plan: xxx` 的任务承载, 这里按标题前缀过滤,
+   * 与创建侧同一个约定, 不另立一套模型。
+   */
+  async listPlanIssues(companyId: string): Promise<Issue[]> {
+    const issues = await this.listIssues(companyId, { limit: 200 });
+    return issues.filter((issue) => /^plan[:\s]/i.test(issue.title.trim()));
   }
 
   /** GET /api/search — 全局搜索 (员工/任务/文档) */

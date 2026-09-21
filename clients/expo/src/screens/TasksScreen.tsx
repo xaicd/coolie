@@ -15,6 +15,7 @@ import { C, coolie, type AgentRow } from "../coolie";
 import { RADIUS, SPACING } from "../ui/tokens";
 import { IssuesList } from "../components/IssuesList";
 import { CreateTaskModal } from "../components/CreateTaskModal";
+import { BuildModeModal } from "../components/BuildModeModal";
 import { QuickApprovalCard } from "../components/QuickApprovalCard";
 
 /**
@@ -24,6 +25,9 @@ import { QuickApprovalCard } from "../components/QuickApprovalCard";
  * 右下角浮起 [+ 新建任务]。语音入口在全局顶栏的 mic (见 AppBar/TasksScreen 的
  * 语音派发), 复用 wave14 的 useRecorder + voiceDispatch 链路。
  *
+ * 顶部另有编排按钮组 [🔨 Build 5 步链] [🛤️ Pipeline] [📋 Plan] (wave20): 把工坊
+ * 对话里能触发的三种编排, 在任务页给出直接入口, 不必先学会说触发词。
+ *
  * 旧的 TaskDetailScreen 保留: 这里点任务行由外层压入详情, 深链也仍走它。
  */
 export function TasksScreen({
@@ -31,23 +35,31 @@ export function TasksScreen({
   whoami,
   refreshToken = 0,
   onOpenIssue,
+  onOpenBuildIssue,
   onOpenSettings,
   onOpenWorkshop,
   onOpenOntology,
   onOpenArtifacts,
+  onOpenPipelines,
+  onOpenPlans,
 }: {
   company: Company;
   whoami: string;
   /** 外层 (中央 "+" / 语音) 建完任务后 +1, 让列表重新拉取 */
   refreshToken?: number;
   onOpenIssue: (issue: Issue) => void;
+  /** Build 进度卡点某环节: 按 issueId 补全 Issue 后压详情, 由外层实现 */
+  onOpenBuildIssue: (issueId: string) => void;
   onOpenSettings: () => void;
   onOpenWorkshop: () => void;
   onOpenOntology: () => void;
   onOpenArtifacts: () => void;
+  onOpenPipelines: () => void;
+  onOpenPlans: () => void;
 }) {
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+  const [buildOpen, setBuildOpen] = useState(false);
   const [refreshSignal, setRefreshSignal] = useState(0);
   const [agents, setAgents] = useState<AgentRow[]>([]);
 
@@ -63,6 +75,15 @@ export function TasksScreen({
     setRefreshSignal((value) => value + 1);
     Alert.alert("任务已创建", issue.title);
   }, []);
+
+  // Build 进度卡点某环节: 先收起弹窗, 再让外层按 id 补全任务压详情
+  const handleBuildIssue = useCallback(
+    (issueId: string) => {
+      setBuildOpen(false);
+      onOpenBuildIssue(issueId);
+    },
+    [onOpenBuildIssue],
+  );
 
   return (
     <View style={styles.screen}>
@@ -85,6 +106,37 @@ export function TasksScreen({
             <EntryIcon icon="cube-outline" label="产物" onPress={onOpenArtifacts} />
             <EntryIcon icon="settings-outline" label="设置" onPress={onOpenSettings} />
           </View>
+        </View>
+
+        {/* 编排按钮组 (wave20): 工坊能做的三种编排在任务页给直达入口 */}
+        <View style={styles.orchestrationRow}>
+          <Pressable
+            style={({ pressed }) => [styles.orchBtn, pressed && styles.orchBtnPressed]}
+            onPress={() => setBuildOpen(true)}
+            accessibilityRole="button"
+            accessibilityLabel="Build 5 步链"
+          >
+            <Text style={styles.orchEmoji}>🔨</Text>
+            <Text style={styles.orchLabel}>Build 5 步链</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.orchBtn, pressed && styles.orchBtnPressed]}
+            onPress={onOpenPipelines}
+            accessibilityRole="button"
+            accessibilityLabel="Pipeline"
+          >
+            <Text style={styles.orchEmoji}>🛤️</Text>
+            <Text style={styles.orchLabel}>Pipeline</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [styles.orchBtn, pressed && styles.orchBtnPressed]}
+            onPress={onOpenPlans}
+            accessibilityRole="button"
+            accessibilityLabel="Plan"
+          >
+            <Text style={styles.orchEmoji}>📋</Text>
+            <Text style={styles.orchLabel}>Plan</Text>
+          </Pressable>
         </View>
 
         {/* 搜索框 */}
@@ -135,6 +187,13 @@ export function TasksScreen({
         agents={agents}
         onClose={() => setCreateOpen(false)}
         onCreated={handleCreated}
+      />
+
+      <BuildModeModal
+        visible={buildOpen}
+        companyId={company.id}
+        onClose={() => setBuildOpen(false)}
+        onOpenIssue={handleBuildIssue}
       />
     </View>
   );
@@ -203,6 +262,34 @@ const styles = StyleSheet.create({
     padding: 5,
     alignItems: "center",
     justifyContent: "center",
+  },
+  // 编排按钮组: 3 个按钮平分宽度, 紫蓝 accent 描边
+  orchestrationRow: {
+    flexDirection: "row",
+    gap: SPACING.sm,
+  },
+  orchBtn: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingVertical: 12,
+    paddingHorizontal: SPACING.sm,
+    borderWidth: 1,
+    borderColor: C.accent,
+    borderRadius: RADIUS.md,
+    backgroundColor: "rgba(94, 106, 210, 0.08)",
+  },
+  orchBtnPressed: {
+    backgroundColor: "rgba(94, 106, 210, 0.18)",
+  },
+  orchEmoji: {
+    fontSize: 16,
+  },
+  orchLabel: {
+    color: C.ink2,
+    fontSize: 12,
+    fontWeight: "500",
   },
   searchBox: {
     flexDirection: "row",

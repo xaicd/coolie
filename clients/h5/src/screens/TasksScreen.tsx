@@ -37,7 +37,18 @@ const C = {
   lineSubtle: "rgba(255,255,255,0.05)",
 } as const;
 
-export function TasksScreen({ style }: { style?: CSSProperties }) {
+export function TasksScreen({
+  style,
+  onOpenBuild,
+  onOpenPipelines,
+  onOpenPlans,
+}: {
+  style?: CSSProperties;
+  /** [🔨 Build 5 步链] → 工坊页 (在对话里输入 "build xxx" 走同一条编排链) */
+  onOpenBuild?: () => void;
+  onOpenPipelines?: () => void;
+  onOpenPlans?: () => void;
+}) {
   const [company, setCompany] = useState<Company | null>(null);
   const [companyError, setCompanyError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
@@ -105,6 +116,22 @@ export function TasksScreen({ style }: { style?: CSSProperties }) {
         <h1 style={styles.h1}>任务</h1>
         <button type="button" style={styles.primaryBtn} onClick={openCreate} disabled={!company}>
           + 新建任务
+        </button>
+      </div>
+
+      {/* 编排按钮组 (wave20, 镜像 App 任务页): 三种编排的直达入口 */}
+      <div style={styles.orchestrationRow}>
+        <button type="button" style={styles.orchBtn} onClick={onOpenBuild}>
+          <span style={styles.orchEmoji}>🔨</span>
+          <span style={styles.orchLabel}>Build 5 步链</span>
+        </button>
+        <button type="button" style={styles.orchBtn} onClick={onOpenPipelines}>
+          <span style={styles.orchEmoji}>🛤️</span>
+          <span style={styles.orchLabel}>Pipeline</span>
+        </button>
+        <button type="button" style={styles.orchBtn} onClick={onOpenPlans}>
+          <span style={styles.orchEmoji}>📋</span>
+          <span style={styles.orchLabel}>Plan</span>
         </button>
       </div>
 
@@ -226,6 +253,22 @@ const styles: Record<string, CSSProperties> = {
     cursor: "pointer",
   },
   disabled: { opacity: 0.4, cursor: "not-allowed" },
+  orchestrationRow: { display: "flex", gap: 8 },
+  orchBtn: {
+    flex: 1,
+    display: "flex",
+    flexDirection: "column",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    padding: "12px 8px",
+    borderRadius: 8,
+    border: `1px solid ${C.accent}`,
+    background: "rgba(94,106,210,0.08)",
+    cursor: "pointer",
+  },
+  orchEmoji: { fontSize: 16 },
+  orchLabel: { color: C.ink2, fontSize: 12, fontWeight: 500 },
   searchBox: {
     display: "flex",
     alignItems: "center",

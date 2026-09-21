@@ -113,6 +113,53 @@ Boss 看 Coolie Web 0.6.2 Tasks 页（截图：appBar 「Coolie Web」 + 「任�
 - 旧的 TaskDetailScreen 保留 (深链跳转用)
 - 底部 tab 第 2 个 TasksScreen (选中态紫蓝)
 
+### 3.6 TasksScreen 顶部加编排按钮组 (boss 09-21 22:38 OOB 「app工坊要有这些功能的合适入口」+ 「a,b」)
+
+老板选了 A + B 两个方案. A = TasksScreen 顶部按钮组.
+
+在 TasksScreen 顶部 (appBar 下方, 搜索框上方) 加一排 3 按钮:
+
+```
+┌────────────────────────────────────────────┐
+│ [🔨 Build 5 步链] [🛤️ Pipeline] [📋 Plan]   │
+└────────────────────────────────────────────┘
+```
+
+每个按钮行为:
+
+#### 3.6.1 [🔨 Build 5 步链]
+- 点击 → 弹 BuildModeModal (复用 BoardChatScreen 的 build trigger 形态)
+- 用户填"build xxx" → POST /api/board/build/start (server build-orchestrator.ts 已有)
+- 弹 BuildProgressCard (5 步链渲染)
+- 进 BoardChatScreen 看 BuildProgressCard 详情
+
+#### 3.6.2 [🛤️ Pipeline]
+- 点击 → 进 PipelinesScreen (新建) 列表
+- 列公司所有 pipelines (server GET /api/pipelines?companyId=X — 复用 paperclip 上游 /api/pipelines 端点)
+- 每条 pipeline: 名称 + 阶段数 + 当前状态 (Active/Draft/Archived)
+- 点 [+] → PipelineEditor (新建)
+- 点 pipeline → 进 PipelineDetail (阶段列表 + 跳 ChatHome 看 case)
+
+#### 3.6.3 [📋 Plan]
+- 点击 → 进 PlansScreen (新建) 列表
+- 列当前公司所有 in-progress plan documents
+- 每条 plan: 标题 + 评审状态 (Approved/Pending/Rejected)
+- 点 plan → 进 PlanDetail (纸clip Ask mode + 修订 + 评审)
+
+新建文件:
+- `clients/expo/src/screens/PipelinesScreen.tsx` + `PipelineEditorScreen.tsx` + `PipelineDetailScreen.tsx`
+- `clients/expo/src/screens/PlansScreen.tsx` + `PlanDetailScreen.tsx`
+- `clients/h5/src/screens/Pipelines*.tsx` + `Plans*.tsx` (镜像)
+
+App.tsx 加路由:
+```
+/pipelines → PipelinesScreen
+/pipelines/new → PipelineEditorScreen
+/pipelines/:id → PipelineDetailScreen
+/plans → PlansScreen
+/plans/:id → PlanDetailScreen
+```
+
 ## 4. 模拟器验证
 
 ```bash

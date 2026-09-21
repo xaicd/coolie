@@ -60,6 +60,8 @@ import { RegisterScreen } from "./src/screens/RegisterScreen";
 import { AgentDetailScreen } from "./src/screens/AgentDetailScreen";
 import { TaskDetailScreen } from "./src/screens/TaskDetailScreen";
 import { TasksScreen } from "./src/screens/TasksScreen";
+import { PipelinesScreen } from "./src/screens/PipelinesScreen";
+import { PlansScreen } from "./src/screens/PlansScreen";
 import { useNotificationsStore } from "./src/stores/notifications";
 import { WorkspaceScreen } from "./src/screens/workspace/WorkspaceScreen";
 import { BoardChatScreen, exportBoardEcho, exportBoardPrompt } from "./src/screens/BoardChatScreen";
@@ -689,6 +691,9 @@ function HomeScreen({
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [agentDetail, setAgentDetail] = useState<AgentRow | null>(null);
+  // 任务页顶部编排按钮组 (wave20) 的落地屏: Pipeline 列表 / Plan 列表
+  const [pipelinesOpen, setPipelinesOpen] = useState(false);
+  const [plansOpen, setPlansOpen] = useState(false);
   const ota = useOTA();
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const loadNotifications = useNotificationsStore((s) => s.load);
@@ -834,6 +839,26 @@ function HomeScreen({
     }
   }, [companyId, recording, start, stop]);
 
+  /**
+   * Build 进度卡点某环节, 或别的只给出 issueId 的入口: 从任务列表补齐 Issue 再压详情页,
+   * 与 BoardChatScreen 的 handleOpenBuildIssue 同一套做法 (卡片只带 id, 没有完整 Issue)。
+   */
+  const openIssueById = useCallback(
+    async (issueId: string) => {
+      try {
+        const issues = await coolie.listIssues(companyId, { limit: 200 });
+        const found = issues.find((issue) => issue.id === issueId);
+        if (found) {
+          setTab("tasks");
+          setSelected(found);
+        }
+      } catch {
+        // 找不到就不跳, 与审批卡「关联任务」的行为一致
+      }
+    },
+    [companyId],
+  );
+
   if (sandboxContext) {
     return (
       <PrototypeSandboxScreen
@@ -913,6 +938,24 @@ function HomeScreen({
           setAgentDetail(null);
           setTab("tasks");
           setSelected(issueItem);
+        }}
+      />
+    );
+  }
+
+  if (pipelinesOpen) {
+    return <PipelinesScreen company={company} onBack={() => setPipelinesOpen(false)} />;
+  }
+
+  if (plansOpen) {
+    return (
+      <PlansScreen
+        company={company}
+        onBack={() => setPlansOpen(false)}
+        onOpenPlan={(issue) => {
+          setPlansOpen(false);
+          setTab("tasks");
+          setSelected(issue);
         }}
       />
     );
@@ -1045,10 +1088,13 @@ function HomeScreen({
             whoami={whoami}
             refreshToken={tasksRefreshToken}
             onOpenIssue={setSelected}
+            onOpenBuildIssue={(issueId) => void openIssueById(issueId)}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenWorkshop={() => setTab("chat")}
             onOpenOntology={() => setTab("ontology")}
             onOpenArtifacts={() => setTab("artifacts")}
+            onOpenPipelines={() => setPipelinesOpen(true)}
+            onOpenPlans={() => setPlansOpen(true)}
           />
         ) : null}
       </View>
