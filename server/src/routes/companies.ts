@@ -60,6 +60,7 @@ import {
   companyArtifactsService,
   companyPortabilityService,
   companyService,
+  evaluateDsApproval,
   feedbackService,
   listCompanyTemplates,
   logActivity,
@@ -435,6 +436,16 @@ export function companyRoutes(db: Db, storage?: StorageService, options?: Compan
     res.json(await artifacts.list(companyId, query, {
       userId: query.starred && req.actor.type === "board" ? req.actor.userId : undefined,
     }));
+  });
+
+  // Coolie fork: the DS production veto (gate G4). Board-only read of whether
+  // the company's most recent issue carries a DS `go` decision. The release
+  // script calls this before shipping; the UI can use it to explain a refusal.
+  router.get("/:companyId/release-gate/ds-approval", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    assertCompanyAccess(req, companyId);
+    assertBoard(req);
+    res.json(await evaluateDsApproval(db, companyId));
   });
 
   router.get("/:companyId/timeline", async (req, res) => {

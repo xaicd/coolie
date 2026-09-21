@@ -18,6 +18,14 @@ export {
   resolveRoleTemplates,
 } from "./role-template.js";
 export { companySearchService } from "./company-search.js";
+export {
+  commentIsGoDecision,
+  evaluateDsApproval,
+  ReleaseGateError,
+  RELEASE_REJECTED_NEEDS_DS,
+  requireDsApproval,
+  type DsApprovalDecision,
+} from "./release-gate.js";
 export { companySearchExtractService } from "./company-search-extract.js";
 export { feedbackService } from "./feedback.js";
 export { companySkillService } from "./company-skills.js";

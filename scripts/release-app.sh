@@ -65,6 +65,32 @@ dry() { [ "$DRY_RUN" -eq 1 ]; }
 run() { if dry; then printf '   [dry-run] %s\n' "$*"; else "$@"; fi; }
 run_sh() { if dry; then printf '   [dry-run] %s\n' "$1"; else bash -c "$1"; fi; }
 
+# DS 投产一票否决（gate G4，见 server/src/services/release-gate.ts）。
+# 公司上下文由 COOLIE_RELEASE_COMPANY_ID 提供：App 发版本身没有公司概念，
+# 未设置时跳过；设置后若该公司最近一期 issue 上没有 DS 的 go 决议即拒绝发版。
+require_ds_approval() {
+  local company_id="${COOLIE_RELEASE_COMPANY_ID:-}"
+  local api_base="${COOLIE_API_BASE:-http://localhost:3100}"
+  if [ -z "$company_id" ]; then
+    echo "   · 跳过：COOLIE_RELEASE_COMPANY_ID 未设置（无公司上下文的 App 发版）"
+    return 0
+  fi
+  local args=(-sS --fail-with-body "$api_base/api/companies/$company_id/release-gate/ds-approval")
+  [ -n "${COOLIE_API_TOKEN:-}" ] && args+=(-H "authorization: Bearer $COOLIE_API_TOKEN")
+  local body
+  if ! body="$(curl "${args[@]}")"; then
+    echo "   ✗ DS gate 查询失败（company_id=$company_id, API=$api_base）" >&2
+    return 1
+  fi
+  if printf '%s' "$body" | python3 -c 'import json,sys; sys.exit(0 if json.load(sys.stdin).get("approved") else 1)'; then
+    echo "   ✓ DS 已签 go（company_id=$company_id）"
+    return 0
+  fi
+  echo "   ✗ RELEASE_REJECTED_NEEDS_DS: DS 未签 go，拒绝发版" >&2
+  printf '%s' "$body" | python3 -c 'import json,sys; print("     reason:", json.load(sys.stdin).get("reason"))' >&2 || true
+  return 1
+}
+
 if [ -z "$VERSION" ] || [ -z "$NOTES" ]; then
   echo "用法: bash scripts/release-app.sh <新版本号> \"<更新说明>\" [--dry-run]" >&2
   exit 2
@@ -87,6 +113,9 @@ echo " 模式:       $([ "$DRY_RUN" -eq 1 ] && echo 'dry-run (只打印步骤)' 
 echo "========================================================"
 
 cd "$REPO_ROOT"
+
+step "[0/9] DS 投产一票否决 (release-gate)"
+require_ds_approval || exit 1
 
 step "[1/9] 前置检查"
 DIRTY="$(git status --porcelain -- clients/expo)"
