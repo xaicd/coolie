@@ -50,6 +50,21 @@ export function formatRelativeTime(iso: string | number | Date): string {
   return `${Math.floor(diff / DAY)} 天前`;
 }
 
+/**
+ * 紧凑相对时间, 对齐 Coolie Web 任务行的时间列: just now / 5m ago / 1h ago / 4h ago / 1d ago.
+ * 与 formatRelativeTime (中文长格式) 区分: 这个专供任务列表行内的窄时间列。
+ */
+export function formatRelativeShort(iso?: string | number | Date | null): string {
+  if (iso === undefined || iso === null) return "";
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return "";
+  const diff = Date.now() - date.getTime();
+  if (diff < MINUTE) return "just now";
+  if (diff < HOUR) return `${Math.floor(diff / MINUTE)}m ago`;
+  if (diff < DAY) return `${Math.floor(diff / HOUR)}h ago`;
+  return `${Math.floor(diff / DAY)}d ago`;
+}
+
 /** 日期时间: 2026-09-20 14:05 */
 export function formatDateTime(iso: string | number | Date): string {
   const date = new Date(iso);

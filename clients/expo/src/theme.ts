@@ -31,6 +31,7 @@ export const C = {
   done: "#10B981",
   warn: "#F59E0B",
   err: "#EF4444",
+  violet: "#8B5CF6", // 评审中(in_review)状态色, 与 Coolie Web 的 violet 对齐
   // 边框(半透明白, 不用实色深边)
   line: "rgba(255,255,255,0.08)",
   lineSubtle: "rgba(255,255,255,0.05)",

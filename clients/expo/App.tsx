@@ -2,7 +2,6 @@ import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  FlatList,
   Linking,
   Pressable,
   SafeAreaView,
@@ -43,13 +42,11 @@ import { AppBar } from "./src/components/AppBar";
 import { TabBar } from "./src/components/TabBar";
 import { StatusDot } from "./src/components/StatusDot";
 import { AppCard } from "./src/ui/AppCard";
-import { EmptyState } from "./src/ui/EmptyState";
 import { ErrorRetry } from "./src/ui/ErrorRetry";
 import { LoadingState } from "./src/ui/LoadingState";
 import { Pill } from "./src/ui/Pill";
 import { ScreenHeader } from "./src/ui/ScreenHeader";
 import { Sheet } from "./src/ui/Sheet";
-import { StatTile } from "./src/ui/StatTile";
 import { useRecorder } from "./src/useRecorder";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
@@ -62,6 +59,7 @@ import { SearchScreen } from "./src/screens/SearchScreen";
 import { RegisterScreen } from "./src/screens/RegisterScreen";
 import { AgentDetailScreen } from "./src/screens/AgentDetailScreen";
 import { TaskDetailScreen } from "./src/screens/TaskDetailScreen";
+import { TasksScreen } from "./src/screens/TasksScreen";
 import { useNotificationsStore } from "./src/stores/notifications";
 import { WorkspaceScreen } from "./src/screens/workspace/WorkspaceScreen";
 import { BoardChatScreen, exportBoardEcho, exportBoardPrompt } from "./src/screens/BoardChatScreen";
@@ -139,124 +137,16 @@ const PRIORITY_DOT_COLOR: Record<IssuePriority, string> = {
   low: C.ink4,
 };
 
-const STATUS_LABEL: Record<string, string> = {
-  open: "待处理",
-  in_progress: "进行中",
-  blocked: "受阻",
-  done: "已完成",
-};
-
-const STATUS_DOT_COLOR: Record<string, string> = {
-  open: C.ink3,
-  in_progress: C.accent,
-  blocked: C.err,
-  done: C.ok,
-};
-
 type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "inbox" | "artifacts" | "ontology";
 
 /**
  * 底部栏只有 5 项 (汇览 / 任务 / [+] / 员工 / 收件箱, 见 src/components/TabBar.tsx)。
  * 工坊(chat) / 本体(ontology) / 产物(artifacts) 不再占底部栏, 仍从任务页顶部的
  * 图标行进入 —— 入口换了位置, 能力没减。
+ *
+ * 任务页本体 (列表 / 看板 / 分组) 已迁到 src/screens/TasksScreen.tsx +
+ * src/components/IssuesList.tsx (wave18, 对齐 Coolie Web Tasks 页)。
  */
-
-/** 看板视图：按状态分列横滑，点卡片循环推进状态，长按卡片打开详情 */
-const BOARD_COLUMNS: { status: string; label: string; color: string; next: string }[] = [
-  { status: "open", label: "待处理", color: C.ink3, next: "in_progress" },
-  { status: "in_progress", label: "进行中", color: C.accent, next: "done" },
-  { status: "blocked", label: "受阻", color: C.err, next: "in_progress" },
-  { status: "done", label: "已完成", color: C.ok, next: "open" },
-];
-
-function IssueBoardView({
-  issues,
-  onMove,
-  onOpen,
-  onChangePriority,
-}: {
-  issues: Issue[];
-  onMove: (id: string, status: string) => Promise<void>;
-  onOpen: (issue: Issue) => void;
-  onChangePriority: (id: string, priority: string) => Promise<void>;
-}) {
-  const handleCardLongPress = (it: Issue) => {
-    Alert.alert(
-      "修改优先级",
-      `任务：${it.title}`,
-      [
-        {
-          text: "低 (low)",
-          onPress: () => void onChangePriority(it.id, "low"),
-        },
-        {
-          text: "中 (medium)",
-          onPress: () => void onChangePriority(it.id, "medium"),
-        },
-        {
-          text: "高 (high)",
-          onPress: () => void onChangePriority(it.id, "high"),
-        },
-        {
-          text: "查看详情",
-          onPress: () => onOpen(it),
-        },
-        {
-          text: "取消",
-          style: "cancel",
-        },
-      ],
-    );
-  };
-
-  return (
-    <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 16, paddingBottom: 12, gap: 10 }}
-    >
-      {BOARD_COLUMNS.map((col) => {
-        const items = issues.filter((i) => i.status === col.status);
-        return (
-          <View key={col.status} style={styles.boardCol}>
-            <View style={styles.boardColHeader}>
-              <View style={[styles.boardColDot, { backgroundColor: col.color }]} />
-              <Text style={styles.boardColTitle}>{col.label}</Text>
-              <Text style={styles.boardColCount}>{items.length}</Text>
-            </View>
-            <ScrollView contentContainerStyle={{ gap: 8, paddingBottom: 16 }}>
-              {items.length === 0 ? (
-                <Text style={styles.boardEmpty}>暂无</Text>
-              ) : (
-                items.map((it) => (
-                  <Pressable
-                    key={it.id}
-                    style={styles.boardCard}
-                    onPress={() => void onMove(it.id, col.next)}
-                    onLongPress={() => handleCardLongPress(it)}
-                  >
-                    <Text style={styles.boardCardTitle} numberOfLines={3}>
-                      {it.title}
-                    </Text>
-                    <View style={styles.boardCardMeta}>
-                      <View
-                        style={[
-                          styles.boardPrioDot,
-                          { backgroundColor: PRIORITY_DOT_COLOR[it.priority] ?? C.ink3 },
-                        ]}
-                      />
-                      <Text style={styles.boardCardHint}>点按→{BOARD_COLUMNS.find((c) => c.status === col.next)?.label} · 长按改优先级</Text>
-                    </View>
-                  </Pressable>
-                ))
-              )}
-            </ScrollView>
-          </View>
-        );
-      })}
-    </ScrollView>
-  );
-}
 
 /** 应用升级卡片：新版本提示 + 一键下载 APK */
 function AppUpdateCard({ info, onClose }: { info: RemoteVersionInfo; onClose: () => void }) {
@@ -852,7 +742,6 @@ function HomeScreen({
     return () => subscription.remove();
   }, []);
 
-  const [issues, setIssues] = useState<Issue[]>([]);
   const [selected, setSelected] = useState<Issue | null>(null);
   const [focusedApprovalId, setFocusedApprovalId] = useState<string | null>(null);
   const [diffContext, setDiffContext] = useState<{
@@ -867,26 +756,12 @@ function HomeScreen({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<IssuePriority>("medium");
-  const [loading, setLoading] = useState(false);
   const [busy, setBusy] = useState(false);
+  /** 递增后让 TasksScreen 重新拉列表 (中央 "+" 浮层或语音在别处建了任务)。 */
+  const [tasksRefreshToken, setTasksRefreshToken] = useState(0);
   const { recording, start, stop } = useRecorder();
 
   const companyId = company.id;
-
-  const loadIssues = useCallback(async () => {
-    setLoading(true);
-    try {
-      setIssues(await coolie.listIssues(companyId, { limit: 50 }));
-    } catch (e) {
-      Alert.alert("加载失败", String((e as Error)?.message ?? e));
-    } finally {
-      setLoading(false);
-    }
-  }, [companyId]);
-
-  useEffect(() => {
-    void loadIssues();
-  }, [loadIssues]);
 
   const createTask = useCallback(async (): Promise<boolean> => {
     if (!title.trim()) return false;
@@ -901,7 +776,7 @@ function HomeScreen({
       setTitle("");
       setDescription("");
       setPriority("medium");
-      await loadIssues();
+      setTasksRefreshToken((value) => value + 1);
       return true;
     } catch (e) {
       Alert.alert("创建失败", String((e as Error)?.message ?? e));
@@ -909,12 +784,7 @@ function HomeScreen({
     } finally {
       setBusy(false);
     }
-  }, [companyId, title, description, priority, loadIssues]);
-
-  // 任务页 composer: 建完就地刷新列表, 不切屏。
-  const submitInlineTask = useCallback(() => {
-    void createTask();
-  }, [createTask]);
+  }, [companyId, title, description, priority]);
 
   // 中央 "+" 浮层: 建完关浮层并落到任务页看到新任务。
   const submitOverlayTask = useCallback(() => {
@@ -944,9 +814,15 @@ function HomeScreen({
         audioBase64: base64,
         format,
       });
-      if (res.issue) Alert.alert("任务已创建", res.issue.title);
-      else Alert.alert("转写结果", res.transcription.text || "(空)");
-      await loadIssues();
+      if (res.issue) {
+        Alert.alert("任务已创建", res.issue.title);
+        // 派发成功即落到工坊聊天流 (wave18): 老板要的是「说完就有活干」。
+        setComposeOpen(false);
+        setTab("chat");
+      } else {
+        Alert.alert("转写结果", res.transcription.text || "(空)");
+      }
+      setTasksRefreshToken((value) => value + 1);
     } catch (e) {
       if (isAsrNotConfigured(e)) {
         Alert.alert("语音未配置", "该实例尚未配置腾讯 ASR 凭据，请改用文字输入。");
@@ -956,7 +832,7 @@ function HomeScreen({
     } finally {
       setBusy(false);
     }
-  }, [companyId, recording, start, stop, loadIssues]);
+  }, [companyId, recording, start, stop]);
 
   if (sandboxContext) {
     return (
@@ -1068,8 +944,6 @@ function HomeScreen({
     );
   }
 
-  const open = issues.filter((i) => i.status !== "done").length;
-
   return (
     <SafeAreaView style={[styles.shell, { paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
       <StatusBar style="light" />
@@ -1079,6 +953,10 @@ function HomeScreen({
         unreadCount={unreadCount}
         onOpenNotifications={() => setNotificationsOpen(true)}
         onOpenSearch={() => setSearchOpen(true)}
+        // 语音派发只在任务页出现 (wave18): 顶栏右侧 mic, 复用 wave14 的录音链路。
+        onVoice={tab === "tasks" ? voiceDispatch : undefined}
+        voiceRecording={recording}
+        voiceBusy={busy}
       />
       <View style={styles.shellContent}>
         {tab === "dashboard" ? (
@@ -1148,169 +1026,17 @@ function HomeScreen({
             }
           />
         ) : tab === "tasks" ? (
-          <ScrollView
-            style={{ flex: 1, backgroundColor: C.bg }}
-            contentContainerStyle={styles.screen}
-          >
-            {/* 顶部标题与身份胶囊 */}
-            <View style={styles.rowBetween}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.h1}>工坊控制台</Text>
-                <Pill style={styles.companyCapsule}>
-                  <StatusDot status="ok" size={6} />
-                  <Text style={styles.companyCapsuleText} numberOfLines={1}>
-                    {company.name}
-                  </Text>
-                  <Text style={styles.companyCapsuleSubText}>· {whoami}</Text>
-                </Pill>
-              </View>
-              {/* 底部栏只剩 5 项, 工坊/本体/产物 收进任务页顶部这一排图标 */}
-              <Pressable
-                onPress={() => setBoardView((v) => !v)}
-                hitSlop={10}
-                style={styles.headerIcon}
-              >
-                <Ionicons name={boardView ? "list" : "grid"} size={19} color={C.ink2} />
-              </Pressable>
-              <Pressable
-                onPress={() => setTab("chat")}
-                hitSlop={10}
-                style={styles.headerIcon}
-              >
-                <Ionicons name="chatbubbles-outline" size={19} color={C.ink2} />
-              </Pressable>
-              <Pressable
-                onPress={() => setTab("ontology")}
-                hitSlop={10}
-                style={styles.headerIcon}
-              >
-                <Ionicons name="git-network-outline" size={19} color={C.ink2} />
-              </Pressable>
-              <Pressable
-                onPress={() => setTab("artifacts")}
-                hitSlop={10}
-                style={styles.headerIcon}
-              >
-                <Ionicons name="cube-outline" size={19} color={C.ink2} />
-              </Pressable>
-              <Pressable onPress={() => setSettingsOpen(true)} hitSlop={10} style={styles.headerIcon}>
-                <Ionicons name="settings-outline" size={19} color={C.ink2} />
-              </Pressable>
-            </View>
-
-            {/* 概览统计卡片 (tabularNum + 亮度分层) */}
-      <View style={styles.statRow}>
-        <StatTile value={issues.length} label="全部任务" />
-        <StatTile value={open} label="进行中" valueColor={C.accent} />
-        <StatTile value={issues.length - open} label="已完成" valueColor={C.ok} />
-      </View>
-
-      {/* 创建任务输入框区域 (与中央 "+" 浮层共用 TaskComposer) */}
-      <TaskComposer
-        title={title}
-        onTitle={setTitle}
-        description={description}
-        onDescription={setDescription}
-        priority={priority}
-        onPriority={setPriority}
-        busy={busy}
-        recording={recording}
-        onSubmit={submitInlineTask}
-        onVoice={voiceDispatch}
-      />
-
-      {/* 任务列表 (规范行高 56，状态点呼吸灯) */}
-      {boardView && !loading && issues.length > 0 ? (
-        <IssueBoardView
-          issues={issues}
-          onMove={async (id, status) => {
-            try {
-              await coolie.updateIssueStatus(id, status);
-              await loadIssues();
-            } catch (e) {
-              Alert.alert("状态更新失败", String((e as Error)?.message ?? e));
-            }
-          }}
-          onChangePriority={async (id, prio) => {
-            try {
-              await coolie.updateIssuePriority(id, prio);
-              await loadIssues();
-            } catch (e) {
-              Alert.alert("优先级更新失败", String((e as Error)?.message ?? e));
-            }
-          }}
-          onOpen={(it) => setSelected(it)}
-        />
-      ) : loading ? (
-        <LoadingState style={styles.listLoader} />
-      ) : (
-        <FlatList
-          scrollEnabled={false}
-          data={issues}
-          keyExtractor={(i) => i.id}
-          ListEmptyComponent={
-            <EmptyState
-              icon="📋"
-              title="还没有任务"
-              subtitle="在上方输入标题创建第一个任务，或用语音派发。"
-            />
-          }
-          renderItem={({ item }) => {
-            const isRunning = item.status === "in_progress";
-            const dotStatus = isRunning
-              ? "ok"
-              : item.status === "blocked"
-              ? "err"
-              : "idle";
-
-            return (
-              <AppCard
-                onPress={() => setSelected(item)}
-                row
-                padding={12}
-                style={styles.taskCard}
-              >
-                <View style={styles.taskCardMain}>
-                  <View style={styles.taskTitleRow}>
-                    <StatusDot
-                      status={dotStatus}
-                      color={STATUS_DOT_COLOR[item.status]}
-                      pulse={isRunning}
-                      size={8}
-                    />
-                    <Text style={styles.taskTitle} numberOfLines={2}>
-                      {item.title}
-                    </Text>
-                  </View>
-
-                  <View style={styles.taskMeta}>
-                    {/* 状态徽标胶囊 */}
-                    <Pill
-                      label={STATUS_LABEL[item.status] ?? item.status}
-                      dotColor={STATUS_DOT_COLOR[item.status] ?? C.ink3}
-                      mono
-                      size="sm"
-                    />
-
-                    {/* 优先级徽标胶囊 */}
-                    <Pill
-                      label={PRIORITY_LABEL[item.priority] ?? item.priority}
-                      dotColor={PRIORITY_DOT_COLOR[item.priority] ?? C.ink3}
-                      mono
-                      size="sm"
-                    />
-                  </View>
-                </View>
-
-                <Text style={styles.chevron}>›</Text>
-              </AppCard>
-            );
-          }}
-        />
-      )}
-      <QuickApprovalCard companyId={companyId} floating={true} />
-            </ScrollView>
-          ) : null}
+          <TasksScreen
+            company={company}
+            whoami={whoami}
+            refreshToken={tasksRefreshToken}
+            onOpenIssue={setSelected}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenWorkshop={() => setTab("chat")}
+            onOpenOntology={() => setTab("ontology")}
+            onOpenArtifacts={() => setTab("artifacts")}
+          />
+        ) : null}
       </View>
       {appUpdate ? <AppUpdateCard info={appUpdate} onClose={() => setAppUpdate(null)} /> : null}
       {settingsOpen ? (
@@ -1483,39 +1209,6 @@ const styles = StyleSheet.create({
   shellContent: {
     flex: 1,
   },
-  headerIcon: {
-    padding: 5,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  boardCol: {
-    width: 168,
-    backgroundColor: C.panel,
-    borderRadius: 12,
-    padding: 8,
-    alignSelf: "flex-start",
-  },
-  boardColHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 4,
-    paddingBottom: 8,
-  },
-  boardColDot: { width: 8, height: 8, borderRadius: 4 },
-  boardColTitle: { color: C.ink2, fontSize: 13, fontWeight: "600", flex: 1 },
-  boardColCount: { color: C.ink4, fontSize: 12 },
-  boardEmpty: { color: C.ink4, fontSize: 12, paddingHorizontal: 4, paddingVertical: 10 },
-  boardCard: {
-    backgroundColor: C.surface,
-    borderRadius: 10,
-    padding: 10,
-    gap: 6,
-  },
-  boardCardTitle: { color: C.ink, fontSize: 13, lineHeight: 18 },
-  boardCardMeta: { flexDirection: "row", alignItems: "center", gap: 6 },
-  boardPrioDot: { width: 6, height: 6, borderRadius: 3 },
-  boardCardHint: { color: C.ink4, fontSize: 10 },
   updateBanner: {
     position: "absolute",
     top: 8,
@@ -1673,11 +1366,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     fontSize: 13,
   },
-  listLoader: {
-    flex: 0,
-    marginTop: 24,
-    paddingVertical: 0,
-  },
   inlineLoader: {
     flex: 0,
     marginVertical: 24,
@@ -1807,56 +1495,11 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  companyCapsule: {
-    marginTop: 6,
-    gap: 6,
-  },
-  companyCapsuleText: {
-    fontSize: 11,
-    color: C.ink2,
-    fontWeight: "500",
-    maxWidth: 160,
-  },
-  companyCapsuleSubText: {
-    fontSize: 11,
-    color: C.ink4,
-    fontWeight: "400",
-  },
   chips: {
     flexGrow: 0,
     flexDirection: "row",
     flexWrap: "wrap",
     gap: 8,
-  },
-  statRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  taskCard: {
-    minHeight: 56,
-    justifyContent: "space-between",
-    marginBottom: 8,
-    gap: 10,
-  },
-  taskCardMain: {
-    flex: 1,
-    gap: 6,
-  },
-  taskTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  taskTitle: {
-    color: C.ink,
-    fontSize: 15,
-    fontWeight: "500",
-    flex: 1,
-  },
-  taskMeta: {
-    flexDirection: "row",
-    gap: 8,
-    marginLeft: 16,
   },
   detailTitle: {
     fontSize: 20,

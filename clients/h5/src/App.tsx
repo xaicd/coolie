@@ -4,6 +4,7 @@ import { BoardChatScreen, type WorkspaceCompany } from "./screens/BoardChatScree
 import { WorkspaceScreen } from "./screens/workspace/WorkspaceScreen";
 import { DashboardScreen } from "./screens/DashboardScreen";
 import { OntologyScreen } from "./screens/OntologyScreen";
+import { TasksScreen } from "./screens/TasksScreen";
 import { WhatsNewScreen } from "./screens/WhatsNewScreen";
 
 /**
@@ -23,10 +24,11 @@ import { WhatsNewScreen } from "./screens/WhatsNewScreen";
 /** 本地 stub: 本波不接登录/公司选择, 先固定一个占位主体 (工坊页用) */
 const STUB_COMPANY: WorkspaceCompany = { id: "local-stub", name: "Coolie (local stub)" };
 
-type TabKey = "chat" | "quota" | "ontology" | "whats-new";
+type TabKey = "chat" | "tasks" | "quota" | "ontology" | "whats-new";
 
 const NAV_ITEMS: Array<{ key: TabKey; label: string; icon: string; hash: string }> = [
   { key: "chat", label: "工坊", icon: "💬", hash: "#/chat" },
+  { key: "tasks", label: "任务", icon: "☰", hash: "#/tasks" },
   { key: "quota", label: "看额度", icon: "💰", hash: "#/quota" },
   { key: "ontology", label: "本体驱动", icon: "🧩", hash: "#/ontology" },
   { key: "whats-new", label: "更新", icon: "🎉", hash: "#/whats-new" },
@@ -114,6 +116,7 @@ export function App() {
             onOpenWorkspace={openWorkspace}
           />
         ) : null}
+        {tab === "tasks" ? <TasksScreen style={{ flex: 1, overflowY: "auto" }} /> : null}
         {tab === "quota" ? <DashboardScreen /> : null}
         {tab === "ontology" ? <OntologyScreen /> : null}
         {tab === "whats-new" ? (

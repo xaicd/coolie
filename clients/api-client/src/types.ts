@@ -30,6 +30,18 @@ export interface Issue {
   status: IssueStatus;
   priority: IssuePriority;
   companyId: string;
+  /**
+   * Presentation fields the list endpoints already return. Optional because the
+   * create/voice responses only guarantee the core fields above; the task list
+   * (identifier, timestamps, assignee) reads them defensively.
+   */
+  identifier?: string | null;
+  assigneeAgentId?: string | null;
+  assigneeUserId?: string | null;
+  projectId?: string | null;
+  parentId?: string | null;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 }
 
 export interface SessionUser {
