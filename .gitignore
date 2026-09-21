@@ -109,3 +109,8 @@ coscli_output/
 # divergence, recorded in `scripts/fork-surface.json`: at a merge, keep this rule
 # and drop upstream's images again rather than restoring them.
 screenshots/
+
+# Replay evidence (agent-device screenshots) — local only. Per fork policy,
+# capture artifacts (binary screenshots, .gitkeep only) never enter commits.
+clients/*/replays/evidence/
+**/replays/evidence/

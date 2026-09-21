@@ -111,13 +111,14 @@ curl -I http://localhost:5173
 ### 失败真实记录
 - <真红写这里,不要改松>
 
-### 截图清单（ls 真实输出）
+### 截图清单（ls 真实输出,本地不入 git）
 $(ls -la clients/h5/replays/evidence/)
 ```
 
 ## 4. 重要约束
 
-- `clients/h5/replays/evidence/` 截图要 **git add 进库**（h5 版本不入 .gitignore，expo 那个 gitignore 但我们覆盖）
+- **截图不入 git**（fork 政策：截图只留本地）。`screenshots/` `clients/h5/replays/evidence/` 都加进 `.gitignore`
+- 报告里写「本地证据路径」即可（绝对路径），commit 不带图
 - 失败写 `docs-coolie/TEST-FAILURES-2026-09-21.md`（新建）含 root cause + 真实 stdout
 - 不许改断言 / 不许 stub 跑过
 - 真红（API 500 / agent-device 报 fetch error）就报 FAIL，**不许撤回**
@@ -127,7 +128,7 @@ $(ls -la clients/h5/replays/evidence/)
 - [ ] 跑前准备 4 步全过
 - [ ] §1 3 spot-check 全报
 - [ ] §2 8 项全报
-- [ ] 11 张截图入库
+- [ ] 11 张截图在本地（不入 git）
 - [ ] 失败写 docs-coolie/TEST-FAILURES-2026-09-21.md（如有）
 - [ ] commit + push
 - [ ] PM-LOG 加一行
