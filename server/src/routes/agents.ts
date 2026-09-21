@@ -27,6 +27,7 @@ import {
   createAgentKeySchema,
   createAgentHireSchema,
   createAgentSchema,
+  registerCompanyRolesSchema,
   deriveAgentUrlKey,
   isUuidLike,
   normalizeIssueIdentifier,
@@ -70,13 +71,16 @@ import {
   builtInAgentService,
   companySkillService,
   budgetService,
+  deduplicateAgentName,
   heartbeatService,
   ISSUE_LIST_DEFAULT_LIMIT,
   issueApprovalService,
   issueRecoveryActionService,
   issueService,
   logActivity,
+  resolveRoleTemplates,
   syncInstructionsBundleConfigFromFilePath,
+  templateRoles,
   workspaceOperationService,
 } from "../services/index.js";
 import { badRequest, conflict, forbidden, HttpError, notFound, unprocessable } from "../errors.js";
@@ -4848,6 +4852,149 @@ export function agentRoutes(
 
     res.status(201).json(redactAgentRowForResponse(agent));
   });
+
+  /**
+   * Coolie fork: staff a company with its Palantir role agents.
+   *
+   * `POST /api/companies/:companyId/agents` already means "create one agent from
+   * a full create body", so the bulk form lives one segment deeper rather than
+   * overloading that body with a `roles` array.
+   *
+   * The route is idempotent by role: a role that already has a live agent in the
+   * company is reported in `skipped` and left alone, so re-running
+   * `scripts/register-roles.sh` (or the one-key project script) does not staff a
+   * second FDA. With `roles` omitted the company's own template roles are used,
+   * which is how a `template-palantir-5-role` company gets its five employees.
+   *
+   * Each agent is created through the same `agentService.create` factory the
+   * single-agent route uses, then gets the same default task-assign grant and
+   * activity entry, so a bulk-created agent is indistinguishable from one hired
+   * one at a time.
+   */
+  router.post(
+    "/companies/:companyId/agents/bulk",
+    validate(registerCompanyRolesSchema),
+    async (req, res) => {
+      const companyId = req.params.companyId as string;
+      await assertCanCreateAgentsForCompany(req, companyId);
+
+      const company = await db
+        .select()
+        .from(companies)
+        .where(eq(companies.id, companyId))
+        .then((rows) => rows[0] ?? null);
+      if (!company) {
+        res.status(404).json({ error: "Company not found" });
+        return;
+      }
+      if (company.requireBoardApprovalForNewAgents) {
+        throw conflict(
+          "Direct agent creation requires board approval. Use POST /api/companies/:companyId/agent-hires to create a pending hire approval.",
+        );
+      }
+
+      const requestedRoles = Array.isArray(req.body.roles)
+        ? (req.body.roles as string[])
+        : templateRoles(company.templateId);
+      const templates = resolveRoleTemplates(requestedRoles);
+
+      // One read of the roster serves both the idempotency check and shortname
+      // de-duplication, so a second run sees the agents the first one created.
+      const roster = await db
+        .select({
+          id: agentsTable.id,
+          name: agentsTable.name,
+          role: agentsTable.role,
+          status: agentsTable.status,
+        })
+        .from(agentsTable)
+        .where(eq(agentsTable.companyId, companyId));
+
+      const actor = getActorInfo(req);
+      const grantedByUserId = req.actor.type === "board" ? (req.actor.userId ?? null) : null;
+      const telemetryClient = getTelemetryClient();
+
+      const created: Awaited<ReturnType<typeof svc.create>>[] = [];
+      const skipped: Array<{ role: string; agentId: string }> = [];
+
+      for (const template of templates) {
+        const existing = roster.find(
+          (row) => row.role === template.role && row.status !== "terminated",
+        );
+        if (existing) {
+          skipped.push({ role: template.role, agentId: existing.id });
+          continue;
+        }
+
+        const createdAgent = await svc.create(companyId, {
+          id: randomUUID(),
+          name: deduplicateAgentName(template.agentName, roster),
+          role: template.role,
+          title: template.title,
+          capabilities: template.capabilities,
+          adapterType: "process",
+          adapterConfig: {},
+          runtimeConfig: {},
+          status: "idle",
+          spentMonthlyCents: 0,
+          lastHeartbeatAt: null,
+          metadata: {
+            roleTemplate: {
+              role: template.role,
+              cli: template.cli,
+              model: template.model,
+              backup: template.backup,
+              skillRef: template.skillRef,
+              gates: template.gates,
+            },
+          },
+        });
+
+        // Keep the in-memory roster current so a later role in this same batch
+        // cannot pick the name this one just took.
+        roster.push({
+          id: createdAgent.id,
+          name: createdAgent.name,
+          role: createdAgent.role,
+          status: createdAgent.status,
+        });
+
+        await applyDefaultAgentTaskAssignGrant(companyId, createdAgent.id, grantedByUserId);
+        await logActivity(db, {
+          companyId,
+          actorType: actor.actorType,
+          actorId: actor.actorId,
+          agentId: actor.agentId,
+          runId: actor.runId,
+          agentApiKeyId: actor.agentApiKeyId,
+          action: "agent.created",
+          entityType: "agent",
+          entityId: createdAgent.id,
+          details: {
+            name: createdAgent.name,
+            role: createdAgent.role,
+            batch: true,
+            templateId: company.templateId ?? null,
+          },
+        });
+        if (telemetryClient) {
+          trackAgentCreated(telemetryClient, {
+            agentRole: createdAgent.role,
+            agentId: createdAgent.id,
+          });
+        }
+
+        created.push(createdAgent);
+      }
+
+      res.status(201).json({
+        created: created.map((agent) => redactAgentRowForResponse(agent)),
+        skipped,
+        templateId: company.templateId ?? null,
+        roles: templates.map((template) => template.role),
+      });
+    },
+  );
 
   router.patch("/agents/:id/permissions", validate(updateAgentPermissionsSchema), async (req, res) => {
     const id = req.params.id as string;

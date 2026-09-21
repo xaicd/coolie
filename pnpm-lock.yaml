@@ -1222,6 +1222,9 @@ importers:
       '@paperclipai/adapter-utils':
         specifier: workspace:*
         version: link:../packages/adapter-utils
+      '@paperclipai/agents':
+        specifier: workspace:*
+        version: link:../packages/agents
       '@paperclipai/db':
         specifier: workspace:*
         version: link:../packages/db

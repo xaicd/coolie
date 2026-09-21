@@ -110,6 +110,19 @@ export const createAgentSchema = z.object({
 
 export type CreateAgent = z.infer<typeof createAgentSchema>;
 
+/**
+ * Coolie fork: bulk-register the Palantir role agents for a company
+ * (`POST /api/companies/:companyId/agents/bulk`). `roles` is optional — when it
+ * is omitted the route staffs the company's own template roles. Role ids are
+ * validated against the role-template catalogue in the route, so an unknown role
+ * is a 422 naming the known ones rather than a body-validation error.
+ */
+export const registerCompanyRolesSchema = z.object({
+  roles: z.array(z.string().min(1)).min(1).optional(),
+});
+
+export type RegisterCompanyRoles = z.infer<typeof registerCompanyRolesSchema>;
+
 export const builtInAgentProvisionSchema = z.object({
   adapterType: agentAdapterTypeSchema.optional(),
   adapterConfig: adapterConfigSchema.optional(),

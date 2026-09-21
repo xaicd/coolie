@@ -10,6 +10,13 @@ export {
   type CompanyTemplateSummary,
 } from "./company-template.js";
 export { companyArtifactsService } from "./company-artifacts.js";
+export {
+  COMPANY_ROLE_IDS,
+  isCompanyRoleId,
+  listRoleTemplates,
+  resolveRoleTemplate,
+  resolveRoleTemplates,
+} from "./role-template.js";
 export { companySearchService } from "./company-search.js";
 export { companySearchExtractService } from "./company-search-extract.js";
 export { feedbackService } from "./feedback.js";

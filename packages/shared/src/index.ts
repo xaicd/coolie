@@ -1870,6 +1870,7 @@ export {
   builtInAgentProvisionSchema,
   builtInAgentResetSchema,
   createAgentHireSchema,
+  registerCompanyRolesSchema,
   updateAgentSchema,
   agentInstructionsBundleModeSchema,
   updateAgentInstructionsBundleSchema,
