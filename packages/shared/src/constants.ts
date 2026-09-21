@@ -56,6 +56,15 @@ export const AGENT_ROLES = [
   "devops",
   "researcher",
   "general",
+  // Coolie fork: the 5 Palantir Foundry ontology roles a company is staffed
+  // with at creation (see packages/agents/role-templates and
+  // packages/templates/template-palantir-5-role). Appended after the existing
+  // roles, so no existing role changes meaning and no stored row is affected.
+  "fda",
+  "core-swe",
+  "pre-sre",
+  "fdse",
+  "ds",
 ] as const;
 export type AgentRole = (typeof AGENT_ROLES)[number];
 
@@ -72,6 +81,11 @@ export const AGENT_ROLE_LABELS: Record<AgentRole, string> = {
   devops: "DevOps",
   researcher: "Researcher",
   general: "General",
+  fda: "FDA",
+  "core-swe": "Core SWE",
+  "pre-sre": "PRE-SRE",
+  fdse: "FDSE",
+  ds: "DS",
 };
 
 export const AGENT_DEFAULT_MAX_CONCURRENT_RUNS = 20;
