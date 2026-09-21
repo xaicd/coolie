@@ -12,6 +12,8 @@
 # 环境变量：
 #   COOLIE_API_BASE         Coolie 平台地址           (默认: http://localhost:3100)
 #   COOLIE_API_TOKEN        看板 bearer token；local_trusted 本地模式可留空
+#   COOLIE_COOKIE_JAR       看板会话 cookie 文件 (curl -c 产物)；authenticated
+#                           模式 (生产) 用会话 cookie 认证，无 bearer 时用这个
 #   COOLIE_WORKSPACE_HOME   workspace 父目录          (默认: $HOME/workspace/xaicd)
 #   COOLIE_SKIP_WORKSPACE   设为 1 只建平台公司 + agent，不铺本地目录
 set -euo pipefail
@@ -26,6 +28,7 @@ fi
 
 API_BASE="${COOLIE_API_BASE:-http://localhost:3100}"
 API_TOKEN="${COOLIE_API_TOKEN:-}"
+COOKIE_JAR="${COOLIE_COOKIE_JAR:-}"
 WORKSPACE_HOME="${COOLIE_WORKSPACE_HOME:-$HOME/workspace/xaicd}"
 SKIP_WORKSPACE="${COOLIE_SKIP_WORKSPACE:-0}"
 
@@ -40,10 +43,17 @@ command -v python3 >/dev/null || die "需要 python3 (用于解析 API JSON)"
 
 # ---- API 调用（带可选 bearer 认证）----------------------------------------
 # --fail-with-body: HTTP 4xx/5xx 直接非零退出，同时把错误体打出来。
+# 会话 cookie 认证时，服务端 CSRF 守卫要求同源 Origin；从 API_BASE 推导。
+ORIGIN=""
+if [[ -n "$COOKIE_JAR" ]]; then
+  ORIGIN="$(python3 -c 'import sys,urllib.parse as u; p=u.urlparse(sys.argv[1]); print(f"{p.scheme}://{p.netloc}")' "$API_BASE")"
+fi
 api() {
   local method="$1" path="$2" body="${3:-}"
   local args=(-sS --fail-with-body -X "$method" "$API_BASE$path" -H 'content-type: application/json')
   [[ -n "$API_TOKEN" ]] && args+=(-H "authorization: Bearer $API_TOKEN")
+  [[ -n "$COOKIE_JAR" ]] && args+=(-b "$COOKIE_JAR")
+  [[ -n "$ORIGIN" ]] && args+=(-H "origin: $ORIGIN")
   [[ -n "$body" ]] && args+=(-d "$body")
   curl "${args[@]}"
 }
@@ -54,7 +64,7 @@ echo "========================================================"
 echo " Coolie 一键立项"
 echo " 公司名:   $NAME"
 echo " 模板:     $TEMPLATE"
-echo " API:      $API_BASE$([[ -n "$API_TOKEN" ]] && echo ' (bearer)' || echo ' (no token)')"
+echo " API:      $API_BASE$([[ -n "$API_TOKEN" ]] && echo ' (bearer)' || { [[ -n "$COOKIE_JAR" ]] && echo ' (cookie)' || echo ' (no token)'; })"
 echo "========================================================"
 
 step "[1/4] 建平台公司 (POST /api/companies)"
