@@ -120,16 +120,28 @@ export async function evaluateDsApproval(db: Db, companyId: string): Promise<DsA
       const author = comment.authorAgentId ?? comment.derivedAuthorAgentId;
       return author !== null && dsAgentIds.includes(author);
     })
-    .filter((comment) => commentIsGoDecision(comment.body))
     .at(-1);
 
+  // The LATEST DS word wins: a `go` followed by a `no-go` is a refusal, so this
+  // reads the last decision rather than the last approval.
   if (!approval) {
     return {
       approved: false,
-      reason: `DS has not posted a "go" decision on the most recent issue (${latestIssue.id}).`,
+      reason: `DS has not posted a decision on the most recent issue (${latestIssue.id}).`,
       issueId: latestIssue.id,
       approvedByAgentId: null,
       approvalCommentId: null,
+      dsAgentIds,
+    };
+  }
+
+  if (!commentIsGoDecision(approval.body)) {
+    return {
+      approved: false,
+      reason: `DS's latest decision on the most recent issue (${latestIssue.id}) is not a go.`,
+      issueId: latestIssue.id,
+      approvedByAgentId: null,
+      approvalCommentId: approval.id,
       dsAgentIds,
     };
   }
