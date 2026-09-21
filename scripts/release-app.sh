@@ -154,6 +154,33 @@ for path, key, value in zip(args[0::3], args[1::3], args[2::3]):
 PY
 fi
 
+# android/app/build.gradle 才是 gradle 直构建真正的版本来源：app.json 的
+# android.versionCode 只在 `expo prebuild` 时写进 build.gradle。本仓库的 android/
+# 是 gitignore 的本地预构建目录、走 gradle 直构建（不跑 prebuild），所以这里
+# 就地同步它的版本号，否则 APK 的 manifest 会一直停在上一个版本，和 version.json
+# 对不上。android/ 不进提交，改完即用。
+if dry; then
+  echo "   [dry-run] $EXPO_DIR/app.json  expo.android.versionCode = $VERSION_CODE"
+  echo "   [dry-run] $EXPO_DIR/android/app/build.gradle  versionCode $VERSION_CODE / versionName \"$VERSION\""
+else
+  python3 - "$EXPO_DIR/app.json" "$VERSION_CODE" <<'PY'
+import json
+import sys
+
+path, code = sys.argv[1], int(sys.argv[2])
+with open(path, encoding="utf-8") as handle:
+    data = json.load(handle)
+data["expo"]["android"]["versionCode"] = code
+with open(path, "w", encoding="utf-8") as handle:
+    json.dump(data, handle, indent=2, ensure_ascii=False)
+    handle.write("\n")
+print(f"   ✓ {path} → expo.android.versionCode = {code}")
+PY
+  sed -i '' -E "s/versionCode [0-9]+/versionCode $VERSION_CODE/" "$EXPO_DIR/android/app/build.gradle"
+  sed -i '' -E "s/versionName \"[^\"]*\"/versionName \"$VERSION\"/" "$EXPO_DIR/android/app/build.gradle"
+  grep -nE 'versionCode|versionName' "$EXPO_DIR/android/app/build.gradle" | sed 's/^/   ✓ build.gradle /'
+fi
+
 step "[3/9] CHANGELOG.md 顶部插入 v$VERSION 节"
 if dry; then
   echo "   [dry-run] 在首个 '## v' 节前插入: ## v$VERSION / > Released: $TODAY · Android release APK / ### 更新 / - $NOTES"
@@ -184,6 +211,7 @@ if dry; then
   echo "   [dry-run] git add clients/expo/{app.json,package.json,CHANGELOG.md}"
   echo "   [dry-run] git commit -m \"release: v$VERSION — $NOTES\""
 else
+  # android/ 是 gitignore 的本地预构建目录，不进提交；[2/9] 已就地改好它的版本号。
   git add "$EXPO_DIR/app.json" "$EXPO_DIR/package.json" "$EXPO_DIR/CHANGELOG.md"
   git commit -m "release: v$VERSION — $NOTES"
   echo "   ✓ 已提交 $(git rev-parse --short HEAD)"
