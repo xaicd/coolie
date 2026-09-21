@@ -13,12 +13,21 @@ import {
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { WebView } from "react-native-webview";
-import type {
-  WebViewErrorEvent,
-  WebViewNavigation,
-  WebViewProgressEvent,
-} from "react-native-webview/lib/WebViewTypes";
+import { WebView, type WebViewNavigation } from "react-native-webview";
+
+/**
+ * react-native-webview@14 的根 `index.d.ts` 把组件声明成
+ * `class WebView<P = undefined> extends Component<WebViewProps & P>`；P 默认到
+ * undefined，于是 `WebViewProps & undefined` 直接塌成 `never`，任何 `<WebView/>`
+ * JSX 都会报 20+ 条 overload（`tsc --noEmit` 实测）。clients/expo 也是靠同一次
+ * cast 绕开的（见 src/components/board-inline/InlinePreviewPanel.tsx 的 SafeWebView）。
+ * 事件类型用宽松的本地结构类型，避免再 import `lib/WebViewTypes` 造出第二条模块身份。
+ */
+type WebViewLike = React.ComponentType<any>;
+const SafeWebView = WebView as unknown as WebViewLike;
+
+type WebViewErrorEvent = { nativeEvent?: { description?: string } };
+type WebViewLoadProgressEvent = { nativeEvent: { progress?: number } };
 
 /**
  * Coolie Web — paperclip PC web 的 native 壳。
@@ -31,6 +40,20 @@ import type {
 
 /** 目标站点：paperclip 上游完整 PC web (会议室 / Agent Feed / 12 项导航)。 */
 const PAPERCLIP_WEB_URL = "https://www.xrobinai.cn/XROA";
+
+/**
+ * 老板 (2026-09-21 反馈)：Coolie Web 装机后 web UI 默认英文。
+ * paperclip 上游 i18n 通过 `localStorage.coolie.locale` 决定语言。
+ * 在页面脚本执行前注入 zh-CN localStorage + 全局钩子，让 i18next 立刻取中文 bundle。
+ * 同时设置 `document.documentElement.lang` 让无障碍 / 浏览器提示也对。
+ */
+const ZH_CN_INJECTION = `
+try {
+  window.__COOLIE_DEFAULT_LOCALE__ = "zh-CN";
+  localStorage.setItem("coolie.locale", "zh-CN");
+  document.documentElement.lang = "zh-CN";
+} catch (e) {}
+`;
 
 /** 驾驶舱 App 的深链 scheme (cloud.coolie.app，见 clients/expo/app.json)。 */
 const COCKPIT_DEEP_LINK = "coolie://";
@@ -156,7 +179,7 @@ export default function App() {
 
   const onError = useCallback((event: WebViewErrorEvent) => {
     setLoading(false);
-    setLoadError(event.nativeEvent.description ?? "页面加载失败");
+    setLoadError(event?.nativeEvent?.description ?? "页面加载失败");
   }, []);
 
   const displayUrl = useMemo(
@@ -173,17 +196,21 @@ export default function App() {
     >
       <StatusBar style="light" />
 
-      <View style={styles.toolbar}>
-        <ToolbarButton label="←" onPress={goBack} disabled={!canGoBack} />
-        <ToolbarButton label="⟳" onPress={reload} />
-        <ToolbarButton label="→" onPress={goForward} disabled={!canGoForward} />
-
-        <View style={styles.urlBox}>
-          <Text style={styles.urlText} numberOfLines={1}>
-            {displayUrl}
-          </Text>
-        </View>
-
+      {/* 老板 (2026-09-21) 反馈：顶部 toolbar 看起来像浏览器不像 App, 改成原生 appBar: ← 标题 → [驾驶舱]。URL box 和 ⟳ 按钮去掉 (隐去浏览器特征)。*/}
+      <View style={styles.appBar}>
+        <Pressable
+          onPress={goBack}
+          disabled={!canGoBack}
+          hitSlop={8}
+          style={({ pressed }) => [
+            styles.navBtn,
+            !canGoBack && styles.navBtnDisabled,
+            pressed && canGoBack && styles.navBtnPressed,
+          ]}
+        >
+          <Text style={[styles.navBtnText, !canGoBack && styles.navBtnTextDisabled]}>←</Text>
+        </Pressable>
+        <Text style={styles.appBarTitle}>Coolie Web</Text>
         <Pressable
           onPress={() => void openCockpit()}
           hitSlop={8}
@@ -205,12 +232,14 @@ export default function App() {
       ) : null}
 
       <View style={styles.content}>
-        <WebView
+        <SafeWebView
           key={reloadNonce}
           ref={webRef}
           source={{ uri: PAPERCLIP_WEB_URL }}
           style={styles.webview}
           // —— wave 9 spec §3.5 配置 ——
+          // 老板 (2026-09-21) 要求默认中文：页面脚本执行前注入 zh-CN locale
+          injectedJavaScriptBeforeContentLoaded={ZH_CN_INJECTION}
           mixedContentMode="compatibility"
           allowsBackForwardNavigationGestures
           javaScriptEnabled
@@ -226,8 +255,8 @@ export default function App() {
           onLoadEnd={onLoadEnd}
           onHttpError={onError}
           onError={onError}
-          onProgress={(e: WebViewProgressEvent) => {
-            const p = e.nativeEvent.progress;
+          onLoadProgress={(e: WebViewLoadProgressEvent) => {
+            const p = e?.nativeEvent?.progress;
             if (typeof p === "number" && Number.isFinite(p)) setProgress(p);
           }}
           startInLoadingState
@@ -257,6 +286,47 @@ const styles = StyleSheet.create({
   shell: {
     flex: 1,
     backgroundColor: C.bg,
+  },
+  // 老板 (2026-09-21) 要求：去掉浏览器样 toolbar, 换成原生 appBar（标题 + 右侧驾驶舱按钮）
+  appBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+    borderBottomColor: C.lineSubtle,
+    backgroundColor: C.panel,
+  },
+  appBarTitle: {
+    color: C.ink,
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  navBtn: {
+    minWidth: 36,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  navBtnPressed: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  navBtnDisabled: {
+    opacity: 0.35,
+  },
+  navBtnText: {
+    color: C.ink,
+    fontSize: 18,
+    fontWeight: "500",
+  },
+  navBtnTextDisabled: {
+    color: C.ink3,
   },
   toolbar: {
     flexDirection: "row",
