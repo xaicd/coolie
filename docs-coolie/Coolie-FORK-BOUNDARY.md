@@ -69,7 +69,48 @@
 - [ ] 第二批抽 `packages/inline-board/` 共享包（expo + h5 共用 tagParser / useWorkspaceStore）
 - [ ] 5 角色 agent 真接入 company 创建流程（铁匠第二波）
 
-## 7. 老板回签点
+## 7. dsh = DeepSeek Harness（2026-09-21 老板拍板）
+
+老板原话：「准备用 dsh 作 mcp 网关，定制新业务智能体」
+
+### 7.1 DSH 是什么
+
+- 全名：DeepSeek Harness
+- 角色：**MCP 网关**（centralized MCP gateway）
+- 用途：定制新业务智能体（在 Coolie 上挂载）
+
+### 7.2 仓库已有"harness"层（DSH 落点）
+
+- `packages/adapters/hermes-gateway/` —— 现有 harness 网关（Hermes 自己）
+- `packages/adapters/openclaw_gateway/` —— 同类（OpenClaw）
+- `packages/adapters/codex_local/` `claude-local/` `gemini-local/` `grok-local/` `opencode_local/` `kimi-local/` `cursor_local/` `cursor-cloud/` —— 现有真实编码引擎
+- `packages/adapters/paperclip_runner/` —— ACP runtime
+
+**DSH 新加在 `packages/adapters/dsh/`，按 hermes-gateway / openclaw_gateway 范本。**
+
+### 7.3 MCP 网关的接入点
+
+- 服务端 MCP：`packages/ontology-core/src/mcp/` —— 本体核心已有 MCP
+- 业务智能体：走 Coolie 的 agent 注册 + role templates（刚立的5 角色模板）
+- DSH adapter 调 MCP server，把结果作为 agent 能力暴露给 Coolie 工坊对话
+
+### 7.4 边界纪律（DSH 项目）
+
+- ✅ 新建 `packages/adapters/dsh/` —— fork 自己
+- ✅ 接 MCP —— fork 自己
+- ✅ 定制业务智能体（agent role templates）—— fork 自己
+- ❌ 改 `hermes-gateway/` 已有的（除非真要改 Hermes 行为）
+- ❌ 改 `ontology-core/src/mcp/` 协议（除非真要扩 MCP 协议）
+
+### 7.5 派单前 PM 自查
+
+1. DSH adapter 是否在 `packages/adapters/dsh/`？
+2. 是否接 MCP server（不是发明新协议）？
+3. 业务智能体是否走 Coolie agent role template？
+
+任一不是 → 改 spec 重派。
+
+## 8. 老板回签点
 
 老板一句话即可：
 - 「派 h5 wave 1」 → 继续（已在跑 proc_25904b0f8716）
