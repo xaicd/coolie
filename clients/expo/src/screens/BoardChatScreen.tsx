@@ -100,6 +100,22 @@ function drainBoardEchoQueue(): BoardChatMessage[] {
   return boardEchoQueue.splice(0, boardEchoQueue.length);
 }
 
+const boardPromptQueue: string[] = [];
+
+/**
+ * 从其它屏幕 (如装机自检页的「查看演示」、`coolie://chat/build` 深链) 向工坊投
+ * 一条待发送的 prompt。聊天屏未挂载时先入队，待其挂载并完成历史加载后自动发出。
+ */
+export function exportBoardPrompt(text: string): void {
+  const trimmed = text.trim();
+  if (!trimmed) return;
+  boardPromptQueue.push(trimmed);
+}
+
+function drainBoardPromptQueue(): string[] {
+  return boardPromptQueue.splice(0, boardPromptQueue.length);
+}
+
 interface ApprovalFeedItem {
   approval: Approval;
   decision: "approve" | "reject" | null;
@@ -713,6 +729,15 @@ export function BoardChatScreen({
     },
     [input, sending, company.id, boardIssueId, scrollToBottom, startBuild],
   );
+
+  // 外部入口 (「查看演示」/ 深链) 投递的待发送 prompt：历史加载完成后自动发出。
+  useEffect(() => {
+    if (!historyReady) return;
+    const queued = drainBoardPromptQueue();
+    if (queued.length > 0) void handleSend(queued[0]);
+    // handleSend 每次渲染都会变；这里只在历史就绪时消费一次队列，刻意不重跑。
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [historyReady]);
 
   const handleRetry = () => {
     if (lastPrompt) {

@@ -4,6 +4,7 @@ import { BoardChatScreen, type WorkspaceCompany } from "./screens/BoardChatScree
 import { WorkspaceScreen } from "./screens/workspace/WorkspaceScreen";
 import { DashboardScreen } from "./screens/DashboardScreen";
 import { OntologyScreen } from "./screens/OntologyScreen";
+import { WhatsNewScreen } from "./screens/WhatsNewScreen";
 
 /**
  * Coolie H5 (PC web) shell — ChatHome 预览 + 工作空间 + 看额度 + 本体驱动。
@@ -22,12 +23,13 @@ import { OntologyScreen } from "./screens/OntologyScreen";
 /** 本地 stub: 本波不接登录/公司选择, 先固定一个占位主体 (工坊页用) */
 const STUB_COMPANY: WorkspaceCompany = { id: "local-stub", name: "Coolie (local stub)" };
 
-type TabKey = "chat" | "quota" | "ontology";
+type TabKey = "chat" | "quota" | "ontology" | "whats-new";
 
 const NAV_ITEMS: Array<{ key: TabKey; label: string; icon: string; hash: string }> = [
   { key: "chat", label: "工坊", icon: "💬", hash: "#/chat" },
   { key: "quota", label: "看额度", icon: "💰", hash: "#/quota" },
   { key: "ontology", label: "本体驱动", icon: "🧩", hash: "#/ontology" },
+  { key: "whats-new", label: "更新", icon: "🎉", hash: "#/whats-new" },
 ];
 
 /** 从 location.hash 解析当前 Tab (默认工坊) */
@@ -63,6 +65,17 @@ export function App() {
     if (item) window.location.hash = item.hash;
     setTab(key);
   }, []);
+
+  // What's New 页的「我知道了」→ 回工坊；「查看演示」→ 回工坊并拉开工作空间。
+  const goToChat = useCallback(() => {
+    window.location.hash = "#/chat";
+    setTab("chat");
+  }, []);
+
+  const viewDemo = useCallback(() => {
+    goToChat();
+    setWorkspaceOpen(true);
+  }, [goToChat]);
 
   return (
     <div style={styles.app}>
@@ -103,6 +116,9 @@ export function App() {
         ) : null}
         {tab === "quota" ? <DashboardScreen /> : null}
         {tab === "ontology" ? <OntologyScreen /> : null}
+        {tab === "whats-new" ? (
+          <WhatsNewScreen onClose={goToChat} onViewDemo={viewDemo} />
+        ) : null}
       </main>
 
       <dialog

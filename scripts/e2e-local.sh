@@ -36,6 +36,11 @@ CHAT_TIMEOUT_MS="${E2E_CHAT_TIMEOUT_MS:-60000}"
 STATE_DIR="${AGENT_DEVICE_STATE_DIR:-$HOME/.agent-device}"
 EVIDENCE_DIR="$REPO_ROOT/clients/expo/replays/evidence"
 REPLAY_DIR="clients/expo/replays"
+# h5 (PC web) parity target — started mid-run; also the only web-drivable surface
+# for the What's New / workspace smoke (the RN app has no react-native-web build).
+H5_DIR="$REPO_ROOT/clients/h5"
+H5_PORT="${E2E_H5_PORT:-5173}"
+H5_URL="http://localhost:$H5_PORT"
 # A per-run session name gives a fresh browser profile, so the run always
 # starts logged out and the sign-in replay is deterministic.
 SESSION="coolie-e2e-$(date +%s)-$$"
@@ -170,6 +175,7 @@ run_replay() {
   local out rc
   out="$(agent-device replay "$REPLAY_DIR/$file" --platform web --session "$SESSION" \
     --env "E2E_BASE_URL=$BASE_URL" \
+    --env "E2E_H5_URL=$H5_URL" \
     --env "E2E_COMPANY_PREFIX=$COMPANY_PREFIX" \
     --env "E2E_EMAIL=$E2E_EMAIL" \
     --env "E2E_PASSWORD=$E2E_PASSWORD" 2>&1)"
@@ -217,6 +223,28 @@ fi
 run_replay "R2-tasks-page"      "tasks-list.ad"        || true
 run_replay "R3-board-chat-reply" "board-chat.ad"       || true
 
+# ── app-side install-loop invariants (static) ────────────────────────────────
+# The RN app has no react-native-web build, so `agent-device --platform web`
+# cannot open it. The install-loop pieces that live in the app are pinned as
+# source invariants instead: the code has to ship *and* be wired into the root
+# navigator, or the 装机 loop regresses with nothing to catch it. Behavioural
+# proof of the same flow lives in replays/whats-new.ad (driven against h5).
+
+if grep -q 'InlinePreviewPanel' "$REPO_ROOT/clients/expo/src/screens/BoardChatScreen.tsx" \
+   && grep -q 'parseInlineTags' "$REPO_ROOT/clients/expo/src/screens/BoardChatScreen.tsx"; then
+  record "ChatHome-inline-preview" PASS "BoardChatScreen renders InlinePreviewPanel inline"
+else
+  record "ChatHome-inline-preview" FAIL "BoardChatScreen no longer renders the inline preview"
+fi
+
+if [ -f "$REPO_ROOT/clients/expo/src/releaseNotes.ts" ] \
+   && grep -q 'WhatsNewScreen' "$REPO_ROOT/clients/expo/App.tsx" \
+   && grep -q 'shouldShowWhatsNew' "$REPO_ROOT/clients/expo/App.tsx"; then
+  record "expo-whats-new" PASS "WhatsNewScreen ships + wired into App.tsx"
+else
+  record "expo-whats-new" FAIL "WhatsNewScreen missing or not wired into App.tsx"
+fi
+
 # ── h5 (PC web) parity — ChatHome preview + workspace ────────────────────────
 
 # spec docs-coolie/specs/2026-09-21-h5-web-parity.md §4.5. The PC web client
@@ -224,9 +252,6 @@ run_replay "R3-board-chat-reply" "board-chat.ad"       || true
 # so its parity is proven by three cheap, deterministic checks instead: the dev
 # server answers, it builds to dist/, and the workspace screen ships the 4 tabs.
 
-H5_DIR="$REPO_ROOT/clients/h5"
-H5_PORT="${E2E_H5_PORT:-5173}"
-H5_URL="http://localhost:$H5_PORT"
 H5_LOG="$(mktemp -t coolie-h5-dev.XXXXXX)"
 H5_PID=""
 
@@ -266,6 +291,11 @@ if wait_for_url "$H5_URL"; then
   else
     record "H5-workspace-tabs" FAIL "WorkspaceScreen tab labels not found"
   fi
+
+  # Assertion 4: What's New → 工坊 → workspace 4-tab, as a real browser replay.
+  # This is the install loop from the boss's seat; h5 mirrors the RN screens, so
+  # a green run here is behavioural proof the flow still works end to end.
+  run_replay "R4-whats-new" "whats-new.ad" || true
 else
   record "H5-dev-server" FAIL "dev server did not come up (see log below)"
   record "H5-workspace-tabs" SKIP "dev server down"

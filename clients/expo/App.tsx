@@ -59,10 +59,15 @@ import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen
 import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
 import { PrototypeSandboxScreen } from "./src/screens/PrototypeSandboxScreen";
 import { WorkspaceScreen } from "./src/screens/workspace/WorkspaceScreen";
-import { BoardChatScreen, exportBoardEcho } from "./src/screens/BoardChatScreen";
+import { BoardChatScreen, exportBoardEcho, exportBoardPrompt } from "./src/screens/BoardChatScreen";
 import { AgentsScreen } from "./src/screens/AgentsScreen";
 import { useOTA } from "./src/OTA";
 import { checkAppVersion, downloadApk, localVersion, type RemoteVersionInfo } from "./src/AppVersion";
+import {
+  WhatsNewScreen,
+  markWhatsNewSeen,
+  shouldShowWhatsNew,
+} from "./src/screens/WhatsNewScreen";
 
 /** 统计并清理 App 缓存目录，返回可读大小 */
 async function clearAppCache(): Promise<string> {
@@ -658,6 +663,57 @@ function HomeScreen({
       if (r.updateAvailable && r.info) setAppUpdate(r.info);
     });
   }, []);
+
+  // ── 装机自检 (What's New) + 深链 ──────────────────────────────────────
+  // 新版首次启动弹一次说明屏；「查看演示」把用户送到工作空间并投一条示例 prompt。
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+
+  useEffect(() => {
+    // 老板/客服排查用：确认 App 载入的是 Coolie fork 自带的 ChatHome，而非 plugin-chat。
+    console.log("[chat] ChatHome active");
+  }, []);
+
+  useEffect(() => {
+    void shouldShowWhatsNew().then((show) => {
+      if (show) setWhatsNewOpen(true);
+    });
+  }, []);
+
+  const dismissWhatsNew = useCallback(() => {
+    setWhatsNewOpen(false);
+    void markWhatsNewSeen();
+  }, []);
+
+  const viewWhatsNewDemo = useCallback(() => {
+    setWhatsNewOpen(false);
+    void markWhatsNewSeen();
+    setWorkspaceOpen(true);
+    exportBoardPrompt("build 一个演示项目：Coolie 工坊看板");
+  }, []);
+
+  // 深链: coolie://workspace → 工作空间; coolie://chat/build[/<标题>] → 工坊并投构建 prompt。
+  useEffect(() => {
+    const handleUrl = (url: string | null) => {
+      if (!url) return;
+      const path = url.replace(/^coolie:\/\//i, "").replace(/^\/+/, "");
+      const [route, ...rest] = path.split("/");
+      if (route === "workspace") {
+        setWorkspaceOpen(true);
+        return;
+      }
+      if (route === "chat") {
+        setTab("chat");
+        if (rest[0] === "build") {
+          const title = decodeURIComponent(rest.slice(1).join("/")).trim();
+          exportBoardPrompt(title ? `build ${title}` : "build 一个演示项目");
+        }
+      }
+    };
+    void Linking.getInitialURL().then(handleUrl).catch(() => {});
+    const subscription = Linking.addEventListener("url", (event) => handleUrl(event.url));
+    return () => subscription.remove();
+  }, []);
+
   const [issues, setIssues] = useState<Issue[]>([]);
   const [selected, setSelected] = useState<Issue | null>(null);
   const [focusedApprovalId, setFocusedApprovalId] = useState<string | null>(null);
@@ -1084,6 +1140,12 @@ function HomeScreen({
           }}
         />
       ) : null}
+      {/* 装机自检 / What's New: 新版首次启动时覆盖在最上层 */}
+      <WhatsNewScreen
+        visible={whatsNewOpen}
+        onClose={dismissWhatsNew}
+        onViewDemo={viewWhatsNewDemo}
+      />
       <BottomTabBar tab={tab} onChange={setTab} />
     </SafeAreaView>
   );

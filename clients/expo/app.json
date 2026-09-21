@@ -37,6 +37,16 @@
       "expo-av",
       "expo-secure-store",
       "expo-updates"
-    ]
+    ],
+    "extra": {
+      "deepLinks": {
+        "scheme": "coolie",
+        "routes": {
+          "workspace": "coolie://workspace",
+          "chatBuild": "coolie://chat/build",
+          "chatBuildWithTitle": "coolie://chat/build/<标题>"
+        }
+      }
+    }
   }
 }
