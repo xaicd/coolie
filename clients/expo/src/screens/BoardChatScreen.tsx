@@ -31,15 +31,14 @@ import {
 import { CodeViewerWebView } from "../components/CodeViewerWebView";
 import {
   BuildProgressCard,
-  isBuildPrompt,
   type BuildProgressStep,
 } from "../components/BuildProgressCard";
 import {
   SpecDiffCard,
-  isDomainPrompt,
   type DomainSpecPayload,
   type SpecProblemPayload,
 } from "../components/SpecDiffCard";
+import { parseCommand, pipelineKeyFromName, tCommand } from "../components/commandRouter";
 import { AppCard } from "../ui/AppCard";
 import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
@@ -59,6 +58,10 @@ export interface BoardChatScreenProps {
   onOpenApproval?: (approvalId: string) => void;
   /** 气泡「关联任务」链接: 打开任务详情页 */
   onOpenIssue?: (issue: Issue) => void;
+  /** 「建 pipeline xxx」创建成功后跳编辑器, 由 App.tsx 注入 */
+  onOpenPipeline?: (pipelineId: string) => void;
+  /** 「plan xxx」创建成功后跳计划详情, 由 App.tsx 注入 */
+  onOpenPlan?: (issue: Issue) => void;
   /** 嵌入模式: 工作空间「对话」Tab 里复用本屏内容区, 不套整屏页头 */
   embedded?: boolean;
   /** 顶部右上角 [Workspace] 入口, 由 App.tsx 注入 (拉起工作空间 Modal) */
@@ -322,6 +325,8 @@ export function BoardChatScreen({
   onOpenSettings,
   onOpenApproval,
   onOpenIssue,
+  onOpenPipeline,
+  onOpenPlan,
   embedded = false,
   onOpenWorkspace,
 }: BoardChatScreenProps) {
@@ -701,6 +706,78 @@ export function BoardChatScreen({
     [company.id],
   );
 
+  /**
+   * Pipeline 分发: 「建 pipeline xxx」走 paperclip 上游既有的
+   * POST /api/companies/:companyId/pipelines 建一条只带名字的 pipeline,
+   * 回执后交给 App.tsx 跳编辑器。
+   */
+  const startPipeline = useCallback(
+    async (subject: string) => {
+      pushSystemEcho(`⏳ 正在创建 Pipeline · ${subject}`);
+      try {
+        const created = await coolie.request<{ id: string; name: string }>(
+          "POST",
+          `/api/companies/${encodeURIComponent(company.id)}/pipelines`,
+          { key: pipelineKeyFromName(subject), name: subject },
+        );
+        pushSystemEcho(
+          `✅ ${tCommand("Pipeline created")} · ${created.name} (#${created.id.slice(0, 8)})`,
+        );
+        onOpenPipeline?.(created.id);
+      } catch (e) {
+        pushSystemEcho(`❌ Pipeline 创建失败: ${String((e as Error)?.message ?? e)}`);
+      }
+    },
+    [company.id, pushSystemEcho, onOpenPipeline],
+  );
+
+  /**
+   * Plan 分发: 服务端没有 plans 端点, 按 brief 用 issue_relations 模拟 ——
+   * 建一条 `Plan: xxx` 的 plan 任务承载计划, 回执后跳它的详情。
+   */
+  const startPlan = useCallback(
+    async (subject: string) => {
+      pushSystemEcho(`⏳ 正在创建 Plan · ${subject}`);
+      try {
+        const issue = await coolie.createIssue({
+          companyId: company.id,
+          title: `Plan: ${subject}`,
+          description: `由工坊对话创建的计划任务 (Plan mode)\n\n目标: ${subject}`,
+        });
+        pushSystemEcho(
+          `✅ ${tCommand("Plan created")} · #${issue.id.slice(0, 6)} ${issue.title}`,
+        );
+        onOpenPlan?.(issue);
+      } catch (e) {
+        pushSystemEcho(`❌ Plan 创建失败: ${String((e as Error)?.message ?? e)}`);
+      }
+    },
+    [company.id, pushSystemEcho, onOpenPlan],
+  );
+
+  /**
+   * PR 分发: 建一条带 pr-workflow 意图的任务, 交 heartbeat 走 GitHub 开 PR
+   * 链路。issue 创建模型没有 tags 字段, 意图写进标题前缀 + 描述里。
+   */
+  const startPr = useCallback(
+    async (subject: string) => {
+      pushSystemEcho(`⏳ 正在触发 PR workflow · ${subject}`);
+      try {
+        const issue = await coolie.createIssue({
+          companyId: company.id,
+          title: `PR: ${subject}`,
+          description: `由工坊对话触发 GitHub PR workflow (标签意图: pr-workflow)\n\n改动: ${subject}`,
+        });
+        pushSystemEcho(
+          `✅ ${tCommand("PR workflow triggered")} · #${issue.id.slice(0, 6)} ${issue.title}`,
+        );
+      } catch (e) {
+        pushSystemEcho(`❌ PR workflow 触发失败: ${String((e as Error)?.message ?? e)}`);
+      }
+    },
+    [company.id, pushSystemEcho],
+  );
+
   const handleSend = useCallback(
     async (textToSend?: string) => {
       const prompt = (textToSend ?? input).trim();
@@ -709,10 +786,11 @@ export function BoardChatScreen({
       setInput("");
       setErrorText(null);
       setLastPrompt(prompt);
-      setStreamingText("");
-      setStatusText("正在连接总办助手…");
-      setSending(true);
-      accumulatedRef.current = "";
+
+      // 先判这条消息要触发的编排能力, 再决定是否进总办问答流。
+      const command = parseCommand(prompt);
+      const isOrchestrationCommand =
+        command.kind === "pipeline" || command.kind === "plan" || command.kind === "pr";
 
       // 乐观追加用户消息
       const userMsg: BoardChatMessage = {
@@ -724,10 +802,20 @@ export function BoardChatScreen({
       setMessages((prev) => [...prev, userMsg]);
       scrollToBottom();
 
-      // "build xxx" 追加构建计划卡, "建域 xxx" 追加本体规范卡;
-      // 两者与总办回答并行推进, 且触发词不重叠。
-      if (isDomainPrompt(prompt)) void startSpec(prompt);
-      else if (isBuildPrompt(prompt)) void startBuild(prompt);
+      // "build xxx" 追加构建计划卡, "建域 xxx" 追加本体规范卡, 与总办回答并行推进;
+      // pipeline / plan / pr 只走各自编排分发 (不再进问答流)。
+      if (command.kind === "domain") void startSpec(prompt);
+      else if (command.kind === "build") void startBuild(prompt);
+      else if (command.kind === "pipeline") void startPipeline(command.subject);
+      else if (command.kind === "plan") void startPlan(command.subject);
+      else if (command.kind === "pr") void startPr(command.subject);
+
+      if (isOrchestrationCommand) return;
+
+      setStreamingText("");
+      setStatusText("正在连接总办助手…");
+      setSending(true);
+      accumulatedRef.current = "";
 
       const controller = new AbortController();
       abortControllerRef.current = controller;
@@ -801,7 +889,18 @@ export function BoardChatScreen({
         scrollToBottom();
       }
     },
-    [input, sending, company.id, boardIssueId, scrollToBottom, startBuild],
+    [
+      input,
+      sending,
+      company.id,
+      boardIssueId,
+      scrollToBottom,
+      startSpec,
+      startBuild,
+      startPipeline,
+      startPlan,
+      startPr,
+    ],
   );
 
   // 外部入口 (「查看演示」/ 深链) 投递的待发送 prompt：历史加载完成后自动发出。

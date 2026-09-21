@@ -1001,6 +1001,20 @@ function HomeScreen({
               setTab("tasks");
               setSelected(issue);
             }}
+            // wave19: 「建 pipeline xxx」建好后跳 Coolie Web 的 pipeline 编辑器
+            // (App 内没有 pipeline 屏, Web 端 /pipelines/:id 才是真正的编辑器)。
+            onOpenPipeline={(pipelineId) => {
+              void Linking.openURL(
+                `${COOLIE_BASE_URL}/pipelines/${encodeURIComponent(pipelineId)}`,
+              ).catch(() => {
+                Alert.alert("无法打开 Pipeline", "请在浏览器里打开 Coolie Web 查看该 pipeline。");
+              });
+            }}
+            // 「plan xxx」建出的是一条 plan 任务, 跳任务详情即可。
+            onOpenPlan={(issue) => {
+              setTab("tasks");
+              setSelected(issue);
+            }}
           />
         ) : tab === "inbox" ? (
           <InboxScreen

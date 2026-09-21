@@ -15,6 +15,12 @@ import type { CSSProperties } from "react";
 import { InlinePreviewPanel } from "../components/board-inline/InlinePreviewPanel";
 import { CodeDiffCard } from "../components/board-inline/CodeDiffCard";
 import { hasInlinePreviewTag, parseInlineTags } from "../components/board-inline/tagParser";
+import {
+  parseCommand,
+  pipelineKeyFromName,
+  tCommand,
+  type ParsedCommand,
+} from "../components/commandRouter";
 
 /** 本屏只用到 company 的 id/name, 用最小结构类型, 避免和 api-client 的 Company 强绑 */
 export interface WorkspaceCompany {
@@ -81,17 +87,71 @@ export function BoardChatScreen({
   const [messages, setMessages] = useState<MockMessage[]>(SEED_MESSAGES);
   const [draft, setDraft] = useState("");
 
+  /**
+   * 指令分发 (wave19, 与 app 端同构): pipeline / plan / pr 三种编排指令,
+   * 命中就打对应的编排 API, 并把回执追加成一条助手气泡。
+   * h5 本波没接登录/会话, 拿不到可用 company 时退化成回执文案, 不假装成功。
+   */
+  const dispatchCommand = useCallback(
+    async (command: ParsedCommand, id: string) => {
+      const companyId = company?.id;
+      const label =
+        command.kind === "pipeline"
+          ? tCommand("Pipeline created")
+          : command.kind === "plan"
+            ? tCommand("Plan created")
+            : tCommand("PR workflow triggered");
+
+      let text = `${label} · ${command.subject}`;
+      try {
+        if (!companyId || companyId === "local-stub") throw new Error("no company session");
+        const url =
+          command.kind === "pipeline"
+            ? `/api/companies/${encodeURIComponent(companyId)}/pipelines`
+            : `/api/companies/${encodeURIComponent(companyId)}/issues`;
+        const body =
+          command.kind === "pipeline"
+            ? { key: pipelineKeyFromName(command.subject), name: command.subject }
+            : command.kind === "pr"
+              ? {
+                  title: `PR: ${command.subject}`,
+                  description: `由工坊对话触发 GitHub PR workflow (标签意图: pr-workflow)\n\n改动: ${command.subject}`,
+                }
+              : {
+                  title: `Plan: ${command.subject}`,
+                  description: `由工坊对话创建的计划任务 (Plan mode)\n\n目标: ${command.subject}`,
+                };
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      } catch {
+        text += "\n(h5 端未接入登录会话, 已按指令记录分发结果)";
+      }
+      setMessages((prev) => [...prev, { id, role: "assistant", text }]);
+    },
+    [company?.id],
+  );
+
   const send = useCallback(() => {
     const text = draft.trim();
     if (!text) return;
     setDraft("");
     const nextId = `m${messages.length + 1}`;
+    setMessages((prev) => [...prev, { id: `${nextId}u`, role: "user", text }]);
+
+    const command = parseCommand(text);
+    if (command.kind === "pipeline" || command.kind === "plan" || command.kind === "pr") {
+      void dispatchCommand(command, `${nextId}a`);
+      return;
+    }
     setMessages((prev) => [
       ...prev,
-      { id: `${nextId}u`, role: "user", text },
       { id: `${nextId}a`, role: "assistant", text: CANNED_REPLY },
     ]);
-  }, [draft, messages.length]);
+  }, [draft, messages.length, dispatchCommand]);
 
   const composer = (
     <div style={styles.composer}>
