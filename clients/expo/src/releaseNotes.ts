@@ -22,6 +22,17 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: "0.5.5",
+    title: "对齐 Coolie Web 风格 + 登录修复",
+    features: [
+      "原生 appBar + 底部 tab bar：汇览 / 任务 / 中央「+」/ 员工 / 收件箱，跟 Coolie Web 同一套骨架",
+      "顶栏 [驾驶舱Web] 一键跳 coolieweb:// 深链，直达 Coolie Web App",
+      "主题色统一：近黑三档背景 + 品牌紫蓝 #5E6AD2，与 Coolie Web 一致",
+      "装机自检 (What's New) 屏改成启动即弹 —— 未登录也先弹，看完再进登录页",
+      "登录修复：切换「邮箱密码 / API Key」时清空输入并给出 ready 提示，按钮不再「看起来没反应」",
+    ],
+  },
+  {
     version: "0.5.2",
     title: "ChatHome 收编 + 装机自检",
     features: [

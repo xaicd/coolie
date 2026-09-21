@@ -13,6 +13,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 - **对齐 Coolie Web 风格 (wave10, boss: 参考web做expo)** — 顶部换成原生 appBar (居中标题 "Coolie工坊" + 右侧 [驾驶舱Web] 跳 `coolieweb://` 深链到 Coolie Web App); 底部换成 5 项 tab bar: 汇览 / 任务 / 中央 "+" (新建任务屏) / 员工 / 收件箱。
 - **主题色统一** — 颜色令牌抽到 `src/theme.ts`, 与 Coolie Web 完全一致 (bg `#08090A` / panel `#0F1011` / accent `#5E6AD2`)。
 - 工坊(对话) / 本体 / 产物 不再占底部栏, 从任务页顶部图标行进入 (入口换位置, 能力不减)。
+- **登录修复 (wave7)** — 装机自检 (What's New) 屏提到 App 顶层, 启动即弹 (登录前也弹, 之前挂在 HomeScreen 里未登录永远不弹); 切换「邮箱密码 / API Key」时清空输入并显示 ready 提示, 按钮不再「看起来没反应」。
 
 ---
 

@@ -459,6 +459,13 @@ export default function App() {
   const [credential, setCredential] = useState<Credential | null | undefined>(undefined);
   const [registering, setRegistering] = useState(false);
 
+  // 装机自检 (What's New) 必须挂在 App 顶层：HomeScreen 只在登录后才渲染，
+  // 首次装机 (未登录) 时它永远不会跑，老板实测「装了啥也没变」就是这个原因。
+  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
+  const [whatsNewChecked, setWhatsNewChecked] = useState(false);
+  // 「查看演示」要落到工作空间 (登录后才有)，所以顶层只登记意图，交给 HomeScreen 消费。
+  const [pendingDemo, setPendingDemo] = useState(false);
+
   useEffect(() => {
     void restoreCredential().then(setCredential);
     const unsub = setupOTAListener();
@@ -467,32 +474,68 @@ export default function App() {
     };
   }, []);
 
+  useEffect(() => {
+    void shouldShowWhatsNew().then((show) => {
+      setWhatsNewOpen(show);
+      setWhatsNewChecked(true);
+    });
+  }, []);
+
   const signOut = useCallback(() => {
     void signOutEverywhere().then(() => setCredential(null));
   }, []);
 
-  if (credential === undefined) {
-    return (
+  const dismissWhatsNew = useCallback(() => {
+    setWhatsNewOpen(false);
+    void markWhatsNewSeen();
+  }, []);
+
+  const viewWhatsNewDemo = useCallback(() => {
+    setWhatsNewOpen(false);
+    void markWhatsNewSeen();
+    setPendingDemo(true);
+  }, []);
+
+  const handleDemoHandled = useCallback(() => setPendingDemo(false), []);
+
+  let screen: React.ReactNode;
+  if (credential === undefined || !whatsNewChecked) {
+    screen = (
       <SafeAreaView style={[styles.center, { backgroundColor: C.bg, paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
         <LoadingState size="small" />
       </SafeAreaView>
     );
-  }
-
-  if (credential) {
-    return <CompanyGate credential={credential} onSignOut={signOut} />;
-  }
-
-  if (registering) {
-    return (
+  } else if (credential) {
+    screen = (
+      <CompanyGate
+        credential={credential}
+        onSignOut={signOut}
+        demoRequested={pendingDemo}
+        onDemoHandled={handleDemoHandled}
+      />
+    );
+  } else if (registering) {
+    screen = (
       <RegisterScreen
         onRegistered={(user) => setCredential({ kind: "session", user })}
         onBack={() => setRegistering(false)}
       />
     );
+  } else {
+    screen = <SignInScreen onSignedIn={setCredential} onRegister={() => setRegistering(true)} />;
   }
 
-  return <SignInScreen onSignedIn={setCredential} onRegister={() => setRegistering(true)} />;
+  return (
+    <>
+      {screen}
+      {/* 装机自检：登录前也能弹（onViewDemo 只在已登录时可点，因为演示要进工作空间） */}
+      <WhatsNewScreen
+        visible={whatsNewOpen}
+        onClose={dismissWhatsNew}
+        onViewDemo={credential ? viewWhatsNewDemo : undefined}
+      />
+    </>
+  );
 }
 
 function whoamiFor(credential: Credential): string {
@@ -507,9 +550,13 @@ function whoamiFor(credential: Credential): string {
 function CompanyGate({
   credential,
   onSignOut,
+  demoRequested,
+  onDemoHandled,
 }: {
   credential: Credential;
   onSignOut: () => void;
+  demoRequested?: boolean;
+  onDemoHandled?: () => void;
 }) {
   const [companies, setCompanies] = useState<Company[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -534,6 +581,8 @@ function CompanyGate({
         company={chosen}
         whoami={whoamiFor(credential)}
         onSignOut={onSignOut}
+        demoRequested={demoRequested}
+        onDemoHandled={onDemoHandled}
       />
     );
   }
@@ -627,6 +676,16 @@ function SignInScreen({
     }
   }, [useToken, token, email, password, onSignedIn]);
 
+  // 切换登录方式时清空所有输入：否则从邮箱模式切到 Key 模式，界面上还留着
+  // 邮箱/密码，但校验只看 token（空）→ 按钮变灰、看起来「点了没反应」。
+  const toggleMode = useCallback(() => {
+    setUseToken((v) => !v);
+    setEmail("");
+    setPassword("");
+    setToken("");
+    setError(null);
+  }, []);
+
   const ready = useToken
     ? token.trim().length > 0
     : email.trim().length > 0 && password.length > 0;
@@ -681,6 +740,13 @@ function SignInScreen({
 
       {error !== null && <Text style={styles.error}>{error}</Text>}
 
+      {/* ready 提示：按钮为什么变灰，这里直说，不让用户猜（老板实测「按了没反应」） */}
+      {!ready ? (
+        <Text style={styles.readyHint}>
+          {useToken ? "请输入 API Key 后再连接" : "请输入邮箱和密码后再登录"}
+        </Text>
+      ) : null}
+
       <Pressable
         style={[styles.btnPrimary, (!ready || busy) && styles.btnDisabled]}
         disabled={!ready || busy}
@@ -698,10 +764,8 @@ function SignInScreen({
       ) : null}
 
       <Pressable
-        onPress={() => {
-          setUseToken(!useToken);
-          setError(null);
-        }}
+        onPress={toggleMode}
+        hitSlop={8}
         style={styles.linkWrapper}
       >
         <Text style={styles.link}>
@@ -716,10 +780,14 @@ function HomeScreen({
   company,
   whoami,
   onSignOut,
+  demoRequested,
+  onDemoHandled,
 }: {
   company: Company;
   whoami: string;
   onSignOut: () => void;
+  demoRequested?: boolean;
+  onDemoHandled?: () => void;
 }) {
   const [tab, setTab] = useState<TabKey>("dashboard");
   /** 中央 "+" 打开的新建任务浮层 */
@@ -747,31 +815,19 @@ function HomeScreen({
   }, [company.id, loadNotifications]);
 
   // ── 装机自检 (What's New) + 深链 ──────────────────────────────────────
-  // 新版首次启动弹一次说明屏；「查看演示」把用户送到工作空间并投一条示例 prompt。
-  const [whatsNewOpen, setWhatsNewOpen] = useState(false);
-
+  // WhatsNew 本体挂在 App 顶层 (登录前也要弹)。这里只消费它的「查看演示」意图：
+  // 把用户送到工作空间并投一条示例 prompt。
   useEffect(() => {
     // 老板/客服排查用：确认 App 载入的是 Coolie fork 自带的 ChatHome，而非 plugin-chat。
     console.log("[chat] ChatHome active");
   }, []);
 
   useEffect(() => {
-    void shouldShowWhatsNew().then((show) => {
-      if (show) setWhatsNewOpen(true);
-    });
-  }, []);
-
-  const dismissWhatsNew = useCallback(() => {
-    setWhatsNewOpen(false);
-    void markWhatsNewSeen();
-  }, []);
-
-  const viewWhatsNewDemo = useCallback(() => {
-    setWhatsNewOpen(false);
-    void markWhatsNewSeen();
+    if (!demoRequested) return;
     setWorkspaceOpen(true);
     exportBoardPrompt("build 一个演示项目：Coolie 工坊看板");
-  }, []);
+    onDemoHandled?.();
+  }, [demoRequested, onDemoHandled]);
 
   // 深链: coolie://workspace → 工作空间; coolie://chat/build[/<标题>] → 工坊并投构建 prompt。
   useEffect(() => {
@@ -1283,12 +1339,6 @@ function HomeScreen({
           }}
         />
       ) : null}
-      {/* 装机自检 / What's New: 新版首次启动时覆盖在最上层 */}
-      <WhatsNewScreen
-        visible={whatsNewOpen}
-        onClose={dismissWhatsNew}
-        onViewDemo={viewWhatsNewDemo}
-      />
       {/* 底部导航 — 汇览 / 任务 / [+] / 员工 / 收件箱 */}
       <TabBar tab={tab} onChange={setTab} onCreate={() => setComposeOpen(true)} />
       {/* 中央 "+" 打开的新建任务屏 (覆盖底部栏) */}
@@ -1608,6 +1658,11 @@ const styles = StyleSheet.create({
     color: C.err,
     fontSize: 13,
     fontWeight: "500",
+  },
+  readyHint: {
+    color: C.ink4,
+    fontSize: 12,
+    fontWeight: "400",
   },
   linkWrapper: {
     paddingVertical: 8,
