@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.9
+
+> Released: 2026-09-22 · Android release APK
+
+### 更新
+
+- 工坊对话智能识别: 建 pipeline / plan / 开 pr 解析后分发到 pipeline 创建 / plan 任务 / GitHub PR workflow
+
+---
+
 ## v0.5.8
 
 > Released: 2026-09-22 · Android release APK
