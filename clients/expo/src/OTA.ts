@@ -143,6 +143,122 @@ export async function checkAndApplyUpdate(interactive = true): Promise<boolean> 
   }
 }
 
+export interface OTAManifestCheck {
+  /** 更新源真的可用（2xx + JSON + 含 launchAsset.url）时为 true */
+  ok: boolean;
+  /** HTTP 状态码；请求没发出去时为 null */
+  status: number | null;
+  /** 响应 Content-Type 原样，用于把「被 SPA 兜底成 HTML」当场点名 */
+  contentType: string | null;
+  /** 响应头的 expo-protocol-version；expo-updates 靠它判定协议版本 */
+  protocolVersion: string | null;
+  /** manifest 的 runtimeVersion；解析成功才有 */
+  runtimeVersion: string | null;
+  /** manifest 指向的 bundle 地址 */
+  bundleUrl: string | null;
+  /** 失败原因（人话，直接显示在自检屏上） */
+  error: string | null;
+}
+
+/**
+ * 严格探测更新源是否真的可用 —— 不自欺的版本。
+ *
+ * 老板 2026-09-21 撞的坑：自检只看 `Updates.isEnabled`（那是打包时的开关），于是
+ * 生产上 manifest URL 被 Caddy 的 SPA 兜底路由返回 HTML 时，屏上仍然绿字「OTA 已
+ * 启用」。这里按 expo-updates 真正会做的事重新验一遍：
+ *   1. GET manifest URL（带 expo-channel-name，与客户端请求头一致）
+ *   2. HTTP 必须 2xx
+ *   3. Content-Type 必须是 application/json —— HTML 兜底当场露馅
+ *   4. 必须带 expo-protocol-version 响应头 —— 缺它 expo-updates 判为旧协议
+ *   5. body 必须能 JSON.parse，且含 launchAsset.url
+ * 任一步不过 → ok:false + 人话原因，绝不返回「看起来没问题」。
+ */
+export async function checkOTAManifest(
+  url: string,
+  timeoutMs = 8000,
+): Promise<OTAManifestCheck> {
+  const fail = (
+    error: string,
+    extra: Partial<OTAManifestCheck> = {},
+  ): OTAManifestCheck => ({
+    ok: false,
+    status: null,
+    contentType: null,
+    protocolVersion: null,
+    runtimeVersion: null,
+    bundleUrl: null,
+    error,
+    ...extra,
+  });
+
+  if (!url) return fail("未配置更新源地址");
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const res = await fetch(url, {
+      method: "GET",
+      headers: { "expo-channel-name": "production" },
+      signal: controller.signal,
+    });
+    const contentType = res.headers.get("content-type");
+    const protocolVersion = res.headers.get("expo-protocol-version");
+    if (!res.ok) {
+      return fail(`HTTP ${res.status}`, { status: res.status, contentType });
+    }
+    if (!contentType || !contentType.toLowerCase().includes("application/json")) {
+      return fail(
+        `响应不是 JSON（${contentType ?? "无 Content-Type"}）—— 多半被 SPA 兜底成了 HTML`,
+        { status: res.status, contentType },
+      );
+    }
+    // expo-updates 0.27 (SDK 52) 的 UpdateFactory 在缺这个头时直接判为「旧协议」并抛错
+    // —— 哪怕 body 是合法 JSON。生产上这正是 "Failed to construct manifest" 的真凶。
+    if (!protocolVersion) {
+      return fail("响应缺少 expo-protocol-version 头（expo-updates 会当成旧协议拒绝）", {
+        status: res.status,
+        contentType,
+      });
+    }
+    const text = await res.text();
+    let manifest: {
+      runtimeVersion?: string;
+      launchAsset?: { url?: string };
+    } | null = null;
+    try {
+      manifest = JSON.parse(text);
+    } catch {
+      return fail("manifest 不是合法 JSON", {
+        status: res.status,
+        contentType,
+        protocolVersion,
+      });
+    }
+    const bundleUrl = manifest?.launchAsset?.url ?? null;
+    if (!bundleUrl) {
+      return fail("manifest 缺 launchAsset.url", {
+        status: res.status,
+        contentType,
+        protocolVersion,
+      });
+    }
+    return {
+      ok: true,
+      status: res.status,
+      contentType,
+      protocolVersion,
+      runtimeVersion: manifest?.runtimeVersion ?? null,
+      bundleUrl,
+      error: null,
+    };
+  } catch (e: any) {
+    const aborted = e?.name === "AbortError";
+    return fail(aborted ? `请求超时（${timeoutMs}ms）` : e?.message || String(e));
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 /**
  * React Hook: 管理 OTA 更新状态、静默监听与手动检查动作
  */

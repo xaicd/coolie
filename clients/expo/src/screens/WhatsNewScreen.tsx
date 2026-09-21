@@ -12,7 +12,7 @@
  * 模态，并向工坊对话流投一条示例 prompt —— 屏幕本层不该知道导航细节。
  */
 
-import React from "react";
+import React, { useEffect, useState } from "react";
 import {
   Modal,
   Platform,
@@ -32,8 +32,15 @@ import * as Updates from "expo-updates";
 import { C } from "../coolie";
 import { RADIUS, SPACING } from "../ui/tokens";
 import { noteForVersion, type ReleaseNote } from "../releaseNotes";
+import { checkOTAManifest, type OTAManifestCheck } from "../OTA";
 
 const SEEN_VERSION_KEY = "coolie.lastSeenVersion";
+
+/** 更新源地址 —— 来自 app.json 的 expo.updates.url，打包时内联。 */
+function otaManifestUrl(): string {
+  const updates = Constants.expoConfig?.updates as { url?: string } | undefined;
+  return updates?.url ?? "";
+}
 
 /** 当前 APK 的版本号 —— 来自 app.json 的 expo.version，打包时内联。 */
 export function currentAppVersion(): string {
@@ -99,6 +106,35 @@ export function WhatsNewScreen({ visible, onClose, onViewDemo }: WhatsNewScreenP
   // APK 版本；OTA 下发新 bundle 后仍是同一 runtimeVersion，属正常。
   const runtimeMatches = runtimeVersion === null || runtimeVersion === version;
 
+  // 更新源真伪：HTTP 200 不算数，得是 application/json 且能解析出 launchAsset。
+  // 这一行就是 0.5.x「OTA 已启用」误报的修复点 —— 见 checkOTAManifest 的注释。
+  const manifestUrl = otaManifestUrl();
+  const [manifestCheck, setManifestCheck] = useState<OTAManifestCheck | null>(null);
+  const manifestChecking = otaEnabled && manifestCheck === null;
+  const manifestOk = manifestCheck?.ok === true;
+  // updateId 非空 = 当前跑的 JS bundle 由 OTA 下发（而非 APK 内嵌）。
+  const usingOtaBundle = Updates.updateId !== null;
+
+  useEffect(() => {
+    if (!visible || !otaEnabled) return;
+    let cancelled = false;
+    setManifestCheck(null);
+    void checkOTAManifest(manifestUrl).then((result) => {
+      if (cancelled) return;
+      // 打到 logcat（ReactNativeJS tag），装机验证时可直接 grep 这一段。
+      console.info(
+        `[OTA] manifest check url=${manifestUrl} ok=${result.ok} status=${result.status} ` +
+          `contentType=${result.contentType} protocolVersion=${result.protocolVersion} ` +
+          `runtimeVersion=${result.runtimeVersion} updateId=${Updates.updateId ?? "embedded"} ` +
+          `error=${result.error ?? "none"}`,
+      );
+      setManifestCheck(result);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, otaEnabled, manifestUrl]);
+
   return (
     <Modal
       visible={visible}
@@ -136,17 +172,48 @@ export function WhatsNewScreen({ visible, onClose, onViewDemo }: WhatsNewScreenP
               label="OTA 运行时"
               value={runtimeVersion ?? "未知"}
             />
+            <CheckRow
+              ok={manifestOk}
+              label="更新源"
+              value={
+                !otaEnabled
+                  ? "未启用"
+                  : manifestChecking
+                    ? "检测中…"
+                    : manifestOk
+                      ? "已连通"
+                      : "未连通"
+              }
+            />
+            <CheckRow
+              ok
+              label="当前运行 bundle"
+              value={usingOtaBundle ? "OTA 下发" : "APK 内嵌"}
+            />
             {!otaEnabled ? (
               <Text style={styles.warn}>
                 这台设备上的 App 没开 OTA —— 很可能是旧 APK。请从装机指南里的最新直链重装。
               </Text>
+            ) : manifestChecking ? (
+              <Text style={styles.hint}>正在检测更新源 {manifestUrl || "(未配置)"} …</Text>
+            ) : !manifestOk ? (
+              <>
+                <Text style={styles.warn}>OTA 未启用, 当前用 APK 内嵌版本。</Text>
+                <Text style={styles.hint}>
+                  更新源 {manifestUrl || "(未配置)"} 不可用：{manifestCheck?.error ?? "未知原因"}
+                </Text>
+              </>
             ) : !runtimeMatches ? (
               <Text style={styles.hint}>
                 运行时版本（{runtimeVersion}）与 APK 版本（{version}）不同：当前 bundle 由 OTA
                 下发，属正常。杀后台重开一次即拉到最新。
               </Text>
+            ) : usingOtaBundle ? (
+              <Text style={styles.okText}>更新源连通，当前 bundle 由 OTA 下发。</Text>
             ) : (
-              <Text style={styles.okText}>版本一致，OTA 通路正常。</Text>
+              <Text style={styles.okText}>
+                更新源连通；本次运行仍是 APK 内嵌 bundle，重启 App 即拉到最新。
+              </Text>
             )}
           </View>
 

@@ -17,7 +17,9 @@ EXPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$EXPO_DIR"
 
 SSH_TARGET="${SSH_TARGET:-tc-coolie-claw}"
-REMOTE_OTA_DIR="${REMOTE_OTA_DIR:-/opt/coolie/ui/dist/ota}"
+# Caddy 用 `handle_path /ota/*` + file_server 直接读这个目录，不经过 Express
+# 的 SPA 兜底 —— 所以这里和 /etc/caddy/Caddyfile 的 root 必须一致。
+REMOTE_OTA_DIR="${REMOTE_OTA_DIR:-/opt/coolie/ui/ota}"
 OTA_BASE_URL="${OTA_BASE_URL:-https://xrobinai.cn/ota}"
 PLATFORMS="${1:-all}"
 DIST_DIR="$EXPO_DIR/dist"
@@ -73,6 +75,11 @@ if (platforms.length === 0) {
   console.warn("⚠️ 警告: dist/metadata.json 中未检测到任何平台 Bundle");
 }
 
+// expo-updates 跑 OTA bundle 时，把 Constants.expoConfig 解析成 manifest 的
+// extra.expoClient。只塞 name/slug/version 会让 OTA 之后的 app 读不到 app.json
+// 的其余配置（updates.url、extra.deepLinks 等）—— 所以整份 expo 配置原样带上。
+const expoClientConfig = appJson.expo || { name: 'Coolie', slug: 'coolie', version };
+
 for (const platform of platforms) {
   const meta = fileMeta[platform];
   const manifestId = crypto.randomUUID();
@@ -92,13 +99,7 @@ for (const platform of platforms) {
       url: `${baseUrl}/${asset.path}`,
     })),
     metadata: {},
-    extra: {
-      expoClient: {
-        name: appJson.expo?.name || 'Coolie',
-        slug: appJson.expo?.slug || 'coolie',
-        version: version,
-      },
-    },
+    extra: { expoClient: expoClientConfig },
   };
 
   const platformFile = path.resolve(`dist/manifest.${platform}.json`);
@@ -126,13 +127,7 @@ const defaultManifest = {
     url: `${baseUrl}/${asset.path}`,
   })) : [],
   metadata: {},
-  extra: {
-    expoClient: {
-      name: appJson.expo?.name || 'Coolie',
-      slug: appJson.expo?.slug || 'coolie',
-      version: version,
-    },
-  },
+  extra: { expoClient: expoClientConfig },
 };
 
 const manifestContent = JSON.stringify(defaultManifest, null, 2);
