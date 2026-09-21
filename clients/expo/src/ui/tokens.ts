@@ -51,8 +51,8 @@ export const TONE = {
   },
   accent: {
     fg: C.accent,
-    bg: "rgba(113, 112, 255, 0.15)",
-    border: "rgba(113, 112, 255, 0.4)",
+    bg: alpha(C.accent, 0.15),
+    border: alpha(C.accent, 0.4),
   },
   ok: {
     fg: C.ok,

@@ -6,21 +6,22 @@
 ## 1. 色彩令牌(dark theme 唯一主题)
 
 ```ts
-// coolie.ts 里替换现有 palette
+// 单一来源 src/theme.ts (wave10: 与 Coolie Web / clients/expo-paperclip-web 对齐);
+// src/coolie.ts 只做 re-export, 屏/组件一律 `import { C } from "../theme"`。
 export const C = {
   // 背景三层(亮度阶梯 = 海拔)
   bg:      "#08090A",  // 页面最底(marketing black)
-  panel:   "#0F1011",  // 侧栏/面板
+  panel:   "#0F1011",  // AppBar/TabBar/侧栏
   surface: "#191A1B",  // 卡片/浮层
   surfaceHover: "#28282C",
   // 文字四级
-  ink:    "#F7F8F8",   // 主文字(不是纯白!)
-  ink2:   "#D0D6E0",   // 次文字
+  ink:    "#E6E6E6",   // 主文字(不是纯白!)
+  ink2:   "#9BA1A6",   // 次文字
   ink3:   "#8A8F98",   // 占位/元数据
   ink4:   "#62666D",   // 时间戳/禁用
   // 品牌色(全 App 唯一彩色,只用于 CTA/激活/选中)
   brand:     "#5E6AD2", // 按钮底/品牌标记
-  accent:    "#7170FF", // 链接/激活态
+  accent:    "#5E6AD2", // 链接/激活态(与 Coolie Web 一致)
   accentHover:"#828FFF",
   // 状态(仅状态指示)
   ok:   "#27A644",
@@ -33,7 +34,7 @@ export const C = {
 } as const;
 ```
 
-**红线**:品牌紫蓝(#5E6AD2/#7170FF)是唯一彩色,禁止装饰性滥用;禁止纯白 #FFF 文字;禁止实色深色边框(深底上用半透明白);状态色只出现在状态点/徽标。
+**红线**:品牌紫蓝(#5E6AD2)是唯一彩色,禁止装饰性滥用;禁止纯白 #FFF 文字;禁止实色深色边框(深底上用半透明白);状态色只出现在状态点/徽标。
 
 ## 2. 字体(RN 无 Inter Variable 就用系统字重近似)
 

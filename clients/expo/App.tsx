@@ -39,6 +39,8 @@ import {
   type Credential,
   type SearchAgentResult,
 } from "./src/coolie";
+import { AppBar } from "./src/components/AppBar";
+import { TabBar } from "./src/components/TabBar";
 import { StatusDot } from "./src/components/StatusDot";
 import { AppCard } from "./src/ui/AppCard";
 import { EmptyState } from "./src/ui/EmptyState";
@@ -153,23 +155,11 @@ const STATUS_DOT_COLOR: Record<string, string> = {
 
 type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "inbox" | "artifacts" | "ontology";
 
-type BottomTab = {
-  key: TabKey;
-  label: string;
-  icon: React.ComponentProps<typeof Ionicons>["name"];
-  activeIcon: React.ComponentProps<typeof Ionicons>["name"];
-};
-
-const BOTTOM_TABS: BottomTab[] = [
-  { key: "dashboard", label: "汇览", icon: "stats-chart-outline", activeIcon: "stats-chart" },
-  { key: "agents", label: "员工", icon: "people-outline", activeIcon: "people" },
-  { key: "chat", label: "工坊", icon: "hammer-outline", activeIcon: "hammer" },
-  { key: "tasks", label: "任务", icon: "list-outline", activeIcon: "list" },
-  { key: "inbox", label: "收件箱", icon: "mail-unread-outline", activeIcon: "mail-unread" },
-  { key: "ontology", label: "本体", icon: "git-network-outline", activeIcon: "git-network" },
-];
-/** 产物不占底部栏，从任务页右上角进入 */
-const HIDDEN_TABS = new Set<TabKey>(["artifacts"]);
+/**
+ * 底部栏只有 5 项 (汇览 / 任务 / [+] / 员工 / 收件箱, 见 src/components/TabBar.tsx)。
+ * 工坊(chat) / 本体(ontology) / 产物(artifacts) 不再占底部栏, 仍从任务页顶部的
+ * 图标行进入 —— 入口换了位置, 能力没减。
+ */
 
 /** 看板视图：按状态分列横滑，点卡片循环推进状态，长按卡片打开详情 */
 const BOARD_COLUMNS: { status: string; label: string; color: string; next: string }[] = [
@@ -375,37 +365,91 @@ function SettingsSheet({
   );
 }
 
-function BottomTabBar({
-  tab,
-  onChange,
+/**
+ * 新建任务输入区 —— 任务页顶部的 composer 与中央 "+" 的浮层共用这一份实现,
+ * 也共用 HomeScreen 里的同一组状态 (title/description/priority) 与同一个
+ * createTask, 所以两个入口不会写出两套行为。
+ */
+function TaskComposer({
+  title,
+  onTitle,
+  description,
+  onDescription,
+  priority,
+  onPriority,
+  busy,
+  recording,
+  onSubmit,
+  onVoice,
 }: {
-  tab: TabKey;
-  onChange: (t: TabKey) => void;
+  title: string;
+  onTitle: (v: string) => void;
+  description: string;
+  onDescription: (v: string) => void;
+  priority: IssuePriority;
+  onPriority: (p: IssuePriority) => void;
+  busy: boolean;
+  recording: boolean;
+  onSubmit: () => void;
+  onVoice: () => void;
 }) {
   return (
-    <View style={styles.bottomBar}>
-      {BOTTOM_TABS.filter((t) => !HIDDEN_TABS.has(t.key)).map((t) => {
-        const active = tab === t.key;
-        return (
-          <Pressable
-            key={t.key}
-            style={styles.bottomTab}
-            onPress={() => onChange(t.key)}
-            hitSlop={4}
-          >
-            <Ionicons
-              name={active ? t.activeIcon : t.icon}
-              size={22}
-              color={active ? C.accent : C.ink3}
-            />
-            <Text
-              style={[styles.bottomTabLabel, active && styles.bottomTabLabelActive]}
-            >
-              {t.label}
-            </Text>
-          </Pressable>
-        );
-      })}
+    <View style={styles.composer}>
+      <TextInput
+        style={styles.input}
+        placeholder="新任务标题…"
+        placeholderTextColor={C.ink3}
+        value={title}
+        onChangeText={onTitle}
+      />
+      <TextInput
+        style={[styles.input, styles.inputMultiline]}
+        placeholder="描述 (可选)"
+        placeholderTextColor={C.ink3}
+        multiline
+        value={description}
+        onChangeText={onDescription}
+      />
+
+      {/* 优先级徽标胶囊 (前缀色点) */}
+      <View style={styles.chips}>
+        {(["low", "medium", "high", "critical"] as IssuePriority[]).map((p) => (
+          <Pill
+            key={p}
+            label={PRIORITY_LABEL[p]}
+            dotColor={PRIORITY_DOT_COLOR[p]}
+            active={priority === p}
+            onPress={() => onPriority(p)}
+          />
+        ))}
+      </View>
+
+      <View style={styles.rowGap}>
+        <Pressable
+          style={[
+            styles.btnPrimary,
+            styles.btnFlex,
+            (!title.trim() || busy) && styles.btnDisabled,
+          ]}
+          disabled={!title.trim() || busy}
+          onPress={onSubmit}
+        >
+          <Text style={styles.btnPrimaryText}>添加任务</Text>
+        </Pressable>
+        <Pressable
+          style={[
+            styles.btnVoice,
+            recording && styles.btnVoiceRecording,
+            busy && styles.btnDisabled,
+          ]}
+          disabled={busy && !recording}
+          onPress={onVoice}
+        >
+          <Text style={[styles.btnVoiceText, recording && { color: C.err }]}>
+            {recording ? "■ 停止并派发" : "🎤 语音派发"}
+          </Text>
+        </Pressable>
+      </View>
     </View>
   );
 }
@@ -678,6 +722,8 @@ function HomeScreen({
   onSignOut: () => void;
 }) {
   const [tab, setTab] = useState<TabKey>("dashboard");
+  /** 中央 "+" 打开的新建任务浮层 */
+  const [composeOpen, setComposeOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [boardView, setBoardView] = useState(false);
@@ -786,8 +832,8 @@ function HomeScreen({
     void loadIssues();
   }, [loadIssues]);
 
-  const createTask = useCallback(async () => {
-    if (!title.trim()) return;
+  const createTask = useCallback(async (): Promise<boolean> => {
+    if (!title.trim()) return false;
     setBusy(true);
     try {
       await coolie.createIssue({
@@ -800,12 +846,29 @@ function HomeScreen({
       setDescription("");
       setPriority("medium");
       await loadIssues();
+      return true;
     } catch (e) {
       Alert.alert("创建失败", String((e as Error)?.message ?? e));
+      return false;
     } finally {
       setBusy(false);
     }
   }, [companyId, title, description, priority, loadIssues]);
+
+  // 任务页 composer: 建完就地刷新列表, 不切屏。
+  const submitInlineTask = useCallback(() => {
+    void createTask();
+  }, [createTask]);
+
+  // 中央 "+" 浮层: 建完关浮层并落到任务页看到新任务。
+  const submitOverlayTask = useCallback(() => {
+    void createTask().then((ok) => {
+      if (ok) {
+        setComposeOpen(false);
+        setTab("tasks");
+      }
+    });
+  }, [createTask]);
 
   const voiceDispatch = useCallback(async () => {
     try {
@@ -954,40 +1017,14 @@ function HomeScreen({
   return (
     <SafeAreaView style={[styles.shell, { paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
       <StatusBar style="light" />
+      {/* 全局顶栏 — 对齐 Coolie Web 的 appBar: 居中标题 + 右侧 [驾驶舱Web] 深链 */}
+      <AppBar
+        title="Coolie工坊"
+        unreadCount={unreadCount}
+        onOpenNotifications={() => setNotificationsOpen(true)}
+        onOpenSearch={() => setSearchOpen(true)}
+      />
       <View style={styles.shellContent}>
-        {/* 全局顶栏: 铃铛(未读红点) + 全局搜索 */}
-        <View style={styles.topBar}>
-          <View style={styles.topBarBrand}>
-            <Text style={styles.topBarBrandText}>Coolie</Text>
-            <Text style={styles.topBarCompany} numberOfLines={1}>
-              {company.name}
-            </Text>
-          </View>
-          <View style={styles.topBarActions}>
-            <Pressable
-              style={styles.topBarBtn}
-              hitSlop={10}
-              onPress={() => setNotificationsOpen(true)}
-            >
-              <Ionicons name="notifications-outline" size={20} color={C.ink2} />
-              {unreadCount > 0 ? (
-                <View style={styles.topBarBadge}>
-                  <Text style={styles.topBarBadgeText}>
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </Text>
-                </View>
-              ) : null}
-            </Pressable>
-            <Pressable
-              style={styles.topBarBtn}
-              hitSlop={10}
-              onPress={() => setSearchOpen(true)}
-            >
-              <Ionicons name="search-outline" size={20} color={C.ink2} />
-            </Pressable>
-          </View>
-        </View>
-
         {tab === "dashboard" ? (
           <DashboardScreen
             company={company}
@@ -1071,26 +1108,37 @@ function HomeScreen({
                   <Text style={styles.companyCapsuleSubText}>· {whoami}</Text>
                 </Pill>
               </View>
+              {/* 底部栏只剩 5 项, 工坊/本体/产物 收进任务页顶部这一排图标 */}
               <Pressable
                 onPress={() => setBoardView((v) => !v)}
-                hitSlop={12}
-                style={styles.btnGhost}
+                hitSlop={10}
+                style={styles.headerIcon}
               >
-                <Ionicons
-                  name={boardView ? "list" : "grid"}
-                  size={20}
-                  color={C.ink2}
-                />
+                <Ionicons name={boardView ? "list" : "grid"} size={19} color={C.ink2} />
+              </Pressable>
+              <Pressable
+                onPress={() => setTab("chat")}
+                hitSlop={10}
+                style={styles.headerIcon}
+              >
+                <Ionicons name="chatbubbles-outline" size={19} color={C.ink2} />
+              </Pressable>
+              <Pressable
+                onPress={() => setTab("ontology")}
+                hitSlop={10}
+                style={styles.headerIcon}
+              >
+                <Ionicons name="git-network-outline" size={19} color={C.ink2} />
               </Pressable>
               <Pressable
                 onPress={() => setTab("artifacts")}
-                hitSlop={12}
-                style={styles.btnGhost}
+                hitSlop={10}
+                style={styles.headerIcon}
               >
-                <Ionicons name="cube-outline" size={20} color={C.ink2} />
+                <Ionicons name="cube-outline" size={19} color={C.ink2} />
               </Pressable>
-              <Pressable onPress={() => setSettingsOpen(true)} hitSlop={12} style={styles.btnGhost}>
-                <Ionicons name="settings-outline" size={20} color={C.ink2} />
+              <Pressable onPress={() => setSettingsOpen(true)} hitSlop={10} style={styles.headerIcon}>
+                <Ionicons name="settings-outline" size={19} color={C.ink2} />
               </Pressable>
             </View>
 
@@ -1101,64 +1149,19 @@ function HomeScreen({
         <StatTile value={issues.length - open} label="已完成" valueColor={C.ok} />
       </View>
 
-      {/* 创建任务输入框区域 */}
-      <View style={styles.composer}>
-        <TextInput
-          style={styles.input}
-          placeholder="新任务标题…"
-          placeholderTextColor={C.ink3}
-          value={title}
-          onChangeText={setTitle}
-        />
-        <TextInput
-          style={[styles.input, styles.inputMultiline]}
-          placeholder="描述 (可选)"
-          placeholderTextColor={C.ink3}
-          multiline
-          value={description}
-          onChangeText={setDescription}
-        />
-
-        {/* 优先级徽标胶囊 (前缀色点) */}
-        <View style={styles.chips}>
-          {(["low", "medium", "high", "critical"] as IssuePriority[]).map((p) => (
-            <Pill
-              key={p}
-              label={PRIORITY_LABEL[p]}
-              dotColor={PRIORITY_DOT_COLOR[p]}
-              active={priority === p}
-              onPress={() => setPriority(p)}
-            />
-          ))}
-        </View>
-
-        <View style={styles.rowGap}>
-          <Pressable
-            style={[
-              styles.btnPrimary,
-              styles.btnFlex,
-              (!title.trim() || busy) && styles.btnDisabled,
-            ]}
-            disabled={!title.trim() || busy}
-            onPress={createTask}
-          >
-            <Text style={styles.btnPrimaryText}>添加任务</Text>
-          </Pressable>
-          <Pressable
-            style={[
-              styles.btnVoice,
-              recording && styles.btnVoiceRecording,
-              busy && styles.btnDisabled,
-            ]}
-            disabled={busy && !recording}
-            onPress={voiceDispatch}
-          >
-            <Text style={[styles.btnVoiceText, recording && { color: C.err }]}>
-              {recording ? "■ 停止并派发" : "🎤 语音派发"}
-            </Text>
-          </Pressable>
-        </View>
-      </View>
+      {/* 创建任务输入框区域 (与中央 "+" 浮层共用 TaskComposer) */}
+      <TaskComposer
+        title={title}
+        onTitle={setTitle}
+        description={description}
+        onDescription={setDescription}
+        priority={priority}
+        onPriority={setPriority}
+        busy={busy}
+        recording={recording}
+        onSubmit={submitInlineTask}
+        onVoice={voiceDispatch}
+      />
 
       {/* 任务列表 (规范行高 56，状态点呼吸灯) */}
       {boardView && !loading && issues.length > 0 ? (
@@ -1286,7 +1289,37 @@ function HomeScreen({
         onClose={dismissWhatsNew}
         onViewDemo={viewWhatsNewDemo}
       />
-      <BottomTabBar tab={tab} onChange={setTab} />
+      {/* 底部导航 — 汇览 / 任务 / [+] / 员工 / 收件箱 */}
+      <TabBar tab={tab} onChange={setTab} onCreate={() => setComposeOpen(true)} />
+      {/* 中央 "+" 打开的新建任务屏 (覆盖底部栏) */}
+      {composeOpen ? (
+        <View style={styles.composeOverlay}>
+          <View style={styles.composeHeader}>
+            <Text style={styles.composeTitle}>新建任务</Text>
+            <Pressable onPress={() => setComposeOpen(false)} hitSlop={10}>
+              <Ionicons name="close" size={22} color={C.ink3} />
+            </Pressable>
+          </View>
+          <ScrollView
+            style={styles.composeScroll}
+            contentContainerStyle={styles.composeBody}
+            keyboardShouldPersistTaps="handled"
+          >
+            <TaskComposer
+              title={title}
+              onTitle={setTitle}
+              description={description}
+              onDescription={setDescription}
+              priority={priority}
+              onPriority={setPriority}
+              busy={busy}
+              recording={recording}
+              onSubmit={submitOverlayTask}
+              onVoice={voiceDispatch}
+            />
+          </ScrollView>
+        </View>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -1400,62 +1433,10 @@ const styles = StyleSheet.create({
   shellContent: {
     flex: 1,
   },
-  topBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: 12,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 8,
-    borderBottomWidth: 1,
-    borderBottomColor: C.lineSubtle,
-    backgroundColor: C.bg,
-  },
-  topBarBrand: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    flex: 1,
-  },
-  topBarBrandText: {
-    color: C.ink,
-    fontSize: 16,
-    fontWeight: "600",
-    letterSpacing: -0.3,
-  },
-  topBarCompany: {
-    color: C.ink3,
-    fontSize: 12,
-    flexShrink: 1,
-  },
-  topBarActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  topBarBtn: {
-    padding: 6,
+  headerIcon: {
+    padding: 5,
     alignItems: "center",
     justifyContent: "center",
-  },
-  topBarBadge: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 4,
-    backgroundColor: C.err,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  topBarBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 9,
-    fontWeight: "700",
-    fontVariant: ["tabular-nums"],
   },
   boardCol: {
     width: 168,
@@ -1564,29 +1545,36 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   settingsSignOutText: { color: C.err, fontSize: 15, fontWeight: "600" },
-  bottomBar: {
+  composeOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    // 绝对定位会忽略 SafeAreaView 的 paddingTop, 不补这一条头部(含关闭 X)会落到
+    // Android 状态栏底下 —— 系统吃掉那块触摸, 浮层就关不掉了(实测)。
+    paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0,
+    backgroundColor: C.bg,
+    zIndex: 110,
+  },
+  composeHeader: {
+    height: 56,
     flexDirection: "row",
-    borderTopWidth: 1,
-    borderTopColor: C.lineSubtle,
-    backgroundColor: C.panel,
-    paddingTop: 6,
-    paddingBottom: 8,
-    paddingHorizontal: 8,
-  },
-  bottomTab: {
-    flex: 1,
     alignItems: "center",
-    gap: 3,
-    paddingVertical: 2,
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: C.lineSubtle,
+    backgroundColor: C.panel,
   },
-  bottomTabLabel: {
-    fontSize: 10,
-    color: C.ink3,
-    fontWeight: "400",
+  composeTitle: {
+    color: C.ink,
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: 0.2,
   },
-  bottomTabLabelActive: {
-    color: C.accent,
-    fontWeight: "500",
+  composeScroll: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  composeBody: {
+    padding: 16,
   },
   hero: {
     alignItems: "center",

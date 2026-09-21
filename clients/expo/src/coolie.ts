@@ -8,31 +8,10 @@ import {
   type SessionUser,
 } from "@coolie/api-client";
 
-// ── Linear 设计系统色彩令牌 (DESIGN.md 第1节) ─────────────────────────
-export const C = {
-  // 背景三层(亮度阶梯 = 海拔)
-  bg: "#08090A", // 页面最底(marketing black)
-  panel: "#0F1011", // 侧栏/面板
-  surface: "#191A1B", // 卡片/浮层
-  surfaceHover: "#28282C",
-  // 文字四级
-  ink: "#F7F8F8", // 主文字(不是纯白!)
-  ink2: "#D0D6E0", // 次文字
-  ink3: "#8A8F98", // 占位/元数据
-  ink4: "#62666D", // 时间戳/禁用
-  // 品牌色(全 App 唯一彩色,只用于 CTA/激活/选中)
-  brand: "#5E6AD2", // 按钮底/品牌标记
-  accent: "#7170FF", // 链接/激活态
-  accentHover: "#828FFF",
-  // 状态(仅状态指示)
-  ok: "#27A644",
-  done: "#10B981",
-  warn: "#F59E0B",
-  err: "#EF4444",
-  // 边框(半透明白,不用实色深边)
-  line: "rgba(255,255,255,0.08)",
-  lineSubtle: "rgba(255,255,255,0.05)",
-} as const;
+// ── Linear 设计系统色彩令牌 ─────────────────────────────────────────
+// 单一来源在 src/theme.ts (与 Coolie Web 对齐); 这里再导出, 让 30+ 个
+// `import { C } from "../coolie"` 的既有调用点无需改动。
+export { C } from "./theme";
 
 /**
  * Instance base URL. Override per build with `EXPO_PUBLIC_COOLIE_BASE_URL`
@@ -47,7 +26,7 @@ export const C = {
 declare const process: { env?: Record<string, string | undefined> } | undefined;
 
 export const COOLIE_BASE_URL =
-  process?.env?.EXPO_PUBLIC_COOLIE_BASE_URL ?? "https://xrobinai.cn";
+  process?.env?.EXPO_PUBLIC_COOLIE_BASE_URL ?? "http://127.0.0.1:3100";
 
 /**
  * The origin this native client declares on every request.

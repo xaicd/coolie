@@ -2,8 +2,8 @@
   "expo": {
     "name": "Coolie工坊",
     "slug": "coolie",
-    "scheme": "coolie",
-    "version": "0.5.2",
+    "scheme": ["coolie", "coolieweb"],
+    "version": "0.5.5",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -28,7 +28,7 @@
     },
     "android": {
       "package": "cloud.coolie.app",
-      "versionCode": 502,
+      "versionCode": 505,
       "permissions": [
         "RECORD_AUDIO"
       ]
@@ -45,7 +45,8 @@
           "workspace": "coolie://workspace",
           "chatBuild": "coolie://chat/build",
           "chatBuildWithTitle": "coolie://chat/build/<标题>"
-        }
+        },
+        "coolieWeb": "coolieweb://"
       }
     }
   }

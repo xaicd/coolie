@@ -1,0 +1,132 @@
+import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { C } from "../theme";
+import { openCoolieWeb } from "../utils/openCoolieWeb";
+
+/**
+ * 全局顶栏 — 对齐 Coolie Web (clients/expo-paperclip-web) 的原生 appBar:
+ * 中间标题 "Coolie工坊", 右侧 [驾驶舱Web] 按钮跳 coolieweb:// 深链。
+ *
+ * 左侧留空 (驾驶舱没有 web 后退, 不渲染 ←); 通知铃铛 + 全局搜索仍放左侧,
+ * 因为它们原先只挂在旧 topBar 上, 去掉会丢掉两个入口 (通知中心 / 全局搜索)。
+ */
+export function AppBar({
+  title,
+  unreadCount = 0,
+  onOpenNotifications,
+  onOpenSearch,
+}: {
+  title: string;
+  unreadCount?: number;
+  onOpenNotifications?: () => void;
+  onOpenSearch?: () => void;
+}) {
+  return (
+    <View style={styles.bar}>
+      <View style={styles.side}>
+        {onOpenNotifications ? (
+          <Pressable
+            style={styles.iconBtn}
+            hitSlop={10}
+            onPress={onOpenNotifications}
+          >
+            <Ionicons name="notifications-outline" size={20} color={C.ink2} />
+            {unreadCount > 0 ? (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {unreadCount > 99 ? "99+" : unreadCount}
+                </Text>
+              </View>
+            ) : null}
+          </Pressable>
+        ) : null}
+        {onOpenSearch ? (
+          <Pressable style={styles.iconBtn} hitSlop={10} onPress={onOpenSearch}>
+            <Ionicons name="search-outline" size={20} color={C.ink2} />
+          </Pressable>
+        ) : null}
+      </View>
+
+      <Text style={styles.title} numberOfLines={1}>
+        {title}
+      </Text>
+
+      <View style={[styles.side, styles.sideRight]}>
+        <Pressable
+          onPress={() => void openCoolieWeb()}
+          hitSlop={8}
+          style={({ pressed }) => [styles.webBtn, pressed && styles.webBtnPressed]}
+        >
+          <Text style={styles.webBtnText}>驾驶舱Web</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  bar: {
+    height: 56,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    backgroundColor: C.panel,
+    borderBottomWidth: 1,
+    borderBottomColor: C.lineSubtle,
+  },
+  side: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  sideRight: {
+    justifyContent: "flex-end",
+  },
+  iconBtn: {
+    padding: 6,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badge: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    backgroundColor: C.err,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  badgeText: {
+    color: "#FFFFFF",
+    fontSize: 9,
+    fontWeight: "700",
+    fontVariant: ["tabular-nums"],
+  },
+  title: {
+    color: C.ink,
+    fontSize: 17,
+    fontWeight: "700",
+    letterSpacing: 0.2,
+  },
+  webBtn: {
+    height: 32,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.accent,
+  },
+  webBtnPressed: {
+    backgroundColor: C.accentHover,
+  },
+  webBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+});
