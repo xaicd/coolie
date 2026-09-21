@@ -76,6 +76,296 @@ const ZH_CN_ENSURE = `
 true;
 `;
 
+/**
+ * 老板 (2026-09-21)：「整个 web 的国际化还有很多问题」。
+ *
+ * paperclip 上游的 i18n 只覆盖 bundle 里登记的 key；大量**硬编码英文文案**直接写在
+ * .tsx 里（登录页 / 详情弹窗 / 按钮 / placeholder），zh-CN bundle 覆盖不到。
+ * 上游 `ui/` 是 fork-surface 保护目录（见 docs-coolie/FORK-SURFACE-AUDIT.md），
+ * 不能改，所以在壳这一层做**运行时翻译补丁**：注入后在 DOM 层把命中的英文替换成中文。
+ *
+ * 约定：key 必须是页面里出现的「完整去空白文本」，或完整的 placeholder /
+ * aria-label / title。值不得再命中其它 key（避免链式替换死循环）。
+ */
+const I18N_PATCH: Record<string, string> = {
+  // —— 登录 / 注册 (pages/Auth.tsx) ——
+  "Sign in to Coolie": "登录 Coolie",
+  "Create your Coolie account": "创建您的 Coolie 账号",
+  "Use your email and password to access this instance.": "使用邮箱和密码访问此实例。",
+  "Create an account for this instance. Email confirmation is not required in v1.":
+    "为此实例创建账号。v1 无需邮箱确认。",
+  Email: "邮箱",
+  Password: "密码",
+  Name: "名称",
+  "Forgot password?": "忘记密码？",
+  "Sign in": "登录",
+  "Sign In": "登录",
+  "Sign up": "注册",
+  "Create account": "创建账号",
+  "Create Account": "创建账号",
+  "Working…": "处理中…",
+  "Working...": "处理中…",
+  "Need an account?": "还没有账号？",
+  "Already have an account?": "已有账号？",
+  "Create one": "创建一个",
+  "Enter your name.": "请输入名称。",
+  "Enter your email address.": "请输入邮箱地址。",
+  "Enter a valid email address.": "请输入有效的邮箱地址。",
+  "Enter your password.": "请输入密码。",
+  "Password must be at least 8 characters.": "密码至少 8 个字符。",
+  "Authentication failed": "认证失败",
+
+  // —— 导航 (MobileBottomNav / Sidebar / CommandPalette) ——
+  Home: "首页",
+  "Recent Tasks": "最近任务",
+  Tasks: "任务",
+  "New Task": "新建任务",
+  Agents: "智能体",
+  Inbox: "收件箱",
+  Projects: "项目",
+  Dashboard: "仪表盘",
+  Goals: "目标",
+  Costs: "成本",
+  Activity: "活动",
+  "Open Connectors": "打开连接器",
+  "Runner Inspector": "运行器检查",
+  "Execution Workspaces": "执行工作空间",
+  "Quick filters": "快速筛选",
+  Actions: "操作",
+  Pages: "页面",
+  "Create new task": "新建任务",
+  "Create new agent": "新建智能体",
+  "Create new project": "新建项目",
+  "Search tasks, agents, projects...": "搜索任务、智能体、项目…",
+  "Keyboard shortcuts": "键盘快捷键",
+
+  // —— 账户菜单 (SidebarAccountMenu) ——
+  Settings: "设置",
+  "View profile": "查看资料",
+  "Edit profile": "编辑资料",
+  Documentation: "文档",
+  "Sign out": "退出登录",
+  "Signing out...": "正在退出…",
+  "Share feedback": "分享反馈",
+  "Open account menu": "打开账户菜单",
+  Board: "看板",
+  "Signed in": "已登录",
+  "Local workspace board": "本地工作区看板",
+
+  // —— 通用按钮 / 动作 ——
+  Cancel: "取消",
+  Save: "保存",
+  "Save changes": "保存更改",
+  "Save URL": "保存 URL",
+  Delete: "删除",
+  Remove: "移除",
+  Create: "创建",
+  Edit: "编辑",
+  Done: "完成",
+  Confirm: "确认",
+  Back: "返回",
+  Continue: "继续",
+  Close: "关闭",
+  Retry: "重试",
+  "Try again": "重试",
+  Dismiss: "忽略",
+  Clear: "清除",
+  Refresh: "刷新",
+  Search: "搜索",
+  "Loading...": "正在加载…",
+  "Loading…": "正在加载…",
+  "No results found.": "未找到结果。",
+  None: "无",
+
+  // —— 设置 / 组织 (CompanyAccess / InstanceGeneralSettings) ——
+  General: "通用",
+  "Deployment and auth": "部署与认证",
+  "Organization Members": "组织成员",
+  Role: "角色",
+  Status: "状态",
+  Action: "操作",
+  Active: "活跃",
+  Pending: "待处理",
+  Suspended: "已停用",
+
+  // —— 任务 / 用例 / 例行 ——
+  Sort: "排序",
+  Group: "分组",
+  "All routines": "所有例行任务",
+  Cases: "案例",
+  Experimental: "实验功能",
+  "No cases yet": "暂无案例",
+
+  // —— 工作区 / 密钥 ——
+  Workspaces: "工作区",
+  "No workspace activity yet.": "暂无工作区活动。",
+  Secrets: "密钥",
+  Value: "值",
+  Provider: "提供商",
+  "Display name": "显示名称",
+  "Coming soon": "即将推出",
+  Disabled: "已停用",
+  Missing: "缺失",
+
+  // —— placeholder / 搜索框 ——
+  "Header name": "Header 名称",
+  "Search apps…": "搜索应用…",
+  "Search agents…": "搜索智能体…",
+  "Search teams": "搜索团队",
+  "Search connectors": "搜索连接器",
+  "Search inbox…": "搜索收件箱…",
+  "Search files...": "搜索文件…",
+  "Search users": "搜索用户",
+  "Search labels…": "搜索标签…",
+  "Search icons...": "搜索图标…",
+  "Search tools…": "搜索工具…",
+  "Search skills": "搜索技能",
+  "Search discovered skills…": "搜索已发现的技能…",
+  "Search activity…": "搜索活动…",
+  "Search secrets": "搜索密钥",
+  "Search artifacts": "搜索产物",
+  "Search query": "搜索查询",
+  "Search by name or email": "按名称或邮箱搜索",
+  "Search by name, ARN, tag": "按名称、ARN 或标签搜索",
+  "Paste path, GitHub URL, or skills.sh command": "粘贴路径、GitHub URL 或 skills.sh 命令",
+  "Add a description...": "添加描述…",
+  "Add a comment...": "添加评论…",
+  "Write a comment…": "写评论…",
+  "Add a tag…": "添加标签…",
+  "Optional decision note…": "可选的决策备注…",
+  "Why is this being rejected?": "为何驳回？",
+  "Paste your token or credential": "粘贴您的令牌或凭据",
+  "Paste your new key": "粘贴您的新密钥",
+  "Ask anything about your organization...": "询问关于您组织的任何问题…",
+
+  // —— 连接器 / 身份流程 (connection-dialogs / ConnectionSetupFlow) ——
+  "Open sign-in in a new tab": "在新标签页打开登录",
+  "Reconnect selected account": "重新连接所选账号",
+  "Cancel repair": "取消修复",
+  "Cancel setup": "取消设置",
+  "Adopt Connections for this agent": "为此智能体采用连接",
+  "Connect account": "连接账号",
+  "Add application": "添加应用",
+  "Select an application": "选择应用",
+  "Select a connection": "选择连接",
+
+  // —— 弹窗标题 ——
+  "Chat with an agent": "与智能体对话",
+  "Run routine": "运行例行任务",
+  "Rename task": "重命名任务",
+  "Delete comment?": "删除评论？",
+  "Install Plugin": "安装插件",
+  "Uninstall Plugin": "卸载插件",
+  "Edit member": "编辑成员",
+  "Remove member": "移除成员",
+  "New pipeline": "新建流水线",
+  "New card": "新建卡片",
+  "New gateway": "新建网关",
+  "Edit gateway": "编辑网关",
+  "Add a skill source": "添加技能源",
+  "Import a skill": "导入技能",
+  "Remove skill": "移除技能",
+  "Delete secret": "删除密钥",
+  "Create new secret": "新建密钥",
+  "Discard changes?": "放弃更改？",
+
+  // —— 空状态 / 错误页 ——
+  "No tasks yet.": "暂无任务。",
+  "No cases yet.": "暂无案例。",
+  "No types yet.": "暂无类型。",
+  "No labels yet.": "暂无标签。",
+  "None yet": "暂无",
+  "Page not found": "页面未找到",
+  "Organization not found": "未找到组织",
+  "Not Found": "未找到",
+  "This route does not exist.": "此路由不存在。",
+  "Requested path:": "请求路径：",
+  "Open dashboard": "打开仪表盘",
+  "Go home": "回到首页",
+  "Resume all": "全部恢复",
+  "Resuming…": "正在恢复中…",
+  "Unlimited budget": "无限预算",
+  "Awaiting board review": "等待董事会审核",
+  "You're the instance admin": "您是实例管理员",
+  "Redirecting...": "正在跳转…",
+  "Continue to dashboard": "继续前往仪表盘",
+  "Finishing setup from the host": "正在从主机完成设置",
+};
+
+/**
+ * 运行时翻译补丁。`injectedJavaScript*` 只接受字符串，所以脚本拼在这里。
+ *
+ * - 只在完整去空白的 text node / placeholder / aria-label / title 上做替换，
+ *   保留原有缩进空白；替换值用函数形式避免 `$&` 之类的特殊替换序列。
+ * - MutationObserver 监听整棵 DOM（React 重渲染后会重新扫），带 **200ms debounce**
+ *   （spec §10：避免影响 React 性能）。
+ * - `__COOLIE_I18N_PATCH_INSTALLED__` 幂等守卫：beforeContentLoaded + 页面加载后
+ *   各注入一次，只装一个 observer。
+ */
+const I18N_PATCH_INJECTION = `
+window.__COOLIE_I18N_PATCH__ = ${JSON.stringify(I18N_PATCH)};
+(function () {
+  if (window.__COOLIE_I18N_PATCH_INSTALLED__) return;
+  window.__COOLIE_I18N_PATCH_INSTALLED__ = true;
+  var PATCH = window.__COOLIE_I18N_PATCH__ || {};
+  var SKIP = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEXTAREA: 1, CODE: 1, PRE: 1 };
+  var ATTRS = ["placeholder", "aria-label", "title"];
+  function translate(raw) {
+    if (raw === null || raw === undefined) return null;
+    var text = String(raw).trim();
+    if (!text) return null;
+    var hit = PATCH[text];
+    if (typeof hit !== "string" || hit === text) return null;
+    return String(raw).replace(text, function () { return hit; });
+  }
+  function apply(root) {
+    if (!root) return;
+    try {
+      var walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+      var node;
+      while ((node = walker.nextNode())) {
+        var parent = node.parentNode;
+        if (parent && SKIP[parent.nodeName]) continue;
+        var next = translate(node.nodeValue);
+        if (next !== null) node.nodeValue = next;
+      }
+    } catch (e) {}
+    try {
+      var els = root.querySelectorAll("[placeholder],[aria-label],[title]");
+      for (var i = 0; i < els.length; i++) {
+        for (var a = 0; a < ATTRS.length; a++) {
+          var got = translate(els[i].getAttribute(ATTRS[a]));
+          if (got !== null) els[i].setAttribute(ATTRS[a], got);
+        }
+      }
+    } catch (e) {}
+  }
+  function schedule() {
+    if (window.__COOLIE_I18N_PATCH_TIMER__) clearTimeout(window.__COOLIE_I18N_PATCH_TIMER__);
+    window.__COOLIE_I18N_PATCH_TIMER__ = setTimeout(function () {
+      window.__COOLIE_I18N_PATCH_TIMER__ = null;
+      apply(document.body || document.documentElement);
+    }, 200);
+  }
+  function start() {
+    apply(document.body || document.documentElement);
+    var target = document.documentElement;
+    if (!target || !window.MutationObserver) return;
+    new MutationObserver(schedule).observe(target, {
+      childList: true,
+      subtree: true,
+      characterData: true,
+    });
+  }
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", start);
+  } else {
+    start();
+  }
+})();
+true;
+`;
+
 /** 驾驶舱 App 的深链 scheme (cloud.coolie.app，见 clients/expo/app.json)。 */
 const COCKPIT_DEEP_LINK = "coolie://";
 
@@ -260,8 +550,11 @@ export default function App() {
           style={styles.webview}
           // —— wave 9 spec §3.5 配置 ——
           // 老板 (2026-09-21) 要求默认中文：页面脚本执行前注入 zh-CN locale
-          injectedJavaScriptBeforeContentLoaded={ZH_CN_INJECTION}
-          injectedJavaScript={ZH_CN_ENSURE}
+          // wave 10.1：同一对钩子里再挂 i18n 运行时补丁（beforeContentLoaded 覆盖 iOS，
+          // 页面加载后那次覆盖 Android —— 之前实测 Android 的 beforeContentLoaded 跑在
+          // about:blank 上下文，localStorage/DOM 补丁都会丢，必须补一次）。
+          injectedJavaScriptBeforeContentLoaded={ZH_CN_INJECTION + I18N_PATCH_INJECTION}
+          injectedJavaScript={ZH_CN_ENSURE + I18N_PATCH_INJECTION}
           mixedContentMode="compatibility"
           allowsBackForwardNavigationGestures
           javaScriptEnabled
