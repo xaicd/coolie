@@ -46,6 +46,12 @@ else
 fi
 
 echo "=== [2/4] 生成自建更新源 Manifest (Expo Updates Protocol v0) ==="
+# runtimeVersion 必须等于装机 APK 的原生 EXPO_RUNTIME_VERSION —— expo-updates 就是拿它
+# 判断「这份 bundle 能不能在自己的运行时上加载」，对不上会只下载不加载。口径只有一处：
+# scripts/runtime-version.mjs（读 APK 真值，无 APK 时回落 app.json 意图）。
+RUNTIME_VERSION="$(node "$SCRIPT_DIR/runtime-version.mjs")"
+echo "   runtimeVersion = $RUNTIME_VERSION (见上方 note/warning 的来源说明)"
+export OTA_RUNTIME_VERSION="$RUNTIME_VERSION"
 node - << 'EOF'
 const fs = require('fs');
 const path = require('path');
@@ -63,8 +69,12 @@ const appJson = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
 const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
 
 const version = appJson.expo?.version || '0.1.0';
-const runtimePolicy = appJson.expo?.runtimeVersion?.policy;
-const runtimeVersion = runtimePolicy === 'appVersion' ? version : (appJson.expo?.runtimeVersion || version);
+// 由 scripts/runtime-version.mjs 解析（APK 真值优先）；这里不再自己推导，避免第二份口径。
+const runtimeVersion = process.env.OTA_RUNTIME_VERSION;
+if (!runtimeVersion) {
+  console.error("❌ 缺少 OTA_RUNTIME_VERSION（应由 scripts/runtime-version.mjs 提供）");
+  process.exit(1);
+}
 const baseUrl = (process.env.OTA_BASE_URL || 'https://xrobinai.cn/ota').replace(/\/+$/, '');
 const now = new Date().toISOString();
 
@@ -146,4 +156,4 @@ ssh "$SSH_TARGET" "if [ -f $REMOTE_OTA_DIR/manifest ]; then echo '✓ 远端 man
 echo ""
 echo "🎉 OTA 增量更新发布完成!"
 echo "自建更新源 URL: $OTA_BASE_URL/manifest"
-echo "支持渠道: production, runtimeVersion: $(node -e 'console.log(require("./app.json").expo.version)')"
+echo "支持渠道: production, runtimeVersion: $RUNTIME_VERSION"

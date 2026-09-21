@@ -14,7 +14,7 @@
 #   2. 改 clients/expo/app.json / package.json 版本号
 #   3. clients/expo/CHANGELOG.md 顶部插入新版本节
 #   4. git add + commit (不 push)
-#   5. 修正 AndroidManifest 确保 OTA 打开
+#   5. 修正 AndroidManifest：OTA 打开 + 原生 runtimeVersion 跟随 app.json（漂移则拒绝发版）
 #   6. gradle assembleRelease 出 APK (失败则回退上一步的 commit)
 #   7. coscli 上传 APK 到 COS
 #   8. 生成 version.json 并 scp 到生产 (App 内升级检测用)
@@ -217,8 +217,22 @@ else
   echo "   ✓ 已提交 $(git rev-parse --short HEAD)"
 fi
 
-step "[5/9] 确保 Android OTA 配置打开 (fix-android-manifest.sh)"
+step "[5/9] 确保 Android OTA 配置打开 + 运行时版本跟随 app.json"
+# fix-android-manifest.sh 会把原生 EXPO_RUNTIME_VERSION 重写成 app.json 的运行时意图
+# (policy=appVersion → expo.version)。native 与 app.json 漂移时 expo-updates 会认为
+# 运行时不符，bundle 只下载不加载 —— 所以这里 fail-loud 断言，而不是让它带病出包。
 run bash "$EXPO_DIR/scripts/fix-android-manifest.sh"
+NATIVE_MANIFEST="$EXPO_DIR/android/app/src/main/AndroidManifest.xml"
+EXPECTED_RUNTIME="$(node "$EXPO_DIR/scripts/runtime-version.mjs" --app-json)"
+if dry; then
+  echo "   [dry-run] 断言 $NATIVE_MANIFEST 的 EXPO_RUNTIME_VERSION == $EXPECTED_RUNTIME"
+else
+  ACTUAL_RUNTIME="$(node "$EXPO_DIR/scripts/runtime-version.mjs" --native-manifest "$NATIVE_MANIFEST")" ||
+    die "读不到 $NATIVE_MANIFEST 的 EXPO_RUNTIME_VERSION"
+  [ "$ACTUAL_RUNTIME" = "$EXPECTED_RUNTIME" ] ||
+    die "原生 EXPO_RUNTIME_VERSION=$ACTUAL_RUNTIME ≠ app.json 意图 $EXPECTED_RUNTIME —— OTA 会「下了不装」，拒绝发版"
+  echo "   ✓ 原生 runtimeVersion = $EXPECTED_RUNTIME (与 app.json 一致)"
+fi
 
 step "[6/9] gradle assembleRelease"
 echo "   JAVA_HOME=$JAVA_HOME"
