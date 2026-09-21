@@ -149,6 +149,9 @@ curl -fsS https://xrobinai.cn/ota/manifest | jq '.createdAt'
 
 **注意：runtimeVersion 不变 = expo-updates 接受新 bundle 作为 patch，不 bump version.json。**
 
+> `runtimeVersion` 必须与**装机 APK 的原生值**一致，否则 bundle 只下载不加载 —— 口径与
+> 门禁见 skill `ota-runtime-version-consistency`（`runtime-version.mjs` 是唯一来源）。
+
 ### 5.2 原生改动（gradle / keystore / 新权限）
 
 ```bash
@@ -160,7 +163,7 @@ bash scripts/release-app.sh
 #   - gradle assembleRelease
 #   - coscli upload cos://gzbucket/coolie/app/0.5.1/coolie-release.apk
 #   - version.json → 0.5.1 / 501
-#   - OTA bundle → runtimeVersion 0.5.1
+#   - OTA bundle → runtimeVersion 0.5.1（原生 runtime 同值，release-app 会断言，见 ota-runtime-version-consistency）
 #   - CHANGELOG 加段
 #   - commit + push
 
@@ -212,6 +215,8 @@ X 改的是什么层？
 ## 9. 文件引用
 
 - `scripts/publish-ota.sh` —— OTA JS-only 发布
+- `clients/expo/scripts/runtime-version.mjs` —— runtimeVersion 唯一口径（APK 真值优先）
+- `clients/expo/scripts/verify-ota-runtime-consistency.mjs` —— 三处一致性门禁
 - `scripts/release-app.sh` —— APK + OTA + version.json 一起发
 - `scripts/release-lib.sh` —— 共享发布工具
 - `scripts/release.sh` —— 通用发布入口
