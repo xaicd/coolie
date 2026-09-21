@@ -1,5 +1,5 @@
 {
-  "_comment": "Upstream-owned files this fork intentionally changes. Anything not listed here fails scripts/check-fork-surface.mjs; the fix is to move the change into one of our own trees, or to add it here deliberately. Budgets are the most this fork may change in one commit — they catch creep, not a single honest edit. maxNetLines is the most one commit may change; maxTotalLines is the most this fork may have changed in total.",
+  "_comment": "Upstream-owned files this fork intentionally changes. Anything not listed here fails scripts/check-fork-surface.mjs; the fix is to move the change into one of our own trees, or to add it here deliberately. Budgets are the most this fork may change in one commit — they catch creep, not a single honest edit. maxNetLines is the most one commit may change; maxTotalLines is the most this fork may have changed in total. A note the per-file entries cannot carry: this fork keeps `screenshots/` entirely local (see `.gitignore`), which deletes 12 images upstream tracks (`PAP-*.png`, `PR-*.png`). At a merge, keep the rule and drop upstream's images again rather than restoring them.",
   "entries": [
     {
       "path": "ui/src/index.css",
@@ -204,12 +204,6 @@
       "maxNetLines": 35,
       "reason": "New file: unit coverage for `inviteTokenFromInput` — a raw code, a full invite URL, a trailing slash, a query string, a fragment, surrounding whitespace, and blank input. No upstream counterpart, so nothing to reconcile at a merge.",
       "maxTotalLines": 40
-    },
-    {
-      "path": "screenshots/expo-signin-email.png",
-      "maxNetLines": 1,
-      "reason": "Screenshot evidence for the Expo sign-in screen, referenced by clients/expo/README.md. A binary, so it contributes no line count — the budget is a nominal 1 because every entry must state a positive one (scripts/check-fork-surface.test.mjs). It is declared only because upstream owns the `screenshots/` directory. New evidence should go under `docs-coolie/` instead, which is ours, rather than growing this entry list one image at a time.",
-      "maxTotalLines": 1
     },
     {
       "path": "server/src/services/dashboard.ts",

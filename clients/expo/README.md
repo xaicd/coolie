@@ -198,8 +198,10 @@ CSRF guard was measured with and without `Origin` on a real mutation, which is w
 `originHeader` option comes from.
 
 The app itself was built, installed and launched on an iPhone 17 Pro simulator
-(`npx expo run:ios`), and the sign-in screen of this change is in
-`screenshots/expo-signin-email.png`. What that does **not** cover: nobody has typed
+(`npx expo run:ios`), and the sign-in screen of this change was captured as
+`screenshots/expo-signin-email.png` — **that file is local-only, `screenshots/` is
+gitignored**, so a reader of this repo will not have it; rebuild the app and the screen
+is one command away. What that capture does **not** cover: nobody has typed
 credentials into it, so the app-side wiring of sign-in (cookie jar, `Origin` header through
 RN's fetch) is reasoned-plus-measured-elsewhere rather than observed in the app.
 

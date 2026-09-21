@@ -80,7 +80,6 @@ tests/storybook-visual/playwright-report/
 .vercel/
 .env.local
 test-results/
-screenshots/ds-workbench/
 
 # A crash dump is not an artifact: `core` was 1.3 GB of one here. `coscli` writes
 # its log and output beside the checkout, and both are run output, not source.
@@ -98,19 +97,15 @@ coscli_output/
 .commandcode/import-report.md
 .commandcode/taste/
 
-# Playwright scratch that accumulated beside the evidence under
-# `screenshots/ontplay/`: login scripts carrying a hardcoded password, an
-# `auth-state.json` holding a live session token, and console logs. Only the
-# images are evidence; the rest is how they were taken, and it must not be
-# committed. (The images are ignored too — see the screenshot rule below.)
-screenshots/ontplay/*.cjs
-screenshots/ontplay/*.ts
-screenshots/ontplay/*.json
-screenshots/ontplay/*.txt
-
-# Test and exploration screenshots stay local. They are observation records, not
-# source: they go stale the moment either UI moves, and they are megabytes of
-# binary per capture session. The directories are ignored wholesale so a capture
-# run cannot sweep them into a commit by accident.
-screenshots/ds-explore/
-screenshots/ontplay/
+# Screenshots stay local, the whole tree. They are observation records, not
+# source: they go stale the moment a UI moves, they are megabytes of binary per
+# capture session, and the capture runs leave scratch beside them — under
+# `screenshots/ontplay/` that scratch included login scripts with a hardcoded
+# password and an `auth-state.json` holding a live session token, which is the
+# kind of thing a directory-level rule is for. Ignoring the tree outright means a
+# capture run cannot sweep any of it into a commit by accident.
+#
+# This deletes 12 images upstream tracks (`PAP-*.png`, `PR-*.png`) — a deliberate
+# divergence, recorded in `scripts/fork-surface.json`: at a merge, keep this rule
+# and drop upstream's images again rather than restoring them.
+screenshots/
