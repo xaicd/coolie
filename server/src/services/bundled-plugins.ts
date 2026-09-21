@@ -110,7 +110,11 @@ export const BUNDLED_PLUGIN_CATALOG: readonly BundledPluginCatalogEntry[] = [
   {
     key: "chat",
     pluginKey: "paperclipai.plugin-chat",
-    relativePath: "plugin-chat",
+    // Coolie fork: the chat bundle is deprecated (superseded by the built-in
+    // ChatHome) and lives under `_deprecated/`. It stays in the catalog so the
+    // `COOLIE_USE_PLUGIN_CHAT` opt-in can still resolve it where the bundle
+    // exists; a boot that does not opt in never asks for it.
+    relativePath: "_deprecated/plugin-chat",
   },
   {
     key: "workspace-diff",
@@ -130,6 +134,42 @@ export const SELF_HOSTED_AUTO_INSTALL_KEYS: readonly string[] = [
   "chat",
   "workspace-diff",
 ];
+
+/**
+ * Coolie fork: opt-in switch for the deprecated `plugin-chat` bundle.
+ *
+ * plugin-chat is superseded by the built-in ChatHome (the server's
+ * `board-chat` route plus the `board-inline` chat surface in the clients).
+ * ChatHome is the default; plugin-chat installs only when an operator
+ * deliberately sets this to "true".
+ */
+export const USE_PLUGIN_CHAT_ENV_VAR = "COOLIE_USE_PLUGIN_CHAT";
+
+/** Coolie fork: catalog key of the deprecated chat bundle. */
+const PLUGIN_CHAT_CATALOG_KEY = "chat";
+
+/** Coolie fork: anything but the literal "true" keeps the ChatHome default. */
+export function isPluginChatEnabled(
+  env: Record<string, string | undefined>,
+): boolean {
+  return env[USE_PLUGIN_CHAT_ENV_VAR]?.trim().toLowerCase() === "true";
+}
+
+/**
+ * Coolie fork: the self-hosted auto-install list actually used at boot.
+ *
+ * Identical to {@link SELF_HOSTED_AUTO_INSTALL_KEYS} except the deprecated
+ * `chat` bundle, which is dropped unless the operator opted in with
+ * `COOLIE_USE_PLUGIN_CHAT=true`. Managed instances are unaffected: their key
+ * list comes from the control plane, not from here.
+ */
+export function resolveSelfHostedAutoInstallKeys(
+  env: Record<string, string | undefined>,
+): string[] {
+  return isPluginChatEnabled(env)
+    ? [...SELF_HOSTED_AUTO_INSTALL_KEYS]
+    : SELF_HOSTED_AUTO_INSTALL_KEYS.filter((key) => key !== PLUGIN_CHAT_CATALOG_KEY);
+}
 
 export function resolveBundledCatalogRoot(
   env: Record<string, string | undefined>,

@@ -231,9 +231,15 @@
     },
     {
       "path": "server/src/services/bundled-plugins.ts",
-      "maxNetLines": 30,
-      "reason": "Fork ships ontology, chat, and workspace-diff plugins as self-hosted auto-installs so the mobile cockpit's ontology/chat/code-review tabs work out of the box.",
-      "maxTotalLines": 40
+      "maxNetLines": 60,
+      "reason": "Fork ships ontology and workspace-diff plugins as self-hosted auto-installs so the mobile cockpit's ontology/code-review tabs work out of the box, and makes the deprecated chat bundle opt-in: `resolveSelfHostedAutoInstallKeys` drops the `chat` key unless `COOLIE_USE_PLUGIN_CHAT=true`, because ChatHome (server `board-chat` + the clients' `board-inline` surface) replaces plugin-chat. The catalog entry for `chat` points at `_deprecated/plugin-chat` so the opt-in still resolves where that leftover bundle exists.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "server/src/__tests__/bundled-plugins.test.ts",
+      "maxNetLines": 20,
+      "reason": "Upstream's test asserted the self-hosted auto-install list is exactly `[\"kubernetes\"]`. This fork adds ontology and workspace-diff (see the bundled-plugins.ts entry above), so that assertion cannot hold; it now asserts the boot default keeps kubernetes/ontology/workspace-diff and drops chat unless opted in. Read together with the bundled-plugins.ts entry: it pins the same divergence from the other side.",
+      "maxTotalLines": 30
     },
     {
       "path": "server/src/routes/board-chat.ts",

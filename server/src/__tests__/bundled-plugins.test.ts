@@ -9,6 +9,7 @@ import {
   ensureBundledPlugins,
   resolveBundledCatalogRoot,
   resolveBundledPluginInstalls,
+  resolveSelfHostedAutoInstallKeys,
   type BundledPluginProvisionerDeps,
   type ResolvedBundledPlugin,
 } from "../services/bundled-plugins.js";
@@ -166,14 +167,21 @@ describe("resolveBundledPluginInstalls", () => {
     expect(resolved).toHaveLength(1);
   });
 
-  it("keeps the self-hosted default list to exactly the kubernetes bundle", () => {
-    expect(SELF_HOSTED_AUTO_INSTALL_KEYS).toEqual(["kubernetes"]);
+  it("drops the deprecated chat bundle from the self-hosted default list unless opted in", () => {
+    // Coolie fork: ChatHome replaces plugin-chat, so the boot default omits it.
+    expect(resolveSelfHostedAutoInstallKeys({})).toEqual([
+      "kubernetes",
+      "ontology",
+      "workspace-diff",
+    ]);
+    expect(resolveSelfHostedAutoInstallKeys({ COOLIE_USE_PLUGIN_CHAT: "true" })).toContain("chat");
+    expect(resolveSelfHostedAutoInstallKeys({ COOLIE_USE_PLUGIN_CHAT: "1" })).not.toContain("chat");
     const [entry] = resolveBundledPluginInstalls(SELF_HOSTED_AUTO_INSTALL_KEYS, {
       catalogRoot: resolveBundledCatalogRoot({}),
       env: {},
       enforceCatalogRoot: false,
     });
-    // Exactly the pre-refactor default path.
+    // The kubernetes bundle is still the first self-hosted default.
     expect(entry).toEqual({
       key: "kubernetes",
       pluginKey: "paperclip.kubernetes-sandbox-provider",

@@ -132,10 +132,11 @@ import {
   type PluginLoader,
 } from "./services/plugin-loader.js";
 import {
-  SELF_HOSTED_AUTO_INSTALL_KEYS,
   ensureBundledPlugins,
+  isPluginChatEnabled,
   resolveBundledCatalogRoot,
   resolveBundledPluginInstalls,
+  resolveSelfHostedAutoInstallKeys,
 } from "./services/bundled-plugins.js";
 import {
   createPluginWorkerManager,
@@ -645,10 +646,21 @@ export async function createApp(
   app.use(emailWebhookRoutes(emailChannels));
   app.use(chatWebhookRoutes(chatChannels));
   const managedAutoInstallKeys = opts.managedPluginAutoInstall ?? null;
+  // Coolie fork: ChatHome is the default chat surface, so a self-hosted boot
+  // skips the deprecated plugin-chat bundle unless the operator opted in.
+  // Managed instances keep their control-plane key list untouched.
+  const selfHostedAutoInstallKeys = resolveSelfHostedAutoInstallKeys(process.env);
+  if (managedAutoInstallKeys === null) {
+    console.log(
+      isPluginChatEnabled(process.env)
+        ? "[chat] plugin-chat enabled via COOLIE_USE_PLUGIN_CHAT=true (Coolie fork)."
+        : "[chat] using ChatHome (Coolie fork) — plugin-chat disabled by default. Set COOLIE_USE_PLUGIN_CHAT=true to enable.",
+    );
+  }
   const bundledCatalogRoot =
     opts.bundledPluginCatalogRoot ?? resolveBundledCatalogRoot(process.env);
   const bundledPluginInstalls = resolveBundledPluginInstalls(
-    managedAutoInstallKeys ?? SELF_HOSTED_AUTO_INSTALL_KEYS,
+    managedAutoInstallKeys ?? selfHostedAutoInstallKeys,
     {
       catalogRoot: bundledCatalogRoot,
       env: process.env,
