@@ -26,6 +26,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { getAuthToken } from "../../coolie";
 import { PreviewToolbar } from "./PreviewToolbar";
+import { MvpPreviewCard } from "./MvpPreviewCard";
 
 /** iframe 加载前写入的 cookie 名 (表值带 Bearer 前缀, 与 Authorization 头同形) */
 const PREVIEW_COOKIE = "coolie_preview_token";
@@ -50,6 +51,8 @@ export interface InlinePreviewPanelProps {
   imageUrl?: string;
   /** 工具条标题 */
   title?: string;
+  /** `<preview-mvp meta='{…}'>` 解析出的键值行 (仅 mvp 图片卡展示) */
+  meta?: Record<string, string>;
   /** 外部注入的全屏行为; 缺省时用本组件内置的全屏 dialog */
   onFullscreen?: () => void;
   /** 外部注入的外链行为; 缺省时新开标签页 */
@@ -62,6 +65,7 @@ export function InlinePreviewPanel({
   url,
   imageUrl,
   title,
+  meta,
   onFullscreen,
   onExternal,
   compact = true,
@@ -150,22 +154,17 @@ export function InlinePreviewPanel({
     </div>
   ) : null;
 
+  // 图片 / mvp 分支交给 MvpPreviewCard: 缩略图 + 标题 + meta 键值行。
+  // 它自己管图片加载失败态, 工具条仍由本组件托管 (全屏/外链不重复)。
   const imageBody = (
-    <button
-      type="button"
-      style={styles.imageWrap}
-      onClick={handleFullscreen}
-      title="点击全屏"
-    >
-      <img
-        src={imageUrl}
-        alt={panelTitle}
-        style={compact ? styles.imageCompact : styles.imageFull}
-        onError={() => setError("图片加载失败")}
-        onLoad={() => setError(null)}
-      />
-      {errorOverlay}
-    </button>
+    <MvpPreviewCard
+      title={title || panelTitle}
+      imageUrl={imageUrl}
+      url={url}
+      meta={meta}
+      compact={compact}
+      onOpen={handleFullscreen}
+    />
   );
 
   const webBody = (

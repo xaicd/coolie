@@ -13,6 +13,7 @@
 import { useCallback, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import { InlinePreviewPanel } from "../components/board-inline/InlinePreviewPanel";
+import { CodeDiffCard } from "../components/board-inline/CodeDiffCard";
 import { hasInlinePreviewTag, parseInlineTags } from "../components/board-inline/tagParser";
 
 /** 本屏只用到 company 的 id/name, 用最小结构类型, 避免和 api-client 的 Company 强绑 */
@@ -52,8 +53,17 @@ const SEED_MESSAGES: MockMessage[] = [
     id: "m4",
     role: "assistant",
     text:
-      "新版首页缩略图如下 (点击看大图):\n" +
-      '<preview-mvp title="首页 v2" thumb="https://picsum.photos/seed/coolie/640/360" url="https://xrobinai.cn">首页 v2</preview-mvp>',
+      "新版首页缩略图如下 (点击看大图), 属性列在缩略图下面:\n" +
+      '<preview-mvp title="首页 v2" thumb="https://picsum.photos/seed/coolie/640/360" url="https://xrobinai.cn" meta=\'{"作者":"小陈","版本":"v2.0","构建":"2026-09-21"}\'>首页 v2</preview-mvp>',
+  },
+  { id: "m5", role: "user", text: "顺手把这次改动贴出来。" },
+  {
+    id: "m6",
+    role: "assistant",
+    text:
+      "改动如下 (绿=新增, 红=删除, 行号在左侧):\n" +
+      '<code-diff file="src/hello.ts" lang="ts">@@ -1,3 +1,4 @@\n export function hello() {\n-  return "hi";\n+  return "hello";\n }\n+// added by coolie</code-diff>\n' +
+      "点右上角 [编辑] 可以在网页里直接改。",
   },
 ];
 
@@ -152,7 +162,16 @@ function MessageBubble({ message }: { message: MockMessage }) {
         {parsed.cleanText ? <div style={styles.bubbleText}>{parsed.cleanText}</div> : null}
         {parsed.previews.map((p) => (
           <div key={p.id} style={styles.previewSlot}>
-            <InlinePreviewPanel url={p.url} imageUrl={p.imageUrl} title={p.title} />
+            {p.kind === "diff" ? (
+              <CodeDiffCard file={p.file} lang={p.lang} patch={p.patch ?? ""} />
+            ) : (
+              <InlinePreviewPanel
+                url={p.url}
+                imageUrl={p.imageUrl}
+                title={p.title}
+                meta={p.meta}
+              />
+            )}
           </div>
         ))}
       </div>

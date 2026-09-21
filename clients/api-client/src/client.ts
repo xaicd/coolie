@@ -117,9 +117,15 @@ export class CoolieClient {
   constructor(opts: CoolieClientOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/+$/, "");
     this.getAuthHeader = opts.getAuthHeader ?? (() => ({}));
-    this.fetchImpl = opts.fetchImpl ?? globalThis.fetch;
+    // Bind the global fetch to globalThis before storing it. Called as
+    // `this.fetchImpl(...)` the receiver would be the client instance, which
+    // browsers reject with "Failed to execute 'fetch' on 'Window': Illegal
+    // invocation" (React Native's fetch ignores the receiver, so only browser
+    // callers hit this).
+    const fetchImpl = opts.fetchImpl ?? globalThis.fetch?.bind(globalThis);
+    if (!fetchImpl) throw new Error("No fetch available; pass fetchImpl");
+    this.fetchImpl = fetchImpl;
     this.originHeader = opts.originHeader;
-    if (!this.fetchImpl) throw new Error("No fetch available; pass fetchImpl");
   }
 
   /** @internal expo 壳层需要直接打杂项 API */

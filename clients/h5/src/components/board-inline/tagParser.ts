@@ -4,9 +4,11 @@
  * 抄 DigitalStaff ChatHome 的意图: 总办/服务端在回复文本里夹带结构化标签,
  * 客户端把标签摘出来就地渲染成组件, 而不是让用户点链接跳到别的界面。
  *
- * 支持两种标签:
+ * 支持三种标签:
  *   <preview-url>https://example.com/preview</preview-url>
  *   <preview-mvp title="首页" thumb="https://…/thumb.png" meta='{"author":"张三"}'>…</preview-mvp>
+ *   <code-diff file="src/a.ts" lang="ts">+added
+ * -removed</code-diff>
  *
  * 设计原则:
  * - 解析失败的标签原样保留在 cleanText 里, 不吞字 —— 宁可露出原始标记,
@@ -17,9 +19,9 @@
  * 这是纯 TS、渲染无关的解析层, H5 与 App 共用同一份语义。
  */
 
-export type PreviewKind = "url" | "mvp";
+export type PreviewKind = "url" | "mvp" | "diff";
 
-/** 一条可渲染的预览规格 (InlinePreviewPanel 的入参来源) */
+/** 一条可渲染的预览规格 (InlinePreviewPanel / CodeDiffCard 的入参来源) */
 export interface PreviewSpec {
   /** 稳定 id: 由类型 + 顺序 + 目标派生, 用于 React key 与去重 */
   id: string;
@@ -30,6 +32,12 @@ export interface PreviewSpec {
   imageUrl?: string;
   title?: string;
   meta?: Record<string, string>;
+  /** diff 类型: 文件路径 */
+  file?: string;
+  /** diff 类型: 语言提示 */
+  lang?: string;
+  /** diff 类型: diff / patch 文本 */
+  patch?: string;
   /** 命中的原始标签文本, 便于调试与"编辑原始内容"回填 */
   raw: string;
 }
@@ -45,6 +53,9 @@ const URL_TAG_PATTERN = /<preview-url\b[^>]*>([\s\S]*?)<\/preview-url>/gi;
 
 /** <preview-mvp attrs>body</preview-mvp> 或自闭合 <preview-mvp attrs /> */
 const MVP_TAG_PATTERN = /<preview-mvp\b([^>]*?)(?:\/>|>([\s\S]*?)<\/preview-mvp>)/gi;
+
+/** <code-diff file="…" lang="…">patch</code-diff> (标签体允许换行) */
+const CODE_DIFF_TAG_PATTERN = /<code-diff\b([^>]*?)>([\s\S]*?)<\/code-diff>/gi;
 
 /** 属性 key="value" / key='value' / key=value(无引号, 取到空白为止) */
 const ATTR_PATTERN = /([a-zA-Z_][\w-]*)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/g;
@@ -150,9 +161,30 @@ export function parseInlineTags(text: string, seed = ""): ParsedInlineText {
     });
   }
 
+  CODE_DIFF_TAG_PATTERN.lastIndex = 0;
+  let diffMatch: RegExpExecArray | null;
+  while ((diffMatch = CODE_DIFF_TAG_PATTERN.exec(source)) !== null) {
+    const attrs = parseAttrs(diffMatch[1] ?? "");
+    const patch = diffMatch[2] ?? "";
+    // 空标签体 → 卡片没内容可展示, 保留原文而不是摘成一个空壳
+    if (!patch.trim()) continue;
+    spans.push({ start: diffMatch.index, end: diffMatch.index + diffMatch[0].length });
+    previews.push({
+      id: makeId("diff", previews.length, attrs.file || attrs.lang || "patch"),
+      kind: "diff",
+      file: attrs.file || attrs.path || undefined,
+      lang: attrs.lang || attrs.language || undefined,
+      patch,
+      raw: diffMatch[0],
+    });
+  }
+
   const seen = new Set<string>();
   const unique = previews.filter((p) => {
-    const key = `${p.kind}:${p.url ?? ""}:${p.imageUrl ?? ""}`;
+    const key =
+      p.kind === "diff"
+        ? `diff:${p.file ?? ""}:${p.lang ?? ""}:${p.patch ?? ""}`
+        : `${p.kind}:${p.url ?? ""}:${p.imageUrl ?? ""}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -177,5 +209,5 @@ export function parseInlineTags(text: string, seed = ""): ParsedInlineText {
 
 /** 文本里是否可能存在预览标签 (渲染层廉价短路, 避免每条气泡都跑正则) */
 export function hasInlinePreviewTag(text: string): boolean {
-  return typeof text === "string" && /<preview-(url|mvp)\b/i.test(text);
+  return typeof text === "string" && /<(?:preview-(?:url|mvp)|code-diff)\b/i.test(text);
 }

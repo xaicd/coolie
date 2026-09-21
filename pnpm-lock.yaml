@@ -151,9 +151,24 @@ importers:
 
   clients/h5:
     dependencies:
+      '@codemirror/lang-javascript':
+        specifier: ^6.2.4
+        version: 6.2.5
+      '@codemirror/language':
+        specifier: ^6.11.0
+        version: 6.12.4
+      '@codemirror/state':
+        specifier: ^6.7.2
+        version: 6.7.2
+      '@codemirror/view':
+        specifier: ^6.43.11
+        version: 6.43.11
       '@coolie/api-client':
         specifier: workspace:*
         version: link:../api-client
+      codemirror:
+        specifier: ^6.0.1
+        version: 6.0.2
       react:
         specifier: ^19.2.8
         version: 19.2.8
@@ -1995,14 +2010,8 @@ packages:
     resolution: {integrity: sha512-y7/yvZ2TPAnR9+jnc00klvNNLkJiXFFrQA/hlLCcxA9a2A4zQIOimyFQ9XfwYKiGD1fb5GY8vbKIIgO8d5Tb2A==}
     engines: {node: '>= 20.12.0'}
 
-  '@codemirror/autocomplete@6.20.0':
-    resolution: {integrity: sha512-bOwvTOIJcG5FVo5gUUupiwYh8MioPLQ4UcqbcRf7UQ98X90tCa9E1kZ3Z7tqwpZxYyOvh1YTYbmZE9RTfTp5hg==}
-
   '@codemirror/autocomplete@6.20.3':
     resolution: {integrity: sha512-tlosUqb+3BbxCxZdu4tKeRghPFC+QM7q4X5YhKV2eCmPG+1r2F3f4AaSz5sCrFqUtX4Jh20VFTKecl16MgiV9g==}
-
-  '@codemirror/commands@6.10.2':
-    resolution: {integrity: sha512-vvX1fsih9HledO1c9zdotZYUZnE4xV0m6i3m25s5DIfXofuprk6cRcLUZvSk3CASUbwjQX21tOGbkY2BH8TpnQ==}
 
   '@codemirror/commands@6.11.0':
     resolution: {integrity: sha512-/K4Rl5BN0OtTiPWmJCdqODu38XnDMsDxKY5rgrPnCkutPTJf2wVbkoixLfealF5Kwse/s8P8M5jAiURiwSwnFA==}
@@ -2078,9 +2087,6 @@ packages:
 
   '@codemirror/legacy-modes@6.5.4':
     resolution: {integrity: sha512-/cZr6qZyl08iYNLGsJ862CXXNI51LryRFRE40ejgoIjXZz0C1rGkD3/Ek5jM/8w1ceRjqtt4qx/KLMh4zBTgew==}
-
-  '@codemirror/lint@6.9.4':
-    resolution: {integrity: sha512-ABc9vJ8DEmvOWuH26P3i8FpMWPQkduD9Rvba5iwb6O3hxASgclm3T3krGo8NASXkHCidz6b++LWlzWIUfEPSWw==}
 
   '@codemirror/lint@6.9.6':
     resolution: {integrity: sha512-6Kp7r6XfCi/D/5sdXieMfg9pJU1bUEx96WITuLU6ESaKizCz0QHFMjY/TaFSbigDdEAIgi93itLBIUETP4oK+A==}
@@ -9988,21 +9994,7 @@ snapshots:
       fast-wrap-ansi: 0.2.2
       sisteransi: 1.0.5
 
-  '@codemirror/autocomplete@6.20.0':
-    dependencies:
-      '@codemirror/language': 6.12.4
-      '@codemirror/state': 6.7.2
-      '@codemirror/view': 6.43.11
-      '@lezer/common': 1.5.2
-
   '@codemirror/autocomplete@6.20.3':
-    dependencies:
-      '@codemirror/language': 6.12.4
-      '@codemirror/state': 6.7.2
-      '@codemirror/view': 6.43.11
-      '@lezer/common': 1.5.2
-
-  '@codemirror/commands@6.10.2':
     dependencies:
       '@codemirror/language': 6.12.4
       '@codemirror/state': 6.7.2
@@ -10229,12 +10221,6 @@ snapshots:
   '@codemirror/legacy-modes@6.5.4':
     dependencies:
       '@codemirror/language': 6.12.4
-
-  '@codemirror/lint@6.9.4':
-    dependencies:
-      '@codemirror/state': 6.7.2
-      '@codemirror/view': 6.43.11
-      crelt: 1.0.7
 
   '@codemirror/lint@6.9.6':
     dependencies:
@@ -14066,10 +14052,10 @@ snapshots:
 
   codemirror@6.0.2:
     dependencies:
-      '@codemirror/autocomplete': 6.20.0
-      '@codemirror/commands': 6.10.2
+      '@codemirror/autocomplete': 6.20.3
+      '@codemirror/commands': 6.11.0
       '@codemirror/language': 6.12.4
-      '@codemirror/lint': 6.9.4
+      '@codemirror/lint': 6.9.6
       '@codemirror/search': 6.6.0
       '@codemirror/state': 6.7.2
       '@codemirror/view': 6.43.11
