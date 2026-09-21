@@ -49,6 +49,7 @@ A_NAME=(); A_STATUS=(); A_DETAIL=()
 cleanup() {
   agent-device close --session "$SESSION" >/dev/null 2>&1
   rm -f "$COOKIE_JAR"
+  command -v stop_h5 >/dev/null 2>&1 && stop_h5 || true
 }
 trap cleanup EXIT
 
@@ -215,6 +216,72 @@ fi
 
 run_replay "R2-tasks-page"      "tasks-list.ad"        || true
 run_replay "R3-board-chat-reply" "board-chat.ad"       || true
+
+# ── h5 (PC web) parity — ChatHome preview + workspace ────────────────────────
+
+# spec docs-coolie/specs/2026-09-21-h5-web-parity.md §4.5. The PC web client
+# (clients/h5, Vite + React 19) has no browser replay under clients/expo/replays,
+# so its parity is proven by three cheap, deterministic checks instead: the dev
+# server answers, it builds to dist/, and the workspace screen ships the 4 tabs.
+
+H5_DIR="$REPO_ROOT/clients/h5"
+H5_PORT="${E2E_H5_PORT:-5173}"
+H5_URL="http://localhost:$H5_PORT"
+H5_LOG="$(mktemp -t coolie-h5-dev.XXXXXX)"
+H5_PID=""
+
+stop_h5() {
+  [ -n "$H5_PID" ] || return 0
+  kill "$H5_PID" >/dev/null 2>&1 || true
+  wait "$H5_PID" >/dev/null 2>&1 || true
+  H5_PID=""
+  rm -f "$H5_LOG"
+}
+
+wait_for_url() {
+  local url="$1" tries="${2:-40}" i
+  for ((i = 0; i < tries; i++)); do
+    curl -s -o /dev/null --max-time 2 "$url" && return 0
+    sleep 0.5
+  done
+  return 1
+}
+
+# Assertion 1: the h5 dev server comes up on its fixed port (5173) and returns 200.
+( cd "$H5_DIR" && exec pnpm dev --port "$H5_PORT" --strictPort ) >"$H5_LOG" 2>&1 &
+H5_PID=$!
+
+if wait_for_url "$H5_URL"; then
+  h5_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 "$H5_URL" || true)"
+  if [ "$h5_code" = "200" ]; then
+    record "H5-dev-server" PASS "http://localhost:$H5_PORT → 200"
+  else
+    record "H5-dev-server" FAIL "HTTP ${h5_code:-000}"
+  fi
+
+  # Assertion 3: the workspace screen serves the 4 tabs 对话/预览/文件/终端.
+  if curl -s --max-time 5 "$H5_URL/src/screens/workspace/WorkspaceScreen.tsx" \
+       | grep -q '对话.*预览.*文件.*终端'; then
+    record "H5-workspace-tabs" PASS "WorkspaceScreen ships 对话/预览/文件/终端"
+  else
+    record "H5-workspace-tabs" FAIL "WorkspaceScreen tab labels not found"
+  fi
+else
+  record "H5-dev-server" FAIL "dev server did not come up (see log below)"
+  record "H5-workspace-tabs" SKIP "dev server down"
+  printf '\n----- h5 dev log -----\n%s\n----------------------\n' "$(tail -20 "$H5_LOG" 2>/dev/null)"
+fi
+
+# Assertion 2: h5 builds and emits dist/index.html. Stop the dev server first so
+# the build is not fighting it for the watched output directory.
+stop_h5
+if ( cd "$H5_DIR" && pnpm build ) >"$H5_LOG" 2>&1 && [ -f "$H5_DIR/dist/index.html" ]; then
+  record "H5-build" PASS "clients/h5/dist/index.html ($(du -h "$H5_DIR/dist/index.html" | cut -f1))"
+else
+  record "H5-build" FAIL "clients/h5 build did not emit dist/index.html"
+  printf '\n----- h5 build log -----\n%s\n------------------------\n' "$(tail -30 "$H5_LOG" 2>/dev/null)"
+fi
+rm -f "$H5_LOG"
 
 # ── evidence + summary ───────────────────────────────────────────────────────
 

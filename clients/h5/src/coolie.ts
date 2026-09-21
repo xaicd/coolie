@@ -19,7 +19,9 @@ export function getAuthToken(): string | null {
  */
 export const coolie = new CoolieClient({
   baseUrl: "",
-  getAuthHeader: () => {
+  // Explicit return type: without it the unauth branch infers as
+  // `{ Authorization?: undefined }`, which is not a `Record<string, string>`.
+  getAuthHeader: (): Record<string, string> => {
     const token = getAuthToken();
     return token ? { Authorization: `Bearer ${token}` } : {};
   },

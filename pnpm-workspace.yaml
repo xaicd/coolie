@@ -12,6 +12,14 @@ packages:
   - server
   - ui
   - cli
+  # Coolie clients. `clients/h5` and its one dependency `clients/api-client` are
+  # pure TS/Vite with no native toolchain, so they join the workspace and get
+  # covered by `pnpm -r typecheck` / `pnpm --filter @coolie/h5 ...`.
+  # `clients/expo` stays standalone on purpose: it pins react-native and needs a
+  # hoisted node_modules (see clients/expo/.npmrc), which the root linker must
+  # not inherit.
+  - clients/api-client
+  - clients/h5
 
 # Keep in sync with package.json#pnpm.patchedDependencies. Newer pnpm
 # versions read patch configuration only from the workspace manifest.
