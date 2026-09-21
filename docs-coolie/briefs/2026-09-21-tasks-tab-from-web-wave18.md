@@ -81,6 +81,26 @@ Boss 看 Coolie Web 0.6.2 Tasks 页（截图：appBar 「Coolie Web」 + 「任�
 
 [创建] → POST `/api/issues` → 关闭 modal + toast + 列表新增
 
+**i18n (boss 09-21 22:35 截图):** NewTaskDialog 里的字段**全部需要中文** — i18n 补丁字典加 9 条:
+
+```ts
+// clients/expo-paperclip-web/App.tsx 里 I18N_PATCH 字典加:
+'New task': '新建任务',
+'Task title': '任务标题',
+'For': '指派给',
+'Assignee': '被指派人',
+'in': '在',
+'Project': '项目中',
+'Add description...': '添加任务描述...',
+'Todo': '待办',
+'Upload': '上传',
+'Auto mode': '智能模式',
+'Discard Draft': '放弃草稿',
+'Create Task': '创建任务',
+```
+
+(Dialog 是 portal 渲染, MutationObserver 200ms debounce 能扫到)
+
 ### 3.4 语音按钮接 dispatch
 
 复用 wave14 `dispatchVoice()` — 在 TasksScreen appBar 右上 mic icon:
