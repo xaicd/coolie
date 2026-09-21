@@ -27,8 +27,10 @@ export interface Company {
   spentMonthlyCents: number;
   defaultResponsibleUserId: string | null;
   // Coolie fork: the built-in template this company was created from, or null
-  // when none was chosen. Additive — existing rows stay null.
-  templateId: string | null;
+  // when none was chosen. Additive and optional: the column is nullable, and an
+  // optional field keeps existing `Company` literals (UI fixtures, older
+  // callers) compiling unchanged, which is the whole point of an additive field.
+  templateId?: string | null;
   requireBoardApprovalForNewAgents: boolean;
   interactionResolverGovernance: InteractionResolverGovernance;
   feedbackDataSharingEnabled: boolean;
