@@ -8,9 +8,12 @@ dispatch** (speak a task, Tencent ASR transcribes it, a task/issue is created).
   Coolie REST API (auth, tasks, voice dispatch).
 - [`expo/`](./expo) — Expo (React Native) app: sign in, list tasks, open one, create a
   task, and voice dispatch.
+- [`expo-paperclip-web/`](./expo-paperclip-web) — Expo (React Native) app that wraps the
+  full paperclip PC web (`https://www.xrobinai.cn/XROA`) in a single `react-native-webview`
+  screen. Ships as `cloud.coolie.app.web` ("Coolie Web"), side by side with the cockpit app.
 - [`h5/`](./h5) — browser client.
 
-Neither client package is a pnpm workspace member (the workspace globs are
+None of the client packages is a pnpm workspace member (the workspace globs are
 `packages/*`, `server`, `ui`, `cli`), so `pnpm -r typecheck` does **not** cover them.
 Run their own `pnpm typecheck`; `clients/expo` also has `pnpm bundle`.
 
