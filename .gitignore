@@ -102,9 +102,15 @@ coscli_output/
 # `screenshots/ontplay/`: login scripts carrying a hardcoded password, an
 # `auth-state.json` holding a live session token, and console logs. Only the
 # images are evidence; the rest is how they were taken, and it must not be
-# committed. The images themselves stay tracked, because a committed plan cites
-# one of them (`doc/plans/2026-09-18-ops-console-plugin.md`).
+# committed. (The images are ignored too — see the screenshot rule below.)
 screenshots/ontplay/*.cjs
 screenshots/ontplay/*.ts
 screenshots/ontplay/*.json
 screenshots/ontplay/*.txt
+
+# Test and exploration screenshots stay local. They are observation records, not
+# source: they go stale the moment either UI moves, and they are megabytes of
+# binary per capture session. The directories are ignored wholesale so a capture
+# run cannot sweep them into a commit by accident.
+screenshots/ds-explore/
+screenshots/ontplay/

@@ -252,6 +252,12 @@
       "maxNetLines": 60,
       "reason": "Upstream's version of this test asserted `authenticated` is refused. This fork allows it, and `DEPLOYMENT_MODES` holds only `local_trusted` and `authenticated`, so that assertion cannot hold: rewritten to assert `authenticated` is admitted, with the refusal branch kept for a mode outside today's union. Its correctness depends on the board-chat.ts entry above, so the two are read together.",
       "maxTotalLines": 80
+    },
+    {
+      "path": ".gitignore",
+      "maxNetLines": 60,
+      "reason": "Fork-specific ignores: the mobile client tree (`clients/`), the Expo/OTA and coolie-claw deploy outputs, local crash dumps and CLI logs (`core`, `coscli*`), Command Code's local-only state, and test/exploration screenshots, which this fork keeps local rather than committing. A recurring divergence by nature — every new local artifact kind adds a line — so it is declared rather than reduced.",
+      "maxTotalLines": 120
     }
   ]
 }
