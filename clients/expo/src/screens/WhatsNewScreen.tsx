@@ -36,6 +36,13 @@ import { checkOTAManifest, type OTAManifestCheck } from "../OTA";
 
 const SEEN_VERSION_KEY = "coolie.lastSeenVersion";
 
+/**
+ * wave15 OTA 增量更新指纹 —— 这一段字符串只存在于这次 patch bundle 里。
+ * 它的唯一用途是验证「设备真的加载了 OTA 下发的新 bundle」而不是 APK 内嵌的旧
+ * 那份：装机后用 `adb logcat | grep OTA_PATCH` 就能一眼看到，无需猜。
+ */
+export const OTA_PATCH_MARKER = "ota-patch-wave15-2026-09-21";
+
 /** 更新源地址 —— 来自 app.json 的 expo.updates.url，打包时内联。 */
 function otaManifestUrl(): string {
   const updates = Constants.expoConfig?.updates as { url?: string } | undefined;
@@ -126,7 +133,7 @@ export function WhatsNewScreen({ visible, onClose, onViewDemo }: WhatsNewScreenP
         `[OTA] manifest check url=${manifestUrl} ok=${result.ok} status=${result.status} ` +
           `contentType=${result.contentType} protocolVersion=${result.protocolVersion} ` +
           `runtimeVersion=${result.runtimeVersion} updateId=${Updates.updateId ?? "embedded"} ` +
-          `error=${result.error ?? "none"}`,
+          `OTA_PATCH_MARKER=${OTA_PATCH_MARKER} error=${result.error ?? "none"}`,
       );
       setManifestCheck(result);
     });
