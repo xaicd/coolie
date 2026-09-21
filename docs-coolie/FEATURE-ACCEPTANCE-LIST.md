@@ -54,11 +54,13 @@
 
 ## 4. DSH（DeepSeek Harness）验收清单（老板 2026-09-21 拍板，等 spec）
 
-| # | 功能 | 验证手段 | 优先级 |
+| # | 功能 | 验证手段 | 状态 |
 |---:|---|---|---|
-| 26 | `packages/adapters/dsh/` adapter | 文件存在 + tsc 0 | ⏸️ 待 spec |
-| 27 | DSH 接 MCP | `dsh` agent 能调本体 MCP server | ⏸️ |
-| 28 | DSH 定制业务智能体 | 在 Coolie 上注册 1 个 DSH 智能体，跑通最小任务 | ⏸️ |
+| 26 | `packages/adapters/dsh/` adapter | 文件存在 + tsc 0 | ✅ wave12（`pnpm --filter @paperclipai/adapter-dsh typecheck` 0；单测 9 passed）|
+| 27 | DSH 接 MCP | `dsh` agent 能调本体 MCP server | ⏸️ 待 `mcpUrl` 指向生产本体 MCP + 一次真 run |
+| 28 | DSH 定制业务智能体 | 在 Coolie 上注册 1 个 DSH 智能体，跑通最小任务 | ⏸️ 依赖 deploy 到生产（见 wave12 brief §4）|
+
+Spec: `docs-coolie/specs/2026-09-21-dsh-mcp-gateway.md`；证据：`docs-coolie/briefs/2026-09-21-ops-wave12-dsh-prod-smoke.md`。
 
 ## 5. 验收脚本模板（agent-device）
 

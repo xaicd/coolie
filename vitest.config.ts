@@ -11,6 +11,7 @@ export default defineConfig({
       "packages/adapters/codex-local",
       "packages/adapters/cursor-cloud",
       "packages/adapters/cursor-local",
+      "packages/adapters/dsh",
       "packages/adapters/gemini-local",
       "packages/adapters/grok-local",
       "packages/adapters/kimi-local",

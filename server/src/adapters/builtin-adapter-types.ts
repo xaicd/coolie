@@ -19,4 +19,5 @@ export const BUILTIN_ADAPTER_TYPES = new Set([
   "process",
   "http",
   "coolie_native",
+  "dsh",
 ]);

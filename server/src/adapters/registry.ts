@@ -130,6 +130,7 @@ import {
   listPiModels,
 } from "@paperclipai/adapter-pi-local/server";
 import { agentConfigurationDoc as piAgentConfigurationDoc } from "@paperclipai/adapter-pi-local";
+import { dshAdapter } from "@paperclipai/adapter-dsh/server";
 import { BUILTIN_ADAPTER_TYPES } from "./builtin-adapter-types.js";
 import { buildExternalAdapters } from "./plugin-loader.js";
 import { getDisabledAdapterTypes } from "../services/adapter-plugin-store.js";
@@ -870,6 +871,7 @@ function registerBuiltInAdapters() {
     processAdapter,
     httpAdapter,
     coolieNativeAdapter,
+    dshAdapter,
   ]) {
     adaptersByType.set(adapter.type, adapter);
   }
