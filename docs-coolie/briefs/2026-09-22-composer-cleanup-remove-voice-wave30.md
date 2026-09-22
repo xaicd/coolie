@@ -1,56 +1,56 @@
-# Brief: wave 30 — composer 视觉整理 + 删 voice 按钮 (boss 23:25 '页面看起来有点乱, 语音暂时不了')
+# Brief: wave 30 (v2) — composer 视觉整理 (KEEP voice 按钮, boss 23:28 OOB '语音要的')
 
 Repo: `~/workspace/xaicd/coolie` (main)
 PM: Hermes
 Worker: cmd
 
-## 0. Boss 09-22 23:25 OOB 「页面看起来有点乱, 语音暂时不了」
+## 0. Boss 09-22 23:28 OOB 「语音要的」
 
-老板看了 0.5.17 真机截图, 觉得 composer 1:1 抄 Coolie Web NewIssueDialog 太乱 (字段全堆), 且不要 wave26 §3.5 voice 按钮.
+老板撤回 23:25 的 "语音暂时不了", 说语音功能还是要保留. wave30 改为:**视觉整理 + KEEP voice 按钮**.
 
 ## 1. 已知现状
 
 ```
-✅ Coolie工坊 0.5.17 composer 1:1 抄 Coolie Web NewIssueDialog (wave26 完成):
-   - 标题 + Description + For/Assignee + in/Project
-   - ⋯ 添加 Reviewer/Approver/Watchdog
-   - 优先级 4 chip + Status chip + Mode chips + Upload
-   - Discard Draft + Create Task 双按钮
-❌ 字段全堆在一起视觉乱 (老板)
-❌ wave26 §3.5 加的 voice 按钮 — 删
+✅ Coolie工坊 0.5.17 composer 1:1 抄 Coolie Web NewIssueDialog (wave26):
+  - 标题 + Description + For/Assignee + in/Project
+  - ⋯ 添加 Reviewer/Approver/Watchdog
+  - 优先级 4 chip + Status chip + Mode chips + Upload
+  - **Voice 按钮 (wave26 §3.5) — 老板说保留**
+  - Discard Draft + Create Task 双按钮
+❌ 字段全堆在一起视觉乱 (老板 23:25)
+❌ wave30 (proc_c56e161d158d) 已 kill, 没真发版
 ```
 
 ## 2. 目标
 
-**Coolie工坊 0.5.19 App** composer 视觉整理:
+**Coolie工坊 0.5.19 App** composer 视觉整理 + **KEEP voice 按钮**:
 
-- ❌ 删 voice 按钮 (wave26 §3.5 撤回)
-- ✅ 字段分组: Title/Description 一组, Assignee/Project/Status/Priority 二组, Mode/Upload 三组, ⋯ Reviewer/Approver/Watchdog 默认收起 (折叠)
-- ✅ 间距加大, 卡片化分组 (减少视觉混乱)
-- ✅ 字段减少到核心: Title + Description + Assignee + Project + Mode + Priority + Discard/Create
+- ✅ 字段分组: 4 SectionCard + 1 Disclosure
+- ✅ **Voice 按钮保留** (放在「主要内容」卡片下方, 或 Description 与「指派」卡片之间)
+- ✅ 间距加大, 卡片化分组
+- ✅ Mode chips 折叠到「设置」卡片 (不占独立行)
+- ✅ 高级选项默认折叠
 
 ## 3. 任务 (4 步)
 
-### 3.1 删 voice 按钮 (wave26 §3.5)
+### 3.1 KEEP voice 按钮 (wave26 §3.5 不删)
 
-读 `clients/expo/src/screens/ComposeScreen.tsx` (wave26 新建) 找 voiceRow + voiceBtn + voiceEmoji + voiceLabel + useRecorder + dispatchVoice 全部删除.
-
-同时删:
-- `clients/expo/src/components/composer/VoiceInput.tsx` (如果新建了)
-- 任何 `mode='transcribe-only'` 相关调用
-- server 端 `mode: 'transcribe-only'` 分支 (波 21 加的, 现删 client 不再调用 — 保留 server 不破坏)
-- TODO 文档加注: voice dispatch 暂未集成, 后续如要恢复可重启 wave21 + wave26 §3.5
+读 `clients/expo/src/screens/ComposeScreen.tsx` (wave26 新建) **保留**:
+- voiceRow + voiceBtn + voiceEmoji + voiceLabel
+- useRecorder + dispatchVoice 调用
+- `mode: 'transcribe-only'` 链路
 
 ### 3.2 字段视觉整理
 
-把 1:1 抄 NewIssueDialog 的所有字段, **视觉分组**:
+把字段**卡片化分组** (但不删字段):
 
 ```tsx
 <View style={styles.composeBody}>
-  {/* 主组: 标题 + 描述 */}
+  {/* 主组: 标题 + 描述 + voice 按钮 */}
   <SectionCard title="主要内容">
     <Input title="标题" />
     <Textarea description="描述" />
+    <VoiceInputButton />   {/* KEEP! */}
   </SectionCard>
 
   {/* 任务组: 关键指派 */}
@@ -102,33 +102,32 @@ i18n 字典加:
 - 卡片 radius var(--radius)
 - section title fontSize 11px, color var(--ink-3), uppercase letter-spacing 0.5px
 
-### 3.4 bump 0.5.17 → 0.5.19 (跳过 0.5.18) + 模拟器验证
+### 3.4 bump 0.5.18 → 0.5.19 + 模拟器验证
 
 ```bash
-1. bump 0.5.17 → 0.5.19 (跳过 0.5.18, wave29 取消)
+1. bump 0.5.18 → 0.5.19 (release-app.sh runtimeVersion drift fix from wave16)
 2. Build APK + adb install
 3. 进 [任务] tab → 点 [+] → composer 浮层打开:
-   ✅ 标题 + 描述 主卡片
+   ✅ 标题 + 描述 + voice 按钮 主卡片
    ✅ Assignee + Project 指派卡片
    ✅ Mode + Priority + Status 设置卡片
-   ✅ 高级选项 默认折叠 (点展开 Reviewer/Approver/Watchdog)
+   ✅ 高级选项 默认折叠
    ✅ 附件 卡片
-   ❌ 没有 voice 按钮
-   ✅ 整体视觉: 4 个卡片 + 1 折叠, 字段不堆
+   ✅ 整体视觉: 4 卡片 + 1 折叠, 字段不堆
+   ✅ Voice 按钮 还在
 4. 截图 /tmp/emu-evidence/wave30-0.5.19/
 ```
 
 ## 4. Constraints
 
-- ❌ DON'T 保留 voice 按钮 (boss 不要)
-- ❌ DON'T 重设计字段 (只视觉整理分组, 不删字段)
+- ❌ DON'T 删 voice 按钮 (boss 23:28 '语音要的')
 - ❌ DON'T 触碰 paperclip 上游
-- ✅ DO 卡片化分组 (4 SectionCard + 1 Disclosure)
+- ✅ DO 卡片化分组
 - ✅ DO 默认折叠 Reviewer/Approver/Watchdog (高级)
 
 ## 5. Done definition
 
-4 步全完 + 0.5.19 APK 装机 + 模拟器验证 (4 卡片 + 折叠 1 + 无 voice 按钮) + commit + push + 发版 + 上 COS:
+4 步全完 + 0.5.19 APK 装机 + 模拟器验证 (4 卡片 + 1 折叠 + voice 按钮 还在) + commit + push + 发版 + 上 COS:
 
 ```
 Coolie工坊 0.5.19: https://dls.xrobinai.cn/coolie/app/0.5.19/coolie-release.apk
