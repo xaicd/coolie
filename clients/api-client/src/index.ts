@@ -124,5 +124,9 @@ export type {
   ApprovalComment,
   ResolveApprovalOptions,
   ListApprovalsOptions,
+  InboxApprovalItem,
+  InboxFailureItem,
+  InboxMentionItem,
+  InboxFeed,
 } from "./types";
 

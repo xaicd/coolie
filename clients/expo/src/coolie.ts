@@ -150,40 +150,16 @@ export interface WorkTimelineResult {
   };
 }
 
-/** 收件箱一条待审批 — GET /api/inbox */
-export interface InboxApprovalItem {
-  id: string;
-  title: string;
-  type: string;
-  status: string;
-  createdAt: string;
-}
-
-/** 收件箱一条受阻任务 — GET /api/inbox */
-export interface InboxFailureItem {
-  id: string;
-  title: string;
-  status: string;
-  priority: string;
-  updatedAt: string;
-}
-
-/** 收件箱一条 @提及 — GET /api/inbox */
-export interface InboxMentionItem {
-  id: string;
-  issueId: string;
-  issueTitle: string;
-  body: string;
-  authorName: string;
-  createdAt: string;
-}
-
-/** 收件箱三段聚合 — GET /api/inbox */
-export interface InboxFeed {
-  pendingApprovals: InboxApprovalItem[];
-  failures: InboxFailureItem[];
-  mentionedBy: InboxMentionItem[];
-}
+/**
+ * 收件箱聚合类型 —— 单一来源在 `@coolie/api-client` (App 与 h5 共用同一份),
+ * 这里再导出, 让既有 `import { type InboxFeed } from "../coolie"` 的调用点无需改动。
+ */
+export type {
+  InboxApprovalItem,
+  InboxFailureItem,
+  InboxMentionItem,
+  InboxFeed,
+} from "@coolie/api-client";
 
 export type NotificationKind = "approval" | "failure" | "mention" | "activity";
 
@@ -478,14 +454,6 @@ export class CoolieClient extends BaseCoolieClient {
    */
   async register(input: RegisterInput): Promise<RegisterResult> {
     return this.request<RegisterResult>("POST", "/api/auth/register", input, { auth: false });
-  }
-
-  /** GET /api/inbox — 收件箱三段聚合 (待审批/受阻/@我) */
-  async getInbox(companyId: string, limit = 20): Promise<InboxFeed> {
-    return this.request<InboxFeed>(
-      "GET",
-      `/api/inbox?companyId=${encodeURIComponent(companyId)}&limit=${limit}`,
-    );
   }
 
   /** GET /api/notifications — 通知中心列表 + 未读数 */

@@ -18,6 +18,7 @@ import {
   type IssueAttachment,
   type IssueLabel,
   type IssueWorkProduct,
+  type InboxFeed,
   type OntologyDomain,
   type OntologyDomainLifecycleState,
   type OntologyGraphCounts,
@@ -293,6 +294,54 @@ export class CoolieClient {
       fields,
     );
     return isRecord(body) && "issue" in body ? (body.issue as Issue) : (body as Issue);
+  }
+
+  /**
+   * 收件箱快捷归档 —— 与 Coolie Web 的 `InboxArchiveButton` / `SwipeToArchive`
+   * 同一个端点 (`POST /issues/:id/inbox-archive`)。归档是 per-user 的收件箱状态,
+   * 不是删除任务: 任务本体和详情页都不受影响。
+   */
+  async archiveIssueFromInbox(
+    issueId: string,
+  ): Promise<{ id: string; archivedAt: string | Date }> {
+    return this.request<{ id: string; archivedAt: string | Date }>(
+      "POST",
+      `/api/issues/${encodeURIComponent(issueId)}/inbox-archive`,
+      {},
+    );
+  }
+
+  /** 撤销收件箱归档 (`DELETE /issues/:id/inbox-archive`)。 */
+  async unarchiveIssueFromInbox(
+    issueId: string,
+  ): Promise<{ id: string; archivedAt: string | Date } | { ok: true }> {
+    return this.request<{ id: string; archivedAt: string | Date } | { ok: true }>(
+      "DELETE",
+      `/api/issues/${encodeURIComponent(issueId)}/inbox-archive`,
+    );
+  }
+
+  /**
+   * 派活 —— 设/清任务的 agent 负责人。
+   * `PATCH /issues/:id`, body 走 `updateIssueSchema` 的 `assigneeAgentId` 字段。
+   */
+  async setIssueAssignee(issueId: string, assigneeAgentId: string | null): Promise<unknown> {
+    return this.request<unknown>(
+      "PATCH",
+      `/api/issues/${encodeURIComponent(issueId)}`,
+      { assigneeAgentId },
+    );
+  }
+
+  /**
+   * 收件箱三段聚合 (`GET /api/inbox`) —— 与 Coolie Web 收件箱同一份数据:
+   * 待审批 / 受阻任务 / @我。
+   */
+  async getInbox(companyId: string, limit = 20): Promise<InboxFeed> {
+    return this.request<InboxFeed>(
+      "GET",
+      `/api/inbox?companyId=${encodeURIComponent(companyId)}&limit=${limit}`,
+    );
   }
 
   /**

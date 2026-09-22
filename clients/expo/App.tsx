@@ -953,6 +953,7 @@ function HomeScreen({
               setSelected(issue);
             }}
             onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
+            onOpenWorkshop={() => navigateTab("chat")}
           />
         ) : tab === "ontology" ? (
           <OntologyDomainListScreen company={company} whoami={whoami} onOpenSettings={() => setSettingsOpen(true)} />

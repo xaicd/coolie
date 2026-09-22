@@ -814,3 +814,41 @@ export interface ListApprovalsOptions {
   status?: string;
 }
 
+// ── 收件箱聚合 (GET /api/inbox) ─────────────────────────────────────────────
+// 与 Coolie Web 收件箱同一份三段聚合: 待审批 / 受阻任务 / @我。
+
+/** 收件箱一条待审批 */
+export interface InboxApprovalItem {
+  id: string;
+  title: string;
+  type: string;
+  status: string;
+  createdAt: string;
+}
+
+/** 收件箱一条受阻任务 */
+export interface InboxFailureItem {
+  id: string;
+  title: string;
+  status: string;
+  priority: string;
+  updatedAt: string;
+}
+
+/** 收件箱一条 @提及 */
+export interface InboxMentionItem {
+  id: string;
+  issueId: string;
+  issueTitle: string;
+  body: string;
+  authorName: string;
+  createdAt: string;
+}
+
+/** 收件箱三段聚合 — GET /api/inbox */
+export interface InboxFeed {
+  pendingApprovals: InboxApprovalItem[];
+  failures: InboxFailureItem[];
+  mentionedBy: InboxMentionItem[];
+}
+
