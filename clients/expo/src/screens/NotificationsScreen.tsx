@@ -148,6 +148,7 @@ export function NotificationsScreen({
       ) : (
         <ScrollView
           contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

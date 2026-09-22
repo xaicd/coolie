@@ -234,6 +234,7 @@ export function DashboardScreen({
       <ScrollView
         style={{ backgroundColor: C.bg, flex: 1 }}
         contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -733,6 +734,7 @@ export function DashboardScreen({
             horizontal
             showsHorizontalScrollIndicator={false}
             style={styles.timelineScroll}
+            keyboardShouldPersistTaps="handled"
           >
             {(eff?.dailyThroughput ?? []).slice(-7).map((d) => (
               <View key={d.date} style={styles.timelineCol}>

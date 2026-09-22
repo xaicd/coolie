@@ -205,6 +205,7 @@ export function IssuesList({
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.switcher}
+          keyboardShouldPersistTaps="handled"
         >
           {VIEW_OPTIONS.map((option) => {
             const active = option.key === view;
@@ -380,6 +381,7 @@ function BoardView({
       horizontal
       showsHorizontalScrollIndicator={false}
       contentContainerStyle={styles.boardContent}
+      keyboardShouldPersistTaps="handled"
     >
       {ISSUE_STATUS_ORDER.map((status) => {
         const items = issues.filter((issue) => issue.status === status);

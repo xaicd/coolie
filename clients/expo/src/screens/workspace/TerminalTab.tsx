@@ -158,6 +158,7 @@ export function TerminalTab() {
         ref={scrollRef}
         style={styles.output}
         contentContainerStyle={styles.outputContent}
+        keyboardShouldPersistTaps="handled"
         onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
       >
         {lines.map((l) => (

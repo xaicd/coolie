@@ -82,7 +82,11 @@ export function PipelinesScreen({
         }
       />
 
-      <ScrollView style={styles.scroll} contentContainerStyle={styles.content}>
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+      >
         {loading ? (
           <LoadingState size="small" text="正在加载 pipeline…" />
         ) : error ? (

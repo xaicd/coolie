@@ -347,6 +347,7 @@ export function PrototypeSandboxScreen({
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.serviceList}
+            keyboardShouldPersistTaps="handled"
           >
             <Text style={styles.servicePickerLabel}>服务:</Text>
             {services.map((srv) => {

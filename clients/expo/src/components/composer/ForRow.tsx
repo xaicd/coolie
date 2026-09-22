@@ -37,6 +37,7 @@ export function ForRow({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chips}
+        keyboardShouldPersistTaps="handled"
       >
         <ComposerChip
           label="自动派发"

@@ -140,6 +140,7 @@ export function AssigneeOptionsPanel({
                 horizontal
                 showsHorizontalScrollIndicator={false}
                 contentContainerStyle={styles.chips}
+                keyboardShouldPersistTaps="handled"
               >
                 <ComposerChip
                   label="Default model"

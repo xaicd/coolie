@@ -397,7 +397,11 @@ export function OntologyDomainListScreen({
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="light" />
-        <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+        >
           {/* 顶部返回条 */}
           <ScreenHeader
             onBack={() => setViewMode("detail")}
@@ -555,6 +559,7 @@ export function OntologyDomainListScreen({
         <ScrollView
           style={styles.container}
           contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={snapshotLoading}

@@ -164,6 +164,7 @@ export function AgentDetailScreen({
       <StatusBar style="light" />
       <ScrollView
         contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}

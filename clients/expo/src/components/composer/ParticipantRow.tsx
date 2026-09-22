@@ -45,6 +45,7 @@ export function ParticipantRow({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chips}
+        keyboardShouldPersistTaps="handled"
       >
         <ComposerChip
           label={noneLabel}
@@ -108,6 +109,7 @@ export function WatchdogRow({
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chips}
+          keyboardShouldPersistTaps="handled"
         >
           <ComposerChip
             label="No watchdog agent"

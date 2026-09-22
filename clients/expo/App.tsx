@@ -438,6 +438,7 @@ function Surface({ children }: { children: React.ReactNode }) {
       <ScrollView
         style={{ backgroundColor: C.bg, flex: 1 }}
         contentContainerStyle={styles.screen}
+        keyboardShouldPersistTaps="handled"
       >
         {children}
       </ScrollView>

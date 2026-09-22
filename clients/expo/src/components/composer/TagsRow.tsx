@@ -45,6 +45,7 @@ export function TagsRow({
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.chips}
+          keyboardShouldPersistTaps="handled"
         >
           {labels.map((label) => (
             <ComposerChip

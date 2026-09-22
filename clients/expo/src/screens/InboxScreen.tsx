@@ -191,6 +191,7 @@ export function InboxScreen({
       ) : (
         <ScrollView
           contentContainerStyle={styles.list}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}

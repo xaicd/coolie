@@ -116,6 +116,7 @@ export function MarkdownToolbar({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.actions}
+        keyboardShouldPersistTaps="handled"
       >
         {ACTIONS.map((action) => (
           <Pressable

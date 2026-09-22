@@ -157,7 +157,11 @@ export function WhatsNewScreen({ visible, onClose, onViewDemo }: WhatsNewScreenP
         ]}
       >
         <StatusBar style="light" />
-        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        <ScrollView
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+        >
           <View style={styles.hero}>
             <Text style={styles.heroGlyph}>🎉</Text>
             <Text style={styles.badge}>v{version}</Text>

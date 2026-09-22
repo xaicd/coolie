@@ -29,6 +29,7 @@ export function WorkModeChips({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chips}
+        keyboardShouldPersistTaps="handled"
       >
         {workModeOptions().map((option) => {
           const active = option.value === value;

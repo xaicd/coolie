@@ -1370,6 +1370,7 @@ export function BoardChatScreen({
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.promptChipsScroll}
+            keyboardShouldPersistTaps="handled"
           >
             {QUICK_PROMPTS.map((prompt) => (
               <Pressable
@@ -1503,7 +1504,11 @@ export function BoardChatScreen({
               )}
 
               {!sessionsLoading && !sessionsError && (
-                <ScrollView style={styles.sessionList} showsVerticalScrollIndicator={false}>
+                <ScrollView
+                  style={styles.sessionList}
+                  showsVerticalScrollIndicator={false}
+                  keyboardShouldPersistTaps="handled"
+                >
                   {sessions.length === 0 ? (
                     <Text style={styles.sessionEmptyText}>暂无历史会话记录</Text>
                   ) : (

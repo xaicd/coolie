@@ -36,6 +36,7 @@ export function ProjectRow({
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.chips}
+        keyboardShouldPersistTaps="handled"
       >
         <ComposerChip
           label="无项目"

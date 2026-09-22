@@ -170,6 +170,7 @@ function AgentDetailSheet({
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{ gap: 10, paddingBottom: 16 }}
         style={{ flexShrink: 1 }}
+        keyboardShouldPersistTaps="handled"
       >
         <View style={styles.headRow}>
           <View style={styles.avatar}>
@@ -445,6 +446,7 @@ export function AgentsScreen({
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, paddingBottom: 32, gap: 10 }}
+          keyboardShouldPersistTaps="handled"
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
