@@ -12,6 +12,19 @@ export interface Company {
 }
 
 /**
+ * The slice of an agent's permission document the composer reads.
+ *
+ * Upstream, `trustPreset` decides whether an agent is a low-trust reviewer
+ * (`packages/shared/src/trust-policy.ts`), and the New task dialog shows that as
+ * a shield badge on the assignee option plus a warning note. Only the key the UI
+ * renders is typed; the endpoint returns more.
+ */
+export interface AgentPermissions {
+  trustPreset?: string | null;
+  [key: string]: unknown;
+}
+
+/**
  * A company agent, as `GET /companies/:id/agents` returns it (the Coolie Web
  * `agentsApi.list`). The App's `AgentRow` is this type — one shape for both
  * clients, so the composer's assignee rail cannot drift from the endpoint.
@@ -23,6 +36,20 @@ export interface Agent {
   role?: string | null;
   status: string;
   adapterType?: string | null;
+  permissions?: AgentPermissions | null;
+}
+
+/**
+ * A company label the composer can attach to a task (`GET /companies/:id/labels`).
+ *
+ * Mirrors the Coolie Web label picker's option shape; `labelIds` is the create
+ * field, joined through `issue_labels` on the server.
+ */
+export interface IssueLabel {
+  id: string;
+  name: string;
+  color?: string | null;
+  description?: string | null;
 }
 
 /**
@@ -90,15 +117,27 @@ export interface SessionUser {
   name?: string;
 }
 
+/**
+ * New-task payload — the fields the composer can set, matching the Coolie Web
+ * `NewIssueDialog` submit.
+ *
+ * `status` is optional because the server owns the default: an omitted status
+ * resolves to `todo` when an assignee is present and `backlog` otherwise
+ * (`resolveCreateIssueStatusDefault` in `packages/shared/src/validators/issue.ts`).
+ * The composer sends it explicitly whenever the user picked a status chip, so the
+ * choice on screen is the state that lands.
+ */
 export interface CreateIssueInput {
   companyId: string;
   title: string;
   description?: string;
   priority?: IssuePriority;
+  status?: IssueStatus;
   projectId?: string;
   assigneeAgentId?: string;
   assigneeUserId?: string;
   workMode?: IssueWorkMode;
+  labelIds?: string[];
 }
 
 export type AudioFormat = "mp3" | "wav" | "m4a" | "pcm" | "flac" | "ogg-opus";

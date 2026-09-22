@@ -15,6 +15,7 @@ import {
   type GetWorkspaceDiffParams,
   type Issue,
   type IssueAttachment,
+  type IssueLabel,
   type IssueWorkProduct,
   type OntologyDomain,
   type OntologyDomainLifecycleState,
@@ -283,6 +284,20 @@ export class CoolieClient {
       `/api/companies/${encodeURIComponent(companyId)}/projects`,
     );
     return Array.isArray(body) ? body : (body.projects ?? []);
+  }
+
+  /**
+   * Labels a task can carry — `GET /companies/:id/labels`.
+   *
+   * The ids travel as `labelIds` on the create payload (the server joins them
+   * through `issue_labels`), which is how the Coolie Web composer attaches tags.
+   */
+  async listLabels(companyId: string): Promise<IssueLabel[]> {
+    const body = await this.request<IssueLabel[] | { labels?: IssueLabel[] }>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/labels`,
+    );
+    return Array.isArray(body) ? body : (body.labels ?? []);
   }
 
   /**

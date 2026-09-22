@@ -14,11 +14,22 @@ export {
   workModeOptions,
 } from "./work-modes";
 export type { IssueWorkMode, WorkModeMeta } from "./work-modes";
+export {
+  DEFAULT_TRUST_PRESET,
+  LOW_TRUST_REVIEW_PRESET,
+  TRUST_PRESETS,
+  TRUST_PRESET_DESCRIPTION,
+  TRUST_PRESET_LABEL,
+  getTrustPreset,
+} from "./trust";
+export type { TrustPreset } from "./trust";
 export type {
   IssuePriority,
   IssueStatus,
   Agent,
   AgentIdentity,
+  AgentPermissions,
+  IssueLabel,
   Company,
   Issue,
   SessionUser,

@@ -161,7 +161,11 @@ const I18N_PATCH: Record<string, string> = {
   Remove: "移除",
   Create: "创建",
   Edit: "编辑",
-  Done: "完成",
+  // New task 弹窗的状态选项也用 "Done" (NewIssueDialog 的 buildStatusOptions)。
+  // 改成「已完成」会让 ExternalAgentInviteDialog / FolderControls / TeamCatalog
+  // 三处「Done」确认按钮一起读成「已完成」—— 语义上偏一点, 但状态是这句话的
+  // 主语境 (弹窗里那颗状态胶囊), 按 brief 取「已完成」。
+  Done: "已完成",
   Confirm: "确认",
   Back: "返回",
   Continue: "继续",
@@ -209,6 +213,23 @@ const I18N_PATCH: Record<string, string> = {
   "Plan mode": "规划模式",
   "Ask mode": "问答模式",
   "Skill test": "技能测试",
+
+  // —— New task 弹窗: 标题栏 / 状态胶囊 / ⋯ 菜单 (wave25) ——
+  // 都是「整段文本全等」替换, 所以只写独立成段的那几处:
+  // 标题栏「New task」、状态选项 (Todo / In Progress / Done)、底部「Discard Draft」、
+  // ⋯ 菜单的「Start date」「Due date」。
+  // 「Tags」「Trust policy」「Markdown editor」按 brief 列的名字补上: 上游
+  // NewIssueDialog 的 ⋯ 菜单实际只有 Start/Due date (Labels 胶囊在源码里是注释掉的
+  // 占位), 这三条若截图里确实有就命中, 没有就是一次无害空转 —— 不写反而会漏。
+  "New task": "新建任务",
+  Todo: "待办",
+  "In Progress": "进行中",
+  "Discard Draft": "放弃草稿",
+  "Start date": "开始日期",
+  "Due date": "截止日期",
+  Tags: "标签",
+  "Trust policy": "信任策略",
+  "Markdown editor": "Markdown 编辑器",
 
   // —— 工作区 / 密钥 ——
   Workspaces: "工作区",

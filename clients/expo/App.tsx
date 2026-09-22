@@ -9,6 +9,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  ToastAndroid,
   View,
   Platform,
   StatusBar as RNStatusBar,
@@ -40,10 +41,7 @@ import {
 import { AppBar } from "./src/components/AppBar";
 import { TabBar, TAB_BAR_HEIGHT } from "./src/components/TabBar";
 import { StatusDot } from "./src/components/StatusDot";
-import { ForRow } from "./src/components/composer/ForRow";
-import { ProjectRow } from "./src/components/composer/ProjectRow";
-import { UploadRow } from "./src/components/composer/UploadRow";
-import { WorkModeChips } from "./src/components/composer/WorkModeChips";
+import { ComposerForm } from "./src/components/composer/ComposerForm";
 import {
   useComposerFields,
   type ComposerFieldsState,
@@ -51,7 +49,6 @@ import {
 import { AppCard } from "./src/ui/AppCard";
 import { ErrorRetry } from "./src/ui/ErrorRetry";
 import { LoadingState } from "./src/ui/LoadingState";
-import { Pill } from "./src/ui/Pill";
 import { ScreenHeader } from "./src/ui/ScreenHeader";
 import { Sheet } from "./src/ui/Sheet";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
@@ -129,21 +126,6 @@ import { setupOTAListener } from "./src/OTA";
  * - 数字 tabularNum 对齐
  * - 状态点呼吸灯
  */
-
-const PRIORITY_LABEL: Record<IssuePriority, string> = {
-  low: "低",
-  medium: "中",
-  high: "高",
-  critical: "紧急",
-};
-
-// 胶囊内前缀色点 (DESIGN.md 第3节: P0 #EF4444 / P1 #F59E0B / P2 #8A8F98)
-const PRIORITY_DOT_COLOR: Record<IssuePriority, string> = {
-  critical: C.err,
-  high: C.warn,
-  medium: C.ink3,
-  low: C.ink4,
-};
 
 type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "inbox" | "artifacts" | "ontology";
 
@@ -264,98 +246,17 @@ function SettingsSheet({
 }
 
 /**
- * 新建任务输入区 —— 任务页顶部的 composer 与中央 "+" 的浮层共用这一份实现,
- * 也共用 HomeScreen 里的同一组状态 (title/description/priority) 与同一个
- * createTask, 所以两个入口不会写出两套行为。
+ * 草稿丢弃的回执 —— Android 用系统 toast (不打断), iOS 没有 toast 才退化为弹窗。
+ * 与 h5 端的 `toast` 同一个语义: 告诉你「刚才那些输入没了」。
  */
-function TaskComposer({
-  title,
-  onTitle,
-  description,
-  onDescription,
-  priority,
-  onPriority,
-  agents,
-  fields,
-  busy,
-  onSubmit,
-}: {
-  title: string;
-  onTitle: (v: string) => void;
-  description: string;
-  onDescription: (v: string) => void;
-  priority: IssuePriority;
-  onPriority: (p: IssuePriority) => void;
-  agents: AgentRow[];
-  /** For / in / Mode / Upload 四行的状态, 与任务页弹窗共用 (见 useComposerFields) */
-  fields: ComposerFieldsState;
-  busy: boolean;
-  onSubmit: () => void;
-}) {
-  return (
-    <View style={styles.composer}>
-      <TextInput
-        style={styles.input}
-        placeholder="新任务标题…"
-        placeholderTextColor={C.ink3}
-        value={title}
-        onChangeText={onTitle}
-      />
-
-      <ForRow
-        agents={agents}
-        value={fields.assigneeAgentId}
-        onChange={fields.setAssigneeAgentId}
-      />
-
-      <ProjectRow
-        projects={fields.projects}
-        value={fields.projectId}
-        onChange={fields.setProjectId}
-      />
-
-      <TextInput
-        style={[styles.input, styles.inputMultiline]}
-        placeholder="描述 (可选)"
-        placeholderTextColor={C.ink3}
-        multiline
-        value={description}
-        onChangeText={onDescription}
-      />
-
-      {/* 优先级徽标胶囊 (前缀色点) */}
-      <View style={styles.chips}>
-        {(["low", "medium", "high", "critical"] as IssuePriority[]).map((p) => (
-          <Pill
-            key={p}
-            label={PRIORITY_LABEL[p]}
-            dotColor={PRIORITY_DOT_COLOR[p]}
-            active={priority === p}
-            onPress={() => onPriority(p)}
-          />
-        ))}
-      </View>
-
-      <WorkModeChips value={fields.workMode} onChange={fields.setWorkMode} />
-
-      <UploadRow files={fields.attachments} onChange={fields.setAttachments} disabled={busy} />
-
-      <View style={styles.rowGap}>
-        <Pressable
-          style={[
-            styles.btnPrimary,
-            styles.btnFlex,
-            (!title.trim() || busy) && styles.btnDisabled,
-          ]}
-          disabled={!title.trim() || busy}
-          onPress={onSubmit}
-        >
-          <Text style={styles.btnPrimaryText}>添加任务</Text>
-        </Pressable>
-      </View>
-    </View>
-  );
+function notifyDraftDiscarded(): void {
+  if (Platform.OS === "android") {
+    ToastAndroid.show("草稿已丢弃", ToastAndroid.SHORT);
+    return;
+  }
+  Alert.alert("草稿已丢弃");
 }
+
 
 
 export default function App() {
@@ -837,6 +738,22 @@ function HomeScreen({
   }, [createTask]);
 
   /**
+   * [放弃草稿] / 标题栏 ✕ —— 清空这一份草稿 (标题/描述/优先级 + For/in/Mode/附件/
+   * 状态/标签), 关浮层, 并回执「草稿已丢弃」。
+   *
+   * 与提交成功后的清理走同一组 setter, 所以不会出现「提交清了、放弃没清」这种
+   * 二次打开还剩上次输入的情况。
+   */
+  const discardOverlayDraft = useCallback(() => {
+    setTitle("");
+    setDescription("");
+    setPriority("medium");
+    resetComposerFields();
+    setComposeOpen(false);
+    notifyDraftDiscarded();
+  }, [resetComposerFields]);
+
+  /**
    * Build 进度卡点某环节, 或别的只给出 issueId 的入口: 从任务列表补齐 Issue 再压详情页,
    * 与 BoardChatScreen 的 handleOpenBuildIssue 同一套做法 (卡片只带 id, 没有完整 Issue)。
    */
@@ -1132,30 +1049,19 @@ function HomeScreen({
       {/* 中央 "+" 打开的新建任务屏 (内容区浮层, 让出底部 TabBar) */}
       {composeOpen ? (
         <View style={styles.composeOverlay}>
-          <View style={styles.composeHeader}>
-            <Text style={styles.composeTitle}>新建任务</Text>
-            <Pressable onPress={() => setComposeOpen(false)} hitSlop={10}>
-              <Ionicons name="close" size={22} color={C.ink3} />
-            </Pressable>
-          </View>
-          <ScrollView
-            style={styles.composeScroll}
-            contentContainerStyle={styles.composeBody}
-            keyboardShouldPersistTaps="handled"
-          >
-            <TaskComposer
-              title={title}
-              onTitle={setTitle}
-              description={description}
-              onDescription={setDescription}
-              priority={priority}
-              onPriority={setPriority}
-              agents={composerAgents}
-              fields={composerFields}
-              busy={busy}
-              onSubmit={submitOverlayTask}
-            />
-          </ScrollView>
+          <ComposerForm
+            title={title}
+            onTitle={setTitle}
+            description={description}
+            onDescription={setDescription}
+            priority={priority}
+            onPriority={setPriority}
+            agents={composerAgents}
+            fields={composerFields}
+            busy={busy}
+            onSubmit={submitOverlayTask}
+            onDiscard={discardOverlayDraft}
+          />
         </View>
       ) : null}
     </SafeAreaView>
@@ -1361,29 +1267,6 @@ const styles = StyleSheet.create({
     backgroundColor: C.bg,
     zIndex: 110,
   },
-  composeHeader: {
-    height: 56,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: C.lineSubtle,
-    backgroundColor: C.panel,
-  },
-  composeTitle: {
-    color: C.ink,
-    fontSize: 17,
-    fontWeight: "700",
-    letterSpacing: 0.2,
-  },
-  composeScroll: {
-    flex: 1,
-    backgroundColor: C.bg,
-  },
-  composeBody: {
-    padding: 16,
-  },
   hero: {
     alignItems: "center",
     gap: 8,
@@ -1447,10 +1330,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: C.ink,
   },
-  inputMultiline: {
-    minHeight: 72,
-    textAlignVertical: "top",
-  },
   // 主按钮 (DESIGN.md 第3节: bg #5E6AD2, text ink, radius 8, padding 12×16, weight 500)
   btnPrimary: {
     backgroundColor: C.brand,
@@ -1464,9 +1343,6 @@ const styles = StyleSheet.create({
     color: C.ink,
     fontWeight: "500",
     fontSize: 15,
-  },
-  btnFlex: {
-    flex: 1,
   },
   // 幽灵按钮 (DESIGN.md 第3节: bg 0.02, border line, text ink2, radius 8)
   btnGhost: {
@@ -1517,18 +1393,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "400",
   },
-  composer: {
-    gap: 12,
-    backgroundColor: "rgba(255,255,255,0.02)",
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.line,
-  },
-  rowGap: {
-    flexDirection: "row",
-    gap: 8,
-  },
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -1538,12 +1402,6 @@ const styles = StyleSheet.create({
   rowAlignCenterGap: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 8,
-  },
-  chips: {
-    flexGrow: 0,
-    flexDirection: "row",
-    flexWrap: "wrap",
     gap: 8,
   },
   detailTitle: {

@@ -58,6 +58,30 @@ export const ISSUE_STATUS_ORDER: IssueStatus[] = [
   "cancelled",
 ];
 
+/**
+ * 新建任务时可选的状态 —— 镜像 Coolie Web `NewIssueDialog` 的
+ * `buildStatusOptions()`: backlog / todo / in_progress / in_review / done。
+ *
+ * 比 `ISSUE_STATUSES` 少 blocked / cancelled: 那两个是任务**流转中**的状态
+ * (受阻、取消), 不是建单时的选择, 上游的对话框同样不提供。
+ */
+export const COMPOSER_STATUSES: IssueStatus[] = [
+  "backlog",
+  "todo",
+  "in_progress",
+  "in_review",
+  "done",
+];
+
+/**
+ * backlog / todo 的一行说明 —— 与上游 `buildStatusOptions()` 的 description
+ * 同义: 这两个状态决定「负责人会不会被唤醒」, 其余状态不需要解释。
+ */
+export const COMPOSER_STATUS_HINT: Partial<Record<IssueStatus, string>> = {
+  backlog: "搁置: 不唤醒负责人",
+  todo: "可执行: 会唤醒负责人",
+};
+
 export const ISSUE_PRIORITIES: IssuePriority[] = ["critical", "high", "medium", "low"];
 
 export const PRIORITY_LABEL: Record<IssuePriority, string> = {
