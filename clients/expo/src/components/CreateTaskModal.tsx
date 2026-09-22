@@ -14,17 +14,26 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Issue, IssuePriority } from "@coolie/api-client";
-import { C, coolie, type AgentRow } from "../coolie";
+import { C, type AgentRow } from "../coolie";
 import { ELEVATION, RADIUS, SPACING } from "../ui/tokens";
 import { openCoolieWeb } from "../utils/openCoolieWeb";
 import { ISSUE_PRIORITIES, PRIORITY_COLOR, PRIORITY_LABEL, issueStatusColor } from "./issue-status";
+import { ComposerChip } from "./composer/Chip";
+import { ForRow } from "./composer/ForRow";
+import { ProjectRow } from "./composer/ProjectRow";
+import { UploadRow } from "./composer/UploadRow";
+import { WorkModeChips } from "./composer/WorkModeChips";
+import { useComposerFields } from "./composer/useComposerFields";
 
 /**
- * 新建任务弹窗 —— 对齐 Coolie Web 0.6.2 的 New Task 弹窗:
+ * 新建任务弹窗 —— 对齐 Coolie Web NewIssueDialog:
  * 面包屑标题 "XROA › New task" + ↗ (跳 Coolie Web) + ✕, 大标题输入框,
- * For [指派] 选择行, 大描述区, 状态行, 底部 [放弃草稿] / [创建任务]。
+ * For [指派] / in [项目] / Mode [执行模式] / Upload [附件] 四行, 大描述区,
+ * 优先级 4 选, 状态行, 底部 [放弃草稿] / [创建任务]。
  *
  * 标题必填, 其余可选; 指派默认「自动派发」(不传 assigneeAgentId, 由系统路由)。
+ * 字段状态与「建完再传附件」的时序都在 useComposerFields 里, 与中央 "+"
+ * 浮层 (App.tsx TaskComposer) 共用同一份 —— 两个浮层是同一个表单的两种呈现。
  */
 export function CreateTaskModal({
   visible,
@@ -42,15 +51,17 @@ export function CreateTaskModal({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<IssuePriority>("medium");
-  const [assigneeAgentId, setAssigneeAgentId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  const fields = useComposerFields(companyId);
+  const { reset: resetFields } = fields;
 
   const reset = useCallback(() => {
     setTitle("");
     setDescription("");
     setPriority("medium");
-    setAssigneeAgentId(null);
-  }, []);
+    resetFields();
+  }, [resetFields]);
 
   const discard = useCallback(() => {
     reset();
@@ -62,21 +73,22 @@ export function CreateTaskModal({
     if (!trimmed || busy) return;
     setBusy(true);
     try {
-      const issue = await coolie.createIssue({
-        companyId,
+      const { issue, failedUploads } = await fields.createTask({
         title: trimmed,
         priority,
         ...(description.trim() ? { description: description.trim() } : {}),
-        ...(assigneeAgentId ? { assigneeAgentId } : {}),
       });
       reset();
       onCreated(issue);
+      if (failedUploads.length > 0) {
+        Alert.alert("附件未上传", `任务已创建, 但这些附件没传成功: ${failedUploads.join("、")}`);
+      }
     } catch (e) {
       Alert.alert("创建失败", String((e as Error)?.message ?? e));
     } finally {
       setBusy(false);
     }
-  }, [assigneeAgentId, busy, companyId, description, onCreated, priority, reset, title]);
+  }, [busy, description, fields, onCreated, priority, reset, title]);
 
   const canSubmit = title.trim().length > 0 && !busy;
 
@@ -119,29 +131,17 @@ export function CreateTaskModal({
               autoFocus
             />
 
-            {/* For [指派人] */}
-            <View style={styles.forRow}>
-              <Text style={styles.forLabel}>For</Text>
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.forChips}
-              >
-                <AssigneeChip
-                  label="自动派发"
-                  active={assigneeAgentId === null}
-                  onPress={() => setAssigneeAgentId(null)}
-                />
-                {agents.map((agent) => (
-                  <AssigneeChip
-                    key={agent.id}
-                    label={agent.name}
-                    active={assigneeAgentId === agent.id}
-                    onPress={() => setAssigneeAgentId(agent.id)}
-                  />
-                ))}
-              </ScrollView>
-            </View>
+            <ForRow
+              agents={agents}
+              value={fields.assigneeAgentId}
+              onChange={fields.setAssigneeAgentId}
+            />
+
+            <ProjectRow
+              projects={fields.projects}
+              value={fields.projectId}
+              onChange={fields.setProjectId}
+            />
 
             <TextInput
               style={styles.descriptionInput}
@@ -157,7 +157,7 @@ export function CreateTaskModal({
               <Text style={styles.sectionLabel}>优先级</Text>
               <View style={styles.chipRow}>
                 {ISSUE_PRIORITIES.map((value) => (
-                  <Chip
+                  <ComposerChip
                     key={value}
                     label={PRIORITY_LABEL[value]}
                     dotColor={PRIORITY_COLOR[value]}
@@ -167,6 +167,10 @@ export function CreateTaskModal({
                 ))}
               </View>
             </View>
+
+            <WorkModeChips value={fields.workMode} onChange={fields.setWorkMode} />
+
+            <UploadRow files={fields.attachments} onChange={fields.setAttachments} disabled={busy} />
 
             {/* 状态行 (新建默认待处理) */}
             <View style={styles.section}>
@@ -183,24 +187,6 @@ export function CreateTaskModal({
                   <Ionicons name="ellipsis-horizontal" size={15} color={C.ink3} />
                 </Pressable>
               </View>
-            </View>
-
-            {/* 附件 / 智能模式 */}
-            <View style={styles.chipRow}>
-              <Pressable
-                style={styles.iconChip}
-                onPress={() => Alert.alert("附件", "App 端暂不支持上传附件，请在 Coolie Web 中追加。")}
-              >
-                <Ionicons name="cloud-upload-outline" size={15} color={C.ink3} />
-                <Text style={styles.iconChipText}>Upload</Text>
-              </Pressable>
-              <Pressable
-                style={styles.iconChip}
-                onPress={() => Alert.alert("Auto mode", "创建后由系统按任务内容自动路由执行，无需手动选择。")}
-              >
-                <Ionicons name="sparkles-outline" size={15} color={C.ink2} />
-                <Text style={[styles.iconChipText, { color: C.ink2 }]}>Auto mode</Text>
-              </Pressable>
             </View>
           </ScrollView>
 
@@ -224,48 +210,6 @@ export function CreateTaskModal({
         </KeyboardAvoidingView>
       </View>
     </Modal>
-  );
-}
-
-function AssigneeChip({
-  label,
-  active,
-  onPress,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={[styles.assigneeChip, active && styles.chipActive]}>
-      <Ionicons
-        name="person-circle-outline"
-        size={14}
-        color={active ? C.ink : C.ink3}
-      />
-      <Text style={[styles.chipText, active && styles.chipTextActive]} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function Chip({
-  label,
-  dotColor,
-  active,
-  onPress,
-}: {
-  label: string;
-  dotColor: string;
-  active: boolean;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable onPress={onPress} style={[styles.chip, active && styles.chipActive]}>
-      <View style={[styles.dot, { backgroundColor: dotColor }]} />
-      <Text style={[styles.chipText, active && styles.chipTextActive]}>{label}</Text>
-    </Pressable>
   );
 }
 
@@ -331,31 +275,6 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.xs,
     minHeight: 32,
   },
-  forRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-  },
-  forLabel: {
-    color: C.ink4,
-    fontSize: 13,
-  },
-  forChips: {
-    gap: 6,
-    paddingRight: SPACING.md,
-  },
-  assigneeChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: C.line,
-    backgroundColor: ELEVATION.base,
-    maxWidth: 160,
-  },
   descriptionInput: {
     color: C.ink2,
     fontSize: 14,
@@ -377,29 +296,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: SPACING.sm,
-  },
-  chip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: RADIUS.pill,
-    borderWidth: 1,
-    borderColor: C.line,
-    backgroundColor: ELEVATION.base,
-  },
-  chipActive: {
-    borderColor: C.brand,
-    backgroundColor: "rgba(94, 106, 210, 0.18)",
-  },
-  chipText: {
-    color: C.ink3,
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  chipTextActive: {
-    color: C.ink,
   },
   dot: {
     width: 6,
@@ -432,11 +328,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: C.line,
     backgroundColor: ELEVATION.base,
-  },
-  iconChipText: {
-    color: C.ink3,
-    fontSize: 12,
-    fontWeight: "500",
   },
   footer: {
     flexDirection: "row",

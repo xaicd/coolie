@@ -40,6 +40,14 @@ import {
 import { AppBar } from "./src/components/AppBar";
 import { TabBar, TAB_BAR_HEIGHT } from "./src/components/TabBar";
 import { StatusDot } from "./src/components/StatusDot";
+import { ForRow } from "./src/components/composer/ForRow";
+import { ProjectRow } from "./src/components/composer/ProjectRow";
+import { UploadRow } from "./src/components/composer/UploadRow";
+import { WorkModeChips } from "./src/components/composer/WorkModeChips";
+import {
+  useComposerFields,
+  type ComposerFieldsState,
+} from "./src/components/composer/useComposerFields";
 import { AppCard } from "./src/ui/AppCard";
 import { ErrorRetry } from "./src/ui/ErrorRetry";
 import { LoadingState } from "./src/ui/LoadingState";
@@ -267,6 +275,8 @@ function TaskComposer({
   onDescription,
   priority,
   onPriority,
+  agents,
+  fields,
   busy,
   onSubmit,
 }: {
@@ -276,6 +286,9 @@ function TaskComposer({
   onDescription: (v: string) => void;
   priority: IssuePriority;
   onPriority: (p: IssuePriority) => void;
+  agents: AgentRow[];
+  /** For / in / Mode / Upload 四行的状态, 与任务页弹窗共用 (见 useComposerFields) */
+  fields: ComposerFieldsState;
   busy: boolean;
   onSubmit: () => void;
 }) {
@@ -288,6 +301,19 @@ function TaskComposer({
         value={title}
         onChangeText={onTitle}
       />
+
+      <ForRow
+        agents={agents}
+        value={fields.assigneeAgentId}
+        onChange={fields.setAssigneeAgentId}
+      />
+
+      <ProjectRow
+        projects={fields.projects}
+        value={fields.projectId}
+        onChange={fields.setProjectId}
+      />
+
       <TextInput
         style={[styles.input, styles.inputMultiline]}
         placeholder="描述 (可选)"
@@ -309,6 +335,10 @@ function TaskComposer({
           />
         ))}
       </View>
+
+      <WorkModeChips value={fields.workMode} onChange={fields.setWorkMode} />
+
+      <UploadRow files={fields.attachments} onChange={fields.setAttachments} disabled={busy} />
 
       <View style={styles.rowGap}>
         <Pressable
@@ -748,12 +778,33 @@ function HomeScreen({
 
   const companyId = company.id;
 
+  // 中央 "+" 浮层的 For/in/Mode/Upload 四行 (与任务页弹窗同一份状态)
+  const composerFields = useComposerFields(companyId);
+  const { reset: resetComposerFields, createTask: createComposerTask } = composerFields;
+  /** 浮层打开时才需要的员工列表; 任务页自己有另一份 (IssuesList 也要用)。 */
+  const [composerAgents, setComposerAgents] = useState<AgentRow[]>([]);
+
+  useEffect(() => {
+    if (!composeOpen) return;
+    let cancelled = false;
+    void coolie
+      .listAgents(companyId)
+      .then((rows) => {
+        if (!cancelled) setComposerAgents(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setComposerAgents([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId, composeOpen]);
+
   const createTask = useCallback(async (): Promise<boolean> => {
     if (!title.trim()) return false;
     setBusy(true);
     try {
-      await coolie.createIssue({
-        companyId,
+      const { failedUploads } = await createComposerTask({
         title: title.trim(),
         priority,
         ...(description.trim() ? { description: description.trim() } : {}),
@@ -761,7 +812,11 @@ function HomeScreen({
       setTitle("");
       setDescription("");
       setPriority("medium");
+      resetComposerFields();
       setTasksRefreshToken((value) => value + 1);
+      if (failedUploads.length > 0) {
+        Alert.alert("附件未上传", `任务已创建, 但这些附件没传成功: ${failedUploads.join("、")}`);
+      }
       return true;
     } catch (e) {
       Alert.alert("创建失败", String((e as Error)?.message ?? e));
@@ -769,7 +824,7 @@ function HomeScreen({
     } finally {
       setBusy(false);
     }
-  }, [companyId, title, description, priority]);
+  }, [createComposerTask, description, priority, resetComposerFields, title]);
 
   // 中央 "+" 浮层: 建完关浮层并落到任务页看到新任务。
   const submitOverlayTask = useCallback(() => {
@@ -1095,6 +1150,8 @@ function HomeScreen({
               onDescription={setDescription}
               priority={priority}
               onPriority={setPriority}
+              agents={composerAgents}
+              fields={composerFields}
               busy={busy}
               onSubmit={submitOverlayTask}
             />

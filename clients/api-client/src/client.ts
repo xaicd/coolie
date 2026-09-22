@@ -2,6 +2,7 @@ import {
   ASR_NOT_CONFIGURED,
   MULTIMODAL_PLUGIN_ID,
   ONTOLOGY_PLUGIN_ID,
+  type Agent,
   type AgentIdentity,
   type CockpitDashboardMetrics,
   type Company,
@@ -19,8 +20,10 @@ import {
   type OntologyDomainLifecycleState,
   type OntologyGraphCounts,
   type OntologyGraphSnapshot,
+  type Project,
   type SessionUser,
   type SetDomainLifecycleOptions,
+  type UploadFilePart,
   type VoiceDispatchInput,
   type VoiceDispatchResult,
   type WorkspaceDiffResponse,
@@ -147,6 +150,35 @@ export class CoolieClient {
       credentials: "include",
     });
 
+    return this.decode<T>(res);
+  }
+
+  /**
+   * Multipart POST for uploads — mirrors the Coolie Web `api.postForm`.
+   *
+   * `Content-Type` is deliberately absent: only the runtime knows the multipart
+   * boundary, so setting it by hand would produce a body the server cannot
+   * parse.
+   */
+  private async postForm<T>(path: string, form: FormData): Promise<T> {
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (this.originHeader) headers.Origin = this.originHeader;
+    Object.assign(headers, await this.getAuthHeader());
+
+    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+      method: "POST",
+      headers,
+      // React Native's FormData is not a DOM `BodyInit`; the cast keeps one
+      // code path for both runtimes, which both accept the value as-is.
+      body: form as unknown as BodyInit,
+      credentials: "include",
+    });
+
+    return this.decode<T>(res);
+  }
+
+  /** Shared status/error handling for every transport in this client. */
+  private async decode<T>(res: Response): Promise<T> {
     const text = await res.text();
     const parsed = text ? safeJson(text) : null;
     if (!res.ok) {
@@ -189,6 +221,19 @@ export class CoolieClient {
     return this.request<AgentIdentity>("GET", "/api/agents/me");
   }
 
+  // --- agents -------------------------------------------------------------
+  /**
+   * Company agents — the same call the Coolie Web composer makes
+   * (`agentsApi.list` → `GET /companies/:id/agents`) to fill its assignee rail.
+   */
+  async listAgents(companyId: string): Promise<Agent[]> {
+    const body = await this.request<Agent[] | { agents?: Agent[] }>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/agents`,
+    );
+    return Array.isArray(body) ? body : (body.agents ?? []);
+  }
+
   // --- companies ----------------------------------------------------------
   /**
    * Board/session only. An **agent** key gets 403 here (host-enforced), so an
@@ -226,6 +271,43 @@ export class CoolieClient {
       fields,
     );
     return isRecord(body) && "issue" in body ? (body.issue as Issue) : (body as Issue);
+  }
+
+  /**
+   * Projects a task can be filed into — the same call the Coolie Web composer
+   * makes (`projectsApi.list` → `GET /companies/:id/projects`).
+   */
+  async listProjects(companyId: string): Promise<Project[]> {
+    const body = await this.request<Project[] | { projects?: Project[] }>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/projects`,
+    );
+    return Array.isArray(body) ? body : (body.projects ?? []);
+  }
+
+  /**
+   * Attach a file to an existing task.
+   *
+   * Mirrors the Coolie Web composer (`issuesApi.uploadAttachment` →
+   * `POST /companies/:companyId/issues/:issueId/attachments`): the task must
+   * exist first, which is why the composers upload after the create call
+   * instead of staging the file into the create body.
+   */
+  uploadAttachment(
+    companyId: string,
+    issueId: string,
+    file: UploadFilePart,
+    issueCommentId?: string | null,
+  ): Promise<IssueAttachment> {
+    const form = new FormData();
+    // A native `{ uri, name, type }` part carries its own name, so the extra
+    // filename argument is only for Blob parts (browsers).
+    form.append("file", file as unknown as Blob);
+    if (issueCommentId) form.append("issueCommentId", issueCommentId);
+    return this.postForm<IssueAttachment>(
+      `/api/companies/${encodeURIComponent(companyId)}/issues/${encodeURIComponent(issueId)}/attachments`,
+      form,
+    );
   }
 
   // --- dashboard & efficiency telemetry (Top1 驾驶舱) --------------------

@@ -2,6 +2,7 @@ import * as SecureStore from "expo-secure-store";
 import {
   CoolieApiError,
   CoolieClient as BaseCoolieClient,
+  type Agent,
   type AgentIdentity,
   type Company,
   type Issue,
@@ -75,19 +76,12 @@ export async function getAuthToken(): Promise<string | null> {
 }
 
 /**
- * Shared Coolie client. Auth is either a bearer token from SecureStore or the
- * session cookie the platform's own cookie jar holds after sign-in; both travel
- * in the same `Authorization`/`Cookie` headers RN already manages.
+ * 员工(agents)行。
+ *
+ * 形状来自 `@coolie/api-client` 的 `Agent` —— 与 Coolie Web 的 `agentsApi.list`
+ * 同一个端点/同一份字段, 组件层 (ForRow / IssuesList 等) 30+ 处仍照旧名字引用。
  */
-/** 员工(agents)行的最小字段 */
-export interface AgentRow {
-  id: string;
-  name: string;
-  title?: string | null;
-  role?: string | null;
-  status: string;
-  adapterType?: string | null;
-}
+export type AgentRow = Agent;
 
 /** 按智能体聚合的消耗行 — GET /costs/by-agent */
 export interface AgentCostRow {
@@ -378,14 +372,6 @@ export class CoolieClient extends BaseCoolieClient {
     );
   }
 
-  /** GET /api/companies/:id/agents — 员工(智能体)列表 */
-  async listAgents(companyId: string): Promise<AgentRow[]> {
-    return this.request<AgentRow[]>(
-      "GET",
-      `/api/companies/${encodeURIComponent(companyId)}/agents`,
-    );
-  }
-
   /** GET /api/companies/:id/live-runs — 正在运行的 run 数 + agent 名 */
   async getLiveRuns(companyId: string): Promise<LiveRunRow[]> {
     return this.request<LiveRunRow[]>(
@@ -550,6 +536,11 @@ export class CoolieClient extends BaseCoolieClient {
   }
 }
 
+/**
+ * Shared Coolie client. Auth is either a bearer token from SecureStore or the
+ * session cookie the platform's own cookie jar holds after sign-in; both travel
+ * in the same `Authorization`/`Cookie` headers RN already manages.
+ */
 export const coolie = new CoolieClient({
   baseUrl: COOLIE_BASE_URL,
   originHeader: COOLIE_ORIGIN,

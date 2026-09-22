@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import type { Company, Issue, IssuePriority } from "@coolie/api-client";
+import type { Agent, Company, Issue, IssuePriority } from "@coolie/api-client";
 import { coolie } from "../coolie";
 import {
   IssuesList,
@@ -22,6 +22,11 @@ import {
   PRIORITY_COLOR,
   PRIORITY_LABEL,
 } from "../components/IssuesList";
+import { ForRow } from "../components/composer/ForRow";
+import { ProjectRow } from "../components/composer/ProjectRow";
+import { UploadRow } from "../components/composer/UploadRow";
+import { WorkModeChips } from "../components/composer/WorkModeChips";
+import { useComposerFields } from "../components/composer/useComposerFields";
 
 const C = {
   bg: "#08090A",
@@ -60,6 +65,11 @@ export function TasksScreen({
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<IssuePriority>("medium");
   const [busy, setBusy] = useState(false);
+  const [agents, setAgents] = useState<Agent[]>([]);
+
+  // For / in / Mode / Upload 四行 (与 App 端 composer 同一份字段语义)
+  const fields = useComposerFields(company?.id ?? null);
+  const { reset: resetFields } = fields;
 
   useEffect(() => {
     void (async () => {
@@ -76,6 +86,23 @@ export function TasksScreen({
     })();
   }, []);
 
+  // 指派行的选项: 与 Coolie Web composer 的 agentsApi.list 同一个端点
+  useEffect(() => {
+    if (!company) return;
+    let cancelled = false;
+    void coolie
+      .listAgents(company.id)
+      .then((rows) => {
+        if (!cancelled) setAgents(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setAgents([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company]);
+
   const openCreate = useCallback(() => dialogRef.current?.showModal(), []);
   const closeCreate = useCallback(() => dialogRef.current?.close(), []);
 
@@ -83,14 +110,14 @@ export function TasksScreen({
     setTitle("");
     setDescription("");
     setPriority("medium");
-  }, []);
+    resetFields();
+  }, [resetFields]);
 
   const submit = useCallback(async () => {
     if (!company || !title.trim() || busy) return;
     setBusy(true);
     try {
-      const issue = await coolie.createIssue({
-        companyId: company.id,
+      const { issue, failedUploads } = await fields.createTask({
         title: title.trim(),
         priority,
         ...(description.trim() ? { description: description.trim() } : {}),
@@ -98,13 +125,17 @@ export function TasksScreen({
       resetDraft();
       dialogRef.current?.close();
       setRefreshSignal((value) => value + 1);
-      setToast(`任务已创建: ${issue.title}`);
+      setToast(
+        failedUploads.length > 0
+          ? `任务已创建: ${issue.title}（附件未上传: ${failedUploads.join("、")}）`
+          : `任务已创建: ${issue.title}`,
+      );
     } catch (e) {
       window.alert(`创建失败: ${String((e as Error)?.message ?? e)}`);
     } finally {
       setBusy(false);
     }
-  }, [busy, company, description, priority, resetDraft, title]);
+  }, [busy, company, description, fields, priority, resetDraft, title]);
 
   const openIssue = useCallback((issue: Issue) => {
     setToast(`已选任务: ${issue.title}（h5 详情页待后续波次）`);
@@ -195,6 +226,10 @@ export function TasksScreen({
             onChange={(e) => setTitle(e.target.value)}
           />
 
+          <ForRow agents={agents} value={fields.assigneeAgentId} onChange={fields.setAssigneeAgentId} />
+
+          <ProjectRow projects={fields.projects} value={fields.projectId} onChange={fields.setProjectId} />
+
           <textarea
             style={styles.descriptionInput}
             placeholder="Add description..."
@@ -218,6 +253,10 @@ export function TasksScreen({
               ))}
             </div>
           </div>
+
+          <WorkModeChips value={fields.workMode} onChange={fields.setWorkMode} />
+
+          <UploadRow files={fields.attachments} onChange={fields.setAttachments} disabled={busy} />
 
           <div style={styles.dialogFooter}>
             <button type="button" style={styles.discardBtn} onClick={closeCreate} disabled={busy}>

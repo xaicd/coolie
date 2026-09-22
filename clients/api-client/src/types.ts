@@ -1,6 +1,8 @@
 // Minimal shared types for the Coolie mobile/web happy path. For the full,
 // always-current contract, generate from GET /api/openapi.json.
 
+import type { IssueWorkMode } from "./work-modes";
+
 export type IssuePriority = "critical" | "high" | "medium" | "low";
 export type IssueStatus = "backlog" | "todo" | "in_progress" | "in_review" | "done" | "blocked" | "cancelled";
 
@@ -8,6 +10,43 @@ export interface Company {
   id: string;
   name: string;
 }
+
+/**
+ * A company agent, as `GET /companies/:id/agents` returns it (the Coolie Web
+ * `agentsApi.list`). The App's `AgentRow` is this type — one shape for both
+ * clients, so the composer's assignee rail cannot drift from the endpoint.
+ */
+export interface Agent {
+  id: string;
+  name: string;
+  title?: string | null;
+  role?: string | null;
+  status: string;
+  adapterType?: string | null;
+}
+
+/**
+ * A project the composer can file a task into (`GET /companies/:id/projects`,
+ * which mirrors the Coolie Web `projectsApi.list`). Only the fields the picker
+ * renders are typed; the endpoint returns more.
+ */
+export interface Project {
+  id: string;
+  name: string;
+  description?: string | null;
+  /** Square dot next to the name, same as the web picker. */
+  color?: string | null;
+  status?: string;
+}
+
+/**
+ * A file handed to a multipart upload.
+ *
+ * Browsers pass a `Blob`/`File`; React Native passes `{ uri, name, type }`
+ * because its FormData has no Blob. Both are accepted so one client method
+ * serves the expo and h5 composers.
+ */
+export type UploadFilePart = Blob | { uri: string; name: string; type: string };
 
 /**
  * What an agent API key can see about itself (`GET /api/agents/me`). A key is
@@ -40,6 +79,7 @@ export interface Issue {
   assigneeUserId?: string | null;
   projectId?: string | null;
   parentId?: string | null;
+  workMode?: IssueWorkMode;
   createdAt?: string | Date;
   updatedAt?: string | Date;
 }
@@ -57,6 +97,8 @@ export interface CreateIssueInput {
   priority?: IssuePriority;
   projectId?: string;
   assigneeAgentId?: string;
+  assigneeUserId?: string;
+  workMode?: IssueWorkMode;
 }
 
 export type AudioFormat = "mp3" | "wav" | "m4a" | "pcm" | "flac" | "ogg-opus";

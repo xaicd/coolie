@@ -196,6 +196,20 @@ const I18N_PATCH: Record<string, string> = {
   Experimental: "实验功能",
   "No cases yet": "暂无案例",
 
+  // —— 新建任务弹窗 (NewIssueDialog): For [Assignee] in [Project] + Work Mode ——
+  // 值是上游 workModeMetaList() 的原始 label, 逐字匹配整段文本节点。
+  // 不写裸 "Auto"/"Plan"/"Code": 补丁是「整段文本全等」替换, 短词会误伤
+  // 导航和其它页面里同名的按钮。
+  Assignee: "被指派人",
+  "No assignee": "不指派",
+  Project: "项目",
+  "No project": "无项目",
+  "Work Mode": "执行模式",
+  "Auto mode": "智能模式",
+  "Plan mode": "规划模式",
+  "Ask mode": "问答模式",
+  "Skill test": "技能测试",
+
   // —— 工作区 / 密钥 ——
   Workspaces: "工作区",
   "No workspace activity yet.": "暂无工作区活动。",

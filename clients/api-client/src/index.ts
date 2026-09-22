@@ -5,14 +5,26 @@ export {
   MULTIMODAL_PLUGIN_ID,
   ONTOLOGY_PLUGIN_ID,
 } from "./types";
+export {
+  DEFAULT_WORK_MODE,
+  WORK_MODES,
+  WORK_MODE_OPTIONS,
+  isSelectableWorkMode,
+  workModeMetaFor,
+  workModeOptions,
+} from "./work-modes";
+export type { IssueWorkMode, WorkModeMeta } from "./work-modes";
 export type {
   IssuePriority,
   IssueStatus,
+  Agent,
   AgentIdentity,
   Company,
   Issue,
   SessionUser,
   CreateIssueInput,
+  Project,
+  UploadFilePart,
   AudioFormat,
   VoiceDispatchInput,
   VoiceDispatchResult,
