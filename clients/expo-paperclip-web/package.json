@@ -1,6 +1,6 @@
 {
   "name": "@coolie/expo-paperclip-web",
-  "version": "0.6.0",
+  "version": "0.6.4",
   "private": true,
   "main": "index.ts",
   "scripts": {

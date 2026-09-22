@@ -116,11 +116,14 @@ const I18N_PATCH: Record<string, string> = {
   "Authentication failed": "认证失败",
 
   // —— 导航 (MobileBottomNav / Sidebar / CommandPalette) ——
-  Home: "首页",
+  // 底部 5 tab (MobileBottomNav.tsx) 硬编码 Home/Tasks/New Task/Agents/Inbox，
+  // 不走上游 i18n，只能靠这层补丁；按老板 wave34 的指定译法：
+  // Home → 仪表盘 (跟上游 nav.dashboard 一致)、Agents → 员工。
+  Home: "仪表盘",
   "Recent Tasks": "最近任务",
   Tasks: "任务",
   "New Task": "新建任务",
-  Agents: "智能体",
+  Agents: "员工",
   Inbox: "收件箱",
   Projects: "项目",
   Dashboard: "仪表盘",
@@ -356,13 +359,195 @@ const I18N_PATCH: Record<string, string> = {
   "Redirecting...": "正在跳转…",
   "Continue to dashboard": "继续前往仪表盘",
   "Finishing setup from the host": "正在从主机完成设置",
+
+  // —— wave34: 底部 tab / 页头 / 专区标题 ——
+  // 老板 09-22 23:48 真机截图里还没翻的英文 (上游 i18n bundle 覆盖不到、
+  // 或 .tsx 里硬编码)。仍是「整段文本全等」替换：只收**多词或语义唯一**的
+  // 句子，不收裸 "New"/"Old"/"Run"/"Type" 这类会在表单里误命中的短词。
+  "AGENTS": "员工",
+  // 上游 zh-CN bundle 把 nav.agents 译作「智能体」，老板要「员工」。
+  // 补一条整段替换，避免底部 tab 叫「员工」而页头/侧栏还写「智能体」。
+  "智能体": "员工",
+  Notifications: "通知",
+  "No linked task": "无关联任务",
+  "Scheduled heartbeat": "定时心跳",
+  "Active Agents": "活跃员工",
+  "All agents": "所有员工",
+  "Agent name": "员工名称",
+  "Agent Chat": "员工对话",
+  "Needs attention": "需关注",
+  "Mark as read": "标记为已读",
+  "Mark all as read?": "全部标记为已读？",
+  "Archive from inbox": "从收件箱归档",
+  "View details": "查看详情",
+
+  // —— wave34: 通用 label / 表头 / 空状态 (多页共用) ——
+  "Add a description": "添加描述",
+  "Add instructions...": "添加指令…",
+  "Description (optional)": "描述（可选）",
+  Notes: "备注",
+  Overview: "概览",
+  "Last 14 days": "最近 14 天",
+  "Last used": "最近使用",
+  "Last run": "上次运行",
+  "Last activity": "最近活动",
+  Created: "已创建",
+  Updated: "已更新",
+  Category: "分类",
+  Version: "版本",
+  Owner: "负责人",
+  Scope: "范围",
+  Tool: "工具",
+  Type: "类型",
+  "Unknown project": "未知项目",
+  "Unknown agent": "未知员工",
+  "Unknown folder": "未知文件夹",
+  "Unknown error": "未知错误",
+  "Save failed": "保存失败",
+  "Delete failed": "删除失败",
+  "Update failed": "更新失败",
+  "Import failed": "导入失败",
+  "Move failed": "移动失败",
+  "Folder save failed": "文件夹保存失败",
+  "Folder created": "文件夹已创建",
+  "Folder deleted": "文件夹已删除",
+  "Load more": "加载更多",
+  "View all": "查看全部",
+  "List view": "列表视图",
+  "Org chart view": "组织架构视图",
+  "Org Chart": "组织架构图",
+  "Read only": "只读",
+  "Read-only": "只读",
+  "Danger zone": "危险区",
+  "Required skills": "所需技能",
+  "Provided by": "提供方",
+  "All secrets": "所有密钥",
+  "Run now": "立即运行",
+  "Recent Runs": "最近运行",
+  "New skill": "新建技能",
+  "Skill name": "技能名称",
+  "Create a new skill": "新建技能",
+  "Fork this skill": "复刻此技能",
+  "All skills": "所有技能",
+  "Access profiles": "访问配置",
+  Capabilities: "能力",
+  "Workspace name": "工作区名称",
+  "Repo URL": "仓库 URL",
+  "Endpoint URL": "端点 URL",
+  "Application ID": "应用 ID",
+
+  // —— wave34: 成本 / 财务页 (pages/Costs.tsx) ——
+  Budgets: "预算",
+  "Budget control plane": "预算控制台",
+  "By agent": "按员工",
+  "By project": "按项目",
+  "By biller": "按计费方",
+  Billers: "计费方",
+  Finance: "财务",
+  "Finance ledger": "财务账本",
+  "Inference ledger": "推理账本",
+  Providers: "提供商",
+  "All providers": "所有提供商",
+  "All billers": "所有计费方",
+  "No cost events yet.": "暂无成本事件。",
+  "No cost events in this period.": "本期无成本事件。",
+  "No finance events yet.": "暂无财务事件。",
+  "No billable events in this period.": "本期无计费事件。",
+  "No project-attributed run costs yet.": "暂无按项目归集的运行成本。",
+  "Select a start and end date to load data.": "选择起止日期以加载数据。",
+
+  // —— wave34: 流水线 / 自动化页 (pages/Pipelines.tsx) ——
+  Pipelines: "流水线",
+  Automation: "自动化",
+  Learnings: "经验",
+  "In review": "评审中",
+  "Move to stage": "移动到阶段",
+  "Item preview": "条目预览",
+  "No stages are set up for this pipeline yet.": "此流水线尚未配置阶段。",
+  "Build your list, then submit it all at once": "先列清单，再一次性提交",
+
+  // —— wave34: brief §3.2 点名的 Plan 评审 / 新建项目 ——
+  "New project": "新建项目",
+  "Add stage": "添加阶段",
+  "Plan review": "Plan 评审",
+  "Approve plan": "批准 Plan",
+
+  // —— wave34 round 2: 实机逐 tab 扫出来的残留英文 (0.6.2 模拟器) ——
+  // 收件箱页 (Inbox.tsx PageTabBar) —— blocked 是**任务状态**过滤
+  // (Inbox.tsx 的 statuses: todo / in_progress / in_review / blocked)，
+  // 所以取「已阻塞」而不是「已屏蔽」。
+  Mine: "我的",
+  Recent: "最近",
+  Unread: "未读",
+  Blocked: "已阻塞",
+  All: "全部",
+  "In Review": "评审中",
+  // 列表分组标题 (Inbox.tsx / IssuesList，CSS text-transform 大写显示)
+  Today: "今天",
+  Yesterday: "昨天",
+  Earlier: "更早",
+  // 员工页 (Agents.tsx)
+  "New Agent": "新建员工",
+  Chat: "对话",
+  "Invalid reporting chain": "汇报链无效",
+  // 成员动作 (MembershipAction.tsx) —— 员工列表右侧那颗按钮
+  Join: "加入",
+  Leave: "离开",
+  "Joining...": "正在加入…",
+  "Leaving...": "正在离开…",
+  // 运行面板 / 例行任务 (ActiveAgentsPanel / RoutineOverview)
+  "View all runs": "查看全部运行",
+  // 任务页搜索框 (Issues.tsx)
+  "Search tasks...": "搜索任务…",
 };
+
+/**
+ * wave34: 动态文案的补丁层。I18N_PATCH 是「整段文本全等」替换，盖不住
+ * **运行时拼出来的**相对时间 —— 老板 23:48 截图里的 "Finished Xd ago" 就是
+ * `ActiveAgentsPanel.tsx` 的 `` `Finished ${relativeTime(...)}` ``，文本节点里
+ * 已经是 "Finished 2d ago"，字典查不到。
+ *
+ * 每条是 [正则源码, 替换串]，替换只作用于**整段**文本（^...$），命中后仍走
+ * 同一套「保留原空白」的逻辑。值里出现的数字/单位保持英文缩写（2d / 3h），
+ * 与上游 timeAgo 的紧凑写法一致，也避免和中文数字单位再对一次表。
+ */
+const I18N_PATTERNS: Array<[string, string]> = [
+  // ActiveAgentsPanel.tsx: `Finished ${relativeTime(run.finishedAt)}`
+  ["^Finished (\\d+\\s*(?:s|m|h|d|w|mo)) ago$", "$1 前完成"],
+  // IssueChatThread.tsx: `no output for ${lastActivityElapsed} - still running`
+  ["^no output for (\\d+\\s*(?:s|m|h|d|w|mo)) - still running$", "$1 无输出 · 仍在运行"],
+  // lib/timeAgo.ts / lib/utils.ts / Secrets.tsx: "5s ago" / "2m ago" / "3d ago" / "1mo ago"
+  ["^(\\d+\\s*(?:s|m|h|d|w|mo)) ago$", "$1 前"],
+  ["^in (\\d+\\s*(?:s|m|h|d|w|mo))$", "$1 后"],
+  // 员工页计数徽标: "1 agent" / "3 agents" (Agents.tsx 的单复数拼接)
+  ["^(\\d+) agents?$", "$1 位员工"],
+  // 上面那条够不到 Agents.tsx:528 的 `{n} agent{…}` —— JSX 把它拆成两个文本节点
+  // ("1" 和 " agent")，整段匹配必然失败。这里退一步只认名词片段，数字那半边
+  // 原样留着，拼起来就是 "1 位员工"。
+  ["^agents?$", "位员工"],
+];
+
+/**
+ * wave34: 底部导航「重叠」的补丁。
+ *
+ * `MobileBottomNav.tsx` 的底色是 `bg-border/50 … dark:bg-muted` —— 只有 **dark**
+ * 主题是不透明的；web 站默认 light，于是半透明的 fixed 导航条下方的正文会**透出来**
+ * （模拟器实测：`构建: 一个演示项目` / `19h ago` / 状态圆点 都从导航底下透出）。
+ * 老板 23:48 截图里的 "View dInboxs" 就是这个 —— 正文短语叠在导航 tab 文案上。
+ *
+ * 约束是不改上游 `ui/`，所以在壳这层注入一条样式把它钉成不透明。用 `--muted`
+ * （跟 dark 主题下的 `dark:bg-muted` 同一个 token），并带一个兜底色，两种主题一致。
+ */
+const I18N_CSS_PATCH = `
+nav[aria-label="Mobile navigation"] { background-color: var(--muted, #f2f2f2) !important; }
+`;
 
 /**
  * 运行时翻译补丁。`injectedJavaScript*` 只接受字符串，所以脚本拼在这里。
  *
  * - 只在完整去空白的 text node / placeholder / aria-label / title 上做替换，
  *   保留原有缩进空白；替换值用函数形式避免 `$&` 之类的特殊替换序列。
+ * - 字典查不中时再跑 I18N_PATTERNS（动态相对时间等），同样只匹配整段文本。
  * - MutationObserver 监听整棵 DOM（React 重渲染后会重新扫），带 **200ms debounce**
  *   （spec §10：避免影响 React 性能）。
  * - `__COOLIE_I18N_PATCH_INSTALLED__` 幂等守卫：beforeContentLoaded + 页面加载后
@@ -370,10 +555,19 @@ const I18N_PATCH: Record<string, string> = {
  */
 const I18N_PATCH_INJECTION = `
 window.__COOLIE_I18N_PATCH__ = ${JSON.stringify(I18N_PATCH)};
+window.__COOLIE_I18N_PATTERNS__ = ${JSON.stringify(I18N_PATTERNS)};
+window.__COOLIE_I18N_CSS__ = ${JSON.stringify(I18N_CSS_PATCH)};
 (function () {
   if (window.__COOLIE_I18N_PATCH_INSTALLED__) return;
   window.__COOLIE_I18N_PATCH_INSTALLED__ = true;
   var PATCH = window.__COOLIE_I18N_PATCH__ || {};
+  var PATTERN_SPECS = window.__COOLIE_I18N_PATTERNS__ || [];
+  var PATTERNS = [];
+  for (var p = 0; p < PATTERN_SPECS.length; p++) {
+    try {
+      PATTERNS.push([new RegExp(PATTERN_SPECS[p][0]), PATTERN_SPECS[p][1]]);
+    } catch (e) {}
+  }
   var SKIP = { SCRIPT: 1, STYLE: 1, NOSCRIPT: 1, TEXTAREA: 1, CODE: 1, PRE: 1 };
   var ATTRS = ["placeholder", "aria-label", "title"];
   function translate(raw) {
@@ -381,8 +575,16 @@ window.__COOLIE_I18N_PATCH__ = ${JSON.stringify(I18N_PATCH)};
     var text = String(raw).trim();
     if (!text) return null;
     var hit = PATCH[text];
-    if (typeof hit !== "string" || hit === text) return null;
-    return String(raw).replace(text, function () { return hit; });
+    if (typeof hit === "string" && hit !== text) {
+      return String(raw).replace(text, function () { return hit; });
+    }
+    for (var i = 0; i < PATTERNS.length; i++) {
+      var re = PATTERNS[i][0];
+      if (!re.test(text)) continue;
+      var out = text.replace(re, PATTERNS[i][1]);
+      if (out !== text) return String(raw).replace(text, function () { return out; });
+    }
+    return null;
   }
   function apply(root) {
     if (!root) return;
@@ -413,8 +615,29 @@ window.__COOLIE_I18N_PATCH__ = ${JSON.stringify(I18N_PATCH)};
       apply(document.body || document.documentElement);
     }, 200);
   }
+  function installCss() {
+    try {
+      if (document.getElementById("__coolie_i18n_css__")) return;
+      var style = document.createElement("style");
+      style.id = "__coolie_i18n_css__";
+      style.appendChild(document.createTextNode(window.__COOLIE_I18N_CSS__ || ""));
+      (document.head || document.documentElement).appendChild(style);
+    } catch (e) {}
+  }
   function start() {
+    installCss();
     apply(document.body || document.documentElement);
+    // 兜底重扫 (wave34)：老板 23:48 报「底部 5 tab 还是英文」，但同一份 0.6.2
+    // bundle 里其实**有**这些词条 (COS 产物 UTF-16 里能查到 首页/收件箱/智能体)，
+    // 说明不是字典缺失，而是真机上某次挂载的 observer 回调赶不上那帧 —— 壳这层
+    // 没法复现 (模拟器 0.6.2 一直是中文)。这里在挂载后补几次延时重扫，把这条
+    // 时间窗抹掉；apply 是幂等的 (命中过就不会再命中)，多跑几次没有副作用。
+    var SWEEP_DELAYS = [300, 1000, 2500];
+    for (var d = 0; d < SWEEP_DELAYS.length; d++) {
+      setTimeout(function () {
+        apply(document.body || document.documentElement);
+      }, SWEEP_DELAYS[d]);
+    }
     var target = document.documentElement;
     if (!target || !window.MutationObserver) return;
     new MutationObserver(schedule).observe(target, {

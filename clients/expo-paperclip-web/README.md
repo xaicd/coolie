@@ -9,8 +9,8 @@ App，用 `react-native-webview` 装 `https://www.xrobinai.cn/XROA`，商店名
 | | 驾驶舱 (`clients/expo/`) | Coolie Web (本目录) |
 | --- | --- | --- |
 | 包名 | `cloud.coolie.app` | `cloud.coolie.app.web` |
-| versionName | `0.5.2` | `0.6.2-paperclip-web` |
-| OTA runtimeVersion | `0.5.2` | `0.6.2` |
+| versionName | `0.5.2` | `0.6.4-paperclip-web` |
+| OTA runtimeVersion | `0.5.2` | `0.6.4` |
 | OTA 更新源 | `https://xrobinai.cn/ota/manifest` | `https://xrobinai.cn/ota/paperclip-web/manifest` |
 
 两个 App 的 `runtimeVersion` 不同，所以一方的 OTA bundle 不会被另一方装上。
