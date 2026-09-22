@@ -10,14 +10,14 @@
 #   bash scripts/release-app.sh 0.3.1 "修复本体图谱点击错位" --dry-run
 #
 # 流程:
-#   1. 前置检查 (clients/expo 工作区干净、版本号合法且非当前版本)
+#   1. 前置检查 (clients/expo 工作区干净、全仓 tracked 无改动即 1.5 commit 强制、版本号合法且非当前版本)
 #   2. 改 clients/expo/app.json / package.json 版本号
 #   3. clients/expo/CHANGELOG.md 顶部插入新版本节
-#   4. git add + commit (不 push)
+#   4. git add + commit (不 push) — 该 commit hash 记入 version.json 的 commitSha
 #   5. 修正 AndroidManifest：OTA 打开 + 原生 runtimeVersion 跟随 app.json（漂移则拒绝发版）
 #   6. gradle assembleRelease 出 APK (失败则回退上一步的 commit)
 #   7. coscli 上传 APK 到 COS
-#   8. 生成 version.json 并 scp 到生产 (App 内升级检测用)
+#   8. 生成 version.json (含 commitSha) 并 scp 到生产 (App 内升级检测用)
 #   9. 发布 OTA 增量更新
 #  10. 输出汇总
 #
@@ -123,6 +123,17 @@ if [ -n "$DIRTY" ]; then
   printf 'clients/expo 下有未提交的改动，先处理干净再发版:\n%s\n' "$DIRTY" >&2
   exit 1
 fi
+# === 1.5 commit 强制检查 (NEW, boss 09-22 23:59 OOB) ===
+# 「每个部署打包最好要有提交, 不然丢版本了」: 发版前工作区必须是干净的 commit,
+# 否则发出去的产物对不上任何 commit, 无法回溯 / 重发。tracked 有改动直接 abort。
+if [ -n "$(git status --porcelain | grep -v '^??')" ]; then
+  die "[sanity] git status NOT clean (modified files in tracked). Commit first. Don't ship dirty state."
+fi
+# untracked 只警告不 abort: 发版要带的源文件若还没 add, 先提醒 (clients/ 下尤其危险)。
+if [ -n "$(git status --porcelain clients/ packages/ server/ docs-coolie/ scripts/ 2>/dev/null | grep '^??')" ]; then
+  echo "[warning] untracked files in tracked dirs. Run 'git add' first."
+fi
+
 CURRENT_VERSION="$(python3 -c "import json; print(json.load(open('$EXPO_DIR/app.json'))['expo']['version'])")"
 [ "$CURRENT_VERSION" != "$VERSION" ] || die "当前已是 v${CURRENT_VERSION}，无需发版"
 COMMIT_BEFORE="$(git rev-parse HEAD)"
@@ -216,6 +227,9 @@ else
   git commit -m "release: v$VERSION — $NOTES"
   echo "   ✓ 已提交 $(git rev-parse --short HEAD)"
 fi
+# 发版 commit hash — 写入 version.json 的 commitSha (J2)，供回溯 / 重发。
+RELEASE_COMMIT="$(git rev-parse HEAD)"
+echo "发版 commit: ${RELEASE_COMMIT:0:12}"
 
 step "[5/9] 确保 Android OTA 配置打开 + 运行时版本跟随 app.json"
 # fix-android-manifest.sh 会把原生 EXPO_RUNTIME_VERSION 重写成 app.json 的运行时意图
@@ -266,15 +280,15 @@ step "[8/9] 生成并上传 version.json ($SSH_TARGET:$REMOTE_VERSION_JSON)"
 TMP_JSON="$(mktemp -t coolie-version-json.XXXXXX)"
 if dry; then
   echo "   [dry-run] 生成 version.json:"
-  printf '   [dry-run]   { "version": "%s", "versionCode": %s, "downloadUrl": "%s", "releaseNotes": "%s" }\n' \
-    "$VERSION" "$VERSION_CODE" "$APK_URL" "$NOTES"
+  printf '   [dry-run]   { "version": "%s", "versionCode": %s, "downloadUrl": "%s", "releaseNotes": "%s", "commitSha": "%s" }\n' \
+    "$VERSION" "$VERSION_CODE" "$APK_URL" "$NOTES" "$RELEASE_COMMIT"
   echo "   [dry-run] scp <tmp>/version.json $SSH_TARGET:$REMOTE_VERSION_JSON"
 else
-  python3 - "$TMP_JSON" "$VERSION" "$VERSION_CODE" "$APK_URL" "$NOTES" <<'PY'
+  python3 - "$TMP_JSON" "$VERSION" "$VERSION_CODE" "$APK_URL" "$NOTES" "$RELEASE_COMMIT" <<'PY'
 import json
 import sys
 
-path, version, code, url, notes = sys.argv[1:6]
+path, version, code, url, notes, commit = sys.argv[1:7]
 with open(path, "w", encoding="utf-8") as handle:
     json.dump(
         {
@@ -282,6 +296,7 @@ with open(path, "w", encoding="utf-8") as handle:
             "versionCode": int(code),
             "downloadUrl": url,
             "releaseNotes": notes,
+            "commitSha": commit,
         },
         handle,
         indent=2,

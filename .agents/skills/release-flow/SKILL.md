@@ -18,8 +18,8 @@ description: 记录 Coolie fork 四类资产的发布方式（SQL schema / API s
 
 ## 发版前必跑（⛔ 前置门禁）
 
-**任何发版前必须跑 [`docs-coolie/PM-RELEASE-CHECKLIST.md`](../../../docs-coolie/PM-RELEASE-CHECKLIST.md) 全部 gate（原 24 项 + 新增 5 项 = 29 项）**：
-A1-A6 / B1-B4 / C1-C4 / D1-D3 / E1-E4 / F1-F3 / G1-G2 + H1-H4 / I1。
+**任何发版前必须跑 [`docs-coolie/PM-RELEASE-CHECKLIST.md`](../../../docs-coolie/PM-RELEASE-CHECKLIST.md) 全部 gate（26 项实列 + H1-H4 / I1 / J1-J3 = 34 项）**：
+A1-A6 / B1-B4 / C1-C4 / D1-D3 / E1-E4 / F1-F3 / G1-G2 + H1-H4 / I1 + J1-J3。
 
 跳过任何一项 ⛔ = **不发版**。PM 跑完签字。
 
@@ -31,6 +31,23 @@ A1-A6 / B1-B4 / C1-C4 / D1-D3 / E1-E4 / F1-F3 / G1-G2 + H1-H4 / I1。
 
 > 每个被改的资产还要在发版前更新自己的 CHANGELOG 顶部（H1-H4）：
 > `clients/expo/CHANGELOG.md`（App）/ `clients/expo-paperclip-web/CHANGELOG.md`（Coolie Web）/ `clients/h5/CHANGELOG.md`（h5）。
+
+## commit 强制（boss 09-22 23:59 OOB）
+
+任何发布物 (APK / OTA / h5) 必须有对应 git commit，否则版本丢失（无法回溯 / 重发）：
+
+```
+1. 发版前 git status 干净 (no modified tracked files)
+2. commit hash 记入 version.json 的 commitSha 字段
+3. commit push 到 origin
+4. release-app.sh / publish-ota.sh / publish-h5.sh 在 bump version 前 sanity check
+```
+
+- `release-app.sh` 第 1.5 步：tracked 有改动即 abort（不发脏版本），untracked 只警告。
+- `publish-ota.sh` / `publish-h5.sh`：工作区脏时仍发布，但打印 `[warning]` 提示先 commit。
+
+> wave26 0.5.15 是真实案例：release commit 只 bump version，没 typecheck / build APK → APK 没真发（老板说「丢版本」）。
+> 修法：现在每个发版 `release-app.sh` 第 1.5 步强制 sanity check。
 
 ## 2. SQL schema 发布（最易踩坑）
 
@@ -217,7 +234,7 @@ X 改的是什么层？
 2. **schema 改先 PGlite 验证**（不允许直接上生产）
 3. **bundle/dist 不入 git**（`.gitignore` 已加）
 4. **不发版不发 OTA 不 rsync 不重启** = 没交付
-5. **每次发布 PM 签字**（PM-RELEASE-CHECKLIST 29 项 gate）
+5. **每次发布 PM 签字**（PM-RELEASE-CHECKLIST 34 项 gate）
 
 ## 8. 跨类发布冲突场景
 
@@ -239,7 +256,7 @@ X 改的是什么层？
 - `scripts/deploy-tc-coolie-claw.sh` —— 生产部署
 - `scripts/prepare-server-ui-dist.sh` —— h5 dist 同步
 - `scripts/rollback-latest.sh` —— 紧急回滚
-- `docs-coolie/PM-RELEASE-CHECKLIST.md` —— 29 项 gate
+- `docs-coolie/PM-RELEASE-CHECKLIST.md` —— 34 项 gate
 - `docs-coolie/Coolie-FORK-BOUNDARY.md` —— 哪些动哪些不动
 
 ## 10. 测试

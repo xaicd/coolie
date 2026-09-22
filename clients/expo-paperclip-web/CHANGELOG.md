@@ -6,7 +6,7 @@ Coolie Web 移动套壳 App（Expo + WebView 包 paperclip UI）版本流水。
 
 ---
 
-## 0.6.4 (2026-09-22)
+## 0.6.4 (2026-09-22) — commit `29a033dd5`
 
 - 底部 5 tab 100% 中文（仪表盘 / 任务 / 新建任务 / 员工 / 收件箱）
 - i18n 字典扩展 60 条（跟 NewIssueDialog 字段 label + boss 截图发现的英文）
@@ -17,7 +17,7 @@ Coolie Web 移动套壳 App（Expo + WebView 包 paperclip UI）版本流水。
 
 ---
 
-## 0.6.2 (2026-09-21)
+## 0.6.2 (2026-09-21) — commit `d3af9a1f3`
 
 - 初版 wave9 paperclip-web 套壳（Cloud + UI 路由）
 - i18n PATCH 字典 180 条（wave10.1）

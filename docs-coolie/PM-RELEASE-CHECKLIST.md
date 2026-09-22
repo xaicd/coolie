@@ -1,6 +1,6 @@
 # Coolie PM 发版 Checklist — 2026-09-20
 
-发版前必跑 31 项 gate（26 项实列 + H1-H4 / I1 共 5 项加固）。任何一项 ⛔ 都**不发版**。PM 自己负责跑完签字。
+发版前必跑 34 项 gate（26 项实列 + H1-H4 / I1 / J1-J3 共 8 项加固）。任何一项 ⛔ 都**不发版**。PM 自己负责跑完签字。
 
 ## A. 代码质量（6 项）
 
@@ -62,9 +62,15 @@
 
 - [ ] **I1** version bump 符合 semver（patch=hotfix / minor=feature / major=breaking，见 `docs-coolie/VERSIONING.md`）
 
+## J. Commit 强制（3 项）— NEW（boss 09-22 23:59 OOB）
+
+- [ ] **J1** 发版前 `git status` 必须干净（no uncommitted changes，no untracked files in clients/*）
+- [ ] **J2** 发版 commit hash 已记录到 `version.json` 的 `commitSha` 字段
+- [ ] **J3** 该 commit 在 origin 上（push done before release-app.sh bump）
+
 ---
 
-## 31 项速查表
+## 34 项速查表
 
 | 类别 | 数 | 关键项 |
 |---|---:|---|
@@ -77,6 +83,7 @@
 | 老板回签 | 2 | weixin 回 / 至少一个功能实测 |
 | 变更规范 | 4 | 3 个 CHANGELOG 更新 + brief 拍板理由 |
 | 变更语义 | 1 | semver 三段（跟 VERSIONING.md）|
+| Commit 强制 | 3 | git status 干净 / commitSha 入 version.json / commit 已 push |
 
 ---
 
@@ -109,6 +116,10 @@ grep version clients/expo/app.json clients/expo/package.json clients/expo/androi
 # C1-C4
 git log --oneline -5 && git status --short
 
+# J1 / J3
+git status --porcelain              # 必须空 (tracked 无改动)
+git log origin/main..HEAD --oneline # 空 = 该 commit 已 push 到 origin
+
 # E1-E4
 curl -fsS https://xrobinai.cn/api/health
 curl -fsS https://xrobinai.cn/ota/manifest | python3 -c 'import json,sys;print(json.load(sys.stdin)["runtimeVersion"])'
@@ -128,6 +139,6 @@ curl -fsS https://xrobinai.cn/version.json
 
 ## 升级到老板的一句话
 
-> 老板，发版要 31 项 ⛔ 全过才发。我自己不再「老板说发就立刻发」了，跑完这表我签字再发。
+> 老板，发版要 34 项 ⛔ 全过才发。我自己不再「老板说发就立刻发」了，跑完这表我签字再发。
 
 以后 PM 流程 = 派单 + 派单前置 + 派单后置 + 本 checklist + 验收 + 推。**少一个不签字。**

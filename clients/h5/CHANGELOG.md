@@ -6,7 +6,7 @@ Coolie h5 web 镜像（浏览器端，跟 Coolie工坊 App 同 API）版本流�
 
 ---
 
-## 0.6.2 (2026-09-21)
+## 0.6.2 (2026-09-21) — commit `c25f21354`
 
 - h5 端 TasksScreen（NewTaskDialog 镜像 + IssuesList 6 视图切换）
 - h5 镜像 + 17 字段 ComposeScreen（wave24 / wave26）
@@ -15,6 +15,6 @@ Coolie h5 web 镜像（浏览器端，跟 Coolie工坊 App 同 API）版本流�
 
 ---
 
-## 0.5.0 (2026-09-20)
+## 0.5.0 (2026-09-20) — commit `608de91a9`
 
 - 初版 h5 web 镜像（Coolie工坊 App + 浏览器）

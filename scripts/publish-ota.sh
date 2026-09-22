@@ -13,6 +13,13 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$REPO_ROOT/clients/expo"
 
+# === commit 强制 sanity check (warning, boss 09-22 23:59 OOB) ===
+# 发布物必须有对应 commit; 工作区脏时仍然发布, 但提示先 commit 以免丢版本。
+cd "$REPO_ROOT"
+if [ -n "$(git status --porcelain | grep -v '^??')" ]; then
+  echo "[warning] git status NOT clean (modified files). publish-ota still runs but commit first."
+fi
+
+cd "$REPO_ROOT/clients/expo"
 bash scripts/publish-ota.sh "$@"

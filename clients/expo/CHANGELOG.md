@@ -4,7 +4,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.21
+## v0.5.21 — commit `2594a71e8`
 
 > Released: 2026-09-22 · Android release APK
 
@@ -14,7 +14,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.18
+## v0.5.18 — commit `9384c21af`
 
 > Released: 2026-09-22 · Android release APK
 
@@ -24,7 +24,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.17
+## v0.5.17 — commit `902122bab`
 
 > Released: 2026-09-22 · Android release APK
 
@@ -35,7 +35,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.16
+## v0.5.16 — commit `00ac4c646`
 
 > Released: 2026-09-22 · Android release APK
 
@@ -46,7 +46,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.15 — ⚠️ NOT RELEASED
+## v0.5.15 — ⚠️ NOT RELEASED — release commit `dfd328db3`（后 revert 再以 `1c3d08e99` 重放）
 
 > Tagged: 2026-09-22 · ⚠️ APK 实际未发出（见下方说明）
 
@@ -60,7 +60,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.14
+## v0.5.14 — commit `7f5184861`
 
 > Released: 2026-09-22 · Android release APK
 
@@ -70,7 +70,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.13
+## v0.5.13 — commit `ef493204d`
 
 > Released: 2026-09-22 · Android release APK
 
@@ -80,7 +80,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.12
+## v0.5.12 — commit `536c98489`
 
 > Released: 2026-09-22 · Android release APK
 
@@ -90,7 +90,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.11
+## v0.5.11 — commit `50d74b7e9`
 
 > Released: 2026-09-22 · Android release APK
 
@@ -100,7 +100,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.10
+## v0.5.10 — commit `6dd65a90c`
 
 > Released: 2026-09-22 · Android release APK
 
@@ -110,7 +110,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.9
+## v0.5.9 — commit `c41918949`
 
 > Released: 2026-09-22 · Android release APK
 
@@ -120,7 +120,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.8
+## v0.5.8 — commit `87f4dc92e`
 
 > Released: 2026-09-22 · Android release APK
 
@@ -130,7 +130,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.7
+## v0.5.7 — commit `0e972f48d`
 
 > Released: 2026-09-21 · Android release APK
 
@@ -140,7 +140,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.6
+## v0.5.6 — commit `60e32c93c`
 
 > Released: 2026-09-21 · Android release APK
 
@@ -150,7 +150,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.5
+## v0.5.5 — commit `2ddfd85fe`
 
 > Released: 2026-09-21 · Android release APK
 
@@ -163,7 +163,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.2
+## v0.5.2 — commit `c8e82a0db`
 
 > Released: 2026-09-21 · Android release APK
 
@@ -173,7 +173,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.1
+## v0.5.1 — commit `05b090cb4`
 
 > Released: 2026-09-21 · Android release APK
 
@@ -183,7 +183,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.0
+## v0.5.0 — commit `8a9e984a5`
 
 > Released: 2026-09-20 · Android release APK
 
@@ -215,7 +215,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.3.5
+## v0.3.5 — commit `2023ae59e`
 
 > Released: 2026-09-20 · Android release APK
 
@@ -225,7 +225,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.3.4
+## v0.3.4 — commit `99b2bcf3e`
 
 > Released: 2026-09-20 · Android release APK
 
@@ -235,7 +235,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.3.3
+## v0.3.3 — commit `ae0530748`
 
 > Released: 2026-09-20 · Android release APK
 
@@ -247,7 +247,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.3.2
+## v0.3.2 — commit `5aec7285b`
 
 > Released: 2026-09-20 · Android release APK
 
@@ -257,7 +257,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.3.1
+## v0.3.1 — commit `fd99bdcf5`
 
 > Released: 2026-09-20 · Android release APK
 
@@ -267,7 +267,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.3.0
+## v0.3.0 — commit `ce1c050bf`
 
 > Released: 2026-09-19 · Android release APK
 
@@ -314,7 +314,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.2.0
+## v0.2.0 — commit `f963d74c3`
 
 > Released: 2026-09-19 · Android release APK
 
@@ -336,6 +336,6 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.1.0
+## v0.1.0 — commit `608de91a9`
 
 > 初始版本（品牌化 Coolie，一期 5 个 Bug 修复后基线）。
