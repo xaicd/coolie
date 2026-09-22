@@ -24,100 +24,107 @@ const ROWS: { key: ComposerSection; icon: string; label: string }[] = [
 ];
 
 /**
- * 「⋯ 更多」——属性条最后一个胶囊, 展开二级菜单。
+ * 「⋯ 更多」触发胶囊。
+ *
+ * 与 `StatusChip` 同理拆成触发器 + 列表: 菜单落在属性条整行的下方, 展开时不会把
+ * 旁边的状态胶囊挤走(否则点完状态再点 ⋯ 会落空, 实测)。
+ */
+export function MoreMenu({
+  onPress,
+  expanded = false,
+  disabled = false,
+}: {
+  onPress: () => void;
+  expanded?: boolean;
+  disabled?: boolean;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="更多"
+      accessibilityState={{ expanded }}
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.chip,
+        expanded && styles.chipOpen,
+        pressed && styles.chipPressed,
+        disabled && styles.disabled,
+      ]}
+    >
+      <Ionicons name="ellipsis-horizontal" size={15} color={expanded ? C.ink : C.ink3} />
+    </Pressable>
+  );
+}
+
+/**
+ * 「⋯」展开的二级菜单。
  *
  * `dueDate` 单独处理: 平台的 issue 模型没有截止日期字段
  * (`packages/db/src/schema/issues.ts` 里没有该列, `createIssueBaseSchema` 也不收),
  * 所以这一项**不能**做成一个选了却发不出去的日期选择器 —— 点开它会就地说明原因,
  * 而不是给一个静默丢弃输入的控件。上游的 Due date 同样是占位按钮。
  */
-export function MoreMenu({
+export function MoreMenuList({
   sections,
   onToggle,
-  disabled = false,
 }: {
   /** 当前展开的可选区块。 */
   sections: ReadonlySet<ComposerSection>;
   onToggle: (section: ComposerSection) => void;
-  disabled?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   const [dueDateNoteShown, setDueDateNoteShown] = useState(false);
 
   return (
-    <View style={styles.wrap}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel="更多"
-        onPress={() => setOpen((v) => !v)}
-        disabled={disabled}
-        style={({ pressed }) => [
-          styles.chip,
-          open && styles.chipOpen,
-          pressed && styles.chipPressed,
-          disabled && styles.disabled,
-        ]}
-      >
-        <Ionicons name="ellipsis-horizontal" size={15} color={open ? C.ink : C.ink3} />
-      </Pressable>
+    <View style={styles.menu}>
+      {ROWS.map((row) => {
+        const active = sections.has(row.key);
+        const unsupported = row.key === "dueDate";
+        return (
+          <Pressable
+            key={row.key}
+            accessibilityRole="button"
+            accessibilityLabel={row.label}
+            accessibilityState={{ selected: active }}
+            onPress={() => {
+              if (unsupported) {
+                setDueDateNoteShown((v) => !v);
+                return;
+              }
+              onToggle(row.key);
+            }}
+            style={({ pressed }) => [
+              styles.menuItem,
+              active && styles.menuItemActive,
+              pressed && styles.menuItemPressed,
+            ]}
+          >
+            <Ionicons
+              name={row.icon as React.ComponentProps<typeof Ionicons>["name"]}
+              size={14}
+              color={active ? C.ink : C.ink3}
+            />
+            <Text style={[styles.menuLabel, active && styles.menuLabelActive]}>{row.label}</Text>
+            {unsupported ? (
+              <Ionicons name="information-circle-outline" size={13} color={C.ink4} />
+            ) : active ? (
+              <Ionicons name="checkmark" size={14} color={C.accent} />
+            ) : null}
+          </Pressable>
+        );
+      })}
 
-      {open && !disabled ? (
-        <View style={styles.menu}>
-          {ROWS.map((row) => {
-            const active = sections.has(row.key);
-            const unsupported = row.key === "dueDate";
-            return (
-              <Pressable
-                key={row.key}
-                accessibilityRole="button"
-                accessibilityLabel={row.label}
-                accessibilityState={{ selected: active }}
-                onPress={() => {
-                  if (unsupported) {
-                    setDueDateNoteShown((v) => !v);
-                    return;
-                  }
-                  onToggle(row.key);
-                }}
-                style={({ pressed }) => [
-                  styles.menuItem,
-                  active && styles.menuItemActive,
-                  pressed && styles.menuItemPressed,
-                ]}
-              >
-                <Ionicons
-                  name={row.icon as React.ComponentProps<typeof Ionicons>["name"]}
-                  size={14}
-                  color={active ? C.ink : C.ink3}
-                />
-                <Text style={[styles.menuLabel, active && styles.menuLabelActive]}>
-                  {row.label}
-                </Text>
-                {unsupported ? (
-                  <Ionicons name="information-circle-outline" size={13} color={C.ink4} />
-                ) : active ? (
-                  <Ionicons name="checkmark" size={14} color={C.accent} />
-                ) : null}
-              </Pressable>
-            );
-          })}
-
-          {dueDateNoteShown ? (
-            <Text style={styles.note}>
-              此实例的任务模型没有截止日期字段, 建任务时无法设置 —— 与上游
-              NewIssueDialog 的 Due date 占位按钮一致。
-            </Text>
-          ) : null}
-        </View>
+      {dueDateNoteShown ? (
+        <Text style={styles.note}>
+          此实例的任务模型没有截止日期字段, 建任务时无法设置 —— 与上游 NewIssueDialog
+          的 Due date 占位按钮一致。
+        </Text>
       ) : null}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    gap: SPACING.xs,
-  },
   chip: {
     flexDirection: "row",
     alignItems: "center",
@@ -139,7 +146,8 @@ const styles = StyleSheet.create({
     opacity: 0.4,
   },
   menu: {
-    width: 240,
+    alignSelf: "flex-start",
+    minWidth: 240,
     gap: 2,
     padding: SPACING.xs,
     borderRadius: RADIUS.md,
@@ -176,6 +184,5 @@ const styles = StyleSheet.create({
     lineHeight: 16,
     paddingHorizontal: SPACING.sm,
     paddingTop: SPACING.xs,
-    maxWidth: 260,
   },
 });

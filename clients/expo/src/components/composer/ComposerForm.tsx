@@ -13,9 +13,9 @@ import {
 import { ComposerChip } from "./Chip";
 import { ForRow } from "./ForRow";
 import { MarkdownToolbar } from "./MarkdownToolbar";
-import { MoreMenu, type ComposerSection } from "./MoreMenu";
+import { MoreMenu, MoreMenuList, type ComposerSection } from "./MoreMenu";
 import { ProjectRow } from "./ProjectRow";
-import { StatusChip } from "./StatusChip";
+import { StatusChip, StatusMenu } from "./StatusChip";
 import { TagsRow } from "./TagsRow";
 import { TrustPolicyRow } from "./TrustPolicyRow";
 import { UploadRow } from "./UploadRow";
@@ -64,6 +64,8 @@ export function ComposerForm({
   onDiscard: () => void;
 }) {
   const [sections, setSections] = useState<ReadonlySet<ComposerSection>>(new Set());
+  const [statusOpen, setStatusOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [descriptionSelection, setDescriptionSelection] = useState({ start: 0, end: 0 });
 
   const toggleSection = useCallback((section: ComposerSection) => {
@@ -191,32 +193,63 @@ export function ComposerForm({
         <WorkModeChips value={fields.workMode} onChange={fields.setWorkMode} />
 
         <UploadRow files={fields.attachments} onChange={fields.setAttachments} disabled={busy} />
-
-        {/* 属性条: 状态 + 更多 (上游 NewIssueDialog 的 chips bar) */}
-        <View style={styles.propsBar}>
-          <StatusChip value={fields.status} onChange={fields.setStatus} disabled={busy} />
-          <MoreMenu sections={sections} onToggle={toggleSection} disabled={busy} />
-        </View>
       </ScrollView>
 
-      {/* 底部动作 */}
-      <View style={styles.footer}>
-        <Pressable
-          style={styles.discardBtn}
-          onPress={onDiscard}
-          disabled={busy}
-          accessibilityRole="button"
-        >
-          <Text style={styles.discardText}>放弃草稿</Text>
-        </Pressable>
-        <Pressable
-          style={[styles.createBtn, !canSubmit && styles.disabled]}
-          disabled={!canSubmit}
-          onPress={onSubmit}
-          accessibilityRole="button"
-        >
-          <Text style={styles.createText}>{busy ? "创建中…" : "创建任务"}</Text>
-        </Pressable>
+      {/* 属性条 + 底部动作 —— 与上游 NewIssueDialog 一样**不进滚动区** (上游的 chips bar
+          也是 `overflow-y-auto` 之外的一行)。放在滚动区里会被表单撑到屏幕外: 实测展开
+          「⋯」时后两行 (信任策略 / Markdown 编辑器) 落在可视区之下, 点不到。
+          展开的菜单落在属性条上方, 因此永远完整可见, 也不挤动旁边那颗胶囊。 */}
+      <View style={styles.bottomBar}>
+        {moreOpen ? <MoreMenuList sections={sections} onToggle={toggleSection} /> : null}
+        {statusOpen ? (
+          <StatusMenu
+            value={fields.status}
+            onChange={(status) => {
+              fields.setStatus(status);
+              setStatusOpen(false);
+            }}
+          />
+        ) : null}
+
+        <View style={styles.propsBar}>
+          <StatusChip
+            value={fields.status}
+            onPress={() => {
+              setMoreOpen(false);
+              setStatusOpen((v) => !v);
+            }}
+            expanded={statusOpen}
+            disabled={busy}
+          />
+          <MoreMenu
+            onPress={() => {
+              setStatusOpen(false);
+              setMoreOpen((v) => !v);
+            }}
+            expanded={moreOpen}
+            disabled={busy}
+          />
+        </View>
+
+        {/* 底部动作 */}
+        <View style={styles.footer}>
+          <Pressable
+            style={styles.discardBtn}
+            onPress={onDiscard}
+            disabled={busy}
+            accessibilityRole="button"
+          >
+            <Text style={styles.discardText}>放弃草稿</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.createBtn, !canSubmit && styles.disabled]}
+            disabled={!canSubmit}
+            onPress={onSubmit}
+            accessibilityRole="button"
+          >
+            <Text style={styles.createText}>{busy ? "创建中…" : "创建任务"}</Text>
+          </Pressable>
+        </View>
       </View>
     </>
   );
@@ -271,7 +304,17 @@ const styles = StyleSheet.create({
   bodyContent: {
     padding: SPACING.lg,
     gap: SPACING.lg,
-    paddingBottom: SPACING.xxl,
+    paddingBottom: SPACING.lg,
+  },
+  /**
+   * 属性条 + 底部动作的固定容器 (不进滚动区)。展开的菜单在属性条上方, 所以容器
+   * 只会向上长, 不会把菜单顶到屏幕外。
+   */
+  bottomBar: {
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    borderTopWidth: 1,
+    borderTopColor: C.lineSubtle,
   },
   titleInput: {
     color: C.ink,
@@ -307,18 +350,15 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     gap: SPACING.sm,
-    paddingTop: SPACING.xs,
+    paddingTop: SPACING.sm,
   },
   footer: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: SPACING.md,
-    paddingHorizontal: SPACING.lg,
-    paddingTop: SPACING.md,
+    paddingTop: SPACING.xs,
     paddingBottom: SPACING.lg,
-    borderTopWidth: 1,
-    borderTopColor: C.lineSubtle,
   },
   discardBtn: {
     paddingVertical: 11,

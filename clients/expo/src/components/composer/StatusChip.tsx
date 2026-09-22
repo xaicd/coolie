@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { IssueStatus } from "@coolie/api-client";
@@ -16,83 +15,86 @@ import {
  *
  * 上游是一个 Popover: 触发器显示当前状态 (●Todo), 展开后列出
  * `buildStatusOptions()` 的 5 个可选状态, 每项带状态色圆点 + 说明。
- * App 没有浮层 Popover, 这里就地展开同一份列表 (同一个胶囊位置), 选项集合、
- * 顺序、色点与说明都取自 `issue-status.ts` 这一份单一来源。
+ * App 没有浮层 Popover, 这里把同一份列表就地展开在同一行的**下方**。
  *
- * 状态会随 create 请求一起提交 (`status` 字段), 所以这里选的就是落库的值 ——
- * 不是只改个显示 (见 `CreateIssueInput.status`)。
+ * 触发器与列表分成两个组件 (而不是各自 useState 包一个 wrapper): 属性条上是
+ * 两颗并排的胶囊, 若把菜单塞进胶囊自己的 wrapper, 展开时 wrapper 会被菜单撑宽,
+ * 把旁边那颗胶囊整体挤走 —— 实测点「⋯」会因此落空 (先开了状态菜单, 再点 ⋯ 就点不到了)。
+ * 拆开之后菜单落在整行下方, 两颗胶囊的位置不随展开变化。
  */
 export function StatusChip({
   value,
-  onChange,
+  onPress,
+  expanded = false,
   disabled = false,
 }: {
   value: IssueStatus;
-  onChange: (status: IssueStatus) => void;
+  onPress: () => void;
+  expanded?: boolean;
   disabled?: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const color = issueStatusColor(value);
-
   return (
-    <View style={styles.wrap}>
-      <Pressable
-        accessibilityRole="button"
-        accessibilityLabel={`状态: ${issueStatusLabel(value)}`}
-        onPress={() => setOpen((v) => !v)}
-        disabled={disabled}
-        style={({ pressed }) => [
-          styles.chip,
-          open && styles.chipOpen,
-          pressed && styles.chipPressed,
-          disabled && styles.disabled,
-        ]}
-      >
-        <View style={[styles.dot, { backgroundColor: color }]} />
-        <Text style={styles.chipText}>{issueStatusLabel(value)}</Text>
-      </Pressable>
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`状态: ${issueStatusLabel(value)}`}
+      accessibilityState={{ expanded }}
+      onPress={onPress}
+      disabled={disabled}
+      style={({ pressed }) => [
+        styles.chip,
+        expanded && styles.chipOpen,
+        pressed && styles.chipPressed,
+        disabled && styles.disabled,
+      ]}
+    >
+      <View style={[styles.dot, { backgroundColor: issueStatusColor(value) }]} />
+      <Text style={styles.chipText}>{issueStatusLabel(value)}</Text>
+    </Pressable>
+  );
+}
 
-      {open && !disabled ? (
-        <View style={styles.menu}>
-          {COMPOSER_STATUSES.map((status) => {
-            const active = status === value;
-            const hint = COMPOSER_STATUS_HINT[status];
-            return (
-              <Pressable
-                key={status}
-                accessibilityRole="button"
-                accessibilityLabel={issueStatusLabel(status)}
-                onPress={() => {
-                  onChange(status);
-                  setOpen(false);
-                }}
-                style={({ pressed }) => [
-                  styles.menuItem,
-                  active && styles.menuItemActive,
-                  pressed && styles.menuItemPressed,
-                ]}
-              >
-                <View style={[styles.dot, { backgroundColor: issueStatusColor(status) }]} />
-                <View style={styles.menuText}>
-                  <Text style={[styles.menuLabel, active && styles.menuLabelActive]}>
-                    {issueStatusLabel(status)}
-                  </Text>
-                  {hint ? <Text style={styles.menuHint}>{hint}</Text> : null}
-                </View>
-                {active ? <Ionicons name="checkmark" size={14} color={C.accent} /> : null}
-              </Pressable>
-            );
-          })}
-        </View>
-      ) : null}
+/** 状态列表 —— 展开后落在属性条下方 (见上面为什么拆开)。 */
+export function StatusMenu({
+  value,
+  onChange,
+}: {
+  value: IssueStatus;
+  onChange: (status: IssueStatus) => void;
+}) {
+  return (
+    <View style={styles.menu}>
+      {COMPOSER_STATUSES.map((status) => {
+        const active = status === value;
+        const hint = COMPOSER_STATUS_HINT[status];
+        return (
+          <Pressable
+            key={status}
+            accessibilityRole="button"
+            accessibilityLabel={issueStatusLabel(status)}
+            accessibilityState={{ selected: active }}
+            onPress={() => onChange(status)}
+            style={({ pressed }) => [
+              styles.menuItem,
+              active && styles.menuItemActive,
+              pressed && styles.menuItemPressed,
+            ]}
+          >
+            <View style={[styles.dot, { backgroundColor: issueStatusColor(status) }]} />
+            <View style={styles.menuText}>
+              <Text style={[styles.menuLabel, active && styles.menuLabelActive]}>
+                {issueStatusLabel(status)}
+              </Text>
+              {hint ? <Text style={styles.menuHint}>{hint}</Text> : null}
+            </View>
+            {active ? <Ionicons name="checkmark" size={14} color={C.accent} /> : null}
+          </Pressable>
+        );
+      })}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    gap: SPACING.xs,
-  },
   chip: {
     flexDirection: "row",
     alignItems: "center",
@@ -121,7 +123,8 @@ const styles = StyleSheet.create({
     borderRadius: 3,
   },
   menu: {
-    width: 210,
+    alignSelf: "flex-start",
+    minWidth: 210,
     gap: 2,
     padding: SPACING.xs,
     borderRadius: RADIUS.md,
