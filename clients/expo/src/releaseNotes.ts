@@ -22,6 +22,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: "0.5.22",
+    title: "[驾驶舱Web] 内置网页兜底",
+    features: [
+      "顶栏 [驾驶舱Web] 智能路由：装了 Coolie Web 就深链拉起，没装就用内置网页兜底 —— 不再只弹「未安装」就断",
+      "兜底页整屏加载 Coolie Web，顶部 [安装独立] 引导去下独立 APK：只引导，不静默强装",
+      "新会话页 ↗ (在 Coolie Web 打开) 走同一套逻辑",
+    ],
+  },
+  {
     version: "0.5.5",
     title: "对齐 Coolie Web 风格 + 登录修复",
     features: [

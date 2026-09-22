@@ -69,6 +69,35 @@ else:
         element = element.replace("/>", f' android:value="{version}"/>', 1)
     text = text[: target.start()] + element + text[target.end():]
 
+# 3b) 包可见性 (Android 11+): 判断「本机装没装 Coolie Web」用的是
+#    Linking.canOpenURL('coolieweb://'), 它在原生侧走 resolveActivity; 而
+#    resolveActivity 会被包可见性过滤 —— 没在 <queries> 里声明过的自定义 scheme
+#    一律返回 null, 于是装了 Coolie Web 也会被判定成「没装」(wave40 的判定入口)。
+#    这里把 coolieweb scheme 补进 <queries>; 已存在则不动 (幂等)。
+if 'android:scheme="coolieweb"' not in text:
+    coolieweb_intent = (
+        "    <intent>\n"
+        '      <action android:name="android.intent.action.VIEW"/>\n'
+        '      <category android:name="android.intent.category.BROWSABLE"/>\n'
+        '      <data android:scheme="coolieweb"/>\n'
+        "    </intent>\n"
+    )
+    patched, count = re.subn(
+        r"<queries>\s*\n",
+        lambda match: match.group(0) + coolieweb_intent,
+        text,
+        count=1,
+    )
+    if count:
+        text = patched
+        print("   ✓ <queries> 已补 coolieweb scheme (Android 11+ 包可见性)")
+    else:
+        print(
+            "   ⚠ 未找到 <queries>, 未补 coolieweb scheme: canOpenURL 可能误判「没装」 "
+            "(openURL 兜底仍可用)",
+            file=sys.stderr,
+        )
+
 with open(path, "w", encoding="utf-8") as handle:
     handle.write(text)
 PY

@@ -1,11 +1,17 @@
+import { useState } from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { C } from "../theme";
 import { openCoolieWeb } from "../utils/openCoolieWeb";
+import { CoolieWebFallback } from "./CoolieWebFallback";
 
 /**
  * 全局顶栏 — 对齐 Coolie Web (clients/expo-paperclip-web) 的原生 appBar:
  * 中间标题 "Coolie工坊", 右侧 [驾驶舱Web] 按钮跳 coolieweb:// 深链。
+ *
+ * [驾驶舱Web] 是**智能路由** (wave40 方案 B, boss 09-22 23:59 选 B):
+ * 装了 Coolie Web → 深链拉起 (原行为); 没装 → 内置 webview 兜底加载
+ * https://www.xrobinai.cn/XROA (CoolieWebFallback), 不再只弹「未安装」。
  *
  * 左侧留空 (驾驶舱没有 web 后退, 不渲染 ←); 通知铃铛 + 全局搜索仍放左侧,
  * 因为它们原先只挂在旧 topBar 上, 去掉会丢掉两个入口 (通知中心 / 全局搜索)。
@@ -24,46 +30,61 @@ export function AppBar({
   onOpenNotifications?: () => void;
   onOpenSearch?: () => void;
 }) {
+  /** 本机没装 Coolie Web 时, 打开内置 webview 兜底 (见 CoolieWebFallback)。 */
+  const [webFallbackOpen, setWebFallbackOpen] = useState(false);
+
   return (
-    <View style={styles.bar}>
-      <View style={styles.side}>
-        {onOpenNotifications ? (
+    <>
+      <View style={styles.bar}>
+        <View style={styles.side}>
+          {onOpenNotifications ? (
+            <Pressable
+              style={styles.iconBtn}
+              hitSlop={10}
+              onPress={onOpenNotifications}
+            >
+              <Ionicons name="notifications-outline" size={20} color={C.ink2} />
+              {unreadCount > 0 ? (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+          ) : null}
+          {onOpenSearch ? (
+            <Pressable style={styles.iconBtn} hitSlop={10} onPress={onOpenSearch}>
+              <Ionicons name="search-outline" size={20} color={C.ink2} />
+            </Pressable>
+          ) : null}
+        </View>
+
+        <Text style={styles.title} numberOfLines={1}>
+          {title}
+        </Text>
+
+        <View style={[styles.side, styles.sideRight]}>
           <Pressable
-            style={styles.iconBtn}
-            hitSlop={10}
-            onPress={onOpenNotifications}
+            onPress={() =>
+              void openCoolieWeb().then((opened) => {
+                if (!opened) setWebFallbackOpen(true);
+              })
+            }
+            hitSlop={8}
+            style={({ pressed }) => [styles.webBtn, pressed && styles.webBtnPressed]}
           >
-            <Ionicons name="notifications-outline" size={20} color={C.ink2} />
-            {unreadCount > 0 ? (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>
-                  {unreadCount > 99 ? "99+" : unreadCount}
-                </Text>
-              </View>
-            ) : null}
+            <Text style={styles.webBtnText}>驾驶舱Web</Text>
           </Pressable>
-        ) : null}
-        {onOpenSearch ? (
-          <Pressable style={styles.iconBtn} hitSlop={10} onPress={onOpenSearch}>
-            <Ionicons name="search-outline" size={20} color={C.ink2} />
-          </Pressable>
-        ) : null}
+        </View>
       </View>
 
-      <Text style={styles.title} numberOfLines={1}>
-        {title}
-      </Text>
-
-      <View style={[styles.side, styles.sideRight]}>
-        <Pressable
-          onPress={() => void openCoolieWeb()}
-          hitSlop={8}
-          style={({ pressed }) => [styles.webBtn, pressed && styles.webBtnPressed]}
-        >
-          <Text style={styles.webBtnText}>驾驶舱Web</Text>
-        </Pressable>
-      </View>
-    </View>
+      {/* 没装 Coolie Web 时的兜底: 整屏 webview 加载远端 Coolie Web */}
+      <CoolieWebFallback
+        visible={webFallbackOpen}
+        onClose={() => setWebFallbackOpen(false)}
+      />
+    </>
   );
 }
 
