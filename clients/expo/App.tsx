@@ -16,7 +16,6 @@ import {
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import {
-  isAsrNotConfigured,
   type Approval,
   type Company,
   type Issue,
@@ -47,7 +46,6 @@ import { LoadingState } from "./src/ui/LoadingState";
 import { Pill } from "./src/ui/Pill";
 import { ScreenHeader } from "./src/ui/ScreenHeader";
 import { Sheet } from "./src/ui/Sheet";
-import { useRecorder } from "./src/useRecorder";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
 import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen";
@@ -270,9 +268,7 @@ function TaskComposer({
   priority,
   onPriority,
   busy,
-  recording,
   onSubmit,
-  onVoice,
 }: {
   title: string;
   onTitle: (v: string) => void;
@@ -281,9 +277,7 @@ function TaskComposer({
   priority: IssuePriority;
   onPriority: (p: IssuePriority) => void;
   busy: boolean;
-  recording: boolean;
   onSubmit: () => void;
-  onVoice: () => void;
 }) {
   return (
     <View style={styles.composer}>
@@ -327,19 +321,6 @@ function TaskComposer({
           onPress={onSubmit}
         >
           <Text style={styles.btnPrimaryText}>添加任务</Text>
-        </Pressable>
-        <Pressable
-          style={[
-            styles.btnVoice,
-            recording && styles.btnVoiceRecording,
-            busy && styles.btnDisabled,
-          ]}
-          disabled={busy && !recording}
-          onPress={onVoice}
-        >
-          <Text style={[styles.btnVoiceText, recording && { color: C.err }]}>
-            {recording ? "■ 停止并派发" : "🎤 语音派发"}
-          </Text>
         </Pressable>
       </View>
     </View>
@@ -762,9 +743,8 @@ function HomeScreen({
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<IssuePriority>("medium");
   const [busy, setBusy] = useState(false);
-  /** 递增后让 TasksScreen 重新拉列表 (中央 "+" 浮层或语音在别处建了任务)。 */
+  /** 递增后让 TasksScreen 重新拉列表 (中央 "+" 浮层建了任务)。 */
   const [tasksRefreshToken, setTasksRefreshToken] = useState(0);
-  const { recording, start, stop } = useRecorder();
 
   const companyId = company.id;
 
@@ -800,44 +780,6 @@ function HomeScreen({
       }
     });
   }, [createTask]);
-
-  const voiceDispatch = useCallback(async () => {
-    try {
-      if (!recording) {
-        setBusy(true);
-        try {
-          await start();
-        } finally {
-          setBusy(false);
-        }
-        return;
-      }
-      const { base64, format } = await stop();
-      setBusy(true);
-      const res = await coolie.voiceDispatch({
-        companyId,
-        audioBase64: base64,
-        format,
-      });
-      if (res.issue) {
-        Alert.alert("任务已创建", res.issue.title);
-        // 派发成功即落到工坊聊天流 (wave18): 老板要的是「说完就有活干」。
-        setComposeOpen(false);
-        setTab("chat");
-      } else {
-        Alert.alert("转写结果", res.transcription.text || "(空)");
-      }
-      setTasksRefreshToken((value) => value + 1);
-    } catch (e) {
-      if (isAsrNotConfigured(e)) {
-        Alert.alert("语音未配置", "该实例尚未配置腾讯 ASR 凭据，请改用文字输入。");
-      } else {
-        Alert.alert("语音派发失败", String((e as Error)?.message ?? e));
-      }
-    } finally {
-      setBusy(false);
-    }
-  }, [companyId, recording, start, stop]);
 
   /**
    * Build 进度卡点某环节, 或别的只给出 issueId 的入口: 从任务列表补齐 Issue 再压详情页,
@@ -996,10 +938,6 @@ function HomeScreen({
         unreadCount={unreadCount}
         onOpenNotifications={() => setNotificationsOpen(true)}
         onOpenSearch={() => setSearchOpen(true)}
-        // 语音派发只在任务页出现 (wave18): 顶栏右侧 mic, 复用 wave14 的录音链路。
-        onVoice={tab === "tasks" ? voiceDispatch : undefined}
-        voiceRecording={recording}
-        voiceBusy={busy}
       />
       <View style={styles.shellContent}>
         {tab === "dashboard" ? (
@@ -1149,9 +1087,7 @@ function HomeScreen({
               priority={priority}
               onPriority={setPriority}
               busy={busy}
-              recording={recording}
               onSubmit={submitOverlayTask}
-              onVoice={voiceDispatch}
             />
           </ScrollView>
         </View>
@@ -1494,26 +1430,6 @@ const styles = StyleSheet.create({
     color: C.ink2,
     fontWeight: "500",
     fontSize: 15,
-  },
-  // 语音按钮 (幽灵半透明微调)
-  btnVoice: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    borderColor: C.line,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  btnVoiceRecording: {
-    backgroundColor: "rgba(239, 68, 68, 0.1)",
-    borderColor: "rgba(239, 68, 68, 0.3)",
-  },
-  btnVoiceText: {
-    color: C.ink2,
-    fontWeight: "500",
-    fontSize: 13,
   },
   btnDisabled: {
     opacity: 0.4,

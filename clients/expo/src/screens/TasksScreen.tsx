@@ -22,8 +22,8 @@ import { QuickApprovalCard } from "../components/QuickApprovalCard";
  * 任务页 —— 底部栏第 2 个 tab 的落地屏。
  *
  * 对齐 Coolie Web 的 Tasks 页: 标题「任务」+ 搜索框 + 6 视图任务列表 (IssuesList),
- * 右下角浮起 [+ 新建任务]。语音入口在全局顶栏的 mic (见 AppBar/TasksScreen 的
- * 语音派发), 复用 wave14 的 useRecorder + voiceDispatch 链路。
+ * 右下角浮起 [+ 新建任务]。语音入口只剩工坊会话内长按 mic (BoardChatScreen);
+ * 任务页与全局顶栏上独立的「语音派发」按钮已在 wave22 删除。
  *
  * 顶部另有编排按钮组 [🔨 Build 5 步链] [🛤️ Pipeline] [📋 Plan] (wave20): 把工坊
  * 对话里能触发的三种编排, 在任务页给出直接入口, 不必先学会说触发词。
@@ -45,7 +45,7 @@ export function TasksScreen({
 }: {
   company: Company;
   whoami: string;
-  /** 外层 (中央 "+" / 语音) 建完任务后 +1, 让列表重新拉取 */
+  /** 外层 (中央 "+") 建完任务后 +1, 让列表重新拉取 */
   refreshToken?: number;
   onOpenIssue: (issue: Issue) => void;
   /** Build 进度卡点某环节: 按 issueId 补全 Issue 后压详情, 由外层实现 */
