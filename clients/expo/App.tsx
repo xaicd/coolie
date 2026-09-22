@@ -38,7 +38,7 @@ import {
   type SearchAgentResult,
 } from "./src/coolie";
 import { AppBar } from "./src/components/AppBar";
-import { TabBar } from "./src/components/TabBar";
+import { TabBar, TAB_BAR_HEIGHT } from "./src/components/TabBar";
 import { StatusDot } from "./src/components/StatusDot";
 import { AppCard } from "./src/ui/AppCard";
 import { ErrorRetry } from "./src/ui/ErrorRetry";
@@ -1064,8 +1064,17 @@ function HomeScreen({
         />
       ) : null}
       {/* 底部导航 — 汇览 / 任务 / [+] / 员工 / 收件箱 */}
-      <TabBar tab={tab} onChange={setTab} onCreate={() => setComposeOpen(true)} />
-      {/* 中央 "+" 打开的新建任务屏 (覆盖底部栏) */}
+      <TabBar
+        tab={tab}
+        onChange={(key) => {
+          // 浮层只盖住内容区 (见 composeOverlay 的 bottom: TAB_BAR_HEIGHT), 底栏仍可点:
+          // 点任一 tab 就落回那一页, 不让浮层僵在原地 (boss 22:59 「底部导航呢」)。
+          setComposeOpen(false);
+          setTab(key);
+        }}
+        onCreate={() => setComposeOpen(true)}
+      />
+      {/* 中央 "+" 打开的新建任务屏 (内容区浮层, 让出底部 TabBar) */}
       {composeOpen ? (
         <View style={styles.composeOverlay}>
           <View style={styles.composeHeader}>
@@ -1286,6 +1295,9 @@ const styles = StyleSheet.create({
   settingsSignOutText: { color: C.err, fontSize: 15, fontWeight: "600" },
   composeOverlay: {
     ...StyleSheet.absoluteFillObject,
+    // 让出底部 TabBar: absoluteFill 的 bottom:0 会把 5 个 tab 整个盖住, 底栏就点不到了
+    // (boss 22:59 OOB)。浮层只铺内容区, 底栏保持可见可点。
+    bottom: TAB_BAR_HEIGHT,
     // 绝对定位会忽略 SafeAreaView 的 paddingTop, 不补这一条头部(含关闭 X)会落到
     // Android 状态栏底下 —— 系统吃掉那块触摸, 浮层就关不掉了(实测)。
     paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0,

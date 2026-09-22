@@ -5,6 +5,12 @@ import { C } from "../theme";
 /** 底部 tab bar 的四个落点 + 中央新建 FAB。 */
 export type BarTabKey = "dashboard" | "tasks" | "agents" | "inbox";
 
+/**
+ * 底栏高度。铺满底部的浮层 (新建任务 composeOverlay) 必须让出这一段,
+ * 否则会把汇览/任务/+/员工/收件箱 5 个入口整个盖住 (boss 22:59 OOB)。
+ */
+export const TAB_BAR_HEIGHT = 60;
+
 type Slot = {
   key: BarTabKey;
   label: string;
@@ -99,7 +105,7 @@ const styles = StyleSheet.create({
   bar: {
     flexDirection: "row",
     alignItems: "center",
-    height: 60,
+    height: TAB_BAR_HEIGHT,
     borderTopWidth: 1,
     borderTopColor: C.lineSubtle,
     backgroundColor: C.panel,
