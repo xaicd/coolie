@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  BackHandler,
   Linking,
   Pressable,
   SafeAreaView,
@@ -797,25 +798,53 @@ function HomeScreen({
   }, []);
 
   /**
-   * 左缘右滑的落点: 从最上层的浮层/详情开始逐层退, 退到最后才回上一个 tab。
+   * 左缘右滑 / 系统返回键 的落点: 从最上层的浮层/详情开始逐层退, 退到最后才回上一个 tab。
    * 顺序 = 堆叠顺序 (composeOverlay zIndex 110 > 设置抽屉 100 > 详情页整屏)。
-   * 任何一层都没有时 `goBackTab` 在历史为空的情况下是 no-op —— 所以 root 页
-   * (汇览) 上滑到底也不会退 App。
+   *
+   * 返回 true = 事件已被 App 消化 (确实退了一层); false = 已经在最外层 (汇览 root),
+   * 没有可退的层。调用方据此决定是「吃掉事件」还是「交回系统」—— 见 backHandler。
    */
-  const swipeBack = () => {
-    if (sandboxContext) return setSandboxContext(null);
-    if (diffContext) return setDiffContext(null);
-    if (focusedApprovalId) return setFocusedApprovalId(null);
-    if (searchOpen) return setSearchOpen(false);
-    if (notificationsOpen) return setNotificationsOpen(false);
-    if (agentDetail) return setAgentDetail(null);
-    if (pipelinesOpen) return setPipelinesOpen(false);
-    if (plansOpen) return setPlansOpen(false);
-    if (selected) return setSelected(null);
-    if (composeOpen) return setComposeOpen(false);
-    if (settingsOpen) return setSettingsOpen(false);
-    goBackTab();
+  const swipeBack = (): boolean => {
+    if (sandboxContext) return setSandboxContext(null), true;
+    if (diffContext) return setDiffContext(null), true;
+    if (focusedApprovalId) return setFocusedApprovalId(null), true;
+    if (searchOpen) return setSearchOpen(false), true;
+    if (notificationsOpen) return setNotificationsOpen(false), true;
+    if (agentDetail) return setAgentDetail(null), true;
+    if (pipelinesOpen) return setPipelinesOpen(false), true;
+    if (plansOpen) return setPlansOpen(false), true;
+    if (selected) return setSelected(null), true;
+    if (composeOpen) return setComposeOpen(false), true;
+    if (settingsOpen) return setSettingsOpen(false), true;
+    if (tabHistoryRef.current.length > 0) return goBackTab(), true;
+    return false;
   };
+
+  // 系统返回键 (三键导航的返回键, 以及**手势导航下从屏幕左/右缘向内滑**触发的返回)
+  // 也走同一套落点。这是老板「手机左边长按右滑不能直接退出 app」在**手势导航**机器上
+  // 的真正修法: 手势导航时左缘内滑是系统手势, 会被 Android 的 EdgeBackGestureHandler
+  // 先吃掉, JS 层的 PanResponder 根本收不到 (实测: 直接退回桌面)。所以必须同时由
+  // BackHandler 接住系统返回, 把它映射成 App 内返回。
+  //
+  // 到了最外层 (汇览 root) 不直接退出: 第一次只给 toast, 2s 内再按一次才真的退出
+  // (Android 常规的「再按一次退出」手势)。既满足「滑一下不会掉出 App」, 也不把用户关在
+  // App 里出不来。
+  const swipeBackRef = useRef(swipeBack);
+  swipeBackRef.current = swipeBack;
+  const lastRootBackAtRef = useRef(0);
+  useEffect(() => {
+    const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
+      if (swipeBackRef.current()) return true;
+      const now = Date.now();
+      if (now - lastRootBackAtRef.current < 2000) return false;
+      lastRootBackAtRef.current = now;
+      if (Platform.OS === "android") {
+        ToastAndroid.show("再按一次返回键退出 Coolie工坊", ToastAndroid.SHORT);
+      }
+      return true;
+    });
+    return () => subscription.remove();
+  }, []);
 
   let content: React.ReactNode;
   if (sandboxContext) {
