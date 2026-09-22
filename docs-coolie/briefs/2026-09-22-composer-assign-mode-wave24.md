@@ -1,12 +1,12 @@
-# Brief: wave 24 — 新建任务 composer 跟 Coolie Web NewIssueDialog 同款 (Assign + Mode)
+# Brief: wave 24 — 新建任务 composer 增强 (拿 Coolie Web NewIssueDialog 存量复用)
 
 Repo: `~/workspace/xaicd/coolie` (main)
 PM: Hermes
 Worker: cmd
 
-## 0. Boss 09-22 00:10 OOB 「新增任务这个页面还是不如外边之前的那个好，它那个里面还可以 assign 分配和那个选择那个那个模式」
+## 0. Boss 09-22 00:10 OOB 「新增任务这个页面还是不如外边之前的那个好，它那个里面还可以 assign 分配和那个选择那个那个模式」+ 23:11 OOB 「我需要的是你把人家那个存量的东西拿过来增强一下，而不是完全从零开始」
 
-老板要求 Coolie工坊 App 新建任务浮层跟 Coolie Web 同款 — 加 Assign (指派人) + Work Mode (执行模式) 字段.
+老板要求 Coolie工坊 App 新建任务浮层跟 Coolie Web 同款 — 加 Assign (指派人) + Work Mode (执行模式) 字段. **不要从零写 RN 适配版, 直接复用 Coolie Web 上游 NewIssueDialog 存量代码**.
 
 ## 1. 已知现状 (PM 09-22 真查)
 
@@ -33,7 +33,14 @@ Coolie Web NewIssueDialog (上游 ui/src/components/NewIssueDialog.tsx):
 
 ## 2. 目标
 
-**Coolie工坊 0.5.13 App** 新建任务 composer 补齐:
+**Coolie工坊 0.5.13 App** 用 *direct reuse + enhancement* 模式: 把 Coolie Web 上游 NewIssueDialog 现有逻辑作为参考, 不重写代码, 但补齐 App 端缺字段.
+
+**核心原则 (boss 09-22 23:11 OOB "把人家那个存量的东西拿过来增强一下")**:
+
+- **DON'T 重发明 NewIssueDialog 的逻辑** — 调上游同一 API 端点 (POST /api/issues) 即可
+- **DO 复用上游的 API client** (`@paperclipai/api-client` 跨 RN/React-DOM 可用)
+- **DO 复用上游 type/常量** (`IssueWorkMode` 枚举, `priorityColor`, etc.)
+- **DON'T 复制 React-DOM JSX 过来** — 那跑不动, 必须 RN 适配
 
 ```
 ┌──────────────────────────────────────┐
