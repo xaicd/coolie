@@ -40,10 +40,14 @@ export interface AgentRoleTemplate {
   title: string;
   /** Short label from AGENT_ROLE_LABELS. */
   label: string;
-  /** Which CLI the employee runs (mirrors workspace-skel/cli/<role>.sh). */
-  cli: string;
-  /** Primary model the employee runs on. */
-  model: string;
+  /** Which CLI(s) the employee can run (mirrors workspace-skel/cli/<role>.sh). */
+  cli: string | string[];
+  /** Model(s) the employee can run on. */
+  model: string | string[];
+  /** Which of `cli` the employee prefers when several are installed. */
+  defaultProvider?: string;
+  /** Providers this employee can be dispatched to (adapter capability set). */
+  providerCapabilities?: string[];
   /** Backup CLI/model when the primary is unavailable. */
   backup: { cli: string; model: string };
   /** The role skill preloaded into the employee's workspace. */

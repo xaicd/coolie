@@ -9,11 +9,17 @@
 /** Palantir 五角色 id。 */
 export type CompanyTemplateRole = "fda" | "core-swe" | "pre-sre" | "fdse" | "ds";
 
-/** 模板中一个角色的默认绑定（cli / 模型 / 角色 skill）。 */
+/** 模板中一个角色的默认绑定（cli / 模型 / provider / 角色 skill）。 */
 export interface CompanyTemplateRoleBinding {
   role: CompanyTemplateRole;
-  cli: string;
-  model: string;
+  /** 可用的 CLI；单值或按优先级排列的多值。 */
+  cli: string | string[];
+  /** 可用的模型；单值或按优先级排列的多值。 */
+  model: string | string[];
+  /** 多个 cli 都装上时，默认派单给哪个。 */
+  defaultProvider?: string;
+  /** 该角色可被派单到的 provider 集合。 */
+  providerCapabilities?: string[];
   skillRef: string;
 }
 
