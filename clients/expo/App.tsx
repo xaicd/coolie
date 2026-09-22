@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
@@ -39,6 +39,7 @@ import {
   type SearchAgentResult,
 } from "./src/coolie";
 import { AppBar } from "./src/components/AppBar";
+import { EdgeSwipeBack } from "./src/components/EdgeSwipeBack";
 import { TabBar, TAB_BAR_HEIGHT } from "./src/components/TabBar";
 import { StatusDot } from "./src/components/StatusDot";
 import { ComposeScreen } from "./src/screens/ComposeScreen";
@@ -644,7 +645,7 @@ function HomeScreen({
         return;
       }
       if (route === "chat") {
-        setTab("chat");
+        navigateTab("chat");
         if (rest[0] === "build") {
           const title = decodeURIComponent(rest.slice(1).join("/")).trim();
           exportBoardPrompt(title ? `build ${title}` : "build 一个演示项目");
@@ -730,7 +731,7 @@ function HomeScreen({
     void createTask().then((ok) => {
       if (ok) {
         setComposeOpen(false);
-        setTab("tasks");
+        navigateTab("tasks");
       }
     });
   }, [createTask]);
@@ -761,7 +762,7 @@ function HomeScreen({
         const issues = await coolie.listIssues(companyId, { limit: 200 });
         const found = issues.find((issue) => issue.id === issueId);
         if (found) {
-          setTab("tasks");
+          navigateTab("tasks");
           setSelected(found);
         }
       } catch {
@@ -771,8 +772,54 @@ function HomeScreen({
     [companyId],
   );
 
+  /**
+   * Tab 级「上一页」—— 底栏 5 项之间也记一层历史, 这样在非 root 的 tab
+   * (任务/员工/收件箱) 上左缘右滑是**回到上一个看过的 tab**, 而不是退出 App。
+   * 用 ref 承载栈 (不是 state): 手势命中的是「此刻」, 不需要为它重渲染。
+   */
+  const tabRef = useRef<TabKey>(tab);
+  tabRef.current = tab;
+  const tabHistoryRef = useRef<TabKey[]>([]);
+  const navigateTab = useCallback((key: TabKey) => {
+    const current = tabRef.current;
+    if (key === current) return;
+    tabHistoryRef.current.push(current);
+    tabRef.current = key;
+    setTab(key);
+  }, []);
+  /** 退到上一个 tab; 历史为空时什么都不做 —— 绝不退出 App。 */
+  const goBackTab = useCallback(() => {
+    const previous = tabHistoryRef.current.pop();
+    if (previous !== undefined) {
+      tabRef.current = previous;
+      setTab(previous);
+    }
+  }, []);
+
+  /**
+   * 左缘右滑的落点: 从最上层的浮层/详情开始逐层退, 退到最后才回上一个 tab。
+   * 顺序 = 堆叠顺序 (composeOverlay zIndex 110 > 设置抽屉 100 > 详情页整屏)。
+   * 任何一层都没有时 `goBackTab` 在历史为空的情况下是 no-op —— 所以 root 页
+   * (汇览) 上滑到底也不会退 App。
+   */
+  const swipeBack = () => {
+    if (sandboxContext) return setSandboxContext(null);
+    if (diffContext) return setDiffContext(null);
+    if (focusedApprovalId) return setFocusedApprovalId(null);
+    if (searchOpen) return setSearchOpen(false);
+    if (notificationsOpen) return setNotificationsOpen(false);
+    if (agentDetail) return setAgentDetail(null);
+    if (pipelinesOpen) return setPipelinesOpen(false);
+    if (plansOpen) return setPlansOpen(false);
+    if (selected) return setSelected(null);
+    if (composeOpen) return setComposeOpen(false);
+    if (settingsOpen) return setSettingsOpen(false);
+    goBackTab();
+  };
+
+  let content: React.ReactNode;
   if (sandboxContext) {
-    return (
+    content = (
       <PrototypeSandboxScreen
         company={company}
         initialUrl={sandboxContext.url}
@@ -781,10 +828,8 @@ function HomeScreen({
         onBack={() => setSandboxContext(null)}
       />
     );
-  }
-
-  if (diffContext) {
-    return (
+  } else if (diffContext) {
+    content = (
       <CodeDiffScreen
         company={company}
         issue={diffContext.issue}
@@ -792,26 +837,22 @@ function HomeScreen({
         onBack={() => setDiffContext(null)}
       />
     );
-  }
-
-  if (focusedApprovalId) {
-    return (
+  } else if (focusedApprovalId) {
+    content = (
       <ApprovalFocusDetail
         companyId={companyId}
         approvalId={focusedApprovalId}
         onBack={() => setFocusedApprovalId(null)}
       />
     );
-  }
-
-  if (searchOpen) {
-    return (
+  } else if (searchOpen) {
+    content = (
       <SearchScreen
         company={company}
         onBack={() => setSearchOpen(false)}
         onOpenIssue={(issueItem) => {
           setSearchOpen(false);
-          setTab("tasks");
+          navigateTab("tasks");
           setSelected(issueItem);
         }}
         onOpenAgent={(agent: SearchAgentResult) => {
@@ -820,16 +861,14 @@ function HomeScreen({
         }}
       />
     );
-  }
-
-  if (notificationsOpen) {
-    return (
+  } else if (notificationsOpen) {
+    content = (
       <NotificationsScreen
         company={company}
         onBack={() => setNotificationsOpen(false)}
         onOpenIssue={(issueItem) => {
           setNotificationsOpen(false);
-          setTab("tasks");
+          navigateTab("tasks");
           setSelected(issueItem);
         }}
         onOpenApproval={(approvalId) => {
@@ -838,43 +877,35 @@ function HomeScreen({
         }}
       />
     );
-  }
-
-  if (agentDetail) {
-    return (
+  } else if (agentDetail) {
+    content = (
       <AgentDetailScreen
         company={company}
         agent={agentDetail}
         onBack={() => setAgentDetail(null)}
         onOpenIssue={(issueItem) => {
           setAgentDetail(null);
-          setTab("tasks");
+          navigateTab("tasks");
           setSelected(issueItem);
         }}
       />
     );
-  }
-
-  if (pipelinesOpen) {
-    return <PipelinesScreen company={company} onBack={() => setPipelinesOpen(false)} />;
-  }
-
-  if (plansOpen) {
-    return (
+  } else if (pipelinesOpen) {
+    content = <PipelinesScreen company={company} onBack={() => setPipelinesOpen(false)} />;
+  } else if (plansOpen) {
+    content = (
       <PlansScreen
         company={company}
         onBack={() => setPlansOpen(false)}
         onOpenPlan={(issue) => {
           setPlansOpen(false);
-          setTab("tasks");
+          navigateTab("tasks");
           setSelected(issue);
         }}
       />
     );
-  }
-
-  if (selected) {
-    return (
+  } else if (selected) {
+    content = (
       <TaskDetailScreen
         issue={selected}
         company={company}
@@ -897,9 +928,8 @@ function HomeScreen({
         }}
       />
     );
-  }
-
-  return (
+  } else {
+    content = (
     <SafeAreaView style={[styles.shell, { paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
       <StatusBar style="light" />
       {/* 全局顶栏 — 对齐 Coolie Web 的 appBar: 居中标题 + 右侧 [驾驶舱Web] 深链 */}
@@ -922,13 +952,13 @@ function HomeScreen({
               setDiffContext(null);
               setSandboxContext(null);
               setFocusedApprovalId(null);
-              setTab("tasks");
+              navigateTab("tasks");
             }}
             onOpenApproval={(approvalId) => {
               // 审计 bug 1: 审批行自带 Pressable,会抢占手势响应,父卡片的 onPress 不会触发,
               // 所以行内点击原先从不切 tab —— 从审批详情返回时退回汇览页(tab 仍是 dashboard)。
               // 与下面 agents/chat 的 onOpenIssue 保持一致:先切 tab 再压入详情。
-              setTab("tasks");
+              navigateTab("tasks");
               setFocusedApprovalId(approvalId);
             }}
           />
@@ -937,7 +967,7 @@ function HomeScreen({
             company={company}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenIssue={(issue) => {
-              setTab("tasks");
+              navigateTab("tasks");
               setSelected(issue);
             }}
           />
@@ -949,7 +979,7 @@ function HomeScreen({
             onOpenWorkspace={() => setWorkspaceOpen(true)}
             onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
             onOpenIssue={(issue) => {
-              setTab("tasks");
+              navigateTab("tasks");
               setSelected(issue);
             }}
             // wave19: 「建 pipeline xxx」建好后跳 Coolie Web 的 pipeline 编辑器
@@ -963,7 +993,7 @@ function HomeScreen({
             }}
             // 「plan xxx」建出的是一条 plan 任务, 跳任务详情即可。
             onOpenPlan={(issue) => {
-              setTab("tasks");
+              navigateTab("tasks");
               setSelected(issue);
             }}
           />
@@ -972,7 +1002,7 @@ function HomeScreen({
             company={company}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenIssue={(issue) => {
-              setTab("tasks");
+              navigateTab("tasks");
               setSelected(issue);
             }}
             onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
@@ -998,9 +1028,9 @@ function HomeScreen({
             onOpenIssue={setSelected}
             onOpenBuildIssue={(issueId) => void openIssueById(issueId)}
             onOpenSettings={() => setSettingsOpen(true)}
-            onOpenWorkshop={() => setTab("chat")}
-            onOpenOntology={() => setTab("ontology")}
-            onOpenArtifacts={() => setTab("artifacts")}
+            onOpenWorkshop={() => navigateTab("chat")}
+            onOpenOntology={() => navigateTab("ontology")}
+            onOpenArtifacts={() => navigateTab("artifacts")}
             onOpenPipelines={() => setPipelinesOpen(true)}
             onOpenPlans={() => setPlansOpen(true)}
           />
@@ -1024,7 +1054,7 @@ function HomeScreen({
           onClose={() => setWorkspaceOpen(false)}
           onOpenIssue={(issue) => {
             setWorkspaceOpen(false);
-            setTab("tasks");
+            navigateTab("tasks");
             setSelected(issue);
           }}
           onOpenApproval={(approvalId) => {
@@ -1040,13 +1070,13 @@ function HomeScreen({
           // 浮层只盖住内容区 (见 composeOverlay 的 bottom: TAB_BAR_HEIGHT), 底栏仍可点:
           // 点任一 tab 就落回那一页, 不让浮层僵在原地 (boss 22:59 「底部导航呢」)。
           setComposeOpen(false);
-          setTab(key);
+          navigateTab(key);
         }}
         onCreate={() => setComposeOpen(true)}
       />
       {/* 中央 "+" 打开的新建任务屏 (内容区浮层, 让出底部 TabBar) */}
       {composeOpen ? (
-        <View style={styles.composeOverlay}>
+        <EdgeSwipeBack style={styles.composeOverlay} onBack={() => setComposeOpen(false)}>
           <ComposeScreen
             companyId={companyId}
             title={title}
@@ -1061,10 +1091,14 @@ function HomeScreen({
             onSubmit={submitOverlayTask}
             onDiscard={discardOverlayDraft}
           />
-        </View>
+        </EdgeSwipeBack>
       ) : null}
     </SafeAreaView>
-  );
+    );
+  }
+
+  // 左缘右滑的顶层包裹: 所有路由 (详情/浮层/tab) 都在它里面, 由 swipeBack 决定退到哪。
+  return <EdgeSwipeBack onBack={swipeBack}>{content}</EdgeSwipeBack>;
 }
 
 function approvalLabel(approval: Approval): string {
