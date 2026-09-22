@@ -1,7 +1,8 @@
 import express from "express";
 import { EventEmitter } from "node:events";
+import type { Server } from "node:http";
 import request from "supertest";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mockGetExperimental = vi.hoisted(() => vi.fn());
 const mockIssueService = vi.hoisted(() => ({
@@ -155,6 +156,141 @@ describe("board-chat client disconnect", () => {
     fakeProc.exitCode = 143;
     fakeProc.emit("close", 143);
     await pending;
+  });
+});
+
+describe("board-chat failure surfacing", () => {
+  const servers: Server[] = [];
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(async () => {
+    await Promise.all(
+      servers.splice(0).map(
+        (s) =>
+          new Promise<void>((done) => {
+            s.closeIdleConnections();
+            s.close(() => done());
+          }),
+      ),
+    );
+  });
+
+  function makeFakeProc() {
+    const proc = new EventEmitter() as any;
+    proc.stdout = new EventEmitter();
+    proc.stderr = new EventEmitter();
+    proc.stdin = { write: vi.fn(), end: vi.fn() };
+    proc.exitCode = null;
+    proc.killed = false;
+    proc.kill = vi.fn(() => {
+      proc.killed = true;
+    });
+    return proc;
+  }
+
+  /**
+   * Start the request against a real HTTP listener and return the promise for
+   * the finished SSE body. supertest buffers unknown content types and never
+   * settles on `text/event-stream`, so the streaming cases go through `fetch`.
+   */
+  async function startChat(proc: any) {
+    mockGetExperimental.mockResolvedValue({ enableConferenceRoomChat: true });
+    mockIssueService.list.mockResolvedValue([
+      { id: "issue-1", title: "Board Operations", status: "todo" },
+    ]);
+    mockIssueService.addComment.mockResolvedValue({ id: "comment-1" });
+    mockIssueService.listComments.mockResolvedValue([]);
+    mockSpawn.mockReturnValue(proc);
+    const app = await createApp();
+
+    const server = app.listen(0);
+    servers.push(server);
+    await new Promise<void>((done) => server.once("listening", () => done()));
+    const { port } = server.address() as { port: number };
+
+    // Await the response headers before emitting on the fake process: the route
+    // flushes them before spawning, so this guarantees the `close` listener is
+    // registered by the time the test drives the subprocess.
+    const response = await fetch(
+      `http://127.0.0.1:${port}/api/board/chat/stream`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ companyId: "company-1", message: "ping" }),
+      },
+    );
+    await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalled());
+    return { pending: response.text() };
+  }
+
+  it("emits an error event + persists a comment when hermes exits non-zero with no output", async () => {
+    const proc = makeFakeProc();
+    const { pending } = await startChat(proc);
+
+    // hermes 429: the terminal error line lands on stdout (now that
+    // stripCliNoise no longer swallows `API call failed`); stderr has only the
+    // session id.
+    proc.stdout.emit(
+      "data",
+      Buffer.from(
+        "API call failed after 3 retries: HTTP 429: 您已达到每周/每月使用上限\n",
+      ),
+    );
+    proc.stderr.emit("data", Buffer.from("session_id: 20260923_014402_4b299d\n"));
+    proc.exitCode = 1;
+    proc.emit("close", 1);
+
+    const text = await pending;
+
+    expect(text).toContain('"type":"error"');
+    expect(text).not.toContain('"type":"done"');
+    // The boss-visible reason must survive the round trip.
+    expect(text).toContain("HTTP 429");
+
+    const errorCall = mockIssueService.addComment.mock.calls.find((call: any[]) =>
+      String(call[1]).includes("[hermes-error]"),
+    );
+    expect(errorCall).toBeTruthy();
+    expect(errorCall?.[2]).toEqual({ userId: "board-concierge" });
+    // No authorType override: `addComment` requires it to match the actor, so
+    // forcing "system" for a userId actor throws and nothing is persisted.
+    expect(errorCall?.[3]).toBeUndefined();
+  });
+
+  it("emits an error event when hermes exits 0 but answers with nothing", async () => {
+    const proc = makeFakeProc();
+    const { pending } = await startChat(proc);
+
+    proc.exitCode = 0;
+    proc.emit("close", 0);
+
+    const text = await pending;
+
+    expect(text).toContain('"type":"error"');
+    expect(text).not.toContain('"type":"done"');
+  });
+
+  it("emits done and persists the reply on a successful run", async () => {
+    const proc = makeFakeProc();
+    const { pending } = await startChat(proc);
+
+    proc.stdout.emit("data", Buffer.from("Hello, boss.\n"));
+    proc.exitCode = 0;
+    proc.emit("close", 0);
+
+    const text = await pending;
+
+    expect(text).toContain('"type":"done"');
+    expect(text).not.toContain('"type":"error"');
+
+    const replyCall = mockIssueService.addComment.mock.calls.find((call: any[]) =>
+      String(call[1]).includes("Hello, boss."),
+    );
+    expect(replyCall).toBeTruthy();
+    expect(replyCall?.[2]).toEqual({ userId: "board-concierge" });
   });
 });
 

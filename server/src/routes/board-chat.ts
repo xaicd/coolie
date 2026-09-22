@@ -29,6 +29,11 @@ function stripCliNoise(line: string): string {
   const noAnsi = line.replace(/\u001b\[[0-9;?]*[A-Za-z]/g, "").replace(/\r/g, "");
   const trimmed = noAnsi.trim();
   if (!trimmed) return "";
+  // CLI chrome only. `API call failed ...` is deliberately NOT here: it is the
+  // terminal error line (e.g. `HTTP 429: 您已达到每周/每月使用上限`), and dropping
+  // it is what made a quota failure render as a blank room. It must reach the
+  // client, where the `close` handler turns an empty/erroring run into a
+  // visible error event.
   const NOISE = [
     /^Query:\s/,
     /^Initializing agent/,
@@ -41,7 +46,6 @@ function stripCliNoise(line: string): string {
     /^Provider:\s/,
     /^Tokens:\s/,
     /^Rate limited/,
-    /^API call failed/,
     /^Auxiliary title generation failed/,
     /^[─═━\-_=]{4,}$/,
   ];
@@ -294,6 +298,10 @@ export function boardChatRoutes(
     let fullResponse = "";
     let streamedViaDelta = false;
     let killed = false;
+    // Tail of the CLI's stderr. hermes prints `session_id:` here and, when the
+    // run dies early, sometimes the reason too; kept for the failure message
+    // below. Capped so a chatty subprocess can't grow it without bound.
+    let stderrBuf = "";
 
     // 120s timeout — board conversations can involve multiple API calls.
     const timeout = setTimeout(() => {
@@ -386,32 +394,79 @@ export function boardChatRoutes(
     });
 
     proc.stderr.on("data", (data: Buffer) => {
-      console.error("[board/chat/stream stderr]", data.toString());
+      const text = data.toString();
+      // Keep the tail: the terminal error line is the last thing written.
+      stderrBuf = (stderrBuf + text).slice(-4000);
+      console.error("[board/chat/stream stderr]", text);
     });
 
     proc.on("close", async (exitCode) => {
       clearTimeout(timeout);
       releaseSlot();
 
-      // Persist the board's reply under the "board-concierge" sentinel so the
-      // UI renders it as an assistant bubble (see BoardChat `isUser` check).
-      // The sentinel is not a real `user` table row, so pass authorType
-      // "system" — `addComment` derives "user" from actor.userId otherwise,
-      // and the FK-validating insert would fail (swallowed by the catch,
-      // leaving the reply streamed but never persisted → empty room on
-      // reload).
       const cleanedResponse = stripActionSignals(fullResponse);
-      if (cleanedResponse) {
+
+      // A run that exits non-zero, or answers with nothing, is a failure the
+      // room has to see. The relay used to emit `done` regardless, so a
+      // quota-exhausted key (HTTP 429, code 1310) or a bad credential looked
+      // like an empty reply: zero chunks, no explanation, and — because the
+      // reply was empty — not even a persisted comment. Surface it on both
+      // channels instead: an `error` event for the live room, and a
+      // board-concierge comment so a reload still shows what happened.
+      const failed = (exitCode ?? 0) !== 0 || !cleanedResponse.trim();
+
+      if (failed) {
+        // Prefer stdout (the CLI writes its terminal error line there) and fall
+        // back to stderr, then to a bare exit description.
+        const detail = (
+          cleanedResponse.trim() ||
+          stderrBuf.trim() ||
+          `hermes exited ${exitCode ?? "?"} with no output`
+        ).slice(0, 1000);
+        const message = killed
+          ? `Board assistant timed out after 120s. ${detail}`
+          : `Board assistant failed (exit ${exitCode ?? "?"}). ${detail}`;
+
         try {
           await issueSvc.addComment(
             resolvedIssueId,
-            cleanedResponse,
+            `[hermes-error] ${message}`,
             { userId: "board-concierge" },
-            { authorType: "system" },
           );
         } catch (e) {
-          console.error("[board-chat] failed to persist concierge reply:", e);
+          console.error("[board-chat] failed to persist concierge error:", e);
         }
+
+        if (res.writable) {
+          res.write(
+            `data: ${JSON.stringify({
+              type: "error",
+              message,
+              exitCode: exitCode ?? 0,
+              timedOut: killed,
+            })}\n\n`,
+          );
+          res.end();
+        }
+        return;
+      }
+
+      // Persist the board's reply under the "board-concierge" sentinel so the
+      // UI renders it as an assistant bubble (see BoardChat `isUser` check).
+      // The sentinel is not a real user row — and does not need to be: the
+      // column is a plain `text` with no FK. Do NOT force `authorType:
+      // "system"` here: `addComment` requires the authorType to match the
+      // actor, so a `userId` actor must stay "user", and the override threw
+      // `Comment authorType must match authenticated actor` — the reason every
+      // concierge reply streamed but was silently never persisted.
+      try {
+        await issueSvc.addComment(
+          resolvedIssueId,
+          cleanedResponse,
+          { userId: "board-concierge" },
+        );
+      } catch (e) {
+        console.error("[board-chat] failed to persist concierge reply:", e);
       }
 
       if (res.writable) {
