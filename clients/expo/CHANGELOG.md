@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.18
+
+> Released: 2026-09-22 · Android release APK
+
+### 更新
+
+- App 打字后点其他按钮不再被吞: 全部 ScrollView 补 keyboardShouldPersistTaps=handled (login/register/composer/各列表页)
+
+---
+
 ## v0.5.17
 
 > Released: 2026-09-22 · Android release APK
