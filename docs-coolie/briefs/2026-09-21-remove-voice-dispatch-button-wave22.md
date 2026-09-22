@@ -70,8 +70,24 @@ const [showVoiceDispatch, setShowVoiceDispatch] = useState(false);
    - 还能看到编排按钮组 [🔨 Build 5 步链] [🛤️ Pipeline] [📋 Plan]
 4. 进 BoardChatScreen:
    - chat input 旁长按 mic 还在 ✅
-5. 截图 /tmp/emu-evidence/wave22-0.5.12/
+5. 进 [+] 中央 FAB → 新建任务浮层打开:
+   - 浮层下边让出 TabBar 高度 (约 60-80px)
+   - **底部 5 tab 仍可见** (汇览/任务/+/员工/收件箱) ✅
+   - 浮层不覆盖 TabBar
+6. 截图 /tmp/emu-evidence/wave22-0.5.12/
 ```
+
+## 4.b 新增需求 (boss 22:59 OOB 「底部导航呢」)
+
+老板 OOB 反馈: 新建任务浮层打开时看不到底部 5 tab (汇览/任务/+/员工/收件箱).
+
+**修法**: 浮层下边让出 TabBar 高度 (约 60-80px, 或用 SafeAreaView), 或浮层打开时让 TabBar 仍可见但禁用.
+
+两种方案选一:
+- A) composeOverlay 用 flex:1 + paddingBottom = TAB_HEIGHT (让出底部)
+- B) composeOverlay 不全屏 (top 50%, bottom 留 TabBar 高度)
+
+PM 建议 A (简单, 让出 60-80px 即可). 门神选一个干.
 
 ## 5. Constraints
 
