@@ -231,6 +231,37 @@ const I18N_PATCH: Record<string, string> = {
   "Trust policy": "信任策略",
   "Markdown editor": "Markdown 编辑器",
 
+  // —— New task 弹窗: 复核/审批/看守 + 模型选项 + 执行工作区 (wave26) ——
+  // 与 NewIssueDialog 的字段 label 一一对应, 补的是 wave25 之前没覆盖的那批。
+  // 仍然是「整段文本全等」替换: 这里只收**多词或语义唯一**的句子, 不收裸
+  // "Default" / "Low" / "Model" 这类短词 —— 它们会在设置页和其它表单里误命中。
+  "Task title": "任务标题",
+  "Add description...": "添加描述…",
+  "Create Task": "创建任务",
+  "Create Sub-Task": "创建子任务",
+  "Creating...": "创建中…",
+  "Failed to create task. Try again.": "创建任务失败, 请重试。",
+  Reviewer: "复核人",
+  "No reviewer": "不设复核人",
+  Approver: "审批人",
+  "No approver": "不设审批人",
+  Watchdog: "看守",
+  "Set watchdog": "设置看守",
+  "No watchdog agent": "不设看守",
+  "Watchdog agent": "看守智能体",
+  "What should the watchdog watch for and how should it keep work moving?":
+    "看守该盯什么、该怎么推动工作继续?",
+  "Model lane": "模型通道",
+  "Claude options": "Claude 选项",
+  "Codex options": "Codex 选项",
+  "OpenCode options": "OpenCode 选项",
+  "Agent options": "智能体选项",
+  "Execution workspace": "执行工作区",
+  "Project default": "项目默认",
+  "New isolated workspace": "新建隔离工作区",
+  "Reuse existing workspace": "复用已有工作区",
+  "Sub-task of": "子任务于",
+
   // —— 工作区 / 密钥 ——
   Workspaces: "工作区",
   "No workspace activity yet.": "暂无工作区活动。",

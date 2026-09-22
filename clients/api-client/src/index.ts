@@ -15,6 +15,37 @@ export {
 } from "./work-modes";
 export type { IssueWorkMode, WorkModeMeta } from "./work-modes";
 export {
+  assigneeValueFromSelection,
+  currentUserAssigneeOption,
+  isAgentTaskTarget,
+  parseAssigneeValue,
+} from "./assignees";
+export type { AssigneeOption, AssigneeSelection } from "./assignees";
+export {
+  ISSUE_OVERRIDE_ADAPTER_TYPES,
+  buildAssigneeAdapterOverrides,
+} from "./issue-assignee-overrides";
+export type { BuildAssigneeAdapterOverridesInput, IssueModelLane } from "./issue-assignee-overrides";
+export {
+  buildExecutionPolicy,
+  principalFromSelectionValue,
+  selectionValueFromPrincipal,
+} from "./issue-execution-policy";
+export type {
+  IssueExecutionPolicy,
+  IssueExecutionStage,
+  IssueExecutionStageParticipant,
+  IssueExecutionStagePrincipal,
+  IssueExecutionStageType,
+} from "./issue-execution-policy";
+export {
+  EXECUTION_WORKSPACE_MODES,
+  ISSUE_THINKING_EFFORT_OPTIONS,
+  assigneeOptionsTitleFor,
+  thinkingEffortOptionsFor,
+} from "./issue-composer-options";
+export type { ComposerOption, ProjectExecutionWorkspacePolicy } from "./issue-composer-options";
+export {
   DEFAULT_TRUST_PRESET,
   LOW_TRUST_REVIEW_PRESET,
   TRUST_PRESETS,
@@ -24,6 +55,7 @@ export {
 } from "./trust";
 export type { TrustPreset } from "./trust";
 export type {
+  AdapterModel,
   IssuePriority,
   IssueStatus,
   Agent,

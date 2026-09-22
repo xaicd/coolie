@@ -125,6 +125,48 @@ i18n 字典加 20+ 条 (跟 NewIssueDialog 字段 label 一一对应).
 
 bump 0.5.13 → 0.5.14 (wave25 续如果完不成, 用这个新版)
 
+### 3.5 加语音按钮 (boss 09-22 23:00 OOB 「这个页面的样子加语音按钮」)
+
+老板 OOB 明确: 这个 NewIssueDialog 1:1 抄过来 + 加语音按钮.
+
+**复用 wave21 长按 mic 入 input 模式** (mode=transcribe-only, 不创建任务, 只入 input).
+
+在 composer 顶部 (Description textarea 下方 或 Title 旁) 加 1 个 mic Pressable:
+
+```tsx
+// 复用 wave21 useRecorder + voiceDispatch 链路
+const { recording, start, stop } = useRecorder();
+
+// 加 mic 按钮在 Description 下方, status/Upload/Auto mode/⋯ 上方
+<View style={styles.voiceRow}>
+  <Pressable
+    onPressIn={start}
+    onPressOut={async () => {
+      const { base64, format } = await stop();
+      const res = await fetch('/api/multimodal/transcriptions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Origin': 'https://xrobinai.cn' },
+        body: JSON.stringify({ audio: base64, format, mode: 'transcribe-only' })
+      });
+      const { text } = await res.json();
+      if (text) {
+        setTitle(prev => prev ? `${prev} ${text}` : text);
+        // 或: setDescription(prev => prev ? `${prev}\n${text}` : text);
+        toast.show('🎤 已转写: ' + text);
+      } else {
+        toast.show('🎤 没听清, 请再说一次');
+      }
+    }}
+    style={[styles.voiceBtn, recording && styles.voiceBtnActive]}
+  >
+    <Text style={styles.voiceEmoji}>{recording ? '🔴' : '🎤'}</Text>
+    <Text style={styles.voiceLabel}>{recording ? '正在录音…松开发送' : '语音输入'}</Text>
+  </Pressable>
+</View>
+```
+
+PM 决策: 录到的文字入 **title** (默认) 而不是 description — 因为老板长按 mic 一般是 "一句话" 当 task title, 不像 description.
+
 ## 4. 模拟器验证
 
 ```bash

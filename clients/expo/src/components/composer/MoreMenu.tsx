@@ -5,7 +5,7 @@ import { C } from "../../coolie";
 import { ELEVATION, RADIUS, SPACING } from "../../ui/tokens";
 
 /**
- * 可选栏位的键 —— 与 `ComposerForm` 里四个二级区块一一对应。
+ * 可选栏位的键 —— 与 `ComposeScreen` 里四个二级区块一一对应。
  *
  * 上游 `NewIssueDialog` 的「⋯」有两处: For/in 行尾那个展开 Reviewer / Approver /
  * Watchdog 三个可选行, 属性条那个展开 Start date / Due date。App 的 For/in 只有

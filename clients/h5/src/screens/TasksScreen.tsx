@@ -16,16 +16,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Agent, Company, Issue, IssuePriority } from "@coolie/api-client";
 import { coolie } from "../coolie";
-import {
-  IssuesList,
-  ISSUE_PRIORITIES,
-  PRIORITY_COLOR,
-  PRIORITY_LABEL,
-} from "../components/IssuesList";
-import { ForRow } from "../components/composer/ForRow";
-import { ProjectRow } from "../components/composer/ProjectRow";
-import { UploadRow } from "../components/composer/UploadRow";
-import { WorkModeChips } from "../components/composer/WorkModeChips";
+import { IssuesList } from "../components/IssuesList";
+import { ComposeScreen } from "./ComposeScreen";
 import { useComposerFields } from "../components/composer/useComposerFields";
 
 const C = {
@@ -67,8 +59,9 @@ export function TasksScreen({
   const [busy, setBusy] = useState(false);
   const [agents, setAgents] = useState<Agent[]>([]);
 
-  // For / in / Mode / Upload 四行 (与 App 端 composer 同一份字段语义)
-  const fields = useComposerFields(company?.id ?? null);
+  // 新建任务弹窗的全部字段 (与 App 端 composer 同一份字段语义)。员工列表是入参:
+  // 指派人的适配器类型决定「模型选项」面板是否存在, 所以 hook 需要拿到它。
+  const fields = useComposerFields(company?.id ?? null, agents);
   const { reset: resetFields } = fields;
 
   useEffect(() => {
@@ -206,72 +199,20 @@ export function TasksScreen({
           if (e.target === dialogRef.current) closeCreate();
         }}
       >
-        <div style={styles.dialogInner}>
-          <div style={styles.dialogHeader}>
-            <span style={styles.breadcrumb}>
-              <span style={{ color: C.ink4 }}>XROA</span>
-              <span style={{ color: C.ink4 }}>›</span>
-              <span style={{ color: C.ink }}>New task</span>
-            </span>
-            <button type="button" style={styles.iconBtn} onClick={closeCreate} aria-label="关闭">
-              ✕
-            </button>
-          </div>
-
-          <input
-            autoFocus
-            style={styles.titleInput}
-            placeholder="Task title"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-          />
-
-          <ForRow agents={agents} value={fields.assigneeAgentId} onChange={fields.setAssigneeAgentId} />
-
-          <ProjectRow projects={fields.projects} value={fields.projectId} onChange={fields.setProjectId} />
-
-          <textarea
-            style={styles.descriptionInput}
-            placeholder="Add description..."
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-          />
-
-          <div style={styles.section}>
-            <span style={styles.sectionLabel}>优先级</span>
-            <div style={styles.chipRow}>
-              {ISSUE_PRIORITIES.map((value) => (
-                <button
-                  key={value}
-                  type="button"
-                  style={{ ...styles.chip, ...(priority === value ? styles.chipActive : null) }}
-                  onClick={() => setPriority(value)}
-                >
-                  <span style={{ ...styles.dot, background: PRIORITY_COLOR[value] }} />
-                  <span style={{ color: priority === value ? C.ink : C.ink3 }}>{PRIORITY_LABEL[value]}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <WorkModeChips value={fields.workMode} onChange={fields.setWorkMode} />
-
-          <UploadRow files={fields.attachments} onChange={fields.setAttachments} disabled={busy} />
-
-          <div style={styles.dialogFooter}>
-            <button type="button" style={styles.discardBtn} onClick={closeCreate} disabled={busy}>
-              放弃草稿
-            </button>
-            <button
-              type="button"
-              style={{ ...styles.primaryBtn, ...(title.trim() && !busy ? null : styles.disabled) }}
-              disabled={!title.trim() || busy}
-              onClick={() => void submit()}
-            >
-              {busy ? "创建中…" : "创建任务"}
-            </button>
-          </div>
-        </div>
+        <ComposeScreen
+          companyId={company?.id ?? null}
+          title={title}
+          onTitle={setTitle}
+          description={description}
+          onDescription={setDescription}
+          priority={priority}
+          onPriority={setPriority}
+          agents={agents}
+          fields={fields}
+          busy={busy}
+          onSubmit={() => void submit()}
+          onDiscard={closeCreate}
+        />
       </dialog>
     </div>
   );
@@ -291,7 +232,6 @@ const styles: Record<string, CSSProperties> = {
     fontWeight: 600,
     cursor: "pointer",
   },
-  disabled: { opacity: 0.4, cursor: "not-allowed" },
   orchestrationRow: { display: "flex", gap: 8 },
   orchBtn: {
     flex: 1,
@@ -340,66 +280,12 @@ const styles: Record<string, CSSProperties> = {
     cursor: "pointer",
   },
   dialog: {
-    width: "min(94vw, 560px)",
+    width: "min(94vw, 640px)",
     padding: 0,
     border: `1px solid ${C.line}`,
     borderRadius: 14,
     background: C.bg,
     color: C.ink,
-  },
-  dialogInner: { padding: 20, display: "flex", flexDirection: "column", gap: 16 },
-  dialogHeader: { display: "flex", alignItems: "center", justifyContent: "space-between" },
-  breadcrumb: { display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600 },
-  iconBtn: {
-    border: "none",
-    background: "transparent",
-    color: C.ink3,
-    fontSize: 15,
-    cursor: "pointer",
-  },
-  titleInput: {
-    border: "none",
-    outline: "none",
-    background: "transparent",
-    color: C.ink,
-    fontSize: 20,
-    fontWeight: 600,
-    letterSpacing: "-0.3px",
-  },
-  descriptionInput: {
-    minHeight: 120,
-    border: "none",
-    outline: "none",
-    background: "transparent",
-    color: C.ink2,
-    fontSize: 14,
-    lineHeight: "20px",
-    resize: "vertical",
-  },
-  section: { display: "flex", flexDirection: "column", gap: 8 },
-  sectionLabel: { color: C.ink4, fontSize: 11, fontWeight: 600, letterSpacing: "0.6px", textTransform: "uppercase" },
-  chipRow: { display: "flex", flexWrap: "wrap", gap: 8 },
-  chip: {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    padding: "7px 12px",
-    borderRadius: 999,
-    border: `1px solid ${C.line}`,
-    background: "rgba(255,255,255,0.02)",
-    fontSize: 12,
-    fontWeight: 500,
-    cursor: "pointer",
-  },
-  chipActive: { borderColor: C.brand, background: "rgba(94,106,210,0.18)" },
-  dot: { width: 6, height: 6, borderRadius: 3 },
-  dialogFooter: { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  discardBtn: {
-    border: "none",
-    background: "transparent",
-    color: C.ink3,
-    fontSize: 14,
-    fontWeight: 500,
-    cursor: "pointer",
+    overflow: "hidden",
   },
 };

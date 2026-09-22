@@ -41,11 +41,8 @@ import {
 import { AppBar } from "./src/components/AppBar";
 import { TabBar, TAB_BAR_HEIGHT } from "./src/components/TabBar";
 import { StatusDot } from "./src/components/StatusDot";
-import { ComposerForm } from "./src/components/composer/ComposerForm";
-import {
-  useComposerFields,
-  type ComposerFieldsState,
-} from "./src/components/composer/useComposerFields";
+import { ComposeScreen } from "./src/screens/ComposeScreen";
+import { useComposerFields } from "./src/components/composer/useComposerFields";
 import { AppCard } from "./src/ui/AppCard";
 import { ErrorRetry } from "./src/ui/ErrorRetry";
 import { LoadingState } from "./src/ui/LoadingState";
@@ -679,11 +676,12 @@ function HomeScreen({
 
   const companyId = company.id;
 
-  // 中央 "+" 浮层的 For/in/Mode/Upload 四行 (与任务页弹窗同一份状态)
-  const composerFields = useComposerFields(companyId);
-  const { reset: resetComposerFields, createTask: createComposerTask } = composerFields;
   /** 浮层打开时才需要的员工列表; 任务页自己有另一份 (IssuesList 也要用)。 */
   const [composerAgents, setComposerAgents] = useState<AgentRow[]>([]);
+  // 中央 "+" 浮层的全部字段 (与任务页弹窗同一份状态)。员工列表是入参: 指派人的
+  // 适配器类型决定「模型选项」面板是否存在, 所以 hook 需要拿到它。
+  const composerFields = useComposerFields(companyId, composerAgents);
+  const { reset: resetComposerFields, createTask: createComposerTask } = composerFields;
 
   useEffect(() => {
     if (!composeOpen) return;
@@ -1049,7 +1047,8 @@ function HomeScreen({
       {/* 中央 "+" 打开的新建任务屏 (内容区浮层, 让出底部 TabBar) */}
       {composeOpen ? (
         <View style={styles.composeOverlay}>
-          <ComposerForm
+          <ComposeScreen
+            companyId={companyId}
             title={title}
             onTitle={setTitle}
             description={description}

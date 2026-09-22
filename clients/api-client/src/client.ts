@@ -2,6 +2,7 @@ import {
   ASR_NOT_CONFIGURED,
   MULTIMODAL_PLUGIN_ID,
   ONTOLOGY_PLUGIN_ID,
+  type AdapterModel,
   type Agent,
   type AgentIdentity,
   type CockpitDashboardMetrics,
@@ -233,6 +234,26 @@ export class CoolieClient {
       `/api/companies/${encodeURIComponent(companyId)}/agents`,
     );
     return Array.isArray(body) ? body : (body.agents ?? []);
+  }
+
+  /**
+   * Models an adapter can run — the same call the Coolie Web dialog makes
+   * (`agentsApi.adapterModels` → `GET /companies/:id/adapters/:type/models`) to
+   * fill its model-override picker.
+   */
+  async listAdapterModels(
+    companyId: string,
+    type: string,
+    opts?: { provider?: string },
+  ): Promise<AdapterModel[]> {
+    const params = new URLSearchParams();
+    if (opts?.provider) params.set("provider", opts.provider);
+    const query = params.size > 0 ? `?${params.toString()}` : "";
+    const body = await this.request<AdapterModel[] | { models?: AdapterModel[] }>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/adapters/${encodeURIComponent(type)}/models${query}`,
+    );
+    return Array.isArray(body) ? body : (body.models ?? []);
   }
 
   // --- companies ----------------------------------------------------------

@@ -2,6 +2,7 @@
 // always-current contract, generate from GET /api/openapi.json.
 
 import type { IssueWorkMode } from "./work-modes";
+import type { ProjectExecutionWorkspacePolicy } from "./issue-composer-options";
 
 export type IssuePriority = "critical" | "high" | "medium" | "low";
 export type IssueStatus = "backlog" | "todo" | "in_progress" | "in_review" | "done" | "blocked" | "cancelled";
@@ -37,6 +38,16 @@ export interface Agent {
   status: string;
   adapterType?: string | null;
   permissions?: AgentPermissions | null;
+  /**
+   * The agent's adapter config, as the composer reads it: `adapterConfig.model`
+   * seeds the model-override placeholder and the effective thinking effort, the
+   * same way upstream `selectedAssigneeAgent.adapterConfig` does.
+   */
+  adapterConfig?: Record<string, unknown> | null;
+  /** Emoji/icon shown next to the agent name in the assignee rail. */
+  icon?: string | null;
+  /** Org-chain health, used by `isAgentTaskTarget` to hide broken agents. */
+  orgChainHealth?: { status?: string } | null;
 }
 
 /**
@@ -64,6 +75,14 @@ export interface Project {
   /** Square dot next to the name, same as the web picker. */
   color?: string | null;
   status?: string;
+  /**
+   * When `enabled`, the dialog shows its execution-workspace row for this
+   * project (upstream gates on `experimentalSettings.enableIsolatedWorkspaces`
+   * *and* this policy).
+   */
+  executionWorkspacePolicy?: ProjectExecutionWorkspacePolicy | null;
+  /** Project-level env bindings, read for the missing-user-secrets banner. */
+  env?: Record<string, unknown> | null;
 }
 
 /**
@@ -74,6 +93,16 @@ export interface Project {
  * serves the expo and h5 composers.
  */
 export type UploadFilePart = Blob | { uri: string; name: string; type: string };
+
+/**
+ * One model an adapter can run (`GET /companies/:id/adapters/:type/models`,
+ * which mirrors the Coolie Web `agentsApi.adapterModels`). Feeds the composer's
+ * model-override picker when the assignee's lane is "custom".
+ */
+export interface AdapterModel {
+  id: string;
+  label: string;
+}
 
 /**
  * What an agent API key can see about itself (`GET /api/agents/me`). A key is
@@ -138,6 +167,24 @@ export interface CreateIssueInput {
   assigneeUserId?: string;
   workMode?: IssueWorkMode;
   labelIds?: string[];
+  /**
+   * The remaining `NewIssueDialog` create fields, all optional and all omitted
+   * when untouched — the composer only sends the ones it actually built (see
+   * `buildAssigneeAdapterOverrides` / `buildExecutionPolicy`), matching the
+   * upstream submit's conditional spreads.
+   */
+  parentId?: string;
+  goalId?: string;
+  projectWorkspaceId?: string;
+  /** Model lane / thinking effort / chrome overrides for the assignee. */
+  assigneeAdapterOverrides?: Record<string, unknown> | null;
+  /** Reviewer / approver stages built from the two participant rows. */
+  executionPolicy?: Record<string, unknown> | null;
+  executionWorkspacePreference?: string | null;
+  executionWorkspaceId?: string | null;
+  executionWorkspaceSettings?: Record<string, unknown> | null;
+  /** Watchdog agent + instructions. */
+  watchdog?: { agentId: string; instructions?: string | null } | null;
 }
 
 export type AudioFormat = "mp3" | "wav" | "m4a" | "pcm" | "flac" | "ogg-opus";

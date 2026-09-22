@@ -10,16 +10,15 @@ import {
 import type { Issue, IssuePriority } from "@coolie/api-client";
 import { C, type AgentRow } from "../coolie";
 import { RADIUS } from "../ui/tokens";
-import { ComposerForm } from "./composer/ComposerForm";
+import { ComposeScreen } from "../screens/ComposeScreen";
 import { useComposerFields } from "./composer/useComposerFields";
 
 /**
  * 新建任务弹窗 —— 任务页右下角 [+ 新建任务] 的落地浮层。
  *
- * 表单本体是 `ComposerForm` (与中央「+」浮层同一份实现), 这里只负责 Modal 外壳:
- * 底部上滑的 sheet、键盘避让、以及建完之后通知列表刷新。
- * 对齐 Coolie Web `NewIssueDialog`: 面包屑 + ↗ + ✕ 标题栏, 大标题输入框,
- * For / in / Mode / Upload, 状态 + 更多, [放弃草稿] / [创建任务]。
+ * 表单本体是 `ComposeScreen` (与中央「+」浮层同一份实现, 字段与上游
+ * `NewIssueDialog` 一一对应), 这里只负责 Modal 外壳: 底部上滑的 sheet、
+ * 键盘避让、以及建完之后通知列表刷新。
  */
 export function CreateTaskModal({
   visible,
@@ -39,7 +38,7 @@ export function CreateTaskModal({
   const [priority, setPriority] = useState<IssuePriority>("medium");
   const [busy, setBusy] = useState(false);
 
-  const fields = useComposerFields(companyId);
+  const fields = useComposerFields(companyId, agents);
   const { reset: resetFields } = fields;
 
   const reset = useCallback(() => {
@@ -83,7 +82,8 @@ export function CreateTaskModal({
           style={styles.sheet}
           behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <ComposerForm
+          <ComposeScreen
+            companyId={companyId}
             title={title}
             onTitle={setTitle}
             description={description}
