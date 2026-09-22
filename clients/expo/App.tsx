@@ -21,7 +21,6 @@ import {
   type Approval,
   type Company,
   type Issue,
-  type IssuePriority,
   type IssueWorkProduct,
   type WorkspaceRuntimeService,
 } from "@coolie/api-client";
@@ -43,8 +42,7 @@ import { AppBar } from "./src/components/AppBar";
 import { EdgeSwipeBack } from "./src/components/EdgeSwipeBack";
 import { TabBar, TAB_BAR_HEIGHT } from "./src/components/TabBar";
 import { StatusDot } from "./src/components/StatusDot";
-import { ComposeScreen } from "./src/screens/ComposeScreen";
-import { useComposerFields } from "./src/components/composer/useComposerFields";
+import { NewTaskPage } from "./src/screens/NewTaskPage";
 import { AppCard } from "./src/ui/AppCard";
 import { ErrorRetry } from "./src/ui/ErrorRetry";
 import { LoadingState } from "./src/ui/LoadingState";
@@ -243,20 +241,6 @@ function SettingsSheet({
     </Sheet>
   );
 }
-
-/**
- * 草稿丢弃的回执 —— Android 用系统 toast (不打断), iOS 没有 toast 才退化为弹窗。
- * 与 h5 端的 `toast` 同一个语义: 告诉你「刚才那些输入没了」。
- */
-function notifyDraftDiscarded(): void {
-  if (Platform.OS === "android") {
-    ToastAndroid.show("草稿已丢弃", ToastAndroid.SHORT);
-    return;
-  }
-  Alert.alert("草稿已丢弃");
-}
-
-
 
 export default function App() {
   const [credential, setCredential] = useState<Credential | null | undefined>(undefined);
@@ -670,21 +654,13 @@ function HomeScreen({
     service?: WorkspaceRuntimeService | null;
     workProduct?: IssueWorkProduct | null;
   } | null>(null);
-  const [title, setTitle] = useState("");
-  const [description, setDescription] = useState("");
-  const [priority, setPriority] = useState<IssuePriority>("medium");
-  const [busy, setBusy] = useState(false);
   /** 递增后让 TasksScreen 重新拉列表 (中央 "+" 浮层建了任务)。 */
   const [tasksRefreshToken, setTasksRefreshToken] = useState(0);
 
   const companyId = company.id;
 
-  /** 浮层打开时才需要的员工列表; 任务页自己有另一份 (IssuesList 也要用)。 */
+  /** 新会话页打开时才需要的员工列表 (CreateTaskModal 的「负责人」下拉要用)。 */
   const [composerAgents, setComposerAgents] = useState<AgentRow[]>([]);
-  // 中央 "+" 浮层的全部字段 (与任务页弹窗同一份状态)。员工列表是入参: 指派人的
-  // 适配器类型决定「模型选项」面板是否存在, 所以 hook 需要拿到它。
-  const composerFields = useComposerFields(companyId, composerAgents);
-  const { reset: resetComposerFields, createTask: createComposerTask } = composerFields;
 
   useEffect(() => {
     if (!composeOpen) return;
@@ -701,58 +677,6 @@ function HomeScreen({
       cancelled = true;
     };
   }, [companyId, composeOpen]);
-
-  const createTask = useCallback(async (): Promise<boolean> => {
-    if (!title.trim()) return false;
-    setBusy(true);
-    try {
-      const { failedUploads } = await createComposerTask({
-        title: title.trim(),
-        priority,
-        ...(description.trim() ? { description: description.trim() } : {}),
-      });
-      setTitle("");
-      setDescription("");
-      setPriority("medium");
-      resetComposerFields();
-      setTasksRefreshToken((value) => value + 1);
-      if (failedUploads.length > 0) {
-        Alert.alert("附件未上传", `任务已创建, 但这些附件没传成功: ${failedUploads.join("、")}`);
-      }
-      return true;
-    } catch (e) {
-      Alert.alert("创建失败", String((e as Error)?.message ?? e));
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }, [createComposerTask, description, priority, resetComposerFields, title]);
-
-  // 中央 "+" 浮层: 建完关浮层并落到任务页看到新任务。
-  const submitOverlayTask = useCallback(() => {
-    void createTask().then((ok) => {
-      if (ok) {
-        setComposeOpen(false);
-        navigateTab("tasks");
-      }
-    });
-  }, [createTask]);
-
-  /**
-   * [放弃草稿] / 标题栏 ✕ —— 清空这一份草稿 (标题/描述/优先级 + For/in/Mode/附件/
-   * 状态/标签), 关浮层, 并回执「草稿已丢弃」。
-   *
-   * 与提交成功后的清理走同一组 setter, 所以不会出现「提交清了、放弃没清」这种
-   * 二次打开还剩上次输入的情况。
-   */
-  const discardOverlayDraft = useCallback(() => {
-    setTitle("");
-    setDescription("");
-    setPriority("medium");
-    resetComposerFields();
-    setComposeOpen(false);
-    notifyDraftDiscarded();
-  }, [resetComposerFields]);
 
   /**
    * Build 进度卡点某环节, 或别的只给出 issueId 的入口: 从任务列表补齐 Issue 再压详情页,
@@ -1104,22 +1028,27 @@ function HomeScreen({
         }}
         onCreate={() => setComposeOpen(true)}
       />
-      {/* 中央 "+" 打开的新建任务屏 (内容区浮层, 让出底部 TabBar) */}
+      {/* 中央 "+" 打开的「新会话」页 (内容区浮层, 让出底部 TabBar) */}
       {composeOpen ? (
         <EdgeSwipeBack style={styles.composeOverlay} onBack={() => setComposeOpen(false)}>
-          <ComposeScreen
+          <NewTaskPage
             companyId={companyId}
-            title={title}
-            onTitle={setTitle}
-            description={description}
-            onDescription={setDescription}
-            priority={priority}
-            onPriority={setPriority}
             agents={composerAgents}
-            fields={composerFields}
-            busy={busy}
-            onSubmit={submitOverlayTask}
-            onDiscard={discardOverlayDraft}
+            onClose={() => setComposeOpen(false)}
+            onOpenChat={() => {
+              setComposeOpen(false);
+              navigateTab("chat");
+            }}
+            onOpenAiCreate={() => {
+              setComposeOpen(false);
+              navigateTab("chat");
+              exportBoardPrompt("build 一个演示项目：Coolie 工坊看板");
+            }}
+            onCreated={() => {
+              setComposeOpen(false);
+              setTasksRefreshToken((value) => value + 1);
+              navigateTab("tasks");
+            }}
           />
         </EdgeSwipeBack>
       ) : null}
