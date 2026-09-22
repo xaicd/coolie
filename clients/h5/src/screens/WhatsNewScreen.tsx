@@ -13,12 +13,12 @@
 import type { CSSProperties } from "react";
 
 /** 与本次发版对应的版本号（展示用） */
-export const H5_RELEASE_VERSION = "0.5.2";
+export const H5_RELEASE_VERSION = "0.5.23";
 
 /** 本版功能点 */
 export const H5_RELEASE_FEATURES = [
-  "ChatHome 内嵌预览：工坊对话流里就地渲染预览标签，不再跳屏",
-  "工作空间四合一：对话 / 预览 / 文件 / 终端",
+  "工坊 (ChatHome) 收编对话：智能识别 build / plan / pipeline + Quick chip + 流式回复",
+  "砍掉「工作空间」四 Tab 屏：对话 / 预览 / 文件 / 终端 是抄来的骨架，整屏删除",
   "5 角色智能体：需求 / 设计 / 编码 / 测试 / 发布",
   "装机自检：核对 APK 版本与 OTA 运行时版本",
 ] as const;
@@ -26,7 +26,7 @@ export const H5_RELEASE_FEATURES = [
 export interface WhatsNewScreenProps {
   /** 「我知道了」：收起本页 */
   onClose: () => void;
-  /** 「查看演示」：回到工坊并拉起工作空间 */
+  /** 「查看演示」：回到工坊 (ChatHome) */
   onViewDemo: () => void;
 }
 
@@ -36,7 +36,7 @@ export function WhatsNewScreen({ onClose, onViewDemo }: WhatsNewScreenProps) {
       <div style={styles.card}>
         <div style={styles.badge}>Coolie {H5_RELEASE_VERSION}</div>
         <h1 style={styles.title}>What's New · {H5_RELEASE_VERSION}</h1>
-        <p style={styles.subtitle}>ChatHome 收编 + 工作空间四合一 + 5 角色员工</p>
+        <p style={styles.subtitle}>ChatHome 收编 + 砍掉工作空间 + 5 角色员工</p>
 
         <ul style={styles.list}>
           {H5_RELEASE_FEATURES.map((feature) => (

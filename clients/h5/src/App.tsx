@@ -1,7 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { BoardChatScreen, type WorkspaceCompany } from "./screens/BoardChatScreen";
-import { WorkspaceScreen } from "./screens/workspace/WorkspaceScreen";
 import { DashboardScreen } from "./screens/DashboardScreen";
 import { OntologyScreen } from "./screens/OntologyScreen";
 import { TasksScreen } from "./screens/TasksScreen";
@@ -10,13 +9,11 @@ import { PlansScreen } from "./screens/PlansScreen";
 import { WhatsNewScreen } from "./screens/WhatsNewScreen";
 
 /**
- * Coolie H5 (PC web) shell — ChatHome 预览 + 工作空间 + 看额度 + 本体驱动。
+ * Coolie H5 (PC web) shell — ChatHome 预览 + 看额度 + 本体驱动。
  *
  * 布局对齐 app 端:
  * - 顶部一条 nav: 工坊 / 看额度 / 本体驱动 (用 hash 路由, 刷新不丢当前页)
- * - 工坊页 = BoardChatScreen (对话流 + 内嵌预览), 右上角 [工作空间]
- * - [工作空间] → 一个原生 `<dialog>` (本文件渲染), 内放 WorkspaceScreen,
- *   WorkspaceScreen 拿到 dialogRef 后调用 `showModal()` 打开 (见 §3.4)。
+ * - 工坊页 = BoardChatScreen (对话流 + 内嵌预览)
  *
  * spec §5: 本波不做登录鉴权 —— 默认已登录, 用一个本地 stub company, 不接后端 SSE。
  * 看额度 / 本体驱动两屏**真的**打后端 (`/api/companies` 等, 见 vite proxy),
@@ -45,14 +42,9 @@ function tabFromHash(hash: string): TabKey {
 }
 
 export function App() {
-  const dialogRef = useRef<HTMLDialogElement>(null);
-  const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [tab, setTab] = useState<TabKey>(() =>
     typeof window === "undefined" ? "chat" : tabFromHash(window.location.hash),
   );
-
-  const openWorkspace = useCallback(() => setWorkspaceOpen(true), []);
-  const closeWorkspace = useCallback(() => setWorkspaceOpen(false), []);
 
   // hash 变化 (浏览器前进/后退 / 手动改地址) → 同步 Tab
   useEffect(() => {
@@ -72,16 +64,11 @@ export function App() {
     setTab(key);
   }, []);
 
-  // What's New 页的「我知道了」→ 回工坊；「查看演示」→ 回工坊并拉开工作空间。
+  // What's New 页的「我知道了」/「查看演示」→ 都回工坊。
   const goToChat = useCallback(() => {
     window.location.hash = "#/chat";
     setTab("chat");
   }, []);
-
-  const viewDemo = useCallback(() => {
-    goToChat();
-    setWorkspaceOpen(true);
-  }, [goToChat]);
 
   return (
     <div style={styles.app}>
@@ -114,11 +101,7 @@ export function App() {
       {/* 内容区 */}
       <main style={styles.main}>
         {tab === "chat" ? (
-          <BoardChatScreen
-            company={STUB_COMPANY}
-            whoami="掌柜"
-            onOpenWorkspace={openWorkspace}
-          />
+          <BoardChatScreen company={STUB_COMPANY} whoami="掌柜" />
         ) : null}
         {tab === "tasks" ? (
           <TasksScreen
@@ -133,33 +116,18 @@ export function App() {
         {tab === "quota" ? <DashboardScreen /> : null}
         {tab === "ontology" ? <OntologyScreen /> : null}
         {tab === "whats-new" ? (
-          <WhatsNewScreen onClose={goToChat} onViewDemo={viewDemo} />
+          <WhatsNewScreen onClose={goToChat} onViewDemo={goToChat} />
         ) : null}
       </main>
 
-      <dialog
-        ref={dialogRef}
-        style={styles.dialog}
-        // Esc / dialog.close() 都会触发 close, 把 state 同步回来
-        onClose={closeWorkspace}
-      >
-        <WorkspaceScreen
-          dialogRef={dialogRef}
-          open={workspaceOpen}
-          onClose={closeWorkspace}
-          company={STUB_COMPANY}
-          whoami="掌柜"
-        />
-      </dialog>
     </div>
   );
 }
 
-/** 让 #root 撑满视口 (index.html 只给了一个裸 div), 并给 dialog 兜住暗色背景 */
+/** 让 #root 撑满视口 (index.html 只给了一个裸 div) */
 const GLOBAL_CSS = `
 html, body, #root { height: 100%; }
 body { margin: 0; background: #08090A; }
-dialog.coolie-workspace::backdrop { background: rgba(0,0,0,0.6); }
 `;
 
 const styles: Record<string, CSSProperties> = {
@@ -195,16 +163,6 @@ const styles: Record<string, CSSProperties> = {
   navLabel: { color: "#8A8F98", fontSize: 13, fontWeight: 500 },
   navLabelActive: { color: "#7170FF" },
   main: { flex: 1, minHeight: 0, display: "flex", flexDirection: "column" },
-  dialog: {
-    width: "min(94vw, 1080px)",
-    height: "min(90vh, 820px)",
-    padding: 0,
-    border: "1px solid rgba(255,255,255,0.08)",
-    borderRadius: 14,
-    background: "#08090A",
-    color: "#F7F8F8",
-    overflow: "hidden",
-  },
 };
 
 export default App;

@@ -5,11 +5,13 @@
 # is deliberately mirrored by clients/h5/src/screens/WhatsNewScreen.tsx, which
 # IS a browser app — and this replay is its behavioural proof. The RN screen's
 # presence + wiring is pinned separately in scripts/e2e-local.sh (assertion
-# `expo-whats-new`), same split the workspace tabs already use.
+# `expo-whats-new`).
 #
 # What it proves end to end: the What's New page renders for the shipped
-# version, "我知道了" lands on the 工坊 (ChatHome) page, and the workspace modal
-# opens with all four tabs. This is the install loop from the boss's seat.
+# version, and "我知道了" lands on the 工坊 (ChatHome) page. This is the install
+# loop from the boss's seat. (wave 42 removed the workspace modal this replay
+# used to open — the 工坊 is now the only chat surface; the removal itself is
+# pinned statically in scripts/e2e-local.sh.)
 #
 # Owned by scripts/e2e-local.sh, which supplies ${E2E_H5_URL} via --env and
 # starts the h5 dev server before this runs.
@@ -19,10 +21,5 @@ wait text "What's New" 60000
 find text "ChatHome" exists
 screenshot clients/expo/replays/evidence/whats-new-01-screen.png
 click label="我知道了"
-wait text "工作空间" 60000
-click label="工作空间"
-wait text "对话" 60000
-find text "预览" exists
-find text "文件" exists
-find text "终端" exists
-screenshot clients/expo/replays/evidence/whats-new-02-workspace.png
+wait text "工坊" 60000
+screenshot clients/expo/replays/evidence/whats-new-02-workshop.png

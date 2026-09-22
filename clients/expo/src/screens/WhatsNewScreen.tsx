@@ -8,8 +8,8 @@
  * 首启判定：SecureStore 里存 `coolie.lastSeenVersion`，与当前 expo.version 不等才弹；
  * 点「我知道了」写回当前版本，之后再启动就不弹了。装了新版 → 版本号变 → 自动再弹。
  *
- * 「查看演示」不在这里直接跳转，而是把意图交回 App.tsx（onViewDemo）：拉起工作空间
- * 模态，并向工坊对话流投一条示例 prompt —— 屏幕本层不该知道导航细节。
+ * 「查看演示」不在这里直接跳转，而是把意图交回 App.tsx（onViewDemo）：切到工坊
+ * (BoardChatScreen) 并向对话流投一条示例 prompt —— 屏幕本层不该知道导航细节。
  */
 
 import React, { useEffect, useState } from "react";
@@ -77,7 +77,7 @@ export interface WhatsNewScreenProps {
   visible: boolean;
   /** 「我知道了」/ 返回键：收起并标记已读 */
   onClose: () => void;
-  /** 「查看演示」：由 App.tsx 拉起工作空间 + 投示例 prompt */
+  /** 「查看演示」：由 App.tsx 切到工坊 + 投示例 prompt */
   onViewDemo?: () => void;
 }
 

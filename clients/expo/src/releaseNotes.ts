@@ -22,6 +22,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: "0.5.23",
+    title: "砍掉工作空间，工坊一件到底",
+    features: [
+      "删掉「工作空间」四 Tab 屏 (对话 / 预览 / 文件 / 终端): 那是抄来的 RN 骨架, 预览/文件/终端全是假数据, 按老板「工作空间很乱, 对话不像对话」的意见整屏删除",
+      "工坊 (ChatHome) 成为唯一对话面: 智能识别 build / plan / pipeline / pr / chat + Quick chip + SSE 流式回复, 现有能力足够",
+      "顶栏不再有 [工作空间] 入口; 旧深链 coolie://workspace 一并移除",
+    ],
+  },
+  {
     version: "0.5.22",
     title: "[驾驶舱Web] 内置网页兜底",
     features: [

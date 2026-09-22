@@ -37,7 +37,7 @@ STATE_DIR="${AGENT_DEVICE_STATE_DIR:-$HOME/.agent-device}"
 EVIDENCE_DIR="$REPO_ROOT/clients/expo/replays/evidence"
 REPLAY_DIR="clients/expo/replays"
 # h5 (PC web) parity target — started mid-run; also the only web-drivable surface
-# for the What's New / workspace smoke (the RN app has no react-native-web build).
+# for the What's New smoke (the RN app has no react-native-web build).
 H5_DIR="$REPO_ROOT/clients/h5"
 H5_PORT="${E2E_H5_PORT:-5173}"
 H5_URL="http://localhost:$H5_PORT"
@@ -237,6 +237,16 @@ else
   record "ChatHome-inline-preview" FAIL "BoardChatScreen no longer renders the inline preview"
 fi
 
+# wave 42: the workspace screen is gone from the app too (工坊 replaced it end to
+# end). Its return would be a regression, so pin the absence of both the import
+# and the directory.
+if ! grep -q 'WorkspaceScreen' "$REPO_ROOT/clients/expo/App.tsx" \
+   && [ ! -d "$REPO_ROOT/clients/expo/src/screens/workspace" ]; then
+  record "expo-workspace-removed" PASS "no WorkspaceScreen import / directory"
+else
+  record "expo-workspace-removed" FAIL "WorkspaceScreen still wired into the app"
+fi
+
 if [ -f "$REPO_ROOT/clients/expo/src/releaseNotes.ts" ] \
    && grep -q 'WhatsNewScreen' "$REPO_ROOT/clients/expo/App.tsx" \
    && grep -q 'shouldShowWhatsNew' "$REPO_ROOT/clients/expo/App.tsx"; then
@@ -245,12 +255,12 @@ else
   record "expo-whats-new" FAIL "WhatsNewScreen missing or not wired into App.tsx"
 fi
 
-# ── h5 (PC web) parity — ChatHome preview + workspace ────────────────────────
+# ── h5 (PC web) parity — ChatHome preview + What's New ───────────────────────
 
 # spec docs-coolie/specs/2026-09-21-h5-web-parity.md §4.5. The PC web client
 # (clients/h5, Vite + React 19) has no browser replay under clients/expo/replays,
-# so its parity is proven by three cheap, deterministic checks instead: the dev
-# server answers, it builds to dist/, and the workspace screen ships the 4 tabs.
+# so its parity is proven by cheap, deterministic checks instead: the dev
+# server answers, it builds to dist/, and the workspace screen is gone (wave 42).
 
 H5_LOG="$(mktemp -t coolie-h5-dev.XXXXXX)"
 H5_PID=""
@@ -284,21 +294,22 @@ if wait_for_url "$H5_URL"; then
     record "H5-dev-server" FAIL "HTTP ${h5_code:-000}"
   fi
 
-  # Assertion 3: the workspace screen serves the 4 tabs 对话/预览/文件/终端.
-  if curl -s --max-time 5 "$H5_URL/src/screens/workspace/WorkspaceScreen.tsx" \
-       | grep -q '对话.*预览.*文件.*终端'; then
-    record "H5-workspace-tabs" PASS "WorkspaceScreen ships 对话/预览/文件/终端"
+  # Assertion 3: wave 42 removed the workspace screen end to end (工坊 replaced
+  # it), so the h5 mirror must not wire it back in: no import, no leftover dir.
+  if ! grep -q 'WorkspaceScreen' "$H5_DIR/src/App.tsx" \
+     && [ ! -d "$H5_DIR/src/screens/workspace" ]; then
+    record "H5-workspace-removed" PASS "no WorkspaceScreen import / directory"
   else
-    record "H5-workspace-tabs" FAIL "WorkspaceScreen tab labels not found"
+    record "H5-workspace-removed" FAIL "WorkspaceScreen still wired into h5"
   fi
 
-  # Assertion 4: What's New → 工坊 → workspace 4-tab, as a real browser replay.
+  # Assertion 4: What's New → 工坊 (ChatHome), as a real browser replay.
   # This is the install loop from the boss's seat; h5 mirrors the RN screens, so
   # a green run here is behavioural proof the flow still works end to end.
   run_replay "R4-whats-new" "whats-new.ad" || true
 else
   record "H5-dev-server" FAIL "dev server did not come up (see log below)"
-  record "H5-workspace-tabs" SKIP "dev server down"
+  record "H5-workspace-removed" SKIP "dev server down"
   printf '\n----- h5 dev log -----\n%s\n----------------------\n' "$(tail -20 "$H5_LOG" 2>/dev/null)"
 fi
 

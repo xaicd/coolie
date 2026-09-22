@@ -63,7 +63,6 @@ import { TasksScreen } from "./src/screens/TasksScreen";
 import { PipelinesScreen } from "./src/screens/PipelinesScreen";
 import { PlansScreen } from "./src/screens/PlansScreen";
 import { useNotificationsStore } from "./src/stores/notifications";
-import { WorkspaceScreen } from "./src/screens/workspace/WorkspaceScreen";
 import { BoardChatScreen, exportBoardEcho, exportBoardPrompt } from "./src/screens/BoardChatScreen";
 import { AgentsScreen } from "./src/screens/AgentsScreen";
 import { useOTA } from "./src/OTA";
@@ -315,7 +314,7 @@ export default function App() {
   return (
     <>
       {screen}
-      {/* 装机自检：登录前也能弹（onViewDemo 只在已登录时可点，因为演示要进工作空间） */}
+      {/* 装机自检：登录前也能弹（onViewDemo 只在已登录时可点，因为演示要进工坊） */}
       <WhatsNewScreen
         visible={whatsNewOpen}
         onClose={dismissWhatsNew}
@@ -581,7 +580,6 @@ function HomeScreen({
   /** 中央 "+" 打开的新建任务浮层 */
   const [composeOpen, setComposeOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [workspaceOpen, setWorkspaceOpen] = useState(false);
   const [boardView, setBoardView] = useState(false);
   const [appUpdate, setAppUpdate] = useState<RemoteVersionInfo | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -607,7 +605,7 @@ function HomeScreen({
 
   // ── 装机自检 (What's New) + 深链 ──────────────────────────────────────
   // WhatsNew 本体挂在 App 顶层 (登录前也要弹)。这里只消费它的「查看演示」意图：
-  // 把用户送到工作空间并投一条示例 prompt。
+  // 把用户送到工坊 (BoardChatScreen) 并投一条示例 prompt。
   useEffect(() => {
     // 老板/客服排查用：确认 App 载入的是 Coolie fork 自带的 ChatHome，而非 plugin-chat。
     console.log("[chat] ChatHome active");
@@ -615,21 +613,17 @@ function HomeScreen({
 
   useEffect(() => {
     if (!demoRequested) return;
-    setWorkspaceOpen(true);
+    navigateTab("chat");
     exportBoardPrompt("build 一个演示项目：Coolie 工坊看板");
     onDemoHandled?.();
   }, [demoRequested, onDemoHandled]);
 
-  // 深链: coolie://workspace → 工作空间; coolie://chat/build[/<标题>] → 工坊并投构建 prompt。
+  // 深链: coolie://chat/build[/<标题>] → 工坊并投构建 prompt。
   useEffect(() => {
     const handleUrl = (url: string | null) => {
       if (!url) return;
       const path = url.replace(/^coolie:\/\//i, "").replace(/^\/+/, "");
       const [route, ...rest] = path.split("/");
-      if (route === "workspace") {
-        setWorkspaceOpen(true);
-        return;
-      }
       if (route === "chat") {
         navigateTab("chat");
         if (rest[0] === "build") {
@@ -930,7 +924,6 @@ function HomeScreen({
             company={company}
             whoami={whoami}
             onOpenSettings={() => setSettingsOpen(true)}
-            onOpenWorkspace={() => setWorkspaceOpen(true)}
             onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
             onOpenIssue={(issue) => {
               navigateTab("tasks");
@@ -997,24 +990,6 @@ function HomeScreen({
           ota={ota}
           onClose={() => setSettingsOpen(false)}
           onSignOut={onSignOut}
-        />
-      ) : null}
-      {/* 工作空间: 对话 / 预览 / 文件 / 终端 四 Tab (Modal slide) */}
-      {workspaceOpen ? (
-        <WorkspaceScreen
-          visible={workspaceOpen}
-          company={company}
-          whoami={whoami}
-          onClose={() => setWorkspaceOpen(false)}
-          onOpenIssue={(issue) => {
-            setWorkspaceOpen(false);
-            navigateTab("tasks");
-            setSelected(issue);
-          }}
-          onOpenApproval={(approvalId) => {
-            setWorkspaceOpen(false);
-            setFocusedApprovalId(approvalId);
-          }}
         />
       ) : null}
       {/* 底部导航 — 汇览 / 任务 / [+] / 员工 / 收件箱 */}
