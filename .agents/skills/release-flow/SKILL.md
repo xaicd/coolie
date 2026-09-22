@@ -16,6 +16,22 @@ description: 记录 Coolie fork 四类资产的发布方式（SQL schema / API s
 | **H5 web** | `clients/h5/src/**` | vite build → dist/ → rsync 到 tc-coolie-claw ui/dist/h5/ | `pnpm --filter @coolie/h5 build` + `scripts/prepare-server-ui-dist.sh` | 改 h5 时 |
 | **APP client** | `clients/expo/src/**` | expo export → OTA bundle（runtimeVersion 不变）OR gradle assembleRelease + coscli（runtimeVersion 变）| `scripts/publish-ota.sh`（JS-only）/ `scripts/release-app.sh`（原生）| 改 expo 时 |
 
+## 发版前必跑（⛔ 前置门禁）
+
+**任何发版前必须跑 [`docs-coolie/PM-RELEASE-CHECKLIST.md`](../../../docs-coolie/PM-RELEASE-CHECKLIST.md) 全部 gate（原 24 项 + 新增 5 项 = 29 项）**：
+A1-A6 / B1-B4 / C1-C4 / D1-D3 / E1-E4 / F1-F3 / G1-G2 + H1-H4 / I1。
+
+跳过任何一项 ⛔ = **不发版**。PM 跑完签字。
+
+### 之前发版的问题（反思）
+
+- wave26 0.5.15 release commit 只 bump version，没 typecheck / test / export / build APK
+- 导致 0.5.15 APK 没真发（wave27 披露）
+- 修法：现在 wave26 之后任何 release commit 必须先跑 PM-RELEASE-CHECKLIST
+
+> 每个被改的资产还要在发版前更新自己的 CHANGELOG 顶部（H1-H4）：
+> `clients/expo/CHANGELOG.md`（App）/ `clients/expo-paperclip-web/CHANGELOG.md`（Coolie Web）/ `clients/h5/CHANGELOG.md`（h5）。
+
 ## 2. SQL schema 发布（最易踩坑）
 
 ### 2.1 改 schema 流程
@@ -201,7 +217,7 @@ X 改的是什么层？
 2. **schema 改先 PGlite 验证**（不允许直接上生产）
 3. **bundle/dist 不入 git**（`.gitignore` 已加）
 4. **不发版不发 OTA 不 rsync 不重启** = 没交付
-5. **每次发布 PM 签字**（PM-RELEASE-CHECKLIST 24 项 gate）
+5. **每次发布 PM 签字**（PM-RELEASE-CHECKLIST 29 项 gate）
 
 ## 8. 跨类发布冲突场景
 
@@ -223,7 +239,7 @@ X 改的是什么层？
 - `scripts/deploy-tc-coolie-claw.sh` —— 生产部署
 - `scripts/prepare-server-ui-dist.sh` —— h5 dist 同步
 - `scripts/rollback-latest.sh` —— 紧急回滚
-- `docs-coolie/PM-RELEASE-CHECKLIST.md` —— 24 项 gate
+- `docs-coolie/PM-RELEASE-CHECKLIST.md` —— 29 项 gate
 - `docs-coolie/Coolie-FORK-BOUNDARY.md` —— 哪些动哪些不动
 
 ## 10. 测试

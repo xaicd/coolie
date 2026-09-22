@@ -1,6 +1,6 @@
 # Coolie PM 发版 Checklist — 2026-09-20
 
-发版前必跑 24 项 gate。任何一项 ⛔ 都**不发版**。PM 自己负责跑完签字。
+发版前必跑 29 项 gate（原 24 项 + 新增 H1-H4 / I1 共 5 项）。任何一项 ⛔ 都**不发版**。PM 自己负责跑完签字。
 
 ## A. 代码质量（6 项）
 
@@ -51,7 +51,20 @@
 
 ---
 
-## 24 项速查表
+## H. 变更规范（4 项）— NEW
+
+- [ ] **H1** `clients/expo/CHANGELOG.md` 顶部插入新版本节（发版前）
+- [ ] **H2** `clients/expo-paperclip-web/CHANGELOG.md` 顶部插入新版本节（改 Coolie Web 时）
+- [ ] **H3** `clients/h5/CHANGELOG.md` 顶部插入新版本节（改 h5 时）
+- [ ] **H4** `docs-coolie/briefs/<date>-<name>.md` 包含 PM 拍板理由 + 受影响资产 + 装机直链
+
+## I. 变更语义（1 项）— NEW（跟 VERSIONING.md 联动）
+
+- [ ] **I1** version bump 符合 semver（patch=hotfix / minor=feature / major=breaking，见 `docs-coolie/VERSIONING.md`）
+
+---
+
+## 29 项速查表
 
 | 类别 | 数 | 关键项 |
 |---|---:|---|
@@ -62,6 +75,8 @@
 | 服务端烟测 | 4 | health / OTA / chat stream / dashboard |
 | 上传/发布 | 3 | APK URL / version.json / OTA runtimeVersion |
 | 老板回签 | 2 | weixin 回 / 至少一个功能实测 |
+| 变更规范 | 4 | 3 个 CHANGELOG 更新 + brief 拍板理由 |
+| 变更语义 | 1 | semver 三段（跟 VERSIONING.md）|
 
 ---
 
@@ -113,6 +128,6 @@ curl -fsS https://xrobinai.cn/version.json
 
 ## 升级到老板的一句话
 
-> 老板，发版要 24 项 ⛔ 全过才发。我自己不再「老板说发就立刻发」了，跑完这表我签字再发。
+> 老板，发版要 29 项 ⛔ 全过才发。我自己不再「老板说发就立刻发」了，跑完这表我签字再发。
 
 以后 PM 流程 = 派单 + 派单前置 + 派单后置 + 本 checklist + 验收 + 推。**少一个不签字。**

@@ -21,6 +21,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 ### 更新
 
 - App 端左缘右滑返回上一页 (不退 App): EdgeSwipeBack 左缘手势 + 系统返回键/手势导航内滑映射为 App 内返回, 详情/浮层/设置逐层退回, tab 间保留历史
+- 修 Alert dialog queue: OTA 不再堆 20+ 条「更新就绪」弹窗排队
 
 ---
 
@@ -31,16 +32,21 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 ### 更新
 
 - App 端左缘右滑返回上一页 (不退 App): 新增 EdgeSwipeBack 左缘手势, 详情/浮层/设置逐层退回, tab 间保留历史
+- 修系统返回键不退出 App: BackHandler 映射为 App 内返回
 
 ---
 
-## v0.5.15
+## v0.5.15 — ⚠️ NOT RELEASED
 
-> Released: 2026-09-22 · Android release APK
+> Tagged: 2026-09-22 · ⚠️ APK 实际未发出（见下方说明）
 
 ### 更新
 
 - 新建任务浮层 1:1 抄 Coolie Web NewIssueDialog 全字段: 复核人/审批人/看守(+指令) / 指派人模型通道·模型·思考档·--chrome / 执行工作区 / 三条建单提示 / 语音按钮(长按说话转写入标题)
+
+> ⚠️ **本版 APK 实际没真发**（wave27 披露）: wave26 的 release commit 只 bump version + 写 CHANGELOG，
+> 跳过了 `scripts/release-app.sh` 的 export / gradle assembleRelease / coscli 上传 / version.json 4-9 步。
+> 真正的 release 是 0.5.16 之后才发出。
 
 ---
 
