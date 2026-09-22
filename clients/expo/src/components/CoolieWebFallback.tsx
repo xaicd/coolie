@@ -1,6 +1,7 @@
 import { useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Linking,
   Modal,
   Pressable,
@@ -59,7 +60,12 @@ export function CoolieWebFallback({
             </Text>
           </View>
           <Pressable
-            onPress={() => void Linking.openURL(COOLIE_WEB_APK_URL)}
+            onPress={() =>
+              void Linking.openURL(COOLIE_WEB_APK_URL).catch(() =>
+                // 本机没有浏览器时至少把直链亮出来, 不让按钮「点了没反应」
+                Alert.alert("无法打开下载页", COOLIE_WEB_APK_URL),
+              )
+            }
             hitSlop={8}
             accessibilityRole="button"
             accessibilityLabel="安装独立 Coolie Web"
