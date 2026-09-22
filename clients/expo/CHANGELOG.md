@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.12
+
+> Released: 2026-09-22 · Android release APK
+
+### 更新
+
+- 删除独立的「语音派发」按钮 (全局顶栏 + 新建任务 composer), 只保留会话内长按 mic; 新建任务浮层让出底部导航
+
+---
+
 ## v0.5.11
 
 > Released: 2026-09-22 · Android release APK
