@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.17
+
+> Released: 2026-09-22 · Android release APK
+
+### 更新
+
+- App 端左缘右滑返回上一页 (不退 App): EdgeSwipeBack 左缘手势 + 系统返回键/手势导航内滑映射为 App 内返回, 详情/浮层/设置逐层退回, tab 间保留历史
+
+---
+
 ## v0.5.16
 
 > Released: 2026-09-22 · Android release APK
