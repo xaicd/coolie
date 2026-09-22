@@ -89,61 +89,84 @@ if (platforms.length === 0) {
 // extra.expoClient。只塞 name/slug/version 会让 OTA 之后的 app 读不到 app.json
 // 的其余配置（updates.url、extra.deepLinks 等）—— 所以整份 expo 配置原样带上。
 const expoClientConfig = appJson.expo || { name: 'Coolie', slug: 'coolie', version };
+const distRoot = path.resolve('dist');
 
-for (const platform of platforms) {
-  const meta = fileMeta[platform];
-  const manifestId = crypto.randomUUID();
-  const manifest = {
+// expo-updates 下载完每个文件后会拿 manifest 里的 hash 做校验，格式必须是
+// **base64url(无 padding) 编码的 SHA-256** —— 见 Android 侧
+// UpdatesUtils.verifySHA256AndWriteToFile（Base64.URL_SAFE | NO_PADDING | NO_WRAP）。
+// 写成 hex 会被判 hash 不符并抛 AssetDownloadException，比不写 hash 更糟：
+// 下载能过、校验必炸。Node 的 digest('base64url') 与上面三个 flag 等价。
+function fingerprint(relativePath) {
+  const absolute = path.resolve(distRoot, relativePath);
+  if (!fs.existsSync(absolute)) {
+    console.error(`❌ manifest 引用的文件不存在: ${relativePath}`);
+    process.exit(1);
+  }
+  const contents = fs.readFileSync(absolute);
+  return {
+    hash: crypto.createHash('sha256').update(contents).digest('base64url'),
+    fileSize: contents.length,
+  };
+}
+
+// launchAsset.key 必须**随 bundle 内容变化**，否则老用户永远拿不到新包：
+// 两端都把 key 直接当磁盘文件名（Android UpdatesUtils.createFilenameForAsset /
+// iOS UpdateAsset.filename → 都是 `key + "." + type`），且都在「文件已存在」时
+// 直接复用、**根本不看 hash**（Android Loader.downloadAllAssets / iOS
+// AppLoader.downloadAsset）。所以常量 key("android-bundle") 等于「这份安装最多
+// 只能拉到一次远端 bundle」。expo-updates 自己的 e2e 也逐次换 key
+// (test-update-1-key / 2-key / 3-key)。这里用内容 hash 拼一个扁平 key：既内容
+// 寻址，又避开 iOS 不建中间目录（assets/… 那种带斜杠的 key 在 iOS 上写不进去）。
+function buildManifest(platform, meta, manifestId) {
+  const bundle = meta && meta.bundle ? fingerprint(meta.bundle) : null;
+  return {
     id: manifestId,
     createdAt: now,
     runtimeVersion: runtimeVersion,
-    launchAsset: {
-      key: `${platform}-bundle`,
-      contentType: 'application/javascript',
-      url: `${baseUrl}/${meta.bundle}`,
-    },
-    assets: (meta.assets || []).map((asset) => ({
-      key: asset.key || asset.path,
-      contentType: asset.contentType || 'application/octet-stream',
-      fileExtension: asset.ext || path.extname(asset.path || ''),
-      url: `${baseUrl}/${asset.path}`,
-    })),
+    launchAsset: bundle
+      ? {
+          key: `${platform}-bundle-${bundle.hash}`,
+          contentType: 'application/javascript',
+          url: `${baseUrl}/${meta.bundle}`,
+          hash: bundle.hash,
+          fileSize: bundle.fileSize,
+        }
+      : null,
+    assets: ((meta && meta.assets) || []).map((asset) => {
+      const { hash, fileSize } = fingerprint(asset.path);
+      return {
+        key: asset.key || asset.path,
+        contentType: asset.contentType || 'application/octet-stream',
+        fileExtension: asset.ext || path.extname(asset.path || ''),
+        url: `${baseUrl}/${asset.path}`,
+        hash,
+        fileSize,
+      };
+    }),
     metadata: {},
     extra: { expoClient: expoClientConfig },
   };
+}
 
+for (const platform of platforms) {
+  const manifest = buildManifest(platform, fileMeta[platform], crypto.randomUUID());
   const platformFile = path.resolve(`dist/manifest.${platform}.json`);
   fs.writeFileSync(platformFile, JSON.stringify(manifest, null, 2));
-  console.log(`✓ 已生成平台 manifest: ${path.basename(platformFile)} (ID: ${manifestId})`);
+  console.log(
+    `✓ 已生成平台 manifest: ${path.basename(platformFile)} (ID: ${manifest.id}, bundle hash: ${manifest.launchAsset ? manifest.launchAsset.hash.slice(0, 12) : 'n/a'}…)`,
+  );
 }
 
 // 生成通用回退 manifest 及 manifest.json
 const defaultPlatform = fileMeta.android ? 'android' : (fileMeta.ios ? 'ios' : platforms[0]);
-const defaultMeta = fileMeta[defaultPlatform];
-
-const defaultManifest = {
-  id: crypto.randomUUID(),
-  createdAt: now,
-  runtimeVersion: runtimeVersion,
-  launchAsset: defaultMeta ? {
-    key: `${defaultPlatform}-bundle`,
-    contentType: 'application/javascript',
-    url: `${baseUrl}/${defaultMeta.bundle}`,
-  } : null,
-  assets: defaultMeta ? (defaultMeta.assets || []).map((asset) => ({
-    key: asset.key || asset.path,
-    contentType: asset.contentType || 'application/octet-stream',
-    fileExtension: asset.ext || path.extname(asset.path || ''),
-    url: `${baseUrl}/${asset.path}`,
-  })) : [],
-  metadata: {},
-  extra: { expoClient: expoClientConfig },
-};
+const defaultManifest = buildManifest(defaultPlatform, fileMeta[defaultPlatform], crypto.randomUUID());
 
 const manifestContent = JSON.stringify(defaultManifest, null, 2);
 fs.writeFileSync(path.resolve('dist/manifest.json'), manifestContent);
 fs.writeFileSync(path.resolve('dist/manifest'), manifestContent);
-console.log(`✓ 已生成自建源入口: dist/manifest & dist/manifest.json (默认回退: ${defaultPlatform || 'none'})`);
+console.log(
+  `✓ 已生成自建源入口: dist/manifest & dist/manifest.json (默认回退: ${defaultPlatform || 'none'}, bundle hash: ${defaultManifest.launchAsset ? defaultManifest.launchAsset.hash.slice(0, 12) : 'n/a'}…)`,
+);
 EOF
 
 echo "=== [3/4] 同步更新包到生产服务器 $SSH_TARGET:$REMOTE_OTA_DIR/ ==="
