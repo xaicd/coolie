@@ -7,20 +7,24 @@
 #   顶层 version/versionCode/downloadUrl   → 驾驶舱 App (cloud.coolie.app)
 #   paperclipWeb.{version,versionCode,...} → Coolie Web (cloud.coolie.app.web)
 # 所以这里**只增不改**: 读回远端现有 JSON, 只覆盖 `paperclipWeb` 键, 其余字段
-# 原样保留。绝不重写顶层驾驶舱字段 (那是 release-app.sh 的职责)。
+# 原样保留。绝不重写顶层驾驶舱字段 (那是 scripts/release-app.sh 的职责)。
+#
+# 放在 clients/ 下而非根 scripts/: 与驾驶舱的同类脚本
+# (clients/expo/scripts/publish-version-json.sh) 一致, 且 clients/ 是我们自己的
+# 树 —— 不占 upstream fork surface (scripts/check-fork-surface.mjs)。
 #
 # 用法:
-#   bash scripts/update-version-json.sh "<更新说明>"
+#   bash clients/expo-paperclip-web/scripts/update-version-json.sh "<更新说明>"
 # 环境变量:
 #   SSH_TARGET             默认 tc-coolie-claw
 #   REMOTE_VERSION_JSON    默认 /opt/coolie/ui/dist/version.json
-#   PAPERCLIP_WEB_APP_DIR  默认 clients/expo-paperclip-web
+#   PAPERCLIP_WEB_APP_DIR  默认本脚本所在包的目录 (clients/expo-paperclip-web)
 #   PAPERCLIP_WEB_DLS_BASE 默认 https://dls.xrobinai.cn/coolie/app
 #==============================================================================
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-APP_DIR="${PAPERCLIP_WEB_APP_DIR:-$REPO_ROOT/clients/expo-paperclip-web}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+APP_DIR="${PAPERCLIP_WEB_APP_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 SSH_TARGET="${SSH_TARGET:-tc-coolie-claw}"
 REMOTE_VERSION_JSON="${REMOTE_VERSION_JSON:-/opt/coolie/ui/dist/version.json}"
 DLS_BASE="${PAPERCLIP_WEB_DLS_BASE:-https://dls.xrobinai.cn/coolie/app}"
@@ -28,7 +32,7 @@ VERSION_JSON_URL="${VERSION_JSON_URL:-https://xrobinai.cn/version.json}"
 
 NOTES="${1:-}"
 if [ -z "$NOTES" ]; then
-  echo "用法: bash scripts/update-version-json.sh \"<更新说明>\"" >&2
+  echo "用法: bash clients/expo-paperclip-web/scripts/update-version-json.sh \"<更新说明>\"" >&2
   exit 2
 fi
 # 换行会破坏 JSON 合法性, 统一压成单行。

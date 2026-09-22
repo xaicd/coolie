@@ -82,7 +82,7 @@ expo-updates 0.27 (SDK 52) 缺这个头会直接
 
 ### 1.4 `version.json` 没有 `paperclipWeb` → 新建脚本合并
 
-新建 `scripts/update-version-json.sh` —— **只增不改**: 读回远端 JSON, 只覆盖
+新建 `clients/expo-paperclip-web/scripts/update-version-json.sh` —— **只增不改**: 读回远端 JSON, 只覆盖
 `paperclipWeb` 键, 顶层驾驶舱字段原样保留 (那是 `release-app.sh` 的职责)。
 
 ```json

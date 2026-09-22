@@ -236,12 +236,6 @@
       "maxTotalLines": 40
     },
     {
-      "path": "scripts/update-version-json.sh",
-      "maxNetLines": 30,
-      "reason": "Merges the paperclipWeb block into the shared production version.json, which the paperclip-web shell reads for upgrade prompts. Additive-only: it reads the remote JSON and rewrites just that key, so the cockpit app's top-level fields (owned by scripts/release-app.sh) are preserved.",
-      "maxTotalLines": 45
-    },
-    {
       "path": "server/src/services/bundled-plugins.ts",
       "maxNetLines": 60,
       "reason": "Fork ships ontology and workspace-diff plugins as self-hosted auto-installs so the mobile cockpit's ontology/code-review tabs work out of the box, and makes the deprecated chat bundle opt-in: `resolveSelfHostedAutoInstallKeys` drops the `chat` key unless `COOLIE_USE_PLUGIN_CHAT=true`, because ChatHome (server `board-chat` + the clients' `board-inline` surface) replaces plugin-chat. The catalog entry for `chat` points at `_deprecated/plugin-chat` so the opt-in still resolves where that leftover bundle exists.",
