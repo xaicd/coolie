@@ -193,11 +193,18 @@ const plugin = definePlugin({
             });
           }
 
+          // mode="transcribe-only" is the in-conversation mic path: the caller
+          // only wants the recognized text to drop into its own input, and
+          // decides separately whether to send it. So it must never create an
+          // issue — the user confirms first. The default path keeps the
+          // single-button voice dispatch (createIssue) working unchanged.
+          const transcribeOnly = b.mode === "transcribe-only";
+
           // Voice dispatch: optionally turn the recognized text into a task
           // (issue). Guarded so an issue-creation failure never fails the
           // transcription itself. Empty transcripts are not dispatched.
           let issue: { id: string; title: string } | null = null;
-          if (b.createIssue === true && result.text.trim() !== "") {
+          if (!transcribeOnly && b.createIssue === true && result.text.trim() !== "") {
             const { title, description } = textToIssueFields(result.text);
             try {
               const created = await ctx.issues.create({
@@ -226,6 +233,15 @@ const plugin = definePlugin({
             }
           }
 
+          // transcribe-only also echoes the text at the top level (plus the
+          // transcription row) so callers that only need the string do not have
+          // to reach into `transcription.text`.
+          if (transcribeOnly) {
+            return {
+              status: 201,
+              body: { transcription: done, issue: null, text: result.text, transcriptionId: record.id },
+            };
+          }
           return { status: 201, body: { transcription: done, issue } };
         } catch (err) {
           const failed = await s.markFailed(companyId, record.id, {

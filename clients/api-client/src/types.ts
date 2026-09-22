@@ -61,6 +61,14 @@ export interface CreateIssueInput {
 
 export type AudioFormat = "mp3" | "wav" | "m4a" | "pcm" | "flac" | "ogg-opus";
 
+/**
+ * "dispatch" (default) turns the transcript into a task; "transcribe-only"
+ * returns the text for the caller to place in its own input and never creates a
+ * task — used by the in-conversation long-press mic, where the user confirms
+ * before sending.
+ */
+export type VoiceDispatchMode = "dispatch" | "transcribe-only";
+
 export interface VoiceDispatchInput {
   companyId: string;
   /** Base64 of the audio (no data: prefix). Tencent one-sentence: <= 3MB, <= 60s. */
@@ -68,12 +76,18 @@ export interface VoiceDispatchInput {
   format?: AudioFormat;
   /** When true (default), the recognized speech is turned into a task. */
   createIssue?: boolean;
+  /** Defaults to "dispatch"; "transcribe-only" skips issue creation. */
+  mode?: VoiceDispatchMode;
   priority?: IssuePriority;
 }
 
 export interface VoiceDispatchResult {
   transcription: { status: "pending" | "done" | "failed"; text: string; error?: string };
   issue: { id: string; title: string } | null;
+  /** Present for mode="transcribe-only": the recognized text, top-level. */
+  text?: string;
+  /** Present for mode="transcribe-only": the persisted transcription id. */
+  transcriptionId?: string;
 }
 
 /** Standard error code when Tencent ASR is not configured on the instance. */

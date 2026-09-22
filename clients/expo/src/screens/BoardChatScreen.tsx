@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   Clipboard,
   FlatList,
   KeyboardAvoidingView,
@@ -74,6 +75,9 @@ const QUICK_PROMPTS = [
   "有哪些待审批",
   "本周交付了什么",
 ];
+
+/** 长按录音的最短时长: 短于此视为误触, 不送 ASR。 */
+const MIN_VOICE_HOLD_MS = 500;
 
 type BoardEchoListener = (message: BoardChatMessage) => void;
 
@@ -363,10 +367,33 @@ export function BoardChatScreen({
   const abortControllerRef = useRef<AbortController | null>(null);
   const accumulatedRef = useRef("");
 
-  // 语音派发: 录音 -> 腾讯 ASR 转写 -> 建任务 (见 useRecorder / plugin-multimodal)
+  // 会话内语音: 长按 mic 录音 -> 松开自动转文字填入输入框 -> 用户确认后再发送。
+  // 只复用 wave14 的 useRecorder + voiceDispatch 链路 (mode=transcribe-only), 不建任务。
   const { recording, start: startRecording, stop: stopRecording } = useRecorder();
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
+  /** 一次长按期间的录音启动承诺 + 按下时刻 (用于算长按时长、规避 onPressOut 早于 start 的竞态) */
+  const voicePressRef = useRef<{ promise: Promise<boolean> | null; startedAt: number }>({
+    promise: null,
+    startedAt: 0,
+  });
+  /** 录音中的 mic 脉冲动画 */
+  const micPulse = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (!recording) {
+      micPulse.setValue(1);
+      return;
+    }
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(micPulse, { toValue: 0.4, duration: 500, useNativeDriver: true }),
+        Animated.timing(micPulse, { toValue: 1, duration: 500, useNativeDriver: true }),
+      ]),
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [recording, micPulse]);
 
   // 光标闪烁定时器
   useEffect(() => {
@@ -468,59 +495,70 @@ export function BoardChatScreen({
   );
 
   /**
-   * 语音派发 (PRD 语音派发): 点击麦克风开始录音, 再次点击停止并把录音交给
-   * 多模态插件。插件走腾讯一句话识别转文字, 且 (createIssue 默认 true) 直接
-   * 把文字建成任务。转写结果与新建任务都作为系统气泡追加进聊天流 —— 派活
-   * 与回执同屏可见。
+   * 会话内语音 (长按 mic): 按下开始录音, 松开自动转文字并**填入输入框**,
+   * 由用户确认后再走既有发送流程。这里不建任务、不自动派发 —— 转写只产出文本。
+   *
+   * 竞态: onPressIn 里的 startRecording 是异步的 (要权限 + 起录音机), 用户可能
+   * 在它完成前就松手。所以按下时先存一个启动承诺, 松开时先 await 它, 再停止录音,
+   * 避免「松手时 recording 还是 false -> 录音机继续空转」。
    */
-  const handleVoiceDispatch = useCallback(async () => {
-    if (voiceBusy) return;
-
-    if (!recording) {
+  const handleMicPressIn = useCallback(() => {
+    if (voiceBusy || sending) return;
+    voicePressRef.current.startedAt = Date.now();
+    voicePressRef.current.promise = (async () => {
       try {
         await startRecording();
-        setVoiceStatus("录音中… 再次点击麦克风结束并派发");
+        setVoiceStatus("🎤 录音中… 松开转文字");
+        return true;
       } catch (e) {
         Alert.alert("录音失败", String((e as Error)?.message ?? e));
+        return false;
       }
-      return;
-    }
+    })();
+  }, [voiceBusy, sending, startRecording]);
+
+  const handleMicPressOut = useCallback(async () => {
+    const press = voicePressRef.current;
+    if (!press.promise) return;
+    voicePressRef.current.promise = null;
 
     setVoiceBusy(true);
-    setVoiceStatus("识别中… 正在派发任务");
+    setVoiceStatus("识别中…");
     try {
+      const started = await press.promise;
+      if (!started) return;
+
       const { base64, format } = await stopRecording();
+      if (Date.now() - press.startedAt < MIN_VOICE_HOLD_MS) {
+        pushSystemEcho("🎤 按太短了, 请长按说话");
+        return;
+      }
+
       const res = await coolie.voiceDispatch({
         companyId: company.id,
         audioBase64: base64,
         format,
+        mode: "transcribe-only",
       });
 
-      const text = res.transcription.text.trim();
-      pushSystemEcho(text ? `🎤 ${text}` : "🎤 没听清这段语音, 请再说一次。");
-      if (res.issue) {
-        pushSystemEcho(
-          `✅ 已派发任务 #${res.issue.id.slice(0, 6)} · ${res.issue.title}`,
-        );
+      const text = (res.text ?? res.transcription?.text ?? "").trim();
+      if (text) {
+        setInput((prev) => (prev ? `${prev} ${text}` : text));
+        pushSystemEcho(`🎤 已转写: ${text}`);
+      } else {
+        pushSystemEcho("🎤 没听清, 请再说一次");
       }
     } catch (e) {
       if (isAsrNotConfigured(e)) {
-        Alert.alert("语音未配置", "该实例尚未配置腾讯 ASR 凭据, 请改用文字输入。");
+        pushSystemEcho("🎤 语音未配置: 该实例尚未配置腾讯 ASR 凭据, 请改用文字输入");
       } else {
-        Alert.alert("语音派发失败", String((e as Error)?.message ?? e));
+        pushSystemEcho(`🎤 转写失败: ${String((e as Error)?.message ?? e)}`);
       }
     } finally {
       setVoiceBusy(false);
       setVoiceStatus(null);
     }
-  }, [
-    voiceBusy,
-    recording,
-    startRecording,
-    stopRecording,
-    company.id,
-    pushSystemEcho,
-  ]);
+  }, [company.id, stopRecording, pushSystemEcho]);
 
   useEffect(() => {
     if (!historyReady) return;
@@ -1358,27 +1396,8 @@ export function BoardChatScreen({
           </View>
         ) : null}
 
-        {/* 底部输入框区域 */}
+        {/* 底部输入框区域: [输入框] [🎤 长按 mic] [发送/停止] */}
         <View style={styles.inputContainer}>
-          <Pressable
-            onPress={() => void handleVoiceDispatch()}
-            disabled={sending || voiceBusy}
-            style={[
-              styles.micBtn,
-              recording && styles.micBtnRecording,
-              (sending || voiceBusy) && styles.micBtnDisabled,
-            ]}
-          >
-            {voiceBusy && !recording ? (
-              <ActivityIndicator size="small" color={C.accent} />
-            ) : (
-              <Ionicons
-                name={recording ? "mic" : "mic-outline"}
-                size={20}
-                color={recording ? C.err : C.ink2}
-              />
-            )}
-          </Pressable>
           <TextInput
             style={styles.textInput}
             placeholder="询问工坊运行、额度、员工负荷或审批…"
@@ -1389,6 +1408,31 @@ export function BoardChatScreen({
             maxLength={1000}
             editable={!sending}
           />
+
+          {/* 长按录音, 松开自动转文字填入输入框 (不自动发送) */}
+          <Animated.View style={{ opacity: recording ? micPulse : 1 }}>
+            <Pressable
+              onPressIn={handleMicPressIn}
+              onPressOut={() => void handleMicPressOut()}
+              disabled={sending || voiceBusy}
+              hitSlop={6}
+              style={[
+                styles.micBtn,
+                recording && styles.micBtnRecording,
+                (sending || voiceBusy) && styles.micBtnDisabled,
+              ]}
+            >
+              {voiceBusy && !recording ? (
+                <ActivityIndicator size="small" color={C.accent} />
+              ) : (
+                <Ionicons
+                  name={recording ? "mic" : "mic-outline"}
+                  size={20}
+                  color={recording ? C.err : C.ink2}
+                />
+              )}
+            </Pressable>
+          </Animated.View>
 
           {sending ? (
             <Pressable onPress={handleStop} style={styles.stopBtn}>

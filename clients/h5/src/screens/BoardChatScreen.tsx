@@ -10,7 +10,7 @@
  * 不依赖 expo / react-native, 纯 HTML + React 19。
  */
 
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { InlinePreviewPanel } from "../components/board-inline/InlinePreviewPanel";
 import { CodeDiffCard } from "../components/board-inline/CodeDiffCard";
@@ -86,6 +86,55 @@ export function BoardChatScreen({
 }: BoardChatScreenProps) {
   const [messages, setMessages] = useState<MockMessage[]>(SEED_MESSAGES);
   const [draft, setDraft] = useState("");
+  const [listening, setListening] = useState(false);
+  const [voiceNote, setVoiceNote] = useState<string | null>(null);
+  const recognitionRef = useRef<any>(null);
+
+  /**
+   * 长按 mic: 浏览器原生语音识别 (Web Speech API), 结果直接追加进输入框,
+   * 由用户确认后再发送。h5 不调服务端 ASR (brief §3.4: 用浏览器原生)。
+   */
+  const startVoice = useCallback(() => {
+    if (recognitionRef.current) return;
+    const w = window as any;
+    const SpeechRecognitionCtor = w.SpeechRecognition || w.webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) {
+      setVoiceNote("当前浏览器不支持语音识别, 请改用键盘输入");
+      return;
+    }
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "zh-CN";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.onresult = (event: any) => {
+      const transcript = Array.from(event.results as ArrayLike<any>)
+        .map((result: any) => result[0]?.transcript ?? "")
+        .join("")
+        .trim();
+      if (transcript) {
+        setDraft((prev) => (prev ? `${prev} ${transcript}` : transcript));
+        setVoiceNote(`🎤 已转写: ${transcript}`);
+      } else {
+        setVoiceNote("🎤 没听清, 请再说一次");
+      }
+    };
+    recognition.onerror = () => {
+      setVoiceNote("🎤 语音识别失败, 请重试");
+      setListening(false);
+    };
+    recognition.onend = () => {
+      setListening(false);
+      recognitionRef.current = null;
+    };
+    recognitionRef.current = recognition;
+    setVoiceNote("🎤 录音中… 松开转文字");
+    setListening(true);
+    recognition.start();
+  }, []);
+
+  const stopVoice = useCallback(() => {
+    recognitionRef.current?.stop();
+  }, []);
 
   /**
    * 指令分发 (wave19, 与 app 端同构): pipeline / plan / pr 三种编排指令,
@@ -154,20 +203,35 @@ export function BoardChatScreen({
   }, [draft, messages.length, dispatchCommand]);
 
   const composer = (
-    <div style={styles.composer}>
-      <input
-        style={styles.input}
-        value={draft}
-        onChange={(e) => setDraft(e.target.value)}
-        onKeyDown={(e) => {
-          if (e.key === "Enter") send();
-        }}
-        placeholder="对工坊说点什么… (回车发送)"
-        spellCheck={false}
-      />
-      <button type="button" style={styles.sendBtn} onClick={send} disabled={!draft.trim()}>
-        发送
-      </button>
+    <div>
+      {voiceNote ? <div style={styles.voiceNote}>{voiceNote}</div> : null}
+      <div style={styles.composer}>
+        <input
+          style={styles.input}
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") send();
+          }}
+          placeholder="对工坊说点什么… (回车发送)"
+          spellCheck={false}
+        />
+        {/* 长按录音, 松开自动转文字填入输入框 (不自动发送) */}
+        <button
+          type="button"
+          aria-label="长按说话"
+          title="长按说话"
+          style={{ ...styles.micBtn, ...(listening ? styles.micBtnListening : null) }}
+          onPointerDown={startVoice}
+          onPointerUp={stopVoice}
+          onPointerLeave={stopVoice}
+        >
+          {listening ? "🔴" : "🎤"}
+        </button>
+        <button type="button" style={styles.sendBtn} onClick={send} disabled={!draft.trim()}>
+          发送
+        </button>
+      </div>
     </div>
   );
 
@@ -319,6 +383,29 @@ const styles: Record<string, CSSProperties> = {
     border: "1px solid rgba(255,255,255,0.08)",
     borderRadius: 8,
     outline: "none",
+  },
+  micBtn: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 8,
+    padding: "9px 12px",
+    fontSize: 14,
+    lineHeight: "14px",
+    cursor: "pointer",
+    userSelect: "none",
+    touchAction: "none",
+  },
+  micBtnListening: {
+    backgroundColor: "rgba(239,68,68,0.16)",
+    borderColor: "rgba(239,68,68,0.4)",
+  },
+  voiceNote: {
+    padding: "6px 16px",
+    color: "#8A8F98",
+    fontSize: 12,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: "rgba(255,255,255,0.05)",
   },
   sendBtn: {
     backgroundColor: "#5E6AD2",

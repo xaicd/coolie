@@ -254,6 +254,9 @@ export class CoolieClient {
    * Send recorded audio to the multimodal plugin. With createIssue (default
    * true) the recognized speech becomes a task. Throws CoolieApiError with
    * code ASR_NOT_CONFIGURED (status 501) when the instance has no Tencent keys.
+   *
+   * mode="transcribe-only" returns the text without creating a task, for the
+   * in-conversation mic where the user confirms before sending.
    */
   async voiceDispatch(input: VoiceDispatchInput): Promise<VoiceDispatchResult> {
     return this.request<VoiceDispatchResult>(
@@ -264,6 +267,7 @@ export class CoolieClient {
         audioBase64: input.audioBase64,
         format: input.format ?? "mp3",
         createIssue: input.createIssue ?? true,
+        mode: input.mode,
         priority: input.priority,
       },
     );
