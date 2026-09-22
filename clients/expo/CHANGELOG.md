@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.14
+
+> Released: 2026-09-22 · Android release APK
+
+### 更新
+
+- 新建任务浮层对齐 Coolie Web NewTaskDialog 全功能: 面包屑标题栏(XROA › New task + 全屏↗ + ✕) / 状态可选并随建单提交 / ⋯二级菜单(标签·信任策略·Markdown编辑器) / 放弃草稿+创建任务双按钮
+
+---
+
 ## v0.5.13
 
 > Released: 2026-09-22 · Android release APK
