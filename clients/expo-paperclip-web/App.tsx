@@ -499,6 +499,10 @@ const I18N_PATCH: Record<string, string> = {
   "View all runs": "查看全部运行",
   // 任务页搜索框 (Issues.tsx)
   "Search tasks...": "搜索任务…",
+  // 侧栏两个 nav 项 (实测抽屉里仍是英文；不在 ui/src，来自插件/nav 注册表，
+  // 所以只能在壳这层按渲染文本翻。Ontology 沿用 fork 文档里的「本体」)
+  Voice: "语音",
+  Ontology: "本体",
 };
 
 /**

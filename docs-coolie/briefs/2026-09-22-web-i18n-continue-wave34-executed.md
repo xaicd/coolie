@@ -11,8 +11,8 @@ Brief: `docs-coolie/briefs/2026-09-22-web-i18n-continue-wave34.md`
 | --- | --- |
 | versionName | `0.6.4-paperclip-web` |
 | versionCode | `4` (was 3) |
-| APK size | 66,081,850 bytes (~63.02 MB) |
-| SHA-256 | `d41194a849486670fab100f1d3ce67f0d2b6271ebb0e17fba2d8e33bc1b5ef13` |
+| APK size | 66,081,814 bytes (~63.02 MB) |
+| SHA-256 | `e37b7311a80a817d204c3ed3bd0f807d7ed113bf45997d065cb0504236a0297c` |
 | COS | `cos://gzbucket/coolie/app/0.6.4-paperclip-web/coolie-release.apk` |
 | 直链 | https://dls.xrobinai.cn/coolie/app/0.6.4-paperclip-web/coolie-release.apk |
 | 证据目录 | `/tmp/emu-evidence/wave34-0.6.4/` |
@@ -20,11 +20,13 @@ Brief: `docs-coolie/briefs/2026-09-22-web-i18n-continue-wave34.md`
 ## 1. 改了什么 (`clients/expo-paperclip-web/`, 只动壳, 没碰 `ui/`)
 
 - `App.tsx`
-  - `I18N_PATCH` 字典: **336 条**(wave34 前 ~218) —— 本轮 **+118**。
+  - `I18N_PATCH` 字典: **340 条**(wave34 前 223) —— 本轮 **+117**。
   - 新增 `I18N_PATTERNS`(6 条): 运行时拼出来的动态文案，字典的「整段全等」够不到。
     例: `Finished 2d ago` → `2d 前完成`、`12h ago` → `12h 前`、`1 agent` → `1 位员工`。
   - 新增 `I18N_CSS_PATCH`: 把底部导航钉成不透明，修「重叠」(见 §2)。
   - `start()` 加 3 次延时兜底重扫 (300/1000/2500ms)，抹掉真机上的 observer 时间窗 (见 §3)。
+  - 侧栏两个 nav 项 `Voice → 语音` / `Ontology → 本体`：实测抽屉里一直是英文，且不在
+    `ui/src`(来自运行时 nav 注册表)，只能在壳这层按渲染文本翻。
 - `app.json` / `package.json` / `android/app/build.gradle`: `0.6.2 → 0.6.4`, `versionCode 3 → 4`
   (`android/` 是 gitignore 目录，`app.json` 是事实来源，两个都要同步改)。
 - `README.md`: 表里的 versionName / runtimeVersion 对齐到 0.6.4。
@@ -68,9 +70,15 @@ Brief: `docs-coolie/briefs/2026-09-22-web-i18n-continue-wave34.md`
 | `03-tab-agents.png` | 员工 | 过滤/计数/动作 | `全部` `新建员工` `1 位员工` `离开` ✅ |
 | `04-tab-inbox.png` | 收件箱 | 过滤 tab/分组 | `我的 最近 未读 已阻塞 全部` `搜索收件箱…` `今天` ✅ |
 | `05-tab-inbox-scrolled-bleedtest.png` | 收件箱(滚动) | 底栏不透正文 | 底栏不透明，无透出 ✅ |
+| `06-drawer.png` | 侧栏抽屉 | nav 全中文 | `新建任务/搜索/仪表盘/收件箱/会议室/工作/任务/项目/例行任务/产物/语音/本体/组织/员工/技能/连接器/审计` ✅ |
 
 底栏 5 tab 最终文案: **仪表盘 / 任务 / 新建任务 / 员工 / 收件箱** (老板指定)。
 仪表盘卡片: `无关联任务`、`1d 前完成` / `4d 前完成` (原 `No linked task` / `Finished 1d ago`)。
+
+**交叉验证**: 同一份注入脚本 (从 `App.tsx` 直接生成，不重写) 也跑在 Playwright + Chromium
+(411×914, mobile UA, 真登录) 上，对照了补丁前后的真实 DOM:
+`Voice` → `语音`、`Ontology` → `本体`、底栏 `仪表盘/任务/新建任务/员工/收件箱`，
+diff 前后各命中 1 个文本节点，确认是「整段文本全等」命中而不是碰巧。
 
 ## 5. 需要老板过目的 2 个取舍
 
