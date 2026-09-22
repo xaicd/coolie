@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.23
+
+> Released: 2026-09-23 · Android release APK
+
+### 更新
+
+- 砍掉「工作空间」四 Tab 屏 (对话/预览/文件/终端), 工坊 (ChatHome) 一件到底: 再无 [工作空间] 入口, 对话/建单/预览都在工坊里完成
+
+---
+
 ## v0.5.21 — commit `2594a71e8`
 
 > Released: 2026-09-22 · Android release APK
