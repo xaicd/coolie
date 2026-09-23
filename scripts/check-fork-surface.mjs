@@ -48,11 +48,42 @@ export const OWNED_PREFIXES = [
   // so nothing in it can conflict, and every file in it used to be reported as
   // an undeclared upstream file.
   "clients/",
+  // Trees upstream has no files in whatsoever, checked with
+  // `git ls-tree -r upstream/master --name-only -- <prefix>`. A prefix belongs
+  // here only when that returns nothing: a *mixed* tree (upstream owns some of
+  // it) must not be added, because the gate skips owned paths before consulting
+  // the manifest, so a prefix over a mixed tree would silently exempt the
+  // upstream files inside it. `server/src/services/` is the standing example of
+  // a tree that cannot be listed here — upstream has 654 files in it.
+  //
+  // Whole packages the fork wrote and upstream does not ship:
+  "packages/adapters/coolie-native/",
+  "packages/adapters/dsh/",
+  "packages/agents/",
+  "packages/plugins/plugin-aigw/",
+  "packages/plugins/plugin-multimodal/",
+  "packages/plugins/plugin-npc-factory/", // hosts the bridge from the ontology's business-system events
+  "packages/plugins/plugin-ops-console/",
+  "packages/plugins/plugin-workflow/",
+  "packages/templates/",
+  "templates/",
+  "tests/plugin-ontology-ai/",
+  "server/src/config/",
+  // Local tool state and one entry point, both ours by origin:
+  ".commandcode/",
   "scripts/check-fork-surface",
   "scripts/check-testing-defenses",
   "scripts/check-ontology",
   "scripts/convert-ontology-playground",
   "scripts/deploy-coolie",
+  // Fork scripts upstream has no file at, each verified the same way as the
+  // trees above. They sit under scripts/ because that is where these entry
+  // points are wired, and that path prefix is the only reason the gate asks.
+  "scripts/new-company.sh",
+  "scripts/register-roles.sh",
+  "scripts/e2e-local.sh",
+  "scripts/deploy-tc-coolie-claw.sh",
+  "scripts/capture-ds-workbench.mjs",
 ];
 
 /** Regenerated, not authored — it cannot be resolved by hand anyway. */

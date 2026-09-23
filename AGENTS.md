@@ -234,6 +234,8 @@ be kept in sync twice.
 - `docs-coolie/FORK-SURFACE-AUDIT.md` — how far this fork actually diverges from
   upstream, and which resolution each part needs.
 - `doc/plans/*.md` — dated plan and design records.
+- `docs-coolie/specs/*.md` — Kiro-style specs (requirements + EARS acceptance
+  criteria, with the technical section appended). Read one before building its feature.
 - `.agents/skills/` — our skill library (`fork-sync` is the upstream-sync playbook).
 
 Before changing a file upstream also owns, read the fork-surface audit: every

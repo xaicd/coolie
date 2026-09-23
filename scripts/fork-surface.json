@@ -32,12 +32,6 @@
       "maxTotalLines": 80
     },
     {
-      "path": "packages/plugins/plugin-npc-factory/src/worker.ts",
-      "maxNetLines": 60,
-      "reason": "Bridge from the ontology's business-system events into npc-factory. A plugin package, but not one we own.",
-      "maxTotalLines": 120
-    },
-    {
       "path": "package.json",
       "maxNetLines": 30,
       "reason": "Entry points for the repo gates (test:defenses and friends). A gate nobody can run is not a gate.",
@@ -52,8 +46,8 @@
     {
       "path": "scripts/fork-surface.json",
       "maxNetLines": 200,
-      "reason": "This manifest itself, and entirely ours — it does not exist upstream. It sits under scripts/ only because that is where the gate is wired (package.json and check-testing-defenses.mjs call it), and that path prefix is the only reason the gate asks about it. The budget is loose on purpose: the file grows by one entry per upstream file we intentionally change, and that growth is the file working, not creep.",
-      "maxTotalLines": 360
+      "reason": "This manifest itself, and entirely ours — it does not exist upstream. It sits under scripts/ only because that is where the gate is wired (package.json and check-testing-defenses.mjs call it), and that path prefix is the only reason the gate asks about it. The budget is loose on purpose: the file grows by one entry per upstream file we intentionally change, and that growth is the file working, not creep. Raised from 360 when the ontology-spec workflow and the DSH/coolie-native adapters were declared in one batch.",
+      "maxTotalLines": 480
     },
     {
       "path": "ui/index.html",
@@ -264,6 +258,66 @@
       "maxNetLines": 60,
       "reason": "Fork-specific ignores: the mobile client tree (`clients/`), the Expo/OTA and coolie-claw deploy outputs, local crash dumps and CLI logs (`core`, `coscli*`), Command Code's local-only state, and test/exploration screenshots, which this fork keeps local rather than committing. A recurring divergence by nature — every new local artifact kind adds a line — so it is declared rather than reduced.",
       "maxTotalLines": 120
+    },
+    {
+      "path": "ui/src/pages/BoardChat.tsx",
+      "maxNetLines": 130,
+      "reason": "Carries the fork's DS-style ontology spec card: a `建域 xxx` prompt plans an ontology domain, and the card renders that spec (object types, relation types, modelling problems) with its approval status without offering an apply button, because the server writes the model only after a human approves the spec. It is appended into upstream's own message list and reuses upstream's trigger detection, which is why it cannot be a component in our own tree. One commit, 114 lines added, nothing removed: at a merge, keep upstream's render path and re-append the card.",
+      "maxTotalLines": 160
+    },
+    {
+      "path": "scripts/release-app.sh",
+      "maxNetLines": 250,
+      "reason": "Fork release script, and entirely ours: upstream ships no release-app.sh, so there is nothing to reconcile at a merge. It sits under scripts/ only because that is where the release entry points are wired, and that path prefix is the only reason the gate asks about it. Content is pre-flight and sanity checks, version.json read permissions, runtimeVersion single-sourced for OTA, and the rule that every release must correspond to a commit — the last paired with backfill-commit-sha.sh below.",
+      "maxTotalLines": 420
+    },
+    {
+      "path": "scripts/publish-h5.sh",
+      "maxNetLines": 40,
+      "reason": "Fork script: builds the h5 client and rsyncs its dist to the deployment's web root. No upstream counterpart — upstream has no clients/ to publish — so nothing to reconcile at a merge, and it cannot live in a package of its own for the same reason. Same shape and same reason as the two publish-ota forwarders above.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "scripts/backfill-commit-sha.sh",
+      "maxNetLines": 40,
+      "reason": "Fork script: backfills the commit SHA a release records. It exists as the repair path for the rule release-app.sh enforces, so the two entries are read together — that script checks the SHA is present, this one writes it when it is not. No upstream counterpart.",
+      "maxTotalLines": 50
+    },
+    {
+      "path": "packages/shared/src/constants.ts",
+      "maxNetLines": 20,
+      "reason": "Upstream file, three additions and every one of them a list member: `dsh` appended to AGENT_ADAPTER_TYPES, the five Palantir roles (fda / core-swe / pre-sre / fdse / ds) appended to AGENT_ROLES, and `ontology_spec` appended to APPROVAL_TYPES. Appended rather than inserted, so no existing value changes meaning and no stored row is affected. They cannot live in our own tree because these are the shared unions the server, the clients and the adapters all compile against: a fork-local copy would let the two sides disagree about what a valid role or approval type is.",
+      "maxTotalLines": 30
+    },
+    {
+      "path": "server/src/routes/build.ts",
+      "maxNetLines": 380,
+      "reason": "The fork's build surface: POST /build/start (the five-step issue chain), POST /build/spec/start (plan an ontology model and validate it against the plugin), GET /build/spec/:specId, and POST /build/spec/:specId/instantiate, which refuses unless the linked `ontology_spec` approval is approved and then calls the plugin's import-document through the provisioner. No upstream counterpart. It sits under server/src/routes/ because it mounts on the host router and needs host-side concerns — issues, approvals, the provisioner — that a plugin route cannot reach.",
+      "maxTotalLines": 520
+    },
+    {
+      "path": "server/src/services/build-orchestrator.ts",
+      "maxNetLines": 560,
+      "reason": "The five-step build chain (BUILD_TRIGGER_PATTERN, BUILD_STEP_KINDS, the per-step agent types) plus the ontology domain trigger, and `dispatchBuildStep`, which the spec decomposition reuses rather than re-implementing. No upstream counterpart. A host service rather than plugin code because it creates issues and paces dispatch through the host's own machinery.",
+      "maxTotalLines": 1250
+    },
+    {
+      "path": "server/src/services/hermes-oneshot.ts",
+      "maxNetLines": 150,
+      "reason": "Spawns the operator's local `hermes` CLI one-shot to plan a build or an ontology spec. No upstream counterpart. It has to sit in the host's service tree because the prompt it sends is assembled from host context (company id, API url, task markdown) and what comes back is a host-side plan — the plugin never spawns a process.",
+      "maxTotalLines": 170
+    },
+    {
+      "path": "server/src/services/ontology-provisioner.ts",
+      "maxNetLines": 260,
+      "reason": "The host's side of the one sanctioned write path into the ontology plugin: it resolves the plugin through the registry and calls its validate-document and import-document routes in-process instead of writing the plugin's namespace itself. No upstream counterpart. It cannot live in the plugin because the authorization is the host's — the caller has already passed assertCompanyAccess, and the actor forwarded is the request's own rather than an identity this module invents.",
+      "maxTotalLines": 280
+    },
+    {
+      "path": "server/src/__tests__/ontology-spec.test.ts",
+      "maxNetLines": 200,
+      "reason": "Tests for the spec workflow's normalization: the document survives byte-identically to what the planner wrote (including the identifier flag the plugin validator requires, and enum/format/unit on properties), and a malformed or contradictory wrapper is refused rather than half-read — no object types, a missing phase, a phase named twice, an unknown phase — while a phase referring to an undeclared object type is dropped without failing the whole spec. No upstream counterpart.",
+      "maxTotalLines": 220
     }
   ]
 }

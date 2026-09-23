@@ -49,7 +49,11 @@ describe("isOwned", () => {
 
   it("does not mistake a prefix for a parent", () => {
     // `packages/plugins/plugin-ontology` must not swallow a sibling plugin.
-    assert.equal(isOwned("packages/plugins/plugin-npc-factory/src/worker.ts"), false);
+    // Targets an upstream sibling on purpose: npc-factory used to sit here, and
+    // it was the wrong example — upstream never shipped that package, so it is
+    // ours and now sits in OWNED_PREFIXES.
+    assert.equal(isOwned("packages/plugins/plugin-workspace-diff/src/worker.ts"), false);
+    assert.equal(isOwned("packages/plugins/plugin-llm-wiki/src/index.ts"), false);
   });
 });
 
