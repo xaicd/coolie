@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.26
+
+> Released: 2026-09-23 · Android release APK
+
+### 更新
+
+- 工坊对话精简: 标题改「工坊」(原「驾驶舱智能问答」), 副标题「驱动 5 角色员工」, placeholder 精简为「派个活, 或问点什么」; 删顶部历史/设置/刷新三按钮 + 快捷 chips 行 + 状态绿点
+
+---
+
 ## v0.5.25
 
 > Released: 2026-09-23 · Android release APK
