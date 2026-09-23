@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.38
+
+> Released: 2026-09-23 · Android release APK
+
+### 更新
+
+- wave61 onboarding-assets 模板替换 Paperclip: greeting.md 'Welcome to Paperclip' → '欢迎来到 Coolie 工坊'; chief-of-staff/AGENTS.md 'You have tools from Paperclip' → '你有来自 Coolie 工坊的工具'; SKILL.md 'first Paperclip task' / 'first task in Paperclip' → Coolie 工坊; default/AGENTS.md 'agent at Paperclip company' → Coolie 智能体工坊 (boss 24:57 '还是有这个')
+
+---
+
 ## v0.5.37
 
 > Released: 2026-09-23 · Android release APK

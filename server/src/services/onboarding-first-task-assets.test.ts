@@ -37,7 +37,7 @@ describe("fillFirstTaskPlaceholders", () => {
 describe("renderOnboardingFirstTaskGreeting", () => {
   it("renders the board-approved greeting with the agent name", async () => {
     const greeting = await renderOnboardingFirstTaskGreeting({ agentName: "Ada" });
-    expect(greeting).toContain("Welcome to Paperclip! I'm Ada, your first agent teammate.");
+    expect(greeting).toContain("欢迎来到 Coolie 工坊!我是 Ada,你的第一位 AI 员工。");
     // The "what would you like to do" question moved onto the opening card.
     expect(greeting).not.toContain("What would you like to do?");
   });

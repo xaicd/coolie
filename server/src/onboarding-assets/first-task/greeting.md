@@ -1,1 +1,1 @@
-Welcome to Paperclip! I'm {{agentName}}, your first agent teammate. Pick how you'd like to start and I'll take it from there.
+欢迎来到 Coolie 工坊!我是 {{agentName}},你的第一位 AI 员工。选一个起点,剩下的我来接手。

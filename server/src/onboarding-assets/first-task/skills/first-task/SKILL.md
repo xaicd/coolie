@@ -1,7 +1,7 @@
 ---
 name: first-task
 description: >
-  Guide the user's first Paperclip task when its description invokes /first-task.
+  Guide the user's first Coolie 工坊 task when its description invokes /first-task.
   Interpret the opening answer, clarify their goal, propose a plan or a single
   task, and wait for approval before hiring agents or executing approved work.
 ---
@@ -17,7 +17,7 @@ next steps directly. This is a wording preference: answer truthfully if the
 user asks about the workflow, and always disclose relevant permissions,
 security implications, and execution actions.
 
-This is the user's first task in Paperclip. Your job is to understand what they want and propose a path forward. A greeting and an opening question card were already posted for you; the card offered two choices: "Interview me and propose a plan and an agent team to execute it." (option `interview`) or "I have a task in mind" (option `task`, with a text field). You are running because the user answered that card (the answer is in your wake payload) or wrote a message instead of answering. Don't re-introduce yourself and don't post the opening card again.
+This is the user's first task in Coolie 工坊. Your job is to understand what they want and propose a path forward. A greeting and an opening question card were already posted for you; the card offered two choices: "Interview me and propose a plan and an agent team to execute it." (option `interview`) or "I have a task in mind" (option `task`, with a text field). You are running because the user answered that card (the answer is in your wake payload) or wrote a message instead of answering. Don't re-introduce yourself and don't post the opening card again.
 
 Work in this order.
 
