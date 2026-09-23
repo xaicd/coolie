@@ -1,31 +1,36 @@
 /**
- * Coolie工坊 原型交互沙箱 — wave55 真仿 DS PreviewPanel.tsx (180 行简洁)
+ * Coolie工坊 原型交互沙箱 — wave56 真仿 DS PreviewWebView.tsx (134 行)
  *
- * 仿 DS 真值 (boss 09-22 24:40 「你确定认真学习 digitalstaff 的预览了吗」):
- *   A. 视口切换: desktop (100%) / tablet (768px) / mobile (375px) — Ionicons
- *   B. Refresh 按钮 (refresh-outline)
- *   C. External Link 按钮 (open-outline → Linking.openURL, 跳出 OS browser)
- *   D. WebView 渲染预览 URL
- *   E. Empty state (「预览未就绪」/「完成任务后将显示预览」)
+ * 仿 DS 真值 (boss 09-23 24:40 「你确定认真学习 digitalstaff 的预览了吗, 最新的预览」):
+ *   A. 工具条: [关闭] + URL tag (LIVE / SNAPSHOT) + [刷新] + [浏览器打开]
+ *   B. 同源代理: 走 <apiBase>/api/tasks/host-preview/<sessionId>/?token=<jwt>&_t=<bust>
+ *      —— DS 端是真值; 我们后端目前没有 host-preview 代理端点 (见下方「真值 vs 现状」)
+ *   C. React Native WebView (Platform.OS !== 'web') + originWhitelist=["*"]
+ *   D. Linking.openURL External Link (跳 OS 浏览器)
+ *   E. Empty state: 「预览未就绪」/「完成任务后将显示预览」
  *
- * 删 wave54 +302 行 (HOST PREVIEW banner + SESSION URL 三段 + sandbox 安全 footer +
- * logs panel — DS 真没有, 是 PM 臆想的)。
+ * 真值 vs 现状 (boss 09-23 24:40):
+ *   DS PreviewWebView.tsx 的 sessionId-keyed host-preview 是建立在他们后端
+ *   「GET /api/tasks/host-preview/<sessionId>/」同源代理 + 「GET
+ *   /api/ide-sessions/<id>/snapshots/by-task/<taskId>/url」快照回放上的。
+ *   我们的 server/src 暂无这两个端点 (grep 验证过)。本文件先用我们已有的
+ *   service.url (LIVE 实时工作空间) / workProduct.url (SNAPSHOT 历史工作产品)
+ *   顶上 — DS 工具条/标签/刷新/外链四项 UI 真值全部保留; 后续补 host-preview
+ *   代理时只需把 resolve() 换成 buildHostPreviewUrl(sessionId) 即可, UI 不动。
  */
 
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
-  Dimensions,
   Linking,
+  Platform,
   Pressable,
   SafeAreaView,
+  StatusBar as RNStatusBar,
   StyleSheet,
   Text,
   View,
-  Platform,
-  StatusBar as RNStatusBar,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { Ionicons } from "@expo/vector-icons";
 import { WebView } from "react-native-webview";
 import type {
   Company,
@@ -45,50 +50,38 @@ export interface PrototypeSandboxScreenProps {
   onBack: () => void;
 }
 
-type ViewportMode = "desktop" | "tablet" | "mobile";
-
-/** 提取 URL 中首个 http(s) 地址 (workProduct.url / metadata.previewUrl / 内容里) */
-function firstHttpUrl(value: unknown): string | null {
-  if (typeof value !== "string") return null;
-  const match = /https?:\/\/[^\s"'<>()[\]{},;，。]+/i.exec(value);
-  return match ? match[0] : null;
-}
-
 /** 从 work product / artifact metadata 里直拿到预览 URL (轻量直开回退) */
 function extractPreviewUrl(workProduct: IssueWorkProduct | null | undefined): string | null {
   if (!workProduct) return null;
-  const metadata = (workProduct.metadata ?? {}) as Record<string, unknown>;
-  const resourceRef = (metadata.resourceRef ?? {}) as Record<string, unknown>;
-  const candidates: unknown[] = [
-    workProduct.url,
-    metadata.previewUrl,
-    metadata.previewURL,
-    resourceRef.url,
-    metadata.url,
-    workProduct.summary,
-  ];
-  for (const candidate of candidates) {
-    const url = firstHttpUrl(candidate);
-    if (url) return url;
-  }
-  for (const value of Object.values(metadata)) {
-    const url = firstHttpUrl(value);
-    if (url) return url;
-  }
-  return null;
+  return (
+    workProduct.url ||
+    ((workProduct.metadata as Record<string, unknown> | null)?.previewUrl as
+      | string
+      | undefined) ||
+    null
+  );
 }
 
-interface ViewportSpec {
-  width: number | string;
-  icon: keyof typeof Ionicons.glyphMap;
-  label: string;
+/** 解析预览 URL 优先 LIVE (service.url) 否则 SNAPSHOT (workProduct.url)。
+ *  DS 真值: buildHostPreviewUrl(sessionId) + fetchSnapshotPreviewUrl(sessionId, taskId)。
+ *  我们后端无这两个端点, 暂用 service.id 作 session 键, 后续补代理时把
+ *  内部实现换成 DS 的 buildHostPreviewUrl 即可, 工具条不变。 */
+function resolvePreviewUrl(
+  service: WorkspaceRuntimeService | null | undefined,
+  workProduct: IssueWorkProduct | null | undefined,
+  initialUrl: string | null | undefined,
+  bust: number,
+): { url: string | null; isSnapshot: boolean } {
+  const live = service?.url?.length ? service.url : null;
+  const snap = extractPreviewUrl(workProduct) || initialUrl || null;
+  if (live) {
+    // LIVE: 同源代理应在后端给我们带 _t 防缓存; 直 URL 时我们手加
+    const sep = live.includes("?") ? "&" : "?";
+    return { url: `${live}${sep}_t=${bust}`, isSnapshot: false };
+  }
+  // SNAPSHOT: 签名 URL 原样使用, 不追加 query (避免破坏签名)
+  return { url: snap, isSnapshot: !!snap };
 }
-
-const VIEWPORTS: Record<ViewportMode, ViewportSpec> = {
-  desktop: { width: "100%", icon: "desktop-outline", label: "桌面" },
-  tablet: { width: 768, icon: "tablet-portrait-outline", label: "平板" },
-  mobile: { width: 375, icon: "phone-portrait-outline", label: "手机" },
-};
 
 export function PrototypeSandboxScreen({
   company: _company,
@@ -97,34 +90,38 @@ export function PrototypeSandboxScreen({
   workProduct,
   onBack,
 }: PrototypeSandboxScreenProps) {
-  // 把 workProduct / initialUrl 拼成一个稳定 URL; 任一来源有就用
-  const initialResolved =
-    initialUrl || extractPreviewUrl(workProduct) || "";
-  const [previewUrl] = useState<string>(initialResolved);
-  const [viewport, setViewport] = useState<ViewportMode>("desktop");
-  const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [webError, setWebError] = useState<string | null>(null);
-  const [key, setKey] = useState<number>(0);
+  const [bust, setBust] = useState<number>(() => Date.now());
+  const [loading, setLoading] = useState<boolean>(true);
+  const [webLoading, setWebLoading] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+  const [{ url, isSnapshot }, setResolved] = useState<{
+    url: string | null;
+    isSnapshot: boolean;
+  }>(() => resolvePreviewUrl(_service, workProduct, initialUrl, bust));
 
-  const handleRefresh = () => {
-    setWebError(null);
-    setKey((k) => k + 1);
-  };
+  // DS 真值: useEffect(resolve, [sessionId]); 我们重入参 resolve() 一次
+  useEffect(() => {
+    setResolved(resolvePreviewUrl(_service, workProduct, initialUrl, bust));
+    setLoading(false);
+  }, [_service, workProduct, initialUrl, bust]);
 
-  const handleOpenExternal = () => {
-    if (!previewUrl) return;
-    void Linking.openURL(previewUrl).catch(() => {
-      // 静默失败 —— 这是「跳到 OS browser」的可选动作, 失败就让用户留在沙箱内
+  const handleRefresh = useCallback(() => {
+    setError(null);
+    setBust(Date.now());
+  }, []);
+
+  const handleOpenExternal = useCallback(() => {
+    if (!url) return;
+    void Linking.openURL(url).catch(() => {
+      // 静默失败 —— 「跳到 OS 浏览器」是可选动作, 失败就让用户留在沙箱内
     });
-  };
+  }, [url]);
 
-  const windowWidth = Dimensions.get("window").width;
-  const isMobileMode = viewport === "mobile";
-  const viewportSpec = VIEWPORTS[viewport];
+  // DS 真值: Web 端降级为「在浏览器打开」; 我们也是
+  const canWebView = !!url && Platform.OS !== "web";
 
-  // DS 真没有「空态用大输入框直接输 URL」这种重 UI — 一个干净的 placeholder 就够。
-  // 真要看预览, 用户从原型任务详情点进; 这里没链接就告诉他等任务跑完。
-  if (!previewUrl) {
+  // DS 真值: 没链接就直接告诉他「暂无可用预览」, 不堆输入框
+  if (!url) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="light" />
@@ -141,129 +138,111 @@ export function PrototypeSandboxScreen({
     );
   }
 
-  const viewportWidth =
-    viewportSpec.width === "100%"
-      ? windowWidth
-      : Math.min(windowWidth - 32, viewportSpec.width as number);
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
 
-      {/* Toolbar: 视口切换 (左) + Refresh + External link (右) — 仿 DS 真值 */}
+      {/* 工具条 — 仿 DS PreviewWebView 真值: 关闭 + tag + 刷新 + 浏览器打开 */}
       <View style={styles.toolbar}>
-        <View style={styles.viewportGroup}>
-          {(Object.keys(VIEWPORTS) as ViewportMode[]).map((mode) => {
-            const spec = VIEWPORTS[mode];
-            const active = mode === viewport;
-            return (
-              <Pressable
-                key={mode}
-                onPress={() => setViewport(mode)}
-                style={[styles.viewportBtn, active && styles.viewportBtnActive]}
-                hitSlop={6}
-              >
-                <Ionicons
-                  name={spec.icon}
-                  size={16}
-                  color={active ? C.accent : C.ink3}
-                />
-                <Text
-                  style={[
-                    styles.viewportBtnText,
-                    active && styles.viewportBtnTextActive,
-                  ]}
-                >
-                  {spec.label}
-                </Text>
-              </Pressable>
-            );
-          })}
+        <Pressable
+          onPress={onBack}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          style={styles.toolBtn}
+        >
+          <Text style={styles.closeText}>关闭</Text>
+        </Pressable>
+
+        <View style={styles.toolMid}>
+          <View
+            style={[
+              styles.tag,
+              isSnapshot ? styles.tagSnap : styles.tagLive,
+            ]}
+          >
+            <Text style={styles.tagText}>
+              {isSnapshot ? "SNAPSHOT" : "LIVE"}
+            </Text>
+          </View>
+          {(webLoading || loading) && (
+            <Text style={styles.loadingHint}>加载中…</Text>
+          )}
         </View>
 
-        <View style={styles.actions}>
+        <View style={styles.toolRight}>
           <Pressable
             onPress={handleRefresh}
-            disabled={isLoading}
-            style={[styles.iconBtn, isLoading && styles.iconBtnDisabled]}
-            hitSlop={8}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.toolBtn}
           >
-            <Ionicons
-              name="refresh-outline"
-              size={18}
-              color={isLoading ? C.ink4 : C.ink2}
-            />
+            <Text style={styles.barBtn}>刷新</Text>
           </Pressable>
           <Pressable
             onPress={handleOpenExternal}
-            style={styles.iconBtn}
-            hitSlop={8}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            style={styles.toolBtn}
           >
-            <Ionicons name="open-outline" size={18} color={C.ink2} />
+            <Text style={styles.barBtn}>浏览器打开</Text>
           </Pressable>
         </View>
       </View>
 
-      {/* iframe WebView: originWhitelist + javaScriptEnabled + domStorageEnabled
-          + cacheEnabled (RN WebView 没 sandbox attr; originWhitelist 起到近似白名单作用) */}
-      <View style={styles.viewportOuter}>
-        <View
-          style={[
-            styles.viewportInner,
-            isMobileMode ? styles.mobileFrame : styles.desktopFrame,
-            { width: viewportWidth },
-          ]}
-        >
-          {webError ? (
-            <View style={styles.errorBox}>
-              <Ionicons name="alert-circle-outline" size={28} color={C.err} />
-              <Text style={styles.errorTitle}>无法连接到原型服务</Text>
-              <Text style={styles.errorMessage}>{webError}</Text>
-              <Pressable style={styles.retryBtn} onPress={handleRefresh}>
-                <Text style={styles.retryBtnText}>重试</Text>
-              </Pressable>
-            </View>
-          ) : (
-            <WebView
-              key={key}
-              source={{ uri: previewUrl }}
-              style={styles.webview}
-              originWhitelist={["*"]}
-              javaScriptEnabled
-              domStorageEnabled
-              cacheEnabled
-              sharedCookiesEnabled={false}
-              thirdPartyCookiesEnabled={false}
-              incognito
-              onLoadStart={() => setIsLoading(true)}
-              onLoadEnd={() => setIsLoading(false)}
-              onHttpError={(syntheticEvent: { nativeEvent: { statusCode?: number } }) => {
-                setIsLoading(false);
-                const code = syntheticEvent.nativeEvent.statusCode;
-                setWebError(code ? `HTTP ${code}` : "无法连接到原型服务");
-              }}
-              onError={(syntheticEvent: {
-                nativeEvent: { description?: string; code?: number };
-              }) => {
-                setIsLoading(false);
-                const { description, code } = syntheticEvent.nativeEvent;
-                setWebError(
-                  `${description || "连接超时或拒绝连接"} (代码: ${code ?? "N/A"})`,
-                );
-              }}
-              renderError={(errorDomain: string | undefined) => (
-                <View style={styles.errorBox}>
-                  <Ionicons name="alert-circle-outline" size={28} color={C.err} />
-                  <Text style={styles.errorTitle}>{errorDomain || "加载失败"}</Text>
-                  <Pressable style={styles.retryBtn} onPress={handleRefresh}>
-                    <Text style={styles.retryBtnText}>重试</Text>
-                  </Pressable>
-                </View>
-              )}
-            />
-          )}
+      {/* 主体 */}
+      {loading ? (
+        <View style={styles.center}>
+          <Text style={styles.hint}>加载预览…</Text>
         </View>
-      </View>
+      ) : canWebView ? (
+        <WebView
+          key={isSnapshot ? url : `${url}`}
+          source={{ uri: url }}
+          style={styles.web}
+          originWhitelist={["*"]}
+          javaScriptEnabled
+          domStorageEnabled
+          onLoadStart={() => setWebLoading(true)}
+          onLoadEnd={() => setWebLoading(false)}
+          onError={() => {
+            setWebLoading(false);
+            setError("页面加载失败 · 工作空间可能尚无可预览内容");
+          }}
+          onHttpError={(syntheticEvent: {
+            nativeEvent: { statusCode?: number };
+          }) => {
+            const code = syntheticEvent.nativeEvent.statusCode;
+            setWebLoading(false);
+            if (code === 404) setError("工作空间暂无 index.html 或可预览页面");
+            else if (code && code >= 500) setError("预览服务错误 · 稍后刷新重试");
+            else if (code) setError(`HTTP ${code}`);
+          }}
+        />
+      ) : url && Platform.OS === "web" ? (
+        <View style={styles.center}>
+          <Text style={styles.hint}>Web 端不内嵌 WebView</Text>
+          <Pressable style={styles.primaryBtn} onPress={handleOpenExternal}>
+            <Text style={styles.primaryBtnText}>在浏览器打开预览</Text>
+          </Pressable>
+        </View>
+      ) : (
+        <View style={styles.center}>
+          <Text style={styles.emptyIcon}>🖥️</Text>
+          <Text style={styles.hint}>{error || "暂无可用预览"}</Text>
+          <Pressable style={styles.primaryBtn} onPress={handleRefresh}>
+            <Text style={styles.primaryBtnText}>重试</Text>
+          </Pressable>
+        </View>
+      )}
+
+      {/* 加载错误横幅 — DS 真值: 有 URL 但代理报错时 */}
+      {url && error && (
+        <View style={styles.errBar}>
+          <Text style={styles.errText} numberOfLines={1}>
+            {error}
+          </Text>
+          <Pressable onPress={handleRefresh} hitSlop={6}>
+            <Text style={styles.errBtn}>刷新</Text>
+          </Pressable>
+        </View>
+      )}
     </SafeAreaView>
   );
 }
@@ -278,124 +257,93 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
+    paddingHorizontal: 12,
     paddingVertical: 10,
-    backgroundColor: C.panel,
     borderBottomWidth: 1,
     borderBottomColor: C.lineSubtle,
-  },
-  viewportGroup: {
-    flexDirection: "row",
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderRadius: 8,
-    padding: 2,
-    borderWidth: 1,
-    borderColor: C.lineSubtle,
-  },
-  viewportBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingVertical: 5,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-  },
-  viewportBtnActive: {
-    backgroundColor: "rgba(94, 106, 210, 0.18)",
-  },
-  viewportBtnText: {
-    color: C.ink3,
-    fontSize: 11,
-    fontWeight: "500",
-  },
-  viewportBtnTextActive: {
-    color: C.accent,
-  },
-  actions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-  },
-  iconBtn: {
-    width: 32,
-    height: 32,
-    alignItems: "center",
-    justifyContent: "center",
-    borderRadius: 6,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    borderWidth: 1,
-    borderColor: C.lineSubtle,
-  },
-  iconBtnDisabled: {
-    opacity: 0.4,
-  },
-  emptyWrap: {
-    flex: 1,
-  },
-  emptyIcon: {
-    fontSize: 40,
-  },
-  viewportOuter: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "flex-start",
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: C.bg,
-  },
-  viewportInner: {
-    flex: 1,
-    borderRadius: 8,
-    overflow: "hidden",
-    borderWidth: 1,
-    borderColor: C.line,
-    backgroundColor: "#FFFFFF",
-  },
-  desktopFrame: {
-    height: "100%",
-  },
-  mobileFrame: {
-    height: "92%",
-    maxWidth: 390,
-    borderRadius: 24,
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.18)",
-    backgroundColor: "#000000",
-  },
-  webview: {
-    flex: 1,
-    backgroundColor: "#FFFFFF",
-  },
-  errorBox: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 24,
-    backgroundColor: C.bg,
     gap: 8,
   },
-  errorTitle: {
-    color: C.ink,
+  toolBtn: {
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+  },
+  closeText: {
+    color: C.accent,
     fontSize: 14,
     fontWeight: "600",
-    marginTop: 8,
   },
-  errorMessage: {
-    color: C.ink3,
+  toolMid: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  toolRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  barBtn: {
+    color: C.ink2,
     fontSize: 12,
-    textAlign: "center",
-    lineHeight: 18,
+    fontWeight: "600",
   },
-  retryBtn: {
-    marginTop: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: C.brand,
+  tag: {
     borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderWidth: 1,
   },
-  retryBtnText: {
-    color: "#FFFFFF",
-    fontSize: 13,
-    fontWeight: "500",
+  tagLive: {
+    borderColor: "rgba(52,211,153,0.5)",
+    backgroundColor: "rgba(52,211,153,0.12)",
   },
+  tagSnap: {
+    borderColor: "rgba(167,139,250,0.5)",
+    backgroundColor: "rgba(167,139,250,0.12)",
+  },
+  tagText: {
+    color: C.ink,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  loadingHint: {
+    color: C.ink3,
+    fontSize: 11,
+  },
+  web: { flex: 1, backgroundColor: "#FFFFFF" },
+  center: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 28,
+    gap: 14,
+    backgroundColor: C.bg,
+  },
+  emptyIcon: { fontSize: 40 },
+  hint: { color: C.ink3, fontSize: 14, textAlign: "center", lineHeight: 20 },
+  primaryBtn: {
+    backgroundColor: C.brand,
+    borderRadius: 12,
+    paddingHorizontal: 22,
+    paddingVertical: 12,
+    alignItems: "center",
+    marginTop: 4,
+  },
+  primaryBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
+  errBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    backgroundColor: "rgba(251,113,133,0.12)",
+    borderTopColor: "rgba(251,113,133,0.4)",
+    borderTopWidth: 1,
+  },
+  errText: { color: C.err, fontSize: 12, flex: 1 },
+  errBtn: { color: C.err, fontSize: 12, fontWeight: "700" },
+  emptyWrap: { flex: 1 },
 });
