@@ -10,16 +10,6 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ### 更新
 
-- wave56 真仿 DS PreviewWebView.tsx (134 行, boss 24:40 '你确定认真学习 digitalstaff 的预览了吗, 最新的预览') 重写任务详情原型沙箱: 删 wave55 仿错的 viewport 切换, 改用 DS 真工具条 [关闭] + LIVE/SNAPSHOT tag + [刷新] + [浏览器打开] + RN WebView originWhitelist
-
----
-
-## v0.5.35
-
-> Released: 2026-09-23 · Android release APK
-
-### 更新
-
 - wave56 真仿 DS PreviewWebView.tsx (134 行) 重写任务详情原型沙箱 (boss 24:40 '你确定认真学习 digitalstaff 的预览了吗, 最新的预览'): 删 wave55 仿错的 PreviewPanel 视口切换 (desktop/tablet/mobile), 改用 DS 真工具条 —— [关闭] + URL tag (LIVE / SNAPSHOT) + [刷新] (_t 防缓存换 bust) + [浏览器打开] (Linking.openURL) + RN WebView originWhitelist=["*"]。400 → 318 行
 - 注明 DS sessionId-keyed host-preview 代理 (`GET /api/tasks/host-preview/<sessionId>/?token=<jwt>&_t=<bust>`) 与 OSS 快照 (`GET /api/ide-sessions/<id>/snapshots/by-task/<taskId>/url`) 是 DS 后端能力 —— 我们 server/src 缺这两个端点 (grep 验证), 本文件先用 service.url LIVE / workProduct.url SNAPSHOT 顶上, 后续补代理时把 resolvePreviewUrl() 内核换成 buildHostPreviewUrl 即可, 工具条 UI 不动
 
