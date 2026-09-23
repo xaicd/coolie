@@ -21,6 +21,14 @@ export interface HermesOneShotInput {
   companyId: string;
   /** Passed as `PAPERCLIP_API_URL` when set. */
   apiUrl?: string;
+  /**
+   * Coolie fork: the active company's display name. Forwarded to the spawned
+   * `hermes` as `$COMPANY_NAME` so persona-aware tooling (board concierge
+   * relays, future agents) sees the same branding the SYSTEM block carries.
+   * Optional: build/orchestrator callers leave it `undefined` and hermes'
+   * own config is the source of truth for those flows.
+   */
+  companyName?: string;
   /** The `[SYSTEM]` block. */
   systemPrompt: string;
   /** The payload block's label, e.g. `BUILD REQUEST` -> `[BUILD REQUEST]`. */
@@ -52,6 +60,9 @@ export async function requestHermesOneShot(input: HermesOneShotInput): Promise<s
           ...process.env,
           ...(input.apiUrl ? { PAPERCLIP_API_URL: input.apiUrl } : {}),
           PAPERCLIP_COMPANY_ID: input.companyId,
+          // Coolie fork: optional persona name passthrough. Only set when
+          // present so an empty value never blanks a downstream env.
+          ...(input.companyName ? { COMPANY_NAME: input.companyName } : {}),
         },
       },
     );
