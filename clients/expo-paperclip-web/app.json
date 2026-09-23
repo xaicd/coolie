@@ -3,7 +3,7 @@
     "name": "Coolie Web",
     "slug": "coolie-paperclip-web",
     "scheme": "coolieweb",
-    "version": "0.6.4",
+    "version": "0.6.5",
     "orientation": "portrait",
     "userInterfaceStyle": "dark",
     "newArchEnabled": true,
@@ -25,7 +25,7 @@
     },
     "android": {
       "package": "cloud.coolie.app.web",
-      "versionCode": 4,
+      "versionCode": 5,
       "permissions": [
         "INTERNET"
       ]

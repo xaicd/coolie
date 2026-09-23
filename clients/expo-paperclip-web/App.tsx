@@ -503,6 +503,58 @@ const I18N_PATCH: Record<string, string> = {
   // 所以只能在壳这层按渲染文本翻。Ontology 沿用 fork 文档里的「本体」)
   Voice: "语音",
   Ontology: "本体",
+
+  // —— wave57: 老板 09-22 24:43 「pageclip 不该出现」, 套壳里所有可见
+  // "Paperclip" 字样替换为 "Coolie" / 适用 coolie 业务语境的译法 ——
+  // 上游 ui/ 是 fork-surface 保护目录, 不能改; 只能在壳这一层用 MutationObserver
+  // 拦截 textContent 替换。和 I18N_PATCH 其它条目一样, 只匹配「整段文本全等」。
+  // 顺序重要: 先匹配「Paperclip X」复合短语, 再匹配裸「Paperclip」, 避免贪婪误伤。
+  // 来源: 上游 grep (L72/75/99 IssueChatThread.tsx, L1038 WorkspaceFileBrowser,
+  // L312 SummarySlotCard, L196 OutputFeedbackButtons, L347 Secrets.tsx,
+  // L136/140 Agents.tsx, L66/285/296/424/515/523/524 InstanceExperimentalSettings,
+  // L66/280/511/731/5209 CompanySkills, L80/126 CliAuth.tsx, L1203/2025/2029/2052/2128/2132/2136/2212/2298/2303 CompanyEnvironments 等)。
+  "Paperclip Labs": "Coolie",
+  "Share with Paperclip Labs": "分享给 Coolie",
+  "Paperclip Enterprise": "Coolie 企业版",
+  "Paperclip Cloud": "Coolie 云",
+  "Paperclip Runner": "Coolie 运行器",
+  "Paperclip Developer Mode": "Coolie 开发者模式",
+  "Paperclip Dev Mode": "Coolie 开发者模式",
+  "Paperclip Board UI": "Coolie 看板",
+  "Paperclip workspace": "Coolie 工作区",
+  "Paperclip Run": "Coolie 任务",
+  "Paperclip Instance": "Coolie 实例",
+  "Paperclip Agent": "Coolie 员工",
+  "Paperclip App": "Coolie 应用",
+  "Paperclip CLI": "Coolie CLI",
+  "Paperclip-managed": "由 Coolie 管理",
+  "Paperclip managed": "由 Coolie 管理",
+  "Managed by Paperclip": "由 Coolie 管理",
+  "Managed by Paperclip Cloud": "由 Coolie 云管理",
+  "Paperclip host": "Coolie 主机",
+  "Paperclip template": "Coolie 模板",
+  "Runs on this Paperclip host.": "运行在此 Coolie 主机上。",
+  "Paperclip execution host": "Coolie 执行主机",
+  "paperclip_managed": "coolie_managed",
+  "Paperclip EE": "Coolie EE",
+  "Get Paperclip EE.": "获取 Coolie EE。",
+  "Restart Paperclip now?": "现在重启 Coolie？",
+  "Approve Paperclip CLI access": "批准 Coolie CLI 访问",
+  "A local Paperclip CLI process is requesting board access to this instance.":
+    "本地 Coolie CLI 进程正在请求此实例的看板访问权限。",
+  "The Paperclip CLI can now finish authentication on the requesting machine.":
+    "Coolie CLI 现在可以在请求的机器上完成认证。",
+  "Agent audit is a Paperclip Enterprise view": "员工审计是 Coolie 企业版视图",
+  "Recorded by Paperclip — entries can't be edited. Sensitive values are never stored.":
+    "由 Coolie 记录 — 条目不可编辑。敏感数据从不被存储。",
+  "In Paperclip Cloud the switcher lists the signed-in user's stacks":
+    "在 Coolie 云里, 切换器列出当前登录用户的栈",
+  "Choose whether voted AI outputs can be shared with Paperclip Labs.":
+    "选择已投票的 AI 输出是否可以分享给 Coolie。",
+  "paperclip.com": "coolie.cloud",
+  // 兜底裸 "Paperclip" 在所有复合短语之后 —— 上游 fallback label (如 IssueChatThread
+  // authorName ?? "Paperclip") / 错误提示起始 / 文档引用都会命中, 整体替换为 Coolie。
+  Paperclip: "Coolie",
 };
 
 /**
