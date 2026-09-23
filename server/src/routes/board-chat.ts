@@ -263,7 +263,15 @@ export function boardChatRoutes(
     // hermes exit before answering (the room just shows nothing). Everything
     // here exists on both the old and new CLI; `--quiet` keeps banners and
     // tool previews out of stdout.
-    const boardModel = process.env.BOARD_CHAT_MODEL ?? "glm-5.3-flash";
+    // Coolie fork: the board concierge runs on MiniMax-M3 through hermes'
+    // built-in `minimax-cn` provider (api.minimaxi.com/anthropic). The provider
+    // is passed explicitly because hermes' own default — `model.provider` in
+    // its config, `glmcode` — rejects a MiniMax model id with
+    // `HTTP 400 模型不存在`. Both are env-overridable so an operator can roll
+    // back to GLM by setting BOARD_CHAT_PROVIDER=glmcode and
+    // BOARD_CHAT_MODEL=<glm model> in the service env, with no code change.
+    const boardModel = process.env.BOARD_CHAT_MODEL ?? "MiniMax-M3";
+    const boardProvider = process.env.BOARD_CHAT_PROVIDER ?? "minimax-cn";
     const args = [
       "--oneshot",
       "--quiet",
@@ -273,6 +281,8 @@ export function boardChatRoutes(
       "--yolo",
       "--max-turns",
       "40",
+      "--provider",
+      boardProvider,
       "-m",
       boardModel,
     ];
@@ -292,6 +302,13 @@ export function boardChatRoutes(
         ...process.env,
         PAPERCLIP_API_URL: apiUrl,
         PAPERCLIP_COMPANY_ID: companyId,
+        // The active provider's credential, pinned explicitly so the relay
+        // does not depend on hermes' own provider state. Only set when present:
+        // hermes also loads its own ~/.hermes/.env, and an empty value here
+        // would blank a key it would otherwise resolve on its own.
+        ...(process.env.MINIMAX_CN_API_KEY
+          ? { MINIMAX_CN_API_KEY: process.env.MINIMAX_CN_API_KEY }
+          : {}),
       },
     });
 
