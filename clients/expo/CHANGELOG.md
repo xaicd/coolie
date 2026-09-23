@@ -10,16 +10,6 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ### 更新
 
-- 修收件箱真数据加载 (boss 09-22 24:35 '收件箱咋又搞坏了'): 复核 InboxScreen fetch URL 已对, 无 mock 数据; emulator 真验 4 tabs + boss 34 issue 列表
-
----
-
-## v0.5.31
-
-> Released: 2026-09-23 · Android release APK
-
-### 更新
-
 - 修收件箱 (boss 09-22 24:35 '收件箱咋又搞坏了'): 复核 `InboxScreen.tsx` 数据加载 — `coolie.getInbox` / `coolie.listIssues` / `coolie.listAgents` / `coolie.listProjects` / `coolie.archiveIssueFromInbox` 都已接真服务端点 (`/api/inbox`, `/api/companies/:id/issues`, `/api/issues/:id/inbox-archive`), 无 mock 数据; 真机 emulator 复测: 4 tabs 渲染、列表加载 boss 账号 34 条 issue、`xrobinai · 任务 34 · 审批 0 · @我 0` 头部胶囊正确
 
 ---
