@@ -765,6 +765,36 @@ function HomeScreen({
     return () => subscription.remove();
   }, []);
 
+  /**
+   * 任务详情在当前 tab 内渲染 (wave51, boss 09-22 24:27 「又是没底部导航了」):
+   * 不再整屏覆盖内容区, 底栏 5 个 tab 始终可见。由 tab 决定是否显示 ——
+   * 任务/收件箱两个 tab 选中 issue 时用它替换列表, 其余早退浮层 (搜索/通知/沙箱等)
+   * 仍是整屏。返回统一走 setSelected(null): 顶部 [← 返回] / 左缘右滑 / 系统 back 三种。
+   */
+  const taskDetail = selected ? (
+    <TaskDetailScreen
+      issue={selected}
+      company={company}
+      onBack={() => setSelected(null)}
+      onOpenDiff={(issueItem) => setDiffContext({ issue: issueItem })}
+      onOpenSandbox={(issueItem) => {
+        void (async () => {
+          const workProducts = await coolie
+            .listWorkProducts(issueItem.id)
+            .catch(() => [] as IssueWorkProduct[]);
+          const prototype = workProducts.find(
+            (wp) => wp.url || wp.type === "prototype" || wp.runtimeServiceId,
+          );
+          setSandboxContext({
+            url: prototype?.url ?? null,
+            service: null,
+            workProduct: prototype ?? null,
+          });
+        })();
+      }}
+    />
+  ) : null;
+
   let content: React.ReactNode;
   if (sandboxContext) {
     content = (
@@ -852,30 +882,6 @@ function HomeScreen({
         }}
       />
     );
-  } else if (selected) {
-    content = (
-      <TaskDetailScreen
-        issue={selected}
-        company={company}
-        onBack={() => setSelected(null)}
-        onOpenDiff={(issueItem) => setDiffContext({ issue: issueItem })}
-        onOpenSandbox={(issueItem) => {
-          void (async () => {
-            const workProducts = await coolie
-              .listWorkProducts(issueItem.id)
-              .catch(() => [] as IssueWorkProduct[]);
-            const prototype = workProducts.find(
-              (wp) => wp.url || wp.type === "prototype" || wp.runtimeServiceId,
-            );
-            setSandboxContext({
-              url: prototype?.url ?? null,
-              service: null,
-              workProduct: prototype ?? null,
-            });
-          })();
-        }}
-      />
-    );
   } else {
     content = (
     <SafeAreaView style={[styles.shell, { paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
@@ -945,16 +951,17 @@ function HomeScreen({
             }}
           />
         ) : tab === "inbox" ? (
-          <InboxScreen
-            company={company}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onOpenIssue={(issue) => {
-              navigateTab("tasks");
-              setSelected(issue);
-            }}
-            onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
-            onOpenWorkshop={() => navigateTab("chat")}
-          />
+          selected ? (
+            taskDetail
+          ) : (
+            <InboxScreen
+              company={company}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenIssue={setSelected}
+              onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
+              onOpenWorkshop={() => navigateTab("chat")}
+            />
+          )
         ) : tab === "ontology" ? (
           <OntologyDomainListScreen company={company} whoami={whoami} onOpenSettings={() => setSettingsOpen(true)} />
         ) : tab === "artifacts" ? (
@@ -969,19 +976,23 @@ function HomeScreen({
             }
           />
         ) : tab === "tasks" ? (
-          <TasksScreen
-            company={company}
-            whoami={whoami}
-            refreshToken={tasksRefreshToken}
-            onOpenIssue={setSelected}
-            onOpenBuildIssue={(issueId) => void openIssueById(issueId)}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onOpenWorkshop={() => navigateTab("chat")}
-            onOpenOntology={() => navigateTab("ontology")}
-            onOpenArtifacts={() => navigateTab("artifacts")}
-            onOpenPipelines={() => setPipelinesOpen(true)}
-            onOpenPlans={() => setPlansOpen(true)}
-          />
+          selected ? (
+            taskDetail
+          ) : (
+            <TasksScreen
+              company={company}
+              whoami={whoami}
+              refreshToken={tasksRefreshToken}
+              onOpenIssue={setSelected}
+              onOpenBuildIssue={(issueId) => void openIssueById(issueId)}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenWorkshop={() => navigateTab("chat")}
+              onOpenOntology={() => navigateTab("ontology")}
+              onOpenArtifacts={() => navigateTab("artifacts")}
+              onOpenPipelines={() => setPipelinesOpen(true)}
+              onOpenPlans={() => setPlansOpen(true)}
+            />
+          )
         ) : null}
       </View>
       {appUpdate ? <AppUpdateCard info={appUpdate} onClose={() => setAppUpdate(null)} /> : null}
@@ -999,7 +1010,9 @@ function HomeScreen({
         onChange={(key) => {
           // 浮层只盖住内容区 (见 composeOverlay 的 bottom: TAB_BAR_HEIGHT), 底栏仍可点:
           // 点任一 tab 就落回那一页, 不让浮层僵在原地 (boss 22:59 「底部导航呢」)。
+          // 任务详情同理 —— 它是「当前 tab 内的一层」(wave51), 换 tab 就回列表, 不跨 tab 残留。
           setComposeOpen(false);
+          setSelected(null);
           navigateTab(key);
         }}
         onCreate={() => setComposeOpen(true)}

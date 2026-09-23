@@ -7,7 +7,6 @@ import {
   RefreshControl,
   SafeAreaView,
   ScrollView,
-  StatusBar as RNStatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -171,12 +170,7 @@ export function TaskDetailScreen({
   }
 
   return (
-    <SafeAreaView
-      style={[
-        styles.safeArea,
-        { paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 },
-      ]}
-    >
+    <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
       <KeyboardAvoidingView
         style={{ flex: 1 }}
