@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.27
+
+> Released: 2026-09-23 · Android release APK
+
+### 更新
+
+- 换 MiniMax-M3 配置 (替代 GLM-5.3-flash): board chat 走 hermes minimax-cn provider, 真验 200 OK
+
+---
+
 ## v0.5.26
 
 > Released: 2026-09-23 · Android release APK
