@@ -776,7 +776,6 @@ function HomeScreen({
       issue={selected}
       company={company}
       onBack={() => setSelected(null)}
-      onOpenDiff={(issueItem) => setDiffContext({ issue: issueItem })}
       onOpenSandbox={(issueItem) => {
         void (async () => {
           const workProducts = await coolie

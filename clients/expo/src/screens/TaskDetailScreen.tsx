@@ -79,13 +79,11 @@ const STATUS_DOT: Record<string, string> = {
 export function TaskDetailScreen({
   issue,
   onBack,
-  onOpenDiff,
   onOpenSandbox,
 }: {
   issue: Issue;
   company?: { id: string; name: string };
   onBack: () => void;
-  onOpenDiff?: (issue: Issue) => void;
   onOpenSandbox?: (issue: Issue) => void;
 }) {
   const [comments, setComments] = useState<IssueComment[]>([]);
@@ -231,20 +229,12 @@ export function TaskDetailScreen({
             </View>
           ) : null}
 
-          {onOpenDiff || onOpenSandbox ? (
+          {onOpenSandbox ? (
             <View style={styles.actionRow}>
-              {onOpenDiff ? (
-                <Pressable style={[styles.btnGhost, { flex: 1 }]} onPress={() => onOpenDiff(issue)}>
-                  <Ionicons name="code-slash-outline" size={16} color={C.accent} />
-                  <Text style={styles.btnGhostText}>代码 Diff</Text>
-                </Pressable>
-              ) : null}
-              {onOpenSandbox ? (
-                <Pressable style={[styles.btnGhost, { flex: 1 }]} onPress={() => onOpenSandbox(issue)}>
-                  <Ionicons name="play-circle-outline" size={16} color={C.accent} />
-                  <Text style={styles.btnGhostText}>原型沙箱</Text>
-                </Pressable>
-              ) : null}
+              <Pressable style={[styles.btnGhost, { flex: 1 }]} onPress={() => onOpenSandbox(issue)}>
+                <Ionicons name="play-circle-outline" size={16} color={C.accent} />
+                <Text style={styles.btnGhostText}>原型沙箱</Text>
+              </Pressable>
             </View>
           ) : null}
 
