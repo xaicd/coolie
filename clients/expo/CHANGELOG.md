@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.33
+
+> Released: 2026-09-23 · Android release APK
+
+### 更新
+
+- wave55 仿 DS PreviewPanel 重写任务详情原型沙箱 (boss 24:40 '你确定认真学习 digitalstaff 的预览了吗'): viewport 切换 (desktop/tablet/mobile) + Refresh + External Link 跳出 OS browser + Empty state '预览未就绪' / '完成任务后将显示预览'。删 wave54 +302 行 (HOST PREVIEW banner + SESSION URL 三段 + sandbox 安全 footer + logs panel — DS 真没有, 是 PM 臆想的)。1219 → 400 行
+
+---
+
 ## v0.5.31
 
 > Released: 2026-09-23 · Android release APK
