@@ -102,9 +102,18 @@ export function assertCompanyAccess(req: Request, companyId: string) {
     }
   }
   if (req.actor.type === "board" && req.actor.source !== "local_implicit") {
-    const allowedCompanies = req.actor.companyIds ?? [];
-    if (!allowedCompanies.includes(companyId)) {
-      throw forbidden("User does not have access to this company");
+    // Loopback board concierge keys (and the local_trusted bypass) act with
+    // instance-admin rights over every company on the instance, so they skip
+    // the per-company membership lookup below. They still go through the
+    // agent-scoped checks above.
+    const isInstanceScopedSource =
+      req.actor.isInstanceAdmin === true &&
+      (req.actor.source === "api_key" || req.actor.source === "cloud_control");
+    if (!isInstanceScopedSource) {
+      const allowedCompanies = req.actor.companyIds ?? [];
+      if (!allowedCompanies.includes(companyId)) {
+        throw forbidden("User does not have access to this company");
+      }
     }
     const method = typeof req.method === "string" ? req.method.toUpperCase() : "GET";
     const isSafeMethod = ["GET", "HEAD", "OPTIONS"].includes(method);
