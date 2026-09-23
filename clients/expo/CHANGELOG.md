@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.36
+
+> Released: 2026-09-23 · Android release APK
+
+### 更新
+
+- wave59 真 PAPERCLIP_API_KEY 鉴权: server 加 x-paperclip-api-key 旁路 (boss 24:50 '我是你的 Paperclip 董事会助手' OOB); production PAPERCLIP_DEPLOYMENT_MODE=authenticated 不变, 同主机 App board concierge 透过该 header 调 127.0.0.1:3100/api/health + /api/companies/4cafeb9a-.../dashboard 实测 200
+
+---
+
 ## v0.5.35
 
 > Released: 2026-09-23 · Android release APK
