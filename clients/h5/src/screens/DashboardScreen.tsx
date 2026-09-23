@@ -1,9 +1,6 @@
 /**
- * 看额度 (DashboardScreen, h5) —— 公司本月支出 / 预算
- *
- * wave1 验收 F-2: h5 端没有额度卡 (board UI 面只有公司级"本月支出"卡)。
- * 本屏补上 web 版: 拉 `GET /api/companies` 拿公司列表, 再对每家公司拉
- * `GET /api/companies/:id/dashboard` 的 `costs` / `quota`, 渲染"本月支出"卡片。
+ * 看额度 (DashboardScreen, h5) —— wave63 精简: 与 expo `DashboardScreen`
+ * + web Dashboard.tsx 同款 4 张核心指标 (员工/任务/花费/审批) + 各公司月度预算水位
  *
  * 数据源 (与 expo `DashboardScreen` 同一后端):
  * - `coolie.listCompanies()`          → GET /api/companies
@@ -108,8 +105,8 @@ export function DashboardScreen({ style }: DashboardScreenProps) {
     <div style={{ ...styles.screen, ...style }}>
       <div style={styles.header}>
         <div>
-          <div style={styles.title}>看额度</div>
-          <div style={styles.subtitle}>本月支出 / 预算 · 汇览</div>
+          <div style={styles.title}>仪表盘</div>
+          <div style={styles.subtitle}>核心统计 · 各公司本月支出</div>
         </div>
         <button type="button" style={styles.refreshBtn} onClick={() => void load()} disabled={loading}>
           {loading ? "刷新中…" : "刷新"}
@@ -203,29 +200,46 @@ function QuotaCard({ row }: { row: CompanyQuota }) {
             />
           </div>
 
-          <dl style={styles.metaTable}>
-            <MetaRow label="月度预算" value={budget == null ? "不限" : formatCents(budget)} />
-            {quota ? (
-              <MetaRow label="剩余额度" value={budget == null ? "不限" : formatCents(quota.remainingCents)} />
-            ) : null}
-            {dashboard ? (
-              <MetaRow label="进行中任务" value={String(dashboard.tasks.inProgress)} />
-            ) : null}
-            {dashboard ? (
-              <MetaRow label="待审批" value={String(dashboard.pendingApprovals)} />
-            ) : null}
-          </dl>
+          {/* 4 张核心 MetricTile (与 web Dashboard.tsx 同源同算) */}
+          <div style={styles.metricGrid}>
+            <MetricTile
+              label="已启用员工"
+              value={String(
+                (dashboard?.agents.active ?? 0) +
+                  (dashboard?.agents.running ?? 0) +
+                  (dashboard?.agents.paused ?? 0) +
+                  (dashboard?.agents.error ?? 0),
+              )}
+            />
+            <MetricTile
+              label="执行中任务"
+              value={String(dashboard?.tasks.inProgress ?? 0)}
+            />
+            <MetricTile
+              label="本月花费"
+              value={dashboard ? formatCents(dashboard.costs.monthSpendCents) : "—"}
+            />
+            <MetricTile
+              label="待审批"
+              value={dashboard
+                ? String(
+                    (dashboard.pendingApprovals ?? 0) +
+                      (dashboard.budgets?.pendingApprovals ?? 0),
+                  )
+                : "—"}
+            />
+          </div>
         </>
       )}
     </div>
   );
 }
 
-function MetaRow({ label, value }: { label: string; value: string }) {
+function MetricTile({ label, value }: { label: string; value: string }) {
   return (
-    <div style={styles.metaRow}>
-      <dt style={styles.metaKey}>{label}</dt>
-      <dd style={styles.metaVal}>{value}</dd>
+    <div style={styles.metricTile}>
+      <div style={styles.metricTileValue}>{value}</div>
+      <div style={styles.metricTileLabel}>{label}</div>
     </div>
   );
 }
@@ -309,10 +323,28 @@ const styles: Record<string, CSSProperties> = {
   cardError: { color: C.warn, fontSize: 12, marginTop: 4, wordBreak: "break-word" },
   barTrack: { height: 5, borderRadius: 3, background: "rgba(255,255,255,0.06)", overflow: "hidden", marginTop: 6 },
   barFill: { height: "100%", borderRadius: 3 },
-  metaTable: { margin: "8px 0 0", display: "flex", flexDirection: "column", gap: 3 },
-  metaRow: { display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 },
-  metaKey: { margin: 0, color: C.ink4, fontSize: 11 },
-  metaVal: { margin: 0, color: C.ink2, fontSize: 11, fontVariantNumeric: "tabular-nums" },
+  metricGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(2, minmax(0, 1fr))",
+    gap: 8,
+    marginTop: 6,
+  },
+  metricTile: {
+    padding: "10px 12px",
+    borderRadius: 8,
+    border: `1px solid ${C.lineSubtle}`,
+    background: "rgba(255,255,255,0.02)",
+    display: "flex",
+    flexDirection: "column",
+    gap: 2,
+  },
+  metricTileValue: {
+    color: C.ink,
+    fontSize: 18,
+    fontWeight: 600,
+    fontVariantNumeric: "tabular-nums",
+  },
+  metricTileLabel: { color: C.ink3, fontSize: 11, fontWeight: 500 },
 };
 
 export default DashboardScreen;
