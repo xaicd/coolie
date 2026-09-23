@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.37
+
+> Released: 2026-09-23 · Android release APK
+
+### 更新
+
+- wave60 切身份 'Coolie 智能体工坊 董事长助理': server system prompt 模板前缀按 company 名注入 persona + 兜底移除 Paperclip 字面; clients/expo 顶部 persona 与欢迎语同步; hermes spawn env 加 COMPANY_NAME 透传 (boss 24:54 '咋还没切')
+
+---
+
 ## v0.5.36
 
 > Released: 2026-09-23 · Android release APK
