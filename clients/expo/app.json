@@ -6,7 +6,7 @@
       "coolie",
       "coolieweb"
     ],
-    "version": "0.5.27",
+    "version": "0.5.29",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
@@ -31,7 +31,7 @@
     },
     "android": {
       "package": "cloud.coolie.app",
-      "versionCode": 527,
+      "versionCode": 529,
       "permissions": [
         "RECORD_AUDIO"
       ]

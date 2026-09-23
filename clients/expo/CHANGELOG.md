@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.29
+
+> Released: 2026-09-23 · Android release APK
+
+### 更新
+
+- 任务详情改在当前 tab 内渲染, 底部 5 tab 导航常驻 (boss 09-22 24:27 '任务列表点击进任务详情, 又是没底部导航了'); 收件箱点 issue 也留在收件箱 tab
+
+---
+
 ## v0.5.27
 
 > Released: 2026-09-23 · Android release APK
