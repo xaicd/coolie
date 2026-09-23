@@ -209,6 +209,19 @@ async function auditAgentKeyMissingResponsibleUser(
 
 interface ActorMiddlewareOptions {
   deploymentMode: DeploymentMode;
+  /**
+   * Loopback board concierge key. When set, requests carrying the matching
+   * `x-paperclip-api-key` header are upgraded to a board actor with
+   * instance-admin rights — the same capability surface a `local_trusted`
+   * deployment carries, but keyed by a long random secret so production
+   * stays on `authenticated`. Designed for the on-device board concierge
+   * inside `coolie` calling `127.0.0.1:3100`: the key never leaves the
+   * device, and the loopback bind keeps it off the public network.
+   *
+   * Comparison uses `timingSafeEqual` so a probing client cannot infer
+   * key bytes from response timing.
+   */
+  apiKey?: string | null;
   resolveSession?: (req: Request) => Promise<BetterAuthSessionResult | null>;
 }
 
@@ -216,6 +229,11 @@ const publicMcpGatewayProtocolPath = /^\/mcp\/gateways\/gw_[a-f0-9]{32}\/?$/i;
 
 export function actorMiddleware(db: Db, opts: ActorMiddlewareOptions): RequestHandler {
   const boardAuth = boardAuthService(db);
+  // Loopback board concierge key. Trim once so a stray newline copied from
+  // a secrets file (e.g. `/etc/coolie/secrets.env` line endings) does not
+  // reject every header-bearing request. A missing/blank config disables
+  // the bypass entirely.
+  const expectedApiKey = opts.apiKey?.trim() || null;
   return async (req, _res, next) => {
     req.actor =
       opts.deploymentMode === "local_trusted"
@@ -229,7 +247,30 @@ export function actorMiddleware(db: Db, opts: ActorMiddlewareOptions): RequestHa
           }
         : { type: "none", source: "none" };
 
+    // Board concierge key bypass: trusted requests from a same-host caller
+    // (the on-device `coolie` App talking to its own loopback server)
+    // present `x-paperclip-api-key: <PAPERCLIP_API_KEY>` and are elevated
+    // to an instance-admin board actor, regardless of deploymentMode.
+    // The header check runs BEFORE the session/bearer/Cloud paths so a
+    // configured key is honoured even on `authenticated` production
+    // (otherwise the concierge would 401 behind the cookie gate).
     const runIdHeader = req.header("x-paperclip-run-id");
+    if (expectedApiKey) {
+      const presentedApiKey = req.header("x-paperclip-api-key");
+      if (presentedApiKey && constantTimeStringEqual(presentedApiKey, expectedApiKey)) {
+        req.actor = {
+          type: "board",
+          userId: "paperclip-concierge",
+          userName: "Paperclip Board Concierge",
+          userEmail: null,
+          isInstanceAdmin: true,
+          source: "api_key",
+          runId: runIdHeader || undefined,
+        };
+        next();
+        return;
+      }
+    }
 
     const authHeader = req.header("authorization");
     const hasBearerCredentials = /^bearer(?:\s|$)/i.test(authHeader ?? "");

@@ -909,6 +909,7 @@ async function startServerWithDatabaseTeardown(
       : undefined,
     deploymentMode: config.deploymentMode,
     deploymentExposure: config.deploymentExposure,
+    apiKey: process.env.PAPERCLIP_API_KEY?.trim() || null,
     allowedHostnames: config.allowedHostnames,
     bindHost: config.host,
     authPublicBaseUrl: config.authPublicBaseUrl,

@@ -480,6 +480,15 @@ export async function createApp(
     databaseBackupHealth?: InspectDatabaseBackupHealthOptions;
     deploymentMode: DeploymentMode;
     deploymentExposure: DeploymentExposure;
+    /**
+     * Loopback board concierge key. When set, requests carrying
+     * `x-paperclip-api-key: <value>` are elevated to a board actor with
+     * instance-admin rights regardless of deploymentMode. Used by the on-device
+     * `coolie` App's board concierge to call `127.0.0.1:3100` APIs from
+     * production (authenticated) instances without a cookie session. See
+     * `server/src/middleware/auth.ts` for the comparison contract.
+     */
+    apiKey?: string | null;
     allowedHostnames: string[];
     bindHost: string;
     authPublicBaseUrl?: string;
@@ -575,6 +584,7 @@ export async function createApp(
   app.use(
     actorMiddleware(db, {
       deploymentMode: opts.deploymentMode,
+      apiKey: opts.apiKey,
       resolveSession: opts.resolveSession,
     }),
   );
