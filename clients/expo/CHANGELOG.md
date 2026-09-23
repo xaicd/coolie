@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.39
+
+> Released: 2026-09-23 · Android release APK
+
+### 更新
+
+- wave62 强制 LLM 回复不用 Paperclip: server/src/routes/board-chat.ts resolveCompanyPersonaLine 加身份要求 (强制) 块; loadBoardSkill 兜底英文模板加 HARD CONSTRAINT (boss 24:58 我是你的 Paperclip 董事会助手, 还是一样)
+
+---
+
 ## v0.5.38
 
 > Released: 2026-09-23 · Android release APK
