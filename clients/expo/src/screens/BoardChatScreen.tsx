@@ -1159,16 +1159,9 @@ export function BoardChatScreen({
               />
             )}
             <View>
-              <View style={styles.titleRow}>
-                <Text style={styles.topTitle}>驾驶舱智能问答</Text>
-                <StatusDot
-                  status={sending ? "running" : "ok"}
-                  size={6}
-                  color={sending ? C.accent : C.ok}
-                />
-              </View>
+              <Text style={styles.topTitle}>工坊</Text>
               <Text style={styles.topSubTitle}>
-                {sending ? "Hermes Concierge 思考中…" : "全双工双向流式对话"}
+                {sending ? "思考中…" : "驱动 5 角色员工"}
               </Text>
             </View>
           </View>
@@ -1184,34 +1177,6 @@ export function BoardChatScreen({
                 <Text style={styles.workspaceBtnText}>Workspace</Text>
               </Pressable>
             ) : null}
-            <Pressable
-              hitSlop={12}
-              onPress={() => {
-                setShowHistory(true);
-                void loadSessions();
-              }}
-              style={styles.historyBtn}
-            >
-              <Ionicons name="time-outline" size={15} color={C.ink2} />
-              <Text style={styles.historyBtnText}>历史</Text>
-            </Pressable>
-            {onOpenSettings ? (
-              <Pressable hitSlop={12} onPress={onOpenSettings} style={styles.backBtn}>
-                <Ionicons name="settings-outline" size={19} color="#8A8F98" />
-              </Pressable>
-            ) : null}
-            <Pressable
-              hitSlop={12}
-              onPress={() => void loadHistory()}
-              disabled={loadingHistory}
-              style={styles.refreshBtn}
-            >
-              {loadingHistory ? (
-                <ActivityIndicator size="small" color={C.ink3} />
-              ) : (
-                <Text style={styles.refreshBtnText}>刷新</Text>
-              )}
-            </Pressable>
           </View>
         </View>
 
@@ -1364,27 +1329,6 @@ export function BoardChatScreen({
           }
         />
 
-        {/* 快捷问答提示词气泡行 */}
-        <View style={styles.promptChipsContainer}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.promptChipsScroll}
-            keyboardShouldPersistTaps="handled"
-          >
-            {QUICK_PROMPTS.map((prompt) => (
-              <Pressable
-                key={prompt}
-                style={styles.chipBtn}
-                onPress={() => void handleSend(prompt)}
-                disabled={sending}
-              >
-                <Text style={styles.chipText}>{prompt}</Text>
-              </Pressable>
-            ))}
-          </ScrollView>
-        </View>
-
         {/* 语音派发状态条 */}
         {voiceStatus ? (
           <View style={styles.voiceStatusBar}>
@@ -1401,7 +1345,7 @@ export function BoardChatScreen({
         <View style={styles.inputContainer}>
           <TextInput
             style={styles.textInput}
-            placeholder="询问工坊运行、额度、员工负荷或审批…"
+            placeholder="派个活, 或问点什么"
             placeholderTextColor={C.ink3}
             value={input}
             onChangeText={setInput}
@@ -1585,19 +1529,8 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 12,
   },
-  backBtn: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-  },
   headerBack: {
     alignSelf: "center",
-  },
-  titleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
   },
   topTitle: {
     color: C.ink,
@@ -1615,21 +1548,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 8,
   },
-  historyBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.line,
-  },
-  historyBtnText: {
-    color: C.ink2,
-    fontSize: 12,
-  },
   workspaceBtn: {
     flexDirection: "row",
     alignItems: "center",
@@ -1645,16 +1563,6 @@ const styles = StyleSheet.create({
     color: C.accent,
     fontSize: 12,
     fontWeight: "500",
-  },
-  refreshBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-  },
-  refreshBtnText: {
-    color: C.ink3,
-    fontSize: 12,
   },
   approvalStack: {
     gap: 10,
@@ -1905,28 +1813,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 8,
     marginVertical: 6,
-  },
-  promptChipsContainer: {
-    paddingVertical: 6,
-    borderTopWidth: 1,
-    borderTopColor: C.lineSubtle,
-    backgroundColor: C.bg,
-  },
-  promptChipsScroll: {
-    paddingHorizontal: 14,
-    gap: 8,
-  },
-  chipBtn: {
-    backgroundColor: C.panel,
-    borderColor: C.line,
-    borderWidth: 1,
-    borderRadius: 14,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  chipText: {
-    color: C.ink2,
-    fontSize: 12,
   },
   voiceStatusBar: {
     flexDirection: "row",
