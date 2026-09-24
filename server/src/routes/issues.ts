@@ -13750,6 +13750,25 @@ export function issueRoutes(
         publishActivity(publication);
       await flushIssuePostCommitActions(postCommitIssueActions);
 
+      // Wave 68 hook: when an issue transitions to a closed status (done /
+      // cancelled) and `COOLIE_AUTO_GIT_COMMIT=true`, auto-commit the
+      // workspace. Errors are swallowed inside the helper so this stays a
+      // best-effort extension of the patch path.
+      if (terminalizingIssue && process.env.COOLIE_AUTO_GIT_COMMIT === "true") {
+        try {
+          const { autoCommitOnTaskSuccess } = await import("../services/workspace-git.js");
+          const workDir = (existing as { executionWorkspacePath?: string | null }).executionWorkspacePath ?? null;
+          await autoCommitOnTaskSuccess({
+            issueId: existing.id,
+            companyId: existing.companyId,
+            workDir,
+            message: `coolie: auto-save issue ${existing.id} (${updateFields.status})`,
+          });
+        } catch {
+          // The helper already logs; never let it escape into the PATCH response.
+        }
+      }
+
       if (enteringBlocked) {
         const blockedIssue = issue;
         let ownerNotifiedAt: Date | null = null;

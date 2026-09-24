@@ -243,3 +243,6 @@ export {
   type RemoteAgentProfileInput,
   type RemoteAgentService,
 } from "./remote-agent-profiles.js";
+export { gitOpsCredentialsService, type SaveCredentialInput, type CredentialView } from "./git-ops-credentials.js";
+export { autoCommitOnTaskSuccess, type AutoCommitInput, type AutoCommitResult } from "./workspace-git.js";
+export { systemPrService, type CreateChangeSetInput } from "./system-pr.js";

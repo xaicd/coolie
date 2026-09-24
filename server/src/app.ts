@@ -124,6 +124,7 @@ import { managedAgentProfileRoutes } from "./routes/managed-agent-profiles.js";
 import { remoteAgentProfileRoutes } from "./routes/remote-agent-profiles.js";
 import { tasksHostPreviewRoutes } from "./routes/tasks-host-preview.js";
 import { pluginUiStaticRoutes } from "./routes/plugin-ui-static.js";
+import { gitCredentialsRoutes } from "./routes/git-credentials.js";
 import { injectCloudUiSnippet } from "./cloud-ui-snippet.js";
 import { readBrandedStaticIndexHtml } from "./static-index-html.js";
 import { isLandingEnabled, renderLandingPage } from "./landing-page.js";
@@ -877,6 +878,7 @@ export async function createApp(
   api.use(sidebarBadgeRoutes(db));
   api.use(sidebarPreferenceRoutes(db));
   api.use(announcementRoutes(db, { ...opts.announcements, version: opts.hostVersion ?? serverVersion }));
+  api.use(gitCredentialsRoutes(db));
   api.use(resourceMembershipRoutes(db));
   api.use(inboxDismissalRoutes(db));
   api.use(instanceSettingsRoutes(db));

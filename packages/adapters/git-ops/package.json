@@ -1,0 +1,70 @@
+{
+  "name": "@paperclipai/adapter-git-ops",
+  "version": "0.1.0",
+  "license": "MIT",
+  "homepage": "https://github.com/paperclipai/paperclip",
+  "bugs": {
+    "url": "https://github.com/paperclipai/paperclip/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/paperclipai/paperclip",
+    "directory": "packages/adapters/git-ops"
+  },
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./services": "./src/services/index.ts",
+    "./services/git-credential-service": "./src/services/GitCredentialService.ts",
+    "./services/workspace-git-manager": "./src/services/WorkspaceGitManager.ts",
+    "./services/system-pr-manager": "./src/services/SystemPRManager.ts"
+  },
+  "publishConfig": {
+    "access": "public",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js"
+      },
+      "./services": {
+        "types": "./dist/services/index.d.ts",
+        "import": "./dist/services/index.js"
+      },
+      "./services/git-credential-service": {
+        "types": "./dist/services/GitCredentialService.d.ts",
+        "import": "./dist/services/GitCredentialService.js"
+      },
+      "./services/workspace-git-manager": {
+        "types": "./dist/services/WorkspaceGitManager.d.ts",
+        "import": "./dist/services/WorkspaceGitManager.js"
+      },
+      "./services/system-pr-manager": {
+        "types": "./dist/services/SystemPRManager.d.ts",
+        "import": "./dist/services/SystemPRManager.js"
+      }
+    },
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "clean": "rm -rf dist",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@paperclipai/shared": "workspace:*",
+    "simple-git": "^3.27.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.11"
+  },
+  "engines": {
+    "node": ">=24.11.0"
+  }
+}

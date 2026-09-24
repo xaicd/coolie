@@ -1961,6 +1961,13 @@
       "when": 1790212502331,
       "tag": "9001_foamy_rawhide_kid",
       "breakpoints": true
+    },
+    {
+      "idx": 9002,
+      "version": "7",
+      "when": 1790217551371,
+      "tag": "9002_colorful_gressill",
+      "breakpoints": true
     }
   ]
 }
