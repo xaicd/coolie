@@ -910,7 +910,7 @@ function HomeScreen({
     content = (
     <SafeAreaView style={[styles.shell, { paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
       <StatusBar style="light" />
-      {/* 全局顶栏 — 对齐 Coolie Web 的 appBar (wave73 删中间标题, 保留左右 icon 组) */}
+      {/* 全局顶栏 — 对齐 Coolie Web 的 appBar (wave73 中间标题 "Coolie工坊" 保留 — boss 26:35) */}
       <AppBar
         unreadCount={unreadCount}
         onOpenNotifications={() => setNotificationsOpen(true)}

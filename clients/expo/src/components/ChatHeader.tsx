@@ -9,16 +9,18 @@ import { formatTime } from "../utils/format";
  * ChatHeader — 工坊对话框顶部条 (wave71 抽出)
  *
  * 三段结构:
- *   1. 标题 + 副标题 (董事长助理 · 状态)
+ *   1. 副标题 (状态文案, 由 thinking / subtitle 控制)
  *   2. 中间 timestamp (最近一条助手消息的时间戳)
  *   3. 右侧 [🗑️ 清空] — 弹 onRequestClear, 由 BoardChatScreen 弹确认 Modal
  *
- * 副标题: 「思考中…」 由父屏传入 `thinking` / `subtitle` 控制。wave73
- * (boss 26:32 OOB 「左上角工坊 驱动5角色员工 这些描述都不要了」):
- * idle 状态不再渲染「驱动 5 角色员工」副标题, 仅保留 `thinking` /
- * `subtitle` 传入的动态文案 (思考中 / 正在生成回复…)。
+ * wave73 (boss 26:32 OOB 「左上角工坊 驱动5角色员工 这些描述都不要了」+ 26:35 OOB
+ * 「顶部中间标题留着 / 对话框中的去掉」):
+ * - 删 "工坊" 标题 Text (boss 26:35 「对话框中的去掉」)
+ * - idle 状态不再渲染「驱动 5 角色员工」副标题 (wave65 之前), 仅保留 `thinking` /
+ *   `subtitle` 传入的动态文案 (思考中 / 正在生成回复…)
+ * - 保留中间的 timestamp + 右侧 🗑️ 清空按钮
  * 之所以抽出: 把头部代码从 BoardChatScreen 那一坨 2084 行的屏里搬出来, 单元
- * 屏幕只管聊天流; 后续要改图标 / 标题 / 时间戳样式只动这一处。
+ * 屏幕只管聊天流; 后续要改图标 / 时间戳样式只动这一处。
  */
 export interface ChatHeaderProps {
   thinking?: boolean;
@@ -51,7 +53,6 @@ export function ChatHeader({
           </Pressable>
         ) : null}
         <View style={styles.titleStack}>
-          <Text style={styles.topTitle}>工坊</Text>
           {subtitle || thinking ? (
             <View style={styles.subtitleRow}>
               <StatusDot
@@ -125,12 +126,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     marginTop: 2,
-  },
-  topTitle: {
-    color: C.ink,
-    fontSize: 16,
-    fontWeight: "600",
-    letterSpacing: -0.2,
   },
   topSubTitle: {
     color: C.ink3,

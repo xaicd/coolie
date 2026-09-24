@@ -310,7 +310,7 @@ function InlineApprovalBubble({
 const WELCOME_MESSAGE: BoardChatMessage = {
   id: "welcome-init",
   role: "assistant",
-  text: "掌柜您好！我是 Coolie 智能体工坊 董事长助理 (Board Concierge)。关于智能体派发、额度消耗、交付进度或待办审批，请随时向我吩咐。",
+  text: "掌柜您好！我是您的董事长助理 (Board Concierge)。关于智能体派发、额度消耗、交付进度或待办审批，请随时向我吩咐。",
   createdAt: new Date().toISOString(),
 };
 
@@ -1259,7 +1259,6 @@ export function BoardChatScreen({
           delayLongPress={300}
         >
           <View style={styles.assistantHeader}>
-            <Text style={styles.assistantName}>Coolie 智能体工坊 董事长助理</Text>
             <Text style={styles.timestamp}>{formatTime(item.createdAt)}</Text>
           </View>
           {segments.length === 1 && segments[0].type === "text" ? (
@@ -1452,7 +1451,6 @@ export function BoardChatScreen({
                   </View>
                   <View style={styles.assistantBubble}>
                     <View style={styles.assistantHeader}>
-                      <Text style={styles.assistantName}>Coolie 智能体工坊 董事长助理</Text>
                       {Boolean(statusText) && (
                         <StatusBadge
                           label={statusText}
@@ -2037,11 +2035,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 6,
-  },
-  assistantName: {
-    color: C.ink,
-    fontSize: 12,
-    fontWeight: "600",
   },
   timestamp: {
     color: C.ink4,
