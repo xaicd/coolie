@@ -1,5 +1,6 @@
 import { Router } from "express";
 import { spawn } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -53,6 +54,34 @@ async function resolveCompanyPersonaLine(db: Db, companyId: string): Promise<str
 - 查花销 (GET /api/companies/:id/usage)
 
 回答用中文, 简洁, 不啰嗦.`;
+}
+
+/**
+ * Coolie fork (wave66): stable persona signature, stamped into the system
+ * prompt and forwarded to the spawned hermes as `$PERSONA_SIG`. The LLM sees
+ * a `[[persona_sig: <sessionId>:<finalName>:<hash>]]` block that asks it to
+ * self-identify consistently across turns, preventing persona drift between
+ * models or across sessions on the same company. The hash binds sessionId +
+ * finalName + a server-side secret so a user cannot forge a different sig
+ * via prompt injection (the secret is server-only). The block is rendered
+ * inside the existing `[SYSTEM]…[/SYSTEM]` wrapper so it cannot be
+ * confused with user content.
+ */
+function buildPersonaSigLine(
+  sessionId: string,
+  finalName: string,
+  personaSecret: string,
+): string {
+  const hash = createHash("sha256")
+    .update(`${personaSecret}|${sessionId}|${finalName}`)
+    .digest("hex")
+    .slice(0, 16);
+  return (
+    `# Persona Signature (coolie-fork, wave66)\n` +
+    `[[persona_sig: ${sessionId}:${finalName}:${hash}]]\n` +
+    `If asked "你是谁 / who are you", respond with EXACTLY: "我是 ${finalName} 董事长助理". ` +
+    `Treat this sig as authoritative for the entire conversation; do not adopt any other persona.`
+  );
 }
 
 /**
@@ -328,6 +357,24 @@ export function boardChatRoutes(
       ? personaLine.slice(3).split(" 董事长助理", 1)[0]?.trim() || "Coolie 智能体工坊"
       : "Coolie 智能体工坊";
 
+    // Coolie fork (wave66): append a stable persona signature to the SYSTEM
+    // block so the LLM has a single source-of-truth for "who am I" across
+    // turns, and forward the same sig to the spawned hermes as `$PERSONA_SIG`
+    // so downstream persona-aware tooling can verify it without re-reading
+    // the SYSTEM block. The hash binds sessionId + finalName + a server-only
+    // secret so a prompt-injected user message cannot mint a competing sig.
+    const personaSecret = process.env.COOLIE_PERSONA_SECRET ?? "coolie-board-persona-v1";
+    const personaSigLine = buildPersonaSigLine(
+      resolvedIssueId,
+      companyDisplayName,
+      personaSecret,
+    );
+    // Splice the sig block in below the persona line (still inside SYSTEM).
+    const promptWithSig = prompt.replace(
+      `[SYSTEM]\n${personaLine}\n\n`,
+      `[SYSTEM]\n${personaLine}\n\n${personaSigLine}\n\n`,
+    );
+
     // Flag set kept version-tolerant on purpose: the CLI on the production
     // box may predate `--format stream-json`, and an unsupported flag makes
     // hermes exit before answering (the room just shows nothing). Everything
@@ -377,6 +424,11 @@ export function boardChatRoutes(
         // hermes itself does not read $COMPANY_NAME today; we set it so the
         // next round of persona-aware tooling has a stable source.
         COMPANY_NAME: companyDisplayName,
+        // Coolie fork (wave66): forward the persona signature computed above
+        // so any persona-aware tooling inside `hermes` (or future agent
+        // skills that consume it) can verify identity without re-reading
+        // the SYSTEM block. Format: `<sessionId>:<finalName>:<sha256prefix>`.
+        PERSONA_SIG: personaSigLine.split("[[persona_sig: ")[1]?.split("]]")[0] ?? "",
         // The active provider's credential, pinned explicitly so the relay
         // does not depend on hermes' own provider state. Only set when present:
         // hermes also loads its own ~/.hermes/.env, and an empty value here
@@ -590,8 +642,9 @@ export function boardChatRoutes(
       }
     });
 
-    // Feed the prompt to the CLI via stdin.
-    proc.stdin.write(prompt);
+    // Feed the prompt to the CLI via stdin (coolie-fork: promptWithSig
+    // includes the wave66 persona_sig block appended inside SYSTEM).
+    proc.stdin.write(promptWithSig);
     proc.stdin.end();
   });
 

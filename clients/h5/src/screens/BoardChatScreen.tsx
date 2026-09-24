@@ -2,15 +2,17 @@
  * BoardChatScreen (h5 简化版) —— 工坊对话流 + 内嵌预览
  *
  * spec §5: "❌ 完整的 BoardChatScreen（只做最小骨架）"。app 端那份 4000+ 行的
- * 流式/审批/构建卡一律不要, 这里只保留本波真正要验证的两件事:
- *   1. 对话文本里夹带的 `<preview-url>` / `<preview-mvp>` 标签, 被就地渲染成
+ * 流式/审批/构建卡一律不要, 这里只保留本波真正要验证的三件事:
+ *   1. 真接口: 拉取常驻 Board Operations Issue 的历史评论, 渲染 SSE 流式回复;
+ *      失败 / 公司未选 时如实显示错误, 不假装成功 (wave66 老板 25:15 '派' P2)。
+ *   2. 对话文本里夹带的 `<preview-url>` / `<preview-mvp>` 标签, 被就地渲染成
  *      InlinePreviewPanel, 而不是跳走;
- *   2. 右上角 [Workspace] 入口, 由 App.tsx 注入, 拉起工作空间。
+ *   3. 右上角 [Workspace] 入口, 由 App.tsx 注入, 拉起工作空间。
  *
  * 不依赖 expo / react-native, 纯 HTML + React 19。
  */
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { InlinePreviewPanel } from "../components/board-inline/InlinePreviewPanel";
 import { CodeDiffCard } from "../components/board-inline/CodeDiffCard";
@@ -21,6 +23,7 @@ import {
   tCommand,
   type ParsedCommand,
 } from "../components/commandRouter";
+import { coolie } from "../coolie";
 
 /** 本屏只用到 company 的 id/name, 用最小结构类型, 避免和 api-client 的 Company 强绑 */
 export interface WorkspaceCompany {
@@ -37,58 +40,70 @@ export interface BoardChatScreenProps {
   onOpenWorkspace?: () => void;
 }
 
-interface MockMessage {
+interface ChatMessage {
   id: string;
   role: "user" | "assistant";
   text: string;
 }
 
-/** mock 对话: 两条带内嵌预览标签的回复, 用来演示 tagParser + InlinePreviewPanel */
-const SEED_MESSAGES: MockMessage[] = [
-  { id: "m1", role: "user", text: "帮我看下线上首页的预览。" },
-  {
-    id: "m2",
-    role: "assistant",
-    text:
-      "线上地址在这里, 直接就地加载:\n" +
-      "<preview-url>https://xrobinai.cn</preview-url>\n" +
-      "点击工具条 [⤢ 全屏] 可以放大看。",
-  },
-  { id: "m3", role: "user", text: "有没有新版首页的缩略图?" },
-  {
-    id: "m4",
-    role: "assistant",
-    text:
-      "新版首页缩略图如下 (点击看大图), 属性列在缩略图下面:\n" +
-      '<preview-mvp title="首页 v2" thumb="https://picsum.photos/seed/coolie/640/360" url="https://xrobinai.cn" meta=\'{"作者":"小陈","版本":"v2.0","构建":"2026-09-21"}\'>首页 v2</preview-mvp>',
-  },
-  { id: "m5", role: "user", text: "顺手把这次改动贴出来。" },
-  {
-    id: "m6",
-    role: "assistant",
-    text:
-      "改动如下 (绿=新增, 红=删除, 行号在左侧):\n" +
-      '<code-diff file="src/hello.ts" lang="ts">@@ -1,3 +1,4 @@\n export function hello() {\n-  return "hi";\n+  return "hello";\n }\n+// added by coolie</code-diff>\n' +
-      "点右上角 [编辑] 可以在网页里直接改。",
-  },
-];
-
-/** 收到消息时给的固定回执 (本波不接后端 SSE, spec §5) */
-const CANNED_REPLY =
-  "收到。本波 h5 端用的是 mock 数据, 真流式接后端后这里会换成 SSE 输出。\n" +
-  "<preview-url>https://xrobinai.cn</preview-url>";
-
+/**
+ * wave66 (老板 25:15 '派' P2): 真接口拉取常驻会话 + SSE 推送。无公司 / 拉取失败时
+ * 显示空状态, 不预填任何 SEED 假数据, 不假装 SSE 推送可用。
+ */
 export function BoardChatScreen({
   company,
   whoami,
   embedded = false,
   onOpenWorkspace,
 }: BoardChatScreenProps) {
-  const [messages, setMessages] = useState<MockMessage[]>(SEED_MESSAGES);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState("");
   const [listening, setListening] = useState(false);
   const [voiceNote, setVoiceNote] = useState<string | null>(null);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [historyError, setHistoryError] = useState<string | null>(null);
+  const [streaming, setStreaming] = useState(false);
   const recognitionRef = useRef<any>(null);
+
+  // wave66: 真接口拉取历史 (常驻 Board Operations Issue)。公司未选时跳过。
+  useEffect(() => {
+    const companyId = company?.id;
+    if (!companyId || companyId === "local-stub") {
+      setMessages([]);
+      setHistoryError(null);
+      setLoadingHistory(false);
+      return;
+    }
+    let cancelled = false;
+    setLoadingHistory(true);
+    setHistoryError(null);
+    coolie
+      .getBoardChatHistory(companyId)
+      .then((hist) => {
+        if (cancelled) return;
+        // Filter out system messages — they belong to /api/board/chat/stream
+        // tool events, not the user-visible conversation. This screen renders
+        // only the 2-role dialogue (`user` / `assistant`).
+        const visible = hist.messages
+          .filter((m): m is typeof m & { role: "user" | "assistant" } =>
+            m.role === "user" || m.role === "assistant",
+          )
+          .map((m) => ({ id: m.id, role: m.role, text: m.text }));
+        setMessages(visible);
+      })
+      .catch((err: unknown) => {
+        if (cancelled) return;
+        setHistoryError(err instanceof Error ? err.message : "加载历史失败");
+        setMessages([]);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setLoadingHistory(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company?.id]);
 
   /**
    * 长按 mic: 浏览器原生语音识别 (Web Speech API), 结果直接追加进输入框,
@@ -176,17 +191,35 @@ export function BoardChatScreen({
           body: JSON.stringify(body),
         });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      } catch {
-        text += "\n(h5 端未接入登录会话, 已按指令记录分发结果)";
+      } catch (err) {
+        // wave66: 失败如实上报, 不假装成功。
+        const reason = err instanceof Error ? err.message : "未知错误";
+        text = `⚠️ 指令下发失败: ${reason}\n${label} · ${command.subject}`;
       }
       setMessages((prev) => [...prev, { id, role: "assistant", text }]);
     },
     [company?.id],
   );
 
-  const send = useCallback(() => {
+  /**
+   * wave66: 真 SSE 推送 (POST /api/board/chat/stream)。未选公司 / SSE 失败
+   * 时如实显示错误, 不返回固定 CANNED_REPLY (老板 25:15 '派' P2)。
+   */
+  const send = useCallback(async () => {
     const text = draft.trim();
-    if (!text) return;
+    if (!text || streaming) return;
+    const companyId = company?.id;
+    if (!companyId || companyId === "local-stub") {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `m${prev.length + 1}a`,
+          role: "assistant",
+          text: "⚠️ 当前未选择公司 (h5 还在 local-stub), 请先登录真实会话再发对话。",
+        },
+      ]);
+      return;
+    }
     setDraft("");
     const nextId = `m${messages.length + 1}`;
     setMessages((prev) => [...prev, { id: `${nextId}u`, role: "user", text }]);
@@ -196,11 +229,45 @@ export function BoardChatScreen({
       void dispatchCommand(command, `${nextId}a`);
       return;
     }
-    setMessages((prev) => [
-      ...prev,
-      { id: `${nextId}a`, role: "assistant", text: CANNED_REPLY },
-    ]);
-  }, [draft, messages.length, dispatchCommand]);
+
+    // 普通对话 → 真 SSE 流式推送
+    setStreaming(true);
+    const assistantId = `${nextId}a`;
+    setMessages((prev) => [...prev, { id: assistantId, role: "assistant", text: "" }]);
+    try {
+      await coolie.streamBoardChat(
+        { companyId, message: text },
+        {
+          onChunk: (chunk) => {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === assistantId ? { ...m, text: m.text + chunk } : m)),
+            );
+          },
+          onError: (msg) => {
+            const errText = typeof msg === "string" ? msg : (msg?.message ?? "流式推送失败");
+            setMessages((prev) =>
+              prev.map((m) =>
+                m.id === assistantId
+                  ? { ...m, text: m.text ? `${m.text}\n\n⚠️ ${errText}` : `⚠️ ${errText}` }
+                  : m,
+              ),
+            );
+          },
+        },
+      );
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "流式推送失败";
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantId
+            ? { ...m, text: m.text ? `${m.text}\n\n⚠️ ${reason}` : `⚠️ ${reason}` }
+            : m,
+        ),
+      );
+    } finally {
+      setStreaming(false);
+    }
+  }, [draft, messages.length, dispatchCommand, company?.id, streaming]);
 
   const composer = (
     <div>
@@ -240,6 +307,26 @@ export function BoardChatScreen({
     [messages],
   );
 
+  // wave66: 真接口空态 / 加载 / 错误三态, 替代原 SEED_MESSAGES 默认填充。
+  const streamBody = (
+    <>
+      {loadingHistory ? (
+        <div style={styles.statusLine}>加载常驻会话历史…</div>
+      ) : null}
+      {historyError ? (
+        <div style={styles.errorLine}>⚠️ 加载历史失败: {historyError}</div>
+      ) : null}
+      {!loadingHistory && !historyError && messages.length === 0 ? (
+        <div style={styles.statusLine}>
+          {company?.id && company.id !== "local-stub"
+            ? "常驻会话暂无对话, 在下面输入框跟工坊说点什么。"
+            : "h5 端默认 local-stub 公司。要测真接口, 请先在 App 端登录后用 h5 拉取真实会话。"}
+        </div>
+      ) : null}
+      {bubbles}
+    </>
+  );
+
   return (
     <div style={styles.wrap}>
       {embedded ? (
@@ -263,14 +350,14 @@ export function BoardChatScreen({
         </div>
       )}
 
-      <div style={styles.stream}>{bubbles}</div>
+      <div style={styles.stream}>{streamBody}</div>
 
       {composer}
     </div>
   );
 }
 
-function MessageBubble({ message }: { message: MockMessage }) {
+function MessageBubble({ message }: { message: ChatMessage }) {
   const parsed = useMemo(
     () =>
       hasInlinePreviewTag(message.text)
@@ -406,6 +493,22 @@ const styles: Record<string, CSSProperties> = {
     borderTopWidth: 1,
     borderTopStyle: "solid",
     borderTopColor: "rgba(255,255,255,0.05)",
+  },
+  // wave66: 真接口空态 / 加载 / 错误三态样式。
+  statusLine: {
+    color: "#62666D",
+    fontSize: 12,
+    padding: "16px 0",
+    textAlign: "center",
+  },
+  errorLine: {
+    color: "#F87171",
+    fontSize: 12,
+    padding: "10px 12px",
+    marginBottom: 8,
+    borderRadius: 8,
+    backgroundColor: "rgba(239,68,68,0.10)",
+    border: "1px solid rgba(239,68,68,0.25)",
   },
   sendBtn: {
     backgroundColor: "#5E6AD2",

@@ -6,6 +6,12 @@ Coolie h5 web 镜像（浏览器端，跟 Coolie工坊 App 同 API）版本流�
 
 ---
 
+## 0.6.3 (2026-09-24)
+
+- BoardChatScreen 删 mock: SEED_MESSAGES / CANNED_REPLY 全删, 改真接口 (coolie.getBoardChatHistory + coolie.streamBoardChat SSE), 未选公司/失败如实显示空态/错误 (boss 25:15 '派' wave64 audit P2)
+
+---
+
 ## 0.6.2 (2026-09-21) — commit `c25f21354`
 
 - h5 端 TasksScreen（NewTaskDialog 镜像 + IssuesList 6 视图切换）
