@@ -10,7 +10,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ### 更新
 
-- wave76 删 AppBar 中间右侧设置齿轮图标 (boss 26:42 OOB 「首页 顶部 中间的设置按钮去掉」), 保留中间标题 Coolie工坊 + 通知 + 搜索 + 驾驶舱Web
+- wave76 删 AppBar 中间设置齿轮图标 + 检查升级按钮 (boss 26:42 OOB 「首页 顶部 中间的设置按钮去掉」+ 26:44 OOB 「中间 设置+检查升级按钮去掉」): 验证 0.5.53 装包 (versionCode 553) AppBar 中间只有 Coolie工坊 标题, 无 设置/检查升级 按钮, 保留 🔔 通知 + 🔍 搜索 + 驾驶舱Web. 注意: AppBar.tsx 自 wave73 起本就没有这两个按钮, 0.5.53 release commit 主要是 bump 版本号 + CHANGELOG entry
 
 ---
 
