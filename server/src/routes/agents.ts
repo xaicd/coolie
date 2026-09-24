@@ -80,6 +80,7 @@ import {
   issueService,
   logActivity,
   resolveRoleTemplates,
+  stripRoleDescription,
   syncInstructionsBundleConfigFromFilePath,
   templateRoles,
   workspaceOperationService,
@@ -4934,12 +4935,16 @@ export function agentRoutes(
           continue;
         }
 
+        // wave69 — boss 25:00 OOB 「5 角色描述都去掉」: 不再把 role 的长
+        // 描述(title 长头衔 + capabilities 长描述串)写到 agents 行 — UI
+        // 不渲染, 留着只是占位。老数据按现状保留, 新创建走此路径清空。
+        const scrubbed = stripRoleDescription(template);
         const createdAgent = await svc.create(companyId, {
           id: randomUUID(),
           name: deduplicateAgentName(template.agentName, roster),
           role: template.role,
-          title: template.title,
-          capabilities: template.capabilities,
+          title: scrubbed.title,
+          capabilities: scrubbed.capabilities,
           adapterType: "process",
           adapterConfig: {},
           runtimeConfig: {},

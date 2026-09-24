@@ -16,6 +16,7 @@ export {
   listRoleTemplates,
   resolveRoleTemplate,
   resolveRoleTemplates,
+  stripRoleDescription,
 } from "./role-template.js";
 export { companySearchService } from "./company-search.js";
 export {

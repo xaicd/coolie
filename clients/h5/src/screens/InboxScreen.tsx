@@ -366,13 +366,22 @@ export function InboxScreen({
     })();
   }, []);
 
+  // wave69 — 补客户端 state 修正 (与 expo 端对齐):
+  //   1) AbortController: 公司/tab 切换取消老请求;
+  //   2) 失败不清空 issues/mentions, 保留旧值供 ErrorRetry 显示;
+  //   3) document.visibilitychange 触发一次静默重拉 (web 端后台切回场景).
+  const abortRef = useRef<AbortController | null>(null);
   const load = useCallback(async () => {
     if (!company) return;
-    setError(null);
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
     const reqId = loadReqIdRef.current + 1;
     loadReqIdRef.current = reqId;
+    setError(null);
     const maxRetries = 2;
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      if (controller.signal.aborted) return;
       try {
         const [nextIssues, feed, nextAgents, nextProjects] = await Promise.all([
           coolie.listIssues(company.id, { limit: 200 }),
@@ -380,6 +389,7 @@ export function InboxScreen({
           coolie.listAgents(company.id).catch(() => [] as Agent[]),
           coolie.listProjects(company.id).catch(() => [] as Project[]),
         ]);
+        if (controller.signal.aborted) return;
         if (loadReqIdRef.current !== reqId) return;
         setIssues(nextIssues);
         setMentions(feed.mentionedBy);
@@ -389,20 +399,31 @@ export function InboxScreen({
         setError(null);
         break;
       } catch (e) {
+        if (controller.signal.aborted || loadReqIdRef.current !== reqId) return;
         const msg = String((e as Error)?.message ?? e);
         if (attempt < maxRetries) {
           await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
-          if (loadReqIdRef.current !== reqId) return;
           continue;
         }
-        if (loadReqIdRef.current === reqId) setError(msg);
+        // wave69 — 失败只更新 error, 不清空 issues/mentions/approvals.
+        setError(msg);
       }
     }
-    if (loadReqIdRef.current === reqId) setLoading(false);
+    if (loadReqIdRef.current === reqId && !controller.signal.aborted) setLoading(false);
   }, [company]);
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  // wave69 — web 后台切回时静默重拉.
+  useEffect(() => {
+    if (typeof document === "undefined") return;
+    const handler = () => {
+      if (document.visibilityState === "visible") void load();
+    };
+    document.addEventListener("visibilitychange", handler);
+    return () => document.removeEventListener("visibilitychange", handler);
   }, [load]);
 
   useEffect(() => {

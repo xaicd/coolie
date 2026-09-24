@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Animated,
+  AppState,
   Modal,
   PanResponder,
   Platform,
@@ -159,14 +160,27 @@ export function InboxScreen({
   // wave65 — 重试 / 旧公司 / 竞态守卫
   // 收件箱反反复复真因之一: tab/公司切换瞬间旧请求 setState 覆盖新数据。
   // 解决: reqId 自增, 只接受最新一次请求的返回值; 失败自动退避重试。
+  // wave69 — 补客户端 state 修正:
+  //   1) 失败时不清空 issues/mentions/approvals, 保留旧值配合错误提示,
+  //      而不是闪一下变空让用户以为被清了;
+  //   2) 前后台切换 (AppState) 触发一次 silent refresh,
+  //      修复"切回 app 收件箱不更新"的常见反反复复场景;
+  //   3) AbortController: tab 切换/公司切换时取消老请求, 避免 Promise
+  //      解析后 setState 已卸载组件的 React 警告。
+  const abortRef = useRef<AbortController | null>(null);
   const load = useCallback(
     async (silent = false) => {
-      if (!silent) setLoading(true);
-      setError(null);
+      // 取消进行中的旧请求, 避免 Promise 还在挂起时组件已切走
+      abortRef.current?.abort();
+      const controller = new AbortController();
+      abortRef.current = controller;
       const reqId = loadReqIdRef.current + 1;
       loadReqIdRef.current = reqId;
+      if (!silent) setLoading(true);
+      setError(null);
       const maxRetries = 2;
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        if (controller.signal.aborted) return;
         try {
           const [nextIssues, feed, nextAgents, nextProjects] = await Promise.all([
             coolie.listIssues(company.id, { limit: 200 }),
@@ -174,7 +188,8 @@ export function InboxScreen({
             coolie.listAgents(company.id).catch(() => [] as Agent[]),
             coolie.listProjects(company.id).catch(() => [] as Project[]),
           ]);
-          // 如果是旧请求, 直接丢弃
+          if (controller.signal.aborted) return;
+          // 旧请求/旧公司 — 直接丢弃返回值
           if (loadReqIdRef.current !== reqId) return;
           setIssues(nextIssues);
           setMentions(feed.mentionedBy);
@@ -184,17 +199,20 @@ export function InboxScreen({
           setError(null);
           break;
         } catch (e) {
+          if (controller.signal.aborted || loadReqIdRef.current !== reqId) return;
           const msg = String((e as Error)?.message ?? e);
           if (attempt < maxRetries) {
             // 退避重试: 600ms / 1200ms
             await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
-            if (loadReqIdRef.current !== reqId) return;
             continue;
           }
-          if (loadReqIdRef.current === reqId) setError(msg);
+          // wave69 — 失败只更新 error, 不清空已有数据.
+          // 保留旧 issues/mentions 配合上方的 ErrorRetry/空态分支,
+          // 避免闪一下变空让用户以为数据被清掉了。
+          setError(msg);
         }
       }
-      if (loadReqIdRef.current === reqId) {
+      if (loadReqIdRef.current === reqId && !controller.signal.aborted) {
         setLoading(false);
         setRefreshing(false);
       }
@@ -204,6 +222,14 @@ export function InboxScreen({
 
   useEffect(() => {
     void load();
+  }, [load]);
+
+  // wave69 — 后台切回时静默重拉, 修"切回 app 收件箱不更新"反反复复场景。
+  useEffect(() => {
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") void load(true);
+    });
+    return () => sub.remove();
   }, [load]);
 
   useEffect(() => {

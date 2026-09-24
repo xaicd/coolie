@@ -23,6 +23,13 @@ import { unprocessable } from "../errors.js";
  * descriptions. This module is the validating bridge: it turns a caller-supplied
  * role id into a template, and turns a role list into the deduplicated, ordered
  * template list the bulk-register route materialises onto `agents` rows.
+ *
+ * wave69 — boss 25:00 OOB 「工坊 5 角色员工描述都去掉」二次确认:
+ *   之前 wave65 只删了 UI 渲染, 没动数据写入。这里顺手把 `description`
+ *   类的字段(title + 长 capabilities 描述字符串)在写入 agents 行前清空,
+ *   只保留 `role`/`label`/`skillRef`/`cli`/`model` 这几个机器可读字段。
+ *   老数据(已注册的 agent)的 title 列仍保留(供 skills/CLI 内部用),
+ *   新创建时不再写入长描述。
  */
 
 /** The role ids a company can be staffed with. */
@@ -48,6 +55,21 @@ export function resolveRoleTemplate(role: string): AgentRoleTemplate {
     );
   }
   return roleTemplate(role);
+}
+
+/**
+ * wave69 — boss 25:00 OOB 「5 角色描述都去掉」: 长描述类字段 (title 头衔
+ * 长字符串 + capabilities 长描述字符串) 在写入 agents 行前清空, 只保留
+ * 机器可读字段 (role / label / cli / model / backup / skillRef / gates /
+ * responsibilities / deliverables / antiPatterns / summary)。
+ * 返回 shallow clone, 不改 inputs。
+ */
+export function stripRoleDescription(template: AgentRoleTemplate): AgentRoleTemplate {
+  return {
+    ...template,
+    title: "",
+    capabilities: "",
+  };
 }
 
 /**
