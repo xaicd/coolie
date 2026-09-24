@@ -9,8 +9,12 @@ import {
 } from "@paperclipai/shared";
 import {
   signUpWithEmailPassword,
-  type BetterAuthEmailSignUp,
+  type BetterAuthApiClient,
 } from "../auth/better-auth.js";
+import {
+  isAppWebLoginBridgeRequestSecure,
+  runAppWebLoginBridge,
+} from "../auth/app-web-login-bridge.js";
 import { badRequest, unauthorized } from "../errors.js";
 import { validate } from "../middleware/validate.js";
 import { logActivity } from "../services/activity-log.js";
@@ -67,7 +71,7 @@ async function loadCurrentUserProfile(db: Db, userId: string) {
   });
 }
 
-export function authRoutes(db: Db, opts: { betterAuth?: BetterAuthEmailSignUp } = {}) {
+export function authRoutes(db: Db, opts: { betterAuth?: BetterAuthApiClient } = {}) {
   const router = Router();
   const companies = companyService(db);
   const access = accessService(db);
@@ -191,6 +195,38 @@ export function authRoutes(db: Db, opts: { betterAuth?: BetterAuthEmailSignUp } 
       name: updated.name ?? null,
       image: updated.image ?? null,
     }));
+  });
+
+  /**
+   * Wave 80 — App ↔ Web full-feature login sharing (PAP-board-bridge).
+   *
+   * The Coolie App signs in against Better Auth and stores the raw
+   * `paperclip-<instance>.session_token` value in `expo-secure-store`. Its
+   * WebView's cookie jar never sees that value, so opening the Web full-feature
+   * board from `WebContainerScreen` would normally land the user on the
+   * sign-in screen again. This endpoint mirrors the App's token into a real
+   * `Set-Cookie` header on a 302 redirect — the WebView follows the redirect
+   * with the cookie attached, and the browser session becomes the same session
+   * the App already holds.
+   *
+   * Mounted at `/api/auth/exchange` BEFORE the Better Auth wildcard handler so
+   * Express matches this route first and never lets Better Auth see the
+   * query string (the token must stay off Better Auth's logs and never hit a
+   * third-party plugin that doesn't expect it). Mounted without `auth` (no
+   * board/agent actor required): the token itself is the credential, validated
+   * server-side against Better Auth's session table.
+   */
+  router.get("/exchange", async (req, res) => {
+    const outcome = await runAppWebLoginBridge({
+      req,
+      res,
+      auth: opts.betterAuth ?? {},
+      secure: isAppWebLoginBridgeRequestSecure(req as unknown as Parameters<typeof isAppWebLoginBridgeRequestSecure>[0]),
+    });
+    if (!outcome.ok) {
+      res.status(401).json({ ok: false, reason: outcome.reason });
+      return;
+    }
   });
 
   return router;

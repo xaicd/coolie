@@ -4915,6 +4915,8 @@ export function agentRoutes(
           name: agentsTable.name,
           role: agentsTable.role,
           status: agentsTable.status,
+          adapterType: agentsTable.adapterType,
+          adapterConfig: agentsTable.adapterConfig,
         })
         .from(agentsTable)
         .where(eq(agentsTable.companyId, companyId));
@@ -4927,10 +4929,59 @@ export function agentRoutes(
       const skipped: Array<{ role: string; agentId: string }> = [];
 
       for (const template of templates) {
+        // Coolie fork — wave77: 5 角色默认装 Claude + Hermes 工具与适配器。
+        // defaultProvider 为 claude 时绑定 claude_local，备用 hermes_local；
+        // 杜绝使用空 adapterConfig: {} 导致 "Process adapter missing command"。
+        const defaultProvider = template.defaultProvider ?? "claude";
+        let adapterType = "claude_local";
+        let adapterConfig: Record<string, unknown> = {
+          model: Array.isArray(template.model) ? (template.model[1] ?? "claude-sonnet-4-5") : "claude-sonnet-4-5",
+          dangerouslySkipPermissions: true,
+        };
+
+        if (defaultProvider === "hermes") {
+          adapterType = "hermes_local";
+          adapterConfig = {
+            model: "MiniMax-M3",
+            provider: "minimax-cn",
+          };
+        } else if (defaultProvider === "cmd" || defaultProvider === "process") {
+          adapterType = "process";
+          adapterConfig = {
+            command: "cmd",
+          };
+        }
+
+        const roleTemplateMeta = {
+          role: template.role,
+          cli: template.cli,
+          model: template.model,
+          defaultProvider: template.defaultProvider ?? "claude",
+          providerCapabilities: template.providerCapabilities ?? ["claude", "hermes"],
+          backup: template.backup,
+          skillRef: template.skillRef,
+          gates: template.gates,
+        };
+
         const existing = roster.find(
           (row) => row.role === template.role && row.status !== "terminated",
         );
         if (existing) {
+          // 自愈逻辑：若已有 agent 处于 process 模式但配置为空 (缺失 command)，自动修补为默认 claude_local
+          if (
+            existing.adapterType === "process" &&
+            (!existing.adapterConfig ||
+              Object.keys(existing.adapterConfig).length === 0 ||
+              !(existing.adapterConfig as Record<string, unknown>).command)
+          ) {
+            await svc.update(existing.id, {
+              adapterType,
+              adapterConfig,
+              metadata: {
+                roleTemplate: roleTemplateMeta,
+              },
+            });
+          }
           skipped.push({ role: template.role, agentId: existing.id });
           continue;
         }
@@ -4945,21 +4996,14 @@ export function agentRoutes(
           role: template.role,
           title: scrubbed.title,
           capabilities: scrubbed.capabilities,
-          adapterType: "process",
-          adapterConfig: {},
+          adapterType,
+          adapterConfig,
           runtimeConfig: {},
           status: "idle",
           spentMonthlyCents: 0,
           lastHeartbeatAt: null,
           metadata: {
-            roleTemplate: {
-              role: template.role,
-              cli: template.cli,
-              model: template.model,
-              backup: template.backup,
-              skillRef: template.skillRef,
-              gates: template.gates,
-            },
+            roleTemplate: roleTemplateMeta,
           },
         });
 
@@ -4970,6 +5014,8 @@ export function agentRoutes(
           name: createdAgent.name,
           role: createdAgent.role,
           status: createdAgent.status,
+          adapterType: createdAgent.adapterType,
+          adapterConfig: (createdAgent.adapterConfig ?? {}) as Record<string, unknown>,
         });
 
         await applyDefaultAgentTaskAssignGrant(companyId, createdAgent.id, grantedByUserId);

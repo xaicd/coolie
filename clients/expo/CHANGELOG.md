@@ -4,6 +4,20 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.56
+
+> Released: 2026-09-24 · Android release APK
+
+### 更新
+
+- wave80 — App 登录 ↔ Web 全功能 共享 (boss 26:59 OOB 「App 登录与 Web 全功能 登录不共享」)
+  - **server 新增 `/api/auth/exchange`**：用 `expo-secure-store` 里的 session token 写 `Set-Cookie` 并 302 跳转到目标页，WebView 的 cookie jar 自动有登录态
+  - **App 端 `signInEmail` 返 `{token, user}`**：登录后立即把 Better Auth 颁发的 session token 持久化到 `expo-secure-store`
+  - **`WebContainerScreen` 注入 `?exchange=<token>`**：首屏加载前先拉一次 SecureStore，命中即让 WebView 走 bridge 链路，最终落地到 XROA 时已带 cookie，不再二次登录
+  - **防 open redirect**：`next` 参数被限制为同源根相对路径，绝对 URL/协议相对 URL 一律回退到 `/`
+
+---
+
 ## v0.5.55
 
 > Released: 2026-09-24 · Android release APK

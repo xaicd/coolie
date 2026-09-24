@@ -318,6 +318,12 @@
       "maxNetLines": 200,
       "reason": "Tests for the spec workflow's normalization: the document survives byte-identically to what the planner wrote (including the identifier flag the plugin validator requires, and enum/format/unit on properties), and a malformed or contradictory wrapper is refused rather than half-read — no object types, a missing phase, a phase named twice, an unknown phase — while a phase referring to an undeclared object type is dropped without failing the whole spec. No upstream counterpart.",
       "maxTotalLines": 220
+    },
+    {
+      "path": "server/src/routes/agents.ts",
+      "maxNetLines": 120,
+      "reason": "Default Palantir 5 roles (FDA/Core-SWE/PRE-SRE/FDSE/DS) to Claude Code and Hermes adapters with self-healing rather than empty process adapter.",
+      "maxTotalLines": 200
     }
   ]
 }

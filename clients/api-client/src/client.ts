@@ -197,9 +197,75 @@ export class CoolieClient {
     return parsed as T;
   }
 
+  /**
+   * Issue a request that needs to read the response headers alongside the
+   * parsed JSON body. Used by sign-in flows that must persist the session
+   * cookie for the WebView bridge (`AppScreen → WebContainerScreen`). The
+   * raw `Response` is consumed only once, so the caller does not need to
+   * release it.
+   */
+  private async requestWithHeaders<T>(
+    method: string,
+    path: string,
+    body?: unknown,
+    opts?: { auth?: boolean },
+  ): Promise<{ body: T; headers: Headers }> {
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (body !== undefined) headers["Content-Type"] = "application/json";
+    if (this.originHeader) headers.Origin = this.originHeader;
+    if (opts?.auth !== false) Object.assign(headers, await this.getAuthHeader());
+
+    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+      method,
+      headers,
+      body: body === undefined ? undefined : JSON.stringify(body),
+      credentials: "include",
+    });
+
+    const text = await res.text();
+    const parsed = text ? safeJson(text) : null;
+    if (!res.ok) {
+      const code = isRecord(parsed) && typeof parsed.error === "string" ? parsed.error : undefined;
+      const message =
+        (isRecord(parsed) && typeof parsed.message === "string" && parsed.message) ||
+        code ||
+        `Request failed: ${res.status}`;
+      throw new CoolieApiError(res.status, message, code, parsed);
+    }
+    return { body: parsed as T, headers: res.headers };
+  }
+
   // --- auth ---------------------------------------------------------------
-  signInEmail(input: { email: string; password: string }): Promise<unknown> {
-    return this.request("POST", "/api/auth/sign-in/email", input, { auth: false });
+  /**
+   * Sign in with email/password. The returned `token` is the raw
+   * `paperclip-<instance>.session_token` value Better Auth minted on this
+   * response — stored in `expo-secure-store` by the App, replayed into the
+   * WebView via `/api/auth/exchange` so the Web full-feature board inherits
+   * the App's session without a second sign-in.
+   *
+   * `user` is the same payload `GET /api/auth/get-session` would return.
+   */
+  async signInEmail(
+    input: { email: string; password: string },
+  ): Promise<{ token: string | null; user: { id: string; email?: string | null; name?: string | null; image?: string | null } }> {
+    const { body, headers } = await this.requestWithHeaders<{
+      user?: { id?: string; email?: string | null; name?: string | null; image?: string | null };
+    }>("POST", "/api/auth/sign-in/email", input, { auth: false });
+
+    const userId = body?.user?.id;
+    if (!userId) {
+      throw new Error("Sign-in response did not include a user id.");
+    }
+    const userPayload = body.user ?? {};
+    return {
+      token: extractSessionTokenCookie(headers),
+      user: {
+        id: userId,
+        email: userPayload.email ?? null,
+        name: userPayload.name ?? null,
+        image: userPayload.image ?? null,
+      },
+    };
   }
   signUpEmail(input: { name: string; email: string; password: string }): Promise<unknown> {
     return this.request("POST", "/api/auth/sign-up/email", input, { auth: false });
@@ -1088,4 +1154,33 @@ function safeJson(text: string): unknown {
 }
 function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/**
+ * Pull the `paperclip-<instance>.session_token` value out of a Better Auth
+ * sign-in response. Better Auth stamps the cookie on sign-in (no separate
+ * `Set-Cookie` lookup required), and the cookie name carries the instance id
+ * so a worktree token never bleeds into the default-instance session jar.
+ *
+ * The lookup is case-insensitive and tolerant of attribute ordering because
+ * the underlying header string is server-controlled and can grow new
+ * attributes (Domain, Partitioned, etc.) without breaking the parser.
+ */
+export function extractSessionTokenCookie(headers: Headers): string | null {
+  const getSetCookie = (headers as { getSetCookie?: () => string[] }).getSetCookie;
+  if (typeof getSetCookie === "function") {
+    const values = getSetCookie.call(headers);
+    if (Array.isArray(values)) {
+      for (const value of values) {
+        const match = value.match(/(?:^|; )(?:__Secure-)?paperclip-[^=;]+\.session_token=([^;]+)/i);
+        if (match && typeof match[1] === "string" && match[1]) return match[1];
+      }
+    }
+  }
+  const folded = headers.get("set-cookie");
+  if (folded) {
+    const match = folded.match(/(?:^|; )(?:__Secure-)?paperclip-[^=;]+\.session_token=([^;]+)/i);
+    if (match && typeof match[1] === "string" && match[1]) return match[1];
+  }
+  return null;
 }

@@ -19,6 +19,7 @@ import { C } from "../theme";
 import { COOLIE_WEB_URL } from "../utils/openCoolieWeb";
 import { RADIUS, SPACING } from "../ui/tokens";
 import { CoolieLogo } from "../components/CoolieLogo";
+import { getAuthToken } from "../coolie";
 
 type WebViewLike = React.ComponentType<any>;
 const SafeWebView = WebView as unknown as WebViewLike;
@@ -60,6 +61,14 @@ export function WebContainerScreen({
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // Wave 80 — pull the App's session token from SecureStore once per mount.
+  // `tokenReady` gates the WebView render: without it, the first navigation
+  // would race against the SecureStore read and load the plain landing URL
+  // before the bridge URL had a chance to attach. Resolving first means the
+  // WebView only ever makes one navigation, with the bridge redirect chain
+  // (`/api/auth/exchange` → 302 → landing page) baked in.
+  const [tokenReady, setTokenReady] = useState(false);
+  const [exchangeToken, setExchangeToken] = useState<string | null>(null);
 
   // 拼接 ?shell=native 让 Web 端也能通过 URL 参数检测原生壳
   const baseUrl = initialUrl
@@ -67,9 +76,34 @@ export function WebContainerScreen({
     : initialPath
       ? `${COOLIE_WEB_URL}${initialPath.startsWith("/") ? "" : "/"}${initialPath}`
       : COOLIE_WEB_URL;
-  const targetUrl = baseUrl.includes("?")
-    ? `${baseUrl}&shell=native`
-    : `${baseUrl}?shell=native`;
+  const withShell = (url: string) =>
+    url.includes("?") ? `${url}&shell=native` : `${url}?shell=native`;
+
+  // Wave 80 — pull the App's session token from SecureStore once per mount.
+  // The token is replayed into the WebView's cookie jar on the very first
+  // navigation by loading `/api/auth/exchange?token=<...>&next=<baseUrl>`;
+  // the bridge 302s to the landing page with `Set-Cookie` attached, and the
+  // WebView follows the redirect with the cookie already in its jar.
+  useEffect(() => {
+    let cancelled = false;
+    void getAuthToken().then((token) => {
+      if (cancelled) return;
+      setExchangeToken(token ?? null);
+      setTokenReady(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const bridgeUrl = exchangeToken
+    ? `${COOLIE_WEB_URL.replace(/\/+$/, "")}/api/auth/exchange?token=${encodeURIComponent(exchangeToken)}&next=${encodeURIComponent(baseUrl)}`
+    : null;
+  const targetUrl = tokenReady
+    ? bridgeUrl
+      ? withShell(bridgeUrl)
+      : withShell(baseUrl)
+    : null;
 
   // 物理返回键拦截：若 WebView 可后退则在页面内后退，否则退出容器
   useEffect(() => {
@@ -106,7 +140,7 @@ export function WebContainerScreen({
   };
 
   const handleOpenExternal = () => {
-    const urlToOpen = currentUrl || targetUrl;
+    const urlToOpen = currentUrl || targetUrl || baseUrl;
     Linking.openURL(urlToOpen).catch(() => {
       Alert.alert("无法打开外部浏览器", urlToOpen);
     });
@@ -213,40 +247,47 @@ export function WebContainerScreen({
 
       {/* WebView 内容主体 */}
       <View style={styles.body}>
-        <SafeWebView
-          ref={webViewRef}
-          key={reloadKey}
-          source={{ uri: targetUrl }}
-          style={styles.webview}
-          originWhitelist={["*"]}
-          javaScriptEnabled={true}
-          domStorageEnabled={true}
-          sharedCookiesEnabled={true}
-          thirdPartyCookiesEnabled={true}
-          mixedContentMode="compatibility"
-          allowsBackForwardNavigationGestures={true}
-          injectedJavaScriptBeforeContentLoaded={ZH_CN_INJECTION + I18N_PATCH_INJECTION}
-          injectedJavaScript={ZH_CN_ENSURE + I18N_PATCH_INJECTION}
-          onNavigationStateChange={handleNavigationStateChange}
-          onLoadStart={() => {
-            setLoading(true);
-            setError(null);
-          }}
-          onLoadProgress={(e: { nativeEvent: { progress: number } }) => {
-            setProgress(e.nativeEvent.progress);
-          }}
-          onLoadEnd={() => {
-            setLoading(false);
-          }}
-          onError={(e: { nativeEvent?: { description?: string } }) => {
-            setLoading(false);
-            setError(e?.nativeEvent?.description || "页面加载失败");
-          }}
-          onHttpError={(e: { nativeEvent?: { statusCode?: number } }) => {
-            setLoading(false);
-            setError(`HTTP ${e?.nativeEvent?.statusCode ?? "错误"}`);
-          }}
-        />
+        {targetUrl ? (
+          <SafeWebView
+            ref={webViewRef}
+            key={reloadKey}
+            source={{ uri: targetUrl }}
+            style={styles.webview}
+            originWhitelist={["*"]}
+            javaScriptEnabled={true}
+            domStorageEnabled={true}
+            sharedCookiesEnabled={true}
+            thirdPartyCookiesEnabled={true}
+            mixedContentMode="compatibility"
+            allowsBackForwardNavigationGestures={true}
+            injectedJavaScriptBeforeContentLoaded={ZH_CN_INJECTION + I18N_PATCH_INJECTION}
+            injectedJavaScript={ZH_CN_ENSURE + I18N_PATCH_INJECTION}
+            onNavigationStateChange={handleNavigationStateChange}
+            onLoadStart={() => {
+              setLoading(true);
+              setError(null);
+            }}
+            onLoadProgress={(e: { nativeEvent: { progress: number } }) => {
+              setProgress(e.nativeEvent.progress);
+            }}
+            onLoadEnd={() => {
+              setLoading(false);
+            }}
+            onError={(e: { nativeEvent?: { description?: string } }) => {
+              setLoading(false);
+              setError(e?.nativeEvent?.description || "页面加载失败");
+            }}
+            onHttpError={(e: { nativeEvent?: { statusCode?: number } }) => {
+              setLoading(false);
+              setError(`HTTP ${e?.nativeEvent?.statusCode ?? "错误"}`);
+            }}
+          />
+        ) : (
+          <View style={styles.centerOverlay}>
+            <ActivityIndicator size="small" color={C.accent} />
+            <Text style={styles.overlayText}>正在准备 Web 容器…</Text>
+          </View>
+        )}
 
         {loading && !error && progress < 0.3 ? (
           <View style={styles.centerOverlay} pointerEvents="none">

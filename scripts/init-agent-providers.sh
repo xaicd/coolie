@@ -45,7 +45,7 @@ COOKIE_JAR="${COOLIE_COOKIE_JAR:-}"
 # 5 角色（Palantir Foundry）——与 packages/agents/role-templates 同源。
 ROLES=(fda core-swe pre-sre fdse ds)
 # 角色默认 provider 对应的 adapter 类型。
-PROVIDERS=(${COOLIE_PROVIDERS:-claude_local hermes_gateway})
+PROVIDERS=(${COOLIE_PROVIDERS:-claude_local hermes_local hermes_gateway})
 
 step() { printf '\n=== %s ===\n' "$1"; }
 die() { printf '\n失败: %s\n' "$1" >&2; exit 1; }

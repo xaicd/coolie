@@ -601,14 +601,22 @@ export async function classifyToken(token: string): Promise<Credential> {
  * Sign in with email and password, returning the session user.
  *
  * Any stored bearer token is cleared first: the shared client sends both, and a
- * stale token would shadow the session cookie for every later call.
+ * stale token would shadow the session cookie for every later call. The
+ * session cookie Better Auth mints is also captured into `expo-secure-store`
+ * so `WebContainerScreen` can replay it through `/api/auth/exchange` and the
+ * Web full-feature board inherits the App's session — otherwise the WebView's
+ * own cookie jar never sees the cookie and the user lands on the sign-in
+ * screen again.
  */
 export async function signInWithEmail(input: {
   email: string;
   password: string;
 }): Promise<SessionUser> {
   await clearAuthToken();
-  await coolie.signInEmail(input);
+  const result = await coolie.signInEmail(input);
+  if (result.token) {
+    await saveAuthToken(result.token);
+  }
   const session = await coolie.getSession();
   if (!session?.user) {
     throw new Error("Signed in, but this instance returned no session for the account.");

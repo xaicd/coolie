@@ -177,7 +177,7 @@ import { createPluginDevWatcher } from "./services/plugin-dev-watcher.js";
 import { createPluginHostServiceCleanup } from "./services/plugin-host-service-cleanup.js";
 import { pluginRegistryService } from "./services/plugin-registry.js";
 import { createHostClientHandlers } from "@paperclipai/plugin-sdk";
-import type { BetterAuthEmailSignUp, BetterAuthSessionResult } from "./auth/better-auth.js";
+import type { BetterAuthApiClient, BetterAuthSessionResult } from "./auth/better-auth.js";
 import { createCachedViteHtmlRenderer } from "./vite-html-renderer.js";
 import {
   DEFAULT_JSON_BODY_LIMIT,
@@ -510,7 +510,7 @@ export async function createApp(
      * an account in-process (reusing Better Auth's own sign-up logic) before it
      * bootstraps the new user's first company.
      */
-    betterAuth?: BetterAuthEmailSignUp;
+    betterAuth?: BetterAuthApiClient;
     resolveSession?: (
       req: ExpressRequest,
     ) => Promise<BetterAuthSessionResult | null>;

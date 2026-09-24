@@ -458,6 +458,14 @@ export type BetterAuthEmailSignUp = {
   api?: { signUpEmail?: BetterAuthSignUpEndpoint };
 };
 
+/**
+ * Slice of the live Better Auth instance the in-process routes
+ * (`/api/auth/register`, `/api/auth/exchange`) need. The handler exposes both
+ * endpoints off the same `auth.api` object — declaring them together keeps the
+ * call sites from having to thread two narrowly-typed option bags.
+ */
+export type BetterAuthApiClient = BetterAuthEmailSignUp & BetterAuthSessionResolver;
+
 export type EmailSignUpOutcome =
   | { ok: true; user: BetterAuthSessionUser; setCookies: string[] }
   | { ok: false; status: number; message: string };
