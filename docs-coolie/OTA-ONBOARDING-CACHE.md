@@ -155,3 +155,73 @@ A: 技术上可以, 但**默认不做** —— 改 entry instructions 是侵入�
 - `server/src/onboarding-assets/ceo/` — CEO persona 的镜像, 同一份一次性逻辑
 - `clients/expo/scripts/publish-ota.sh` — OTA 增量, 与 onboarding 无关, 别混
 - `docs-coolie/OTA-PUBLISHED-WAVE35.md` 之类 — 历史 OTA 流水
+
+---
+
+## 8. Testing (`scripts/test-onboarding-cache.sh`)
+
+`scripts/test-onboarding-cache.sh` 是老板 09-23 26:24 「派」wave72 Sprint 1.1
+配的烟测脚本。一次性跑过三件事:
+
+1. **源资产断言** — `server/src/onboarding-assets/first-task/` 下:
+   - `greeting.md` / `chief-of-staff/AGENTS.md` / `skills/first-task/SKILL.md`:
+     既含 `Coolie` 也不含 `Paperclip`(wave61 已替换)
+   - `brief.md` / `opening-question.json`: 不含 `Paperclip`(brand-neutral 文件)
+2. **端到端真验** — 建一个新公司 → 建 agent → `POST /api/companies/<id>/issues`
+   带 `onboardingFirstTask: true` → `GET /api/issues/<id>/comments` 拿到一条
+   agent-authored greeting comment, 验证内容是「欢迎来到 Coolie 工坊」(Coolie
+   化), 不是「Welcome to Paperclip」。
+3. **snapshot 不迁移断言** — ssh 进 prod 查 `issue_comments` 里既有公司的 agent
+   comment 不被 source 改动反向同步(默认不动数据, 只读验)。
+
+跑法(默认本地 dev, `local_trusted`, 无需登录):
+
+```bash
+bash scripts/test-onboarding-cache.sh
+```
+
+跑线上(prod `authenticated`, 用 cookie-jar 走 Better Auth):
+
+```bash
+COOLIE_API_BASE=https://xrobinai.cn \
+  COOLIE_COOKIE_JAR=/tmp/coolie.jar \
+  COOLIE_EMAIL=... COOLIE_PASSWORD=... \
+  bash scripts/test-onboarding-cache.sh
+```
+
+环境变量:
+
+- `COOLIE_API_BASE` — base URL (默认 `http://localhost:3100`)
+- `COOLIE_COOKIE_JAR` — 走 `local_trusted` 模式可留空; 线上 `authenticated`
+  模式必须给, 脚本会先用 `POST /api/auth/sign-in/email` 把 cookie 烤进 jar
+- `COOLIE_SOURCE_DIR` — 源资产目录 (默认 `server/src/onboarding-assets/first-task`)
+- `COOLIE_PROD_HOST` — ssh 别名 (默认 `tc-coolie-claw`), 用于第 3 步
+  snapshot 不迁移断言
+
+退出码: 0 = 全过, 非零 = 任一步失败。
+
+---
+
+## 9. Manual Test Plan (老板 / PM 手测 5 步)
+
+老板想自己手测一次 onboarding cache 替换效果, 按这 5 步走:
+
+1. **确认 source 已是 Coolie** —
+   `cat server/src/onboarding-assets/first-task/greeting.md`, 看是不是「欢迎来
+   到 Coolie 工坊」开头。
+2. **确认 prod 已 sync** —
+   `ssh tc-coolie-claw 'sudo cat /opt/coolie/server/src/onboarding-assets/first-task/greeting.md'`
+   (注意 prod 跑 src, 不是 dist — `tsx` 直接读源), 跟 source 对一下。
+3. **建一个全新公司** — UI 上点「新建公司」或
+   `curl -X POST https://xrobinai.cn/api/companies -H 'x-paperclip-api-key: ...'
+   -d '{"name":"manual-test"}'`, 不要碰任何已有公司。
+4. **建第一个 task** — UI 上点「Get started」(等价于
+   `POST /api/companies/<new-id>/issues { onboardingFirstTask: true }`),
+   打开 task 详情页, 第一条 comment 应该是「欢迎来到 Coolie 工坊」开头的
+   agent bubble, 不是右对齐 user。
+5. **不动旧公司** — 不要对任何 wave61 之前建的公司跑 SQL UPDATE, 老板 / PM 之
+   前手工调过的内容会被覆盖(详见 3.2)。如果非要看效果, 跟 3.2 走手工覆盖或一次
+   性脚本。
+
+跑完 5 步, 老板就能独立判断「源改了 + 新公司看到新文案」这条链路是通的; 老公
+司的快照按约定不动, 不需要也不应该被脚本碰。

@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.48
+
+> Released: 2026-09-24 · Android release APK
+
+### 更新
+
+- wave72 Sprint 1.1: OTA onboarding cache 测试 + 真验 — `scripts/test-onboarding-cache.sh` 端到端验证新公司 greeting 已 Coolie 化 + 老公司 snapshot 不迁移 + docs-coolie/OTA-ONBOARDING-CACHE.md 加 testing section + manual test plan
+
+---
+
 ## v0.5.46
 
 > Released: 2026-09-24 · Android release APK
