@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   FlatList,
+  Linking,
   Modal,
   Pressable,
   RefreshControl,
   SafeAreaView,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -13,6 +15,7 @@ import {
   StatusBar as RNStatusBar,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
 import type {
   Company,
@@ -152,6 +155,7 @@ export function ArtifactsScreen({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterKind>("all");
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [previewArtifact, setPreviewArtifact] = useState<CompanyArtifact | null>(null);
@@ -201,6 +205,20 @@ export function ArtifactsScreen({
     void loadArtifacts();
   }, [loadArtifacts]);
 
+  // 从产物列表计算去重的 Agent 列表
+  const distinctAgents = useMemo(() => {
+    const map = new Map<string, { id: string; name: string }>();
+    for (const a of artifacts) {
+      if (a.createdByAgent?.id) {
+        map.set(a.createdByAgent.id, {
+          id: a.createdByAgent.id,
+          name: a.createdByAgent.name || `智能体 ${a.createdByAgent.id.slice(0, 6)}`,
+        });
+      }
+    }
+    return Array.from(map.values());
+  }, [artifacts]);
+
   // 统计各分类数量
   const counts = useMemo(() => {
     let images = 0;
@@ -220,17 +238,23 @@ export function ArtifactsScreen({
   }, [artifacts]);
 
   const filteredList = useMemo(() => {
-    if (filter === "all") return artifacts;
+    let list = artifacts;
     if (filter === "work_product") {
-      return artifacts.filter((a) => a.source === "work_product");
-    }
-    if (filter === "document") {
-      return artifacts.filter(
+      list = list.filter((a) => a.source === "work_product");
+    } else if (filter === "document") {
+      list = list.filter(
         (a) => a.mediaKind === "document" || a.mediaKind === "text",
       );
+    } else if (filter !== "all") {
+      list = list.filter((a) => a.mediaKind === filter);
     }
-    return artifacts.filter((a) => a.mediaKind === filter);
-  }, [artifacts, filter]);
+
+    if (selectedAgentId) {
+      list = list.filter((a) => a.createdByAgent?.id === selectedAgentId);
+    }
+
+    return list;
+  }, [artifacts, filter, selectedAgentId]);
 
   const handleCardPress = (artifact: CompanyArtifact) => {
     if (artifact.mediaKind === "image") {
@@ -318,6 +342,53 @@ export function ArtifactsScreen({
           value={filter}
           onChange={(key) => setFilter(key as FilterKind)}
         />
+
+        {/* 按智能体筛选胶囊行 */}
+        {distinctAgents.length > 0 && (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.agentFilterRow}
+          >
+            <Pressable
+              style={[
+                styles.agentChip,
+                selectedAgentId === null && styles.agentChipActive,
+              ]}
+              onPress={() => setSelectedAgentId(null)}
+            >
+              <Text
+                style={[
+                  styles.agentChipText,
+                  selectedAgentId === null && styles.agentChipTextActive,
+                ]}
+              >
+                全部员工
+              </Text>
+            </Pressable>
+            {distinctAgents.map((ag) => {
+              const isSelected = selectedAgentId === ag.id;
+              return (
+                <Pressable
+                  key={ag.id}
+                  style={[styles.agentChip, isSelected && styles.agentChipActive]}
+                  onPress={() =>
+                    setSelectedAgentId(isSelected ? null : ag.id)
+                  }
+                >
+                  <Text
+                    style={[
+                      styles.agentChipText,
+                      isSelected && styles.agentChipTextActive,
+                    ]}
+                  >
+                    🤖 {ag.name}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        )}
       </View>
 
       {/* 产物卡片流列表 */}
@@ -494,7 +565,7 @@ export function ArtifactsScreen({
         />
       )}
 
-      {/* 图片全屏查看 Modal (expo-image 驱动) */}
+      {/* 图片/产物大图预览浮层 (expo-image 驱动) */}
       <Modal
         visible={!!previewArtifact}
         transparent={true}
@@ -503,7 +574,7 @@ export function ArtifactsScreen({
       >
         <SafeAreaView style={styles.modalBackdrop}>
           <View style={styles.modalHeader}>
-            <View style={{ flex: 1, paddingRight: 16 }}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
               <Text style={styles.modalTitle} numberOfLines={1}>
                 {previewArtifact?.title}
               </Text>
@@ -511,13 +582,46 @@ export function ArtifactsScreen({
                 #{previewArtifact?.issue.identifier} · {previewArtifact?.issue.title}
               </Text>
             </View>
-            <Pressable
-              onPress={() => setPreviewArtifact(null)}
-              hitSlop={12}
-              style={styles.modalCloseBtn}
-            >
-              <Text style={styles.modalCloseText}>✕ 关闭</Text>
-            </Pressable>
+            <View style={styles.modalActionsRow}>
+              {Boolean(
+                previewArtifact &&
+                  resolveMediaUrl(
+                    previewArtifact.downloadPath ||
+                      previewArtifact.contentPath ||
+                      previewArtifact.openPath,
+                  ),
+              ) && (
+                <Pressable
+                  onPress={() => {
+                    const url = resolveMediaUrl(
+                      previewArtifact?.downloadPath ||
+                        previewArtifact?.contentPath ||
+                        previewArtifact?.openPath,
+                    );
+                    if (url) {
+                      void Linking.openURL(url);
+                    }
+                  }}
+                  hitSlop={8}
+                  style={styles.modalDownloadBtn}
+                >
+                  <Ionicons
+                    name="download-outline"
+                    size={14}
+                    color={C.accent}
+                    style={{ marginRight: 4 }}
+                  />
+                  <Text style={styles.modalDownloadBtnText}>下载 / 打开</Text>
+                </Pressable>
+              )}
+              <Pressable
+                onPress={() => setPreviewArtifact(null)}
+                hitSlop={12}
+                style={styles.modalCloseBtn}
+              >
+                <Text style={styles.modalCloseText}>✕ 关闭</Text>
+              </Pressable>
+            </View>
           </View>
 
           <View style={styles.modalImageWrapper}>
@@ -860,5 +964,52 @@ const styles = StyleSheet.create({
   modalFooterText: {
     color: C.ink4,
     fontSize: 12,
+  },
+  agentFilterRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingTop: 6,
+    paddingBottom: 2,
+  },
+  agentChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+  },
+  agentChipActive: {
+    backgroundColor: "rgba(113, 112, 255, 0.15)",
+    borderColor: C.accent,
+  },
+  agentChipText: {
+    color: C.ink3,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  agentChipTextActive: {
+    color: C.ink,
+    fontWeight: "600",
+  },
+  modalActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  modalDownloadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  modalDownloadBtnText: {
+    color: C.ink2,
+    fontSize: 12,
+    fontWeight: "500",
   },
 });

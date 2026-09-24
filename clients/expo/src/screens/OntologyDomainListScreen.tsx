@@ -301,7 +301,8 @@ export function OntologyDomainListScreen({
 
   // 过滤显示
   const activeCount = domains.filter((d) => d.lifecycle_state === "active").length;
-  const lockedCount = domains.filter(
+  const draftCount = domains.filter((d) => d.lifecycle_state === "draft").length;
+  const archivedCount = domains.filter(
     (d) =>
       d.lifecycle_state === "archived" ||
       d.lifecycle_state === "deprecated" ||
@@ -855,11 +856,12 @@ export function OntologyDomainListScreen({
           onChange={(key) => setFilter(key as DomainFilter)}
           options={[
             { key: "all", label: `全部 (${domains.length})` },
-            { key: "active", label: `运行中 (${activeCount})` },
+            { key: "active", label: `生产 (${activeCount})` },
+            { key: "draft", label: `草稿 (${draftCount})` },
             {
-              key: "locked",
-              label: `已锁定 (${lockedCount})`,
-              color: lockedCount > 0 ? C.err : undefined,
+              key: "archived",
+              label: `已归档 (${archivedCount})`,
+              color: archivedCount > 0 ? C.err : undefined,
             },
           ]}
           style={styles.filterSwitcher}
@@ -874,8 +876,38 @@ export function OntologyDomainListScreen({
         <EmptyState
           variant="standalone"
           icon="🌐"
-          title="暂无匹配的业务本体域"
-          subtitle="插件已挂载于 @paperclipai/plugin-ontology，可在后台创建电商、文旅等域。"
+          title={domains.length === 0 ? "暂无业务本体域" : "暂无匹配的业务本体域"}
+          subtitle={
+            domains.length === 0
+              ? "当前工坊尚未初始化任何业务本体。您可以一键注入官方示例本体域。"
+              : "可尝试切换上方分类筛选标签查看其他本体域。"
+          }
+          action={
+            domains.length === 0 ? (
+              <Pressable
+                style={[
+                  styles.refreshBtn,
+                  styles.seedBtn,
+                  { marginTop: 12, paddingHorizontal: 16, paddingVertical: 10 },
+                ]}
+                disabled={seedingSample}
+                onPress={() => void handleSeedSample()}
+              >
+                {seedingSample ? (
+                  <ActivityIndicator size="small" color={C.accent} />
+                ) : (
+                  <Text style={[styles.seedBtnText, { fontSize: 14 }]}>✨ 注入示例域</Text>
+                )}
+              </Pressable>
+            ) : (
+              <Pressable
+                style={[styles.refreshBtn, { marginTop: 12 }]}
+                onPress={() => setFilter("all")}
+              >
+                <Text style={styles.refreshBtnText}>查看全部域</Text>
+              </Pressable>
+            )
+          }
         />
       ) : (
         <FlatList
