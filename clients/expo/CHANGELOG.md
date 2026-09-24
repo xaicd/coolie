@@ -4,6 +4,22 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.54
+
+> Released: 2026-09-24 · Android release APK
+
+### 更新
+
+- wave77 打包 boss Claude 4fbb4c92e 大改造 (boss 26:51 OOB 「打包发布」) — Hybrid WebContainer + 多源仓库 + 项目中心 + ontology parity
+  - 新增 WebContainerScreen: 原生壳内嵌 Web 全功能工作台 (sharedCookies 免二次登录 / 导航控制 / 物理返回键 / 进度条 / 错误恢复), 入口: AppBar Web全功能, 项目 Web全量, 本体 Web图谱, 流水线
+  - 新增 ProjectsScreen: 原生项目列表 (状态筛选 / Git-本地标签 / 指标卡)
+  - NewProjectDialog 支持 4 源模式: Git URL / 本地目录 / GitHub OAuth / 无
+  - normalizeProjectRepositoryUrl 兼容 Gitee / GitLab / 自建 Git
+  - api-client: Project 类型增强, listIssues 增 projectId 过滤
+  - plugin-ontology: Microsoft Ontology-Playground 功能对齐
+
+---
+
 ## v0.5.53
 
 > Released: 2026-09-24 · Android release APK
