@@ -9,6 +9,49 @@
 > 下表的分桶是**同步前**那次测量,桶间比例不变;**当天数字一律用报告取**:
 > `node .agents/skills/fork-sync/scripts/sync-report.mjs`。
 
+> **2026-09-22 第二次审计(结构性,数字待重取)。** 方法:`git diff --numstat
+> $(git merge-base HEAD upstream/master)..HEAD`,再用 `check-fork-surface.mjs` 导出的
+> `isOwned` / `loadManifest` 分类——**不重新实现门禁的逻辑,直接 import 它**,否则两边会漂。
+> 当天 `upstream/master` 是本地缓存的 `c65fc9e3`(沙箱连不上 github,`sync-report.mjs`
+> 会 `SSL_ERROR_SYSCALL`),所以下面每个数字都是**那个基线**的,且早于其后约 40 个提交。
+> 要用,先重取。
+>
+> 这次测到:全量改动 **828** 文件 = 已登记 54 + 自有前缀 518 + **未登记 256**。
+> 未登记的 256 分成两类,处置完全不同:
+>
+> | 类 | 文件 | 依据 | 处置 |
+> | --- | --- | --- | --- |
+> | **可整体归我方** | 121 | 上游在该前缀下**零文件** | 加进 `OWNED_PREFIXES` |
+> | **必须逐条登记** | 135 | 上游同路径**有**文件 | 补 `scripts/fork-surface.json` |
+>
+> 第二类里真正贵的是 **A 类(上游真有这个 path)**:108 文件 / 8393 行,其中约 64 个是
+> §3 那批 locale;另外 **21 个是"混合树里的新文件"**——落在上游目录下但上游没有这个文件,
+> 构不成合并冲突,门禁却按前缀认不出来。这是 §2 分桶之外的一个新类,值得单独定一条规则。
+>
+> **这次已经落地的**(见提交 `1ae5ef3f5`、`824a58f6f`):
+> - `OWNED_PREFIXES` 加了 **18 个前缀**(13 棵树 + 5 个脚本),**并把准入规则写进代码注释**:
+>   一个前缀只有在上游该路径下零文件时才能加。混合树绝不能加——门禁先判 owned 再查
+>   manifest,加了会把树里的上游文件一起静默豁免。`server/src/services/` 就是反例(上游 654 个文件)。
+>   这同时把 §2 的 **C 桶**("上游没有同名 → 考虑搬进我们自己的目录")就地解决了:没有搬目录,
+>   而是让门禁承认它们本来就归我方。
+> - 登记 **10 条**新条目,并**删掉一条错的**:`plugin-npc-factory/src/worker.ts` 的 reason 写着
+>   "A plugin package, but not one we own" —— 上游 `packages/plugins/` 下**从来没有**这个包
+>   (也从来没有过),它是 `47bb99a0f` 我们自己建的。同一个错误前提还被一个单测断言着
+>   (`isOwned(".../plugin-npc-factory/...") === false`),一并改到真正的上游兄弟包上。
+> - 未登记 256 → **129**;**`--cumulative` 仍余 2 个超预算**(`server/src/auth/better-auth.ts`
+>   126/70 为既存,`server/src/__tests__/board-chat-route-feature-flag.test.ts` 169/80 是后加的)。
+>
+> **一个校准提醒(这次踩到的)**:`--range=<分叉点>..HEAD` 是拿**全量净值**去比
+> `maxNetLines`(单提交预算),必然虚高——当天它报了 12 个"超预算",而 `--cumulative`
+> 只有 1 个是真的。**总量看 `--cumulative`,单次提交看 `--range=HEAD~1..HEAD`。**
+>
+> **一个真实的教训(§2 之外的第七类风险)**:我们的迁移曾用 `0280_lumpy_thunderbird.sql`,
+> 而上游已经有 `0280_unique_genesis` / `0281_true_boom_boom`。两边的**四位号**撞在同一号段,
+> 下次合并必然 `Duplicate migration number 0280`,且 `meta/0280_snapshot.json` 同名不同内容。
+> 已改到 **9000**(`9000_coolie_company_template`)并把 journal 的 `idx` 也设到 9000,
+> 让 `drizzle-kit generate` 的下一个号从 9001 起、不再回到 0280。**结论:fork 的迁移要占一个
+> 上游够不到的号段**,这一条不在上面的六个桶里,因为它是"数字"层面的冲突,而六个桶只看文件。
+
 **为什么要这份**:`scripts/fork-surface.json` 是**预算**清单,不是**地图**。它只登记了 7 个文件,
 而实际分歧是 91 个 / 9295 行 —— 也就是说 `check-fork-surface --cumulative` 的 PASS
 **只对清单里那几个成立**。上游一动,冲突大概率落在**没登记、也没记理由**的那些文件里。
@@ -96,11 +139,18 @@
 ## 5. 收敛动作(建议顺序)
 
 1. **i18n**:先决定走上游 PR,还是做覆盖层;不管哪条,先**停止**继续往上游 locale 文件里加词条。
-2. **D 桶 28 个**:每个要么补进 `scripts/fork-surface.json`(`maxNetLines` + `reason`,写清为什么),
-   要么把改动缩回一行 re-export。做完之后,冲突文件能与清单对得上,**解决靠意图而不是靠猜**。
-3. **C 桶 7 个 `scripts/`**:考虑移进我们自己的目录(它们是我们的门禁工具,不是上游的),
-   顺手消除"上游将来加同名脚本"的风险。
-4. **把 `--range=` 用起来**:`node scripts/check-fork-surface.mjs --range=origin/master..main`
+   **仍未定** —— 这是未登记清单里最大的一块(约 64 个文件 × 每 161 行)。
+2. **D 桶 28 个 + 2026-09-22 新增的 A 类**:每个要么补进 `scripts/fork-surface.json`
+   (`maxNetLines` + `reason`,写清为什么),要么把改动缩回一行 re-export。做完之后,冲突文件能与清单
+   对得上,**解决靠意图而不是靠猜**。
+3. ~~**C 桶 7 个 `scripts/`**:考虑移进我们自己的目录~~ —— **2026-09-22 已解决,换了更便宜的解法**:
+   不搬目录,把它们加进 `OWNED_PREFIXES`(上游本来就没有同名文件),并把准入规则写进代码注释。
+4. **混合树里的新文件(约 21 个)**:定一条规则 —— 上游在该 path 下没有文件时,是否仍需登记。
+   倾向"不需要"(门禁约束的是**冲突面**,上游没有的文件构不成冲突),代价是上游日后在同一路径新增
+   文件会变成 create/create 冲突。**未定。**
+5. **把 `--range=` 用起来**:`node scripts/check-fork-surface.mjs --range=origin/master..main`
    能看见新增的上游文件,是这份地图下次刷新时的一致性检查。
+6. **迁移号段**:fork 自己的迁移要占一个上游够不到的号段(现有 `9000_coolie_company_template`)。
+   这是**文件层面之外**的"数字"冲突,上面六个桶都看不见 —— 见头部 2026-09-22 那条。
 
 > 这份文档是**地图**,不是预算。`scripts/fork-surface.json` 才是预算;两者的差值就是待收敛的工作量。
