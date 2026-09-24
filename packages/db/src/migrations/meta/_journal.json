@@ -1968,6 +1968,13 @@
       "when": 1790217551371,
       "tag": "9002_colorful_gressill",
       "breakpoints": true
+    },
+    {
+      "idx": 9003,
+      "version": "7",
+      "when": 1790226704704,
+      "tag": "9003_clear_palantir_role_titles",
+      "breakpoints": true
     }
   ]
 }

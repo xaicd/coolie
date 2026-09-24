@@ -140,6 +140,21 @@ export function gitOpsCredentialsService(db: Db) {
       });
       return row ? toView(row) : null;
     },
+
+    /**
+     * wave70 — App 端凭证管理屏「删除」按钮使用.
+     *
+     * 只删当前用户自己的凭证; 别人的 row 直接返回 false 让路由层 404.
+     * 返回 boolean 而非 affected count, 避免泄漏 row count 给 App.
+     */
+    async remove(userId: string, id: string): Promise<boolean> {
+      const existing = await db.query.gitCredentials.findFirst({
+        where: eq(gitCredentials.id, id),
+      });
+      if (!existing || existing.userId !== userId) return false;
+      await db.delete(gitCredentials).where(eq(gitCredentials.id, id));
+      return true;
+    },
   };
 }
 

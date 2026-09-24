@@ -47,6 +47,22 @@ interface ChatMessage {
 }
 
 /**
+ * wave71: h5 附件上传 — 用 hidden <input type="file"> 拿附件, 走同样的
+ * uploadAttachment → attachmentIds 路径。h5 没有 ActionSheet, 直接弹原生
+ * 文件选择器。
+ */
+interface StagedFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  size: number | null;
+  file: File;
+}
+
+/** wave71: 三态机 — 'idle' / 'thinking' / 'streaming' */
+type LoadingState = "idle" | "thinking" | "streaming";
+
+/**
  * wave66 (老板 25:15 '派' P2): 真接口拉取常驻会话 + SSE 推送。无公司 / 拉取失败时
  * 显示空状态, 不预填任何 SEED 假数据, 不假装 SSE 推送可用。
  */
@@ -63,6 +79,17 @@ export function BoardChatScreen({
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyError, setHistoryError] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
+  /** wave71: 三态机 + 首 token 标志 → 驱动 typing/streaming 提示 */
+  const [hasFirstToken, setHasFirstToken] = useState(false);
+  /** wave71: 工坊会话 issueId, 上传附件时需要 */
+  const [boardIssueId, setBoardIssueId] = useState<string | null>(null);
+  /** wave71: 附件上传队列 */
+  const [stagedFiles, setStagedFiles] = useState<StagedFile[]>([]);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  /** wave71: 清空确认 modal */
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<any>(null);
 
   // wave66: 真接口拉取历史 (常驻 Board Operations Issue)。公司未选时跳过。
@@ -204,6 +231,9 @@ export function BoardChatScreen({
   /**
    * wave66: 真 SSE 推送 (POST /api/board/chat/stream)。未选公司 / SSE 失败
    * 时如实显示错误, 不返回固定 CANNED_REPLY (老板 25:15 '派' P2)。
+   *
+   * wave71: 附件上传 — 先用 fetch /uploadAttachment 拿到 attachment.id,
+   * 一起随 message 提交; clearBoardConversation 走 DELETE 同款路由。
    */
   const send = useCallback(async () => {
     const text = draft.trim();
@@ -230,15 +260,60 @@ export function BoardChatScreen({
       return;
     }
 
+    // wave71: 附件上传 — 先把 staged files 走 multipart 上传到 board issue,
+    // 拿到 attachment.id 后随 message 一起 POST。
+    let attachmentIds: string[] = [];
+    if (stagedFiles.length > 0) {
+      setUploadingFile(true);
+      try {
+        const ids = await Promise.all(
+          stagedFiles.map(async (entry) => {
+            const uploaded = await coolie.uploadAttachment(
+              companyId,
+              boardIssueId ?? "",
+              entry.file,
+            );
+            return uploaded.id;
+          }),
+        );
+        attachmentIds = ids.filter((id): id is string => Boolean(id));
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : "附件上传失败";
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: `m${prev.length + 1}err`,
+            role: "assistant",
+            text: `⚠️ 附件上传失败: ${reason}`,
+          },
+        ]);
+        setUploadingFile(false);
+        return;
+      } finally {
+        setUploadingFile(false);
+        setStagedFiles([]);
+      }
+    }
+
     // 普通对话 → 真 SSE 流式推送
     setStreaming(true);
+    setHasFirstToken(false);
     const assistantId = `${nextId}a`;
     setMessages((prev) => [...prev, { id: assistantId, role: "assistant", text: "" }]);
     try {
       await coolie.streamBoardChat(
-        { companyId, message: text },
         {
+          companyId,
+          message: text,
+          taskId: boardIssueId ?? undefined,
+          attachmentIds: attachmentIds.length > 0 ? attachmentIds : undefined,
+        },
+        {
+          onStart: (issueId) => {
+            setBoardIssueId(issueId);
+          },
           onChunk: (chunk) => {
+            setHasFirstToken(true);
             setMessages((prev) =>
               prev.map((m) => (m.id === assistantId ? { ...m, text: m.text + chunk } : m)),
             );
@@ -266,13 +341,107 @@ export function BoardChatScreen({
       );
     } finally {
       setStreaming(false);
+      setHasFirstToken(false);
     }
-  }, [draft, messages.length, dispatchCommand, company?.id, streaming]);
+  }, [draft, messages.length, dispatchCommand, company?.id, streaming, stagedFiles, boardIssueId]);
+
+  /**
+   * wave71: 工坊对话框清空 — DELETE /api/board/chat/conversation/:issueId。
+   * 本地 messages 同步置空 (回到「暂无对话」空态)。
+   */
+  const clearConversation = useCallback(async () => {
+    setConfirmClear(false);
+    const companyId = company?.id;
+    if (!companyId || companyId === "local-stub") {
+      setMessages([]);
+      return;
+    }
+    setClearing(true);
+    try {
+      if (boardIssueId) {
+        await coolie.clearBoardConversation(companyId, boardIssueId);
+      }
+      setMessages([]);
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "清空失败";
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `m${prev.length + 1}err`,
+          role: "assistant",
+          text: `⚠️ 清空失败: ${reason}`,
+        },
+      ]);
+    } finally {
+      setClearing(false);
+    }
+  }, [boardIssueId, company?.id]);
+
+  /**
+   * wave71: 附件上传 — 弹原生文件选择器, 选中后 stage 到 stagedFiles。
+   * 真正上传在 send 时再批量执行 (跟 server 端 addComment 后再 link
+   * issueCommentId 的语义对齐)。
+   */
+  const handleFilePicked = useCallback(
+    (event: React.ChangeEvent<HTMLInputElement>) => {
+      const files = event.target.files;
+      if (!files || files.length === 0) return;
+      const next: StagedFile[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!file) continue;
+        next.push({
+          id: `${file.name}:${file.size}:${i}`,
+          name: file.name,
+          mimeType: file.type || "application/octet-stream",
+          size: file.size,
+          file,
+        });
+      }
+      setStagedFiles((prev) => [...prev, ...next]);
+      // reset 让下一次选同一文件也能触发 change
+      event.target.value = "";
+    },
+    [],
+  );
 
   const composer = (
     <div>
       {voiceNote ? <div style={styles.voiceNote}>{voiceNote}</div> : null}
+      {/* wave71: 附件 stage 区 */}
+      {stagedFiles.length > 0 ? (
+        <div style={styles.stagedRow}>
+          <span style={styles.stagedHint}>
+            📎 已选 {stagedFiles.length} 个附件
+            {uploadingFile ? " · 上传中…" : ""}
+          </span>
+          <button
+            type="button"
+            style={styles.stagedClear}
+            onClick={() => setStagedFiles([])}
+          >
+            清空
+          </button>
+        </div>
+      ) : null}
       <div style={styles.composer}>
+        {/* wave71: hidden file input — 弹原生文件选择器 (图片/文件通用) */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          multiple
+          style={{ display: "none" }}
+          onChange={handleFilePicked}
+        />
+        <button
+          type="button"
+          aria-label="添加附件"
+          title="添加附件"
+          style={styles.attachBtn}
+          onClick={() => fileInputRef.current?.click()}
+        >
+          ＋
+        </button>
         <input
           style={styles.input}
           value={draft}
@@ -307,6 +476,13 @@ export function BoardChatScreen({
     [messages],
   );
 
+  // wave71: 三态机 — 'idle' / 'thinking' / 'streaming'
+  const loadingState: LoadingState = streaming
+    ? hasFirstToken
+      ? "streaming"
+      : "thinking"
+    : "idle";
+
   // wave66: 真接口空态 / 加载 / 错误三态, 替代原 SEED_MESSAGES 默认填充。
   const streamBody = (
     <>
@@ -324,11 +500,21 @@ export function BoardChatScreen({
         </div>
       ) : null}
       {bubbles}
+      {/* wave71: thinking 三点动画 — SSE 已连上但首 token 没回来时 */}
+      {loadingState === "thinking" ? (
+        <div style={styles.typingRow}>
+          <span style={styles.typingDot} />
+          <span style={{ ...styles.typingDot, animationDelay: "0.15s" }} />
+          <span style={{ ...styles.typingDot, animationDelay: "0.3s" }} />
+          <span style={styles.typingText}>总办正在处理并调取工坊数据…</span>
+        </div>
+      ) : null}
     </>
   );
 
   return (
     <div style={styles.wrap}>
+      <style>{TYPING_KEYFRAMES}</style>
       {embedded ? (
         <div style={styles.embeddedBar}>
           嵌入模式 · {company?.name ?? "未选择公司"}
@@ -338,24 +524,91 @@ export function BoardChatScreen({
           <div style={styles.headerLeft}>
             <div style={styles.headerTitle}>工坊</div>
             <div style={styles.headerSubtitle}>
-              {company?.name ?? "Coolie"}
-              {whoami ? ` · ${whoami}` : ""}
+              {loadingState === "thinking"
+                ? "思考中…"
+                : loadingState === "streaming"
+                  ? "正在生成回复…"
+                  : (company?.name ?? "Coolie") + (whoami ? ` · ${whoami}` : "")}
             </div>
           </div>
-          {onOpenWorkspace ? (
-            <button type="button" style={styles.workspaceBtn} onClick={onOpenWorkspace}>
-              ▦ 工作空间
-            </button>
-          ) : null}
+          <div style={styles.headerRight}>
+            {/* wave71: 清空对话 */}
+            {messages.length > 0 ? (
+              <button
+                type="button"
+                aria-label="清空对话"
+                title="清空对话"
+                style={styles.clearBtn}
+                onClick={() => setConfirmClear(true)}
+              >
+                🗑
+              </button>
+            ) : null}
+            {onOpenWorkspace ? (
+              <button type="button" style={styles.workspaceBtn} onClick={onOpenWorkspace}>
+                ▦ 工作空间
+              </button>
+            ) : null}
+          </div>
         </div>
       )}
 
       <div style={styles.stream}>{streamBody}</div>
 
       {composer}
+
+      {/* wave71: 清空对话确认 Modal */}
+      {confirmClear ? (
+        <div style={styles.confirmBackdrop}>
+          <button
+            type="button"
+            aria-label="关闭"
+            style={StyleSheet_absoluteFill}
+            onClick={() => !clearing && setConfirmClear(false)}
+          />
+          <div style={styles.confirmSheet}>
+            <div style={styles.confirmTitle}>清空对话?</div>
+            <div style={styles.confirmBody}>
+              当前工坊会话的全部对话将被清空, 工坊会回到欢迎状态。此操作不可撤销。
+            </div>
+            <div style={styles.confirmRow}>
+              <button
+                type="button"
+                style={styles.confirmBtnCancel}
+                disabled={clearing}
+                onClick={() => setConfirmClear(false)}
+              >
+                取消
+              </button>
+              <button
+                type="button"
+                style={styles.confirmBtnOk}
+                disabled={clearing}
+                onClick={() => void clearConversation()}
+              >
+                {clearing ? "清空中…" : "清空"}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
+
+const StyleSheet_absoluteFill: CSSProperties = {
+  position: "absolute",
+  inset: 0,
+  border: "none",
+  background: "transparent",
+  cursor: "default",
+};
+
+/** wave71: typing 三点跳动 keyframes — 跟 expo 端 TypingDots 的位移同步 */
+const TYPING_KEYFRAMES = `@keyframes coolie-typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}`;
 
 function MessageBubble({ message }: { message: ChatMessage }) {
   const parsed = useMemo(
@@ -412,6 +665,120 @@ const styles: Record<string, CSSProperties> = {
   headerLeft: { display: "flex", flexDirection: "column" },
   headerTitle: { color: "#F7F8F8", fontSize: 16, fontWeight: 600 },
   headerSubtitle: { color: "#62666D", fontSize: 11, marginTop: 1 },
+  /** wave71: 顶部右侧 — [清空] + [Workspace] 并排 */
+  headerRight: { display: "flex", alignItems: "center", gap: 6 },
+  /** wave71: 清空对话按钮 */
+  clearBtn: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 8,
+    padding: "7px 10px",
+    color: "#D0D6E0",
+    fontSize: 14,
+    lineHeight: "14px",
+    cursor: "pointer",
+  },
+  /** wave71: 附件 + 按钮 */
+  attachBtn: {
+    backgroundColor: "rgba(255,255,255,0.04)",
+    border: "1px solid rgba(255,255,255,0.12)",
+    borderRadius: 8,
+    padding: "9px 10px",
+    color: "#D0D6E0",
+    fontSize: 16,
+    lineHeight: "14px",
+    cursor: "pointer",
+  },
+  /** wave71: stage 区 — 在 composer 上方一行 */
+  stagedRow: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: "6px 16px",
+    color: "#D0D6E0",
+    fontSize: 12,
+    borderTopWidth: 1,
+    borderTopStyle: "solid",
+    borderTopColor: "rgba(255,255,255,0.05)",
+  },
+  stagedHint: { color: "#D0D6E0", fontSize: 12 },
+  stagedClear: {
+    background: "transparent",
+    border: "none",
+    color: "#7170FF",
+    fontSize: 12,
+    fontWeight: 500,
+    cursor: "pointer",
+  },
+  /** wave71: typing 三点动画 */
+  typingRow: {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "12px 4px",
+    color: "#62666D",
+    fontSize: 12,
+  },
+  typingDot: {
+    display: "inline-block",
+    width: 6,
+    height: 6,
+    borderRadius: "50%",
+    backgroundColor: "#7170FF",
+    animation: "coolie-typing-bounce 1.2s infinite ease-in-out",
+  },
+  typingText: { marginLeft: 4 },
+  /** wave71: 清空对话确认 Modal */
+  confirmBackdrop: {
+    position: "fixed",
+    inset: 0,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: "0 24px",
+    zIndex: 100,
+  },
+  confirmSheet: {
+    backgroundColor: "#191A1B",
+    borderRadius: 14,
+    padding: "16px 18px",
+    width: "100%",
+    maxWidth: 360,
+    border: "1px solid rgba(255,255,255,0.12)",
+    display: "flex",
+    flexDirection: "column",
+    gap: 10,
+    position: "relative",
+  },
+  confirmTitle: { color: "#F7F8F8", fontSize: 16, fontWeight: 600 },
+  confirmBody: { color: "#D0D6E0", fontSize: 13, lineHeight: "20px" },
+  confirmRow: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: 8,
+    marginTop: 4,
+  },
+  confirmBtnCancel: {
+    background: "rgba(255,255,255,0.06)",
+    border: "1px solid rgba(255,255,255,0.16)",
+    borderRadius: 8,
+    padding: "8px 14px",
+    color: "#D0D6E0",
+    fontSize: 14,
+    fontWeight: 500,
+    cursor: "pointer",
+  },
+  confirmBtnOk: {
+    backgroundColor: "#5E6AD2",
+    border: "none",
+    borderRadius: 8,
+    padding: "8px 14px",
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: 600,
+    cursor: "pointer",
+  },
   workspaceBtn: {
     backgroundColor: "rgba(94,106,210,0.14)",
     border: "1px solid #5E6AD2",

@@ -42,6 +42,7 @@ export function TasksScreen({
   onOpenArtifacts,
   onOpenPipelines,
   onOpenPlans,
+  onOpenGitCredentials,
 }: {
   company: Company;
   whoami: string;
@@ -56,6 +57,8 @@ export function TasksScreen({
   onOpenArtifacts: () => void;
   onOpenPipelines: () => void;
   onOpenPlans: () => void;
+  /** wave70 — 「新建仓库绑定」入口 (跳到凭证管理屏) */
+  onOpenGitCredentials?: () => void;
 }) {
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -137,6 +140,17 @@ export function TasksScreen({
             <Text style={styles.orchEmoji}>📋</Text>
             <Text style={styles.orchLabel}>Plan</Text>
           </Pressable>
+          {onOpenGitCredentials ? (
+            <Pressable
+              style={({ pressed }) => [styles.orchBtn, pressed && styles.orchBtnPressed]}
+              onPress={onOpenGitCredentials}
+              accessibilityRole="button"
+              accessibilityLabel="新建仓库绑定"
+            >
+              <Text style={styles.orchEmoji}>🔗</Text>
+              <Text style={styles.orchLabel}>仓库绑定</Text>
+            </Pressable>
+          ) : null}
         </View>
 
         {/* 搜索框 */}

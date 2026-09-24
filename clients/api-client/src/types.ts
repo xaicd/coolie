@@ -518,6 +518,30 @@ export interface IssueWorkProduct {
   metadata?: Record<string, unknown> | null;
 }
 
+/**
+ * Coolie fork — wave70 (git-ops App UI 4 屏): Git provider credential row
+ * 镜像 server/src/routes/git-credentials.ts 的 GET /api/git-credentials
+ * 返回的 metadata 字段 (绝不含加密 token, 只供 UI 列表/删除/重存用)。
+ */
+export type GitProvider = "github" | "gitlab" | "gitee" | "codeup" | "cnb";
+
+export interface GitCredential {
+  id: string;
+  userId: string;
+  provider: GitProvider;
+  repoUrl?: string | null;
+  companyId?: string | null;
+  tokenExpiresAt?: string | null;
+  createdAt: string;
+}
+
+export interface SaveGitCredentialInput {
+  provider: GitProvider;
+  token: string;
+  repoUrl?: string | null;
+  companyId?: string | null;
+}
+
 // --- Business Ontology Plugin (Top3 业务本体域与紧急熔断 需求⑪) ---
 
 export const ONTOLOGY_PLUGIN_ID = "paperclipai.plugin-ontology";
@@ -752,6 +776,8 @@ export interface BoardChatStreamInput {
   companyId: string;
   message: string;
   taskId?: string;
+  /** Coolie fork (wave71): 附件 id 列表 — 上传后随 message 一起 POST */
+  attachmentIds?: string[];
   signal?: AbortSignal;
 }
 

@@ -62,6 +62,8 @@ import { TaskDetailScreen } from "./src/screens/TaskDetailScreen";
 import { TasksScreen } from "./src/screens/TasksScreen";
 import { PipelinesScreen } from "./src/screens/PipelinesScreen";
 import { PlansScreen } from "./src/screens/PlansScreen";
+import { GitCredentialsScreen } from "./src/screens/GitCredentialsScreen";
+import { WorkspaceGitToggle } from "./src/components/WorkspaceGitToggle";
 import { useNotificationsStore } from "./src/stores/notifications";
 import { BoardChatScreen, exportBoardEcho, exportBoardPrompt } from "./src/screens/BoardChatScreen";
 import { AgentsScreen } from "./src/screens/AgentsScreen";
@@ -171,11 +173,17 @@ function SettingsSheet({
   ota,
   onClose,
   onSignOut,
+  workspaceGitEnabled,
+  onToggleWorkspaceGit,
+  onOpenGitCredentials,
 }: {
   whoami: string;
   ota: ReturnType<typeof useOTA>;
   onClose: () => void;
   onSignOut: () => void;
+  workspaceGitEnabled: boolean;
+  onToggleWorkspaceGit: (next: boolean) => void;
+  onOpenGitCredentials: () => void;
 }) {
   const [cacheSize, setCacheSize] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
@@ -233,6 +241,14 @@ function SettingsSheet({
           {clearing ? "清理中…" : (cacheSize ?? "计算中…")}
         </Text>
       </Pressable>
+
+      {/* wave70 — git-ops App 端 UI 4 屏之 Workspace Git Toggle. */}
+      <Text style={styles.settingsGroup}>开发者</Text>
+      <WorkspaceGitToggle
+        enabled={workspaceGitEnabled}
+        onToggle={onToggleWorkspaceGit}
+        onOpenCredentials={onOpenGitCredentials}
+      />
 
       <Pressable style={styles.settingsSignOut} onPress={onSignOut}>
         <Text style={styles.settingsSignOutText}>退出登录</Text>
@@ -588,6 +604,10 @@ function HomeScreen({
   // 任务页顶部编排按钮组 (wave20) 的落地屏: Pipeline 列表 / Plan 列表
   const [pipelinesOpen, setPipelinesOpen] = useState(false);
   const [plansOpen, setPlansOpen] = useState(false);
+  // wave70 — git-ops App 端 UI 4 屏之「凭证管理」落地屏
+  const [gitCredentialsOpen, setGitCredentialsOpen] = useState(false);
+  // wave70 — Workspace Git Toggle 的状态 (本地开关, 后端未消费, 但 UI 反馈要有)
+  const [workspaceGitEnabled, setWorkspaceGitEnabled] = useState(false);
   const ota = useOTA();
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const loadNotifications = useNotificationsStore((s) => s.load);
@@ -732,6 +752,7 @@ function HomeScreen({
     if (agentDetail) return setAgentDetail(null), true;
     if (pipelinesOpen) return setPipelinesOpen(false), true;
     if (plansOpen) return setPlansOpen(false), true;
+    if (gitCredentialsOpen) return setGitCredentialsOpen(false), true;
     if (selected) return setSelected(null), true;
     if (composeOpen) return setComposeOpen(false), true;
     if (settingsOpen) return setSettingsOpen(false), true;
@@ -881,6 +902,10 @@ function HomeScreen({
         }}
       />
     );
+  } else if (gitCredentialsOpen) {
+    content = (
+      <GitCredentialsScreen company={company} onBack={() => setGitCredentialsOpen(false)} />
+    );
   } else {
     content = (
     <SafeAreaView style={[styles.shell, { paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
@@ -990,6 +1015,7 @@ function HomeScreen({
               onOpenArtifacts={() => navigateTab("artifacts")}
               onOpenPipelines={() => setPipelinesOpen(true)}
               onOpenPlans={() => setPlansOpen(true)}
+              onOpenGitCredentials={() => setGitCredentialsOpen(true)}
             />
           )
         ) : null}
@@ -1001,6 +1027,12 @@ function HomeScreen({
           ota={ota}
           onClose={() => setSettingsOpen(false)}
           onSignOut={onSignOut}
+          workspaceGitEnabled={workspaceGitEnabled}
+          onToggleWorkspaceGit={setWorkspaceGitEnabled}
+          onOpenGitCredentials={() => {
+            setSettingsOpen(false);
+            setGitCredentialsOpen(true);
+          }}
         />
       ) : null}
       {/* 底部导航 — 汇览 / 任务 / [+] / 员工 / 收件箱 */}

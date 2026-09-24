@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
@@ -13,7 +13,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
   StatusBar as RNStatusBar,
   Modal,
@@ -24,6 +23,9 @@ import type { BoardChatMessage, Company, Approval, Issue } from "@coolie/api-cli
 import { C, coolie } from "../coolie";
 import { useRecorder } from "../useRecorder";
 import { StatusDot } from "../components/StatusDot";
+import { ChatHeader } from "../components/ChatHeader";
+import { ChatInput, type StagedAttachment } from "../components/ChatInput";
+import { TypingBubbleText } from "../components/TypingDots";
 import {
   approvalTypeLabel,
   formatApprovalSummary,
@@ -44,7 +46,6 @@ import { AppCard } from "../ui/AppCard";
 import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
 import { Pill } from "../ui/Pill";
-import { ScreenHeader } from "../ui/ScreenHeader";
 import { StatusBadge } from "../ui/StatusBadge";
 import { formatTime } from "../utils/format";
 import { parseInlineTags } from "../components/board-inline/tagParser";
@@ -345,6 +346,31 @@ export function BoardChatScreen({
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyReady, setHistoryReady] = useState(false);
   const [cursorVisible, setCursorVisible] = useState(true);
+
+  /**
+   * wave71: loadingState — 三态机驱动 thinking 三点动画 + streaming 切换。
+   *   idle      : 不在等回复, 啥都不闪
+   *   thinking  : SSE 已连上但首 token 还没回来 (等待中)
+   *   streaming : 已经在收 token
+   *
+   * 真正的状态机用一段 useEffect 同步 `sending + streamingText` 派生:
+   * `sending && !streamingText` → thinking, 否则 → streaming/sending=false → idle。
+   * 不让 handleSend 自己去设, 是为了 onStatus / onChunk / onDone / 失败四路都要触发。
+   */
+  const loadingState: "idle" | "thinking" | "streaming" = sending
+    ? streamingText
+      ? "streaming"
+      : "thinking"
+    : "idle";
+
+  /** wave71: 附件上传队列 (stage 状态, 每条带本地 uri + 远端 id) */
+  const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
+  /** 远端已上传完毕的附件 id, 跟 stagedAttachments 一一对应 (按顺序) */
+  const [uploadedAttachmentIds, setUploadedAttachmentIds] = useState<string[]>([]);
+  const [uploadingAttachments, setUploadingAttachments] = useState(false);
+  /** 清空对话确认 modal */
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
 
   const [approvalFeed, setApprovalFeed] = useState<ApprovalFeedItem[]>([]);
   const [approvalBusy, setApprovalBusy] = useState<
@@ -821,6 +847,20 @@ export function BoardChatScreen({
       const prompt = (textToSend ?? input).trim();
       if (!prompt || sending) return;
 
+      // wave71: 附件 — 发问前先把 staged 的本地文件全部上传成 attachment.id,
+      // 一起随 message 走 POST /api/board/chat/stream (server 端会反向 link
+      // issueCommentId)。即便 board issue 还未建好, send 路径会在 SSE 收到
+      // `start` 事件后回填 boardIssueId, 这里在它到位之前先 stage 着, 等下
+      // 次发送再传 — 但 board issue 没 issueId 上传会失败, 兜底: 等到 boardIssueId
+      // 就绪后再上传 (用 await 一拍)。
+      const staged = stagedAttachments;
+      let activeAttachmentIds = uploadedAttachmentIds;
+      if (staged.length > 0 && uploadedAttachmentIds.length !== staged.length) {
+        // 上传还在飞 (或失败); 取消本次发送, 让用户稍后重试
+        Alert.alert("附件上传中", "请等附件上传完毕再发送");
+        return;
+      }
+
       setInput("");
       setErrorText(null);
       setLastPrompt(prompt);
@@ -839,6 +879,11 @@ export function BoardChatScreen({
       };
       setMessages((prev) => [...prev, userMsg]);
       scrollToBottom();
+
+      // 消费完清空附件队列 (无论流是否成功)
+      const attachmentIdsForThisSend = activeAttachmentIds;
+      setStagedAttachments([]);
+      setUploadedAttachmentIds([]);
 
       // "build xxx" 追加构建计划卡, "建域 xxx" 追加本体规范卡, 与总办回答并行推进;
       // pipeline / plan / pr 只走各自编排分发 (不再进问答流)。
@@ -864,6 +909,9 @@ export function BoardChatScreen({
             companyId: company.id,
             message: prompt,
             taskId: boardIssueId ?? undefined,
+            attachmentIds: attachmentIdsForThisSend.length > 0
+              ? attachmentIdsForThisSend
+              : undefined,
             signal: controller.signal,
           },
           {
@@ -932,6 +980,8 @@ export function BoardChatScreen({
       sending,
       company.id,
       boardIssueId,
+      stagedAttachments,
+      uploadedAttachmentIds,
       scrollToBottom,
       startSpec,
       startBuild,
@@ -949,6 +999,132 @@ export function BoardChatScreen({
     // handleSend 每次渲染都会变；这里只在历史就绪时消费一次队列，刻意不重跑。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [historyReady]);
+
+  /**
+   * wave71: 选完附件后立即上传到 board operations issue (boardIssueId) —
+   * 拿回来的 attachment.id 喂给 send 路径, 由 server 在新建用户评论时反向
+   * link issueCommentId。
+   *
+   * boardIssueId 还没就绪时 (首屏还没发过问), 我们就只 stage 住, 等下次
+   * `start` 事件回来再补传; 这一拍只推 stagedAttachments, 不更新 ids。
+   */
+  const handlePickAttachment = useCallback(
+    async (picked: StagedAttachment) => {
+      setStagedAttachments((prev) => [...prev, picked]);
+      if (!boardIssueId) {
+        // 等会儿: 第一次发送时 server 会回 start 事件, 到那时再传。
+        return;
+      }
+      setUploadingAttachments(true);
+      try {
+        const uploaded = await coolie.uploadAttachment(
+          company.id,
+          boardIssueId,
+          { uri: picked.uri, name: picked.name, type: picked.mimeType },
+        );
+        setUploadedAttachmentIds((prev) => [...prev, uploaded.id]);
+      } catch (e) {
+        Alert.alert(
+          "附件上传失败",
+          `${picked.name} 上传失败: ${String((e as Error)?.message ?? e)}`,
+        );
+        // 移除失败的 staged 项, 避免用户再次发送时把 null id 传过去。
+        setStagedAttachments((prev) =>
+          prev.filter((entry) => entry.id !== picked.id),
+        );
+      } finally {
+        setUploadingAttachments(false);
+      }
+    },
+    [boardIssueId, company.id],
+  );
+
+  /**
+   * wave71: boardIssueId 就绪后 (start 事件 / 历史加载), 把还没有
+   * uploadedAttachmentIds 的 staged 全部补传 — 否则用户首屏直接 + 上传
+   * 会因为 board issue 还没建好而漏传附件。
+   */
+  useEffect(() => {
+    if (!boardIssueId) return;
+    if (stagedAttachments.length === 0) return;
+    if (stagedAttachments.length === uploadedAttachmentIds.length) return;
+    const pending = stagedAttachments.slice(uploadedAttachmentIds.length);
+    if (pending.length === 0) return;
+    setUploadingAttachments(true);
+    (async () => {
+      try {
+        for (const item of pending) {
+          try {
+            const uploaded = await coolie.uploadAttachment(
+              company.id,
+              boardIssueId,
+              { uri: item.uri, name: item.name, type: item.mimeType },
+            );
+            setUploadedAttachmentIds((prev) =>
+              prev.includes(uploaded.id) ? prev : [...prev, uploaded.id],
+            );
+          } catch (e) {
+            Alert.alert(
+              "附件上传失败",
+              `${item.name} 上传失败: ${String((e as Error)?.message ?? e)}`,
+            );
+            setStagedAttachments((prev) =>
+              prev.filter((entry) => entry.id !== item.id),
+            );
+          }
+        }
+      } finally {
+        setUploadingAttachments(false);
+      }
+    })();
+  }, [boardIssueId, stagedAttachments, uploadedAttachmentIds, company.id]);
+
+  /**
+   * wave71: 清空工坊对话框 — DELETE /api/board/chat/conversation/:issueId,
+   * 软删所有评论; 本地 messages 同步置为欢迎语, 让 UI 立即干净。
+   */
+  const handleClearConversation = useCallback(async () => {
+    setConfirmClear(false);
+    if (!boardIssueId) {
+      // 还没有 board issue: 直接清空本地视图即可
+      setMessages([WELCOME_MESSAGE]);
+      pushSystemEcho("🧹 对话框已清空 (无历史会话)");
+      return;
+    }
+    setClearing(true);
+    try {
+      const result = await coolie.clearBoardConversation(company.id, boardIssueId);
+      setMessages([WELCOME_MESSAGE]);
+      pushSystemEcho(
+        `🧹 对话框已清空 (${result.deletedCount} 条历史)${
+          result.deletedCount === 0 ? " — 工坊是干净的" : ""
+        }`,
+      );
+    } catch (e) {
+      Alert.alert(
+        "清空失败",
+        String((e as Error)?.message ?? e ?? "未知错误"),
+      );
+    } finally {
+      setClearing(false);
+    }
+  }, [boardIssueId, company.id, pushSystemEcho]);
+
+  /**
+   * wave71: 最近一条 assistant / system 消息的时间戳 — 头部右侧显示。
+   * 用户消息不计入, 因为头部的「上一回」始终是工坊的回复时间。
+   */
+  const latestAssistantTimestamp = useMemo(() => {
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role === "assistant" || m.role === "system") {
+        return typeof m.createdAt === "string"
+          ? m.createdAt
+          : m.createdAt.toISOString();
+      }
+    }
+    return null;
+  }, [messages]);
 
   const handleRetry = () => {
     if (lastPrompt) {
@@ -1148,37 +1324,35 @@ export function BoardChatScreen({
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
-        {/* 顶部导航栏 */}
-        <View style={styles.topBar}>
-          <View style={styles.topLeft}>
-            {Boolean(onBack) && (
-              <ScreenHeader
-                onBack={onBack}
-                backLabel="返回"
-                style={styles.headerBack}
-              />
-            )}
-            <View>
-              <Text style={styles.topTitle}>工坊</Text>
-              <Text style={styles.topSubTitle}>
-                {sending ? "思考中…" : "驱动 5 角色员工"}
-              </Text>
-            </View>
-          </View>
+        {/* 顶部导航栏 (wave71 抽出到 <ChatHeader/>) */}
+        <ChatHeader
+          thinking={loadingState !== "idle"}
+          subtitle={
+            loadingState === "streaming"
+              ? "正在生成回复…"
+              : loadingState === "thinking"
+                ? statusText || "思考中…"
+                : "驱动 5 角色员工"
+          }
+          timestamp={latestAssistantTimestamp}
+          embedded={embedded}
+          onBack={onBack}
+          onRequestClear={() => setConfirmClear(true)}
+        />
 
-          <View style={styles.topRight}>
-            {onOpenWorkspace && !embedded ? (
-              <Pressable
-                hitSlop={12}
-                onPress={onOpenWorkspace}
-                style={styles.workspaceBtn}
-              >
-                <Ionicons name="grid-outline" size={14} color={C.accent} />
-                <Text style={styles.workspaceBtnText}>Workspace</Text>
-              </Pressable>
-            ) : null}
+        {/* 嵌入式 Workspace 入口 (保留内嵌时的右侧入口) */}
+        {onOpenWorkspace && !embedded ? (
+          <View style={styles.embeddedWorkspaceRow}>
+            <Pressable
+              hitSlop={12}
+              onPress={onOpenWorkspace}
+              style={styles.workspaceBtn}
+            >
+              <Ionicons name="grid-outline" size={14} color={C.accent} />
+              <Text style={styles.workspaceBtnText}>Workspace</Text>
+            </Pressable>
           </View>
-        </View>
+        ) : null}
 
         {/* 问答对话列表 */}
         <FlatList
@@ -1305,12 +1479,12 @@ export function BoardChatScreen({
                         </Text>
                       </Text>
                     ) : (
-                      <View style={styles.typingIndicatorRow}>
-                        <ActivityIndicator size="small" color={C.accent} />
-                        <Text style={styles.typingIndicatorText}>
-                          {statusText || "总办正在处理并调取工坊数据…"}
-                        </Text>
-                      </View>
+                      // wave71: thinking 态用三点动画 (TypingBubbleText) 替
+                      // 换 ActivityIndicator, 更轻、更像 ChatGPT 风格
+                      <TypingBubbleText
+                        text={statusText || "总办正在处理并调取工坊数据…"}
+                        visible={loadingState === "thinking"}
+                      />
                     )}
                   </View>
                 </View>
@@ -1341,58 +1515,39 @@ export function BoardChatScreen({
           </View>
         ) : null}
 
-        {/* 底部输入框区域: [输入框] [🎤 长按 mic] [发送/停止] */}
-        <View style={styles.inputContainer}>
-          <TextInput
-            style={styles.textInput}
-            placeholder="派个活, 或问点什么"
-            placeholderTextColor={C.ink3}
-            value={input}
-            onChangeText={setInput}
-            multiline
-            maxLength={1000}
-            editable={!sending}
-          />
-
-          {/* 长按录音, 松开自动转文字填入输入框 (不自动发送) */}
-          <Animated.View style={{ opacity: recording ? micPulse : 1 }}>
+        {/* wave71: 附件 stage 区 — 选了附件就在输入区上方显示一行, 允许移除 */}
+        {stagedAttachments.length > 0 ? (
+          <View style={styles.stagedRow}>
+            <Text style={styles.stagedHint}>
+              📎 已选 {stagedAttachments.length} 个附件
+              {uploadingAttachments ? " · 上传中…" : ""}
+            </Text>
             <Pressable
-              onPressIn={handleMicPressIn}
-              onPressOut={() => void handleMicPressOut()}
-              disabled={sending || voiceBusy}
               hitSlop={6}
-              style={[
-                styles.micBtn,
-                recording && styles.micBtnRecording,
-                (sending || voiceBusy) && styles.micBtnDisabled,
-              ]}
+              onPress={() => {
+                setStagedAttachments([]);
+                setUploadedAttachmentIds([]);
+              }}
             >
-              {voiceBusy && !recording ? (
-                <ActivityIndicator size="small" color={C.accent} />
-              ) : (
-                <Ionicons
-                  name={recording ? "mic" : "mic-outline"}
-                  size={20}
-                  color={recording ? C.err : C.ink2}
-                />
-              )}
+              <Text style={styles.stagedClear}>清空</Text>
             </Pressable>
-          </Animated.View>
+          </View>
+        ) : null}
 
-          {sending ? (
-            <Pressable onPress={handleStop} style={styles.stopBtn}>
-              <View style={styles.stopIcon} />
-            </Pressable>
-          ) : (
-            <Pressable
-              onPress={() => void handleSend()}
-              style={[styles.sendBtn, !input.trim() && styles.sendBtnDisabled]}
-              disabled={!input.trim()}
-            >
-              <Text style={styles.sendBtnIcon}>↑</Text>
-            </Pressable>
-          )}
-        </View>
+        {/* 底部输入框区域 (wave71 抽出到 <ChatInput/>) */}
+        <ChatInput
+          value={input}
+          onChangeText={setInput}
+          sending={sending}
+          recording={recording}
+          voiceBusy={voiceBusy}
+          onMicPressIn={handleMicPressIn}
+          onMicPressOut={() => void handleMicPressOut()}
+          onSend={() => void handleSend()}
+          onStop={handleStop}
+          onPickAttachment={(picked) => void handlePickAttachment(picked)}
+          uploading={uploadingAttachments}
+        />
 
         {/* 会话历史侧拉 / 抽屉 Modal */}
         <Modal
@@ -1500,6 +1655,49 @@ export function BoardChatScreen({
             </View>
           </View>
         </Modal>
+
+        {/* wave71: 清空对话确认 Modal */}
+        <Modal
+          visible={confirmClear}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setConfirmClear(false)}
+        >
+          <View style={styles.confirmBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => !clearing && setConfirmClear(false)}
+            />
+            <View style={styles.confirmSheet}>
+              <Text style={styles.confirmTitle}>清空对话?</Text>
+              <Text style={styles.confirmBody}>
+                当前工坊会话的全部对话将被清空, 工坊会回到欢迎状态。此操作不可撤销。
+              </Text>
+              <View style={styles.confirmRow}>
+                <Pressable
+                  hitSlop={6}
+                  disabled={clearing}
+                  onPress={() => setConfirmClear(false)}
+                  style={[styles.confirmBtn, styles.confirmBtnCancel]}
+                >
+                  <Text style={styles.confirmBtnCancelText}>取消</Text>
+                </Pressable>
+                <Pressable
+                  hitSlop={6}
+                  disabled={clearing}
+                  onPress={() => void handleClearConversation()}
+                  style={[styles.confirmBtn, styles.confirmBtnOk]}
+                >
+                  {clearing ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.confirmBtnOkText}>清空</Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </Root>
   );
@@ -1524,29 +1722,13 @@ const styles = StyleSheet.create({
     borderBottomColor: C.lineSubtle,
     backgroundColor: C.bg,
   },
-  topLeft: {
+  embeddedWorkspaceRow: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-  },
-  headerBack: {
-    alignSelf: "center",
-  },
-  topTitle: {
-    color: C.ink,
-    fontSize: 16,
-    fontWeight: "600",
-    letterSpacing: -0.2,
-  },
-  topSubTitle: {
-    color: C.ink3,
-    fontSize: 11,
-    marginTop: 1,
-  },
-  topRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
+    justifyContent: "flex-end",
+    paddingHorizontal: 14,
+    paddingTop: 4,
+    paddingBottom: 6,
+    backgroundColor: C.bg,
   },
   workspaceBtn: {
     flexDirection: "row",
@@ -1563,6 +1745,93 @@ const styles = StyleSheet.create({
     color: C.accent,
     fontSize: 12,
     fontWeight: "500",
+  },
+  /**
+   * wave71: 附件 stage 行 — 输入框上方一行提示当前选了几个附件
+   */
+  stagedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    backgroundColor: C.bg,
+    borderTopWidth: 1,
+    borderTopColor: C.lineSubtle,
+  },
+  stagedHint: {
+    color: C.ink2,
+    fontSize: 12,
+    flex: 1,
+    minWidth: 0,
+  },
+  stagedClear: {
+    color: C.accent,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  /**
+   * wave71: 清空对话确认 Modal 样式
+   */
+  confirmBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.6)",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 24,
+  },
+  confirmSheet: {
+    backgroundColor: C.panel,
+    borderRadius: 14,
+    paddingHorizontal: 18,
+    paddingVertical: 16,
+    width: "100%",
+    maxWidth: 360,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  confirmTitle: {
+    color: C.ink,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  confirmBody: {
+    color: C.ink2,
+    fontSize: 13,
+    lineHeight: 18,
+  },
+  confirmRow: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 8,
+    marginTop: 4,
+  },
+  confirmBtn: {
+    minWidth: 84,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  confirmBtnCancel: {
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: C.surface,
+  },
+  confirmBtnCancelText: {
+    color: C.ink2,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  confirmBtnOk: {
+    backgroundColor: C.brand,
+  },
+  confirmBtnOkText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
   },
   approvalStack: {
     gap: 10,

@@ -417,13 +417,21 @@ export function InboxScreen({
   }, [load]);
 
   // wave69 — web 后台切回时静默重拉.
+  // wave70 — 加 5 min 静默 refresh; mount/unmount 处 abort 进行中请求.
   useEffect(() => {
     if (typeof document === "undefined") return;
     const handler = () => {
       if (document.visibilityState === "visible") void load();
     };
     document.addEventListener("visibilitychange", handler);
-    return () => document.removeEventListener("visibilitychange", handler);
+    const interval = setInterval(() => {
+      void load();
+    }, 5 * 60 * 1000);
+    return () => {
+      document.removeEventListener("visibilitychange", handler);
+      clearInterval(interval);
+      abortRef.current?.abort();
+    };
   }, [load]);
 
   useEffect(() => {

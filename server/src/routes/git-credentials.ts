@@ -18,6 +18,12 @@
  *     Auth: board
  *     Effect: returns metadata for the given credential row id and the
  *             decrypted token (caller is the same user who owns the row).
+ *
+ *   DELETE /api/git-credentials/:repoId  (wave70)
+ *     Auth: board
+ *     Effect: deletes the credential row if (and only if) it belongs to the
+ *             caller. Returns 404 for ids the caller doesn't own so we don't
+ *             leak existence of other users' rows.
  */
 
 import { Router } from "express";
@@ -119,6 +125,24 @@ export function gitCredentialsRoutes(db: Db): Router {
         token: decrypted.accessToken,
       },
     });
+  });
+
+  // wave70 — App 端凭证管理屏「删除」按钮使用.
+  // 只允许当前用户删自己的 row; 否则 404 不告知行存在.
+  router.delete("/git-credentials/:repoId", async (req, res) => {
+    const userId = req.actor.userId;
+    if (!userId) {
+      throw unprocessable("Authenticated user id is required");
+    }
+    const id = String(req.params.repoId ?? "").trim();
+    if (!id) {
+      throw badRequest("Missing credential id");
+    }
+    const removed = await credentials.remove(userId, id);
+    if (!removed) {
+      throw notFound("Credential not found");
+    }
+    res.status(200).json({ ok: true });
   });
 
   return router;

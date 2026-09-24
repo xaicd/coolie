@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
+  Linking,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -15,7 +16,7 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import type { Issue } from "@coolie/api-client";
+import type { Issue, IssueWorkProduct } from "@coolie/api-client";
 import {
   C,
   coolie,
@@ -88,6 +89,8 @@ export function TaskDetailScreen({
 }) {
   const [comments, setComments] = useState<IssueComment[]>([]);
   const [agents, setAgents] = useState<AgentRow[]>([]);
+  // wave70 — git-ops PR 显示: 拉 work products, 抽出 type === "pull_request" 那条
+  const [pullRequests, setPullRequests] = useState<IssueWorkProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -112,13 +115,20 @@ export function TaskDetailScreen({
           issue.companyId
             ? coolie.listAgents(issue.companyId).then(setAgents).catch(() => setAgents([]))
             : Promise.resolve(),
+          // wave70 — 拉 work products, 抽出 pull_request 用于 PR 链接卡
+          coolie
+            .listWorkProducts(issue.id)
+            .then((products) =>
+              setPullRequests(products.filter((wp) => wp.type === "pull_request")),
+            )
+            .catch(() => setPullRequests([])),
         ]);
       } finally {
         setLoading(false);
         setRefreshing(false);
       }
     },
-    [loadComments, issue.companyId],
+    [loadComments, issue.companyId, issue.id],
   );
 
   useEffect(() => {
@@ -226,6 +236,53 @@ export function TaskDetailScreen({
               <AppCard padding={16} style={styles.descriptionCard}>
                 <Text style={styles.description}>{issue.description}</Text>
               </AppCard>
+            </View>
+          ) : null}
+
+          {/* wave70 — git-ops PR 显示: 列出本任务关联的 pull request */}
+          {pullRequests.length > 0 ? (
+            <View style={styles.section}>
+              <SectionHeader title="Pull Request" count={pullRequests.length} />
+              <View style={{ gap: 8 }}>
+                {pullRequests.map((pr) => (
+                  <AppCard key={pr.id} padding={14}>
+                    <View style={styles.prHeaderRow}>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.prTitle} numberOfLines={1}>
+                          {pr.title}
+                        </Text>
+                        <Text style={styles.prMeta} numberOfLines={1}>
+                          {pr.provider} · {pr.status}
+                        </Text>
+                      </View>
+                      {pr.url ? (
+                        <Pressable
+                          onPress={() => {
+                            void Linking.openURL(pr.url!).catch(() =>
+                              Alert.alert("无法打开 PR", "请在浏览器里查看。"),
+                            );
+                          }}
+                          hitSlop={8}
+                          style={styles.prBtn}
+                          accessibilityLabel="查看 PR"
+                        >
+                          <Ionicons
+                            name="open-outline"
+                            size={14}
+                            color={C.accent}
+                          />
+                          <Text style={styles.prBtnText}>查看 PR</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                    {pr.url ? (
+                      <Text style={styles.prUrl} numberOfLines={1}>
+                        {pr.url}
+                      </Text>
+                    ) : null}
+                  </AppCard>
+                ))}
+              </View>
             </View>
           ) : null}
 
@@ -341,6 +398,21 @@ const styles = StyleSheet.create({
   section: { gap: 8 },
   descriptionCard: { padding: 16 },
   description: { color: C.ink2, fontSize: 14, lineHeight: 20 },
+  prHeaderRow: { flexDirection: "row", alignItems: "center", gap: 10 },
+  prTitle: { color: C.ink, fontSize: 14, fontWeight: "600" },
+  prMeta: { color: C.ink3, fontSize: 11, marginTop: 2 },
+  prUrl: { color: C.ink3, fontSize: 11, marginTop: 6, fontFamily: "monospace" },
+  prBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: C.accent,
+  },
+  prBtnText: { color: C.accent, fontSize: 12, fontWeight: "500" },
   actionRow: { flexDirection: "row", gap: 8 },
   btnGhost: {
     flexDirection: "row",

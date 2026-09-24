@@ -62,6 +62,13 @@ export function resolveRoleTemplate(role: string): AgentRoleTemplate {
  * 长字符串 + capabilities 长描述字符串) 在写入 agents 行前清空, 只保留
  * 机器可读字段 (role / label / cli / model / backup / skillRef / gates /
  * responsibilities / deliverables / antiPatterns / summary)。
+ *
+ * wave70 — 第 3 轮彻底清: 「title / description / capabilities」三种
+ * 描述类字段全清空。`AgentRoleTemplate` 没有名为 `description` 的字段,
+ * 实际存储里 agents 表对应列也是 `title` + `capabilities`, 两者都置
+ * 空字符串即可。所有 5 个 Palantir 角色 (fda / core-swe / pre-sre /
+ * fdse / ds) 都走这条路径。
+ *
  * 返回 shallow clone, 不改 inputs。
  */
 export function stripRoleDescription(template: AgentRoleTemplate): AgentRoleTemplate {

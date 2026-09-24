@@ -6,8 +6,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Db } from "@paperclipai/db";
 import type { DeploymentMode } from "@paperclipai/shared";
-import { companies } from "@paperclipai/db";
-import { eq } from "drizzle-orm";
+import { companies, issueAttachments, issueComments, issues } from "@paperclipai/db";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { instanceSettingsService, issueService } from "../services/index.js";
 import { assertCompanyAccess, getActorInfo } from "./authz.js";
 import { loadAgentPersona } from "../services/role-template.js";
@@ -243,10 +243,11 @@ export function boardChatRoutes(
       return;
     }
 
-    const { companyId, message, taskId } = req.body as {
+    const { companyId, message, taskId, attachmentIds } = req.body as {
       companyId?: string;
       message?: string;
       taskId?: string;
+      attachmentIds?: string[];
     };
 
     if (!companyId || !message) {
@@ -307,11 +308,41 @@ export function boardChatRoutes(
     // Persist the user's message. Use the authenticated board/user actor so
     // attribution and author-type checks pass; "board" (the local fallback)
     // is distinct from the "board-concierge" sentinel used for replies.
-    await issueSvc.addComment(resolvedIssueId, message, {
+    //
+    // Coolie fork (wave71): 支持在发问时附带附件 (coolie 工坊 + / 文件夹) —
+    // 客户端先调 `POST /api/companies/:companyId/issues/:issueId/attachments`
+    // 把附件上传到这个常驻 issue, 拿到 attachment.id 后随 message 一起传进来。
+    // 这里建完用户评论后, 把这些附件反向 link 到新建的评论 (issueCommentId),
+    // 这样工坊对话框的附件有「归属谁发的」语义 (避免历史会话里乱飘)。
+    const userComment = await issueSvc.addComment(resolvedIssueId, message, {
       agentId: actor.agentId ?? undefined,
       userId: actor.agentId ? undefined : actor.actorId,
       runId: actor.runId,
     });
+
+    if (Array.isArray(attachmentIds) && attachmentIds.length > 0) {
+      const ids = attachmentIds
+        .filter((entry): entry is string => typeof entry === "string" && entry.length > 0)
+        .slice(0, 10); // 一次最多挂 10 个附件, 防止前端误传过大数组
+      if (ids.length > 0) {
+        try {
+          await db
+            .update(issueAttachments)
+            .set({ issueCommentId: userComment.id })
+            .where(
+              and(
+                eq(issueAttachments.issueId, resolvedIssueId),
+                eq(issueAttachments.companyId, companyId),
+                inArray(issueAttachments.id, ids),
+                // 安全网: 只挂未挂过评论的附件, 防止多次发送把附件搬到新评论上。
+                isNull(issueAttachments.issueCommentId),
+              ),
+            );
+        } catch (e) {
+          console.error("[board-chat] failed to link attachments:", e);
+        }
+      }
+    }
 
     // Build conversation history from recent comments (oldest first).
     const comments = await issueSvc.listComments(resolvedIssueId, { order: "asc" });
@@ -664,6 +695,83 @@ export function boardChatRoutes(
     // includes the wave66 persona_sig block appended inside SYSTEM).
     proc.stdin.write(promptWithSig);
     proc.stdin.end();
+  });
+
+  /**
+   * DELETE /board/chat/conversation/:id
+   *
+   * Coolie fork (wave71): 老板想在工坊对话框点「🗑️ 清空对话」一键清空当前
+   * 常驻 Board Operations Issue 的历史评论。会话本身保留 (issue 不删),
+   * 只把所有尚未删除的评论软删 (deletedAt + deletedByUserId), 后续会话从
+   * 干净的列表继续累加。
+   *
+   * 鉴权与 POST /board/chat/stream 同源: 必须已登录的 board/agent
+   * (board/agent 决定 deletedByType), 且 companyId 必须与请求里的
+   * companyId 一致 (URL 上的 :issueId 绑定了 company, 这里走
+   * `companies.id = issue.companyId` 联合校验)。
+   */
+  router.delete("/board/chat/conversation/:id", async (req, res) => {
+    const experimental = await instanceSettingsService(db).getExperimental();
+    if (experimental.enableConferenceRoomChat !== true) {
+      res.status(403).json({
+        error: "Conference Room Chat is not enabled",
+        code: "FEATURE_DISABLED",
+      });
+      return;
+    }
+
+    const issueId = req.params.id as string;
+    const companyId =
+      typeof req.query.companyId === "string" ? req.query.companyId : null;
+    if (!issueId || !companyId) {
+      res.status(400).json({
+        error: "issue id and companyId are required",
+      });
+      return;
+    }
+
+    // 必须有公司访问权 (会抛 403 给前端)
+    assertCompanyAccess(req, companyId);
+
+    // 校验该 issue 真的属于该公司 — 防止跨公司通过 URL 删别人的会话
+    const ownedIssue = await db
+      .select({ id: issues.id, companyId: issues.companyId })
+      .from(issues)
+      .where(eq(issues.id, issueId))
+      .then((rows) => rows[0] ?? null);
+    if (!ownedIssue || ownedIssue.companyId !== companyId) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+
+    const actor = getActorInfo(req);
+    const deletedAt = new Date();
+
+    // 软删: 只清掉 issue 范围内 + 仍未删除的评论。
+    // 返回受影响行数, 前端拿来做「已清空 N 条」提示。
+    const updated = await db
+      .update(issueComments)
+      .set({
+        deletedAt,
+        deletedByType: actor.actorType === "agent" ? "agent" : "user",
+        deletedByUserId:
+          actor.actorType === "agent"
+            ? null
+            : actor.actorId ?? null,
+      })
+      .where(
+        and(
+          eq(issueComments.issueId, issueId),
+          eq(issueComments.companyId, companyId),
+          isNull(issueComments.deletedAt),
+        ),
+      )
+      .returning({ id: issueComments.id });
+
+    res.json({
+      ok: true,
+      deletedCount: updated.length,
+    });
   });
 
   return router;

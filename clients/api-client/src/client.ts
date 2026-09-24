@@ -39,6 +39,8 @@ import {
   type BoardChatStreamInput,
   type ListApprovalsOptions,
   type ResolveApprovalOptions,
+  type GitCredential,
+  type SaveGitCredentialInput,
 } from "./types";
 
 export interface CoolieClientOptions {
@@ -522,6 +524,43 @@ export class CoolieClient {
   }
 
   /**
+   * wave70 — Git provider 凭证列表 (App 端凭证管理屏使用).
+   * 镜像 GET /api/git-credentials, 返回当前用户的元数据 (无 token).
+   */
+  async listGitCredentials(): Promise<GitCredential[]> {
+    const body = await this.request<{ credentials?: GitCredential[] } | GitCredential[]>(
+      "GET",
+      "/api/git-credentials",
+    );
+    if (Array.isArray(body)) return body;
+    return Array.isArray(body?.credentials) ? body.credentials : [];
+  }
+
+  /**
+   * wave70 — 新建/覆盖一个 Git provider 凭证.
+   * 镜像 POST /api/git-credentials, 返回存储后的元数据 (无 token).
+   */
+  async saveGitCredential(input: SaveGitCredentialInput): Promise<GitCredential> {
+    const body = await this.request<{ credential?: GitCredential } | GitCredential>(
+      "POST",
+      "/api/git-credentials",
+      input,
+    );
+    if (body && typeof body === "object" && "credential" in body && body.credential) {
+      return body.credential;
+    }
+    return body as GitCredential;
+  }
+
+  /**
+   * wave70 — 删除一个 Git provider 凭证.
+   * 镜像 DELETE /api/git-credentials/:id.
+   */
+  async deleteGitCredential(id: string): Promise<void> {
+    await this.request<unknown>("DELETE", `/api/git-credentials/${encodeURIComponent(id)}`);
+  }
+
+  /**
    * 查询公司产物中心投影列表 (需求③看产物)
    * 聚合工单交付物(work products)、附件(attachments)与文档(documents)
    * 对应 GET /api/companies/:companyId/artifacts
@@ -765,6 +804,9 @@ export class CoolieClient {
         companyId: input.companyId,
         message: input.message,
         taskId: input.taskId,
+        ...(input.attachmentIds && input.attachmentIds.length > 0
+          ? { attachmentIds: input.attachmentIds }
+          : {}),
       }),
       signal: input.signal,
       credentials: "include",
@@ -937,6 +979,23 @@ export class CoolieClient {
     } catch {
       return { issueId, messages: [] };
     }
+  }
+
+  /**
+   * 清空工坊对话框历史 (coolie fork wave71: 老板点 🗑️ 一键清空)。
+   *
+   * 实际是 DELETE /api/board/chat/conversation/:issueId?companyId=:companyId,
+   * 会把该 issue 下所有未删除的评论软删 (deletedAt 标记), 会话本身保留。
+   * 返回 { ok, deletedCount } — 前端拿 deletedCount 做「已清空 N 条」提示。
+   */
+  async clearBoardConversation(
+    companyId: string,
+    issueId: string,
+  ): Promise<{ ok: boolean; deletedCount: number }> {
+    return this.request<{ ok: boolean; deletedCount: number }>(
+      "DELETE",
+      `/api/board/chat/conversation/${encodeURIComponent(issueId)}?companyId=${encodeURIComponent(companyId)}`,
+    );
   }
 
   // ── Approvals & Governance (快捷审批闭环) ───────────────────────────

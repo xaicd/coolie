@@ -128,5 +128,8 @@ export type {
   InboxFailureItem,
   InboxMentionItem,
   InboxFeed,
+  GitProvider,
+  GitCredential,
+  SaveGitCredentialInput,
 } from "./types";
 

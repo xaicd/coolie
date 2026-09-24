@@ -225,11 +225,20 @@ export function InboxScreen({
   }, [load]);
 
   // wave69 — 后台切回时静默重拉, 修"切回 app 收件箱不更新"反反复复场景。
+  // wave70 — 加 5 min 静默 refresh, 避免长时挂起收件箱数据陈旧; 同时在
+  //   mount/unmount 处 abort 进行中的请求, 防止 setState 已卸载组件警告。
   useEffect(() => {
     const sub = AppState.addEventListener("change", (next) => {
       if (next === "active") void load(true);
     });
-    return () => sub.remove();
+    const interval = setInterval(() => {
+      void load(true);
+    }, 5 * 60 * 1000);
+    return () => {
+      sub.remove();
+      clearInterval(interval);
+      abortRef.current?.abort();
+    };
   }, [load]);
 
   useEffect(() => {

@@ -9,6 +9,16 @@ import {
 import { unprocessable } from "../errors.js";
 
 /**
+ * Coolie fork — wave70: boss 25:00 OOB 「5 角色描述都去掉」第 3 轮。
+ *
+ * 5 角色的 description 清空实际发生在 server/src/routes/agents.ts 的
+ * `stripRoleDescription` (新注册时), 以及 packages/db/src/migrations/
+ * 9003_clear_palantir_role_titles.sql (老 DB 一次性更新)。本文件负责
+ * `CompanyTemplateSeed.description` (公司描述, 不是 5 角色) 的透传;
+ * 那条由用户 wizard 输入, 不在此清洗范围内。
+ */
+
+/**
  * Coolie fork — company template catalogue.
  *
  * The built-in templates themselves live in `@paperclipai/templates` (pure data,
