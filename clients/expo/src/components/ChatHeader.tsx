@@ -13,7 +13,10 @@ import { formatTime } from "../utils/format";
  *   2. 中间 timestamp (最近一条助手消息的时间戳)
  *   3. 右侧 [🗑️ 清空] — 弹 onRequestClear, 由 BoardChatScreen 弹确认 Modal
  *
- * 副标题: 「思考中…」 由父屏传入 `thinking` 控制, 否则显示「驱动 5 角色员工」。
+ * 副标题: 「思考中…」 由父屏传入 `thinking` / `subtitle` 控制。wave73
+ * (boss 26:32 OOB 「左上角工坊 驱动5角色员工 这些描述都不要了」):
+ * idle 状态不再渲染「驱动 5 角色员工」副标题, 仅保留 `thinking` /
+ * `subtitle` 传入的动态文案 (思考中 / 正在生成回复…)。
  * 之所以抽出: 把头部代码从 BoardChatScreen 那一坨 2084 行的屏里搬出来, 单元
  * 屏幕只管聊天流; 后续要改图标 / 标题 / 时间戳样式只动这一处。
  */
@@ -49,16 +52,18 @@ export function ChatHeader({
         ) : null}
         <View style={styles.titleStack}>
           <Text style={styles.topTitle}>工坊</Text>
-          <View style={styles.subtitleRow}>
-            <StatusDot
-              status={thinking ? "running" : "ok"}
-              color={thinking ? C.warn : C.accent}
-              size={6}
-            />
-            <Text style={styles.topSubTitle}>
-              {subtitle ?? (thinking ? "思考中…" : "驱动 5 角色员工")}
-            </Text>
-          </View>
+          {subtitle || thinking ? (
+            <View style={styles.subtitleRow}>
+              <StatusDot
+                status={thinking ? "running" : "ok"}
+                color={thinking ? C.warn : C.accent}
+                size={6}
+              />
+              <Text style={styles.topSubTitle}>
+                {subtitle ?? "思考中…"}
+              </Text>
+            </View>
+          ) : null}
         </View>
       </View>
 

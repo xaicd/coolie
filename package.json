@@ -127,5 +127,8 @@
       "@codemirror/state": "^6.7.2",
       "@codemirror/view": "^6.43.11"
     }
+  },
+  "dependencies": {
+    "expo-image-picker": "~16.0.6"
   }
 }

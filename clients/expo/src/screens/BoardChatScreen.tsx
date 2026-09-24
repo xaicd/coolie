@@ -1332,7 +1332,7 @@ export function BoardChatScreen({
               ? "正在生成回复…"
               : loadingState === "thinking"
                 ? statusText || "思考中…"
-                : "驱动 5 角色员工"
+                : ""
           }
           timestamp={latestAssistantTimestamp}
           embedded={embedded}

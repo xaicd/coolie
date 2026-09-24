@@ -7,7 +7,12 @@ import { CoolieWebFallback } from "./CoolieWebFallback";
 
 /**
  * 全局顶栏 — 对齐 Coolie Web (clients/expo-paperclip-web) 的原生 appBar:
- * 中间标题 "Coolie工坊", 右侧 [驾驶舱Web] 按钮跳 coolieweb:// 深链。
+ * 右侧 [驾驶舱Web] 按钮跳 coolieweb:// 深链。
+ *
+ * wave73 (boss 26:32 OOB 「左上角工坊 驱动5角色员工 这些描述都不要了」):
+ * 删掉中间的 title Text (原先显示 "Coolie工坊"), 现在中间留空, 只剩
+ * 左侧 (通知 / 搜索) + 右侧 (驾驶舱Web) 两组 icon。`title` prop 保留
+ * 但不再渲染, 兼容现有调用方 (App.tsx)。
  *
  * [驾驶舱Web] 是**智能路由** (wave40 方案 B, boss 09-22 23:59 选 B):
  * 装了 Coolie Web → 深链拉起 (原行为); 没装 → 内置 webview 兜底加载
@@ -20,12 +25,13 @@ import { CoolieWebFallback } from "./CoolieWebFallback";
  * Ionicons 都是空白, 见 wave18 记录)。icon 暂维持原样, 待单独修字体。
  */
 export function AppBar({
-  title,
+  // wave73 — title 不再渲染, 仅保留为可选 prop 以兼容历史调用方
+  title: _title,
   unreadCount = 0,
   onOpenNotifications,
   onOpenSearch,
 }: {
-  title: string;
+  title?: string;
   unreadCount?: number;
   onOpenNotifications?: () => void;
   onOpenSearch?: () => void;
@@ -60,9 +66,8 @@ export function AppBar({
           ) : null}
         </View>
 
-        <Text style={styles.title} numberOfLines={1}>
-          {title}
-        </Text>
+        {/* wave73 — 删中间标题 (原 title="Coolie工坊"), 中间留空 */}
+        <View style={styles.titleSlot} />
 
         <View style={[styles.side, styles.sideRight]}>
           <Pressable
@@ -136,6 +141,11 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "700",
     letterSpacing: 0.2,
+  },
+  // wave73 — 标题位占空, 中间留空让左右两组 icon 自然分布
+  titleSlot: {
+    flex: 0,
+    minWidth: 0,
   },
   webBtn: {
     height: 32,
