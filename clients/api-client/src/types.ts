@@ -74,7 +74,35 @@ export interface Project {
   description?: string | null;
   /** Square dot next to the name, same as the web picker. */
   color?: string | null;
+  icon?: string | null;
   status?: string;
+  targetDate?: string | null;
+  leadAgentId?: string | null;
+  goals?: Array<{ id: string; title: string }>;
+  workspaces?: Array<{
+    id: string;
+    name: string;
+    sourceType?: string;
+    cwd?: string | null;
+    repoUrl?: string | null;
+    repoRef?: string | null;
+    isPrimary?: boolean;
+  }>;
+  primaryWorkspace?: {
+    id: string;
+    name: string;
+    sourceType?: string;
+    cwd?: string | null;
+    repoUrl?: string | null;
+    repoRef?: string | null;
+  } | null;
+  taskCount?: number;
+  codebase?: {
+    origin?: string;
+    localFolder?: string | null;
+    repoUrl?: string | null;
+    repoName?: string | null;
+  } | null;
   /**
    * When `enabled`, the dialog shows its execution-workspace row for this
    * project (upstream gates on `experimentalSettings.enableIsolatedWorkspaces`

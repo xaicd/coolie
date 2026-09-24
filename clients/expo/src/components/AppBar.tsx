@@ -33,11 +33,13 @@ export function AppBar({
   unreadCount = 0,
   onOpenNotifications,
   onOpenSearch,
+  onOpenWebWorkbench,
 }: {
   title?: string;
   unreadCount?: number;
   onOpenNotifications?: () => void;
   onOpenSearch?: () => void;
+  onOpenWebWorkbench?: () => void;
 }) {
   /** 本机没装 Coolie Web 时, 打开内置 webview 兜底 (见 CoolieWebFallback)。 */
   const [webFallbackOpen, setWebFallbackOpen] = useState(false);
@@ -76,15 +78,19 @@ export function AppBar({
 
         <View style={[styles.side, styles.sideRight]}>
           <Pressable
-            onPress={() =>
-              void openCoolieWeb().then((opened) => {
-                if (!opened) setWebFallbackOpen(true);
-              })
-            }
+            onPress={() => {
+              if (onOpenWebWorkbench) {
+                onOpenWebWorkbench();
+              } else {
+                void openCoolieWeb().then((opened) => {
+                  if (!opened) setWebFallbackOpen(true);
+                });
+              }
+            }}
             hitSlop={8}
             style={({ pressed }) => [styles.webBtn, pressed && styles.webBtnPressed]}
           >
-            <Text style={styles.webBtnText}>驾驶舱Web</Text>
+            <Text style={styles.webBtnText}>Web全功能</Text>
           </Pressable>
         </View>
       </View>

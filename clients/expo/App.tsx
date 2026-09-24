@@ -63,6 +63,8 @@ import { TasksScreen } from "./src/screens/TasksScreen";
 import { PipelinesScreen } from "./src/screens/PipelinesScreen";
 import { PlansScreen } from "./src/screens/PlansScreen";
 import { GitCredentialsScreen } from "./src/screens/GitCredentialsScreen";
+import { ProjectsScreen } from "./src/screens/ProjectsScreen";
+import { WebContainerScreen } from "./src/screens/WebContainerScreen";
 import { WorkspaceGitToggle } from "./src/components/WorkspaceGitToggle";
 import { useNotificationsStore } from "./src/stores/notifications";
 import { BoardChatScreen, exportBoardEcho, exportBoardPrompt } from "./src/screens/BoardChatScreen";
@@ -601,9 +603,16 @@ function HomeScreen({
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [agentDetail, setAgentDetail] = useState<AgentRow | null>(null);
-  // 任务页顶部编排按钮组 (wave20) 的落地屏: Pipeline 列表 / Plan 列表
+  // 任务页顶部编排按钮组 (wave20) 的落地屏: Pipeline 列表 / Plan 列表 / 项目中心
   const [pipelinesOpen, setPipelinesOpen] = useState(false);
   const [plansOpen, setPlansOpen] = useState(false);
+  const [projectsOpen, setProjectsOpen] = useState(false);
+  // 全功能 Web 容器 (Hybrid WebContainer): 零重复开发复用 Web 端能力
+  const [webContainerTarget, setWebContainerTarget] = useState<{
+    path?: string;
+    url?: string;
+    title: string;
+  } | null>(null);
   // wave70 — git-ops App 端 UI 4 屏之「凭证管理」落地屏
   const [gitCredentialsOpen, setGitCredentialsOpen] = useState(false);
   // wave70 — Workspace Git Toggle 的状态 (本地开关, 后端未消费, 但 UI 反馈要有)
@@ -744,6 +753,7 @@ function HomeScreen({
    * 没有可退的层。调用方据此决定是「吃掉事件」还是「交回系统」—— 见 backHandler。
    */
   const swipeBack = (): boolean => {
+    if (webContainerTarget) return setWebContainerTarget(null), true;
     if (sandboxContext) return setSandboxContext(null), true;
     if (diffContext) return setDiffContext(null), true;
     if (focusedApprovalId) return setFocusedApprovalId(null), true;
@@ -752,6 +762,7 @@ function HomeScreen({
     if (agentDetail) return setAgentDetail(null), true;
     if (pipelinesOpen) return setPipelinesOpen(false), true;
     if (plansOpen) return setPlansOpen(false), true;
+    if (projectsOpen) return setProjectsOpen(false), true;
     if (gitCredentialsOpen) return setGitCredentialsOpen(false), true;
     if (selected) return setSelected(null), true;
     if (composeOpen) return setComposeOpen(false), true;
@@ -889,7 +900,15 @@ function HomeScreen({
       />
     );
   } else if (pipelinesOpen) {
-    content = <PipelinesScreen company={company} onBack={() => setPipelinesOpen(false)} />;
+    content = (
+      <PipelinesScreen
+        company={company}
+        onBack={() => setPipelinesOpen(false)}
+        onOpenWeb={(path, title) =>
+          setWebContainerTarget({ path, title: title ?? "流水线" })
+        }
+      />
+    );
   } else if (plansOpen) {
     content = (
       <PlansScreen
@@ -899,6 +918,29 @@ function HomeScreen({
           setPlansOpen(false);
           navigateTab("tasks");
           setSelected(issue);
+        }}
+      />
+    );
+  } else if (webContainerTarget) {
+    content = (
+      <WebContainerScreen
+        initialPath={webContainerTarget.path}
+        initialUrl={webContainerTarget.url}
+        title={webContainerTarget.title}
+        onBack={() => setWebContainerTarget(null)}
+      />
+    );
+  } else if (projectsOpen) {
+    content = (
+      <ProjectsScreen
+        company={company}
+        onBack={() => setProjectsOpen(false)}
+        onOpenWebProjects={() =>
+          setWebContainerTarget({ path: "/projects", title: "项目中心 (Web 全量)" })
+        }
+        onOpenProjectTasks={(_project) => {
+          setProjectsOpen(false);
+          navigateTab("tasks");
         }}
       />
     );
@@ -915,12 +957,16 @@ function HomeScreen({
         unreadCount={unreadCount}
         onOpenNotifications={() => setNotificationsOpen(true)}
         onOpenSearch={() => setSearchOpen(true)}
+        onOpenWebWorkbench={() =>
+          setWebContainerTarget({ path: "/dashboard", title: "Web 全功能工作台" })
+        }
       />
       <View style={styles.shellContent}>
         {tab === "dashboard" ? (
           <DashboardScreen
             company={company}
             onOpenSettings={() => setSettingsOpen(true)}
+            onOpenProjects={() => setProjectsOpen(true)}
             onOpenApprovals={() => {
               // 审计 bug 1: 审批卡点击原先只 setTab("tasks")。tab 分支上方还有 selected /
               // diffContext / sandboxContext / focusedApprovalId 四个 early-return 浮层,
@@ -986,7 +1032,14 @@ function HomeScreen({
             />
           )
         ) : tab === "ontology" ? (
-          <OntologyDomainListScreen company={company} whoami={whoami} onOpenSettings={() => setSettingsOpen(true)} />
+          <OntologyDomainListScreen
+            company={company}
+            whoami={whoami}
+            onOpenSettings={() => setSettingsOpen(true)}
+            onOpenWebOntology={() =>
+              setWebContainerTarget({ path: "/ontology", title: "本体可视化设计器" })
+            }
+          />
         ) : tab === "artifacts" ? (
           <ArtifactsScreen
             company={company}
@@ -1014,6 +1067,7 @@ function HomeScreen({
               onOpenArtifacts={() => navigateTab("artifacts")}
               onOpenPipelines={() => setPipelinesOpen(true)}
               onOpenPlans={() => setPlansOpen(true)}
+              onOpenProjects={() => setProjectsOpen(true)}
               onOpenGitCredentials={() => setGitCredentialsOpen(true)}
             />
           )

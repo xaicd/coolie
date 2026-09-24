@@ -41,18 +41,28 @@ export function resolveProjectRepositorySelection(
   });
 }
 
-/** Register an existing GitHub URL without assuming it is in the connection catalog.
+/** Register an existing Git URL without assuming it is in the connection catalog.
  * No fetch or credential sharing: execution uses the normal repository access policy.
  */
 export function normalizeProjectRepositoryUrl(value: string): { fullName: string; url: string } {
   let parsed: URL;
-  try { parsed = new URL(value); } catch { throw unprocessable("Repository URL must be an HTTPS GitHub repository URL"); }
-  if (parsed.protocol !== "https:" || parsed.hostname !== "github.com" || parsed.port || parsed.username || parsed.password || parsed.search || parsed.hash) {
-    throw unprocessable("Repository URL must be an HTTPS GitHub repository URL without credentials, query, or fragment");
+  try {
+    parsed = new URL(value);
+  } catch {
+    throw unprocessable("Repository URL must be a valid HTTP or HTTPS Git repository URL");
   }
-  const path = parsed.pathname.replace(/\/$/, "").replace(/\.git$/, "");
-  if (!/^\/[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(path) || path.split("/").some(part => part === "." || part === "..")) {
-    throw unprocessable("Repository URL must identify a GitHub owner and repository");
+  if ((parsed.protocol !== "https:" && parsed.protocol !== "http:") || parsed.search || parsed.hash) {
+    throw unprocessable("Repository URL must be an HTTP or HTTPS Git repository URL without query or fragment");
   }
-  return { fullName: path.slice(1), url: `https://github.com${path}` };
+  if (parsed.username || parsed.password) {
+    throw unprocessable("Repository URL must not contain embedded credentials; use Git Credentials management instead");
+  }
+  const cleanPath = parsed.pathname.replace(/\/$/, "").replace(/\.git$/, "");
+  const parts = cleanPath.split("/").filter(Boolean);
+  if (parts.length === 0 || parts.some((part) => part === "." || part === "..")) {
+    throw unprocessable("Repository URL must identify a Git repository path");
+  }
+  const fullName = parts.slice(-2).join("/");
+  const url = `${parsed.protocol}//${parsed.host}${cleanPath}`;
+  return { fullName, url };
 }

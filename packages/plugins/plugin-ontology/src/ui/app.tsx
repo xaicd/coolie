@@ -42,7 +42,7 @@ import { BootstrapPanel } from "./BootstrapPanel.js";
  * Chinese; everything else falls back to English.
  */
 import { t } from "./isZh.js";
-import { LegacyImportWizardModal } from "./LegacyImportWizardModal.js";
+import { LegacyImportWizardModal, type ParsedSource } from "./LegacyImportWizardModal.js";
 import { DatasetsTab } from "./DatasetsTab.js";
 import { ConnectorsTab } from "./ConnectorsTab.js";
 import { TransformsTab } from "./TransformsTab.js";
@@ -363,6 +363,7 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
   // Left object-type tree. Collapsible so the canvas can go full-bleed.
   const [treeOpen, setTreeOpen] = useState(true);
   const [showNewDomain, setShowNewDomain] = useState(false);
+  const [newDomainDefaultMode, setNewDomainDefaultMode] = useState<"directory" | "manual">("directory");
   // When the graph node right-click menu dispatches "动作", DomainWorkspace
   // catches the window CustomEvent and writes the captured nodeTypeId here
   // via the setter we thread down as a prop. ActionsTab consumes the prefill
@@ -374,6 +375,8 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
   // the multi-step wizard below. The wizard is the entry to ingest a real
   // legacy app's schema into ontology (SQL DDL / OpenAPI / code / docs).
   const [wizardOpen, setWizardOpen] = useState(false);
+  const [wizardInitialParsed, setWizardInitialParsed] = useState<ParsedSource | null>(null);
+  const [wizardInitialStep, setWizardInitialStep] = useState<1 | 2 | 3 | 4>(1);
 
   // Auto-select first domain
   const activeDomainId = selectedDomainId ?? domains[0]?.id ?? null;
@@ -578,6 +581,10 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
               refreshDomains();
             }}
             onImportLegacy={() => setWizardOpen(true)}
+            onOpenNewDomain={(mode) => {
+              setNewDomainDefaultMode(mode ?? "directory");
+              setShowNewDomain(true);
+            }}
           />
         </div>
       ) : (
@@ -608,6 +615,7 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
       {showNewDomain && (
         <NewDomainModal
           companyId={companyId}
+          initialMode={newDomainDefaultMode}
           onClose={() => setShowNewDomain(false)}
           onCreated={(newDomainId) => {
             setShowNewDomain(false);
@@ -619,6 +627,12 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
             refreshDomains();
             if (newDomainId) setSelectedDomainId(newDomainId);
           }}
+          onOpenWizard={(parsed, step) => {
+            setShowNewDomain(false);
+            setWizardInitialParsed(parsed ?? null);
+            setWizardInitialStep(step ?? 1);
+            setWizardOpen(true);
+          }}
         />
       )}
 
@@ -628,9 +642,17 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
       {wizardOpen && (
         <LegacyImportWizardModal
           companyId={companyId}
-          onClose={() => setWizardOpen(false)}
+          initialParsed={wizardInitialParsed}
+          initialStep={wizardInitialStep}
+          onClose={() => {
+            setWizardOpen(false);
+            setWizardInitialParsed(null);
+            setWizardInitialStep(1);
+          }}
           onPublished={(newDomainId) => {
             setWizardOpen(false);
+            setWizardInitialParsed(null);
+            setWizardInitialStep(1);
             setView("graph");
             refreshDomains();
             if (newDomainId) setSelectedDomainId(newDomainId);
@@ -641,45 +663,236 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
   );
 }
 
-/** Centered modal for creating a new ontology domain; auto-selects it on success. */
+/** Centered modal for creating a new ontology domain; supports manual blank creation and directory scan import. */
 function NewDomainModal({
   companyId,
+  initialMode = "directory",
   onClose,
   onCreated,
+  onOpenWizard,
 }: {
   companyId: string;
+  initialMode?: "directory" | "manual";
   onClose: () => void;
   onCreated: (newDomainId: string | null) => void;
+  onOpenWizard?: (parsed?: ParsedSource | null, step?: 1 | 2 | 3 | 4) => void;
 }): ReactElement {
   const createDomain = usePluginAction("create-domain");
+  const createNodeType = usePluginAction("create-node-type");
+  const createRelationType = usePluginAction("create-relation-type");
+  const createBusinessSystem = usePluginAction("create-business-system");
+  const importArchitecture = usePluginAction("import-architecture");
+
+  const [mode, setMode] = useState<"directory" | "manual">(initialMode);
   const [slug, setSlug] = useState("");
   const [displayName, setDisplayName] = useState("");
   const [description, setDescription] = useState("");
   const [busy, setBusy] = useState(false);
+  const [scanning, setScanning] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+
+  // Directory scan state
+  const [scanned, setScanned] = useState<ParsedSource | null>(null);
+  const [folderName, setFolderName] = useState("");
+  const [fileCount, setFileCount] = useState(0);
+
+  const handleDirectoryScan = async (files: FileList) => {
+    setScanning(true);
+    setErr(null);
+    try {
+      const { scanProject, IGNORED_EXTENSIONS } = await import(
+        "@paperclipai/ontology-core/cognition/projectScanner.js"
+      );
+      const { buildTypeProvenance } = await import(
+        "@paperclipai/ontology-core/provenance.js"
+      );
+      const inputs: Array<{ path: string; content: string }> = [];
+      const repos = new Set<string>();
+      const MAX_FILE_BYTES = 1024 * 1024;
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i]!;
+        const relative =
+          (f as File & { webkitRelativePath?: string }).webkitRelativePath ?? f.name;
+        const root = relative.split("/").filter(Boolean)[0];
+        if (root) repos.add(root);
+        const ext = /(\.[A-Za-z0-9]+)$/.exec(relative)?.[1]?.toLowerCase() ?? "";
+        if (IGNORED_EXTENSIONS.has(ext)) continue;
+        if (f.size > MAX_FILE_BYTES) continue;
+        inputs.push({ path: relative, content: await f.text() });
+      }
+
+      const scan = scanProject(inputs);
+      const provenance: Record<string, Record<string, unknown>> = {};
+      for (const seed of scan.draft.seedNodeTypes) {
+        const bag = buildTypeProvenance(seed.origin, seed.sourceFiles);
+        if (bag) provenance[seed.typeName] = bag;
+      }
+
+      const parsedData: ParsedSource = {
+        nodeTypes: scan.draft.seedNodeTypes.map((n) => ({
+          key: n.typeName,
+          displayName: n.displayName,
+          properties: n.properties ?? {},
+          propertyOrder: n.propertyOrder,
+        })),
+        relationTypes: scan.draft.seedRelationTypes.map((r) => ({
+          key: `${r.sourceType}_${r.relationType}_${r.targetType}`,
+          displayName: r.displayName,
+          sourceNodeTypeKey: r.sourceType,
+          targetNodeTypeKey: r.targetType,
+        })),
+        actions: scan.draft.seedActions.map((a) => ({
+          key: `${a.method} ${a.path}`,
+          method: a.method,
+          endpoint: a.path,
+        })),
+        repos: [...repos],
+        services: scan.services,
+        dependencies: scan.dependencies,
+        sharedDatabases: scan.sharedDatabases,
+        provenance,
+        scanCoverage: {
+          byExtension: scan.byExtension,
+          unsupported: scan.unsupported,
+          architectureOnly: scan.architectureOnly,
+          truncationNote: scan.truncationNote,
+        },
+      };
+
+      const rootName = [...repos][0] || "project";
+      setFolderName(rootName);
+      setFileCount(inputs.length);
+      setScanned(parsedData);
+      setDisplayName(rootName);
+      setSlug(rootName.toLowerCase().replace(/[^a-z0-9_-]/g, "_"));
+      setDescription(
+        `由工程目录「${rootName}」自动分析生成的业务本体域，涵盖 ${parsedData.nodeTypes.length} 个对象类型与 ${parsedData.relationTypes.length} 个关系类型。`,
+      );
+    } catch (e) {
+      setErr(String((e as Error)?.message ?? e));
+    } finally {
+      setScanning(false);
+    }
+  };
 
   const submit = useCallback(async () => {
     if (!slug.trim() || !displayName.trim()) return;
     setBusy(true);
     setErr(null);
     try {
-      const res = (await createDomain({
-        companyId,
-        slug: slug.trim(),
-        displayName: displayName.trim(),
-        description: description.trim() || undefined,
-      })) as {
-        domain?: { id?: string };
-        id?: string;
-      };
-      const newId = res?.domain?.id ?? res?.id ?? null;
-      onCreated(newId);
+      if (scanned) {
+        const dom = (await createDomain({
+          companyId,
+          slug: slug.trim(),
+          displayName: displayName.trim(),
+          description: description.trim() || undefined,
+          category: "legacy-system",
+          metadata: {
+            pipelineMode: "virtualization",
+            sourceNodeTypeKeys: scanned.nodeTypes.map((n) => n.key),
+            bridgeActions: scanned.actions ?? [],
+          },
+        })) as
+          | { domain?: { id?: string }; id?: string; data?: { domain?: { id?: string } } }
+          | undefined;
+        const domainId = dom?.domain?.id ?? dom?.id ?? dom?.data?.domain?.id;
+        if (!domainId) {
+          throw new Error(t("创建本体域失败: 未返回域ID", "create-domain returned no domain id"));
+        }
+
+        for (const nt of scanned.nodeTypes) {
+          try {
+            await createNodeType({
+              companyId,
+              domainId,
+              key: nt.key,
+              displayName: nt.displayName,
+              propertiesSchema: nt.properties,
+              propertyOrder: nt.propertyOrder,
+              metadata: scanned.provenance?.[nt.key],
+            });
+          } catch (e) {
+            console.warn(`Object type ${nt.key} failed:`, e);
+          }
+        }
+
+        for (const rt of scanned.relationTypes) {
+          try {
+            await createRelationType({
+              companyId,
+              domainId,
+              key: rt.key,
+              displayName: rt.displayName,
+              metadata: {
+                sourceNodeTypeKey: rt.sourceNodeTypeKey,
+                targetNodeTypeKey: rt.targetNodeTypeKey,
+              },
+            });
+          } catch (e) {
+            console.warn(`Relation type ${rt.key} failed:`, e);
+          }
+        }
+
+        try {
+          await createBusinessSystem({
+            companyId,
+            code: `SYS_${slug.trim().toUpperCase()}`,
+            name: displayName.trim(),
+            ontologyDomainId: domainId,
+            status: "planning",
+            ...(scanned.repos && scanned.repos.length > 0
+              ? { repos: scanned.repos.map((name) => ({ name })) }
+              : {}),
+          });
+        } catch (e) {
+          console.warn("createBusinessSystem failed:", e);
+        }
+
+        if (scanned.services && scanned.services.length > 0) {
+          try {
+            await importArchitecture({
+              companyId,
+              businessSystemId: `SYS_${slug.trim().toUpperCase()}`,
+              services: scanned.services,
+              dependencies: scanned.dependencies ?? [],
+            });
+          } catch (e) {
+            console.warn("importArchitecture failed:", e);
+          }
+        }
+
+        onCreated(domainId);
+      } else {
+        const res = (await createDomain({
+          companyId,
+          slug: slug.trim(),
+          displayName: displayName.trim(),
+          description: description.trim() || undefined,
+        })) as {
+          domain?: { id?: string };
+          id?: string;
+        };
+        const newId = res?.domain?.id ?? res?.id ?? null;
+        onCreated(newId);
+      }
     } catch (e) {
       setErr(String((e as Error)?.message ?? e));
     } finally {
       setBusy(false);
     }
-  }, [companyId, slug, displayName, description, createDomain, onCreated]);
+  }, [
+    companyId,
+    slug,
+    displayName,
+    description,
+    scanned,
+    createDomain,
+    createNodeType,
+    createRelationType,
+    createBusinessSystem,
+    importArchitecture,
+    onCreated,
+  ]);
 
   return (
     <div
@@ -687,55 +900,213 @@ function NewDomainModal({
       onClick={onClose}
     >
       <div
-        className="w-[min(28rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-4 shadow-2xl"
-        onClick={e => e.stopPropagation()}
+        className="w-[min(32rem,calc(100vw-2rem))] rounded-xl border border-border bg-card p-4 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between">
-          <span className="text-(length:--text-base) font-semibold">{t("新建本体域", "New ontology domain")}</span>
-          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">✕</button>
+          <span className="text-(length:--text-base) font-semibold">
+            {t("新建本体域", "New ontology domain")}
+          </span>
+          <button onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            ✕
+          </button>
         </div>
+
+        {/* Tab 切换: 文件夹目录接入 vs 空白手动创建 */}
+        <div className="mb-3 flex rounded-lg border border-border bg-muted/20 p-0.5 text-(length:--text-nano)">
+          <button
+            type="button"
+            className={[
+              "flex-1 rounded-md py-1 font-medium transition-colors",
+              mode === "directory"
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground",
+            ].join(" ")}
+            onClick={() => setMode("directory")}
+          >
+            📁 {t("文件夹目录接入", "Import folder directory")}
+          </button>
+          <button
+            type="button"
+            className={[
+              "flex-1 rounded-md py-1 font-medium transition-colors",
+              mode === "manual"
+                ? "bg-background text-foreground shadow-xs"
+                : "text-muted-foreground hover:text-foreground",
+            ].join(" ")}
+            onClick={() => setMode("manual")}
+          >
+            ✏️ {t("空白手动创建", "Blank domain")}
+          </button>
+        </div>
+
+        {mode === "directory" && (
+          <div className="mb-3 space-y-2">
+            {!scanned ? (
+              <div>
+                <label className="flex cursor-pointer flex-col items-center justify-center gap-1.5 rounded-lg border border-dashed border-primary/50 bg-primary/5 p-4 text-center hover:bg-primary/10 transition-colors">
+                  <span className="text-xl">📁</span>
+                  <span className="text-(length:--text-compact) font-medium text-foreground">
+                    {t("点击选择工程文件夹目录", "Click to select project directory")}
+                  </span>
+                  <span className="text-(length:--text-nano) text-muted-foreground max-w-xs">
+                    {t(
+                      "支持识别 Java/Kotlin(Spring/JPA/MyBatis)、.proto、SQL DDL、TS/JS/Py/Go 代码与服务架构",
+                      "Reads Java/Kotlin, .proto, SQL DDL, and TS/JS/Py/Go to extract object models and services",
+                    )}
+                  </span>
+                  <input
+                    type="file"
+                    /* @ts-expect-error webkitdirectory is browser-native */
+                    webkitdirectory=""
+                    multiple
+                    className="hidden"
+                    onChange={(e) => {
+                      const fl = e.target?.files;
+                      if (fl && fl.length > 0) void handleDirectoryScan(fl);
+                    }}
+                  />
+                </label>
+                {scanning && (
+                  <div className="mt-2 flex items-center justify-center gap-2 py-3 text-(length:--text-compact) text-muted-foreground">
+                    <span className="animate-spin">⏳</span>
+                    <span>{t("正在扫描分析工程目录并提取实体模型…", "Scanning project directory…")}</span>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-border bg-muted/30 p-2.5">
+                <div className="flex items-center justify-between text-(length:--text-nano)">
+                  <span className="font-semibold text-foreground">
+                    📁 {folderName} ({fileCount} {t("个代码文件", "files")})
+                  </span>
+                  <label className="cursor-pointer text-primary hover:underline">
+                    {t("重新选择", "Change folder")}
+                    <input
+                      type="file"
+                      /* @ts-expect-error webkitdirectory is browser-native */
+                      webkitdirectory=""
+                      multiple
+                      className="hidden"
+                      onChange={(e) => {
+                        const fl = e.target?.files;
+                        if (fl && fl.length > 0) void handleDirectoryScan(fl);
+                      }}
+                    />
+                  </label>
+                </div>
+                <div className="mt-1.5 flex flex-wrap gap-1.5 text-(length:--text-nano)">
+                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">
+                    ✓ {scanned.nodeTypes.length} {t("对象类型", "object types")}
+                  </span>
+                  <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">
+                    ✓ {scanned.relationTypes.length} {t("关系类型", "relation types")}
+                  </span>
+                  {scanned.services && scanned.services.length > 0 && (
+                    <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">
+                      ✓ {scanned.services.length} {t("微服务", "services")}
+                    </span>
+                  )}
+                  {scanned.actions && scanned.actions.length > 0 && (
+                    <span className="rounded bg-primary/10 px-1.5 py-0.5 text-primary">
+                      ✓ {scanned.actions.length} {t("接口", "actions")}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         <div className="space-y-2">
           <div>
-            <label className="mb-1 block text-(length:--text-nano) text-muted-foreground">{t("标识 (slug)", "Slug")}</label>
+            <label className="mb-1 block text-(length:--text-nano) text-muted-foreground">
+              {t("标识 (slug)", "Slug")}
+            </label>
             <input
-              autoFocus
+              autoFocus={mode === "manual"}
               className={INPUT + " mr-0 w-full"}
               placeholder="e.g. orders, ecommerce"
               value={slug}
-              onChange={e => setSlug(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") void submit(); }}
-            />
-          </div>
-          <div>
-            <label className="mb-1 block text-(length:--text-nano) text-muted-foreground">{t("显示名称", "Display name")}</label>
-            <input
-              className={INPUT + " mr-0 w-full"}
-              placeholder={t("如：订单域、电商平台", "e.g. Orders, E-commerce")}
-              value={displayName}
-              onChange={e => setDisplayName(e.target.value)}
-              onKeyDown={e => { if (e.key === "Enter") void submit(); }}
+              onChange={(e) => setSlug(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void submit();
+              }}
             />
           </div>
           <div>
             <label className="mb-1 block text-(length:--text-nano) text-muted-foreground">
-              {t("描述 (可选 — 让 AI 初始化补全效果更好)", "Description (optional — improves AI bootstrap quality)")}
+              {t("显示名称", "Display name")}
+            </label>
+            <input
+              className={INPUT + " mr-0 w-full"}
+              placeholder={t("如：订单域、电商平台", "e.g. Orders, E-commerce")}
+              value={displayName}
+              onChange={(e) => setDisplayName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void submit();
+              }}
+            />
+          </div>
+          <div>
+            <label className="mb-1 block text-(length:--text-nano) text-muted-foreground">
+              {t(
+                "描述 (可选 — 让 AI 初始化补全效果更好)",
+                "Description (optional — improves AI bootstrap quality)",
+              )}
             </label>
             <textarea
               className={INPUT + " mr-0 w-full resize-none"}
               rows={2}
-              placeholder={t("例：本域建模银行核心系统,涵盖账户、交易、风控三类实体", "e.g. This domain models our banking core: accounts, transactions, risk")}
+              placeholder={t(
+                "例：本域建模银行核心系统,涵盖账户、交易、风控三类实体",
+                "e.g. This domain models our banking core: accounts, transactions, risk",
+              )}
               value={description}
-              onChange={e => setDescription(e.target.value)}
+              onChange={(e) => setDescription(e.target.value)}
             />
           </div>
-          {err && <div className="text-(length:--text-compact) text-muted-foreground">{err}</div>}
-          <div className="mt-1 flex justify-end gap-2">
-            <button onClick={onClose} className="rounded-md border border-border px-3 py-1.5 text-(length:--text-compact) text-muted-foreground hover:bg-accent">
-              {t("取消", "Cancel")}
-            </button>
-            <button className={BTN} disabled={busy || !slug.trim() || !displayName.trim()} onClick={() => void submit()}>
-              {busy ? "…" : t("创建", "Create")}
-            </button>
+          {err && <div className="text-(length:--text-compact) text-destructive">{err}</div>}
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <div>
+              {mode === "directory" && scanned && onOpenWizard && (
+                <button
+                  type="button"
+                  onClick={() => onOpenWizard(scanned, 2)}
+                  className="text-(length:--text-nano) text-muted-foreground hover:text-foreground underline"
+                >
+                  {t("进入完整接入向导 (4步) →", "Full 4-step wizard →")}
+                </button>
+              )}
+              {mode === "manual" && (
+                <button
+                  type="button"
+                  onClick={() => setMode("directory")}
+                  className="text-(length:--text-nano) text-primary hover:underline"
+                >
+                  📁 {t("选择文件夹目录接入 →", "Import folder directory →")}
+                </button>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={onClose}
+                className="rounded-md border border-border px-3 py-1.5 text-(length:--text-compact) text-muted-foreground hover:bg-accent"
+              >
+                {t("取消", "Cancel")}
+              </button>
+              <button
+                className={BTN}
+                disabled={busy || scanning || !slug.trim() || !displayName.trim()}
+                onClick={() => void submit()}
+              >
+                {busy
+                  ? "…"
+                  : mode === "directory" && scanned
+                    ? t("创建并接入", "Create & Ingest")
+                    : t("创建", "Create")}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -3418,10 +3789,12 @@ function NoDomainState({
   companyId,
   onCreated,
   onImportLegacy,
+  onOpenNewDomain,
 }: {
   companyId: string;
   onCreated: (domainId: string) => void;
   onImportLegacy?: () => void;
+  onOpenNewDomain?: (mode?: "directory" | "manual") => void;
 }): ReactElement {
   const createDomain = usePluginAction("create-domain");
   const [displayName, setDisplayName] = useState("");
@@ -3502,16 +3875,28 @@ function NoDomainState({
           />
         )}
       </div>
-      {onImportLegacy && (
-        <button
-          type="button"
-          onClick={onImportLegacy}
-          className="rounded-md border border-border bg-card px-3 py-1.5 text-(length:--text-nano) font-medium text-foreground hover:border-primary hover:text-primary"
-          title={t("4 步渐进式接入存量旧系统 (Zero-ETL 虚拟化)", "4-step wizard to ingest a legacy system")}
-        >
-          ⚡ {t("接入旧系统", "Import legacy")}
-        </button>
-      )}
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {onOpenNewDomain && (
+          <button
+            type="button"
+            onClick={() => onOpenNewDomain("directory")}
+            className="rounded-md border border-primary/50 bg-primary/10 px-3 py-1.5 text-(length:--text-nano) font-medium text-primary hover:bg-primary/20 transition-colors"
+            title={t("选择工程文件夹目录自动分析并接入本体", "Select folder directory to import ontology")}
+          >
+            📁 {t("选择文件夹目录接入", "Import folder directory")}
+          </button>
+        )}
+        {onImportLegacy && (
+          <button
+            type="button"
+            onClick={onImportLegacy}
+            className="rounded-md border border-border bg-card px-3 py-1.5 text-(length:--text-nano) font-medium text-foreground hover:border-primary hover:text-primary"
+            title={t("4 步渐进式接入存量旧系统 (Zero-ETL 虚拟化)", "4-step wizard to ingest a legacy system")}
+          >
+            ⚡ {t("接入旧系统", "Import legacy")}
+          </button>
+        )}
+      </div>
       {err && <div className="text-(length:--text-nano) text-muted-foreground">{err}</div>}
     </div>
   );

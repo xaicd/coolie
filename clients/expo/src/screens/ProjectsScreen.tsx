@@ -1,0 +1,685 @@
+import { useCallback, useEffect, useMemo, useState } from "react";
+import {
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import type { Company, Project } from "@coolie/api-client";
+import { C, coolie } from "../coolie";
+import { RADIUS, SPACING } from "../ui/tokens";
+import { AppCard } from "../ui/AppCard";
+import { EmptyState } from "../ui/EmptyState";
+import { ErrorRetry } from "../ui/ErrorRetry";
+import { LoadingState } from "../ui/LoadingState";
+import { ScreenHeader } from "../ui/ScreenHeader";
+import { StatusDot } from "../components/StatusDot";
+
+type StatusFilter = "all" | "in_progress" | "planned" | "completed" | "paused";
+
+const STATUS_FILTERS: Array<{ key: StatusFilter; label: string }> = [
+  { key: "all", label: "全部" },
+  { key: "in_progress", label: "进行中" },
+  { key: "planned", label: "计划中" },
+  { key: "paused", label: "已暂停" },
+  { key: "completed", label: "已完成" },
+];
+
+function projectStatusColor(status?: string): string {
+  switch (status) {
+    case "in_progress":
+      return C.accent;
+    case "planned":
+      return C.ink3;
+    case "completed":
+      return C.ok;
+    case "paused":
+      return C.warn;
+    case "backlog":
+      return C.ink4;
+    default:
+      return C.ink3;
+  }
+}
+
+function projectStatusLabel(status?: string): string {
+  switch (status) {
+    case "in_progress":
+      return "进行中";
+    case "planned":
+      return "计划中";
+    case "completed":
+      return "已完成";
+    case "paused":
+      return "已暂停";
+    case "backlog":
+      return "待规划";
+    case "cancelled":
+      return "已取消";
+    default:
+      return status ?? "未知";
+  }
+}
+
+interface ProjectsScreenProps {
+  company: Company;
+  onBack: () => void;
+  onOpenProjectTasks?: (project: Project) => void;
+  onCreateTaskForProject?: (project: Project) => void;
+  onOpenWebProjects?: () => void;
+}
+
+/**
+ * 项目中心 (ProjectsScreen) — Linear 设计系统规范。
+ *
+ * 展示当前企业的全部项目维度信息：
+ * - 项目状态与目标 (Goals)
+ * - 绑定代码库来源 (本地目录 / Git 仓库 / 纯管理型)
+ * - 关联任务数与穿透跳转
+ */
+export function ProjectsScreen({
+  company,
+  onBack,
+  onOpenProjectTasks,
+  onCreateTaskForProject,
+  onOpenWebProjects,
+}: ProjectsScreenProps) {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
+  const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
+
+  const load = useCallback(
+    async (isRefresh = false) => {
+      if (isRefresh) setRefreshing(true);
+      else setLoading(true);
+      setError(null);
+      try {
+        const list = await coolie.listProjects(company.id);
+        setProjects(list);
+      } catch (e) {
+        setError(String((e as Error)?.message ?? e));
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [company.id],
+  );
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const filteredProjects = useMemo(() => {
+    if (statusFilter === "all") return projects;
+    return projects.filter((p) => p.status === statusFilter);
+  }, [projects, statusFilter]);
+
+  const countsByStatus = useMemo(() => {
+    const counts: Record<string, number> = {
+      all: projects.length,
+      in_progress: 0,
+      planned: 0,
+      completed: 0,
+      paused: 0,
+    };
+    for (const p of projects) {
+      if (p.status && counts[p.status] !== undefined) {
+        counts[p.status] = (counts[p.status] ?? 0) + 1;
+      }
+    }
+    return counts;
+  }, [projects]);
+
+  return (
+    <View style={styles.screen}>
+      <ScreenHeader
+        title="项目中心"
+        subtitle={
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {company.name} · 代码库与工作空间
+          </Text>
+        }
+        onBack={onBack}
+        backLabel="任务"
+        right={
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            {onOpenWebProjects ? (
+              <Pressable
+                style={styles.webBtn}
+                onPress={onOpenWebProjects}
+                hitSlop={8}
+                accessibilityLabel="打开 Web 全量项目视图"
+              >
+                <Ionicons name="open-outline" size={13} color={C.accent} />
+                <Text style={styles.webBtnText}>Web全量</Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              style={styles.refreshBtn}
+              onPress={() => void load(true)}
+              hitSlop={8}
+              accessibilityLabel="刷新项目列表"
+            >
+              <Ionicons name="refresh-outline" size={16} color={C.ink3} />
+            </Pressable>
+          </View>
+        }
+      />
+
+      {/* 状态过滤 Chips */}
+      <View style={styles.filterBar}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterContent}
+        >
+          {STATUS_FILTERS.map((f) => {
+            const count = countsByStatus[f.key] ?? 0;
+            const active = statusFilter === f.key;
+            return (
+              <Pressable
+                key={f.key}
+                onPress={() => setStatusFilter(f.key)}
+                style={[styles.filterChip, active && styles.filterChipActive]}
+              >
+                <Text style={[styles.filterLabel, active && styles.filterLabelActive]}>
+                  {f.label} {count > 0 ? `(${count})` : ""}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
+
+      <ScrollView
+        style={styles.scroll}
+        contentContainerStyle={styles.content}
+        keyboardShouldPersistTaps="handled"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void load(true)}
+            tintColor={C.accent}
+          />
+        }
+      >
+        {loading && !refreshing ? (
+          <LoadingState size="small" text="正在加载项目中心…" />
+        ) : error ? (
+          <ErrorRetry variant="section" message={`⚠️ ${error}`} onRetry={() => void load()} />
+        ) : filteredProjects.length === 0 ? (
+          <EmptyState
+            icon="📁"
+            title={statusFilter === "all" ? "暂无项目" : "没有符合状态的项目"}
+            subtitle={
+              statusFilter === "all"
+                ? "在 Web 平台新建项目绑定本地目录或 Git 仓库后，此处将自动同步呈现。"
+                : "当前筛选条件下没有项目，可切换上方状态标签查看。"
+            }
+          />
+        ) : (
+          filteredProjects.map((project) => {
+            const isExpanded = expandedProjectId === project.id;
+            const color = project.color ?? C.accent;
+            const statusColor = projectStatusColor(project.status);
+            const workspaces = project.workspaces ?? [];
+            const primaryWorkspace = project.primaryWorkspace ?? workspaces[0];
+
+            return (
+              <AppCard
+                key={project.id}
+                onPress={() => setExpandedProjectId(isExpanded ? null : project.id)}
+                style={styles.card}
+              >
+                {/* 顶部标题与状态 */}
+                <View style={styles.cardTop}>
+                  <View style={styles.titleWrap}>
+                    <View style={[styles.colorDot, { backgroundColor: color }]} />
+                    <Text style={styles.projectName} numberOfLines={1}>
+                      {project.name}
+                    </Text>
+                  </View>
+                  <View style={[styles.statusBadge, { borderColor: statusColor }]}>
+                    <StatusDot
+                      status={project.status === "in_progress" ? "ok" : "idle"}
+                      size={6}
+                    />
+                    <Text style={[styles.statusText, { color: statusColor }]}>
+                      {projectStatusLabel(project.status)}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* 项目描述 */}
+                {project.description ? (
+                  <Text
+                    style={styles.description}
+                    numberOfLines={isExpanded ? undefined : 2}
+                  >
+                    {project.description}
+                  </Text>
+                ) : null}
+
+                {/* 工作区 / 仓库绑定胶囊 */}
+                <View style={styles.workspacesSection}>
+                  {primaryWorkspace ? (
+                    <View style={styles.workspaceRow}>
+                      <Ionicons
+                        name={
+                          primaryWorkspace.sourceType === "local_path"
+                            ? "folder-outline"
+                            : "git-branch-outline"
+                        }
+                        size={14}
+                        color={C.ink3}
+                      />
+                      <Text style={styles.workspacePath} numberOfLines={1}>
+                        {primaryWorkspace.sourceType === "local_path"
+                          ? `本地: ${primaryWorkspace.cwd ?? primaryWorkspace.name}`
+                          : `Git: ${primaryWorkspace.repoUrl ?? primaryWorkspace.name}`}
+                      </Text>
+                    </View>
+                  ) : project.codebase?.localFolder ? (
+                    <View style={styles.workspaceRow}>
+                      <Ionicons name="folder-outline" size={14} color={C.ink3} />
+                      <Text style={styles.workspacePath} numberOfLines={1}>
+                        本地: {project.codebase.localFolder}
+                      </Text>
+                    </View>
+                  ) : project.codebase?.repoUrl ? (
+                    <View style={styles.workspaceRow}>
+                      <Ionicons name="git-branch-outline" size={14} color={C.ink3} />
+                      <Text style={styles.workspacePath} numberOfLines={1}>
+                        Git: {project.codebase.repoUrl}
+                      </Text>
+                    </View>
+                  ) : (
+                    <View style={styles.workspaceRow}>
+                      <Ionicons name="document-text-outline" size={14} color={C.ink4} />
+                      <Text style={styles.workspaceMuted}>无代码库 (管理型项目)</Text>
+                    </View>
+                  )}
+
+                  {workspaces.length > 1 ? (
+                    <Text style={styles.moreWorkspaces}>
+                      +{workspaces.length - 1} 更多工作区
+                    </Text>
+                  ) : null}
+                </View>
+
+                {/* 关联目标 (Goals) */}
+                {project.goals && project.goals.length > 0 ? (
+                  <View style={styles.goalsWrap}>
+                    {project.goals.map((g) => (
+                      <View key={g.id} style={styles.goalTag}>
+                        <Text style={styles.goalIcon}>🎯</Text>
+                        <Text style={styles.goalText} numberOfLines={1}>
+                          {g.title}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+
+                {/* 底部元数据栏 */}
+                <View style={styles.cardFooter}>
+                  <View style={styles.metaLeft}>
+                    {project.taskCount !== undefined ? (
+                      <View style={styles.metaItem}>
+                        <Ionicons name="checkbox-outline" size={13} color={C.ink3} />
+                        <Text style={styles.metaText}>{project.taskCount} 个任务</Text>
+                      </View>
+                    ) : null}
+                    {project.targetDate ? (
+                      <View style={styles.metaItem}>
+                        <Ionicons name="calendar-outline" size={13} color={C.ink3} />
+                        <Text style={styles.metaText}>
+                          截止: {project.targetDate.slice(0, 10)}
+                        </Text>
+                      </View>
+                    ) : null}
+                  </View>
+
+                  <Ionicons
+                    name={isExpanded ? "chevron-up" : "chevron-down"}
+                    size={16}
+                    color={C.ink4}
+                  />
+                </View>
+
+                {/* 展开的详情面板 */}
+                {isExpanded ? (
+                  <View style={styles.expandedPanel}>
+                    <View style={styles.divider} />
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>项目 ID:</Text>
+                      <Text style={styles.detailValue} numberOfLines={1}>
+                        {project.id}
+                      </Text>
+                    </View>
+
+                    {workspaces.length > 0 ? (
+                      <View style={styles.detailBlock}>
+                        <Text style={styles.detailLabel}>工作区清单:</Text>
+                        {workspaces.map((ws, i) => (
+                          <View key={ws.id ?? i} style={styles.wsDetailItem}>
+                            <Text style={styles.wsDetailName}>
+                              {ws.name || `工作区 ${i + 1}`}
+                              {ws.isPrimary ? " (主)" : ""}
+                            </Text>
+                            <Text style={styles.wsDetailPath} numberOfLines={2}>
+                              {ws.sourceType === "local_path" ? ws.cwd : ws.repoUrl}
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    ) : null}
+
+                    {/* 操作动作按钮组 */}
+                    <View style={styles.actionButtonsRow}>
+                      {onOpenProjectTasks ? (
+                        <Pressable
+                          style={styles.actionBtnPrimary}
+                          onPress={() => onOpenProjectTasks(project)}
+                        >
+                          <Ionicons name="list" size={14} color="#FFF" />
+                          <Text style={styles.actionBtnTextPrimary}>查看关联任务</Text>
+                        </Pressable>
+                      ) : null}
+
+                      {onCreateTaskForProject ? (
+                        <Pressable
+                          style={styles.actionBtnSecondary}
+                          onPress={() => onCreateTaskForProject(project)}
+                        >
+                          <Ionicons name="add" size={14} color={C.accent} />
+                          <Text style={styles.actionBtnTextSecondary}>创建新任务</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  </View>
+                ) : null}
+              </AppCard>
+            );
+          })
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  screen: {
+    flex: 1,
+    backgroundColor: C.bg,
+  },
+  subtitle: {
+    fontSize: 12,
+    color: C.ink3,
+  },
+  refreshBtn: {
+    padding: 6,
+    borderRadius: RADIUS.sm,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+  },
+  webBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(94, 106, 210, 0.3)",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: RADIUS.sm,
+  },
+  webBtnText: {
+    fontSize: 11,
+    color: C.accent,
+    fontWeight: "500",
+  },
+  filterBar: {
+    backgroundColor: C.panel,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: C.line,
+  },
+  filterContent: {
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  filterChip: {
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 5,
+    borderRadius: RADIUS.pill,
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  filterChipActive: {
+    backgroundColor: "rgba(94, 106, 210, 0.15)",
+    borderColor: C.accent,
+  },
+  filterLabel: {
+    fontSize: 12,
+    color: C.ink3,
+    fontWeight: "500",
+  },
+  filterLabelActive: {
+    color: C.accent,
+  },
+  scroll: {
+    flex: 1,
+  },
+  content: {
+    padding: SPACING.lg,
+    gap: SPACING.md,
+  },
+  card: {
+    padding: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  cardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: SPACING.sm,
+  },
+  titleWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+    flex: 1,
+  },
+  colorDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 3,
+  },
+  projectName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: C.ink,
+    flex: 1,
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderRadius: RADIUS.pill,
+    borderWidth: 1,
+    backgroundColor: "rgba(255, 255, 255, 0.03)",
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  description: {
+    fontSize: 13,
+    lineHeight: 18,
+    color: C.ink2,
+  },
+  workspacesSection: {
+    marginTop: 2,
+    gap: 4,
+  },
+  workspaceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: RADIUS.sm,
+  },
+  workspacePath: {
+    fontSize: 12,
+    color: C.ink2,
+    fontFamily: "monospace",
+    flex: 1,
+  },
+  workspaceMuted: {
+    fontSize: 12,
+    color: C.ink4,
+  },
+  moreWorkspaces: {
+    fontSize: 11,
+    color: C.ink4,
+    marginLeft: 6,
+  },
+  goalsWrap: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginTop: 2,
+  },
+  goalTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderRadius: RADIUS.sm,
+    paddingHorizontal: 7,
+    paddingVertical: 3,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  goalIcon: {
+    fontSize: 10,
+  },
+  goalText: {
+    fontSize: 11,
+    color: C.ink2,
+    maxWidth: 180,
+  },
+  cardFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 4,
+  },
+  metaLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.md,
+  },
+  metaItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  metaText: {
+    fontSize: 12,
+    color: C.ink3,
+  },
+  expandedPanel: {
+    marginTop: SPACING.sm,
+    gap: SPACING.sm,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: C.line,
+    marginVertical: 4,
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  detailLabel: {
+    fontSize: 11,
+    color: C.ink4,
+  },
+  detailValue: {
+    fontSize: 11,
+    color: C.ink3,
+    fontFamily: "monospace",
+    flex: 1,
+  },
+  detailBlock: {
+    gap: 4,
+    backgroundColor: "rgba(0, 0, 0, 0.2)",
+    padding: 8,
+    borderRadius: RADIUS.sm,
+  },
+  wsDetailItem: {
+    gap: 2,
+    marginTop: 2,
+  },
+  wsDetailName: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: C.ink2,
+  },
+  wsDetailPath: {
+    fontSize: 11,
+    color: C.ink3,
+    fontFamily: "monospace",
+  },
+  actionButtonsRow: {
+    flexDirection: "row",
+    gap: SPACING.sm,
+    marginTop: SPACING.sm,
+  },
+  actionBtnPrimary: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: C.accent,
+    borderRadius: RADIUS.sm,
+    paddingVertical: 8,
+  },
+  actionBtnTextPrimary: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: "#FFFFFF",
+  },
+  actionBtnSecondary: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
+    borderWidth: 1,
+    borderColor: "rgba(94, 106, 210, 0.3)",
+    borderRadius: RADIUS.sm,
+    paddingVertical: 8,
+  },
+  actionBtnTextSecondary: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: C.accent,
+  },
+});

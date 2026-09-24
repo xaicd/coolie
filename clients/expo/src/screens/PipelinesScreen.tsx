@@ -28,9 +28,11 @@ import { ScreenHeader } from "../ui/ScreenHeader";
 export function PipelinesScreen({
   company,
   onBack,
+  onOpenWeb: onOpenWebProp,
 }: {
   company: Company;
   onBack: () => void;
+  onOpenWeb?: (path: string, title?: string) => void;
 }) {
   const [rows, setRows] = useState<PipelineListRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,11 +54,18 @@ export function PipelinesScreen({
     void load();
   }, [load]);
 
-  const openWeb = useCallback((path: string, failTitle: string) => {
-    void Linking.openURL(`${COOLIE_BASE_URL}${path}`).catch(() => {
-      Alert.alert(failTitle, "请在浏览器里打开 Coolie Web 查看该 pipeline。");
-    });
-  }, []);
+  const openWeb = useCallback(
+    (path: string, failTitle: string) => {
+      if (onOpenWebProp) {
+        onOpenWebProp(path, "流水线编辑器");
+      } else {
+        void Linking.openURL(`${COOLIE_BASE_URL}${path}`).catch(() => {
+          Alert.alert(failTitle, "请在浏览器里打开 Coolie Web 查看该 pipeline。");
+        });
+      }
+    },
+    [onOpenWebProp],
+  );
 
   return (
     <View style={styles.screen}>

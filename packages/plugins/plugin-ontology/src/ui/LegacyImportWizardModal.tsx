@@ -125,15 +125,19 @@ export function LegacyImportWizardModal({
   companyId,
   onClose,
   onPublished,
+  initialParsed = null,
+  initialStep = 1,
 }: {
   companyId: string;
   onClose: () => void;
   /** Called with the new domain id when the wizard reaches the end of
    *  Step 4 successfully. The host typically selects the new domain. */
   onPublished: (newDomainId: string) => void;
+  initialParsed?: ParsedSource | null;
+  initialStep?: WizardStep;
 }): ReactElement {
-  const [step, setStep] = useState<WizardStep>(1);
-  const [parsed, setParsed] = useState<ParsedSource | null>(null);
+  const [step, setStep] = useState<WizardStep>(initialStep);
+  const [parsed, setParsed] = useState<ParsedSource | null>(initialParsed);
 
   // Close on Escape (Steps 1-3 — Step 4 is locked once publishing starts).
   useEffect(() => {

@@ -6,8 +6,12 @@ import {
   type AgentIdentity,
   type Company,
   type Issue,
+  type OntologyDomain,
+  type Project,
   type SessionUser,
 } from "@coolie/api-client";
+
+export type { Project };
 
 // ── Linear 设计系统色彩令牌 ─────────────────────────────────────────
 // 单一来源在 src/theme.ts (与 Coolie Web 对齐); 这里再导出, 让 30+ 个
@@ -444,6 +448,36 @@ export class CoolieClient extends BaseCoolieClient {
    */
   seedDomainSamples(companyId: string, domainId: string) {
     return super.seedDomainSamples(companyId, domainId);
+  }
+
+  /**
+   * POST /api/plugins/paperclipai.plugin-ontology/actions/create-domain
+   *
+   * 新建本体域，支持关联文件夹目录/代码工程路径。
+   */
+  async createOntologyDomain(
+    companyId: string,
+    params: {
+      slug: string;
+      displayName: string;
+      description?: string;
+      category?: string;
+      metadata?: Record<string, unknown>;
+    },
+  ): Promise<OntologyDomain> {
+    const res = await this.request<{ data?: { domain?: OntologyDomain }; domain?: OntologyDomain }>(
+      "POST",
+      "/api/plugins/paperclipai.plugin-ontology/actions/create-domain",
+      {
+        companyId,
+        ...params,
+      },
+    );
+    const domain = res.data?.domain ?? res.domain;
+    if (!domain) {
+      throw new Error("创建本体域失败: 服务端未返回有效域对象");
+    }
+    return domain;
   }
 
   /**

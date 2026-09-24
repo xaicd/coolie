@@ -35,6 +35,7 @@ interface DashboardScreenProps {
   onBack?: () => void;
   onOpenApprovals?: () => void;
   onOpenApproval?: (approvalId: string) => void;
+  onOpenProjects?: () => void;
 }
 
 /**
@@ -49,6 +50,7 @@ export function DashboardScreen({
   onBack,
   onOpenSettings,
   onOpenApprovals,
+  onOpenProjects,
 }: DashboardScreenProps) {
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -211,6 +213,27 @@ export function DashboardScreen({
             style={styles.gridTile}
           />
         </Pressable>
+
+        {/* 项目中心快捷入口卡片 */}
+        {onOpenProjects ? (
+          <AppCard onPress={onOpenProjects} style={styles.projectCard}>
+            <View style={styles.projectCardLeft}>
+              <View style={styles.projectIconWrap}>
+                <Ionicons name="folder" size={18} color={C.accent} />
+              </View>
+              <View style={styles.projectTextWrap}>
+                <Text style={styles.projectTitle}>项目中心</Text>
+                <Text style={styles.projectSubtitle}>
+                  查看当前企业工作区代码库、目标及任务全貌
+                </Text>
+              </View>
+            </View>
+            <View style={styles.projectCardRight}>
+              <Text style={styles.projectActionText}>进入</Text>
+              <Ionicons name="chevron-forward" size={15} color={C.accent} />
+            </View>
+          </AppCard>
+        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -303,5 +326,51 @@ const styles = StyleSheet.create({
   errorRetryCentered: {
     flex: 0,
     padding: 0,
+  },
+  projectCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 14,
+    marginTop: 4,
+  },
+  projectCardLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    flex: 1,
+  },
+  projectIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  projectTextWrap: {
+    flex: 1,
+    gap: 2,
+  },
+  projectTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  projectSubtitle: {
+    fontSize: 12,
+    color: C.ink3,
+    lineHeight: 16,
+  },
+  projectCardRight: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingLeft: 8,
+  },
+  projectActionText: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: C.accent,
   },
 });

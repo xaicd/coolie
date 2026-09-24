@@ -4,15 +4,18 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import * as DocumentPicker from "expo-document-picker";
 import type {
   Company,
   OntologyDomain,
@@ -37,6 +40,7 @@ interface OntologyDomainListScreenProps {
   company: Company;
   whoami?: string;
   onBack?: () => void;
+  onOpenWebOntology?: () => void;
 }
 
 const LIFECYCLE_CONFIG: Record<
@@ -88,6 +92,7 @@ export function OntologyDomainListScreen({
   whoami = "管理员",
   onBack,
   onOpenSettings,
+  onOpenWebOntology,
 }: OntologyDomainListScreenProps) {
   const [domains, setDomains] = useState<OntologyDomain[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,6 +102,15 @@ export function OntologyDomainListScreen({
   const [viewMode, setViewMode] = useState<OntologyViewMode>("list");
   const [seedingSample, setSeedingSample] = useState(false);
   const [selectedNodeTypeKey, setSelectedNodeTypeKey] = useState<string | null>(null);
+
+  // 新建本体域弹层状态
+  const [newDomainModalOpen, setNewDomainModalOpen] = useState(false);
+  const [newDomainMode, setNewDomainMode] = useState<"directory" | "manual">("directory");
+  const [newDomainDisplayName, setNewDomainDisplayName] = useState("");
+  const [newDomainSlug, setNewDomainSlug] = useState("");
+  const [newDomainDescription, setNewDomainDescription] = useState("");
+  const [newDomainDirectoryPath, setNewDomainDirectoryPath] = useState("");
+  const [creatingDomain, setCreatingDomain] = useState(false);
 
   // 快照详情视图
   const [selectedDomain, setSelectedDomain] = useState<OntologyDomain | null>(null);
@@ -177,6 +191,74 @@ export function OntologyDomainListScreen({
     },
     [companyId],
   );
+
+  const handlePickDirectoryFile = useCallback(async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: "*/*",
+        copyToCacheDirectory: false,
+      });
+      if (res.canceled) return;
+      const asset = res.assets[0];
+      if (asset) {
+        const path = asset.uri.replace(/^file:\/\//, "");
+        const dir = path.substring(0, path.lastIndexOf("/")) || asset.name;
+        setNewDomainDirectoryPath(dir);
+        if (!newDomainDisplayName) {
+          const namePart = asset.name.split(".")[0];
+          setNewDomainDisplayName(namePart);
+          setNewDomainSlug(namePart.toLowerCase().replace(/[^a-z0-9_-]/g, "_"));
+        }
+      }
+    } catch (e) {
+      Alert.alert("选择失败", String((e as Error)?.message ?? e));
+    }
+  }, [newDomainDisplayName]);
+
+  const handleCreateDomain = useCallback(async () => {
+    if (!newDomainDisplayName.trim() || !newDomainSlug.trim()) {
+      Alert.alert("请填写完整", "本体域名称与标识 (Slug) 为必填项");
+      return;
+    }
+    setCreatingDomain(true);
+    try {
+      const created = await coolie.createOntologyDomain(companyId, {
+        displayName: newDomainDisplayName.trim(),
+        slug: newDomainSlug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_"),
+        description: newDomainDescription.trim() || undefined,
+        category: newDomainDirectoryPath.trim() ? "legacy-system" : "custom",
+        metadata: newDomainDirectoryPath.trim()
+          ? {
+              sourceDirectory: newDomainDirectoryPath.trim(),
+              pipelineMode: "virtualization",
+            }
+          : undefined,
+      });
+      setNewDomainModalOpen(false);
+      setNewDomainDisplayName("");
+      setNewDomainSlug("");
+      setNewDomainDescription("");
+      setNewDomainDirectoryPath("");
+      await loadDomains();
+      Alert.alert(
+        "创建成功",
+        `业务本体域「${created.display_name || created.displayName || created.slug}」已成功创建`,
+      );
+      void openDomainDetail(created);
+    } catch (e) {
+      Alert.alert("创建失败", String((e as Error)?.message ?? e));
+    } finally {
+      setCreatingDomain(false);
+    }
+  }, [
+    companyId,
+    newDomainDisplayName,
+    newDomainSlug,
+    newDomainDescription,
+    newDomainDirectoryPath,
+    loadDomains,
+    openDomainDetail,
+  ]);
 
   // 一键注入官方示例本体域:骨架接口只建域,实例节点/边要逐个域补种
   const handleSeedSample = useCallback(async () => {
@@ -826,11 +908,41 @@ export function OntologyDomainListScreen({
           }
           right={
             <>
+              {onOpenWebOntology ? (
+                <Pressable
+                  onPress={onOpenWebOntology}
+                  hitSlop={12}
+                  style={[
+                    styles.refreshBtn,
+                    {
+                      flexDirection: "row",
+                      alignItems: "center",
+                      gap: 4,
+                      backgroundColor: "rgba(94, 106, 210, 0.12)",
+                      borderColor: "rgba(94, 106, 210, 0.3)",
+                    },
+                  ]}
+                  accessibilityLabel="打开 Web 端可视化图谱"
+                >
+                  <Ionicons name="open-outline" size={13} color={C.accent} />
+                  <Text style={{ color: C.accent, fontSize: 12, fontWeight: "500" }}>Web图谱</Text>
+                </Pressable>
+              ) : null}
               {onOpenSettings ? (
                 <Pressable onPress={onOpenSettings} hitSlop={12} style={styles.refreshBtn}>
                   <Ionicons name="settings-outline" size={17} color={C.ink3} />
                 </Pressable>
               ) : null}
+              <Pressable
+                onPress={() => setNewDomainModalOpen(true)}
+                hitSlop={12}
+                style={[
+                  styles.refreshBtn,
+                  { backgroundColor: C.accent, borderColor: C.accent },
+                ]}
+              >
+                <Text style={{ color: "#FFFFFF", fontSize: 12, fontWeight: "600" }}>+ 新建</Text>
+              </Pressable>
               <Pressable
                 onPress={handleSeedSample}
                 disabled={seedingSample}
@@ -884,21 +996,39 @@ export function OntologyDomainListScreen({
           }
           action={
             domains.length === 0 ? (
-              <Pressable
-                style={[
-                  styles.refreshBtn,
-                  styles.seedBtn,
-                  { marginTop: 12, paddingHorizontal: 16, paddingVertical: 10 },
-                ]}
-                disabled={seedingSample}
-                onPress={() => void handleSeedSample()}
-              >
-                {seedingSample ? (
-                  <ActivityIndicator size="small" color={C.accent} />
-                ) : (
-                  <Text style={[styles.seedBtnText, { fontSize: 14 }]}>✨ 注入示例域</Text>
-                )}
-              </Pressable>
+              <View style={{ flexDirection: "row", gap: 10, marginTop: 12 }}>
+                <Pressable
+                  style={[
+                    styles.refreshBtn,
+                    {
+                      backgroundColor: C.accent,
+                      borderColor: C.accent,
+                      paddingHorizontal: 16,
+                      paddingVertical: 10,
+                    },
+                  ]}
+                  onPress={() => setNewDomainModalOpen(true)}
+                >
+                  <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "600" }}>
+                    + 新建本体
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.refreshBtn,
+                    styles.seedBtn,
+                    { paddingHorizontal: 16, paddingVertical: 10 },
+                  ]}
+                  disabled={seedingSample}
+                  onPress={() => void handleSeedSample()}
+                >
+                  {seedingSample ? (
+                    <ActivityIndicator size="small" color={C.accent} />
+                  ) : (
+                    <Text style={[styles.seedBtnText, { fontSize: 14 }]}>✨ 注入示例域</Text>
+                  )}
+                </Pressable>
+              </View>
             ) : (
               <Pressable
                 style={[styles.refreshBtn, { marginTop: 12 }]}
@@ -1000,6 +1130,158 @@ export function OntologyDomainListScreen({
           }}
         />
       )}
+
+      {/* 新建本体域弹层 (支持文件夹目录接入 / 手动创建) */}
+      <Modal
+        visible={newDomainModalOpen}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setNewDomainModalOpen(false)}
+      >
+        <Pressable
+          style={styles.modalBackdrop}
+          onPress={() => setNewDomainModalOpen(false)}
+        >
+          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>新建业务本体</Text>
+              <Pressable onPress={() => setNewDomainModalOpen(false)} hitSlop={8}>
+                <Ionicons name="close" size={20} color={C.ink3} />
+              </Pressable>
+            </View>
+
+            {/* 模式切换 */}
+            <View style={styles.modalTabRow}>
+              <Pressable
+                style={[
+                  styles.modalTabBtn,
+                  newDomainMode === "directory" && styles.modalTabBtnActive,
+                ]}
+                onPress={() => setNewDomainMode("directory")}
+              >
+                <Text
+                  style={[
+                    styles.modalTabBtnText,
+                    newDomainMode === "directory" && styles.modalTabBtnTextActive,
+                  ]}
+                >
+                  📁 文件夹目录接入
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.modalTabBtn,
+                  newDomainMode === "manual" && styles.modalTabBtnActive,
+                ]}
+                onPress={() => setNewDomainMode("manual")}
+              >
+                <Text
+                  style={[
+                    styles.modalTabBtnText,
+                    newDomainMode === "manual" && styles.modalTabBtnTextActive,
+                  ]}
+                >
+                  ✏️ 空白手动定义
+                </Text>
+              </Pressable>
+            </View>
+
+            <ScrollView style={{ maxHeight: 380 }} keyboardShouldPersistTaps="handled">
+              {newDomainMode === "directory" ? (
+                <View style={styles.dirSelectBox}>
+                  <Text style={styles.fieldLabel}>代码工程 / 文件夹目录</Text>
+                  <View style={styles.dirInputRow}>
+                    <TextInput
+                      style={[styles.input, { flex: 1 }]}
+                      placeholder="如 /workspace/orders 或选取工程文件"
+                      placeholderTextColor={C.ink4}
+                      value={newDomainDirectoryPath}
+                      onChangeText={setNewDomainDirectoryPath}
+                    />
+                    <Pressable
+                      style={styles.dirBrowseBtn}
+                      onPress={() => void handlePickDirectoryFile()}
+                    >
+                      <Ionicons name="folder-open-outline" size={16} color={C.ink} />
+                      <Text style={styles.dirBrowseText}>选择</Text>
+                    </Pressable>
+                  </View>
+                  <Text style={styles.fieldTip}>
+                    支持 Java/Spring Boot、.proto、SQL DDL、TS/JS 等工程目录，自动分析实体与架构。
+                  </Text>
+                </View>
+              ) : null}
+
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>显示名称 *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="如：订单核心系统、电商交易域"
+                  placeholderTextColor={C.ink4}
+                  value={newDomainDisplayName}
+                  onChangeText={(val) => {
+                    setNewDomainDisplayName(val);
+                    if (!newDomainSlug) {
+                      setNewDomainSlug(val.toLowerCase().replace(/[^a-z0-9_-]/g, "_"));
+                    }
+                  }}
+                />
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>标识 (Slug) *</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="如：orders, trade_center"
+                  placeholderTextColor={C.ink4}
+                  value={newDomainSlug}
+                  onChangeText={setNewDomainSlug}
+                  autoCapitalize="none"
+                />
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={styles.fieldLabel}>业务描述 (可选)</Text>
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  placeholder="例：涵盖账户、交易订单、履约配送三类实体模型与关系"
+                  placeholderTextColor={C.ink4}
+                  value={newDomainDescription}
+                  onChangeText={setNewDomainDescription}
+                  multiline
+                  numberOfLines={3}
+                />
+              </View>
+            </ScrollView>
+
+            <View style={styles.modalFooter}>
+              <Pressable
+                style={styles.cancelBtn}
+                onPress={() => setNewDomainModalOpen(false)}
+              >
+                <Text style={styles.cancelBtnText}>取消</Text>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.confirmBtn,
+                  (!newDomainDisplayName.trim() || !newDomainSlug.trim() || creatingDomain) &&
+                    styles.btnDisabled,
+                ]}
+                disabled={!newDomainDisplayName.trim() || !newDomainSlug.trim() || creatingDomain}
+                onPress={() => void handleCreateDomain()}
+              >
+                {creatingDomain ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.confirmBtnText}>
+                    {newDomainMode === "directory" ? "创建并接入" : "创建本体"}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -1363,4 +1645,171 @@ const styles = StyleSheet.create({
   },
   schemaPropKey: { color: C.ink2, fontSize: 12, fontWeight: "600", flex: 1 },
   schemaPropType: { color: C.ink4, fontSize: 11 },
+
+  // ── 新建本体域弹层 (Modal) ──
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.7)",
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  modalCard: {
+    width: "100%",
+    maxWidth: 480,
+    backgroundColor: C.surface,
+    borderColor: C.line,
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 18,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.35,
+    shadowRadius: 16,
+    elevation: 8,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingBottom: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: C.lineSubtle,
+    marginBottom: 14,
+  },
+  modalTitle: {
+    color: C.ink,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  modalTabRow: {
+    flexDirection: "row",
+    backgroundColor: C.panel,
+    borderRadius: 8,
+    padding: 3,
+    marginBottom: 16,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+  },
+  modalTabBtn: {
+    flex: 1,
+    paddingVertical: 7,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 6,
+  },
+  modalTabBtnActive: {
+    backgroundColor: C.surfaceHover,
+  },
+  modalTabBtnText: {
+    color: C.ink3,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  modalTabBtnTextActive: {
+    color: C.ink,
+    fontWeight: "600",
+  },
+  dirSelectBox: {
+    backgroundColor: C.panel,
+    borderColor: C.lineSubtle,
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 14,
+  },
+  dirInputRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 6,
+  },
+  dirBrowseBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: C.surfaceHover,
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+  },
+  dirBrowseText: {
+    color: C.ink,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  fieldGroup: {
+    marginBottom: 14,
+  },
+  fieldLabel: {
+    color: C.ink2,
+    fontSize: 12,
+    fontWeight: "500",
+    marginBottom: 6,
+  },
+  fieldTip: {
+    color: C.ink4,
+    fontSize: 11,
+    lineHeight: 16,
+    marginTop: 6,
+  },
+  input: {
+    backgroundColor: C.panel,
+    borderColor: C.line,
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    color: C.ink,
+    fontSize: 13,
+  },
+  textArea: {
+    height: 64,
+    textAlignVertical: "top",
+    paddingTop: 8,
+  },
+  modalFooter: {
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    gap: 10,
+    marginTop: 16,
+    paddingTop: 14,
+    borderTopWidth: 1,
+    borderTopColor: C.lineSubtle,
+  },
+  cancelBtn: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  cancelBtnText: {
+    color: C.ink3,
+    fontSize: 13,
+    fontWeight: "500",
+  },
+  confirmBtn: {
+    backgroundColor: C.accent,
+    borderRadius: 8,
+    paddingHorizontal: 18,
+    paddingVertical: 9,
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 96,
+  },
+  confirmBtnText: {
+    color: "#FFFFFF",
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  btnDisabled: {
+    opacity: 0.5,
+  },
 });
+

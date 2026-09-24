@@ -276,10 +276,11 @@ export class CoolieClient {
   // --- tasks (issues) -----------------------------------------------------
   // Issues are company-scoped in the path. `/api/issues?companyId=…` does not
   // exist and answers 400 — this called it, so every task call used to fail.
-  async listIssues(companyId: string, opts?: { status?: string; limit?: number }): Promise<Issue[]> {
+  async listIssues(companyId: string, opts?: { status?: string; limit?: number; projectId?: string }): Promise<Issue[]> {
     const q = new URLSearchParams();
     if (opts?.status) q.set("status", opts.status);
     if (opts?.limit) q.set("limit", String(opts.limit));
+    if (opts?.projectId) q.set("projectId", opts.projectId);
     const suffix = q.size > 0 ? `?${q.toString()}` : "";
     const body = await this.request<{ issues?: Issue[] } | Issue[]>(
       "GET",
@@ -356,6 +357,17 @@ export class CoolieClient {
       `/api/companies/${encodeURIComponent(companyId)}/projects`,
     );
     return Array.isArray(body) ? body : (body.projects ?? []);
+  }
+
+  /**
+   * Single project details — `GET /api/projects/:id`.
+   */
+  async getProject(projectId: string, companyId?: string): Promise<Project> {
+    const suffix = companyId ? `?companyId=${encodeURIComponent(companyId)}` : "";
+    return this.request<Project>(
+      "GET",
+      `/api/projects/${encodeURIComponent(projectId)}${suffix}`,
+    );
   }
 
   /**
