@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.52
+
+> Released: 2026-09-24 · Android release APK
+
+### 更新
+
+- **wave75 生产 board chat 旧对话清理** (boss 26:39 OOB 「生产对话清理一下吧」): 老板装 0.5.51 后在工坊对话框看到旧历史 (含 'Paperclip' 旧自我称呼 + miniMax-M3 主动纠错回复). 这版清掉生产 server 上 `4cafeb9a-...` (xrobinai) 公司 created_at < 2026-09-22 的所有 board chat 评论 (软删保留 deleted_at + deleted_by_user_id audit) + chat_conversations 行. 备份在 `tc-coolie-claw:/tmp/board_chat_backup_20260924_*.sql`. 同时加了 server API `DELETE /api/board/chat/conversations?before=<ISO date>&companyId=<uuid>` (board actor 鉴权, 跟 wave59 PAPERCLIP_API_KEY 兼容) — 老板以后想再清可以走 API 或 `scripts/cleanup-board-chat-history.sh [BEFORE_DATE]`. 未改 issues / agents / users / companies, 未改 PAPERCLIP_API_KEY / PAPERCLIP_DEPLOYMENT_MODE.
+
+---
+
 ## v0.5.51
 
 > Released: 2026-09-24 · Android release APK

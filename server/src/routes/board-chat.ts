@@ -6,8 +6,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Db } from "@paperclipai/db";
 import type { DeploymentMode } from "@paperclipai/shared";
-import { companies, issueAttachments, issueComments, issues } from "@paperclipai/db";
-import { and, eq, inArray, isNull } from "drizzle-orm";
+import { companies, issueAttachments, issueComments, issues, chatConversations } from "@paperclipai/db";
+import { and, eq, inArray, isNull, lt } from "drizzle-orm";
 import { instanceSettingsService, issueService } from "../services/index.js";
 import { assertCompanyAccess, getActorInfo } from "./authz.js";
 import { loadAgentPersona } from "../services/role-template.js";
@@ -771,6 +771,97 @@ export function boardChatRoutes(
     res.json({
       ok: true,
       deletedCount: updated.length,
+    });
+  });
+
+  /**
+   * DELETE /board/chat/conversations?before=<ISO date>&companyId=<uuid>
+   *
+   * Coolie fork (wave75): 老板按 26:39 OOB "生产对话清理一下吧"
+   * 想在 server 端批量清理 board chat 历史 — UI 上一个一个 🗑️ 太多
+   * 历史时太慢, 给个 server endpoint 一次清 before 一个 cutoff 之前
+   * 的所有 board chat 评论 (软删保留 audit) + 删 chat_conversations 行。
+   *
+   * 鉴权: board actor (走 middleware 的 x-paperclip-api-key 升级, 跟 wave59
+   * PAPERCLIP_API_KEY 兼容), 必须 company 成员。
+   *
+   * Query params:
+   *   - before (required): ISO date / datetime, 比如 2026-09-22
+   *   - companyId (required): 限制在该公司范围内, 不传返 400
+   *
+   * Returns: { deleted_messages: N, deleted_conversations: M, cutoff: ISO }
+   */
+  router.delete("/board/chat/conversations", async (req, res) => {
+    const experimental = await instanceSettingsService(db).getExperimental();
+    if (experimental.enableConferenceRoomChat !== true) {
+      res.status(403).json({
+        error: "Conference Room Chat is not enabled",
+        code: "FEATURE_DISABLED",
+      });
+      return;
+    }
+
+    const before = typeof req.query.before === "string" ? req.query.before.trim() : "";
+    const companyIdRaw =
+      typeof req.query.companyId === "string" ? req.query.companyId : null;
+    if (!before || !companyIdRaw) {
+      res.status(400).json({
+        error: "before and companyId are required",
+      });
+      return;
+    }
+
+    const cutoff = new Date(before);
+    if (Number.isNaN(cutoff.getTime())) {
+      res.status(400).json({
+        error: "before must be a valid ISO date",
+      });
+      return;
+    }
+
+    // 必须有公司访问权 (会抛 403 给前端)
+    assertCompanyAccess(req, companyIdRaw);
+
+    const companyId = companyIdRaw;
+    const actor = getActorInfo(req);
+
+    // 软删: 保留 deleted_at / deleted_by_user_id audit, 不删行, 不动 issues
+    const softDeleted = await db
+      .update(issueComments)
+      .set({
+        deletedAt: new Date(),
+        deletedByType: actor.actorType === "agent" ? "agent" : "user",
+        deletedByUserId:
+          actor.actorType === "agent"
+            ? null
+            : actor.actorId ?? null,
+      })
+      .where(
+        and(
+          eq(issueComments.companyId, companyId),
+          isNull(issueComments.deletedAt),
+          lt(issueComments.createdAt, cutoff),
+        ),
+      )
+      .returning({ id: issueComments.id });
+
+    // 硬删 chat_conversations 行: 这是 endpoint 映射, 本身没什么 audit 价值,
+    // 老板在 concierge surface 看不到这些 chat (外键不会显示已 endpoint_removed 的 conversation)
+    const hardDeleted = await db
+      .delete(chatConversations)
+      .where(
+        and(
+          eq(chatConversations.companyId, companyId),
+          lt(chatConversations.createdAt, cutoff),
+        ),
+      )
+      .returning({ id: chatConversations.id });
+
+    res.json({
+      ok: true,
+      deleted_messages: softDeleted.length,
+      deleted_conversations: hardDeleted.length,
+      cutoff: cutoff.toISOString(),
     });
   });
 
