@@ -18,6 +18,7 @@ import { WebView, type WebViewNavigation } from "react-native-webview";
 import { C } from "../theme";
 import { COOLIE_WEB_URL } from "../utils/openCoolieWeb";
 import { RADIUS, SPACING } from "../ui/tokens";
+import { CoolieLogo } from "../components/CoolieLogo";
 
 type WebViewLike = React.ComponentType<any>;
 const SafeWebView = WebView as unknown as WebViewLike;
@@ -152,9 +153,12 @@ export function WebContainerScreen({
         </View>
 
         <View style={styles.titleWrap}>
-          <Text style={styles.headerTitle} numberOfLines={1}>
-            {pageTitle}
-          </Text>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5 }}>
+            <CoolieLogo size={15} />
+            <Text style={styles.headerTitle} numberOfLines={1}>
+              {pageTitle}
+            </Text>
+          </View>
           <Text style={styles.headerSubtitle} numberOfLines={1}>
             {currentUrl ? currentUrl.replace(/^https?:\/\//, "") : "xrobinai.cn/XROA"}
           </Text>

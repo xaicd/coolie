@@ -66,6 +66,7 @@ import { GitCredentialsScreen } from "./src/screens/GitCredentialsScreen";
 import { ProjectsScreen } from "./src/screens/ProjectsScreen";
 import { WebContainerScreen } from "./src/screens/WebContainerScreen";
 import { WorkspaceGitToggle } from "./src/components/WorkspaceGitToggle";
+import { CoolieLogo } from "./src/components/CoolieLogo";
 import { useNotificationsStore } from "./src/stores/notifications";
 import { BoardChatScreen, exportBoardEcho, exportBoardPrompt } from "./src/screens/BoardChatScreen";
 import { AgentsScreen } from "./src/screens/AgentsScreen";
@@ -498,6 +499,7 @@ function SignInScreen({
   return (
     <Surface>
       <View style={styles.hero}>
+        <CoolieLogo size={52} style={{ marginBottom: 12 }} />
         <Text style={styles.brandBig}>Coolie</Text>
         <Text style={styles.tagline}>把 AI 智能体当成一支团队来管理</Text>
       </View>

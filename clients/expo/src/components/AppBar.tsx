@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { C } from "../theme";
 import { openCoolieWeb } from "../utils/openCoolieWeb";
 import { CoolieWebFallback } from "./CoolieWebFallback";
+import { CoolieLogo } from "./CoolieLogo";
 
 /**
  * 全局顶栏 — 对齐 Coolie Web (clients/expo-paperclip-web) 的原生 appBar:
@@ -71,10 +72,13 @@ export function AppBar({
           ) : null}
         </View>
 
-        {/* wave73 — 中间标题保留 (boss 26:35 「顶部中间标题留着」) */}
-        <Text style={styles.title} numberOfLines={1}>
-          Coolie工坊
-        </Text>
+        {/* wave73 — 中间标题保留并增加品牌 Logo 标识 */}
+        <View style={styles.titleContainer}>
+          <CoolieLogo size={20} style={styles.titleLogo} />
+          <Text style={styles.title} numberOfLines={1}>
+            Coolie工坊
+          </Text>
+        </View>
 
         <View style={[styles.side, styles.sideRight]}>
           <Pressable
@@ -147,14 +151,21 @@ const styles = StyleSheet.create({
     fontWeight: "700",
     fontVariant: ["tabular-nums"],
   },
-  // wave73 — 标题样式 (boss 26:35 「顶部中间标题留着」)
-  title: {
+  titleContainer: {
     flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+  },
+  titleLogo: {
+    borderRadius: 4,
+  },
+  title: {
     color: C.ink,
     fontSize: 17,
     fontWeight: "700",
     letterSpacing: 0.2,
-    textAlign: "center",
   },
   webBtn: {
     height: 32,

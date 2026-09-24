@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { Company, DashboardSummary } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
+import { CoolieLogo } from "../components/CoolieLogo";
 import { useOTA } from "../OTA";
 import { AppCard } from "../ui/AppCard";
 import { ErrorRetry } from "../ui/ErrorRetry";
@@ -188,7 +189,8 @@ export function DashboardScreen({
           backLabel="任务"
           subtitle={
             <View style={styles.companyCapsule}>
-              <StatusDot status="ok" size={6} />
+              <CoolieLogo size={14} style={{ marginRight: 2 }} />
+              <StatusDot status="ok" size={5} />
               <Text style={styles.companyCapsuleText} numberOfLines={1}>
                 {company.name}
               </Text>
