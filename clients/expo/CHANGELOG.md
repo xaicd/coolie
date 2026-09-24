@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.53
+
+> Released: 2026-09-24 · Android release APK
+
+### 更新
+
+- wave76 删 AppBar 中间右侧设置齿轮图标 (boss 26:42 OOB 「首页 顶部 中间的设置按钮去掉」), 保留中间标题 Coolie工坊 + 通知 + 搜索 + 驾驶舱Web
+
+---
+
 ## v0.5.52
 
 > Released: 2026-09-24 · Android release APK
