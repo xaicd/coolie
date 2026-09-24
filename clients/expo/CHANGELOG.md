@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.51
+
+> Released: 2026-09-24 · Android release APK
+
+### 更新
+
+- wave73 UI 文字精简: 保留 AppBar 中间标题 Coolie工坊 (boss 26:35), 删 ChatHeader 工坊标题 + 对话气泡 Coolie 智能体工坊 董事长助理 (boss 26:35), 删 底部驱动 5 角色员工 (boss 26:32)
+
+---
+
 ## v0.5.50
 
 > Released: 2026-09-24 · Android release APK
