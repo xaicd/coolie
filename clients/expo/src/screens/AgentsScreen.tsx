@@ -8,7 +8,6 @@ import {
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -52,7 +51,7 @@ const STATUS_DOT: Record<string, "ok" | "idle" | "err"> = {
   error: "err",
 };
 
-/** 员工详情浮层：改状态(启停)、改头衔、看 token 用量、看技能/配置、看最近任务 */
+/** 员工详情浮层：改状态(启停)、看 token 用量、看技能/配置、看最近任务 */
 function AgentDetailSheet({
   companyId,
   agent,
@@ -68,7 +67,6 @@ function AgentDetailSheet({
   onChanged: () => void;
   onOpenIssue?: (issue: Issue) => void;
 }) {
-  const [title, setTitle] = useState(agent.title ?? "");
   const [busy, setBusy] = useState(false);
 
   const [skills, setSkills] = useState<AgentSkillsSnapshot | null>(null);
@@ -152,18 +150,6 @@ function AgentDetailSheet({
     [agent.id, agent.name, onChanged],
   );
 
-  const saveTitle = useCallback(async () => {
-    setBusy(true);
-    try {
-      await coolie.updateAgent(agent.id, { title: title.trim() || null });
-      onChanged();
-    } catch (e) {
-      Alert.alert("保存失败", String((e as Error)?.message ?? e));
-    } finally {
-      setBusy(false);
-    }
-  }, [agent.id, title, onChanged]);
-
   return (
     <Sheet onClose={onClose} maxHeight={540} contentStyle={{ gap: 0 }}>
       <ScrollView
@@ -178,6 +164,8 @@ function AgentDetailSheet({
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.name}>{agent.name}</Text>
+            {/* wave65 — boss 25:00 '工坊 5 角色员工 描述都去掉'.
+                不再渲染 agent.title 长描述; 只显示状态 + 适配器 + 短角色标签. */}
             <Text style={styles.meta}>
               {STATUS_LABEL[agent.status] ?? agent.status}
               {agent.adapterType ? ` · ${agent.adapterType}` : ""}
@@ -227,6 +215,8 @@ function AgentDetailSheet({
                 label="适配器"
                 value={config?.adapterType || agent.adapterType || "通用"}
               />
+              {/* wave65 — boss 25:00 '工坊 5 角色员工 描述都去掉'.
+                  不再渲染 agent.title 行; 适配器 + 心跳 + 技能 三行已足够. */}
               <View style={styles.infoPropRow}>
                 <Text style={styles.infoPropLabel}>心跳状态</Text>
                 <View style={styles.rowAlignCenter}>
@@ -296,23 +286,8 @@ function AgentDetailSheet({
           )}
         </View>
 
-        <Text style={styles.sectionLabel}>头衔 / 职责</Text>
-        <View style={styles.inputRow}>
-          <TextInput
-            style={styles.input}
-            placeholder="如: 全栈工匠"
-            placeholderTextColor={C.ink3}
-            value={title}
-            onChangeText={setTitle}
-          />
-          <Pressable
-            style={[styles.saveBtn, busy && styles.btnDisabled]}
-            disabled={busy}
-            onPress={saveTitle}
-          >
-            <Text style={styles.saveBtnText}>保存</Text>
-          </Pressable>
-        </View>
+        {/* wave65 — boss 25:00 '工坊 5 角色员工 描述都去掉'.
+            整段 '头衔 / 职责' 输入框 (title) 删除 — agents.title 不再展示/编辑. */}
 
         <Text style={styles.sectionLabel}>运行状态</Text>
         <View style={styles.statusRow}>
@@ -491,11 +466,8 @@ export function AgentsScreen({
                     <Text style={styles.name} numberOfLines={1}>
                       {item.name}
                     </Text>
-                    {item.title ? (
-                      <Text style={styles.titleTag} numberOfLines={1}>
-                        {item.title}
-                      </Text>
-                    ) : null}
+                    {/* wave65 — boss 25:00 '工坊 5 角色员工 描述都去掉'.
+                        不再渲染 item.title 长描述; 只显示名字 + 状态 + 适配器. */}
                   </View>
                   <Text style={styles.meta} numberOfLines={1}>
                     {STATUS_LABEL[item.status] ?? item.status}

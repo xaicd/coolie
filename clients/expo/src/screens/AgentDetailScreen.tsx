@@ -186,7 +186,7 @@ export function AgentDetailScreen({
             <Text style={styles.name}>{agent.name}</Text>
             <Text style={styles.headMeta}>
               {STATUS_LABEL[agent.status] ?? agent.status}
-              {agent.title ? ` · ${agent.title}` : ""}
+              {/* wave65 — boss 25:00 '工坊 5 角色员工 描述都去掉' — 不再渲染 title. */}
             </Text>
           </View>
           <StatusDot status={STATUS_DOT[agent.status] ?? "idle"} size={9} pulse={agent.status === "active"} />
@@ -194,7 +194,7 @@ export function AgentDetailScreen({
 
         <AppCard padding={16} style={styles.card}>
           <KeyValueRow label="角色 (role)" value={agent.role || "general"} />
-          <KeyValueRow label="头衔" value={agent.title || "未设置"} />
+          {/* wave65 — boss 25:00 '工坊 5 角色员工 描述都去掉' — 删除 '头衔' 行. */}
           <KeyValueRow label="适配器 / 模型" value={readModel(config, agent)} />
           <KeyValueRow label="运行状态" value={STATUS_LABEL[agent.status] ?? agent.status} />
         </AppCard>

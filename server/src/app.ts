@@ -122,6 +122,7 @@ import {
 import { adapterRoutes } from "./routes/adapters.js";
 import { managedAgentProfileRoutes } from "./routes/managed-agent-profiles.js";
 import { remoteAgentProfileRoutes } from "./routes/remote-agent-profiles.js";
+import { tasksHostPreviewRoutes } from "./routes/tasks-host-preview.js";
 import { pluginUiStaticRoutes } from "./routes/plugin-ui-static.js";
 import { injectCloudUiSnippet } from "./cloud-ui-snippet.js";
 import { readBrandedStaticIndexHtml } from "./static-index-html.js";
@@ -922,6 +923,11 @@ export async function createApp(
     approveToolActionRequest: (input) => toolGateway.approveActionRequest(input),
     declineToolActionRequest: (input) => toolGateway.declineActionRequest(input),
   }));
+  // wave65 — boss 09-23 24:38 '学 DS host preview' 续.
+  // /api/tasks/host-preview/<sessionId>/ 同源代理; 见 routes/tasks-host-preview.ts.
+  // 显式挂在 /tasks/host-preview 子路径上, 避免被 issueRoutes 的 path-to-regexp
+  // 当作普通 issue id 截走; router 内部 regex 仅匹配 /<sessionId>... 单段前缀.
+  api.use("/tasks/host-preview", tasksHostPreviewRoutes(db));
   app.locals.toolGateway = toolGateway;
   app.locals.toolActionDeliveries = toolActionDeliveries;
   app.use(mcpGatewayProtocolRoutes(toolGateway));

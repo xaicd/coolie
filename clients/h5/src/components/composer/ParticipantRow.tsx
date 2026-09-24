@@ -46,7 +46,9 @@ export function ParticipantRow({
             label={agent.name}
             active={value === agent.id}
             onClick={() => onChange(agent.id)}
-            title={agent.title ?? agent.role ?? agent.name}
+            /* wave65 — boss 25:00 '工坊 5 角色员工 描述都去掉'.
+                复核/审批/守望 agent 选 chip 不再展示长 title. */
+            title={agent.role ?? agent.name}
           />
         ))}
       </div>
@@ -94,7 +96,7 @@ export function WatchdogRow({
               label={agent.name}
               active={agentId === agent.id}
               onClick={() => onAgentChange(agent.id)}
-              title={agent.title ?? agent.role ?? agent.name}
+              title={agent.role ?? agent.name}
             />
           ))}
         </div>

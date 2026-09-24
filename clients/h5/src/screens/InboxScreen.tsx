@@ -13,7 +13,7 @@
  * 公司取 `coolie.listCompanies()` 的第一家 (h5 暂无公司选择器, 与 TasksScreen 同)。
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Agent, Company, Issue, Project } from "@coolie/api-client";
 import { coolie } from "../coolie";
@@ -346,6 +346,8 @@ export function InboxScreen({
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [blockedGroupBy, setBlockedGroupBy] = useState<BlockedGroupBy>("blocker_type");
   const [blockedSortBy, setBlockedSortBy] = useState<BlockedSort>("urgency");
+  // wave65 — 防止旧公司/旧 tab 的请求回调 setState 覆盖新数据
+  const loadReqIdRef = useRef(0);
 
   useEffect(() => {
     void (async () => {
@@ -367,23 +369,36 @@ export function InboxScreen({
   const load = useCallback(async () => {
     if (!company) return;
     setError(null);
-    try {
-      const [nextIssues, feed, nextAgents, nextProjects] = await Promise.all([
-        coolie.listIssues(company.id, { limit: 200 }),
-        coolie.getInbox(company.id),
-        coolie.listAgents(company.id).catch(() => [] as Agent[]),
-        coolie.listProjects(company.id).catch(() => [] as Project[]),
-      ]);
-      setIssues(nextIssues);
-      setMentions(feed.mentionedBy);
-      setApprovals(feed.pendingApprovals);
-      setAgents(nextAgents);
-      setProjects(nextProjects);
-    } catch (e) {
-      setError(String((e as Error)?.message ?? e));
-    } finally {
-      setLoading(false);
+    const reqId = loadReqIdRef.current + 1;
+    loadReqIdRef.current = reqId;
+    const maxRetries = 2;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const [nextIssues, feed, nextAgents, nextProjects] = await Promise.all([
+          coolie.listIssues(company.id, { limit: 200 }),
+          coolie.getInbox(company.id),
+          coolie.listAgents(company.id).catch(() => [] as Agent[]),
+          coolie.listProjects(company.id).catch(() => [] as Project[]),
+        ]);
+        if (loadReqIdRef.current !== reqId) return;
+        setIssues(nextIssues);
+        setMentions(feed.mentionedBy);
+        setApprovals(feed.pendingApprovals);
+        setAgents(nextAgents);
+        setProjects(nextProjects);
+        setError(null);
+        break;
+      } catch (e) {
+        const msg = String((e as Error)?.message ?? e);
+        if (attempt < maxRetries) {
+          await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+          if (loadReqIdRef.current !== reqId) return;
+          continue;
+        }
+        if (loadReqIdRef.current === reqId) setError(msg);
+      }
     }
+    if (loadReqIdRef.current === reqId) setLoading(false);
   }, [company]);
 
   useEffect(() => {

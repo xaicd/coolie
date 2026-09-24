@@ -44,3 +44,4 @@ export { instanceSettingsRoutes } from "./instance-settings.js";
 export { instanceDatabaseBackupRoutes } from "./instance-database-backups.js";
 export { managedAgentProfileRoutes } from "./managed-agent-profiles.js";
 export { remoteAgentProfileRoutes } from "./remote-agent-profiles.js";
+export { tasksHostPreviewRoutes } from "./tasks-host-preview.js";

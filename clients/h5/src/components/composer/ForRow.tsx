@@ -35,7 +35,9 @@ export function ForRow({
             label={agent.name}
             active={value === agent.id}
             onClick={() => onChange(agent.id)}
-            title={agent.title ?? agent.role ?? agent.name}
+            /* wave65 — boss 25:00 '工坊 5 角色员工 描述都去掉'.
+                选 agent 悬浮 tooltip 不再显示长描述, 只用 role 短标签. */
+            title={agent.role ?? agent.name}
           />
         ))}
       </div>

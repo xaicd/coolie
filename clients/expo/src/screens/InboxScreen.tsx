@@ -153,26 +153,48 @@ export function InboxScreen({
   const [blockedSortBy, setBlockedSortBy] = useState<BlockedInboxSort>("urgency");
   const [actionIssue, setActionIssue] = useState<Issue | null>(null);
   const [assignIssue, setAssignIssue] = useState<Issue | null>(null);
+  // wave65 — 防止旧公司/旧 tab 的请求回调 setState 覆盖新数据
+  const loadReqIdRef = useRef(0);
 
+  // wave65 — 重试 / 旧公司 / 竞态守卫
+  // 收件箱反反复复真因之一: tab/公司切换瞬间旧请求 setState 覆盖新数据。
+  // 解决: reqId 自增, 只接受最新一次请求的返回值; 失败自动退避重试。
   const load = useCallback(
     async (silent = false) => {
       if (!silent) setLoading(true);
       setError(null);
-      try {
-        const [nextIssues, feed, nextAgents, nextProjects] = await Promise.all([
-          coolie.listIssues(company.id, { limit: 200 }),
-          coolie.getInbox(company.id),
-          coolie.listAgents(company.id).catch(() => [] as Agent[]),
-          coolie.listProjects(company.id).catch(() => [] as Project[]),
-        ]);
-        setIssues(nextIssues);
-        setMentions(feed.mentionedBy);
-        setApprovals(feed.pendingApprovals);
-        setAgents(nextAgents);
-        setProjects(nextProjects);
-      } catch (e) {
-        setError(String((e as Error)?.message ?? e));
-      } finally {
+      const reqId = loadReqIdRef.current + 1;
+      loadReqIdRef.current = reqId;
+      const maxRetries = 2;
+      for (let attempt = 0; attempt <= maxRetries; attempt++) {
+        try {
+          const [nextIssues, feed, nextAgents, nextProjects] = await Promise.all([
+            coolie.listIssues(company.id, { limit: 200 }),
+            coolie.getInbox(company.id),
+            coolie.listAgents(company.id).catch(() => [] as Agent[]),
+            coolie.listProjects(company.id).catch(() => [] as Project[]),
+          ]);
+          // 如果是旧请求, 直接丢弃
+          if (loadReqIdRef.current !== reqId) return;
+          setIssues(nextIssues);
+          setMentions(feed.mentionedBy);
+          setApprovals(feed.pendingApprovals);
+          setAgents(nextAgents);
+          setProjects(nextProjects);
+          setError(null);
+          break;
+        } catch (e) {
+          const msg = String((e as Error)?.message ?? e);
+          if (attempt < maxRetries) {
+            // 退避重试: 600ms / 1200ms
+            await new Promise((r) => setTimeout(r, 600 * (attempt + 1)));
+            if (loadReqIdRef.current !== reqId) return;
+            continue;
+          }
+          if (loadReqIdRef.current === reqId) setError(msg);
+        }
+      }
+      if (loadReqIdRef.current === reqId) {
         setLoading(false);
         setRefreshing(false);
       }

@@ -4,6 +4,19 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.41
+
+> Released: 2026-09-24 · Android release APK
+
+### 更新
+
+- wave65 P1 集中修 3 件 (boss 25:09 '派' wave64 audit P1):
+  - **收件箱彻底修复** — 收件箱 fetch 加退避重试 (2 次) + race-condition 守卫 (`loadReqIdRef`); 旧请求自动丢弃, 防止旧公司/旧 tab 数据覆盖新数据
+  - **5 角色员工描述删** — AgentsScreen / AgentDetailScreen 列表/详情/编辑全删 `agent.title` 长描述渲染; clients/h5 `ForRow` / `ParticipantRow` chip 同步 (boss 25:00 '工坊 5 角色员工 描述都去掉')
+  - **DS host-preview 端点补** — server `/api/tasks/host-preview/<sessionId>/?token=<jwt>&_t=<bust>` 同源代理; 见 `server/src/routes/tasks-host-preview.ts` (boss 09-23 24:38 续)
+
+---
+
 ## v0.5.40
 
 > Released: 2026-09-24 · Android release APK
