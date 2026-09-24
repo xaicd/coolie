@@ -29,35 +29,11 @@ interface WebContainerScreenProps {
   onBack: () => void;
 }
 
-/**
- * 确保中文语言包注入脚本。
- */
-const INJECTED_SCRIPTS = `
-try {
-  window.__COOLIE_DEFAULT_LOCALE__ = "zh-CN";
-  window.__COOLIE_NATIVE_SHELL__ = true;
-  if (!localStorage.getItem("coolie.locale")) {
-    localStorage.setItem("coolie.locale", "zh-CN");
-  }
-  document.documentElement.lang = "zh-CN";
-  // 标记原生壳, 让 Web 端通过 CSS 隐藏自己的底部导航和顶部浏览器栏
-  // (避免 Web 底栏 + Expo 原生顶栏 双层导航)
-  document.documentElement.classList.add("native-shell");
-  var style = document.createElement("style");
-  style.textContent = [
-    // 隐藏 Web 自带的 MobileBottomNav (fixed bottom nav)
-    ".native-shell nav[aria-label='Mobile navigation'] { display: none !important; }",
-    // 隐藏顶部 standalone browser controls (Web 的面包屑/返回栏)
-    ".native-shell [data-standalone-browser] { display: none !important; }",
-    // 补偿底部导航隐藏后的安全区
-    ".native-shell body { padding-bottom: 0 !important; }",
-    // 确保内容区占满整屏
-    ".native-shell main, .native-shell [data-main-content] { min-height: 100dvh !important; }",
-  ].join("\\n");
-  document.head.appendChild(style);
-} catch (e) {}
-true;
-`;
+import {
+  I18N_PATCH_INJECTION,
+  ZH_CN_ENSURE,
+  ZH_CN_INJECTION,
+} from "../utils/i18nPatch";
 
 /**
  * 全功能 Web 容器 (WebContainerScreen)。
@@ -245,7 +221,8 @@ export function WebContainerScreen({
           thirdPartyCookiesEnabled={true}
           mixedContentMode="compatibility"
           allowsBackForwardNavigationGestures={true}
-          injectedJavaScriptBeforeContentLoaded={INJECTED_SCRIPTS}
+          injectedJavaScriptBeforeContentLoaded={ZH_CN_INJECTION + I18N_PATCH_INJECTION}
+          injectedJavaScript={ZH_CN_ENSURE + I18N_PATCH_INJECTION}
           onNavigationStateChange={handleNavigationStateChange}
           onLoadStart={() => {
             setLoading(true);

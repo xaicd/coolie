@@ -3058,3 +3058,17 @@ span.paperclip-mention-chip[data-mention-kind="external-object"] {
 @media (prefers-reduced-motion: reduce) {
   .announcement-well { animation: none; }
 }
+
+/* Native Shell immersion mode for embedded Expo WebContainer */
+html.native-shell nav[aria-label="Mobile navigation"] {
+  display: none !important;
+}
+
+html.native-shell [data-standalone-browser] {
+  display: none !important;
+}
+
+html.native-shell body {
+  padding-bottom: 0 !important;
+}
+
