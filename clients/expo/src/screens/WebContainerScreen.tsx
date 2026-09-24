@@ -35,10 +35,26 @@ interface WebContainerScreenProps {
 const INJECTED_SCRIPTS = `
 try {
   window.__COOLIE_DEFAULT_LOCALE__ = "zh-CN";
+  window.__COOLIE_NATIVE_SHELL__ = true;
   if (!localStorage.getItem("coolie.locale")) {
     localStorage.setItem("coolie.locale", "zh-CN");
   }
   document.documentElement.lang = "zh-CN";
+  // 标记原生壳, 让 Web 端通过 CSS 隐藏自己的底部导航和顶部浏览器栏
+  // (避免 Web 底栏 + Expo 原生顶栏 双层导航)
+  document.documentElement.classList.add("native-shell");
+  var style = document.createElement("style");
+  style.textContent = [
+    // 隐藏 Web 自带的 MobileBottomNav (fixed bottom nav)
+    ".native-shell nav[aria-label='Mobile navigation'] { display: none !important; }",
+    // 隐藏顶部 standalone browser controls (Web 的面包屑/返回栏)
+    ".native-shell [data-standalone-browser] { display: none !important; }",
+    // 补偿底部导航隐藏后的安全区
+    ".native-shell body { padding-bottom: 0 !important; }",
+    // 确保内容区占满整屏
+    ".native-shell main, .native-shell [data-main-content] { min-height: 100dvh !important; }",
+  ].join("\\n");
+  document.head.appendChild(style);
 } catch (e) {}
 true;
 `;
@@ -68,11 +84,15 @@ export function WebContainerScreen({
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
-  const targetUrl = initialUrl
+  // 拼接 ?shell=native 让 Web 端也能通过 URL 参数检测原生壳
+  const baseUrl = initialUrl
     ? initialUrl
     : initialPath
       ? `${COOLIE_WEB_URL}${initialPath.startsWith("/") ? "" : "/"}${initialPath}`
       : COOLIE_WEB_URL;
+  const targetUrl = baseUrl.includes("?")
+    ? `${baseUrl}&shell=native`
+    : `${baseUrl}?shell=native`;
 
   // 物理返回键拦截：若 WebView 可后退则在页面内后退，否则退出容器
   useEffect(() => {
