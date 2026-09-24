@@ -3,6 +3,7 @@ import { prepareManagedAiRuntime, assertManagedAiProjectAuth, stripAiAuthBinding
 import { ADAPTER_AUTH_MISSING_CHECK_CODE, AI_CONNECTION_CAPABILITIES, aiConnectionBindingSchema, type AiConnectionBinding } from "@paperclipai/shared";
 import { toolConnections } from "@paperclipai/db";
 import { aiConnectionService } from "../services/ai-connections.js";
+import { loadAgentPersona } from "../services/role-template.js";
 import { defaultAiConnectionForHire } from "../services/agent-ai-connection-default.js";
 import { assertAiConnectionCreateAccess, canInstallSharedAiConnectionForNewAgent, responsibleUserForAiRequest, validateAiApiKey } from "./ai-connections.js";
 import { isAiConnectionCompatible } from "@paperclipai/shared";
@@ -4781,6 +4782,13 @@ export function agentRoutes(
         ...createInput,
         adapterConfig: normalizedAdapterConfig,
         runtimeConfig: normalizedRuntimeConfig,
+        // Coolie fork (wave67): materialise the 7 persona template files
+        // (SOUL/IDENTITY/USER/AGENTS/TOOLS/HEARTBEAT/BOOTSTRAP) onto the agent
+        // row on create. The single source of truth for the file list lives
+        // in `packages/agents/role-templates/user-context-paths.ts`; the spawn
+        // path (`server/src/routes/board-chat.ts`) reads `$AGENT_PERSONA_FILES`
+        // to forward the same set into the subprocess at start.
+        persona: loadAgentPersona(createInput.name),
         status: "idle",
         spentMonthlyCents: 0,
         lastHeartbeatAt: null,

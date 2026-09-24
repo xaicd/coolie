@@ -1,0 +1,1 @@
+ALTER TABLE "agents" ADD COLUMN "persona" jsonb DEFAULT '{}'::jsonb NOT NULL;

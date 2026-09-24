@@ -7,11 +7,13 @@
   "exports": {
     ".": "./index.ts",
     "./role-templates": "./role-templates/index.ts",
-    "./role-templates/*": "./role-templates/*.ts"
+    "./role-templates/*": "./role-templates/*.ts",
+    "./role-templates/templates/*": "./role-templates/templates/*"
   },
   "files": [
     "*.ts",
-    "role-templates/*.ts"
+    "role-templates/*.ts",
+    "role-templates/templates/*.md"
   ],
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",

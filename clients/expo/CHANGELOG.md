@@ -4,6 +4,21 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.43
+
+> Released: 2026-09-24 · Android release APK
+
+### 更新
+
+- wave67: DS 同步 7 人格模板 (boss 25:18 '派' DS 能力同步)
+  - 同步 SOUL.md / IDENTITY.md / USER.md / AGENTS.md / TOOLS.md / HEARTBEAT.md / BOOTSTRAP.md 7 件到 `packages/agents/role-templates/templates/`, 翻译到中文 + 替换 DigitalStaff → Coolie 智能体工坊
+  - 新增 `user-context-paths.ts` (仿 DS CrushContextPaths)
+  - server `loadAgentPersona(roleName)` 加载 7 模板
+  - `agents` 表新增 `persona JSONB` 列, create agent 时自动物化
+  - board chat spawn hermes 转发 `$AGENT_PERSONA_FILES` env
+
+---
+
 ## v0.5.42
 
 > Released: 2026-09-24 · Android release APK

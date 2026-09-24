@@ -91,6 +91,12 @@ export const createAgentSchema = z.object({
   budgetMonthlyCents: z.number().int().nonnegative().optional().default(0),
   permissions: agentPermissionsSchema.optional(),
   metadata: z.record(z.string(), z.unknown()).optional().nullable(),
+  /**
+   * Coolie fork — wave67 (DS 能力同步): 智能体人格模板内容 (7 份 .md 正文).
+   * 由 server `loadAgentPersona` 在 create 时物化, 也允许 caller 直接提供
+   * (测试 / 未来 API).
+   */
+  persona: z.record(z.string(), z.string()).optional(),
   // The optional stored-session claim from a completed Claude login session. It
   // is the non-secret `storedSessionId`; it carries no token. The agent-create
   // transaction consumes it as the one-time stored-session claim.

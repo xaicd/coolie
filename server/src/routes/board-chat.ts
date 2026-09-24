@@ -10,6 +10,7 @@ import { companies } from "@paperclipai/db";
 import { eq } from "drizzle-orm";
 import { instanceSettingsService, issueService } from "../services/index.js";
 import { assertCompanyAccess, getActorInfo } from "./authz.js";
+import { loadAgentPersona } from "../services/role-template.js";
 
 /**
  * Coolie fork: prefix every board-chat system prompt with a persona block
@@ -375,6 +376,16 @@ export function boardChatRoutes(
       `[SYSTEM]\n${personaLine}\n\n${personaSigLine}\n\n`,
     );
 
+    // Coolie fork (wave67): forward the 7 persona template files
+    // (SOUL/IDENTITY/USER/AGENTS/TOOLS/HEARTBEAT/BOOTSTRAP) as a JSON-encoded
+    // `$AGENT_PERSONA_FILES` env so any persona-aware tooling inside `hermes`
+    // can read them without re-reading the SYSTEM block. The board concierge
+    // itself is not a registered agent, so we materialise the templates
+    // directly from disk rather than reading them from a row. Single source of
+    // truth for the file list lives in
+    // `packages/agents/role-templates/user-context-paths.ts`.
+    const personaFiles = loadAgentPersona(companyDisplayName);
+
     // Flag set kept version-tolerant on purpose: the CLI on the production
     // box may predate `--format stream-json`, and an unsupported flag makes
     // hermes exit before answering (the room just shows nothing). Everything
@@ -424,6 +435,13 @@ export function boardChatRoutes(
         // hermes itself does not read $COMPANY_NAME today; we set it so the
         // next round of persona-aware tooling has a stable source.
         COMPANY_NAME: companyDisplayName,
+        // Coolie fork (wave67): forward the 7 persona template files as
+        // JSON, keyed by filename. The persona-aware tooling inside `hermes`
+        // can read $AGENT_PERSONA_FILES and `$PERSONA_FILE_<NAME>` for each
+        // individual file. The board concierge itself is not a registered
+        // agent, so the templates come from disk (`loadAgentPersona`) rather
+        // than from an `agents.persona` row.
+        AGENT_PERSONA_FILES: JSON.stringify(personaFiles),
         // Coolie fork (wave66): forward the persona signature computed above
         // so any persona-aware tooling inside `hermes` (or future agent
         // skills that consume it) can verify identity without re-reading
