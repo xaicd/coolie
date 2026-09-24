@@ -967,10 +967,13 @@ function HomeScreen({
             company={company}
             onOpenSettings={() => setSettingsOpen(true)}
             onOpenProjects={() => setProjectsOpen(true)}
+            onOpenWorkshop={() => navigateTab("chat")}
+            onOpenOntology={() => navigateTab("ontology")}
+            onOpenPipelines={() => setPipelinesOpen(true)}
+            onOpenWebWorkbench={() =>
+              setWebContainerTarget({ path: "/dashboard", title: "Web 全功能工作台" })
+            }
             onOpenApprovals={() => {
-              // 审计 bug 1: 审批卡点击原先只 setTab("tasks")。tab 分支上方还有 selected /
-              // diffContext / sandboxContext / focusedApprovalId 四个 early-return 浮层,
-              // 只要有一个残留,tab 改了屏幕上仍是原页面。先清浮层再切 tab,保证任务页渲染。
               setSelected(null);
               setDiffContext(null);
               setSandboxContext(null);
@@ -978,9 +981,6 @@ function HomeScreen({
               navigateTab("tasks");
             }}
             onOpenApproval={(approvalId) => {
-              // 审计 bug 1: 审批行自带 Pressable,会抢占手势响应,父卡片的 onPress 不会触发,
-              // 所以行内点击原先从不切 tab —— 从审批详情返回时退回汇览页(tab 仍是 dashboard)。
-              // 与下面 agents/chat 的 onOpenIssue 保持一致:先切 tab 再压入详情。
               navigateTab("tasks");
               setFocusedApprovalId(approvalId);
             }}

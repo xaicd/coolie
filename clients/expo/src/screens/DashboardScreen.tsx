@@ -20,6 +20,7 @@ import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { StatTile } from "../ui/StatTile";
+import { RADIUS, SPACING } from "../ui/tokens";
 
 function formatMoney(cents: number): string {
   const yuan = (cents / 100).toFixed(2);
@@ -29,6 +30,13 @@ function formatMoney(cents: number): string {
   })}`;
 }
 
+function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+  if (seconds < 86400) return `${(seconds / 3600).toFixed(1)}h`;
+  return `${(seconds / 86400).toFixed(1)}d`;
+}
+
 interface DashboardScreenProps {
   onOpenSettings?: () => void;
   company: Company;
@@ -36,14 +44,21 @@ interface DashboardScreenProps {
   onOpenApprovals?: () => void;
   onOpenApproval?: (approvalId: string) => void;
   onOpenProjects?: () => void;
+  onOpenWorkshop?: () => void;
+  onOpenOntology?: () => void;
+  onOpenPipelines?: () => void;
+  onOpenWebWorkbench?: () => void;
 }
 
 /**
- * 仪表盘 (wave63 精简: 与 web Dashboard.tsx 同款 4 张 MetricCard)
- * - 已启用员工 = agents.active+running+paused+error
- * - 执行中任务 = tasks.inProgress
- * - 本月花费   = costs.monthSpendCents
- * - 待审批     = pendingApprovals + budgets.pendingApprovals
+ * 仪表盘 — 登录后的首页。
+ *
+ * 设计目标: 让用户一眼看到工坊全貌，立刻知道该做什么。
+ * - 第 1 行: 4 张核心 StatTile (员工/任务/花费/审批)
+ * - 第 2 行: 快速操作入口 (工坊/本体/流水线/项目/Web全功能)
+ * - 第 3 行: 任务完成率进度条 + 7 天活动趋势
+ * - 第 4 行: 员工状态分布 + 预算使用进度
+ * - 第 5 行: 项目中心入口卡片
  */
 export function DashboardScreen({
   company,
@@ -51,6 +66,10 @@ export function DashboardScreen({
   onOpenSettings,
   onOpenApprovals,
   onOpenProjects,
+  onOpenWorkshop,
+  onOpenOntology,
+  onOpenPipelines,
+  onOpenWebWorkbench,
 }: DashboardScreenProps) {
   const [data, setData] = useState<DashboardSummary | null>(null);
   const [loading, setLoading] = useState(true);
@@ -106,7 +125,7 @@ export function DashboardScreen({
     );
   }
 
-  // 4 张核心 StatTile (与 web Dashboard.tsx MetricCard 同源同算)
+  // ── 核心指标 ──
   const enabledAgents =
     (data?.agents.active ?? 0) +
     (data?.agents.running ?? 0) +
@@ -116,9 +135,37 @@ export function DashboardScreen({
   const monthSpendCents = data?.costs.monthSpendCents ?? 0;
   const pendingApprovals =
     (data?.pendingApprovals ?? 0) + (data?.budgets.pendingApprovals ?? 0);
+  const pendingAccent = pendingApprovals > 0 ? C.err : C.ink;
 
-  const pendingAccent =
-    pendingApprovals > 0 ? C.err : C.ink;
+  // ── 任务分布 ──
+  const totalTasks =
+    (data?.tasks.open ?? 0) +
+    (data?.tasks.inProgress ?? 0) +
+    (data?.tasks.blocked ?? 0) +
+    (data?.tasks.done ?? 0);
+  const completionRate = data?.progress?.completionRatePercent ?? (totalTasks > 0 ? Math.round(((data?.tasks.done ?? 0) / totalTasks) * 100) : 0);
+
+  // ── 7 天活动趋势 (runActivity 最多取最后 7 天) ──
+  const recentActivity = (data?.runActivity ?? []).slice(-7);
+  const maxTotal = Math.max(1, ...recentActivity.map((d) => d.total));
+
+  // ── 效率指标 ──
+  const velocity = data?.efficiency?.velocityPerDay ?? 0;
+  const completed24h = data?.efficiency?.completedTasks24h ?? 0;
+  const completed7d = data?.efficiency?.completedTasks7d ?? 0;
+
+  // ── 预算使用 ──
+  const budgetCents = data?.costs.monthBudgetCents ?? 0;
+  const budgetUtilPct = budgetCents > 0
+    ? Math.min(100, Math.round((monthSpendCents / budgetCents) * 100))
+    : 0;
+
+  // ── 交付周期 ──
+  const avgCycleSec = data?.deliveryCycle?.avgSeconds ?? 0;
+  const medianCycleSec = data?.deliveryCycle?.medianSeconds ?? 0;
+
+  // ── 失败率 ──
+  const failRatePct = data?.failureRate?.overallFailureRatePercent ?? 0;
 
   return (
     <SafeAreaView style={{ backgroundColor: C.bg, flex: 1 }}>
@@ -145,7 +192,7 @@ export function DashboardScreen({
               <Text style={styles.companyCapsuleText} numberOfLines={1}>
                 {company.name}
               </Text>
-              <Text style={styles.companyCapsuleTag}>核心统计</Text>
+              <Text style={styles.companyCapsuleTag}>效能总览</Text>
             </View>
           }
           right={
@@ -171,18 +218,11 @@ export function DashboardScreen({
                   <Text style={styles.otaBtnText}>检查更新</Text>
                 )}
               </Pressable>
-              <Pressable
-                style={styles.refreshBtn}
-                onPress={() => fetchDashboard(true)}
-                hitSlop={12}
-              >
-                <Text style={styles.refreshBtnText}>刷新</Text>
-              </Pressable>
             </>
           }
         />
 
-        {/* 4 张核心 StatTile (与 web Dashboard.tsx 同款) */}
+        {/* ── 第 1 行: 4 张核心指标卡 ── */}
         <Pressable
           style={styles.gridContainer}
           onPress={onOpenApprovals}
@@ -214,7 +254,222 @@ export function DashboardScreen({
           />
         </Pressable>
 
-        {/* 项目中心快捷入口卡片 */}
+        {/* ── 第 2 行: 快速操作入口 ── */}
+        <View style={styles.quickActions}>
+          <Text style={styles.sectionTitle}>快速操作</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.quickActionsScroll}
+          >
+            {onOpenWorkshop ? (
+              <QuickAction
+                icon="chatbubbles"
+                label="工坊"
+                color={C.accent}
+                onPress={onOpenWorkshop}
+              />
+            ) : null}
+            {onOpenOntology ? (
+              <QuickAction
+                icon="git-network"
+                label="本体"
+                color="#8B5CF6"
+                onPress={onOpenOntology}
+              />
+            ) : null}
+            {onOpenPipelines ? (
+              <QuickAction
+                icon="git-merge"
+                label="流水线"
+                color="#06B6D4"
+                onPress={onOpenPipelines}
+              />
+            ) : null}
+            {onOpenProjects ? (
+              <QuickAction
+                icon="folder"
+                label="项目"
+                color="#F59E0B"
+                onPress={onOpenProjects}
+              />
+            ) : null}
+            {onOpenWebWorkbench ? (
+              <QuickAction
+                icon="globe"
+                label="Web全功能"
+                color={C.accent}
+                onPress={onOpenWebWorkbench}
+              />
+            ) : null}
+          </ScrollView>
+        </View>
+
+        {/* ── 第 3 行: 任务完成率 + 产能概览 ── */}
+        <AppCard style={styles.wideCard}>
+          <View style={styles.cardHeader}>
+            <Text style={styles.cardTitle}>任务进度</Text>
+            <Text style={styles.cardBadge}>{totalTasks} 个任务</Text>
+          </View>
+          <View style={styles.progressBarTrack}>
+            <View
+              style={[
+                styles.progressBarFill,
+                { width: `${Math.min(completionRate, 100)}%` },
+              ]}
+            />
+          </View>
+          <View style={styles.progressRow}>
+            <Text style={styles.progressLabel}>完成率 {completionRate}%</Text>
+            <View style={styles.progressLegend}>
+              <StatusChip
+                color={C.ok}
+                label={`已完成 ${data?.tasks.done ?? 0}`}
+              />
+              <StatusChip
+                color={C.accent}
+                label={`进行中 ${tasksInProgress}`}
+              />
+              <StatusChip
+                color={C.warn}
+                label={`阻塞 ${data?.tasks.blocked ?? 0}`}
+              />
+              <StatusChip
+                color={C.ink3}
+                label={`待办 ${data?.tasks.open ?? 0}`}
+              />
+            </View>
+          </View>
+        </AppCard>
+
+        {/* ── 第 4 行: 7 天活动趋势 ── */}
+        {recentActivity.length > 0 ? (
+          <AppCard style={styles.wideCard}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>近 7 天运行活动</Text>
+              <Text style={styles.cardBadge}>
+                {velocity > 0 ? `${velocity.toFixed(1)} 任务/天` : ""}
+              </Text>
+            </View>
+            <View style={styles.barChart}>
+              {recentActivity.map((day, i) => {
+                const h = Math.max(4, (day.total / maxTotal) * 64);
+                const failH = day.total > 0 ? (day.failed / day.total) * h : 0;
+                const label = day.date.slice(5); // "MM-DD"
+                return (
+                  <View key={i} style={styles.barCol}>
+                    <View style={styles.barStack}>
+                      {failH > 0 ? (
+                        <View
+                          style={[
+                            styles.barSegFail,
+                            { height: failH },
+                          ]}
+                        />
+                      ) : null}
+                      <View
+                        style={[
+                          styles.barSegOk,
+                          { height: h - failH },
+                        ]}
+                      />
+                    </View>
+                    <Text style={styles.barLabel}>{label}</Text>
+                    <Text style={styles.barValue}>{day.total}</Text>
+                  </View>
+                );
+              })}
+            </View>
+            <View style={styles.barLegend}>
+              <StatusChip color={C.accent} label="成功" />
+              <StatusChip color={C.err} label="失败" />
+            </View>
+          </AppCard>
+        ) : null}
+
+        {/* ── 第 5 行: 效能快照 (3 个小指标) ── */}
+        <View style={styles.miniRow}>
+          <AppCard style={styles.miniCard}>
+            <Text style={styles.miniValue}>{completed24h}</Text>
+            <Text style={styles.miniLabel}>24h 完成</Text>
+          </AppCard>
+          <AppCard style={styles.miniCard}>
+            <Text style={styles.miniValue}>{completed7d}</Text>
+            <Text style={styles.miniLabel}>7 天完成</Text>
+          </AppCard>
+          <AppCard style={styles.miniCard}>
+            <Text style={[styles.miniValue, failRatePct > 20 ? { color: C.err } : null]}>
+              {failRatePct.toFixed(1)}%
+            </Text>
+            <Text style={styles.miniLabel}>失败率</Text>
+          </AppCard>
+        </View>
+
+        {/* ── 第 6 行: 员工状态 + 预算进度 ── */}
+        <View style={styles.dualRow}>
+          <AppCard style={styles.halfCard}>
+            <Text style={styles.cardTitle}>员工状态</Text>
+            <View style={styles.agentStatusList}>
+              <AgentStatusRow
+                icon="flash"
+                label="运行中"
+                count={data?.agents.running ?? 0}
+                color={C.ok}
+              />
+              <AgentStatusRow
+                icon="checkmark-circle"
+                label="就绪"
+                count={data?.agents.active ?? 0}
+                color={C.accent}
+              />
+              <AgentStatusRow
+                icon="pause-circle"
+                label="暂停"
+                count={data?.agents.paused ?? 0}
+                color={C.warn}
+              />
+              <AgentStatusRow
+                icon="alert-circle"
+                label="异常"
+                count={data?.agents.error ?? 0}
+                color={C.err}
+              />
+            </View>
+          </AppCard>
+
+          <AppCard style={styles.halfCard}>
+            <Text style={styles.cardTitle}>预算</Text>
+            {budgetCents > 0 ? (
+              <>
+                <View style={styles.budgetBarTrack}>
+                  <View
+                    style={[
+                      styles.budgetBarFill,
+                      {
+                        width: `${budgetUtilPct}%`,
+                        backgroundColor: budgetUtilPct > 80 ? C.err : C.accent,
+                      },
+                    ]}
+                  />
+                </View>
+                <Text style={styles.budgetText}>
+                  {formatMoney(monthSpendCents)} / {formatMoney(budgetCents)}
+                </Text>
+                <Text style={styles.budgetPct}>{budgetUtilPct}% 已使用</Text>
+              </>
+            ) : (
+              <Text style={styles.budgetText}>未设预算上限</Text>
+            )}
+            {avgCycleSec > 0 ? (
+              <View style={styles.cycleRow}>
+                <Text style={styles.cycleLabel}>平均交付</Text>
+                <Text style={styles.cycleValue}>{formatDuration(avgCycleSec)}</Text>
+              </View>
+            ) : null}
+          </AppCard>
+        </View>
+
+        {/* ── 第 7 行: 项目中心入口卡 ── */}
         {onOpenProjects ? (
           <AppCard onPress={onOpenProjects} style={styles.projectCard}>
             <View style={styles.projectCardLeft}>
@@ -239,12 +494,68 @@ export function DashboardScreen({
   );
 }
 
+// ── 子组件 ──────────────────────────────────────────────────────────
+
+function QuickAction({
+  icon,
+  label,
+  color,
+  onPress,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  label: string;
+  color: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable style={styles.quickActionBtn} onPress={onPress} hitSlop={4}>
+      <View style={[styles.quickActionIcon, { backgroundColor: color + "18" }]}>
+        <Ionicons name={icon} size={20} color={color} />
+      </View>
+      <Text style={styles.quickActionLabel} numberOfLines={1}>
+        {label}
+      </Text>
+    </Pressable>
+  );
+}
+
+function StatusChip({ color, label }: { color: string; label: string }) {
+  return (
+    <View style={styles.statusChip}>
+      <View style={[styles.statusDot, { backgroundColor: color }]} />
+      <Text style={styles.statusChipText}>{label}</Text>
+    </View>
+  );
+}
+
+function AgentStatusRow({
+  icon,
+  label,
+  count,
+  color,
+}: {
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  label: string;
+  count: number;
+  color: string;
+}) {
+  return (
+    <View style={styles.agentRow}>
+      <Ionicons name={icon} size={14} color={color} />
+      <Text style={styles.agentRowLabel}>{label}</Text>
+      <Text style={[styles.agentRowCount, { color }]}>{count}</Text>
+    </View>
+  );
+}
+
+// ── 样式 ────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
   container: {
     padding: 16,
     paddingTop: 16,
     paddingBottom: 32,
-    gap: 16,
+    gap: 14,
   },
   center: {
     flex: 1,
@@ -293,22 +604,6 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
   },
-  refreshBtn: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: C.line,
-    height: 32,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  refreshBtnText: {
-    color: C.ink2,
-    fontSize: 13,
-    fontWeight: "500",
-  },
   gridContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -327,12 +622,243 @@ const styles = StyleSheet.create({
     flex: 0,
     padding: 0,
   },
+
+  // ── 快速操作入口 ──
+  quickActions: {
+    gap: 10,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: C.ink2,
+    paddingLeft: 2,
+  },
+  quickActionsScroll: {
+    gap: 14,
+    paddingHorizontal: 2,
+    paddingVertical: 4,
+  },
+  quickActionBtn: {
+    alignItems: "center",
+    gap: 6,
+    width: 60,
+  },
+  quickActionIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  quickActionLabel: {
+    fontSize: 11,
+    color: C.ink2,
+    fontWeight: "500",
+    textAlign: "center",
+  },
+
+  // ── 宽卡 (任务进度 / 活动趋势) ──
+  wideCard: {
+    padding: 14,
+    gap: 10,
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  cardTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  cardBadge: {
+    fontSize: 11,
+    color: C.ink3,
+    fontWeight: "400",
+  },
+
+  // ── 任务进度条 ──
+  progressBarTrack: {
+    height: 6,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  progressBarFill: {
+    height: "100%",
+    backgroundColor: C.ok,
+    borderRadius: 3,
+  },
+  progressRow: {
+    gap: 6,
+  },
+  progressLabel: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: C.ink2,
+  },
+  progressLegend: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+  },
+  statusChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  statusChipText: {
+    fontSize: 11,
+    color: C.ink3,
+  },
+
+  // ── 7 天条形图 ──
+  barChart: {
+    flexDirection: "row",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    height: 90,
+    gap: 6,
+    paddingTop: 4,
+  },
+  barCol: {
+    flex: 1,
+    alignItems: "center",
+    gap: 3,
+  },
+  barStack: {
+    width: "100%",
+    maxWidth: 28,
+    borderRadius: RADIUS.sm,
+    overflow: "hidden",
+  },
+  barSegOk: {
+    backgroundColor: C.accent,
+    borderTopLeftRadius: RADIUS.sm,
+    borderTopRightRadius: RADIUS.sm,
+  },
+  barSegFail: {
+    backgroundColor: C.err,
+  },
+  barLabel: {
+    fontSize: 9,
+    color: C.ink4,
+  },
+  barValue: {
+    fontSize: 9,
+    color: C.ink3,
+    fontVariant: ["tabular-nums"],
+  },
+  barLegend: {
+    flexDirection: "row",
+    gap: 16,
+    justifyContent: "center",
+    paddingTop: 2,
+  },
+
+  // ── 效能快照小卡 ──
+  miniRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  miniCard: {
+    flex: 1,
+    alignItems: "center",
+    padding: 12,
+    gap: 4,
+  },
+  miniValue: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: C.accent,
+    fontVariant: ["tabular-nums"],
+  },
+  miniLabel: {
+    fontSize: 11,
+    color: C.ink3,
+    fontWeight: "400",
+  },
+
+  // ── 双列卡 (员工状态 + 预算) ──
+  dualRow: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  halfCard: {
+    flex: 1,
+    padding: 14,
+    gap: 10,
+  },
+  agentStatusList: {
+    gap: 8,
+  },
+  agentRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  agentRowLabel: {
+    flex: 1,
+    fontSize: 12,
+    color: C.ink2,
+  },
+  agentRowCount: {
+    fontSize: 14,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+  },
+
+  // ── 预算 ──
+  budgetBarTrack: {
+    height: 6,
+    backgroundColor: "rgba(255,255,255,0.06)",
+    borderRadius: 3,
+    overflow: "hidden",
+  },
+  budgetBarFill: {
+    height: "100%",
+    borderRadius: 3,
+  },
+  budgetText: {
+    fontSize: 12,
+    color: C.ink2,
+    fontWeight: "400",
+  },
+  budgetPct: {
+    fontSize: 11,
+    color: C.ink3,
+  },
+  cycleRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: 1,
+    borderTopColor: C.line,
+    paddingTop: 8,
+    marginTop: 2,
+  },
+  cycleLabel: {
+    fontSize: 11,
+    color: C.ink3,
+  },
+  cycleValue: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: C.accent,
+  },
+
+  // ── 项目中心入口卡 ──
   projectCard: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     padding: 14,
-    marginTop: 4,
   },
   projectCardLeft: {
     flexDirection: "row",
