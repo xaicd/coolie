@@ -4,6 +4,32 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.50
+
+> Released: 2026-09-24 · Android release APK
+
+### 修复
+
+- **wave74 修 Audio.Recording 多实例冲突 bug** (boss 26:36 OOB 「新任务 录音bug」): 老板装 0.5.48 APK 进任务 tab 长按 mic 弹错 `Only one Recording object can be prepared at a given time`。根因是 `useRecorder` hook 里 expo-av `Audio.Recording.createAsync()` 异步 + 多次按 mic 没串行 + 卸载时 native Recording 没释放。修法 (`clients/expo/src/useRecorder.ts`):
+  - **Module-level singleton**: 把 native Recording 引用提到模块作用域, BoardChatScreen / VoiceInputButton / useVoiceInput 三处共享同一份录音对象, 杜绝多实例 race
+  - **useEffect cleanup**: 卸载时如果还在录 → 静默 `unloadAsync` + 复位 iOS audio session (`Audio.setAudioModeAsync({ allowsRecordingIOS: false })`)
+  - **并发 start() 防护**: `startPromise` 单例, 第二次按 mic 复用同一个 promise, 不再开新录音
+  - **异常路径**: `createAsync` 失败立刻 reset audio mode + 清 ref, 下次按下不被「半成品」阻塞; `stopAndUnloadAsync` 5s timeout 兜底, finally 复位 audio session
+
+---
+
+## v0.5.49
+
+> Released: 2026-09-24 · Android release APK
+
+### 更新
+
+- wave73 UI 文字精简 (boss 26:32 OOB 「左上角工坊 驱动5角色员工 这些描述都不要了」):
+  - 删 AppBar 中间 "Coolie工坊" 标题 (`AppBar.tsx`), 仅保留左右两组 icon (通知/搜索 + 驾驶舱Web)
+  - 删工坊对话框顶部 idle 状态 "驱动 5 角色员工" 副标题 (`ChatHeader.tsx` + `BoardChatScreen.tsx`), 仅保留 `thinking` / `streaming` 动态文案
+
+---
+
 ## v0.5.48
 
 > Released: 2026-09-24 · Android release APK
