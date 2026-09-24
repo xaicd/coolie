@@ -3,12 +3,14 @@
 PM: Jason
 Worker: claude
 
-## 0. Boss 09-23 26:32 OOB 「左上角 工坊 驱动5角色员工 这些描述都不要了」
+## 0. Boss 09-23 26:32 OOB 「左上角 工坊 驱动5角色员工 这些描述都不要了」+ 26:35 OOB 「顶部中间标题留着 / 对话框中的去掉」
 
 老板装 0.5.48 APK 看到:
-- AppBar 左上角标题 "Coolie工坊" → ❌ 多余
-- 底部工坊描述 "驱动 5 角色员工" → ❌ 多余
-- 老板要删这两个
+- AppBar 左上角标题 "Coolie工坊" → ❌ 删 (boss 26:32 OOB)
+- **AppBar 中间标题** (中央) → ✅ **保留** (boss 26:35 OOB 「顶部中间标题留着」)
+- 对话框 ChatHeader "Coolie 智能体工坊 董事长助理" → ❌ 删 (boss 26:35 OOB)
+- 底部工坊描述 "驱动 5 角色员工" → ❌ 删 (boss 26:32 OOB)
+- 其他 (🔔 通知 + 🔍 搜索 + 🗑️ 清空 + 驾驶舱Web) → ✅ 保留
 
 ## 1. PM 老实盘点 (截图真值)
 
@@ -32,9 +34,10 @@ Worker: claude
 
 **Coolie工坊 0.5.49** UI 文字精简:
 
-A. 删 AppBar 左上角 "Coolie工坊" 标题 (AppBar 只剩 logo + 右侧 3 icon)
-B. 删底部工坊描述 "驱动 5 角色员工" (BoardChatScreen + SpaceScreens)
-C. splash 屏 logo "Coolie" 保留 (品牌认知)
+A. **删** AppBar 左上角 "Coolie工坊" 标题 (保留中间标题 + logo + 右侧 3 icon)
+B. **删** ChatHeader "Coolie 智能体工坊 董事长助理" 标题 (保留 🗑️ 清空按钮 + 时间戳)
+C. **删** 底部工坊描述 "驱动 5 角色员工" (BoardChatScreen + SpaceScreens)
+D. splash 屏 logo "Coolie" 保留 (品牌认知)
 
 ## 3. 任务 (3 步)
 
