@@ -40,6 +40,7 @@ import type {
 import { C } from "../coolie";
 import { EmptyState } from "../ui/EmptyState";
 import { ScreenHeader } from "../ui/ScreenHeader";
+import { ExternalOpenSheet } from "../components/ExternalOpenSheet";
 
 export interface PrototypeSandboxScreenProps {
   company: Company;
@@ -110,11 +111,11 @@ export function PrototypeSandboxScreen({
     setBust(Date.now());
   }, []);
 
+  const [showExternalSheet, setShowExternalSheet] = useState<boolean>(false);
+
   const handleOpenExternal = useCallback(() => {
     if (!url) return;
-    void Linking.openURL(url).catch(() => {
-      // 静默失败 —— 「跳到 OS 浏览器」是可选动作, 失败就让用户留在沙箱内
-    });
+    setShowExternalSheet(true);
   }, [url]);
 
   // DS 真值: Web 端降级为「在浏览器打开」; 我们也是
@@ -243,6 +244,15 @@ export function PrototypeSandboxScreen({
           </Pressable>
         </View>
       )}
+
+      {/* 外部应用与浏览器选择底栏 */}
+      <ExternalOpenSheet
+        visible={showExternalSheet}
+        url={url}
+        title="打开原型外部应用"
+        subtitle="推荐使用 QQ 浏览器（内置腾讯 TBS X5 内核秒开 Office/PDF 与原型），也可调用系统默认浏览器打开。"
+        onClose={() => setShowExternalSheet(false)}
+      />
     </SafeAreaView>
   );
 }

@@ -97,14 +97,6 @@ export function WebContainerScreen({
     };
   }, []);
 
-  // Wave 84 — trace the resolved bridge URL so adb logcat can confirm the
-  // WebView actually loads the exchange endpoint (and not the bare landing
-  // URL, which is what happens when tokenReady flips before the SecureStore
-  // read resolves).
-  useEffect(() => {
-    console.log(`[bridge] targetUrl=${targetUrl ? targetUrl.slice(0, 80) + "..." : "null"} tokenReady=${tokenReady}`);
-  }, [targetUrl, tokenReady]);
-
   const bridgeUrl = exchangeToken
     ? `${COOLIE_WEB_URL.replace(/\/+$/, "")}/api/auth/exchange?token=${encodeURIComponent(exchangeToken)}&next=${encodeURIComponent(baseUrl)}`
     : null;
@@ -113,6 +105,14 @@ export function WebContainerScreen({
       ? withShell(bridgeUrl)
       : withShell(baseUrl)
     : null;
+
+  // Wave 84 — trace the resolved bridge URL so adb logcat can confirm the
+  // WebView actually loads the exchange endpoint (and not the bare landing
+  // URL, which is what happens when tokenReady flips before the SecureStore
+  // read resolves).
+  useEffect(() => {
+    console.log(`[bridge] targetUrl=${targetUrl ? targetUrl.slice(0, 80) + "..." : "null"} tokenReady=${tokenReady}`);
+  }, [targetUrl, tokenReady]);
 
   // 物理返回键拦截：若 WebView 可后退则在页面内后退，否则退出容器
   useEffect(() => {

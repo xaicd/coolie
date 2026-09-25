@@ -33,6 +33,7 @@ import { LoadingState } from "../ui/LoadingState";
 import { Pill } from "../ui/Pill";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { SegmentedControl } from "../ui/SegmentedControl";
+import { ExternalOpenSheet } from "../components/ExternalOpenSheet";
 
 export interface ArtifactsScreenProps {
   company: Company;
@@ -157,8 +158,10 @@ export function ArtifactsScreen({
   const [filter, setFilter] = useState<FilterKind>("all");
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
-  const [authToken, setAuthToken] = useState<string | null>(null);
   const [previewArtifact, setPreviewArtifact] = useState<CompanyArtifact | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
+  const [showExternalSheet, setShowExternalSheet] = useState(false);
+  const [externalSheetUrl, setExternalSheetUrl] = useState<string | null>(null);
 
   const companyId = company.id;
 
@@ -552,10 +555,32 @@ export function ArtifactsScreen({
                       )}
                     </View>
                   ) : (
-                    <View style={styles.fileInfoRow}>
-                      <Text style={styles.fileInfoText}>
-                        {item.contentType || "标准交付资产"}
-                      </Text>
+                    <View style={styles.actionGroup}>
+                      <View style={styles.fileInfoRow}>
+                        <Text style={styles.fileInfoText}>
+                          {item.contentType || "标准交付资产"}
+                        </Text>
+                      </View>
+                      {Boolean(
+                        resolveMediaUrl(item.downloadPath || item.contentPath || item.openPath),
+                      ) && (
+                        <Pressable
+                          style={styles.actionBtnSecondary}
+                          onPress={() => {
+                            const url = resolveMediaUrl(
+                              item.downloadPath || item.contentPath || item.openPath,
+                            );
+                            if (url) {
+                              setExternalSheetUrl(url);
+                              setShowExternalSheet(true);
+                            }
+                          }}
+                        >
+                          <Text style={styles.actionBtnTextSecondary}>
+                            🚀 外部/QQ打开
+                          </Text>
+                        </Pressable>
+                      )}
                     </View>
                   )}
                 </View>
@@ -599,19 +624,20 @@ export function ArtifactsScreen({
                         previewArtifact?.openPath,
                     );
                     if (url) {
-                      void Linking.openURL(url);
+                      setExternalSheetUrl(url);
+                      setShowExternalSheet(true);
                     }
                   }}
                   hitSlop={8}
                   style={styles.modalDownloadBtn}
                 >
                   <Ionicons
-                    name="download-outline"
+                    name="open-outline"
                     size={14}
                     color={C.accent}
                     style={{ marginRight: 4 }}
                   />
-                  <Text style={styles.modalDownloadBtnText}>下载 / 打开</Text>
+                  <Text style={styles.modalDownloadBtnText}>外部应用 / QQ打开</Text>
                 </Pressable>
               )}
               <Pressable
@@ -669,6 +695,18 @@ export function ArtifactsScreen({
           </View>
         </SafeAreaView>
       </Modal>
+
+      {/* 外部应用与浏览器选择底栏 (支持 QQ 浏览器 / 系统浏览器) */}
+      <ExternalOpenSheet
+        visible={showExternalSheet}
+        url={externalSheetUrl}
+        title="打开外部应用 / 浏览器"
+        subtitle="针对各类工程文档（Word / Excel / PPT / PDF / H5），推荐使用 QQ 浏览器，内置腾讯 TBS 内核支持高保真秒开。"
+        onClose={() => {
+          setShowExternalSheet(false);
+          setExternalSheetUrl(null);
+        }}
+      />
     </SafeAreaView>
   );
 }

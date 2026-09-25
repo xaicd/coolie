@@ -33,6 +33,7 @@ import { WebView } from "react-native-webview";
 import { C, getAuthToken } from "../../coolie";
 import { RADIUS, SPACING } from "../../ui/tokens";
 import { PreviewToolbar } from "./PreviewToolbar";
+import { showExternalAppChooser } from "../../utils/openExternalApp";
 
 /** WebView 事件类型在 RN 端是结构化的; 取其子集即可, 避免依赖内部类型名 */
 type WebViewLike = React.ComponentType<any>;
@@ -104,7 +105,7 @@ export function InlinePreviewPanel({
     }
     const target = url || imageUrl;
     if (!target) return;
-    void Linking.openURL(target).catch(() => setError("无法唤起外部浏览器"));
+    showExternalAppChooser(target, "打开外部应用 / 浏览器");
   }, [onExternal, url, imageUrl]);
 
   const handleFullscreen = useCallback(() => {
