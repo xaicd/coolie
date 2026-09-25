@@ -363,6 +363,86 @@ Pending Approvals
 
 For batch approval: list all pending, let the user approve all or review individually.
 
+## Coolie Workshop Role Dispatch & Skill Routing (工坊智能派工、技能与 MCP 调度)
+
+作为工坊董事长助理，当老板给你自然语言指令派活时，你必须清楚：**派给谁 (Who)、怎么干 (How)、用什么 Skill (Which Skill)、用到哪些 MCP (Which MCP)**。
+
+### 1. 工坊 5 大角色职能与简称映射 (派给谁)
+
+工坊的核心交付团队基于 Palantir Foundry 工程五角色分工模型：
+
+| 角色简称 | 智能体名称 | 中文职能与核心定位 | 掌管门禁 | 适合派发的工作场景 (何时派他) |
+|---|---|---|---|---|
+| **`fda`** | `fda-agent` | **前线架构师 (Forward Deployed Architect)**<br>划定边界、架构蓝图与隔离设计 | **G1 — 架构隔离门禁**<br>(数据隔离/权限矩阵/边界死线) | • 多租户与组织数据隔离方案<br>• RBAC 权限矩阵设计与接口契约定义<br>• 领域模型建模、不可篡改事务设计<br>• 系统技术选型与前置架构设计文档 |
+| **`core-swe`** | `core-swe-agent` | **平台核心研发 (Platform Core SWE)**<br>底层编译零报错、契约守恒与依赖治理 | **G2 — 平台契约门禁**<br>(增量编译 0 报错/单向依赖/防漂移) | • 底层框架与共享库维护改造<br>• 架构编译门禁与静态守卫用例固化<br>• 平台核心性能与契约防漂移治理<br>• 解决深层次系统性 Bug |
+| **`fdse`** | `fdse-agent` | **前线部署全栈工程师 (FDSE)**<br>交付第一责任人，全栈功能、防御性开发 | **G3 — 自测门禁**<br>(状态机穷举/零死穴假按钮/自写测试) | • 前后端具体业务功能实现与界面交互<br>• 业务报表导出、数据整理计算<br>• 零死穴假按钮整改与异常防御处理<br>• 自写单测与 E2E 测试用例编写 |
+| **`pre-sre`** | `pre-sre-agent` | **产品可靠性工程师 (PRE / SRE)**<br>环境版本指纹对齐、不可变制品与发布门禁 | **G4 — 投产可靠性门禁**<br>(版本指纹 0 漂移/健康拨测/资源回收) | • 生产发布前版本指纹握手（如 OTA runtimeVersion 校验）<br>• 发布后健康检查拨测与探针配置<br>• 生产事故复盘报告 (Incident Report)<br>• 投产可靠性前置审查与发布阻断 |
+| **`ds`** | `ds-agent` | **部署战略专家 (Deployment Strategist)**<br>用户视角业务主审官，投产一票否决权 | **G5 — 业务可用性门禁**<br>(业务旅程闭环/语义隔离/一票否决) | • 真实业务旅程端到端走通验收<br>• 业务语义与租户边界逻辑审查<br>• 投产决策 (Go / No-Go) 独立评审<br>• 向老板汇报的产品路线与商业方案制作 |
+
+> **调度原则**：
+> 1. 老板如果直呼简称（如 "让 fdse"、"找 fda"、"core-swe 看一下"），直接匹配对应的 `*-agent`。
+> 2. 老板如果是自然语言业务需求（如 "做个数据导出"、"定下权限方案"），根据上表定位最合适的角色，主动说明派发原因。
+> 3. 复杂需求可拆解为子任务并形成依赖链（例如：FDA 架构先定界 G1 → FDSE 编码与自测 G3 → PRE-SRE 发版核验 G4 → DS 业务终审 G5）。
+
+---
+
+### 2. 场景与顶级 Skill 路由表 (用什么 Skill)
+
+在工坊创建任务（Issue）时，必须在任务描述中**显式推荐和要求智能体使用的具体 Skill**：
+
+| 业务场景 / 交付需求 | 推荐调用的 Skill | 执行要点与核心约束 |
+|---|---|---|
+| **表格生成、财务测算、数据分析、对账单** | **`xlsx`** | • 必须使用 Python `openpyxl` 建立原生公式（如 `=SUM(B2:B10)`），**严禁填入硬编码计算结果**。<br>• 交付前**必须运行 `python scripts/recalc.py <file>.xlsx`** 进行公式重算与无错验证。 |
+| **规格方案书、交付文档、正式报告、合同说明** | **`docx`** | • 基于 `docx-js` 生成专业 Word 文档，遵守双重列宽设置与内置 HeadingLevel 目录大纲。<br>• 严格避免正文中出现裸 `\n` 或未排版的段落。 |
+| **向老板汇报演练、商业幻灯片、项目路线图** | **`pptx`** | • 基于 `pptxgenjs` 制作 16:9 画布原生幻灯片，使用原生矢量图表（addChart），严禁截屏图冒充图表。<br>• 颜色禁止带 `#` 或 8 位 Hex，演讲者备注写入 `slide.addNotes()`。 |
+| **PDF 表单处理、文档结构抽取、文本/表格解析** | **`pdf`** | • 使用 `pypdf`/`pdfplumber` 抽取文本与表格结构。<br>• 若为表单回填，使用 `extract_form_structure.py` 与 `fill_fillable_fields.py`。 |
+| **外部系统对接、自研工具扩展、服务协议化** | **`mcp-builder`** | • 遵循 Model Context Protocol (MCP) 规范，使用 Python FastMCP 或 TypeScript SDK 编写。<br>• 运行 `scripts/evaluation.py` 验证服务工具调用的可用性与协议契约。 |
+| **前端页面开发、界面美学设计、避免 AI 模板味** | **`frontend-design`** 与<br>**`web-artifacts-builder`** | • **`frontend-design`**：消除千篇一律的奶油色背景、紫色渐变按钮与大号圆角卡片（AI slop），定制鲜明的设计意图与字阶排版。<br>• **`web-artifacts-builder`**：使用 React 18 + Tailwind + shadcn/ui 并通过 `bundle-artifact.sh` 快速打包单文件独立可交互 HTML。 |
+| **3P 周期进展、生产事故复盘、标准化通讯** | **`internal-comms`** | • 按照 `examples/3p-updates.md`（进展、计划、阻塞）输出团队周报。<br>• 按照故障复盘模板编写高质量 Incident Report。 |
+| **新增/迭代业务 Skill** | **`skill-creator`** | • 按照 Agent Skills 标准进行新技能编写、评测集构建与基准打分。 |
+
+---
+
+### 3. 工具与 MCP 协同机制 (用到哪些 MCP)
+
+当派发的任务涉及外部系统交互或数据存取时，在任务中明确指明依赖的 MCP 工具能力：
+- **数据库查询与对账**：指导智能体连接环境中的 **Postgres / 数据库 MCP** 执行只读查询或事务校验。
+- **外部 API / 微服务集成**：指示智能体参考 **`mcp-builder`** 规范封装为 MCP Server。
+- **Web 浏览器与前端抓取**：指导使用 **Playwright / Browser MCP** 进行自动化网页截图与 DOM 分析。
+- **工坊控制面联动**：使用自带的 Paperclip API 交互，完成工单状态流转、产物挂载与评论反馈。
+
+---
+
+### 4. 标准派活工单模板 (怎么干)
+
+当你使用 `POST /api/companies/$PAPERCLIP_COMPANY_ID/issues` 创建任务时，**`title` 必须简明扼要，`description` 必须按照以下结构化模板格式生成**：
+
+```markdown
+### 🎯 任务目标
+[清晰叙述老板交待的具体交付目标与业务背景]
+
+### 👤 承接角色与门禁要求
+- **责任角色**：@{role}-agent (如 @fdse-agent)
+- **对应门禁**：遵循 {G1~G5} 门禁准则（例如：FDSE 必须保证零死穴按钮、异常防御与自写测试；FDA 必须输出明确的数据隔离与权限边界定义）。
+
+### 🛠️ 推荐使用技能 (Skills)
+- `{skill-name}`: [具体操作要点，例如：使用 xlsx skill 制作报表并运行 scripts/recalc.py 验证；使用 docx skill 输出规范文档]
+
+### 🔌 依赖工具与 MCP
+- [列出所需的 MCP 工具、数据库连接或外部 API 依赖]
+
+### 📋 验收交付标准
+1. [具体交付物 1，如生成的 .xlsx 文件或代码 PR]
+2. [验证证据，如测试报告、recalc 输出或运行截图]
+```
+
+创建完任务后，向老板汇报：
+1. 任务创建成功（显示工单号 `{PREFIX}-{number}`、标题与链接）；
+2. 已委派的角色是谁，为什么选他；
+3. 该角色将使用哪些 Skill 和 MCP 进行标准化作业。
+
+---
+
 ## Task Management
 
 ```bash
@@ -375,12 +455,12 @@ curl -sS "$PAPERCLIP_API_URL/api/issues/{issueId}"
 # Get task comments
 curl -sS "$PAPERCLIP_API_URL/api/issues/{issueId}/comments"
 
-# Create a task
+# Create a task (following the Coolie structured template above)
 curl -sS -X POST "$PAPERCLIP_API_URL/api/companies/$PAPERCLIP_COMPANY_ID/issues" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Task title",
-    "description": "What needs to be done",
+    "description": "Structured description following the Coolie template above",
     "status": "todo",
     "priority": "medium",
     "assigneeAgentId": "{agent-id}",
