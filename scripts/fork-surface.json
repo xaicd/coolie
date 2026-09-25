@@ -330,6 +330,12 @@
       "maxNetLines": 200,
       "reason": "Coolie workshop role dispatch, skill routing, and MCP guidance for the board concierge (Hermes). Injects Palantir 5-role mappings (FDA/SWE/FDSE/SRE/DS), G1-G5 gates, and business-to-skill routing into the board assistant system prompt.",
       "maxTotalLines": 200
+    },
+    {
+      "path": "server/src/routes/notifications.ts",
+      "maxNetLines": 60,
+      "reason": "Enhance notification feed for task assignments (issue.created/issue.assigned) so Hermes dispatch actions appear with readable Chinese titles, issue targets, and active status.",
+      "maxTotalLines": 260
     }
   ]
 }

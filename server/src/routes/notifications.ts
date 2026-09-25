@@ -109,6 +109,7 @@ async function buildFeed(db: Db, companyId: string, limit: number): Promise<Noti
         entityType: activityLog.entityType,
         entityId: activityLog.entityId,
         actorType: activityLog.actorType,
+        details: activityLog.details,
         createdAt: activityLog.createdAt,
       })
       .from(activityLog)
@@ -142,14 +143,44 @@ async function buildFeed(db: Db, companyId: string, limit: number): Promise<Noti
       target: { kind: "issue" as const, id: row.issueId },
       createdAt: row.createdAt.toISOString(),
     })),
-    ...activity.map((row) => ({
-      id: `activity:${row.id}`,
-      type: "activity" as const,
-      title: `${row.actorType === "agent" ? "员工" : "系统"}：${row.action}`,
-      body: `${row.entityType} · ${row.entityId}`,
-      target: null,
-      createdAt: row.createdAt.toISOString(),
-    })),
+    ...activity.map((row) => {
+      const isIssue = row.entityType === "issue";
+      const isApproval = row.entityType === "approval";
+      let title: string;
+      let body: string | null = null;
+      const d = row.details as Record<string, unknown> | null;
+      const issueTitle = (d?.title as string) || (d?.name as string) || null;
+      const issueIdent = (d?.identifier as string) || null;
+
+      if (row.action === "issue.created") {
+        title = `Hermes 派工通知：已安排「${issueTitle ?? "新任务"}」`;
+        body = issueIdent ? `工号 ${issueIdent} 已立项，正在由责任人推进` : "任务已立项并分配责任人";
+      } else if (row.action === "issue.assigned") {
+        title = `Hermes 派工通知：${issueTitle ? `「${issueTitle}」已分配` : "任务责任人已安排"}`;
+        body = issueIdent ? `工号 ${issueIdent} 责任人已明确` : "任务责任人已变更";
+      } else if (row.action === "issue.updated") {
+        title = `任务动态：${issueTitle ?? "工单更新"}`;
+        body = typeof d?.status === "string" ? `状态更新为：${d.status}` : (issueIdent ? `工号 ${issueIdent} 有新进展` : "任务已有最新进展");
+      } else {
+        title = `${row.actorType === "agent" ? "员工" : "系统"}：${row.action}`;
+        body = `${row.entityType} · ${row.entityId}`;
+      }
+
+      const target = isIssue
+        ? ({ kind: "issue" as const, id: row.entityId })
+        : isApproval
+        ? ({ kind: "approval" as const, id: row.entityId })
+        : null;
+
+      return {
+        id: `activity:${row.id}`,
+        type: "activity" as const,
+        title,
+        body,
+        target,
+        createdAt: row.createdAt.toISOString(),
+      };
+    }),
   ];
 
   items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));

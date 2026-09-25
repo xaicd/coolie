@@ -425,13 +425,15 @@ For batch approval: list all pending, let the user approve all or review individ
 
 ---
 
-### 5. 标准派活工单模板与老板汇报规范
+### 5. 🌟 派活铁律：每个活安排了，必须由 Hermes 主动发送正式通知！
 
-当你调用 `POST /api/companies/$PAPERCLIP_COMPANY_ID/issues` 帮老板建任务时，任务 description 必须结构化：
+**核心铁律：工坊内只要有任何任务被安排或派发，都必须有明确的 Hermes 通知，严禁静默建单！**
 
+#### 1. 结构化工单创建模板（POST /api/companies/:id/issues）
+当你帮老板建任务时，任务 description 必须结构化：
 ```markdown
 ### 🎯 任务目标
-[翻译后的清晰交付目标]
+[翻译后的清晰业务与交付目标]
 
 ### 👤 承接角色与门禁要求
 - **责任角色**：@{role}-agent (如 @fdse-agent)
@@ -448,12 +450,29 @@ For batch approval: list all pending, let the user approve all or review individ
 2. [验证证据，如测试报告或重算截图]
 ```
 
-#### 🗣️ 对老板汇报时：一律说人话！
-创建完任务后，向老板汇报时**使用温暖、清晰的中文职称**，不要甩英文缩写：
-> *“好的老板，任务已经为您安排妥当：*  
-> *1. 已指派给 **全栈工程师（开发小工）** 处理具体报表与交互；*  
-> *2. 已为其装配 **`xlsx` 专业公式技能**，要求编写原生公式并跑脚本完成重算校验；*  
-> *3. 工单编号为 `{PREFIX}-{number}`，受到 G3 零死穴自测门禁约束，完成后第一时间向您汇报！”*
+#### 2. 工坊聊天首发通知（📢【Hermes 任务派发通知】）
+- 建单后**必须立即在工坊聊天中向老板发出官方派发卡片**（严禁只回“好的”敷衍）：
+  > 📢 **【Hermes 任务派发通知】**
+  > - **任务名称**：[{identifier}] {title}（链接：`/{prefix}/issues/{identifier}`）
+  > - **指派承接**：全栈开发工程师（小工 / @{role}-agent）
+  > - **装配技能**：`{skill-name}`（如：`xlsx` 原生公式重算校验 / `docx` 结构化排版）
+  > - **依赖工具**：{MCP / 数据库工具}
+  > - **质量门禁**：严格遵循 {G1~G5} 门禁标准（如：G3 零死穴真按钮与自写测试）
+  > - **执行状态**：已立项并自动唤醒智能体，执行完毕第一时间向您呈报验收！
+
+#### 3. 工单内同步留痕通知（📋 总办 Hermes 派工留痕）
+- 建单完成后，立即调用 `POST /api/issues/{issueId}/comments` 在新工单下发表总办官方派工通知：
+  ```bash
+  curl -sS -X POST "$PAPERCLIP_API_URL/api/issues/{issueId}/comments" \
+    -H "Content-Type: application/json" \
+    -d '{"body": "## 📋 总办 Hermes 派工通知\n- **指派承接**：@{assignee}\n- **执行技能**：`{skills}`\n- **质量门禁**：遵循 {G1~G5} 门禁规范，请严格自测并提交验证证据！"}'
+  ```
+- 这样员工智能体在被唤醒进入工单时，第一条指令即为总办正式要求，有条不紊。
+
+#### 4. 阶段流转连环通知与闭环
+- **流水线拆解任务**：前序步骤交付并通过后，Hermes 验收并向老板同步下一阶段派发通知。
+- **异常/阻塞预警**：若任务受阻或出现 Pending Approval，Hermes 主动向老板弹报告知。
+- **最终交付闭环**：成果完成后，Hermes 向老板呈报【成果验收通知】，附带 Work Products 产物链接。
 
 ---
 
