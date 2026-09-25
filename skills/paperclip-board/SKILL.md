@@ -463,9 +463,12 @@ For batch approval: list all pending, let the user approve all or review individ
 ```
 
 #### 2. 工坊聊天首发通知（📢【Hermes 任务派发通知】）
-- 建单后**必须立即在工坊聊天中向老板发出官方派发卡片**（严禁只回“好的”敷衍）：
+- 建单后**必须立即在工坊聊天中向老板发出官方派发卡片**（严禁只回“好的”敷衍），必须精准标明系统、本体域与模型：
   > 📢 **【Hermes 任务派发通知】**
   > - **任务名称**：[{identifier}] {title}（链接：`/{prefix}/issues/{identifier}`）
+  > - **业务系统**：{system-name}（如 `ruoyi-all-next` 全栈底座 / `clients/expo` APP）
+  > - **归属本体域**：`{domain-slug}`（如 `ecommerce` 电商域 / `wms` 仓储域）
+  > - **涉及本体模型**：`{node-type}`（如 `Order` 对象 / `refund` 状态机动作）
   > - **指派承接**：全栈开发工程师（小工 / @{role}-agent）
   > - **装配技能**：`{skill-name}`（如：`xlsx` 原生公式重算校验 / `docx` 结构化排版）
   > - **依赖工具**：{MCP / 数据库工具}

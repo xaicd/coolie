@@ -23,4 +23,17 @@
   **插件模式下是惰性的** —— 只有 standalone MCP 会校验它,插件 worker 从不校验。
   读到时按"本体内部的残留概念"理解,**不要拿它给平台加一层租户**。
 
+## 系统、本体域、本体模型与代码位置 (层级绝不混淆)
+
+| 层级 | 术语 | 英文 | 概念本质 | 典型例子 | 在 Coolie 哪个位置强制 |
+|---|---|---|---|---|---|
+| **L1 平台隔离** | **公司** | Company | 平台唯一顶级租户/组织边界 | `acme` 公司 (`companies` 表) | `company_id` |
+| **L2 工程载体** | **业务系统** | Business System | 具体的软件代码工程或客户端 | 若依后台 `ruoyi-all-next`、移动端 `clients/expo` | `ontology_business_systems` / `projects` |
+| **L3 业务限界** | **本体域** | Ontology Domain | 业务概念隔离的命名空间容器 | 电商域 `ecommerce`、仓储进销存域 `wms`、财务域 `finance` | `ontology_domains` 表 (`slug`) |
+| **L4 架构图纸** | **本体模型** | Ontology Model | 域内的实体属性、拓扑与状态机 | `Order` 对象、`price` 属性、`HAS_ITEM` 关系、`refund` 状态迁移动作 | `ontology_node_types` / `relation_types` / `action_types` |
+| **L5 代码实现** | **代码落点** | Code Location | 具体的源码目录与文件树 | `prisma/schema.prisma`、`src/modules/order/`、`src/app/(admin-pages)/admin/order/` | 物理目录树与 FDA G1 白名单 |
+
+- **严禁把「本体域」与「本体模型」混同**：域是“房间”，模型是“房间里的图纸与规则”。一个本体域可以有多套模型演进快照。
+- **严禁把「业务系统」与「本体域」混同**：系统是代码工程（如 Next.js 后台 / React Native APP），本体域是业务逻辑边界（如仓储物流）。一个业务系统可以连接消费多个本体域，一个本体域也可由多个业务系统共同呈现。
+
 *本表与任何历史文档的裸 "coolie" 用法冲突时,以本表为准。*
