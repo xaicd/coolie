@@ -14,9 +14,9 @@ export const ENTERPRISE_CORE_DOMAIN: SampleDomain = {
   category: "enterprise",
   tags: ["enterprise", "organization", "employee", "workflow", "document", "cmdb", "builtin"],
   stats: {
-    nodeTypes: 13,
-    relationTypes: 23,
-    properties: 77,
+    nodeTypes: 14,
+    relationTypes: 27,
+    properties: 83,
   },
   nodeTypes: [
     {
@@ -260,6 +260,30 @@ export const ENTERPRISE_CORE_DOMAIN: SampleDomain = {
         acceptanceCriteria: { type: "string", description: "准出验收指标与交付物要求" },
       },
     },
+    {
+      key: "skill_template",
+      displayName: "工程技能模板",
+      description: "CMMI 与研发过程标准的可执行 Agent Skill 模板，可由业务系统复制与独立定制",
+      propertiesSchema: {
+        skillId: { type: "string", isIdentifier: true, description: "技能模板唯一代号" },
+        skillName: { type: "string", description: "技能全称" },
+        cmmiProcessArea: { type: "string", description: "对应的 CMMI 关键过程域 (如 RD, TS, VER, CM, QPM, CAR)" },
+        category: {
+          type: "string",
+          enum: [
+            "cmmi_requirements",
+            "cmmi_architecture",
+            "cmmi_development",
+            "cmmi_verification",
+            "cmmi_release",
+            "cmmi_metrics",
+          ],
+          description: "技能分类",
+        },
+        templatePath: { type: "string", description: "母版 Skill 定义文件相对路径" },
+        version: { type: "string", description: "技能模版版本" },
+      },
+    },
   ],
   relationTypes: [
     {
@@ -446,6 +470,38 @@ export const ENTERPRISE_CORE_DOMAIN: SampleDomain = {
       sourceNodeTypeKey: "knowledge_document",
       targetNodeTypeKey: "cmdb_infrastructure_resource",
     },
+    {
+      key: "system_uses_skill",
+      displayName: "使用定制技能",
+      description: "业务系统在独立开发、更新与交付时使用的定制 CMMI 技能",
+      cardinality: "many_to_many",
+      sourceNodeTypeKey: "cmdb_business_system",
+      targetNodeTypeKey: "skill_template",
+    },
+    {
+      key: "skill_satisfies_gate",
+      displayName: "技能保障门禁",
+      description: "技能自动化执行产物所保障的 CMMI 风控门禁卡点",
+      cardinality: "many_to_many",
+      sourceNodeTypeKey: "skill_template",
+      targetNodeTypeKey: "governance_gate",
+    },
+    {
+      key: "skill_managed_by_role",
+      displayName: "主责工匠岗位",
+      description: "主责执行和维护该过程技能的工匠岗位角色",
+      cardinality: "many_to_many",
+      sourceNodeTypeKey: "skill_template",
+      targetNodeTypeKey: "job_role",
+    },
+    {
+      key: "skill_produces_document",
+      displayName: "生成过程文档",
+      description: "技能执行自动化产出的 CMMI 过程资产与交付物文档",
+      cardinality: "one_to_many",
+      sourceNodeTypeKey: "skill_template",
+      targetNodeTypeKey: "knowledge_document",
+    },
   ],
 };
 
@@ -605,6 +661,26 @@ export const ENTERPRISE_INITIAL_INSTANCES = {
         roleKey: "sre",
         roleName: "产品可靠性工程师",
         permissionLevel: "L4_admin",
+      },
+    },
+    {
+      key: "role_ds",
+      label: "业务方案与需求专家角色 (DS)",
+      type: "job_role",
+      properties: {
+        roleKey: "ds",
+        roleName: "业务方案专家",
+        permissionLevel: "L3_maintainer",
+      },
+    },
+    {
+      key: "role_hermes",
+      label: "主控调度与风控总监角色 (Hermes)",
+      type: "job_role",
+      properties: {
+        roleKey: "hermes",
+        roleName: "主控调度与风控总监",
+        permissionLevel: "L5_owner",
       },
     },
     // Workflows & Gates
@@ -1249,6 +1325,85 @@ export const ENTERPRISE_INITIAL_INSTANCES = {
         specConfig: "99.999999999% 高持久性，自动预签名下载与归档策略",
       },
     },
+    // CMMI Standard Engineering Skills (可执行 Skill 模板体系)
+    {
+      key: "skill_cmmi_req",
+      label: "CMMI 需求工程与双向跟踪矩阵规范 (RD/REQM)",
+      type: "skill_template",
+      properties: {
+        skillId: "SKILL_CMMI_REQ",
+        skillName: "CMMI 需求工程与双向跟踪矩阵规范",
+        cmmiProcessArea: "RD & REQM",
+        category: "cmmi_requirements",
+        templatePath: ".agents/skills/cmmi-req-spec/SKILL.md",
+        version: "1.0.0",
+      },
+    },
+    {
+      key: "skill_cmmi_arch",
+      label: "CMMI 架构设计与技术决策分析 (TS/DAR/RSKM)",
+      type: "skill_template",
+      properties: {
+        skillId: "SKILL_CMMI_ARCH",
+        skillName: "CMMI 架构设计与技术决策分析",
+        cmmiProcessArea: "TS & DAR & RSKM",
+        category: "cmmi_architecture",
+        templatePath: ".agents/skills/cmmi-tech-solution/SKILL.md",
+        version: "1.0.0",
+      },
+    },
+    {
+      key: "skill_cmmi_contracts",
+      label: "CMMI 详细设计与静态契约守卫 (TS/VER)",
+      type: "skill_template",
+      properties: {
+        skillId: "SKILL_CMMI_CONTRACTS",
+        skillName: "CMMI 详细设计与静态契约守卫",
+        cmmiProcessArea: "TS & VER",
+        category: "cmmi_development",
+        templatePath: ".agents/skills/cmmi-detailed-contracts/SKILL.md",
+        version: "1.0.0",
+      },
+    },
+    {
+      key: "skill_cmmi_eval",
+      label: "CMMI 验证与确认全栈验收规范 (VER/VAL)",
+      type: "skill_template",
+      properties: {
+        skillId: "SKILL_CMMI_EVAL",
+        skillName: "CMMI 验证与确认全栈验收规范",
+        cmmiProcessArea: "VER & VAL",
+        category: "cmmi_verification",
+        templatePath: ".agents/skills/cmmi-ver-val/SKILL.md",
+        version: "1.0.0",
+      },
+    },
+    {
+      key: "skill_cmmi_release",
+      label: "CMMI 配置管理与不可变投产规范 (CM/RSKM/PMC)",
+      type: "skill_template",
+      properties: {
+        skillId: "SKILL_CMMI_RELEASE",
+        skillName: "CMMI 配置管理与不可变投产规范",
+        cmmiProcessArea: "CM & RSKM & PMC",
+        category: "cmmi_release",
+        templatePath: ".agents/skills/cmmi-immutable-release/SKILL.md",
+        version: "1.0.0",
+      },
+    },
+    {
+      key: "skill_cmmi_car",
+      label: "CMMI 5 统计过程控制与因果缺陷预防 (QPM/CAR)",
+      type: "skill_template",
+      properties: {
+        skillId: "SKILL_CMMI_CAR",
+        skillName: "CMMI 5 统计过程控制与因果缺陷预防",
+        cmmiProcessArea: "QPM & CAR & OPM",
+        category: "cmmi_metrics",
+        templatePath: ".agents/skills/cmmi-car-spc-metrics/SKILL.md",
+        version: "1.0.0",
+      },
+    },
   ],
   edges: [
     { from: "company_root", to: "dept_rd", rel: "has_department" },
@@ -1264,6 +1419,8 @@ export const ENTERPRISE_INITIAL_INSTANCES = {
     { from: "emp_swe", to: "role_engineer", rel: "assigned_role" },
     { from: "emp_fdse", to: "role_engineer", rel: "assigned_role" },
     { from: "emp_sre", to: "role_sre", rel: "assigned_role" },
+    { from: "emp_ds", to: "role_ds", rel: "assigned_role" },
+    { from: "emp_hermes", to: "role_hermes", rel: "assigned_role" },
     { from: "emp_swe", to: "emp_fda", rel: "reports_to" },
     { from: "emp_fdse", to: "emp_fda", rel: "reports_to" },
     // Workflows and Stage sequence (G1 to G5)
@@ -1449,5 +1606,70 @@ export const ENTERPRISE_INITIAL_INSTANCES = {
     { from: "doc_mobile_ota_sop", to: "res_oss_bucket", rel: "stored_in_resource" },
     { from: "doc_cmmi_qpm_spc", to: "res_oss_bucket", rel: "stored_in_resource" },
     { from: "doc_cmmi_car_prevention", to: "res_oss_bucket", rel: "stored_in_resource" },
+
+    // =========================================================================
+    // CMMI 过程技能图谱连接 (CMMI Skills Graph Topology)
+    // =========================================================================
+    // 1. CMDB Business Systems -> CMMI Skills (system_uses_skill)
+    { from: "sys_control_plane", to: "skill_cmmi_req", rel: "system_uses_skill" },
+    { from: "sys_control_plane", to: "skill_cmmi_arch", rel: "system_uses_skill" },
+    { from: "sys_control_plane", to: "skill_cmmi_contracts", rel: "system_uses_skill" },
+    { from: "sys_control_plane", to: "skill_cmmi_eval", rel: "system_uses_skill" },
+    { from: "sys_control_plane", to: "skill_cmmi_release", rel: "system_uses_skill" },
+    { from: "sys_control_plane", to: "skill_cmmi_car", rel: "system_uses_skill" },
+
+    { from: "sys_backend", to: "skill_cmmi_req", rel: "system_uses_skill" },
+    { from: "sys_backend", to: "skill_cmmi_arch", rel: "system_uses_skill" },
+    { from: "sys_backend", to: "skill_cmmi_contracts", rel: "system_uses_skill" },
+    { from: "sys_backend", to: "skill_cmmi_eval", rel: "system_uses_skill" },
+    { from: "sys_backend", to: "skill_cmmi_release", rel: "system_uses_skill" },
+    { from: "sys_backend", to: "skill_cmmi_car", rel: "system_uses_skill" },
+
+    { from: "sys_mobile", to: "skill_cmmi_req", rel: "system_uses_skill" },
+    { from: "sys_mobile", to: "skill_cmmi_arch", rel: "system_uses_skill" },
+    { from: "sys_mobile", to: "skill_cmmi_contracts", rel: "system_uses_skill" },
+    { from: "sys_mobile", to: "skill_cmmi_eval", rel: "system_uses_skill" },
+    { from: "sys_mobile", to: "skill_cmmi_release", rel: "system_uses_skill" },
+    { from: "sys_mobile", to: "skill_cmmi_car", rel: "system_uses_skill" },
+
+    // 2. CMMI Skills -> Governance Gates (skill_satisfies_gate)
+    { from: "skill_cmmi_req", to: "gate_g1_spec", rel: "skill_satisfies_gate" },
+    { from: "skill_cmmi_arch", to: "gate_g2_arch", rel: "skill_satisfies_gate" },
+    { from: "skill_cmmi_contracts", to: "gate_g3_compile", rel: "skill_satisfies_gate" },
+    { from: "skill_cmmi_eval", to: "gate_g4_eval", rel: "skill_satisfies_gate" },
+    { from: "skill_cmmi_release", to: "gate_g5_release", rel: "skill_satisfies_gate" },
+    { from: "skill_cmmi_car", to: "gate_g5_release", rel: "skill_satisfies_gate" },
+
+    // 3. CMMI Skills -> Job Roles (skill_managed_by_role)
+    { from: "skill_cmmi_req", to: "role_ds", rel: "skill_managed_by_role" },
+    { from: "skill_cmmi_arch", to: "role_architect", rel: "skill_managed_by_role" },
+    { from: "skill_cmmi_contracts", to: "role_engineer", rel: "skill_managed_by_role" },
+    { from: "skill_cmmi_eval", to: "role_engineer", rel: "skill_managed_by_role" },
+    { from: "skill_cmmi_release", to: "role_sre", rel: "skill_managed_by_role" },
+    { from: "skill_cmmi_car", to: "role_hermes", rel: "skill_managed_by_role" },
+
+    // 4. CMMI Skills -> Produced Documents (skill_produces_document)
+    { from: "skill_cmmi_req", to: "doc_cp_srs", rel: "skill_produces_document" },
+    { from: "skill_cmmi_req", to: "doc_backend_srs", rel: "skill_produces_document" },
+    { from: "skill_cmmi_req", to: "doc_mobile_prd", rel: "skill_produces_document" },
+
+    { from: "skill_cmmi_arch", to: "doc_cp_hld", rel: "skill_produces_document" },
+    { from: "skill_cmmi_arch", to: "doc_backend_hld", rel: "skill_produces_document" },
+    { from: "skill_cmmi_arch", to: "doc_mobile_arch", rel: "skill_produces_document" },
+
+    { from: "skill_cmmi_contracts", to: "doc_cp_lld", rel: "skill_produces_document" },
+    { from: "skill_cmmi_contracts", to: "doc_backend_api", rel: "skill_produces_document" },
+    { from: "skill_cmmi_contracts", to: "doc_mobile_state_machine", rel: "skill_produces_document" },
+
+    { from: "skill_cmmi_eval", to: "doc_cp_test", rel: "skill_produces_document" },
+    { from: "skill_cmmi_eval", to: "doc_backend_test", rel: "skill_produces_document" },
+    { from: "skill_cmmi_eval", to: "doc_mobile_test", rel: "skill_produces_document" },
+
+    { from: "skill_cmmi_release", to: "doc_release_sop", rel: "skill_produces_document" },
+    { from: "skill_cmmi_release", to: "doc_backend_deploy", rel: "skill_produces_document" },
+    { from: "skill_cmmi_release", to: "doc_mobile_ota_sop", rel: "skill_produces_document" },
+
+    { from: "skill_cmmi_car", to: "doc_cmmi_qpm_spc", rel: "skill_produces_document" },
+    { from: "skill_cmmi_car", to: "doc_cmmi_car_prevention", rel: "skill_produces_document" },
   ],
 };
