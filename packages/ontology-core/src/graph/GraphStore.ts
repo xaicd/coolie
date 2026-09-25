@@ -799,10 +799,13 @@ export interface OntologyBusinessSystemRow {
   company_id: string;
   code: string;
   name: string;
+  description?: string;
   domain: BusinessSystemDomain;
   status: BusinessSystemStatus;
   ontology_domain_id: string | null;
   is_template_system: boolean;
+  ontology_binding?: Record<string, unknown> | null;
+  metadata?: Record<string, unknown> | null;
 }
 
 /**
@@ -3739,7 +3742,7 @@ export class PostgresGraphStore implements GraphStore {
   // -------------------------------------------------------------------------
 
   private static readonly BUSINESS_SYSTEM_COLS =
-    "id, company_id, code, name, domain, status, ontology_domain_id, is_template_system";
+    "id, company_id, code, name, description, domain, status, ontology_domain_id, is_template_system, ontology_binding, metadata";
 
   async createBusinessSystem(
     input: OntologyBusinessSystemInput,
@@ -5395,8 +5398,9 @@ export class PostgresGraphStore implements GraphStore {
       status: string;
       description: string | null;
       target_role: string | null;
+      ontology_binding: Record<string, unknown> | null;
     }>(
-      `SELECT id, code, name, status, description, target_role
+      `SELECT id, code, name, status, description, target_role, ontology_binding
          FROM ${this.table("ontology_business_systems")}
         WHERE company_id = $1 AND ontology_domain_id = $2 AND is_deleted = false
         ORDER BY name ASC`,
@@ -5501,6 +5505,7 @@ export class PostgresGraphStore implements GraphStore {
         status: row.status,
         description: row.description,
         targetRole: row.target_role,
+        domainVersion: (row.ontology_binding as { domainVersion?: number } | null)?.domainVersion ?? null,
       })),
       subProjects: subProjects.map((row) => ({
         id: row.id,
@@ -5563,6 +5568,7 @@ export interface DescribeDomainBusinessSystem {
   status: string;
   description: string | null;
   targetRole: string | null;
+  domainVersion?: number | null;
 }
 
 export interface DescribeDomainSubProject {

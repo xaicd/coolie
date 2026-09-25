@@ -7,6 +7,8 @@ export interface OntologyDomainOption {
   id: string;
   slug: string;
   display_name: string;
+  schema_version?: number;
+  version?: number;
 }
 
 export interface OntologyBusinessSystemSummary {
@@ -15,6 +17,22 @@ export interface OntologyBusinessSystemSummary {
   name: string;
   status: string;
   ontology_domain_id?: string | null;
+  ontology_binding?: {
+    domainVersion?: number;
+    domainSlug?: string;
+    syncPolicy?: string;
+    allowedActionIds?: string[];
+    actionPolicies?: unknown[];
+    subscribedEventTypes?: string[];
+    upgradeHistory?: Array<{
+      fromVersion: number;
+      toVersion: number;
+      at: string;
+      action: "upgrade" | "downgrade" | "initial";
+      reason?: string;
+    }>;
+    [key: string]: unknown;
+  } | null;
   metadata?: Record<string, unknown> | null;
 }
 
@@ -24,6 +42,8 @@ export interface SyncProjectPayload {
   name: string;
   description?: string;
   ontologyDomainId: string;
+  targetDomainVersion?: number;
+  domainSlug?: string;
   repos?: Array<{ name: string; cwd?: string | null; repoUrl?: string | null }>;
 }
 
@@ -75,11 +95,40 @@ export const ontologyApi = {
   syncProjectToBusinessSystem: async (
     companyId: string,
     payload: SyncProjectPayload,
-  ): Promise<{ businessSystemId?: string; code: string }> => {
+  ): Promise<{ businessSystemId?: string; code: string; domainVersion: number }> => {
     const existing = await ontologyApi.listBusinessSystems(companyId);
     const match = existing.find((s) => s.code.toUpperCase() === payload.code.toUpperCase());
 
     let businessSystemId = match?.id;
+    const prevBinding = (match?.ontology_binding ?? {}) as Record<string, unknown>;
+    const history = Array.isArray(prevBinding.upgradeHistory) ? [...prevBinding.upgradeHistory] : [];
+    const fromVer = typeof prevBinding.domainVersion === "number" ? prevBinding.domainVersion : null;
+    const toVer = payload.targetDomainVersion ?? 0;
+    if (fromVer !== null && fromVer !== toVer) {
+      history.push({
+        fromVersion: fromVer,
+        toVersion: toVer,
+        at: new Date().toISOString(),
+        action: toVer > fromVer ? "upgrade" : "downgrade",
+      });
+    }
+
+    const updatedBinding = {
+      ...prevBinding,
+      syncPolicy: prevBinding.syncPolicy ?? "manual",
+      domainVersion: toVer,
+      domainSlug: payload.domainSlug,
+      boundAt: new Date().toISOString(),
+      upgradeHistory: history,
+    };
+
+    const updatedMetadata = {
+      ...(match?.metadata ?? {}),
+      projectId: payload.projectId,
+      syncedAt: new Date().toISOString(),
+      domainVersion: toVer,
+      domainSlug: payload.domainSlug,
+    };
 
     if (match) {
       await api.patch(
@@ -90,11 +139,8 @@ export const ontologyApi = {
           description: payload.description,
           ontologyDomainId: payload.ontologyDomainId,
           repos: payload.repos,
-          metadata: {
-            ...(match.metadata ?? {}),
-            projectId: payload.projectId,
-            syncedAt: new Date().toISOString(),
-          },
+          ontologyBinding: updatedBinding,
+          metadata: updatedMetadata,
         },
       );
     } else {
@@ -110,10 +156,8 @@ export const ontologyApi = {
           description: payload.description,
           ontologyDomainId: payload.ontologyDomainId,
           repos: payload.repos,
-          metadata: {
-            projectId: payload.projectId,
-            syncedAt: new Date().toISOString(),
-          },
+          ontologyBinding: updatedBinding,
+          metadata: updatedMetadata,
         },
         companyId,
       );
@@ -139,6 +183,6 @@ export const ontologyApi = {
       // Non-fatal if link already exists
     }
 
-    return { businessSystemId, code: payload.code };
+    return { businessSystemId, code: payload.code, domainVersion: toVer };
   },
 };

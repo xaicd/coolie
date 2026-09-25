@@ -102,6 +102,11 @@ export function Projects() {
     queryFn: () => ontologyApi.listBusinessSystems(selectedCompanyId!),
     enabled: !!selectedCompanyId,
   });
+  const { data: ontologyDomains } = useQuery({
+    queryKey: ["ontology-domains", selectedCompanyId],
+    queryFn: () => ontologyApi.listDomains(selectedCompanyId!),
+    enabled: !!selectedCompanyId,
+  });
   const membershipsQuery = useResourceMemberships(selectedCompanyId);
   const membershipMutation = useResourceMembershipMutation(selectedCompanyId);
   const projects = useMemo(
@@ -254,6 +259,15 @@ export function Projects() {
                                   bs.metadata?.projectId === project.id ||
                                   bs.code.toUpperCase() === `SYS_${project.name.toUpperCase().replace(/[^A-Z0-9_]/g, "_")}`,
                               );
+                              const boundDomain = syncedSystem?.ontology_domain_id
+                                ? (ontologyDomains ?? []).find((d) => d.id === syncedSystem.ontology_domain_id)
+                                : null;
+                              const boundVersion =
+                                syncedSystem?.ontology_binding?.domainVersion ??
+                                (typeof syncedSystem?.metadata?.domainVersion === "number" ? syncedSystem.metadata.domainVersion : null);
+                              const liveVersion = boundDomain?.schema_version ?? null;
+                              const hasUpgrade = boundVersion !== null && liveVersion !== null && liveVersion > boundVersion;
+
                               return (
                                 <Button
                                   type="button"
@@ -261,11 +275,19 @@ export function Projects() {
                                   variant={syncedSystem ? "secondary" : "outline"}
                                   className={cn(
                                     "h-6 px-2 text-xs gap-1 font-normal transition-colors shrink-0",
-                                    syncedSystem
-                                      ? "text-primary border-primary/20 bg-primary/10 hover:bg-primary/20"
-                                      : "text-muted-foreground hover:text-foreground",
+                                    hasUpgrade
+                                      ? "text-primary border-primary/40 bg-primary/15 hover:bg-primary/25 font-medium"
+                                      : syncedSystem
+                                        ? "text-primary border-primary/20 bg-primary/10 hover:bg-primary/20"
+                                        : "text-muted-foreground hover:text-foreground",
                                   )}
-                                  title={syncedSystem ? `已同步至业务系统: ${syncedSystem.code} (点击可重新同步)` : "同步到业务系统资产"}
+                                  title={
+                                    hasUpgrade
+                                      ? `可升级：系统绑定本体域版本 v${boundVersion}，最新版本 v${liveVersion}，点击同步升级`
+                                      : syncedSystem
+                                        ? `已同步至业务系统: ${syncedSystem.code}${boundVersion !== null ? ` (域版本 v${boundVersion})` : ""}，点击查看或变更`
+                                        : "同步到业务系统资产"
+                                  }
                                   onClick={(e) => {
                                     e.preventDefault();
                                     e.stopPropagation();
@@ -273,7 +295,13 @@ export function Projects() {
                                   }}
                                 >
                                   <RefreshCw className={cn("size-3", syncedSystem ? "text-primary" : "text-muted-foreground")} />
-                                  <span>{syncedSystem ? "已同步" : "同步"}</span>
+                                  <span>
+                                    {hasUpgrade
+                                      ? `可升级 v${boundVersion}→v${liveVersion}`
+                                      : syncedSystem
+                                        ? (boundVersion !== null ? `已同步 v${boundVersion}` : "已同步")
+                                        : "同步"}
+                                  </span>
                                 </Button>
                               );
                             })()}

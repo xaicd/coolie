@@ -1117,6 +1117,11 @@ function BusinessSystemChips({
           <span className="font-mono text-muted-foreground">{bs.code}</span>
           <span>·</span>
           <span>{bs.name}</span>
+          {typeof bs.domainVersion === "number" && (
+            <span className="rounded bg-muted px-1 font-mono text-(length:--text-tiny) text-muted-foreground">
+              v{bs.domainVersion}
+            </span>
+          )}
           <span className={`rounded-full px-1 text-(length:--text-tiny) ${statusClass(bs.status)}`}>
             {bs.status}
           </span>

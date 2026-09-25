@@ -267,21 +267,21 @@
     },
     {
       "path": "ui/src/pages/Projects.tsx",
-      "maxNetLines": 80,
-      "reason": "Add per-row Sync action button and SyncProjectDialog integration in Projects list to bind projects to ontology business systems.",
-      "maxTotalLines": 360
+      "maxNetLines": 120,
+      "reason": "Add per-row Sync action button, version drift detection, and SyncProjectDialog integration in Projects list to bind projects to ontology business systems.",
+      "maxTotalLines": 400
     },
     {
       "path": "ui/src/components/SyncProjectDialog.tsx",
-      "maxNetLines": 330,
-      "reason": "New file: Modal dialog to sync a project to an ontology business system and domain.",
-      "maxTotalLines": 360
+      "maxNetLines": 420,
+      "reason": "New file: Modal dialog to sync a project to an ontology business system and domain with domain version anchoring and upgrade/downgrade awareness.",
+      "maxTotalLines": 450
     },
     {
       "path": "ui/src/api/ontology.ts",
-      "maxNetLines": 160,
-      "reason": "New file: Ontology API client for listing domains, business systems, and syncing projects as business systems.",
-      "maxTotalLines": 180
+      "maxNetLines": 220,
+      "reason": "New file: Ontology API client for listing domains, business systems, and syncing projects as business systems with domain version anchoring and upgrade history.",
+      "maxTotalLines": 250
     },
     {
       "path": "ui/src/api/index.ts",

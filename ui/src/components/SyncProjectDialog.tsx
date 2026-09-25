@@ -39,21 +39,51 @@ export function SyncProjectDialog({
     enabled: open && !!companyId,
   });
 
+  // Fetch existing business systems to detect prior binding and version
+  const { data: businessSystems } = useQuery({
+    queryKey: ["ontology-business-systems", companyId],
+    queryFn: () => ontologyApi.listBusinessSystems(companyId),
+    enabled: open && !!companyId,
+  });
+
+  const existingSystem = useMemo(() => {
+    if (!project || !businessSystems) return null;
+    return businessSystems.find(
+      (bs) =>
+        bs.metadata?.projectId === project.id ||
+        bs.code.toUpperCase() === `SYS_${project.name.toUpperCase().replace(/[^A-Z0-9_]/g, "_")}`,
+    );
+  }, [project, businessSystems]);
+
+  const currentBoundVersion = useMemo(() => {
+    if (!existingSystem) return null;
+    if (typeof existingSystem.ontology_binding?.domainVersion === "number") {
+      return existingSystem.ontology_binding.domainVersion;
+    }
+    if (typeof existingSystem.metadata?.domainVersion === "number") {
+      return existingSystem.metadata.domainVersion;
+    }
+    return null;
+  }, [existingSystem]);
+
   // Pre-fill form when project changes or dialog opens
   useEffect(() => {
     if (project) {
-      const generatedCode = `SYS_${project.name
+      const generatedCode = existingSystem?.code || `SYS_${project.name
         .trim()
         .toUpperCase()
         .replace(/[^A-Z0-9_]/g, "_")
         .slice(0, 32)}`;
       setCode(generatedCode);
-      setName(project.name);
+      setName(existingSystem?.name || project.name);
       setDescription(project.description ?? "");
+      if (existingSystem?.ontology_domain_id) {
+        setSelectedDomainId(existingSystem.ontology_domain_id);
+      }
       setError(null);
       setIsCreatingDomain(false);
     }
-  }, [project, open]);
+  }, [project, open, existingSystem]);
 
   // Set default selected domain when domains load
   useEffect(() => {
@@ -65,10 +95,16 @@ export function SyncProjectDialog({
   const primaryWorkspace = project?.primaryWorkspace ?? project?.workspaces?.[0];
   const workspacePath = primaryWorkspace?.cwd || primaryWorkspace?.repoUrl;
 
+  const targetDomain = useMemo(() => {
+    return domains?.find((d) => d.id === selectedDomainId);
+  }, [domains, selectedDomainId]);
+
   const syncMutation = useMutation({
     mutationFn: async () => {
       if (!project) throw new Error("No project selected");
       let domainId = selectedDomainId;
+      let targetVersion = targetDomain?.schema_version ?? 0;
+      let targetSlug = targetDomain?.slug;
 
       if (isCreatingDomain) {
         if (!newDomainSlug.trim() || !newDomainName.trim()) {
@@ -83,6 +119,8 @@ export function SyncProjectDialog({
           throw new Error("创建新本体域失败");
         }
         domainId = createdDomain.id;
+        targetVersion = 0;
+        targetSlug = createdDomain.slug;
       }
 
       if (!domainId) {
@@ -105,6 +143,8 @@ export function SyncProjectDialog({
         name: name.trim(),
         description: description.trim(),
         ontologyDomainId: domainId,
+        targetDomainVersion: targetVersion,
+        domainSlug: targetSlug,
         repos,
       });
     },
@@ -113,7 +153,7 @@ export function SyncProjectDialog({
       void queryClient.invalidateQueries({ queryKey: ["ontology-domains", companyId] });
       pushToast({
         title: "同步成功",
-        body: `项目已成功登记为业务系统「${result.code}」并挂靠到本体域`,
+        body: `项目已成功绑定到业务系统「${result.code}」（本体域版本 v${result.domainVersion}）`,
         tone: "success",
       });
       onClose();
@@ -260,10 +300,39 @@ export function SyncProjectDialog({
                 )}
                 {domains?.map((d) => (
                   <option key={d.id} value={d.id}>
-                    {d.display_name} ({d.slug})
+                    {d.display_name} ({d.slug} · v{d.schema_version ?? 0})
                   </option>
                 ))}
               </select>
+            )}
+
+            {/* Version drift / alignment info */}
+            {currentBoundVersion !== null && targetDomain && !isCreatingDomain && (
+              <div className="rounded-md border border-border bg-muted/40 p-2.5 space-y-1 text-xs">
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">当前绑定版本:</span>
+                  <span className="font-mono font-medium text-foreground">v{currentBoundVersion}</span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">目标域最新模型版本:</span>
+                  <span className="font-mono font-medium text-foreground">v{targetDomain.schema_version ?? 0}</span>
+                </div>
+                {targetDomain.schema_version !== undefined && targetDomain.schema_version > currentBoundVersion && (
+                  <div className="text-xs text-primary font-medium pt-1">
+                    ↑ 升级提示：确认同步将从 v{currentBoundVersion} 升级至 v{targetDomain.schema_version}
+                  </div>
+                )}
+                {targetDomain.schema_version !== undefined && targetDomain.schema_version < currentBoundVersion && (
+                  <div className="text-xs text-destructive font-medium pt-1">
+                    ↓ 降级提示：目标域版本为 v{targetDomain.schema_version}，低于当前绑定的 v{currentBoundVersion}
+                  </div>
+                )}
+                {targetDomain.schema_version !== undefined && targetDomain.schema_version === currentBoundVersion && (
+                  <div className="text-xs text-muted-foreground pt-1">
+                    ✓ 当前系统与本体域模型版本保持一致 (v{currentBoundVersion})
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
