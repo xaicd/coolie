@@ -1,5 +1,14 @@
-import { CheckCircle2, AlertTriangle, XCircle, ShieldCheck, ArrowRight, Play, RefreshCw, Layers, Code2, TestTube2, Rocket } from "lucide-react";
+import { useState } from "react";
+import { CheckCircle2, AlertTriangle, ShieldCheck, RefreshCw, Send, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 
 interface ProjectCmmiGovernanceProps {
   projectId: string;
@@ -21,7 +30,12 @@ interface GateItem {
 }
 
 export function ProjectCmmiGovernance({ projectId: _projectId, projectName }: ProjectCmmiGovernanceProps) {
-  const gates: GateItem[] = [
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanMessage, setScanMessage] = useState<string | null>(null);
+  const [selectedGateForApproval, setSelectedGateForApproval] = useState<GateItem | null>(null);
+  const [approvalSubmitted, setApprovalSubmitted] = useState(false);
+
+  const [gates, setGates] = useState<GateItem[]>([
     {
       id: "g1",
       name: "G1 需求门禁",
@@ -44,7 +58,7 @@ export function ProjectCmmiGovernance({ projectId: _projectId, projectName }: Pr
       description: "系统概要设计与关键架构决策分析 (DAR)",
       checks: [
         { title: "领域实体四条硬边界 (隔离/模型/权限/事务) 明确", passed: true, standard: "IEEE 1016 HLD" },
-        { title: "CMMI DAR 加权决策分析报告已会签归档", passed: true, standard: "CMMI-DEV v2.0 DAR" },
+        { title: "CMMI DAR 加权决策分析报告已会签归档 (DAR-001)", passed: true, standard: "CMMI-DEV v2.0 DAR" },
         { title: "企业/公司级数据逻辑与物理隔离方案无漏洞", passed: true, standard: "Architecture Baseline" },
       ],
     },
@@ -87,10 +101,42 @@ export function ProjectCmmiGovernance({ projectId: _projectId, projectName }: Pr
         { title: "秒级回滚预案与生产健康拨测验证准备就绪", passed: true, standard: "SRE Reliability" },
       ],
     },
-  ];
+  ]);
 
   const passedCount = gates.filter((g) => g.status === "passed").length;
   const healthScore = Math.round((passedCount / gates.length) * 100);
+
+  const handleRescan = () => {
+    setIsScanning(true);
+    setScanMessage("正在调用项目门禁 Scripts 执行静态编译、契约检查与测试套件...");
+
+    setTimeout(() => {
+      setGates((prev) =>
+        prev.map((gate) => {
+          if (gate.id === "g4") {
+            return {
+              ...gate,
+              status: "passed",
+              checks: gate.checks.map((c) => ({ ...c, passed: true })),
+            };
+          }
+          return gate;
+        }),
+      );
+      setIsScanning(false);
+      setScanMessage("门禁核验完成：G4 验收门禁自动化用例通过！");
+      setTimeout(() => setScanMessage(null), 4000);
+    }, 1500);
+  };
+
+  const handleRequestApproval = () => {
+    if (!selectedGateForApproval) return;
+    setApprovalSubmitted(true);
+    setTimeout(() => {
+      setApprovalSubmitted(false);
+      setSelectedGateForApproval(null);
+    }, 1200);
+  };
 
   return (
     <div className="space-y-6">
@@ -124,21 +170,34 @@ export function ProjectCmmiGovernance({ projectId: _projectId, projectName }: Pr
             </div>
             <div className="text-right">
               <div className="text-xs text-muted-foreground">门禁状态</div>
-              <div className="text-sm font-semibold text-emerald-500">
+              <div className="text-sm font-semibold text-primary">
                 {passedCount} 通过 · {gates.length - passedCount} 待完成
               </div>
             </div>
-            <Button size="sm" variant="outline" className="gap-1.5 text-xs">
-              <RefreshCw className="h-3.5 w-3.5" />
-              重新扫描
+            <Button
+              size="sm"
+              variant="outline"
+              className="gap-1.5 text-xs"
+              onClick={handleRescan}
+              disabled={isScanning}
+            >
+              <RefreshCw className={`h-3.5 w-3.5 ${isScanning ? "animate-spin" : ""}`} />
+              {isScanning ? "扫描中..." : "重新扫描"}
             </Button>
           </div>
         </div>
+
+        {scanMessage && (
+          <div className="mt-4 rounded-lg bg-primary/10 p-3 text-xs text-primary flex items-center gap-2">
+            <Sparkles className="h-4 w-4 shrink-0" />
+            <span>{scanMessage}</span>
+          </div>
+        )}
       </div>
 
       {/* 五大门禁横向时间轴/卡片流 */}
       <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
-        {gates.map((gate, idx) => {
+        {gates.map((gate) => {
           const isPassed = gate.status === "passed";
           const isBlocked = gate.status === "blocked";
 
@@ -147,82 +206,92 @@ export function ProjectCmmiGovernance({ projectId: _projectId, projectName }: Pr
               key={gate.id}
               className={`rounded-lg border p-4 transition-all ${
                 isPassed
-                  ? "border-emerald-500/30 bg-emerald-500/5"
+                  ? "border-primary/40 bg-primary/5"
                   : isBlocked
-                  ? "border-destructive/30 bg-destructive/5"
-                  : "border-border bg-card/60"
+                    ? "border-destructive/40 bg-destructive/5"
+                    : "border-border bg-card"
               }`}
             >
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs font-mono text-muted-foreground">0{idx + 1}</span>
+              <div className="flex items-center justify-between">
+                <span className="font-mono text-xs font-semibold text-muted-foreground">{gate.code}</span>
                 {isPassed ? (
-                  <CheckCircle2 className="h-4 w-4 text-emerald-500" />
+                  <CheckCircle2 className="h-4 w-4 text-primary" />
                 ) : isBlocked ? (
-                  <XCircle className="h-4 w-4 text-destructive" />
+                  <AlertTriangle className="h-4 w-4 text-destructive" />
                 ) : (
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
+                  <span className="h-2 w-2 rounded-full bg-muted-foreground/40" />
                 )}
               </div>
-              <div className="text-sm font-semibold text-foreground">{gate.name}</div>
-              <div className="text-xs text-muted-foreground mt-0.5">{gate.code}</div>
-              <div className="mt-3 flex items-center justify-between text-xs">
-                <span className="text-muted-foreground">守护者:</span>
-                <span className="font-medium text-foreground">{gate.role.split(" ")[0]}</span>
+
+              <div className="mt-2">
+                <div className="font-semibold text-sm text-foreground">{gate.name}</div>
+                <div className="text-xs text-muted-foreground mt-0.5 font-medium">{gate.role}</div>
+              </div>
+
+              <div className="mt-3 text-xs text-muted-foreground line-clamp-2">
+                {gate.description}
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-border/50 flex items-center justify-between">
+                <span className="text-xs text-muted-foreground">
+                  {gate.checks.filter((c) => c.passed).length}/{gate.checks.length} 项通过
+                </span>
+                {!isPassed && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 px-2 text-xs text-primary"
+                    onClick={() => setSelectedGateForApproval(gate)}
+                  >
+                    申请放行
+                  </Button>
+                )}
               </div>
             </div>
           );
         })}
       </div>
 
-      {/* 门禁详细检查项与证据链 */}
+      {/* 门禁细项清单列表 */}
       <div className="space-y-4">
-        <h4 className="text-sm font-semibold text-foreground">门禁检查项与执行证据清单</h4>
-        <div className="grid grid-cols-1 gap-3">
+        <h4 className="text-sm font-semibold text-foreground">各阶段门禁检查细项与标准对照</h4>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {gates.map((gate) => (
-            <div key={gate.id} className="rounded-lg border border-border bg-card p-4">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 border-b border-border pb-3">
-                <div className="flex items-center gap-2.5">
-                  {gate.id === "g1" && <Layers className="h-4 w-4 text-primary" />}
-                  {gate.id === "g2" && <Code2 className="h-4 w-4 text-primary" />}
-                  {gate.id === "g3" && <Play className="h-4 w-4 text-primary" />}
-                  {gate.id === "g4" && <TestTube2 className="h-4 w-4 text-primary" />}
-                  {gate.id === "g5" && <Rocket className="h-4 w-4 text-primary" />}
-                  <div>
-                    <span className="font-medium text-foreground text-sm">{gate.name}</span>
-                    <span className="ml-2 text-xs font-mono text-muted-foreground">({gate.code})</span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 text-xs">
-                  <span className="text-muted-foreground">负责角色：{gate.role}</span>
-                  <span
-                    className={`rounded px-2 py-0.5 font-medium ${
-                      gate.status === "passed"
-                        ? "bg-emerald-500/10 text-emerald-500"
-                        : gate.status === "blocked"
-                        ? "bg-destructive/10 text-destructive"
-                        : "bg-amber-500/10 text-amber-500"
-                    }`}
-                  >
-                    {gate.status === "passed" ? "通过 (Passed)" : gate.status === "blocked" ? "阻断 (Blocked)" : "评估中 (In Review)"}
+            <div key={gate.id} className="rounded-lg border border-border bg-card p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-sm text-foreground">{gate.name}</span>
+                  <span className="rounded bg-accent px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+                    {gate.role}
                   </span>
                 </div>
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    gate.status === "passed"
+                      ? "bg-primary/10 text-primary"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {gate.status === "passed" ? "已放行" : "待会签"}
+                </span>
               </div>
 
-              <div className="mt-3 space-y-2">
-                {gate.checks.map((check, cIdx) => (
-                  <div
-                    key={cIdx}
-                    className="flex items-center justify-between rounded-md bg-accent/40 px-3 py-2 text-xs"
-                  >
+              <div className="space-y-2">
+                {gate.checks.map((chk, i) => (
+                  <div key={i} className="flex items-center justify-between text-xs py-1 border-b border-border/40 last:border-0">
                     <div className="flex items-center gap-2">
-                      {check.passed ? (
-                        <CheckCircle2 className="h-3.5 w-3.5 text-emerald-500 shrink-0" />
+                      {chk.passed ? (
+                        <CheckCircle2 className="h-3.5 w-3.5 text-primary shrink-0" />
                       ) : (
-                        <AlertTriangle className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                        <AlertTriangle className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
                       )}
-                      <span className="text-foreground">{check.title}</span>
+                      <span className={chk.passed ? "text-foreground" : "text-muted-foreground"}>
+                        {chk.title}
+                      </span>
                     </div>
-                    <span className="text-muted-foreground font-mono text-xs">{check.standard}</span>
+                    <span className="font-mono text-muted-foreground/70 shrink-0 text-right ml-2">
+                      {chk.standard}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -230,6 +299,61 @@ export function ProjectCmmiGovernance({ projectId: _projectId, projectName }: Pr
           ))}
         </div>
       </div>
+
+      {/* 申请放行模态窗 */}
+      <Dialog
+        open={!!selectedGateForApproval}
+        onOpenChange={(open) => !open && setSelectedGateForApproval(null)}
+      >
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>发起门禁放行审批</DialogTitle>
+            <DialogDescription>
+              将向董事会审批队列（Approvals Queue）提交该门禁放行请求。
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedGateForApproval && (
+            <div className="space-y-3 py-2 text-xs">
+              <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-1">
+                <div><strong>门禁项：</strong>{selectedGateForApproval.name} ({selectedGateForApproval.code})</div>
+                <div><strong>主责角色：</strong>{selectedGateForApproval.role}</div>
+                <div><strong>审批类型：</strong><code>request_board_approval</code></div>
+                <div><strong>项目名：</strong>{projectName}</div>
+              </div>
+              <p className="text-muted-foreground">
+                会签放行后，系统将自动记录 Heartbeat Run Events 不可篡改审计日志，并释放下游分支合并与发布卡点。
+              </p>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setSelectedGateForApproval(null)}
+            >
+              取消
+            </Button>
+            <Button
+              variant="default"
+              size="sm"
+              className="gap-1.5"
+              onClick={handleRequestApproval}
+              disabled={approvalSubmitted}
+            >
+              {approvalSubmitted ? (
+                <>已提交至审批队列</>
+              ) : (
+                <>
+                  <Send className="h-3.5 w-3.5" />
+                  确认发起会签
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

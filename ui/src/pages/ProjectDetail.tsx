@@ -47,10 +47,12 @@ import {
 } from "../hooks/useResourceMemberships";
 import { ProjectCmmiGovernance } from "../components/ProjectCmmiGovernance";
 import { ProjectCmmiBaseline } from "../components/ProjectCmmiBaseline";
+import { ProjectCmmiRtm } from "../components/ProjectCmmiRtm";
+import { ProjectCmmiSpc } from "../components/ProjectCmmiSpc";
 
 /* ── Top-level tab types ── */
 
-type ProjectBaseTab = "list" | "plugin-operations" | "workspaces" | "configuration" | "budget" | "governance" | "baseline";
+type ProjectBaseTab = "list" | "plugin-operations" | "workspaces" | "configuration" | "budget" | "governance" | "baseline" | "rtm" | "spc";
 type ProjectPluginTab = `plugin:${string}`;
 type ProjectTab = ProjectBaseTab | ProjectPluginTab;
 
@@ -68,6 +70,8 @@ function resolveProjectTab(pathname: string, projectId: string): ProjectTab | nu
   if (tab === "budget") return "budget";
   if (tab === "governance") return "governance";
   if (tab === "baseline") return "baseline";
+  if (tab === "rtm") return "rtm";
+  if (tab === "spc") return "spc";
   if (tab === "issues") return "list";
   if (tab === "plugin-operations") return "plugin-operations";
   if (tab === "workspaces") return "workspaces";
@@ -670,6 +674,12 @@ export function ProjectDetail() {
     if (cachedTab === "baseline") {
       return <Navigate to={`/projects/${canonicalProjectRef}/baseline`} replace />;
     }
+    if (cachedTab === "rtm") {
+      return <Navigate to={`/projects/${canonicalProjectRef}/rtm`} replace />;
+    }
+    if (cachedTab === "spc") {
+      return <Navigate to={`/projects/${canonicalProjectRef}/spc`} replace />;
+    }
     if (cachedTab === "workspaces" && workspaceTabDecisionLoaded && showWorkspacesTab) {
       return <Navigate to={`/projects/${canonicalProjectRef}/workspaces`} replace />;
     }
@@ -712,6 +722,10 @@ export function ProjectDetail() {
       navigate(`/projects/${canonicalProjectRef}/governance`);
     } else if (tab === "baseline") {
       navigate(`/projects/${canonicalProjectRef}/baseline`);
+    } else if (tab === "rtm") {
+      navigate(`/projects/${canonicalProjectRef}/rtm`);
+    } else if (tab === "spc") {
+      navigate(`/projects/${canonicalProjectRef}/spc`);
     } else if (tab === "plugin-operations") {
       navigate(`/projects/${canonicalProjectRef}/plugin-operations`);
     } else if (tab === "configuration") {
@@ -847,6 +861,8 @@ export function ProjectDetail() {
             { value: "list", label: "Tasks" },
             { value: "governance", label: "质量门禁 (CMMI)" },
             { value: "baseline", label: "5+2 黄金文档" },
+            { value: "rtm", label: "RTM 需求穿透" },
+            { value: "spc", label: "过程度量 (SPC 3σ)" },
             ...(project.managedByPlugin ? [{ value: "plugin-operations", label: "Plugin operations" }] : []),
             ...(showWorkspacesTab ? [{ value: "workspaces", label: "Workspaces" }] : []),
             { value: "configuration", label: "Configuration" },
@@ -868,6 +884,14 @@ export function ProjectDetail() {
 
       {activeTab === "baseline" && project && (
         <ProjectCmmiBaseline projectId={project.id} projectName={project.name} />
+      )}
+
+      {activeTab === "rtm" && project && (
+        <ProjectCmmiRtm projectId={project.id} projectName={project.name} />
+      )}
+
+      {activeTab === "spc" && project && (
+        <ProjectCmmiSpc projectId={project.id} projectName={project.name} />
       )}
 
       {activeTab === "list" && project?.id && resolvedCompanyId && (

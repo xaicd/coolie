@@ -952,8 +952,8 @@ function HomeScreen({
             <ProjectsScreen
               company={company}
               onBack={() => setProjectsOpen(false)}
-              onOpenWebProjects={() =>
-                setWebContainerTarget({ path: "/projects", title: "项目中心 (Web 全量)" })
+              onOpenWebProjects={(subPath?: string, title?: string) =>
+                setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心 (Web 全量)" })
               }
               onOpenProjectTasks={(_project) => {
                 setProjectsOpen(false);

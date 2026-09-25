@@ -69,7 +69,7 @@ interface ProjectsScreenProps {
   onBack: () => void;
   onOpenProjectTasks?: (project: Project) => void;
   onCreateTaskForProject?: (project: Project) => void;
-  onOpenWebProjects?: () => void;
+  onOpenWebProjects?: (path?: string, title?: string) => void;
 }
 
 /**
@@ -405,17 +405,30 @@ export function ProjectsScreen({
                     <View style={styles.cmmiActionRow}>
                       <Pressable
                         style={styles.cmmiBtn}
-                        onPress={() => onOpenWebProjects ? onOpenWebProjects() : null}
+                        onPress={() =>
+                          onOpenWebProjects?.(`/projects/${project.id}/rtm`, `${project.name} · RTM 需求穿透`)
+                        }
                       >
                         <Ionicons name="git-network-outline" size={13} color={C.accent} />
-                        <Text style={styles.cmmiBtnText}>RTM 需求穿透树</Text>
+                        <Text style={styles.cmmiBtnText}>RTM 穿透</Text>
                       </Pressable>
                       <Pressable
                         style={styles.cmmiBtn}
-                        onPress={() => onOpenWebProjects ? onOpenWebProjects() : null}
+                        onPress={() =>
+                          onOpenWebProjects?.(`/projects/${project.id}/baseline`, `${project.name} · 5+2 黄金文档`)
+                        }
                       >
                         <Ionicons name="document-text-outline" size={13} color={C.ok} />
-                        <Text style={[styles.cmmiBtnText, { color: C.ok }]}>5+2 黄金文档基线</Text>
+                        <Text style={[styles.cmmiBtnText, { color: C.ok }]}>5+2 文档</Text>
+                      </Pressable>
+                      <Pressable
+                        style={styles.cmmiBtn}
+                        onPress={() =>
+                          onOpenWebProjects?.(`/projects/${project.id}/spc`, `${project.name} · SPC 过程控制`)
+                        }
+                      >
+                        <Ionicons name="analytics-outline" size={13} color={C.warn} />
+                        <Text style={[styles.cmmiBtnText, { color: C.warn }]}>SPC 控制</Text>
                       </Pressable>
                     </View>
 
