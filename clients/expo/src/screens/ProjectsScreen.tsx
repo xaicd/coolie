@@ -17,6 +17,7 @@ import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { StatusDot } from "../components/StatusDot";
+import { ApiContractSheet } from "../components/ApiContractSheet";
 
 type StatusFilter = "all" | "in_progress" | "planned" | "completed" | "paused";
 
@@ -93,6 +94,7 @@ export function ProjectsScreen({
   const [error, setError] = useState<string | null>(null);
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
+  const [activeApiContractProject, setActiveApiContractProject] = useState<Project | null>(null);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -483,9 +485,7 @@ export function ProjectsScreen({
                       </Pressable>
                       <Pressable
                         style={styles.cmmiBtn}
-                        onPress={() =>
-                          onOpenWebProjects?.(`/projects/${project.id}/api-lifecycle`, `${project.name} · API 契约中心`)
-                        }
+                        onPress={() => setActiveApiContractProject(project)}
                       >
                         <Ionicons name="code-slash-outline" size={13} color={C.ok} />
                         <Text style={[styles.cmmiBtnText, { color: C.ok }]}>API 契约 (DSH/MCP)</Text>
@@ -521,6 +521,20 @@ export function ProjectsScreen({
           })
         )}
       </ScrollView>
+
+      {/* 原生 API 契约与 DSH 生命周期速览抽屉 */}
+      {activeApiContractProject ? (
+        <ApiContractSheet
+          projectId={activeApiContractProject.id}
+          projectName={activeApiContractProject.name}
+          onClose={() => setActiveApiContractProject(null)}
+          onOpenFullWeb={() => {
+            const p = activeApiContractProject;
+            setActiveApiContractProject(null);
+            onOpenWebProjects?.(`/projects/${p.id}/api-lifecycle`, `${p.name} · API 契约中心`);
+          }}
+        />
+      ) : null}
     </View>
   );
 }
