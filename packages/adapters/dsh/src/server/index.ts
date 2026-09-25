@@ -13,7 +13,12 @@ export type {
   DeepSeekChatResponse,
   DshChatClient,
 } from "./deepseek.js";
-export { createMcpToolInvoker, ontologyMcpTools } from "./mcp.js";
+export {
+  createMcpToolInvoker,
+  ontologyMcpTools,
+  projectApiMcpTools,
+  dshCombinedTools,
+} from "./mcp.js";
 export { runDshHarness } from "./harness.js";
 
 /**

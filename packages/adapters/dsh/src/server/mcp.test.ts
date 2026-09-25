@@ -106,4 +106,49 @@ describe("createMcpToolInvoker", () => {
       "No such domain: nope",
     );
   });
+
+  it("synthesizes high-fidelity mock response directly for registered mocking APIs without remote call", async () => {
+    const fakeApis = [
+      {
+        id: "api_order",
+        companyId: "comp_1",
+        projectId: "proj_1",
+        name: "创建订单",
+        apiKey: "order.create",
+        protocol: "http" as const,
+        endpoint: "/api/v1/orders",
+        stage: "mocking" as const,
+        version: "v1.0.0",
+        description: "测试下单",
+        requestSchema: [
+          { name: "userId", type: "string" as const, required: true, description: "用户ID" },
+        ],
+        responseSchema: [
+          { name: "orderId", type: "string" as const, required: true, description: "订单ID", example: "ord_123" },
+          { name: "amount", type: "decimal" as const, required: true, description: "金额", example: 88.0 },
+        ],
+        errorContracts: [],
+        mcpExposed: true,
+        mcpToolName: "call_order_create",
+        idempotent: true,
+        tenantIsolated: true,
+        createdAt: "2026-09-25T00:00:00Z",
+        updatedAt: "2026-09-25T00:00:00Z",
+      },
+    ];
+
+    const invoker = createMcpToolInvoker({
+      endpoint: "https://ontology.test/mcp",
+      registeredApis: fakeApis,
+    });
+
+    const res = (await invoker.callTool("call_order_create", { userId: "usr_1" })) as Record<string, unknown>;
+    expect(res).toBeDefined();
+    expect(res.code).toBe(200);
+    expect(res.data).toMatchObject({
+      orderId: "ord_123",
+      amount: 88.0,
+    });
+  });
 });
+

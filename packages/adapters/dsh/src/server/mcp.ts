@@ -9,6 +9,11 @@
  */
 
 import { ONTOLOGY_TOOLS } from "@paperclipai/ontology-core/mcp/tools.js";
+import {
+  projectApiToMcpTool,
+  synthesizeMockResponse,
+  type ApiContractDefinition,
+} from "@paperclipai/ontology-core/api/lifecycle.js";
 import type { DeepSeekTool } from "./deepseek.js";
 
 export const DSH_MCP_PROTOCOL_VERSION = "2025-06-18";
@@ -27,6 +32,34 @@ export function ontologyMcpTools(): DeepSeekTool[] {
   }));
 }
 
+/**
+ * Projects dynamic project business API contracts into DeepSeek function tools.
+ */
+export function projectApiMcpTools(apis: ApiContractDefinition[]): DeepSeekTool[] {
+  return apis
+    .filter((api) => api.mcpExposed)
+    .map((api) => {
+      const projected = projectApiToMcpTool(api);
+      return {
+        type: "function" as const,
+        function: {
+          name: projected.name,
+          description: projected.description,
+          parameters: projected.parameters,
+        },
+      };
+    });
+}
+
+/**
+ * Combined tool catalogue exposing both ontology schema tools and business API tools to DSH.
+ */
+export function dshCombinedTools(dynamicApis?: ApiContractDefinition[]): DeepSeekTool[] {
+  const baseTools = ontologyMcpTools();
+  if (!dynamicApis || dynamicApis.length === 0) return baseTools;
+  return [...baseTools, ...projectApiMcpTools(dynamicApis)];
+}
+
 export interface McpToolInvokerOptions {
   /** Streamable-HTTP MCP endpoint, e.g. https://host/mcp or /mcp/gateways/gw_... */
   endpoint: string;
@@ -34,6 +67,8 @@ export interface McpToolInvokerOptions {
   headers?: Record<string, string>;
   fetchImpl?: typeof fetch;
   timeoutMs?: number;
+  /** Optional project API contracts registered in DSH. */
+  registeredApis?: ApiContractDefinition[];
 }
 
 export interface McpToolInvoker {
@@ -142,6 +177,19 @@ export function createMcpToolInvoker(options: McpToolInvokerOptions): McpToolInv
 
   return {
     async callTool(name: string, args: Record<string, unknown>): Promise<unknown> {
+      if (options.registeredApis && options.registeredApis.length > 0) {
+        const matchedApi = options.registeredApis.find(
+          (a) =>
+            a.mcpToolName === name ||
+            `call_${a.apiKey.replace(/[^a-zA-Z0-9_]/g, "_")}` === name,
+        );
+        if (matchedApi) {
+          if (matchedApi.stage === "mocking" || !options.endpoint) {
+            return synthesizeMockResponse(matchedApi);
+          }
+        }
+      }
+
       if (!initialized) initialized = initialize();
       await initialized;
 
