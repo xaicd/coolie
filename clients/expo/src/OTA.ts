@@ -53,6 +53,32 @@ export function promptRestart(
  *    - 发布脚本中对导出的 manifest 使用私钥计算数字签名，并作为 `expo-signature` 响应头下发
  *    - expo-updates 客户端原生验证签名，确保更新包未被劫持、篡改或未授权发布。
  */
+/**
+ * 触发链观测点 (wave86, boss 09-25 27:18 OOB「0.5.55 为啥不更新」):
+ * 把「更新源声称的 runtimeVersion」和「本机原生的 runtimeVersion」打进 logcat。
+ * 实测 (09-25 模拟器 0.5.58 ← manifest 0.5.59) expo-updates 并不因 runtimeVersion
+ * 不同拒载 bundle —— mismatch 只是提示「新 bundle 跑在旧原生层上」, 不是失败。
+ */
+async function logOTAProbe(): Promise<void> {
+  const installed = Updates.runtimeVersion ?? Constants.expoConfig?.version ?? "unknown";
+  const updatesCfg = (Constants.expoConfig as Record<string, any> | undefined)?.updates as
+    | { url?: string }
+    | undefined;
+  if (!updatesCfg?.url) {
+    console.warn(`[OTA] probe skipped: expoConfig 无 updates.url (installedApp=${installed})`);
+    return;
+  }
+  const probe = await checkOTAManifest(updatesCfg.url, 8000);
+  if (!probe.ok) {
+    console.warn(`[OTA] check manifest FAILED: ${probe.error} (installedApp=${installed})`);
+    return;
+  }
+  const verdict = probe.runtimeVersion === installed ? "match" : "MISMATCH";
+  console.log(
+    `[OTA] check manifest runtimeVersion=${probe.runtimeVersion} vs installedApp=${installed} → ${verdict}`,
+  );
+}
+
 export async function initOTASecurity(): Promise<void> {
   if (!Updates.isEnabled) return;
   try {
@@ -73,14 +99,24 @@ export async function initOTASecurity(): Promise<void> {
  */
 export function setupOTAListener(onUpdateDownloaded?: () => void): () => void {
   if (!Updates.isEnabled) {
+    console.log("[OTA] listener: updates disabled (dev 宿主或打包未启用), 不检查更新");
     return () => {};
   }
 
+  console.log(
+    `[OTA] listener setup: runtimeVersion=${Updates.runtimeVersion ?? "?"} channel=${Updates.channel ?? "?"} updateId=${Updates.updateId ?? "embedded(装机包)"}`,
+  );
+
   void initOTASecurity();
+  void logOTAProbe();
 
   try {
+    // 已下载待重启时只提示一次：状态每变一次就弹窗会把用户轰炸到「稍后」永远不点。
+    let pendingNotified = false;
     const subscription = Updates.addUpdatesStateChangeListener((event) => {
-      if (event.context.isUpdatePending) {
+      if (event.context.isUpdatePending && !pendingNotified) {
+        pendingNotified = true;
+        console.log("[OTA] update downloaded & pending, prompting restart");
         if (onUpdateDownloaded) {
           onUpdateDownloaded();
         } else {
@@ -89,10 +125,32 @@ export function setupOTAListener(onUpdateDownloaded?: () => void): () => void {
             "应用新版本已在后台静默下载完毕，是否立即重启生效？",
           );
         }
+      } else if (!event.context.isUpdatePending) {
+        pendingNotified = false;
       }
     });
 
+    // checkAutomatically=ON_LOAD 只覆盖冷启动；App 常驻前台时 (老板的手机很少冷启)
+    // 每次发版都要等到下次冷启才可见 —— 这里每 60s 主动复查一次。
+    const interval = setInterval(() => {
+      void (async () => {
+        if (pendingNotified) return; // 已下载待重启, 复查只是重复弹窗
+        try {
+          await logOTAProbe();
+          const check = await Updates.checkForUpdateAsync();
+          if (check.isAvailable) {
+            console.log("[OTA] periodic check: update available → fetching");
+            const fetched = await Updates.fetchUpdateAsync();
+            console.log(`[OTA] periodic fetch: isNew=${fetched.isNew}`);
+          }
+        } catch (e: unknown) {
+          console.warn("[OTA] periodic check error:", e);
+        }
+      })();
+    }, 60_000);
+
     return () => {
+      clearInterval(interval);
       subscription.remove();
     };
   } catch (e) {
@@ -115,6 +173,9 @@ export async function checkAndApplyUpdate(interactive = true): Promise<boolean> 
 
   try {
     const checkResult = await Updates.checkForUpdateAsync();
+    console.log(
+      `[OTA] checkAndApplyUpdate: isAvailable=${String(checkResult.isAvailable)} (installedApp=${Updates.runtimeVersion ?? Constants.expoConfig?.version ?? "?"})`,
+    );
     if (!checkResult.isAvailable) {
       if (interactive) {
         Alert.alert("检查更新", "当前已是最新版本，无需更新。");
@@ -124,6 +185,7 @@ export async function checkAndApplyUpdate(interactive = true): Promise<boolean> 
 
     // 发现可用更新，下载更新包
     const fetchResult = await Updates.fetchUpdateAsync();
+    console.log(`[OTA] checkAndApplyUpdate: fetch isNew=${String(fetchResult.isNew)}`);
     if (fetchResult.isNew) {
       promptRestart("发现新版本", "新版本已下载完成，是否立即重启应用？");
       return true;

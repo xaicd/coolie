@@ -148,3 +148,45 @@ adb logcat -d | grep -iE "Failed to construct manifest|Updates state change|\[OT
 - `ota-cache-busting`：更新源够得着，但**内容不新**（bundle hash / runtimeVersion 没变）。
 
 先查够不够得着，再查新不新。
+
+## 7. 第零步：先验装机 APK 有没有 OTA 配置 (wave86 教训)
+
+boss 09-23 27:18 OOB「0.5.55 为啥不更新」的真因**不在更新源**：dls 上那份
+0.5.55 APK 是陈旧 `android/` 目录 (gitignored) 构建的坏产物 —— 包名是
+`com.coolie` (正确的是 `cloud.coolie.app`)，AndroidManifest 里**零** expo-updates
+meta-data（无 `EXPO_UPDATE_URL`、无 `EXPO_RUNTIME_VERSION`）。原生层没配更新源，
+App 从不检查更新，更新源再健康也没用。
+
+排障时**先**跑这个（10 秒排除一半可能性）：
+
+```bash
+curl -s -o /tmp/v.apk https://dls.xrobinai.cn/coolie/app/<版本>/coolie-release.apk
+aapt2 dump badging /tmp/v.apk | head -1        # 包名对不对? versionCode 对不对?
+aapt2 dump xmltree /tmp/v.apk --file AndroidManifest.xml | grep -A2 'expo.modules.updates'
+#   必须看到 EXPO_UPDATE_URL / EXPO_RUNTIME_VERSION / ENABLED 三件套
+aapt2 dump resources /tmp/v.apk | grep -A1 'string/expo_runtime_version'   # runtime 真值
+```
+
+配套事实（模拟器实测 09-25，0.5.58 装机 ← manifest 0.5.59）：manifest 的
+`runtimeVersion` 与装机 runtime **不一致时 expo-updates 照样下载并加载**
+（`DownloadComplete` + `NEW_UPDATE_LOADED`）。「runtimeVersion 不匹配 → 静默
+忽略」是错误认知，别按它排障；不匹配只意味着新 JS bundle 跑在旧原生层上
+（原生依赖没变时安全，`clients/expo/package.json` 依赖 diff 可证）。
+
+预防复发：发版一律 `expo prebuild --platform android --clean` 全量重建，
+不要依赖 patch-in-place（`fix-android-manifest.sh` 只补 `EXPO_RUNTIME_VERSION`
+一个键，不会补整个 updates 配置块 —— android/ 陈旧时就产出无 OTA 的 APK）。
+
+## 8. 服务端观测：Caddy 访问日志 (wave86 加)
+
+生产 `/etc/caddy/Caddyfile` 站点块内有 `log` 指令（JSON、已过滤
+Cookie/Authorization 头）。查「谁在什么时候拉了哪次 manifest、用什么 runtime」：
+
+```bash
+ssh tc-coolie-claw 'grep ota/manifest /var/log/caddy/xrobinai-access.log | tail -5'
+# request.headers 里有 expo-runtime-version / expo-platform / expo-channel-name
+```
+
+装机侧配合 `adb logcat -s ReactNativeJS | grep '\[OTA\]'`（wave86 起客户端
+会打 `[OTA] listener setup` / `[OTA] check manifest runtimeVersion=X vs
+installedApp=Y` 全链日志）。

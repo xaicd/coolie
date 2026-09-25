@@ -4,6 +4,19 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.60
+
+> Released: 2026-09-25 · Android release APK + OTA bundle
+
+### 更新
+
+- wave86 — OTA 触发链 debug + 真验 (boss 09-23 27:18 OOB 「0.5.55 为啥不更新」+ 27:19 派)
+  - 真因: dls 上的 0.5.55 APK 是陈旧构建 (包名 `com.coolie`、零 expo-updates 配置)，从不检查更新; OTA 链路本身对 0.5.56+ 装机实测健康 (详见 `docs-coolie/OTA-STALE-APK-0.5.55-wave86.md`)
+  - 客户端加 `[OTA]` 全链观测日志 + 每 60s 主动复查更新 + 弹窗去重
+  - 生产 Caddy 加访问日志: `expo-runtime-version` 等请求头落盘，manifest 拉取可追溯
+
+---
+
 ## v0.5.59
 
 > Released: 2026-09-25 · APK + OTA bundle
