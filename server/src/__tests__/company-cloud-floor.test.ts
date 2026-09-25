@@ -17,7 +17,11 @@ const mockBudgetService = vi.hoisted(() => ({
 
 const mockLogActivity = vi.hoisted(() => vi.fn());
 
-vi.mock("../services/index.js", () => ({
+vi.mock("../services/index.js", async (importOriginal) => ({
+  // Keep the barrel's real domain helpers (company templates, DS approval, …)
+  // available: the route reads them during creation and they must not turn
+  // into mock misses. Only the service factories are stubbed below.
+  ...(await importOriginal<typeof import("../services/index.js")>()),
   accessService: () => mockAccessService,
   agentService: () => ({}),
   budgetService: () => mockBudgetService,

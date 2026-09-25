@@ -1,5 +1,7 @@
 import { createDiscordAdapter } from "@chat-adapter/discord";
 import { createRequire } from "node:module";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -1697,8 +1699,17 @@ type DiscordClientForLifecycleTest = {
   login(token?: string): Promise<string>;
 };
 
+// The vite module runner does not implement `import.meta.resolve`; anchor the
+// adapter's real package dir through this checkout's workspace link instead.
 const discordRequire = createRequire(
-  import.meta.resolve("@chat-adapter/discord"),
+  realpathSync(
+    fileURLToPath(
+      new URL(
+        "../../node_modules/@chat-adapter/discord/package.json",
+        import.meta.url,
+      ),
+    ),
+  ),
 );
 const { Client, Events } = discordRequire("discord.js") as {
   Client: {

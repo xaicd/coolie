@@ -501,14 +501,14 @@ export const pluginsApi = {
    * @see PLUGIN_SPEC.md §13.9 — `performAction`
    * @see PLUGIN_SPEC.md §19.7 — Error Propagation Through The Bridge
    */
-  bridgePerformAction: (
+  bridgePerformAction: <T = unknown>(
     pluginId: string,
     key: string,
     params?: Record<string, unknown>,
     companyId?: string | null,
     renderEnvironment?: PluginLauncherRenderContextSnapshot | null,
   ) =>
-    api.post<{ data: unknown }>(`/plugins/${pluginId}/actions/${encodeURIComponent(key)}`, {
+    api.post<{ data: T }>(`/plugins/${pluginId}/actions/${encodeURIComponent(key)}`, {
       companyId: companyId ?? undefined,
       params,
       renderEnvironment: renderEnvironment ?? undefined,

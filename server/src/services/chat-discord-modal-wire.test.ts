@@ -1,4 +1,6 @@
 import { createRequire } from "node:module";
+import { realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { Modal, Select, SelectOption, TextInput } from "chat";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -32,9 +34,18 @@ interface WireInteraction {
 
 // Resolve the adapter's own pinned discord.js, not a separately installed test
 // dependency. These are actual constructors and response methods, never mocks.
-const discordJs = createRequire(import.meta.resolve("@chat-adapter/discord"))(
-  "discord.js",
-) as {
+// The vite module runner does not implement `import.meta.resolve`; anchor the
+// adapter's real package dir through this checkout's workspace link instead.
+const discordJs = createRequire(
+  realpathSync(
+    fileURLToPath(
+      new URL(
+        "../../node_modules/@chat-adapter/discord/package.json",
+        import.meta.url,
+      ),
+    ),
+  ),
+)("discord.js") as {
   Client: new (options: { intents: number[] }) => WireClient;
   ButtonInteraction: new (
     client: WireClient,

@@ -135,6 +135,24 @@ if (!embeddedPostgresSupport.supported) {
 }
 const provisionWorktreeScriptPath = new URL("../../../scripts/provision-worktree.sh", import.meta.url);
 
+// Worktree provisioning resolves a CLI as: base-checkout CLI → `pnpm paperclipai`
+// → any `paperclipai` on PATH. The fixture repos below ship no CLI, so on a host
+// with a machine-global install (e.g. /opt/homebrew/bin/paperclipai) that binary
+// captures provisioning and rejects the minimal fixture config with its own
+// schema. Shadow the name with a stub exiting 127 — the script's "CLI unusable"
+// signal — so provisioning takes the same fallback-config path as CI. On hosts
+// without a global install the stub just answers the PATH probe the same way a
+// missing binary would.
+const paperclipaiPathShadowDir = await fs.mkdtemp(path.join(os.tmpdir(), "paperclip-test-path-shadow-"));
+await fs.writeFile(path.join(paperclipaiPathShadowDir, "paperclipai"), "#!/bin/sh\nexit 127\n", { mode: 0o755 });
+process.env.PATH = `${paperclipaiPathShadowDir}${path.delimiter}${process.env.PATH}`;
+afterAll(async () => {
+  if (process.env.PATH) {
+    process.env.PATH = process.env.PATH.replace(`${paperclipaiPathShadowDir}${path.delimiter}`, "");
+  }
+  await fs.rm(paperclipaiPathShadowDir, { recursive: true, force: true });
+});
+
 async function runGit(cwd: string, args: string[]) {
   await execFileAsync("git", args, { cwd });
 }
