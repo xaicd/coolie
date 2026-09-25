@@ -22,8 +22,11 @@ import {
 } from "../hooks/useResourceMemberships";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { ArrowUpDown, Check, Hexagon, Plus } from "lucide-react";
+import { ArrowUpDown, Check, Hexagon, Plus, RefreshCw } from "lucide-react";
 import { Card } from "@/components/ui/card";
+import { SyncProjectDialog } from "../components/SyncProjectDialog";
+import { ontologyApi } from "../api/ontology";
+import { cn } from "../lib/utils";
 
 type ProjectSortField = "name" | "updated" | "created" | "targetDate";
 type ProjectSortDir = "asc" | "desc";
@@ -82,6 +85,7 @@ export function Projects() {
   const { setBreadcrumbs } = useBreadcrumbs();
   const [sortField, setSortField] = useState<ProjectSortField>("name");
   const [sortDir, setSortDir] = useState<ProjectSortDir>("asc");
+  const [syncProject, setSyncProject] = useState<Project | null>(null);
 
   useEffect(() => {
     setBreadcrumbs([{ label: "Projects" }]);
@@ -90,6 +94,12 @@ export function Projects() {
   const { data: allProjects, isLoading, error } = useQuery({
     queryKey: queryKeys.projects.list(selectedCompanyId!),
     queryFn: () => projectsApi.list(selectedCompanyId!),
+    enabled: !!selectedCompanyId,
+  });
+
+  const { data: businessSystems } = useQuery({
+    queryKey: ["ontology-business-systems", selectedCompanyId],
+    queryFn: () => ontologyApi.listBusinessSystems(selectedCompanyId!),
     enabled: !!selectedCompanyId,
   });
   const membershipsQuery = useResourceMemberships(selectedCompanyId);
@@ -238,6 +248,35 @@ export function Projects() {
                               </span>
                             )}
                             <StatusBadge status={project.status} />
+                            {(() => {
+                              const syncedSystem = (businessSystems ?? []).find(
+                                (bs) =>
+                                  bs.metadata?.projectId === project.id ||
+                                  bs.code.toUpperCase() === `SYS_${project.name.toUpperCase().replace(/[^A-Z0-9_]/g, "_")}`,
+                              );
+                              return (
+                                <Button
+                                  type="button"
+                                  size="xs"
+                                  variant={syncedSystem ? "secondary" : "outline"}
+                                  className={cn(
+                                    "h-6 px-2 text-xs gap-1 font-normal transition-colors shrink-0",
+                                    syncedSystem
+                                      ? "text-primary border-primary/20 bg-primary/10 hover:bg-primary/20"
+                                      : "text-muted-foreground hover:text-foreground",
+                                  )}
+                                  title={syncedSystem ? `已同步至业务系统: ${syncedSystem.code} (点击可重新同步)` : "同步到业务系统资产"}
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    e.stopPropagation();
+                                    setSyncProject(project);
+                                  }}
+                                >
+                                  <RefreshCw className={cn("size-3", syncedSystem ? "text-primary" : "text-muted-foreground")} />
+                                  <span>{syncedSystem ? "已同步" : "同步"}</span>
+                                </Button>
+                              );
+                            })()}
                             <MembershipAction
                               state={state}
                               pending={joinLeavePending}
@@ -279,6 +318,13 @@ export function Projects() {
           })}
         </div>
       )}
+
+      <SyncProjectDialog
+        project={syncProject}
+        open={!!syncProject}
+        companyId={selectedCompanyId}
+        onClose={() => setSyncProject(null)}
+      />
     </div>
   );
 }

@@ -266,6 +266,30 @@
       "maxTotalLines": 160
     },
     {
+      "path": "ui/src/pages/Projects.tsx",
+      "maxNetLines": 80,
+      "reason": "Add per-row Sync action button and SyncProjectDialog integration in Projects list to bind projects to ontology business systems.",
+      "maxTotalLines": 360
+    },
+    {
+      "path": "ui/src/components/SyncProjectDialog.tsx",
+      "maxNetLines": 330,
+      "reason": "New file: Modal dialog to sync a project to an ontology business system and domain.",
+      "maxTotalLines": 360
+    },
+    {
+      "path": "ui/src/api/ontology.ts",
+      "maxNetLines": 160,
+      "reason": "New file: Ontology API client for listing domains, business systems, and syncing projects as business systems.",
+      "maxTotalLines": 180
+    },
+    {
+      "path": "ui/src/api/index.ts",
+      "maxNetLines": 10,
+      "reason": "Export ontologyApi from api index.",
+      "maxTotalLines": 35
+    },
+    {
       "path": "scripts/release-app.sh",
       "maxNetLines": 250,
       "reason": "Fork release script, and entirely ours: upstream ships no release-app.sh, so there is nothing to reconcile at a merge. It sits under scripts/ only because that is where the release entry points are wired, and that path prefix is the only reason the gate asks about it. Content is pre-flight and sanity checks, version.json read permissions, runtimeVersion single-sourced for OTA, and the rule that every release must correspond to a commit — the last paired with backfill-commit-sha.sh below.",
