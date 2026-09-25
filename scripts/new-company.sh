@@ -92,11 +92,17 @@ for entry in payload.get("skipped", []):
 [[ -n "$AGENT_LINES" ]] || die "没有创建任何 agent: $AGENTS_JSON"
 printf '%s\n' "$AGENT_LINES"
 
+step "[3/5] 初始化企业基座本体域 (POST /api/plugins/ontology/actions/seed-enterprise-context)"
+ONTOLOGY_BODY="$(python3 -c 'import json,sys; print(json.dumps({"companyId":sys.argv[1]}))' "$COMPANY_ID")"
+api POST "/api/plugins/ontology/actions/seed-enterprise-context" "$ONTOLOGY_BODY" >/dev/null 2>&1 \
+  && echo "   ✓ enterprise-core 企业基座本体域已初始化" \
+  || echo "   · ontology 插件将在首次访问控制台时自动补齐企业基座"
+
 if [[ "$SKIP_WORKSPACE" == "1" ]]; then
-  step "[3/4] 跳过 workspace（COOLIE_SKIP_WORKSPACE=1）"
+  step "[4/5] 跳过 workspace（COOLIE_SKIP_WORKSPACE=1）"
   ROOT="(skipped)"
 else
-  step "[3/4] 铺 workspace 骨架"
+  step "[4/5] 铺 workspace 骨架"
   REPO_ROOT="$(git rev-parse --show-toplevel)"
   SKEL="$REPO_ROOT/templates/workspace-skel"
   [[ -d "$SKEL" ]] || die "workspace 骨架不存在: $SKEL"
@@ -109,7 +115,7 @@ else
   fi
   echo "   ✓ $ROOT"
 
-  step "[4/4] ruoyi-all-next 子模块"
+  step "[5/5] ruoyi-all-next 子模块"
   cd "$ROOT"
   # 子模块为可选项：网络不可达 / 已声明时不阻断立项。
   git submodule add https://github.com/xaicd/ruoyi-all-next.git 2>&1 | head -3 \

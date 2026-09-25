@@ -69,7 +69,7 @@ const isCardinality = (value: string): value is LinkCardinality =>
   (LINK_CARDINALITIES as readonly string[]).includes(value);
 
 export interface SeedStore {
-  listDomains(companyId: string): Promise<Array<{ slug: string }>>;
+  listDomains(companyId: string): Promise<Array<{ slug: string; id?: string }>>;
   createDomain(input: {
     companyId: string;
     slug: string;
@@ -113,6 +113,9 @@ export interface SeedStore {
     targetNodeId: string;
     relationKey: string;
   }): Promise<{ id: string }>;
+  listNodeTypes?(companyId: string, domainId: string): Promise<Array<{ id: string; key: string }>>;
+  listRelationTypes?(companyId: string, domainId: string): Promise<Array<{ id: string; key: string }>>;
+  listNodes?(companyId: string, domainId: string, limit?: number): Promise<Array<{ id: string; key: string }>>;
 }
 
 export interface SeedReport {
@@ -177,13 +180,127 @@ export async function seedSampleDomains(
     ? SAMPLE_DOMAINS.filter((domain) => options.only!.includes(domain.key))
     : SAMPLE_DOMAINS;
 
-  const existing = new Set((await store.listDomains(companyId)).map((row) => row.slug));
+  const existingRows = await store.listDomains(companyId);
+  const existingMap = new Map(existingRows.map((row) => [row.slug, row]));
   const report: SeedReport = { domains: [], created: 0, skipped: 0, failed: 0 };
 
   for (const domain of wanted) {
-    if (existing.has(domain.key)) {
+    const isEnterpriseCore = domain.key === "enterprise-core";
+    const existingDomain = existingMap.get(domain.key);
+
+    if (existingDomain && !isEnterpriseCore) {
       report.domains.push({ slug: domain.key, displayName: domain.displayName, status: "skipped-existing" });
       report.skipped += 1;
+      continue;
+    }
+
+    if (existingDomain && isEnterpriseCore) {
+      const domainId = existingDomain.id;
+      let reconciledTypes = 0;
+      let reconciledNodes = 0;
+
+      if (domainId && typeof store.listNodeTypes === "function") {
+        const existingNodeTypes = await store.listNodeTypes(companyId, domainId);
+        const typeIdByKey = new Map<string, string>(existingNodeTypes.map((nt) => [nt.key, nt.id]));
+
+        for (const type of domain.nodeTypes) {
+          if (!typeIdByKey.has(type.key)) {
+            const createdType = await store.createNodeType({
+              companyId,
+              domainId,
+              key: type.key,
+              displayName: type.displayName,
+              description: type.description,
+              propertiesSchema: type.propertiesSchema ?? {},
+            });
+            if (createdType?.id) {
+              typeIdByKey.set(type.key, createdType.id);
+              reconciledTypes += 1;
+            }
+          }
+        }
+
+        if (typeof store.listRelationTypes === "function") {
+          const existingRels = await store.listRelationTypes(companyId, domainId);
+          const relKeySet = new Set(existingRels.map((rt) => rt.key));
+
+          for (const relation of domain.relationTypes) {
+            if (!isCardinality(relation.cardinality) || relKeySet.has(relation.key)) continue;
+            const metadata = buildRelationMetadata(relation.sourceNodeTypeKey, relation.targetNodeTypeKey, {
+              sample: true,
+            });
+            await store.createRelationType({
+              companyId,
+              domainId,
+              key: relation.key,
+              displayName: relation.displayName,
+              description: relation.description,
+              cardinality: relation.cardinality,
+              metadata,
+            });
+            reconciledTypes += 1;
+          }
+        }
+
+        if (
+          typeof store.listNodes === "function" &&
+          typeof store.createNode === "function" &&
+          typeof store.createEdge === "function"
+        ) {
+          const existingNodes = await store.listNodes(companyId, domainId, 300);
+          const nodeIdByKey = new Map<string, string>(existingNodes.map((n) => [n.key, n.id]));
+
+          for (const nodeDef of ENTERPRISE_INITIAL_INSTANCES.nodes) {
+            if (!nodeIdByKey.has(nodeDef.key)) {
+              const nodeTypeId = typeIdByKey.get(nodeDef.type) ?? null;
+              const createdNode = await store.createNode({
+                companyId,
+                domainId,
+                key: nodeDef.key,
+                label: nodeDef.label,
+                nodeTypeId,
+                properties: nodeDef.properties,
+              });
+              if (createdNode?.id) {
+                nodeIdByKey.set(nodeDef.key, createdNode.id);
+                reconciledNodes += 1;
+              }
+            }
+          }
+
+          for (const edgeDef of ENTERPRISE_INITIAL_INSTANCES.edges) {
+            const sourceNodeId = nodeIdByKey.get(edgeDef.from);
+            const targetNodeId = nodeIdByKey.get(edgeDef.to);
+            if (sourceNodeId && targetNodeId) {
+              try {
+                await store.createEdge({
+                  companyId,
+                  domainId,
+                  sourceNodeId,
+                  targetNodeId,
+                  relationKey: edgeDef.rel,
+                });
+              } catch {
+                // Edge might already exist, safe to swallow
+              }
+            }
+          }
+        }
+      }
+
+      report.domains.push({
+        slug: domain.key,
+        displayName: domain.displayName,
+        status: reconciledTypes > 0 || reconciledNodes > 0 ? "created" : "skipped-existing",
+        nodeTypes: domain.nodeTypes.length,
+        relationTypes: domain.relationTypes.length,
+        nodes: reconciledNodes > 0 ? reconciledNodes : undefined,
+      });
+      if (reconciledTypes > 0 || reconciledNodes > 0) {
+        report.created += 1;
+      } else {
+        report.skipped += 1;
+      }
       continue;
     }
 
@@ -199,7 +316,6 @@ export async function seedSampleDomains(
       continue;
     }
 
-    const isEnterpriseCore = domain.key === "enterprise-core";
     const created = await store.createDomain({
       companyId,
       slug: domain.key,

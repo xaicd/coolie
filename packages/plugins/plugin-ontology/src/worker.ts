@@ -107,6 +107,22 @@ let activeContext: PluginContext | null = null;
 let graphStore: GraphStore | null = null;
 let aideStore: AideStore | null = null;
 
+const ensuredEnterpriseCompanies = new Set<string>();
+
+/**
+ * Ensures the enterprise core domain is present and reconciled for a company.
+ * Completely idempotent: if already present and current, it returns immediately.
+ */
+async function ensureEnterpriseDomain(companyId: string, store: GraphStore): Promise<void> {
+  if (!companyId || ensuredEnterpriseCompanies.has(companyId)) return;
+  try {
+    await seedSampleDomains(companyId, store, { only: ["enterprise-core"] });
+    ensuredEnterpriseCompanies.add(companyId);
+  } catch (err) {
+    activeContext?.logger.warn(`[ontology-worker] ensureEnterpriseDomain failed for ${companyId}: ${err}`);
+  }
+}
+
 /**
  * Registry of in-flight `ask-aide` streams, keyed by their stream channel.
  * The UI calls the `aide-abort` action with a (companyId, domainId) pair; we
@@ -1782,6 +1798,7 @@ const plugin = definePlugin({
     // Backs usePluginData("list-domains") in the plugin UI.
     ctx.data.register("list-domains", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
+      await ensureEnterpriseDomain(companyId, store);
       return { domains: await store.listDomains(companyId) };
     });
 
@@ -1790,6 +1807,9 @@ const plugin = definePlugin({
     ctx.data.register("domain-detail", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
       const domainId = requireString(params.domainId, "domainId");
+      if (domainId === "enterprise-core") {
+        await ensureEnterpriseDomain(companyId, store);
+      }
       const [domain, nodeTypes, relationTypes, graph, services] = await Promise.all([
         store.getDomain(companyId, domainId),
         store.listNodeTypes(companyId, domainId),
@@ -3626,6 +3646,23 @@ const plugin = definePlugin({
       return { snapshot: target };
     });
 
+    // Production auto-seeding pass: background ensure enterprise-core domain exists for active companies
+    setTimeout(async () => {
+      try {
+        const rows = await ctx.db.query<{ id: string }>(
+          `SELECT id FROM "${ctx.db.namespace}".companies WHERE status != 'archived'`
+        );
+        for (const row of rows) {
+          if (row?.id) {
+            await ensureEnterpriseDomain(row.id, store);
+          }
+        }
+      } catch {
+        // Fallback: if companies table is in another schema or query fails,
+        // on-demand ensureEnterpriseDomain in list-domains / onApiRequest covers it.
+      }
+    }, 1000).unref?.();
+
     ctx.logger.info("Ontology plugin worker started", { namespace: ctx.db.namespace });
   },
 
@@ -3664,6 +3701,7 @@ const plugin = definePlugin({
         // retiring became possible — visible only to this path, which is the
         // worst kind of difference. It also dropped `lifecycle_state`, which the
         // same rows carry everywhere else.
+        await ensureEnterpriseDomain(companyId, store);
         return { body: { domains: await store.listDomains(companyId) } };
       }
 
