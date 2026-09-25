@@ -1,0 +1,7 @@
+{
+  "version": "0.5.58",
+  "versionCode": 558,
+  "commitSha": "3602c3932",
+  "apkUrl": "https://dls.xrobinai.cn/coolie/app/0.5.58/coolie-release.apk",
+  "notes": "wave84 排查 web cookie + 打包 boss Claude 后 8 commit"
+}

@@ -88,6 +88,7 @@ export function WebContainerScreen({
     let cancelled = false;
     void getAuthToken().then((token) => {
       if (cancelled) return;
+      console.log(`[bridge] token=${token ? token.slice(0, 12) + "..." : "null"} len=${token ? token.length : 0}`);
       setExchangeToken(token ?? null);
       setTokenReady(true);
     });
@@ -95,6 +96,14 @@ export function WebContainerScreen({
       cancelled = true;
     };
   }, []);
+
+  // Wave 84 — trace the resolved bridge URL so adb logcat can confirm the
+  // WebView actually loads the exchange endpoint (and not the bare landing
+  // URL, which is what happens when tokenReady flips before the SecureStore
+  // read resolves).
+  useEffect(() => {
+    console.log(`[bridge] targetUrl=${targetUrl ? targetUrl.slice(0, 80) + "..." : "null"} tokenReady=${tokenReady}`);
+  }, [targetUrl, tokenReady]);
 
   const bridgeUrl = exchangeToken
     ? `${COOLIE_WEB_URL.replace(/\/+$/, "")}/api/auth/exchange?token=${encodeURIComponent(exchangeToken)}&next=${encodeURIComponent(baseUrl)}`

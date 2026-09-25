@@ -4,6 +4,32 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.58
+
+> Released: 2026-09-25 · APK + OTA bundle
+
+### 更新
+
+- wave84 — 排查 + 修 App ↔ Web cookie 共享 + 打包 boss Claude 后 8 commit (boss 27:11 OOB)
+  - **根因 (wave84 bridge bug)**：`server/src/auth/app-web-login-bridge.ts` 的
+    `validateAppWebLoginBridgeToken` 在 HTTPS 请求里构造
+    `Cookie: paperclip-default.session_token=<token>`，但 Better Auth 在 HTTPS 上
+    只识别 `__Secure-paperclip-default.session_token`。bridge 永远命中空查询，
+    永远 401 → WebView 拿不到 Set-Cookie → 老板装 0.5.57 APK 仍要单独登录 web。
+  - **修法**：让 `validateAppWebLoginBridgeToken` 接受 `secure` 参数（由
+    `isAppWebLoginBridgeRequestSecure(req)` 决定），HTTPS 走
+    `__Secure-` 前缀，与 `buildAppWebLoginBridgeCookie` 对齐。Bridge 现在
+    真验: 302 + `set-cookie: __Secure-paperclip-default.session_token=...; Path=/;
+    HttpOnly; SameSite=Lax; Max-Age=604800; Secure` + 跟 next 重定向到登录态。
+  - **debug log**：`[bridge] token=xxx URL=yyy` + `[bridge] ok|invalid_token|
+    missing_token` adb logcat 抓 trace，定位真因用。
+  - **测试**：`__tests__/app-web-login-bridge.test.ts` 加 2 个用例覆盖
+    secure=true/false 时 cookie 名前缀。
+  - **boss Claude 后 8 commit**：CMMI 治理 + ontology + 项目同步按钮（详见 server
+    rebuild log）。
+
+---
+
 ## v0.5.57
 
 > Released: 2026-09-25 · OTA bundle only (no APK)

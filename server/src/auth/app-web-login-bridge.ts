@@ -56,7 +56,9 @@ export type AppWebLoginBridgeSessionApi = {
  * own `getSession`. The value goes into a synthetic `Cookie` header using the
  * exact cookie name the instance writes (prefix derived from the same env the
  * instance is running under, so a worktree never accepts a default-instance
- * token or vice versa).
+ * token or vice versa). When the inbound request arrived over HTTPS we also
+ * add the `__Secure-` prefix — Better Auth only reads the prefixed cookie
+ * name on HTTPS, so without it the lookup misses and the bridge 401s.
  *
  * Returns null when the token doesn't resolve to a live session, so the
  * caller can distinguish a forged token (bridge must reject) from a session
@@ -65,16 +67,18 @@ export type AppWebLoginBridgeSessionApi = {
  */
 export async function validateAppWebLoginBridgeToken(
   auth: AppWebLoginBridgeSessionApi,
-  input: { token: string },
+  input: { token: string; secure?: boolean },
 ): Promise<{ userId: string } | null> {
   if (!input.token) return null;
   const api = auth.api?.getSession;
   if (!api) return null;
 
-  const cookieName = `${deriveAuthCookiePrefix()}.session_token`;
+  const baseName = `${deriveAuthCookiePrefix()}.session_token`;
+  const cookieName = input.secure ? `__Secure-${baseName}` : baseName;
   const headers = new Headers({
     cookie: `${cookieName}=${input.token}`,
   });
+  console.log(`[bridge] validate cookieName=${cookieName} tokenLen=${input.token.length}`);
 
   let value: unknown;
   try {
@@ -162,13 +166,16 @@ export async function runAppWebLoginBridge(input: {
   const next = sanitizeAppWebLoginBridgeNext(rawNext);
 
   if (!token) {
+    console.log(`[bridge] missing_token next=${next}`);
     return { ok: false, reason: "missing_token" };
   }
 
-  const validated = await validateAppWebLoginBridgeToken(input.auth, { token });
+  const validated = await validateAppWebLoginBridgeToken(input.auth, { token, secure: input.secure });
   if (!validated) {
+    console.log(`[bridge] invalid_token tokenLen=${token.length} tokenHead=${token.slice(0, 12)}... next=${next} secure=${input.secure}`);
     return { ok: false, reason: "invalid_token" };
   }
+  console.log(`[bridge] ok userId=${validated.userId} tokenLen=${token.length} next=${next} secure=${input.secure}`);
 
   input.res.setHeader("Set-Cookie", buildAppWebLoginBridgeCookie({ token, secure: input.secure }));
   input.res.setHeader("Cache-Control", "no-store");

@@ -162,6 +162,41 @@ describe.sequential("app-web-login-bridge validators", () => {
     expect(seenCookies[0]).not.toMatch(/paperclip-default\.session_token=/);
   });
 
+  it("prefixes the cookie name with __Secure- when secure=true so HTTPS validation works", async () => {
+    process.env.PAPERCLIP_INSTANCE_ID = "default";
+    const seenCookies: string[] = [];
+    const auth = {
+      api: {
+        getSession: async ({ headers }: { headers: Headers }) => {
+          seenCookies.push(headers.get("cookie") ?? "");
+          return null;
+        },
+      },
+    };
+
+    await validateAppWebLoginBridgeToken(auth, { token: TOKEN, secure: true });
+
+    expect(seenCookies[0]).toMatch(/^__Secure-paperclip-default\.session_token=/);
+  });
+
+  it("omits the __Secure- prefix when secure=false so HTTP loopback validation works", async () => {
+    process.env.PAPERCLIP_INSTANCE_ID = "default";
+    const seenCookies: string[] = [];
+    const auth = {
+      api: {
+        getSession: async ({ headers }: { headers: Headers }) => {
+          seenCookies.push(headers.get("cookie") ?? "");
+          return null;
+        },
+      },
+    };
+
+    await validateAppWebLoginBridgeToken(auth, { token: TOKEN, secure: false });
+
+    expect(seenCookies[0]).toMatch(/^paperclip-default\.session_token=/);
+    expect(seenCookies[0]).not.toContain("__Secure-");
+  });
+
   it("returns null when Better Auth's getSession throws", async () => {
     const auth = {
       api: {
