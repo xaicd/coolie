@@ -33,9 +33,23 @@ bash scripts/new-company.sh acme
 # 进入新 workspace 自举
 cd ~/workspace/xaicd/acme && bash scripts/bootstrap.sh
 
-# 拉取框架子模块
+# 拉取框架子模块 (ruoyi-all-next: Next.js 15 + PostgreSQL + Prisma/Kysely)
 bash scripts/import-ruoyi.sh
+
+# 启动 ruoyi-all-next 底座
+cd ruoyi-all-next
+npm install
+./start.sh memory   # 内存免库极速预览
+# 或
+./start.sh dev      # 启动 PostgreSQL 5433 + Redis 6380 + Next.js 15
 ```
+
+## 大型复杂项目底座：ruoyi-all-next
+作为企业级全栈管理平台的默认初始化底座（`https://github.com/xaicd/ruoyi-all-next.git`）：
+- **全套 System 域**：用户/角色/部门树/菜单树/岗位/字典/多租户/JWT 鉴权已全部跑通；
+- **全套 Infra 域**：系统配置/定时任务/文件存储；
+- **丰富业务域骨架**：BPM 审批/支付 Pay/商城 Mall/CRM/ERP/WMS/MES/AI 智能体/IoT/IM/Member/Report；
+- **业务项目初始化**：按 `docs/guides/project-profile-bootstrap.md` 调整 `project-profile.json` 与 `.env.local` 即可，不用从零造轮子。
 
 ## 五个角色
 

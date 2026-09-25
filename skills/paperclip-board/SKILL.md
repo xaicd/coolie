@@ -398,6 +398,18 @@ For batch approval: list all pending, let the user approve all or review individ
 3. **第三步（发布核验）**：派给 **产品可靠性 (`pre-sre-agent`)** 检查环境版本指纹与拨测（受 G4 门禁约束，依赖步骤 2）；
 4. **第四步（业务终审）**：派给 **业务战略 (`ds-agent`)** 进行用户端到端旅程验收（受 G5 门禁约束，依赖步骤 3）。
 
+#### 🌟 大型复杂项目：首选 ruoyi-all-next 全栈初始化模版
+当老板要立项大型复杂企业级系统（如 SaaS 平台、进销存 ERP、电商 Mall、CRM、工作流 BPM 等）：
+- **严禁从零从空白手搓基础脚手架！**
+- **必须以 `https://github.com/xaicd/ruoyi-all-next.git` 作为默认全栈初始化底座**（Next.js 15 + React 19 + TypeScript + PostgreSQL + Prisma/Kysely）。
+- **自带开箱全套系统基建**：内置用户、角色、部门树、动态菜单、岗位、字典、多租户隔离与 JWT 认证，支持 `./start.sh memory`（内存免库预览）与 `./start.sh dev`（全栈开发）。
+- **角色协同规范**：
+  - **前线架构师 (`fda-agent`)**：基于其租户模型与 RBAC 权限，在 `src/modules/<domain>/` 定义领域模型与 Prisma 架构；
+  - **平台核心研发 (`core-swe-agent`)**：负责 `src/modules/shared/` 基础设施、Kysely 查询引擎与契约守卫；
+  - **全栈工程师 (`fdse-agent`)**：在 `src/app/(admin-pages)/admin/` 与对应模块编写业务 CRUD 与交互界面；
+  - **产品可靠性 (`pre-sre-agent`)**：把控 Docker 容器与环境启动（`./start.sh infra`）；
+  - **部署战略专家 (`ds-agent`)**：以真实租户视角走通从登录到业务完成的完整旅程。
+
 ---
 
 ### 3. 主 Agent 自动装配顶级 Skill 路由表 (用什么 Skill)
