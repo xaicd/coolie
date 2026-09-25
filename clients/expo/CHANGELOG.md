@@ -4,6 +4,20 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.61
+
+> Released: 2026-09-25 · Android release APK + OTA bundle
+
+### 更新
+
+- wave87 — 修 HEAD 既有 17 失败测试 + adapter-utils 7 TS error (boss 09-23 27:22 OOB 「派」)
+  - 根因 1: 本机 `packages/adapter-utils/node_modules/acpx` 被覆盖成未打补丁的实体目录 → 恢复指向 patched 0.12.0 的 symlink (7 个 TS error 全消, 无源码改动)
+  - 根因 2: `packages/db` migration journal 缺 9004 条目 (wave80 漏同步) → 补齐
+  - 根因 3: 测试环境泄漏 — `~/.claude/settings.json` 的 ANTHROPIC_AUTH_TOKEN 被 AI connection 巡检扫到 (10 个失败, 测试补 `cwd` 隔离); 全局 `/opt/homebrew/bin/paperclipai` 劫持 worktree provisioning (5 个失败, 测试加 PATH shadow); fork 改了报错文案没同步断言 (1 个); template barrel export 没 mock (1 个)
+  - 全仓 vitest 0 失败 + typecheck 0 error, 无产品行为变化
+
+---
+
 ## v0.5.60
 
 > Released: 2026-09-25 · Android release APK + OTA bundle
