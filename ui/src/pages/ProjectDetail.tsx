@@ -50,10 +50,11 @@ import { ProjectCmmiBaseline } from "../components/ProjectCmmiBaseline";
 import { ProjectCmmiRtm } from "../components/ProjectCmmiRtm";
 import { ProjectCmmiSpc } from "../components/ProjectCmmiSpc";
 import { ProjectCmmiLivingTopology } from "../components/ProjectCmmiLivingTopology";
+import { ProjectApiLifecycleHarness } from "../components/ProjectApiLifecycleHarness";
 
 /* ── Top-level tab types ── */
 
-type ProjectBaseTab = "list" | "plugin-operations" | "workspaces" | "configuration" | "budget" | "governance" | "baseline" | "rtm" | "spc" | "living-topology";
+type ProjectBaseTab = "list" | "plugin-operations" | "workspaces" | "configuration" | "budget" | "governance" | "baseline" | "rtm" | "spc" | "living-topology" | "api-lifecycle";
 type ProjectPluginTab = `plugin:${string}`;
 type ProjectTab = ProjectBaseTab | ProjectPluginTab;
 
@@ -74,6 +75,7 @@ function resolveProjectTab(pathname: string, projectId: string): ProjectTab | nu
   if (tab === "rtm") return "rtm";
   if (tab === "spc") return "spc";
   if (tab === "living-topology") return "living-topology";
+  if (tab === "api-lifecycle") return "api-lifecycle";
   if (tab === "issues") return "list";
   if (tab === "plugin-operations") return "plugin-operations";
   if (tab === "workspaces") return "workspaces";
@@ -685,6 +687,9 @@ export function ProjectDetail() {
     if (cachedTab === "living-topology") {
       return <Navigate to={`/projects/${canonicalProjectRef}/living-topology`} replace />;
     }
+    if (cachedTab === "api-lifecycle") {
+      return <Navigate to={`/projects/${canonicalProjectRef}/api-lifecycle`} replace />;
+    }
     if (cachedTab === "workspaces" && workspaceTabDecisionLoaded && showWorkspacesTab) {
       return <Navigate to={`/projects/${canonicalProjectRef}/workspaces`} replace />;
     }
@@ -733,6 +738,8 @@ export function ProjectDetail() {
       navigate(`/projects/${canonicalProjectRef}/spc`);
     } else if (tab === "living-topology") {
       navigate(`/projects/${canonicalProjectRef}/living-topology`);
+    } else if (tab === "api-lifecycle") {
+      navigate(`/projects/${canonicalProjectRef}/api-lifecycle`);
     } else if (tab === "plugin-operations") {
       navigate(`/projects/${canonicalProjectRef}/plugin-operations`);
     } else if (tab === "configuration") {
@@ -871,6 +878,7 @@ export function ProjectDetail() {
             { value: "rtm", label: "RTM 需求穿透" },
             { value: "spc", label: "过程度量 (SPC 3σ)" },
             { value: "living-topology", label: "三态活拓扑 (SkyWalking/Chaos)" },
+            { value: "api-lifecycle", label: "API 契约中心 (DSH/MCP)" },
             ...(project.managedByPlugin ? [{ value: "plugin-operations", label: "Plugin operations" }] : []),
             ...(showWorkspacesTab ? [{ value: "workspaces", label: "Workspaces" }] : []),
             { value: "configuration", label: "Configuration" },
@@ -904,6 +912,10 @@ export function ProjectDetail() {
 
       {activeTab === "living-topology" && project && (
         <ProjectCmmiLivingTopology projectId={project.id} projectName={project.name} />
+      )}
+
+      {activeTab === "api-lifecycle" && project && (
+        <ProjectApiLifecycleHarness projectId={project.id} projectName={project.name} />
       )}
 
       {activeTab === "list" && project?.id && resolvedCompanyId && (

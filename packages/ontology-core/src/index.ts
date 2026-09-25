@@ -244,3 +244,16 @@ export type {
 } from "./document/OntologyDocument.js";
 export { lintDocument } from "./document/lintDocument.js";
 export type { LintFinding } from "./document/lintDocument.js";
+
+export {
+  projectApiToMcpTool,
+  synthesizeMockResponse,
+  generateCodeStub,
+} from "./api/lifecycle.js";
+export type {
+  ApiProtocol,
+  ApiLifecycleStage,
+  ApiFieldContract,
+  ApiErrorContract,
+  ApiContractDefinition,
+} from "./api/lifecycle.js";

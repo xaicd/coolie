@@ -375,15 +375,15 @@
     },
     {
       "path": "ui/src/App.tsx",
-      "maxNetLines": 30,
-      "reason": "Mount project governance, 5+2 baseline, RTM, SPC, and Living Topology routes (/projects/:id/{governance,baseline,rtm,spc,living-topology}) for CMMI quality governance.",
-      "maxTotalLines": 70
+      "maxNetLines": 35,
+      "reason": "Mount project governance, 5+2 baseline, RTM, SPC, Living Topology, and API Lifecycle routes (/projects/:id/{governance,baseline,rtm,spc,living-topology,api-lifecycle}) for CMMI quality governance.",
+      "maxTotalLines": 80
     },
     {
       "path": "ui/src/pages/ProjectDetail.tsx",
-      "maxNetLines": 80,
-      "reason": "Add CMMI quality governance, 5+2 golden documents baseline, RTM traceability tree, SPC control chart, and Tri-State Living Topology tabs to project detail view.",
-      "maxTotalLines": 120
+      "maxNetLines": 100,
+      "reason": "Add CMMI quality governance, 5+2 golden documents baseline, RTM traceability tree, SPC control chart, Tri-State Living Topology, and API Lifecycle tabs to project detail view.",
+      "maxTotalLines": 150
     },
     {
       "path": "ui/src/components/ProjectCmmiGovernance.tsx",
@@ -414,6 +414,12 @@
       "maxNetLines": 500,
       "reason": "Living Tri-State Ontology topology viewer unifying CMMI Design (HLD), SkyWalking APM runtime traffic, and Chaosblade resilience fault injection. Fork feature with no upstream counterpart.",
       "maxTotalLines": 550
+    },
+    {
+      "path": "ui/src/components/ProjectApiLifecycleHarness.tsx",
+      "maxNetLines": 700,
+      "reason": "DSH-powered Multi-Protocol API Lifecycle & MCP Tool Projection workbench (HTTP/gRPC/Dubbo/MQ). Fork feature with no upstream counterpart.",
+      "maxTotalLines": 750
     }
   ]
 }

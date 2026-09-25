@@ -439,7 +439,7 @@ export function ProjectsScreen({
                       </View>
                     </View>
 
-                    {/* CMMI 穿透与黄金文档快捷入口 */}
+                    {/* CMMI 穿透与黄金文档快捷入口 (第一行: 流程与过程) */}
                     <View style={styles.cmmiActionRow}>
                       <Pressable
                         style={styles.cmmiBtn}
@@ -468,6 +468,10 @@ export function ProjectsScreen({
                         <Ionicons name="analytics-outline" size={13} color={C.warn} />
                         <Text style={[styles.cmmiBtnText, { color: C.warn }]}>SPC 控制</Text>
                       </Pressable>
+                    </View>
+
+                    {/* CMMI 架构与契约快捷入口 (第二行: 拓扑与API) */}
+                    <View style={styles.cmmiActionRow}>
                       <Pressable
                         style={styles.cmmiBtn}
                         onPress={() =>
@@ -475,7 +479,16 @@ export function ProjectsScreen({
                         }
                       >
                         <Ionicons name="git-merge-outline" size={13} color={C.accent} />
-                        <Text style={[styles.cmmiBtnText, { color: C.accent }]}>三态拓扑</Text>
+                        <Text style={[styles.cmmiBtnText, { color: C.accent }]}>三态拓扑 (SkyWalking/Chaos)</Text>
+                      </Pressable>
+                      <Pressable
+                        style={styles.cmmiBtn}
+                        onPress={() =>
+                          onOpenWebProjects?.(`/projects/${project.id}/api-lifecycle`, `${project.name} · API 契约中心`)
+                        }
+                      >
+                        <Ionicons name="code-slash-outline" size={13} color={C.ok} />
+                        <Text style={[styles.cmmiBtnText, { color: C.ok }]}>API 契约 (DSH/MCP)</Text>
                       </Pressable>
                     </View>
 
