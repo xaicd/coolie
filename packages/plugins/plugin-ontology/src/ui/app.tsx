@@ -325,23 +325,23 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
   const [seedMsg, setSeedMsg] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
 
-  const runSeedDomains = useCallback(async () => {
+  const runSeedDomains = useCallback(async (only?: string[]) => {
     setSeeding(true);
     setSeedMsg(null);
     try {
-      const report = (await seedSampleDomains({ companyId })) as {
+      const report = (await seedSampleDomains({ companyId, only })) as {
         created?: number;
         skipped?: number;
         failed?: number;
       };
       setSeedMsg(
         t(
-          `已创建 ${report.created ?? 0} 个,跳过 ${report.skipped ?? 0} 个(已存在)${
-            report.failed ? `,失败 ${report.failed} 个` : ""
-          }`,
-          `Created ${report.created ?? 0}, skipped ${report.skipped ?? 0} already present${
+          `就绪 (创建 ${report.created ?? 0}, 跳过 ${report.skipped ?? 0}${
+            report.failed ? `, 失败 ${report.failed}` : ""
+          })`,
+          `Ready (${report.created ?? 0} created, ${report.skipped ?? 0} skipped${
             report.failed ? `, ${report.failed} failed` : ""
-          }`,
+          })`,
         ),
       );
       await refreshDomains();
@@ -453,10 +453,24 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
         </div>
 
         <div className="ml-auto flex items-center gap-2">
+          {/* 企业基座域 — initializes the enterprise core context and CMDB domain */}
+          <button
+            onClick={() => { void runSeedDomains(["enterprise-core"]); }}
+            disabled={seeding}
+            title={t(
+              "初始化企业组织架构、员工/数字工匠、审批流、资料与CMDB基础设施底座核心域",
+              "Initialize enterprise core domain (organizations, employees/agents, approvals, documentation, CMDB & infra)",
+            )}
+            className="flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-(length:--text-compact) font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
+          >
+            <span className="text-[13px] leading-none">🏢</span>
+            {t("企业基座域", "Enterprise Core")}
+          </button>
+
           {/* 接入 — opens the legacy-system import wizard. Reachable from
               any view so the user doesn't have to back out to start one. */}
           <button
-            onClick={runSeedDomains}
+            onClick={() => { void runSeedDomains(); }}
             disabled={seeding}
             title={t(
               "载入内置行业样例域(零售、电商、金融、医疗、制造、教育、供应链)。已存在的域会被跳过,不会覆盖。",
@@ -465,7 +479,7 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
             className="flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-(length:--text-compact) font-medium text-foreground hover:border-primary hover:text-primary disabled:opacity-50"
           >
             <span className="text-[13px] leading-none">✨</span>
-            {t("样例域", "Samples")}
+            {t("行业样例", "Samples")}
           </button>
           {seedMsg && (
             <span className="text-(length:--text-nano) text-muted-foreground">{seedMsg}</span>

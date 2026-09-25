@@ -2608,6 +2608,17 @@ const plugin = definePlugin({
       return { ...report, sampleSource: SAMPLE_SOURCE };
     });
 
+    /**
+     * Seed or idempotently ensure the enterprise core operations and CMDB domain.
+     * Plants the corporate entity, departments, personnel & agents, approval
+     * workflows, governance gates, documentation, and CMDB infrastructure.
+     */
+    ctx.actions.register("seed-enterprise-context", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const report = await seedSampleDomains(companyId, store, { only: ["enterprise-core"] });
+      return { ...report, domainKey: "enterprise-core" };
+    });
+
     // Evaluation / simulation — domain-scoped data/action handlers for the UI.
     ctx.data.register("domain-evaluation", async (params) => {
       const companyId = requireString(params.companyId, "companyId");

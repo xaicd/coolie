@@ -27,6 +27,9 @@ import { buildRelationMetadata } from "@paperclipai/ontology-core/relationEndpoi
 import { LINK_CARDINALITIES, type LinkCardinality } from "@paperclipai/ontology-core/enums.js";
 // `with { type: "json" }` is required under NodeNext; the bundler honours it too.
 import domainsFile from "./ontology-domains.json" with { type: "json" };
+import { ENTERPRISE_CORE_DOMAIN, ENTERPRISE_INITIAL_INSTANCES } from "./enterprise-domain.js";
+
+export { ENTERPRISE_CORE_DOMAIN, ENTERPRISE_INITIAL_INSTANCES };
 
 export interface SampleNodeType {
   key: string;
@@ -55,7 +58,10 @@ export interface SampleDomain {
   stats: { nodeTypes: number; relationTypes: number; properties: number };
 }
 
-export const SAMPLE_DOMAINS: SampleDomain[] = (domainsFile as { domains: SampleDomain[] }).domains;
+export const SAMPLE_DOMAINS: SampleDomain[] = [
+  ENTERPRISE_CORE_DOMAIN,
+  ...(domainsFile as { domains: SampleDomain[] }).domains,
+];
 
 export const SAMPLE_SOURCE = (domainsFile as { source: Record<string, unknown> }).source;
 
@@ -92,6 +98,21 @@ export interface SeedStore {
     cardinality?: LinkCardinality;
     metadata?: Record<string, unknown>;
   }): Promise<{ id: string }>;
+  createNode?(input: {
+    companyId: string;
+    domainId: string;
+    key: string;
+    label: string;
+    nodeTypeId?: string | null;
+    properties?: Record<string, unknown>;
+  }): Promise<{ id: string }>;
+  createEdge?(input: {
+    companyId: string;
+    domainId: string;
+    sourceNodeId: string;
+    targetNodeId: string;
+    relationKey: string;
+  }): Promise<{ id: string }>;
 }
 
 export interface SeedReport {
@@ -102,6 +123,7 @@ export interface SeedReport {
     nodeTypes?: number;
     relationTypes?: number;
     withEndpoints?: number;
+    nodes?: number;
     reason?: string;
   }>;
   created: number;
@@ -177,6 +199,7 @@ export async function seedSampleDomains(
       continue;
     }
 
+    const isEnterpriseCore = domain.key === "enterprise-core";
     const created = await store.createDomain({
       companyId,
       slug: domain.key,
@@ -185,14 +208,21 @@ export async function seedSampleDomains(
       category: domain.category ?? "sample",
       isBuiltIn: true,
       bootstrapSource: "system-seed",
-      bootstrapDescription: `Sample domain from Microsoft Ontology Playground (${String(
-        SAMPLE_SOURCE.revision ?? "unknown",
-      ).slice(0, 8)})`,
-      metadata: { tags: domain.tags, sampleSource: SAMPLE_SOURCE.repository },
+      bootstrapDescription: isEnterpriseCore
+        ? "企业组织架构、员工与数字工匠编制、授权风控流程、资料资产库与CMDB基础设施底座核心本体域"
+        : `Sample domain from Microsoft Ontology Playground (${String(
+            SAMPLE_SOURCE.revision ?? "unknown",
+          ).slice(0, 8)})`,
+      metadata: {
+        tags: domain.tags,
+        isEnterpriseCore: isEnterpriseCore || undefined,
+        sampleSource: isEnterpriseCore ? "coolie-native" : SAMPLE_SOURCE.repository,
+      },
     });
 
+    const typeIdByKey = new Map<string, string>();
     for (const type of domain.nodeTypes) {
-      await store.createNodeType({
+      const createdType = await store.createNodeType({
         companyId,
         domainId: created.id,
         key: type.key,
@@ -200,6 +230,9 @@ export async function seedSampleDomains(
         description: type.description,
         propertiesSchema: type.propertiesSchema ?? {},
       });
+      if (createdType?.id) {
+        typeIdByKey.set(type.key, createdType.id);
+      }
     }
 
     let withEndpoints = 0;
@@ -220,6 +253,44 @@ export async function seedSampleDomains(
       });
     }
 
+    let instanceCount = 0;
+    if (
+      isEnterpriseCore &&
+      typeof store.createNode === "function" &&
+      typeof store.createEdge === "function"
+    ) {
+      const nodeIdByKey = new Map<string, string>();
+      for (const nodeDef of ENTERPRISE_INITIAL_INSTANCES.nodes) {
+        const nodeTypeId = typeIdByKey.get(nodeDef.type) ?? null;
+        const createdNode = await store.createNode({
+          companyId,
+          domainId: created.id,
+          key: nodeDef.key,
+          label: nodeDef.label,
+          nodeTypeId,
+          properties: nodeDef.properties,
+        });
+        if (createdNode?.id) {
+          nodeIdByKey.set(nodeDef.key, createdNode.id);
+          instanceCount += 1;
+        }
+      }
+
+      for (const edgeDef of ENTERPRISE_INITIAL_INSTANCES.edges) {
+        const sourceNodeId = nodeIdByKey.get(edgeDef.from);
+        const targetNodeId = nodeIdByKey.get(edgeDef.to);
+        if (sourceNodeId && targetNodeId) {
+          await store.createEdge({
+            companyId,
+            domainId: created.id,
+            sourceNodeId,
+            targetNodeId,
+            relationKey: edgeDef.rel,
+          });
+        }
+      }
+    }
+
     report.domains.push({
       slug: domain.key,
       displayName: domain.displayName,
@@ -227,6 +298,7 @@ export async function seedSampleDomains(
       nodeTypes: domain.nodeTypes.length,
       relationTypes: domain.relationTypes.length,
       withEndpoints,
+      nodes: instanceCount > 0 ? instanceCount : undefined,
     });
     report.created += 1;
   }
