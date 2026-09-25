@@ -368,6 +368,12 @@
       "maxTotalLines": 600
     },
     {
+      "path": "scripts/reverse-scaffold-legacy-project.mjs",
+      "maxNetLines": 520,
+      "reason": "Fork script: reverse-engineers legacy complex systems (RuoYi-Vue-Pro, JeecgBoot, Spring Cloud) SQL schema and pom.xml into CMMI 5+2 baselines and door-check scripts. No upstream counterpart.",
+      "maxTotalLines": 600
+    },
+    {
       "path": "ui/src/App.tsx",
       "maxNetLines": 25,
       "reason": "Mount project governance, 5+2 baseline, RTM, and SPC routes (/projects/:id/{governance,baseline,rtm,spc}) for CMMI quality governance.",
