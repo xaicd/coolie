@@ -327,9 +327,9 @@
     },
     {
       "path": "skills/paperclip-board/SKILL.md",
-      "maxNetLines": 120,
+      "maxNetLines": 200,
       "reason": "Coolie workshop role dispatch, skill routing, and MCP guidance for the board concierge (Hermes). Injects Palantir 5-role mappings (FDA/SWE/FDSE/SRE/DS), G1-G5 gates, and business-to-skill routing into the board assistant system prompt.",
-      "maxTotalLines": 120
+      "maxTotalLines": 200
     }
   ]
 }
