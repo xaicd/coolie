@@ -15,8 +15,8 @@ export const ENTERPRISE_CORE_DOMAIN: SampleDomain = {
   tags: ["enterprise", "organization", "employee", "workflow", "document", "cmdb", "builtin"],
   stats: {
     nodeTypes: 13,
-    relationTypes: 22,
-    properties: 73,
+    relationTypes: 23,
+    properties: 77,
   },
   nodeTypes: [
     {
@@ -124,6 +124,14 @@ export const ENTERPRISE_CORE_DOMAIN: SampleDomain = {
           description: "资料分类",
         },
         storagePath: { type: "string", description: "存放路径或系统引用链接" },
+        storageBackend: {
+          type: "string",
+          enum: ["local_disk", "git_repo", "oss_object"],
+          description: "交付物存储介质类型（文件磁盘/Git仓库/OSS对象存储）",
+        },
+        storageUri: { type: "string", description: "统一定位符 (file://..., git://..., oss://...)" },
+        fileSize: { type: "number", description: "交付物字节大小 (Bytes)" },
+        checksum: { type: "string", description: "SHA-256 完整性哈希校验和" },
         securityClassification: {
           type: "string",
           enum: ["public", "internal", "confidential", "secret"],
@@ -172,7 +180,15 @@ export const ENTERPRISE_CORE_DOMAIN: SampleDomain = {
         resourceId: { type: "string", isIdentifier: true, description: "资源编号" },
         resourceType: {
           type: "string",
-          enum: ["server_host", "k8s_cluster", "database_pg", "redis_cache", "object_storage", "gateway"],
+          enum: [
+            "server_host",
+            "k8s_cluster",
+            "database_pg",
+            "redis_cache",
+            "object_storage",
+            "gateway",
+            "git_repository",
+          ],
           description: "基础设施类型",
         },
         resourceName: { type: "string", description: "资源实例名称" },
@@ -421,6 +437,14 @@ export const ENTERPRISE_CORE_DOMAIN: SampleDomain = {
       cardinality: "many_to_one",
       sourceNodeTypeKey: "knowledge_document",
       targetNodeTypeKey: "company_entity",
+    },
+    {
+      key: "stored_in_resource",
+      displayName: "物理存储介质",
+      description: "交付物或资料所存放的底层基础设施资源（本地磁盘/Git仓库/OSS存储桶）",
+      cardinality: "many_to_one",
+      sourceNodeTypeKey: "knowledge_document",
+      targetNodeTypeKey: "cmdb_infrastructure_resource",
     },
   ],
 };
@@ -1191,6 +1215,40 @@ export const ENTERPRISE_INITIAL_INSTANCES = {
         specConfig: "双机容灾 自动化证书更新",
       },
     },
+    // Multi-Backend Storage Resources (Disk, Git, OSS)
+    {
+      key: "res_local_disk",
+      label: "本地文件磁盘与NAS共享存储",
+      type: "cmdb_infrastructure_resource",
+      properties: {
+        resourceType: "server_host",
+        resourceName: "工坊统一文件磁盘存储 /data/artifacts",
+        endpoint: "file:///data/artifacts",
+        specConfig: "NVMe SSD 高速阵列，多节点NAS网络挂载",
+      },
+    },
+    {
+      key: "res_git_repo",
+      label: "企业 Git 版本控制基线仓库",
+      type: "cmdb_infrastructure_resource",
+      properties: {
+        resourceType: "git_repository",
+        resourceName: "GitLab/Gitea 源码与工程文档版本仓库",
+        endpoint: "https://git.internal/coolie/deliverables.git",
+        specConfig: "高可用Git集群，支持Git LFS二进制大文件版本锁定",
+      },
+    },
+    {
+      key: "res_oss_bucket",
+      label: "企业级 OSS 对象存储桶 (MinIO/S3)",
+      type: "cmdb_infrastructure_resource",
+      properties: {
+        resourceType: "object_storage",
+        resourceName: "MinIO/S3 交付物不可变持久化存储桶",
+        endpoint: "s3://artifacts-bucket.internal:9000",
+        specConfig: "99.999999999% 高持久性，自动预签名下载与归档策略",
+      },
+    },
   ],
   edges: [
     { from: "company_root", to: "dept_rd", rel: "has_department" },
@@ -1359,5 +1417,37 @@ export const ENTERPRISE_INITIAL_INSTANCES = {
     { from: "doc_cmmi_qpm_spc", to: "gate_g5_release", rel: "satisfies_gate" },
     { from: "doc_cmmi_car_prevention", to: "gate_g5_release", rel: "satisfies_gate" },
     { from: "doc_company_context", to: "gate_g5_release", rel: "satisfies_gate" },
+
+    // Storage Infrastructure -> Environments (hosted_on_resource)
+    { from: "env_prod", to: "res_local_disk", rel: "hosted_on_resource" },
+    { from: "env_prod", to: "res_git_repo", rel: "hosted_on_resource" },
+    { from: "env_prod", to: "res_oss_bucket", rel: "hosted_on_resource" },
+
+    // Deliverables & Documents -> Storage Infrastructure (stored_in_resource)
+    // 1. Local Disk Storage (测试报告与本地工件)
+    { from: "doc_cp_test", to: "res_local_disk", rel: "stored_in_resource" },
+    { from: "doc_backend_test", to: "res_local_disk", rel: "stored_in_resource" },
+    { from: "doc_mobile_test", to: "res_local_disk", rel: "stored_in_resource" },
+
+    // 2. Git Repository Storage (工程规范、架构与API基线文档)
+    { from: "doc_company_context", to: "res_git_repo", rel: "stored_in_resource" },
+    { from: "doc_spec_guide", to: "res_git_repo", rel: "stored_in_resource" },
+    { from: "doc_cmmi_role_governance", to: "res_git_repo", rel: "stored_in_resource" },
+    { from: "doc_cp_srs", to: "res_git_repo", rel: "stored_in_resource" },
+    { from: "doc_cp_hld", to: "res_git_repo", rel: "stored_in_resource" },
+    { from: "doc_cp_lld", to: "res_git_repo", rel: "stored_in_resource" },
+    { from: "doc_backend_srs", to: "res_git_repo", rel: "stored_in_resource" },
+    { from: "doc_backend_hld", to: "res_git_repo", rel: "stored_in_resource" },
+    { from: "doc_backend_api", to: "res_git_repo", rel: "stored_in_resource" },
+    { from: "doc_mobile_prd", to: "res_git_repo", rel: "stored_in_resource" },
+    { from: "doc_mobile_arch", to: "res_git_repo", rel: "stored_in_resource" },
+    { from: "doc_mobile_state_machine", to: "res_git_repo", rel: "stored_in_resource" },
+
+    // 3. OSS Object Storage (不可变发版制品、SOP与持续优化度量图)
+    { from: "doc_release_sop", to: "res_oss_bucket", rel: "stored_in_resource" },
+    { from: "doc_backend_deploy", to: "res_oss_bucket", rel: "stored_in_resource" },
+    { from: "doc_mobile_ota_sop", to: "res_oss_bucket", rel: "stored_in_resource" },
+    { from: "doc_cmmi_qpm_spc", to: "res_oss_bucket", rel: "stored_in_resource" },
+    { from: "doc_cmmi_car_prevention", to: "res_oss_bucket", rel: "stored_in_resource" },
   ],
 };
