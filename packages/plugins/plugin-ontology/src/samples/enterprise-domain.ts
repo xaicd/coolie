@@ -14,9 +14,9 @@ export const ENTERPRISE_CORE_DOMAIN: SampleDomain = {
   category: "enterprise",
   tags: ["enterprise", "organization", "employee", "workflow", "document", "cmdb", "builtin"],
   stats: {
-    nodeTypes: 12,
-    relationTypes: 15,
-    properties: 66,
+    nodeTypes: 13,
+    relationTypes: 19,
+    properties: 73,
   },
   nodeTypes: [
     {
@@ -205,6 +205,35 @@ export const ENTERPRISE_CORE_DOMAIN: SampleDomain = {
         exitCriteria: { type: "string", description: "阶段准出交付物与验收标准" },
       },
     },
+    {
+      key: "work_task",
+      displayName: "工作任务与测试样例",
+      description: "工坊安排的多维度协同任务与企业本体域功能测试样例",
+      propertiesSchema: {
+        taskId: { type: "string", isIdentifier: true, description: "任务唯一编号" },
+        taskKey: { type: "string", description: "任务代码（如 TASK_REQ_CAPTURE）" },
+        title: { type: "string", description: "工作任务标题" },
+        dimension: {
+          type: "string",
+          enum: [
+            "business_requirement",
+            "architecture_boundary",
+            "platform_engineering",
+            "fullstack_delivery",
+            "production_reliability",
+            "budget_governance",
+          ],
+          description: "所属业务或技术协同维度",
+        },
+        priority: { type: "string", enum: ["P0_urgent", "P1_high", "P2_medium"], description: "优先级" },
+        status: {
+          type: "string",
+          enum: ["pending", "in_progress", "completed", "blocked"],
+          description: "任务推进流转状态",
+        },
+        acceptanceCriteria: { type: "string", description: "准出验收指标与交付物要求" },
+      },
+    },
   ],
   relationTypes: [
     {
@@ -326,6 +355,38 @@ export const ENTERPRISE_CORE_DOMAIN: SampleDomain = {
       cardinality: "many_to_many",
       sourceNodeTypeKey: "governance_gate",
       targetNodeTypeKey: "process_stage",
+    },
+    {
+      key: "assigned_to",
+      displayName: "指派给工匠",
+      description: "工作任务指派给特定员工或智能体负责执行",
+      cardinality: "many_to_one",
+      sourceNodeTypeKey: "work_task",
+      targetNodeTypeKey: "employee",
+    },
+    {
+      key: "executes_stage",
+      displayName: "推进阶段",
+      description: "工作任务在哪个具体的管理流转阶段中推进",
+      cardinality: "many_to_one",
+      sourceNodeTypeKey: "work_task",
+      targetNodeTypeKey: "process_stage",
+    },
+    {
+      key: "targets_system",
+      displayName: "目标业务系统",
+      description: "工作任务所变更或维护的 CMDB 业务系统",
+      cardinality: "many_to_many",
+      sourceNodeTypeKey: "work_task",
+      targetNodeTypeKey: "cmdb_business_system",
+    },
+    {
+      key: "verified_by_gate",
+      displayName: "门禁卡点校验",
+      description: "工作任务准出必须通过的治理门禁",
+      cardinality: "many_to_many",
+      sourceNodeTypeKey: "work_task",
+      targetNodeTypeKey: "governance_gate",
     },
   ],
 };
@@ -670,7 +731,98 @@ export const ENTERPRISE_INITIAL_INSTANCES = {
         exitCriteria: "环境版本指纹对齐，蓝绿切流无损，健康拨测通过",
       },
     },
+    // Multi-dimensional Work Tasks (Testing Company Ontology Functions & Workshop Enterprise Context)
+    {
+      key: "task_g1_requirements",
+      label: "任务一: 客户全业务旅程与 EARS 需求定案 (DS)",
+      type: "work_task",
+      properties: {
+        taskKey: "TASK_REQ_CAPTURE",
+        title: "智能工匠驾驶舱全旅程业务梳理与 EARS 规范定稿",
+        dimension: "business_requirement",
+        priority: "P0_urgent",
+        status: "in_progress",
+        acceptanceCriteria: "EARS验收断言清单完整，业务旅程闭环，无死交互按钮",
+      },
+    },
+    {
+      key: "task_g2_arch_isolation",
+      label: "任务二: 控制台架构分层与多租户隔离审查 (FDA)",
+      type: "work_task",
+      properties: {
+        taskKey: "TASK_ARCH_BOUNDARY",
+        title: "控制台架构分层审查、多租户隔离防线与代码库边界定型",
+        dimension: "architecture_boundary",
+        priority: "P0_urgent",
+        status: "in_progress",
+        acceptanceCriteria: "四条边界画死，check-fork-surface 零超标，获架构定版签发",
+      },
+    },
+    {
+      key: "task_g3_compile_guards",
+      label: "任务三: 核心契约保护与静态门禁守卫 (Core-SWE)",
+      type: "work_task",
+      properties: {
+        taskKey: "TASK_CORE_STATIC_GUARD",
+        title: "核心服务契约保护、增量编译零报错与设计Token门禁",
+        dimension: "platform_engineering",
+        priority: "P1_high",
+        status: "in_progress",
+        acceptanceCriteria: "增量typecheck零报错，check-token-gates四项全绿，单测通过",
+      },
+    },
+    {
+      key: "task_g4_fullstack_eval",
+      label: "任务四: 移动端与Web状态机穷举及集成验收 (FDSE)",
+      type: "work_task",
+      properties: {
+        taskKey: "TASK_E2E_STATE_MACHINE",
+        title: "移动端与Web双端状态机穷举、异常捕获防御与旅程走通",
+        dimension: "fullstack_delivery",
+        priority: "P1_high",
+        status: "in_progress",
+        acceptanceCriteria: "状态机异常路径覆盖率达标，无未处理Promise拒绝，E2E全绿",
+      },
+    },
+    {
+      key: "task_g5_prod_release",
+      label: "任务五: 生产不可变发布与双人会签拨测 (PRE-SRE)",
+      type: "work_task",
+      properties: {
+        taskKey: "TASK_SRE_PROD_RELEASE",
+        title: "正式生产环境不可变制品发布、双人会签切流与健康拨测",
+        dimension: "production_reliability",
+        priority: "P0_urgent",
+        status: "pending",
+        acceptanceCriteria: "环境版本指纹对齐，双人会签核准生效，生产拨测返回200",
+      },
+    },
+    {
+      key: "task_g6_budget_override",
+      label: "任务六: 算力预算阈值硬熔断与特批解锁 (Hermes)",
+      type: "work_task",
+      properties: {
+        taskKey: "TASK_BUDGET_OVERRIDE",
+        title: "月度Token与算力预算超限熔断、告警通知与特批解锁演练",
+        dimension: "budget_governance",
+        priority: "P2_medium",
+        status: "pending",
+        acceptanceCriteria: "消耗达到90%预警、100%硬熔断挂起，主理人特批签字后恢复调用",
+      },
+    },
     // Documents
+    {
+      key: "doc_company_context",
+      label: "工坊企业上下文基座指南",
+      type: "knowledge_document",
+      properties: {
+        title: "智能工匠工坊企业级上下文基座使用手册",
+        docType: "specification",
+        storagePath: "docs-coolie/ENTERPRISE-CONTEXT.md",
+        securityClassification: "internal",
+        version: "1.0.0",
+      },
+    },
     {
       key: "doc_spec_guide",
       label: "企业研发规范与命名标准",
@@ -850,6 +1002,43 @@ export const ENTERPRISE_INITIAL_INSTANCES = {
     { from: "flow_release", to: "sys_control_plane", rel: "governs_system" },
     { from: "flow_release", to: "sys_backend", rel: "governs_system" },
     { from: "flow_release", to: "sys_mobile", rel: "governs_system" },
+    // Work Tasks -> Assigned Employee / Agent (assigned_to)
+    { from: "task_g1_requirements", to: "emp_ds", rel: "assigned_to" },
+    { from: "task_g2_arch_isolation", to: "emp_fda", rel: "assigned_to" },
+    { from: "task_g3_compile_guards", to: "emp_swe", rel: "assigned_to" },
+    { from: "task_g4_fullstack_eval", to: "emp_fdse", rel: "assigned_to" },
+    { from: "task_g5_prod_release", to: "emp_sre", rel: "assigned_to" },
+    { from: "task_g6_budget_override", to: "emp_hermes", rel: "assigned_to" },
+
+    // Work Tasks -> Process Stage (executes_stage)
+    { from: "task_g1_requirements", to: "stage_g1_req", rel: "executes_stage" },
+    { from: "task_g2_arch_isolation", to: "stage_g2_arch", rel: "executes_stage" },
+    { from: "task_g3_compile_guards", to: "stage_g3_build", rel: "executes_stage" },
+    { from: "task_g4_fullstack_eval", to: "stage_g4_eval", rel: "executes_stage" },
+    { from: "task_g5_prod_release", to: "stage_g5_deploy", rel: "executes_stage" },
+    { from: "task_g6_budget_override", to: "stage_g5_deploy", rel: "executes_stage" },
+
+    // Work Tasks -> Target Business Systems (targets_system)
+    { from: "task_g1_requirements", to: "sys_control_plane", rel: "targets_system" },
+    { from: "task_g2_arch_isolation", to: "sys_control_plane", rel: "targets_system" },
+    { from: "task_g2_arch_isolation", to: "sys_backend", rel: "targets_system" },
+    { from: "task_g3_compile_guards", to: "sys_backend", rel: "targets_system" },
+    { from: "task_g4_fullstack_eval", to: "sys_mobile", rel: "targets_system" },
+    { from: "task_g4_fullstack_eval", to: "sys_control_plane", rel: "targets_system" },
+    { from: "task_g5_prod_release", to: "sys_control_plane", rel: "targets_system" },
+    { from: "task_g5_prod_release", to: "sys_backend", rel: "targets_system" },
+    { from: "task_g5_prod_release", to: "sys_mobile", rel: "targets_system" },
+    { from: "task_g6_budget_override", to: "sys_control_plane", rel: "targets_system" },
+
+    // Work Tasks -> Governance Gates (verified_by_gate)
+    { from: "task_g1_requirements", to: "gate_g1_spec", rel: "verified_by_gate" },
+    { from: "task_g2_arch_isolation", to: "gate_g2_arch", rel: "verified_by_gate" },
+    { from: "task_g3_compile_guards", to: "gate_g3_compile", rel: "verified_by_gate" },
+    { from: "task_g4_fullstack_eval", to: "gate_g4_eval", rel: "verified_by_gate" },
+    { from: "task_g5_prod_release", to: "gate_g5_release", rel: "verified_by_gate" },
+
+    // Documents -> CMDB Business Systems
+    { from: "doc_company_context", to: "sys_control_plane", rel: "documents_system" },
     { from: "doc_spec_guide", to: "sys_control_plane", rel: "documents_system" },
     { from: "doc_spec_guide", to: "sys_backend", rel: "documents_system" },
     { from: "doc_release_sop", to: "sys_control_plane", rel: "documents_system" },
