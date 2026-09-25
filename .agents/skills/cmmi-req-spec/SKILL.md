@@ -79,3 +79,10 @@ flowchart TD
 - [ ] 所有需求项均符合 EARS 语法规则，无“尽量”、“大致”等歧义副词。
 - [ ] 需求双向跟踪矩阵覆盖率 100%（每个需求必有对应测试项和模块负责人）。
 - [ ] `node scripts/verify-reqs.mjs` 退出码为 0。
+
+---
+
+## 5. 权威开源标准与参考文献
+- **ISO/IEC/IEEE 29148:2018** (取代 IEEE 830) 需求工程标准、EARS 句式正反例与 G1 评审清单：
+  - 请参阅 [`references/ieee-29148-srs-standard.md`](references/ieee-29148-srs-standard.md)
+

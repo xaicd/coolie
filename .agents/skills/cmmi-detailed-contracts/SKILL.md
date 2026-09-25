@@ -88,3 +88,10 @@ flowchart TD
 - [ ] 编译器与类型检查 0 Error（如 `pnpm -r typecheck`）。
 - [ ] 核心业务算法单元测试全部绿色通过。
 - [ ] G3 静态检查脚本（如 `check-contracts.mjs`）校验 100% 成功。
+
+---
+
+## 5. 权威开源标准与参考文献
+- **IEEE 1016 详细设计 (LLD)** 算法时序规范、OpenAPI 3.1 统一契约设计与 G3 评审清单：
+  - 请参阅 [`references/ieee-1016-lld-api-contracts.md`](references/ieee-1016-lld-api-contracts.md)
+

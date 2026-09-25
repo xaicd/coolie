@@ -360,6 +360,12 @@
       "maxNetLines": 60,
       "reason": "Enhance notification feed for task assignments (issue.created/issue.assigned) so Hermes dispatch actions appear with readable Chinese titles, issue targets, and active status.",
       "maxTotalLines": 260
+    },
+    {
+      "path": "scripts/scaffold-project-cmmi-skills.mjs",
+      "maxNetLines": 500,
+      "reason": "Fork script: scaffolds CMMI 3/5 engineering skills, door-checking scripts, and 5+2 golden documents baseline into target projects. No upstream counterpart.",
+      "maxTotalLines": 600
     }
   ]
 }

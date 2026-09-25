@@ -75,3 +75,10 @@ flowchart TD
 - [ ] 所有集成测试与自动化用例 100% 绿色通过。
 - [ ] P0 / P1 / P2 级已知缺陷全部清零。
 - [ ] G4 门禁检查脚本（如 `run-tests.mjs`）成功通过。
+
+---
+
+## 5. 权威开源标准与参考文献
+- **ISO/IEC/IEEE 29119:2022** (取代 IEEE 829) 软件测试标准、四态状态机全覆盖与 G4 验收清单：
+  - 请参阅 [`references/ieee-29119-test-acceptance.md`](references/ieee-29119-test-acceptance.md)
+

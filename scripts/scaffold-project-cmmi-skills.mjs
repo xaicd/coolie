@@ -298,6 +298,20 @@ description: [${options.projectCode}] 定制的 ${skill.title} 核心技能。
 
     const targetSkillFile = path.join(options.targetDir, ".agents/skills", skill.dir, "SKILL.md");
     writeFile(targetSkillFile, content, options.dryRun);
+
+    // 复制关联的权威标准规范 references/ (IEEE 29148, IEEE 1016, ISO 29119, IEEE 828, SPC/CAR)
+    const masterRefsDir = path.join(masterSkillsDir, skill.dir, "references");
+    if (fs.existsSync(masterRefsDir)) {
+      const refFiles = fs.readdirSync(masterRefsDir);
+      for (const rf of refFiles) {
+        const refSrc = path.join(masterRefsDir, rf);
+        const refDstSkill = path.join(options.targetDir, ".agents/skills", skill.dir, "references", rf);
+        const refDstDoc = path.join(options.targetDir, "docs/cmmi/references", rf);
+        const refContent = fs.readFileSync(refSrc, "utf-8");
+        writeFile(refDstSkill, refContent, options.dryRun);
+        writeFile(refDstDoc, refContent, options.dryRun);
+      }
+    }
   }
 
   // 2. 生成本地自动化守卫 scripts/

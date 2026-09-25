@@ -72,3 +72,10 @@ flowchart TD
 - [ ] 关键质量指标纳入 SPC 过程监控，有明确均值与控制限。
 - [ ] 线上及重测缺陷 100% 完成 5-Why CAR 分析。
 - [ ] 改进措施全部转化为项目本地 scripts 自动化测试用例或平台级规则，完成永久固化。
+
+---
+
+## 5. 权威开源标准与参考文献
+- **CMMI 5 高成熟度指南**、休哈特 SPC 统计控制限计算公式、6M 鱼骨图与防退化断言清单：
+  - 请参阅 [`references/cmmi-spc-car-methodology.md`](references/cmmi-spc-car-methodology.md)
+

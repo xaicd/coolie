@@ -82,3 +82,10 @@ graph TD
 - [ ] 企业/租户数据隔离机制通过安全性推演与静态审查。
 - [ ] 核心技术选型附带完整 DAR 加权评估表。
 - [ ] G2 检查脚本（如 `check-fork-surface.mjs`）验证通过，无未登记漂移。
+
+---
+
+## 5. 权威开源标准与参考文献
+- **IEEE 1016-2009 (SDD)** 软件设计描述标准、DAR 加权决策分析模型与 G2 评审清单：
+  - 请参阅 [`references/ieee-1016-hld-dar-standard.md`](references/ieee-1016-hld-dar-standard.md)
+

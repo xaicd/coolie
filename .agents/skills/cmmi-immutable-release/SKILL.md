@@ -78,3 +78,10 @@ flowchart TD
 - [ ] 发布制品生成唯一的不可变校验指纹，且已归档入安全存储。
 - [ ] 秒级回滚 SOP 与脚本经过预发演练验证可行。
 - [ ] G5 发布检查脚本（如 `check-release-baseline.mjs`）校验 100% 成功。
+
+---
+
+## 5. 权威开源标准与参考文献
+- **IEEE 828-2012** 软件配置管理标准、不可变制品防篡改与 G5 投产自检清单：
+  - 请参阅 [`references/ieee-828-configuration-management.md`](references/ieee-828-configuration-management.md)
+
