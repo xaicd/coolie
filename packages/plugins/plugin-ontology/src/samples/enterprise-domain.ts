@@ -14,9 +14,9 @@ export const ENTERPRISE_CORE_DOMAIN: SampleDomain = {
   category: "enterprise",
   tags: ["enterprise", "organization", "employee", "workflow", "document", "cmdb", "builtin"],
   stats: {
-    nodeTypes: 10,
-    relationTypes: 11,
-    properties: 48,
+    nodeTypes: 12,
+    relationTypes: 15,
+    properties: 66,
   },
   nodeTypes: [
     {
@@ -170,6 +170,41 @@ export const ENTERPRISE_CORE_DOMAIN: SampleDomain = {
         specConfig: { type: "string", description: "硬件或配置规格" },
       },
     },
+    {
+      key: "approval_authority",
+      displayName: "审批权限与授权项",
+      description: "治理卡点中的审批权限定义、会签模式与额度授权",
+      propertiesSchema: {
+        authorityId: { type: "string", isIdentifier: true, description: "权限唯一标识" },
+        authorityKey: { type: "string", description: "权限代码（如 AUTH_PROD_RELEASE）" },
+        name: { type: "string", description: "审批权限名称" },
+        tierLevel: {
+          type: "string",
+          enum: ["L1_standard", "L2_lead", "L3_architect", "L4_director", "L5_board"],
+          description: "权限行政与架构职级要求",
+        },
+        signMode: {
+          type: "string",
+          enum: ["single_approver", "joint_dual_sign", "quorum_majority"],
+          description: "审批签字模式（单签/双人会签/多数票决）",
+        },
+        maxBudgetLimit: { type: "number", unit: "CNY", description: "权限涵盖的最大免审/审批预算额度" },
+      },
+    },
+    {
+      key: "process_stage",
+      displayName: "流程流转阶段",
+      description: "企业研发与管理流程中的具体流转阶段与关键卡口",
+      propertiesSchema: {
+        stageId: { type: "string", isIdentifier: true, description: "阶段唯一标识" },
+        stageKey: { type: "string", description: "阶段代码（如 G1_REQ, G2_ARCH）" },
+        stageName: { type: "string", description: "流转阶段名称" },
+        sequenceOrder: { type: "number", description: "流程推进步骤序号" },
+        responsibleRoleKey: { type: "string", description: "该阶段的第一责任角色代号" },
+        entryCriteria: { type: "string", description: "阶段准入启动条件" },
+        exitCriteria: { type: "string", description: "阶段准出交付物与验收标准" },
+      },
+    },
   ],
   relationTypes: [
     {
@@ -259,6 +294,38 @@ export const ENTERPRISE_CORE_DOMAIN: SampleDomain = {
       cardinality: "many_to_many",
       sourceNodeTypeKey: "cmdb_business_system",
       targetNodeTypeKey: "cmdb_infrastructure_resource",
+    },
+    {
+      key: "requires_authority",
+      displayName: "需要审批权限",
+      description: "审批与管理流程执行终审所需的授权特权项",
+      cardinality: "many_to_many",
+      sourceNodeTypeKey: "approval_workflow",
+      targetNodeTypeKey: "approval_authority",
+    },
+    {
+      key: "holds_authority",
+      displayName: "持有审批权限",
+      description: "员工或主理智能体被授予的审批特权",
+      cardinality: "many_to_many",
+      sourceNodeTypeKey: "employee",
+      targetNodeTypeKey: "approval_authority",
+    },
+    {
+      key: "has_stage",
+      displayName: "包含流转阶段",
+      description: "管理流程包含的有先后顺序的步骤阶段",
+      cardinality: "one_to_many",
+      sourceNodeTypeKey: "approval_workflow",
+      targetNodeTypeKey: "process_stage",
+    },
+    {
+      key: "guards_stage",
+      displayName: "守卫流程阶段",
+      description: "风控门禁硬卡点守卫特定流程流转阶段",
+      cardinality: "many_to_many",
+      sourceNodeTypeKey: "governance_gate",
+      targetNodeTypeKey: "process_stage",
     },
   ],
 };
@@ -444,6 +511,18 @@ export const ENTERPRISE_INITIAL_INSTANCES = {
         autoApprovalPolicy: "达到上限自动Hard-Stop挂起，需增补预算解锁",
       },
     },
+    // Governance Gates (G1 to G5 Palantir Role Engineering Gates)
+    {
+      key: "gate_g1_spec",
+      label: "G1 需求与业务旅程门禁",
+      type: "governance_gate",
+      properties: {
+        gateKey: "G1",
+        gateName: "EARS规范需求与业务旅程验收卡点",
+        strictness: "blocking",
+        checkCommand: "node scripts/verify-requirements.mjs",
+      },
+    },
     {
       key: "gate_g2_arch",
       label: "G2 架构与隔离门禁",
@@ -464,6 +543,131 @@ export const ENTERPRISE_INITIAL_INSTANCES = {
         gateName: "静态类型与设计Token卡点",
         strictness: "hard_stop",
         checkCommand: "node scripts/check-token-gates.mjs",
+      },
+    },
+    {
+      key: "gate_g4_eval",
+      label: "G4 全栈验证与旅程走通门禁",
+      type: "governance_gate",
+      properties: {
+        gateKey: "G4",
+        gateName: "状态机全覆盖与零死穴交互卡点",
+        strictness: "blocking",
+        checkCommand: "pnpm test",
+      },
+    },
+    {
+      key: "gate_g5_release",
+      label: "G5 生产投产与双签发布门禁",
+      type: "governance_gate",
+      properties: {
+        gateKey: "G5",
+        gateName: "不可变制品发布与环境指纹卡点",
+        strictness: "hard_stop",
+        checkCommand: "bash scripts/pre-release-check.sh",
+      },
+    },
+    // Approval Authorities (Permissions Matrix)
+    {
+      key: "auth_spec_sign",
+      label: "需求与架构定版审批权 (Spec Sign-off)",
+      type: "approval_authority",
+      properties: {
+        authorityKey: "AUTH_SPEC_SIGN",
+        name: "需求与架构设计定版终审权",
+        tierLevel: "L3_architect",
+        signMode: "single_approver",
+        maxBudgetLimit: 100000,
+      },
+    },
+    {
+      key: "auth_prod_release",
+      label: "生产发版终审权 (Prod Release Sign-off)",
+      type: "approval_authority",
+      properties: {
+        authorityKey: "AUTH_PROD_RELEASE",
+        name: "正式生产环境切流与投产授权",
+        tierLevel: "L4_director",
+        signMode: "joint_dual_sign",
+        maxBudgetLimit: 500000,
+      },
+    },
+    {
+      key: "auth_budget_override",
+      label: "预算熔断解锁权 (Budget Override)",
+      type: "approval_authority",
+      properties: {
+        authorityKey: "AUTH_BUDGET_OVERRIDE",
+        name: "Token额度超限特批与熔断重置权",
+        tierLevel: "L5_board",
+        signMode: "single_approver",
+        maxBudgetLimit: 1000000,
+      },
+    },
+    // Process Stages (Management Workflow Stages G1-G5)
+    {
+      key: "stage_g1_req",
+      label: "阶段一: 需求捕获与结构化 (G1-REQ)",
+      type: "process_stage",
+      properties: {
+        stageKey: "G1_REQ",
+        stageName: "需求捕获与业务梳理阶段",
+        sequenceOrder: 1,
+        responsibleRoleKey: "ds",
+        entryCriteria: "收到业务或客户原始需求输入",
+        exitCriteria: "输出EARS规范需求文档与验收指标，完成业务方案对齐",
+      },
+    },
+    {
+      key: "stage_g2_arch",
+      label: "阶段二: 架构审查与隔离防线 (G2-ARCH)",
+      type: "process_stage",
+      properties: {
+        stageKey: "G2_ARCH",
+        stageName: "前线架构与隔离边界定型阶段",
+        sequenceOrder: 2,
+        responsibleRoleKey: "fda",
+        entryCriteria: "G1需求文档评审通过",
+        exitCriteria: "四条边界画死，完成fork-surface审计，获得架构定版签发",
+      },
+    },
+    {
+      key: "stage_g3_build",
+      label: "阶段三: 平台核心研发与静态守卫 (G3-BUILD)",
+      type: "process_stage",
+      properties: {
+        stageKey: "G3_BUILD",
+        stageName: "核心服务编码与静态质量守卫阶段",
+        sequenceOrder: 3,
+        responsibleRoleKey: "swe",
+        entryCriteria: "G2技术方案完成冻结",
+        exitCriteria: "增量typecheck零报错，Token设计门禁通过，单测全绿",
+      },
+    },
+    {
+      key: "stage_g4_eval",
+      label: "阶段四: 全栈部署与综合验证 (G4-EVAL)",
+      type: "process_stage",
+      properties: {
+        stageKey: "G4_EVAL",
+        stageName: "全栈集成、状态机穷举与旅程验收阶段",
+        sequenceOrder: 4,
+        responsibleRoleKey: "fdse",
+        entryCriteria: "代码合入联调分支",
+        exitCriteria: "状态机异常路径覆盖，无死穴按钮，DS业务旅程走通",
+      },
+    },
+    {
+      key: "stage_g5_deploy",
+      label: "阶段五: 生产投产与发布门禁 (G5-DEPLOY)",
+      type: "process_stage",
+      properties: {
+        stageKey: "G5_DEPLOY",
+        stageName: "不可变制品发布与拨测监控阶段",
+        sequenceOrder: 5,
+        responsibleRoleKey: "sre",
+        entryCriteria: "G4全链路测试全绿且双人会签完成",
+        exitCriteria: "环境版本指纹对齐，蓝绿切流无损，健康拨测通过",
       },
     },
     // Documents
@@ -610,8 +814,39 @@ export const ENTERPRISE_INITIAL_INSTANCES = {
     { from: "emp_sre", to: "role_sre", rel: "assigned_role" },
     { from: "emp_swe", to: "emp_fda", rel: "reports_to" },
     { from: "emp_fdse", to: "emp_fda", rel: "reports_to" },
+    // Workflows and Stage sequence (G1 to G5)
+    { from: "flow_release", to: "stage_g1_req", rel: "has_stage" },
+    { from: "flow_release", to: "stage_g2_arch", rel: "has_stage" },
+    { from: "flow_release", to: "stage_g3_build", rel: "has_stage" },
+    { from: "flow_release", to: "stage_g4_eval", rel: "has_stage" },
+    { from: "flow_release", to: "stage_g5_deploy", rel: "has_stage" },
+
+    // Workflow -> Governance Gates (G1 to G5)
+    { from: "flow_release", to: "gate_g1_spec", rel: "enforces_gate" },
     { from: "flow_release", to: "gate_g2_arch", rel: "enforces_gate" },
     { from: "flow_release", to: "gate_g3_compile", rel: "enforces_gate" },
+    { from: "flow_release", to: "gate_g4_eval", rel: "enforces_gate" },
+    { from: "flow_release", to: "gate_g5_release", rel: "enforces_gate" },
+
+    // Governance Gates -> Process Stages (G1 to G5)
+    { from: "gate_g1_spec", to: "stage_g1_req", rel: "guards_stage" },
+    { from: "gate_g2_arch", to: "stage_g2_arch", rel: "guards_stage" },
+    { from: "gate_g3_compile", to: "stage_g3_build", rel: "guards_stage" },
+    { from: "gate_g4_eval", to: "stage_g4_eval", rel: "guards_stage" },
+    { from: "gate_g5_release", to: "stage_g5_deploy", rel: "guards_stage" },
+
+    // Workflow -> Approval Authorities
+    { from: "flow_release", to: "auth_prod_release", rel: "requires_authority" },
+    { from: "flow_budget", to: "auth_budget_override", rel: "requires_authority" },
+
+    // Employee / Agent -> Approval Authorities
+    { from: "emp_hermes", to: "auth_spec_sign", rel: "holds_authority" },
+    { from: "emp_fda", to: "auth_spec_sign", rel: "holds_authority" },
+    { from: "emp_sre", to: "auth_prod_release", rel: "holds_authority" },
+    { from: "emp_hermes", to: "auth_prod_release", rel: "holds_authority" },
+    { from: "emp_hermes", to: "auth_budget_override", rel: "holds_authority" },
+
+    // Workflow -> Business Systems
     { from: "flow_release", to: "sys_control_plane", rel: "governs_system" },
     { from: "flow_release", to: "sys_backend", rel: "governs_system" },
     { from: "flow_release", to: "sys_mobile", rel: "governs_system" },
