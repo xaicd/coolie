@@ -4,6 +4,27 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.57
+
+> Released: 2026-09-25 · OTA bundle only (no APK)
+
+### 更新
+
+- wave82 — 修 `scripts/runtime-version.mjs` aapt2 解析 bug (boss 27:03 OOB)
+  - **根因**：expo-updates 把 `EXPO_RUNTIME_VERSION` 编译成 Android string resource，
+    meta-data 里写的是资源引用 `@0x7f120082`，不是字面值。`aapt2 dump xmltree`
+    看不到引用解析后的值，正则只吃字面字符串，静默回落 app.json 意图，
+    publish-ota.sh 用错值 → 装机 App「下了不装」。
+  - **修法**：切换到 `aapt2 dump resources` 读 `string/expo_runtime_version` 的
+    default-config 值；xmltree 路径保留为 debug-only。
+  - **测试**：`tests/ota-runtime/runtime-version.test.ts`（10 个用例）覆盖
+    xmltree 资源引用返回 null、resources 解析多 config 优先级、
+    `readApkRuntimeVersion` 端到端读到 0.5.56 真值。
+  - **结果**：现在 `runtime-version.mjs` 读到 APK 真值，0.5.57 manifest 的
+    runtimeVersion 不再漂移。
+
+---
+
 ## v0.5.56
 
 > Released: 2026-09-24 · Android release APK

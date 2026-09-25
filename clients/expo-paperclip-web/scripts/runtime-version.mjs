@@ -113,7 +113,14 @@ export function findAapt2(env = process.env) {
 
 const VALUE_RE = /android:value\(0x[0-9a-f]+\)="([^"]*)"/;
 
-/** 从 aapt2 dump xmltree 输出里取 EXPO_RUNTIME_VERSION 的值。 */
+/**
+ * 从 aapt2 dump xmltree 输出里取 EXPO_RUNTIME_VERSION 的值。
+ *
+ * 注：这条路径只读得到字面字符串值。expo-updates 会把 EXPO_RUNTIME_VERSION 编译成
+ * Android string resource（meta-data 里是 `@0x7f...` 形式的资源引用，不是字面值），
+ * 因此单靠 xmltree 永远读到 null。生产读 APK 一律走 parseApkResources（dump resources）。
+ * 这个函数保留下来只为调试「manifest 里到底写了什么」。
+ */
 export function parseApkXmltree(xml) {
   const lines = xml.split("\n");
   for (let i = 0; i < lines.length; i += 1) {
@@ -127,17 +134,63 @@ export function parseApkXmltree(xml) {
   return null;
 }
 
+/**
+ * 资源表里 string/<name> 那一段的起始正则。
+ *
+ * 例:
+ *     resource 0x7f120082 string/expo_runtime_version
+ *       () "0.5.56"
+ */
+const RESOURCE_HEADER_RE = /^\s*resource\s+0x[0-9a-fA-F]+\s+string\/([\w.]+)\s*$/;
+/** 单条 (config) "value" 行；config 可以为空（默认），value 不含转义双引号。 */
+const RESOURCE_VALUE_RE = /^\s*\(([^)]*)\)\s+"([^"]*)"\s*$/;
+
+/**
+ * 从 aapt2 dump resources 输出里取 string/<name> 的资源值。
+ *
+ * 优先 default config（`()` —— 空括号），否则取第一条非空字符串值。
+ * 资源名直接拼死（不写 `@0x7f...` 的 id 反查），是因为 expo-updates 把
+ * `EXPO_RUNTIME_VERSION` 编译进 resources.arsc 时用的资源名就是字符串 `expo_runtime_version`，
+ * 写死比 xmltree+dump 两步走更稳。
+ */
+export function parseApkResources(resources, name) {
+  if (!resources || !name) return null;
+  const lines = resources.split("\n");
+  let inBlock = false;
+  let firstValue = null;
+  for (const line of lines) {
+    const header = line.match(RESOURCE_HEADER_RE);
+    if (header) {
+      if (inBlock) break;
+      if (header[1] === name) inBlock = true;
+      continue;
+    }
+    if (!inBlock) continue;
+    const value = line.match(RESOURCE_VALUE_RE);
+    if (!value) {
+      if (line.trim() === "") continue;
+      if (/^\s*resource\s+0x/.test(line)) break;
+      continue;
+    }
+    const [, config, val] = value;
+    if (val === "") continue;
+    if (config === "") return val;
+    if (firstValue === null) firstValue = val;
+  }
+  return firstValue;
+}
+
 /** 读装机 APK 内嵌的原生运行时版本；不可读（无 APK/无 aapt2/无 meta-data）返回 null。 */
 export function readApkRuntimeVersion(apkPath = DEFAULT_APK, env = process.env) {
   if (!apkPath || !existsSync(apkPath)) return null;
   const aapt2 = findAapt2(env);
   if (!aapt2) return null;
-  const xml = execFileSync(
+  const resources = execFileSync(
     aapt2,
-    ["dump", "xmltree", apkPath, "--file", "AndroidManifest.xml"],
+    ["dump", "resources", apkPath],
     { encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
   );
-  return parseApkXmltree(xml);
+  return parseApkResources(resources, "expo_runtime_version");
 }
 
 const SOURCE_ELEMENT_RE = /<meta-data\b[^>]*\/?>/g;
