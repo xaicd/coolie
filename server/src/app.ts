@@ -102,6 +102,7 @@ import { inboxDismissalRoutes } from "./routes/inbox-dismissals.js";
 import { instanceSettingsRoutes } from "./routes/instance-settings.js";
 import { instanceSettingsService } from "./services/instance-settings.js";
 import { openApiRoutes } from "./routes/openapi.js";
+import { otaManifestRoutes } from "./routes/ota-manifest.js";
 import {
   instanceDatabaseBackupRoutes,
   type InstanceDatabaseBackupService,
@@ -720,6 +721,9 @@ export async function createApp(
     }),
   );
   api.use(openApiRoutes());
+  // 动态 OTA manifest (wave86): 按 expo-runtime-version 回写 runtimeVersion,
+  // 否则每次发版所有旧版本装机都被「只下载不加载」搁浅。public, 无鉴权。
+  api.use("/ota", otaManifestRoutes());
   api.use("/cloud", cloudRoutes());
   api.use("/companies", companyRoutes(db, opts.storageService));
   api.use(llmRoutes(db));

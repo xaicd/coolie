@@ -7,9 +7,15 @@
 
 ## TL;DR
 
-**OTA 触发链本身没坏。坏的是 boss 装的那份 0.5.55 APK —— 它是一个陈旧构建：
-包名是 `com.coolie` (而不是 `cloud.coolie.app`)，且原生层完全没有 expo-updates
-配置 (无 update URL、无 runtimeVersion)。它从不检查更新，所以永远「不更新」。**
+**两个真因，都修了：**
+
+1. **boss 装的 0.5.55 APK 是陈旧构建**：包名 `com.coolie` (正确是
+   `cloud.coolie.app`)、原生层零 expo-updates 配置 (无 URL、无 runtimeVersion)。
+   它从不检查更新 —— 只能装一次正确的 0.5.60 APK 解决。
+2. **静态 manifest 搁浅所有旧版本装机**：runtimeVersion 不匹配时 expo-updates
+   只下载不加载，而静态 manifest 永远钉在最新 APK 版本上 → 每次发版 0.5.56+
+   的存量装机全部「下了也不装」。修法: manifest 动态分发，按客户端
+   `expo-runtime-version` 回写 runtimeVersion。
 
 同时排除了 PM 的 5 个理论假设里的 4 个，并修正了一个认知：
 
@@ -19,9 +25,11 @@
   比 PM 猜的「版本号钉错」严重得多。
 - ❌ Caddyfile `/ota/*` 路径 —— 配置正确，静态直出，manifest 实测可拉。
 - ❌ `updates.url` —— app.json 与 APK (0.5.56+) 内嵌一致。
-- 🔧 **认知修正**: manifest `runtimeVersion`(0.5.59) ≠ 装机 runtime(0.5.58) 时，
-  expo-updates **照样下载并加载** bundle (模拟器实测 `DownloadComplete +
-  NEW_UPDATE_LOADED`)。runtimeVersion 不匹配不是「静默忽略」，是能更新的。
+- ✅ **第二个真因 (链路级)**: manifest `runtimeVersion` ≠ 装机 runtime 时，
+  expo-updates **只下载、不加载** —— `DownloadComplete` 后冷启仍回内嵌包
+  (wave86 模拟器 0.5.58 ← manifest 0.5.60 复验，与 wave16 结论一致)。
+  静态 manifest 的 runtimeVersion 钉在最新构建 APK 版本上，于是**每次发版
+  所有旧版本装机都被搁浅**，只能等 APK 升级卡片。
 
 ## 1. 证据 (aapt2 实证)
 
@@ -52,21 +60,48 @@ Updates state change: DownloadComplete, context={isUpdateAvailable=true,
 ErrorRecovery: remote load status changed: NEW_UPDATE_LOADED
 ```
 
-→ 0.5.58 装机自动拉到了 0.5.59 bundle。**OTA 链路对一切 0.5.56+ 装机是通的。**
+→ 0.5.58 装机能**拉到** bundle (网络/路由/发布链全通)；但 force-stop 冷启后
+`isUpdatePending` 归零、跑的仍是内嵌 0.5.58 JS —— **加载被 runtimeVersion
+不匹配拦下**。所以「能下载」≠「能更新」，两个真因都要修。
 
 ## 3. 修复 (v0.5.60)
 
 1. **发布正确的 0.5.60 APK** (`cloud.coolie.app` + 完整 OTA 配置，
    `expo prebuild --clean` 全量重建，不走 patch-in-place —— 那正是陈旧
    android/ 的温床)。version.json 指向它。
-2. **客户端观测点** (`clients/expo/src/OTA.ts`):
+2. **动态 manifest (server)**: `server/src/routes/ota-manifest.ts` —
+   `/ota/manifest` 反代到 Express。仅按请求头回写 runtimeVersion 不够，
+   终验途中又挖出两个客户端侧硬约束, 一并处理:
+   - **旧版 expo-updates 的下载请求不带 Expo-\* 头** (0.5.58 实测, 只带
+     `expo-channel-name` + `If-None-Match`): 路由按 IP 短时记忆 (120s TTL)
+     复用检查请求的 runtime/platform, 让同设备的下载拿到同一份回写 manifest。
+   - **updates 表有 `UNIQUE(scope_key, commit_time)` 索引**: publish 脚本生成的
+     各平台 manifest 共享同一 `createdAt`, 已入库过本 publish 任一变体的设备
+     再插其它变体必撞唯一索引 (logcat 表现 "Failed to construct manifest from
+     response", 真实栈在 `UpdateDao.insertUpdate`)。回写时从 (bundleHash,
+     runtime) 派生确定性 UUID 并按 runtime 错开 createdAt。
+   下限 `MIN_SUPPORTED_OTA_RUNTIME=0.5.56` (原生依赖自 0.5.56 零变化)。
+   每次请求落一条 `[ota-manifest] served` 日志 (ip/platform/clientRuntime/
+   runtimeSource/servedRuntime/manifestId/bundleHash/rewritten)。
+   Caddy: `/ota/manifest` → `/api/ota/manifest`，其余 `/ota/*` 资产仍静态直出。
+3. **客户端观测点** (`clients/expo/src/OTA.ts`):
    - `setupOTAListener` 启动即打 `[OTA] listener setup: runtimeVersion=... channel=...`
    - `[OTA] check manifest runtimeVersion=X vs installedApp=Y → match|MISMATCH` 探针
    - 每 60s 主动复查 (ON_LOAD 只覆盖冷启动；常驻前台的装机会错过更新)
    - 弹窗去重: 待重启状态只提示一次，不再每次状态变化都轰炸
-3. **服务端观测点**: 生产 Caddy 增加站点访问日志 (JSON, 过滤 Cookie/Authorization)，
-   请求头里的 `expo-runtime-version` / `expo-platform` 全部落盘 ——
-   「谁在什么时候拉了哪次 manifest」从此可查。
+4. **服务端观测点 (Caddy)**: 生产站点访问日志 (JSON, 过滤 Cookie/Authorization)，
+   请求头里的 `expo-runtime-version` / `expo-platform` 全部落盘。
+
+## 3.5 终验证据 (emulator-5554, 全链真跑)
+
+```
+装 dls 0.5.58 → 冷启自动检查 → 下载 → DownloadComplete
+  → 冷重启加载新 bundle → ReactNativeJS:
+[OTA] listener setup: runtimeVersion=0.5.58 channel=production updateId=0e1f59e3-…
+[OTA] check manifest runtimeVersion=0.5.58 vs installedApp=0.5.58 → match
+UI 版本角标: v0.5.60   (native versionName 仍 0.5.58 = 未重装 APK, 纯 OTA 更新)
+再原地升级 0.5.60 APK → updateId=0d3d16f0 (rv 0.5.60) → match, UI v0.5.60
+```
 
 ## 4. Boss 手机怎么更新 (重要)
 

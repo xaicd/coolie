@@ -167,11 +167,27 @@ aapt2 dump xmltree /tmp/v.apk --file AndroidManifest.xml | grep -A2 'expo.module
 aapt2 dump resources /tmp/v.apk | grep -A1 'string/expo_runtime_version'   # runtime 真值
 ```
 
-配套事实（模拟器实测 09-25，0.5.58 装机 ← manifest 0.5.59）：manifest 的
-`runtimeVersion` 与装机 runtime **不一致时 expo-updates 照样下载并加载**
-（`DownloadComplete` + `NEW_UPDATE_LOADED`）。「runtimeVersion 不匹配 → 静默
-忽略」是错误认知，别按它排障；不匹配只意味着新 JS bundle 跑在旧原生层上
-（原生依赖没变时安全，`clients/expo/package.json` 依赖 diff 可证）。
+配套事实（模拟器实测 09-25，0.5.58 装机 ← manifest 0.5.60，与 wave16 结论一致）：
+manifest 的 `runtimeVersion` 与装机 runtime 不一致时，expo-updates **只下载、
+不加载** —— `DownloadComplete` 后冷启仍回内嵌包。所以静态 manifest 的
+runtimeVersion 钉在最新 APK 版本上时，**每次发版都搁浅所有旧版本装机**。
+wave86 起由 `server/src/routes/ota-manifest.ts` 动态分发：按请求头
+`expo-runtime-version` 回写 manifest.runtimeVersion（下限 0.5.56），Caddy 把
+`/ota/manifest` 反代到 `/api/ota/manifest`，其余 `/ota/*` 资产仍静态直出。
+改了原生依赖的版本必须同步抬高该路由的 `MIN_SUPPORTED_OTA_RUNTIME`。
+
+自建 manifest 服务器还必须扛住 expo-updates 客户端的两个硬约束（都在
+`ota-manifest.ts` 里处理过，改动前先读）：
+
+1. **旧版客户端的「下载」请求不带任何 Expo-\* 头**（0.5.58 实测只有
+   `expo-channel-name` + `If-None-Match`；「检查」请求才带全套）。按头回写
+   的话，下载会拿到未回写的另一份 manifest —— 路由用 IP 短时记忆兜住。
+2. **updates 表有 `UNIQUE(scope_key, commit_time)` 索引**：publish 脚本给各
+   平台 manifest 写同一个 `createdAt`，客户端只要入库过本 publish 的任一
+   变体，再插其它变体必撞唯一索引，logcat 报
+   `Failed to construct manifest from response`（真实栈在
+   `UpdateDao.insertUpdate`，别被 "manifest" 字样骗去查 JSON 解析）。
+   回写版 manifest 必须派生独立 (id, createdAt)。
 
 预防复发：发版一律 `expo prebuild --platform android --clean` 全量重建，
 不要依赖 patch-in-place（`fix-android-manifest.sh` 只补 `EXPO_RUNTIME_VERSION`
