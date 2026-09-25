@@ -328,6 +328,25 @@ export function ProjectsScreen({
                   </View>
                 ) : null}
 
+                {/* CMMI 质量门禁状态条 (G1~G5) */}
+                <View style={styles.cmmiGateBar}>
+                  <View style={[styles.cmmiGateChip, { backgroundColor: "rgba(16, 185, 129, 0.12)", borderColor: C.ok }]}>
+                    <Text style={[styles.cmmiGateText, { color: C.ok }]}>G1 需求 ✓</Text>
+                  </View>
+                  <View style={[styles.cmmiGateChip, { backgroundColor: "rgba(16, 185, 129, 0.12)", borderColor: C.ok }]}>
+                    <Text style={[styles.cmmiGateText, { color: C.ok }]}>G2 方案 ✓</Text>
+                  </View>
+                  <View style={[styles.cmmiGateChip, { backgroundColor: "rgba(94, 106, 210, 0.12)", borderColor: C.accent }]}>
+                    <Text style={[styles.cmmiGateText, { color: C.accent }]}>G3 契约/0报错</Text>
+                  </View>
+                  <View style={[styles.cmmiGateChip, { backgroundColor: "rgba(255, 255, 255, 0.04)", borderColor: C.line }]}>
+                    <Text style={[styles.cmmiGateText, { color: C.ink3 }]}>G4 验收</Text>
+                  </View>
+                  <View style={[styles.cmmiGateChip, { backgroundColor: "rgba(255, 255, 255, 0.04)", borderColor: C.line }]}>
+                    <Text style={[styles.cmmiGateText, { color: C.ink4 }]}>G5 投产</Text>
+                  </View>
+                </View>
+
                 {/* 底部元数据栏 */}
                 <View style={styles.cardFooter}>
                   <View style={styles.metaLeft}>
@@ -381,6 +400,24 @@ export function ProjectsScreen({
                         ))}
                       </View>
                     ) : null}
+
+                    {/* CMMI 穿透与黄金文档快捷入口 */}
+                    <View style={styles.cmmiActionRow}>
+                      <Pressable
+                        style={styles.cmmiBtn}
+                        onPress={() => onOpenWebProjects ? onOpenWebProjects() : null}
+                      >
+                        <Ionicons name="git-network-outline" size={13} color={C.accent} />
+                        <Text style={styles.cmmiBtnText}>RTM 需求穿透树</Text>
+                      </Pressable>
+                      <Pressable
+                        style={styles.cmmiBtn}
+                        onPress={() => onOpenWebProjects ? onOpenWebProjects() : null}
+                      >
+                        <Ionicons name="document-text-outline" size={13} color={C.ok} />
+                        <Text style={[styles.cmmiBtnText, { color: C.ok }]}>5+2 黄金文档基线</Text>
+                      </Pressable>
+                    </View>
 
                     {/* 操作动作按钮组 */}
                     <View style={styles.actionButtonsRow}>
@@ -681,5 +718,44 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: "500",
     color: C.accent,
+  },
+  cmmiGateBar: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    marginTop: 4,
+    marginBottom: 2,
+  },
+  cmmiGateChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: RADIUS.xs ?? 4,
+    borderWidth: 1,
+  },
+  cmmiGateText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  cmmiActionRow: {
+    flexDirection: "row",
+    gap: SPACING.sm,
+    marginTop: 4,
+  },
+  cmmiBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: RADIUS.sm,
+    paddingVertical: 7,
+  },
+  cmmiBtnText: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: C.ink2,
   },
 });

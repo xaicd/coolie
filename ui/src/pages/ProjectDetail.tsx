@@ -45,10 +45,12 @@ import {
   useResourceMembershipMutation,
   useResourceMemberships,
 } from "../hooks/useResourceMemberships";
+import { ProjectCmmiGovernance } from "../components/ProjectCmmiGovernance";
+import { ProjectCmmiBaseline } from "../components/ProjectCmmiBaseline";
 
 /* ── Top-level tab types ── */
 
-type ProjectBaseTab = "list" | "plugin-operations" | "workspaces" | "configuration" | "budget";
+type ProjectBaseTab = "list" | "plugin-operations" | "workspaces" | "configuration" | "budget" | "governance" | "baseline";
 type ProjectPluginTab = `plugin:${string}`;
 type ProjectTab = ProjectBaseTab | ProjectPluginTab;
 
@@ -64,6 +66,8 @@ function resolveProjectTab(pathname: string, projectId: string): ProjectTab | nu
   if (tab === "overview") return "configuration";
   if (tab === "configuration") return "configuration";
   if (tab === "budget") return "budget";
+  if (tab === "governance") return "governance";
+  if (tab === "baseline") return "baseline";
   if (tab === "issues") return "list";
   if (tab === "plugin-operations") return "plugin-operations";
   if (tab === "workspaces") return "workspaces";
@@ -660,6 +664,12 @@ export function ProjectDetail() {
     if (cachedTab === "plugin-operations" && project?.managedByPlugin) {
       return <Navigate to={`/projects/${canonicalProjectRef}/plugin-operations`} replace />;
     }
+    if (cachedTab === "governance") {
+      return <Navigate to={`/projects/${canonicalProjectRef}/governance`} replace />;
+    }
+    if (cachedTab === "baseline") {
+      return <Navigate to={`/projects/${canonicalProjectRef}/baseline`} replace />;
+    }
     if (cachedTab === "workspaces" && workspaceTabDecisionLoaded && showWorkspacesTab) {
       return <Navigate to={`/projects/${canonicalProjectRef}/workspaces`} replace />;
     }
@@ -698,6 +708,10 @@ export function ProjectDetail() {
       navigate(`/projects/${canonicalProjectRef}/workspaces`);
     } else if (tab === "budget") {
       navigate(`/projects/${canonicalProjectRef}/budget`);
+    } else if (tab === "governance") {
+      navigate(`/projects/${canonicalProjectRef}/governance`);
+    } else if (tab === "baseline") {
+      navigate(`/projects/${canonicalProjectRef}/baseline`);
     } else if (tab === "plugin-operations") {
       navigate(`/projects/${canonicalProjectRef}/plugin-operations`);
     } else if (tab === "configuration") {
@@ -831,7 +845,8 @@ export function ProjectDetail() {
         <PageTabBar
           items={[
             { value: "list", label: "Tasks" },
-
+            { value: "governance", label: "质量门禁 (CMMI)" },
+            { value: "baseline", label: "5+2 黄金文档" },
             ...(project.managedByPlugin ? [{ value: "plugin-operations", label: "Plugin operations" }] : []),
             ...(showWorkspacesTab ? [{ value: "workspaces", label: "Workspaces" }] : []),
             { value: "configuration", label: "Configuration" },
@@ -847,7 +862,13 @@ export function ProjectDetail() {
         />
       </Tabs>
 
+      {activeTab === "governance" && project && (
+        <ProjectCmmiGovernance projectId={project.id} projectName={project.name} />
+      )}
 
+      {activeTab === "baseline" && project && (
+        <ProjectCmmiBaseline projectId={project.id} projectName={project.name} />
+      )}
 
       {activeTab === "list" && project?.id && resolvedCompanyId && (
         <ProjectIssuesList projectId={project.id} companyId={resolvedCompanyId} />

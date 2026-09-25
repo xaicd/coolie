@@ -366,6 +366,30 @@
       "maxNetLines": 500,
       "reason": "Fork script: scaffolds CMMI 3/5 engineering skills, door-checking scripts, and 5+2 golden documents baseline into target projects. No upstream counterpart.",
       "maxTotalLines": 600
+    },
+    {
+      "path": "ui/src/App.tsx",
+      "maxNetLines": 20,
+      "reason": "Mount project governance and 5+2 baseline routes (/projects/:id/governance, /projects/:id/baseline) for CMMI quality governance.",
+      "maxTotalLines": 50
+    },
+    {
+      "path": "ui/src/pages/ProjectDetail.tsx",
+      "maxNetLines": 50,
+      "reason": "Add CMMI quality governance and 5+2 golden documents baseline tabs to project detail view.",
+      "maxTotalLines": 80
+    },
+    {
+      "path": "ui/src/components/ProjectCmmiGovernance.tsx",
+      "maxNetLines": 260,
+      "reason": "CMMI 3-5 quality governance dashboard with G1-G5 gates and compliance checks. Fork feature with no upstream counterpart.",
+      "maxTotalLines": 300
+    },
+    {
+      "path": "ui/src/components/ProjectCmmiBaseline.tsx",
+      "maxNetLines": 220,
+      "reason": "CMMI 5+2 golden documents baseline manager with audit export package capability. Fork feature with no upstream counterpart.",
+      "maxTotalLines": 260
     }
   ]
 }

@@ -848,81 +848,6 @@ function HomeScreen({
         onBack={() => setDiffContext(null)}
       />
     );
-  } else if (focusedApprovalId) {
-    content = (
-      <ApprovalFocusDetail
-        companyId={companyId}
-        approvalId={focusedApprovalId}
-        onBack={() => setFocusedApprovalId(null)}
-      />
-    );
-  } else if (searchOpen) {
-    content = (
-      <SearchScreen
-        company={company}
-        onBack={() => setSearchOpen(false)}
-        onOpenIssue={(issueItem) => {
-          setSearchOpen(false);
-          navigateTab("tasks");
-          setSelected(issueItem);
-        }}
-        onOpenAgent={(agent: SearchAgentResult) => {
-          setSearchOpen(false);
-          setAgentDetail(agent);
-        }}
-      />
-    );
-  } else if (notificationsOpen) {
-    content = (
-      <NotificationsScreen
-        company={company}
-        onBack={() => setNotificationsOpen(false)}
-        onOpenIssue={(issueItem) => {
-          setNotificationsOpen(false);
-          navigateTab("tasks");
-          setSelected(issueItem);
-        }}
-        onOpenApproval={(approvalId) => {
-          setNotificationsOpen(false);
-          setFocusedApprovalId(approvalId);
-        }}
-      />
-    );
-  } else if (agentDetail) {
-    content = (
-      <AgentDetailScreen
-        company={company}
-        agent={agentDetail}
-        onBack={() => setAgentDetail(null)}
-        onOpenIssue={(issueItem) => {
-          setAgentDetail(null);
-          navigateTab("tasks");
-          setSelected(issueItem);
-        }}
-      />
-    );
-  } else if (pipelinesOpen) {
-    content = (
-      <PipelinesScreen
-        company={company}
-        onBack={() => setPipelinesOpen(false)}
-        onOpenWeb={(path, title) =>
-          setWebContainerTarget({ path, title: title ?? "流水线" })
-        }
-      />
-    );
-  } else if (plansOpen) {
-    content = (
-      <PlansScreen
-        company={company}
-        onBack={() => setPlansOpen(false)}
-        onOpenPlan={(issue) => {
-          setPlansOpen(false);
-          navigateTab("tasks");
-          setSelected(issue);
-        }}
-      />
-    );
   } else if (webContainerTarget) {
     content = (
       <WebContainerScreen
@@ -932,177 +857,253 @@ function HomeScreen({
         onBack={() => setWebContainerTarget(null)}
       />
     );
-  } else if (projectsOpen) {
-    content = (
-      <ProjectsScreen
-        company={company}
-        onBack={() => setProjectsOpen(false)}
-        onOpenWebProjects={() =>
-          setWebContainerTarget({ path: "/projects", title: "项目中心 (Web 全量)" })
-        }
-        onOpenProjectTasks={(_project) => {
-          setProjectsOpen(false);
-          navigateTab("tasks");
-        }}
-      />
-    );
-  } else if (gitCredentialsOpen) {
-    content = (
-      <GitCredentialsScreen company={company} onBack={() => setGitCredentialsOpen(false)} />
-    );
   } else {
+    // 固化外层 Shell：固定顶部状态栏 + 固定底部 TabBar (boss: APP 底部导航要固定起来的)
+    const hasSubHeader = Boolean(
+      focusedApprovalId ||
+      searchOpen ||
+      notificationsOpen ||
+      agentDetail ||
+      pipelinesOpen ||
+      plansOpen ||
+      projectsOpen ||
+      gitCredentialsOpen,
+    );
+
     content = (
-    <SafeAreaView style={[styles.shell, { paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
-      <StatusBar style="light" />
-      {/* 全局顶栏 — 对齐 Coolie Web 的 appBar (wave73 中间标题 "Coolie工坊" 保留 — boss 26:35) */}
-      <AppBar
-        unreadCount={unreadCount}
-        onOpenNotifications={() => setNotificationsOpen(true)}
-        onOpenSearch={() => setSearchOpen(true)}
-        onOpenWebWorkbench={() =>
-          setWebContainerTarget({ path: "/dashboard", title: "Web 全功能工作台" })
-        }
-      />
-      <View style={styles.shellContent}>
-        {tab === "dashboard" ? (
-          <DashboardScreen
-            company={company}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onOpenProjects={() => setProjectsOpen(true)}
-            onOpenWorkshop={() => navigateTab("chat")}
-            onOpenOntology={() => navigateTab("ontology")}
-            onOpenPipelines={() => setPipelinesOpen(true)}
+      <SafeAreaView style={[styles.shell, { paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
+        <StatusBar style="light" />
+        {/* 未进入子屏时显示全局顶栏；进入项目中心/流水线/计划/员工详情等子屏时由子屏自身的 ScreenHeader 承载返回 */}
+        {!hasSubHeader && (
+          <AppBar
+            unreadCount={unreadCount}
+            onOpenNotifications={() => setNotificationsOpen(true)}
+            onOpenSearch={() => setSearchOpen(true)}
             onOpenWebWorkbench={() =>
               setWebContainerTarget({ path: "/dashboard", title: "Web 全功能工作台" })
             }
-            onOpenApprovals={() => {
-              setSelected(null);
-              setDiffContext(null);
-              setSandboxContext(null);
-              setFocusedApprovalId(null);
-              navigateTab("tasks");
-            }}
-            onOpenApproval={(approvalId) => {
-              navigateTab("tasks");
-              setFocusedApprovalId(approvalId);
-            }}
           />
-        ) : tab === "agents" ? (
-          <AgentsScreen
-            company={company}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onOpenIssue={(issue) => {
-              navigateTab("tasks");
-              setSelected(issue);
-            }}
-          />
-        ) : tab === "chat" ? (
-          <BoardChatScreen
-            company={company}
-            whoami={whoami}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
-            onOpenIssue={(issue) => {
-              navigateTab("tasks");
-              setSelected(issue);
-            }}
-            // wave19: 「建 pipeline xxx」建好后跳 Coolie Web 的 pipeline 编辑器
-            // (App 内没有 pipeline 屏, Web 端 /pipelines/:id 才是真正的编辑器)。
-            onOpenPipeline={(pipelineId) => {
-              void Linking.openURL(
-                `${COOLIE_BASE_URL}/pipelines/${encodeURIComponent(pipelineId)}`,
-              ).catch(() => {
-                Alert.alert("无法打开 Pipeline", "请在浏览器里打开 Coolie Web 查看该 pipeline。");
-              });
-            }}
-            // 「plan xxx」建出的是一条 plan 任务, 跳任务详情即可。
-            onOpenPlan={(issue) => {
-              navigateTab("tasks");
-              setSelected(issue);
-            }}
-          />
-        ) : tab === "inbox" ? (
-          selected ? (
-            taskDetail
-          ) : (
-            <InboxScreen
-              company={company}
-              onOpenSettings={() => setSettingsOpen(true)}
-              onOpenIssue={setSelected}
-              onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
-              onOpenWorkshop={() => navigateTab("chat")}
+        )}
+        <View style={styles.shellContent}>
+          {focusedApprovalId ? (
+            <ApprovalFocusDetail
+              companyId={companyId}
+              approvalId={focusedApprovalId}
+              onBack={() => setFocusedApprovalId(null)}
             />
-          )
-        ) : tab === "ontology" ? (
-          <OntologyDomainListScreen
-            company={company}
-            whoami={whoami}
-            onOpenSettings={() => setSettingsOpen(true)}
-            onOpenWebOntology={() =>
-              setWebContainerTarget({ path: "/ontology", title: "本体可视化设计器" })
-            }
-          />
-        ) : tab === "artifacts" ? (
-          <ArtifactsScreen
-            company={company}
-            whoami={whoami}
-            onOpenSandbox={(url, service, wp) =>
-              setSandboxContext({ url, service, workProduct: wp })
-            }
-            onOpenDiff={(issueItem, wp) =>
-              setDiffContext({ issue: issueItem, workProduct: wp })
-            }
-          />
-        ) : tab === "tasks" ? (
-          selected ? (
-            taskDetail
-          ) : (
-            <TasksScreen
+          ) : searchOpen ? (
+            <SearchScreen
               company={company}
-              whoami={whoami}
-              refreshToken={tasksRefreshToken}
-              onOpenIssue={setSelected}
-              onOpenBuildIssue={(issueId) => void openIssueById(issueId)}
+              onBack={() => setSearchOpen(false)}
+              onOpenIssue={(issueItem) => {
+                setSearchOpen(false);
+                navigateTab("tasks");
+                setSelected(issueItem);
+              }}
+              onOpenAgent={(agent: SearchAgentResult) => {
+                setSearchOpen(false);
+                setAgentDetail(agent);
+              }}
+            />
+          ) : notificationsOpen ? (
+            <NotificationsScreen
+              company={company}
+              onBack={() => setNotificationsOpen(false)}
+              onOpenIssue={(issueItem) => {
+                setNotificationsOpen(false);
+                navigateTab("tasks");
+                setSelected(issueItem);
+              }}
+              onOpenApproval={(approvalId) => {
+                setNotificationsOpen(false);
+                setFocusedApprovalId(approvalId);
+              }}
+            />
+          ) : agentDetail ? (
+            <AgentDetailScreen
+              company={company}
+              agent={agentDetail}
+              onBack={() => setAgentDetail(null)}
+              onOpenIssue={(issueItem) => {
+                setAgentDetail(null);
+                navigateTab("tasks");
+                setSelected(issueItem);
+              }}
+            />
+          ) : pipelinesOpen ? (
+            <PipelinesScreen
+              company={company}
+              onBack={() => setPipelinesOpen(false)}
+              onOpenWeb={(path, title) =>
+                setWebContainerTarget({ path, title: title ?? "流水线" })
+              }
+            />
+          ) : plansOpen ? (
+            <PlansScreen
+              company={company}
+              onBack={() => setPlansOpen(false)}
+              onOpenPlan={(issue) => {
+                setPlansOpen(false);
+                navigateTab("tasks");
+                setSelected(issue);
+              }}
+            />
+          ) : projectsOpen ? (
+            <ProjectsScreen
+              company={company}
+              onBack={() => setProjectsOpen(false)}
+              onOpenWebProjects={() =>
+                setWebContainerTarget({ path: "/projects", title: "项目中心 (Web 全量)" })
+              }
+              onOpenProjectTasks={(_project) => {
+                setProjectsOpen(false);
+                navigateTab("tasks");
+              }}
+            />
+          ) : gitCredentialsOpen ? (
+            <GitCredentialsScreen company={company} onBack={() => setGitCredentialsOpen(false)} />
+          ) : tab === "dashboard" ? (
+            <DashboardScreen
+              company={company}
               onOpenSettings={() => setSettingsOpen(true)}
+              onOpenProjects={() => setProjectsOpen(true)}
               onOpenWorkshop={() => navigateTab("chat")}
               onOpenOntology={() => navigateTab("ontology")}
-              onOpenArtifacts={() => navigateTab("artifacts")}
               onOpenPipelines={() => setPipelinesOpen(true)}
-              onOpenPlans={() => setPlansOpen(true)}
-              onOpenProjects={() => setProjectsOpen(true)}
-              onOpenGitCredentials={() => setGitCredentialsOpen(true)}
+              onOpenWebWorkbench={() =>
+                setWebContainerTarget({ path: "/dashboard", title: "Web 全功能工作台" })
+              }
+              onOpenApprovals={() => {
+                setSelected(null);
+                setDiffContext(null);
+                setSandboxContext(null);
+                setFocusedApprovalId(null);
+                navigateTab("tasks");
+              }}
+              onOpenApproval={(approvalId) => {
+                navigateTab("tasks");
+                setFocusedApprovalId(approvalId);
+              }}
             />
-          )
+          ) : tab === "agents" ? (
+            <AgentsScreen
+              company={company}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenIssue={(issue) => {
+                navigateTab("tasks");
+                setSelected(issue);
+              }}
+            />
+          ) : tab === "chat" ? (
+            <BoardChatScreen
+              company={company}
+              whoami={whoami}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
+              onOpenIssue={(issue) => {
+                navigateTab("tasks");
+                setSelected(issue);
+              }}
+              onOpenPipeline={(pipelineId) => {
+                void Linking.openURL(
+                  `${COOLIE_BASE_URL}/pipelines/${encodeURIComponent(pipelineId)}`,
+                ).catch(() => {
+                  Alert.alert("无法打开 Pipeline", "请在浏览器里打开 Coolie Web 查看该 pipeline。");
+                });
+              }}
+              onOpenPlan={(issue) => {
+                navigateTab("tasks");
+                setSelected(issue);
+              }}
+            />
+          ) : tab === "inbox" ? (
+            selected ? (
+              taskDetail
+            ) : (
+              <InboxScreen
+                company={company}
+                onOpenSettings={() => setSettingsOpen(true)}
+                onOpenIssue={setSelected}
+                onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
+                onOpenWorkshop={() => navigateTab("chat")}
+              />
+            )
+          ) : tab === "ontology" ? (
+            <OntologyDomainListScreen
+              company={company}
+              whoami={whoami}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenWebOntology={() =>
+                setWebContainerTarget({ path: "/ontology", title: "本体可视化设计器" })
+              }
+            />
+          ) : tab === "artifacts" ? (
+            <ArtifactsScreen
+              company={company}
+              whoami={whoami}
+              onOpenSandbox={(url, service, wp) =>
+                setSandboxContext({ url, service, workProduct: wp })
+              }
+              onOpenDiff={(issueItem, wp) =>
+                setDiffContext({ issue: issueItem, workProduct: wp })
+              }
+            />
+          ) : tab === "tasks" ? (
+            selected ? (
+              taskDetail
+            ) : (
+              <TasksScreen
+                company={company}
+                whoami={whoami}
+                refreshToken={tasksRefreshToken}
+                onOpenIssue={setSelected}
+                onOpenBuildIssue={(issueId) => void openIssueById(issueId)}
+                onOpenSettings={() => setSettingsOpen(true)}
+                onOpenWorkshop={() => navigateTab("chat")}
+                onOpenOntology={() => navigateTab("ontology")}
+                onOpenArtifacts={() => navigateTab("artifacts")}
+                onOpenPipelines={() => setPipelinesOpen(true)}
+                onOpenPlans={() => setPlansOpen(true)}
+                onOpenProjects={() => setProjectsOpen(true)}
+                onOpenGitCredentials={() => setGitCredentialsOpen(true)}
+              />
+            )
+          ) : null}
+        </View>
+        {appUpdate ? <AppUpdateCard info={appUpdate} onClose={() => setAppUpdate(null)} /> : null}
+        {settingsOpen ? (
+          <SettingsSheet
+            whoami={whoami}
+            ota={ota}
+            onClose={() => setSettingsOpen(false)}
+            onSignOut={onSignOut}
+            workspaceGitEnabled={workspaceGitEnabled}
+            onToggleWorkspaceGit={setWorkspaceGitEnabled}
+            onOpenGitCredentials={() => {
+              setSettingsOpen(false);
+              setGitCredentialsOpen(true);
+            }}
+          />
         ) : null}
-      </View>
-      {appUpdate ? <AppUpdateCard info={appUpdate} onClose={() => setAppUpdate(null)} /> : null}
-      {settingsOpen ? (
-        <SettingsSheet
-          whoami={whoami}
-          ota={ota}
-          onClose={() => setSettingsOpen(false)}
-          onSignOut={onSignOut}
-          workspaceGitEnabled={workspaceGitEnabled}
-          onToggleWorkspaceGit={setWorkspaceGitEnabled}
-          onOpenGitCredentials={() => {
-            setSettingsOpen(false);
-            setGitCredentialsOpen(true);
+        {/* 底部导航 — 汇览 / 任务 / [+] / 员工 / 收件箱 (固定常驻) */}
+        <TabBar
+          tab={tab}
+          onChange={(key) => {
+            // 切 tab 时重置子页面，直达所选 tab 根界面 (boss: APP 底部导航要固定起来的)
+            setComposeOpen(false);
+            setSelected(null);
+            setProjectsOpen(false);
+            setPipelinesOpen(false);
+            setPlansOpen(false);
+            setAgentDetail(null);
+            setGitCredentialsOpen(false);
+            setSearchOpen(false);
+            setNotificationsOpen(false);
+            setFocusedApprovalId(null);
+            navigateTab(key);
           }}
+          onCreate={() => setComposeOpen(true)}
         />
-      ) : null}
-      {/* 底部导航 — 汇览 / 任务 / [+] / 员工 / 收件箱 */}
-      <TabBar
-        tab={tab}
-        onChange={(key) => {
-          // 浮层只盖住内容区 (见 composeOverlay 的 bottom: TAB_BAR_HEIGHT), 底栏仍可点:
-          // 点任一 tab 就落回那一页, 不让浮层僵在原地 (boss 22:59 「底部导航呢」)。
-          // 任务详情同理 —— 它是「当前 tab 内的一层」(wave51), 换 tab 就回列表, 不跨 tab 残留。
-          setComposeOpen(false);
-          setSelected(null);
-          navigateTab(key);
-        }}
-        onCreate={() => setComposeOpen(true)}
-      />
       {/* 中央 "+" 打开的「新会话」页 (内容区浮层, 让出底部 TabBar) */}
       {composeOpen ? (
         <EdgeSwipeBack style={styles.composeOverlay} onBack={() => setComposeOpen(false)}>

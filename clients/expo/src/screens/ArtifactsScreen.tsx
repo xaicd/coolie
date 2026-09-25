@@ -47,12 +47,13 @@ export interface ArtifactsScreenProps {
   onOpenDiff?: (issue: Issue, workProduct?: IssueWorkProduct | null) => void;
 }
 
-type FilterKind = "all" | "image" | "document" | "work_product";
+type FilterKind = "all" | "cmmi_baseline" | "image" | "document" | "work_product";
 
 const FILTER_TABS: Array<{ key: FilterKind; label: string }> = [
   { key: "all", label: "全部" },
-  { key: "image", label: "图片" },
+  { key: "cmmi_baseline", label: "5+2黄金文档" },
   { key: "document", label: "文档" },
+  { key: "image", label: "图片" },
   { key: "work_product", label: "代码/原型" },
 ];
 
@@ -227,13 +228,20 @@ export function ArtifactsScreen({
     let images = 0;
     let documents = 0;
     let workProducts = 0;
+    let cmmiBaselines = 0;
+    const isCmmiDoc = (name?: string, desc?: string) => {
+      const text = `${name ?? ""} ${desc ?? ""}`.toLowerCase();
+      return /srs|hld|lld|atp|cmp|car|decision|需求|概要设计|详细设计|验收|投产|合规|门禁|基线/.test(text);
+    };
     for (const a of artifacts) {
       if (a.source === "work_product") workProducts += 1;
       if (a.mediaKind === "image") images += 1;
       if (a.mediaKind === "document" || a.mediaKind === "text") documents += 1;
+      if (isCmmiDoc(a.name, a.description)) cmmiBaselines += 1;
     }
     return {
       all: artifacts.length,
+      cmmi_baseline: cmmiBaselines,
       image: images,
       document: documents,
       work_product: workProducts,
@@ -242,7 +250,10 @@ export function ArtifactsScreen({
 
   const filteredList = useMemo(() => {
     let list = artifacts;
-    if (filter === "work_product") {
+    if (filter === "cmmi_baseline") {
+      const pattern = /srs|hld|lld|atp|cmp|car|decision|需求|概要设计|详细设计|验收|投产|合规|门禁|基线/i;
+      list = list.filter((a) => pattern.test(`${a.name ?? ""} ${a.description ?? ""}`));
+    } else if (filter === "work_product") {
       list = list.filter((a) => a.source === "work_product");
     } else if (filter === "document") {
       list = list.filter(
