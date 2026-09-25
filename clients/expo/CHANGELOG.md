@@ -4,6 +4,20 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.59
+
+> Released: 2026-09-25 · APK + OTA bundle
+
+### 更新
+
+- wave85 — 打包今天 boss Claude 21 commit (boss 27:17 OOB 「派」)
+  - `feat(cmmi): absorb open source IEEE and ISO standards into CMMI skills references and templates` (30dc3d4ce)
+  - `feat(cmmi): solidify cmmi documents into executable skills templates and project scaffolding tool` (adde24484)
+  - `feat(expo): support opening prototypes and document previews in QQ browser and external apps` (6c480bf14)
+  - `feat(deliverables): support disk, git, and oss multi-storage backends and design management module` (032dde072)
+
+---
+
 ## v0.5.58
 
 > Released: 2026-09-25 · APK + OTA bundle

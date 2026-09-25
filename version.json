@@ -1,7 +1,7 @@
 {
-  "version": "0.5.58",
-  "versionCode": 558,
-  "commitSha": "3602c3932",
-  "apkUrl": "https://dls.xrobinai.cn/coolie/app/0.5.58/coolie-release.apk",
-  "notes": "wave84 排查 web cookie + 打包 boss Claude 后 8 commit"
+  "version": "0.5.59",
+  "versionCode": 559,
+  "commitSha": "481e1e34e",
+  "apkUrl": "https://dls.xrobinai.cn/coolie/app/0.5.59/coolie-release.apk",
+  "notes": "wave85 打包今天 boss Claude 21 commit (boss 27:17 OOB 派)"
 }
