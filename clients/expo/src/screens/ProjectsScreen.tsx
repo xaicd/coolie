@@ -401,6 +401,44 @@ export function ProjectsScreen({
                       </View>
                     ) : null}
 
+                    {/* 原生 CMMI 质量与门禁审计态势面板 */}
+                    <View style={styles.cmmiSummaryBlock}>
+                      <View style={styles.cmmiSummaryHeader}>
+                        <View style={styles.cmmiSummaryTitleRow}>
+                          <Ionicons name="shield-checkmark" size={13} color={C.accent} />
+                          <Text style={styles.cmmiSummaryTitle}>CMMI 质量与门禁审计态势</Text>
+                        </View>
+                        <Text style={styles.cmmiSummaryBadge}>合规分 80/100</Text>
+                      </View>
+
+                      <View style={styles.cmmiDetailGrid}>
+                        <View style={styles.cmmiGridItem}>
+                          <Text style={styles.cmmiGridLabel}>G1 需求 (DS)</Text>
+                          <Text style={[styles.cmmiGridVal, { color: C.ok }]}>100% EARS/RTM</Text>
+                        </View>
+                        <View style={styles.cmmiGridItem}>
+                          <Text style={styles.cmmiGridLabel}>G2 方案 (FDA)</Text>
+                          <Text style={[styles.cmmiGridVal, { color: C.ok }]}>DAR-001 会签</Text>
+                        </View>
+                        <View style={styles.cmmiGridItem}>
+                          <Text style={styles.cmmiGridLabel}>G3 契约 (SWE)</Text>
+                          <Text style={[styles.cmmiGridVal, { color: C.ok }]}>0 编译报错</Text>
+                        </View>
+                        <View style={styles.cmmiGridItem}>
+                          <Text style={styles.cmmiGridLabel}>G4 验收 (FDSE)</Text>
+                          <Text style={[styles.cmmiGridVal, { color: C.warn }]}>用例执行中</Text>
+                        </View>
+                        <View style={styles.cmmiGridItem}>
+                          <Text style={styles.cmmiGridLabel}>G5 投产 (SRE)</Text>
+                          <Text style={[styles.cmmiGridVal, { color: C.ink3 }]}>待会签</Text>
+                        </View>
+                        <View style={styles.cmmiGridItem}>
+                          <Text style={styles.cmmiGridLabel}>SPC 稳定性</Text>
+                          <Text style={[styles.cmmiGridVal, { color: C.ok }]}>3σ 受控 (42s)</Text>
+                        </View>
+                      </View>
+                    </View>
+
                     {/* CMMI 穿透与黄金文档快捷入口 */}
                     <View style={styles.cmmiActionRow}>
                       <Pressable
@@ -753,6 +791,58 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     gap: SPACING.sm,
     marginTop: 4,
+  },
+  cmmiSummaryBlock: {
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: RADIUS.sm,
+    padding: SPACING.sm,
+    marginTop: 4,
+    marginBottom: 4,
+  },
+  cmmiSummaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 8,
+  },
+  cmmiSummaryTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  cmmiSummaryTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.ink1,
+  },
+  cmmiSummaryBadge: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: C.accent,
+  },
+  cmmiDetailGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  cmmiGridItem: {
+    width: "31%",
+    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    paddingVertical: 5,
+    paddingHorizontal: 6,
+    borderRadius: RADIUS.xs ?? 4,
+  },
+  cmmiGridLabel: {
+    fontSize: 9,
+    color: C.ink4,
+    fontWeight: "500",
+  },
+  cmmiGridVal: {
+    fontSize: 10,
+    fontWeight: "600",
+    marginTop: 2,
   },
   cmmiBtn: {
     flex: 1,
