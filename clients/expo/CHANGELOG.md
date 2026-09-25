@@ -4,6 +4,19 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.62
+
+> Released: 2026-09-25 · Android release APK + OTA bundle
+
+### 更新
+
+- wave88 — 打包 boss Claude 后 2 commit (boss 09-23 27:24 OOB 「派下」)
+  - `173ce98d2` feat(mobile): native CMMI governance state block (RTM/SPC tabs) + enterprise audit spec
+  - `f509fd6c2` feat(cmmi): reverse-scaffold 模式 — 从 RuoYi / JeecgBoot 老项目反推生成 CMMI 文档脚手架
+  - 这 2 commit 未进 0.5.61 APK，本版装入
+
+---
+
 ## v0.5.61
 
 > Released: 2026-09-25 · Android release APK + OTA bundle

@@ -468,6 +468,15 @@ export function ProjectsScreen({
                         <Ionicons name="analytics-outline" size={13} color={C.warn} />
                         <Text style={[styles.cmmiBtnText, { color: C.warn }]}>SPC 控制</Text>
                       </Pressable>
+                      <Pressable
+                        style={styles.cmmiBtn}
+                        onPress={() =>
+                          onOpenWebProjects?.(`/projects/${project.id}/living-topology`, `${project.name} · 三态活拓扑`)
+                        }
+                      >
+                        <Ionicons name="git-merge-outline" size={13} color={C.accent} />
+                        <Text style={[styles.cmmiBtnText, { color: C.accent }]}>三态拓扑</Text>
+                      </Pressable>
                     </View>
 
                     {/* 操作动作按钮组 */}
