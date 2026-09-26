@@ -78,3 +78,57 @@ G. APK + coscli + version.json + publish-ota + adb 真验
 ```
 Coolie工坊 0.5.65: https://dls.xrobinai.cn/coolie/app/0.5.65/coolie-release.apk    (待定)
 ```
+---
+
+## 5. 执行结果 (2026-09-26 12:00-13:10, claude)
+
+### 5.1 排查深化 — 发现两个更深真因 (都在 server 侧)
+
+1. **Better Auth 签名 cookie 契约** (better-call `getSignedCookie`):
+   session cookie 值必须是 `<token>.<44位base64 HMAC-SHA256>` 签名形式。
+   裸 DB token 永远无法通过 web 端校验 → a11f38871 的 `/api/auth/session-token`
+   返回裸 token、exchange 回写裸 token, 即使路由部署了 WebView 也登不上。
+2. **wave93 真因** (boss 12:07 真机 trace, 本 wave 执行中发现并一并修复):
+   App bridge URL 带 `/XROA` 前缀 (`COOLIE_WEB_URL` 含部署基路径), 请求
+   `/XROA/api/auth/exchange` 落 SPA 兜底 → 200 HTML 无 Set-Cookie。
+
+### 5.2 修复 (server-only, 已装 0.5.64 真机无需升级即生效)
+
+- `9db148ebd` — `/api/auth/session-token` 返回签名 cookie 值; exchange 对裸
+  token 签名后写 Set-Cookie (不双签已签名值)。
+- `e7a0929ad` — `/XROA/api/*` 重写到 `/api/*`; `next` 绝对 URL 取 pathname
+  (同源安全, 302 → `/XROA/dashboard`)。
+- 服务器重建 + rsync (src 是生产真身, tsx 运行) + restart ×2, 健康全绿,
+  补跑了 1 个 pending migration (9004)。
+
+### 5.3 真验 (prod, 真值)
+
+- 签名 cookie → `/api/auth/session-token` **200**, 返回值与构造签名一致。
+- `/api/auth/exchange` 签名 token → **302 + Set-Cookie**; 按 WebView 方式回放
+  cookie → **200** (web 会话真建立)。裸 token 走 DB fallback → cookie 已签名 →
+  回放 **200**。对照组裸 token 直打 → 401。
+- **老板 12:07 原始请求形态** `GET /XROA/api/auth/exchange?token=<签名>
+  &next=https://www.xrobinai.cn/XROA/dashboard` → **302 + Location:
+  /XROA/dashboard + 签名 Set-Cookie** (修复前: 200 HTML 无 cookie)。
+- 单测 30/30 (bridge), typecheck 干净。
+
+### 5.4 发版 0.5.65
+
+- APK: versionCode 565 / versionName 0.5.65 / runtimeVersion 双处 0.5.65
+  (manifest + strings.xml), COS 已传, 公网下载 200:
+  `https://dls.xrobinai.cn/coolie/app/0.5.65/coolie-release.apk`
+- version.json (0.5.65) 已上 prod; OTA 0.5.65 已发布 (带 header 验真)。
+- 模拟器: 安装 565 → 装机自检全绿 (OTA 已连通/bundle OTA 下发) → API Key
+  登录真会话 (mint 短时 board key, 已撤销) → 点「在 Web 上查看全部项目」→
+  **WebView 显示完整 Web 驾驶舱, 已登录, 无登录页**。
+
+### 5.5 环境备注
+
+- 模拟器 API 流量经本机代理栈, prod journal/Caddy 看不到对应请求 (boss 真机
+  流量直达, 11:53/12:07 日志可证); 模拟器验证以 UI 截图 + prod DB 数据回显为准。
+- `expo prebuild --clean` 会抹掉 `android/local.properties` 和 gradle.properties
+  的 kotlinVersion pin, 需重写后再 gradle (memory 已有记录)。
+
+```
+Coolie工坊 0.5.65: https://dls.xrobinai.cn/coolie/app/0.5.65/coolie-release.apk
+```
