@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -21,6 +22,8 @@ import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { StatTile } from "../ui/StatTile";
+import { Sheet } from "../ui/Sheet";
+import { EmergencyKillSwitch } from "../components/EmergencyKillSwitch";
 import { RADIUS, SPACING } from "../ui/tokens";
 
 function formatMoney(cents: number): string {
@@ -76,6 +79,8 @@ export function DashboardScreen({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [killModalOpen, setKillModalOpen] = useState(false);
+  const [isEmergencyLocked, setIsEmergencyLocked] = useState(false);
   const { isChecking: otaChecking, checkUpdate: checkOTA } = useOTA();
 
   const fetchDashboard = useCallback(
@@ -199,6 +204,15 @@ export function DashboardScreen({
           }
           right={
             <>
+              <Pressable
+                style={[styles.otaBtn, styles.killTriggerBtn]}
+                onPress={() => setKillModalOpen(true)}
+                hitSlop={12}
+                accessibilityLabel="紧急熔断"
+              >
+                <Ionicons name="warning" size={13} color="#EF4444" />
+                <Text style={styles.killBtnText}>熔断</Text>
+              </Pressable>
               {onOpenSettings ? (
                 <Pressable onPress={onOpenSettings} hitSlop={12} style={styles.otaBtn}>
                   <Ionicons name="settings-outline" size={18} color="#8A8F98" />
@@ -654,6 +668,32 @@ export function DashboardScreen({
           </AppCard>
         ) : null}
       </ScrollView>
+
+      {killModalOpen ? (
+        <Sheet
+          title="🚨 突发异常应急保护 · 一键熔断"
+          onClose={() => setKillModalOpen(false)}
+        >
+          <View style={styles.killSheetContent}>
+            <Text style={styles.killSheetDesc}>
+              向右滑动即可强制暂停所有正在运行的智能体任务并锁定业务本体写权限，即刻拦截潜在算力刷爆与数据污染风险。
+            </Text>
+            <EmergencyKillSwitch
+              domainId="company-all"
+              domainName={company.name}
+              isLocked={isEmergencyLocked}
+              onTrigger={async () => {
+                setIsEmergencyLocked(true);
+                Alert.alert(
+                  "🚨 全局紧急熔断生效",
+                  `已向 ${company.name} 广播应急指令，当前智能体写入权限已就地加锁，审计日志已记录。`,
+                );
+                setKillModalOpen(false);
+              }}
+            />
+          </View>
+        </Sheet>
+      ) : null}
     </SafeAreaView>
   );
 }
@@ -767,6 +807,27 @@ const styles = StyleSheet.create({
     color: C.ink2,
     fontSize: 13,
     fontWeight: "500",
+  },
+  killTriggerBtn: {
+    minWidth: 54,
+    gap: 4,
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
+    borderColor: "rgba(239, 68, 68, 0.35)",
+  },
+  killBtnText: {
+    fontSize: 12,
+    color: "#EF4444",
+    fontWeight: "600",
+  },
+  killSheetContent: {
+    padding: SPACING.lg,
+    gap: 16,
+    paddingBottom: SPACING.xl,
+  },
+  killSheetDesc: {
+    fontSize: 13,
+    color: C.ink3,
+    lineHeight: 18,
   },
   gridContainer: {
     flexDirection: "row",
