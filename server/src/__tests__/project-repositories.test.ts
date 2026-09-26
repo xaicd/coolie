@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { canBrowseProjectRepositoryGrant, mergeProjectRepository, resolveProjectRepositorySelection } from "../services/project-repositories.js";
+import { canBrowseProjectRepositoryGrant, mergeProjectRepository, normalizeProjectRepositoryUrl, resolveProjectRepositorySelection } from "../services/project-repositories.js";
 import { loadGitHubTokenRepositories } from "../services/tool-access.js";
 import type { ProjectRepository } from "@paperclipai/shared";
 
@@ -50,5 +50,30 @@ describe("project repository access", () => {
     for (const response of [new Response("secret", { status: 401 }), new Response(JSON.stringify([{ id: 1, full_name: "../bad" }]))]) {
       await expect(loadGitHubTokenRepositories({}, vi.fn().mockResolvedValue(response))).rejects.toThrow(/GitHub/);
     }
+  });
+
+  it("normalizes generic Git URLs across GitHub, Gitee, GitLab, and SSH formats", () => {
+    expect(normalizeProjectRepositoryUrl("https://github.com/alibaba/spring-cloud-alibaba.git")).toEqual({
+      fullName: "alibaba/spring-cloud-alibaba",
+      url: "https://github.com/alibaba/spring-cloud-alibaba",
+    });
+    expect(normalizeProjectRepositoryUrl("https://gitee.com/yudaocode/ruoyi-vue-pro.git")).toEqual({
+      fullName: "yudaocode/ruoyi-vue-pro",
+      url: "https://gitee.com/yudaocode/ruoyi-vue-pro",
+    });
+    expect(normalizeProjectRepositoryUrl("git@github.com:alibaba/spring-cloud-alibaba.git")).toEqual({
+      fullName: "alibaba/spring-cloud-alibaba",
+      url: "git@github.com:alibaba/spring-cloud-alibaba.git",
+    });
+    expect(normalizeProjectRepositoryUrl("git@gitee.com:yudaocode/ruoyi-vue-pro.git")).toEqual({
+      fullName: "yudaocode/ruoyi-vue-pro",
+      url: "git@gitee.com:yudaocode/ruoyi-vue-pro.git",
+    });
+    expect(normalizeProjectRepositoryUrl("ssh://git@gitlab.internal.corp:2222/platform/microservice.git")).toEqual({
+      fullName: "platform/microservice",
+      url: "ssh://git@gitlab.internal.corp:2222/platform/microservice.git",
+    });
+    expect(() => normalizeProjectRepositoryUrl("https://user:password@github.com/repo.git")).toThrow(/embedded credentials/);
+    expect(() => normalizeProjectRepositoryUrl("invalid-not-a-url")).toThrow(/Repository URL/);
   });
 });

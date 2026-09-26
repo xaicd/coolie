@@ -47,7 +47,7 @@ const projectWorkspaceFields = {
   name: z.string().min(1).optional(),
   sourceType: projectWorkspaceSourceTypeSchema.optional(),
   cwd: z.string().min(1).optional().nullable(),
-  repoUrl: z.string().url().optional().nullable(),
+  repoUrl: z.string().trim().min(1).max(2000).optional().nullable(),
   repoRef: z.string().optional().nullable(),
   defaultRef: z.string().optional().nullable(),
   visibility: projectWorkspaceVisibilitySchema.optional(),
@@ -121,7 +121,7 @@ export const createProjectSchema = z.object({
   ...projectFields,
   workspace: createProjectWorkspaceSchema.optional(),
   repositoryIds: z.array(z.string().regex(/^\d+$/)).optional(),
-  repositoryUrls: z.array(z.string().url().max(2000)).max(100).optional(),
+  repositoryUrls: z.array(z.string().trim().min(1).max(2000)).max(100).optional(),
 });
 
 export type CreateProject = z.infer<typeof createProjectSchema>;

@@ -45,11 +45,33 @@ export function resolveProjectRepositorySelection(
  * No fetch or credential sharing: execution uses the normal repository access policy.
  */
 export function normalizeProjectRepositoryUrl(value: string): { fullName: string; url: string } {
+  const trimmed = value.trim();
+  // Support SCP-style SSH Git URL: git@host:owner/repo.git
+  const scpMatch = trimmed.match(/^git@([^:]+):([^\s]+)$/);
+  if (scpMatch) {
+    const cleanPath = scpMatch[2].replace(/\/$/, "").replace(/\.git$/, "");
+    const parts = cleanPath.split("/").filter(Boolean);
+    if (parts.length === 0 || parts.some((part) => part === "." || part === "..")) {
+      throw unprocessable("Repository URL must identify a Git repository path");
+    }
+    const fullName = parts.slice(-2).join("/");
+    return { fullName, url: trimmed };
+  }
+
   let parsed: URL;
   try {
-    parsed = new URL(value);
+    parsed = new URL(trimmed);
   } catch {
-    throw unprocessable("Repository URL must be a valid HTTP or HTTPS Git repository URL");
+    throw unprocessable("Repository URL must be a valid HTTP, HTTPS, or SSH Git repository URL");
+  }
+  if (parsed.protocol === "ssh:") {
+    const cleanPath = parsed.pathname.replace(/\/$/, "").replace(/\.git$/, "");
+    const parts = cleanPath.split("/").filter(Boolean);
+    if (parts.length === 0 || parts.some((part) => part === "." || part === "..")) {
+      throw unprocessable("Repository URL must identify a Git repository path");
+    }
+    const fullName = parts.slice(-2).join("/");
+    return { fullName, url: trimmed };
   }
   if ((parsed.protocol !== "https:" && parsed.protocol !== "http:") || parsed.search || parsed.hash) {
     throw unprocessable("Repository URL must be an HTTP or HTTPS Git repository URL without query or fragment");

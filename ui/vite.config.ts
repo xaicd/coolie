@@ -23,6 +23,7 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "@paperclipai/ontology-core": path.resolve(__dirname, "../packages/ontology-core/src"),
       lexical: path.resolve(__dirname, "./node_modules/lexical/dist/Lexical.mjs"),
     },
   },

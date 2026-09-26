@@ -47,7 +47,7 @@
       "path": "scripts/fork-surface.json",
       "maxNetLines": 200,
       "reason": "This manifest itself, and entirely ours — it does not exist upstream. It sits under scripts/ only because that is where the gate is wired (package.json and check-testing-defenses.mjs call it), and that path prefix is the only reason the gate asks about it. The budget is loose on purpose: the file grows by one entry per upstream file we intentionally change, and that growth is the file working, not creep. Raised from 360 when the ontology-spec workflow and the DSH/coolie-native adapters were declared in one batch.",
-      "maxTotalLines": 480
+      "maxTotalLines": 600
     },
     {
       "path": "ui/index.html",
@@ -420,6 +420,36 @@
       "maxNetLines": 700,
       "reason": "DSH-powered Multi-Protocol API Lifecycle & MCP Tool Projection workbench (HTTP/gRPC/Dubbo/MQ). Fork feature with no upstream counterpart.",
       "maxTotalLines": 750
+    },
+    {
+      "path": "ui/src/components/NewProjectDialog.tsx",
+      "maxNetLines": 320,
+      "reason": "Comprehensive multi-source repository selection: generic Git URLs (Gitee/GitLab/GitHub/SSH), multi-repo project support, quick framework presets, local workspace directory, and OAuth.",
+      "maxTotalLines": 350
+    },
+    {
+      "path": "ui/src/components/ProjectRepositories.tsx",
+      "maxNetLines": 320,
+      "reason": "Project configuration codebase manager supporting adding and managing generic Git repositories, local directories, and GitHub connections.",
+      "maxTotalLines": 350
+    },
+    {
+      "path": "ui/vite.config.ts",
+      "maxNetLines": 50,
+      "reason": "Module alias mapping for @paperclipai/ontology-core in Vite UI build.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "packages/shared/src/validators/project.ts",
+      "maxNetLines": 40,
+      "reason": "Support SSH (git@...) and generic Git URLs in repoUrl and repositoryUrls validators for multi-source project creation.",
+      "maxTotalLines": 50
+    },
+    {
+      "path": "server/src/services/project-repositories.ts",
+      "maxNetLines": 40,
+      "reason": "Support SSH Git URLs (git@host:owner/repo.git and ssh://...) in normalizeProjectRepositoryUrl without restricting to GitHub.",
+      "maxTotalLines": 50
     }
   ]
 }
