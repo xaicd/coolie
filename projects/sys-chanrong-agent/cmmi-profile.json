@@ -1,0 +1,73 @@
+{
+  "systemCode": "SYS_CHANRONG_AGENT",
+  "systemName": "国信产融智能体应用系统",
+  "domainKey": "chanrong-core",
+  "techStack": "node",
+  "storageBackend": "git_repo",
+  "scaffoldedAt": "2026-09-26T12:23:46.033Z",
+  "skills": [
+    {
+      "key": "cmmi-req-spec",
+      "role": "emp_ds",
+      "gate": "gate_g1_spec",
+      "localPath": ".agents/skills/cmmi-req-spec/SKILL.md"
+    },
+    {
+      "key": "cmmi-tech-solution",
+      "role": "emp_fda",
+      "gate": "gate_g2_arch",
+      "localPath": ".agents/skills/cmmi-tech-solution/SKILL.md"
+    },
+    {
+      "key": "cmmi-detailed-contracts",
+      "role": "emp_swe",
+      "gate": "gate_g3_compile",
+      "localPath": ".agents/skills/cmmi-detailed-contracts/SKILL.md"
+    },
+    {
+      "key": "cmmi-ver-val",
+      "role": "emp_fdse",
+      "gate": "gate_g4_eval",
+      "localPath": ".agents/skills/cmmi-ver-val/SKILL.md"
+    },
+    {
+      "key": "cmmi-immutable-release",
+      "role": "emp_sre",
+      "gate": "gate_g5_release",
+      "localPath": ".agents/skills/cmmi-immutable-release/SKILL.md"
+    },
+    {
+      "key": "cmmi-car-spc-metrics",
+      "role": "emp_hermes",
+      "gate": "gate_g5_release",
+      "localPath": ".agents/skills/cmmi-car-spc-metrics/SKILL.md"
+    }
+  ],
+  "gates": {
+    "g1": {
+      "gateKey": "gate_g1_spec",
+      "checkCommand": "node scripts/verify-reqs.mjs",
+      "doc": "docs/cmmi/01-srs.md"
+    },
+    "g2": {
+      "gateKey": "gate_g2_arch",
+      "checkCommand": "node scripts/check-fork-surface.mjs",
+      "doc": "docs/cmmi/02-hld.md"
+    },
+    "g3": {
+      "gateKey": "gate_g3_compile",
+      "checkCommand": "node scripts/check-contracts.mjs",
+      "doc": "docs/cmmi/03-lld-api.md"
+    },
+    "g4": {
+      "gateKey": "gate_g4_eval",
+      "checkCommand": "node scripts/run-tests.mjs",
+      "doc": "docs/cmmi/04-test-report.md"
+    },
+    "g5": {
+      "gateKey": "gate_g5_release",
+      "checkCommand": "node scripts/check-release-baseline.mjs",
+      "doc": "docs/cmmi/05-deploy-sop.md"
+    }
+  }
+}
