@@ -589,7 +589,15 @@ export const coolie = new CoolieClient({
   // `{ Authorization?: undefined }`, which is not a `Record<string, string>`.
   getAuthHeader: async (): Promise<Record<string, string>> => {
     const token = await getAuthToken();
-    return token ? { Authorization: `Bearer ${token}` } : {};
+    if (token) return { Authorization: `Bearer ${token}` };
+    const sessionToken = await getSessionToken();
+    if (sessionToken) {
+      const encoded = encodeURIComponent(sessionToken);
+      return {
+        Cookie: `paperclip.session_token=${encoded}; __Secure-paperclip.session_token=${encoded}; better-auth.session_token=${encoded}; __Secure-better-auth.session_token=${encoded}`,
+      };
+    }
+    return {};
   },
 });
 
