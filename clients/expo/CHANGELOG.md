@@ -14,6 +14,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
   - 真因: a11f38871 的 /api/auth/session-token 一直没部署到生产 (404), 且 Better Auth 1.7.x 通过 getSignedCookie 读 session cookie, 要求 cookie 值带 44 位 base64 HMAC 签名; 服务器返回/桥接回写的裸 session token 永远无法通过 web 端校验 → 点驾驶舱Web 还是登录页
   - server: /api/auth/session-token 返回签名后的 cookie 值; /api/auth/exchange 对裸 token 签名后再写 Set-Cookie (9db148ebd)
   - 真验: 签名 cookie → session-token 200; exchange 302 Set-Cookie 按 WebView 方式回放 → 200; 裸 token fallback 路径同样 200
+  - wave93 真因 (boss 12:07 真机 trace): App 的 bridge URL 带 /XROA 前缀 (`/XROA/api/auth/exchange`) 落到 SPA 兜底, 200 HTML 无 Set-Cookie → WebView 还是登录页; server 现把 /XROA/api/* 重写到 /api/*, next 绝对 URL 取 pathname (302 → /XROA/dashboard + 签名 cookie), 已装 0.5.64 无需升级即生效
 
 ## v0.5.64
 

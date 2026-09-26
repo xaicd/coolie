@@ -542,6 +542,20 @@ export async function createApp(
   // when the server may be reachable without a known reverse proxy in front.
   applyTrustProxy(app, parseTrustProxyEnv(process.env.TRUST_PROXY));
 
+  // Wave 93 — the Expo App builds its WebContainer bridge URL from
+  // COOLIE_WEB_URL, which carries the web deployment's /XROA base path, so the
+  // WebView asks for /XROA/api/auth/exchange. That never matched the API mount
+  // and fell through to the SPA fallback: 200 HTML, no Set-Cookie, and the
+  // boss's WebView stayed on the sign-in page (boss 09-26 12:07 real-device
+  // trace). Strip the prefix before anything else looks at the URL so the
+  // exchange — and any other /XROA-prefixed API call — reaches the real route.
+  app.use((req, _res, next) => {
+    if (req.url === "/XROA/api" || req.url.startsWith("/XROA/api/")) {
+      req.url = req.url.slice("/XROA".length);
+    }
+    next();
+  });
+
   app.use(
     COMPANY_IMPORT_API_PATH,
     express.json({

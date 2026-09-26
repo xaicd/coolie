@@ -260,8 +260,15 @@ describe.sequential("app-web-login-bridge next-path sanitization", () => {
     );
   });
 
-  it("falls back to / for an absolute URL", () => {
-    expect(sanitizeAppWebLoginBridgeNext("https://evil.example/x")).toBe("/");
+  it("reduces an absolute URL to its pathname (stays same-origin)", () => {
+    expect(sanitizeAppWebLoginBridgeNext("https://evil.example/x")).toBe("/x");
+    expect(sanitizeAppWebLoginBridgeNext("https://www.xrobinai.cn/XROA/dashboard")).toBe(
+      "/XROA/dashboard",
+    );
+  });
+
+  it("falls back to / for an unparseable absolute URL", () => {
+    expect(sanitizeAppWebLoginBridgeNext("https://%")).toBe("/");
   });
 
   it("falls back to / for a protocol-relative URL", () => {
@@ -342,7 +349,7 @@ describe.sequential("app-web-login-bridge end-to-end", () => {
     expect(res.headers["set-cookie"]).toBeUndefined();
   });
 
-  it("falls back to / when next is hostile and never lets the redirect leave the origin", async () => {
+  it("reduces a hostile absolute next to its same-origin pathname, never leaving the origin", async () => {
     const auth = createAuthStub({ acceptToken: TOKEN, userId: USER_ID });
     const app = createBridgeApp({ auth });
 
@@ -351,8 +358,20 @@ describe.sequential("app-web-login-bridge end-to-end", () => {
       .set("x-forwarded-proto", "https");
 
     expect(res.status).toBe(302);
-    expect(res.headers.location).toBe("/");
+    expect(res.headers.location).toBe("/x");
     expect(res.headers.location).not.toContain("evil.example");
+  });
+
+  it("keeps the App's absolute /XROA next as its pathname", async () => {
+    const auth = createAuthStub({ acceptToken: TOKEN, userId: USER_ID });
+    const app = createBridgeApp({ auth });
+
+    const res = await request(app)
+      .get(`/api/auth/exchange?token=${encodeURIComponent(TOKEN)}&next=${encodeURIComponent("https://www.xrobinai.cn/XROA/dashboard")}`)
+      .set("x-forwarded-proto", "https");
+
+    expect(res.status).toBe(302);
+    expect(res.headers.location).toBe("/XROA/dashboard");
   });
 
   it("writes the non-secure cookie name when the request is plain HTTP", async () => {

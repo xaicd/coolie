@@ -216,18 +216,26 @@ export async function buildAppWebLoginBridgeCookie(input: {
 }
 
 /**
- * Scope an arbitrary `next` value to a same-origin path. Anything that isn't
- * a clean absolute or root-relative path falls back to `/`, which keeps this
- * endpoint from being an open redirect when the WebView ever stops pinning the
- * landing URL itself.
+ * Scope an arbitrary `next` value to a same-origin path. Absolute URLs (the
+ * App sends `next=encodeURIComponent(COOLIE_WEB_URL + path)`, which is
+ * absolute) reduce to their pathname — the redirect then stays same-origin by
+ * construction, so this can never become an open redirect. Anything that
+ * isn't reducible to a clean root-relative path falls back to `/`.
  */
 export function sanitizeAppWebLoginBridgeNext(value: unknown): string {
   if (typeof value !== "string") return "/";
-  const trimmed = value.trim();
-  if (!trimmed) return "/";
-  if (!trimmed.startsWith("/")) return "/";
-  if (trimmed.startsWith("//")) return "/";
-  return trimmed;
+  let candidate = value.trim();
+  if (!candidate) return "/";
+  if (/^https?:\/\//i.test(candidate)) {
+    try {
+      candidate = decodeURIComponent(new URL(candidate).pathname);
+    } catch {
+      return "/";
+    }
+  }
+  if (!candidate.startsWith("/")) return "/";
+  if (candidate.startsWith("//")) return "/";
+  return candidate;
 }
 
 /**
