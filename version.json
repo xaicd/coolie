@@ -1,7 +1,7 @@
 {
-  "version": "0.5.65",
-  "versionCode": 565,
-  "commitSha": "9db148ebd",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.65/coolie-release.apk",
-  "releaseNotes": "wave92 — server rebuild + restart 部署 session-token 路由 + bridge cookie 签名修复 (驾驶舱Web 自动登录)"
+  "version": "0.5.66",
+  "versionCode": 566,
+  "commitSha": "ad922935b",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.66/coolie-release.apk",
+  "releaseNotes": "wave94 — 打包 boss Claude 后 2 commit (Web 登录 + Web 全功能 surface): 296481625 App 直接用 Web 全功能登录 + 无缝 session 同步; b7c6a2bb8 原生端 surface Web 全控制台 + CMMI 金档 + 活拓扑 + 多源项目"
 }

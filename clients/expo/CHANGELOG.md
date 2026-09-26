@@ -4,6 +4,17 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.66
+
+> Released: 2026-09-26 · Android release APK + OTA bundle
+
+### 更新
+
+- wave94 — 打包 boss Claude 后 2 commit (boss 27:35 OOB「打新包, 发生产」)
+  - `296481625` feat(expo): directly use Web full-feature login in native app with seamless session synchronization — App 直接用 Web 全功能登录 (WebLoginScreen + 无缝 session 同步)
+  - `b7c6a2bb8` feat(expo): surface Web full console, CMMI golden docs, living topology and multi-source projects on native app — 原生端 surface Web 全控制台 + CMMI 金档 + 活拓扑 + 多源项目
+  - 这 2 commit 未进 0.5.65 APK, 本版装入
+
 ## v0.5.65
 
 > Released: 2026-09-26 · Android release APK + OTA bundle
