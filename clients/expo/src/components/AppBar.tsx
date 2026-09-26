@@ -40,7 +40,7 @@ export function AppBar({
   unreadCount?: number;
   onOpenNotifications?: () => void;
   onOpenSearch?: () => void;
-  onOpenWebWorkbench?: () => void;
+  onOpenWebWorkbench?: (path?: string, title?: string) => void;
 }) {
   /** 本机没装 Coolie Web 时, 打开内置 webview 兜底 (见 CoolieWebFallback)。 */
   const [webFallbackOpen, setWebFallbackOpen] = useState(false);
@@ -84,7 +84,7 @@ export function AppBar({
           <Pressable
             onPress={() => {
               if (onOpenWebWorkbench) {
-                onOpenWebWorkbench();
+                onOpenWebWorkbench("/dashboard", "Web 全功能工作台");
               } else {
                 void openCoolieWeb().then((opened) => {
                   if (!opened) setWebFallbackOpen(true);
@@ -94,6 +94,7 @@ export function AppBar({
             hitSlop={8}
             style={({ pressed }) => [styles.webBtn, pressed && styles.webBtnPressed]}
           >
+            <Ionicons name="globe-outline" size={13} color="#FFFFFF" style={{ marginRight: 4 }} />
             <Text style={styles.webBtnText}>Web全功能</Text>
           </Pressable>
         </View>
@@ -169,8 +170,9 @@ const styles = StyleSheet.create({
   },
   webBtn: {
     height: 32,
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     borderRadius: 8,
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: C.accent,

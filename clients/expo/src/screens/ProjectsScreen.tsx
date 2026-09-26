@@ -154,6 +154,17 @@ export function ProjectsScreen({
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
             {onOpenWebProjects ? (
               <Pressable
+                style={styles.newProjectHeaderBtn}
+                onPress={() => onOpenWebProjects("/projects", "项目中心 · 新建多源项目")}
+                hitSlop={8}
+                accessibilityLabel="新建多源项目"
+              >
+                <Ionicons name="add" size={15} color="#FFFFFF" />
+                <Text style={styles.newProjectHeaderBtnText}>新建</Text>
+              </Pressable>
+            ) : null}
+            {onOpenWebProjects ? (
+              <Pressable
                 style={styles.webBtn}
                 onPress={() => onOpenWebProjects()}
                 hitSlop={8}
@@ -212,6 +223,38 @@ export function ProjectsScreen({
           />
         }
       >
+        {/* 多源代码库与 CMMI 新建项目横幅 */}
+        <AppCard style={styles.multiSourceBanner}>
+          <View style={styles.multiSourceTop}>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <Ionicons name="git-branch" size={16} color={C.accent} />
+              <Text style={styles.multiSourceTitle}>多源代码库与 CMMI 工程标准</Text>
+            </View>
+            <View style={styles.multiSourceTag}>
+              <Text style={styles.multiSourceTagText}>多源 Git · 脚手架</Text>
+            </View>
+          </View>
+          <Text style={styles.multiSourceDesc}>
+            支持 GitHub、GitLab、Gitee 及企业私有 Git (SSH/HTTPS) 代码库绑定与本地工作区，预设 Spring Cloud Alibaba、RuoYi-Vue-Pro 与 JeecgBoot 企业微服务脚手架。
+          </Text>
+          <View style={styles.repoSourcePills}>
+            <View style={styles.repoSourcePill}><Text style={styles.repoSourcePillText}>GitHub</Text></View>
+            <View style={styles.repoSourcePill}><Text style={styles.repoSourcePillText}>GitLab</Text></View>
+            <View style={styles.repoSourcePill}><Text style={styles.repoSourcePillText}>Gitee (码云)</Text></View>
+            <View style={styles.repoSourcePill}><Text style={styles.repoSourcePillText}>私有 SSH/HTTPS</Text></View>
+          </View>
+          {onOpenWebProjects ? (
+            <Pressable
+              style={({ pressed }) => [styles.newProjectBtn, pressed && styles.newProjectBtnPressed]}
+              onPress={() => onOpenWebProjects("/projects", "项目中心 · 新建多源项目")}
+              accessibilityLabel="新建多源代码库项目"
+            >
+              <Ionicons name="add-circle-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
+              <Text style={styles.newProjectBtnText}>新建多源项目 / 导入代码库</Text>
+            </Pressable>
+          ) : null}
+        </AppCard>
+
         {loading && !refreshing ? (
           <LoadingState size="small" text="正在加载项目中心…" />
         ) : error ? (
@@ -896,5 +939,89 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "500",
     color: C.ink2,
+  },
+
+  // ── 多源代码库与新建横幅 ──
+  multiSourceBanner: {
+    padding: 14,
+    gap: 10,
+    marginBottom: 12,
+    borderColor: "rgba(94, 106, 210, 0.25)",
+    backgroundColor: "rgba(94, 106, 210, 0.04)",
+  },
+  multiSourceTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  multiSourceTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  multiSourceTag: {
+    backgroundColor: "rgba(94, 106, 210, 0.15)",
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: RADIUS.sm,
+  },
+  multiSourceTagText: {
+    fontSize: 10,
+    fontWeight: "500",
+    color: C.accent,
+  },
+  multiSourceDesc: {
+    fontSize: 11,
+    color: C.ink3,
+    lineHeight: 16,
+  },
+  repoSourcePills: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  repoSourcePill: {
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderWidth: 1,
+    borderColor: C.line,
+    paddingVertical: 2,
+    paddingHorizontal: 6,
+    borderRadius: 4,
+  },
+  repoSourcePillText: {
+    fontSize: 10,
+    color: C.ink2,
+  },
+  newProjectBtn: {
+    height: 34,
+    borderRadius: RADIUS.sm,
+    backgroundColor: C.accent,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  newProjectBtnPressed: {
+    backgroundColor: C.accentHover,
+  },
+  newProjectBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  newProjectHeaderBtn: {
+    height: 28,
+    paddingHorizontal: 8,
+    borderRadius: RADIUS.sm,
+    backgroundColor: C.accent,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+  },
+  newProjectHeaderBtnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
 });

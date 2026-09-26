@@ -44,6 +44,7 @@ export function TasksScreen({
   onOpenPlans,
   onOpenProjects,
   onOpenGitCredentials,
+  onOpenWebWorkbench,
 }: {
   company: Company;
   whoami: string;
@@ -61,6 +62,7 @@ export function TasksScreen({
   onOpenProjects?: () => void;
   /** wave70 — 「新建仓库绑定」入口 (跳到凭证管理屏) */
   onOpenGitCredentials?: () => void;
+  onOpenWebWorkbench?: (path?: string, title?: string) => void;
 }) {
   const [search, setSearch] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
@@ -162,6 +164,28 @@ export function TasksScreen({
             >
               <Text style={styles.orchEmoji}>🔗</Text>
               <Text style={styles.orchLabel}>仓库绑定</Text>
+            </Pressable>
+          ) : null}
+          {onOpenWebWorkbench ? (
+            <Pressable
+              style={({ pressed }) => [styles.orchBtn, pressed && styles.orchBtnPressed]}
+              onPress={() => onOpenWebWorkbench("/dashboard", "Web 全功能工作台")}
+              accessibilityRole="button"
+              accessibilityLabel="Web 全功能工作台"
+            >
+              <Text style={styles.orchEmoji}>🌐</Text>
+              <Text style={styles.orchLabel}>Web全功能</Text>
+            </Pressable>
+          ) : null}
+          {onOpenWebWorkbench ? (
+            <Pressable
+              style={({ pressed }) => [styles.orchBtn, pressed && styles.orchBtnPressed]}
+              onPress={() => onOpenWebWorkbench("/projects", "CMMI 质量工程与门禁")}
+              accessibilityRole="button"
+              accessibilityLabel="CMMI 门禁"
+            >
+              <Text style={styles.orchEmoji}>🏛️</Text>
+              <Text style={styles.orchLabel}>CMMI门禁</Text>
             </Pressable>
           ) : null}
         </View>

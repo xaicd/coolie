@@ -888,8 +888,8 @@ function HomeScreen({
             unreadCount={unreadCount}
             onOpenNotifications={() => setNotificationsOpen(true)}
             onOpenSearch={() => setSearchOpen(true)}
-            onOpenWebWorkbench={() =>
-              setWebContainerTarget({ path: "/dashboard", title: "Web 全功能工作台" })
+            onOpenWebWorkbench={(path, title) =>
+              setWebContainerTarget({ path: path || "/dashboard", title: title || "Web 全功能工作台" })
             }
           />
         )}
@@ -979,8 +979,8 @@ function HomeScreen({
               onOpenWorkshop={() => navigateTab("chat")}
               onOpenOntology={() => navigateTab("ontology")}
               onOpenPipelines={() => setPipelinesOpen(true)}
-              onOpenWebWorkbench={() =>
-                setWebContainerTarget({ path: "/dashboard", title: "Web 全功能工作台" })
+              onOpenWebWorkbench={(path, title) =>
+                setWebContainerTarget({ path: path || "/dashboard", title: title || "Web 全功能工作台" })
               }
               onOpenApprovals={() => {
                 setSelected(null);
@@ -1075,6 +1075,9 @@ function HomeScreen({
                 onOpenPlans={() => setPlansOpen(true)}
                 onOpenProjects={() => setProjectsOpen(true)}
                 onOpenGitCredentials={() => setGitCredentialsOpen(true)}
+                onOpenWebWorkbench={(path, title) =>
+                  setWebContainerTarget({ path: path || "/dashboard", title: title || "Web 全功能工作台" })
+                }
               />
             )
           ) : null}
