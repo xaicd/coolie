@@ -243,11 +243,13 @@ export function boardChatRoutes(
       return;
     }
 
-    const { companyId, message, taskId, attachmentIds } = req.body as {
+    const { companyId, message, taskId, attachmentIds, projectId } = req.body as {
       companyId?: string;
       message?: string;
       taskId?: string;
       attachmentIds?: string[];
+      /** Coolie fork: project context for build-mode CMMI integration. */
+      projectId?: string;
     };
 
     if (!companyId || !message) {
@@ -485,6 +487,9 @@ export function boardChatRoutes(
         ...(process.env.MINIMAX_CN_API_KEY
           ? { MINIMAX_CN_API_KEY: process.env.MINIMAX_CN_API_KEY }
           : {}),
+        // Coolie fork: forward the project context so hermes' board skill can
+        // scope build plans and CMMI artifacts under the active project.
+        ...(projectId ? { PAPERCLIP_PROJECT_ID: projectId } : {}),
       },
     });
 

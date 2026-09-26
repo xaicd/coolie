@@ -97,9 +97,11 @@ export function buildRoutes(
   router.post("/build/start", async (req, res) => {
     if (!assertBuildModeDeploymentAllowed(res)) return;
 
-    const { companyId, prompt } = (req.body ?? {}) as {
+    const { companyId, prompt, projectId } = (req.body ?? {}) as {
       companyId?: string;
       prompt?: string;
+      /** Coolie fork: bind build-plan issues under this project. */
+      projectId?: string;
     };
 
     if (!companyId || typeof companyId !== "string") {
@@ -128,7 +130,7 @@ export function buildRoutes(
 
     const result = await createBuildPlanIssues(
       { db, heartbeat: opts.heartbeat },
-      { companyId, prompt: prompt.trim(), plan, actor: buildActor },
+      { companyId, prompt: prompt.trim(), plan, actor: buildActor, projectId },
     );
 
     res.status(201).json({

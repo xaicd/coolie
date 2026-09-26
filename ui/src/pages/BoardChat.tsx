@@ -22,7 +22,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Activity, ArrowDown, History, MessageSquarePlus, X } from "lucide-react";
+import { Activity, ArrowDown, Hammer, History, MessageSquarePlus, X } from "lucide-react";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { ChatComposer, type ChatComposerHandle } from "../components/ChatComposer";
 import {
@@ -37,6 +37,12 @@ import {
   type SpecProblem,
 } from "../components/SpecDiffCard";
 import { cn, formatDateTime } from "../lib/utils";
+
+/** Coolie fork: detect "build xxx" / "做 xxx" / "开发 xxx" — mirrors server BUILD_TRIGGER_PATTERN. */
+const BUILD_TRIGGER_PATTERN = /^(?:build|开发|做)\s+/i;
+function isBuildPrompt(text: string): boolean {
+  return BUILD_TRIGGER_PATTERN.test(text.trim());
+}
 import type { FeedbackVoteValue } from "@paperclipai/shared";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
@@ -126,6 +132,38 @@ interface SpecStartResponse {
   spec: { document?: SpecDocumentPayload } | null;
   problems?: SpecProblem[];
   approvalId?: string;
+}
+
+/** Coolie fork: build plan step from `POST /api/build/start`. */
+interface BuildPlanStepIssue {
+  step: number;
+  kind: string;
+  title: string;
+  description: string;
+  issueId: string;
+  identifier: string | null;
+  status: string;
+  assigneeAgentId: string | null;
+  assignedAgentType: string;
+}
+
+/** `POST /api/build/start` response. */
+interface BuildStartResponse {
+  buildId: string;
+  plan: BuildPlanStepIssue[];
+  planSource: "hermes" | "template";
+  unassignedAgentTypes: string[];
+}
+
+/** The build card's lifecycle for one "做 xxx" / "build xxx" ask. */
+interface BuildCardState {
+  prompt: string;
+  loading: boolean;
+  error: string | null;
+  buildId: string | null;
+  plan: BuildPlanStepIssue[];
+  planSource: "hermes" | "template" | null;
+  unassignedAgentTypes: string[];
 }
 
 export function BoardChat() {
@@ -223,6 +261,8 @@ export function BoardChat() {
    * and the issue it produced, not a list of cards.
    */
   const [specCard, setSpecCard] = useState<SpecCardState | null>(null);
+  /** Coolie fork: build-plan card for "做 xxx" / "build xxx" asks. */
+  const [buildCard, setBuildCard] = useState<BuildCardState | null>(null);
   const [boardIssueId, setBoardIssueId] = useState<string | null>(null);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [optimisticMessage, setOptimisticMessage] = useState<string | null>(null);
@@ -638,6 +678,59 @@ export function BoardChat() {
     [selectedCompanyId],
   );
 
+  /**
+   * Coolie fork: trigger a build plan from a "做 xxx" / "build xxx" ask.
+   * Calls POST /api/build/start and shows the resulting 5-step CMMI plan card.
+   */
+  const startBuild = useCallback(
+    async (prompt: string) => {
+      if (!selectedCompanyId) return;
+      setBuildCard({
+        prompt,
+        loading: true,
+        error: null,
+        buildId: null,
+        plan: [],
+        planSource: null,
+        unassignedAgentTypes: [],
+      });
+      try {
+        const res = await fetch("/api/build/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ companyId: selectedCompanyId, prompt }),
+        });
+        if (!res.ok) {
+          const detail = (await res.json().catch(() => null)) as { error?: string } | null;
+          throw new Error(detail?.error ?? `构建计划生成失败 (${res.status})`);
+        }
+        const result = (await res.json()) as BuildStartResponse;
+        setBuildCard({
+          prompt,
+          loading: false,
+          error: null,
+          buildId: result.buildId,
+          plan: result.plan,
+          planSource: result.planSource,
+          unassignedAgentTypes: result.unassignedAgentTypes,
+        });
+        // Refresh issue list so the new build plan issues appear
+        void queryClient.invalidateQueries({ queryKey: queryKeys.issues.list(selectedCompanyId) });
+      } catch (e) {
+        setBuildCard({
+          prompt,
+          loading: false,
+          error: e instanceof Error ? e.message : "构建计划生成失败",
+          buildId: null,
+          plan: [],
+          planSource: null,
+          unassignedAgentTypes: [],
+        });
+      }
+    },
+    [selectedCompanyId, queryClient],
+  );
+
   const sendMessage = useCallback(
     async (body: string) => {
       const trimmed = body.trim();
@@ -655,6 +748,11 @@ export function BoardChat() {
       // card are independent: the concierge still replies, and the card reports
       // what could be approved. Trigger words do not overlap with the app build.
       if (isDomainPrompt(trimmed)) void startSpec(trimmed);
+
+      // Coolie fork: "做 xxx" / "build xxx" / "开发 xxx" additionally triggers a
+      // 5-step CMMI build plan. The concierge still replies conversationally, and
+      // the build card shows the plan + issue links independently.
+      if (isBuildPrompt(trimmed)) void startBuild(trimmed);
 
       try {
         const controller = new AbortController();
@@ -1014,6 +1112,65 @@ export function BoardChat() {
                   approvalStatus={specCard.approvalStatus}
                   domainId={specCard.domainId}
                 />
+              )}
+
+              {/* Coolie fork: build plan card — planned by "做 xxx" / "build xxx". */}
+              {buildCard && (
+                <div className="mx-auto w-full max-w-(--pct-85) rounded-lg border border-border bg-card p-4 text-sm">
+                  <div className="mb-2 flex items-center gap-2 font-medium text-foreground">
+                    <Hammer className="h-4 w-4 text-primary" />
+                    构建计划
+                    {buildCard.planSource && (
+                      <span className="text-xs text-muted-foreground">
+                        ({buildCard.planSource === "hermes" ? "AI 规划" : "模板"})
+                      </span>
+                    )}
+                  </div>
+                  {buildCard.loading && (
+                    <div className="flex items-center gap-2 text-muted-foreground">
+                      <span className="typing-dots" aria-label="typing"><span /><span /><span /></span>
+                      正在生成构建计划…
+                    </div>
+                  )}
+                  {buildCard.error && (
+                    <div className="text-destructive">{buildCard.error}</div>
+                  )}
+                  {buildCard.plan.length > 0 && (
+                    <ol className="space-y-1.5">
+                      {buildCard.plan.map((step) => (
+                        <li key={step.issueId} className="flex items-start gap-2">
+                          <span className={cn(
+                            "mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-medium",
+                            step.status === "done" ? "bg-primary/20 text-primary" :
+                            step.status === "blocked" ? "bg-muted text-muted-foreground" :
+                            "bg-primary/10 text-primary",
+                          )}>
+                            {step.step + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <span className="font-medium">{step.title}</span>
+                            {step.identifier && (
+                              <span className="ml-1 text-xs text-muted-foreground">{step.identifier}</span>
+                            )}
+                            <span className={cn(
+                              "ml-2 inline-block rounded px-1 py-0.5 text-xs",
+                              step.status === "blocked" ? "bg-muted text-muted-foreground" :
+                              step.status === "done" ? "bg-primary/20 text-primary" :
+                              "bg-warning/20 text-warning-foreground",
+                            )}>
+                              {step.status === "blocked" ? "等待前置" : step.status === "todo" ? "就绪" : step.status}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                  {buildCard.unassignedAgentTypes.length > 0 && (
+                    <div className="mt-2 text-xs text-warning-foreground">
+                      ⚠ 未匹配到对应角色的智能体: {buildCard.unassignedAgentTypes.join(", ")}
+                    </div>
+                  )}
+                </div>
               )}
 
               {/* Status bar — always visible while sending, independent from the chat bubble */}

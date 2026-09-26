@@ -88,6 +88,59 @@ const BUILD_STEP_TITLES: Record<BuildStepKind, string> = {
   release: "发布上线",
 };
 
+/**
+ * Coolie fork: CMMI skill directives injected into each build step's description
+ * when a project carries a CMMI profile. Maps each build phase to the CMMI skill
+ * that governs it and the document it must produce.
+ */
+export const BUILD_STEP_CMMI_DIRECTIVES: Record<BuildStepKind, {
+  skill: string;
+  document: string;
+  gateId: string;
+  directive: string;
+}> = {
+  requirements: {
+    skill: "cmmi-req-spec",
+    document: "01-srs.md",
+    gateId: "G1",
+    directive:
+      "使用 EARS 语法提炼需求，产出软件需求规格说明书 (SRS) 和双向需求跟踪矩阵 (RTM)。" +
+      "完成后运行 G1 需求风控门禁脚本校验。",
+  },
+  design: {
+    skill: "cmmi-tech-solution",
+    document: "02-hld.md",
+    gateId: "G2",
+    directive:
+      "产出系统概要设计 (HLD)，包含架构图 (Mermaid)、数据隔离方案、关键技术决策分析 (DAR)、" +
+      "风险登记册 (RSKM)。完成后运行 G2 架构选型门禁脚本校验。",
+  },
+  impl: {
+    skill: "cmmi-detailed-contracts",
+    document: "03-lld-api.md",
+    gateId: "G3",
+    directive:
+      "产出详细设计与 API 契约 (LLD)，包含数据库 Schema、REST API 契约、接口连接器规范。" +
+      "完成后运行 G3 编译门禁脚本校验，确保 0 编译报错。",
+  },
+  test: {
+    skill: "cmmi-ver-val",
+    document: "04-test-report.md",
+    gateId: "G4",
+    directive:
+      "执行端到端业务旅程验证、UI 四态状态机穷举、交互防抖防御和系统集成测试。" +
+      "产出测试验收报告，完成后运行 G4 全栈验收门禁脚本校验。",
+  },
+  release: {
+    skill: "cmmi-immutable-release",
+    document: "05-deploy-sop.md",
+    gateId: "G5",
+    directive:
+      "产出部署运维 SOP，包含配置基线、部署拓扑、双人复核会签单、秒级回滚 SOP。" +
+      "完成后运行 G5 投产门禁脚本校验，验证制品指纹。",
+  },
+};
+
 const PLAN_TIMEOUT_MS = 60_000;
 const PLAN_MAX_OUTPUT_BYTES = 256 * 1024;
 const DEFAULT_PLANNER_MODEL = "glm-5.3-flash";
@@ -815,6 +868,8 @@ export async function createBuildPlanIssues(
     prompt: string;
     plan: BuildPlanStep[];
     actor: BuildActor;
+    /** Coolie fork: bind all build-plan issues to this project when set. */
+    projectId?: string;
   },
 ): Promise<{
   buildId: string;
@@ -846,6 +901,7 @@ export async function createBuildPlanIssues(
     // itself carries a null originId.
     originKind: "build_plan",
     ...actorFields,
+    ...(input.projectId ? { projectId: input.projectId } : {}),
   });
   const buildId = parent.id;
 
@@ -862,7 +918,15 @@ export async function createBuildPlanIssues(
         `${step.description}\n\n` +
         `构建环节: ${step.kind} (${step.step + 1}/${input.plan.length})\n` +
         `负责类型: ${step.assignedAgentType} / ${BUILD_AGENT_TYPE_LABELS[step.assignedAgentType]}\n` +
-        `所属构建: ${buildId}`,
+        `所属构建: ${buildId}` +
+        // Coolie fork: inject CMMI skill directive so the assigned agent
+        // knows which CMMI document to produce and which gate to pass.
+        (input.projectId
+          ? `\n\n---\n**CMMI 交付指令** (${BUILD_STEP_CMMI_DIRECTIVES[step.kind].gateId})\n` +
+            `技能: ${BUILD_STEP_CMMI_DIRECTIVES[step.kind].skill}\n` +
+            `产出文档: ${BUILD_STEP_CMMI_DIRECTIVES[step.kind].document}\n` +
+            `${BUILD_STEP_CMMI_DIRECTIVES[step.kind].directive}`
+          : ""),
       parentId: buildId,
       // The first step is open; every later step waits on its predecessor and is
       // released by the platform's dependency-resolved wakeup.
@@ -873,6 +937,7 @@ export async function createBuildPlanIssues(
       ...(assigneeAgentId ? { assigneeAgentId } : {}),
       ...(blockerIssueIds.length > 0 ? { blockedByIssueIds: blockerIssueIds } : {}),
       ...actorFields,
+      ...(input.projectId ? { projectId: input.projectId } : {}),
     });
 
     // Only steps with no unresolved blocker are runnable now; the rest are woken
