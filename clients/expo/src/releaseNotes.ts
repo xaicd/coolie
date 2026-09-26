@@ -7,7 +7,7 @@
  * h5 端也不再常年停在旧版本号。
  *
  * 本文件内的数组降级为离线兜底：取不到远端（断网 / 端点还没部署 / 版本节还没写）
- * 时 WhatsNew 用它显示最近一版，不白屏、不空屏。
+ * 时 WhatsNew 用它显示「同版本」的说明（精确匹配，找不到就明说，不拿旧版充数）。
  *
  * 新增版本时正常发版（CHANGELOG 顶部加节）即可；只有想在离线兜底里也带上
  * 说明时才需要往数组顶部加一节。
@@ -32,37 +32,71 @@ interface RemoteReleaseNotes {
   bullets: string[];
 }
 
-/**
- * 拉某版本的远端说明；任何失败（网络 / 非 200 / 结构不对）都返回 null，
- * 调用方回退到本地兜底数组 —— WhatsNew 绝不因拉取失败而缺内容。
- */
-export async function fetchReleaseNotes(version: string): Promise<ReleaseNote | null> {
+/** 单次拉取；超时给移动网络留足余量，但不再傻等。 */
+async function fetchReleaseNotesOnce(version: string): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 6000);
   try {
-    const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), 6000);
-    const res = await fetch(
+    return await fetch(
       `${COOLIE_BASE_URL}/api/release-notes?version=${encodeURIComponent(version)}`,
       { headers: { Accept: "application/json" }, signal: controller.signal },
     );
+  } finally {
     clearTimeout(timer);
-    if (!res.ok) return null;
-    const data = (await res.json()) as RemoteReleaseNotes | null;
-    if (typeof data?.version !== "string" || !Array.isArray(data?.bullets)) return null;
-    const features = data.bullets.filter(
-      (bullet): bullet is string => typeof bullet === "string" && bullet.length > 0,
-    );
-    if (features.length === 0) return null;
-    return {
-      version: data.version,
-      title: typeof data.title === "string" && data.title ? data.title : `v${data.version} 更新`,
-      features,
-    };
-  } catch {
-    return null;
   }
 }
 
+/**
+ * 拉某版本的远端说明；失败（网络 / 非 200 / 结构不对）整体返回 null，由调用方
+ * 决定显示「离线兜底」还是「加载中」。
+ *
+ * wave95：弱网下首拉偶发失败会直接落回随包兜底数组（顶部还是老版本），老板
+ * 看到的就是「更新内容老是旧的」。这里重试一次 —— 两次都失败才算真失败。
+ */
+export async function fetchReleaseNotes(version: string): Promise<ReleaseNote | null> {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const res = await fetchReleaseNotesOnce(version);
+      if (!res.ok) continue;
+      const data = (await res.json()) as RemoteReleaseNotes | null;
+      if (typeof data?.version !== "string" || !Array.isArray(data?.bullets)) continue;
+      const features = data.bullets.filter(
+        (bullet): bullet is string => typeof bullet === "string" && bullet.length > 0,
+      );
+      if (features.length === 0) continue;
+      return {
+        version: data.version,
+        title: typeof data.title === "string" && data.title ? data.title : `v${data.version} 更新`,
+        features,
+      };
+    } catch {
+      // 网络异常 / 超时：进入下一次尝试。
+    }
+  }
+  return null;
+}
+
 export const RELEASE_NOTES: ReleaseNote[] = [
+  {
+    version: "0.5.67",
+    title: "wave95 — 移动端 Super-Shell 5 栏全功能重构 + 企业 CMMI/活拓扑独立治理插件化 (@paperclipai/plugin-governance)",
+    features: [
+      "重构移动端五大导航底座（工坊/对话/本体/任务/资产），彻底根除「独立 Web 全功能」割裂按钮",
+      "将企业 CMMI 5+2 门禁、活拓扑与 API 生命周期抽离为独立官方插件 @paperclipai/plugin-governance",
+      "实现原生与 Web 双向安全 JSBridge 握手通道、互动式 CMMI 质量门禁抽屉与组织资产沉淀",
+      "仪表盘增加移动端一键紧急制动安全阀弹窗 (Emergency Kill Switch Modal)",
+      "为底部 Tab 栏与中央悬浮呼叫按钮增加触觉震动反馈 (Haptics)",
+      "WhatsNew 更新说明真值修复: 远端优先 + 失败重试, 离线兜底只精确匹配本版本, 拉取期间显示「正在获取」",
+    ],
+  },
+  {
+    version: "0.5.66",
+    title: "wave94 — App 直接用 Web 全功能登录",
+    features: [
+      "App 直接用 Web 全功能登录（WebLoginScreen + 无缝 session 同步）",
+      "原生端 surface Web 全控制台 + CMMI 金档 + 活拓扑 + 多源项目",
+    ],
+  },
   {
     version: "0.5.23",
     title: "砍掉工作空间，工坊一件到底",
@@ -113,7 +147,13 @@ export const RELEASE_NOTES: ReleaseNote[] = [
   },
 ];
 
-/** 取某版本的说明；找不到就给最近一版，绝不返回空指针。 */
-export function noteForVersion(version: string): ReleaseNote {
-  return RELEASE_NOTES.find((note) => note.version === version) ?? RELEASE_NOTES[0];
+/**
+ * 取某版本的离线兜底说明；只做精确匹配，找不到返回 null。
+ *
+ * wave95：这里曾经「找不到就给最近一版」—— 数组停在旧版本时，每个新版本的
+ * WhatsNew 都会显示那条最老的内容，正是老板说的「更新内容老是旧的」。
+ * 宁可返回 null 让 WhatsNew 显示「加载中/未取到」，也不拿旧版本充数。
+ */
+export function noteForVersion(version: string): ReleaseNote | null {
+  return RELEASE_NOTES.find((note) => note.version === version) ?? null;
 }

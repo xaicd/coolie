@@ -105,10 +105,16 @@ function CheckRow({
 
 export function WhatsNewScreen({ visible, onClose, onViewDemo }: WhatsNewScreenProps) {
   const version = currentAppVersion();
-  // 本版说明优先取远端（server 从 CHANGELOG 抽节, wave89 修法 C），拉不到/拉失败
-  // 回退到随包的本地数组 —— 弹屏不等人，先显示兜底内容，远端回来再刷新。
+  // 本版说明优先取远端（server 从 CHANGELOG 抽节, wave89 修法 C）。
+  // wave95 真值修复：远端没回来之前显示「正在获取」，拉失败只回退到「同版本」
+  // 的随包兜底；兜底数组没有本版就明说「未取到」—— 绝不拿旧版本内容充数，
+  // 那正是老板看到的「更新内容老是旧的」。
   const [remoteNote, setRemoteNote] = useState<ReleaseNote | null>(null);
-  const note: ReleaseNote = remoteNote ?? noteForVersion(version);
+  /** fetch 已结束（成功或失败）。false = 还在拉。 */
+  const [remoteSettled, setRemoteSettled] = useState(false);
+  const localNote = noteForVersion(version);
+  const note: ReleaseNote | null = remoteNote ?? localNote;
+  const remotePending = visible && !remoteSettled;
 
   const otaEnabled = Updates.isEnabled;
   const runtimeVersion = Updates.runtimeVersion ?? null;
@@ -128,12 +134,24 @@ export function WhatsNewScreen({ visible, onClose, onViewDemo }: WhatsNewScreenP
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
+    // 版本/可见性变化时清掉上一轮结果，避免显示上一个版本的远端内容。
+    setRemoteNote(null);
+    setRemoteSettled(false);
     void fetchReleaseNotes(version).then((fetched) => {
-      if (!cancelled && fetched) setRemoteNote(fetched);
+      if (cancelled) return;
+      // 打到 logcat（ReactNativeJS tag），装机验证时 grep [WhatsNew] 可直接看
+      // 远端说明到底拉没拉到 —— 不用再靠截图猜。
+      console.info(
+        `[WhatsNew] fetchReleaseNotes version=${version} ` +
+          `ok=${fetched !== null} source=${fetched ? "remote" : localNote ? "local-fallback" : "none"}`,
+      );
+      if (fetched) setRemoteNote(fetched);
+      setRemoteSettled(true);
     });
     return () => {
       cancelled = true;
     };
+    // localNote 是 version 的派生值，随 version 变化，不额外列 dep。
   }, [visible, version]);
 
   useEffect(() => {
@@ -180,7 +198,9 @@ export function WhatsNewScreen({ visible, onClose, onViewDemo }: WhatsNewScreenP
             <Text style={styles.heroGlyph}>🎉</Text>
             <Text style={styles.badge}>v{version}</Text>
             <Text style={styles.title}>Coolie {version} 已就绪</Text>
-            <Text style={styles.subtitle}>{note.title}</Text>
+            <Text style={styles.subtitle}>
+              {remotePending ? "正在获取本版更新内容…" : (note?.title ?? "本版更新说明未取到")}
+            </Text>
           </View>
 
           {/* 装机自检：装对没有，版本说了算 */}
@@ -242,19 +262,30 @@ export function WhatsNewScreen({ visible, onClose, onViewDemo }: WhatsNewScreenP
             )}
           </View>
 
-          {/* 本版功能点 */}
+          {/* 本版功能点：远端真值 > 同版本离线兜底 > 如实说未取到 */}
           <Text style={styles.sectionTitle}>本版更新</Text>
-          {note.features.map((feature) => (
-            <View key={feature} style={styles.featureRow}>
-              <Ionicons
-                name="checkmark-circle-outline"
-                size={18}
-                color={C.accent}
-                style={styles.featureIcon}
-              />
-              <Text style={styles.featureText}>{feature}</Text>
-            </View>
-          ))}
+          {remotePending ? (
+            <Text style={styles.hint}>正在从更新源获取 v{version} 的更新说明…</Text>
+          ) : note ? (
+            note.features.map((feature) => (
+              <View key={feature} style={styles.featureRow}>
+                <Ionicons
+                  name="checkmark-circle-outline"
+                  size={18}
+                  color={C.accent}
+                  style={styles.featureIcon}
+                />
+                <Text style={styles.featureText}>{feature}</Text>
+              </View>
+            ))
+          ) : (
+            <Text style={styles.warn}>
+              v{version} 的更新说明暂未取到（更新源未返回本版内容）。联网重启 App 可再试一次。
+            </Text>
+          )}
+          {note && !remotePending && remoteSettled && !remoteNote ? (
+            <Text style={styles.hint}>当前显示的是随包离线说明；联网后重启 App 会换成服务端最新内容。</Text>
+          ) : null}
 
           {/* 动作 */}
           <View style={styles.actions}>
