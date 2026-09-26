@@ -1,4 +1,4 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { C } from "../theme";
 
@@ -37,7 +37,16 @@ function Tab({
   onPress: () => void;
 }) {
   return (
-    <Pressable style={styles.tab} onPress={onPress} hitSlop={4}>
+    <Pressable
+      style={styles.tab}
+      onPress={() => {
+        if (!active) {
+          Vibration.vibrate(15);
+        }
+        onPress();
+      }}
+      hitSlop={4}
+    >
       <Ionicons
         name={active ? slot.activeIcon : slot.icon}
         size={22}
@@ -80,9 +89,12 @@ export function TabBar({
       <View style={styles.fabSlot}>
         <Pressable
           style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-          onPress={onCreate}
+          onPress={() => {
+            Vibration.vibrate(30);
+            onCreate();
+          }}
           hitSlop={8}
-          accessibilityLabel="新建任务"
+          accessibilityLabel="新建与语音派单"
         >
           <Ionicons name="add" size={26} color="#FFFFFF" />
         </Pressable>
