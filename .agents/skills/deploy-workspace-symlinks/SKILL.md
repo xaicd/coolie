@@ -31,7 +31,7 @@ for pkg in $(grep -rhoE "from ['\"]@paperclipai/[a-z-]+['\"]" /opt/coolie/server
 done
 
 # 2. bundled plugins
-for plugin in plugin-aigw plugin-chat plugin-llm-wiki plugin-multimodal plugin-npc-factory plugin-ontology plugin-ops-console plugin-workflow plugin-workspace-diff paperclip-plugin-fake-sandbox; do
+for plugin in plugin-aigw plugin-chat plugin-governance plugin-llm-wiki plugin-multimodal plugin-npc-factory plugin-ontology plugin-ops-console plugin-workflow plugin-workspace-diff paperclip-plugin-fake-sandbox; do
   if [ -d "/opt/coolie/packages/plugins/$plugin/dist" ] && [ ! -e "$plugin" ]; then
     ln -s "../../../packages/plugins/$plugin" "$plugin"
     echo "linked $plugin"

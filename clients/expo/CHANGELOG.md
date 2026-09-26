@@ -4,6 +4,20 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.67
+
+> Released: 2026-09-26 · Android release APK + OTA bundle
+
+### 更新
+
+- wave95 — 移动端 Super-Shell 5 栏全功能重构 + 企业 CMMI/活拓扑独立治理插件化 (@paperclipai/plugin-governance)
+  - `1e89603b3` feat(governance): 将企业 CMMI 5+2 门禁、活拓扑与 API 生命周期抽离为独立官方插件 `@paperclipai/plugin-governance`
+  - `22c17a392` feat(expo): 重构移动端五大导航底座（工坊/对话/本体/任务/资产），彻底根除「独立 Web 全功能」割裂按钮
+  - `ad03144ab` feat(expo): 仪表盘增加移动端一键紧急制动安全阀弹窗 (Emergency Kill Switch Modal)
+  - `75929afe0` feat(expo): 实现原生与 Web 双向安全 JSBridge 握手通道、互动式 CMMI 质量门禁抽屉与组织资产沉淀
+  - `18561bc54` feat(expo): 为底部 Tab 栏与中央悬浮呼叫按钮增加触觉震动反馈 (Haptics)
+  - Spec v3.1.0 移动端无损 Super-Shell 规范与产融智能体集成规范固化
+
 ## v0.5.66
 
 > Released: 2026-09-26 · Android release APK + OTA bundle

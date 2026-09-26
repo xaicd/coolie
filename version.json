@@ -1,7 +1,7 @@
 {
-  "version": "0.5.66",
-  "versionCode": 566,
-  "commitSha": "ad922935b",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.66/coolie-release.apk",
-  "releaseNotes": "wave94 — 打包 boss Claude 后 2 commit (Web 登录 + Web 全功能 surface): 296481625 App 直接用 Web 全功能登录 + 无缝 session 同步; b7c6a2bb8 原生端 surface Web 全控制台 + CMMI 金档 + 活拓扑 + 多源项目"
+  "version": "0.5.67",
+  "versionCode": 567,
+  "commitSha": "18561bc54",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.67/coolie-release.apk",
+  "releaseNotes": "wave95 — 移动端 Super-Shell 5 栏全功能重构 + 企业 CMMI/活拓扑独立治理插件化 (@paperclipai/plugin-governance) + JSBridge 双向握手 + 触觉震动反馈 + 紧急制动安全阀"
 }

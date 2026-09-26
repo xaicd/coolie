@@ -56,7 +56,7 @@ for pkg in $pkgs; do
   link "$pkg" "packages/$pkg"
   link "$pkg" "packages/adapters/$pkg"
 done
-for plugin in plugin-aigw plugin-chat plugin-llm-wiki plugin-multimodal plugin-npc-factory plugin-ontology plugin-ops-console plugin-workflow plugin-workspace-diff paperclip-plugin-fake-sandbox; do
+for plugin in plugin-aigw plugin-chat plugin-governance plugin-llm-wiki plugin-multimodal plugin-npc-factory plugin-ontology plugin-ops-console plugin-workflow plugin-workspace-diff paperclip-plugin-fake-sandbox; do
   link "$plugin" "packages/plugins/$plugin"
 done
 # prune dangling links left by rsync --delete (e.g. plugin-chat moved to _deprecated)
