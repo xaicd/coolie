@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
 import {
-  ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -16,15 +14,12 @@ import type { Company, DashboardSummary } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
 import { CoolieLogo } from "../components/CoolieLogo";
-import { useOTA } from "../OTA";
 import { AppCard } from "../ui/AppCard";
 import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { StatTile } from "../ui/StatTile";
-import { Sheet } from "../ui/Sheet";
-import { EmergencyKillSwitch } from "../components/EmergencyKillSwitch";
-import { RADIUS, SPACING } from "../ui/tokens";
+import { RADIUS } from "../ui/tokens";
 
 function formatMoney(cents: number): string {
   const yuan = (cents / 100).toFixed(2);
@@ -42,7 +37,6 @@ function formatDuration(seconds: number): string {
 }
 
 interface DashboardScreenProps {
-  onOpenSettings?: () => void;
   company: Company;
   onBack?: () => void;
   onOpenApprovals?: () => void;
@@ -57,9 +51,11 @@ interface DashboardScreenProps {
 /**
  * 仪表盘 — 登录后的首页。
  *
- * 设计目标: 让用户一眼看到工坊全貌，立刻知道该做什么。
- * - 第 1 行: 4 张核心 StatTile (员工/任务/花费/审批)
- * - 第 2 行: 快速操作入口 (工坊/本体/流水线/项目/Web全功能)
+ * wave96 精简 (boss 22:14 OOB「更复杂了」): 删业务本体态势大卡、熔断 modal、
+ * 设置/检查更新按钮; CMMI 卡收敛到 1 项 + 1 按钮。保留的是 web 版首页的
+ * 核心统计:
+ * - 第 1 行: 4 张核心 StatTile (员工/任务/花费/审批 — 本月花费与待审批的简版)
+ * - 第 2 行: 快速操作入口 (工坊/本体/流水线/项目)
  * - 第 3 行: 任务完成率进度条 + 7 天活动趋势
  * - 第 4 行: 员工状态分布 + 预算使用进度
  * - 第 5 行: 项目中心入口卡片
@@ -67,7 +63,6 @@ interface DashboardScreenProps {
 export function DashboardScreen({
   company,
   onBack,
-  onOpenSettings,
   onOpenApprovals,
   onOpenProjects,
   onOpenWorkshop,
@@ -79,9 +74,6 @@ export function DashboardScreen({
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [killModalOpen, setKillModalOpen] = useState(false);
-  const [isEmergencyLocked, setIsEmergencyLocked] = useState(false);
-  const { isChecking: otaChecking, checkUpdate: checkOTA } = useOTA();
 
   const fetchDashboard = useCallback(
     async (isRefresh = false) => {
@@ -202,40 +194,6 @@ export function DashboardScreen({
               <Text style={styles.companyCapsuleTag}>效能总览</Text>
             </View>
           }
-          right={
-            <>
-              <Pressable
-                style={[styles.otaBtn, styles.killTriggerBtn]}
-                onPress={() => setKillModalOpen(true)}
-                hitSlop={12}
-                accessibilityLabel="紧急熔断"
-              >
-                <Ionicons name="warning" size={13} color="#EF4444" />
-                <Text style={styles.killBtnText}>熔断</Text>
-              </Pressable>
-              {onOpenSettings ? (
-                <Pressable onPress={onOpenSettings} hitSlop={12} style={styles.otaBtn}>
-                  <Ionicons name="settings-outline" size={18} color="#8A8F98" />
-                </Pressable>
-              ) : null}
-              <Pressable
-                style={styles.otaBtn}
-                onPress={() => void checkOTA(true)}
-                hitSlop={12}
-                disabled={otaChecking}
-              >
-                {otaChecking ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={C.accent}
-                    style={{ transform: [{ scale: 0.7 }] }}
-                  />
-                ) : (
-                  <Text style={styles.otaBtnText}>检查更新</Text>
-                )}
-              </Pressable>
-            </>
-          }
         />
 
         {/* ── 第 1 行: 4 张核心指标卡 ── */}
@@ -270,174 +228,29 @@ export function DashboardScreen({
           />
         </Pressable>
 
-        {/* ── 核心态势: 业务本体数字孪生与组织资产 ── */}
-        <AppCard style={styles.webHeroCard}>
-          <View style={styles.webHeroTop}>
-            <View style={styles.webHeroTitleRow}>
-              <View style={[styles.webHeroIconWrap, { backgroundColor: "#8B5CF6" }]}>
-                <Ionicons name="shapes" size={18} color="#FFFFFF" />
-              </View>
-              <View>
-                <Text style={styles.webHeroTitle}>业务本体态势</Text>
-                <Text style={styles.webHeroSubtitle}>数字孪生架构 · 实体网络 · 规则守卫中</Text>
-              </View>
-            </View>
-            <View style={styles.sessionPill}>
-              <StatusDot status="ok" size={6} />
-              <Text style={styles.sessionPillText}>状态正常 🟢</Text>
-            </View>
-          </View>
-
-          <Text style={styles.webHeroDesc}>
-            业务领域模型与数据物理隔离规则实时守卫中，无跨企业实体越权穿透。点击即可直达本体域列表、实体拓扑图与快照审计。
-          </Text>
-
-          <View style={styles.webHeroActionRow}>
-            {onOpenOntology ? (
-              <Pressable
-                style={({ pressed }) => [styles.webHeroMainBtn, pressed && styles.webHeroMainBtnPressed, { backgroundColor: "#8B5CF6" }]}
-                onPress={onOpenOntology}
-                accessibilityLabel="查看业务本体"
-              >
-                <Text style={styles.webHeroMainBtnText}>🧠 查看业务本体与实体网络</Text>
-              </Pressable>
-            ) : null}
-          </View>
-
-          {/* 企业核心资产直达胶囊 */}
-          <View style={styles.webHeroQuickLinks}>
-            {onOpenProjects ? (
-              <Pressable style={styles.webQuickChip} onPress={onOpenProjects}>
-                <Ionicons name="folder-outline" size={12} color={C.accent} />
-                <Text style={styles.webQuickChipText}>项目中心</Text>
-              </Pressable>
-            ) : null}
-            {onOpenWorkshop ? (
-              <Pressable style={styles.webQuickChip} onPress={onOpenWorkshop}>
-                <Ionicons name="chatbubbles-outline" size={12} color={C.ok} />
-                <Text style={styles.webQuickChipText}>智能工坊</Text>
-              </Pressable>
-            ) : null}
-            {onOpenPipelines ? (
-              <Pressable style={styles.webQuickChip} onPress={onOpenPipelines}>
-                <Ionicons name="git-merge-outline" size={12} color="#F59E0B" />
-                <Text style={styles.webQuickChipText}>流水线中心</Text>
-              </Pressable>
-            ) : null}
-            {onOpenWebWorkbench ? (
-              <>
-                <Pressable
-                  style={styles.webQuickChip}
-                  onPress={() => onOpenWebWorkbench("/routines", "例行计划调度")}
-                >
-                  <Ionicons name="time-outline" size={12} color="#06B6D4" />
-                  <Text style={styles.webQuickChipText}>例行计划</Text>
-                </Pressable>
-                <Pressable
-                  style={styles.webQuickChip}
-                  onPress={() => onOpenWebWorkbench("/costs", "全景成本分析")}
-                >
-                  <Ionicons name="cash-outline" size={12} color="#10B981" />
-                  <Text style={styles.webQuickChipText}>成本分析</Text>
-                </Pressable>
-              </>
-            ) : null}
-          </View>
-        </AppCard>
-
-        {/* ── CMMI 5+2 黄金文档与 API 架构治理态势卡 ── */}
+        {/* ── CMMI 质量工程 (wave96 精简: 1 项核心 + 1 按钮) ── */}
         <AppCard style={styles.wideCard}>
           <View style={styles.cardHeader}>
             <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
               <Ionicons name="shield-checkmark" size={16} color={C.accent} />
-              <Text style={styles.cardTitle}>CMMI 质量工程与 API 治理</Text>
-            </View>
-            <View style={styles.cmmiBadgeWrap}>
-              <Text style={styles.cmmiBadgeText}>5 角色责任制 · 3σ SPC</Text>
+              <Text style={styles.cardTitle}>CMMI 质量工程</Text>
             </View>
           </View>
 
-          {/* G1 ~ G5 阶段门禁进度 */}
-          <View style={styles.cmmiGateOverview}>
-            <View style={styles.cmmiGateStep}>
-              <View style={[styles.cmmiGateDot, { backgroundColor: C.ok }]}>
-                <Ionicons name="checkmark" size={10} color="#FFF" />
-              </View>
-              <Text style={styles.cmmiGateStepTitle}>G1 需求</Text>
-              <Text style={styles.cmmiGateStepDesc}>DS · EARS</Text>
-            </View>
-            <View style={styles.cmmiGateConnector} />
-            <View style={styles.cmmiGateStep}>
-              <View style={[styles.cmmiGateDot, { backgroundColor: C.ok }]}>
-                <Ionicons name="checkmark" size={10} color="#FFF" />
-              </View>
-              <Text style={styles.cmmiGateStepTitle}>G2 方案</Text>
-              <Text style={styles.cmmiGateStepDesc}>FDA · HLD</Text>
-            </View>
-            <View style={styles.cmmiGateConnector} />
-            <View style={styles.cmmiGateStep}>
-              <View style={[styles.cmmiGateDot, { backgroundColor: C.accent }]}>
-                <Ionicons name="code-slash" size={10} color="#FFF" />
-              </View>
-              <Text style={styles.cmmiGateStepTitle}>G3 契约</Text>
-              <Text style={styles.cmmiGateStepDesc}>SWE · 0报错</Text>
-            </View>
-            <View style={styles.cmmiGateConnector} />
-            <View style={styles.cmmiGateStep}>
-              <View style={[styles.cmmiGateDot, { backgroundColor: "rgba(255,255,255,0.12)" }]}>
-                <Ionicons name="flask-outline" size={10} color={C.ink3} />
-              </View>
-              <Text style={styles.cmmiGateStepTitle}>G4 验收</Text>
-              <Text style={styles.cmmiGateStepDesc}>FDSE · ATP</Text>
-            </View>
-            <View style={styles.cmmiGateConnector} />
-            <View style={styles.cmmiGateStep}>
-              <View style={[styles.cmmiGateDot, { backgroundColor: "rgba(255,255,255,0.12)" }]}>
-                <Ionicons name="rocket-outline" size={10} color={C.ink4} />
-              </View>
-              <Text style={styles.cmmiGateStepTitle}>G5 投产</Text>
-              <Text style={styles.cmmiGateStepDesc}>SRE · CMP</Text>
-            </View>
+          <View style={styles.cmmiCapItem}>
+            <Text style={styles.cmmiCapLabel}>门禁进度</Text>
+            <Text style={styles.cmmiCapVal}>G1 需求 → G5 投产 · 5 角色责任制</Text>
           </View>
 
-          {/* 支撑能力矩阵 */}
-          <View style={styles.cmmiCapabilityMatrix}>
-            <View style={styles.cmmiCapItem}>
-              <Text style={styles.cmmiCapLabel}>DSH API 治理</Text>
-              <Text style={styles.cmmiCapVal}>HTTP · gRPC · Dubbo · MQ</Text>
-            </View>
-            <View style={styles.cmmiCapItem}>
-              <Text style={styles.cmmiCapLabel}>活态拓扑视图</Text>
-              <Text style={styles.cmmiCapVal}>Spring Cloud / Gateway</Text>
-            </View>
-            <View style={styles.cmmiCapItem}>
-              <Text style={styles.cmmiCapLabel}>全链路观测</Text>
-              <Text style={styles.cmmiCapVal}>SkyWalking Trace 拓扑</Text>
-            </View>
-            <View style={styles.cmmiCapItem}>
-              <Text style={styles.cmmiCapLabel}>混沌应急演练</Text>
-              <Text style={styles.cmmiCapVal}>ChaosBlade 逆向注入</Text>
-            </View>
-          </View>
-
-          {/* 快捷跳转按钮 */}
-          <View style={styles.cmmiCardFooter}>
-            {onOpenProjects ? (
-              <Pressable style={styles.cmmiFootBtn} onPress={onOpenProjects}>
-                <Ionicons name="folder-outline" size={13} color={C.accent} />
-                <Text style={styles.cmmiFootBtnText}>项目 CMMI 审计</Text>
-              </Pressable>
-            ) : null}
-            {onOpenWebWorkbench ? (
-              <Pressable
-                style={[styles.cmmiFootBtn, styles.cmmiFootBtnPrimary]}
-                onPress={() => onOpenWebWorkbench("/projects", "活态架构与 CMMI 门禁")}
-              >
-                <Ionicons name="open-outline" size={13} color="#FFF" />
-                <Text style={[styles.cmmiFootBtnText, { color: "#FFF" }]}>Web 全景拓扑</Text>
-              </Pressable>
-            ) : null}
-          </View>
+          {onOpenWebWorkbench ? (
+            <Pressable
+              style={[styles.cmmiFootBtn, styles.cmmiFootBtnPrimary]}
+              onPress={() => onOpenWebWorkbench("/projects", "CMMI 质量工程")}
+            >
+              <Ionicons name="open-outline" size={13} color="#FFF" />
+              <Text style={[styles.cmmiFootBtnText, { color: "#FFF" }]}>进入 CMMI 门禁</Text>
+            </Pressable>
+          ) : null}
         </AppCard>
 
         {/* ── 快速操作入口 ── */}
@@ -668,32 +481,6 @@ export function DashboardScreen({
           </AppCard>
         ) : null}
       </ScrollView>
-
-      {killModalOpen ? (
-        <Sheet
-          title="🚨 突发异常应急保护 · 一键熔断"
-          onClose={() => setKillModalOpen(false)}
-        >
-          <View style={styles.killSheetContent}>
-            <Text style={styles.killSheetDesc}>
-              向右滑动即可强制暂停所有正在运行的智能体任务并锁定业务本体写权限，即刻拦截潜在算力刷爆与数据污染风险。
-            </Text>
-            <EmergencyKillSwitch
-              domainId="company-all"
-              domainName={company.name}
-              isLocked={isEmergencyLocked}
-              onTrigger={async () => {
-                setIsEmergencyLocked(true);
-                Alert.alert(
-                  "🚨 全局紧急熔断生效",
-                  `已向 ${company.name} 广播应急指令，当前智能体写入权限已就地加锁，审计日志已记录。`,
-                );
-                setKillModalOpen(false);
-              }}
-            />
-          </View>
-        </Sheet>
-      ) : null}
     </SafeAreaView>
   );
 }
@@ -789,45 +576,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: C.ink4,
     fontWeight: "400",
-  },
-  otaBtn: {
-    backgroundColor: "rgba(255,255,255,0.02)",
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: C.line,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    minWidth: 70,
-    height: 32,
-  },
-  otaBtnText: {
-    color: C.ink2,
-    fontSize: 13,
-    fontWeight: "500",
-  },
-  killTriggerBtn: {
-    minWidth: 54,
-    gap: 4,
-    backgroundColor: "rgba(239, 68, 68, 0.12)",
-    borderColor: "rgba(239, 68, 68, 0.35)",
-  },
-  killBtnText: {
-    fontSize: 12,
-    color: "#EF4444",
-    fontWeight: "600",
-  },
-  killSheetContent: {
-    padding: SPACING.lg,
-    gap: 16,
-    paddingBottom: SPACING.xl,
-  },
-  killSheetDesc: {
-    fontSize: 13,
-    color: C.ink3,
-    lineHeight: 18,
   },
   gridContainer: {
     flexDirection: "row",
@@ -1125,163 +873,8 @@ const styles = StyleSheet.create({
     color: C.accent,
   },
 
-  // ── Web 全功能 Hero 卡片 ──
-  webHeroCard: {
-    padding: 16,
-    gap: 12,
-    borderColor: "rgba(94, 106, 210, 0.35)",
-    backgroundColor: "rgba(94, 106, 210, 0.04)",
-  },
-  webHeroTop: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  webHeroTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    flex: 1,
-  },
-  webHeroIconWrap: {
-    width: 34,
-    height: 34,
-    borderRadius: 8,
-    backgroundColor: C.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  webHeroTitle: {
-    fontSize: 15,
-    fontWeight: "600",
-    color: C.ink,
-  },
-  webHeroSubtitle: {
-    fontSize: 11,
-    color: C.ink3,
-    marginTop: 1,
-  },
-  sessionPill: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    backgroundColor: "rgba(39, 166, 68, 0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(39, 166, 68, 0.3)",
-    paddingVertical: 3,
-    paddingHorizontal: 8,
-    borderRadius: 999,
-  },
-  sessionPillText: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: C.ok,
-  },
-  webHeroDesc: {
-    fontSize: 12,
-    color: C.ink2,
-    lineHeight: 18,
-  },
-  webHeroActionRow: {
-    marginTop: 2,
-  },
-  webHeroMainBtn: {
-    height: 38,
-    borderRadius: 8,
-    backgroundColor: C.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  webHeroMainBtnPressed: {
-    backgroundColor: C.accentHover,
-  },
-  webHeroMainBtnText: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
-  webHeroQuickLinks: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 6,
-    paddingTop: 4,
-  },
-  webQuickChip: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
-    borderWidth: 1,
-    borderColor: C.line,
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 6,
-  },
-  webQuickChipText: {
-    fontSize: 11,
-    color: C.ink2,
-  },
-
-  // ── CMMI 质量工程与 API 治理 ──
-  cmmiBadgeWrap: {
-    backgroundColor: "rgba(94, 106, 210, 0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(94, 106, 210, 0.3)",
-    paddingVertical: 2,
-    paddingHorizontal: 8,
-    borderRadius: 999,
-  },
-  cmmiBadgeText: {
-    fontSize: 10,
-    fontWeight: "500",
-    color: C.accent,
-  },
-  cmmiGateOverview: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 8,
-  },
-  cmmiGateStep: {
-    alignItems: "center",
-    gap: 3,
-    flex: 1,
-  },
-  cmmiGateDot: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  cmmiGateStepTitle: {
-    fontSize: 10,
-    fontWeight: "600",
-    color: C.ink,
-  },
-  cmmiGateStepDesc: {
-    fontSize: 9,
-    color: C.ink4,
-  },
-  cmmiGateConnector: {
-    height: 1,
-    flex: 0.5,
-    backgroundColor: C.line,
-    marginTop: -14,
-  },
-  cmmiCapabilityMatrix: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 8,
-    backgroundColor: "rgba(255, 255, 255, 0.02)",
-    borderWidth: 1,
-    borderColor: C.line,
-    borderRadius: 8,
-    padding: 10,
-    marginTop: 4,
-  },
+  // ── CMMI 质量工程 (精简: 1 项 + 1 按钮) ──
   cmmiCapItem: {
-    width: "48%",
     gap: 2,
   },
   cmmiCapLabel: {
@@ -1292,11 +885,6 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "500",
     color: C.ink2,
-  },
-  cmmiCardFooter: {
-    flexDirection: "row",
-    gap: 10,
-    marginTop: 6,
   },
   cmmiFootBtn: {
     flex: 1,

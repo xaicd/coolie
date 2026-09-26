@@ -64,6 +64,7 @@ export const COOLIE_ORIGIN = /^(https?:\/\/[^/]+)/i.exec(COOLIE_BASE_URL)?.[1];
 
 const AUTH_KEY = "coolie.authToken";
 const SESSION_TOKEN_KEY = "coolie.sessionToken";
+const SESSION_COOKIE_NAME_KEY = "coolie.sessionCookieName";
 
 /**
  * Persist a bearer credential (agent API key or board API key). SecureStore keeps
@@ -90,9 +91,24 @@ export async function saveSessionToken(token: string): Promise<void> {
 }
 export async function clearSessionToken(): Promise<void> {
   await SecureStore.deleteItemAsync(SESSION_TOKEN_KEY);
+  await SecureStore.deleteItemAsync(SESSION_COOKIE_NAME_KEY);
 }
 export async function getSessionToken(): Promise<string | null> {
   return SecureStore.getItemAsync(SESSION_TOKEN_KEY);
+}
+
+/**
+ * The exact cookie name the instance wrote at sign-in (`__Secure-paperclip-default.session_token`
+ * on prod HTTPS). Better Auth reads the session back only under the name it wrote,
+ * so the replay in `getAuthHeader` must use this name — a guessed alias
+ * (`paperclip.session_token`) is silently ignored, which is how the App↔Web
+ * session bridge came up empty (wave96 real-device trace).
+ */
+export async function saveSessionCookieName(name: string): Promise<void> {
+  await SecureStore.setItemAsync(SESSION_COOKIE_NAME_KEY, name);
+}
+export async function getSessionCookieName(): Promise<string | null> {
+  return SecureStore.getItemAsync(SESSION_COOKIE_NAME_KEY);
 }
 
 /**
@@ -593,8 +609,24 @@ export const coolie = new CoolieClient({
     const sessionToken = await getSessionToken();
     if (sessionToken) {
       const encoded = encodeURIComponent(sessionToken);
+      // Replay the cookie under every name the instance might read it back
+      // from: the exact name captured at sign-in first, then the default
+      // instance's real names (`paperclip-default…`, with/without `__Secure-`),
+      // then the legacy aliases. Better Auth only answers to the name it
+      // wrote, and it derives that name from the instance id + HTTPS-ness of
+      // the request — none of which the App can predict offline.
+      const savedName = await getSessionCookieName();
+      const names = new Set<string>([
+        ...(savedName ? [savedName] : []),
+        "__Secure-paperclip-default.session_token",
+        "paperclip-default.session_token",
+        "paperclip.session_token",
+        "__Secure-paperclip.session_token",
+        "better-auth.session_token",
+        "__Secure-better-auth.session_token",
+      ]);
       return {
-        Cookie: `paperclip.session_token=${encoded}; __Secure-paperclip.session_token=${encoded}; better-auth.session_token=${encoded}; __Secure-better-auth.session_token=${encoded}`,
+        Cookie: [...names].map((name) => `${name}=${encoded}`).join("; "),
       };
     }
     return {};
@@ -663,6 +695,9 @@ export async function signInWithEmail(input: {
   await clearSessionToken();
   const result = await coolie.signInEmail(input);
   let sessionToken = result.token;
+  if (result.cookieName) {
+    await saveSessionCookieName(result.cookieName);
+  }
   if (!sessionToken) {
     try {
       const fetched = await coolie.getSessionToken();

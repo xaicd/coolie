@@ -741,26 +741,6 @@ function HomeScreen({
   }, [companyId, composeOpen]);
 
   /**
-   * Build 进度卡点某环节, 或别的只给出 issueId 的入口: 从任务列表补齐 Issue 再压详情页,
-   * 与 BoardChatScreen 的 handleOpenBuildIssue 同一套做法 (卡片只带 id, 没有完整 Issue)。
-   */
-  const openIssueById = useCallback(
-    async (issueId: string) => {
-      try {
-        const issues = await coolie.listIssues(companyId, { limit: 200 });
-        const found = issues.find((issue) => issue.id === issueId);
-        if (found) {
-          navigateTab("tasks");
-          setSelected(found);
-        }
-      } catch {
-        // 找不到就不跳, 与审批卡「关联任务」的行为一致
-      }
-    },
-    [companyId],
-  );
-
-  /**
    * Tab 级「上一页」—— 底栏 5 项之间也记一层历史, 这样在非 root 的 tab
    * (任务/员工/收件箱) 上左缘右滑是**回到上一个看过的 tab**, 而不是退出 App。
    * 用 ref 承载栈 (不是 state): 手势命中的是「此刻」, 不需要为它重渲染。
@@ -999,7 +979,6 @@ function HomeScreen({
           ) : tab === "dashboard" ? (
             <DashboardScreen
               company={company}
-              onOpenSettings={() => setSettingsOpen(true)}
               onOpenProjects={() => setProjectsOpen(true)}
               onOpenWorkshop={() => navigateTab("chat")}
               onOpenOntology={() => navigateTab("ontology")}
@@ -1094,18 +1073,6 @@ function HomeScreen({
                 whoami={whoami}
                 refreshToken={tasksRefreshToken}
                 onOpenIssue={setSelected}
-                onOpenBuildIssue={(issueId) => void openIssueById(issueId)}
-                onOpenSettings={() => setSettingsOpen(true)}
-                onOpenWorkshop={() => navigateTab("chat")}
-                onOpenOntology={() => navigateTab("ontology")}
-                onOpenArtifacts={() => navigateTab("artifacts")}
-                onOpenPipelines={() => setPipelinesOpen(true)}
-                onOpenPlans={() => setPlansOpen(true)}
-                onOpenProjects={() => setProjectsOpen(true)}
-                onOpenGitCredentials={() => setGitCredentialsOpen(true)}
-                onOpenWebWorkbench={(path, title) =>
-                  setWebContainerTarget({ path: path || "/dashboard", title: title || "Web 全功能工作台" })
-                }
               />
             )
           ) : null}

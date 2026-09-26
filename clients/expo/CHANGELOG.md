@@ -6,11 +6,15 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ## v0.5.68
 
-> Released: 2026-09-26 · Android release APK
+> Released: 2026-09-26 · Android release APK + OTA bundle
 
 ### 更新
 
 - wave96 修真机「录音开启就停不了」: 语音录音五重防线 (多组件状态广播同步 + 30 秒看门狗自动切断 + 录音中再按强制停 + 手指滑出自动停 + 异常兜底复位), 全部语音入口空录音保护
+- wave96 精简 (boss 22:14 OOB「更复杂了」): 仪表盘删「业务本体态势」大卡, CMMI 卡收敛到 1 项 + 1 按钮, 删熔断 modal、设置齿轮、检查更新按钮 (wave76 已删被重构加回的 3 个回归)
+- 任务页精简: 删 6 个编排图标卡 (Build/Pipeline/Plan/项目/仓库绑定/CMMI门禁)、右上角 4 个入口 icon、看板/分列/漏斗等视图切换, 只留任务列表 + 新建任务
+- 任务 Tab 只显示「今日 + 进行中」, 与收件箱 Tab (@提及/审批/阻塞) 分工不重叠 (boss 09-25 OOB「任务导航与收件箱是不是功能重复了」)
+- 修 WebView 自动登录: session cookie 回放改用实例真实 cookie 名 (`__Secure-paperclip-default.session_token`, 登录时从 Set-Cookie 捕获持久化), 此前按猜测别名回放被 Better Auth 静默忽略, bridge 取不到 token 落回登录页
 
 ---
 

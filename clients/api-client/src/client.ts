@@ -247,7 +247,7 @@ export class CoolieClient {
    */
   async signInEmail(
     input: { email: string; password: string },
-  ): Promise<{ token: string | null; user: { id: string; email?: string | null; name?: string | null; image?: string | null } }> {
+  ): Promise<{ token: string | null; cookieName: string | null; user: { id: string; email?: string | null; name?: string | null; image?: string | null } }> {
     const { body, headers } = await this.requestWithHeaders<{
       user?: { id?: string; email?: string | null; name?: string | null; image?: string | null };
     }>("POST", "/api/auth/sign-in/email", input, { auth: false });
@@ -259,6 +259,7 @@ export class CoolieClient {
     const userPayload = body.user ?? {};
     return {
       token: extractSessionTokenCookie(headers),
+      cookieName: extractSessionCookieName(headers),
       user: {
         id: userId,
         email: userPayload.email ?? null,
@@ -1168,6 +1169,41 @@ function isRecord(v: unknown): v is Record<string, unknown> {
 }
 
 /**
+ * Every `Set-Cookie` line a `Headers` instance (or React Native's polyfill of
+ * it) will give up, across the three introspection shapes RN has shipped:
+ * `getSetCookie()`, `raw()["set-cookie"]`, and `map["set-cookie"]`, plus the
+ * folded `headers.get("set-cookie")` fallback.
+ */
+function setCookieHeaderStrings(headers: Headers): string[] {
+  const out: string[] = [];
+  const push = (values: unknown) => {
+    if (Array.isArray(values)) {
+      out.push(...values.filter((value): value is string => typeof value === "string"));
+    }
+  };
+
+  const getSetCookie = (headers as { getSetCookie?: () => string[] }).getSetCookie;
+  if (typeof getSetCookie === "function") {
+    push(getSetCookie.call(headers));
+  }
+
+  // React Native headers polyfill introspection
+  const rawHeaders = (headers as any).raw?.();
+  if (rawHeaders) push(rawHeaders["set-cookie"]);
+
+  const headersMap = (headers as any).map;
+  if (headersMap) {
+    const val = headersMap["set-cookie"];
+    if (Array.isArray(val)) push(val);
+    else if (typeof val === "string") out.push(val);
+  }
+
+  const folded = headers.get("set-cookie");
+  if (folded) out.push(folded);
+  return out;
+}
+
+/**
  * Pull the `paperclip-<instance>.session_token` value out of a Better Auth
  * sign-in response. Better Auth stamps the cookie on sign-in (no separate
  * `Set-Cookie` lookup required), and the cookie name carries the instance id
@@ -1179,47 +1215,26 @@ function isRecord(v: unknown): v is Record<string, unknown> {
  */
 export function extractSessionTokenCookie(headers: Headers): string | null {
   const cookieRegex = /(?:^|;|\s)(?:__Secure-)?(?:paperclip(?:-[^=;\s]+)?|better-auth)\.session_token=([^;]+)/i;
-  const parseCookieList = (list: string[]): string | null => {
-    for (const val of list) {
-      if (typeof val === "string") {
-        const match = val.match(cookieRegex);
-        if (match && typeof match[1] === "string" && match[1].trim()) return match[1].trim();
-      }
-    }
-    return null;
-  };
-
-  const getSetCookie = (headers as { getSetCookie?: () => string[] }).getSetCookie;
-  if (typeof getSetCookie === "function") {
-    const values = getSetCookie.call(headers);
-    if (Array.isArray(values)) {
-      const token = parseCookieList(values);
-      if (token) return token;
-    }
-  }
-
-  // React Native headers polyfill introspection
-  const rawHeaders = (headers as any).raw?.();
-  if (rawHeaders && Array.isArray(rawHeaders["set-cookie"])) {
-    const token = parseCookieList(rawHeaders["set-cookie"]);
-    if (token) return token;
-  }
-  const headersMap = (headers as any).map;
-  if (headersMap) {
-    const val = headersMap["set-cookie"];
-    if (Array.isArray(val)) {
-      const token = parseCookieList(val);
-      if (token) return token;
-    } else if (typeof val === "string") {
-      const match = val.match(cookieRegex);
-      if (match && typeof match[1] === "string" && match[1].trim()) return match[1].trim();
-    }
-  }
-
-  const folded = headers.get("set-cookie");
-  if (folded) {
-    const match = folded.match(cookieRegex);
+  for (const val of setCookieHeaderStrings(headers)) {
+    const match = val.match(cookieRegex);
     if (match && typeof match[1] === "string" && match[1].trim()) return match[1].trim();
+  }
+  return null;
+}
+
+/**
+ * The exact cookie NAME the instance wrote (`__Secure-paperclip-default.session_token`
+ * on a prod HTTPS deployment) — captured from the same sign-in response as the
+ * value. Better Auth only reads back the name it wrote: replaying the value
+ * under a guessed alias (`paperclip.session_token`) never authenticates, so
+ * callers that replay the cookie later must persist this name alongside the
+ * token (wave96: this is what made the App↔Web session bridge come up empty).
+ */
+export function extractSessionCookieName(headers: Headers): string | null {
+  const nameRegex = /(?:^|;|\s)((?:__Secure-)?(?:paperclip(?:-[^=;\s]+)?|better-auth)\.session_token)=/i;
+  for (const val of setCookieHeaderStrings(headers)) {
+    const match = val.match(nameRegex);
+    if (match && typeof match[1] === "string") return match[1];
   }
   return null;
 }
