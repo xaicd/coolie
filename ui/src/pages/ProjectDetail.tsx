@@ -45,9 +45,10 @@ import {
   useResourceMembershipMutation,
   useResourceMemberships,
 } from "../hooks/useResourceMemberships";
+import { BoardChat } from "./BoardChat";
 /* ── Top-level tab types ── */
 
-type ProjectBaseTab = "list" | "plugin-operations" | "workspaces" | "configuration" | "budget";
+type ProjectBaseTab = "list" | "chat" | "plugin-operations" | "workspaces" | "configuration" | "budget";
 type ProjectPluginTab = `plugin:${string}`;
 type ProjectTab = ProjectBaseTab | ProjectPluginTab;
 
@@ -62,6 +63,7 @@ function resolveProjectTab(pathname: string, projectId: string): ProjectTab | nu
   const tab = segments[projectsIdx + 2];
   if (tab === "overview") return "configuration";
   if (tab === "configuration") return "configuration";
+  if (tab === "chat") return "chat";
   if (tab === "budget") return "budget";
   if (tab === "governance") return "plugin:paperclipai.plugin-governance:governance-tab";
   if (tab === "baseline") return "plugin:paperclipai.plugin-governance:baseline-tab";
@@ -854,6 +856,7 @@ export function ProjectDetail() {
         <PageTabBar
           items={[
             { value: "list", label: "Tasks" },
+            { value: "chat", label: "工坊对话" },
             ...(project.managedByPlugin ? [{ value: "plugin-operations", label: "Plugin operations" }] : []),
             ...(showWorkspacesTab ? [{ value: "workspaces", label: "Workspaces" }] : []),
             { value: "configuration", label: "Configuration" },
@@ -871,6 +874,12 @@ export function ProjectDetail() {
 
       {activeTab === "list" && project?.id && resolvedCompanyId && (
         <ProjectIssuesList projectId={project.id} companyId={resolvedCompanyId} />
+      )}
+
+      {activeTab === "chat" && project?.id && (
+        <div className="h-(--sz-calc-29) w-full rounded-lg border border-border overflow-hidden bg-card">
+          <BoardChat projectId={project.id} projectName={project.name} />
+        </div>
       )}
 
       {activeTab === "plugin-operations" && project?.id && resolvedCompanyId && project.managedByPlugin && (

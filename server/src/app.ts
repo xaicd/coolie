@@ -855,8 +855,12 @@ export async function createApp(
   api.use(executionWorkspaceRoutes(db, { pluginWorkerManager: workerManager }));
   api.use(emailRoutes(db, emailChannels));
   api.use(goalRoutes(db));
-  api.use(onboardingSeedRoutes(db));
-  api.use(boardChatRoutes(db, { deploymentMode: opts.deploymentMode }));
+  api.use(
+    boardChatRoutes(db, {
+      deploymentMode: opts.deploymentMode,
+      storage: opts.storageService,
+    }),
+  );
   api.use(
     buildRoutes(db, {
       deploymentMode: opts.deploymentMode,
