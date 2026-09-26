@@ -212,9 +212,9 @@ describe.sequential("app-web-login-bridge validators", () => {
 });
 
 describe.sequential("app-web-login-bridge cookie format", () => {
-  it("writes the Secure-prefixed name with the Secure attribute over HTTPS", () => {
+  it("writes the Secure-prefixed name with the Secure attribute over HTTPS", async () => {
     process.env.PAPERCLIP_INSTANCE_ID = "default";
-    const cookie = buildAppWebLoginBridgeCookie({ token: TOKEN, secure: true });
+    const cookie = await buildAppWebLoginBridgeCookie({ token: TOKEN, secure: true });
     expect(cookie.startsWith(`__Secure-paperclip-default.session_token=${TOKEN}; `)).toBe(true);
     expect(cookie).toContain("Path=/");
     expect(cookie).toContain("HttpOnly");
@@ -223,12 +223,33 @@ describe.sequential("app-web-login-bridge cookie format", () => {
     expect(cookie).toContain("Secure");
   });
 
-  it("writes the plain name without the Secure attribute over HTTP", () => {
+  it("writes the plain name without the Secure attribute over HTTP", async () => {
     process.env.PAPERCLIP_INSTANCE_ID = "default";
-    const cookie = buildAppWebLoginBridgeCookie({ token: TOKEN, secure: false });
+    const cookie = await buildAppWebLoginBridgeCookie({ token: TOKEN, secure: false });
     expect(cookie.startsWith(`paperclip-default.session_token=${TOKEN}; `)).toBe(true);
     expect(cookie).not.toContain("__Secure-");
     expect(cookie).not.toMatch(/;\s*Secure(?:\b|$)/);
+  });
+
+  it("signs a raw token when the auth secret is available", async () => {
+    process.env.PAPERCLIP_INSTANCE_ID = "default";
+    const cookie = await buildAppWebLoginBridgeCookie({ token: TOKEN, secure: true, secret: "test-secret" });
+    const value = cookie.slice("__Secure-paperclip-default.session_token=".length).split(";")[0];
+    const decoded = decodeURIComponent(value);
+    expect(decoded.startsWith(`${TOKEN}.`)).toBe(true);
+    const signature = decoded.slice(TOKEN.length + 1);
+    expect(signature).toMatch(/^[A-Za-z0-9+/]{43}=$/);
+    // Better Auth verifies the signature against the token with the same secret.
+    const crypto = await import("node:crypto");
+    const expected = crypto.createHmac("sha256", "test-secret").update(TOKEN).digest("base64");
+    expect(signature).toBe(expected);
+  });
+
+  it("does not double-sign an already-signed token", async () => {
+    process.env.PAPERCLIP_INSTANCE_ID = "default";
+    const signed = `${TOKEN}.${"A".repeat(43)}=`;
+    const cookie = await buildAppWebLoginBridgeCookie({ token: signed, secure: false, secret: "test-secret" });
+    expect(cookie.startsWith(`paperclip-default.session_token=${encodeURIComponent(signed)}; `)).toBe(true);
   });
 });
 
@@ -399,6 +420,44 @@ describe.sequential("runAppWebLoginBridge direct invocation", () => {
       db: mockDb,
     });
     expect(result).toEqual({ userId: "user-db-1" });
+  });
+
+  it("signs the exchange cookie with the auth secret when validation went through the db", async () => {
+    const auth = { api: { getSession: async () => null }, options: { secret: "bridge-secret" } };
+    const mockDb = {
+      select: () => ({
+        from: (table: any) => ({
+          where: () => ({
+            then: (resolve: (rows: any[]) => any) => {
+              if (table === authUsers || table?._?.name === "user") {
+                return resolve([{ id: "user-db-1" }]);
+              }
+              return resolve([{ id: "session-1", userId: "user-db-1", token: "valid-db-token" }]);
+            },
+          }),
+        }),
+      }),
+    } as any;
+
+    let setCookie: string | undefined;
+    const outcome = await runAppWebLoginBridge({
+      req: { query: { token: "valid-db-token", next: "/" } } as any,
+      res: {
+        setHeader: (key: string, value: string) => {
+          if (key === "Set-Cookie") setCookie = value;
+        },
+        redirect: () => undefined,
+      } as any,
+      auth,
+      secure: true,
+      db: mockDb,
+    });
+
+    expect(outcome.ok).toBe(true);
+    const value = decodeURIComponent(setCookie!.split(";")[0].split("=").slice(1).join("="));
+    const crypto = await import("node:crypto");
+    const expected = crypto.createHmac("sha256", "bridge-secret").update("valid-db-token").digest("base64");
+    expect(value).toBe(`valid-db-token.${expected}`);
   });
 
   it("mints a session token when input is a valid board API key", async () => {

@@ -37,7 +37,11 @@ import { and, desc, eq, gt } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
 import { authSessions, authUsers } from "@paperclipai/db";
 import { boardAuthService } from "../services/board-auth.js";
-import { deriveAuthCookiePrefix } from "./better-auth.js";
+import {
+  deriveAuthCookiePrefix,
+  looksLikeSignedSessionCookieValue,
+  signSessionCookieValue,
+} from "./better-auth.js";
 
 const EXCHANGE_TOKEN_QUERY_PARAM = "token";
 const EXCHANGE_NEXT_QUERY_PARAM = "next";
@@ -54,6 +58,8 @@ export type AppWebLoginBridgeOutcome =
  */
 export type AppWebLoginBridgeSessionApi = {
   api?: { getSession?: (input: { headers: Headers }) => Promise<unknown> };
+  /** Live Better Auth instances expose `options.secret`; used to sign the cookie. */
+  options?: { secret?: string };
 };
 
 /**
@@ -178,16 +184,28 @@ export async function validateAppWebLoginBridgeToken(
  * `secure` matches what Better Auth would have written for the request that
  * triggered the exchange: HTTPS gets `__Secure-` and `Secure`, plain HTTP gets
  * neither.
+ *
+ * Better Auth reads the session cookie through `getSignedCookie`, so the value
+ * must be signed (`<token>.<base64 HMAC>`). Tokens validated through the
+ * database fallback are raw session tokens — when the auth instance's secret
+ * is available, sign them here so the cookie the WebView receives actually
+ * authenticates on the next request. Without a secret the value passes through
+ * unchanged (test doubles, unsigned deployments).
  */
-export function buildAppWebLoginBridgeCookie(input: {
+export async function buildAppWebLoginBridgeCookie(input: {
   token: string;
   secure: boolean;
-}): string {
+  secret?: string;
+}): Promise<string> {
   const prefix = deriveAuthCookiePrefix();
   const baseName = `${prefix}.session_token`;
   const name = input.secure ? `__Secure-${baseName}` : baseName;
+  let value = input.token;
+  if (input.secret && !looksLikeSignedSessionCookieValue(value)) {
+    value = await signSessionCookieValue(value, input.secret);
+  }
   const attributes = [
-    `${name}=${input.token}`,
+    `${name}=${encodeURIComponent(value)}`,
     "Path=/",
     "HttpOnly",
     "SameSite=Lax",
@@ -252,7 +270,14 @@ export async function runAppWebLoginBridge(input: {
   const sessionToken = validated.sessionToken || token;
   console.log(`[bridge] ok userId=${validated.userId} tokenLen=${sessionToken.length} next=${next} secure=${input.secure}`);
 
-  input.res.setHeader("Set-Cookie", buildAppWebLoginBridgeCookie({ token: sessionToken, secure: input.secure }));
+  input.res.setHeader(
+    "Set-Cookie",
+    await buildAppWebLoginBridgeCookie({
+      token: sessionToken,
+      secure: input.secure,
+      secret: input.auth.options?.secret,
+    }),
+  );
   input.res.setHeader("Cache-Control", "no-store");
   input.res.setHeader("Referrer-Policy", "no-referrer");
   input.res.redirect(302, next);

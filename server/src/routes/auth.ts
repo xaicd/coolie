@@ -10,6 +10,8 @@ import {
 } from "@paperclipai/shared";
 import {
   signUpWithEmailPassword,
+  looksLikeSignedSessionCookieValue,
+  signSessionCookieValue,
   type BetterAuthApiClient,
 } from "../auth/better-auth.js";
 import {
@@ -235,11 +237,23 @@ export function authRoutes(db: Db, opts: { betterAuth?: BetterAuthApiClient } = 
    * Return the active session token for the authenticated board user.
    * If authenticated via session, returns the active Better Auth token.
    * If authenticated via board API key, returns or creates an active Better Auth session.
+   *
+   * The returned value is signed the way Better Auth signs its session cookie
+   * (`<token>.<base64 HMAC>`): callers replay it through `/api/auth/exchange`
+   * and the web resolves session cookies via `getSignedCookie`, which rejects
+   * unsigned raw tokens. Without the instance secret the raw token is returned
+   * unchanged.
    */
   router.get("/session-token", async (req, res) => {
     if (req.actor.type !== "board" || !req.actor.userId) {
       throw unauthorized("Board authentication required");
     }
+
+    const secret = opts.betterAuth?.options?.secret;
+    const forClient = (token: string) =>
+      secret && !looksLikeSignedSessionCookieValue(token)
+        ? signSessionCookieValue(token, secret)
+        : Promise.resolve(token);
 
     const now = new Date();
 
@@ -255,7 +269,7 @@ export function authRoutes(db: Db, opts: { betterAuth?: BetterAuthApiClient } = 
         )
         .then((rows) => rows[0] ?? null);
       if (sessionRow?.token) {
-        res.json({ token: sessionRow.token });
+        res.json({ token: await forClient(sessionRow.token) });
         return;
       }
     }
@@ -273,7 +287,7 @@ export function authRoutes(db: Db, opts: { betterAuth?: BetterAuthApiClient } = 
       .then((rows) => rows[0] ?? null);
 
     if (activeSession?.token) {
-      res.json({ token: activeSession.token });
+      res.json({ token: await forClient(activeSession.token) });
       return;
     }
 
@@ -290,7 +304,7 @@ export function authRoutes(db: Db, opts: { betterAuth?: BetterAuthApiClient } = 
       expiresAt,
     });
 
-    res.json({ token: newToken });
+    res.json({ token: await forClient(newToken) });
   });
 
   return router;

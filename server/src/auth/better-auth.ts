@@ -73,6 +73,39 @@ export function deriveAuthCookiePrefix(instanceId = resolvePaperclipInstanceId()
   return `paperclip-${scopedInstanceId}`;
 }
 
+/**
+ * True when a token string already carries Better Auth's cookie signature
+ * (`<token>.<44-char base64>`). Better Auth (1.7.x) reads the session cookie
+ * through better-call's `getSignedCookie`, which rejects any value without a
+ * trailing 44-char base64 signature — an unsigned raw session token never
+ * resolves as a cookie, no matter how valid the session row behind it is.
+ */
+export function looksLikeSignedSessionCookieValue(value: string): boolean {
+  const dot = value.lastIndexOf(".");
+  if (dot < 1) return false;
+  const signature = value.slice(dot + 1);
+  return signature.length === 44 && signature.endsWith("=");
+}
+
+/**
+ * Sign a session token exactly the way Better Auth's `setSignedCookie` does —
+ * append `.<base64 HMAC-SHA256(secret, token)>` — so a token delivered over
+ * JSON can be replayed as a session cookie by the App ↔ Web login bridge.
+ * Returns the unencoded form; HTTP writers URL-encode when serializing, and
+ * better-call's cookie parser decodes on the way back in.
+ */
+export async function signSessionCookieValue(token: string, secret: string): Promise<string> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const signature = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(token));
+  return `${token}.${Buffer.from(signature).toString("base64")}`;
+}
+
 export function buildBetterAuthAdvancedOptions(input: { disableSecureCookies: boolean }) {
   return {
     cookiePrefix: deriveAuthCookiePrefix(),
@@ -464,7 +497,16 @@ export type BetterAuthEmailSignUp = {
  * endpoints off the same `auth.api` object — declaring them together keeps the
  * call sites from having to thread two narrowly-typed option bags.
  */
-export type BetterAuthApiClient = BetterAuthEmailSignUp & BetterAuthSessionResolver;
+/**
+ * The live Better Auth instance carries `options.secret`; declared structurally
+ * (and optional) so test doubles keep assigning without the full auth type.
+ * The session-token route needs it to sign the token it returns.
+ */
+export type BetterAuthSecretHolder = {
+  options?: { secret?: string };
+};
+
+export type BetterAuthApiClient = BetterAuthEmailSignUp & BetterAuthSessionResolver & BetterAuthSecretHolder;
 
 export type EmailSignUpOutcome =
   | { ok: true; user: BetterAuthSessionUser; setCookies: string[] }
