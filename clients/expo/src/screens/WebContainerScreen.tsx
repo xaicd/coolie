@@ -19,7 +19,7 @@ import { C } from "../theme";
 import { COOLIE_WEB_URL } from "../utils/openCoolieWeb";
 import { RADIUS, SPACING } from "../ui/tokens";
 import { CoolieLogo } from "../components/CoolieLogo";
-import { getAuthToken } from "../coolie";
+import { getWebExchangeToken } from "../coolie";
 
 type WebViewLike = React.ComponentType<any>;
 const SafeWebView = WebView as unknown as WebViewLike;
@@ -61,7 +61,7 @@ export function WebContainerScreen({
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  // Wave 80 — pull the App's session token from SecureStore once per mount.
+  // Wave 80/90 — pull the App's session/exchange token from SecureStore or server once per mount.
   // `tokenReady` gates the WebView render: without it, the first navigation
   // would race against the SecureStore read and load the plain landing URL
   // before the bridge URL had a chance to attach. Resolving first means the
@@ -79,14 +79,14 @@ export function WebContainerScreen({
   const withShell = (url: string) =>
     url.includes("?") ? `${url}&shell=native` : `${url}?shell=native`;
 
-  // Wave 80 — pull the App's session token from SecureStore once per mount.
+  // Wave 80/90 — pull the App's session token from SecureStore once per mount.
   // The token is replayed into the WebView's cookie jar on the very first
   // navigation by loading `/api/auth/exchange?token=<...>&next=<baseUrl>`;
   // the bridge 302s to the landing page with `Set-Cookie` attached, and the
   // WebView follows the redirect with the cookie already in its jar.
   useEffect(() => {
     let cancelled = false;
-    void getAuthToken().then((token) => {
+    void getWebExchangeToken().then((token) => {
       if (cancelled) return;
       console.log(`[bridge] token=${token ? token.slice(0, 12) + "..." : "null"} len=${token ? token.length : 0}`);
       setExchangeToken(token ?? null);

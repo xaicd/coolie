@@ -16,6 +16,7 @@
 import express from "express";
 import request from "supertest";
 import { afterEach, describe, expect, it } from "vitest";
+import { authUsers } from "@paperclipai/db";
 import { authRoutes } from "../routes/auth.js";
 import {
   buildAppWebLoginBridgeCookie,
@@ -374,5 +375,73 @@ describe.sequential("runAppWebLoginBridge direct invocation", () => {
     });
     expect(outcome).toEqual({ ok: false, reason: "missing_token" });
     expect(calls).toHaveLength(0);
+  });
+
+  it("validates token via db authSessions when Better Auth getSession misses", async () => {
+    const auth = { api: { getSession: async () => null } };
+    const mockDb = {
+      select: () => ({
+        from: (table: any) => ({
+          where: () => ({
+            then: (resolve: (rows: any[]) => any) => {
+              if (table === authUsers || table?._?.name === "user") {
+                return resolve([{ id: "user-db-1" }]);
+              }
+              return resolve([{ id: "session-1", userId: "user-db-1", token: "valid-db-token" }]);
+            },
+          }),
+        }),
+      }),
+    } as any;
+
+    const result = await validateAppWebLoginBridgeToken(auth, {
+      token: "valid-db-token",
+      db: mockDb,
+    });
+    expect(result).toEqual({ userId: "user-db-1" });
+  });
+
+  it("mints a session token when input is a valid board API key", async () => {
+    const auth = { api: { getSession: async () => null } };
+    let insertedValues: any = null;
+    const mockDb = {
+      select: () => ({
+        from: (table: any) => ({
+          where: () => ({
+            then: (resolve: (rows: any[]) => any) => {
+              // Simulating findBoardApiKeyByToken -> authUsers lookup
+              return resolve([{ id: "user-board-1" }]);
+            },
+            orderBy: () => ({
+              then: (resolve: (rows: any[]) => any) => resolve([]),
+            }),
+          }),
+        }),
+      }),
+      insert: () => ({
+        values: (val: any) => {
+          insertedValues = val;
+          return Promise.resolve();
+        },
+      }),
+    } as any;
+
+    // Provide mock board key lookup
+    const outcome = await runAppWebLoginBridge({
+      req: { query: { token: "valid-board-key", next: "/XROA" } } as any,
+      res: {
+        setHeader: () => undefined,
+        redirect: () => undefined,
+      } as any,
+      auth,
+      secure: true,
+      db: mockDb,
+    });
+
+    expect(outcome.ok).toBe(true);
+    if (outcome.ok) {
+      expect(outcome.token).toBeTruthy();
+      expect(outcome.next).toBe("/XROA");
+    }
   });
 });

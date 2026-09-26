@@ -63,6 +63,7 @@ export const COOLIE_BASE_URL = inlinedBaseUrl ?? "https://xrobinai.cn";
 export const COOLIE_ORIGIN = /^(https?:\/\/[^/]+)/i.exec(COOLIE_BASE_URL)?.[1];
 
 const AUTH_KEY = "coolie.authToken";
+const SESSION_TOKEN_KEY = "coolie.sessionToken";
 
 /**
  * Persist a bearer credential (agent API key or board API key). SecureStore keeps
@@ -77,6 +78,44 @@ export async function clearAuthToken(): Promise<void> {
 }
 export async function getAuthToken(): Promise<string | null> {
   return SecureStore.getItemAsync(AUTH_KEY);
+}
+
+/**
+ * Persist the Better Auth session token specifically for the WebContainerScreen
+ * session bridge (/api/auth/exchange). Kept separate from AUTH_KEY so session tokens
+ * are never mistaken for bearer tokens nor erased by bearer token classifiers.
+ */
+export async function saveSessionToken(token: string): Promise<void> {
+  await SecureStore.setItemAsync(SESSION_TOKEN_KEY, token);
+}
+export async function clearSessionToken(): Promise<void> {
+  await SecureStore.deleteItemAsync(SESSION_TOKEN_KEY);
+}
+export async function getSessionToken(): Promise<string | null> {
+  return SecureStore.getItemAsync(SESSION_TOKEN_KEY);
+}
+
+/**
+ * Resolve the token to use for WebContainerScreen session bridge.
+ * Prioritizes the active session token; falls back to server query or board API key.
+ */
+export async function getWebExchangeToken(): Promise<string | null> {
+  let token = await getSessionToken();
+  if (!token) {
+    try {
+      const res = await coolie.getSessionToken();
+      if (res?.token) {
+        token = res.token;
+        await saveSessionToken(token);
+      }
+    } catch {
+      // Best effort
+    }
+  }
+  if (!token) {
+    token = await getAuthToken();
+  }
+  return token;
 }
 
 /**
@@ -613,9 +652,19 @@ export async function signInWithEmail(input: {
   password: string;
 }): Promise<SessionUser> {
   await clearAuthToken();
+  await clearSessionToken();
   const result = await coolie.signInEmail(input);
-  if (result.token) {
-    await saveAuthToken(result.token);
+  let sessionToken = result.token;
+  if (!sessionToken) {
+    try {
+      const fetched = await coolie.getSessionToken();
+      if (fetched?.token) sessionToken = fetched.token;
+    } catch {
+      // Best-effort
+    }
+  }
+  if (sessionToken) {
+    await saveSessionToken(sessionToken);
   }
   const session = await coolie.getSession();
   if (!session?.user) {
@@ -641,6 +690,7 @@ export async function getSessionUser(): Promise<SessionUser | null> {
  */
 export async function signOutEverywhere(): Promise<void> {
   await clearAuthToken();
+  await clearSessionToken();
   try {
     await coolie.signOut();
   } catch {
@@ -664,7 +714,21 @@ export async function restoreCredential(): Promise<Credential | null> {
     }
   }
   const user = await getSessionUser();
-  return user ? { kind: "session", user } : null;
+  if (user) {
+    const currentSessionToken = await getSessionToken();
+    if (!currentSessionToken) {
+      try {
+        const fetched = await coolie.getSessionToken();
+        if (fetched?.token) {
+          await saveSessionToken(fetched.token);
+        }
+      } catch {
+        // Best-effort
+      }
+    }
+    return { kind: "session", user };
+  }
+  return null;
 }
 
 /**

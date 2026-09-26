@@ -31,7 +31,12 @@
  *    `session` table and we never write to it here.
  */
 
+import { randomBytes, randomUUID } from "node:crypto";
 import type { Request, Response } from "express";
+import { and, desc, eq, gt } from "drizzle-orm";
+import type { Db } from "@paperclipai/db";
+import { authSessions, authUsers } from "@paperclipai/db";
+import { boardAuthService } from "../services/board-auth.js";
 import { deriveAuthCookiePrefix } from "./better-auth.js";
 
 const EXCHANGE_TOKEN_QUERY_PARAM = "token";
@@ -53,50 +58,114 @@ export type AppWebLoginBridgeSessionApi = {
 
 /**
  * Validate an App-stored session token by replaying it through Better Auth's
- * own `getSession`. The value goes into a synthetic `Cookie` header using the
- * exact cookie name the instance writes (prefix derived from the same env the
- * instance is running under, so a worktree never accepts a default-instance
- * token or vice versa). When the inbound request arrived over HTTPS we also
- * add the `__Secure-` prefix — Better Auth only reads the prefixed cookie
- * name on HTTPS, so without it the lookup misses and the bridge 401s.
+ * own `getSession`, with a transparent fallback to direct database session verification
+ * and board key session exchange.
  *
- * Returns null when the token doesn't resolve to a live session, so the
- * caller can distinguish a forged token (bridge must reject) from a session
- * lookup that succeeded for a user whose account was disabled (also rejected —
- * the bridge only mints cookies for sessions the user can still use).
+ * Returns null when the token doesn't resolve to a live session or valid board key.
  */
 export async function validateAppWebLoginBridgeToken(
   auth: AppWebLoginBridgeSessionApi,
-  input: { token: string; secure?: boolean },
-): Promise<{ userId: string } | null> {
+  input: { token: string; secure?: boolean; db?: Db },
+): Promise<{ userId: string; sessionToken?: string } | null> {
   if (!input.token) return null;
+
   const api = auth.api?.getSession;
-  if (!api) return null;
+  if (api) {
+    const baseName = `${deriveAuthCookiePrefix()}.session_token`;
+    const cookieName = input.secure ? `__Secure-${baseName}` : baseName;
+    const headers = new Headers({
+      cookie: `${cookieName}=${input.token}`,
+    });
+    console.log(`[bridge] validate cookieName=${cookieName} tokenLen=${input.token.length}`);
 
-  const baseName = `${deriveAuthCookiePrefix()}.session_token`;
-  const cookieName = input.secure ? `__Secure-${baseName}` : baseName;
-  const headers = new Headers({
-    cookie: `${cookieName}=${input.token}`,
-  });
-  console.log(`[bridge] validate cookieName=${cookieName} tokenLen=${input.token.length}`);
-
-  let value: unknown;
-  try {
-    value = await api({ headers });
-  } catch {
-    return null;
+    let value: unknown;
+    try {
+      value = await api({ headers });
+    } catch {
+      value = null;
+    }
+    if (value && typeof value === "object") {
+      const session = (value as { session?: { id?: unknown; userId?: unknown } | null }).session;
+      const user = (value as { user?: { id?: unknown } | null }).user;
+      if (
+        session &&
+        typeof session.id === "string" &&
+        typeof session.userId === "string" &&
+        user &&
+        typeof user.id === "string" &&
+        session.userId === user.id
+      ) {
+        return { userId: user.id };
+      }
+    }
   }
-  if (!value || typeof value !== "object") return null;
 
-  const session = (value as { session?: { id?: unknown; userId?: unknown } | null }).session;
-  const user = (value as { user?: { id?: unknown } | null }).user;
-  if (!session || typeof session.id !== "string" || typeof session.userId !== "string") return null;
-  if (!user || typeof user.id !== "string") return null;
-  // `getSession` returns the session row tied to the cookie; mismatched
-  // userIds mean the cookie's session points at a user that has since been
-  // removed, which we treat as "not authenticated".
-  if (session.userId !== user.id) return null;
-  return { userId: user.id };
+  // Fallback to database check if db instance was provided
+  if (input.db) {
+    try {
+      const now = new Date();
+      // 1. Direct active session token lookup
+      const sessionRow = await input.db
+        .select({ id: authSessions.id, userId: authSessions.userId, token: authSessions.token })
+        .from(authSessions)
+        .where(and(eq(authSessions.token, input.token), gt(authSessions.expiresAt, now)))
+        .then((rows) => rows[0] ?? null);
+
+      if (sessionRow) {
+        const userRow = await input.db
+          .select({ id: authUsers.id })
+          .from(authUsers)
+          .where(eq(authUsers.id, sessionRow.userId))
+          .then((rows) => rows[0] ?? null);
+        if (userRow) {
+          console.log(`[bridge] db session hit userId=${userRow.id}`);
+          return { userId: userRow.id };
+        }
+      }
+
+      // 2. Board API key lookup
+      const boardAuth = boardAuthService(input.db);
+      const boardKey = await boardAuth.findBoardApiKeyByToken(input.token);
+      if (boardKey) {
+        const userRow = await input.db
+          .select({ id: authUsers.id })
+          .from(authUsers)
+          .where(eq(authUsers.id, boardKey.userId))
+          .then((rows) => rows[0] ?? null);
+        if (userRow) {
+          const existingSession = await input.db
+            .select({ token: authSessions.token })
+            .from(authSessions)
+            .where(and(eq(authSessions.userId, userRow.id), gt(authSessions.expiresAt, now)))
+            .orderBy(desc(authSessions.updatedAt))
+            .then((rows) => rows[0] ?? null);
+
+          if (existingSession?.token) {
+            console.log(`[bridge] db board key hit userId=${userRow.id} with existing session`);
+            return { userId: userRow.id, sessionToken: existingSession.token };
+          }
+
+          const newSessionToken = randomBytes(32).toString("hex");
+          const newSessionId = randomUUID();
+          const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+          await input.db.insert(authSessions).values({
+            id: newSessionId,
+            token: newSessionToken,
+            userId: userRow.id,
+            createdAt: now,
+            updatedAt: now,
+            expiresAt,
+          });
+          console.log(`[bridge] db board key hit userId=${userRow.id} with minted session`);
+          return { userId: userRow.id, sessionToken: newSessionToken };
+        }
+      }
+    } catch (err) {
+      console.warn("[bridge] db fallback check error:", err);
+    }
+  }
+
+  return null;
 }
 
 /**
@@ -159,6 +228,7 @@ export async function runAppWebLoginBridge(input: {
   res: ResponseLike;
   auth: AppWebLoginBridgeSessionApi;
   secure: boolean;
+  db?: Db;
 }): Promise<AppWebLoginBridgeOutcome> {
   const rawToken = (input.req.query as Record<string, unknown>)[EXCHANGE_TOKEN_QUERY_PARAM];
   const rawNext = (input.req.query as Record<string, unknown>)[EXCHANGE_NEXT_QUERY_PARAM];
@@ -170,18 +240,23 @@ export async function runAppWebLoginBridge(input: {
     return { ok: false, reason: "missing_token" };
   }
 
-  const validated = await validateAppWebLoginBridgeToken(input.auth, { token, secure: input.secure });
+  const validated = await validateAppWebLoginBridgeToken(input.auth, {
+    token,
+    secure: input.secure,
+    db: input.db,
+  });
   if (!validated) {
     console.log(`[bridge] invalid_token tokenLen=${token.length} tokenHead=${token.slice(0, 12)}... next=${next} secure=${input.secure}`);
     return { ok: false, reason: "invalid_token" };
   }
-  console.log(`[bridge] ok userId=${validated.userId} tokenLen=${token.length} next=${next} secure=${input.secure}`);
+  const sessionToken = validated.sessionToken || token;
+  console.log(`[bridge] ok userId=${validated.userId} tokenLen=${sessionToken.length} next=${next} secure=${input.secure}`);
 
-  input.res.setHeader("Set-Cookie", buildAppWebLoginBridgeCookie({ token, secure: input.secure }));
+  input.res.setHeader("Set-Cookie", buildAppWebLoginBridgeCookie({ token: sessionToken, secure: input.secure }));
   input.res.setHeader("Cache-Control", "no-store");
   input.res.setHeader("Referrer-Policy", "no-referrer");
   input.res.redirect(302, next);
-  return { ok: true, token, next };
+  return { ok: true, token: sessionToken, next };
 }
 
 /**

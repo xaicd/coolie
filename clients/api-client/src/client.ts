@@ -274,6 +274,17 @@ export class CoolieClient {
     return this.request("GET", "/api/auth/get-session");
   }
   /**
+   * Fetch active session token for the current user.
+   * Used for App ↔ Web session bridge and cross-environment login exchange.
+   */
+  async getSessionToken(): Promise<{ token: string } | null> {
+    try {
+      return await this.request<{ token: string }>("GET", "/api/auth/session-token");
+    } catch {
+      return null;
+    }
+  }
+  /**
    * Drops the session server-side. Requires `originHeader`: Better Auth guards
    * this one with "Missing or null Origin" (measured 403 without it), even though
    * sign-in itself needs no Origin — there is no session cookie to protect yet at
@@ -1167,20 +1178,48 @@ function isRecord(v: unknown): v is Record<string, unknown> {
  * attributes (Domain, Partitioned, etc.) without breaking the parser.
  */
 export function extractSessionTokenCookie(headers: Headers): string | null {
+  const cookieRegex = /(?:^|;|\s)(?:__Secure-)?(?:paperclip(?:-[^=;\s]+)?|better-auth)\.session_token=([^;]+)/i;
+  const parseCookieList = (list: string[]): string | null => {
+    for (const val of list) {
+      if (typeof val === "string") {
+        const match = val.match(cookieRegex);
+        if (match && typeof match[1] === "string" && match[1].trim()) return match[1].trim();
+      }
+    }
+    return null;
+  };
+
   const getSetCookie = (headers as { getSetCookie?: () => string[] }).getSetCookie;
   if (typeof getSetCookie === "function") {
     const values = getSetCookie.call(headers);
     if (Array.isArray(values)) {
-      for (const value of values) {
-        const match = value.match(/(?:^|; )(?:__Secure-)?paperclip-[^=;]+\.session_token=([^;]+)/i);
-        if (match && typeof match[1] === "string" && match[1]) return match[1];
-      }
+      const token = parseCookieList(values);
+      if (token) return token;
     }
   }
+
+  // React Native headers polyfill introspection
+  const rawHeaders = (headers as any).raw?.();
+  if (rawHeaders && Array.isArray(rawHeaders["set-cookie"])) {
+    const token = parseCookieList(rawHeaders["set-cookie"]);
+    if (token) return token;
+  }
+  const headersMap = (headers as any).map;
+  if (headersMap) {
+    const val = headersMap["set-cookie"];
+    if (Array.isArray(val)) {
+      const token = parseCookieList(val);
+      if (token) return token;
+    } else if (typeof val === "string") {
+      const match = val.match(cookieRegex);
+      if (match && typeof match[1] === "string" && match[1].trim()) return match[1].trim();
+    }
+  }
+
   const folded = headers.get("set-cookie");
   if (folded) {
-    const match = folded.match(/(?:^|; )(?:__Secure-)?paperclip-[^=;]+\.session_token=([^;]+)/i);
-    if (match && typeof match[1] === "string" && match[1]) return match[1];
+    const match = folded.match(cookieRegex);
+    if (match && typeof match[1] === "string" && match[1].trim()) return match[1].trim();
   }
   return null;
 }

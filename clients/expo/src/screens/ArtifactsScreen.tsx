@@ -237,7 +237,7 @@ export function ArtifactsScreen({
       if (a.source === "work_product") workProducts += 1;
       if (a.mediaKind === "image") images += 1;
       if (a.mediaKind === "document" || a.mediaKind === "text") documents += 1;
-      if (isCmmiDoc(a.name, a.description)) cmmiBaselines += 1;
+      if (isCmmiDoc(a.title, a.previewText ?? undefined)) cmmiBaselines += 1;
     }
     return {
       all: artifacts.length,
@@ -252,7 +252,7 @@ export function ArtifactsScreen({
     let list = artifacts;
     if (filter === "cmmi_baseline") {
       const pattern = /srs|hld|lld|atp|cmp|car|decision|需求|概要设计|详细设计|验收|投产|合规|门禁|基线/i;
-      list = list.filter((a) => pattern.test(`${a.name ?? ""} ${a.description ?? ""}`));
+      list = list.filter((a) => pattern.test(`${a.title ?? ""} ${a.previewText ?? ""}`));
     } else if (filter === "work_product") {
       list = list.filter((a) => a.source === "work_product");
     } else if (filter === "document") {

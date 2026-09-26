@@ -220,7 +220,7 @@ const styles = StyleSheet.create({
   webBtn: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    borderRadius: RADIUS.xs,
+    borderRadius: RADIUS.sm,
     backgroundColor: "rgba(255, 255, 255, 0.04)",
     borderWidth: 1,
     borderColor: C.line,
@@ -269,7 +269,7 @@ const styles = StyleSheet.create({
   apiName: {
     fontSize: 12,
     fontWeight: "600",
-    color: C.ink1,
+    color: C.ink,
     marginTop: 2,
   },
   apiKey: {
@@ -300,7 +300,7 @@ const styles = StyleSheet.create({
   detailTitle: {
     fontSize: 13,
     fontWeight: "600",
-    color: C.ink1,
+    color: C.ink,
   },
   mcpPill: {
     fontSize: 10,
@@ -325,7 +325,7 @@ const styles = StyleSheet.create({
     width: "48%",
     backgroundColor: "rgba(255, 255, 255, 0.02)",
     padding: 6,
-    borderRadius: RADIUS.xs,
+    borderRadius: RADIUS.sm,
   },
   metaLabel: {
     fontSize: 9,
@@ -339,7 +339,7 @@ const styles = StyleSheet.create({
   },
   mockSummary: {
     backgroundColor: "rgba(0, 0, 0, 0.3)",
-    borderRadius: RADIUS.xs,
+    borderRadius: RADIUS.sm,
     padding: 8,
     borderWidth: 1,
     borderColor: "rgba(255, 255, 255, 0.05)",

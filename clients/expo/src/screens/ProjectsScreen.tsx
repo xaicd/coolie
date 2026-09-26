@@ -155,7 +155,7 @@ export function ProjectsScreen({
             {onOpenWebProjects ? (
               <Pressable
                 style={styles.webBtn}
-                onPress={onOpenWebProjects}
+                onPress={() => onOpenWebProjects()}
                 hitSlop={8}
                 accessibilityLabel="打开 Web 全量项目视图"
               >
@@ -816,7 +816,7 @@ const styles = StyleSheet.create({
   cmmiGateChip: {
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: RADIUS.xs ?? 4,
+    borderRadius: RADIUS.sm,
     borderWidth: 1,
   },
   cmmiGateText: {
@@ -851,7 +851,7 @@ const styles = StyleSheet.create({
   cmmiSummaryTitle: {
     fontSize: 12,
     fontWeight: "600",
-    color: C.ink1,
+    color: C.ink,
   },
   cmmiSummaryBadge: {
     fontSize: 11,
@@ -868,7 +868,7 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.03)",
     paddingVertical: 5,
     paddingHorizontal: 6,
-    borderRadius: RADIUS.xs ?? 4,
+    borderRadius: RADIUS.sm,
   },
   cmmiGridLabel: {
     fontSize: 9,

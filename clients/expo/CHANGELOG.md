@@ -4,6 +4,21 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.64
+
+> Released: 2026-09-26 · Android release APK + OTA bundle
+
+### 更新
+
+- wave90 — 修旧密码登不上 + 打包 boss Claude 后 1 commit
+  - 真因: 0.5.56 (wave80) 起 App 邮箱登录后把 Better Auth session token 当 Bearer 存进共享凭据, 后续每个请求 (含登录后第一步 get-session) 都带 `Authorization: Bearer <session token>`, 服务器 agent-key 中间件校验失败直接 401「Agent token did not verify」, 掩盖了完全有效的 session cookie → 密码明明正确却报登录失败
+  - 修法: session token 单独存 `coolie.sessionToken` (仅供 WebView `/api/auth/exchange` 桥用), Bearer 只发真正的 agent/board API key; 登录 → get-session 纯 cookie 直接过
+  - server 新增 `GET /api/auth/session-token` (board 会话/密钥取当前会话 token, 兜底 WebView 桥与重启回填)
+  - RN fetch Set-Cookie 提取兜底 (getSetCookie 缺失时读 raw headers map)
+  - 打包 boss Claude 后 1 commit `c2c5d7ee8` feat(projects): expand multi-source repository support (未进 0.5.63 APK, 本版装入)
+
+---
+
 ## v0.5.63
 
 > Released: 2026-09-26 · Android release APK

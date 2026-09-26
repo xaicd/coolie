@@ -1,7 +1,8 @@
+import { randomBytes, randomUUID } from "node:crypto";
 import { Router, type Request } from "express";
-import { eq } from "drizzle-orm";
+import { and, desc, eq, gt } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
-import { authUsers } from "@paperclipai/db";
+import { authSessions, authUsers } from "@paperclipai/db";
 import {
   authSessionSchema,
   currentUserProfileSchema,
@@ -222,11 +223,74 @@ export function authRoutes(db: Db, opts: { betterAuth?: BetterAuthApiClient } = 
       res,
       auth: opts.betterAuth ?? {},
       secure: isAppWebLoginBridgeRequestSecure(req as unknown as Parameters<typeof isAppWebLoginBridgeRequestSecure>[0]),
+      db,
     });
     if (!outcome.ok) {
       res.status(401).json({ ok: false, reason: outcome.reason });
       return;
     }
+  });
+
+  /**
+   * Return the active session token for the authenticated board user.
+   * If authenticated via session, returns the active Better Auth token.
+   * If authenticated via board API key, returns or creates an active Better Auth session.
+   */
+  router.get("/session-token", async (req, res) => {
+    if (req.actor.type !== "board" || !req.actor.userId) {
+      throw unauthorized("Board authentication required");
+    }
+
+    const now = new Date();
+
+    if (req.actor.sessionId) {
+      const sessionRow = await db
+        .select({ token: authSessions.token })
+        .from(authSessions)
+        .where(
+          and(
+            eq(authSessions.id, req.actor.sessionId),
+            gt(authSessions.expiresAt, now),
+          ),
+        )
+        .then((rows) => rows[0] ?? null);
+      if (sessionRow?.token) {
+        res.json({ token: sessionRow.token });
+        return;
+      }
+    }
+
+    const activeSession = await db
+      .select({ token: authSessions.token })
+      .from(authSessions)
+      .where(
+        and(
+          eq(authSessions.userId, req.actor.userId),
+          gt(authSessions.expiresAt, now),
+        ),
+      )
+      .orderBy(desc(authSessions.updatedAt))
+      .then((rows) => rows[0] ?? null);
+
+    if (activeSession?.token) {
+      res.json({ token: activeSession.token });
+      return;
+    }
+
+    const newToken = randomBytes(32).toString("hex");
+    const newSessionId = randomUUID();
+    const expiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+
+    await db.insert(authSessions).values({
+      id: newSessionId,
+      token: newToken,
+      userId: req.actor.userId,
+      createdAt: now,
+      updatedAt: now,
+      expiresAt,
+    });
+
+    res.json({ token: newToken });
   });
 
   return router;

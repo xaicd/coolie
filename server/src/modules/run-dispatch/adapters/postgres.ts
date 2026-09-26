@@ -818,7 +818,7 @@ export function createPostgresRunDispatchAdapter(
           }
         : { outcome: { outcome: "not_promoted" as const }, telemetryRun: null };
     };
-    const transactionResult = await withIssueThenRunLocks(
+    const transactionResult = await withIssueThenRunLocks<Awaited<ReturnType<typeof promoteLockedRun>>>(
       input,
       () => ({ outcome: { outcome: "not_promoted" as const }, telemetryRun: null }),
       promoteLockedRun,
