@@ -1,7 +1,7 @@
 {
   "version": "0.5.67",
   "versionCode": 567,
-  "commitSha": "18561bc54",
+  "commitSha": "b6c43102e7d4ec2332cbbe4d4cc8d819491483a7",
   "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.67/coolie-release.apk",
-  "releaseNotes": "wave95 — 移动端 Super-Shell 5 栏全功能重构 + 企业 CMMI/活拓扑独立治理插件化 (@paperclipai/plugin-governance) + JSBridge 双向握手 + 触觉震动反馈 + 紧急制动安全阀"
+  "releaseNotes": "wave95 修 WhatsNew releaseNotes 真值 (远端优先+精确兜底, 不再显示旧版本内容) + 打包 boss Claude 后 5 commit: Super-Shell 5 栏全功能重构 + 企业治理插件化 + JSBridge 双向握手 + 触觉震动 + 紧急制动安全阀"
 }
