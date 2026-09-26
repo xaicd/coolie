@@ -16,6 +16,7 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
   - server 新增 `GET /api/auth/session-token` (board 会话/密钥取当前会话 token, 兜底 WebView 桥与重启回填)
   - RN fetch Set-Cookie 提取兜底 (getSetCookie 缺失时读 raw headers map)
   - 打包 boss Claude 后 1 commit `c2c5d7ee8` feat(projects): expand multi-source repository support (未进 0.5.63 APK, 本版装入)
+  - 附带发现: wave89 发的 OTA bundle 是从当时未提交的实验工作区导出的, 内含半成品登录改版 (登录后不出网请求、假公司页); 且 `/ota/manifest` 路由会把客户端 runtime 回写进 manifest, 0.5.64 原生壳也拉到并加载了这份旧 JS。本版 OTA 从已验证的干净工作区重发, 顶掉污染 bundle
 
 ---
 
