@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.68
+
+> Released: 2026-09-26 · Android release APK
+
+### 更新
+
+- wave96 修真机「录音开启就停不了」: 语音录音五重防线 (多组件状态广播同步 + 30 秒看门狗自动切断 + 录音中再按强制停 + 手指滑出自动停 + 异常兜底复位), 全部语音入口空录音保护
+
+---
+
 ## v0.5.67
 
 > Released: 2026-09-26 · Android release APK + OTA bundle
