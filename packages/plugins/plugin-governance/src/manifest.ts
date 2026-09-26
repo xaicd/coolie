@@ -10,7 +10,10 @@ const manifest: PaperclipPluginManifestV1 = {
   description:
     "企业级 CMMI 质量门禁与基线、微服务活态三态拓扑 (SkyWalking/Chaos)、以及 DSH API 全生命周期契约治理中心。",
   author: "Coolie",
-  categories: ["governance", "ui"],
+  // NOTE: must stay within PLUGIN_CATEGORIES (connector/workspace/automation/ui).
+  // The SDK type is looser than the runtime validator, so an out-of-enum value
+  // only fails at install time (see plugin-manifest-validator parseOrThrow).
+  categories: ["workspace", "ui"],
   capabilities: [
     "ui.page.register",
     "ui.sidebar.register",
