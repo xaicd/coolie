@@ -1,15 +1,19 @@
 /**
- * 版本更新说明 —— 装机后「这台机器到底装了什么新东西」的唯一数据源。
+ * 版本更新说明 —— 装机后「这台机器到底装了什么新东西」。
  *
- * WhatsNewScreen 用当前 app.json 的 expo.version 作 key 在这里取本节，取不到
- * 就回退到数组第一项（最近一版）。它随 bundle 一起发布，不依赖网络：老板装哪个
- * APK，启动就看到哪份说明。
+ * 优先走服务端：GET /api/release-notes?version=<expo.version>，由 server 从
+ * clients/expo/CHANGELOG.md 抽 `## vX.Y.Z` 节（wave89 修法 C）。CHANGELOG 是
+ * 发版流水本来就要写的文档，这样 WhatsNew 不再要求「每个版本手工同步两份文案」，
+ * h5 端也不再常年停在旧版本号。
  *
- * 这正是 0.5.x「装了没变化」的解法 —— 装对版本后，第一屏当场把本版功能点列出来；
- * 装错（OTA 关着 / 运行时版本对不上），同一屏用红字点破，不让人去猜。
+ * 本文件内的数组降级为离线兜底：取不到远端（断网 / 端点还没部署 / 版本节还没写）
+ * 时 WhatsNew 用它显示最近一版，不白屏、不空屏。
  *
- * 新增版本时在数组顶部加一节即可，不需要改任何别的文件。
+ * 新增版本时正常发版（CHANGELOG 顶部加节）即可；只有想在离线兜底里也带上
+ * 说明时才需要往数组顶部加一节。
  */
+
+import { COOLIE_BASE_URL } from "./coolie";
 
 export interface ReleaseNote {
   /** 语义化版本，必须与 app.json 的 expo.version 一致 */
@@ -18,6 +22,44 @@ export interface ReleaseNote {
   title: string;
   /** 本版功能点，逐条列出 */
   features: string[];
+}
+
+/** /api/release-notes 的响应体（公开只读，见 server/src/routes/release-notes.ts） */
+interface RemoteReleaseNotes {
+  version: string;
+  title: string;
+  content: string;
+  bullets: string[];
+}
+
+/**
+ * 拉某版本的远端说明；任何失败（网络 / 非 200 / 结构不对）都返回 null，
+ * 调用方回退到本地兜底数组 —— WhatsNew 绝不因拉取失败而缺内容。
+ */
+export async function fetchReleaseNotes(version: string): Promise<ReleaseNote | null> {
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 6000);
+    const res = await fetch(
+      `${COOLIE_BASE_URL}/api/release-notes?version=${encodeURIComponent(version)}`,
+      { headers: { Accept: "application/json" }, signal: controller.signal },
+    );
+    clearTimeout(timer);
+    if (!res.ok) return null;
+    const data = (await res.json()) as RemoteReleaseNotes | null;
+    if (typeof data?.version !== "string" || !Array.isArray(data?.bullets)) return null;
+    const features = data.bullets.filter(
+      (bullet): bullet is string => typeof bullet === "string" && bullet.length > 0,
+    );
+    if (features.length === 0) return null;
+    return {
+      version: data.version,
+      title: typeof data.title === "string" && data.title ? data.title : `v${data.version} 更新`,
+      features,
+    };
+  } catch {
+    return null;
+  }
 }
 
 export const RELEASE_NOTES: ReleaseNote[] = [

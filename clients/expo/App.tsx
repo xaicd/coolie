@@ -71,7 +71,13 @@ import { useNotificationsStore } from "./src/stores/notifications";
 import { BoardChatScreen, exportBoardEcho, exportBoardPrompt } from "./src/screens/BoardChatScreen";
 import { AgentsScreen } from "./src/screens/AgentsScreen";
 import { useOTA } from "./src/OTA";
-import { checkAppVersion, downloadApk, localVersion, type RemoteVersionInfo } from "./src/AppVersion";
+import {
+  checkAppVersion,
+  downloadApk,
+  fetchVersionJson,
+  localVersion,
+  type RemoteVersionInfo,
+} from "./src/AppVersion";
 import {
   WhatsNewScreen,
   markWhatsNewSeen,
@@ -274,6 +280,9 @@ export default function App() {
   useEffect(() => {
     void restoreCredential().then(setCredential);
     const unsub = setupOTAListener();
+    // 启动即预热 version.json 缓存：登录前 WhatsNew / 登录后 HomeScreen 的升级
+    // 检查共用同一次网络请求（fetchVersionJson 进程内缓存, wave89）。
+    void fetchVersionJson();
     return () => {
       unsub();
     };

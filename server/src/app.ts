@@ -111,6 +111,7 @@ import { llmRoutes } from "./routes/llms.js";
 import { authRoutes } from "./routes/auth.js";
 import { assetRoutes } from "./routes/assets.js";
 import { accessRoutes } from "./routes/access.js";
+import { releaseNotesRoutes } from "./routes/release-notes.js";
 import { pluginRoutes } from "./routes/plugins.js";
 import {
   mcpGatewayProtocolRoutes,
@@ -1043,6 +1044,10 @@ export async function createApp(
     }),
   );
   app.use("/api", api);
+  // Public release notes for the App What's New screen (pre-login, same trust
+  // level as /version.json). Mounted after `api` but before the /api 404
+  // catch-all so it stays a stable standalone path regardless of api internals.
+  app.use("/api/release-notes", releaseNotesRoutes());
   app.use("/api", (_req, res) => {
     res.status(404).json({ error: "API route not found" });
   });

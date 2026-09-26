@@ -40,26 +40,48 @@ export interface VersionCheckResult {
   info: RemoteVersionInfo | null;
 }
 
-/** 检查远端新版本（静默失败返回无更新） */
-export async function checkAppVersion(
-  endpoint = "https://xrobinai.cn/version.json",
-): Promise<VersionCheckResult> {
+const DEFAULT_VERSION_ENDPOINT = "https://xrobinai.cn/version.json";
+
+/** 原始拉取 version.json；任何失败返回 null（调用方按「无更新」处理） */
+async function requestVersionJson(endpoint: string): Promise<RemoteVersionInfo | null> {
   try {
     const res = await fetch(endpoint, { headers: { Accept: "application/json" } });
-    if (!res.ok) return { updateAvailable: false, forceUpdate: false, info: null };
+    if (!res.ok) return null;
     const info = (await res.json()) as RemoteVersionInfo;
-    if (!info?.version || !info?.downloadUrl) {
-      return { updateAvailable: false, forceUpdate: false, info: null };
-    }
-    const newer = cmpVersion(info.version, localVersion()) > 0;
-    const force =
-      newer
-      && typeof info.minSupportedVersionCode === "number"
-      && localVersionCode() < info.minSupportedVersionCode;
-    return { updateAvailable: newer, forceUpdate: force, info };
+    if (!info?.version || !info?.downloadUrl) return null;
+    return info;
   } catch {
+    return null;
+  }
+}
+
+let cachedVersionJson: Promise<RemoteVersionInfo | null> | null = null;
+
+/**
+ * version.json 拉取（默认端点进程内缓存）。App 启动时预热一次，之后
+ * HomeScreen 的升级检查 / AppUpdateCard 直接复用，不再重复打网络。
+ */
+export function fetchVersionJson(): Promise<RemoteVersionInfo | null> {
+  cachedVersionJson ??= requestVersionJson(DEFAULT_VERSION_ENDPOINT);
+  return cachedVersionJson;
+}
+
+/** 检查远端新版本（静默失败返回无更新） */
+export async function checkAppVersion(
+  endpoint = DEFAULT_VERSION_ENDPOINT,
+): Promise<VersionCheckResult> {
+  const info = await (endpoint === DEFAULT_VERSION_ENDPOINT
+    ? fetchVersionJson()
+    : requestVersionJson(endpoint));
+  if (!info) {
     return { updateAvailable: false, forceUpdate: false, info: null };
   }
+  const newer = cmpVersion(info.version, localVersion()) > 0;
+  const force =
+    newer
+    && typeof info.minSupportedVersionCode === "number"
+    && localVersionCode() < info.minSupportedVersionCode;
+  return { updateAvailable: newer, forceUpdate: force, info };
 }
 
 /** 拉起系统下载（浏览器/APK 安装器接管） */

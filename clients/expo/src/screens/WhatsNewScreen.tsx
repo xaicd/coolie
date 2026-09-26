@@ -31,7 +31,7 @@ import Constants from "expo-constants";
 import * as Updates from "expo-updates";
 import { C } from "../coolie";
 import { RADIUS, SPACING } from "../ui/tokens";
-import { noteForVersion, type ReleaseNote } from "../releaseNotes";
+import { fetchReleaseNotes, noteForVersion, type ReleaseNote } from "../releaseNotes";
 import { checkOTAManifest, type OTAManifestCheck } from "../OTA";
 
 const SEEN_VERSION_KEY = "coolie.lastSeenVersion";
@@ -105,7 +105,10 @@ function CheckRow({
 
 export function WhatsNewScreen({ visible, onClose, onViewDemo }: WhatsNewScreenProps) {
   const version = currentAppVersion();
-  const note: ReleaseNote = noteForVersion(version);
+  // 本版说明优先取远端（server 从 CHANGELOG 抽节, wave89 修法 C），拉不到/拉失败
+  // 回退到随包的本地数组 —— 弹屏不等人，先显示兜底内容，远端回来再刷新。
+  const [remoteNote, setRemoteNote] = useState<ReleaseNote | null>(null);
+  const note: ReleaseNote = remoteNote ?? noteForVersion(version);
 
   const otaEnabled = Updates.isEnabled;
   const runtimeVersion = Updates.runtimeVersion ?? null;
@@ -121,6 +124,17 @@ export function WhatsNewScreen({ visible, onClose, onViewDemo }: WhatsNewScreenP
   const manifestOk = manifestCheck?.ok === true;
   // updateId 非空 = 当前跑的 JS bundle 由 OTA 下发（而非 APK 内嵌）。
   const usingOtaBundle = Updates.updateId !== null;
+
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    void fetchReleaseNotes(version).then((fetched) => {
+      if (!cancelled && fetched) setRemoteNote(fetched);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible, version]);
 
   useEffect(() => {
     if (!visible || !otaEnabled) return;

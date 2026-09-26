@@ -6,22 +6,39 @@
  * RN 端没有 react-native-web 构建，跑不了 web 回放，所以装机闭环的行为验证
  * 落在这里（replays/whats-new.ad）。
  *
- * 版本号与功能点写死在文件里（本波不引远程配置），改版时改 constants 即可。
+ * wave89 起优先读服务端 /api/release-notes（server 从 clients/expo/CHANGELOG.md
+ * 抽版本节），拉不到时回退到下面的本地常量 —— 所以回放/离线仍有稳定锚点，
  * 文案里的 "ChatHome" 是 e2e 回放的锚点，改动请同步 replays/whats-new.ad。
  */
 
-import type { CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 
-/** 与本次发版对应的版本号（展示用） */
+/** 与最近发版对应的版本号（远端不可用时的兜底展示） */
 export const H5_RELEASE_VERSION = "0.5.23";
 
-/** 本版功能点 */
+/** 本版功能点（兜底） */
 export const H5_RELEASE_FEATURES = [
   "工坊 (ChatHome) 收编对话：智能识别 build / plan / pipeline + Quick chip + 流式回复",
   "砍掉「工作空间」四 Tab 屏：对话 / 预览 / 文件 / 终端 是抄来的骨架，整屏删除",
   "5 角色智能体：需求 / 设计 / 编码 / 测试 / 发布",
   "装机自检：核对 APK 版本与 OTA 运行时版本",
 ] as const;
+
+/** /api/release-notes 响应（公开只读, 见 server/src/routes/release-notes.ts） */
+interface RemoteReleaseNotes {
+  version: string;
+  title: string;
+  bullets: string[];
+}
+
+/** 拉远端版本说明；失败返回 null，调用方用本地常量兜底。 */
+function fetchRemoteNotes(version: string): Promise<RemoteReleaseNotes | null> {
+  return fetch(`/api/release-notes?version=${encodeURIComponent(version)}`, {
+    headers: { Accept: "application/json" },
+  })
+    .then((res) => (res.ok ? (res.json() as Promise<RemoteReleaseNotes>) : null))
+    .catch(() => null);
+}
 
 export interface WhatsNewScreenProps {
   /** 「我知道了」：收起本页 */
@@ -31,15 +48,33 @@ export interface WhatsNewScreenProps {
 }
 
 export function WhatsNewScreen({ onClose, onViewDemo }: WhatsNewScreenProps) {
+  // 优先远端（server 从 CHANGELOG 抽节, wave89），拉不到先渲染本地兜底，
+  // 远端回来后 setState 刷新 —— 屏幕永远有内容，不白屏。
+  const [remote, setRemote] = useState<RemoteReleaseNotes | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    void fetchRemoteNotes(H5_RELEASE_VERSION).then((data) => {
+      if (!cancelled && data && Array.isArray(data.bullets) && data.bullets.length > 0) {
+        setRemote(data);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const version = remote?.version ?? H5_RELEASE_VERSION;
+  const features = remote?.bullets ?? H5_RELEASE_FEATURES;
+
   return (
     <div style={styles.wrap}>
       <div style={styles.card}>
-        <div style={styles.badge}>Coolie {H5_RELEASE_VERSION}</div>
-        <h1 style={styles.title}>What's New · {H5_RELEASE_VERSION}</h1>
-        <p style={styles.subtitle}>ChatHome 收编 + 砍掉工作空间 + 5 角色员工</p>
+        <div style={styles.badge}>Coolie {version}</div>
+        <h1 style={styles.title}>What's New · {version}</h1>
+        <p style={styles.subtitle}>{remote?.title || "ChatHome 收编 + 砍掉工作空间 + 5 角色员工"}</p>
 
         <ul style={styles.list}>
-          {H5_RELEASE_FEATURES.map((feature) => (
+          {features.map((feature) => (
             <li key={feature} style={styles.item}>
               <span style={styles.tick} aria-hidden>
                 ✓
