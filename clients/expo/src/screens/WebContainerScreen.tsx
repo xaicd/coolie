@@ -149,7 +149,21 @@ export function WebContainerScreen({
   };
 
   const handleOpenExternal = () => {
-    const urlToOpen = currentUrl || targetUrl || baseUrl;
+    let nextTarget = "/";
+    const rawTarget = currentUrl || baseUrl;
+    if (rawTarget) {
+      try {
+        const parsed = new URL(rawTarget);
+        nextTarget = parsed.pathname + parsed.search;
+      } catch {
+        nextTarget = rawTarget.startsWith("/") ? rawTarget : `/${rawTarget}`;
+      }
+    }
+
+    const urlToOpen = exchangeToken
+      ? `${COOLIE_WEB_URL.replace(/\/+$/, "")}/api/auth/exchange?token=${encodeURIComponent(exchangeToken)}&next=${encodeURIComponent(nextTarget)}`
+      : (currentUrl || targetUrl || baseUrl);
+
     Linking.openURL(urlToOpen).catch(() => {
       Alert.alert("无法打开外部浏览器", urlToOpen);
     });
