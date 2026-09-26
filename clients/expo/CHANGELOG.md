@@ -4,6 +4,17 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.65
+
+> Released: 2026-09-26 · Android release APK + OTA bundle
+
+### 更新
+
+- wave92 — server rebuild + restart 部署 a11f38871 /api/auth/session-token + bridge cookie 签名修复 (boss 27:31 OOB「0.5.64了 + 还是要再登录」)
+  - 真因: a11f38871 的 /api/auth/session-token 一直没部署到生产 (404), 且 Better Auth 1.7.x 通过 getSignedCookie 读 session cookie, 要求 cookie 值带 44 位 base64 HMAC 签名; 服务器返回/桥接回写的裸 session token 永远无法通过 web 端校验 → 点驾驶舱Web 还是登录页
+  - server: /api/auth/session-token 返回签名后的 cookie 值; /api/auth/exchange 对裸 token 签名后再写 Set-Cookie (9db148ebd)
+  - 真验: 签名 cookie → session-token 200; exchange 302 Set-Cookie 按 WebView 方式回放 → 200; 裸 token fallback 路径同样 200
+
 ## v0.5.64
 
 > Released: 2026-09-26 · Android release APK + OTA bundle

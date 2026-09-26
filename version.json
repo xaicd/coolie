@@ -1,7 +1,7 @@
 {
-  "version": "0.5.59",
-  "versionCode": 559,
-  "commitSha": "481e1e34e",
-  "apkUrl": "https://dls.xrobinai.cn/coolie/app/0.5.59/coolie-release.apk",
-  "notes": "wave85 打包今天 boss Claude 21 commit (boss 27:17 OOB 派)"
+  "version": "0.5.65",
+  "versionCode": 565,
+  "commitSha": "9db148ebd",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.65/coolie-release.apk",
+  "releaseNotes": "wave92 — server rebuild + restart 部署 session-token 路由 + bridge cookie 签名修复 (驾驶舱Web 自动登录)"
 }
