@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { GitBranch, Layers, Code2, TestTube2, Package, CheckCircle2, ChevronRight, ChevronDown, ArrowRightLeft, Search, Filter } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Button, Input } from "./primitives.js";
 
 interface ProjectCmmiRtmProps {
   projectId: string;

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Activity, AlertTriangle, CheckCircle2, TrendingUp, HelpCircle, ShieldAlert, Cpu, Users, Wrench, FileCode, Sliders } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "./primitives.js";
 
 interface ProjectCmmiSpcProps {
   projectId: string;

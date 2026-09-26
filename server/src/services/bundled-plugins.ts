@@ -117,6 +117,11 @@ export const BUNDLED_PLUGIN_CATALOG: readonly BundledPluginCatalogEntry[] = [
     relativePath: "_deprecated/plugin-chat",
   },
   {
+    key: "governance",
+    pluginKey: "paperclipai.plugin-governance",
+    relativePath: "plugin-governance",
+  },
+  {
     key: "workspace-diff",
     pluginKey: "paperclip.workspace-diff",
     relativePath: "plugin-workspace-diff",
@@ -131,6 +136,7 @@ export const BUNDLED_PLUGIN_CATALOG: readonly BundledPluginCatalogEntry[] = [
 export const SELF_HOSTED_AUTO_INSTALL_KEYS: readonly string[] = [
   "kubernetes",
   "ontology",
+  "governance",
   "chat",
   "workspace-diff",
 ];

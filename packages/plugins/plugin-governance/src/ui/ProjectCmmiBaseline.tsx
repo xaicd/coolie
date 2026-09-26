@@ -1,13 +1,13 @@
 import { useState } from "react";
 import { FileText, Download, CheckCircle2, Clock, Shield, ExternalLink, Archive, Eye } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
-} from "@/components/ui/dialog";
+} from "./primitives.js";
 
 interface ProjectCmmiBaselineProps {
   projectId: string;

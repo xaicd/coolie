@@ -17,7 +17,7 @@ import {
   ShieldAlert,
   Clock,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Button } from "./primitives.js";
 
 interface ProjectCmmiLivingTopologyProps {
   projectId: string;

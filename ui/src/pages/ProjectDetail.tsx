@@ -45,16 +45,9 @@ import {
   useResourceMembershipMutation,
   useResourceMemberships,
 } from "../hooks/useResourceMemberships";
-import { ProjectCmmiGovernance } from "../components/ProjectCmmiGovernance";
-import { ProjectCmmiBaseline } from "../components/ProjectCmmiBaseline";
-import { ProjectCmmiRtm } from "../components/ProjectCmmiRtm";
-import { ProjectCmmiSpc } from "../components/ProjectCmmiSpc";
-import { ProjectCmmiLivingTopology } from "../components/ProjectCmmiLivingTopology";
-import { ProjectApiLifecycleHarness } from "../components/ProjectApiLifecycleHarness";
-
 /* ── Top-level tab types ── */
 
-type ProjectBaseTab = "list" | "plugin-operations" | "workspaces" | "configuration" | "budget" | "governance" | "baseline" | "rtm" | "spc" | "living-topology" | "api-lifecycle";
+type ProjectBaseTab = "list" | "plugin-operations" | "workspaces" | "configuration" | "budget";
 type ProjectPluginTab = `plugin:${string}`;
 type ProjectTab = ProjectBaseTab | ProjectPluginTab;
 
@@ -70,12 +63,12 @@ function resolveProjectTab(pathname: string, projectId: string): ProjectTab | nu
   if (tab === "overview") return "configuration";
   if (tab === "configuration") return "configuration";
   if (tab === "budget") return "budget";
-  if (tab === "governance") return "governance";
-  if (tab === "baseline") return "baseline";
-  if (tab === "rtm") return "rtm";
-  if (tab === "spc") return "spc";
-  if (tab === "living-topology") return "living-topology";
-  if (tab === "api-lifecycle") return "api-lifecycle";
+  if (tab === "governance") return "plugin:paperclipai.plugin-governance:governance-tab";
+  if (tab === "baseline") return "plugin:paperclipai.plugin-governance:baseline-tab";
+  if (tab === "rtm") return "plugin:paperclipai.plugin-governance:rtm-tab";
+  if (tab === "spc") return "plugin:paperclipai.plugin-governance:spc-tab";
+  if (tab === "living-topology") return "plugin:paperclipai.plugin-governance:living-topology-tab";
+  if (tab === "api-lifecycle") return "plugin:paperclipai.plugin-governance:api-lifecycle-tab";
   if (tab === "issues") return "list";
   if (tab === "plugin-operations") return "plugin-operations";
   if (tab === "workspaces") return "workspaces";
@@ -673,22 +666,22 @@ export function ProjectDetail() {
       return <Navigate to={`/projects/${canonicalProjectRef}/plugin-operations`} replace />;
     }
     if (cachedTab === "governance") {
-      return <Navigate to={`/projects/${canonicalProjectRef}/governance`} replace />;
+      return <Navigate to={`/projects/${canonicalProjectRef}?tab=plugin:paperclipai.plugin-governance:governance-tab`} replace />;
     }
     if (cachedTab === "baseline") {
-      return <Navigate to={`/projects/${canonicalProjectRef}/baseline`} replace />;
+      return <Navigate to={`/projects/${canonicalProjectRef}?tab=plugin:paperclipai.plugin-governance:baseline-tab`} replace />;
     }
     if (cachedTab === "rtm") {
-      return <Navigate to={`/projects/${canonicalProjectRef}/rtm`} replace />;
+      return <Navigate to={`/projects/${canonicalProjectRef}?tab=plugin:paperclipai.plugin-governance:rtm-tab`} replace />;
     }
     if (cachedTab === "spc") {
-      return <Navigate to={`/projects/${canonicalProjectRef}/spc`} replace />;
+      return <Navigate to={`/projects/${canonicalProjectRef}?tab=plugin:paperclipai.plugin-governance:spc-tab`} replace />;
     }
     if (cachedTab === "living-topology") {
-      return <Navigate to={`/projects/${canonicalProjectRef}/living-topology`} replace />;
+      return <Navigate to={`/projects/${canonicalProjectRef}?tab=plugin:paperclipai.plugin-governance:living-topology-tab`} replace />;
     }
     if (cachedTab === "api-lifecycle") {
-      return <Navigate to={`/projects/${canonicalProjectRef}/api-lifecycle`} replace />;
+      return <Navigate to={`/projects/${canonicalProjectRef}?tab=plugin:paperclipai.plugin-governance:api-lifecycle-tab`} replace />;
     }
     if (cachedTab === "workspaces" && workspaceTabDecisionLoaded && showWorkspacesTab) {
       return <Navigate to={`/projects/${canonicalProjectRef}/workspaces`} replace />;
@@ -728,18 +721,6 @@ export function ProjectDetail() {
       navigate(`/projects/${canonicalProjectRef}/workspaces`);
     } else if (tab === "budget") {
       navigate(`/projects/${canonicalProjectRef}/budget`);
-    } else if (tab === "governance") {
-      navigate(`/projects/${canonicalProjectRef}/governance`);
-    } else if (tab === "baseline") {
-      navigate(`/projects/${canonicalProjectRef}/baseline`);
-    } else if (tab === "rtm") {
-      navigate(`/projects/${canonicalProjectRef}/rtm`);
-    } else if (tab === "spc") {
-      navigate(`/projects/${canonicalProjectRef}/spc`);
-    } else if (tab === "living-topology") {
-      navigate(`/projects/${canonicalProjectRef}/living-topology`);
-    } else if (tab === "api-lifecycle") {
-      navigate(`/projects/${canonicalProjectRef}/api-lifecycle`);
     } else if (tab === "plugin-operations") {
       navigate(`/projects/${canonicalProjectRef}/plugin-operations`);
     } else if (tab === "configuration") {
@@ -873,12 +854,6 @@ export function ProjectDetail() {
         <PageTabBar
           items={[
             { value: "list", label: "Tasks" },
-            { value: "governance", label: "质量门禁 (CMMI)" },
-            { value: "baseline", label: "5+2 黄金文档" },
-            { value: "rtm", label: "RTM 需求穿透" },
-            { value: "spc", label: "过程度量 (SPC 3σ)" },
-            { value: "living-topology", label: "三态活拓扑 (SkyWalking/Chaos)" },
-            { value: "api-lifecycle", label: "API 契约中心 (DSH/MCP)" },
             ...(project.managedByPlugin ? [{ value: "plugin-operations", label: "Plugin operations" }] : []),
             ...(showWorkspacesTab ? [{ value: "workspaces", label: "Workspaces" }] : []),
             { value: "configuration", label: "Configuration" },
@@ -893,30 +868,6 @@ export function ProjectDetail() {
           onValueChange={(value) => handleTabChange(value as ProjectTab)}
         />
       </Tabs>
-
-      {activeTab === "governance" && project && (
-        <ProjectCmmiGovernance projectId={project.id} projectName={project.name} />
-      )}
-
-      {activeTab === "baseline" && project && (
-        <ProjectCmmiBaseline projectId={project.id} projectName={project.name} />
-      )}
-
-      {activeTab === "rtm" && project && (
-        <ProjectCmmiRtm projectId={project.id} projectName={project.name} />
-      )}
-
-      {activeTab === "spc" && project && (
-        <ProjectCmmiSpc projectId={project.id} projectName={project.name} />
-      )}
-
-      {activeTab === "living-topology" && project && (
-        <ProjectCmmiLivingTopology projectId={project.id} projectName={project.name} />
-      )}
-
-      {activeTab === "api-lifecycle" && project && (
-        <ProjectApiLifecycleHarness projectId={project.id} projectName={project.name} />
-      )}
 
       {activeTab === "list" && project?.id && resolvedCompanyId && (
         <ProjectIssuesList projectId={project.id} companyId={resolvedCompanyId} />

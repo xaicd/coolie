@@ -385,42 +385,7 @@
       "reason": "Add CMMI quality governance, 5+2 golden documents baseline, RTM traceability tree, SPC control chart, Tri-State Living Topology, and API Lifecycle tabs to project detail view.",
       "maxTotalLines": 150
     },
-    {
-      "path": "ui/src/components/ProjectCmmiGovernance.tsx",
-      "maxNetLines": 260,
-      "reason": "CMMI 3-5 quality governance dashboard with G1-G5 gates and compliance checks. Fork feature with no upstream counterpart.",
-      "maxTotalLines": 300
-    },
-    {
-      "path": "ui/src/components/ProjectCmmiBaseline.tsx",
-      "maxNetLines": 380,
-      "reason": "CMMI 5+2 golden documents baseline manager with audit export package capability. Fork feature with no upstream counterpart.",
-      "maxTotalLines": 420
-    },
-    {
-      "path": "ui/src/components/ProjectCmmiRtm.tsx",
-      "maxNetLines": 320,
-      "reason": "Interactive CMMI RTM Requirements Traceability Matrix tree visualization. Fork feature with no upstream counterpart.",
-      "maxTotalLines": 360
-    },
-    {
-      "path": "ui/src/components/ProjectCmmiSpc.tsx",
-      "maxNetLines": 260,
-      "reason": "CMMI Level 5 Statistical Process Control (SPC 3-sigma) chart and 5-Why Ishikawa root cause diagram. Fork feature with no upstream counterpart.",
-      "maxTotalLines": 300
-    },
-    {
-      "path": "ui/src/components/ProjectCmmiLivingTopology.tsx",
-      "maxNetLines": 500,
-      "reason": "Living Tri-State Ontology topology viewer unifying CMMI Design (HLD), SkyWalking APM runtime traffic, and Chaosblade resilience fault injection. Fork feature with no upstream counterpart.",
-      "maxTotalLines": 550
-    },
-    {
-      "path": "ui/src/components/ProjectApiLifecycleHarness.tsx",
-      "maxNetLines": 700,
-      "reason": "DSH-powered Multi-Protocol API Lifecycle & MCP Tool Projection workbench (HTTP/gRPC/Dubbo/MQ). Fork feature with no upstream counterpart.",
-      "maxTotalLines": 750
-    },
+
     {
       "path": "ui/src/components/NewProjectDialog.tsx",
       "maxNetLines": 320,

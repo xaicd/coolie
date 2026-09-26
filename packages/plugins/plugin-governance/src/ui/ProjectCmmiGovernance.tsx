@@ -1,14 +1,14 @@
 import { useState } from "react";
 import { CheckCircle2, AlertTriangle, ShieldCheck, RefreshCw, Send, Sparkles } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
+} from "./primitives.js";
 
 interface ProjectCmmiGovernanceProps {
   projectId: string;

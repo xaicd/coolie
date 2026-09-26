@@ -6,7 +6,7 @@ import {
   projectApiToMcpTool,
   synthesizeMockResponse,
   generateCodeStub,
-} from "@paperclipai/ontology-core";
+} from "@paperclipai/ontology-core/api/lifecycle.js";
 
 interface ProjectApiLifecycleHarnessProps {
   projectId: string;

@@ -172,6 +172,7 @@ describe("resolveBundledPluginInstalls", () => {
     expect(resolveSelfHostedAutoInstallKeys({})).toEqual([
       "kubernetes",
       "ontology",
+      "governance",
       "workspace-diff",
     ]);
     expect(resolveSelfHostedAutoInstallKeys({ COOLIE_USE_PLUGIN_CHAT: "true" })).toContain("chat");
