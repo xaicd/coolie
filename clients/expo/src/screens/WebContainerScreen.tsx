@@ -10,6 +10,7 @@ import {
   StatusBar as RNStatusBar,
   StyleSheet,
   Text,
+  Vibration,
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
@@ -29,7 +30,32 @@ interface WebContainerScreenProps {
   initialUrl?: string;
   title?: string;
   onBack: () => void;
+  onNavigate?: (target: string, path?: string) => void;
+  onEmergencyStop?: () => void;
 }
+
+const JSBRIDGE_INJECTION = `
+(function() {
+  if (window.__COOLIE_JSBRIDGE_INSTALLED__) return;
+  window.__COOLIE_JSBRIDGE_INSTALLED__ = true;
+  window.CoolieMobileShell = {
+    postMessage: function(action, payload) {
+      if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+        window.ReactNativeWebView.postMessage(JSON.stringify({
+          protocol: "COOLIE_SHELL_V1",
+          action: action,
+          payload: payload || {}
+        }));
+      }
+    },
+    close: function() { this.postMessage("COOLIE_CLOSE"); },
+    haptic: function(style) { this.postMessage("COOLIE_HAPTIC", { style: style || "light" }); },
+    navigate: function(target, path) { this.postMessage("COOLIE_NAVIGATE", { target: target, path: path }); },
+    emergencyStop: function() { this.postMessage("COOLIE_EMERGENCY_STOP"); }
+  };
+})();
+true;
+`;
 
 import {
   I18N_PATCH_INJECTION,
@@ -51,6 +77,8 @@ export function WebContainerScreen({
   initialUrl,
   title = "Coolie Web",
   onBack,
+  onNavigate,
+  onEmergencyStop,
 }: WebContainerScreenProps) {
   const webViewRef = useRef<any>(null);
   const [canGoBack, setCanGoBack] = useState(false);
@@ -177,6 +205,43 @@ export function WebContainerScreen({
     }
   };
 
+  const handleMessage = useCallback(
+    (event: any) => {
+      try {
+        const rawData = event.nativeEvent?.data;
+        if (!rawData) return;
+        const msg = JSON.parse(rawData);
+        if (msg.protocol === "COOLIE_SHELL_V1") {
+          switch (msg.action) {
+            case "COOLIE_CLOSE":
+              onBack();
+              break;
+            case "COOLIE_HAPTIC":
+              Vibration.vibrate(50);
+              break;
+            case "COOLIE_NAVIGATE":
+              if (msg.payload?.target && onNavigate) {
+                onNavigate(String(msg.payload.target), msg.payload.path as string | undefined);
+              }
+              break;
+            case "COOLIE_EMERGENCY_STOP":
+              if (onEmergencyStop) {
+                onEmergencyStop();
+              } else {
+                Alert.alert("🚨 紧急熔断", "Web 页面触发了紧急安全制动指令。");
+              }
+              break;
+            default:
+              break;
+          }
+        }
+      } catch {
+        // Non-JSON or third-party message, ignore
+      }
+    },
+    [onBack, onNavigate, onEmergencyStop],
+  );
+
   return (
     <SafeAreaView
       style={[
@@ -283,8 +348,9 @@ export function WebContainerScreen({
             thirdPartyCookiesEnabled={true}
             mixedContentMode="compatibility"
             allowsBackForwardNavigationGestures={true}
-            injectedJavaScriptBeforeContentLoaded={ZH_CN_INJECTION + I18N_PATCH_INJECTION}
-            injectedJavaScript={ZH_CN_ENSURE + I18N_PATCH_INJECTION}
+            injectedJavaScriptBeforeContentLoaded={ZH_CN_INJECTION + I18N_PATCH_INJECTION + JSBRIDGE_INJECTION}
+            injectedJavaScript={ZH_CN_ENSURE + I18N_PATCH_INJECTION + JSBRIDGE_INJECTION}
+            onMessage={handleMessage}
             onNavigationStateChange={handleNavigationStateChange}
             onLoadStart={() => {
               setLoading(true);

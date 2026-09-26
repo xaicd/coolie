@@ -1063,6 +1063,9 @@ function HomeScreen({
               onOpenWebOntology={(subPath?: string, title?: string) =>
                 setWebContainerTarget({ path: subPath || "/ontology", title: title || "本体可视化设计器" })
               }
+              onOpenWebWorkbench={(subPath?: string, title?: string) =>
+                setWebContainerTarget({ path: subPath || "/dashboard", title: title || "控制台" })
+              }
               onOpenSandbox={(url, service, wp) =>
                 setSandboxContext({ url, service, workProduct: wp })
               }

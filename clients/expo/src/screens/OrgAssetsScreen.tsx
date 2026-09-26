@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { SafeAreaView, StyleSheet, Text, View } from "react-native";
+import { Pressable, SafeAreaView, StyleSheet, Text, View } from "react-native";
 import { StatusBar } from "expo-status-bar";
+import { Ionicons } from "@expo/vector-icons";
 import type { Company, Issue, IssueWorkProduct, Project, WorkspaceRuntimeService } from "@coolie/api-client";
 import { C } from "../theme";
+import { RADIUS } from "../ui/tokens";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { OntologyDomainListScreen } from "./OntologyDomainListScreen";
 import { ProjectsScreen } from "./ProjectsScreen";
@@ -21,6 +23,7 @@ interface OrgAssetsScreenProps {
   onCreateTaskForProject?: (project: Project) => void;
   onOpenWebProjects?: (path?: string, title?: string) => void;
   onOpenWebOntology?: (path?: string, title?: string) => void;
+  onOpenWebWorkbench?: (path?: string, title?: string) => void;
   onOpenSandbox?: (url: string, service?: WorkspaceRuntimeService | null, wp?: IssueWorkProduct | null) => void;
   onOpenDiff?: (issue: Issue, wp?: IssueWorkProduct | null) => void;
 }
@@ -35,8 +38,8 @@ const TAB_OPTIONS: Array<{ key: OrgAssetTab; label: string }> = [
 /**
  * 资产与组织中枢 (OrgAssetsScreen)。
  * 彻底解决「本体藏太深、员工进不去、项目无治理」的痛点：
- * 将公司四大数字资产（业务本体、微服务项目、数字员工、交付产物）汇聚于 Tab 5，
- * 一键秒级平滑切换，能力 100% 完整具备，零功能缩水。
+ * 将公司核心数字资产（业务本体、微服务项目、数字员工、交付产物、例行计划、成本核算）
+ * 全部汇聚于 Tab 5，一键秒级平滑切换，能力 100% 完整具备，零功能缩水。
  */
 export function OrgAssetsScreen({
   company,
@@ -48,6 +51,7 @@ export function OrgAssetsScreen({
   onCreateTaskForProject,
   onOpenWebProjects,
   onOpenWebOntology,
+  onOpenWebWorkbench,
   onOpenSandbox,
   onOpenDiff,
 }: OrgAssetsScreenProps) {
@@ -59,8 +63,32 @@ export function OrgAssetsScreen({
       {/* 顶部资产切换分段控制器 */}
       <View style={styles.header}>
         <View style={styles.headerTitleRow}>
-          <Text style={styles.headerTitle}>资产与组织</Text>
-          <Text style={styles.headerSubtitle}>{company.name}</Text>
+          <View>
+            <Text style={styles.headerTitle}>资产与组织</Text>
+            <Text style={styles.headerSubtitle}>{company.name}</Text>
+          </View>
+          {onOpenWebWorkbench ? (
+            <View style={styles.extraPillsRow}>
+              <Pressable
+                style={styles.extraPill}
+                onPress={() => onOpenWebWorkbench("/routines", "例行计划调度")}
+                hitSlop={6}
+                accessibilityLabel="例行计划调度"
+              >
+                <Ionicons name="time-outline" size={12} color="#06B6D4" />
+                <Text style={styles.extraPillText}>例行计划</Text>
+              </Pressable>
+              <Pressable
+                style={styles.extraPill}
+                onPress={() => onOpenWebWorkbench("/costs", "全景成本分析")}
+                hitSlop={6}
+                accessibilityLabel="全景成本分析"
+              >
+                <Ionicons name="cash-outline" size={12} color="#10B981" />
+                <Text style={styles.extraPillText}>成本核算</Text>
+              </Pressable>
+            </View>
+          ) : null}
         </View>
         <SegmentedControl
           options={TAB_OPTIONS}
@@ -127,7 +155,7 @@ const styles = StyleSheet.create({
   },
   headerTitleRow: {
     flexDirection: "row",
-    alignItems: "baseline",
+    alignItems: "center",
     justifyContent: "space-between",
     marginBottom: 8,
   },
@@ -139,6 +167,27 @@ const styles = StyleSheet.create({
   headerSubtitle: {
     fontSize: 12,
     color: C.ink3,
+  },
+  extraPillsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  extraPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: RADIUS.sm,
+  },
+  extraPillText: {
+    fontSize: 11,
+    color: C.ink2,
+    fontWeight: "500",
   },
   segmentedControl: {
     marginBottom: 2,

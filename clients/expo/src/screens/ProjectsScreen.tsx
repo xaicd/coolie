@@ -446,30 +446,84 @@ export function ProjectsScreen({
                       </View>
 
                       <View style={styles.cmmiDetailGrid}>
-                        <View style={styles.cmmiGridItem}>
+                        <Pressable
+                          style={styles.cmmiGridItem}
+                          onPress={() =>
+                            onOpenWebProjects?.(
+                              `/projects/${project.id}/rtm`,
+                              `${project.name} · G1 需求与 RTM`,
+                            )
+                          }
+                          hitSlop={4}
+                        >
                           <Text style={styles.cmmiGridLabel}>G1 需求 (DS)</Text>
                           <Text style={[styles.cmmiGridVal, { color: C.ok }]}>100% EARS/RTM</Text>
-                        </View>
-                        <View style={styles.cmmiGridItem}>
+                        </Pressable>
+                        <Pressable
+                          style={styles.cmmiGridItem}
+                          onPress={() =>
+                            onOpenWebProjects?.(
+                              `/projects/${project.id}/baseline`,
+                              `${project.name} · G2 方案与 5+2 文档`,
+                            )
+                          }
+                          hitSlop={4}
+                        >
                           <Text style={styles.cmmiGridLabel}>G2 方案 (FDA)</Text>
                           <Text style={[styles.cmmiGridVal, { color: C.ok }]}>DAR-001 会签</Text>
-                        </View>
-                        <View style={styles.cmmiGridItem}>
+                        </Pressable>
+                        <Pressable
+                          style={styles.cmmiGridItem}
+                          onPress={() =>
+                            onOpenWebProjects?.(
+                              `/projects/${project.id}/api-lifecycle`,
+                              `${project.name} · G3 API 契约`,
+                            )
+                          }
+                          hitSlop={4}
+                        >
                           <Text style={styles.cmmiGridLabel}>G3 契约 (SWE)</Text>
                           <Text style={[styles.cmmiGridVal, { color: C.ok }]}>0 编译报错</Text>
-                        </View>
-                        <View style={styles.cmmiGridItem}>
+                        </Pressable>
+                        <Pressable
+                          style={styles.cmmiGridItem}
+                          onPress={() =>
+                            onOpenWebProjects?.(
+                              `/projects/${project.id}/spc`,
+                              `${project.name} · G4 验收与 SPC`,
+                            )
+                          }
+                          hitSlop={4}
+                        >
                           <Text style={styles.cmmiGridLabel}>G4 验收 (FDSE)</Text>
                           <Text style={[styles.cmmiGridVal, { color: C.warn }]}>用例执行中</Text>
-                        </View>
-                        <View style={styles.cmmiGridItem}>
+                        </Pressable>
+                        <Pressable
+                          style={styles.cmmiGridItem}
+                          onPress={() =>
+                            onOpenWebProjects?.(
+                              `/projects/${project.id}/living-topology`,
+                              `${project.name} · G5 投产活拓扑`,
+                            )
+                          }
+                          hitSlop={4}
+                        >
                           <Text style={styles.cmmiGridLabel}>G5 投产 (SRE)</Text>
                           <Text style={[styles.cmmiGridVal, { color: C.ink3 }]}>待会签</Text>
-                        </View>
-                        <View style={styles.cmmiGridItem}>
+                        </Pressable>
+                        <Pressable
+                          style={styles.cmmiGridItem}
+                          onPress={() =>
+                            onOpenWebProjects?.(
+                              `/projects/${project.id}/spc`,
+                              `${project.name} · SPC 3σ 控制`,
+                            )
+                          }
+                          hitSlop={4}
+                        >
                           <Text style={styles.cmmiGridLabel}>SPC 稳定性</Text>
                           <Text style={[styles.cmmiGridVal, { color: C.ok }]}>3σ 受控 (42s)</Text>
-                        </View>
+                        </Pressable>
                       </View>
                     </View>
 
