@@ -67,6 +67,8 @@ export function VoiceInputButton({
       if (!started) return;
 
       const { base64, format } = await stop();
+      // stop() 失败/看门狗强制切断时返回空 base64, 不要把空音频送去转写
+      if (!base64) return;
       if (Date.now() - press.startedAt < MIN_VOICE_HOLD_MS) {
         setStatus("🎤 按太短了, 请长按说话");
         return;

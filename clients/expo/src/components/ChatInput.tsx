@@ -236,8 +236,15 @@ export function ChatInput({
           <Pressable
             onPressIn={onMicPressIn}
             onPressOut={onMicPressOut}
+            onPress={() => {
+              // 防御: 录音态下轻点一下强制停止
+              if (recording) {
+                onMicPressOut();
+              }
+            }}
+            onResponderTerminate={onMicPressOut}
             disabled={!canEdit || voiceBusy}
-            hitSlop={6}
+            hitSlop={12}
             style={({ pressed }) => [
               styles.iconBtn,
               pressed && styles.iconBtnPressed,

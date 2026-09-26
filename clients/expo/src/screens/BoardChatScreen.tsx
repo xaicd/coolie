@@ -395,7 +395,7 @@ export function BoardChatScreen({
 
   // 会话内语音: 长按 mic 录音 -> 松开自动转文字填入输入框 -> 用户确认后再发送。
   // 只复用 wave14 的 useRecorder + voiceDispatch 链路 (mode=transcribe-only), 不建任务。
-  const { recording, start: startRecording, stop: stopRecording } = useRecorder();
+  const { recording, start: startRecording, stop: stopRecording, forceStop } = useRecorder();
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
   /** 一次长按期间的录音启动承诺 + 按下时刻 (用于算长按时长、规避 onPressOut 早于 start 的竞态) */
@@ -529,6 +529,13 @@ export function BoardChatScreen({
    * 避免「松手时 recording 还是 false -> 录音机继续空转」。
    */
   const handleMicPressIn = useCallback(() => {
+    // 保护: 如果已经在录音中，再次按下代表用户希望强制停止卡死的录音
+    if (recording) {
+      void forceStop();
+      setVoiceBusy(false);
+      setVoiceStatus(null);
+      return;
+    }
     if (voiceBusy || sending) return;
     voicePressRef.current.startedAt = Date.now();
     voicePressRef.current.promise = (async () => {
@@ -541,11 +548,19 @@ export function BoardChatScreen({
         return false;
       }
     })();
-  }, [voiceBusy, sending, startRecording]);
+  }, [recording, forceStop, voiceBusy, sending, startRecording]);
 
   const handleMicPressOut = useCallback(async () => {
     const press = voicePressRef.current;
-    if (!press.promise) return;
+    if (!press.promise) {
+      // 容错: 如果当前还在录音但 promise 丢了，强制切断
+      if (recording) {
+        await forceStop();
+        setVoiceBusy(false);
+        setVoiceStatus(null);
+      }
+      return;
+    }
     voicePressRef.current.promise = null;
 
     setVoiceBusy(true);
@@ -555,6 +570,9 @@ export function BoardChatScreen({
       if (!started) return;
 
       const { base64, format } = await stopRecording();
+      if (!base64) {
+        return;
+      }
       if (Date.now() - press.startedAt < MIN_VOICE_HOLD_MS) {
         pushSystemEcho("🎤 按太短了, 请长按说话");
         return;
@@ -584,7 +602,7 @@ export function BoardChatScreen({
       setVoiceBusy(false);
       setVoiceStatus(null);
     }
-  }, [company.id, stopRecording, pushSystemEcho]);
+  }, [recording, forceStop, company.id, stopRecording, pushSystemEcho]);
 
   useEffect(() => {
     if (!historyReady) return;

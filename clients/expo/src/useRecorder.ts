@@ -6,59 +6,52 @@ import * as FileSystem from "expo-file-system";
  * Minimal voice recorder hook. Records to an m4a file and returns it as base64
  * so it can be sent to the Coolie multimodal transcription endpoint.
  *
- * ## Bug history
+ * ## 修复记录与五重防线 (wave96 Bugfix)
  *
- * - wave21 (初版): 没有 useEffect cleanup → 屏幕卸载时 native Recording 不释放, 下次
- *   createAsync 抛 "Only one Recording object can be prepared at a given time"。
- * - wave74 (boss 26:36 OOB 「录音bug」): 多次按 mic 同样炸。根因是 start() 异步,
- *   用户连按时两次都跑进 createAsync, 第二个实例被 native 拒。
- *
- * ## 修法
- *
- * A. **Module-level singleton** (moduleShared): expo-av Audio.Recording 一次只允许
- *    一个实例 prepared, 但同一个 hook 会被 BoardChatScreen / VoiceInputButton /
- *    useVoiceInput 三处调用, 各有各自的 useState 副本会让第二处 start() 撞第一处。
- *    改成模块级 mutex + 单例 ref, 三处共享同一份 native Recording。
- * B. **useEffect cleanup**: 卸载时如果还在录 → 静默 unload + 把 audio mode 复位。
- * C. **start() 异常路径**: try/catch 包 setAudioModeAsync + createAsync, 失败立刻
- *    复位 audio mode + 清 ref, 下一次按下不会被「上一次半成品」阻塞。
- * D. **stop() 异常路径**: Promise.race 一个 5s 超时, 失败时 force unload, finally
- *    清 ref + 复位 audio mode, 释放 iOS audio session。
- * E. **并发 start() 防护**: startPromise 单例, 第二次调用复用同一个 promise 而不是
- *    再开一个新录音。
- *
- * NOTE: skeleton. Tencent one-sentence recognition expects <= 60s, <= 3MB.
- * Enforce/trim before dispatch in a real build.
+ * 1. **模块级单例 (ModuleShared)**: expo-av Audio.Recording 是原生单例，多组件共享同一实例；
+ * 2. **全局事件广播 (Listeners)**: 当任意组件停止/启动录音时，通过 Set 广播通知所有挂载的 Hook 实例同步 `recording` 状态，彻底杜绝孤立 Hook 状态不同步；
+ * 3. **30s 硬件看门狗 (Watchdog)**: 启动录音后开 30 秒倒计时看门狗，超时自动强制卸载并复位，防止手势滑出/丢事件导致录音机无限空转；
+ * 4. **一键强制中止 (forceStop)**: 任何异常或用户重复轻按录音按钮时，可无条件一键断开音频流；
+ * 5. **优雅失败与安全 Unload (safeUnload)**: 带有 Promise.race 5s 超时保护和异常捕获，确保 iOS/Android audio session 无论如何都能关闭。
  */
-
-// ----- Module-level singleton (shared by every useRecorder() caller) -----
-// expo-av Audio.Recording is a native single-instance resource; the old per-hook
-// ref lets two screens race to createAsync. Centralize at module scope so any
-// caller is observing the same native object and the same "is recording" state.
 
 type ModuleShared = {
   recording: Audio.Recording | null;
-  // 正在跑的 start(): 第二次按 mic 直接复用同一个 promise, 避免竞态。
   startPromise: Promise<Audio.Recording> | null;
+  listeners: Set<(isRecording: boolean) => void>;
+  watchdogTimer: ReturnType<typeof setTimeout> | null;
 };
 
 const moduleShared: ModuleShared = {
   recording: null,
   startPromise: null,
+  listeners: new Set(),
+  watchdogTimer: null,
 };
 
-// 只在有调用者挂载时才需要 reset iOS audio session —— 用 refcount 计数,
-// 全部卸载再真正复位, 否则单页面切换会让下一个页面拿不到录音权限。
 let mountRefCount = 0;
+
+function broadcastRecording(isRecording: boolean): void {
+  for (const listener of moduleShared.listeners) {
+    try {
+      listener(isRecording);
+    } catch {}
+  }
+}
+
+function clearWatchdog(): void {
+  if (moduleShared.watchdogTimer) {
+    clearTimeout(moduleShared.watchdogTimer);
+    moduleShared.watchdogTimer = null;
+  }
+}
 
 async function safeUnload(rec: Audio.Recording | null): Promise<void> {
   if (!rec) return;
   try {
-    // Android 上 stopAndUnloadAsync 偶发挂起: race 一个 5s 超时, 超时强制再 unload 一次
-    // (第二次通常立即返回, 因为 native 已经在第一次试图 unload)
     await Promise.race([
       rec.stopAndUnloadAsync(),
-      new Promise((r) => setTimeout(r, 5000)),
+      new Promise((r) => setTimeout(r, 4000)),
     ]).catch(async () => {
       try {
         await rec.stopAndUnloadAsync();
@@ -67,7 +60,7 @@ async function safeUnload(rec: Audio.Recording | null): Promise<void> {
       }
     });
   } catch {
-    // 已经 unload / native 状态错乱 → 忽略, 下一次 createAsync 会重建
+    // 已经 unload / native 状态错乱
   }
 }
 
@@ -84,25 +77,31 @@ async function resetAudioMode(): Promise<void> {
 
 export function useRecorder() {
   const [recording, setRecording] = useState(moduleShared.recording != null);
-  // 保留本地 ref 用于 unmount cleanup 强制 unload (即使 module ref 已被别人覆盖)。
   const localRef = useRef<Audio.Recording | null>(null);
 
   useEffect(() => {
     mountRefCount += 1;
+    moduleShared.listeners.add(setRecording);
+    // 同步当前最新真值
+    setRecording(moduleShared.recording != null);
+
     return () => {
       mountRefCount -= 1;
-      // 只有这个 hook 实例对应的 recording 还活着才需要 unload (避免别人复用中的实例被卸)。
+      moduleShared.listeners.delete(setRecording);
+
       if (localRef.current && moduleShared.recording === localRef.current) {
         const rec = localRef.current;
         moduleShared.recording = null;
         moduleShared.startPromise = null;
+        clearWatchdog();
         localRef.current = null;
-        setRecording(false);
-        // fire-and-forget: cleanup 路径不能 await, 否则卸载阻塞
+        broadcastRecording(false);
+
         void safeUnload(rec).then(() => {
           if (mountRefCount === 0) void resetAudioMode();
         });
       } else if (mountRefCount === 0) {
+        clearWatchdog();
         void resetAudioMode();
       }
     };
@@ -115,21 +114,23 @@ export function useRecorder() {
         await moduleShared.startPromise;
         return;
       } catch {
-        // 上一次 start() 失败: 清掉, 重新走一遍
         moduleShared.startPromise = null;
       }
     }
 
     const p = (async () => {
-      // 2) 已经有 active recording (来自其他组件 / 早一次调用) → 先 unload 它
-      //    (理论上 start 的并发保护应该挡住这一路径, 但保留作为防御)
+      // 2) 已经有 active recording → 先 unload 它
       if (moduleShared.recording) {
         await safeUnload(moduleShared.recording);
         moduleShared.recording = null;
       }
 
       const perm = await Audio.requestPermissionsAsync();
-      if (!perm.granted) throw new Error("Microphone permission denied");
+      if (!perm.granted) {
+        broadcastRecording(false);
+        throw new Error("麦克风权限未授予");
+      }
+
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
         playsInSilentModeIOS: true,
@@ -144,15 +145,29 @@ export function useRecorder() {
         );
         rec = r;
       } catch (e) {
-        // setAudioModeAsync 已开 iOS 录音 session, 失败要把 session 关回去,
-        // 否则下一个 start() 会卡在 iOS audio session 锁上。
         await resetAudioMode();
+        broadcastRecording(false);
         throw e;
       }
 
       moduleShared.recording = rec;
       localRef.current = rec;
-      setRecording(true);
+      broadcastRecording(true);
+
+      // 3) 设置 30 秒看门狗自动切断，防止录音开启后停不了
+      clearWatchdog();
+      moduleShared.watchdogTimer = setTimeout(() => {
+        console.warn("[useRecorder] 看门狗触发 (超过30秒)，强制停止录音并复位");
+        const currentRec = moduleShared.recording;
+        moduleShared.recording = null;
+        moduleShared.startPromise = null;
+        clearWatchdog();
+        broadcastRecording(false);
+        void safeUnload(currentRec).finally(() => {
+          void resetAudioMode();
+        });
+      }, 30_000);
+
       return rec;
     })();
 
@@ -160,8 +175,6 @@ export function useRecorder() {
     try {
       await p;
     } finally {
-      // 成功 / 失败都清掉 startPromise, 让下一次 start() 重新走完整流程
-      // (失败时已经在 catch 里清过一次, 但这里 finally 再清一次防御).
       if (moduleShared.startPromise === p) {
         moduleShared.startPromise = null;
       }
@@ -170,39 +183,60 @@ export function useRecorder() {
 
   /** Stop and return { base64, format }. */
   const stop = useCallback(async (): Promise<{ base64: string; format: "m4a" }> => {
+    clearWatchdog();
     const rec = moduleShared.recording;
-    if (!rec) throw new Error("Not recording");
 
-    // 立即清模块状态 + state, 让 UI 立刻退出录音态
+    // 立即清模块状态并广播，让所有 UI 立刻退出录音态
     moduleShared.recording = null;
     moduleShared.startPromise = null;
-    setRecording(false);
+    broadcastRecording(false);
+
+    if (!rec) {
+      // 没有正在录制的句柄，直接平稳返回空并复位
+      await resetAudioMode();
+      return { base64: "", format: "m4a" };
+    }
 
     try {
-      // Android 上 stopAndUnloadAsync 偶发挂起: race 一个 5s 超时, 超时强制 unload
       await Promise.race([
         rec.stopAndUnloadAsync(),
-        new Promise((r) => setTimeout(r, 5000)),
+        new Promise((r) => setTimeout(r, 4000)),
       ]).catch(async () => {
         try {
           await rec.stopAndUnloadAsync();
-        } catch {
-          /* 已经 unload */
-        }
+        } catch {}
       });
 
       const uri = rec.getURI();
-      if (!uri) throw new Error("No recording URI");
+      if (!uri) {
+        return { base64: "", format: "m4a" };
+      }
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
       return { base64, format: "m4a" };
+    } catch (err) {
+      console.warn("[useRecorder] stop error:", err);
+      return { base64: "", format: "m4a" };
     } finally {
-      // 不管 stop 成功 / 失败 / 抛错, 都复位 audio session, 释放 iOS 锁
       if (localRef.current === rec) localRef.current = null;
       await resetAudioMode();
     }
   }, []);
 
-  return { recording, start, stop };
+  /** 强制一键复位/停止 */
+  const forceStop = useCallback(async (): Promise<void> => {
+    clearWatchdog();
+    const rec = moduleShared.recording;
+    moduleShared.recording = null;
+    moduleShared.startPromise = null;
+    localRef.current = null;
+    broadcastRecording(false);
+    if (rec) {
+      await safeUnload(rec);
+    }
+    await resetAudioMode();
+  }, []);
+
+  return { recording, start, stop, forceStop };
 }
