@@ -3,11 +3,10 @@ import { Ionicons } from "@expo/vector-icons";
 import { C } from "../theme";
 
 /** 底部 tab bar 的四个落点 + 中央新建 FAB。 */
-export type BarTabKey = "dashboard" | "tasks" | "agents" | "inbox";
+export type BarTabKey = "dashboard" | "tasks" | "chat" | "assets" | "agents" | "inbox" | "ontology" | "artifacts";
 
 /**
- * 底栏高度。铺满底部的浮层 (新建任务 composeOverlay) 必须让出这一段,
- * 否则会把汇览/任务/+/员工/收件箱 5 个入口整个盖住 (boss 22:59 OOB)。
+ * 底栏高度。铺满底部的浮层必须让出这一段。
  */
 export const TAB_BAR_HEIGHT = 60;
 
@@ -24,8 +23,8 @@ const LEFT: Slot[] = [
 ];
 
 const RIGHT: Slot[] = [
-  { key: "agents", label: "员工", icon: "people-outline", activeIcon: "people" },
-  { key: "inbox", label: "收件箱", icon: "mail-unread-outline", activeIcon: "mail-unread" },
+  { key: "chat", label: "工坊", icon: "chatbubble-ellipses-outline", activeIcon: "chatbubble-ellipses" },
+  { key: "assets", label: "资产", icon: "grid-outline", activeIcon: "grid" },
 ];
 
 function Tab({
@@ -89,14 +88,19 @@ export function TabBar({
         </Pressable>
       </View>
 
-      {RIGHT.map((slot) => (
-        <Tab
-          key={slot.key}
-          slot={slot}
-          active={tab === slot.key}
-          onPress={() => onChange(slot.key)}
-        />
-      ))}
+      {RIGHT.map((slot) => {
+        const isActive =
+          tab === slot.key ||
+          (slot.key === "assets" && (tab === "agents" || tab === "ontology" || tab === "artifacts"));
+        return (
+          <Tab
+            key={slot.key}
+            slot={slot}
+            active={isActive}
+            onPress={() => onChange(slot.key)}
+          />
+        );
+      })}
     </View>
   );
 }

@@ -256,79 +256,80 @@ export function DashboardScreen({
           />
         </Pressable>
 
-        {/* ── 核心入口: Web 全功能控制台 (免密直达) ── */}
-        {onOpenWebWorkbench ? (
-          <AppCard style={styles.webHeroCard}>
-            <View style={styles.webHeroTop}>
-              <View style={styles.webHeroTitleRow}>
-                <View style={styles.webHeroIconWrap}>
-                  <Ionicons name="globe" size={18} color="#FFFFFF" />
-                </View>
-                <View>
-                  <Text style={styles.webHeroTitle}>Web 全功能控制台</Text>
-                  <Text style={styles.webHeroSubtitle}>全景大屏 · 活态拓扑 · 5+2 黄金文档</Text>
-                </View>
+        {/* ── 核心态势: 业务本体数字孪生与组织资产 ── */}
+        <AppCard style={styles.webHeroCard}>
+          <View style={styles.webHeroTop}>
+            <View style={styles.webHeroTitleRow}>
+              <View style={[styles.webHeroIconWrap, { backgroundColor: "#8B5CF6" }]}>
+                <Ionicons name="shapes" size={18} color="#FFFFFF" />
               </View>
-              <View style={styles.sessionPill}>
-                <StatusDot status="ok" size={6} />
-                <Text style={styles.sessionPillText}>免密直通</Text>
+              <View>
+                <Text style={styles.webHeroTitle}>业务本体态势</Text>
+                <Text style={styles.webHeroSubtitle}>数字孪生架构 · 实体网络 · 规则守卫中</Text>
               </View>
             </View>
+            <View style={styles.sessionPill}>
+              <StatusDot status="ok" size={6} />
+              <Text style={styles.sessionPillText}>状态正常 🟢</Text>
+            </View>
+          </View>
 
-            <Text style={styles.webHeroDesc}>
-              已建立 Web 会话安全交换桥。一键免密拉起完整桌面工作台，无缝使用多源项目创建、CMMI 阶段门禁、微服务调用链路与混沌演练。
-            </Text>
+          <Text style={styles.webHeroDesc}>
+            业务领域模型与数据物理隔离规则实时守卫中，无跨企业实体越权穿透。点击即可直达本体域列表、实体拓扑图与快照审计。
+          </Text>
 
-            <View style={styles.webHeroActionRow}>
+          <View style={styles.webHeroActionRow}>
+            {onOpenOntology ? (
               <Pressable
-                style={({ pressed }) => [styles.webHeroMainBtn, pressed && styles.webHeroMainBtnPressed]}
-                onPress={() => onOpenWebWorkbench("/dashboard", "Web 全功能工作台")}
-                accessibilityLabel="进入 Web 全功能工作台"
+                style={({ pressed }) => [styles.webHeroMainBtn, pressed && styles.webHeroMainBtnPressed, { backgroundColor: "#8B5CF6" }]}
+                onPress={onOpenOntology}
+                accessibilityLabel="查看业务本体"
               >
-                <Text style={styles.webHeroMainBtnText}>🚀 进入 Web 全功能工作台</Text>
+                <Text style={styles.webHeroMainBtnText}>🧠 查看业务本体与实体网络</Text>
               </Pressable>
-            </View>
+            ) : null}
+          </View>
 
-            {/* 快捷直达链接胶囊 */}
-            <View style={styles.webHeroQuickLinks}>
-              <Pressable
-                style={styles.webQuickChip}
-                onPress={() => onOpenWebWorkbench("/projects", "项目中心 · 多源代码库")}
-              >
+          {/* 企业核心资产直达胶囊 */}
+          <View style={styles.webHeroQuickLinks}>
+            {onOpenProjects ? (
+              <Pressable style={styles.webQuickChip} onPress={onOpenProjects}>
                 <Ionicons name="folder-outline" size={12} color={C.accent} />
-                <Text style={styles.webQuickChipText}>多源项目</Text>
+                <Text style={styles.webQuickChipText}>项目中心</Text>
               </Pressable>
-              <Pressable
-                style={styles.webQuickChip}
-                onPress={() => onOpenWebWorkbench("/projects", "CMMI 5+2 黄金文档")}
-              >
-                <Ionicons name="shield-checkmark-outline" size={12} color={C.ok} />
-                <Text style={styles.webQuickChipText}>5+2 黄金文档</Text>
+            ) : null}
+            {onOpenWorkshop ? (
+              <Pressable style={styles.webQuickChip} onPress={onOpenWorkshop}>
+                <Ionicons name="chatbubbles-outline" size={12} color={C.ok} />
+                <Text style={styles.webQuickChipText}>智能工坊</Text>
               </Pressable>
-              <Pressable
-                style={styles.webQuickChip}
-                onPress={() => onOpenWebWorkbench("/projects", "活态微服务拓扑与混沌演练")}
-              >
-                <Ionicons name="git-network-outline" size={12} color="#06B6D4" />
-                <Text style={styles.webQuickChipText}>微服务活拓扑</Text>
-              </Pressable>
-              <Pressable
-                style={styles.webQuickChip}
-                onPress={() => onOpenWebWorkbench("/ontology", "本体可视化设计器")}
-              >
-                <Ionicons name="shapes-outline" size={12} color="#8B5CF6" />
-                <Text style={styles.webQuickChipText}>本体设计器</Text>
-              </Pressable>
-              <Pressable
-                style={styles.webQuickChip}
-                onPress={() => onOpenWebWorkbench("/pipelines", "流水线中心")}
-              >
+            ) : null}
+            {onOpenPipelines ? (
+              <Pressable style={styles.webQuickChip} onPress={onOpenPipelines}>
                 <Ionicons name="git-merge-outline" size={12} color="#F59E0B" />
                 <Text style={styles.webQuickChipText}>流水线中心</Text>
               </Pressable>
-            </View>
-          </AppCard>
-        ) : null}
+            ) : null}
+            {onOpenWebWorkbench ? (
+              <>
+                <Pressable
+                  style={styles.webQuickChip}
+                  onPress={() => onOpenWebWorkbench("/routines", "例行计划调度")}
+                >
+                  <Ionicons name="time-outline" size={12} color="#06B6D4" />
+                  <Text style={styles.webQuickChipText}>例行计划</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.webQuickChip}
+                  onPress={() => onOpenWebWorkbench("/costs", "全景成本分析")}
+                >
+                  <Ionicons name="cash-outline" size={12} color="#10B981" />
+                  <Text style={styles.webQuickChipText}>成本分析</Text>
+                </Pressable>
+              </>
+            ) : null}
+          </View>
+        </AppCard>
 
         {/* ── CMMI 5+2 黄金文档与 API 架构治理态势卡 ── */}
         <AppCard style={styles.wideCard}>
@@ -463,14 +464,6 @@ export function DashboardScreen({
                 label="项目"
                 color="#F59E0B"
                 onPress={onOpenProjects}
-              />
-            ) : null}
-            {onOpenWebWorkbench ? (
-              <QuickAction
-                icon="globe"
-                label="Web全功能"
-                color={C.accent}
-                onPress={() => onOpenWebWorkbench("/dashboard", "Web 全功能工作台")}
               />
             ) : null}
           </ScrollView>

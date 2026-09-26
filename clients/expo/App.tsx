@@ -52,6 +52,7 @@ import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
 import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen";
 import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
+import { OrgAssetsScreen } from "./src/screens/OrgAssetsScreen";
 import { PrototypeSandboxScreen } from "./src/screens/PrototypeSandboxScreen";
 import { InboxScreen } from "./src/screens/InboxScreen";
 import { NotificationsScreen } from "./src/screens/NotificationsScreen";
@@ -135,7 +136,7 @@ import { setupOTAListener } from "./src/OTA";
  * - 状态点呼吸灯
  */
 
-type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "inbox" | "artifacts" | "ontology";
+type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "inbox" | "artifacts" | "ontology" | "assets";
 
 /**
  * 底部栏只有 5 项 (汇览 / 任务 / [+] / 员工 / 收件箱, 见 src/components/TabBar.tsx)。
@@ -915,9 +916,6 @@ function HomeScreen({
             unreadCount={unreadCount}
             onOpenNotifications={() => setNotificationsOpen(true)}
             onOpenSearch={() => setSearchOpen(true)}
-            onOpenWebWorkbench={(path, title) =>
-              setWebContainerTarget({ path: path || "/dashboard", title: title || "Web 全功能工作台" })
-            }
           />
         )}
         <View style={styles.shellContent}>
@@ -989,7 +987,7 @@ function HomeScreen({
               company={company}
               onBack={() => setProjectsOpen(false)}
               onOpenWebProjects={(subPath?: string, title?: string) =>
-                setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心 (Web 全量)" })
+                setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" })
               }
               onOpenProjectTasks={(_project) => {
                 setProjectsOpen(false);
@@ -1007,7 +1005,7 @@ function HomeScreen({
               onOpenOntology={() => navigateTab("ontology")}
               onOpenPipelines={() => setPipelinesOpen(true)}
               onOpenWebWorkbench={(path, title) =>
-                setWebContainerTarget({ path: path || "/dashboard", title: title || "Web 全功能工作台" })
+                setWebContainerTarget({ path: path || "/dashboard", title: title || "控制台" })
               }
               onOpenApprovals={() => {
                 setSelected(null);
@@ -1019,15 +1017,6 @@ function HomeScreen({
               onOpenApproval={(approvalId) => {
                 navigateTab("tasks");
                 setFocusedApprovalId(approvalId);
-              }}
-            />
-          ) : tab === "agents" ? (
-            <AgentsScreen
-              company={company}
-              onOpenSettings={() => setSettingsOpen(true)}
-              onOpenIssue={(issue) => {
-                navigateTab("tasks");
-                setSelected(issue);
               }}
             />
           ) : tab === "chat" ? (
@@ -1052,6 +1041,35 @@ function HomeScreen({
                 setSelected(issue);
               }}
             />
+          ) : tab === "assets" || tab === "agents" || tab === "ontology" || tab === "artifacts" ? (
+            <OrgAssetsScreen
+              company={company}
+              whoami={whoami}
+              initialTab={tab === "agents" ? "agents" : tab === "artifacts" ? "artifacts" : "ontology"}
+              onOpenSettings={() => setSettingsOpen(true)}
+              onOpenIssue={(issue) => {
+                navigateTab("tasks");
+                setSelected(issue);
+              }}
+              onOpenProjectTasks={(_project) => {
+                navigateTab("tasks");
+              }}
+              onCreateTaskForProject={(_project) => {
+                setComposeOpen(true);
+              }}
+              onOpenWebProjects={(subPath?: string, title?: string) =>
+                setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" })
+              }
+              onOpenWebOntology={(subPath?: string, title?: string) =>
+                setWebContainerTarget({ path: subPath || "/ontology", title: title || "本体可视化设计器" })
+              }
+              onOpenSandbox={(url, service, wp) =>
+                setSandboxContext({ url, service, workProduct: wp })
+              }
+              onOpenDiff={(issueItem, wp) =>
+                setDiffContext({ issue: issueItem, workProduct: wp })
+              }
+            />
           ) : tab === "inbox" ? (
             selected ? (
               taskDetail
@@ -1064,26 +1082,6 @@ function HomeScreen({
                 onOpenWorkshop={() => navigateTab("chat")}
               />
             )
-          ) : tab === "ontology" ? (
-            <OntologyDomainListScreen
-              company={company}
-              whoami={whoami}
-              onOpenSettings={() => setSettingsOpen(true)}
-              onOpenWebOntology={() =>
-                setWebContainerTarget({ path: "/ontology", title: "本体可视化设计器" })
-              }
-            />
-          ) : tab === "artifacts" ? (
-            <ArtifactsScreen
-              company={company}
-              whoami={whoami}
-              onOpenSandbox={(url, service, wp) =>
-                setSandboxContext({ url, service, workProduct: wp })
-              }
-              onOpenDiff={(issueItem, wp) =>
-                setDiffContext({ issue: issueItem, workProduct: wp })
-              }
-            />
           ) : tab === "tasks" ? (
             selected ? (
               taskDetail

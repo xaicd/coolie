@@ -169,17 +169,6 @@ export function TasksScreen({
           {onOpenWebWorkbench ? (
             <Pressable
               style={({ pressed }) => [styles.orchBtn, pressed && styles.orchBtnPressed]}
-              onPress={() => onOpenWebWorkbench("/dashboard", "Web 全功能工作台")}
-              accessibilityRole="button"
-              accessibilityLabel="Web 全功能工作台"
-            >
-              <Text style={styles.orchEmoji}>🌐</Text>
-              <Text style={styles.orchLabel}>Web全功能</Text>
-            </Pressable>
-          ) : null}
-          {onOpenWebWorkbench ? (
-            <Pressable
-              style={({ pressed }) => [styles.orchBtn, pressed && styles.orchBtnPressed]}
               onPress={() => onOpenWebWorkbench("/projects", "CMMI 质量工程与门禁")}
               accessibilityRole="button"
               accessibilityLabel="CMMI 门禁"

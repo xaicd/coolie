@@ -15,8 +15,6 @@ import * as DocumentPicker from "expo-document-picker";
 import type { Issue } from "@coolie/api-client";
 import { C, type AgentRow } from "../coolie";
 import { ELEVATION, RADIUS, SPACING } from "../ui/tokens";
-import { openCoolieWeb } from "../utils/openCoolieWeb";
-import { CoolieWebFallback } from "../components/CoolieWebFallback";
 import { CreateTaskModal } from "../components/CreateTaskModal";
 import { ModeSwitch } from "../components/doubao/ModeSwitch";
 import { QuickActionsRow, type QuickAction } from "../components/doubao/QuickActionsRow";
@@ -66,8 +64,6 @@ export function NewTaskPage({
   const [editing, setEditing] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
   const [attachments, setAttachments] = useState<StagedAttachment[]>([]);
-  /** 本机没装 Coolie Web 时, ↗ 改走内置 webview 兜底 (wave40 方案 B)。 */
-  const [webFallbackOpen, setWebFallbackOpen] = useState(false);
   const titleRef = useRef<TextInput>(null);
 
   const handleTranscript = useCallback((text: string) => {
@@ -123,7 +119,7 @@ export function NewTaskPage({
 
   return (
     <>
-      {/* 标题栏: 面包屑 + ↗ (Coolie Web 打开) + ✕ (丢弃草稿) */}
+      {/* 标题栏: 面包屑 + ✕ (丢弃草稿) */}
       <View style={styles.header}>
         <View style={styles.breadcrumb}>
           <Text style={styles.breadcrumbMuted}>XROA</Text>
@@ -131,19 +127,6 @@ export function NewTaskPage({
           <Text style={styles.breadcrumbCurrent}>新会话</Text>
         </View>
         <View style={styles.headerActions}>
-          <Pressable
-            onPress={() =>
-              void openCoolieWeb().then((opened) => {
-                if (!opened) setWebFallbackOpen(true);
-              })
-            }
-            hitSlop={8}
-            accessibilityRole="button"
-            accessibilityLabel="在 Coolie Web 打开"
-            style={({ pressed }) => [styles.headerBtn, pressed && styles.headerBtnPressed]}
-          >
-            <Ionicons name="expand-outline" size={17} color={C.ink3} />
-          </Pressable>
           <Pressable
             onPress={discard}
             hitSlop={8}
@@ -233,12 +216,6 @@ export function NewTaskPage({
           }}
         />
       ) : null}
-
-      {/* 没装 Coolie Web 时的兜底: ↗ 不再弹「未安装」, 直接整屏 webview */}
-      <CoolieWebFallback
-        visible={webFallbackOpen}
-        onClose={() => setWebFallbackOpen(false)}
-      />
     </>
   );
 }

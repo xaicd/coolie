@@ -163,17 +163,6 @@ export function ProjectsScreen({
                 <Text style={styles.newProjectHeaderBtnText}>新建</Text>
               </Pressable>
             ) : null}
-            {onOpenWebProjects ? (
-              <Pressable
-                style={styles.webBtn}
-                onPress={() => onOpenWebProjects()}
-                hitSlop={8}
-                accessibilityLabel="打开 Web 全量项目视图"
-              >
-                <Ionicons name="open-outline" size={13} color={C.accent} />
-                <Text style={styles.webBtnText}>Web全量</Text>
-              </Pressable>
-            ) : null}
             <Pressable
               style={styles.refreshBtn}
               onPress={() => void load(true)}
@@ -537,13 +526,29 @@ export function ProjectsScreen({
 
                     {/* 操作动作按钮组 */}
                     <View style={styles.actionButtonsRow}>
+                      {onOpenWebProjects ? (
+                        <Pressable
+                          style={styles.actionBtnSecondary}
+                          onPress={() =>
+                            onOpenWebProjects(
+                              `/projects/${project.id}`,
+                              `${project.name} · 控制台`,
+                            )
+                          }
+                          accessibilityLabel="打开项目全量控制台"
+                        >
+                          <Ionicons name="desktop-outline" size={14} color={C.accent} />
+                          <Text style={styles.actionBtnTextSecondary}>项目控制台</Text>
+                        </Pressable>
+                      ) : null}
+
                       {onOpenProjectTasks ? (
                         <Pressable
                           style={styles.actionBtnPrimary}
                           onPress={() => onOpenProjectTasks(project)}
                         >
                           <Ionicons name="list" size={14} color="#FFF" />
-                          <Text style={styles.actionBtnTextPrimary}>查看关联任务</Text>
+                          <Text style={styles.actionBtnTextPrimary}>查看任务</Text>
                         </Pressable>
                       ) : null}
 
@@ -553,7 +558,7 @@ export function ProjectsScreen({
                           onPress={() => onCreateTaskForProject(project)}
                         >
                           <Ionicons name="add" size={14} color={C.accent} />
-                          <Text style={styles.actionBtnTextSecondary}>创建新任务</Text>
+                          <Text style={styles.actionBtnTextSecondary}>创建任务</Text>
                         </Pressable>
                       ) : null}
                     </View>
@@ -595,22 +600,6 @@ const styles = StyleSheet.create({
     padding: 6,
     borderRadius: RADIUS.sm,
     backgroundColor: "rgba(255, 255, 255, 0.05)",
-  },
-  webBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    backgroundColor: "rgba(94, 106, 210, 0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(94, 106, 210, 0.3)",
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: RADIUS.sm,
-  },
-  webBtnText: {
-    fontSize: 11,
-    color: C.accent,
-    fontWeight: "500",
   },
   filterBar: {
     backgroundColor: C.panel,
