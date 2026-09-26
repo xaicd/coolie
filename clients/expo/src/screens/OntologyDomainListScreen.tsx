@@ -36,7 +36,6 @@ import { StatTile } from "../ui/StatTile";
 import { StatusBadge } from "../ui/StatusBadge";
 
 interface OntologyDomainListScreenProps {
-  onOpenSettings?: () => void;
   company: Company;
   whoami?: string;
   onBack?: () => void;
@@ -91,7 +90,6 @@ export function OntologyDomainListScreen({
   company,
   whoami = "管理员",
   onBack,
-  onOpenSettings,
   onOpenWebOntology,
 }: OntologyDomainListScreenProps) {
   const [domains, setDomains] = useState<OntologyDomain[]>([]);
@@ -926,11 +924,6 @@ export function OntologyDomainListScreen({
                 >
                   <Ionicons name="open-outline" size={13} color={C.accent} />
                   <Text style={{ color: C.accent, fontSize: 12, fontWeight: "500" }}>Web图谱</Text>
-                </Pressable>
-              ) : null}
-              {onOpenSettings ? (
-                <Pressable onPress={onOpenSettings} hitSlop={12} style={styles.refreshBtn}>
-                  <Ionicons name="settings-outline" size={17} color={C.ink3} />
                 </Pressable>
               ) : null}
               <Pressable

@@ -321,11 +321,9 @@ function AgentDetailSheet({
 
 export function AgentsScreen({
   company,
-  onOpenSettings,
   onOpenIssue,
 }: {
   company: { id: string; name: string };
-  onOpenSettings?: () => void;
   onOpenIssue?: (issue: Issue) => void;
 }) {
   const [agents, setAgents] = useState<AgentRow[]>([]);
@@ -401,11 +399,6 @@ export function AgentsScreen({
             ]}
           />
         </View>
-        {onOpenSettings ? (
-          <Pressable onPress={onOpenSettings} hitSlop={12}>
-            <Ionicons name="settings-outline" size={20} color={C.ink3} />
-          </Pressable>
-        ) : null}
       </View>
 
       {loading ? (

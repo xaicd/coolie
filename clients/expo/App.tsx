@@ -1025,7 +1025,6 @@ function HomeScreen({
               company={company}
               whoami={whoami}
               initialTab={tab === "agents" ? "agents" : tab === "artifacts" ? "artifacts" : "ontology"}
-              onOpenSettings={() => setSettingsOpen(true)}
               onOpenIssue={(issue) => {
                 navigateTab("tasks");
                 setSelected(issue);

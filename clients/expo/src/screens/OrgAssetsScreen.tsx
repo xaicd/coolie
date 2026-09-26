@@ -17,7 +17,6 @@ interface OrgAssetsScreenProps {
   company: Company;
   whoami?: string;
   initialTab?: OrgAssetTab;
-  onOpenSettings: () => void;
   onOpenIssue: (issue: Issue) => void;
   onOpenProjectTasks?: (project: Project) => void;
   onCreateTaskForProject?: (project: Project) => void;
@@ -45,7 +44,6 @@ export function OrgAssetsScreen({
   company,
   whoami,
   initialTab = "ontology",
-  onOpenSettings,
   onOpenIssue,
   onOpenProjectTasks,
   onCreateTaskForProject,
@@ -104,7 +102,6 @@ export function OrgAssetsScreen({
           <OntologyDomainListScreen
             company={company}
             whoami={whoami}
-            onOpenSettings={onOpenSettings}
             onOpenWebOntology={() => onOpenWebOntology?.("/ontology", "本体可视化设计器")}
           />
         )}
@@ -122,7 +119,6 @@ export function OrgAssetsScreen({
         {activeTab === "agents" && (
           <AgentsScreen
             company={company}
-            onOpenSettings={onOpenSettings}
             onOpenIssue={onOpenIssue}
           />
         )}

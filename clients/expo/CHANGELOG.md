@@ -4,6 +4,17 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.69
+
+> Released: 2026-09-26 · Android release APK + OTA bundle
+
+### 更新
+
+- wave97 删资产 Tab 设置齿轮 (boss 23:28 OOB「派97」): wave96 漏删的 ⚙️ 齿轮 (75929afe0 重构加回) 从资产 Tab 两个子页 (业务本体域列表头 + 数字员工列表头) 彻底移除
+- 保留 4 子分类 chip (业务本体/项目中心/数字员工/交付产物) + 业务本体 Web图谱按钮 + 新建 + 注入示例域; 收件箱齿轮保留为设置 (登出/OTA/Git 凭证) 唯一入口
+
+---
+
 ## v0.5.68
 
 > Released: 2026-09-26 · Android release APK + OTA bundle
