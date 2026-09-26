@@ -109,4 +109,20 @@ grep -E 'updates\.(ENABLED|EXPO_UPDATE_URL|EXPO_RUNTIME_VERSION)' "$M" | sed 's/
   printf '✗ AndroidManifest EXPO_RUNTIME_VERSION=%s ≠ app.json 意图 %s\n' "$ACTUAL" "$VERSION" >&2
   exit 1
 }
+
+# 5) strings.xml 的 expo_runtime_version 资源也要同步 (wave89): expo-updates 运行时
+#    读的是 AndroidManifest meta-data, 但 runtime-version.mjs 的「APK 真值」读的是
+#    资源表 (aapt2 dump resources)。两处不同步时（资源停在 prebuild 时代的旧值），
+#    发版脚本断言通过、APK 实际也对，publish-ota 却按旧资源值发 manifest —— 0.5.63
+#    就这样发成了 runtimeVersion 0.5.62, 新装机「下了不装」。
+RES="$REPO_ROOT/clients/expo/android/app/src/main/res/values/strings.xml"
+if [ -f "$RES" ]; then
+  sed -i '' "s|<string name=\"expo_runtime_version\">[^<]*</string>|<string name=\"expo_runtime_version\">$VERSION</string>|" "$RES"
+  RES_ACTUAL="$(grep -o 'expo_runtime_version">[^<]*' "$RES" | head -1 | cut -d'>' -f2)"
+  [ "$RES_ACTUAL" = "$VERSION" ] || {
+    printf '✗ strings.xml expo_runtime_version=%s ≠ app.json 意图 %s\n' "${RES_ACTUAL:-<缺失>}" "$VERSION" >&2
+    exit 1
+  }
+  echo "strings.xml expo_runtime_version ok ($VERSION)"
+fi
 echo "manifest OTA config ok (runtimeVersion=$VERSION)"
