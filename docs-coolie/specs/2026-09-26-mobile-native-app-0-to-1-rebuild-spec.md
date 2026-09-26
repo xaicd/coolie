@@ -1,208 +1,238 @@
 # Coolie 移动端原生应用 (Mobile Cockpit) 0-1 全量重构规格说明书
-# (Mobile Native App 0-to-1 Ground-Up Rebuild Specification)
+# (Mobile Native App 0-to-1 Ground-Up Rebuild Specification: Cockpit + Universal Web Engine)
 
 - **文档编号**: SPEC-COOLIE-MOBILE-001
-- **版本**: v1.0.0
+- **版本**: v2.0.0 (深度融合版)
 - **创建日期**: 2026-09-26
 - **主审架构师**: Principal Product Manager & Chief Architect (DS, FDA & Core SWE)
 - **目标工程**: `clients/expo` (React Native / Expo · 包名 `cloud.coolie.app`)
-- **关联工程**: `server/` (REST API & Auth), `packages/shared/`, `ui/` (Web 全功能参考实现)
+- **关联工程**: `server/` (REST API & Auth), `packages/shared/`, `ui/` (Web 全功能控制台), `packages/plugins/plugin-governance/`
 
 ---
 
-## 1. 业务背景与愿景 (Vision & Background)
+## 1. 顶级产品经理战略立论 (Executive Product Thesis)
 
-### 1.1 业务诉求
-当前 Coolie 控制面已在 Web 端建立了完整的 AI-Agent 组织治理能力（CMMI G1~G5 门禁、5+2 黄金文档、RTM 需求穿透、SPC 3σ 过程控制、SkyWalking 三态活拓扑、API 生命周期与插件生态）。然而现有的移动端原生应用存在以下根本性断层：
-1. **体验断层与二次登录痛点**：移动端原生与 Web 全功能（内嵌 WebView / WebContainer）登录态割裂，用户在原生端登录后点进 Web 页面仍需重复输入账号密码。
-2. **入口冗余与死入口**：审批操作分散在 5 处不同页面；员工详情页只能靠搜索撞到（列表无法点击）；新建任务存在多个重复表单与弹窗外壳。
-3. **新功能完全不可见**：Web 端新增的企业级治理、API 契约中心、三态动态拓扑在原生端缺乏系统性映射与原生轻量载体。
-4. **角色定位不清晰**：未能充分针对“老板随时掌握大盘与审批”、“业务专家真机走查原型”、“工程师随身查验 Diff 与流水线”提供极速原生交互。
+### 1.1 痛点本质：彻底破除“原生复刻陷阱”
+过去移动端迭代陷入了经典的**“原生复刻陷阱 (The Native Rewriting Trap)”**：
+1. **功能永远滞后与严重缩水**：
+   Web 全功能端作为主战场，演进极其迅速（近期新增了企业级 CMMI 质量门禁、5+2 黄金文档、RTM 需求穿透、SPC 3σ 过程控制、SkyWalking 三态活拓扑、DSH 多协议 API 契约中心、定时例程 Routines、精细化 Token 成本大盘）。
+   而移动端试图用 React Native 纯手工重写每一个页面，导致移动端开发永远落后于 Web 端，用户在手机上**“新增的功能完全看不到”**。
+2. **两套体系割裂，登录反复输入账号密码**：
+   原生端搞了一套登录，内嵌 Web 容器与外部独立 Web App 又各搞一套，导致用户在 App 内一旦点击“Web 全功能”，立即跳出未登录页面要求重复输入账号密码，体验极度割裂。
+3. **原生优势未充分发挥，劣势被放大**：
+   在手机上纯手写长表单和复杂配置，既吃力又不讨好；而手机最不可替代的硬件特性——**随时随地长按语音派工、系统级锁屏推送、触感震动反馈、相机直接拍摄报错屏幕、毫秒级一键紧急熔断**，反而没有做到极致。
 
-### 1.2 愿景与 0-1 重构目标
-彻底推倒冗余历史包袱，从 0 到 1 重新定义并构建 **Coolie 移动端原生控制舱 (Mobile Cockpit)**：
-- **老板 3 秒掌控**：经营大盘、资金燃尽、一键手势审批、按住说话秒级语音派工、紧急一键熔断。
-- **全端一次登录，零二次认证**：原生端通过原生 Cookie Jar 注入与 Token 漫游，打通 Webview / WebContainer，彻底消灭二次登录。
-- **极致移动原生**：5 栏精简底栏、单手操作手势、触感震动反馈、单列 Git Diff 语法高亮查看器、原生真机沙箱热载。
+### 1.2 全新架构范式：原生高管指挥舱 + 泛在全功能 Web 引擎
+借鉴 **Slack、Linear、Shopify Mobile、微信/飞书** 的成熟跨端架构，重新定义 App 的能力模型：
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    Coolie 移动端超级控制舱 (Mobile Super-App)               │
+├─────────────────────────────────────────────────────────────────────────────┤
+│                                                                             │
+│  【第一层：原生高管控制舱 (Native Cockpit Layer)】                          │
+│  • 语音秒级派工 (Hold-to-Talk) ➔ 腾讯云 ASR + 大模型语义提取                │
+│  • 触感滑动快速审批 (Haptic Quick Approvals) ➔ 预算/发布一键批准            │
+│  • 硬件级紧急熔断器 (Emergency Kill Switch) ➔ 毫秒级停机下电                │
+│  • 多模态原生采集 (Native Camera/Haptics) ➔ 拍照涂鸦直接推工坊              │
+│                                                                             │
+│  【第二层：泛在 Web 全功能引擎 (Universal Web Engine)】                     │
+│  • 100% 具备 Web 端全部功能：项目详情、治理插件 (CMMI/拓扑/API)、Routines   │
+│  • Web 端新增任何功能、插件或大屏，移动端零开发秒级同步可见                 │
+│  • 原生外壳 (Native Shell) 提供原生导航头、平滑进度条、手势返回与沉浸视口  │
+│                                                                             │
+│  【第三层：零感知会话互通底座 (Zero-Reauth Session Bridge)】                │
+│  • 原生统一使用 Web 登录流 (/auth) ➔ Cookie Jar 与 LocalStorage 全端漫游    │
+│  • 绝对杜绝二次输入密码，App 内进入任何 Web 功能页面 100% 免密秒开          │
+│                                                                             │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
-## 2. 系统服务对象角色与场景矩阵 (Target Roles & Scenarios)
+## 2. 系统服务对象角色与双模体验设计 (Personas & Dual-Mode Experience)
 
-| 服务角色 | 角色定位 | 移动端核心痛点 | 原生杀手级功能 |
+| 服务角色 | 核心关注点 | 移动端交互模式 | 承载载体 |
 | :--- | :--- | :--- | :--- |
-| **老板 / 创始人 (Boss / Executive)** | 最终决策者、出资人、一票否决权持有人 | 差旅中无法看清 Token/资金消耗；审批慢阻断研发；打字建单太繁琐 | • 资金燃尽与健康度大盘<br>• 一键滑动批量审批<br>• 豆包/腾讯云语音按住派活<br>• 紧急防爆熔断器 (Kill Switch) |
-| **业务方案 / DS (Deployment Strategist)** | 用户体验主审、需求全链路穿透验收人 | 手机上看不了 Agent 交付的原型效果，无法在真机上验证白屏与死按钮 | • 真机原生运行沙箱 (Native Sandbox)<br>• 交付物中心 (Artifacts Stream)<br>• 工坊拍照/截图标注反馈 |
-| **研发 / FDSE / SWE / SRE** | 代码质量第一责任人、交付闭环者 | 移动端无法看代码 Diff，构建失败无法排查步骤日志 | • 移动单列高亮 Git Diff 查看器<br>• 流水线分步骤实时日志展开<br>• API 契约与质量门禁速览抽屉 |
-| **AI 员工 (Agent Workforce)** | 被管理者、自主执行者 | 缺乏透明呈现，用户不知道 Agent 在干什么 | • 数字员工档案与动态心电图<br>• 实时心跳监控与思考链 (CoT) 折叠展开 |
+| **老板 / 创始人 (Boss / Executive)** | 钱花在哪了、谁卡住了、随时语音下达、紧急防爆 | **驾驶舱模式 (Cockpit Mode)**<br>• 今日/本月资金燃尽卡<br>• 单手滑动批准卡<br>• 长按语音即刻建单<br>• 紧急熔断制动按键 | 原生原生组件 (RN Pure Native)，0.3s 极速冷启，触觉与动画拉满 |
+| **业务方案 / DS (Deployment Strategist)** | 质量门禁是否达标、界面好不好用、原型走查 | **全功能工作台 (Workbench Mode)**<br>• CMMI G1~G5 会签评审<br>• 5+2 黄金文档与 RTM 穿透<br>• 原生真机沙箱运行前端页面 | 泛在 Web 引擎 (内嵌无缝 WebView，共享 Session，即时具备 Web 全功能) |
+| **研发 / FDSE / SWE / SRE** | 代码变更 Diff、流水线日志、微服务拓扑与契约 | **工程与拓扑模式**<br>• 移动优化单列 Git Diff 高亮<br>• 三态活拓扑 (SkyWalking) 巡检<br>• API 契约中心与 Mock 调试 | 原生 Diff 查看器 + Web 全功能插件容器混合驱动 |
+| **AI 员工 (Agent Workforce)** | 存活心跳、运行负载、工具库 | **数字员工档案**<br>• 员工实时心电图与心跳延迟<br>• 思考链 (CoT) 智能折叠展开 | 原生工坊 SSE 流 + 员工卡片下潜 |
 
 ---
 
-## 3. 需求说明书 (EARS 形式化语法规格)
+## 3. 全局信息架构：5 栏底盘 + 全功能工作台透传
 
-### 3.1 认证与会话漫游 (Authentication & Session Sync)
-- **UBIQUITOUS-01**: 系统应当支持账号密码 (`POST /api/auth/sign-in/email`) 与 Agent API Key 两种原生登录机制，并持久化到设备安全存储 (`SecureStore`)。
-- **EVENT-01**: WHEN 用户在原生端登录成功后打开任何内嵌 Web 页面（包括 WebContainer、项目深度配置或 H5 视图），系统应当在 WebView 初始化阶段自动注入 `better-auth.session_token` Cookie 与 LocalStorage 凭证，**禁止**展示任何登录界面。
-- **UNWANTED-01**: IF 原生 Session Token 过期或被服务端吊销，THEN 系统应当优雅拦截 401 响应，弹出原生轻量重新鉴权弹窗，并在成功后自动重试刚才的请求，不得导致应用白屏闪退。
-
-### 3.2 汇览驾驶舱 (Cockpit & Dashboard)
-- **UBIQUITOUS-02**: 驾驶舱应当在一屏内呈现：资金/Token 本月燃尽图、六维态势指标（完成率、交付均时、吞吐量、故障率）、实时在线 Agent 心跳动态。
-- **EVENT-02**: WHEN 存在待处理的人工阻断审批（如预算超额、高危代码合入、生产投产会签），系统应当在驾驶舱最显眼区域展示**滑动批准卡片 (Quick Approval)**，支持右滑通过、左滑驳回。
-- **EVENT-03**: WHEN 用户点击右上角“紧急熔断 (Kill Switch)”并完成生物识别/二次确认后，系统应当立即向服务端广播下电指令，毫秒级终止本公司所有正在运行的 Agent 进程并停止计费。
-
-### 3.3 中央调度与语音派工 (Dispatch Hub & Voice-to-Task)
-- **STATE-01**: WHILE 用户在底栏中央大按钮上长按 (Hold-to-Talk)，系统应当调用设备原生麦克风录制音频，并提供波形触感震动反馈。
-- **EVENT-04**: WHEN 用户松开录音手势，系统应当将音频发送至 ASR 语音识别与大模型解析网关，自动提取任务标题、描述、优先级（`critical|high|medium|low`）并推荐指派 Agent。
-- **OPTIONAL-01**: WHERE 用户希望手动精细建单，点击中央按钮唤醒单底抽屉式智能建单面板，支持关联项目、父任务及 EARS 验收标准输入。
-
-### 3.4 协同工坊与执行流 (Board Chat & Execution Stream)
-- **EVENT-05**: WHEN 用户进入工坊与 Agent 沟通，系统应当通过 SSE 流式接收消息，并以打字机动效平滑上屏。
-- **UBIQUITOUS-03**: 系统应当将 Agent 内部推理链路 (`<thinking>` / CoT) 默认折叠展示，并提供“展开思考过程”开关。
-- **EVENT-06**: WHEN Agent 在会话中提交中间交付物（如 HTML 页面、架构图、代码补丁），系统应当在气泡内渲染交互式卡片，点击可直接拉起原生真机沙箱或 Diff 查看器。
-- **EVENT-07**: WHEN 用户在工坊点击“发送截图/拍照”，系统应当支持直接调起相机或手机相册，并附带涂鸦画笔标注后上报。
-
-### 3.5 任务看板与代码 Diff (Tasks & Code Diff)
-- **UBIQUITOUS-04**: 任务页面应当提供“列表”与“看板 (Kanban)”双重视图，支持按项目、负责人、优先级、状态进行多维度即时过滤。
-- **EVENT-08**: WHEN 用户点击任意任务详情中的“代码变更 (Git Diff)”，系统应当在单列优化视图中渲染变更文件树与增删行（绿色添加/红色删除），支持行内高亮与代码折叠。
-- **EVENT-09**: WHEN 用户点击任务“执行全景日志”，系统应当结构化分段呈现 Agent 的执行心跳与工具调用明细。
-
-### 3.6 组织、资产与原生沙箱 (Workforce, Assets & Sandbox)
-- **EVENT-10**: WHEN 用户在员工名册中点击任意 Agent 行，系统应当打开该 Agent 的原生专属详情页，展示其当前任务、模型底座、Token 消耗及技能工具箱，并提供“指派任务”入口（杜绝死入口）。
-- **UBIQUITOUS-05**: 系统应当提供集中的“交付物中心 (Artifacts)”，分类归集 HTML 原型、Markdown 文档、架构图及部署包。
-- **EVENT-11**: WHEN 用户点击预览 HTML/React 原型交付物时，系统应当以独立原生沙箱容器（`PrototypeSandbox`）加载，提供真实手机视口模拟与浮动调试菜单（刷新、错误日志、视口旋转）。
-
-### 3.7 统一收件箱 (Unified Inbox)
-- **UBIQUITOUS-06**: 顶栏铃铛入口应当统一汇聚通知与待办，并严格划分为三个分段：
-  1. `待我审批` (Pending Approvals)
-  2. `求助受阻` (Blocked Issues)
-  3. `系统与@动态` (Activities & Mentions)
-  彻底移除通知中心与收件箱两套重叠数据流的现状。
+```
++-----------------------------------------------------------------------------------+
+|  [🏢 XROA 智研科技 v]       [🟢 12 Agents 运行中]        [🔍 搜全部]    [🔔 收件箱 (3)] |
++-----------------------------------------------------------------------------------+
+|                                                                                   |
+|  Tab 1: 汇览驾驶舱 (Cockpit) [原生极速]                                           |
+|  • 资金与 Token 实时燃尽大盘 (今日花销、本月预测、超额预警)                         |
+|  • 阻断卡点快审浮条 (右滑同意 / 左滑驳回，带触感震动)                              |
+|  • 紧急熔断制动器 (Emergency Kill Switch - 防死循环刷爆额度)                        |
+|  • 效能指标速报 (交付周期、完成率、吞吐量、故障率)                                  |
+|                                                                                   |
+|  Tab 2: 工作台 / WEB全功能 (Workbench) [泛在 Web 引擎]                            |
+|  • 具备 Web 端的全部菜单与功能，包含最新插件生态：                                 |
+|    - 🚀 项目中心 (Projects - 全部项目详情、仓库、分支、工作区)                    |
+|    - 🛡️ 质量治理 (Governance - CMMI G1~G5 门禁、5+2 文档、RTM 穿透、SPC 3σ)       |
+|    - 🌐 三态活拓扑 (Living Topology - SkyWalking + Chaos 架构动态演练)            |
+|    - 🔌 API 契约中心 (API Lifecycle - DSH/MCP 多协议契约沙箱)                     |
+|    - ⏱️ 例行计划 (Routines - 自动化周期调度与执行记录)                            |
+|    - 📊 成本核算 (Costs - 模型与 Token 消耗全景分析)                              |
+|  • 顶部分段切换器 (Projects / Governance / Routines / Costs)，丝滑免密加载         |
+|                                                                                   |
+|  Tab 3: 调度中心 ([+] / 🎙️) [原生超级交互] —— 居中悬浮突出大按键                  |
+|  • 长按按住说话 (Hold-to-Talk)：腾讯云 ASR + 豆包语义提取，3 秒智能建单            |
+|  • 轻触快速建单：自包含轻量底抽屉，支持项目关联与 EARS 验收标准输入                |
+|                                                                                   |
+|  Tab 4: 协同工坊 (Workshop) [原生 + Web 混合]                                     |
+|  • SSE 打字机流式输出，智能折叠 Agent 内部推理思考过程 (CoT)                       |
+|  • 多模态原生采集：调起真机相机拍摄电脑屏幕报错，圈选涂鸦后发入工坊               |
+|  • 交互式富卡片：构建进度、审批请求、交付物卡片                                   |
+|                                                                                   |
+|  Tab 5: 组织与资产 (Org & Assets) [原生与详情下潜]                                |
+|  • 数字员工花名册 (Agent Roster)：点击直达真实员工详情，查看模型配置与技能        |
+|  • 交付物中心 (Artifacts Stream)：HTML 原型一键拉起原生真机沙箱走查体验            |
+|  • 系统与个人配置：切换公司、OTA 版本检查、清除缓存、退出登录                     |
+|                                                                                   |
++-----------------------------------------------------------------------------------+
+|  [ 汇览 Cockpit ]   [ 💼 WEB全功能 ]   [ 🎙️ 派工 ]   [ 工坊 Chat ]   [ 资产 Org ]  |
++-----------------------------------------------------------------------------------+
+```
 
 ---
 
-## 4. 全新信息架构与导航模型 (Navigation & IA Model)
+## 4. 深度技术规格与核心机制实现 (Technical Specifications)
 
-### 4.1 五大底栏导航 (Main Bottom Navigation)
-```
-+-----------------------------------------------------------------------+
-|  [ 汇览 Cockpit ]   [ 任务 Tasks ]   [ 🎙️ 派工 ]   [ 工坊 Chat ]   [ 资产 Org ]  |
-+-----------------------------------------------------------------------+
-```
-1. **汇览 (Cockpit)**：经营态势、预算消耗、快速审批、熔断制动。
-2. **任务 (Tasks)**：列表/看板双视图、搜索过滤、任务执行全生命周期追踪。
-3. **调度中心 ([+] / 🎙️)**：突出悬浮大按钮：长按语音派工、点击打开敏捷建单。
-4. **工坊 (Chat)**：实时会话、流式思考链、多模态拍照/涂鸦、富交互嵌入卡片。
-5. **资产 (Org)**：数字员工档案（带真实详情）、项目代码库、交付物中心、治理轻量入口。
+### 4.1 零感知免密认证与 Cookie 共享桥 (Zero-Reauth Auth Bridge)
+彻底拔除以前“打开 Web 全功能弹出登录框”的顽疾。
 
-### 4.2 顶栏全局状态 (Global AppBar)
-- **左侧**：多公司/工作空间快速下拉选择器 (Company Switcher)。
-- **中央**：当前公司状态指示灯与在线员工计数。
-- **右侧**：
-  - 智能全局搜索图标 (`[🔍]` 打开 Cmd+K 搜索层：支持搜索任务、员工、文档、代码)。
-  - 统一收件箱图标 (`[🔔 (N)]` 红色未读角标，点击打开三段式收件箱抽屉)。
+```mermaid
+sequenceDiagram
+    autonumber
+    actor User as 用户 (移动端)
+    participant NativeApp as 原生 App Shell
+    participant WebContainer as Web 全功能容器 (WebView)
+    participant Server as Coolie 后端 (/api/auth)
 
----
-
-## 5. 技术架构与工程实现方案 (Technical Architecture)
-
-```
-clients/expo/
-├── src/
-│   ├── api/
-│   │   ├── authBridge.ts           # 统一鉴权、Cookie 注入与自动静默刷新
-│   │   ├── client.ts               # 基于 @coolie/api-client 的类型化单例
-│   │   └── sseStream.ts            # 工坊 SSE 流式消费驱动器
-│   ├── components/
-│   │   ├── layout/
-│   │   │   ├── AppBar.tsx          # 顶栏全局组件 (公司切换 + 搜索 + 统一收件箱)
-│   │   │   └── TabBar.tsx          # 5 栏底栏规范组件 (带长按语音触感)
-│   │   ├── approval/
-│   │   │   └── QuickApprovalCard.tsx # 单手滑动快审卡片 (左驳回/右通过)
-│   │   ├── voice/
-│   │   │   └── VoiceDispatchOverlay.tsx # 语音录制、声波动画与意图提取弹窗
-│   │   ├── diff/
-│   │   │   └── UnifiedDiffViewer.tsx   # 移动端优化单列 Git Diff 高亮组件
-│   │   └── sandbox/
-│   │       └── NativeWebContainer.tsx  # 免密 Cookie 注入的真机沙箱容器
-│   ├── screens/
-│   │   ├── DashboardScreen.tsx     # Tab 1: 汇览驾驶舱大屏
-│   │   ├── TasksScreen.tsx         # Tab 2: 任务看板与列表
-│   │   ├── TaskDetailScreen.tsx    # 任务详情 (执行链 + 工作区 + 评论)
-│   │   ├── BoardChatScreen.tsx     # Tab 4: 工坊实时会话 (思考链折叠 + 多模态)
-│   │   ├── OrgAssetsScreen.tsx     # Tab 5: 组织员工 + 项目 + 交付物多合一
-│   │   ├── AgentDetailScreen.tsx   # 员工专属详情 (从列表直接下潜)
-│   │   ├── UnifiedInboxSheet.tsx   # 顶栏收件箱抽屉 (审批/受阻/动态)
-│   │   └── PrototypeSandboxScreen.tsx # 交付原型真机走查沙箱
-│   └── stores/
-│       ├── authStore.ts            # 登录凭证与会话状态
-│       ├── companyStore.ts         # 当前激活公司与公司列表
-│       └── offlineStore.ts         # AsyncStorage 离线数据缓存
+    User->>NativeApp: 首次启动 App
+    NativeApp->>WebContainer: 默认展示 Web 登录页 (/auth?shell=native)
+    User->>WebContainer: 输入账号密码 / 第三方登录
+    WebContainer->>Server: POST /api/auth/sign-in/email
+    Server-->>WebContainer: 200 OK (Set-Cookie: better-auth.session_token)
+    Note over WebContainer: 注入探针捕获 session-token
+    WebContainer->>NativeApp: postMessage({ type: 'WEB_LOGIN_SUCCESS', token })
+    NativeApp->>NativeApp: SecureStore 固化 token 与用户凭证
+    
+    Note over User,NativeApp: ── 此时全端登录态已打通 ──
+    
+    User->>NativeApp: 切换到底栏「💼 WEB全功能」或点开任意插件大屏
+    NativeApp->>WebContainer: 加载目标 URL (/api/auth/exchange?token=...&next=/governance)
+    WebContainer->>Server: 携带 Exchange Token 握手
+    Server-->>WebContainer: 302 重定向并下发合法 Session Cookie
+    WebContainer-->>User: 零延迟直接呈现全功能界面，绝对不出现登录提示！
 ```
 
-### 5.1 零二次登录 (Zero-Reauth) 原生与 Webview 桥接方案
-在 `NativeWebContainer.tsx` 中实现前置注入：
+#### 关键实现代码：`clients/expo/src/components/CoolieWebFallback.tsx` 与所有 WebView 调用点修复
+必须彻底消除以前 `source={{ uri: COOLIE_WEB_URL }}` 这种无凭证裸请求，统一包裹 Token Exchange：
 ```typescript
-import { WebView } from "react-native-webview";
-import { getStoredSessionToken } from "../api/authBridge";
+import { getWebExchangeToken, COOLIE_WEB_URL } from "../coolie";
 
-export function NativeWebContainer({ uri }: { uri: string }) {
-  const sessionToken = getStoredSessionToken();
-  const injectedCode = `
-    (function() {
-      // 1. 注入 Better-Auth 关键 Cookie
-      document.cookie = "better-auth.session_token=${sessionToken}; path=/; max-age=2592000; SameSite=Lax";
-      // 2. 注入 LocalStorage 备份
-      try {
-        localStorage.setItem("paperclip_session_token", "${sessionToken}");
-      } catch(e) {}
-    })();
-    true;
-  `;
-
-  return (
-    <WebView
-      source={{ uri }}
-      injectedJavaScriptBeforeContentLoaded={injectedCode}
-      sharedCookiesEnabled={true}
-      thirdPartyCookiesEnabled={true}
-      domStorageEnabled={true}
-      javaScriptEnabled={true}
-    />
-  );
+export async function resolveAuthenticatedWebUrl(targetPath: string = "/dashboard"): Promise<string> {
+  const token = await getWebExchangeToken();
+  const baseUrl = `${COOLIE_WEB_URL.replace(/\/+$/, "")}${targetPath.startsWith("/") ? "" : "/"}${targetPath}`;
+  if (!token) {
+    return `${baseUrl}?shell=native`;
+  }
+  return `${COOLIE_WEB_URL.replace(/\/+$/, "")}/api/auth/exchange?token=${encodeURIComponent(token)}&next=${encodeURIComponent(baseUrl)}&shell=native`;
 }
 ```
 
-### 5.2 移动端单列 Git Diff 语法高亮
-彻底剔除重量级 PC 专用 Monaco/CodeMirror，采用轻量抽象解析语法树：
-- 增量行标记为 `diff-added` (淡绿底色 + 绿色行首 `+`)。
-- 删减行标记为 `diff-removed` (淡红底色 + 红色行首 `-`)。
-- 未改动上下文折叠为“展开更多上下文 (20 行)”按钮。
-- 行首点击支持弹出“快速指派改进建议”。
+---
+
+### 4.2 泛在 Web 全功能容器外壳增强 (Universal Workbench Shell)
+在 `clients/expo/src/screens/WebContainerScreen.tsx` 与全新工作台 Tab 中引入：
+1. **沉浸式原生导航条**：
+   - 包含：返回按键、前进按键、页面标题自适应、刷新按键、在外部浏览器打开。
+   - 顶部悬挂 2px 极细品牌紫色加载进度条 (`#5E6AD2`)。
+2. **物理手势融合 (Gesture Interception)**：
+   - Android 物理返回键与 iOS 屏幕左边缘侧滑返回：若 WebView 内部有历史记录（如在项目内点击了某个 Issue），优先在 WebView 内部后退，后退到顶时才退出容器，完全符合原生直觉。
+3. **JSBridge 双向通信能力 (Bidirectional Bridge)**：
+   - Web 页面可通过 `window.ReactNativeWebView.postMessage(JSON.stringify({ action, payload }))` 调用原生能力：
+     - `TRIGGER_HAPTIC`：触发原生马达震动；
+     - `TAKE_PHOTO`：调起原生相机并回传 base64 图片；
+     - `SHOW_KILL_SWITCH`：弹出原生紧急熔断保护锁；
+     - `UPDATE_UNREAD`：更新 App 桌面角标数字。
 
 ---
 
-## 6. 验收标准与验证方案 (Acceptance Criteria & G1~G5 Gates)
+### 4.3 原生高管杀手级功能规格 (Native Executive Superpowers)
 
-### 6.1 G1 需求覆盖门禁 (EARS 验收)
-- [ ] **AC-01 (免密漫游)**：在 App 登录后打开任何 Web 容器页面，100% 无需输入账号密码直接进入，Cookie 注入成功率 100%。
-- [ ] **AC-02 (语音派工)**：长按录音 5 秒说话，松手后 2 秒内返回 ASR 识别文本并自动填入标题与优先级。
-- [ ] **AC-03 (审批收敛)**：整车间仅在收件箱与大盘两处保留统一卡片，不存在第 3 处不同样式的审批弹窗。
-- [ ] **AC-04 (零死入口)**：在员工列表中点击任何一个 Agent，均能正常打开其详情页；在任务列表点击任何任务，均能打开详情。
-- [ ] **AC-05 (紧急熔断)**：点击紧急熔断后，本地所有任务倒计时暂停，后端活跃 Agent 状态变为 `paused`。
+#### 1. 长按语音派工 (Hold-to-Talk Voice Dispatch)
+- **交互规范**：
+  - 手指按下中央 `[🎙️]` 键，设备发出微震 (`Haptics.impactAsync(Light)`)，屏幕弹出声波扩散水波纹动效；
+  - 实时采集麦克风流，松手时发出成功震动，若录音时长 < 1 秒则提示“说话时间太短”并取消；
+  - 自动向后端 `/api/plugins/paperclipai.plugin-multimodal/api/transcriptions` 提交 base64 录音；
+  - 智能语义提取出：
+    - `title`：任务主旨（如“修复移动端登录后仍然提示输密码的 Bug”）；
+    - `priority`：优先级（语调或字眼包含“加急/严重”设为 `high`/`critical`，否则为 `medium`）；
+    - `assignee`：根据上下文匹配最合适的 Agent。
+  - 弹出 3 秒倒计时卡片，老板可微调或直接自动下发入库执行。
 
-### 6.2 G2/G3 技术合规与编译门禁
-- [ ] `cd clients/expo && pnpm typecheck`：**0 TypeScript 编译报错**。
-- [ ] `cd clients/expo && pnpm bundle`：**Metro/Expo 离线 Bundle 打包通过**。
-- [ ] 符合 `DESIGN.md` 设计规范：底色、边框、文字亮度严格遵守四档阶梯，无纯白与刺眼高对比度。
+#### 2. 阻断卡点滑动审批 (Haptic Slide-to-Approve)
+- **痛点解决**：彻底消除此前审批分散在 5 处不同界面的混乱问题。
+- **组件规范**：
+  - 统一为标准 `QuickApprovalCard`；
+  - 卡片呈现：申请 Agent 头像、行为类型（预算提额 / 生产发布 / 高危操作）、关联项目、Diff 指纹；
+  - 右滑通过滑块通过：滑动到位触发成功强震动；
+  - 点击左侧小红键：弹出驳回原因输入框。
+
+#### 3. 硬件级紧急熔断 (Emergency Kill Switch)
+- **防爆机制**：
+  - 点击大盘右上角红白闪烁的熔断图标，弹出全屏高危警示抽屉；
+  - 要求指纹/面容或长按 2 秒确认，杜绝误触；
+  - 确认后立即调用 `POST /api/companies/{companyId}/emergency-stop`，将后端所有活动的 Agent 心跳状态置为 `PAUSED`，并在本地断开所有任务调度，阻止任何进一步的 Token 与资金扣费。
 
 ---
 
-## 7. 实施落地步骤 (Implementation Plan)
+## 5. EARS 验收标准与质量门禁 (Acceptance Criteria & Gates)
 
-1. **Step 1 (底座打通)**：实现 `authBridge.ts` 与 `NativeWebContainer.tsx`，彻底打通原生与 Web 容器的免密会话共享。
-2. **Step 2 (架构收敛)**：将 `App.tsx` 与导航重构为 5 栏规范底栏；把通知中心与收件箱合并为 `UnifiedInboxSheet.tsx`。
-3. **Step 3 (三大杀手屏研发)**：
-   - 升级 `DashboardScreen`：资金燃尽图 + 六维指标 + 紧急熔断器；
-   - 升级 `BoardChatScreen`：流式打字机 + 思考链折叠 + 多模态图片上传；
-   - 研发原生 `UnifiedDiffViewer` 与真机沙箱 `PrototypeSandboxScreen`。
-4. **Step 4 (真机回归与打包验证)**：本地运行 Metro 编译，执行双轨 OTA 与 Android APK 验证。
+### 5.1 G1 需求覆盖门禁 (EARS 形式化验收)
+- **UBIQUITOUS-01 (全功能透传与零落后)**：系统应当在移动端「工作台」Tab 中无缝挂载 Web 全功能（包含刚上线的 `@paperclipai/plugin-governance` CMMI 门禁、三态活拓扑与 API 契约中心），Web 端新增任何功能或插件，移动端无需发版必须 100% 实时可见且功能可用。
+- **EVENT-01 (零二次登录)**：WHEN 用户在移动端完成一次登录后，访问任何 Web 容器页面（包括工作台、沙箱、项目详情），系统应当 100% 自动携带 Session Token 与 Cookie，**严禁**出现要求再次输入邮箱或密码的界面。
+- **STATE-01 (按住说话派工)**：WHILE 用户按住中央语音键，系统应当保持原生录音并展示波行动画；WHEN 松开时，应当在 2.5 秒内完成识别并呈现任务派发确认。
+- **EVENT-02 (一键熔断)**：WHEN 用户触发紧急熔断确认，系统应当在 500ms 内向后端广播停机指令，并将大盘指示灯置为全红告警状态。
+- **UNWANTED-01 (断网优雅退化)**：IF 移动设备处于弱网或飞行模式，THEN 驾驶舱大盘应当优雅读取本地 AsyncStorage 缓存数据，展示离线标识，不得出现红屏闪退。
+
+### 5.2 G2/G3 技术合规与代码门禁
+- [ ] **TS 编译门禁**：`clients/expo` 目录下执行 `pnpm typecheck` 实现 **0 错误**。
+- [ ] **Bundle 打包门禁**：`clients/expo` 目录下执行 `pnpm bundle` 离线打包通过。
+- [ ] **视觉设计门禁**：严格遵循 `DESIGN.md` 暗黑层级（`#08090A` / `#0F1011` / `#191A1B`），主色严守 `#5E6AD2`，严禁纯白文字与刺眼强光。
+
+---
+
+## 6. 四步实施落地路线图 (Phased Implementation Roadmap)
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│ 第 1 步：底层打通与免密彻底修复 (Immediate)                                │
+│ • 修复 CoolieWebFallback / WebContainerScreen 的裸请求漏洞，全量接入 exchange │
+│ • 固化统一登录流，实现原生 SecureStore 与 WebView Cookie Jar 双向绝对同步   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 第 2 步：全新 5 栏底盘与全功能工作台透传                                   │
+│ • 重构 App.tsx 与 TabBar，落地 Tab 2 [💼 WEB全功能] 挂载容器               │
+│ • 支持在移动端工作台直接畅玩 CMMI 质量治理、三态拓扑、API 契约、Routines   │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 第 3 步：原生三大杀手级体验做深做透                                         │
+│ • Tab 1 驾驶舱大盘：资金燃尽图 + 六维效能 + 紧急熔断器                      │
+│ • Tab 3 中央派工：长按语音 (Tencent ASR) + 智能意图建单                     │
+│ • 收敛统一收件箱与审批卡片，移除分散在 5 处的重复入口                       │
+├─────────────────────────────────────────────────────────────────────────────┤
+│ 第 4 步：真机实测与双轨 OTA 发版                                            │
+│ • 验证离线体验、弱网提示与手势返回拦截                                      │
+│ • 跑通 scripts/publish-ota.sh 生成最新 bundle hash 并同步生产环境           │
+└─────────────────────────────────────────────────────────────────────────────┘
+```
