@@ -1,8 +1,8 @@
 {
-  "version": "0.5.77",
-  "versionCode": 577,
-  "commitSha": "6d7cef66829574872360817a271f8882aa89a732",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.77/coolie-release.apk",
-  "sha256": "c29e2c98cb062672fd0c313a3838e813de49b2736060e99a0bf86429a463b385",
-  "releaseNotes": "wave112 修 0.5.76 选完公司白屏 (DashboardScreen 的 D11 Hook 落在提前 return 之后 → React 卸载整棵树); 登录态回原生表单 + Web 登录 15s 空白兜底 + prober 401 退避"
+  "version": "0.5.78",
+  "versionCode": 578,
+  "commitSha": "2ea022b4fddfda63e49e2425bf454df5fc48507b",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.78/coolie-release.apk",
+  "sha256": "33f0fb20916b7d2ea6654f3a183b3a3c25d7c61775487aeaa0a2fdcbbd1c1767",
+  "releaseNotes": "wave113 修项目中心返回标签溢出 (ScreenHeader 缺水平内边距 — 项目中心/Plan/Pipeline/Git 凭证/原型沙箱 返回标签贴左缘); 资产→项目中心 返回按钮完整落在屏幕内"
 }
