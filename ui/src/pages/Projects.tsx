@@ -225,6 +225,96 @@ export function Projects() {
                     const starPending = pending && membershipMutation.variables?.starred !== undefined;
                     const joinLeavePending = pending && membershipMutation.variables?.starred === undefined;
                     const starred = isStarred(membershipsQuery.data, "project", project.id);
+                    // The sync / membership / star cluster is wider than the space
+                    // a narrow (mobile) row can spare, which used to squeeze the
+                    // project name down to a couple of characters. Keep it inline
+                    // from `sm` up, and stack it on its own line below that.
+                    const rowActionCluster = (
+                      <>
+                        {(() => {
+                          const syncedSystem = (businessSystems ?? []).find(
+                            (bs) =>
+                              bs.metadata?.projectId === project.id ||
+                              bs.code.toUpperCase() === `SYS_${project.name.toUpperCase().replace(/[^A-Z0-9_]/g, "_")}`,
+                          );
+                          const boundDomain = syncedSystem?.ontology_domain_id
+                            ? (ontologyDomains ?? []).find((d) => d.id === syncedSystem.ontology_domain_id)
+                            : null;
+                          const boundVersion =
+                            syncedSystem?.ontology_binding?.domainVersion ??
+                            (typeof syncedSystem?.metadata?.domainVersion === "number" ? syncedSystem.metadata.domainVersion : null);
+                          const liveVersion = boundDomain?.schema_version ?? null;
+                          const hasUpgrade = boundVersion !== null && liveVersion !== null && liveVersion > boundVersion;
+
+                          return (
+                            <Button
+                              type="button"
+                              size="xs"
+                              variant={syncedSystem ? "secondary" : "outline"}
+                              className={cn(
+                                "h-6 px-2 text-xs gap-1 font-normal transition-colors shrink-0",
+                                hasUpgrade
+                                  ? "text-primary border-primary/40 bg-primary/15 hover:bg-primary/25 font-medium"
+                                  : syncedSystem
+                                    ? "text-primary border-primary/20 bg-primary/10 hover:bg-primary/20"
+                                    : "text-muted-foreground hover:text-foreground",
+                              )}
+                              title={
+                                hasUpgrade
+                                  ? `可升级：系统绑定本体域版本 v${boundVersion}，最新版本 v${liveVersion}，点击同步升级`
+                                  : syncedSystem
+                                    ? `已同步至业务系统: ${syncedSystem.code}${boundVersion !== null ? ` (域版本 v${boundVersion})` : ""}，点击查看或变更`
+                                    : "同步到业务系统资产"
+                              }
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                setSyncProject(project);
+                              }}
+                            >
+                              <RefreshCw className={cn("size-3", syncedSystem ? "text-primary" : "text-muted-foreground")} />
+                              <span>
+                                {hasUpgrade
+                                  ? `可升级 v${boundVersion}→v${liveVersion}`
+                                  : syncedSystem
+                                    ? (boundVersion !== null ? `已同步 v${boundVersion}` : "已同步")
+                                    : "同步"}
+                              </span>
+                            </Button>
+                          );
+                        })()}
+                        <MembershipAction
+                          state={state}
+                          pending={joinLeavePending}
+                          pendingState={joinLeavePending ? membershipMutation.variables?.state : null}
+                          resourceName={project.name}
+                          onJoin={() => membershipMutation.mutate({
+                            resourceType: "project",
+                            resourceId: project.id,
+                            resourceName: project.name,
+                            state: "joined",
+                          })}
+                          onLeave={() => membershipMutation.mutate({
+                            resourceType: "project",
+                            resourceId: project.id,
+                            resourceName: project.name,
+                            state: "left",
+                          })}
+                        />
+                        <StarToggle
+                          size="row"
+                          starred={starred}
+                          pending={starPending}
+                          resourceName={project.name}
+                          onToggle={(next) => membershipMutation.mutate({
+                            resourceType: "project",
+                            resourceId: project.id,
+                            resourceName: project.name,
+                            starred: next,
+                          })}
+                        />
+                      </>
+                    );
                     return (
                       <EntityRow
                         key={project.id}
@@ -253,89 +343,11 @@ export function Projects() {
                               </span>
                             )}
                             <StatusBadge status={project.status} />
-                            {(() => {
-                              const syncedSystem = (businessSystems ?? []).find(
-                                (bs) =>
-                                  bs.metadata?.projectId === project.id ||
-                                  bs.code.toUpperCase() === `SYS_${project.name.toUpperCase().replace(/[^A-Z0-9_]/g, "_")}`,
-                              );
-                              const boundDomain = syncedSystem?.ontology_domain_id
-                                ? (ontologyDomains ?? []).find((d) => d.id === syncedSystem.ontology_domain_id)
-                                : null;
-                              const boundVersion =
-                                syncedSystem?.ontology_binding?.domainVersion ??
-                                (typeof syncedSystem?.metadata?.domainVersion === "number" ? syncedSystem.metadata.domainVersion : null);
-                              const liveVersion = boundDomain?.schema_version ?? null;
-                              const hasUpgrade = boundVersion !== null && liveVersion !== null && liveVersion > boundVersion;
-
-                              return (
-                                <Button
-                                  type="button"
-                                  size="xs"
-                                  variant={syncedSystem ? "secondary" : "outline"}
-                                  className={cn(
-                                    "h-6 px-2 text-xs gap-1 font-normal transition-colors shrink-0",
-                                    hasUpgrade
-                                      ? "text-primary border-primary/40 bg-primary/15 hover:bg-primary/25 font-medium"
-                                      : syncedSystem
-                                        ? "text-primary border-primary/20 bg-primary/10 hover:bg-primary/20"
-                                        : "text-muted-foreground hover:text-foreground",
-                                  )}
-                                  title={
-                                    hasUpgrade
-                                      ? `可升级：系统绑定本体域版本 v${boundVersion}，最新版本 v${liveVersion}，点击同步升级`
-                                      : syncedSystem
-                                        ? `已同步至业务系统: ${syncedSystem.code}${boundVersion !== null ? ` (域版本 v${boundVersion})` : ""}，点击查看或变更`
-                                        : "同步到业务系统资产"
-                                  }
-                                  onClick={(e) => {
-                                    e.preventDefault();
-                                    e.stopPropagation();
-                                    setSyncProject(project);
-                                  }}
-                                >
-                                  <RefreshCw className={cn("size-3", syncedSystem ? "text-primary" : "text-muted-foreground")} />
-                                  <span>
-                                    {hasUpgrade
-                                      ? `可升级 v${boundVersion}→v${liveVersion}`
-                                      : syncedSystem
-                                        ? (boundVersion !== null ? `已同步 v${boundVersion}` : "已同步")
-                                        : "同步"}
-                                  </span>
-                                </Button>
-                              );
-                            })()}
-                            <MembershipAction
-                              state={state}
-                              pending={joinLeavePending}
-                              pendingState={joinLeavePending ? membershipMutation.variables?.state : null}
-                              resourceName={project.name}
-                              onJoin={() => membershipMutation.mutate({
-                                resourceType: "project",
-                                resourceId: project.id,
-                                resourceName: project.name,
-                                state: "joined",
-                              })}
-                              onLeave={() => membershipMutation.mutate({
-                                resourceType: "project",
-                                resourceId: project.id,
-                                resourceName: project.name,
-                                state: "left",
-                              })}
-                            />
-                            <StarToggle
-                              size="row"
-                              starred={starred}
-                              pending={starPending}
-                              resourceName={project.name}
-                              onToggle={(next) => membershipMutation.mutate({
-                                resourceType: "project",
-                                resourceId: project.id,
-                                resourceName: project.name,
-                                starred: next,
-                              })}
-                            />
+                            <div className="hidden items-center gap-3 sm:flex">{rowActionCluster}</div>
                           </div>
+                        }
+                        secondaryRow={
+                          <div className="flex flex-wrap items-center gap-2 sm:hidden">{rowActionCluster}</div>
                         }
                       />
                     );
