@@ -216,11 +216,18 @@ export function DashboardScreen({
           subtitle={
             <View style={styles.companyCapsule}>
               <CoolieLogo size={14} style={{ marginRight: 2 }} />
-              <StatusDot status="ok" size={5} />
+              <StatusDot status={isPaused ? "err" : "ok"} size={5} />
               <Text style={styles.companyCapsuleText} numberOfLines={1}>
                 {company.name}
               </Text>
-              <Text style={styles.companyCapsuleTag}>效能总览</Text>
+              <Text
+                style={[
+                  styles.companyCapsuleTag,
+                  isPaused && styles.companyCapsuleTagPaused,
+                ]}
+              >
+                {isPaused ? "已熔断" : "效能总览"}
+              </Text>
             </View>
           }
         />
@@ -561,9 +568,17 @@ const styles = StyleSheet.create({
     maxWidth: 160,
   },
   companyCapsuleTag: {
+    color: C.ink2,
     fontSize: 11,
-    color: C.ink4,
-    fontWeight: "400",
+    paddingLeft: 6,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: C.line,
+    marginLeft: 6,
+  },
+  companyCapsuleTagPaused: {
+    color: C.err,
+    borderLeftColor: C.err,
+    fontWeight: "600",
   },
   gridContainer: {
     flexDirection: "row",

@@ -44,10 +44,12 @@ export JAVA_HOME="${JAVA_HOME:-$HOME/jdk/jdk-17.0.20.1+1/Contents/Home}"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Library/Developer/CommandLineTools}"
 
 DRY_RUN=0
+SKIP_SERVER_DEPLOY=0
 ARGS=()
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
+  --skip-server-deploy) SKIP_SERVER_DEPLOY=1 ;;
     -h|--help) sed -n '3,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) ARGS+=("$arg") ;;
   esac
@@ -316,10 +318,38 @@ echo "   ✓ 升级检测地址: $VERSION_JSON_URL"
 step "[9/9] 发布 OTA 增量更新 (android)"
 run_sh "cd '$EXPO_DIR' && bash scripts/publish-ota.sh android"
 
+# ── wave105 联动: 跨端变更 (server routes / shared schema) 必须随客户端一起部署,
+#    否则 App 端紧急熔断按钮点了会得到 404 / 401 (wave105 真实经历)。默认自动
+#    跑 deploy-tc-coolie-claw.sh --skip-build (server 用 tsx 热读 src, 增量足够);
+#    --skip-server-deploy 可跳过此步。
+step "[10/10] server 同步部署 (--skip-build, tsx 热读 src)"
+if [ "$SKIP_SERVER_DEPLOY" = "1" ]; then
+  echo "   ⏭ 跳过 server 部署 (--skip-server-deploy)"
+else
+  SERVER_DIFF=$(ssh "$SSH_TARGET" "cd $REMOTE_DIR 2>/dev/null && git diff --stat server/src packages/shared/src 2>/dev/null | tail -1 || echo ''")
+  if [ -z "$SERVER_DIFF" ] || echo "$SERVER_DIFF" | grep -q "0 files changed"; then
+    echo "   ✓ 远端 server/src 与 packages/shared/src 与本仓 HEAD 同步, 无需部署"
+  else
+    echo "   ⚠ 远端 server/src 落后于 HEAD: ${SERVER_DIFF}"
+    echo "   → 自动部署中 (deploy-tc-coolie-claw.sh --skip-build)..."
+    run_sh "bash '$REPO_ROOT/scripts/deploy-tc-coolie-claw.sh' --skip-build"
+    echo "   ✓ server 已部署, 验证 /api/health..."
+    HEALTH=$(ssh "$SSH_TARGET" "curl -s -m 5 localhost:3100/api/health | head -c 120")
+    echo "   ✓ /api/health: $HEALTH"
+  fi
+fi
+
 printf '\n========================================================\n'
 printf ' 发版完成:      v%s (versionCode %s)\n' "$VERSION" "$VERSION_CODE"
 printf ' APK 直链:      %s\n' "$APK_URL"
 printf ' COS 对象:      %s\n' "$COS_OBJECT"
 printf ' version.json:  %s → %s:%s\n' "$VERSION_JSON_URL" "$SSH_TARGET" "$REMOTE_VERSION_JSON"
 printf ' OTA (android): %s\n' "$(dry && echo 'dry-run 未发布' || echo '已发布到 https://xrobinai.cn/ota/manifest')"
+if [ "$SKIP_SERVER_DEPLOY" = "1" ]; then
+  printf ' server:        跳过 (--skip-server-deploy)\n'
+elif dry; then
+  printf ' server:        dry-run\n'
+else
+  printf ' server:        已联动部署 (deploy-tc-coolie-claw.sh --skip-build)\n'
+fi
 printf '========================================================\n'
