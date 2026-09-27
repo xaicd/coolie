@@ -61,7 +61,7 @@ RSYNC_EXCLUDES=(
 )
 
 # Workspace packages the server loads from built output rather than source.
-BUILT_PACKAGES=(shared db adapter-utils plugins/sdk skills-catalog teams-catalog)
+BUILT_PACKAGES=(shared db adapter-utils plugins/sdk skills-catalog teams-catalog mcp-server)
 
 step() { printf '\n=== %s ===\n' "$1"; }
 die() { printf '\nFAIL: %s\n' "$1" >&2; exit 1; }
