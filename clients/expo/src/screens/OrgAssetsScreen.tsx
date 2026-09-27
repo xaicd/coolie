@@ -109,7 +109,6 @@ export function OrgAssetsScreen({
         {activeTab === "projects" && (
           <ProjectsScreen
             company={company}
-            embedded
             onBack={() => setActiveTab("ontology")}
             onOpenProjectTasks={onOpenProjectTasks}
             onCreateTaskForProject={onCreateTaskForProject}

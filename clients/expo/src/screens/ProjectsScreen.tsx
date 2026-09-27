@@ -71,7 +71,6 @@ interface ProjectsScreenProps {
   onOpenProjectTasks?: (project: Project) => void;
   onCreateTaskForProject?: (project: Project) => void;
   onOpenWebProjects?: (path?: string, title?: string) => void;
-  embedded?: boolean;
 }
 
 /**
@@ -88,7 +87,6 @@ export function ProjectsScreen({
   onOpenProjectTasks,
   onCreateTaskForProject,
   onOpenWebProjects,
-  embedded = false,
 }: ProjectsScreenProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -155,88 +153,42 @@ export function ProjectsScreen({
           backLabel="返回"
           style={styles.header}
           right={
-            // 嵌入资产 Tab 时, 新建/刷新 挪到下方过滤条右侧 (embeddedActions),
-            // 头部只留 返回 + 标题, 避免同一组动作渲染两遍。
-            embedded ? undefined : (
-              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-                {onOpenWebProjects ? (
-                  <Pressable
-                    style={styles.newProjectHeaderBtn}
-                    onPress={() => onOpenWebProjects("/projects", "项目中心 · 新建多源项目")}
-                    hitSlop={8}
-                    accessibilityLabel="新建多源项目"
-                  >
-                    <Ionicons name="add" size={15} color={C.ink} />
-                    <Text style={styles.newProjectHeaderBtnText} numberOfLines={1}>
-                      新建
-                    </Text>
-                  </Pressable>
-                ) : null}
-                <Pressable
-                  style={styles.refreshBtn}
-                  onPress={() => void load(true)}
-                  hitSlop={8}
-                  accessibilityLabel="刷新项目列表"
-                >
-                  <Ionicons name="refresh-outline" size={16} color={C.ink3} />
-                </Pressable>
-              </View>
-            )
+            // wave114: 新建改为右下角悬浮 FAB, 头部只留刷新, 过滤条只放 chips。
+            <Pressable
+              style={styles.refreshBtn}
+              onPress={() => void load(true)}
+              hitSlop={8}
+              accessibilityLabel="刷新项目列表"
+            >
+              <Ionicons name="refresh-outline" size={16} color={C.ink3} />
+            </Pressable>
           }
         />
       ) : null}
 
-      {/* 状态过滤 Chips 与右上角快捷操作 */}
+      {/* 状态过滤 Chips — wave114: 新建/刷新 已移出此条, 只留 chips */}
       <View style={styles.filterBar}>
-        <View style={styles.filterRow}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.filterContent}
-          >
-            {STATUS_FILTERS.map((f) => {
-              const count = countsByStatus[f.key] ?? 0;
-              const active = statusFilter === f.key;
-              return (
-                <Pressable
-                  key={f.key}
-                  onPress={() => setStatusFilter(f.key)}
-                  style={[styles.filterChip, active && styles.filterChipActive]}
-                >
-                  <Text style={[styles.filterLabel, active && styles.filterLabelActive]}>
-                    {f.label} {count > 0 ? `(${count})` : ""}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
-          {embedded ? (
-            <View style={styles.embeddedActions}>
-              {onOpenWebProjects ? (
-                <Pressable
-                  style={styles.newProjectHeaderBtn}
-                  onPress={() => onOpenWebProjects("/projects", "项目中心 · 新建多源项目")}
-                  hitSlop={8}
-                  accessibilityLabel="新建多源项目"
-                >
-                  <Ionicons name="add" size={15} color={C.ink} />
-                  <Text style={styles.newProjectHeaderBtnText} numberOfLines={1}>
-                    新建
-                  </Text>
-                </Pressable>
-              ) : null}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterContent}
+        >
+          {STATUS_FILTERS.map((f) => {
+            const count = countsByStatus[f.key] ?? 0;
+            const active = statusFilter === f.key;
+            return (
               <Pressable
-                style={styles.refreshBtn}
-                onPress={() => void load(true)}
-                hitSlop={8}
-                accessibilityLabel="刷新项目列表"
+                key={f.key}
+                onPress={() => setStatusFilter(f.key)}
+                style={[styles.filterChip, active && styles.filterChipActive]}
               >
-                <Ionicons name="refresh-outline" size={16} color={C.ink3} />
+                <Text style={[styles.filterLabel, active && styles.filterLabelActive]}>
+                  {f.label} {count > 0 ? `(${count})` : ""}
+                </Text>
               </Pressable>
-            </View>
-          ) : null}
-        </View>
+            );
+          })}
+        </ScrollView>
       </View>
 
       <ScrollView
@@ -613,6 +565,19 @@ export function ProjectsScreen({
         )}
       </ScrollView>
 
+      {/* 右下角浮起 [+ 新建项目] — wave114: 与 TasksScreen 的「+ 新建任务」一致,
+          让出底部 TabBar, 不再挤在过滤条右端像浮错位置。 */}
+      {onOpenWebProjects ? (
+        <Pressable
+          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+          onPress={() => onOpenWebProjects("/projects", "项目中心 · 新建多源项目")}
+          accessibilityLabel="新建多源项目"
+        >
+          <Ionicons name="add" size={20} color="#FFFFFF" />
+          <Text style={styles.fabText}>新建项目</Text>
+        </Pressable>
+      ) : null}
+
       {/* 原生 API 契约与 DSH 生命周期速览抽屉 */}
       {activeApiContractProject ? (
         <ApiContractSheet
@@ -654,17 +619,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: C.line,
   },
-  filterRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-  embeddedActions: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingRight: SPACING.md,
-  },
   filterContent: {
     paddingHorizontal: SPACING.lg,
     paddingVertical: SPACING.sm,
@@ -695,6 +649,8 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: SPACING.lg,
+    // 让出右下角悬浮 [新建项目] FAB, 最后一张卡片不被压住
+    paddingBottom: 96,
     gap: SPACING.md,
   },
   card: {
@@ -1033,19 +989,30 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: C.ink,
   },
-  newProjectHeaderBtn: {
-    height: 28,
-    paddingHorizontal: 8,
-    borderRadius: RADIUS.sm,
-    backgroundColor: C.accent,
+  // ── 右下角悬浮 [新建项目] FAB (对齐 TasksScreen 的 [+ 新建任务]) ──
+  fab: {
+    position: "absolute",
+    right: SPACING.lg,
+    bottom: SPACING.lg,
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
+    gap: 6,
+    paddingHorizontal: SPACING.lg,
+    paddingVertical: 12,
+    borderRadius: RADIUS.pill,
+    backgroundColor: C.brand,
+    shadowColor: "#000",
+    shadowOpacity: 0.4,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 6,
   },
-  newProjectHeaderBtnText: {
-    fontSize: 11,
+  fabPressed: {
+    backgroundColor: C.accentHover,
+  },
+  fabText: {
+    color: "#FFFFFF",
+    fontSize: 13,
     fontWeight: "600",
-    color: C.ink,
   },
 });
