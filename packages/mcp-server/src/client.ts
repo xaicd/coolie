@@ -83,6 +83,7 @@ export class PaperclipApiClient {
     const url = new URL(path.slice(1), `${this.config.apiUrl}/`);
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.config.apiKey}`,
+      "X-Paperclip-Api-Key": this.config.apiKey,
       Accept: "application/json",
     };
     if (options.body !== undefined) {
