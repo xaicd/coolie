@@ -129,8 +129,6 @@ import { remoteAgentProfileRoutes } from "./routes/remote-agent-profiles.js";
 import { tasksHostPreviewRoutes } from "./routes/tasks-host-preview.js";
 import { pluginUiStaticRoutes } from "./routes/plugin-ui-static.js";
 import { gitCredentialsRoutes } from "./routes/git-credentials.js";
-import { injectCloudUiSnippet } from "./cloud-ui-snippet.js";
-import { slackToolRoutes } from "./routes/slack-tools.js";
 import { readBrandedStaticIndexHtml } from "./static-index-html.js";
 import { isLandingEnabled, renderLandingPage } from "./landing-page.js";
 import { staticUiCacheControl } from "./static-ui-cache.js";
