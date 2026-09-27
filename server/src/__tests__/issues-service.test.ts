@@ -2541,6 +2541,66 @@ describeEmbeddedPostgres("issueService.list participantAgentId", () => {
     expect(comments).toEqual([]);
   });
 
+  it("excludes soft-deleted comments when includeDeleted is false", async () => {
+    const companyId = randomUUID();
+    const issueId = randomUUID();
+    const liveCommentId = randomUUID();
+    const deletedCommentId = randomUUID();
+
+    await db.insert(companies).values({
+      id: companyId,
+      name: "Paperclip",
+      issuePrefix: `T${companyId.replace(/-/g, "").slice(0, 6).toUpperCase()}`,
+      requireBoardApprovalForNewAgents: false,
+    });
+
+    await db.insert(issues).values({
+      id: issueId,
+      companyId,
+      title: "Cleared conversation issue",
+      status: "todo",
+      priority: "medium",
+    });
+
+    await db.insert(issueComments).values([
+      {
+        id: liveCommentId,
+        companyId,
+        issueId,
+        body: "Still here",
+        createdAt: new Date("2026-03-26T10:00:00.000Z"),
+        updatedAt: new Date("2026-03-26T10:00:00.000Z"),
+      },
+      {
+        id: deletedCommentId,
+        companyId,
+        issueId,
+        body: "Cleared away",
+        createdAt: new Date("2026-03-26T11:00:00.000Z"),
+        updatedAt: new Date("2026-03-26T11:00:00.000Z"),
+        deletedAt: new Date("2026-03-26T12:00:00.000Z"),
+        deletedByType: "user",
+      },
+    ]);
+
+    // Default keeps the tombstone (body blanked) so the issue thread can render it.
+    const withDeleted = await svc.listComments(issueId, { order: "asc" });
+    expect(withDeleted.map((comment) => comment.id)).toEqual([
+      liveCommentId,
+      deletedCommentId,
+    ]);
+    expect(
+      withDeleted.find((comment) => comment.id === deletedCommentId)?.body,
+    ).toBe("");
+
+    // includeDeleted=false drops the cleared row entirely (board chat history).
+    const liveOnly = await svc.listComments(issueId, {
+      order: "asc",
+      includeDeleted: false,
+    });
+    expect(liveOnly.map((comment) => comment.id)).toEqual([liveCommentId]);
+  });
+
   it("lists user comments when derived run attribution scans a timestamp window", async () => {
     const companyId = randomUUID();
     const agentId = randomUUID();

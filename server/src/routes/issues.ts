@@ -15286,10 +15286,17 @@ export function issueRoutes(
       limitRaw && Number.isFinite(limitRaw) && limitRaw > 0
         ? Math.min(Math.floor(limitRaw), MAX_ISSUE_COMMENT_LIMIT)
         : null;
+    // Soft-deleted comments are returned by default (body blanked) so the issue
+    // thread renders a tombstone. Callers reading a plain conversation — the
+    // board chat history — pass includeDeleted=false to drop them entirely.
+    const includeDeleted = !(
+      req.query.includeDeleted === "false" || req.query.includeDeleted === "0"
+    );
     const comments = await svc.listComments(id, {
       afterCommentId,
       order,
       limit,
+      includeDeleted,
     });
     res.json(
       await runRedactions.redactForIssue(issue.companyId, issue.id, comments),

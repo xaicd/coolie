@@ -1016,19 +1016,28 @@ export class CoolieClient {
 
   /**
    * 获取任务评论列表 (GET /api/issues/:id/comments)
+   *
+   * 默认跟 web 线一致, 会把软删评论当作 "墓碑" 返回 (body 置空 + deletedAt)。
+   * 纯会话场景 (工坊历史) 传 `includeDeleted: false`, 让服务端在 SQL 里
+   * 直接过滤掉软删行 —— 清空对话后就不会再拉回一串空 content 的壳。
    */
-  async listIssueComments(issueId: string): Promise<
+  async listIssueComments(
+    issueId: string,
+    opts?: { includeDeleted?: boolean },
+  ): Promise<
     Array<{
       id: string;
       body: string;
       createdAt: string;
       authorUserId?: string | null;
       authorAgentId?: string | null;
+      deletedAt?: string | null;
     }>
   > {
+    const query = opts?.includeDeleted === false ? "?order=asc&includeDeleted=false" : "?order=asc";
     return this.request(
       "GET",
-      `/api/issues/${encodeURIComponent(issueId)}/comments?order=asc`,
+      `/api/issues/${encodeURIComponent(issueId)}/comments${query}`,
     );
   }
 
@@ -1058,13 +1067,19 @@ export class CoolieClient {
     }
 
     try {
-      const comments = await this.listIssueComments(issueId);
-      const messages: BoardChatMessage[] = comments.map((c) => ({
-        id: c.id,
-        role: !c.authorAgentId && c.authorUserId === "board-concierge" ? "assistant" : "user",
-        text: c.body,
-        createdAt: c.createdAt,
-      }));
+      // includeDeleted=false keeps soft-deleted (cleared) comments out of the
+      // response entirely. The extra filter is defensive: a legacy server that
+      // still returns tombstones (blank body + deletedAt) must never render as
+      // an empty transparent bubble in the app.
+      const comments = await this.listIssueComments(issueId, { includeDeleted: false });
+      const messages: BoardChatMessage[] = comments
+        .filter((c) => !c.deletedAt && c.body.trim().length > 0)
+        .map((c) => ({
+          id: c.id,
+          role: !c.authorAgentId && c.authorUserId === "board-concierge" ? "assistant" : "user",
+          text: c.body,
+          createdAt: c.createdAt,
+        }));
       return { issueId, messages };
     } catch {
       return { issueId, messages: [] };

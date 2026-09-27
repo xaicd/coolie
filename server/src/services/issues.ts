@@ -11781,6 +11781,13 @@ export function issueService(db: Db) {
         afterCommentId?: string | null;
         order?: "asc" | "desc";
         limit?: number | null;
+        /**
+         * Soft-deleted comments are returned by default (redacted to an empty
+         * body) so the issue thread can render them as tombstones. Callers that
+         * must not surface deletions at all — e.g. the board chat history —
+         * pass `false` and the rows are filtered out in SQL.
+         */
+        includeDeleted?: boolean;
       },
     ) => {
       const order = opts?.order === "asc" ? "asc" : "desc";
@@ -11791,6 +11798,9 @@ export function issueService(db: Db) {
           : null;
 
       const conditions = [eq(issueComments.issueId, issueId)];
+      if (opts?.includeDeleted === false) {
+        conditions.push(isNull(issueComments.deletedAt));
+      }
       if (afterCommentId) {
         // Guard: reject non-UUID cursors before hitting the DB to avoid Postgres type errors.
         if (!isUuidLike(afterCommentId)) return [];

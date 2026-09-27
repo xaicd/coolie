@@ -399,7 +399,13 @@ export function boardChatRoutes(
     }
 
     // Build conversation history from recent comments (oldest first).
-    const comments = await issueSvc.listComments(resolvedIssueId, { order: "asc" });
+    // Soft-deleted comments are skipped: the clear-conversation action blanks
+    // their body, and feeding empty <turn> blocks to the assistant both wastes
+    // context and leaks the existence of cleared turns.
+    const comments = await issueSvc.listComments(resolvedIssueId, {
+      order: "asc",
+      includeDeleted: false,
+    });
     const recent = comments.slice(-20);
     const history = recent
       .map((c) => serializeTurn(isConciergeReply(c) ? "assistant" : "user", c.body))
