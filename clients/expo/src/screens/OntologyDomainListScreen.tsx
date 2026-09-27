@@ -25,6 +25,7 @@ import { C, coolie } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
 import { EmergencyKillSwitch } from "../components/EmergencyKillSwitch";
 import { AppCard } from "../ui/AppCard";
+import { RADIUS } from "../ui/tokens";
 import { EmptyState } from "../ui/EmptyState";
 import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
@@ -38,7 +39,6 @@ import { StatusBadge } from "../ui/StatusBadge";
 interface OntologyDomainListScreenProps {
   company: Company;
   whoami?: string;
-  onBack?: () => void;
   onOpenWebOntology?: () => void;
 }
 
@@ -89,7 +89,6 @@ export type OntologyViewMode = "list" | "detail" | "graph";
 export function OntologyDomainListScreen({
   company,
   whoami = "管理员",
-  onBack,
   onOpenWebOntology,
 }: OntologyDomainListScreenProps) {
   const [domains, setDomains] = useState<OntologyDomain[]>([]);
@@ -934,68 +933,37 @@ export function OntologyDomainListScreen({
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
       <View style={styles.header}>
-        <ScreenHeader
-          onBack={onBack}
-          title="业务本体域"
-          subtitle={
-            <Pill style={styles.companyCapsule}>
-              <StatusDot status="ok" size={6} />
-              <Text style={styles.companyCapsuleText} numberOfLines={1}>
-                {company.name}
+        {/* 紧凑操作行: 外层资产页已有标题与四段选择器, 这里不再重复页头。
+            旧版 4 个文字按钮在 fontScale 放大下逐字竖排, 且与外层 chrome 叠了三层。 */}
+        <View style={styles.listActionBar}>
+          <View style={{ flex: 1 }} />
+          <View style={styles.listActionBarBtns}>
+            {onOpenWebOntology ? (
+              <Pressable
+                onPress={onOpenWebOntology}
+                hitSlop={8}
+                style={styles.iconActionBtn}
+                accessibilityLabel="打开 Web 端可视化图谱"
+              >
+                <Ionicons name="open-outline" size={16} color={C.accent} />
+              </Pressable>
+            ) : null}
+            <Pressable onPress={onRefresh} hitSlop={8} style={styles.iconActionBtn} accessibilityLabel="刷新本体域列表">
+              <Ionicons name="refresh-outline" size={16} color={C.ink3} />
+            </Pressable>
+            <Pressable
+              onPress={() => setNewDomainModalOpen(true)}
+              hitSlop={8}
+              style={styles.newDomainBtn}
+              accessibilityLabel="新建本体域"
+            >
+              <Ionicons name="add" size={15} color={C.ink} />
+              <Text style={styles.newDomainBtnText} numberOfLines={1}>
+                新建
               </Text>
-              <Text style={styles.companyCapsuleSubText}>· 资产底座</Text>
-            </Pill>
-          }
-          right={
-            <>
-              {onOpenWebOntology ? (
-                <Pressable
-                  onPress={onOpenWebOntology}
-                  hitSlop={12}
-                  style={[
-                    styles.refreshBtn,
-                    {
-                      flexDirection: "row",
-                      alignItems: "center",
-                      gap: 4,
-                      backgroundColor: "rgba(94, 106, 210, 0.12)",
-                      borderColor: "rgba(94, 106, 210, 0.3)",
-                    },
-                  ]}
-                  accessibilityLabel="打开 Web 端可视化图谱"
-                >
-                  <Ionicons name="open-outline" size={13} color={C.accent} />
-                  <Text style={{ color: C.accent, fontSize: 12, fontWeight: "500" }}>Web图谱</Text>
-                </Pressable>
-              ) : null}
-              <Pressable
-                onPress={() => setNewDomainModalOpen(true)}
-                hitSlop={12}
-                style={[
-                  styles.refreshBtn,
-                  { backgroundColor: C.accent, borderColor: C.accent },
-                ]}
-              >
-                <Text style={{ color: C.ink, fontSize: 12, fontWeight: "600" }}>+ 新建</Text>
-              </Pressable>
-              <Pressable
-                onPress={handleSeedSample}
-                disabled={seedingSample}
-                hitSlop={12}
-                style={[styles.refreshBtn, styles.seedBtn]}
-              >
-                {seedingSample ? (
-                  <ActivityIndicator size="small" color={C.accent} />
-                ) : (
-                  <Text style={styles.seedBtnText}>注入示例域</Text>
-                )}
-              </Pressable>
-              <Pressable onPress={onRefresh} hitSlop={12} style={styles.refreshBtn}>
-                <Text style={styles.refreshBtnText}>刷新</Text>
-              </Pressable>
-            </>
-          }
-        />
+            </Pressable>
+          </View>
+        </View>
 
         {/* 顶部过滤切换器 */}
         <SegmentedControl
@@ -1341,19 +1309,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: C.lineSubtle,
   },
-  companyCapsule: {
-    marginTop: 6,
-    gap: 6,
-  },
-  companyCapsuleText: {
-    color: C.ink2,
-    fontSize: 11,
-    fontWeight: "500",
-  },
-  companyCapsuleSubText: {
-    color: C.ink4,
-    fontSize: 11,
-  },
   refreshBtn: {
     backgroundColor: C.lineSubtle,
     borderColor: C.line,
@@ -1366,6 +1321,42 @@ const styles = StyleSheet.create({
     color: C.ink2,
     fontSize: 12,
     fontWeight: "500",
+  },
+  listActionBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  listActionBarBtns: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexShrink: 0,
+  },
+  iconActionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: C.line,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  newDomainBtn: {
+    height: 32,
+    paddingHorizontal: 10,
+    borderRadius: RADIUS.sm,
+    backgroundColor: C.accent,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 2,
+    flexShrink: 0,
+  },
+  newDomainBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.ink,
   },
   seedBtn: {
     backgroundColor: "rgba(94, 106, 210, 0.12)",
