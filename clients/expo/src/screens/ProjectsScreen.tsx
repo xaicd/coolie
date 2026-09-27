@@ -67,10 +67,11 @@ function projectStatusLabel(status?: string): string {
 
 interface ProjectsScreenProps {
   company: Company;
-  onBack: () => void;
+  onBack?: () => void;
   onOpenProjectTasks?: (project: Project) => void;
   onCreateTaskForProject?: (project: Project) => void;
   onOpenWebProjects?: (path?: string, title?: string) => void;
+  embedded?: boolean;
 }
 
 /**
@@ -87,6 +88,7 @@ export function ProjectsScreen({
   onOpenProjectTasks,
   onCreateTaskForProject,
   onOpenWebProjects,
+  embedded = false,
 }: ProjectsScreenProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
@@ -141,65 +143,100 @@ export function ProjectsScreen({
 
   return (
     <View style={styles.screen}>
-      <ScreenHeader
-        title="项目中心"
-        subtitle={
-          <Text style={styles.subtitle} numberOfLines={1}>
-            {company.name} · 代码库与工作空间
-          </Text>
-        }
-        onBack={onBack}
-        backLabel="任务"
-        right={
-          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-            {onOpenWebProjects ? (
-              <Pressable
-                style={styles.newProjectHeaderBtn}
-                onPress={() => onOpenWebProjects("/projects", "项目中心 · 新建多源项目")}
-                hitSlop={8}
-                accessibilityLabel="新建多源项目"
-              >
-                <Ionicons name="add" size={15} color={C.ink} />
-                <Text style={styles.newProjectHeaderBtnText} numberOfLines={1}>
-                  新建
-                </Text>
-              </Pressable>
-            ) : null}
-            <Pressable
-              style={styles.refreshBtn}
-              onPress={() => void load(true)}
-              hitSlop={8}
-              accessibilityLabel="刷新项目列表"
-            >
-              <Ionicons name="refresh-outline" size={16} color={C.ink3} />
-            </Pressable>
-          </View>
-        }
-      />
+      {onBack ? (
+        <ScreenHeader
+          title="项目中心"
+          subtitle={
+            <Text style={styles.subtitle} numberOfLines={1}>
+              {company.name} · 代码库与工作空间
+            </Text>
+          }
+          onBack={onBack}
+          backLabel="返回"
+          style={styles.header}
+          right={
+            // 嵌入资产 Tab 时, 新建/刷新 挪到下方过滤条右侧 (embeddedActions),
+            // 头部只留 返回 + 标题, 避免同一组动作渲染两遍。
+            embedded ? undefined : (
+              <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                {onOpenWebProjects ? (
+                  <Pressable
+                    style={styles.newProjectHeaderBtn}
+                    onPress={() => onOpenWebProjects("/projects", "项目中心 · 新建多源项目")}
+                    hitSlop={8}
+                    accessibilityLabel="新建多源项目"
+                  >
+                    <Ionicons name="add" size={15} color={C.ink} />
+                    <Text style={styles.newProjectHeaderBtnText} numberOfLines={1}>
+                      新建
+                    </Text>
+                  </Pressable>
+                ) : null}
+                <Pressable
+                  style={styles.refreshBtn}
+                  onPress={() => void load(true)}
+                  hitSlop={8}
+                  accessibilityLabel="刷新项目列表"
+                >
+                  <Ionicons name="refresh-outline" size={16} color={C.ink3} />
+                </Pressable>
+              </View>
+            )
+          }
+        />
+      ) : null}
 
-      {/* 状态过滤 Chips */}
+      {/* 状态过滤 Chips 与右上角快捷操作 */}
       <View style={styles.filterBar}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.filterContent}
-        >
-          {STATUS_FILTERS.map((f) => {
-            const count = countsByStatus[f.key] ?? 0;
-            const active = statusFilter === f.key;
-            return (
+        <View style={styles.filterRow}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.filterContent}
+          >
+            {STATUS_FILTERS.map((f) => {
+              const count = countsByStatus[f.key] ?? 0;
+              const active = statusFilter === f.key;
+              return (
+                <Pressable
+                  key={f.key}
+                  onPress={() => setStatusFilter(f.key)}
+                  style={[styles.filterChip, active && styles.filterChipActive]}
+                >
+                  <Text style={[styles.filterLabel, active && styles.filterLabelActive]}>
+                    {f.label} {count > 0 ? `(${count})` : ""}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {embedded ? (
+            <View style={styles.embeddedActions}>
+              {onOpenWebProjects ? (
+                <Pressable
+                  style={styles.newProjectHeaderBtn}
+                  onPress={() => onOpenWebProjects("/projects", "项目中心 · 新建多源项目")}
+                  hitSlop={8}
+                  accessibilityLabel="新建多源项目"
+                >
+                  <Ionicons name="add" size={15} color={C.ink} />
+                  <Text style={styles.newProjectHeaderBtnText} numberOfLines={1}>
+                    新建
+                  </Text>
+                </Pressable>
+              ) : null}
               <Pressable
-                key={f.key}
-                onPress={() => setStatusFilter(f.key)}
-                style={[styles.filterChip, active && styles.filterChipActive]}
+                style={styles.refreshBtn}
+                onPress={() => void load(true)}
+                hitSlop={8}
+                accessibilityLabel="刷新项目列表"
               >
-                <Text style={[styles.filterLabel, active && styles.filterLabelActive]}>
-                  {f.label} {count > 0 ? `(${count})` : ""}
-                </Text>
+                <Ionicons name="refresh-outline" size={16} color={C.ink3} />
               </Pressable>
-            );
-          })}
-        </ScrollView>
+            </View>
+          ) : null}
+        </View>
       </View>
 
       <ScrollView
@@ -598,6 +635,11 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: C.bg,
   },
+  // 头部自带水平内边距: 项目中心既可能是独立页 (任务页压入), 也可能是
+  // 资产 Tab 内的分段 — 没有这层内边距时返回标签会贴在屏幕左缘, 像溢出。
+  header: {
+    paddingHorizontal: SPACING.lg,
+  },
   subtitle: {
     fontSize: 12,
     color: C.ink3,
@@ -611,6 +653,17 @@ const styles = StyleSheet.create({
     backgroundColor: C.panel,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: C.line,
+  },
+  filterRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  embeddedActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingRight: SPACING.md,
   },
   filterContent: {
     paddingHorizontal: SPACING.lg,
@@ -687,8 +740,11 @@ const styles = StyleSheet.create({
   },
   description: {
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 19,
     color: C.ink2,
+    marginLeft: 18,
+    marginRight: 4,
+    flexShrink: 1,
   },
   workspacesSection: {
     marginTop: 2,

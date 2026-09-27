@@ -131,7 +131,7 @@ export function PrototypeSandboxScreen({
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="light" />
-        <ScreenHeader onBack={onBack} backLabel="返回" title="原型交互沙箱" />
+        <ScreenHeader onBack={onBack} backLabel="返回" title="原型交互沙箱" style={styles.header} />
         <View style={styles.emptyWrap}>
           <EmptyState
             variant="standalone"
@@ -267,6 +267,9 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0,
     flex: 1,
     backgroundColor: C.bg,
+  },
+  header: {
+    paddingHorizontal: 16,
   },
   toolbar: {
     flexDirection: "row",

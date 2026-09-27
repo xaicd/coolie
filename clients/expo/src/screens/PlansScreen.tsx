@@ -60,6 +60,7 @@ export function PlansScreen({
         }
         onBack={onBack}
         backLabel="任务"
+        style={styles.header}
       />
 
       <ScrollView
@@ -106,6 +107,9 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: C.bg,
+  },
+  header: {
+    paddingHorizontal: SPACING.lg,
   },
   scroll: {
     flex: 1,

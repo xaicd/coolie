@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.78
+
+> Released: 2026-09-27 · Android release APK
+
+### 更新
+
+- wave113 修项目中心返回标签溢出: 真因是 `ScreenHeader` 自身不带水平内边距 (由调用方提供), 而项目中心 / Plan / Pipeline / Git 凭证 / 原型沙箱这几屏渲染头部时漏了这层内边距 —— 返回标签(如「任务」)贴在屏幕左缘、比正文的 16px 左边距更靠外, 看起来像溢出/突出 (老板 21:48 截图 资产→项目中心)。已给这些屏的头部补上 16px 内边距, 返回箭头 + 标签完整落在屏幕内。
+
+---
+
 ## v0.5.77
 
 > Released: 2026-09-27 · Android release APK

@@ -175,6 +175,7 @@ export function GitCredentialsScreen({
         }
         onBack={onBack}
         backLabel="设置"
+        style={styles.header}
         right={
           <Pressable
             onPress={() => setCreateOpen(true)}
@@ -344,6 +345,7 @@ function CreateCredentialSheet({
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: C.bg },
+  header: { paddingHorizontal: SPACING.lg },
   scroll: { flex: 1 },
   content: { padding: SPACING.md, paddingBottom: SPACING.xl, gap: SPACING.sm },
   subtitle: { color: C.ink3, fontSize: 12, marginTop: 2 },

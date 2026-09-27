@@ -78,6 +78,7 @@ export function PipelinesScreen({
         }
         onBack={onBack}
         backLabel="任务"
+        style={styles.header}
         right={
           <Pressable
             onPress={() => openWeb("/pipelines/new", "无法打开 Pipeline 编辑器")}
@@ -150,6 +151,9 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: C.bg,
+  },
+  header: {
+    paddingHorizontal: SPACING.lg,
   },
   scroll: {
     flex: 1,
