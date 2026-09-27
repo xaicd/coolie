@@ -244,8 +244,8 @@
     {
       "path": "server/src/routes/board-chat.ts",
       "maxNetLines": 60,
-      "reason": "Board chat runs on `hermes` (the operator's own agent) instead of `claude`, and its deployment gate admits `authenticated` as well as `local_trusted`, because this fork's install is single-operator (one boss) rather than an upstream multi-tenant deployment. Registered so the next upstream merge resolves this file by intent: keep upstream's relay logic, re-apply the hermes spawn and the widened gate.",
-      "maxTotalLines": 160
+      "reason": "Board chat runs on `hermes` (the operator's own agent) instead of `claude`, and its deployment gate admits `authenticated` as well as `local_trusted`, because this fork's install is single-operator (one boss) rather than an upstream multi-tenant deployment. It also carries the fork's conversation-clear handling (wave115): DELETE /board/chat/conversation/:id hard-deletes the issue's rows so a cleared chat cannot render as empty transparent bubbles, the concierge reply is not persisted when it is a bare status line, the prompt history reads with includeDeleted=false and drops blank/status turns. Registered so the next upstream merge resolves this file by intent: keep upstream's relay logic, re-apply the hermes spawn, the widened gate, and the clear/status handling.",
+      "maxTotalLines": 200
     },
     {
       "path": "server/src/__tests__/board-chat-route-feature-flag.test.ts",
