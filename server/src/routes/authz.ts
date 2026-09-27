@@ -167,6 +167,13 @@ export function hasCompanyAccess(req: Request, companyId: string): boolean {
   if (req.actor.type === "none") return false;
   if (req.actor.type === "agent") return req.actor.companyId === companyId;
   if (req.actor.source === "local_implicit") return true;
+  if (
+    req.actor.type === "board" &&
+    req.actor.isInstanceAdmin === true &&
+    (req.actor.source === "api_key" || req.actor.source === "cloud_control")
+  ) {
+    return true;
+  }
   return (req.actor.companyIds ?? []).includes(companyId);
 }
 
