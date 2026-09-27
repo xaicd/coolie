@@ -381,42 +381,68 @@ The concrete payoff would be the Feishu/Lark family and any future internal regi
 `well_known` resolver could handle `open.feishu.cn/.well-known/skills/*` natively
 instead of everyone hand-rolling a `ramp`-style wrapper.
 
-## Operational note: the manifest build does not complete in a constrained environment
+## Operational note: why the manifest build was slow, and how it was fixed
 
-This is the most important unresolved problem in this pass, and it contradicts an earlier
-draft of this document.
+An earlier draft of this document called this the most important unresolved problem. It was
+a real problem and it is now fixed; the record is kept because the reasoning in that draft
+was half wrong and the correction is the useful part.
 
-`build:manifest` fetches one repository tree plus one raw file per referenced file, and it
-does so **fully serialized, with no concurrency and no per-request timeout**. With 14
-references — one of which (`last30days`) carries ~79 files — that is well over 100
+The builder fetched one repository tree plus one raw file per referenced file, and it did
+so **fully serialized, with no concurrency and no per-request timeout**. With 14
+references — one of which (`last30days`) carries ~79 files — that was well over 100
 sequential HTTP requests. Measured behaviour in this environment:
 
 - With a healthy network the build ran past **20 minutes** without completing.
 - Unauthenticated GitHub API allows **60 requests/hour**, and this pass exhausted it. Tree
-  requests then return `403`, and the build blocks on them.
+  requests then returned `403`, and the build blocked on them.
 
-The consequence is worse than "degrades gracefully". When tree fetches fail, the builder
-falls back to the previously generated manifest entry — so the **build** still exits `0`
-with a written manifest. But the resulting file is then reported as **stale** by the
-`validate` gate, which compares it against a fresh expected manifest:
+A second trap: when tree fetches fail, the builder falls back to the previously generated
+manifest entry — so the **build** still exits `0` with a written manifest. The resulting
+file is then reported as **stale** by the `validate` gate, which compares it against a
+fresh expected manifest:
 
 ```
 - generated/catalog.json is stale. Run pnpm --filter @paperclipai/skills-catalog build:manifest.
 ```
 
-So the fallback keeps `build:manifest` green while leaving the verification gate red. The
-committed `catalog.json` (`generatedAt: 2026-09-27T06:22:50.193Z`, sha256 `7ea3b60e…`)
-was produced inside the rate-limited window via exactly this path, and `validate` fails
-against it. Whether the divergence is a substantive entry difference or pure fallback
-artifact could not be determined, because a fresh build never completed.
+**Corrected cause of the staleness.** It was not a fallback artifact. The committed
+manifest recorded `find-skills/SKILL.md` at 7405 bytes with sha256 `b389bd3a…`, while the
+committed file itself is 8911 bytes with sha256 `d7d4951c…`. The manifest was generated
+before the final edit to that file and then committed alongside the edited file, so HEAD
+was internally inconsistent: `build:manifest` had exited `0` on an input set that no
+longer existed. The refresh above resolved it. The lesson is a process one — the batch was
+committed without running `validate`.
 
-Two things follow:
+## Fix: bounded concurrency, timeouts, and a shared tree cache (implemented)
 
-- `validate` passing is the honest signal for this package, and **it is currently failing**.
-  Do not treat the catalog as verified on the strength of `build:manifest` exiting `0`.
-- The reference mechanism needs concurrency, per-request timeouts, and either a
-  `GITHUB_TOKEN` or a warm artifact cache before it is CI-safe. Until then, adding a
-  reference is a slow, rate-limit-fragile operation.
+The builder now fetches referenced files through a bounded pool (default 8 in flight,
+`fetchConcurrency`), gives every request a timeout (default 20s, `fetchTimeoutMs`), and
+caches each repository tree per `(hostname, owner, repo, commit)` so references sharing a
+pinned repo — the five `anthropics/knowledge-work-plugins` entries, for example — spend one
+API request instead of five. Errors are still merged in tree order, so the manifest and its
+error text stay deterministic, and the three new builder tests pin the tree-cache reuse,
+the timeout abort, and the concurrency bound.
+
+Measured in this environment:
+
+| | before | after |
+|---|---|---|
+| `build:manifest` | hung past 20 min, or failed after 166s | **17s**, wrote 32 skills |
+| `validate` | failed (stale) | **valid with 32 catalog skills**, 227s |
+
+`validate` is still network-bound because it rebuilds the expected manifest (twice, when
+the first pass differs from the committed file), so it remains the slow gate. A
+`GITHUB_TOKEN` or cached artifacts would cut it further, but it now completes and passes
+without either.
+
+Two caveats worth keeping:
+
+- The per-request timeout means a slow-but-working upstream is now treated as unreachable
+  and falls back to the existing entry. That trades a hang for a stale-but-written
+  manifest, so `validate` is precisely the gate that catches the difference — and is
+  precisely the gate that was skipped last time. It must run in CI.
+- `build:manifest` exiting `0` never means "the manifest is current". Only `validate`
+  does.
 
 The test suite is unaffected by this: `shipped-catalog` (20/20) asserts against the
 checked-in manifest, not a fresh build, so it stays green.
@@ -424,15 +450,26 @@ checked-in manifest, not a fresh build, so it stays green.
 
 ## Follow-ups
 
-1. **Make the manifest build CI-safe, and get `validate` green.** Concurrency, per-request
-   timeouts, and an authenticated or cached fetch. Until this is done the reference
-   mechanism is slow and rate-limit-fragile, and `validate` fails. Highest priority,
-   because it undermines the trustworthiness of the whole catalog.
-2. **Write the missing end-to-end test** for the script-bearing import gate: a mocked
-   `fetch` producing a `scripts/`-bearing external source, asserting deny with no
-   policy, deny with a default-allow policy, and success with an explicit rule. The
-   policy semantics and the unchanged default-deny are covered, but the gate itself is a
-   security boundary and deserves direct coverage.
+1. **Guard against a stale manifest (offline half done).** A new `shipped-catalog` test
+   recomputes every local skill's file inventory from disk and compares it to the shipped
+   manifest, so the exact incident that happened here — `find-skills/SKILL.md` edited
+   after its manifest was generated — now fails the normal test suite with no network and
+   a message that names the skill and the changed file. The referenced half still needs
+   `validate`.
+   Wiring `validate` into CI was deliberately **not** done here: `pr.yml` loads
+   `pr-trusted.yml` from **upstream master** (`paperclipai/paperclip@master`), so an edit
+   in this fork would not gate this fork's merges; `.github/**` is CODEOWNERS-guarded by
+   the repo's own rule; and a new job must also be added to the `verify` job's `needs`
+   list to actually block. Whoever owns CI should add it, with `GITHUB_TOKEN` to lift the
+   60/hour unauthenticated API limit.
+2. **Cover the script-bearing import gate end to end — done.** The gate is now tested at
+   both levels. `company-skills-service` drives a mocked `scripts/`-bearing GitHub import
+   through `importFromSource`: no authorizer → `422 scripts_executables_blocked`;
+   a refusing authorizer → blocked with nothing persisted; a consenting authorizer →
+   imported as `scripts_executables` with the pinned ref, and the authorizer receives the
+   payload it is deciding about. `company-skills-routes` captures the authorizer the route
+   passes and asserts that `no_policy_default` and `policy_default` are rejected while
+   `explicit_rule` is accepted, and that the decision is made on the payload's trust level.
 3. **Apply the trust gate to local authoring, or document the exception.** Today a
    rejected external skill could be re-authored locally. Either extend the gate or state
    plainly why local authoring is trusted.

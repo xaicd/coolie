@@ -1860,6 +1860,72 @@ describe("company skill mutation permissions", () => {
     );
   });
 
+  it("denies a script-bearing import unless a policy rule explicitly allows it", async () => {
+    const res = await request(await createApp({
+      type: "board",
+      userId: "local-board",
+      companyIds: ["company-1"],
+      source: "local_implicit",
+      isInstanceAdmin: false,
+    }))
+      .post("/api/companies/company-1/skills/import")
+      .send({ source: "https://github.com/acme/heavy" });
+
+    expect(res.status, JSON.stringify(res.body)).toBe(201);
+    const authorize = mockCompanySkillService.importFromSource.mock.calls[0]![2]
+      .authorizeScriptBearingImport as (input: unknown) => Promise<void>;
+
+    const payload = {
+      skillKey: "acme/heavy/heavy",
+      skillSlug: "heavy",
+      sourceType: "github",
+      sourceLocator: "https://github.com/acme/heavy",
+    };
+
+    // The harness default is an open policy reporting `no_policy_default`, which must
+    // not be mistaken for consent.
+    await expect(authorize(payload)).rejects.toMatchObject({
+      status: 403,
+      details: { code: "scripts_executables_denied", policyReason: "no_policy_default" },
+    });
+
+    // Nor does a materialized default-allow policy.
+    mockCompanySkillPolicyService.evaluate.mockImplementation(async (input) => ({
+      allowed: true,
+      action: input.action,
+      reason: "policy_default",
+      policyRevision: 1,
+      matchedRuleId: null,
+      remediation: null,
+    }));
+    await expect(authorize(payload)).rejects.toMatchObject({
+      status: 403,
+      details: { code: "scripts_executables_denied", policyReason: "policy_default" },
+    });
+
+    // A deliberate allow rule is the only opt-in.
+    mockCompanySkillPolicyService.evaluate.mockImplementation(async (input) => ({
+      allowed: true,
+      action: input.action,
+      reason: "explicit_rule",
+      policyRevision: 2,
+      matchedRuleId: "allow-script-bearing-imports",
+      remediation: null,
+    }));
+    await expect(authorize(payload)).resolves.toBeUndefined();
+
+    // The authorizer decides on the payload trust level, and normalizes the source type.
+    expect(mockCompanySkillPolicyService.evaluate).toHaveBeenLastCalledWith(expect.objectContaining({
+      companyId: "company-1",
+      action: "skills.import",
+      resource: expect.objectContaining({
+        trustLevel: "scripts_executables",
+        sourceType: "git",
+        skillKey: "acme/heavy/heavy",
+      }),
+    }));
+  });
+
   it("allows same-company agents without either legacy skill grant", async () => {
     mockAccessService.decide.mockResolvedValue(denySkillChangeDecision());
     mockAgentService.getById.mockResolvedValue({

@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -85,6 +86,31 @@ function readFrontmatterDescription(markdown: string): string | null {
   }
 
   return inlineValue.replace(/^['"]|['"]$/g, "");
+}
+
+function sha256Hex(contents: Buffer) {
+  return createHash("sha256").update(contents).digest("hex");
+}
+
+/** Mirrors the builder's local inventory: every file under the skill dir, by path. */
+function listLocalSkillInventory(skillDir: string): { path: string; sha256: string }[] {
+  const out: { path: string; sha256: string }[] = [];
+  const visit = (dir: string) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      const absolute = path.join(dir, entry.name);
+      if (entry.isDirectory()) {
+        visit(absolute);
+        continue;
+      }
+      if (!entry.isFile()) continue;
+      out.push({
+        path: path.relative(skillDir, absolute).split(path.sep).join("/"),
+        sha256: sha256Hex(readFileSync(absolute)),
+      });
+    }
+  };
+  visit(skillDir);
+  return out.sort((a, b) => a.path.localeCompare(b.path));
 }
 
 describe("shipped skills catalog", () => {
@@ -209,5 +235,39 @@ describe("shipped skills catalog", () => {
     const remoteExecPattern = /\b(?:curl|wget)\b[\s\S]{0,160}\|\s*(?:sh|bash)|\b(?:bash|sh)\s+-c\b|\beval\b|\bpython\s+-c\b|\bnode\s+-e\b/i;
 
     expect(remoteExecPattern.test(rampSkill)).toBe(false);
+  });
+
+  it("keeps the shipped manifest in sync with the local catalog sources on disk", () => {
+    // A manifest generated before its sources were last edited is silently stale:
+    // every other test still passes and `build:manifest` still exits 0, because a stale
+    // manifest is a valid manifest. That is how find-skills/SKILL.md was once committed
+    // ahead of its own inventory. Local skills are verifiable offline, so catch it here.
+    // Referenced skills need network and are covered by
+    // `pnpm --filter @paperclipai/skills-catalog validate`.
+    const violations: string[] = [];
+    for (const skill of catalogSkills) {
+      if (skill.source) continue;
+      // `skill.path` is relative to the catalog package dir, not the repo root.
+      const onDisk = listLocalSkillInventory(path.join(REPO_ROOT, "packages/skills-catalog", skill.path));
+      const recorded = skill.files
+        .map((file) => ({ path: file.path, sha256: file.sha256 }))
+        .sort((a, b) => a.path.localeCompare(b.path));
+      if (JSON.stringify(onDisk) === JSON.stringify(recorded)) continue;
+
+      const onDiskPaths = new Set(onDisk.map((file) => file.path));
+      const recordedPaths = new Set(recorded.map((file) => file.path));
+      const added = [...onDiskPaths].filter((file) => !recordedPaths.has(file));
+      const removed = [...recordedPaths].filter((file) => !onDiskPaths.has(file));
+      const recordedByPath = new Map(recorded.map((file) => [file.path, file.sha256]));
+      const changed = onDisk
+        .filter((file) => recordedByPath.has(file.path) && recordedByPath.get(file.path) !== file.sha256)
+        .map((file) => file.path);
+      violations.push(
+        `${skill.key}: manifest is stale (changed=${changed.join(",") || "-"} `
+        + `added=${added.join(",") || "-"} removed=${removed.join(",") || "-"}) `
+        + "— run pnpm --filter @paperclipai/skills-catalog build:manifest",
+      );
+    }
+    expect(violations).toEqual([]);
   });
 });

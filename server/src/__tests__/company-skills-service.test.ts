@@ -196,6 +196,61 @@ describeEmbeddedPostgres("companySkillService.list", () => {
     } finally { vi.unstubAllGlobals(); }
   });
 
+  it("requires an authorizer before importing an external skill that carries scripts", async () => {
+    const companyId = randomUUID();
+    await db.insert(companies).values({ id: companyId, name: "Script gate", issuePrefix: `T${companyId.slice(0, 6)}` });
+    const revision = "c".repeat(40);
+    const skillMarkdown = "---\nname: heavy\ndescription: An external skill that ships executable scripts.\n---\n# Heavy\n";
+    vi.stubGlobal("fetch", vi.fn(async (input: string | URL) => {
+      const url = String(input);
+      if (url.includes("/commits/")) return Response.json({ sha: revision });
+      if (url.includes("/git/trees/")) {
+        return Response.json({
+          tree: [
+            { path: "heavy/SKILL.md", type: "blob" },
+            { path: "heavy/scripts/run.sh", type: "blob" },
+          ],
+        });
+      }
+      if (url.endsWith("/SKILL.md")) return new Response(skillMarkdown);
+      if (url.endsWith("/scripts/run.sh")) return new Response("#!/bin/sh\necho hi\n");
+      return Response.json({ default_branch: "main" });
+    }));
+    try {
+      // No authorizer: the historic hard deny, unchanged, and nothing is persisted.
+      await expect(svc.importFromSource(companyId, "https://github.com/acme/heavy")).rejects.toMatchObject({
+        status: 422,
+        details: { trustLevel: "scripts_executables", reason: "scripts_executables_blocked" },
+      });
+      // Scoped to the rejected slug: touching the company also installs bundled defaults.
+      expect(await db.select().from(companySkills).where(eq(companySkills.slug, "heavy"))).toHaveLength(0);
+
+      // An authorizer that refuses keeps the import blocked and writes nothing.
+      const refusal = vi.fn(async () => {
+        throw new Error("no explicit rule allows this");
+      });
+      await expect(
+        svc.importFromSource(companyId, "https://github.com/acme/heavy", {
+          authorizeScriptBearingImport: refusal,
+        }),
+      ).rejects.toThrow(/no explicit rule allows this/);
+      expect(refusal).toHaveBeenCalledTimes(1);
+      expect(await db.select().from(companySkills).where(eq(companySkills.slug, "heavy"))).toHaveLength(0);
+
+      // Consent admits it, and the authorizer saw the payload it is deciding about.
+      const consent = vi.fn(async () => {});
+      const result = await svc.importFromSource(companyId, "https://github.com/acme/heavy", {
+        authorizeScriptBearingImport: consent,
+      });
+      expect(result.imported).toHaveLength(1);
+      expect(result.imported[0]).toMatchObject({ trustLevel: "scripts_executables", sourceRef: revision });
+      expect(consent).toHaveBeenCalledWith(expect.objectContaining({
+        sourceType: "github",
+        skillSlug: "heavy",
+      }));
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it("observes edits to a direct local source on the next preparation", async () => {
     const companyId = randomUUID();
     await db.insert(companies).values({ id: companyId, name: "Local cache", issuePrefix: `T${companyId.slice(0, 6)}` });
