@@ -27,6 +27,7 @@ import type {
 } from "@coolie/api-client";
 import { C, COOLIE_BASE_URL, coolie, getAuthToken } from "../coolie";
 import { CodeViewerWebView } from "../components/CodeViewerWebView";
+import { openInExternalApp } from "../utils/openExternalApp";
 import { AppCard } from "../ui/AppCard";
 import { EmptyState } from "../ui/EmptyState";
 import { LoadingState } from "../ui/LoadingState";
@@ -581,14 +582,19 @@ export function ArtifactsScreen({
                             const url = resolveMediaUrl(
                               item.downloadPath || item.contentPath || item.openPath,
                             );
-                            if (url) {
+                            if (!url) return;
+                            // QA 报告 D02 (wave107): 直接走外部应用, QQ 浏览器优先,
+                            // fallback 到系统浏览器. 不再弹选择 sheet (选择 sheet
+                            // 给用户感觉「App 没帮我打开, 还要我做选择」, 跳出感强).
+                            // 想要三选 (QQ / 系统 / 复制) 的入口保留在预览浮层里.
+                            void openInExternalApp(url, true).catch(() => {
                               setExternalSheetUrl(url);
                               setShowExternalSheet(true);
-                            }
+                            });
                           }}
                         >
                           <Text style={styles.actionBtnTextSecondary}>
-                            🚀 外部/QQ打开
+                            🚀 外部应用打开
                           </Text>
                         </Pressable>
                       )}
@@ -634,10 +640,11 @@ export function ArtifactsScreen({
                         previewArtifact?.contentPath ||
                         previewArtifact?.openPath,
                     );
-                    if (url) {
+                    if (!url) return;
+                    void openInExternalApp(url, true).catch(() => {
                       setExternalSheetUrl(url);
                       setShowExternalSheet(true);
-                    }
+                    });
                   }}
                   hitSlop={8}
                   style={styles.modalDownloadBtn}

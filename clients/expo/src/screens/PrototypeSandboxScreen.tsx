@@ -41,6 +41,7 @@ import { C } from "../coolie";
 import { EmptyState } from "../ui/EmptyState";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { ExternalOpenSheet } from "../components/ExternalOpenSheet";
+import { openInExternalApp } from "../utils/openExternalApp";
 
 export interface PrototypeSandboxScreenProps {
   company: Company;
@@ -113,9 +114,13 @@ export function PrototypeSandboxScreen({
 
   const [showExternalSheet, setShowExternalSheet] = useState<boolean>(false);
 
+  // wave107 (QA 报告 D02): 主入口直接走 QQ 浏览器优先 + 系统 fallback,
+  // 不弹选择 sheet (跳出感强); 三选 sheet 仅作兜底 (fallback 抛错时).
   const handleOpenExternal = useCallback(() => {
     if (!url) return;
-    setShowExternalSheet(true);
+    void openInExternalApp(url, true).catch(() => {
+      setShowExternalSheet(true);
+    });
   }, [url]);
 
   // DS 真值: Web 端降级为「在浏览器打开」; 我们也是
