@@ -313,7 +313,6 @@ PY
   # umask 影响（实测 600），会让直出变成 403、App 静默判定「无更新」。显式放开读权限。
   ssh "$SSH_TARGET" "chmod 644 '$REMOTE_VERSION_JSON'"
 fi
-rm -f "$TMP_JSON"
 echo "   ✓ 升级检测地址: $VERSION_JSON_URL"
 
 step "[9/9] 发布 OTA 增量更新 (android)"
@@ -334,6 +333,13 @@ else
     run_sh "bash '$REPO_ROOT/scripts/deploy-tc-coolie-claw.sh' --skip-build"
     HEALTH=$(ssh "$SSH_TARGET" "curl -s -m 5 localhost:3100/api/health | head -c 120")
     echo "   ✓ /api/health: $HEALTH"
+    # deploy 的 rsync --delete 会把上面 scp 到 ui/dist/version.json 的文件删掉
+    # (本地 ui/dist 不含它, 只在远端存在) — 0.5.75 实证 404。部署后重推。
+    if [ -f "$TMP_JSON" ]; then
+      scp "$TMP_JSON" "$SSH_TARGET:$REMOTE_VERSION_JSON"
+      ssh "$SSH_TARGET" "chmod 644 '$REMOTE_VERSION_JSON'"
+      echo "   ✓ version.json 已在部署后重推 (rsync --delete 补偿)"
+    fi
   fi
 fi
 
@@ -351,3 +357,5 @@ else
   printf ' server:        已联动部署 (deploy-tc-coolie-claw.sh --skip-build)\n'
 fi
 printf '========================================================\n'
+
+rm -f "$TMP_JSON"
