@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
@@ -78,7 +78,7 @@ const LIFECYCLE_CONFIG: Record<
     label: "草稿中",
     status: "idle",
     color: C.ink3,
-    bg: "rgba(255, 255, 255, 0.04)",
+    bg: C.lineSubtle,
     border: C.line,
   },
 };
@@ -461,19 +461,47 @@ export function OntologyDomainListScreen({
       nodeTypesList.find((nt) => nt.key === activeSelectedKey) || nodeTypesList[0];
 
     const N = nodeTypesList.length;
-    const canvasSize = 320;
+    const canvasSize = 340;
     const cx = canvasSize / 2;
     const cy = canvasSize / 2;
-    const R = Math.min(105, 55 + N * 10);
+    const R = Math.min(100, 48 + N * 8);
+
+    // 节点半径随实例数缩放 (sqrt 抑制极端值), fontScale 下也留足内空间
+    const nodeRadiusOf = (count: number) =>
+      Math.round(Math.min(34, 20 + Math.sqrt(Math.max(count - 1, 0)) * 5));
 
     const positions = nodeTypesList.map((nt, idx) => {
       const angle = (2 * Math.PI * idx) / Math.max(N, 1) - Math.PI / 2;
+      const r = nodeRadiusOf(nt.count);
       return {
         key: nt.key,
+        r,
         x: cx + R * Math.cos(angle),
         y: cy + R * Math.sin(angle),
       };
     });
+    const posByKey = new Map(positions.map((p) => [p.key, p]));
+
+    // 真实关系连线: 快照采样节点 id -> 实体类型, 两端都能解析的边才画。
+    // 旧版画的是「环上相邻假连线」, 看着像关系链, 实际与业务关系无关。
+    const nodeIdType = new Map<string, string>();
+    for (const n of snapshot?.nodes || []) {
+      nodeIdType.set(n.id, n.nodeTypeId || n.label || n.key);
+    }
+    const typeEdges = (() => {
+      const seen = new Set<string>();
+      const out: Array<{ fromKey: string; toKey: string }> = [];
+      for (const e of snapshot?.edges || []) {
+        const a = nodeIdType.get(e.sourceNodeId);
+        const b = nodeIdType.get(e.targetNodeId);
+        if (!a || !b || a === b) continue;
+        const dedupe = [a, b].sort().join("→");
+        if (seen.has(dedupe)) continue;
+        seen.add(dedupe);
+        out.push({ fromKey: a, toKey: b });
+      }
+      return out;
+    })();
 
     return (
       <SafeAreaView style={styles.safeArea}>
@@ -499,9 +527,9 @@ export function OntologyDomainListScreen({
           <AppCard variant="surface" style={styles.graphCanvasCard}>
             <View style={styles.graphCanvasHeader}>
               <View>
-                <Text style={styles.graphCanvasTitle}>实体关系环形拓扑</Text>
+                <Text style={styles.graphCanvasTitle}>实体关系拓扑</Text>
                 <Text style={styles.graphCanvasSub}>
-                  {nodeTypesList.length} 个实体类型 · 点击节点查看 Properties Schema
+                  {nodeTypesList.length} 个实体类型 · {snapshot?.counts?.edges ?? 0} 条关系 · 节点大小=实例数
                 </Text>
               </View>
               <View style={styles.graphLegend}>
@@ -511,22 +539,24 @@ export function OntologyDomainListScreen({
             </View>
 
             <View style={[styles.graphCanvas, { width: canvasSize, height: canvasSize, alignSelf: "center" }]}>
-              {/* 连线 */}
-              {positions.map((posA, i) => {
-                if (positions.length <= 1) return null;
-                const posB = positions[(i + 1) % positions.length];
+              {/* 真实关系连线 (类型级, 快照采样) */}
+              {typeEdges.map(({ fromKey, toKey }) => {
+                const posA = posByKey.get(fromKey);
+                const posB = posByKey.get(toKey);
+                if (!posA || !posB) return null;
                 const dx = posB.x - posA.x;
                 const dy = posB.y - posA.y;
                 const length = Math.sqrt(dx * dx + dy * dy);
+                if (length <= posA.r + posB.r) return null;
                 const angle = Math.atan2(dy, dx);
                 const midX = (posA.x + posB.x) / 2;
                 const midY = (posA.y + posB.y) / 2;
                 const isEdgeActive =
-                  posA.key === activeSelectedKey || posB.key === activeSelectedKey;
+                  fromKey === activeSelectedKey || toKey === activeSelectedKey;
 
                 return (
                   <View
-                    key={`edge-${posA.key}-${posB.key}`}
+                    key={`edge-${fromKey}-${toKey}`}
                     style={[
                       styles.graphEdgeLine,
                       {
@@ -534,48 +564,60 @@ export function OntologyDomainListScreen({
                         top: midY,
                         width: length,
                         backgroundColor: isEdgeActive ? C.accent : C.line,
-                        opacity: isEdgeActive ? 0.8 : 0.3,
+                        opacity: isEdgeActive ? 0.85 : 0.45,
                         transform: [{ rotate: `${angle}rad` }],
                       },
                     ]}
                   />
                 );
               })}
+              {typeEdges.length === 0 && snapshot?.counts?.edges ? (
+                <Text style={styles.graphEdgesHint}>
+                  关系连线需实体采样数据 (当前快照抽样不足, 显示 {snapshot.counts.edges} 条关系统计)
+                </Text>
+              ) : null}
 
-              {/* 节点气泡 */}
+              {/* 节点气泡: 实例数在圆内, 名称标签在圆下方 */}
               {positions.map((pos) => {
                 const nt = nodeTypesList.find((n) => n.key === pos.key)!;
                 const isSelected = nt.key === activeSelectedKey;
-                const nodeRadius = 26;
 
                 return (
-                  <Pressable
-                    key={`node-${pos.key}`}
-                    style={[
-                      styles.graphNodeCircle,
-                      {
-                        left: pos.x - nodeRadius,
-                        top: pos.y - nodeRadius,
-                        width: nodeRadius * 2,
-                        height: nodeRadius * 2,
-                        borderRadius: nodeRadius,
-                        borderColor: isSelected ? C.accent : C.line,
-                        backgroundColor: isSelected ? C.surfaceHover : C.panel,
-                      },
-                    ]}
-                    onPress={() => setSelectedNodeTypeKey(nt.key)}
-                  >
+                  <React.Fragment key={`node-${pos.key}`}>
+                    <Pressable
+                      style={[
+                        styles.graphNodeCircle,
+                        {
+                          left: pos.x - pos.r,
+                          top: pos.y - pos.r,
+                          width: pos.r * 2,
+                          height: pos.r * 2,
+                          borderRadius: pos.r,
+                          borderColor: isSelected ? C.accent : C.line,
+                          backgroundColor: isSelected ? C.surfaceHover : C.panel,
+                        },
+                      ]}
+                      onPress={() => setSelectedNodeTypeKey(nt.key)}
+                    >
+                      <Text
+                        style={[
+                          styles.graphNodeCountText,
+                          isSelected && { color: C.ink, fontWeight: "700" },
+                        ]}
+                      >
+                        {nt.count}
+                      </Text>
+                    </Pressable>
                     <Text
                       style={[
-                        styles.graphNodeCircleText,
-                        isSelected && { color: C.ink, fontWeight: "700" },
+                        styles.graphNodeCaption,
+                        { left: pos.x - 46, top: pos.y + pos.r + 4 },
                       ]}
                       numberOfLines={1}
                     >
-                      {nt.label.slice(0, 5)}
+                      {nt.label}
                     </Text>
-                    <Text style={styles.graphNodeCountText}>{nt.count}</Text>
-                  </Pressable>
+                  </React.Fragment>
                 );
               })}
             </View>
@@ -934,7 +976,7 @@ export function OntologyDomainListScreen({
                   { backgroundColor: C.accent, borderColor: C.accent },
                 ]}
               >
-                <Text style={{ color: "#FFFFFF", fontSize: 12, fontWeight: "600" }}>+ 新建</Text>
+                <Text style={{ color: C.ink, fontSize: 12, fontWeight: "600" }}>+ 新建</Text>
               </Pressable>
               <Pressable
                 onPress={handleSeedSample}
@@ -1002,7 +1044,7 @@ export function OntologyDomainListScreen({
                   ]}
                   onPress={() => setNewDomainModalOpen(true)}
                 >
-                  <Text style={{ color: "#FFFFFF", fontSize: 14, fontWeight: "600" }}>
+                  <Text style={{ color: C.ink, fontSize: 14, fontWeight: "600" }}>
                     + 新建本体
                   </Text>
                 </Pressable>
@@ -1264,7 +1306,7 @@ export function OntologyDomainListScreen({
                 onPress={() => void handleCreateDomain()}
               >
                 {creatingDomain ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
+                  <ActivityIndicator size="small" color={C.ink} />
                 ) : (
                   <Text style={styles.confirmBtnText}>
                     {newDomainMode === "directory" ? "创建并接入" : "创建本体"}
@@ -1313,7 +1355,7 @@ const styles = StyleSheet.create({
     fontSize: 11,
   },
   refreshBtn: {
-    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    backgroundColor: C.lineSubtle,
     borderColor: C.line,
     borderWidth: 1,
     borderRadius: 8,
@@ -1493,7 +1535,7 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   unlockBtn: {
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor: C.lineSubtle,
     borderColor: C.line,
     borderWidth: 1,
     borderRadius: 8,
@@ -1514,7 +1556,7 @@ const styles = StyleSheet.create({
     width: "48%",
   },
   cardList: {
-    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    backgroundColor: C.lineSubtle,
     borderColor: C.line,
     borderWidth: 1,
     borderRadius: 12,
@@ -1603,6 +1645,23 @@ const styles = StyleSheet.create({
   graphLegendDot: { width: 8, height: 8, borderRadius: 4 },
   graphLegendText: { color: C.ink3, fontSize: 11 },
   graphCanvas: { position: "relative" },
+  graphEdgesHint: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    bottom: 8,
+    color: C.ink4,
+    fontSize: 10,
+    textAlign: "center",
+  },
+  graphNodeCaption: {
+    position: "absolute",
+    width: 92,
+    textAlign: "center",
+    color: C.ink2,
+    fontSize: 10,
+    lineHeight: 13,
+  },
   graphEdgeLine: {
     position: "absolute",
     height: 1,
@@ -1613,8 +1672,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 1,
   },
-  graphNodeCircleText: { color: C.ink2, fontSize: 10 },
-  graphNodeCountText: { color: C.ink4, fontSize: 9 },
+  graphNodeCountText: { color: C.ink2, fontSize: 13, fontWeight: "600" },
   schemaCard: {
     marginTop: 12,
   },
@@ -1797,7 +1855,7 @@ const styles = StyleSheet.create({
     minWidth: 96,
   },
   confirmBtnText: {
-    color: "#FFFFFF",
+    color: C.ink,
     fontSize: 13,
     fontWeight: "600",
   },
