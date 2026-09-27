@@ -8,7 +8,7 @@ export type BarTabKey = "dashboard" | "tasks" | "chat" | "assets" | "agents" | "
 /**
  * 底栏高度。铺满底部的浮层必须让出这一段。
  */
-export const TAB_BAR_HEIGHT = 60;
+export const TAB_BAR_HEIGHT = 64;
 
 type Slot = {
   key: BarTabKey;
@@ -49,7 +49,7 @@ function Tab({
     >
       <Ionicons
         name={active ? slot.activeIcon : slot.icon}
-        size={22}
+        size={24}
         color={active ? C.accent : C.ink3}
       />
       <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
@@ -131,10 +131,11 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: "center",
     justifyContent: "center",
-    gap: 3,
+    gap: 4,
   },
   tabLabel: {
-    fontSize: 10,
+    fontSize: 13,
+    lineHeight: 16,
     color: C.ink3,
     fontWeight: "400",
   },

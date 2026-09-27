@@ -4,6 +4,17 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.81
+
+> Released: 2026-09-27 · Android release APK
+
+### 更新
+
+- wave116 底部导航栏字号优化 (boss 真机 23:00 反馈「底部导航栏字太小了」): 标签 10→13px、图标 22→24px、栏高 60→64px, 五个 tab (汇览/任务/工坊/资产) + 中央 FAB 布局不变
+- 随包带上 0.5.80 之后的新提交 (3967d063b: 平台核心工具经 MCP 暴露 + Hermes 连接)
+
+---
+
 ## v0.5.80
 
 > Released: 2026-09-27 · Android release APK
