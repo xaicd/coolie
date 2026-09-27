@@ -133,6 +133,38 @@ export function DashboardScreen({
     }
   }, [company.id, emergencyBusy]);
 
+  // wave112: 所有 Hook 必须位于下方提前 return 之前 —— React 要求每次渲染 Hook
+  // 的数量/顺序一致。D11 成本下钻这批 Hook 曾被放在 `loading` 提前 return 之后:
+  // 首帧 loading=true 少跑 4 个 Hook, 数据到达后重渲染多跑 4 个 → "Rendered more
+  // hooks than during the previous render" 抛错并卸载整棵 React 树 → 选完公司白屏
+  // (boss 0.5.76 真机, HomeScreen 默认 tab 就是 dashboard)。切勿下移。
+  const [costSheetOpen, setCostSheetOpen] = useState(false);
+  const [costLoading, setCostLoading] = useState(false);
+  const [costRows, setCostRows] = useState<Array<{
+    agentId: string;
+    agentName: string;
+    agentStatus?: string;
+    costCents: number;
+    inputTokens: number;
+    outputTokens: number;
+  }>>([]);
+  const loadCostRows = useCallback(async () => {
+    setCostSheetOpen(true);
+    setCostLoading(true);
+    try {
+      const rows = await coolie.costsByAgent(company.id);
+      setCostRows(
+        rows
+          .filter((r) => r.costCents > 0 || r.inputTokens > 0 || r.outputTokens > 0)
+          .sort((a, b) => b.costCents - a.costCents),
+      );
+    } catch {
+      setCostRows([]);
+    } finally {
+      setCostLoading(false);
+    }
+  }, [company.id]);
+
   if (loading && !data) {
     return (
       <SafeAreaView style={{ backgroundColor: C.bg, flex: 1 }}>
@@ -200,34 +232,6 @@ export function DashboardScreen({
 
   // ── 失败率 ──
   const failRatePct = data?.failureRate?.overallFailureRatePercent ?? 0;
-
-  // ── D11 成本下钻: 按员工花费 ──
-  const [costSheetOpen, setCostSheetOpen] = useState(false);
-  const [costLoading, setCostLoading] = useState(false);
-  const [costRows, setCostRows] = useState<Array<{
-    agentId: string;
-    agentName: string;
-    agentStatus?: string;
-    costCents: number;
-    inputTokens: number;
-    outputTokens: number;
-  }>>([]);
-  const loadCostRows = useCallback(async () => {
-    setCostSheetOpen(true);
-    setCostLoading(true);
-    try {
-      const rows = await coolie.costsByAgent(company.id);
-      setCostRows(
-        rows
-          .filter((r) => r.costCents > 0 || r.inputTokens > 0 || r.outputTokens > 0)
-          .sort((a, b) => b.costCents - a.costCents),
-      );
-    } catch {
-      setCostRows([]);
-    } finally {
-      setCostLoading(false);
-    }
-  }, [company.id]);
 
   return (
     <SafeAreaView style={{ backgroundColor: C.bg, flex: 1 }}>

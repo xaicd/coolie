@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.77
+
+> Released: 2026-09-27 · Android release APK
+
+### 更新
+
+- wave112 修 0.5.76 选完公司白屏: 真因是 DashboardScreen 的 D11 成本下钻 Hook 被放在提前 return 之后 — 首帧 loading=true 少跑 4 个 Hook, 数据到达后重渲染多跑 4 个 → "Rendered more hooks than during the previous render" 抛错并卸载整棵 React 树 → 白屏 (HomeScreen 默认 tab 就是 dashboard)。已把该批 Hook 移回提前 return 之上。附带: ①默认登录与退出登录均回原生表单 (老 WebView Chromium <80 解析不了 ES2020 SPA) ②Web 登录加 15s 空白兜底 (页面未报存活自动切回原生) ③登录 prober 401 指数退避 + 25 次封顶停表 ④Web 登录只写 session 槽, 不再污染 bearer 槽
+
+---
+
 ## v0.5.76
 
 > Released: 2026-09-27 · Android release APK

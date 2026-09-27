@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   BackHandler,
@@ -20,7 +20,6 @@ import { CoolieLogo } from "../components/CoolieLogo";
 import {
   coolie,
   getSessionUser,
-  saveAuthToken,
   saveSessionToken,
   type Credential,
 } from "../coolie";
@@ -41,36 +40,77 @@ interface WebLoginScreenProps {
 const INJECTED_SESSION_PROBER = `
 (function() {
   // wave111: 单实例护栏 — injectedJavaScript 与 onNavigationStateChange 的补注
-  // 会在同一页面各跑一份, 两份 setInterval 各自 1.2s 轮询一次 (实测双倍 401 流量)。
+  // 会在同一页面各跑一份, 两份各自轮询 (实测双倍 401 流量)。
   if (window.__COOLIE_SESSION_PROBER__) return;
   window.__COOLIE_SESSION_PROBER__ = true;
   var sent = false;
+  var aliveSent = false;
   var timer = null;
+  // wave112: 401 不再无限秒级轮询 — 指数退避 (1.2s 起, ×1.7, 上限 10s) + 连续
+  // 25 次失败后彻底停表。老 WebView 上 SPA 解析失败白屏时, prober 曾以 1.2s/次
+  // 无限打 401 (boss 真机全天 266 次); 且 Android 的 RN 会话不在 WebView cookie
+  // jar 里, 原生已登录也一样全 401, 轮询本身探测不到任何东西。
+  var delay = 1200;
+  var MAX_DELAY = 10000;
+  var failures = 0;
+  var MAX_FAILURES = 25;
+  function post(msg) {
+    if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
+      window.ReactNativeWebView.postMessage(JSON.stringify(msg));
+    }
+  }
   function stop() {
-    if (timer !== null) { clearInterval(timer); timer = null; }
+    if (timer !== null) { clearTimeout(timer); timer = null; }
+  }
+  function scheduleNext() {
+    if (sent || failures >= MAX_FAILURES) { stop(); return; }
+    timer = setTimeout(probeSession, delay);
+  }
+  function noteFailure() {
+    failures++;
+    delay = Math.min(Math.round(delay * 1.7), MAX_DELAY);
+    scheduleNext();
+  }
+  // 页面存活心跳: SPA (#root 有子节点) 渲染出来过一次就上报一次, 原生侧用它
+  // 区分「页面在正常跑」和「老 WebView 解析失败白屏」(wave112 空白兜底的前提)。
+  function checkAlive() {
+    if (aliveSent) return;
+    var root = document.querySelector('#root');
+    if (root && root.childElementCount > 0) {
+      aliveSent = true;
+      post({ type: 'WEB_LOGIN_PAGE_ALIVE' });
+    }
   }
   function probeSession() {
     if (sent) { stop(); return; }
+    checkAlive();
     fetch('/api/auth/session-token')
       .then(function(res) {
-        if (!res.ok) return null;
-        return res.json();
+        if (res.ok) return res.json();
+        return { __failed: true };
       })
       .then(function(data) {
-        if (data && data.token && !sent) {
+        if (sent) { stop(); return; }
+        if (data && data.token) {
           sent = true;
           stop();
-          if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
-            window.ReactNativeWebView.postMessage(JSON.stringify({
-              type: 'WEB_LOGIN_SUCCESS',
-              token: data.token
-            }));
-          }
+          post({ type: 'WEB_LOGIN_SUCCESS', token: data.token });
+          return;
         }
+        noteFailure();
       })
-      .catch(function() {});
+      .catch(function() {
+        if (sent) return;
+        noteFailure();
+      });
   }
-  timer = setInterval(probeSession, 1200);
+  // 心跳独立于探测节奏: 页面渲染是渐进的, 每 800ms 看一眼, 最多看 30 眼。
+  var aliveTicks = 0;
+  var aliveTimer = setInterval(function() {
+    aliveTicks++;
+    checkAlive();
+    if (aliveSent || aliveTicks >= 30) clearInterval(aliveTimer);
+  }, 800);
   probeSession();
 })();
 true;
@@ -93,14 +133,39 @@ export function WebLoginScreen({ onSignedIn, onFallbackNative }: WebLoginScreenP
 
   const loginUrl = `${COOLIE_WEB_URL.replace(/\/+$/, "")}/auth?shell=native`;
 
+  // wave112 空白兜底: 页面 15s 内既没报「SPA 渲染存活」也没登录成功, 判定这块
+  // WebView 渲染不了登录页 (老 WebView Chromium <80 解析不了 ES2020 SPA, 整页
+  // 空白), 自动切回原生表单, 不让用户停在白布上。
+  const pageUsableRef = useRef(false);
+
+  useEffect(() => {
+    pageUsableRef.current = false;
+    if (!onFallbackNative) return;
+    const fallbackTimer = setTimeout(() => {
+      if (!pageUsableRef.current) {
+        console.log("[web-login] page blank after 15s (old WebView?), falling back to native form");
+        onFallbackNative();
+      }
+    }, 15000);
+    return () => clearTimeout(fallbackTimer);
+  }, [reloadKey, onFallbackNative]);
+
   const handleMessage = useCallback(
     async (event: { nativeEvent: { data: string } }) => {
       try {
         const payload = JSON.parse(event.nativeEvent.data);
+        if (payload?.type === "WEB_LOGIN_PAGE_ALIVE") {
+          pageUsableRef.current = true;
+          return;
+        }
         if (payload?.type === "WEB_LOGIN_SUCCESS" && payload.token) {
+          pageUsableRef.current = true;
           const token = String(payload.token).trim();
+          // wave112: 只存 session 槽, 不再写 bearer 槽 (AUTH_KEY)。session token
+          // 不是 agent/board key, 写进去后每次冷启动 restoreCredential 都要白烧
+          // 两轮 401 探测再靠 cookie 重放续命。原生 API 调用走 SESSION_TOKEN_KEY
+          // 的 Cookie 重放, WebContainerScreen 的会话桥同样读 SESSION_TOKEN_KEY。
           await saveSessionToken(token);
-          await saveAuthToken(token);
 
           // 尝试通过 session 加载用户信息
           let user = await getSessionUser();

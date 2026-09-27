@@ -270,7 +270,12 @@ function SettingsSheet({
 export default function App() {
   const [credential, setCredential] = useState<Credential | null | undefined>(undefined);
   const [registering, setRegistering] = useState(false);
-  const [loginMode, setLoginMode] = useState<"web" | "native">("web");
+  // wave112: 默认登录改回原生表单。Web 登录页是 ES2020+ 的 SPA bundle (大量 ?? / ?. /
+  // 私有字段), Chromium <80 的老 WebView 直接解析失败 → 整页空白, 老板真机 0.5.76 的
+  // 「选完公司白屏」就是凭证一失效就落在这块白布上。原生表单在任何设备都能用;
+  // Web 登录保留为显式入口 (SignInScreen 的 🌐 横幅), 且 WebLoginScreen 自带
+  // 空白兜底 (15s 无渲染自动切回原生)。
+  const [loginMode, setLoginMode] = useState<"web" | "native">("native");
 
   // 装机自检 (What's New) 必须挂在 App 顶层：HomeScreen 只在登录后才渲染，
   // 首次装机 (未登录) 时它永远不会跑，老板实测「装了啥也没变」就是这个原因。
@@ -300,7 +305,9 @@ export default function App() {
   const signOut = useCallback(() => {
     void signOutEverywhere().then(() => {
       setCredential(null);
-      setLoginMode("web");
+      // wave112: 退出后回原生表单, 不回 Web 登录页 — 老 WebView (Chromium <80)
+      // 解析不了 ES2020 SPA, 退回落上去就是整页白布 (老板真机复现点)。
+      setLoginMode("native");
     });
   }, []);
 
