@@ -1,3 +1,5 @@
+import { slackToolRoutes } from "./routes/slack-tools.js";
+import { agentAvatarRoutes } from "./routes/agent-avatars.js";
 import { aiConnectionRoutes } from "./routes/ai-connections.js";
 import { projectToolRoutes } from "./routes/project-tools.js";
 import { emailChannelService } from "./services/email-channels.js";
@@ -128,6 +130,7 @@ import { tasksHostPreviewRoutes } from "./routes/tasks-host-preview.js";
 import { pluginUiStaticRoutes } from "./routes/plugin-ui-static.js";
 import { gitCredentialsRoutes } from "./routes/git-credentials.js";
 import { injectCloudUiSnippet } from "./cloud-ui-snippet.js";
+import { slackToolRoutes } from "./routes/slack-tools.js";
 import { readBrandedStaticIndexHtml } from "./static-index-html.js";
 import { isLandingEnabled, renderLandingPage } from "./landing-page.js";
 import { staticUiCacheControl } from "./static-ui-cache.js";
@@ -139,12 +142,15 @@ import {
   type PluginLoader,
 } from "./services/plugin-loader.js";
 import {
+  SELF_HOSTED_AUTO_INSTALL_KEYS,
+  BUNDLED_PLUGIN_CATALOG,
   ensureBundledPlugins,
   isPluginChatEnabled,
   resolveBundledCatalogRoot,
   resolveBundledPluginInstalls,
   resolveSelfHostedAutoInstallKeys,
 } from "./services/bundled-plugins.js";
+import { readDistributionPluginCatalog, distributionPluginActivationGuard } from "./services/distribution-plugin-catalog.js";
 import {
   createPluginWorkerManager,
   type PluginWorkerManager,
@@ -682,6 +688,14 @@ export async function createApp(
   const emailChannels = emailChannelService(db, { heartbeat: connectionIntentHeartbeat, storage: opts.storageService, publicBaseUrl: opts.chatWebhookPublicBaseUrl ?? opts.authPublicBaseUrl });
   app.use(emailWebhookRoutes(emailChannels));
   app.use(chatWebhookRoutes(chatChannels));
+  // The instance validates single-use registration state and its trusted
+  // current origin. This exact GET is the only public setup return.
+  app.get("/api/chat-github/manifest/callback", async (req, res) => {
+    res.set("Cache-Control", "no-store");
+    res.set("Referrer-Policy", "no-referrer");
+    const redirect = await chatChannels.completeGitHubRegistration(String(req.query.state ?? ""), String(req.query.code ?? ""));
+    res.redirect(303, redirect);
+  });
   const managedAutoInstallKeys = opts.managedPluginAutoInstall ?? null;
   // Coolie fork: ChatHome is the default chat surface, so a self-hosted boot
   // skips the deprecated plugin-chat bundle unless the operator opted in.
@@ -696,12 +710,14 @@ export async function createApp(
   }
   const bundledCatalogRoot =
     opts.bundledPluginCatalogRoot ?? resolveBundledCatalogRoot(process.env);
+  const distributionPlugins = readDistributionPluginCatalog(bundledCatalogRoot, BUNDLED_PLUGIN_CATALOG);
   const bundledPluginInstalls = resolveBundledPluginInstalls(
     managedAutoInstallKeys ?? selfHostedAutoInstallKeys,
     {
       catalogRoot: bundledCatalogRoot,
       env: process.env,
       enforceCatalogRoot: managedAutoInstallKeys !== null,
+      distributionPlugins,
     },
   );
   const managedBundledPluginKeys =
@@ -724,6 +740,8 @@ export async function createApp(
 
   // Mount API routes
   const api = Router();
+  const agentAvatars = agentAvatarRoutes();
+  api.use(agentAvatars.router);
   api.use(boardMutationGuard());
   api.use(
     "/health",
@@ -837,7 +855,7 @@ export async function createApp(
   api.use(projectToolRoutes(db));
   api.use(projectRoutes(db));
   api.use(caseRoutes(db, opts.storageService));
-  api.use(issueTreeControlRoutes(db));
+  api.use(issueTreeControlRoutes(db, { pluginWorkerManager: workerManager }));
   api.use(fileResourceRoutes(db));
   api.use(routineRoutes(db, { pluginWorkerManager: workerManager }));
   api.use(pipelineRoutes(db));
@@ -953,6 +971,7 @@ export async function createApp(
   // 显式挂在 /tasks/host-preview 子路径上, 避免被 issueRoutes 的 path-to-regexp
   // 当作普通 issue id 截走; router 内部 regex 仅匹配 /<sessionId>... 单段前缀.
   api.use("/tasks/host-preview", tasksHostPreviewRoutes(db));
+  api.use(slackToolRoutes(db, opts.authPublicBaseUrl));
   app.locals.toolGateway = toolGateway;
   app.locals.toolActionDeliveries = toolActionDeliveries;
   app.use(mcpGatewayProtocolRoutes(toolGateway));
@@ -993,6 +1012,7 @@ export async function createApp(
     {
       localPluginDir: opts.localPluginDir ?? DEFAULT_LOCAL_PLUGIN_DIR,
       migrationDb: opts.pluginMigrationDb,
+      assertPackageActivation: distributionPluginActivationGuard(bundledCatalogRoot, distributionPlugins, managedAutoInstallKeys),
     },
     {
       workerManager,
@@ -1215,7 +1235,7 @@ export async function createApp(
     viteHtmlRenderer = createCachedViteHtmlRenderer({
       vite,
       uiRoot,
-      brandHtml: (html) => injectCloudUiSnippet(applyUiBranding(html)),
+      brandHtml: applyUiBranding,
     });
     const renderViteHtml = viteHtmlRenderer;
 
@@ -1403,7 +1423,8 @@ export async function createApp(
     { registry: pluginRegistry, loader, lifecycle, logger },
     // Managed mode reinstalls soft-uninstalled bundles (the control plane
     // owns provisioning); self-hosted leaves an operator's uninstall alone.
-    // Operator-DISABLED plugins are never touched in either mode.
+    // Disabled plugins never start automatically. Added distribution permissions
+    // still enter upgrade_pending so enabling them requires an operator decision.
     { reinstallUninstalled: managedAutoInstallKeys !== null },
   )
     .then(() => loader.loadAll())
@@ -1450,6 +1471,9 @@ export async function createApp(
       hostServiceCleanup.teardown();
       await emailChannels.shutdown();
       await chatChannels.shutdown();
+      // End the avatar worker pool, if a request ever started one, so no
+      // render outlives the HTTP teardown.
+      await agentAvatars.close();
       // Cancel every live setup-token login session and AWAIT the cancellation,
       // so each direct child stops and the server releases each lease before the
       // caller stops the database and the provider. A lease release that
