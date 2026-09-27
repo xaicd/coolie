@@ -69,6 +69,10 @@ const styles = StyleSheet.create({
   },
   main: {
     flex: 1,
+    // fontScale 放大时允许主区收缩 (title 已 numberOfLines=1),
+    // 挤压方向只能是标题, 不能是右侧动作钮 — 否则按钮文字被压成竖排。
+    flexShrink: 1,
+    minWidth: 0,
   },
   titleRow: {
     flexDirection: "row",
@@ -95,5 +99,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING.sm,
+    flexShrink: 0,
   },
 });

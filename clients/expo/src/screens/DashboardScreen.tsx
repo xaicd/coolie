@@ -41,10 +41,6 @@ interface DashboardScreenProps {
   onBack?: () => void;
   onOpenApprovals?: () => void;
   onOpenApproval?: (approvalId: string) => void;
-  onOpenProjects?: () => void;
-  onOpenWorkshop?: () => void;
-  onOpenOntology?: () => void;
-  onOpenPipelines?: () => void;
   onOpenWebWorkbench?: (path?: string, title?: string) => void;
 }
 
@@ -55,19 +51,16 @@ interface DashboardScreenProps {
  * 设置/检查更新按钮; CMMI 卡收敛到 1 项 + 1 按钮。保留的是 web 版首页的
  * 核心统计:
  * - 第 1 行: 4 张核心 StatTile (员工/任务/花费/审批 — 本月花费与待审批的简版)
- * - 第 2 行: 快速操作入口 (工坊/本体/流水线/项目)
- * - 第 3 行: 任务完成率进度条 + 7 天活动趋势
- * - 第 4 行: 员工状态分布 + 预算使用进度
- * - 第 5 行: 项目中心入口卡片
+ * - 第 2 行: 任务完成率进度条 + 7 天活动趋势
+ * - 第 3 行: 员工状态分布 + 预算使用进度
+ *
+ * wave97 入口收敛 (SPEC-COOLIE-MOBILE-002 EVENT-02): 删「快速操作」4 项与
+ * 项目中心入口卡 — 目的地全部有更短路径 (底栏 Tab / Tab5 资产段 / 任务页)。
  */
 export function DashboardScreen({
   company,
   onBack,
   onOpenApprovals,
-  onOpenProjects,
-  onOpenWorkshop,
-  onOpenOntology,
-  onOpenPipelines,
   onOpenWebWorkbench,
 }: DashboardScreenProps) {
   const [data, setData] = useState<DashboardSummary | null>(null);
@@ -253,49 +246,6 @@ export function DashboardScreen({
           ) : null}
         </AppCard>
 
-        {/* ── 快速操作入口 ── */}
-        <View style={styles.quickActions}>
-          <Text style={styles.sectionTitle}>快速操作</Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.quickActionsScroll}
-          >
-            {onOpenWorkshop ? (
-              <QuickAction
-                icon="chatbubbles"
-                label="工坊"
-                color={C.accent}
-                onPress={onOpenWorkshop}
-              />
-            ) : null}
-            {onOpenOntology ? (
-              <QuickAction
-                icon="git-network"
-                label="本体"
-                color="#8B5CF6"
-                onPress={onOpenOntology}
-              />
-            ) : null}
-            {onOpenPipelines ? (
-              <QuickAction
-                icon="git-merge"
-                label="流水线"
-                color="#06B6D4"
-                onPress={onOpenPipelines}
-              />
-            ) : null}
-            {onOpenProjects ? (
-              <QuickAction
-                icon="folder"
-                label="项目"
-                color="#F59E0B"
-                onPress={onOpenProjects}
-              />
-            ) : null}
-          </ScrollView>
-        </View>
-
         {/* ── 第 3 行: 任务完成率 + 产能概览 ── */}
         <AppCard style={styles.wideCard}>
           <View style={styles.cardHeader}>
@@ -460,55 +410,12 @@ export function DashboardScreen({
           </AppCard>
         </View>
 
-        {/* ── 第 7 行: 项目中心入口卡 ── */}
-        {onOpenProjects ? (
-          <AppCard onPress={onOpenProjects} style={styles.projectCard}>
-            <View style={styles.projectCardLeft}>
-              <View style={styles.projectIconWrap}>
-                <Ionicons name="folder" size={18} color={C.accent} />
-              </View>
-              <View style={styles.projectTextWrap}>
-                <Text style={styles.projectTitle}>项目中心</Text>
-                <Text style={styles.projectSubtitle}>
-                  查看当前企业工作区代码库、目标及任务全貌
-                </Text>
-              </View>
-            </View>
-            <View style={styles.projectCardRight}>
-              <Text style={styles.projectActionText}>进入</Text>
-              <Ionicons name="chevron-forward" size={15} color={C.accent} />
-            </View>
-          </AppCard>
-        ) : null}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
 // ── 子组件 ──────────────────────────────────────────────────────────
-
-function QuickAction({
-  icon,
-  label,
-  color,
-  onPress,
-}: {
-  icon: React.ComponentProps<typeof Ionicons>["name"];
-  label: string;
-  color: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable style={styles.quickActionBtn} onPress={onPress} hitSlop={4}>
-      <View style={[styles.quickActionIcon, { backgroundColor: color + "18" }]}>
-        <Ionicons name={icon} size={20} color={color} />
-      </View>
-      <Text style={styles.quickActionLabel} numberOfLines={1}>
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
 
 function StatusChip({ color, label }: { color: string; label: string }) {
   return (
@@ -597,37 +504,11 @@ const styles = StyleSheet.create({
   },
 
   // ── 快速操作入口 ──
-  quickActions: {
-    gap: 10,
-  },
   sectionTitle: {
     fontSize: 14,
     fontWeight: "600",
     color: C.ink2,
     paddingLeft: 2,
-  },
-  quickActionsScroll: {
-    gap: 14,
-    paddingHorizontal: 2,
-    paddingVertical: 4,
-  },
-  quickActionBtn: {
-    alignItems: "center",
-    gap: 6,
-    width: 60,
-  },
-  quickActionIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: RADIUS.md,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  quickActionLabel: {
-    fontSize: 11,
-    color: C.ink2,
-    fontWeight: "500",
-    textAlign: "center",
   },
 
   // ── 宽卡 (任务进度 / 活动趋势) ──
@@ -827,51 +708,6 @@ const styles = StyleSheet.create({
   },
 
   // ── 项目中心入口卡 ──
-  projectCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    padding: 14,
-  },
-  projectCardLeft: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    flex: 1,
-  },
-  projectIconWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
-    backgroundColor: "rgba(94, 106, 210, 0.12)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  projectTextWrap: {
-    flex: 1,
-    gap: 2,
-  },
-  projectTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: C.ink,
-  },
-  projectSubtitle: {
-    fontSize: 12,
-    color: C.ink3,
-    lineHeight: 16,
-  },
-  projectCardRight: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingLeft: 8,
-  },
-  projectActionText: {
-    fontSize: 13,
-    fontWeight: "500",
-    color: C.accent,
-  },
 
   // ── CMMI 质量工程 (精简: 1 项 + 1 按钮) ──
   cmmiCapItem: {

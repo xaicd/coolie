@@ -54,7 +54,6 @@ import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen
 import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
 import { OrgAssetsScreen } from "./src/screens/OrgAssetsScreen";
 import { PrototypeSandboxScreen } from "./src/screens/PrototypeSandboxScreen";
-import { InboxScreen } from "./src/screens/InboxScreen";
 import { NotificationsScreen } from "./src/screens/NotificationsScreen";
 import { SearchScreen } from "./src/screens/SearchScreen";
 import { RegisterScreen } from "./src/screens/RegisterScreen";
@@ -136,7 +135,7 @@ import { setupOTAListener } from "./src/OTA";
  * - 状态点呼吸灯
  */
 
-type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "inbox" | "artifacts" | "ontology" | "assets";
+type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "artifacts" | "ontology" | "assets";
 
 /**
  * 底部栏只有 5 项 (汇览 / 任务 / [+] / 员工 / 收件箱, 见 src/components/TabBar.tsx)。
@@ -979,10 +978,6 @@ function HomeScreen({
           ) : tab === "dashboard" ? (
             <DashboardScreen
               company={company}
-              onOpenProjects={() => setProjectsOpen(true)}
-              onOpenWorkshop={() => navigateTab("chat")}
-              onOpenOntology={() => navigateTab("ontology")}
-              onOpenPipelines={() => setPipelinesOpen(true)}
               onOpenWebWorkbench={(path, title) =>
                 setWebContainerTarget({ path: path || "/dashboard", title: title || "控制台" })
               }
@@ -1002,7 +997,6 @@ function HomeScreen({
             <BoardChatScreen
               company={company}
               whoami={whoami}
-              onOpenSettings={() => setSettingsOpen(true)}
               onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
               onOpenIssue={(issue) => {
                 navigateTab("tasks");
@@ -1051,18 +1045,6 @@ function HomeScreen({
                 setDiffContext({ issue: issueItem, workProduct: wp })
               }
             />
-          ) : tab === "inbox" ? (
-            selected ? (
-              taskDetail
-            ) : (
-              <InboxScreen
-                company={company}
-                onOpenSettings={() => setSettingsOpen(true)}
-                onOpenIssue={setSelected}
-                onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
-                onOpenWorkshop={() => navigateTab("chat")}
-              />
-            )
           ) : tab === "tasks" ? (
             selected ? (
               taskDetail

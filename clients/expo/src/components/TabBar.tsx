@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { C } from "../theme";
 
 /** 底部 tab bar 的四个落点 + 中央新建 FAB。 */
-export type BarTabKey = "dashboard" | "tasks" | "chat" | "assets" | "agents" | "inbox" | "ontology" | "artifacts";
+export type BarTabKey = "dashboard" | "tasks" | "chat" | "assets" | "agents" | "ontology" | "artifacts";
 
 /**
  * 底栏高度。铺满底部的浮层必须让出这一段。

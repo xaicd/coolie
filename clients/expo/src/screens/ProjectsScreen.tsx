@@ -159,8 +159,10 @@ export function ProjectsScreen({
                 hitSlop={8}
                 accessibilityLabel="新建多源项目"
               >
-                <Ionicons name="add" size={15} color="#FFFFFF" />
-                <Text style={styles.newProjectHeaderBtnText}>新建</Text>
+                <Ionicons name="add" size={15} color={C.ink} />
+                <Text style={styles.newProjectHeaderBtnText} numberOfLines={1}>
+                  新建
+                </Text>
               </Pressable>
             ) : null}
             <Pressable
@@ -238,8 +240,10 @@ export function ProjectsScreen({
               onPress={() => onOpenWebProjects("/projects", "项目中心 · 新建多源项目")}
               accessibilityLabel="新建多源代码库项目"
             >
-              <Ionicons name="add-circle-outline" size={15} color="#FFFFFF" style={{ marginRight: 4 }} />
-              <Text style={styles.newProjectBtnText}>新建多源项目 / 导入代码库</Text>
+              <Ionicons name="add-circle-outline" size={15} color={C.ink} style={{ marginRight: 4 }} />
+              <Text style={styles.newProjectBtnText} numberOfLines={1}>
+                新建多源项目 / 导入代码库
+              </Text>
             </Pressable>
           ) : null}
         </AppCard>
@@ -373,10 +377,10 @@ export function ProjectsScreen({
                   <View style={[styles.cmmiGateChip, { backgroundColor: "rgba(94, 106, 210, 0.12)", borderColor: C.accent }]}>
                     <Text style={[styles.cmmiGateText, { color: C.accent }]}>G3 契约/0报错</Text>
                   </View>
-                  <View style={[styles.cmmiGateChip, { backgroundColor: "rgba(255, 255, 255, 0.04)", borderColor: C.line }]}>
+                  <View style={[styles.cmmiGateChip, { backgroundColor: C.lineSubtle, borderColor: C.line }]}>
                     <Text style={[styles.cmmiGateText, { color: C.ink3 }]}>G4 验收</Text>
                   </View>
-                  <View style={[styles.cmmiGateChip, { backgroundColor: "rgba(255, 255, 255, 0.04)", borderColor: C.line }]}>
+                  <View style={[styles.cmmiGateChip, { backgroundColor: C.lineSubtle, borderColor: C.line }]}>
                     <Text style={[styles.cmmiGateText, { color: C.ink4 }]}>G5 投产</Text>
                   </View>
                 </View>
@@ -601,7 +605,7 @@ export function ProjectsScreen({
                           style={styles.actionBtnPrimary}
                           onPress={() => onOpenProjectTasks(project)}
                         >
-                          <Ionicons name="list" size={14} color="#FFF" />
+                          <Ionicons name="list" size={14} color={C.ink} />
                           <Text style={styles.actionBtnTextPrimary}>查看任务</Text>
                         </Pressable>
                       ) : null}
@@ -653,7 +657,7 @@ const styles = StyleSheet.create({
   refreshBtn: {
     padding: 6,
     borderRadius: RADIUS.sm,
-    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    backgroundColor: C.lineSubtle,
   },
   filterBar: {
     backgroundColor: C.panel,
@@ -669,7 +673,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.md,
     paddingVertical: 5,
     borderRadius: RADIUS.pill,
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    backgroundColor: C.lineSubtle,
     borderWidth: 1,
     borderColor: "transparent",
   },
@@ -727,7 +731,7 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     borderRadius: RADIUS.pill,
     borderWidth: 1,
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    backgroundColor: C.lineSubtle,
   },
   statusText: {
     fontSize: 11,
@@ -746,7 +750,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    backgroundColor: C.lineSubtle,
     paddingHorizontal: 8,
     paddingVertical: 5,
     borderRadius: RADIUS.sm,
@@ -776,7 +780,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    backgroundColor: C.lineSubtle,
     borderRadius: RADIUS.sm,
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -873,7 +877,7 @@ const styles = StyleSheet.create({
   actionBtnTextPrimary: {
     fontSize: 13,
     fontWeight: "500",
-    color: "#FFFFFF",
+    color: C.ink,
   },
   actionBtnSecondary: {
     flex: 1,
@@ -915,7 +919,7 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   cmmiSummaryBlock: {
-    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    backgroundColor: C.lineSubtle,
     borderWidth: 1,
     borderColor: C.line,
     borderRadius: RADIUS.sm,
@@ -951,7 +955,7 @@ const styles = StyleSheet.create({
   },
   cmmiGridItem: {
     width: "31%",
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    backgroundColor: C.lineSubtle,
     paddingVertical: 5,
     paddingHorizontal: 6,
     borderRadius: RADIUS.sm,
@@ -972,7 +976,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     gap: 4,
-    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    backgroundColor: C.lineSubtle,
     borderWidth: 1,
     borderColor: C.line,
     borderRadius: RADIUS.sm,
@@ -1024,7 +1028,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   repoSourcePill: {
-    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    backgroundColor: C.lineSubtle,
     borderWidth: 1,
     borderColor: C.line,
     paddingVertical: 2,
@@ -1050,7 +1054,7 @@ const styles = StyleSheet.create({
   newProjectBtnText: {
     fontSize: 12,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: C.ink,
   },
   newProjectHeaderBtn: {
     height: 28,
@@ -1065,6 +1069,6 @@ const styles = StyleSheet.create({
   newProjectHeaderBtnText: {
     fontSize: 11,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: C.ink,
   },
 });

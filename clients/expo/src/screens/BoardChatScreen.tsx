@@ -44,7 +44,6 @@ import {
 import { parseCommand, pipelineKeyFromName, tCommand } from "../components/commandRouter";
 import { AppCard } from "../ui/AppCard";
 import { ErrorRetry } from "../ui/ErrorRetry";
-import { LoadingState } from "../ui/LoadingState";
 import { Pill } from "../ui/Pill";
 import { StatusBadge } from "../ui/StatusBadge";
 import { formatTime } from "../utils/format";
@@ -52,10 +51,8 @@ import { parseInlineTags } from "../components/board-inline/tagParser";
 import { InlinePreviewPanel } from "../components/board-inline/InlinePreviewPanel";
 
 export interface BoardChatScreenProps {
-  onOpenSettings?: () => void;
   company: Company;
   whoami?: string;
-  onBack?: () => void;
   /** 气泡「查看详情」深链: 打开审批裁决页 (companyId + approvalId) */
   onOpenApproval?: (approvalId: string) => void;
   /** 气泡「关联任务」链接: 打开任务详情页 */
@@ -66,8 +63,6 @@ export interface BoardChatScreenProps {
   onOpenPlan?: (issue: Issue) => void;
   /** 嵌入模式: 工作空间「对话」Tab 里复用本屏内容区, 不套整屏页头 */
   embedded?: boolean;
-  /** 顶部右上角 [Workspace] 入口, 由 App.tsx 注入 (拉起工作空间 Modal) */
-  onOpenWorkspace?: () => void;
 }
 
 const QUICK_PROMPTS = [
@@ -326,14 +321,11 @@ const WELCOME_MESSAGE: BoardChatMessage = {
 export function BoardChatScreen({
   company,
   whoami: _whoami,
-  onBack,
-  onOpenSettings,
   onOpenApproval,
   onOpenIssue,
   onOpenPipeline,
   onOpenPlan,
   embedded = false,
-  onOpenWorkspace,
 }: BoardChatScreenProps) {
   const [messages, setMessages] = useState<BoardChatMessage[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
@@ -343,7 +335,6 @@ export function BoardChatScreen({
   const [errorText, setErrorText] = useState<string | null>(null);
   const [lastPrompt, setLastPrompt] = useState<string | null>(null);
   const [boardIssueId, setBoardIssueId] = useState<string | null>(null);
-  const [loadingHistory, setLoadingHistory] = useState(false);
   const [historyReady, setHistoryReady] = useState(false);
   const [cursorVisible, setCursorVisible] = useState(true);
 
@@ -383,10 +374,6 @@ export function BoardChatScreen({
   /** 构建环节 issueId -> Issue, 点击环节跳详情时补齐 */
   const buildIssueCache = useRef<Record<string, Issue | null>>({});
 
-  const [showHistory, setShowHistory] = useState(false);
-  const [sessions, setSessions] = useState<Array<{ id: string; title: string }>>([]);
-  const [sessionsLoading, setSessionsLoading] = useState(false);
-  const [sessionsError, setSessionsError] = useState<string | null>(null);
   const [buildCard, setBuildCard] = useState<BuildCardState | null>(null);
   const [specCard, setSpecCard] = useState<SpecCardState | null>(null);
   const flatListRef = useRef<FlatList<BoardChatMessage>>(null);
@@ -432,7 +419,6 @@ export function BoardChatScreen({
 
   // 加载持久化历史对话 (基于 "Board Operations" Issue)
   const loadHistory = useCallback(async () => {
-    setLoadingHistory(true);
     setErrorText(null);
     try {
       const history = await coolie.getBoardChatHistory(company.id);
@@ -447,7 +433,6 @@ export function BoardChatScreen({
     } catch {
       // 保持当前显示
     } finally {
-      setLoadingHistory(false);
       setHistoryReady(true);
     }
   }, [company.id]);
@@ -455,38 +440,6 @@ export function BoardChatScreen({
   useEffect(() => {
     void loadHistory();
   }, [loadHistory]);
-
-  const loadSessions = useCallback(async () => {
-    setSessionsLoading(true);
-    setSessionsError(null);
-    try {
-      const issues = await coolie.listIssues(company.id, { limit: 30 });
-      const mapped = issues.map((i) => ({ id: i.id, title: i.title }));
-      setSessions(mapped);
-    } catch (e) {
-      setSessionsError(String((e as Error)?.message ?? e));
-    } finally {
-      setSessionsLoading(false);
-    }
-  }, [company.id]);
-
-  const switchSession = useCallback(
-    async (targetTaskId?: string) => {
-      setShowHistory(false);
-      setLoadingHistory(true);
-      setErrorText(null);
-      try {
-        const history = await coolie.getBoardChatHistory(company.id, targetTaskId);
-        setBoardIssueId(history.issueId);
-        setMessages(history.messages.length > 0 ? history.messages : [WELCOME_MESSAGE]);
-      } catch (e) {
-        Alert.alert("切换会话失败", String((e as Error)?.message ?? e));
-      } finally {
-        setLoadingHistory(false);
-      }
-    },
-    [company.id],
-  );
 
   const copyToClipboard = useCallback((text: string) => {
     Clipboard.setString(text);
@@ -1353,23 +1306,8 @@ export function BoardChatScreen({
           }
           timestamp={latestAssistantTimestamp}
           embedded={embedded}
-          onBack={onBack}
           onRequestClear={() => setConfirmClear(true)}
         />
-
-        {/* 嵌入式 Workspace 入口 (保留内嵌时的右侧入口) */}
-        {onOpenWorkspace && !embedded ? (
-          <View style={styles.embeddedWorkspaceRow}>
-            <Pressable
-              hitSlop={12}
-              onPress={onOpenWorkspace}
-              style={styles.workspaceBtn}
-            >
-              <Ionicons name="grid-outline" size={14} color={C.accent} />
-              <Text style={styles.workspaceBtnText}>Workspace</Text>
-            </Pressable>
-          </View>
-        ) : null}
 
         {/* 问答对话列表 */}
         <FlatList
@@ -1565,113 +1503,6 @@ export function BoardChatScreen({
           uploading={uploadingAttachments}
         />
 
-        {/* 会话历史侧拉 / 抽屉 Modal */}
-        <Modal
-          visible={showHistory}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setShowHistory(false)}
-        >
-          <View style={styles.historyModalBackdrop}>
-            <Pressable
-              style={StyleSheet.absoluteFill}
-              onPress={() => setShowHistory(false)}
-            />
-            <View style={styles.historyDrawerSheet}>
-              <View style={styles.historyDrawerHandle} />
-              <View style={styles.historyDrawerHeader}>
-                <View style={styles.historyDrawerTitleRow}>
-                  <Ionicons name="time-outline" size={18} color={C.ink} style={{ marginRight: 6 }} />
-                  <Text style={styles.historyDrawerTitle}>会话历史</Text>
-                </View>
-                <Pressable
-                  hitSlop={10}
-                  onPress={() => setShowHistory(false)}
-                  style={styles.historyCloseBtn}
-                >
-                  <Ionicons name="close" size={20} color={C.ink2} />
-                </Pressable>
-              </View>
-
-              <Pressable
-                style={styles.newChatBtn}
-                onPress={() => void switchSession(undefined)}
-              >
-                <Ionicons name="add-circle-outline" size={18} color={C.accent} style={{ marginRight: 6 }} />
-                <Text style={styles.newChatBtnText}>开启新总办会话</Text>
-              </Pressable>
-
-              {sessionsLoading && (
-                <LoadingState
-                  size="small"
-                  text="加载历史会话…"
-                  style={styles.historyLoadingBox}
-                />
-              )}
-
-              {Boolean(sessionsError) && (
-                <ErrorRetry
-                  variant="section"
-                  message={`⚠️ ${sessionsError}`}
-                  onRetry={() => void loadSessions()}
-                  style={styles.historyErrorBox}
-                />
-              )}
-
-              {!sessionsLoading && !sessionsError && (
-                <ScrollView
-                  style={styles.sessionList}
-                  showsVerticalScrollIndicator={false}
-                  keyboardShouldPersistTaps="handled"
-                >
-                  {sessions.length === 0 ? (
-                    <Text style={styles.sessionEmptyText}>暂无历史会话记录</Text>
-                  ) : (
-                    sessions.map((sess) => {
-                      const isActive = sess.id === boardIssueId;
-                      return (
-                        <AppCard
-                          key={sess.id}
-                          row
-                          radius={8}
-                          padding={12}
-                          onPress={() => void switchSession(sess.id)}
-                          style={[styles.sessionCard, isActive && styles.sessionCardActive]}
-                        >
-                          <Ionicons
-                            name={isActive ? "chatbubble" : "chatbubble-outline"}
-                            size={16}
-                            color={isActive ? C.accent : C.ink3}
-                            style={{ marginRight: 10, marginTop: 2 }}
-                          />
-                          <View style={{ flex: 1 }}>
-                            <Text
-                              style={[styles.sessionCardTitle, isActive && styles.sessionCardTitleActive]}
-                              numberOfLines={2}
-                            >
-                              {sess.title}
-                            </Text>
-                            <Text style={styles.sessionCardId}>ID: {sess.id.slice(0, 8)}</Text>
-                          </View>
-                          {isActive && (
-                            <Pill
-                              label="当前"
-                              tone="accent"
-                              size="sm"
-                              textStyle={{ color: C.accent }}
-                              style={styles.sessionActiveBadge}
-                            />
-                          )}
-                        </AppCard>
-                      );
-                    })
-                  )}
-                </ScrollView>
-              )}
-            </View>
-          </View>
-        </Modal>
-
         {/* wave71: 清空对话确认 Modal */}
         <Modal
           visible={confirmClear}
@@ -1737,30 +1568,6 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: C.lineSubtle,
     backgroundColor: C.bg,
-  },
-  embeddedWorkspaceRow: {
-    flexDirection: "row",
-    justifyContent: "flex-end",
-    paddingHorizontal: 14,
-    paddingTop: 4,
-    paddingBottom: 6,
-    backgroundColor: C.bg,
-  },
-  workspaceBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
-    backgroundColor: "rgba(94,106,210,0.14)",
-    borderWidth: 1,
-    borderColor: C.brand,
-  },
-  workspaceBtnText: {
-    color: C.accent,
-    fontSize: 12,
-    fontWeight: "500",
   },
   /**
    * wave71: 附件 stage 行 — 输入框上方一行提示当前选了几个附件
@@ -2246,119 +2053,5 @@ const styles = StyleSheet.create({
     color: C.ink2,
     fontSize: 12,
     fontWeight: "500",
-  },
-  historyModalBackdrop: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    justifyContent: "flex-end",
-  },
-  historyDrawerSheet: {
-    backgroundColor: C.panel,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    borderTopWidth: 1,
-    borderColor: C.line,
-    paddingHorizontal: 16,
-    paddingTop: 8,
-    paddingBottom: 28,
-    maxHeight: "80%",
-  },
-  historyDrawerHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: C.line,
-    alignSelf: "center",
-    marginBottom: 12,
-  },
-  historyDrawerHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginBottom: 12,
-  },
-  historyDrawerTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  historyDrawerTitle: {
-    color: C.ink,
-    fontSize: 16,
-    fontWeight: "600",
-  },
-  historyCloseBtn: {
-    padding: 4,
-  },
-  newChatBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: C.surface,
-    borderWidth: 1,
-    borderColor: C.line,
-    borderRadius: 8,
-    paddingVertical: 10,
-    marginBottom: 12,
-  },
-  newChatBtnText: {
-    color: C.accent,
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  historyLoadingBox: {
-    paddingVertical: 24,
-    paddingHorizontal: 0,
-    alignItems: "center",
-    gap: 0,
-    flex: 0,
-  },
-  historyErrorBox: {
-    gap: 8,
-    paddingVertical: 16,
-    paddingHorizontal: 0,
-    borderWidth: 0,
-    backgroundColor: "transparent",
-  },
-  sessionList: {
-    maxHeight: 360,
-  },
-  sessionEmptyText: {
-    color: C.ink4,
-    fontSize: 13,
-    textAlign: "center",
-    paddingVertical: 24,
-  },
-  sessionCard: {
-    alignItems: "flex-start",
-    backgroundColor: C.surface,
-    marginBottom: 8,
-  },
-  sessionCardActive: {
-    borderColor: C.accent,
-    backgroundColor: C.surfaceHover,
-  },
-  sessionCardTitle: {
-    color: C.ink2,
-    fontSize: 13,
-    fontWeight: "500",
-    lineHeight: 18,
-  },
-  sessionCardTitleActive: {
-    color: C.ink,
-    fontWeight: "600",
-  },
-  sessionCardId: {
-    color: C.ink4,
-    fontSize: 11,
-    marginTop: 4,
-    fontFamily: Platform.OS === "ios" ? "Courier" : "monospace",
-  },
-  sessionActiveBadge: {
-    backgroundColor: "rgba(113, 112, 255, 0.15)",
-    borderColor: "transparent",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    marginLeft: 6,
   },
 });
