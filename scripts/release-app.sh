@@ -36,6 +36,7 @@ APK_SRC="$EXPO_DIR/android/app/build/outputs/apk/release/app-release.apk"
 COS_BUCKET="${COS_BUCKET:-cos://gzbucket/coolie/app}"
 DLS_BASE="${DLS_BASE:-https://dls.xrobinai.cn/coolie/app}"
 SSH_TARGET="${SSH_TARGET:-tc-coolie-claw}"
+REMOTE_DIR="${REMOTE_DIR:-/opt/coolie}"
 REMOTE_VERSION_JSON="${REMOTE_VERSION_JSON:-/opt/coolie/ui/dist/version.json}"
 VERSION_JSON_URL="${VERSION_JSON_URL:-https://xrobinai.cn/version.json}"
 
@@ -319,21 +320,18 @@ step "[9/9] 发布 OTA 增量更新 (android)"
 run_sh "cd '$EXPO_DIR' && bash scripts/publish-ota.sh android"
 
 # ── wave105 联动: 跨端变更 (server routes / shared schema) 必须随客户端一起部署,
-#    否则 App 端紧急熔断按钮点了会得到 404 / 401 (wave105 真实经历)。默认自动
-#    跑 deploy-tc-coolie-claw.sh --skip-build (server 用 tsx 热读 src, 增量足够);
+#    否则 App 端紧急熔断按钮点了会得到 404 (wave105 真实经历)。
+#    /opt/coolie 是 rsync 镜像不是 git 仓库, 无法做 diff 探测 — 无条件幂等部署,
+#    deploy 脚本自身很快 (rsync 增量 + systemctl restart ~10s)。
 #    --skip-server-deploy 可跳过此步。
-step "[10/10] server 同步部署 (--skip-build, tsx 热读 src)"
+step "[10/10] server 同步部署 (deploy-tc-coolie-claw.sh --skip-build)"
 if [ "$SKIP_SERVER_DEPLOY" = "1" ]; then
   echo "   ⏭ 跳过 server 部署 (--skip-server-deploy)"
 else
-  SERVER_DIFF=$(ssh "$SSH_TARGET" "cd $REMOTE_DIR 2>/dev/null && git diff --stat server/src packages/shared/src 2>/dev/null | tail -1 || echo ''")
-  if [ -z "$SERVER_DIFF" ] || echo "$SERVER_DIFF" | grep -q "0 files changed"; then
-    echo "   ✓ 远端 server/src 与 packages/shared/src 与本仓 HEAD 同步, 无需部署"
+  if dry; then
+    echo "   [dry-run] bash '$REPO_ROOT/scripts/deploy-tc-coolie-claw.sh' --skip-build"
   else
-    echo "   ⚠ 远端 server/src 落后于 HEAD: ${SERVER_DIFF}"
-    echo "   → 自动部署中 (deploy-tc-coolie-claw.sh --skip-build)..."
     run_sh "bash '$REPO_ROOT/scripts/deploy-tc-coolie-claw.sh' --skip-build"
-    echo "   ✓ server 已部署, 验证 /api/health..."
     HEALTH=$(ssh "$SSH_TARGET" "curl -s -m 5 localhost:3100/api/health | head -c 120")
     echo "   ✓ /api/health: $HEALTH"
   fi
