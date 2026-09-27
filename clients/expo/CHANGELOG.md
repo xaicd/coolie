@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.75
+
+> Released: 2026-09-27 · Android release APK
+
+### 更新
+
+- wave110 审计收尾: ①审批卡决策辅助 — 发起人+等待时长+批准/驳回后果一行话, 老板不再盲签 ②员工技能 chip 可点下钻职责描述 ③QA 审计 17 项全部清账入库 docs-coolie/specs/2026-09-27-app-qa-audit-and-closure.md
+
+---
+
 ## v0.5.74
 
 > Released: 2026-09-27 · Android release APK
