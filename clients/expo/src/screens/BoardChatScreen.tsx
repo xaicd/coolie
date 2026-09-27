@@ -867,7 +867,7 @@ export function BoardChatScreen({
       if (isOrchestrationCommand) return;
 
       setStreamingText("");
-      setStatusText("正在连接总办助手…");
+      setStatusText("正在连接会话助手…");
       setSending(true);
       accumulatedRef.current = "";
 
@@ -1436,7 +1436,7 @@ export function BoardChatScreen({
                       // wave71: thinking 态用三点动画 (TypingBubbleText) 替
                       // 换 ActivityIndicator, 更轻、更像 ChatGPT 风格
                       <TypingBubbleText
-                        text={statusText || "总办正在处理并调取工坊数据…"}
+                        text={statusText || "会话助手正在处理并调取数据…"}
                         visible={loadingState === "thinking"}
                       />
                     )}

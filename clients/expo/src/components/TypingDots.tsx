@@ -87,7 +87,7 @@ export function TypingBubbleText({
   return (
     <View style={styles.typingRow}>
       <Text style={styles.typingText} numberOfLines={1}>
-        {text ?? "总办正在处理并调取工坊数据…"}
+        {text ?? "会话助手正在处理并调取数据…"}
       </Text>
       <TypingDots visible={visible} />
     </View>

@@ -439,14 +439,16 @@ export function ProjectsScreen({
                       </View>
                     ) : null}
 
-                    {/* 原生 CMMI 质量与门禁审计态势面板 */}
+                    {/* 原生 CMMI 质量与门禁审计态势面板
+                        wave108 (QA D09): 删除与六宫格同目标的 10 个重复深链按钮;
+                        六宫格数值从「伪实时状态」改为门禁交付物名 — 在接通真实
+                        门禁数据源之前, 不展示任何编造的合规分/百分比/σ值。 */}
                     <View style={styles.cmmiSummaryBlock}>
                       <View style={styles.cmmiSummaryHeader}>
                         <View style={styles.cmmiSummaryTitleRow}>
                           <Ionicons name="shield-checkmark" size={13} color={C.accent} />
-                          <Text style={styles.cmmiSummaryTitle}>CMMI 质量与门禁审计态势</Text>
+                          <Text style={styles.cmmiSummaryTitle}>CMMI 门禁 · 点击下钻</Text>
                         </View>
-                        <Text style={styles.cmmiSummaryBadge}>合规分 80/100</Text>
                       </View>
 
                       <View style={styles.cmmiDetailGrid}>
@@ -461,7 +463,7 @@ export function ProjectsScreen({
                           hitSlop={4}
                         >
                           <Text style={styles.cmmiGridLabel}>G1 需求 (DS)</Text>
-                          <Text style={[styles.cmmiGridVal, { color: C.ok }]}>100% EARS/RTM</Text>
+                          <Text style={[styles.cmmiGridVal, { color: C.ink3 }]}>RTM 需求矩阵</Text>
                         </Pressable>
                         <Pressable
                           style={styles.cmmiGridItem}
@@ -474,20 +476,17 @@ export function ProjectsScreen({
                           hitSlop={4}
                         >
                           <Text style={styles.cmmiGridLabel}>G2 方案 (FDA)</Text>
-                          <Text style={[styles.cmmiGridVal, { color: C.ok }]}>DAR-001 会签</Text>
+                          <Text style={[styles.cmmiGridVal, { color: C.ink3 }]}>5+2 黄金文档</Text>
                         </Pressable>
                         <Pressable
                           style={styles.cmmiGridItem}
                           onPress={() =>
-                            onOpenWebProjects?.(
-                              `/projects/${project.id}/api-lifecycle`,
-                              `${project.name} · G3 API 契约`,
-                            )
+                            setActiveApiContractProject(project)
                           }
                           hitSlop={4}
                         >
                           <Text style={styles.cmmiGridLabel}>G3 契约 (SWE)</Text>
-                          <Text style={[styles.cmmiGridVal, { color: C.ok }]}>0 编译报错</Text>
+                          <Text style={[styles.cmmiGridVal, { color: C.ink3 }]}>API 契约中心</Text>
                         </Pressable>
                         <Pressable
                           style={styles.cmmiGridItem}
@@ -500,7 +499,7 @@ export function ProjectsScreen({
                           hitSlop={4}
                         >
                           <Text style={styles.cmmiGridLabel}>G4 验收 (FDSE)</Text>
-                          <Text style={[styles.cmmiGridVal, { color: C.warn }]}>用例执行中</Text>
+                          <Text style={[styles.cmmiGridVal, { color: C.ink3 }]}>验收与控制图</Text>
                         </Pressable>
                         <Pressable
                           style={styles.cmmiGridItem}
@@ -513,7 +512,7 @@ export function ProjectsScreen({
                           hitSlop={4}
                         >
                           <Text style={styles.cmmiGridLabel}>G5 投产 (SRE)</Text>
-                          <Text style={[styles.cmmiGridVal, { color: C.ink3 }]}>待会签</Text>
+                          <Text style={[styles.cmmiGridVal, { color: C.ink3 }]}>投产活拓扑</Text>
                         </Pressable>
                         <Pressable
                           style={styles.cmmiGridItem}
@@ -526,60 +525,9 @@ export function ProjectsScreen({
                           hitSlop={4}
                         >
                           <Text style={styles.cmmiGridLabel}>SPC 稳定性</Text>
-                          <Text style={[styles.cmmiGridVal, { color: C.ok }]}>3σ 受控 (42s)</Text>
+                          <Text style={[styles.cmmiGridVal, { color: C.ink3 }]}>3σ 过程控制</Text>
                         </Pressable>
                       </View>
-                    </View>
-
-                    {/* CMMI 穿透与黄金文档快捷入口 (第一行: 流程与过程) */}
-                    <View style={styles.cmmiActionRow}>
-                      <Pressable
-                        style={styles.cmmiBtn}
-                        onPress={() =>
-                          onOpenWebProjects?.(`/projects/${project.id}/rtm`, `${project.name} · RTM 需求穿透`)
-                        }
-                      >
-                        <Ionicons name="git-network-outline" size={13} color={C.accent} />
-                        <Text style={styles.cmmiBtnText}>RTM 穿透</Text>
-                      </Pressable>
-                      <Pressable
-                        style={styles.cmmiBtn}
-                        onPress={() =>
-                          onOpenWebProjects?.(`/projects/${project.id}/baseline`, `${project.name} · 5+2 黄金文档`)
-                        }
-                      >
-                        <Ionicons name="document-text-outline" size={13} color={C.ok} />
-                        <Text style={[styles.cmmiBtnText, { color: C.ok }]}>5+2 文档</Text>
-                      </Pressable>
-                      <Pressable
-                        style={styles.cmmiBtn}
-                        onPress={() =>
-                          onOpenWebProjects?.(`/projects/${project.id}/spc`, `${project.name} · SPC 过程控制`)
-                        }
-                      >
-                        <Ionicons name="analytics-outline" size={13} color={C.warn} />
-                        <Text style={[styles.cmmiBtnText, { color: C.warn }]}>SPC 控制</Text>
-                      </Pressable>
-                    </View>
-
-                    {/* CMMI 架构与契约快捷入口 (第二行: 拓扑与API) */}
-                    <View style={styles.cmmiActionRow}>
-                      <Pressable
-                        style={styles.cmmiBtn}
-                        onPress={() =>
-                          onOpenWebProjects?.(`/projects/${project.id}/living-topology`, `${project.name} · 三态活拓扑`)
-                        }
-                      >
-                        <Ionicons name="git-merge-outline" size={13} color={C.accent} />
-                        <Text style={[styles.cmmiBtnText, { color: C.accent }]}>三态拓扑 (SkyWalking/Chaos)</Text>
-                      </Pressable>
-                      <Pressable
-                        style={styles.cmmiBtn}
-                        onPress={() => setActiveApiContractProject(project)}
-                      >
-                        <Ionicons name="code-slash-outline" size={13} color={C.ok} />
-                        <Text style={[styles.cmmiBtnText, { color: C.ok }]}>API 契约 (DSH/MCP)</Text>
-                      </Pressable>
                     </View>
 
                     {/* 操作动作按钮组 */}
@@ -913,11 +861,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "600",
   },
-  cmmiActionRow: {
-    flexDirection: "row",
-    gap: SPACING.sm,
-    marginTop: 4,
-  },
   cmmiSummaryBlock: {
     backgroundColor: C.lineSubtle,
     borderWidth: 1,
@@ -943,11 +886,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: C.ink,
   },
-  cmmiSummaryBadge: {
-    fontSize: 11,
-    fontWeight: "600",
-    color: C.accent,
-  },
   cmmiDetailGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
@@ -969,23 +907,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "600",
     marginTop: 2,
-  },
-  cmmiBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-    backgroundColor: C.lineSubtle,
-    borderWidth: 1,
-    borderColor: C.line,
-    borderRadius: RADIUS.sm,
-    paddingVertical: 7,
-  },
-  cmmiBtnText: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: C.ink2,
   },
 
   // ── 多源代码库与新建横幅 ──
