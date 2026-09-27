@@ -42,6 +42,7 @@ import {
   type GitCredential,
   type SaveGitCredentialInput,
 } from "./types";
+import { isRenderableBoardMessage } from "./board-chat";
 
 export interface CoolieClientOptions {
   /** Instance base URL, e.g. "http://100.84.124.71:3100". No trailing slash. */
@@ -1069,11 +1070,12 @@ export class CoolieClient {
     try {
       // includeDeleted=false keeps soft-deleted (cleared) comments out of the
       // response entirely. The extra filter is defensive: a legacy server that
-      // still returns tombstones (blank body + deletedAt) must never render as
-      // an empty transparent bubble in the app.
+      // still returns tombstones (blank body + deletedAt), or a history row
+      // that somehow stored a transient status line, must never render as an
+      // empty transparent bubble in the app.
       const comments = await this.listIssueComments(issueId, { includeDeleted: false });
       const messages: BoardChatMessage[] = comments
-        .filter((c) => !c.deletedAt && c.body.trim().length > 0)
+        .filter((c) => !c.deletedAt && isRenderableBoardMessage({ text: c.body }))
         .map((c) => ({
           id: c.id,
           role: !c.authorAgentId && c.authorUserId === "board-concierge" ? "assistant" : "user",

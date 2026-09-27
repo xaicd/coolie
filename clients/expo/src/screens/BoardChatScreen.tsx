@@ -18,7 +18,7 @@ import {
   Modal,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import { isAsrNotConfigured } from "@coolie/api-client";
+import { isAsrNotConfigured, isRenderableBoardMessage } from "@coolie/api-client";
 import type { BoardChatMessage, Company, Approval, Issue } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
 import { useRecorder } from "../useRecorder";
@@ -45,7 +45,6 @@ import { parseCommand, pipelineKeyFromName, tCommand } from "../components/comma
 import { AppCard } from "../ui/AppCard";
 import { ErrorRetry } from "../ui/ErrorRetry";
 import { Pill } from "../ui/Pill";
-import { StatusBadge } from "../ui/StatusBadge";
 import { formatTime } from "../utils/format";
 import { parseInlineTags } from "../components/board-inline/tagParser";
 import { InlinePreviewPanel } from "../components/board-inline/InlinePreviewPanel";
@@ -425,11 +424,10 @@ export function BoardChatScreen({
       if (history.issueId) {
         setBoardIssueId(history.issueId);
       }
-      if (history.messages.length > 0) {
-        setMessages(history.messages);
-      } else {
-        setMessages([WELCOME_MESSAGE]);
-      }
+      // wave115: 防御性过滤 —— 历史里若有空 content 行或状态提示伪消息
+      // (「正在连接会话助手…」类), 一律不渲染; 过滤后为空则回到欢迎语。
+      const clean = history.messages.filter(isRenderableBoardMessage);
+      setMessages(clean.length > 0 ? clean : [WELCOME_MESSAGE]);
     } catch {
       // 保持当前显示
     } finally {
@@ -1295,15 +1293,10 @@ export function BoardChatScreen({
         keyboardVerticalOffset={Platform.OS === "ios" ? 10 : 0}
       >
         {/* 顶部导航栏 (wave71 抽出到 <ChatHeader/>) */}
+        {/* wave115: 状态提示只保留聊天流内那一处 —— 头部不再重复渲染
+            「正在连接会话助手…」(boss 反馈那行黄点+文案看上去像一条被存库的
+            消息, 且与气泡内指示同时出现 = loading 双渲染)。 */}
         <ChatHeader
-          thinking={loadingState !== "idle"}
-          subtitle={
-            loadingState === "streaming"
-              ? "正在生成回复…"
-              : loadingState === "thinking"
-                ? statusText || "思考中…"
-                : ""
-          }
           timestamp={latestAssistantTimestamp}
           embedded={embedded}
           onRequestClear={() => setConfirmClear(true)}
@@ -1406,20 +1399,9 @@ export function BoardChatScreen({
                     <Text style={styles.avatarText}>🤖</Text>
                   </View>
                   <View style={styles.assistantBubble}>
-                    <View style={styles.assistantHeader}>
-                      {Boolean(statusText) && (
-                        <StatusBadge
-                          label={statusText}
-                          color={C.accent}
-                          bg="rgba(113, 112, 255, 0.12)"
-                          border="transparent"
-                          dotStatus="running"
-                          size={5}
-                          style={styles.statusPill}
-                        />
-                      )}
-                    </View>
-
+                    {/* wave115: 单一 loading 指示 —— 只保留三点动画
+                        (TypingBubbleText), 去掉并排的蓝点 StatusBadge 行,
+                        避免同一时刻渲染两个「正在连接…」指示。 */}
                     {streamingText ? (
                       <Text style={styles.assistantText}>
                         {streamingText}
@@ -1870,11 +1852,6 @@ const styles = StyleSheet.create({
     color: C.ink,
     fontSize: 14,
     lineHeight: 21,
-  },
-  statusPill: {
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
   },
   cursorText: {
     color: C.accent,

@@ -1,6 +1,10 @@
 export { CoolieClient, CoolieApiError, isAsrNotConfigured } from "./client";
 export type { CoolieClientOptions } from "./client";
 export {
+  isBoardChatStatusLine,
+  isRenderableBoardMessage,
+} from "./board-chat";
+export {
   ASR_NOT_CONFIGURED,
   MULTIMODAL_PLUGIN_ID,
   ONTOLOGY_PLUGIN_ID,

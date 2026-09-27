@@ -98,6 +98,28 @@ function stripActionSignals(response: string): string {
 }
 
 /**
+ * Transient client-side status lines ("正在连接会话助手…", "思考中…", tool
+ * progress). They must never be persisted as a concierge reply nor replayed to
+ * the model as a conversation turn — wave115: the boss saw one reappear as if
+ * it were a stored message. Mirrors `isBoardChatStatusLine` in
+ * @coolie/api-client (the two cannot share code across the workspace boundary;
+ * keep them in sync).
+ */
+const BOARD_CHAT_STATUS_LINE_PATTERNS: readonly RegExp[] = [
+  /^正在连接会话助手[\s.…]*$/,
+  /^会话助手正在处理/,
+  /^正在生成回复[\s.…]*$/,
+  /^思考中[\s.…]*$/,
+  /^Connecting[\s.]*$/,
+  /^Thinking[\s.]*$/,
+];
+export function isBoardChatStatusLine(text: string): boolean {
+  const trimmed = text.trim();
+  if (!trimmed) return false;
+  return BOARD_CHAT_STATUS_LINE_PATTERNS.some((re) => re.test(trimmed));
+}
+
+/**
  * Clean a plain-text line emitted by the spawned CLI when it is *not* talking
  * in JSON (older Hermes builds, or any fallback path). Two jobs: drop ANSI
  * escape sequences, and drop the CLI's own chrome — the "Resume this session
@@ -406,7 +428,11 @@ export function boardChatRoutes(
       order: "asc",
       includeDeleted: false,
     });
-    const recent = comments.slice(-20);
+    const recent = comments
+      .slice(-20)
+      // Drop blank bodies (a cleared conversation leaves empty rows) and
+      // transient status lines — neither is a real conversation turn.
+      .filter((c) => c.body.trim().length > 0 && !isBoardChatStatusLine(c.body));
     const history = recent
       .map((c) => serializeTurn(isConciergeReply(c) ? "assistant" : "user", c.body))
       .join("\n\n");
@@ -667,14 +693,19 @@ export function boardChatRoutes(
 
       const cleanedResponse = stripActionSignals(fullResponse);
 
-      // A run that exits non-zero, or answers with nothing, is a failure the
-      // room has to see. The relay used to emit `done` regardless, so a
-      // quota-exhausted key (HTTP 429, code 1310) or a bad credential looked
-      // like an empty reply: zero chunks, no explanation, and — because the
-      // reply was empty — not even a persisted comment. Surface it on both
-      // channels instead: an `error` event for the live room, and a
+      // A run that exits non-zero, answers with nothing, or answers with a bare
+      // transient status line is a failure the room has to see. This is also
+      // the store-time guard for wave115: a status/progress line must never be
+      // persisted as a concierge bubble. The relay used to emit `done`
+      // regardless, so a quota-exhausted key (HTTP 429, code 1310) or a bad
+      // credential looked like an empty reply: zero chunks, no explanation, and
+      // — because the reply was empty — not even a persisted comment. Surface
+      // it on both channels instead: an `error` event for the live room, and a
       // board-concierge comment so a reload still shows what happened.
-      const failed = (exitCode ?? 0) !== 0 || !cleanedResponse.trim();
+      const failed =
+        (exitCode ?? 0) !== 0 ||
+        !cleanedResponse.trim() ||
+        isBoardChatStatusLine(cleanedResponse);
 
       if (failed) {
         // Prefer stdout (the CLI writes its terminal error line there) and fall
@@ -770,13 +801,16 @@ export function boardChatRoutes(
    *
    * Coolie fork (wave71): 老板想在工坊对话框点「🗑️ 清空对话」一键清空当前
    * 常驻 Board Operations Issue 的历史评论。会话本身保留 (issue 不删),
-   * 只把所有尚未删除的评论软删 (deletedAt + deletedByUserId), 后续会话从
-   * 干净的列表继续累加。
+   * 后续会话从干净的列表继续累加。
    *
-   * 鉴权与 POST /board/chat/stream 同源: 必须已登录的 board/agent
-   * (board/agent 决定 deletedByType), 且 companyId 必须与请求里的
-   * companyId 一致 (URL 上的 :issueId 绑定了 company, 这里走
-   * `companies.id = issue.companyId` 联合校验)。
+   * wave115: 改为**硬删**该 issue 下的评论行 (原来只软删 deletedAt)。软删
+   * 留下的墓碑行会在历史读路径被空 body 渲染成一串「空透明气泡」(boss
+   * 22:50 截图), includeDeleted=false 只是把它们藏起来、行仍在库里。老板点
+   * 清空要的是真的清掉, 所以这里 DELETE 掉行 (含历史遗留的软删墓碑)。
+   *
+   * 鉴权与 POST /board/chat/stream 同源: 必须已登录的 board/agent,
+   * 且 companyId 必须与请求里的 companyId 一致 (URL 上的 :issueId 绑定了
+   * company, 这里走 issue.companyId 联合校验)。
    */
   router.delete("/board/chat/conversation/:id", async (req, res) => {
     const experimental = await instanceSettingsService(db).getExperimental();
@@ -812,33 +846,21 @@ export function boardChatRoutes(
       return;
     }
 
-    const actor = getActorInfo(req);
-    const deletedAt = new Date();
-
-    // 软删: 只清掉 issue 范围内 + 仍未删除的评论。
+    // wave115: 硬删该 issue 下的全部评论行 (含历史遗留的软删墓碑)。
     // 返回受影响行数, 前端拿来做「已清空 N 条」提示。
-    const updated = await db
-      .update(issueComments)
-      .set({
-        deletedAt,
-        deletedByType: actor.actorType === "agent" ? "agent" : "user",
-        deletedByUserId:
-          actor.actorType === "agent"
-            ? null
-            : actor.actorId ?? null,
-      })
+    const deleted = await db
+      .delete(issueComments)
       .where(
         and(
           eq(issueComments.issueId, issueId),
           eq(issueComments.companyId, companyId),
-          isNull(issueComments.deletedAt),
         ),
       )
       .returning({ id: issueComments.id });
 
     res.json({
       ok: true,
-      deletedCount: updated.length,
+      deletedCount: deleted.length,
     });
   });
 
