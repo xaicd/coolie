@@ -9,7 +9,7 @@ export const capabilityInventoryCounts = {
   "skillReferenceCapabilities": 155,
   "evalCases": 106,
   "normativeRows": 261,
-  "legacyMcpAliases": 42
+  "legacyMcpAliases": 50
 } as const;
 
 export const capabilityEvalGroups = [
