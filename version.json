@@ -1,8 +1,8 @@
 {
-  "version": "0.5.79",
-  "versionCode": 579,
-  "commitSha": "49b3285087745a8ee2a105ab744ba8a74e4f23e3",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.79/coolie-release.apk",
-  "sha256": "5bebe9bb90383e969b31b5f1a695663d257e33acd58ea0b1c7c627947bafe895",
-  "releaseNotes": "wave114 项目中心新建按钮改为右下悬浮 (过滤条只留 chips; 新建 改为右下角悬浮 [+ 新建项目], 对齐 TasksScreen 的 [+ 新建任务])"
+  "version": "0.5.80",
+  "versionCode": 580,
+  "commitSha": "4f10cd3f15d6aaac0b75ba7f95a75f8059d77007",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.80/coolie-release.apk",
+  "sha256": "79780b47bfb1f599bdc6af437da8d4d949668a09a8c2862d4095c960498ddf96",
+  "releaseNotes": "wave115 修空气泡+状态行入库+loading双渲染"
 }
