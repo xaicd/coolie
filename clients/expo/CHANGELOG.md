@@ -4,6 +4,17 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.82
+
+> Released: 2026-09-28 · Android release APK
+
+### 更新
+
+- wave118 Web 新建项目「快速填入开源复杂项目预设」补上自有 ruoyi-all-next 底座预设 (RuoYi-All-Next, https://github.com/xaicd/ruoyi-all-next.git), 预设 3 → 4 (企业级全栈底座)
+- 随包带上 0.5.81 之后的新提交: expo 原型沙箱按 COOLIE_BASE_URL 解析相对产物 URL + markdown 附件渲染、原生快速建项目、server 实例级 board actor 放行、mcp X-Paperclip-Api-Key 认证
+
+---
+
 ## v0.5.81
 
 > Released: 2026-09-27 · Android release APK

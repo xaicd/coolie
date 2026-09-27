@@ -1,6 +1,6 @@
 {
   "name": "@coolie/expo",
-  "version": "0.5.81",
+  "version": "0.5.82",
   "private": true,
   "main": "index.ts",
   "scripts": {
