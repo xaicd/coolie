@@ -40,9 +40,17 @@ interface WebLoginScreenProps {
 
 const INJECTED_SESSION_PROBER = `
 (function() {
+  // wave111: 单实例护栏 — injectedJavaScript 与 onNavigationStateChange 的补注
+  // 会在同一页面各跑一份, 两份 setInterval 各自 1.2s 轮询一次 (实测双倍 401 流量)。
+  if (window.__COOLIE_SESSION_PROBER__) return;
+  window.__COOLIE_SESSION_PROBER__ = true;
   var sent = false;
+  var timer = null;
+  function stop() {
+    if (timer !== null) { clearInterval(timer); timer = null; }
+  }
   function probeSession() {
-    if (sent) return;
+    if (sent) { stop(); return; }
     fetch('/api/auth/session-token')
       .then(function(res) {
         if (!res.ok) return null;
@@ -51,6 +59,7 @@ const INJECTED_SESSION_PROBER = `
       .then(function(data) {
         if (data && data.token && !sent) {
           sent = true;
+          stop();
           if (window.ReactNativeWebView && window.ReactNativeWebView.postMessage) {
             window.ReactNativeWebView.postMessage(JSON.stringify({
               type: 'WEB_LOGIN_SUCCESS',
@@ -61,7 +70,7 @@ const INJECTED_SESSION_PROBER = `
       })
       .catch(function() {});
   }
-  setInterval(probeSession, 1200);
+  timer = setInterval(probeSession, 1200);
   probeSession();
 })();
 true;

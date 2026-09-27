@@ -19,6 +19,10 @@ if [ "$SKIP_BUILD" != "--skip-build" ]; then
 fi
 
 echo "=== [2/6] rsync 代码(排除 node_modules/.git/本地数据) ==="
+# ui/ota 是 publish-ota.sh 直传远端的 OTA 分发目录, 不在仓库里 —— 不 exclude 的话
+# --delete 每次部署都会把它整个抹掉, 所有装机的 OTA 下载变 404 (wave111 实证:
+# 0.5.75 发版 15:30 部署后 /ota/* 资产全 404)。同 version.json 的 rsync 补偿是
+# release-app.sh 侧的兜底, 这里从源头不再删。
 rsync -az --delete \
   --exclude 'node_modules' \
   --exclude '.git' \
@@ -30,6 +34,7 @@ rsync -az --delete \
   --exclude 'clients/expo/node_modules' \
   --exclude 'clients/expo/.expo' \
   --exclude 'doc/plans' \
+  --exclude 'ui/ota' \
   ./ "$SSH_TARGET:$REMOTE_DIR/"
 
 echo "=== [3/6] 远端安装依赖 ==="

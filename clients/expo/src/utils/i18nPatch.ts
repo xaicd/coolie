@@ -373,6 +373,14 @@ try {
 /**
  * Android 兜底：WebView 在 about:blank 时可能丢失 localStorage 写入，
  * 在页面加载后检查并确保 coolie.locale 存在。
+ *
+ * wave111 重载环护栏：旧 Android WebView (实测 Chromium 66/73, boss 真机
+ * SM-G9860 Chrome 73) 的 localStorage 写入不跨页面加载持久 — setItem 成功但
+ * 重载后 getItem 仍为空。旧逻辑「locale 缺 → set → reload」在这种 WebView 上
+ * 变成每 ~1.2s 一次的无限重载环 (登录页永远加载不完, 老板侧表现即「闪退」)。
+ * 用 window.name 做单次护栏：它跨 reload 存活且不依赖 storage flush，
+ * 保证最多只重载一次；旧 WebView 上 locale 持续写不进也没关系 —— 页面文案
+ * 由 I18N_PATCH_INJECTION 的 DOM 运行时翻译兜底, 不再依赖这次重载生效。
  */
 export const ZH_CN_ENSURE = `
 (function () {
@@ -381,7 +389,11 @@ export const ZH_CN_ENSURE = `
     document.documentElement.classList.add("native-shell");
     if (!localStorage.getItem("coolie.locale")) {
       localStorage.setItem("coolie.locale", "zh-CN");
-      window.location.reload();
+      var reloadedFlag = "coolie_locale_reloaded";
+      if (String(window.name || "").indexOf(reloadedFlag) === -1) {
+        window.name = (window.name ? window.name + "|" : "") + reloadedFlag;
+        window.location.reload();
+      }
     }
   } catch (e) {}
 })();
