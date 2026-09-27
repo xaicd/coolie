@@ -38,7 +38,9 @@ A1-A6 / B1-B4 / C1-C4 / D1-D3 / E1-E4 / F1-F3 / G1-G2 + H1-H4 / I1 + J1-J3。
 
 ```
 1. 发版前 git status 干净 (no modified tracked files)
-2. commit hash 记入 version.json 的 commitSha 字段
+2. commit hash 记入 version.json 的 commitSha 字段（该 sha 只有 commit 之后才存在，所以仓库
+   `version.json` 必须由**紧随其后的 chore commit** 更新 —— `release-app.sh` 不会替你改它，
+   只把生成的临时文件 scp 到生产。见 `release-version-sync` §3）
 3. commit push 到 origin
 4. release-app.sh / publish-ota.sh / publish-h5.sh 在 bump version 前 sanity check
 ```
