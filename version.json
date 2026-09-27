@@ -1,8 +1,8 @@
 {
-  "version": "0.5.81",
-  "versionCode": 581,
-  "commitSha": "b0ebb72a236e3b9846038d3b9ef2d0455bb95db4",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.81/coolie-release.apk",
-  "sha256": "2f56c4a38f56caeac91e3251e470c99a68c3a40a2eebc4a7d59609245658d321",
-  "releaseNotes": "wave116 底部导航字号优化 (标签 10→13px, 图标 22→24px, 栏高 60→64px) + 带上 3967d063b 平台核心工具经 MCP 暴露 / Hermes 连接"
+  "version": "0.5.82",
+  "versionCode": 582,
+  "commitSha": "b8d17986a79765b184239e5ec53dd2a8e98774a4",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.82/coolie-release.apk",
+  "sha256": "97c5adf20cd1c666b7217154dc8265047ba58fe1d64333bd8e58c810ae03d0c6",
+  "releaseNotes": "wave118 Web 新建项目快速预设补自有 ruoyi-all-next 企业级全栈底座 (3→4) + 打包 0.5.81 后新提交: expo 沙箱产物相对 URL 解析/markdown 附件渲染、原生快速建项目、server 实例级 board actor 放行、mcp X-Paperclip-Api-Key 认证"
 }
