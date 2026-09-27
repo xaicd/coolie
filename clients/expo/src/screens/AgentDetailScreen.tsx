@@ -57,16 +57,25 @@ function readModel(config: AgentConfiguration | null, agent: AgentRow): string {
   return config?.adapterType || agent.adapterType || "未指定";
 }
 
-function collectSkillNames(skills: AgentSkillsSnapshot | null): string[] {
-  const names: string[] = [];
+/** wave109 D12: 技能清单带描述 — chip 可点开下钻, 不再是纯文字墙。 */
+function collectSkillEntries(
+  skills: AgentSkillsSnapshot | null,
+): Array<{ name: string; description?: string }> {
+  const byName = new Map<string, { name: string; description?: string }>();
   if (Array.isArray(skills?.skills)) {
-    for (const s of skills.skills) if (s.name || s.key) names.push(s.name || s.key);
+    for (const s of skills.skills) {
+      if (s.name || s.key) byName.set(s.name || s.key, { name: s.name || s.key, description: s.description });
+    }
   }
-  if (Array.isArray(skills?.desiredSkills)) names.push(...skills.desiredSkills);
+  if (Array.isArray(skills?.desiredSkills)) {
+    for (const d of skills.desiredSkills) if (!byName.has(d)) byName.set(d, { name: d });
+  }
   if (Array.isArray(skills?.entries)) {
-    for (const e of skills.entries) if (e.name || e.key) names.push(e.name || e.key);
+    for (const e of skills.entries) {
+      if (e.name || e.key) byName.set(e.name || e.key, { name: e.name || e.key, description: e.description });
+    }
   }
-  return names.filter((v, i, a) => a.indexOf(v) === i);
+  return Array.from(byName.values());
 }
 
 /**
@@ -128,7 +137,8 @@ export function AgentDetailScreen({
     void load();
   }, [load]);
 
-  const skillNames = useMemo(() => collectSkillNames(skills), [skills]);
+  const skillEntries = useMemo(() => collectSkillEntries(skills), [skills]);
+  const [expandedSkill, setExpandedSkill] = useState<string | null>(null);
   const currentTask = assigned.find((i) => i.status === "in_progress") ?? null;
   const recentTasks = assigned.slice(0, 5);
   const recentArtifacts = artifacts.slice(0, 5);
@@ -256,18 +266,38 @@ export function AgentDetailScreen({
         </View>
 
         <View style={styles.section}>
-          <SectionHeader title="技能清单" count={skillNames.length} />
-          {skillNames.length === 0 ? (
+          <SectionHeader title="技能清单 (点击查看职责)" count={skillEntries.length} />
+          {skillEntries.length === 0 ? (
             <Text style={styles.emptyText}>未挂载额外技能</Text>
           ) : (
             <View style={styles.chips}>
-              {skillNames.map((skill, idx) => (
-                <View key={`${skill}-${idx}`} style={styles.chip}>
-                  <Text style={styles.chipText}>{skill}</Text>
-                </View>
+              {skillEntries.map((skill, idx) => (
+                <Pressable
+                  key={`${skill.name}-${idx}`}
+                  style={[styles.chip, expandedSkill === skill.name && styles.chipActive]}
+                  onPress={() =>
+                    setExpandedSkill(expandedSkill === skill.name ? null : skill.name)
+                  }
+                >
+                  <Text style={[styles.chipText, expandedSkill === skill.name && styles.chipTextActive]}>
+                    {skill.name}
+                  </Text>
+                </Pressable>
               ))}
             </View>
           )}
+          {(() => {
+            const active = skillEntries.find((s) => s.name === expandedSkill);
+            if (!active) return null;
+            return (
+              <View style={styles.skillDetailBox}>
+                <Text style={styles.skillDetailName}>{active.name}</Text>
+                <Text style={styles.skillDetailDesc}>
+                  {active.description || "该技能由适配器挂载, 无内置说明。详见公司技能库。"}
+                </Text>
+              </View>
+            );
+          })()}
         </View>
 
         {loading ? <ActivityIndicator color={C.accent} style={{ marginTop: 8 }} /> : null}
@@ -302,6 +332,32 @@ const styles = StyleSheet.create({
   chevron: { color: C.ink4, fontSize: 20 },
   emptyText: { color: C.ink4, fontSize: 12, fontStyle: "italic", paddingVertical: 6 },
   chips: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
+  chipActive: {
+    borderColor: C.accent,
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
+  },
+  chipTextActive: {
+    color: C.accent,
+  },
+  skillDetailBox: {
+    backgroundColor: C.surface,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+    padding: 12,
+    marginTop: 10,
+  },
+  skillDetailName: {
+    color: C.ink,
+    fontSize: 13,
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  skillDetailDesc: {
+    color: C.ink2,
+    fontSize: 12,
+    lineHeight: 18,
+  },
   chip: {
     backgroundColor: "rgba(255,255,255,0.04)",
     borderColor: C.lineSubtle,

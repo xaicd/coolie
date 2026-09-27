@@ -63,6 +63,35 @@ export function approvalTypeLabel(type: string): string {
   return TYPE_CONFIG[type]?.label ?? type;
 }
 
+/** D15: 申请时长 — 老板需要知道这单压了多久 (积压 3 天的审批和刚提交的紧迫度不同)。 */
+export function formatApprovalAge(createdAt: string): string {
+  const ageMs = Date.now() - Date.parse(createdAt);
+  if (!Number.isFinite(ageMs) || ageMs < 0) return "";
+  const mins = Math.floor(ageMs / 60_000);
+  if (mins < 1) return "刚刚提交";
+  if (mins < 60) return `等待 ${mins} 分钟`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `等待 ${hours} 小时`;
+  const days = Math.floor(hours / 24);
+  return `等待 ${days} 天`;
+}
+
+/** D15: 批准后果 — 签字前一句话讲清「点了同意会发生什么、钱/系统会怎么动」。 */
+export function formatApprovalConsequence(type: string): string {
+  switch (type) {
+    case "hire_agent":
+      return "✓ 批准后: 创建该员工并开始产生模型费用; ✗ 驳回: 不产生任何成本";
+    case "spend_money":
+      return "✓ 批准后: 额度立即生效并计入本月花费; ✗ 驳回: 预算不变";
+    case "execute_command":
+      return "✓ 批准后: 该指令将在工作区真实执行; ✗ 驳回: 指令不执行";
+    case "ontology_action":
+      return "✓ 批准后: 变更写入业务本体并生成快照; ✗ 驳回: 本体保持不变";
+    default:
+      return "✓ 批准后立即生效; ✗ 驳回需补充理由退回发起人";
+  }
+}
+
 export function formatApprovalTitle(approval: Approval): string {
   if (approval.title) return approval.title;
   const payload = approval.payload ?? {};
@@ -322,7 +351,7 @@ export function QuickApprovalCard({
         </View>
       </View>
 
-      {/* 标题与摘要详情 */}
+      {/* 标题与摘要详情 (wave109 D15: 决策辅助三要素 — 摘要/申请人+时长/批准后果) */}
       <View style={styles.bodySection}>
         <Text style={styles.titleText} numberOfLines={2}>
           {formatApprovalTitle(activeApproval)}
@@ -330,11 +359,19 @@ export function QuickApprovalCard({
         <Text style={styles.summaryText} numberOfLines={3}>
           {formatApprovalSummary(activeApproval)}
         </Text>
-        {Boolean(activeApproval.requestedByAgentId) && (
-          <Text style={styles.requesterText}>
-            申请发起: 智能体 · {activeApproval.requestedByAgentId?.slice(0, 8)}…
-          </Text>
-        )}
+        <View style={styles.decisionMetaRow}>
+          {Boolean(activeApproval.requestedByAgentId) ? (
+            <Text style={styles.requesterText}>
+              发起: 智能体 · {activeApproval.requestedByAgentId?.slice(0, 8)}…
+            </Text>
+          ) : (
+            <Text style={styles.requesterText}>发起: 成员</Text>
+          )}
+          <Text style={styles.requesterText}>{formatApprovalAge(activeApproval.createdAt)}</Text>
+        </View>
+        <Text style={styles.consequenceText} numberOfLines={2}>
+          {formatApprovalConsequence(activeApproval.type)}
+        </Text>
       </View>
 
       {/* 驳回理由输入区域 (展开态) */}
@@ -518,6 +555,18 @@ const styles = StyleSheet.create({
     color: C.ink2,
     fontSize: 12,
     lineHeight: 17,
+  },
+  decisionMetaRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 8,
+    marginTop: 4,
+  },
+  consequenceText: {
+    color: C.ink4,
+    fontSize: 10,
+    lineHeight: 14,
+    marginTop: 4,
   },
   requesterText: {
     color: C.ink4,
