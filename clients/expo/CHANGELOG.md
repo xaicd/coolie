@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.76
+
+> Released: 2026-09-27 · Android release APK
+
+### 更新
+
+- wave111 修 0.5.75 选公司进入后闪退: ①旧 WebView (Chromium 66/73) 登录页无限重载环 — localStorage 不持久时 ZH_CN_ENSURE 反复 reload, 加单次护栏 ②登录 prober 双实例+永不停表修复 ③部署 rsync 不再抹 OTA 分发目录 (0.5.75 起所有 OTA 下载 404 的根因), OTA 恢复下发
+
+---
+
 ## v0.5.75
 
 > Released: 2026-09-27 · Android release APK
