@@ -260,7 +260,7 @@ const styles = StyleSheet.create({
   },
   badgeText: {
     fontSize: 9,
-    fontWeight: "700",
+    fontWeight: "600",
   },
   stageText: {
     fontSize: 9,

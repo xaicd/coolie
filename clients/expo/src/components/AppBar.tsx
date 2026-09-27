@@ -96,7 +96,7 @@ const styles = StyleSheet.create({
   badgeText: {
     color: "#FFFFFF",
     fontSize: 9,
-    fontWeight: "700",
+    fontWeight: "600",
     fontVariant: ["tabular-nums"],
   },
   titleContainer: {
@@ -112,7 +112,7 @@ const styles = StyleSheet.create({
   title: {
     color: C.ink,
     fontSize: 17,
-    fontWeight: "700",
+    fontWeight: "600",
     letterSpacing: 0.2,
   },
 });

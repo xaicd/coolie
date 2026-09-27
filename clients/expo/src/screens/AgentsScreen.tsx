@@ -504,7 +504,7 @@ export function AgentsScreen({
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.bg },
   header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-  h1: { color: C.ink, fontSize: 22, fontWeight: "700", marginBottom: 8 },
+  h1: { color: C.ink, fontSize: 22, fontWeight: "600", marginBottom: 8 },
   capsule: {
     flexDirection: "row",
     alignItems: "center",
@@ -525,7 +525,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
-  avatarText: { color: C.accent, fontSize: 16, fontWeight: "700" },
+  avatarText: { color: C.accent, fontSize: 16, fontWeight: "600" },
   nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   name: { color: C.ink, fontSize: 15, fontWeight: "600" },
   titleTag: { color: C.ink3, fontSize: 12, flexShrink: 1 },

@@ -346,7 +346,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 4,
   },
-  primaryBtnText: { color: "#FFFFFF", fontWeight: "700", fontSize: 14 },
+  primaryBtnText: { color: C.ink, fontWeight: "600", fontSize: 14 },
   errBar: {
     flexDirection: "row",
     alignItems: "center",
@@ -359,6 +359,6 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
   },
   errText: { color: C.err, fontSize: 12, flex: 1 },
-  errBtn: { color: C.err, fontSize: 12, fontWeight: "700" },
+  errBtn: { color: C.err, fontSize: 12, fontWeight: "600" },
   emptyWrap: { flex: 1 },
 });

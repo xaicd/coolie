@@ -157,7 +157,7 @@ const styles = StyleSheet.create({
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "700",
+    fontWeight: "600",
     color: C.ink,
   },
   headerSubtitle: {

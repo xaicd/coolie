@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  Modal,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -34,6 +35,12 @@ function formatDuration(seconds: number): string {
   if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
   if (seconds < 86400) return `${(seconds / 3600).toFixed(1)}h`;
   return `${(seconds / 86400).toFixed(1)}d`;
+}
+
+function formatTokenCount(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
+  return String(n);
 }
 
 interface DashboardScreenProps {
@@ -194,6 +201,34 @@ export function DashboardScreen({
   // ── 失败率 ──
   const failRatePct = data?.failureRate?.overallFailureRatePercent ?? 0;
 
+  // ── D11 成本下钻: 按员工花费 ──
+  const [costSheetOpen, setCostSheetOpen] = useState(false);
+  const [costLoading, setCostLoading] = useState(false);
+  const [costRows, setCostRows] = useState<Array<{
+    agentId: string;
+    agentName: string;
+    agentStatus?: string;
+    costCents: number;
+    inputTokens: number;
+    outputTokens: number;
+  }>>([]);
+  const loadCostRows = useCallback(async () => {
+    setCostSheetOpen(true);
+    setCostLoading(true);
+    try {
+      const rows = await coolie.costsByAgent(company.id);
+      setCostRows(
+        rows
+          .filter((r) => r.costCents > 0 || r.inputTokens > 0 || r.outputTokens > 0)
+          .sort((a, b) => b.costCents - a.costCents),
+      );
+    } catch {
+      setCostRows([]);
+    } finally {
+      setCostLoading(false);
+    }
+  }, [company.id]);
+
   return (
     <SafeAreaView style={{ backgroundColor: C.bg, flex: 1 }}>
       <StatusBar style="light" />
@@ -277,12 +312,9 @@ export function DashboardScreen({
           </Pressable>
         ) : null}
 
-        {/* ── 第 1 行: 4 张核心指标卡 ── */}
-        <Pressable
-          style={styles.gridContainer}
-          onPress={onOpenApprovals}
-          disabled={!onOpenApprovals}
-        >
+        {/* ── 第 1 行: 4 张核心指标卡 (wave108: 每格独立语义 — 花费格下钻原生
+            成本面板 D11, 审批格进待办, 员工/任务格纯信息) ── */}
+        <View style={styles.gridContainer}>
           <StatTile
             value={enabledAgents}
             label="已启用员工"
@@ -295,19 +327,90 @@ export function DashboardScreen({
             valueColor={C.accent}
             style={styles.gridTile}
           />
-          <StatTile
-            value={formatMoney(monthSpendCents)}
-            label="本月花费"
-            valueColor={C.ok}
+          <Pressable
             style={styles.gridTile}
-          />
-          <StatTile
-            value={pendingApprovals}
-            label="待审批"
-            valueColor={pendingAccent}
+            onPress={() => void loadCostRows()}
+            disabled={costLoading}
+          >
+            <StatTile
+              value={formatMoney(monthSpendCents)}
+              label="本月花费 ›"
+              valueColor={C.ok}
+            />
+          </Pressable>
+          <Pressable
             style={styles.gridTile}
-          />
-        </Pressable>
+            onPress={onOpenApprovals}
+            disabled={!onOpenApprovals}
+          >
+            <StatTile
+              value={pendingApprovals}
+              label="待审批"
+              valueColor={pendingAccent}
+            />
+          </Pressable>
+        </View>
+
+        {/* ── D11: 原生成本下钻面板 (按员工花费排序 + 预算水位) ── */}
+        <Modal
+          visible={costSheetOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setCostSheetOpen(false)}
+        >
+          <View style={styles.costSheetBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setCostSheetOpen(false)}
+            />
+            <View style={styles.costSheetPanel}>
+              <Text style={styles.costSheetTitle}>成本明细 · 本月</Text>
+              <Text style={styles.costSheetSub}>
+                总花费 {formatMoney(monthSpendCents)}
+                {budgetCents > 0 ? ` / 预算 ${formatMoney(budgetCents)} (${budgetUtilPct}%)` : " · 未设预算"}
+              </Text>
+              {budgetCents > 0 ? (
+                <View style={styles.costBudgetTrack}>
+                  <View
+                    style={[
+                      styles.costBudgetFill,
+                      { width: `${Math.min(budgetUtilPct, 100)}%` },
+                    ]}
+                  />
+                </View>
+              ) : null}
+              {costLoading ? (
+                <Text style={styles.costEmptyText}>正在加载各员工花费…</Text>
+              ) : costRows.length === 0 ? (
+                <Text style={styles.costEmptyText}>本月暂无 token 消耗记录</Text>
+              ) : (
+                <ScrollView style={styles.costList}>
+                  {costRows.map((row) => (
+                    <View key={row.agentId} style={styles.costRow}>
+                      <StatusDot
+                        status={row.agentStatus === "paused" ? "idle" : "ok"}
+                        size={6}
+                      />
+                      <Text style={styles.costRowName} numberOfLines={1}>
+                        {row.agentName}
+                      </Text>
+                      <Text style={styles.costRowTokens}>
+                        {formatTokenCount(row.inputTokens)}→{formatTokenCount(row.outputTokens)}
+                      </Text>
+                      <Text style={styles.costRowAmount}>{formatMoney(row.costCents)}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
+              <Pressable
+                style={styles.costCloseBtn}
+                onPress={() => setCostSheetOpen(false)}
+              >
+                <Text style={styles.costCloseText}>关闭</Text>
+              </Pressable>
+            </View>
+          </View>
+        </Modal>
 
         {/* ── CMMI 质量工程 (wave96 精简: 1 项核心 + 1 按钮) ── */}
         <AppCard style={styles.wideCard}>
@@ -840,6 +943,87 @@ const styles = StyleSheet.create({
     color: C.accent,
   },
   // wave105 公司级紧急熔断: 仅 1 个 chip + 1 个 banner, 不进任何 dashboard 子模块
+  costSheetBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    justifyContent: "flex-end",
+  },
+  costSheetPanel: {
+    backgroundColor: C.panel,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 20,
+    maxHeight: 520,
+  },
+  costSheetTitle: {
+    color: C.ink,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  costSheetSub: {
+    color: C.ink2,
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  costBudgetTrack: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.surfaceHover,
+    overflow: "hidden",
+    marginBottom: 10,
+  },
+  costBudgetFill: {
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: C.accent,
+  },
+  costList: {
+    flexGrow: 0,
+  },
+  costRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 8,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: C.lineSubtle,
+  },
+  costRowName: {
+    flex: 1,
+    color: C.ink,
+    fontSize: 13,
+  },
+  costRowTokens: {
+    color: C.ink4,
+    fontSize: 11,
+    fontVariant: ["tabular-nums"],
+  },
+  costRowAmount: {
+    color: C.ok,
+    fontSize: 13,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
+    minWidth: 64,
+    textAlign: "right",
+  },
+  costEmptyText: {
+    color: C.ink3,
+    fontSize: 12,
+    paddingVertical: 20,
+    textAlign: "center",
+  },
+  costCloseBtn: {
+    alignItems: "center",
+    paddingVertical: 10,
+    marginTop: 6,
+  },
+  costCloseText: {
+    color: C.ink3,
+    fontSize: 14,
+  },
   emergencyChip: {
     flexDirection: "row",
     alignItems: "center",
@@ -872,7 +1056,7 @@ const styles = StyleSheet.create({
   emergencyBannerTitle: {
     color: C.err,
     fontSize: 15,
-    fontWeight: "700",
+    fontWeight: "600",
     marginBottom: 2,
   },
   emergencyBannerSub: {

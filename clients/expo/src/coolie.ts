@@ -716,10 +716,12 @@ export async function classifyToken(token: string): Promise<Credential> {
     await probe.listCompanies();
     return { kind: "board", token };
   } catch (e) {
+    // D03: 瞬态故障 (网络不可达 / status 0 / 5xx) 原样上抛, 让调用方能区分
+    // 「服务器暂时联系不上」与「实例明确拒绝这把钥匙」。旧版把一切错误包成
+    // "did not accept that key", 于是部署重启的 10 秒窗口就能把用户永久登出。
+    if (!(e instanceof CoolieApiError) || e.status === 0 || e.status >= 500) throw e;
     throw new Error(
-      `This instance did not accept that key (${
-        e instanceof CoolieApiError ? `${e.status} ${e.message}` : String(e)
-      }).`,
+      `This instance did not accept that key (${e.status} ${e.message}).`,
     );
   }
 }
@@ -800,7 +802,14 @@ export async function restoreCredential(): Promise<Credential | null> {
   if (token) {
     try {
       return await classifyToken(token);
-    } catch {
+    } catch (e) {
+      // D03: 只有实例「明确拒绝」才清凭证。网络抖动 / 服务器部署重启窗口 /
+      // 5xx 一律保留 token —— 本次进登录页 (无网也用不了 App), 服务恢复后
+      // 下一次冷启动自动回到已登录态。旧版任何异常都 clearAuthToken(),
+      // 一次 systemctl restart coolie 就把全设备永久登出。
+      const definitive =
+        e instanceof Error && /did not accept that key/i.test(e.message);
+      if (!definitive) return null;
       await clearAuthToken();
     }
   }

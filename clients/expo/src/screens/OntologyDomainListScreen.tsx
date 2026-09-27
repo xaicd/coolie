@@ -601,7 +601,7 @@ export function OntologyDomainListScreen({
                       <Text
                         style={[
                           styles.graphNodeCountText,
-                          isSelected && { color: C.ink, fontWeight: "700" },
+                          isSelected && { color: C.ink, fontWeight: "600" },
                         ]}
                       >
                         {nt.count}
