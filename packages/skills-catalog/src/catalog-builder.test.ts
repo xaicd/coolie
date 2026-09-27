@@ -368,6 +368,131 @@ describe("skills catalog manifest", () => {
       "generated/catalog.json is stale. Run pnpm --filter @paperclipai/skills-catalog build:manifest.",
     );
   });
+
+  it("fetches a pinned repository tree once even when several references share it", async () => {
+    const packageDir = await createCatalogPackage();
+    const commit = "0123456789abcdef0123456789abcdef01234567";
+    for (const [slug, name] of [["alpha", "Alpha"], ["beta", "Beta"]] as const) {
+      await writeReference(packageDir, "optional", "research", slug, {
+        source: {
+          type: "github",
+          hostname: "github.com",
+          owner: "example",
+          repo: "shared",
+          ref: "v1.0.0",
+          commit,
+          path: `skills/${slug}`,
+        },
+        files: ["SKILL.md"],
+        recommendedForRoles: ["researcher"],
+        tags: ["research"],
+      });
+    }
+    const treeFetches: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("/git/trees/")) {
+        treeFetches.push(url);
+        return Response.json({
+          tree: [
+            { path: "skills/alpha/SKILL.md", type: "blob", size: 64 },
+            { path: "skills/beta/SKILL.md", type: "blob", size: 64 },
+          ],
+        });
+      }
+      const name = url.includes("/skills/alpha/") ? "Alpha" : "Beta";
+      return new Response(`---\nname: ${name}\ndescription: Shared repo reference for ${name}.\n---\n\nUse this skill.\n`);
+    }));
+
+    const result = await buildCatalogManifest({ packageDir, generatedAt: "2026-05-26T00:00:00.000Z" });
+
+    expect(result.errors).toEqual([]);
+    expect(result.manifest.skills).toHaveLength(2);
+    expect(treeFetches).toHaveLength(1);
+  });
+
+  it("aborts a hanging fetch instead of blocking the build", async () => {
+    const packageDir = await createCatalogPackage();
+    await writeReference(packageDir, "optional", "research", "remote-research", {
+      source: {
+        type: "github",
+        hostname: "github.com",
+        owner: "example",
+        repo: "remote-skill",
+        ref: "v1.0.0",
+        commit: "0123456789abcdef0123456789abcdef01234567",
+        path: "skills/remote-research",
+      },
+      files: ["SKILL.md"],
+      recommendedForRoles: ["researcher"],
+      tags: ["research"],
+    });
+    vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
+      if (url.includes("/git/trees/")) {
+        return await new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+        });
+      }
+      return new Response("not found", { status: 404 });
+    }));
+
+    const result = await buildCatalogManifest({
+      packageDir,
+      generatedAt: "2026-05-26T00:00:00.000Z",
+      fetchTimeoutMs: 50,
+    });
+
+    expect(result.errors.some((error) => error.includes("failed to fetch GitHub tree:"))).toBe(true);
+    expect(result.manifest.skills).toHaveLength(0);
+  });
+
+  it("bounds in-flight file fetches to the configured concurrency", async () => {
+    const packageDir = await createCatalogPackage();
+    await writeReference(packageDir, "optional", "research", "wide-skill", {
+      source: {
+        type: "github",
+        hostname: "github.com",
+        owner: "example",
+        repo: "wide",
+        ref: "v1.0.0",
+        commit: "0123456789abcdef0123456789abcdef01234567",
+        path: "skills/wide",
+      },
+      files: ["SKILL.md", "references/**"],
+      recommendedForRoles: ["researcher"],
+      tags: ["research"],
+    });
+    const referencePaths = Array.from({ length: 11 }, (_, index) => `skills/wide/references/${index}.md`);
+    let inFlight = 0;
+    let maxInFlight = 0;
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("/git/trees/")) {
+        return Response.json({
+          tree: [
+            { path: "skills/wide/SKILL.md", type: "blob", size: 64 },
+            ...referencePaths.map((path) => ({ path, type: "blob", size: 16 })),
+          ],
+        });
+      }
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      inFlight -= 1;
+      return new Response(url.includes("/SKILL.md")
+        ? "---\nname: Wide Skill\ndescription: A referenced skill with many supporting files.\n---\n\nUse it.\n"
+        : "# Reference\n");
+    }));
+
+    const result = await buildCatalogManifest({
+      packageDir,
+      generatedAt: "2026-05-26T00:00:00.000Z",
+      fetchConcurrency: 3,
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(result.manifest.skills[0]!.files).toHaveLength(12);
+    expect(maxInFlight).toBeGreaterThan(1);
+    expect(maxInFlight).toBeLessThanOrEqual(3);
+  });
 });
 
 async function createCatalogPackage() {

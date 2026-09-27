@@ -66,6 +66,61 @@ interface GitHubTreeEntry {
 interface BuildCatalogManifestOptions {
   packageDir: string;
   generatedAt?: string;
+  /** Per-request timeout for GitHub fetches. Defaults to DEFAULT_FETCH_TIMEOUT_MS. */
+  fetchTimeoutMs?: number;
+  /** Maximum concurrent file fetches within one referenced skill. Defaults to DEFAULT_FETCH_CONCURRENCY. */
+  fetchConcurrency?: number;
+}
+
+// A referenced skill fetches one repository tree plus one raw file per included file.
+// Without a bound and a timeout that is >100 sequential requests for the shipped
+// catalog, which does not finish inside a constrained network or CI budget.
+const DEFAULT_FETCH_TIMEOUT_MS = 20_000;
+const DEFAULT_FETCH_CONCURRENCY = 8;
+
+type CachedGitHubTree =
+  | { ok: true; tree: GitHubTreeEntry[]; truncated: boolean }
+  | { ok: false; reason: string };
+
+interface ReferencedFetchContext {
+  timeoutMs: number;
+  concurrency: number;
+  /**
+   * Trees are immutable for a pinned commit, and several references can share one
+   * (hostname, owner, repo, commit). Reuse the response so repeated references do not
+   * each spend an API request against the 60/hour unauthenticated budget.
+   */
+  treeCache: Map<string, CachedGitHubTree>;
+}
+
+function createReferencedFetchContext(options: BuildCatalogManifestOptions): ReferencedFetchContext {
+  return {
+    timeoutMs: options.fetchTimeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS,
+    concurrency: options.fetchConcurrency ?? DEFAULT_FETCH_CONCURRENCY,
+    treeCache: new Map(),
+  };
+}
+
+/**
+ * Runs `fn` over `items` with a bounded number of in-flight calls, preserving the input
+ * order of the results so manifest output stays deterministic.
+ */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  const workerCount = Math.max(1, Math.min(Math.floor(limit) || 1, items.length));
+  let cursor = 0;
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (cursor < items.length) {
+      const index = cursor;
+      cursor += 1;
+      results[index] = await fn(items[index]!);
+    }
+  }));
+  return results;
 }
 
 interface BuildCatalogManifestResult {
@@ -106,6 +161,7 @@ export async function buildCatalogManifest(
   const errors: string[] = [];
   const candidates = await discoverSkillCandidates(packageDir, errors);
   const skills: CatalogSkill[] = [];
+  const fetchContext = createReferencedFetchContext(options);
 
   collectCandidateUniquenessErrors(candidates, errors);
 
@@ -115,6 +171,7 @@ export async function buildCatalogManifest(
       candidate,
       errors,
       existingSkillsById.get(skillIdForCandidate(candidate)) ?? null,
+      fetchContext,
     );
     if (skill) skills.push(skill);
   }
@@ -261,9 +318,10 @@ async function buildCatalogSkill(
   candidate: SkillCandidate,
   errors: string[],
   existingSkill: CatalogSkill | null,
+  fetchContext: ReferencedFetchContext,
 ): Promise<CatalogSkill | null> {
   if (candidate.source === "reference") {
-    return buildReferencedCatalogSkill(packageDir, candidate, errors, existingSkill);
+    return buildReferencedCatalogSkill(packageDir, candidate, errors, existingSkill, fetchContext);
   }
 
   const prefix = relativePackagePath(packageDir, candidate.absolutePath);
@@ -333,6 +391,7 @@ async function buildReferencedCatalogSkill(
   candidate: Extract<SkillCandidate, { source: "reference" }>,
   errors: string[],
   existingSkill: CatalogSkill | null,
+  fetchContext: ReferencedFetchContext,
 ): Promise<CatalogSkill | null> {
   const prefix = relativePackagePath(packageDir, candidate.absolutePath);
   validateSlug("category", candidate.category, prefix, errors);
@@ -355,8 +414,14 @@ async function buildReferencedCatalogSkill(
     : null;
   const errorStart = errors.length;
 
-  const files = await collectReferencedSkillFiles(source, descriptor.files ?? [SKILL_ENTRYPOINT], prefix, errors);
-  const skillMarkdown = await readReferencedFileText(source, SKILL_ENTRYPOINT, prefix, errors);
+  const files = await collectReferencedSkillFiles(
+    source,
+    descriptor.files ?? [SKILL_ENTRYPOINT],
+    prefix,
+    errors,
+    fetchContext,
+  );
+  const skillMarkdown = await readReferencedFileText(source, SKILL_ENTRYPOINT, prefix, errors, fetchContext);
   if (!skillMarkdown) {
     const nextErrors = errors.slice(errorStart);
     if (fallbackSkill && canFallbackToExistingReferencedSkill(nextErrors)) {
@@ -566,8 +631,9 @@ async function collectReferencedSkillFiles(
   includePatterns: string[],
   prefix: string,
   errors: string[],
+  fetchContext: ReferencedFetchContext,
 ): Promise<CatalogSkillFile[]> {
-  const tree = await fetchGitHubTree(source, prefix, errors);
+  const tree = await fetchGitHubTree(source, prefix, errors, fetchContext);
   const sourceRoot = source.path ? `${source.path}/` : "";
   const normalizedPatterns: string[] = [];
   for (const pattern of includePatterns) {
@@ -578,25 +644,36 @@ async function collectReferencedSkillFiles(
     }
     if (normalizedPattern) normalizedPatterns.push(normalizedPattern);
   }
-  const files: CatalogSkillFile[] = [];
 
-  for (const entry of tree) {
-    if (entry.type !== "blob") continue;
-    if (!entry.path.startsWith(sourceRoot)) continue;
+  const matchedEntries = tree.filter((entry) => {
+    if (entry.type !== "blob") return false;
+    if (!entry.path.startsWith(sourceRoot)) return false;
     const relativePath = entry.path.slice(sourceRoot.length);
-    if (!normalizedPatterns.some((pattern) => referencedPathMatches(relativePath, pattern))) continue;
-    if ((entry.size ?? 0) > MAX_CATALOG_FILE_BYTES) {
-      errors.push(`${prefix}/${relativePath} exceeds ${MAX_CATALOG_FILE_BYTES} bytes.`);
-      continue;
-    }
+    return normalizedPatterns.some((pattern) => referencedPathMatches(relativePath, pattern));
+  });
 
-    const bytes = await fetchReferencedFileBytes(source, relativePath, prefix, errors);
-    if (!bytes) continue;
+  // Fetch with a bounded pool. Each item keeps its own error list so the merged error
+  // order still follows the tree's order rather than completion order.
+  const outcomes = await mapWithConcurrency(matchedEntries, fetchContext.concurrency, async (entry) => {
+    const relativePath = entry.path.slice(sourceRoot.length);
+    const localErrors: string[] = [];
+    if ((entry.size ?? 0) > MAX_CATALOG_FILE_BYTES) {
+      localErrors.push(`${prefix}/${relativePath} exceeds ${MAX_CATALOG_FILE_BYTES} bytes.`);
+      return { relativePath, localErrors, bytes: null };
+    }
+    const bytes = await fetchReferencedFileBytes(source, relativePath, prefix, localErrors, fetchContext);
+    return { relativePath, localErrors, bytes };
+  });
+
+  const files: CatalogSkillFile[] = [];
+  for (const outcome of outcomes) {
+    errors.push(...outcome.localErrors);
+    if (!outcome.bytes) continue;
     files.push({
-      path: relativePath,
-      kind: classifyCatalogFile(relativePath),
-      sizeBytes: bytes.byteLength,
-      sha256: sha256(bytes),
+      path: outcome.relativePath,
+      kind: classifyCatalogFile(outcome.relativePath),
+      sizeBytes: outcome.bytes.byteLength,
+      sha256: sha256(outcome.bytes),
     });
   }
 
@@ -612,20 +689,45 @@ async function fetchGitHubTree(
   source: CatalogSkillSource,
   prefix: string,
   errors: string[],
+  fetchContext: ReferencedFetchContext,
 ): Promise<GitHubTreeEntry[]> {
+  const cacheKey = `${source.hostname}|${source.owner}|${source.repo}|${source.commit}`;
+  let cached = fetchContext.treeCache.get(cacheKey);
+  if (!cached) {
+    cached = await requestGitHubTree(source, fetchContext);
+    fetchContext.treeCache.set(cacheKey, cached);
+  }
+  if (!cached.ok) {
+    errors.push(`${prefix} failed to fetch GitHub tree: ${cached.reason}.`);
+    return [];
+  }
+  if (cached.truncated) {
+    errors.push(`${prefix} GitHub tree response was truncated.`);
+  }
+  return cached.tree;
+}
+
+async function requestGitHubTree(
+  source: CatalogSkillSource,
+  fetchContext: ReferencedFetchContext,
+): Promise<CachedGitHubTree> {
   const url = `${githubApiBase(source.hostname)}/repos/${source.owner}/${source.repo}/git/trees/${source.commit}?recursive=1`;
   try {
-    const response = await fetch(url, { headers: { accept: "application/vnd.github+json" } });
+    const response = await fetch(url, {
+      headers: { accept: "application/vnd.github+json" },
+      signal: AbortSignal.timeout(fetchContext.timeoutMs),
+    });
     if (!response.ok) {
-      errors.push(`${prefix} failed to fetch GitHub tree: HTTP ${response.status}.`);
-      return [];
+      return { ok: false, reason: `HTTP ${response.status}` };
     }
     const body = await response.json() as { tree?: GitHubTreeEntry[]; truncated?: boolean };
-    if (body.truncated) errors.push(`${prefix} GitHub tree response was truncated.`);
-    return Array.isArray(body.tree) ? body.tree : [];
+    return {
+      ok: true,
+      tree: Array.isArray(body.tree) ? body.tree : [],
+      truncated: Boolean(body.truncated),
+    };
   } catch (error) {
-    errors.push(`${prefix} failed to fetch GitHub tree: ${errorMessage(error)}.`);
-    return [];
+    return { ok: false, reason: errorMessage(error) };
   }
 }
 
@@ -634,8 +736,9 @@ async function readReferencedFileText(
   relativePath: string,
   prefix: string,
   errors: string[],
+  fetchContext: ReferencedFetchContext,
 ) {
-  const bytes = await fetchReferencedFileBytes(source, relativePath, prefix, errors);
+  const bytes = await fetchReferencedFileBytes(source, relativePath, prefix, errors, fetchContext);
   return bytes ? bytes.toString("utf8") : null;
 }
 
@@ -644,6 +747,7 @@ async function fetchReferencedFileBytes(
   relativePath: string,
   prefix: string,
   errors: string[],
+  fetchContext: ReferencedFetchContext,
 ): Promise<Buffer | null> {
   const normalizedPath = normalizeReferencedPath(relativePath);
   if (!normalizedPath) {
@@ -652,7 +756,7 @@ async function fetchReferencedFileBytes(
   }
   const url = rawGitHubUrl(source, normalizedPath);
   try {
-    const response = await fetch(url);
+    const response = await fetch(url, { signal: AbortSignal.timeout(fetchContext.timeoutMs) });
     if (!response.ok) {
       errors.push(`${prefix}/${normalizedPath} failed to fetch pinned GitHub file: HTTP ${response.status}.`);
       return null;
