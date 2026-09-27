@@ -42,3 +42,15 @@ Worker: cmd (门神)
 
 ## 5. Done
 新版本真发版 + 模拟器复测清空→重开无空泡 + commit push + 报告真因。
+---
+
+## 补充 (boss 23:33 截图 + 产品总监判定)
+
+工坊还出现 **3 条「正在连接会话助手…」**:
+1. 23:32 那条带黄点+垃圾桶图标 = 状态行被当消息**存库**, 每次打开都重新渲染 (状态提示绝不该入库, 更不该有删除按钮)
+2. 老板发「员工都在忙啥」后同时出现 **2 条 loading 指示** (蓝点行 + 三点动画行) = loading 态重复渲染
+
+修法追加:
+- A. 「正在连接…」状态**绝不入库**: 存库前过滤掉 status/connecting 类伪消息; 历史里已有的脏数据 (含空 content 行) 由 loadHistory 或 server 一次性清洗
+- B. loading 指示**单实例**: 同一时刻只渲染一个 thinking 指示 (BoardChatScreen.tsx:880 setStatusText + :1450 thinking visible 只留一个渲染路径)
+- C. 清单: ①空透明气泡 ②状态行入库 ③loading 双渲染 —— 三病同修
