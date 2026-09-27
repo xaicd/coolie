@@ -279,9 +279,17 @@ export function ArtifactsScreen({
 
     // 若为代码/原型产物，且包含 URL 或原型特征，可引导前往沙箱或 Diff
     if (artifact.source === "work_product") {
-      if (artifact.openPath?.startsWith("http") || artifact.contentPath?.startsWith("http")) {
-        const url = artifact.openPath || artifact.contentPath || "";
-        onOpenSandbox?.(url, null, null);
+      let targetUrl = artifact.openPath || artifact.contentPath || "";
+      if (targetUrl && targetUrl.startsWith("/")) {
+        targetUrl = `${COOLIE_BASE_URL}${targetUrl}`;
+      }
+      if (targetUrl) {
+        onOpenSandbox?.(targetUrl, null, {
+          id: artifact.id,
+          title: artifact.title,
+          summary: artifact.previewText || artifact.title,
+          url: targetUrl,
+        } as any);
         return;
       }
       if (onOpenDiff) {
@@ -538,9 +546,17 @@ export function ArtifactsScreen({
                       <Pressable
                         style={styles.actionBtnPrimary}
                         onPress={() => {
-                          const targetUrl =
+                          let targetUrl =
                             item.openPath || item.contentPath || "";
-                          onOpenSandbox?.(targetUrl, null, null);
+                          if (targetUrl && targetUrl.startsWith("/")) {
+                            targetUrl = `${COOLIE_BASE_URL}${targetUrl}`;
+                          }
+                          onOpenSandbox?.(targetUrl, null, {
+                            id: item.id,
+                            title: item.title,
+                            summary: item.previewText || item.title,
+                            url: targetUrl,
+                          } as any);
                         }}
                       >
                         <Text style={styles.actionBtnTextPrimary}>

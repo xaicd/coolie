@@ -37,7 +37,7 @@ import type {
   IssueWorkProduct,
   WorkspaceRuntimeService,
 } from "@coolie/api-client";
-import { C } from "../coolie";
+import { C, COOLIE_BASE_URL } from "../coolie";
 import { EmptyState } from "../ui/EmptyState";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { ExternalOpenSheet } from "../components/ExternalOpenSheet";
@@ -207,12 +207,20 @@ export function PrototypeSandboxScreen({
 
   // DS 真值: useEffect(resolve, [sessionId]); 我们重入参 resolve() 一次
   useEffect(() => {
-    const next = resolvePreviewUrl(_service, workProduct, initialUrl, bust);
-    setResolved(next);
+    const raw = resolvePreviewUrl(_service, workProduct, initialUrl, bust);
+    const resolvedUrl = raw.url && raw.url.startsWith("/") ? `${COOLIE_BASE_URL}${raw.url}` : raw.url;
+    setResolved({ url: resolvedUrl, isSnapshot: raw.isSnapshot });
     setLoading(false);
 
-    if (next.url && (next.url.endsWith(".md") || next.url.endsWith(".txt") || next.url.includes("/docs/"))) {
-      fetch(next.url)
+    const isDocUrl =
+      resolvedUrl &&
+      (resolvedUrl.endsWith(".md") ||
+        resolvedUrl.endsWith(".txt") ||
+        resolvedUrl.includes("/docs/") ||
+        resolvedUrl.includes("/attachments/"));
+
+    if (resolvedUrl && isDocUrl) {
+      fetch(resolvedUrl)
         .then((res) => res.text())
         .then((text) => setMarkdownHtml(generateMarkdownHtml(workProduct?.title ?? "产物文档", text)))
         .catch(() => {
@@ -220,7 +228,7 @@ export function PrototypeSandboxScreen({
             setMarkdownHtml(generateMarkdownHtml(workProduct.title ?? "产物概览", workProduct.summary));
           }
         });
-    } else if (!next.url && workProduct?.summary) {
+    } else if (workProduct?.summary && (!resolvedUrl || resolvedUrl.endsWith(".md"))) {
       setMarkdownHtml(generateMarkdownHtml(workProduct.title ?? "产物概览", workProduct.summary));
     } else {
       setMarkdownHtml(null);
