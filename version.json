@@ -1,8 +1,8 @@
 {
-  "version": "0.5.80",
-  "versionCode": 580,
-  "commitSha": "4f10cd3f15d6aaac0b75ba7f95a75f8059d77007",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.80/coolie-release.apk",
-  "sha256": "b06e6cbf0580d15e4a4fc9273ffa6dec85f5fae8135230cabf0ecff0c7bb17e0",
-  "releaseNotes": "wave115 修空气泡+状态行入库+loading双渲染"
+  "version": "0.5.81",
+  "versionCode": 581,
+  "commitSha": "b0ebb72a236e3b9846038d3b9ef2d0455bb95db4",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.81/coolie-release.apk",
+  "sha256": "2f56c4a38f56caeac91e3251e470c99a68c3a40a2eebc4a7d59609245658d321",
+  "releaseNotes": "wave116 底部导航字号优化 (标签 10→13px, 图标 22→24px, 栏高 60→64px) + 带上 3967d063b 平台核心工具经 MCP 暴露 / Hermes 连接"
 }
