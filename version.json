@@ -3,6 +3,6 @@
   "versionCode": 580,
   "commitSha": "4f10cd3f15d6aaac0b75ba7f95a75f8059d77007",
   "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.80/coolie-release.apk",
-  "sha256": "79780b47bfb1f599bdc6af437da8d4d949668a09a8c2862d4095c960498ddf96",
+  "sha256": "b06e6cbf0580d15e4a4fc9273ffa6dec85f5fae8135230cabf0ecff0c7bb17e0",
   "releaseNotes": "wave115 修空气泡+状态行入库+loading双渲染"
 }
