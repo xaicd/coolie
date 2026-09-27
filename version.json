@@ -1,8 +1,8 @@
 {
-  "version": "0.5.78",
-  "versionCode": 578,
-  "commitSha": "2ea022b4fddfda63e49e2425bf454df5fc48507b",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.78/coolie-release.apk",
-  "sha256": "33f0fb20916b7d2ea6654f3a183b3a3c25d7c61775487aeaa0a2fdcbbd1c1767",
-  "releaseNotes": "wave113 修项目中心返回标签溢出 (ScreenHeader 缺水平内边距 — 项目中心/Plan/Pipeline/Git 凭证/原型沙箱 返回标签贴左缘); 资产→项目中心 返回按钮完整落在屏幕内"
+  "version": "0.5.79",
+  "versionCode": 579,
+  "commitSha": "49b3285087745a8ee2a105ab744ba8a74e4f23e3",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.79/coolie-release.apk",
+  "sha256": "5bebe9bb90383e969b31b5f1a695663d257e33acd58ea0b1c7c627947bafe895",
+  "releaseNotes": "wave114 项目中心新建按钮改为右下悬浮 (过滤条只留 chips; 新建 改为右下角悬浮 [+ 新建项目], 对齐 TasksScreen 的 [+ 新建任务])"
 }
