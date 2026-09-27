@@ -65,7 +65,7 @@ bash skills/paperclip/scripts/paperclip-upload-artifact.sh \
 
 ## 3. 必须一并上报的待决事项 (需业主决策)
 
-1. **`xaicd/ruoyi-all-next` 无许可证**(GitHub API 实测 `NO-LICENSE`)。它是要进交付物的,客户需要授权依据 —— 与 `REQ-CR-012` 要求的 "License 授权锁" 直接冲突。
+1. ~~`xaicd/ruoyi-all-next` 无许可证~~ **已解决**:业主方已于 2026-09-27 17:34 推送 LICENSE,现为 **MIT**(API 实测 `spdx=MIT`,标准全文、零附加条款,`Copyright (c) 2026 xaicd`)。遗留义务(非阻塞):交付包须随附 `LICENSE` 全文与版权声明,漏署即许可违约。
 2. **「若依」角色歧义(阻塞架构)**:`01-srs.md`/`03-lld-api.md` 把若依写成**甲方现有门户**(`REQ-CR-010`),而本次选型是**自建控制台**。代码归属/交付物/验收方式不同。
 3. **★2.4 要求"采购的商用财报 OCR 工具"**,原 HLD 用 PaddleOCR+视觉模型覆盖财报,属**未声明偏离**;新版 DAR 已裁为"财报采购、发票/合同用开源"的组合路线。
 4. **`REQ-CR-012` 硬件指纹 License 锁**会把国企客户系统锁死,须写入合同附件。

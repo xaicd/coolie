@@ -20,6 +20,11 @@ interface GitUrlItem {
 
 const TEMPLATE_PRESETS = [
   {
+    name: "RuoYi-All-Next",
+    url: "https://github.com/xaicd/ruoyi-all-next.git",
+    tag: "自有全栈底座",
+  },
+  {
     name: "Spring Cloud Alibaba",
     url: "https://github.com/alibaba/spring-cloud-alibaba.git",
     tag: "微服务治理",
