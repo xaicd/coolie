@@ -1217,9 +1217,33 @@ export function extractSessionTokenCookie(headers: Headers): string | null {
   const cookieRegex = /(?:^|;|\s)(?:__Secure-)?(?:paperclip(?:-[^=;\s]+)?|better-auth)\.session_token=([^;]+)/i;
   for (const val of setCookieHeaderStrings(headers)) {
     const match = val.match(cookieRegex);
-    if (match && typeof match[1] === "string" && match[1].trim()) return match[1].trim();
+    if (match && typeof match[1] === "string" && match[1].trim()) {
+      return decodeCookieWireValue(match[1].trim());
+    }
   }
   return null;
+}
+
+/**
+ * Better Auth writes the session cookie as `encodeURIComponent(<signed token>)`
+ * and decodes exactly one layer when reading it back (`parseCookies` →
+ * `tryDecode`). The wire value therefore carries the percent-encoded form
+ * (`%2F`/`%2B` inside the HMAC suffix), and a caller that stores or replays the
+ * token must hold the *logical* value, not the wire form: storing the wire form
+ * made the App encode it a second time in the `/api/auth/exchange` URL, the
+ * bridge validated it (server decodes once) but minted a double-encoded cookie,
+ * and the WebView's follow-up `get-session` came back 401 — the App showed the
+ * sign-in page right after a successful exchange (wave100 real-device trace).
+ * Decode one layer when the value looks percent-encoded; raw hex/base64 tokens
+ * never contain `%`, so this never touches an already-logical value.
+ */
+function decodeCookieWireValue(value: string): string {
+  if (!value.includes("%")) return value;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 /**

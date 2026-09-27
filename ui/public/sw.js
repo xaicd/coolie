@@ -24,8 +24,12 @@ self.addEventListener("fetch", (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests and API calls
-  if (request.method !== "GET" || url.pathname.startsWith("/api")) {
+  // Skip non-GET requests and API calls. The check matches `/api/` anywhere in
+  // the path, so the /XROA-prefixed API surface (including the App↔Web login
+  // bridge `/XROA/api/auth/exchange`, whose 302 + Set-Cookie must be processed
+  // by the browser's own navigation stack, not refetched inside the worker)
+  // stays outside the worker.
+  if (request.method !== "GET" || url.pathname.includes("/api/")) {
     return;
   }
 

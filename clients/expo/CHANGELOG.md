@@ -4,6 +4,21 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.70
+
+> Released: 2026-09-27 · Android release APK + OTA bundle
+
+### 更新
+
+wave98+wave100 修 App 内点「进入 CMMI 门禁」仍看到 web 登录页 (boss 23:36 OOB)。prod Caddy 日志铁证 (09-27 08:36 真机): exchange 302+Set-Cookie 成功但紧接的 get-session 401 — **两层叠加真因**, 两层都修:
+
+- **值错了 (wave100 根因)**: App 把 Better Auth cookie 的 wire 形式 (encodeURIComponent 过的签名值, 含 `%2F`/`%2B`) 当逻辑值存进 SecureStore, exchange URL 又 encode 一次 → `%252F` 双重编码。server 验证时 better-auth parseCookies 只 tryDecode 一层 → 验得过 (302), 但铸出的 cookie 再 encode 一层 → WebView 回传时只解一层得到 wire 形式 → HMAC 校验失败 → 401。修: api-client `extractSessionTokenCookie` 解码 wire 值; App `saveSessionToken`/`getSessionToken` 双向归一 (顺带 heal 旧版本已存的 wire 形式值, 不用重登)
+- **存不进 (wave98)**: 老 sw.js 的 fetch 拦截只豁免 `startsWith("/api")`, `/XROA/api/auth/exchange` 导航被 service worker 代理, Lax cookie 在该上下文存不进 jar。修: sw.js 改豁免任何含 `/api/` 的路径 (bridge 302+Set-Cookie 交还浏览器导航栈); bridge Set-Cookie SameSite=Lax → None (+Secure) —— prod 单变量 A/B 实证 Lax=登录页 / None=自动登录
+- 配套: server auth wrapper 暴露 `options.secret` (session-token 路由 + bridge 对 raw DB token 正确签名); WebContainerScreen 落到 /auth 页时一次自愈重试 exchange (覆盖旧 SW 更新窗口期)
+- **OTA 发布卫生 (wave100)**: publish-ota.sh 从 warning 升级为硬阻断 — 工作区不干净拒绝发布 (09-26 23:40 曾从未 commit 工作区发出过一份幽灵 OTA bundle, 不可审计不可复现; 本次 0.5.70 OTA 从 committed HEAD 重发)
+
+---
+
 ## v0.5.69
 
 > Released: 2026-09-26 · Android release APK + OTA bundle

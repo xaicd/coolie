@@ -81,6 +81,12 @@ export function WebContainerScreen({
   onEmergencyStop,
 }: WebContainerScreenProps) {
   const webViewRef = useRef<any>(null);
+  // Wave 98 — one-shot self-heal: if the first navigation lands on the web
+  // console's /auth page even though we had an exchange token, remount the
+  // WebView so the bridge URL runs again. Covers the window where the site's
+  // service worker is still a stale build (workers only update byte-diff on
+  // navigation) or the first exchange raced the cookie jar.
+  const authRetryDoneRef = useRef(false);
   const [canGoBack, setCanGoBack] = useState(false);
   const [canGoForward, setCanGoForward] = useState(false);
   const [currentUrl, setCurrentUrl] = useState<string>("");
@@ -157,14 +163,26 @@ export function WebContainerScreen({
     return () => sub.remove();
   }, [canGoBack, onBack]);
 
-  const handleNavigationStateChange = useCallback((navState: WebViewNavigation) => {
-    setCanGoBack(navState.canGoBack);
-    setCanGoForward(navState.canGoForward);
-    setCurrentUrl(navState.url);
-    if (navState.title && !navState.title.includes("http")) {
-      setPageTitle(navState.title);
-    }
-  }, []);
+  const handleNavigationStateChange = useCallback(
+    (navState: WebViewNavigation) => {
+      setCanGoBack(navState.canGoBack);
+      setCanGoForward(navState.canGoForward);
+      setCurrentUrl(navState.url);
+      if (navState.title && !navState.title.includes("http")) {
+        setPageTitle(navState.title);
+      }
+      if (
+        !authRetryDoneRef.current &&
+        exchangeToken &&
+        navState.url.includes("/auth")
+      ) {
+        authRetryDoneRef.current = true;
+        console.log(`[bridge] landed on auth page (${navState.url.slice(0, 60)}), retrying exchange once`);
+        setTimeout(() => setReloadKey((k) => k + 1), 1500);
+      }
+    },
+    [exchangeToken],
+  );
 
   const handleReload = () => {
     setError(null);

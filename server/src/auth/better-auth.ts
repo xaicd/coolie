@@ -60,7 +60,10 @@ type BetterAuthSessionResolver = {
   api?: BetterAuthGetSessionApi;
 };
 
-type BetterAuthInstance = BetterAuthHandlerTarget & BetterAuthSessionResolver;
+type BetterAuthInstance = BetterAuthHandlerTarget & BetterAuthSessionResolver & {
+  /** The instance secret, surfaced for in-process signers (session-token route, login bridge). */
+  options?: { secret?: string };
+};
 
 const AUTH_COOKIE_PREFIX_FALLBACK = "default";
 const AUTH_COOKIE_PREFIX_INVALID_SEGMENTS_RE = /[^a-zA-Z0-9_-]+/g;
@@ -433,6 +436,13 @@ export function createBetterAuthInstance(db: Db, config: Config, trustedOrigins:
         return auth.api.getSession(input);
       },
     },
+    // Surface the instance secret on the wrapper (both underlying instances
+    // share it) so in-process callers — `/api/auth/session-token` and the
+    // App↔Web login bridge — can sign the cookie values they return. Without
+    // it the session-token route handed out raw tokens that Better Auth's
+    // getSignedCookie read rejected, and the bridge passed raw DB tokens
+    // through unsigned.
+    options: { secret },
   };
 }
 

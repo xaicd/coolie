@@ -87,14 +87,36 @@ export async function getAuthToken(): Promise<string | null> {
  * are never mistaken for bearer tokens nor erased by bearer token classifiers.
  */
 export async function saveSessionToken(token: string): Promise<void> {
-  await SecureStore.setItemAsync(SESSION_TOKEN_KEY, token);
+  await SecureStore.setItemAsync(SESSION_TOKEN_KEY, normalizeSessionTokenValue(token));
 }
 export async function clearSessionToken(): Promise<void> {
   await SecureStore.deleteItemAsync(SESSION_TOKEN_KEY);
   await SecureStore.deleteItemAsync(SESSION_COOKIE_NAME_KEY);
 }
 export async function getSessionToken(): Promise<string | null> {
-  return SecureStore.getItemAsync(SESSION_TOKEN_KEY);
+  const stored = await SecureStore.getItemAsync(SESSION_TOKEN_KEY);
+  return stored ? normalizeSessionTokenValue(stored) : stored;
+}
+
+/**
+ * Better Auth's session cookie wire value is `encodeURIComponent(<signed>)`;
+ * versions before 0.5.70 stored that wire form (percent-encoded `%2F`/`%2B`
+ * inside the HMAC suffix) straight out of the sign-in `Set-Cookie` header.
+ * Every consumer here wants the logical value: replaying it as a `Cookie`
+ * header or in the `/api/auth/exchange` URL encodes it exactly once, matching
+ * the one layer Better Auth decodes on read. With the wire form stored, both
+ * paths double-encoded — the exchange validated but minted a cookie the
+ * WebView's next `get-session` rejected with 401, landing the user on the
+ * sign-in page inside the App (wave100). Raw hex/base64 tokens never contain
+ * `%`, so a `%` reliably marks a legacy wire-form value.
+ */
+function normalizeSessionTokenValue(value: string): string {
+  if (!value.includes("%")) return value;
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 /**

@@ -218,7 +218,7 @@ describe.sequential("app-web-login-bridge cookie format", () => {
     expect(cookie.startsWith(`__Secure-paperclip-default.session_token=${TOKEN}; `)).toBe(true);
     expect(cookie).toContain("Path=/");
     expect(cookie).toContain("HttpOnly");
-    expect(cookie).toContain("SameSite=Lax");
+    expect(cookie).toContain("SameSite=None");
     expect(cookie).toContain("Max-Age=604800");
     expect(cookie).toContain("Secure");
   });

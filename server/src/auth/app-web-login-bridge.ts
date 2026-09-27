@@ -204,11 +204,17 @@ export async function buildAppWebLoginBridgeCookie(input: {
   if (input.secret && !looksLikeSignedSessionCookieValue(value)) {
     value = await signSessionCookieValue(value, input.secret);
   }
+  // SameSite=None (not Lax): the WebView triggers the exchange through a
+  // native-initiated navigation, which Chromium classifies as
+  // `Sec-Fetch-Site: none`. Chromium refuses to *store* a SameSite=Lax/Strict
+  // cookie outside a same-site context, so the Lax form was silently dropped
+  // from the cookie jar and the web console booted unauthenticated (wave 98).
+  // `None` requires `Secure`, which this response already carries on HTTPS.
   const attributes = [
     `${name}=${encodeURIComponent(value)}`,
     "Path=/",
     "HttpOnly",
-    "SameSite=Lax",
+    "SameSite=None",
     "Max-Age=604800",
   ];
   if (input.secure) attributes.push("Secure");
