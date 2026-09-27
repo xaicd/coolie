@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.72
+
+> Released: 2026-09-27 · Android release APK
+
+### 更新
+
+- wave105 公司级紧急熔断: 董事会一键停掉全公司派单 (companies.status paused, heartbeat 自动停派), Dashboard 顶部红 chip + paused 状态红底 banner + 解除熔断按钮, board-only 鉴权 + reason 必填 + activity_log 留痕, 6 个 vitest 全过 (CEO 拒熔/幂等/必填 reason/resume 闭环/notPaused 无副作用)
+
+---
+
 ## v0.5.70
 
 > Released: 2026-09-27 · Android release APK + OTA bundle
