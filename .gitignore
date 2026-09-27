@@ -28,6 +28,11 @@ check-*.mjs
 !.github/scripts/check-*.mjs
 !.github/scripts/tests/check-*.mjs
 !scripts/check-*.mjs
+# Project-local CMMI gate scripts are governed deliverables, referenced by
+# `projects/*/cmmi-profile.json` (`gates.gN.checkCommand`), not scratch. Without this
+# negation a NEW gate script lands silently untracked, so it never ships and the gate
+# degrades to a missing-file error on every fresh checkout.
+!projects/**/scripts/check-*.mjs
 new-agent*.json
 newcompany.json
 seed-*.mjs
