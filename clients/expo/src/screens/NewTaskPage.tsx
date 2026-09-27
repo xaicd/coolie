@@ -193,6 +193,7 @@ export function NewTaskPage({
           status={voice.status}
           onPressIn={voice.pressIn}
           onPressOut={voice.pressOut}
+          onCancel={voice.cancel}
         />
 
         <View style={styles.auxRow}>

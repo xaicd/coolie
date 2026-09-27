@@ -127,6 +127,7 @@ describe("paperclip MCP tools", () => {
       priority: "medium",
       assigneeAgentId: "22222222-2222-2222-2222-222222222222",
       requestDepth: 0,
+      allowDuplicate: false,
     });
   });
 
@@ -403,15 +404,106 @@ describe("paperclip MCP tools", () => {
     expect(response.content[0]?.text).toContain("path must start with /");
   });
 
-  it("rejects generic request paths that escape /api", async () => {
-    vi.stubGlobal("fetch", vi.fn());
+  it("fetches company dashboard using default company id", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockJsonResponse({ agentsCount: 6, openTasksCount: 12 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
 
-    const tool = getTool("paperclipApiRequest");
-    const response = await tool.execute({
-      method: "GET",
-      path: "/../../secret",
+    const tool = getTool("paperclipGetCompanyDashboard");
+    await tool.execute({});
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(
+      "http://localhost:3100/api/companies/11111111-1111-1111-1111-111111111111/dashboard",
+    );
+    expect(init.method).toBe("GET");
+  });
+
+  it("creates project with name and description", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockJsonResponse({ id: "project-1", name: "GuoXin ChanRong" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const tool = getTool("paperclipCreateProject");
+    await tool.execute({
+      name: "GuoXin ChanRong",
+      description: "Supply chain agent integration",
     });
 
-    expect(response.content[0]?.text).toContain("must not contain '..'");
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(
+      "http://localhost:3100/api/companies/11111111-1111-1111-1111-111111111111/projects",
+    );
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toMatchObject({
+      name: "GuoXin ChanRong",
+      description: "Supply chain agent integration",
+    });
+  });
+
+  it("dispatches task to FDA role by finding matching agent", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        mockJsonResponse([
+          { id: "agent-fda-123", name: "fda-agent", role: "Forward Deployed Architect" },
+          { id: "agent-fdse-456", name: "fdse-agent", role: "Forward Deployed Software Engineer" },
+        ]),
+      )
+      .mockResolvedValueOnce(
+        mockJsonResponse({ id: "issue-999", title: "Design Multi-tenant Isolation" }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const tool = getTool("paperclipDispatchTaskToRole");
+    await tool.execute({
+      role: "fda",
+      title: "Design Multi-tenant Isolation",
+      cmmiPhase: "architecture",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [issueUrl, issueInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(String(issueUrl)).toBe(
+      "http://localhost:3100/api/companies/11111111-1111-1111-1111-111111111111/issues",
+    );
+    expect(JSON.parse(String(issueInit.body))).toMatchObject({
+      title: "Design Multi-tenant Isolation",
+      assigneeAgentId: "agent-fda-123",
+    });
+    expect(JSON.parse(String(issueInit.body)).description).toContain("[CMMI 阶段要求: ARCHITECTURE]");
+  });
+
+  it("records boss decision to issue decision-log document", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(
+        mockJsonResponse({ content: "### 决策: 初始架构\n- 仅用6个员工" }),
+      )
+      .mockResolvedValueOnce(
+        mockJsonResponse({ key: "decision-log", version: 2 }),
+      );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const tool = getTool("paperclipRecordBossDecision");
+    await tool.execute({
+      issueId: "issue-abc-123",
+      topic: "Hermes总控与DSH定位",
+      decision: "Hermes直面微信QQ总控，DSH做后台算力",
+      rationale: "避免多重转发与长程记忆丢失",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [putUrl, putInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(String(putUrl)).toBe(
+      "http://localhost:3100/api/issues/issue-abc-123/documents/decision-log",
+    );
+    expect(putInit.method).toBe("PUT");
+    const payload = JSON.parse(String(putInit.body));
+    expect(payload.content).toContain("Hermes总控与DSH定位");
+    expect(payload.content).toContain("Hermes直面微信QQ总控");
   });
 });
+

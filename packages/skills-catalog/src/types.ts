@@ -44,6 +44,12 @@ export interface CatalogSkill {
   tags: string[];
   files: CatalogSkillFile[];
   contentHash: string;
+  /**
+   * Licence of the skill content. Required for referenced (third-party) skills, so an
+   * unlicensed upstream cannot land silently — see the descriptor reader in
+   * catalog-builder.ts. Absent for skills this repository authors, which it owns.
+   */
+  license?: string;
   source?: CatalogSkillSource;
 }
 

@@ -416,30 +416,6 @@ export function DashboardScreen({
           </View>
         </Modal>
 
-        {/* ── CMMI 质量工程 (wave96 精简: 1 项核心 + 1 按钮) ── */}
-        <AppCard style={styles.wideCard}>
-          <View style={styles.cardHeader}>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-              <Ionicons name="shield-checkmark" size={16} color={C.accent} />
-              <Text style={styles.cardTitle}>CMMI 质量工程</Text>
-            </View>
-          </View>
-
-          <View style={styles.cmmiCapItem}>
-            <Text style={styles.cmmiCapLabel}>门禁进度</Text>
-            <Text style={styles.cmmiCapVal}>G1 需求 → G5 投产 · 5 角色责任制</Text>
-          </View>
-
-          {onOpenWebWorkbench ? (
-            <Pressable
-              style={[styles.cmmiFootBtn, styles.cmmiFootBtnPrimary]}
-              onPress={() => onOpenWebWorkbench("/projects", "CMMI 质量工程")}
-            >
-              <Ionicons name="open-outline" size={13} color="#FFF" />
-              <Text style={[styles.cmmiFootBtnText, { color: "#FFF" }]}>进入 CMMI 门禁</Text>
-            </Pressable>
-          ) : null}
-        </AppCard>
 
         {/* ── 第 3 行: 任务完成率 + 产能概览 ── */}
         <AppCard style={styles.wideCard}>
@@ -912,40 +888,7 @@ const styles = StyleSheet.create({
 
   // ── 项目中心入口卡 ──
 
-  // ── CMMI 质量工程 (精简: 1 项 + 1 按钮) ──
-  cmmiCapItem: {
-    gap: 2,
-  },
-  cmmiCapLabel: {
-    fontSize: 10,
-    color: C.ink4,
-  },
-  cmmiCapVal: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: C.ink2,
-  },
-  cmmiFootBtn: {
-    flex: 1,
-    height: 32,
-    borderRadius: 6,
-    borderWidth: 1,
-    borderColor: C.line,
-    backgroundColor: "rgba(255,255,255,0.03)",
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 4,
-  },
-  cmmiFootBtnPrimary: {
-    backgroundColor: C.accent,
-    borderColor: C.accent,
-  },
-  cmmiFootBtnText: {
-    fontSize: 11,
-    fontWeight: "500",
-    color: C.accent,
-  },
+
   // wave105 公司级紧急熔断: 仅 1 个 chip + 1 个 banner, 不进任何 dashboard 子模块
   costSheetBackdrop: {
     ...StyleSheet.absoluteFillObject,

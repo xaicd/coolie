@@ -31,9 +31,49 @@ export interface TencentAsrCredentials {
 export interface TencentSentencePayload {
   EngSerViceType: string;
   SourceType: number;
-  VoiceFormat: string;
+  VoiceFormat: number;
   Data: string;
   DataLen: number;
+}
+
+/**
+ * Tencent Cloud SentenceRecognition VoiceFormat values:
+ * 1: wav
+ * 4: spx (speex)
+ * 6: silk
+ * 8: mp3
+ * 9: aac
+ * 10: m4a (16k_zh supported)
+ * 16: ogg-opus
+ */
+export const TENCENT_VOICE_FORMAT_MAP: Record<string, number> = {
+  wav: 1,
+  pcm: 1,
+  spx: 4,
+  speex: 4,
+  silk: 6,
+  mp3: 8,
+  aac: 9,
+  m4a: 10,
+  opus: 16,
+  "ogg-opus": 16,
+  ogg: 16,
+};
+
+export function resolveTencentVoiceFormat(format: string | number): number {
+  if (typeof format === "number" && Number.isFinite(format)) {
+    return format;
+  }
+  const clean = String(format).toLowerCase().trim();
+  const mapped = TENCENT_VOICE_FORMAT_MAP[clean];
+  if (mapped !== undefined) {
+    return mapped;
+  }
+  if (clean.includes("m4a")) return 10;
+  if (clean.includes("aac")) return 9;
+  if (clean.includes("wav")) return 1;
+  if (clean.includes("opus")) return 16;
+  return 10; // Default to m4a (mobile recorder standard)
 }
 
 /**
@@ -42,14 +82,14 @@ export interface TencentSentencePayload {
  */
 export function buildPayload(input: {
   audioBase64: string;
-  format: string;
+  format: string | number;
   engineType?: string;
 }): TencentSentencePayload {
   const dataLen = Buffer.from(input.audioBase64, "base64").length;
   return {
     EngSerViceType: input.engineType ?? DEFAULT_ASR_ENGINE_TYPE,
     SourceType: 1,
-    VoiceFormat: String(input.format).toLowerCase(),
+    VoiceFormat: resolveTencentVoiceFormat(input.format),
     Data: input.audioBase64,
     DataLen: dataLen,
   };
@@ -119,7 +159,7 @@ export interface TranscribeResult {
 export async function transcribeTencent(
   fetchFn: (url: string, init?: RequestInit) => Promise<Response>,
   creds: TencentAsrCredentials,
-  input: { audioBase64: string; format: string; engineType?: string },
+  input: { audioBase64: string; format: string | number; engineType?: string },
 ): Promise<TranscribeResult> {
   const payload = buildPayload(input);
   const payloadStr = JSON.stringify(payload);

@@ -301,6 +301,7 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: -0.3,
     paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.xs,
     minHeight: 28,
   },
   descriptionInput: {
@@ -309,6 +310,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     minHeight: 72,
     textAlignVertical: "top",
+    paddingHorizontal: SPACING.xs,
   },
   priorityBlock: {
     gap: SPACING.sm,

@@ -133,4 +133,21 @@ describe("multimodal worker — transcribe-only mode", () => {
       false,
     );
   });
+
+  it("correctly maps VoiceFormat to integer enum per Tencent protocol", async () => {
+    const { buildPayload, resolveTencentVoiceFormat } = await import("../src/asr/tencent.js");
+    expect(resolveTencentVoiceFormat("m4a")).toBe(10);
+    expect(resolveTencentVoiceFormat("mp3")).toBe(8);
+    expect(resolveTencentVoiceFormat("wav")).toBe(1);
+    expect(resolveTencentVoiceFormat("aac")).toBe(9);
+    expect(resolveTencentVoiceFormat("ogg-opus")).toBe(16);
+    expect(resolveTencentVoiceFormat(10)).toBe(10);
+
+    const payload = buildPayload({
+      audioBase64: Buffer.from("test").toString("base64"),
+      format: "m4a",
+    });
+    expect(payload.VoiceFormat).toBe(10);
+    expect(typeof payload.VoiceFormat).toBe("number");
+  });
 });

@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   ActionSheetIOS,
   ActivityIndicator,
   Alert,
   Animated,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -21,7 +22,7 @@ import { C } from "../coolie";
  *
  * 三件按钮 + 一段多行文本:
  *   [+] 弹 ActionSheet (相册 / 拍照 / 文件) -> 走 picker
- *   [🎤] 长按 mic (父屏传入 onMicPressIn/Out 接管录音逻辑)
+ *   [🎤] 长按 mic (父屏传入 onMicPressIn/Out 接管录音逻辑, 仿微信QQ左滑取消/右滑转文字)
  *   [send] / [stop] — sending 时显示停止
  *
  * 附件上传由父屏注入 `onUploadAttachment(file)`, 父屏拿到返回的 attachmentId
@@ -47,6 +48,8 @@ export interface ChatInputProps {
   /** 长按 mic 接管 — 父屏实现 startRecording / stopRecording 的 race-safe 串接 */
   onMicPressIn?: () => void;
   onMicPressOut?: () => void;
+  /** 向左滑动取消录音 (仿微信/QQ) */
+  onMicCancel?: () => void;
   /** send 按钮: 由父屏实际发请求 */
   onSend: () => void;
   /** 手动停止生成 */
@@ -66,6 +69,7 @@ export function ChatInput({
   voiceBusy = false,
   onMicPressIn,
   onMicPressOut,
+  onMicCancel,
   onSend,
   onStop,
   onPickAttachment,
@@ -73,10 +77,19 @@ export function ChatInput({
   disabled = false,
 }: ChatInputProps) {
   const micPulse = React.useRef(new Animated.Value(1)).current;
+  const [gestureMode, setGestureMode] = useState<"recording" | "cancel" | "transcribe">("recording");
+
+  // 微信/QQ 风格音浪动效高度
+  const waveAnim1 = React.useRef(new Animated.Value(0.4)).current;
+  const waveAnim2 = React.useRef(new Animated.Value(0.8)).current;
+  const waveAnim3 = React.useRef(new Animated.Value(1.0)).current;
 
   useEffect(() => {
     if (!recording) {
       micPulse.setValue(1);
+      waveAnim1.setValue(0.4);
+      waveAnim2.setValue(0.8);
+      waveAnim3.setValue(1.0);
       return;
     }
     const loop = Animated.loop(
@@ -94,8 +107,29 @@ export function ChatInput({
       ]),
     );
     loop.start();
-    return () => loop.stop();
-  }, [recording, micPulse]);
+
+    const createWaveAnim = (anim: Animated.Value, minVal: number, maxVal: number, duration: number) =>
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(anim, { toValue: maxVal, duration, useNativeDriver: true }),
+          Animated.timing(anim, { toValue: minVal, duration, useNativeDriver: true }),
+        ]),
+      );
+
+    const w1 = createWaveAnim(waveAnim1, 0.3, 1.2, 350);
+    const w2 = createWaveAnim(waveAnim2, 0.4, 1.5, 450);
+    const w3 = createWaveAnim(waveAnim3, 0.3, 1.1, 400);
+    w1.start();
+    w2.start();
+    w3.start();
+
+    return () => {
+      loop.stop();
+      w1.stop();
+      w2.stop();
+      w3.stop();
+    };
+  }, [recording, micPulse, waveAnim1, waveAnim2, waveAnim3]);
 
   /** ActionSheet 三选一: 相册 / 拍照 / 文件 */
   const showAttachmentSheet = useCallback(() => {
@@ -197,73 +231,199 @@ export function ChatInput({
   const showSend = value.trim().length > 0 && !sending;
   const canEdit = !sending && !disabled;
 
+  const panResponder = React.useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => canEdit && !voiceBusy,
+        onMoveShouldSetPanResponder: () => canEdit && !voiceBusy,
+        onPanResponderGrant: () => {
+          setGestureMode("recording");
+          onMicPressIn?.();
+        },
+        onPanResponderMove: (_, gestureState) => {
+          if (gestureState.dx < -45) {
+            setGestureMode("cancel");
+          } else if (gestureState.dx > 45) {
+            setGestureMode("transcribe");
+          } else {
+            setGestureMode("recording");
+          }
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          const finalMode = gestureState.dx < -45 ? "cancel" : "transcribe";
+          setGestureMode("recording");
+          if (finalMode === "cancel") {
+            if (onMicCancel) onMicCancel();
+            else onMicPressOut?.();
+          } else {
+            onMicPressOut?.();
+          }
+        },
+        onPanResponderTerminate: () => {
+          setGestureMode("recording");
+          if (onMicCancel) onMicCancel();
+          else onMicPressOut?.();
+        },
+      }),
+    [canEdit, voiceBusy, onMicPressIn, onMicPressOut, onMicCancel],
+  );
+
   return (
-    <View style={styles.row}>
-      {/* [+] 弹 ActionSheet */}
-      <Pressable
-        onPress={showAttachmentSheet}
-        disabled={!canEdit || uploading}
-        hitSlop={6}
-        accessibilityRole="button"
-        accessibilityLabel="添加附件"
-        style={({ pressed }) => [
-          styles.iconBtn,
-          pressed && styles.iconBtnPressed,
-          (!canEdit || uploading) && styles.iconBtnDisabled,
-        ]}
-      >
-        {uploading ? (
-          <ActivityIndicator size="small" color={C.ink2} />
-        ) : (
-          <Ionicons name="add" size={20} color={C.ink2} />
-        )}
-      </Pressable>
-
-      <TextInput
-        style={[styles.textInput, !canEdit && styles.textInputDisabled]}
-        placeholder="派个活, 或问点什么"
-        placeholderTextColor={C.ink3}
-        value={value}
-        onChangeText={onChangeText}
-        multiline
-        maxLength={1000}
-        editable={canEdit}
-      />
-
-      {/* [🎤] 长按 mic — 父屏 race-safe 串接 startRecording/stopRecording */}
-      {onMicPressIn && onMicPressOut ? (
-        <Animated.View style={{ opacity: recording ? micPulse : 1 }}>
-          <Pressable
-            onPressIn={onMicPressIn}
-            onPressOut={onMicPressOut}
-            onPress={() => {
-              // 防御: 录音态下轻点一下强制停止
-              if (recording) {
-                onMicPressOut();
-              }
-            }}
-            onResponderTerminate={onMicPressOut}
-            disabled={!canEdit || voiceBusy}
-            hitSlop={12}
-            style={({ pressed }) => [
-              styles.iconBtn,
-              pressed && styles.iconBtnPressed,
-              recording && styles.iconBtnRecording,
-              (!canEdit || voiceBusy) && styles.iconBtnDisabled,
+    <View style={styles.wrapper}>
+      {/* 微信/QQ 风格录音滑动 HUD 浮层 */}
+      {recording ? (
+        <View style={styles.hudContainer}>
+          {/* 左侧: 取消区 */}
+          <View
+            style={[
+              styles.hudActionItem,
+              gestureMode === "cancel" && styles.hudActionCancelActive,
             ]}
           >
-            {voiceBusy && !recording ? (
-              <ActivityIndicator size="small" color={C.accent} />
-            ) : (
+            <View
+              style={[
+                styles.hudIconCircle,
+                gestureMode === "cancel" && styles.hudIconCircleCancelActive,
+              ]}
+            >
               <Ionicons
-                name={recording ? "mic" : "mic-outline"}
-                size={18}
-                color={recording ? C.err : C.ink2}
+                name="trash-outline"
+                size={22}
+                color={gestureMode === "cancel" ? "#FFFFFF" : C.ink3}
               />
-            )}
-          </Pressable>
-        </Animated.View>
+            </View>
+            <Text
+              style={[
+                styles.hudActionText,
+                gestureMode === "cancel" && styles.hudActionTextCancelActive,
+              ]}
+            >
+              {gestureMode === "cancel" ? "松开 取消" : "← 左滑 取消"}
+            </Text>
+          </View>
+
+          {/* 中间: 录音音浪与提示 */}
+          <View style={styles.hudCenter}>
+            <View style={styles.waveRow}>
+              <Animated.View style={[styles.waveBar, { transform: [{ scaleY: waveAnim1 }] }]} />
+              <Animated.View style={[styles.waveBar, { transform: [{ scaleY: waveAnim2 }] }]} />
+              <Animated.View style={[styles.waveBar, { transform: [{ scaleY: waveAnim3 }] }]} />
+              <Animated.View style={[styles.waveBar, { transform: [{ scaleY: waveAnim2 }] }]} />
+              <Animated.View style={[styles.waveBar, { transform: [{ scaleY: waveAnim1 }] }]} />
+            </View>
+            <Text
+              style={[
+                styles.hudTipText,
+                gestureMode === "cancel" && styles.hudTipTextCancel,
+                gestureMode === "transcribe" && styles.hudTipTextTranscribe,
+              ]}
+            >
+              {gestureMode === "cancel"
+                ? "松开手指，取消发送"
+                : gestureMode === "transcribe"
+                ? "松开手指，转为文字"
+                : "按住说话，滑动选择"}
+            </Text>
+          </View>
+
+          {/* 右侧: 转文字区 */}
+          <View
+            style={[
+              styles.hudActionItem,
+              gestureMode === "transcribe" && styles.hudActionTranscribeActive,
+            ]}
+          >
+            <View
+              style={[
+                styles.hudIconCircle,
+                gestureMode === "transcribe" && styles.hudIconCircleTranscribeActive,
+              ]}
+            >
+              <Ionicons
+                name="document-text-outline"
+                size={22}
+                color={gestureMode === "transcribe" ? "#FFFFFF" : C.ink3}
+              />
+            </View>
+            <Text
+              style={[
+                styles.hudActionText,
+                gestureMode === "transcribe" && styles.hudActionTextTranscribeActive,
+              ]}
+            >
+              {gestureMode === "transcribe" ? "松开 转文字" : "右滑 转文字 →"}
+            </Text>
+          </View>
+        </View>
       ) : null}
+
+      <View style={styles.row}>
+        {/* [+] 弹 ActionSheet */}
+        <Pressable
+          onPress={showAttachmentSheet}
+          disabled={!canEdit || uploading}
+          hitSlop={6}
+          accessibilityRole="button"
+          accessibilityLabel="添加附件"
+          style={({ pressed }) => [
+            styles.iconBtn,
+            pressed && styles.iconBtnPressed,
+            (!canEdit || uploading) && styles.iconBtnDisabled,
+          ]}
+        >
+          {uploading ? (
+            <ActivityIndicator size="small" color={C.ink2} />
+          ) : (
+            <Ionicons name="add" size={20} color={C.ink2} />
+          )}
+        </Pressable>
+
+        <TextInput
+          style={[
+            styles.textInput,
+            recording && styles.textInputRecording,
+            !canEdit && styles.textInputDisabled,
+          ]}
+          placeholder={
+            recording
+              ? gestureMode === "cancel"
+                ? "⚠️ 松开手指将取消发送"
+                : "🎤 正在录音… 松开转文字"
+              : "派个活, 或问点什么"
+          }
+          placeholderTextColor={recording ? (gestureMode === "cancel" ? C.err : C.accent) : C.ink3}
+          value={value}
+          onChangeText={onChangeText}
+          multiline
+          maxLength={1000}
+          editable={canEdit}
+        />
+
+        {/* [🎤] 微信/QQ 风格滑动 mic: PanResponder 驱动左滑取消 / 右滑转文字 */}
+        {onMicPressIn && onMicPressOut ? (
+          <Animated.View
+            style={{ opacity: recording ? micPulse : 1 }}
+            {...panResponder.panHandlers}
+          >
+            <View
+              style={[
+                styles.iconBtn,
+                recording && styles.iconBtnRecording,
+                (!canEdit || (voiceBusy && !recording)) && styles.iconBtnDisabled,
+              ]}
+            >
+              {voiceBusy && !recording ? (
+                <ActivityIndicator size="small" color={C.accent} />
+              ) : (
+                <Ionicons
+                  name={recording ? "mic" : "mic-outline"}
+                  size={18}
+                  color={recording ? (gestureMode === "cancel" ? C.err : C.accent) : C.ink2}
+                />
+              )}
+            </View>
+          </Animated.View>
+        ) : null}
 
       {sending && onStop ? (
         <Pressable
@@ -287,11 +447,115 @@ export function ChatInput({
           <Text style={styles.sendBtnIcon}>↑</Text>
         </Pressable>
       )}
+      </View>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
+  wrapper: {
+    position: "relative",
+  },
+  hudContainer: {
+    position: "absolute",
+    bottom: 58,
+    left: 12,
+    right: 12,
+    backgroundColor: C.panel,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.line,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 999,
+  },
+  hudActionItem: {
+    alignItems: "center",
+    justifyContent: "center",
+    width: 76,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  hudActionCancelActive: {
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
+  },
+  hudActionTranscribeActive: {
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
+  },
+  hudIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: C.surface,
+    borderWidth: 1,
+    borderColor: C.line,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 4,
+  },
+  hudIconCircleCancelActive: {
+    backgroundColor: C.err,
+    borderColor: C.err,
+    transform: [{ scale: 1.15 }],
+  },
+  hudIconCircleTranscribeActive: {
+    backgroundColor: "#10B981",
+    borderColor: "#10B981",
+    transform: [{ scale: 1.15 }],
+  },
+  hudActionText: {
+    fontSize: 11,
+    color: C.ink3,
+    fontWeight: "500",
+  },
+  hudActionTextCancelActive: {
+    color: C.err,
+    fontWeight: "bold",
+  },
+  hudActionTextTranscribeActive: {
+    color: "#10B981",
+    fontWeight: "bold",
+  },
+  hudCenter: {
+    alignItems: "center",
+    justifyContent: "center",
+    flex: 1,
+  },
+  waveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    height: 28,
+    gap: 5,
+    marginBottom: 4,
+  },
+  waveBar: {
+    width: 3.5,
+    height: 18,
+    borderRadius: 2,
+    backgroundColor: C.accent,
+  },
+  hudTipText: {
+    fontSize: 12,
+    color: C.ink2,
+    fontWeight: "500",
+  },
+  hudTipTextCancel: {
+    color: C.err,
+    fontWeight: "bold",
+  },
+  hudTipTextTranscribe: {
+    color: "#10B981",
+    fontWeight: "bold",
+  },
   row: {
     flexDirection: "row",
     alignItems: "flex-end",
@@ -339,6 +603,10 @@ const styles = StyleSheet.create({
   },
   textInputDisabled: {
     opacity: 0.4,
+  },
+  textInputRecording: {
+    borderColor: "rgba(239, 68, 68, 0.4)",
+    backgroundColor: "rgba(239, 68, 68, 0.05)",
   },
   sendBtn: {
     width: 36,

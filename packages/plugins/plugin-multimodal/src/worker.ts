@@ -59,31 +59,42 @@ function parseInt10(value: string | undefined): number | undefined {
 }
 
 /**
- * Resolve Tencent ASR credentials from operator plugin config. The config
- * stores secret references (never raw keys); resolve them at call time.
+ * Resolve Tencent ASR credentials from operator plugin config or system env.
+ * The config stores secret references (never raw keys); resolve them at call time.
+ * Falls back to process.env.TENCENT_ASR_SECRET_ID / TENCENT_SECRET_ID.
  * Returns null when not configured so the route can surface ASR_NOT_CONFIGURED.
  */
 async function resolveTencentCreds(
   ctx: PluginContext,
   companyId: string,
 ): Promise<TencentAsrCredentials | null> {
-  const config = await ctx.config.get(companyId);
-  const idRef = config.tencentSecretIdRef;
-  const keyRef = config.tencentSecretKeyRef;
-  if (!idRef || !keyRef) return null;
   try {
-    const [secretId, secretKey] = await Promise.all([
-      ctx.secrets.resolve(idRef as never, { companyId }),
-      ctx.secrets.resolve(keyRef as never, { companyId }),
-    ]);
-    if (!secretId || !secretKey) return null;
-    return { secretId, secretKey };
+    const config = await ctx.config.get(companyId);
+    const idRef = config.tencentSecretIdRef;
+    const keyRef = config.tencentSecretKeyRef;
+    if (idRef && keyRef) {
+      const [secretId, secretKey] = await Promise.all([
+        ctx.secrets.resolve(idRef as never, { companyId }),
+        ctx.secrets.resolve(keyRef as never, { companyId }),
+      ]);
+      if (secretId && secretKey) {
+        return { secretId, secretKey };
+      }
+    }
   } catch (err) {
     ctx.logger.warn("Failed to resolve Tencent ASR secret refs", {
       error: String((err as Error)?.message ?? err),
     });
-    return null;
   }
+
+  // Fallback: check environment variables (system deployment)
+  const envSecretId = process.env.TENCENT_ASR_SECRET_ID || process.env.TENCENT_SECRET_ID;
+  const envSecretKey = process.env.TENCENT_ASR_SECRET_KEY || process.env.TENCENT_SECRET_KEY;
+  if (envSecretId && envSecretKey) {
+    return { secretId: envSecretId.trim(), secretKey: envSecretKey.trim() };
+  }
+
+  return null;
 }
 
 const plugin = definePlugin({
@@ -244,11 +255,19 @@ const plugin = definePlugin({
           }
           return { status: 201, body: { transcription: done, issue } };
         } catch (err) {
+          const errMsg = String((err as Error)?.message ?? err);
           const failed = await s.markFailed(companyId, record.id, {
-            error: String((err as Error)?.message ?? err),
+            error: errMsg,
             durationMs: Date.now() - startedAt,
           });
-          return { status: 502, body: { transcription: failed, error: "transcription failed" } };
+          return {
+            status: 502,
+            body: {
+              transcription: failed,
+              error: "transcription failed",
+              message: errMsg,
+            },
+          };
         }
       }
 

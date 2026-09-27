@@ -71,8 +71,8 @@ const QUICK_PROMPTS = [
   "本周交付了什么",
 ];
 
-/** 长按录音的最短时长: 短于此视为误触, 不送 ASR。 */
-const MIN_VOICE_HOLD_MS = 500;
+/** 长按录音的最短时长: 短于此视为误触 (300ms), 不送 ASR。 */
+const MIN_VOICE_HOLD_MS = 300;
 
 type BoardEchoListener = (message: BoardChatMessage) => void;
 
@@ -522,6 +522,7 @@ export function BoardChatScreen({
 
       const { base64, format } = await stopRecording();
       if (!base64) {
+        pushSystemEcho("🎤 未采集到有效声音, 请长按麦克风说话后松开");
         return;
       }
       if (Date.now() - press.startedAt < MIN_VOICE_HOLD_MS) {
@@ -554,6 +555,15 @@ export function BoardChatScreen({
       setVoiceStatus(null);
     }
   }, [recording, forceStop, company.id, stopRecording, pushSystemEcho]);
+
+  /** 向左滑动取消录音 */
+  const handleMicCancel = useCallback(async () => {
+    voicePressRef.current.promise = null;
+    await forceStop();
+    setVoiceBusy(false);
+    setVoiceStatus(null);
+    pushSystemEcho("🎤 录音已取消");
+  }, [forceStop, pushSystemEcho]);
 
   useEffect(() => {
     if (!historyReady) return;
@@ -1479,6 +1489,7 @@ export function BoardChatScreen({
           voiceBusy={voiceBusy}
           onMicPressIn={handleMicPressIn}
           onMicPressOut={() => void handleMicPressOut()}
+          onMicCancel={() => void handleMicCancel()}
           onSend={() => void handleSend()}
           onStop={handleStop}
           onPickAttachment={(picked) => void handlePickAttachment(picked)}

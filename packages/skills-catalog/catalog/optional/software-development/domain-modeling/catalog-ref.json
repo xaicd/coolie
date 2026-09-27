@@ -8,6 +8,7 @@
     "commit": "c55ee46073ed923f86ce59a5eb3b6d895095d1b7",
     "path": "skills/engineering/domain-modeling"
   },
+  "license": "MIT",
   "files": [
     "SKILL.md",
     "ADR-FORMAT.md",

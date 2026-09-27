@@ -8,6 +8,7 @@
     "commit": "69b4753651ab7fab518c82be087b9f1d5b966631",
     "path": ".agents/skills/implement-specs"
   },
+  "license": "MIT",
   "files": [
     "SKILL.md"
   ],

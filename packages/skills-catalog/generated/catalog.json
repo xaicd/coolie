@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "packageName": "@paperclipai/skills-catalog",
   "packageVersion": "0.3.1",
-  "generatedAt": "2026-09-27T07:24:42.746Z",
+  "generatedAt": "2026-09-27T12:31:46.310Z",
   "skills": [
     {
       "id": "paperclipai:bundled:docs:doc-maintenance",
@@ -592,6 +592,7 @@
         }
       ],
       "contentHash": "sha256:ac785e30ab0158e76138eda6515cf54b35883f1da2b64a6c908807f398b33fb1",
+      "license": "Apache-2.0",
       "source": {
         "type": "github",
         "hostname": "github.com",
@@ -639,6 +640,7 @@
         }
       ],
       "contentHash": "sha256:1aeef93114f4d017f1e88ebe3bfba28c9630f0f3d233734616e457dc0ec1c84e",
+      "license": "Apache-2.0",
       "source": {
         "type": "github",
         "hostname": "github.com",
@@ -721,6 +723,7 @@
         }
       ],
       "contentHash": "sha256:f0eb0cdfa4bf8c2db209769343c2f8a04c81b04528390537d62c5e4ac4a250ce",
+      "license": "Apache-2.0",
       "source": {
         "type": "github",
         "hostname": "github.com",
@@ -802,6 +805,7 @@
         }
       ],
       "contentHash": "sha256:925fee06bad60b9d79a5c6035622236a02f93ab8780669713d29f15b080ef7cb",
+      "license": "Apache-2.0",
       "source": {
         "type": "github",
         "hostname": "github.com",
@@ -849,6 +853,7 @@
         }
       ],
       "contentHash": "sha256:30a328d1821bfd2ab39cb446943fb98cabe49c020caddd50789089c5aa3368ce",
+      "license": "MIT",
       "source": {
         "type": "github",
         "hostname": "github.com",
@@ -896,6 +901,7 @@
         }
       ],
       "contentHash": "sha256:d1c1f1bf2279451155050e4c3f7c6540bd2eace2950e032ab952ca69a8acc07b",
+      "license": "MIT",
       "source": {
         "type": "github",
         "hostname": "github.com",
@@ -942,6 +948,7 @@
         }
       ],
       "contentHash": "sha256:56a11ca679172699359d1438841a5f154e7e4d1778c048b2a9b54bc5b11cbf37",
+      "license": "MIT",
       "source": {
         "type": "github",
         "hostname": "github.com",
@@ -987,6 +994,7 @@
         }
       ],
       "contentHash": "sha256:e875eb19b16b8aef961d78756df534ef406a6429a4079fa62aebde7e4c87ff7c",
+      "license": "Apache-2.0",
       "source": {
         "type": "github",
         "hostname": "github.com",
@@ -1508,6 +1516,7 @@
         }
       ],
       "contentHash": "sha256:9e11e9d2ed3d2062273d131a826cdeedea39bdd269063e2f73ca7f218770c769",
+      "license": "MIT",
       "source": {
         "type": "github",
         "hostname": "github.com",
@@ -1566,6 +1575,7 @@
         }
       ],
       "contentHash": "sha256:72d7d346209c3371ec6931f29fa09c1978f90bd9ad7c3986bdb6c795675ff5e2",
+      "license": "MIT",
       "source": {
         "type": "github",
         "hostname": "github.com",
@@ -1611,6 +1621,7 @@
         }
       ],
       "contentHash": "sha256:f8b02468b42a52c472827c1c578b49f366173fefa7bc93919d1a78b7c2060c28",
+      "license": "MIT",
       "source": {
         "type": "github",
         "hostname": "github.com",
@@ -1668,6 +1679,7 @@
         }
       ],
       "contentHash": "sha256:13038c8a4f78a198dcdf3b8bb481343a45e7c0572c797b17d962cef67454e631",
+      "license": "MIT",
       "source": {
         "type": "github",
         "hostname": "github.com",
@@ -1713,6 +1725,7 @@
         }
       ],
       "contentHash": "sha256:8e211f3844b739c666f8801b661cbf0314f33787214863958b009fc550d1a430",
+      "license": "MIT",
       "source": {
         "type": "github",
         "hostname": "github.com",
@@ -1812,6 +1825,7 @@
         }
       ],
       "contentHash": "sha256:dc923e8f02ed77ba28f382d9affe80f649fbececf723afeee79f5cbd936f0f24",
+      "license": "MIT",
       "source": {
         "type": "github",
         "hostname": "github.com",
@@ -1859,6 +1873,7 @@
         }
       ],
       "contentHash": "sha256:7d597f1d8dce87ffeab84778ec3fd509bf10cbdb7c3e5d6ffb82eb337592710a",
+      "license": "MIT",
       "source": {
         "type": "github",
         "hostname": "github.com",

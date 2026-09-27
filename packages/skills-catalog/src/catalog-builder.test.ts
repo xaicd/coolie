@@ -82,6 +82,7 @@ describe("skills catalog manifest", () => {
         commit: "0123456789abcdef0123456789abcdef01234567",
         path: "skills/remote-research",
       },
+      license: "MIT",
       files: ["SKILL.md", "scripts/**"],
       recommendedForRoles: ["researcher"],
       tags: ["research"],
@@ -147,6 +148,7 @@ describe("skills catalog manifest", () => {
         commit: "0123456789abcdef0123456789abcdef01234567",
         path: "skills/remote-research",
       },
+      license: "MIT",
       files: ["SKILL.md", "scripts/**"],
       recommendedForRoles: ["researcher"],
       tags: ["research"],
@@ -220,6 +222,9 @@ describe("skills catalog manifest", () => {
     expect(result.manifest.skills).toHaveLength(1);
     expect(result.manifest.skills[0]?.name).toBe("Remote Research");
     expect(result.manifest.skills[0]?.files.map((file) => file.path)).toEqual(["SKILL.md", "scripts/run.py"]);
+    // This cached entry was generated before `license` existed. Reusing it must not
+    // smuggle a licence-less entry past the reader's requirement.
+    expect(result.manifest.skills[0]?.license).toBe("MIT");
   });
 
   it("reuses the existing manifest entry when the GitHub tree is unavailable but SKILL.md can be fetched", async () => {
@@ -234,6 +239,7 @@ describe("skills catalog manifest", () => {
         commit: "0123456789abcdef0123456789abcdef01234567",
         path: "skills/remote-research",
       },
+      license: "MIT",
       files: ["SKILL.md", "scripts/**"],
       recommendedForRoles: ["researcher"],
       tags: ["research"],
@@ -300,6 +306,65 @@ describe("skills catalog manifest", () => {
     expect(result.errors).toEqual([]);
     expect(result.manifest.skills).toHaveLength(1);
     expect(result.manifest.skills[0]?.files.map((file) => file.path)).toEqual(["SKILL.md"]);
+    expect(result.manifest.skills[0]?.license).toBe("MIT");
+  });
+
+  it("refuses a referenced skill that does not declare its upstream licence", async () => {
+    const packageDir = await createCatalogPackage();
+    await writeReference(packageDir, "optional", "research", "unlicensed", {
+      source: {
+        type: "github",
+        hostname: "github.com",
+        owner: "example",
+        repo: "no-license",
+        ref: "v1.0.0",
+        commit: "0123456789abcdef0123456789abcdef01234567",
+        path: "skills/unlicensed",
+      },
+      files: ["SKILL.md"],
+      recommendedForRoles: ["researcher"],
+      tags: ["research"],
+    });
+    // The descriptor is rejected before any fetch, so an unlicensed source is never even
+    // probed. That is the point of the gate: no human has to notice the omission.
+    const fetchMock = vi.fn(async () => new Response("should not be fetched", { status: 500 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const result = await buildCatalogManifest({ packageDir, generatedAt: "2026-05-26T00:00:00.000Z" });
+
+    expect(result.manifest.skills).toHaveLength(0);
+    expect(result.errors.join("\n")).toContain('must declare "license"');
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("records the declared licence on the manifest entry", async () => {
+    const packageDir = await createCatalogPackage();
+    await writeReference(packageDir, "optional", "research", "licensed", {
+      source: {
+        type: "github",
+        hostname: "github.com",
+        owner: "example",
+        repo: "licensed",
+        ref: "v1.0.0",
+        commit: "0123456789abcdef0123456789abcdef01234567",
+        path: "skills/licensed",
+      },
+      license: "Apache-2.0",
+      files: ["SKILL.md"],
+      recommendedForRoles: ["researcher"],
+      tags: ["research"],
+    });
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      if (url.includes("/git/trees/")) {
+        return Response.json({ tree: [{ path: "skills/licensed/SKILL.md", type: "blob", size: 64 }] });
+      }
+      return new Response("---\nname: Licensed\ndescription: A referenced skill with a declared licence.\n---\n\nUse it.\n");
+    }));
+
+    const result = await buildCatalogManifest({ packageDir, generatedAt: "2026-05-26T00:00:00.000Z" });
+
+    expect(result.errors).toEqual([]);
+    expect(result.manifest.skills[0]).toMatchObject({ license: "Apache-2.0" });
   });
 
   it("reports frontmatter, directory, uniqueness, and inventory errors together", async () => {
@@ -383,6 +448,7 @@ describe("skills catalog manifest", () => {
           commit,
           path: `skills/${slug}`,
         },
+        license: "MIT",
         files: ["SKILL.md"],
         recommendedForRoles: ["researcher"],
         tags: ["research"],
@@ -422,6 +488,7 @@ describe("skills catalog manifest", () => {
         commit: "0123456789abcdef0123456789abcdef01234567",
         path: "skills/remote-research",
       },
+      license: "MIT",
       files: ["SKILL.md"],
       recommendedForRoles: ["researcher"],
       tags: ["research"],
@@ -457,6 +524,7 @@ describe("skills catalog manifest", () => {
         commit: "0123456789abcdef0123456789abcdef01234567",
         path: "skills/wide",
       },
+      license: "MIT",
       files: ["SKILL.md", "references/**"],
       recommendedForRoles: ["researcher"],
       tags: ["research"],

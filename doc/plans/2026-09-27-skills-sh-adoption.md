@@ -448,6 +448,53 @@ The test suite is unaffected by this: `shipped-catalog` (20/20) asserts against 
 checked-in manifest, not a fresh build, so it stays green.
 
 
+## A required licence on every referenced skill (implemented)
+
+The catalog could not express *rights*. It had `trustLevel` (how dangerous a payload is)
+and, on connectors, `riskTier` — but nothing saying what a third-party skill is licensed
+under. So the earlier decision to drop `vercel-labs/agent-skills` for having no LICENSE
+file was a human judgement, recorded nowhere a tool could enforce.
+
+Referenced descriptors now require `license`, and the value flows to `CatalogSkill.license`
+in the shipped manifest. The check lives in `readReferencedSkillDescriptor`, so the
+descriptor is rejected **before any fetch** — an unlicensed source is never even probed.
+Local, repository-authored skills omit it, because we own them.
+
+All 15 existing descriptors were stamped from their verified upstream licences: MIT for
+`mvanhorn/last30days-skill`, `obra/superpowers`, `mattpocock/skills` and
+`warpdotdev/common-skills`; Apache-2.0 for `anthropics/knowledge-work-plugins`.
+
+The shape is borrowed from AlphaFold 3's release, which separates the licence of the
+*code* (Apache-2.0) from the terms of the *model parameters* (a separate terms-of-use plus
+a prohibited-use policy) from the terms of the *outputs* (a third document). Paperclip now
+models the first half of that split — granted rights. It deliberately does not model the
+second: no current entry carries a usage restriction, and a field nothing populates is not
+worth adding.
+
+**Two holes the verification caught, both worth knowing about:**
+
+1. **The fallback path bypassed the new requirement.** `last30days` — the largest
+   inventory, ~79 files — hit a transient fetch failure, so the builder reused its cached
+   manifest entry. The build stayed green, and that entry, generated before the field
+   existed, had no licence. The fix takes the licence from the descriptor when reusing a
+   cached entry: it is declared, not fetched, so it must survive a stale inventory. Pinned
+   by the two existing fallback tests, which now assert it.
+2. **`validate` tracked the network, not the content.** `buildExpectedCatalogManifest`
+   returns a retry with a *fresh* `generatedAt` when its first pass disagrees with the
+   committed file, and never re-checks it. So a first pass that tripped a transient fetch
+   failure yielded a "stale" verdict purely because the clock moved — observed three runs
+   in a row here. This is why the earlier claim in this document that "`validate` is the
+   honest gate" needed qualifying. Two fixes: the retry restores the existing timestamp
+   when its content agrees, and `validate` no longer counts a `generatedAt`-only
+   difference as stale.
+
+With both, the committed manifest is byte-identical to a fresh build and `validate`
+reports "Catalog manifest is valid with 32 catalog skills".
+
+Still worth stating plainly: `validate` needs the network and took 1.5–8 minutes across
+runs depending on GitHub's mood. A `GITHUB_TOKEN` would help, as would running it where
+the network is reliable.
+
 ## Follow-ups
 
 1. **Guard against a stale manifest (offline half done).** A new `shipped-catalog` test
@@ -479,9 +526,7 @@ checked-in manifest, not a fresh build, so it stays green.
    `find-skills` is itself a casualty of this cap.
 5. **Spec the source-resolver and trust-classifier registries** (see above) so the
    Feishu/Lark family and future registries can be added without touching core.
-6. **Make the license requirement mechanical.** The descriptor schema has no license
-   field, so excluding `vercel-labs/agent-skills` was a human judgement. A required
-   `license` field plus a CI check would stop the next unlicensed source from landing.
+6. ~~**Make the license requirement mechanical.**~~ **Done.** See the section below.
 7. **Verify installed skills load end to end.** This proves the catalog resolves and that
    the batch is internally consistent. It does not prove an agent ingests one at runtime.
 8. **Fix the pre-existing server typecheck break** in `server/src/routes/companies.ts`

@@ -557,6 +557,7 @@ export const catalogSkillSchema = z.object({
   tags: z.array(z.string()),
   files: z.array(catalogSkillFileSchema),
   contentHash: z.string().min(1),
+  license: z.string().min(1).optional(),
   source: catalogSkillSourceSchema.optional(),
   packageName: z.string().min(1).optional(),
   packageVersion: z.string().min(1).optional(),

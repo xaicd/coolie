@@ -50,6 +50,8 @@ interface ReferencedGitHubSourceDescriptor {
 
 interface ReferencedSkillDescriptor {
   source: ReferencedGitHubSourceDescriptor;
+  /** Upstream content licence. Required: a referenced skill may not ship without one. */
+  license: string;
   files?: string[];
   defaultInstall?: boolean;
   recommendedForRoles?: string[];
@@ -145,10 +147,18 @@ export async function buildExpectedCatalogManifest(
     return firstPass;
   }
 
-  return buildCatalogManifest({
+  const secondPass = await buildCatalogManifest({
     packageDir,
     generatedAt: new Date().toISOString(),
   });
+  // The first pass can differ for a reason that is not a content change, and the retry
+  // can then agree with the existing manifest again. Keep the existing timestamp in that
+  // case: otherwise `validate` reports "stale" purely because the clock moved, so its
+  // verdict would track the network rather than the content.
+  if (existing && sameManifestExceptGeneratedAt(existing, secondPass.manifest)) {
+    return { ...secondPass, manifest: { ...secondPass.manifest, generatedAt: existing.generatedAt } };
+  }
+  return secondPass;
 }
 
 export async function buildCatalogManifest(
@@ -206,7 +216,14 @@ export async function validateCatalog(packageDir: string): Promise<BuildCatalogM
 
   if (generatedText !== null) {
     const expectedText = formatCatalogManifest(expected.manifest);
-    if (generatedText !== expectedText) {
+    // A file that differs only by its `generatedAt` is current: that field records when
+    // the file was written, not what it contains. Without this, a first pass that trips a
+    // transient fetch failure moves the timestamp and the verdict flips on network
+    // weather rather than on content.
+    if (generatedText !== expectedText && !sameManifestExceptGeneratedAt(
+      JSON.parse(generatedText) as CatalogManifest,
+      expected.manifest,
+    )) {
       errors.push("generated/catalog.json is stale. Run pnpm --filter @paperclipai/skills-catalog build:manifest.");
     }
   }
@@ -426,7 +443,10 @@ async function buildReferencedCatalogSkill(
     const nextErrors = errors.slice(errorStart);
     if (fallbackSkill && canFallbackToExistingReferencedSkill(nextErrors)) {
       errors.splice(errorStart, nextErrors.length);
-      return fallbackSkill;
+      // Reuse the cached inventory but take the licence from the descriptor: it is
+      // declared, not fetched, so an entry generated before this field existed must not
+      // resurrect a licence-less entry past the reader's requirement.
+      return { ...fallbackSkill, license: descriptor.license };
     }
     return null;
   }
@@ -463,14 +483,20 @@ async function buildReferencedCatalogSkill(
     const nextErrors = errors.slice(errorStart);
     if (fallbackSkill && canFallbackToExistingReferencedSkill(nextErrors)) {
       errors.splice(errorStart, nextErrors.length);
-      return fallbackSkill;
+      // Reuse the cached inventory but take the licence from the descriptor: it is
+      // declared, not fetched, so an entry generated before this field existed must not
+      // resurrect a licence-less entry past the reader's requirement.
+      return { ...fallbackSkill, license: descriptor.license };
     }
   }
   if (!name || !description) {
     const nextErrors = errors.slice(errorStart);
     if (fallbackSkill && canFallbackToExistingReferencedSkill(nextErrors)) {
       errors.splice(errorStart, nextErrors.length);
-      return fallbackSkill;
+      // Reuse the cached inventory but take the licence from the descriptor: it is
+      // declared, not fetched, so an entry generated before this field existed must not
+      // resurrect a licence-less entry past the reader's requirement.
+      return { ...fallbackSkill, license: descriptor.license };
     }
     return null;
   }
@@ -493,6 +519,7 @@ async function buildReferencedCatalogSkill(
     tags,
     files,
     contentHash: buildContentHash(files),
+    license: descriptor.license,
     source,
   };
 }
@@ -574,6 +601,18 @@ async function readReferencedSkillDescriptor(
     return null;
   }
 
+  // Refuse an unlicensed reference outright rather than recording it and relying on a
+  // human to notice. This is the same class of gate as the pinned-commit requirement:
+  // the descriptor must state its provenance before the skill can enter the catalog.
+  const license = asString(raw.license);
+  if (!license) {
+    errors.push(
+      `${prefix}/${CATALOG_REFERENCE_FILE} must declare "license" — the upstream content licence. `
+      + "A referenced skill cannot ship without one; check the upstream repository for a LICENSE file.",
+    );
+    return null;
+  }
+
   const descriptor: ReferencedSkillDescriptor = {
     source: {
       type: "github",
@@ -584,6 +623,7 @@ async function readReferencedSkillDescriptor(
       commit,
       path: sourcePath,
     },
+    license,
     defaultInstall: asBoolean(raw.defaultInstall) ?? false,
     files: asStringArray(raw.files ?? undefined) ?? undefined,
     recommendedForRoles: asStringArray(raw.recommendedForRoles ?? undefined) ?? undefined,

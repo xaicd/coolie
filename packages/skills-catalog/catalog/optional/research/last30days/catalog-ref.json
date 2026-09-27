@@ -8,6 +8,7 @@
     "commit": "daca71f89eb71d0d56d01a43ed7627aa919dba4f",
     "path": "skills/last30days"
   },
+  "license": "MIT",
   "files": [
     "SKILL.md",
     "agents/openai.yaml",

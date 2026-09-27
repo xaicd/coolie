@@ -9,6 +9,8 @@ import {
   connectionsSearchInputSchema,
   createApprovalSchema,
   createIssueInputSchema,
+  createProjectSchema,
+  updateProjectSchema,
   issueThreadInteractionContinuationPolicySchema,
   requestCheckboxConfirmationPayloadSchema,
   requestConfirmationPayloadSchema,
@@ -201,6 +203,50 @@ const createApprovalToolSchema = z.object({
   companyId: companyIdOptional,
 }).merge(createApprovalSchema);
 
+const createProjectToolSchema = z.object({
+  companyId: companyIdOptional,
+}).merge(createProjectSchema);
+
+const updateProjectToolSchema = z.object({
+  projectId: projectIdSchema,
+}).merge(updateProjectSchema);
+
+const createProjectWorkspaceToolSchema = z.object({
+  projectId: projectIdSchema,
+  name: z.string().min(1).optional(),
+  sourceType: z.enum(["local_path", "git_repo", "remote_managed", "non_git_path"]).optional(),
+  cwd: z.string().min(1).optional().nullable(),
+  repoUrl: z.string().trim().min(1).max(2000).optional().nullable(),
+  repoRef: z.string().optional().nullable(),
+  defaultRef: z.string().optional().nullable(),
+  isPrimary: z.boolean().optional(),
+});
+
+const controlProjectWorkspaceRuntimeToolSchema = z.object({
+  projectId: projectIdSchema,
+  workspaceId: z.string().min(1),
+  action: z.enum(["start", "stop", "restart"]),
+  serviceName: z.string().optional(),
+  servicePort: z.number().int().optional(),
+});
+
+const dispatchTaskToRoleToolSchema = z.object({
+  companyId: companyIdOptional,
+  projectId: z.string().guid().optional(),
+  role: z.enum(["fda", "core-swe", "fdse", "pre-sre", "ds", "hermes"]),
+  title: z.string().min(1),
+  description: z.string().optional(),
+  priority: z.enum(["urgent", "high", "medium", "low"]).optional().default("medium"),
+  cmmiPhase: z.enum(["srs", "architecture", "contracts", "ver-val", "release", "metrics", "car"]).optional(),
+});
+
+const recordBossDecisionToolSchema = z.object({
+  issueId: issueIdSchema,
+  topic: z.string().min(1),
+  decision: z.string().min(1),
+  rationale: z.string().optional(),
+});
+
 const apiRequestSchema = z.object({
   method: z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]),
   path: z.string().min(1),
@@ -298,6 +344,13 @@ export function createToolDefinitions(client: PaperclipApiClient): ToolDefinitio
       "Get the current authenticated agent inbox-lite assignment list",
       z.object({}),
       async () => client.requestJson("GET", "/agents/me/inbox-lite"),
+    ),
+    makeTool(
+      "paperclipGetCompanyDashboard",
+      "Get comprehensive company board dashboard summary (active/paused agents, open/in_progress/blocked tasks, budget and spend, pending approvals)",
+      z.object({ companyId: companyIdOptional }),
+      async ({ companyId }) =>
+        client.requestJson("GET", `/companies/${client.resolveCompanyId(companyId)}/dashboard`),
     ),
     makeTool(
       "paperclipListAgents",
@@ -412,6 +465,112 @@ export function createToolDefinitions(client: PaperclipApiClient): ToolDefinitio
       async ({ projectId, companyId }) => {
         const qs = companyId ? `?companyId=${encodeURIComponent(companyId)}` : "";
         return client.requestJson("GET", `/projects/${encodeURIComponent(projectId)}${qs}`);
+      },
+    ),
+    makeTool(
+      "paperclipCreateProject",
+      "Create a new company project with target delivery date, description, lead agent, and workspace policies",
+      createProjectToolSchema,
+      async ({ companyId, ...body }) =>
+        client.requestJson("POST", `/companies/${client.resolveCompanyId(companyId)}/projects`, { body }),
+    ),
+    makeTool(
+      "paperclipUpdateProject",
+      "Update an existing project (name, description, status, target date, etc.)",
+      updateProjectToolSchema,
+      async ({ projectId, ...body }) =>
+        client.requestJson("PATCH", `/projects/${encodeURIComponent(projectId)}`, { body }),
+    ),
+    makeTool(
+      "paperclipListProjectWorkspaces",
+      "List execution workspaces associated with a project",
+      z.object({ projectId: projectIdSchema }),
+      async ({ projectId }) =>
+        client.requestJson("GET", `/projects/${encodeURIComponent(projectId)}/workspaces`),
+    ),
+    makeTool(
+      "paperclipCreateProjectWorkspace",
+      "Bind an execution workspace or git repo (e.g. https://github.com/xaicd/ruoyi-all-next.git) to a project",
+      createProjectWorkspaceToolSchema,
+      async ({ projectId, ...body }) =>
+        client.requestJson("POST", `/projects/${encodeURIComponent(projectId)}/workspaces`, { body }),
+    ),
+    makeTool(
+      "paperclipControlProjectWorkspaceRuntime",
+      "Start, stop, or restart runtime services in a project workspace (e.g. launch prototype sandbox on port 3200)",
+      controlProjectWorkspaceRuntimeToolSchema,
+      async ({ projectId, workspaceId, action, ...body }) =>
+        client.requestJson(
+          "POST",
+          `/projects/${encodeURIComponent(projectId)}/workspaces/${encodeURIComponent(workspaceId)}/runtime-services/${action}`,
+          { body },
+        ),
+    ),
+    makeTool(
+      "paperclipDispatchTaskToRole",
+      "Semantic task dispatch to one of the 6 fixed company roles (fda, core-swe, fdse, pre-sre, ds, hermes) with optional CMMI phase tags and project binding",
+      dispatchTaskToRoleToolSchema,
+      async ({ companyId, projectId, role, title, description, priority, cmmiPhase }) => {
+        const resolvedCompanyId = client.resolveCompanyId(companyId);
+        const agents = (await client.requestJson(
+          "GET",
+          `/companies/${resolvedCompanyId}/agents`,
+        )) as Array<{ id: string; name?: string; role?: string }>;
+
+        const targetAgent = agents.find((a) => {
+          const name = (a.name ?? "").toLowerCase();
+          const agentRole = (a.role ?? "").toLowerCase();
+          if (role === "fda") return name.includes("fda") || agentRole.includes("architect");
+          if (role === "core-swe") return name.includes("core-swe") || name.includes("swe") || agentRole.includes("core");
+          if (role === "fdse") return name.includes("fdse") || agentRole.includes("fullstack");
+          if (role === "pre-sre") return name.includes("sre") || agentRole.includes("reliability");
+          if (role === "ds") return name.includes("ds") || agentRole.includes("strategist");
+          if (role === "hermes") return name.includes("hermes");
+          return false;
+        });
+
+        const cmmiHeader = cmmiPhase
+          ? `[CMMI 阶段要求: ${cmmiPhase.toUpperCase()}]\n本任务须产出对应规范交付物并满足质量门禁断言。\n\n`
+          : "";
+
+        const fullDescription = `${cmmiHeader}${description ?? ""}`.trim();
+
+        return client.requestJson("POST", `/companies/${resolvedCompanyId}/issues`, {
+          body: {
+            title,
+            description: fullDescription || undefined,
+            projectId: projectId || undefined,
+            assigneeAgentId: targetAgent?.id,
+            priority: priority ?? "medium",
+          },
+        });
+      },
+    ),
+    makeTool(
+      "paperclipRecordBossDecision",
+      "Record a boss decision or key directive to the project/issue decision-log document so all agents stay aligned",
+      recordBossDecisionToolSchema,
+      async ({ issueId, topic, decision, rationale }) => {
+        let existing = "";
+        try {
+          const doc = (await client.requestJson(
+            "GET",
+            `/issues/${encodeURIComponent(issueId)}/documents/decision-log`,
+          )) as { content?: string } | null;
+          existing = typeof doc?.content === "string" ? doc.content : "";
+        } catch {
+          // ignore not found
+        }
+        const timestamp = new Date().toISOString();
+        const entry = `\n\n### 决策: ${topic} (${timestamp})\n- **拍板决议**: ${decision}\n${rationale ? `- **考量背景**: ${rationale}\n` : ""}`;
+        const newContent = (existing + entry).trim();
+        return client.requestJson("PUT", `/issues/${encodeURIComponent(issueId)}/documents/decision-log`, {
+          body: {
+            title: "Boss Decision Log",
+            format: "markdown",
+            content: newContent,
+          },
+        });
       },
     ),
     makeTool(

@@ -17,9 +17,10 @@ import * as FileSystem from "expo-file-system";
 
 type ModuleShared = {
   recording: Audio.Recording | null;
-  startPromise: Promise<Audio.Recording> | null;
+  startPromise: Promise<Audio.Recording | null> | null;
   listeners: Set<(isRecording: boolean) => void>;
   watchdogTimer: ReturnType<typeof setTimeout> | null;
+  activeSessionId: number;
 };
 
 const moduleShared: ModuleShared = {
@@ -27,6 +28,7 @@ const moduleShared: ModuleShared = {
   startPromise: null,
   listeners: new Set(),
   watchdogTimer: null,
+  activeSessionId: 0,
 };
 
 let mountRefCount = 0;
@@ -51,7 +53,7 @@ async function safeUnload(rec: Audio.Recording | null): Promise<void> {
   try {
     await Promise.race([
       rec.stopAndUnloadAsync(),
-      new Promise((r) => setTimeout(r, 4000)),
+      new Promise((r) => setTimeout(r, 3000)),
     ]).catch(async () => {
       try {
         await rec.stopAndUnloadAsync();
@@ -91,6 +93,7 @@ export function useRecorder() {
 
       if (localRef.current && moduleShared.recording === localRef.current) {
         const rec = localRef.current;
+        moduleShared.activeSessionId += 1;
         moduleShared.recording = null;
         moduleShared.startPromise = null;
         clearWatchdog();
@@ -118,6 +121,8 @@ export function useRecorder() {
       }
     }
 
+    const sessionId = ++moduleShared.activeSessionId;
+
     const p = (async () => {
       // 2) 已经有 active recording → 先 unload 它
       if (moduleShared.recording) {
@@ -129,6 +134,12 @@ export function useRecorder() {
       if (!perm.granted) {
         broadcastRecording(false);
         throw new Error("麦克风权限未授予");
+      }
+
+      // 快速检查：如果请求权限期间用户已经取消/松手，直接中止
+      if (moduleShared.activeSessionId !== sessionId) {
+        await resetAudioMode();
+        return null;
       }
 
       await Audio.setAudioModeAsync({
@@ -150,6 +161,14 @@ export function useRecorder() {
         throw e;
       }
 
+      // 核心防线：如果录音机异步初始化完成期间，外部已经调用 stop() 或 forceStop()，立刻就地释放，绝不能让孤儿录音机在后台无限空转！
+      if (moduleShared.activeSessionId !== sessionId) {
+        void safeUnload(rec).finally(() => {
+          void resetAudioMode();
+        });
+        return null;
+      }
+
       moduleShared.recording = rec;
       localRef.current = rec;
       broadcastRecording(true);
@@ -158,6 +177,7 @@ export function useRecorder() {
       clearWatchdog();
       moduleShared.watchdogTimer = setTimeout(() => {
         console.warn("[useRecorder] 看门狗触发 (超过30秒)，强制停止录音并复位");
+        moduleShared.activeSessionId += 1;
         const currentRec = moduleShared.recording;
         moduleShared.recording = null;
         moduleShared.startPromise = null;
@@ -183,13 +203,25 @@ export function useRecorder() {
 
   /** Stop and return { base64, format }. */
   const stop = useCallback(async (): Promise<{ base64: string; format: "m4a" }> => {
+    // 递增 sessionId 使任何正在 pending 的 start() 在完成后直接自我销毁
+    moduleShared.activeSessionId += 1;
     clearWatchdog();
-    const rec = moduleShared.recording;
 
-    // 立即清模块状态并广播，让所有 UI 立刻退出录音态
-    moduleShared.recording = null;
-    moduleShared.startPromise = null;
+    // 立即广播 UI 退出录音状态
     broadcastRecording(false);
+
+    // 如果正在排队或初始化 start，等待其就绪以获取有效 recording 句柄
+    if (moduleShared.startPromise) {
+      try {
+        await moduleShared.startPromise;
+      } catch {
+        // 忽略初始化错误
+      }
+      moduleShared.startPromise = null;
+    }
+
+    const rec = moduleShared.recording;
+    moduleShared.recording = null;
 
     if (!rec) {
       // 没有正在录制的句柄，直接平稳返回空并复位
@@ -200,23 +232,24 @@ export function useRecorder() {
     try {
       await Promise.race([
         rec.stopAndUnloadAsync(),
-        new Promise((r) => setTimeout(r, 4000)),
-      ]).catch(async () => {
-        try {
-          await rec.stopAndUnloadAsync();
-        } catch {}
+        new Promise((r) => setTimeout(r, 3000)),
+      ]).catch((err) => {
+        console.warn("[useRecorder] stopAndUnloadAsync warning:", err);
       });
 
       const uri = rec.getURI();
       if (!uri) {
+        console.warn("[useRecorder] rec.getURI() is null");
         return { base64: "", format: "m4a" };
       }
+
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
-      return { base64, format: "m4a" };
+
+      return { base64: base64 ?? "", format: "m4a" };
     } catch (err) {
-      console.warn("[useRecorder] stop error:", err);
+      console.warn("[useRecorder] stop read error:", err);
       return { base64: "", format: "m4a" };
     } finally {
       if (localRef.current === rec) localRef.current = null;
@@ -226,6 +259,7 @@ export function useRecorder() {
 
   /** 强制一键复位/停止 */
   const forceStop = useCallback(async (): Promise<void> => {
+    moduleShared.activeSessionId += 1;
     clearWatchdog();
     const rec = moduleShared.recording;
     moduleShared.recording = null;

@@ -8,6 +8,7 @@
     "commit": "da38ec1ee89d41e5380e652a97382695003396e7",
     "path": "enterprise-search/skills/knowledge-synthesis"
   },
+  "license": "Apache-2.0",
   "files": [
     "SKILL.md"
   ],

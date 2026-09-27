@@ -8,6 +8,7 @@
     "commit": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
     "path": "skills/writing-plans"
   },
+  "license": "MIT",
   "files": [
     "SKILL.md"
   ],

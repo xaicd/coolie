@@ -4,8 +4,8 @@ import { isAsrNotConfigured } from "@coolie/api-client";
 import { voiceTranscribe } from "../../services/voiceTranscribe";
 import { useRecorder } from "../../useRecorder";
 
-/** 短于这个时长算误触, 不当一句话 (与 composer 的 mic 同一口径)。 */
-const MIN_VOICE_HOLD_MS = 500;
+/** 短于这个时长算误触 (300ms), 不当一句话 (与 composer 的 mic 同一口径)。 */
+const MIN_VOICE_HOLD_MS = 300;
 
 /**
  * 「按住说话」的录音 → 转写链路 —— wave21 那条 transcribe-only 链路的豆包版封装。
@@ -24,7 +24,7 @@ export function useVoiceInput({
   companyId: string;
   onTranscript: (text: string) => void;
 }) {
-  const { recording, start, stop } = useRecorder();
+  const { recording, start, stop, forceStop } = useRecorder();
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   // start() 是异步的 (要权限 + 起录音机), 用户可能在它完成前就松手。按下时先存这个
@@ -56,8 +56,10 @@ export function useVoiceInput({
         if (!started) return;
 
         const { base64, format } = await stop();
-        // stop() 失败/看门狗强制切断时返回空 base64, 不要把空音频送去转写
-        if (!base64) return;
+        if (!base64) {
+          setStatus("🎤 未采集到有效声音, 请重试");
+          return;
+        }
         if (Date.now() - startedAt < MIN_VOICE_HOLD_MS) {
           setStatus("🎤 按太短了, 请长按说话");
           return;
@@ -96,6 +98,13 @@ export function useVoiceInput({
     void finish(press.startedAt, press.promise);
   }, [finish]);
 
+  const cancel = useCallback(async () => {
+    pressRef.current.promise = null;
+    await forceStop();
+    setStatus("🎤 录音已取消");
+    setBusy(false);
+  }, [forceStop]);
+
   /** 点一下开始, 再点一下结束 —— 快捷行「录音转写」chip 用。 */
   const toggle = useCallback(() => {
     if (busy) return;
@@ -103,5 +112,5 @@ export function useVoiceInput({
     else pressIn();
   }, [busy, pressIn, pressOut, recording]);
 
-  return { recording, busy, status, pressIn, pressOut, toggle };
+  return { recording, busy, status, pressIn, pressOut, cancel, toggle };
 }
