@@ -420,4 +420,126 @@ describe.sequential("company route cross-company authorization", () => {
     expect(adminWrite.body.error).toContain("access to this company");
     assertNoTargetMutationSideEffects();
   });
+
+  // ── 公司级紧急熔断 (wave105): board-only, idempotent, audit-logged ──
+
+  it("board can trigger emergency-stop: status flips to paused and activity log captures reason", async () => {
+    mockCompanyService.getById.mockResolvedValueOnce(createCompany(companyAId));
+    mockCompanyService.update.mockResolvedValueOnce({ ...createCompany(companyAId), status: "paused" });
+    const app = await createApp(
+      boardActor({
+        userId: "owner-a",
+        companyIds: [companyAId],
+        memberships: [{ companyId: companyAId, membershipRole: "owner", status: "active" }],
+      }),
+    );
+
+    const res = await request(app)
+      .post(`/api/companies/${companyAId}/emergency-stop`)
+      .send({ reason: "客户端误报刷 token", reasonKind: "manual" });
+
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+    expect(res.body.company.status).toBe("paused");
+    expect(mockCompanyService.update).toHaveBeenCalledWith(
+      companyAId,
+      { status: "paused" },
+      expect.objectContaining({}),
+    );
+    expect(mockLogActivity).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        companyId: companyAId,
+        action: "company.emergency_stop",
+        entityType: "company",
+        entityId: companyAId,
+        details: { reason: "客户端误报刷 token", reasonKind: "manual" },
+      }),
+    );
+  });
+
+  it("CEO agent cannot trigger emergency-stop (board-only)", async () => {
+    const app = await createApp(companyACeoActor());
+    const res = await request(app)
+      .post(`/api/companies/${companyAId}/emergency-stop`)
+      .send({ reason: "测试 agent 拒熔断" });
+    expect(res.status).toBe(403);
+    expect(mockCompanyService.update).not.toHaveBeenCalled();
+    expect(mockLogActivity).not.toHaveBeenCalled();
+  });
+
+  it("emergency-stop is idempotent: already-paused company returns alreadyPaused without re-logging", async () => {
+    mockCompanyService.getById.mockResolvedValueOnce({
+      ...createCompany(companyAId),
+      status: "paused",
+    });
+    const app = await createApp(
+      boardActor({
+        userId: "owner-a",
+        companyIds: [companyAId],
+        memberships: [{ companyId: companyAId, membershipRole: "owner", status: "active" }],
+      }),
+    );
+    const res = await request(app)
+      .post(`/api/companies/${companyAId}/emergency-stop`)
+      .send({ reason: "再按一次" });
+    expect(res.status).toBe(200);
+    expect(res.body.alreadyPaused).toBe(true);
+    expect(mockCompanyService.update).not.toHaveBeenCalled();
+    expect(mockLogActivity).not.toHaveBeenCalled();
+  });
+
+  it("emergency-stop rejects empty reason (audit trail must be useful)", async () => {
+    const app = await createApp(
+      boardActor({
+        userId: "owner-a",
+        companyIds: [companyAId],
+        memberships: [{ companyId: companyAId, membershipRole: "owner", status: "active" }],
+      }),
+    );
+    const res = await request(app)
+      .post(`/api/companies/${companyAId}/emergency-stop`)
+      .send({ reason: "" });
+    expect(res.status).toBe(400);
+    expect(mockCompanyService.update).not.toHaveBeenCalled();
+  });
+
+  it("emergency-resume flips paused → active and logs separately", async () => {
+    mockCompanyService.getById.mockResolvedValueOnce({
+      ...createCompany(companyAId),
+      status: "paused",
+    });
+    mockCompanyService.update.mockResolvedValueOnce(createCompany(companyAId));
+    const app = await createApp(
+      boardActor({
+        userId: "owner-a",
+        companyIds: [companyAId],
+        memberships: [{ companyId: companyAId, membershipRole: "owner", status: "active" }],
+      }),
+    );
+    const res = await request(app).post(`/api/companies/${companyAId}/emergency-resume`).send({});
+    expect(res.status).toBe(200);
+    expect(res.body.company.status).toBe("active");
+    expect(mockLogActivity).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: "company.emergency_resume",
+        entityId: companyAId,
+      }),
+    );
+  });
+
+  it("emergency-resume on already-active company returns notPaused without side effects", async () => {
+    const app = await createApp(
+      boardActor({
+        userId: "owner-a",
+        companyIds: [companyAId],
+        memberships: [{ companyId: companyAId, membershipRole: "owner", status: "active" }],
+      }),
+    );
+    const res = await request(app).post(`/api/companies/${companyAId}/emergency-resume`).send({});
+    expect(res.status).toBe(200);
+    expect(res.body.notPaused).toBe(true);
+    expect(mockCompanyService.update).not.toHaveBeenCalled();
+  });
 });

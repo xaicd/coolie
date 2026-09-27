@@ -69,3 +69,23 @@ export const updateCompanyBrandingSchema = z
   );
 
 export type UpdateCompanyBranding = z.infer<typeof updateCompanyBrandingSchema>;
+
+/**
+ * 公司级紧急熔断 (wave105) — boss 失控时刻的「救命按钮」。
+ *
+ * 语义: 把 companies.status 切换为 paused — heartbeat 派单 (heartbeat.ts:10394
+ * / 11788) 已经守门 active, 熔断后所有派单、待跑 agent 立即停摆。后续 web/移动
+ * 端的读 API 仍可访问, 不会把人锁在库外。
+ *
+ * reason 必填: 留痕到 activity_log 让审计能解释为什么停。reasonKind 区分
+ * "manual" (老板手按) 和 "budget" / "compliance" 等系统触发 — 当前手动场景
+ * 只用 manual, 但 schema 留口给自动化触发器复用 (例如预算烧到 120% 自动熔断)。
+ */
+export const emergencyStopSchema = z
+  .object({
+    reason: z.string().min(1).max(280),
+    reasonKind: z.enum(["manual", "budget", "compliance", "anomaly"]).default("manual"),
+  })
+  .strict();
+
+export type EmergencyStopPayload = z.infer<typeof emergencyStopSchema>;

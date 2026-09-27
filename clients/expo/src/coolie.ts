@@ -384,6 +384,32 @@ export interface SeedSampleDomainsReport {
 }
 
 export class CoolieClient extends BaseCoolieClient {
+  /**
+   * 公司级紧急熔断 (wave105) — 董事会一键停掉本公司所有派单。
+   * Heartbeat 守门 companies.status="active" — pause 后立即停派。
+   */
+  async emergencyStop(
+    companyId: string,
+    reason: string,
+    reasonKind: "manual" | "budget" | "compliance" | "anomaly" = "manual",
+  ): Promise<{ ok: boolean; company?: Company; alreadyPaused?: boolean }> {
+    return this.request(
+      "POST",
+      `/api/companies/${encodeURIComponent(companyId)}/emergency-stop`,
+      { reason, reasonKind },
+    );
+  }
+
+  /** 解除公司熔断。 */
+  async emergencyResume(
+    companyId: string,
+  ): Promise<{ ok: boolean; company?: Company; notPaused?: boolean }> {
+    return this.request(
+      "POST",
+      `/api/companies/${encodeURIComponent(companyId)}/emergency-resume`,
+    );
+  }
+
   /** GET /api/companies/:id/costs/by-agent — 按智能体聚合 token/花费 */
   async costsByAgent(companyId: string): Promise<AgentCostRow[]> {
     return this.request<AgentCostRow[]>(

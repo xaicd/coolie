@@ -25,6 +25,7 @@ import {
   hidesCompanyPage,
   updateCompanyBrandingSchema,
   updateCompanySchema,
+  emergencyStopSchema,
 } from "@paperclipai/shared";
 import {
   COMPANY_IMPORT_TRANSFERS_ROUTE_PATH,
@@ -1393,6 +1394,88 @@ export function companyRoutes(db: Db, storage?: StorageService, options?: Compan
       return;
     }
     res.json({ ok: true });
+  });
+
+  /**
+   * 公司级紧急熔断 (wave105) — 把 companies.status 切为 paused, heartbeat
+   * 派单守门 (heartbeat.ts:10394 / 11788) 会自动停派。company.paused 是
+   * 既有 status enum 的一档, 无 schema 迁移。reason 必填, 落 activity_log。
+   *
+   * 鉴权: 仅 board (CEO/管理员), agent / 普通成员不能误触。
+   */
+  router.post("/:companyId/emergency-stop", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    // board-only: 与 PATCH 区分 — 熔断是不可逆敏感动作
+    const actor = req.actor;
+    if (actor?.type !== "board") {
+      res.status(403).json({ error: "仅董事会成员可触发紧急熔断" });
+      return;
+    }
+    await assertSameCompanyCeoAgentOrBoard(req, companyId, "company emergency stop");
+    const body = emergencyStopSchema.parse(req.body);
+
+    const existing = await svc.getById(companyId);
+    if (!existing) {
+      res.status(404).json({ error: "Company not found" });
+      return;
+    }
+    if (existing.status === "archived") {
+      res.status(409).json({ error: "已归档的公司无法熔断, 请先恢复" });
+      return;
+    }
+    if (existing.status === "paused") {
+      res.json({ ok: true, alreadyPaused: true });
+      return;
+    }
+
+    const updated = await svc.update(companyId, { status: "paused" }, actor);
+    await logActivity(db, {
+      companyId,
+      actorType: "user",
+      actorId: actor.userId ?? "board",
+      agentId: actor.agentId,
+      runId: actor.runId,
+      agentApiKeyId: actor.agentApiKeyId,
+      action: "company.emergency_stop",
+      entityType: "company",
+      entityId: companyId,
+      details: { reason: body.reason, reasonKind: body.reasonKind },
+    });
+    res.json({ ok: true, company: updated });
+  });
+
+  /** 解除熔断 — 把 companies.status 切回 active。沿用同样的 board-only 鉴权。 */
+  router.post("/:companyId/emergency-resume", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    const actor = req.actor;
+    if (actor?.type !== "board") {
+      res.status(403).json({ error: "仅董事会成员可解除紧急熔断" });
+      return;
+    }
+    await assertSameCompanyCeoAgentOrBoard(req, companyId, "company emergency resume");
+    const existing = await svc.getById(companyId);
+    if (!existing) {
+      res.status(404).json({ error: "Company not found" });
+      return;
+    }
+    if (existing.status !== "paused") {
+      res.json({ ok: true, notPaused: true });
+      return;
+    }
+    const updated = await svc.update(companyId, { status: "active" }, actor);
+    await logActivity(db, {
+      companyId,
+      actorType: "user",
+      actorId: actor.userId ?? "board",
+      agentId: actor.agentId,
+      runId: actor.runId,
+      agentApiKeyId: actor.agentApiKeyId,
+      action: "company.emergency_resume",
+      entityType: "company",
+      entityId: companyId,
+      details: {},
+    });
+    res.json({ ok: true, company: updated });
   });
 
   return router;

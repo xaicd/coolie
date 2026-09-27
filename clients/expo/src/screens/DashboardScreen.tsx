@@ -90,6 +90,42 @@ export function DashboardScreen({
     void fetchDashboard();
   }, [fetchDashboard]);
 
+  // wave105 公司级紧急熔断 — 董事会一键停掉所有派单。Dashboard 是该入口的
+  // 唯一常驻位 (AppBar/TabBar 都覆盖不到失控时刻); 显示规则:
+  //   active  → 右上小红 chip「🚨 紧急熔断」
+  //   paused  → 整页顶部红底 banner + 「解除熔断」按钮
+  const isPaused = company.status === "paused";
+  const [emergencyBusy, setEmergencyBusy] = useState(false);
+  const handleEmergencyStop = useCallback(async () => {
+    if (emergencyBusy) return;
+    setEmergencyBusy(true);
+    try {
+      const result = await coolie.emergencyStop(company.id, "Dashboard 一键熔断");
+      // 触发完整重拉以反映 paused 状态变化
+      if (result.ok) {
+        // 即时翻 company 状态避免等下一次 fetch
+        // (BoardChatScreen 等其他屏会通过 onRefresh 拉新, 这里只是 UI)
+      }
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[Dashboard] emergency-stop failed:", e);
+    } finally {
+      setEmergencyBusy(false);
+    }
+  }, [company.id, emergencyBusy]);
+  const handleEmergencyResume = useCallback(async () => {
+    if (emergencyBusy) return;
+    setEmergencyBusy(true);
+    try {
+      await coolie.emergencyResume(company.id);
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn("[Dashboard] emergency-resume failed:", e);
+    } finally {
+      setEmergencyBusy(false);
+    }
+  }, [company.id, emergencyBusy]);
+
   if (loading && !data) {
     return (
       <SafeAreaView style={{ backgroundColor: C.bg, flex: 1 }}>
@@ -188,6 +224,51 @@ export function DashboardScreen({
             </View>
           }
         />
+
+        {/* ── wave105: 公司级紧急熔断 banner / chip ── */}
+        {isPaused ? (
+          <View style={styles.emergencyBanner}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.emergencyBannerTitle}>🚨 公司已紧急熔断</Text>
+              <Text style={styles.emergencyBannerSub}>
+                所有派单已停摆。确认风险解除后再恢复运行。
+              </Text>
+            </View>
+            <Pressable
+              onPress={() => void handleEmergencyResume()}
+              disabled={emergencyBusy}
+              style={({ pressed }) => [
+                styles.emergencyResumeBtn,
+                pressed && styles.emergencyResumeBtnPressed,
+                emergencyBusy && styles.emergencyResumeBtnDisabled,
+              ]}
+              accessibilityLabel="解除公司紧急熔断"
+            >
+              <Text style={styles.emergencyResumeBtnText}>
+                {emergencyBusy ? "处理中…" : "解除熔断"}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* 顶部右上小红 chip: 在 ScreenHeader 旁独立, 大字小屏必看到 */}
+        {!isPaused ? (
+          <Pressable
+            onPress={() => void handleEmergencyStop()}
+            disabled={emergencyBusy}
+            style={({ pressed }) => [
+              styles.emergencyChip,
+              pressed && styles.emergencyChipPressed,
+              emergencyBusy && styles.emergencyChipDisabled,
+            ]}
+            accessibilityLabel="紧急熔断: 停掉所有派单"
+          >
+            <Ionicons name="warning-outline" size={14} color={C.ink} />
+            <Text style={styles.emergencyChipText} numberOfLines={1}>
+              {emergencyBusy ? "熔断中…" : "🚨 紧急熔断"}
+            </Text>
+          </Pressable>
+        ) : null}
 
         {/* ── 第 1 行: 4 张核心指标卡 ── */}
         <Pressable
@@ -742,5 +823,59 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: "500",
     color: C.accent,
+  },
+  // wave105 公司级紧急熔断: 仅 1 个 chip + 1 个 banner, 不进任何 dashboard 子模块
+  emergencyChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-end",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    backgroundColor: C.err,
+    marginBottom: 8,
+  },
+  emergencyChipPressed: { opacity: 0.7 },
+  emergencyChipDisabled: { opacity: 0.5 },
+  emergencyChipText: {
+    color: C.ink,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  emergencyBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: C.err,
+    backgroundColor: C.surface,
+  },
+  emergencyBannerTitle: {
+    color: C.err,
+    fontSize: 15,
+    fontWeight: "700",
+    marginBottom: 2,
+  },
+  emergencyBannerSub: {
+    color: C.ink2,
+    fontSize: 12,
+    lineHeight: 17,
+  },
+  emergencyResumeBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: RADIUS.md,
+    backgroundColor: C.err,
+  },
+  emergencyResumeBtnPressed: { opacity: 0.7 },
+  emergencyResumeBtnDisabled: { opacity: 0.5 },
+  emergencyResumeBtnText: {
+    color: C.ink,
+    fontSize: 13,
+    fontWeight: "600",
   },
 });

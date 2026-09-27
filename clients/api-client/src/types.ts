@@ -10,6 +10,8 @@ export type IssueStatus = "backlog" | "todo" | "in_progress" | "in_review" | "do
 export interface Company {
   id: string;
   name: string;
+  /** company lifecycle: active (default), paused (wave105 emergency stop), archived */
+  status?: "active" | "paused" | "archived";
 }
 
 /**

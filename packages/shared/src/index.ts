@@ -1824,6 +1824,8 @@ export {
   interactionResolverGovernanceSchema,
   updateCompanySchema,
   updateCompanyBrandingSchema,
+  emergencyStopSchema,
+  type EmergencyStopPayload,
   feedbackTargetTypeSchema,
   feedbackTraceStatusSchema,
   feedbackVoteValueSchema,
