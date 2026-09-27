@@ -381,44 +381,78 @@ The concrete payoff would be the Feishu/Lark family and any future internal regi
 `well_known` resolver could handle `open.feishu.cn/.well-known/skills/*` natively
 instead of everyone hand-rolling a `ramp`-style wrapper.
 
-## Operational note: the manifest build needs GitHub API budget
+## Operational note: the manifest build does not complete in a constrained environment
 
-`build:manifest` fetches one repository tree plus one raw file per referenced skill, so
-it embeds a meaningful amount of work per reference. Unauthenticated GitHub API allows
-**60 requests per hour**, and this pass exhausted it — the build then blocks on tree
-requests returning `403` and can exceed a five-minute command timeout.
+This is the most important unresolved problem in this pass, and it contradicts an earlier
+draft of this document.
 
-This is survivable by design: a recoverable fetch error falls back to the previously
-generated manifest entry, so a rate-limited build still writes a valid manifest for
-everything else (that is how the `find-skills` entry landed while the API was
-exhausted). But a CI job that needs to *change* a reference must have API budget —
-either a token for a higher limit, or a warm cache. Worth setting `GITHUB_TOKEN` in CI if
-this catalog grows.
+`build:manifest` fetches one repository tree plus one raw file per referenced file, and it
+does so **fully serialized, with no concurrency and no per-request timeout**. With 14
+references — one of which (`last30days`) carries ~79 files — that is well over 100
+sequential HTTP requests. Measured behaviour in this environment:
+
+- With a healthy network the build ran past **20 minutes** without completing.
+- Unauthenticated GitHub API allows **60 requests/hour**, and this pass exhausted it. Tree
+  requests then return `403`, and the build blocks on them.
+
+The consequence is worse than "degrades gracefully". When tree fetches fail, the builder
+falls back to the previously generated manifest entry — so the **build** still exits `0`
+with a written manifest. But the resulting file is then reported as **stale** by the
+`validate` gate, which compares it against a fresh expected manifest:
+
+```
+- generated/catalog.json is stale. Run pnpm --filter @paperclipai/skills-catalog build:manifest.
+```
+
+So the fallback keeps `build:manifest` green while leaving the verification gate red. The
+committed `catalog.json` (`generatedAt: 2026-09-27T06:22:50.193Z`, sha256 `7ea3b60e…`)
+was produced inside the rate-limited window via exactly this path, and `validate` fails
+against it. Whether the divergence is a substantive entry difference or pure fallback
+artifact could not be determined, because a fresh build never completed.
+
+Two things follow:
+
+- `validate` passing is the honest signal for this package, and **it is currently failing**.
+  Do not treat the catalog as verified on the strength of `build:manifest` exiting `0`.
+- The reference mechanism needs concurrency, per-request timeouts, and either a
+  `GITHUB_TOKEN` or a warm artifact cache before it is CI-safe. Until then, adding a
+  reference is a slow, rate-limit-fragile operation.
+
+The test suite is unaffected by this: `shipped-catalog` (20/20) asserts against the
+checked-in manifest, not a fresh build, so it stays green.
+
 
 ## Follow-ups
 
-1. **Write the missing end-to-end test** for the script-bearing import gate: a mocked
+1. **Make the manifest build CI-safe, and get `validate` green.** Concurrency, per-request
+   timeouts, and an authenticated or cached fetch. Until this is done the reference
+   mechanism is slow and rate-limit-fragile, and `validate` fails. Highest priority,
+   because it undermines the trustworthiness of the whole catalog.
+2. **Write the missing end-to-end test** for the script-bearing import gate: a mocked
    `fetch` producing a `scripts/`-bearing external source, asserting deny with no
-   policy, deny with a default-allow policy, and success with an explicit rule. This is
-   the gap that matters most, because the gate is a security boundary.
-2. **Apply the trust gate to local authoring, or document the exception.** Today a
+   policy, deny with a default-allow policy, and success with an explicit rule. The
+   policy semantics and the unchanged default-deny are covered, but the gate itself is a
+   security boundary and deserves direct coverage.
+3. **Apply the trust gate to local authoring, or document the exception.** Today a
    rejected external skill could be re-authored locally. Either extend the gate or state
    plainly why local authoring is trusted.
-3. **Give referenced skills an optional `description` override.** Still the single
+4. **Give referenced skills an optional `description` override.** Still the single
    highest-leverage catalog change. It unblocks `spec-driven-implementation`,
    `code-review`, `react-best-practices`, and the entire marketing set. Note
    `find-skills` is itself a casualty of this cap.
-4. **Spec the source-resolver and trust-classifier registries** (see above) so the
+5. **Spec the source-resolver and trust-classifier registries** (see above) so the
    Feishu/Lark family and future registries can be added without touching core.
-5. **Make the license requirement mechanical.** The descriptor schema has no license
+6. **Make the license requirement mechanical.** The descriptor schema has no license
    field, so excluding `vercel-labs/agent-skills` was a human judgement. A required
    `license` field plus a CI check would stop the next unlicensed source from landing.
-6. **Verify installed skills load end to end.** This proves the catalog builds, validates
-   and resolves. It does not yet prove an agent ingests one at runtime.
-7. **Resolve the pre-existing description-cap failure** on the `.agents/skills/`
-   document skills, either by trimming those descriptions or by scoping the audit.
+7. **Verify installed skills load end to end.** This proves the catalog resolves and that
+   the batch is internally consistent. It does not prove an agent ingests one at runtime.
 8. **Fix the pre-existing server typecheck break** in `server/src/routes/companies.ts`
    (the wave105 `company.emergency_stop` handler passes an actor shape missing
    `actorType`/`actorId` for `CompanyActivityActor`). Unrelated to this work but it
    blocks `pnpm --filter @paperclipai/server typecheck` for everyone.
+
+Resolved during this pass: the description-cap failure on `.agents/skills/` document
+skills was fixed by trimming those descriptions, so `shipped-catalog` is now 20/20.
+
 
