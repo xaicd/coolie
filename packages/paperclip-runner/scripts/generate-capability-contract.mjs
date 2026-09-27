@@ -141,7 +141,7 @@ function renderHandoff() {
     "## Stable Inputs",
     "",
     "- `capabilities.yaml`: every current Paperclip skill and reference heading, including its source anchor, disposition, semantic operation, and mock-state expectation.",
-    "- `mcp-tool-map.yaml`: the complete 42-tool legacy MCP replacement map.",
+    "- `mcp-tool-map.yaml`: the complete 50-tool legacy MCP replacement map.",
     "- `eval-traceability.yaml`: all 106 corpus cases in 16 groups, including fixtures, grants, operations, state projections, forbids, and browser evidence IDs.",
     "- `contract-schema.json`: required row fields and the closed disposition enum.",
     "",
@@ -183,7 +183,7 @@ async function buildContract() {
   for (const mappedToolName of Object.keys(contract.toolMappings)) {
     if (!discoveredToolNames.has(mappedToolName)) throw new Error(`MCP mapping has no registered source tool: ${mappedToolName}`);
   }
-  if (tools.length !== 42 || Object.keys(contract.toolMappings).length !== 42) throw new Error(`Expected 42 legacy MCP tools, found ${tools.length}`);
+  if (tools.length !== 50 || Object.keys(contract.toolMappings).length !== 50) throw new Error(`Expected 50 legacy MCP tools, found ${tools.length}`);
   if (evals.length !== 106 || new Set(evals.map((row) => row.group)).size !== 16) throw new Error(`Expected 106 eval cases in 16 groups, found ${evals.length}`);
 
   return {

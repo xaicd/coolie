@@ -11,7 +11,7 @@ The skill/reference inventory and eval cases are the only normative behavior sou
 - Skill/reference headings: 155
 - Eval cases: 106 across 16 groups
 - Total normative rows: 261
-- Legacy MCP aliases folded into normative rows: 42
+- Legacy MCP aliases folded into normative rows: 50
 
 | Eval group | Cases |
 | --- | ---: |
@@ -177,25 +177,25 @@ The skill/reference inventory and eval cases are the only normative behavior sou
 | skill:skills/paperclip/references/api-reference.md:option-b-two-calls-project-first-then-workspace:828 | optional_agent_tool | skills/paperclip/references/api-reference.md:828 |
 | skill:skills/paperclip/references/api-reference.md:governance-and-approvals:857 | optional_agent_tool | skills/paperclip/references/api-reference.md:857 |
 | skill:skills/paperclip/references/api-reference.md:requesting-a-hire-management-only:861 | optional_agent_tool | skills/paperclip/references/api-reference.md:861 |
-| skill:skills/paperclip/references/api-reference.md:ceo-strategy-approval:893 | optional_agent_tool | skills/paperclip/references/api-reference.md:893 |
-| skill:skills/paperclip/references/api-reference.md:questions-and-waiting-for-human-input:902 | always_agent_tool | skills/paperclip/references/api-reference.md:902 |
-| skill:skills/paperclip/references/api-reference.md:issue-thread-confirmations:993 | always_agent_tool | skills/paperclip/references/api-reference.md:993 |
-| skill:skills/paperclip/references/api-reference.md:checkbox-confirmations:1051 | always_agent_tool | skills/paperclip/references/api-reference.md:1051 |
-| skill:skills/paperclip/references/api-reference.md:item-verdict-requests:1166 | optional_agent_tool | skills/paperclip/references/api-reference.md:1166 |
-| skill:skills/paperclip/references/api-reference.md:checking-approval-status:1276 | optional_agent_tool | skills/paperclip/references/api-reference.md:1276 |
-| skill:skills/paperclip/references/api-reference.md:approval-follow-up-requesting-agent:1282 | always_agent_tool | skills/paperclip/references/api-reference.md:1282 |
-| skill:skills/paperclip/references/api-reference.md:issue-lifecycle:1300 | always_agent_tool | skills/paperclip/references/api-reference.md:1300 |
-| skill:skills/paperclip/references/api-reference.md:error-handling:1330 | control_plane_owned | skills/paperclip/references/api-reference.md:1330 |
-| skill:skills/paperclip/references/api-reference.md:full-api-reference:1344 | optional_agent_tool | skills/paperclip/references/api-reference.md:1344 |
-| skill:skills/paperclip/references/api-reference.md:agents:1346 | optional_agent_tool | skills/paperclip/references/api-reference.md:1346 |
-| skill:skills/paperclip/references/api-reference.md:issues-tasks:1367 | optional_agent_tool | skills/paperclip/references/api-reference.md:1367 |
-| skill:skills/paperclip/references/api-reference.md:companies-projects-goals:1407 | optional_agent_tool | skills/paperclip/references/api-reference.md:1407 |
-| skill:skills/paperclip/references/api-reference.md:routines:1431 | optional_agent_tool | skills/paperclip/references/api-reference.md:1431 |
-| skill:skills/paperclip/references/api-reference.md:approvals-costs-activity-dashboard:1447 | optional_agent_tool | skills/paperclip/references/api-reference.md:1447 |
-| skill:skills/paperclip/references/api-reference.md:secrets:1469 | optional_agent_tool | skills/paperclip/references/api-reference.md:1469 |
-| skill:skills/paperclip/references/api-reference.md:agent-secret-proposals:1482 | optional_agent_tool | skills/paperclip/references/api-reference.md:1482 |
-| skill:skills/paperclip/references/api-reference.md:agent-secret-access:1582 | optional_agent_tool | skills/paperclip/references/api-reference.md:1582 |
-| skill:skills/paperclip/references/api-reference.md:common-mistakes:1622 | optional_agent_tool | skills/paperclip/references/api-reference.md:1622 |
+| skill:skills/paperclip/references/api-reference.md:ceo-strategy-approval:926 | optional_agent_tool | skills/paperclip/references/api-reference.md:926 |
+| skill:skills/paperclip/references/api-reference.md:questions-and-waiting-for-human-input:935 | always_agent_tool | skills/paperclip/references/api-reference.md:935 |
+| skill:skills/paperclip/references/api-reference.md:issue-thread-confirmations:1032 | always_agent_tool | skills/paperclip/references/api-reference.md:1032 |
+| skill:skills/paperclip/references/api-reference.md:checkbox-confirmations:1090 | always_agent_tool | skills/paperclip/references/api-reference.md:1090 |
+| skill:skills/paperclip/references/api-reference.md:item-verdict-requests:1205 | optional_agent_tool | skills/paperclip/references/api-reference.md:1205 |
+| skill:skills/paperclip/references/api-reference.md:checking-approval-status:1315 | optional_agent_tool | skills/paperclip/references/api-reference.md:1315 |
+| skill:skills/paperclip/references/api-reference.md:approval-follow-up-requesting-agent:1321 | always_agent_tool | skills/paperclip/references/api-reference.md:1321 |
+| skill:skills/paperclip/references/api-reference.md:issue-lifecycle:1339 | always_agent_tool | skills/paperclip/references/api-reference.md:1339 |
+| skill:skills/paperclip/references/api-reference.md:error-handling:1369 | control_plane_owned | skills/paperclip/references/api-reference.md:1369 |
+| skill:skills/paperclip/references/api-reference.md:full-api-reference:1383 | optional_agent_tool | skills/paperclip/references/api-reference.md:1383 |
+| skill:skills/paperclip/references/api-reference.md:agents:1385 | optional_agent_tool | skills/paperclip/references/api-reference.md:1385 |
+| skill:skills/paperclip/references/api-reference.md:issues-tasks:1406 | optional_agent_tool | skills/paperclip/references/api-reference.md:1406 |
+| skill:skills/paperclip/references/api-reference.md:companies-projects-goals:1446 | optional_agent_tool | skills/paperclip/references/api-reference.md:1446 |
+| skill:skills/paperclip/references/api-reference.md:routines:1470 | optional_agent_tool | skills/paperclip/references/api-reference.md:1470 |
+| skill:skills/paperclip/references/api-reference.md:approvals-costs-activity-dashboard:1486 | optional_agent_tool | skills/paperclip/references/api-reference.md:1486 |
+| skill:skills/paperclip/references/api-reference.md:secrets:1508 | optional_agent_tool | skills/paperclip/references/api-reference.md:1508 |
+| skill:skills/paperclip/references/api-reference.md:agent-secret-proposals:1521 | optional_agent_tool | skills/paperclip/references/api-reference.md:1521 |
+| skill:skills/paperclip/references/api-reference.md:agent-secret-access:1621 | optional_agent_tool | skills/paperclip/references/api-reference.md:1621 |
+| skill:skills/paperclip/references/api-reference.md:common-mistakes:1661 | optional_agent_tool | skills/paperclip/references/api-reference.md:1661 |
 
 ## Legacy MCP Alias Index
 
@@ -203,45 +203,53 @@ This is a compatibility/traceability index, not a tool catalog. “Inherited dis
 
 | Legacy MCP name | Folded into normative row | Inherited disposition | Source anchor |
 | --- | --- | --- | --- |
-| paperclipMe | eval:hb-inbox-lite-01 | control_plane_owned | packages/mcp-server/src/tools.ts:290 |
-| paperclipInboxLite | eval:hb-inbox-lite-01 | control_plane_owned | packages/mcp-server/src/tools.ts:296 |
-| paperclipListAgents | eval:rf-api-mgr-heartbeat-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:302 |
-| paperclipListSkills | eval:rf-cskill-audit-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:308 |
-| paperclipGetAgent | eval:rf-api-mgr-heartbeat-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:314 |
-| paperclipListIssues | eval:se-q-filters-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:323 |
-| paperclipGetIssue | eval:se-get-issue-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:338 |
-| paperclipGetHeartbeatContext | eval:hb-context-01 | control_plane_owned | packages/mcp-server/src/tools.ts:344 |
-| paperclipListComments | eval:se-get-issue-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:353 |
-| paperclipGetComment | eval:hb-wake-comment-01 | control_plane_owned | packages/mcp-server/src/tools.ts:366 |
-| paperclipListIssueApprovals | eval:ap-board-approval-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:373 |
-| paperclipListDocuments | eval:dp-base-revision-01 | always_agent_tool | packages/mcp-server/src/tools.ts:379 |
-| paperclipGetDocument | eval:dp-base-revision-01 | always_agent_tool | packages/mcp-server/src/tools.ts:385 |
-| paperclipListDocumentRevisions | eval:dp-base-revision-01 | always_agent_tool | packages/mcp-server/src/tools.ts:392 |
-| paperclipListProjects | eval:rf-wf-project-setup-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:402 |
-| paperclipGetProject | eval:rf-wf-project-setup-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:408 |
-| paperclipGetIssueWorkspaceRuntime | eval:rf-iws-start-url-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:417 |
-| paperclipControlIssueWorkspaceServices | eval:rf-iws-start-url-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:423 |
-| paperclipWaitForIssueWorkspaceService | eval:rf-iws-target-restart-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:440 |
-| paperclipListGoals | eval:su-parent-goal-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:466 |
-| paperclipGetGoal | eval:su-parent-goal-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:472 |
-| paperclipListApprovals | eval:ap-approval-wake-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:478 |
-| paperclipCreateApproval | eval:ap-board-approval-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:487 |
-| paperclipGetApproval | eval:ap-approval-wake-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:496 |
-| paperclipGetApprovalIssues | eval:ap-approval-wake-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:502 |
-| paperclipListApprovalComments | eval:ap-approval-deny-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:508 |
-| paperclipCreateIssue | eval:su-parent-goal-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:514 |
-| paperclipUpdateIssue | eval:st-done-comment-01 | always_agent_tool | packages/mcp-server/src/tools.ts:521 |
-| paperclipCheckoutIssue | eval:co-body-contract-01 | control_plane_owned | packages/mcp-server/src/tools.ts:528 |
-| paperclipReleaseIssue | eval:er-release-01 | control_plane_owned | packages/mcp-server/src/tools.ts:540 |
-| paperclipAddComment | eval:cm-multiline-01 | always_agent_tool | packages/mcp-server/src/tools.ts:546 |
-| paperclipSuggestTasks | eval:ix-suggest-tasks-01 | always_agent_tool | packages/mcp-server/src/tools.ts:553 |
-| paperclipAskUserQuestions | eval:ix-questions-01 | always_agent_tool | packages/mcp-server/src/tools.ts:565 |
-| paperclipRequestConfirmation | eval:ix-confirmation-plan-01 | always_agent_tool | packages/mcp-server/src/tools.ts:577 |
-| paperclipRequestCheckboxConfirmation | eval:ix-checkbox-01 | always_agent_tool | packages/mcp-server/src/tools.ts:589 |
-| paperclipUpsertIssueDocument | eval:dp-plan-doc-01 | always_agent_tool | packages/mcp-server/src/tools.ts:601 |
-| paperclipRestoreIssueDocumentRevision | eval:dp-base-revision-01 | always_agent_tool | packages/mcp-server/src/tools.ts:612 |
-| paperclipLinkIssueApproval | eval:ap-board-approval-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:627 |
-| paperclipUnlinkIssueApproval | eval:ap-board-approval-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:636 |
-| paperclipApprovalDecision | eval:ap-approval-wake-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:646 |
-| paperclipAddApprovalComment | eval:ap-approval-deny-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:668 |
-| paperclipApiRequest | eval:rf-api-404-report-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:677 |
+| paperclipMe | eval:hb-inbox-lite-01 | control_plane_owned | packages/mcp-server/src/tools.ts:336 |
+| paperclipInboxLite | eval:hb-inbox-lite-01 | control_plane_owned | packages/mcp-server/src/tools.ts:342 |
+| paperclipGetCompanyDashboard | eval:rf-api-mgr-heartbeat-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:348 |
+| paperclipListAgents | eval:rf-api-mgr-heartbeat-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:355 |
+| paperclipListSkills | eval:rf-cskill-audit-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:361 |
+| paperclipGetAgent | eval:rf-api-mgr-heartbeat-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:367 |
+| paperclipListIssues | eval:se-q-filters-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:376 |
+| paperclipGetIssue | eval:se-get-issue-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:391 |
+| paperclipGetHeartbeatContext | eval:hb-context-01 | control_plane_owned | packages/mcp-server/src/tools.ts:397 |
+| paperclipListComments | eval:se-get-issue-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:406 |
+| paperclipGetComment | eval:hb-wake-comment-01 | control_plane_owned | packages/mcp-server/src/tools.ts:419 |
+| paperclipListIssueApprovals | eval:ap-board-approval-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:426 |
+| paperclipListDocuments | eval:dp-base-revision-01 | always_agent_tool | packages/mcp-server/src/tools.ts:432 |
+| paperclipGetDocument | eval:dp-base-revision-01 | always_agent_tool | packages/mcp-server/src/tools.ts:438 |
+| paperclipListDocumentRevisions | eval:dp-base-revision-01 | always_agent_tool | packages/mcp-server/src/tools.ts:445 |
+| paperclipListProjects | eval:rf-wf-project-setup-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:455 |
+| paperclipGetProject | eval:rf-wf-project-setup-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:461 |
+| paperclipCreateProject | eval:rf-wf-project-setup-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:470 |
+| paperclipUpdateProject | eval:rf-wf-project-setup-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:477 |
+| paperclipListProjectWorkspaces | eval:rf-wf-project-setup-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:484 |
+| paperclipCreateProjectWorkspace | eval:rf-wf-project-setup-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:491 |
+| paperclipControlProjectWorkspaceRuntime | eval:rf-iws-start-url-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:498 |
+| paperclipDispatchTaskToRole | eval:su-parent-goal-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:509 |
+| paperclipRecordBossDecision | eval:dp-plan-doc-01 | always_agent_tool | packages/mcp-server/src/tools.ts:549 |
+| paperclipGetIssueWorkspaceRuntime | eval:rf-iws-start-url-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:576 |
+| paperclipControlIssueWorkspaceServices | eval:rf-iws-start-url-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:582 |
+| paperclipWaitForIssueWorkspaceService | eval:rf-iws-target-restart-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:599 |
+| paperclipListGoals | eval:su-parent-goal-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:625 |
+| paperclipGetGoal | eval:su-parent-goal-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:631 |
+| paperclipListApprovals | eval:ap-approval-wake-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:637 |
+| paperclipCreateApproval | eval:ap-board-approval-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:646 |
+| paperclipGetApproval | eval:ap-approval-wake-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:655 |
+| paperclipGetApprovalIssues | eval:ap-approval-wake-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:661 |
+| paperclipListApprovalComments | eval:ap-approval-deny-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:667 |
+| paperclipCreateIssue | eval:su-parent-goal-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:673 |
+| paperclipUpdateIssue | eval:st-done-comment-01 | always_agent_tool | packages/mcp-server/src/tools.ts:680 |
+| paperclipCheckoutIssue | eval:co-body-contract-01 | control_plane_owned | packages/mcp-server/src/tools.ts:687 |
+| paperclipReleaseIssue | eval:er-release-01 | control_plane_owned | packages/mcp-server/src/tools.ts:699 |
+| paperclipAddComment | eval:cm-multiline-01 | always_agent_tool | packages/mcp-server/src/tools.ts:705 |
+| paperclipSuggestTasks | eval:ix-suggest-tasks-01 | always_agent_tool | packages/mcp-server/src/tools.ts:712 |
+| paperclipAskUserQuestions | eval:ix-questions-01 | always_agent_tool | packages/mcp-server/src/tools.ts:724 |
+| paperclipRequestConfirmation | eval:ix-confirmation-plan-01 | always_agent_tool | packages/mcp-server/src/tools.ts:736 |
+| paperclipRequestCheckboxConfirmation | eval:ix-checkbox-01 | always_agent_tool | packages/mcp-server/src/tools.ts:748 |
+| paperclipUpsertIssueDocument | eval:dp-plan-doc-01 | always_agent_tool | packages/mcp-server/src/tools.ts:760 |
+| paperclipRestoreIssueDocumentRevision | eval:dp-base-revision-01 | always_agent_tool | packages/mcp-server/src/tools.ts:771 |
+| paperclipLinkIssueApproval | eval:ap-board-approval-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:786 |
+| paperclipUnlinkIssueApproval | eval:ap-board-approval-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:795 |
+| paperclipApprovalDecision | eval:ap-approval-wake-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:805 |
+| paperclipAddApprovalComment | eval:ap-approval-deny-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:827 |
+| paperclipApiRequest | eval:rf-api-404-report-01 | optional_agent_tool | packages/mcp-server/src/tools.ts:836 |

@@ -53,7 +53,15 @@
     "paperclipUnlinkIssueApproval": ["optional_agent_tool", "unlink_approval"],
     "paperclipApprovalDecision": ["optional_agent_tool", "decide_approval"],
     "paperclipAddApprovalComment": ["optional_agent_tool", "comment_on_approval"],
-    "paperclipApiRequest": ["optional_agent_tool", "test_only_api_escape_hatch"]
+    "paperclipApiRequest": ["optional_agent_tool", "test_only_api_escape_hatch"],
+    "paperclipGetCompanyDashboard": ["optional_agent_tool", "get_company_dashboard"],
+    "paperclipCreateProject": ["optional_agent_tool", "create_project"],
+    "paperclipUpdateProject": ["optional_agent_tool", "update_project"],
+    "paperclipListProjectWorkspaces": ["optional_agent_tool", "list_project_workspaces"],
+    "paperclipCreateProjectWorkspace": ["optional_agent_tool", "create_project_workspace"],
+    "paperclipControlProjectWorkspaceRuntime": ["optional_agent_tool", "control_project_workspace_runtime"],
+    "paperclipDispatchTaskToRole": ["optional_agent_tool", "dispatch_task_to_role"],
+    "paperclipRecordBossDecision": ["always_agent_tool", "record_boss_decision"]
   },
   "evalGroups": {
     "hb": ["control_plane_owned", "control_plane_invariant", "get_task_context", "active_task_context"],

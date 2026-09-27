@@ -1406,12 +1406,12 @@ export function companyRoutes(db: Db, storage?: StorageService, options?: Compan
   router.post("/:companyId/emergency-stop", async (req, res) => {
     const companyId = req.params.companyId as string;
     // board-only: 与 PATCH 区分 — 熔断是不可逆敏感动作
-    const actor = req.actor;
-    if (actor?.type !== "board") {
+    if (req.actor?.type !== "board") {
       res.status(403).json({ error: "仅董事会成员可触发紧急熔断" });
       return;
     }
     await assertSameCompanyCeoAgentOrBoard(req, companyId, "company emergency stop");
+    const actor = getActorInfo(req);
     const body = emergencyStopSchema.parse(req.body);
 
     const existing = await svc.getById(companyId);
@@ -1431,8 +1431,8 @@ export function companyRoutes(db: Db, storage?: StorageService, options?: Compan
     const updated = await svc.update(companyId, { status: "paused" }, actor);
     await logActivity(db, {
       companyId,
-      actorType: "user",
-      actorId: actor.userId ?? "board",
+      actorType: actor.actorType,
+      actorId: actor.actorId,
       agentId: actor.agentId,
       runId: actor.runId,
       agentApiKeyId: actor.agentApiKeyId,
@@ -1447,12 +1447,12 @@ export function companyRoutes(db: Db, storage?: StorageService, options?: Compan
   /** 解除熔断 — 把 companies.status 切回 active。沿用同样的 board-only 鉴权。 */
   router.post("/:companyId/emergency-resume", async (req, res) => {
     const companyId = req.params.companyId as string;
-    const actor = req.actor;
-    if (actor?.type !== "board") {
+    if (req.actor?.type !== "board") {
       res.status(403).json({ error: "仅董事会成员可解除紧急熔断" });
       return;
     }
     await assertSameCompanyCeoAgentOrBoard(req, companyId, "company emergency resume");
+    const actor = getActorInfo(req);
     const existing = await svc.getById(companyId);
     if (!existing) {
       res.status(404).json({ error: "Company not found" });
@@ -1465,8 +1465,8 @@ export function companyRoutes(db: Db, storage?: StorageService, options?: Compan
     const updated = await svc.update(companyId, { status: "active" }, actor);
     await logActivity(db, {
       companyId,
-      actorType: "user",
-      actorId: actor.userId ?? "board",
+      actorType: actor.actorType,
+      actorId: actor.actorId,
       agentId: actor.agentId,
       runId: actor.runId,
       agentApiKeyId: actor.agentApiKeyId,
