@@ -410,6 +410,29 @@ export class CoolieClient extends BaseCoolieClient {
     );
   }
 
+  /** POST /api/companies/:id/projects — 原生极速立项 */
+  async createProject(
+    companyId: string,
+    input: {
+      name: string;
+      description?: string;
+      status?: "planned" | "in_progress";
+      targetDate?: string;
+      workspace?: {
+        name?: string;
+        cwd?: string;
+        repoUrl?: string;
+        branch?: string;
+      };
+    },
+  ): Promise<Project> {
+    return this.request<Project>(
+      "POST",
+      `/api/companies/${encodeURIComponent(companyId)}/projects`,
+      input,
+    );
+  }
+
   /** GET /api/companies/:id/costs/by-agent — 按智能体聚合 token/花费 */
   async costsByAgent(companyId: string): Promise<AgentCostRow[]> {
     return this.request<AgentCostRow[]>(

@@ -85,6 +85,109 @@ function resolvePreviewUrl(
   return { url: snap, isSnapshot: !!snap };
 }
 
+function generateMarkdownHtml(title: string, md: string): string {
+  const lines = md.split("\n");
+  let inCode = false;
+  const codeBuffer: string[] = [];
+  const htmlLines: string[] = [];
+
+  for (const line of lines) {
+    if (line.startsWith("```")) {
+      if (inCode) {
+        htmlLines.push(`<pre><code>${codeBuffer.join("\n")}</code></pre>`);
+        codeBuffer.length = 0;
+        inCode = false;
+      } else {
+        inCode = true;
+      }
+      continue;
+    }
+    if (inCode) {
+      codeBuffer.push(line.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"));
+      continue;
+    }
+
+    if (line.startsWith("# ")) {
+      htmlLines.push(`<h1>${line.slice(2)}</h1>`);
+    } else if (line.startsWith("## ")) {
+      htmlLines.push(`<h2>${line.slice(3)}</h2>`);
+    } else if (line.startsWith("### ")) {
+      htmlLines.push(`<h3>${line.slice(4)}</h3>`);
+    } else if (line.startsWith("> ")) {
+      htmlLines.push(`<blockquote>${line.slice(2)}</blockquote>`);
+    } else if (line.startsWith("- ") || line.startsWith("* ")) {
+      htmlLines.push(`<li>${line.slice(2)}</li>`);
+    } else if (line.trim().length === 0) {
+      htmlLines.push(`<div style="height: 8px;"></div>`);
+    } else {
+      const formatted = line
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>")
+        .replace(/`([^`]+)`/g, "<code>$1</code>");
+      htmlLines.push(`<p>${formatted}</p>`);
+    }
+  }
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>${title}</title>
+  <style>
+    body {
+      background-color: #08090A;
+      color: #E6E6E6;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      padding: 16px 20px 48px;
+      line-height: 1.6;
+      font-size: 15px;
+    }
+    h1 { font-size: 20px; color: #FFFFFF; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 8px; margin-top: 16px; }
+    h2 { font-size: 17px; color: #FFFFFF; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 6px; margin-top: 16px; }
+    h3 { font-size: 15px; color: #9BA1A6; margin-top: 14px; }
+    p { margin: 8px 0; color: #E6E6E6; }
+    li { margin: 4px 0; color: #D1D5DB; }
+    code {
+      background: #191A1B;
+      color: #828FFF;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 13px;
+      font-family: monospace;
+    }
+    pre {
+      background: #191A1B;
+      border: 1px solid rgba(255,255,255,0.08);
+      padding: 12px;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 12px 0;
+    }
+    pre code {
+      background: transparent;
+      padding: 0;
+      color: #34D399;
+    }
+    blockquote {
+      border-left: 3px solid #5E6AD2;
+      background: rgba(94,106,210,0.08);
+      margin: 12px 0;
+      padding: 8px 14px;
+      border-radius: 0 6px 6px 0;
+      color: #9BA1A6;
+    }
+    strong { color: #FFFFFF; font-weight: 600; }
+  </style>
+</head>
+<body>
+  ${htmlLines.join("\n")}
+</body>
+</html>`;
+}
+
 export function PrototypeSandboxScreen({
   company: _company,
   initialUrl,
@@ -96,6 +199,7 @@ export function PrototypeSandboxScreen({
   const [loading, setLoading] = useState<boolean>(true);
   const [webLoading, setWebLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [markdownHtml, setMarkdownHtml] = useState<string | null>(null);
   const [{ url, isSnapshot }, setResolved] = useState<{
     url: string | null;
     isSnapshot: boolean;
@@ -103,8 +207,24 @@ export function PrototypeSandboxScreen({
 
   // DS 真值: useEffect(resolve, [sessionId]); 我们重入参 resolve() 一次
   useEffect(() => {
-    setResolved(resolvePreviewUrl(_service, workProduct, initialUrl, bust));
+    const next = resolvePreviewUrl(_service, workProduct, initialUrl, bust);
+    setResolved(next);
     setLoading(false);
+
+    if (next.url && (next.url.endsWith(".md") || next.url.endsWith(".txt") || next.url.includes("/docs/"))) {
+      fetch(next.url)
+        .then((res) => res.text())
+        .then((text) => setMarkdownHtml(generateMarkdownHtml(workProduct?.title ?? "产物文档", text)))
+        .catch(() => {
+          if (workProduct?.summary) {
+            setMarkdownHtml(generateMarkdownHtml(workProduct.title ?? "产物概览", workProduct.summary));
+          }
+        });
+    } else if (!next.url && workProduct?.summary) {
+      setMarkdownHtml(generateMarkdownHtml(workProduct.title ?? "产物概览", workProduct.summary));
+    } else {
+      setMarkdownHtml(null);
+    }
   }, [_service, workProduct, initialUrl, bust]);
 
   const handleRefresh = useCallback(() => {
@@ -124,10 +244,10 @@ export function PrototypeSandboxScreen({
   }, [url]);
 
   // DS 真值: Web 端降级为「在浏览器打开」; 我们也是
-  const canWebView = !!url && Platform.OS !== "web";
+  const canWebView = (!!url || !!markdownHtml) && Platform.OS !== "web";
 
-  // DS 真值: 没链接就直接告诉他「暂无可用预览」, 不堆输入框
-  if (!url) {
+  // DS 真值: 没链接且无可用预览内容就直接告诉他「暂无可用预览」
+  if (!url && !markdownHtml) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="light" />
@@ -199,8 +319,8 @@ export function PrototypeSandboxScreen({
         </View>
       ) : canWebView ? (
         <WebView
-          key={isSnapshot ? url : `${url}`}
-          source={{ uri: url }}
+          key={markdownHtml ? "markdown-preview" : isSnapshot ? url : `${url}`}
+          source={markdownHtml ? { html: markdownHtml } : { uri: url ?? "" }}
           style={styles.web}
           originWhitelist={["*"]}
           javaScriptEnabled

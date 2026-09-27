@@ -18,6 +18,7 @@ import { LoadingState } from "../ui/LoadingState";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { StatusDot } from "../components/StatusDot";
 import { ApiContractSheet } from "../components/ApiContractSheet";
+import { CreateProjectSheet } from "../components/CreateProjectSheet";
 
 type StatusFilter = "all" | "in_progress" | "planned" | "completed" | "paused";
 
@@ -95,6 +96,7 @@ export function ProjectsScreen({
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
   const [expandedProjectId, setExpandedProjectId] = useState<string | null>(null);
   const [activeApiContractProject, setActiveApiContractProject] = useState<Project | null>(null);
+  const [showCreateSheet, setShowCreateSheet] = useState(false);
 
   const load = useCallback(
     async (isRefresh = false) => {
@@ -223,18 +225,16 @@ export function ProjectsScreen({
             <View style={styles.repoSourcePill}><Text style={styles.repoSourcePillText}>Gitee (码云)</Text></View>
             <View style={styles.repoSourcePill}><Text style={styles.repoSourcePillText}>私有 SSH/HTTPS</Text></View>
           </View>
-          {onOpenWebProjects ? (
-            <Pressable
-              style={({ pressed }) => [styles.newProjectBtn, pressed && styles.newProjectBtnPressed]}
-              onPress={() => onOpenWebProjects("/projects", "项目中心 · 新建多源项目")}
-              accessibilityLabel="新建多源代码库项目"
-            >
-              <Ionicons name="add-circle-outline" size={15} color={C.ink} style={{ marginRight: 4 }} />
-              <Text style={styles.newProjectBtnText} numberOfLines={1}>
-                新建多源项目 / 导入代码库
-              </Text>
-            </Pressable>
-          ) : null}
+          <Pressable
+            style={({ pressed }) => [styles.newProjectBtn, pressed && styles.newProjectBtnPressed]}
+            onPress={() => setShowCreateSheet(true)}
+            accessibilityLabel="新建多源代码库项目"
+          >
+            <Ionicons name="add-circle-outline" size={15} color={C.ink} style={{ marginRight: 4 }} />
+            <Text style={styles.newProjectBtnText} numberOfLines={1}>
+              极速立项 / 导入代码库
+            </Text>
+          </Pressable>
         </AppCard>
 
         {loading && !refreshing ? (
@@ -565,18 +565,26 @@ export function ProjectsScreen({
         )}
       </ScrollView>
 
-      {/* 右下角浮起 [+ 新建项目] — wave114: 与 TasksScreen 的「+ 新建任务」一致,
-          让出底部 TabBar, 不再挤在过滤条右端像浮错位置。 */}
-      {onOpenWebProjects ? (
-        <Pressable
-          style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
-          onPress={() => onOpenWebProjects("/projects", "项目中心 · 新建多源项目")}
-          accessibilityLabel="新建多源项目"
-        >
-          <Ionicons name="add" size={20} color="#FFFFFF" />
-          <Text style={styles.fabText}>新建项目</Text>
-        </Pressable>
-      ) : null}
+      {/* 右下角浮起 [+ 极速立项] */}
+      <Pressable
+        style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
+        onPress={() => setShowCreateSheet(true)}
+        accessibilityLabel="极速立项"
+      >
+        <Ionicons name="add" size={20} color="#FFFFFF" />
+        <Text style={styles.fabText}>极速立项</Text>
+      </Pressable>
+
+      {/* 原生极速立项与多源工作区挂载抽屉 */}
+      <CreateProjectSheet
+        company={company}
+        visible={showCreateSheet}
+        onClose={() => setShowCreateSheet(false)}
+        onCreated={(newProj) => {
+          void load(true);
+          setExpandedProjectId(newProj.id);
+        }}
+      />
 
       {/* 原生 API 契约与 DSH 生命周期速览抽屉 */}
       {activeApiContractProject ? (
