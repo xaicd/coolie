@@ -1,0 +1,27 @@
+{
+  "source": {
+    "type": "github",
+    "hostname": "github.com",
+    "owner": "anthropics",
+    "repo": "knowledge-work-plugins",
+    "ref": "main",
+    "commit": "da38ec1ee89d41e5380e652a97382695003396e7",
+    "path": "finance/skills/variance-analysis"
+  },
+  "files": [
+    "SKILL.md"
+  ],
+  "defaultInstall": false,
+  "recommendedForRoles": [
+    "cfo",
+    "ds"
+  ],
+  "requires": [],
+  "tags": [
+    "finance",
+    "variance",
+    "budget",
+    "reporting",
+    "analysis"
+  ]
+}

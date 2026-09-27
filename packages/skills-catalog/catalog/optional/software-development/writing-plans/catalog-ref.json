@@ -1,0 +1,29 @@
+{
+  "source": {
+    "type": "github",
+    "hostname": "github.com",
+    "owner": "obra",
+    "repo": "superpowers",
+    "ref": "main",
+    "commit": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
+    "path": "skills/writing-plans"
+  },
+  "files": [
+    "SKILL.md"
+  ],
+  "defaultInstall": false,
+  "recommendedForRoles": [
+    "ceo",
+    "cto",
+    "core-swe",
+    "fda",
+    "pm"
+  ],
+  "requires": [],
+  "tags": [
+    "planning",
+    "design-doc",
+    "task-breakdown",
+    "spec"
+  ]
+}

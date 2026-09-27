@@ -39,7 +39,7 @@ import {
   issueService,
   logActivity,
 } from "../services/index.js";
-import { isGitRepoSkillImportSource, parseSkillImportSourceInput } from "../services/company-skills.js";
+import { isGitRepoSkillImportSource, parseSkillImportSourceInput, type ScriptBearingImportAuthorization } from "../services/company-skills.js";
 import {
   getCatalogSkillOrThrow,
   listCatalogSkillsOrEmpty,
@@ -193,6 +193,45 @@ export function companySkillRoutes(db: Db) {
         isGitRepoSkillImportSource(resolvedSource) ? "git" : /^https?:\/\//i.test(resolvedSource) ? "external_package" : "workspace",
       ),
       sourceLocator: normalizeSkillPolicySourceLocator(resolvedSource),
+    };
+  }
+
+  /**
+   * Opts a company into importing an external skill whose payload carries a scripts/
+   * directory. The trust level is only known after the source has been fetched, so this
+   * cannot be decided up front like `skillImportPolicyResource`.
+   *
+   * The bar is a *deliberate* policy rule: the company must have written an allow rule
+   * that matches the resource. The default-allow outcomes (`no_policy_default`,
+   * `policy_default`) and the legacy grant fallback do not qualify, so today's
+   * hard-deny stays the default until an administrator explicitly changes it.
+   */
+  function scriptBearingImportAuthorizer(req: Request, companyId: string) {
+    return async (input: ScriptBearingImportAuthorization) => {
+      const decision = await skillPolicies.evaluate({
+        companyId,
+        principal: await skillPolicyPrincipal(req, companyId),
+        action: "skills.import",
+        resource: {
+          skillKey: input.skillKey,
+          sourceType: normalizeSkillPolicySourceType(input.sourceType),
+          trustLevel: "scripts_executables",
+          ...(input.sourceLocator
+            ? { sourceLocator: normalizeSkillPolicySourceLocator(input.sourceLocator) }
+            : {}),
+        },
+      });
+      if (decision.allowed && decision.reason === "explicit_rule") return;
+      throw forbidden(
+        "Skill import denied: the source contains executable scripts and no company policy rule explicitly allows script-bearing skill imports",
+        {
+          code: "scripts_executables_denied",
+          trustLevel: "scripts_executables",
+          skillSlug: input.skillSlug,
+          sourceType: input.sourceType,
+          policyReason: decision.reason,
+        },
+      );
     };
   }
 
@@ -1169,7 +1208,9 @@ export function companySkillRoutes(db: Db) {
       const companyId = req.params.companyId as string;
       const source = String(req.body.source ?? "");
       await assertCanMutateCompanySkills(req, companyId, "skills.import", () => skillImportPolicyResource(source));
-      const result = await svc.importFromSource(companyId, source);
+      const result = await svc.importFromSource(companyId, source, {
+        authorizeScriptBearingImport: scriptBearingImportAuthorizer(req, companyId),
+      });
 
       const actor = getActorInfo(req);
       await logActivity(db, {
@@ -1186,6 +1227,7 @@ export function companySkillRoutes(db: Db) {
           source,
           importedCount: result.imported.length,
           importedSlugs: result.imported.map((skill) => skill.slug),
+          importedTrustLevels: result.imported.map((skill) => skill.trustLevel),
           warningCount: result.warnings.length,
         },
       });

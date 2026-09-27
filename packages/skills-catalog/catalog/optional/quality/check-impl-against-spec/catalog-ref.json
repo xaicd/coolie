@@ -1,0 +1,29 @@
+{
+  "source": {
+    "type": "github",
+    "hostname": "github.com",
+    "owner": "warpdotdev",
+    "repo": "common-skills",
+    "ref": "main",
+    "commit": "69b4753651ab7fab518c82be087b9f1d5b966631",
+    "path": ".agents/skills/check-impl-against-spec"
+  },
+  "files": [
+    "SKILL.md"
+  ],
+  "defaultInstall": false,
+  "recommendedForRoles": [
+    "qa",
+    "core-swe",
+    "fda",
+    "cto"
+  ],
+  "requires": [],
+  "tags": [
+    "spec",
+    "review",
+    "verification",
+    "cmmi",
+    "change-control"
+  ]
+}

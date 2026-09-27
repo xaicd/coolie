@@ -1,0 +1,28 @@
+{
+  "source": {
+    "type": "github",
+    "hostname": "github.com",
+    "owner": "obra",
+    "repo": "superpowers",
+    "ref": "main",
+    "commit": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
+    "path": "skills/verification-before-completion"
+  },
+  "files": [
+    "SKILL.md"
+  ],
+  "defaultInstall": false,
+  "recommendedForRoles": [
+    "qa",
+    "core-swe",
+    "fdse",
+    "pre-sre"
+  ],
+  "requires": [],
+  "tags": [
+    "verification",
+    "evidence",
+    "definition-of-done",
+    "testing"
+  ]
+}

@@ -279,17 +279,45 @@ function isPinnedCommitRef(value: string | null | undefined) {
   return Boolean(value && /^[0-9a-f]{40}$/i.test(value.trim()));
 }
 
-function assertImportedSkillSourceAllowed(skill: ImportedSkill) {
+export type ScriptBearingImportAuthorization = {
+  skillKey: string;
+  skillSlug: string;
+  sourceType: CompanySkillSourceType;
+  sourceLocator: string | null;
+};
+
+/**
+ * Authorizes an external skill whose payload contains a scripts/ directory. The default
+ * (no authorizer) is a hard deny, so every existing caller keeps today's behaviour. A
+ * caller only supplies one to opt a company into script-bearing imports under its own
+ * policy; it must throw to deny.
+ */
+export type ScriptBearingImportAuthorizer = (
+  input: ScriptBearingImportAuthorization,
+) => Promise<void>;
+
+async function assertImportedSkillSourceAllowed(
+  skill: ImportedSkill,
+  authorizeScriptBearingImport?: ScriptBearingImportAuthorizer,
+) {
   if (!EXTERNAL_SKILL_SOURCE_TYPES.has(skill.sourceType)) return;
   if (skill.trustLevel === "scripts_executables") {
-    throw unprocessable(
-      `External skill source "${skill.slug}" contains executable scripts and cannot be imported.`,
-      {
-        sourceType: skill.sourceType,
-        trustLevel: skill.trustLevel,
-        reason: "scripts_executables_blocked",
-      },
-    );
+    if (!authorizeScriptBearingImport) {
+      throw unprocessable(
+        `External skill source "${skill.slug}" contains executable scripts and cannot be imported.`,
+        {
+          sourceType: skill.sourceType,
+          trustLevel: skill.trustLevel,
+          reason: "scripts_executables_blocked",
+        },
+      );
+    }
+    await authorizeScriptBearingImport({
+      skillKey: skill.key,
+      skillSlug: skill.slug,
+      sourceType: skill.sourceType,
+      sourceLocator: skill.sourceLocator,
+    });
   }
   if ((skill.sourceType === "github" || skill.sourceType === "skills_sh") && !isPinnedCommitRef(skill.sourceRef)) {
     throw unprocessable(
@@ -6025,7 +6053,7 @@ export function companySkillService(db: Db) {
     // package before returning the existing skill.
     for (const skill of importedSkills) {
       assertImportedSkillKeyAllowed(skill);
-      assertImportedSkillSourceAllowed(skill);
+      await assertImportedSkillSourceAllowed(skill);
     }
 
     for (const skill of importedSkills) {
@@ -6151,11 +6179,12 @@ export function companySkillService(db: Db) {
     companyId: string,
     imported: ImportedSkill[],
     database: DbOrTransaction = db,
+    authorizeScriptBearingImport?: ScriptBearingImportAuthorizer,
   ): Promise<CompanySkill[]> {
     const out: CompanySkill[] = [];
     for (const skill of imported) {
       assertImportedSkillKeyAllowed(skill);
-      assertImportedSkillSourceAllowed(skill);
+      await assertImportedSkillSourceAllowed(skill, authorizeScriptBearingImport);
       const existing = await getByKey(companyId, skill.key, database);
       const existingMeta = existing ? getSkillMeta(existing) : {};
       const incomingMeta = skill.metadata && isPlainRecord(skill.metadata) ? skill.metadata : {};
@@ -6235,7 +6264,11 @@ export function companySkillService(db: Db) {
     return out;
   }
 
-  async function importFromSource(companyId: string, source: string): Promise<CompanySkillImportResult> {
+  async function importFromSource(
+    companyId: string,
+    source: string,
+    options: { authorizeScriptBearingImport?: ScriptBearingImportAuthorizer } = {},
+  ): Promise<CompanySkillImportResult> {
     await ensureSkillInventoryCurrent(companyId);
     const parsed = parseSkillImportSourceInput(source);
     const local = !/^https?:\/\//i.test(parsed.resolvedSource);
@@ -6274,7 +6307,12 @@ export function companySkillService(db: Db) {
         skill.key = deriveCanonicalSkillKey(companyId, skill);
       }
     }
-    const imported = await upsertImportedSkills(companyId, filteredSkills);
+    const imported = await upsertImportedSkills(
+      companyId,
+      filteredSkills,
+      undefined,
+      options.authorizeScriptBearingImport,
+    );
     return { imported, warnings };
   }
 

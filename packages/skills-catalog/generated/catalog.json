@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "packageName": "@paperclipai/skills-catalog",
   "packageVersion": "0.3.1",
-  "generatedAt": "2026-08-11T15:05:34.526Z",
+  "generatedAt": "2026-09-27T06:22:50.193Z",
   "skills": [
     {
       "id": "paperclipai:bundled:docs:doc-maintenance",
@@ -559,6 +559,180 @@
       "contentHash": "sha256:276d85e98a4732f278204e26438aa95fde158dd2d15c1e427c4c7c7d492e769d"
     },
     {
+      "id": "paperclipai:optional:finance:variance-analysis",
+      "key": "paperclipai/optional/finance/variance-analysis",
+      "kind": "optional",
+      "category": "finance",
+      "slug": "variance-analysis",
+      "name": "variance-analysis",
+      "description": "Decompose financial variances into drivers with narrative explanations and waterfall analysis. Use when analyzing budget vs. actual, period-over-period changes, revenue or expense variances, or preparing variance commentary for leadership.",
+      "path": "catalog/optional/finance/variance-analysis",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "cfo",
+        "ds"
+      ],
+      "requires": [],
+      "tags": [
+        "finance",
+        "variance",
+        "budget",
+        "reporting",
+        "analysis"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 11232,
+          "sha256": "467db7de3fb118550d013409254e2d4a9f87385a661e154655bf3431919b0ba1"
+        }
+      ],
+      "contentHash": "sha256:ac785e30ab0158e76138eda6515cf54b35883f1da2b64a6c908807f398b33fb1",
+      "source": {
+        "type": "github",
+        "hostname": "github.com",
+        "owner": "anthropics",
+        "repo": "knowledge-work-plugins",
+        "ref": "main",
+        "commit": "da38ec1ee89d41e5380e652a97382695003396e7",
+        "path": "finance/skills/variance-analysis",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/tree/main/finance/skills/variance-analysis"
+      }
+    },
+    {
+      "id": "paperclipai:optional:operations:risk-assessment",
+      "key": "paperclipai/optional/operations/risk-assessment",
+      "kind": "optional",
+      "category": "operations",
+      "slug": "risk-assessment",
+      "name": "risk-assessment",
+      "description": "Identify, assess, and mitigate operational risks. Trigger with \"what are the risks\", \"risk assessment\", \"risk register\", \"what could go wrong\", or when the user is evaluating risks associated with a project, vendor, process, or decision.",
+      "path": "catalog/optional/operations/risk-assessment",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "ceo",
+        "cto",
+        "security",
+        "ds"
+      ],
+      "requires": [],
+      "tags": [
+        "risk",
+        "assessment",
+        "mitigation",
+        "governance",
+        "operations"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 1630,
+          "sha256": "82e29810a762c396a56f92bbd5c5afd252f7a07c6be69a246c28f7b82c4086d9"
+        }
+      ],
+      "contentHash": "sha256:1aeef93114f4d017f1e88ebe3bfba28c9630f0f3d233734616e457dc0ec1c84e",
+      "source": {
+        "type": "github",
+        "hostname": "github.com",
+        "owner": "anthropics",
+        "repo": "knowledge-work-plugins",
+        "ref": "main",
+        "commit": "da38ec1ee89d41e5380e652a97382695003396e7",
+        "path": "operations/skills/risk-assessment",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/tree/main/operations/skills/risk-assessment"
+      }
+    },
+    {
+      "id": "paperclipai:optional:paperclip-operations:find-skills",
+      "key": "paperclipai/optional/paperclip-operations/find-skills",
+      "kind": "optional",
+      "category": "paperclip-operations",
+      "slug": "find-skills",
+      "name": "find-skills",
+      "description": "Find out whether an installable skill already exists for a capability, then install it through Paperclip's governed company library and attach it to the agent. Use when asked to find a skill or extend an agent's abilities.",
+      "path": "catalog/optional/paperclip-operations/find-skills",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "ceo",
+        "cto",
+        "engineer",
+        "general"
+      ],
+      "requires": [],
+      "tags": [
+        "skills",
+        "discovery",
+        "registry",
+        "governance"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 7405,
+          "sha256": "b389bd3acbfc05d006a9340a9a6f13016cd7fa92c2248e69ff5ba343efac7bef"
+        }
+      ],
+      "contentHash": "sha256:5c9ed6775d8191475ebbb6406b1e4b5092f076c19b84b69202370697b1b82c93"
+    },
+    {
+      "id": "paperclipai:optional:product:accessibility-review",
+      "key": "paperclipai/optional/product/accessibility-review",
+      "kind": "optional",
+      "category": "product",
+      "slug": "accessibility-review",
+      "name": "accessibility-review",
+      "description": "Run a WCAG 2.1 AA accessibility audit on a design or page. Trigger with \"audit accessibility\", \"check a11y\", \"is this accessible?\", or when reviewing a design for color contrast, keyboard navigation, touch target size, or screen reader behavior before handoff.",
+      "path": "catalog/optional/product/accessibility-review",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "designer",
+        "fdse",
+        "qa"
+      ],
+      "requires": [],
+      "tags": [
+        "accessibility",
+        "a11y",
+        "wcag",
+        "design-review",
+        "ui"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 4278,
+          "sha256": "ef42982af0d51238dda2ab16d08626712891bdd41864876c32d1e7b13fb3124f"
+        }
+      ],
+      "contentHash": "sha256:f0eb0cdfa4bf8c2db209769343c2f8a04c81b04528390537d62c5e4ac4a250ce",
+      "source": {
+        "type": "github",
+        "hostname": "github.com",
+        "owner": "anthropics",
+        "repo": "knowledge-work-plugins",
+        "ref": "main",
+        "commit": "da38ec1ee89d41e5380e652a97382695003396e7",
+        "path": "design/skills/accessibility-review",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/tree/main/design/skills/accessibility-review"
+      }
+    },
+    {
       "id": "paperclipai:optional:product:design-critique",
       "key": "paperclipai/optional/product/design-critique",
       "kind": "optional",
@@ -592,6 +766,237 @@
         }
       ],
       "contentHash": "sha256:429f94df398a0697042b5bbe4755b1ff1a230aa5f41d99118ad37493ac65d21c"
+    },
+    {
+      "id": "paperclipai:optional:product:write-spec",
+      "key": "paperclipai/optional/product/write-spec",
+      "kind": "optional",
+      "category": "product",
+      "slug": "write-spec",
+      "name": "write-spec",
+      "description": "Write a feature spec or PRD from a problem statement or feature idea. Use when turning a vague idea or user request into a structured document, scoping a feature with goals and non-goals, defining success metrics and acceptance criteria, or breaking a big ask into a phased spec.",
+      "path": "catalog/optional/product/write-spec",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "pm",
+        "fda",
+        "cto",
+        "ceo"
+      ],
+      "requires": [],
+      "tags": [
+        "product-spec",
+        "requirements",
+        "prd",
+        "planning"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 12326,
+          "sha256": "ca6670913878b4ac4582727562bfced5271492a5a800d934f68c9e7bc1cd4dcc"
+        }
+      ],
+      "contentHash": "sha256:925fee06bad60b9d79a5c6035622236a02f93ab8780669713d29f15b080ef7cb",
+      "source": {
+        "type": "github",
+        "hostname": "github.com",
+        "owner": "anthropics",
+        "repo": "knowledge-work-plugins",
+        "ref": "main",
+        "commit": "da38ec1ee89d41e5380e652a97382695003396e7",
+        "path": "product-management/skills/write-spec",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/tree/main/product-management/skills/write-spec"
+      }
+    },
+    {
+      "id": "paperclipai:optional:quality:check-impl-against-spec",
+      "key": "paperclipai/optional/quality/check-impl-against-spec",
+      "kind": "optional",
+      "category": "quality",
+      "slug": "check-impl-against-spec",
+      "name": "check-impl-against-spec",
+      "description": "Compare a pull request's implementation against spec context in spec_context.md and feed any material mismatches into review.json. Use during PR review when approved or repository spec context is available.",
+      "path": "catalog/optional/quality/check-impl-against-spec",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "qa",
+        "core-swe",
+        "fda",
+        "cto"
+      ],
+      "requires": [],
+      "tags": [
+        "spec",
+        "review",
+        "verification",
+        "cmmi",
+        "change-control"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 2477,
+          "sha256": "c0e5d80739ae39d5081fd8b3e3b02fe96496d11c286ce241426fe5429df323ad"
+        }
+      ],
+      "contentHash": "sha256:30a328d1821bfd2ab39cb446943fb98cabe49c020caddd50789089c5aa3368ce",
+      "source": {
+        "type": "github",
+        "hostname": "github.com",
+        "owner": "warpdotdev",
+        "repo": "common-skills",
+        "ref": "main",
+        "commit": "69b4753651ab7fab518c82be087b9f1d5b966631",
+        "path": ".agents/skills/check-impl-against-spec",
+        "url": "https://github.com/warpdotdev/common-skills/tree/main/.agents/skills/check-impl-against-spec"
+      }
+    },
+    {
+      "id": "paperclipai:optional:quality:validate-changes-match-specs",
+      "key": "paperclipai/optional/quality/validate-changes-match-specs",
+      "kind": "optional",
+      "category": "quality",
+      "slug": "validate-changes-match-specs",
+      "name": "validate-changes-match-specs",
+      "description": "Validate that a branch or pull request implementation matches introduced product, technical, security, and related specs. Use when reviewing or finishing a spec-driven change and resolving mismatches between checked-in specs and implementation.",
+      "path": "catalog/optional/quality/validate-changes-match-specs",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "qa",
+        "core-swe",
+        "cto",
+        "fda"
+      ],
+      "requires": [],
+      "tags": [
+        "spec",
+        "conformance",
+        "review",
+        "cmmi",
+        "traceability"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 16206,
+          "sha256": "52de2c86ab22776a45f54ef10a8b194b524a16e2e64b8454da31f87a55ffa629"
+        }
+      ],
+      "contentHash": "sha256:d1c1f1bf2279451155050e4c3f7c6540bd2eace2950e032ab952ca69a8acc07b",
+      "source": {
+        "type": "github",
+        "hostname": "github.com",
+        "owner": "warpdotdev",
+        "repo": "common-skills",
+        "ref": "main",
+        "commit": "69b4753651ab7fab518c82be087b9f1d5b966631",
+        "path": ".agents/skills/validate-changes-match-specs",
+        "url": "https://github.com/warpdotdev/common-skills/tree/main/.agents/skills/validate-changes-match-specs"
+      }
+    },
+    {
+      "id": "paperclipai:optional:quality:verification-before-completion",
+      "key": "paperclipai/optional/quality/verification-before-completion",
+      "kind": "optional",
+      "category": "quality",
+      "slug": "verification-before-completion",
+      "name": "verification-before-completion",
+      "description": "Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - requires running verification commands and confirming output before making any success claims; evidence before assertions always",
+      "path": "catalog/optional/quality/verification-before-completion",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "qa",
+        "core-swe",
+        "fdse",
+        "pre-sre"
+      ],
+      "requires": [],
+      "tags": [
+        "verification",
+        "evidence",
+        "definition-of-done",
+        "testing"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 3646,
+          "sha256": "2befe7fc55bcadaa3d97dd9e8efeb633d2561c0ebe74c5a8b17c4d9e7e4520b3"
+        }
+      ],
+      "contentHash": "sha256:56a11ca679172699359d1438841a5f154e7e4d1778c048b2a9b54bc5b11cbf37",
+      "source": {
+        "type": "github",
+        "hostname": "github.com",
+        "owner": "obra",
+        "repo": "superpowers",
+        "ref": "main",
+        "commit": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
+        "path": "skills/verification-before-completion",
+        "url": "https://github.com/obra/superpowers/tree/main/skills/verification-before-completion"
+      }
+    },
+    {
+      "id": "paperclipai:optional:research:knowledge-synthesis",
+      "key": "paperclipai/optional/research/knowledge-synthesis",
+      "kind": "optional",
+      "category": "research",
+      "slug": "knowledge-synthesis",
+      "name": "knowledge-synthesis",
+      "description": "Combines search results from multiple sources into coherent, deduplicated answers with source attribution. Handles confidence scoring based on freshness and authority, and summarizes large result sets effectively.",
+      "path": "catalog/optional/research/knowledge-synthesis",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "researcher",
+        "ds",
+        "general"
+      ],
+      "requires": [],
+      "tags": [
+        "research",
+        "synthesis",
+        "sources",
+        "briefing"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 8526,
+          "sha256": "8dc66c66ef0004010bbf2d569251163e90a6675b982e0cb99ef26b4dd1c5a0f6"
+        }
+      ],
+      "contentHash": "sha256:e875eb19b16b8aef961d78756df534ef406a6429a4079fa62aebde7e4c87ff7c",
+      "source": {
+        "type": "github",
+        "hostname": "github.com",
+        "owner": "anthropics",
+        "repo": "knowledge-work-plugins",
+        "ref": "main",
+        "commit": "da38ec1ee89d41e5380e652a97382695003396e7",
+        "path": "enterprise-search/skills/knowledge-synthesis",
+        "url": "https://github.com/anthropics/knowledge-work-plugins/tree/main/enterprise-search/skills/knowledge-synthesis"
+      }
     },
     {
       "id": "paperclipai:optional:research:last30days",
@@ -1115,6 +1520,211 @@
       }
     },
     {
+      "id": "paperclipai:optional:software-development:codebase-design",
+      "key": "paperclipai/optional/software-development/codebase-design",
+      "kind": "optional",
+      "category": "software-development",
+      "slug": "codebase-design",
+      "name": "codebase-design",
+      "description": "Shared vocabulary for designing deep modules. Use when the user wants to design or improve a module's interface, find deepening opportunities, decide where a seam goes, make code more testable or AI-navigable, or when another skill needs the deep-module vocabulary.",
+      "path": "catalog/optional/software-development/codebase-design",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "fda",
+        "cto",
+        "core-swe"
+      ],
+      "requires": [],
+      "tags": [
+        "architecture",
+        "deep-modules",
+        "interfaces",
+        "design",
+        "refactoring"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 6446,
+          "sha256": "2c20617f87ec8af6a434859f381b2f061a69b530444e74eb39e78bb016a6d1e2"
+        },
+        {
+          "path": "DEEPENING.md",
+          "kind": "markdown",
+          "sizeBytes": 2553,
+          "sha256": "f3dd099ce99289bd213914d8ee3e2429b78309c3957ca4583f7659551b1d53c1"
+        },
+        {
+          "path": "DESIGN-IT-TWICE.md",
+          "kind": "markdown",
+          "sizeBytes": 2664,
+          "sha256": "8e740bf98446dbd4dfdc132ac4346d9a7eedaf93de6a495889171cf7f99f16bd"
+        }
+      ],
+      "contentHash": "sha256:72d7d346209c3371ec6931f29fa09c1978f90bd9ad7c3986bdb6c795675ff5e2",
+      "source": {
+        "type": "github",
+        "hostname": "github.com",
+        "owner": "mattpocock",
+        "repo": "skills",
+        "ref": "main",
+        "commit": "c55ee46073ed923f86ce59a5eb3b6d895095d1b7",
+        "path": "skills/engineering/codebase-design",
+        "url": "https://github.com/mattpocock/skills/tree/main/skills/engineering/codebase-design"
+      }
+    },
+    {
+      "id": "paperclipai:optional:software-development:diagnose-ci-failures",
+      "key": "paperclipai/optional/software-development/diagnose-ci-failures",
+      "kind": "optional",
+      "category": "software-development",
+      "slug": "diagnose-ci-failures",
+      "name": "diagnose-ci-failures",
+      "description": "Diagnose CI failures for a PR using the GitHub CLI, extract error logs, and generate a plan to fix them. Use when the user asks to check CI status, pull CI issues, triage test failures, or investigate PR build failures.",
+      "path": "catalog/optional/software-development/diagnose-ci-failures",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "devops",
+        "core-swe",
+        "pre-sre"
+      ],
+      "requires": [],
+      "tags": [
+        "ci",
+        "triage",
+        "build-failure",
+        "debugging"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 3997,
+          "sha256": "eacf6cc68063d5c92e1d0a87051b4c5cdd0a18cf8931cb4def3ae541808ddfc8"
+        }
+      ],
+      "contentHash": "sha256:f8b02468b42a52c472827c1c578b49f366173fefa7bc93919d1a78b7c2060c28",
+      "source": {
+        "type": "github",
+        "hostname": "github.com",
+        "owner": "warpdotdev",
+        "repo": "common-skills",
+        "ref": "main",
+        "commit": "69b4753651ab7fab518c82be087b9f1d5b966631",
+        "path": ".agents/skills/diagnose-ci-failures",
+        "url": "https://github.com/warpdotdev/common-skills/tree/main/.agents/skills/diagnose-ci-failures"
+      }
+    },
+    {
+      "id": "paperclipai:optional:software-development:domain-modeling",
+      "key": "paperclipai/optional/software-development/domain-modeling",
+      "kind": "optional",
+      "category": "software-development",
+      "slug": "domain-modeling",
+      "name": "domain-modeling",
+      "description": "Build and sharpen a project's domain model. Use when discussing codebase terminology, writing or editing a CONTEXT.md, or recording or editing an ADR.",
+      "path": "catalog/optional/software-development/domain-modeling",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "fda",
+        "cto",
+        "ds"
+      ],
+      "requires": [],
+      "tags": [
+        "domain-modeling",
+        "adr",
+        "bounded-context",
+        "ubiquitous-language"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 3331,
+          "sha256": "327a2b50620e2fd70abc6893cd6965e76b20f8d0adb0dc2c8d5eb3845efb643e"
+        },
+        {
+          "path": "ADR-FORMAT.md",
+          "kind": "markdown",
+          "sizeBytes": 2733,
+          "sha256": "944c92aa790e8fbdc9199640b170979abb8a34ba8d0fe18c2a01a63bce140ca0"
+        },
+        {
+          "path": "CONTEXT-FORMAT.md",
+          "kind": "markdown",
+          "sizeBytes": 2290,
+          "sha256": "17ab16ce783e4d2801ee52fd9acdf550cbf44de65ae76797a93943bbedf22a13"
+        }
+      ],
+      "contentHash": "sha256:13038c8a4f78a198dcdf3b8bb481343a45e7c0572c797b17d962cef67454e631",
+      "source": {
+        "type": "github",
+        "hostname": "github.com",
+        "owner": "mattpocock",
+        "repo": "skills",
+        "ref": "main",
+        "commit": "c55ee46073ed923f86ce59a5eb3b6d895095d1b7",
+        "path": "skills/engineering/domain-modeling",
+        "url": "https://github.com/mattpocock/skills/tree/main/skills/engineering/domain-modeling"
+      }
+    },
+    {
+      "id": "paperclipai:optional:software-development:implement-specs",
+      "key": "paperclipai/optional/software-development/implement-specs",
+      "kind": "optional",
+      "category": "software-development",
+      "slug": "implement-specs",
+      "name": "implement-specs",
+      "description": "Implement an approved feature from PRODUCT.md and TECH.md, keeping specs and code aligned in the same PR as implementation evolves. Use after the product and tech specs are approved and the next step is building the feature.",
+      "path": "catalog/optional/software-development/implement-specs",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "core-swe",
+        "fdse",
+        "engineer"
+      ],
+      "requires": [],
+      "tags": [
+        "spec",
+        "implementation",
+        "workflow",
+        "cmmi"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 3939,
+          "sha256": "07f18e0f3ba358378a31516e2e59368ca08f9a55bed29860338988e5737ceb19"
+        }
+      ],
+      "contentHash": "sha256:8e211f3844b739c666f8801b661cbf0314f33787214863958b009fc550d1a430",
+      "source": {
+        "type": "github",
+        "hostname": "github.com",
+        "owner": "warpdotdev",
+        "repo": "common-skills",
+        "ref": "main",
+        "commit": "69b4753651ab7fab518c82be087b9f1d5b966631",
+        "path": ".agents/skills/implement-specs",
+        "url": "https://github.com/warpdotdev/common-skills/tree/main/.agents/skills/implement-specs"
+      }
+    },
+    {
       "id": "paperclipai:optional:software-development:prepare-mcp-integration",
       "key": "paperclipai/optional/software-development/prepare-mcp-integration",
       "kind": "optional",
@@ -1160,6 +1770,105 @@
         }
       ],
       "contentHash": "sha256:84f2a28d7d004393719684f2b435e5ee01ddc58591e0dfeb73d72c7605db7f49"
+    },
+    {
+      "id": "paperclipai:optional:software-development:test-driven-development",
+      "key": "paperclipai/optional/software-development/test-driven-development",
+      "kind": "optional",
+      "category": "software-development",
+      "slug": "test-driven-development",
+      "name": "test-driven-development",
+      "description": "Use when implementing any feature or bugfix, before writing implementation code",
+      "path": "catalog/optional/software-development/test-driven-development",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "core-swe",
+        "fdse",
+        "engineer",
+        "qa"
+      ],
+      "requires": [],
+      "tags": [
+        "tdd",
+        "testing",
+        "red-green-refactor",
+        "quality"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 9578,
+          "sha256": "64b03fce4aee5a97a93160cea8111f3ba13a17b7c001db4bd5836d67fd10705d"
+        },
+        {
+          "path": "writing-good-tests.md",
+          "kind": "markdown",
+          "sizeBytes": 8268,
+          "sha256": "51471c853306ff92ca8bb41dcaea05f31c0e46b03651f8f3c99754b7172f4ae1"
+        }
+      ],
+      "contentHash": "sha256:dc923e8f02ed77ba28f382d9affe80f649fbececf723afeee79f5cbd936f0f24",
+      "source": {
+        "type": "github",
+        "hostname": "github.com",
+        "owner": "obra",
+        "repo": "superpowers",
+        "ref": "main",
+        "commit": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
+        "path": "skills/test-driven-development",
+        "url": "https://github.com/obra/superpowers/tree/main/skills/test-driven-development"
+      }
+    },
+    {
+      "id": "paperclipai:optional:software-development:writing-plans",
+      "key": "paperclipai/optional/software-development/writing-plans",
+      "kind": "optional",
+      "category": "software-development",
+      "slug": "writing-plans",
+      "name": "writing-plans",
+      "description": "Use when you have a spec or requirements for a multi-step task, before touching code",
+      "path": "catalog/optional/software-development/writing-plans",
+      "entrypoint": "SKILL.md",
+      "trustLevel": "markdown_only",
+      "compatibility": "compatible",
+      "defaultInstall": false,
+      "recommendedForRoles": [
+        "ceo",
+        "cto",
+        "core-swe",
+        "fda",
+        "pm"
+      ],
+      "requires": [],
+      "tags": [
+        "planning",
+        "design-doc",
+        "task-breakdown",
+        "spec"
+      ],
+      "files": [
+        {
+          "path": "SKILL.md",
+          "kind": "skill",
+          "sizeBytes": 10335,
+          "sha256": "a6c67c1900064347c2a329990dd3c555657c51c3ec53b259a08aa01a2c26139a"
+        }
+      ],
+      "contentHash": "sha256:7d597f1d8dce87ffeab84778ec3fd509bf10cbdb7c3e5d6ffb82eb337592710a",
+      "source": {
+        "type": "github",
+        "hostname": "github.com",
+        "owner": "obra",
+        "repo": "superpowers",
+        "ref": "main",
+        "commit": "8ca22dba9a94f28898bbce59f2537ff4d87c747d",
+        "path": "skills/writing-plans",
+        "url": "https://github.com/obra/superpowers/tree/main/skills/writing-plans"
+      }
     }
   ]
 }

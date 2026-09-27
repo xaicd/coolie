@@ -1,0 +1,29 @@
+{
+  "source": {
+    "type": "github",
+    "hostname": "github.com",
+    "owner": "mattpocock",
+    "repo": "skills",
+    "ref": "main",
+    "commit": "c55ee46073ed923f86ce59a5eb3b6d895095d1b7",
+    "path": "skills/engineering/domain-modeling"
+  },
+  "files": [
+    "SKILL.md",
+    "ADR-FORMAT.md",
+    "CONTEXT-FORMAT.md"
+  ],
+  "defaultInstall": false,
+  "recommendedForRoles": [
+    "fda",
+    "cto",
+    "ds"
+  ],
+  "requires": [],
+  "tags": [
+    "domain-modeling",
+    "adr",
+    "bounded-context",
+    "ubiquitous-language"
+  ]
+}

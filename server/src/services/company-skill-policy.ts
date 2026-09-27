@@ -57,6 +57,7 @@ function resourceMatches(rule: SkillPolicyRule, resource: SkillPolicyEvaluationR
   if (selector.skillIds && (!resource.skillId || !selector.skillIds.includes(resource.skillId))) return false;
   if (selector.skillKeys && (!resource.skillKey || !selector.skillKeys.includes(resource.skillKey))) return false;
   if (selector.sourceTypes && (!resource.sourceType || !selector.sourceTypes.includes(resource.sourceType))) return false;
+  if (selector.trustLevels && (!resource.trustLevel || !selector.trustLevels.includes(resource.trustLevel))) return false;
   if (selector.sourceLocators) {
     // Compare in canonical form on both sides: rules written before locator
     // normalization existed are stored raw, and callers may pass un-normalized

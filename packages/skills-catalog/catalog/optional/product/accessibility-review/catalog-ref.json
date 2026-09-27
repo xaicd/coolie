@@ -1,0 +1,28 @@
+{
+  "source": {
+    "type": "github",
+    "hostname": "github.com",
+    "owner": "anthropics",
+    "repo": "knowledge-work-plugins",
+    "ref": "main",
+    "commit": "da38ec1ee89d41e5380e652a97382695003396e7",
+    "path": "design/skills/accessibility-review"
+  },
+  "files": [
+    "SKILL.md"
+  ],
+  "defaultInstall": false,
+  "recommendedForRoles": [
+    "designer",
+    "fdse",
+    "qa"
+  ],
+  "requires": [],
+  "tags": [
+    "accessibility",
+    "a11y",
+    "wcag",
+    "design-review",
+    "ui"
+  ]
+}

@@ -77,6 +77,98 @@ describeEmbeddedPostgres("companySkillPolicyService", () => {
     }
   });
 
+  it("gates script-bearing imports behind an explicit trust-level rule", async () => {
+    const seeded = await seedAgent();
+    const service = companySkillPolicyService(db);
+    const activity = { actorType: "agent" as const, actorId: seeded.agentId, agentId: seeded.agentId };
+    const external = {
+      sourceType: "external_package" as const,
+      sourceLocator: "https://skills.sh/acme/tools/heavy",
+    };
+    const scriptBearing = { ...external, trustLevel: "scripts_executables" as const };
+
+    // Unmaterialized policy: ordinary imports are open, but the open default is reported
+    // as `no_policy_default`, which the import authorizer refuses to treat as consent.
+    await expect(service.evaluate({
+      companyId: seeded.companyId,
+      principal: seeded.principal,
+      action: "skills.import",
+      resource: scriptBearing,
+    })).resolves.toMatchObject({ allowed: true, reason: "no_policy_default" });
+
+    // A materialized default-allow policy is still not consent: `policy_default`.
+    await service.replace({
+      companyId: seeded.companyId,
+      expectedRevision: 0,
+      policy: { schemaVersion: 1, defaultEffect: "allow", rules: [] },
+      activity,
+    });
+    await expect(service.evaluate({
+      companyId: seeded.companyId,
+      principal: seeded.principal,
+      action: "skills.import",
+      resource: scriptBearing,
+    })).resolves.toMatchObject({ allowed: true, reason: "policy_default", matchedRuleId: null });
+
+    // An explicit rule scoped to the trust level is the opt-in.
+    await service.replace({
+      companyId: seeded.companyId,
+      expectedRevision: 1,
+      policy: {
+        schemaVersion: 1,
+        defaultEffect: "allow",
+        rules: [{
+          id: "allow-script-bearing-imports",
+          priority: 10,
+          effect: "allow",
+          subject: { type: "agents", agentIds: [seeded.agentId] },
+          actions: ["skills.import"],
+          resources: { trustLevels: ["scripts_executables"] },
+        }],
+      },
+      activity,
+    });
+    await expect(service.evaluate({
+      companyId: seeded.companyId,
+      principal: seeded.principal,
+      action: "skills.import",
+      resource: scriptBearing,
+    })).resolves.toMatchObject({
+      allowed: true,
+      reason: "explicit_rule",
+      matchedRuleId: "allow-script-bearing-imports",
+    });
+
+    // The rule is trust-level scoped, so it does not leak to safer payloads from the
+    // same source, nor to a resource that never declares its trust level.
+    await expect(service.evaluate({
+      companyId: seeded.companyId,
+      principal: seeded.principal,
+      action: "skills.import",
+      resource: { ...external, trustLevel: "markdown_only" as const },
+    })).resolves.toMatchObject({ allowed: true, reason: "policy_default", matchedRuleId: null });
+    await expect(service.evaluate({
+      companyId: seeded.companyId,
+      principal: seeded.principal,
+      action: "skills.import",
+      resource: external,
+    })).resolves.toMatchObject({ allowed: true, reason: "policy_default", matchedRuleId: null });
+
+    // Under a closed policy with no matching rule the same import is denied outright.
+    await service.replace({
+      companyId: seeded.companyId,
+      expectedRevision: 2,
+      policy: { schemaVersion: 1, defaultEffect: "deny", rules: [] },
+      activity,
+    });
+    await expect(service.evaluate({
+      companyId: seeded.companyId,
+      principal: seeded.principal,
+      action: "skills.import",
+      resource: scriptBearing,
+    })).resolves.toMatchObject({ allowed: false, reason: "policy_default" });
+  });
+
   it("evaluates protected resources, role overrides, and agent overrides deterministically", async () => {
     const seeded = await seedAgent("security");
     const service = companySkillPolicyService(db);

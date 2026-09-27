@@ -1,0 +1,27 @@
+{
+  "source": {
+    "type": "github",
+    "hostname": "github.com",
+    "owner": "warpdotdev",
+    "repo": "common-skills",
+    "ref": "main",
+    "commit": "69b4753651ab7fab518c82be087b9f1d5b966631",
+    "path": ".agents/skills/diagnose-ci-failures"
+  },
+  "files": [
+    "SKILL.md"
+  ],
+  "defaultInstall": false,
+  "recommendedForRoles": [
+    "devops",
+    "core-swe",
+    "pre-sre"
+  ],
+  "requires": [],
+  "tags": [
+    "ci",
+    "triage",
+    "build-failure",
+    "debugging"
+  ]
+}

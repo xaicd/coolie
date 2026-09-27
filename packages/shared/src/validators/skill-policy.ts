@@ -20,8 +20,18 @@ export const SKILL_POLICY_SOURCE_TYPES = [
   "unknown",
 ] as const;
 
+// Payload trust levels, mirroring CompanySkillTrustLevel. A rule that selects
+// `scripts_executables` is the only way an external source carrying a scripts/ directory
+// can be imported; see assertImportedSkillSourceAllowed on the server.
+export const SKILL_POLICY_TRUST_LEVELS = [
+  "markdown_only",
+  "assets",
+  "scripts_executables",
+] as const;
+
 export const skillPolicyActionSchema = z.enum(SKILL_POLICY_ACTIONS);
 export const skillPolicySourceTypeSchema = z.enum(SKILL_POLICY_SOURCE_TYPES);
+export const skillPolicyTrustLevelSchema = z.enum(SKILL_POLICY_TRUST_LEVELS);
 export const skillPolicyEffectSchema = z.enum(["allow", "deny"]);
 
 const nonEmptyUniqueStrings = z.array(z.string().trim().min(1).max(512)).min(1).max(500)
@@ -89,6 +99,9 @@ export const skillPolicyResourceSelectorSchema = z.object({
   sourceTypes: z.array(skillPolicySourceTypeSchema).min(1)
     .refine((values) => new Set(values).size === values.length, "Source types must be unique")
     .optional(),
+  trustLevels: z.array(skillPolicyTrustLevelSchema).min(1)
+    .refine((values) => new Set(values).size === values.length, "Trust levels must be unique")
+    .optional(),
   sourceLocators: z.array(skillPolicySourceLocatorSchema).min(1).max(500)
     .refine((values) => new Set(values).size === values.length, "Source locators must be unique")
     .optional(),
@@ -119,6 +132,7 @@ export const skillPolicyEvaluationResourceSchema = z.object({
   skillId: z.string().guid().optional(),
   skillKey: z.string().trim().min(1).max(512).optional(),
   sourceType: skillPolicySourceTypeSchema.optional(),
+  trustLevel: skillPolicyTrustLevelSchema.optional(),
   sourceLocator: skillPolicySourceLocatorSchema.optional(),
 }).strict();
 
@@ -130,6 +144,7 @@ export const evaluateSkillPolicySchema = z.object({
 
 export type SkillPolicyAction = z.infer<typeof skillPolicyActionSchema>;
 export type SkillPolicySourceType = z.infer<typeof skillPolicySourceTypeSchema>;
+export type SkillPolicyTrustLevel = z.infer<typeof skillPolicyTrustLevelSchema>;
 export type SkillPolicyEffect = z.infer<typeof skillPolicyEffectSchema>;
 export type SkillPolicySubject = z.infer<typeof skillPolicySubjectSchema>;
 export type SkillPolicyResourceSelector = z.infer<typeof skillPolicyResourceSelectorSchema>;
