@@ -1,7 +1,8 @@
 {
-  "version": "0.5.67",
-  "versionCode": 567,
-  "commitSha": "b6c43102e7d4ec2332cbbe4d4cc8d819491483a7",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.67/coolie-release.apk",
-  "releaseNotes": "wave95 修 WhatsNew releaseNotes 真值 (远端优先+精确兜底, 不再显示旧版本内容) + 打包 boss Claude 后 5 commit: Super-Shell 5 栏全功能重构 + 企业治理插件化 + JSBridge 双向握手 + 触觉震动 + 紧急制动安全阀"
+  "version": "0.5.77",
+  "versionCode": 577,
+  "commitSha": "6d7cef66829574872360817a271f8882aa89a732",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.77/coolie-release.apk",
+  "sha256": "c29e2c98cb062672fd0c313a3838e813de49b2736060e99a0bf86429a463b385",
+  "releaseNotes": "wave112 修 0.5.76 选完公司白屏 (DashboardScreen 的 D11 Hook 落在提前 return 之后 → React 卸载整棵树); 登录态回原生表单 + Web 登录 15s 空白兜底 + prober 401 退避"
 }
