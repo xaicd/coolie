@@ -115,7 +115,45 @@ git diff HEAD~1 HEAD --stat     # 复核文件清单,防止匠人夹带任务外
 git show --stat <commit>
 ```
 
-## 验收标准
+### 7. 任务受阻排查：403 RESPONSIBLE_USER_UNAVAILABLE
+
+症状:员工干完活交不上——agent run 里每次 `POST/PATCH /api/issues/:id/comments` 等都吃 403,
+系统等不到 disposition,periodic heartbeat recovery 就把工单判 `blocked`
+(`missing disposition ... board decision required`),而且自己修不好(`dispositionRepairQueued` 恒为 0)。
+
+先在生产服务器上确认是不是这一类:
+
+```sh
+# 近 24h 有没有这条拒绝;有 → 命中本类问题
+ssh tc-coolie-claw "sudo journalctl -u coolie --since '-24 hours' --no-pager \
+  | grep RESPONSIBLE_USER_UNAVAILABLE | tail -5"
+
+# 判据:日志里出现 responsibleUserId 而且它的值是合成身份(不是任何真实用户),
+#   典型就是 paperclip-concierge —— 来自本机 x-paperclip-api-key(loopback board concierge)。
+#   真正原因是建单时把合成身份写进了 issue 的 responsible_user_id,run 继承后过不了
+#   "responsible-user company access intersection"(authz.ts assertCompanyAccess)。
+
+# 受影响工单(应为 0;非 0 就是存量脏数据)
+ssh tc-coolie-claw 'DBU=$(sudo sed -n "s/^DATABASE_URL=//p" /etc/coolie/secrets.env | tr -d "\r"); \
+  psql "$DBU" -c "select identifier,status,responsible_user_id from issues \
+  where responsible_user_id='"'"'paperclip-concierge'"'"';"'
+```
+
+处理:
+
+1. **代码**(本波已修,勿回退):所有写入路径(建单 / run seed / run identity / agent key / routine)统一走
+   `server/src/services/responsible-user.ts` 的 `resolveCompanyScopedResponsibleUserId`,只把合成
+   concierge 换成公司真实默认用户。改这条链路前先读 `docs-coolie/audit/WAVE134-RESPONSIBLE-USER-403.md`。
+2. **存量**:把 issue/run/identity 三类表的 `paperclip-concierge` 批量改成公司真实 owner
+   (`companies.default_responsible_user_id`);`created_by_user_id` 是历史归属,不改。
+3. **解封验证**:对受影响工单重新 wake 其 assignee,看两件事——
+   ```sh
+   # 日志里不再出现该拒绝(窗口内计数为 0)
+   # 工单脱离 blocked(blocked → done / in_progress)
+   ```
+   注意:重派后仍 `blocked` 的,要读其最新 comment 判断是不是 agent 依**自身业务**给出的正常
+   board 决策阻塞,而不是把「没解封」都算到这条 auth bug 头上。
+
 
 1. 每个派单都能追到一个 brief 文件 + 一个 commit(receipt 齐备,F13)。
 2. 同一时段同一仓库只有一个写者;并发只在白名单互不相交时出现。
@@ -135,6 +173,7 @@ git show --stat <commit>
 | F6 | 版本号与分支错位 | 简报没写 checkout | abort 重写简报;不信"门神会自己看" |
 | F7 | "Reached maximum turns" | max-turns 不够 | 发版类 80–160,普通 30–50,单文件 20 |
 | F12 | 10 分钟连派 4 个 → 全撞限流 | 无冷却 | 强制冷却 + 日上限 |
+| F14 | 工单被判 blocked,agent 报 403 `RESPONSIBLE_USER_UNAVAILABLE` | 建单/run 写入了合成身份 `paperclip-concierge` 当 responsibleUser | 见 §7:修入归属 + 存量改正 + 重派验证 |
 
 ## 关联
 
