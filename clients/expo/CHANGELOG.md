@@ -4,30 +4,6 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.5.90
-
-> Released: 2026-09-28 · Android release APK
-
-### 更新
-
-- wave135 修 wave129 拟人走查 3 个缺陷：
-  - **邮箱/密码登录 100% 失效（Board authentication required）**: RN 原生层自己管 cookie jar
-    （`NSURLSession` `HTTPShouldSetCookies=YES`），手写 `Cookie` 头会让原生层丢弃/破坏 jar 里的
-    签名会话 cookie，请求到服务端就 401 —— 实测手写 `Cookie` 头（无论是否 encode）→ 401，
-    同一签名值由 jar 自动带 → 200。修法: 共享客户端不再手写 `Cookie`，会话 cookie 交给平台 jar
-    回放，`Authorization: Bearer` 只留给 agent/board API Key。（`clients/expo/src/coolie.ts`）
-  - **工坊对话带附件发送死锁**: 同一文件被「即选即传 + 补传」两条路径各传一遍，远端 id 数(2)
-    永远不等于 staged 数(1)，发送被「附件上传中」永久卡死。修法: 远端 id 挂在附件身份上
-    （`remoteId`），上传按 staged id 幂等去重（并发复用同一 promise），发送守卫改成按附件身份
-    判断而非比数组长度；失败可点发送重试。全新公司还没有常驻 Board Operations issue 时，
-    先调 `POST /api/board/chat/issue` 解析出 issue 再上传。
-  - **大盘任务总数对不上 API（164 vs 124）**: `open` 已含 inProgress/blocked，旧算法再加一遍
-    导致重复计数；改用服务端 `progress.total`。
-- server: 新增 `POST /api/board/chat/issue`（Find-or-create 常驻 Board Operations issue，
-  供 App 上传附件前解析）。
-
----
-
 ## v0.5.89
 
 > Released: 2026-09-29 · Android release APK
