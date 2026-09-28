@@ -1,3 +1,5 @@
+import { readFile } from "node:fs/promises";
+import { basename } from "node:path";
 import { z } from "zod";
 import {
   CONNECTION_REQUEST_TOOL_DESCRIPTION,
@@ -55,6 +57,29 @@ function makeTool<TSchema extends z.ZodRawShape>(
 function parseOptionalJson(raw: string | undefined | null): unknown {
   if (!raw || raw.trim().length === 0) return undefined;
   return JSON.parse(raw);
+}
+
+/**
+ * Build the multipart body the upload endpoints expect. Every upload route
+ * reads a single part named `file` (issue attachments, project requirement
+ * documents, analyze-document), so that name is fixed here rather than left to
+ * each caller. The MCP server runs on the same host as the agent, so the tool
+ * takes a filesystem path rather than inline bytes.
+ */
+async function buildFileForm(
+  filePath: string,
+  filename?: string,
+  fields?: Record<string, string>,
+): Promise<FormData> {
+  const buffer = await readFile(filePath);
+  const name = filename?.trim() || basename(filePath);
+  const form = new FormData();
+  form.append("file", new Blob([buffer]), name);
+  for (const [key, value] of Object.entries(fields ?? {})) {
+    if (value === undefined || value === null) continue;
+    form.append(key, value);
+  }
+  return form;
 }
 
 async function callRuntimeConnectionTool(
@@ -832,6 +857,245 @@ export function createToolDefinitions(client: PaperclipApiClient): ToolDefinitio
         client.requestJson("POST", `/approvals/${encodeURIComponent(approvalId)}/comments`, {
           body: { body },
         }),
+    ),
+    makeTool(
+      "paperclipAssignIssue",
+      "Assign an issue to an agent (or clear the assignee with null) and optionally set status",
+      z.object({
+        issueId: issueIdSchema,
+        assigneeAgentId: z.string().guid().nullable().optional(),
+        status: z.string().optional(),
+      }),
+      async ({ issueId, assigneeAgentId, status }) =>
+        client.requestJson("PATCH", `/issues/${encodeURIComponent(issueId)}`, {
+          body: {
+            ...(assigneeAgentId !== undefined ? { assigneeAgentId } : {}),
+            ...(status !== undefined ? { status } : {}),
+          },
+        }),
+    ),
+    makeTool(
+      "paperclipListIssueAttachments",
+      "List the attachments on an issue, each with its contentPath/openPath/downloadPath",
+      z.object({ issueId: issueIdSchema }),
+      async ({ issueId }) =>
+        client.requestJson("GET", `/issues/${encodeURIComponent(issueId)}/attachments`),
+    ),
+    makeTool(
+      "paperclipUploadIssueAttachment",
+      "Upload a local file as an issue attachment (multipart, field `file`); paths the workshop/board can open",
+      z.object({
+        companyId: companyIdOptional,
+        issueId: issueIdSchema,
+        filePath: z.string().min(1),
+        filename: z.string().min(1).max(255).optional(),
+        issueCommentId: z.string().guid().nullable().optional(),
+      }),
+      async ({ companyId, issueId, filePath, filename, issueCommentId }) => {
+        const form = await buildFileForm(
+          filePath,
+          filename,
+          issueCommentId ? { issueCommentId } : undefined,
+        );
+        return client.requestMultipart(
+          "POST",
+          `/companies/${client.resolveCompanyId(companyId)}/issues/${encodeURIComponent(issueId)}/attachments`,
+          form,
+        );
+      },
+    ),
+    makeTool(
+      "paperclipListWorkProducts",
+      "List the work products recorded on an issue (preview urls, artifacts, branches, commits, documents)",
+      z.object({ issueId: issueIdSchema }),
+      async ({ issueId }) =>
+        client.requestJson("GET", `/issues/${encodeURIComponent(issueId)}/work-products`),
+    ),
+    makeTool(
+      "paperclipCreateWorkProduct",
+      "Record a work product on an issue so the deliverable is inspectable in the workshop (not just a local path)",
+      z.object({
+        issueId: issueIdSchema,
+        type: z.enum([
+          "preview_url",
+          "runtime_service",
+          "pull_request",
+          "branch",
+          "commit",
+          "artifact",
+          "document",
+        ]),
+        title: z.string().min(1),
+        provider: z.string().min(1),
+        summary: z.string().optional(),
+        url: z.string().optional(),
+        externalId: z.string().optional(),
+        status: z.string().optional(),
+        isPrimary: z.boolean().optional(),
+        metadataJson: z.string().optional(),
+      }),
+      async ({ issueId, metadataJson, ...body }) =>
+        client.requestJson("POST", `/issues/${encodeURIComponent(issueId)}/work-products`, {
+          body: { ...body, metadata: parseOptionalJson(metadataJson) },
+        }),
+    ),
+    makeTool(
+      "paperclipListProjectDocuments",
+      "List the requirement documents landed under a project's coolie-docs directory",
+      z.object({ companyId: companyIdOptional, projectId: projectIdSchema }),
+      async ({ companyId, projectId }) =>
+        client.requestJson(
+          "GET",
+          `/companies/${client.resolveCompanyId(companyId)}/projects/${encodeURIComponent(projectId)}/documents`,
+        ),
+    ),
+    makeTool(
+      "paperclipUploadProjectDocument",
+      "Upload a local requirement document to a project (multipart, field `file`); lands in the project's coolie-docs dir",
+      z.object({
+        companyId: companyIdOptional,
+        projectId: projectIdSchema,
+        filePath: z.string().min(1),
+        filename: z.string().min(1).max(255).optional(),
+      }),
+      async ({ companyId, projectId, filePath, filename }) => {
+        const form = await buildFileForm(filePath, filename);
+        return client.requestMultipart(
+          "POST",
+          `/companies/${client.resolveCompanyId(companyId)}/projects/${encodeURIComponent(projectId)}/documents`,
+          form,
+        );
+      },
+    ),
+    makeTool(
+      "paperclipAnalyzeProjectDocument",
+      "Analyze a local requirement document before creating a project: returns a suggested name, slug and summary",
+      z.object({
+        companyId: companyIdOptional,
+        filePath: z.string().min(1),
+        filename: z.string().min(1).max(255).optional(),
+      }),
+      async ({ companyId, filePath, filename }) => {
+        const form = await buildFileForm(filePath, filename);
+        return client.requestMultipart(
+          "POST",
+          `/companies/${client.resolveCompanyId(companyId)}/projects/analyze-document`,
+          form,
+        );
+      },
+    ),
+    makeTool(
+      "paperclipGetCostsSummary",
+      "Get a company's cost summary, optionally scoped to a date range",
+      z.object({
+        companyId: companyIdOptional,
+        from: z.string().optional(),
+        to: z.string().optional(),
+      }),
+      async ({ companyId, from, to }) => {
+        const params = new URLSearchParams();
+        if (from) params.set("from", from);
+        if (to) params.set("to", to);
+        const qs = params.toString();
+        return client.requestJson(
+          "GET",
+          `/companies/${client.resolveCompanyId(companyId)}/costs/summary${qs ? `?${qs}` : ""}`,
+        );
+      },
+    ),
+    makeTool(
+      "paperclipGetCostsByAgent",
+      "Get a company's spend broken down by agent, optionally scoped to a date range",
+      z.object({
+        companyId: companyIdOptional,
+        from: z.string().optional(),
+        to: z.string().optional(),
+      }),
+      async ({ companyId, from, to }) => {
+        const params = new URLSearchParams();
+        if (from) params.set("from", from);
+        if (to) params.set("to", to);
+        const qs = params.toString();
+        return client.requestJson(
+          "GET",
+          `/companies/${client.resolveCompanyId(companyId)}/costs/by-agent${qs ? `?${qs}` : ""}`,
+        );
+      },
+    ),
+    makeTool(
+      "paperclipGetBudgetsOverview",
+      "Get a company's budget overview including active incidents, paused agents and paused projects",
+      z.object({ companyId: companyIdOptional }),
+      async ({ companyId }) =>
+        client.requestJson(
+          "GET",
+          `/companies/${client.resolveCompanyId(companyId)}/budgets/overview`,
+        ),
+    ),
+    makeTool(
+      "paperclipUpdateCompanyBudget",
+      "Set a company's monthly budget in cents (board only)",
+      z.object({
+        companyId: companyIdOptional,
+        budgetMonthlyCents: z.number().int().nonnegative(),
+      }),
+      async ({ companyId, budgetMonthlyCents }) =>
+        client.requestJson(
+          "PATCH",
+          `/companies/${client.resolveCompanyId(companyId)}/budgets`,
+          { body: { budgetMonthlyCents } },
+        ),
+    ),
+    makeTool(
+      "paperclipUpdateAgentBudget",
+      "Set an agent's monthly budget in cents (board only)",
+      z.object({
+        agentId: z.string().min(1),
+        budgetMonthlyCents: z.number().int().nonnegative(),
+      }),
+      async ({ agentId, budgetMonthlyCents }) =>
+        client.requestJson("PATCH", `/agents/${encodeURIComponent(agentId)}/budgets`, {
+          body: { budgetMonthlyCents },
+        }),
+    ),
+    makeTool(
+      "paperclipGetAgentRuntimeState",
+      "Get an agent's persisted runtime state (board only) — heartbeat and run bookkeeping for that agent",
+      z.object({ agentId: z.string().min(1) }),
+      async ({ agentId }) =>
+        client.requestJson("GET", `/agents/${encodeURIComponent(agentId)}/runtime-state`),
+    ),
+    makeTool(
+      "paperclipListSchedulerHeartbeats",
+      "List the instance scheduler/heartbeat status per agent (status, heartbeatEnabled, schedulerActive)",
+      z.object({}),
+      async () => client.requestJson("GET", "/instance/scheduler-heartbeats"),
+    ),
+    makeTool(
+      "paperclipEmergencyStopCompany",
+      "Company kill-switch: pause a company so heartbeat dispatch stops (board only)",
+      z.object({
+        companyId: companyIdOptional,
+        reason: z.string().min(1).max(280),
+        reasonKind: z.enum(["manual", "budget", "compliance", "anomaly"]).optional(),
+      }),
+      async ({ companyId, reason, reasonKind }) =>
+        client.requestJson(
+          "POST",
+          `/companies/${client.resolveCompanyId(companyId)}/emergency-stop`,
+          { body: { reason, ...(reasonKind ? { reasonKind } : {}) } },
+        ),
+    ),
+    makeTool(
+      "paperclipEmergencyResumeCompany",
+      "Company kill-switch release: resume a paused company so heartbeat dispatch can continue (board only)",
+      z.object({ companyId: companyIdOptional }),
+      async ({ companyId }) =>
+        client.requestJson(
+          "POST",
+          `/companies/${client.resolveCompanyId(companyId)}/emergency-resume`,
+          { body: {} },
+        ),
     ),
     makeTool(
       "paperclipApiRequest",

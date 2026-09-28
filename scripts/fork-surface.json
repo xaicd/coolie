@@ -463,6 +463,24 @@
       "maxNetLines": 110,
       "reason": "wave123: vitest cover for the description/goal extraction heuristics above (paragraph selection, 目标-section scoping, 8-goal cap, 80-char title cap, dedupe, numbered/bulleted lists). New test file beside its subject.",
       "maxTotalLines": 120
+    },
+    {
+      "path": "packages/mcp-server/src/client.ts",
+      "maxNetLines": 80,
+      "reason": "wave128C: adds requestMultipart for the upload endpoints (issue attachments, project requirement documents, analyze-document), which are multipart/form-data and cannot be reached through the JSON-only requestJson. Shares one buildHeaders so the fork's dual credential (Authorization Bearer AND X-Paperclip-Api-Key, from commit 731fd0207) and the run-id header are applied identically to both shapes. Resolution at a merge: keep requestMultipart and the extracted helpers; upstream's requestJson body is otherwise unchanged.",
+      "maxTotalLines": 140
+    },
+    {
+      "path": "packages/mcp-server/src/tools.ts",
+      "maxNetLines": 400,
+      "reason": "wave128C: lifts the team's high-frequency operations into MCP tools — issue assign, issue attachments (list/upload), work products (list/create), project documents (list/upload/analyze), costs and budgets (summary/by-agent/overview/company+agent budget), agent runtime state, scheduler heartbeats, and the company kill-switch (emergency-stop/resume). Every company-scoped tool resolves its company through the client so company isolation is honoured. Resolution at a merge: keep the added tool blocks; they append to createToolDefinitions and do not alter upstream's existing tools.",
+      "maxTotalLines": 520
+    },
+    {
+      "path": "packages/mcp-server/src/tools.test.ts",
+      "maxNetLines": 260,
+      "reason": "wave128C: covers the new tools (multipart upload with no JSON content-type, work product creation, budget update, kill-switch round-trip, scheduler heartbeats) and a company-isolation case asserted both ways — a client pinned to company A resolves to A, and a cross-company read is reported as a 403 refusal rather than returning B's data. Resolution at a merge: keep the added cases and the companyId-parameterised makeClient.",
+      "maxTotalLines": 340
     }
   ]
 }

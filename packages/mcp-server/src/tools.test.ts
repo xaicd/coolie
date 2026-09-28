@@ -2,11 +2,20 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PaperclipApiClient } from "./client.js";
 import { createToolDefinitions } from "./tools.js";
 
-function makeClient() {
+// The upload tools read the file from disk; the tests only need a determinate
+// buffer, so the read is stubbed rather than a real temp file being created.
+vi.mock("node:fs/promises", () => ({
+  readFile: vi.fn(async () => Buffer.from("requirement document body")),
+}));
+
+const COMPANY_A = "11111111-1111-1111-1111-111111111111";
+const COMPANY_B = "99999999-9999-4999-8999-999999999999";
+
+function makeClient(companyId: string = COMPANY_A) {
   return new PaperclipApiClient({
     apiUrl: "http://localhost:3100/api",
     apiKey: "token-123",
-    companyId: "11111111-1111-1111-1111-111111111111",
+    companyId,
     agentId: "22222222-2222-2222-2222-222222222222",
     runId: "33333333-3333-3333-3333-333333333333",
   });
@@ -14,6 +23,12 @@ function makeClient() {
 
 function getTool(name: string) {
   const tool = createToolDefinitions(makeClient()).find((candidate) => candidate.name === name);
+  if (!tool) throw new Error(`Missing tool ${name}`);
+  return tool;
+}
+
+function getToolFor(name: string, client: PaperclipApiClient) {
+  const tool = createToolDefinitions(client).find((candidate) => candidate.name === name);
   if (!tool) throw new Error(`Missing tool ${name}`);
   return tool;
 }
@@ -504,6 +519,183 @@ describe("paperclip MCP tools", () => {
     const payload = JSON.parse(String(putInit.body));
     expect(payload.content).toContain("Hermes总控与DSH定位");
     expect(payload.content).toContain("Hermes直面微信QQ总控");
+  });
+
+  it("assigns an issue through the issue patch route", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "PAP-1", status: "todo" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getTool("paperclipAssignIssue").execute({
+      issueId: "PAP-1",
+      assigneeAgentId: "22222222-2222-4222-8222-222222222222",
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/PAP-1");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(String(init.body))).toEqual({
+      assigneeAgentId: "22222222-2222-4222-8222-222222222222",
+    });
+  });
+
+  it("uploads an issue attachment as multipart under the company-scoped route", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "att-1" }, 201));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipUploadIssueAttachment").execute({
+      issueId: "PAP-1",
+      filePath: "/tmp/spec.md",
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(
+      `http://localhost:3100/api/companies/${COMPANY_A}/issues/PAP-1/attachments`,
+    );
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeInstanceOf(FormData);
+    const headers = init.headers as Record<string, string>;
+    expect(headers["Authorization"]).toBe("Bearer token-123");
+    expect(headers["X-Paperclip-Api-Key"]).toBe("token-123");
+    // fetch must own the boundary — a JSON content-type here would break parsing.
+    expect(headers["Content-Type"]).toBeUndefined();
+    expect(response.content[0]?.text).toContain("att-1");
+  });
+
+  it("analyzes a project document before project creation", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockJsonResponse({ suggestedName: "进销存", source: "content" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipAnalyzeProjectDocument").execute({
+      filePath: "/tmp/req.docx",
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(
+      `http://localhost:3100/api/companies/${COMPANY_A}/projects/analyze-document`,
+    );
+    expect(init.method).toBe("POST");
+    expect(init.body).toBeInstanceOf(FormData);
+    expect(response.content[0]?.text).toContain("content");
+  });
+
+  it("records a work product on an issue", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "wp-1" }, 201));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getTool("paperclipCreateWorkProduct").execute({
+      issueId: "PAP-1",
+      type: "artifact",
+      title: "Release APK",
+      provider: "coolie",
+      url: "https://dls.xrobinai.cn/coolie/app/0.5.88/coolie-release.apk",
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/PAP-1/work-products");
+    expect(init.method).toBe("POST");
+    expect(JSON.parse(String(init.body))).toEqual({
+      type: "artifact",
+      title: "Release APK",
+      provider: "coolie",
+      url: "https://dls.xrobinai.cn/coolie/app/0.5.88/coolie-release.apk",
+    });
+  });
+
+  it("sets a company budget through the board-only budgets route", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "company-1" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getTool("paperclipUpdateCompanyBudget").execute({ budgetMonthlyCents: 500000 });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/budgets`);
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(String(init.body))).toEqual({ budgetMonthlyCents: 500000 });
+  });
+
+  it("stops and resumes a company through the kill-switch routes", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ ok: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getTool("paperclipEmergencyStopCompany").execute({
+      reason: "预算异常",
+      reasonKind: "budget",
+    });
+    await getTool("paperclipEmergencyResumeCompany").execute({});
+
+    const [stopUrl, stopInit] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(stopUrl)).toBe(
+      `http://localhost:3100/api/companies/${COMPANY_A}/emergency-stop`,
+    );
+    expect(stopInit.method).toBe("POST");
+    expect(JSON.parse(String(stopInit.body))).toEqual({
+      reason: "预算异常",
+      reasonKind: "budget",
+    });
+
+    const [resumeUrl, resumeInit] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(String(resumeUrl)).toBe(
+      `http://localhost:3100/api/companies/${COMPANY_A}/emergency-resume`,
+    );
+    expect(resumeInit.method).toBe("POST");
+  });
+
+  it("reads scheduler heartbeats from the instance route", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockJsonResponse([{ agentId: "a-1", schedulerActive: true }]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getTool("paperclipListSchedulerHeartbeats").execute({});
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/instance/scheduler-heartbeats");
+    expect(init.method).toBe("GET");
+  });
+
+  it("keeps company-scoped reads inside the configured company (company A cannot see company B)", async () => {
+    const listA = getToolFor("paperclipListIssues", makeClient(COMPANY_A));
+    const listB = getToolFor("paperclipListIssues", makeClient(COMPANY_B));
+
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+    await listA.execute({});
+    await listB.execute({});
+
+    // The default company is the client's own — a client pinned to A never
+    // silently resolves to B.
+    expect(String(fetchMock.mock.calls[0][0])).toBe(
+      `http://localhost:3100/api/companies/${COMPANY_A}/issues`,
+    );
+    expect(String(fetchMock.mock.calls[1][0])).toBe(
+      `http://localhost:3100/api/companies/${COMPANY_B}/issues`,
+    );
+
+    // Asking A's client for B is an explicit cross-company request; the backend
+    // refuses it, and the tool must report that refusal rather than return B's
+    // data. A restriction that silently returns something is a restriction in
+    // name only.
+    const denied = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    vi.stubGlobal("fetch", denied);
+
+    const response = await getToolFor("paperclipGetCompanyDashboard", makeClient(COMPANY_A)).execute({
+      companyId: COMPANY_B,
+    });
+
+    expect(denied).toHaveBeenCalledTimes(1);
+    expect(String(denied.mock.calls[0][0])).toBe(
+      `http://localhost:3100/api/companies/${COMPANY_B}/dashboard`,
+    );
+    const text = response.content[0]?.text ?? "";
+    expect(text).toContain("403");
+    expect(text).toContain("Forbidden");
   });
 });
 

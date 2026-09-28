@@ -75,29 +75,68 @@ export class PaperclipApiClient {
     return resolved;
   }
 
-  async requestJson<T>(method: string, path: string, options: JsonRequestOptions = {}): Promise<T> {
-    if (!path.startsWith("/")) {
-      throw new Error(`API path must start with "/": ${path}`);
-    }
-
-    const url = new URL(path.slice(1), `${this.config.apiUrl}/`);
+  /**
+   * Auth + run-scoped headers shared by every request shape. The fork's board
+   * channel reads `X-Paperclip-Api-Key` while agent runs read `Authorization`,
+   * so both are always sent (see the fork-surface entry for this file).
+   */
+  private buildHeaders(method: string, options: JsonRequestOptions, jsonBody: boolean): Record<string, string> {
     const headers: Record<string, string> = {
       Authorization: `Bearer ${this.config.apiKey}`,
       "X-Paperclip-Api-Key": this.config.apiKey,
       Accept: "application/json",
     };
-    if (options.body !== undefined) {
+    if (jsonBody) {
       headers["Content-Type"] = "application/json";
     }
     if ((options.includeRunId ?? isWriteMethod(method)) && this.config.runId) {
       headers["X-Paperclip-Run-Id"] = this.config.runId;
     }
+    return headers;
+  }
+
+  private resolveUrl(path: string): URL {
+    if (!path.startsWith("/")) {
+      throw new Error(`API path must start with "/": ${path}`);
+    }
+    return new URL(path.slice(1), `${this.config.apiUrl}/`);
+  }
+
+  async requestJson<T>(method: string, path: string, options: JsonRequestOptions = {}): Promise<T> {
+    const url = this.resolveUrl(path);
+    const headers = this.buildHeaders(method, options, options.body !== undefined);
 
     const response = await fetch(url, {
       method,
       headers,
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
+    const parsedBody = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new PaperclipApiError({
+        status: response.status,
+        method: method.toUpperCase(),
+        path,
+        body: parsedBody,
+        message: buildErrorMessage(method.toUpperCase(), path, response.status, parsedBody),
+      });
+    }
+
+    return parsedBody as T;
+  }
+
+  /**
+   * multipart/form-data request for the upload endpoints (issue attachments,
+   * project requirement documents, document analysis). Content-Type is left to
+   * fetch so it can set the multipart boundary itself — setting it here would
+   * omit the boundary and the server's parser would reject the body.
+   */
+  async requestMultipart<T>(method: string, path: string, form: FormData, options: JsonRequestOptions = {}): Promise<T> {
+    const url = this.resolveUrl(path);
+    const headers = this.buildHeaders(method, options, false);
+
+    const response = await fetch(url, { method, headers, body: form });
     const parsedBody = await parseResponseBody(response);
 
     if (!response.ok) {
