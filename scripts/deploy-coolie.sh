@@ -100,11 +100,13 @@ check_public_asset() {
   if curl -fsS -m 20 "$url" >/dev/null 2>&1; then
     echo "  ok   $label ($url)"
   else
-    die "$label is GONE after the sync ($url).
-The tree sync deleted a file it must not touch — ui/ota or ui/dist/version.json.
+    die "$label is GONE after the deploy step ($url).
+The sync or the UI rebuild deleted a file it must not touch — ui/ota or ui/dist/version.json.
 Every installed App's OTA/upgrade feed is now broken. Restore it before serving traffic:
   publish-ota.sh re-uploads ui/ota; release-app.sh re-uploads ui/dist/version.json.
-Then fix the RSYNC_EXCLUDES list in $0 so this cannot happen again."
+Then fix the step that deleted it so this cannot happen again: the sync's RSYNC_EXCLUDES
+must cover both paths, and the UI build must stash and restore ui/dist/version.json
+(vite empties dist, which takes the manifest with it — seen live at 0.5.89)."
   fi
 }
 
@@ -174,7 +176,12 @@ else
   for target in $STALE; do
     case "$target" in
       ui)
-        ssh -o BatchMode=yes "$COOLIE_HOST" "cd '$COOLIE_DIR' && export CI=1 && pnpm --filter @paperclipai/ui build" >/dev/null \
+        # `vite build` empties ui/dist, which also removes the App upgrade
+        # manifest release-app.sh writes there (it is not in the local tree, so
+        # nothing rebuilds it). Stash it across the build and restore it with the
+        # read permission Caddy serves it with — otherwise /version.json 404s and
+        # every installed App silently sees "no update".
+        ssh -o BatchMode=yes "$COOLIE_HOST" "cd '$COOLIE_DIR' && export CI=1 && keep=\$(mktemp) && if [ -f ui/dist/version.json ]; then cp ui/dist/version.json \"\$keep\"; fi && pnpm --filter @paperclipai/ui build && if [ -s \"\$keep\" ]; then cp \"\$keep\" ui/dist/version.json && chmod 644 ui/dist/version.json; fi && rm -f \"\$keep\"" >/dev/null \
           || die "ui build failed"
         echo "  built ui" ;;
       pkg:*)
@@ -185,6 +192,13 @@ else
     esac
   done
 fi
+
+# The upgrade feed survived the sync, but a UI rebuild happens after that check
+# and vite empties dist, so prove it again now — while the fix (restore, or fix
+# the build) is still cheap and before traffic is served.
+step "assert upgrade feed survived the build"
+check_public_asset "${COOLIE_PUBLIC_URL}/version.json" "upgrade manifest"
+check_public_asset "${COOLIE_PUBLIC_URL}/ota/manifest" "OTA manifest"
 
 # The UI must exist: the server runs in static mode, and without dist it silently
 # falls back to API-only and the site serves nothing.
