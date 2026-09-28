@@ -108,6 +108,8 @@ export interface PluginHostContext {
   entityId: string | null;
   entityType: string | null;
   parentEntityId?: string | null;
+  /** Route ref (URL key) of the active project, when the slot is project-scoped. */
+  projectRef?: string | null;
   userId: string | null;
   renderEnvironment?: PluginRenderEnvironmentContext | null;
 }

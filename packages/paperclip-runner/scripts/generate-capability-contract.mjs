@@ -161,7 +161,20 @@ async function buildContract() {
   const contract = JSON.parse(await readFile(contractPath, "utf8"));
   const capabilities = await readSkillHeadings(contract.skillSources);
   const discoveredTools = await readLegacyTools();
-  const tools = discoveredTools.map((tool) => {
+  const discoveredToolNames = new Set(discoveredTools.map((tool) => tool.name));
+
+  // Tools this fork added to the MCP server are new capabilities, not traceability
+  // aliases into the upstream skill/eval corpus, so they are declared in the
+  // contract and kept out of the map. The gate stays exact rather than lenient: a
+  // tool that is present in tools.ts and is neither mapped nor declared still
+  // fails, and a declared tool that is missing or also mapped is caught here.
+  const forkAdded = new Set(contract.forkAddedTools ?? []);
+  for (const name of forkAdded) {
+    if (!discoveredToolNames.has(name)) throw new Error(`Fork-added MCP tool ${name} is declared but not present in packages/mcp-server/src/tools.ts`);
+    if (contract.toolMappings[name]) throw new Error(`Fork-added MCP tool ${name} must not also be classified in toolMappings`);
+  }
+
+  const tools = discoveredTools.filter((tool) => !forkAdded.has(tool.name)).map((tool) => {
     const mapping = contract.toolMappings[tool.name];
     if (!mapping) throw new Error(`Legacy MCP tool ${tool.name} is unclassified`);
     return {
@@ -179,7 +192,6 @@ async function buildContract() {
   validateRows(capabilities, "Skill headings");
   validateRows(tools, "MCP tools");
   validateRows(evals, "Eval cases");
-  const discoveredToolNames = new Set(discoveredTools.map((tool) => tool.name));
   for (const mappedToolName of Object.keys(contract.toolMappings)) {
     if (!discoveredToolNames.has(mappedToolName)) throw new Error(`MCP mapping has no registered source tool: ${mappedToolName}`);
   }

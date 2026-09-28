@@ -24,8 +24,13 @@ if [ "$SKIP_BUILD" != "--skip-build" ]; then
 fi
 
 echo "=== [2/6] rsync 代码(保护远端 .env，排除 node_modules/.git/本地数据) ==="
-# ui/ota 是 publish-ota.sh 直传远端的 OTA 分发目录; .env 是远端生产独立配置
-# 必须显式 exclude，防止 --delete 把远端生产数据库配置或 OTA 资产抹掉
+# 这些路径是别的写入者直传远端的生产状态，不在本地 checkout 里 ——
+# rsync --delete 会删掉「目标有、源没有」的文件，所以必须显式 exclude：
+#   · ui/ota                    publish-ota*.sh 直传的 OTA 分发目录
+#   · ui/dist/version.json      release-app.sh scp 的 App 升级清单 (Caddy 直出 /version.json)
+#   · ui/dist/h5                publish-h5.sh 直传的 H5 站点
+#   · .env / data / server/data 远端生产独立配置与实例数据
+# version.json 用无斜杠模式，顺带保护根目录下可能存在的同名文件。
 rsync -az --delete \
   --exclude '.env' \
   --exclude '.env.*' \
@@ -39,6 +44,8 @@ rsync -az --delete \
   --exclude 'clients/expo' \
   --exclude 'doc/plans' \
   --exclude 'ui/ota' \
+  --exclude 'version.json' \
+  --exclude 'ui/dist/h5' \
   ./ "$SSH_TARGET:$REMOTE_DIR/"
 
 # 仅对 PAT 配置进行无损增量合并，绝不覆盖远端已有的 DATABASE_URL、SECRET 等生产关键变量

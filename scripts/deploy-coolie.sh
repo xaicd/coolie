@@ -48,11 +48,23 @@ cd "$REPO_ROOT"
 # Paths that must never be copied to the host: local installs, build output, and
 # history. `dist` is excluded because it is rebuilt there; shipping a stale one
 # is worse than shipping none.
+#
+# The second group is not local build state — it is production state that lives
+# inside the deploy directory and is written by something other than this sync.
+# rsync --delete removes any destination file the source does not have, so an
+# exclude here is the only thing standing between a routine deploy and that
+# state. `ui/ota` and `ui/dist/version.json` are pushed directly by publish-ota.sh
+# and release-app.sh; `data/` and `server/data/` are the instance database and
+# uploads; `clients/expo` is the mobile checkout (never served); `doc/plans` is
+# local-only planning. Keep this list a superset of deploy-tc-coolie-claw.sh's
+# (the sibling deploy), because that one is the path release-app.sh actually
+# drives.
 RSYNC_EXCLUDES=(
   --exclude='.env'
   --exclude='.env.*'
   --exclude='node_modules'
   --exclude='.git'
+  --exclude='.claude'
   --exclude='target'
   --exclude='dist'
   --exclude='test-results'
@@ -60,6 +72,12 @@ RSYNC_EXCLUDES=(
   --exclude='report'
   --exclude='.commandcode'
   --exclude='*.tsbuildinfo'
+  --exclude='data'
+  --exclude='server/data'
+  --exclude='clients/expo'
+  --exclude='doc/plans'
+  --exclude='ui/ota'
+  --exclude='version.json'
 )
 
 # Workspace packages the server loads from built output rather than source.
@@ -67,6 +85,28 @@ BUILT_PACKAGES=(shared db adapter-utils plugins/sdk skills-catalog teams-catalog
 
 step() { printf '\n=== %s ===\n' "$1"; }
 die() { printf '\nFAIL: %s\n' "$1" >&2; exit 1; }
+
+# Ask the public endpoint for a file the tree sync must never have touched.
+#
+# The deployed upgrade feed (version.json) and the OTA distribution (ui/ota) are
+# not part of the checkout: publish-ota.sh and release-app.sh write them straight
+# into the deploy directory. `rsync --delete` deletes whatever the source lacks,
+# so a single missing `--exclude` takes every installed App's update feed down —
+# silent 404s, no alert. This probe runs immediately after the sync, before the
+# build and the restart, and it asks the site itself rather than trusting the
+# exclude list to have been correct.
+check_public_asset() {
+  local url="$1" label="$2"
+  if curl -fsS -m 20 "$url" >/dev/null 2>&1; then
+    echo "  ok   $label ($url)"
+  else
+    die "$label is GONE after the sync ($url).
+The tree sync deleted a file it must not touch — ui/ota or ui/dist/version.json.
+Every installed App's OTA/upgrade feed is now broken. Restore it before serving traffic:
+  publish-ota.sh re-uploads ui/ota; release-app.sh re-uploads ui/dist/version.json.
+Then fix the RSYNC_EXCLUDES list in $0 so this cannot happen again."
+  fi
+}
 
 # Paths this deployment has retired and must never serve again, space-separated.
 # Empty by default, because a retired path is a fact about one deployment and
@@ -109,6 +149,13 @@ step "sync whole tree"
 rsync -az --delete "${RSYNC_EXCLUDES[@]}" ./ "${COOLIE_HOST}:${COOLIE_DIR}/" \
   || die "rsync failed"
 echo "synced"
+
+# Prove the sync spared the upgrade feed, while the damage (if any) is still the
+# only thing wrong. Doing this here rather than at the end means a wipe fails the
+# deploy before the build and restart, not after.
+step "assert upgrade feed survived the sync"
+check_public_asset "${COOLIE_PUBLIC_URL}/version.json" "upgrade manifest"
+check_public_asset "${COOLIE_PUBLIC_URL}/ota/manifest" "OTA manifest"
 
 step "rebuild whatever went stale"
 # A package only needs rebuilding when its source is newer than its build output.

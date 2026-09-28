@@ -165,8 +165,8 @@ function parseCase(source, sourceAnchor) {
   };
 }
 
-function parseMcpTools(source) {
-  return [...source.matchAll(/makeTool\(\s*"([^"]+)"\s*,\s*"([^"]+)"/g)].map((match) => {
+function parseMcpTools(source, forkAddedTools = new Set()) {
+  return [...source.matchAll(/makeTool\(\s*"([^"]+)"\s*,\s*"([^"]+)"/g)].filter((match) => !forkAddedTools.has(match[1])).map((match) => {
     const [name, description] = [match[1], match[2]];
     const foldedInto = legacyMcpFoldTargets[name];
     return {
@@ -244,12 +244,22 @@ export async function buildSkillInventory(repoRoot) {
 }
 
 export async function buildMcpInventory(repoRoot) {
+  // MCP tools this fork added are declared in the capability contract and kept
+  // out of the legacy alias index: they are new capabilities, not aliases into
+  // the upstream skill/eval corpus, so they have no normative row to fold into.
+  // Declaring them (rather than silently skipping) keeps the index exact — an
+  // undeclared tool still surfaces below as a live row with no folded target.
+  const contract = JSON.parse(await readFile(resolve(repoRoot, "packages/paperclip-runner/spec/capability/source-contract.json"), "utf8"));
+  const forkAddedTools = new Set(contract.forkAddedTools ?? []);
+  for (const name of forkAddedTools) {
+    if (legacyMcpFoldTargets[name]) throw new Error(`Fork-added MCP tool ${name} must not be folded into the upstream eval corpus`);
+  }
   return {
     schemaVersion: 2,
     inventoryRole: "legacy_alias_index",
     generatedFrom: "packages/mcp-server/src/tools.ts",
     normativeSources: ["capabilities", "evaluations"],
-    rows: parseMcpTools(await readFile(resolve(repoRoot, "packages/mcp-server/src/tools.ts"), "utf8")),
+    rows: parseMcpTools(await readFile(resolve(repoRoot, "packages/mcp-server/src/tools.ts"), "utf8"), forkAddedTools),
   };
 }
 

@@ -102,6 +102,15 @@ export interface PluginHostContext {
    * For `commentAnnotation` slots this is the issue ID containing the comment.
    */
   parentEntityId?: string | null;
+  /**
+   * Route ref (URL key) of the currently active project, if any.
+   *
+   * The host already threads this through the slot context — it is what builds
+   * the `/projects/:projectRef` route — so detail tabs read it to label their
+   * project-scoped views without a second lookup. Optional because only
+   * project-scoped slots have one.
+   */
+  projectRef?: string | null;
   /** UUID of the current authenticated user. */
   userId: string | null;
   /** Runtime metadata for the host container currently rendering this plugin UI. */

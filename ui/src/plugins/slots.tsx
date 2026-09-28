@@ -828,6 +828,7 @@ function slotContextToHostContext(
     entityId: pluginSlotContext.entityId ?? null,
     entityType: pluginSlotContext.entityType ?? null,
     parentEntityId: pluginSlotContext.parentEntityId ?? null,
+    projectRef: pluginSlotContext.projectRef ?? null,
     userId,
     renderEnvironment: null,
   };

@@ -171,7 +171,13 @@ EOF
 
 echo "=== [3/4] 同步更新包到生产服务器 $SSH_TARGET:$REMOTE_OTA_DIR/ ==="
 ssh "$SSH_TARGET" "mkdir -p $REMOTE_OTA_DIR"
-rsync -avz --delete "$DIST_DIR/" "$SSH_TARGET:$REMOTE_OTA_DIR/"
+# --delete 会删掉「目标有、源没有」的文件。Coolie Web (paperclip-web) 的 OTA 套件
+# 是 $REMOTE_OTA_DIR 下的子目录，由 clients/expo-paperclip-web 独立发布 —— 本 App
+# 的 dist 里没有它，若不排除，每次发驾驶舱 OTA 都会把 Coolie Web 的更新源整个删掉。
+# 排除后桥接保住子目录（exclude 的文件/目录不参与 --delete）。
+rsync -avz --delete \
+  --exclude 'paperclip-web' \
+  "$DIST_DIR/" "$SSH_TARGET:$REMOTE_OTA_DIR/"
 
 echo "=== [4/4] 验证远端更新源有效性 ==="
 ssh "$SSH_TARGET" "if [ -f $REMOTE_OTA_DIR/manifest ]; then echo '✓ 远端 manifest 已更新就绪:'; head -n 12 $REMOTE_OTA_DIR/manifest; else echo '❌ 远端未找到 manifest'; exit 1; fi"

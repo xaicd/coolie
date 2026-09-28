@@ -63,6 +63,25 @@
     "paperclipDispatchTaskToRole": ["optional_agent_tool", "dispatch_task_to_role"],
     "paperclipRecordBossDecision": ["always_agent_tool", "record_boss_decision"]
   },
+  "forkAddedTools": [
+    "paperclipAssignIssue",
+    "paperclipListIssueAttachments",
+    "paperclipUploadIssueAttachment",
+    "paperclipListWorkProducts",
+    "paperclipCreateWorkProduct",
+    "paperclipListProjectDocuments",
+    "paperclipUploadProjectDocument",
+    "paperclipAnalyzeProjectDocument",
+    "paperclipGetCostsSummary",
+    "paperclipGetCostsByAgent",
+    "paperclipGetBudgetsOverview",
+    "paperclipUpdateCompanyBudget",
+    "paperclipUpdateAgentBudget",
+    "paperclipGetAgentRuntimeState",
+    "paperclipListSchedulerHeartbeats",
+    "paperclipEmergencyStopCompany",
+    "paperclipEmergencyResumeCompany"
+  ],
   "evalGroups": {
     "hb": ["control_plane_owned", "control_plane_invariant", "get_task_context", "active_task_context"],
     "co": ["control_plane_owned", "control_plane_invariant", "atomic_checkout", "checkout_decision"],
