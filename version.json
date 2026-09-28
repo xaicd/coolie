@@ -1,8 +1,8 @@
 {
-  "version": "0.5.83",
-  "versionCode": 583,
-  "commitSha": "7248f558b29a10e2369b8bdee22b86cab9c727f4",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.83/coolie-release.apk",
-  "sha256": "a471e427bc8e08db3783e87065df845a39d58215c26e518da8d09c5b899c4788",
-  "releaseNotes": "wave119 修极速立项：原生「极速立项」抽屉重构为稳固全高弹窗（固定头尾 + 自适应滚动，修复真机只看得到项目名称），补齐 4 大开源底座预设与多仓库/本地目录绑定；board 助手不再编造「凭证失效」，统一 x-paperclip-api-key 头与公网链接。"
+  "version": "0.5.84",
+  "versionCode": 584,
+  "commitSha": "36e7310d0473febbb269fdd58ab6963df6c0666e",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.84/coolie-release.apk",
+  "sha256": "5a2be5efd32f85f45669991253fa1a42c949b3897217f4ce85d0717c1539b423",
+  "releaseNotes": "wave120 原生任务指派/改派：任务详情「分配智能体」行改为可点，打开员工底部选择器（列出本公司员工 + 在线状态，含「未分配」清除项），选中即乐观更新并 PATCH /api/issues/:id（assigneeAgentId，传 null 清除），失败回滚并提示；新建任务「负责人」改用同一选择器"
 }
