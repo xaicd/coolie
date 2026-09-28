@@ -224,6 +224,7 @@ import {
 } from "../errors.js";
 import { privateJsonEtag } from "../middleware/private-json-etag.js";
 import { createRequestPromiseMemo } from "../lib/request-promise-memo.js";
+import { runTolerantMultipartUpload } from "../lib/multipart-upload.js";
 import {
   assertBoard,
   assertCompanyAccess,
@@ -4878,12 +4879,9 @@ export function issueRoutes(
       defParamCharset: "utf8",
       limits: { fileSize: fileSizeLimit, files: 1 },
     });
-    await new Promise<void>((resolve, reject) => {
-      upload.single("file")(req, res, (err: unknown) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    // Tolerates React Native's `filename*=utf-8''…` part header, which busboy
+    // would otherwise reject and drop (see lib/multipart-upload.ts).
+    await runTolerantMultipartUpload(upload, req, res, fileSizeLimit);
   }
 
   async function assertCanManageIssueApprovalLinks(

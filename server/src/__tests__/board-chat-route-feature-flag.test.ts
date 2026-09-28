@@ -164,9 +164,11 @@ describe("board-chat failure surfacing", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    delete process.env.PAPERCLIP_BOARD_CHAT_TIMEOUT_MS;
   });
 
   afterEach(async () => {
+    delete process.env.PAPERCLIP_BOARD_CHAT_TIMEOUT_MS;
     await Promise.all(
       servers.splice(0).map(
         (s) =>
@@ -258,6 +260,45 @@ describe("board-chat failure surfacing", () => {
     // No authorType override: `addComment` requires it to match the actor, so
     // forcing "system" for a userId actor throws and nothing is persisted.
     expect(errorCall?.[3]).toBeUndefined();
+  });
+
+  it("keeps a timed-out run's partial reply instead of a raw [hermes-error]", async () => {
+    process.env.PAPERCLIP_BOARD_CHAT_TIMEOUT_MS = "80";
+    const proc = makeFakeProc();
+    const { pending } = await startChat(proc);
+
+    proc.stdout.emit("data", Buffer.from("先说一部分结果\n"));
+
+    // The timeout fires on its own; no manual kill.
+    await vi.waitFor(() => expect(proc.kill).toHaveBeenCalledWith("SIGTERM"));
+    proc.exitCode = 143;
+    proc.emit("close", 143);
+
+    const text = await pending;
+
+    expect(text).toContain('"type":"done"');
+    expect(text).toContain('"timedOut":true');
+    expect(text).not.toContain('"type":"error"');
+    const saved = String(mockIssueService.addComment.mock.calls.at(-1)?.[1]);
+    expect(saved).toContain("先说一部分结果");
+    expect(saved).not.toContain("[hermes-error]");
+  });
+
+  it("reports a timed-out run with no output as a graceful status, not [hermes-error]", async () => {
+    process.env.PAPERCLIP_BOARD_CHAT_TIMEOUT_MS = "80";
+    const proc = makeFakeProc();
+    const { pending } = await startChat(proc);
+
+    await vi.waitFor(() => expect(proc.kill).toHaveBeenCalledWith("SIGTERM"));
+    proc.exitCode = 143;
+    proc.emit("close", 143);
+
+    const text = await pending;
+
+    expect(text).toContain('"type":"error"');
+    expect(text).toContain("秒");
+    const saved = String(mockIssueService.addComment.mock.calls.at(-1)?.[1]);
+    expect(saved).not.toContain("[hermes-error]");
   });
 
   it("emits an error event when hermes exits 0 but answers with nothing", async () => {

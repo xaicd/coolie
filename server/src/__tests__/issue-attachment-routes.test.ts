@@ -292,6 +292,43 @@ describe("issue attachment routes", () => {
     expect(res.body.contentType).toBe("application/zip");
   });
 
+  it("accepts a React Native multipart body whose filename* breaks busboy", async () => {
+    // React Native writes `filename*=utf-8''<encodeURI(name)>`; `encodeURI`
+    // leaves `(` and `)` unencoded, which busboy rejects in an unquoted value
+    // and then drops the whole part — the live 400 "Missing file field 'file'".
+    const storage = createStorageService();
+    const filename = "某公司产融智能体应用系统集成服务项目技术规范书 (1).docx";
+    const contentType =
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    mockIssueService.createAttachment.mockResolvedValue(makeAttachment(contentType, filename));
+    const boundary = "7cc48727-0000-4000-8000-000000000000";
+    const body = Buffer.concat([
+      Buffer.from(`--${boundary}\r\n`),
+      Buffer.from(
+        `Content-Disposition: form-data; name="file"; filename="${filename}"; filename*=utf-8''${encodeURI(filename)}\r\n`,
+      ),
+      Buffer.from(`Content-Type: ${contentType}\r\n\r\n`),
+      Buffer.from("docx-bytes"),
+      Buffer.from(`\r\n--${boundary}--\r\n`),
+    ]);
+
+    const app = await createApp(storage);
+    const res = await request(app)
+      .post("/api/companies/company-1/issues/11111111-1111-4111-8111-111111111111/attachments")
+      .set("Content-Type", `multipart/form-data; boundary=${boundary}`)
+      .send(body);
+
+    expect(res.status).toBe(201);
+    expect(storage.__calls.putFile).toMatchObject({
+      companyId: "company-1",
+      originalFilename: filename,
+      contentType,
+    });
+    expect(mockIssueService.createAttachment).toHaveBeenCalledWith(
+      expect.objectContaining({ originalFilename: filename, contentType }),
+    );
+  });
+
   it("removes a newly stored object when attachment registration is rejected", async () => {
     const storage = createStorageService();
     const { HttpError } = await vi.importActual<

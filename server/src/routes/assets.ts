@@ -13,6 +13,7 @@ import {
   MAX_ATTACHMENT_BYTES,
 } from "../attachment-types.js";
 import { assertCompanyAccess, getAccessibleResource, getActorInfo } from "./authz.js";
+import { runTolerantMultipartUpload } from "../lib/multipart-upload.js";
 const SVG_CONTENT_TYPE = "image/svg+xml";
 const ALLOWED_COMPANY_LOGO_CONTENT_TYPES = new Set([
   "image/png",
@@ -92,10 +93,13 @@ export function assetRoutes(db: Db, storage: StorageService) {
   const svc = assetService(db);
   const assetUpload = multer({
     storage: multer.memoryStorage(),
+    // React Native and browser FormData send filenames as raw UTF-8.
+    defParamCharset: "utf8",
     limits: { fileSize: MAX_ATTACHMENT_BYTES, files: 1 },
   });
   const companyLogoUpload = multer({
     storage: multer.memoryStorage(),
+    defParamCharset: "utf8",
     limits: { fileSize: MAX_ATTACHMENT_BYTES, files: 1 },
   });
 
@@ -104,12 +108,9 @@ export function assetRoutes(db: Db, storage: StorageService) {
     req: Request,
     res: Response,
   ) {
-    await new Promise<void>((resolve, reject) => {
-      upload.single("file")(req, res, (err: unknown) => {
-        if (err) reject(err);
-        else resolve();
-      });
-    });
+    // Tolerates React Native's `filename*=utf-8''…` part header, which busboy
+    // would otherwise reject and drop (see lib/multipart-upload.ts).
+    await runTolerantMultipartUpload(upload, req, res, MAX_ATTACHMENT_BYTES);
   }
 
   router.post("/companies/:companyId/assets/images", async (req, res) => {

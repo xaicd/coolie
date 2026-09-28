@@ -619,11 +619,18 @@ export function boardChatRoutes(
     // below. Capped so a chatty subprocess can't grow it without bound.
     let stderrBuf = "";
 
-    // 120s timeout — board conversations can involve multiple API calls.
+    // Board conversations can involve several model turns plus artifact
+    // generation and upload. The old hard 120s cut off real work: wave124's
+    // "生成一个测试看板文件" turn kept going and uploaded its artifact ~40s after
+    // the room had already shown a timeout. Keep it generous and configurable.
+    const timeoutMs = (() => {
+      const raw = Number(process.env.PAPERCLIP_BOARD_CHAT_TIMEOUT_MS);
+      return Number.isFinite(raw) && raw > 0 ? raw : 180_000;
+    })();
     const timeout = setTimeout(() => {
       killed = true;
       proc.kill("SIGTERM");
-    }, 120000);
+    }, timeoutMs);
 
     // If the client disconnects mid-stream, stop the subprocess rather than
     // letting it run out the remaining timeout window. `close` also fires
@@ -744,14 +751,53 @@ export function boardChatRoutes(
           stderrBuf.trim() ||
           `hermes exited ${exitCode ?? "?"} with no output`
         ).slice(0, 1000);
+
+        // A slow run that still produced usable text (wave124: a 看板文件 turn
+        // was cut off at the old 120s cap) must not throw that work away. Keep
+        // the partial reply, note it was cut short, and close with `done` so the
+        // room shows the content instead of a raw `[hermes-error]`.
+        if (
+          killed &&
+          cleanedResponse.trim() &&
+          !isBoardChatStatusLine(cleanedResponse)
+        ) {
+          const note = `\n\n（本次生成超过 ${Math.round(timeoutMs / 1000)} 秒被中断，以上是已完成的部分；若未完成请再发一次。）`;
+          try {
+            await issueSvc.addComment(
+              resolvedIssueId,
+              `${cleanedResponse}${note}`,
+              { userId: "board-concierge" },
+            );
+          } catch (e) {
+            console.error("[board-chat] failed to persist partial concierge reply:", e);
+          }
+          if (res.writable) {
+            res.write(
+              `data: ${JSON.stringify({
+                type: "done",
+                issueId: resolvedIssueId,
+                exitCode: exitCode ?? 0,
+                timedOut: true,
+                message: note.trim(),
+              })}\n\n`,
+            );
+            res.end();
+          }
+          return;
+        }
+
+        const seconds = Math.round(timeoutMs / 1000);
         const message = killed
-          ? `Board assistant timed out after 120s. ${detail}`
+          ? `这次生成超过 ${seconds} 秒仍未完成，任务可能较大或模型较慢；请再发一次让我继续。`
           : `Board assistant failed (exit ${exitCode ?? "?"}). ${detail}`;
+        // The raw detail stays in the server log for operators; a timeout is
+        // reported to the boss as a plain status line, not `[hermes-error]`.
+        if (killed) console.error("[board-chat] timed out:", detail);
 
         try {
           await issueSvc.addComment(
             resolvedIssueId,
-            `[hermes-error] ${message}`,
+            killed ? message : `[hermes-error] ${message}`,
             { userId: "board-concierge" },
           );
         } catch (e) {

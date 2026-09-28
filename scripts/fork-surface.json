@@ -419,8 +419,8 @@
     {
       "path": "server/src/routes/projects.ts",
       "maxNetLines": 220,
-      "reason": "wave122: (1) multipart POST/GET /companies/:companyId/projects/:projectId/documents — land an uploaded requirement doc in the project's plain-storage docs dir <instanceRoot>/projects/<companyId>/<projectId>/coolie-docs/ (a sibling of the managed repo checkout — never inside it, never git-committed), and list what landed; (2) POST /companies/:companyId/projects/analyze-document (Req C) — parse the same multipart `file` and return a suggested project name/slug/summary so the create-project flow can prefill 项目名称. Both reuse the issue-attachment multipart shape and the single MAX_ATTACHMENT_BYTES cap, plus audit logging. Belongs here rather than new route files because they are project-scoped sub-resources beside project creation. Resolution: keep the import block, the multer instance and the three route blocks; upstream has no counterpart.",
-      "maxTotalLines": 320
+      "reason": "wave122: (1) multipart POST/GET /companies/:companyId/projects/:projectId/documents — land an uploaded requirement doc in the project's plain-storage docs dir <instanceRoot>/projects/<companyId>/<projectId>/coolie-docs/ (a sibling of the managed repo checkout — never inside it, never git-committed), and list what landed; (2) POST /companies/:companyId/projects/analyze-document (Req C) — parse the same multipart `file` and return a suggested project name/slug/summary so the create-project flow can prefill 项目名称. Both reuse the issue-attachment multipart shape and the single MAX_ATTACHMENT_BYTES cap, plus audit logging. Belongs here rather than new route files because they are project-scoped sub-resources beside project creation. wave123: the documents upload additionally calls scheduleProjectDocumentEnrichment() (server/src/services/project-document-enrichment.ts) after responding, so create/upload stays fast while description + 建设目标 backfill in the background. Resolution: keep the import block, the multer instance and the three route blocks; upstream has no counterpart.",
+      "maxTotalLines": 340
     },
     {
       "path": "ui/src/api/projects.ts",
@@ -451,6 +451,18 @@
       "maxNetLines": 60,
       "reason": "wave122: (1) send the credential as BOTH `Authorization: Bearer` and `x-paperclip-api-key` — this fork's board channel reads only the latter and rejects Bearer with 401, so the helper the board skill mandates could not upload here at all (the failure behind the boss's 'credential expired' complaint); upstream instances ignore the header they do not read, so one helper works on either credential. (2) Make PAPERCLIP_RUN_ID optional: a board-concierge chat has no heartbeat run, and a fabricated run id violates activity_log's run FK with a 500 — the run-scoped header and work-product attribution are now sent only when a real run id is present, so agent runs are unchanged. Resolution: keep both changes; do not revert to Bearer-only or to a required run id.",
       "maxTotalLines": 80
+    },
+    {
+      "path": "server/src/services/project-document-enrichment.ts",
+      "maxNetLines": 300,
+      "reason": "wave123: the background enrichment job behind the upload route. Pure, LLM-free heuristics turn an uploaded requirement doc into a project description (first prose paragraph, ~200 chars) and Goal titles (list items under a 目标/里程碑/交付/功能模块 heading, else the doc's list items; capped at 8, ≤80 chars each), link the new goals to the project through the existing projectService.update goalIds path, and append one project.document_enriched activity entry. scheduleProjectDocumentEnrichment() runs it via setImmediate with a 10s Promise.race timeout, so a slow document can never block the create/upload response and a failure is logged and swallowed. New file; lives under server/src/services/ because that is where project services live.",
+      "maxTotalLines": 320
+    },
+    {
+      "path": "server/src/services/project-document-enrichment.test.ts",
+      "maxNetLines": 110,
+      "reason": "wave123: vitest cover for the description/goal extraction heuristics above (paragraph selection, 目标-section scoping, 8-goal cap, 80-char title cap, dedupe, numbered/bulleted lists). New test file beside its subject.",
+      "maxTotalLines": 120
     }
   ]
 }

@@ -125,7 +125,7 @@ request_json() {
   response_file="$(mktemp)"
   if [[ -n "$body" ]]; then
     status_code="$(
-      curl -sS -X "$method" -w '%{http_code}' -o "$response_file" \
+      curl -sS --connect-timeout 10 --max-time 30 -X "$method" -w '%{http_code}' -o "$response_file" \
         "$url" \
         -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
         -H "x-paperclip-api-key: $PAPERCLIP_API_KEY" \
@@ -135,7 +135,7 @@ request_json() {
     )"
   else
     status_code="$(
-      curl -sS -X "$method" -w '%{http_code}' -o "$response_file" \
+      curl -sS --connect-timeout 10 --max-time 30 -X "$method" -w '%{http_code}' -o "$response_file" \
         "$url" \
         -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
         -H "x-paperclip-api-key: $PAPERCLIP_API_KEY" \
@@ -169,7 +169,7 @@ upload_file() {
   escaped_path="${escaped_path//\"/\\\"}"
   response_file="$(mktemp)"
   status_code="$(
-    curl -sS -X POST -w '%{http_code}' -o "$response_file" \
+    curl -sS --connect-timeout 10 --max-time 120 -X POST -w '%{http_code}' -o "$response_file" \
       "$url" \
       -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
       -H "x-paperclip-api-key: $PAPERCLIP_API_KEY" \

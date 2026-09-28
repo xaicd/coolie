@@ -13,7 +13,9 @@ import {
   listProjectDocuments,
   sanitizeProjectDocumentFilename,
 } from "../services/project-documents.js";
+import { scheduleProjectDocumentEnrichment } from "../services/project-document-enrichment.js";
 import multer from "multer";
+import { runTolerantMultipartUpload } from "../lib/multipart-upload.js";
 import { toolAccessService } from "../services/tool-access.js";
 import { Router, type Request, type Response } from "express";
 import type { Db } from "@paperclipai/db";
@@ -64,6 +66,8 @@ export function projectRoutes(db: Db) {
   // reusing MAX_ATTACHMENT_BYTES so the two upload paths cannot drift.
   const documentUpload = multer({
     storage: multer.memoryStorage(),
+    // React Native and browser FormData send filenames as raw UTF-8.
+    defParamCharset: "utf8",
     limits: { fileSize: MAX_ATTACHMENT_BYTES, files: 1 },
   });
 
@@ -380,9 +384,7 @@ export function projectRoutes(db: Db) {
       if (!(await assertProjectReadAllowed(req, res, project))) return;
 
       try {
-        await new Promise<void>((resolve, reject) => {
-          documentUpload.single("file")(req, res, (err: unknown) => (err ? reject(err) : resolve()));
-        });
+        await runTolerantMultipartUpload(documentUpload, req, res, MAX_ATTACHMENT_BYTES);
       } catch (err) {
         if (err instanceof multer.MulterError) {
           res.status(err.code === "LIMIT_FILE_SIZE" ? 422 : 400).json({
@@ -395,7 +397,7 @@ export function projectRoutes(db: Db) {
         throw err;
       }
 
-      const file = (req as Request & { file?: { buffer: Buffer; originalname: string } }).file;
+      const file = (req as Request & { file?: { buffer: Buffer; originalname: string; mimetype?: string } }).file;
       if (!file) {
         res.status(400).json({ error: "Missing file field 'file'" });
         return;
@@ -437,6 +439,18 @@ export function projectRoutes(db: Db) {
         },
       });
 
+      // wave123: the upload returns now; the heavy read/parse/backfill runs off
+      // the request path and backfills the project's description and 建设目标.
+      scheduleProjectDocumentEnrichment({
+        db,
+        companyId: project.companyId,
+        projectId: project.id,
+        filename: landed.filename,
+        body: file.buffer,
+        contentType: file.mimetype,
+        relativePath: landed.relativePath,
+      });
+
       res.status(201).json(landed);
     },
   );
@@ -469,9 +483,7 @@ export function projectRoutes(db: Db) {
     assertCompanyAccess(req, companyId);
 
     try {
-      await new Promise<void>((resolve, reject) => {
-        documentUpload.single("file")(req, res, (err: unknown) => (err ? reject(err) : resolve()));
-      });
+      await runTolerantMultipartUpload(documentUpload, req, res, MAX_ATTACHMENT_BYTES);
     } catch (err) {
       if (err instanceof multer.MulterError) {
         res.status(err.code === "LIMIT_FILE_SIZE" ? 422 : 400).json({
