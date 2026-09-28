@@ -204,11 +204,13 @@ export function DashboardScreen({
   const pendingAccent = pendingApprovals > 0 ? C.err : C.ink;
 
   // ── 任务分布 ──
+  // wave135: 用服务端 progress.total (工单总数的权威口径)。旧算法把
+  // open + inProgress + blocked + done 相加, 而服务端的 `open` 已经含
+  // inProgress/blocked (见 dashboard.ts: 非 done/cancelled 一律计入 open),
+  // 于是 inProgress/blocked 被重复计一次 —— 大盘「164 个任务」对不上 API 的
+  // 124 (差值≈阻塞 39+进行中)。fallback 只 + done, 不再重复加。
   const totalTasks =
-    (data?.tasks.open ?? 0) +
-    (data?.tasks.inProgress ?? 0) +
-    (data?.tasks.blocked ?? 0) +
-    (data?.tasks.done ?? 0);
+    data?.progress?.total ?? ((data?.tasks.open ?? 0) + (data?.tasks.done ?? 0));
   const completionRate = data?.progress?.completionRatePercent ?? (totalTasks > 0 ? Math.round(((data?.tasks.done ?? 0) / totalTasks) * 100) : 0);
 
   // ── 7 天活动趋势 (runActivity 最多取最后 7 天) ──

@@ -76,6 +76,23 @@ const MIN_VOICE_HOLD_MS = 300;
 
 type BoardEchoListener = (message: BoardChatMessage) => void;
 
+/**
+ * wave135: staged 附件 + 远端上传结果。
+ *
+ * 远端 id 挂在附件对象自己身上 (`remoteId`)，不再单独维护一个按下标对齐的
+ * id 数组。两数组靠 `length` 相等来判断「传完了」是 P2-C 的死锁根因：
+ * 「即选即传」和「boardIssueId 就绪后补传」两条路径把同一文件各传一遍，
+ * 服务端落两条附件 -> 远端 id 数(2) 永远不等于 staged 数(1)，发送时
+ * `uploaded.length !== staged.length` 恒成立，永远弹「附件上传中」。
+ * 改成按附件身份去重/幂等，重传同一文件不会写第二条，失败也能重试。
+ */
+type StagedAttachmentLocal = StagedAttachment & {
+  /** 服务端附件 id；存在即已上传成功 */
+  remoteId?: string;
+  /** 上一次上传失败的原因，存在则停在此状态等用户重试 */
+  error?: string;
+};
+
 const boardEchoListeners = new Set<BoardEchoListener>();
 const boardEchoQueue: BoardChatMessage[] = [];
 
@@ -353,11 +370,15 @@ export function BoardChatScreen({
       : "thinking"
     : "idle";
 
-  /** wave71: 附件上传队列 (stage 状态, 每条带本地 uri + 远端 id) */
-  const [stagedAttachments, setStagedAttachments] = useState<StagedAttachment[]>([]);
-  /** 远端已上传完毕的附件 id, 跟 stagedAttachments 一一对应 (按顺序) */
-  const [uploadedAttachmentIds, setUploadedAttachmentIds] = useState<string[]>([]);
+  /** wave71/wave135: 附件上传队列 (远端 id 挂在每条上, 见 StagedAttachmentLocal) */
+  const [stagedAttachments, setStagedAttachments] = useState<StagedAttachmentLocal[]>([]);
   const [uploadingAttachments, setUploadingAttachments] = useState(false);
+  /**
+   * wave135: 在飞上传的 promise 表 (staged.id -> promise)。同一文件被并发触发
+   * (即选即传 / boardIssueId 补传 / 发送前重试) 时复用同一个 promise，服务端
+   * 只会收到一条附件；promise 结束即移除，失败可再次触发重试。
+   */
+  const attachmentUploadsRef = useRef<Map<string, Promise<string | null>>>(new Map());
   /** 清空对话确认 modal */
   const [confirmClear, setConfirmClear] = useState(false);
   const [clearing, setClearing] = useState(false);
@@ -821,24 +842,101 @@ export function BoardChatScreen({
     [company.id, pushSystemEcho],
   );
 
+  /**
+   * wave135: 把一个 staged 附件上传成服务端 attachment.id。
+   *
+   * 幂等 + 去重，替代旧的「即选即传 + 按下标补传」双路径：
+   *  - 已有 remoteId -> 直接返回该 id (同一文件不会重复上传)；
+   *  - 已在飞 -> 复用同一个 promise (并发路径不会各传一份，服务端只落一条)；
+   *  - 失败 -> 记 error 停在 staged 上，等发送守卫显式重试，不会自动重跑成死循环。
+   */
+  const uploadStagedAttachment = useCallback(
+    (item: StagedAttachmentLocal): Promise<string | null> => {
+      if (item.remoteId) return Promise.resolve(item.remoteId);
+      const inFlight = attachmentUploadsRef.current.get(item.id);
+      if (inFlight) return inFlight;
+
+      const task = (async (): Promise<string | null> => {
+        setUploadingAttachments(true);
+        setStagedAttachments((prev) =>
+          prev.map((entry) =>
+            entry.id === item.id ? { ...entry, error: undefined } : entry,
+          ),
+        );
+        try {
+          // wave135: 附件必须挂在已存在的 issue 上。boardIssueId 还没就绪时
+          // (全新公司尚无常驻 Board Operations issue) 先把它解析/创建出来,
+          // 否则新公司「第一次带附件发送」无 issue 可传、被永久挡下。
+          let issueId = boardIssueId;
+          if (!issueId) {
+            issueId = await coolie.ensureBoardIssue(company.id);
+            setBoardIssueId(issueId);
+          }
+          const uploaded = await coolie.uploadAttachment(company.id, issueId, {
+            uri: item.uri,
+            name: item.name,
+            type: item.mimeType,
+          });
+          setStagedAttachments((prev) =>
+            prev.map((entry) =>
+              entry.id === item.id
+                ? { ...entry, remoteId: uploaded.id, error: undefined }
+                : entry,
+            ),
+          );
+          return uploaded.id;
+        } catch (e) {
+          const message = String((e as Error)?.message ?? e);
+          setStagedAttachments((prev) =>
+            prev.map((entry) =>
+              entry.id === item.id ? { ...entry, error: message } : entry,
+            ),
+          );
+          return null;
+        }
+      })();
+
+      attachmentUploadsRef.current.set(item.id, task);
+      void task.finally(() => {
+        attachmentUploadsRef.current.delete(item.id);
+        setUploadingAttachments(attachmentUploadsRef.current.size > 0);
+      });
+      return task;
+    },
+    [boardIssueId, company.id],
+  );
+
   const handleSend = useCallback(
     async (textToSend?: string) => {
       const prompt = (textToSend ?? input).trim();
       if (!prompt || sending) return;
 
-      // wave71: 附件 — 发问前先把 staged 的本地文件全部上传成 attachment.id,
+      // wave71/wave135: 附件 — 发问前把 staged 的本地文件全部上传成 attachment.id,
       // 一起随 message 走 POST /api/board/chat/stream (server 端会反向 link
-      // issueCommentId)。即便 board issue 还未建好, send 路径会在 SSE 收到
-      // `start` 事件后回填 boardIssueId, 这里在它到位之前先 stage 着, 等下
-      // 次发送再传 — 但 board issue 没 issueId 上传会失败, 兜底: 等到 boardIssueId
-      // 就绪后再上传 (用 await 一拍)。
+      // issueCommentId)。守卫改成「按附件身份 (remoteId) 判断是否齐全」而不是
+      // 比数组长度：在飞的复用同一个上传 promise 等它落地，之前失败的在这里
+      // 就地重试一次 —— 无论哪条路径，都不会出现「永远相等不了」的死锁。
       const staged = stagedAttachments;
-      let activeAttachmentIds = uploadedAttachmentIds;
-      if (staged.length > 0 && uploadedAttachmentIds.length !== staged.length) {
-        // 上传还在飞 (或失败); 取消本次发送, 让用户稍后重试
-        Alert.alert("附件上传中", "请等附件上传完毕再发送");
-        return;
+      const pendingUploads = staged.filter((entry) => !entry.remoteId);
+      if (pendingUploads.length > 0) {
+        // 并发触发同一文件时复用同一个 promise (服务端只收一条附件);
+        // boardIssueId 缺省时 uploadStagedAttachment 会先解析出常驻 issue。
+        // 全新公司的第一次上传也不会被挡下。
+        const results = await Promise.all(
+          pendingUploads.map((entry) => uploadStagedAttachment(entry)),
+        );
+        const failed = pendingUploads.filter((_, index) => !results[index]);
+        if (failed.length > 0) {
+          Alert.alert(
+            "附件上传失败",
+            `${failed.map((entry) => entry.name).join("、")} 上传失败, 请重试或清空附件`,
+          );
+          return;
+        }
       }
+      const activeAttachmentIds = staged
+        .map((entry) => entry.remoteId)
+        .filter((id): id is string => Boolean(id));
 
       setInput("");
       setErrorText(null);
@@ -862,7 +960,6 @@ export function BoardChatScreen({
       // 消费完清空附件队列 (无论流是否成功)
       const attachmentIdsForThisSend = activeAttachmentIds;
       setStagedAttachments([]);
-      setUploadedAttachmentIds([]);
 
       // "build xxx" 追加构建计划卡, "建域 xxx" 追加本体规范卡, 与总办回答并行推进;
       // pipeline / plan / pr 只走各自编排分发 (不再进问答流)。
@@ -960,7 +1057,7 @@ export function BoardChatScreen({
       company.id,
       boardIssueId,
       stagedAttachments,
-      uploadedAttachmentIds,
+      uploadStagedAttachment,
       scrollToBottom,
       startSpec,
       startBuild,
@@ -980,83 +1077,28 @@ export function BoardChatScreen({
   }, [historyReady]);
 
   /**
-   * wave71: 选完附件后立即上传到 board operations issue (boardIssueId) —
-   * 拿回来的 attachment.id 喂给 send 路径, 由 server 在新建用户评论时反向
-   * link issueCommentId。
-   *
-   * boardIssueId 还没就绪时 (首屏还没发过问), 我们就只 stage 住, 等下次
-   * `start` 事件回来再补传; 这一拍只推 stagedAttachments, 不更新 ids。
+   * wave71/wave135: 选完附件只 stage 住 (同一文件按 id 幂等, 不重复 stage)。
+   * 真正的上传统一走下面的 effect —— 只有一条路径，不会再出现「即选即传」
+   * 与「补传」双触发导致同一文件被传两遍。
    */
-  const handlePickAttachment = useCallback(
-    async (picked: StagedAttachment) => {
-      setStagedAttachments((prev) => [...prev, picked]);
-      if (!boardIssueId) {
-        // 等会儿: 第一次发送时 server 会回 start 事件, 到那时再传。
-        return;
-      }
-      setUploadingAttachments(true);
-      try {
-        const uploaded = await coolie.uploadAttachment(
-          company.id,
-          boardIssueId,
-          { uri: picked.uri, name: picked.name, type: picked.mimeType },
-        );
-        setUploadedAttachmentIds((prev) => [...prev, uploaded.id]);
-      } catch (e) {
-        Alert.alert(
-          "附件上传失败",
-          `${picked.name} 上传失败: ${String((e as Error)?.message ?? e)}`,
-        );
-        // 移除失败的 staged 项, 避免用户再次发送时把 null id 传过去。
-        setStagedAttachments((prev) =>
-          prev.filter((entry) => entry.id !== picked.id),
-        );
-      } finally {
-        setUploadingAttachments(false);
-      }
-    },
-    [boardIssueId, company.id],
-  );
+  const handlePickAttachment = useCallback((picked: StagedAttachment) => {
+    setStagedAttachments((prev) =>
+      prev.some((entry) => entry.id === picked.id) ? prev : [...prev, picked],
+    );
+  }, []);
 
   /**
-   * wave71: boardIssueId 就绪后 (start 事件 / 历史加载), 把还没有
-   * uploadedAttachmentIds 的 staged 全部补传 — 否则用户首屏直接 + 上传
-   * 会因为 board issue 还没建好而漏传附件。
+   * wave71/wave135: boardIssueId 就绪后 (start 事件 / 历史加载) 自动补传所有
+   * 还没有 remoteId 的 staged 附件。失败项带着 error 停在队列里不自动重试，
+   * 由用户点发送时重试，避免 effect<->state 互相触发成死循环。
    */
   useEffect(() => {
     if (!boardIssueId) return;
-    if (stagedAttachments.length === 0) return;
-    if (stagedAttachments.length === uploadedAttachmentIds.length) return;
-    const pending = stagedAttachments.slice(uploadedAttachmentIds.length);
-    if (pending.length === 0) return;
-    setUploadingAttachments(true);
-    (async () => {
-      try {
-        for (const item of pending) {
-          try {
-            const uploaded = await coolie.uploadAttachment(
-              company.id,
-              boardIssueId,
-              { uri: item.uri, name: item.name, type: item.mimeType },
-            );
-            setUploadedAttachmentIds((prev) =>
-              prev.includes(uploaded.id) ? prev : [...prev, uploaded.id],
-            );
-          } catch (e) {
-            Alert.alert(
-              "附件上传失败",
-              `${item.name} 上传失败: ${String((e as Error)?.message ?? e)}`,
-            );
-            setStagedAttachments((prev) =>
-              prev.filter((entry) => entry.id !== item.id),
-            );
-          }
-        }
-      } finally {
-        setUploadingAttachments(false);
-      }
-    })();
-  }, [boardIssueId, stagedAttachments, uploadedAttachmentIds, company.id]);
+    for (const item of stagedAttachments) {
+      if (item.remoteId || item.error) continue;
+      void uploadStagedAttachment(item);
+    }
+  }, [boardIssueId, stagedAttachments, uploadStagedAttachment]);
 
   /**
    * wave71: 清空工坊对话框 — DELETE /api/board/chat/conversation/:issueId,
@@ -1467,12 +1509,15 @@ export function BoardChatScreen({
             <Text style={styles.stagedHint}>
               📎 已选 {stagedAttachments.length} 个附件
               {uploadingAttachments ? " · 上传中…" : ""}
+              {stagedAttachments.some((entry) => entry.error) &&
+              !uploadingAttachments
+                ? " · 有附件上传失败, 点发送重试"
+                : ""}
             </Text>
             <Pressable
               hitSlop={6}
               onPress={() => {
                 setStagedAttachments([]);
-                setUploadedAttachmentIds([]);
               }}
             >
               <Text style={styles.stagedClear}>清空</Text>

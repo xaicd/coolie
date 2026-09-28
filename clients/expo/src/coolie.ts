@@ -670,9 +670,25 @@ export class CoolieClient extends BaseCoolieClient {
 }
 
 /**
- * Shared Coolie client. Auth is either a bearer token from SecureStore or the
- * session cookie the platform's own cookie jar holds after sign-in; both travel
- * in the same `Authorization`/`Cookie` headers RN already manages.
+ * Shared Coolie client. Auth is either a bearer token from SecureStore (agent /
+ * board API keys) or the session cookie the platform's own cookie jar holds
+ * after sign-in.
+ *
+ * The session is deliberately NOT replayed as a hand-built `Cookie` header.
+ * React Native owns the cookie jar (`NSURLSession` with
+ * `HTTPShouldSetCookies = YES` / `HTTPCookieAcceptPolicy = always` on iOS,
+ * `CookieManager` on Android) and already attaches the signed session cookie to
+ * every `credentials: "include"` request. Adding a `Cookie` header on top makes
+ * the native layer drop or corrupt the jar's own cookie, so the request reaches
+ * the server with no usable session and 401s with "Board authentication
+ * required" — even though the cookie the server set at sign-in is sitting in the
+ * jar. Measured on iOS 26.5 (RN 0.76.5) against production: a manually set
+ * `Cookie` header (encoded or raw) → 401, the same signed value sent by the jar
+ * → 200. So the bearer branch returns the only header we ever set ourselves.
+ *
+ * The stored session token is still kept (`getSessionToken`) for the
+ * WebContainerScreen `/api/auth/exchange` bridge, which lives in the WebView's
+ * separate cookie store.
  */
 export const coolie = new CoolieClient({
   baseUrl: COOLIE_BASE_URL,
@@ -682,29 +698,6 @@ export const coolie = new CoolieClient({
   getAuthHeader: async (): Promise<Record<string, string>> => {
     const token = await getAuthToken();
     if (token) return { Authorization: `Bearer ${token}` };
-    const sessionToken = await getSessionToken();
-    if (sessionToken) {
-      const encoded = encodeURIComponent(sessionToken);
-      // Replay the cookie under every name the instance might read it back
-      // from: the exact name captured at sign-in first, then the default
-      // instance's real names (`paperclip-default…`, with/without `__Secure-`),
-      // then the legacy aliases. Better Auth only answers to the name it
-      // wrote, and it derives that name from the instance id + HTTPS-ness of
-      // the request — none of which the App can predict offline.
-      const savedName = await getSessionCookieName();
-      const names = new Set<string>([
-        ...(savedName ? [savedName] : []),
-        "__Secure-paperclip-default.session_token",
-        "paperclip-default.session_token",
-        "paperclip.session_token",
-        "__Secure-paperclip.session_token",
-        "better-auth.session_token",
-        "__Secure-better-auth.session_token",
-      ]);
-      return {
-        Cookie: [...names].map((name) => `${name}=${encoded}`).join("; "),
-      };
-    }
     return {};
   },
 });

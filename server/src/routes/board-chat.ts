@@ -215,6 +215,52 @@ async function readReadableToBuffer(stream: Readable): Promise<Buffer> {
 /** Max simultaneous `claude` subprocesses across all board-chat requests. */
 const MAX_CONCURRENT_BOARD_CHATS = 3;
 
+/**
+ * wave135: Find (or create) the standing "Board Operations" issue that anchors
+ * a company's workshop conversation, and return its id.
+ *
+ * Extracted from the stream handler so the App can resolve the issue id
+ * *before* it uploads an attachment: a freshly created company has no board
+ * issue yet, and `POST .../issues/:issueId/attachments` needs an existing
+ * issue. Without this, the first-ever "attach a file then send" in a new
+ * company had no issue to upload against and the send was blocked ("请稍候,
+ * 附件正在上传") with no in-app way forward.
+ *
+ * The query/creation semantics are identical to the stream path (same title
+ * match, same "not done/cancelled" filter, same actor attribution) so the two
+ * callers always resolve to the same issue.
+ */
+async function ensureBoardIssueId(
+  db: Db,
+  input: {
+    companyId: string;
+    taskId?: string;
+    actor: ReturnType<typeof getActorInfo>;
+  },
+): Promise<string> {
+  if (input.taskId) return input.taskId;
+  const issueSvc = issueService(db);
+  const companyIssues = await issueSvc.list(input.companyId, { q: "Board Operations" });
+  const boardIssue = companyIssues.find(
+    (i) =>
+      i.title === "Board Operations" &&
+      i.status !== "done" &&
+      i.status !== "cancelled",
+  );
+  if (boardIssue) return boardIssue.id;
+  const created = await issueSvc.create(input.companyId, {
+    title: "Board Operations",
+    description:
+      "Standing issue for board concierge conversations and decision log",
+    status: "todo",
+    priority: "medium",
+    createdByUserId: input.actor.actorType === "user" ? input.actor.actorId : null,
+    responsibleUserId: input.actor.actorType === "user" ? input.actor.actorId : null,
+    trustExplicitResponsibleUserId: input.actor.actorType === "user",
+  });
+  return created.id;
+}
+
 export function boardChatRoutes(
   db: Db,
   opts: { deploymentMode: DeploymentMode; storage?: StorageService },
@@ -312,40 +358,15 @@ export function boardChatRoutes(
     }
 
     const issueSvc = issueService(db);
-    let issueId = taskId;
     const actor = getActorInfo(req);
 
     // Find or create the standing "Board Operations" issue that anchors the
     // board conversation + decision log.
-    if (!issueId) {
-      const companyIssues = await issueSvc.list(companyId, { q: "Board Operations" });
-      const boardIssue = companyIssues.find(
-        (i) =>
-          i.title === "Board Operations" &&
-          i.status !== "done" &&
-          i.status !== "cancelled",
-      );
-      if (boardIssue) {
-        issueId = boardIssue.id;
-      } else {
-        const created = await issueSvc.create(companyId, {
-          title: "Board Operations",
-          description:
-            "Standing issue for board concierge conversations and decision log",
-          // `todo` rather than `in_progress`: this is an unassigned standing
-          // issue, and the service rejects in_progress issues without an
-          // assignee.
-          status: "todo",
-          priority: "medium",
-          createdByUserId: actor.actorType === "user" ? actor.actorId : null,
-          responsibleUserId: actor.actorType === "user" ? actor.actorId : null,
-          trustExplicitResponsibleUserId: actor.actorType === "user",
-        });
-        issueId = created.id;
-      }
-    }
-
-    const resolvedIssueId = issueId!;
+    const resolvedIssueId = await ensureBoardIssueId(db, {
+      companyId,
+      taskId,
+      actor,
+    });
 
     // Persist the user's message. Use the authenticated board/user actor so
     // attribution and author-type checks pass; "board" (the local fallback)
@@ -884,6 +905,53 @@ export function boardChatRoutes(
     // includes the wave66 persona_sig block appended inside SYSTEM).
     proc.stdin.write(promptWithSig);
     proc.stdin.end();
+  });
+
+  /**
+   * POST /board/chat/issue  { companyId, taskId? } -> { issueId }
+   *
+   * wave135: 返回该公司的常驻 Board Operations Issue id (不存在则创建)。
+   * App 端在给工坊上传附件前先调它 —— 附件必须挂在一个已存在的 issue 上,
+   * 而全新公司还没有这个 issue(它此前只在第一次发起对话、SSE start 事件里
+   * 才被建), 于是「新公司第一次带附件发送」会卡在"请稍候, 附件正在上传"。
+   * 复用 stream 路径同一套查找/创建逻辑, 两者永远解析到同一个 issue。
+   *
+   * 鉴权与 /board/chat/stream 同源: 必须已登录的 board/agent, 且对
+   * companyId 有访问权。
+   */
+  router.post("/board/chat/issue", async (req, res) => {
+    const experimental = await instanceSettingsService(db).getExperimental();
+    if (experimental.enableConferenceRoomChat !== true) {
+      res.status(403).json({
+        error: "Conference Room Chat is not enabled",
+        code: "FEATURE_DISABLED",
+      });
+      return;
+    }
+    if (opts.deploymentMode !== "local_trusted" && opts.deploymentMode !== "authenticated") {
+      res.status(403).json({
+        error: "Board chat is only available on local single-operator instances",
+        code: "DEPLOYMENT_MODE_UNSUPPORTED",
+      });
+      return;
+    }
+
+    const { companyId, taskId } = (req.body ?? {}) as {
+      companyId?: string;
+      taskId?: string;
+    };
+    if (!companyId) {
+      res.status(400).json({ error: "companyId is required" });
+      return;
+    }
+    assertCompanyAccess(req, companyId);
+
+    const issueId = await ensureBoardIssueId(db, {
+      companyId,
+      taskId: typeof taskId === "string" ? taskId : undefined,
+      actor: getActorInfo(req),
+    });
+    res.json({ issueId });
   });
 
   /**

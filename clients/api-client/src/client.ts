@@ -945,6 +945,26 @@ export class CoolieClient {
   // ── Board Chat & Concierge Streaming (需求⑫ 驾驶舱问答) ────────────
 
   /**
+   * Resolve (creating if needed) the company's standing "Board Operations"
+   * issue that anchors the workshop conversation, returning its id.
+   *
+   * The App calls this before uploading an attachment: attachments must target
+   * an existing issue, and a brand-new company has no board issue yet (it used
+   * to be created lazily by the first chat stream's `start` event), so the
+   * first-ever "attach a file then send" had nothing to upload against.
+   * Idempotent — an existing board issue is returned as-is.
+   */
+  async ensureBoardIssue(companyId: string): Promise<string> {
+    const body = await this.request<{ issueId?: string }>(
+      "POST",
+      "/api/board/chat/issue",
+      { companyId },
+    );
+    if (!body?.issueId) throw new Error("Board issue could not be resolved");
+    return body.issueId;
+  }
+
+  /**
    * 驾驶舱流式问答 (POST /api/board/chat/stream)
    * 消费 SSE text/event-stream 事件流 (start, status, chunk, done, error)
    */
