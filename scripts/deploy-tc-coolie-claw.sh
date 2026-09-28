@@ -12,10 +12,15 @@ SSH_TARGET="tc-coolie-claw"
 REMOTE_DIR="/opt/coolie"
 SKIP_BUILD="${1:-}"
 
-echo "=== [1/6] 本地构建 UI ==="
+echo "=== [1/6] 构建 UI (本地尝试，失败则在远端构建) ==="
+LOCAL_UI_BUILT=0
 if [ "$SKIP_BUILD" != "--skip-build" ]; then
-  (cd ui && pnpm build)
-  (cd clients/api-client && pnpm build 2>/dev/null || true)
+  if (cd ui && pnpm build 2>/dev/null) && (cd clients/api-client && pnpm build 2>/dev/null || true); then
+    LOCAL_UI_BUILT=1
+    echo "本地 UI 构建完成"
+  else
+    echo "本地环境缺少对应架构编译工具链，将在远端服务器执行 UI 构建"
+  fi
 fi
 
 echo "=== [2/6] rsync 代码(保护远端 .env，排除 node_modules/.git/本地数据) ==="
@@ -42,13 +47,20 @@ if [ -f .env ]; then
   for key in GITEE_PAT GITHUB_PAT GIT_PAT GITEE_TOKEN GITHUB_TOKEN; do
     val=$(grep -E "^${key}=" .env | cut -d= -f2- || true)
     if [ -n "$val" ]; then
-      echo "增量同步 ${key} 到远端生产 .env (无损更新，保留远端现有配置)..."
+      echo "增量同步 ${key} 到远端生产 .env 及 secrets.env (无损更新，保留远端现有配置)..."
       ssh "$SSH_TARGET" "
         touch $REMOTE_DIR/.env
         if grep -q '^${key}=' $REMOTE_DIR/.env; then
           sed -i 's|^${key}=.*|${key}=${val}|' $REMOTE_DIR/.env
         else
           echo '${key}=${val}' >> $REMOTE_DIR/.env
+        fi
+        if sudo test -f /etc/coolie/secrets.env; then
+          if sudo grep -q '^${key}=' /etc/coolie/secrets.env; then
+            sudo sed -i 's|^${key}=.*|${key}=${val}|' /etc/coolie/secrets.env
+          else
+            echo '${key}=${val}' | sudo tee -a /etc/coolie/secrets.env >/dev/null
+          fi
         fi
       " || true
     fi
@@ -87,6 +99,11 @@ for l in "$NM"/*; do
   if [ -L "$l" ] && [ ! -e "$l" ]; then rm -f "$l"; echo "pruned dangling link $(basename "$l")"; fi
 done
 REMOTE
+
+if [ "$LOCAL_UI_BUILT" -eq 0 ] && [ "$SKIP_BUILD" != "--skip-build" ]; then
+  echo "=== [4.5/6] 远端构建 UI ==="
+  ssh $SSH_TARGET "cd $REMOTE_DIR/ui && pnpm build 2>&1 | tail -5"
+fi
 
 echo "=== [5/6] 重启服务 ==="
 ssh $SSH_TARGET "sudo systemctl restart coolie"
