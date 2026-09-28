@@ -35,6 +35,20 @@ export interface ProjectDocument {
   modifiedAt: string;
 }
 
+/**
+ * Heuristic auto-recognition of an uploaded requirement doc: a name/slug to
+ * prefill the create-project form with, plus a one-line summary.
+ */
+export interface ProjectDocumentAnalysis {
+  suggestedName: string;
+  suggestedSlug: string;
+  summary: string;
+  source: "content" | "filename";
+  extractedChars: number;
+  /** False when the format has no text extractor yet (PDF). */
+  textSupported: boolean;
+}
+
 export const projectsApi = {
   repositoryOptions: (companyId: string) => api.get<ProjectRepositoryOptions>(`/companies/${companyId}/project-repositories`),
   setRepositories: (id: string, repositoryIds: string[]) => api.put<Project>(projectPath(id, undefined, "/repositories"), { repositoryIds }),
@@ -53,6 +67,15 @@ export const projectsApi = {
     form.append("file", file);
     return api.postForm<ProjectDocumentUpload>(
       `/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/documents`,
+      form,
+    );
+  },
+  /** Auto-recognize a picked doc and suggest a project name/slug to prefill. */
+  analyzeDocument: (companyId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.postForm<ProjectDocumentAnalysis>(
+      `/companies/${encodeURIComponent(companyId)}/projects/analyze-document`,
       form,
     );
   },

@@ -147,6 +147,20 @@ export interface ProjectDocument {
 }
 
 /**
+ * Heuristic auto-recognition of an uploaded requirement doc: a name/slug to
+ * prefill the create-project form with, plus a one-line summary.
+ */
+export interface ProjectDocumentAnalysis {
+  suggestedName: string;
+  suggestedSlug: string;
+  summary: string;
+  source: "content" | "filename";
+  extractedChars: number;
+  /** False when the format has no text extractor yet (PDF). */
+  textSupported: boolean;
+}
+
+/**
  * One model an adapter can run (`GET /companies/:id/adapters/:type/models`,
  * which mirrors the Coolie Web `agentsApi.adapterModels`). Feeds the composer's
  * model-override picker when the assignee's lane is "custom".

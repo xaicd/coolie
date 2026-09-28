@@ -25,6 +25,7 @@ import {
   type OntologyGraphSnapshot,
   type Project,
   type ProjectDocument,
+  type ProjectDocumentAnalysis,
   type ProjectDocumentUpload,
   type SessionUser,
   type SetDomainLifecycleOptions,
@@ -508,6 +509,28 @@ export class CoolieClient {
     form.append("file", file as unknown as Blob);
     return this.postForm<ProjectDocumentUpload>(
       `/api/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/documents`,
+      form,
+    );
+  }
+
+  /**
+   * Auto-recognize a requirement doc so the create-project form can prefill the
+   * project name.
+   *
+   * Mirrors the Coolie Web `projectsApi.analyzeDocument` →
+   * `POST /companies/:companyId/projects/analyze-document`. Heuristic and
+   * deterministic (no LLM call): the title/H1 becomes the display name and an
+   * ASCII slug is derived; a doc without extractable text (PDF) still yields a
+   * name from the filename, with `textSupported: false` to say so.
+   */
+  analyzeProjectDocument(
+    companyId: string,
+    file: UploadFilePart,
+  ): Promise<ProjectDocumentAnalysis> {
+    const form = new FormData();
+    form.append("file", file as unknown as Blob);
+    return this.postForm<ProjectDocumentAnalysis>(
+      `/api/companies/${encodeURIComponent(companyId)}/projects/analyze-document`,
       form,
     );
   }

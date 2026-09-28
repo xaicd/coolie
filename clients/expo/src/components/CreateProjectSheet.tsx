@@ -77,9 +77,13 @@ export function CreateProjectSheet({
   const [gitUrls, setGitUrls] = useState<string[]>([""]);
   const [localPath, setLocalPath] = useState("");
   const [hostedRemote, setHostedRemote] = useState(true);
-  // 需求文档/截图: 立项拿到 projectId 后才能上传 (落档 docs-coolie/projects/<slug>/),
-  // 所以先在此暂存, createProject 返回后逐个上传 —— 与任务作曲家的附件时序一致。
+  // 需求文档/截图: 立项拿到 projectId 后才能上传 (落档
+  // projects/<companyId>/<projectId>/coolie-docs/), 所以先在此暂存,
+  // createProject 返回后逐个上传 —— 与任务作曲家的附件时序一致。
   const [attachments, setAttachments] = useState<StagedAttachment[]>([]);
+  // 文档自动识别 (Req C): 选中文件后按内容/文件名推断项目名称, 预填但允许用户改写。
+  const [nameAutoFilled, setNameAutoFilled] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [patTarget, setPatTarget] = useState<{
@@ -118,6 +122,7 @@ export function CreateProjectSheet({
     setSourceMode("git_url");
     setGitUrls([preset.url]);
     setError(null);
+    setNameAutoFilled(false);
   };
 
   const handleGitUrlChange = (index: number, val: string) => {
@@ -149,6 +154,34 @@ export function CreateProjectSheet({
       if (clean) setName(clean);
     }
     if (error) setError(null);
+  };
+
+  // 选中需求文档后自动识别 (Req C): 用标题/H1 推断项目名称并预填, 用户仍可改写;
+  // 若用户已手填名称则不覆盖。识别失败时静默保持字段原样。
+  const recognizeName = async (file: StagedAttachment) => {
+    if (name.trim() !== "" && !nameAutoFilled) return;
+    setAnalyzing(true);
+    try {
+      const result = await coolie.analyzeProjectDocument(company.id, {
+        uri: file.uri,
+        name: file.name,
+        type: file.mimeType,
+      });
+      if (result.suggestedName) {
+        setName(result.suggestedName);
+        setNameAutoFilled(true);
+      }
+    } catch {
+      // 静默失败: 不打断立项流程。
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  const handleAttachmentsChange = (next: StagedAttachment[]) => {
+    const added = next.filter((file) => !attachments.some((prev) => prev.id === file.id));
+    setAttachments(next);
+    if (added.length > 0) void recognizeName(added[0]!);
   };
 
   const handleCreate = async () => {
@@ -323,9 +356,16 @@ export function CreateProjectSheet({
 
             {/* 项目名称输入 */}
             <View style={styles.section}>
-              <Text style={styles.sectionLabel}>
-                项目名称 <Text style={{ color: C.warn }}>*</Text>
-              </Text>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionLabel}>
+                  项目名称 <Text style={{ color: C.warn }}>*</Text>
+                </Text>
+                {analyzing ? (
+                  <Text style={styles.sectionSubLabel}>识别中…</Text>
+                ) : nameAutoFilled ? (
+                  <Text style={styles.sectionSubLabel}>已自动识别</Text>
+                ) : null}
+              </View>
               <TextInput
                 style={styles.input}
                 placeholder="例如：若依业务管理平台 / 产融协作平台"
@@ -333,6 +373,7 @@ export function CreateProjectSheet({
                 value={name}
                 onChangeText={(t) => {
                   setName(t);
+                  setNameAutoFilled(false);
                   if (error) setError(null);
                 }}
                 autoFocus={false}
@@ -491,15 +532,15 @@ export function CreateProjectSheet({
               </View>
             </View>
 
-            {/* 需求文档 / 截图 (选填): 立项后上传, 落档 docs-coolie/projects/<slug>/ */}
+            {/* 需求文档 / 截图 (选填): 立项后上传, 落档 projects/<companyId>/<projectId>/coolie-docs/ */}
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
                 <Text style={styles.sectionLabel}>需求文档 / 截图</Text>
-                <Text style={styles.sectionSubLabel}>立项后落档 docs-coolie</Text>
+                <Text style={styles.sectionSubLabel}>上传后自动识别项目名</Text>
               </View>
               <UploadRow
                 files={attachments}
-                onChange={setAttachments}
+                onChange={handleAttachmentsChange}
                 disabled={submitting}
               />
             </View>

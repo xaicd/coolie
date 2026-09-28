@@ -92,3 +92,30 @@ export function resolveManagedProjectWorkspaceDir(input: {
     sanitizeFriendlyPathSegment(input.repoName, "_default"),
   );
 }
+
+/**
+ * Resolve the plain-storage directory that holds one project's uploaded
+ * requirement documents/screenshots:
+ * `<instanceRoot>/projects/<companyId>/<projectId>/coolie-docs/`.
+ *
+ * This is a SIBLING of the managed repo checkout
+ * (`resolveManagedProjectWorkspaceDir` -> `.../<repoName|_default>`), never
+ * inside it: an upload must not dirty a git checkout, and history is a later
+ * concern. The same segment-isolation invariant holds — `companyId` and
+ * `projectId` are distinct path segments, so two projects never share or nest a
+ * docs directory.
+ */
+export function resolveProjectCoolieDocsDir(companyId: string, projectId: string): string {
+  const company = companyId.trim();
+  const project = projectId.trim();
+  if (!company || !project) {
+    throw new Error("Project coolie-docs path requires companyId and projectId.");
+  }
+  return path.resolve(
+    resolvePaperclipInstanceRoot(),
+    "projects",
+    sanitizeFriendlyPathSegment(company, "company"),
+    sanitizeFriendlyPathSegment(project, "project"),
+    "coolie-docs",
+  );
+}

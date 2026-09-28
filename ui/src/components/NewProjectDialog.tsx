@@ -4,6 +4,7 @@ import type { ProjectRepository } from "@paperclipai/shared";
 import { FileText, Folder, GitBranch, HardDrive, Link2, Paperclip, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { useDialog } from "../context/DialogContext";
 import { useCompany } from "../context/CompanyContext";
+import { useToastActions } from "../context/ToastContext";
 import { projectsApi } from "../api/projects";
 import { queryKeys } from "../lib/queryKeys";
 import { Dialog, DialogContent, DialogTitle } from "./ui/dialog";
@@ -50,6 +51,7 @@ export function NewProjectDialog() {
 
 export function NewProjectForm({ companyId, onClose }: { companyId: string; onClose: () => void }) {
   const client = useQueryClient();
+  const toast = useToastActions();
   const uniqueId = useId();
   const [name, setName] = useState("");
   const [sourceMode, setSourceMode] = useState<SourceMode>("git_url");
@@ -58,6 +60,9 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
   const [repos, setRepos] = useState<ProjectRepository[]>([]);
   const [connecting, setConnecting] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  // 文档自动识别 (Req C): 选中文件后按内容/文件名推断项目名称, 预填但允许用户改写。
+  const [nameAutoFilled, setNameAutoFilled] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
 
@@ -81,6 +86,7 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
     setName(preset.name);
     setSourceMode("git_url");
     setGitUrls([{ id: `${uniqueId}-preset`, url: preset.url }]);
+    setNameAutoFilled(false);
   };
 
   const handleLocalPathChange = (val: string) => {
@@ -88,6 +94,24 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
     if (!name.trim()) {
       const clean = val.split("/").filter(Boolean).pop();
       if (clean) setName(clean);
+    }
+  };
+
+  // 选中需求文档后自动识别 (Req C): 用标题/H1 推断项目名称并预填, 用户仍可改写;
+  // 若用户已手填名称则不覆盖。识别失败时静默保持字段原样。
+  const recognizeName = async (file: File) => {
+    if (name.trim() !== "" && !nameAutoFilled) return;
+    setAnalyzing(true);
+    try {
+      const result = await projectsApi.analyzeDocument(companyId, file);
+      if (result.suggestedName) {
+        setName(result.suggestedName);
+        setNameAutoFilled(true);
+      }
+    } catch {
+      // 静默失败: 不打断立项流程。
+    } finally {
+      setAnalyzing(false);
     }
   };
 
@@ -113,15 +137,29 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
       }
 
       const project = await projectsApi.create(companyId, payload);
-      // Files need a project id to land under docs-coolie/projects/<slug>/,
-      // so they upload right after the 201 just like the task composer.
+      // Files need the project id to land in projects/<companyId>/<projectId>/coolie-docs/,
+      // so they upload right after the 201 (same shape as the task composer). A
+      // failed upload must not fail 立项 — the project already exists — so it is
+      // collected and surfaced instead of thrown.
+      const failedUploads: string[] = [];
       for (const file of files) {
-        await projectsApi.uploadDocument(companyId, project.id, file);
+        try {
+          await projectsApi.uploadDocument(companyId, project.id, file);
+        } catch {
+          failedUploads.push(file.name);
+        }
       }
-      return project;
+      return { project, failedUploads };
     },
-    onSuccess: () => {
+    onSuccess: ({ failedUploads }) => {
       void client.invalidateQueries({ queryKey: queryKeys.projects.all(companyId) });
+      if (failedUploads.length > 0) {
+        toast.pushToast({
+          title: "部分需求文档未上传",
+          body: failedUploads.join("、"),
+          tone: "error",
+        });
+      }
       onClose();
     },
   });
@@ -151,8 +189,13 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
               </div>
               <div className="flex items-center gap-3 rounded-lg border border-input px-3 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
                 <Folder className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-                <input ref={input} aria-label="Project name" value={name} disabled={create.isPending} onChange={(event) => setName(event.target.value)} placeholder="项目名称 (Project Name)" required
+                <input ref={input} aria-label="Project name" value={name} disabled={create.isPending} onChange={(event) => { setName(event.target.value); setNameAutoFilled(false); }} placeholder="项目名称 (Project Name)" required
                   className="h-10 w-full min-w-0 border-0 bg-transparent text-base outline-none placeholder:text-muted-foreground md:text-sm" />
+                {analyzing ? (
+                  <span className="shrink-0 text-xs text-muted-foreground">识别中…</span>
+                ) : nameAutoFilled ? (
+                  <span className="shrink-0 text-xs text-muted-foreground">已自动识别</span>
+                ) : null}
               </div>
             </div>
 
@@ -312,7 +355,7 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
             <div className="flex shrink-0 flex-col gap-2 px-5 pb-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-medium text-muted-foreground">需求文档 / 截图 (选填)</span>
-                <span className="text-xs text-muted-foreground">立项后落档 docs-coolie/projects/</span>
+                <span className="text-xs text-muted-foreground">立项后落档 projects/&lt;companyId&gt;/&lt;projectId&gt;/coolie-docs/</span>
               </div>
               <input
                 ref={fileInput}
@@ -324,7 +367,11 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
                 disabled={create.isPending}
                 onChange={(event) => {
                   const picked = Array.from(event.target.files ?? []);
-                  if (picked.length > 0) setFiles((prev) => [...prev, ...picked]);
+                  if (picked.length > 0) {
+                    setFiles((prev) => [...prev, ...picked]);
+                    // 自动识别第一个新文件, 预填项目名称。
+                    void recognizeName(picked[0]!);
+                  }
                   event.target.value = "";
                 }}
               />

@@ -72,6 +72,7 @@ export type {
   CreateIssueInput,
   Project,
   ProjectDocument,
+  ProjectDocumentAnalysis,
   ProjectDocumentUpload,
   UploadFilePart,
   AudioFormat,

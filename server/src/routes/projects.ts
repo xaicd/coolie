@@ -8,6 +8,7 @@ import { normalizeProjectRepositoryUrl, resolveProjectRepositorySelection } from
 import { getDefaultPatTarget, ensureRemoteRepository } from "../services/git-pat.js";
 import { MAX_ATTACHMENT_BYTES, formatAttachmentSize } from "../attachment-types.js";
 import {
+  analyzeProjectDocument,
   landProjectDocument,
   listProjectDocuments,
   sanitizeProjectDocumentFilename,
@@ -456,6 +457,51 @@ export function projectRoutes(db: Db) {
 
     const documents = await listProjectDocuments({ companyId: project.companyId, projectId: project.id });
     res.json({ projectId: project.id, documents });
+  });
+
+  // Auto-recognize an uploaded requirement doc so the create-project flow can
+  // prefill 项目名称 (Req C). Multipart, same `file` field and size cap as the
+  // document upload above. Deterministic and local — no LLM call: the title/H1
+  // becomes the display name, an ASCII slug is derived and made unique against
+  // the company's existing projects, and one summary line is returned.
+  router.post("/companies/:companyId/projects/analyze-document", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    assertCompanyAccess(req, companyId);
+
+    try {
+      await new Promise<void>((resolve, reject) => {
+        documentUpload.single("file")(req, res, (err: unknown) => (err ? reject(err) : resolve()));
+      });
+    } catch (err) {
+      if (err instanceof multer.MulterError) {
+        res.status(err.code === "LIMIT_FILE_SIZE" ? 422 : 400).json({
+          error: err.code === "LIMIT_FILE_SIZE"
+            ? `Document is larger than the ${formatAttachmentSize(MAX_ATTACHMENT_BYTES)} limit`
+            : err.message,
+        });
+        return;
+      }
+      throw err;
+    }
+
+    const file = (req as Request & { file?: { buffer: Buffer; originalname: string; mimetype?: string } }).file;
+    if (!file) {
+      res.status(400).json({ error: "Missing file field 'file'" });
+      return;
+    }
+    if (file.buffer.length <= 0) {
+      res.status(422).json({ error: "Document is empty" });
+      return;
+    }
+
+    const existing = await svc.list(companyId, { includeArchived: true });
+    const analysis = await analyzeProjectDocument({
+      body: file.buffer,
+      filename: file.originalname ?? "",
+      contentType: file.mimetype,
+      existingProjectNames: existing.map((project) => project.name),
+    });
+    res.json(analysis);
   });
 
   router.patch("/projects/:id", validate(updateProjectSchema), async (req, res) => {

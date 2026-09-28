@@ -418,15 +418,33 @@
     },
     {
       "path": "server/src/routes/projects.ts",
-      "maxNetLines": 140,
-      "reason": "wave122: multipart POST /companies/:companyId/projects/:projectId/documents lands uploaded requirement docs under docs-coolie/projects/<slug>/ (reusing the issue-attachment multipart shape, size cap and audit logging). Belongs here rather than a new route file because it is a project-scoped sub-resource beside project creation. Resolution: keep the import block, the multer instance and the single route block; upstream has no counterpart.",
-      "maxTotalLines": 160
+      "maxNetLines": 220,
+      "reason": "wave122: (1) multipart POST/GET /companies/:companyId/projects/:projectId/documents — land an uploaded requirement doc in the project's plain-storage docs dir <instanceRoot>/projects/<companyId>/<projectId>/coolie-docs/ (a sibling of the managed repo checkout — never inside it, never git-committed), and list what landed; (2) POST /companies/:companyId/projects/analyze-document (Req C) — parse the same multipart `file` and return a suggested project name/slug/summary so the create-project flow can prefill 项目名称. Both reuse the issue-attachment multipart shape and the single MAX_ATTACHMENT_BYTES cap, plus audit logging. Belongs here rather than new route files because they are project-scoped sub-resources beside project creation. Resolution: keep the import block, the multer instance and the three route blocks; upstream has no counterpart.",
+      "maxTotalLines": 320
     },
     {
       "path": "ui/src/api/projects.ts",
-      "maxNetLines": 30,
-      "reason": "wave122: projectsApi.uploadDocument + its ProjectDocumentUpload result type — speaks to the new project-documents endpoint above. Resolution: keep the added method and interface; they append to the existing projectsApi object.",
-      "maxTotalLines": 40
+      "maxNetLines": 60,
+      "reason": "wave122: projectsApi.uploadDocument/listDocuments/analyzeDocument and their ProjectDocument/ProjectDocumentUpload/ProjectDocumentAnalysis result types — speak to the project-documents and analyze-document endpoints above. Resolution: keep the added methods and interfaces; they append to the existing projectsApi object.",
+      "maxTotalLines": 90
+    },
+    {
+      "path": "server/src/home-paths.ts",
+      "maxNetLines": 50,
+      "reason": "wave122: resolveProjectCoolieDocsDir(companyId, projectId) -> <instanceRoot>/projects/<companyId>/<projectId>/coolie-docs — the plain-storage home for a project's uploaded requirement docs. Placed beside resolveManagedProjectWorkspaceDir so it inherits the same per-project segment-isolation invariant, and is deliberately a sibling of the managed repo checkout so an upload never dirties a checkout.",
+      "maxTotalLines": 70
+    },
+    {
+      "path": "server/src/services/project-documents.ts",
+      "maxNetLines": 260,
+      "reason": "wave122: the project-documents service — land/list a project's uploaded requirement docs under the coolie-docs directory above (no git), and (Req C) the deterministic, LLM-free analyzer that turns a doc's title/H1 (or filename stem) into a suggested project name, a unique ASCII slug and a one-line summary. New file; lives under server/src/services/ only because that is where project services live.",
+      "maxTotalLines": 320
+    },
+    {
+      "path": "server/src/services/project-documents.test.ts",
+      "maxNetLines": 160,
+      "reason": "wave122: vitest cover for the project-documents service above (landing path, list, filename sanitization, name/slug extraction). New test file beside its subject.",
+      "maxTotalLines": 180
     },
     {
       "path": "skills/paperclip/scripts/paperclip-upload-artifact.sh",
