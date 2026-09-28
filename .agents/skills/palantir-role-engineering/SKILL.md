@@ -163,6 +163,7 @@ DS 的必查动作：
 
 | 门禁 | 移交 | 必须成立 |
 |---|---|---|
+| G0 选型与竞品 | DS + FDA → 立项 / G1 | 行业竞品功能矩阵对照明确；GitHub 开源底座扫描与 License 排查完成；CMMI DAR 加权决策打分成立 (见 `solution-scouting-and-dar`) |
 | G1 设计 | FDA → Core SWE / FDSE | 租户隔离点、领域边界、权限矩阵、守恒断言已写明，且能指出在哪个文件/哪一层强制 |
 | G2 可编译 | Core SWE → FDSE | `pnpm -r typecheck` 0 报错；静态守卫用例全绿；契约与实现一致 |
 | G3 自测 | FDSE → DS | 状态机分支有覆盖证据；无死穴按钮；无未捕获异常；真实例证据（非仅单测） |

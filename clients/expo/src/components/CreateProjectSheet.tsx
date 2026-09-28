@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
@@ -72,6 +72,27 @@ export function CreateProjectSheet({
   const [localPath, setLocalPath] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [patTarget, setPatTarget] = useState<{
+    configured: boolean;
+    platform: "gitee" | "github" | null;
+    targetOrg: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (!visible) return;
+    coolie
+      .request<{
+        configured: boolean;
+        platform: "gitee" | "github" | null;
+        targetOrg: string | null;
+      }>("GET", "/api/git-pat/target")
+      .then((data) => {
+        if (data?.configured && data?.targetOrg) {
+          setPatTarget(data);
+        }
+      })
+      .catch(() => undefined);
+  }, [visible]);
 
   if (!visible) return null;
 
@@ -350,7 +371,7 @@ export function CreateProjectSheet({
                       sourceMode === "none" && styles.modeTabTextActive,
                     ]}
                   >
-                    无代码库
+                    {patTarget?.targetOrg ? `组织托管 (${patTarget.targetOrg})` : "无代码库"}
                   </Text>
                 </Pressable>
               </View>
@@ -418,12 +439,18 @@ export function CreateProjectSheet({
                 </View>
               )}
 
-              {/* 无代码库模式 */}
+              {/* 无代码库 / PAT 默认托管模式 */}
               {sourceMode === "none" && (
                 <View style={styles.nonePanel}>
-                  <Ionicons name="information-circle-outline" size={16} color={C.ink3} />
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={16}
+                    color={patTarget?.targetOrg ? C.accent : C.ink3}
+                  />
                   <Text style={styles.nonePanelText}>
-                    创建纯规划与任务管理项目，无需预先绑定任何 Git 代码库或本地目录。后续可随时在项目配置中挂载工作区。
+                    {patTarget?.targetOrg
+                      ? `已接入启动 PAT：项目将默认托管并自动在 ${patTarget.platform === "gitee" ? "Gitee" : "GitHub"} 组织 [${patTarget.targetOrg}] 下创建专属私有仓库。`
+                      : "创建纯规划与任务管理项目，无需预先绑定任何 Git 代码库或本地目录。后续可随时在项目配置中挂载工作区。"}
                   </Text>
                 </View>
               )}

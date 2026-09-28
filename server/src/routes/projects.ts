@@ -5,6 +5,7 @@ import { projectToolContext } from "../services/project-tool-context.js";
 import { persistActivity, publishActivity } from "../services/activity-log.js";
 import { z } from "zod";
 import { normalizeProjectRepositoryUrl, resolveProjectRepositorySelection } from "../services/project-repositories.js";
+import { getDefaultPatTarget, ensureRemoteRepository } from "../services/git-pat.js";
 import { toolAccessService } from "../services/tool-access.js";
 import { Router, type Request, type Response } from "express";
 import type { Db } from "@paperclipai/db";
@@ -230,6 +231,11 @@ export function projectRoutes(db: Db) {
     res.json(summary);
   });
 
+  router.get("/git-pat/target", async (_req, res) => {
+    const target = await getDefaultPatTarget();
+    res.json(target);
+  });
+
   router.post("/companies/:companyId/projects", validate(createProjectSchema), async (req, res) => {
     const companyId = req.params.companyId as string;
     assertCompanyAccess(req, companyId);
@@ -261,7 +267,18 @@ export function projectRoutes(db: Db) {
       );
     }
     if (workspace && (repositoryIds || repositoryUrls)) throw unprocessable("Use either workspace or repositoryIds/repositoryUrls when creating a project");
-    const urlRepositories = (repositoryUrls ?? []).map(normalizeProjectRepositoryUrl);
+    let urlRepositories = (repositoryUrls ?? []).map(normalizeProjectRepositoryUrl);
+    // If no explicit workspace or repository is specified, check if startup PAT is configured to default to first organization repo
+    if (!workspace && (!repositoryIds || repositoryIds.length === 0) && urlRepositories.length === 0) {
+      try {
+        const remoteRepo = await ensureRemoteRepository(projectData.name, projectData.description ?? undefined);
+        if (remoteRepo) {
+          urlRepositories = [normalizeProjectRepositoryUrl(remoteRepo.cloneUrl)];
+        }
+      } catch (err) {
+        console.warn("[git-pat] Auto-provisioning remote repository skipped:", err);
+      }
+    }
     const repositories = repositoryIds ? await selectedRepositories(req, companyId, repositoryIds) : null;
     const actor = getActorInfo(req);
     const fingerprint = createHash("sha256").update(JSON.stringify({ projectData, workspace, repositoryIds, repositoryUrls })).digest("hex");

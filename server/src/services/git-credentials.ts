@@ -28,27 +28,24 @@ import { toolAccessService } from "./tool-access.js";
 /** Company-secret names probed for a GitHub token, in priority order. */
 export const DEFAULT_GITHUB_TOKEN_SECRET_NAMES = ["GITHUB_TOKEN", "GH_TOKEN", "PAPERCLIP_GITHUB_TOKEN"] as const;
 
+/** Company-secret names probed for a Gitee token, in priority order. */
+export const DEFAULT_GITEE_TOKEN_SECRET_NAMES = ["GITEE_TOKEN", "GITEE_PAT", "PAPERCLIP_GITEE_TOKEN"] as const;
+
 /** Env var the credential helper reads the token from; never appears in argv. */
 export const GIT_CREDENTIAL_TOKEN_ENV_KEY = "PAPERCLIP_GIT_TOKEN";
 
 // `!`-prefixed helpers run via `sh -c` with the credential action appended as "$1". Only the
-// `get` action answers; store/erase drain stdin and exit 0 silently. `x-access-token`
-// authenticates classic PATs, fine-grained PATs, and GitHub App installation tokens alike.
-//
-// The helper re-validates the credential request from its stdin description and answers only
-// for `protocol=https` + `host=github.com`/`www.github.com`. The pre-invocation URL check
-// runs before git applies configuration like repository-local `url.<base>.insteadOf`
-// rewrites, so a rewritten remote could otherwise request the token for an arbitrary host.
-// The helper is additionally installed URL-scoped (`credential.https://github.com.helper`)
-// so git does not consult it for other hosts in the first place — two independent gates.
+// `get` action answers; store/erase drain stdin and exit 0 silently. `x-access-token` (GitHub)
+// and `oauth2` (Gitee/GitLab) authenticate classic PATs and personal access tokens.
 const GIT_CREDENTIAL_HELPER =
-  `!f() { ok=; proto=; while IFS= read -r l && [ -n "$l" ]; do case "$l" in host=github.com|host=www.github.com) ok=1;; protocol=https) proto=1;; esac; done; if [ "$1" = get ] && [ -n "$ok" ] && [ -n "$proto" ]; then printf 'username=x-access-token\\npassword=%s\\n' "$PAPERCLIP_GIT_TOKEN"; fi; }; f`;
+  `!f() { ok=; proto=; while IFS= read -r l && [ -n "$l" ]; do case "$l" in host=github.com|host=www.github.com) ok=github;; host=gitee.com|host=www.gitee.com) ok=gitee;; protocol=https) proto=1;; esac; done; if [ "$1" = get ] && [ -n "$ok" ] && [ -n "$proto" ]; then if [ "$ok" = gitee ]; then printf 'username=oauth2\\npassword=%s\\n' "$PAPERCLIP_GIT_TOKEN"; else printf 'username=x-access-token\\npassword=%s\\n' "$PAPERCLIP_GIT_TOKEN"; fi; fi; }; f`;
 
 export type GitCredential = {
   token: string;
   source: "managed_connection" | "company_secret" | "server_env";
   /** The company-secret name the token came from; null for a server-environment token. */
   secretName: string | null;
+  targetHost?: "github" | "gitee" | "generic";
   githubIdentity?: { userId: string; login: string };
   identitySource?: "personal" | "dedicated";
   connectionId?: string;
@@ -64,16 +61,14 @@ export type GitAuthInvocation = {
 };
 
 /**
- * Resolve auth for one remote URL. Returns null when the URL is out of scope (non-GitHub,
- * ssh, or already credentialed) or when no token is available — callers then run git with
- * ambient behavior, exactly as before this module existed.
+ * Resolve auth for one remote URL. Returns null when the URL is out of scope (non-GitHub/Gitee,
+ * ssh to unhandled hosts, or already credentialed) or when no token is available — callers then
+ * run git with ambient behavior, exactly as before this module existed.
  */
 export type GitRemoteAuthProvider = (remoteUrl: string) => Promise<GitAuthInvocation | null>;
 
 /**
- * True only for `https://github.com/...` (or `www.`) URLs without inline userinfo. GHES and
- * other hosts are out of scope for now — sending a github.com token to an arbitrary host
- * would leak it, and an operator's inline URL credential must never be overridden.
+ * True only for `https://github.com/...` (or `www.`) URLs without inline userinfo.
  */
 export function isGitHubHttpsRemoteUrl(remoteUrl: string): boolean {
   let parsed: URL;
@@ -87,7 +82,7 @@ export function isGitHubHttpsRemoteUrl(remoteUrl: string): boolean {
   return isGitHubDotCom(parsed.hostname);
 }
 
-function isSupportedGitHubRemoteUrl(remoteUrl: string): boolean {
+export function isSupportedGitHubRemoteUrl(remoteUrl: string): boolean {
   if (isGitHubHttpsRemoteUrl(remoteUrl)) return true;
   if (/^git@(?:www\.)?github\.com:[^\s]+$/i.test(remoteUrl)) return true;
   try {
@@ -96,6 +91,43 @@ function isSupportedGitHubRemoteUrl(remoteUrl: string): boolean {
   } catch {
     return false;
   }
+}
+
+/**
+ * True only for `https://gitee.com/...` (or `www.`) URLs without inline userinfo.
+ */
+export function isGiteeHttpsRemoteUrl(remoteUrl: string): boolean {
+  let parsed: URL;
+  try {
+    parsed = new URL(remoteUrl);
+  } catch {
+    return false;
+  }
+  if (parsed.protocol !== "https:") return false;
+  if (parsed.username || parsed.password) return false;
+  return parsed.hostname === "gitee.com" || parsed.hostname === "www.gitee.com";
+}
+
+export function isSupportedGiteeRemoteUrl(remoteUrl: string): boolean {
+  if (isGiteeHttpsRemoteUrl(remoteUrl)) return true;
+  if (/^git@(?:www\.)?gitee\.com:[^\s]+$/i.test(remoteUrl)) return true;
+  try {
+    const parsed = new URL(remoteUrl);
+    return (
+      parsed.protocol === "ssh:" &&
+      parsed.username === "git" &&
+      !parsed.password &&
+      (parsed.hostname === "gitee.com" || parsed.hostname === "www.gitee.com")
+    );
+  } catch {
+    return false;
+  }
+}
+
+export function getSupportedGitHost(remoteUrl: string): "github" | "gitee" | null {
+  if (isSupportedGitHubRemoteUrl(remoteUrl)) return "github";
+  if (isSupportedGiteeRemoteUrl(remoteUrl)) return "gitee";
+  return null;
 }
 
 /**
@@ -115,7 +147,8 @@ export function scrubGitCredentialText(text: string): string {
 export function buildGitAuthInvocation(credential: GitCredential): GitAuthInvocation {
   const identity = credential.githubIdentity;
   const noreplyEmail = identity ? `${identity.userId}+${identity.login}@users.noreply.github.com` : null;
-  const configEntries = [
+  const isGitee = credential.targetHost === "gitee";
+  const configEntries: [string, string][] = [
     ["credential.helper", ""],
     ["credential.https://github.com.helper", GIT_CREDENTIAL_HELPER],
     ["credential.https://www.github.com.helper", GIT_CREDENTIAL_HELPER],
@@ -127,22 +160,34 @@ export function buildGitAuthInvocation(credential: GitCredential): GitAuthInvoca
       ["user.name", identity.login],
       ["user.email", noreplyEmail!],
     ] : []),
+    ["credential.https://gitee.com.helper", GIT_CREDENTIAL_HELPER],
+    ["credential.https://www.gitee.com.helper", GIT_CREDENTIAL_HELPER],
+    ["url.https://gitee.com/.insteadOf", "git@gitee.com:"],
+    ["url.https://gitee.com/.insteadOf", "ssh://git@gitee.com/"],
+    ["url.https://gitee.com/.insteadOf", "git@www.gitee.com:"],
+    ["url.https://gitee.com/.insteadOf", "ssh://git@www.gitee.com/"],
   ];
   return {
     // The leading empty helper clears ambient helpers (gh, osxkeychain, credential-store) so
     // they neither outrank the resolved token nor receive store/erase callbacks for it. The
     // token helper is installed URL-scoped: git consults it only for credential requests
-    // whose context matches github.com over https, so an `insteadOf`-rewritten remote never
+    // whose context matches github.com or gitee.com over https, so an `insteadOf`-rewritten remote never
     // reaches it (and the helper itself re-checks the request host — see above).
     configArgs: [
       "-c", "credential.helper=",
       "-c", `credential.https://github.com.helper=${GIT_CREDENTIAL_HELPER}`,
       "-c", `credential.https://www.github.com.helper=${GIT_CREDENTIAL_HELPER}`,
+      "-c", `credential.https://gitee.com.helper=${GIT_CREDENTIAL_HELPER}`,
+      "-c", `credential.https://www.gitee.com.helper=${GIT_CREDENTIAL_HELPER}`,
     ],
     env: {
       [GIT_CREDENTIAL_TOKEN_ENV_KEY]: credential.token,
-      GH_TOKEN: credential.token,
-      GITHUB_TOKEN: credential.token,
+      ...(isGitee
+        ? { GITEE_TOKEN: credential.token }
+        : {
+            GH_TOKEN: credential.token,
+            GITHUB_TOKEN: credential.token,
+          }),
       GIT_TERMINAL_PROMPT: "0",
       ...(identity ? {
         GIT_AUTHOR_NAME: identity.login,
@@ -173,19 +218,25 @@ const GIT_AUTH_FAILURE_PATTERN =
 export function describeGitAuthFailure(input: {
   error: string;
   used: { source: GitCredential["source"]; secretName: string | null } | null;
+  remoteUrl?: string;
 }): string | null {
   if (!GIT_AUTH_FAILURE_PATTERN.test(input.error)) {
     return null;
   }
+  const isGitee = input.remoteUrl ? isSupportedGiteeRemoteUrl(input.remoteUrl) : false;
+  const platform = isGitee ? "Gitee" : "GitHub";
   if (input.used) {
     const label = input.used.secretName
-      ? `the ${input.used.secretName} company-secret GitHub credential`
+      ? `the ${input.used.secretName} company-secret ${platform} credential`
       : input.used.source === "managed_connection"
-        ? "the resolved GitHub connection"
-      : "the server-environment GitHub credential";
+        ? `the resolved ${platform} connection`
+      : `the server-environment ${platform} credential`;
     return `The operation authenticated with ${label}, which was rejected or lacks access to this repository.`;
   }
-  return "No GitHub credential is configured — add a GITHUB_TOKEN or GH_TOKEN company secret in Settings → Secrets, or configure a local checkout cwd for this project workspace.";
+  if (isGitee) {
+    return "No Gitee credential is configured — set GITEE_PAT or GITEE_TOKEN in server startup environment variables, or add a company secret in Settings → Secrets.";
+  }
+  return "No GitHub credential is configured — add a GITHUB_TOKEN or GH_TOKEN company secret in Settings → Secrets, set GITHUB_PAT in server startup environment, or configure a local checkout cwd for this project workspace.";
 }
 
 type SecretServiceLike = ReturnType<typeof secretService>;
@@ -202,10 +253,10 @@ type GitCredentialSecretsDeps = {
 /**
  * Build the credential provider for one run. Resolution order: the managed GitHub identity
  * resolver, then a company secret by well-known name, then the server process environment
- * (`GITHUB_TOKEN`/`GH_TOKEN`) for self-hosted operators. A configured managed identity fails
- * closed instead of falling through to legacy credentials. The lookup is memoized per
- * provider instance so one run performs at most one secret resolution (and writes at most
- * one audit event) no matter how many git operations it authenticates.
+ * (`GITHUB_PAT`, `GITEE_PAT`, `GITHUB_TOKEN`, `GH_TOKEN`, `GITEE_TOKEN`, `GIT_PAT`, `GIT_TOKEN`)
+ * for self-hosted operators. A configured managed identity fails closed instead of falling
+ * through to legacy credentials. Lookups are memoized per host so one run performs at most one
+ * secret resolution per target host.
  */
 export function createGitRemoteAuthProvider(
   db: Db,
@@ -225,26 +276,12 @@ export function createGitRemoteAuthProvider(
   const secrets: GitCredentialSecretsDeps = deps?.secrets ?? secretService(db);
   const env = deps?.env ?? process.env;
   const secretNames = deps?.secretNames ?? DEFAULT_GITHUB_TOKEN_SECRET_NAMES;
-  let credentialPromise: Promise<GitCredential | null> | null = null;
+  const memoizedCredentials: Record<string, Promise<GitCredential | null>> = {};
 
-  const resolveCredential = async (): Promise<GitCredential | null> => {
-    // Unit callers historically pass a null DB through the typed test seam. Production
-    // always supplies a real DB and therefore always checks managed identities before
-    // considering legacy secrets or process environment credentials.
-    const managed = db
-      ? await resolveManagedGitHubCredential(db, secrets, companyId, context ?? {})
-      : { configured: false as const };
-    if (managed.configured) {
-      if (!managed.credential) throw new Error(managed.error ?? "Managed GitHub connection is unavailable");
-      return managed.credential;
-    }
-    for (const secretName of secretNames) {
-      const secret = await Promise.resolve(secrets.getByName(companyId, secretName)).catch(() => null);
-      if (!secret) continue;
-      // A resolution failure (inactive secret, provider outage) records its own failure audit
-      // event; fall through to the next source instead of failing the whole git operation here.
-      const token = await secrets
-        .resolveSecretValue(companyId, secret.id, "latest", {
+  const resolveCredentialForHost = async (host: "github" | "gitee"): Promise<GitCredential | null> => {
+    const resolveSecret = async (secretId: string) => {
+      return secrets
+        .resolveSecretValue(companyId, secretId, "latest", {
           accessContext: {
             consumerType: "system",
             consumerId: "workspace-git-credential",
@@ -256,16 +293,65 @@ export function createGitRemoteAuthProvider(
         })
         .then((value) => value.trim())
         .catch(() => "");
-      if (token) return { token, source: "company_secret", secretName };
+    };
+
+    if (host === "gitee") {
+      for (const secretName of DEFAULT_GITEE_TOKEN_SECRET_NAMES) {
+        const secret = await Promise.resolve(secrets.getByName(companyId, secretName)).catch(() => null);
+        if (!secret) continue;
+        const token = await resolveSecret(secret.id);
+        if (token) return { token, source: "company_secret", secretName, targetHost: "gitee" };
+      }
+      const envToken =
+        env.GITEE_PAT?.trim() ||
+        env.GITEE_TOKEN?.trim() ||
+        env.PAPERCLIP_GITEE_TOKEN?.trim() ||
+        env.GIT_PAT?.trim() ||
+        env.GIT_TOKEN?.trim() ||
+        "";
+      if (envToken) return { token: envToken, source: "server_env", secretName: null, targetHost: "gitee" };
+      return null;
     }
-    const envToken = env.GITHUB_TOKEN?.trim() || env.GH_TOKEN?.trim() || "";
-    if (envToken) return { token: envToken, source: "server_env", secretName: null };
+
+    // Default GitHub
+    const managed = db
+      ? await resolveManagedGitHubCredential(db, secrets, companyId, context ?? {})
+      : { configured: false as const };
+    if (managed.configured) {
+      if (!managed.credential) throw new Error(managed.error ?? "Managed GitHub connection is unavailable");
+      return managed.credential;
+    }
+    const allSecretNames = [...secretNames];
+    if (!allSecretNames.includes("GITHUB_PAT")) {
+      allSecretNames.push("GITHUB_PAT");
+    }
+    for (const secretName of allSecretNames) {
+      const secret = await Promise.resolve(secrets.getByName(companyId, secretName)).catch(() => null);
+      if (!secret) continue;
+      const token = await resolveSecret(secret.id);
+      if (token) return { token, source: "company_secret", secretName, targetHost: "github" };
+    }
+    const envToken =
+      env.GITHUB_TOKEN?.trim() ||
+      env.GH_TOKEN?.trim() ||
+      env.GITHUB_PAT?.trim() ||
+      env.PAPERCLIP_GITHUB_TOKEN?.trim() ||
+      env.GIT_PAT?.trim() ||
+      env.GIT_TOKEN?.trim() ||
+      "";
+    if (envToken) return { token: envToken, source: "server_env", secretName: null, targetHost: "github" };
     return null;
   };
 
+  const resolveMemoized = (host: "github" | "gitee") => {
+    memoizedCredentials[host] ??= resolveCredentialForHost(host);
+    return memoizedCredentials[host];
+  };
+
   return async (remoteUrl: string) => {
-    if (!isSupportedGitHubRemoteUrl(remoteUrl)) return null;
-    if (db && context?.heartbeatRunId && context.agentId) {
+    const hostType = getSupportedGitHost(remoteUrl);
+    if (!hostType) return null;
+    if (hostType === "github" && db && context?.heartbeatRunId && context.agentId) {
       const [run] = await db.select({ contextId: heartbeatRuns.activeIdentityContextId }).from(heartbeatRuns).where(and(
         eq(heartbeatRuns.id, context.heartbeatRunId), eq(heartbeatRuns.companyId, companyId), eq(heartbeatRuns.agentId, context.agentId),
       ));
@@ -275,10 +361,10 @@ export function createGitRemoteAuthProvider(
           companyId, runId: context.heartbeatRunId, agentId: context.agentId,
         });
         if (result.status === "absent") {
-          const credential = await resolveCredential();
+          const credential = await resolveMemoized("github");
           return credential ? buildGitAuthInvocation(credential) : null;
         }
-        const anonymous = buildGitAuthInvocation({ token: "", source: "managed_connection", secretName: null });
+        const anonymous = buildGitAuthInvocation({ token: "", source: "managed_connection", secretName: null, targetHost: "github" });
         return { ...anonymous, env: {
           ...anonymous.env, GIT_CONFIG_GLOBAL: "/dev/null", GIT_CONFIG_SYSTEM: "/dev/null",
           GIT_AUTHOR_NAME: "", GIT_AUTHOR_EMAIL: "", GIT_COMMITTER_NAME: "", GIT_COMMITTER_EMAIL: "",
@@ -286,8 +372,7 @@ export function createGitRemoteAuthProvider(
         } };
       }
     }
-    credentialPromise ??= resolveCredential();
-    const credential = await credentialPromise;
+    const credential = await resolveMemoized(hostType);
     if (!credential) return null;
     return buildGitAuthInvocation(credential);
   };
