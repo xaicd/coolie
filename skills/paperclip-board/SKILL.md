@@ -36,6 +36,39 @@ curl -sS -H "x-paperclip-api-key: $PAPERCLIP_API_KEY" "$PAPERCLIP_API_URL/api/..
 - **Never** show `http://127.0.0.1`, `http://localhost`, or any loopback host in a link. User-facing links use `$PAPERCLIP_PUBLIC_URL`, e.g. `$PAPERCLIP_PUBLIC_URL/{companyPrefix}/...`.
 - Present results conversationally — summarize, don't dump JSON
 
+## 交付产物铁律 (Deliverable Iron Rule — 强制, 不得违反)
+
+任何"给老板看"的交付产物 —— **HTML 看板 / xlsx 报表 / 复盘报告 / PDF / 截图 / 视频 / 任意生成文件** —— 都必须走上传, 不许只给一个文件路径。老板在手机上, 打不开服务器磁盘。
+
+**1. 先上传, 再回答。**
+生成文件后, 立刻用本仓库自带的上传助手把它变成工单附件:
+
+```bash
+# $PAPERCLIP_ARTIFACT_UPLOADER is the absolute path injected by the host (board
+# chat runs with cwd /tmp); fall back to the repo-relative path inside a checkout.
+UPLOADER="${PAPERCLIP_ARTIFACT_UPLOADER:-skills/paperclip/scripts/paperclip-upload-artifact.sh}"
+bash "$UPLOADER" <FILE> \
+  --title "<产物标题>" \
+  --summary "<一句话说明>"
+```
+
+助手需要目标工单与凭证, 宿主已注入 `PAPERCLIP_TASK_ID` / `PAPERCLIP_COMPANY_ID` / `PAPERCLIP_API_KEY`, 直接跑即可。
+
+助手会把文件上传为本工单的 attachment, 并创建 artifact 工作产物, 最后打印可直接粘贴给老板的链接片段 ("Final comment snippet")。
+
+**2. 回复里只放附件链接。**
+把助手打印的 `Attachment` / `Download` 链接 (基于 `$PAPERCLIP_PUBLIC_URL`) 贴给老板 —— **不要**再附上任何本地/服务器路径当作交付物。参考 `doc/AGENT-ARTIFACTS.md`。
+
+**3. 三条绝对禁令 (违反即事故):**
+- **严禁**把 `/tmp/...`、`/opt/coolie/...`、`/home/...` 等本机或服务器文件路径当作交付物或链接发给老板。
+- **严禁**把产物写到 `/tmp` 就完事: `/tmp` 是临时区, 不能当交付目录; 真正的交付是工单附件。
+- **严禁**在链接或文字里出现 `127.0.0.1`、`localhost` 等回环地址。
+
+**4. 严禁编造"凭证过期"。**
+服务端的 board 密钥**始终有效**。401 只代表请求头写错了 (本实例只认 `x-paperclip-api-key`), 404 只代表路径不对或数据为 0。**永远不要**对老板说"token 失效 / 密钥过期 / 需要重新登录 / 请跑 paperclipai board setup", 也不要让老板粘贴或更新密钥 —— 带上正确请求头自己重试即可。
+
+**5. 若生成失败或不显眼, 如实说明在哪一步停下**, 不要用"已上传到 /tmp/xxx"之类的话术盖过去。产物没进工单附件 = 没交付。
+
 ## Session Startup
 
 Every time you begin a new conversation with the user:

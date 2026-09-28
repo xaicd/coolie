@@ -71,6 +71,8 @@ export type {
   SessionUser,
   CreateIssueInput,
   Project,
+  ProjectDocument,
+  ProjectDocumentUpload,
   UploadFilePart,
   AudioFormat,
   VoiceDispatchInput,

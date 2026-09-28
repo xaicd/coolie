@@ -125,6 +125,28 @@ export interface Project {
 export type UploadFilePart = Blob | { uri: string; name: string; type: string };
 
 /**
+ * Result of landing a project requirement document in the project's
+ * plain-storage docs directory
+ * `<instanceRoot>/projects/<companyId>/<projectId>/coolie-docs/`, a sibling of
+ * the managed repo checkout. `relativePath` is relative to the instance root.
+ */
+export interface ProjectDocumentUpload {
+  projectId: string;
+  filename: string;
+  relativePath: string;
+  byteSize: number;
+  sha256: string;
+  originalFilename: string | null;
+}
+
+/** One landed requirement document, as returned by the project documents list. */
+export interface ProjectDocument {
+  filename: string;
+  byteSize: number;
+  modifiedAt: string;
+}
+
+/**
  * One model an adapter can run (`GET /companies/:id/adapters/:type/models`,
  * which mirrors the Coolie Web `agentsApi.adapterModels`). Feeds the composer's
  * model-override picker when the assignee's lane is "custom".

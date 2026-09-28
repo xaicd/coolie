@@ -18,6 +18,23 @@ function projectPath(id: string, companyId?: string, suffix = "") {
   return withCompanyScope(`/projects/${encodeURIComponent(id)}${suffix}`, companyId);
 }
 
+/** Result of landing one requirement document under projects/<companyId>/<projectId>/coolie-docs/. */
+export interface ProjectDocumentUpload {
+  projectId: string;
+  filename: string;
+  relativePath: string;
+  byteSize: number;
+  sha256: string;
+  originalFilename: string | null;
+}
+
+/** One landed requirement document, as returned by the project documents list. */
+export interface ProjectDocument {
+  filename: string;
+  byteSize: number;
+  modifiedAt: string;
+}
+
 export const projectsApi = {
   repositoryOptions: (companyId: string) => api.get<ProjectRepositoryOptions>(`/companies/${companyId}/project-repositories`),
   setRepositories: (id: string, repositoryIds: string[]) => api.put<Project>(projectPath(id, undefined, "/repositories"), { repositoryIds }),
@@ -30,6 +47,20 @@ export const projectsApi = {
   get: (id: string, companyId?: string) => api.get<Project>(projectPath(id, companyId)),
   create: (companyId: string, data: Record<string, unknown>) =>
     api.post<Project>(`/companies/${companyId}/projects`, data),
+  /** Upload a requirement doc/screenshot for a project; lands in projects/<companyId>/<projectId>/coolie-docs/. */
+  uploadDocument: (companyId: string, projectId: string, file: File) => {
+    const form = new FormData();
+    form.append("file", file);
+    return api.postForm<ProjectDocumentUpload>(
+      `/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/documents`,
+      form,
+    );
+  },
+  /** List the requirement documents landed for a project. */
+  listDocuments: (companyId: string, projectId: string) =>
+    api.get<{ projectId: string; documents: ProjectDocument[] }>(
+      `/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/documents`,
+    ),
   update: (id: string, data: Record<string, unknown>, companyId?: string) =>
     api.patch<Project>(projectPath(id, companyId), data),
   listWorkspaces: (projectId: string, companyId?: string) =>

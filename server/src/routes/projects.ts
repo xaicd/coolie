@@ -6,6 +6,13 @@ import { persistActivity, publishActivity } from "../services/activity-log.js";
 import { z } from "zod";
 import { normalizeProjectRepositoryUrl, resolveProjectRepositorySelection } from "../services/project-repositories.js";
 import { getDefaultPatTarget, ensureRemoteRepository } from "../services/git-pat.js";
+import { MAX_ATTACHMENT_BYTES, formatAttachmentSize } from "../attachment-types.js";
+import {
+  landProjectDocument,
+  listProjectDocuments,
+  sanitizeProjectDocumentFilename,
+} from "../services/project-documents.js";
+import multer from "multer";
 import { toolAccessService } from "../services/tool-access.js";
 import { Router, type Request, type Response } from "express";
 import type { Db } from "@paperclipai/db";
@@ -52,6 +59,12 @@ const SHARED_WORKSPACE_STOP_AND_RESTART_ACTIONS = new Set(["stop", "restart"]);
 export function projectRoutes(db: Db) {
   const router = Router();
   const svc = projectService(db);
+  // Same multipart shape and size cap as issue attachments (`file` field),
+  // reusing MAX_ATTACHMENT_BYTES so the two upload paths cannot drift.
+  const documentUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: MAX_ATTACHMENT_BYTES, files: 1 },
+  });
 
   async function repositoryViewer(req: Request) {
     if (req.actor.type === "board") return { userId: req.actor.userId ?? null, localTrusted: req.actor.source === "local_implicit" };
@@ -344,6 +357,105 @@ export function projectRoutes(db: Db) {
       trackProjectCreated(telemetryClient);
     }
     res.status(result.duplicate ? 200 : 201).json(result.project);
+  });
+
+  // Requirement docs / screenshots uploaded alongside 立项. Multipart, same
+  // `file` field and size cap as issue attachments; the file lands in the
+  // project's plain-storage docs directory
+  // `<instanceRoot>/projects/<companyId>/<projectId>/coolie-docs/`, a sibling
+  // of the managed repo checkout, so an upload never dirties a checkout.
+  router.post(
+    "/companies/:companyId/projects/:projectId/documents",
+    async (req, res) => {
+      const companyId = req.params.companyId as string;
+      const projectId = req.params.projectId as string;
+      assertCompanyAccess(req, companyId);
+      const project = await getAccessibleResource(req, res, svc.getById(projectId), "Project not found");
+      if (!project) return;
+      if (project.companyId !== companyId) {
+        res.status(422).json({ error: "Project does not belong to company" });
+        return;
+      }
+      if (!(await assertProjectReadAllowed(req, res, project))) return;
+
+      try {
+        await new Promise<void>((resolve, reject) => {
+          documentUpload.single("file")(req, res, (err: unknown) => (err ? reject(err) : resolve()));
+        });
+      } catch (err) {
+        if (err instanceof multer.MulterError) {
+          res.status(err.code === "LIMIT_FILE_SIZE" ? 422 : 400).json({
+            error: err.code === "LIMIT_FILE_SIZE"
+              ? `Document is larger than the ${formatAttachmentSize(MAX_ATTACHMENT_BYTES)} limit`
+              : err.message,
+          });
+          return;
+        }
+        throw err;
+      }
+
+      const file = (req as Request & { file?: { buffer: Buffer; originalname: string } }).file;
+      if (!file) {
+        res.status(400).json({ error: "Missing file field 'file'" });
+        return;
+      }
+      if (file.buffer.length <= 0) {
+        res.status(422).json({ error: "Document is empty" });
+        return;
+      }
+
+      const filename = sanitizeProjectDocumentFilename(file.originalname ?? "");
+      if (!filename) {
+        res.status(422).json({ error: "Invalid document filename" });
+        return;
+      }
+
+      const landed = await landProjectDocument({
+        companyId: project.companyId,
+        projectId: project.id,
+        filename,
+        body: file.buffer,
+        originalFilename: file.originalname ?? null,
+      });
+
+      const actor = getActorInfo(req);
+      await logActivity(db, {
+        companyId,
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        agentId: actor.agentId,
+        runId: actor.runId,
+        action: "project.document_added",
+        entityType: "project",
+        entityId: project.id,
+        details: {
+          relativePath: landed.relativePath,
+          filename: landed.filename,
+          byteSize: landed.byteSize,
+          originalFilename: file.originalname,
+        },
+      });
+
+      res.status(201).json(landed);
+    },
+  );
+
+  // List the requirement docs landed for a project. Minimal on purpose: the
+  // board UI reads this to show what was attached at 立项 time.
+  router.get("/companies/:companyId/projects/:projectId/documents", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    const projectId = req.params.projectId as string;
+    assertCompanyAccess(req, companyId);
+    const project = await getAccessibleResource(req, res, svc.getById(projectId), "Project not found");
+    if (!project) return;
+    if (project.companyId !== companyId) {
+      res.status(422).json({ error: "Project does not belong to company" });
+      return;
+    }
+    if (!(await assertProjectReadAllowed(req, res, project))) return;
+
+    const documents = await listProjectDocuments({ companyId: project.companyId, projectId: project.id });
+    res.json({ projectId: project.id, documents });
   });
 
   router.patch("/projects/:id", validate(updateProjectSchema), async (req, res) => {

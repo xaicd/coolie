@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -16,6 +17,7 @@ import { Ionicons } from "@expo/vector-icons";
 import type { Company, Project } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
 import { RADIUS, SPACING } from "../ui/tokens";
+import { UploadRow, type StagedAttachment } from "./composer/UploadRow";
 
 interface CreateProjectSheetProps {
   company: Company;
@@ -75,6 +77,9 @@ export function CreateProjectSheet({
   const [gitUrls, setGitUrls] = useState<string[]>([""]);
   const [localPath, setLocalPath] = useState("");
   const [hostedRemote, setHostedRemote] = useState(true);
+  // 需求文档/截图: 立项拿到 projectId 后才能上传 (落档 docs-coolie/projects/<slug>/),
+  // 所以先在此暂存, createProject 返回后逐个上传 —— 与任务作曲家的附件时序一致。
+  const [attachments, setAttachments] = useState<StagedAttachment[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [patTarget, setPatTarget] = useState<{
@@ -188,8 +193,25 @@ export function CreateProjectSheet({
 
     try {
       const created = await coolie.createProject(company.id, payload);
+      const failedUploads: string[] = [];
+      for (const file of attachments) {
+        try {
+          await coolie.uploadProjectDocument(company.id, created.id, {
+            uri: file.uri,
+            name: file.name,
+            type: file.mimeType,
+          });
+        } catch {
+          failedUploads.push(file.name);
+        }
+      }
+      setAttachments([]);
       onCreated(created);
       onClose();
+      // 立项已成功; 附件失败不阻断, 但要让老板知道哪些没落档。
+      if (failedUploads.length > 0) {
+        Alert.alert("部分需求文档未上传", failedUploads.join("、"));
+      }
     } catch (err) {
       setError((err as Error)?.message || "立项失败，请检查网络或配置");
     } finally {
@@ -467,6 +489,19 @@ export function CreateProjectSheet({
                   }
                 />
               </View>
+            </View>
+
+            {/* 需求文档 / 截图 (选填): 立项后上传, 落档 docs-coolie/projects/<slug>/ */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionLabel}>需求文档 / 截图</Text>
+                <Text style={styles.sectionSubLabel}>立项后落档 docs-coolie</Text>
+              </View>
+              <UploadRow
+                files={attachments}
+                onChange={setAttachments}
+                disabled={submitting}
+              />
             </View>
 
             {/* 建设目标与项目概述 */}

@@ -551,6 +551,15 @@ export function boardChatRoutes(
       liveBoardChats -= 1;
     };
 
+    // Coolie fork (wave122): absolute path of the artifact uploader. The board
+    // chat runs with cwd `/tmp`, so the skill's repo-relative command cannot
+    // resolve there; the concierge needs this to attach a generated deliverable
+    // instead of replying with a bare `/tmp` path.
+    const artifactUploaderPath = path.resolve(
+      path.dirname(fileURLToPath(import.meta.url)),
+      "../../../skills/paperclip/scripts/paperclip-upload-artifact.sh",
+    );
+
     const proc = spawn("hermes", ["chat", ...args], {
       stdio: ["pipe", "pipe", "pipe"],
       cwd: "/tmp",
@@ -558,6 +567,11 @@ export function boardChatRoutes(
         ...process.env,
         PAPERCLIP_API_URL: apiUrl,
         PAPERCLIP_COMPANY_ID: companyId,
+        // Coolie fork (wave122): the standing board issue this chat is anchored
+        // to, so the uploader knows where a deliverable attaches. A board chat
+        // has no PAPERCLIP_TASK_ID of its own.
+        PAPERCLIP_TASK_ID: resolvedIssueId,
+        PAPERCLIP_ARTIFACT_UPLOADER: artifactUploaderPath,
         // Coolie fork (wave119): 宿主已配置的 board 凭证 —— 子进程调 API 必须带
         // `x-paperclip-api-key: $PAPERCLIP_API_KEY` (本实例 board 通道只认这个头;
         // Authorization: Bearer 会 401, 老板因此见过「token 失效, 请跑 paperclipai

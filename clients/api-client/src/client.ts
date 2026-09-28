@@ -24,6 +24,8 @@ import {
   type OntologyGraphCounts,
   type OntologyGraphSnapshot,
   type Project,
+  type ProjectDocument,
+  type ProjectDocumentUpload,
   type SessionUser,
   type SetDomainLifecycleOptions,
   type UploadFilePart,
@@ -485,6 +487,39 @@ export class CoolieClient {
     return this.postForm<IssueAttachment>(
       `/api/companies/${encodeURIComponent(companyId)}/issues/${encodeURIComponent(issueId)}/attachments`,
       form,
+    );
+  }
+
+  /**
+   * Attach a requirement document to a freshly created project.
+   *
+   * Mirrors the Coolie Web `projectsApi.uploadDocument` →
+   * `POST /companies/:companyId/projects/:projectId/documents`: the project
+   * must exist first (same "upload after the create answers" shape as
+   * `uploadAttachment`), and the file lands in the project's plain-storage
+   * docs directory `projects/<companyId>/<projectId>/coolie-docs/`.
+   */
+  uploadProjectDocument(
+    companyId: string,
+    projectId: string,
+    file: UploadFilePart,
+  ): Promise<ProjectDocumentUpload> {
+    const form = new FormData();
+    form.append("file", file as unknown as Blob);
+    return this.postForm<ProjectDocumentUpload>(
+      `/api/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/documents`,
+      form,
+    );
+  }
+
+  /** List the requirement documents landed for a project. */
+  listProjectDocuments(
+    companyId: string,
+    projectId: string,
+  ): Promise<{ projectId: string; documents: ProjectDocument[] }> {
+    return this.request<{ projectId: string; documents: ProjectDocument[] }>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/documents`,
     );
   }
 

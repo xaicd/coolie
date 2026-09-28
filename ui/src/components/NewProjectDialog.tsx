@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ProjectRepository } from "@paperclipai/shared";
-import { Folder, GitBranch, HardDrive, Link2, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { FileText, Folder, GitBranch, HardDrive, Link2, Paperclip, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { useDialog } from "../context/DialogContext";
 import { useCompany } from "../context/CompanyContext";
 import { projectsApi } from "../api/projects";
@@ -57,7 +57,9 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
   const [localPath, setLocalPath] = useState("");
   const [repos, setRepos] = useState<ProjectRepository[]>([]);
   const [connecting, setConnecting] = useState(false);
+  const [files, setFiles] = useState<File[]>([]);
   const input = useRef<HTMLInputElement>(null);
+  const fileInput = useRef<HTMLInputElement>(null);
 
   const handleGitUrlChange = (id: string, val: string) => {
     setGitUrls((prev) => prev.map((item) => (item.id === id ? { ...item, url: val } : item)));
@@ -90,7 +92,7 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
   };
 
   const create = useMutation({
-    mutationFn: () => {
+    mutationFn: async () => {
       const payload: Record<string, unknown> = {
         name: name.trim(),
         status: "planned",
@@ -110,7 +112,13 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
         payload.repositoryIds = repos.map((repo) => repo.id);
       }
 
-      return projectsApi.create(companyId, payload);
+      const project = await projectsApi.create(companyId, payload);
+      // Files need a project id to land under docs-coolie/projects/<slug>/,
+      // so they upload right after the 201 just like the task composer.
+      for (const file of files) {
+        await projectsApi.uploadDocument(companyId, project.id, file);
+      }
+      return project;
     },
     onSuccess: () => {
       void client.invalidateQueries({ queryKey: queryKeys.projects.all(companyId) });
@@ -298,6 +306,47 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
                 <div className="rounded-lg border border-border/60 bg-muted/20 p-4 text-xs text-muted-foreground">
                   创建纯规划与任务管理项目，无需预先绑定任何 Git 代码库或本地目录。后续可随时在项目配置中挂载工作区。
                 </div>
+              )}
+            </div>
+
+            <div className="flex shrink-0 flex-col gap-2 px-5 pb-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-medium text-muted-foreground">需求文档 / 截图 (选填)</span>
+                <span className="text-xs text-muted-foreground">立项后落档 docs-coolie/projects/</span>
+              </div>
+              <input
+                ref={fileInput}
+                type="file"
+                multiple
+                aria-label="需求文档"
+                accept=".md,.markdown,.txt,.pdf,.doc,.docx,.png,.jpg,.jpeg,.gif,.webp,.xlsx,.xls"
+                className="hidden"
+                disabled={create.isPending}
+                onChange={(event) => {
+                  const picked = Array.from(event.target.files ?? []);
+                  if (picked.length > 0) setFiles((prev) => [...prev, ...picked]);
+                  event.target.value = "";
+                }}
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <Button type="button" variant="outline" size="sm" className="gap-1.5 text-xs h-7" disabled={create.isPending} onClick={() => fileInput.current?.click()}>
+                  <Paperclip className="size-3" />
+                  选择文件 (多选)
+                </Button>
+                <span className="text-xs text-muted-foreground">支持 md / pdf / docx / 图片，可多选</span>
+              </div>
+              {files.length > 0 && (
+                <ul className="flex flex-col gap-1">
+                  {files.map((file, index) => (
+                    <li key={`${file.name}-${file.size}-${index}`} className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/20 px-2 py-1">
+                      <FileText className="size-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                      <span className="min-w-0 flex-1 truncate text-xs">{file.name}</span>
+                      <Button type="button" variant="ghost" size="icon-sm" aria-label={`移除 ${file.name}`} disabled={create.isPending} onClick={() => setFiles((prev) => prev.filter((_, i) => i !== index))}>
+                        <Trash2 className="size-3.5 text-muted-foreground" />
+                      </Button>
+                    </li>
+                  ))}
+                </ul>
               )}
             </div>
 

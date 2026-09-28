@@ -11,7 +11,9 @@ Uploads a generated file from the current workspace to the current Paperclip
 issue, then creates an attachment-backed artifact work product by default.
 
 Required environment for live uploads:
-  PAPERCLIP_API_URL, PAPERCLIP_API_KEY, PAPERCLIP_COMPANY_ID, PAPERCLIP_TASK_ID, PAPERCLIP_RUN_ID
+  PAPERCLIP_API_URL, PAPERCLIP_API_KEY, PAPERCLIP_COMPANY_ID, PAPERCLIP_TASK_ID
+  (PAPERCLIP_RUN_ID is optional: set it during an agent run for run-scoped
+   dedup/attribution; a board-concierge chat has no run and omits it.)
 
 Options:
   --issue-id ID          Issue id to attach to (default: PAPERCLIP_TASK_ID)
@@ -126,7 +128,8 @@ request_json() {
       curl -sS -X "$method" -w '%{http_code}' -o "$response_file" \
         "$url" \
         -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
-        -H "X-Paperclip-Run-Id: $PAPERCLIP_RUN_ID" \
+        -H "x-paperclip-api-key: $PAPERCLIP_API_KEY" \
+        ${run_header_args[@]+"${run_header_args[@]}"} \
         -H 'Content-Type: application/json' \
         --data-binary "$body"
     )"
@@ -135,7 +138,8 @@ request_json() {
       curl -sS -X "$method" -w '%{http_code}' -o "$response_file" \
         "$url" \
         -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
-        -H "X-Paperclip-Run-Id: $PAPERCLIP_RUN_ID"
+        -H "x-paperclip-api-key: $PAPERCLIP_API_KEY" \
+        ${run_header_args[@]+"${run_header_args[@]}"}
     )"
   fi
 
@@ -168,7 +172,8 @@ upload_file() {
     curl -sS -X POST -w '%{http_code}' -o "$response_file" \
       "$url" \
       -H "Authorization: Bearer $PAPERCLIP_API_KEY" \
-      -H "X-Paperclip-Run-Id: $PAPERCLIP_RUN_ID" \
+      -H "x-paperclip-api-key: $PAPERCLIP_API_KEY" \
+      ${run_header_args[@]+"${run_header_args[@]}"} \
       -F "file=@\"${escaped_path}\";type=${content_type}"
   )" || curl_status=$?
 
@@ -398,9 +403,19 @@ if [[ "$dry_run" == "1" ]]; then
   exit 0
 fi
 
-if [[ -z "${PAPERCLIP_API_URL:-}" || -z "${PAPERCLIP_API_KEY:-}" || -z "${PAPERCLIP_RUN_ID:-}" ]]; then
-  printf 'Missing PAPERCLIP_API_URL, PAPERCLIP_API_KEY, or PAPERCLIP_RUN_ID.\n' >&2
+if [[ -z "${PAPERCLIP_API_URL:-}" || -z "${PAPERCLIP_API_KEY:-}" ]]; then
+  printf 'Missing PAPERCLIP_API_URL or PAPERCLIP_API_KEY.\n' >&2
   exit 1
+fi
+
+# PAPERCLIP_RUN_ID is optional. A board-concierge chat has no heartbeat run of
+# its own (board-chat spawns the CLI without one), and a fabricated run id
+# violates activity_log's run FK with a 500 — so a run-scoped header is only
+# sent when a real run id is present. Agent runs still get run attribution.
+run_id="${PAPERCLIP_RUN_ID:-}"
+run_header_args=()
+if [[ -n "$run_id" ]]; then
+  run_header_args=(-H "X-Paperclip-Run-Id: $run_id")
 fi
 
 if [[ -z "$issue_id" || -z "$company_id" ]]; then
@@ -408,6 +423,10 @@ if [[ -z "$issue_id" || -z "$company_id" ]]; then
   exit 1
 fi
 
+# Credential header: a runner's agent key authenticates with
+# `Authorization: Bearer`, while this instance's board channel accepts only
+# `x-paperclip-api-key` (Bearer there is a 401). Send both so one helper works
+# on either credential — an instance ignores the header it does not read.
 api_root="${PAPERCLIP_API_URL%/}"
 case "$api_root" in
   */api) api_base="$api_root" ;;
@@ -416,7 +435,7 @@ esac
 file_sha256="$(sha256_file "$file_path")"
 original_filename="$(basename "$file_path")"
 operation_key="$(
-  sha256_text "$api_base|$company_id|$issue_id|$PAPERCLIP_RUN_ID|$original_filename|$file_sha256|$content_type"
+  sha256_text "$api_base|$company_id|$issue_id|$run_id|$original_filename|$file_sha256|$content_type"
 )"
 acquire_operation_lock "$operation_key"
 trap release_operation_lock EXIT
@@ -433,7 +452,7 @@ for ((lookup_attempt = 1; lookup_attempt <= lookup_attempts; lookup_attempt++));
   attachment="$(
     jq -nc \
       --argjson attachments "$existing_attachments" \
-      --arg runId "$PAPERCLIP_RUN_ID" \
+      --arg runId "$run_id" \
       --arg sha256 "$file_sha256" \
       --arg originalFilename "$original_filename" \
       --arg contentType "$content_type" \
@@ -503,7 +522,7 @@ if [[ "$create_work_product" == "1" ]]; then
       --arg title "$title" \
       --arg summary "$summary" \
       --arg status "$status" \
-      --arg runId "$PAPERCLIP_RUN_ID" \
+      --arg runId "$run_id" \
       --arg attachmentId "$attachment_id" \
       --arg contentType "$content_type" \
       --argjson byteSize "$byte_size" \
@@ -521,7 +540,7 @@ if [[ "$create_work_product" == "1" ]]; then
         isPrimary: $isPrimary,
         healthStatus: "unknown",
         summary: (if $summary == "" then null else $summary end),
-        createdByRunId: $runId,
+        createdByRunId: (if $runId == "" then null else $runId end),
         metadata: {
           attachmentId: $attachmentId,
           contentType: $contentType,

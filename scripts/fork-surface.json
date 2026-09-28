@@ -244,8 +244,8 @@
     {
       "path": "server/src/routes/board-chat.ts",
       "maxNetLines": 60,
-      "reason": "Board chat runs on `hermes` (the operator's own agent) instead of `claude`, and its deployment gate admits `authenticated` as well as `local_trusted`, because this fork's install is single-operator (one boss) rather than an upstream multi-tenant deployment. It also carries the fork's conversation-clear handling (wave115): DELETE /board/chat/conversation/:id hard-deletes the issue's rows so a cleared chat cannot render as empty transparent bubbles, the concierge reply is not persisted when it is a bare status line, the prompt history reads with includeDeleted=false and drops blank/status turns. Registered so the next upstream merge resolves this file by intent: keep upstream's relay logic, re-apply the hermes spawn, the widened gate, and the clear/status handling.",
-      "maxTotalLines": 200
+      "reason": "Board chat runs on `hermes` (the operator's own agent) instead of `claude`, and its deployment gate admits `authenticated` as well as `local_trusted`, because this fork's install is single-operator (one boss) rather than an upstream multi-tenant deployment. It also carries the fork's conversation-clear handling (wave115): DELETE /board/chat/conversation/:id hard-deletes the issue's rows so a cleared chat cannot render as empty transparent bubbles, the concierge reply is not persisted when it is a bare status line, the prompt history reads with includeDeleted=false and drops blank/status turns. wave122 adds the deliverable plumbing to the spawn env: PAPERCLIP_TASK_ID (the standing board issue this chat anchors to) and PAPERCLIP_ARTIFACT_UPLOADER (absolute path of the upload helper, needed because the spawn cwd is /tmp so the skill's repo-relative command cannot resolve) — without them the concierge could only answer with a /tmp path. Registered so the next upstream merge resolves this file by intent: keep upstream's relay logic, re-apply the hermes spawn (incl. the wave119 board-credential forwarding and the wave122 task-id/uploader vars), the widened gate, and the clear/status handling. Budget raised 200 → 240: the counter was already at 210 before this change from earlier fork work, and wave122 adds ~10 more lines.",
+      "maxTotalLines": 240
     },
     {
       "path": "server/src/__tests__/board-chat-route-feature-flag.test.ts",
@@ -415,6 +415,24 @@
       "maxNetLines": 40,
       "reason": "Support SSH Git URLs (git@host:owner/repo.git and ssh://...) in normalizeProjectRepositoryUrl without restricting to GitHub.",
       "maxTotalLines": 50
+    },
+    {
+      "path": "server/src/routes/projects.ts",
+      "maxNetLines": 140,
+      "reason": "wave122: multipart POST /companies/:companyId/projects/:projectId/documents lands uploaded requirement docs under docs-coolie/projects/<slug>/ (reusing the issue-attachment multipart shape, size cap and audit logging). Belongs here rather than a new route file because it is a project-scoped sub-resource beside project creation. Resolution: keep the import block, the multer instance and the single route block; upstream has no counterpart.",
+      "maxTotalLines": 160
+    },
+    {
+      "path": "ui/src/api/projects.ts",
+      "maxNetLines": 30,
+      "reason": "wave122: projectsApi.uploadDocument + its ProjectDocumentUpload result type — speaks to the new project-documents endpoint above. Resolution: keep the added method and interface; they append to the existing projectsApi object.",
+      "maxTotalLines": 40
+    },
+    {
+      "path": "skills/paperclip/scripts/paperclip-upload-artifact.sh",
+      "maxNetLines": 30,
+      "reason": "wave122: (1) send the credential as BOTH `Authorization: Bearer` and `x-paperclip-api-key` — this fork's board channel reads only the latter and rejects Bearer with 401, so the helper the board skill mandates could not upload here at all (the failure behind the boss's 'credential expired' complaint); upstream instances ignore the header they do not read, so one helper works on either credential. (2) Make PAPERCLIP_RUN_ID optional: a board-concierge chat has no heartbeat run, and a fabricated run id violates activity_log's run FK with a 500 — the run-scoped header and work-product attribution are now sent only when a real run id is present, so agent runs are unchanged. Resolution: keep both changes; do not revert to Bearer-only or to a required run id.",
+      "maxTotalLines": 40
     }
   ]
 }
