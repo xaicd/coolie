@@ -1,8 +1,8 @@
 {
-  "version": "0.5.87",
-  "versionCode": 587,
-  "commitSha": "b26376d44753b26d413dfc212a3c43db6d410f78",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.87/coolie-release.apk",
-  "sha256": "39ba8cae7827d516ed6eacd1e778bd20f3cc1f2eaadb10e38ce706211f3ea935",
-  "releaseNotes": "wave125 任务列表对齐 web 功能：状态/指派/项目筛选、列表/分组(按项目)/看板(按状态分列)三视图切换、排序（更新时间/创建时间/标题）、今日+进行中/全部 范围切换"
+  "version": "0.5.88",
+  "versionCode": 588,
+  "commitSha": "1ff479e878dfbe212744209c03f91ce7a70c982c",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.88/coolie-release.apk",
+  "sha256": "319ce9674de283cb3d1f7e895c20590d48685bd34a767a206b2e4d0965f70ef1",
+  "releaseNotes": "wave126 项目中心项目卡「创建任务」直接打开新建任务弹窗并预选该项目（服务端据此绑定项目主工作区）；「查看任务」跳任务页并自动套用该项目筛选"
 }
