@@ -1,8 +1,8 @@
 {
-  "version": "0.5.84",
-  "versionCode": 584,
-  "commitSha": "36e7310d0473febbb269fdd58ab6963df6c0666e",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.84/coolie-release.apk",
-  "sha256": "5a2be5efd32f85f45669991253fa1a42c949b3897217f4ce85d0717c1539b423",
-  "releaseNotes": "wave120 原生任务指派/改派：任务详情「分配智能体」行改为可点，打开员工底部选择器（列出本公司员工 + 在线状态，含「未分配」清除项），选中即乐观更新并 PATCH /api/issues/:id（assigneeAgentId，传 null 清除），失败回滚并提示；新建任务「负责人」改用同一选择器"
+  "version": "0.5.85",
+  "versionCode": 585,
+  "commitSha": "2d557120afec15ab4d9679e97005841359f40297",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.85/coolie-release.apk",
+  "sha256": "6499722995847982046463e0184401d1192d4deea86dce416dc837256290d314",
+  "releaseNotes": "wave121 极速立项「模板源」与「组织托管」拆分为两个独立属性：代码源只留 Git 仓库地址/本地目录，组织托管改为独立开关（自动识别远端组织 robinschen1990、可关闭），本地目录 + 组织托管可同时生效"
 }
