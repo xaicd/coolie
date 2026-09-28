@@ -12,6 +12,10 @@ import {
 import { conflict, forbidden } from "../errors.js";
 import { isUuidLike } from "@paperclipai/shared";
 import { queuedCommentIdsFromRunContext, queuedCommentIdsFromWakePayload } from "./issue-queued-comment-queue.js";
+import {
+  isConciergePrincipalUserId,
+  resolveCompanyScopedResponsibleUserId,
+} from "./responsible-user.js";
 
 /** Resolve an explicit click from persisted receipts, never caller context or message authors. */
 export async function explicitOperatorRunIdentity(
@@ -190,7 +194,20 @@ export async function initializeRunIdentity(
         .where(eq(runIdentityContexts.id, run.activeIdentityContextId));
       return current!;
     }
-    const operatorIdentity = await explicitOperatorRunIdentity(tx, run);
+    const rawOperatorIdentity = await explicitOperatorRunIdentity(tx, run);
+    // A manual wake made through the loopback board-concierge key records the
+    // synthetic "paperclip-concierge" principal as its actor. Keep the explicit
+    // wake's semantics (no parent-identity inheritance, its cause) but drop the
+    // unusable actor id so the run falls through to the normalized caller value;
+    // otherwise every agent request on the run fails RESPONSIBLE_USER_UNAVAILABLE.
+    const operatorIdentity = rawOperatorIdentity
+      ? {
+          actorId: isConciergePrincipalUserId(rawOperatorIdentity.actorId)
+            ? null
+            : rawOperatorIdentity.actorId,
+          cause: rawOperatorIdentity.cause,
+        }
+      : null;
     const [parent] = input.parentRunId
       ? await tx
           .select()
@@ -235,7 +252,12 @@ export async function initializeRunIdentity(
     let current = await append(tx, {
       companyId: input.companyId,
       runId: input.runId,
-      responsibleUserId: operatorIdentity?.actorId ?? (origin ? origin.responsibleUserId : input.responsibleUserId),
+      responsibleUserId: await resolveCompanyScopedResponsibleUserId(
+        tx,
+        input.companyId,
+        operatorIdentity?.actorId ??
+          (origin ? origin.responsibleUserId : input.responsibleUserId),
+      ),
       parentContextId: origin?.id ?? null,
       cause:
         operatorIdentity ? operatorIdentity.cause : origin?.cause === "company_default" ? "company_default" : input.cause,
@@ -261,7 +283,11 @@ export async function initializeRunIdentity(
       current = await append(tx, {
         companyId: input.companyId,
         runId: input.runId,
-        responsibleUserId: operatorIdentity?.actorId ?? comment.authorUserId,
+        responsibleUserId: await resolveCompanyScopedResponsibleUserId(
+          tx,
+          input.companyId,
+          operatorIdentity?.actorId ?? comment.authorUserId,
+        ),
         messageId: id,
         parentContextId: current.id,
         cause: operatorIdentity?.cause ?? "instruction",

@@ -6,8 +6,6 @@ import type { Db } from "@paperclipai/db";
 import {
   agents,
   activityLog,
-  companies,
-  companyMemberships,
   companySecretBindings,
   companySecretVersions,
   companySecrets,
@@ -79,6 +77,10 @@ import {
 } from "./instance-settings.js";
 import { queueIssueAssignmentWakeup, type IssueAssignmentWakeupDeps } from "./issue-assignment-wakeup.js";
 import { logActivity } from "./activity-log.js";
+import {
+  resolveCompanyDefaultResponsibleUserId,
+  resolveCompanyScopedResponsibleUserId,
+} from "./responsible-user.js";
 import type { PluginWorkerManager } from "./plugin-worker-manager.js";
 import { runtimePublicOrigin } from "./cloud-runtime-identity.js";
 
@@ -143,32 +145,7 @@ function legacyExecutionIssueTransientFailureStatus(
   ) ?? null;
 }
 
-async function resolveCompanyDefaultResponsibleUserId(db: Db, companyId: string) {
-  const company = await db
-    .select({ defaultResponsibleUserId: companies.defaultResponsibleUserId })
-    .from(companies)
-    .where(eq(companies.id, companyId))
-    .then((rows) => rows[0] ?? null);
-  if (company?.defaultResponsibleUserId) return company.defaultResponsibleUserId;
-
-  const owner = await db
-    .select({ userId: companyMemberships.principalId })
-    .from(companyMemberships)
-    .where(
-      and(
-        eq(companyMemberships.companyId, companyId),
-        eq(companyMemberships.principalType, "user"),
-        eq(companyMemberships.status, "active"),
-        eq(companyMemberships.membershipRole, "owner"),
-      ),
-    )
-    .orderBy(asc(companyMemberships.createdAt), asc(companyMemberships.id))
-    .limit(1)
-    .then((rows) => rows[0] ?? null);
-  return owner?.userId ?? null;
-}
-
-async function resolveRoutineResponsibleUserId(db: Db, companyId: string, actorUserId: string | null | undefined, parentIssueId?: string | null) {
+async function deriveRoutineResponsibleUserId(db: Db, companyId: string, actorUserId: string | null | undefined, parentIssueId?: string | null) {
   if (actorUserId) return actorUserId;
   if (parentIssueId) {
     const parent = await db
@@ -180,6 +157,14 @@ async function resolveRoutineResponsibleUserId(db: Db, companyId: string, actorU
     if (parent?.createdByUserId) return parent.createdByUserId;
   }
   return resolveCompanyDefaultResponsibleUserId(db, companyId);
+}
+
+async function resolveRoutineResponsibleUserId(db: Db, companyId: string, actorUserId: string | null | undefined, parentIssueId?: string | null) {
+  // A routine created through the loopback board concierge would otherwise stamp
+  // its generated issues with the synthetic "paperclip-concierge" principal,
+  // which no agent run may act for; resolve to a real company member.
+  const derived = await deriveRoutineResponsibleUserId(db, companyId, actorUserId, parentIssueId);
+  return resolveCompanyScopedResponsibleUserId(db, companyId, derived);
 }
 
 type Actor = { agentId?: string | null; userId?: string | null; runId?: string | null };

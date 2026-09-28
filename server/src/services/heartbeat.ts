@@ -1,4 +1,5 @@
 import { externalConversationStateSql, nonIdleSlackIssueCondition } from "./slack-conversation-state.js";
+import { isConciergePrincipalUserId, resolveCompanyScopedResponsibleUserId } from "./responsible-user.js";
 import { settleSlackConversation } from "./slack-conversation-lifecycle.js";
 import { publicChatTaskUrl } from "./chat-task-url.js";
 import { toolActionDeliveryService } from "./tool-action-delivery.js";
@@ -10868,6 +10869,27 @@ export function heartbeatService(
     triggerDetail?: WakeupOptions["triggerDetail"] | null;
     existingRunResponsibleUserId?: string | null;
   }) {
+    const derived = await deriveResponsibleUserIdForRunSeed(input);
+    // A run whose only claim to an owner is the synthetic loopback-concierge
+    // principal (the x-paperclip-api-key board key, which is not a company
+    // member) would reject every agent request with RESPONSIBLE_USER_UNAVAILABLE.
+    // Substitute the company's real default so the run can record a disposition.
+    return resolveCompanyScopedResponsibleUserId(db, input.companyId, derived);
+  }
+
+  async function deriveResponsibleUserIdForRunSeed(input: {
+    companyId: string;
+    contextSnapshot: Record<string, unknown>;
+    issueContext: { id: string; responsibleUserId: string | null; parentId: string | null } | null;
+    routineEnvContext: Awaited<
+      ReturnType<typeof getRoutineEnvForExecutionIssue>
+    >;
+    requestedByActorType?: "user" | "agent" | "system" | null;
+    requestedByActorId?: string | null;
+    source?: WakeupOptions["source"] | null;
+    triggerDetail?: WakeupOptions["triggerDetail"] | null;
+    existingRunResponsibleUserId?: string | null;
+  }) {
     const contextResponsibleUserId = readNonEmptyString(
       input.contextSnapshot.responsibleUserId,
     );
@@ -10950,7 +10972,13 @@ export function heartbeatService(
     >;
   }) {
     const operatorIdentity = await explicitOperatorRunIdentity(db, input.run);
-    const responsibleUserId = operatorIdentity?.actorId ?? await resolveResponsibleUserIdForRunSeed({
+    // The loopback-concierge principal is not a company member; treat it as no
+    // explicit operator identity so the run falls through to the issue/company
+    // default instead of carrying an unusable responsible user.
+    const operatorActorId = isConciergePrincipalUserId(operatorIdentity?.actorId)
+      ? null
+      : operatorIdentity?.actorId ?? null;
+    const responsibleUserId = operatorActorId ?? await resolveResponsibleUserIdForRunSeed({
       companyId: input.run.companyId,
       contextSnapshot: input.contextSnapshot,
       issueContext: input.issueContext,
@@ -20476,12 +20504,28 @@ export function heartbeatService(
       });
       // Initialization has persisted the active context, including an explicit
       // absence of identity inherited from an automatic continuation.
+      const runResponsibleUserIdBeforeDispatch = run.responsibleUserId;
       responsibleUserId = identityContext.responsibleUserId;
       run = {
         ...run,
         activeIdentityContextId: identityContext.id,
         responsibleUserId,
       };
+      // The run row is created at wake time, before this identity is resolved,
+      // so keep its responsible user in step with the authoritative identity —
+      // otherwise the row (and the UI that reads it) shows a stale owner such as
+      // the synthetic loopback-concierge principal.
+      if (runResponsibleUserIdBeforeDispatch !== responsibleUserId) {
+        await db
+          .update(heartbeatRuns)
+          .set({ responsibleUserId })
+          .where(
+            and(
+              eq(heartbeatRuns.id, run.id),
+              eq(heartbeatRuns.companyId, agent.companyId),
+            ),
+          );
+      }
       context.executionIdentityRunId = run.id;
       if (
         responsibleUserId &&

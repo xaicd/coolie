@@ -65,6 +65,7 @@ import {
 import { trackAgentCreated } from "@paperclipai/shared/telemetry";
 import { validate } from "../middleware/validate.js";
 import { inheritNativeRunnerAdapterConfig } from "../services/native-runtime/native-agent-runtime-inheritance.js";
+import { resolveCompanyScopedResponsibleUserId } from "../services/responsible-user.js";
 import { agentInstructionsBundleMode } from "../services/agent-instructions.js";
 import {
   agentService,
@@ -5892,8 +5893,18 @@ export function agentRoutes(
     if (!agent) {
       return;
     }
+    // The responsible user is who every request made with this key acts for, and
+    // the key is unusable (403 RESPONSIBLE_USER_UNAVAILABLE on every call) unless
+    // that user is an active member of the agent's company. A key minted by the
+    // loopback board concierge would otherwise carry the synthetic
+    // "paperclip-concierge" principal; resolve to the company's real default.
+    const responsibleUserId = await resolveCompanyScopedResponsibleUserId(
+      db,
+      agent.companyId,
+      req.actor.userId ?? null,
+    );
     const key = await svc.createApiKey(id, req.body.name, req.body.scope, {
-      responsibleUserId: req.actor.userId ?? null,
+      responsibleUserId,
     });
 
     await logActivity(db, {

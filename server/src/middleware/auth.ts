@@ -26,6 +26,7 @@ import type { BetterAuthSessionResult } from "../auth/better-auth.js";
 import { logger } from "./logger.js";
 import { captureRunIdentity } from "../services/run-identity.js";
 import { boardAuthService } from "../services/board-auth.js";
+import { PAPERCLIP_CONCIERGE_USER_ID } from "../services/responsible-user.js";
 
 const CLOUD_TENANT_WRITE_DEBOUNCE_MS = 5_000;
 const CLOUD_TENANT_WRITE_DEBOUNCE_MAX = 1_000;
@@ -271,7 +272,7 @@ export function actorMiddleware(db: Db, opts: ActorMiddlewareOptions): RequestHa
       if (presentedApiKey && constantTimeStringEqual(presentedApiKey, expectedApiKey)) {
         req.actor = {
           type: "board",
-          userId: "paperclip-concierge",
+          userId: PAPERCLIP_CONCIERGE_USER_ID,
           userName: "Paperclip Board Concierge",
           userEmail: null,
           isInstanceAdmin: true,

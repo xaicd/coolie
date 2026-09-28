@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { eq, sql } from "drizzle-orm";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { agentWakeupRequests, agents, companies, createDb, heartbeatRuns, heartbeatRunEvents, issueComments, issueThreadInteractions, issues } from "@paperclipai/db";
+import { agentWakeupRequests, agents, companies, companyMemberships, createDb, heartbeatRuns, heartbeatRunEvents, issueComments, issueThreadInteractions, issues } from "@paperclipai/db";
 import { getEmbeddedPostgresTestSupport, startEmbeddedPostgresTestDatabase } from "./helpers/embedded-postgres.js";
 import { acceptSteeredIdentity, captureRunIdentity, initializeRunIdentity, listRunIdentityContexts, rejectSteeredIdentity, reserveSteeredIdentity } from "../services/run-identity.js";
 
@@ -57,6 +57,27 @@ const support = await getEmbeddedPostgresTestSupport();
     await db.update(heartbeatRuns).set({ wakeupRequestId, contextSnapshot }).where(eq(heartbeatRuns.id, input.runId));
     return { ...input, queueId, wakeupRequestId, contextSnapshot };
   }
+
+  it("substitutes the loopback-concierge principal on a manual wake with the company default", async () => {
+    const companyId = randomUUID(), agentId = randomUUID(), issueId = randomUUID(), runId = randomUUID(), wakeupRequestId = randomUUID();
+    const ownerUserId = `owner-${randomUUID()}`;
+    await db.insert(companies).values({ id: companyId, name: "Concierge identity", issuePrefix: companyId.slice(0, 8), defaultResponsibleUserId: ownerUserId });
+    await db.insert(companyMemberships).values({ companyId, principalType: "user", principalId: ownerUserId, membershipRole: "owner", status: "active" });
+    await db.insert(agents).values({ id: agentId, companyId, name: "Concierge agent", role: "engineer", adapterType: "codex_local" });
+    await db.insert(issues).values({ id: issueId, companyId, title: "Concierge wake", responsibleUserId: ownerUserId });
+    await db.insert(heartbeatRuns).values({ id: runId, companyId, agentId, status: "running", contextSnapshot: { issueId } });
+    await db.insert(agentWakeupRequests).values({
+      id: wakeupRequestId, companyId, agentId, runId, source: "on_demand", status: "queued",
+      requestedByActorType: "user", requestedByActorId: "paperclip-concierge",
+      payload: { issueId, manualUserWake: true },
+    });
+    await db.update(heartbeatRuns).set({ wakeupRequestId }).where(eq(heartbeatRuns.id, runId));
+    const identity = await initializeRunIdentity(db, {
+      companyId, runId, issueId, responsibleUserId: "paperclip-concierge", cause: "manual_user_wake",
+    });
+    expect(identity.responsibleUserId).toBe(ownerUserId);
+    expect(identity.cause).toBe("manual_user_wake");
+  });
 
   it("uses the clicking operator through startup and restart without changing message authors", async () => {
     const input = await seedInterrupt();

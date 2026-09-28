@@ -346,7 +346,7 @@
     {
       "path": "server/src/routes/agents.ts",
       "maxNetLines": 120,
-      "reason": "Default Palantir 5 roles (FDA/Core-SWE/PRE-SRE/FDSE/DS) to Claude Code and Hermes adapters with self-healing rather than empty process adapter.",
+      "reason": "Default Palantir 5 roles (FDA/Core-SWE/PRE-SRE/FDSE/DS) to Claude Code and Hermes adapters with self-healing rather than empty process adapter. wave134: POST /agents/:id/keys resolves the key's responsibleUserId through resolveCompanyScopedResponsibleUserId so a key minted by the loopback board concierge carries a real company member instead of the synthetic paperclip-concierge principal (which made every request with the key fail RESPONSIBLE_USER_UNAVAILABLE).",
       "maxTotalLines": 200
     },
     {
@@ -598,9 +598,9 @@
     },
     {
       "path": "server/src/services/issues.ts",
-      "maxNetLines": 40,
-      "reason": "wave132: projects `defect` in issueListSelect so list/detail responses carry it, and adds the `defect?: boolean` filter (defect IS NOT NULL) to IssueFilters and the list query. Create needs no change — the insert spreads issueData, which already carries defect.",
-      "maxTotalLines": 40
+      "maxNetLines": 60,
+      "reason": "wave132: projects `defect` in issueListSelect so list/detail responses carry it, and adds the `defect?: boolean` filter (defect IS NOT NULL) to IssueFilters and the list query. Create needs no change — the insert spreads issueData, which already carries defect. wave134: resolveResponsibleUserIdForIssueCreate now routes its derived value through resolveCompanyScopedResponsibleUserId, so an issue created by the loopback board concierge (createdByUserId paperclip-concierge) is stamped with a real company member and its agent runs can authenticate.",
+      "maxTotalLines": 60
     },
     {
       "path": "server/src/routes/issues.ts",
@@ -648,6 +648,48 @@
       "path": "ui/src/components/issue-properties/IssueProperties.tsx",
       "maxNetLines": 80,
       "reason": "wave132: shows 类型/严重度/来源/复现步骤/证据 rows in the task-detail properties panel when issue.defect is set; evidence attachments themselves keep rendering in the existing attachments section.",
+      "maxTotalLines": 80
+    },
+    {
+      "path": "server/src/middleware/auth.ts",
+      "maxNetLines": 40,
+      "reason": "wave134: the loopback board-concierge actor's userId now comes from the shared PAPERCLIP_CONCIERGE_USER_ID constant in services/responsible-user.ts instead of a bare literal, so the id that responsible-user resolution must special-case can never drift out of sync with the middleware that mints it.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "server/src/services/heartbeat.ts",
+      "maxNetLines": 80,
+      "reason": "wave134: run responsible-user resolution substitutes the synthetic loopback-concierge principal with the company's real default. resolveResponsibleUserIdForRunSeed is now a thin wrapper over deriveResponsibleUserIdForRunSeed that normalizes the result, resolveResponsibleUserIdForRun ignores a concierge explicit-operator identity, and dispatch rewrites heartbeat_runs.responsible_user_id to the resolved identity (the row is created at wake time, before the identity is known). Non-member responsible users are deliberately preserved (external commenters); only the one id that can never be a member is rewritten.",
+      "maxTotalLines": 120
+    },
+    {
+      "path": "server/src/services/routines.ts",
+      "maxNetLines": 80,
+      "reason": "wave134: resolveRoutineResponsibleUserId normalizes the concierge principal to a real company member so routine-generated issues are dispatchable, and the file-local resolveCompanyDefaultResponsibleUserId was replaced by the shared one in services/responsible-user.ts to keep a single implementation.",
+      "maxTotalLines": 100
+    },
+    {
+      "path": "server/src/services/responsible-user.ts",
+      "maxNetLines": 140,
+      "reason": "wave134: new shared resolver for company-scoped responsible users. Owns PAPERCLIP_CONCIERGE_USER_ID and rewrites only that synthetic principal to the company's real default (explicit defaultResponsibleUserId, then owner, then earliest active member). It exists because the same wrong attribution could be written from the issue-create, run-seed and agent-key paths, and each surface must apply one shared rule.",
+      "maxTotalLines": 140
+    },
+    {
+      "path": "server/src/services/responsible-user.test.ts",
+      "maxNetLines": 180,
+      "reason": "wave134: covers the shared resolver and the issue-create path against embedded Postgres — the concierge principal is substituted with the real owner, a real member is preserved, and the persisted issue carries the resolved value.",
+      "maxTotalLines": 200
+    },
+    {
+      "path": "server/src/services/run-identity.ts",
+      "maxNetLines": 70,
+      "reason": "wave134: initializeRunIdentity re-derives the explicit operator identity itself and preferred operatorIdentity.actorId over the caller's already-normalized value, so a manual wake made through the loopback board-concierge key still persisted the synthetic paperclip-concierge principal into run_identity_contexts and every agent request on the run got 403 RESPONSIBLE_USER_UNAVAILABLE. It now drops a concierge actor id (keeping the explicit-wake semantics and cause) and routes the identity responsible user — dispatch and per-message — through resolveCompanyScopedResponsibleUserId.",
+      "maxTotalLines": 90
+    },
+    {
+      "path": "server/src/__tests__/run-identity.test.ts",
+      "maxNetLines": 60,
+      "reason": "wave134: pins that a manual wake whose requested actor is the loopback-concierge principal produces an identity context carrying the company's real default responsible user while keeping the manual_user_wake cause.",
       "maxTotalLines": 80
     }
   ]

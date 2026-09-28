@@ -2,6 +2,7 @@ import { externalConversationStateSql, nonIdleSlackIssueCondition, resumeSlackCo
 import { documentService } from "./documents.js";
 import { parseTaskSearch, taskSearchCtes, taskSearchScore } from "./task-search.js";
 import { createdFromIssueCondition } from "./issue-creation-origin.js";
+import { resolveCompanyScopedResponsibleUserId } from "./responsible-user.js";
 import { executionProjectionsForRuns } from "./execution-projection.js";
 import type { ExecutionProjection } from "@paperclipai/shared";
 import { Buffer } from "node:buffer";
@@ -376,6 +377,34 @@ function readStringFromRecord(record: unknown, key: string) {
 }
 
 async function resolveResponsibleUserIdForIssueCreate(
+  reader: DbReader,
+  companyId: string,
+  input: {
+    explicitResponsibleUserId?: string | null;
+    createdByUserId?: string | null;
+    parentId?: string | null;
+    originKind?: string | null;
+    originRunId?: string | null;
+    actorRunId?: string | null;
+    actorResponsibleUserId?: string | null;
+    trustExplicitResponsibleUserId?: boolean;
+  },
+) {
+  const derived = await deriveResponsibleUserIdForIssueCreate(
+    reader,
+    companyId,
+    input,
+  );
+  // The loopback board-concierge key (x-paperclip-api-key) creates issues with
+  // createdByUserId === "paperclip-concierge". That synthetic principal is not a
+  // company member, so storing it as the issue's responsible user makes every
+  // agent run on the issue fail the responsible-user company-access intersection
+  // and the issue can never leave `blocked`. Replace it with the company's real
+  // default before it is persisted.
+  return resolveCompanyScopedResponsibleUserId(reader, companyId, derived);
+}
+
+async function deriveResponsibleUserIdForIssueCreate(
   reader: DbReader,
   companyId: string,
   input: {
