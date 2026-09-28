@@ -74,12 +74,15 @@ export function TasksScreen({
   company,
   whoami,
   refreshToken = 0,
+  initialProjectId,
   onOpenIssue,
 }: {
   company: Company;
   whoami: string;
   /** 外层 (中央 "+") 建完任务后 +1, 让列表重新拉取 */
   refreshToken?: number;
+  /** 项目卡「查看任务」带上来的项目 —— 落地即套用项目筛选 (null = 不筛选)。 */
+  initialProjectId?: string | null;
   onOpenIssue: (issue: Issue) => void;
 }) {
   const [search, setSearch] = useState("");
@@ -96,7 +99,7 @@ export function TasksScreen({
   const [scope, setScope] = useState<IssuesScope>("focus");
   const [status, setStatus] = useState<StatusFilter>("all");
   const [assignee, setAssignee] = useState("all");
-  const [project, setProject] = useState("all");
+  const [project, setProject] = useState(initialProjectId ?? "all");
   const [view, setView] = useState<IssuesView>("list");
   const [sortValue, setSortValue] = useState(SORT_OPTIONS[0]!.value);
   const [sheet, setSheet] = useState<SheetKind>(null);
@@ -158,6 +161,11 @@ export function TasksScreen({
       .then(setProjects)
       .catch(() => setProjects([]));
   }, [company.id]);
+
+  // 项目卡「查看任务」带过来的项目: 落地即套用项目筛选; 外部清空时回到全部。
+  useEffect(() => {
+    setProject(initialProjectId ?? "all");
+  }, [initialProjectId]);
 
   const handleCreated = useCallback((issue: Issue) => {
     setCreateOpen(false);

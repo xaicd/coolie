@@ -44,6 +44,7 @@ export function CreateTaskModal({
   agents,
   initialTitle = "",
   initialAttachments,
+  initialProjectId,
   onClose,
   onCreated,
 }: {
@@ -54,6 +55,8 @@ export function CreateTaskModal({
   initialTitle?: string;
   /** 新会话页上先挑好的附件 (选图), 打开即并入待传列表。 */
   initialAttachments?: StagedAttachment[];
+  /** 项目卡「创建任务」带上来的项目 —— 打开即预选 (boss: 项目要已经选好)。 */
+  initialProjectId?: string | null;
   onClose: () => void;
   onCreated: (issue: Issue) => void;
 }) {
@@ -64,7 +67,7 @@ export function CreateTaskModal({
   const [assigneeOpen, setAssigneeOpen] = useState(false);
 
   const fields = useComposerFields(companyId, agents);
-  const { reset: resetFields, setAttachments } = fields;
+  const { reset: resetFields, setAttachments, setProjectId } = fields;
 
   // 入口页先挑好的附件并进 composer 的待传列表。上传要 issue id, 所以这里只暂存,
   // 建单成功后由 useComposerFields 统一 flush。
@@ -73,6 +76,14 @@ export function CreateTaskModal({
       setAttachments(initialAttachments);
     }
   }, [initialAttachments, setAttachments]);
+
+  // 项目卡「创建任务」预选项目 —— 每次打开把入口带来的项目落进 composer,
+  // 建单时随 projectId 提交, 服务端据此绑定该项目的主工作区。
+  useEffect(() => {
+    if (visible && initialProjectId) {
+      setProjectId(initialProjectId);
+    }
+  }, [visible, initialProjectId, setProjectId]);
 
   const reset = useCallback(() => {
     setTitle("");

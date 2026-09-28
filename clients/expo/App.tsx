@@ -43,6 +43,7 @@ import { EdgeSwipeBack } from "./src/components/EdgeSwipeBack";
 import { TabBar, TAB_BAR_HEIGHT } from "./src/components/TabBar";
 import { StatusDot } from "./src/components/StatusDot";
 import { NewTaskPage } from "./src/screens/NewTaskPage";
+import { CreateTaskModal } from "./src/components/CreateTaskModal";
 import { AppCard } from "./src/ui/AppCard";
 import { ErrorRetry } from "./src/ui/ErrorRetry";
 import { LoadingState } from "./src/ui/LoadingState";
@@ -652,6 +653,10 @@ function HomeScreen({
   const [pipelinesOpen, setPipelinesOpen] = useState(false);
   const [plansOpen, setPlansOpen] = useState(false);
   const [projectsOpen, setProjectsOpen] = useState(false);
+  /** 项目卡「创建任务」带过来的项目 id —— 非空即打开建单弹窗并预选该项目。 */
+  const [createTaskProjectId, setCreateTaskProjectId] = useState<string | null>(null);
+  /** 项目卡「查看任务」带过来的项目 id —— 任务页落地时套用为项目筛选。 */
+  const [tasksFilterProjectId, setTasksFilterProjectId] = useState<string | null>(null);
   // 全功能 Web 容器 (Hybrid WebContainer): 零重复开发复用 Web 端能力
   const [webContainerTarget, setWebContainerTarget] = useState<{
     path?: string;
@@ -731,7 +736,7 @@ function HomeScreen({
   const [composerAgents, setComposerAgents] = useState<AgentRow[]>([]);
 
   useEffect(() => {
-    if (!composeOpen) return;
+    if (!composeOpen && !createTaskProjectId) return;
     let cancelled = false;
     void coolie
       .listAgents(companyId)
@@ -744,7 +749,7 @@ function HomeScreen({
     return () => {
       cancelled = true;
     };
-  }, [companyId, composeOpen]);
+  }, [companyId, composeOpen, createTaskProjectId]);
 
   /**
    * Tab 级「上一页」—— 底栏 5 项之间也记一层历史, 这样在非 root 的 tab
@@ -778,6 +783,7 @@ function HomeScreen({
    * 没有可退的层。调用方据此决定是「吃掉事件」还是「交回系统」—— 见 backHandler。
    */
   const swipeBack = (): boolean => {
+    if (createTaskProjectId) return setCreateTaskProjectId(null), true;
     if (webContainerTarget) return setWebContainerTarget(null), true;
     if (sandboxContext) return setSandboxContext(null), true;
     if (diffContext) return setDiffContext(null), true;
@@ -975,8 +981,9 @@ function HomeScreen({
               onOpenWebProjects={(subPath?: string, title?: string) =>
                 setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" })
               }
-              onOpenProjectTasks={(_project) => {
+              onOpenProjectTasks={(project) => {
                 setProjectsOpen(false);
+                setTasksFilterProjectId(project.id);
                 navigateTab("tasks");
               }}
             />
@@ -1030,11 +1037,12 @@ function HomeScreen({
                 navigateTab("tasks");
                 setSelected(issue);
               }}
-              onOpenProjectTasks={(_project) => {
+              onOpenProjectTasks={(project) => {
+                setTasksFilterProjectId(project.id);
                 navigateTab("tasks");
               }}
-              onCreateTaskForProject={(_project) => {
-                setComposeOpen(true);
+              onCreateTaskForProject={(project) => {
+                setCreateTaskProjectId(project.id);
               }}
               onOpenWebProjects={(subPath?: string, title?: string) =>
                 setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" })
@@ -1060,6 +1068,7 @@ function HomeScreen({
                 company={company}
                 whoami={whoami}
                 refreshToken={tasksRefreshToken}
+                initialProjectId={tasksFilterProjectId}
                 onOpenIssue={setSelected}
               />
             )
@@ -1095,6 +1104,8 @@ function HomeScreen({
             setSearchOpen(false);
             setNotificationsOpen(false);
             setFocusedApprovalId(null);
+            setCreateTaskProjectId(null);
+            setTasksFilterProjectId(null);
             navigateTab(key);
           }}
           onCreate={() => setComposeOpen(true)}
@@ -1122,6 +1133,21 @@ function HomeScreen({
             }}
           />
         </EdgeSwipeBack>
+      ) : null}
+      {/* 项目卡「创建任务」: 直接打开建单弹窗, 并把该项目预选好 (boss 20:42) */}
+      {createTaskProjectId ? (
+        <CreateTaskModal
+          visible={createTaskProjectId !== null}
+          companyId={companyId}
+          agents={composerAgents}
+          initialProjectId={createTaskProjectId}
+          onClose={() => setCreateTaskProjectId(null)}
+          onCreated={(issue) => {
+            setCreateTaskProjectId(null);
+            setTasksRefreshToken((value) => value + 1);
+            Alert.alert("任务已创建", issue.title);
+          }}
+        />
       ) : null}
     </SafeAreaView>
     );
