@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.87
+
+> Released: 2026-09-28 · Android release APK
+
+### 更新
+
+- wave125 任务列表对齐 web 功能：状态/指派/项目筛选、列表/分组(按项目)/看板(按状态分列)三视图切换、排序（更新时间/创建时间/标题）、今日+进行中/全部 范围切换
+
+---
+
 ## v0.5.86
 
 > Released: 2026-09-28 · Android release APK
