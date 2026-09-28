@@ -2,6 +2,7 @@ import { Router } from "express";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Db } from "@paperclipai/db";
@@ -572,6 +573,20 @@ export function boardChatRoutes(
         // has no PAPERCLIP_TASK_ID of its own.
         PAPERCLIP_TASK_ID: resolvedIssueId,
         PAPERCLIP_ARTIFACT_UPLOADER: artifactUploaderPath,
+        // Coolie fork (wave124): give every board chat its own uploader lock
+        // namespace. The upload helper serializes concurrent uploads with a
+        // symlink lock under $PAPERCLIP_HELPER_STATE_DIR (default
+        // `${TMPDIR:-/tmp}/paperclip-upload-artifact`). A helper killed by an
+        // earlier timeout leaves that lock behind; with a shared directory the
+        // next chat's upload then spins on "Another matching artifact upload is
+        // still in progress" until the turn times out — the real 120s hang the
+        // boss hit (its own diagnosis, wave124: pointing this env at a fresh dir
+        // was what let an upload through). A per-chat dir makes a stale lock
+        // from a dead chat unreachable.
+        PAPERCLIP_HELPER_STATE_DIR: path.join(
+          os.tmpdir(),
+          `paperclip-board-chat-${resolvedIssueId}-${process.pid}-${Date.now()}`,
+        ),
         // Coolie fork (wave119): 宿主已配置的 board 凭证 —— 子进程调 API 必须带
         // `x-paperclip-api-key: $PAPERCLIP_API_KEY` (本实例 board 通道只认这个头;
         // Authorization: Bearer 会 401, 老板因此见过「token 失效, 请跑 paperclipai
