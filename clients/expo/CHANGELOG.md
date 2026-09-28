@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.84
+
+> Released: 2026-09-28 · Android release APK
+
+### 更新
+
+- wave120 原生任务指派/改派：任务详情「分配智能体」行改为可点，打开员工底部选择器（列出本公司员工 + 在线状态，含「未分配」清除项），选中即乐观更新并 PATCH /api/issues/:id（assigneeAgentId，传 null 清除），失败回滚并提示；新建任务「负责人」改用同一选择器
+
+---
+
 ## v0.5.83
 
 > Released: 2026-09-28 · Android release APK

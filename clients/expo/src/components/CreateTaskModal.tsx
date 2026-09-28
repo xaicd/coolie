@@ -17,6 +17,7 @@ import { C, type AgentRow } from "../coolie";
 import { ELEVATION, RADIUS, SPACING } from "../ui/tokens";
 import { Dropdown, type DropdownOption } from "../ui/Dropdown";
 import { SectionCard } from "../ui/SectionCard";
+import { AgentPickerSheet } from "./AgentPickerSheet";
 import { useComposerFields } from "./composer/useComposerFields";
 import { UploadRow, type StagedAttachment } from "./composer/UploadRow";
 import { ISSUE_PRIORITIES, PRIORITY_COLOR, PRIORITY_LABEL } from "./issue-status";
@@ -60,6 +61,7 @@ export function CreateTaskModal({
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<IssuePriority>("medium");
   const [busy, setBusy] = useState(false);
+  const [assigneeOpen, setAssigneeOpen] = useState(false);
 
   const fields = useComposerFields(companyId, agents);
   const { reset: resetFields, setAttachments } = fields;
@@ -76,6 +78,7 @@ export function CreateTaskModal({
     setTitle("");
     setDescription("");
     setPriority("medium");
+    setAssigneeOpen(false);
     resetFields();
   }, [resetFields]);
 
@@ -106,10 +109,12 @@ export function CreateTaskModal({
     }
   }, [busy, description, fields, onCreated, priority, reset, title]);
 
-  const agentOptions = useMemo<DropdownOption[]>(
-    () => agents.map((agent) => ({ value: agent.id, label: agent.name })),
-    [agents],
-  );
+  const selectedAssigneeName = useMemo(() => {
+    if (!fields.assigneeAgentId) return "自动派发";
+    return (
+      agents.find((agent) => agent.id === fields.assigneeAgentId)?.name ?? "自动派发"
+    );
+  }, [agents, fields.assigneeAgentId]);
   const projectOptions = useMemo<DropdownOption[]>(
     () =>
       fields.projects
@@ -163,18 +168,26 @@ export function CreateTaskModal({
             </SectionCard>
 
             <SectionCard title="指派">
-              <Dropdown
-                label="负责人"
-                options={[{ value: NONE, label: "自动派发" }, ...agentOptions]}
-                selected={[fields.assigneeAgentId ?? NONE]}
-                disabled={busy}
-                onToggle={(value) => {
-                  const agentId = value === NONE ? null : value;
-                  fields.setAssigneeAgentId(agentId);
-                  // 指派即「可执行」: backlog 只在刻意搁置时才留 (上游同款)。
-                  if (agentId && fields.status === "backlog") fields.setStatus("todo");
-                }}
-              />
+              <View style={styles.assigneeRow}>
+                <Text style={styles.dropdownLabel}>负责人</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`负责人: ${selectedAssigneeName}`}
+                  accessibilityState={{ expanded: assigneeOpen }}
+                  disabled={busy}
+                  onPress={() => setAssigneeOpen(true)}
+                  style={({ pressed }) => [
+                    styles.assigneeTrigger,
+                    pressed && styles.assigneeTriggerPressed,
+                    busy && styles.assigneeTriggerDisabled,
+                  ]}
+                >
+                  <Text style={styles.assigneeValue} numberOfLines={1}>
+                    {selectedAssigneeName}
+                  </Text>
+                  <Ionicons name="chevron-down" size={14} color={C.ink4} />
+                </Pressable>
+              </View>
 
               <Dropdown
                 label="项目"
@@ -225,6 +238,22 @@ export function CreateTaskModal({
             </Pressable>
           </View>
         </KeyboardAvoidingView>
+
+        <AgentPickerSheet
+          visible={assigneeOpen}
+          title="负责人"
+          emptyLabel="自动派发"
+          agents={agents}
+          selectedAgentId={fields.assigneeAgentId}
+          busy={busy}
+          onSelect={(agentId) => {
+            setAssigneeOpen(false);
+            fields.setAssigneeAgentId(agentId);
+            // 指派即「可执行」: backlog 只在刻意搁置时才留 (上游同款)。
+            if (agentId && fields.status === "backlog") fields.setStatus("todo");
+          }}
+          onClose={() => setAssigneeOpen(false)}
+        />
       </View>
     </Modal>
   );
@@ -318,6 +347,41 @@ const styles = StyleSheet.create({
   fieldLabel: {
     color: C.ink4,
     fontSize: 13,
+  },
+  assigneeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: SPACING.sm,
+  },
+  dropdownLabel: {
+    color: C.ink4,
+    fontSize: 13,
+    minWidth: 52,
+  },
+  assigneeTrigger: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: SPACING.sm,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 10,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: ELEVATION.base,
+  },
+  assigneeTriggerPressed: {
+    backgroundColor: ELEVATION.active,
+  },
+  assigneeTriggerDisabled: {
+    opacity: 0.4,
+  },
+  assigneeValue: {
+    flex: 1,
+    color: C.ink,
+    fontSize: 13,
+    fontWeight: "500",
   },
   chipRow: {
     flexDirection: "row",

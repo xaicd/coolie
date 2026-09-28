@@ -23,6 +23,7 @@ import {
   type AgentRow,
   type IssueComment,
 } from "../coolie";
+import { AgentPickerSheet } from "../components/AgentPickerSheet";
 import { StatusDot } from "../components/StatusDot";
 import { AppCard } from "../ui/AppCard";
 import { ErrorRetry } from "../ui/ErrorRetry";
@@ -96,6 +97,11 @@ export function TaskDetailScreen({
   const [error, setError] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  // 分配是可变的本屏状态 —— `issue` 只是外层压进来的快照, 乐观改派后不能等它刷新。
+  const [assigneeId, setAssigneeId] = useState<string | null>(
+    issue.assigneeAgentId ?? null,
+  );
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const loadComments = useCallback(async () => {
     setError(null);
@@ -135,6 +141,12 @@ export function TaskDetailScreen({
     void load();
   }, [load]);
 
+  // 外层换任务 (同一实例被复用) 时, 把改派状态重新对齐到新任务的当前负责人。
+  useEffect(() => {
+    setAssigneeId(issue.assigneeAgentId ?? null);
+    setPickerOpen(false);
+  }, [issue.id, issue.assigneeAgentId]);
+
   const agentNameById = useMemo(() => {
     const map = new Map<string, string>();
     for (const agent of agents) map.set(agent.id, agent.name);
@@ -142,10 +154,30 @@ export function TaskDetailScreen({
   }, [agents]);
 
   const assigneeName = useMemo(() => {
-    const id = (issue as Issue & { assigneeAgentId?: string | null }).assigneeAgentId;
-    if (!id) return "未分配";
-    return agentNameById.get(id) ?? `员工 ${id.slice(0, 6)}`;
-  }, [issue, agentNameById]);
+    if (!assigneeId) return "未分配";
+    return agentNameById.get(assigneeId) ?? `员工 ${assigneeId.slice(0, 6)}`;
+  }, [assigneeId, agentNameById]);
+
+  /**
+   * 改派 —— 先乐观更新本屏负责人, 再 PATCH /api/issues/:id (`assigneeAgentId`,
+   * 传 null 即清除)。失败则回滚, 并把服务端错误原样告知。乐观更新让抽屉一收起
+   * 行文本就变了, 不必等一个网络往返。
+   */
+  const changeAssignee = useCallback(
+    async (nextAgentId: string | null) => {
+      setPickerOpen(false);
+      const previous = assigneeId;
+      if (nextAgentId === previous) return;
+      setAssigneeId(nextAgentId);
+      try {
+        await coolie.setIssueAssignee(issue.id, nextAgentId);
+      } catch (e) {
+        setAssigneeId(previous);
+        Alert.alert("改派失败", String((e as Error)?.message ?? e));
+      }
+    },
+    [assigneeId, issue.id],
+  );
 
   const insertMention = useCallback((name: string) => {
     setInput((prev) => {
@@ -216,7 +248,20 @@ export function TaskDetailScreen({
           </View>
 
           <AppCard padding={16} style={styles.card}>
-            <KeyValueRow label="分配智能体" value={assigneeName} />
+            <Pressable
+              onPress={() => setPickerOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel={`分配智能体: ${assigneeName}`}
+              style={({ pressed }) => [
+                styles.assigneeRow,
+                pressed && styles.assigneeRowPressed,
+              ]}
+            >
+              <View style={styles.assigneeText}>
+                <KeyValueRow label="分配智能体" value={assigneeName} />
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={C.ink4} />
+            </Pressable>
             <KeyValueRow
               label="状态"
               value={STATUS_LABEL[issue.status] ?? issue.status}
@@ -385,6 +430,14 @@ export function TaskDetailScreen({
           </Pressable>
         </View>
       </KeyboardAvoidingView>
+
+      <AgentPickerSheet
+        visible={pickerOpen}
+        agents={agents}
+        selectedAgentId={assigneeId}
+        onSelect={(agentId) => void changeAssignee(agentId)}
+        onClose={() => setPickerOpen(false)}
+      />
     </SafeAreaView>
   );
 }
@@ -395,6 +448,9 @@ const styles = StyleSheet.create({
   title: { color: C.ink, fontSize: 20, fontWeight: "600", letterSpacing: -0.4 },
   metaRow: { flexDirection: "row", gap: 8, flexWrap: "wrap" },
   card: { gap: 12 },
+  assigneeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  assigneeRowPressed: { opacity: 0.7 },
+  assigneeText: { flex: 1 },
   section: { gap: 8 },
   descriptionCard: { padding: 16, overflow: "hidden", width: "100%" },
   description: { color: C.ink2, fontSize: 14, lineHeight: 22, flexShrink: 1 },
