@@ -90,6 +90,8 @@ export type IssueListFilters = {
   inboxArchivedByUserId?: string;
   unreadForUserId?: string;
   labelId?: string;
+  /** When true, return only defects (tasks carrying defect metadata). */
+  defect?: boolean;
   workspaceId?: string;
   executionWorkspaceId?: string;
   originKind?: string;
@@ -129,6 +131,7 @@ function issueListSearchParams(filters?: IssueListFilters) {
   if (filters?.unreadForUserId)
     params.set("unreadForUserId", filters.unreadForUserId);
   if (filters?.labelId) params.set("labelId", filters.labelId);
+  if (filters?.defect) params.set("defect", "true");
   if (filters?.workspaceId) params.set("workspaceId", filters.workspaceId);
   if (filters?.executionWorkspaceId)
     params.set("executionWorkspaceId", filters.executionWorkspaceId);

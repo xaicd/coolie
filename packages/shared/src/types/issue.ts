@@ -5,6 +5,8 @@ import type {
   IssueCommentPresentationKind,
   IssueCommentPresentationTone,
   IssueCommentPresentationDensity,
+  IssueDefectSeverity,
+  IssueDefectSource,
   IssueExecutionMonitorClearReason,
   IssueExecutionMonitorKind,
   IssueExecutionMonitorRecoveryPolicy,
@@ -86,6 +88,19 @@ export interface IssueLabel {
   color: string;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/**
+ * Defect metadata. Its presence on an issue is what makes the issue a defect
+ * (`kind === "defect"`), so `severity` is required and the rest is optional.
+ * `evidenceAttachmentIds` holds `issue_attachments.id` values, attached to the
+ * same issue — screenshots, recordings, dumps that prove the defect.
+ */
+export interface IssueDefect {
+  severity: IssueDefectSeverity;
+  source: IssueDefectSource | null;
+  reproSteps: string | null;
+  evidenceAttachmentIds: string[];
 }
 
 export interface IssueAssigneeAdapterOverrides {
@@ -791,6 +806,8 @@ export interface Issue {
   status: IssueStatus;
   workMode: IssueWorkMode;
   priority: IssuePriority;
+  /** Present when this task is a defect; its presence is what makes it one. */
+  defect?: IssueDefect | null;
   reviewPolicy: IssueReviewPolicy | null;
   assigneeAgentId: string | null;
   assigneeUserId: string | null;
@@ -906,6 +923,7 @@ export type CompactIssue = Pick<
 > & {
   labelIds?: string[];
   labels?: IssueLabel[];
+  defect?: IssueDefect | null;
   blockedBy?: IssueRelationIssueSummary[];
   blockerAttention?: IssueBlockerAttention;
   reviewAttention?: IssueReviewAttention;

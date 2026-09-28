@@ -17,6 +17,41 @@
 2. **不许用"读源码"当证据**。UI 功能必须真点:每个按钮、菜单、弹窗、tab、下拉。
 3. **不许改断言让结果变绿**。真红就真红,写进失败文档。
 4. **截图只留本地,不上传 git**(`screenshots/` 已 gitignore)。
+5. **铁律:每发现一个问题,必须立即在系统里建一条缺陷任务**——不能只写进 markdown 报告。
+   缺陷任务 = 严重度(P0/P1/P2/P3) + 截图附件 + 复现步骤 + 关联项目。
+   markdown 报告**只做汇总索引**(缺陷编号 + 一句话),不承载缺陷本体;报告里没有对应
+   缺陷任务的条目 = 没发现。**禁止只写文档不建任务。**
+
+## 问题 → 缺陷任务(铁律步骤)
+
+发现即建单,不要攒到最后。建缺陷 → 传截图 → 回写证据 id:
+
+```sh
+JSON=(-H "Authorization: Bearer $KEY" -H "x-paperclip-api-key: $KEY" -H "Content-Type: application/json")
+BIN=(-H "Authorization: Bearer $KEY" -H "x-paperclip-api-key: $KEY")
+
+# 1) 建缺陷任务(defect 出现即「缺陷」, severity 必填; projectId 关联项目)
+curl -fsS "${JSON[@]}" -X POST "$API/companies/$CID/issues" -d '{
+  "title": "[P1][App走查] 任务详情页崩溃",
+  "description": "现象/影响",
+  "status": "todo",
+  "projectId": "<project-id>",
+  "defect": { "severity": "P1", "source": "app_walkthrough",
+              "reproSteps": "1. … 2. … 期望 … 实际 …", "evidenceAttachmentIds": [] }
+}'                                                              # 记下 issue.id
+
+# 2) 传截图作证据
+AID=$(curl -fsS "${BIN[@]}" -F "file=@screenshots/waveNNN/01.png" \
+  "$API/companies/$CID/issues/<issue-id>/attachments" | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
+
+# 3) 回写证据附件 id
+curl -fsS "${JSON[@]}" -X PATCH "$API/issues/<issue-id>" \
+  -d "{\"defect\":{\"severity\":\"P1\",\"source\":\"app_walkthrough\",\"evidenceAttachmentIds\":[\"$AID\"]}}"
+```
+
+严重度:P0 阻断/数据损坏/安全 · P1 核心功能不可用 · P2 受损可绕行 · P3 体验瑕疵。
+来源 `source`:`web_walkthrough` / `app_walkthrough` / `api` / `customer_feedback`。
+验证缺陷进了系统:`GET $API/companies/$CID/issues?defect=true` 能筛出来。
 
 ## 前置
 
@@ -115,6 +150,8 @@ adb shell uiautomator dump && adb pull /sdcard/window_dump.xml screenshots/waveN
 4. 每次失败都落一份 dated 失败文档(根因 + 原始 stdout),真红不洗白。
 5. 截图/录制留本地;证据目录可复现(记录怎么拍的)。
 6. 伪阴性被明确标注为环境问题并给出判据,不冒充产品结论。
+7. **每个发现的缺陷都在系统里有对应任务**(严重度 + 截图附件 + 复现步骤 + 关联项目),
+   markdown 报告只做索引;`GET /issues?defect=true` 能筛出全部缺陷。
 
 ## 失败分支
 
@@ -126,6 +163,7 @@ adb shell uiautomator dump && adb pull /sdcard/window_dump.xml screenshots/waveN
 | F4 | 断言过不去 | 真缺陷 | **不改断言**;写 dated 失败文档,报红 |
 | F5 | 截图进了 git | 忘了 ignore | 确认 `screenshots/` 被忽略;`git rm -r --cached` 撤回 |
 | F6 | 净装才复现的 bug | 老缓存掩盖 | 固定加一步"净装"回归 |
+| F7 | 只写了报告,系统里没缺陷任务 | 违反铁律 | 立即按「问题 → 缺陷任务」三步入库;报告只留索引 |
 
 ## 关联
 

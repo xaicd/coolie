@@ -23,6 +23,44 @@ description: >
 2. 不许用读源码当证据——UI 必须真点（按钮/菜单/弹窗/tab/下拉）。
 3. 不许改断言让结果变绿——真红就真红。
 4. 截图只留本地，不上传 git。
+5. **铁律：每发现一个问题，必须立即在系统里建一条缺陷任务**——不能只写进 markdown 报告。
+   缺陷任务必须带：严重度（P0/P1/P2/P3）+ 截图作为附件 + 复现步骤 + 关联项目。
+   markdown 报告只做**汇总索引**（列出缺陷编号 + 一句话），不承载缺陷本体。
+   报告里没有对应缺陷任务的条目，视为没发现。
+
+## 问题 → 缺陷任务（铁律步骤）
+
+走查中**发现即建单**，不要攒到最后。三步入库（建缺陷 → 传截图 → 回写证据 id）：
+
+```sh
+H=(-H "Authorization: Bearer $PAPERCLIP_API_KEY" -H "x-paperclip-api-key: $PAPERCLIP_API_KEY" \
+   -H "Content-Type: application/json")
+
+# 1) 建缺陷任务（defect 出现即为「缺陷」，severity 必填）
+curl -fsS "${H[@]}" -X POST "$API/companies/$CID/issues" -d '{
+  "title": "[P1][网页走查] 登录后工作台空白",
+  "description": "现象/影响",
+  "status": "todo",
+  "projectId": "<project-id>",
+  "defect": {
+    "severity": "P1",
+    "source": "web_walkthrough",
+    "reproSteps": "1. 打开 …\n2. 点击 …\n期望：…\n实际：…",
+    "evidenceAttachmentIds": []
+  }
+}'   # 记下返回的 issue.id
+
+# 2) 传截图/录屏作为证据（服务端 issue 必须已存在）
+ATTACH_ID=$(curl -fsS "${H[@]:0:2}" -F "file=@screenshots/waveNNN/01.png" \
+  "$API/companies/$CID/issues/<issue-id>/attachments" | python3 -c "import sys,json;print(json.load(sys.stdin)['id'])")
+
+# 3) 把证据附件 id 回写进缺陷元数据
+curl -fsS "${H[@]}" -X PATCH "$API/issues/<issue-id>" \
+  -d "{\"defect\": {\"severity\": \"P1\", \"source\": \"web_walkthrough\", \"evidenceAttachmentIds\": [\"$ATTACH_ID\"]}}"
+```
+
+按严重度分级：P0 阻断/数据损坏/安全，P1 核心功能不可用，P2 功能受损有绕行，P3 体验瑕疵。
+`source` 取值：`web_walkthrough` / `app_walkthrough` / `api` / `customer_feedback`。
 
 ## 执行步骤
 
@@ -85,6 +123,7 @@ okhttp→prod 而 WebView→clone。**必须把"环境伪阴性"与"真产品缺
 4. 断言过不去 = 真缺陷，**不改断言**。
 5. 截图别进 git（`screenshots/` 已 ignore）。
 6. 净装才复现的 bug 要固定进回归。
+7. **只写 markdown 报告、不在系统建缺陷任务 = 没记录**。报告是汇总索引，缺陷本体必须在任务系统里。
 
 ## 验收标准
 
@@ -99,6 +138,8 @@ okhttp→prod 而 WebView→clone。**必须把"环境伪阴性"与"真产品缺
 - 用单测绿写"验证通过"。
 - 只截图默认首页就宣布走查完成。
 - 把模拟器环境问题写成产品缺陷。
+- **发现问题只写进 markdown 报告，没在系统里建缺陷任务**（不可指派、不可跟踪、不可验收）。
+- 建了缺陷任务但没挂截图附件、没写复现步骤、没关联项目。
 
 ## 关联
 

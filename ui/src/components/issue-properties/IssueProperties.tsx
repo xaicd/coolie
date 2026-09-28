@@ -2353,6 +2353,36 @@ export function IssueProperties({
           </PropertyRow>
         )}
 
+        {issue.defect ? (
+          <>
+            <PropertyRow label="类型">
+              <span className="text-xs font-medium text-destructive">
+                缺陷 · {issue.defect.severity}
+              </span>
+            </PropertyRow>
+            <PropertyRow label="严重度">
+              <span className="text-xs">{issue.defect.severity}</span>
+            </PropertyRow>
+            {issue.defect.source ? (
+              <PropertyRow label="来源">
+                <span className="text-xs">{issue.defect.source}</span>
+              </PropertyRow>
+            ) : null}
+            {issue.defect.reproSteps ? (
+              <PropertyRow label="复现步骤">
+                <span className="text-xs whitespace-pre-wrap">{issue.defect.reproSteps}</span>
+              </PropertyRow>
+            ) : null}
+            <PropertyRow label="证据">
+              <span className="text-xs text-muted-foreground">
+                {issue.defect.evidenceAttachmentIds.length > 0
+                  ? `${issue.defect.evidenceAttachmentIds.length} 个附件（见下方附件区）`
+                  : "无"}
+              </span>
+            </PropertyRow>
+          </>
+        ) : null}
+
         <PropertyPicker
           inline={inline}
           label="Assignee"

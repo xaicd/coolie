@@ -796,6 +796,15 @@ export function ProjectDetail() {
               Managed by {project.managedByPlugin.pluginDisplayName}
             </div>
           ) : null}
+          {(project.defectCount ?? 0) > 0 ? (
+            <div
+              data-testid="project-defect-count"
+              className="inline-flex items-center gap-2 rounded-full border border-destructive/30 bg-destructive/10 px-3 py-1 text-(length:--text-micro) font-medium text-destructive"
+            >
+              <span className="h-2 w-2 rounded-full bg-destructive" />
+              {project.defectCount} 个缺陷
+            </div>
+          ) : null}
         </div>
         <div className="ml-auto flex items-center gap-2">
           <StarToggle

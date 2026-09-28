@@ -63,6 +63,9 @@ export function CreateTaskModal({
   const [title, setTitle] = useState(initialTitle);
   const [description, setDescription] = useState("");
   const [priority, setPriority] = useState<IssuePriority>("medium");
+  // 缺陷记录到任务 (wave132): 类型 任务/缺陷 + 严重度 P0-P3。
+  const [issueKind, setIssueKind] = useState<"task" | "defect">("task");
+  const [severity, setSeverity] = useState<"P0" | "P1" | "P2" | "P3">("P1");
   const [busy, setBusy] = useState(false);
   const [assigneeOpen, setAssigneeOpen] = useState(false);
 
@@ -107,7 +110,12 @@ export function CreateTaskModal({
         title: trimmed,
         priority,
         ...(description.trim() ? { description: description.trim() } : {}),
+        ...(issueKind === "defect"
+          ? { defect: { severity, source: null, reproSteps: null } }
+          : {}),
       });
+      setIssueKind("task");
+      setSeverity("P1");
       reset();
       onCreated(issue);
       if (failedUploads.length > 0) {
@@ -118,7 +126,7 @@ export function CreateTaskModal({
     } finally {
       setBusy(false);
     }
-  }, [busy, description, fields, onCreated, priority, reset, title]);
+  }, [busy, description, fields, issueKind, onCreated, priority, reset, severity, title]);
 
   const selectedAssigneeName = useMemo(() => {
     if (!fields.assigneeAgentId) return "自动派发";
@@ -207,6 +215,58 @@ export function CreateTaskModal({
                 disabled={busy}
                 onToggle={(value) => fields.setProjectId(value === NONE ? null : value)}
               />
+
+              <View style={styles.priorityBlock}>
+                <Text style={styles.fieldLabel}>类型</Text>
+                <View style={styles.chipRow}>
+                  {(["task", "defect"] as const).map((value) => (
+                    <Pressable
+                      key={value}
+                      accessibilityRole="button"
+                      accessibilityLabel={value === "defect" ? "缺陷" : "任务"}
+                      accessibilityState={{ selected: issueKind === value }}
+                      disabled={busy}
+                      onPress={() => setIssueKind(value)}
+                      style={({ pressed }) => [
+                        styles.priorityChip,
+                        issueKind === value && styles.priorityChipActive,
+                        pressed && styles.priorityChipPressed,
+                      ]}
+                    >
+                      <Text style={[styles.priorityText, issueKind === value && styles.priorityTextActive]}>
+                        {value === "defect" ? "缺陷" : "任务"}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+
+              {issueKind === "defect" ? (
+                <View style={styles.priorityBlock}>
+                  <Text style={styles.fieldLabel}>严重度</Text>
+                  <View style={styles.chipRow}>
+                    {(["P0", "P1", "P2", "P3"] as const).map((value) => (
+                      <Pressable
+                        key={value}
+                        accessibilityRole="button"
+                        accessibilityLabel={`严重度 ${value}`}
+                        accessibilityState={{ selected: severity === value }}
+                        disabled={busy}
+                        onPress={() => setSeverity(value)}
+                        style={({ pressed }) => [
+                          styles.priorityChip,
+                          severity === value && styles.priorityChipActive,
+                          pressed && styles.priorityChipPressed,
+                        ]}
+                      >
+                        <Text style={[styles.priorityText, severity === value && styles.priorityTextActive]}>
+                          {value}
+                        </Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
 
               <View style={styles.priorityBlock}>
                 <Text style={styles.fieldLabel}>优先级</Text>

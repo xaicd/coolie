@@ -1,0 +1,11 @@
+-- Coolie fork — wave132: 缺陷记录到任务 (defect record-to-task closure).
+-- Adds one nullable jsonb column carrying defect metadata
+-- (severity / source / reproSteps / evidenceAttachmentIds). A non-null value is
+-- what marks an issue as a defect ("类型: 缺陷"); ordinary tasks keep NULL, so
+-- nothing existing changes meaning and no backfill is needed.
+--
+-- Hand-written rather than generated: `drizzle-kit generate` cannot run on this
+-- fork (pre-existing snapshot collision between 0280/9000 and 9002/9003), which
+-- is why the 9000-range exists for fork migrations. Nullable, no default and no
+-- table rewrite, so it is safe on the live `issues` table.
+ALTER TABLE "issues" ADD COLUMN IF NOT EXISTS "defect" jsonb;

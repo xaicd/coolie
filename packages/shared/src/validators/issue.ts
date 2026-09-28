@@ -13,6 +13,8 @@ import {
   ISSUE_COMMENT_PRESENTATION_KINDS,
   ISSUE_COMMENT_PRESENTATION_TONES,
   ISSUE_COMMENT_PRESENTATION_DENSITIES,
+  ISSUE_DEFECT_SEVERITIES,
+  ISSUE_DEFECT_SOURCES,
   ISSUE_HARNESS_KINDS,
   ISSUE_MONITOR_SCHEDULED_BY,
   ISSUE_PRIORITIES,
@@ -677,6 +679,25 @@ function withCreateIssueStatusDefault<T extends z.ZodRawShape>(
   }, schema);
 }
 
+const issueDefectSchema = z
+  .object({
+    severity: z.enum(ISSUE_DEFECT_SEVERITIES),
+    source: z.enum(ISSUE_DEFECT_SOURCES).optional().nullable().default(null),
+    reproSteps: multilineTextSchema
+      .pipe(z.string().trim().max(20_000))
+      .optional()
+      .nullable()
+      .default(null),
+    evidenceAttachmentIds: z
+      .array(z.string().uuid())
+      .max(50)
+      .optional()
+      .default([]),
+  })
+  .strict();
+
+export type IssueDefectInput = z.infer<typeof issueDefectSchema>;
+
 const createIssueBaseSchema = z.object({
   projectId: z.string().guid().optional().nullable(),
   projectWorkspaceId: z.string().guid().optional().nullable(),
@@ -702,6 +723,8 @@ const createIssueBaseSchema = z.object({
   workMode: z.enum(ISSUE_WORK_MODES).optional().default("standard"),
   harnessKind: z.enum(ISSUE_HARNESS_KINDS).optional().nullable(),
   priority: z.enum(ISSUE_PRIORITIES).optional().default("medium"),
+  /** Present when the issue is a defect; severity is required in that case. */
+  defect: issueDefectSchema.optional().nullable(),
   reviewPolicy: z.enum(ISSUE_REVIEW_POLICIES).optional().nullable(),
   assigneeAgentId: z.string().guid().optional().nullable(),
   assigneeUserId: z.string().optional().nullable(),

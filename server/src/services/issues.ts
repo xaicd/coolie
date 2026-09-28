@@ -1804,6 +1804,8 @@ export interface IssueFilters {
   descendantOf?: string;
   createdFromIssueId?: string;
   labelId?: string;
+  /** When true, return only defects (issues carrying defect metadata). */
+  defect?: boolean;
   originKind?: string;
   originKindPrefix?: string;
   originId?: string;
@@ -4897,6 +4899,7 @@ const issueListSelect = {
   executionWorkspaceSettings: sql<null>`null`,
   sourceTrust: issues.sourceTrust,
   unblockDescriptor: issues.unblockDescriptor,
+  defect: issues.defect,
   blockedTransitionAt: issues.blockedTransitionAt,
   blockedOwnerNotifiedAt: issues.blockedOwnerNotifiedAt,
   startedAt: issues.startedAt,
@@ -7979,6 +7982,9 @@ export function issueService(db: Db) {
         if (Number.isFinite(since.getTime())) {
           conditions.push(gt(issues.updatedAt, since));
         }
+      }
+      if (filters?.defect) {
+        conditions.push(sql`${issues.defect} is not null`);
       }
       if (
         filters?.excludeRoutineExecutions &&

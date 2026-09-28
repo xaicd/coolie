@@ -99,10 +99,15 @@ export interface Project {
   primaryWorkspace: ProjectWorkspace | null;
   managedByPlugin?: ProjectManagedByPlugin | null;
   /**
-   * Number of tasks (issues) in the project. Populated by the projects list
-   * endpoint (IA Phase 4 — PAP-60); omitted on single-project payloads.
+   * Number of tasks (issues) in the project. Populated by the projects list and
+   * single-project endpoints (IA Phase 4 — PAP-60; wave132 adds it to detail).
    */
   taskCount?: number;
+  /**
+   * Number of defects (tasks carrying defect metadata) in the project.
+   * Populated by the projects list and single-project endpoints (wave132).
+   */
+  defectCount?: number;
   /**
    * Active budget for the project, when set. Populated by the projects list
    * endpoint (IA Phase 4 — PAP-60); omitted on single-project payloads.

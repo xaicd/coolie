@@ -317,6 +317,38 @@ export function IssueFiltersPopover({
             </div>
           </div>
 
+          <div className="space-y-1.5">
+            <span className="text-xs text-muted-foreground">Defects</span>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                  state.defects
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                }`}
+                onClick={() => onChange({ defects: !state.defects })}
+              >
+                仅缺陷
+              </button>
+              <button
+                type="button"
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                  (state.severities ?? []).includes("P0")
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                }`}
+                onClick={() =>
+                  onChange({
+                    severities: (state.severities ?? []).includes("P0") ? [] : ["P0"],
+                  })
+                }
+              >
+                P0
+              </button>
+            </div>
+          </div>
+
           <div className="border-t border-border" />
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

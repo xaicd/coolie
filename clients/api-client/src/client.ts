@@ -419,6 +419,19 @@ export class CoolieClient {
   }
 
   /**
+   * 通用任务更新 —— `PATCH /api/issues/:id`。用于派活之外的部分更新，例如把
+   * 已上传证据的附件 id 回写到缺陷元数据（`defect.evidenceAttachmentIds`）。
+   */
+  async updateIssue(issueId: string, fields: Record<string, unknown>): Promise<Issue> {
+    const body = await this.request<{ issue?: Issue } | Issue>(
+      "PATCH",
+      `/api/issues/${encodeURIComponent(issueId)}`,
+      fields,
+    );
+    return isRecord(body) && "issue" in body ? (body.issue as Issue) : (body as Issue);
+  }
+
+  /**
    * 收件箱三段聚合 (`GET /api/inbox`) —— 与 Coolie Web 收件箱同一份数据:
    * 待审批 / 受阻任务 / @我。
    */

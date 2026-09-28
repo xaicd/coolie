@@ -7,6 +7,25 @@ import type { ProjectExecutionWorkspacePolicy } from "./issue-composer-options";
 export type IssuePriority = "critical" | "high" | "medium" | "low";
 export type IssueStatus = "backlog" | "todo" | "in_progress" | "in_review" | "done" | "blocked" | "cancelled";
 
+/** Defect severity, P0 (worst) → P3. */
+export type IssueDefectSeverity = "P0" | "P1" | "P2" | "P3";
+export type IssueDefectSource =
+  | "web_walkthrough"
+  | "app_walkthrough"
+  | "api"
+  | "customer_feedback";
+
+/**
+ * Defect metadata. Its presence on an issue is what makes the issue a defect.
+ * `evidenceAttachmentIds` holds attachment ids attached to the same task.
+ */
+export interface IssueDefect {
+  severity: IssueDefectSeverity;
+  source: IssueDefectSource | null;
+  reproSteps: string | null;
+  evidenceAttachmentIds: string[];
+}
+
 export interface Company {
   id: string;
   name: string;
@@ -190,6 +209,8 @@ export interface Issue {
   description?: string;
   status: IssueStatus;
   priority: IssuePriority;
+  /** Present when this task is a defect; its presence is what makes it one. */
+  defect?: IssueDefect | null;
   companyId: string;
   /**
    * Presentation fields the list endpoints already return. Optional because the
@@ -228,6 +249,13 @@ export interface CreateIssueInput {
   description?: string;
   priority?: IssuePriority;
   status?: IssueStatus;
+  /** Set to record a defect; `severity` is required when present. */
+  defect?: {
+    severity: IssueDefectSeverity;
+    source?: IssueDefectSource | null;
+    reproSteps?: string | null;
+    evidenceAttachmentIds?: string[];
+  } | null;
   projectId?: string;
   assigneeAgentId?: string;
   assigneeUserId?: string;

@@ -21,6 +21,10 @@ export type IssueFilterState = {
   projects: string[];
   workspaces: string[];
   liveOnly?: boolean;
+  /** Show only defects (tasks carrying defect metadata). */
+  defects?: boolean;
+  /** Defect severities to include (P0–P3); empty means any severity. */
+  severities?: string[];
   /**
    * External object status filter. Values are special tokens that map to
    * properties of the issue's external-object summary (rather than to a
@@ -48,6 +52,8 @@ export const defaultIssueFilterState: IssueFilterState = {
   projects: [],
   workspaces: [],
   liveOnly: false,
+  defects: false,
+  severities: [],
   externalObjectStatuses: [],
   hideRoutineExecutions: false,
 };
@@ -78,6 +84,7 @@ export function externalObjectFilterLabel(value: string): string {
 
 export const issueStatusOrder = ["in_progress", "todo", "backlog", "in_review", "blocked", "done", "cancelled"];
 export const issuePriorityOrder = ["critical", "high", "medium", "low"];
+export const issueDefectSeverityOrder = ["P0", "P1", "P2", "P3"];
 
 export const issueQuickFilterPresets = [
   { label: "All", statuses: [] as string[] },
@@ -114,6 +121,8 @@ export function normalizeIssueFilterState(value: unknown): IssueFilterState {
     projects: normalizeIssueFilterValueArray(candidate.projects),
     workspaces: normalizeIssueFilterValueArray(candidate.workspaces),
     liveOnly: candidate.liveOnly === true,
+    defects: candidate.defects === true,
+    severities: normalizeIssueFilterValueArray(candidate.severities),
     externalObjectStatuses: normalizeIssueFilterValueArray(candidate.externalObjectStatuses),
     hideRoutineExecutions: candidate.hideRoutineExecutions === true,
   };
@@ -245,6 +254,13 @@ export function applyIssueFilters(
   if (state.labels.length > 0) {
     result = result.filter((issue) => (issue.labelIds ?? []).some((id) => state.labels.includes(id)));
   }
+  if (state.defects) result = result.filter((issue) => issue.defect != null);
+  const severities = state.severities ?? [];
+  if (severities.length > 0) {
+    result = result.filter(
+      (issue) => issue.defect != null && severities.includes(issue.defect.severity),
+    );
+  }
   if (state.projects.length > 0) {
     result = result.filter((issue) => issue.projectId != null && state.projects.includes(issue.projectId));
   }
@@ -277,6 +293,8 @@ export function countActiveIssueFilters(
   if (state.assignees.length > 0) count += 1;
   if (state.creators.length > 0) count += 1;
   if (state.labels.length > 0) count += 1;
+  if (state.defects) count += 1;
+  if ((state.severities?.length ?? 0) > 0) count += 1;
   if (state.projects.length > 0) count += 1;
   if (state.workspaces.length > 0) count += 1;
   if (state.liveOnly) count += 1;

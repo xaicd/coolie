@@ -3014,6 +3014,7 @@ function toCompactIssue(issue: any): CompactIssue {
     updatedAt: issue.updatedAt,
     ...(issue.labelIds ? { labelIds: issue.labelIds } : {}),
     ...(issue.labels ? { labels: issue.labels } : {}),
+    ...(issue.defect ? { defect: issue.defect } : {}),
     ...(issue.blockedBy ? { blockedBy: issue.blockedBy } : {}),
     ...(issue.blockerAttention
       ? { blockerAttention: issue.blockerAttention }
@@ -8094,6 +8095,8 @@ export function issueRoutes(
       descendantOf: req.query.descendantOf as string | undefined,
       createdFromIssueId: req.query.createdFromIssueId as string | undefined,
       labelId: req.query.labelId as string | undefined,
+      defect:
+        req.query.defect === "true" || req.query.defect === "1",
       originKind: req.query.originKind as string | undefined,
       originKindPrefix: req.query.originKindPrefix as string | undefined,
       originId: req.query.originId as string | undefined,

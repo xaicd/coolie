@@ -46,8 +46,8 @@
     {
       "path": "scripts/fork-surface.json",
       "maxNetLines": 200,
-      "reason": "This manifest itself, and entirely ours — it does not exist upstream. It sits under scripts/ only because that is where the gate is wired (package.json and check-testing-defenses.mjs call it), and that path prefix is the only reason the gate asks about it. The budget is loose on purpose: the file grows by one entry per upstream file we intentionally change, and that growth is the file working, not creep. Raised from 360 when the ontology-spec workflow and the DSH/coolie-native adapters were declared in one batch.",
-      "maxTotalLines": 600
+      "reason": "This manifest itself, and entirely ours — it does not exist upstream. It sits under scripts/ only because that is where the gate is wired (package.json and check-testing-defenses.mjs call it), and that path prefix is the only reason the gate asks about it. The budget is loose on purpose: the file grows by one entry per upstream file we intentionally change, and that growth is the file working, not creep. Raised from 360 when the ontology-spec workflow and the DSH/coolie-native adapters were declared in one batch; raised again to 900 for the wave132 defect feature, whose one hand-written migration carries a ~48k-line generated drizzle snapshot.",
+      "maxTotalLines": 900
     },
     {
       "path": "ui/index.html",
@@ -268,8 +268,8 @@
     {
       "path": "ui/src/pages/Projects.tsx",
       "maxNetLines": 120,
-      "reason": "Add per-row Sync action button, version drift detection, and SyncProjectDialog integration in Projects list to bind projects to ontology business systems.",
-      "maxTotalLines": 400
+      "reason": "Add per-row Sync action button, version drift detection, and SyncProjectDialog integration in Projects list to bind projects to ontology business systems. wave132 adds the per-row defect count beside the task count (project.defectCount).",
+      "maxTotalLines": 420
     },
     {
       "path": "ui/src/components/SyncProjectDialog.tsx",
@@ -310,8 +310,8 @@
     {
       "path": "packages/shared/src/constants.ts",
       "maxNetLines": 20,
-      "reason": "Upstream file, three additions and every one of them a list member: `dsh` appended to AGENT_ADAPTER_TYPES, the five Palantir roles (fda / core-swe / pre-sre / fdse / ds) appended to AGENT_ROLES, and `ontology_spec` appended to APPROVAL_TYPES. Appended rather than inserted, so no existing value changes meaning and no stored row is affected. They cannot live in our own tree because these are the shared unions the server, the clients and the adapters all compile against: a fork-local copy would let the two sides disagree about what a valid role or approval type is.",
-      "maxTotalLines": 30
+      "reason": "Upstream file, three additions and every one of them a list member: `dsh` appended to AGENT_ADAPTER_TYPES, the five Palantir roles (fda / core-swe / pre-sre / fdse / ds) appended to AGENT_ROLES, and `ontology_spec` appended to APPROVAL_TYPES. Appended rather than inserted, so no existing value changes meaning and no stored row is affected. They cannot live in our own tree because these are the shared unions the server, the clients and the adapters all compile against: a fork-local copy would let the two sides disagree about what a valid role or approval type is. wave132 appends the defect unions (ISSUE_KINDS, ISSUE_DEFECT_SEVERITIES, ISSUE_DEFECT_SOURCES), same append-only rule.",
+      "maxTotalLines": 60
     },
     {
       "path": "server/src/routes/build.ts",
@@ -381,9 +381,9 @@
     },
     {
       "path": "ui/src/pages/ProjectDetail.tsx",
-      "maxNetLines": 100,
-      "reason": "Add CMMI quality governance, 5+2 golden documents baseline, RTM traceability tree, SPC control chart, Tri-State Living Topology, and API Lifecycle tabs to project detail view.",
-      "maxTotalLines": 150
+      "maxNetLines": 110,
+      "reason": "Add CMMI quality governance, 5+2 golden documents baseline, RTM traceability tree, SPC control chart, Tri-State Living Topology, and API Lifecycle tabs to project detail view. wave132 adds a defect-count chip in the header when project.defectCount > 0.",
+      "maxTotalLines": 170
     },
 
     {
@@ -541,6 +541,114 @@
       "maxNetLines": 10,
       "reason": "wave131: forwards projectRef from the slot context into the bridge host context — the one line that makes the type change above honest at runtime. It is the file that owns that mapping, so it cannot live elsewhere.",
       "maxTotalLines": 15
+    },
+    {
+      "path": "packages/db/src/schema/issues.ts",
+      "maxNetLines": 20,
+      "reason": "wave132 缺陷记录到任务: adds one nullable jsonb column `defect` ($type<IssueDefect | null>) beside source_trust/unblock_descriptor. A non-null value is what marks an issue as a defect, so no existing row changes meaning and no backfill is needed. Cannot live in our own tree: it is the issue table the server, the validators and the migration snapshot all read.",
+      "maxTotalLines": 20
+    },
+    {
+      "path": "packages/db/src/migrations/9005_add_issue_defect.sql",
+      "maxNetLines": 30,
+      "reason": "wave132: the hand-written fork migration that adds the `defect` column (ALTER TABLE ... ADD COLUMN IF NOT EXISTS, nullable jsonb, no rewrite). Hand-written because `drizzle-kit generate` cannot run on this fork — a pre-existing snapshot collision between 0280/9000 and 9002/9003 — which is exactly what the reserved 9000-range is for. No upstream counterpart.",
+      "maxTotalLines": 30
+    },
+    {
+      "path": "packages/db/src/migrations/meta/_journal.json",
+      "maxNetLines": 30,
+      "reason": "wave132: one appended journal entry (idx/tag 9005_add_issue_defect) so the hand-written migration above is applied and satisfies check-migration-numbering (journal tags must match SQL files 1:1 in order).",
+      "maxTotalLines": 30
+    },
+    {
+      "path": "packages/db/src/migrations/meta/9005_snapshot.json",
+      "maxNetLines": 60000,
+      "reason": "wave132: the drizzle snapshot for 9005. `drizzle-kit generate` cannot run on this fork (snapshot collision noted above), and migration-snapshot-drift.test.ts derives the newest snapshot's filename from the journal's last entry, so a 9000-range migration must ship its own snapshot or that test throws ENOENT. Generated, not authored: regenerate with `pnpm --filter @paperclipai/db generate` once the collision is fixed; never hand-merge.",
+      "maxTotalLines": 60000
+    },
+    {
+      "path": "packages/shared/src/index.ts",
+      "maxNetLines": 30,
+      "reason": "wave132: adds the defect unions and the IssueDefect type to the shared barrel's explicit export lists (values from ./constants.js, types from ./types/index.js) so the server, UI and clients can import them from @paperclipai/shared.",
+      "maxTotalLines": 30
+    },
+    {
+      "path": "packages/shared/src/types/index.ts",
+      "maxNetLines": 20,
+      "reason": "wave132: adds IssueDefect to the ./issue.js re-export list — the one line that makes the barrel export above resolvable.",
+      "maxTotalLines": 20
+    },
+    {
+      "path": "packages/shared/src/types/issue.ts",
+      "maxNetLines": 60,
+      "reason": "wave132: adds the IssueDefect interface (severity/source/reproSteps/evidenceAttachmentIds) and the optional `defect` field on Issue and CompactIssue. It is the contract the create validator, the DB column type and both clients compile against, so it cannot live in a fork-local copy.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "packages/shared/src/types/project.ts",
+      "maxNetLines": 30,
+      "reason": "wave132: adds optional `defectCount` to Project and notes that taskCount now also rides single-project payloads (the detail endpoint attaches the same list metrics). Optional, so no existing consumer changes.",
+      "maxTotalLines": 30
+    },
+    {
+      "path": "packages/shared/src/validators/issue.ts",
+      "maxNetLines": 60,
+      "reason": "wave132: adds issueDefectSchema (severity required, source/reproSteps/evidenceAttachmentIds optional with defaults) and the optional `defect` field on createIssueBaseSchema, so every create path — createIssueSchema, createChildIssueSchema and the derived updateIssueSchema — accepts it. Same reason as the type file: it is the shared validator the server route runs.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "server/src/services/issues.ts",
+      "maxNetLines": 40,
+      "reason": "wave132: projects `defect` in issueListSelect so list/detail responses carry it, and adds the `defect?: boolean` filter (defect IS NOT NULL) to IssueFilters and the list query. Create needs no change — the insert spreads issueData, which already carries defect.",
+      "maxTotalLines": 40
+    },
+    {
+      "path": "server/src/routes/issues.ts",
+      "maxNetLines": 30,
+      "reason": "wave132: parses `?defect=true|1` into listFilters and includes defect in toCompactIssue so the compact list view carries it too. Three lines, both additive.",
+      "maxTotalLines": 30
+    },
+    {
+      "path": "server/src/services/projects.ts",
+      "maxNetLines": 60,
+      "reason": "wave132: the list-metrics aggregate also computes per-project defect counts (count(*) FILTER (WHERE defect IS NOT NULL)), buildProjectListMetricMaps returns a defectCountByProjectId map, and getProjectById now attaches the same metrics so the project-detail payload carries defectCount. The pure helper keeps its old keys, so its unit test is unaffected.",
+      "maxTotalLines": 70
+    },
+    {
+      "path": "ui/src/api/issues.ts",
+      "maxNetLines": 30,
+      "reason": "wave132: adds `defect?: boolean` to IssueListFilters and serializes it as ?defect=true — the UI side of the server filter above.",
+      "maxTotalLines": 30
+    },
+    {
+      "path": "ui/src/lib/issue-filters.ts",
+      "maxNetLines": 60,
+      "reason": "wave132: adds `defects` and `severities` to IssueFilterState (default/normalize), the client-side filter clauses in applyIssueFilters, the active-filter count, and issueDefectSeverityOrder. Kept beside the other filter state so the toolbar stays the single owner of list filtering.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "ui/src/components/IssueFiltersPopover.tsx",
+      "maxNetLines": 80,
+      "reason": "wave132: adds the 「仅缺陷」/「P0」 quick toggles next to the existing quick-filter chips, wired to the new filter state. Reuses the same pill button styling as the status/quick-filter chips.",
+      "maxTotalLines": 80
+    },
+    {
+      "path": "ui/src/components/IssuesList.tsx",
+      "maxNetLines": 40,
+      "reason": "wave132: renders a 「缺陷 P{n}」 badge in the row title suffix when issue.defect is set, following the existing title-suffix badge pattern (issueBadge / Needs next step).",
+      "maxTotalLines": 40
+    },
+    {
+      "path": "ui/src/components/NewIssueDialog.tsx",
+      "maxNetLines": 260,
+      "reason": "wave132: adds the 类型(任务/缺陷) + 严重度 chips and an optional 复现步骤 textarea to the composer, sends `defect` on create, and — because uploads are issue-scoped — records the uploaded evidence attachment ids back onto the defect metadata in a best-effort follow-up PATCH. Evidence reuses the dialog's existing staged-file upload path.",
+      "maxTotalLines": 260
+    },
+    {
+      "path": "ui/src/components/issue-properties/IssueProperties.tsx",
+      "maxNetLines": 80,
+      "reason": "wave132: shows 类型/严重度/来源/复现步骤/证据 rows in the task-detail properties panel when issue.defect is set; evidence attachments themselves keep rendering in the existing attachments section.",
+      "maxTotalLines": 80
     }
   ]
 }

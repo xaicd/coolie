@@ -2181,6 +2181,15 @@ function StreamlinedIssuesList({
                         externalObjectSummary={externalObjectSummaryByIssueId.get(issue.id) ?? null}
                         titleSuffix={(
                           <>
+                            {issue.defect ? (
+                              <Badge variant="outline"
+                                className="ml-1.5 border-destructive/40 bg-destructive/10 px-1.5 text-(length:--text-nano) text-destructive"
+                                data-testid="issue-defect-badge"
+                                title={`缺陷 · 严重度 ${issue.defect.severity}`}
+                              >
+                                缺陷 {issue.defect.severity}
+                              </Badge>
+                            ) : null}
                             {hasChildren && !isExpanded ? (
                               <span className="ml-1.5 text-xs text-muted-foreground">
                                 ({totalDescendants} sub-task{totalDescendants !== 1 ? "s" : ""})

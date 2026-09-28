@@ -332,6 +332,14 @@ export function Projects() {
                             >
                               {formatNumber(project.taskCount ?? 0)} task{(project.taskCount ?? 0) === 1 ? "" : "s"}
                             </span>
+                            {(project.defectCount ?? 0) > 0 && (
+                              <span
+                                className="hidden text-xs text-destructive tabular-nums sm:inline"
+                                title={`${formatNumber(project.defectCount ?? 0)} defect${(project.defectCount ?? 0) === 1 ? "" : "s"}`}
+                              >
+                                {formatNumber(project.defectCount ?? 0)} defect{(project.defectCount ?? 0) === 1 ? "" : "s"}
+                              </span>
+                            )}
                             {project.budget && (
                               <span className="hidden text-xs text-muted-foreground tabular-nums sm:inline">
                                 {formatProjectBudget(project.budget)}

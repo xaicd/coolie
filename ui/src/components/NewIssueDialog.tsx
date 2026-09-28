@@ -4,6 +4,7 @@ import { normalizeLegacyRunnerProvider } from "@paperclipai/adapter-utils";
 import { memo, useState, useEffect, useRef, useCallback, useMemo, type ChangeEvent, type CSSProperties, type DragEvent, type RefObject } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { AgentEnvConfig, EnvBinding, IssueWorkMode } from "@paperclipai/shared";
+import { ISSUE_DEFECT_SEVERITIES } from "@paperclipai/shared";
 import { useDialog } from "../context/DialogContext";
 import { useCompany } from "../context/CompanyContext";
 import { executionWorkspacesApi } from "../api/execution-workspaces";
@@ -518,6 +519,12 @@ export function NewIssueDialog() {
   // Popover states
   const [statusOpen, setStatusOpen] = useState(false);
   const [priorityOpen, setPriorityOpen] = useState(false);
+  const [severityOpen, setSeverityOpen] = useState(false);
+  // Defect capture: 类型(任务/缺陷) + 严重度 + 复现步骤. Defect metadata is only
+  // attached to the create payload when the kind is "defect".
+  const [issueKind, setIssueKind] = useState<"task" | "defect">("task");
+  const [defectSeverity, setDefectSeverity] = useState<string>("P1");
+  const [defectReproSteps, setDefectReproSteps] = useState("");
   const [workModeOpen, setWorkModeOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [companyOpen, setCompanyOpen] = useState(false);
@@ -624,6 +631,7 @@ export function NewIssueDialog() {
     }: { companyId: string; stagedFiles: StagedIssueFile[] } & Record<string, unknown>) => {
       const issue = await issuesApi.create(companyId, data);
       const failures: string[] = [];
+      const uploadedAttachmentIds: string[] = [];
 
       for (const stagedFile of pendingStagedFiles) {
         try {
@@ -636,10 +644,29 @@ export function NewIssueDialog() {
               baseRevisionId: null,
             });
           } else {
-            await issuesApi.uploadAttachment(companyId, issue.id, stagedFile.file);
+            const attachment = await issuesApi.uploadAttachment(companyId, issue.id, stagedFile.file);
+            uploadedAttachmentIds.push(attachment.id);
           }
         } catch {
           failures.push(stagedFile.file.name);
+        }
+      }
+
+      // Evidence is attached after the issue exists (uploads are issue-scoped), so
+      // record the resulting attachment ids on the defect metadata in a second call.
+      const defect = data.defect as
+        | { severity: string; source?: string | null; reproSteps?: string | null }
+        | null
+        | undefined;
+      if (defect && uploadedAttachmentIds.length > 0) {
+        try {
+          const updated = await issuesApi.update(issue.id, {
+            defect: { ...defect, evidenceAttachmentIds: uploadedAttachmentIds },
+          });
+          return { issue: updated as typeof issue, companyId, failures };
+        } catch {
+          // Best-effort: the issue and its attachments already exist; a failed
+          // evidence link must not fail the create.
         }
       }
 
@@ -965,6 +992,9 @@ export function NewIssueDialog() {
     setIssueText("", "");
     setStatus("todo");
     setPriority("");
+    setIssueKind("task");
+    setDefectSeverity("P1");
+    setDefectReproSteps("");
     setAssigneeValue("");
     setReviewerValue("");
     setApproverValue("");
@@ -1066,6 +1096,16 @@ export function NewIssueDialog() {
       status,
       priority: priority || "medium",
       workMode,
+      ...(issueKind === "defect"
+        ? {
+            defect: {
+              severity: defectSeverity,
+              source: null,
+              reproSteps: defectReproSteps.trim() || null,
+              evidenceAttachmentIds: [],
+            },
+          }
+        : {}),
       ...(selectedAssigneeAgentId ? { assigneeAgentId: selectedAssigneeAgentId } : {}),
       ...(selectedAssigneeUserId ? { assigneeUserId: selectedAssigneeUserId } : {}),
       ...(newIssueDefaults.parentId ? { parentId: newIssueDefaults.parentId } : {}),
@@ -2091,6 +2131,16 @@ export function NewIssueDialog() {
 
         {/* Property chips bar */}
         <div className="flex items-center gap-1.5 px-4 py-2 border-t border-border flex-wrap shrink-0">
+          {issueKind === "defect" ? (
+            <Textarea
+              data-testid="new-issue-defect-repro"
+              value={defectReproSteps}
+              onChange={(e) => setDefectReproSteps(e.target.value)}
+              placeholder="复现步骤（可选）：环境 / 操作 / 期望 / 实际"
+              rows={2}
+              className="w-full min-h-0 text-xs"
+            />
+          ) : null}
           {/* Status chip */}
           <Popover open={statusOpen} onOpenChange={setStatusOpen}>
             <PopoverTrigger asChild>
@@ -2123,6 +2173,67 @@ export function NewIssueDialog() {
               ))}
             </PopoverContent>
           </Popover>
+
+          {/* Task kind + defect severity — 缺陷记录到任务 (wave132). */}
+          <div
+            data-testid="new-issue-kind-chip"
+            className="inline-flex h-8 items-center gap-0.5 rounded-md border border-border p-0.5 sm:h-auto"
+          >
+            <button
+              type="button"
+              data-testid="new-issue-kind-task"
+              className={cn(
+                "rounded px-2 py-1 text-xs transition-colors",
+                issueKind === "task" ? "bg-accent font-medium" : "text-muted-foreground hover:bg-accent/50",
+              )}
+              onClick={() => setIssueKind("task")}
+            >
+              任务
+            </button>
+            <button
+              type="button"
+              data-testid="new-issue-kind-defect"
+              className={cn(
+                "rounded px-2 py-1 text-xs transition-colors",
+                issueKind === "defect"
+                  ? "bg-destructive/10 font-medium text-destructive"
+                  : "text-muted-foreground hover:bg-accent/50",
+              )}
+              onClick={() => setIssueKind("defect")}
+            >
+              缺陷
+            </button>
+          </div>
+
+          {issueKind === "defect" ? (
+            <Popover open={severityOpen} onOpenChange={setSeverityOpen}>
+              <PopoverTrigger asChild>
+                <button
+                  type="button"
+                  data-testid="new-issue-severity-chip"
+                  className="inline-flex h-8 items-center gap-1.5 rounded-md border border-destructive/40 px-2.5 py-0 text-xs text-destructive hover:bg-destructive/10 sm:h-auto sm:px-2 sm:py-1"
+                >
+                  {defectSeverity}
+                </button>
+              </PopoverTrigger>
+              <PopoverContent className="w-28 p-1" align="start">
+                {ISSUE_DEFECT_SEVERITIES.map((severity) => (
+                  <button
+                    key={severity}
+                    type="button"
+                    data-testid={`new-issue-severity-${severity}`}
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-accent/50",
+                      severity === defectSeverity && "bg-accent",
+                    )}
+                    onClick={() => { setDefectSeverity(severity); setSeverityOpen(false); }}
+                  >
+                    {severity}
+                  </button>
+                ))}
+              </PopoverContent>
+            </Popover>
+          ) : null}
 
           {/* Priority chip — PAP-411: hidden behind SHOW_TASK_PRIORITY_UI. */}
           {SHOW_TASK_PRIORITY_UI && (

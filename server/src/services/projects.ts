@@ -68,6 +68,8 @@ interface ProjectWithGoals extends Omit<ProjectRow, "executionWorkspacePolicy"> 
   primaryWorkspace: ProjectWorkspace | null;
   managedByPlugin: ProjectManagedByPlugin | null;
   taskCount?: number;
+  /** Number of defects (tasks carrying defect metadata) in the project. */
+  defectCount?: number;
   budget?: ProjectBudgetSummary | null;
 }
 
@@ -322,7 +324,7 @@ async function attachWorkspaces(db: Db, rows: ProjectWithGoals[]): Promise<Proje
   });
 }
 
-type TaskCountRow = { projectId: string | null; count: number };
+type TaskCountRow = { projectId: string | null; count: number; defectCount?: number };
 type ProjectBudgetRow = { scopeId: string; amount: number; windowKind: string };
 
 /**
@@ -332,8 +334,12 @@ type ProjectBudgetRow = { scopeId: string; amount: number; windowKind: string };
  */
 export function buildProjectListMetricMaps(taskCountRows: TaskCountRow[], budgetRows: ProjectBudgetRow[]) {
   const taskCountByProjectId = new Map<string, number>();
+  const defectCountByProjectId = new Map<string, number>();
   for (const row of taskCountRows) {
-    if (row.projectId) taskCountByProjectId.set(row.projectId, Number(row.count) || 0);
+    if (row.projectId) {
+      taskCountByProjectId.set(row.projectId, Number(row.count) || 0);
+      defectCountByProjectId.set(row.projectId, Number(row.defectCount ?? 0) || 0);
+    }
   }
 
   const budgetByProjectId = new Map<string, ProjectBudgetSummary>();
@@ -346,7 +352,7 @@ export function buildProjectListMetricMaps(taskCountRows: TaskCountRow[], budget
     }
   }
 
-  return { taskCountByProjectId, budgetByProjectId };
+  return { taskCountByProjectId, defectCountByProjectId, budgetByProjectId };
 }
 
 /**
@@ -368,6 +374,7 @@ async function attachListMetrics(
       .select({
         projectId: issues.projectId,
         count: sql<number>`count(*)::int`,
+        defectCount: sql<number>`count(*) filter (where ${issues.defect} is not null)::int`,
       })
       .from(issues)
       .where(and(eq(issues.companyId, companyId), inArray(issues.projectId, projectIds), isNull(issues.conversationAgentId)))
@@ -390,7 +397,7 @@ async function attachListMetrics(
       ),
   ]);
 
-  const { taskCountByProjectId, budgetByProjectId } = buildProjectListMetricMaps(
+  const { taskCountByProjectId, defectCountByProjectId, budgetByProjectId } = buildProjectListMetricMaps(
     taskCountRows,
     budgetRows,
   );
@@ -398,6 +405,7 @@ async function attachListMetrics(
   return rows.map((row) => ({
     ...row,
     taskCount: taskCountByProjectId.get(row.id) ?? 0,
+    defectCount: defectCountByProjectId.get(row.id) ?? 0,
     budget: budgetByProjectId.get(row.id) ?? null,
   }));
 }
@@ -617,7 +625,9 @@ export function projectService(db: Db) {
     const [withGoals] = await attachGoals(db, [row]);
     if (!withGoals) return null;
     const [enriched] = await attachWorkspaces(db, [withGoals]);
-    return enriched ?? null;
+    if (!enriched) return null;
+    const [withMetrics] = await attachListMetrics(db, row.companyId, [enriched]);
+    return withMetrics ?? enriched;
   };
 
   return {

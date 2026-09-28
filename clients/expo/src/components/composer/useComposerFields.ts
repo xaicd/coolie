@@ -144,6 +144,17 @@ export function useComposerFields(companyId: string, agents: AgentRow[] = []) {
       title: string;
       description?: string;
       priority: IssuePriority;
+      /** Set to record this task as a defect (wave132). */
+      defect?: {
+        severity: "P0" | "P1" | "P2" | "P3";
+        source?:
+          | "web_walkthrough"
+          | "app_walkthrough"
+          | "api"
+          | "customer_feedback"
+          | null;
+        reproSteps?: string | null;
+      } | null;
     }): Promise<{ issue: Issue; failedUploads: string[] }> => {
       const assigneeAdapterOverrides = buildAssigneeAdapterOverrides({
         adapterType: assigneeAdapterType,
@@ -169,6 +180,7 @@ export function useComposerFields(companyId: string, agents: AgentRow[] = []) {
         priority: fields.priority,
         status,
         workMode,
+        ...(fields.defect ? { defect: fields.defect } : {}),
         ...(fields.description ? { description: fields.description } : {}),
         ...(projectId ? { projectId } : {}),
         ...(assigneeAgentId ? { assigneeAgentId } : {}),
@@ -192,15 +204,28 @@ export function useComposerFields(companyId: string, agents: AgentRow[] = []) {
       });
 
       const failedUploads: string[] = [];
+      const uploadedAttachmentIds: string[] = [];
       for (const file of attachments) {
         try {
-          await coolie.uploadAttachment(companyId, issue.id, {
+          const attachment = await coolie.uploadAttachment(companyId, issue.id, {
             uri: file.uri,
             name: file.name,
             type: file.mimeType,
           });
+          uploadedAttachmentIds.push(attachment.id);
         } catch {
           failedUploads.push(file.name);
+        }
+      }
+
+      // Uploads are issue-scoped, so the evidence ids are recorded after the fact.
+      if (fields.defect && uploadedAttachmentIds.length > 0) {
+        try {
+          await coolie.updateIssue(issue.id, {
+            defect: { ...fields.defect, evidenceAttachmentIds: uploadedAttachmentIds },
+          });
+        } catch {
+          // Best-effort: the task and its attachments already exist.
         }
       }
 

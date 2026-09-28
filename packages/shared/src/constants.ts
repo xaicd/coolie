@@ -224,6 +224,21 @@ export const INBOX_MINE_ISSUE_STATUS_FILTER = INBOX_MINE_ISSUE_STATUSES.join(","
 
 export const ISSUE_PRIORITIES = ["critical", "high", "medium", "low"] as const;
 export type IssuePriority = (typeof ISSUE_PRIORITIES)[number];
+
+/** Task kind. A defect carries `IssueDefect` metadata; a task does not. */
+export const ISSUE_KINDS = ["task", "defect"] as const;
+export type IssueKind = (typeof ISSUE_KINDS)[number];
+
+export const ISSUE_DEFECT_SEVERITIES = ["P0", "P1", "P2", "P3"] as const;
+export type IssueDefectSeverity = (typeof ISSUE_DEFECT_SEVERITIES)[number];
+
+export const ISSUE_DEFECT_SOURCES = [
+  "web_walkthrough",
+  "app_walkthrough",
+  "api",
+  "customer_feedback",
+] as const;
+export type IssueDefectSource = (typeof ISSUE_DEFECT_SOURCES)[number];
 export const ISSUE_REVIEW_POLICIES = ["anyone", "not_creator", "human_only"] as const;
 export type IssueReviewPolicy = (typeof ISSUE_REVIEW_POLICIES)[number];
 export const ISSUE_WORK_MODES = ["standard", "ask", "planning", "skill_test"] as const;

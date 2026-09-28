@@ -245,6 +245,13 @@ export function TaskDetailScreen({
               dotColor={PRIORITY_DOT[issue.priority] ?? C.ink3}
               mono
             />
+            {issue.defect ? (
+              <Pill
+                label={`缺陷 ${issue.defect.severity}`}
+                dotColor={C.err}
+                mono
+              />
+            ) : null}
           </View>
 
           <AppCard padding={16} style={styles.card}>
