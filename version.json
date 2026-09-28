@@ -1,8 +1,8 @@
 {
-  "version": "0.5.88",
-  "versionCode": 588,
-  "commitSha": "1ff479e878dfbe212744209c03f91ce7a70c982c",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.88/coolie-release.apk",
-  "sha256": "319ce9674de283cb3d1f7e895c20590d48685bd34a767a206b2e4d0965f70ef1",
-  "releaseNotes": "wave126 项目中心项目卡「创建任务」直接打开新建任务弹窗并预选该项目（服务端据此绑定项目主工作区）；「查看任务」跳任务页并自动套用该项目筛选"
+  "version": "0.5.89",
+  "versionCode": 589,
+  "commitSha": "6c483d079a86921fd2e228c9ec38d0b5075da7cd",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.89/coolie-release.apk",
+  "sha256": "9b4fc85c1af51cdc59967362243e1414174317c78e02a6e890933addf08aa50c",
+  "releaseNotes": "wave132 缺陷记录到任务：新建任务支持类型(任务/缺陷)+严重度P0-P3+复现步骤+截图证据，列表/详情显示缺陷徽章与严重度并支持仅缺陷/P0筛选，项目显示缺陷数"
 }
