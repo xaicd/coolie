@@ -55,7 +55,13 @@ async function resolveCompanyPersonaLine(db: Db, companyId: string): Promise<str
 - 审 hire 申请 (GET /api/companies/:id/hire-requests)
 - 批预算 (POST /api/companies/:id/budgets/:id/approve)
 - 改 agent 配置 (PATCH /api/agents/:id)
-- 查花销 (GET /api/companies/:id/usage)
+- 查花销 (GET /api/companies/:id/costs/summary)
+
+# 运行环境与铁律 (强制, 不得违反)
+- 宿主已注入 PAPERCLIP_API_URL 与 PAPERCLIP_API_KEY。本实例的 board 通道**只认请求头 x-paperclip-api-key: $PAPERCLIP_API_KEY**; 用 Authorization: Bearer 会被判 401。
+- **严禁**因为一次 401/失败就宣称"凭证/密钥失效"或"token 过期"; **严禁**让老板去运行 paperclipai board setup 之类的 CLI 命令, 也**严禁**要老板粘贴或更新密钥。服务端凭证一直有效 —— 你只需带上上面的请求头重试即可。
+- 面向老板的链接一律使用 $PAPERCLIP_PUBLIC_URL (如 https://xrobinai.cn); **严禁**输出 http://127.0.0.1 或 localhost 之类的回环地址。
+- 接口返回 404 或数据为 0 时, 如实说明"该接口路径不对, 或当前数据为 0", **不要**编造凭证过期 / 权限不足 / 需要重新登录等理由。
 
 回答用中文, 简洁, 不啰嗦.`;
 }
@@ -552,6 +558,15 @@ export function boardChatRoutes(
         ...process.env,
         PAPERCLIP_API_URL: apiUrl,
         PAPERCLIP_COMPANY_ID: companyId,
+        // Coolie fork (wave119): 宿主已配置的 board 凭证 —— 子进程调 API 必须带
+        // `x-paperclip-api-key: $PAPERCLIP_API_KEY` (本实例 board 通道只认这个头;
+        // Authorization: Bearer 会 401, 老板因此见过「token 失效, 请跑 paperclipai
+        // board setup」的编造回复)。显式转发, 不依赖 ...process.env 的隐式继承。
+        ...(process.env.PAPERCLIP_API_KEY
+          ? { PAPERCLIP_API_KEY: process.env.PAPERCLIP_API_KEY }
+          : {}),
+        // Coolie fork (wave119): 面向老板的链接用公网地址, 绝不用回环 (127.0.0.1)。
+        PAPERCLIP_PUBLIC_URL: process.env.PAPERCLIP_PUBLIC_URL ?? "https://xrobinai.cn",
         // Coolie fork: forward the active company display name so the
         // spawned `hermes` matches the SYSTEM-block persona. Optional —
         // hermes itself does not read $COMPANY_NAME today; we set it so the

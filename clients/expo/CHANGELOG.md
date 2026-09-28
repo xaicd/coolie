@@ -4,6 +4,19 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.5.83
+
+> Released: 2026-09-28 · Android release APK
+
+### 更新
+
+- wave119 彻底重构「极速立项」原生抽屉（对齐 Web 端完整能力与 CreateTaskModal 稳固全高弹窗）：
+  1. 布局修复：重构为稳固全高安全弹窗架构，顶部把手与标题（带关闭叉号）固定、底部「取消」与「一键立项并开工」操作栏常驻贴底，中间表单自适应高度并流畅滚动，彻底解决真机被底边推挤遮挡、软键盘顶起导致只看得到“项目名称”的问题；
+  2. 预设对齐：完整引入四大复杂开源项目底座预设（RuoYi-All-Next 自有全栈底座、Spring Cloud Alibaba 微服务治理、RuoYi-Vue-Pro 企业全栈脚手架、JeecgBoot 低代码微服务），点击一键预填项目名称、切换至 Git 模式并填入仓库；
+  3. 多源模式：完整提供 Git 仓库地址（支持添加多仓库 Multi-Repo 与删除、支持 Gitee/GitLab/自建Git/GitHub/SSH）、本地工作区物理目录绑定（绝对路径 cwd）与无代码库（纯规划管理）三大模式。
+
+---
+
 ## v0.5.82
 
 > Released: 2026-09-28 · Android release APK
