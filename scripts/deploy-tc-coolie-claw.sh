@@ -29,6 +29,9 @@ echo "=== [2/6] rsync 代码(保护远端 .env，排除 node_modules/.git/本地
 #   · ui/ota                    publish-ota*.sh 直传的 OTA 分发目录
 #   · ui/dist/version.json      release-app.sh scp 的 App 升级清单 (Caddy 直出 /version.json)
 #   · ui/dist/h5                publish-h5.sh 直传的 H5 站点
+#   · server/ui-dist            Express 优先直出的静态 UI 根目录 (构建产物);
+#                               本地若有一份陈旧副本, 同步过去会盖掉远端新构建
+#                               —— wave135 实测 prod 因此落后源码一整天 (index-CR4jE0C_)
 #   · .env / data / server/data 远端生产独立配置与实例数据
 # version.json 用无斜杠模式，顺带保护根目录下可能存在的同名文件。
 rsync -az --delete \
@@ -41,6 +44,7 @@ rsync -az --delete \
   --exclude 'screenshots' \
   --exclude 'data' \
   --exclude 'server/data' \
+  --exclude 'server/ui-dist' \
   --exclude 'clients/expo' \
   --exclude 'doc/plans' \
   --exclude 'ui/ota' \

@@ -74,6 +74,13 @@ RSYNC_EXCLUDES=(
   --exclude='*.tsbuildinfo'
   --exclude='data'
   --exclude='server/data'
+  # `server/ui-dist` is build output (the published static UI root Express
+  # serves), not source. Shipping a developer's local copy would shadow the
+  # freshly rebuilt `ui/dist` — which is exactly how prod kept serving an old
+  # bundle (index-CR4jE0C_) for a day: the sync pushed a stale local
+  # `server/ui-dist` and nothing ever regenerated it after the UI rebuild. It is
+  # regenerated on the host after the build instead.
+  --exclude='server/ui-dist'
   --exclude='clients/expo'
   --exclude='doc/plans'
   --exclude='ui/ota'
@@ -181,9 +188,16 @@ else
         # nothing rebuilds it). Stash it across the build and restore it with the
         # read permission Caddy serves it with — otherwise /version.json 404s and
         # every installed App silently sees "no update".
-        ssh -o BatchMode=yes "$COOLIE_HOST" "cd '$COOLIE_DIR' && export CI=1 && keep=\$(mktemp) && if [ -f ui/dist/version.json ]; then cp ui/dist/version.json \"\$keep\"; fi && pnpm --filter @paperclipai/ui build && if [ -s \"\$keep\" ]; then cp \"\$keep\" ui/dist/version.json && chmod 644 ui/dist/version.json; fi && rm -f \"\$keep\"" >/dev/null \
+        # After the rebuild, refresh the published static UI root
+        # (`server/ui-dist`) from the fresh `ui/dist`. Express prefers
+        # `server/ui-dist` over `../../ui/dist`, and that published copy is what
+        # actually serves the SPA — leaving it stale is how prod ran a day behind
+        # the source even though every deploy rebuilt `ui/dist`. Done on the host
+        # (that tree is excluded from the sync) so the served root and the build
+        # can never disagree.
+        ssh -o BatchMode=yes "$COOLIE_HOST" "cd '$COOLIE_DIR' && export CI=1 && keep=\$(mktemp) && if [ -f ui/dist/version.json ]; then cp ui/dist/version.json \"\$keep\"; fi && pnpm --filter @paperclipai/ui build && if [ -s \"\$keep\" ]; then cp \"\$keep\" ui/dist/version.json && chmod 644 ui/dist/version.json; fi && rm -f \"\$keep\" && rm -rf server/ui-dist && cp -r ui/dist server/ui-dist" >/dev/null \
           || die "ui build failed"
-        echo "  built ui" ;;
+        echo "  built ui + refreshed server/ui-dist" ;;
       pkg:*)
         name="${target#pkg:}"
         ssh -o BatchMode=yes "$COOLIE_HOST" "cd '$COOLIE_DIR' && export CI=1 && pnpm --filter @paperclipai/${name#plugins\/} build" >/dev/null \
