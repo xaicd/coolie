@@ -49,6 +49,8 @@ cd "$REPO_ROOT"
 # history. `dist` is excluded because it is rebuilt there; shipping a stale one
 # is worse than shipping none.
 RSYNC_EXCLUDES=(
+  --exclude='.env'
+  --exclude='.env.*'
   --exclude='node_modules'
   --exclude='.git'
   --exclude='target'

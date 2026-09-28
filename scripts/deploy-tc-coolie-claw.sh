@@ -18,12 +18,12 @@ if [ "$SKIP_BUILD" != "--skip-build" ]; then
   (cd clients/api-client && pnpm build 2>/dev/null || true)
 fi
 
-echo "=== [2/6] rsync 代码(排除 node_modules/.git/本地数据) ==="
-# ui/ota 是 publish-ota.sh 直传远端的 OTA 分发目录, 不在仓库里 —— 不 exclude 的话
-# --delete 每次部署都会把它整个抹掉, 所有装机的 OTA 下载变 404 (wave111 实证:
-# 0.5.75 发版 15:30 部署后 /ota/* 资产全 404)。同 version.json 的 rsync 补偿是
-# release-app.sh 侧的兜底, 这里从源头不再删。
+echo "=== [2/6] rsync 代码(保护远端 .env，排除 node_modules/.git/本地数据) ==="
+# ui/ota 是 publish-ota.sh 直传远端的 OTA 分发目录; .env 是远端生产独立配置
+# 必须显式 exclude，防止 --delete 把远端生产数据库配置或 OTA 资产抹掉
 rsync -az --delete \
+  --exclude '.env' \
+  --exclude '.env.*' \
   --exclude 'node_modules' \
   --exclude '.git' \
   --exclude '.claude' \
@@ -36,6 +36,24 @@ rsync -az --delete \
   --exclude 'doc/plans' \
   --exclude 'ui/ota' \
   ./ "$SSH_TARGET:$REMOTE_DIR/"
+
+# 仅对 PAT 配置进行无损增量合并，绝不覆盖远端已有的 DATABASE_URL、SECRET 等生产关键变量
+if [ -f .env ]; then
+  for key in GITEE_PAT GITHUB_PAT GIT_PAT GITEE_TOKEN GITHUB_TOKEN; do
+    val=$(grep -E "^${key}=" .env | cut -d= -f2- || true)
+    if [ -n "$val" ]; then
+      echo "增量同步 ${key} 到远端生产 .env (无损更新，保留远端现有配置)..."
+      ssh "$SSH_TARGET" "
+        touch $REMOTE_DIR/.env
+        if grep -q '^${key}=' $REMOTE_DIR/.env; then
+          sed -i 's|^${key}=.*|${key}=${val}|' $REMOTE_DIR/.env
+        else
+          echo '${key}=${val}' >> $REMOTE_DIR/.env
+        fi
+      " || true
+    fi
+  done
+fi
 
 echo "=== [3/6] 远端安装依赖 ==="
 ssh $SSH_TARGET "cd $REMOTE_DIR && pnpm install --frozen-lockfile 2>&1 | tail -2 || pnpm install 2>&1 | tail -2"
