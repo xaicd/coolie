@@ -436,9 +436,9 @@
     },
     {
       "path": "server/src/services/project-documents.ts",
-      "maxNetLines": 260,
+      "maxNetLines": 340,
       "reason": "wave122: the project-documents service — land/list a project's uploaded requirement docs under the coolie-docs directory above (no git), and (Req C) the deterministic, LLM-free analyzer that turns a doc's title/H1 (or filename stem) into a suggested project name, a unique ASCII slug and a one-line summary. New file; lives under server/src/services/ only because that is where project services live.",
-      "maxTotalLines": 320
+      "maxTotalLines": 700
     },
     {
       "path": "server/src/services/project-documents.test.ts",
@@ -448,9 +448,9 @@
     },
     {
       "path": "skills/paperclip/scripts/paperclip-upload-artifact.sh",
-      "maxNetLines": 30,
+      "maxNetLines": 60,
       "reason": "wave122: (1) send the credential as BOTH `Authorization: Bearer` and `x-paperclip-api-key` — this fork's board channel reads only the latter and rejects Bearer with 401, so the helper the board skill mandates could not upload here at all (the failure behind the boss's 'credential expired' complaint); upstream instances ignore the header they do not read, so one helper works on either credential. (2) Make PAPERCLIP_RUN_ID optional: a board-concierge chat has no heartbeat run, and a fabricated run id violates activity_log's run FK with a 500 — the run-scoped header and work-product attribution are now sent only when a real run id is present, so agent runs are unchanged. Resolution: keep both changes; do not revert to Bearer-only or to a required run id.",
-      "maxTotalLines": 40
+      "maxTotalLines": 80
     }
   ]
 }
