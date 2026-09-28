@@ -36,8 +36,7 @@ rsync -az --delete \
   --exclude 'screenshots' \
   --exclude 'data' \
   --exclude 'server/data' \
-  --exclude 'clients/expo/node_modules' \
-  --exclude 'clients/expo/.expo' \
+  --exclude 'clients/expo' \
   --exclude 'doc/plans' \
   --exclude 'ui/ota' \
   ./ "$SSH_TARGET:$REMOTE_DIR/"
