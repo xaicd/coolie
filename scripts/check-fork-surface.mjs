@@ -73,6 +73,7 @@ export const OWNED_PREFIXES = [
   ".commandcode/",
   "scripts/check-fork-surface",
   "scripts/check-testing-defenses",
+  "scripts/check-security-audit",
   "scripts/check-ontology",
   "scripts/convert-ontology-playground",
   "scripts/deploy-coolie",
@@ -84,6 +85,7 @@ export const OWNED_PREFIXES = [
   "scripts/e2e-local.sh",
   "scripts/deploy-tc-coolie-claw.sh",
   "scripts/capture-ds-workbench.mjs",
+  "version.json",
 ];
 
 /** Regenerated, not authored — it cannot be resolved by hand anyway. */
