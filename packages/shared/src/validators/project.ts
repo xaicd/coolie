@@ -122,6 +122,15 @@ export const createProjectSchema = z.object({
   workspace: createProjectWorkspaceSchema.optional(),
   repositoryIds: z.array(z.string().regex(/^\d+$/)).optional(),
   repositoryUrls: z.array(z.string().trim().min(1).max(2000)).max(100).optional(),
+  /**
+   * 组织托管 (organization hosting): an attribute independent of the code
+   * source. When true the server auto-detects the startup PAT's target org,
+   * creates (or reuses) a private repo for this project there, and attaches it
+   * as a workspace — composed with whichever source the caller also sends
+   * (a git URL to clone, a local directory, or neither for a planning-only
+   * project). When absent/false nothing is auto-provisioned.
+   */
+  hostedRemote: z.boolean().optional(),
 });
 
 export type CreateProject = z.infer<typeof createProjectSchema>;

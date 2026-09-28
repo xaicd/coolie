@@ -156,10 +156,12 @@ export function buildGitAuthInvocation(credential: GitCredential): GitAuthInvoca
     ["url.https://github.com/.insteadOf", "ssh://git@github.com/"],
     ["url.https://github.com/.insteadOf", "git@www.github.com:"],
     ["url.https://github.com/.insteadOf", "ssh://git@www.github.com/"],
-    ...(identity ? [
-      ["user.name", identity.login],
-      ["user.email", noreplyEmail!],
-    ] : []),
+    ...(identity
+      ? ([
+          ["user.name", identity.login],
+          ["user.email", noreplyEmail!],
+        ] as [string, string][])
+      : []),
     ["credential.https://gitee.com.helper", GIT_CREDENTIAL_HELPER],
     ["credential.https://www.gitee.com.helper", GIT_CREDENTIAL_HELPER],
     ["url.https://gitee.com/.insteadOf", "git@gitee.com:"],

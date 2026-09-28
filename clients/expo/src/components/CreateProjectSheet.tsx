@@ -7,6 +7,7 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
+  Switch,
   Text,
   TextInput,
   View,
@@ -23,7 +24,10 @@ interface CreateProjectSheetProps {
   onCreated: (project: Project) => void;
 }
 
-type SourceMode = "git_url" | "local_path" | "none";
+// 代码源 (source) 与 组织托管 (hostedRemote) 是两个独立属性:
+// 源决定初始代码从哪来 (克隆 Git 仓库 / 绑定本地目录), 组织托管决定是否把
+// 新项目自动推到远端组织。二者自由组合, 不再是一行单选。
+type SourceMode = "git_url" | "local_path";
 
 interface TemplatePreset {
   name: string;
@@ -70,6 +74,7 @@ export function CreateProjectSheet({
   const [sourceMode, setSourceMode] = useState<SourceMode>("git_url");
   const [gitUrls, setGitUrls] = useState<string[]>([""]);
   const [localPath, setLocalPath] = useState("");
+  const [hostedRemote, setHostedRemote] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [patTarget, setPatTarget] = useState<{
@@ -89,9 +94,16 @@ export function CreateProjectSheet({
       .then((data) => {
         if (data?.configured && data?.targetOrg) {
           setPatTarget(data);
+          setHostedRemote(true);
+        } else {
+          setPatTarget(null);
+          setHostedRemote(false);
         }
       })
-      .catch(() => undefined);
+      .catch(() => {
+        setPatTarget(null);
+        setHostedRemote(false);
+      });
   }, [visible]);
 
   if (!visible) return null;
@@ -153,9 +165,12 @@ export function CreateProjectSheet({
         sourceType?: string;
         cwd?: string;
       };
+      hostedRemote?: boolean;
     } = {
       name: trimmedName,
       status: "in_progress",
+      // 组织托管: 独立属性, 显式传布尔值 (false = 明确不托管), 与源模式无关。
+      hostedRemote: hostedRemote && Boolean(patTarget?.targetOrg),
       ...(description.trim() ? { description: description.trim() } : {}),
     };
 
@@ -302,10 +317,10 @@ export function CreateProjectSheet({
               />
             </View>
 
-            {/* 代码库源模式 (Source Codebase Mode) */}
+            {/* 代码源 (Source): 初始代码从哪来, 与「组织托管」相互独立 */}
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
-                <Text style={styles.sectionLabel}>代码库源模式</Text>
+                <Text style={styles.sectionLabel}>代码源</Text>
                 <Text style={styles.sectionSubLabel}>任意多源解绑</Text>
               </View>
               <View style={styles.modeTabs}>
@@ -350,28 +365,6 @@ export function CreateProjectSheet({
                     ]}
                   >
                     本地目录
-                  </Text>
-                </Pressable>
-
-                <Pressable
-                  style={[
-                    styles.modeTab,
-                    sourceMode === "none" && styles.modeTabActive,
-                  ]}
-                  onPress={() => setSourceMode("none")}
-                >
-                  <Ionicons
-                    name="document-text-outline"
-                    size={14}
-                    color={sourceMode === "none" ? C.accent : C.ink3}
-                  />
-                  <Text
-                    style={[
-                      styles.modeTabText,
-                      sourceMode === "none" && styles.modeTabTextActive,
-                    ]}
-                  >
-                    {patTarget?.targetOrg ? `组织托管 (${patTarget.targetOrg})` : "无代码库"}
                   </Text>
                 </Pressable>
               </View>
@@ -434,26 +427,46 @@ export function CreateProjectSheet({
                     autoCorrect={false}
                   />
                   <Text style={styles.hintText}>
-                    直接绑定开发主机或执行容器上的工作区物理目录，智能体将直接就地读写代码。
+                    直接绑定开发主机或执行容器上的工作区物理目录，智能体将直接就地读写代码；留空则仅创建纯规划项目，后续可随时挂载工作区。
                   </Text>
                 </View>
               )}
+            </View>
 
-              {/* 无代码库 / PAT 默认托管模式 */}
-              {sourceMode === "none" && (
-                <View style={styles.nonePanel}>
-                  <Ionicons
-                    name="information-circle-outline"
-                    size={16}
-                    color={patTarget?.targetOrg ? C.accent : C.ink3}
-                  />
-                  <Text style={styles.nonePanelText}>
+            {/* 组织托管 (Org Hosting): 独立于代码源 —— 自动识别远端组织并上传 */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={styles.sectionLabel}>组织托管</Text>
+                <Text style={styles.sectionSubLabel}>自动识别并上传至远端组织</Text>
+              </View>
+              <View style={styles.hostingRow}>
+                <Ionicons
+                  name="cloud-upload-outline"
+                  size={18}
+                  color={hostedRemote && patTarget?.targetOrg ? C.accent : C.ink3}
+                />
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.hostingTitle}>
                     {patTarget?.targetOrg
-                      ? `已接入启动 PAT：项目将默认托管并自动在 ${patTarget.platform === "gitee" ? "Gitee" : "GitHub"} 组织 [${patTarget.targetOrg}] 下创建专属私有仓库。`
-                      : "创建纯规划与任务管理项目，无需预先绑定任何 Git 代码库或本地目录。后续可随时在项目配置中挂载工作区。"}
+                      ? `${patTarget.platform === "gitee" ? "Gitee" : "GitHub"} 组织 ${patTarget.targetOrg}`
+                      : "未检测到远端组织"}
+                  </Text>
+                  <Text style={styles.hostingHint}>
+                    {patTarget?.targetOrg
+                      ? "立项后自动在远端组织创建专属私有仓库并上传代码，可关闭而仅保留本地工作区；与上方代码源自由组合。"
+                      : "未接入启动 PAT，无法自动托管远端；仅创建本地工作区。"}
                   </Text>
                 </View>
-              )}
+                <Switch
+                  value={hostedRemote && Boolean(patTarget?.targetOrg)}
+                  onValueChange={setHostedRemote}
+                  disabled={!patTarget?.targetOrg}
+                  trackColor={{ false: C.line, true: C.accent }}
+                  thumbColor={
+                    hostedRemote && patTarget?.targetOrg ? C.accentHover : C.ink3
+                  }
+                />
+              </View>
             </View>
 
             {/* 建设目标与项目概述 */}
@@ -728,21 +741,26 @@ const styles = StyleSheet.create({
     color: C.ink4,
     lineHeight: 14,
   },
-  nonePanel: {
+  hostingRow: {
     flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 8,
+    alignItems: "center",
+    gap: 10,
     backgroundColor: "rgba(255, 255, 255, 0.03)",
     padding: 10,
     borderRadius: RADIUS.md,
     borderWidth: 1,
     borderColor: C.lineSubtle,
   },
-  nonePanelText: {
-    fontSize: 11,
-    color: C.ink3,
-    lineHeight: 16,
-    flex: 1,
+  hostingTitle: {
+    fontSize: 13,
+    fontWeight: "500",
+    color: C.ink,
+  },
+  hostingHint: {
+    fontSize: 10,
+    color: C.ink4,
+    lineHeight: 15,
+    marginTop: 2,
   },
   errorBox: {
     flexDirection: "row",

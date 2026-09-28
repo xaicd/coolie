@@ -244,7 +244,7 @@ export function projectRoutes(db: Db) {
       repositoryIds?: string[];
     };
 
-    const { workspace, repositoryIds, repositoryUrls, idempotencyKey, ...projectData } = req.body as CreateProjectPayload & { idempotencyKey?: string; repositoryUrls?: string[] };
+    const { workspace, repositoryIds, repositoryUrls, idempotencyKey, hostedRemote, ...projectData } = req.body as CreateProjectPayload & { idempotencyKey?: string; repositoryUrls?: string[]; hostedRemote?: boolean };
     const runContext = req.actor.type === "agent" && req.actor.source === "agent_jwt" && req.actor.runId
       ? await projectToolContext(db, req.actor, true) : null;
     await assertProjectEnvironmentSelection(
@@ -268,12 +268,20 @@ export function projectRoutes(db: Db) {
     }
     if (workspace && (repositoryIds || repositoryUrls)) throw unprocessable("Use either workspace or repositoryIds/repositoryUrls when creating a project");
     let urlRepositories = (repositoryUrls ?? []).map(normalizeProjectRepositoryUrl);
-    // If no explicit workspace or repository is specified, check if startup PAT is configured to default to first organization repo
-    if (!workspace && (!repositoryIds || repositoryIds.length === 0) && urlRepositories.length === 0) {
+    // 组织托管 (hostedRemote) is an independent attribute from the code source.
+    // `true` always provisions the startup PAT org's repo for this project —
+    // even alongside a git URL to clone or a local directory — so "local source
+    // + hosted remote" composes. `false` explicitly opts out, even for a
+    // source-less project. Absent keeps the legacy default (provision only when
+    // no explicit source was given) so callers that never send the flag are
+    // unchanged.
+    const shouldAutoProvisionRemote = hostedRemote === true
+      || (hostedRemote !== false && !workspace && (!repositoryIds || repositoryIds.length === 0) && urlRepositories.length === 0);
+    if (shouldAutoProvisionRemote) {
       try {
         const remoteRepo = await ensureRemoteRepository(projectData.name, projectData.description ?? undefined);
         if (remoteRepo) {
-          urlRepositories = [normalizeProjectRepositoryUrl(remoteRepo.cloneUrl)];
+          urlRepositories = [...urlRepositories, normalizeProjectRepositoryUrl(remoteRepo.cloneUrl)];
         }
       } catch (err) {
         console.warn("[git-pat] Auto-provisioning remote repository skipped:", err);
@@ -281,7 +289,7 @@ export function projectRoutes(db: Db) {
     }
     const repositories = repositoryIds ? await selectedRepositories(req, companyId, repositoryIds) : null;
     const actor = getActorInfo(req);
-    const fingerprint = createHash("sha256").update(JSON.stringify({ projectData, workspace, repositoryIds, repositoryUrls })).digest("hex");
+    const fingerprint = createHash("sha256").update(JSON.stringify({ projectData, workspace, repositoryIds, repositoryUrls, hostedRemote })).digest("hex");
     const receiptKey = idempotencyKey ? `project:${companyId}:${actor.actorId}:${runContext?.issue.id ?? "board"}:${idempotencyKey}` : null;
     const result = await db.transaction(async (tx) => {
       if (receiptKey) {

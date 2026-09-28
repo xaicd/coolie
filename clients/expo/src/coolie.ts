@@ -418,12 +418,17 @@ export class CoolieClient extends BaseCoolieClient {
       description?: string;
       status?: "planned" | "in_progress";
       targetDate?: string;
+      /** 代码源 = Git 仓库地址 (可多个) */
+      repositoryUrls?: string[];
       workspace?: {
         name?: string;
+        sourceType?: string;
         cwd?: string;
         repoUrl?: string;
         branch?: string;
       };
+      /** 组织托管 = 独立属性, 自动识别远端组织并上传 (false 明确不托管) */
+      hostedRemote?: boolean;
     },
   ): Promise<Project> {
     return this.request<Project>(
