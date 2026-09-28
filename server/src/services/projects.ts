@@ -33,6 +33,7 @@ import { listCurrentRuntimeServicesForProjectWorkspaces } from "./workspace-runt
 import { parseProjectExecutionWorkspacePolicy } from "./execution-workspace-policy.js";
 import { mergeProjectWorkspaceRuntimeConfig, readProjectWorkspaceRuntimeConfig } from "./project-workspace-runtime-config.js";
 import { resolveManagedProjectWorkspaceDir } from "../home-paths.js";
+import { assertWorkspaceCwdAllowed } from "./workspace-path-policy.js";
 
 type ProjectRow = typeof projects.$inferSelect;
 type ProjectWorkspaceRow = typeof projectWorkspaces.$inferSelect;
@@ -987,7 +988,8 @@ export function projectService(db: Db) {
         .then((rows) => rows[0] ?? null);
       if (!project) return null;
 
-      const cwd = normalizeWorkspaceCwd(data.cwd);
+      const requestedCwd = normalizeWorkspaceCwd(data.cwd);
+      const cwd = requestedCwd === null ? null : assertWorkspaceCwdAllowed(requestedCwd);
       const repoUrl = readNonEmptyString(data.repoUrl);
       const sourceType = readNonEmptyString(data.sourceType) ?? (repoUrl ? "git_repo" : cwd ? "local_path" : "remote_managed");
       const remoteWorkspaceRef = readNonEmptyString(data.remoteWorkspaceRef);
@@ -1074,9 +1076,13 @@ export function projectService(db: Db) {
         .then((rows) => rows[0] ?? null);
       if (!existing) return null;
 
+      // Only a newly supplied cwd is checked. An existing row may already hold a path the
+      // current allowlist rejects (it predates this rule), and an unrelated update must not
+      // be blocked by it: the rule binds new input, not stored state.
+      const suppliedCwd = data.cwd !== undefined ? normalizeWorkspaceCwd(data.cwd) : null;
       const nextCwd =
         data.cwd !== undefined
-          ? normalizeWorkspaceCwd(data.cwd)
+          ? (suppliedCwd === null ? null : assertWorkspaceCwdAllowed(suppliedCwd))
           : normalizeWorkspaceCwd(existing.cwd);
       const nextRepoUrl =
         data.repoUrl !== undefined

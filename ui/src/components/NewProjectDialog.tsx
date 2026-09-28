@@ -278,12 +278,12 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
                       value={localPath}
                       disabled={create.isPending}
                       onChange={(event) => handleLocalPathChange(event.target.value)}
-                      placeholder="/host-workspace/your-project (宿主机或容器绝对路径)"
+                      placeholder="留空 = 按 projectId 自动分配；或填已授权的绝对路径"
                       className="h-10 w-full min-w-0 border-0 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    直接绑定开发主机或执行容器上的工作区物理目录，智能体将直接就地读写代码。
+                    留空则由系统按 projectId 分配托管目录（推荐）。若绑定自有目录，必须是绝对路径且位于允许的根目录内（托管根，或 PAPERCLIP_WORKSPACE_ALLOWED_ROOTS 中配置的根），否则服务端会拒绝。
                   </p>
                 </div>
               )}
