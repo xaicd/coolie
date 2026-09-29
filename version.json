@@ -1,8 +1,8 @@
 {
-  "version": "0.5.95",
-  "versionCode": 595,
-  "commitSha": "a0af6485374d364cda9b33dade9ea2b1400db82b",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.95/coolie-release.apk",
-  "sha256": "43bc1f533f18a6189eaeb02b4392101e944723372d293eed9923292dae5abc34",
-  "releaseNotes": "wave141 交付产物按项目筛选 + 交付物版本管理: 同一交付物多次修改形成 v1/v2/v3 版本链, 内容相同不重复上传, 交付产物页与原型沙箱显示最新版与版本数, 可按项目筛选"
+  "version": "0.5.97",
+  "versionCode": 597,
+  "commitSha": "1b9074935dbef7551cdc0d17f0f400bdd97ac09f",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.97/coolie-release.apk",
+  "sha256": "2e16b803966cfa7a68bc532267345812170732a4ceb22c3307adfb3f9cc56d9e",
+  "releaseNotes": "wave142 WBS 任务自动路由 + 交付物激活补产物(S3 沙箱示范) + 看板/工坊对话内联渲染 HTML 交付物"
 }
