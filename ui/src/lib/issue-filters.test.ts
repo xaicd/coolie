@@ -6,6 +6,7 @@ import {
   applyIssueFilters,
   countActiveIssueFilters,
   defaultIssueFilterState,
+  normalizeIssueFilterState,
   resolveIssueFilterWorkspaceId,
   searchIssueFilterOptions,
   shouldIncludeIssueFilterWorkspaceOption,
@@ -97,6 +98,28 @@ describe("issue filters", () => {
       ...defaultIssueFilterState,
       creators: ["user:user-1"],
     })).toBe(1);
+  });
+
+  it("filters issues to 里程碑/主线 tasks when mainline is enabled", () => {
+    const issues = [
+      makeIssue({ id: "milestone-a", isMilestone: true }),
+      makeIssue({ id: "plain-b" }),
+      makeIssue({ id: "milestone-c", isMilestone: true }),
+    ];
+
+    expect(applyIssueFilters(issues, { ...defaultIssueFilterState, mainline: true }).map((i) => i.id))
+      .toEqual(["milestone-a", "milestone-c"]);
+    // Default (no mainline filter) keeps everything.
+    expect(applyIssueFilters(issues, defaultIssueFilterState)).toHaveLength(3);
+  });
+
+  it("counts the mainline filter as an active filter group", () => {
+    expect(countActiveIssueFilters({ ...defaultIssueFilterState, mainline: true })).toBe(1);
+  });
+
+  it("normalizes a persisted mainline filter back to a boolean", () => {
+    expect(normalizeIssueFilterState({ mainline: true }).mainline).toBe(true);
+    expect(normalizeIssueFilterState({ mainline: "yes" }).mainline).toBe(false);
   });
 
   it("filters issues to live issue ids when live-only is enabled", () => {

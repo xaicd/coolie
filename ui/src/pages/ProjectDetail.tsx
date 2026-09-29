@@ -536,6 +536,10 @@ export function ProjectDetail() {
       navigate(`/projects/${canonicalProjectRef}/workspaces`, { replace: true });
       return;
     }
+    if (activeTab === "milestones") {
+      navigate(`/projects/${canonicalProjectRef}/milestones`, { replace: true });
+      return;
+    }
     if (activeTab === "list") {
       if (filter) {
         navigate(`/projects/${canonicalProjectRef}/issues/${filter}`, { replace: true });
@@ -741,6 +745,8 @@ export function ProjectDetail() {
       navigate(`/projects/${canonicalProjectRef}/plugin-operations`);
     } else if (tab === "configuration") {
       navigate(`/projects/${canonicalProjectRef}/configuration`);
+    } else if (tab === "milestones") {
+      navigate(`/projects/${canonicalProjectRef}/milestones`);
     } else {
       navigate(`/projects/${canonicalProjectRef}/issues`);
     }
