@@ -6,7 +6,7 @@
       "coolie",
       "coolieweb"
     ],
-    "version": "0.5.95",
+    "version": "0.5.96",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
@@ -37,7 +37,7 @@
     },
     "android": {
       "package": "cloud.coolie.app",
-      "versionCode": 595,
+      "versionCode": 596,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#08090A"
