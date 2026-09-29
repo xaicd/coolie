@@ -3,12 +3,13 @@ import { AgentAvatar } from "@/components/AgentAvatar";
 import { normalizeLegacyRunnerProvider } from "@paperclipai/adapter-utils";
 import { memo, useState, useEffect, useRef, useCallback, useMemo, type ChangeEvent, type CSSProperties, type DragEvent, type RefObject } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { AgentEnvConfig, EnvBinding, IssueWorkMode } from "@paperclipai/shared";
-import { ISSUE_DEFECT_SEVERITIES } from "@paperclipai/shared";
+import type { AgentEnvConfig, EnvBinding, IssueSpecKind, IssueWorkMode } from "@paperclipai/shared";
+import { ISSUE_DEFECT_SEVERITIES, ISSUE_SPEC_KINDS, specTemplateSkeleton } from "@paperclipai/shared";
 import { useDialog } from "../context/DialogContext";
 import { useCompany } from "../context/CompanyContext";
 import { executionWorkspacesApi } from "../api/execution-workspaces";
 import { issuesApi } from "../api/issues";
+import { specsApi } from "../api/specs";
 import { MissingUserSecretsBanner } from "../pages/secrets/MissingUserSecretsBanner";
 import { instanceSettingsApi } from "../api/instanceSettings";
 import { projectsApi } from "../api/projects";
@@ -88,6 +89,14 @@ import { codexReasoningEffortOptions } from "../lib/codex-reasoning-effort";
 
 const DRAFT_KEY = "paperclip:issue-draft";
 const DEBOUNCE_MS = 800;
+
+/** spec-driven chain kinds (wave147). */
+const SPEC_KIND_LABEL: Record<IssueSpecKind, string> = {
+  requirement: "需求",
+  bugfix: "缺陷修复",
+  design: "设计",
+  task: "任务",
+};
 
 type VisualViewportLayout = {
   height: number;
@@ -525,6 +534,10 @@ export function NewIssueDialog() {
   const [issueKind, setIssueKind] = useState<"task" | "defect">("task");
   const [defectSeverity, setDefectSeverity] = useState<string>("P1");
   const [defectReproSteps, setDefectReproSteps] = useState("");
+  // spec-driven chain (wave147): when set, the created task is seeded with a spec
+  // skeleton of that kind (written after the issue exists).
+  const [specKind, setSpecKind] = useState<IssueSpecKind | "">("");
+  const [specKindOpen, setSpecKindOpen] = useState(false);
   const [workModeOpen, setWorkModeOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
   const [companyOpen, setCompanyOpen] = useState(false);
@@ -627,9 +640,22 @@ export function NewIssueDialog() {
     mutationFn: async ({
       companyId,
       stagedFiles: pendingStagedFiles,
+      specKind: requestedSpecKind,
       ...data
-    }: { companyId: string; stagedFiles: StagedIssueFile[] } & Record<string, unknown>) => {
+    }: {
+      companyId: string;
+      stagedFiles: StagedIssueFile[];
+      specKind?: IssueSpecKind;
+    } & Record<string, unknown>) => {
       const issue = await issuesApi.create(companyId, data);
+      // spec-driven chain (wave147): seed the task's spec from the kind's skeleton.
+      if (requestedSpecKind) {
+        try {
+          await specsApi.save(issue.id, specTemplateSkeleton(requestedSpecKind));
+        } catch {
+          // Best-effort: the issue exists; a failed spec write must not fail the create.
+        }
+      }
       const failures: string[] = [];
       const uploadedAttachmentIds: string[] = [];
 
@@ -995,6 +1021,7 @@ export function NewIssueDialog() {
     setIssueKind("task");
     setDefectSeverity("P1");
     setDefectReproSteps("");
+    setSpecKind("");
     setAssigneeValue("");
     setReviewerValue("");
     setApproverValue("");
@@ -1091,6 +1118,7 @@ export function NewIssueDialog() {
     createIssue.mutate({
       companyId: effectiveCompanyId,
       stagedFiles,
+      ...(specKind ? { specKind } : {}),
       title: currentTitle,
       description: currentDescription || undefined,
       status,
@@ -2204,6 +2232,57 @@ export function NewIssueDialog() {
               缺陷
             </button>
           </div>
+
+          {/* spec 类型 (wave147) — 选定后新建的任务自动带上该类型的 spec 骨架。 */}
+          <Popover open={specKindOpen} onOpenChange={setSpecKindOpen}>
+            <PopoverTrigger asChild>
+              <button
+                type="button"
+                data-testid="new-issue-spec-chip"
+                className={cn(
+                  "inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 py-0 text-xs sm:h-auto sm:py-1",
+                  specKind
+                    ? "border-primary/40 text-foreground"
+                    : "border-border text-muted-foreground hover:bg-accent/50",
+                )}
+              >
+                {specKind ? `Spec · ${SPEC_KIND_LABEL[specKind]}` : "Spec"}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent className="w-40 p-1" align="start">
+              <button
+                type="button"
+                data-testid="new-issue-spec-none"
+                className={cn(
+                  "flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-accent/50",
+                  !specKind && "bg-accent",
+                )}
+                onClick={() => {
+                  setSpecKind("");
+                  setSpecKindOpen(false);
+                }}
+              >
+                无
+              </button>
+              {ISSUE_SPEC_KINDS.map((candidate) => (
+                <button
+                  key={candidate}
+                  type="button"
+                  data-testid={`new-issue-spec-${candidate}`}
+                  className={cn(
+                    "flex w-full items-center gap-2 rounded px-2 py-1.5 text-xs hover:bg-accent/50",
+                    specKind === candidate && "bg-accent",
+                  )}
+                  onClick={() => {
+                    setSpecKind(candidate);
+                    setSpecKindOpen(false);
+                  }}
+                >
+                  {SPEC_KIND_LABEL[candidate]}
+                </button>
+              ))}
+            </PopoverContent>
+          </Popover>
 
           {issueKind === "defect" ? (
             <Popover open={severityOpen} onOpenChange={setSeverityOpen}>

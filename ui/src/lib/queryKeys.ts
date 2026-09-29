@@ -725,4 +725,9 @@ export const queryKeys = {
   adapters: {
     all: ["adapters"] as const,
   },
+  specs: {
+    issue: (issueId: string) => ["specs", "issue", issueId] as const,
+    tree: (companyId: string, projectId?: string) =>
+      ["specs", "tree", companyId, projectId ?? "__all-projects__"] as const,
+  },
 };
