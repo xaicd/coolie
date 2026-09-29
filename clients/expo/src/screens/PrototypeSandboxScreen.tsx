@@ -19,12 +19,13 @@
  *   代理时只需把 resolve() 换成 buildHostPreviewUrl(sessionId) 即可, UI 不动。
  */
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Linking,
   Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   StatusBar as RNStatusBar,
   StyleSheet,
   Text,
@@ -35,9 +36,10 @@ import { WebView } from "react-native-webview";
 import type {
   Company,
   IssueWorkProduct,
+  WorkProductVersion,
   WorkspaceRuntimeService,
 } from "@coolie/api-client";
-import { C, COOLIE_BASE_URL, getAuthToken, getWebExchangeToken } from "../coolie";
+import { C, COOLIE_BASE_URL, coolie, getAuthToken, getWebExchangeToken } from "../coolie";
 import { EmptyState } from "../ui/EmptyState";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { ExternalOpenSheet } from "../components/ExternalOpenSheet";
@@ -73,7 +75,10 @@ function resolvePreviewUrl(
   workProduct: IssueWorkProduct | null | undefined,
   initialUrl: string | null | undefined,
   bust: number,
+  overrideUrl?: string | null,
 ): { url: string | null; isSnapshot: boolean } {
+  // wave141 — 用户在版本链里选中的历史版本优先展示 (始终按 SNAPSHOT 处理)。
+  if (overrideUrl) return { url: overrideUrl, isSnapshot: true };
   const live = service?.url?.length ? service.url : null;
   const snap = extractPreviewUrl(workProduct) || initialUrl || null;
   if (live) {
@@ -93,6 +98,12 @@ function resolvePreviewUrl(
 // 退一步只约束资源与网络, 页面仍在 App 自己的 WebView 内执行。
 const INLINE_HTML_CSP =
   "default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src 'self' data:; media-src 'self' blob: data:; connect-src 'none'";
+
+function absoluteVersionUrl(path: string | null | undefined): string | null {
+  if (!path) return null;
+  if (path.startsWith("http://") || path.startsWith("https://")) return path;
+  return `${COOLIE_BASE_URL}${path.startsWith("/") ? path : `/${path}`}`;
+}
 
 function withInlineHtmlCsp(html: string): string {
   const meta = `<meta http-equiv="Content-Security-Policy" content="${INLINE_HTML_CSP}">`;
@@ -219,10 +230,40 @@ export function PrototypeSandboxScreen({
   const [markdownHtml, setMarkdownHtml] = useState<string | null>(null);
   // 取回来的 HTML 交付产物: 直接渲染成 WebView 文档, 不走文本/markdown 通道。
   const [htmlDoc, setHtmlDoc] = useState<{ html: string; baseUrl: string } | null>(null);
+  // wave141 — 版本链: 有历史版本时, 工具条下方出现版本 chip 行, 可切换预览。
+  const [versions, setVersions] = useState<WorkProductVersion[]>([]);
+  const [selectedVersionId, setSelectedVersionId] = useState<string | null>(null);
+  const workProductId = workProduct?.id?.replace(/^work_product:/, "") ?? null;
+  const selectedVersion = useMemo(
+    () => versions.find((version) => version.id === selectedVersionId) ?? null,
+    [versions, selectedVersionId],
+  );
+  const overrideUrl = selectedVersion
+    ? absoluteVersionUrl(selectedVersion.openPath || selectedVersion.contentPath)
+    : null;
   const [{ url, isSnapshot }, setResolved] = useState<{
     url: string | null;
     isSnapshot: boolean;
-  }>(() => resolvePreviewUrl(_service, workProduct, initialUrl, bust));
+  }>(() => resolvePreviewUrl(_service, workProduct, initialUrl, bust, overrideUrl));
+
+  useEffect(() => {
+    if (!workProductId) {
+      setVersions([]);
+      return;
+    }
+    let cancelled = false;
+    void coolie
+      .listWorkProductVersions(workProductId)
+      .then((res) => {
+        if (!cancelled) setVersions(res.versions);
+      })
+      .catch(() => {
+        if (!cancelled) setVersions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [workProductId]);
   // 附件内容端点需要鉴权。两种登录方式各有各的凭据:
   //   · API Key 登录 → SecureStore 里的 bearer token, 直接塞进 WebView 请求头;
   //   · 邮箱/会话登录 → 只有原生 cookie jar 里有会话 cookie, 而 Android WebView
@@ -265,7 +306,7 @@ export function PrototypeSandboxScreen({
   // DS 真值: useEffect(resolve, [sessionId]); 我们重入参 resolve() 一次
   useEffect(() => {
     let cancelled = false;
-    const raw = resolvePreviewUrl(_service, workProduct, initialUrl, bust);
+    const raw = resolvePreviewUrl(_service, workProduct, initialUrl, bust, overrideUrl);
     const resolvedUrl = raw.url && raw.url.startsWith("/") ? `${COOLIE_BASE_URL}${raw.url}` : raw.url;
     setResolved({ url: resolvedUrl, isSnapshot: raw.isSnapshot });
     setLoading(false);
@@ -320,7 +361,7 @@ export function PrototypeSandboxScreen({
     } else {
       applySummaryFallback();
     }
-  }, [_service, workProduct, initialUrl, bust]);
+  }, [_service, workProduct, initialUrl, bust, overrideUrl]);
 
   const handleRefresh = useCallback(() => {
     setError(null);
@@ -406,6 +447,35 @@ export function PrototypeSandboxScreen({
           </Pressable>
         </View>
       </View>
+
+      {/* wave141 — 版本链 chip 行: 仅当该交付物有多个版本时出现 */}
+      {versions.length > 1 ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.versionRow}
+        >
+          {versions.map((version) => {
+            const active = selectedVersionId === version.id;
+            return (
+              <Pressable
+                key={version.id}
+                onPress={() => setSelectedVersionId(version.id)}
+                style={[styles.versionChip, active && styles.versionChipActive]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <Text
+                  style={[styles.versionChipText, active && styles.versionChipTextActive]}
+                >
+                  v{version.versionNumber}
+                  {version.isLatest ? " 最新" : ""}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      ) : null}
 
       {/* 主体 */}
       {loading ? (
@@ -562,6 +632,35 @@ const styles = StyleSheet.create({
   loadingHint: {
     color: C.ink3,
     fontSize: 11,
+  },
+  versionRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: C.lineSubtle,
+  },
+  versionChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 999,
+    backgroundColor: "rgba(255,255,255,0.04)",
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+  },
+  versionChipActive: {
+    backgroundColor: "rgba(94, 106, 210, 0.15)",
+    borderColor: C.accent,
+  },
+  versionChipText: {
+    color: C.ink3,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  versionChipTextActive: {
+    color: C.accent,
+    fontWeight: "600",
   },
   web: { flex: 1, backgroundColor: "#FFFFFF" },
   center: {

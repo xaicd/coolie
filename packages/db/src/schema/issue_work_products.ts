@@ -1,6 +1,7 @@
 import {
   boolean,
   index,
+  integer,
   jsonb,
   pgTable,
   text,
@@ -38,6 +39,16 @@ export const issueWorkProducts = pgTable(
     summary: text("summary"),
     metadata: jsonb("metadata").$type<Record<string, unknown>>(),
     sourceTrust: jsonb("source_trust").$type<SourceTrustMetadata | null>(),
+    // wave141 — deliverable version chain. Versions of the same logical
+    // deliverable (same issue + same title) share a `versionGroupId`; each
+    // upload appends a new row with versionNumber = previous max + 1 and marks
+    // only the newest row `isLatest`. `contentSha256` powers idempotent
+    // dedupe (same bytes re-uploaded → no new version).
+    versionGroupId: uuid("version_group_id"),
+    versionNumber: integer("version_number").notNull().default(1),
+    isLatest: boolean("is_latest").notNull().default(true),
+    contentSha256: text("content_sha256"),
+    versionNote: text("version_note"),
     createdByRunId: uuid("created_by_run_id").references(() => heartbeatRuns.id, { onDelete: "set null" }),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
@@ -61,6 +72,10 @@ export const issueWorkProducts = pgTable(
     companyUpdatedIdx: index("issue_work_products_company_updated_idx").on(
       table.companyId,
       table.updatedAt,
+    ),
+    companyVersionGroupIdx: index("issue_work_products_company_version_group_idx").on(
+      table.companyId,
+      table.versionGroupId,
     ),
   }),
 );

@@ -623,6 +623,9 @@ export type {
   PullRequestWorkProductState,
   PullRequestWorkProductMetadata,
   CommitWorkProductMetadata,
+  WorkProductVersion,
+  WorkProductVersionsResponse,
+  ActivateWorkProductVersionResponse,
 } from "./work-product.js";
 export type {
   CompanyArtifact,
@@ -633,6 +636,7 @@ export type {
   CompanyArtifactMediaKind,
   CompanyArtifactProjectSummary,
   CompanyArtifactSource,
+  CompanyArtifactVersionSummary,
   CompanyArtifactsResponse,
 } from "./artifact.js";
 

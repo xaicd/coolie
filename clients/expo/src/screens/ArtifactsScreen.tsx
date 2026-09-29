@@ -23,18 +23,22 @@ import type {
   CompanyArtifactMediaKind,
   Issue,
   IssueWorkProduct,
+  Project,
   WorkspaceRuntimeService,
 } from "@coolie/api-client";
 import { C, COOLIE_BASE_URL, coolie, getAuthToken } from "../coolie";
 import { CodeViewerWebView } from "../components/CodeViewerWebView";
 import { openInExternalApp } from "../utils/openExternalApp";
 import { AppCard } from "../ui/AppCard";
+import { Chip } from "../ui/Chip";
 import { EmptyState } from "../ui/EmptyState";
 import { LoadingState } from "../ui/LoadingState";
 import { Pill } from "../ui/Pill";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { ExternalOpenSheet } from "../components/ExternalOpenSheet";
+import { FilterSheet, type FilterOption } from "../components/FilterSheet";
+import { ArtifactVersionSheet } from "../components/ArtifactVersionSheet";
 
 export interface ArtifactsScreenProps {
   company: Company;
@@ -159,8 +163,12 @@ export function ArtifactsScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterKind>("all");
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [projectSheetOpen, setProjectSheetOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [previewArtifact, setPreviewArtifact] = useState<CompanyArtifact | null>(null);
+  const [versionArtifact, setVersionArtifact] = useState<CompanyArtifact | null>(null);
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [showExternalSheet, setShowExternalSheet] = useState(false);
   const [externalSheetUrl, setExternalSheetUrl] = useState<string | null>(null);
@@ -170,6 +178,13 @@ export function ArtifactsScreen({
   useEffect(() => {
     void getAuthToken().then(setAuthToken);
   }, []);
+
+  useEffect(() => {
+    void coolie
+      .listProjects(companyId)
+      .then(setProjects)
+      .catch(() => setProjects([]));
+  }, [companyId]);
 
   const loadArtifacts = useCallback(async () => {
     try {
@@ -182,6 +197,7 @@ export function ArtifactsScreen({
 
       const res = await coolie.listArtifacts(companyId, {
         kind: kindParam,
+        projectId: selectedProjectId ?? undefined,
         q: searchQuery.trim() || undefined,
         limit: 50,
       });
@@ -198,7 +214,7 @@ export function ArtifactsScreen({
       setLoading(false);
       setRefreshing(false);
     }
-  }, [companyId, filter, searchQuery]);
+  }, [companyId, filter, searchQuery, selectedProjectId]);
 
   useEffect(() => {
     setLoading(true);
@@ -223,6 +239,24 @@ export function ArtifactsScreen({
     }
     return Array.from(map.values());
   }, [artifacts]);
+
+  // wave141 项目筛选
+  const projectLabel = useMemo(() => {
+    if (!selectedProjectId) return "全部项目";
+    return projects.find((p) => p.id === selectedProjectId)?.name ?? "项目";
+  }, [selectedProjectId, projects]);
+
+  const projectOptions: FilterOption[] = useMemo(
+    () => [
+      { value: "", label: "全部项目" },
+      ...projects.map((p) => ({
+        value: p.id,
+        label: p.name,
+        dotColor: p.color ?? undefined,
+      })),
+    ],
+    [projects],
+  );
 
   // 统计各分类数量
   const counts = useMemo(() => {
@@ -366,6 +400,27 @@ export function ArtifactsScreen({
           onChange={(key) => setFilter(key as FilterKind)}
         />
 
+        {/* wave141 项目筛选 —— 与任务页 wave125 chips 同一视觉口径 */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.projectChipRow}
+        >
+          <Chip
+            label={`项目 · ${projectLabel}`}
+            active={selectedProjectId !== null}
+            chevron
+            onPress={() => setProjectSheetOpen(true)}
+          />
+          {selectedProjectId ? (
+            <Chip
+              label="清除项目筛选"
+              active={false}
+              onPress={() => setSelectedProjectId(null)}
+            />
+          ) : null}
+        </ScrollView>
+
         {/* 按智能体筛选胶囊行 */}
         {distinctAgents.length > 0 && (
           <ScrollView
@@ -434,7 +489,21 @@ export function ArtifactsScreen({
             <EmptyState
               icon={<Text style={styles.emptyIcon}>📦</Text>}
               title="暂无匹配的交付产物"
-              subtitle="AI 员工执行任务产出的设计图、文档或原型将在此实时展示。"
+              subtitle={
+                selectedProjectId
+                  ? "该项目暂无交付产物。可清除项目筛选或切换分类查看。"
+                  : "AI 员工执行任务产出的设计图、文档或原型将在此实时展示。"
+              }
+              action={
+                selectedProjectId ? (
+                  <Pressable
+                    style={styles.emptyActionBtn}
+                    onPress={() => setSelectedProjectId(null)}
+                  >
+                    <Text style={styles.emptyActionText}>清除项目筛选</Text>
+                  </Pressable>
+                ) : undefined
+              }
               variant="standalone"
               style={styles.emptyContainer}
             />
@@ -474,6 +543,17 @@ export function ArtifactsScreen({
                       style={styles.sourceTag}
                       textStyle={styles.sourceTagText}
                     />
+                    {item.version ? (
+                      <Pill
+                        label={`v${item.version.number}${
+                          item.version.isLatest ? " 最新" : ""
+                        } · 共${item.version.count}版`}
+                        size="sm"
+                        mono
+                        style={styles.versionBadge}
+                        textStyle={styles.versionBadgeText}
+                      />
+                    ) : null}
                   </View>
 
                   <Text style={styles.cardTime}>
@@ -563,6 +643,16 @@ export function ArtifactsScreen({
                           🎮 交互原型沙箱 ›
                         </Text>
                       </Pressable>
+                      {item.version ? (
+                        <Pressable
+                          style={styles.actionBtnGhost}
+                          onPress={() => setVersionArtifact(item)}
+                        >
+                          <Text style={styles.actionBtnTextGhost}>
+                            版本历史 ({item.version.count})
+                          </Text>
+                        </Pressable>
+                      ) : null}
                       {onOpenDiff && (
                         <Pressable
                           style={styles.actionBtnGhost}
@@ -741,6 +831,35 @@ export function ArtifactsScreen({
           setExternalSheetUrl(null);
         }}
       />
+
+      {/* wave141 项目筛选抽屉 (wave125 FilterSheet) */}
+      <FilterSheet
+        visible={projectSheetOpen}
+        title="按项目筛选"
+        options={projectOptions}
+        selected={selectedProjectId ?? ""}
+        onSelect={(value) => setSelectedProjectId(value || null)}
+        onClose={() => setProjectSheetOpen(false)}
+      />
+
+      {/* wave141 版本历史抽屉 */}
+      <ArtifactVersionSheet
+        visible={!!versionArtifact}
+        artifact={versionArtifact}
+        onClose={() => setVersionArtifact(null)}
+        onChanged={() => void loadArtifacts()}
+        onOpenVersion={(version) => {
+          const path = version.openPath || version.contentPath;
+          if (!path) return;
+          const url = path.startsWith("/") ? `${COOLIE_BASE_URL}${path}` : path;
+          onOpenSandbox?.(url, null, {
+            id: version.id,
+            title: version.title,
+            summary: version.summary || version.title,
+            url,
+          } as any);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -808,6 +927,36 @@ const styles = StyleSheet.create({
   emptyIcon: {
     fontSize: 36,
     marginBottom: 4,
+  },
+  emptyActionBtn: {
+    marginTop: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: "rgba(255,255,255,0.03)",
+  },
+  emptyActionText: {
+    color: C.ink2,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  projectChipRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingTop: 2,
+    paddingBottom: 2,
+  },
+  versionBadge: {
+    backgroundColor: "rgba(39, 166, 68, 0.12)",
+    borderColor: "rgba(39, 166, 68, 0.3)",
+    paddingVertical: 2,
+  },
+  versionBadgeText: {
+    color: C.ok,
+    fontSize: 10,
+    fontWeight: "600",
   },
   artifactCard: {
     gap: 10,

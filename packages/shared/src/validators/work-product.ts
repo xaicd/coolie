@@ -93,6 +93,8 @@ export const createIssueWorkProductSchema = z.object({
   healthStatus: z.enum(["unknown", "healthy", "unhealthy"]).optional().default("unknown"),
   summary: z.string().optional().nullable(),
   metadata: issueWorkProductMetadataSchema.optional().nullable(),
+  /** wave141 — optional change note recorded with the new version. */
+  versionNote: z.string().max(500).optional().nullable(),
   createdByRunId: z.string().guid().optional().nullable(),
 });
 

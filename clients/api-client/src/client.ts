@@ -15,9 +15,11 @@ import {
   type ExecutionWorkspace,
   type GetWorkspaceDiffParams,
   type Issue,
+  type ActivateWorkProductVersionResponse,
   type IssueAttachment,
   type IssueLabel,
   type IssueWorkProduct,
+  type WorkProductVersionsResponse,
   type InboxFeed,
   type OntologyDomain,
   type OntologyDomainLifecycleState,
@@ -713,6 +715,37 @@ export class CoolieClient {
       `/api/issues/${encodeURIComponent(issueId)}/work-products${suffix}`,
     );
     return Array.isArray(body) ? body : [];
+  }
+
+  /**
+   * wave141 — 查询某个交付物的版本链 (新→旧)。
+   * 镜像 GET /api/work-products/:id/versions
+   */
+  async listWorkProductVersions(
+    workProductId: string,
+  ): Promise<WorkProductVersionsResponse> {
+    const body = await this.request<WorkProductVersionsResponse>(
+      "GET",
+      `/api/work-products/${encodeURIComponent(workProductId)}/versions`,
+    );
+    return {
+      groupId: body?.groupId ?? null,
+      versions: Array.isArray(body?.versions) ? body.versions : [],
+    };
+  }
+
+  /**
+   * wave141 — 把版本链中的某一版标记为最新 (回滚/置顶)。
+   * 镜像 POST /api/work-products/:id/versions/:versionId/activate
+   */
+  async activateWorkProductVersion(
+    workProductId: string,
+    versionId: string,
+  ): Promise<ActivateWorkProductVersionResponse> {
+    return await this.request<ActivateWorkProductVersionResponse>(
+      "POST",
+      `/api/work-products/${encodeURIComponent(workProductId)}/versions/${encodeURIComponent(versionId)}/activate`,
+    );
   }
 
   /**

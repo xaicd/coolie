@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { useInfiniteQuery } from "@tanstack/react-query";
-import { ArrowLeft, Check, Layers, Package, Search, X } from "lucide-react";
+import { useInfiniteQuery, useQuery } from "@tanstack/react-query";
+import { ArrowLeft, Check, FolderKanban, Layers, Package, Search, X } from "lucide-react";
 import type { To } from "react-router-dom";
 import {
   artifactsApi,
   type ArtifactGroupBy,
   type ArtifactKindFilter,
 } from "../api/artifacts";
+import { projectsApi } from "../api/projects";
 import { useCompany } from "../context/CompanyContext";
 import { useBreadcrumbs } from "../context/BreadcrumbContext";
 import { queryKeys } from "../lib/queryKeys";
@@ -70,6 +71,19 @@ export function Artifacts() {
   const query = searchParams.get("q") ?? "";
   const groupBy = parseGroupBy(searchParams.get("groupBy"));
   const groupIssueId = searchParams.get("groupIssueId") ?? undefined;
+  const projectId = searchParams.get("projectId") ?? undefined;
+
+  // wave141 — 交付产物按项目筛选 (与任务页 chips 同口径, Web 用下拉)。
+  const projectsQuery = useQuery({
+    queryKey: queryKeys.projects.list(selectedCompanyId ?? ""),
+    queryFn: () => projectsApi.list(selectedCompanyId!),
+    enabled: !!selectedCompanyId,
+  });
+  const projects = projectsQuery.data ?? [];
+  const selectedProject = useMemo(
+    () => projects.find((project) => project.id === projectId) ?? null,
+    [projects, projectId],
+  );
 
   const [draftQuery, setDraftQuery] = useState(query);
   const loadMoreRef = useRef<HTMLDivElement | null>(null);
@@ -119,6 +133,18 @@ export function Artifacts() {
       updateParams((next) => {
         if (value === "all") next.delete("kind");
         else next.set("kind", value);
+      });
+    },
+    [updateParams],
+  );
+
+  const selectProject = useCallback(
+    (value: string) => {
+      updateParams((next) => {
+        // Changing the project scope returns to the stack list.
+        next.delete("groupIssueId");
+        if (!value) next.delete("projectId");
+        else next.set("projectId", value);
       });
     },
     [updateParams],
@@ -177,13 +203,14 @@ export function Artifacts() {
     fetchNextPage,
     error,
   } = useInfiniteQuery({
-    queryKey: queryKeys.artifacts.list(selectedCompanyId!, kind, query, groupBy, groupIssueId),
+    queryKey: queryKeys.artifacts.list(selectedCompanyId!, kind, query, groupBy, groupIssueId, projectId),
     queryFn: ({ pageParam }) =>
       artifactsApi.list(selectedCompanyId!, {
         kind,
         q: query || undefined,
         groupBy,
         groupIssueId,
+        projectId,
         limit: ARTIFACTS_PAGE_SIZE,
         cursor: pageParam,
       }),
@@ -241,9 +268,11 @@ export function Artifacts() {
       ? "No artifacts match this search."
       : viewingSelectedStack
         ? "No artifacts in this stack match the current filters."
-        : kind === "all"
-          ? "No artifacts yet. Outputs attached to issues will appear here."
-          : "No artifacts of this type yet.";
+        : projectId
+          ? "No artifacts in this project yet."
+          : kind === "all"
+            ? "No artifacts yet. Outputs attached to issues will appear here."
+            : "No artifacts of this type yet.";
 
   return (
     <div className="w-full max-w-6xl space-y-5">
@@ -270,6 +299,50 @@ export function Artifacts() {
         </div>
 
         <div className="flex flex-wrap items-center gap-1.5">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                aria-label={`Filter artifacts by project (currently ${selectedProject ? selectedProject.name : "All projects"})`}
+                title="Filter by project"
+                data-testid="artifact-project-control"
+                data-project-id={projectId ?? ""}
+                className={cn("h-8 gap-1 px-2 text-xs", projectId && "bg-accent")}
+              >
+                <FolderKanban className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="max-w-32 truncate">
+                  {selectedProject ? selectedProject.name : "All projects"}
+                </span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="max-h-(--sz-320px) w-56 overflow-auto">
+              <DropdownMenuLabel>Project</DropdownMenuLabel>
+              <DropdownMenuItem
+                data-testid="artifact-project-option-all"
+                aria-selected={!projectId}
+                onSelect={() => selectProject("")}
+                className="justify-between"
+              >
+                All projects
+                {!projectId ? <Check className="h-3.5 w-3.5" /> : null}
+              </DropdownMenuItem>
+              {projects.map((project) => (
+                <DropdownMenuItem
+                  key={project.id}
+                  data-testid={`artifact-project-option-${project.id}`}
+                  aria-selected={projectId === project.id}
+                  onSelect={() => selectProject(project.id)}
+                  className="justify-between"
+                >
+                  <span className="truncate">{project.name}</span>
+                  {projectId === project.id ? <Check className="h-3.5 w-3.5" /> : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button

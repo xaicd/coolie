@@ -2024,6 +2024,13 @@
       "when": 1790396400000,
       "tag": "9006_add_issue_wbs_milestone",
       "breakpoints": true
+    },
+    {
+      "idx": 9007,
+      "version": "7",
+      "when": 1790482800000,
+      "tag": "9007_add_work_product_versions",
+      "breakpoints": true
     }
   ]
 }

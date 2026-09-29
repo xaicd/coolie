@@ -1,8 +1,9 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, or } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
-import { heartbeatRunEvents, issueWorkProducts, workspaceRuntimeServices } from "@paperclipai/db";
-import type { IssueWorkProduct } from "@paperclipai/shared";
+import { agents, heartbeatRunEvents, heartbeatRuns, issueWorkProducts, workspaceRuntimeServices } from "@paperclipai/db";
+import type { IssueWorkProduct, WorkProductVersionsResponse } from "@paperclipai/shared";
 import { insertRowsInChunks } from "./batch-insert.js";
+import { resolveArtifactVersion, toWorkProductVersion } from "./work-product-versions.js";
 import {
   createPullRequestMergeDetailsResolver,
   extractGitHubPullRequestReferences,
@@ -120,6 +121,11 @@ function toIssueWorkProduct(row: IssueWorkProductRow): IssueWorkProduct {
     metadata: (row.metadata as Record<string, unknown> | null) ?? null,
     sourceTrust: row.sourceTrust ?? null,
     createdByRunId: row.createdByRunId ?? null,
+    versionGroupId: row.versionGroupId ?? null,
+    versionNumber: row.versionNumber ?? 1,
+    isLatest: row.isLatest ?? true,
+    contentSha256: row.contentSha256 ?? null,
+    versionNote: row.versionNote ?? null,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   };
@@ -180,7 +186,9 @@ export function workProductService(
       const rows = await db
         .select()
         .from(issueWorkProducts)
-        .where(eq(issueWorkProducts.issueId, issueId))
+        // wave141 — the issue's work-product list shows the latest version of
+        // each deliverable; the full chain is served by `listVersions`.
+        .where(and(eq(issueWorkProducts.issueId, issueId), eq(issueWorkProducts.isLatest, true)))
         .orderBy(desc(issueWorkProducts.isPrimary), desc(issueWorkProducts.updatedAt));
       const products = rows.map(toIssueWorkProduct);
       const runtimeServiceIds = products
@@ -268,6 +276,171 @@ export function workProductService(
           .then((rows) => rows[0] ?? null);
       });
       return row ? toIssueWorkProduct(row) : null;
+    },
+
+    /**
+     * wave141 — create an artifact work product as the next version of its
+     * deliverable chain (or report that the bytes are unchanged).
+     */
+    createArtifactWithVersion: async (
+      issueId: string,
+      companyId: string,
+      data: Omit<typeof issueWorkProducts.$inferInsert, "issueId" | "companyId">,
+      version: { versionKey: string; contentSha256?: string | null; versionNote?: string | null },
+    ): Promise<
+      | { kind: "unchanged"; workProduct: IssueWorkProduct | null }
+      | { kind: "created"; workProduct: IssueWorkProduct | null }
+    > => {
+      return await db.transaction(async (tx) => {
+        const resolution = await resolveArtifactVersion(tx as unknown as Db, {
+          companyId,
+          issueId,
+          versionKey: version.versionKey,
+          contentSha256: version.contentSha256,
+          versionNote: version.versionNote,
+        });
+        if (resolution.kind === "unchanged") {
+          const row = await tx
+            .select()
+            .from(issueWorkProducts)
+            .where(eq(issueWorkProducts.id, resolution.workProductId))
+            .then((rows) => rows[0] ?? null);
+          return { kind: "unchanged" as const, workProduct: row ? toIssueWorkProduct(row) : null };
+        }
+        const row = await tx
+          .insert(issueWorkProducts)
+          .values({ ...data, ...resolution.values, companyId, issueId })
+          .returning()
+          .then((rows) => rows[0] ?? null);
+        return { kind: "created" as const, workProduct: row ? toIssueWorkProduct(row) : null };
+      });
+    },
+
+    /**
+     * wave141 — read-only check used by the upload route before writing bytes:
+     * returns the current latest version when the incoming content is identical.
+     */
+    findUnchangedArtifactVersion: async (input: {
+      companyId: string;
+      issueId: string;
+      versionKey: string;
+      contentSha256: string;
+    }) => {
+      const resolution = await resolveArtifactVersion(db, { ...input, dedupe: true });
+      return resolution.kind === "unchanged" ? resolution : null;
+    },
+
+    /** wave141 — the full version chain for a deliverable (newest first). */
+    listVersions: async (workProductId: string): Promise<WorkProductVersionsResponse | null> => {
+      const root = await db
+        .select()
+        .from(issueWorkProducts)
+        .where(eq(issueWorkProducts.id, workProductId))
+        .then((rows) => rows[0] ?? null);
+      if (!root) return null;
+      const groupId = root.versionGroupId ?? root.id;
+      const rows = await db
+        .select({ product: issueWorkProducts, agentId: agents.id, agentName: agents.name })
+        .from(issueWorkProducts)
+        .leftJoin(
+          heartbeatRuns,
+          and(
+            eq(issueWorkProducts.createdByRunId, heartbeatRuns.id),
+            eq(heartbeatRuns.companyId, issueWorkProducts.companyId),
+          ),
+        )
+        .leftJoin(
+          agents,
+          and(eq(heartbeatRuns.agentId, agents.id), eq(agents.companyId, heartbeatRuns.companyId)),
+        )
+        .where(
+          and(
+            eq(issueWorkProducts.companyId, root.companyId),
+            eq(issueWorkProducts.issueId, root.issueId),
+            or(
+              eq(issueWorkProducts.versionGroupId, groupId),
+              eq(issueWorkProducts.id, groupId),
+            ),
+          ),
+        )
+        .orderBy(desc(issueWorkProducts.versionNumber), desc(issueWorkProducts.updatedAt));
+      return {
+        groupId: root.versionGroupId ?? null,
+        versions: rows.map((row) =>
+          toWorkProductVersion(
+            row.product,
+            row.agentId && row.agentName ? { id: row.agentId, name: row.agentName } : null,
+          ),
+        ),
+      };
+    },
+
+    /**
+     * wave141 — mark a version as the latest (rollback / pin). Clears the flag
+     * on every other version in the chain.
+     */
+    activateVersion: async (
+      workProductId: string,
+      versionId: string,
+    ): Promise<
+      | { status: "ok"; previousLatestId: string | null }
+      | { status: "not_found" }
+      | { status: "invalid" }
+    > => {
+      return await db.transaction(async (tx) => {
+        const root = await tx
+          .select()
+          .from(issueWorkProducts)
+          .where(eq(issueWorkProducts.id, workProductId))
+          .then((rows) => rows[0] ?? null);
+        if (!root) return { status: "not_found" as const };
+        const target = await tx
+          .select()
+          .from(issueWorkProducts)
+          .where(eq(issueWorkProducts.id, versionId))
+          .then((rows) => rows[0] ?? null);
+        if (!target) return { status: "not_found" as const };
+        const groupId = root.versionGroupId ?? root.id;
+        const targetGroupId = target.versionGroupId ?? target.id;
+        if (
+          target.companyId !== root.companyId ||
+          target.issueId !== root.issueId ||
+          targetGroupId !== groupId
+        ) {
+          return { status: "invalid" as const };
+        }
+        const previousLatest = await tx
+          .select({ id: issueWorkProducts.id })
+          .from(issueWorkProducts)
+          .where(
+            and(
+              eq(issueWorkProducts.companyId, root.companyId),
+              eq(issueWorkProducts.versionGroupId, groupId),
+              eq(issueWorkProducts.isLatest, true),
+            ),
+          )
+          .then((rows) => rows[0] ?? null);
+        await tx
+          .update(issueWorkProducts)
+          .set({ isLatest: false, updatedAt: new Date() })
+          .where(
+            and(
+              eq(issueWorkProducts.companyId, root.companyId),
+              or(
+                eq(issueWorkProducts.versionGroupId, groupId),
+                eq(issueWorkProducts.id, groupId),
+              ),
+            ),
+          );
+        await tx
+          .update(issueWorkProducts)
+          .set({ isLatest: true, versionGroupId: groupId, updatedAt: new Date() })
+          .where(eq(issueWorkProducts.id, versionId));
+        return {
+          status: "ok" as const,
+          previousLatestId: previousLatest?.id ?? null,
+        };
+      });
     },
 
     update: async (id: string, patch: Partial<typeof issueWorkProducts.$inferInsert>) => {

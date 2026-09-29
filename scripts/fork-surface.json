@@ -385,7 +385,6 @@
       "reason": "Add CMMI quality governance, 5+2 golden documents baseline, RTM traceability tree, SPC control chart, Tri-State Living Topology, and API Lifecycle tabs to project detail view. wave132 adds a defect-count chip in the header when project.defectCount > 0.",
       "maxTotalLines": 170
     },
-
     {
       "path": "ui/src/components/NewProjectDialog.tsx",
       "maxNetLines": 320,
@@ -598,15 +597,15 @@
     },
     {
       "path": "server/src/services/issues.ts",
-      "maxNetLines": 60,
-      "reason": "wave132: projects `defect` in issueListSelect so list/detail responses carry it, and adds the `defect?: boolean` filter (defect IS NOT NULL) to IssueFilters and the list query. Create needs no change — the insert spreads issueData, which already carries defect. wave134: resolveResponsibleUserIdForIssueCreate now routes its derived value through resolveCompanyScopedResponsibleUserId, so an issue created by the loopback board concierge (createdByUserId paperclip-concierge) is stamped with a real company member and its agent runs can authenticate.",
-      "maxTotalLines": 60
+      "maxNetLines": 100,
+      "reason": "wave132: projects `defect` in issueListSelect so list/detail responses carry it, and adds the `defect?: boolean` filter (defect IS NOT NULL) to IssueFilters and the list query. Create needs no change — the insert spreads issueData, which already carries defect. wave134: resolveResponsibleUserIdForIssueCreate now routes its derived value through resolveCompanyScopedResponsibleUserId, so an issue created by the loopback board concierge (createdByUserId paperclip-concierge) is stamped with a real company member and its agent runs can authenticate. wave141 stamps the artifact work product created by createAttachment with its version-chain fields.",
+      "maxTotalLines": 120
     },
     {
       "path": "server/src/routes/issues.ts",
-      "maxNetLines": 30,
-      "reason": "wave132: parses `?defect=true|1` into listFilters and includes defect in toCompactIssue so the compact list view carries it too. Three lines, both additive. wave136 adds the HTML-deliverable branch to GET /attachments/:id/content (declare text/html; charset=utf-8, infer text/html for a generic .html upload, and emit the sandbox CSP) — raised the cumulative budget 30 → 60 for it.",
-      "maxTotalLines": 60
+      "maxNetLines": 200,
+      "reason": "wave132: parses `?defect=true|1` into listFilters and includes defect in toCompactIssue so the compact list view carries it too. Three lines, both additive. wave136 adds the HTML-deliverable branch to GET /attachments/:id/content (declare text/html; charset=utf-8, infer text/html for a generic .html upload, and emit the sandbox CSP) — raised the cumulative budget 30 → 60 for it. wave141 adds the deliverable version-chain routes (GET /work-products/:id/versions and POST /work-products/:id/versions/:versionId/activate) and the byte-identical dedupe branch on POST attachments and POST work-products.",
+      "maxTotalLines": 240
     },
     {
       "path": "server/src/services/projects.ts",
@@ -745,6 +744,84 @@
       "maxNetLines": 50,
       "reason": "wave136: the task-chat shell is the default task surface, so its ResourceCard must render an html attachment inline too — the same sandboxed iframe as the attachments section. Without this the inline preview would only exist on the classic interface.",
       "maxTotalLines": 50
+    },
+    {
+      "path": "packages/db/src/schema/issue_work_products.ts",
+      "maxNetLines": 30,
+      "maxTotalLines": 60,
+      "reason": "wave141 deliverable version chain: version_group_id / version_number / is_latest / content_sha256 / version_note columns plus the (company_id, version_group_id) index. Cannot live elsewhere: the chain is a property of the work-product row itself."
+    },
+    {
+      "path": "packages/shared/src/types/work-product.ts",
+      "maxNetLines": 90,
+      "maxTotalLines": 140,
+      "reason": "wave141 contract: version fields on IssueWorkProduct and the exported WorkProductVersion / WorkProductVersionsResponse / ActivateWorkProductVersionResponse types the App and Web render."
+    },
+    {
+      "path": "packages/shared/src/types/artifact.ts",
+      "maxNetLines": 30,
+      "maxTotalLines": 50,
+      "reason": "wave141 contract: optional version summary (number / count / isLatest / groupId) on CompanyArtifact."
+    },
+    {
+      "path": "packages/shared/src/validators/artifact.ts",
+      "maxNetLines": 20,
+      "maxTotalLines": 40,
+      "reason": "wave141 validator: optional version object on companyArtifactSchema."
+    },
+    {
+      "path": "packages/shared/src/validators/work-product.ts",
+      "maxNetLines": 20,
+      "maxTotalLines": 40,
+      "reason": "wave141 validator: optional versionNote on createIssueWorkProductSchema."
+    },
+    {
+      "path": "server/src/services/work-products.ts",
+      "maxNetLines": 260,
+      "maxTotalLines": 320,
+      "reason": "wave141 version-aware work products: latest-only listForIssue, createArtifactWithVersion (dedupe), listVersions, activateVersion."
+    },
+    {
+      "path": "server/src/services/company-artifacts.ts",
+      "maxNetLines": 50,
+      "maxTotalLines": 80,
+      "reason": "wave141 projection: show only the latest version of each deliverable and attach the version number/count summary."
+    },
+    {
+      "path": "ui/src/pages/Artifacts.tsx",
+      "maxNetLines": 150,
+      "maxTotalLines": 210,
+      "reason": "wave141 web: project filter control (dropdown) on the artifacts page, wired to the projectId query param."
+    },
+    {
+      "path": "ui/src/lib/queryKeys.ts",
+      "maxNetLines": 20,
+      "maxTotalLines": 40,
+      "reason": "wave141 web: projectId added to the artifacts list query key."
+    },
+    {
+      "path": "ui/src/components/artifacts/ArtifactCard.tsx",
+      "maxNetLines": 30,
+      "maxTotalLines": 50,
+      "reason": "wave141 web: version badge (latest + count) on the artifact card."
+    },
+    {
+      "path": "packages/db/src/migrations/9007_add_work_product_versions.sql",
+      "maxNetLines": 60,
+      "maxTotalLines": 60,
+      "reason": "wave141: hand-written migration for the work-product version chain (9000-range, like 9005/9006 — drizzle-kit generate cannot run on this fork)."
+    },
+    {
+      "path": "server/src/services/work-product-versions.ts",
+      "maxNetLines": 220,
+      "maxTotalLines": 220,
+      "reason": "wave141: the version-chain decision logic itself (resolveArtifactVersion / toWorkProductVersion), shared by the HTTP upload, manual registration and native runner paths. Cannot live elsewhere: it reads/writes the work-product rows in the caller's transaction."
+    },
+    {
+      "path": "server/src/__tests__/work-product-versions.test.ts",
+      "maxNetLines": 200,
+      "maxTotalLines": 200,
+      "reason": "wave141: embedded-postgres test for the v1/v2/v3 chain, sha256 dedupe, listVersions and activateVersion."
     }
   ]
 }

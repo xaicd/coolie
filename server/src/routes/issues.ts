@@ -10746,16 +10746,55 @@ export function issueRoutes(
               .limit(1)
               .then((rows) => rows[0] ?? null)
           : null;
-      const product = existingRunAttachmentProduct
-        ? await workProductsSvc.update(
-            existingRunAttachmentProduct.id,
-            createInput,
-          )
-        : await workProductsSvc.createForIssue(
-            issue.id,
-            issue.companyId,
-            createInput,
-          );
+      // wave141 — an artifact bound to an attachment becomes the next version of
+      // its deliverable chain (same issue + same logical file name). Byte-identical
+      // re-uploads are reported as "内容未变化" instead of creating a new version.
+      let artifactVersionInput: {
+        versionKey: string;
+        contentSha256: string | null;
+        versionNote: string | null;
+      } | null = null;
+      if (typeof attachmentId === "string") {
+        const attachment = await svc.getAttachmentById(attachmentId);
+        if (
+          attachment &&
+          attachment.companyId === issue.companyId &&
+          attachment.issueId === issue.id
+        ) {
+          artifactVersionInput = {
+            versionKey: attachment.originalFilename ?? createInput.title,
+            contentSha256: attachment.sha256 ?? null,
+            versionNote:
+              typeof createInput.versionNote === "string"
+                ? createInput.versionNote
+                : null,
+          };
+        }
+      }
+
+      let product: Awaited<ReturnType<typeof workProductsSvc.createForIssue>> = null;
+      let versionUnchanged = false;
+      if (existingRunAttachmentProduct) {
+        product = await workProductsSvc.update(
+          existingRunAttachmentProduct.id,
+          createInput,
+        );
+      } else if (artifactVersionInput) {
+        const result = await workProductsSvc.createArtifactWithVersion(
+          issue.id,
+          issue.companyId,
+          createInput,
+          artifactVersionInput,
+        );
+        product = result.workProduct;
+        versionUnchanged = result.kind === "unchanged";
+      } else {
+        product = await workProductsSvc.createForIssue(
+          issue.id,
+          issue.companyId,
+          createInput,
+        );
+      }
       if (!product) {
         res.status(422).json({ error: "Invalid work product payload" });
         return;
@@ -10767,13 +10806,17 @@ export function issueRoutes(
         agentId: actor.agentId,
         runId: actor.runId,
         agentApiKeyId: actor.agentApiKeyId,
-        action: "issue.work_product_created",
+        action: versionUnchanged
+          ? "issue.work_product_version_unchanged"
+          : "issue.work_product_created",
         entityType: "issue",
         entityId: issue.id,
         details: {
           workProductId: product.id,
           type: product.type,
           provider: product.provider,
+          ...(product.versionNumber ? { versionNumber: product.versionNumber } : {}),
+          ...(versionUnchanged ? { unchanged: true } : {}),
         },
       });
       await revalidateActiveSourceRecoveryAfterCommittedWrite({
@@ -10787,6 +10830,10 @@ export function issueRoutes(
         workProduct: product,
         actor,
       });
+      if (versionUnchanged) {
+        res.status(200).json({ ...product, versionUnchanged: true });
+        return;
+      }
       res.status(201).json(product);
     },
   );
@@ -11233,6 +11280,79 @@ export function issueRoutes(
       workProductChanged: true,
     });
     res.json(removed);
+  });
+
+  // wave141 — deliverable version chain: read history and activate (rollback to)
+  // a specific version. Activation is a mutation, so it is activity-logged.
+  router.get("/work-products/:id/versions", async (req, res) => {
+    const id = req.params.id as string;
+    const existing = await getAccessibleResource(
+      req,
+      res,
+      workProductsSvc.getById(id),
+      "Work product not found",
+    );
+    if (!existing) return;
+    const versions = await workProductsSvc.listVersions(id);
+    if (!versions) {
+      res.status(404).json({ error: "Work product not found" });
+      return;
+    }
+    res.json(versions);
+  });
+
+  router.post("/work-products/:id/versions/:versionId/activate", async (req, res) => {
+    const id = req.params.id as string;
+    const versionId = req.params.versionId as string;
+    const existing = await getAccessibleResource(
+      req,
+      res,
+      workProductsSvc.getById(id),
+      "Work product not found",
+    );
+    if (!existing) return;
+    const issue = await svc.getById(existing.issueId);
+    if (!issue) {
+      res.status(404).json({ error: "Issue not found" });
+      return;
+    }
+    if (!(await assertAgentIssueMutationAllowed(req, res, issue))) return;
+    if (!(await assertDeliverableMutationAllowedByRunContext(req, res, issue)))
+      return;
+    const result = await workProductsSvc.activateVersion(id, versionId);
+    if (result.status === "not_found") {
+      res.status(404).json({ error: "Version not found" });
+      return;
+    }
+    if (result.status === "invalid") {
+      res.status(422).json({
+        error: "Version does not belong to this deliverable",
+      });
+      return;
+    }
+    const actor = getActorInfo(req);
+    await logActivity(db, {
+      companyId: existing.companyId,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      agentId: actor.agentId,
+      runId: actor.runId,
+      agentApiKeyId: actor.agentApiKeyId,
+      action: "issue.work_product_version_activated",
+      entityType: "issue",
+      entityId: existing.issueId,
+      details: {
+        workProductId: id,
+        versionId,
+        previousLatestId: result.previousLatestId,
+      },
+    });
+    res.json({
+      ok: true,
+      workProductId: id,
+      previousLatestId: result.previousLatestId,
+      activatedVersionId: versionId,
+    });
   });
 
   router.post("/issues/:id/read", async (req, res) => {
@@ -18518,6 +18638,44 @@ export function issueRoutes(
       }
 
       const actor = getActorInfo(req);
+      // wave141 — a run-registered agent upload whose bytes match the current
+      // latest version of the same deliverable is reported as "内容未变化"
+      // instead of writing a new object + version.
+      if (actor.agentId && actor.runId) {
+        const contentSha256 = createHash("sha256").update(file.buffer).digest("hex");
+        const unchanged = await workProductsSvc.findUnchangedArtifactVersion({
+          companyId,
+          issueId,
+          versionKey: file.originalname || "Attachment",
+          contentSha256,
+        });
+        if (unchanged) {
+          await logActivity(db, {
+            companyId,
+            actorType: actor.actorType,
+            actorId: actor.actorId,
+            agentId: actor.agentId,
+            runId: actor.runId,
+            agentApiKeyId: actor.agentApiKeyId,
+            action: "issue.work_product_version_unchanged",
+            entityType: "issue",
+            entityId: issueId,
+            details: {
+              workProductId: unchanged.workProductId,
+              versionNumber: unchanged.versionNumber,
+              contentSha256,
+            },
+          });
+          res.status(200).json({
+            unchanged: true,
+            versionUnchanged: true,
+            workProductId: unchanged.workProductId,
+            versionNumber: unchanged.versionNumber,
+            contentSha256,
+          });
+          return;
+        }
+      }
       const stored = await storage.putFile({
         companyId,
         namespace: `issues/${issueId}`,

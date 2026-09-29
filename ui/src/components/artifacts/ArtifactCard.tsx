@@ -227,6 +227,18 @@ export function ArtifactCard({ artifact }: ArtifactCardProps) {
         </div>
 
         <div className="mt-0.5 flex items-center gap-1.5 text-(length:--text-micro) text-muted-foreground/65">
+          {artifact.version ? (
+            <>
+              <span
+                data-testid="artifact-version-badge"
+                className="rounded bg-accent/40 px-1.5 py-0.5 font-medium text-foreground/75"
+              >
+                v{artifact.version.number}
+                {artifact.version.isLatest ? " 最新" : ""} · 共{artifact.version.count}版
+              </span>
+              <span className="text-muted-foreground/50">·</span>
+            </>
+          ) : null}
           <span>Last edited {formatDate(artifact.updatedAt)}</span>
           {artifact.createdByAgent ? (
             <>

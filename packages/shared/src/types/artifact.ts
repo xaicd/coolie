@@ -20,6 +20,18 @@ export interface CompanyArtifactAgentSummary {
   name: string;
 }
 
+/** wave141 — version info attached to a deliverable that belongs to a chain. */
+export interface CompanyArtifactVersionSummary {
+  /** 1-based version number of this (latest by default) row. */
+  number: number;
+  /** Total versions in the chain. */
+  count: number;
+  /** True for the version the list defaults to. */
+  isLatest: boolean;
+  /** Version-chain id, for fetching the full history. */
+  groupId: string | null;
+}
+
 export interface CompanyArtifact {
   id: string;
   source: CompanyArtifactSource;
@@ -33,6 +45,8 @@ export interface CompanyArtifact {
   issue: CompanyArtifactIssueSummary;
   project: CompanyArtifactProjectSummary | null;
   createdByAgent: CompanyArtifactAgentSummary | null;
+  /** wave141 — present for deliverables that belong to a version chain. */
+  version?: CompanyArtifactVersionSummary | null;
   updatedAt: string;
   href: string;
 }

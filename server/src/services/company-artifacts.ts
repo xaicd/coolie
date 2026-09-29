@@ -483,6 +483,9 @@ export function companyArtifactsService(db: Db, storage?: StorageService) {
           ...issueConditions,
         ];
         const workProductConditions: SQL[] = [...workProductBaseConditions];
+        // wave141 — the list defaults to the latest version of each deliverable.
+        // Superseded versions stay reachable through the versions endpoint.
+        workProductConditions.push(eq(issueWorkProducts.isLatest, true));
         const workProductCursor = groupBy
           ? undefined
           : cursorCondition(sql<Date>`${issueWorkProducts.updatedAt}`, workProductArtifactId, cursor);
@@ -525,6 +528,9 @@ export function companyArtifactsService(db: Db, storage?: StorageService) {
             title: issueWorkProducts.title,
             summary: issueWorkProducts.summary,
             metadata: issueWorkProducts.metadata,
+            versionGroupId: issueWorkProducts.versionGroupId,
+            versionNumber: issueWorkProducts.versionNumber,
+            versionCount: sql<number>`(select count(*)::int from "issue_work_products" as vp where vp.company_id = ${issueWorkProducts.companyId} and coalesce(vp.version_group_id, vp.id) = coalesce(${issueWorkProducts.versionGroupId}, ${issueWorkProducts.id}))`,
             createdByAgentId: workProductAgent.id,
             createdByAgentName: workProductAgent.name,
             updatedAt: issueWorkProducts.updatedAt,
@@ -591,6 +597,7 @@ export function companyArtifactsService(db: Db, storage?: StorageService) {
           }
           const contentType = attachmentMetadata?.contentType ?? null;
           const identifier = row.issueIdentifier ?? row.issueId;
+          const versionCount = Number(row.versionCount ?? 1);
           artifacts.push({
             id: row.artifactId,
             source: "work_product",
@@ -605,6 +612,14 @@ export function companyArtifactsService(db: Db, storage?: StorageService) {
             project: row.projectId && row.projectName ? { id: row.projectId, name: row.projectName } : null,
             createdByAgent: row.createdByAgentId && row.createdByAgentName
               ? { id: row.createdByAgentId, name: row.createdByAgentName }
+              : null,
+            version: versionCount > 1
+              ? {
+                number: row.versionNumber ?? 1,
+                count: versionCount,
+                isLatest: true,
+                groupId: row.versionGroupId ?? null,
+              }
               : null,
             updatedAt: row.updatedAt.toISOString(),
             href: buildIssueHref(company.issuePrefix, identifier, `work-product-${row.workProductId}`),

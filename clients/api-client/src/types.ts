@@ -728,6 +728,47 @@ export interface IssueWorkProduct {
   reviewState: string;
   summary?: string | null;
   metadata?: Record<string, unknown> | null;
+  /** wave141 — version chain (see `WorkProductVersion`). */
+  versionGroupId?: string | null;
+  versionNumber?: number;
+  isLatest?: boolean;
+  contentSha256?: string | null;
+  versionNote?: string | null;
+}
+
+/** wave141 — one entry in a deliverable's version chain. */
+export interface WorkProductVersion {
+  id: string;
+  versionGroupId: string | null;
+  versionNumber: number;
+  isLatest: boolean;
+  title: string;
+  summary: string | null;
+  versionNote: string | null;
+  contentSha256: string | null;
+  contentType: string | null;
+  byteSize: number | null;
+  originalFilename: string | null;
+  attachmentId: string | null;
+  contentPath: string | null;
+  openPath: string | null;
+  downloadPath: string | null;
+  createdByAgent: { id: string; name: string } | null;
+  createdByUserId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WorkProductVersionsResponse {
+  groupId: string | null;
+  versions: WorkProductVersion[];
+}
+
+export interface ActivateWorkProductVersionResponse {
+  ok: true;
+  workProductId: string;
+  previousLatestId: string | null;
+  activatedVersionId: string;
 }
 
 /**
@@ -863,6 +904,14 @@ export interface CompanyArtifactAgentSummary {
   name: string;
 }
 
+/** wave141 — version info for a deliverable that belongs to a chain. */
+export interface CompanyArtifactVersionSummary {
+  number: number;
+  count: number;
+  isLatest: boolean;
+  groupId: string | null;
+}
+
 export interface CompanyArtifact {
   id: string;
   source: CompanyArtifactSource;
@@ -876,6 +925,7 @@ export interface CompanyArtifact {
   issue: CompanyArtifactIssueSummary;
   project: CompanyArtifactProjectSummary | null;
   createdByAgent: CompanyArtifactAgentSummary | null;
+  version?: CompanyArtifactVersionSummary | null;
   updatedAt: string;
   href: string;
 }

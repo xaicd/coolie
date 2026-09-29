@@ -4,6 +4,7 @@ import { parseTaskSearch, taskSearchCtes, taskSearchScore } from "./task-search.
 import { createdFromIssueCondition } from "./issue-creation-origin.js";
 import { resolveCompanyScopedResponsibleUserId } from "./responsible-user.js";
 import { executionProjectionsForRuns } from "./execution-projection.js";
+import { resolveArtifactVersion } from "./work-product-versions.js";
 import type { ExecutionProjection } from "@paperclipai/shared";
 import { Buffer } from "node:buffer";
 import { createHash, randomUUID } from "node:crypto";
@@ -12890,33 +12891,57 @@ export function issueService(db: Db) {
           })
           .returning();
         const contentPath = `/api/attachments/${attachment.id}/content`;
-        const [artifactWorkProduct] = registeredRunId
-          ? await tx
-              .insert(issueWorkProducts)
-              .values({
-                companyId: issue.companyId,
-                issueId: issue.id,
-                type: "artifact",
-                provider: "paperclip",
-                externalId: attachment.id,
-                title: asset.originalFilename ?? "Attachment",
-                status: "active",
-                reviewState: "none",
-                isPrimary: false,
-                healthStatus: "unknown",
-                metadata: {
-                  attachmentId: attachment.id,
-                  contentType: asset.contentType,
-                  byteSize: asset.byteSize,
-                  contentPath,
-                  openPath: contentPath,
-                  downloadPath: `${contentPath}?download=1`,
-                  originalFilename: asset.originalFilename,
-                },
-                createdByRunId: registeredRunId,
-              })
-              .returning({ id: issueWorkProducts.id })
-          : [];
+        const artifactTitle = asset.originalFilename ?? "Attachment";
+        let artifactWorkProductId: string | null = null;
+        if (registeredRunId) {
+          // wave141 — register this upload as the next version of the deliverable
+          // chain (same issue + same logical file name). `dedupe: false`: the
+          // bytes were already written, so the caller's intent is a new upload;
+          // byte-identical repeats are rejected earlier by the HTTP route.
+          const version = await resolveArtifactVersion(tx as unknown as Db, {
+            companyId: issue.companyId,
+            issueId: issue.id,
+            versionKey: asset.originalFilename ?? artifactTitle,
+            contentSha256: asset.sha256,
+            dedupe: false,
+          });
+          const versionValues = version.kind === "create"
+            ? version.values
+            : {
+              versionGroupId: randomUUID(),
+              versionNumber: 1,
+              isLatest: true as const,
+              contentSha256: asset.sha256,
+              versionNote: null,
+            };
+          const [artifactWorkProduct] = await tx
+            .insert(issueWorkProducts)
+            .values({
+              companyId: issue.companyId,
+              issueId: issue.id,
+              type: "artifact",
+              provider: "paperclip",
+              externalId: attachment.id,
+              title: artifactTitle,
+              status: "active",
+              reviewState: "none",
+              isPrimary: false,
+              healthStatus: "unknown",
+              metadata: {
+                attachmentId: attachment.id,
+                contentType: asset.contentType,
+                byteSize: asset.byteSize,
+                contentPath,
+                openPath: contentPath,
+                downloadPath: `${contentPath}?download=1`,
+                originalFilename: asset.originalFilename,
+              },
+              createdByRunId: registeredRunId,
+              ...versionValues,
+            })
+            .returning({ id: issueWorkProducts.id });
+          artifactWorkProductId = artifactWorkProduct?.id ?? null;
+        }
 
         if (
           input.createdByAgentId &&
@@ -12972,7 +12997,7 @@ export function issueService(db: Db) {
           createdByUserId: asset.createdByUserId,
           createdAt: attachment.createdAt,
           updatedAt: attachment.updatedAt,
-          artifactWorkProductId: artifactWorkProduct?.id ?? null,
+          artifactWorkProductId,
         };
       });
     },

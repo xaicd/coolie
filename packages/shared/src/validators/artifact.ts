@@ -53,6 +53,12 @@ export const companyArtifactSchema = z.object({
     id: z.string().guid(),
     name: z.string(),
   }).nullable(),
+  version: z.object({
+    number: z.number().int().min(1),
+    count: z.number().int().min(1),
+    isLatest: z.boolean(),
+    groupId: z.string().guid().nullable(),
+  }).nullable().optional(),
   updatedAt: z.string().datetime(),
   href: z.string().min(1),
 });
