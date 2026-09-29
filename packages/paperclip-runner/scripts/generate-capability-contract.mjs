@@ -73,7 +73,14 @@ async function readSkillHeadings(paths) {
 async function readLegacyTools() {
   const path = "packages/mcp-server/src/tools.ts";
   const contents = await readFile(resolve(repositoryRoot, path), "utf8");
-  return [...contents.matchAll(/makeTool\(\s*\n?\s*"(paperclip[A-Za-z0-9]+)"/g)].map((match) => ({
+  // Discover the same tool set the inventory parser does
+  // (scripts/lib/capability-inventory.mjs): a `makeTool("name", "description", …)`
+  // whose first two arguments are string literals. Matching the inventory's shape
+  // exactly keeps the two honest; tools described by an identifier (upstream's
+  // connections_search/connection_request) are outside this map in both places.
+  // A fork tool without the upstream prefix (wave147's spec_*) is discovered so it
+  // can be declared in `forkAddedTools` and kept out of the legacy map.
+  return [...contents.matchAll(/makeTool\(\s*"([^"]+)"\s*,\s*"([^"]+)"/g)].map((match) => ({
     name: match[1],
     sourceAnchor: sourceAnchor(path, contents.slice(0, match.index).split("\n").length, match[1]),
   }));

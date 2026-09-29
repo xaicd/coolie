@@ -80,7 +80,10 @@
     "paperclipGetAgentRuntimeState",
     "paperclipListSchedulerHeartbeats",
     "paperclipEmergencyStopCompany",
-    "paperclipEmergencyResumeCompany"
+    "paperclipEmergencyResumeCompany",
+    "spec_create",
+    "spec_tree",
+    "spec_template_apply"
   ],
   "evalGroups": {
     "hb": ["control_plane_owned", "control_plane_invariant", "get_task_context", "active_task_context"],
