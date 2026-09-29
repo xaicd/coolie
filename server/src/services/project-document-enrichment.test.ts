@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   extractProjectDescription,
   extractProjectGoals,
+  projectAlreadyHasGoals,
 } from "./project-document-enrichment.js";
 
 describe("extractProjectDescription", () => {
@@ -82,5 +83,98 @@ describe("extractProjectGoals", () => {
 
   it("returns an empty list when there are no list items", () => {
     expect(extractProjectGoals("# 项目\n\n只有正文，没有列表。")).toEqual([]);
+  });
+
+  // wave139: the real 《某公司产融智能体应用系统集成服务项目技术规范书》 shape —
+  // plain numbered section titles, no markdown. `2.3 系统功能` is a Word table
+  // flattened to one cell per line, and the row descriptions are prose.
+  it("reads a flattened table under a plain `2.3 系统功能` heading", () => {
+    const text = [
+      "二、服务要求",
+      "2.1 技术目标",
+      "基于 AIGC 中台构建覆盖风险防控、经营管理、知识管理三大领域的企业级智能体应用体系。",
+      "（应答：满足/不满足/优于）应答：",
+      "★2.2 技术要求",
+      "遵循场景驱动、价值优先、快速迭代原则，采用平台底座+场景应用技术路线。",
+      "★2.3 系统功能",
+      "序号",
+      "功能模块",
+      "功能菜单",
+      "详细描述",
+      "1",
+      "智能体应用平台标准功能",
+      "系统配置",
+      "用于设置系统标题，默认语言，标签页，首页地址链接等基础信息。",
+      "2",
+      "",
+      "角色管理",
+      "用来创建角色，微角色分配用户，分配菜单，设置角色权限等信息。",
+      "3",
+      "",
+      "菜单配置",
+      "创建系统菜单目录和功能。",
+    ].join("\n");
+
+    const goals = extractProjectGoals(text);
+    expect(goals).toEqual([
+      "智能体应用平台标准功能",
+      "系统配置",
+      "角色管理",
+      "菜单配置",
+    ]);
+    // The table header and the prose descriptions must not leak in as goals.
+    for (const noise of ["序号", "功能模块", "功能菜单", "详细描述"]) {
+      expect(goals).not.toContain(noise);
+    }
+    expect(goals.some((goal) => goal.includes("默认语言"))).toBe(false);
+  });
+
+  it("reads numbered list items under a plain `2.1 技术目标` heading", () => {
+    const text = ["2.1 技术目标", "1. 建成统一门户", "2. 打通支付结算", "3、沉淀数据资产"].join(
+      "\n",
+    );
+    expect(extractProjectGoals(text)).toEqual(["建成统一门户", "打通支付结算", "沉淀数据资产"]);
+  });
+
+  it("reads 第X章, 一、 and （n） headings with numbered and bulleted entries", () => {
+    const text = [
+      "第三章 建设范围",
+      "1. 统一门户",
+      "2) 支付结算",
+      "（3）数据资产",
+      "- 运营保障",
+    ].join("\n");
+    expect(extractProjectGoals(text)).toEqual([
+      "统一门户",
+      "支付结算",
+      "数据资产",
+      "运营保障",
+    ]);
+  });
+
+  it("recognises the English scope/deliverable/objective headings", () => {
+    const text = ["## Objectives", "- Deliver the customer portal", "- Secure the data"].join(
+      "\n",
+    );
+    expect(extractProjectGoals(text)).toEqual(["Deliver the customer portal", "Secure the data"]);
+  });
+
+  it("skips a long prose line inside a flattened table row", () => {
+    const text = [
+      "## 交付内容",
+      "1",
+      "项目工作说明书",
+      "即本文件，作为合同附件，约定项目实施范围、实施策略、关键性约定、交付物等全部内容。",
+    ].join("\n");
+    expect(extractProjectGoals(text)).toEqual(["项目工作说明书"]);
+  });
+});
+
+describe("projectAlreadyHasGoals", () => {
+  it("is false for a project with no goals and true once either link is present", () => {
+    expect(projectAlreadyHasGoals({ goalIds: [], goals: [] })).toBe(false);
+    expect(projectAlreadyHasGoals({})).toBe(false);
+    expect(projectAlreadyHasGoals({ goalIds: ["g1"] })).toBe(true);
+    expect(projectAlreadyHasGoals({ goals: [{ id: "g1" }] })).toBe(true);
   });
 });
