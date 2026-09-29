@@ -1,8 +1,8 @@
 {
-  "version": "0.5.94",
-  "versionCode": 594,
-  "commitSha": "75dcce25550ffe3ad3492a6b33a45ab528d47fe5",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.94/coolie-release.apk",
-  "sha256": "a77193700c212e4bba6a8ab95b0058cbf4261c3dfa17dd370cf5eeb2f0d506e4",
-  "releaseNotes": "wave140 CMMI WBS 拆解 + 里程碑主线任务：项目初始化后自动产出 WBS 草案(可一键采纳)、里程碑主线视图与「只看主线」筛选、阶段门禁联动(未达成则后续任务受阻、可留痕豁免)"
+  "version": "0.5.95",
+  "versionCode": 595,
+  "commitSha": "a0af6485374d364cda9b33dade9ea2b1400db82b",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.95/coolie-release.apk",
+  "sha256": "43bc1f533f18a6189eaeb02b4392101e944723372d293eed9923292dae5abc34",
+  "releaseNotes": "wave141 交付产物按项目筛选 + 交付物版本管理: 同一交付物多次修改形成 v1/v2/v3 版本链, 内容相同不重复上传, 交付产物页与原型沙箱显示最新版与版本数, 可按项目筛选"
 }

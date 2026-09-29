@@ -194,6 +194,38 @@ unfiltered                        -> 2
 - App: `scripts/release-app.sh 0.5.95 "<notes>"` —— 全量发版。
 - Server: `scripts/deploy-coolie.sh` —— 加固部署，护栏（前后 version.json + ota/manifest 200 + health）。
 
-### 结果
+### 结果（已执行，2026-09-29）
 
-> 见本提交之后的「release」与「chore(release)」提交，以及本报告末尾的追加段落。
+**App 全量发版**（`release-app.sh 0.5.95`，exit 0）:
+- 版本三处已改: `app.json` 0.5.95 / `package.json` 0.5.95 / `build.gradle` 595。
+- 发版 commit: `release: v0.5.95 — wave141 …`（`a0af64853`）。
+- APK: `assembleRelease` 出包 → COS `cos://gzbucket/coolie/app/0.5.95/coolie-release.apk`。
+- OTA: `https://xrobinai.cn/ota/manifest` → runtimeVersion 0.5.95（id `c595a311`，launchAsset hbc）。
+- 该脚本的 `[10/10]` 步已联动 server 同步部署（`deploy-tc-coolie-claw.sh --skip-build`）。
+
+**生产外网验证**（发版后）:
+```
+/version.json   → version 0.5.95, versionCode 595, commitSha a0af64853...
+/ota/manifest   → HTTP 200, runtimeVersion 0.5.95
+/api/health     → HTTP 200
+APK 直链         → HTTP 206 (range ok, 78.1 MB)
+```
+
+**Server 加固部署**（`scripts/deploy-coolie.sh`，exit 0）:
+```
+built ui + refreshed server/ui-dist
+assert upgrade feed survived the build: ok version.json | ok ota/manifest
+restart + wait for health: health ok
+verify from outside: api health ok | filing number (landing) ok | filing number (app shell) ok
+                     | retired paths: skip (COOLIE_LEGACY_PATHS 未声明) | www host ok
+DEPLOYED main@a0af64853 to https://xrobinai.cn
+```
+
+**version.json 收尾**: `release-app.sh` 不改仓库根 `version.json`；本 wave 用
+`chore(release): version.json 0.5.94 → 0.5.95` 把仓库副本对齐（含 commitSha `a0af64853…`
+与 APK sha256 `43bc1f53…`，APK 直链下载后本地 sha256 实算）。
+
+> 发版期间临时 `git stash` 了两处**与本 wave 无关**的既存改动（根 `.gitignore`、
+> 根 `package.json`，均来自上一会话的 board e2e 脚手架），发版后已 `git stash pop` 还原，
+> 未纳入本 wave 提交。未做 `--amend`/`--force`（仅 push 前一次 amend 把 fork-surface
+> 预算调整并入同一条 feat commit，该 commit 尚未 push，属未发布历史）。
