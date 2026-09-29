@@ -10,6 +10,7 @@ import { OntologyDomainListScreen } from "./OntologyDomainListScreen";
 import { ProjectsScreen } from "./ProjectsScreen";
 import { AgentsScreen } from "./AgentsScreen";
 import { ArtifactsScreen } from "./ArtifactsScreen";
+import type { SandboxScope } from "./PrototypeSandboxScreen";
 
 export type OrgAssetTab = "ontology" | "projects" | "agents" | "artifacts";
 
@@ -23,7 +24,12 @@ interface OrgAssetsScreenProps {
   onOpenWebProjects?: (path?: string, title?: string) => void;
   onOpenWebOntology?: (path?: string, title?: string) => void;
   onOpenWebWorkbench?: (path?: string, title?: string) => void;
-  onOpenSandbox?: (url: string, service?: WorkspaceRuntimeService | null, wp?: IssueWorkProduct | null) => void;
+  onOpenSandbox?: (
+    url: string,
+    service?: WorkspaceRuntimeService | null,
+    wp?: IssueWorkProduct | null,
+    scope?: SandboxScope | null,
+  ) => void;
   onOpenDiff?: (issue: Issue, wp?: IssueWorkProduct | null) => void;
 }
 
@@ -127,7 +133,7 @@ export function OrgAssetsScreen({
           <ArtifactsScreen
             company={company}
             whoami={whoami}
-            onOpenSandbox={(url, service, wp) => onOpenSandbox?.(url, service, wp)}
+            onOpenSandbox={(url, service, wp, scope) => onOpenSandbox?.(url, service, wp, scope)}
             onOpenDiff={(issue, wp) => onOpenDiff?.(issue, wp)}
           />
         )}

@@ -39,6 +39,7 @@ import { SegmentedControl } from "../ui/SegmentedControl";
 import { ExternalOpenSheet } from "../components/ExternalOpenSheet";
 import { FilterSheet, type FilterOption } from "../components/FilterSheet";
 import { ArtifactVersionSheet } from "../components/ArtifactVersionSheet";
+import type { SandboxScope } from "./PrototypeSandboxScreen";
 
 export interface ArtifactsScreenProps {
   company: Company;
@@ -48,8 +49,19 @@ export interface ArtifactsScreenProps {
     url: string,
     service?: WorkspaceRuntimeService | null,
     workProduct?: IssueWorkProduct | null,
+    scope?: SandboxScope | null,
   ) => void;
   onOpenDiff?: (issue: Issue, workProduct?: IssueWorkProduct | null) => void;
+}
+
+/** wave138c — 进沙箱时带上任务上下文, 列表视图据此列出该任务的全部交付物与附件。 */
+function sandboxScopeFor(artifact: CompanyArtifact): SandboxScope {
+  return {
+    issueId: artifact.issue.id,
+    issueTitle: artifact.issue.title,
+    projectId: artifact.project?.id ?? null,
+    projectName: artifact.project?.name ?? null,
+  };
 }
 
 type FilterKind = "all" | "cmmi_baseline" | "image" | "document" | "work_product";
@@ -318,12 +330,17 @@ export function ArtifactsScreen({
         targetUrl = `${COOLIE_BASE_URL}${targetUrl}`;
       }
       if (targetUrl) {
-        onOpenSandbox?.(targetUrl, null, {
-          id: artifact.id,
-          title: artifact.title,
-          summary: artifact.previewText || artifact.title,
-          url: targetUrl,
-        } as any);
+        onOpenSandbox?.(
+          targetUrl,
+          null,
+          {
+            id: artifact.id,
+            title: artifact.title,
+            summary: artifact.previewText || artifact.title,
+            url: targetUrl,
+          } as any,
+          sandboxScopeFor(artifact),
+        );
         return;
       }
       if (onOpenDiff) {
@@ -626,17 +643,23 @@ export function ArtifactsScreen({
                       <Pressable
                         style={styles.actionBtnPrimary}
                         onPress={() => {
-                          let targetUrl =
-                            item.openPath || item.contentPath || "";
+                          let targetUrl = item.openPath || item.contentPath || "";
                           if (targetUrl && targetUrl.startsWith("/")) {
                             targetUrl = `${COOLIE_BASE_URL}${targetUrl}`;
                           }
-                          onOpenSandbox?.(targetUrl, null, {
-                            id: item.id,
-                            title: item.title,
-                            summary: item.previewText || item.title,
-                            url: targetUrl,
-                          } as any);
+                          // wave138c: 即使没有直开 URL 也进沙箱(列表视图按任务上下文
+                          // 列出全部交付物/附件), 不再导到「预览未就绪」空屏。
+                          onOpenSandbox?.(
+                            targetUrl,
+                            null,
+                            {
+                              id: item.id,
+                              title: item.title,
+                              summary: item.previewText || item.title,
+                              url: targetUrl,
+                            } as any,
+                            sandboxScopeFor(item),
+                          );
                         }}
                       >
                         <Text style={styles.actionBtnTextPrimary}>
@@ -852,12 +875,17 @@ export function ArtifactsScreen({
           const path = version.openPath || version.contentPath;
           if (!path) return;
           const url = path.startsWith("/") ? `${COOLIE_BASE_URL}${path}` : path;
-          onOpenSandbox?.(url, null, {
-            id: version.id,
-            title: version.title,
-            summary: version.summary || version.title,
+          onOpenSandbox?.(
             url,
-          } as any);
+            null,
+            {
+              id: version.id,
+              title: version.title,
+              summary: version.summary || version.title,
+              url,
+            } as any,
+            versionArtifact ? sandboxScopeFor(versionArtifact) : null,
+          );
         }}
       />
     </SafeAreaView>

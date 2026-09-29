@@ -2,13 +2,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Pressable,
   RefreshControl,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
-  Platform,
-  StatusBar as RNStatusBar,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import type {
@@ -252,7 +249,7 @@ export function CodeDiffScreen({
       const lines = parsePatchToLines(combinedPatch, file.path);
       const lineCount = lines.length;
       return (
-        <SafeAreaView style={styles.fullScreen}>
+        <View style={styles.fullScreen}>
           <StatusBar style="light" />
           <ScreenHeader
             onBack={() => setSelectedFileForFullView(null)}
@@ -285,13 +282,13 @@ export function CodeDiffScreen({
             readOnly={true}
             style={styles.fullScreenWebView}
           />
-        </SafeAreaView>
+        </View>
       );
     }
   }
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar style="light" />
 
       {/* 顶部主导航栏 */}
@@ -526,7 +523,7 @@ export function CodeDiffScreen({
           />
         ) : null}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -638,12 +635,10 @@ function generate2500LineBenchmarkDiff(
 
 const styles = StyleSheet.create({
   container: {
-    paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0,
     flex: 1,
     backgroundColor: C.bg,
   },
   fullScreen: {
-    paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0,
     flex: 1,
     backgroundColor: C.bg,
   },

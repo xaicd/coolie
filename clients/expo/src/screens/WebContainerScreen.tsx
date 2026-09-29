@@ -4,10 +4,7 @@ import {
   Alert,
   BackHandler,
   Linking,
-  Platform,
   Pressable,
-  SafeAreaView,
-  StatusBar as RNStatusBar,
   StyleSheet,
   Text,
   Vibration,
@@ -261,12 +258,7 @@ export function WebContainerScreen({
   );
 
   return (
-    <SafeAreaView
-      style={[
-        styles.screen,
-        { paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 },
-      ]}
-    >
+    <View style={styles.screen}>
       <StatusBar style="light" />
 
       {/* 原生控制栏 */}
@@ -419,7 +411,7 @@ export function WebContainerScreen({
           </View>
         ) : null}
       </View>
-    </SafeAreaView>
+    </View>
   );
 }
 

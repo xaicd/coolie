@@ -54,7 +54,10 @@ import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
 import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen";
 import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
 import { OrgAssetsScreen } from "./src/screens/OrgAssetsScreen";
-import { PrototypeSandboxScreen } from "./src/screens/PrototypeSandboxScreen";
+import {
+  PrototypeSandboxScreen,
+  type SandboxScope,
+} from "./src/screens/PrototypeSandboxScreen";
 import { NotificationsScreen } from "./src/screens/NotificationsScreen";
 import { SearchScreen } from "./src/screens/SearchScreen";
 import { RegisterScreen } from "./src/screens/RegisterScreen";
@@ -726,6 +729,10 @@ function HomeScreen({
     url?: string | null;
     service?: WorkspaceRuntimeService | null;
     workProduct?: IssueWorkProduct | null;
+    /** wave138c — 列表视图的数据范围(任务/项目)。 */
+    scope?: SandboxScope | null;
+    /** wave138c — 入口任务快照(空态「查看任务」需要完整 Issue 才能落到任务详情)。 */
+    issue?: Issue | null;
   } | null>(null);
   /** 递增后让 TasksScreen 重新拉列表 (中央 "+" 浮层建了任务)。 */
   const [tasksRefreshToken, setTasksRefreshToken] = useState(0);
@@ -851,6 +858,14 @@ function HomeScreen({
             url: prototype?.url ?? null,
             service: null,
             workProduct: prototype ?? null,
+            // wave138c — 即使没有原型交付物也进沙箱: 列表视图会列出该任务的全部
+            // 交付物与附件; 真的空则给可操作空态, 不再是「预览未就绪」空屏。
+            scope: {
+              issueId: issueItem.id,
+              issueTitle: issueItem.title,
+              projectId: issueItem.projectId ?? null,
+            },
+            issue: issueItem,
           });
         })();
       }}
@@ -858,37 +873,16 @@ function HomeScreen({
   ) : null;
 
   let content: React.ReactNode;
-  if (sandboxContext) {
-    content = (
-      <PrototypeSandboxScreen
-        company={company}
-        initialUrl={sandboxContext.url}
-        service={sandboxContext.service}
-        workProduct={sandboxContext.workProduct}
-        onBack={() => setSandboxContext(null)}
-      />
-    );
-  } else if (diffContext) {
-    content = (
-      <CodeDiffScreen
-        company={company}
-        issue={diffContext.issue}
-        workProduct={diffContext.workProduct}
-        onBack={() => setDiffContext(null)}
-      />
-    );
-  } else if (webContainerTarget) {
-    content = (
-      <WebContainerScreen
-        initialPath={webContainerTarget.path}
-        initialUrl={webContainerTarget.url}
-        title={webContainerTarget.title}
-        onBack={() => setWebContainerTarget(null)}
-      />
-    );
-  } else {
+  {
     // 固化外层 Shell：固定顶部状态栏 + 固定底部 TabBar (boss: APP 底部导航要固定起来的)
+    //
+    // wave138c — 全屏巡检硬规矩: 所有页面/功能都必须渲染在这个壳里(顶部状态栏与底部
+    // TabBar 之间)。沙箱 / 代码 Diff / Web 容器 也从「整屏覆盖」收回壳内 —— 它们各自的
+    // ScreenHeader 承载返回, hasSubHeader 抑制全局 AppBar, 底部 5 个 tab 始终可见可点。
     const hasSubHeader = Boolean(
+      sandboxContext ||
+      diffContext ||
+      webContainerTarget ||
       focusedApprovalId ||
       searchOpen ||
       notificationsOpen ||
@@ -911,7 +905,49 @@ function HomeScreen({
           />
         )}
         <View style={styles.shellContent}>
-          {focusedApprovalId ? (
+          {sandboxContext ? (
+            <PrototypeSandboxScreen
+              company={company}
+              initialUrl={sandboxContext.url}
+              service={sandboxContext.service}
+              workProduct={sandboxContext.workProduct}
+              scope={sandboxContext.scope}
+              onBack={() => setSandboxContext(null)}
+              onCreateTask={() => {
+                setSandboxContext(null);
+                setComposeOpen(true);
+              }}
+              onOpenTask={
+                sandboxContext.issue
+                  ? () => {
+                      const entryIssue = sandboxContext.issue;
+                      if (!entryIssue) return;
+                      setSandboxContext(null);
+                      navigateTab("tasks");
+                      setSelected(entryIssue);
+                    }
+                  : undefined
+              }
+              onOpenArtifacts={() => {
+                setSandboxContext(null);
+                navigateTab("artifacts");
+              }}
+            />
+          ) : diffContext ? (
+            <CodeDiffScreen
+              company={company}
+              issue={diffContext.issue}
+              workProduct={diffContext.workProduct}
+              onBack={() => setDiffContext(null)}
+            />
+          ) : webContainerTarget ? (
+            <WebContainerScreen
+              initialPath={webContainerTarget.path}
+              initialUrl={webContainerTarget.url}
+              title={webContainerTarget.title}
+              onBack={() => setWebContainerTarget(null)}
+            />
+          ) : focusedApprovalId ? (
             <ApprovalFocusDetail
               companyId={companyId}
               approvalId={focusedApprovalId}
@@ -1053,8 +1089,8 @@ function HomeScreen({
               onOpenWebWorkbench={(subPath?: string, title?: string) =>
                 setWebContainerTarget({ path: subPath || "/dashboard", title: title || "控制台" })
               }
-              onOpenSandbox={(url, service, wp) =>
-                setSandboxContext({ url, service, workProduct: wp })
+              onOpenSandbox={(url, service, wp, scope) =>
+                setSandboxContext({ url, service, workProduct: wp, scope })
               }
               onOpenDiff={(issueItem, wp) =>
                 setDiffContext({ issue: issueItem, workProduct: wp })
@@ -1106,6 +1142,11 @@ function HomeScreen({
             setFocusedApprovalId(null);
             setCreateTaskProjectId(null);
             setTasksFilterProjectId(null);
+            // wave138c: 壳内的整屏子页(沙箱/Diff/Web 容器)也一并退出 —— 底栏 5 个 tab
+            // 在任意页面都必须「可见且可点」, 点了就直达该 tab 根界面。
+            setSandboxContext(null);
+            setDiffContext(null);
+            setWebContainerTarget(null);
             navigateTab(key);
           }}
           onCreate={() => setComposeOpen(true)}
