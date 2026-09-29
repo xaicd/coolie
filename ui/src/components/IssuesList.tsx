@@ -2181,6 +2181,15 @@ function StreamlinedIssuesList({
                         externalObjectSummary={externalObjectSummaryByIssueId.get(issue.id) ?? null}
                         titleSuffix={(
                           <>
+                            {issue.isMilestone ? (
+                              <Badge variant="outline"
+                                className="ml-1.5 border-primary/40 bg-primary/10 px-1.5 text-(length:--text-nano) text-primary"
+                                data-testid="issue-milestone-badge"
+                                title={issue.milestone?.gate ? `里程碑 · ${issue.milestone.gate}` : "里程碑 / 主线"}
+                              >
+                                主线
+                              </Badge>
+                            ) : null}
                             {issue.defect ? (
                               <Badge variant="outline"
                                 className="ml-1.5 border-destructive/40 bg-destructive/10 px-1.5 text-(length:--text-nano) text-destructive"

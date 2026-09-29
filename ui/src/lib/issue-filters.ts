@@ -23,6 +23,8 @@ export type IssueFilterState = {
   liveOnly?: boolean;
   /** Show only defects (tasks carrying defect metadata). */
   defects?: boolean;
+  /** Show only 里程碑/主线 tasks (isMilestone). */
+  mainline?: boolean;
   /** Defect severities to include (P0–P3); empty means any severity. */
   severities?: string[];
   /**
@@ -53,6 +55,7 @@ export const defaultIssueFilterState: IssueFilterState = {
   workspaces: [],
   liveOnly: false,
   defects: false,
+  mainline: false,
   severities: [],
   externalObjectStatuses: [],
   hideRoutineExecutions: false,
@@ -122,6 +125,7 @@ export function normalizeIssueFilterState(value: unknown): IssueFilterState {
     workspaces: normalizeIssueFilterValueArray(candidate.workspaces),
     liveOnly: candidate.liveOnly === true,
     defects: candidate.defects === true,
+    mainline: candidate.mainline === true,
     severities: normalizeIssueFilterValueArray(candidate.severities),
     externalObjectStatuses: normalizeIssueFilterValueArray(candidate.externalObjectStatuses),
     hideRoutineExecutions: candidate.hideRoutineExecutions === true,
@@ -255,6 +259,7 @@ export function applyIssueFilters(
     result = result.filter((issue) => (issue.labelIds ?? []).some((id) => state.labels.includes(id)));
   }
   if (state.defects) result = result.filter((issue) => issue.defect != null);
+  if (state.mainline) result = result.filter((issue) => issue.isMilestone === true);
   const severities = state.severities ?? [];
   if (severities.length > 0) {
     result = result.filter(
@@ -294,6 +299,7 @@ export function countActiveIssueFilters(
   if (state.creators.length > 0) count += 1;
   if (state.labels.length > 0) count += 1;
   if (state.defects) count += 1;
+  if (state.mainline) count += 1;
   if ((state.severities?.length ?? 0) > 0) count += 1;
   if (state.projects.length > 0) count += 1;
   if (state.workspaces.length > 0) count += 1;

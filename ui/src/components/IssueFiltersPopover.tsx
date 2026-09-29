@@ -349,6 +349,24 @@ export function IssueFiltersPopover({
             </div>
           </div>
 
+          <div className="space-y-1.5">
+            <span className="text-xs text-muted-foreground">里程碑主线</span>
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                data-testid="filter-mainline-toggle"
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                  state.mainline
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                }`}
+                onClick={() => onChange({ mainline: !state.mainline })}
+              >
+                只看主线
+              </button>
+            </div>
+          </div>
+
           <div className="border-t border-border" />
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">

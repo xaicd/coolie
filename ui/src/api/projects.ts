@@ -1,7 +1,10 @@
 import type {
   Project,
   ProjectRepositoryOptions,
+  ProjectWbsDraft,
   ProjectWorkspace,
+  WbsGateState,
+  WbsMainline,
   WorkspaceOperation,
   WorkspaceRuntimeControlTarget,
 } from "@paperclipai/shared";
@@ -28,6 +31,25 @@ export interface ProjectDocumentUpload {
   originalFilename: string | null;
 }
 
+/**
+ * The CMMI WBS view for a project (wave140): the pending draft, the milestone
+ * mainline, and the per-issue stage-gate state. All derived server-side from the
+ * project's own issues through the shared pure module.
+ */
+export interface ProjectWbsView {
+  projectId: string;
+  draft: ProjectWbsDraft | null;
+  mainline: WbsMainline;
+  gateStates: Record<string, WbsGateState>;
+}
+
+/** Result of adopting a WBS draft into real issues. */
+export interface ProjectWbsAdoption {
+  projectId: string;
+  createdIssueIds: string[];
+  milestoneIssueIds: string[];
+  itemCount: number;
+}
 /** One landed requirement document, as returned by the project documents list. */
 export interface ProjectDocument {
   filename: string;
@@ -83,6 +105,22 @@ export const projectsApi = {
   listDocuments: (companyId: string, projectId: string) =>
     api.get<{ projectId: string; documents: ProjectDocument[] }>(
       `/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/documents`,
+    ),
+  /** wave140: the CMMI WBS view — pending draft, milestone mainline, gate state. */
+  getWbs: (companyId: string, projectId: string) =>
+    api.get<ProjectWbsView>(
+      `/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/wbs`,
+    ),
+  /** Materialise the pending WBS draft into issues (idempotent). */
+  adoptWbsDraft: (companyId: string, projectId: string) =>
+    api.post<ProjectWbsAdoption>(
+      `/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/wbs/adopt`,
+      {},
+    ),
+  /** Dismiss the pending WBS draft without materialising it. */
+  dismissWbsDraft: (companyId: string, projectId: string) =>
+    api.delete<void>(
+      `/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/wbs/draft`,
     ),
   update: (id: string, data: Record<string, unknown>, companyId?: string) =>
     api.patch<Project>(projectPath(id, companyId), data),

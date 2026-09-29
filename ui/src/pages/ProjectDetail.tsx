@@ -22,6 +22,7 @@ import { StatusBadge } from "../components/StatusBadge";
 import { ProjectTile } from "../components/ProjectTile";
 import { BudgetPolicyCard } from "../components/BudgetPolicyCard";
 import { IssuesList } from "../components/IssuesList";
+import { ProjectMilestones } from "../components/ProjectMilestones";
 import { PageSkeleton } from "../components/PageSkeleton";
 import { PageTabBar } from "../components/PageTabBar";
 import { ProjectWorkspacesContent } from "../components/ProjectWorkspacesContent";
@@ -49,7 +50,7 @@ import {
 import { BoardChat } from "./BoardChat";
 /* ── Top-level tab types ── */
 
-type ProjectBaseTab = "list" | "chat" | "plugin-operations" | "workspaces" | "configuration" | "budget";
+type ProjectBaseTab = "list" | "milestones" | "chat" | "plugin-operations" | "workspaces" | "configuration" | "budget";
 type ProjectPluginTab = `plugin:${string}`;
 type ProjectTab = ProjectBaseTab | ProjectPluginTab;
 
@@ -73,6 +74,7 @@ function resolveProjectTab(pathname: string, projectId: string): ProjectTab | nu
   if (tab === "living-topology") return "plugin:paperclipai.plugin-governance:living-topology-tab";
   if (tab === "api-lifecycle") return "plugin:paperclipai.plugin-governance:api-lifecycle-tab";
   if (tab === "issues") return "list";
+  if (tab === "milestones") return "milestones";
   if (tab === "plugin-operations") return "plugin-operations";
   if (tab === "workspaces") return "workspaces";
   return null;
@@ -817,6 +819,15 @@ export function ProjectDetail() {
               {project.defectCount} 个缺陷
             </div>
           ) : null}
+          {(project.milestoneCount ?? 0) > 0 ? (
+            <div
+              data-testid="project-milestone-count"
+              className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-(length:--text-micro) font-medium text-primary"
+            >
+              <span className="h-2 w-2 rounded-full bg-primary" />
+              {project.milestoneCount} 个里程碑
+            </div>
+          ) : null}
         </div>
         <div className="ml-auto flex items-center gap-2">
           <StarToggle
@@ -877,6 +888,7 @@ export function ProjectDetail() {
         <PageTabBar
           items={[
             { value: "list", label: "Tasks" },
+            { value: "milestones", label: "里程碑主线" },
             { value: "chat", label: "工坊对话" },
             ...(project.managedByPlugin ? [{ value: "plugin-operations", label: "Plugin operations" }] : []),
             ...(showWorkspacesTab ? [{ value: "workspaces", label: "Workspaces" }] : []),
@@ -895,6 +907,10 @@ export function ProjectDetail() {
 
       {activeTab === "list" && project?.id && resolvedCompanyId && (
         <ProjectIssuesList projectId={project.id} companyId={resolvedCompanyId} />
+      )}
+
+      {activeTab === "milestones" && project?.id && resolvedCompanyId && (
+        <ProjectMilestones projectId={project.id} companyId={resolvedCompanyId} />
       )}
 
       {activeTab === "chat" && project?.id && (
