@@ -44,6 +44,7 @@ import {
   type BoardChatStreamCallbacks,
   type BoardChatStreamEvent,
   type BoardChatStreamInput,
+  type BoardConversation,
   type ListApprovalsOptions,
   type ResolveApprovalOptions,
   type GitCredential,
@@ -1007,24 +1008,90 @@ export class CoolieClient {
 
   // ── Board Chat & Concierge Streaming (需求⑫ 驾驶舱问答) ────────────
 
+  /** wave148: list a company's workshop conversations, newest first. */
+  async listBoardConversations(
+    companyId: string,
+    opts?: { includeArchived?: boolean },
+  ): Promise<BoardConversation[]> {
+    const query = opts?.includeArchived ? "?includeArchived=1" : "";
+    return this.request<BoardConversation[]>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/board/conversations${query}`,
+    );
+  }
+
+  /** wave148: create a conversation (title required; project optional). */
+  async createBoardConversation(
+    companyId: string,
+    input: { title: string; projectId?: string | null },
+  ): Promise<BoardConversation> {
+    return this.request<BoardConversation>(
+      "POST",
+      `/api/companies/${encodeURIComponent(companyId)}/board/conversations`,
+      { title: input.title, projectId: input.projectId ?? null },
+    );
+  }
+
+  /** wave148: rename (`title`) or archive/unarchive (`archived`). */
+  async updateBoardConversation(
+    companyId: string,
+    conversationId: string,
+    input: { title?: string; archived?: boolean },
+  ): Promise<BoardConversation> {
+    return this.request<BoardConversation>(
+      "PATCH",
+      `/api/companies/${encodeURIComponent(companyId)}/board/conversations/${encodeURIComponent(conversationId)}`,
+      input,
+    );
+  }
+
+  /** wave148: soft-delete a conversation (sets archived_at). */
+  async deleteBoardConversation(
+    companyId: string,
+    conversationId: string,
+  ): Promise<{ ok: boolean }> {
+    return this.request<{ ok: boolean }>(
+      "DELETE",
+      `/api/companies/${encodeURIComponent(companyId)}/board/conversations/${encodeURIComponent(conversationId)}`,
+    );
+  }
+
   /**
-   * Resolve (creating if needed) the company's standing "Board Operations"
-   * issue that anchors the workshop conversation, returning its id.
+   * wave148/wave135: resolve the issue a conversation's turns and attachments
+   * hang off, creating it if needed.
    *
-   * The App calls this before uploading an attachment: attachments must target
-   * an existing issue, and a brand-new company has no board issue yet (it used
-   * to be created lazily by the first chat stream's `start` event), so the
-   * first-ever "attach a file then send" had nothing to upload against.
-   * Idempotent — an existing board issue is returned as-is.
+   * When `conversationId` is omitted the newest active conversation is used
+   * (the default "Board Operations" one for a company that has none), so the
+   * pre-wave148 call sites keep working.
    */
-  async ensureBoardIssue(companyId: string): Promise<string> {
-    const body = await this.request<{ issueId?: string }>(
+  async resolveBoardConversation(
+    companyId: string,
+    conversationId?: string,
+  ): Promise<{ issueId: string; conversationId: string }> {
+    const body = await this.request<{ issueId?: string; conversationId?: string }>(
       "POST",
       "/api/board/chat/issue",
-      { companyId },
+      { companyId, ...(conversationId ? { conversationId } : {}) },
     );
-    if (!body?.issueId) throw new Error("Board issue could not be resolved");
-    return body.issueId;
+    if (!body?.issueId || !body?.conversationId) {
+      throw new Error("Board conversation could not be resolved");
+    }
+    return { issueId: body.issueId, conversationId: body.conversationId };
+  }
+
+  /**
+   * Resolve (creating if needed) the standing issue that anchors a workshop
+   * conversation, returning its id.
+   *
+   * The App calls this before uploading an attachment: attachments must target
+   * an existing issue, and a brand-new company has no board issue yet. Idempotent.
+   */
+  async ensureBoardIssue(
+    companyId: string,
+    conversationId?: string,
+  ): Promise<string> {
+    const resolved = await this.resolveBoardConversation(companyId, conversationId);
+    return resolved.issueId;
   }
 
   /**
@@ -1034,7 +1101,7 @@ export class CoolieClient {
   async streamBoardChat(
     input: BoardChatStreamInput,
     callbacks?: BoardChatStreamCallbacks,
-  ): Promise<{ fullText: string; issueId?: string }> {
+  ): Promise<{ fullText: string; issueId?: string; conversationId?: string }> {
     const headers: Record<string, string> = {
       Accept: "text/event-stream",
       "Content-Type": "application/json",
@@ -1049,6 +1116,7 @@ export class CoolieClient {
         companyId: input.companyId,
         message: input.message,
         taskId: input.taskId,
+        ...(input.conversationId ? { conversationId: input.conversationId } : {}),
         ...(input.attachmentIds && input.attachmentIds.length > 0
           ? { attachmentIds: input.attachmentIds }
           : {}),
@@ -1078,6 +1146,7 @@ export class CoolieClient {
     let buffer = "";
     let fullText = "";
     let resolvedIssueId: string | undefined = input.taskId;
+    let resolvedConversationId: string | undefined = input.conversationId;
 
     const dispatchLine = (line: string) => {
       const trimmed = line.trim();
@@ -1089,7 +1158,8 @@ export class CoolieClient {
         callbacks?.onEvent?.(event);
         if (event.type === "start") {
           resolvedIssueId = event.issueId;
-          callbacks?.onStart?.(event.issueId);
+          if (event.conversationId) resolvedConversationId = event.conversationId;
+          callbacks?.onStart?.(event.issueId, resolvedConversationId);
         } else if (event.type === "status") {
           callbacks?.onStatus?.(event.text);
         } else if (event.type === "chunk") {
@@ -1097,6 +1167,7 @@ export class CoolieClient {
           callbacks?.onChunk?.(event.text);
         } else if (event.type === "done") {
           if (event.issueId) resolvedIssueId = event.issueId;
+          if (event.conversationId) resolvedConversationId = event.conversationId;
           callbacks?.onDone?.(event);
         } else if (event.type === "error") {
           callbacks?.onError?.(event.message);
@@ -1127,7 +1198,7 @@ export class CoolieClient {
         }
       } catch (err: any) {
         if (input.signal?.aborted) {
-          return { fullText, issueId: resolvedIssueId };
+          return { fullText, issueId: resolvedIssueId, conversationId: resolvedConversationId };
         }
         callbacks?.onError?.(err instanceof Error ? err : String(err));
         throw err;
@@ -1150,7 +1221,7 @@ export class CoolieClient {
         }
       } catch (err: any) {
         if (input.signal?.aborted) {
-          return { fullText, issueId: resolvedIssueId };
+          return { fullText, issueId: resolvedIssueId, conversationId: resolvedConversationId };
         }
         callbacks?.onError?.(err instanceof Error ? err : String(err));
         throw err;
@@ -1166,7 +1237,7 @@ export class CoolieClient {
       dispatchLine(buffer);
     }
 
-    return { fullText, issueId: resolvedIssueId };
+    return { fullText, issueId: resolvedIssueId, conversationId: resolvedConversationId };
   }
 
   /**
@@ -1197,28 +1268,31 @@ export class CoolieClient {
   }
 
   /**
-   * 获取驾驶舱问答历史会话 (基于常驻 "Board Operations" Issue)
+   * 获取驾驶舱问答历史会话 (wave148: 每个 conversation 一个 issue)。
+   *
+   * `conversationId` 省略时用公司当前活跃的那个 conversation (全新公司会
+   * 得到默认的 "Board Operations"), 因此旧调用点仍然可用。
    */
   async getBoardChatHistory(
     companyId: string,
-    taskId?: string,
-  ): Promise<{ issueId: string | null; messages: BoardChatMessage[] }> {
-    let issueId = taskId;
-    if (!issueId) {
-      const issues = await this.listIssues(companyId, { limit: 50 });
-      const boardIssue = issues.find(
-        (i) =>
-          i.title === "Board Operations" &&
-          i.status !== "done" &&
-          i.status !== "cancelled",
-      );
-      if (boardIssue) {
-        issueId = boardIssue.id;
-      }
+    conversationId?: string,
+  ): Promise<{
+    issueId: string | null;
+    conversationId: string | null;
+    messages: BoardChatMessage[];
+  }> {
+    let issueId: string | null = null;
+    let resolvedConversationId: string | null = conversationId ?? null;
+    try {
+      const resolved = await this.resolveBoardConversation(companyId, conversationId);
+      issueId = resolved.issueId;
+      resolvedConversationId = resolved.conversationId;
+    } catch {
+      return { issueId: null, conversationId: resolvedConversationId, messages: [] };
     }
 
     if (!issueId) {
-      return { issueId: null, messages: [] };
+      return { issueId: null, conversationId: resolvedConversationId, messages: [] };
     }
 
     try {
@@ -1236,9 +1310,9 @@ export class CoolieClient {
           text: c.body,
           createdAt: c.createdAt,
         }));
-      return { issueId, messages };
+      return { issueId, conversationId: resolvedConversationId, messages };
     } catch {
-      return { issueId, messages: [] };
+      return { issueId, conversationId: resolvedConversationId, messages: [] };
     }
   }
 

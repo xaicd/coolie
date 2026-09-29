@@ -3,6 +3,7 @@ import { EventEmitter } from "node:events";
 import type { Server } from "node:http";
 import request from "supertest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { boardConversations, issues as issuesTable } from "@paperclipai/db";
 
 const mockGetExperimental = vi.hoisted(() => vi.fn());
 const mockIssueService = vi.hoisted(() => ({
@@ -25,11 +26,66 @@ vi.mock("../routes/authz.js", () => ({
   assertCompanyAccess: () => {},
 }));
 
+/**
+ * wave148: the stream now resolves a conversation first. This table-aware fake
+ * drizzle client hands back one conversation already linked to "issue-1", so the
+ * stream tests resolve their issue without needing an insert/create.
+ */
+function makeChatDb() {
+  const conversation = {
+    id: "conv-1",
+    companyId: "company-1",
+    projectId: null,
+    issueId: "issue-1",
+    title: "Board Operations",
+    createdByUserId: null,
+    lastMessageAt: new Date(),
+    archivedAt: null,
+    createdAt: new Date(),
+  };
+  const issueRow = { id: "issue-1" };
+  const rowsFor = (table: unknown) =>
+    table === boardConversations ? [conversation] : table === issuesTable ? [issueRow] : [];
+  const select = vi.fn(() => {
+    let table: unknown;
+    const chain: any = {
+      from: (t: unknown) => {
+        table = t;
+        return chain;
+      },
+      where: () => chain,
+      orderBy: () => chain,
+      limit: () => chain,
+      then: (resolve: any, reject: any) =>
+        Promise.resolve(rowsFor(table)).then(resolve, reject),
+    };
+    return chain;
+  });
+  const update = vi.fn(() => {
+    const chain: any = {
+      set: () => chain,
+      where: () => chain,
+      then: (resolve: any, reject: any) => Promise.resolve([]).then(resolve, reject),
+    };
+    return chain;
+  });
+  const insert = vi.fn(() => {
+    const chain: any = {
+      values: () => chain,
+      returning: () => chain,
+      then: (resolve: any, reject: any) =>
+        Promise.resolve([conversation]).then(resolve, reject),
+    };
+    return chain;
+  });
+  return { select, update, insert } as never;
+}
+
 async function createApp(deploymentMode: "local_trusted" | "authenticated" = "local_trusted") {
   const { boardChatRoutes } = await import("../routes/board-chat.js");
   const app = express();
   app.use(express.json());
-  app.use("/api", boardChatRoutes({} as any, { deploymentMode }));
+  app.use("/api", boardChatRoutes(makeChatDb(), { deploymentMode }));
   return app;
 }
 

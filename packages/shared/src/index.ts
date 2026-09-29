@@ -2830,12 +2830,10 @@ export {
   issueSpecRequirementSchema,
   issueSpecSchema,
   issueSpecTaskSchema,
-  saveIssueSpecSchema,
   specTreeQuerySchema,
   type CreateSpecFromTemplateInput,
   type IssueSpecDraftInput,
   type IssueSpecInput,
-  type SaveIssueSpecInput,
 } from "./validators/issue-spec.js";
 export {
   SPEC_TEMPLATE_NAMES,
@@ -2845,3 +2843,12 @@ export {
   type SpecTemplateName,
 } from "./spec-templates.js";
 export { buildSpecTree, type SpecTreeRow } from "./spec-tree.js";
+
+// Workshop multi-conversation (wave148): one named board-chat thread per row.
+export type { BoardConversation } from "./types/board-conversation.js";
+export {
+  createBoardConversationSchema,
+  updateBoardConversationSchema,
+  type CreateBoardConversationInput,
+  type UpdateBoardConversationInput,
+} from "./validators/board-conversation.js";

@@ -142,6 +142,7 @@ export type {
   BoardChatStreamInput,
   BoardChatStreamEvent,
   BoardChatStreamCallbacks,
+  BoardConversation,
   ApprovalStatus,
   Approval,
   ApprovalComment,

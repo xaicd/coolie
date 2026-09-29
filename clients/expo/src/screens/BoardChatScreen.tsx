@@ -13,13 +13,21 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
   StatusBar as RNStatusBar,
   Modal,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { isAsrNotConfigured, isRenderableBoardMessage } from "@coolie/api-client";
-import type { BoardChatMessage, Company, Approval, Issue } from "@coolie/api-client";
+import type {
+  BoardChatMessage,
+  BoardConversation,
+  Company,
+  Approval,
+  Issue,
+  Project,
+} from "@coolie/api-client";
 import { C, coolie } from "../coolie";
 import { useRecorder } from "../useRecorder";
 import { StatusDot } from "../components/StatusDot";
@@ -391,6 +399,24 @@ export function BoardChatScreen({
   const [cursorVisible, setCursorVisible] = useState(true);
 
   /**
+   * wave148: 工坊多对话 (boss 09-29 实机: 「工坊对话要支持新建对话, 不能老在一个
+   * 中对话」)。`conversations` 是公司当前活跃的对话列表 (lastMessageAt 倒序),
+   * `activeConversationId` 是当前对话; 历史与发问都按该 conversation 落到它自己的
+   * issue, 于是不同话题的历史 / 上下文互不串味。
+   */
+  const [conversations, setConversations] = useState<BoardConversation[]>([]);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [conversationsOpen, setConversationsOpen] = useState(false);
+  /** 新建 / 重命名 复用同一个编辑弹层: mode='new' | 'rename' */
+  const [editorOpen, setEditorOpen] = useState(false);
+  const [editorMode, setEditorMode] = useState<"new" | "rename">("new");
+  const [editorTargetId, setEditorTargetId] = useState<string | null>(null);
+  const [editorTitle, setEditorTitle] = useState("");
+  const [editorProjectId, setEditorProjectId] = useState<string | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [conversationBusy, setConversationBusy] = useState(false);
+
+  /**
    * wave71: loadingState — 三态机驱动 thinking 三点动画 + streaming 切换。
    *   idle      : 不在等回复, 啥都不闪
    *   thinking  : SSE 已连上但首 token 还没回来 (等待中)
@@ -476,13 +502,52 @@ export function BoardChatScreen({
     return () => clearInterval(interval);
   }, [sending]);
 
-  // 加载持久化历史对话 (基于 "Board Operations" Issue)
+  /**
+   * wave148: 拉取公司活跃对话列表 (lastMessageAt 倒序)。返回列表以便调用方串联。
+   */
+  const refreshConversations = useCallback(async (): Promise<BoardConversation[]> => {
+    try {
+      const list = await coolie.listBoardConversations(company.id);
+      setConversations(list);
+      return list;
+    } catch {
+      return [] as BoardConversation[];
+    }
+  }, [company.id]);
+
+  // wave148: 公司切换 — 清空对话状态, 拉列表并选中最新一个 (没有就让 loadHistory
+  // 去服务端创建默认的 "Board Operations")。
+  useEffect(() => {
+    setConversations([]);
+    setActiveConversationId(null);
+    setMessages([WELCOME_MESSAGE]);
+    setBoardIssueId(null);
+    setHistoryReady(false);
+    void (async () => {
+      const list = await refreshConversations();
+      if (list.length > 0) setActiveConversationId(list[0].id);
+    })();
+  }, [company.id, refreshConversations]);
+
+  // 加载当前对话的持久化历史。activeConversationId 为空时由服务端解析默认对话
+  // (全新公司会被创建出 "Board Operations"), 解析结果回填到 activeConversationId,
+  // 于是"第一次进工坊"也有一个明确的当前对话。
   const loadHistory = useCallback(async () => {
     setErrorText(null);
     try {
-      const history = await coolie.getBoardChatHistory(company.id);
+      const history = await coolie.getBoardChatHistory(
+        company.id,
+        activeConversationId ?? undefined,
+      );
       if (history.issueId) {
         setBoardIssueId(history.issueId);
+      }
+      if (
+        history.conversationId &&
+        history.conversationId !== activeConversationId
+      ) {
+        setActiveConversationId(history.conversationId);
+        void refreshConversations();
       }
       // wave115: 防御性过滤 —— 历史里若有空 content 行或状态提示伪消息
       // (「正在连接会话助手…」类), 一律不渲染; 过滤后为空则回到欢迎语。
@@ -493,11 +558,134 @@ export function BoardChatScreen({
     } finally {
       setHistoryReady(true);
     }
-  }, [company.id]);
+  }, [company.id, activeConversationId, refreshConversations]);
 
   useEffect(() => {
     void loadHistory();
   }, [loadHistory]);
+
+  /** wave148: 打开新建对话弹层 (懒加载项目列表供可选的 项目 选择)。 */
+  const openNewConversation = useCallback(() => {
+    setEditorMode("new");
+    setEditorTargetId(null);
+    setEditorTitle("");
+    setEditorProjectId(null);
+    setEditorOpen(true);
+    setConversationsOpen(false);
+    if (projects.length === 0) {
+      void (async () => {
+        try {
+          setProjects(await coolie.listProjects(company.id));
+        } catch {
+          // 项目列表拿不到就不显示项目选择, 不影响新建对话
+        }
+      })();
+    }
+  }, [company.id, projects.length]);
+
+  /** wave148: 打开重命名弹层。 */
+  const openRenameConversation = useCallback((conversation: BoardConversation) => {
+    setEditorMode("rename");
+    setEditorTargetId(conversation.id);
+    setEditorTitle(conversation.title);
+    setEditorProjectId(conversation.projectId);
+    setEditorOpen(true);
+    setConversationsOpen(false);
+  }, []);
+
+  /** wave148: 提交新建 / 重命名。 */
+  const handleEditorSubmit = useCallback(async () => {
+    const title = editorTitle.trim();
+    if (!title) {
+      Alert.alert("请填写对话名称");
+      return;
+    }
+    setConversationBusy(true);
+    try {
+      if (editorMode === "new") {
+        const created = await coolie.createBoardConversation(company.id, {
+          title,
+          projectId: editorProjectId,
+        });
+        const list = await refreshConversations();
+        setActiveConversationId(created.id);
+        if (list.length === 0) setConversations([created]);
+      } else if (editorTargetId) {
+        await coolie.updateBoardConversation(company.id, editorTargetId, { title });
+        await refreshConversations();
+      }
+      setEditorOpen(false);
+    } catch (e) {
+      Alert.alert(
+        editorMode === "new" ? "新建对话失败" : "重命名失败",
+        String((e as Error)?.message ?? e),
+      );
+    } finally {
+      setConversationBusy(false);
+    }
+  }, [
+    editorTitle,
+    editorMode,
+    editorTargetId,
+    editorProjectId,
+    company.id,
+    refreshConversations,
+  ]);
+
+  /** wave148: 切换当前对话。 */
+  const handleSwitchConversation = useCallback(
+    (id: string) => {
+      setConversationsOpen(false);
+      if (id === activeConversationId) return;
+      setActiveConversationId(id);
+    },
+    [activeConversationId],
+  );
+
+  /** wave148: 归档对话 (软删, 历史保留)。 */
+  const handleArchiveConversation = useCallback(
+    (conversation: BoardConversation) => {
+      Alert.alert("归档对话", `归档「${conversation.title}」? 历史会保留, 可在归档里恢复。`, [
+        { text: "取消", style: "cancel" },
+        {
+          text: "归档",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              try {
+                await coolie.updateBoardConversation(company.id, conversation.id, {
+                  archived: true,
+                });
+                const list = await refreshConversations();
+                if (conversation.id === activeConversationId) {
+                  setActiveConversationId(list[0]?.id ?? null);
+                }
+              } catch (e) {
+                Alert.alert("归档失败", String((e as Error)?.message ?? e));
+              }
+            })();
+          },
+        },
+      ]);
+    },
+    [company.id, activeConversationId, refreshConversations],
+  );
+
+  /** wave148: 对话内的操作菜单 (长按对话行)。 */
+  const handleConversationActions = useCallback(
+    (conversation: BoardConversation) => {
+      Alert.alert(conversation.title, "选择操作", [
+        { text: "取消", style: "cancel" },
+        { text: "重命名", onPress: () => openRenameConversation(conversation) },
+        {
+          text: "归档",
+          style: "destructive",
+          onPress: () => handleArchiveConversation(conversation),
+        },
+      ]);
+    },
+    [openRenameConversation, handleArchiveConversation],
+  );
 
   /**
    * wave144: 订阅并恢复在飞的这一次发问。挂载时若模块里还留着一条在飞的流
@@ -935,7 +1123,10 @@ export function BoardChatScreen({
           // 否则新公司「第一次带附件发送」无 issue 可传、被永久挡下。
           let issueId = boardIssueId;
           if (!issueId) {
-            issueId = await coolie.ensureBoardIssue(company.id);
+            issueId = await coolie.ensureBoardIssue(
+              company.id,
+              activeConversationId ?? undefined,
+            );
             setBoardIssueId(issueId);
           }
           const uploaded = await coolie.uploadAttachment(company.id, issueId, {
@@ -969,7 +1160,7 @@ export function BoardChatScreen({
       });
       return task;
     },
-    [boardIssueId, company.id],
+    [boardIssueId, activeConversationId, company.id],
   );
 
   const handleSend = useCallback(
@@ -1066,14 +1257,19 @@ export function BoardChatScreen({
             companyId: company.id,
             message: prompt,
             taskId: boardIssueId ?? undefined,
+            // wave148: 这一问落到当前对话自己的 issue 上。
+            conversationId: activeConversationId ?? undefined,
             attachmentIds: attachmentIdsForThisSend.length > 0
               ? attachmentIdsForThisSend
               : undefined,
             signal: controller.signal,
           },
           {
-            onStart: (issueId) => {
+            onStart: (issueId, conversationId) => {
               setBoardIssueId(issueId);
+              if (conversationId && conversationId !== activeConversationId) {
+                setActiveConversationId(conversationId);
+              }
             },
             onStatus: (status) => {
               setStatusText(status);
@@ -1163,6 +1359,8 @@ export function BoardChatScreen({
         abortControllerRef.current = null;
         // 清掉模块镜像: 结束的这一次不再恢复 (回复由 loadHistory 从服务端拉)。
         publishLiveBoardChat(null);
+        // wave148: 这一轮让该对话的 lastMessageAt 前进, 刷新列表顺序。
+        void refreshConversations();
         scrollToBottom();
       }
     },
@@ -1171,6 +1369,8 @@ export function BoardChatScreen({
       sending,
       company.id,
       boardIssueId,
+      activeConversationId,
+      refreshConversations,
       stagedAttachments,
       uploadStagedAttachment,
       scrollToBottom,
@@ -1267,6 +1467,12 @@ export function BoardChatScreen({
       void handleSend(lastPrompt);
     }
   };
+
+  /** wave148: 当前对话行 (头部标题 / 列表高亮共用)。 */
+  const activeConversation = useMemo(
+    () => conversations.find((c) => c.id === activeConversationId) ?? null,
+    [conversations, activeConversationId],
+  );
 
   const handleStop = () => {
     // wave144: 重挂载后本组件的 ref 里已经没有 controller —— 用模块里那条在飞
@@ -1473,7 +1679,10 @@ export function BoardChatScreen({
         <ChatHeader
           timestamp={latestAssistantTimestamp}
           embedded={embedded}
+          title={activeConversation?.title ?? null}
           onRequestClear={() => setConfirmClear(true)}
+          onOpenConversations={() => setConversationsOpen(true)}
+          onNewConversation={openNewConversation}
         />
 
         {/* 问答对话列表 */}
@@ -1730,6 +1939,192 @@ export function BoardChatScreen({
             </View>
           </View>
         </Modal>
+
+        {/* wave148: 对话列表 (切换 / 新建 / 长按 重命名·归档) */}
+        <Modal
+          visible={conversationsOpen}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setConversationsOpen(false)}
+        >
+          <View style={styles.convBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => setConversationsOpen(false)}
+            />
+            <View style={styles.convSheet}>
+              <View style={styles.convSheetHeader}>
+                <Text style={styles.convSheetTitle}>工坊对话</Text>
+                <Pressable
+                  onPress={openNewConversation}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel="新建对话"
+                  style={styles.convNewBtn}
+                >
+                  <Ionicons name="add" size={16} color={C.ink} />
+                  <Text style={styles.convNewBtnText}>新建</Text>
+                </Pressable>
+              </View>
+
+              <ScrollView style={styles.convList} keyboardShouldPersistTaps="handled">
+                {conversations.length === 0 ? (
+                  <Text style={styles.convEmpty}>还没有对话, 点「新建」开始。</Text>
+                ) : (
+                  conversations.map((conversation) => {
+                    const active = conversation.id === activeConversationId;
+                    return (
+                      <Pressable
+                        key={conversation.id}
+                        onPress={() => handleSwitchConversation(conversation.id)}
+                        onLongPress={() => handleConversationActions(conversation)}
+                        delayLongPress={300}
+                        style={[styles.convRow, active && styles.convRowActive]}
+                      >
+                        <Ionicons
+                          name={active ? "chatbubble-ellipses" : "chatbubble-outline"}
+                          size={16}
+                          color={active ? C.accent : C.ink3}
+                        />
+                        <View style={styles.convRowMain}>
+                          <Text
+                            style={[styles.convRowTitle, active && styles.convRowTitleActive]}
+                            numberOfLines={1}
+                          >
+                            {conversation.title}
+                          </Text>
+                          <Text style={styles.convRowMeta} numberOfLines={1}>
+                            {formatTime(conversation.lastMessageAt)}
+                          </Text>
+                        </View>
+                        <Pressable
+                          hitSlop={8}
+                          onPress={() => handleConversationActions(conversation)}
+                          accessibilityRole="button"
+                          accessibilityLabel="对话操作"
+                        >
+                          <Ionicons name="ellipsis-horizontal" size={16} color={C.ink4} />
+                        </Pressable>
+                      </Pressable>
+                    );
+                  })
+                )}
+              </ScrollView>
+
+              <Text style={styles.convHint}>
+                长按或点 ⋯ 可重命名 / 归档; 归档的对话历史会保留。
+              </Text>
+            </View>
+          </View>
+        </Modal>
+
+        {/* wave148: 新建 / 重命名对话编辑弹层 */}
+        <Modal
+          visible={editorOpen}
+          transparent
+          animationType="fade"
+          onRequestClose={() => !conversationBusy && setEditorOpen(false)}
+        >
+          <View style={styles.confirmBackdrop}>
+            <Pressable
+              style={StyleSheet.absoluteFill}
+              onPress={() => !conversationBusy && setEditorOpen(false)}
+            />
+            <View style={styles.confirmSheet}>
+              <Text style={styles.confirmTitle}>
+                {editorMode === "new" ? "新建对话" : "重命名对话"}
+              </Text>
+              <TextInput
+                value={editorTitle}
+                onChangeText={setEditorTitle}
+                placeholder="对话名称, 例如: 欢迎页需求"
+                placeholderTextColor={C.ink4}
+                style={styles.editorInput}
+                autoFocus
+                maxLength={200}
+                editable={!conversationBusy}
+                returnKeyType="done"
+                onSubmitEditing={() => void handleEditorSubmit()}
+              />
+
+              {editorMode === "new" && projects.length > 0 ? (
+                <>
+                  <Text style={styles.editorLabel}>归属项目 (可空)</Text>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.editorProjectRow}
+                  >
+                    <Pressable
+                      onPress={() => setEditorProjectId(null)}
+                      style={[
+                        styles.editorProjectChip,
+                        editorProjectId === null && styles.editorProjectChipActive,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.editorProjectChipText,
+                          editorProjectId === null && styles.editorProjectChipTextActive,
+                        ]}
+                      >
+                        不指定
+                      </Text>
+                    </Pressable>
+                    {projects.map((project) => {
+                      const active = editorProjectId === project.id;
+                      return (
+                        <Pressable
+                          key={project.id}
+                          onPress={() => setEditorProjectId(project.id)}
+                          style={[
+                            styles.editorProjectChip,
+                            active && styles.editorProjectChipActive,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.editorProjectChipText,
+                              active && styles.editorProjectChipTextActive,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {project.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </ScrollView>
+                </>
+              ) : null}
+
+              <View style={styles.confirmRow}>
+                <Pressable
+                  hitSlop={6}
+                  disabled={conversationBusy}
+                  onPress={() => setEditorOpen(false)}
+                  style={[styles.confirmBtn, styles.confirmBtnCancel]}
+                >
+                  <Text style={styles.confirmBtnCancelText}>取消</Text>
+                </Pressable>
+                <Pressable
+                  hitSlop={6}
+                  disabled={conversationBusy}
+                  onPress={() => void handleEditorSubmit()}
+                  style={[styles.confirmBtn, styles.confirmBtnOk]}
+                >
+                  {conversationBusy ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.confirmBtnOkText}>
+                      {editorMode === "new" ? "创建" : "保存"}
+                    </Text>
+                  )}
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Modal>
       </KeyboardAvoidingView>
     </Root>
   );
@@ -1839,6 +2234,139 @@ const styles = StyleSheet.create({
   confirmBtnOkText: {
     color: "#FFFFFF",
     fontSize: 14,
+    fontWeight: "600",
+  },
+  /**
+   * wave148: 对话列表 + 编辑弹层样式
+   */
+  convBackdrop: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.55)",
+    justifyContent: "flex-end",
+  },
+  convSheet: {
+    backgroundColor: C.panel,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 20,
+    maxHeight: "70%",
+    borderTopWidth: 1,
+    borderColor: C.line,
+  },
+  convSheetHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  convSheetTitle: {
+    color: C.ink,
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  convNewBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: C.surface,
+  },
+  convNewBtnText: {
+    color: C.ink,
+    fontSize: 13,
+    fontWeight: "600",
+  },
+  convList: {
+    flexGrow: 0,
+  },
+  convEmpty: {
+    color: C.ink3,
+    fontSize: 13,
+    paddingVertical: 14,
+    textAlign: "center",
+  },
+  convRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "transparent",
+    marginBottom: 4,
+  },
+  convRowActive: {
+    backgroundColor: C.surface,
+    borderColor: C.line,
+  },
+  convRowMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  convRowTitle: {
+    color: C.ink,
+    fontSize: 14,
+    fontWeight: "500",
+  },
+  convRowTitleActive: {
+    color: C.accent,
+    fontWeight: "600",
+  },
+  convRowMeta: {
+    color: C.ink4,
+    fontSize: 11,
+    marginTop: 2,
+  },
+  convHint: {
+    color: C.ink4,
+    fontSize: 11,
+    marginTop: 10,
+  },
+  editorInput: {
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: C.surface,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: C.ink,
+    fontSize: 14,
+  },
+  editorLabel: {
+    color: C.ink3,
+    fontSize: 12,
+    marginTop: 12,
+  },
+  editorProjectRow: {
+    marginTop: 8,
+  },
+  editorProjectChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: C.surface,
+    marginRight: 8,
+    maxWidth: 200,
+  },
+  editorProjectChipActive: {
+    borderColor: C.accent,
+    backgroundColor: "rgba(59, 130, 246, 0.15)",
+  },
+  editorProjectChipText: {
+    color: C.ink2,
+    fontSize: 12,
+  },
+  editorProjectChipTextActive: {
+    color: C.accent,
     fontWeight: "600",
   },
   approvalStack: {

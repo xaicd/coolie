@@ -9,50 +9,68 @@ import { formatTime } from "../utils/format";
  * ChatHeader — 工坊对话框顶部条 (wave71 抽出)
  *
  * 三段结构:
- *   1. 副标题 (状态文案, 由 thinking / subtitle 控制)
+ *   1. 左侧 [☰ 对话列表] (wave148) + 标题/副标题
  *   2. 中间 timestamp (最近一条助手消息的时间戳)
- *   3. 右侧 [🗑️ 清空] — 弹 onRequestClear, 由 BoardChatScreen 弹确认 Modal
+ *   3. 右侧 [+ 新建对话] + [🗑️ 清空]
  *
- * wave73 (boss 26:32 OOB 「左上角工坊 驱动5角色员工 这些描述都不要了」+ 26:35 OOB
- * 「顶部中间标题留着 / 对话框中的去掉」):
- * - 删 "工坊" 标题 Text (boss 26:35 「对话框中的去掉」)
- * - idle 状态不再渲染「驱动 5 角色员工」副标题 (wave65 之前), 仅保留 `thinking` /
- *   `subtitle` 传入的动态文案 (思考中 / 正在生成回复…)
- * - 保留中间的 timestamp + 右侧 🗑️ 清空按钮
- * 之所以抽出: 把头部代码从 BoardChatScreen 那一坨 2084 行的屏里搬出来, 单元
- * 屏幕只管聊天流; 后续要改图标 / 时间戳样式只动这一处。
+ * wave73: 删 "工坊" 标题 Text, idle 状态不再渲染「驱动 5 角色员工」副标题。
+ * wave148: 加多对话入口 —— 左侧 ☰ 打开对话列表 (切换 / 重命名 / 归档),
+ *          右侧 + 新建对话; 头部标题显示当前对话名 (boss 09-29: 不能老在一个
+ *          对话里)。
  */
 export interface ChatHeaderProps {
   thinking?: boolean;
   subtitle?: string;
   timestamp?: string | null;
-  /** 是否处于嵌入模式 (Workspace Tab) — 嵌入时不显示返回 + 清空入口 */
+  /** wave148: 当前对话标题, 显示在头部 */
+  title?: string | null;
+  /** 是否处于嵌入模式 (Workspace Tab) — 嵌入时不显示返回 + 清空 + 对话入口 */
   embedded?: boolean;
   onBack?: () => void;
   onRequestClear?: () => void;
+  /** wave148: 打开对话列表 (切换 / 重命名 / 归档) */
+  onOpenConversations?: () => void;
+  /** wave148: 新建对话 */
+  onNewConversation?: () => void;
 }
 
 export function ChatHeader({
   thinking = false,
   subtitle,
   timestamp,
+  title,
   embedded = false,
   onBack,
   onRequestClear,
+  onOpenConversations,
+  onNewConversation,
 }: ChatHeaderProps) {
+  const showConversationControls = !embedded;
   return (
     <View style={styles.topBar}>
       <View style={styles.topLeft}>
         {Boolean(onBack) && !embedded ? (
-          <Pressable
-            onPress={onBack}
-            hitSlop={8}
-            style={styles.backBtn}
-          >
+          <Pressable onPress={onBack} hitSlop={8} style={styles.iconBtn}>
             <Ionicons name="chevron-back" size={18} color={C.ink2} />
           </Pressable>
         ) : null}
+        {showConversationControls && onOpenConversations ? (
+          <Pressable
+            onPress={onOpenConversations}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="对话列表"
+            style={styles.iconBtn}
+          >
+            <Ionicons name="list-outline" size={18} color={C.ink2} />
+          </Pressable>
+        ) : null}
         <View style={styles.titleStack}>
+          {title ? (
+            <Text style={styles.titleText} numberOfLines={1}>
+              {title}
+            </Text>
+          ) : null}
           {subtitle || thinking ? (
             <View style={styles.subtitleRow}>
               <StatusDot
@@ -60,9 +78,7 @@ export function ChatHeader({
                 color={thinking ? C.warn : C.accent}
                 size={6}
               />
-              <Text style={styles.topSubTitle}>
-                {subtitle ?? "思考中…"}
-              </Text>
+              <Text style={styles.topSubTitle}>{subtitle ?? "思考中…"}</Text>
             </View>
           ) : null}
         </View>
@@ -70,9 +86,18 @@ export function ChatHeader({
 
       <View style={styles.topRight}>
         {timestamp ? (
-          <Text style={styles.timestampText}>
-            {formatTime(timestamp)}
-          </Text>
+          <Text style={styles.timestampText}>{formatTime(timestamp)}</Text>
+        ) : null}
+        {showConversationControls && onNewConversation ? (
+          <Pressable
+            onPress={onNewConversation}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="新建对话"
+            style={styles.iconBtn}
+          >
+            <Ionicons name="add" size={20} color={C.ink2} />
+          </Pressable>
         ) : null}
         {onRequestClear && !embedded ? (
           <Pressable
@@ -107,19 +132,25 @@ const styles = StyleSheet.create({
   topLeft: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 8,
     flex: 1,
     minWidth: 0,
   },
-  backBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+  iconBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 8,
     alignItems: "center",
     justifyContent: "center",
   },
   titleStack: {
     minWidth: 0,
+    flex: 1,
+  },
+  titleText: {
+    color: C.ink,
+    fontSize: 14,
+    fontWeight: "600",
   },
   subtitleRow: {
     flexDirection: "row",
@@ -134,7 +165,7 @@ const styles = StyleSheet.create({
   topRight: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
+    gap: 6,
   },
   timestampText: {
     color: C.ink4,

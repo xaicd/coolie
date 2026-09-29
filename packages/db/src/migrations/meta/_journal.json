@@ -2038,6 +2038,13 @@
       "when": 1790569200000,
       "tag": "9008_add_issue_spec",
       "breakpoints": true
+    },
+    {
+      "idx": 9009,
+      "version": "7",
+      "when": 1790655600000,
+      "tag": "9009_add_board_conversations",
+      "breakpoints": true
     }
   ]
 }

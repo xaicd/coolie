@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Response } from "express";
 import { spawn } from "node:child_process";
 import { createHash } from "node:crypto";
 import fs from "node:fs";
@@ -7,8 +7,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Db } from "@paperclipai/db";
 import type { DeploymentMode } from "@paperclipai/shared";
-import { companies, issueAttachments, issueComments, issues, chatConversations, assets } from "@paperclipai/db";
-import { and, eq, inArray, isNull, lt } from "drizzle-orm";
+import { createBoardConversationSchema, updateBoardConversationSchema } from "@paperclipai/shared";
+import { companies, issueAttachments, issueComments, issues, chatConversations, assets, boardConversations } from "@paperclipai/db";
+import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 import { instanceSettingsService, issueService } from "../services/index.js";
 import { assertCompanyAccess, getActorInfo } from "./authz.js";
 import { loadAgentPersona } from "../services/role-template.js";
@@ -216,49 +217,146 @@ async function readReadableToBuffer(stream: Readable): Promise<Buffer> {
 const MAX_CONCURRENT_BOARD_CHATS = 3;
 
 /**
- * wave135: Find (or create) the standing "Board Operations" issue that anchors
- * a company's workshop conversation, and return its id.
- *
- * Extracted from the stream handler so the App can resolve the issue id
- * *before* it uploads an attachment: a freshly created company has no board
- * issue yet, and `POST .../issues/:issueId/attachments` needs an existing
- * issue. Without this, the first-ever "attach a file then send" in a new
- * company had no issue to upload against and the send was blocked ("请稍候,
- * 附件正在上传") with no in-app way forward.
- *
- * The query/creation semantics are identical to the stream path (same title
- * match, same "not done/cancelled" filter, same actor attribution) so the two
- * callers always resolve to the same issue.
+ * wave148: the row shape shared by the conversation helpers below. Kept as an
+ * inferred type off the schema so it can never drift from the table.
  */
-async function ensureBoardIssueId(
+type BoardConversationRow = typeof boardConversations.$inferSelect;
+
+/** Serialize a conversation row for the HTTP clients (dates -> ISO strings). */
+function serializeBoardConversation(row: BoardConversationRow) {
+  return {
+    id: row.id,
+    companyId: row.companyId,
+    projectId: row.projectId,
+    issueId: row.issueId,
+    title: row.title,
+    createdByUserId: row.createdByUserId,
+    lastMessageAt: row.lastMessageAt.toISOString(),
+    archivedAt: row.archivedAt ? row.archivedAt.toISOString() : null,
+    createdAt: row.createdAt.toISOString(),
+  };
+}
+
+/**
+ * wave148: load one conversation scoped to its company. Returns null when the id
+ * does not exist or belongs to another company — the caller answers 404 for
+ * both, so the endpoint never leaks cross-tenant existence.
+ */
+async function findBoardConversation(
   db: Db,
-  input: {
-    companyId: string;
-    taskId?: string;
-    actor: ReturnType<typeof getActorInfo>;
-  },
+  companyId: string,
+  conversationId: string,
+): Promise<BoardConversationRow | null> {
+  return db
+    .select()
+    .from(boardConversations)
+    .where(
+      and(
+        eq(boardConversations.id, conversationId),
+        eq(boardConversations.companyId, companyId),
+      ),
+    )
+    .then((rows) => rows[0] ?? null);
+}
+
+/**
+ * wave148: find (or lazily create) the per-conversation issue that anchors the
+ * conversation's comment stream.
+ *
+ * Before wave148 every turn in a company landed on one shared "Board Operations"
+ * issue, so histories and prompt contexts mixed. Now each conversation owns an
+ * issue: its history is that issue's comments, and its prompt context is built
+ * from them alone. Attachment upload needs the issue to exist *before* the first
+ * send, which is why the id is stored on the conversation row and resolved here
+ * (also from `POST /board/chat/issue`, the pre-upload path).
+ */
+async function ensureBoardConversationIssue(
+  db: Db,
+  conversation: BoardConversationRow,
+  actor: ReturnType<typeof getActorInfo>,
 ): Promise<string> {
-  if (input.taskId) return input.taskId;
+  if (conversation.issueId) {
+    const existing = await db
+      .select({ id: issues.id })
+      .from(issues)
+      .where(eq(issues.id, conversation.issueId))
+      .then((rows) => rows[0] ?? null);
+    if (existing) return existing.id;
+  }
+
   const issueSvc = issueService(db);
-  const companyIssues = await issueSvc.list(input.companyId, { q: "Board Operations" });
+  const created = await issueSvc.create(conversation.companyId, {
+    // The migrated default keeps its historical title so nothing renames the
+    // long-standing "Board Operations" issue; every other conversation is named
+    // after itself so the issue list reads as the conversation list.
+    title:
+      conversation.title === "Board Operations"
+        ? "Board Operations"
+        : `Conversation ${conversation.title}`,
+    description: "Standing issue for a board concierge conversation",
+    status: "todo",
+    priority: "medium",
+    ...(conversation.projectId ? { projectId: conversation.projectId } : {}),
+    createdByUserId: actor.actorType === "user" ? actor.actorId : null,
+    responsibleUserId: actor.actorType === "user" ? actor.actorId : null,
+    trustExplicitResponsibleUserId: actor.actorType === "user",
+  });
+  await db
+    .update(boardConversations)
+    .set({ issueId: created.id })
+    .where(eq(boardConversations.id, conversation.id));
+  return created.id;
+}
+
+/**
+ * wave148: resolve the newest active conversation for a company, creating the
+ * default "Board Operations" one when the company has none.
+ *
+ * This is the fallback for any client that has not adopted conversation ids yet
+ * (and for a brand-new company). When a standing "Board Operations" issue already
+ * exists it is adopted rather than duplicated, so pre-wave148 history stays on
+ * the same issue and shows up in the default conversation.
+ */
+async function resolveOrCreateDefaultConversation(
+  db: Db,
+  companyId: string,
+  actor: ReturnType<typeof getActorInfo>,
+): Promise<BoardConversationRow> {
+  const existing = await db
+    .select()
+    .from(boardConversations)
+    .where(
+      and(
+        eq(boardConversations.companyId, companyId),
+        isNull(boardConversations.archivedAt),
+      ),
+    )
+    .orderBy(desc(boardConversations.lastMessageAt))
+    .limit(1)
+    .then((rows) => rows[0] ?? null);
+  if (existing) return existing;
+
+  const issueSvc = issueService(db);
+  const companyIssues = await issueSvc.list(companyId, { q: "Board Operations" });
   const boardIssue = companyIssues.find(
     (i) =>
       i.title === "Board Operations" &&
       i.status !== "done" &&
       i.status !== "cancelled",
   );
-  if (boardIssue) return boardIssue.id;
-  const created = await issueSvc.create(input.companyId, {
-    title: "Board Operations",
-    description:
-      "Standing issue for board concierge conversations and decision log",
-    status: "todo",
-    priority: "medium",
-    createdByUserId: input.actor.actorType === "user" ? input.actor.actorId : null,
-    responsibleUserId: input.actor.actorType === "user" ? input.actor.actorId : null,
-    trustExplicitResponsibleUserId: input.actor.actorType === "user",
-  });
-  return created.id;
+
+  const created = await db
+    .insert(boardConversations)
+    .values({
+      companyId,
+      title: "Board Operations",
+      issueId: boardIssue?.id ?? null,
+      createdByUserId: actor.actorType === "user" ? actor.actorId : null,
+      lastMessageAt: new Date(),
+    })
+    .returning()
+    .then((rows) => rows[0]);
+  return created;
 }
 
 export function boardChatRoutes(
@@ -267,6 +365,33 @@ export function boardChatRoutes(
 ) {
   const router = Router();
   let liveBoardChats = 0;
+
+  /**
+   * wave148: shared gate for every board-chat surface — the conference-room
+   * feature flag and the single-operator deployment mode. Returns false after
+   * writing the refusal, so each caller just `if (!(await require...)) return;`.
+   */
+  async function requireBoardChatEnabled(res: Response): Promise<boolean> {
+    const experimental = await instanceSettingsService(db).getExperimental();
+    if (experimental.enableConferenceRoomChat !== true) {
+      res.status(403).json({
+        error: "Conference Room Chat is not enabled",
+        code: "FEATURE_DISABLED",
+      });
+      return false;
+    }
+    if (
+      opts.deploymentMode !== "local_trusted" &&
+      opts.deploymentMode !== "authenticated"
+    ) {
+      res.status(403).json({
+        error: "Board chat is only available on local single-operator instances",
+        code: "DEPLOYMENT_MODE_UNSUPPORTED",
+      });
+      return false;
+    }
+    return true;
+  }
 
   // The board skill is read from disk once and cached. Resolves to the
   // repo-root `skills/paperclip-board/SKILL.md` whether running from
@@ -329,13 +454,15 @@ export function boardChatRoutes(
       return;
     }
 
-    const { companyId, message, taskId, attachmentIds, projectId } = req.body as {
+    const { companyId, message, taskId, attachmentIds, projectId, conversationId } = req.body as {
       companyId?: string;
       message?: string;
       taskId?: string;
       attachmentIds?: string[];
       /** Coolie fork: project context for build-mode CMMI integration. */
       projectId?: string;
+      /** wave148: which workshop conversation this turn belongs to. */
+      conversationId?: string;
     };
 
     if (!companyId || !message) {
@@ -360,13 +487,29 @@ export function boardChatRoutes(
     const issueSvc = issueService(db);
     const actor = getActorInfo(req);
 
-    // Find or create the standing "Board Operations" issue that anchors the
-    // board conversation + decision log.
-    const resolvedIssueId = await ensureBoardIssueId(db, {
-      companyId,
-      taskId,
-      actor,
-    });
+    // wave148: resolve which conversation this turn belongs to. An explicit
+    // conversationId must belong to the company (404 otherwise, matching
+    // findBoardConversation's cross-tenant 404); otherwise fall back to the
+    // newest active conversation, creating the default one on first use.
+    let conversation = conversationId
+      ? await findBoardConversation(db, companyId, conversationId)
+      : null;
+    if (conversationId && !conversation) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+    if (!conversation) {
+      conversation = await resolveOrCreateDefaultConversation(db, companyId, actor);
+    }
+
+    // Each conversation anchors its own issue. Legacy clients that still send
+    // `taskId` pin the issue directly (the conversation is then only used for
+    // list ordering); everyone else resolves the conversation's own issue.
+    const resolvedIssueId =
+      taskId ?? (await ensureBoardConversationIssue(db, conversation, actor));
+
+    // The conversation's project is the default context when the body omits one.
+    const effectiveProjectId = projectId ?? conversation.projectId ?? undefined;
 
     // Persist the user's message. Use the authenticated board/user actor so
     // attribution and author-type checks pass; "board" (the local fallback)
@@ -382,6 +525,17 @@ export function boardChatRoutes(
       userId: actor.agentId ? undefined : actor.actorId,
       runId: actor.runId,
     });
+
+    // wave148: move this conversation to the top of the list (lastMessageAt is
+    // the list ordering key). Best-effort — a failure must not block the turn.
+    try {
+      await db
+        .update(boardConversations)
+        .set({ lastMessageAt: new Date() })
+        .where(eq(boardConversations.id, conversation.id));
+    } catch (e) {
+      console.error("[board-chat] failed to bump conversation lastMessageAt:", e);
+    }
 
     let attachedDocContext = "";
     if (Array.isArray(attachmentIds) && attachmentIds.length > 0) {
@@ -470,8 +624,8 @@ export function boardChatRoutes(
     // identifies as the active company's chairperson aide, not the upstream
     // `Paperclip` brand. Falls back to "Coolie 智能体工坊" if the row is gone.
     const personaLine = await resolveCompanyPersonaLine(db, companyId);
-    const projectBlock = projectId
-      ? `\n\n[当前项目上下文]\n项目ID: ${projectId}\n用户当前处于该项目工坊中，所有派活、build 指令、CMMI 交付物均默认归属于该项目。\n[/当前项目上下文]`
+    const projectBlock = effectiveProjectId
+      ? `\n\n[当前项目上下文]\n项目ID: ${effectiveProjectId}\n用户当前处于该项目工坊中，所有派活、build 指令、CMMI 交付物均默认归属于该项目。\n[/当前项目上下文]`
       : "";
 
     // hermes chat has no --append-system-prompt; prefix it into the query.
@@ -490,7 +644,13 @@ export function boardChatRoutes(
       "X-Accel-Buffering": "no",
     });
     res.flushHeaders();
-    res.write(`data: ${JSON.stringify({ type: "start", issueId: resolvedIssueId })}\n\n`);
+    res.write(
+      `data: ${JSON.stringify({
+        type: "start",
+        issueId: resolvedIssueId,
+        conversationId: conversation.id,
+      })}\n\n`,
+    );
 
     // Resolve the API base URL the spawned process should call back into so
     // the board skill can drive the control plane.
@@ -648,7 +808,7 @@ export function boardChatRoutes(
           : {}),
         // Coolie fork: forward the project context so hermes' board skill can
         // scope build plans and CMMI artifacts under the active project.
-        ...(projectId ? { PAPERCLIP_PROJECT_ID: projectId } : {}),
+        ...(effectiveProjectId ? { PAPERCLIP_PROJECT_ID: effectiveProjectId } : {}),
       },
     });
 
@@ -907,6 +1067,7 @@ export function boardChatRoutes(
               `data: ${JSON.stringify({
                 type: "done",
                 issueId: resolvedIssueId,
+                conversationId: conversation.id,
                 exitCode: exitCode ?? 0,
                 timedOut: true,
                 message: note.trim(),
@@ -1011,6 +1172,7 @@ export function boardChatRoutes(
           `data: ${JSON.stringify({
             type: "done",
             issueId: resolvedIssueId,
+            conversationId: conversation.id,
             exitCode: exitCode ?? 0,
             timedOut: killed,
           })}\n\n`,
@@ -1070,9 +1232,10 @@ export function boardChatRoutes(
       return;
     }
 
-    const { companyId, taskId } = (req.body ?? {}) as {
+    const { companyId, taskId, conversationId } = (req.body ?? {}) as {
       companyId?: string;
       taskId?: string;
+      conversationId?: string;
     };
     if (!companyId) {
       res.status(400).json({ error: "companyId is required" });
@@ -1080,12 +1243,24 @@ export function boardChatRoutes(
     }
     assertCompanyAccess(req, companyId);
 
-    const issueId = await ensureBoardIssueId(db, {
-      companyId,
-      taskId: typeof taskId === "string" ? taskId : undefined,
-      actor: getActorInfo(req),
-    });
-    res.json({ issueId });
+    const actor = getActorInfo(req);
+    // wave148: resolve the conversation this upload targets. An explicit id must
+    // belong to the company; otherwise the newest active (or the default, if the
+    // company has none) is used, so the pre-conversation callers keep working.
+    let conversation = conversationId
+      ? await findBoardConversation(db, companyId, conversationId)
+      : null;
+    if (conversationId && !conversation) {
+      res.status(404).json({ error: "Conversation not found" });
+      return;
+    }
+    if (!conversation) {
+      conversation = await resolveOrCreateDefaultConversation(db, companyId, actor);
+    }
+    const issueId = typeof taskId === "string"
+      ? taskId
+      : await ensureBoardConversationIssue(db, conversation, actor);
+    res.json({ issueId, conversationId: conversation.id });
   });
 
   /**
@@ -1246,6 +1421,172 @@ export function boardChatRoutes(
       cutoff: cutoff.toISOString(),
     });
   });
+
+  // ── wave148: workshop conversations (工坊对话) ────────────────────────────
+  //
+  // Every conversation is company-scoped; the id is validated against
+  // companyId in findBoardConversation, so a cross-tenant id answers the same
+  // 404 as a missing one and never leaks existence.
+
+  /** GET /companies/:companyId/board/conversations — newest first. */
+  router.get("/companies/:companyId/board/conversations", async (req, res) => {
+    if (!(await requireBoardChatEnabled(res))) return;
+    const companyId = req.params.companyId as string;
+    assertCompanyAccess(req, companyId);
+
+    const includeArchived =
+      req.query.includeArchived === "1" || req.query.includeArchived === "true";
+    const rows = await db
+      .select()
+      .from(boardConversations)
+      .where(
+        includeArchived
+          ? eq(boardConversations.companyId, companyId)
+          : and(
+              eq(boardConversations.companyId, companyId),
+              isNull(boardConversations.archivedAt),
+            ),
+      )
+      .orderBy(desc(boardConversations.lastMessageAt));
+
+    res.json(rows.map(serializeBoardConversation));
+  });
+
+  /** POST /companies/:companyId/board/conversations — create + eagerly anchor its issue. */
+  router.post("/companies/:companyId/board/conversations", async (req, res) => {
+    if (!(await requireBoardChatEnabled(res))) return;
+    const companyId = req.params.companyId as string;
+    assertCompanyAccess(req, companyId);
+
+    const parsed = createBoardConversationSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      res.status(400).json({
+        error: "Invalid conversation payload",
+        issues: parsed.error.issues,
+      });
+      return;
+    }
+
+    const actor = getActorInfo(req);
+    const created = await db
+      .insert(boardConversations)
+      .values({
+        companyId,
+        title: parsed.data.title,
+        projectId: parsed.data.projectId ?? null,
+        createdByUserId: actor.actorType === "user" ? actor.actorId : null,
+        lastMessageAt: new Date(),
+      })
+      .returning()
+      .then((rows) => rows[0]);
+
+    // Create the issue now so the App can attach a file before the first send
+    // (attachments must target an existing issue — wave135's reason, carried on).
+    await ensureBoardConversationIssue(db, created, actor);
+    const fresh = await findBoardConversation(db, companyId, created.id);
+    res.status(201).json(serializeBoardConversation(fresh ?? created));
+  });
+
+  /** GET /companies/:companyId/board/conversations/:conversationId */
+  router.get(
+    "/companies/:companyId/board/conversations/:conversationId",
+    async (req, res) => {
+      if (!(await requireBoardChatEnabled(res))) return;
+      const companyId = req.params.companyId as string;
+      assertCompanyAccess(req, companyId);
+      const row = await findBoardConversation(
+        db,
+        companyId,
+        req.params.conversationId as string,
+      );
+      if (!row) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+      }
+      res.json(serializeBoardConversation(row));
+    },
+  );
+
+  /** PATCH /companies/:companyId/board/conversations/:conversationId — rename / archive. */
+  router.patch(
+    "/companies/:companyId/board/conversations/:conversationId",
+    async (req, res) => {
+      if (!(await requireBoardChatEnabled(res))) return;
+      const companyId = req.params.companyId as string;
+      assertCompanyAccess(req, companyId);
+      const row = await findBoardConversation(
+        db,
+        companyId,
+        req.params.conversationId as string,
+      );
+      if (!row) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+      }
+
+      const parsed = updateBoardConversationSchema.safeParse(req.body ?? {});
+      if (!parsed.success) {
+        res.status(400).json({
+          error: "Invalid conversation payload",
+          issues: parsed.error.issues,
+        });
+        return;
+      }
+
+      const updates: Partial<typeof boardConversations.$inferInsert> = {};
+      if (parsed.data.title !== undefined) updates.title = parsed.data.title;
+      if (parsed.data.archived !== undefined) {
+        updates.archivedAt = parsed.data.archived ? new Date() : null;
+      }
+      if (Object.keys(updates).length > 0) {
+        await db
+          .update(boardConversations)
+          .set(updates)
+          .where(eq(boardConversations.id, row.id));
+      }
+
+      // Keep the anchor issue's title in step with the rename. The migrated
+      // default keeps its historical "Board Operations" title so the pre-wave148
+      // adoption path (which matches on that title) stays valid.
+      if (
+        parsed.data.title !== undefined &&
+        row.issueId &&
+        parsed.data.title !== "Board Operations"
+      ) {
+        await db
+          .update(issues)
+          .set({ title: `Conversation ${parsed.data.title}` })
+          .where(eq(issues.id, row.issueId));
+      }
+
+      const fresh = await findBoardConversation(db, companyId, row.id);
+      res.json(serializeBoardConversation(fresh ?? row));
+    },
+  );
+
+  /** DELETE /companies/:companyId/board/conversations/:conversationId — soft delete. */
+  router.delete(
+    "/companies/:companyId/board/conversations/:conversationId",
+    async (req, res) => {
+      if (!(await requireBoardChatEnabled(res))) return;
+      const companyId = req.params.companyId as string;
+      assertCompanyAccess(req, companyId);
+      const row = await findBoardConversation(
+        db,
+        companyId,
+        req.params.conversationId as string,
+      );
+      if (!row) {
+        res.status(404).json({ error: "Conversation not found" });
+        return;
+      }
+      await db
+        .update(boardConversations)
+        .set({ archivedAt: new Date() })
+        .where(eq(boardConversations.id, row.id));
+      res.json({ ok: true });
+    },
+  );
 
   return router;
 }

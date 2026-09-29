@@ -14,18 +14,21 @@ import { useDialogState } from "../context/DialogContext";
 import { agentsApi } from "../api/agents";
 import { issuesApi } from "../api/issues";
 import { goalsApi } from "../api/goals";
+import { projectsApi } from "../api/projects";
+import { boardApi } from "../api/board";
 import { queryKeys } from "../lib/queryKeys";
 import { MarkdownBody } from "../components/MarkdownBody";
 import { SandboxedHtmlAttachment } from "../components/SandboxedHtmlAttachment";
 import { groupHtmlAttachmentsByComment } from "../lib/issue-attachments";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Activity, ArrowDown, History, MessageSquarePlus, X } from "lucide-react";
+import { Activity, Archive, ArrowDown, History, MessageSquarePlus, Pencil, X } from "lucide-react";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { ChatComposer, type ChatComposerHandle } from "../components/ChatComposer";
 import {
@@ -46,8 +49,12 @@ import {
   type BuildStartResponse,
 } from "../components/BuildPlanCard";
 import { cn, formatDateTime } from "../lib/utils";
-import type { FeedbackVoteValue, IssueAttachment } from "@paperclipai/shared";
+import type { BoardConversation, FeedbackVoteValue, IssueAttachment } from "@paperclipai/shared";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+
+/** wave148: query key for the workshop conversation list of a company. */
+const boardConversationsKey = (companyId: string) =>
+  ["board", "conversations", companyId] as const;
 
 /**
  * Board Concierge Chat — a chat interface powered by the board-member skill.
@@ -231,6 +238,17 @@ export function BoardChat({
   /** Coolie fork: build-plan card for "做 xxx" / "build xxx" asks. */
   const [buildCard, setBuildCard] = useState<BuildCardState | null>(null);
   const [boardIssueId, setBoardIssueId] = useState<string | null>(null);
+
+  /**
+   * wave148: workshop conversations. `activeConversationId` selects which
+   * conversation the room shows and writes to; the list is newest-first.
+   */
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
+  const [conversationsOpen, setConversationsOpen] = useState(false);
+  const [newConversationOpen, setNewConversationOpen] = useState(false);
+  const [newConversationTitle, setNewConversationTitle] = useState("");
+  const [newConversationProjectId, setNewConversationProjectId] = useState("");
+  const [conversationBusy, setConversationBusy] = useState(false);
   const [elapsedSec, setElapsedSec] = useState(0);
   const [optimisticMessage, setOptimisticMessage] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -338,23 +356,44 @@ export function BoardChat({
     return active?.title ?? null;
   }, [goals]);
 
-  // Find or detect the board operations issue
-  const { data: issues } = useQuery({
-    queryKey: queryKeys.issues.list(selectedCompanyId!),
-    queryFn: () => issuesApi.list(selectedCompanyId!),
+  // wave148: the company's workshop conversations. The active one decides which
+  // issue's history/attachments the room reads and which conversation the next
+  // turn lands on. A company with no conversation yet gets its default one
+  // created lazily by the server list/stream paths.
+  const { data: conversations } = useQuery({
+    queryKey: boardConversationsKey(selectedCompanyId!),
+    queryFn: () => boardApi.listConversations(selectedCompanyId!),
     enabled: !!selectedCompanyId,
   });
 
+  // Default the active conversation to the newest (the list is newest-first) and
+  // drop a stale selection whose conversation no longer exists (e.g. archived).
   useEffect(() => {
-    if (!issues) {
-      setBoardIssueId(null);
-      return;
-    }
-    const boardIssue = issues.find(
-      (i) => i.title === "Board Operations" && i.status !== "done" && i.status !== "cancelled",
+    if (!conversations) return;
+    setActiveConversationId((prev) =>
+      prev && conversations.some((c) => c.id === prev)
+        ? prev
+        : conversations[0]?.id ?? null,
     );
-    setBoardIssueId(boardIssue?.id ?? null);
-  }, [issues]);
+  }, [conversations]);
+
+  const activeConversation = useMemo(
+    () => (conversations ?? []).find((c) => c.id === activeConversationId) ?? null,
+    [conversations, activeConversationId],
+  );
+
+  // wave148: projects for the optional project picker in the new-conversation
+  // dialog. Fetched only while that dialog is open.
+  const { data: projects } = useQuery({
+    queryKey: ["projects", "list", selectedCompanyId],
+    queryFn: () => projectsApi.list(selectedCompanyId!),
+    enabled: !!selectedCompanyId && newConversationOpen,
+  });
+
+  // The active conversation's issue carries its comment stream.
+  useEffect(() => {
+    setBoardIssueId(activeConversation?.issueId ?? null);
+  }, [activeConversation]);
 
   // Fetch comments for the board issue
   const { data: comments } = useQuery({
@@ -715,6 +754,73 @@ export function BoardChat({
     [selectedCompanyId, queryClient, projectId],
   );
 
+  // wave148: create a conversation and switch to it immediately.
+  const handleCreateConversation = useCallback(async () => {
+    const title = newConversationTitle.trim();
+    if (!selectedCompanyId || !title || conversationBusy) return;
+    setConversationBusy(true);
+    try {
+      const created = await boardApi.createConversation(selectedCompanyId, {
+        title,
+        projectId: newConversationProjectId || null,
+      });
+      await queryClient.invalidateQueries({
+        queryKey: boardConversationsKey(selectedCompanyId),
+      });
+      setActiveConversationId(created.id);
+      setNewConversationOpen(false);
+      setConversationsOpen(false);
+      setNewConversationTitle("");
+      setNewConversationProjectId("");
+    } catch (e) {
+      console.error("create conversation failed", e);
+      setErrorText("新建对话失败, 请重试。");
+    } finally {
+      setConversationBusy(false);
+    }
+  }, [
+    selectedCompanyId,
+    newConversationTitle,
+    newConversationProjectId,
+    conversationBusy,
+    queryClient,
+  ]);
+
+  const handleRenameConversation = useCallback(
+    async (conversation: BoardConversation) => {
+      if (!selectedCompanyId) return;
+      const next = window.prompt("重命名对话", conversation.title);
+      const title = next?.trim();
+      if (!title || title === conversation.title) return;
+      try {
+        await boardApi.updateConversation(selectedCompanyId, conversation.id, { title });
+        await queryClient.invalidateQueries({
+          queryKey: boardConversationsKey(selectedCompanyId),
+        });
+      } catch (e) {
+        console.error("rename conversation failed", e);
+      }
+    },
+    [selectedCompanyId, queryClient],
+  );
+
+  const handleArchiveConversation = useCallback(
+    async (conversation: BoardConversation) => {
+      if (!selectedCompanyId) return;
+      if (!window.confirm(`归档「${conversation.title}」? 历史会保留。`)) return;
+      try {
+        await boardApi.archiveConversation(selectedCompanyId, conversation.id);
+        if (conversation.id === activeConversationId) setActiveConversationId(null);
+        await queryClient.invalidateQueries({
+          queryKey: boardConversationsKey(selectedCompanyId),
+        });
+      } catch (e) {
+        console.error("archive conversation failed", e);
+      }
+    },
+    [selectedCompanyId, activeConversationId, queryClient],
+  );
+
   const sendMessage = useCallback(
     async (body: string) => {
       const trimmed = body.trim();
@@ -748,6 +854,7 @@ export function BoardChat({
             companyId: selectedCompanyId,
             message: trimmed,
             taskId: boardIssueId ?? undefined,
+            conversationId: activeConversationId ?? undefined,
             projectId,
           }),
           signal: controller.signal,
@@ -785,6 +892,7 @@ export function BoardChat({
                 setStatusText(event.text);
               } else if (event.type === "start" && event.issueId) {
                 setBoardIssueId(event.issueId);
+                if (event.conversationId) setActiveConversationId(event.conversationId);
               } else if (event.type === "error") {
                 setErrorText(
                   event.message ||
@@ -797,7 +905,7 @@ export function BoardChat({
                     queryKey: queryKeys.issues.comments(event.issueId),
                   });
                   queryClient.invalidateQueries({
-                    queryKey: queryKeys.issues.list(selectedCompanyId),
+                    queryKey: boardConversationsKey(selectedCompanyId),
                   });
                 }
               }
@@ -823,7 +931,7 @@ export function BoardChat({
         composerRef.current?.focus();
       }
     },
-    [sending, selectedCompanyId, boardIssueId, queryClient],
+    [sending, selectedCompanyId, boardIssueId, activeConversationId, queryClient],
   );
 
   const handleSend = useCallback(() => {
@@ -871,10 +979,11 @@ export function BoardChat({
             />
             <div className="min-w-0 flex-1">
               <h3 className="text-sm font-semibold">
-                {ceoAgent?.name ?? "Conference Room"}
+                {activeConversation?.title ?? ceoAgent?.name ?? "Conference Room"}
               </h3>
               <p className="text-xs text-muted-foreground">
                 {selectedCompany?.name ?? "Your organization"}
+                {activeConversation ? ` · ${activeConversation.title}` : ""}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-0.5">
@@ -886,11 +995,12 @@ export function BoardChat({
                     size="icon-sm"
                     className="text-muted-foreground"
                     aria-label="chat history"
+                    onClick={() => setConversationsOpen(true)}
                   >
                     <History className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom">chat history</TooltipContent>
+                <TooltipContent side="bottom">对话列表</TooltipContent>
               </Tooltip>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -900,11 +1010,16 @@ export function BoardChat({
                     size="icon-sm"
                     className="text-muted-foreground"
                     aria-label="new chat"
+                    onClick={() => {
+                      setNewConversationTitle("");
+                      setNewConversationProjectId("");
+                      setNewConversationOpen(true);
+                    }}
                   >
                     <MessageSquarePlus className="h-4 w-4" />
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent side="bottom">new chat</TooltipContent>
+                <TooltipContent side="bottom">新建对话</TooltipContent>
               </Tooltip>
             </div>
           </div>
@@ -1220,6 +1335,158 @@ export function BoardChat({
           </SheetContent>
         </Sheet>
       </div>
+
+      {/* wave148: conversation list — switch / rename / archive */}
+      <Sheet open={conversationsOpen} onOpenChange={setConversationsOpen}>
+        <SheetContent side="left" className="w-80 p-0">
+          <div className="flex h-full flex-col">
+            <div className="flex items-center justify-between border-b border-border px-4 py-3">
+              <h3 className="text-sm font-semibold">工坊对话</h3>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="gap-1.5 text-muted-foreground"
+                onClick={() => {
+                  setNewConversationTitle("");
+                  setNewConversationProjectId("");
+                  setConversationsOpen(false);
+                  setNewConversationOpen(true);
+                }}
+              >
+                <MessageSquarePlus className="h-4 w-4" />
+                新建
+              </Button>
+            </div>
+            <div className="flex-1 overflow-y-auto p-2">
+              {(conversations ?? []).length === 0 ? (
+                <p className="px-2 py-6 text-center text-xs text-muted-foreground">
+                  还没有对话, 点「新建」开始。
+                </p>
+              ) : (
+                (conversations ?? []).map((conversation) => {
+                  const active = conversation.id === activeConversationId;
+                  return (
+                    <div
+                      key={conversation.id}
+                      className={cn(
+                        "mb-1 flex items-center gap-1 rounded-md border px-2 py-2",
+                        active
+                          ? "border-border bg-accent"
+                          : "border-transparent hover:bg-accent",
+                      )}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setActiveConversationId(conversation.id);
+                          setConversationsOpen(false);
+                        }}
+                        className="min-w-0 flex-1 text-left"
+                      >
+                        <span
+                          className={cn(
+                            "block truncate text-sm",
+                            active ? "font-medium text-foreground" : "text-foreground",
+                          )}
+                        >
+                          {conversation.title}
+                        </span>
+                        <span className="block text-xs text-muted-foreground">
+                          {formatDateTime(conversation.lastMessageAt)}
+                        </span>
+                      </button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-muted-foreground"
+                        aria-label="重命名对话"
+                        onClick={() => void handleRenameConversation(conversation)}
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        className="text-muted-foreground"
+                        aria-label="归档对话"
+                        onClick={() => void handleArchiveConversation(conversation)}
+                      >
+                        <Archive className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      {/* wave148: new conversation — title + optional project */}
+      <Sheet open={newConversationOpen} onOpenChange={setNewConversationOpen}>
+        <SheetContent side="bottom" className="p-4">
+          <h3 className="mb-3 text-sm font-semibold">新建对话</h3>
+          <Input
+            value={newConversationTitle}
+            onChange={(e) => setNewConversationTitle(e.target.value)}
+            placeholder="对话名称, 例如: 欢迎页需求"
+            maxLength={200}
+            autoFocus
+            onKeyDown={(e) => {
+              if (e.key === "Enter") void handleCreateConversation();
+            }}
+          />
+          <p className="mt-3 text-xs text-muted-foreground">归属项目 (可空)</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => setNewConversationProjectId("")}
+              className={cn(
+                "rounded-full border px-3 py-1.5 text-xs transition-colors duration-150",
+                newConversationProjectId === ""
+                  ? "border-foreground/40 bg-accent text-foreground"
+                  : "border-border text-muted-foreground hover:bg-accent",
+              )}
+            >
+              不指定
+            </button>
+            {(projects ?? []).map((project) => (
+              <button
+                key={project.id}
+                type="button"
+                onClick={() => setNewConversationProjectId(project.id)}
+                className={cn(
+                  "max-w-48 truncate rounded-full border px-3 py-1.5 text-xs transition-colors duration-150",
+                  newConversationProjectId === project.id
+                    ? "border-foreground/40 bg-accent text-foreground"
+                    : "border-border text-muted-foreground hover:bg-accent",
+                )}
+              >
+                {project.name}
+              </button>
+            ))}
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setNewConversationOpen(false)}
+            >
+              取消
+            </Button>
+            <Button
+              type="button"
+              onClick={() => void handleCreateConversation()}
+              disabled={conversationBusy || !newConversationTitle.trim()}
+            >
+              {conversationBusy ? "创建中…" : "创建"}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

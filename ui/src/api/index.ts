@@ -23,3 +23,4 @@ export { inboxDismissalsApi } from "./inboxDismissals";
 export { companySkillsApi } from "./companySkills";
 export { chatEndpointsApi } from "./chatEndpoints";
 export { ontologyApi } from "./ontology";
+export { boardApi } from "./board";

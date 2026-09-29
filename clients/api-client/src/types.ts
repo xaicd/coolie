@@ -1025,6 +1025,23 @@ export interface WorkspaceRuntimeService {
 
 // --- Board Chat & Concierge Streaming (需求⑫ 驾驶舱问答) ---
 
+/**
+ * wave148: a named workshop conversation (工坊对话). Each conversation owns its
+ * own issue (`issueId`) and therefore its own history; the boss can create,
+ * switch, rename and archive them instead of sharing one thread.
+ */
+export interface BoardConversation {
+  id: string;
+  companyId: string;
+  projectId: string | null;
+  issueId: string | null;
+  title: string;
+  createdByUserId: string | null;
+  lastMessageAt: string;
+  archivedAt: string | null;
+  createdAt: string;
+}
+
 export interface BoardChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
@@ -1038,16 +1055,18 @@ export interface BoardChatStreamInput {
   companyId: string;
   message: string;
   taskId?: string;
+  /** wave148: the conversation this turn belongs to (preferred over taskId). */
+  conversationId?: string;
   /** Coolie fork (wave71): 附件 id 列表 — 上传后随 message 一起 POST */
   attachmentIds?: string[];
   signal?: AbortSignal;
 }
 
 export type BoardChatStreamEvent =
-  | { type: "start"; issueId: string }
+  | { type: "start"; issueId: string; conversationId?: string }
   | { type: "status"; text: string }
   | { type: "chunk"; text: string }
-  | { type: "done"; issueId: string; exitCode?: number; timedOut?: boolean }
+  | { type: "done"; issueId: string; conversationId?: string; exitCode?: number; timedOut?: boolean }
   // wave144: `signal` is set when the relay's child was terminated by a signal
   // (e.g. SIGINT), and `timedOut` marks both the first-token watchdog and the
   // overall cap, so a client can tell the three failures apart.
@@ -1060,10 +1079,10 @@ export type BoardChatStreamEvent =
     };
 
 export interface BoardChatStreamCallbacks {
-  onStart?: (issueId: string) => void;
+  onStart?: (issueId: string, conversationId?: string) => void;
   onStatus?: (text: string) => void;
   onChunk?: (text: string) => void;
-  onDone?: (event: { issueId: string; exitCode?: number; timedOut?: boolean }) => void;
+  onDone?: (event: { issueId: string; conversationId?: string; exitCode?: number; timedOut?: boolean }) => void;
   onError?: (error: Error | string) => void;
   onEvent?: (event: BoardChatStreamEvent) => void;
 }

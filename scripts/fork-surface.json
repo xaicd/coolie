@@ -243,15 +243,15 @@
     },
     {
       "path": "server/src/routes/board-chat.ts",
-      "maxNetLines": 90,
-      "reason": "Board chat runs on `hermes` (the operator's own agent) instead of `claude`, and its deployment gate admits `authenticated` as well as `local_trusted`, because this fork's install is single-operator (one boss) rather than an upstream multi-tenant deployment. It also carries the fork's conversation-clear handling (wave115): DELETE /board/chat/conversation/:id hard-deletes the issue's rows so a cleared chat cannot render as empty transparent bubbles, the concierge reply is not persisted when it is a bare status line, the prompt history reads with includeDeleted=false and drops blank/status turns. wave122 adds the deliverable plumbing to the spawn env: PAPERCLIP_TASK_ID (the standing board issue this chat anchors to) and PAPERCLIP_ARTIFACT_UPLOADER (absolute path of the upload helper, needed because the spawn cwd is /tmp so the skill's repo-relative command cannot resolve) — without them the concierge could only answer with a /tmp path. Registered so the next upstream merge resolves this file by intent: keep upstream's relay logic, re-apply the hermes spawn (incl. the wave119 board-credential forwarding and the wave122 task-id/uploader vars), the widened gate, and the clear/status handling. Budget raised 200 → 240: the counter was already at 210 before this change from earlier fork work, and wave122 adds ~10 more lines. wave124 adds the timeout/partial-reply handling (configurable PAPERCLIP_BOARD_CHAT_TIMEOUT_MS; a timed-out run with usable text is kept and closed with a `done`+timedOut event, and a bare timeout is reported as a plain status line rather than `[hermes-error]`) plus a per-chat PAPERCLIP_HELPER_STATE_DIR so the upload helper's symlink lock cannot be inherited stale from a chat a previous timeout killed — that stale lock, not the credential, was the real 120s hang. Budget raised 240 → 300 (counter at 278).",
-      "maxTotalLines": 300
+      "maxNetLines": 700,
+      "reason": "Board chat runs on `hermes` (the operator's own agent) instead of `claude`, and its deployment gate admits `authenticated` as well as `local_trusted`, because this fork's install is single-operator (one boss) rather than an upstream multi-tenant deployment. It also carries the fork's conversation-clear handling (wave115): DELETE /board/chat/conversation/:id hard-deletes the issue's rows so a cleared chat cannot render as empty transparent bubbles, the concierge reply is not persisted when it is a bare status line, the prompt history reads with includeDeleted=false and drops blank/status turns. wave122 adds the deliverable plumbing to the spawn env: PAPERCLIP_TASK_ID (the standing board issue this chat anchors to) and PAPERCLIP_ARTIFACT_UPLOADER (absolute path of the upload helper, needed because the spawn cwd is /tmp so the skill's repo-relative command cannot resolve) — without them the concierge could only answer with a /tmp path. Registered so the next upstream merge resolves this file by intent: keep upstream's relay logic, re-apply the hermes spawn (incl. the wave119 board-credential forwarding and the wave122 task-id/uploader vars), the widened gate, and the clear/status handling. Budget raised 200 → 240: the counter was already at 210 before this change from earlier fork work, and wave122 adds ~10 more lines. wave124 adds the timeout/partial-reply handling (configurable PAPERCLIP_BOARD_CHAT_TIMEOUT_MS; a timed-out run with usable text is kept and closed with a `done`+timedOut event, and a bare timeout is reported as a plain status line rather than `[hermes-error]`) plus a per-chat PAPERCLIP_HELPER_STATE_DIR so the upload helper's symlink lock cannot be inherited stale from a chat a previous timeout killed — that stale lock, not the credential, was the real 120s hang. Budget raised 240 → 300 (counter at 278). wave148 (工坊多对话) adds conversation resolution before every turn, the per-conversation issue helper, a shared feature/deployment gate, and the five conversation CRUD routes — ~450 net lines; budget raised 300 → 950.",
+      "maxTotalLines": 950
     },
     {
       "path": "server/src/__tests__/board-chat-route-feature-flag.test.ts",
-      "maxNetLines": 90,
-      "reason": "Upstream's version of this test asserted `authenticated` is refused. This fork allows it, and `DEPLOYMENT_MODES` holds only `local_trusted` and `authenticated`, so that assertion cannot hold: rewritten to assert `authenticated` is admitted, with the refusal branch kept for a mode outside today's union. Its correctness depends on the board-chat.ts entry above, so the two are read together. wave124 adds two cases for the timeout path: a timed-out run that already produced text keeps that text and closes with `done`+timedOut (no `[hermes-error]`), and a timed-out run with no output reports a plain Chinese status line. Budget raised 190 → 230 (counter at 210).",
-      "maxTotalLines": 230
+      "maxNetLines": 200,
+      "reason": "Upstream's version of this test asserted `authenticated` is refused. This fork allows it, and `DEPLOYMENT_MODES` holds only `local_trusted` and `authenticated`, so that assertion cannot hold: rewritten to assert `authenticated` is admitted, with the refusal branch kept for a mode outside today's union. Its correctness depends on the board-chat.ts entry above, so the two are read together. wave124 adds two cases for the timeout path: a timed-out run that already produced text keeps that text and closes with `done`+timedOut (no `[hermes-error]`), and a timed-out run with no output reports a plain Chinese status line. Budget raised 190 → 230 (counter at 210). wave148 adds a table-aware fake drizzle client so the stream tests resolve a conversation (budget 230 → 340).",
+      "maxTotalLines": 340
     },
     {
       "path": ".gitignore",
@@ -261,9 +261,9 @@
     },
     {
       "path": "ui/src/pages/BoardChat.tsx",
-      "maxNetLines": 130,
-      "reason": "Carries the fork's DS-style ontology spec card: a `建域 xxx` prompt plans an ontology domain, and the card renders that spec (object types, relation types, modelling problems) with its approval status without offering an apply button, because the server writes the model only after a human approves the spec. It is appended into upstream's own message list and reuses upstream's trigger detection, which is why it cannot be a component in our own tree. One commit, 114 lines added, nothing removed: at a merge, keep upstream's render path and re-append the card.",
-      "maxTotalLines": 160
+      "maxNetLines": 420,
+      "reason": "Carries the fork's DS-style ontology spec card: a `建域 xxx` prompt plans an ontology domain, and the card renders that spec (object types, relation types, modelling problems) with its approval status without offering an apply button, because the server writes the model only after a human approves the spec. It is appended into upstream's own message list and reuses upstream's trigger detection, which is why it cannot be a component in our own tree. One commit, 114 lines added, nothing removed: at a merge, keep upstream's render path and re-append the card. wave148 (工坊多对话) replaces the global Board Operations lookup with a conversation list + active conversation, wires the previously-dead History/MessageSquarePlus buttons to a conversation sheet and a new-conversation form, and threads conversationId through the stream — ~305 net lines; budget raised 160 → 540.",
+      "maxTotalLines": 540
     },
     {
       "path": "ui/src/pages/Projects.tsx",
@@ -567,9 +567,9 @@
     },
     {
       "path": "packages/shared/src/index.ts",
-      "maxNetLines": 30,
-      "reason": "wave132: adds the defect unions and the IssueDefect type to the shared barrel's explicit export lists (values from ./constants.js, types from ./types/index.js) so the server, UI and clients can import them from @paperclipai/shared.",
-      "maxTotalLines": 30
+      "maxNetLines": 40,
+      "reason": "wave132: adds the defect unions and the IssueDefect type to the shared barrel's explicit export lists (values from ./constants.js, types from ./types/index.js) so the server, UI and clients can import them from @paperclipai/shared. wave148 appends the BoardConversation type and the create/update conversation validators; budget raised 30 → 60.",
+      "maxTotalLines": 60
     },
     {
       "path": "packages/shared/src/types/index.ts",
@@ -822,6 +822,54 @@
       "maxNetLines": 200,
       "maxTotalLines": 200,
       "reason": "wave141: embedded-postgres test for the v1/v2/v3 chain, sha256 dedupe, listVersions and activateVersion."
+    },
+    {
+      "path": "packages/db/src/schema/board_conversations.ts",
+      "maxNetLines": 70,
+      "maxTotalLines": 70,
+      "reason": "wave148 (工坊多对话): the board_conversations table — one named workshop conversation per row, each owning its own issue (issue_id) so histories and prompt contexts are separate instead of all sharing one standing Board Operations issue. Cannot live in our own tree: it is the table the server, the migration and the drizzle snapshot all read."
+    },
+    {
+      "path": "packages/db/src/schema/index.ts",
+      "maxNetLines": 10,
+      "maxTotalLines": 20,
+      "reason": "wave148: exports boardConversations from the schema barrel — the one line the server imports it through."
+    },
+    {
+      "path": "packages/db/src/migrations/9009_add_board_conversations.sql",
+      "maxNetLines": 80,
+      "maxTotalLines": 80,
+      "reason": "wave148: hand-written fork migration creating board_conversations and backfilling each company's existing 'Board Operations' issue into one conversation. Hand-written because `drizzle-kit generate` cannot run on this fork (snapshot collision between 0280/9000 and 9002/9003), which is exactly what the 9000-range is for. No upstream counterpart."
+    },
+    {
+      "path": "packages/db/src/migrations/meta/9009_snapshot.json",
+      "maxNetLines": 60000,
+      "maxTotalLines": 60000,
+      "reason": "wave148: the drizzle snapshot for 9009, generated from the current schema. It is also the newest snapshot, so it absorbs the snapshot-less 9006/9007/9008 fork migrations and makes migration-snapshot-drift.test.ts pass again (it was failing with ENOENT on 9008 before this change). Generated, not authored: regenerate with `pnpm --filter @paperclipai/db generate` once the collision is fixed; never hand-merge."
+    },
+    {
+      "path": "packages/shared/src/types/board-conversation.ts",
+      "maxNetLines": 40,
+      "maxTotalLines": 40,
+      "reason": "wave148: the BoardConversation shared type. The web UI and the api-client both compile against it, so it cannot live in a fork-local copy."
+    },
+    {
+      "path": "packages/shared/src/validators/board-conversation.ts",
+      "maxNetLines": 40,
+      "maxTotalLines": 40,
+      "reason": "wave148: createBoardConversationSchema / updateBoardConversationSchema — the contract the conversation CRUD routes validate against."
+    },
+    {
+      "path": "server/src/__tests__/board-chat-issue-route.test.ts",
+      "maxNetLines": 400,
+      "maxTotalLines": 400,
+      "reason": "wave135/wave148: covers POST /board/chat/issue. wave148 changed its contract (it now resolves a conversation and returns { issueId, conversationId }) and its find-or-create now goes through the conversation tables, so the test drives the route with a table-aware fake drizzle client. Not declared before because no earlier change had touched it; declaring it now that this wave does."
+    },
+    {
+      "path": "ui/src/api/board.ts",
+      "maxNetLines": 60,
+      "maxTotalLines": 60,
+      "reason": "wave148: new web API client for the workshop conversation endpoints (list/create/update/archive). No upstream counterpart — upstream's BoardChat had no conversation concept."
     }
   ]
 }
