@@ -139,6 +139,15 @@ after:  blocked=12 | by: Counter({'2.2': 12})
 | `pnpm check:token-gates` | 4 gate 全 CLEAN（UI 纯 token，无裸 hex/px） |
 | App 纯选择层 `selectIssues(..., mainline:true)` | 实跑：`all:a,b,c,d / 只看主线:a,c,d`（APP_SELECT_OK） |
 
+**关于全量 `pnpm test:run`**：跑了一遍，出现的失败都落在**本 wave 未触碰的文件**里
+（`ai-connections` / `file-resources-git-scan`（超时）/ `project-repositories-persistence` /
+`agent-avatars`（worker 初始化失败，daytona 插件未构建）），失败信息是环境性的
+（sandbox `unavailable`、workspace 路径策略、行锁超时）。按仓库口径「不停在 plausibility，
+要 revert 证明」，对其中**唯一 import 了本 wave 改动文件**（`services/projects.ts`）的
+`project-repositories-persistence.test.ts` 做了证明：把该文件回退到基线（`4ec49e8b7`）后
+**仍然 2 failed** → 判定为既有/环境失败，非本 wave 引入。其余失败文件不 import 任何本 wave
+改动模块。全量套件未跑到最终汇总即被叫停（该文件改动已在本地逐文件跑绿）。
+
 ---
 
 ## 3. 缺口（如实标注）
@@ -161,15 +170,46 @@ after:  blocked=12 | by: Counter({'2.2': 12})
 
 ## 4. 发版
 
-（见本节末尾「结果」——在发版执行后回填。）
-
 - 目标版本: **0.5.94**（`app.json` 0.5.93 → 0.5.94，versionCode 594；patch bump，
-  当前生产为 0.5.93）。
-- App: `scripts/release-app.sh 0.5.94 "<notes>"`（全量发版；含 DS 门禁 / 干净树 /
-  APK 构建 / COS / version.json / OTA / 服务端同步）。
-- Server: `scripts/deploy-coolie.sh`（加固部署；护栏 = 部署前后 `version.json` 与
-  `ota/manifest` 200 + `/api/health`）。
+  发版前已 `git fetch origin main` + 查生产 `version.json` 确认为 0.5.93，无撞号）。
+- App: `scripts/release-app.sh 0.5.94 "<notes>"` —— 全量发版成功。
+- Server: `scripts/deploy-coolie.sh` —— 加固部署成功，护栏全绿。
 
-### 结果
+### 结果（已执行，2026-09-29）
 
-待发版执行后回填。
+**App 全量发版**（`release-app.sh 0.5.94`，exit 0）:
+- 版本三处已改: `app.json` 0.5.94 / `package.json` 0.5.94 / `build.gradle` 594 & `"0.5.94"`。
+- 发版 commit: `release: v0.5.94 — wave140 CMMI WBS 拆解 + 里程碑主线任务(自动草案/门禁联动/主线视图)`
+  （`75dcce255`）。
+- 原生 `EXPO_RUNTIME_VERSION` = 0.5.94（与 app.json 一致，脚本断言通过）。
+- APK: `assembleRelease` 出包 → COS `cos://gzbucket/coolie/app/0.5.94/coolie-release.apk`。
+- OTA: `https://xrobinai.cn/ota/manifest` → runtimeVersion 0.5.94（id `c5ed8feb`）。
+
+**生产外网验证**（发版后）:
+```
+/api/health            → {"status":"ok", ...}
+/version.json          → version 0.5.94, versionCode 594, commitSha 75dcce255...
+/ota/manifest          → runtimeVersion 0.5.94
+APK 直链                → HTTP 200 (Content-Length 78098262)
+```
+
+**Server 加固部署**（`deploy-coolie.sh`，exit 0）:
+```
+preflight: deploying main@75dcce255 to tc-coolie-claw:/opt/coolie
+sync whole tree: synced
+assert upgrade feed survived the sync:  ok version.json | ok ota/manifest
+rebuild stale: skills-catalog, mcp-server
+assert upgrade feed survived the build: ok version.json | ok ota/manifest
+restart + health: health ok
+verify from outside: api health ok | filing number (landing) ok | filing number (app shell) ok
+                     | retired paths: skip (COOLIE_LEGACY_PATHS 未声明) | www host ok
+```
+
+**version.json 收尾**（`release-app.sh` 不改仓库根 `version.json`）:
+本提交 `chore(release): version.json 0.5.89 → 0.5.94` 把仓库副本对齐到发版（含
+commitSha `75dcce255...` 与 APK sha256 `a7719370...`）。
+
+> 分步提交而非单一 squash: 本 wave 按仓库既有约定「一个逻辑改动一个 commit」拆成 8 个
+> conventional commit（数据/契约 → 草案生成 → 主线服务 → Web UI → App → 文档 → 真验修复 →
+> 报告），最后一个业务 commit 是发版 commit（消息里带 `wave140` 标记）。未做 `--amend`/
+> `--force`。

@@ -1,8 +1,8 @@
 {
-  "version": "0.5.89",
-  "versionCode": 589,
-  "commitSha": "6c483d079a86921fd2e228c9ec38d0b5075da7cd",
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.89/coolie-release.apk",
-  "sha256": "9b4fc85c1af51cdc59967362243e1414174317c78e02a6e890933addf08aa50c",
-  "releaseNotes": "wave132 缺陷记录到任务：新建任务支持类型(任务/缺陷)+严重度P0-P3+复现步骤+截图证据，列表/详情显示缺陷徽章与严重度并支持仅缺陷/P0筛选，项目显示缺陷数"
+  "version": "0.5.94",
+  "versionCode": 594,
+  "commitSha": "75dcce25550ffe3ad3492a6b33a45ab528d47fe5",
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.5.94/coolie-release.apk",
+  "sha256": "a77193700c212e4bba6a8ab95b0058cbf4261c3dfa17dd370cf5eeb2f0d506e4",
+  "releaseNotes": "wave140 CMMI WBS 拆解 + 里程碑主线任务：项目初始化后自动产出 WBS 草案(可一键采纳)、里程碑主线视图与「只看主线」筛选、阶段门禁联动(未达成则后续任务受阻、可留痕豁免)"
 }
