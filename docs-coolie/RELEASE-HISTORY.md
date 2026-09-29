@@ -29,8 +29,7 @@ bash scripts/release-app.sh 0.5.98 "wave144 工坊对话修复 + wave148 工坊�
 
 ## v0.6.1 — 未发起 (本波未发版)
 
-wave147 的 spec-driven 开发链（requirement/bugfix → design → task）代码已全部落 `main`
-（8 个未 push 的 commit），但**本波没有发版**:
+wave147 的 spec-driven 开发链（requirement/bugfix → design → task）代码已全部落 `main`，但**本波没有发版**:
 
 - 目标版本按 brief 为 0.6.1，前提是 wave146 先发 0.6.0；实际 `version.json`/`app.json`
   仍是 **0.5.97**，wave146 的 0.6.0 未落地，wave148 的 0.5.98 也因 `clients/expo`

@@ -16,10 +16,10 @@
 | 声明 | `scripts/fork-surface.json`（新增 15 条）+ 文档本目录 |
 | 契约机读 | `packages/paperclip-runner/{spec/capability/source-contract.json,spec/capability/mcp-tool-map.yaml,generated/capability/*,docs/capability-contract.md,scripts/generate-capability-contract.mjs}` |
 
-提交（main，未 push）：
-`df14c27ea`(契约+迁移) · `5f11ae5bc`(服务端) · `96a37f21f`(模板+skill+MCP) ·
-`13edc85d0`(清理) · `ef6fb39b6`(网页) · `86580a17a`(App) · `1ca56ee4b`(fork-surface) ·
-`43b3b6b63`(树视图) · `80f75ab28`(文档) · `8257efbe6`(capability 契约对齐)。
+提交（main）：本波共 11 个 commit。其中 `df14c27ea`…`ef6fb39b6`（前 5 个）已被一个并发会话
+push 到 `origin/main`（当前 `origin/main = 0cc1a63eb`）；后 6 个（`86580a17a` App · `1ca56ee4b`
+fork-surface · `43b3b6b63` 树视图 · `80f75ab28` 文档 · `8257efbe6` capability 契约 · `dfdc5fb49`
+QA 报告）**仍在本地**（`ahead 6`）。
 
 ## 2. 验证（真命令 / 真值）
 
@@ -93,4 +93,5 @@ capability 契约、token gates、per-commit fork-surface）已全绿。
 
 ## 6. 回滚
 
-`git reset --hard 078923ead`（本波 10 个 commit 尚未 push）。迁移 9008 为纯 additive，可保留。
+`git reset --hard 078923ead`（前 5 个 commit 已由并发会话 push，回滚需 `--force` 并会改写已推送历史
+—— 除非确有必要，否则应改用 **新提交** 收敛）。迁移 9008 为纯 additive，可保留。
