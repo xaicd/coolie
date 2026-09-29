@@ -26,3 +26,17 @@ bash scripts/release-app.sh 0.5.98 "wave144 工坊对话修复 + wave148 工坊�
 ```
 
 详见 `docs-coolie/evidence/wave148/QA-REPORT.md` §3B。
+
+## v0.6.1 — 未发起 (本波未发版)
+
+wave147 的 spec-driven 开发链（requirement/bugfix → design → task）代码已全部落 `main`
+（8 个未 push 的 commit），但**本波没有发版**:
+
+- 目标版本按 brief 为 0.6.1，前提是 wave146 先发 0.6.0；实际 `version.json`/`app.json`
+  仍是 **0.5.97**，wave146 的 0.6.0 未落地，wave148 的 0.5.98 也因 `clients/expo`
+  有他人未提交改动被 `release-app.sh` 拦下（上节）。此时 bump 0.6.1 会跨版本、并冲撞
+  其它并发工作线的发版 —— 违反「一波一版本、不动他人发版」。
+- 出 APK 还需 Android 工具链且要五面对齐（version.json / OTA / sha256 / app.json / APK badging）。
+
+→ 待 0.6.0/0.5.98 之一落地、`clients/expo` 工作区干净后，再出 0.6.1。
+详见 `docs-coolie/evidence/wave147/QA-REPORT.md`。
