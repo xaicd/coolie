@@ -150,9 +150,67 @@ type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "artifacts" | "ontolog
  * src/components/IssuesList.tsx (wave18, 对齐 Coolie Web Tasks 页)。
  */
 
-/** 应用升级卡片：新版本提示 + 一键下载 APK */
+/**
+ * 应用升级卡片：新版本提示 + 一键下载。
+ *
+ * Android 维持 OTA 口径 —— 拉 APK 直链升级 (downloadUrl)。
+ * iOS 无 APK/OTA 直装能力，改走三条路径 (version.json 顶层扁平字段):
+ *   区块1 App Store —— 尚未上架, 只提示「即将上架」;
+ *   区块2 TestFlight 内测 (iosTestFlightUrl, 优先);
+ *   区块3 开发期直装 .ipa (iosDownloadUrl)。
+ * 注意: 直装 .ipa 需 Ad Hoc/企业签; 本波 ipa 是 App Store 签名, 仅供 TestFlight。
+ */
 function AppUpdateCard({ info, onClose }: { info: RemoteVersionInfo; onClose: () => void }) {
   const [downloading, setDownloading] = useState(false);
+  const isIOS = Platform.OS === "ios";
+
+  const openLink = async (url: string | null | undefined, label: string) => {
+    if (!url) return;
+    const ok = await Linking.openURL(url).then(() => true).catch(() => false);
+    if (!ok) Alert.alert("打开失败", `无法打开${label}，请稍后重试`);
+  };
+
+  // iOS：无 APK/OTA 直装能力，按 v6 任务书分三块 (数据全取自 version.json 顶层扁平字段)。
+  if (isIOS) {
+    return (
+      <View style={[styles.updateBanner, styles.updateBannerIos]}>
+        <View style={styles.updateIosHeader}>
+          <Text style={styles.updateTitle}>📦 新版本 v{info.version}</Text>
+          <Pressable onPress={onClose} hitSlop={8}>
+            <Ionicons name="close" size={18} color={C.ink4} />
+          </Pressable>
+        </View>
+        {info.releaseNotes ? (
+          <Text style={styles.updateNotes} numberOfLines={2}>
+            {info.releaseNotes}
+          </Text>
+        ) : null}
+        {/* 区块1: App Store —— 尚未上架, 只提示 */}
+        <Text style={styles.updateNotes}>App Store：即将上架</Text>
+        <View style={styles.updateIosActions}>
+          {/* 区块2: TestFlight 内测 (优先) */}
+          {info.iosTestFlightUrl ? (
+            <Pressable
+              style={styles.updateBtn}
+              onPress={() => void openLink(info.iosTestFlightUrl, "TestFlight")}
+            >
+              <Text style={styles.updateBtnText}>TestFlight 内测</Text>
+            </Pressable>
+          ) : null}
+          {/* 区块3: 开发期直装 .ipa (App Store 签名 ipa 需 Ad Hoc 重签才能真机安装) */}
+          {info.iosDownloadUrl ? (
+            <Pressable
+              style={[styles.updateBtn, styles.updateBtnGhost]}
+              onPress={() => void openLink(info.iosDownloadUrl, "下载页")}
+            >
+              <Text style={styles.updateBtnText}>直接下载 .ipa</Text>
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.updateBanner}>
       <View style={{ flex: 1 }}>
@@ -1331,6 +1389,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
   },
   updateBtnText: { color: C.ink, fontSize: 13, fontWeight: "600" },
+  updateBannerIos: { flexDirection: "column", alignItems: "stretch" },
+  updateIosHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
+  updateIosActions: { flexDirection: "row", gap: 8, marginTop: 10 },
+  updateBtnGhost: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line },
   settingsBackdrop: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 100,

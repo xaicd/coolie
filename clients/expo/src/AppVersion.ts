@@ -10,6 +10,15 @@ export interface RemoteVersionInfo {
   minSupportedVersionCode?: number;
   releaseNotes?: string;
   sha256?: string;
+  // ── iOS (version.json 顶层扁平字段, 非嵌套) ──────────────────────────────
+  /** iOS 直装 .ipa 直链 */
+  iosDownloadUrl?: string;
+  /** iOS bundle id (cn.xrobinai.app) */
+  iosBundleId?: string;
+  /** iOS .ipa sha256 */
+  iosSha256?: string;
+  /** TestFlight 公开链接；App Store Connect 建档前为 null */
+  iosTestFlightUrl?: string | null;
 }
 
 export function localVersion(): string {

@@ -64,3 +64,18 @@ wave147 的 spec-driven 开发链（requirement/bugfix → design → task）代
 
 → 待 0.6.0/0.5.98 之一落地、`clients/expo` 工作区干净后，再出 0.6.1。
 详见 `docs-coolie/evidence/wave147/QA-REPORT.md`。
+
+## v0.6.0-ios — iOS 包已出，TestFlight 未上（阻塞）
+
+wave149-v6 走 iOS「打包 → TestFlight」路径。**本波不新增 tag 行**（上方表格只记 git tag，本波未打 tag），真实状态：
+
+- `ASC_ISSUER_ID` 已到位，并**经真实 App Store Connect API 校验通过**（`GET /v1/apps` → HTTP 200）——首轮 v6 报告里「Issuer ID 空」的阻塞已解除。
+- iOS 包已出：`https://dls.xrobinai.cn/coolie/app/0.6.0/coolie-release-ios.ipa`，14,274,490 Byte (13.61 MB)，
+  sha256 `bea5ad103dba0bb2a7547bbc67930af2ec0122069fb275de39cc9531872bae09`（COS 对象 `cos://gzbucket/coolie/app/0.6.0/coolie-release-ios.ipa`）；
+  App Store Distribution 签名（`Apple Distribution: wei chen (UU7T5893WZ)` + profile `Coolie工坊`），`codesign --verify --deep --strict` 通过。
+- `version.json` 顶层新增**扁平** ios 字段（`iosDownloadUrl` / `iosBundleId` / `iosSha256` / `iosTestFlightUrl: null`），已部署，公网校验 8/8 PASS。
+- **TestFlight 未上 —— 硬阻塞**：App Store Connect 帐号内**没有 `cn.xrobinai.app` 应用记录**（`GET /v1/apps` total=1，仅 `HJ大眼蛙`），
+  `altool --upload-app` 报错 19「Unable to find Apple ID for Bundle ID 'cn.xrobinai.app' … create this app first」。需 boss/PM 先在 ASC 建档。
+- 另注：该 profile 是 App Store 分发 profile（无 `ProvisionedDevices`），**ipa 不能真机直装**，只能走 TestFlight。
+
+详见 `docs-coolie/evidence/wave149/QA-REPORT-v6.md` §11。
