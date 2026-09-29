@@ -120,6 +120,11 @@ wave129 的「JS 0.5.89 vs 原生 0.1.0 + OTA 未启用」是 **Metro dev build 
   `task-chat/TaskChatProtocolCard.tsx`：html 附件用 `<iframe sandbox="allow-scripts">` 内联预览；
   任何「打开」入口也因为服务端改成 inline 而**直接渲染页面**而不是下载。
 
+  > 说明（避免夸大）：默认的 task-chat shell 下，**用户上传**的 html 附件在评论气泡里是
+  > 一个 chip，点开（服务端已 inline）就是渲染好的页面 —— 本轮 Web 证据走的就是这条
+  > （`w136-11`）。**内联 iframe** 覆盖的是 classic 任务界面与 agent 交付物（work product /
+  > artifact）资源卡这两处。原「显示源码」症状在两端都已消除。
+
 ### 3.2 App 真机迭代（诚实记录，含两次失败）
 
 | 版本 | 现象 | 根因（证据） | 处置 |
