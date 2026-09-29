@@ -4934,6 +4934,8 @@ const issueListSelect = {
   wbsType: issues.wbsType,
   isMilestone: issues.isMilestone,
   milestone: issues.milestone,
+  specKind: issues.specKind,
+  spec: issues.spec,
   blockedTransitionAt: issues.blockedTransitionAt,
   blockedOwnerNotifiedAt: issues.blockedOwnerNotifiedAt,
   startedAt: issues.startedAt,
