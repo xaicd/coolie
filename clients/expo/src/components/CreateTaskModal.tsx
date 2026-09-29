@@ -13,7 +13,7 @@ import {
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Issue, IssuePriority } from "@coolie/api-client";
-import { C, type AgentRow } from "../coolie";
+import { C, coolie, type AgentRow } from "../coolie";
 import { ELEVATION, RADIUS, SPACING } from "../ui/tokens";
 import { Dropdown, type DropdownOption } from "../ui/Dropdown";
 import { SectionCard } from "../ui/SectionCard";
@@ -24,6 +24,55 @@ import { ISSUE_PRIORITIES, PRIORITY_COLOR, PRIORITY_LABEL } from "./issue-status
 
 /** 单选用「空 value」表示清除 (自动派发 / 无项目)。 */
 const NONE = "";
+
+/** spec-driven chain (wave147)。骨架内容与 `packages/shared/src/spec-templates.ts` 对应。 */
+type SpecKind = "requirement" | "bugfix" | "design" | "task";
+const SPEC_KINDS: SpecKind[] = ["requirement", "bugfix", "design", "task"];
+const SPEC_KIND_LABEL: Record<SpecKind, string> = {
+  requirement: "需求",
+  bugfix: "缺陷修复",
+  design: "设计",
+  task: "任务",
+};
+function specSkeleton(kind: SpecKind): Record<string, unknown> {
+  const todo = "（待填写）";
+  switch (kind) {
+    case "requirement":
+      return {
+        kind,
+        requirement: {
+          body: `${todo}描述要做什么 —— 1~3 句话。`,
+          acceptanceCriteria: [`${todo}一条可判定的验收条件。`],
+        },
+      };
+    case "bugfix":
+      return {
+        kind,
+        bugfix: {
+          reproSteps: `${todo}复现步骤 1、2、3…`,
+          expectedBehavior: `${todo}预期行为。`,
+          actualBehavior: `${todo}实际行为。`,
+        },
+      };
+    case "design":
+      return {
+        kind,
+        design: {
+          approach: `${todo}怎么做：接口 / 数据 / 边界。`,
+          tradeoffs: [`${todo}权衡 1。`],
+          apiSurface: `${todo}接口或数据结构（可留空）。`,
+        },
+      };
+    case "task":
+      return {
+        kind,
+        task: {
+          files: [`${todo}path/to/file.ts`],
+          steps: [`${todo}改动点 1。`],
+        },
+      };
+  }
+}
 
 /**
  * 新建任务弹窗 —— **两张卡** (主要内容 + 指派) + [放弃]/[创建任务]。
@@ -66,6 +115,8 @@ export function CreateTaskModal({
   // 缺陷记录到任务 (wave132): 类型 任务/缺陷 + 严重度 P0-P3。
   const [issueKind, setIssueKind] = useState<"task" | "defect">("task");
   const [severity, setSeverity] = useState<"P0" | "P1" | "P2" | "P3">("P1");
+  // spec-driven chain (wave147): 选定后建单成功即把该类型的 spec 骨架写进任务。
+  const [specKind, setSpecKind] = useState<SpecKind | "">("");
   const [busy, setBusy] = useState(false);
   const [assigneeOpen, setAssigneeOpen] = useState(false);
 
@@ -93,6 +144,7 @@ export function CreateTaskModal({
     setDescription("");
     setPriority("medium");
     setAssigneeOpen(false);
+    setSpecKind("");
     resetFields();
   }, [resetFields]);
 
@@ -114,8 +166,17 @@ export function CreateTaskModal({
           ? { defect: { severity, source: null, reproSteps: null } }
           : {}),
       });
+      // spec-driven chain (wave147): 建单成功后补写 spec 骨架（失败不阻塞建单）。
+      if (specKind) {
+        try {
+          await coolie.saveIssueSpec(issue.id, specSkeleton(specKind));
+        } catch {
+          // 任务已存在；spec 写失败不改建单结果。
+        }
+      }
       setIssueKind("task");
       setSeverity("P1");
+      setSpecKind("");
       reset();
       onCreated(issue);
       if (failedUploads.length > 0) {
@@ -126,7 +187,7 @@ export function CreateTaskModal({
     } finally {
       setBusy(false);
     }
-  }, [busy, description, fields, issueKind, onCreated, priority, reset, severity, title]);
+  }, [busy, description, fields, issueKind, onCreated, priority, reset, severity, specKind, title]);
 
   const selectedAssigneeName = useMemo(() => {
     if (!fields.assigneeAgentId) return "自动派发";
@@ -278,6 +339,47 @@ export function CreateTaskModal({
                       active={priority === value}
                       onPress={() => setPriority(value)}
                     />
+                  ))}
+                </View>
+              </View>
+
+              <View style={styles.priorityBlock}>
+                <Text style={styles.fieldLabel}>Spec 类型</Text>
+                <View style={styles.chipRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="无 Spec"
+                    accessibilityState={{ selected: specKind === "" }}
+                    disabled={busy}
+                    onPress={() => setSpecKind("")}
+                    style={({ pressed }) => [
+                      styles.priorityChip,
+                      specKind === "" && styles.priorityChipActive,
+                      pressed && styles.priorityChipPressed,
+                    ]}
+                  >
+                    <Text style={[styles.priorityText, specKind === "" && styles.priorityTextActive]}>
+                      无
+                    </Text>
+                  </Pressable>
+                  {SPEC_KINDS.map((kind) => (
+                    <Pressable
+                      key={kind}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Spec ${SPEC_KIND_LABEL[kind]}`}
+                      accessibilityState={{ selected: specKind === kind }}
+                      disabled={busy}
+                      onPress={() => setSpecKind(kind)}
+                      style={({ pressed }) => [
+                        styles.priorityChip,
+                        specKind === kind && styles.priorityChipActive,
+                        pressed && styles.priorityChipPressed,
+                      ]}
+                    >
+                      <Text style={[styles.priorityText, specKind === kind && styles.priorityTextActive]}>
+                        {SPEC_KIND_LABEL[kind]}
+                      </Text>
+                    </Pressable>
                   ))}
                 </View>
               </View>

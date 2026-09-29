@@ -387,6 +387,18 @@ export class CoolieClient {
   }
 
   /**
+   * spec-driven chain (wave147): write a spec onto an existing task.
+   * Same endpoint the Coolie Web Spec editor uses (`POST /api/issues/:id/spec`).
+   */
+  async saveIssueSpec(issueId: string, spec: Record<string, unknown>): Promise<unknown> {
+    return this.request<unknown>(
+      "POST",
+      `/api/issues/${encodeURIComponent(issueId)}/spec`,
+      spec,
+    );
+  }
+
+  /**
    * 收件箱快捷归档 —— 与 Coolie Web 的 `InboxArchiveButton` / `SwipeToArchive`
    * 同一个端点 (`POST /issues/:id/inbox-archive`)。归档是 per-user 的收件箱状态,
    * 不是删除任务: 任务本体和详情页都不受影响。
