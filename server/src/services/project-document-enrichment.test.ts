@@ -159,6 +159,59 @@ describe("extractProjectGoals", () => {
     expect(extractProjectGoals(text)).toEqual(["Deliver the customer portal", "Secure the data"]);
   });
 
+  // wave139: the exact section vocabulary the relaxation was specified for, so a
+  // future edit to GOAL_SECTION_RE cannot silently drop one of them.
+  it.each([
+    "建设目标",
+    "项目目标",
+    "业务目标",
+    "建设内容",
+    "交付内容",
+    "业务场景",
+    "功能清单",
+    "建设范围",
+  ])("recognises the `%s` section heading", (heading) => {
+    const text = [`## ${heading}`, "- 建成门户", "- 打通结算"].join("\n");
+    expect(extractProjectGoals(text)).toEqual(["建成门户", "打通结算"]);
+  });
+
+  it.each(["Goals", "Objectives", "Scope", "Deliverables"])(
+    "recognises the English `%s` heading",
+    (heading) => {
+      const text = [`## ${heading}`, "- Deliver the customer portal", "- Secure the data"].join(
+        "\n",
+      );
+      expect(extractProjectGoals(text)).toEqual([
+        "Deliver the customer portal",
+        "Secure the data",
+      ]);
+    },
+  );
+
+  // wave139: every entry-numbering form a Chinese spec uses, under one plain
+  // `2.1 技术目标` heading — `1.`, `1)`, `1、`, `（1）` and the three bullets.
+  it("reads `1.`/`1)`/`1、`/`（1）` and the markdown bullets as entries", () => {
+    const text = [
+      "2.1 技术目标",
+      "1. 统一门户",
+      "2) 支付结算",
+      "3、数据资产",
+      "（4）运营保障",
+      "- 培训服务",
+      "* 质保服务",
+      "+ 安全服务",
+    ].join("\n");
+    expect(extractProjectGoals(text)).toEqual([
+      "统一门户",
+      "支付结算",
+      "数据资产",
+      "运营保障",
+      "培训服务",
+      "质保服务",
+      "安全服务",
+    ]);
+  });
+
   it("skips a long prose line inside a flattened table row", () => {
     const text = [
       "## 交付内容",

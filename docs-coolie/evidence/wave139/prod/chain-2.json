@@ -1,0 +1,56 @@
+{
+  "identifier": "XROA-168",
+  "issueId": "f3b3a82e-d371-471f-a2e0-9545ec179368",
+  "finalStatus": "done",
+  "commentCount": 1,
+  "comments": [
+    {
+      "author": "95069d63",
+      "at": "2026-09-29T07:11:56.636Z",
+      "body": "wave139 全链路末段复测交付完成。\n\n- 文件路径：/home/ubuntu/.paperclip/instances/default/projects/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/b0e465c4-3a06-49e6-93cc-e97ca3eebf9f/wave139-before-1790664333497/wave139-delivery.txt\n- 文件内容：wave139 员工交付自检通过\n\n自检通过，状态置为 done。"
+    }
+  ],
+  "recentRuns": [
+    {
+      "id": "dec26111-696c-4fd0-8f8b-271b75ced2a9",
+      "status": "succeeded",
+      "agentId": "95069d63-2221-4500-9e17-25a472c5a921",
+      "startedAt": "2026-09-29T07:11:38.332Z",
+      "finishedAt": "2026-09-29T07:11:46.936Z",
+      "error": null
+    },
+    {
+      "id": "4b391b40-47c7-4327-b76d-189f59738d63",
+      "status": "running",
+      "agentId": "95069d63-2221-4500-9e17-25a472c5a921",
+      "startedAt": "2026-09-29T07:11:38.300Z",
+      "finishedAt": null,
+      "error": null
+    },
+    {
+      "id": "7e346a86-1577-40ad-a93a-3f6b35d624d9",
+      "status": "succeeded",
+      "agentId": "95069d63-2221-4500-9e17-25a472c5a921",
+      "startedAt": "2026-09-29T06:56:48.782Z",
+      "finishedAt": "2026-09-29T06:59:49.934Z",
+      "error": null
+    },
+    {
+      "id": "ef20b165-17ac-4213-b10b-fd3a6f6d3c33",
+      "status": "succeeded",
+      "agentId": "5fdf1a19-ec56-4d6f-85d0-363a57614307",
+      "startedAt": "2026-09-28T21:51:16.739Z",
+      "finishedAt": "2026-09-28T21:51:33.369Z",
+      "error": null
+    },
+    {
+      "id": "b4e10499-629c-4d35-bf4e-6324bcf9e000",
+      "status": "succeeded",
+      "agentId": "5de33aed-2ed3-443d-ad2e-51085a158a36",
+      "startedAt": "2026-09-28T21:51:08.580Z",
+      "finishedAt": "2026-09-28T21:57:58.216Z",
+      "error": null
+    }
+  ],
+  "at": "2026-09-29T07:12:02.884Z"
+}

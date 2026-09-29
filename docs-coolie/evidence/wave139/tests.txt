@@ -1,0 +1,9 @@
+
+ RUN  v4.1.11 /Users/mac/workspace/xaicd/coolie/server
+
+
+ Test Files  2 passed (2)
+      Tests  33 passed (33)
+   Start at  14:56:52
+   Duration  2.29s (transform 1.12s, setup 94ms, import 2.01s, tests 9ms, environment 0ms)
+

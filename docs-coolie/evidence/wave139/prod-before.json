@@ -1,0 +1,58 @@
+{
+  "tag": "before",
+  "base": "https://www.xrobinai.cn/XROA",
+  "companyId": "4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e",
+  "doc": "/tmp/req.docx",
+  "startedAt": "2026-09-29T06:45:27.554Z",
+  "projectId": "b0e465c4-3a06-49e6-93cc-e97ca3eebf9f",
+  "projectName": "wave139 解析真验 before 1790664333497",
+  "before": {
+    "description": null,
+    "goals": [],
+    "goalIds": []
+  },
+  "upload": {
+    "status": 201,
+    "bytes": 75521
+  },
+  "enrichmentLatencyMs": 784,
+  "after": {
+    "description": "某公司产融智能体应用系统集成服务项目 技术规范书",
+    "goals": [
+      "智能体应用平台标准功能",
+      "系统配置",
+      "角色管理",
+      "菜单配置",
+      "子账户管理",
+      "登录管理",
+      "组织信息",
+      "员工定义"
+    ],
+    "goalIds": [
+      "8f66600a-6f98-45be-a0ab-d5afed28500c",
+      "f62e7b91-b188-4aa3-b84b-d87bb9ce488c",
+      "f500812b-65e7-45dc-9a29-6f3f35039fe2",
+      "8c45f1e5-279b-4343-9c73-1a25d458a870",
+      "cdcaac93-957b-4f39-807e-04e630c23237",
+      "5e3d2f55-27f5-4ed2-9cda-49b2d13a8ee3",
+      "df322ea0-3c7d-4893-a8cf-0880080fc0a5",
+      "7e190129-f107-4707-bf53-48753807b886"
+    ]
+  },
+  "goalCount": 8,
+  "wbsDraft": {
+    "source": "某公司产融智能体应用系统集成服务项目技术规范书.docx",
+    "items": 25,
+    "goalTitles": [
+      "智能体应用平台标准功能",
+      "系统配置",
+      "角色管理",
+      "菜单配置",
+      "子账户管理",
+      "登录管理",
+      "组织信息",
+      "员工定义"
+    ]
+  },
+  "finishedAt": "2026-09-29T06:45:40.642Z"
+}

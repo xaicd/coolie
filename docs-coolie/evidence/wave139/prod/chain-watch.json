@@ -1,0 +1,61 @@
+{
+  "base": "https://www.xrobinai.cn/XROA",
+  "projectId": "b0e465c4-3a06-49e6-93cc-e97ca3eebf9f",
+  "issueId": "f3b3a82e-d371-471f-a2e0-9545ec179368",
+  "identifier": "XROA-168",
+  "finalStatus": "backlog",
+  "assigneeAgentId": "95069d63-2221-4500-9e17-25a472c5a921",
+  "commentCount": 0,
+  "comments": [],
+  "recentRuns": [
+    {
+      "id": "7e346a86-1577-40ad-a93a-3f6b35d624d9",
+      "status": "running",
+      "agentId": "95069d63-2221-4500-9e17-25a472c5a921",
+      "startedAt": "2026-09-29T06:56:48.782Z",
+      "finishedAt": null,
+      "error": null
+    },
+    {
+      "id": "ef20b165-17ac-4213-b10b-fd3a6f6d3c33",
+      "status": "succeeded",
+      "agentId": "5fdf1a19-ec56-4d6f-85d0-363a57614307",
+      "startedAt": "2026-09-28T21:51:16.739Z",
+      "finishedAt": "2026-09-28T21:51:33.369Z",
+      "error": null
+    },
+    {
+      "id": "b4e10499-629c-4d35-bf4e-6324bcf9e000",
+      "status": "succeeded",
+      "agentId": "5de33aed-2ed3-443d-ad2e-51085a158a36",
+      "startedAt": "2026-09-28T21:51:08.580Z",
+      "finishedAt": "2026-09-28T21:57:58.216Z",
+      "error": null
+    },
+    {
+      "id": "8658c71c-e046-42d0-99a2-0c938e35ad64",
+      "status": "succeeded",
+      "agentId": "3e3dbce1-d8cb-47bd-af68-2872200ac509",
+      "startedAt": "2026-09-28T21:49:29.414Z",
+      "finishedAt": "2026-09-28T21:50:16.326Z",
+      "error": null
+    },
+    {
+      "id": "969c98c0-379d-4943-9239-57c46145b0bd",
+      "status": "succeeded",
+      "agentId": "5de33aed-2ed3-443d-ad2e-51085a158a36",
+      "startedAt": "2026-09-28T21:49:29.225Z",
+      "finishedAt": "2026-09-28T21:50:13.119Z",
+      "error": null
+    },
+    {
+      "id": "aab7ebe0-1dfb-4b20-8a85-75ed6570da6f",
+      "status": "succeeded",
+      "agentId": "a6911d32-83cb-49e0-bd0f-cb12a14cd583",
+      "startedAt": "2026-09-28T21:49:29.145Z",
+      "finishedAt": "2026-09-28T21:50:05.329Z",
+      "error": null
+    }
+  ],
+  "at": "2026-09-29T07:06:17.887Z"
+}
