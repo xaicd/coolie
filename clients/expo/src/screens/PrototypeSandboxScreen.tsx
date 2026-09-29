@@ -37,7 +37,7 @@ import type {
   IssueWorkProduct,
   WorkspaceRuntimeService,
 } from "@coolie/api-client";
-import { C, COOLIE_BASE_URL, getAuthToken } from "../coolie";
+import { C, COOLIE_BASE_URL, getAuthToken, getWebExchangeToken } from "../coolie";
 import { EmptyState } from "../ui/EmptyState";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { ExternalOpenSheet } from "../components/ExternalOpenSheet";
@@ -204,22 +204,44 @@ export function PrototypeSandboxScreen({
     url: string | null;
     isSnapshot: boolean;
   }>(() => resolvePreviewUrl(_service, workProduct, initialUrl, bust));
-  // 附件内容端点需要鉴权; WebView 与内容探测都带上 SecureStore 里的 bearer token。
+  // 附件内容端点需要鉴权。两种登录方式各有各的凭据:
+  //   · API Key 登录 → SecureStore 里的 bearer token, 直接塞进 WebView 请求头;
+  //   · 邮箱/会话登录 → 只有原生 cookie jar 里有会话 cookie, 而 Android WebView
+  //     用的是自己的 cookie 存储(sharedCookiesEnabled 仅 iOS 生效)。这里改用
+  //     WebContainerScreen 同一套 /api/auth/exchange 桥: WebView 先访问
+  //     <origin>/api/auth/exchange?token=…&next=<目标>, 服务端 302 并 Set-Cookie,
+  //     WebView 自带 cookie 再跟随到交付物 URL —— 于是页面在沙箱里真渲染。
   const [authHeaders, setAuthHeaders] = useState<Record<string, string> | undefined>(undefined);
+  const [bridgeUrl, setBridgeUrl] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void getAuthToken()
-      .then((token) => {
-        if (!cancelled) setAuthHeaders(token ? { Authorization: `Bearer ${token}` } : undefined);
-      })
-      .catch(() => {
-        if (!cancelled) setAuthHeaders(undefined);
-      });
+    setAuthHeaders(undefined);
+    setBridgeUrl(null);
+    if (!url) return;
+    void (async () => {
+      const token = await getAuthToken().catch(() => null);
+      if (cancelled) return;
+      if (token) {
+        setAuthHeaders({ Authorization: `Bearer ${token}` });
+        return;
+      }
+      const session = await getWebExchangeToken().catch(() => null);
+      if (cancelled || !session) return;
+      let origin = COOLIE_BASE_URL;
+      try {
+        origin = new URL(url).origin;
+      } catch {
+        // 相对路径时沿用默认站点。
+      }
+      setBridgeUrl(
+        `${origin.replace(/\/+$/, "")}/api/auth/exchange?token=${encodeURIComponent(session)}&next=${encodeURIComponent(url)}`,
+      );
+    })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [url]);
 
   // DS 真值: useEffect(resolve, [sessionId]); 我们重入参 resolve() 一次
   useEffect(() => {
@@ -250,10 +272,14 @@ export function PrototypeSandboxScreen({
       void (async () => {
         try {
           const token = await getAuthToken().catch(() => null);
+          // credentials:"include" 借原生 cookie jar 授权(会话登录的探测路径);
+          // bearer 登录已由 headers 带上。
           const res = await fetch(resolvedUrl, {
             headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+            credentials: "include",
           });
           if (cancelled) return;
+          if (!res.ok) return; // 鉴权/网络失败时交给 WebView(桥/头部)去处理
           const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
           if (
             contentType.includes("text/html") ||
@@ -367,11 +393,15 @@ export function PrototypeSandboxScreen({
         </View>
       ) : canWebView ? (
         <WebView
-          key={markdownHtml ? "markdown-preview" : isSnapshot ? url : `${url}`}
+          key={markdownHtml ? "markdown-preview" : (bridgeUrl ?? url ?? "preview")}
           source={
             markdownHtml
               ? { html: markdownHtml }
-              : { uri: url ?? "", headers: authHeaders }
+              : authHeaders
+                ? { uri: url ?? "", headers: authHeaders }
+                // 会话登录: 先走 exchange 桥给 WebView 自己的 cookie jar 落 cookie,
+                // 再 302 到交付物 URL。
+                : { uri: bridgeUrl ?? url ?? "" }
           }
           style={styles.web}
           originWhitelist={["*"]}
