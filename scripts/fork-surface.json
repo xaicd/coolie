@@ -544,8 +544,8 @@
     {
       "path": "packages/db/src/schema/issues.ts",
       "maxNetLines": 20,
-      "reason": "wave132 缺陷记录到任务: adds one nullable jsonb column `defect` ($type<IssueDefect | null>) beside source_trust/unblock_descriptor. A non-null value is what marks an issue as a defect, so no existing row changes meaning and no backfill is needed. Cannot live in our own tree: it is the issue table the server, the validators and the migration snapshot all read.",
-      "maxTotalLines": 20
+      "reason": "wave132 缺陷记录到任务: adds one nullable jsonb column `defect` ($type<IssueDefect | null>) beside source_trust/unblock_descriptor. A non-null value is what marks an issue as a defect, so no existing row changes meaning and no backfill is needed. Cannot live in our own tree: it is the issue table the server, the validators and the migration snapshot all read. wave147 appends `spec_kind` (text) + `spec` (jsonb) and the (company_id, spec_kind) index for the spec-driven chain; cumulative budget raised 20 → 40 to cover both waves.",
+      "maxTotalLines": 40
     },
     {
       "path": "packages/db/src/migrations/9005_add_issue_defect.sql",
@@ -870,6 +870,90 @@
       "maxNetLines": 60,
       "maxTotalLines": 60,
       "reason": "wave148: new web API client for the workshop conversation endpoints (list/create/update/archive). No upstream counterpart — upstream's BoardChat had no conversation concept."
+    },
+    {
+      "path": "packages/shared/src/types/issue-spec.ts",
+      "maxNetLines": 120,
+      "maxTotalLines": 140,
+      "reason": "wave147: the spec-driven chain contract (IssueSpec + per-kind payloads). No upstream counterpart — upstream has no spec-driven layer."
+    },
+    {
+      "path": "packages/shared/src/validators/issue-spec.ts",
+      "maxNetLines": 180,
+      "maxTotalLines": 220,
+      "reason": "wave147: issueSpecSchema (strict) and issueSpecDraftSchema (lenient) plus the from-template/tree request schemas. No upstream counterpart."
+    },
+    {
+      "path": "packages/shared/src/validators/issue-spec.test.ts",
+      "maxNetLines": 140,
+      "maxTotalLines": 170,
+      "reason": "wave147: unit tests for the two spec schemas. No upstream counterpart."
+    },
+    {
+      "path": "packages/shared/src/spec-templates.ts",
+      "maxNetLines": 120,
+      "maxTotalLines": 140,
+      "reason": "wave147: the per-kind skeleton registry, one source for what a fresh spec of each kind starts as. No upstream counterpart."
+    },
+    {
+      "path": "packages/shared/src/spec-tree.ts",
+      "maxNetLines": 100,
+      "maxTotalLines": 120,
+      "reason": "wave147: the pure spec-forest builder (no I/O), tested on its own. No upstream counterpart."
+    },
+    {
+      "path": "packages/shared/src/spec-tree.test.ts",
+      "maxNetLines": 120,
+      "maxTotalLines": 140,
+      "reason": "wave147: tests for the spec-forest builder including the orphan and self-parent cases. No upstream counterpart."
+    },
+    {
+      "path": "packages/shared/src/validators/index.ts",
+      "maxNetLines": 30,
+      "maxTotalLines": 40,
+      "reason": "wave147: one export block re-exporting the issue-spec validators, matching the existing ./work-product.js block."
+    },
+    {
+      "path": "packages/db/src/migrations/9008_add_issue_spec.sql",
+      "maxNetLines": 60,
+      "maxTotalLines": 80,
+      "reason": "wave147: hand-written fork migration adding issues.spec_kind/spec plus the (company_id, spec_kind) index. No upstream counterpart; the 9000 range is where fork migrations live."
+    },
+    {
+      "path": "server/src/routes/issue-specs.ts",
+      "maxNetLines": 300,
+      "maxTotalLines": 360,
+      "reason": "wave147: new route module for GET/POST /issues/:id/spec, GET /companies/:id/specs/tree and POST /companies/:id/specs/from-template. No upstream counterpart."
+    },
+    {
+      "path": "server/src/routes/index.ts",
+      "maxNetLines": 20,
+      "maxTotalLines": 30,
+      "reason": "wave147: one re-export line for issueSpecRoutes, matching the sibling route barrels."
+    },
+    {
+      "path": "server/src/__tests__/issue-spec-routes.test.ts",
+      "maxNetLines": 240,
+      "maxTotalLines": 280,
+      "reason": "wave147: embedded-Postgres integration test driving the spec chain through the real routes. No upstream counterpart."
+    },
+    {
+      "path": "ui/src/api/specs.ts",
+      "maxNetLines": 80,
+      "maxTotalLines": 100,
+      "reason": "wave147: typed web client for the spec endpoints. No upstream counterpart."
+    },
+    {
+      "path": "ui/src/components/SpecEditor.tsx",
+      "maxNetLines": 480,
+      "maxTotalLines": 560,
+      "reason": "wave147: the three-step spec editor (stepper + four kind tabs). No upstream counterpart; token-only styling."
+    },
+    {
+      "path": "ui/src/pages/IssueSpecPage.tsx",
+      "maxNetLines": 90,
+      "maxTotalLines": 110,
+      "reason": "wave147: the /issues/:issueId/spec page that hosts the spec editor. No upstream counterpart."
     }
   ]
 }
