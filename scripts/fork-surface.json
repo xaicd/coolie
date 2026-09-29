@@ -954,6 +954,12 @@
       "maxNetLines": 90,
       "maxTotalLines": 110,
       "reason": "wave147: the /issues/:issueId/spec page that hosts the spec editor. No upstream counterpart."
+    },
+    {
+      "path": "ui/src/pages/SpecTreePage.tsx",
+      "maxNetLines": 140,
+      "maxTotalLines": 160,
+      "reason": "wave147: the /specs forest view (requirement/bugfix -> design -> task). No upstream counterpart; token-only styling."
     }
   ]
 }

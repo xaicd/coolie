@@ -37,6 +37,7 @@ import { Issues } from "./pages/Issues";
 import { Search } from "./pages/Search";
 import { IssueDetail } from "./pages/IssueDetail";
 import { IssueSpecPage } from "./pages/IssueSpecPage";
+import { SpecTreePage } from "./pages/SpecTreePage";
 import { AgentChat } from "./pages/AgentChat";
 import { IssueChatLongThreadPerf } from "./pages/IssueChatLongThreadPerf";
 import { Routines } from "./pages/Routines";
@@ -316,6 +317,7 @@ function boardRoutes(streamlinedUiEnabled: boolean) {
       <Route path="chats/:agentRef" element={<AgentChat />} />
       <Route path="issues/:issueId" element={<IssueDetail />} />
       <Route path="issues/:issueId/spec" element={<IssueSpecPage />} />
+      <Route path="specs" element={<SpecTreePage />} />
       {import.meta.env.DEV ? (
         <Route path="tests/perf/long-thread" element={<IssueChatLongThreadPerf />} />
       ) : null}
@@ -780,6 +782,7 @@ export function App() {
           <Route path="tasks" element={<UnprefixedBoardRedirect />} />
           <Route path="issues/:issueId" element={<UnprefixedBoardRedirect />} />
           <Route path="issues/:issueId/spec" element={<UnprefixedBoardRedirect />} />
+          <Route path="specs" element={<UnprefixedBoardRedirect />} />
           <Route path="routines" element={<UnprefixedBoardRedirect />} />
           <Route path="routines/:routineId" element={<UnprefixedBoardRedirect />} />
           <Route path="review-queue" element={<UnprefixedBoardRedirect />} />
