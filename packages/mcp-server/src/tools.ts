@@ -13,6 +13,9 @@ import {
   createIssueInputSchema,
   createProjectSchema,
   updateProjectSchema,
+  issueSpecKindSchema,
+  specTemplateSkeleton,
+  type IssueSpec,
   issueThreadInteractionContinuationPolicySchema,
   requestCheckboxConfirmationPayloadSchema,
   requestConfirmationPayloadSchema,
@@ -162,6 +165,42 @@ const createIssueToolSchema = z.object({
 const updateIssueToolSchema = z.object({
   issueId: issueIdSchema,
 }).merge(updateIssueSchema);
+
+const specCreateToolSchema = z.object({
+  companyId: companyIdOptional,
+  kind: issueSpecKindSchema,
+  parentIssueId: issueIdSchema.optional().nullable(),
+  title: z.string().trim().min(1).max(300).optional(),
+  body: z.string().trim().max(20_000).optional(),
+});
+
+const specTreeToolSchema = z.object({
+  companyId: companyIdOptional,
+  projectId: projectIdSchema.optional().nullable(),
+});
+
+const specTemplateApplyToolSchema = z.object({
+  issueId: issueIdSchema,
+  templateName: issueSpecKindSchema,
+  parentSpecId: issueIdSchema.optional().nullable(),
+});
+
+/**
+ * Overwrite the one field a kind treats as its primary text (the rest of the
+ * skeleton, e.g. an empty acceptance-criteria list, is left for a human).
+ */
+function withPrimarySpecBody(spec: IssueSpec, body: string): IssueSpec {
+  switch (spec.kind) {
+    case "requirement":
+      return { ...spec, requirement: { ...spec.requirement!, body } };
+    case "bugfix":
+      return { ...spec, bugfix: { ...spec.bugfix!, reproSteps: body } };
+    case "design":
+      return { ...spec, design: { ...spec.design!, approach: body } };
+    case "task":
+      return { ...spec, task: { ...spec.task!, steps: [body] } };
+  }
+}
 
 const checkoutIssueToolSchema = z.object({
   issueId: issueIdSchema,
@@ -1109,6 +1148,44 @@ export function createToolDefinitions(client: PaperclipApiClient): ToolDefinitio
           body: parseOptionalJson(jsonBody),
         });
       },
+    ),
+    makeTool(
+      "spec_create",
+      "Start a spec-driven chain by creating a new issue with a spec of the given kind (requirement/bugfix/design/task). Optionally set the primary body text and link a parent spec via parentIssueId.",
+      specCreateToolSchema,
+      async ({ companyId, kind, parentIssueId, title, body }) => {
+        const created = (await client.requestJson(
+          "POST",
+          `/companies/${client.resolveCompanyId(companyId)}/specs/from-template`,
+          { body: { kind, parentIssueId: parentIssueId ?? null, ...(title ? { title } : {}) } },
+        )) as { issueId: string };
+        if (body && created?.issueId) {
+          await client.requestJson("POST", `/issues/${created.issueId}/spec`, {
+            body: withPrimarySpecBody(specTemplateSkeleton(kind), body),
+          });
+        }
+        return created;
+      },
+    ),
+    makeTool(
+      "spec_tree",
+      "Read a company's whole spec-driven tree (requirement/bugfix -> design -> task), optionally scoped to one project",
+      specTreeToolSchema,
+      async ({ companyId, projectId }) =>
+        client.requestJson(
+          "GET",
+          `/companies/${client.resolveCompanyId(companyId)}/specs/tree` +
+            (projectId ? `?projectId=${encodeURIComponent(projectId)}` : ""),
+        ),
+    ),
+    makeTool(
+      "spec_template_apply",
+      "Apply a spec template skeleton (requirement/bugfix/design/task) to an existing issue's spec",
+      specTemplateApplyToolSchema,
+      async ({ issueId, templateName, parentSpecId }) =>
+        client.requestJson("POST", `/issues/${issueId}/spec`, {
+          body: { ...specTemplateSkeleton(templateName), parentSpecId: parentSpecId ?? null },
+        }),
     ),
   ];
 }

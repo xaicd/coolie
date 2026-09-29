@@ -699,3 +699,70 @@ describe("paperclip MCP tools", () => {
   });
 });
 
+describe("spec-driven MCP tools (wave147)", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("spec_create starts from a template, then writes the primary body", async () => {
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(mockJsonResponse({ issueId: "ISSUE-1" }))
+      .mockResolvedValueOnce(mockJsonResponse({ issueId: "ISSUE-1", specKind: "requirement" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getTool("spec_create").execute({
+      kind: "requirement",
+      parentIssueId: "PARENT-1",
+      title: "Receipt",
+      body: "Show a receipt",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [url1, init1] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url1)).toBe(
+      `http://localhost:3100/api/companies/${COMPANY_A}/specs/from-template`,
+    );
+    expect(init1.method).toBe("POST");
+    expect(JSON.parse(String(init1.body))).toEqual({
+      kind: "requirement",
+      parentIssueId: "PARENT-1",
+      title: "Receipt",
+    });
+
+    const [url2, init2] = fetchMock.mock.calls[1] as [string, RequestInit];
+    expect(String(url2)).toBe("http://localhost:3100/api/issues/ISSUE-1/spec");
+    expect(JSON.parse(String(init2.body))).toMatchObject({
+      kind: "requirement",
+      requirement: { body: "Show a receipt" },
+    });
+  });
+
+  it("spec_tree reads the company tree with an optional project filter", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ roots: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getTool("spec_tree").execute({ projectId: "PROJ-1" });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(
+      `http://localhost:3100/api/companies/${COMPANY_A}/specs/tree?projectId=PROJ-1`,
+    );
+    expect(init.method).toBe("GET");
+  });
+
+  it("spec_template_apply writes a skeleton onto an existing issue", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ issueId: "ISSUE-2" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getTool("spec_template_apply").execute({ issueId: "ISSUE-2", templateName: "task" });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/ISSUE-2/spec");
+    const body = JSON.parse(String(init.body));
+    expect(body.kind).toBe("task");
+    expect(Array.isArray(body.task.files)).toBe(true);
+    expect(body.parentSpecId).toBeNull();
+  });
+});
+
