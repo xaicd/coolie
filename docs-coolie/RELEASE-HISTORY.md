@@ -6,9 +6,30 @@ Git 里程碑 tag 流水。自 **v0.5.97** 起建立本文件；此前的 0.5.x 
 | Tag | Date | Version | Commit | Notes |
 |---|---|---|---|---|
 | v0.5.97 | 2026-09-29 | 0.5.97 | bc48b1e80 | wave142: WBS 任务自动路由 + 沙箱附件真渲染 + 启动链路端到端可观察 |
+| v0.6.0 | 2026-09-29 | 0.6.0 | 269526f19 | wave150 合并发版: wave147 spec-driven + wave148 多对话 + wave144 board-chat 修复（见 §v0.6.0） |
 
 约定: tag 指向该版本「发版完成」的提交（含 `chore(release): version.json …` 这一步），
 注释写本波主题。推送方式 `git push origin <tag>`（本仓库 push 需绕本地代理）。
+
+## v0.6.0 — 已发出 (wave150)
+
+`bash scripts/release-app.sh 0.6.0 "…"` **exit 0**，发版 commit **`269526f19`**。真值：
+
+- APK：`https://dls.xrobinai.cn/coolie/app/0.6.0/coolie-release.apk`，78,117,898 Byte (74.50 MB)，
+  sha256 `5fd43b4436538b549075e58481d802962f9b0a99ab73bc13e7c39dd8b7022978`（COS 对象 `cos://gzbucket/coolie/app/0.6.0/coolie-release.apk`）。
+- version.json / OTA(android, runtimeVersion 0.6.0) / server 联动部署 均已完成；**4 护栏全 200**
+  （version.json=0.6.0 · ota/manifest 200 · APK 206 · api/health 200）。
+- 本波同时把 wave147 的 7 个 commit push 上 `origin/main`（`0cc1a63eb` → `536fcca9f`）。
+
+**5 波合并的真实构成（诚实标注）**：0.6.0 实际只含 **3 波**——wave147 spec-driven、wave148 工坊多对话、
+wave144 board-chat 修复。**wave146「init script」从未落地**（该波自己的 `FINDINGS.md` 记录 P0-A 前提被
+推翻、P2-D/P2-E 未做）；**wave149「浏览器打开按钮」修法仍在 `clients/expo` 的未提交改动里**，本波按纪律
+`stash`（`stash@{0}`）而未入包。故 production `version.json` 的 `releaseNotes` 里「wave146 init script /
+wave149 浏览器打开按钮」两句名不副实，需修正或由下一版补。详见
+`docs-coolie/evidence/wave150/QA-REPORT.md` §6。
+
+> 本节同时**作废**下方「v0.5.98 未发出」「v0.6.1 未发起」两节的等待前提：0.6.0 已落地，0.5.98 / 0.6.1
+> 作为独立版本号不再需要；`clients/expo` 工作区在发版时是干净的（未提交改动已 stash 保留）。
 
 ## v0.5.98 — 已发起, 未发出 (blocked)
 
