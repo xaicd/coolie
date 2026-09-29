@@ -2807,3 +2807,41 @@ export { REMOTE_MCP_CONNECTOR_METHODS, isRemoteMcpConnectorId, isRemoteMcpConnec
 export { isRetiredComposioConnection, RETIRED_COMPOSIO_MESSAGE } from "./retired-composio.js";
 
 export * from "./slack-tools.js";
+
+// Spec-driven development (wave147): the spec chain's contract, validators,
+// template skeletons and the pure tree builder.
+export { ISSUE_SPEC_KINDS, type IssueSpecKind } from "./constants.js";
+export type {
+  IssueSpec,
+  IssueSpecRequirement,
+  IssueSpecBugfix,
+  IssueSpecDesign,
+  IssueSpecTask,
+  IssueSpecResponse,
+  IssueSpecTreeNode,
+  IssueSpecTreeResponse,
+} from "./types/issue-spec.js";
+export {
+  createSpecFromTemplateSchema,
+  issueSpecBugfixSchema,
+  issueSpecDesignSchema,
+  issueSpecDraftSchema,
+  issueSpecKindSchema,
+  issueSpecRequirementSchema,
+  issueSpecSchema,
+  issueSpecTaskSchema,
+  saveIssueSpecSchema,
+  specTreeQuerySchema,
+  type CreateSpecFromTemplateInput,
+  type IssueSpecDraftInput,
+  type IssueSpecInput,
+  type SaveIssueSpecInput,
+} from "./validators/issue-spec.js";
+export {
+  SPEC_TEMPLATE_NAMES,
+  isSpecPlaceholder,
+  specPayloadKey,
+  specTemplateSkeleton,
+  type SpecTemplateName,
+} from "./spec-templates.js";
+export { buildSpecTree, type SpecTreeRow } from "./spec-tree.js";

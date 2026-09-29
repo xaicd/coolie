@@ -21,7 +21,7 @@ import { companies } from "./companies.js";
 import { heartbeatRuns } from "./heartbeat_runs.js";
 import { projectWorkspaces } from "./project_workspaces.js";
 import { executionWorkspaces } from "./execution_workspaces.js";
-import type { IssueDefect, IssueMilestone, IssueReviewPolicy, IssueUnblockDescriptor, IssueWbsType, SourceTrustMetadata } from "@paperclipai/shared";
+import type { IssueDefect, IssueMilestone, IssueReviewPolicy, IssueSpec, IssueSpecKind, IssueUnblockDescriptor, IssueWbsType, SourceTrustMetadata } from "@paperclipai/shared";
 
 export const issues = pgTable(
   "issues",
@@ -91,6 +91,10 @@ export const issues = pgTable(
     isMilestone: boolean("is_milestone").notNull().default(false),
     /** Milestone metadata; only ever non-null together with is_milestone = true. */
     milestone: jsonb("milestone").$type<IssueMilestone | null>(),
+    /** Spec-driven stage (wave147): requirement / bugfix / design / task. */
+    specKind: text("spec_kind").$type<IssueSpecKind | null>(),
+    /** The spec payload matching spec_kind; null when the issue carries no spec. */
+    spec: jsonb("spec").$type<IssueSpec | null>(),
     blockedTransitionAt: timestamp("blocked_transition_at", { withTimezone: true }),
     blockedOwnerNotifiedAt: timestamp("blocked_owner_notified_at", { withTimezone: true }),
     startedAt: timestamp("started_at", { withTimezone: true }),
@@ -210,5 +214,7 @@ export const issues = pgTable(
     onboardingFirstTaskIdx: uniqueIndex("issues_onboarding_first_task_uq")
       .on(table.companyId)
       .where(sql`${table.originKind} = 'onboarding_first_task'`),
+    /** Spec tree reads filter one company by spec_kind (wave147). */
+    specKindIdx: index("issues_company_spec_kind_idx").on(table.companyId, table.specKind),
   }),
 );

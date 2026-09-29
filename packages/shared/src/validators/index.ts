@@ -566,6 +566,23 @@ export {
 } from "./work-product.js";
 
 export {
+  createSpecFromTemplateSchema,
+  issueSpecBugfixSchema,
+  issueSpecDesignSchema,
+  issueSpecDraftSchema,
+  issueSpecKindSchema,
+  issueSpecRequirementSchema,
+  issueSpecSchema,
+  issueSpecTaskSchema,
+  saveIssueSpecSchema,
+  specTreeQuerySchema,
+  type CreateSpecFromTemplateInput,
+  type IssueSpecDraftInput,
+  type IssueSpecInput,
+  type SaveIssueSpecInput,
+} from "./issue-spec.js";
+
+export {
   COMPANY_ARTIFACTS_DEFAULT_LIMIT,
   COMPANY_ARTIFACTS_MAX_LIMIT,
   COMPANY_ARTIFACTS_MAX_QUERY_LENGTH,

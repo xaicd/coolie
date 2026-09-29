@@ -251,6 +251,13 @@ export const MILESTONE_STATUSES = ["not_started", "in_progress", "achieved", "bl
 export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number];
 
 /**
+ * Spec-driven development stage (wave147). A spec rides on an issue; the chain is
+ * requirement/bugfix (root) → design → task, linked by the parent issue's id.
+ */
+export const ISSUE_SPEC_KINDS = ["requirement", "bugfix", "design", "task"] as const;
+export type IssueSpecKind = (typeof ISSUE_SPEC_KINDS)[number];
+
+/**
  * CMMI gate vocabulary, aligned to the `cmmi-*` skills' machine-readable
  * `cmmi-profile.json` (`gate_g1_spec` … `gate_g5_release`). A 收口 milestone
  * carries the gate it closes; the stage-gate linkage reads that key.

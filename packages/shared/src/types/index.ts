@@ -1075,3 +1075,14 @@ export * from "./chat-channels.js";
 export * from "./chat-github.js";
 
 export * from "./email.js";
+
+export type {
+  IssueSpec,
+  IssueSpecRequirement,
+  IssueSpecBugfix,
+  IssueSpecDesign,
+  IssueSpecTask,
+  IssueSpecResponse,
+  IssueSpecTreeNode,
+  IssueSpecTreeResponse,
+} from "./issue-spec.js";
