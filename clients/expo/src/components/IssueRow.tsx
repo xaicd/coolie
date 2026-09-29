@@ -53,6 +53,12 @@ export const IssueRow = memo(function IssueRow({
         {issue.title}
       </Text>
 
+      {issue.isMilestone ? (
+        <Text style={styles.mainlineTag} numberOfLines={1}>
+          主线
+        </Text>
+      ) : null}
+
       {showStatusLabel ? (
         <Text style={[styles.statusLabel, { color }]} numberOfLines={1}>
           {issue.status}
@@ -94,6 +100,17 @@ const styles = StyleSheet.create({
   titleCancelled: {
     color: C.ink4,
     textDecorationLine: "line-through",
+  },
+  mainlineTag: {
+    color: C.accent,
+    fontSize: 10,
+    fontWeight: "600",
+    borderWidth: 1,
+    borderColor: C.accent,
+    borderRadius: RADIUS.pill,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    overflow: "hidden",
   },
   statusLabel: {
     fontSize: 11,

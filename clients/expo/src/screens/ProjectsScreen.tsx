@@ -19,6 +19,7 @@ import { ScreenHeader } from "../ui/ScreenHeader";
 import { StatusDot } from "../components/StatusDot";
 import { ApiContractSheet } from "../components/ApiContractSheet";
 import { CreateProjectSheet } from "../components/CreateProjectSheet";
+import { ProjectMilestones } from "../components/ProjectMilestones";
 
 type StatusFilter = "all" | "in_progress" | "planned" | "completed" | "paused";
 
@@ -427,6 +428,13 @@ export function ProjectsScreen({
                         ))}
                       </View>
                     ) : null}
+
+                    {/* 里程碑主线 (wave140): CMMI WBS 草案 + 阶段里程碑 + 门禁联动 */}
+                    <ProjectMilestones
+                      companyId={company.id}
+                      projectId={project.id}
+                      onChanged={() => void load()}
+                    />
 
                     {/* 原生 CMMI 质量与门禁审计态势面板
                         wave108 (QA D09): 删除与六宫格同目标的 10 个重复深链按钮;

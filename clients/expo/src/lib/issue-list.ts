@@ -32,6 +32,8 @@ export interface IssueSelection {
   status: StatusFilter;
   assignee: AssigneeFilter;
   project: ProjectFilter;
+  /** 只看主线 —— 只留 里程碑 (isMilestone) 任务 (wave140). */
+  mainline?: boolean;
   sortField: IssueSortField;
   sortDir: IssueSortDir;
 }
@@ -109,6 +111,9 @@ export function selectIssues(issues: Issue[], sel: IssueSelection): Issue[] {
     list = list.filter(
       (issue) => (issue.projectId ?? NO_PROJECT) === sel.project,
     );
+  }
+  if (sel.mainline) {
+    list = list.filter((issue) => issue.isMilestone === true);
   }
 
   return sortIssues(list, sel.sortField, sel.sortDir);

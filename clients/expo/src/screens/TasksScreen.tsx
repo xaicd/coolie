@@ -100,6 +100,7 @@ export function TasksScreen({
   const [status, setStatus] = useState<StatusFilter>("all");
   const [assignee, setAssignee] = useState("all");
   const [project, setProject] = useState(initialProjectId ?? "all");
+  const [mainline, setMainline] = useState(false);
   const [view, setView] = useState<IssuesView>("list");
   const [sortValue, setSortValue] = useState(SORT_OPTIONS[0]!.value);
   const [sheet, setSheet] = useState<SheetKind>(null);
@@ -116,10 +117,11 @@ export function TasksScreen({
       status,
       assignee,
       project,
+      mainline,
       sortField: sortOption.field,
       sortDir: sortOption.dir,
     }),
-    [search, scope, status, assignee, project, sortOption],
+    [search, scope, status, assignee, project, mainline, sortOption],
   );
 
   const statusCounts = useMemo(
@@ -321,6 +323,11 @@ export function TasksScreen({
             active={false}
             chevron
             onPress={() => setSheet("sort")}
+          />
+          <Chip
+            label="只看主线"
+            active={mainline}
+            onPress={() => setMainline((value) => !value)}
           />
         </ScrollView>
 

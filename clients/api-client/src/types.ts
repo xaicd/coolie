@@ -26,6 +26,112 @@ export interface IssueDefect {
   evidenceAttachmentIds: string[];
 }
 
+/** WBS node kinds an issue can carry: 阶段 / 工作包 / 任务 (wave140). */
+export type IssueWbsType = "phase" | "work_package" | "task";
+/** Milestone lifecycle: 未开始 / 进行中 / 已达成 / 阻塞. */
+export type MilestoneStatus = "not_started" | "in_progress" | "achieved" | "blocked";
+/** CMMI gate vocabulary, aligned to the cmmi-* skills' cmmi-profile.json. */
+export type CmmiGateKey =
+  | "gate_g1_spec"
+  | "gate_g2_arch"
+  | "gate_g3_compile"
+  | "gate_g4_eval"
+  | "gate_g5_release";
+
+/**
+ * Milestone metadata for a 主线 task (wave140). Only present together with
+ * `isMilestone === true`. `exempted` + `exemptionReason` record a deliberate
+ * waiver of the stage-gate linkage.
+ */
+export interface IssueMilestone {
+  gate: CmmiGateKey | null;
+  status: MilestoneStatus;
+  plannedDate: string | null;
+  completedDate: string | null;
+  approver: string | null;
+  evidence: string | null;
+  exempted: boolean;
+  exemptionReason: string | null;
+}
+
+/** One node of an auto-generated CMMI WBS draft (wave140). */
+export interface ProjectWbsDraftItem {
+  code: string;
+  type: IssueWbsType;
+  title: string;
+  description: string | null;
+  isMilestone: boolean;
+  milestone: IssueMilestone | null;
+  parentCode: string | null;
+}
+
+export interface ProjectWbsDraft {
+  generatedAt: string;
+  source: string | null;
+  goalTitles: string[];
+  items: ProjectWbsDraftItem[];
+}
+
+/** Stage-gate state for one issue (wave140), derived server-side. */
+export interface WbsGateState {
+  gate: CmmiGateKey | null;
+  blocked: boolean;
+  blockedByMilestoneId: string | null;
+  blockedByMilestoneCode: string | null;
+  blockedByMilestoneTitle: string | null;
+  reason: string | null;
+}
+
+export interface WbsMainlineMilestone {
+  id: string;
+  code: string;
+  title: string;
+  gate: CmmiGateKey | null;
+  gateLabel: string | null;
+  status: MilestoneStatus;
+  plannedDate: string | null;
+  completedDate: string | null;
+  approver: string | null;
+  evidence: string | null;
+  exempted: boolean;
+  exemptionReason: string | null;
+  blocked: boolean;
+}
+
+export interface WbsMainlinePhase {
+  index: number;
+  key: string;
+  name: string;
+  gate: CmmiGateKey | null;
+  acceptance: string;
+  milestone: WbsMainlineMilestone | null;
+  issueCount: number;
+  doneCount: number;
+}
+
+export interface WbsMainline {
+  phases: WbsMainlinePhase[];
+  achievedGates: number;
+  totalGates: number;
+  currentPhaseIndex: number | null;
+}
+
+/** `GET /companies/:companyId/projects/:projectId/wbs` (wave140). */
+export interface ProjectWbsView {
+  projectId: string;
+  draft: ProjectWbsDraft | null;
+  mainline: WbsMainline;
+  gateStates: Record<string, WbsGateState>;
+}
+
+/** Result of adopting a WBS draft into real issues. */
+export interface ProjectWbsAdoption {
+  projectId: string;
+  createdIssueIds: string[];
+  milestoneIssueIds: string[];
+  itemCount: number;
+}
+
 export interface Company {
   id: string;
   name: string;
@@ -118,6 +224,10 @@ export interface Project {
     repoRef?: string | null;
   } | null;
   taskCount?: number;
+  /** Number of 里程碑/主线 tasks in the project (wave140). */
+  milestoneCount?: number;
+  /** Auto-generated CMMI WBS draft awaiting 采纳/忽略 (wave140). */
+  wbsDraft?: ProjectWbsDraft | null;
   codebase?: {
     origin?: string;
     localFolder?: string | null;
@@ -211,6 +321,14 @@ export interface Issue {
   priority: IssuePriority;
   /** Present when this task is a defect; its presence is what makes it one. */
   defect?: IssueDefect | null;
+  /** WBS hierarchical number ("1", "1.1", "1.1.2"); null when the task has no WBS slot. */
+  wbsCode?: string | null;
+  /** WBS node kind: 阶段 / 工作包 / 任务. */
+  wbsType?: IssueWbsType | null;
+  /** True marks a 里程碑/主线 task — the flag the 只看主线 filter reads. */
+  isMilestone?: boolean;
+  /** Milestone metadata; only present (non-null) when `isMilestone` is true. */
+  milestone?: IssueMilestone | null;
   companyId: string;
   /**
    * Presentation fields the list endpoints already return. Optional because the

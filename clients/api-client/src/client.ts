@@ -27,6 +27,8 @@ import {
   type ProjectDocument,
   type ProjectDocumentAnalysis,
   type ProjectDocumentUpload,
+  type ProjectWbsAdoption,
+  type ProjectWbsView,
   type SessionUser,
   type SetDomainLifecycleOptions,
   type UploadFilePart,
@@ -462,6 +464,34 @@ export class CoolieClient {
     return this.request<Project>(
       "GET",
       `/api/projects/${encodeURIComponent(projectId)}${suffix}`,
+    );
+  }
+
+  /**
+   * wave140: 项目 CMMI WBS 主线视图 —— 待采纳草案 + 里程碑主线 + 各任务门禁状态。
+   * `GET /api/companies/:companyId/projects/:projectId/wbs`
+   */
+  async getProjectWbs(companyId: string, projectId: string): Promise<ProjectWbsView> {
+    return this.request<ProjectWbsView>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/wbs`,
+    );
+  }
+
+  /** 一键采纳 WBS 草案 → 物化为阶段/工作包/里程碑任务（幂等）。 */
+  async adoptProjectWbsDraft(companyId: string, projectId: string): Promise<ProjectWbsAdoption> {
+    return this.request<ProjectWbsAdoption>(
+      "POST",
+      `/api/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/wbs/adopt`,
+      {},
+    );
+  }
+
+  /** 忽略 WBS 草案（不物化）。 */
+  async dismissProjectWbsDraft(companyId: string, projectId: string): Promise<void> {
+    await this.request<unknown>(
+      "DELETE",
+      `/api/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/wbs/draft`,
     );
   }
 
