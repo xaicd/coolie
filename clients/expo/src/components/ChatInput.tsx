@@ -229,6 +229,11 @@ export function ChatInput({
   }, [onPickAttachment]);
 
   const showSend = value.trim().length > 0 && !sending;
+  // wave144: buttons (attach / mic) stand down while a reply is streaming, but
+  // the text box must not. The boss read the disabled input as "the page is
+  // locked" and could not even draft the next message. `editable` below is
+  // driven by `disabled` alone; the send button is already replaced by the stop
+  // button while `sending`, so nothing can be dispatched twice.
   const canEdit = !sending && !disabled;
 
   const panResponder = React.useMemo(
@@ -382,7 +387,7 @@ export function ChatInput({
           style={[
             styles.textInput,
             recording && styles.textInputRecording,
-            !canEdit && styles.textInputDisabled,
+            disabled && styles.textInputDisabled,
           ]}
           placeholder={
             recording
@@ -396,7 +401,7 @@ export function ChatInput({
           onChangeText={onChangeText}
           multiline
           maxLength={1000}
-          editable={canEdit}
+          editable={!disabled}
         />
 
         {/* [🎤] 微信/QQ 风格滑动 mic: PanResponder 驱动左滑取消 / 右滑转文字 */}

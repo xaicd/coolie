@@ -583,6 +583,11 @@ export function boardChatRoutes(
     );
 
     const proc = spawn("hermes", ["chat", ...args], {
+      // wave144: keep the child in this process group explicitly (the default).
+      // `detached: true` would put hermes in its own group, where a signal we
+      // send the child never reaches the grandchildren it spawns — and a
+      // `hermes` wedged inside a provider call would then outlive its relay.
+      detached: false,
       stdio: ["pipe", "pipe", "pipe"],
       cwd: "/tmp",
       env: {
@@ -647,9 +652,24 @@ export function boardChatRoutes(
       },
     });
 
+    // wave144: announce the spawn. The client renders `status` as a progress
+    // line, so "subprocess is up, waiting on the model" is distinguishable from
+    // "nothing has started yet" — the boss could not tell those apart before.
+    if (res.writable) {
+      res.write(
+        `data: ${JSON.stringify({ type: "status", text: "会话助手已启动, 正在等待模型…" })}\n\n`,
+      );
+    }
+
     let fullResponse = "";
     let streamedViaDelta = false;
     let killed = false;
+    // wave144: the first-token watchdog tripped — the child wrote nothing at all
+    // inside its window. Tracked separately from `killed` (the overall cap) so
+    // the room gets "nothing came back" instead of "the answer was too long".
+    let firstTokenTimedOut = false;
+    // Set on the child's first stdout byte; the watchdog then stands down.
+    let sawStdout = false;
     // Tail of the CLI's stderr. hermes prints `session_id:` here and, when the
     // run dies early, sometimes the reason too; kept for the failure message
     // below. Capped so a chatty subprocess can't grow it without bound.
@@ -663,10 +683,67 @@ export function boardChatRoutes(
       const raw = Number(process.env.PAPERCLIP_BOARD_CHAT_TIMEOUT_MS);
       return Number.isFinite(raw) && raw > 0 ? raw : 180_000;
     })();
+
+    // wave144: how long the room waits for the child's *first* byte before the
+    // relay gives up. The cap above covers a long-but-working turn; this one
+    // covers the opposite failure — a `hermes` that never gets anywhere
+    // (provider blocked, wedged startup, an unexpected interactive prompt).
+    // Without it the boss watched a spinner until the 180s cap.
+    const firstTokenTimeoutMs = (() => {
+      const raw = Number(process.env.PAPERCLIP_BOARD_CHAT_FIRST_TOKEN_TIMEOUT_MS);
+      return Number.isFinite(raw) && raw > 0 ? raw : 30_000;
+    })();
+
+    /**
+     * wave144: `SIGTERM` asks a process to stop; it does not make it. A child
+     * wedged inside a provider SDK call can ignore it, and then the SSE stream
+     * stays open until the overall cap — the "一直转圈" the boss reported.
+     * Escalate to `SIGKILL` after a short grace period so the close handler
+     * always runs and the room always gets a terminal event.
+     */
+    let killGrace: NodeJS.Timeout | null = null;
+    const killChild = (signal: NodeJS.Signals = "SIGTERM") => {
+      if (proc.exitCode !== null || proc.killed) return;
+      proc.kill(signal);
+      if (!killGrace) {
+        killGrace = setTimeout(() => {
+          if (proc.exitCode === null) proc.kill("SIGKILL");
+        }, 5_000);
+      }
+    };
+
     const timeout = setTimeout(() => {
       killed = true;
-      proc.kill("SIGTERM");
+      killChild("SIGTERM");
     }, timeoutMs);
+
+    const firstTokenWatchdog = setTimeout(() => {
+      if (sawStdout) return;
+      firstTokenTimedOut = true;
+      killChild("SIGTERM");
+    }, firstTokenTimeoutMs);
+
+    // wave144: keep the SSE connection warm. A byte-idle stream can be dropped
+    // by an intermediary, and RN's fetch gives the caller no way to tell a dead
+    // socket from a slow model. A comment frame every 5s keeps it open and marks
+    // the relay alive; the client parser only reads `data:` lines, so it is
+    // invisible to the UI.
+    const heartbeat = setInterval(() => {
+      if (res.writable) res.write(": ping\n\n");
+    }, 5_000);
+
+    const cleanupTimers = () => {
+      clearTimeout(timeout);
+      clearTimeout(firstTokenWatchdog);
+      if (killGrace) clearTimeout(killGrace);
+      clearInterval(heartbeat);
+    };
+
+    // wave144: set when the stream closes while the child is still running —
+    // i.e. the boss cancelled (the App aborts the fetch) or the connection
+    // dropped. Distinguishes "we stopped it" from "something killed it", so a
+    // cancel does not land in history as `[hermes-error] … SIGTERM`.
+    let stoppedByClient = false;
 
     // If the client disconnects mid-stream, stop the subprocess rather than
     // letting it run out the remaining timeout window. `close` also fires
@@ -674,9 +751,8 @@ export function boardChatRoutes(
     // the `proc.on("close")` handler still persists partial output and
     // releases the concurrency slot.
     res.on("close", () => {
-      if (proc.exitCode === null && !proc.killed) {
-        proc.kill("SIGTERM");
-      }
+      if (proc.exitCode === null) stoppedByClient = true;
+      killChild("SIGTERM");
     });
 
     const writeChunk = (text: string) => {
@@ -708,6 +784,12 @@ export function boardChatRoutes(
     // terminal full `assistant` message to avoid duplicating the text.
     let stdoutBuf = "";
     proc.stdout.on("data", (data: Buffer) => {
+      // wave144: first byte seen — the child is alive and talking, so the
+      // first-token watchdog stands down.
+      if (!sawStdout) {
+        sawStdout = true;
+        clearTimeout(firstTokenWatchdog);
+      }
       stdoutBuf += data.toString();
       const lines = stdoutBuf.split("\n");
       stdoutBuf = lines.pop() ?? "";
@@ -759,22 +841,35 @@ export function boardChatRoutes(
       console.error("[board/chat/stream stderr]", text);
     });
 
-    proc.on("close", async (exitCode) => {
-      clearTimeout(timeout);
+    proc.on("close", async (exitCode, signal) => {
+      cleanupTimers();
       releaseSlot();
 
       const cleanedResponse = stripActionSignals(fullResponse);
 
-      // A run that exits non-zero, answers with nothing, or answers with a bare
-      // transient status line is a failure the room has to see. This is also
-      // the store-time guard for wave115: a status/progress line must never be
-      // persisted as a concierge bubble. The relay used to emit `done`
-      // regardless, so a quota-exhausted key (HTTP 429, code 1310) or a bad
-      // credential looked like an empty reply: zero chunks, no explanation, and
-      // — because the reply was empty — not even a persisted comment. Surface
-      // it on both channels instead: an `error` event for the live room, and a
-      // board-concierge comment so a reload still shows what happened.
+      // wave144: a child killed by a signal reports `code === null`. The relay
+      // used to read only the exit code, so a signalled child — the boss's
+      // "exit 130" (SIGINT), or the SIGTERM we send on timeout — was judged by
+      // its output alone and could be reported as a clean `done`. Treat
+      // "terminated by a signal" as a failure in its own right and name it, so
+      // SIGINT/killed is never mistaken for success.
+      const signalled = signal != null;
+      const exitLabel = signalled
+        ? `${exitCode ?? "?"} (signal ${signal})`
+        : `${exitCode ?? "?"}`;
+
+      // A run that is signalled, exits non-zero, answers with nothing, or
+      // answers with a bare transient status line is a failure the room has to
+      // see. This is also the store-time guard for wave115: a status/progress
+      // line must never be persisted as a concierge bubble. The relay used to
+      // emit `done` regardless, so a quota-exhausted key (HTTP 429, code 1310)
+      // or a bad credential looked like an empty reply: zero chunks, no
+      // explanation, and — because the reply was empty — not even a persisted
+      // comment. Surface it on both channels instead: an `error` event for the
+      // live room, and a board-concierge comment so a reload still shows what
+      // happened.
       const failed =
+        signalled ||
         (exitCode ?? 0) !== 0 ||
         !cleanedResponse.trim() ||
         isBoardChatStatusLine(cleanedResponse);
@@ -785,7 +880,7 @@ export function boardChatRoutes(
         const detail = (
           cleanedResponse.trim() ||
           stderrBuf.trim() ||
-          `hermes exited ${exitCode ?? "?"} with no output`
+          `hermes exited ${exitLabel} with no output`
         ).slice(0, 1000);
 
         // A slow run that still produced usable text (wave124: a 看板文件 turn
@@ -822,18 +917,56 @@ export function boardChatRoutes(
           return;
         }
 
-        const seconds = Math.round(timeoutMs / 1000);
-        const message = killed
-          ? `这次生成超过 ${seconds} 秒仍未完成，任务可能较大或模型较慢；请再发一次让我继续。`
-          : `Board assistant failed (exit ${exitCode ?? "?"}). ${detail}`;
+        // wave144: we stopped this run ourselves because the boss cancelled or
+        // the connection dropped. That must not be written as
+        // `[hermes-error] … SIGTERM` — that turns "we called it off" into a
+        // fault piling up in history (the boss complained about exactly this
+        // class of text in wave129). Keep any usable text as a partial reply so
+        // a reload still shows what was generated; otherwise close quietly.
+        if (stoppedByClient) {
+          if (cleanedResponse.trim() && !isBoardChatStatusLine(cleanedResponse)) {
+            try {
+              await issueSvc.addComment(resolvedIssueId, cleanedResponse, {
+                userId: "board-concierge",
+              });
+            } catch (e) {
+              console.error(
+                "[board-chat] failed to persist stopped concierge reply:",
+                e,
+              );
+            }
+          }
+          return;
+        }
+
+        // wave144: three distinct failures, three distinct messages. A
+        // first-token timeout means the child never produced anything (the
+        // "一直转圈" case); the overall cap means it answered but ran long; a
+        // signalled/非零 exit is a real error and keeps the raw detail.
+        const timedOut = killed || firstTokenTimedOut;
+        const seconds = Math.round(
+          (firstTokenTimedOut ? firstTokenTimeoutMs : timeoutMs) / 1000,
+        );
+        const message = firstTokenTimedOut
+          ? `助手在 ${seconds} 秒内没有返回任何内容, 已自动中止; 请点重试。`
+          : killed
+            ? `这次生成超过 ${seconds} 秒仍未完成，任务可能较大或模型较慢；请再发一次让我继续。`
+            : `Board assistant failed (exit ${exitLabel}). ${detail}`;
         // The raw detail stays in the server log for operators; a timeout is
         // reported to the boss as a plain status line, not `[hermes-error]`.
-        if (killed) console.error("[board-chat] timed out:", detail);
+        if (timedOut) {
+          console.error(
+            firstTokenTimedOut
+              ? "[board-chat] first-token timeout:"
+              : "[board-chat] timed out:",
+            detail,
+          );
+        }
 
         try {
           await issueSvc.addComment(
             resolvedIssueId,
-            killed ? message : `[hermes-error] ${message}`,
+            timedOut ? message : `[hermes-error] ${message}`,
             { userId: "board-concierge" },
           );
         } catch (e) {
@@ -846,7 +979,8 @@ export function boardChatRoutes(
               type: "error",
               message,
               exitCode: exitCode ?? 0,
-              timedOut: killed,
+              ...(signalled ? { signal } : {}),
+              timedOut,
             })}\n\n`,
           );
           res.end();
@@ -886,7 +1020,7 @@ export function boardChatRoutes(
     });
 
     proc.on("error", (err) => {
-      clearTimeout(timeout);
+      cleanupTimers();
       releaseSlot();
       console.error("[board/chat/stream spawn error]", err);
       if (res.writable) {

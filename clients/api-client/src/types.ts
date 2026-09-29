@@ -1048,7 +1048,16 @@ export type BoardChatStreamEvent =
   | { type: "status"; text: string }
   | { type: "chunk"; text: string }
   | { type: "done"; issueId: string; exitCode?: number; timedOut?: boolean }
-  | { type: "error"; message: string };
+  // wave144: `signal` is set when the relay's child was terminated by a signal
+  // (e.g. SIGINT), and `timedOut` marks both the first-token watchdog and the
+  // overall cap, so a client can tell the three failures apart.
+  | {
+      type: "error";
+      message: string;
+      exitCode?: number;
+      signal?: string;
+      timedOut?: boolean;
+    };
 
 export interface BoardChatStreamCallbacks {
   onStart?: (issueId: string) => void;

@@ -165,10 +165,12 @@ describe("board-chat failure surfacing", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.PAPERCLIP_BOARD_CHAT_TIMEOUT_MS;
+    delete process.env.PAPERCLIP_BOARD_CHAT_FIRST_TOKEN_TIMEOUT_MS;
   });
 
   afterEach(async () => {
     delete process.env.PAPERCLIP_BOARD_CHAT_TIMEOUT_MS;
+    delete process.env.PAPERCLIP_BOARD_CHAT_FIRST_TOKEN_TIMEOUT_MS;
     await Promise.all(
       servers.splice(0).map(
         (s) =>
@@ -197,6 +199,9 @@ describe("board-chat failure surfacing", () => {
    * Start the request against a real HTTP listener and return the promise for
    * the finished SSE body. supertest buffers unknown content types and never
    * settles on `text/event-stream`, so the streaming cases go through `fetch`.
+   *
+   * `abort` walks away mid-stream (the App's cancel button / a dropped
+   * connection); the body promise then resolves to "" instead of rejecting.
    */
   async function startChat(proc: any) {
     mockGetExperimental.mockResolvedValue({ enableConferenceRoomChat: true });
@@ -216,16 +221,21 @@ describe("board-chat failure surfacing", () => {
     // Await the response headers before emitting on the fake process: the route
     // flushes them before spawning, so this guarantees the `close` listener is
     // registered by the time the test drives the subprocess.
+    const controller = new AbortController();
     const response = await fetch(
       `http://127.0.0.1:${port}/api/board/chat/stream`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ companyId: "company-1", message: "ping" }),
+        signal: controller.signal,
       },
     );
     await vi.waitFor(() => expect(mockSpawn).toHaveBeenCalled());
-    return { pending: response.text() };
+    return {
+      pending: response.text().catch(() => ""),
+      abort: () => controller.abort(),
+    };
   }
 
   it("emits an error event + persists a comment when hermes exits non-zero with no output", async () => {
@@ -297,6 +307,85 @@ describe("board-chat failure surfacing", () => {
 
     expect(text).toContain('"type":"error"');
     expect(text).toContain("秒");
+    const saved = String(mockIssueService.addComment.mock.calls.at(-1)?.[1]);
+    expect(saved).not.toContain("[hermes-error]");
+  });
+
+  /**
+   * wave144: when the boss cancels (or the connection drops) the relay SIGTERMs
+   * the child it started. That is not a fault, and writing it as
+   * `[hermes-error] … SIGTERM` would pile fake failures into the standing
+   * issue's history. The partial answer is kept instead.
+   */
+  it("treats a client cancel as a stop, not as [hermes-error]", async () => {
+    const proc = makeFakeProc();
+    const { pending, abort } = await startChat(proc);
+
+    proc.stdout.emit("data", Buffer.from("已经写了一半的回答\n"));
+
+    // The boss taps 停止 / the connection drops.
+    abort();
+    await vi.waitFor(() => expect(proc.kill).toHaveBeenCalledWith("SIGTERM"));
+
+    proc.exitCode = null;
+    proc.emit("close", null, "SIGTERM");
+
+    await pending;
+
+    const bodies = mockIssueService.addComment.mock.calls.map((call: any[]) =>
+      String(call[1]),
+    );
+    expect(bodies.some((body) => body.includes("[hermes-error]"))).toBe(false);
+    expect(bodies.some((body) => body.includes("已经写了一半的回答"))).toBe(true);
+  });
+
+  /**
+   * wave144: a child killed by a signal reports `code === null`. Before, the
+   * relay only read the exit code, so a SIGINT-killed child was judged by its
+   * output alone and could be closed as a clean `done`. The boss hit exactly
+   * this as "Board assistant failed (exit 130)" in the persisted history.
+   */
+  it("reports a signalled exit (SIGINT) as an error and names the signal", async () => {
+    const proc = makeFakeProc();
+    const { pending } = await startChat(proc);
+
+    proc.exitCode = null;
+    proc.emit("close", null, "SIGINT");
+
+    const text = await pending;
+
+    expect(text).toContain('"type":"error"');
+    expect(text).toContain("SIGINT");
+    expect(text).not.toContain('"type":"done"');
+
+    const saved = String(mockIssueService.addComment.mock.calls.at(-1)?.[1]);
+    expect(saved).toContain("[hermes-error]");
+    expect(saved).toContain("SIGINT");
+  });
+
+  /**
+   * wave144: the boss's "一直转圈". A child that never writes a single byte is
+   * hung, not slow — the room must be told inside the first-token window
+   * instead of waiting out the (much longer) overall cap.
+   */
+  it("aborts a run with no first token and reports it honestly", async () => {
+    process.env.PAPERCLIP_BOARD_CHAT_FIRST_TOKEN_TIMEOUT_MS = "80";
+    const proc = makeFakeProc();
+    const { pending } = await startChat(proc);
+
+    // The watchdog fires on its own; no manual kill.
+    await vi.waitFor(() => expect(proc.kill).toHaveBeenCalledWith("SIGTERM"));
+    proc.exitCode = 143;
+    proc.emit("close", 143, "SIGTERM");
+
+    const text = await pending;
+
+    expect(text).toContain('"type":"error"');
+    expect(text).toContain("没有返回任何内容");
+    expect(text).toContain('"timedOut":true');
+    expect(text).not.toContain('"type":"done"');
+
+    // A stall is reported as a plain status line, not as `[hermes-error]`.
     const saved = String(mockIssueService.addComment.mock.calls.at(-1)?.[1]);
     expect(saved).not.toContain("[hermes-error]");
   });

@@ -43,7 +43,6 @@ import {
 } from "../components/SpecDiffCard";
 import { parseCommand, pipelineKeyFromName, tCommand } from "../components/commandRouter";
 import { AppCard } from "../ui/AppCard";
-import { ErrorRetry } from "../ui/ErrorRetry";
 import { Pill } from "../ui/Pill";
 import { formatTime } from "../utils/format";
 import { parseInlineTags } from "../components/board-inline/tagParser";
@@ -73,6 +72,14 @@ const QUICK_PROMPTS = [
 
 /** 长按录音的最短时长: 短于此视为误触 (300ms), 不送 ASR。 */
 const MIN_VOICE_HOLD_MS = 300;
+
+/**
+ * wave144: 首 token 超时。SSE 连上后这么久还没吐出任何 token, 就认为这次发问
+ * 卡住了 (服务端子进程 hung, 或被中间层吞掉的连接), 主动 abort 并把状态变成
+ * 「可重试」的错误气泡 —— 而不是让老板一直看着转圈。服务端自己的 first-token
+ * watchdog 也是 30s 量级, 谁先到都能收场。
+ */
+const FIRST_TOKEN_TIMEOUT_MS = 30_000;
 
 type BoardEchoListener = (message: BoardChatMessage) => void;
 
@@ -119,6 +126,35 @@ export function exportBoardEcho(text: string): void {
 function drainBoardEchoQueue(): BoardChatMessage[] {
   if (boardEchoQueue.length === 0) return [];
   return boardEchoQueue.splice(0, boardEchoQueue.length);
+}
+
+/**
+ * wave144: 「正在进行的这一次发问」的模块级镜像。
+ *
+ * App.tsx 按 tab 条件渲染工坊屏 —— 发问期间切到「汇览」会把它卸载, 组件内的
+ * sending / streamingText 随之清零, 老板切回工坊时看到一片空白, 以为整个 App
+ * 卡死了。把在飞的这一次发问镜像到模块作用域, 重新挂载时据此恢复转圈和已到的
+ * 正文; 结束 (publishLiveBoardChat(null)) 后不恢复 —— 服务端已经把回复落成
+ * concierge 评论, loadHistory 会拉到, 不会重复渲染。
+ *
+ * abort controller 也放在这里: 它属于发起它的那次 handleSend 闭包, 重挂载后的
+ * 局部 ref 已指向 null, 挂在模块上才能让新的「取消」按钮中止原来那条流。
+ */
+interface LiveBoardChatState {
+  companyId: string;
+  accumulated: string;
+  status: string;
+}
+let liveBoardChat: LiveBoardChatState | null = null;
+let liveBoardChatAbort: AbortController | null = null;
+const liveBoardChatListeners = new Set<
+  (state: LiveBoardChatState | null) => void
+>();
+
+function publishLiveBoardChat(next: LiveBoardChatState | null): void {
+  liveBoardChat = next;
+  if (next === null) liveBoardChatAbort = null;
+  liveBoardChatListeners.forEach((listener) => listener(next));
 }
 
 const boardPromptQueue: string[] = [];
@@ -399,6 +435,9 @@ export function BoardChatScreen({
   const flatListRef = useRef<FlatList<BoardChatMessage>>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   const accumulatedRef = useRef("");
+  /** wave144: 首 token 看门狗的表 + 是否由它触发 (区别于用户主动取消) */
+  const firstTokenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const firstTokenTimeoutRef = useRef(false);
 
   // 会话内语音: 长按 mic 录音 -> 松开自动转文字填入输入框 -> 用户确认后再发送。
   // 只复用 wave14 的 useRecorder + voiceDispatch 链路 (mode=transcribe-only), 不建任务。
@@ -459,6 +498,33 @@ export function BoardChatScreen({
   useEffect(() => {
     void loadHistory();
   }, [loadHistory]);
+
+  /**
+   * wave144: 订阅并恢复在飞的这一次发问。挂载时若模块里还留着一条在飞的流
+   * (老板发完问切去了别的 tab 又切回来), 立刻恢复转圈 / 已到的正文; 流结束时
+   * 会收到 null 并清干净。已结束的不恢复 —— 回复已由服务端落库, loadHistory
+   * 会拉到, 避免重复。
+   */
+  useEffect(() => {
+    const listener = (state: LiveBoardChatState | null) => {
+      if (state && state.companyId === company.id) {
+        setSending(true);
+        setStreamingText(state.accumulated);
+        setStatusText(state.status);
+        return;
+      }
+      if (!state) {
+        setSending(false);
+        setStreamingText("");
+        setStatusText("");
+      }
+    };
+    liveBoardChatListeners.add(listener);
+    listener(liveBoardChat);
+    return () => {
+      liveBoardChatListeners.delete(listener);
+    };
+  }, [company.id]);
 
   const copyToClipboard = useCallback((text: string) => {
     Clipboard.setString(text);
@@ -978,6 +1044,21 @@ export function BoardChatScreen({
 
       const controller = new AbortController();
       abortControllerRef.current = controller;
+      // wave144: 把这次发问镜像到模块, 切 tab 卸载后仍能恢复; 同时起首 token
+      // 看门狗 —— 全程没有 token 就主动收场, 不把老板晾在转圈里。
+      liveBoardChatAbort = controller;
+      firstTokenTimeoutRef.current = false;
+      publishLiveBoardChat({
+        companyId: company.id,
+        accumulated: "",
+        status: "正在连接会话助手…",
+      });
+      if (firstTokenTimerRef.current) clearTimeout(firstTokenTimerRef.current);
+      firstTokenTimerRef.current = setTimeout(() => {
+        if (accumulatedRef.current.trim()) return;
+        firstTokenTimeoutRef.current = true;
+        controller.abort();
+      }, FIRST_TOKEN_TIMEOUT_MS);
 
       try {
         await coolie.streamBoardChat(
@@ -996,11 +1077,26 @@ export function BoardChatScreen({
             },
             onStatus: (status) => {
               setStatusText(status);
+              publishLiveBoardChat({
+                companyId: company.id,
+                accumulated: accumulatedRef.current,
+                status,
+              });
             },
             onChunk: (chunk) => {
+              // 首个 token 到了, 看门狗下班。
+              if (firstTokenTimerRef.current) {
+                clearTimeout(firstTokenTimerRef.current);
+                firstTokenTimerRef.current = null;
+              }
               accumulatedRef.current += chunk;
               setStreamingText(accumulatedRef.current);
               setStatusText("");
+              publishLiveBoardChat({
+                companyId: company.id,
+                accumulated: accumulatedRef.current,
+                status: "",
+              });
               scrollToBottom(false);
             },
             onDone: (doneEvent) => {
@@ -1009,6 +1105,11 @@ export function BoardChatScreen({
               }
             },
             onError: (err) => {
+              // 服务端已经给了终局错误, 看门狗没有意义了。
+              if (firstTokenTimerRef.current) {
+                clearTimeout(firstTokenTimerRef.current);
+                firstTokenTimerRef.current = null;
+              }
               const msg =
                 typeof err === "string" ? err : err?.message ?? "问答流中断";
               setErrorText(msg);
@@ -1028,6 +1129,14 @@ export function BoardChatScreen({
           setMessages((prev) => [...prev, assistantMsg]);
         }
       } catch (e: any) {
+        // wave144: 看门狗触发的 abort 不是「用户取消」—— 要给出可重试的错误,
+        // 不能像主动取消那样静默返回 (那正是老板看不到任何反馈的原因)。
+        if (firstTokenTimeoutRef.current) {
+          setErrorText(
+            `助手 ${Math.round(FIRST_TOKEN_TIMEOUT_MS / 1000)} 秒内没有返回内容, 可能卡住了 — 点「重试」再发一次。`,
+          );
+          return;
+        }
         if (controller.signal.aborted) return;
         const msg = String(e?.message ?? e ?? "连接异常");
         setErrorText(msg);
@@ -1044,10 +1153,16 @@ export function BoardChatScreen({
           setMessages((prev) => [...prev, assistantMsg]);
         }
       } finally {
+        if (firstTokenTimerRef.current) {
+          clearTimeout(firstTokenTimerRef.current);
+          firstTokenTimerRef.current = null;
+        }
         setSending(false);
         setStreamingText("");
         setStatusText("");
         abortControllerRef.current = null;
+        // 清掉模块镜像: 结束的这一次不再恢复 (回复由 loadHistory 从服务端拉)。
+        publishLiveBoardChat(null);
         scrollToBottom();
       }
     },
@@ -1154,24 +1269,31 @@ export function BoardChatScreen({
   };
 
   const handleStop = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      setSending(false);
-      const partial = accumulatedRef.current.trim();
-      if (partial) {
-        setMessages((prev) => [
-          ...prev,
-          {
-            id: `assistant-stopped-${Date.now()}`,
-            role: "assistant",
-            text: `${partial}\n\n*(已手动停止生成)*`,
-            createdAt: new Date().toISOString(),
-          },
-        ]);
-      }
-      setStreamingText("");
-      setStatusText("");
+    // wave144: 重挂载后本组件的 ref 里已经没有 controller —— 用模块里那条在飞
+    // 的 (liveBoardChatAbort), 这样「切走又切回来」后的取消键仍能中止原来的流。
+    const controller = abortControllerRef.current ?? liveBoardChatAbort;
+    if (!controller) return;
+    if (firstTokenTimerRef.current) {
+      clearTimeout(firstTokenTimerRef.current);
+      firstTokenTimerRef.current = null;
     }
+    controller.abort();
+    setSending(false);
+    const partial = accumulatedRef.current.trim();
+    if (partial) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-stopped-${Date.now()}`,
+          role: "assistant",
+          text: `${partial}\n\n*(已手动停止生成)*`,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    }
+    setStreamingText("");
+    setStatusText("");
+    publishLiveBoardChat(null);
   };
 
   /**
@@ -1478,14 +1600,39 @@ export function BoardChatScreen({
                 </View>
               )}
 
-              {/* 异常或中断提示条 */}
+              {/* wave144: 失败不再只是底部闪一条 —— 像助手气泡一样留在流里,
+                  带 [重试] [复制], 老板能看清到底发生了什么, 也能一键重来。 */}
               {Boolean(errorText) && (
-                <ErrorRetry
-                  variant="inline"
-                  message={`⚠️ ${errorText}`}
-                  onRetry={handleRetry}
-                  style={styles.errorBanner}
-                />
+                <View style={styles.assistantRow}>
+                  <View style={[styles.avatarBox, styles.errorAvatarBox]}>
+                    <Text style={styles.avatarText}>⚠️</Text>
+                  </View>
+                  <View style={[styles.assistantBubble, styles.errorBubble]}>
+                    <Text style={styles.errorBubbleText}>{errorText}</Text>
+                    <View style={styles.errorActionsRow}>
+                      <Pressable
+                        onPress={handleRetry}
+                        hitSlop={6}
+                        accessibilityRole="button"
+                        accessibilityLabel="重试"
+                        style={styles.errorActionBtn}
+                      >
+                        <Ionicons name="refresh" size={13} color={C.err} />
+                        <Text style={styles.errorActionText}>重试</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => copyToClipboard(errorText ?? "")}
+                        hitSlop={6}
+                        accessibilityRole="button"
+                        accessibilityLabel="复制"
+                        style={styles.errorActionBtn}
+                      >
+                        <Ionicons name="copy-outline" size={13} color={C.err} />
+                        <Text style={styles.errorActionText}>复制</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                </View>
               )}
             </>
           }
@@ -1927,12 +2074,39 @@ const styles = StyleSheet.create({
     color: C.ink3,
     fontSize: 12,
   },
-  errorBanner: {
+  errorAvatarBox: {
     backgroundColor: "rgba(239, 68, 68, 0.12)",
-    borderColor: "rgba(239, 68, 68, 0.28)",
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    marginVertical: 6,
+    borderColor: "rgba(239, 68, 68, 0.3)",
+  },
+  errorBubble: {
+    borderColor: "rgba(239, 68, 68, 0.3)",
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
+  },
+  errorBubbleText: {
+    color: C.err,
+    fontSize: 13,
+    lineHeight: 19,
+  },
+  errorActionsRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 8,
+  },
+  errorActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.3)",
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
+  },
+  errorActionText: {
+    color: C.err,
+    fontSize: 12,
+    fontWeight: "600",
   },
   voiceStatusBar: {
     flexDirection: "row",
