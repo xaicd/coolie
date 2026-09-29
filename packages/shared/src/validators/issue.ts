@@ -15,6 +15,9 @@ import {
   ISSUE_COMMENT_PRESENTATION_DENSITIES,
   ISSUE_DEFECT_SEVERITIES,
   ISSUE_DEFECT_SOURCES,
+  ISSUE_WBS_TYPES,
+  MILESTONE_STATUSES,
+  CMMI_GATE_KEYS,
   ISSUE_HARNESS_KINDS,
   ISSUE_MONITOR_SCHEDULED_BY,
   ISSUE_PRIORITIES,
@@ -698,6 +701,38 @@ const issueDefectSchema = z
 
 export type IssueDefectInput = z.infer<typeof issueDefectSchema>;
 
+/**
+ * Milestone metadata (wave140). A waiver of the stage-gate linkage must carry a
+ * reason — an exemption with no trace is exactly the "留痕" this guards against.
+ */
+const issueMilestoneSchema = z
+  .object({
+    gate: z.enum(CMMI_GATE_KEYS).optional().nullable().default(null),
+    status: z.enum(MILESTONE_STATUSES).optional().default("not_started"),
+    plannedDate: z.string().trim().min(1).max(64).optional().nullable().default(null),
+    completedDate: z.string().trim().min(1).max(64).optional().nullable().default(null),
+    approver: multilineTextSchema.pipe(z.string().trim().max(200)).optional().nullable().default(null),
+    evidence: multilineTextSchema.pipe(z.string().trim().max(2_000)).optional().nullable().default(null),
+    exempted: z.boolean().optional().default(false),
+    exemptionReason: multilineTextSchema
+      .pipe(z.string().trim().max(2_000))
+      .optional()
+      .nullable()
+      .default(null),
+  })
+  .strict()
+  .superRefine((value, ctx) => {
+    if (value.exempted && !value.exemptionReason?.trim()) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "exempted requires exemptionReason",
+        path: ["exemptionReason"],
+      });
+    }
+  });
+
+export type IssueMilestoneInput = z.infer<typeof issueMilestoneSchema>;
+
 const createIssueBaseSchema = z.object({
   projectId: z.string().guid().optional().nullable(),
   projectWorkspaceId: z.string().guid().optional().nullable(),
@@ -725,6 +760,11 @@ const createIssueBaseSchema = z.object({
   priority: z.enum(ISSUE_PRIORITIES).optional().default("medium"),
   /** Present when the issue is a defect; severity is required in that case. */
   defect: issueDefectSchema.optional().nullable(),
+  /** WBS / milestone semantics (wave140). */
+  wbsCode: z.string().trim().max(64).optional().nullable(),
+  wbsType: z.enum(ISSUE_WBS_TYPES).optional().nullable(),
+  isMilestone: z.boolean().optional(),
+  milestone: issueMilestoneSchema.optional().nullable(),
   reviewPolicy: z.enum(ISSUE_REVIEW_POLICIES).optional().nullable(),
   assigneeAgentId: z.string().guid().optional().nullable(),
   assigneeUserId: z.string().optional().nullable(),

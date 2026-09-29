@@ -4,6 +4,7 @@ import {
   pgTable,
   uuid,
   text,
+  boolean,
   timestamp,
   integer,
   jsonb,
@@ -20,7 +21,7 @@ import { companies } from "./companies.js";
 import { heartbeatRuns } from "./heartbeat_runs.js";
 import { projectWorkspaces } from "./project_workspaces.js";
 import { executionWorkspaces } from "./execution_workspaces.js";
-import type { IssueDefect, IssueReviewPolicy, IssueUnblockDescriptor, SourceTrustMetadata } from "@paperclipai/shared";
+import type { IssueDefect, IssueMilestone, IssueReviewPolicy, IssueUnblockDescriptor, IssueWbsType, SourceTrustMetadata } from "@paperclipai/shared";
 
 export const issues = pgTable(
   "issues",
@@ -82,6 +83,14 @@ export const issues = pgTable(
     unblockDescriptor: jsonb("unblock_descriptor").$type<IssueUnblockDescriptor | null>(),
     /** Defect metadata (type/severity/source/repro/evidence). Non-null marks a defect. */
     defect: jsonb("defect").$type<IssueDefect | null>(),
+    /** Hierarchical WBS number ("1", "1.1", "1.1.2"); null when the task has no WBS slot. */
+    wbsCode: text("wbs_code"),
+    /** WBS node kind: 阶段 / 工作包 / 任务. */
+    wbsType: text("wbs_type").$type<IssueWbsType | null>(),
+    /** True marks a 里程碑/主线 task — read by the 只看主线 filter and mainline view. */
+    isMilestone: boolean("is_milestone").notNull().default(false),
+    /** Milestone metadata; only ever non-null together with is_milestone = true. */
+    milestone: jsonb("milestone").$type<IssueMilestone | null>(),
     blockedTransitionAt: timestamp("blocked_transition_at", { withTimezone: true }),
     blockedOwnerNotifiedAt: timestamp("blocked_owner_notified_at", { withTimezone: true }),
     startedAt: timestamp("started_at", { withTimezone: true }),

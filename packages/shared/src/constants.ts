@@ -239,6 +239,82 @@ export const ISSUE_DEFECT_SOURCES = [
   "customer_feedback",
 ] as const;
 export type IssueDefectSource = (typeof ISSUE_DEFECT_SOURCES)[number];
+/**
+ * WBS node kinds an issue can carry through the CMMI work breakdown:
+ * `phase` (阶段) → `work_package` (工作包) → `task` (任务).
+ */
+export const ISSUE_WBS_TYPES = ["phase", "work_package", "task"] as const;
+export type IssueWbsType = (typeof ISSUE_WBS_TYPES)[number];
+
+/** Milestone lifecycle: 未开始 / 进行中 / 已达成 / 阻塞. */
+export const MILESTONE_STATUSES = ["not_started", "in_progress", "achieved", "blocked"] as const;
+export type MilestoneStatus = (typeof MILESTONE_STATUSES)[number];
+
+/**
+ * CMMI gate vocabulary, aligned to the `cmmi-*` skills' machine-readable
+ * `cmmi-profile.json` (`gate_g1_spec` … `gate_g5_release`). A 收口 milestone
+ * carries the gate it closes; the stage-gate linkage reads that key.
+ */
+export const CMMI_GATE_KEYS = [
+  "gate_g1_spec",
+  "gate_g2_arch",
+  "gate_g3_compile",
+  "gate_g4_eval",
+  "gate_g5_release",
+] as const;
+export type CmmiGateKey = (typeof CMMI_GATE_KEYS)[number];
+
+export interface CmmiGateDefinition {
+  key: CmmiGateKey;
+  /** Gx label + 中文名. */
+  label: string;
+  /** 主责工匠角色 (emp_*). */
+  role: string;
+  /** The gate's owning artifact under docs/cmmi/. */
+  doc: string;
+  /** G1 closure means the requirement set is frozen; used for ordering. */
+  order: number;
+}
+
+export const CMMI_GATES: readonly CmmiGateDefinition[] = [
+  { key: "gate_g1_spec", label: "G1 需求门禁", role: "emp_ds", doc: "docs/cmmi/01-srs.md", order: 1 },
+  { key: "gate_g2_arch", label: "G2 架构门禁", role: "emp_fda", doc: "docs/cmmi/02-hld.md", order: 2 },
+  { key: "gate_g3_compile", label: "G3 静态编译门禁", role: "emp_swe", doc: "docs/cmmi/03-lld-api.md", order: 3 },
+  { key: "gate_g4_eval", label: "G4 验收门禁", role: "emp_fdse", doc: "docs/cmmi/04-test-report.md", order: 4 },
+  { key: "gate_g5_release", label: "G5 投产门禁", role: "emp_sre", doc: "docs/cmmi/05-deploy-sop.md", order: 5 },
+];
+
+const CMMI_GATE_BY_KEY = new Map<CmmiGateKey, CmmiGateDefinition>(CMMI_GATES.map((gate) => [gate.key, gate]));
+
+export function cmmiGateDefinition(key: CmmiGateKey | null | undefined): CmmiGateDefinition | null {
+  return key ? CMMI_GATE_BY_KEY.get(key) ?? null : null;
+}
+
+/** One row of the CMMI WBS phase template — the 顶层阶段 a project is broken into. */
+export interface CmmiWbsPhaseTemplate {
+  /** Stable phase key. */
+  key: string;
+  /** 中文阶段名. */
+  name: string;
+  /** Gate the phase 收口 closes; null for an intermediate (non-gate) checkpoint. */
+  gate: CmmiGateKey | null;
+  /** 验收标准占位 — the project head fills it in after adoption. */
+  acceptance: string;
+}
+
+/**
+ * The six CMMI WBS phases, in order (需求确认 → … → 上线移交). Each phase 收口
+ * produces a milestone; phases that sit on a gate boundary carry its key.
+ */
+export const CMMI_WBS_PHASES: readonly CmmiWbsPhaseTemplate[] = [
+  { key: "requirements", name: "需求确认", gate: "gate_g1_spec", acceptance: "需求规格经 G1 门禁评审通过，需求双向跟踪矩阵 100% 覆盖。" },
+  { key: "architecture", name: "架构/设计", gate: "gate_g2_arch", acceptance: "架构分层与对外契约明确，隔离机制通过 G2 评审。" },
+  { key: "detailed_design", name: "详细设计", gate: null, acceptance: "详细设计与接口契约与实现一致，无死接口。" },
+  { key: "development", name: "开发实现", gate: "gate_g3_compile", acceptance: "编译与类型检查 0 Error，核心用例全绿，G3 静态门禁通过。" },
+  { key: "acceptance", name: "测试验收", gate: "gate_g4_eval", acceptance: "四态覆盖、0 假死按钮，集成用例全绿，P0-P2 缺陷清零。" },
+  { key: "handover", name: "上线移交", gate: "gate_g5_release", acceptance: "制品唯一不可变指纹归档，秒级回滚 SOP 演练通过。" },
+];
+
 export const ISSUE_REVIEW_POLICIES = ["anyone", "not_creator", "human_only"] as const;
 export type IssueReviewPolicy = (typeof ISSUE_REVIEW_POLICIES)[number];
 export const ISSUE_WORK_MODES = ["standard", "ask", "planning", "skill_test"] as const;

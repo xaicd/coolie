@@ -2017,6 +2017,13 @@
       "when": 1790310000000,
       "tag": "9005_add_issue_defect",
       "breakpoints": true
+    },
+    {
+      "idx": 9006,
+      "version": "7",
+      "when": 1790396400000,
+      "tag": "9006_add_issue_wbs_milestone",
+      "breakpoints": true
     }
   ]
 }

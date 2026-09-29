@@ -1,5 +1,6 @@
 import type { ExecutionProjection, ExecutionBlocker } from "./execution-projection.js";
 import type {
+  CmmiGateKey,
   IssueCommentAuthorType,
   IssueCommentMetadataRowType,
   IssueCommentPresentationKind,
@@ -7,6 +8,8 @@ import type {
   IssueCommentPresentationDensity,
   IssueDefectSeverity,
   IssueDefectSource,
+  IssueWbsType,
+  MilestoneStatus,
   IssueExecutionMonitorClearReason,
   IssueExecutionMonitorKind,
   IssueExecutionMonitorRecoveryPolicy,
@@ -101,6 +104,26 @@ export interface IssueDefect {
   source: IssueDefectSource | null;
   reproSteps: string | null;
   evidenceAttachmentIds: string[];
+}
+
+/**
+ * Milestone metadata for a 主线 task (wave140). Only ever present together with
+ * `isMilestone === true`. `gate` names the CMMI gate this 收口 closes;
+ * `exempted` + `exemptionReason` record a deliberate waiver of the stage-gate
+ * linkage so a downstream phase can proceed against an unmet milestone.
+ */
+export interface IssueMilestone {
+  gate: CmmiGateKey | null;
+  status: MilestoneStatus;
+  plannedDate: string | null;
+  completedDate: string | null;
+  /** 判定人 — who signed the milestone off. */
+  approver: string | null;
+  /** 判定证据 — the artifact / link that proves the milestone is met. */
+  evidence: string | null;
+  /** When true the gate is waived for downstream tasks; the reason is required. */
+  exempted: boolean;
+  exemptionReason: string | null;
 }
 
 export interface IssueAssigneeAdapterOverrides {
@@ -808,6 +831,14 @@ export interface Issue {
   priority: IssuePriority;
   /** Present when this task is a defect; its presence is what makes it one. */
   defect?: IssueDefect | null;
+  /** WBS hierarchical number ("1", "1.1", "1.1.2"); null when the task has no WBS slot. */
+  wbsCode?: string | null;
+  /** WBS node kind: 阶段 / 工作包 / 任务. */
+  wbsType?: IssueWbsType | null;
+  /** True marks a 里程碑/主线 task — the flag the 只看主线 filter and mainline view read. */
+  isMilestone?: boolean;
+  /** Milestone metadata; only present (non-null) when `isMilestone` is true. */
+  milestone?: IssueMilestone | null;
   reviewPolicy: IssueReviewPolicy | null;
   assigneeAgentId: string | null;
   assigneeUserId: string | null;

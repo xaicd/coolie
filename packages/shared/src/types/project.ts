@@ -1,4 +1,5 @@
-import type { BudgetWindowKind, PauseReason, ProjectStatus } from "../constants.js";
+import type { BudgetWindowKind, IssueWbsType, PauseReason, ProjectStatus } from "../constants.js";
+import type { IssueMilestone } from "./issue.js";
 import type {
   ProjectExecutionWorkspacePolicy,
   ProjectWorkspaceRuntimeConfig,
@@ -23,6 +24,34 @@ export interface ProjectBudgetSummary {
   /** Budget limit in cents. */
   amountCents: number;
   windowKind: BudgetWindowKind;
+}
+
+/**
+ * One node of an auto-generated CMMI WBS draft (wave140). A draft is a proposal
+ * only — it lives on `projects.wbs_draft` until the project head adopts it, at
+ * which point each node becomes an issue carrying these WBS/milestone fields.
+ */
+export interface ProjectWbsDraftItem {
+  /** Hierarchical WBS number ("1", "1.1", "1.2"). */
+  code: string;
+  type: IssueWbsType;
+  title: string;
+  description: string | null;
+  isMilestone: boolean;
+  milestone: IssueMilestone | null;
+  /** Code of the parent node (the phase); null for a top-level phase. */
+  parentCode: string | null;
+}
+
+/** A generated WBS draft awaiting 采纳/忽略. */
+export interface ProjectWbsDraft {
+  /** ISO timestamp the draft was generated. */
+  generatedAt: string;
+  /** Source document filename, when the draft came from an uploaded doc. */
+  source: string | null;
+  /** Project goal titles this breakdown serves (reuses the project's goals). */
+  goalTitles: string[];
+  items: ProjectWbsDraftItem[];
 }
 
 export interface ProjectWorkspace {
@@ -108,6 +137,13 @@ export interface Project {
    * Populated by the projects list and single-project endpoints (wave132).
    */
   defectCount?: number;
+  /**
+   * Auto-generated CMMI WBS draft awaiting 采纳/忽略 (wave140). Null once adopted
+   * or dismissed, and for projects that have not had a requirement doc parsed.
+   */
+  wbsDraft?: ProjectWbsDraft | null;
+  /** Number of 里程碑/主线 tasks in the project (is_milestone = true), wave140. */
+  milestoneCount?: number;
   /**
    * Active budget for the project, when set. Populated by the projects list
    * endpoint (IA Phase 4 — PAP-60); omitted on single-project payloads.
