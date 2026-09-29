@@ -145,6 +145,7 @@ import { getTelemetryClient } from "../telemetry.js";
 import { isUniqueViolation } from "../db-errors.js";
 import type { StorageService } from "../storage/types.js";
 import { validate, validateIssueMutationBody } from "../middleware/validate.js";
+import { recordAudit } from "../middleware/audit.js";
 import * as serviceIndex from "../services/index.js";
 import {
   accessService,
@@ -11273,6 +11274,13 @@ export function issueRoutes(
       entityId: existing.issueId,
       details: { workProductId: removed.id, type: removed.type },
     });
+    await recordAudit(db, req, {
+      companyId: existing.companyId,
+      action: "issue_work_product.deleted",
+      target: { type: "issue_work_product", id: removed.id },
+      before: { issueId: existing.issueId, type: removed.type, title: removed.title ?? null },
+      after: null,
+    });
     await revalidateActiveSourceRecoveryAfterCommittedWrite({
       issue,
       trigger: "work_product",
@@ -11346,6 +11354,13 @@ export function issueRoutes(
         versionId,
         previousLatestId: result.previousLatestId,
       },
+    });
+    await recordAudit(db, req, {
+      companyId: existing.companyId,
+      action: "issue_work_product.version_activated",
+      target: { type: "issue_work_product", id },
+      before: { latestVersionId: result.previousLatestId ?? null },
+      after: { latestVersionId: versionId },
     });
     res.json({
       ok: true,
@@ -15139,6 +15154,18 @@ export function issueRoutes(
       entityType: "issue",
       entityId: issue.id,
     });
+    await recordAudit(db, req, {
+      companyId: issue.companyId,
+      action: "issue.deleted",
+      target: { type: "issue", id: issue.id },
+      before: {
+        identifier: existing.identifier ?? null,
+        title: existing.title ?? null,
+        status: existing.status ?? null,
+        assigneeAgentId: existing.assigneeAgentId ?? null,
+      },
+      after: null,
+    });
 
     await queueTaskWatchdogEvaluation(existing, actor.runId);
     res.json(issue);
@@ -18913,6 +18940,13 @@ export function issueRoutes(
       details: {
         attachmentId: removed.id,
       },
+    });
+    await recordAudit(db, req, {
+      companyId: removed.companyId,
+      action: "issue.attachment_deleted",
+      target: { type: "issue_attachment", id: removed.id },
+      before: { issueId: removed.issueId, assetId: removed.assetId ?? null },
+      after: null,
     });
 
     res.json({ ok: true });

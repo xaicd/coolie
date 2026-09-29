@@ -13,6 +13,9 @@ export { projectRoutes } from "./projects.js";
 export { issueRoutes } from "./issues.js";
 export { issueTreeControlRoutes } from "./issue-tree-control.js";
 export { issueSpecRoutes } from "./issue-specs.js";
+export { auditLogRoutes } from "./audit-log.js";
+export { metricsRoutes } from "./metrics.js";
+export { defectKbRoutes } from "./defect-kb.js";
 export {
   fileResourceRoutes,
   createFileResourceAvailabilityLimiter,

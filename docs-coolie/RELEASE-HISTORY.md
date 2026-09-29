@@ -8,9 +8,33 @@ Git 里程碑 tag 流水。自 **v0.5.97** 起建立本文件；此前的 0.5.x 
 | v0.5.97 | 2026-09-29 | 0.5.97 | bc48b1e80 | wave142: WBS 任务自动路由 + 沙箱附件真渲染 + 启动链路端到端可观察 |
 | v0.6.0 | 2026-09-29 | 0.6.0 | 269526f19 | wave150 合并发版: wave147 spec-driven + wave148 多对话 + wave144 board-chat 修复（见 §v0.6.0） |
 | — | 2026-09-29 | 0.6.2 | (未打 tag) | **未发出** — wave153 客户首接触 (App 登录 cookie 回放 + 资产筛选竞态 + App spec 编辑器 + onboarding 入口)。见 §v0.6.2 |
+| — | 2026-09-29 | 0.6.1 | (未打 tag) | **未发出** — wave152 治理 + 可观察性 (审计 log 全留痕 + 四类资源隔离补测 + 失败率/交付周期/产能 metrics + 缺陷 KB)。见 §v0.6.1 (wave152) |
 
 约定: tag 指向该版本「发版完成」的提交（含 `chore(release): version.json …` 这一步），
 注释写本波主题。推送方式 `git push origin <tag>`（本仓库 push 需绕本地代理）。
+
+## v0.6.1 — 未发出 (wave152 治理 + 可观察性)
+
+**本波没有发版，`version.json` 未 bump（仍 0.6.0），未打 tag。** 按 boss 纪律本波只记本文件。
+发版被 `scripts/release-app.sh` 前置检查挡下（工作树同时含 wave154 ontology-graph、wave149
+e2e/scripts 的他人未提交改动），未尝试绕过。
+
+服务端交付（真值见 `docs-coolie/evidence/wave152/QA-REPORT.md`）:
+
+- **审计 log**：新表 `audit_log`（迁移 **9011**；9009 已被 wave148 占、9010 被并发 wave154 抢注）
+  + `services/audit.ts` + `middleware/audit.ts` + `GET /api/companies/:cid/audit-log`；
+  写点覆盖 issue 状态/负责人/删除、spec 写入、conversation 建/归档/删、work_product 版本切换/删、
+  attachment 删。活机 curl 实测四类事件落库（含 before/after）。
+- **隔离补测**：attachment 既有单测已证跨公司 404；本波新增 spec/conversation 跨公司真测（404/403）。
+- **metrics**：`services/metrics.ts` + `GET /api/companies/:cid/metrics/overview`
+  （failure_rate / delivery_cycle_days_avg / throughput_per_day + by_agent + 14 天 sparkline series）。
+- **缺陷 KB**：新表 `defect_kb` + `services/defect-kb.ts` + 关闭钩子（指纹第 3 次 → 自动建 playbook 任务）
+  + `GET /api/companies/:cid/defect-kb`。
+
+**缺口（诚实）**：Web/App 三处 UI（AuditLogViewer / Dashboard 卡片 / DefectKBPage）**未做**；
+审计未覆盖 agent 任命、role/permission、app_releases；本地实例无 `4cafeb9a`（真值跑在 `onboarding-cache-test-*`）。
+验证：wave152 新增 15 单测全过、`packages/db`/`server` tsc 均 exit 0；`issue-attachment-routes` 有 1 条
+**本波之前就红**的既有失败（已用 HEAD 版复现，未修）。
 
 ## v0.6.2 — 未发出 (wave153)
 

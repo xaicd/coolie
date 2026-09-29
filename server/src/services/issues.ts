@@ -5,6 +5,8 @@ import { createdFromIssueCondition } from "./issue-creation-origin.js";
 import { resolveCompanyScopedResponsibleUserId } from "./responsible-user.js";
 import { executionProjectionsForRuns } from "./execution-projection.js";
 import { resolveArtifactVersion } from "./work-product-versions.js";
+import { auditService } from "./audit.js";
+import { DEFECT_PLAYBOOK_THRESHOLD, defectFingerprint, defectKbService } from "./defect-kb.js";
 import type { ExecutionProjection } from "@paperclipai/shared";
 import { Buffer } from "node:buffer";
 import { createHash, randomUUID } from "node:crypto";
@@ -6571,6 +6573,128 @@ async function countBlockedInboxIssues(
   }, 0);
 }
 
+/**
+ * wave152 — governance audit rows for the fields this service governs.
+ *
+ * Only status and assignee transitions are audited here; other field edits
+ * (title, description, priority …) stay on the activity feed. `changes` comes
+ * from `buildIssueChanges`, so `from`/`to` are already the true field diff and
+ * only actually-changed keys are present.
+ */
+async function writeIssueChangeAudit(
+  db: Db,
+  input: {
+    companyId: string;
+    issueId: string;
+    actorUserId?: string | null;
+    actorAgentId?: string | null;
+    changes: Record<string, { from?: unknown; to?: unknown }> | null | undefined;
+  },
+): Promise<void> {
+  const changes = input.changes;
+  if (!changes) return;
+  const svc = auditService(db);
+  const ctx = {
+    companyId: input.companyId,
+    actorUserId: input.actorUserId ?? null,
+    actorAgentId: input.actorAgentId ?? null,
+  };
+  const target = { type: "issue", id: input.issueId };
+
+  const status = changes.status;
+  if (status && status.from !== status.to) {
+    await svc.write(
+      ctx,
+      "issue.status_changed",
+      target,
+      { status: status.from ?? null },
+      { status: status.to ?? null },
+    );
+  }
+
+  const agentAssignee = changes.assigneeAgentId;
+  const userAssignee = changes.assigneeUserId;
+  if (agentAssignee || userAssignee) {
+    const before = {
+      ...(agentAssignee ? { assigneeAgentId: agentAssignee.from ?? null } : {}),
+      ...(userAssignee ? { assigneeUserId: userAssignee.from ?? null } : {}),
+    };
+    const after = {
+      ...(agentAssignee ? { assigneeAgentId: agentAssignee.to ?? null } : {}),
+      ...(userAssignee ? { assigneeUserId: userAssignee.to ?? null } : {}),
+    };
+    await svc.write(ctx, "issue.assignee_changed", target, before, after);
+  }
+}
+
+/**
+ * wave152 (D) — when a defect task closes, count the sighting in the knowledge
+ * base and, on the threshold-th sighting, open a playbook task.
+ *
+ * Best-effort and post-commit: a knowledge-base write or a playbook task must
+ * never fail or roll back the close it describes. Only the transition INTO
+ * `done` on a defect task counts, so re-opening and re-closing counts again (a
+ * genuine re-sighting), while repeated no-op updates do not.
+ */
+async function handleClosedDefect(
+  db: Db,
+  input: {
+    companyId: string;
+    issueId: string;
+    title: string;
+    severity: string | null;
+    previousStatus: string;
+    nextStatus: string;
+    wasDefect: boolean;
+  },
+): Promise<void> {
+  if (!input.wasDefect) return;
+  if (input.nextStatus !== "done" || input.previousStatus === "done") return;
+  try {
+    const kb = defectKbService(db);
+    const fingerprint = defectFingerprint({ title: input.title, severity: input.severity });
+    // Runs on whatever handle the caller passed: when the close is durable in a
+    // transaction, this upsert joins it, so a rolled-back close never leaves a
+    // counted sighting behind.
+    const record = await kb.recordClosed({
+      companyId: input.companyId,
+      fingerprint,
+      sampleIssueId: input.issueId,
+    });
+    if (record.count < DEFECT_PLAYBOOK_THRESHOLD || record.playbookTaskId) return;
+
+    // The playbook task opens in a nested transaction (a SAVEPOINT when the
+    // caller already holds one). A failure here rolls back only the task, not
+    // the caller's close, so the count is kept and the next sighting retries.
+    await db.transaction(async (sp) => {
+      const created = await issueService(db).create(
+        input.companyId,
+        {
+          title: `缺陷指纹 ${fingerprint.slice(0, 12)} 已 ${record.count} 次, 应写 playbook`,
+          description:
+            `同一缺陷已闭环 ${record.count} 次 (指纹 ${fingerprint})。` +
+            `请把排查/修复步骤沉淀为可复用 playbook, 避免同类缺陷再次发生。`,
+          status: "backlog",
+          priority: "medium",
+          allowDuplicate: true,
+        },
+        sp as unknown as Db,
+      );
+      if (!created) return;
+      await defectKbService(sp as unknown as Db).markPlaybookSuggested(
+        input.companyId,
+        fingerprint,
+        { taskId: created.id, note: `在第 ${record.count} 次闭环时自动创建沉淀任务` },
+      );
+    });
+  } catch (err) {
+    logger.warn(
+      { err, companyId: input.companyId, issueId: input.issueId },
+      "defect KB close hook failed",
+    );
+  }
+}
+
 export function issueService(db: Db) {
   const instanceSettings = instanceSettingsService(db);
   const treeControlSvc = issueTreeControlService(db);
@@ -11220,6 +11344,13 @@ export function issueService(db: Db) {
           });
           activityPublications.push(publication);
         }
+        await writeIssueChangeAudit(tx as unknown as Db, {
+          companyId: updated.companyId,
+          issueId: updated.id,
+          actorUserId,
+          actorAgentId,
+          changes: changes as Record<string, { from?: unknown; to?: unknown }>,
+        });
         return {
           ...enriched,
           ...(nextBlockedByIssueIds !== undefined
@@ -11238,6 +11369,17 @@ export function issueService(db: Db) {
       }
       if (dbOrTx === db && !postCommitActions) {
         await executeIssuePostCommitActions(db, ownedPostCommitActions);
+      }
+      if (result) {
+        await handleClosedDefect(dbOrTx as unknown as Db, {
+          companyId: result.companyId,
+          issueId: result.id,
+          title: existing.title,
+          severity: existing.defect?.severity ?? null,
+          previousStatus: existing.status,
+          nextStatus: result.status,
+          wasDefect: Boolean(existing.defect),
+        });
       }
       return result;
     },

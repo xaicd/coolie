@@ -18,6 +18,7 @@ import {
 import { notFound, unprocessable } from "../errors.js";
 import { issueService, logActivity } from "../services/index.js";
 import { assertCompanyAccess, getAccessibleResource, getActorInfo } from "./authz.js";
+import { recordAudit } from "../middleware/audit.js";
 
 const SPEC_TITLES: Record<IssueSpecKind, string> = {
   requirement: "需求：待填写",
@@ -126,6 +127,13 @@ export function issueSpecRoutes(db: Db) {
       issueId: issue.id,
       details: { kind, draft: isDraft, parentSpecId },
     });
+    await recordAudit(db, req, {
+      companyId: issue.companyId,
+      action: "issue.spec_saved",
+      target: { type: "issue", id: issue.id },
+      before: { specKind: issue.specKind ?? null, spec: (issue.spec as unknown) ?? null },
+      after: { specKind: kind, spec: stored },
+    });
 
     res.json({ issueId: issue.id, specKind: kind, spec: stored });
   });
@@ -212,6 +220,13 @@ export function issueSpecRoutes(db: Db) {
       entityId: created.id,
       issueId: created.id,
       details: { kind, templateName: input.templateName ?? kind, parentSpecId: parentIssueId },
+    });
+    await recordAudit(db, req, {
+      companyId,
+      action: "issue.spec_created",
+      target: { type: "issue", id: created.id },
+      before: null,
+      after: { specKind: kind, spec: stored },
     });
 
     res.status(201).json({ issueId: created.id, specKind: kind, spec: stored });

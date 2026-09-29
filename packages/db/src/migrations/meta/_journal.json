@@ -2045,6 +2045,13 @@
       "when": 1790655600000,
       "tag": "9009_add_board_conversations",
       "breakpoints": true
+    },
+    {
+      "idx": 9011,
+      "version": "7",
+      "when": 1790745600000,
+      "tag": "9011_add_audit_log_and_defect_kb",
+      "breakpoints": true
     }
   ]
 }

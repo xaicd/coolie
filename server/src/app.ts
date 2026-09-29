@@ -66,6 +66,9 @@ import { projectRoutes } from "./routes/projects.js";
 import { issueRoutes } from "./routes/issues.js";
 import { issueTreeControlRoutes } from "./routes/issue-tree-control.js";
 import { issueSpecRoutes } from "./routes/issue-specs.js";
+import { auditLogRoutes } from "./routes/audit-log.js";
+import { metricsRoutes } from "./routes/metrics.js";
+import { defectKbRoutes } from "./routes/defect-kb.js";
 import { caseRoutes } from "./routes/cases.js";
 import { fileResourceRoutes } from "./routes/file-resources.js";
 import { routineRoutes } from "./routes/routines.js";
@@ -856,6 +859,11 @@ export async function createApp(
   api.use(caseRoutes(db, opts.storageService));
   api.use(issueTreeControlRoutes(db, { pluginWorkerManager: workerManager }));
   api.use(issueSpecRoutes(db));
+  // wave152 — governance audit trail read surface (board-only, company-scoped).
+  api.use(auditLogRoutes(db));
+  // wave152 — delivery-health metrics + defect knowledge base (board-only).
+  api.use(metricsRoutes(db));
+  api.use(defectKbRoutes(db));
   api.use(fileResourceRoutes(db));
   api.use(routineRoutes(db, { pluginWorkerManager: workerManager }));
   api.use(pipelineRoutes(db));

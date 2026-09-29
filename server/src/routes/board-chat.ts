@@ -12,6 +12,7 @@ import { companies, issueAttachments, issueComments, issues, chatConversations, 
 import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 import { instanceSettingsService, issueService } from "../services/index.js";
 import { assertCompanyAccess, getActorInfo } from "./authz.js";
+import { recordAudit } from "../middleware/audit.js";
 import { loadAgentPersona } from "../services/role-template.js";
 import type { StorageService } from "../storage/types.js";
 import { extractDocumentText } from "../services/document-extractor.js";
@@ -1484,6 +1485,17 @@ export function boardChatRoutes(
     // (attachments must target an existing issue — wave135's reason, carried on).
     await ensureBoardConversationIssue(db, created, actor);
     const fresh = await findBoardConversation(db, companyId, created.id);
+    await recordAudit(db, req, {
+      companyId,
+      action: "board_conversation.created",
+      target: { type: "board_conversation", id: created.id },
+      before: null,
+      after: {
+        title: created.title,
+        projectId: created.projectId ?? null,
+        issueId: fresh?.issueId ?? created.issueId ?? null,
+      },
+    });
     res.status(201).json(serializeBoardConversation(fresh ?? created));
   });
 
@@ -1560,6 +1572,14 @@ export function boardChatRoutes(
       }
 
       const fresh = await findBoardConversation(db, companyId, row.id);
+      const isArchive = parsed.data.archived === true && row.archivedAt == null;
+      await recordAudit(db, req, {
+        companyId,
+        action: isArchive ? "board_conversation.archived" : "board_conversation.updated",
+        target: { type: "board_conversation", id: row.id },
+        before: { title: row.title, archivedAt: row.archivedAt ?? null },
+        after: { title: fresh?.title ?? row.title, archivedAt: fresh?.archivedAt ?? null },
+      });
       res.json(serializeBoardConversation(fresh ?? row));
     },
   );
@@ -1584,6 +1604,13 @@ export function boardChatRoutes(
         .update(boardConversations)
         .set({ archivedAt: new Date() })
         .where(eq(boardConversations.id, row.id));
+      await recordAudit(db, req, {
+        companyId,
+        action: "board_conversation.deleted",
+        target: { type: "board_conversation", id: row.id },
+        before: { title: row.title, archivedAt: row.archivedAt ?? null },
+        after: { archivedAt: new Date().toISOString() },
+      });
       res.json({ ok: true });
     },
   );
