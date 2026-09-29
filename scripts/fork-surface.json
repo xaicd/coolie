@@ -605,8 +605,8 @@
     {
       "path": "server/src/routes/issues.ts",
       "maxNetLines": 30,
-      "reason": "wave132: parses `?defect=true|1` into listFilters and includes defect in toCompactIssue so the compact list view carries it too. Three lines, both additive.",
-      "maxTotalLines": 30
+      "reason": "wave132: parses `?defect=true|1` into listFilters and includes defect in toCompactIssue so the compact list view carries it too. Three lines, both additive. wave136 adds the HTML-deliverable branch to GET /attachments/:id/content (declare text/html; charset=utf-8, infer text/html for a generic .html upload, and emit the sandbox CSP) — raised the cumulative budget 30 → 60 for it.",
+      "maxTotalLines": 60
     },
     {
       "path": "server/src/services/projects.ts",
@@ -691,6 +691,60 @@
       "maxNetLines": 60,
       "reason": "wave134: pins that a manual wake whose requested actor is the loopback-concierge principal produces an identity context carrying the company's real default responsible user while keeping the manual_user_wake cause.",
       "maxTotalLines": 80
+    },
+    {
+      "path": "server/src/attachment-types.ts",
+      "maxNetLines": 60,
+      "reason": "wave136: text/html and application/xhtml+xml join INLINE_ATTACHMENT_TYPES so an HTML deliverable is served inline for preview; adds HTML_ATTACHMENT_CONTENT_SECURITY_POLICY (sandbox allow-scripts, opaque origin, connect-src 'none'), isHtmlAttachmentContentType, and inferHtmlAttachmentContentTypeFromFilename, and lets the upload normaliser infer text/html from an .html/.htm filename when the client sent a generic binary type. Lives here because this module is the single attachment-type policy every upload/serve route already reads.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "server/src/__tests__/attachment-types.test.ts",
+      "maxNetLines": 50,
+      "reason": "wave136: pins that html is now inline-safe, that an .html/.htm filename infers text/html for a generic-binary upload, and that isHtmlAttachmentContentType tolerates a charset parameter.",
+      "maxTotalLines": 50
+    },
+    {
+      "path": "server/src/__tests__/issue-attachment-routes.test.ts",
+      "maxNetLines": 70,
+      "reason": "wave136: replaces the old 'html is a download' case with three: html renders inline under the sandbox CSP (no allow-same-origin, connect-src 'none'), a generic-binary .html attachment is inferred and rendered inline, and ?download=1 still forces a download.",
+      "maxTotalLines": 110
+    },
+    {
+      "path": "ui/src/context/DialogContext.tsx",
+      "maxNetLines": 40,
+      "reason": "wave136 (P3-1): adds a page-scoped defaultProjectId plus setDefaultProjectId so a project page can register itself; the global New Task affordances open the dialog with no projectId and NewIssueDialog falls back to it. The App already preselects the project on its project card, so this is the parity half.",
+      "maxTotalLines": 40
+    },
+    {
+      "path": "ui/src/context/DialogContext.test.tsx",
+      "maxNetLines": 60,
+      "reason": "wave136 (P3-1): asserts the new defaultProjectId is exposed on state and settable through the action, and that registering it does not rerender action-only consumers.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "ui/src/components/NewIssueDialog.test.tsx",
+      "maxNetLines": 60,
+      "reason": "wave136 (P3-1): the dialog mock now carries defaultProjectId, plus a case that an open with no projectId on a project page submits the registered project.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "ui/src/lib/issue-attachments.ts",
+      "maxNetLines": 40,
+      "reason": "wave136: isHtmlAttachment classifies an HTML deliverable by content type (text/html, application/xhtml+xml, application/html) or by .html/.htm filename when the upload declared a generic binary type, so the attachments section can preview it in an iframe rather than offering only a download.",
+      "maxTotalLines": 40
+    },
+    {
+      "path": "ui/src/components/IssueAttachmentsSection.tsx",
+      "maxNetLines": 75,
+      "reason": "wave136: renders html attachments in a sandboxed <iframe sandbox=\"allow-scripts\" referrerPolicy=\"no-referrer\"> sized from the --sz-320px token, grouped ahead of markdown. The matching sandbox attribute keeps the frame opaque even if a proxy strips the server's CSP.",
+      "maxTotalLines": 75
+    },
+    {
+      "path": "ui/src/components/task-chat/TaskChatProtocolCard.tsx",
+      "maxNetLines": 50,
+      "reason": "wave136: the task-chat shell is the default task surface, so its ResourceCard must render an html attachment inline too — the same sandboxed iframe as the attachments section. Without this the inline preview would only exist on the classic interface.",
+      "maxTotalLines": 50
     }
   ]
 }

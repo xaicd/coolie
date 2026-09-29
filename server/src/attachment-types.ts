@@ -62,11 +62,34 @@ export const INLINE_ATTACHMENT_TYPES: readonly string[] = [
   "text/markdown",
   "application/json",
   "text/csv",
+  "text/html",
+  "application/xhtml+xml",
   "video/mp4",
   "video/webm",
   "video/quicktime",
   "video/x-m4v",
 ];
+
+export const HTML_ATTACHMENT_CONTENT_TYPES: readonly string[] = [
+  "text/html",
+  "application/xhtml+xml",
+];
+
+/**
+ * Content-Security-Policy for HTML attachments served inline.
+ *
+ * `sandbox` without `allow-same-origin` gives the document an opaque, unique
+ * origin. The prototype therefore cannot read `document.cookie`, cannot touch
+ * localStorage/sessionStorage, and cannot reach into the embedding page or the
+ * viewer's session. Scripts stay enabled (`allow-scripts`) because prototypes
+ * need them, but `connect-src 'none'` blocks fetch/XHR/WebSocket exfiltration
+ * and `default-src 'none'` blocks every other remote resource class. Inline
+ * scripts and styles are allowed because a prototype normally ships as a single
+ * self-contained file; its own images may still load from the same origin or a
+ * data:/blob: URL.
+ */
+export const HTML_ATTACHMENT_CONTENT_SECURITY_POLICY =
+  "sandbox allow-scripts; default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src 'self' data:; media-src 'self' blob: data:; connect-src 'none'";
 
 /**
  * Parse a comma-separated list of MIME type patterns into a normalised array.
@@ -128,6 +151,25 @@ export function inferOfficeAttachmentContentTypeFromFilename(
   return null;
 }
 
+/**
+ * Infer the HTML content type from the filename alone. An `.html`/`.htm`
+ * deliverable is very often uploaded with a generic binary content type, so the
+ * response falls back to the extension before deciding how to serve it.
+ */
+export function inferHtmlAttachmentContentTypeFromFilename(
+  filename: string | null | undefined,
+): string | null {
+  const lower = (filename ?? "").trim().toLowerCase();
+  if (lower.endsWith(".html") || lower.endsWith(".htm")) return "text/html";
+  return null;
+}
+
+export function isHtmlAttachmentContentType(contentType: string): boolean {
+  return matchesContentType(normalizeContentType(contentType), [
+    ...HTML_ATTACHMENT_CONTENT_TYPES,
+  ]);
+}
+
 export function normalizeUploadAttachmentContentType(input: {
   contentType: string | null | undefined;
   originalFilename?: string | null;
@@ -135,7 +177,9 @@ export function normalizeUploadAttachmentContentType(input: {
 }): string {
   const normalized = normalizeContentType(input.contentType);
   if (!GENERIC_ATTACHMENT_CONTENT_TYPES.includes(normalized)) return normalized;
-  const inferred = inferOfficeAttachmentContentTypeFromFilename(input.originalFilename);
+  const inferred =
+    inferOfficeAttachmentContentTypeFromFilename(input.originalFilename) ??
+    inferHtmlAttachmentContentTypeFromFilename(input.originalFilename);
   if (!inferred) return normalized;
   if (input.isAllowedContentType && !input.isAllowedContentType(inferred)) return normalized;
   return inferred;

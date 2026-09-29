@@ -239,6 +239,9 @@ import { shouldWakeAssigneeOnCheckout } from "./issues-checkout-wakeup.js";
 import {
   formatAttachmentSize,
   GENERIC_ATTACHMENT_CONTENT_TYPES,
+  HTML_ATTACHMENT_CONTENT_SECURITY_POLICY,
+  inferHtmlAttachmentContentTypeFromFilename,
+  isHtmlAttachmentContentType,
   isInlineAttachmentContentType,
   MAX_ATTACHMENT_BYTES,
   normalizeContentType,
@@ -604,6 +607,7 @@ function resolveAttachmentResponseContentType(input: {
     return storedContentType;
   return (
     inferVideoContentTypeFromFilename(input.originalFilename) ??
+    inferHtmlAttachmentContentTypeFromFilename(input.originalFilename) ??
     storedContentType
   );
 }
@@ -18642,17 +18646,19 @@ export function issueRoutes(
       objectContentType: object.contentType,
       originalFilename: attachment.originalFilename,
     });
-    // Markdown bodies are stored as UTF-8; declare the charset so inline
-    // (raw) views do not mojibake. SVG/inline checks below stay on the bare type.
+    // Markdown and HTML bodies are stored as UTF-8; declare the charset so
+    // inline (raw) views do not mojibake. SVG/inline checks below stay on the
+    // bare type.
     const isMarkdownResponse = isMarkdownAttachmentContent({
       contentType: responseContentType,
       originalFilename: attachment.originalFilename,
     });
+    const isHtmlResponse = isHtmlAttachmentContentType(responseContentType);
     // Express formats filenames with an encoded Unicode parameter when needed.
     res.attachment(attachment.originalFilename ?? "attachment");
     res.setHeader(
       "Content-Type",
-      isMarkdownResponse
+      isMarkdownResponse || isHtmlResponse
         ? `${responseContentType}; charset=utf-8`
         : responseContentType,
     );
@@ -18663,6 +18669,12 @@ export function issueRoutes(
         "Content-Security-Policy",
         "sandbox; default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'",
       );
+    } else if (isHtmlResponse) {
+      // wave136: HTML deliverables (prototype sandboxes, dashboards) render
+      // inline in the App WebView / Web iframe. The sandbox CSP gives the
+      // document an opaque origin so uploader-authored scripts cannot reach
+      // the viewer's cookies, storage, or the embedding page.
+      res.setHeader("Content-Security-Policy", HTML_ATTACHMENT_CONTENT_SECURITY_POLICY);
     }
     const disposition = parseBooleanQuery(req.query.download)
       ? "attachment"

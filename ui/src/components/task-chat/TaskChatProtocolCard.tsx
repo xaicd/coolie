@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { isHtmlAttachment } from "@/lib/issue-attachments";
 import {
   clearDraft,
   loadStructuredDraft,
@@ -1036,7 +1037,7 @@ function ResourceCard({
       testId={`task-chat-resource-${item.resourceKind}`}
     />
   );
-  return item.href ? (
+  const card = item.href ? (
     <a
       className="block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       href={item.href}
@@ -1046,6 +1047,32 @@ function ResourceCard({
   ) : (
     body
   );
+  // wave136: an HTML deliverable renders inline. The server serves it
+  // `text/html` inline under a sandbox CSP; the sandbox attribute here keeps
+  // the origin opaque even if a proxy strips that header.
+  if (
+    item.resourceKind === "attachment" &&
+    item.attachment &&
+    item.href &&
+    isHtmlAttachment(item.attachment)
+  ) {
+    return (
+      <div className="space-y-2">
+        {card}
+        <div className="overflow-hidden rounded-md border border-border bg-background">
+          <iframe
+            title={`Preview of ${item.title}`}
+            src={item.href}
+            sandbox="allow-scripts"
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            className="h-(--sz-320px) w-full"
+          />
+        </div>
+      </div>
+    );
+  }
+  return card;
 }
 
 export function TaskChatProtocolCard({

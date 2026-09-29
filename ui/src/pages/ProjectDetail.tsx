@@ -11,6 +11,7 @@ import { agentsApi } from "../api/agents";
 import { heartbeatsApi } from "../api/heartbeats";
 import { assetsApi } from "../api/assets";
 import { usePanel } from "../context/PanelContext";
+import { useDialogActions } from "../context/DialogContext";
 import { useCompany } from "../context/CompanyContext";
 import { useToastActions } from "../context/ToastContext";
 import { useBreadcrumbs } from "../context/BreadcrumbContext";
@@ -335,6 +336,7 @@ export function ProjectDetail() {
     filter?: string;
   }>();
   const { companies, selectedCompanyId, setSelectedCompanyId } = useCompany();
+  const { setDefaultProjectId } = useDialogActions();
   const { closePanel } = usePanel();
   const { setBreadcrumbs } = useBreadcrumbs();
   const { pushToast } = useToastActions();
@@ -437,6 +439,16 @@ export function ProjectDetail() {
     if (!project?.companyId || project.companyId === selectedCompanyId) return;
     setSelectedCompanyId(project.companyId, { source: "route_sync" });
   }, [project?.companyId, selectedCompanyId, setSelectedCompanyId]);
+
+  // wave136 (P3-1): the global New Task affordances (sidebar, ⌘/keyboard
+  // shortcut, mobile nav, command palette) open the dialog with no projectId.
+  // Register this project while its page is mounted so those entries preselect
+  // it — matching the App, whose project card preselects the project.
+  useEffect(() => {
+    if (!project?.id) return;
+    setDefaultProjectId(project.id);
+    return () => setDefaultProjectId(null);
+  }, [project?.id, setDefaultProjectId]);
 
   const invalidateProject = () => {
     queryClient.invalidateQueries({ queryKey: queryKeys.projects.detail(routeProjectRef) });

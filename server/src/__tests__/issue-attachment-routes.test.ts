@@ -548,9 +548,13 @@ describe("issue attachment routes", () => {
     expect(mockCompanyService.getById).not.toHaveBeenCalled();
   });
 
-  it("serves html attachments as downloads with nosniff", async () => {
-    const storage = createStorageService();
-    mockIssueService.getAttachmentById.mockResolvedValue(makeAttachment("text/html", "report.html"));
+  it("serves html attachments inline under a sandbox CSP so prototypes render", async () => {
+    const body = Buffer.from("<!doctype html><h1>hi</h1>");
+    const storage = createStorageService(body);
+    mockIssueService.getAttachmentById.mockResolvedValue({
+      ...makeAttachment("text/html", "report.html"),
+      byteSize: body.length,
+    });
 
     const app = await createApp(storage);
     const res = await request(app)
@@ -559,11 +563,50 @@ describe("issue attachment routes", () => {
       .parse(parseBinaryResponse);
 
     expect(res.status).toBe(200);
-    expect([
-      undefined,
-      'attachment; filename="report.html"',
-    ]).toContain(res.headers["content-disposition"]);
+    expect(res.headers["content-type"]).toBe("text/html; charset=utf-8");
+    expect(res.headers["content-disposition"]).toBe('inline; filename="report.html"');
     expect(res.headers["x-content-type-options"]).toBe("nosniff");
+    const csp = res.headers["content-security-policy"];
+    expect(csp).toContain("sandbox allow-scripts");
+    // No same-origin: uploader scripts must not reach the viewer's cookies.
+    expect(csp).not.toContain("allow-same-origin");
+    expect(csp).toContain("connect-src 'none'");
+  });
+
+  it("infers text/html for a generic-binary .html attachment and renders it inline", async () => {
+    const storage = createStorageService(Buffer.from("<!doctype html>"));
+    mockIssueService.getAttachmentById.mockResolvedValue({
+      ...makeAttachment("application/octet-stream", "prototype.html"),
+      byteSize: 15,
+    });
+
+    const app = await createApp(storage);
+    const res = await request(app)
+      .get("/api/attachments/attachment-1/content")
+      .buffer(true)
+      .parse(parseBinaryResponse);
+
+    expect(res.status).toBe(200);
+    expect(res.headers["content-type"]).toBe("text/html; charset=utf-8");
+    expect(res.headers["content-disposition"]).toBe('inline; filename="prototype.html"');
+    expect(res.headers["content-security-policy"]).toContain("sandbox allow-scripts");
+  });
+
+  it("still downloads html attachments when ?download=1 is set", async () => {
+    const storage = createStorageService(Buffer.from("<!doctype html>"));
+    mockIssueService.getAttachmentById.mockResolvedValue({
+      ...makeAttachment("text/html", "report.html"),
+      byteSize: 15,
+    });
+
+    const app = await createApp(storage);
+    const res = await request(app)
+      .get("/api/attachments/attachment-1/content?download=1")
+      .buffer(true)
+      .parse(parseBinaryResponse);
+
+    expect(res.status).toBe(200);
+    expect(res.headers["content-disposition"]).toBe('attachment; filename="report.html"');
   });
 
   it("serves arbitrary binary attachments as downloads with nosniff", async () => {

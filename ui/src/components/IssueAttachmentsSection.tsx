@@ -12,6 +12,7 @@ import {
   attachmentDownloadPath,
   attachmentFilename,
   attachmentOpenPath,
+  isHtmlAttachment,
   isImageAttachment,
   isMarkdownAttachment,
   isVideoAttachment,
@@ -147,6 +148,45 @@ function MarkdownAttachmentCard({
   );
 }
 
+function HtmlAttachmentCard({
+  attachment,
+  onDelete,
+  deletePending,
+}: {
+  attachment: IssueAttachment;
+  onDelete?: (attachmentId: string) => void;
+  deletePending?: boolean;
+}) {
+  const filename = attachmentFilename(attachment);
+  return (
+    <div id={`attachment-${attachment.id}`} className="scroll-mt-20 rounded-lg border border-border p-3">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-2">
+            <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
+            <span className="truncate text-sm font-medium" title={filename}>{filename}</span>
+          </div>
+          <AttachmentMeta attachment={attachment} />
+        </div>
+        <AttachmentActions attachment={attachment} onDelete={onDelete} deletePending={deletePending} />
+      </div>
+      {/* The server serves html attachments inline under a sandbox CSP; the
+          matching sandbox attribute here keeps the origin opaque even if the
+          frame is embedded without that header. */}
+      <div className="mt-3 overflow-hidden rounded-md border border-border bg-background">
+        <iframe
+          title={`Preview of ${filename}`}
+          src={attachmentOpenPath(attachment)}
+          sandbox="allow-scripts"
+          referrerPolicy="no-referrer"
+          loading="lazy"
+          className="h-(--sz-320px) w-full"
+        />
+      </div>
+    </div>
+  );
+}
+
 function VideoAttachmentCard({
   attachment,
   onDelete,
@@ -224,14 +264,16 @@ export function IssueAttachmentsSection({
   onDrop,
 }: IssueAttachmentsSectionProps) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
-  const { imageAttachments, markdownAttachments, videoAttachments, genericAttachments } = useMemo(() => {
+  const { imageAttachments, htmlAttachments, markdownAttachments, videoAttachments, genericAttachments } = useMemo(() => {
     const images: IssueAttachment[] = [];
+    const html: IssueAttachment[] = [];
     const markdown: IssueAttachment[] = [];
     const videos: IssueAttachment[] = [];
     const generic: IssueAttachment[] = [];
 
     for (const attachment of attachments) {
       if (isImageAttachment(attachment)) images.push(attachment);
+      else if (isHtmlAttachment(attachment)) html.push(attachment);
       else if (isMarkdownAttachment(attachment)) markdown.push(attachment);
       else if (isVideoAttachment(attachment)) videos.push(attachment);
       else generic.push(attachment);
@@ -239,6 +281,7 @@ export function IssueAttachmentsSection({
 
     return {
       imageAttachments: images,
+      htmlAttachments: html,
       markdownAttachments: markdown,
       videoAttachments: videos,
       genericAttachments: generic,
@@ -336,6 +379,19 @@ export function IssueAttachmentsSection({
                 </button>
               ) : null}
             </div>
+          ))}
+        </div>
+      )}
+
+      {htmlAttachments.length > 0 && (
+        <div className="space-y-3">
+          {htmlAttachments.map((attachment) => (
+            <HtmlAttachmentCard
+              key={attachment.id}
+              attachment={attachment}
+              onDelete={onDelete ? requestDelete : undefined}
+              deletePending={deletePending}
+            />
           ))}
         </div>
       )}

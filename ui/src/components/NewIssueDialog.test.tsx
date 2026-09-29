@@ -11,6 +11,7 @@ import { NewIssueDialog } from "./NewIssueDialog";
 const dialogState = vi.hoisted(() => ({
   newIssueOpen: true,
   newIssueDefaults: {} as Record<string, unknown>,
+  defaultProjectId: null as string | null,
   closeNewIssue: vi.fn(),
 }));
 
@@ -337,6 +338,7 @@ describe("NewIssueDialog", () => {
     document.body.appendChild(container);
     dialogState.newIssueOpen = true;
     dialogState.newIssueDefaults = {};
+    dialogState.defaultProjectId = null;
     dialogState.closeNewIssue.mockReset();
     dialogContentState.onEscapeKeyDown = null;
     dialogContentState.onPointerDownOutside = null;
@@ -414,6 +416,44 @@ describe("NewIssueDialog", () => {
     expect(container.textContent).not.toContain("Sub-task of");
 
     act(() => rerendered.root.unmount());
+  });
+
+  // wave136 (P3-1): the global New Task entries open the dialog with no
+  // projectId; on a project page the registered default project must be
+  // preselected, matching the App.
+  it("preselects the page-scoped default project when opened without a projectId", async () => {
+    dialogState.newIssueDefaults = {};
+    dialogState.defaultProjectId = "project-1";
+
+    const { root } = renderDialog(container);
+    await flush();
+
+    const titleInput = container.querySelector(
+      'textarea[placeholder="Task title"]',
+    ) as HTMLTextAreaElement | null;
+    expect(titleInput).not.toBeNull();
+    await typeTextareaValue(titleInput!, "Scoped project task");
+
+    const submitButton = Array.from(container.querySelectorAll("button"))
+      .find((button) => button.textContent?.includes("Create Task"));
+    await vi.waitFor(() => {
+      expect(submitButton?.hasAttribute("disabled")).toBe(false);
+    });
+
+    await act(async () => {
+      submitButton!.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    await flush();
+
+    expect(mockIssuesApi.create).toHaveBeenCalledWith(
+      "company-1",
+      expect.objectContaining({
+        title: "Scoped project task",
+        projectId: "project-1",
+      }),
+    );
+
+    act(() => root.unmount());
   });
 
   it("uses the compact composer control proportions for mobile task fields", async () => {

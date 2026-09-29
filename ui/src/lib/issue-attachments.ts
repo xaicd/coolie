@@ -40,3 +40,23 @@ export function isMarkdownAttachment(
 ) {
   return isMarkdownAttachmentContent(attachment);
 }
+
+/**
+ * An HTML deliverable (prototype sandbox, dashboard, static report). The server
+ * serves these `text/html` with an inline disposition and a sandbox CSP, so the
+ * UI can render them in an iframe instead of offering a download. Uploads often
+ * arrive with a generic binary content type, so the filename is checked too.
+ */
+export function isHtmlAttachment(
+  attachment: Pick<IssueAttachment, "contentType" | "originalFilename">,
+) {
+  const type = normalizedContentType(attachment);
+  if (type === "text/html" || type === "application/xhtml+xml" || type === "application/html") {
+    return true;
+  }
+  if (type !== "" && type !== "application/octet-stream" && type !== "binary/octet-stream") {
+    return false;
+  }
+  const name = (attachment.originalFilename ?? "").toLowerCase();
+  return name.endsWith(".html") || name.endsWith(".htm");
+}

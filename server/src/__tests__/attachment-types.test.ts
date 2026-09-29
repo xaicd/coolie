@@ -3,7 +3,9 @@ import {
   DEFAULT_ALLOWED_TYPES,
   formatAttachmentSize,
   INLINE_ATTACHMENT_TYPES,
+  inferHtmlAttachmentContentTypeFromFilename,
   inferOfficeAttachmentContentTypeFromFilename,
+  isHtmlAttachmentContentType,
   isInlineAttachmentContentType,
   matchesContentType,
   MAX_ATTACHMENT_BYTES,
@@ -209,19 +211,46 @@ describe("normalizeUploadAttachmentContentType", () => {
       }),
     ).toBe("application/octet-stream");
   });
+
+  it("infers text/html for generic .html/.htm uploads", () => {
+    expect(inferHtmlAttachmentContentTypeFromFilename("dashboard.html")).toBe("text/html");
+    expect(inferHtmlAttachmentContentTypeFromFilename("PROTOTYPE.HTM")).toBe("text/html");
+    expect(inferHtmlAttachmentContentTypeFromFilename("notes.md")).toBeNull();
+    expect(
+      normalizeUploadAttachmentContentType({
+        contentType: "application/octet-stream",
+        originalFilename: "prototype.html",
+      }),
+    ).toBe("text/html");
+  });
+
+  it("classifies html content types (with parameters) as html", () => {
+    expect(isHtmlAttachmentContentType("text/html")).toBe(true);
+    expect(isHtmlAttachmentContentType("text/html; charset=utf-8")).toBe(true);
+    expect(isHtmlAttachmentContentType("application/xhtml+xml")).toBe(true);
+    expect(isHtmlAttachmentContentType("text/plain")).toBe(false);
+  });
 });
 
 describe("isInlineAttachmentContentType", () => {
   it("allows the configured inline-safe types", () => {
-    for (const contentType of ["image/png", "image/svg+xml", "application/pdf", "text/plain", "video/mp4"]) {
+    for (const contentType of [
+      "image/png",
+      "image/svg+xml",
+      "application/pdf",
+      "text/plain",
+      "text/html",
+      "application/xhtml+xml",
+      "video/mp4",
+    ]) {
       expect(isInlineAttachmentContentType(contentType)).toBe(true);
     }
   });
 
   it("rejects potentially unsafe or binary download types", () => {
-    expect(INLINE_ATTACHMENT_TYPES).not.toContain("text/html");
-    expect(isInlineAttachmentContentType("text/html")).toBe(false);
+    expect(INLINE_ATTACHMENT_TYPES).not.toContain("application/zip");
     expect(isInlineAttachmentContentType("application/zip")).toBe(false);
+    expect(isInlineAttachmentContentType("application/x-msdownload")).toBe(false);
   });
 });
 

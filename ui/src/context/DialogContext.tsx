@@ -34,6 +34,13 @@ interface DialogContextValue {
   newIssueDefaults: NewIssueDefaults;
   openNewIssue: (defaults?: NewIssueDefaults) => void;
   closeNewIssue: () => void;
+  // wave136 (P3-1): the project a page is currently scoped to. The global
+  // "New Task" affordances (sidebar, keyboard shortcut, mobile nav, command
+  // palette) open the dialog without a projectId, so a project page registers
+  // its own id here and NewIssueDialog falls back to it — matching the App,
+  // whose project card preselects the project.
+  defaultProjectId: string | null;
+  setDefaultProjectId: (projectId: string | null) => void;
   newProjectOpen: boolean;
   openNewProject: () => void;
   closeNewProject: () => void;
@@ -59,6 +66,7 @@ type DialogStateValue = Pick<
   DialogContextValue,
   | "newIssueOpen"
   | "newIssueDefaults"
+  | "defaultProjectId"
   | "newProjectOpen"
   | "newGoalOpen"
   | "newGoalDefaults"
@@ -76,6 +84,7 @@ const DialogActionsContext = createContext<DialogActionsValue | null>(null);
 export function DialogProvider({ children }: { children: ReactNode }) {
   const [newIssueOpen, setNewIssueOpen] = useState(false);
   const [newIssueDefaults, setNewIssueDefaults] = useState<NewIssueDefaults>({});
+  const [defaultProjectId, setDefaultProjectIdState] = useState<string | null>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [newGoalOpen, setNewGoalOpen] = useState(false);
   const [newGoalDefaults, setNewGoalDefaults] = useState<NewGoalDefaults>({});
@@ -92,6 +101,10 @@ export function DialogProvider({ children }: { children: ReactNode }) {
   const closeNewIssue = useCallback(() => {
     setNewIssueOpen(false);
     setNewIssueDefaults({});
+  }, []);
+
+  const setDefaultProjectId = useCallback((projectId: string | null) => {
+    setDefaultProjectIdState(projectId);
   }, []);
 
   const openNewProject = useCallback(() => {
@@ -134,6 +147,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     () => ({
       newIssueOpen,
       newIssueDefaults,
+      defaultProjectId,
       newProjectOpen,
       newGoalOpen,
       newGoalDefaults,
@@ -145,6 +159,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     [
       newIssueOpen,
       newIssueDefaults,
+      defaultProjectId,
       newProjectOpen,
       newGoalOpen,
       newGoalDefaults,
@@ -159,6 +174,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     () => ({
       openNewIssue,
       closeNewIssue,
+      setDefaultProjectId,
       openNewProject,
       closeNewProject,
       openNewGoal,
@@ -172,6 +188,7 @@ export function DialogProvider({ children }: { children: ReactNode }) {
     [
       openNewIssue,
       closeNewIssue,
+      setDefaultProjectId,
       openNewProject,
       closeNewProject,
       openNewGoal,

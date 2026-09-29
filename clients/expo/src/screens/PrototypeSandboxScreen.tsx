@@ -37,7 +37,7 @@ import type {
   IssueWorkProduct,
   WorkspaceRuntimeService,
 } from "@coolie/api-client";
-import { C, COOLIE_BASE_URL } from "../coolie";
+import { C, COOLIE_BASE_URL, getAuthToken } from "../coolie";
 import { EmptyState } from "../ui/EmptyState";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { ExternalOpenSheet } from "../components/ExternalOpenSheet";
@@ -204,34 +204,74 @@ export function PrototypeSandboxScreen({
     url: string | null;
     isSnapshot: boolean;
   }>(() => resolvePreviewUrl(_service, workProduct, initialUrl, bust));
+  // 附件内容端点需要鉴权; WebView 与内容探测都带上 SecureStore 里的 bearer token。
+  const [authHeaders, setAuthHeaders] = useState<Record<string, string> | undefined>(undefined);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getAuthToken()
+      .then((token) => {
+        if (!cancelled) setAuthHeaders(token ? { Authorization: `Bearer ${token}` } : undefined);
+      })
+      .catch(() => {
+        if (!cancelled) setAuthHeaders(undefined);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // DS 真值: useEffect(resolve, [sessionId]); 我们重入参 resolve() 一次
   useEffect(() => {
+    let cancelled = false;
     const raw = resolvePreviewUrl(_service, workProduct, initialUrl, bust);
     const resolvedUrl = raw.url && raw.url.startsWith("/") ? `${COOLIE_BASE_URL}${raw.url}` : raw.url;
     setResolved({ url: resolvedUrl, isSnapshot: raw.isSnapshot });
     setLoading(false);
+    setMarkdownHtml(null);
 
-    const isDocUrl =
-      resolvedUrl &&
+    const applySummaryFallback = () => {
+      if (workProduct?.summary && (!resolvedUrl || resolvedUrl.endsWith(".md"))) {
+        setMarkdownHtml(generateMarkdownHtml(workProduct.title ?? "产物概览", workProduct.summary));
+      }
+    };
+
+    const isTextDocUrl =
+      !!resolvedUrl &&
       (resolvedUrl.endsWith(".md") ||
         resolvedUrl.endsWith(".txt") ||
-        resolvedUrl.includes("/docs/") ||
-        resolvedUrl.includes("/attachments/"));
+        resolvedUrl.includes("/docs/"));
+    // wave136: 附件 URL 不带扩展名, 不能只看路径就断定它是文本文档 —— 先探一次
+    // content-type: text/html(.htm) 的交付产物要交给 WebView 直接渲染真页面,
+    // 而不是 fetch 成文本再走 markdown 渲染器(那会把 HTML 源码显示出来)。
+    const isAttachmentUrl = !!resolvedUrl && resolvedUrl.includes("/attachments/");
 
-    if (resolvedUrl && isDocUrl) {
-      fetch(resolvedUrl)
-        .then((res) => res.text())
-        .then((text) => setMarkdownHtml(generateMarkdownHtml(workProduct?.title ?? "产物文档", text)))
-        .catch(() => {
-          if (workProduct?.summary) {
-            setMarkdownHtml(generateMarkdownHtml(workProduct.title ?? "产物概览", workProduct.summary));
+    if (resolvedUrl && (isTextDocUrl || isAttachmentUrl)) {
+      void (async () => {
+        try {
+          const token = await getAuthToken().catch(() => null);
+          const res = await fetch(resolvedUrl, {
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          });
+          if (cancelled) return;
+          const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
+          if (
+            contentType.includes("text/html") ||
+            contentType.includes("application/xhtml+xml")
+          ) {
+            // 保持 markdownHtml=null, 让 WebView 用 uri 加载渲染页面。
+            return;
           }
-        });
-    } else if (workProduct?.summary && (!resolvedUrl || resolvedUrl.endsWith(".md"))) {
-      setMarkdownHtml(generateMarkdownHtml(workProduct.title ?? "产物概览", workProduct.summary));
+          const text = await res.text();
+          if (cancelled) return;
+          setMarkdownHtml(generateMarkdownHtml(workProduct?.title ?? "产物文档", text));
+        } catch {
+          if (cancelled) return;
+          applySummaryFallback();
+        }
+      })();
     } else {
-      setMarkdownHtml(null);
+      applySummaryFallback();
     }
   }, [_service, workProduct, initialUrl, bust]);
 
@@ -328,11 +368,16 @@ export function PrototypeSandboxScreen({
       ) : canWebView ? (
         <WebView
           key={markdownHtml ? "markdown-preview" : isSnapshot ? url : `${url}`}
-          source={markdownHtml ? { html: markdownHtml } : { uri: url ?? "" }}
+          source={
+            markdownHtml
+              ? { html: markdownHtml }
+              : { uri: url ?? "", headers: authHeaders }
+          }
           style={styles.web}
           originWhitelist={["*"]}
           javaScriptEnabled
           domStorageEnabled
+          sharedCookiesEnabled
           onLoadStart={() => setWebLoading(true)}
           onLoadEnd={() => setWebLoading(false)}
           onError={() => {

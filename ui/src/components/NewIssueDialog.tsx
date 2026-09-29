@@ -463,7 +463,7 @@ const IssueDescriptionEditor = memo(function IssueDescriptionEditor({
 
 export function NewIssueDialog() {
   const { visible: workspaceIsolationControlsVisible } = useWorkspaceIsolationControls();
-  const { newIssueOpen, newIssueDefaults, closeNewIssue } = useDialog();
+  const { newIssueOpen, newIssueDefaults, closeNewIssue, defaultProjectId: scopedDefaultProjectId } = useDialog();
   const visualViewportLayout = useVisualViewportLayout(newIssueOpen);
   const dialogBodyRef = useRef<HTMLDivElement>(null);
   const { companies, selectedCompanyId, selectedCompany } = useCompany();
@@ -829,7 +829,7 @@ export function NewIssueDialog() {
     const draft = loadDraft();
     if (newIssueDefaults.parentId) {
       const nextWorkMode = isIssueWorkMode(newIssueDefaults.workMode) ? newIssueDefaults.workMode : "standard";
-      const defaultProjectId = newIssueDefaults.projectId ?? "";
+      const defaultProjectId = newIssueDefaults.projectId ?? scopedDefaultProjectId ?? "";
       const defaultProject = orderedProjects.find((project) => project.id === defaultProjectId);
       const hasExplicitProjectWorkspaceId = newIssueDefaults.projectWorkspaceId !== undefined;
       const defaultProjectWorkspaceId = newIssueDefaults.projectWorkspaceId
@@ -856,7 +856,7 @@ export function NewIssueDialog() {
       setIssueText(newIssueDefaults.title, newIssueDefaults.description ?? "");
       setStatus(newIssueDefaults.status ?? "todo");
       setPriority(newIssueDefaults.priority ?? "");
-      const defaultProjectId = newIssueDefaults.projectId ?? "";
+      const defaultProjectId = newIssueDefaults.projectId ?? scopedDefaultProjectId ?? "";
       const defaultProject = orderedProjects.find((project) => project.id === defaultProjectId);
       const hasExplicitProjectWorkspaceId = newIssueDefaults.projectWorkspaceId !== undefined;
       setProjectId(defaultProjectId);
@@ -880,7 +880,7 @@ export function NewIssueDialog() {
         : null;
     } else if (draft && draft.title.trim()) {
       const nextWorkMode = isIssueWorkMode(draft.workMode) ? draft.workMode : "standard";
-      const restoredProjectId = newIssueDefaults.projectId ?? draft.projectId;
+      const restoredProjectId = newIssueDefaults.projectId ?? scopedDefaultProjectId ?? draft.projectId;
       const restoredProject = orderedProjects.find((project) => project.id === restoredProjectId);
       const hasExplicitProjectWorkspaceId = newIssueDefaults.projectWorkspaceId !== undefined;
       const hasExplicitExecutionWorkspaceId = newIssueDefaults.executionWorkspaceId !== undefined;
@@ -929,7 +929,7 @@ export function NewIssueDialog() {
         : null;
     } else {
       setWorkMode("standard");
-      const defaultProjectId = newIssueDefaults.projectId ?? "";
+      const defaultProjectId = newIssueDefaults.projectId ?? scopedDefaultProjectId ?? "";
       const defaultProject = orderedProjects.find((project) => project.id === defaultProjectId);
       const hasExplicitProjectWorkspaceId = newIssueDefaults.projectWorkspaceId !== undefined;
       setIssueText("", "");
@@ -954,7 +954,7 @@ export function NewIssueDialog() {
         ? defaultProjectId || null
         : null;
     }
-  }, [newIssueOpen, newIssueDefaults, orderedProjects, selectedCompanyId, setIssueText]);
+  }, [newIssueOpen, newIssueDefaults, scopedDefaultProjectId, orderedProjects, selectedCompanyId, setIssueText]);
 
   useEffect(() => {
     if (!supportsAssigneeOverrides) {

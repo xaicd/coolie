@@ -151,13 +151,25 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
       }
       return { project, failedUploads };
     },
-    onSuccess: ({ failedUploads }) => {
+    onSuccess: ({ project, failedUploads }) => {
       void client.invalidateQueries({ queryKey: queryKeys.projects.all(companyId) });
       if (failedUploads.length > 0) {
         toast.pushToast({
           title: "部分需求文档未上传",
           body: failedUploads.join("、"),
           tone: "error",
+        });
+      } else if (files.length > 0) {
+        // wave136 (P3-2): the server parses the landed 需求文档 off the request
+        // path and backfills the project description/goals. The upload has just
+        // returned, so the enrichment may not be done yet — drop the cached
+        // detail so the project page refetches the filled-in description/goals
+        // on open, and tell the user it is on its way.
+        void client.invalidateQueries({ queryKey: queryKeys.projects.detail(project.id) });
+        toast.pushToast({
+          title: "需求文档已上传",
+          body: "系统正在解析文档以补齐项目描述与建设目标，稍后进入项目页可见。",
+          tone: "info",
         });
       }
       onClose();

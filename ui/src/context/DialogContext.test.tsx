@@ -55,4 +55,41 @@ describe("DialogContext", () => {
 
     act(() => root.unmount());
   });
+
+  it("exposes a page-scoped defaultProjectId that pages can register", () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const root = createRoot(host);
+
+    function PageScopedConsumer() {
+      const { setDefaultProjectId } = useDialogActions();
+      const { defaultProjectId } = useDialogState();
+      return (
+        <div>
+          <span data-testid="state">{defaultProjectId ?? "none"}</span>
+          <button onClick={() => setDefaultProjectId("project-42")}>register</button>
+        </div>
+      );
+    }
+
+    act(() => {
+      root.render(
+        <DialogProvider>
+          <PageScopedConsumer />
+        </DialogProvider>,
+      );
+    });
+
+    expect(host.querySelector('[data-testid="state"]')?.textContent).toBe("none");
+
+    act(() => {
+      host
+        .querySelector("button")
+        ?.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+
+    expect(host.querySelector('[data-testid="state"]')?.textContent).toBe("project-42");
+
+    act(() => root.unmount());
+  });
 });
