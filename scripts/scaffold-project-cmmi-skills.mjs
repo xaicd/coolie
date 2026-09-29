@@ -76,7 +76,7 @@ Coolie 工坊 CMMI 技能脚手架与定制工具 (CMMI Skills Scaffolder)
 `);
 }
 
-// 6 大核心 CMMI 技能清单
+// 7 大核心 CMMI 技能清单
 const CMMI_SKILLS = [
   {
     dir: "cmmi-req-spec",
@@ -84,6 +84,14 @@ const CMMI_SKILLS = [
     role: "emp_ds",
     gate: "gate_g1_spec",
     title: "CMMI 需求工程与双向跟踪矩阵规范 (RD/REQM)",
+    docFile: "01-srs.md",
+  },
+  {
+    dir: "cmmi-wbs-milestone",
+    name: "cmmi-wbs-milestone",
+    role: "emp_ds",
+    gate: "gate_g1_spec",
+    title: "CMMI 工作分解结构与里程碑主线管理 (PP/PMC)",
     docFile: "01-srs.md",
   },
   {
