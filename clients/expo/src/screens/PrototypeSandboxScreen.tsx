@@ -85,6 +85,23 @@ function resolvePreviewUrl(
   return { url: snap, isSnapshot: !!snap };
 }
 
+// wave136: 交付产物是 HTML 时, 我们在 RN 侧带凭据把它取回来再交给 WebView 渲染。
+// 这样不依赖 WebView 自己的 cookie 存储 —— Android 上 sharedCookiesEnabled 无效,
+// 且实测旧内核的 WebView 会把 exchange 302 的 Set-Cookie 丢掉, 附件请求变匿名
+// 而 404。参数与 server 端 HTML_ATTACHMENT_CONTENT_SECURITY_POLICY 对齐:
+// connect-src 'none' 断脚本外发; sandbox 只能由响应头下发, meta 不支持, 所以这里
+// 退一步只约束资源与网络, 页面仍在 App 自己的 WebView 内执行。
+const INLINE_HTML_CSP =
+  "default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src 'self' data:; media-src 'self' blob: data:; connect-src 'none'";
+
+function withInlineHtmlCsp(html: string): string {
+  const meta = `<meta http-equiv="Content-Security-Policy" content="${INLINE_HTML_CSP}">`;
+  if (/<head[^>]*>/i.test(html)) {
+    return html.replace(/<head[^>]*>/i, (match) => `${match}\n  ${meta}`);
+  }
+  return `${meta}\n${html}`;
+}
+
 function generateMarkdownHtml(title: string, md: string): string {
   const lines = md.split("\n");
   let inCode = false;
@@ -200,6 +217,8 @@ export function PrototypeSandboxScreen({
   const [webLoading, setWebLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [markdownHtml, setMarkdownHtml] = useState<string | null>(null);
+  // 取回来的 HTML 交付产物: 直接渲染成 WebView 文档, 不走文本/markdown 通道。
+  const [htmlDoc, setHtmlDoc] = useState<{ html: string; baseUrl: string } | null>(null);
   const [{ url, isSnapshot }, setResolved] = useState<{
     url: string | null;
     isSnapshot: boolean;
@@ -251,6 +270,7 @@ export function PrototypeSandboxScreen({
     setResolved({ url: resolvedUrl, isSnapshot: raw.isSnapshot });
     setLoading(false);
     setMarkdownHtml(null);
+    setHtmlDoc(null);
 
     const applySummaryFallback = () => {
       if (workProduct?.summary && (!resolvedUrl || resolvedUrl.endsWith(".md"))) {
@@ -281,15 +301,16 @@ export function PrototypeSandboxScreen({
           if (cancelled) return;
           if (!res.ok) return; // 鉴权/网络失败时交给 WebView(桥/头部)去处理
           const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
+          const text = await res.text();
+          if (cancelled) return;
           if (
             contentType.includes("text/html") ||
             contentType.includes("application/xhtml+xml")
           ) {
-            // 保持 markdownHtml=null, 让 WebView 用 uri 加载渲染页面。
+            // HTML 交付产物: 带凭据取回正文, 交给 WebView 渲染真页面(而不是源码)。
+            setHtmlDoc({ html: withInlineHtmlCsp(text), baseUrl: resolvedUrl });
             return;
           }
-          const text = await res.text();
-          if (cancelled) return;
           setMarkdownHtml(generateMarkdownHtml(workProduct?.title ?? "产物文档", text));
         } catch {
           if (cancelled) return;
@@ -318,10 +339,10 @@ export function PrototypeSandboxScreen({
   }, [url]);
 
   // DS 真值: Web 端降级为「在浏览器打开」; 我们也是
-  const canWebView = (!!url || !!markdownHtml) && Platform.OS !== "web";
+  const canWebView = (!!url || !!markdownHtml || !!htmlDoc) && Platform.OS !== "web";
 
   // DS 真值: 没链接且无可用预览内容就直接告诉他「暂无可用预览」
-  if (!url && !markdownHtml) {
+  if (!url && !markdownHtml && !htmlDoc) {
     return (
       <SafeAreaView style={styles.safeArea}>
         <StatusBar style="light" />
@@ -393,15 +414,24 @@ export function PrototypeSandboxScreen({
         </View>
       ) : canWebView ? (
         <WebView
-          key={markdownHtml ? "markdown-preview" : (bridgeUrl ?? url ?? "preview")}
+          key={
+            markdownHtml
+              ? "markdown-preview"
+              : htmlDoc
+                ? "html-doc"
+                : (bridgeUrl ?? url ?? "preview")
+          }
           source={
             markdownHtml
               ? { html: markdownHtml }
-              : authHeaders
-                ? { uri: url ?? "", headers: authHeaders }
-                // 会话登录: 先走 exchange 桥给 WebView 自己的 cookie jar 落 cookie,
-                // 再 302 到交付物 URL。
-                : { uri: bridgeUrl ?? url ?? "" }
+              : htmlDoc
+                // HTML 交付产物: 已带凭据取回, 以 baseUrl 为准渲染(相对资源可解析)。
+                ? { html: htmlDoc.html, baseUrl: htmlDoc.baseUrl }
+                : authHeaders
+                  ? { uri: url ?? "", headers: authHeaders }
+                  // 会话登录的 URL 预览: 先走 exchange 桥给 WebView 的 cookie jar
+                  // 落 cookie, 再 302 到目标 URL。
+                  : { uri: bridgeUrl ?? url ?? "" }
           }
           style={styles.web}
           originWhitelist={["*"]}
