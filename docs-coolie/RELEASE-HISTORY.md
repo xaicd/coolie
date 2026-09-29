@@ -48,6 +48,10 @@ bash scripts/release-app.sh 0.5.98 "wave144 工坊对话修复 + wave148 工坊�
 
 详见 `docs-coolie/evidence/wave148/QA-REPORT.md` §3B。
 
+> wave148b 复核: v3 退出后这 4 个文件仍是未提交的改动, 由 wave150 以 `stash@{0}`
+> (「wave149-v3 in-flight (do not touch)」) 保留; **0.5.98 不再单独发出** (已由 0.6.0 全额覆盖)。
+> 详见 `docs-coolie/evidence/wave148b/QA-REPORT.md`。
+
 ## v0.6.1 — 未发起 (本波未发版)
 
 wave147 的 spec-driven 开发链（requirement/bugfix → design → task）代码已全部落 `main`，但**本波没有发版**:
