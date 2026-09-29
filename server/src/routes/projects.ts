@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
-import { activityLog } from "@paperclipai/db";
+import { activityLog, issues } from "@paperclipai/db";
 import { projectToolContext } from "../services/project-tool-context.js";
 import { persistActivity, publishActivity } from "../services/activity-log.js";
 import { z } from "zod";
@@ -20,8 +20,10 @@ import { toolAccessService } from "../services/tool-access.js";
 import { Router, type Request, type Response } from "express";
 import type { Db } from "@paperclipai/db";
 import {
+  buildWbsMainline,
   createProjectSchema,
   createProjectWorkspaceSchema,
+  evaluateWbsGates,
   findWorkspaceCommandDefinition,
   isUuidLike,
   matchWorkspaceRuntimeServiceToCommand,
@@ -32,7 +34,7 @@ import {
 import type { WorkspaceRuntimeDesiredState, WorkspaceRuntimeServiceStateMap } from "@paperclipai/shared";
 import { trackProjectCreated } from "@paperclipai/shared/telemetry";
 import { validate } from "../middleware/validate.js";
-import { accessService, projectService, logActivity, workspaceOperationService } from "../services/index.js";
+import { accessService, issueService, projectService, logActivity, workspaceOperationService } from "../services/index.js";
 import { conflict, forbidden, unprocessable } from "../errors.js";
 import { externalObjectService } from "../services/external-objects.js";
 import { instanceSettingsService } from "../services/instance-settings.js";
@@ -471,6 +473,163 @@ export function projectRoutes(db: Db) {
 
     const documents = await listProjectDocuments({ companyId: project.companyId, projectId: project.id });
     res.json({ projectId: project.id, documents });
+  });
+
+  // ── wave140: CMMI WBS 拆解 + 里程碑主线 ──────────────────────────────────────
+  //
+  // The WBS draft is produced off the request path by the document enrichment and
+  // stored on `projects.wbs_draft`. These routes are the human side of it: read
+  // the milestone mainline (+ per-issue gate state), adopt the draft into real
+  // issues, or dismiss it. Adoption is never automatic — 不静默乱建.
+
+  const loadWbsProject = async (req: Request, res: Response, companyId: string, projectId: string) => {
+    const project = await getAccessibleResource(req, res, svc.getById(projectId), "Project not found");
+    if (!project) return null;
+    if (project.companyId !== companyId) {
+      res.status(422).json({ error: "Project does not belong to company" });
+      return null;
+    }
+    if (!(await assertProjectReadAllowed(req, res, project))) return null;
+    return project;
+  };
+
+  router.get("/companies/:companyId/projects/:projectId/wbs", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    const projectId = req.params.projectId as string;
+    assertCompanyAccess(req, companyId);
+    const project = await loadWbsProject(req, res, companyId, projectId);
+    if (!project) return;
+
+    const projectIssues = await issueService(db).list(companyId, { projectId: project.id });
+    const wbsIssues = projectIssues.map((issue) => ({
+      id: issue.id,
+      title: issue.title,
+      status: issue.status,
+      wbsCode: issue.wbsCode,
+      wbsType: issue.wbsType,
+      isMilestone: issue.isMilestone,
+      milestone: issue.milestone,
+    }));
+    res.json({
+      projectId: project.id,
+      draft: project.wbsDraft ?? null,
+      mainline: buildWbsMainline(wbsIssues),
+      gateStates: Object.fromEntries(evaluateWbsGates(wbsIssues)),
+    });
+  });
+
+  router.post("/companies/:companyId/projects/:projectId/wbs/adopt", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    const projectId = req.params.projectId as string;
+    assertCompanyAccess(req, companyId);
+    const project = await loadWbsProject(req, res, companyId, projectId);
+    if (!project) return;
+
+    const draft = project.wbsDraft ?? null;
+    if (!draft || draft.items.length === 0) {
+      res.status(409).json({ error: "No WBS draft to adopt" });
+      return;
+    }
+    const already = await db
+      .select({ id: issues.id })
+      .from(issues)
+      .where(and(eq(issues.projectId, project.id), eq(issues.isMilestone, true)))
+      .limit(1);
+    if (already.length > 0) {
+      res.status(409).json({ error: "WBS already adopted" });
+      return;
+    }
+
+    // Item order is phase → its work packages → its milestone, so each child's
+    // code resolves to an already-created parent id. Milestones serve the
+    // project's primary goal; a 需求 work package matching a goal title links to
+    // that goal, so "一个里程碑服务于哪个目标" is answerable.
+    const goalIdByTitle = new Map(
+      (project.goals ?? []).map((goal) => [goal.title.trim().toLowerCase(), goal.id] as const),
+    );
+    const primaryGoalId = project.goalIds?.[0] ?? null;
+    const issueSvc = issueService(db);
+    const idByCode = new Map<string, string>();
+    const createdIds: string[] = [];
+    const createdMilestones: string[] = [];
+
+    for (const item of draft.items) {
+      const parentId = item.parentCode ? idByCode.get(item.parentCode) ?? null : null;
+      const goalId = item.isMilestone
+        ? primaryGoalId
+        : item.type === "work_package"
+          ? goalIdByTitle.get(item.title.trim().toLowerCase()) ?? null
+          : null;
+      const created = await issueSvc.create(companyId, {
+        projectId: project.id,
+        title: item.title,
+        description: item.description ?? undefined,
+        status: "backlog",
+        parentId,
+        goalId,
+        wbsCode: item.code,
+        wbsType: item.type,
+        isMilestone: item.isMilestone,
+        milestone: item.milestone ?? undefined,
+        allowDuplicate: true,
+        idempotencyKey: `wbs-adopt:${project.id}:${item.code}`,
+      });
+      idByCode.set(item.code, created.id);
+      createdIds.push(created.id);
+      if (item.isMilestone) createdMilestones.push(created.id);
+    }
+
+    await svc.update(project.id, { wbsDraft: null });
+    const actor = getActorInfo(req);
+    await logActivity(db, {
+      companyId,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      agentId: actor.agentId,
+      runId: actor.runId,
+      action: "project.wbs_adopted",
+      entityType: "project",
+      entityId: project.id,
+      details: {
+        itemCount: createdIds.length,
+        milestoneCount: createdMilestones.length,
+        source: draft.source,
+      },
+    });
+
+    res.status(201).json({
+      projectId: project.id,
+      createdIssueIds: createdIds,
+      milestoneIssueIds: createdMilestones,
+      itemCount: createdIds.length,
+    });
+  });
+
+  router.delete("/companies/:companyId/projects/:projectId/wbs/draft", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    const projectId = req.params.projectId as string;
+    assertCompanyAccess(req, companyId);
+    const project = await loadWbsProject(req, res, companyId, projectId);
+    if (!project) return;
+    if (project.wbsDraft == null) {
+      res.status(404).json({ error: "No WBS draft" });
+      return;
+    }
+
+    await svc.update(project.id, { wbsDraft: null });
+    const actor = getActorInfo(req);
+    await logActivity(db, {
+      companyId,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      agentId: actor.agentId,
+      runId: actor.runId,
+      action: "project.wbs_draft_dismissed",
+      entityType: "project",
+      entityId: project.id,
+      details: { itemCount: project.wbsDraft.items.length },
+    });
+    res.status(204).end();
   });
 
   // Auto-recognize an uploaded requirement doc so the create-project flow can

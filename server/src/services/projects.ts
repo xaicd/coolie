@@ -70,6 +70,8 @@ interface ProjectWithGoals extends Omit<ProjectRow, "executionWorkspacePolicy"> 
   taskCount?: number;
   /** Number of defects (tasks carrying defect metadata) in the project. */
   defectCount?: number;
+  /** Number of 里程碑/主线 tasks (is_milestone) in the project (wave140). */
+  milestoneCount?: number;
   budget?: ProjectBudgetSummary | null;
 }
 
@@ -324,7 +326,7 @@ async function attachWorkspaces(db: Db, rows: ProjectWithGoals[]): Promise<Proje
   });
 }
 
-type TaskCountRow = { projectId: string | null; count: number; defectCount?: number };
+type TaskCountRow = { projectId: string | null; count: number; defectCount?: number; milestoneCount?: number };
 type ProjectBudgetRow = { scopeId: string; amount: number; windowKind: string };
 
 /**
@@ -335,10 +337,12 @@ type ProjectBudgetRow = { scopeId: string; amount: number; windowKind: string };
 export function buildProjectListMetricMaps(taskCountRows: TaskCountRow[], budgetRows: ProjectBudgetRow[]) {
   const taskCountByProjectId = new Map<string, number>();
   const defectCountByProjectId = new Map<string, number>();
+  const milestoneCountByProjectId = new Map<string, number>();
   for (const row of taskCountRows) {
     if (row.projectId) {
       taskCountByProjectId.set(row.projectId, Number(row.count) || 0);
       defectCountByProjectId.set(row.projectId, Number(row.defectCount ?? 0) || 0);
+      milestoneCountByProjectId.set(row.projectId, Number(row.milestoneCount ?? 0) || 0);
     }
   }
 
@@ -352,7 +356,7 @@ export function buildProjectListMetricMaps(taskCountRows: TaskCountRow[], budget
     }
   }
 
-  return { taskCountByProjectId, defectCountByProjectId, budgetByProjectId };
+  return { taskCountByProjectId, defectCountByProjectId, milestoneCountByProjectId, budgetByProjectId };
 }
 
 /**
@@ -375,6 +379,7 @@ async function attachListMetrics(
         projectId: issues.projectId,
         count: sql<number>`count(*)::int`,
         defectCount: sql<number>`count(*) filter (where ${issues.defect} is not null)::int`,
+        milestoneCount: sql<number>`count(*) filter (where ${issues.isMilestone})::int`,
       })
       .from(issues)
       .where(and(eq(issues.companyId, companyId), inArray(issues.projectId, projectIds), isNull(issues.conversationAgentId)))
@@ -397,7 +402,7 @@ async function attachListMetrics(
       ),
   ]);
 
-  const { taskCountByProjectId, defectCountByProjectId, budgetByProjectId } = buildProjectListMetricMaps(
+  const { taskCountByProjectId, defectCountByProjectId, milestoneCountByProjectId, budgetByProjectId } = buildProjectListMetricMaps(
     taskCountRows,
     budgetRows,
   );
@@ -406,6 +411,7 @@ async function attachListMetrics(
     ...row,
     taskCount: taskCountByProjectId.get(row.id) ?? 0,
     defectCount: defectCountByProjectId.get(row.id) ?? 0,
+    milestoneCount: milestoneCountByProjectId.get(row.id) ?? 0,
     budget: budgetByProjectId.get(row.id) ?? null,
   }));
 }
