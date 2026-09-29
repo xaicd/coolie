@@ -574,12 +574,10 @@ export {
   issueSpecRequirementSchema,
   issueSpecSchema,
   issueSpecTaskSchema,
-  saveIssueSpecSchema,
   specTreeQuerySchema,
   type CreateSpecFromTemplateInput,
   type IssueSpecDraftInput,
   type IssueSpecInput,
-  type SaveIssueSpecInput,
 } from "./issue-spec.js";
 
 export {

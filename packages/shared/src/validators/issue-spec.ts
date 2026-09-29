@@ -95,17 +95,7 @@ export const issueSpecDraftSchema = z
 
 export type IssueSpecDraftInput = z.infer<typeof issueSpecDraftSchema>;
 
-/** `POST /api/issues/:id/spec` — a full spec, or a partial draft when `draft`. */
-export const saveIssueSpecSchema = z
-  .object({
-    spec: issueSpecSchema,
-    draft: z.boolean().optional().default(false),
-  })
-  .strict();
-
-export type SaveIssueSpecInput = z.infer<typeof saveIssueSpecSchema>;
-
-/** `POST /api/companies/:companyId/specs/from-template`. */
+/** `POST /api/issues/:id/spec` — a full spec; with `?draft=1`, a partial one. */
 export const createSpecFromTemplateSchema = z
   .object({
     kind: issueSpecKindSchema,
