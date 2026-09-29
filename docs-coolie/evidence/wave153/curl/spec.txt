@@ -1,0 +1,3 @@
+== GET /api/issues/:id/spec (wave153 App spec editor read path) ==
+HTTP 200
+{"issueId":"e20bd52f-0ea6-42fe-abb7-6b2770475055","specKind":null,"spec":null}

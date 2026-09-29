@@ -18,6 +18,8 @@ interface OrgAssetsScreenProps {
   company: Company;
   whoami?: string;
   initialTab?: OrgAssetTab;
+  /** wave153 — 进入时预设的产物项目筛选 (项目卡「查看产物」直达)。 */
+  initialArtifactsProjectId?: string | null;
   onOpenIssue: (issue: Issue) => void;
   onOpenProjectTasks?: (project: Project) => void;
   onCreateTaskForProject?: (project: Project) => void;
@@ -50,6 +52,7 @@ export function OrgAssetsScreen({
   company,
   whoami,
   initialTab = "ontology",
+  initialArtifactsProjectId,
   onOpenIssue,
   onOpenProjectTasks,
   onCreateTaskForProject,
@@ -60,6 +63,10 @@ export function OrgAssetsScreen({
   onOpenDiff,
 }: OrgAssetsScreenProps) {
   const [activeTab, setActiveTab] = useState<OrgAssetTab>(initialTab);
+  // wave153 — 项目卡「查看产物」把项目 id 带进来, 切到产物 Tab 并按该项目筛选。
+  const [artifactsProjectId, setArtifactsProjectId] = useState<string | null>(
+    initialArtifactsProjectId ?? null,
+  );
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -118,6 +125,10 @@ export function OrgAssetsScreen({
             onBack={() => setActiveTab("ontology")}
             onOpenProjectTasks={onOpenProjectTasks}
             onCreateTaskForProject={onCreateTaskForProject}
+            onOpenProjectArtifacts={(project) => {
+              setArtifactsProjectId(project.id);
+              setActiveTab("artifacts");
+            }}
             onOpenWebProjects={onOpenWebProjects}
           />
         )}
@@ -133,6 +144,7 @@ export function OrgAssetsScreen({
           <ArtifactsScreen
             company={company}
             whoami={whoami}
+            initialProjectId={artifactsProjectId}
             onOpenSandbox={(url, service, wp, scope) => onOpenSandbox?.(url, service, wp, scope)}
             onOpenDiff={(issue, wp) => onOpenDiff?.(issue, wp)}
           />

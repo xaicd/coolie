@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   FlatList,
   Linking,
@@ -44,6 +44,8 @@ import type { SandboxScope } from "./PrototypeSandboxScreen";
 export interface ArtifactsScreenProps {
   company: Company;
   whoami?: string;
+  /** wave153 — 进入时预设的项目筛选 (项目卡「查看产物」直达)。 */
+  initialProjectId?: string | null;
   onBack?: () => void;
   onOpenSandbox?: (
     url: string,
@@ -166,6 +168,7 @@ function getSourceLabel(source: string): string {
 
 export function ArtifactsScreen({
   company,
+  initialProjectId,
   onBack,
   onOpenSandbox,
   onOpenDiff,
@@ -175,7 +178,9 @@ export function ArtifactsScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<FilterKind>("all");
   const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
+    initialProjectId ?? null,
+  );
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectSheetOpen, setProjectSheetOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -184,6 +189,14 @@ export function ArtifactsScreen({
   const [authToken, setAuthToken] = useState<string | null>(null);
   const [showExternalSheet, setShowExternalSheet] = useState(false);
   const [externalSheetUrl, setExternalSheetUrl] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  /**
+   * wave153 — 请求序号。`projectId`/`q`/`filter` 变化会重发请求, 但响应可能乱序
+   * 到达: 例如挂载时的「全部产物」请求慢于用户随后选项目发的请求, 「全部产物」
+   * 后到就会覆盖掉已按项目筛选的结果 —— 现象就是「选了项目, 列表却还是全部」。
+   * 只接受最新一次请求的响应 (seq === 当前值), 过期响应直接丢弃。
+   */
+  const reqSeqRef = useRef(0);
 
   const companyId = company.id;
 
@@ -199,6 +212,7 @@ export function ArtifactsScreen({
   }, [companyId]);
 
   const loadArtifacts = useCallback(async () => {
+    const seq = ++reqSeqRef.current;
     try {
       const kindParam: CompanyArtifactMediaKind | "all" | undefined =
         filter === "work_product"
@@ -214,17 +228,26 @@ export function ArtifactsScreen({
         limit: 50,
       });
 
+      // 过期响应 (更新的请求已发出) 直接丢弃, 不落库、不动 loading。
+      if (seq !== reqSeqRef.current) return;
+
       let items = res.artifacts;
       if (filter === "work_product") {
         items = items.filter((a) => a.source === "work_product");
       }
       setArtifacts(items);
-    } catch {
-      // 容错: 如果端点暂无数据，保留空数组
+      setLoadError(null);
+    } catch (e) {
+      if (seq !== reqSeqRef.current) return;
+      // 不再静默回落成空表: 记下错误并显式展示, 让「拉取失败」与「确实没有产物」
+      // 可区分。空数组只代表这一次请求的结果, 不代表「全部产物」。
+      setLoadError(String((e as Error)?.message ?? e));
       setArtifacts([]);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (seq === reqSeqRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [companyId, filter, searchQuery, selectedProjectId]);
 
@@ -383,6 +406,18 @@ export function ArtifactsScreen({
         divider
         style={styles.headerBar}
       />
+
+      {/* wave153 — 拉取失败显式提示 (不再静默显示空表) */}
+      {loadError ? (
+        <View style={styles.errorBanner}>
+          <Text style={styles.errorBannerText} numberOfLines={2}>
+            ⚠️ 产物加载失败：{loadError}
+          </Text>
+          <Pressable onPress={() => { setLoading(true); void loadArtifacts(); }} hitSlop={8}>
+            <Text style={styles.errorBannerRetry}>重试</Text>
+          </Pressable>
+        </View>
+      ) : null}
 
       {/* 搜索与过滤分段器 */}
       <View style={styles.filterSection}>
@@ -912,6 +947,30 @@ const styles = StyleSheet.create({
     gap: 10,
     borderBottomWidth: 1,
     borderBottomColor: C.lineSubtle,
+  },
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+    marginHorizontal: 16,
+    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(245, 158, 11, 0.35)",
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+  },
+  errorBannerText: {
+    flex: 1,
+    color: C.warn,
+    fontSize: 12,
+  },
+  errorBannerRetry: {
+    color: C.accent,
+    fontSize: 12,
+    fontWeight: "600",
   },
   searchBox: {
     flexDirection: "row",

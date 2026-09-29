@@ -82,11 +82,14 @@ export function TaskDetailScreen({
   issue,
   onBack,
   onOpenSandbox,
+  onOpenSpec,
 }: {
   issue: Issue;
   company?: { id: string; name: string };
   onBack: () => void;
   onOpenSandbox?: (issue: Issue) => void;
+  /** wave153 — 打开 App 原生 spec 编辑器。 */
+  onOpenSpec?: (issue: Issue) => void;
 }) {
   const [comments, setComments] = useState<IssueComment[]>([]);
   const [agents, setAgents] = useState<AgentRow[]>([]);
@@ -338,12 +341,24 @@ export function TaskDetailScreen({
             </View>
           ) : null}
 
-          {onOpenSandbox ? (
+          {onOpenSandbox || onOpenSpec ? (
             <View style={styles.actionRow}>
-              <Pressable style={[styles.btnGhost, { flex: 1 }]} onPress={() => onOpenSandbox(issue)}>
-                <Ionicons name="play-circle-outline" size={16} color={C.accent} />
-                <Text style={styles.btnGhostText}>原型沙箱</Text>
-              </Pressable>
+              {onOpenSandbox ? (
+                <Pressable style={[styles.btnGhost, { flex: 1 }]} onPress={() => onOpenSandbox(issue)}>
+                  <Ionicons name="play-circle-outline" size={16} color={C.accent} />
+                  <Text style={styles.btnGhostText}>原型沙箱</Text>
+                </Pressable>
+              ) : null}
+              {onOpenSpec ? (
+                <Pressable
+                  style={[styles.btnGhost, { flex: 1 }]}
+                  onPress={() => onOpenSpec(issue)}
+                  accessibilityLabel="打开 Spec 编辑器"
+                >
+                  <Ionicons name="documents-outline" size={16} color={C.accent} />
+                  <Text style={styles.btnGhostText}>Spec 编辑器</Text>
+                </Pressable>
+              ) : null}
             </View>
           ) : null}
 

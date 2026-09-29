@@ -389,12 +389,34 @@ export class CoolieClient {
   /**
    * spec-driven chain (wave147): write a spec onto an existing task.
    * Same endpoint the Coolie Web Spec editor uses (`POST /api/issues/:id/spec`).
+   *
+   * `draft: true` appends `?draft=1`, which the server validates leniently so a
+   * half-written spec can be saved without satisfying every required field.
    */
-  async saveIssueSpec(issueId: string, spec: Record<string, unknown>): Promise<unknown> {
+  async saveIssueSpec(
+    issueId: string,
+    spec: Record<string, unknown>,
+    opts?: { draft?: boolean },
+  ): Promise<unknown> {
     return this.request<unknown>(
       "POST",
-      `/api/issues/${encodeURIComponent(issueId)}/spec`,
+      `/api/issues/${encodeURIComponent(issueId)}/spec${opts?.draft ? "?draft=1" : ""}`,
       spec,
+    );
+  }
+
+  /**
+   * spec-driven chain (wave147): read the spec stored on a task.
+   * Mirrors `GET /api/issues/:id/spec` → `{ issueId, specKind, spec }`.
+   */
+  async getIssueSpec(issueId: string): Promise<{
+    issueId: string;
+    specKind: string | null;
+    spec: Record<string, unknown> | null;
+  }> {
+    return this.request(
+      "GET",
+      `/api/issues/${encodeURIComponent(issueId)}/spec`,
     );
   }
 

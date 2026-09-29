@@ -1,0 +1,5 @@
+== session-token (App refresh path, replayed as Cookie) ==
+HTTP 200
+tokenLen=77 signed=true
+== get-session WITH header ==
+HTTP 200

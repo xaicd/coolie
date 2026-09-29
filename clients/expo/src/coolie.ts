@@ -65,6 +65,17 @@ export const COOLIE_ORIGIN = /^(https?:\/\/[^/]+)/i.exec(COOLIE_BASE_URL)?.[1];
 const AUTH_KEY = "coolie.authToken";
 const SESSION_TOKEN_KEY = "coolie.sessionToken";
 const SESSION_COOKIE_NAME_KEY = "coolie.sessionCookieName";
+const LAST_EMAIL_KEY = "coolie.lastEmail";
+
+/**
+ * The cookie name Better Auth writes on an HTTPS deployment when sign-in's
+ * `Set-Cookie` could not be read back (React Native's `Headers` polyfill does
+ * not always expose `set-cookie`). Parsing the response is still the primary
+ * path — `extractSessionCookieName` is tried first — but every replay needs a
+ * name, and a replay under a guessed alias is silently ignored by Better Auth
+ * (wave96). This default removes that last failure mode on prod HTTPS.
+ */
+const DEFAULT_SESSION_COOKIE_NAME = "__Secure-paperclip-default.session_token";
 
 /**
  * Persist a bearer credential (agent API key or board API key). SecureStore keeps
@@ -131,6 +142,45 @@ export async function saveSessionCookieName(name: string): Promise<void> {
 }
 export async function getSessionCookieName(): Promise<string | null> {
   return SecureStore.getItemAsync(SESSION_COOKIE_NAME_KEY);
+}
+
+/**
+ * Remember the last email that signed in, to prefill the sign-in form. The
+ * password is deliberately NOT stored: a device-local copy of a user password
+ * is a credential the app never needs — the signed session cookie is the
+ * credential (see `getSessionCookieHeaderValue`), and a session that expires is
+ * re-authenticated by the user, not by the app replaying their password.
+ */
+export async function saveLastEmail(email: string): Promise<void> {
+  const trimmed = email.trim();
+  if (trimmed) await SecureStore.setItemAsync(LAST_EMAIL_KEY, trimmed);
+}
+export async function getLastEmail(): Promise<string | null> {
+  return SecureStore.getItemAsync(LAST_EMAIL_KEY);
+}
+
+/**
+ * The `Cookie` request header value that replays the stored Better Auth
+ * session, or null when there is no stored session.
+ *
+ * This is the fix for wave129 P1-B. Better Auth resolves a session only from
+ * the signed cookie it wrote (`resolveSession` → `getSession`). The App's
+ * native `fetch` runs on the platform networking stack, not the app's WebView,
+ * and its cookie jar does not reliably carry the `Set-Cookie` from
+ * `POST /api/auth/sign-in/email` across the subsequent `GET /api/auth/get-session`
+ * (measured: sign-in 200, then get-session → 401 "Board authentication
+ * required"; the same signed value sent explicitly → 200). Sending the signed
+ * value ourselves removes the dependence on that jar.
+ *
+ * The value is re-encoded once (`encodeURIComponent`): Better Auth writes the
+ * cookie as `encodeURIComponent(<signed>)` and decodes exactly one layer on
+ * read, while `saveSessionToken` stores the logical form.
+ */
+export async function getSessionCookieHeaderValue(): Promise<string | null> {
+  const token = await getSessionToken();
+  if (!token) return null;
+  const name = (await getSessionCookieName()) ?? DEFAULT_SESSION_COOKIE_NAME;
+  return `${name}=${encodeURIComponent(token)}`;
 }
 
 /**
@@ -671,22 +721,23 @@ export class CoolieClient extends BaseCoolieClient {
 
 /**
  * Shared Coolie client. Auth is either a bearer token from SecureStore (agent /
- * board API keys) or the session cookie the platform's own cookie jar holds
- * after sign-in.
+ * board API keys) or the signed Better Auth session cookie.
  *
- * The session is deliberately NOT replayed as a hand-built `Cookie` header.
- * React Native owns the cookie jar (`NSURLSession` with
- * `HTTPShouldSetCookies = YES` / `HTTPCookieAcceptPolicy = always` on iOS,
- * `CookieManager` on Android) and already attaches the signed session cookie to
- * every `credentials: "include"` request. Adding a `Cookie` header on top makes
- * the native layer drop or corrupt the jar's own cookie, so the request reaches
- * the server with no usable session and 401s with "Board authentication
- * required" — even though the cookie the server set at sign-in is sitting in the
- * jar. Measured on iOS 26.5 (RN 0.76.5) against production: a manually set
- * `Cookie` header (encoded or raw) → 401, the same signed value sent by the jar
- * → 200. So the bearer branch returns the only header we ever set ourselves.
+ * The session is replayed as an explicit `Cookie` header. Better Auth resolves
+ * a session only from the signed cookie it minted, and the App's native `fetch`
+ * (platform networking stack, NOT the WebView) did not carry sign-in's
+ * `Set-Cookie` into the following `get-session` — measured on wave129 as
+ * sign-in 200 → `GET /api/auth/get-session` 401 "Board authentication
+ * required", while the same signed value sent explicitly answered 200. Sending
+ * the stored signed value ourselves is what makes email/password login work.
  *
- * The stored session token is still kept (`getSessionToken`) for the
+ * `credentials: "include"` stays on (see the client's `request`): on iOS
+ * `NSURLSession` prefers its own cookie jar and ignores a manually set `Cookie`
+ * header, so the jar remains the iOS path; on Android the header is honoured.
+ * Both send the same value, and a duplicated cookie with an identical
+ * name/value is read identically by Better Auth.
+ *
+ * The stored session token is also kept (`getSessionToken`) for the
  * WebContainerScreen `/api/auth/exchange` bridge, which lives in the WebView's
  * separate cookie store.
  */
@@ -698,6 +749,8 @@ export const coolie = new CoolieClient({
   getAuthHeader: async (): Promise<Record<string, string>> => {
     const token = await getAuthToken();
     if (token) return { Authorization: `Bearer ${token}` };
+    const cookie = await getSessionCookieHeaderValue();
+    if (cookie) return { Cookie: cookie };
     return {};
   },
 });
@@ -751,12 +804,15 @@ export async function classifyToken(token: string): Promise<Credential> {
  * Sign in with email and password, returning the session user.
  *
  * Any stored bearer token is cleared first: the shared client sends both, and a
- * stale token would shadow the session cookie for every later call. The
- * session cookie Better Auth mints is also captured into `expo-secure-store`
- * so `WebContainerScreen` can replay it through `/api/auth/exchange` and the
- * Web full-feature board inherits the App's session — otherwise the WebView's
- * own cookie jar never sees the cookie and the user lands on the sign-in
- * screen again.
+ * stale token would shadow the session cookie for every later call. The signed
+ * session cookie Better Auth mints is captured into `expo-secure-store` (and
+ * replayed as a `Cookie` header by `getAuthHeader`) so both the native API calls
+ * and the `WebContainerScreen` `/api/auth/exchange` bridge inherit the session.
+ *
+ * `getSession()` is retried once after refreshing the stored token: the first
+ * call exercises the new `Cookie` replay path, and a transient race between the
+ * cookie write and the read is absorbed without bouncing the user back to the
+ * sign-in screen.
  */
 export async function signInWithEmail(input: {
   email: string;
@@ -765,10 +821,10 @@ export async function signInWithEmail(input: {
   await clearAuthToken();
   await clearSessionToken();
   const result = await coolie.signInEmail(input);
+  await saveLastEmail(input.email);
+  await saveSessionCookieName(result.cookieName ?? defaultSessionCookieName());
+
   let sessionToken = result.token;
-  if (result.cookieName) {
-    await saveSessionCookieName(result.cookieName);
-  }
   if (!sessionToken) {
     try {
       const fetched = await coolie.getSessionToken();
@@ -780,11 +836,46 @@ export async function signInWithEmail(input: {
   if (sessionToken) {
     await saveSessionToken(sessionToken);
   }
-  const session = await coolie.getSession();
-  if (!session?.user) {
+
+  let session = await getSessionUser();
+  if (!session) {
+    await refreshSessionToken();
+    session = await getSessionUser();
+  }
+  if (!session) {
     throw new Error("Signed in, but this instance returned no session for the account.");
   }
-  return session.user;
+  return session;
+}
+
+/** The Better Auth cookie name for this instance's scheme (secure vs plain HTTP). */
+function defaultSessionCookieName(): string {
+  return /^https:/i.test(COOLIE_BASE_URL)
+    ? DEFAULT_SESSION_COOKIE_NAME
+    : "paperclip-default.session_token";
+}
+
+/**
+ * Re-mint the stored signed session token from an already-authenticated
+ * request. `GET /api/auth/session-token` answers with a freshly signed
+ * `<token>.<HMAC>` value for the current board actor, so calling it through the
+ * existing `Cookie` replay keeps the stored value valid and signed after a
+ * rotated instance secret — the same reason `restoreCredential` refreshes it.
+ *
+ * Returns true when a token was refreshed. Best-effort: a failure leaves the
+ * current stored token untouched.
+ */
+export async function refreshSessionToken(): Promise<boolean> {
+  try {
+    const fetched = await coolie.getSessionToken();
+    if (fetched?.token) {
+      await saveSessionToken(fetched.token);
+      return true;
+    }
+  } catch {
+    // Offline / rejected: keep whatever is stored.
+  }
+  return false;
 }
 
 /** The signed-in user, or null when there is no usable session. */
@@ -836,17 +927,12 @@ export async function restoreCredential(): Promise<Credential | null> {
   }
   const user = await getSessionUser();
   if (user) {
-    const currentSessionToken = await getSessionToken();
-    if (!currentSessionToken) {
-      try {
-        const fetched = await coolie.getSessionToken();
-        if (fetched?.token) {
-          await saveSessionToken(fetched.token);
-        }
-      } catch {
-        // Best-effort
-      }
-    }
+    // Keep the stored signed token current on every cold start. Better Auth
+    // signs the cookie with the instance secret; if that secret is rotated the
+    // stored value stops validating, so re-mint it from the live session while
+    // we still can. Best-effort — a failure keeps the existing token and the
+    // session itself still works.
+    await refreshSessionToken();
     return { kind: "session", user };
   }
   return null;
@@ -863,4 +949,55 @@ export async function credentialCompanies(cred: Credential): Promise<Company[]> 
     return [await coolie.getCompany(cred.identity.companyId)];
   }
   return coolie.listCompanies();
+}
+
+// ── Onboarding (wave153) ────────────────────────────────────────────────
+//
+// The web app already ships an onboarding wizard at `/<companyPrefix>/onboarding`
+// (`ui/src/components/OnboardingWizard.tsx`); the App had no way to reach it, so
+// a new customer's first session on the phone dropped straight onto an empty
+// board. These helpers gate the App onto that wizard and remember completion
+// locally.
+//
+// Honest scope note: this fork has no `company.metadata` column (verified —
+// `packages/shared/src/types/company.ts` has no `metadata`, and the companies
+// table has none), so the brief's `company.metadata.onboarded_step = 3` cannot
+// be persisted server-side. Completion is therefore recorded per company on the
+// device, and "needs onboarding" is inferred from the company having no agents
+// yet — the same signal `register`/`onboarding-seed` leave behind (a fresh
+// account has a company but no agents; onboarding hires the first one).
+
+const ONBOARDED_KEY_PREFIX = "coolie.onboarded.";
+
+/** Whether this device has already completed onboarding for the company. */
+export async function isOnboardingDone(companyId: string): Promise<boolean> {
+  try {
+    return (await SecureStore.getItemAsync(`${ONBOARDED_KEY_PREFIX}${companyId}`)) === "1";
+  } catch {
+    return false;
+  }
+}
+
+/** Record that this device has completed (or dismissed) onboarding. */
+export async function markOnboardingDone(companyId: string): Promise<void> {
+  try {
+    await SecureStore.setItemAsync(`${ONBOARDED_KEY_PREFIX}${companyId}`, "1");
+  } catch {
+    // Best-effort: a failed write only means the gate may show again.
+  }
+}
+
+/**
+ * Whether the App should open the onboarding wizard for this company: no agents
+ * yet (brand-new company) and not already completed on this device. Never
+ * throws — a lookup failure means "don't nag".
+ */
+export async function shouldShowOnboarding(companyId: string): Promise<boolean> {
+  if (await isOnboardingDone(companyId)) return false;
+  try {
+    const agents = await coolie.listAgents(companyId);
+    return agents.length === 0;
+  } catch {
+    return false;
+  }
 }

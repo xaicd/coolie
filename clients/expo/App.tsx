@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
+  AppState,
   BackHandler,
   Linking,
   Pressable,
@@ -30,8 +31,12 @@ import {
   classifyToken,
   coolie,
   credentialCompanies,
+  getLastEmail,
+  markOnboardingDone,
+  refreshSessionToken,
   restoreCredential,
   saveAuthToken,
+  shouldShowOnboarding,
   signInWithEmail,
   signOutEverywhere,
   type AgentRow,
@@ -63,6 +68,7 @@ import { SearchScreen } from "./src/screens/SearchScreen";
 import { RegisterScreen } from "./src/screens/RegisterScreen";
 import { AgentDetailScreen } from "./src/screens/AgentDetailScreen";
 import { TaskDetailScreen } from "./src/screens/TaskDetailScreen";
+import { SpecEditorScreen } from "./src/screens/SpecEditorScreen";
 import { TasksScreen } from "./src/screens/TasksScreen";
 import { PipelinesScreen } from "./src/screens/PipelinesScreen";
 import { PlansScreen } from "./src/screens/PlansScreen";
@@ -357,6 +363,21 @@ export default function App() {
     };
   }, []);
 
+  // wave153 — session keep-alive. Better Auth's cookie carries a 7-day
+  // `Max-Age`; a long-lived install would otherwise hit an expired session with
+  // no way back. Re-mint the stored signed token whenever the app returns to
+  // the foreground (and on cold start via `restoreCredential`). This is an
+  // in-process refresh, not `expo-background-fetch` — that needs a native
+  // module and a rebuilt binary, so the refresh only runs while the app is
+  // alive. It is a no-op for bearer-key logins (no stored session token).
+  useEffect(() => {
+    if (!credential || credential.kind !== "session") return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") void refreshSessionToken();
+    });
+    return () => subscription.remove();
+  }, [credential]);
+
   useEffect(() => {
     void shouldShowWhatsNew().then((show) => {
       setWhatsNewOpen(show);
@@ -560,6 +581,13 @@ function SignInScreen({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // wave153 — prefill the last email so a returning user only types the password.
+  useEffect(() => {
+    void getLastEmail().then((last) => {
+      if (last) setEmail((current) => (current ? current : last));
+    });
+  }, []);
+
   const submit = useCallback(async () => {
     setBusy(true);
     setError(null);
@@ -743,6 +771,20 @@ function HomeScreen({
     void loadNotifications(company.id, { silent: true });
   }, [company.id, loadNotifications]);
 
+  // wave153 — 客户首接触。公司还没有员工 (全新账号) 且本机未完成过引导时, 自动
+  // 打开 web 端既有 onboarding 向导 (`/<issuePrefix>/onboarding`), 让客户先建好
+  // 组织与首个员工, 而不是直接落到空看板。判定与完成态都在 coolie.ts, 失败即
+  // 不打扰 (shouldShowOnboarding 从不抛)。
+  useEffect(() => {
+    let cancelled = false;
+    void shouldShowOnboarding(company.id).then((needs) => {
+      if (!cancelled && needs) setOnboardingOpen(true);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [company.id]);
+
   // ── 装机自检 (What's New) + 深链 ──────────────────────────────────────
   // WhatsNew 本体挂在 App 顶层 (登录前也要弹)。这里只消费它的「查看演示」意图：
   // 把用户送到工坊 (BoardChatScreen) 并投一条示例 prompt。
@@ -779,6 +821,10 @@ function HomeScreen({
 
   const [selected, setSelected] = useState<Issue | null>(null);
   const [focusedApprovalId, setFocusedApprovalId] = useState<string | null>(null);
+  // wave153 — App 端 spec 编辑器 (3 步: 需求/缺陷 → 设计 → 任务)
+  const [specIssue, setSpecIssue] = useState<Issue | null>(null);
+  // wave153 — 首接触引导: 新公司 (无员工) 首次进入时打开 web /onboarding 向导
+  const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [diffContext, setDiffContext] = useState<{
     issue?: Issue | null;
     workProduct?: IssueWorkProduct | null;
@@ -848,9 +894,11 @@ function HomeScreen({
    * 没有可退的层。调用方据此决定是「吃掉事件」还是「交回系统」—— 见 backHandler。
    */
   const swipeBack = (): boolean => {
+    if (onboardingOpen) return setOnboardingOpen(false), true;
     if (createTaskProjectId) return setCreateTaskProjectId(null), true;
     if (webContainerTarget) return setWebContainerTarget(null), true;
     if (sandboxContext) return setSandboxContext(null), true;
+    if (specIssue) return setSpecIssue(null), true;
     if (diffContext) return setDiffContext(null), true;
     if (focusedApprovalId) return setFocusedApprovalId(null), true;
     if (searchOpen) return setSearchOpen(false), true;
@@ -904,6 +952,7 @@ function HomeScreen({
       issue={selected}
       company={company}
       onBack={() => setSelected(null)}
+      onOpenSpec={(issue) => setSpecIssue(issue)}
       onOpenSandbox={(issueItem) => {
         void (async () => {
           const workProducts = await coolie
@@ -938,7 +987,9 @@ function HomeScreen({
     // TabBar 之间)。沙箱 / 代码 Diff / Web 容器 也从「整屏覆盖」收回壳内 —— 它们各自的
     // ScreenHeader 承载返回, hasSubHeader 抑制全局 AppBar, 底部 5 个 tab 始终可见可点。
     const hasSubHeader = Boolean(
+      onboardingOpen ||
       sandboxContext ||
+      specIssue ||
       diffContext ||
       webContainerTarget ||
       focusedApprovalId ||
@@ -963,7 +1014,18 @@ function HomeScreen({
           />
         )}
         <View style={styles.shellContent}>
-          {sandboxContext ? (
+          {onboardingOpen ? (
+            <WebContainerScreen
+              initialPath={
+                company.issuePrefix ? `/${company.issuePrefix}/onboarding` : "/onboarding"
+              }
+              title="新手引导"
+              onBack={() => {
+                setOnboardingOpen(false);
+                void markOnboardingDone(companyId);
+              }}
+            />
+          ) : sandboxContext ? (
             <PrototypeSandboxScreen
               company={company}
               initialUrl={sandboxContext.url}
@@ -997,6 +1059,12 @@ function HomeScreen({
               issue={diffContext.issue}
               workProduct={diffContext.workProduct}
               onBack={() => setDiffContext(null)}
+            />
+          ) : specIssue ? (
+            <SpecEditorScreen
+              issue={specIssue}
+              company={company}
+              onBack={() => setSpecIssue(null)}
             />
           ) : webContainerTarget ? (
             <WebContainerScreen
@@ -1205,6 +1273,8 @@ function HomeScreen({
             setSandboxContext(null);
             setDiffContext(null);
             setWebContainerTarget(null);
+            setSpecIssue(null);
+            setOnboardingOpen(false);
             navigateTab(key);
           }}
           onCreate={() => setComposeOpen(true)}

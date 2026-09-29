@@ -7,9 +7,32 @@ Git 里程碑 tag 流水。自 **v0.5.97** 起建立本文件；此前的 0.5.x 
 |---|---|---|---|---|
 | v0.5.97 | 2026-09-29 | 0.5.97 | bc48b1e80 | wave142: WBS 任务自动路由 + 沙箱附件真渲染 + 启动链路端到端可观察 |
 | v0.6.0 | 2026-09-29 | 0.6.0 | 269526f19 | wave150 合并发版: wave147 spec-driven + wave148 多对话 + wave144 board-chat 修复（见 §v0.6.0） |
+| — | 2026-09-29 | 0.6.2 | (未打 tag) | **未发出** — wave153 客户首接触 (App 登录 cookie 回放 + 资产筛选竞态 + App spec 编辑器 + onboarding 入口)。见 §v0.6.2 |
 
 约定: tag 指向该版本「发版完成」的提交（含 `chore(release): version.json …` 这一步），
 注释写本波主题。推送方式 `git push origin <tag>`（本仓库 push 需绕本地代理）。
+
+## v0.6.2 — 未发出 (wave153)
+
+**本波没有发版，`version.json` 未 bump（仍 0.6.0）。** 原因是硬门 + 环境，非实现问题：
+
+- `scripts/release-app.sh` 第 1 步前置检查要求 `clients/expo` 工作区干净、全仓 tracked 无改动。
+  当前工作树**同时**含**并行工作线**的未提交改动（wave152 audit/metrics：`server/src/routes/`
+  下 `metrics.ts` / `audit-log.ts` / `defect-kb.ts` / `ontology-graph.ts`，`packages/db`、
+  `packages/shared`、`ui/` 多处），以及 wave149 的未提交脚本。**必然被该门拦下**；
+  且本波纪律不允许把他人的改动卷进自己的 commit。
+- 无 Android 工具链/真机，`gradle assembleRelease` 出 APK 亦不可行。
+
+因此本波只 **commit wave153 自己的客户端改动**（`clients/api-client`、`clients/expo` 的
+4 屏 + App.tsx + coolie.ts，及本报告/审计文档），发版留给工作区干净后的单独一轮。
+
+真实交付与缺口（诚实）: 见 `docs-coolie/evidence/wave153/QA-REPORT.md`。要点 ——
+A 登录根因=App 未回放**签名**会话 cookie（服务端实测签名→200 / 未签名→401, curl 真值），
+已改为显式回放 `Cookie` 头 + 冷启动/回前台刷新; D「项目筛选」**服务端本来就正确**
+（curl 33→3→2），真 bug 是 App 端**请求竞态**（慢的「全部产物」覆盖了筛选结果），已加请求序号保护;
+C 新增 App `SpecEditorScreen`（3 步 + 4 tab, 契约同 wave147）; B 只做了 App 侧 onboarding
+入口（**`companies` 表无 `metadata` 列**，brief 的 `onboarded_step` **未做**）。A/C/D 均**未在
+老板 Samsung 真机运行**（无实机），不假装跑通。
 
 ## v0.6.0 — 已发出 (wave150)
 

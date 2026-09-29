@@ -1,0 +1,4 @@
+== artifacts projectId filter — raw counts ==
+projectId=<none> -> 33 artifacts
+projectId=939ff822-140e-480e-9081-b5df284b8272 -> 3 artifacts
+projectId=c0e182ae-36d0-4f26-b3d8-f65a3c00e8c0 -> 2 artifacts

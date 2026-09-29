@@ -72,6 +72,8 @@ interface ProjectsScreenProps {
   onBack?: () => void;
   onOpenProjectTasks?: (project: Project) => void;
   onCreateTaskForProject?: (project: Project) => void;
+  /** wave153 — 直达该项目的交付产物列表。 */
+  onOpenProjectArtifacts?: (project: Project) => void;
   onOpenWebProjects?: (path?: string, title?: string) => void;
 }
 
@@ -88,6 +90,7 @@ export function ProjectsScreen({
   onBack,
   onOpenProjectTasks,
   onCreateTaskForProject,
+  onOpenProjectArtifacts,
   onOpenWebProjects,
 }: ProjectsScreenProps) {
   const [projects, setProjects] = useState<Project[]>([]);
@@ -562,6 +565,17 @@ export function ProjectsScreen({
                         >
                           <Ionicons name="add" size={14} color={C.accent} />
                           <Text style={styles.actionBtnTextSecondary}>创建任务</Text>
+                        </Pressable>
+                      ) : null}
+
+                      {onOpenProjectArtifacts ? (
+                        <Pressable
+                          style={styles.actionBtnSecondary}
+                          onPress={() => onOpenProjectArtifacts(project)}
+                          accessibilityLabel="查看该项目交付产物"
+                        >
+                          <Ionicons name="cube-outline" size={14} color={C.accent} />
+                          <Text style={styles.actionBtnTextSecondary}>查看产物</Text>
                         </Pressable>
                       ) : null}
                     </View>

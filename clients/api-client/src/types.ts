@@ -137,6 +137,12 @@ export interface Company {
   name: string;
   /** company lifecycle: active (default), paused (wave105 emergency stop), archived */
   status?: "active" | "paused" | "archived";
+  /**
+   * The company's issue prefix (e.g. `XROA`), returned by `GET /api/companies`.
+   * Used to build company-scoped web URLs on the App (the web board mounts under
+   * `/<issuePrefix>/...`). Optional so existing Company literals keep compiling.
+   */
+  issuePrefix?: string;
 }
 
 /**
