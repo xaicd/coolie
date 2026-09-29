@@ -20,6 +20,7 @@ import {
 import { queryKeys } from "@/lib/queryKeys";
 import { cn } from "@/lib/utils";
 import { Card } from "@/components/ui/card";
+import { SandboxedHtmlAttachment } from "@/components/SandboxedHtmlAttachment";
 
 interface IssueAttachmentsSectionProps {
   attachments: IssueAttachment[];
@@ -170,19 +171,7 @@ function HtmlAttachmentCard({
         </div>
         <AttachmentActions attachment={attachment} onDelete={onDelete} deletePending={deletePending} />
       </div>
-      {/* The server serves html attachments inline under a sandbox CSP; the
-          matching sandbox attribute here keeps the origin opaque even if the
-          frame is embedded without that header. */}
-      <div className="mt-3 overflow-hidden rounded-md border border-border bg-background">
-        <iframe
-          title={`Preview of ${filename}`}
-          src={attachmentOpenPath(attachment)}
-          sandbox="allow-scripts"
-          referrerPolicy="no-referrer"
-          loading="lazy"
-          className="h-(--sz-320px) w-full"
-        />
-      </div>
+      <SandboxedHtmlAttachment attachment={attachment} className="mt-3" />
     </div>
   );
 }

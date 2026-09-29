@@ -60,3 +60,21 @@ export function isHtmlAttachment(
   const name = (attachment.originalFilename ?? "").toLowerCase();
   return name.endsWith(".html") || name.endsWith(".htm");
 }
+
+/**
+ * Group HTML attachments by the comment they were bound to, so a board-chat reply can
+ * render the deliverable it produced instead of only linking it. Attachments with no
+ * comment, and non-HTML ones, are dropped.
+ */
+export function groupHtmlAttachmentsByComment(
+  attachments: readonly IssueAttachment[],
+): Map<string, IssueAttachment[]> {
+  const grouped = new Map<string, IssueAttachment[]>();
+  for (const attachment of attachments) {
+    if (!attachment.issueCommentId || !isHtmlAttachment(attachment)) continue;
+    const forComment = grouped.get(attachment.issueCommentId);
+    if (forComment) forComment.push(attachment);
+    else grouped.set(attachment.issueCommentId, [attachment]);
+  }
+  return grouped;
+}

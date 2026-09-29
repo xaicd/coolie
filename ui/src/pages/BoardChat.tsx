@@ -16,6 +16,8 @@ import { issuesApi } from "../api/issues";
 import { goalsApi } from "../api/goals";
 import { queryKeys } from "../lib/queryKeys";
 import { MarkdownBody } from "../components/MarkdownBody";
+import { SandboxedHtmlAttachment } from "../components/SandboxedHtmlAttachment";
+import { groupHtmlAttachmentsByComment } from "../lib/issue-attachments";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
@@ -44,7 +46,7 @@ import {
   type BuildStartResponse,
 } from "../components/BuildPlanCard";
 import { cn, formatDateTime } from "../lib/utils";
-import type { FeedbackVoteValue } from "@paperclipai/shared";
+import type { FeedbackVoteValue, IssueAttachment } from "@paperclipai/shared";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 /**
@@ -361,6 +363,23 @@ export function BoardChat({
     enabled: !!boardIssueId,
     refetchInterval: 3000,
   });
+
+  // HTML deliverables reach the board issue as attachments and every attachment carries
+  // the `issueCommentId` it was bound to, so a reply can render its own html inline
+  // instead of leaving the reader a download link. Without this the chat showed the
+  // deliverable as text only, and the inline-preview tag path never fired because nothing
+  // instructs the model to emit those tags.
+  const { data: boardAttachments } = useQuery({
+    queryKey: queryKeys.issues.attachments(boardIssueId ?? ""),
+    queryFn: () => issuesApi.listAttachments(boardIssueId!),
+    enabled: !!boardIssueId,
+    refetchInterval: 3000,
+  });
+
+  const htmlAttachmentsByComment = useMemo(
+    () => groupHtmlAttachmentsByComment(boardAttachments ?? []),
+    [boardAttachments],
+  );
 
   const sortedComments = (comments ?? [])
     .slice()
@@ -1007,6 +1026,9 @@ export function BoardChat({
                         {comment.body ?? ""}
                       </MarkdownBody>
                     </div>
+                    {htmlAttachmentsByComment.get(comment.id)?.map((attachment) => (
+                      <SandboxedHtmlAttachment key={attachment.id} attachment={attachment} className="mt-2" />
+                    ))}
                     <AgentBubbleActionRow
                       copyText={comment.body ?? ""}
                       dateLabel={agentBubbleDateLabel(comment.createdAt)}
