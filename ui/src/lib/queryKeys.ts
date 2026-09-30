@@ -735,8 +735,10 @@ export const queryKeys = {
       companyId: string,
       rootType: string,
       rootId: string | null,
-      depth: number,
-    ) => ["ontology", "graph", companyId, rootType, rootId ?? "__none__", depth] as const,
+      depth: number | null,
+      view?: string,
+    ) =>
+      ["ontology", "graph", companyId, rootType, rootId ?? "__none__", depth ?? "__preset__", view ?? "__default__"] as const,
     paths: (
       companyId: string,
       srcType: string,
@@ -746,5 +748,8 @@ export const queryKeys = {
     ) =>
       ["ontology", "paths", companyId, srcType, srcId ?? "__none__", targetType, targetId ?? "__none__"] as const,
     stats: (companyId: string) => ["ontology", "stats", companyId] as const,
+  },
+  onboarding: {
+    state: (companyId: string) => ["onboarding", "state", companyId] as const,
   },
 };

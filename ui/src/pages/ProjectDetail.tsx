@@ -937,6 +937,7 @@ export function ProjectDetail() {
             companyId={resolvedCompanyId}
             rootType="project"
             rootId={project.id}
+            view="project_tree"
             depth={3}
           />
         </div>

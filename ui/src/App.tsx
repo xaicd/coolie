@@ -32,6 +32,7 @@ import { AgentDetail } from "./pages/AgentDetail";
 import { Projects } from "./pages/Projects";
 import { ProjectDetail } from "./pages/ProjectDetail";
 import { OntologyGraphPage } from "./pages/OntologyGraphPage";
+import { CompanyOnboardingPage } from "./pages/CompanyOnboardingPage";
 import { ProjectWorkspaceDetail } from "./pages/ProjectWorkspaceDetail";
 import { Workspaces } from "./pages/Workspaces";
 import { Issues } from "./pages/Issues";
@@ -103,6 +104,9 @@ import { InviteLandingPage } from "./pages/InviteLanding";
 import { JoinRequestQueue } from "./pages/JoinRequestQueue";
 import { NotFoundPage } from "./pages/NotFound";
 import { useCompany } from "./context/CompanyContext";
+import { useQuery } from "@tanstack/react-query";
+import { queryKeys } from "./lib/queryKeys";
+import { onboardingApi } from "./api/onboarding";
 import { useDialogActions, useDialogState } from "./context/DialogContext";
 import { loadLastInboxTab } from "./lib/inbox";
 import {
@@ -157,6 +161,7 @@ function boardRoutes(streamlinedUiEnabled: boolean) {
         element={streamlinedUiEnabled ? <AuditCompatibilityRedirect to="/activity/timeline" /> : <Timeline />}
       />
       <Route path="onboarding" element={<OnboardingRoutePage />} />
+      <Route path="getting-started" element={<CompanyOnboardingPage />} />
       <Route path="companies" element={<Companies />} />
       <Route path="company/settings" element={<CompanySettings />} />
       <Route path="company/settings/environments" element={<Navigate to="/company/settings/instance/environments" replace />} />
@@ -639,11 +644,21 @@ function CompanyRootRedirect() {
   const { companies, selectedCompany, loading } = useCompany();
   const location = useLocation();
 
+  const targetCompany = selectedCompany ?? companies[0] ?? null;
+  // Wave155 gate: a company that has never onboarded (onboarding_state NULL) is
+  // sent to the 3-step wizard when it is entered at its root. The query is
+  // skipped for no company; while it is still loading we fall through to the
+  // dashboard rather than block the page on a network round trip.
+  const { data: onboarding } = useQuery({
+    queryKey: queryKeys.onboarding.state(targetCompany?.id ?? ""),
+    queryFn: () => onboardingApi.state(targetCompany!.id),
+    enabled: Boolean(targetCompany),
+  });
+
   if (loading) {
     return <PaperclipLoading />;
   }
 
-  const targetCompany = selectedCompany ?? companies[0] ?? null;
   if (!targetCompany) {
     if (
       shouldRedirectCompanylessRouteToOnboarding({
@@ -654,6 +669,10 @@ function CompanyRootRedirect() {
       return <Navigate to="/onboarding" replace />;
     }
     return <NoCompaniesStartPage />;
+  }
+
+  if (onboarding && onboarding.onboardedStep === null) {
+    return <Navigate to={`/${targetCompany.issuePrefix}/getting-started`} replace />;
   }
 
   return <Navigate to={`/${targetCompany.issuePrefix}/dashboard`} replace />;

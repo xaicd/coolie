@@ -67,6 +67,7 @@ import { issueRoutes } from "./routes/issues.js";
 import { issueTreeControlRoutes } from "./routes/issue-tree-control.js";
 import { issueSpecRoutes } from "./routes/issue-specs.js";
 import { ontologyGraphRoutes } from "./routes/ontology-graph.js";
+import { onboardingRoutes } from "./routes/onboarding.js";
 import { auditLogRoutes } from "./routes/audit-log.js";
 import { metricsRoutes } from "./routes/metrics.js";
 import { defectKbRoutes } from "./routes/defect-kb.js";
@@ -861,6 +862,7 @@ export async function createApp(
   api.use(issueTreeControlRoutes(db, { pluginWorkerManager: workerManager }));
   api.use(issueSpecRoutes(db));
   api.use(ontologyGraphRoutes(db));
+  api.use(onboardingRoutes(db));
   // wave152 — governance audit trail read surface (board-only, company-scoped).
   api.use(auditLogRoutes(db));
   // wave152 — delivery-health metrics + defect knowledge base (board-only).

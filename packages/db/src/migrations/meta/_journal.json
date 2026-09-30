@@ -2059,6 +2059,13 @@
       "when": 1790745600000,
       "tag": "9011_add_audit_log_and_defect_kb",
       "breakpoints": true
+    },
+    {
+      "idx": 9012,
+      "version": "7",
+      "when": 1790749200000,
+      "tag": "9012_add_company_metadata",
+      "breakpoints": true
     }
   ]
 }

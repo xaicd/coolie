@@ -1,4 +1,5 @@
 import {
+  agents,
   assets,
   boardConversations,
   companies,
@@ -19,6 +20,7 @@ import type {
   OntologyGraphEdge,
   OntologyGraphNode,
   OntologyGraphResponse,
+  OntologyGraphView,
   OntologyPath,
   OntologyPathsResponse,
   OntologyStatsResponse,
@@ -45,6 +47,23 @@ import type {
 const MAX_EDGES = 20_000;
 const MAX_NODES = 400;
 const MAX_PATHS = 10;
+
+/**
+ * Preset recipes (wave155). `depth` is the preset's default (an explicit query
+ * depth still wins); `relations`, when present, narrows the walk to the verbs
+ * that view is about so an agent dashboard does not drag in every stray link.
+ */
+const VIEW_PRESETS: Record<OntologyGraphView, { depth: number; relations?: string[] }> = {
+  project_tree: { depth: 3 },
+  agent_dashboard: {
+    depth: 2,
+    relations: ["assigned_to", "belongs_to", "attached_to", "discussed_in", "derived_from"],
+  },
+  conversation_thread: {
+    depth: 3,
+    relations: ["discussed_in", "belongs_to", "attached_to", "derived_from"],
+  },
+};
 
 const nodeKey = (type: string, id: string) => `${type}:${id}`;
 
@@ -411,6 +430,24 @@ export function ontologyGraphService(db: Db) {
       }
     }
 
+    const agentIds = idsOf("agent");
+    if (agentIds.length) {
+      const rows = await db
+        .select({ id: agents.id, name: agents.name, role: agents.role, status: agents.status })
+        .from(agents)
+        .where(and(eq(agents.companyId, companyId), inArray(agents.id, agentIds)));
+      for (const row of rows) {
+        put({
+          type: "agent",
+          id: row.id,
+          key: nodeKey("agent", row.id),
+          label: row.name,
+          href: `/agents/${row.id}`,
+          metadata: { role: row.role, status: row.status },
+        });
+      }
+    }
+
     // Any ref whose owning row is gone still gets a placeholder node so the
     // graph stays consistent (an edge is never drawn to nothing).
     const result: OntologyGraphNode[] = [];
@@ -432,18 +469,23 @@ export function ontologyGraphService(db: Db) {
   async function buildView(input: {
     companyId: string;
     root: EntityRef;
-    depth: number;
+    depth?: number;
+    view?: OntologyGraphView;
     relations?: string[];
   }): Promise<OntologyGraphResponse> {
-    const relationFilter = input.relations && input.relations.length > 0
-      ? new Set(input.relations)
-      : undefined;
+    const view: OntologyGraphView = input.view ?? "project_tree";
+    const preset = VIEW_PRESETS[view];
+    // An explicit depth or relation list from the caller wins over the preset.
+    const depth = input.depth ?? preset.depth;
+    const relations = input.relations && input.relations.length > 0 ? input.relations : preset.relations;
+    const relationFilter = relations && relations.length > 0 ? new Set(relations) : undefined;
+
     const edgeRows = await loadEdges(input.companyId, relationFilter);
     const edges = edgeRows.map(toEdge);
     const rootKey = nodeKey(input.root.type, input.root.id);
-    const { nodeKeys, edges: keptEdges, truncated } = bfs(edges, rootKey, input.depth);
+    const { nodeKeys, edges: keptEdges, truncated } = bfs(edges, rootKey, depth);
     const nodes = await hydrate(input.companyId, keysToRefs(nodeKeys));
-    return { root: input.root, depth: input.depth, truncated, nodes, edges: keptEdges };
+    return { root: input.root, depth, view, truncated, nodes, edges: keptEdges };
   }
 
   /**

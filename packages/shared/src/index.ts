@@ -2857,13 +2857,17 @@ export {
 export {
   ENTITY_RELATION_KINDS,
   ENTITY_TYPES,
+  ONTOLOGY_GRAPH_VIEWS,
   type EntityRef,
   type EntityRelationKind,
   type EntityType,
+  type OntologyBackfillBucket,
+  type OntologyBackfillResponse,
   type OntologyGraphEdge,
   type OntologyGraphNode,
   type OntologyGraphResponse,
   type OntologyGraphRoot,
+  type OntologyGraphView,
   type OntologyPath,
   type OntologyPathsResponse,
   type OntologyStatsResponse,
@@ -2873,7 +2877,21 @@ export {
   entityRelationKindSchema,
   entityTypeSchema,
   ontologyGraphQuerySchema,
+  ontologyGraphViewSchema,
   ontologyPathsQuerySchema,
   type OntologyGraphQuery,
   type OntologyPathsQuery,
 } from "./validators/entity-relation.js";
+
+// Company onboarding (wave155): the 3-step first-run state.
+export {
+  ONBOARDING_INDUSTRIES,
+  ONBOARDING_STEP_COUNT,
+  type CompanyOnboardingResponse,
+  type CompanyOnboardingState,
+  type OnboardingIndustry,
+} from "./types/company-onboarding.js";
+export {
+  onboardingStepSchema,
+  type OnboardingStepInput,
+} from "./validators/company-onboarding.js";

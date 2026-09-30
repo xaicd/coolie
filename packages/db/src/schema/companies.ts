@@ -1,4 +1,4 @@
-import type { InteractionResolverGovernance } from "@paperclipai/shared";
+import type { CompanyOnboardingState, InteractionResolverGovernance } from "@paperclipai/shared";
 import { pgTable, uuid, text, integer, timestamp, boolean, jsonb, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const companies = pgTable(
@@ -33,6 +33,11 @@ export const companies = pgTable(
     feedbackDataSharingConsentAt: timestamp("feedback_data_sharing_consent_at", { withTimezone: true }),
     feedbackDataSharingConsentByUserId: text("feedback_data_sharing_consent_by_user_id"),
     feedbackDataSharingTermsVersion: text("feedback_data_sharing_terms_version"),
+    // Coolie fork — wave155: free-form company facts (industry, branding hints).
+    metadata: jsonb("metadata").$type<Record<string, unknown>>().notNull().default({}),
+    // Coolie fork — wave155: the board's own 3-step onboarding progress. Null
+    // means the company has never onboarded and is routed to the wizard.
+    onboardingState: jsonb("onboarding_state").$type<CompanyOnboardingState | null>(),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
