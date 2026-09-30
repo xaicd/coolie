@@ -137,6 +137,8 @@ import {
   type WorkspaceRuntimeService,
   issueWriteDenialCodeForResponsibleUserDenial,
   issueWriteDenialResponse,
+  ISSUE_STATUSES,
+  type IssueStatus,
   type IssueWriteDenialCode,
   type IssueWriteDenialContext,
 } from "@paperclipai/shared";
@@ -18951,6 +18953,159 @@ export function issueRoutes(
 
     res.json({ ok: true });
   });
+
+  // ── Kanban / drag-drop 专用端点 ────────────────────────────────────────
+  // 双端 (Web + App) 任务看板拖拽换状态走这里, 而不是通用 PATCH /issues/:id:
+  //   1. 校验面更窄 (只允许 status 字段, 拒绝其它 PATCH 字段混入)
+  //   2. 状态转换有专门校验:
+  //      - backlog → todo 必须已指派 (assigneeAgentId)
+  //      - in_progress → done 必须有产物 (workProducts.length > 0)
+  //      - 任何状态 → cancelled 放行 (boss 一票否决, 不卡校验)
+  //   3. 失败返回明确的 422 + 原因, 客户端做乐观回滚时能展示
+  // 通用 PATCH 仍然支持状态修改 (老路径/详情页/代理调用), 端点是新增, 不替换。
+  router.patch(
+    "/companies/:companyId/issues/:id/status",
+    validate(
+      z.object({
+        status: z.enum(ISSUE_STATUSES),
+      }),
+    ),
+    async (req, res) => {
+      const companyId = req.params.companyId as string;
+      const id = req.params.id as string;
+      const issue = await getAccessibleResource(
+        req,
+        res,
+        svc.getById(id),
+        "Issue not found",
+      );
+      if (!issue) return;
+      if (issue.companyId !== companyId) {
+        res.status(404).json({ error: "Issue not found" });
+        return;
+      }
+      if (!(await assertAgentIssueMutationAllowed(req, res, issue))) return;
+
+      const next = req.body.status as IssueStatus;
+      const prev = issue.status as IssueStatus;
+
+      if (prev === "backlog" && next === "todo" && !issue.assigneeAgentId) {
+        res.status(422).json({
+          error: "Task must be assigned before moving to Todo",
+          code: "status_transition_requires_assignee",
+          from: prev,
+          to: next,
+        });
+        return;
+      }
+      if (prev === "in_progress" && next === "done") {
+        const products = await workProductsSvc.listForIssue(issue.id);
+        if (products.length === 0) {
+          res.status(422).json({
+            error: "Moving In progress → Done requires at least one deliverable",
+            code: "status_transition_requires_deliverable",
+            from: prev,
+            to: next,
+          });
+          return;
+        }
+      }
+      if (prev === next) {
+        res.json({ issue });
+        return;
+      }
+
+      const updated = await svc.update(id, { status: next });
+      if (!updated) {
+        res.status(404).json({ error: "Issue not found" });
+        return;
+      }
+      const actor = getActorInfo(req);
+      await logActivity(db, {
+        companyId: updated.companyId,
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        agentId: actor.agentId,
+        runId: actor.runId,
+        agentApiKeyId: actor.agentApiKeyId,
+        action: "issue.status_changed",
+        entityType: "issue",
+        entityId: updated.id,
+        details: { from: prev, to: next, via: "kanban" },
+      });
+      res.json({ issue: updated });
+    },
+  );
+
+  // 不带 companyId 的别名 — 旧代码/脚本走 /issues/:id/status 也兼容
+  router.patch(
+    "/issues/:id/status",
+    validate(
+      z.object({
+        status: z.enum(ISSUE_STATUSES),
+      }),
+    ),
+    async (req, res) => {
+      const id = req.params.id as string;
+      const issue = await getAccessibleResource(
+        req,
+        res,
+        svc.getById(id),
+        "Issue not found",
+      );
+      if (!issue) return;
+      if (!(await assertAgentIssueMutationAllowed(req, res, issue))) return;
+
+      const next = req.body.status as IssueStatus;
+      const prev = issue.status as IssueStatus;
+
+      if (prev === "backlog" && next === "todo" && !issue.assigneeAgentId) {
+        res.status(422).json({
+          error: "Task must be assigned before moving to Todo",
+          code: "status_transition_requires_assignee",
+          from: prev,
+          to: next,
+        });
+        return;
+      }
+      if (prev === "in_progress" && next === "done") {
+        const products = await workProductsSvc.listForIssue(issue.id);
+        if (products.length === 0) {
+          res.status(422).json({
+            error: "Moving In progress → Done requires at least one deliverable",
+            code: "status_transition_requires_deliverable",
+            from: prev,
+            to: next,
+          });
+          return;
+        }
+      }
+      if (prev === next) {
+        res.json({ issue });
+        return;
+      }
+
+      const updated = await svc.update(id, { status: next });
+      if (!updated) {
+        res.status(404).json({ error: "Issue not found" });
+        return;
+      }
+      const actor = getActorInfo(req);
+      await logActivity(db, {
+        companyId: updated.companyId,
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        agentId: actor.agentId,
+        runId: actor.runId,
+        agentApiKeyId: actor.agentApiKeyId,
+        action: "issue.status_changed",
+        entityType: "issue",
+        entityId: updated.id,
+        details: { from: prev, to: next, via: "kanban" },
+      });
+      res.json({ issue: updated });
+    },
+  );
 
   return router;
 }

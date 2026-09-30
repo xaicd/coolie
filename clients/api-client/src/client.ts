@@ -15,6 +15,7 @@ import {
   type ExecutionWorkspace,
   type GetWorkspaceDiffParams,
   type Issue,
+  type IssueStatus,
   type ActivateWorkProductVersionResponse,
   type IssueAttachment,
   type IssueLabel,
@@ -466,6 +467,28 @@ export class CoolieClient {
       "PATCH",
       `/api/issues/${encodeURIComponent(issueId)}`,
       fields,
+    );
+    return isRecord(body) && "issue" in body ? (body.issue as Issue) : (body as Issue);
+  }
+
+  /**
+   * Kanban / 拖拽换状态 —— `PATCH /api/companies/:companyId/issues/:id/status`
+   * (wave213)。走专门端点而不是通用 updateIssue:
+   *   1. 只接受 status 字段, 拒绝混入其它字段
+   *   2. 服务端校验状态转换合法性:
+   *      - backlog → todo 必须已指派
+   *      - in_progress → done 必须有产物
+   *   3. 失败返回 422 + code, 客户端做乐观回滚时能区分原因
+   */
+  async updateIssueStatus(
+    companyId: string,
+    issueId: string,
+    status: IssueStatus,
+  ): Promise<Issue> {
+    const body = await this.request<{ issue?: Issue } | Issue>(
+      "PATCH",
+      `/api/companies/${encodeURIComponent(companyId)}/issues/${encodeURIComponent(issueId)}/status`,
+      { status },
     );
     return isRecord(body) && "issue" in body ? (body.issue as Issue) : (body as Issue);
   }

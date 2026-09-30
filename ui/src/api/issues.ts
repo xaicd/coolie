@@ -19,6 +19,7 @@ import type {
   IssueLabel,
   IssueRecoveryAction,
   IssueRetryNowResponse,
+  IssueStatus,
   StalledReviewDecision,
   StalledReviewDecisionResponse,
   IssueThreadInteraction,
@@ -269,6 +270,16 @@ export const issuesApi = {
         )
       : response;
   },
+  /**
+   * Kanban 拖拽换状态 —— `PATCH /api/companies/:companyId/issues/:id/status`
+   * (wave213)。校验更严 (backlog→todo 需指派 / in_progress→done 需产物),
+   * 失败返回 422 + code, 客户端能做乐观回滚 + 提示原因。
+   */
+  updateStatus: (companyId: string, id: string, status: IssueStatus) =>
+    api.patch<IssueUpdateResponse>(
+      `/companies/${companyId}/issues/${id}/status`,
+      { status },
+    ),
   decideStalledReview: (id: string, data: StalledReviewDecision) =>
     api.post<StalledReviewDecisionResponse>(
       `/issues/${id}/stalled-review-decision`,

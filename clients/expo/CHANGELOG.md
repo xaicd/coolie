@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.6.5
+
+> Released: 2026-09-30 · Android release APK
+
+### 更新
+
+- wave213 双端任务看板 + 拖拽换状态: App 任务 tab 改看 Kanban (TaskKanbanScreen), 5 列横向滚动, 卡片长按拖到另一列即时换状态; 服务端新端点 `PATCH /api/companies/:companyId/issues/:id/status` 做状态转换合法性校验 (backlog→todo 需指派 / in_progress→done 需产物); 拖拽有震动反馈, 失败回弹 + Alert 提示原因
+
+---
+
 ## v0.6.2
 
 > Released: 2026-09-30 · Android release APK

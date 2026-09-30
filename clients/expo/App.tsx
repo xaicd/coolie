@@ -70,6 +70,8 @@ import { AgentDetailScreen } from "./src/screens/AgentDetailScreen";
 import { TaskDetailScreen } from "./src/screens/TaskDetailScreen";
 import { SpecEditorScreen } from "./src/screens/SpecEditorScreen";
 import { TasksScreen } from "./src/screens/TasksScreen";
+import { TaskKanbanScreen } from "./src/screens/TaskKanbanScreen";
+import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { PipelinesScreen } from "./src/screens/PipelinesScreen";
 import { PlansScreen } from "./src/screens/PlansScreen";
 import { GitCredentialsScreen } from "./src/screens/GitCredentialsScreen";
@@ -1003,6 +1005,7 @@ function HomeScreen({
     );
 
     content = (
+      <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaView style={[styles.shell, { paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }]}>
         <StatusBar style="light" />
         {/* 未进入子屏时显示全局顶栏；进入项目中心/流水线/计划/员工详情等子屏时由子屏自身的 ScreenHeader 承载返回 */}
@@ -1226,9 +1229,8 @@ function HomeScreen({
             selected ? (
               taskDetail
             ) : (
-              <TasksScreen
+              <TaskKanbanScreen
                 company={company}
-                whoami={whoami}
                 refreshToken={tasksRefreshToken}
                 initialProjectId={tasksFilterProjectId}
                 onOpenIssue={setSelected}
@@ -1319,6 +1321,7 @@ function HomeScreen({
         />
       ) : null}
     </SafeAreaView>
+    </GestureHandlerRootView>
     );
   }
 

@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useCallback, useRef, useState } from "react";
 import { useLocation, useSearchParams } from "@/lib/router";
 import { useInfiniteQuery, useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { IssueStatus } from "@paperclipai/shared";
 import { issuesApi } from "../api/issues";
 import { agentsApi } from "../api/agents";
 import { projectsApi } from "../api/projects";
 import { heartbeatsApi } from "../api/heartbeats";
 import { useCompany } from "../context/CompanyContext";
 import { useBreadcrumbs } from "../context/BreadcrumbContext";
+import { useToastActions } from "../context/ToastContext";
 import { collectLiveIssueIds } from "../lib/liveIssueIds";
 import { usePublishSharedQueryData, useSharedPollingQuery } from "@/hooks/useSharedPolling";
 import { queryKeys } from "../lib/queryKeys";
@@ -199,6 +201,28 @@ export function Issues() {
     },
   });
 
+  // Kanban 拖拽换状态 (wave213) — 走专门端点, 校验更严, 422 时回滚 + Toast 提示原因。
+  const { pushToast } = useToastActions();
+  const updateIssueStatus = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: IssueStatus }) =>
+      issuesApi.updateStatus(selectedCompanyId!, id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.issues.list(selectedCompanyId!) });
+    },
+    onError: (err) => {
+      const body = (err as { body?: { code?: string; error?: string } }).body;
+      const code = body?.code ?? "";
+      const reason =
+        code === "status_transition_requires_assignee"
+          ? "请先指派负责人, 再移到 Todo。"
+          : code === "status_transition_requires_deliverable"
+          ? "需要至少一个交付物才能移到 Done。"
+          : body?.error ?? "状态更新失败, 已回滚。";
+      pushToast({ title: "无法换列", body: reason, tone: "error" });
+      queryClient.invalidateQueries({ queryKey: queryKeys.issues.list(selectedCompanyId!) });
+    },
+  });
+
   if (!selectedCompanyId) {
     return (
       <EmptyState
@@ -230,7 +254,21 @@ export function Issues() {
       enableRoutineVisibilityFilter
       hasMoreIssues={hasMoreServerIssues}
       onLoadMoreIssues={loadMoreServerIssues}
-      onUpdateIssue={(id, data) => updateIssue.mutate({ id, data })}
+      onUpdateIssue={(id, data) => {
+        // Kanban 拖拽换状态: 走专门 status 端点, 校验状态转换合法性
+        // (backlog→todo 需指派 / in_progress→done 需产物)。其它字段 (assigneeAgentId 等)
+        // 仍然走通用 updateIssue。
+        if (
+          data &&
+          typeof data === "object" &&
+          Object.keys(data).length === 1 &&
+          typeof data.status === "string"
+        ) {
+          updateIssueStatus.mutate({ id, status: data.status as IssueStatus });
+        } else {
+          updateIssue.mutate({ id, data });
+        }
+      }}
       searchFilters={participantAgentId || workspaceIdFilter ? { participantAgentId, workspaceId: workspaceIdFilter } : undefined}
     />
   );

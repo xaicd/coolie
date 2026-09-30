@@ -6,6 +6,7 @@ import {
   type AgentIdentity,
   type Company,
   type Issue,
+  type IssueStatus,
   type OntologyDomain,
   type Project,
   type SessionUser,
@@ -30,6 +31,10 @@ export {
   detectApiBaseUrl,
 } from "./instanceTarget";
 import { COOLIE_BASE_URL, COOLIE_ORIGIN, detectApiBaseUrl, originOf } from "./instanceTarget";
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
 
 const AUTH_KEY = "coolie.authToken";
 const SESSION_TOKEN_KEY = "coolie.sessionToken";
@@ -511,13 +516,23 @@ export class CoolieClient extends BaseCoolieClient {
     );
   }
 
-  /** PATCH /api/issues/:id — 改任务状态 */
-  async updateIssueStatus(issueId: string, status: string): Promise<unknown> {
-    return this.request<unknown>(
+  /**
+   * 看板拖拽换状态 — `PATCH /api/companies/:companyId/issues/:id/status`。
+   * wave213: 走专门 status 端点, 服务端校验转换合法性
+   * (backlog→todo 需指派 / in_progress→done 需产物),
+   * 失败返回 422 + code, 客户端可识别并做 Toast + 回弹。
+   */
+  async updateIssueStatus(
+    companyId: string,
+    issueId: string,
+    status: IssueStatus,
+  ): Promise<Issue> {
+    const body = await this.request<{ issue?: Issue } | Issue>(
       "PATCH",
-      `/api/issues/${encodeURIComponent(issueId)}`,
+      `/api/companies/${encodeURIComponent(companyId)}/issues/${encodeURIComponent(issueId)}/status`,
       { status },
     );
+    return isRecord(body) && "issue" in body ? (body.issue as Issue) : (body as Issue);
   }
 
   /** GET /api/companies/:id/live-runs — 正在运行的 run 数 + agent 名 */
