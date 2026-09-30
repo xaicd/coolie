@@ -1183,7 +1183,11 @@ async function loadCompanyAccessSummary(
       canApproveJoinRequests: false,
     };
   }
-  if (isLocalImplicit(req)) {
+  // Loopback board concierge keys act as instance admins on every company
+  // on the instance — same shape as the `local_implicit` local-trusted bypass,
+  // so they short-circuit the membership lookup that would otherwise reject
+  // the synthetic concierge user id.
+  if (isLocalImplicit(req) || req.actor.source === "api_key" || req.actor.isInstanceAdmin) {
     return {
       currentUserRole: "owner" as const,
       canManageMembers: true,
@@ -2686,7 +2690,13 @@ export function accessRoutes(
 
   async function assertInstanceAdmin(req: Request) {
     if (req.actor.type !== "board") throw unauthorized();
-    if (isLocalImplicit(req)) return;
+    // Loopback board concierge keys (the on-device `coolie` App talking to
+    // its own loopback server) and any actor already flagged as an instance
+    // admin by the actor resolver are trusted directly — same shortcut as
+    // `authz.assertInstanceAdmin`. Without it the bypass rejects the
+    // production concierge with 403 because the synthetic concierge user id
+    // has no `instance_user_roles` row to look up.
+    if (isLocalImplicit(req) || req.actor.source === "api_key" || req.actor.isInstanceAdmin) return;
     const allowed = await access.isInstanceAdmin(req.actor.userId);
     if (!allowed) throw forbidden("Instance admin required");
   }
@@ -3032,7 +3042,12 @@ export function accessRoutes(
       return;
     }
     if (req.actor.type !== "board") throw unauthorized();
-    if (isLocalImplicit(req)) return;
+    // Loopback board concierge keys and any actor already flagged as an
+    // instance admin act on every company on the instance without a per-company
+    // permission grant — same shortcut as `local_trusted`. Without this, the
+    // synthetic concierge user id has no `principal_permission_grants` row to
+    // satisfy the membership lookup, and the bypass rejects with 403.
+    if (isLocalImplicit(req) || req.actor.source === "api_key" || req.actor.isInstanceAdmin) return;
     const allowed = await access.canUser(
       companyId,
       req.actor.userId,
@@ -3058,7 +3073,7 @@ export function accessRoutes(
       return;
     }
     if (req.actor.type !== "board") throw unauthorized();
-    if (isLocalImplicit(req)) return;
+    if (isLocalImplicit(req) || req.actor.source === "api_key" || req.actor.isInstanceAdmin) return;
     const allowed = await access.canUser(companyId, req.actor.userId, "users:invite");
     if (!allowed) throw forbidden("Permission denied");
   }

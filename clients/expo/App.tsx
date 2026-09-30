@@ -582,6 +582,10 @@ function SignInScreen({
   const [useToken, setUseToken] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // wave172 — 客户端校验邮箱格式 + 密码长度, 错就不让提交。比让服务端把 "abc" 当邮箱
+  // 打回来再弹错少一次往返, 也避免用户反复点「按了没反应」的按钮 (wave153 的同源痛点)。
+  const [emailError, setEmailError] = useState<string | null>(null);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   // wave153 — prefill the last email so a returning user only types the password.
   useEffect(() => {
@@ -590,7 +594,46 @@ function SignInScreen({
     });
   }, []);
 
+  // 实时校验邮箱格式: 用户改一格就重算, 错误消失就立刻清掉提示, 不要一直红。
+  useEffect(() => {
+    if (useToken) {
+      setEmailError(null);
+      return;
+    }
+    const trimmed = email.trim();
+    if (trimmed.length === 0) {
+      setEmailError(null);
+      return;
+    }
+    // 与 Web /api/auth/sign-in/email 的服务端校验同源: 一个合法邮箱的形状。
+    // 不强求顶级域名完整 (公司内网常是 user@corp 这种), 只卡 @ 与左右两侧非空。
+    setEmailError(
+      /^[^\s@]+@[^\s@]+$/.test(trimmed) ? null : "请输入有效的邮箱地址",
+    );
+  }, [email, useToken]);
+
+  // 实时校验密码长度: < 8 字符不让提交。
+  useEffect(() => {
+    if (useToken) {
+      setPasswordError(null);
+      return;
+    }
+    setPasswordError(
+      password.length === 0 || password.length >= 8
+        ? null
+        : "密码至少需要 8 个字符",
+    );
+  }, [password, useToken]);
+
   const submit = useCallback(async () => {
+    if (useToken) {
+      const candidate = token.trim();
+      if (!candidate) return;
+    } else {
+      const trimmedEmail = email.trim();
+      if (!trimmedEmail || !password) return;
+      if (emailError || passwordError) return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -608,7 +651,7 @@ function SignInScreen({
     } finally {
       setBusy(false);
     }
-  }, [useToken, token, email, password, onSignedIn]);
+  }, [useToken, token, email, password, emailError, passwordError, onSignedIn]);
 
   // 切换登录方式时清空所有输入：否则从邮箱模式切到 Key 模式，界面上还留着
   // 邮箱/密码，但校验只看 token（空）→ 按钮变灰、看起来「点了没反应」。
@@ -618,11 +661,16 @@ function SignInScreen({
     setPassword("");
     setToken("");
     setError(null);
+    setEmailError(null);
+    setPasswordError(null);
   }, []);
 
   const ready = useToken
     ? token.trim().length > 0
-    : email.trim().length > 0 && password.length > 0;
+    : email.trim().length > 0 &&
+      password.length > 0 &&
+      emailError === null &&
+      passwordError === null;
 
   return (
     <Surface>
@@ -668,6 +716,7 @@ function SignInScreen({
             value={email}
             onChangeText={setEmail}
           />
+          {emailError ? <Text style={styles.inputError}>{emailError}</Text> : null}
           <TextInput
             style={styles.input}
             placeholder="密码"
@@ -677,6 +726,9 @@ function SignInScreen({
             value={password}
             onChangeText={setPassword}
           />
+          {passwordError ? (
+            <Text style={styles.inputError}>{passwordError}</Text>
+          ) : null}
         </>
       )}
 
@@ -1564,6 +1616,13 @@ const styles = StyleSheet.create({
     color: C.err,
     fontSize: 13,
     fontWeight: "500",
+  },
+  // wave172 — 单字段校验提示, 贴在对应输入框下面 (DESIGN.md: 用 C.err, 不引新色)。
+  inputError: {
+    color: C.err,
+    fontSize: 12,
+    fontWeight: "400",
+    marginTop: -8,
   },
   readyHint: {
     color: C.ink4,
