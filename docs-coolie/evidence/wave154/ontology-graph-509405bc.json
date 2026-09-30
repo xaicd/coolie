@@ -1,0 +1,458 @@
+{
+  "summary": {
+    "companyId": "b1d6850c-02a4-41cc-a716-67797fe2b494",
+    "root": {
+      "type": "project",
+      "id": "509405bc-723d-407f-a937-2dd26e5297df"
+    },
+    "depth": 3,
+    "nodeCounts": {
+      "project": 1,
+      "issue": 25
+    },
+    "edgeCount": 25,
+    "relations": {
+      "belongs_to": 25
+    },
+    "capturedFrom": "embedded postgres :54329 (local default instance), read-only"
+  },
+  "nodes": [
+    {
+      "key": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "type": "project",
+      "id": "509405bc-723d-407f-a937-2dd26e5297df",
+      "label": "产融智能体应用系统集成服务项目 1790652625",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 0
+    },
+    {
+      "key": "issue:4a1ea7db-d239-4dd1-8833-88b91ef93256",
+      "type": "issue",
+      "id": "4a1ea7db-d239-4dd1-8833-88b91ef93256",
+      "label": "ONB-15 架构/设计收口里程碑",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:9e9bc728-b844-4c6f-b09e-a080080645e8",
+      "type": "issue",
+      "id": "9e9bc728-b844-4c6f-b09e-a080080645e8",
+      "label": "ONB-3 产融智能体应用系统集成服务项目 1790652625 · 需求确认阶段",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:1c579314-8983-4448-9775-d13e5d2f598d",
+      "type": "issue",
+      "id": "1c579314-8983-4448-9775-d13e5d2f598d",
+      "label": "ONB-4 智能体应用平台标准功能",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:6251642e-500f-4510-9d51-373f344a9f89",
+      "type": "issue",
+      "id": "6251642e-500f-4510-9d51-373f344a9f89",
+      "label": "ONB-5 系统配置",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:ed520225-509c-43e7-82f0-d1a5de157efb",
+      "type": "issue",
+      "id": "ed520225-509c-43e7-82f0-d1a5de157efb",
+      "label": "ONB-6 风险防控智能体",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:334bf18e-af1e-472d-8eaf-f6214f9e2593",
+      "type": "issue",
+      "id": "334bf18e-af1e-472d-8eaf-f6214f9e2593",
+      "label": "ONB-7 风险预警",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:20d6291a-09ba-4533-924f-0cb6e410bec6",
+      "type": "issue",
+      "id": "20d6291a-09ba-4533-924f-0cb6e410bec6",
+      "label": "ONB-8 经营管理智能体",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:8e1411c9-e4b7-4916-a192-31046c26998f",
+      "type": "issue",
+      "id": "8e1411c9-e4b7-4916-a192-31046c26998f",
+      "label": "ONB-9 经营分析",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:876157b9-00ea-493d-a616-332be74790a3",
+      "type": "issue",
+      "id": "876157b9-00ea-493d-a616-332be74790a3",
+      "label": "ONB-10 知识管理智能体",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:44f92db0-6de2-4118-8ee0-0d651f4a728d",
+      "type": "issue",
+      "id": "44f92db0-6de2-4118-8ee0-0d651f4a728d",
+      "label": "ONB-11 知识检索",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:c2438779-ef28-4202-a685-20835531b005",
+      "type": "issue",
+      "id": "c2438779-ef28-4202-a685-20835531b005",
+      "label": "ONB-13 产融智能体应用系统集成服务项目 1790652625 · 架构/设计阶段",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:19aa5f45-ec58-42b0-b97d-c06c6f16182b",
+      "type": "issue",
+      "id": "19aa5f45-ec58-42b0-b97d-c06c6f16182b",
+      "label": "ONB-14 架构/设计阶段工作包",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:3b3b556e-e3e6-4e56-80a6-d1fc8204a819",
+      "type": "issue",
+      "id": "3b3b556e-e3e6-4e56-80a6-d1fc8204a819",
+      "label": "ONB-16 产融智能体应用系统集成服务项目 1790652625 · 详细设计阶段",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:016b03ac-7a03-4eca-bacd-e7f9de54c6d6",
+      "type": "issue",
+      "id": "016b03ac-7a03-4eca-bacd-e7f9de54c6d6",
+      "label": "ONB-17 详细设计阶段工作包",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:4f7508fe-765c-4d87-b249-592fb1f6772d",
+      "type": "issue",
+      "id": "4f7508fe-765c-4d87-b249-592fb1f6772d",
+      "label": "ONB-18 详细设计收口里程碑",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:fb8a1b3a-ceda-480a-a60c-eb9a0368d985",
+      "type": "issue",
+      "id": "fb8a1b3a-ceda-480a-a60c-eb9a0368d985",
+      "label": "ONB-19 产融智能体应用系统集成服务项目 1790652625 · 开发实现阶段",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:8d9b9aa3-ccc1-4382-bce0-aabd10bd6849",
+      "type": "issue",
+      "id": "8d9b9aa3-ccc1-4382-bce0-aabd10bd6849",
+      "label": "ONB-20 开发实现阶段工作包",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:f2b9b3cf-44be-42de-8d03-b90d76c017b4",
+      "type": "issue",
+      "id": "f2b9b3cf-44be-42de-8d03-b90d76c017b4",
+      "label": "ONB-21 开发实现收口里程碑",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:3f554978-18e1-45f9-9632-47d091bcb275",
+      "type": "issue",
+      "id": "3f554978-18e1-45f9-9632-47d091bcb275",
+      "label": "ONB-22 产融智能体应用系统集成服务项目 1790652625 · 测试验收阶段",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:dbaead42-35ab-4c68-9350-347e5a24ec60",
+      "type": "issue",
+      "id": "dbaead42-35ab-4c68-9350-347e5a24ec60",
+      "label": "ONB-23 测试验收阶段工作包",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:2fbd57db-887d-4510-a288-9fbf1846c475",
+      "type": "issue",
+      "id": "2fbd57db-887d-4510-a288-9fbf1846c475",
+      "label": "ONB-24 测试验收收口里程碑",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:08d0067a-6a68-45bc-9a98-7f42cb24a6e1",
+      "type": "issue",
+      "id": "08d0067a-6a68-45bc-9a98-7f42cb24a6e1",
+      "label": "ONB-25 产融智能体应用系统集成服务项目 1790652625 · 上线移交阶段",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:e2ee001a-b489-4ad3-8550-cb6a8dfc5e35",
+      "type": "issue",
+      "id": "e2ee001a-b489-4ad3-8550-cb6a8dfc5e35",
+      "label": "ONB-26 上线移交阶段工作包",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:16093a4f-5c96-489a-8032-ec6e58c41723",
+      "type": "issue",
+      "id": "16093a4f-5c96-489a-8032-ec6e58c41723",
+      "label": "ONB-27 上线移交收口里程碑",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    },
+    {
+      "key": "issue:61278e94-8f85-4cbc-a9ee-dcc734700745",
+      "type": "issue",
+      "id": "61278e94-8f85-4cbc-a9ee-dcc734700745",
+      "label": "ONB-12 需求确认收口里程碑",
+      "metadata": {
+        "status": "backlog"
+      },
+      "depth": 1
+    }
+  ],
+  "edges": [
+    {
+      "key": "issue:4a1ea7db-d239-4dd1-8833-88b91ef93256|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:4a1ea7db-d239-4dd1-8833-88b91ef93256",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:9e9bc728-b844-4c6f-b09e-a080080645e8|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:9e9bc728-b844-4c6f-b09e-a080080645e8",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:1c579314-8983-4448-9775-d13e5d2f598d|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:1c579314-8983-4448-9775-d13e5d2f598d",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:6251642e-500f-4510-9d51-373f344a9f89|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:6251642e-500f-4510-9d51-373f344a9f89",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:ed520225-509c-43e7-82f0-d1a5de157efb|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:ed520225-509c-43e7-82f0-d1a5de157efb",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:334bf18e-af1e-472d-8eaf-f6214f9e2593|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:334bf18e-af1e-472d-8eaf-f6214f9e2593",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:20d6291a-09ba-4533-924f-0cb6e410bec6|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:20d6291a-09ba-4533-924f-0cb6e410bec6",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:8e1411c9-e4b7-4916-a192-31046c26998f|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:8e1411c9-e4b7-4916-a192-31046c26998f",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:876157b9-00ea-493d-a616-332be74790a3|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:876157b9-00ea-493d-a616-332be74790a3",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:44f92db0-6de2-4118-8ee0-0d651f4a728d|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:44f92db0-6de2-4118-8ee0-0d651f4a728d",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:c2438779-ef28-4202-a685-20835531b005|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:c2438779-ef28-4202-a685-20835531b005",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:19aa5f45-ec58-42b0-b97d-c06c6f16182b|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:19aa5f45-ec58-42b0-b97d-c06c6f16182b",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:3b3b556e-e3e6-4e56-80a6-d1fc8204a819|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:3b3b556e-e3e6-4e56-80a6-d1fc8204a819",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:016b03ac-7a03-4eca-bacd-e7f9de54c6d6|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:016b03ac-7a03-4eca-bacd-e7f9de54c6d6",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:4f7508fe-765c-4d87-b249-592fb1f6772d|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:4f7508fe-765c-4d87-b249-592fb1f6772d",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:fb8a1b3a-ceda-480a-a60c-eb9a0368d985|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:fb8a1b3a-ceda-480a-a60c-eb9a0368d985",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:8d9b9aa3-ccc1-4382-bce0-aabd10bd6849|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:8d9b9aa3-ccc1-4382-bce0-aabd10bd6849",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:f2b9b3cf-44be-42de-8d03-b90d76c017b4|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:f2b9b3cf-44be-42de-8d03-b90d76c017b4",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:3f554978-18e1-45f9-9632-47d091bcb275|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:3f554978-18e1-45f9-9632-47d091bcb275",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:dbaead42-35ab-4c68-9350-347e5a24ec60|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:dbaead42-35ab-4c68-9350-347e5a24ec60",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:2fbd57db-887d-4510-a288-9fbf1846c475|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:2fbd57db-887d-4510-a288-9fbf1846c475",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:08d0067a-6a68-45bc-9a98-7f42cb24a6e1|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:08d0067a-6a68-45bc-9a98-7f42cb24a6e1",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:e2ee001a-b489-4ad3-8550-cb6a8dfc5e35|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:e2ee001a-b489-4ad3-8550-cb6a8dfc5e35",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:16093a4f-5c96-489a-8032-ec6e58c41723|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:16093a4f-5c96-489a-8032-ec6e58c41723",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    },
+    {
+      "key": "issue:61278e94-8f85-4cbc-a9ee-dcc734700745|belongs_to|project:509405bc-723d-407f-a937-2dd26e5297df",
+      "source": "issue:61278e94-8f85-4cbc-a9ee-dcc734700745",
+      "target": "project:509405bc-723d-407f-a937-2dd26e5297df",
+      "relation": "belongs_to",
+      "weight": 3
+    }
+  ]
+}
