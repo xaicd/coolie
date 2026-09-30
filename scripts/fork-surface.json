@@ -960,6 +960,18 @@
       "maxNetLines": 140,
       "maxTotalLines": 160,
       "reason": "wave147: the /specs forest view (requirement/bugfix -> design -> task). No upstream counterpart; token-only styling."
+    },
+    {
+      "path": "server/src/services/ontology-graph.ts",
+      "maxNetLines": 80,
+      "maxTotalLines": 110,
+      "reason": "wave154/wave155/wave163: graph read service — buildView / findPaths / stats, with agent hydration and the entity_relations BFS/DFS core. wave163 tightens the placeholder label and attachment fallback so the board never renders a uuid slice. Cannot live elsewhere: it is the BFS/DFS core the routes call."
+    },
+    {
+      "path": "ui/src/components/OntologyGraphView.tsx",
+      "maxNetLines": 360,
+      "maxTotalLines": 420,
+      "reason": "wave154/wave155/wave163: the graph visualization (canvas + node types + view presets). wave163 widens the label truncate cap (16→28) so real names like `ONB-15 架构/设计收口里程碑` render fully on the board. It is the centerpiece of the Workshop tab; cannot live elsewhere."
     }
   ]
 }

@@ -387,7 +387,11 @@ export function ontologyGraphService(db: Db) {
           type: "attachment",
           id: row.id,
           key: nodeKey("attachment", row.id),
-          label: row.filename ?? `Attachment ${row.id.slice(0, 8)}`,
+          // wave163: hydrate by filename (real name), not a uuid slice — even
+          // when the original_filename column is null, fall back to a typed
+          // placeholder rather than slicing the id (which looked like a uuid
+          // on the board).
+          label: row.filename ?? "未命名附件",
           href: `/issues/${row.issueId}`,
           metadata: { issueId: row.issueId },
         });
@@ -406,7 +410,8 @@ export function ontologyGraphService(db: Db) {
           type: "comment",
           id: row.id,
           key: nodeKey("comment", row.id),
-          label: snippet || "Comment",
+          // wave163: prefer the body snippet; never slice the id.
+          label: snippet || "评论",
           href: `/issues/${row.issueId}`,
           metadata: { issueId: row.issueId },
         });
@@ -449,7 +454,20 @@ export function ontologyGraphService(db: Db) {
     }
 
     // Any ref whose owning row is gone still gets a placeholder node so the
-    // graph stays consistent (an edge is never drawn to nothing).
+    // graph stays consistent (an edge is never drawn to nothing). wave163:
+    // label by type only — never slice the id, which read like a uuid on the
+    // board.
+    const PLACEHOLDER_LABEL: Record<EntityType, string> = {
+      company: "已删除的公司",
+      project: "已删除的项目",
+      issue: "已删除的任务",
+      spec: "已删除的规格",
+      conversation: "已删除的对话",
+      work_product: "已删除的交付物",
+      attachment: "已删除的附件",
+      comment: "已删除的评论",
+      agent: "已删除的智能体",
+    };
     const result: OntologyGraphNode[] = [];
     for (const ref of refs) {
       const key = nodeKey(ref.type, ref.id);
@@ -458,7 +476,7 @@ export function ontologyGraphService(db: Db) {
           type: ref.type,
           id: ref.id,
           key,
-          label: `${ref.type} ${ref.id.slice(0, 8)}`,
+          label: PLACEHOLDER_LABEL[ref.type] ?? `已删除的 ${ref.type}`,
           href: null,
         },
       );

@@ -140,6 +140,21 @@ function truncate(value: string, max: number) {
   return value.length > max ? `${value.slice(0, max - 1)}…` : value;
 }
 
+/**
+ * wave163 — when the server returns a real label, render it in full. The
+ * server's hydration already prefers `name` / `title` / `identifier` /
+ * `filename` for every entity type, so the truncate cap below is just a
+ * guard against pathological labels. We render the full label as a child of
+ * the node so it stays inside the canvas without colliding with neighbouring
+ * rings; only the most extreme labels get capped.
+ */
+function displayLabel(value: string) {
+  // Plenty of room for a real "ONB-12 架构/设计收口里程碑" or a long project
+  // name — fall back to ellipsis only if the server still hands us something
+  // pathological (e.g. a fresh company whose rows never hydrated).
+  return truncate(value, 28);
+}
+
 export function OntologyGraphView({
   companyId,
   rootType,
@@ -280,7 +295,7 @@ export function OntologyGraphView({
                   y={radius + 14}
                   style={{ fill: "var(--foreground)" }}
                 >
-                  {truncate(node.label, 16)}
+                  {displayLabel(node.label)}
                 </text>
                 <text
                   className="text-(length:--text-nano)"
