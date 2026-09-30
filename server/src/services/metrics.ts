@@ -84,11 +84,88 @@ function dateKeyUTC(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/**
+ * Boss "车间效率" view (wave215-b, boss 9): three rolling windows — 7d / 30d
+ * / 90d — of completion efficiency, all derived from the same underlying
+ * definitions the `/metrics/overview` endpoint uses (`done / period`, plus
+ * the cancellation/blocked-stuck component). One round-trip from the UI
+ * instead of three.
+ *
+ * Each window reports the totals, the failure rate, the average delivery
+ * cycle (in days) over done tasks, and a daily throughput series spanning
+ * the window — same shape `/metrics/overview` returns, just for three
+ * windows in parallel. The series length is bounded to the window so the
+ * 90d payload stays compact.
+ */
+export interface MetricsWindow {
+  period_days: 7 | 30 | 90;
+  window: { from: string; to: string };
+  totals: MetricsTotals;
+  failure_rate: number;
+  delivery_cycle_days_avg: number | null;
+  throughput_per_day: number;
+  series: MetricsSeriesPoint[];
+}
+
+export interface MetricsEfficiency {
+  generated_at: string;
+  company_id: string;
+  windows: MetricsWindow[];
+}
+
+const EFFICIENCY_WINDOW_DAYS = [7, 30, 90] as const;
+
 export function metricsService(db: Db) {
+  async function window(
+    companyId: string,
+    periodDays: number,
+  ): Promise<MetricsWindow> {
+    const overview = await _overviewImpl(db, companyId, {
+      periodDays,
+      seriesDays: periodDays,
+    });
+    return {
+      period_days: periodDays as 7 | 30 | 90,
+      window: overview.window,
+      totals: overview.totals,
+      failure_rate: overview.failureRate,
+      delivery_cycle_days_avg: overview.deliveryCycleDaysAvg,
+      throughput_per_day: overview.throughputPerDay,
+      series: overview.series,
+    };
+  }
+
+  /**
+   * Three rolling windows (7d / 30d / 90d) in a single round-trip. Each
+   * window is computed independently so a 90-day spike in cancellations
+   * does not bleed into the 7-day view.
+   */
+  async function efficiency(companyId: string): Promise<MetricsEfficiency> {
+    const windows = await Promise.all(
+      EFFICIENCY_WINDOW_DAYS.map((days) => window(companyId, days)),
+    );
+    return {
+      generated_at: new Date().toISOString(),
+      company_id: companyId,
+      windows,
+    };
+  }
+
   async function overview(
     companyId: string,
     opts: { periodDays?: number; seriesDays?: number } = {},
   ): Promise<MetricsOverview> {
+    return _overviewImpl(db, companyId, opts);
+  }
+
+  return { overview, window, efficiency };
+}
+
+async function _overviewImpl(
+  db: Db,
+  companyId: string,
+  opts: { periodDays?: number; seriesDays?: number } = {},
+): Promise<MetricsOverview> {
     const periodDays = normalizeMetricsPeriod(opts.periodDays);
     const seriesDays = Math.max(1, Math.min(90, opts.seriesDays ?? DEFAULT_SERIES_DAYS));
     const now = new Date();
@@ -219,9 +296,6 @@ export function metricsService(db: Db) {
       byAgent,
       series,
     };
-  }
-
-  return { overview };
 }
 
 export type MetricsService = ReturnType<typeof metricsService>;
