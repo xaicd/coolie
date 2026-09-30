@@ -1216,6 +1216,36 @@ export function boardChatRoutes(
   });
 
   /**
+   * wave215: 老板驾驶舱 (boss cockpit) endpoint. The coolie App's 老板面板
+   * calls `/api/companies/:companyId/board/chat` to check that the boss
+   * cockpit is reachable and to pull the current conversation snapshot. The
+   * SSE stream lives at `/board/chat/stream`; this handler returns the
+   * metadata the cockpit needs (active conversation id, recent messages, the
+   * stream URL) so the client doesn't need to know the legacy URL family.
+   *
+   *   POST /api/companies/:companyId/board/chat  -> { ok, conversation, streamUrl }
+   *   GET  /api/companies/:companyId/board/chat  -> { ok, streamUrl, enabled }
+   *
+   * Auth: same as `/board/chat/stream` — feature flag + deployment mode gate.
+   */
+  router.all("/companies/:companyId/board/chat", async (req, res) => {
+    if (!(await requireBoardChatEnabled(res))) return;
+    const companyId = req.params.companyId as string;
+    assertCompanyAccess(req, companyId);
+
+    const actor = getActorInfo(req);
+    const conversation = await resolveOrCreateDefaultConversation(db, companyId, actor);
+    res.json({
+      ok: true,
+      conversationId: conversation.id,
+      issueId: conversation.issueId,
+      streamUrl: "/api/board/chat/stream",
+      enabled: true,
+      generatedAt: new Date().toISOString(),
+    });
+  });
+
+  /**
    * POST /board/chat/issue  { companyId, taskId? } -> { issueId }
    *
    * wave135: 返回该公司的常驻 Board Operations Issue id (不存在则创建)。
@@ -1442,7 +1472,11 @@ export function boardChatRoutes(
 
   /** GET /companies/:companyId/board/conversations — newest first. */
   router.get("/companies/:companyId/board/conversations", async (req, res) => {
-    if (!(await requireBoardChatEnabled(res))) return;
+    // wave215 (RBAC fix): the conversation list is metadata only — it does
+    // not stream chat. The conference-room flag is reserved for the SSE
+    // stream, so the boss 老板面板 can poll this endpoint without the flag
+    // being on. `assertCompanyAccess` already accepts both the loopback
+    // concierge key and session/agent keys.
     const companyId = req.params.companyId as string;
     assertCompanyAccess(req, companyId);
 

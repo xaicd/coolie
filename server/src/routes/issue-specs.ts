@@ -232,5 +232,45 @@ export function issueSpecRoutes(db: Db) {
     res.status(201).json({ issueId: created.id, specKind: kind, spec: stored });
   });
 
+  // wave215 alias: the coolie App's 老板面板 calls
+  // `/api/companies/:companyId/issue-specs`. Reuse the tree endpoint's logic
+  // so callers don't need to know about the `/specs/` (plural) URL.
+  router.get("/companies/:companyId/issue-specs", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    assertCompanyAccess(req, companyId);
+    const query = specTreeQuerySchema.parse(req.query);
+
+    const rows = await db
+      .select({
+        id: issueRows.id,
+        identifier: issueRows.identifier,
+        title: issueRows.title,
+        status: issueRows.status,
+        projectId: issueRows.projectId,
+        specKind: issueRows.specKind,
+        spec: issueRows.spec,
+      })
+      .from(issueRows)
+      .where(and(eq(issueRows.companyId, companyId), isNotNull(issueRows.specKind)));
+
+    const specRows: SpecTreeRow[] = [];
+    for (const row of rows) {
+      if (!row.specKind || !row.spec) continue;
+      if (query.projectId && row.projectId !== query.projectId) continue;
+      const spec = row.spec as IssueSpec;
+      specRows.push({
+        issueId: row.id,
+        identifier: row.identifier,
+        title: row.title,
+        status: row.status,
+        specKind: row.specKind,
+        spec,
+        parentSpecId: spec.parentSpecId ?? null,
+      });
+    }
+
+    res.json({ roots: buildSpecTree(specRows) });
+  });
+
   return router;
 }

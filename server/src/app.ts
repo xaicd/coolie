@@ -84,6 +84,13 @@ import { buildRoutes } from "./routes/build.js";
 import { approvalRoutes } from "./routes/approvals.js";
 import { secretRoutes } from "./routes/secrets.js";
 import { toolAccessRoutes } from "./routes/tool-access.js";
+// wave215 — boss endpoints (12 老板需求端点)
+import { dispatchRoutes } from "./routes/dispatch.js";
+import { quotasRoutes } from "./routes/quotas.js";
+import { workProductsRoutes } from "./routes/work-products.js";
+import { sandboxesRoutes } from "./routes/sandboxes.js";
+import { cycleTimeRoutes } from "./routes/cycle-time.js";
+import { milestonesRoutes } from "./routes/milestones.js";
 import {
   chatChannelRoutes,
   chatWebhookRoutes,
@@ -868,6 +875,14 @@ export async function createApp(
   // wave152 — delivery-health metrics + defect knowledge base (board-only).
   api.use(metricsRoutes(db));
   api.use(defectKbRoutes(db));
+  // wave215 — boss endpoints (12 老板需求端点 + 5 RBAC fixes).
+  // Mounted after metrics/defect-kb so they can reuse the same read patterns.
+  api.use(dispatchRoutes(db));
+  api.use(quotasRoutes(db));
+  api.use(workProductsRoutes(db));
+  api.use(sandboxesRoutes(db));
+  api.use(cycleTimeRoutes(db));
+  api.use(milestonesRoutes(db));
   api.use(fileResourceRoutes(db));
   api.use(routineRoutes(db, { pluginWorkerManager: workerManager }));
   api.use(pipelineRoutes(db));

@@ -51,3 +51,10 @@ export { instanceDatabaseBackupRoutes } from "./instance-database-backups.js";
 export { managedAgentProfileRoutes } from "./managed-agent-profiles.js";
 export { remoteAgentProfileRoutes } from "./remote-agent-profiles.js";
 export { tasksHostPreviewRoutes } from "./tasks-host-preview.js";
+// wave215 — 17 endpoints (老板 12 需求端点 + 5 RBAC fixes)
+export { dispatchRoutes } from "./dispatch.js";
+export { quotasRoutes } from "./quotas.js";
+export { workProductsRoutes } from "./work-products.js";
+export { sandboxesRoutes } from "./sandboxes.js";
+export { cycleTimeRoutes } from "./cycle-time.js";
+export { milestonesRoutes } from "./milestones.js";
