@@ -1115,7 +1115,8 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     paddingHorizontal: 12,
-    paddingVertical: 5,
+    // wave214 — 上下各加 3px, 真实文字内容 5 + 12*1.2 + 5 = 24.4 不会被打断
+    paddingVertical: 8,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
@@ -1129,6 +1130,10 @@ const styles = StyleSheet.create({
     color: C.ink3,
     fontSize: 12,
     fontWeight: "500",
+    // wave214 — Android 默认 line-height 会把文字压扁; 显式行高 + 关 includeFontPadding
+    // (iOS 无 includeFontPadding 概念, 在 Android 上让 padding 精确等于 lineHeight - fontSize)
+    lineHeight: 18,
+    ...Platform.select({ android: { includeFontPadding: false } }),
   },
   filterChipTextActive: {
     color: C.accent,
@@ -1275,7 +1280,8 @@ const styles = StyleSheet.create({
   },
   versionChip: {
     paddingHorizontal: 10,
-    paddingVertical: 4,
+    // wave214 — 与 filterChip 对齐, 上下各加 3px 防 Android 文字压扁
+    paddingVertical: 7,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
@@ -1289,6 +1295,9 @@ const styles = StyleSheet.create({
     color: C.ink3,
     fontSize: 12,
     fontWeight: "500",
+    // wave214 — 显式 lineHeight + Android 关 includeFontPadding, 与 filterChip 同一原因
+    lineHeight: 18,
+    ...Platform.select({ android: { includeFontPadding: false } }),
   },
   versionChipTextActive: {
     color: C.accent,
