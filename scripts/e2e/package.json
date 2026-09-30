@@ -1,0 +1,19 @@
+{
+  "name": "@coolie/board-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Reusable, repeatable Playwright regression suite for the Coolie board (wave137 baseline). Lives outside the pnpm workspace so it never touches the main dependency tree; it resolves @playwright/test from the repo root by default.",
+  "scripts": {
+    "test": "node run.mjs",
+    "test:p0": "node run.mjs --p0",
+    "test:headed": "node run.mjs --headed",
+    "test:ui": "node run.mjs --ui",
+    "fixtures": "node fixtures/assets/make-fixtures.mjs",
+    "report": "playwright show-report .run/html-report",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.62.1"
+  }
+}

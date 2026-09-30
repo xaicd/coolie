@@ -1,0 +1,278 @@
+{
+  "config": {
+    "argv": [
+      "/opt/homebrew/Cellar/node@24/24.20.0/bin/node",
+      "/Users/mac/workspace/xaicd/coolie/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "/Users/mac/workspace/xaicd/coolie/scripts/e2e/playwright.config.ts",
+      "--list"
+    ],
+    "configFile": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/playwright.config.ts",
+    "rootDir": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/auth.setup.ts",
+    "globalTeardown": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {},
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929022545-1n7/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {},
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "open": "never",
+          "outputFolder": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929022545-1n7/html-report"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929022545-1n7/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "p0-01-login.spec.ts",
+      "file": "p0-01-login.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-1 login → organization → dashboard",
+          "file": "p0-01-login.spec.ts",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "signs in, selects an organization, and reaches a live dashboard",
+              "ok": true,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "4af9c2d1af471e150fdf-a1a47cded5473c481387",
+              "file": "p0-01-login.spec.ts",
+              "line": 5,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "p0-02-project.spec.ts",
+      "file": "p0-02-project.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-2 project — create with a requirement document",
+          "file": "p0-02-project.spec.ts",
+          "line": 7,
+          "column": 6,
+          "specs": [
+            {
+              "title": "uploads a docx, auto-recognizes the name, and the project shows docs + description",
+              "ok": true,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "90181fef0d65f0a4f0fe-42f8b78537a625669e8e",
+              "file": "p0-02-project.spec.ts",
+              "line": 8,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "p0-03-task.spec.ts",
+      "file": "p0-03-task.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-3 task — create in a project, assign to an agent",
+          "file": "p0-03-task.spec.ts",
+          "line": 8,
+          "column": 6,
+          "specs": [
+            {
+              "title": "creates a task with the project preselected, assigns an agent, and reads the assignee back",
+              "ok": true,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "d0a984036a0fd89dadb0-012239c65b8fefebe308",
+              "file": "p0-03-task.spec.ts",
+              "line": 9,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "p0-04-approval.spec.ts",
+      "file": "p0-04-approval.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-4 approval — find a pending item, approve it",
+          "file": "p0-04-approval.spec.ts",
+          "line": 18,
+          "column": 6,
+          "specs": [
+            {
+              "title": "approves a pending approval and both the new status and the audit trail are readable",
+              "ok": true,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "a5972c96c45aca2b68cd-a2b538280ce32f6aaad5",
+              "file": "p0-04-approval.spec.ts",
+              "line": 19,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "p0-05-artifact.spec.ts",
+      "file": "p0-05-artifact.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-5 artifact — upload an attachment and open it",
+          "file": "p0-05-artifact.spec.ts",
+          "line": 8,
+          "column": 6,
+          "specs": [
+            {
+              "title": "uploads an html artifact, lists it, and it renders (not raw source)",
+              "ok": true,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [],
+                  "status": "skipped"
+                }
+              ],
+              "id": "adfea908e6a2e14a02ef-09c371e4de33cae730b2",
+              "file": "p0-05-artifact.spec.ts",
+              "line": 9,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-29T02:25:46.167Z",
+    "duration": 95.04599999999999,
+    "expected": 0,
+    "skipped": 5,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

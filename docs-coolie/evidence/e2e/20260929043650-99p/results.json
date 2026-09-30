@@ -1,0 +1,858 @@
+{
+  "config": {
+    "argv": [
+      "/opt/homebrew/Cellar/node@24/24.20.0/bin/node",
+      "/Users/mac/workspace/xaicd/coolie/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "/Users/mac/workspace/xaicd/coolie/scripts/e2e/playwright.config.ts",
+      "--grep",
+      "@p0"
+    ],
+    "configFile": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/playwright.config.ts",
+    "rootDir": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/auth.setup.ts",
+    "globalTeardown": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "open": "never",
+          "outputFolder": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/html-report"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "p0-01-login.spec.ts",
+      "file": "p0-01-login.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-1 login → organization → dashboard",
+          "file": "p0-01-login.spec.ts",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "signs in, selects an organization, and reaches a live dashboard",
+              "ok": false,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 50410,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 45000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 45000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n    at switchCompany (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/board.ts:107:14)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-01-login.spec.ts:15:5",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/board.ts",
+                          "column": 14,
+                          "line": 107
+                        },
+                        "snippet": "   at ../src/board.ts:107\n\n  105 |   await item.waitFor({ state: \"visible\", timeout: 15_000 });\n  106 |   await item.click();\n> 107 |   await page.waitForURL(new RegExp(`/${escapeRegExp(company.issuePrefix)}/dashboard`, \"i\"), {\n      |              ^\n  108 |     timeout: 45_000,\n  109 |   });\n  110 | }"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/board.ts",
+                            "column": 14,
+                            "line": 107
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 45000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n\n   at ../src/board.ts:107\n\n  105 |   await item.waitFor({ state: \"visible\", timeout: 15_000 });\n  106 |   await item.click();\n> 107 |   await page.waitForURL(new RegExp(`/${escapeRegExp(company.issuePrefix)}/dashboard`, \"i\"), {\n      |              ^\n  108 |     timeout: 45_000,\n  109 |   });\n  110 | }\n    at switchCompany (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/board.ts:107:14)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-01-login.spec.ts:15:5"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-29T04:36:50.755Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-01-login-P0-1-login-→-o-148a9-nd-reaches-a-live-dashboard-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-01-login-P0-1-login-→-o-148a9-nd-reaches-a-live-dashboard-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/board.ts",
+                        "column": 14,
+                        "line": 107
+                      }
+                    },
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 51538,
+                      "error": {
+                        "message": "TimeoutError: page.waitForURL: Timeout 45000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================",
+                        "stack": "TimeoutError: page.waitForURL: Timeout 45000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n    at switchCompany (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/board.ts:107:14)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-01-login.spec.ts:15:5",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/board.ts",
+                          "column": 14,
+                          "line": 107
+                        },
+                        "snippet": "   at ../src/board.ts:107\n\n  105 |   await item.waitFor({ state: \"visible\", timeout: 15_000 });\n  106 |   await item.click();\n> 107 |   await page.waitForURL(new RegExp(`/${escapeRegExp(company.issuePrefix)}/dashboard`, \"i\"), {\n      |              ^\n  108 |     timeout: 45_000,\n  109 |   });\n  110 | }"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/board.ts",
+                            "column": 14,
+                            "line": 107
+                          },
+                          "message": "TimeoutError: page.waitForURL: Timeout 45000ms exceeded.\n=========================== logs ===========================\nwaiting for navigation until \"load\"\n============================================================\n\n   at ../src/board.ts:107\n\n  105 |   await item.waitFor({ state: \"visible\", timeout: 15_000 });\n  106 |   await item.click();\n> 107 |   await page.waitForURL(new RegExp(`/${escapeRegExp(company.issuePrefix)}/dashboard`, \"i\"), {\n      |              ^\n  108 |     timeout: 45_000,\n  109 |   });\n  110 | }\n    at switchCompany (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/board.ts:107:14)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-01-login.spec.ts:15:5"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-09-29T04:37:41.709Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-01-login-P0-1-login-→-o-148a9-nd-reaches-a-live-dashboard-chromium-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-01-login-P0-1-login-→-o-148a9-nd-reaches-a-live-dashboard-chromium-retry1/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-01-login-P0-1-login-→-o-148a9-nd-reaches-a-live-dashboard-chromium-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-01-login-P0-1-login-→-o-148a9-nd-reaches-a-live-dashboard-chromium-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/board.ts",
+                        "column": 14,
+                        "line": 107
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "4af9c2d1af471e150fdf-a1a47cded5473c481387",
+              "file": "p0-01-login.spec.ts",
+              "line": 5,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "p0-02-project.spec.ts",
+      "file": "p0-02-project.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-2 project — create with a requirement document",
+          "file": "p0-02-project.spec.ts",
+          "line": 7,
+          "column": 6,
+          "specs": [
+            {
+              "title": "uploads a docx, auto-recognizes the name, and the project shows docs + description",
+              "ok": false,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 30203,
+                      "error": {
+                        "message": "TimeoutError: locator.click: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Add Project/ }).first()\u001b[22m\n",
+                        "stack": "TimeoutError: locator.click: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Add Project/ }).first()\u001b[22m\n\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-02-project.spec.ts:13:69",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-02-project.spec.ts",
+                          "column": 69,
+                          "line": 13
+                        },
+                        "snippet": "  11 |\n  12 |     await gotoBoard(page, env, `/${companyPrefix}/projects`);\n> 13 |     await page.getByRole(\"button\", { name: /Add Project/ }).first().click();\n     |                                                                     ^\n  14 |     const dialogTitle = page.getByRole(\"heading\", { name: /Create Project/ });\n  15 |     await expect(dialogTitle).toBeVisible();\n  16 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-02-project.spec.ts",
+                            "column": 69,
+                            "line": 13
+                          },
+                          "message": "TimeoutError: locator.click: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Add Project/ }).first()\u001b[22m\n\n\n  11 |\n  12 |     await gotoBoard(page, env, `/${companyPrefix}/projects`);\n> 13 |     await page.getByRole(\"button\", { name: /Add Project/ }).first().click();\n     |                                                                     ^\n  14 |     const dialogTitle = page.getByRole(\"heading\", { name: /Create Project/ });\n  15 |     await expect(dialogTitle).toBeVisible();\n  16 |\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-02-project.spec.ts:13:69"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-29T04:38:33.765Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-02-project-P0-2-project-54f4d-ject-shows-docs-description-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-02-project-P0-2-project-54f4d-ject-shows-docs-description-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-02-project.spec.ts",
+                        "column": 69,
+                        "line": 13
+                      }
+                    },
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 30770,
+                      "error": {
+                        "message": "TimeoutError: locator.click: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Add Project/ }).first()\u001b[22m\n",
+                        "stack": "TimeoutError: locator.click: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Add Project/ }).first()\u001b[22m\n\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-02-project.spec.ts:13:69",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-02-project.spec.ts",
+                          "column": 69,
+                          "line": 13
+                        },
+                        "snippet": "  11 |\n  12 |     await gotoBoard(page, env, `/${companyPrefix}/projects`);\n> 13 |     await page.getByRole(\"button\", { name: /Add Project/ }).first().click();\n     |                                                                     ^\n  14 |     const dialogTitle = page.getByRole(\"heading\", { name: /Create Project/ });\n  15 |     await expect(dialogTitle).toBeVisible();\n  16 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-02-project.spec.ts",
+                            "column": 69,
+                            "line": 13
+                          },
+                          "message": "TimeoutError: locator.click: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Add Project/ }).first()\u001b[22m\n\n\n  11 |\n  12 |     await gotoBoard(page, env, `/${companyPrefix}/projects`);\n> 13 |     await page.getByRole(\"button\", { name: /Add Project/ }).first().click();\n     |                                                                     ^\n  14 |     const dialogTitle = page.getByRole(\"heading\", { name: /Create Project/ });\n  15 |     await expect(dialogTitle).toBeVisible();\n  16 |\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-02-project.spec.ts:13:69"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-09-29T04:39:04.353Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-02-project-P0-2-project-54f4d-ject-shows-docs-description-chromium-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-02-project-P0-2-project-54f4d-ject-shows-docs-description-chromium-retry1/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-02-project-P0-2-project-54f4d-ject-shows-docs-description-chromium-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-02-project-P0-2-project-54f4d-ject-shows-docs-description-chromium-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-02-project.spec.ts",
+                        "column": 69,
+                        "line": 13
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "90181fef0d65f0a4f0fe-42f8b78537a625669e8e",
+              "file": "p0-02-project.spec.ts",
+              "line": 8,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "p0-03-task.spec.ts",
+      "file": "p0-03-task.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-3 task — create in a project, assign to an agent",
+          "file": "p0-03-task.spec.ts",
+          "line": 8,
+          "column": 6,
+          "specs": [
+            {
+              "title": "creates a task with the project preselected, assigns an agent, and reads the assignee back",
+              "ok": false,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 4,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 266,
+                      "error": {
+                        "message": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/projects failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}",
+                        "stack": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/projects failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}\n    at ApiClient.request (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts:59:13)\n    at DataFactory.createProject (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/factory.ts:77:21)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-03-task.spec.ts:14:21",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                          "column": 13,
+                          "line": 59
+                        },
+                        "snippet": "   at ../src/api.ts:59\n\n  57 |     if (!result.ok) {\n  58 |       const snippet = JSON.stringify(result.body)?.slice(0, 400) ?? \"\";\n> 59 |       throw new ApiError(\n     |             ^\n  60 |         `${method} ${url} failed with ${result.status}: ${snippet}`,\n  61 |         result.status,\n  62 |         method,"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                            "column": 13,
+                            "line": 59
+                          },
+                          "message": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/projects failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}\n\n   at ../src/api.ts:59\n\n  57 |     if (!result.ok) {\n  58 |       const snippet = JSON.stringify(result.body)?.slice(0, 400) ?? \"\";\n> 59 |       throw new ApiError(\n     |             ^\n  60 |         `${method} ${url} failed with ${result.status}: ${snippet}`,\n  61 |         result.status,\n  62 |         method,\n    at ApiClient.request (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts:59:13)\n    at DataFactory.createProject (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/factory.ts:77:21)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-03-task.spec.ts:14:21"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-29T04:39:35.549Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-03-task-P0-3-task-—-cre-269a2-and-reads-the-assignee-back-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-03-task-P0-3-task-—-cre-269a2-and-reads-the-assignee-back-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                        "column": 13,
+                        "line": 59
+                      }
+                    },
+                    {
+                      "workerIndex": 5,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 311,
+                      "error": {
+                        "message": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/projects failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}",
+                        "stack": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/projects failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}\n    at ApiClient.request (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts:59:13)\n    at DataFactory.createProject (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/factory.ts:77:21)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-03-task.spec.ts:14:21",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                          "column": 13,
+                          "line": 59
+                        },
+                        "snippet": "   at ../src/api.ts:59\n\n  57 |     if (!result.ok) {\n  58 |       const snippet = JSON.stringify(result.body)?.slice(0, 400) ?? \"\";\n> 59 |       throw new ApiError(\n     |             ^\n  60 |         `${method} ${url} failed with ${result.status}: ${snippet}`,\n  61 |         result.status,\n  62 |         method,"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                            "column": 13,
+                            "line": 59
+                          },
+                          "message": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/projects failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}\n\n   at ../src/api.ts:59\n\n  57 |     if (!result.ok) {\n  58 |       const snippet = JSON.stringify(result.body)?.slice(0, 400) ?? \"\";\n> 59 |       throw new ApiError(\n     |             ^\n  60 |         `${method} ${url} failed with ${result.status}: ${snippet}`,\n  61 |         result.status,\n  62 |         method,\n    at ApiClient.request (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts:59:13)\n    at DataFactory.createProject (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/factory.ts:77:21)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-03-task.spec.ts:14:21"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-09-29T04:39:36.153Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-03-task-P0-3-task-—-cre-269a2-and-reads-the-assignee-back-chromium-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-03-task-P0-3-task-—-cre-269a2-and-reads-the-assignee-back-chromium-retry1/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-03-task-P0-3-task-—-cre-269a2-and-reads-the-assignee-back-chromium-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-03-task-P0-3-task-—-cre-269a2-and-reads-the-assignee-back-chromium-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                        "column": 13,
+                        "line": 59
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "d0a984036a0fd89dadb0-012239c65b8fefebe308",
+              "file": "p0-03-task.spec.ts",
+              "line": 9,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "p0-04-approval.spec.ts",
+      "file": "p0-04-approval.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-4 approval — find a pending item, approve it",
+          "file": "p0-04-approval.spec.ts",
+          "line": 18,
+          "column": 6,
+          "specs": [
+            {
+              "title": "approves a pending approval and both the new status and the audit trail are readable",
+              "ok": false,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 6,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 259,
+                      "error": {
+                        "message": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/approvals failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}",
+                        "stack": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/approvals failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}\n    at ApiClient.request (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts:59:13)\n    at DataFactory.createApproval (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/factory.ts:167:22)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-04-approval.spec.ts:24:22",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                          "column": 13,
+                          "line": 59
+                        },
+                        "snippet": "   at ../src/api.ts:59\n\n  57 |     if (!result.ok) {\n  58 |       const snippet = JSON.stringify(result.body)?.slice(0, 400) ?? \"\";\n> 59 |       throw new ApiError(\n     |             ^\n  60 |         `${method} ${url} failed with ${result.status}: ${snippet}`,\n  61 |         result.status,\n  62 |         method,"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                            "column": 13,
+                            "line": 59
+                          },
+                          "message": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/approvals failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}\n\n   at ../src/api.ts:59\n\n  57 |     if (!result.ok) {\n  58 |       const snippet = JSON.stringify(result.body)?.slice(0, 400) ?? \"\";\n> 59 |       throw new ApiError(\n     |             ^\n  60 |         `${method} ${url} failed with ${result.status}: ${snippet}`,\n  61 |         result.status,\n  62 |         method,\n    at ApiClient.request (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts:59:13)\n    at DataFactory.createApproval (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/factory.ts:167:22)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-04-approval.spec.ts:24:22"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-29T04:39:36.816Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-04-approval-P0-4-approv-5bda3-he-audit-trail-are-readable-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-04-approval-P0-4-approv-5bda3-he-audit-trail-are-readable-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                        "column": 13,
+                        "line": 59
+                      }
+                    },
+                    {
+                      "workerIndex": 7,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 312,
+                      "error": {
+                        "message": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/approvals failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}",
+                        "stack": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/approvals failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}\n    at ApiClient.request (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts:59:13)\n    at DataFactory.createApproval (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/factory.ts:167:22)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-04-approval.spec.ts:24:22",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                          "column": 13,
+                          "line": 59
+                        },
+                        "snippet": "   at ../src/api.ts:59\n\n  57 |     if (!result.ok) {\n  58 |       const snippet = JSON.stringify(result.body)?.slice(0, 400) ?? \"\";\n> 59 |       throw new ApiError(\n     |             ^\n  60 |         `${method} ${url} failed with ${result.status}: ${snippet}`,\n  61 |         result.status,\n  62 |         method,"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                            "column": 13,
+                            "line": 59
+                          },
+                          "message": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/approvals failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}\n\n   at ../src/api.ts:59\n\n  57 |     if (!result.ok) {\n  58 |       const snippet = JSON.stringify(result.body)?.slice(0, 400) ?? \"\";\n> 59 |       throw new ApiError(\n     |             ^\n  60 |         `${method} ${url} failed with ${result.status}: ${snippet}`,\n  61 |         result.status,\n  62 |         method,\n    at ApiClient.request (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts:59:13)\n    at DataFactory.createApproval (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/factory.ts:167:22)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-04-approval.spec.ts:24:22"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-09-29T04:39:37.416Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-04-approval-P0-4-approv-5bda3-he-audit-trail-are-readable-chromium-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-04-approval-P0-4-approv-5bda3-he-audit-trail-are-readable-chromium-retry1/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-04-approval-P0-4-approv-5bda3-he-audit-trail-are-readable-chromium-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-04-approval-P0-4-approv-5bda3-he-audit-trail-are-readable-chromium-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                        "column": 13,
+                        "line": 59
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "a5972c96c45aca2b68cd-a2b538280ce32f6aaad5",
+              "file": "p0-04-approval.spec.ts",
+              "line": 19,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "p0-05-artifact.spec.ts",
+      "file": "p0-05-artifact.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-5 artifact — upload an attachment and open it",
+          "file": "p0-05-artifact.spec.ts",
+          "line": 8,
+          "column": 6,
+          "specs": [
+            {
+              "title": "uploads an html artifact, lists it, and it renders (not raw source)",
+              "ok": false,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 8,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 256,
+                      "error": {
+                        "message": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/issues failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}",
+                        "stack": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/issues failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}\n    at ApiClient.request (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts:59:13)\n    at DataFactory.createTask (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/factory.ts:104:19)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts:13:19",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                          "column": 13,
+                          "line": 59
+                        },
+                        "snippet": "   at ../src/api.ts:59\n\n  57 |     if (!result.ok) {\n  58 |       const snippet = JSON.stringify(result.body)?.slice(0, 400) ?? \"\";\n> 59 |       throw new ApiError(\n     |             ^\n  60 |         `${method} ${url} failed with ${result.status}: ${snippet}`,\n  61 |         result.status,\n  62 |         method,"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                            "column": 13,
+                            "line": 59
+                          },
+                          "message": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/issues failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}\n\n   at ../src/api.ts:59\n\n  57 |     if (!result.ok) {\n  58 |       const snippet = JSON.stringify(result.body)?.slice(0, 400) ?? \"\";\n> 59 |       throw new ApiError(\n     |             ^\n  60 |         `${method} ${url} failed with ${result.status}: ${snippet}`,\n  61 |         result.status,\n  62 |         method,\n    at ApiClient.request (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts:59:13)\n    at DataFactory.createTask (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/factory.ts:104:19)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts:13:19"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-29T04:39:38.092Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                        "column": 13,
+                        "line": 59
+                      }
+                    },
+                    {
+                      "workerIndex": 9,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 316,
+                      "error": {
+                        "message": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/issues failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}",
+                        "stack": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/issues failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}\n    at ApiClient.request (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts:59:13)\n    at DataFactory.createTask (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/factory.ts:104:19)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts:13:19",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                          "column": 13,
+                          "line": 59
+                        },
+                        "snippet": "   at ../src/api.ts:59\n\n  57 |     if (!result.ok) {\n  58 |       const snippet = JSON.stringify(result.body)?.slice(0, 400) ?? \"\";\n> 59 |       throw new ApiError(\n     |             ^\n  60 |         `${method} ${url} failed with ${result.status}: ${snippet}`,\n  61 |         result.status,\n  62 |         method,"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                            "column": 13,
+                            "line": 59
+                          },
+                          "message": "ApiError: POST /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/issues failed with 403: {\"error\":\"Board mutation requires trusted browser origin\"}\n\n   at ../src/api.ts:59\n\n  57 |     if (!result.ok) {\n  58 |       const snippet = JSON.stringify(result.body)?.slice(0, 400) ?? \"\";\n> 59 |       throw new ApiError(\n     |             ^\n  60 |         `${method} ${url} failed with ${result.status}: ${snippet}`,\n  61 |         result.status,\n  62 |         method,\n    at ApiClient.request (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts:59:13)\n    at DataFactory.createTask (/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/factory.ts:104:19)\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts:13:19"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-09-29T04:39:38.686Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium-retry1/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043650-99p/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/api.ts",
+                        "column": 13,
+                        "line": 59
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "adfea908e6a2e14a02ef-09c371e4de33cae730b2",
+              "file": "p0-05-artifact.spec.ts",
+              "line": 9,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-29T04:36:50.353Z",
+    "duration": 169048.714,
+    "expected": 0,
+    "skipped": 0,
+    "unexpected": 5,
+    "flaky": 0
+  }
+}

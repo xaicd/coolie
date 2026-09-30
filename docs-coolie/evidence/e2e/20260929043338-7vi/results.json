@@ -1,0 +1,146 @@
+{
+  "config": {
+    "argv": [
+      "/opt/homebrew/Cellar/node@24/24.20.0/bin/node",
+      "/Users/mac/workspace/xaicd/coolie/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "/Users/mac/workspace/xaicd/coolie/scripts/e2e/playwright.config.ts",
+      "--grep",
+      "@p0",
+      "tests/p0-01-login.spec.ts"
+    ],
+    "configFile": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/playwright.config.ts",
+    "rootDir": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/auth.setup.ts",
+    "globalTeardown": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043338-7vi/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "open": "never",
+          "outputFolder": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043338-7vi/html-report"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929043338-7vi/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "p0-01-login.spec.ts",
+      "file": "p0-01-login.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-1 login → organization → dashboard",
+          "file": "p0-01-login.spec.ts",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "signs in, selects an organization, and reaches a live dashboard",
+              "ok": true,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5743,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"prod-smoke-1789989524 (PROA)\",\"companies\":3,\"agents\":5,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-29T04:34:46.292Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4af9c2d1af471e150fdf-a1a47cded5473c481387",
+              "file": "p0-01-login.spec.ts",
+              "line": 5,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-29T04:33:39.090Z",
+    "duration": 74054.587,
+    "expected": 1,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 0
+  }
+}

@@ -1,0 +1,282 @@
+{
+  "config": {
+    "argv": [
+      "/opt/homebrew/Cellar/node@24/24.20.0/bin/node",
+      "/Users/mac/workspace/xaicd/coolie/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "/Users/mac/workspace/xaicd/coolie/scripts/e2e/playwright.config.ts",
+      "--grep",
+      "@p0",
+      "tests/p0-03-task.spec.ts",
+      "tests/p0-05-artifact.spec.ts"
+    ],
+    "configFile": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/playwright.config.ts",
+    "rootDir": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/auth.setup.ts",
+    "globalTeardown": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929045121-fzo/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "open": "never",
+          "outputFolder": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929045121-fzo/html-report"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929045121-fzo/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "p0-03-task.spec.ts",
+      "file": "p0-03-task.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-3 task — create in a project, assign to an agent",
+          "file": "p0-03-task.spec.ts",
+          "line": 8,
+          "column": 6,
+          "specs": [
+            {
+              "title": "creates a task with the project preselected, assigns an agent, and reads the assignee back",
+              "ok": true,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 8401,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-29T04:51:22.352Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "d0a984036a0fd89dadb0-012239c65b8fefebe308",
+              "file": "p0-03-task.spec.ts",
+              "line": 9,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "p0-05-artifact.spec.ts",
+      "file": "p0-05-artifact.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-5 artifact — upload an attachment and open it",
+          "file": "p0-05-artifact.spec.ts",
+          "line": 8,
+          "column": 6,
+          "specs": [
+            {
+              "title": "uploads an html artifact, lists it, and it renders (not raw source)",
+              "ok": true,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [
+                    {
+                      "type": "artifact",
+                      "description": "content"
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 5753,
+                      "error": {
+                        "message": "Error: uploaded attachment should be readable via API\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mundefined\u001b[39m",
+                        "stack": "Error: uploaded attachment should be readable via API\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mundefined\u001b[39m\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts:35:74",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts",
+                          "column": 74,
+                          "line": 35
+                        },
+                        "snippet": "  33 |     const attachments = await factory.listAttachments(issue.id);\n  34 |     const attachment = attachments.find((a) => (a.originalFilename ?? \"\") === ARTIFACT_FILENAME);\n> 35 |     expect(attachment, \"uploaded attachment should be readable via API\").toBeTruthy();\n     |                                                                          ^\n  36 |     expect(attachment!.contentType ?? \"\").toContain(\"text/html\");\n  37 |     expect(attachment!.contentPath ?? \"\").toBeTruthy();\n  38 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts",
+                            "column": 74,
+                            "line": 35
+                          },
+                          "message": "Error: uploaded attachment should be readable via API\n\n\u001b[2mexpect(\u001b[22m\u001b[31mreceived\u001b[39m\u001b[2m).\u001b[22mtoBeTruthy\u001b[2m()\u001b[22m\n\nReceived: \u001b[31mundefined\u001b[39m\n\n  33 |     const attachments = await factory.listAttachments(issue.id);\n  34 |     const attachment = attachments.find((a) => (a.originalFilename ?? \"\") === ARTIFACT_FILENAME);\n> 35 |     expect(attachment, \"uploaded attachment should be readable via API\").toBeTruthy();\n     |                                                                          ^\n  36 |     expect(attachment!.contentType ?? \"\").toContain(\"text/html\");\n  37 |     expect(attachment!.contentPath ?? \"\").toBeTruthy();\n  38 |\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts:35:74"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-29T04:51:31.015Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929045121-fzo/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929045121-fzo/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts",
+                        "column": 74,
+                        "line": 35
+                      }
+                    },
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 6946,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-09-29T04:51:37.048Z",
+                      "annotations": [
+                        {
+                          "type": "artifact",
+                          "description": "content"
+                        }
+                      ],
+                      "attachments": [
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929045121-fzo/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium-retry1/video-1.webm"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929045121-fzo/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium-retry1/video.webm"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929045121-fzo/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium-retry1/trace.zip"
+                        }
+                      ]
+                    }
+                  ],
+                  "status": "flaky"
+                }
+              ],
+              "id": "adfea908e6a2e14a02ef-09c371e4de33cae730b2",
+              "file": "p0-05-artifact.spec.ts",
+              "line": 9,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-29T04:51:21.893Z",
+    "duration": 22696.179,
+    "expected": 1,
+    "skipped": 0,
+    "unexpected": 0,
+    "flaky": 1
+  }
+}

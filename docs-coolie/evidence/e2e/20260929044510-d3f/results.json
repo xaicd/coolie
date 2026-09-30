@@ -1,0 +1,588 @@
+{
+  "config": {
+    "argv": [
+      "/opt/homebrew/Cellar/node@24/24.20.0/bin/node",
+      "/Users/mac/workspace/xaicd/coolie/node_modules/@playwright/test/cli.js",
+      "test",
+      "--config",
+      "/Users/mac/workspace/xaicd/coolie/scripts/e2e/playwright.config.ts",
+      "--grep",
+      "@p0"
+    ],
+    "configFile": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/playwright.config.ts",
+    "rootDir": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests",
+    "failOnFlakyTests": false,
+    "forbidOnly": false,
+    "fullyParallel": false,
+    "globalSetup": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/auth.setup.ts",
+    "globalTeardown": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/src/global-teardown.ts",
+    "globalTimeout": 0,
+    "grep": {},
+    "grepInvert": null,
+    "maxFailures": 0,
+    "metadata": {
+      "actualWorkers": 1
+    },
+    "preserveOutput": "always",
+    "projects": [
+      {
+        "outputDir": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/artifacts",
+        "repeatEach": 1,
+        "retries": 1,
+        "metadata": {
+          "actualWorkers": 1
+        },
+        "id": "chromium",
+        "name": "chromium",
+        "testDir": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests",
+        "testIgnore": [],
+        "testMatch": [
+          "**/*.spec.ts"
+        ],
+        "timeout": 120000
+      }
+    ],
+    "quiet": false,
+    "reporter": [
+      [
+        "list",
+        null
+      ],
+      [
+        "html",
+        {
+          "open": "never",
+          "outputFolder": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/html-report"
+        }
+      ],
+      [
+        "json",
+        {
+          "outputFile": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/results.json"
+        }
+      ]
+    ],
+    "reportSlowTests": {
+      "max": 5,
+      "threshold": 300000
+    },
+    "shard": null,
+    "tags": [],
+    "updateSnapshots": "missing",
+    "updateSourceMethod": "patch",
+    "version": "1.62.1",
+    "workers": 1,
+    "webServer": null
+  },
+  "suites": [
+    {
+      "title": "p0-01-login.spec.ts",
+      "file": "p0-01-login.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-1 login → organization → dashboard",
+          "file": "p0-01-login.spec.ts",
+          "line": 4,
+          "column": 6,
+          "specs": [
+            {
+              "title": "signs in, selects an organization, and reaches a live dashboard",
+              "ok": true,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5972,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-29T04:45:11.143Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "4af9c2d1af471e150fdf-a1a47cded5473c481387",
+              "file": "p0-01-login.spec.ts",
+              "line": 5,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "p0-02-project.spec.ts",
+      "file": "p0-02-project.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-2 project — create with a requirement document",
+          "file": "p0-02-project.spec.ts",
+          "line": 7,
+          "column": 6,
+          "specs": [
+            {
+              "title": "uploads a docx, auto-recognizes the name, and the project shows docs + description",
+              "ok": true,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [
+                    {
+                      "type": "auto-recognized-name",
+                      "description": "白鹭巡检平台需求说明书"
+                    },
+                    {
+                      "type": "known-gap",
+                      "description": "No UI lists a project's landed requirement documents; document visibility is API-verified."
+                    }
+                  ],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 9984,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-29T04:45:17.208Z",
+                      "annotations": [
+                        {
+                          "type": "auto-recognized-name",
+                          "description": "白鹭巡检平台需求说明书"
+                        },
+                        {
+                          "type": "known-gap",
+                          "description": "No UI lists a project's landed requirement documents; document visibility is API-verified."
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "90181fef0d65f0a4f0fe-42f8b78537a625669e8e",
+              "file": "p0-02-project.spec.ts",
+              "line": 8,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "p0-03-task.spec.ts",
+      "file": "p0-03-task.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-3 task — create in a project, assign to an agent",
+          "file": "p0-03-task.spec.ts",
+          "line": 8,
+          "column": 6,
+          "specs": [
+            {
+              "title": "creates a task with the project preselected, assigns an agent, and reads the assignee back",
+              "ok": false,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 0,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 31433,
+                      "error": {
+                        "message": "TimeoutError: locator.click: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /wave137-e2e-510d3f-task-proj-01 任务项目/ }).first()\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm touch-manipulation bg-accent\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m  - element was detached from the DOM, retrying\u001b[22m\n",
+                        "stack": "TimeoutError: locator.click: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /wave137-e2e-510d3f-task-proj-01 任务项目/ }).first()\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm touch-manipulation bg-accent\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m  - element was detached from the DOM, retrying\u001b[22m\n\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-03-task.spec.ts:28:96",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-03-task.spec.ts",
+                          "column": 96,
+                          "line": 28
+                        },
+                        "snippet": "  26 |       await page.getByRole(\"button\", { name: /^Project$/ }).first().click();\n  27 |       await page.getByPlaceholder(\"Search projects...\").fill(project.name);\n> 28 |       await page.getByRole(\"button\", { name: new RegExp(escapeRegExp(project.name)) }).first().click();\n     |                                                                                                ^\n  29 |     }\n  30 |     await expect(projectTrigger.first()).toBeVisible();\n  31 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-03-task.spec.ts",
+                            "column": 96,
+                            "line": 28
+                          },
+                          "message": "TimeoutError: locator.click: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /wave137-e2e-510d3f-task-proj-01 任务项目/ }).first()\u001b[22m\n\u001b[2m    - locator resolved to <button type=\"button\" class=\"flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm touch-manipulation bg-accent\">…</button>\u001b[22m\n\u001b[2m  - attempting click action\u001b[22m\n\u001b[2m    - waiting for element to be visible, enabled and stable\u001b[22m\n\u001b[2m  - element was detached from the DOM, retrying\u001b[22m\n\n\n  26 |       await page.getByRole(\"button\", { name: /^Project$/ }).first().click();\n  27 |       await page.getByPlaceholder(\"Search projects...\").fill(project.name);\n> 28 |       await page.getByRole(\"button\", { name: new RegExp(escapeRegExp(project.name)) }).first().click();\n     |                                                                                                ^\n  29 |     }\n  30 |     await expect(projectTrigger.first()).toBeVisible();\n  31 |\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-03-task.spec.ts:28:96"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-29T04:45:27.203Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/artifacts/p0-03-task-P0-3-task-—-cre-269a2-and-reads-the-assignee-back-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/artifacts/p0-03-task-P0-3-task-—-cre-269a2-and-reads-the-assignee-back-chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-03-task.spec.ts",
+                        "column": 96,
+                        "line": 28
+                      }
+                    },
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 31119,
+                      "error": {
+                        "message": "TimeoutError: locator.click: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /wave137-e2e-510d3f-task-proj-01 任务项目/ }).first()\u001b[22m\n",
+                        "stack": "TimeoutError: locator.click: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /wave137-e2e-510d3f-task-proj-01 任务项目/ }).first()\u001b[22m\n\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-03-task.spec.ts:28:96",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-03-task.spec.ts",
+                          "column": 96,
+                          "line": 28
+                        },
+                        "snippet": "  26 |       await page.getByRole(\"button\", { name: /^Project$/ }).first().click();\n  27 |       await page.getByPlaceholder(\"Search projects...\").fill(project.name);\n> 28 |       await page.getByRole(\"button\", { name: new RegExp(escapeRegExp(project.name)) }).first().click();\n     |                                                                                                ^\n  29 |     }\n  30 |     await expect(projectTrigger.first()).toBeVisible();\n  31 |"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-03-task.spec.ts",
+                            "column": 96,
+                            "line": 28
+                          },
+                          "message": "TimeoutError: locator.click: Timeout 25000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /wave137-e2e-510d3f-task-proj-01 任务项目/ }).first()\u001b[22m\n\n\n  26 |       await page.getByRole(\"button\", { name: /^Project$/ }).first().click();\n  27 |       await page.getByPlaceholder(\"Search projects...\").fill(project.name);\n> 28 |       await page.getByRole(\"button\", { name: new RegExp(escapeRegExp(project.name)) }).first().click();\n     |                                                                                                ^\n  29 |     }\n  30 |     await expect(projectTrigger.first()).toBeVisible();\n  31 |\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-03-task.spec.ts:28:96"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-09-29T04:45:58.926Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/artifacts/p0-03-task-P0-3-task-—-cre-269a2-and-reads-the-assignee-back-chromium-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/artifacts/p0-03-task-P0-3-task-—-cre-269a2-and-reads-the-assignee-back-chromium-retry1/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/artifacts/p0-03-task-P0-3-task-—-cre-269a2-and-reads-the-assignee-back-chromium-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/artifacts/p0-03-task-P0-3-task-—-cre-269a2-and-reads-the-assignee-back-chromium-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-03-task.spec.ts",
+                        "column": 96,
+                        "line": 28
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "d0a984036a0fd89dadb0-012239c65b8fefebe308",
+              "file": "p0-03-task.spec.ts",
+              "line": 9,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "p0-04-approval.spec.ts",
+      "file": "p0-04-approval.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-4 approval — find a pending item, approve it",
+          "file": "p0-04-approval.spec.ts",
+          "line": 18,
+          "column": 6,
+          "specs": [
+            {
+              "title": "approves a pending approval and both the new status and the audit trail are readable",
+              "ok": true,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "passed",
+                      "duration": 5947,
+                      "errors": [],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        },
+                        {
+                          "text": "[e2e] approvals are append-only (no delete API); left in place {\"count\":1,\"ids\":[\"00020cca-54af-4b67-a9d7-83c7f88d7a02\"]}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-29T04:46:30.502Z",
+                      "annotations": [],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "expected"
+                }
+              ],
+              "id": "a5972c96c45aca2b68cd-a2b538280ce32f6aaad5",
+              "file": "p0-04-approval.spec.ts",
+              "line": 19,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "p0-05-artifact.spec.ts",
+      "file": "p0-05-artifact.spec.ts",
+      "column": 0,
+      "line": 0,
+      "specs": [],
+      "suites": [
+        {
+          "title": "P0-5 artifact — upload an attachment and open it",
+          "file": "p0-05-artifact.spec.ts",
+          "line": 8,
+          "column": 6,
+          "specs": [
+            {
+              "title": "uploads an html artifact, lists it, and it renders (not raw source)",
+              "ok": false,
+              "tags": [
+                "p0"
+              ],
+              "tests": [
+                {
+                  "timeout": 120000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
+                  "projectId": "chromium",
+                  "projectName": "chromium",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 36264,
+                      "error": {
+                        "message": "TimeoutError: locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Upload attachment/ }).first() to be visible\u001b[22m\n",
+                        "stack": "TimeoutError: locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Upload attachment/ }).first() to be visible\u001b[22m\n\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts:19:24",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts",
+                          "column": 24,
+                          "line": 19
+                        },
+                        "snippet": "  17 |     await gotoBoard(page, env, `/${companyPrefix}/issues/${issue.id}`);\n  18 |     const uploadButton = page.getByRole(\"button\", { name: /Upload attachment/ }).first();\n> 19 |     await uploadButton.waitFor({ state: \"visible\", timeout: 30_000 });\n     |                        ^\n  20 |     const [chooser] = await Promise.all([\n  21 |       page.waitForEvent(\"filechooser\"),\n  22 |       uploadButton.click(),"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts",
+                            "column": 24,
+                            "line": 19
+                          },
+                          "message": "TimeoutError: locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Upload attachment/ }).first() to be visible\u001b[22m\n\n\n  17 |     await gotoBoard(page, env, `/${companyPrefix}/issues/${issue.id}`);\n  18 |     const uploadButton = page.getByRole(\"button\", { name: /Upload attachment/ }).first();\n> 19 |     await uploadButton.waitFor({ state: \"visible\", timeout: 30_000 });\n     |                        ^\n  20 |     const [chooser] = await Promise.all([\n  21 |       page.waitForEvent(\"filechooser\"),\n  22 |       uploadButton.click(),\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts:19:24"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-09-29T04:46:36.555Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium/error-context.md"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts",
+                        "column": 24,
+                        "line": 19
+                      }
+                    },
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 0,
+                      "status": "failed",
+                      "duration": 35973,
+                      "error": {
+                        "message": "TimeoutError: locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Upload attachment/ }).first() to be visible\u001b[22m\n",
+                        "stack": "TimeoutError: locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Upload attachment/ }).first() to be visible\u001b[22m\n\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts:19:24",
+                        "location": {
+                          "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts",
+                          "column": 24,
+                          "line": 19
+                        },
+                        "snippet": "  17 |     await gotoBoard(page, env, `/${companyPrefix}/issues/${issue.id}`);\n  18 |     const uploadButton = page.getByRole(\"button\", { name: /Upload attachment/ }).first();\n> 19 |     await uploadButton.waitFor({ state: \"visible\", timeout: 30_000 });\n     |                        ^\n  20 |     const [chooser] = await Promise.all([\n  21 |       page.waitForEvent(\"filechooser\"),\n  22 |       uploadButton.click(),"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts",
+                            "column": 24,
+                            "line": 19
+                          },
+                          "message": "TimeoutError: locator.waitFor: Timeout 30000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('button', { name: /Upload attachment/ }).first() to be visible\u001b[22m\n\n\n  17 |     await gotoBoard(page, env, `/${companyPrefix}/issues/${issue.id}`);\n  18 |     const uploadButton = page.getByRole(\"button\", { name: /Upload attachment/ }).first();\n> 19 |     await uploadButton.waitFor({ state: \"visible\", timeout: 30_000 });\n     |                        ^\n  20 |     const [chooser] = await Promise.all([\n  21 |       page.waitForEvent(\"filechooser\"),\n  22 |       uploadButton.click(),\n    at /Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts:19:24"
+                        }
+                      ],
+                      "stdout": [
+                        {
+                          "text": "[e2e] board resolved {\"company\":\"xrobinai (XROA)\",\"companies\":3,\"agents\":6,\"agent\":\"core-swe-agent\"}\n"
+                        }
+                      ],
+                      "stderr": [],
+                      "retry": 1,
+                      "startTime": "2026-09-29T04:47:13.088Z",
+                      "annotations": [],
+                      "attachments": [
+                        {
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium-retry1/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium-retry1/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium-retry1/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/e2e/20260929044510-d3f/artifacts/p0-05-artifact-P0-5-artifa-3f98d--it-renders-not-raw-source--chromium-retry1/trace.zip"
+                        }
+                      ],
+                      "errorLocation": {
+                        "file": "/Users/mac/workspace/xaicd/coolie/scripts/e2e/tests/p0-05-artifact.spec.ts",
+                        "column": 24,
+                        "line": 19
+                      }
+                    }
+                  ],
+                  "status": "unexpected"
+                }
+              ],
+              "id": "adfea908e6a2e14a02ef-09c371e4de33cae730b2",
+              "file": "p0-05-artifact.spec.ts",
+              "line": 9,
+              "column": 3
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "errors": [],
+  "stats": {
+    "startTime": "2026-09-29T04:45:10.729Z",
+    "duration": 158803.9,
+    "expected": 3,
+    "skipped": 0,
+    "unexpected": 2,
+    "flaky": 0
+  }
+}

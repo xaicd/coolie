@@ -120,3 +120,15 @@ screenshots/
 # capture artifacts (binary screenshots, .gitkeep only) never enter commits.
 clients/*/replays/evidence/
 **/replays/evidence/
+
+# P0 e2e capture artifacts — local only, same fork policy as above. A Playwright
+# run emits megabytes of binary per run (`.png` / `.webm` / `trace.zip`) plus an
+# `html-report` bundle; none of it is source, and it goes stale the moment a UI
+# moves. The *harness* (`scripts/e2e/**`) and the *text* records
+# (`SUMMARY.md` / `results.json` / QA reports) are what gets committed; the raw
+# captures stay on the machine that ran them.
+docs-coolie/evidence/**/*.png
+docs-coolie/evidence/**/*.webm
+docs-coolie/evidence/**/*.zip
+docs-coolie/evidence/e2e/**/html-report/
+docs-coolie/evidence/e2e/**/artifacts/

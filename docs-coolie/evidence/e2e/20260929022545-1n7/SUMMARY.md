@@ -1,0 +1,23 @@
+# E2E run 20260929022545-1n7
+
+- Base URL: `(default)`
+- Started: 2026-09-29T02:25:45.797Z · duration 0.5s
+- Exit code: 0
+- Playwright stats: 0 expected · 0 unexpected · 0 flaky · 5 skipped
+
+## Cases
+
+- [PASS] p0-01-login.spec.ts › P0-1 login → organization → dashboard › signs in, selects an organization, and reaches a live dashboard
+- [PASS] p0-02-project.spec.ts › P0-2 project — create with a requirement document › uploads a docx, auto-recognizes the name, and the project shows docs + description
+- [PASS] p0-03-task.spec.ts › P0-3 task — create in a project, assign to an agent › creates a task with the project preselected, assigns an agent, and reads the assignee back
+- [PASS] p0-04-approval.spec.ts › P0-4 approval — find a pending item, approve it › approves a pending approval and both the new status and the audit trail are readable
+- [PASS] p0-05-artifact.spec.ts › P0-5 artifact — upload an attachment and open it › uploads an html artifact, lists it, and it renders (not raw source)
+
+## Evidence
+
+- Traces / videos / failure screenshots: `artifacts/`
+- HTML report: `html-report/index.html`
+- Machine results: `results.json`
+- Run trail: `notes.log`
+
+> Binary capture stays local (gitignored); only this summary and the run trail are committed.

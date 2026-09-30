@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    // This package is standalone (outside the pnpm workspace) and has no local
+    // node_modules, so reuse a sibling package's @types/node the same way
+    // tests/runner-e2e/tsconfig.json does.
+    "typeRoots": ["../../cli/node_modules/@types", "../../server/node_modules/@types"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts", "fixtures/**/*.ts", "playwright.config.ts"]
+}
