@@ -1,0 +1,53 @@
+# wave179 curl probe — requireRole(role) HTTP-level 403 evidence
+# Captured: 2026-09-30 (wave179)
+# Server: local HEAD a58e6ee36.dirty on port 3191 (authenticated mode, isolation from prod 3100)
+#         local_trusted 3100 keeps the implicit board, so 403 is unreachable there;
+#         3191 is a side-by-side instance with PAPERCLIP_DEPLOYMENT_MODE=authenticated so
+#         the no-implicit-board actor model can actually deny role mismatches.
+
+## T-0. isolation server health
+```
+status: ok
+deploymentMode: authenticated
+commit: a58e6ee36085
+```
+
+## T-1. POST /api/agents/:id/keys WITHOUT credentials — expect 403
+```
+HTTP 403
+{"error":"Board access required"}
+```
+body matches the 403 message emitted by the assertBoard helper (= requireRole(board))
+
+## T-2. POST /api/agents/:id/keys with BOGUS agent token — expect 403 (not 401)
+```
+HTTP 403
+{"error":"Board access required"}
+```
+403 (not 401) is intentional: requireRole runs BEFORE agent-key verification,
+so an attacker cannot tell whether their bogus token would have been valid
+if the role check had passed. Closes a token-existence oracle.
+
+## T-3. POST /api/agents/:id/keys with REAL agent token — expect 403
+```
+HTTP 403
+{"error":"Board access required"}
+```
+Even with a valid agent token, the endpoint refuses because board-only
+operations (agent-key minting) MUST come from a board actor. requireRole(board)
+is the thin wrapper over the existing assertBoard — the route handler no longer
+needs to import the symbol, just declare the role string.
+
+## T-4. GET /api/companies with agent token — expect 403 (board-only listing)
+```
+HTTP 403
+{"error":"Board access required"}
+```
+
+## T-5. local_trusted prod port 3100 (regression baseline) — board implicit, agent key mint OK
+```
+HTTP 201
+{"id":"adcab358-29b7-4682-ab91-1d39f9104e32","name":"wave179-board-regression","scope":{"kind":"standard"},"responsibleUserId":"local-board","token":"pcp_119f21211a3dabc0397758030d274abd995c431b48e0c542","createdAt":"2026-09-30T14:43:53.293Z"}
+```
+local_trusted keeps the implicit board, so a 201 is the expected outcome. This
+is the regression baseline: the new code path did not break the happy case.

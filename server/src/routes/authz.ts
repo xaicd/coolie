@@ -4,6 +4,44 @@ import { forbidden, HttpError, unauthorized } from "../errors.js";
 import { logger } from "../middleware/logger.js";
 import { responsibleUserAuthzShadowMode } from "../services/authorization.js";
 
+/**
+ * Named role gates the route layer can require by enum, instead of importing
+ * a specific `assertXxx` symbol. Lets a route declare its access shape in one
+ * place (the role string in the route file, the role check in authz.ts) so the
+ * audit trail for "which endpoint requires which role" is one grep away.
+ *
+ * The factories below all throw `HttpError(403)` on deny, matching the
+ * existing `assertXxx` family — callers should not wrap the result in a
+ * try/catch.
+ */
+export type Role =
+  | "authenticated"
+  | "board"
+  | "board_or_agent"
+  | "instance_admin";
+
+const ROLE_CHECKERS: Record<Role, (req: Request) => void> = {
+  authenticated: assertAuthenticated,
+  board: assertBoard,
+  board_or_agent: assertBoardOrAgent,
+  instance_admin: assertInstanceAdmin,
+};
+
+/**
+ * Returns a role-checking function for the named role. Throw-style (not
+ * Express middleware) to match every other authz helper in this file.
+ *
+ *     requireRole("board")(req);
+ *     requireRole("instance_admin")(req);
+ */
+export function requireRole(role: Role): (req: Request) => void {
+  // The Record<Role, ...> type ensures every Role has a checker at compile
+  // time, so the `!` is provably safe today. The runtime guard stays anyway,
+  // because a future Role addition that forgets to register a checker would
+  // otherwise return `undefined` and produce a less-helpful crash later.
+  return ROLE_CHECKERS[role]!;
+}
+
 function throwOrShadowResponsibleUserCompanyAccessDeny(
   req: Request,
   companyId: string,

@@ -219,9 +219,9 @@
     },
     {
       "path": "scripts/publish-ota.sh",
-      "maxNetLines": 30,
-      "reason": "Forwarder script for mobile Expo app OTA publishing, delegating to clients/expo/scripts/publish-ota.sh to export and sync bundles to tc-coolie-claw.",
-      "maxTotalLines": 40
+      "maxNetLines": 80,
+      "reason": "Forwarder script for mobile Expo app OTA publishing, delegating to clients/expo/scripts/publish-ota.sh to export and sync bundles to tc-coolie-claw. wave233 raised the budget for the new --server-deploy and --4-guard flags (and the auto-deploy.sh sourcing), so the OTA forwarder can also pull server and the four guardrails when the schedule asks for one combined run; the base delegation logic is unchanged.",
+      "maxTotalLines": 120
     },
     {
       "path": "scripts/publish-ota-paperclip-web.sh",
@@ -291,9 +291,9 @@
     },
     {
       "path": "scripts/release-app.sh",
-      "maxNetLines": 250,
-      "reason": "Fork release script, and entirely ours: upstream ships no release-app.sh, so there is nothing to reconcile at a merge. It sits under scripts/ only because that is where the release entry points are wired, and that path prefix is the only reason the gate asks about it. Content is pre-flight and sanity checks, version.json read permissions, runtimeVersion single-sourced for OTA, and the rule that every release must correspond to a commit — the last paired with backfill-commit-sha.sh below.",
-      "maxTotalLines": 420
+      "maxNetLines": 320,
+      "reason": "Fork release script, and entirely ours: upstream ships no release-app.sh, so there is nothing to reconcile at a merge. It sits under scripts/ only because that is where the release entry points are wired, and that path prefix is the only reason the gate asks about it. Content is pre-flight and sanity checks, version.json read permissions, runtimeVersion single-sourced for OTA, and the rule that every release must correspond to a commit — the last paired with backfill-commit-sha.sh below. wave233 raised the budget for the explicit --with-server-deploy flag and the optional --with-4-guard step that runs the four post-deploy smoke checks (version.json / ota/manifest / APK HEAD / /api/health).",
+      "maxTotalLines": 500
     },
     {
       "path": "scripts/publish-h5.sh",
@@ -348,6 +348,18 @@
       "maxNetLines": 120,
       "reason": "Default Palantir 5 roles (FDA/Core-SWE/PRE-SRE/FDSE/DS) to Claude Code and Hermes adapters with self-healing rather than empty process adapter. wave134: POST /agents/:id/keys resolves the key's responsibleUserId through resolveCompanyScopedResponsibleUserId so a key minted by the loopback board concierge carries a real company member instead of the synthetic paperclip-concierge principal (which made every request with the key fail RESPONSIBLE_USER_UNAVAILABLE).",
       "maxTotalLines": 200
+    },
+    {
+      "path": "server/src/routes/authz.ts",
+      "maxNetLines": 60,
+      "reason": "wave179: adds the requireRole(role) factory and a Role union alongside the existing assertXxx family, so route handlers can declare their access shape in one place instead of importing a specific assertBoard/assertInstanceAdmin symbol. Implementation is a one-line dispatch table keyed by Role — the existing assertXxx functions are the implementations. The instance-scoped source bypass for board concierge keys (api_key / cloud_control with isInstanceAdmin=true) also lives here from earlier fork work, which is why the file is in the manifest at all — that bypass lets the board concierge act with instance-admin rights over every company without a per-company membership lookup. Cannot live elsewhere: it is the only file that defines the assertXxx contract the routes call.",
+      "maxTotalLines": 100
+    },
+    {
+      "path": "server/src/__tests__/authz-require-role.test.ts",
+      "maxNetLines": 160,
+      "reason": "wave179: vitest cover for the requireRole(role) factory — 14 cases across all four roles (authenticated / board / board_or_agent / instance_admin) and the actor types (board / agent / none / local_implicit / instance-scoped board key), plus a return-value-stability check pinning the dispatch-table lookup. New file; lives under __tests__/ because it covers the new requireRole export. No upstream counterpart (upstream has no requireRole factory to test).",
+      "maxTotalLines": 180
     },
     {
       "path": "skills/paperclip-board/SKILL.md",
@@ -1074,6 +1086,36 @@
       "maxNetLines": 240,
       "maxTotalLines": 280,
       "reason": "wave154/wave155: the Workshop page hosting the graph view. Cannot live elsewhere: it is the registered route."
+    },
+    {
+      "path": "scripts/lib/mcp-install-common.sh",
+      "maxNetLines": 200,
+      "maxTotalLines": 200,
+      "reason": "wave228: shared bash helpers (mcp_register_server / mcp_for_each_cli / dry-run) for the four MCP install shims. Lives under scripts/lib/ because that is where this fork's existing bash helpers live (chat-webhook-proxy-diagnostics.mjs is its sibling); moving it would scatter fork-owned code."
+    },
+    {
+      "path": "scripts/__tests__/install-mcp-shims.test.mjs",
+      "maxNetLines": 360,
+      "maxTotalLines": 360,
+      "reason": "wave228: node:test suite (11 cases) for the four MCP install shims. Lives under scripts/__tests__/ next to its siblings (e2e-update-migrations.test.mjs etc.); vitest's mjs test runner pattern matches."
+    },
+    {
+      "path": "scripts/lib/auto-deploy.sh",
+      "maxNetLines": 240,
+      "maxTotalLines": 240,
+      "reason": "wave233: shared bash helpers (ad_log / ad_step / ad_guard_4) for the auto-deploy chain. Sits beside scripts/lib/mcp-install-common.sh because both are fork-owned bash lib modules; moving it would scatter fork-owned code. The 4-guard helper is the one source of truth for the post-deploy smoke (version.json / ota/manifest / APK HEAD / /api/health), shared by release-app.sh, publish-ota.sh, and auto-deploy-all.sh so all three entry points give identical evidence."
+    },
+    {
+      "path": "scripts/auto-deploy-all.sh",
+      "maxNetLines": 240,
+      "maxTotalLines": 240,
+      "reason": "wave233: PM-scheduling orchestrator that chains release-app.sh + publish-ota.sh + an idempotent server deploy + version.json rsync compensation + the four post-deploy guardrails. No upstream counterpart — upstream has no App/OTA/server coupling to orchestrate. Sits under scripts/ only because that is where the release entry points are wired, and that path prefix is the only reason the gate asks about it. Exits non-zero on any failed step so the Paperclip schedule can mark the issue blocked."
+    },
+    {
+      "path": "scripts/__tests__/auto-deploy.test.mjs",
+      "maxNetLines": 200,
+      "maxTotalLines": 200,
+      "reason": "wave233: node:test suite (11 cases) for the auto-deploy chain — release-app.sh / publish-ota.sh / auto-deploy-all.sh / auto-deploy.sh lib — exercising --help text, syntax (bash -n), flag parsing, bad-version rejection, dry-run orchestration, and the 4-guard PASS line. Lives under scripts/__tests__/ next to its sibling wave228 suite (install-mcp-shims.test.mjs)."
     }
   ]
 }
