@@ -1,0 +1,67 @@
+HTTP 200
+{
+  "data": [
+    {
+      "type": "betaGroups",
+      "id": "2fe78acd-8eb1-489b-a351-a18b797dd2a5",
+      "attributes": {
+        "publicLinkLimit": null,
+        "iosBuildsAvailableForAppleSiliconMac": true,
+        "createdDate": "2026-09-30T04:41:42.394Z",
+        "publicLinkEnabled": null,
+        "publicLink": null,
+        "hasAccessToAllBuilds": true,
+        "publicLinkId": null,
+        "isInternalGroup": true,
+        "name": "coolie",
+        "feedbackEnabled": true,
+        "publicLinkLimitEnabled": null,
+        "iosBuildsAvailableForAppleVision": true
+      },
+      "relationships": {
+        "app": {
+          "links": {
+            "self": "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/relationships/app",
+            "related": "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/app"
+          }
+        },
+        "builds": {
+          "links": {
+            "self": "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/relationships/builds",
+            "related": "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/builds"
+          }
+        },
+        "betaRecruitmentCriteria": {
+          "links": {
+            "self": "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/relationships/betaRecruitmentCriteria",
+            "related": "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/betaRecruitmentCriteria"
+          }
+        },
+        "betaRecruitmentCriterionCompatibleBuildCheck": {
+          "links": {
+            "self": "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/relationships/betaRecruitmentCriterionCompatibleBuildCheck",
+            "related": "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/betaRecruitmentCriterionCompatibleBuildCheck"
+          }
+        },
+        "betaTesters": {
+          "links": {
+            "self": "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/relationships/betaTesters",
+            "related": "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/betaTesters"
+          }
+        }
+      },
+      "links": {
+        "self": "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5"
+      }
+    }
+  ],
+  "links": {
+    "self": "https://api.appstoreconnect.apple.com/v1/betaGroups?filter%5Bapp%5D=6817620959"
+  },
+  "meta": {
+    "paging": {
+      "total": 1,
+      "limit": 50
+    }
+  }
+}

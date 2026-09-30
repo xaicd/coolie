@@ -1,0 +1,12 @@
+HTTP 404
+{
+  "errors": [
+    {
+      "id": "5afb3cc4-f5c3-4a50-8a05-1113d8361003",
+      "status": "404",
+      "code": "NOT_FOUND",
+      "title": "The specified resource does not exist",
+      "detail": "There is no resource of type 'userInvitations' with id '00000000-0000-0000-0000-000000000000'"
+    }
+  ]
+}

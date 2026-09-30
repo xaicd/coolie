@@ -1,0 +1,347 @@
+# curl transcript (post-change verification) — 2026-09-30 13:36:53 +0800
+
+### team users
+$ curl -sS -w '\nHTTP %{http_code}\n' -X GET -H 'Authorization: Bearer <JWT>'  'https://api.appstoreconnect.apple.com/v1/users?limit=100'
+{
+  "data" : [ {
+    "type" : "users",
+    "id" : "2659b62b-ec01-4c0b-af92-1c42db36b835",
+    "attributes" : {
+      "allAppsVisible" : true,
+      "lastName" : "chen",
+      "firstName" : "wei",
+      "provisioningAllowed" : true,
+      "roles" : [ "ACCOUNT_HOLDER", "ADMIN" ],
+      "username" : "waj_615@qq.com"
+    },
+    "relationships" : {
+      "visibleApps" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/users/2659b62b-ec01-4c0b-af92-1c42db36b835/relationships/visibleApps",
+          "related" : "https://api.appstoreconnect.apple.com/v1/users/2659b62b-ec01-4c0b-af92-1c42db36b835/visibleApps"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://api.appstoreconnect.apple.com/v1/users/2659b62b-ec01-4c0b-af92-1c42db36b835"
+    }
+  }, {
+    "type" : "users",
+    "id" : "1f1c91a5-6e20-48be-9515-0802b2670234",
+    "attributes" : {
+      "allAppsVisible" : true,
+      "lastName" : "ma",
+      "firstName" : "ruby",
+      "provisioningAllowed" : false,
+      "roles" : [ "ADMIN" ],
+      "username" : "robinschen1990@gmail.com"
+    },
+    "relationships" : {
+      "visibleApps" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/users/1f1c91a5-6e20-48be-9515-0802b2670234/relationships/visibleApps",
+          "related" : "https://api.appstoreconnect.apple.com/v1/users/1f1c91a5-6e20-48be-9515-0802b2670234/visibleApps"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://api.appstoreconnect.apple.com/v1/users/1f1c91a5-6e20-48be-9515-0802b2670234"
+    }
+  } ],
+  "links" : {
+    "self" : "https://api.appstoreconnect.apple.com/v1/users?limit=100"
+  },
+  "meta" : {
+    "paging" : {
+      "total" : 2,
+      "limit" : 100
+    }
+  }
+}
+HTTP 200
+
+
+### pending team invitations
+$ curl -sS -w '\nHTTP %{http_code}\n' -X GET -H 'Authorization: Bearer <JWT>'  'https://api.appstoreconnect.apple.com/v1/userInvitations?limit=100'
+{
+  "data" : [ {
+    "type" : "userInvitations",
+    "id" : "d1aa530b-220f-4c00-aa78-fbeeca331f84",
+    "attributes" : {
+      "firstName" : "XiaoChen",
+      "lastName" : "boss",
+      "roles" : [ "DEVELOPER" ],
+      "allAppsVisible" : null,
+      "email" : "robinschen1989@gmail.com",
+      "provisioningAllowed" : false,
+      "expirationDate" : "2026-10-02T22:06:57.75-07:00"
+    },
+    "relationships" : {
+      "visibleApps" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/userInvitations/d1aa530b-220f-4c00-aa78-fbeeca331f84/relationships/visibleApps",
+          "related" : "https://api.appstoreconnect.apple.com/v1/userInvitations/d1aa530b-220f-4c00-aa78-fbeeca331f84/visibleApps"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://api.appstoreconnect.apple.com/v1/userInvitations/d1aa530b-220f-4c00-aa78-fbeeca331f84"
+    }
+  }, {
+    "type" : "userInvitations",
+    "id" : "9fd0f4ed-1d44-4597-b83e-9a79e64d6f5f",
+    "attributes" : {
+      "firstName" : "ze",
+      "lastName" : "yi",
+      "roles" : [ "ADMIN" ],
+      "allAppsVisible" : null,
+      "email" : "runze66@163.com",
+      "provisioningAllowed" : false,
+      "expirationDate" : "2026-09-10T18:56:34.766-07:00"
+    },
+    "relationships" : {
+      "visibleApps" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/userInvitations/9fd0f4ed-1d44-4597-b83e-9a79e64d6f5f/relationships/visibleApps",
+          "related" : "https://api.appstoreconnect.apple.com/v1/userInvitations/9fd0f4ed-1d44-4597-b83e-9a79e64d6f5f/visibleApps"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://api.appstoreconnect.apple.com/v1/userInvitations/9fd0f4ed-1d44-4597-b83e-9a79e64d6f5f"
+    }
+  } ],
+  "links" : {
+    "self" : "https://api.appstoreconnect.apple.com/v1/userInvitations?limit=100"
+  },
+  "meta" : {
+    "paging" : {
+      "total" : 2,
+      "limit" : 100
+    }
+  }
+}
+HTTP 200
+
+
+### internal group testers (coolie)
+$ curl -sS -w '\nHTTP %{http_code}\n' -X GET -H 'Authorization: Bearer <JWT>'  'https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/betaTesters?limit=200'
+{
+  "data" : [ {
+    "type" : "betaTesters",
+    "id" : "3155a0ed-e682-4e4f-b4cc-d07275383c6b",
+    "attributes" : {
+      "lastName" : "chen",
+      "firstName" : "wei",
+      "inviteType" : "EMAIL",
+      "state" : "INVITED",
+      "appDevices" : [ ],
+      "email" : "waj_615@qq.com"
+    },
+    "relationships" : {
+      "betaGroups" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/betaTesters/3155a0ed-e682-4e4f-b4cc-d07275383c6b/relationships/betaGroups",
+          "related" : "https://api.appstoreconnect.apple.com/v1/betaTesters/3155a0ed-e682-4e4f-b4cc-d07275383c6b/betaGroups"
+        }
+      },
+      "builds" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/betaTesters/3155a0ed-e682-4e4f-b4cc-d07275383c6b/relationships/builds",
+          "related" : "https://api.appstoreconnect.apple.com/v1/betaTesters/3155a0ed-e682-4e4f-b4cc-d07275383c6b/builds"
+        }
+      },
+      "apps" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/betaTesters/3155a0ed-e682-4e4f-b4cc-d07275383c6b/relationships/apps",
+          "related" : "https://api.appstoreconnect.apple.com/v1/betaTesters/3155a0ed-e682-4e4f-b4cc-d07275383c6b/apps"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://api.appstoreconnect.apple.com/v1/betaTesters/3155a0ed-e682-4e4f-b4cc-d07275383c6b"
+    }
+  } ],
+  "links" : {
+    "self" : "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/betaTesters?limit=200"
+  },
+  "meta" : {
+    "paging" : {
+      "total" : 1,
+      "limit" : 200
+    }
+  }
+}
+HTTP 200
+
+
+### beta group (coolie)
+$ curl -sS -w '\nHTTP %{http_code}\n' -X GET -H 'Authorization: Bearer <JWT>'  'https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5'
+{
+  "data" : {
+    "type" : "betaGroups",
+    "id" : "2fe78acd-8eb1-489b-a351-a18b797dd2a5",
+    "attributes" : {
+      "publicLinkLimit" : null,
+      "iosBuildsAvailableForAppleSiliconMac" : true,
+      "createdDate" : "2026-09-30T04:41:42.394Z",
+      "publicLinkEnabled" : null,
+      "publicLink" : null,
+      "hasAccessToAllBuilds" : true,
+      "publicLinkId" : null,
+      "isInternalGroup" : true,
+      "name" : "coolie",
+      "feedbackEnabled" : true,
+      "publicLinkLimitEnabled" : null,
+      "iosBuildsAvailableForAppleVision" : true
+    },
+    "relationships" : {
+      "app" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/relationships/app",
+          "related" : "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/app"
+        }
+      },
+      "builds" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/relationships/builds",
+          "related" : "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/builds"
+        }
+      },
+      "betaRecruitmentCriteria" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/relationships/betaRecruitmentCriteria",
+          "related" : "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/betaRecruitmentCriteria"
+        }
+      },
+      "betaRecruitmentCriterionCompatibleBuildCheck" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/relationships/betaRecruitmentCriterionCompatibleBuildCheck",
+          "related" : "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/betaRecruitmentCriterionCompatibleBuildCheck"
+        }
+      },
+      "betaTesters" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/relationships/betaTesters",
+          "related" : "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5/betaTesters"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5"
+    }
+  },
+  "links" : {
+    "self" : "https://api.appstoreconnect.apple.com/v1/betaGroups/2fe78acd-8eb1-489b-a351-a18b797dd2a5"
+  }
+}
+HTTP 200
+
+
+### build 600
+$ curl -sS -w '\nHTTP %{http_code}\n' -X GET -H 'Authorization: Bearer <JWT>'  'https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa'
+{
+  "data" : {
+    "type" : "builds",
+    "id" : "c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa",
+    "attributes" : {
+      "version" : "600",
+      "uploadedDate" : "2026-09-29T22:04:32-07:00",
+      "expirationDate" : "2026-12-28T21:04:32-08:00",
+      "expired" : false,
+      "minOsVersion" : "15.1",
+      "lsMinimumSystemVersion" : "12.0",
+      "computedMinMacOsVersion" : "12.0",
+      "computedMinVisionOsVersion" : "1.0",
+      "iconAssetToken" : {
+        "templateUrl" : "https://is1-ssl.mzstatic.com/image/thumb/Purple221/v4/95/57/87/95578755-4e48-e0ad-75fd-1334b779a1d7/AppIcon76x76@2x_U007eipad.png/{w}x{h}bb.{f}",
+        "width" : 152,
+        "height" : 152
+      },
+      "processingState" : "VALID",
+      "buildAudienceType" : "APP_STORE_ELIGIBLE",
+      "usesNonExemptEncryption" : false
+    },
+    "relationships" : {
+      "preReleaseVersion" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/relationships/preReleaseVersion",
+          "related" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/preReleaseVersion"
+        }
+      },
+      "individualTesters" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/relationships/individualTesters",
+          "related" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/individualTesters"
+        }
+      },
+      "betaGroups" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/relationships/betaGroups"
+        }
+      },
+      "betaBuildLocalizations" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/relationships/betaBuildLocalizations",
+          "related" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/betaBuildLocalizations"
+        }
+      },
+      "appEncryptionDeclaration" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/relationships/appEncryptionDeclaration",
+          "related" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/appEncryptionDeclaration"
+        }
+      },
+      "betaAppReviewSubmission" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/relationships/betaAppReviewSubmission",
+          "related" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/betaAppReviewSubmission"
+        }
+      },
+      "app" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/relationships/app",
+          "related" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/app"
+        }
+      },
+      "buildBetaDetail" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/relationships/buildBetaDetail",
+          "related" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/buildBetaDetail"
+        }
+      },
+      "appStoreVersion" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/relationships/appStoreVersion",
+          "related" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/appStoreVersion"
+        }
+      },
+      "icons" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/relationships/icons",
+          "related" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/icons"
+        }
+      },
+      "perfPowerMetrics" : {
+        "links" : {
+          "related" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/perfPowerMetrics"
+        }
+      },
+      "diagnosticSignatures" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/relationships/diagnosticSignatures",
+          "related" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa/diagnosticSignatures"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa"
+    }
+  },
+  "links" : {
+    "self" : "https://api.appstoreconnect.apple.com/v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa"
+  }
+}
+HTTP 200
+
+

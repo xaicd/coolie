@@ -1,0 +1,65 @@
+HTTP 200
+{
+  "data": [
+    {
+      "type": "users",
+      "id": "2659b62b-ec01-4c0b-af92-1c42db36b835",
+      "attributes": {
+        "allAppsVisible": true,
+        "lastName": "chen",
+        "firstName": "wei",
+        "provisioningAllowed": true,
+        "roles": [
+          "ACCOUNT_HOLDER",
+          "ADMIN"
+        ],
+        "username": "waj_615@qq.com"
+      },
+      "relationships": {
+        "visibleApps": {
+          "links": {
+            "self": "https://api.appstoreconnect.apple.com/v1/users/2659b62b-ec01-4c0b-af92-1c42db36b835/relationships/visibleApps",
+            "related": "https://api.appstoreconnect.apple.com/v1/users/2659b62b-ec01-4c0b-af92-1c42db36b835/visibleApps"
+          }
+        }
+      },
+      "links": {
+        "self": "https://api.appstoreconnect.apple.com/v1/users/2659b62b-ec01-4c0b-af92-1c42db36b835"
+      }
+    },
+    {
+      "type": "users",
+      "id": "1f1c91a5-6e20-48be-9515-0802b2670234",
+      "attributes": {
+        "allAppsVisible": true,
+        "lastName": "ma",
+        "firstName": "ruby",
+        "provisioningAllowed": false,
+        "roles": [
+          "ADMIN"
+        ],
+        "username": "robinschen1990@gmail.com"
+      },
+      "relationships": {
+        "visibleApps": {
+          "links": {
+            "self": "https://api.appstoreconnect.apple.com/v1/users/1f1c91a5-6e20-48be-9515-0802b2670234/relationships/visibleApps",
+            "related": "https://api.appstoreconnect.apple.com/v1/users/1f1c91a5-6e20-48be-9515-0802b2670234/visibleApps"
+          }
+        }
+      },
+      "links": {
+        "self": "https://api.appstoreconnect.apple.com/v1/users/1f1c91a5-6e20-48be-9515-0802b2670234"
+      }
+    }
+  ],
+  "links": {
+    "self": "https://api.appstoreconnect.apple.com/v1/users?limit=100"
+  },
+  "meta": {
+    "paging": {
+      "total": 2,
+      "limit": 100
+    }
+  }
+}

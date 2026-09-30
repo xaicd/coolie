@@ -1,0 +1,12 @@
+HTTP 403
+{
+  "errors": [
+    {
+      "id": "87c0467a-4ae1-4197-9b21-c42cc911c8b4",
+      "status": "403",
+      "code": "FORBIDDEN_ERROR",
+      "title": "This request is forbidden for security reasons",
+      "detail": "The API key in use does not allow this request"
+    }
+  ]
+}

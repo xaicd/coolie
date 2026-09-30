@@ -1,0 +1,15 @@
+HTTP 400
+{
+  "errors": [
+    {
+      "id": "32920125-0217-4090-b8b5-de4e78e98188",
+      "status": "400",
+      "code": "PARAMETER_ERROR.INVALID",
+      "title": "A parameter has an invalid value",
+      "detail": "'email' is not a valid filter type",
+      "source": {
+        "parameter": "filter[email]"
+      }
+    }
+  ]
+}
