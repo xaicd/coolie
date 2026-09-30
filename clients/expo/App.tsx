@@ -66,6 +66,7 @@ import {
   type SandboxScope,
 } from "./src/screens/PrototypeSandboxScreen";
 import { NotificationsScreen } from "./src/screens/NotificationsScreen";
+import { NativeModulesScreen } from "./src/screens/NativeModulesScreen";
 import { SearchScreen } from "./src/screens/SearchScreen";
 import { RegisterScreen } from "./src/screens/RegisterScreen";
 import { AgentDetailScreen } from "./src/screens/AgentDetailScreen";
@@ -258,6 +259,7 @@ function SettingsSheet({
   workspaceGitEnabled,
   onToggleWorkspaceGit,
   onOpenGitCredentials,
+  onOpenNativeModules,
 }: {
   whoami: string;
   ota: ReturnType<typeof useOTA>;
@@ -266,6 +268,7 @@ function SettingsSheet({
   workspaceGitEnabled: boolean;
   onToggleWorkspaceGit: (next: boolean) => void;
   onOpenGitCredentials: () => void;
+  onOpenNativeModules: () => void;
 }) {
   const [cacheSize, setCacheSize] = useState<string | null>(null);
   const [clearing, setClearing] = useState(false);
@@ -331,6 +334,13 @@ function SettingsSheet({
         onToggle={onToggleWorkspaceGit}
         onOpenCredentials={onOpenGitCredentials}
       />
+
+      {/* wave188 — 6 个 expo-* 原生模块最小集成 demo 入口。 */}
+      <Pressable style={styles.settingsRow} onPress={onOpenNativeModules}>
+        <Ionicons name="hardware-chip-outline" size={20} color={C.ink3} />
+        <Text style={styles.settingsRowLabel}>原生模块 (6 expo-*)</Text>
+        <Text style={styles.settingsRowValue}>demo</Text>
+      </Pressable>
 
       <Pressable style={styles.settingsSignOut} onPress={onSignOut}>
         <Text style={styles.settingsSignOutText}>退出登录</Text>
@@ -815,6 +825,8 @@ function HomeScreen({
   // wave235 — 插件管理 + 单插件设置 (App 内模态屏, 复用 Shell 模式)
   const [pluginManagerOpen, setPluginManagerOpen] = useState(false);
   const [pluginSettingsId, setPluginSettingsId] = useState<string | null>(null);
+  // wave188 — 6 个 expo-* 原生模块最小集成 demo 入口 (设置 → 原生模块)
+  const [nativeModulesOpen, setNativeModulesOpen] = useState(false);
   const ota = useOTA();
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const loadNotifications = useNotificationsStore((s) => s.load);
@@ -972,6 +984,7 @@ function HomeScreen({
     if (selected) return setSelected(null), true;
     if (composeOpen) return setComposeOpen(false), true;
     if (settingsOpen) return setSettingsOpen(false), true;
+    if (nativeModulesOpen) return setNativeModulesOpen(false), true;
     if (tabHistoryRef.current.length > 0) return goBackTab(), true;
     return false;
   };
@@ -1335,7 +1348,14 @@ function HomeScreen({
               setSettingsOpen(false);
               setGitCredentialsOpen(true);
             }}
+            onOpenNativeModules={() => {
+              setSettingsOpen(false);
+              setNativeModulesOpen(true);
+            }}
           />
+        ) : null}
+        {nativeModulesOpen ? (
+          <NativeModulesScreen onClose={() => setNativeModulesOpen(false)} />
         ) : null}
         {/* 底部导航 — 汇览 / 任务 / [+] / 员工 / 收件箱 (固定常驻) */}
         <TabBar
@@ -1361,6 +1381,7 @@ function HomeScreen({
             setWebContainerTarget(null);
             setSpecIssue(null);
             setOnboardingOpen(false);
+            setNativeModulesOpen(false);
             navigateTab(key);
           }}
           onCreate={() => setComposeOpen(true)}

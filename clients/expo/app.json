@@ -6,7 +6,7 @@
       "coolie",
       "coolieweb"
     ],
-    "version": "0.6.11",
+    "version": "0.6.13",
     "orientation": "portrait",
     "userInterfaceStyle": "automatic",
     "icon": "./assets/icon.png",
@@ -32,24 +32,32 @@
       "supportsTablet": true,
       "bundleIdentifier": "cn.xrobinai.app",
       "infoPlist": {
-        "NSMicrophoneUsageDescription": "Coolie uses the microphone to dispatch tasks by voice."
+        "NSMicrophoneUsageDescription": "Coolie uses the microphone to dispatch tasks by voice.",
+        "NSLocationWhenInUseUsageDescription": "Coolie uses your location to tag where you are when dispatching tasks."
       }
     },
     "android": {
       "package": "cloud.coolie.app",
-      "versionCode": 611,
+      "versionCode": 613,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#08090A"
       },
       "permissions": [
-        "RECORD_AUDIO"
+        "RECORD_AUDIO",
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION",
+        "POST_NOTIFICATIONS"
       ]
     },
     "plugins": [
       "expo-av",
       "expo-secure-store",
-      "expo-updates"
+      "expo-updates",
+      "expo-task-manager",
+      "expo-background-fetch",
+      "expo-location",
+      "expo-notifications"
     ],
     "extra": {
       "deepLinks": {

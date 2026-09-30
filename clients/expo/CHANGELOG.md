@@ -4,6 +4,35 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.6.13
+
+> Released: 2026-09-30 · Android release APK + OTA bundle
+
+### 更新
+
+- wave188 6 个 expo-* 原生模块最小集成 demo: 之前 App 只装了 17 个 expo-* 库, 还有 6 个老板可能用得上的没装 (`expo-task-manager` / `expo-background-fetch` / `expo-location` / `expo-sharing` / `expo-print` / `expo-notifications`), 现在统一装上, 版本锁到 SDK 52 bundledNativeModules 对齐 (task-manager ~12.0.6 / background-fetch ~13.0.4 / location ~18.0.10 / sharing ~13.0.0 / print ~14.0.1 / notifications ~0.29.14)。在 **设置 → 原生模块** 加一入口, 打开 `NativeModulesScreen` (新屏, 走 Sheet 模式), 6 节每节一个按钮 + 结果回执:
+  - **expo-task-manager** — 模块顶层 `defineTask` 注册 `coolie-demo-task`, 按按钮用 `BackgroundFetch.registerTaskAsync` 真正挂上, 列已注册任务
+  - **expo-background-fetch** — 注册 15min 周期, `getStatusAsync()` 读系统状态 (available / denied / restricted)
+  - **expo-location** — `requestForegroundPermissionsAsync` + `getCurrentPositionAsync` (Balanced), 显示经纬度
+  - **expo-sharing** — 写临时 `coolie-share-demo.txt`, 调系统分享面板
+  - **expo-print** — HTML 渲染成 PDF, `printToFileAsync` 出 URI 后直接走 sharing
+  - **expo-notifications** — 5s 后本地推送 (`SchedulableTriggerInputTypes.TIME_INTERVAL`), Android 13+ 自动弹 `POST_NOTIFICATIONS` 权限
+  - `app.json` 加 4 个 config plugin (task-manager / background-fetch / location / notifications) + Android 权限 (`ACCESS_FINE_LOCATION` / `ACCESS_COARSE_LOCATION` / `POST_NOTIFICATIONS`) + iOS `NSLocationWhenInUseUsageDescription`
+  - 后续不接 FCM/APNs (服务端 APNs 证书是另一波) / 后台定位 (`UIBackgroundModes` 复杂权限)
+  - 无服务端改动
+
+---
+
+## v0.6.12
+
+> Released: 2026-09-30 · Android release APK + OTA bundle
+
+### 更新
+
+- wave186 网络感知 (NetInfo): 之前关 WiFi/飞行模式后所有 fetch 静默失败, 用户不知道是「网断了」还是「server 崩了」; 现在装 `@react-native-community/netinfo` 11.4.1 (RN 0.76 已把 NetInfo 从 core 抽出, 必须显式装), App 顶层监听网络变化 — 断网弹 Toast「网络已断开: 操作可能失败, 请检查网络连接」, 恢复弹 Toast「网络已恢复」(均 3s info Toast, 不抢焦点)。新增 `src/network.ts` (useNetworkStatus hook + setupNetworkListener), 启动期断网不弹 (避免骚扰)。`App.tsx` 顶层 useEffect 复用 setupOTAListener 同款位置挂监听。无服务端改动。
+
+---
+
 ## v0.6.11
 
 > Released: 2026-09-30 · Android release APK + OTA bundle
