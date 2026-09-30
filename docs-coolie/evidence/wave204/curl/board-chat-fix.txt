@@ -1,0 +1,15 @@
+=== tc-coolie-claw @ 2026-09-30 ~22:00 UTC+8 (wave204 deploy 后) ===
+
+--- pre-deploy baseline (board/chat 之前 404) ---
+HTTP=404 body={"error":"API route not found"} ← 老板报的 bug
+
+--- post-deploy 6 端点实测 ---
+200  GET /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/board/chat
+200  POST /api/board/chat/issue
+200  GET /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/board/conversations
+200  GET /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/quotas
+200  GET /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/work-products
+200  GET /api/companies/4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e/sandboxes
+
+--- 完整响应 (board/chat) ---
+{"ok":true,"conversationId":"5c027506-166a-4f33-b69f-5abbc7a28f0e","issueId":"b5c0008b-76bd-4917-9293-f6db0f444083","streamUrl":"/api/board/chat/stream","enabled":true,"generatedAt":"2026-09-30T14:06:14.232Z"}
