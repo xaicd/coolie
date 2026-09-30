@@ -1,4 +1,4 @@
-# HOW-TO-DELEGATE — 老板对 PM (Hermes) 派活 SOP (wave225 + wave227 + wave229 cmd 修正)
+# HOW-TO-DELEGATE — 老板对 PM (Hermes) 派活 SOP (wave225 + wave227 + wave229 cmd 修正 + wave236 agy 恢复 + claude-ds 退出)
 
 > **目的**: 老板说需求 → Hermes (PM) 派活 → 5 员工执行. 本 SOP 老板能看懂, 5 员工能照做,
 > PM (Hermes) 能按部就班派单. 老板可以直接对着本文说话, PM 收到后查 §3 路由表派单.
@@ -12,6 +12,13 @@
 > **wave229 修正**: `cmd` 工具 = `commandcode.ai` CLI (`@commandcode/ai`), **不是老板亲自跑**.
 > 之前 wave225 误记"老板本人 180s 冷却", 老板 2026-09-30 澄清. cmd 是 commandcode.ai 的
 > 自动化批处理 CLI, 派给门神 (FDSE) 在 PM 调度下跑, 老板不直接 spawn. 见 §3 / §4 / §6.
+>
+> **wave236 改**: 老板原话 2 条:
+> - "agy 恢复了应该可以用" — agy (Gemini 3.8) 2026-09-23 配额耗尽, ~7 天后恢复 (09-30 配额可用).
+>   **墨斗 (FDA) 默认切回 agy**, cmd 作为紧急兜底. 选型 / 原型 / 画图 / 业务访谈都用 agy.
+> - "claude-ds 也不能用, 换 cmd, claude-mm" — claude-ds 配额紧 (PM 之前漏改).
+>   **兑底渊 (PRE-SRE) 工具改 cmd + claude-mm** (替换 claude-ds). claude-ds 标"不可用, 配额紧" —
+>   仅百晓生 SRE 临时大任务按量兜底.
 
 ---
 
@@ -28,8 +35,9 @@
 **例**:
 - "派个活修 UUID bug" — 默认走铁匠 + cmd (`@commandcode/ai` CLI, wave234 起; 旧: claude-glm)
 - "紧急自动化批处理, 看下 OTA manifest" — 走门神 + cmd (`@commandcode/ai`)
-- "选个 typeorm vs drizzle" — 走墨斗 + agy
-- "部署 wave225, 看监控" — 走兑底渊 + claude-ds (监控主改百晓生, 兑底渊副)
+- "选个 typeorm vs drizzle" — 走墨斗 + **agy (wave236 恢复)**; 紧急时切 cmd 兜底
+- "部署 wave225, 看监控" — 走**兑底渊 + cmd (wave236 改, 替换 claude-ds)** + claude-mm 兜底 (监控主改百晓生, 兑底渊副)
+- "画个原型 / 竞品图" — 走墨斗 + **agy (wave236 恢复, 原型 / 画图主跑)**
 - "License 扫一下" — 走百晓生 (限, 当前无额度)
 - "测试一下 wave227" — wave234 起走百晓生 + claude-mm (测试主改百晓生, 门神副; 旧: claude-glm)
 - "运营看监控告警" — wave234 起走百晓生 + claude-mm (运营主改百晓生, 兑底渊副; 旧: claude-glm)
@@ -71,9 +79,9 @@
 4. 看员工工具配额
    - **铁匠 (wave234 起)**: cmd (`@commandcode/ai` CLI) 队列状态; 排满时切 claude-mm (按量兜底); claude-glm 不再是铁匠主线
    - 门神: cmd (`@commandcode/ai`) CLI 配额状态, **不是老板本人空闲** (wave229)
-   - 兑底渊: claude-ds 按量, 不受限
-   - 墨斗: agy 按量, 不受限
-   - **百晓生 (wave227 多工具, wave234 主线切 claude-mm)**: claude-mm (主线, 按量) → claude-glm (老板备用, GLM 充裕时) → copilot (限) → claude-ds (按量); 测试/运营/风险/部署/复盘 默认走 claude-mm
+   - **兑底渊 (wave236 改)**: cmd (`@commandcode/ai`) CLI 队列状态 + claude-mm 按量兜底; **claude-ds 退出兑底渊主线** (配额紧)
+   - **墨斗 (wave236 恢复)**: agy (Gemini 3.8) 按量, 充裕 (2026-09-30 ~7 天后恢复); 紧急时切 cmd
+   - **百晓生 (wave227 多工具, wave234 主线切 claude-mm)**: claude-mm (主线, 按量) → claude-glm (老板备用, GLM 充裕时) → copilot (限) → claude-ds (按量, SRE 临时大任务); 测试/运营/风险/部署/复盘 默认走 claude-mm
    ↓
 5. 写 brief
    - brief = (a) 老板原话 + (b) CMMI Phase/任务 + (c) 主员工 + (d) 工具 + (e) 验收标准
@@ -112,9 +120,10 @@ PM 派活时必须遵守:
 | 老板原话 (示例) | CMMI Phase | 主员工 | 默认工具 | 紧急 → 切 |
 |---|---|---|---|---|
 | "派个活修 UUID bug" | Phase 4.1 / 4.3 | 铁匠 | **cmd (`@commandcode/ai`, wave234)** | 门神 cmd (`@commandcode/ai`) |
-| "看下 OTA manifest" | Phase 5.1 / 5.3 | 兑底渊 | claude-ds | 门神 cmd (`@commandcode/ai`) |
-| "部署 wave225" | Phase 5.1 | 兑底渊 | claude-ds | 门神 cmd (`@commandcode/ai`) |
-| "选个 typeorm vs drizzle" | Phase 1.4 / 3.1 | 墨斗 | agy | 铁匠 cmd (`@commandcode/ai`, wave234) |
+| "看下 OTA manifest" | Phase 5.1 / 5.3 | 兑底渊 | **cmd (`@commandcode/ai`, wave236 改)** + claude-mm 兜底 | 门神 cmd (`@commandcode/ai`) |
+| "部署 wave225" | Phase 5.1 | 兑底渊 | **cmd (`@commandcode/ai`, wave236 改)** + claude-mm 兜底 | 门神 cmd (`@commandcode/ai`) |
+| "选个 typeorm vs drizzle" | Phase 1.4 / 3.1 | 墨斗 | **agy (wave236 恢复)** | 铁匠 cmd (`@commandcode/ai`, wave234) |
+| "画个原型 / 竞品图" | Phase 1.4 / 3.1 | 墨斗 | **agy (wave236 恢复, 原型主跑)** | 铁匠 cmd (`@commandcode/ai`, wave234) |
 | "License 扫一下" | Phase 1.3 | 百晓生 (限) | copilot | 墨斗 agy |
 | "写个 spec" | Phase 2.3 | 铁匠 | **cmd (`@commandcode/ai`, wave234)** | 门神 cmd (`@commandcode/ai`) |
 | "代码审查" | Phase 4.3 | 门神 | cmd (`@commandcode/ai`) | 铁匠 cmd (`@commandcode/ai`, wave234) |
@@ -144,7 +153,7 @@ PM 派活时必须遵守:
    (wave227 起, 测试/运营/风险/部署/复盘 5 项主员工为百晓生)
 
 4. 紧急 → 切门神 cmd (`@commandcode/ai` 自动化批处理, **不是老板亲自跑** — wave229)
-   监控/部署/风险类紧急 → 切兑底渊 claude-ds
+   监控/部署/风险类紧急 → 切兑底渊 **cmd (`@commandcode/ai`, wave236 改)** + claude-mm 兜底 (claude-ds 不可用, 配额紧)
 
 5. 铁匠 / 百晓生 配额见顶 → 切 claude-mm (兜底)
    - 铁匠 (wave234): cmd 排满 → claude-mm
@@ -159,8 +168,8 @@ PM 派活时必须遵守:
 |---|---|---|---|
 | **铁匠 (wave234 改)** | **cmd (`@commandcode/ai` CLI)** | claude-mm | cmd 排满时切 claude-mm (按量); **claude-glm 退出铁匠主线** (老板原话 "额度不够") |
 | 门神 | **cmd (`@commandcode/ai` CLI)** | (无) | commandcode.ai CLI 自动化批处理 (wave229: 老板不亲自跑, 无 180s 冷却约束) |
-| 兑底渊 | claude-ds | (无) | 按量不限 |
-| 墨斗 | agy | (无) | 按量不限 |
+| **兑底渊 (wave236 改)** | **cmd (`@commandcode/ai` CLI)** | claude-mm | **wave236 改**: cmd 为主 (替换 claude-ds); claude-mm 按量兜底; **claude-ds 退出兑底渊主线** (老板原话 "claude-ds 不能用", 配额紧) |
+| **墨斗 (wave236 恢复)** | **agy (Gemini 3.8)** | cmd (紧急) | **wave236 恢复**: agy 为主 (2026-09-30 ~7 天后恢复); 紧急时切 cmd (`@commandcode/ai`) |
 | **百晓生 (wave227 多工具, wave234 主线切 claude-mm)** | **claude-mm** (主线) | claude-glm (老板备用, GLM 充裕时) → copilot (限) → claude-ds (按量) | wave227 起 DS 责任扩到 5 个主任务 (2.5/3.5/5.2/5.3/5.5); wave234 起主线从 claude-glm 切到 claude-mm, claude-glm 降为老板备用 (GLM 充裕时仍可用) |
 
 **PM 监控命令** (PM 自己跑, 老板不看):
@@ -334,7 +343,7 @@ PM 派活后, 按这个流程验收:
 - 派单日志: [`docs-coolie/PM-DISPATCH-LOG-2026-09-20.md`](PM-DISPATCH-LOG-2026-09-20.md)
 - 失败案例: [`docs-coolie/PM-FAILURE-CASES.md`](PM-FAILURE-CASES.md)
 - 派活脚本示例: `~/bin/dispatch-wave224.sh` / `~/bin/dispatch-wave225.sh` / `~/bin/dispatch-wave227.sh` (DS 多工具)
-- QA 报告: [`docs-coolie/evidence/wave227/QA-REPORT.md`](evidence/wave227/QA-REPORT.md); [`docs-coolie/evidence/wave234/QA-REPORT.md`](evidence/wave234/QA-REPORT.md)
+- QA 报告: [`docs-coolie/evidence/wave227/QA-REPORT.md`](evidence/wave227/QA-REPORT.md); [`docs-coolie/evidence/wave234/QA-REPORT.md`](evidence/wave234/QA-REPORT.md); [`docs-coolie/evidence/wave236/QA-REPORT.md`](evidence/wave236/QA-REPORT.md) (agy 恢复 + claude-ds 退出)
 
 **本波 (wave227) 变更摘要**:
 - 5 个高频场景 (Phase 2.5 / 3.5 / 5.2 / 5.3 / 5.5) 主员工改百晓生, 默认工具统一 claude-glm
@@ -349,3 +358,15 @@ PM 派活后, 按这个流程验收:
 - §4 工具切换规则: 铁匠行从 "claude-glm / claude-mm" 改为 "cmd / claude-mm"; 百晓生行从 "claude-glm
   主线" 改为 "claude-mm 主线 / claude-glm 备用"
 - §5 派活模板: "派百晓生 wave227 范例" 改为 wave234 版, 主线工具 claude-glm → claude-mm
+
+**本波 (wave236) 变更摘要**:
+- 老板原话 2 条 (2026-09-30): "agy 恢复了应该可以用" + "claude-ds 也不能用, 换 cmd, claude-mm"
+- §1.1 例句: "选个 typeorm vs drizzle" / "画原型 / 竞品图" 改墨斗 + agy (wave236 恢复);
+  "部署 wave225 / 看 OTA manifest" 改兑底渊 + cmd (wave236 替换 claude-ds)
+- §2.1 SOP step 4: 兑底渊行 claude-ds → cmd + claude-mm; 墨斗行 agy 恢复 (紧急切 cmd 兜底)
+- §3.1 路由表: "看下 OTA manifest" / "部署 wave225" 默认工具 claude-ds → cmd; "选 typeorm vs drizzle"
+  默认工具 agy 标"wave236 恢复"; 新增"画原型 / 竞品图" 行 (墨斗 + agy)
+- §3.2 PM 速查流程 step 4: 监控/部署/风险类紧急 → 切兑底渊 cmd + claude-mm (claude-ds 不可用)
+- §4 工具切换规则: 兑底渊行 claude-ds → cmd (主线) + claude-mm (兜底); 墨斗行加 "(wave236 恢复)"
+  + cmd 紧急兜底
+- 0 行代码改动, 仅 5 个 docs-coolie/*.md 同步

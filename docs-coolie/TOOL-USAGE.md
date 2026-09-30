@@ -1,4 +1,4 @@
-# 工具使用规范 (wave228 + wave229 cmd 修正 + wave234 claude-glm 退出主力)
+# 工具使用规范 (wave228 + wave229 cmd 修正 + wave234 claude-glm 退出主力 + wave236 agy 恢复 + claude-ds 退出)
 
 > **目的**: 把老板的"6 工具使用规范 + MCP 默认安装"落到一份独立文档. 配套
 > `TEAM-MAPPING.md` (5 员工岗位) + `CMMI-EMPLOYEE-MAPPING.md` (CMMI 25 任务分工)
@@ -7,6 +7,13 @@
 > **wave229 修正**: `cmd` 工具 = `commandcode.ai` CLI (`@commandcode/ai`), **不是老板自己跑**.
 > 之前 wave228 误记"老板本人 180s 冷却", 老板 2026-09-30 澄清. cmd 是 commandcode.ai 的
 > 自动化批处理 CLI, 由门神 (FDSE) spawn 执行, 老板不亲自跑. 见 §1 / §2 / §5.
+>
+> **wave236 改**: 老板原话 2 条 (2026-09-30):
+> - "agy 恢复了应该可以用" — agy (Gemini 3.8) 2026-09-23 配额耗尽, ~7 天后恢复 (09-30 配额可用).
+>   **墨斗 (FDA) 默认切回 agy**, cmd 作为紧急兜底.
+> - "claude-ds 也不能用, 换 cmd, claude-mm" — claude-ds 配额紧 (PM 之前漏改).
+>   **兑底渊 (PRE-SRE) 工具改 cmd + claude-mm** (替换 claude-ds). claude-ds 标"不可用, 配额紧" —
+>   仅百晓生 SRE 临时大任务按量兜底.
 >
 > **不动**: `server/src/services/agent-assign.ts` / `AGENT_ROLES` enum /
 > `ROLE_MAPPING` / Coolie 工坊系统 / UI / clients/expo.
@@ -32,9 +39,9 @@
 | 1 | **claude-glm** | 每日配额, **经常额度用完** (2026-10-02 17:55 重置) | ⚠️ **wave234 退出主力** (老板备用) | — | GLM 充裕时百晓生仍可用; 不再是铁匠/百晓生主线 |
 | 2 | **claude-mm** | 按量, **多排队跑** (取代铁匠/百晓生主线) | **百晓生** (主线, wave234 起) + 铁匠 (兜底) | — | wave234 起百晓生主线; 铁匠 cmd 排满时切 claude-mm |
 | 3 | **cmd** (`@commandcode/ai`) | commandcode.ai CLI 配额, **老板不亲自跑** (wave229) | **铁匠** (主线, wave234 起) + 门神 (核心) | — | wave234 起铁匠主线 (替代 claude-glm); 门神保留; 紧急 / 自动化批处理 / 真机金标 / E2E 撞机 |
-| 4 | **agy** | 充裕, 按量 | **墨斗** (FDA) | — | 原型 / 画图 / 选型研判 / 业务访谈 |
+| 4 | **agy** | 充裕, 按量 (**2026-09-30 ~7 天后恢复**, 2026-09-23 耗尽) | **墨斗** (FDA, **wave236 恢复** 主线) | — (cmd 紧急兜底) | 原型 / 画图 / 选型研判 / 业务访谈 (墨斗主跑); 偶尔 cmd 紧急 |
 | 5 | **copilot** | **每月 1 号 8 点重置** | **百晓生** (DS, 数据 / 文档轻任务) | — | 1 号 8:00 重置后自动切回 gpt5 sol (cron 跑, 见 §4) |
-| 6 | **claude-ds** | 按量, 不受限 | **兑底渊** (PRE-SRE, 部署 / 监控 SRE 强任务) | **百晓生** (DS, SRE 临时大任务) | 部署架构 / 监控告警 / 按量兜底 |
+| 6 | **claude-ds** | 按量, **配额紧, 不可作主线** (wave236) | ⚠️ **wave236 退出员工主线** (配额紧) | **百晓生** (DS, SRE 临时大任务按量兜底) | 不可作任何员工主线 (wave236); 仅百晓生 SRE 临时大任务按量兜底; 部署架构 / 监控告警走 cmd (兑底渊主线, wave236) 或 claude-mm (百晓生, wave234) |
 
 **配额监控 (PM 跑, 老板不看)**:
 
@@ -53,10 +60,10 @@
 1. 紧急 / 自动化批处理 / 真机金标 → cmd (`@commandcode/ai`, 门神 spawn, **不是老板亲自跑** — wave229)
 2. 写代码主线 (wave234) → cmd (`@commandcode/ai` CLI, 铁匠主线, wave229)
 3. 写代码兜底 (wave234) → claude-mm (铁匠兜底 + 百晓生主线)
-4. 部署 / 监控 / SRE 强任务 → claude-ds (兑底渊)
-5. 选型 / 原型 / 竞品 / 业务访谈 → agy (墨斗)
+4. 部署 / 性能 / SRE 强任务 → cmd (`@commandcode/ai`, **兑底渊主线, wave236 改, 替换 claude-ds**) + claude-mm 兜底
+5. 选型 / 原型 / 竞品 / 业务访谈 → agy (墨斗, **wave236 恢复**)
 6. 数据 / 文档 / 验收 / 审批 / 监控 / 复盘 → copilot (百晓生, 限 1 号 8 点后)
-7. 按量兜底 / 临时大任务 → claude-ds (百晓生按量)
+7. 按量兜底 / SRE 临时大任务 → claude-ds (百晓生, **wave236 起仅 SRE 临时按量兜底**)
 8. 老板备用 / GLM 充裕时 → claude-glm (wave234 起降为备用, 不再是铁匠/百晓生主线)
 ```
 
@@ -137,8 +144,8 @@ bash scripts/cron-copilot-reset.sh --unregister
 |---|---|---|---|
 | **铁匠 (wave234 改)** | **cmd (`@commandcode/ai` CLI)** | claude-mm | cmd 排满时切 claude-mm (按量); **claude-glm 退出铁匠主线** (老板原话 "额度不够") |
 | 门神 | **cmd (`@commandcode/ai`)** | (无) | commandcode.ai CLI 配额 / 队列 (wave229: 老板不亲自跑, 无 180s 冷却约束) |
-| 兑底渊 | claude-ds | (无) | 按量不限, 无切换 |
-| 墨斗 | agy | (无) | 按量不限, 无切换 |
+| **兑底渊 (wave236 改)** | **cmd (`@commandcode/ai` CLI)** | claude-mm | **wave236 改**: cmd 为主 (替换 claude-ds); claude-mm 按量兜底; **claude-ds 退出兑底渊主线** (老板原话 "claude-ds 不能用", 配额紧) |
+| **墨斗 (wave236 恢复)** | **agy (Gemini 3.8)** | cmd (紧急) | **wave236 恢复**: agy 为主 (2026-09-30 ~7 天后恢复); 紧急时切 cmd (`@commandcode/ai`) |
 | **百晓生 (DS, wave234 改)** | **claude-mm** (主线, wave234 起) | claude-glm (老板备用, GLM 充裕时) → copilot (限) → claude-ds | wave227 起多工具, wave234 起主线切 claude-mm; claude-glm 降为老板备用 (GLM 充裕时仍可用); 工具切换规则见 `HOW-TO-DELEGATE.md` §4 DS 段 |
 
 ---
@@ -151,8 +158,8 @@ agent-browser / system-monitor / approval / company-ops).
 
 | CMMI 任务 | 工具 (主, wave234) | MCP |
 |---|---|---|
-| 2.5 风险评估 | agy (副 claude-ds) | system-monitor (查历史) |
-| 3.5 部署架构 | claude-ds | system-monitor (架构建议) |
+| 2.5 风险评估 | **agy (wave236 恢复, 墨斗主线)** | system-monitor (查历史) |
+| 3.5 部署架构 | **cmd (`@commandcode/ai`, wave236 兑底渊主线)** | system-monitor (架构建议) |
 | 5.2 监控告警 | **claude-mm (wave234)** | agent-device (连设备) + system-monitor |
 | 5.3 验收测试 | **claude-mm (wave234) / claude-mm 兜底** | agent-device + agent-browser (撞机器) |
 | 5.4 发布说明 | **cmd (`@commandcode/ai`, wave234)** | - |
@@ -182,7 +189,7 @@ agent-browser / system-monitor / approval / company-ops).
 - CMMI 25 任务分工: [`docs-coolie/CMMI-EMPLOYEE-MAPPING.md`](CMMI-EMPLOYEE-MAPPING.md) (wave225 + wave227 + wave234 主线切换)
 - PM 派活 SOP: [`docs-coolie/HOW-TO-DELEGATE.md`](HOW-TO-DELEGATE.md) (wave225 + wave234 §3.1 路由表更新)
 - 5 员工 Skills: [`docs-coolie/EMPLOYEE-SKILLS.md`](EMPLOYEE-SKILLS.md) (wave232 + wave234 §1.1/§1.5 工具列)
-- QA 报告: [`docs-coolie/evidence/wave234/QA-REPORT.md`](../evidence/wave234/QA-REPORT.md)
+- QA 报告: [`docs-coolie/evidence/wave234/QA-REPORT.md`](../evidence/wave234/QA-REPORT.md); [`docs-coolie/evidence/wave236/QA-REPORT.md`](../evidence/wave236/QA-REPORT.md) (agy 恢复 + claude-ds 退出)
 - MCP install 脚本:
   - [`scripts/install-agent-device-mcp.sh`](../scripts/install-agent-device-mcp.sh) (wave228)
   - [`scripts/install-agent-browser-mcp.sh`](../scripts/install-agent-browser-mcp.sh) (wave228)

@@ -15,6 +15,11 @@
 > (`@commandcode/ai` CLI, wave229); 百晓生主线切 claude-mm (按量); claude-glm 降为
 > 老板备用 (GLM 充裕时百晓生仍可用). 工具切换规则与 `HOW-TO-DELEGATE.md` §4 一致.
 >
+> **wave236 改**: 老板原话 2 条 (2026-09-30): "agy 恢复了应该可以用" + "claude-ds 也不能用,
+> 换 cmd, claude-mm". **墨斗 (FDA) 默认切回 agy** (2026-09-30 ~7 天后恢复), cmd 作为紧急兜底.
+> **兑底渊 (PRE-SRE) 工具改 cmd + claude-mm** (替换 claude-ds). claude-ds 标"不可用, 配额紧" —
+> 仅百晓生 SRE 临时大任务按量兜底. 工具切换规则与 `HOW-TO-DELEGATE.md` §4 一致.
+>
 > **不动**: `ROLE_MAPPING` (wave222 算法层); `AGENT_ROLES` enum; `server/src/services/agent-assign.ts`.
 
 ---
@@ -40,17 +45,17 @@
 
 | 任务 | 主员工 | 副员工 | 默认工具 (主) | 默认工具 (副) | 说明 |
 |---|---|---|---|---|---|
-| 1.1 业务目标 | 墨斗 (`fda`) | - | agy | - | 客户前线需求, 墨斗跑业务访谈 |
-| 1.2 技术约束 | 墨斗 (`fda`) | 铁匠 (`core-swe`) | agy | **cmd (`@commandcode/ai`, wave234)** | 架构选型, 墨斗出方案铁匠审 |
-| 1.3 License 合规 | 墨斗 (`fda` / `ds` 双) | - | agy | - | 开源协议扫描 (FDA + DS 工作重叠) |
-| 1.4 选型研判 (DAR) | 墨斗 (`fda`) | 百晓生 (`ds`) | agy | copilot (限) | 竞品对标, 墨斗主判百晓生兜底 |
+| 1.1 业务目标 | 墨斗 (`fda`) | - | **agy (wave236 恢复)** | - | 客户前线需求, 墨斗跑业务访谈 |
+| 1.2 技术约束 | 墨斗 (`fda`) | 铁匠 (`core-swe`) | **agy (wave236 恢复)** | **cmd (`@commandcode/ai`, wave234)** | 架构选型, 墨斗出方案铁匠审 |
+| 1.3 License 合规 | 墨斗 (`fda` / `ds` 双) | - | **agy (wave236 恢复)** | - | 开源协议扫描 (FDA + DS 工作重叠) |
+| 1.4 选型研判 (DAR) | 墨斗 (`fda`) | 百晓生 (`ds`) | **agy (wave236 恢复)** | copilot (限) | 竞品对标 + 原型 + 画图, 墨斗主判百晓生兜底 |
 | 1.5 G0 选型门禁 | 铁匠 (`core-swe`) | 墨斗 (`fda`) + **Hermes (拍板)** | **cmd (`@commandcode/ai`, wave234)** | agy | 立项前门禁, Hermes 拍板 |
 
 ### Phase 2: 规划
 
 | 任务 | 主员工 | 副员工 | 默认工具 (主) | 默认工具 (副) | 说明 |
 |---|---|---|---|---|---|
-| 2.1 端口策略矩阵 | 兑底渊 (`pre-sre`) | 铁匠 (`core-swe`) | claude-ds | **cmd (`@commandcode/ai`, wave234)** | 网络策略, 兑底渊主规划 |
+| 2.1 端口策略矩阵 | 兑底渊 (`pre-sre`) | 铁匠 (`core-swe`) | **cmd (`@commandcode/ai`, wave236 改)** + claude-mm 兜底 | **cmd (`@commandcode/ai`, wave234)** | 网络策略, 兑底渊主规划 (claude-ds 退出, wave236) |
 | 2.2 WBS 拆解 | 铁匠 (`core-swe`) | 门神 (`fdse`) | **cmd (`@commandcode/ai`, wave234)** | cmd | 主线支线临时拆解 |
 | 2.3 Spec 编写 | 铁匠 (`core-swe`) | - | **cmd (`@commandcode/ai`, wave234)** | - | 4 类 spec schema (Kiro Feature / Bugfix / …) |
 | 2.4 工时估算 | 铁匠 (`core-swe`) | 门神 (`fdse`) | **cmd (`@commandcode/ai`, wave234)** | cmd | 评估工作量, 门神验证 |
@@ -63,7 +68,7 @@
 | 3.1 系统设计 | 铁匠 (`core-swe`) | 墨斗 (`fda`) | **cmd (`@commandcode/ai`, wave234)** | agy | 架构 + 数据模型 |
 | 3.2 API 契约 | 铁匠 (`core-swe`) | - | **cmd (`@commandcode/ai`, wave234)** | - | REST + GraphQL 契约 |
 | 3.3 DB Schema | 铁匠 (`core-swe`) | 百晓生 (`ds`) | **cmd (`@commandcode/ai`, wave234)** | copilot (限) | 数据模型, 百晓生兜底 |
-| 3.4 安全设计 | 兑底渊 (`pre-sre`) | 铁匠 (`core-swe`) | claude-ds | **cmd (`@commandcode/ai`, wave234)** | 鉴权 + RBAC |
+| 3.4 安全设计 | 兑底渊 (`pre-sre`) | 铁匠 (`core-swe`) | **cmd (`@commandcode/ai`, wave236 改)** + claude-mm 兜底 | **cmd (`@commandcode/ai`, wave234)** | 鉴权 + RBAC (claude-ds 退出, wave236) |
 | 3.5 部署架构 | **百晓生 (`ds`)** | 兑底渊 (`pre-sre`) | **claude-mm (wave234)** | claude-ds | **责任重大** (wave227) — CI/CD + 网络策略 + 风险评估联动; 兑底渊给恢复方案 |
 
 ### Phase 4: 开发
@@ -74,13 +79,13 @@
 | 4.2 单元测试 | 铁匠 (`core-swe`) | - | **cmd (`@commandcode/ai`, wave234)** | - | 自己写 |
 | 4.3 代码审查 | 门神 (`fdse`) | 铁匠 (`core-swe`) | cmd | **cmd (`@commandcode/ai`, wave234)** | 互审 (门神 spawn cmd, wave229) |
 | 4.4 集成测试 | 铁匠 (`core-swe`) | 门神 (`fdse`) | **cmd (`@commandcode/ai`, wave234) → claude-mm (兜底)** | cmd | 端到端, mm 擅长长上下文 |
-| 4.5 性能优化 | 兑底渊 (`pre-sre`) | 铁匠 (`core-swe`) | claude-ds | **cmd (`@commandcode/ai`, wave234)** | 性能瓶颈 |
+| 4.5 性能优化 | 兑底渊 (`pre-sre`) | 铁匠 (`core-swe`) | **cmd (`@commandcode/ai`, wave236 改)** + claude-mm 兜底 | **cmd (`@commandcode/ai`, wave234)** | 性能瓶颈 (claude-ds 退出, wave236) |
 
 ### Phase 5: 部署
 
 | 任务 | 主员工 | 副员工 | 默认工具 (主) | 默认工具 (副) | 说明 |
 |---|---|---|---|---|---|
-| 5.1 部署执行 | 兑底渊 (`pre-sre`) | 门神 (`fdse`) | claude-ds | cmd | systemd + OTA |
+| 5.1 部署执行 | 兑底渊 (`pre-sre`) | 门神 (`fdse`) | **cmd (`@commandcode/ai`, wave236 改)** + claude-mm 兜底 | cmd | systemd + OTA (claude-ds 退出, wave236) |
 | 5.2 监控告警 | **百晓生 (`ds`)** | 兑底渊 (`pre-sre`) | **claude-mm (wave234)** | claude-ds | **责任重大** (wave227) — 日志 + 指标 + 应急响应; 兑底渊副出恢复脚本 |
 | 5.3 验收测试 | **百晓生 (`ds`)** | 门神 (`fdse`) | **claude-mm (wave234)** | cmd | **责任重大** (wave227) — 30 项 E2E + 撞机; 老板金标仍走门神 cmd 兜底 |
 | 5.4 发布说明 | 铁匠 (`core-swe`) | - | **cmd (`@commandcode/ai`, wave234)** | - | release notes |
@@ -167,8 +172,8 @@
 |---|---|---|---|---|
 | **铁匠 (wave234 改)** | **cmd (`@commandcode/ai` CLI, wave229)** | claude-mm | commandcode.ai CLI 配额 / 队列 (wave229: 不是老板亲自跑); claude-mm 按量; **claude-glm 退出主力 (wave234)** | agent-device + agent-browser |
 | 门神 | cmd (`@commandcode/ai`, wave229) | (无) | commandcode.ai CLI 配额 / 队列 (wave229: 不是老板亲自跑, 无 180s 冷却) | agent-device + agent-browser |
-| 兑底渊 | claude-ds | (无) | 长期按量 | agent-device + agent-browser |
-| 墨斗 | agy | (无) | 长期按量 | agent-device + agent-browser |
+| **兑底渊 (wave236 改)** | **cmd (`@commandcode/ai` CLI)** | claude-mm (按量) | cmd 配额 / 队列 (wave229: 老板不亲自跑); claude-mm 按量; **claude-ds 退出兑底渊主线 (wave236, 配额紧)** | agent-device + agent-browser |
+| **墨斗 (wave236 恢复)** | **agy (Gemini 3.8)** | cmd (紧急兜底) | agy 长期按量 (2026-09-23 耗尽, **2026-09-30 ~7 天后恢复**); cmd 紧急时兜底 | agent-device + agent-browser |
 | **百晓生 (wave227 多工具 + wave228 DS MCP + wave234 主线切 claude-mm)** | **claude-mm** (主线, wave234 起) | claude-glm (老板备用, GLM 充裕时) → copilot (限) → claude-ds (按量) | wave234 起主线切 claude-mm (按量); claude-glm 降为老板备用; copilot 2026-09-29 已弃用但岗位恢复; claude-ds 按量 | **agent-device + agent-browser + system-monitor + approval + company-ops (5 个 MCP, DS 工具链专属)** |
 
 **百晓生工具切换 (wave234 改)**:
@@ -194,7 +199,7 @@
 |---|---|---|---|
 | **agent-device** | `scripts/install-agent-device-mcp.sh` | claude / claude-mm / claude-glm / claude-ds / agy / copilot / cmd (7 个全部装) | 设备自动化 (iOS / Android / web / macOS / TV) — 跑测试 / 撞机 |
 | **agent-browser** | `scripts/install-agent-browser-mcp.sh` | 同上 (7 个全部装) | 浏览器自动化 — E2E 撞机 / 验收 / 拖拽 |
-| **system-monitor** | `scripts/install-ds-mcp.sh` | **仅 DS 工具链** (claude-mm 主线 / claude-glm 备用 / claude-ds, wave234 起) | 监控系统运行状态 (CPU / mem / paperclip health) |
+| **system-monitor** | `scripts/install-ds-mcp.sh` | **仅 DS 工具链** (claude-mm 主线 / claude-glm 备用 / claude-ds 按量兜底, wave234 起; **wave236 起 claude-ds 仅 SRE 临时按量兜底**) | 监控系统运行状态 (CPU / mem / paperclip health) |
 | **approval** | 同上 | 同上 | 任何变更走 approval gate (PM 自动审批 / 老板拍板) |
 | **company-ops** | 同上 | 同上 | 运营 Coolie 工坊 (日报 / 配额 / release driver) |
 
@@ -269,7 +274,7 @@ cmd -p "<老板一句话需求>"
 - 派活算法: `server/src/services/agent-assign.ts` (wave222, 不动)
 - 派活算法 demo: `scripts/wave222/route-demo.mjs`
 - 派活算法测试: `server/src/services/agent-assign.test.ts`
-- QA 报告: [`docs-coolie/evidence/wave227/QA-REPORT.md`](evidence/wave227/QA-REPORT.md); [`docs-coolie/evidence/wave234/QA-REPORT.md`](evidence/wave234/QA-REPORT.md)
+- QA 报告: [`docs-coolie/evidence/wave227/QA-REPORT.md`](evidence/wave227/QA-REPORT.md); [`docs-coolie/evidence/wave234/QA-REPORT.md`](evidence/wave234/QA-REPORT.md); [`docs-coolie/evidence/wave236/QA-REPORT.md`](evidence/wave236/QA-REPORT.md) (agy 恢复 + claude-ds 退出)
 
 **本波 (wave227) 变更摘要**:
 - 5 个 CMMI 任务主员工改百晓生 (`ds`): Phase 2.5 / Phase 3.5 / Phase 5.2 / Phase 5.3 / Phase 5.5
@@ -296,3 +301,12 @@ cmd -p "<老板一句话需求>"
 - §4.1 新增: 4 个 install 脚本 + copilot cron 行的速查表 + 安装命令
 - §8 索引: 链 `TOOL-USAGE.md` (wave228 新)
 - 算法层 / 员工层 / CMMI 任务分工 / wave227 全部不变; 本波仅 ADDS MCP 信息
+
+**本波 (wave236) 变更摘要**:
+- 老板原话 2 条 (2026-09-30): "agy 恢复了应该可以用" + "claude-ds 也不能用, 换 cmd, claude-mm"
+- §1 25 任务分工表: Phase 1.1/1.2/1.3/1.4 墨斗 agy 行标 "(wave236 恢复)"; 兑底渊 4 个主任务
+  (2.1 / 3.4 / 4.5 / 5.1) 默认工具 claude-ds → cmd (`@commandcode/ai`) + claude-mm 兜底
+- §4 工具矩阵: 兑底渊行 claude-ds → cmd (主线) + claude-mm (兜底); 墨斗行加 "(wave236 恢复)"
+  + cmd 紧急兜底
+- §4.1 MCP 装载注释: claude-ds 仅 SRE 临时按量兜底 (不再是主线)
+- 算法层 `ROLE_MAPPING` 不动 — 5 员工层和算法层各自管各自的派活路由, 工具切换不影响算法层

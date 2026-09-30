@@ -1,4 +1,4 @@
-# 5 员工 × Skills 完整映射 (wave232)
+# 5 员工 × Skills 完整映射 (wave232 + wave236 agy 恢复 + claude-ds 退出)
 
 > **目的**: 老板原话 "本地员工, 各自需要使用到的 skills 都清楚了吗" — 把 5 员工每个岗位需要的
 > skills 一行行落实, PM (Hermes) 派活时直接照表选 skill, 不靠记忆.
@@ -17,6 +17,11 @@
 >
 > **真因 (老板原话)**: "本地员工, 各自需要使用到的 skills 都清楚了吗" — 之前员工岗位 +
 > CMMI 任务维度都有了, 但 skill 维度没明确, PM 派活时哪些 skill 该启用得靠员工自己猜.
+>
+> **wave236 改**: 老板原话 2 条 (2026-09-30): "agy 恢复了应该可以用" + "claude-ds 也不能用,
+> 换 cmd, claude-mm". **墨斗 (FDA) 默认切回 agy** (2026-09-30 ~7 天后恢复), cmd 作为紧急兜底.
+> **兑底渊 (PRE-SRE) 工具改 cmd + claude-mm** (替换 claude-ds). claude-ds 标"不可用, 配额紧" —
+> 仅百晓生 SRE 临时大任务按量兜底.
 
 ---
 
@@ -155,9 +160,9 @@
 > **wave229 注**: cmd = `commandcode.ai` 自动化 CLI, 老板不亲自 spawn, 由 PM (Hermes) 在
 > `dispatch-waveXXX.sh` 里调度门神跑. 所以 `~/.cmd/skills/` 由 PM 在安装时建立, 不靠员工手动.
 
-### 1.3 兑底渊 (Operator / `pre-sre`) — claude-ds (按量)
+### 1.3 兑底渊 (Operator / `pre-sre`) — **cmd (`@commandcode/ai`) 主线 (wave236 改) + claude-mm 按量兜底**
 
-**岗位**: 部署 + 性能 + 部分监控 (Phase 2.1 / 3.4 / 4.5 / 5.1). wave227 起 5.2 / 5.3 / 3.5 / 2.5 主改百晓生, 兑底渊降为副.
+**岗位**: 部署 + 性能 + 部分监控 (Phase 2.1 / 3.4 / 4.5 / 5.1). wave227 起 5.2 / 5.3 / 3.5 / 2.5 主改百晓生, 兑底渊降为副. **wave236 改**: 工具从 claude-ds (按量) 改 cmd (`@commandcode/ai` CLI, wave229) 主线 + claude-mm 按量兜底 (老板原话 "claude-ds 不能用, 换 cmd, claude-mm"); claude-ds 标"不可用, 配额紧" — 仅百晓生 SRE 临时大任务按量兜底.
 
 | Skill | 路径 | 状态 | P | 使用场景 |
 |---|---|---|---|---|
@@ -182,7 +187,7 @@
 | `paperclip-incident-response` | (待创建) | ⚠️ | P0 | 事故响应 — **缺失**, 标 ⚠️; 当前由 `diagnose-why-work-stopped` 间接覆盖 |
 | `paperclip-backup-restore` | (待创建) | ⚠️ | P0 | 备份恢复 — **缺失**, 标 ⚠️; 当前由 `backup-db.sh` 脚本间接覆盖 |
 
-**兑底渊加载路径** (claude-ds CLI):
+**兑底渊加载路径** (cmd `commandcode.ai` CLI 主线 / claude-mm 兜底, wave236 改):
 ```
 ~/.claude/skills/
   ↳ pre-sre, paperclip, paperclip-board, sre-release-and-deploy,
@@ -190,9 +195,9 @@
     ops-task-orchestration, ota-*, apk-installation-cache, ...
 ```
 
-### 1.4 墨斗 (Inkstick / `fda`) — `agy` (Gemini 3.8 按量)
+### 1.4 墨斗 (Inkstick / `fda`) — **agy (Gemini 3.8 按量, wave236 恢复) + cmd 紧急兜底**
 
-**岗位**: 选型研判 + 竞品分析 + License 扫描 (Phase 1.1/1.2/1.3/1.4).
+**岗位**: 选型研判 + 原型 + 画图 + 竞品分析 + License 扫描 (Phase 1.1/1.2/1.3/1.4). **wave236 恢复**: agy 2026-09-23 配额耗尽, ~7 天后 2026-09-30 配额恢复, 墨斗默认切回 agy (老板原话 "agy 恢复了应该可以用"). 偶尔用 cmd (`@commandcode/ai`) 作为紧急兜底.
 
 | Skill | 路径 | 状态 | P | 使用场景 |
 |---|---|---|---|---|
@@ -215,16 +220,18 @@
 | `paperclip-data-viz` | (待创建) | ⚠️ | P0 | 数据可视化 — **缺失**, 标 ⚠️; 当前由 `dataviz` skill 间接覆盖 |
 | `agy-system-instructions` | (待创建) | ⚠️ | P0 | agy 系统指令 — **缺失**, 标 ⚠️; 当前由 `fda` skill 内容覆盖 |
 
-**墨斗加载路径** (agy CLI):
+**墨斗加载路径** (agy `Gemini 3.8` CLI 主线, wave236 恢复; cmd `commandcode.ai` 紧急兜底):
 ```
 ~/.agy/skills/    (待 wave232 install-employee-skills.sh 建软链)
   ↳ fda, paperclip, solution-scouting-and-dar, system-design-spec,
     palantir-role-engineering, cmmi-tech-solution, cmmi-req-spec,
     product-project-intake, requirements-capture, doc-maintenance, ...
+~/.cmd/skills/    (紧急兜底; wave236 起, 墨斗偶尔切 cmd)
 ```
 
-> **agy 现状**: agy CLI 不像 Claude Code 自动从 `~/.agy/skills/` 加载, 标 ⚠️ 提示, 需要
-> agy CLI 升级加载机制后才有意义. 当前 fda skill 内容直接走 prompt, 不靠软链.
+> **agy 现状 (wave236)**: agy 2026-09-30 ~7 天后配额恢复 (2026-09-23 耗尽), **墨斗默认切回 agy**
+> (老板原话 "agy 恢复了应该可以用"). agy CLI 仍不像 Claude Code 自动从 `~/.agy/skills/` 加载,
+> fda skill 内容直接走 prompt, 不靠软链. 偶尔用 cmd 作为紧急兜底 (老板原话 "偶尔用 cmd").
 
 ### 1.5 百晓生 (Sage / `ds`) — **claude-mm 主 (wave234 起), claude-glm 备用, claude-ds 按量, copilot 限**
 
@@ -419,5 +426,6 @@
 
 - `docs-coolie/evidence/wave232/QA-REPORT.md` — 本波 QA 报告
 - `docs-coolie/evidence/wave234/QA-REPORT.md` — claude-glm 退出主力 (5 文档同步)
+- `docs-coolie/evidence/wave236/QA-REPORT.md` — agy 恢复 + claude-ds 退出 (5 文档同步)
 - `scripts/check-employee-skills.sh` — 跑 (默认全查)
 - `scripts/install-employee-skills.sh --dry-run` — 看 install plan
