@@ -65,6 +65,10 @@ const QA_COMPANY = {
   description:
     "Coolie 内部 QA 测试团队 — 装新版本, 跑真值实验, 出测试报告, 让老板只看结论不撞真机",
   budgetMonthlyCents: 0,
+  // wave226 — Boss: "coolie工坊中, 也要固定员工数量, 不能扩". QA 测试公司
+  // 跟 production 一样的封顶规则: 6 人. 这里显式写在 metadata, 即使 server
+  // 默认改 6 也不会扩; 也方便审计脚本读出来核对.
+  metadata: { maxAgents: 6, quotaSource: "wave226" },
 };
 
 /**
@@ -133,6 +137,25 @@ async function ensureCompany() {
   const existing = await findCompanyByName(QA_COMPANY.name);
   if (existing) {
     log("company.exists", { id: existing.id, name: existing.name });
+    // wave226 — Boss said "不扩". If the existing company was created before
+    // the quota landed (no metadata.maxAgents), patch it in so subsequent
+    // creates / bootstraps hit the cap. Idempotent: a re-run with the same
+    // quota just overwrites the same value.
+    const existingMax =
+      existing.metadata && typeof existing.metadata.maxAgents === "number"
+        ? existing.metadata.maxAgents
+        : null;
+    if (existingMax !== 6) {
+      const patched = await api("PATCH", `/api/companies/${existing.id}`, {
+        metadata: { maxAgents: 6, quotaSource: "wave226" },
+      });
+      log("company.quota.patched", {
+        id: patched.id,
+        previousMax: existingMax,
+        newMax: 6,
+      });
+      return patched;
+    }
     return existing;
   }
   const created = await api("POST", "/api/companies", QA_COMPANY);
@@ -183,6 +206,30 @@ async function main() {
   log("health.ok", health);
 
   const company = await ensureCompany();
+  // wave226 — pre-flight quota check. Count current live agents; if adding
+  // the 6 QA specs would push us over metadata.maxAgents, refuse and exit.
+  // The server-side guard also rejects individual creates with 429, but
+  // failing fast here makes the script's blast radius obvious in the log.
+  const maxAgents =
+    typeof company.metadata?.maxAgents === "number"
+      ? company.metadata.maxAgents
+      : 6;
+  const existing = await listAgents(company.id);
+  const room = Math.max(0, maxAgents - existing.length);
+  log("quota.preflight", {
+    current: existing.length,
+    max: maxAgents,
+    requested: QA_AGENTS.length,
+    room,
+  });
+  if (QA_AGENTS.length > room) {
+    log("quota.exceeded", {
+      message: `Cannot bootstrap ${QA_AGENTS.length} QA agents — company has ${existing.length}/${maxAgents} (room=${room}). Boss decision required.`,
+    });
+    console.error("FATAL: agent quota would be exceeded; refusing to bootstrap");
+    process.exit(4);
+  }
+
   const agents = [];
   for (const spec of QA_AGENTS) {
     const agent = await ensureAgent(company.id, spec);

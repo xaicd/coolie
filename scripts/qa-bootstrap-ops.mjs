@@ -179,6 +179,36 @@ async function main() {
   }
   log("company.found", { id: company.id, name: company.name });
 
+  // wave226 — Boss: "不扩" (don't expand). Coolie-Ops-Control-Room was
+  // wave220's bootstrap; that wave was reverted and the 7 ops employees
+  // became orphaned. Re-running this script would add MORE agents on top of
+  // the already-oversized roster. Refuse unless the boss explicitly sets
+  // OPS_ALLOW_BOOTSTRAP=1 to acknowledge the override, OR has manually raised
+  // metadata.maxAgents above the existing 7.
+  const allowEnv = process.env.OPS_ALLOW_BOOTSTRAP === "1";
+  const currentAgents = await listAgents(company.id);
+  const companyMax =
+    typeof company.metadata?.maxAgents === "number"
+      ? company.metadata.maxAgents
+      : 6;
+  const wouldExceed = currentAgents.length + OPS_AGENTS.length > companyMax;
+  log("quota.preflight", {
+    current: currentAgents.length,
+    requested: OPS_AGENTS.length,
+    max: companyMax,
+    wouldExceed,
+    opsAllowBootstrap: allowEnv,
+  });
+  if (wouldExceed && !allowEnv) {
+    log("ERR", {
+      msg: "Ops company agent count would exceed quota — refusing to bootstrap",
+      hint: "Boss decision required: either set company.metadata.maxAgents higher, " +
+        "or run with OPS_ALLOW_BOOTSTRAP=1 to acknowledge explicit override",
+    });
+    console.error("FATAL: ops company quota exceeded; refusing to bootstrap");
+    process.exit(5);
+  }
+
   const agents = [];
   for (const spec of OPS_AGENTS) {
     const agent = await ensureAgent(company.id, spec);
