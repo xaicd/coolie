@@ -34,7 +34,7 @@
   - ⚠️ **MISSING** — 老板 brief 列了但仓库 / 本地都**没有**, 标 ⚠️ 等后续 wave 创建
 - **优先级**: P0 = 必装 / 派活必带; P1 = 重要, 多数场景带; P2 = 备用, 按任务类型带.
 - **加载机制** (跨 CLI):
-  - `claude` / `claude-glm` / `claude-mm` / `claude-ds` → `~/.claude/skills/`
+  - `claude` / `claude-mm` / `claude-glm` (老板备用) / `claude-ds` → `~/.claude/skills/` (wave234 起: claude-mm 主线)
   - `cmd` (`@commandcode/ai`) → `~/.cmd/skills/` (待 wave228 mcp 安装齐后启用)
   - `agy` (Gemini CLI) → `~/.agy/skills/` (目前 agy 不自动加载 skill, 标 P2)
   - `copilot` → `~/.copilot/skills/` (目前无 skill 加载机制, 标 P2)
@@ -43,7 +43,7 @@
 
 ## 1. 5 员工 × Skills 映射主表
 
-### 1.1 铁匠 (Forge / `core-swe`) — claude-glm 主, claude-mm 兜底
+### 1.1 铁匠 (Forge / `core-swe`) — **cmd (`@commandcode/ai` CLI) 主 (wave234 起), claude-mm 兜底**
 
 **岗位**: 主力写代码 + 架构 + 集成. Phase 3 设计 / Phase 4 开发 全阶段主.
 
@@ -226,7 +226,7 @@
 > **agy 现状**: agy CLI 不像 Claude Code 自动从 `~/.agy/skills/` 加载, 标 ⚠️ 提示, 需要
 > agy CLI 升级加载机制后才有意义. 当前 fda skill 内容直接走 prompt, 不靠软链.
 
-### 1.5 百晓生 (Sage / `ds`) — claude-glm 主, claude-mm 兜底, claude-ds 按量, copilot 限
+### 1.5 百晓生 (Sage / `ds`) — **claude-mm 主 (wave234 起), claude-glm 备用, claude-ds 按量, copilot 限**
 
 **岗位**: 责任重大 — 测试 / 运营 / 风险 / 部署架构 / 复盘 (Phase 2.5 / 3.5 / 5.2 / 5.3 / 5.5).
 工具扩到 4 个 (wave227 起), 涵盖产品上线 + 监控 + 应急全链路.
@@ -277,7 +277,7 @@
 | `paperclip-bug-hunt` | (待创建) | ⚠️ | P0 | 撞机 — **缺失**, 标 ⚠️; 当前由 `qa-humanlike-e2e` 间接覆盖 |
 | `paperclip-quality-metrics` | (待创建) | ⚠️ | P0 | 质量指标 — **缺失**, 标 ⚠️; 当前由 `cmmi-car-spc-metrics` 间接覆盖 |
 
-**百晓生加载路径** (claude-glm / claude-mm / claude-ds):
+**百晓生加载路径** (claude-mm 主线 / claude-glm 备用 / claude-ds, wave234 起):
 ```
 ~/.claude/skills/  (DS 工具链共享 ~/.claude/skills/)
   ↳ ds, paperclip, paperclip-board, paperclip-evals,
@@ -308,7 +308,7 @@
   coolie/.agents/skills/<name>/SKILL.md     ← 72 个 skill, 上游 fork 共识
     ↑ (符号链接)
 第 2 层 (软链 — 4 个 CLI 自动加载路径)
-  ~/.claude/skills/<name>                   ← claude / claude-glm / claude-mm / claude-ds
+  ~/.claude/skills/<name>                   ← claude / claude-mm (wave234 主线) / claude-glm (备用) / claude-ds
   ~/.cmd/skills/<name>                      ← cmd (commandcode.ai)
   ~/.agy/skills/<name>                      ← agy (Gemini)  ← 当前不自动加载, 软链为占位
   ~/.copilot/skills/<name>                  ← copilot        ← 当前无加载机制, 软链为占位
@@ -418,5 +418,6 @@
 ## 7. QA 入口
 
 - `docs-coolie/evidence/wave232/QA-REPORT.md` — 本波 QA 报告
+- `docs-coolie/evidence/wave234/QA-REPORT.md` — claude-glm 退出主力 (5 文档同步)
 - `scripts/check-employee-skills.sh` — 跑 (默认全查)
 - `scripts/install-employee-skills.sh --dry-run` — 看 install plan
