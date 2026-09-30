@@ -15,6 +15,9 @@ import type { AgentRole } from "@paperclipai/shared";
  * 1. `ROLE_MAPPING` — 5 阶段 × 25 任务的纯数据映射 (5 角色优先).
  * 2. `pickRoleForCmmiTask` — 给 (阶段, 任务) 返回 5 角色 (主/副).
  * 3. `resolveCandidateAgents` — 在公司里按角色 + 可选 specialtyHint 找具体数字员工.
+ * 4. (wave223) `TEAM_MAPPING` — 5 阶段 × 25 任务的物理层: 6 员工 (Hermes / 铁匠 / 铁匠贰号 /
+ *    门神 / 墨斗 / 兑底渊) 的主/副派活表. 这是老板的派活版, 与算法层 5 角色并行存在.
+ * 5. (wave223) `pickTeamForCmmiTask` — 给 (阶段, 任务) 返回 6 员工 (主/副) 的物理层解析.
  *
  * What this module does NOT own:
  * - 不改 schema (5 阶段 25 任务元数据全部落在常量里).
@@ -22,7 +25,8 @@ import type { AgentRole } from "@paperclipai/shared";
  * - 不替 wave142 路由脚本 (那是历史数据迁移, 本服务是上层算法).
  * - 不替 assertAssignableAgent (那个是 assignment 前的硬校验, 见 agent-assignability.ts).
  *
- * 文档: docs-coolie/ROLE-MAPPING.md (§1 映射表 / §4 算法).
+ * 文档: docs-coolie/ROLE-MAPPING.md (§1 映射表 / §4 算法) + docs-coolie/TEAM-MAPPING.md
+ * (§1 6 员工档案 / §2 派活表 / §4 算法升级).
  */
 
 export const CMMI_PHASES = [
@@ -376,6 +380,162 @@ export function summarizeRoleMapping(): Array<{ role: AgentRole; primary: number
 /** Sanity guard: list every (phase,task) pair so callers can iterate without touching ROLE_MAPPING. */
 export function listAllCmmiTasks(): ReadonlyArray<CmmiTaskRoleBinding> {
   return ROLE_MAPPING;
+}
+
+// ============================================================================
+// wave223 — 6 员工 (Hermes / 铁匠 / 铁匠贰号 / 门神 / 墨斗 / 兑底渊) 物理层映射.
+//
+// Why: 老板原话 "咱们团队也和 coolie 工坊内置, 一样吧, 主 Hermes, 还有其他 5 个员工,
+//      每个员工对应本体角色, 负责不同工作". 把 6 员工的派活关系落到常量, 让派活算法在
+//      5 角色桶之上多一层 "老板团队" 视图.
+//
+// 与 ROLE_MAPPING 的关系:
+//   ROLE_MAPPING 是 "逻辑层" — 给 (phase, task) 返回 5 角色之一 (算法派活用它).
+//   TEAM_MAPPING 是 "物理层" — 给 (phase, task) 返回 6 员工之一 (老板派单 + PM 验收用它).
+//   算法本身只看 5 角色, 不读人名. 人名只在 PM 视角出现.
+//
+// 不动 5 角色 enum (AGENT_ROLES 保持 5 个 fork 角色 + 12 个上游). 不动 ROLE_MAPPING 表.
+// 详见 docs-coolie/TEAM-MAPPING.md §1 (档案) / §2 (派活表) / §4 (算法升级).
+// ============================================================================
+
+/** 6 员工的中文名字 — 老板亲自管的 6 个 AI 员工 (1 PM + 5 工匠角色). */
+export const TEAM_MEMBERS = [
+  "hermes", // Hermes / 黑哥 / XRobinAI — PM / 掌柜, 跨 5 角色
+  "tieshi", // 铁匠 — core-swe 主力 (claude-glm)
+  "tieshi-2", // 铁匠贰号 — core-swe 兜底 (claude-minimax)
+  "menshen", // 门神 — fdse (cmd / Claude Code CLI)
+  "modou", // 墨斗 — fda + ds (agy / Gemini)
+  "duidiyuan", // 兑底渊 — pre-sre (claude-ds 按量)
+] as const;
+export type TeamMember = (typeof TEAM_MEMBERS)[number];
+
+/** 中文标签 — 仅供日志/UI 显示, 不参与路由. */
+export const TEAM_LABELS: Readonly<Record<TeamMember, string>> = {
+  hermes: "Hermes (PM/掌柜)",
+  tieshi: "铁匠 (core-swe 主力)",
+  "tieshi-2": "铁匠贰号 (core-swe 兜底)",
+  menshen: "门神 (fdse)",
+  modou: "墨斗 (fda + ds)",
+  duidiyuan: "兑底渊 (pre-sre)",
+};
+
+export interface CmmiTaskTeamBinding {
+  phase: CmmiPhase;
+  task: CmmiTask;
+  taskTitle: string;
+  /** 主员工 — 6 员工之一, 必填. */
+  primary: TeamMember;
+  /** 副员工 — 6 员工之一 或 "" (空串代表 "无副"). */
+  secondary: TeamMember | "";
+}
+
+/**
+ * 6 员工 × CMMI 25 任务派活表 (物理层).
+ *
+ * 与 ROLE_MAPPING 的对应关系 (algorithm-layer → physical-layer):
+ *   - core-swe 主 → 铁匠 (or 铁匠贰号, 配额见顶时切)
+ *   - pre-sre 主 → 兑底渊
+ *   - fdse 主 → 门神
+ *   - fda 主 / ds 主 → 墨斗 (双角色)
+ *   - (跨 5 角色 / 老板拍板位) → Hermes
+ *
+ * 注意: Phase 5.3 "验收测试" 在 ROLE_MAPPING 里 primary=core-swe (算法派活),
+ *   在 TEAM_MAPPING 里 primary=menshen (老板金标要老板亲自跑门神). 这是两层故意
+ *   不同步的点 — 算法层只看角色, 物理层看老板团队. 文档见 TEAM-MAPPING.md §2.
+ */
+export const TEAM_MAPPING: ReadonlyArray<CmmiTaskTeamBinding> = [
+  // Phase 1: 立项
+  { phase: "phase_1_initiation", task: "p1_business_goal", taskTitle: "1.1 业务目标", primary: "hermes", secondary: "modou" },
+  { phase: "phase_1_initiation", task: "p1_tech_constraint", taskTitle: "1.2 技术约束", primary: "tieshi", secondary: "modou" },
+  { phase: "phase_1_initiation", task: "p1_license_compliance", taskTitle: "1.3 License 合规", primary: "modou", secondary: "" },
+  { phase: "phase_1_initiation", task: "p1_dar_selection", taskTitle: "1.4 选型研判 (DAR)", primary: "modou", secondary: "tieshi" },
+  { phase: "phase_1_initiation", task: "p1_g0_selection_gate", taskTitle: "1.5 G0 选型门禁", primary: "tieshi", secondary: "hermes" },
+  // Phase 2: 规划
+  { phase: "phase_2_planning", task: "p2_port_strategy", taskTitle: "2.1 端口策略矩阵", primary: "duidiyuan", secondary: "tieshi" },
+  { phase: "phase_2_planning", task: "p2_wbs_breakdown", taskTitle: "2.2 WBS 拆解", primary: "tieshi", secondary: "modou" },
+  { phase: "phase_2_planning", task: "p2_spec_write", taskTitle: "2.3 Spec 编写", primary: "tieshi", secondary: "" },
+  { phase: "phase_2_planning", task: "p2_effort_estimate", taskTitle: "2.4 工时估算", primary: "tieshi", secondary: "menshen" },
+  { phase: "phase_2_planning", task: "p2_risk_assess", taskTitle: "2.5 风险评估", primary: "modou", secondary: "duidiyuan" },
+  // Phase 3: 设计
+  { phase: "phase_3_design", task: "p3_system_design", taskTitle: "3.1 系统设计", primary: "tieshi", secondary: "modou" },
+  { phase: "phase_3_design", task: "p3_api_contract", taskTitle: "3.2 API 契约", primary: "tieshi", secondary: "" },
+  { phase: "phase_3_design", task: "p3_db_schema", taskTitle: "3.3 DB Schema", primary: "tieshi", secondary: "" },
+  { phase: "phase_3_design", task: "p3_security_design", taskTitle: "3.4 安全设计", primary: "duidiyuan", secondary: "tieshi" },
+  { phase: "phase_3_design", task: "p3_deploy_arch", taskTitle: "3.5 部署架构", primary: "duidiyuan", secondary: "tieshi" },
+  // Phase 4: 开发
+  { phase: "phase_4_development", task: "p4_coding", taskTitle: "4.1 编码", primary: "tieshi", secondary: "" },
+  { phase: "phase_4_development", task: "p4_unit_test", taskTitle: "4.2 单元测试", primary: "tieshi", secondary: "" },
+  { phase: "phase_4_development", task: "p4_code_review", taskTitle: "4.3 代码审查", primary: "menshen", secondary: "tieshi" },
+  { phase: "phase_4_development", task: "p4_integration_test", taskTitle: "4.4 集成测试", primary: "tieshi-2", secondary: "tieshi" },
+  { phase: "phase_4_development", task: "p4_perf_opt", taskTitle: "4.5 性能优化", primary: "duidiyuan", secondary: "tieshi" },
+  // Phase 5: 部署
+  { phase: "phase_5_deployment", task: "p5_deploy_exec", taskTitle: "5.1 部署执行", primary: "duidiyuan", secondary: "menshen" },
+  { phase: "phase_5_deployment", task: "p5_monitor_alert", taskTitle: "5.2 监控告警", primary: "duidiyuan", secondary: "modou" },
+  { phase: "phase_5_deployment", task: "p5_acceptance_test", taskTitle: "5.3 验收测试", primary: "menshen", secondary: "modou" },
+  { phase: "phase_5_deployment", task: "p5_release_notes", taskTitle: "5.4 发布说明", primary: "tieshi", secondary: "" },
+  { phase: "phase_5_deployment", task: "p5_retrospective", taskTitle: "5.5 复盘", primary: "hermes", secondary: "modou" },
+];
+
+/** Index by `phase + task` for O(1) lookup. */
+const TEAM_MAPPING_BY_KEY = new Map<string, CmmiTaskTeamBinding>(
+  TEAM_MAPPING.map((b) => [`${b.phase}:${b.task}`, b]),
+);
+
+export interface TeamPick {
+  phase: CmmiPhase;
+  task: CmmiTask;
+  taskTitle: string;
+  primary: TeamMember;
+  primaryLabel: string;
+  secondary: TeamMember | null;
+  secondaryLabel: string | null;
+}
+
+/**
+ * Look up the 6-员工 binding for (phase, task). Returns null if the pair is unknown.
+ * Used by:
+ *   - /api/agents/team-route-dry-run (preview before commit).
+ *   - `scripts/wave223/team-route-demo.mjs` demo script.
+ *
+ * Note: 与 ROLE_MAPPING 故意不同步的点 (见 TEAM_MAPPING 顶部注释) 在这里直接返回
+ * 6 员工版, 不试图做"算法层 + 老板层"的协调.
+ */
+export function pickTeamForCmmiTask(phase: CmmiPhase, task: CmmiTask): TeamPick | null {
+  const binding = TEAM_MAPPING_BY_KEY.get(`${phase}:${task}`);
+  if (!binding) return null;
+  return {
+    phase: binding.phase,
+    task: binding.task,
+    taskTitle: binding.taskTitle,
+    primary: binding.primary,
+    primaryLabel: TEAM_LABELS[binding.primary],
+    secondary: binding.secondary === "" ? null : binding.secondary,
+    secondaryLabel: binding.secondary === "" ? null : TEAM_LABELS[binding.secondary as TeamMember],
+  };
+}
+
+/** Sanity guard: list every (phase,task) pair so callers can iterate without touching TEAM_MAPPING. */
+export function listAllCmmiTeamTasks(): ReadonlyArray<CmmiTaskTeamBinding> {
+  return TEAM_MAPPING;
+}
+
+/** Aggregate counts for ops-daily-report / dashboards (6 员工视角). */
+export function summarizeTeamMapping(): Array<{ member: TeamMember; label: string; primary: number; secondary: number }> {
+  const counts = new Map<TeamMember, { primary: number; secondary: number }>();
+  for (const m of TEAM_MEMBERS) counts.set(m, { primary: 0, secondary: 0 });
+  for (const b of TEAM_MAPPING) {
+    const a = counts.get(b.primary);
+    if (a) a.primary += 1;
+    if (b.secondary) {
+      const s = counts.get(b.secondary as TeamMember);
+      if (s) s.secondary += 1;
+    }
+  }
+  return TEAM_MEMBERS.map((m) => ({
+    member: m,
+    label: TEAM_LABELS[m],
+    ...(counts.get(m) ?? { primary: 0, secondary: 0 }),
+  }));
 }
 
 /** Re-export `inArray` so callers (e.g. batch bulk-routes) don't need to import drizzle directly. */
