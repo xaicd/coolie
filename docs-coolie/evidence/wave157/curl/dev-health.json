@@ -1,0 +1,53 @@
+{
+    "status": "ok",
+    "version": "0.6.0+6.git.946c9fd7f.dirty",
+    "serverVersion": "0.6.0+6.git.946c9fd7f.dirty",
+    "commit": "899b45ea5617c4c13d815bd9f8be5f7597db564b",
+    "deploymentMode": "local_trusted",
+    "deploymentExposure": "private",
+    "localAiLoginSupported": true,
+    "authReady": true,
+    "bootstrapStatus": "ready",
+    "bootstrapInviteActive": false,
+    "features": {
+        "companyDeletionEnabled": true
+    },
+    "serverInfo": {
+        "processStartedAt": "2026-09-30T03:08:21.798Z",
+        "git": {
+            "available": true,
+            "fullSha": "899b45ea5617c4c13d815bd9f8be5f7597db564b",
+            "shortSha": "899b45ea5",
+            "branchName": "main",
+            "subject": "feat(ontology): wave155 \u843d\u5730 wave154 + PM \u4f18\u5316 \u2014 \u53ef\u91cd\u590d backfill + \u89c6\u56fe\u9884\u8bbe + agent \u771f\u540d + 3 \u6b65 onboarding",
+            "committedAt": "2026-09-30T03:15:41.000Z",
+            "localChanges": {
+                "available": true,
+                "hasLocalChanges": true,
+                "stagedFileCount": 166,
+                "unstagedFileCount": 12,
+                "untrackedFileCount": 4
+            }
+        }
+    },
+    "startupRecovery": {
+        "phase": "ready",
+        "updatedAt": "2026-09-30T03:08:23.940Z"
+    },
+    "nativeRecovery": {},
+    "databaseBackup": {
+        "enabled": true,
+        "status": "ok",
+        "backupDir": "/Users/mac/.paperclip/instances/default/data/backups",
+        "maxAgeHours": 26,
+        "latestBackup": {
+            "name": "paperclip-20260930-120823.sql.gz",
+            "path": "/Users/mac/.paperclip/instances/default/data/backups/paperclip-20260930-120823.sql.gz",
+            "mtime": "2026-09-30T04:08:24.713Z",
+            "ageHours": 0.3,
+            "sizeBytes": 462087
+        },
+        "lastFailure": null,
+        "warnings": []
+    }
+}

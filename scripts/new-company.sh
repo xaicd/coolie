@@ -5,9 +5,9 @@
 #
 #   1. POST /api/companies { name, templateId }   → company_id
 #   2. POST /api/companies/<id>/agents/bulk { roles:[5] } → 5 个 agent id
-#   3. mkdir ~/workspace/xaicd/<公司名>/ + 拷贝 templates/workspace-skel/
-#   4. git init + ruoyi-all-next 子模块注册
-#   5. 打印报告：company_id / workspace 路径 / 5 个 agent id
+#   3. POST .../seed-enterprise-context          → 企业基座本体域
+#   4. mkdir ~/workspace/xaicd/<公司名>/ + 拷贝 templates/workspace-skel/ + git init
+#   5. 拉轻量底座代码 coolie-base-1.0（可选，不含业务域）
 #
 # 环境变量：
 #   COOLIE_API_BASE         Coolie 平台地址           (默认: http://localhost:3100)
@@ -16,6 +16,8 @@
 #                           模式 (生产) 用会话 cookie 认证，无 bearer 时用这个
 #   COOLIE_WORKSPACE_HOME   workspace 父目录          (默认: $HOME/workspace/xaicd)
 #   COOLIE_SKIP_WORKSPACE   设为 1 只建平台公司 + agent，不铺本地目录
+#   COOLIE_BASE_REPO        轻量底座仓库              (默认: xaicd/ruoyi-all-next)
+#   COOLIE_BASE_TAG         轻量底座 tag              (默认: coolie-base-1.0)
 set -euo pipefail
 
 NAME="${1:-}"
@@ -67,7 +69,7 @@ echo " 模板:     $TEMPLATE"
 echo " API:      $API_BASE$([[ -n "$API_TOKEN" ]] && echo ' (bearer)' || { [[ -n "$COOKIE_JAR" ]] && echo ' (cookie)' || echo ' (no token)'; })"
 echo "========================================================"
 
-step "[1/4] 建平台公司 (POST /api/companies)"
+step "[1/5] 建平台公司 (POST /api/companies)"
 COMPANY_BODY="$(python3 -c 'import json,sys; print(json.dumps({"name":sys.argv[1],"templateId":sys.argv[2]}))' "$NAME" "$TEMPLATE")"
 COMPANY_JSON="$(api POST /api/companies "$COMPANY_BODY")" \
   || die "建公司失败：Coolie API 不可达或拒绝（${API_BASE}）。检查服务是否在跑、COOLIE_API_TOKEN 是否正确。"
@@ -76,7 +78,7 @@ COMPANY_ID="$(printf '%s' "$COMPANY_JSON" | json_get '["id"]')"
 echo "   ✓ company_id = $COMPANY_ID"
 echo "   ✓ template   = $(printf '%s' "$COMPANY_JSON" | json_get '.get("templateId")')"
 
-step "[2/4] 注册 5 角色 agent (POST /api/companies/$COMPANY_ID/agents/bulk)"
+step "[2/5] 注册 5 角色 agent (POST /api/companies/$COMPANY_ID/agents/bulk)"
 ROLES_BODY="$(python3 -c 'import json,sys; print(json.dumps({"roles":sys.argv[1:]}))' "${ROLES[@]}")"
 AGENTS_JSON="$(api POST "/api/companies/$COMPANY_ID/agents/bulk" "$ROLES_BODY")" \
   || die "注册 agent 失败（company_id=${COMPANY_ID}）"
@@ -115,11 +117,13 @@ else
   fi
   echo "   ✓ $ROOT"
 
-  step "[5/5] ruoyi-all-next 子模块"
+  step "[5/5] 轻量底座代码 (coolie-base, 不含业务域)"
+  BASE_REPO="${COOLIE_BASE_REPO:-https://github.com/xaicd/ruoyi-all-next.git}"
+  BASE_TAG="${COOLIE_BASE_TAG:-coolie-base-1.0}"
   cd "$ROOT"
-  # 子模块为可选项：网络不可达 / 已声明时不阻断立项。
-  git submodule add https://github.com/xaicd/ruoyi-all-next.git 2>&1 | head -3 \
-    || echo "   · submodule placeholder (稍后用 scripts/import-ruoyi.sh 重试)"
+  # 可选项：拉不到（网络不可达 / tag 未就绪）不阻断立项 —— 基座骨架本身已可用。
+  git clone --depth 1 --branch "$BASE_TAG" "$BASE_REPO" coolie-base 2>&1 | head -3 \
+    || echo "   · 轻量底座未拉取 (tag=$BASE_TAG 未就绪或网络不可达), 基座骨架仍可用"
 fi
 
 printf '\n========================================================\n'

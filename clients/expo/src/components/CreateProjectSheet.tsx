@@ -38,30 +38,16 @@ interface TemplatePreset {
   desc: string;
 }
 
+// 开发基座：唯一预设。基座是「空壳 + 5 默认模块」，不含业务域 ——
+// 客户按标书在其上快速定制。旧的 4 个全栈/微服务框架预设已删除
+// (RuoYi-All-Next 全量 / Spring Cloud Alibaba / RuoYi-Vue-Pro / JeecgBoot)：
+// 它们预装了用不上的业务域，拖慢每个项目。
 const TEMPLATE_PRESETS: TemplatePreset[] = [
   {
-    name: "RuoYi-All-Next",
+    name: "Coolie 开发基座",
     url: "https://github.com/xaicd/ruoyi-all-next.git",
-    tag: "自有全栈底座",
-    desc: "内置 SQLite / Prisma / 3200 端口，支持 APP 内原型沙箱全功能实时预览",
-  },
-  {
-    name: "Spring Cloud Alibaba",
-    url: "https://github.com/alibaba/spring-cloud-alibaba.git",
-    tag: "微服务治理",
-    desc: "阿里系高可用分布式微服务解决方案与中间件底座",
-  },
-  {
-    name: "RuoYi-Vue-Pro",
-    url: "https://github.com/YunaiV/ruoyi-vue-pro.git",
-    tag: "企业全栈脚手架",
-    desc: "基于 Spring Boot + Vue3 的大型企业级多租户业务中后台系统",
-  },
-  {
-    name: "JeecgBoot",
-    url: "https://github.com/jeecgboot/JeecgBoot.git",
-    tag: "低代码微服务",
-    desc: "低代码微服务开发平台，前后端代码生成与业务中台引擎",
+    tag: "5 默认模块 + 客户定制",
+    desc: "内置 SQLite/Prisma/认证/权限/审计, 无业务域; 按项目标书快速定制",
   },
 ];
 
@@ -299,12 +285,12 @@ export function CreateProjectSheet({
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
           >
-            {/* 常用开源复杂项目底座预设 */}
+            {/* 开发基座预设 (轻量, 默认模块, 不含业务) */}
             <View style={styles.section}>
               <View style={styles.sectionHeaderRow}>
                 <Ionicons name="sparkles" size={14} color={C.accent} />
                 <Text style={styles.sectionLabel}>
-                  快速填入开源复杂项目预设
+                  快速填入开发基座预设
                 </Text>
               </View>
               <View style={styles.presetGrid}>

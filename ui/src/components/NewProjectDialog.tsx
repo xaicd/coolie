@@ -19,26 +19,15 @@ interface GitUrlItem {
   url: string;
 }
 
+// 开发基座：唯一预设，和 App (clients/expo CreateProjectSheet) 保持一致。
+// 基座是「空壳 + 5 默认模块」，不含业务域，客户按标书在其上快速定制。
+// 旧的 4 个全栈/微服务框架预设 (RuoYi-All-Next 全量 / Spring Cloud Alibaba /
+// RuoYi-Vue-Pro / JeecgBoot) 已删除：预装用不上的业务域会拖慢每个项目。
 const TEMPLATE_PRESETS = [
   {
-    name: "RuoYi-All-Next",
+    name: "Coolie 开发基座",
     url: "https://github.com/xaicd/ruoyi-all-next.git",
-    tag: "自有全栈底座",
-  },
-  {
-    name: "Spring Cloud Alibaba",
-    url: "https://github.com/alibaba/spring-cloud-alibaba.git",
-    tag: "微服务治理",
-  },
-  {
-    name: "RuoYi-Vue-Pro",
-    url: "https://github.com/YunaiV/ruoyi-vue-pro.git",
-    tag: "企业全栈脚手架",
-  },
-  {
-    name: "JeecgBoot",
-    url: "https://github.com/jeecgboot/JeecgBoot.git",
-    tag: "低代码微服务",
+    tag: "5 默认模块 + 客户定制",
   },
 ];
 
@@ -309,11 +298,11 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
                     </span>
                   </div>
 
-                  {/* 常用模板预设 */}
+                  {/* 开发基座预设 (轻量, 默认模块, 不含业务) */}
                   <div className="flex flex-col gap-1.5 rounded-lg border border-border/60 bg-muted/30 p-2.5">
                     <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
                       <Sparkles className="size-3 text-primary" />
-                      <span>快速填入开源复杂项目预设 (Quick Presets):</span>
+                      <span>快速填入开发基座预设 (Quick Presets):</span>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {TEMPLATE_PRESETS.map((preset) => (

@@ -18,49 +18,18 @@ export type { Project };
 // `import { C } from "../coolie"` 的既有调用点无需改动。
 export { C } from "./theme";
 
-/**
- * Instance base URL. Override per build with `EXPO_PUBLIC_COOLIE_BASE_URL`
- * (Expo inlines `EXPO_PUBLIC_*` at bundle time), so one build can point at a
- * customer's private instance instead of ours.
- *
- * The default is the live HTTPS instance, so an installed build works out of the
- * box for anyone with an account on it. Local development points elsewhere:
- *
- *   EXPO_PUBLIC_COOLIE_BASE_URL=http://192.168.3.85:3100 npx expo run:ios --device
- *
- * The access below MUST stay a plain `process.env.EXPO_PUBLIC_COOLIE_BASE_URL`
- * member expression. babel-preset-expo inlines only that exact form; an optional
- * chain (`process?.env?.X`) compiles to an OptionalMemberExpression the inliner
- * does not match, so the value stayed a runtime lookup that resolves to
- * undefined in a release build. Every installed APK then silently fell back to
- * the default and could not reach the instance at all (measured on a 0.5.6 APK:
- * requests to 127.0.0.1 died with "Network request failed"). The `typeof` guard
- * keeps it safe in a host without a `process` global, and being a ternary does
- * not stop the inliner from matching the member expression.
- */
-declare const process: { env?: Record<string, string | undefined> } | undefined;
-
-const inlinedBaseUrl =
-  typeof process !== "undefined" && process.env
-    ? process.env.EXPO_PUBLIC_COOLIE_BASE_URL
-    : undefined;
-
-export const COOLIE_BASE_URL = inlinedBaseUrl ?? "https://xrobinai.cn";
-
-/**
- * The origin this native client declares on every request.
- *
- * A native app sends no `Origin` header, and the host then refuses
- * cookie-authenticated mutations ("Board mutation requires trusted browser
- * origin", measured 403) — even though the same request succeeds with a bearer
- * credential. Declaring the instance's own origin is the same-origin evidence
- * the guard asks for, and it is derived from the target rather than configured,
- * so it cannot drift from where requests actually go.
- *
- * Parsed with a regex, not `URL`: React Native's `URL` is a partial polyfill and
- * this runs at import time, where a throw would take the whole app down.
- */
-export const COOLIE_ORIGIN = /^(https?:\/\/[^/]+)/i.exec(COOLIE_BASE_URL)?.[1];
+// ── Instance target ─────────────────────────────────────────────────
+// The base-URL decision lives in its own dependency-free module; re-exported
+// here so the 6+ `import { COOLIE_BASE_URL } from "../coolie"` call sites (and
+// the App) keep working unchanged.
+export {
+  COOLIE_BASE_URL,
+  COOLIE_ORIGIN,
+  DEV_INSTANCE_BASE_URL,
+  PROD_INSTANCE_BASE_URL,
+  detectApiBaseUrl,
+} from "./instanceTarget";
+import { COOLIE_BASE_URL, COOLIE_ORIGIN, detectApiBaseUrl, originOf } from "./instanceTarget";
 
 const AUTH_KEY = "coolie.authToken";
 const SESSION_TOKEN_KEY = "coolie.sessionToken";
@@ -435,6 +404,24 @@ export interface SeedSampleDomainsReport {
 
 export class CoolieClient extends BaseCoolieClient {
   /**
+   * Point this client at another instance, at runtime.
+   *
+   * The base client caches `baseUrl` / `originHeader` in its constructor and
+   * every request reads them back from the instance. At runtime those are plain
+   * own properties (TS `private readonly` is compile-time only), so re-pointing
+   * them here is what makes an in-session switch — an emulator build talking to
+   * the local dev instance — actually take effect, instead of only on the next
+   * launch. The origin is re-derived from the new base URL so the two cannot
+   * drift apart.
+   */
+  setApiBaseUrl(baseUrl: string): void {
+    const trimmed = baseUrl.replace(/\/+$/, "");
+    const target = this as unknown as { baseUrl: string; originHeader?: string };
+    target.baseUrl = trimmed;
+    target.originHeader = originOf(trimmed);
+  }
+
+  /**
    * 公司级紧急熔断 (wave105) — 董事会一键停掉本公司所有派单。
    * Heartbeat 守门 companies.status="active" — pause 后立即停派。
    */
@@ -754,6 +741,21 @@ export const coolie = new CoolieClient({
     return {};
   },
 });
+
+/**
+ * Re-resolve the instance base URL and apply it to the shared client.
+ *
+ * `detectApiBaseUrl` is env/config driven and its result is already what the
+ * client was constructed with, so this is normally a no-op. It exists so a
+ * build can (re-)point the one shared client at runtime — e.g. an emulator
+ * session that should talk to the dev instance — without rebuilding, and so the
+ * target can be inspected from the app. Returns the URL now in effect.
+ */
+export function detectAndSetApiBaseUrl(): string {
+  const baseUrl = detectApiBaseUrl();
+  coolie.setApiBaseUrl(baseUrl);
+  return baseUrl;
+}
 
 /** How we got in. Decides whether a company has to be chosen. */
 export type Credential =

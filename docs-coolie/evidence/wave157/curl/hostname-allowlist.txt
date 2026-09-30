@@ -1,0 +1,7 @@
+# hostname allowlist probe (dev instance 127.0.0.1:3100), Host header varied
+localhost:3100         -> HTTP 200
+127.0.0.1:3100         -> HTTP 200
+10.0.2.2:3100          -> HTTP 403
+
+# 403 body for Host: 10.0.2.2:3100
+{"error":"This hostname is not allowed for this Paperclip instance. If you want to allow a hostname, run npx paperclipai allowed-hostname <host>."}

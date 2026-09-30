@@ -1,9 +1,19 @@
-# Spec: Coolie Workspace-as-Company 脚手架（palantir 5 角色 + ruoyi-all-next）
+# Spec: Coolie Workspace-as-Company 脚手架（palantir 5 角色 + 开发基座）
 
 - 日期：2026-09-21
 - 老板：chenwei（weixin）
 - PM：Hermes（掌柜）
 - 状态：DRAFT（需要老板校对一次设计）→ 派门神搭脚手架
+- 修订：2026-09-30（wave157）
+
+> **修订 (2026-09-30, wave157) — 现行决定：**
+> 底座从「`ruoyi-all-next` 全栈 **15 域**子模块」改为 **Coolie 开发基座**
+> （`templates/workspace-skel/`）：**空壳 + 5 个默认模块（system / infra / member /
+> audit / api），不含任何业务域**。业务（bpm / pay / report / mp / mall / crm / erp /
+> wms / mes / im）按**项目标书在该基座上快速定制**，不预装。
+> 下述 §1.4 / §3.1 / §3.5 / §5 / §6 / §7 中「ruoyi-all-next 全栈 15 域」的旧表述，
+> 一律按本节修订理解；新增 §10「5 默认模块 vs 15 全栈域」与 §11「按标书定制开发」。
+
 
 ## 1. 背景
 
@@ -13,7 +23,8 @@
 1. 角色 = Palantir 5 个本体岗位（FDA / Core SWE / PRE-SRE / FDSE / DS）
 2. 员工 = 每个角色在 Coolie 平台里挂一个 agent，`role` 字段对应
 3. 环境预装 = 仓库自带 `.agents/skills/<role>/` + `cli/` + `models.yaml`
-4. 框架预装 = `ruoyi-all-next/` 作为子模块，clone 仓库后立即可开发
+4. 框架预装 = **开发基座**（`templates/workspace-skel/`：5 默认模块 + 角色入口），
+   clone 仓库后立即可开发 —— 基座**不含业务域**，业务按标书定制（修订 2026-09-30）
 5. workspace 模板 = 一个 `workspace-template/` 仓库，clone 出去就是「一个项目=一个公司」
 
 ## 2. User Stories
@@ -35,10 +46,10 @@
   - 输出「立项报告」含 company_id / workspace 绝对路径 / agent_ids
 - WHEN worker 跑 `acme/scripts/bootstrap.sh`，THEN 应当：
   - `acme/cli/<role>.sh` 已 chmod +x
-  - `acme/.agents/skills/<role>/SKILL.md` 存在
-  - `acme/.agents/skills/<role>/models.yaml` 写好
-  - `acme/ruoyi-all-next/` 已 submodule init + update
-  - 退出码 0 表示全齐
+  - `acme/.agents/skills/<role>/SKILL.md` 存在（按需加入时）
+  - `acme/models.yaml` 写好（5 角色主备 CLI / 模型映射）
+  - `acme/modules/{system,infra,member,audit,api}/` 5 个默认模块齐全
+  - 退出码 0 表示全齐（**不含业务域**，业务按标书定制）
 - WHEN 任何角色打开自己的 workspace，THEN SHALL 看到「本角色指南」（`specs/<role>/README.md`）和「全栈 spec 入口」（`specs/YYYY-MM-DD-<feature>.md`）。
 
 ### 3.2 5 角色 skill 自带
@@ -73,12 +84,17 @@ on_quota_exhausted: cmd    # 最后降级
 large_context: agy         # 长上下文
 ```
 
-### 3.5 ruoyi-all-next 预装
+### 3.5 开发基座预装（修订 2026-09-30）
 
-- workspace 根目录 `ruoyi-all-next/`（git submodule）
-- `workspace/scripts/import-ruoyi.sh` —— `git submodule add https://github.com/your/ruoyi-all-next.git` 或拷贝
-- 启动：`cd ruoyi-all-next && mvn spring-boot:run`（JAVA_HOME 需预检）
-- 与 Coolie 平台账号打通：ruoyi-all-next 的 user 表对接 Coolie 的 user 表（先 stub，后扩展）
+> 原为「ruoyi-all-next 全栈 15 域子模块」，现改为**开发基座**：
+
+- workspace 自带 `modules/{system,infra,member,audit,api}/` 5 个默认模块（骨架 + README）
+- 可选的轻量底座代码（`coolie-base-1.0` tag，仍**不含业务域**）由
+  `scripts/new-company.sh` 按需 `git clone --depth 1 --branch coolie-base-1.0`
+  到 `coolie-base/`；拉取失败不阻断立项
+- （已删除）`.gitmodules` + `scripts/import-ruoyi.sh` 子模块路径
+- **业务域不预装**：bpm / pay / report / mp / mall / crm / erp / wms / mes / im
+  按项目标书在基座上新建模块（见 §11）
 
 ### 3.6 公司/项目=workspace 命名规则
 
@@ -105,58 +121,47 @@ PM 写 `/etc/coolie/companies.json`（PM 内部映射），新公司自动加。
 
 ## 5. 文件范围（白名单）
 
-新文件全部放新仓库 `~/workspace/xaicd/coolie-template/`（**新仓库，不在主仓**），主仓零改动：
+> 修订 (2026-09-30)：骨架最终落在主仓 `templates/workspace-skel/`（不再单建
+> `coolie-template/` 仓库），并已按「开发基座」重写：5 默认模块，删除
+> `.gitmodules` / `import-ruoyi.sh` / ruoyi 子模块。
 
 ```
-coolie-template/
-├── README.md
-├── scripts/
-│   ├── new-company.sh              # 一键立项
-│   ├── bootstrap.sh                # worker 初始化
-│   └── import-ruoyi.sh             # 拉 ruoyi-all-next
-├── cli/
-│   ├── fda.sh
-│   ├── core-swe.sh
-│   ├── pre-sre.sh
-│   ├── fdse.sh
-│   └── ds.sh
-├── .agents/skills/
-│   ├── fda/SKILL.md
-│   ├── core-swe/SKILL.md
-│   ├── pre-sre/SKILL.md
-│   ├── fdse/SKILL.md
-│   └── ds/SKILL.md
-├── specs/
-│   ├── 2026-09-21-coolie-workspace.md   # 本 spec
-│   └── fda/README.md
+templates/workspace-skel/          # 开发基座（本项目实际位置）
+├── README.md                      # 基座说明（5 默认模块, 不含业务域）
+├── models.yaml                    # 5 角色主备 CLI / 模型映射
 ├── docs/
-│   ├── ARCHITECTURE.md
-│   └── ROLE-MATRIX.md
-├── models.yaml.example
-├── .gitmodules.example
-└── ruoyi-all-next/                # git submodule
+│   ├── README.md                  # 文档目录约定
+│   └── ARCHITECTURE.md            # 架构 + 扩展点 + 按标书定制开发指南
+├── modules/                       # 5 个默认模块（骨架, 每个含 README）
+│   ├── system/  infra/  member/  audit/  api/
+├── cli/
+│   ├── fda.sh  core-swe.sh  pre-sre.sh  fdse.sh  ds.sh   # 骨架（空函数 + TODO）
+├── scripts/
+│   └── bootstrap.sh               # 自举：校验 5 角色 + 5 默认模块
+├── specs/.gitkeep
+└── .agents/skills/.gitkeep
 ```
 
-主仓只加一份链接：`docs-coolie/COOLIE-WORKSPACE-TEMPLATE.md`（指 coolie-template repo）。
+一键立项脚本在主仓：`scripts/new-company.sh`。
 
 ## 6. 验收 gate
 
-- [ ] `coolie-template/` 新仓库创建 + push
+- [ ] `templates/workspace-skel/` 为「开发基座」：5 默认模块 + 无业务域
 - [ ] `scripts/new-company.sh acme` 跑通（创建 platform company + workspace + 5 agent）
-- [ ] `coolie-template/scripts/bootstrap.sh` 跑通，5 个 skill + 5 个 cli + ruoyi 子模块就位
-- [ ] 5 角色 skill 范本各 ≥ 50 行，引 `references/` 检查脚本
-- [ ] `claude --model glm-5.3 -p "..."` 至少在 fdse 角色跑通一次 dummy
-- [ ] ruoyi-all-next submodule init + 一条 `mvn compile` 跑通（或记录为「需 JAVA_HOME=17」挡）
-- [ ] `docs-coolie/COOLIE-WORKSPACE-TEMPLATE.md` 主仓文档同步
-- [ ] `git status` 主仓干净，coolie-template 仓库独立干净
+- [ ] `templates/workspace-skel/scripts/bootstrap.sh` 跑通，5 个 cli + 5 个默认模块就位
+- [ ] `cli/*.sh` 为骨架（空函数 + TODO），不含业务实现
+- [ ] `docs/ARCHITECTURE.md` 含「5 默认模块 vs 15 全栈域」对比表与按标书定制开发 playbook
+- [ ] `new-company.sh` 拉轻量底座 `coolie-base-1.0`（拉不到不阻断），**不预装业务域**
+- [ ] `git status` 主仓干净
 
 ## 7. 当前最关键的设计决定（PM 提议）
 
-1. **模板仓库独立**（`xaicd/coolie-template`），不污染主仓 `xaicd/coolie`
+1. **模板骨架放主仓** `templates/workspace-skel/`（修订 2026-09-30：不再单建 `coolie-template` 仓库）
 2. **5 角色 = Palantir 5 岗位**，不重新发明
 3. **匠人池路由照抄** `ai-workshop-dispatch`（GLM 同池串行 / 降级 cmd > claude > agy）
 4. **DS 是验收一票否决**（任何 company 投产前必走 DS 业务旅程探路）
-5. **ruoyi-all-next = 框架层，不绑死**（以后换若依/芋道/yudao 改一行 import）
+5. **基座 = 空壳 + 5 默认模块，不含业务域**（修订 2026-09-30，取代原「ruoyi-all-next 全栈 15 域」）；
+   业务按标书在基座上快速定制
 
 ## 8. 派单准备
 
@@ -170,3 +175,36 @@ PM（掌柜）要做：
 ## 9. 不回签就停在哪
 
 如果老板认为设计不对（任何一项），本 spec 立刻修订，不开工。
+
+## 10. 5 默认模块 vs 15 全栈域（修订 2026-09-30）
+
+旧的「全栈 15 域」底座把 10 个业务域也一起预装了。现有决定只保留 5 个默认模块。
+
+| 维度 | 5 默认模块（开发基座） | 15 全栈域（旧） |
+|---|---|---|
+| 自带模块 | system / infra / member / audit / api | 上述 5 + bpm / pay / report / mp / mall / crm / erp / wms / mes / im |
+| 业务语义 | **无**（真·空壳） | 强（大量用不上的表 / 菜单） |
+| 首次启动 | 快 | 慢（全量编译 / 迁移 / 菜单树） |
+| 交付节奏 | 拿到标书即可定制 | 先删域，再开发 |
+| 需求不符时 | 直接加 | 改别人的业务实现 |
+| 适用 | **任何项目**（按标书定制） | 只有刚好命中那 10 个域的项目 |
+
+**为什么这样选：** 一个交付项目命中全部 15 域的概率极低；预装的 80% 是负担 ——
+占启动时间、迁移时间、菜单空间，且当「需求与预装实现不一致」时反而变成改造负担。
+基座保持空壳、业务按标书快速定制，是净收益。
+
+## 11. 按标书定制开发（playbook）
+
+基座交付后的标准动作：
+
+1. **读标书 → 落 spec。** 标书/需求文档放 `specs/`，走仓库 spec workflow
+   （需求 → 设计 → 任务），产出可追踪的需求条目。
+2. **定领域与边界。** 用 FDA 角色 skill 画死隔离 / 领域 / 权限 / 守恒边界；
+   明确哪些落在 5 个默认模块内，哪些新建模块。
+3. **默认模块直接用，不重造。** 认证、权限、存储、代码生成、通知、定时任务来自基座。
+4. **业务模块按需引入。** 标书要的域（审批流 / 商城 / …）在 workspace 内实现，
+   可复用成熟开源实现；不要求与主仓或其他项目一致。
+5. **门禁收口。** 按 CMMI 门禁（G1 需求 → G2 架构 → G3 编译 → G4 验收 → G5 投产）逐关收口。
+6. **交付物留痕。** 交付产物、审计、验收记录按项目约定归档。
+
+详见 `templates/workspace-skel/docs/ARCHITECTURE.md` §4。

@@ -1,0 +1,18 @@
+# detectApiBaseUrl() branches — real runs of clients/expo/src/instanceTarget.ts
+# (esbuild bundle, node harness; full JSON in this dir per case)
+
+## case 1: no env
+{"env":{"base":null,"useDev":null,"devBase":null},"detectApiBaseUrl":"https://xrobinai.cn","COOLIE_BASE_URL":"https://xrobinai.cn","COOLIE_ORIGIN":"https://xrobinai.cn","originOf":"https://xrobinai.cn","PROD_INSTANCE_BASE_URL":"https://xrobinai.cn","DEV_INSTANCE_BASE_URL":"http://10.0.2.2:3100","expected":"https://xrobinai.cn","pass":true}
+rc=0
+
+## case 2: EXPO_PUBLIC_COOLIE_USE_DEV_INSTANCE=1
+{"env":{"base":null,"useDev":"1","devBase":null},"detectApiBaseUrl":"http://10.0.2.2:3100","COOLIE_BASE_URL":"http://10.0.2.2:3100","COOLIE_ORIGIN":"http://10.0.2.2:3100","originOf":"http://10.0.2.2:3100","PROD_INSTANCE_BASE_URL":"https://xrobinai.cn","DEV_INSTANCE_BASE_URL":"http://10.0.2.2:3100","expected":"http://10.0.2.2:3100","pass":true}
+rc=0
+
+## case 3: use-dev + dev url override
+{"env":{"base":null,"useDev":"1","devBase":"http://localhost:3100"},"detectApiBaseUrl":"http://localhost:3100","COOLIE_BASE_URL":"http://localhost:3100","COOLIE_ORIGIN":"http://localhost:3100","originOf":"http://localhost:3100","PROD_INSTANCE_BASE_URL":"https://xrobinai.cn","DEV_INSTANCE_BASE_URL":"http://10.0.2.2:3100","expected":"http://localhost:3100","pass":true}
+rc=0
+
+## case 4: explicit EXPO_PUBLIC_COOLIE_BASE_URL wins
+{"env":{"base":"http://192.168.3.85:3100","useDev":"1","devBase":null},"detectApiBaseUrl":"http://192.168.3.85:3100","COOLIE_BASE_URL":"http://192.168.3.85:3100","COOLIE_ORIGIN":"http://192.168.3.85:3100","originOf":"http://192.168.3.85:3100","PROD_INSTANCE_BASE_URL":"https://xrobinai.cn","DEV_INSTANCE_BASE_URL":"http://10.0.2.2:3100","expected":"http://192.168.3.85:3100","pass":true}
+rc=0

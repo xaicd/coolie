@@ -1,0 +1,6 @@
+# inlined instance base URL inside the INSTALLED APK (pulled from emulator-5556)
+# apk: cloud.coolie.app 0.6.0 (versionCode 600)
+
+   1 https://xrobinai.cn
+   1 https://www.xrobinai.cn
+   1 https://dls.xrobinai.cn
