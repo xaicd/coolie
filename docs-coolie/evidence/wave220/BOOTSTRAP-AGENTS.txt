@@ -1,8 +1,0 @@
-[2026-09-30T12:56:54.020Z] agent.exists {"id":"d3aa8179-1cd8-49c0-90d5-d8a2453e70be","name":"Ops Lead"}
-[2026-09-30T12:56:54.029Z] agent.exists {"id":"f0cccccd-5ee0-4493-8678-b5bd73569cb8","name":"Mobile Ops"}
-[2026-09-30T12:56:54.040Z] agent.exists {"id":"cbbf2396-ed11-46d4-85ca-dacf566c5677","name":"iOS Ops"}
-[2026-09-30T12:56:54.047Z] agent.exists {"id":"0068762e-3b83-4332-aeb9-48057bb3571a","name":"Web Ops"}
-[2026-09-30T12:56:54.052Z] agent.exists {"id":"ac1e3d44-7c63-48dd-8d94-1473966659ea","name":"Server Ops"}
-[2026-09-30T12:56:54.058Z] agent.exists {"id":"49b52fee-ad01-4db4-8036-6fd3dc1aecf8","name":"Build Ops"}
-[2026-09-30T12:56:54.064Z] agent.exists {"id":"aaac4956-4a3f-444a-97e3-fe67d6a9783e","name":"Release Ops"}
-[2026-09-30T12:56:54.064Z] done {"companyId":"4a5867e1-59e6-4a74-b7ea-038eefb1944f","companyName":"Coolie-Ops-Control-Room","agentCount":7,"agents":[{"id":"d3aa8179-1cd8-49c0-90d5-d8a2453e70be","name":"Ops Lead","role":"devops"},{"id":"f0cccccd-5ee0-4493-8678-b5bd73569cb8","name":"Mobile Ops","role":"devops"},{"id":"cbbf2396-ed11-46d4-85ca-dacf566c5677","name":"iOS Ops","role":"devops"},{"id":"0068762e-3b83-4332-aeb9-48057bb3571a","name":"Web Ops","role":"devops"},{"id":"ac1e3d44-7c63-48dd-8d94-1473966659ea","name":"Server Ops","role":"devops"},{"id":"49b52fee-ad01-4db4-8036-6fd3dc1aecf8","name":"Build Ops","role":"devops"},{"id":"aaac4956-4a3f-444a-97e3-fe67d6a9783e","name":"Release Ops","role":"devops"}]}

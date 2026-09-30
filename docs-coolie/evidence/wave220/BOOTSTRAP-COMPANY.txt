@@ -1,2 +1,0 @@
-[2026-09-30T12:56:53.857Z] company.exists {"id":"4a5867e1-59e6-4a74-b7ea-038eefb1944f","name":"Coolie-Ops-Control-Room"}
-[2026-09-30T12:56:53.857Z] done {"companyId":"4a5867e1-59e6-4a74-b7ea-038eefb1944f","companyName":"Coolie-Ops-Control-Room","action":"noop"}
