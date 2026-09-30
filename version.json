@@ -2,9 +2,9 @@
   "version": "0.6.2",
   "versionCode": 602,
   "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release.apk",
-  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.0/coolie-release-ios.ipa",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
   "iosBundleId": "cn.xrobinai.app",
-  "iosSha256": "bea5ad103dba0bb2a7547bbc67930af2ec0122069fb275de39cc9531872bae09",
+  "iosSha256": "2e7d63c06857dfb115f318e36ece2945b0f4cd4259b13fea0a009a9cf6e6b4c0",
   "iosTestFlightUrl": null,
   "releaseNotes": "wave157 开发基座(5 默认模块, 无业务域) + App 实例目标可切换 + 模板预设收敛; 含 wave153 登录修复",
   "commitSha": "786cb44aba325f80223f03dd44e49609befaea76"

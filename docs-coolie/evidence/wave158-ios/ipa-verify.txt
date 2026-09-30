@@ -1,0 +1,51 @@
+# wave158-ios — .ipa verification (2026-09-30 +08:00)
+
+$ file cn.xrobinai.app.ipa
+cn.xrobinai.app.ipa: iOS App Zip archive data, at least v1.0 to extract, compression method=store
+
+$ shasum -a 256 cn.xrobinai.app.ipa
+2e7d63c06857dfb115f318e36ece2945b0f4cd4259b13fea0a009a9cf6e6b4c0  cn.xrobinai.app.ipa
+
+$ wc -c < cn.xrobinai.app.ipa
+ 14286676
+
+$ codesign -dvv cn.xrobinai.app.ipa   # codesign cannot verify a .ipa container directly
+cn.xrobinai.app.ipa: code object is not signed at all
+
+$ unzip -l (Payload)
+        0  09-30-2026 15:34   Payload/Coolie.app/
+    17679  09-30-2026 15:34   Payload/Coolie.app/_CodeSignature/CodeResources
+  3734713  09-30-2026 15:34   Payload/Coolie.app/main.jsbundle
+     1798  09-30-2026 15:34   Payload/Coolie.app/Frameworks/hermes.framework/_CodeSignature/CodeResources
+    12056  09-30-2026 15:34   Payload/Coolie.app/embedded.mobileprovision
+
+$ codesign -dvvv Payload/Coolie.app
+Identifier=cn.xrobinai.app
+Authority=Apple Distribution: wei chen (UU7T5893WZ)
+Authority=Apple Worldwide Developer Relations Certification Authority
+Authority=Apple Root CA
+TeamIdentifier=UU7T5893WZ
+
+$ codesign --verify --deep --strict Payload/Coolie.app
+OK
+
+$ Info.plist (inside .app)
+CFBundleShortVersionString 0.6.2
+CFBundleVersion            602
+CFBundleIdentifier         cn.xrobinai.app
+CFBundleName               Coolie
+
+$ embedded.mobileprovision
+Name                               Coolie工坊
+TeamIdentifier:0                   UU7T5893WZ
+Entitlements:application-identifier UU7T5893WZ.cn.xrobinai.app
+Entitlements:beta-reports-active   true
+Entitlements:get-task-allow        false
+ExpirationDate                     Wed Sep 08 18:47:27 CST 2027
+ProvisionedDevices present? 0
+
+$ DistributionSummary.plist (key fields)
+  versionNumber = 0.6.2   buildNumber = 602   certificate.type = Apple Distribution
+  entitlements.application-identifier = UU7T5893WZ.cn.xrobinai.app
+  entitlements.get-task-allow = false   entitlements.beta-reports-active = true
+  (full dump: distribution-summary.txt)

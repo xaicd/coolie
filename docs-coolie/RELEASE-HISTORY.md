@@ -9,6 +9,7 @@ Git 里程碑 tag 流水。自 **v0.5.97** 起建立本文件；此前的 0.5.x 
 | v0.6.0 | 2026-09-29 | 0.6.0 | 269526f19 | wave150 合并发版: wave147 spec-driven + wave148 多对话 + wave144 board-chat 修复（见 §v0.6.0） |
 | v0.6.2 | 2026-09-30 | 0.6.2 | 786cb44ab | wave157 开发基座（5 默认模块, 不含业务域）+ App 实例目标可切换 + 模板预设收敛；**含 wave153 客户端修复**（见 §v0.6.2 wave157） |
 | — | 2026-09-29 | 0.6.1 | (未打 tag) | **未发出** — wave152 治理 + 可观察性 (审计 log 全留痕 + 四类资源隔离补测 + 失败率/交付周期/产能 metrics + 缺陷 KB)。见 §v0.6.1 (wave152) |
+| — | 2026-09-30 | 0.6.2-ios | af653b20a | **iOS 0.6.2 包已出并上 COS**（App Store 分发 .ipa，14,286,676 B）；**未上 TestFlight**（build 600 不动）。见 §v0.6.2-ios |
 
 约定: tag 指向该版本「发版完成」的提交（含 `chore(release): version.json …` 这一步），
 注释写本波主题。推送方式 `git push origin <tag>`（本仓库 push 需绕本地代理）。
@@ -38,6 +39,25 @@ Git 里程碑 tag 流水。自 **v0.5.97** 起建立本文件；此前的 0.5.x 
 **诚实缺口**：本波**未做**模拟器上用新包真跑 dev 登录（详见 QA 报告 §6.4–6.5：装的旧包
 0.6.0 打生产；dev 实例的主机名白名单对 `10.0.2.2` 回 403 —— 需 `allowed-hostname 10.0.2.2`
 并重启 dev 才能在模拟器登录 dev）。`coolie-base-1.0` tag 需有推送权限的一方创建。
+
+## v0.6.2-ios — iOS 包已出并上 COS（TestFlight 未上）
+
+wave158-iOS 在 `main` HEAD `af653b20a`（含 wave153 登录修复 + wave157 开发基座）上重出 iOS 0.6.2。**本波不新增 tag 行**（未打 tag）。真值（`docs-coolie/evidence/wave158-ios/`）:
+
+- `.ipa`：`https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa`，14,286,676 Byte (13.62 MB)，
+  sha256 `2e7d63c06857dfb115f318e36ece2945b0f4cd4259b13fea0a009a9cf6e6b4c0`
+  （COS 对象 `cos://gzbucket/coolie/app/0.6.2/coolie-release-ios.ipa`）；版本 **0.6.2 / build 602**。
+- 签名：`Apple Distribution: wei chen (UU7T5893WZ)` + profile `Coolie工坊`（**App Store 分发**，UUID `2630cad1-…`），
+  解包 `codesign --verify --deep --strict` 通过；内嵌 profile `beta-reports-active=true`、无 `ProvisionedDevices`。
+- `version.json` 顶层扁平字段 `iosDownloadUrl` → 0.6.2、`iosSha256` → 新值（**未动** `platform{}` 嵌套）；
+  `version.json` / `ota/manifest` / APK / `api/health` **4 护栏全 200/206**。
+- **TestFlight 未上**（boss 拍板不变更已发布构建）：未上传任何 build；build 600 `c6f5a5fb-…` 仍 `VALID`、未过期，
+  internal 组 `waj_615@qq.com` 仍 `INVITED`（改动前后 ASC 快照 diff 为空）。
+
+**诚实缺口（重要）**：该 `.ipa` 是 **App Store 分发**（无 ProvisionedDevices），**不能真机直装 / 扫码直装**，
+只能经 TestFlight / App Store 安装。故「boss 走 QR / 直链装 0.6.2」在本波产物上**不成立**；要真机直装需另出
+**Ad Hoc** 包（另一条产线），要 TestFlight 装 0.6.2 需新上传 build（= 冲 build，本波明令不做）。
+详见 `docs-coolie/evidence/wave158-ios/QA-REPORT.md` §5。
 
 ## v0.6.1 — 未发出 (wave152 治理 + 可观察性)
 
