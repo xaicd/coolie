@@ -45,7 +45,8 @@ import {
 } from "./src/coolie";
 import { AppBar } from "./src/components/AppBar";
 import { EdgeSwipeBack } from "./src/components/EdgeSwipeBack";
-import { TabBar, TAB_BAR_HEIGHT } from "./src/components/TabBar";
+import { ScreenContainer } from "./src/components/ScreenContainer";
+// wave167 — shell 不再自带 TabBar, 改由每个屏的 ScreenContainer 挂。
 import { StatusDot } from "./src/components/StatusDot";
 import { NewTaskPage } from "./src/screens/NewTaskPage";
 import { CreateTaskModal } from "./src/components/CreateTaskModal";
@@ -917,6 +918,48 @@ function HomeScreen({
     return false;
   };
 
+  /**
+   * wave167 — 切 tab 时重置所有 subpage state。
+   * 抽出来是因为 wave167 起 shell 不再自带 TabBar, 每个屏自己挂 TabBar + 调 onChange。
+   * 共享同一份 reset 逻辑保证「点任意 tab = 直达该 tab 根界面」在所有屏里行为一致。
+   */
+  const resetSubpages = useCallback(() => {
+    setComposeOpen(false);
+    setSelected(null);
+    setProjectsOpen(false);
+    setPipelinesOpen(false);
+    setPlansOpen(false);
+    setAgentDetail(null);
+    setGitCredentialsOpen(false);
+    setSearchOpen(false);
+    setNotificationsOpen(false);
+    setFocusedApprovalId(null);
+    setCreateTaskProjectId(null);
+    setTasksFilterProjectId(null);
+    // wave138c: 壳内的整屏子页(沙箱/Diff/Web 容器)也一并退出
+    setSandboxContext(null);
+    setDiffContext(null);
+    setWebContainerTarget(null);
+    setSpecIssue(null);
+    setOnboardingOpen(false);
+  }, []);
+  /**
+   * wave167 — 包成 ScreenContainer 期望的 (key) => void 形态, 内部做 reset + 切 tab。
+   */
+  const onChangeTab = useCallback(
+    (key: TabKey) => {
+      resetSubpages();
+      navigateTab(key);
+    },
+    [resetSubpages, navigateTab],
+  );
+  /**
+   * wave167 — 中央 "+" FAB 的回调。ScreenContainer 期望 () => void, 不带参数。
+   */
+  const onCreateTask = useCallback(() => {
+    setComposeOpen(true);
+  }, []);
+
   // 系统返回键 (三键导航的返回键, 以及**手势导航下从屏幕左/右缘向内滑**触发的返回)
   // 也走同一套落点。这是老板「手机左边长按右滑不能直接退出 app」在**手势导航**机器上
   // 的真正修法: 手势导航时左缘内滑是系统手势, 会被 Android 的 EdgeBackGestureHandler
@@ -1018,223 +1061,257 @@ function HomeScreen({
         )}
         <View style={styles.shellContent}>
           {onboardingOpen ? (
-            <WebContainerScreen
-              initialPath={
-                company.issuePrefix ? `/${company.issuePrefix}/onboarding` : "/onboarding"
-              }
-              title="新手引导"
-              onBack={() => {
-                setOnboardingOpen(false);
-                void markOnboardingDone(companyId);
-              }}
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <WebContainerScreen
+                initialPath={
+                  company.issuePrefix ? `/${company.issuePrefix}/onboarding` : "/onboarding"
+                }
+                title="新手引导"
+                onBack={() => {
+                  setOnboardingOpen(false);
+                  void markOnboardingDone(companyId);
+                }}
+              />
+            </ScreenContainer>
           ) : sandboxContext ? (
-            <PrototypeSandboxScreen
-              company={company}
-              initialUrl={sandboxContext.url}
-              service={sandboxContext.service}
-              workProduct={sandboxContext.workProduct}
-              scope={sandboxContext.scope}
-              onBack={() => setSandboxContext(null)}
-              onCreateTask={() => {
-                setSandboxContext(null);
-                setComposeOpen(true);
-              }}
-              onOpenTask={
-                sandboxContext.issue
-                  ? () => {
-                      const entryIssue = sandboxContext.issue;
-                      if (!entryIssue) return;
-                      setSandboxContext(null);
-                      navigateTab("tasks");
-                      setSelected(entryIssue);
-                    }
-                  : undefined
-              }
-              onOpenArtifacts={() => {
-                setSandboxContext(null);
-                navigateTab("artifacts");
-              }}
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <PrototypeSandboxScreen
+                company={company}
+                initialUrl={sandboxContext.url}
+                service={sandboxContext.service}
+                workProduct={sandboxContext.workProduct}
+                scope={sandboxContext.scope}
+                onBack={() => setSandboxContext(null)}
+                onCreateTask={() => {
+                  setSandboxContext(null);
+                  setComposeOpen(true);
+                }}
+                onOpenTask={
+                  sandboxContext.issue
+                    ? () => {
+                        const entryIssue = sandboxContext.issue;
+                        if (!entryIssue) return;
+                        setSandboxContext(null);
+                        navigateTab("tasks");
+                        setSelected(entryIssue);
+                      }
+                    : undefined
+                }
+                onOpenArtifacts={() => {
+                  setSandboxContext(null);
+                  navigateTab("artifacts");
+                }}
+              />
+            </ScreenContainer>
           ) : diffContext ? (
-            <CodeDiffScreen
-              company={company}
-              issue={diffContext.issue}
-              workProduct={diffContext.workProduct}
-              onBack={() => setDiffContext(null)}
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <CodeDiffScreen
+                company={company}
+                issue={diffContext.issue}
+                workProduct={diffContext.workProduct}
+                onBack={() => setDiffContext(null)}
+              />
+            </ScreenContainer>
           ) : specIssue ? (
-            <SpecEditorScreen
-              issue={specIssue}
-              company={company}
-              onBack={() => setSpecIssue(null)}
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <SpecEditorScreen
+                issue={specIssue}
+                company={company}
+                onBack={() => setSpecIssue(null)}
+              />
+            </ScreenContainer>
           ) : webContainerTarget ? (
-            <WebContainerScreen
-              initialPath={webContainerTarget.path}
-              initialUrl={webContainerTarget.url}
-              title={webContainerTarget.title}
-              onBack={() => setWebContainerTarget(null)}
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <WebContainerScreen
+                initialPath={webContainerTarget.path}
+                initialUrl={webContainerTarget.url}
+                title={webContainerTarget.title}
+                onBack={() => setWebContainerTarget(null)}
+              />
+            </ScreenContainer>
           ) : focusedApprovalId ? (
-            <ApprovalFocusDetail
-              companyId={companyId}
-              approvalId={focusedApprovalId}
-              onBack={() => setFocusedApprovalId(null)}
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <ApprovalFocusDetail
+                companyId={companyId}
+                approvalId={focusedApprovalId}
+                onBack={() => setFocusedApprovalId(null)}
+              />
+            </ScreenContainer>
           ) : searchOpen ? (
-            <SearchScreen
-              company={company}
-              onBack={() => setSearchOpen(false)}
-              onOpenIssue={(issueItem) => {
-                setSearchOpen(false);
-                navigateTab("tasks");
-                setSelected(issueItem);
-              }}
-              onOpenAgent={(agent: SearchAgentResult) => {
-                setSearchOpen(false);
-                setAgentDetail(agent);
-              }}
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <SearchScreen
+                company={company}
+                onBack={() => setSearchOpen(false)}
+                onOpenIssue={(issueItem) => {
+                  setSearchOpen(false);
+                  navigateTab("tasks");
+                  setSelected(issueItem);
+                }}
+                onOpenAgent={(agent: SearchAgentResult) => {
+                  setSearchOpen(false);
+                  setAgentDetail(agent);
+                }}
+              />
+            </ScreenContainer>
           ) : notificationsOpen ? (
-            <NotificationsScreen
-              company={company}
-              onBack={() => setNotificationsOpen(false)}
-              onOpenIssue={(issueItem) => {
-                setNotificationsOpen(false);
-                navigateTab("tasks");
-                setSelected(issueItem);
-              }}
-              onOpenApproval={(approvalId) => {
-                setNotificationsOpen(false);
-                setFocusedApprovalId(approvalId);
-              }}
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <NotificationsScreen
+                company={company}
+                onBack={() => setNotificationsOpen(false)}
+                onOpenIssue={(issueItem) => {
+                  setNotificationsOpen(false);
+                  navigateTab("tasks");
+                  setSelected(issueItem);
+                }}
+                onOpenApproval={(approvalId) => {
+                  setNotificationsOpen(false);
+                  setFocusedApprovalId(approvalId);
+                }}
+              />
+            </ScreenContainer>
           ) : agentDetail ? (
-            <AgentDetailScreen
-              company={company}
-              agent={agentDetail}
-              onBack={() => setAgentDetail(null)}
-              onOpenIssue={(issueItem) => {
-                setAgentDetail(null);
-                navigateTab("tasks");
-                setSelected(issueItem);
-              }}
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <AgentDetailScreen
+                company={company}
+                agent={agentDetail}
+                onBack={() => setAgentDetail(null)}
+                onOpenIssue={(issueItem) => {
+                  setAgentDetail(null);
+                  navigateTab("tasks");
+                  setSelected(issueItem);
+                }}
+              />
+            </ScreenContainer>
           ) : pipelinesOpen ? (
-            <PipelinesScreen
-              company={company}
-              onBack={() => setPipelinesOpen(false)}
-              onOpenWeb={(path, title) =>
-                setWebContainerTarget({ path, title: title ?? "流水线" })
-              }
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <PipelinesScreen
+                company={company}
+                onBack={() => setPipelinesOpen(false)}
+                onOpenWeb={(path, title) =>
+                  setWebContainerTarget({ path, title: title ?? "流水线" })
+                }
+              />
+            </ScreenContainer>
           ) : plansOpen ? (
-            <PlansScreen
-              company={company}
-              onBack={() => setPlansOpen(false)}
-              onOpenPlan={(issue) => {
-                setPlansOpen(false);
-                navigateTab("tasks");
-                setSelected(issue);
-              }}
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <PlansScreen
+                company={company}
+                onBack={() => setPlansOpen(false)}
+                onOpenPlan={(issue) => {
+                  setPlansOpen(false);
+                  navigateTab("tasks");
+                  setSelected(issue);
+                }}
+              />
+            </ScreenContainer>
           ) : projectsOpen ? (
-            <ProjectsScreen
-              company={company}
-              onBack={() => setProjectsOpen(false)}
-              onOpenWebProjects={(subPath?: string, title?: string) =>
-                setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" })
-              }
-              onOpenProjectTasks={(project) => {
-                setProjectsOpen(false);
-                setTasksFilterProjectId(project.id);
-                navigateTab("tasks");
-              }}
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <ProjectsScreen
+                company={company}
+                onBack={() => setProjectsOpen(false)}
+                onOpenWebProjects={(subPath?: string, title?: string) =>
+                  setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" })
+                }
+                onOpenProjectTasks={(project) => {
+                  setProjectsOpen(false);
+                  setTasksFilterProjectId(project.id);
+                  navigateTab("tasks");
+                }}
+              />
+            </ScreenContainer>
           ) : gitCredentialsOpen ? (
-            <GitCredentialsScreen company={company} onBack={() => setGitCredentialsOpen(false)} />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <GitCredentialsScreen company={company} onBack={() => setGitCredentialsOpen(false)} />
+            </ScreenContainer>
           ) : tab === "dashboard" ? (
-            <DashboardScreen
-              company={company}
-              onOpenWebWorkbench={(path, title) =>
-                setWebContainerTarget({ path: path || "/dashboard", title: title || "控制台" })
-              }
-              onOpenApprovals={() => {
-                setSelected(null);
-                setDiffContext(null);
-                setSandboxContext(null);
-                setFocusedApprovalId(null);
-                navigateTab("tasks");
-              }}
-              onOpenApproval={(approvalId) => {
-                navigateTab("tasks");
-                setFocusedApprovalId(approvalId);
-              }}
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <DashboardScreen
+                company={company}
+                onOpenWebWorkbench={(path, title) =>
+                  setWebContainerTarget({ path: path || "/dashboard", title: title || "控制台" })
+                }
+                onOpenApprovals={() => {
+                  setSelected(null);
+                  setDiffContext(null);
+                  setSandboxContext(null);
+                  setFocusedApprovalId(null);
+                  navigateTab("tasks");
+                }}
+                onOpenApproval={(approvalId) => {
+                  navigateTab("tasks");
+                  setFocusedApprovalId(approvalId);
+                }}
+              />
+            </ScreenContainer>
           ) : tab === "chat" ? (
-            <BoardChatScreen
-              company={company}
-              whoami={whoami}
-              onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
-              onOpenIssue={(issue) => {
-                navigateTab("tasks");
-                setSelected(issue);
-              }}
-              onOpenPipeline={(pipelineId) => {
-                void Linking.openURL(
-                  `${COOLIE_BASE_URL}/pipelines/${encodeURIComponent(pipelineId)}`,
-                ).catch(() => {
-                  Alert.alert("无法打开 Pipeline", "请在浏览器里打开 Coolie Web 查看该 pipeline。");
-                });
-              }}
-              onOpenPlan={(issue) => {
-                navigateTab("tasks");
-                setSelected(issue);
-              }}
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <BoardChatScreen
+                company={company}
+                whoami={whoami}
+                onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
+                onOpenIssue={(issue) => {
+                  navigateTab("tasks");
+                  setSelected(issue);
+                }}
+                onOpenPipeline={(pipelineId) => {
+                  void Linking.openURL(
+                    `${COOLIE_BASE_URL}/pipelines/${encodeURIComponent(pipelineId)}`,
+                  ).catch(() => {
+                    Alert.alert("无法打开 Pipeline", "请在浏览器里打开 Coolie Web 查看该 pipeline。");
+                  });
+                }}
+                onOpenPlan={(issue) => {
+                  navigateTab("tasks");
+                  setSelected(issue);
+                }}
+              />
+            </ScreenContainer>
           ) : tab === "assets" || tab === "agents" || tab === "ontology" || tab === "artifacts" ? (
-            <OrgAssetsScreen
-              company={company}
-              whoami={whoami}
-              initialTab={tab === "agents" ? "agents" : tab === "artifacts" ? "artifacts" : "ontology"}
-              onOpenIssue={(issue) => {
-                navigateTab("tasks");
-                setSelected(issue);
-              }}
-              onOpenProjectTasks={(project) => {
-                setTasksFilterProjectId(project.id);
-                navigateTab("tasks");
-              }}
-              onCreateTaskForProject={(project) => {
-                setCreateTaskProjectId(project.id);
-              }}
-              onOpenWebProjects={(subPath?: string, title?: string) =>
-                setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" })
-              }
-              onOpenWebOntology={(subPath?: string, title?: string) =>
-                setWebContainerTarget({ path: subPath || "/ontology", title: title || "本体可视化设计器" })
-              }
-              onOpenWebWorkbench={(subPath?: string, title?: string) =>
-                setWebContainerTarget({ path: subPath || "/dashboard", title: title || "控制台" })
-              }
-              onOpenSandbox={(url, service, wp, scope) =>
-                setSandboxContext({ url, service, workProduct: wp, scope })
-              }
-              onOpenDiff={(issueItem, wp) =>
-                setDiffContext({ issue: issueItem, workProduct: wp })
-              }
-            />
+            <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+              <OrgAssetsScreen
+                company={company}
+                whoami={whoami}
+                initialTab={tab === "agents" ? "agents" : tab === "artifacts" ? "artifacts" : "ontology"}
+                onOpenIssue={(issue) => {
+                  navigateTab("tasks");
+                  setSelected(issue);
+                }}
+                onOpenProjectTasks={(project) => {
+                  setTasksFilterProjectId(project.id);
+                  navigateTab("tasks");
+                }}
+                onCreateTaskForProject={(project) => {
+                  setCreateTaskProjectId(project.id);
+                }}
+                onOpenWebProjects={(subPath?: string, title?: string) =>
+                  setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" })
+                }
+                onOpenWebOntology={(subPath?: string, title?: string) =>
+                  setWebContainerTarget({ path: subPath || "/ontology", title: title || "本体可视化设计器" })
+                }
+                onOpenWebWorkbench={(subPath?: string, title?: string) =>
+                  setWebContainerTarget({ path: subPath || "/dashboard", title: title || "控制台" })
+                }
+                onOpenSandbox={(url, service, wp, scope) =>
+                  setSandboxContext({ url, service, workProduct: wp, scope })
+                }
+                onOpenDiff={(issueItem, wp) =>
+                  setDiffContext({ issue: issueItem, workProduct: wp })
+                }
+              />
+            </ScreenContainer>
           ) : tab === "tasks" ? (
             selected ? (
               taskDetail
             ) : (
-              <TaskKanbanScreen
-                company={company}
-                refreshToken={tasksRefreshToken}
-                initialProjectId={tasksFilterProjectId}
-                onOpenIssue={setSelected}
-              />
+              <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+                <TaskKanbanScreen
+                  company={company}
+                  refreshToken={tasksRefreshToken}
+                  initialProjectId={tasksFilterProjectId}
+                  onOpenIssue={setSelected}
+                />
+              </ScreenContainer>
             )
           ) : null}
         </View>
@@ -1253,56 +1330,31 @@ function HomeScreen({
             }}
           />
         ) : null}
-        {/* 底部导航 — 汇览 / 任务 / [+] / 员工 / 收件箱 (固定常驻) */}
-        <TabBar
-          tab={tab}
-          onChange={(key) => {
-            // 切 tab 时重置子页面，直达所选 tab 根界面 (boss: APP 底部导航要固定起来的)
-            setComposeOpen(false);
-            setSelected(null);
-            setProjectsOpen(false);
-            setPipelinesOpen(false);
-            setPlansOpen(false);
-            setAgentDetail(null);
-            setGitCredentialsOpen(false);
-            setSearchOpen(false);
-            setNotificationsOpen(false);
-            setFocusedApprovalId(null);
-            setCreateTaskProjectId(null);
-            setTasksFilterProjectId(null);
-            // wave138c: 壳内的整屏子页(沙箱/Diff/Web 容器)也一并退出 —— 底栏 5 个 tab
-            // 在任意页面都必须「可见且可点」, 点了就直达该 tab 根界面。
-            setSandboxContext(null);
-            setDiffContext(null);
-            setWebContainerTarget(null);
-            setSpecIssue(null);
-            setOnboardingOpen(false);
-            navigateTab(key);
-          }}
-          onCreate={() => setComposeOpen(true)}
-        />
+        {/* wave167 — 底部导航移交给各屏 ScreenContainer; shell 不再挂 TabBar。 */}
       {/* 中央 "+" 打开的「新会话」页 (内容区浮层, 让出底部 TabBar) */}
       {composeOpen ? (
         <EdgeSwipeBack style={styles.composeOverlay} onBack={() => setComposeOpen(false)}>
-          <NewTaskPage
-            companyId={companyId}
-            agents={composerAgents}
-            onClose={() => setComposeOpen(false)}
-            onOpenChat={() => {
-              setComposeOpen(false);
-              navigateTab("chat");
-            }}
-            onOpenAiCreate={() => {
-              setComposeOpen(false);
-              navigateTab("chat");
-              exportBoardPrompt("build 一个演示项目：Coolie 工坊看板");
-            }}
-            onCreated={() => {
-              setComposeOpen(false);
-              setTasksRefreshToken((value) => value + 1);
-              navigateTab("tasks");
-            }}
-          />
+          <ScreenContainer tab={tab} onChange={onChangeTab} onCreate={onCreateTask}>
+            <NewTaskPage
+              companyId={companyId}
+              agents={composerAgents}
+              onClose={() => setComposeOpen(false)}
+              onOpenChat={() => {
+                setComposeOpen(false);
+                navigateTab("chat");
+              }}
+              onOpenAiCreate={() => {
+                setComposeOpen(false);
+                navigateTab("chat");
+                exportBoardPrompt("build 一个演示项目：Coolie 工坊看板");
+              }}
+              onCreated={() => {
+                setComposeOpen(false);
+                setTasksRefreshToken((value) => value + 1);
+                navigateTab("tasks");
+              }}
+            />
+          </ScreenContainer>
         </EdgeSwipeBack>
       ) : null}
       {/* 项目卡「创建任务」: 直接打开建单弹窗, 并把该项目预选好 (boss 20:42) */}
@@ -1523,9 +1575,9 @@ const styles = StyleSheet.create({
   settingsSignOutText: { color: C.err, fontSize: 15, fontWeight: "600" },
   composeOverlay: {
     ...StyleSheet.absoluteFillObject,
-    // 让出底部 TabBar: absoluteFill 的 bottom:0 会把 5 个 tab 整个盖住, 底栏就点不到了
-    // (boss 22:59 OOB)。浮层只铺内容区, 底栏保持可见可点。
-    bottom: TAB_BAR_HEIGHT,
+    // wave167 — 新会话页 (NewTaskPage) 改在 ScreenContainer 里自带 TabBar,
+    // 不再依赖 shell TabBar; 浮层铺满全屏, 屏自带 TabBar 钉在底部, 仍可见可点。
+    bottom: 0,
     // 绝对定位会忽略 SafeAreaView 的 paddingTop, 不补这一条头部(含关闭 X)会落到
     // Android 状态栏底下 —— 系统吃掉那块触摸, 浮层就关不掉了(实测)。
     paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0,
