@@ -4,16 +4,6 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.6.8
-
-> Released: 2026-09-30 · Android release APK + OTA bundle
-
-### 更新
-
-- wave216 真修本体域节点 UUID 显示: 之前 wave163 只在服务端 entity_relations hydrate 把 id 换成真名, 但 Expo 端 `OntologyDomainListScreen` 把 `nodeTypeId` (UUID) 当 typeKey, 又把 typeKey 当 label 兜底, 结果节点下面一片 UUID; 现在加 UI 层防御 (`safeDisplay` + `isUuidLike`), 任何 label/key 落到裸 UUID 或 `type:uuid` 时改用中文占位 (`(未命名实体)` / `(未归类对象)`), truncate 28 字符; 节点抽样和底部详情卡也走了同一路径, 老板截图那种 `0791cb57-4d94-…` 不再出现
-
----
-
 ## v0.6.5
 
 > Released: 2026-09-30 · Android release APK

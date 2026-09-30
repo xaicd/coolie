@@ -456,9 +456,7 @@ export function ontologyGraphService(db: Db) {
     // Any ref whose owning row is gone still gets a placeholder node so the
     // graph stays consistent (an edge is never drawn to nothing). wave163:
     // label by type only — never slice the id, which read like a uuid on the
-    // board. wave216: this server-side fallback is also tightened — if the
-    // resolver above somehow returned an id-shaped label (e.g. a future caller
-    // forgot to populate `name`), we still won't ship a uuid to the UI.
+    // board.
     const PLACEHOLDER_LABEL: Record<EntityType, string> = {
       company: "已删除的公司",
       project: "已删除的项目",
