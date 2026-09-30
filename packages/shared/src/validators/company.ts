@@ -31,6 +31,10 @@ export const createCompanySchema = z.object({
   // against the template catalogue in the route, not here, so an unknown id
   // is a 422 rather than a generic body-validation error.
   templateId: z.string().min(1).nullable().optional(),
+  // Coolie fork — wave226: free-form company facts surfaced to the operator
+  // (max agent quota, branding hints, onboarding flag). Stored verbatim in
+  // `companies.metadata` JSONB. The quota service reads `maxAgents` here.
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export type CreateCompany = z.infer<typeof createCompanySchema>;

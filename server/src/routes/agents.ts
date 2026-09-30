@@ -88,7 +88,8 @@ import {
   templateRoles,
   workspaceOperationService,
 } from "../services/index.js";
-import { badRequest, conflict, forbidden, HttpError, notFound, unprocessable } from "../errors.js";
+import { badRequest, conflict, forbidden, HttpError, notFound, tooManyRequests, unprocessable } from "../errors.js";
+import { AgentQuotaError, assertAgentQuota } from "../services/agent-quota.js";
 import { ONBOARDING_FIRST_TASK_SKILL_KEY, PAPERCLIP_CORE_SKILL_KEYS } from "../services/company-skills.js";
 import { createRunSecretRedactionRegistry } from "../services/run-secret-redaction.js";
 import { assertAuthenticated, assertBoard, assertCompanyAccess, assertInstanceAdmin, buildActorSecretContext, getAccessibleResource, getActorInfo, hasCompanyAccess } from "./authz.js";
@@ -4561,6 +4562,27 @@ export function agentRoutes(
       res.status(404).json({ error: "Company not found" });
       return;
     }
+    // wave226 — Boss: "coolie工坊中, 也要固定员工数量, 不能扩". Each
+    // company carries a maxAgents quota in metadata (default 6); the guard
+    // throws AgentQuotaError → 429 if the requested create would breach it.
+    // Pending-hire path goes through approval, but the eventual approve path
+    // also creates an agent — gate it here so we never enqueue a hire the
+    // company can never accept.
+    try {
+      await assertAgentQuota(db, { companyId, incoming: 1 });
+    } catch (err) {
+      if (err instanceof AgentQuotaError) {
+        throw tooManyRequests(err.message, {
+          code: err.code,
+          companyId: err.companyId,
+          current: err.current,
+          max: err.max,
+          incoming: err.incoming,
+          reason: err.reason,
+        });
+      }
+      throw err;
+    }
 
     // Idempotency within a run: if this run already created a hire from this
     // exact request, return that hire instead of creating a duplicate. The
@@ -4772,6 +4794,24 @@ export function agentRoutes(
       res.status(404).json({ error: "Company not found" });
       return;
     }
+    // wave226 — Boss: "coolie工坊中, 也要固定员工数量, 不能扩". Each
+    // company carries a maxAgents quota in metadata (default 6); the guard
+    // throws AgentQuotaError → 429 if the requested create would breach it.
+    try {
+      await assertAgentQuota(db, { companyId, incoming: 1 });
+    } catch (err) {
+      if (err instanceof AgentQuotaError) {
+        throw tooManyRequests(err.message, {
+          code: err.code,
+          companyId: err.companyId,
+          current: err.current,
+          max: err.max,
+          incoming: err.incoming,
+          reason: err.reason,
+        });
+      }
+      throw err;
+    }
     if (company.requireBoardApprovalForNewAgents) {
       throw conflict(
         "Direct agent creation requires board approval. Use POST /api/companies/:companyId/agent-hires to create a pending hire approval.",
@@ -4970,16 +5010,35 @@ export function agentRoutes(
         res.status(404).json({ error: "Company not found" });
         return;
       }
+      // wave226 — Bulk create must budget the full `roles.length` up front so
+      // a 6-role template staff against a 4-of-6 company fails cleanly with
+      // 429 instead of half-creating.
+      const requestedRoles = Array.isArray(req.body.roles)
+        ? (req.body.roles as string[])
+        : templateRoles(company.templateId);
+      const roleTemplates = resolveRoleTemplates(requestedRoles);
+      try {
+        await assertAgentQuota(db, { companyId, incoming: roleTemplates.length });
+      } catch (err) {
+        if (err instanceof AgentQuotaError) {
+          throw tooManyRequests(err.message, {
+            code: err.code,
+            companyId: err.companyId,
+            current: err.current,
+            max: err.max,
+            incoming: err.incoming,
+            reason: err.reason,
+          });
+        }
+        throw err;
+      }
       if (company.requireBoardApprovalForNewAgents) {
         throw conflict(
           "Direct agent creation requires board approval. Use POST /api/companies/:companyId/agent-hires to create a pending hire approval.",
         );
       }
 
-      const requestedRoles = Array.isArray(req.body.roles)
-        ? (req.body.roles as string[])
-        : templateRoles(company.templateId);
-      const templates = resolveRoleTemplates(requestedRoles);
+      const templates = roleTemplates;
 
       // One read of the roster serves both the idempotency check and shortname
       // de-duplication, so a second run sees the agents the first one created.
