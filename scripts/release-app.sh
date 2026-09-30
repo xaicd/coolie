@@ -3,11 +3,13 @@
 # release-app.sh — Coolie App 一键发版 (Android release APK + 云端 version.json + OTA)
 #
 # 用法:
-#   bash scripts/release-app.sh <新版本号> "<更新说明>"
-#   bash scripts/release-app.sh <新版本号> "<更新说明>" --dry-run
+#   bash scripts/release-app.sh <新版本号> "<更新说明>" [--dry-run]
+#                                [--with-server-deploy | --skip-server-deploy]
+#                                [--with-4-guard | --skip-4-guard]
 # 示例:
 #   bash scripts/release-app.sh 0.3.1 "修复本体图谱点击错位"
 #   bash scripts/release-app.sh 0.3.1 "修复本体图谱点击错位" --dry-run
+#   bash scripts/release-app.sh 0.3.1 "wave233 全自动" --with-4-guard
 #
 # 流程:
 #   1. 前置检查 (clients/expo 工作区干净、全仓 tracked 无改动即 1.5 commit 强制、版本号合法且非当前版本)
@@ -19,13 +21,24 @@
 #   7. coscli 上传 APK 到 COS
 #   8. 生成 version.json (含 commitSha) 并 scp 到生产 (App 内升级检测用)
 #   9. 发布 OTA 增量更新
-#  10. 输出汇总
+#  10. (默认) 联动 server deploy (scripts/deploy-tc-coolie-claw.sh --skip-build)
+#  11. (默认 + --with-4-guard) 跑 4 护栏 (version.json / ota/manifest / APK / /api/health)
 #
 # 配置 (环境变量):
 #   COS_BUCKET           COS 目标前缀   (默认: cos://gzbucket/coolie/app)
 #   DLS_BASE             APK 下载前缀    (默认: https://dls.xrobinai.cn/coolie/app)
 #   SSH_TARGET           ssh 目标        (默认: tc-coolie-claw)
 #   REMOTE_VERSION_JSON  远端 version.json 路径 (默认: /opt/coolie/ui/dist/version.json)
+#   AUTO_DEPLOY_EVIDENCE_DIR   4 护栏证据目录 (默认: ./docs-coolie/evidence/wave<latest>)
+#
+# flag 语义 (wave233):
+#   --with-server-deploy    显式启用 server 联动部署 (默认就是启用 — 这是
+#                           历史 step 10 的行为, wave233 只是补一个正向
+#                           flag 让 PM 调度脚本不用读负向 --skip-…)
+#   --skip-server-deploy    老板手动跑 server 时用 — 跳过 step 10 server 联动
+#   --with-4-guard          发版后跑 4 护栏 (version.json / ota/manifest /
+#                           APK HEAD / /api/health) 并写证据到 evidence dir
+#   --skip-4-guard          默认不跑 4 护栏 — 老用法兼容
 #==============================================================================
 set -euo pipefail
 
@@ -46,12 +59,16 @@ export DEVELOPER_DIR="${DEVELOPER_DIR:-/Library/Developer/CommandLineTools}"
 
 DRY_RUN=0
 SKIP_SERVER_DEPLOY=0
+WITH_4_GUARD=0
 ARGS=()
 for arg in "$@"; do
   case "$arg" in
     --dry-run) DRY_RUN=1 ;;
-  --skip-server-deploy) SKIP_SERVER_DEPLOY=1 ;;
-    -h|--help) sed -n '3,30p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    --skip-server-deploy) SKIP_SERVER_DEPLOY=1 ;;
+    --with-server-deploy) SKIP_SERVER_DEPLOY=0 ;;
+    --skip-4-guard) WITH_4_GUARD=0 ;;
+    --with-4-guard) WITH_4_GUARD=1 ;;
+    -h|--help) sed -n '3,42p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) ARGS+=("$arg") ;;
   esac
 done
@@ -67,6 +84,19 @@ dry() { [ "$DRY_RUN" -eq 1 ]; }
 # 执行命令；dry-run 下只打印
 run() { if dry; then printf '   [dry-run] %s\n' "$*"; else "$@"; fi; }
 run_sh() { if dry; then printf '   [dry-run] %s\n' "$1"; else bash -c "$1"; fi; }
+
+# wave233 — 4 护栏 (version.json / ota/manifest / APK HEAD / /api/health).
+# release-app.sh 历史上 step 10 之后就直接退出了, 没有验收. boss 09-30
+# 「打包升级会先更新服务器的版本吗」的根因就是 step 10 deploy 跑没跑没人
+# 知道 — 跑一下 4 个 curl 就能 30s 出结果, 加这块很值. lib 跟
+# publish-ota.sh 和 auto-deploy-all.sh 共享一份 (scripts/lib/auto-deploy.sh).
+# shellcheck source=/dev/null
+. "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/auto-deploy.sh"
+# dry-run 跟 lib 共用同一个 env var (AUTO_DEPLOY_DRY_RUN=1), 这样嵌套子脚本
+# (auto-deploy-all.sh 调 release-app.sh) 也能传递 dry-run 状态.
+if dry; then
+  export AUTO_DEPLOY_DRY_RUN=1
+fi
 
 # DS 投产一票否决（gate G4，见 server/src/services/release-gate.ts）。
 # 公司上下文由 COOLIE_RELEASE_COMPANY_ID 提供：App 发版本身没有公司概念，
@@ -344,8 +374,9 @@ run_sh "cd '$EXPO_DIR' && bash scripts/publish-ota.sh android"
 #    否则 App 端紧急熔断按钮点了会得到 404 (wave105 真实经历)。
 #    /opt/coolie 是 rsync 镜像不是 git 仓库, 无法做 diff 探测 — 无条件幂等部署,
 #    deploy 脚本自身很快 (rsync 增量 + systemctl restart ~10s)。
-#    --skip-server-deploy 可跳过此步。
-step "[10/10] server 同步部署 (deploy-tc-coolie-claw.sh --skip-build)"
+#    --skip-server-deploy 可跳过此步。 --with-server-deploy 是正向同名 (wave233
+#    加, 默认行为不变 — PM 调度脚本里喜欢用正向 flag).
+step "[10/11] server 同步部署 (deploy-tc-coolie-claw.sh --skip-build)"
 if [ "$SKIP_SERVER_DEPLOY" = "1" ]; then
   echo "   ⏭ 跳过 server 部署 (--skip-server-deploy)"
 else
@@ -365,6 +396,22 @@ else
   fi
 fi
 
+# wave233 — 4 护栏. 默认不跑, 老板手动跑时可加 --with-4-guard 出验收报告.
+# 这一步只在 SKIP_SERVER_DEPLOY 之外额外做事, 所以即使 skip 也能跑 (e.g.
+# "已经手动跑过 deploy, 我只要补一份 4-guard 证据").
+step "[11/11] 4 护栏 (version.json / ota/manifest / APK HEAD / /api/health)"
+if [ "$WITH_4_GUARD" = "1" ]; then
+  if [ -z "${AUTO_DEPLOY_EVIDENCE_DIR:-}" ]; then
+    # 默认落到 wave233 目录 (跟 doc/plans/2026-09-30-wave233-…md 对齐).
+    export AUTO_DEPLOY_EVIDENCE_DIR="$REPO_ROOT/docs-coolie/evidence/wave233"
+  fi
+  export VERSION="$VERSION"
+  export APK_URL="$APK_URL"
+  ad_guard_4 "$AUTO_DEPLOY_EVIDENCE_DIR"
+else
+  echo "   ⏭ 跳过 4 护栏 (--with-4-guard 启用)"
+fi
+
 printf '\n========================================================\n'
 printf ' 发版完成:      v%s (versionCode %s)\n' "$VERSION" "$VERSION_CODE"
 printf ' APK 直链:      %s\n' "$APK_URL"
@@ -377,6 +424,15 @@ elif dry; then
   printf ' server:        dry-run\n'
 else
   printf ' server:        已联动部署 (deploy-tc-coolie-claw.sh --skip-build)\n'
+fi
+if [ "$WITH_4_GUARD" = "1" ]; then
+  if dry; then
+    printf ' 4 护栏:       dry-run\n'
+  else
+    printf ' 4 护栏:       已跑通 (证据: %s)\n' "$AUTO_DEPLOY_EVIDENCE_DIR"
+  fi
+else
+  printf ' 4 护栏:       跳过 (--skip-4-guard 默认)\n'
 fi
 printf '========================================================\n'
 
