@@ -6,6 +6,22 @@
 
 - Bound full-tree workspace Git scans with process-wide concurrency, queue, timeout, cancellation, coalescing, and short-lived changed-file caching. Saturated or timed-out changed-file requests now return a retryable degraded response, and hidden file-browser panels no longer initiate scans.
 
+## 0.6.5
+
+### Patch Changes
+
+- Deploy wave215 (commit `23a56c944`) routes to prod: `board/chat/stream`,
+  `board/chat/issue`, `board/chat/conversation/:id`, `board/chat/conversations`,
+  `companies/:companyId/board/chat`, `companies/:companyId/board/conversations`,
+  plus `dispatch`, `quotas`, `usage`, `work-products`, `sandboxes`,
+  `cycle-time`, `milestones`. Fixes boss 0.6.8 App 工坊入口
+  `GET /api/companies/:companyId/board/chat` 404 — local HEAD has the
+  route since wave215 but prod `tsx` server was started before that commit
+  and never reloaded.
+- Bump server package version `0.3.1 → 0.6.5` to align with the
+  `clients/expo-paperclip-web@0.6.5` sibling (App-side gate already
+  published at `0.6.8`).
+
 ## 0.3.1
 
 ### Patch Changes
