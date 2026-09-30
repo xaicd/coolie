@@ -156,5 +156,9 @@ export type {
   GitProvider,
   GitCredential,
   SaveGitCredentialInput,
+  PluginRecord,
+  PluginStatus,
+  PluginConfig,
+  PluginConfigField,
 } from "./types";
 

@@ -59,6 +59,8 @@ import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
 import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen";
 import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
 import { OrgAssetsScreen } from "./src/screens/OrgAssetsScreen";
+import { PluginManagerScreen } from "./src/screens/PluginManagerScreen";
+import { PluginSettingsScreen } from "./src/screens/PluginSettingsScreen";
 import {
   PrototypeSandboxScreen,
   type SandboxScope,
@@ -810,6 +812,9 @@ function HomeScreen({
   const [gitCredentialsOpen, setGitCredentialsOpen] = useState(false);
   // wave70 — Workspace Git Toggle 的状态 (本地开关, 后端未消费, 但 UI 反馈要有)
   const [workspaceGitEnabled, setWorkspaceGitEnabled] = useState(false);
+  // wave235 — 插件管理 + 单插件设置 (App 内模态屏, 复用 Shell 模式)
+  const [pluginManagerOpen, setPluginManagerOpen] = useState(false);
+  const [pluginSettingsId, setPluginSettingsId] = useState<string | null>(null);
   const ota = useOTA();
   const unreadCount = useNotificationsStore((s) => s.unreadCount);
   const loadNotifications = useNotificationsStore((s) => s.load);
@@ -962,6 +967,8 @@ function HomeScreen({
     if (plansOpen) return setPlansOpen(false), true;
     if (projectsOpen) return setProjectsOpen(false), true;
     if (gitCredentialsOpen) return setGitCredentialsOpen(false), true;
+    if (pluginManagerOpen) return setPluginManagerOpen(false), true;
+    if (pluginSettingsId) return setPluginSettingsId(null), true;
     if (selected) return setSelected(null), true;
     if (composeOpen) return setComposeOpen(false), true;
     if (settingsOpen) return setSettingsOpen(false), true;
@@ -1053,7 +1060,9 @@ function HomeScreen({
       pipelinesOpen ||
       plansOpen ||
       projectsOpen ||
-      gitCredentialsOpen,
+      gitCredentialsOpen ||
+      pluginManagerOpen ||
+      pluginSettingsId,
     );
 
     content = (
@@ -1206,6 +1215,22 @@ function HomeScreen({
             />
           ) : gitCredentialsOpen ? (
             <GitCredentialsScreen company={company} onBack={() => setGitCredentialsOpen(false)} />
+          ) : pluginManagerOpen ? (
+            <PluginManagerScreen
+              company={company}
+              onBack={() => setPluginManagerOpen(false)}
+              onOpenPluginSettings={(p) => setPluginSettingsId(p.id)}
+              onOpenWebPluginManager={() => {
+                setWebContainerTarget({ path: "/plugins", title: "插件中心" });
+                setPluginManagerOpen(false);
+              }}
+            />
+          ) : pluginSettingsId ? (
+            <PluginSettingsScreen
+              company={company}
+              pluginId={pluginSettingsId}
+              onBack={() => setPluginSettingsId(null)}
+            />
           ) : tab === "dashboard" ? (
             <DashboardScreen
               company={company}
@@ -1276,6 +1301,13 @@ function HomeScreen({
               onOpenDiff={(issueItem, wp) =>
                 setDiffContext({ issue: issueItem, workProduct: wp })
               }
+              onOpenPluginManager={() => setPluginManagerOpen(true)}
+              onOpenPrototypeSandbox={() => setSandboxContext({
+                url: "",
+                service: null,
+                workProduct: null,
+                scope: null,
+              })}
             />
           ) : tab === "tasks" ? (
             selected ? (

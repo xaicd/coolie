@@ -26,6 +26,10 @@ import {
   type OntologyDomainLifecycleState,
   type OntologyGraphCounts,
   type OntologyGraphSnapshot,
+  type PluginRecord,
+  type PluginStatus,
+  type PluginConfig,
+  type PluginConfigField,
   type Project,
   type ProjectDocument,
   type ProjectDocumentAnalysis,
@@ -1061,6 +1065,89 @@ export class CoolieClient {
       { companyId, params: { companyId, domainId } },
     );
     return res.data ?? { seeded: false };
+  }
+
+  // ── Plugin management (wave235 — 抄 web 端 PluginManager / PluginSettings) ──
+
+  /**
+   * 列出实例所有已装插件, 可按状态过滤.
+   * 服务端 `GET /api/plugins?status=...` 返回 PluginRecord[].
+   */
+  async listPlugins(opts?: { status?: PluginStatus }): Promise<PluginRecord[]> {
+    const query = opts?.status ? `?status=${encodeURIComponent(opts.status)}` : "";
+    return this.request<PluginRecord[]>("GET", `/api/plugins${query}`);
+  }
+
+  /**
+   * 单插件详情 (含 manifestJson 等), 用于 PluginSettingsScreen.
+   * 服务端 `GET /api/plugins/:pluginId`.
+   */
+  async getPlugin(pluginId: string): Promise<PluginRecord> {
+    return this.request<PluginRecord>(
+      "GET",
+      `/api/plugins/${encodeURIComponent(pluginId)}`,
+    );
+  }
+
+  /**
+   * 启用一个插件 (从 disabled/error 状态恢复到 ready).
+   * 服务端 `POST /api/plugins/:pluginId/enable`.
+   */
+  async enablePlugin(pluginId: string): Promise<PluginRecord> {
+    return this.request<PluginRecord>(
+      "POST",
+      `/api/plugins/${encodeURIComponent(pluginId)}/enable`,
+    );
+  }
+
+  /**
+   * 禁用一个插件 (保留安装, 不再加载 worker).
+   * 服务端 `POST /api/plugins/:pluginId/disable`.
+   */
+  async disablePlugin(pluginId: string): Promise<PluginRecord> {
+    return this.request<PluginRecord>(
+      "POST",
+      `/api/plugins/${encodeURIComponent(pluginId)}/disable`,
+    );
+  }
+
+  /**
+   * 卸载一个插件. `purge=true` 还会清掉磁盘上的 install 目录.
+   * 服务端 `DELETE /api/plugins/:pluginId?purge=...`.
+   */
+  async uninstallPlugin(pluginId: string, opts?: { purge?: boolean }): Promise<unknown> {
+    const query = opts?.purge ? "?purge=true" : "";
+    return this.request<unknown>(
+      "DELETE",
+      `/api/plugins/${encodeURIComponent(pluginId)}${query}`,
+    );
+  }
+
+  /**
+   * 单插件的公司级配置 (e.g. ontology 的 domain 默认参数).
+   * 服务端 `GET /api/plugins/:pluginId/config?companyId=...` 返回 PluginConfig 或 null.
+   */
+  async getPluginConfig(pluginId: string, companyId: string): Promise<PluginConfig | null> {
+    return this.request<PluginConfig | null>(
+      "GET",
+      `/api/plugins/${encodeURIComponent(pluginId)}/config?companyId=${encodeURIComponent(companyId)}`,
+    );
+  }
+
+  /**
+   * 保存 (upsert) 单插件的公司级配置. `configJson` 是 schema 校验后的对象.
+   * 服务端 `POST /api/plugins/:pluginId/config` body: `{ companyId, configJson }`.
+   */
+  async updatePluginConfig(
+    pluginId: string,
+    companyId: string,
+    configJson: Record<string, unknown>,
+  ): Promise<PluginConfig> {
+    return this.request<PluginConfig>(
+      "POST",
+      `/api/plugins/${encodeURIComponent(pluginId)}/config`,
+      { companyId, configJson },
+    );
   }
 
   // ── Board Chat & Concierge Streaming (需求⑫ 驾驶舱问答) ────────────

@@ -148,6 +148,58 @@ export interface Company {
 }
 
 /**
+ * wave235 — 抄 web 端插件管理 UI 到 App. 服务端 PluginRecord 的最小子集
+ * (纸面上有 ~20 个字段, App 只展示 5 个). 详细定义见
+ * `packages/shared/src/types/plugin.ts` 的 `PluginRecord`.
+ */
+export type PluginStatus =
+  | "installed"
+  | "ready"
+  | "error"
+  | "upgrade_pending"
+  | "uninstalled"
+  | "disabled";
+
+export interface PluginRecord {
+  id: string;
+  /** package 名 (e.g. "paperclipai.plugin-ontology") */
+  pluginKey: string;
+  /** 人类可读名 (e.g. "Business Ontology") */
+  displayName: string;
+  version: string;
+  status: PluginStatus;
+  description?: string;
+  installPath?: string;
+  installedAt?: string;
+  updatedAt?: string;
+  /** 最近错误, status === "error" 时显示 */
+  lastError?: string;
+  /** 是否在 UI 启用 (wave235 新增, web 上有 toggle) */
+  enabled?: boolean;
+}
+
+/**
+ * wave235 — 单插件详细配置 schema + 当前值. 服务端
+ * `GET /api/plugins/:id/config?companyId=` 返回.
+ */
+export interface PluginConfigField {
+  key: string;
+  label: string;
+  type: "string" | "number" | "boolean" | "select";
+  required?: boolean;
+  default?: unknown;
+  options?: Array<{ value: string; label: string }>;
+  description?: string;
+}
+
+export interface PluginConfig {
+  companyId: string;
+  pluginId: string;
+  configJson: Record<string, unknown>;
+  updatedAt?: string;
+}
+
+/**
  * The slice of an agent's permission document the composer reads.
  *
  * Upstream, `trustPreset` decides whether an agent is a low-trust reviewer
