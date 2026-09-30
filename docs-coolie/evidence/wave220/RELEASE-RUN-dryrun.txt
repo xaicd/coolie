@@ -1,0 +1,6 @@
+[2026-09-30T13:08:49.946Z] start {"dryRun":true,"version":null,"notes":"wave220 release-ops dry run","skipBuild":true}
+[2026-09-30T13:08:49.984Z] ops.found {"id":"4a5867e1-59e6-4a74-b7ea-038eefb1944f","name":"Coolie-Ops-Control-Room"}
+[2026-09-30T13:08:49.984Z] release-app.sh.exists {}
+[2026-09-30T13:08:50.043Z] step.git.status-clean {"exit":0,"ms":59,"stdoutBytes":704,"stderrBytes":0}
+[2026-09-30T13:09:15.299Z] step.gate.api-smoke {"exit":0,"ms":25256,"stdoutBytes":1220,"stderrBytes":0}
+[2026-09-30T13:09:15.299Z] done {"dryRun":true,"version":null,"notes":"wave220 release-ops dry run","opsCompany":{"id":"4a5867e1-59e6-4a74-b7ea-038eefb1944f","name":"Coolie-Ops-Control-Room"},"steps":[{"name":"git.status-clean","exit":0,"ms":59,"ok":true}],"fourGates":{"ok":true,"results":[{"name":"api-smoke","exit":0,"ms":25256,"ok":true}]},"ok":true}
