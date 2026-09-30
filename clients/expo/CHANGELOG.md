@@ -4,6 +4,36 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.6.11
+
+> Released: 2026-09-30 · Android release APK + OTA bundle
+
+### 更新
+
+- wave185 登录页 / 输入屏键盘挡输入框: `App.tsx` 的公共壳 `Surface` 加 `KeyboardAvoidingView` (iOS `behavior="padding"` 自动抬升, Android 由 `adjustResize` + ScrollView 自动让位), 一次性覆盖 `SignInScreen` / 公司选择 / 审批裁决 3 个整屏表单壳; 独立屏 `RegisterScreen` (5 输入框) 也补 KAV。老板实测「点完密码看不见自己敲了什么」修好, 0 副作用 (已经自带 KAV 的 7 个屏未碰)。
+
+---
+
+## v0.6.10
+
+> Released: 2026-09-30 · Android release APK + OTA bundle
+
+### 更新
+
+- wave184 自写 Toast 通知系统：之前关键操作要么弹 `Alert.alert` 阻塞打断, 要么完全静默 (老板实测「登录失败没看到提示」「点退出不知道有没有用」), 现在所有轻量回执走顶部滑入淡出的 Toast, 不抢焦点、不打断、自动消失 (success 2-3s / info 3s / error 5s)。新增 zustand queue store (`src/stores/toast.ts`) + 单例宿主 (`src/components/ToastHost.tsx`), 配色沿用 Linear 令牌 (surface 背景 + 状态色左条 + icon), 走 RN 内建 `Animated.timing` (useNativeDriver:true, 不占 JS 线程), 无新增依赖。`src/ui/toast.ts` 重写 — 调用点零改动 (TaskKanbanScreen 已用 showSuccessToast/showErrorToast, 自动从 Alert 变成真 Toast)。App.tsx 关键路径加 Toast: 登录失败 / 已退出登录 / 缓存已清理 / 缓存清理失败 / iOS 升级路径打开失败 / APK 下载失败 / 任务已创建 / 无法打开 Pipeline — 共 8 处, 全部从阻塞 Alert 改成不抢焦点的 Toast。Click-to-dismiss 已支持 (用户可点 Toast 提前关掉)。
+
+---
+
+## v0.6.9
+
+> Released: 2026-09-30 · Android release APK + OTA bundle
+
+### 更新
+
+- wave178 全屏兜底 ErrorBoundary: 之前任何屏 render 抛错都是裸红屏/白屏, 老板截图没法分析; 现在 App 根挂一个 `ErrorBoundary` (root scope), 崩了显示友好兜底屏 (图标 + 「出了点问题」+ 错误摘要/堆栈 + 「重启 App」+ 「只重试这一屏」按钮); 「重启 App」走 `Updates.reloadAsync()` (OTA 唯一稳的重启方式), 失败降级到 retry 把 boundary state 复位; 堆栈自动剔除 node_modules / RN 内置栈帧, 只留用户代码
+
+---
+
 ## v0.6.8
 
 > Released: 2026-09-30 · Android release APK + OTA bundle

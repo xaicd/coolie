@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -76,8 +77,14 @@ export function RegisterScreen({
       ]}
     >
       <StatusBar style="light" />
-      <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <ScreenHeader onBack={onBack} backLabel="登录" />
+      {/* wave185 — 注册屏 5 个输入框 (名字/公司/邮箱/密码/确认), 键盘弹起会被盖。iOS
+          padding 自动抬升, Android 由 RN ScrollView 自动处理 `adjustResize`。 */}
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+          <ScreenHeader onBack={onBack} backLabel="登录" />
 
         <View style={styles.hero}>
           <Text style={styles.brand}>创建账号</Text>
@@ -156,7 +163,8 @@ export function RegisterScreen({
         <Pressable onPress={onBack} style={styles.linkWrapper}>
           <Text style={styles.link}>已有账号？返回登录</Text>
         </Pressable>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
