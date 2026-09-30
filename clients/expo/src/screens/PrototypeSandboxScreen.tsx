@@ -781,6 +781,7 @@ export function PrototypeSandboxScreen({
                 <Pressable
                   key={f.key}
                   onPress={() => setKindFilter(f.key)}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                   style={[styles.filterChip, active && styles.filterChipActive]}
                 >
                   <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
@@ -955,6 +956,7 @@ export function PrototypeSandboxScreen({
                   <Pressable
                     key={version.id}
                     onPress={() => setSelectedVersionId(version.id)}
+                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                     style={[styles.versionChip, active && styles.versionChipActive]}
                     accessibilityRole="button"
                     accessibilityState={{ selected: active }}
@@ -1115,19 +1117,21 @@ const styles = StyleSheet.create({
   },
   filterChip: {
     paddingHorizontal: 12,
-    // wave214 — chip 文字被 Android 默认 line-height 截断. 旧值 5 + 12*1.2 + 5 = 24.4
-    // 实测只够装下半截, 上半截被截. 改 paddingVertical 8 + 显式 lineHeight 18 + 关
-    // includeFontPadding 让行盒精确等于 (fontSize * 1.5), 即 12*1.5 = 18, 文字垂直居中.
-    paddingVertical: 8,
+    // wave230 — 老板截图 chip 文字仍被上下各裁 1px. wave214 算 8+18+8=34 < height 36,
+    // 上半下半各被切 1px. 现改 10+22+10=42=height, 行高从 18 抬到 22 (fontSize 12 的
+    // 1.83 倍, 给 emoji 字形/字肩留垂直呼吸), includeFontPadding false 让行盒精确等
+    // 于 lineHeight, 文字不再被 Android 默认字体内边距挤扁.
+    paddingVertical: 10,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
     borderColor: C.lineSubtle,
     alignItems: "center",
     justifyContent: "center",
-    // wave214 — Pressable 在 RN 上会无视 paddingVertical 给一个「最小高度」, 实测
-    // 仍渲到 67px. 显式 height 锁死 (borderWidth 1*2 + paddingV 8*2 + lineHeight 18 = 36).
-    height: 36,
+    // wave214 — Pressable 在 RN 上会无视 paddingVertical 给一个「最小高度」, 显式
+    // height 锁死 (borderWidth 1*2 + paddingV 10*2 + lineHeight 22 = 42), wave230
+    // 把 gap 修到正好一致.
+    height: 42,
   },
   filterChipActive: {
     backgroundColor: "rgba(94,106,210,0.15)",
@@ -1137,9 +1141,9 @@ const styles = StyleSheet.create({
     color: C.ink3,
     fontSize: 12,
     fontWeight: "500",
-    // wave214 — Android 默认 line-height 会把文字压扁; 显式行高 + 关 includeFontPadding
-    // (iOS 无 includeFontPadding 概念, 在 Android 上让 padding 精确等于 lineHeight - fontSize)
-    lineHeight: 18,
+    // wave230 — lineHeight 22 给文字完整字身空间; textAlignVertical + Android
+    // includeFontPadding:false 让 chip 行盒精确等于 lineHeight, 不再被截.
+    lineHeight: 22,
     textAlignVertical: "center",
     ...Platform.select({ android: { includeFontPadding: false } }),
   },
@@ -1288,16 +1292,17 @@ const styles = StyleSheet.create({
   },
   versionChip: {
     paddingHorizontal: 10,
-    // wave214 — 与 filterChip 对齐, 上下各加 3px 防 Android 文字压扁
-    paddingVertical: 7,
+    // wave230 — 与 filterChip 同根因同修: 10+20+10=40=height, 给 "v3 最新" 这种带文字+空格的
+    // chip 行盒足够呼吸, 不再被 Android 默认字体内边距挤掉上下边缘.
+    paddingVertical: 10,
     borderRadius: 999,
     backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
     borderColor: C.lineSubtle,
     alignItems: "center",
     justifyContent: "center",
-    // wave214 — 显式 height 锁死 (border 2 + paddingV 14 + lineH 18 = 34), 详见 filterChip 注释
-    height: 34,
+    // wave214 — 显式 height 锁死, wave230 改 10+20+10=40 与之严格对齐.
+    height: 40,
   },
   versionChipActive: {
     backgroundColor: "rgba(94, 106, 210, 0.15)",
@@ -1307,8 +1312,8 @@ const styles = StyleSheet.create({
     color: C.ink3,
     fontSize: 12,
     fontWeight: "500",
-    // wave214 — 显式 lineHeight + Android 关 includeFontPadding, 与 filterChip 同一原因
-    lineHeight: 18,
+    // wave230 — lineHeight 20 与 paddingV 10 配对, 让文字垂直居中且不被切.
+    lineHeight: 20,
     textAlignVertical: "center",
     ...Platform.select({ android: { includeFontPadding: false } }),
   },
