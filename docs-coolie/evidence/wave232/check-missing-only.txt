@@ -1,0 +1,39 @@
+tiejiang           | P0 | coding-style [claude] missing
+tiejiang           | P0 | testing-style [claude] missing
+tiejiang           | P0 | api-design [claude] missing
+tiejiang           | P0 | database-design [claude] missing
+tiejiang           | P0 | code-review [claude] missing
+tiejiang           | P1 | task-driven-development [claude] missing
+menshen            | P0 | paperclip-task [all] missing
+menshen            | P0 | paperclip-frontend-app [all] missing
+menshen            | P0 | paperclip-deploy [all] missing
+menshen            | P0 | dispatch-wave [cmd] missing
+menshen            | P0 | monitor-wave [cmd] missing
+menshen            | P0 | FDE-skills [cmd] missing
+duidiyuan          | P0 | paperclip-runbook [claude] missing
+duidiyuan          | P0 | paperclip-system-monitor [claude] missing
+duidiyuan          | P0 | paperclip-cost-optimize [claude] missing
+duidiyuan          | P0 | paperclip-incident-response [claude] missing
+duidiyuan          | P0 | paperclip-backup-restore [claude] missing
+modou              | P0 | fda [agy] warn
+modou              | P0 | solution-scouting-and-dar [agy] warn
+modou              | P1 | product-project-intake [agy] warn
+modou              | P1 | requirements-capture [agy] warn
+modou              | P0 | paperclip-dar [agy] missing
+modou              | P0 | paperclip-prototype [agy] missing
+modou              | P0 | paperclip-licensing-audit [agy] missing
+modou              | P0 | paperclip-design-pattern [agy] missing
+modou              | P0 | paperclip-data-viz [agy] missing
+modou              | P0 | agy-system-instructions [agy] missing
+baixiaosheng       | P0 | paperclip-system-monitor [claude] missing
+baixiaosheng       | P0 | paperclip-incident-response [claude] missing
+baixiaosheng       | P0 | paperclip-cost-optimize [claude] missing
+baixiaosheng       | P0 | paperclip-data-analysis [claude] missing
+baixiaosheng       | P0 | paperclip-ml-eval [claude] missing
+baixiaosheng       | P0 | paperclip-test-strategy [claude] missing
+baixiaosheng       | P0 | paperclip-bug-hunt [claude] missing
+baixiaosheng       | P0 | paperclip-quality-metrics [claude] missing
+
+Summary:
+  P0 MISSING (any employee): 1
+  P1 MISSING (any employee): 1

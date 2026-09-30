@@ -1,0 +1,43 @@
+[wave232-skills] noop menshen fdse (already links /Users/mac/workspace/xaicd/coolie/.agents/skills/fdse)
+[wave232-skills] noop menshen fdse (already links /Users/mac/workspace/xaicd/coolie/.agents/skills/fdse)
+[wave232-skills] noop menshen fdse (already links /Users/mac/workspace/xaicd/coolie/.agents/skills/fdse)
+[wave232-skills] noop menshen fdse (already links /Users/mac/workspace/xaicd/coolie/.agents/skills/fdse)
+[wave232-skills] noop menshen paperclip (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip)
+[wave232-skills] noop menshen paperclip (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip)
+[wave232-skills] noop menshen paperclip (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip)
+[wave232-skills] noop menshen paperclip (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip)
+[wave232-skills] noop menshen paperclip-board (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip-board)
+[wave232-skills] noop menshen paperclip-board (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip-board)
+[wave232-skills] noop menshen paperclip-board (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip-board)
+[wave232-skills] noop menshen paperclip-board (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip-board)
+[wave232-skills] would symlink menshen qa-humanlike-e2e -> /Users/mac/.cmd/skills/qa-humanlike-e2e
+[wave232-skills] would symlink menshen comprehensive-testing-workflow -> /Users/mac/.cmd/skills/comprehensive-testing-workflow
+[wave232-skills] would symlink menshen ops-task-orchestration -> /Users/mac/.cmd/skills/ops-task-orchestration
+[wave232-skills] would symlink menshen add-product-e2e-eval -> /Users/mac/.cmd/skills/add-product-e2e-eval
+[wave232-skills] would symlink menshen add-runner-eval -> /Users/mac/.cmd/skills/add-runner-eval
+[wave232-skills] would symlink menshen paperclip-evals -> /Users/mac/.cmd/skills/paperclip-evals
+[wave232-skills] would symlink menshen terminal-bench-loop -> /Users/mac/.cmd/skills/terminal-bench-loop
+[wave232-skills] would symlink menshen check-pr -> /Users/mac/.cmd/skills/check-pr
+[wave232-skills] would symlink menshen prcheckloop -> /Users/mac/.cmd/skills/prcheckloop
+[wave232-skills] would symlink menshen pr-gardening -> /Users/mac/.cmd/skills/pr-gardening
+[wave232-skills] would symlink menshen pr-report -> /Users/mac/.cmd/skills/pr-report
+[wave232-skills] would symlink menshen prepare-paperclip-pr -> /Users/mac/.cmd/skills/prepare-paperclip-pr
+[wave232-skills] would symlink menshen diagnose-why-work-stopped -> /Users/mac/.cmd/skills/diagnose-why-work-stopped
+[wave232-skills] would symlink menshen ota-cache-busting -> /Users/mac/.cmd/skills/ota-cache-busting
+[wave232-skills] would symlink menshen ota-launchasset-hash -> /Users/mac/.cmd/skills/ota-launchasset-hash
+[wave232-skills] would symlink menshen ota-runtime-version-consistency -> /Users/mac/.cmd/skills/ota-runtime-version-consistency
+[wave232-skills] would symlink menshen ota-caddy-fallback-trap -> /Users/mac/.cmd/skills/ota-caddy-fallback-trap
+[wave232-skills] would symlink menshen deal-with-security-advisory -> /Users/mac/.cmd/skills/deal-with-security-advisory
+[wave232-skills] would symlink menshen frontend-design -> /Users/mac/.cmd/skills/frontend-design
+[wave232-skills] would symlink menshen garden-inbox -> /Users/mac/.cmd/skills/garden-inbox
+
+Summary:
+  linked (new symlinks):    20
+  noop (already correct):   12
+  relinked (target changed): 0
+  skip-warn (clobber guard): 0
+  skip-missing (no SKILL.md in repo): 0
+
+  dry-run: 1
+  cli filter: cmd
+  employee filter: all

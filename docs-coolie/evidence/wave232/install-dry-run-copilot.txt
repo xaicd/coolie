@@ -1,0 +1,23 @@
+[wave232-skills] noop menshen fdse (already links /Users/mac/workspace/xaicd/coolie/.agents/skills/fdse)
+[wave232-skills] noop menshen fdse (already links /Users/mac/workspace/xaicd/coolie/.agents/skills/fdse)
+[wave232-skills] noop menshen fdse (already links /Users/mac/workspace/xaicd/coolie/.agents/skills/fdse)
+[wave232-skills] noop menshen fdse (already links /Users/mac/workspace/xaicd/coolie/.agents/skills/fdse)
+[wave232-skills] noop menshen paperclip (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip)
+[wave232-skills] noop menshen paperclip (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip)
+[wave232-skills] noop menshen paperclip (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip)
+[wave232-skills] noop menshen paperclip (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip)
+[wave232-skills] noop menshen paperclip-board (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip-board)
+[wave232-skills] noop menshen paperclip-board (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip-board)
+[wave232-skills] noop menshen paperclip-board (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip-board)
+[wave232-skills] noop menshen paperclip-board (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip-board)
+
+Summary:
+  linked (new symlinks):    0
+  noop (already correct):   12
+  relinked (target changed): 0
+  skip-warn (clobber guard): 0
+  skip-missing (no SKILL.md in repo): 0
+
+  dry-run: 1
+  cli filter: copilot
+  employee filter: all

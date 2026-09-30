@@ -1,0 +1,13 @@
+[wave232-skills] noop modou paperclip (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip)
+[wave232-skills] noop modou paperclip-board (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip-board)
+
+Summary:
+  linked (new symlinks):    10
+  noop (already correct):   2
+  relinked (target changed): 0
+  skip-warn (clobber guard): 0
+  skip-missing (no SKILL.md in repo): 0
+
+  dry-run: 0
+  cli filter: agy
+  employee filter: modou

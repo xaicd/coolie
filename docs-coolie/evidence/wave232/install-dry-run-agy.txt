@@ -1,0 +1,35 @@
+[wave232-skills] noop menshen fdse (already links /Users/mac/workspace/xaicd/coolie/.agents/skills/fdse)
+[wave232-skills] noop menshen fdse (already links /Users/mac/workspace/xaicd/coolie/.agents/skills/fdse)
+[wave232-skills] noop menshen fdse (already links /Users/mac/workspace/xaicd/coolie/.agents/skills/fdse)
+[wave232-skills] noop menshen fdse (already links /Users/mac/workspace/xaicd/coolie/.agents/skills/fdse)
+[wave232-skills] noop menshen paperclip (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip)
+[wave232-skills] noop menshen paperclip (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip)
+[wave232-skills] noop menshen paperclip (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip)
+[wave232-skills] noop menshen paperclip (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip)
+[wave232-skills] noop menshen paperclip-board (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip-board)
+[wave232-skills] noop menshen paperclip-board (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip-board)
+[wave232-skills] noop menshen paperclip-board (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip-board)
+[wave232-skills] noop menshen paperclip-board (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip-board)
+[wave232-skills] would symlink modou fda -> /Users/mac/.agy/skills/fda
+[wave232-skills] noop modou paperclip (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip)
+[wave232-skills] noop modou paperclip-board (already links /Users/mac/workspace/xaicd/coolie/skills/paperclip-board)
+[wave232-skills] would symlink modou solution-scouting-and-dar -> /Users/mac/.agy/skills/solution-scouting-and-dar
+[wave232-skills] would symlink modou system-design-spec -> /Users/mac/.agy/skills/system-design-spec
+[wave232-skills] would symlink modou palantir-role-engineering -> /Users/mac/.agy/skills/palantir-role-engineering
+[wave232-skills] would symlink modou cmmi-tech-solution -> /Users/mac/.agy/skills/cmmi-tech-solution
+[wave232-skills] would symlink modou cmmi-req-spec -> /Users/mac/.agy/skills/cmmi-req-spec
+[wave232-skills] would symlink modou product-project-intake -> /Users/mac/.agy/skills/product-project-intake
+[wave232-skills] would symlink modou requirements-capture -> /Users/mac/.agy/skills/requirements-capture
+[wave232-skills] would symlink modou doc-maintenance -> /Users/mac/.agy/skills/doc-maintenance
+[wave232-skills] would symlink modou model-catalog-check -> /Users/mac/.agy/skills/model-catalog-check
+
+Summary:
+  linked (new symlinks):    10
+  noop (already correct):   14
+  relinked (target changed): 0
+  skip-warn (clobber guard): 0
+  skip-missing (no SKILL.md in repo): 0
+
+  dry-run: 1
+  cli filter: agy
+  employee filter: all

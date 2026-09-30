@@ -1,0 +1,11 @@
+employee           | P0 ok / total | P1 ok / total | P2 ok / total | MISSING (P0)
+-------------------+---------------+---------------+---------------+-----------------
+铁匠 (Forge / core-swe) |   5 /  10     |  22 /  23     |  23 /  23     |  coding-style(missing) testing-style(missing) api-design(missing) database-design(missing) code-review(missing)
+门神 (Guardian / fdse) |   6 /  12     |  14 /  14     |   3 /   3     |  paperclip-task(missing) paperclip-frontend-app(missing) paperclip-deploy(missing) dispatch-wave(missing) monitor-wave(missing) FDE-skills(missing)
+兑底渊 (Operator / pre-sre) |  10 /  15     |   6 /   6     |   2 /   2     |  paperclip-runbook(missing) paperclip-system-monitor(missing) paperclip-cost-optimize(missing) paperclip-incident-response(missing) paperclip-backup-restore(missing)
+墨斗 (Inkstick / fda) |   3 /  11     |   4 /   6     |   1 /   1     |  fda(warn) solution-scouting-and-dar(warn) paperclip-dar(missing) paperclip-prototype(missing) paperclip-licensing-audit(missing) paperclip-design-pattern(missing) paperclip-data-viz(missing) agy-system-instructions(missing)
+百晓生 (Sage / ds) |   9 /  17     |  20 /  20     |   6 /   6     |  paperclip-system-monitor(missing) paperclip-incident-response(missing) paperclip-cost-optimize(missing) paperclip-data-analysis(missing) paperclip-ml-eval(missing) paperclip-test-strategy(missing) paperclip-bug-hunt(missing) paperclip-quality-metrics(missing)
+
+Summary:
+  P0 MISSING (any employee): 1
+  P1 MISSING (any employee): 1
