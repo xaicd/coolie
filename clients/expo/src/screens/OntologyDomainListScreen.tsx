@@ -86,6 +86,39 @@ const LIFECYCLE_CONFIG: Record<
 export type DomainFilter = "all" | "active" | "draft" | "archived" | "locked";
 export type OntologyViewMode = "list" | "detail" | "graph";
 
+// wave216: 真修节点 UUID 显示 — 之前 wave163 只在 server 端把 id 换成 label,
+// 但 Expo 端 `OntologyDomainListScreen` 把 `nodeTypeId` (UUID) 当 typeKey,
+// 而且把 typeKey 当 label 的 fallback, 结果 5 个节点类型下面全显示 UUID。
+// 下面是 UI 层防御: 任何时候 label/key 落到 UUID 上 (裸 UUID 或 `type:uuid`),
+// 都用中文占位替换。截图中节点 key 是 "company_entity:0791cb57-4d94-…"
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const KEY_UUID_TAIL_RE = /:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isUuid(value: string | null | undefined): value is string {
+  return typeof value === "string" && UUID_RE.test(value);
+}
+/** ontology_nodes 的 key 是 `type:uuid` 形式; 也算 UUID 派生。 */
+function isUuidLike(value: string | null | undefined): boolean {
+  return typeof value === "string" && (UUID_RE.test(value) || KEY_UUID_TAIL_RE.test(value));
+}
+/** 从 `type:uuid` 形式里只拿 type 部分, 剥掉 UUID 尾部。 */
+function stripUuidTail(value: string | null | undefined): string | null | undefined {
+  if (typeof value !== "string") return value;
+  const match = value.match(KEY_UUID_TAIL_RE);
+  return match && typeof match.index === "number" ? value.slice(0, match.index) : value;
+}
+function truncate(value: string, max: number): string {
+  return value.length > max ? `${value.slice(0, Math.max(1, max - 1))}…` : value;
+}
+/** 把可能落到 UUID 的字段变成人类可读占位, 绝不输出裸 UUID。 */
+function safeDisplay(
+  value: string | null | undefined,
+  placeholder: string,
+  max = 28,
+): string {
+  if (!value || isUuidLike(value)) return placeholder;
+  return truncate(value, max);
+}
+
 export function OntologyDomainListScreen({
   company,
   whoami = "管理员",
@@ -420,15 +453,36 @@ export function OntologyDomainListScreen({
       >();
       if (snapshot?.counts?.byNodeType) {
         for (const [k, count] of Object.entries(snapshot.counts.byNodeType)) {
-          if (k) map.set(k, { key: k, label: k, count, sampleProperties: {} });
+          // wave216: byNodeType 的 key 来自 ontology_node_types.id (UUID);
+          // 用它当 typeKey 是 UUID, 渲染就一片 UUID 满天飞。改成中文占位。
+          if (k) {
+            const tk = isUuidLike(k) ? "(未归类对象)" : k;
+            if (!map.has(tk)) {
+              map.set(tk, {
+                key: tk,
+                label: isUuidLike(k) ? "(未归类对象)" : k,
+                count,
+                sampleProperties: {},
+              });
+            } else {
+              const item = map.get(tk)!;
+              item.count += count;
+            }
+          }
         }
       }
       for (const n of snapshot?.nodes || []) {
-        const typeKey = n.nodeTypeId || n.label || n.key;
+        // wave216: typeKey 优先取实例真名 (label), key 兜底但跳过 UUID 形式;
+        // nodeTypeId 是 UUID, 绝不再当 typeKey — 否则 typeKey 落成 UUID,
+        // 下面 fallback 出来的 label 也跟着是 UUID, 老板截图就一片 UUID。
+        const typeKey =
+          n.label ||
+          (isUuidLike(n.key) ? "(未命名实例)" : n.key) ||
+          "(未命名实例)";
         if (!map.has(typeKey)) {
           map.set(typeKey, {
             key: typeKey,
-            label: n.label || typeKey,
+            label: safeDisplay(n.label, "(未命名实体)"),
             count: 1,
             sampleProperties: (n.properties as Record<string, unknown>) || {},
           });
@@ -483,9 +537,10 @@ export function OntologyDomainListScreen({
 
     // 真实关系连线: 快照采样节点 id -> 实体类型, 两端都能解析的边才画。
     // 旧版画的是「环上相邻假连线」, 看着像关系链, 实际与业务关系无关。
+    // wave216: 跟上面 nodeTypesList 同源修复, 不再用 nodeTypeId (UUID)。
     const nodeIdType = new Map<string, string>();
     for (const n of snapshot?.nodes || []) {
-      nodeIdType.set(n.id, n.nodeTypeId || n.label || n.key);
+      nodeIdType.set(n.id, n.label || n.key || "(未命名实例)");
     }
     const typeEdges = (() => {
       const seen = new Set<string>();
@@ -628,8 +683,11 @@ export function OntologyDomainListScreen({
               <View style={styles.schemaCardHeader}>
                 <View style={styles.schemaTitleRow}>
                   <Ionicons name="cube-outline" size={16} color={C.accent} style={{ marginRight: 6 }} />
+                  {/* wave216: 底部详情卡 — 不再显示 UUID, 改成真名 + 类型。
+                      之前 `({selectedNt.key})` 会把 typeKey (落到 UUID 时) 整段打印出来,
+                      老板截图就是这行。 */}
                   <Text style={styles.schemaCardTitle}>
-                    {selectedNt.label} ({selectedNt.key})
+                    {safeDisplay(selectedNt.label, "(未命名实体)")}
                   </Text>
                 </View>
                 <Pill label={`${selectedNt.count} 实例`} tone="brand" size="sm" />
@@ -891,10 +949,21 @@ export function OntologyDomainListScreen({
                 {snapshot.nodes.slice(0, 8).map((node) => (
                   <View key={node.id} style={styles.nodeItem}>
                     <View style={styles.nodeHeader}>
-                      <Text style={styles.nodeLabel}>{node.label}</Text>
+                      {/* wave216: 节点标题用真名, 永真不再显示 UUID。
+                          之前 `{node.label}` 在 label 为空时是 undefined,
+                          现在 safeDisplay 兜底。 */}
+                      <Text style={styles.nodeLabel} numberOfLines={1}>
+                        {safeDisplay(node.label, "(未命名实体)")}
+                      </Text>
                       <Pill label={node.lifecycleState || "active"} size="sm" />
                     </View>
-                    <Text style={styles.nodeKey}>{node.key}</Text>
+                    {/* wave216: 节点副标题优先显示真名 (label), 剥掉 key 里的 UUID 尾部。
+                        `node.key` 在 plugin-ontology 路径下是 type:uuid 形式,
+                        剥尾后能拿到 `company_entity` / `department` 这类类型 slug,
+                        比显示一长串 UUID 友好。 */}
+                    <Text style={styles.nodeKey} numberOfLines={1}>
+                      {safeDisplay(stripUuidTail(node.key), "(未命名类型)", 64)}
+                    </Text>
                   </View>
                 ))}
               </View>
