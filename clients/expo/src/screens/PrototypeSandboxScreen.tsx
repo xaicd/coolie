@@ -1125,6 +1125,9 @@ const styles = StyleSheet.create({
     borderColor: C.lineSubtle,
     alignItems: "center",
     justifyContent: "center",
+    // wave214 — Pressable 在 RN 上会无视 paddingVertical 给一个「最小高度」, 实测
+    // 仍渲到 67px. 显式 height 锁死 (borderWidth 1*2 + paddingV 8*2 + lineHeight 18 = 36).
+    height: 36,
   },
   filterChipActive: {
     backgroundColor: "rgba(94,106,210,0.15)",
@@ -1293,6 +1296,8 @@ const styles = StyleSheet.create({
     borderColor: C.lineSubtle,
     alignItems: "center",
     justifyContent: "center",
+    // wave214 — 显式 height 锁死 (border 2 + paddingV 14 + lineH 18 = 34), 详见 filterChip 注释
+    height: 34,
   },
   versionChipActive: {
     backgroundColor: "rgba(94, 106, 210, 0.15)",
