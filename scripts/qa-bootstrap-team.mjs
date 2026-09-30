@@ -1,32 +1,42 @@
 #!/usr/bin/env node
 /**
- * wave217 — Bootstrap the Coolie QA test team.
+ * wave221 — Bootstrap the Coolie QA test team (role-mapping fix).
+ *
+ * wave217 originally put all 6 QA 员工 on `role: "qa"`. Boss correction:
+ * "不加角色, 本体 palantir 有新角色吗" — Palantir ontology has 5 roles
+ * (fda / core-swe / pre-sre / fdse / ds) and we should not be adding new
+ * roles in fork. Each QA 员工 gets mapped to the closest Palantir 5 role by
+ * function; the qa-* specialty lives in metadata (so the org chart still
+ * distinguishes QA Lead from Mobile Tester from iOS Tester …).
+ *
+ * Mapping (wave221):
+ *   QA Lead           → fdse     (test reporting, go/no-go tooling)
+ *   Mobile Tester     → core-swe (android emulator + e2e scripts)
+ *   iOS Tester        → core-swe (xcode device + e2e scripts)
+ *   Web Tester        → core-swe (playwright + api smoke driver)
+ *   Performance Tester→ pre-sre  (lighthouse, perf trace, regression)
+ *   Accessibility     → fdse     (axe-core, voiceover, contrast audit)
  *
  * Idempotent: re-runs do not create duplicates (matches by name within the
- * QA company). Logs every step. Exits non-zero on the first hard failure so
- * the operator sees exactly what blocked.
+ * QA company). Logs every step.
  *
  * Usage:
- *   node scripts/qa-bootstrap-team.mjs                 # uses localhost:3100
+ *   node scripts/qa-bootstrap-team.mjs
  *   API_BASE=http://127.0.0.1:3100 node scripts/qa-bootstrap-team.mjs
  *   PAPERCLIP_API_KEY=... node scripts/qa-bootstrap-team.mjs
- *
- * Env:
- *   PAPERCLIP_API_KEY  Board actor token (required).
- *   API_BASE           Defaults to http://localhost:3100.
  */
 import process from "node:process";
 
 const API_BASE = process.env.API_BASE ?? "http://localhost:3100";
 const TOKEN = process.env.PAPERCLIP_API_KEY;
 
-if (!TOKEN) {
-  console.error("PAPERCLIP_API_KEY is required (board actor token).");
-  process.exit(2);
-}
-
+// `PAPERCLIP_API_KEY` is required on `authenticated` deployments. On
+// `local_trusted` the actor middleware grants implicit board access; we
+// still pass the header if a token is provided, but do not refuse without
+// one — this script is meant to run from the local operator box as well as
+// from a concierge on production.
 const HEADERS = {
-  "x-paperclip-api-key": TOKEN,
+  ...(TOKEN ? { "x-paperclip-api-key": TOKEN } : {}),
   "Content-Type": "application/json",
 };
 
@@ -58,18 +68,15 @@ const QA_COMPANY = {
 };
 
 /**
- * Five QA roles + one QA Lead. The role enum is fixed at `qa` (one slot);
- * the specialty lives in `title`, `capabilities`, and `metadata` so the
- * company org chart still distinguishes them. Adapter is `process` with a
- * no-op echo command — these agents exist as org-chart entries; their real
- * work is done by the QA scripts that drive their checklist (E2E, a11y,
- * performance, …), not by an LLM. That keeps bootstrap cheap and
- * deterministic (no real Claude/Codex keys required).
+ * QA 员工按职能映射到 Palantir 5 角色之一 — qa-* specialty 走 metadata.
+ * Adapter: `process` + echo — 这些员工是 org-chart entry; 实际 checklist 由
+ * `qa-run-daily.mjs` / `qa-run-release.mjs` 跑, 不靠 LLM. 这样 bootstrap 不
+ * 要 Claude/Codex key, 启动确定性高.
  */
 const QA_AGENTS = [
   {
     name: "QA Lead",
-    role: "qa",
+    role: "fdse",
     title: "测试负责人 / E2E 编写 + 报告产出",
     capabilities: "end-to-end testing, test reporting, bug triage, regression gating",
     specialty: "qa-lead",
@@ -77,42 +84,42 @@ const QA_AGENTS = [
   },
   {
     name: "Mobile Tester",
-    role: "qa",
+    role: "core-swe",
     title: "移动端真机 + 模拟器 (Android API 28/34, Samsung, iPhone)",
     capabilities: "android emulator, ios device farms, app e2e, deep-link/OTA validation",
-    specialty: "mobile",
+    specialty: "qa-mobile",
     personaNote: "Mobile Tester drives API 28 (Chromium 66) + API 34 (Chromium 120)",
   },
   {
     name: "iOS Tester",
-    role: "qa",
+    role: "core-swe",
     title: "iOS 真机验真 (iPhone 14/15, iOS 17/18)",
     capabilities: "ios xcode device testing, webkit quirks, app store build smoke",
-    specialty: "ios",
+    specialty: "qa-ios",
     personaNote: "iOS Tester runs the iOS-specific deep links + OTA paths",
   },
   {
     name: "Web Tester",
-    role: "qa",
+    role: "core-swe",
     title: "Web 端到端 (Chromium / WebKit / Firefox)",
     capabilities: "playwright cross-browser, accessibility tree, websocket replay",
-    specialty: "web",
+    specialty: "qa-web",
     personaNote: "Web Tester owns the 25-endpoint api-smoke + the board UI E2E suite",
   },
   {
     name: "Performance Tester",
-    role: "qa",
+    role: "pre-sre",
     title: "性能 (启动 / 滚动 FPS / 内存峰值 / OTA 包大小)",
     capabilities: "lighthouse, perf trace, bundle size budget, regression detection",
-    specialty: "performance",
+    specialty: "qa-perf",
     personaNote: "Performance Tester guards the 1.5s cold-start + 250MB RAM budgets",
   },
   {
     name: "Accessibility Tester",
-    role: "qa",
+    role: "fdse",
     title: "a11y (WCAG 2.1 AA / 屏幕阅读器 / 键盘导航 / 颜色对比)",
     capabilities: "axe-core, voiceover, NVDA, contrast audit, focus order",
-    specialty: "a11y",
+    specialty: "qa-a11y",
     personaNote: "Accessibility Tester runs axe on every shipped screen",
   },
 ];
@@ -143,8 +150,6 @@ async function findAgentByName(companyId, name) {
 }
 
 async function createAgent(companyId, agentSpec) {
-  // `process` adapter — `echo` command. The QA agents are placeholders for
-  // the testing scripts that drive checklists, not LLM-driven employees.
   const payload = {
     name: agentSpec.name,
     role: agentSpec.role,
@@ -161,7 +166,7 @@ async function createAgent(companyId, agentSpec) {
 async function ensureAgent(companyId, agentSpec) {
   const existing = await findAgentByName(companyId, agentSpec.name);
   if (existing) {
-    log("agent.exists", { id: existing.id, name: existing.name });
+    log("agent.exists", { id: existing.id, name: existing.name, role: existing.role });
     return existing;
   }
   const created = await createAgent(companyId, agentSpec);

@@ -1,21 +1,23 @@
-# QA Team Standard Operating Procedure (wave217)
+# QA Team Standard Operating Procedure (wave221)
 
 > **Why this exists.** Boss真机撞了 9 次, PM 推卸说"PM 不撞模拟器"。但真因不是 PM 不能撞, 是我们一直没人替老板撞。招了 5 个 QA 员工之后, **撞机器** 和 **写报告** 是他们的活, 不是老板的活, 也不是 PM 的活。
 > **What this SOP enforces.** 每次发版 → 6 个 QA 角色跑 30+ 真值实验 → 出 daily-qa-report / qa-wave-* → 老板只看结论。
 > **What does NOT change.** PM 仍然写代码 + push。发版节奏、Commit 规范、token 护栏保持不变。
+> **wave221 修正.** role 全部映射到 Palantir 5 角色 (`fdse` / `core-swe` / `pre-sre`), specialty 走 `qa-*` prefix metadata. fork 不加新角色 — 见 `docs-coolie/evidence/wave221/QA-REPORT.md` § 1.
 
 ## 1. 测试团队 (QA-Test-Workshop 公司)
 
-| 角色 | Specialty | 撞什么 | 出什么 |
-|---|---|---|---|
-| QA Lead | `qa-lead` | 汇总其它 5 角色产出, 维护发版 go/no-go 决策 | `daily-qa-report.md`, `qa-wave-XYZ.md` |
-| Mobile Tester | `mobile` | Android API 28 (Chromium 66) + API 34 (Chromium 120), OTA 真机回滚, 深链 | `qa-mobile-YYYY-MM-DD.md` |
-| iOS Tester | `ios` | iPhone 14/15 (iOS 17/18), WebKit 旧版本 quirks | `qa-ios-YYYY-MM-DD.md` |
-| Web Tester | `web` | Playwright Chromium/WebKit/Firefox 跑 25+ 端点, axe 端到端 | `qa-web-YYYY-MM-DD.md` |
-| Performance Tester | `perf` | 启动时间, FPS, 内存峰值, OTA 包大小, Lighthouse | `qa-perf-YYYY-MM-DD.md` |
-| Accessibility Tester | `a11y` | WCAG 2.1 AA, axe-core, 键盘导航, 颜色对比 | `qa-a11y-YYYY-MM-DD.md` |
+| 角色 | role (Palantir 5) | Specialty (metadata) | 撞什么 | 出什么 |
+|---|---|---|---|---|
+| QA Lead | `fdse` | `qa-lead` | 汇总其它 5 角色产出, 维护发版 go/no-go 决策 | `daily-qa-report.md`, `qa-wave-XYZ.md` |
+| Mobile Tester | `core-swe` | `qa-mobile` | Android API 28 (Chromium 66) + API 34 (Chromium 120), OTA 真机回滚, 深链 | `qa-mobile-YYYY-MM-DD.md` |
+| iOS Tester | `core-swe` | `qa-ios` | iPhone 14/15 (iOS 17/18), WebKit 旧版本 quirks | `qa-ios-YYYY-MM-DD.md` |
+| Web Tester | `core-swe` | `qa-web` | Playwright Chromium/WebKit/Firefox 跑 25+ 端点, axe 端到端 | `qa-web-YYYY-MM-DD.md` |
+| Performance Tester | `pre-sre` | `qa-perf` | 启动时间, FPS, 内存峰值, OTA 包大小, Lighthouse | `qa-perf-YYYY-MM-DD.md` |
+| Accessibility Tester | `fdse` | `qa-a11y` | WCAG 2.1 AA, axe-core, 键盘导航, 颜色对比 | `qa-a11y-YYYY-MM-DD.md` |
 
 Bootstrap: `node scripts/qa-bootstrap-team.mjs` (幂等, 重复跑不会创重复).
+存量数据修正: `node scripts/qa-migrate-wave221-role-fix.mjs` (幂等, 已修过 = no-op).
 
 ## 2. 每次发版流程 (SOP)
 
