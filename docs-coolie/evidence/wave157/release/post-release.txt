@@ -1,0 +1,44 @@
+# v0.6.2 post-release verification (external requests)
+# date: 2026-09-30T12:36:25+08:00
+
+## version.json (prod)
+{
+  "version": "0.6.2",
+  "versionCode": 602,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release.apk",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.0/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "bea5ad103dba0bb2a7547bbc67930af2ec0122069fb275de39cc9531872bae09",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "wave157 开发基座(5 默认模块, 无业务域) + App 实例目标可切换 + 模板预设收敛; 含 wave153 登录修复",
+  "commitSha": "786cb44aba325f80223f03dd44e49609befaea76"
+}
+
+## api/health
+{"status":"ok","deploymentMode":"authenticated","deploymentExposure":"public","localAiLoginSupported":false,"commit":null,"bootstrapStatus":"ready","bootstrapInviteActive":false,"databaseBackup":{"enabled":true,"status":"ok","warnings":[]}}
+HTTP 200
+
+## APK 0.6.2 (range 0-1000)
+HTTP 206 bytes=1001
+
+## OTA manifest
+{
+    "id": "34180b5f-3962-4625-864f-e1d1a9518063",
+    "createdAt": "2026-09-30T04:32:02.734Z",
+    "runtimeVersion": "0.6.2",
+    "launchAsset": {
+        "key": "android-bundle-jBwQw0K9dv7pcP6NOoYG2i4yswCVXTiV7Aib_aYD7qA",
+        "contentType": "application/javascript",
+        "url": "https://xrobinai.cn/ota/_expo/static/js/android/index-231ff9d185eb531d11fed6f6e8b9a143.hbc",
+        "hash": "jBwQw0K9dv7pcP6NOoYG2i4yswCVXTiV7Aib_aYD7qA",
+        "fileSize": 3746739
+    },
+    "assets": [
+        {
+            "key": "assets/3a2ba31570920eeb9b1d217cabe58315",
+            "contentType": "application/octet-stream",
+            "fileExtension": "ttf",
+            "url": "https://xrobinai.cn/ota/assets/3a2ba31570920eeb9b1d217cabe58315",
+            "hash": "eVXKFBJ7MEEsEU6xPP1wK12rJl_rGIDRaV1zyqgkzeE",
+            "fileSize": 70344
+        },

@@ -7,11 +7,37 @@ Git 里程碑 tag 流水。自 **v0.5.97** 起建立本文件；此前的 0.5.x 
 |---|---|---|---|---|
 | v0.5.97 | 2026-09-29 | 0.5.97 | bc48b1e80 | wave142: WBS 任务自动路由 + 沙箱附件真渲染 + 启动链路端到端可观察 |
 | v0.6.0 | 2026-09-29 | 0.6.0 | 269526f19 | wave150 合并发版: wave147 spec-driven + wave148 多对话 + wave144 board-chat 修复（见 §v0.6.0） |
-| — | 2026-09-29 | 0.6.2 | (未打 tag) | **未发出** — wave153 客户首接触 (App 登录 cookie 回放 + 资产筛选竞态 + App spec 编辑器 + onboarding 入口)。见 §v0.6.2 |
+| v0.6.2 | 2026-09-30 | 0.6.2 | 786cb44ab | wave157 开发基座（5 默认模块, 不含业务域）+ App 实例目标可切换 + 模板预设收敛；**含 wave153 客户端修复**（见 §v0.6.2 wave157） |
 | — | 2026-09-29 | 0.6.1 | (未打 tag) | **未发出** — wave152 治理 + 可观察性 (审计 log 全留痕 + 四类资源隔离补测 + 失败率/交付周期/产能 metrics + 缺陷 KB)。见 §v0.6.1 (wave152) |
 
 约定: tag 指向该版本「发版完成」的提交（含 `chore(release): version.json …` 这一步），
 注释写本波主题。推送方式 `git push origin <tag>`（本仓库 push 需绕本地代理）。
+
+## v0.6.2 — 已发出 (wave157)
+
+`bash scripts/release-app.sh 0.6.2 "…"` **exit 0**，发版 commit **`786cb44ab`**。真实交付：
+
+- **A 开发基座**：`templates/workspace-skel/` 重写为「空壳 + 5 默认模块
+  (system/infra/member/audit/api)，**不含业务域**」；删 `.gitmodules` /
+  `import-ruoyi.sh` / ruoyi 子模块（**不留兼容层**）。`new-company.sh` 改拉轻量底座
+  `coolie-base-1.0`（拉不到不阻断）。模板预设 4 → 1（App + Web 同步）。
+  spec `2026-09-21-coolie-workspace-template.md` 同步（+对比表 +标书定制指南）。
+- **B App 实例目标可切换**：新增 `clients/expo/src/instanceTarget.ts`（纯模块）+
+  `detectAndSetApiBaseUrl()`；默认仍为生产，`EXPO_PUBLIC_COOLIE_USE_DEV_INSTANCE=1`
+  切到 dev（默认 `http://10.0.2.2:3100`）。
+- 真值（`docs-coolie/evidence/wave157/`）：APK `https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release.apk`
+  （78,126,198 Byte / 74.51 MB）；version.json / OTA(runtimeVersion 0.6.2) / server 联动部署
+  均完成；公网 `version.json` = 0.6.2、`/api/health` 200、APK 206、OTA manifest 200。
+
+**附带修的一个真缺陷（诚实标注）**：`release-app.sh` 第 8 步从头重写 version.json，把
+本脚本不管理的键抹掉 —— wave149 加的 **iOS 扁平字段**（`iosDownloadUrl`/`iosBundleId`/
+`iosSha256`/`iosTestFlightUrl`）因此在本次发版时被静默删除，iOS 升级卡片的「直接下载 .ipa」
+按钮随之消失。已修：第 8 步改为**合并保留既有键**（远端真值优先，本地 tracked 兜底），
+并已把带 iOS 字段的 version.json 重新部署，公网校验 9/9 字段齐全。
+
+**诚实缺口**：本波**未做**模拟器上用新包真跑 dev 登录（详见 QA 报告 §6.4–6.5：装的旧包
+0.6.0 打生产；dev 实例的主机名白名单对 `10.0.2.2` 回 403 —— 需 `allowed-hostname 10.0.2.2`
+并重启 dev 才能在模拟器登录 dev）。`coolie-base-1.0` tag 需有推送权限的一方创建。
 
 ## v0.6.1 — 未发出 (wave152 治理 + 可观察性)
 
@@ -36,7 +62,11 @@ e2e/scripts 的他人未提交改动），未尝试绕过。
 验证：wave152 新增 15 单测全过、`packages/db`/`server` tsc 均 exit 0；`issue-attachment-routes` 有 1 条
 **本波之前就红**的既有失败（已用 HEAD 版复现，未修）。
 
-## v0.6.2 — 未发出 (wave153)
+## v0.6.2 (原 wave153 段) — 未单独发出, 已并入上方的 v0.6.2 (wave157)
+
+> wave153 的客户端改动（登录 cookie 回放 / 资产筛选竞态 / App spec 编辑器 /
+> onboarding 入口）当时未能单独发版，随 **v0.6.2 (wave157)** 一起发出；本节保留
+> 当时的记录，结论以 §v0.6.2 (wave157) 为准。
 
 **本波没有发版，`version.json` 未 bump（仍 0.6.0）。** 原因是硬门 + 环境，非实现问题：
 

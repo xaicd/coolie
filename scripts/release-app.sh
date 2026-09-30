@@ -281,30 +281,52 @@ echo "   ✓ APK 直链: $APK_URL"
 
 step "[8/9] 生成并上传 version.json ($SSH_TARGET:$REMOTE_VERSION_JSON)"
 TMP_JSON="$(mktemp -t coolie-version-json.XXXXXX)"
+# 既有 version.json —— 用来保留本脚本不管理的键。脚本只认自己那 5 个字段
+# (version/versionCode/downloadUrl/releaseNotes/commitSha)，从头重写会把别的
+# 键抹掉：wave149 给 version.json 加的 iOS 扁平字段 (iosDownloadUrl/
+# iosBundleId/iosSha256/iosTestFlightUrl) 就这样在 0.6.2 发版时被悄悄弄没了,
+# iOS 升级卡片的「直接下载 .ipa」按钮随之消失。远端真值优先, 取不到用本地
+# tracked version.json 兜底。
+BASE_JSON="$(mktemp -t coolie-version-base.XXXXXX)"
+if ! dry; then
+  curl -sS -m 8 "$VERSION_JSON_URL" -o "$BASE_JSON" 2>/dev/null || true
+  if [ ! -s "$BASE_JSON" ]; then
+    cp "$REPO_ROOT/version.json" "$BASE_JSON" 2>/dev/null || true
+  fi
+fi
 if dry; then
-  echo "   [dry-run] 生成 version.json:"
-  printf '   [dry-run]   { "version": "%s", "versionCode": %s, "downloadUrl": "%s", "releaseNotes": "%s", "commitSha": "%s" }\n' \
+  echo "   [dry-run] 生成 version.json (保留既有 ios* 等非托管键):"
+  printf '   [dry-run]   { "version": "%s", "versionCode": %s, "downloadUrl": "%s", "releaseNotes": "%s", "commitSha": "%s", <既有键保留> }\n' \
     "$VERSION" "$VERSION_CODE" "$APK_URL" "$NOTES" "$RELEASE_COMMIT"
   echo "   [dry-run] scp <tmp>/version.json $SSH_TARGET:$REMOTE_VERSION_JSON"
 else
-  python3 - "$TMP_JSON" "$VERSION" "$VERSION_CODE" "$APK_URL" "$NOTES" "$RELEASE_COMMIT" <<'PY'
+  python3 - "$TMP_JSON" "$BASE_JSON" "$VERSION" "$VERSION_CODE" "$APK_URL" "$NOTES" "$RELEASE_COMMIT" <<'PY'
 import json
+import os
 import sys
 
-path, version, code, url, notes, commit = sys.argv[1:7]
+path, base, version, code, url, notes, commit = sys.argv[1:8]
+data = {}
+if os.path.exists(base):
+    try:
+        with open(base, encoding="utf-8") as handle:
+            loaded = json.load(handle)
+        if isinstance(loaded, dict):
+            data = loaded
+    except (OSError, ValueError):
+        data = {}
+# 脚本管理的 5 个键覆盖之; 其余键 (iOS 字段等) 原样保留。
+data.update(
+    {
+        "version": version,
+        "versionCode": int(code),
+        "downloadUrl": url,
+        "releaseNotes": notes,
+        "commitSha": commit,
+    }
+)
 with open(path, "w", encoding="utf-8") as handle:
-    json.dump(
-        {
-            "version": version,
-            "versionCode": int(code),
-            "downloadUrl": url,
-            "releaseNotes": notes,
-            "commitSha": commit,
-        },
-        handle,
-        indent=2,
-        ensure_ascii=False,
-    )
+    json.dump(data, handle, indent=2, ensure_ascii=False)
     handle.write("\n")
 PY
   cat "$TMP_JSON"
@@ -358,4 +380,4 @@ else
 fi
 printf '========================================================\n'
 
-rm -f "$TMP_JSON"
+rm -f "$TMP_JSON" "$BASE_JSON"

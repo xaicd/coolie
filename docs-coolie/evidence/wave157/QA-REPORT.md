@@ -189,10 +189,35 @@ logic:        esbuild+node harness, detectApiBaseUrl 4 分支 → 4/4 pass
 
 ---
 
-## 8. 交付物 / 边界
+## 9. 发版 v0.6.2（真实发出）
 
-- 本波**未**发新业务域、**未**动 CMMI/spec-driven/ontology/审计、**未**启停 dev。
-- A3 额外同步了 Web 端预设（理由见 §4）；如需最小化可单独回退。
-- `coolie-base-1.0` tag 需有推送权限的一方创建（§3）。
-- 模拟器登录 dev 的 dev 端前提（hostname 白名单）已写明（§6.4），由运维/老板决定是否
-  在 dev 上加白名单并重启。
+`bash scripts/release-app.sh 0.6.2 "…"` → **exit 0**，发版 commit **`786cb44ab`**（tag `v0.6.2`）。
+
+公网复核（`release/post-release.txt`，全部外部请求）：
+
+| 检查 | 结果 |
+|---|---|
+| `https://xrobinai.cn/version.json` | `version=0.6.2` / `versionCode=602` / `commitSha=786cb44ab…`，9 个字段（含 iOS 4 个）齐全 |
+| `https://xrobinai.cn/api/health` | **200** `status: ok` |
+| APK `…/0.6.2/coolie-release.apk` | **206**（range 0-1000 → 1001 bytes；COS 实传 78,126,198 Byte） |
+| `https://xrobinai.cn/ota/manifest` | **200**，`runtimeVersion=0.6.2` |
+
+发版顺带修了一个**真缺陷**：`release-app.sh` 第 8 步原来从头重写 `version.json`，
+把 wave149 加的 iOS 扁平字段静默删掉（本次发版实测：部署后 version.json 只剩 5 个
+Android 字段，iOS「直接下载 .ipa」入口消失）。已改为**合并保留既有键**（远端真值优先，
+本地 tracked 兜底），并重新部署了带 iOS 字段的 version.json；`bash -n` 通过、合并逻辑
+用真实文件实跑验证（iOS 4 字段保留）。`scripts/release-app.sh` 是 fork 自有文件，
+`test:fork-surface` 对其预算 347→384 行（上限 420）仍 **ok**。
+
+## 10. 环境收尾
+
+- 模拟器：`adb reverse` 探针后已 `--remove-all`（列表空）；未改动模拟器状态。
+- 未启停 dev 进程；未改 `PAPERCLIP_API_KEY` / `DEPLOYMENT_MODE`。
+- scratch 的 esbuild bundle / APK 抽取件只在会话临时目录，未入仓。
+
+## 11. 已知既有失败（非本波引入）
+
+`pnpm test:fork-surface`（`--cumulative`）当前 **9 个文件超预算**（`packages/shared/src/constants.ts`、
+`server/src/routes/projects.ts`、`server/src/services/issues.ts` 等）—— 本波**未改这些文件**，
+其超预算来自更早的提交（`(N commits)` 标注），是既有红；本波所有改动文件均在预算内。
+
