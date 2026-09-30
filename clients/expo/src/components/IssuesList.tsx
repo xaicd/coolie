@@ -38,6 +38,8 @@ export interface IssuesListProps {
   error?: string | null;
   onRetry?: () => void;
   onIssuePress: (issue: Issue) => void;
+  /** wave156: 长按主线任务时设置焦点, 用于下钻该主线。 */
+  onIssueLongPress?: (issue: Issue) => void;
   /** 当前筛选/排序 (状态由外层持有)。 */
   selection: IssueSelection;
   /** 视图模式: 列表 / 分组 / 看板。 */
@@ -53,6 +55,7 @@ export function IssuesList({
   error = null,
   onRetry,
   onIssuePress,
+  onIssueLongPress,
   selection,
   view,
   agents = [],
@@ -83,6 +86,33 @@ export function IssuesList({
       { key: "today", label: `今日 · ${today.length}`, items: today },
       { key: "active", label: `进行中 · ${active.length}`, items: active },
     ];
+  }, [visible]);
+
+  // wave156: build a small id → { id, isMilestone } map so each row can
+  // look up its parent without the full issue payload. Drives the
+  // [支线] / [临时] badges. Must live above the early returns — React
+  // requires hooks to be called unconditionally.
+  const parentById = useMemo(() => {
+    const map = new Map<string, { id: string; isMilestone?: boolean }>();
+    for (const issue of visible) {
+      if (issue.parentId && !map.has(issue.parentId)) {
+        map.set(issue.parentId, { id: issue.parentId });
+      }
+    }
+    // Resolve isMilestone by walking the visible list (the parent may also
+    // be in `visible` if it is not filtered out).
+    const resolved = new Map<string, { id: string; isMilestone?: boolean }>();
+    for (const issue of visible) {
+      if (map.has(issue.id)) {
+        resolved.set(issue.id, { id: issue.id, isMilestone: issue.isMilestone });
+      }
+    }
+    // Anything still missing stays as { id } (isMilestone undefined → not
+    // a mainline) so the row renders [临时] rather than [支线].
+    for (const [id, entry] of map) {
+      if (!resolved.has(id)) resolved.set(id, entry);
+    }
+    return resolved;
   }, [visible]);
 
   if (error) {
@@ -127,14 +157,16 @@ export function IssuesList({
         <BoardView
           issues={visible}
           agentNameById={agentNameById}
+          parentById={parentById}
           onIssuePress={onIssuePress}
+          onIssueLongPress={onIssueLongPress}
         />
       ) : view === "group" ? (
-        <SectionsView groups={groups} onIssuePress={onIssuePress} />
+        <SectionsView groups={groups} parentById={parentById} onIssuePress={onIssuePress} onIssueLongPress={onIssueLongPress} />
       ) : selection.scope === "focus" ? (
-        <SectionsView groups={focusGroups} onIssuePress={onIssuePress} />
+        <SectionsView groups={focusGroups} parentById={parentById} onIssuePress={onIssuePress} onIssueLongPress={onIssueLongPress} />
       ) : (
-        <FlatView issues={visible} onIssuePress={onIssuePress} />
+        <FlatView issues={visible} parentById={parentById} onIssuePress={onIssuePress} onIssueLongPress={onIssueLongPress} />
       )}
     </View>
   );
@@ -162,15 +194,25 @@ function GroupHeader({ label, count }: { label: string; count: number }) {
 
 function FlatView({
   issues,
+  parentById,
   onIssuePress,
+  onIssueLongPress,
 }: {
   issues: Issue[];
+  parentById: Map<string, { id: string; isMilestone?: boolean }>;
   onIssuePress: (issue: Issue) => void;
+  onIssueLongPress?: (issue: Issue) => void;
 }) {
   return (
     <View>
       {issues.map((issue) => (
-        <IssueRow key={issue.id} issue={issue} onPress={onIssuePress} />
+        <IssueRow
+          key={issue.id}
+          issue={issue}
+          parentIssue={issue.parentId ? parentById.get(issue.parentId) ?? null : null}
+          onPress={onIssuePress}
+          onLongPress={onIssueLongPress}
+        />
       ))}
     </View>
   );
@@ -178,10 +220,14 @@ function FlatView({
 
 function SectionsView({
   groups,
+  parentById,
   onIssuePress,
+  onIssueLongPress,
 }: {
   groups: { key: string; label: string; items: Issue[] }[];
+  parentById: Map<string, { id: string; isMilestone?: boolean }>;
   onIssuePress: (issue: Issue) => void;
+  onIssueLongPress?: (issue: Issue) => void;
 }) {
   return (
     <View>
@@ -189,7 +235,13 @@ function SectionsView({
         <View key={group.key}>
           <GroupHeader label={group.label} count={group.items.length} />
           {group.items.map((issue) => (
-            <IssueRow key={issue.id} issue={issue} onPress={onIssuePress} />
+            <IssueRow
+              key={issue.id}
+              issue={issue}
+              parentIssue={issue.parentId ? parentById.get(issue.parentId) ?? null : null}
+              onPress={onIssuePress}
+              onLongPress={onIssueLongPress}
+            />
           ))}
         </View>
       ))}
@@ -200,11 +252,15 @@ function SectionsView({
 function BoardView({
   issues,
   agentNameById,
+  parentById,
   onIssuePress,
+  onIssueLongPress,
 }: {
   issues: Issue[];
   agentNameById: Map<string, string>;
+  parentById: Map<string, { id: string; isMilestone?: boolean }>;
   onIssuePress: (issue: Issue) => void;
+  onIssueLongPress?: (issue: Issue) => void;
 }) {
   const columns = useMemo(
     () =>

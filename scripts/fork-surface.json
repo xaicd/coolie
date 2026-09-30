@@ -633,9 +633,9 @@
     },
     {
       "path": "ui/src/components/IssuesList.tsx",
-      "maxNetLines": 40,
-      "reason": "wave132: renders a 「缺陷 P{n}」 badge in the row title suffix when issue.defect is set, following the existing title-suffix badge pattern (issueBadge / Needs next step).",
-      "maxTotalLines": 40
+      "maxNetLines": 80,
+      "reason": "wave132: renders a 「缺陷 P{n}」 badge in the row title suffix when issue.defect is set, following the existing title-suffix badge pattern (issueBadge / Needs next step). wave156 adds the [主线] / [支线] / [临时] / [Spec · 任务] badges and the per-row [聚焦下钻] button on mainline rows — three more rows and a 4-row block of badges fit within the row title-suffix area, plus the focus toggle uses the same updateView path as the existing filter toggles.",
+      "maxTotalLines": 80
     },
     {
       "path": "ui/src/components/NewIssueDialog.tsx",
@@ -972,6 +972,108 @@
       "maxNetLines": 360,
       "maxTotalLines": 420,
       "reason": "wave154/wave155/wave163: the graph visualization (canvas + node types + view presets). wave163 widens the label truncate cap (16→28) so real names like `ONB-15 架构/设计收口里程碑` render fully on the board. It is the centerpiece of the Workshop tab; cannot live elsewhere."
+    },
+    {
+      "path": "packages/db/src/migrations/9012_add_company_metadata.sql",
+      "maxNetLines": 30,
+      "maxTotalLines": 30,
+      "reason": "wave155: hand-written migration adding companies.metadata (industry + employees) for the onboarding wizard. No upstream counterpart; the 9000 range is where fork migrations live."
+    },
+    {
+      "path": "packages/db/src/schema/companies.ts",
+      "maxNetLines": 15,
+      "maxTotalLines": 20,
+      "reason": "wave155: appends the nullable jsonb `metadata` column to the companies table; drizzle's type derives `onboarding_state` from the existing fields and the migration adds the runtime storage. Cannot live elsewhere: it is the companies table the rest of the schema and the server read against."
+    },
+    {
+      "path": "packages/shared/src/types/company-onboarding.ts",
+      "maxNetLines": 80,
+      "maxTotalLines": 80,
+      "reason": "wave155: CompanyOnboardingState contract — the persisted state shape the wizard writes and the server reads. No upstream counterpart."
+    },
+    {
+      "path": "packages/shared/src/types/entity-relation.ts",
+      "maxNetLines": 200,
+      "maxTotalLines": 220,
+      "reason": "wave154: the entity-relation graph contract (EntityType, EntityRef, EntityRelation, OntologyGraphView, OntologyPathResponse, OntologyGraphStats). Cannot live elsewhere: it is the shared contract the server and both clients compile against."
+    },
+    {
+      "path": "packages/shared/src/validators/company-onboarding.ts",
+      "maxNetLines": 40,
+      "maxTotalLines": 40,
+      "reason": "wave155: onboardingStateSchema / onboardingStepSchema — the validators the POST /step route runs."
+    },
+    {
+      "path": "packages/shared/src/validators/entity-relation.ts",
+      "maxNetLines": 80,
+      "maxTotalLines": 100,
+      "reason": "wave154: validators for the graph query/params and the entity-ref payloads. Same reason as the type file: shared."
+    },
+    {
+      "path": "server/src/__tests__/onboarding-routes.test.ts",
+      "maxNetLines": 200,
+      "maxTotalLines": 220,
+      "reason": "wave155/wave156: covers the 3-step flow against the real schema. wave156 adds the Agent API Key → 403 Board gate test, the missing pieces of the audit remediation spec."
+    },
+    {
+      "path": "server/src/__tests__/ontology-graph-routes.test.ts",
+      "maxNetLines": 400,
+      "maxTotalLines": 420,
+      "reason": "wave154/wave155: integration tests for the graph read surface (graph/paths/stats) and the idempotent backfill. Not declared before because no earlier change had touched it; declaring it now that this wave does."
+    },
+    {
+      "path": "server/src/routes/onboarding.ts",
+      "maxNetLines": 60,
+      "maxTotalLines": 80,
+      "reason": "wave155/wave156: the 3-step onboarding routes. wave156 adds `assertBoard` to /step and /complete so an Agent API Key calling either is rejected with 403 — FDA RBAC defence."
+    },
+    {
+      "path": "server/src/routes/ontology-graph.ts",
+      "maxNetLines": 60,
+      "maxTotalLines": 80,
+      "reason": "wave154/wave155/wave156: graph read routes + backfill. wave156 adds `assertBoard` + an `ontology.backfill` activity log entry so a backfill invocation is forensically traceable."
+    },
+    {
+      "path": "server/src/services/onboarding.ts",
+      "maxNetLines": 200,
+      "maxTotalLines": 220,
+      "reason": "wave155: the onboarding service — getOnboardingState / updateOnboardingStep (monotonic) / completeOnboarding / runOnboardingDemo (the 5-seeded-tasks kickoff). Cannot live elsewhere: it owns the state machine the route calls."
+    },
+    {
+      "path": "server/src/services/ontology-backfill.ts",
+      "maxNetLines": 220,
+      "maxTotalLines": 240,
+      "reason": "wave155: the inference engine that derives entity_relations rows from existing tables (issues, projects, board_conversations, agents). Idempotent: ON CONFLICT DO NOTHING. No upstream counterpart."
+    },
+    {
+      "path": "ui/src/api/onboarding.ts",
+      "maxNetLines": 30,
+      "maxTotalLines": 40,
+      "reason": "wave155: typed web client for /onboarding/{state,step,complete}. No upstream counterpart — upstream has no onboarding wizard."
+    },
+    {
+      "path": "ui/src/api/ontologyGraph.ts",
+      "maxNetLines": 80,
+      "maxTotalLines": 90,
+      "reason": "wave154/wave155: typed web client for /ontology/{graph,paths,stats,backfill}. No upstream counterpart."
+    },
+    {
+      "path": "ui/src/components/IssueLinkedEntities.tsx",
+      "maxNetLines": 120,
+      "maxTotalLines": 140,
+      "reason": "wave154: the inline entity chip strip on the issue detail panel — chips link into the ontology graph view. Cannot live elsewhere: it sits in the issue detail surface."
+    },
+    {
+      "path": "ui/src/pages/CompanyOnboardingPage.tsx",
+      "maxNetLines": 320,
+      "maxTotalLines": 360,
+      "reason": "wave155: the 3-step onboarding wizard page (/companies/:id/getting-started). No upstream counterpart — upstream has no onboarding wizard."
+    },
+    {
+      "path": "ui/src/pages/OntologyGraphPage.tsx",
+      "maxNetLines": 240,
+      "maxTotalLines": 280,
+      "reason": "wave154/wave155: the Workshop page hosting the graph view. Cannot live elsewhere: it is the registered route."
     }
   ]
 }

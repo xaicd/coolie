@@ -28,6 +28,8 @@ export interface IssueDefect {
 
 /** WBS node kinds an issue can carry: 阶段 / 工作包 / 任务 (wave140). */
 export type IssueWbsType = "phase" | "work_package" | "task";
+/** wave156: spec-driven chain kinds, mirroring ISSUE_SPEC_KINDS in @paperclipai/shared. */
+export type IssueSpecKind = "requirement" | "bugfix" | "design" | "task";
 /** Milestone lifecycle: 未开始 / 进行中 / 已达成 / 阻塞. */
 export type MilestoneStatus = "not_started" | "in_progress" | "achieved" | "blocked";
 /** CMMI gate vocabulary, aligned to the cmmi-* skills' cmmi-profile.json. */
@@ -335,6 +337,9 @@ export interface Issue {
   isMilestone?: boolean;
   /** Milestone metadata; only present (non-null) when `isMilestone` is true. */
   milestone?: IssueMilestone | null;
+  /** Spec-driven development (wave156). Kind of spec carried by the issue,
+   * or null when the issue is not a spec node. Drives the [Spec · ...] badge. */
+  specKind?: IssueSpecKind | null;
   companyId: string;
   /**
    * Presentation fields the list endpoints already return. Optional because the

@@ -3,6 +3,7 @@ import express from "express";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import {
+  activityLog,
   agents,
   assets,
   boardConversations,
@@ -14,6 +15,7 @@ import {
   issues,
   projects,
 } from "@paperclipai/db";
+import { eq } from "drizzle-orm";
 import {
   getEmbeddedPostgresTestSupport,
   startEmbeddedPostgresTestDatabase,
@@ -67,6 +69,7 @@ describeEmbeddedPostgres("ontology graph routes (wave154)", () => {
     // issues; agents are referenced by issues so they precede companies;
     // board_conversations and entity_relations cascade from companies.
     await db.delete(assets);
+    await db.delete(activityLog);
     await db.delete(issues);
     await db.delete(agents);
     await db.delete(projects);
@@ -347,5 +350,47 @@ describeEmbeddedPostgres("ontology graph routes (wave154)", () => {
     const agentNode = (graph.body.nodes as Array<{ type: string; label: string }>).find((node) => node.type === "agent");
     // A real name, never a truncated uuid.
     expect(agentNode?.label).toBe("产品经理");
+  });
+
+  // wave156 (audit remediation): a Board backfill writes one activity log
+  // entry; an agent caller gets a 403 instead.
+  it("wave156: backfill writes an ontology.backfill activity log entry", async () => {
+    const companyId = await seedCompany("Audit");
+
+    const res = await request(app).post(`/api/companies/${companyId}/ontology/backfill`);
+    expect(res.status).toBe(200);
+
+    const rows = await db
+      .select()
+      .from(activityLog)
+      .where(eq(activityLog.action, "ontology.backfill"));
+    const ourRow = rows.find((row) => row.companyId === companyId);
+    expect(ourRow).toBeDefined();
+    expect(ourRow?.entityType).toBe("company");
+    expect(ourRow?.entityId).toBe(companyId);
+  });
+
+  it("wave156: agent API key is rejected with 403 on /backfill", async () => {
+    const companyId = await seedCompany("AgentAudit");
+
+    const agentApp = express();
+    agentApp.use(express.json());
+    agentApp.use((req, _res, next) => {
+      (req as unknown as { actor: unknown }).actor = {
+        type: "agent",
+        source: "agent_key",
+        actorId: "agent-audit",
+        companyId,
+        agentId: "agent-audit",
+        onBehalfOfUserId: null,
+      };
+      next();
+    });
+    agentApp.use("/api", ontologyGraphRoutes(db));
+    agentApp.use(errorHandler);
+
+    const res = await request(agentApp)
+      .post(`/api/companies/${companyId}/ontology/backfill`);
+    expect(res.status).toBe(403);
   });
 });

@@ -34,6 +34,8 @@ export interface IssueSelection {
   project: ProjectFilter;
   /** 只看主线 —— 只留 里程碑 (isMilestone) 任务 (wave140). */
   mainline?: boolean;
+  /** wave156: 聚焦下钻此主线 —— 只留该主线及其全量后代。 */
+  focusMainlineId?: string | null;
   sortField: IssueSortField;
   sortDir: IssueSortDir;
 }
@@ -114,6 +116,26 @@ export function selectIssues(issues: Issue[], sel: IssueSelection): Issue[] {
   }
   if (sel.mainline) {
     list = list.filter((issue) => issue.isMilestone === true);
+  }
+  if (sel.focusMainlineId) {
+    const childrenByParent = new Map<string, Issue[]>();
+    for (const issue of list) {
+      if (!issue.parentId) continue;
+      const bucket = childrenByParent.get(issue.parentId);
+      if (bucket) bucket.push(issue);
+      else childrenByParent.set(issue.parentId, [issue]);
+    }
+    const keep = new Set<string>([sel.focusMainlineId]);
+    const stack: string[] = [sel.focusMainlineId];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      for (const child of childrenByParent.get(current) ?? []) {
+        if (keep.has(child.id)) continue;
+        keep.add(child.id);
+        stack.push(child.id);
+      }
+    }
+    list = list.filter((issue) => keep.has(issue.id));
   }
 
   return sortIssues(list, sel.sortField, sel.sortDir);

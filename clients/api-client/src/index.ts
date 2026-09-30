@@ -62,6 +62,7 @@ export type {
   AdapterModel,
   IssuePriority,
   IssueStatus,
+  IssueSpecKind,
   Agent,
   AgentIdentity,
   AgentPermissions,

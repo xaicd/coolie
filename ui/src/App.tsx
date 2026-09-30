@@ -646,10 +646,16 @@ function CompanyRootRedirect() {
 
   const targetCompany = selectedCompany ?? companies[0] ?? null;
   // Wave155 gate: a company that has never onboarded (onboarding_state NULL) is
-  // sent to the 3-step wizard when it is entered at its root. The query is
-  // skipped for no company; while it is still loading we fall through to the
-  // dashboard rather than block the page on a network round trip.
-  const { data: onboarding } = useQuery({
+  // sent to the 3-step wizard when it is entered at its root. Wave156 fix:
+  // we now also gate the redirect on `isLoading`/`isError` — while the query is
+  // still in flight we render <PaperclipLoading /> rather than fall through to
+  // the dashboard, which used to race past the gate and silently skip the
+  // wizard for a fresh tenant.
+  const {
+    data: onboarding,
+    isLoading: onboardingLoading,
+    isError: onboardingError,
+  } = useQuery({
     queryKey: queryKeys.onboarding.state(targetCompany?.id ?? ""),
     queryFn: () => onboardingApi.state(targetCompany!.id),
     enabled: Boolean(targetCompany),
@@ -671,7 +677,15 @@ function CompanyRootRedirect() {
     return <NoCompaniesStartPage />;
   }
 
-  if (onboarding && onboarding.onboardedStep === null) {
+  // Wave156: a target company has resolved but we have not yet confirmed its
+  // onboarding state — show the loading shell rather than racing into the
+  // dashboard. Without this guard a fresh tenant would skip the 3-step wizard
+  // on the very first navigation.
+  if (onboardingLoading) {
+    return <PaperclipLoading />;
+  }
+
+  if (!onboardingError && onboarding && onboarding.onboardedStep === null) {
     return <Navigate to={`/${targetCompany.issuePrefix}/getting-started`} replace />;
   }
 

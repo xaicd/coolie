@@ -8,7 +8,8 @@ import {
 } from "@paperclipai/shared";
 import { ontologyGraphService } from "../services/ontology-graph.js";
 import { ontologyBackfillService } from "../services/ontology-backfill.js";
-import { assertCompanyAccess } from "./authz.js";
+import { logActivity } from "../services/activity-log.js";
+import { assertBoard, assertCompanyAccess, getActorInfo } from "./authz.js";
 
 /**
  * Ontology graph routes (wave154) — the "Workshop" read surface over the link
@@ -22,6 +23,12 @@ import { assertCompanyAccess } from "./authz.js";
  * Every route is company-scoped: `assertCompanyAccess` runs first, and the
  * service only ever reads rows whose `company_id` matches, so an id from another
  * tenant resolves to an empty view rather than leaking a shape.
+ *
+ * The mutating endpoint (`/backfill`) additionally calls `assertBoard` and
+ * writes an `ontology.backfill` activity log entry — see wave156 audit
+ * remediation spec: an Agent API Key must not silently mutate the link graph
+ * on the company's behalf, and compliance reviewers need a forensic trail of
+ * who triggered a backfill and how many rows it inserted.
  */
 export function ontologyGraphRoutes(db: Db) {
   const router = Router();
@@ -57,10 +64,34 @@ export function ontologyGraphRoutes(db: Db) {
   // Derive the link rows a company's existing data already implies. Idempotent
   // and safe to re-run; the response reports what was newly inserted. This is
   // the callable form of the one-shot inference migration 9010 ran.
+  //
+  // wave156 (audit remediation): backfill is gated to Board actors and writes
+  // one activity log entry with the actor identity, company id, and the
+  // (inserted, total) counters so compliance can replay who triggered a graph
+  // rebuild and what it produced.
   router.post("/companies/:companyId/ontology/backfill", async (req, res) => {
     const companyId = req.params.companyId as string;
     assertCompanyAccess(req, companyId);
-    res.json(await backfill.backfill(companyId));
+    assertBoard(req);
+    const result = await backfill.backfill(companyId);
+    const actor = getActorInfo(req);
+    await logActivity(db, {
+      companyId,
+      actorType: actor.actorType,
+      actorId: actor.actorId,
+      agentId: actor.agentId,
+      runId: actor.runId,
+      agentApiKeyId: actor.agentApiKeyId,
+      action: "ontology.backfill",
+      entityType: "company",
+      entityId: companyId,
+      details: {
+        inserted: result.totalInserted,
+        total: result.totalRelations,
+        buckets: result.buckets,
+      },
+    });
+    res.json(result);
   });
 
   return router;

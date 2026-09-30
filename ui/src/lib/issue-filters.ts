@@ -25,6 +25,13 @@ export type IssueFilterState = {
   defects?: boolean;
   /** Show only 里程碑/主线 tasks (isMilestone). */
   mainline?: boolean;
+  /**
+   * wave156: "聚焦下钻此主线" filter — when set, only the named mainline
+   * task and every issue in its descendant subtree are kept. Mutually
+   * orthogonal to `mainline`, which is a class filter (anything
+   * isMilestone) rather than a focus filter (one specific tree).
+   */
+  focusMainlineId?: string | null;
   /** Defect severities to include (P0–P3); empty means any severity. */
   severities?: string[];
   /**
@@ -56,6 +63,7 @@ export const defaultIssueFilterState: IssueFilterState = {
   liveOnly: false,
   defects: false,
   mainline: false,
+  focusMainlineId: null,
   severities: [],
   externalObjectStatuses: [],
   hideRoutineExecutions: false,
@@ -126,6 +134,7 @@ export function normalizeIssueFilterState(value: unknown): IssueFilterState {
     liveOnly: candidate.liveOnly === true,
     defects: candidate.defects === true,
     mainline: candidate.mainline === true,
+    focusMainlineId: typeof candidate.focusMainlineId === "string" ? candidate.focusMainlineId : null,
     severities: normalizeIssueFilterValueArray(candidate.severities),
     externalObjectStatuses: normalizeIssueFilterValueArray(candidate.externalObjectStatuses),
     hideRoutineExecutions: candidate.hideRoutineExecutions === true,
@@ -260,6 +269,27 @@ export function applyIssueFilters(
   }
   if (state.defects) result = result.filter((issue) => issue.defect != null);
   if (state.mainline) result = result.filter((issue) => issue.isMilestone === true);
+  if (state.focusMainlineId) {
+    // "聚焦下钻此主线" — keep the named mainline + every descendant.
+    const childrenByParent = new Map<string, Issue[]>();
+    for (const issue of issues) {
+      if (!issue.parentId) continue;
+      const bucket = childrenByParent.get(issue.parentId);
+      if (bucket) bucket.push(issue);
+      else childrenByParent.set(issue.parentId, [issue]);
+    }
+    const keep = new Set<string>([state.focusMainlineId]);
+    const stack: string[] = [state.focusMainlineId];
+    while (stack.length > 0) {
+      const current = stack.pop()!;
+      for (const child of childrenByParent.get(current) ?? []) {
+        if (keep.has(child.id)) continue;
+        keep.add(child.id);
+        stack.push(child.id);
+      }
+    }
+    result = result.filter((issue) => keep.has(issue.id));
+  }
   const severities = state.severities ?? [];
   if (severities.length > 0) {
     result = result.filter(
@@ -300,6 +330,7 @@ export function countActiveIssueFilters(
   if (state.labels.length > 0) count += 1;
   if (state.defects) count += 1;
   if (state.mainline) count += 1;
+  if (state.focusMainlineId) count += 1;
   if ((state.severities?.length ?? 0) > 0) count += 1;
   if (state.projects.length > 0) count += 1;
   if (state.workspaces.length > 0) count += 1;

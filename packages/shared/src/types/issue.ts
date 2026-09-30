@@ -24,6 +24,7 @@ import type {
   IssueOriginKind,
   IssuePriority,
   IssueReviewPolicy,
+  IssueSpecKind,
   IssueRecoveryActionKind,
   IssueRecoveryActionOutcome,
   IssueRecoveryActionOwnerType,
@@ -839,6 +840,13 @@ export interface Issue {
   isMilestone?: boolean;
   /** Milestone metadata; only present (non-null) when `isMilestone` is true. */
   milestone?: IssueMilestone | null;
+  /** Spec-driven development (wave147). The kind of spec this issue carries,
+   * or null when the issue is not a spec node. The UI uses it to render a
+   * `[Spec · 任务/需求/设计/缺陷]` badge next to the title (wave156). */
+  specKind?: IssueSpecKind | null;
+  /** Spec-driven development (wave147). The spec payload matching `specKind`;
+   * null when the issue carries no spec. */
+  spec?: import("./issue-spec.js").IssueSpec | null;
   reviewPolicy: IssueReviewPolicy | null;
   assigneeAgentId: string | null;
   assigneeUserId: string | null;

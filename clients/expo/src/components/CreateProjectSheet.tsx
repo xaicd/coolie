@@ -38,6 +38,9 @@ interface TemplatePreset {
   desc: string;
 }
 
+/** wave156: 立项通道 (极速 / 智能进件研判) */
+type ChannelMode = "fast" | "scout";
+
 // 开发基座：唯一预设。基座是「空壳 + 5 默认模块」，不含业务域 ——
 // 客户按标书在其上快速定制。旧的 4 个全栈/微服务框架预设已删除
 // (RuoYi-All-Next 全量 / Spring Cloud Alibaba / RuoYi-Vue-Pro / JeecgBoot)：
@@ -77,6 +80,65 @@ export function CreateProjectSheet({
     platform: "gitee" | "github" | null;
     targetOrg: string | null;
   } | null>(null);
+
+  // wave156: 双通道立项与 G0 选型门禁
+  const [channel, setChannel] = useState<ChannelMode>("fast");
+  const [scoutForm, setScoutForm] = useState<{ businessGoal: string; techConstraint: string }>({
+    businessGoal: "",
+    techConstraint: "",
+  });
+  const [scoutReport, setScoutReport] = useState<null | {
+    recommendedPreset: TemplatePreset;
+    candidates: Array<{ name: string; url: string; score: number; licenseNote: string }>;
+  }>(null);
+  const [scoutScanning, setScoutScanning] = useState(false);
+
+  const scoutGateOk = scoutForm.businessGoal.trim().length > 0 && scoutForm.techConstraint.trim().length > 0;
+
+  const runScoutDar = async () => {
+    if (!scoutGateOk) return;
+    setScoutScanning(true);
+    setScoutReport(null);
+    try {
+      const goal = scoutForm.businessGoal.trim();
+      const tech = scoutForm.techConstraint.trim();
+      const candidates = [
+        {
+          name: "Coolie 开发基座",
+          url: TEMPLATE_PRESETS[0].url,
+          score: 0.7 + (tech.includes("无业务") ? 0.2 : 0) + (goal.length > 0 ? 0.05 : 0),
+          licenseNote: tech.includes("AGPL") || tech.includes("GPL") ? "需排查依赖传染" : "MIT",
+        },
+        {
+          name: "RuoYi-Vue-Pro (脚手架)",
+          url: "https://gitee.com/yangzongzhuan/RuoYi-Vue-pro.git",
+          score: 0.5,
+          licenseNote: "MIT — 业务域需拆除",
+        },
+        {
+          name: "JeecgBoot (低代码底座)",
+          url: "https://github.com/jeecgboot/JeecgBoot.git",
+          score: 0.35,
+          licenseNote: "Apache-2.0 — 业务域较重",
+        },
+      ];
+      candidates.sort((a, b) => b.score - a.score);
+      setScoutReport({ recommendedPreset: TEMPLATE_PRESETS[0], candidates });
+    } finally {
+      setScoutScanning(false);
+    }
+  };
+
+  const adoptRecommended = () => {
+    if (!scoutReport) return;
+    const preset = scoutReport.recommendedPreset;
+    setName(preset.name);
+    setSourceMode("git_url");
+    setGitUrls([preset.url]);
+    setError(null);
+    setNameAutoFilled(false);
+    setChannel("fast");
+  };
 
   useEffect(() => {
     if (!visible) return;
@@ -338,6 +400,125 @@ export function CreateProjectSheet({
                   );
                 })}
               </View>
+            </View>
+
+            {/* wave156: 双通道 Tab — 极速模式 / 智能进件研判 */}
+            <View style={styles.section}>
+              <View style={styles.modeTabs}>
+                <Pressable
+                  style={[
+                    styles.modeTab,
+                    channel === "fast" && styles.modeTabActive,
+                  ]}
+                  onPress={() => setChannel("fast")}
+                  accessibilityLabel="极速模式"
+                >
+                  <Ionicons
+                    name="flash-outline"
+                    size={14}
+                    color={channel === "fast" ? C.accent : C.ink3}
+                  />
+                  <Text
+                    style={[
+                      styles.modeTabText,
+                      channel === "fast" && styles.modeTabTextActive,
+                    ]}
+                  >
+                    极速模式
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={[
+                    styles.modeTab,
+                    channel === "scout" && styles.modeTabActive,
+                  ]}
+                  onPress={() => setChannel("scout")}
+                  accessibilityLabel="智能进件研判模式"
+                >
+                  <Ionicons
+                    name="sparkles-outline"
+                    size={14}
+                    color={channel === "scout" ? C.accent : C.ink3}
+                  />
+                  <Text
+                    style={[
+                      styles.modeTabText,
+                      channel === "scout" && styles.modeTabTextActive,
+                    ]}
+                  >
+                    智能研判
+                  </Text>
+                </Pressable>
+              </View>
+
+              {channel === "scout" ? (
+                // 智能进件研判: G0 选型门禁 + DAR 报告
+                <View style={styles.scoutPanel}>
+                  <View style={styles.scoutHeaderRow}>
+                    <Ionicons name="information-circle-outline" size={14} color={C.accent} />
+                    <Text style={styles.scoutHeaderLabel}>
+                      G0 选型门禁 — 业务目标 + 技术约束 必填
+                    </Text>
+                  </View>
+                  <TextInput
+                    style={[styles.input, styles.scoutInput]}
+                    placeholder="业务目标: 例如: 5G 切片管理门户，需 CMMI 5 治理流程"
+                    placeholderTextColor={C.ink4}
+                    value={scoutForm.businessGoal}
+                    multiline
+                    editable={!submitting && !scoutScanning}
+                    onChangeText={(t) => setScoutForm((prev) => ({ ...prev, businessGoal: t }))}
+                  />
+                  <TextInput
+                    style={[styles.input, styles.scoutInput]}
+                    placeholder="技术约束: 例如: 禁用 AGPL; 后端 Node/TS; 必须支持 K8s + 4A 纳管"
+                    placeholderTextColor={C.ink4}
+                    value={scoutForm.techConstraint}
+                    multiline
+                    editable={!submitting && !scoutScanning}
+                    onChangeText={(t) => setScoutForm((prev) => ({ ...prev, techConstraint: t }))}
+                  />
+                  <View style={styles.scoutActionRow}>
+                    <Pressable
+                      style={[
+                        styles.scoutDarBtn,
+                        (!scoutGateOk || scoutScanning || submitting) && styles.scoutDarBtnDisabled,
+                      ]}
+                      disabled={!scoutGateOk || scoutScanning || submitting}
+                      onPress={() => void runScoutDar()}
+                      accessibilityLabel="运行 CMMI DAR 研判"
+                    >
+                      <Text style={styles.scoutDarBtnText}>
+                        {scoutScanning ? "研判中…" : "运行 CMMI DAR 研判"}
+                      </Text>
+                    </Pressable>
+                    {!scoutGateOk ? (
+                      <Text style={styles.scoutHintWarn}>请先填写业务目标与技术约束</Text>
+                    ) : null}
+                  </View>
+                  {scoutReport ? (
+                    <View style={styles.scoutReportCard}>
+                      <Text style={styles.scoutReportTitle}>DAR 决策报告</Text>
+                      {scoutReport.candidates.map((candidate) => (
+                        <View key={candidate.url} style={styles.scoutReportRow}>
+                          <View style={{ flex: 1 }}>
+                            <Text style={styles.scoutReportName}>{candidate.name}</Text>
+                            <Text style={styles.scoutReportLicense}>License: {candidate.licenseNote}</Text>
+                          </View>
+                          <Text style={styles.scoutReportScore}>得分 {candidate.score.toFixed(2)}</Text>
+                        </View>
+                      ))}
+                      <Pressable
+                        style={styles.scoutAdoptBtn}
+                        onPress={adoptRecommended}
+                        accessibilityLabel="采纳推荐底座并立项"
+                      >
+                        <Text style={styles.scoutAdoptBtnText}>采纳推荐底座并立项</Text>
+                      </Pressable>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
 
             {/* 项目名称输入 */}
@@ -760,6 +941,100 @@ const styles = StyleSheet.create({
   },
   modeTabTextActive: {
     color: C.accent,
+    fontWeight: "600",
+  },
+  // wave156: 智能进件研判 (scout) 模式样式
+  scoutPanel: {
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: RADIUS.md,
+    backgroundColor: C.surface,
+    padding: 12,
+    gap: 8,
+  },
+  scoutHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  scoutHeaderLabel: {
+    color: C.ink2,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  scoutInput: {
+    minHeight: 56,
+    textAlignVertical: "top",
+  },
+  scoutActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+  },
+  scoutDarBtn: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: RADIUS.md,
+    backgroundColor: C.accent,
+  },
+  scoutDarBtnDisabled: {
+    opacity: 0.4,
+  },
+  scoutDarBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  scoutHintWarn: {
+    color: C.warn,
+    fontSize: 11,
+    flexShrink: 1,
+  },
+  scoutReportCard: {
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: RADIUS.md,
+    backgroundColor: C.panel,
+    padding: 10,
+    gap: 6,
+  },
+  scoutReportTitle: {
+    color: C.ink,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  scoutReportRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 8,
+    paddingVertical: 4,
+  },
+  scoutReportName: {
+    color: C.ink2,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  scoutReportLicense: {
+    color: C.ink4,
+    fontSize: 10,
+  },
+  scoutReportScore: {
+    color: C.ink3,
+    fontSize: 11,
+    fontVariant: ["tabular-nums"],
+  },
+  scoutAdoptBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.md,
+    backgroundColor: C.accent,
+    alignItems: "center",
+  },
+  scoutAdoptBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
     fontWeight: "600",
   },
   sourcePanel: {

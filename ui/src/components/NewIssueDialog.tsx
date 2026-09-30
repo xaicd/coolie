@@ -74,6 +74,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   ScanEye,
+  Info,
 } from "lucide-react";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "../lib/utils";
@@ -1918,7 +1919,23 @@ export function NewIssueDialog() {
               ) : null}
             </div>
             </div>
-          ) : null}
+          ) : (
+            // wave156: soft prompt to encourage挂载当前主线 rather than
+            // silently creating an orphan task. The task still goes through;
+            // the hint just reminds the PM/agent to attach a 主线 if there
+            // is one in flight.
+            <div className="px-4 pb-2">
+              <div
+                className="max-w-full rounded-md border border-amber-500/40 bg-amber-50/40 px-2.5 py-1.5 text-xs text-amber-900 dark:border-amber-300/35 dark:bg-amber-400/10 dark:text-amber-100"
+                data-testid="new-issue-hang-mainline-hint"
+              >
+                <div className="flex items-center gap-1.5">
+                  <Info className="h-3.5 w-3.5 shrink-0" />
+                  <span>支线 / 临时任务请挂载到当前主线，避免生成孤儿任务。</span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {workspaceIsolationControlsVisible && currentProject && currentProjectSupportsExecutionWorkspace && (
             <div className="px-4 py-3 space-y-2">

@@ -364,6 +364,20 @@ export function IssueFiltersPopover({
               >
                 只看主线
               </button>
+              <button
+                type="button"
+                data-testid="filter-focus-mainline-toggle"
+                className={`rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                  state.focusMainlineId
+                    ? "border-primary bg-primary text-primary-foreground"
+                    : "border-border text-muted-foreground hover:border-foreground/30 hover:text-foreground"
+                }`}
+                disabled={!state.focusMainlineId}
+                onClick={() => onChange({ focusMainlineId: null })}
+                title="wave156: 在任务行的 [聚焦下钻] 按钮处选择具体主线；此处清除当前聚焦"
+              >
+                清除聚焦
+              </button>
             </div>
           </div>
 

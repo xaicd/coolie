@@ -138,4 +138,36 @@ describeEmbeddedPostgres("company onboarding routes (wave155)", () => {
     expect(stateA.body.onboardedStep).toBe(2);
     expect(stateB.body.state).toBeNull();
   });
+
+  // wave156 (audit remediation): the mutating endpoints must reject non-Board
+  // actors even when the agent owns the company (assertBoard, not just
+  // assertCompanyAccess). Spin up a second app with an agent actor and assert
+  // 403.
+  it("wave156: agent API key is rejected with 403 on /step and /complete", async () => {
+    const companyId = await seedCompany("AgentGate");
+    const agentApp = express();
+    agentApp.use(express.json());
+    agentApp.use((req, _res, next) => {
+      (req as unknown as { actor: unknown }).actor = {
+        type: "agent",
+        source: "agent_key",
+        actorId: "agent-1",
+        companyId,
+        agentId: "agent-1",
+        onBehalfOfUserId: null,
+      };
+      next();
+    });
+    agentApp.use("/api", onboardingRoutes(db));
+    agentApp.use(errorHandler);
+
+    const step = await request(agentApp)
+      .post(`/api/companies/${companyId}/onboarding/step`)
+      .send({ step: 1 });
+    expect(step.status).toBe(403);
+
+    const complete = await request(agentApp)
+      .post(`/api/companies/${companyId}/onboarding/complete`);
+    expect(complete.status).toBe(403);
+  });
 });

@@ -1,11 +1,11 @@
 {
-  "version": "0.6.4",
-  "versionCode": 604,
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.4/coolie-release.apk",
-  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.4/coolie-release-ios.ipa",
+  "version": "0.6.6",
+  "versionCode": 606,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.6/coolie-release.apk",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.6/coolie-release-ios.ipa",
   "iosBundleId": "cn.xrobinai.app",
   "iosSha256": "",
   "iosTestFlightUrl": null,
-  "releaseNotes": "wave163 OntologyGraphView 节点全真名 — hydrate 路径不再 id.slice, UI truncate 16→28 容纳真名; 含 wave214 chip 文字基线修复",
+  "releaseNotes": "wave156 落地 3 个 spec — carrier-grade CMMI 立项双通道 (极速 + 智能进件研判 DAR + G0 选型门禁) / 主线-支线-临时-Spec 四级徽标与聚焦下钻 / Wave156 审计治理 (fork-surface 纳管 19 个 wave154/155 文件 + onboarding/backfill assertBoard + 审计 log)。不含 iOS TestFlight 出包 (老板未拍板)。",
   "commitSha": ""
 }

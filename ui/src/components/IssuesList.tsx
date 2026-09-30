@@ -96,7 +96,29 @@ import {
   type TaskCollectionPreferenceLocation,
 } from "../lib/task-collection-preferences";
 import { taskDateGroup, taskDateGroupSeparator, type TaskDateGroup } from "../lib/task-date-groups";
-import { deriveOriginatingActor, ISSUE_STATUSES, type Issue, type IssueStatus, type Project } from "@paperclipai/shared";
+import { deriveOriginatingActor, ISSUE_SPEC_KINDS, ISSUE_STATUSES, type Issue, type IssueSpecKind, type IssueStatus, type Project } from "@paperclipai/shared";
+
+/** wave156: short Chinese labels for the spec-driven chain kinds. */
+const SPEC_KIND_LABEL: Record<IssueSpecKind, string> = {
+  requirement: "需求",
+  bugfix: "缺陷修复",
+  design: "设计",
+  task: "任务",
+};
+
+/** wave156: badge text rendered next to spec-driven issues. */
+const SPEC_KIND_BADGE_TEXT: Record<IssueSpecKind, string> = {
+  requirement: "Spec · 需求",
+  bugfix: "Spec · 缺陷修复",
+  design: "Spec · 设计",
+  task: "Spec · 任务",
+};
+const SPEC_KIND_TITLE: Record<IssueSpecKind, string> = {
+  requirement: "Spec 需求文档 (requirement)",
+  bugfix: "Spec 缺陷修复 (bugfix)",
+  design: "Spec 设计 (design)",
+  task: "Spec 任务 (task)",
+};
 import { Badge } from "@/components/ui/badge";
 const ISSUE_SEARCH_DEBOUNCE_MS = 250;
 const ISSUE_SEARCH_RESULT_LIMIT = 200;
@@ -2190,6 +2212,33 @@ function StreamlinedIssuesList({
                                 主线
                               </Badge>
                             ) : null}
+                            {!issue.isMilestone && issue.parentId && parentIssue?.isMilestone ? (
+                              <Badge variant="outline"
+                                className="ml-1.5 border-sky-500/40 bg-sky-500/10 px-1.5 text-(length:--text-nano) text-sky-700 dark:text-sky-300"
+                                data-testid="issue-branch-badge"
+                                title="支线任务 — 直接归属于一条主线"
+                              >
+                                支线
+                              </Badge>
+                            ) : null}
+                            {!issue.isMilestone && issue.parentId && parentIssue && !parentIssue.isMilestone ? (
+                              <Badge variant="outline"
+                                className="ml-1.5 border-slate-500/40 bg-slate-500/10 px-1.5 text-(length:--text-nano) text-slate-700 dark:text-slate-300"
+                                data-testid="issue-adhoc-badge"
+                                title="临时任务 — 归属于一条支线/主线"
+                              >
+                                临时
+                              </Badge>
+                            ) : null}
+                            {issue.specKind && ISSUE_SPEC_KINDS.includes(issue.specKind) ? (
+                              <Badge variant="outline"
+                                className="ml-1.5 border-violet-500/40 bg-violet-500/10 px-1.5 text-(length:--text-nano) text-violet-700 dark:text-violet-300"
+                                data-testid="issue-spec-badge"
+                                title={SPEC_KIND_TITLE[issue.specKind]}
+                              >
+                                {SPEC_KIND_BADGE_TEXT[issue.specKind]}
+                              </Badge>
+                            ) : null}
                             {issue.defect ? (
                               <Badge variant="outline"
                                 className="ml-1.5 border-destructive/40 bg-destructive/10 px-1.5 text-(length:--text-nano) text-destructive"
@@ -2198,6 +2247,22 @@ function StreamlinedIssuesList({
                               >
                                 缺陷 {issue.defect.severity}
                               </Badge>
+                            ) : null}
+                            {issue.isMilestone ? (
+                              <button
+                                type="button"
+                                className="ml-1.5 inline-flex items-center rounded-md border border-primary/40 px-1.5 py-0 text-(length:--text-nano) font-medium text-primary transition-colors hover:bg-primary/10"
+                                data-testid="issue-focus-mainline"
+                                title="聚焦下钻此主线 — 仅显示该主线及其子任务"
+                                aria-pressed={viewState.focusMainlineId === issue.id}
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  e.stopPropagation();
+                                  updateView({ focusMainlineId: viewState.focusMainlineId === issue.id ? null : issue.id });
+                                }}
+                              >
+                                {viewState.focusMainlineId === issue.id ? "✓ 聚焦下钻" : "聚焦下钻"}
+                              </button>
                             ) : null}
                             {hasChildren && !isExpanded ? (
                               <span className="ml-1.5 text-xs text-muted-foreground">

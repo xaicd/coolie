@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import type { ProjectRepository } from "@paperclipai/shared";
-import { FileText, Folder, GitBranch, HardDrive, Link2, Paperclip, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { FileText, Folder, GitBranch, HardDrive, Info, Link2, Paperclip, Plus, Sparkles, Trash2, X, Zap } from "lucide-react";
 import { useDialog } from "../context/DialogContext";
 import { useCompany } from "../context/CompanyContext";
 import { useToastActions } from "../context/ToastContext";
@@ -13,6 +13,8 @@ import { ProjectRepositoryInput, repositoryOptionsKey } from "./ProjectRepositor
 import { ConnectionSetupFlow } from "@/features/connections/ConnectionSetupFlow";
 
 type SourceMode = "git_url" | "local_path" | "github_connect" | "none";
+/** wave156: dual-channel tabs on the create-project dialog. */
+type ChannelMode = "fast" | "scout";
 
 interface GitUrlItem {
   id: string;
@@ -28,8 +30,15 @@ const TEMPLATE_PRESETS = [
     name: "Coolie 开发基座",
     url: "https://github.com/xaicd/ruoyi-all-next.git",
     tag: "5 默认模块 + 客户定制",
+    desc: "内置 SQLite/Prisma/认证/权限/审计，无业务域；客户按标书快速定制",
   },
 ];
+
+/** wave156 (G0 选型门禁): 业务目标 + 技术约束 = 新项目前置必填。 */
+interface ScoutFormState {
+  businessGoal: string;
+  techConstraint: string;
+}
 
 export function NewProjectDialog() {
   const { newProjectOpen, closeNewProject } = useDialog();
@@ -42,6 +51,15 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
   const client = useQueryClient();
   const toast = useToastActions();
   const uniqueId = useId();
+  // wave156: 立项模式 (极速 / 智能进件研判)。
+  const [channel, setChannel] = useState<ChannelMode>("fast");
+  // wave156: G0 选型门禁 — 智能研判通道下必填。
+  const [scoutForm, setScoutForm] = useState<ScoutFormState>({ businessGoal: "", techConstraint: "" });
+  const [scoutReport, setScoutReport] = useState<null | {
+    recommendedPreset: typeof TEMPLATE_PRESETS[number];
+    candidates: Array<{ name: string; url: string; score: number; licenseNote: string }>;
+  }>(null);
+  const [scoutScanning, setScoutScanning] = useState(false);
   const [name, setName] = useState("");
   const [sourceMode, setSourceMode] = useState<SourceMode>("git_url");
   const [gitUrls, setGitUrls] = useState<GitUrlItem[]>([{ id: `${uniqueId}-0`, url: "" }]);
@@ -54,6 +72,64 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
   const [analyzing, setAnalyzing] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const fileInput = useRef<HTMLInputElement>(null);
+
+  /** wave156: 智能进件研判 — 模拟 solution-scouting-and-dar。 等待后端真实接口时给前端
+   * 一个稳定占位: 列出已知候选 + License 排查 + 推荐得分。 */
+  const runScoutDar = async (next: ScoutFormState) => {
+    setScoutScanning(true);
+    setScoutReport(null);
+    try {
+      // 占位打分: Coolie 基座在中等约束下永远胜出; 用户写了 "无业务域"
+      // /"可商用"/"避免 AGPL" 时 Coolie 基座加权最高。
+      const goal = next.businessGoal.trim();
+      const tech = next.techConstraint.trim();
+      const candidates = [
+        {
+          name: "Coolie 开发基座",
+          url: TEMPLATE_PRESETS[0].url,
+          score: 0.7 + (tech.includes("无业务") ? 0.2 : 0) + (goal.length > 0 ? 0.05 : 0),
+          licenseNote: tech.includes("AGPL") || tech.includes("GPL") ? "需排查依赖传染" : "MIT",
+        },
+        {
+          name: "RuoYi-Vue-Pro (脚手架)",
+          url: "https://gitee.com/yangzongzhuan/RuoYi-Vue-pro.git",
+          score: 0.5,
+          licenseNote: "MIT — 业务域需拆除",
+        },
+        {
+          name: "JeecgBoot (低代码底座)",
+          url: "https://github.com/jeecgboot/JeecgBoot.git",
+          score: 0.35,
+          licenseNote: "Apache-2.0 — 业务域较重",
+        },
+      ];
+      // 按得分倒序, 推荐第一项。
+      candidates.sort((a, b) => b.score - a.score);
+      setScoutReport({
+        recommendedPreset: TEMPLATE_PRESETS[0],
+        candidates,
+      });
+    } finally {
+      setScoutScanning(false);
+    }
+  };
+
+  const adoptRecommended = () => {
+    if (!scoutReport) return;
+    const preset = scoutReport.recommendedPreset;
+    setName(preset.name);
+    setSourceMode("git_url");
+    setGitUrls([{ id: `${uniqueId}-scout`, url: preset.url }]);
+    setNameAutoFilled(false);
+    setChannel("fast");
+    void toast.pushToast({
+      title: "已采纳推荐底座",
+      body: `${preset.name} (${preset.url})`,
+      tone: "info",
+    });
+  };
+
+  const scoutGateOk = scoutForm.businessGoal.trim().length > 0 && scoutForm.techConstraint.trim().length > 0;
 
   const handleGitUrlChange = (id: string, val: string) => {
     setGitUrls((prev) => prev.map((item) => (item.id === id ? { ...item, url: val } : item)));
@@ -184,10 +260,113 @@ export function NewProjectForm({ companyId, onClose }: { companyId: string; onCl
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <DialogTitle className="text-lg font-semibold">创建新项目 (Create Project)</DialogTitle>
-                  <p className="text-xs text-muted-foreground mt-0.5">支持通用 Git (Gitee/GitLab/GitHub)、本地工作区目录及 OAuth 授权</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">wave156: 双通道立项 — 极速模式 (已知标品) / 智能进件研判 (标书/新项目)</p>
                 </div>
                 <Button type="button" variant="ghost" size="icon-sm" disabled={create.isPending} aria-label="Close new project" onClick={onClose}><X className="size-4" /></Button>
               </div>
+
+              {/* wave156: 双通道 Tab */}
+              <div role="tablist" aria-label="立项通道" className="grid grid-cols-2 gap-1.5 rounded-lg border border-border bg-muted/30 p-1">
+                <button
+                  role="tab"
+                  type="button"
+                  aria-selected={channel === "fast"}
+                  data-testid="new-project-channel-fast"
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                    channel === "fast" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  onClick={() => setChannel("fast")}
+                  disabled={create.isPending}
+                >
+                  <Zap className="size-3.5 shrink-0" />
+                  极速模式 (已知标品)
+                </button>
+                <button
+                  role="tab"
+                  type="button"
+                  aria-selected={channel === "scout"}
+                  data-testid="new-project-channel-scout"
+                  className={`inline-flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-medium transition-colors ${
+                    channel === "scout" ? "bg-background text-foreground shadow-sm" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  onClick={() => setChannel("scout")}
+                  disabled={create.isPending}
+                >
+                  <Sparkles className="size-3.5 shrink-0" />
+                  智能进件研判 (标书/新项目)
+                </button>
+              </div>
+
+              {channel === "scout" ? (
+                // 智能进件研判: G0 选型门禁 + DAR 报告
+                <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/20 p-3">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <Info className="size-3.5 shrink-0 text-primary" />
+                    <span>G0 选型门禁 — 业务目标 + 技术约束 必填</span>
+                  </div>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium">业务目标 (1~3 句)</span>
+                    <textarea
+                      aria-label="业务目标"
+                      value={scoutForm.businessGoal}
+                      disabled={create.isPending || scoutScanning}
+                      onChange={(event) => setScoutForm((prev) => ({ ...prev, businessGoal: event.target.value }))}
+                      placeholder="例如: 为运营商客户提供 5G 切片管理门户，需支持 CMMI 5 治理流程。"
+                      rows={2}
+                      className="w-full resize-none rounded-md border border-input bg-background px-2.5 py-1.5 text-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-xs font-medium">技术约束 / License / 部署约束</span>
+                    <textarea
+                      aria-label="技术约束"
+                      value={scoutForm.techConstraint}
+                      disabled={create.isPending || scoutScanning}
+                      onChange={(event) => setScoutForm((prev) => ({ ...prev, techConstraint: event.target.value }))}
+                      placeholder="例如: 禁用 AGPL; 后端 Node/TypeScript; 必须支持 K8s 部署; 需要 4A 纳管接口。"
+                      rows={2}
+                      className="w-full resize-none rounded-md border border-input bg-background px-2.5 py-1.5 text-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-1 focus-visible:ring-ring"
+                    />
+                  </label>
+                  <div className="flex items-center justify-between gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={!scoutGateOk || scoutScanning || create.isPending}
+                      onClick={() => void runScoutDar(scoutForm)}
+                      data-testid="new-project-run-scout-dar"
+                    >
+                      {scoutScanning ? "研判中…" : "运行 CMMI DAR 研判"}
+                    </Button>
+                    {!scoutGateOk ? (
+                      <span className="text-xs text-amber-700 dark:text-amber-300" data-testid="new-project-g0-gate-warn">
+                        请先填写业务目标与技术约束
+                      </span>
+                    ) : null}
+                  </div>
+                  {scoutReport ? (
+                    <div className="flex flex-col gap-2 rounded-md border border-border bg-background p-2.5">
+                      <div className="text-xs font-medium">DAR 决策报告 (License 排查 + 加权打分)</div>
+                      <ul className="flex flex-col gap-1.5">
+                        {scoutReport.candidates.map((candidate) => (
+                          <li key={candidate.url} className="flex items-center justify-between gap-2 rounded-md border border-border/60 px-2 py-1 text-xs">
+                            <div className="flex min-w-0 flex-col">
+                              <span className="truncate font-medium">{candidate.name}</span>
+                              <span className="text-muted-foreground">License: {candidate.licenseNote}</span>
+                            </div>
+                            <span className="shrink-0 font-mono text-xs">得分 {candidate.score.toFixed(2)}</span>
+                          </li>
+                        ))}
+                      </ul>
+                      <Button type="button" size="sm" onClick={adoptRecommended} data-testid="new-project-adopt-recommended">
+                        采纳推荐底座并立项
+                      </Button>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
               <div className="flex items-center gap-3 rounded-lg border border-input px-3 focus-within:border-ring focus-within:ring-1 focus-within:ring-ring">
                 <Folder className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                 <input ref={input} aria-label="Project name" value={name} disabled={create.isPending} onChange={(event) => { setName(event.target.value); setNameAutoFilled(false); }} placeholder="项目名称 (Project Name)" required

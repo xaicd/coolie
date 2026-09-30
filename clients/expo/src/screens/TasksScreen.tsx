@@ -101,6 +101,8 @@ export function TasksScreen({
   const [assignee, setAssignee] = useState("all");
   const [project, setProject] = useState(initialProjectId ?? "all");
   const [mainline, setMainline] = useState(false);
+  /** wave156: 当前正在下钻的主线任务 id; null = 未聚焦。 */
+  const [focusMainlineId, setFocusMainlineId] = useState<string | null>(null);
   const [view, setView] = useState<IssuesView>("list");
   const [sortValue, setSortValue] = useState(SORT_OPTIONS[0]!.value);
   const [sheet, setSheet] = useState<SheetKind>(null);
@@ -118,10 +120,11 @@ export function TasksScreen({
       assignee,
       project,
       mainline,
+      focusMainlineId,
       sortField: sortOption.field,
       sortDir: sortOption.dir,
     }),
-    [search, scope, status, assignee, project, mainline, sortOption],
+    [search, scope, status, assignee, project, mainline, focusMainlineId, sortOption],
   );
 
   const statusCounts = useMemo(
@@ -329,6 +332,13 @@ export function TasksScreen({
             active={mainline}
             onPress={() => setMainline((value) => !value)}
           />
+          {focusMainlineId ? (
+            <Chip
+              label="✓ 聚焦主线"
+              active
+              onPress={() => setFocusMainlineId(null)}
+            />
+          ) : null}
         </ScrollView>
 
         {/* 视图切换: 列表 / 分组 / 看板 */}
@@ -344,6 +354,9 @@ export function TasksScreen({
           error={error}
           onRetry={() => void loadIssues()}
           onIssuePress={onOpenIssue}
+          onIssueLongPress={(issue) => {
+            if (issue.isMilestone) setFocusMainlineId(issue.id);
+          }}
           selection={selection}
           view={view}
           agents={agents}
