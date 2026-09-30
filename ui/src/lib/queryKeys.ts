@@ -730,4 +730,21 @@ export const queryKeys = {
     tree: (companyId: string, projectId?: string) =>
       ["specs", "tree", companyId, projectId ?? "__all-projects__"] as const,
   },
+  ontology: {
+    graph: (
+      companyId: string,
+      rootType: string,
+      rootId: string | null,
+      depth: number,
+    ) => ["ontology", "graph", companyId, rootType, rootId ?? "__none__", depth] as const,
+    paths: (
+      companyId: string,
+      srcType: string,
+      srcId: string | null,
+      targetType: string,
+      targetId: string | null,
+    ) =>
+      ["ontology", "paths", companyId, srcType, srcId ?? "__none__", targetType, targetId ?? "__none__"] as const,
+    stats: (companyId: string) => ["ontology", "stats", companyId] as const,
+  },
 };

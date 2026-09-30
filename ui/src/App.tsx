@@ -31,6 +31,7 @@ import { AGENT_FILTER_TABS, Agents } from "./pages/Agents";
 import { AgentDetail } from "./pages/AgentDetail";
 import { Projects } from "./pages/Projects";
 import { ProjectDetail } from "./pages/ProjectDetail";
+import { OntologyGraphPage } from "./pages/OntologyGraphPage";
 import { ProjectWorkspaceDetail } from "./pages/ProjectWorkspaceDetail";
 import { Workspaces } from "./pages/Workspaces";
 import { Issues } from "./pages/Issues";
@@ -290,6 +291,7 @@ function boardRoutes(streamlinedUiEnabled: boolean) {
       <Route path="projects/:projectId/issues" element={<ProjectDetail />} />
       <Route path="projects/:projectId/issues/:filter" element={<ProjectDetail />} />
       <Route path="projects/:projectId/milestones" element={<ProjectDetail />} />
+      <Route path="projects/:projectId/graph" element={<ProjectDetail />} />
       <Route path="projects/:projectId/chat" element={<ProjectDetail />} />
       <Route element={<IsolatedWorkspacesRouteGate />}>
         <Route path="projects/:projectId/workspaces/:workspaceId" element={<ProjectWorkspaceDetail />} />
@@ -318,6 +320,7 @@ function boardRoutes(streamlinedUiEnabled: boolean) {
       <Route path="issues/:issueId" element={<IssueDetail />} />
       <Route path="issues/:issueId/spec" element={<IssueSpecPage />} />
       <Route path="specs" element={<SpecTreePage />} />
+      <Route path="ontology" element={<OntologyGraphPage />} />
       {import.meta.env.DEV ? (
         <Route path="tests/perf/long-thread" element={<IssueChatLongThreadPerf />} />
       ) : null}

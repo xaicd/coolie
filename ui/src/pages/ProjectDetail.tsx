@@ -23,6 +23,7 @@ import { ProjectTile } from "../components/ProjectTile";
 import { BudgetPolicyCard } from "../components/BudgetPolicyCard";
 import { IssuesList } from "../components/IssuesList";
 import { ProjectMilestones } from "../components/ProjectMilestones";
+import { OntologyGraphView } from "../components/OntologyGraphView";
 import { PageSkeleton } from "../components/PageSkeleton";
 import { PageTabBar } from "../components/PageTabBar";
 import { ProjectWorkspacesContent } from "../components/ProjectWorkspacesContent";
@@ -50,7 +51,7 @@ import {
 import { BoardChat } from "./BoardChat";
 /* ── Top-level tab types ── */
 
-type ProjectBaseTab = "list" | "milestones" | "chat" | "plugin-operations" | "workspaces" | "configuration" | "budget";
+type ProjectBaseTab = "list" | "milestones" | "graph" | "chat" | "plugin-operations" | "workspaces" | "configuration" | "budget";
 type ProjectPluginTab = `plugin:${string}`;
 type ProjectTab = ProjectBaseTab | ProjectPluginTab;
 
@@ -75,6 +76,7 @@ function resolveProjectTab(pathname: string, projectId: string): ProjectTab | nu
   if (tab === "api-lifecycle") return "plugin:paperclipai.plugin-governance:api-lifecycle-tab";
   if (tab === "issues") return "list";
   if (tab === "milestones") return "milestones";
+  if (tab === "graph") return "graph";
   if (tab === "plugin-operations") return "plugin-operations";
   if (tab === "workspaces") return "workspaces";
   return null;
@@ -540,6 +542,10 @@ export function ProjectDetail() {
       navigate(`/projects/${canonicalProjectRef}/milestones`, { replace: true });
       return;
     }
+    if (activeTab === "graph") {
+      navigate(`/projects/${canonicalProjectRef}/graph`, { replace: true });
+      return;
+    }
     if (activeTab === "list") {
       if (filter) {
         navigate(`/projects/${canonicalProjectRef}/issues/${filter}`, { replace: true });
@@ -747,6 +753,8 @@ export function ProjectDetail() {
       navigate(`/projects/${canonicalProjectRef}/configuration`);
     } else if (tab === "milestones") {
       navigate(`/projects/${canonicalProjectRef}/milestones`);
+    } else if (tab === "graph") {
+      navigate(`/projects/${canonicalProjectRef}/graph`);
     } else {
       navigate(`/projects/${canonicalProjectRef}/issues`);
     }
@@ -895,6 +903,7 @@ export function ProjectDetail() {
           items={[
             { value: "list", label: "Tasks" },
             { value: "milestones", label: "里程碑主线" },
+            { value: "graph", label: "Graph View" },
             { value: "chat", label: "工坊对话" },
             ...(project.managedByPlugin ? [{ value: "plugin-operations", label: "Plugin operations" }] : []),
             ...(showWorkspacesTab ? [{ value: "workspaces", label: "Workspaces" }] : []),
@@ -917,6 +926,20 @@ export function ProjectDetail() {
 
       {activeTab === "milestones" && project?.id && resolvedCompanyId && (
         <ProjectMilestones projectId={project.id} companyId={resolvedCompanyId} />
+      )}
+
+      {activeTab === "graph" && project?.id && resolvedCompanyId && (
+        <div className="space-y-3" data-testid="project-graph-tab">
+          <p className="text-xs text-muted-foreground">
+            项目 <span className="text-foreground">{project.name}</span> 的关系图（深度 3）。
+          </p>
+          <OntologyGraphView
+            companyId={resolvedCompanyId}
+            rootType="project"
+            rootId={project.id}
+            depth={3}
+          />
+        </div>
       )}
 
       {activeTab === "chat" && project?.id && (

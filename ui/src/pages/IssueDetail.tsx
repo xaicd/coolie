@@ -203,6 +203,7 @@ import { IssueFieldChangeReceipt } from "../components/IssueFieldChangeReceipt";
 import { IssueWriteDenialNotice } from "../components/IssueWriteDenialNotice";
 import { issueWriteDenialForActivity } from "../lib/issue-write-denial-activity";
 import { IssueRelatedWorkPanel } from "../components/IssueRelatedWorkPanel";
+import { IssueLinkedEntities } from "../components/IssueLinkedEntities";
 import {
   IssueMonitorBanner,
   IssueMonitorComposerStrip,
@@ -7997,6 +7998,7 @@ export function TaskDetailSurface({ conversation, tasksTab }: { tasksTab?: TaskS
                     : undefined
                 }
               />
+              <IssueLinkedEntities companyId={issue.companyId} issueId={issue.id} />
             </TabsContent>
 
             {activePluginTab && (

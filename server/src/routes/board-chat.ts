@@ -11,6 +11,7 @@ import { createBoardConversationSchema, updateBoardConversationSchema } from "@p
 import { companies, issueAttachments, issueComments, issues, chatConversations, assets, boardConversations } from "@paperclipai/db";
 import { and, desc, eq, inArray, isNull, lt } from "drizzle-orm";
 import { instanceSettingsService, issueService } from "../services/index.js";
+import { recordCommentRelation } from "../services/ontology-graph.js";
 import { assertCompanyAccess, getActorInfo } from "./authz.js";
 import { recordAudit } from "../middleware/audit.js";
 import { loadAgentPersona } from "../services/role-template.js";
@@ -526,6 +527,16 @@ export function boardChatRoutes(
       userId: actor.agentId ? undefined : actor.actorId,
       runId: actor.runId,
     });
+
+    // wave154: keep the ontology link layer in step with the write path. A turn
+    // in this conversation means the conversation's issue was discussed in it,
+    // so (issue)-[discussed_in]->(conversation) is recorded here. Best-effort:
+    // a missing link must never fail the boss's message.
+    try {
+      await recordCommentRelation(db, { companyId, issueId: resolvedIssueId });
+    } catch (e) {
+      console.error("[board-chat] failed to record ontology relation:", e);
+    }
 
     // wave148: move this conversation to the top of the list (lastMessageAt is
     // the list ordering key). Best-effort — a failure must not block the turn.

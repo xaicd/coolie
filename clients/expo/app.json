@@ -30,7 +30,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "cloud.coolie.app",
+      "bundleIdentifier": "cn.xrobinai.app",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Coolie uses the microphone to dispatch tasks by voice."
       }

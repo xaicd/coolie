@@ -2852,3 +2852,28 @@ export {
   type CreateBoardConversationInput,
   type UpdateBoardConversationInput,
 } from "./validators/board-conversation.js";
+
+// Ontology graph (wave154): the link layer over the workshop's objects.
+export {
+  ENTITY_RELATION_KINDS,
+  ENTITY_TYPES,
+  type EntityRef,
+  type EntityRelationKind,
+  type EntityType,
+  type OntologyGraphEdge,
+  type OntologyGraphNode,
+  type OntologyGraphResponse,
+  type OntologyGraphRoot,
+  type OntologyPath,
+  type OntologyPathsResponse,
+  type OntologyStatsResponse,
+  type OntologyTypeCount,
+} from "./types/entity-relation.js";
+export {
+  entityRelationKindSchema,
+  entityTypeSchema,
+  ontologyGraphQuerySchema,
+  ontologyPathsQuerySchema,
+  type OntologyGraphQuery,
+  type OntologyPathsQuery,
+} from "./validators/entity-relation.js";
