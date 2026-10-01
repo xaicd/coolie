@@ -1116,6 +1116,30 @@
       "maxNetLines": 200,
       "maxTotalLines": 200,
       "reason": "wave233: node:test suite (11 cases) for the auto-deploy chain — release-app.sh / publish-ota.sh / auto-deploy-all.sh / auto-deploy.sh lib — exercising --help text, syntax (bash -n), flag parsing, bad-version rejection, dry-run orchestration, and the 4-guard PASS line. Lives under scripts/__tests__/ next to its sibling wave228 suite (install-mcp-shims.test.mjs)."
+    },
+    {
+      "path": "server/src/services/dispatch-skill-matcher.ts",
+      "maxNetLines": 200,
+      "maxTotalLines": 200,
+      "reason": "wave258: 派活精准匹配 (parseSkillInput + matchAgentsBySkills + topMatchForSkill + 30 CMMI_SKILLS). 给 Hermes 工坊 chat 反讲 '派活给编码 → 铁匠' 用, 不替 wave222 派活算法 (5 角色 → specialty 二次匹配留给算法层). Lives under server/src/services/ 因为这是 server-side 算法, 不能搬到 clients/expo (那里没有 DB)."
+    },
+    {
+      "path": "server/src/services/__tests__/dispatch-skill-matcher.test.ts",
+      "maxNetLines": 200,
+      "maxTotalLines": 200,
+      "reason": "wave258: 10 unit tests (parseSkillInput 3 + 评分逻辑 7) for dispatch-skill-matcher. Lives under server/src/services/__tests__/ 与其它 server service 测试同目录."
+    },
+    {
+      "path": "packages/db/src/migrations/9022_delete_13_digital_employees.sql",
+      "maxNetLines": 30,
+      "maxTotalLines": 30,
+      "reason": "wave258: 删 13 数字员工 (6 QA + 7 Ops) by name, 跨公司 (QA-Test-Workshop / Coolie-Ops-Control-Room 保留, 只删员工). Hand-written 因为这是 DELETE FROM agents WHERE name IN (...) — drizzle-kit generate 不会生成 DELETE-only migration; 跟 wave132 的 9005_add_issue_defect 同样不靠生成器. No upstream counterpart (upstream has the 13 agents). 9021_add_agent_role_responsibilities_skills (wave256) 已加 tools/skills/role_label 列, 9022_add_agent_tools draft 被删 (tools 已并入 9021). 公司本身保留, 只删员工."
+    },
+    {
+      "path": "packages/db/src/migrations/meta/_journal.json",
+      "maxNetLines": 200,
+      "maxTotalLines": 600,
+      "reason": "wave132 baseline 30 (1 entry). Each new hand-written migration appends one entry. wave245/wave250/wave256 cumulative +5 (9017-9021 + ontology snapshot). wave258 -1 cleanup (was 9022_add_agent_tools + 9023_delete_13 in wave256 stale journal, wave258 removed 9022_add_agent_tools draft + renumbered 9023_delete → 9022_delete; tools was already in 9021). net +4 from wave245/250/256 + wave258 cleanup (the journal shrunk by 1 entry because the stale 9022_add_agent_tools is gone and 9023_delete was renumbered to 9022_delete)."
     }
   ]
 }

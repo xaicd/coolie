@@ -17,7 +17,7 @@ import type {
   Project,
   WorkspaceRuntimeService,
 } from "@coolie/api-client";
-import { C } from "../theme";
+import { C, coolie, type AgentRow } from "../coolie";
 import { RADIUS } from "../ui/tokens";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { OntologyDomainListScreen } from "./OntologyDomainListScreen";
@@ -26,6 +26,7 @@ import { AgentsScreen } from "./AgentsScreen";
 import { ArtifactsScreen } from "./ArtifactsScreen";
 import type { SandboxScope } from "./PrototypeSandboxScreen";
 import { PluginOrgSwitcher } from "../components/PluginOrgSwitcher";
+import { SkillMatcherSheet } from "../components/SkillMatcherSheet";
 
 export type OrgAssetTab = "ontology" | "projects" | "agents" | "artifacts";
 
@@ -108,6 +109,23 @@ export function OrgAssetsScreen({
   );
   // wave235 — "更多"下拉.
   const [moreOpen, setMoreOpen] = useState(false);
+  // wave258 — "派活精准" 浮层 (老板原话 "方便后续派活精准").
+  const [skillMatcherOpen, setSkillMatcherOpen] = useState(false);
+  const [skillMatcherAgents, setSkillMatcherAgents] = useState<AgentRow[]>([]);
+
+  const handleOpenSkillMatcher = useMemo(
+    () => async () => {
+      try {
+        const list = await coolie.listAgents(company.id);
+        setSkillMatcherAgents(list);
+        setSkillMatcherOpen(true);
+      } catch (e) {
+        // listAgents 失败时静默; UI 已经把按钮 disable, 不必弹 alert
+        setSkillMatcherAgents([]);
+      }
+    },
+    [company.id],
+  );
 
   const switchable = useMemo<Company[]>(
     () => switchableCompanies ?? [company],
@@ -162,6 +180,16 @@ export function OrgAssetsScreen({
                 <Text style={styles.extraPillText}>成本核算</Text>
               </Pressable>
             ) : null}
+            {/* wave258 — 派活精准 (老板原话 "方便后续派活精准") */}
+            <Pressable
+              style={styles.extraPill}
+              onPress={handleOpenSkillMatcher}
+              hitSlop={6}
+              accessibilityLabel="派活精准"
+            >
+              <Ionicons name="sparkles-outline" size={12} color="#FACC15" />
+              <Text style={styles.extraPillText}>派活精准</Text>
+            </Pressable>
             <Pressable
               style={styles.extraPill}
               onPress={() => setMoreOpen(true)}
@@ -233,6 +261,13 @@ export function OrgAssetsScreen({
         onOpenPrototypeSandbox={onOpenPrototypeSandbox}
         onOpenOnboarding={onOpenOnboarding}
         onOpenWebWorkbench={onOpenWebWorkbench}
+      />
+
+      {/* wave258 — 派活精准浮层 (老板原话 "方便后续派活精准") */}
+      <SkillMatcherSheet
+        visible={skillMatcherOpen}
+        agents={skillMatcherAgents}
+        onClose={() => setSkillMatcherOpen(false)}
       />
     </SafeAreaView>
   );

@@ -394,3 +394,111 @@ wave250 — Object GlobalRID (P3, Object 统一)
 - wave246+ 5 步路线图 (老板拍板)
 - 8 条不动反向约束 (保证 fork-surface gate 不增加)
 - 算法层 / 工具切换 / 图谱 UX 全部不动 — 本波只 ADDS 7 primitives 维度
+
+---
+
+## 10. 中文 2 字 skill × 英文 cli tool 区分 (wave258 新, 老板拍板)
+
+老板原话 (2026-10-01):
+> "中文二字技能, 把 cmmi 任务中所有包含的技能都列全了, 方便后续派活精准"
+> "技能不是 cli 工具, 是 skills, 得区分了"
+> "不要 13 员工"
+
+### 10.1 30 个中文 2 字 skill 全集
+
+按 §1 25 任务的派活路径反讲 + 全阶段覆盖:
+
+| # | 中文 2 字 | 含义 | 覆盖阶段 |
+|---|---|---|---|
+| 1 | 调研 | research / investigation | 立项 + 规划 |
+| 2 | 画图 | sketch / wireframe | 立项 (FDA 必备) |
+| 3 | 选型 | selection / architecture | 立项 (FDA 必备) |
+| 4 | 研判 | decision making | 立项 (FDA 必备) |
+| 5 | 文档 | documentation | 全阶段 |
+| 6 | 评审 | review | 全阶段 |
+| 7 | 立项 | project initiation | Phase 1 |
+| 8 | 规划 | planning | Phase 2 |
+| 9 | 设计 | design | Phase 3 |
+| 10 | 编码 | coding | Phase 4 |
+| 11 | 重构 | refactor | Phase 4 |
+| 12 | 测试 | testing | 全阶段 |
+| 13 | 修复 | bug fixing | Phase 4 |
+| 14 | 联调 | integration | Phase 4 |
+| 15 | 部署 | deployment | Phase 5 |
+| 16 | 运维 | operations | Phase 5 |
+| 17 | 监控 | monitoring | Phase 5 |
+| 18 | 应急 | incident response | Phase 5 |
+| 19 | 命令 | command line | FDSE |
+| 20 | 脚本 | scripting | FDSE |
+| 21 | 自动化 | automation | FDSE |
+| 22 | 数据 | data analysis | DS |
+| 23 | 分析 | analytics | DS |
+| 24 | 报告 | reporting | DS + PM |
+| 25 | 派活 | dispatch | PM |
+| 26 | 验收 | acceptance | PM |
+| 27 | 调度 | orchestration | PM |
+| 28 | 复盘 | retrospective | 全阶段 |
+| 29 | 预算 | estimation | Phase 1+2 |
+| 30 | 风控 | risk management | 全阶段 |
+
+### 10.2 6 老板团队 skill × tools 矩阵
+
+| 员工 | 真名 | role | 中文 skills (8 个) | 英文 tools (2-3 个) |
+|---|---|---|---|---|
+| 1 | Hermes | PM | 派活 / 验收 / 报告 / 调度 / 评审 / 复盘 / 立项 / 文档 | agy / claude-glm |
+| 2 | 墨斗 | FDA | 调研 / 画图 / 选型 / 研判 / 文档 / 设计 / 立项 / 规划 | agy / claude-glm |
+| 3 | 铁匠 | Core SWE | 编码 / 重构 / 测试 / 修复 / 联调 / 文档 / 设计 / 评审 | cmd / claude-mm |
+| 4 | 兑底渊 | PRE-SRE | 部署 / 运维 / 监控 / 应急 / 自动化 / 脚本 / 命令 / 风控 | cmd / claude-mm |
+| 5 | 门神 | FDSE | 命令 / 脚本 / 自动化 / 部署 / 联调 / 测试 / 调研 / 文档 | cmd / claude-mm |
+| 6 | 百晓生 | DS | 数据 / 分析 / 报告 / 测试 / 验收 / 复盘 / 风控 / 评审 | claude-mm / claude-glm |
+
+### 10.3 派活精准 (老板原话 "方便后续派活精准")
+
+新服务 `server/src/services/dispatch-skill-matcher.ts`:
+- 输入: 中文 2 字 skill (单个或多个, 用 `/` 分隔)
+- 输出: 公司内 6 老板团队 × 评分 (matchedCount / inputSkills.length * 100, 降序, 平局按名字升序)
+- App 端 `SkillMatcherSheet` (派活精准浮层, OrgAssetsScreen 顶部 "🎯 派活精准" 入口触发):
+  - 输入框 + 6 员工列表 (role 徽章 + matched skills 绿色 chip + 评分)
+  - 点员工 → 复制到 clipboard + Toast 提示
+- **不动** Hermes 工坊 chat 派活输入逻辑 (这次只做 UI, 端到端派活流程留给下一波)
+
+### 10.4 删 13 数字员工 (老板 "不要 13 员工")
+
+13 数字员工 = 6 QA (wave217, QA-Test-Workshop) + 7 Ops (wave220, Coolie-Ops-Control-Room), 散在 2 个独立公司名下。
+
+修法: 新迁移 `9023_delete_13_digital_employees.sql` 直接 `DELETE FROM agents WHERE name IN ('QA Lead', ..., 'Release Ops')` — 按 name 删, 跨公司.
+
+**Why:** 派活精度从 5 角色降到 13 数字员工反而是噪声, 老板只看 6 老板团队.
+
+**不动:**
+- ❌ qa-bootstrap-team.mjs / qa-bootstrap-ops.mjs (老板原话 "不动 13 数字员工相关 scripts", 改了下次 bootstrap 会重建)
+- ❌ .agents/skills/qa-* / .agents/skills/ops-* (qa/ops 员工的 skills 目录)
+- ❌ migration 删的是 agents 行, 2 个测试公司 (QA-Test-Workshop / Coolie-Ops-Control-Room) 本身保留
+
+### 10.5 schema 改动 (fork-only 增强)
+
+| 表 | 列 | 类型 | 含义 |
+|---|---|---|---|
+| agents | `tools` | text[] | 英文 CLI / tool 列表 (wave258 新). 跟 `skills` 拆开. |
+
+不改:
+- ❌ AGENT_ROLES enum (5 角色不变)
+- ❌ `role_label` / `responsibilities` / `skills` 三列 (wave256 已就位, skills 列内容语义升级为中文 2 字)
+- ❌ ROLE_MAPPING (算法层 25 任务主/副角色不变)
+
+### 10.6 出处
+
+- 老板原话: brief wave258 (2026-10-01, 4 条)
+- 算法层: `server/src/services/agent-assign.ts` (wave222, 不动)
+- 数字员工卡基线: `clients/expo/src/components/AssetsAgentCard.tsx` (wave256)
+- 派活精准: `server/src/services/dispatch-skill-matcher.ts` (wave258 新)
+- 删 13: `packages/db/src/migrations/9023_delete_13_digital_employees.sql` (wave258 新)
+- 加 tools 列: `packages/db/src/migrations/9022_add_agent_tools.sql` (wave258 新)
+
+**本波 (wave258) 变更摘要**:
+- §10 整章新增 (中文 2 字 skill × 英文 cli tool 维度 + 派活精准 + 删 13), 不改前面 §1-§9
+- 30 个中文 2 字 skill 全集 + 6 老板团队 × skill × tool 矩阵
+- 派活精准算法 (`dispatch-skill-matcher.ts`) + App 端 `SkillMatcherSheet` 浮层
+- 删 13 数字员工 (6 QA + 7 Ops), migration 兜底, 不动 bootstrap 脚本
+- agents 表加 `tools` 列 (text[], 中文 cli / 英文 cli), 不动 wave256 加的 3 列
+- 算法层 / 5 角色 / wave256 数字员工卡 / wave222 派活算法 / wave244 图谱 / wave251 chip 去重 全部不动 — 本波只 ADDS 派活精准维度

@@ -2133,15 +2133,8 @@
     {
       "idx": 9022,
       "version": "7",
-      "when": 1790785200000,
-      "tag": "9022_add_agent_tools",
-      "breakpoints": true
-    },
-    {
-      "idx": 9023,
-      "version": "7",
       "when": 1790788800000,
-      "tag": "9023_delete_13_digital_employees",
+      "tag": "9022_delete_13_digital_employees",
       "breakpoints": true
     }
   ]
