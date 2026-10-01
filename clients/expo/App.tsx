@@ -452,7 +452,6 @@ export default function App() {
       <SignInScreen
         onSignedIn={setCredential}
         onRegister={() => setRegistering(true)}
-        onSwitchToWeb={() => setLoginMode("web")}
       />
     );
   } else {
@@ -585,11 +584,9 @@ function Surface({ children }: { children: React.ReactNode }) {
 function SignInScreen({
   onSignedIn,
   onRegister,
-  onSwitchToWeb,
 }: {
   onSignedIn: (credential: Credential) => void;
   onRegister?: () => void;
-  onSwitchToWeb?: () => void;
 }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -694,13 +691,6 @@ function SignInScreen({
         <Text style={styles.brandBig}>Coolie</Text>
         <Text style={styles.tagline}>把 AI 智能体当成一支团队来管理</Text>
       </View>
-
-      {onSwitchToWeb ? (
-        <Pressable style={styles.webLoginBannerBtn} onPress={onSwitchToWeb}>
-          <Ionicons name="globe-outline" size={15} color={C.accent} style={{ marginRight: 6 }} />
-          <Text style={styles.webLoginBannerBtnText}>🌐 直接使用 Web 全功能登录 (免密共享)</Text>
-        </Pressable>
-      ) : null}
 
       {useToken ? (
         <>
@@ -1760,23 +1750,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     fontSize: 15,
     color: C.ink,
-  },
-  webLoginBannerBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 42,
-    borderRadius: 8,
-    backgroundColor: "rgba(94, 106, 210, 0.12)",
-    borderWidth: 1,
-    borderColor: "rgba(94, 106, 210, 0.35)",
-    marginBottom: 14,
-    paddingHorizontal: 12,
-  },
-  webLoginBannerBtnText: {
-    color: C.accent,
-    fontSize: 13,
-    fontWeight: "600",
   },
   // 主按钮 (DESIGN.md 第3节: bg #5E6AD2, text ink, radius 8, padding 12×16, weight 500)
   btnPrimary: {
