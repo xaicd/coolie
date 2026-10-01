@@ -1,0 +1,12 @@
+{
+  "version": "0.6.10",
+  "versionCode": 610,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.10/coolie-release.apk",
+  "apkSha256": "f0c087e28323276b1d53f15ec228cd88f299f7b7dc23d2d7b363085dc73a9702",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "2e7d63c06857dfb115f318e36ece2945b0f4cd4259b13fea0a009a9cf6e6b4c0",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "v0.6.10 OTA 升级提示修法 (wave243): native runtimeVersion 跟踪 manifest, 本机 >= 远端 不再提示升级; 紧急熔断 chip 位置 review 通过",
+  "commitSha": "2a3038b53333577eb41953a070bb445163fa5ade"
+}
