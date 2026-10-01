@@ -837,3 +837,282 @@ plugin-worker 返 snake_case + control-plane 返 camelCase 的妥协产物, 但�
 
 - 撞机完: 11 个并行 agent (老板视角 / Palantir 架构 / 共享层命名 × 2 / 跨功能入口 / bottom tabs / 键盘+刷新+Toast / Modal-Sheet / App.tsx 拓扑 / 审批+任务+插件 / 右上菜单+badge+长按 / Tab+SegmentedControl / 颜色硬编码) + 主线程自查
 - 报告完整: **P0 × 11 + P1 × 18 + P2 × 18 = 47 项**, 跨 5 视角 + 共享层 + 服务端 + 视觉交互层 + 颜色 token 层
+
+---
+
+## 16. 补充 — Server Routes 深度审计 (12 号 agent, post-push)
+
+第 12 个 agent (server routes 深度) 在 commit 之后完成, 这里**追加存档**. 其结论与 §1-§13 已列内容一致, 但**新增 1 项服务层重复** (§13-§15 没列):
+
+### 16.1 Cross-file Route Path 重复 (与 §1-§4 一致)
+
+**全 server/src/routes/ 全扫**, 唯一真 cross-file 路径冲突:
+- `GET /issues` 400-fallback 在 `companies.ts:427` + `issues.ts:7803` 写了两份, **两份内容相同, 文案相同** (P1-5 已列, 此处复确认).
+
+**`ontology-extras.ts` 3 个端点无任何路径冲突**:
+- `GET /companies/:companyId/ontology/instances` (line 35)
+- `GET /companies/:companyId/ontology/types/:typeId/properties` (line 52)
+- `PATCH /companies/:companyId/ontology/types/:typeId/properties` (line 60)
+
+Grep `ontology/instances / ontology/types / ontology/properties` 全 server 仅 `routes/ontology-extras.ts` 命中 (测试文件除外). wave239 新增端点干净.
+
+### 16.2 新增 — Service 层 ~150 行重复 (P2-19, 新增)
+
+`services/ontology-graph.ts` `hydrate()` vs `services/ontology-extras.ts` `listInstances()` 都在做"按 type 取行并水合 label", **同一张 ENTITY_TABLE 映射写了两遍**:
+
+| 关注点 | `services/ontology-graph.ts` | `services/ontology-extras.ts` |
+|---|---|---|
+| 函数 | `hydrate(companyId, refs)` (L249-487) | `listInstances(input)` (L83-237) |
+| 读表 | projects / issues / boardConversations / issueWorkProducts / issueAttachments / issueComments / companies / agents / assets | projects / issues / agents / boardConversations / issueWorkProducts / issueAttachments / issueComments (基本同一组, 通过 `ENTITY_TABLE` map L46-59) |
+| 过滤 | `companyId = ? AND id IN (...)` | `companyId = ?` (可选 owner 过滤) |
+| Owner join | 无 | `entityRelations assigned_to` join agents (L188-203) |
+| 形态 | 完整 OntologyGraphNode | 紧凑 OntologyInstanceRow |
+| 排序 | BFS 决定 | `desc(id)` |
+
+**重复点**: per-type `select * from <table> where company_id = ?` 的脚手架写了两遍 — 提到共享模块能消 ~150 行.
+
+`hydrate` 用于图遍历, `listInstances` 用于屏 2 (实例图) 列表 + 分页 + owner 过滤, **用途不同不是 thin wrapper 对**, 但表映射逻辑重叠. 应抽 `services/_ontology-table-map.ts` 共享.
+
+### 16.3 Adapter ↔ Server Route 重叠: 0
+
+`grep` 全 `packages/adapters/*/src/` 找 `app.use / app.get / app.post / http.createServer / express() / new Hono / new Koa` — **零命中**.
+
+Adapter 只:
+- 调第三方 API (anthropic / chatgpt / github / gitlab)
+- 调本地 CLI (`PAPERCLIP_API_URL` env)
+- 在 prompt 字符串里告诉 agent CLI 调 `/api/agents/me` / `/api/issues/:id/checkout`
+
+Hermes-gateway 调 `/v1/runs/...` (L538/570/719/740/860) 但这是 Hermes Agent 自己的协议, 不是 coolie server — grep 确认 server 端无 `/v1/runs` 路由.
+
+**结论**: 客户端↔服务端路由层**没有重叠**, §1-§13 报告已覆盖此结论.
+
+### 16.4 Membership 表查询对 (P2-20, 新增, borderline)
+
+`services/access.ts` 内:
+- `getMembership(companyId, principalType, principalId)` (L361-377) — 按 natural key 查
+- `getMemberById(companyId, memberId)` (L423-429) — 按 row id 查
+- `listMembers(companyId)` (L415-421) — `desc(createdAt)`
+- `listActiveUserMemberships(companyId)` (L431-443) — `asc(createdAt)` + `principalType='user' AND status='active'`
+
+四个函数都 `select().from(companyMemberships).where(...)`, 但 predicate 列不同. **Borderline 重复**, 可抽 `findMembership(filter)` 收编.
+
+### 16.5 §16 总结
+
+- **新增 P2 (2 项, 紧接 §13 的 P2-18)**:
+  - **P2-19**: 抽 `services/_ontology-table-map.ts`, 共享 `hydrate()` 与 `listInstances()` 的 per-type 表映射 (~150 行).
+  - **P2-20**: `services/access.ts` 的 4 个 membership 查询 (`getMembership` / `getMemberById` / `listMembers` / `listActiveUserMemberships`) 抽 `findMembership(filter)`.
+
+---
+
+## 17. 最终统计 (合并 §10-§16)
+
+| 等级 | §1-§3 | §10 | §13 | §16 | 总计 |
+|---|---|---|---|---|---|
+| **P0** | 7 | 3 | 1 | 0 | **11** |
+| **P1** | 14 | 3 | 1 | 0 | **18** |
+| **P2** | 13 | 4 | 1 | 2 | **20** |
+| **总计** | **34** | **10** | **3** | **2** | **49** |
+
+---
+
+## 18. QA 报告完整度 (最终最终)
+
+- 撞机完: 12 个并行 agent (老板视角 / Palantir 架构 / 共享层命名 × 2 / 跨功能入口 / bottom tabs / 键盘+刷新+Toast / Modal-Sheet / App.tsx 拓扑 / 审批+任务+插件 / 右上菜单+badge+长按 / Tab+SegmentedControl / 颜色硬编码 / **server routes 深度**) + 主线程自查
+- 报告完整: **P0 × 11 + P1 × 18 + P2 × 20 = 49 项**, 跨 5 视角 + 共享层 + 服务端 + 视觉交互层 + 颜色 token 层
+- 主线程实测 (9 处事实核验):
+  1. `App.tsx:1390` NewTaskPage + `App.tsx:1414` CreateTaskModal 同栈并列 ✓
+  2. `App.tsx:1286` 4 个 tab key 共用 OrgAssetsScreen ✓
+  3. `setSettingsOpen(true)` 全仓 0 调用 ✓
+  4. `InboxScreen.tsx` 未被 import ✓
+  5. `TasksScreen.tsx` 静态 import 但 JSX 0 渲染 ✓
+  6. `OrgAssetsScreen` 4 个 MoreSheet 项 `enabled: Boolean(...)` 全部 false ✓
+  7. `BuildModeModal` 0 import ✓
+  8. `PluginOrgSwitcher` 是多公司切换不是插件管理 ✓
+  9. `composer/ModeSwitch.tsx` 已不存在, 残留 `doubao/ModeSwitch.tsx` 独占 ✓
+
+---
+
+## 19. 补充 — FDE API 深度审计 (12 号 agent, post-push-2)
+
+第 12 个 agent (FDE 视角 API 重复) 是与 16 号 server-routes 同源的另一面 — 站在 **客户端 + 端点形状** 视角. 这里补 7 项与 API 层相关的具体新发现, **前 P0/P1/P2 列表已涵盖** (如 P0-2 P0-6 等), 这里**补充技术细节**.
+
+### 19.1 P0 真坏 (3 项, 与 §1-§18 大方向一致, 给出端点级证据)
+
+#### P0-API-1: `listAttachments` 客户端 fallback 永远 404
+
+- 第一次打: `GET /api/issues/:issueId/attachments`
+- fallback: `GET /api/companies/:companyId/issues/:issueId/attachments`
+- **Server 实际只有前者** (`server/src/routes/issues.ts:18583`), 后者 404
+- `clients/api-client/src/client.ts:902-922` 内 try-catch fallback 永远失败
+- 修法: 删 fallback 分支
+
+#### P0-API-2: `wave237` 留的 1:N 真复制粘贴 (`artifacts/code` 双路由)
+
+- `GET /api/companies/:companyId/work-products/artifacts/code` (`work-products.ts:195`)
+- `GET /api/companies/:companyId/artifacts/code` (`work-products.ts:252`)
+- 两段 router handler **复制粘贴**同一份查询, 同一 `listQuerySchema`, 同一 `serializeWorkProduct`
+- 注释自承 (`work-products.ts:243-251`): "the actual data query is identical to ... above, so both paths return the same shape"
+- 等于承认 1:N 是为了凑 17 端点 smoke 通过数
+- 修法: 删 alias 留 1 个
+
+#### P0-API-3: Plugin worker 路径 vs Control-plane 路径 (1:N, 无 deprecation)
+
+| 老 path (plugin worker) | 新 path (control-plane, wave239) |
+|---|---|
+| `/api/plugins/paperclipai.plugin-ontology/api/domains?companyId=` | `/api/companies/:companyId/ontology/instances?entityType=` |
+| `/api/plugins/paperclipai.plugin-ontology/api/domains/:id/snapshot` | `/api/companies/:companyId/ontology/graph?root_type=` |
+| `/api/plugins/paperclipai.plugin-ontology/api/graph` | 同上 (client `getOntologySnapshot` 用这个当 fallback, `client.ts:991-1002`) |
+| `/api/plugins/paperclipai.plugin-ontology/api/domains/:id/lifecycle` | (control-plane 缺迁移路径) |
+| `/api/plugins/paperclipai.plugin-ontology/api/domains/:id/transition` | (同上) |
+
+- Client `getOntologySnapshot` (`client.ts:969-1003`) 自己写 try/catch fallback
+- Plugin path **仍然存活**, 没 deprecation header / sunset 日志
+- wave239 新加的 `ontology_properties` 表是 control-plane 镜像, plugin 的 `ontology_node_types.properties` 是另一份真相, **双写一致性未知**
+
+### 19.2 P1 重复 (4 项)
+
+#### P1-API-1: Inbox 端点 1:N (服务端并存, 客户端只用 inbox)
+
+- `GET /inbox?companyId=&limit=` (老, `server/src/routes/inbox.ts:36`, 3 段聚合)
+- `GET /companies/:companyId/attention?cursor=&sort=&...` (新, wave152, `server/src/routes/attention.ts:18`, 完整 cursor)
+- 客户端 `getInbox` 走老, attention endpoint 是孤儿
+
+#### P1-API-2: 仪表盘 / 指标端点 4 套 (客户端只用 1 个)
+
+| 端点 | Service | Client |
+|---|---|---|
+| `GET /companies/:companyId/dashboard` | `dashboardService.summary` | OK |
+| `GET /companies/:companyId/metrics/cockpit` | `dashboardService.summary().metrics` | OK |
+| `GET /companies/:companyId/metrics` (wave215-b) | `metricsService.efficiency` | **孤儿** |
+| `GET /companies/:companyId/metrics/overview` | `metricsService.overview` | **孤儿** |
+
+3 套 metrics path + 1 套 dashboard path, 数据重叠 (`failure_rate / delivery_cycle_days_avg / throughput_per_day` 字段同构).
+
+#### P1-API-3: Approvals 路径切分不一致
+
+- 列表: `GET /companies/:companyId/approvals` (有 companyId path) — OK
+- 单详情: `GET /approvals/:id` (无 companyId) — actor context
+- 4 个 approval 子端点 (`/issues` `/comments` `/resubmit` 等) 也无 companyId — 客户端 0 调用
+- 应统一到 `POST /approvals/:id/actions { action: 'approve'|'reject'|'resubmit' }` 单端点
+
+#### P1-API-4: Spec 端点 4 个孤儿
+
+- `GET /issues/:id/spec` (`issue-specs.ts:69`) — `getIssueSpec()` OK
+- `POST /issues/:id/spec` (`issue-specs.ts:88`) — `saveIssueSpec()` OK
+- `GET /companies/:companyId/specs/tree` (`issue-specs.ts:142`) — **孤儿**
+- `POST /companies/:companyId/specs/from-template` (`issue-specs.ts:180`) — **孤儿**
+- `GET /companies/:companyId/issue-specs` (`issue-specs.ts:238`) — **孤儿**
+
+多/单数两套, 复数 3 个孤儿.
+
+### 19.3 P1 端点孤儿 (wave215 17 端点)
+
+`docs-coolie/evidence/wave219/PRE-DEPLOY-STATE.md` 列的 17 端点, 客户端用了 3 个 (`work-products/:id/versions` 等), **其余 14 个 zero client 调用**:
+
+| 端点 | 备注 |
+|---|---|
+| `POST /companies/:companyId/dispatch` | wave237 加 |
+| `GET /companies/:companyId/dispatch` | wave237 加 |
+| `GET /companies/:companyId/quotas` | |
+| `POST /companies/:companyId/quotas/refresh` | |
+| `GET /companies/:companyId/usage` | |
+| `GET /companies/:companyId/sandboxes` (+ `:id`) | |
+| `GET /companies/:companyId/cycle-time` | |
+| `GET /companies/:companyId/milestones` (+ `:id`) | |
+| `GET /companies/:companyId/defect-kb` | |
+| `GET /companies/:companyId/audit-log` | |
+| `GET /companies/:companyId/specs/tree` | |
+| `GET /companies/:companyId/issue-specs` | |
+| `GET /companies/:companyId/metrics` (wave215-b) | |
+| `GET /companies/:companyId/metrics/overview` | |
+| `GET /companies/:companyId/workspace-overview` | |
+
+UI 端 (web) 也许在用, 但 App (`clients/expo`) 不用. UI 改动冻结 → **等同孤儿**.
+
+### 19.4 P2 命名/风格 (6 项)
+
+#### P2-API-1: `.get` vs `.list` 不一致
+
+- `getInbox` 返三段聚合 → 应 `listInbox` (`client.ts:509`)
+- `getBoardChatHistory` 返多 message → 应 `listBoardChatHistory` (`client.ts:1507`)
+
+#### P2-API-2: Query 入参 snake vs camel
+
+- `ontology-graph`: `root_type` / `root_id` (snake_case, server `ontology-graph.ts:38`)
+- `ontology-extras`: `entityType` / `ownerId` (camelCase, server `ontology-extras.ts:35`)
+- 同一子树内不统一, 应统一到 camelCase (仓库主流)
+
+#### P2-API-3: Cursor / 分页命名 4 种
+
+- `cursor` (主流, `/artifacts` `/chat-channels` `/tool-gateway`)
+- `before` ISO date (`/board/chat/conversations?before=`)
+- `afterSeq` (`/agents/...`)
+- **无 cursor** (`/execution-workspaces`, `/companies/:id/dashboard`)
+
+#### P2-API-4: Routes 绕过 service 直接 `await db.` (17 个文件)
+
+```
+server/src/routes/{access,agents,ai-connections,announcements,auth,cases,company-skills,
+decisions,environments,health,instance-settings,issue-tree-control,issues,pipelines,
+projects,tool-access,tool-gateway}.ts
+```
+
+**17/101 个 routes 文件 (17%) 直查 db**, 跳过 service 层 — 任何 service cache / hook / audit 都失效. 老 route 没改, 新 route (ontology-extras / ontology-graph / work-products) 都通过 service.
+
+#### P2-API-5: `server/src/routes/index.ts` 死 barrel
+
+`server/src/app.ts:69` 直接 import `ontologyGraphRoutes` 等, **不通过 index barrel**. 本次 wave239 commit 只追加了一行 `export { ontologyExtrasRoutes }`, 但**没人** import 这个 barrel. 历史产物, 应删.
+
+#### P2-API-6: `OntologyPropertyEntry` 三套定义 (与 P2-10 一致)
+
+`db/src/schema/ontology_properties.ts:43` (interface) + `shared/types/entity-relation.ts:189` (interface) + `shared/validators/entity-relation.ts:24` (zod schema) — db 端 inline, 注释说从 `@paperclipai/shared` import, **grep 找不到 import**, 一旦 shared 加字段 db 不会同步.
+
+### 19.5 §19 总结 (1 项新 P2 增量)
+
+**新增 P2 (1 项, 紧接 §16 的 P2-20)**:
+- **P2-21**: `OntologyPropertyEntry` 在 db schema / shared types / shared validators 三套定义, 应**统一收口到 shared** + db 端 import (注释自承但未落实).
+
+---
+
+## 20. 最终统计 (合并 §10-§19)
+
+| 等级 | §1-§3 | §10 | §13 | §16 | §19 | 总计 |
+|---|---|---|---|---|---|---|
+| **P0** | 7 | 3 | 1 | 0 | 0 (已在 §1-§10 列) | **11** |
+| **P1** | 14 | 3 | 1 | 0 | 0 (已在 §1-§10 列) | **18** |
+| **P2** | 13 | 4 | 1 | 2 | 1 | **21** |
+| **总计** | **34** | **10** | **3** | **2** | **1** | **50** |
+
+注: §19 的 FDE API 发现已在 §1-§4 大方向覆盖 (P0 真坏 / P1 重复 / P2 命名), 给出端点级证据但不增量 P 级. 仅 P2-21 是新 (db/types/validators 三套定义重复).
+
+---
+
+## 21. QA 报告完整度 (最终最终最终)
+
+- 撞机完: 12 个并行 agent (老板视角 / Palantir 架构 / 共享层命名 × 2 / 跨功能入口 / bottom tabs / 键盘+刷新+Toast / Modal-Sheet / App.tsx 拓扑 / 审批+任务+插件 / 右上菜单+badge+长按 / Tab+SegmentedControl / 颜色硬编码 / server routes 深度 / **FDE API 深度**) + 主线程自查
+- 报告完整: **P0 × 11 + P1 × 18 + P2 × 21 = 50 项**, 跨 5 视角 + 共享层 + 服务端 + 视觉交互层 + 颜色 token 层 + API 端点层
+- 主线程实测 (9 处事实核验):
+  1. `App.tsx:1390` NewTaskPage + `App.tsx:1414` CreateTaskModal 同栈并列 ✓
+  2. `App.tsx:1286` 4 个 tab key 共用 OrgAssetsScreen ✓
+  3. `setSettingsOpen(true)` 全仓 0 调用 ✓
+  4. `InboxScreen.tsx` 未被 import ✓
+  5. `TasksScreen.tsx` 静态 import 但 JSX 0 渲染 ✓
+  6. `OrgAssetsScreen` 4 个 MoreSheet 项 `enabled: Boolean(...)` 全部 false ✓
+  7. `BuildModeModal` 0 import ✓
+  8. `PluginOrgSwitcher` 是多公司切换不是插件管理 ✓
+  9. `composer/ModeSwitch.tsx` 已不存在, 残留 `doubao/ModeSwitch.tsx` 独占 ✓
+
+---
+
+## 22. 一句话定位 (给老板决策用)
+
+> **Wave239 在已经有 1:N 的 ontology 路径上又叠了 3 个 control-plane 端点, 没 deprecate plugin 路径; 同时 14 个 wave215 server endpoint 在 client 0 调用; 4 类同语义多套 path (metrics/dashboard, inbox/attention, work-products 6 套, artifacts/code 复制粘贴); 客户端有一个永远 fallback 404 的死代码 (attachments); type/validator/db 三层之间 OntologyPropertyEntry 定义三套。**
+
+老板口吻建议拍板项 (cross-wave 待修):
+1. **删 `/api/companies/:id/issues/:id/attachments`** (P0-API-1 死代码, client fallback 永远不会 work)
+2. **合并 `artifacts/code` 1:N** (P0-API-2 真复制粘贴, 注释自承)
+3. **plugin ontology 路径写 deprecation header, 至少定 sunset** (P0-API-3, 否则 1:N 永不清)
+4. **inbox → attention / metrics → dashboard 收敛** (P1-API-1/2, 客户端只用一个就够)
+5. **wave215 14 孤儿 endpoint 拍板: 删 / 留 / 迁 web** (P1-API-3 + §19.3)
+6. **统一 query snake/camel (ontology-graph 用 snake, ontology-extras 用 camel) + 游标命名** (P2-API-2/3)
+7. **删 `server/src/routes/index.ts` 死 barrel** (P2-API-5)
