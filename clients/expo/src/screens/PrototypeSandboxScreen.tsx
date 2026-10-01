@@ -761,11 +761,17 @@ export function PrototypeSandboxScreen({
 
       {view === "list" ? (
         <>
-          {/* 类型筛选 (网页 / 图片 / 视频 / 文档) */}
+          {/* 类型筛选 (网页 / 图片 / 视频 / 文档)
+              wave242 — 老板截图 chip 文字被列表卡片覆盖真修:
+                · 5 chip 平铺占 1/3 屏宽, 装回 height 32 + borderRadius 16 让 chip 更轻.
+                · filterRow 加 backgroundColor: C.bg + zIndex: 1 + elevation: 2,
+                  chip 行背景不再透明, 列表卡片滚到 chip 行下方时被 chip 行覆盖而不是反过来.
+                · chip 文字 lineHeight 与 paddingV 精确对齐, 不再被 Android 默认字体内边距挤掉. */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.filterRow}
+            style={styles.filterRowWrap}
           >
             {(
               [
@@ -1109,29 +1115,35 @@ const styles = StyleSheet.create({
     marginHorizontal: 16,
     marginTop: 10,
   },
+  filterRowWrap: {
+    // wave242 — chip 行作为独立绘制层, backgroundColor 显式铺底 (ScrollView 自身不
+    // 透), zIndex/elevation 把这一行顶到列表卡片之上, 老板截图 chip 文字被卡片覆盖
+    // (绘制顺序错) 即从此修. 不用 stickyHeaderIndices (那需要把 chip 塞进同一个垂直
+    // ScrollView, 与列表 ScrollView 双 scroll 嵌套会打架).
+    backgroundColor: C.bg,
+    zIndex: 1,
+    elevation: 2,
+  },
   filterRow: {
     flexDirection: "row",
     gap: 8,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   filterChip: {
     paddingHorizontal: 12,
-    // wave230 — 老板截图 chip 文字仍被上下各裁 1px. wave214 算 8+18+8=34 < height 36,
-    // 上半下半各被切 1px. 现改 10+22+10=42=height, 行高从 18 抬到 22 (fontSize 12 的
-    // 1.83 倍, 给 emoji 字形/字肩留垂直呼吸), includeFontPadding false 让行盒精确等
-    // 于 lineHeight, 文字不再被 Android 默认字体内边距挤扁.
-    paddingVertical: 10,
-    borderRadius: 999,
+    // wave242 — chip 平铺设计: height 32 (wave230 的 42 太大, 5 个挤屏), borderRadius
+    // 16 (不再用 999 圆药丸, 配合紧凑高度视觉更现代). paddingV 6 + lineHeight 18 + 边 1*2
+    // = 6+18+6+2 = 32 = height ✓. 行高 18 = fontSize 12 的 1.5 倍, 给 Android 字形完整
+    // 字身空间, 不依赖字体默认 line-height 估算.
+    paddingVertical: 6,
+    borderRadius: 16,
     backgroundColor: "rgba(255,255,255,0.04)",
     borderWidth: 1,
     borderColor: C.lineSubtle,
     alignItems: "center",
     justifyContent: "center",
-    // wave214 — Pressable 在 RN 上会无视 paddingVertical 给一个「最小高度」, 显式
-    // height 锁死 (borderWidth 1*2 + paddingV 10*2 + lineHeight 22 = 42), wave230
-    // 把 gap 修到正好一致.
-    height: 42,
+    height: 32,
   },
   filterChipActive: {
     backgroundColor: "rgba(94,106,210,0.15)",
@@ -1141,9 +1153,9 @@ const styles = StyleSheet.create({
     color: C.ink3,
     fontSize: 12,
     fontWeight: "500",
-    // wave230 — lineHeight 22 给文字完整字身空间; textAlignVertical + Android
-    // includeFontPadding:false 让 chip 行盒精确等于 lineHeight, 不再被截.
-    lineHeight: 22,
+    // wave242 — lineHeight 18 与 paddingV 6 配对 (6 + 18 + 6 = 30, 加上 border 1*2 = 32 = height),
+    // textAlignVertical + Android includeFontPadding:false 让行盒精确等于 lineHeight.
+    lineHeight: 18,
     textAlignVertical: "center",
     ...Platform.select({ android: { includeFontPadding: false } }),
   },
