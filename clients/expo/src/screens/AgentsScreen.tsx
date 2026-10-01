@@ -22,6 +22,7 @@ import {
   type AgentConfiguration,
 } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
+import { AssetsAgentCard } from "../components/AssetsAgentCard";
 import { AppCard } from "../ui/AppCard";
 import { EmptyState } from "../ui/EmptyState";
 import { ErrorRetry } from "../ui/ErrorRetry";
@@ -163,13 +164,14 @@ function AgentDetailSheet({
             <Text style={styles.avatarText}>{agent.name.slice(0, 1).toUpperCase()}</Text>
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.name}>{agent.name}</Text>
+            <Text style={styles.name} numberOfLines={2}>{agent.name}</Text>
             {/* wave65 — boss 25:00 '工坊 5 角色员工 描述都去掉'.
-                不再渲染 agent.title 长描述; 只显示状态 + 适配器 + 短角色标签. */}
+                不再渲染 agent.title 长描述; 只显示状态 + 适配器 + 短角色标签.
+                wave256 — 头部加 roleLabel(中文角色徽章文本), 详情卡更直观. */}
             <Text style={styles.meta}>
+              {agent.roleLabel ? `${agent.roleLabel} · ` : ""}
               {STATUS_LABEL[agent.status] ?? agent.status}
               {agent.adapterType ? ` · ${agent.adapterType}` : ""}
-              {agent.role ? ` · ${agent.role}` : ""}
             </Text>
           </View>
           <StatusDot
@@ -201,6 +203,23 @@ function AgentDetailSheet({
             <Text style={styles.sectionLabelNoMargin}>配置与技能</Text>
             {infoLoading && <ActivityIndicator size="small" color={C.accent} />}
           </View>
+
+          {/* wave256 — 完整职责列表 (卡片只展示 1 行, 详情展示全部).
+              与下方「技能清单」分开渲染, 因为这两类信息维度不同:
+                  职责 = 「他能干什么活」(人工理解层)
+                  技能 = 「他会用什么工具」(技术能力层) */}
+          {(agent.responsibilities?.length ?? 0) > 0 ? (
+            <View style={styles.infoPropRow}>
+              <Text style={[styles.infoPropLabel, { marginTop: 4 }]}>职责</Text>
+              <View style={styles.skillsChipsWrap}>
+                {agent.responsibilities!.map((r, idx) => (
+                  <View key={idx} style={styles.skillChip}>
+                    <Text style={styles.skillChipText}>{r}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
 
           {infoError ? (
             <ErrorRetry
@@ -242,6 +261,20 @@ function AgentDetailSheet({
               </View>
             </View>
           )}
+
+          {/* wave258 — 工具 (英文 cli 名, 跟中文 2 字 skill 拆开) */}
+          {(agent.tools?.length ?? 0) > 0 ? (
+            <View style={styles.infoPropRow}>
+              <Text style={[styles.infoPropLabel, { marginTop: 4 }]}>工具</Text>
+              <View style={styles.skillsChipsWrap}>
+                {agent.tools!.map((t, idx) => (
+                  <View key={idx} style={[styles.skillChip, styles.toolChip]}>
+                    <Text style={[styles.skillChipText, styles.toolChipText]}>{t}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ) : null}
         </View>
 
         {/* 最近分配任务 (最多5条，点击跳任务tab) */}
@@ -328,6 +361,8 @@ export function AgentsScreen({
 }) {
   const [agents, setAgents] = useState<AgentRow[]>([]);
   const [costs, setCosts] = useState<Record<string, AgentCostRow>>({});
+  // wave256 — 每个 agent 已完成的任务数 (status=done), 卡片底部状态行显示.
+  const [taskCounts, setTaskCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -339,14 +374,30 @@ export function AgentsScreen({
       if (!silent) setLoading(true);
       setError(null);
       try {
-        const [rows, costRows] = await Promise.all([
+        const [rows, costRows, allIssues] = await Promise.all([
           coolie.listAgents(company.id),
           coolie.costsByAgent(company.id).catch(() => [] as AgentCostRow[]),
+          // wave256 — listIssues 一并拉, 然后按 assigneeAgentId 聚合.
+          // 用 limit=200 是 wave65 dashboard 的口径 (超过 200 不显示「全部任务数」),
+          // 卡片底部用 done 数做软指标, 不要求严格准确.
+          coolie.listIssues(company.id, { limit: 200 }).catch(() => [] as Issue[]),
         ]);
         setAgents(rows);
-        const map: Record<string, AgentCostRow> = {};
-        for (const cr of costRows) map[cr.agentId] = cr;
-        setCosts(map);
+        const costMap: Record<string, AgentCostRow> = {};
+        for (const cr of costRows) costMap[cr.agentId] = cr;
+        setCosts(costMap);
+
+        // 聚合每个 agent 已完成的任务数 (assigneeAgentId === agent.id && status === done).
+        const counts: Record<string, number> = {};
+        for (const issue of allIssues) {
+          if (issue.status !== "done") continue;
+          const assignee =
+            (issue as unknown as { assigneeAgentId?: string | null }).assigneeAgentId ??
+            (issue as unknown as { assignee?: { id?: string } }).assignee?.id;
+          if (!assignee) continue;
+          counts[assignee] = (counts[assignee] ?? 0) + 1;
+        }
+        setTaskCounts(counts);
       } catch (e) {
         setError(String((e as Error)?.message ?? e));
       } finally {
@@ -439,46 +490,13 @@ export function AgentsScreen({
             />
           ) : (
             filteredAgents.map((item) => (
-              <AppCard
+              <AssetsAgentCard
                 key={item.id}
-                variant="surface"
-                row
-                style={{ gap: 12 }}
+                agent={item}
+                cost={costs[item.id]}
+                taskCount={taskCounts[item.id] ?? 0}
                 onPress={() => setSelected(item)}
-              >
-                <View style={styles.avatar}>
-                  <Text style={styles.avatarText}>{item.name.slice(0, 1).toUpperCase()}</Text>
-                </View>
-                <View style={{ flex: 1 }}>
-                  <View style={styles.nameRow}>
-                    <StatusDot
-                      status={STATUS_DOT[item.status] ?? "idle"}
-                      size={7}
-                      pulse={item.status === "active"}
-                    />
-                    <Text style={styles.name} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    {/* wave65 — boss 25:00 '工坊 5 角色员工 描述都去掉'.
-                        不再渲染 item.title 长描述; 只显示名字 + 状态 + 适配器. */}
-                  </View>
-                  <Text style={styles.meta} numberOfLines={1}>
-                    {STATUS_LABEL[item.status] ?? item.status}
-                    {item.adapterType ? ` · ${item.adapterType}` : ""}
-                  </Text>
-                  {costs[item.id] ? (
-                    <Text style={styles.tokenMeta} numberOfLines={1}>
-                      Tokens 入 {formatTokens(costs[item.id].inputTokens)} · 缓存{" "}
-                      {formatTokens(costs[item.id].cachedInputTokens)} · 出{" "}
-                      {formatTokens(costs[item.id].outputTokens)}
-                      {costs[item.id].costCents > 0
-                        ? ` · ${formatMoney(costs[item.id].costCents, "$")}`
-                        : ""}
-                    </Text>
-                  ) : null}
-                </View>
-                <Text style={styles.chevron}>›</Text>
-              </AppCard>
+              />
             ))
           )}
         </ScrollView>
@@ -517,6 +535,7 @@ const styles = StyleSheet.create({
   },
   capsuleText: { color: C.ink2, fontSize: 12 },
   capsuleSub: { color: C.ink3, fontSize: 12 },
+  headRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 14 },
   avatar: {
     width: 38,
     height: 38,
@@ -526,28 +545,11 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   avatarText: { color: C.accent, fontSize: 16, fontWeight: "600" },
-  nameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   name: { color: C.ink, fontSize: 15, fontWeight: "600" },
-  titleTag: { color: C.ink3, fontSize: 12, flexShrink: 1 },
   meta: { color: C.ink3, fontSize: 12, marginTop: 3 },
-  tokenMeta: { color: C.ink4, fontSize: 11, marginTop: 2 },
-  chevron: { color: C.ink4, fontSize: 22 },
-  headRow: { flexDirection: "row", alignItems: "center", gap: 12, marginBottom: 14 },
   costTitle: { color: C.ink2, fontSize: 12, marginBottom: 10 },
   costRow: { flexDirection: "row", gap: 8 },
   sectionLabel: { color: C.ink3, fontSize: 12, marginTop: 12, marginBottom: 6 },
-  inputRow: { flexDirection: "row", gap: 8, alignItems: "center" },
-  input: {
-    flex: 1,
-    backgroundColor: C.surface,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    color: C.ink,
-    fontSize: 14,
-  },
-  saveBtn: { backgroundColor: C.brand, borderRadius: 10, paddingVertical: 10, paddingHorizontal: 16 },
-  saveBtnText: { color: C.ink, fontSize: 13, fontWeight: "600" },
   statusRow: { flexDirection: "row", gap: 10 },
   statusBtn: {
     flex: 1,
@@ -563,7 +565,6 @@ const styles = StyleSheet.create({
   statusPause: { borderWidth: 1, borderColor: C.warn },
   statusBtnText: { fontSize: 14, fontWeight: "600" },
   hint: { color: C.ink4, fontSize: 11, marginTop: 8 },
-  btnDisabled: { opacity: 0.5 },
   infoCard: {
     backgroundColor: C.surface,
     borderRadius: 12,
@@ -619,6 +620,15 @@ const styles = StyleSheet.create({
   skillChipText: {
     color: C.ink2,
     fontSize: 11,
+  },
+  // wave258 — 工具 chip 样式 (英文 cli, 等宽字体 + 浅边框)
+  toolChip: {
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderColor: C.line,
+  },
+  toolChipText: {
+    color: C.ink3,
+    fontFamily: "monospace",
   },
   infoEmptyText: {
     fontSize: 12,

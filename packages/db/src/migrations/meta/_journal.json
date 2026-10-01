@@ -2122,6 +2122,27 @@
       "when": 1790778000000,
       "tag": "9020_add_ontology_branches",
       "breakpoints": true
+    },
+    {
+      "idx": 9021,
+      "version": "7",
+      "when": 1790781600000,
+      "tag": "9021_add_agent_role_responsibilities_skills",
+      "breakpoints": true
+    },
+    {
+      "idx": 9022,
+      "version": "7",
+      "when": 1790785200000,
+      "tag": "9022_add_agent_tools",
+      "breakpoints": true
+    },
+    {
+      "idx": 9023,
+      "version": "7",
+      "when": 1790788800000,
+      "tag": "9023_delete_13_digital_employees",
+      "breakpoints": true
     }
   ]
 }

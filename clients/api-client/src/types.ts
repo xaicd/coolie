@@ -235,6 +235,32 @@ export interface Agent {
   icon?: string | null;
   /** Org-chain health, used by `isAgentTaskTarget` to hide broken agents. */
   orgChainHealth?: { status?: string } | null;
+  /**
+   * Coolie fork — wave256: human-friendly role label ("FDA", "Core SWE",
+   * "PRE-SRE", "FDSE", "DS"). Surfaced as a 5-color chip on the App asset
+   * tab so the boss can tell agents apart at a glance. Server populates
+   * from `scripts/seed-agent-roles.ts`; clients should treat as display only.
+   */
+  roleLabel?: string | null;
+  /**
+   * Coolie fork — wave256: short responsibility phrases ("画原型/选型研判",
+   * "代码开发主力", ...). Card shows the first line; full list available in
+   * the detail sheet. Server populates from the seed script.
+   */
+  responsibilities?: string[] | null;
+  /**
+   * Coolie fork — wave258: 中文 2 字 skill chip list ("调研", "画图", "选型",
+   * "编码", "重构", "测试", "修复", "部署", ...). wave256 原本是英文 cli 名,
+   * boss 原话 "技能不是 cli 工具, 是 skills, 得区分了" 后升级为中文 2 字.
+   * Card shows up to 8 chips; detail sheet shows the full list.
+   */
+  skills?: string[] | null;
+  /**
+   * Coolie fork — wave258: 英文 CLI / tool 列表 ("cmd", "agy", "claude-glm",
+   * "claude-mm", "copilot", ...). 跟 `skills` 拆开 — 老板原话 "技能不是 cli 工具,
+   * 是 skills, 得区分了". Card shows 1-3 chips; detail sheet shows the full list.
+   */
+  tools?: string[] | null;
 }
 
 /**
