@@ -221,6 +221,34 @@ A change is done when all are true:
 4. Docs updated when behavior or commands change
 5. PR description follows the [PR template](.github/PULL_REQUEST_TEMPLATE.md) with all sections filled in (including Model Used)
 
+## 12. PM commit + 发版 tag 规范 (wave265)
+
+老板原话: 「代码要完成任务就提交, 每次发版版本号同时推一个 git tag」「版本号码要一致」.
+
+1. **每次发版必打 tag** — `bash scripts/release-app.sh <version> "<notes>"`
+   自 `[12/12]` 起自动 `git tag -a v<version> -m "v<version> release"
+   <release-commit>` + `git push origin v<version>`. 失败仅警告不阻断
+   (APK / OTA 已发, 回滚代价 >> 补打 tag). 补打方式:
+   `git tag -a v<version> -m "..." <release-commit> && git push origin v<version>`.
+
+2. **tag 指向「发版完成」的 commit** — 即 `release: v<version> — ...`
+   这一笔 (含 version.json bump + CHANGELOG + 其它发版产物), 不是后续
+   docs commit. 例: v0.6.19 → `37e6b3d77` (wave258 feat), 不是 `92796a123`
+   (docs(wave262)).
+
+3. **不发版不 bump 版本号** — 例: wave152 / wave245 / wave261 中只有 wave261
+   顺手 bump 了 0.6.14 → 0.6.19 (老板没发现). 重构 PR 不动 `app.json.version`.
+
+4. **7 处版本号源必须一致** — 见 `docs-coolie/VERSION-CONSISTENCY.md`:
+   - `clients/expo/app.json` (expo.version + expo.android.versionCode)
+   - `clients/expo/package.json` (version)
+   - `clients/expo/android/app/build.gradle` (versionName + versionCode)
+   - `clients/expo/CHANGELOG.md` (顶部 `## v...`)
+   - 远端 `https://xrobinai.cn/version.json` (version + versionCode)
+   - 远端 `https://xrobinai.cn/ota/manifest` (runtimeVersion)
+   - git tag (v<version>)
+   `bash scripts/VERSION-CONSISTENCY-CHECK.sh` 一键校验, 退出码 0 = 通过.
+
 ## This fork's own conventions
 
 This repository is a fork of Paperclip. The rules above are upstream's; these are ours.

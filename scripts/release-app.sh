@@ -23,6 +23,7 @@
 #   9. 发布 OTA 增量更新
 #  10. (默认) 联动 server deploy (scripts/deploy-tc-coolie-claw.sh --skip-build)
 #  11. (默认 + --with-4-guard) 跑 4 护栏 (version.json / ota/manifest / APK / /api/health)
+#  12. (wave265) 打 git tag v$VERSION 并推 origin (失败仅警告不阻断, 补打方式: git push origin v$VERSION)
 #
 # 配置 (环境变量):
 #   COS_BUCKET           COS 目标前缀   (默认: cos://gzbucket/coolie/app)
@@ -412,6 +413,30 @@ else
   echo "   ⏭ 跳过 4 护栏 (--with-4-guard 启用)"
 fi
 
+# ── wave265 联动: 每次发版成功后打 git tag + 推 origin (老板原话: 「代码要完成
+#    任务就提交, 每次发版版本号同时推一个 git tag」). tag 指向本次发版 commit
+#    (即 [4/9] release: v$VERSION — ... 这一笔), 与 docs-coolie/RELEASE-HISTORY.md
+#    「tag 指向该版本「发版完成」的提交」约定一致. 失败只警告不阻断 — tag 没推成功
+#    不该让已经发出的 APK / OTA 回滚 (回滚代价远大于补打 tag). 补打方式: 手跑
+#    `git tag -a v$VERSION -m ... <release-commit> && git push origin v$VERSION`.
+step "[12/12] 打 git tag 并推 origin (v$VERSION)"
+if dry; then
+  echo "   [dry-run] git tag -a v$VERSION -m 'v$VERSION release' $RELEASE_COMMIT"
+  echo "   [dry-run] git push origin v$VERSION"
+else
+  if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+    echo "   · 本地 tag v$VERSION 已存在, 跳过 tag 创建 (只 push)"
+  else
+    git tag -a "v$VERSION" -m "v$VERSION release" "$RELEASE_COMMIT"
+    echo "   ✓ 已创建本地 tag v$VERSION → ${RELEASE_COMMIT:0:12}"
+  fi
+  if git push origin "v$VERSION" 2>&1 | sed 's/^/   /'; then
+    echo "   ✓ 已推送 tag v$VERSION 到 origin"
+  else
+    echo "   ⚠ tag push 失败 — 不阻断 (APK / OTA 已发, 补打: git push origin v$VERSION)" >&2
+  fi
+fi
+
 printf '\n========================================================\n'
 printf ' 发版完成:      v%s (versionCode %s)\n' "$VERSION" "$VERSION_CODE"
 printf ' APK 直链:      %s\n' "$APK_URL"
@@ -433,6 +458,17 @@ if [ "$WITH_4_GUARD" = "1" ]; then
   fi
 else
   printf ' 4 护栏:       跳过 (--skip-4-guard 默认)\n'
+fi
+if dry; then
+  printf ' git tag:      dry-run (v%s)\n' "$VERSION"
+elif git rev-parse "v$VERSION" >/dev/null 2>&1; then
+  if git ls-remote --tags origin "refs/tags/v$VERSION" 2>/dev/null | grep -q "refs/tags/v$VERSION"; then
+    printf ' git tag:      v%s 已推到 origin\n' "$VERSION"
+  else
+    printf ' git tag:      v%s 本地已建, origin 未推 (补打: git push origin v%s)\n' "$VERSION" "$VERSION"
+  fi
+else
+  printf ' git tag:      v%s 未打 (异常 — step [12/12] 跑过了没建出来?)\n' "$VERSION"
 fi
 printf '========================================================\n'
 
