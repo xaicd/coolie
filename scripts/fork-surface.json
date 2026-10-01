@@ -975,9 +975,9 @@
     },
     {
       "path": "server/src/services/ontology-graph.ts",
-      "maxNetLines": 80,
-      "maxTotalLines": 110,
-      "reason": "wave154/wave155/wave163: graph read service — buildView / findPaths / stats, with agent hydration and the entity_relations BFS/DFS core. wave163 tightens the placeholder label and attachment fallback so the board never renders a uuid slice. Cannot live elsewhere: it is the BFS/DFS core the routes call."
+      "maxNetLines": 200,
+      "maxTotalLines": 950,
+      "reason": "wave154/wave155/wave163/wave244/wave261: graph read service — buildView / findPaths / stats, with agent hydration and the entity_relations BFS/DFS core. wave163 tightens the placeholder label and attachment fallback so the board never renders a uuid slice. wave244 makes the placeholder fallback per-type (FALLBACK_LABEL) and adds one more UUID-shape pass before JSON serializes. wave261 adds summarizeLevels (L0/L1/L2/L3/L4 drilldown summary bucketed by domain + entityType) for the boss's 5-level ontology drilldown. Cannot live elsewhere: it is the BFS/DFS core the routes call."
     },
     {
       "path": "ui/src/components/OntologyGraphView.tsx",
