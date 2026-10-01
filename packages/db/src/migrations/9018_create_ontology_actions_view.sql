@@ -11,7 +11,9 @@
 --
 --   * `issues` (action_type = 'issue') — the act of authoring/raising an
 --     issue. `actor_id` is the authoring agent or user; `subject_id` is the
---     issue itself; `props` carries `{ title, projectId, kind }`.
+--     issue itself; `props` carries `{ title, projectId, kind }` where
+--     `kind` mirrors `issues.spec_kind` (nullable; 'requirement' | 'bugfix'
+--     | 'design' | 'task' or null when the issue carries no spec).
 --
 --   * `issue_recovery_actions` (action_type = 'recovery') — an autonomous
 --     repair the agent issued on a failing issue. `actor_id` is the owner
@@ -40,7 +42,7 @@ SELECT
   jsonb_build_object(
     'title', i."title",
     'projectId', i."project_id",
-    'kind', i."kind"
+    'kind', i."spec_kind"
   ) AS "props",
   i."company_id" AS "company_id",
   i."created_at" AS "created_at"

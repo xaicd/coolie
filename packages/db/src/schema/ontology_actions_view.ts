@@ -13,6 +13,7 @@ import { pgView, text, uuid, jsonb, timestamp } from "drizzle-orm/pg-core";
  *
  * Sources:
  * - `issues` (action_type = 'issue'): the act of authoring/raising an issue.
+ *   `props.kind` mirrors `issues.spec_kind` (nullable).
  * - `issue_recovery_actions` (action_type = 'recovery'): an autonomous repair
  *   the agent issued on a failing issue.
  * - `tool_action_deliveries` (action_type = 'tool_action'): a tool call that
