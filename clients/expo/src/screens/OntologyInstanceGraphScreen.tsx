@@ -1,7 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
+  Animated,
+  PanResponder,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -173,8 +175,57 @@ export function OntologyInstanceGraphScreen({
   }, [selectedId, graph]);
 
   const positions = useMemo(() => {
-    return computeRingPositions(instances, 320, 320);
+    return computeClusteredPositions(instances, 420, 420);
   }, [instances]);
+
+  // wave244: pan + zoom, 与屏 1 工作台同套 PanResponder 实现. 状态进 ref
+  // 是为了 gesture handler 在 render 之间复用同一份 closure.
+  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const scale = useRef(new Animated.Value(1)).current;
+  const lastPan = useRef({ x: 0, y: 0 });
+  const lastScale = useRef(1);
+  const initialDistance = useRef<number | null>(null);
+  const viewportResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+          initialDistance.current = null;
+        },
+        onPanResponderMove: (evt, gestureState) => {
+          const touches = evt.nativeEvent.touches;
+          if (touches.length >= 2) {
+            const t0 = touches[0];
+            const t1 = touches[1];
+            const dx = t0.pageX - t1.pageX;
+            const dy = t0.pageY - t1.pageY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (initialDistance.current === null) {
+              initialDistance.current = distance;
+            } else {
+              const ratio = distance / initialDistance.current;
+              const clamped = Math.max(0.5, Math.min(2.2, lastScale.current * ratio));
+              scale.setValue(clamped);
+            }
+          } else {
+            pan.setValue({
+              x: lastPan.current.x + gestureState.dx,
+              y: lastPan.current.y + gestureState.dy,
+            });
+          }
+        },
+        onPanResponderRelease: () => {
+          const t = (pan.x as unknown as { _value: number })._value;
+          const u = (pan.y as unknown as { _value: number })._value;
+          lastPan.current = { x: t ?? 0, y: u ?? 0 };
+          const s = (scale as unknown as { _value: number })._value;
+          lastScale.current = s ?? 1;
+          initialDistance.current = null;
+        },
+      }),
+    [pan, scale],
+  );
 
   const headerSubtitle = `${instances.length} 个实例 · 类型 ${entityType}`;
 
@@ -262,64 +313,92 @@ export function OntologyInstanceGraphScreen({
             <View style={styles.canvasHeader}>
               <Text style={styles.canvasTitle}>实例拓扑</Text>
               <Text style={styles.canvasSub}>
-                {instances.length} 个节点 · 选中节点高亮 1 跳邻居
+                {instances.length} 个节点 · 选中节点高亮 1 跳邻居 · 双指缩放 / 单指拖动
               </Text>
             </View>
-            <View style={[styles.canvas, { width: 320, height: 320 }]}>
-              {/* 连线 (1 跳邻居) */}
-              {selectedId
-                ? instances
-                    .filter((row) => linkedNodes.has(row.id))
-                    .map((row) => {
-                      const a = positions.get(selectedId);
-                      const b = positions.get(row.id);
-                      if (!a || !b) return null;
-                      return (
-                        <Edge
-                          key={`e-${selectedId}-${row.id}`}
-                          ax={a.x}
-                          ay={a.y}
-                          bx={b.x}
-                          by={b.y}
-                        />
-                      );
-                    })
-                : null}
-              {/* 节点气泡 */}
-              {instances.map((row) => {
-                const pos = positions.get(row.id);
-                if (!pos) return null;
-                const isSelected = row.id === selectedId;
-                const isLinked = linkedNodes.has(row.id);
-                return (
-                  <Pressable
-                    key={`n-${row.id}`}
-                    onPress={() => setSelectedId((prev) => (prev === row.id ? null : row.id))}
-                    onLongPress={() => onDelete(row)}
-                    hitSlop={4}
-                    style={[
-                      styles.node,
-                      {
-                        left: pos.x - 24,
-                        top: pos.y - 24,
-                        borderColor: isSelected ? C.accent : isLinked ? C.accent : C.line,
-                        backgroundColor: isSelected
-                          ? "rgba(94, 106, 210, 0.25)"
-                          : isLinked
-                          ? "rgba(94, 106, 210, 0.12)"
-                          : C.panel,
-                      },
-                    ]}
-                  >
-                    <Text style={styles.nodeLabel} numberOfLines={1}>
-                      {truncate(row.label, 8)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-              {selectedId ? null : (
-                <Text style={styles.canvasHint}>点击节点查看 1 跳邻居 · 长按节点查看详情</Text>
-              )}
+            <View style={styles.canvasViewport} {...viewportResponder.panHandlers}>
+              <Animated.View
+                style={{
+                  width: 420,
+                  height: 420,
+                  transform: [
+                    { translateX: pan.x },
+                    { translateY: pan.y },
+                    { scale },
+                  ],
+                }}
+              >
+                {/* 连线 (1 跳邻居) */}
+                {selectedId
+                  ? instances
+                      .filter((row) => linkedNodes.has(row.id))
+                      .map((row) => {
+                        const a = positions.get(selectedId);
+                        const b = positions.get(row.id);
+                        if (!a || !b) return null;
+                        return (
+                          <Edge
+                            key={`e-${selectedId}-${row.id}`}
+                            ax={a.x}
+                            ay={a.y}
+                            bx={b.x}
+                            by={b.y}
+                          />
+                        );
+                      })
+                  : null}
+                {/* 节点气泡: 内圈显示 1..N 序号, label 移出到节点下方独立 Text. */}
+                {instances.map((row, idx) => {
+                  const pos = positions.get(row.id);
+                  if (!pos) return null;
+                  const isSelected = row.id === selectedId;
+                  const isLinked = linkedNodes.has(row.id);
+                  return (
+                    <Pressable
+                      key={`n-${row.id}`}
+                      onPress={() => setSelectedId((prev) => (prev === row.id ? null : row.id))}
+                      onLongPress={() => onDelete(row)}
+                      hitSlop={6}
+                      style={[
+                        styles.nodeWrap,
+                        {
+                          left: pos.x - pos.r - 18,
+                          top: pos.y - pos.r,
+                          width: pos.r * 2 + 36,
+                        },
+                      ]}
+                    >
+                      <View
+                        style={[
+                          styles.node,
+                          {
+                            width: pos.r * 2,
+                            height: pos.r * 2,
+                            borderRadius: pos.r,
+                            borderColor: isSelected ? C.accent : isLinked ? C.accent : C.line,
+                            backgroundColor: isSelected
+                              ? "rgba(94, 106, 210, 0.25)"
+                              : isLinked
+                              ? "rgba(94, 106, 210, 0.12)"
+                              : C.panel,
+                          },
+                        ]}
+                      >
+                        <Text style={styles.nodeIndex}>{idx + 1}</Text>
+                      </View>
+                      <Text
+                        style={styles.nodeLabel}
+                        numberOfLines={1}
+                      >
+                        {truncate(row.label, 12)}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+                {selectedId ? null : (
+                  <Text style={styles.canvasHint}>点击节点查看 1 跳邻居 · 长按节点查看详情</Text>
+                )}
+              </Animated.View>
             </View>
           </AppCard>
 
@@ -484,23 +563,69 @@ function Edge({
   );
 }
 
-function computeRingPositions(
+/**
+ * wave244 — 按 ownerId 分簇的实例布局. 一个 owner 一簇, 簇中心排在
+ * 外环上; 单实例时直接居中. 节点半径按该簇实例数缩放 (上限 24), 不再
+ * 用 wave239 的纯环布局 — 那是老板截图里 75 个实例全部挤在屏幕边角
+ * 的真因之一. 返回的 r 字段给 NodeBubble 画圆用.
+ */
+function computeClusteredPositions(
   rows: OntologyInstanceRow[],
   width: number,
   height: number,
-): Map<string, { x: number; y: number }> {
-  const out = new Map<string, { x: number; y: number }>();
+): Map<string, { x: number; y: number; r: number }> {
+  const out = new Map<string, { x: number; y: number; r: number }>();
   if (rows.length === 0) return out;
   const cx = width / 2;
   const cy = height / 2;
-  const r = Math.min(cx, cy) - 32;
-  rows.forEach((row, idx) => {
-    const angle = (idx / rows.length) * Math.PI * 2;
-    out.set(row.id, {
-      x: cx + r * Math.cos(angle),
-      y: cy + r * Math.sin(angle),
-    });
-  });
+
+  const PAD = 16;
+  const NODE_MAX_R = 24;
+  const NODE_MIN_R = 12;
+
+  // 按 ownerId 聚簇, 没 owner 的归入 "未指派".
+  const byOwner = new Map<string, OntologyInstanceRow[]>();
+  for (const row of rows) {
+    const key = row.ownerId ?? "__unassigned__";
+    const list = byOwner.get(key) ?? [];
+    list.push(row);
+    byOwner.set(key, list);
+  }
+  const clusters = Array.from(byOwner.entries()).sort((a, b) =>
+    a[0].localeCompare(b[0]),
+  );
+  const clusterCount = clusters.length;
+
+  // 簇中心环. 单簇时整个画布就是它; 多簇时按 clusterCount 在外环排.
+  const outerR = clusterCount === 1 ? 0 : Math.max(28, Math.min(cx, cy) - NODE_MAX_R - PAD);
+
+  for (let cIdx = 0; cIdx < clusterCount; cIdx += 1) {
+    const [, group] = clusters[cIdx];
+    const n = group.length;
+    const clusterAngle = clusterCount === 1
+      ? 0
+      : (cIdx / clusterCount) * Math.PI * 2 - Math.PI / 2;
+    const ccx = cx + outerR * Math.cos(clusterAngle);
+    const ccy = cy + outerR * Math.sin(clusterAngle);
+    const nodeR = Math.max(
+      NODE_MIN_R,
+      Math.min(NODE_MAX_R, 12 + Math.sqrt(n) * 3),
+    );
+    const innerR = n === 1 ? 0 : Math.max(nodeR + 6, nodeR + n * 2.4);
+    for (let i = 0; i < n; i += 1) {
+      const row = group[i];
+      if (n === 1) {
+        out.set(row.id, { x: ccx, y: ccy, r: nodeR });
+        continue;
+      }
+      const angle = (i / n) * Math.PI * 2;
+      out.set(row.id, {
+        x: ccx + innerR * Math.cos(angle),
+        y: ccy + innerR * Math.sin(angle),
+        r: nodeR,
+      });
+    }
+  }
   return out;
 }
 
@@ -560,6 +685,15 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     overflow: "hidden",
   },
+  canvasViewport: {
+    width: "100%",
+    height: 360,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   canvasHint: {
     position: "absolute",
     left: 16,
@@ -569,16 +703,28 @@ const styles = StyleSheet.create({
     fontSize: 10,
     textAlign: "center",
   },
-  node: {
+  nodeWrap: {
     position: "absolute",
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    alignItems: "center",
+  },
+  node: {
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
   },
-  nodeLabel: { color: C.ink, fontSize: 9, fontWeight: "500" },
+  nodeIndex: {
+    color: C.ink,
+    fontSize: 13,
+    fontWeight: "700",
+  },
+  nodeLabel: {
+    color: C.ink2,
+    fontSize: 10,
+    fontWeight: "500",
+    textAlign: "center",
+    marginTop: 4,
+    lineHeight: 12,
+  },
   edge: {
     position: "absolute",
     height: 1,

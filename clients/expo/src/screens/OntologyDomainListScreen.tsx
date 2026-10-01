@@ -1,10 +1,12 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Modal,
+  PanResponder,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -19,11 +21,13 @@ import * as DocumentPicker from "expo-document-picker";
 import type {
   Company,
   OntologyDomain,
+  OntologyGraphResponse,
   OntologyGraphSnapshot,
 } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
 import { EmergencyKillSwitch } from "../components/EmergencyKillSwitch";
+import { OntologyGraphCanvas } from "../components/OntologyGraphCanvas";
 import { AppCard } from "../ui/AppCard";
 import { RADIUS } from "../ui/tokens";
 import { EmptyState } from "../ui/EmptyState";
@@ -484,285 +488,12 @@ export function OntologyDomainListScreen({
 
   // 第三层: 关系图谱交互浏览 (Graph View)
   if (viewMode === "graph" && selectedDomain) {
-    const nodeTypesList = (() => {
-      const map = new Map<
-        string,
-        {
-          key: string;
-          label: string;
-          count: number;
-          sampleProperties: Record<string, unknown>;
-        }
-      >();
-      if (snapshot?.counts?.byNodeType) {
-        for (const [k, count] of Object.entries(snapshot.counts.byNodeType)) {
-          // wave216: byNodeType 的 key 来自 ontology_node_types.id (UUID);
-          // 用它当 typeKey 是 UUID, 渲染就一片 UUID 满天飞。改成中文占位。
-          if (k) {
-            const tk = isUuidLike(k) ? "(未归类对象)" : k;
-            if (!map.has(tk)) {
-              map.set(tk, {
-                key: tk,
-                label: isUuidLike(k) ? "(未归类对象)" : k,
-                count,
-                sampleProperties: {},
-              });
-            } else {
-              const item = map.get(tk)!;
-              item.count += count;
-            }
-          }
-        }
-      }
-      for (const n of snapshot?.nodes || []) {
-        // wave216: typeKey 优先取实例真名 (label), key 兜底但跳过 UUID 形式;
-        // nodeTypeId 是 UUID, 绝不再当 typeKey — 否则 typeKey 落成 UUID,
-        // 下面 fallback 出来的 label 也跟着是 UUID, 老板截图就一片 UUID。
-        const typeKey =
-          n.label ||
-          (isUuidLike(n.key) ? "(未命名实例)" : n.key) ||
-          "(未命名实例)";
-        if (!map.has(typeKey)) {
-          map.set(typeKey, {
-            key: typeKey,
-            label: safeDisplay(n.label, "(未命名实体)"),
-            count: 1,
-            sampleProperties: (n.properties as Record<string, unknown>) || {},
-          });
-        } else {
-          const item = map.get(typeKey)!;
-          if (n.properties && Object.keys(item.sampleProperties).length === 0) {
-            item.sampleProperties = n.properties as Record<string, unknown>;
-          }
-        }
-      }
-      if (map.size === 0) {
-        map.set(selectedDomain.slug, {
-          key: selectedDomain.slug,
-          label: selectedDomain.display_name || selectedDomain.displayName || selectedDomain.slug,
-          count: snapshot?.counts?.nodes ?? 0,
-          sampleProperties: {
-            domainId: selectedDomain.id,
-            slug: selectedDomain.slug,
-            category: selectedDomain.category || "业务本体",
-            version: selectedDomain.schema_version ?? 1,
-          },
-        });
-      }
-      return Array.from(map.values());
-    })();
-
-    const activeSelectedKey = selectedNodeTypeKey || nodeTypesList[0]?.key;
-    const selectedNt =
-      nodeTypesList.find((nt) => nt.key === activeSelectedKey) || nodeTypesList[0];
-
-    const N = nodeTypesList.length;
-    const canvasSize = 340;
-    const cx = canvasSize / 2;
-    const cy = canvasSize / 2;
-    const R = Math.min(100, 48 + N * 8);
-
-    // 节点半径随实例数缩放 (sqrt 抑制极端值), fontScale 下也留足内空间
-    const nodeRadiusOf = (count: number) =>
-      Math.round(Math.min(34, 20 + Math.sqrt(Math.max(count - 1, 0)) * 5));
-
-    const positions = nodeTypesList.map((nt, idx) => {
-      const angle = (2 * Math.PI * idx) / Math.max(N, 1) - Math.PI / 2;
-      const r = nodeRadiusOf(nt.count);
-      return {
-        key: nt.key,
-        r,
-        x: cx + R * Math.cos(angle),
-        y: cy + R * Math.sin(angle),
-      };
-    });
-    const posByKey = new Map(positions.map((p) => [p.key, p]));
-
-    // 真实关系连线: 快照采样节点 id -> 实体类型, 两端都能解析的边才画。
-    // 旧版画的是「环上相邻假连线」, 看着像关系链, 实际与业务关系无关。
-    // wave216: 跟上面 nodeTypesList 同源修复, 不再用 nodeTypeId (UUID)。
-    const nodeIdType = new Map<string, string>();
-    for (const n of snapshot?.nodes || []) {
-      nodeIdType.set(n.id, n.label || n.key || "(未命名实例)");
-    }
-    const typeEdges = (() => {
-      const seen = new Set<string>();
-      const out: Array<{ fromKey: string; toKey: string }> = [];
-      for (const e of snapshot?.edges || []) {
-        const a = nodeIdType.get(e.sourceNodeId);
-        const b = nodeIdType.get(e.targetNodeId);
-        if (!a || !b || a === b) continue;
-        const dedupe = [a, b].sort().join("→");
-        if (seen.has(dedupe)) continue;
-        seen.add(dedupe);
-        out.push({ fromKey: a, toKey: b });
-      }
-      return out;
-    })();
-
     return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar style="light" />
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* 顶部返回条 */}
-          <ScreenHeader
-            onBack={() => setViewMode("detail")}
-            backLabel="返回域详情"
-            style={styles.detailNav}
-            right={
-              <Text style={styles.graphNavTitle}>
-                {selectedDomain.display_name || selectedDomain.displayName || selectedDomain.slug} · 关系图谱
-              </Text>
-            }
-          />
-
-          {/* 拓扑画布容器 */}
-          <AppCard variant="surface" style={styles.graphCanvasCard}>
-            <View style={styles.graphCanvasHeader}>
-              <View>
-                <Text style={styles.graphCanvasTitle}>实体关系拓扑</Text>
-                <Text style={styles.graphCanvasSub}>
-                  {nodeTypesList.length} 个实体类型 · {snapshot?.counts?.edges ?? 0} 条关系 · 节点大小=实例数
-                </Text>
-              </View>
-              <View style={styles.graphLegend}>
-                <View style={[styles.graphLegendDot, { backgroundColor: C.accent }]} />
-                <Text style={styles.graphLegendText}>实体类型</Text>
-              </View>
-            </View>
-
-            <View style={[styles.graphCanvas, { width: canvasSize, height: canvasSize, alignSelf: "center" }]}>
-              {/* 真实关系连线 (类型级, 快照采样) */}
-              {typeEdges.map(({ fromKey, toKey }) => {
-                const posA = posByKey.get(fromKey);
-                const posB = posByKey.get(toKey);
-                if (!posA || !posB) return null;
-                const dx = posB.x - posA.x;
-                const dy = posB.y - posA.y;
-                const length = Math.sqrt(dx * dx + dy * dy);
-                if (length <= posA.r + posB.r) return null;
-                const angle = Math.atan2(dy, dx);
-                const midX = (posA.x + posB.x) / 2;
-                const midY = (posA.y + posB.y) / 2;
-                const isEdgeActive =
-                  fromKey === activeSelectedKey || toKey === activeSelectedKey;
-
-                return (
-                  <View
-                    key={`edge-${fromKey}-${toKey}`}
-                    style={[
-                      styles.graphEdgeLine,
-                      {
-                        left: midX - length / 2,
-                        top: midY,
-                        width: length,
-                        backgroundColor: isEdgeActive ? C.accent : C.line,
-                        opacity: isEdgeActive ? 0.85 : 0.45,
-                        transform: [{ rotate: `${angle}rad` }],
-                      },
-                    ]}
-                  />
-                );
-              })}
-              {typeEdges.length === 0 && snapshot?.counts?.edges ? (
-                <Text style={styles.graphEdgesHint}>
-                  关系连线需实体采样数据 (当前快照抽样不足, 显示 {snapshot.counts.edges} 条关系统计)
-                </Text>
-              ) : null}
-
-              {/* 节点气泡: 实例数在圆内, 名称标签在圆下方 */}
-              {positions.map((pos) => {
-                const nt = nodeTypesList.find((n) => n.key === pos.key)!;
-                const isSelected = nt.key === activeSelectedKey;
-
-                return (
-                  <React.Fragment key={`node-${pos.key}`}>
-                    <Pressable
-                      style={[
-                        styles.graphNodeCircle,
-                        {
-                          left: pos.x - pos.r,
-                          top: pos.y - pos.r,
-                          width: pos.r * 2,
-                          height: pos.r * 2,
-                          borderRadius: pos.r,
-                          borderColor: isSelected ? C.accent : C.line,
-                          backgroundColor: isSelected ? C.surfaceHover : C.panel,
-                        },
-                      ]}
-                      onPress={() => setSelectedNodeTypeKey(nt.key)}
-                    >
-                      <Text
-                        style={[
-                          styles.graphNodeCountText,
-                          isSelected && { color: C.ink, fontWeight: "600" },
-                        ]}
-                      >
-                        {nt.count}
-                      </Text>
-                    </Pressable>
-                    <Text
-                      style={[
-                        styles.graphNodeCaption,
-                        { left: pos.x - 46, top: pos.y + pos.r + 4 },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {nt.label}
-                    </Text>
-                  </React.Fragment>
-                );
-              })}
-            </View>
-          </AppCard>
-
-          {/* Properties Schema 属性检视卡片 */}
-          {Boolean(selectedNt) && (
-            <AppCard variant="surface" style={styles.schemaCard}>
-              <View style={styles.schemaCardHeader}>
-                <View style={styles.schemaTitleRow}>
-                  <Ionicons name="cube-outline" size={16} color={C.accent} style={{ marginRight: 6 }} />
-                  {/* wave216: 底部详情卡 — 不再显示 UUID, 改成真名 + 类型。
-                      之前 `({selectedNt.key})` 会把 typeKey (落到 UUID 时) 整段打印出来,
-                      老板截图就是这行。 */}
-                  <Text style={styles.schemaCardTitle}>
-                    {safeDisplay(selectedNt.label, "(未命名实体)")}
-                  </Text>
-                </View>
-                <Pill label={`${selectedNt.count} 实例`} tone="brand" size="sm" />
-              </View>
-
-              <Text style={styles.schemaSectionTitle}>属性定义 (Properties Schema)</Text>
-              {Object.keys(selectedNt.sampleProperties).length === 0 ? (
-                <Text style={styles.schemaEmptyText}>
-                  暂无自定义属性字段，该类型由系统缺省元数据驱动。
-                </Text>
-              ) : (
-                <View style={styles.schemaPropsList}>
-                  {Object.entries(selectedNt.sampleProperties).map(([propKey, propVal]) => (
-                    <View key={propKey} style={styles.schemaPropRow}>
-                      <Text style={styles.schemaPropKey}>{propKey}</Text>
-                      <Text style={styles.schemaPropType}>
-                        {typeof propVal === "object"
-                          ? "object"
-                          : typeof propVal === "number"
-                          ? "number"
-                          : typeof propVal === "boolean"
-                          ? "boolean"
-                          : "string"}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </AppCard>
-          )}
-        </ScrollView>
-      </SafeAreaView>
+      <OntologyDomainGraphView
+        domain={selectedDomain}
+        snapshot={snapshot}
+        onBack={() => setViewMode("detail")}
+      />
     );
   }
 
@@ -1484,6 +1215,297 @@ export function OntologyDomainListScreen({
   );
 }
 
+/**
+ * wave244 — 屏 1 内嵌图谱子组件.
+ * 抽出理由是把 panResponder/ref/useMemo 这些 hooks 集中到一个稳定子组件,
+ * 避免 OntologyDomainListScreen 在 `if (viewMode === "graph")` 条件块里调用 hooks
+ * — 那是 react-hooks/rules-of-hooks 直接 break.
+ */
+function OntologyDomainGraphView({
+  domain,
+  snapshot,
+  onBack,
+}: {
+  domain: OntologyDomain;
+  snapshot: OntologyGraphSnapshot | null;
+  onBack: () => void;
+}) {
+  const [selectedNodeTypeKey, setSelectedNodeTypeKey] = useState<string | null>(null);
+
+  // nodeTypesList: 把 snapshot.counts.byNodeType + snapshot.nodes 合并成类型级视图.
+  // wave216: byNodeType key 可能是 UUID, 这里用 isUuidLike 兜底; 同时把
+  // nodes 里的 instance 按 label/非-UUID key 归类到类型, 让 typeKey 一定不是 UUID.
+  const nodeTypesList = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        key: string;
+        label: string;
+        count: number;
+        sampleProperties: Record<string, unknown>;
+      }
+    >();
+    if (snapshot?.counts?.byNodeType) {
+      for (const [k, count] of Object.entries(snapshot.counts.byNodeType)) {
+        if (k) {
+          const tk = isUuidLike(k) ? "(未归类对象)" : k;
+          if (!map.has(tk)) {
+            map.set(tk, {
+              key: tk,
+              label: isUuidLike(k) ? "(未归类对象)" : k,
+              count,
+              sampleProperties: {},
+            });
+          } else {
+            const item = map.get(tk)!;
+            item.count += count;
+          }
+        }
+      }
+    }
+    for (const n of snapshot?.nodes || []) {
+      const typeKey =
+        n.label || (isUuidLike(n.key) ? "(未命名实例)" : n.key) || "(未命名实例)";
+      if (!map.has(typeKey)) {
+        map.set(typeKey, {
+          key: typeKey,
+          label: safeDisplay(n.label, "(未命名实体)"),
+          count: 1,
+          sampleProperties: (n.properties as Record<string, unknown>) || {},
+        });
+      } else {
+        const item = map.get(typeKey)!;
+        if (n.properties && Object.keys(item.sampleProperties).length === 0) {
+          item.sampleProperties = n.properties as Record<string, unknown>;
+        }
+      }
+    }
+    if (map.size === 0) {
+      map.set(domain.slug, {
+        key: domain.slug,
+        label: domain.display_name || domain.displayName || domain.slug,
+        count: snapshot?.counts?.nodes ?? 0,
+        sampleProperties: {
+          domainId: domain.id,
+          slug: domain.slug,
+          category: domain.category || "业务本体",
+          version: domain.schema_version ?? 1,
+        },
+      });
+    }
+    return Array.from(map.values());
+  }, [snapshot, domain]);
+
+  const selectedNt = useMemo(() => {
+    if (!selectedNodeTypeKey) return nodeTypesList[0];
+    return nodeTypesList.find((nt) => nt.key === selectedNodeTypeKey) ?? nodeTypesList[0];
+  }, [nodeTypesList, selectedNodeTypeKey]);
+
+  // 把类型级视图喂给统一的 OntologyGraphCanvas 组件. 节点是实体类型
+  // (key 形如 entity_type:<typeKey>); 边是把 snapshot.instance-level 边
+  // 映射到类型级 — 两端都能解析成 typeKey 才画.
+  const canvasSize = 420;
+  const graphResponse = useMemo<OntologyGraphResponse>(() => {
+    const nodeIdType = new Map<string, string>();
+    for (const n of snapshot?.nodes || []) {
+      nodeIdType.set(n.id, n.label || n.key || "(未命名实例)");
+    }
+    const graphNodes = nodeTypesList.map((nt) => ({
+      type: "entity_type",
+      id: nt.key,
+      key: `entity_type:${nt.key}`,
+      label: nt.label,
+      metadata: { count: nt.count },
+    }));
+    const seen = new Set<string>();
+    const graphEdges: OntologyGraphResponse["edges"] = [];
+    for (const e of snapshot?.edges || []) {
+      const a = nodeIdType.get(e.sourceNodeId);
+      const b = nodeIdType.get(e.targetNodeId);
+      if (!a || !b || a === b) continue;
+      const dedupe = [a, b].sort().join("→");
+      if (seen.has(dedupe)) continue;
+      seen.add(dedupe);
+      graphEdges.push({
+        key: `e-${a}-${b}`,
+        source: `entity_type:${a}`,
+        target: `entity_type:${b}`,
+        relation: e.relationKey ?? "无",
+        weight: e.weight ?? 1,
+      });
+    }
+    return {
+      root: null,
+      depth: 2,
+      view: "project_tree",
+      truncated: Boolean(
+        snapshot?.counts?.edges && snapshot.counts.edges > graphEdges.length,
+      ),
+      nodes: graphNodes,
+      edges: graphEdges,
+    };
+  }, [nodeTypesList, snapshot]);
+
+  // pan + zoom (PanResponder, 与 wave239 workbench 同一套实现 — 单手指
+  // 平移, 两指缩放). 状态放进 ref 是为了 gesture handler 在每次 render
+  // 之间复用同一份 closure.
+  const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
+  const scale = useRef(new Animated.Value(1)).current;
+  const lastPan = useRef({ x: 0, y: 0 });
+  const lastScale = useRef(1);
+  const initialDistance = useRef<number | null>(null);
+  const canvasPanResponder = useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        onPanResponderGrant: () => {
+          initialDistance.current = null;
+        },
+        onPanResponderMove: (evt, gestureState) => {
+          const touches = evt.nativeEvent.touches;
+          if (touches.length >= 2) {
+            const t0 = touches[0];
+            const t1 = touches[1];
+            const dx = t0.pageX - t1.pageX;
+            const dy = t0.pageY - t1.pageY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+            if (initialDistance.current === null) {
+              initialDistance.current = distance;
+            } else {
+              const ratio = distance / initialDistance.current;
+              const clamped = Math.max(0.5, Math.min(2.2, lastScale.current * ratio));
+              scale.setValue(clamped);
+            }
+          } else {
+            pan.setValue({
+              x: lastPan.current.x + gestureState.dx,
+              y: lastPan.current.y + gestureState.dy,
+            });
+          }
+        },
+        onPanResponderRelease: () => {
+          const t = (pan.x as unknown as { _value: number })._value;
+          const u = (pan.y as unknown as { _value: number })._value;
+          lastPan.current = { x: t ?? 0, y: u ?? 0 };
+          const s = (scale as unknown as { _value: number })._value;
+          lastScale.current = s ?? 1;
+          initialDistance.current = null;
+        },
+      }),
+    [pan, scale],
+  );
+
+  return (
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar style="light" />
+      <ScrollView
+        style={styles.container}
+        contentContainerStyle={styles.scrollContent}
+        keyboardShouldPersistTaps="handled"
+      >
+        <ScreenHeader
+          onBack={onBack}
+          backLabel="返回域详情"
+          style={styles.detailNav}
+          right={
+            <Text style={styles.graphNavTitle}>
+              {domain.display_name || domain.displayName || domain.slug} · 关系图谱
+            </Text>
+          }
+        />
+
+        <AppCard variant="surface" style={styles.graphCanvasCard}>
+          <View style={styles.graphCanvasHeader}>
+            <View>
+              <Text style={styles.graphCanvasTitle}>实体关系拓扑</Text>
+              <Text style={styles.graphCanvasSub}>
+                {nodeTypesList.length} 个实体类型 · {snapshot?.counts?.edges ?? 0} 条关系 · 双指缩放 / 单指拖动
+              </Text>
+            </View>
+            <View style={styles.graphLegend}>
+              <View style={[styles.graphLegendDot, { backgroundColor: C.accent }]} />
+              <Text style={styles.graphLegendText}>实体类型</Text>
+            </View>
+          </View>
+
+          <View style={styles.graphCanvasViewport} {...canvasPanResponder.panHandlers}>
+            <Animated.View
+              style={{
+                width: canvasSize,
+                height: canvasSize,
+                transform: [
+                  { translateX: pan.x },
+                  { translateY: pan.y },
+                  { scale },
+                ],
+              }}
+            >
+              <OntologyGraphCanvas
+                graph={graphResponse}
+                canvasSize={canvasSize}
+                selectedKey={
+                  selectedNodeTypeKey ? `entity_type:${selectedNodeTypeKey}` : null
+                }
+                onSelectNode={(key) => {
+                  const stripped = key.startsWith("entity_type:")
+                    ? key.slice("entity_type:".length)
+                    : key;
+                  setSelectedNodeTypeKey(stripped);
+                }}
+              />
+            </Animated.View>
+          </View>
+
+          {graphResponse.truncated ? (
+            <Text style={styles.graphEdgesHint}>
+              关系连线已去重, 显示 {graphResponse.edges.length} 条; 节点大小=该类型下的实例数
+            </Text>
+          ) : null}
+        </AppCard>
+
+        {Boolean(selectedNt) && (
+          <AppCard variant="surface" style={styles.schemaCard}>
+            <View style={styles.schemaCardHeader}>
+              <View style={styles.schemaTitleRow}>
+                <Ionicons name="cube-outline" size={16} color={C.accent} style={{ marginRight: 6 }} />
+                <Text style={styles.schemaCardTitle}>
+                  {safeDisplay(selectedNt.label, "(未命名实体)")}
+                </Text>
+              </View>
+              <Pill label={`${selectedNt.count} 实例`} tone="brand" size="sm" />
+            </View>
+
+            <Text style={styles.schemaSectionTitle}>属性定义 (Properties Schema)</Text>
+            {Object.keys(selectedNt.sampleProperties).length === 0 ? (
+              <Text style={styles.schemaEmptyText}>
+                暂无自定义属性字段，该类型由系统缺省元数据驱动。
+              </Text>
+            ) : (
+              <View style={styles.schemaPropsList}>
+                {Object.entries(selectedNt.sampleProperties).map(([propKey, propVal]) => (
+                  <View key={propKey} style={styles.schemaPropRow}>
+                    <Text style={styles.schemaPropKey}>{propKey}</Text>
+                    <Text style={styles.schemaPropType}>
+                      {typeof propVal === "object"
+                        ? "object"
+                        : typeof propVal === "number"
+                        ? "number"
+                        : typeof propVal === "boolean"
+                        ? "boolean"
+                        : "string"}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            )}
+          </AppCard>
+        )}
+      </ScrollView>
+    </SafeAreaView>
+  );
+}
+
 const styles = StyleSheet.create({
   safeArea: {
         flex: 1,
@@ -1866,35 +1888,25 @@ const styles = StyleSheet.create({
   graphLegend: { flexDirection: "row", alignItems: "center", gap: 4 },
   graphLegendDot: { width: 8, height: 8, borderRadius: 4 },
   graphLegendText: { color: C.ink3, fontSize: 11 },
-  graphCanvas: { position: "relative" },
+  // wave244: pan + zoom 视口. 实际画布 (420×420) 比 viewport 大, 因此
+  // 起始时即允许拖动 — viewport 切掉溢出部分, 但 panResponder 接到的
+  // 手势落在 viewport 上.
+  graphCanvasViewport: {
+    width: "100%",
+    height: 420,
+    overflow: "hidden",
+    backgroundColor: "rgba(255,255,255,0.02)",
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
   graphEdgesHint: {
-    position: "absolute",
-    left: 16,
-    right: 16,
-    bottom: 8,
+    marginTop: 8,
+    marginHorizontal: 8,
     color: C.ink4,
     fontSize: 10,
     textAlign: "center",
   },
-  graphNodeCaption: {
-    position: "absolute",
-    width: 92,
-    textAlign: "center",
-    color: C.ink2,
-    fontSize: 10,
-    lineHeight: 13,
-  },
-  graphEdgeLine: {
-    position: "absolute",
-    height: 1,
-  },
-  graphNodeCircle: {
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 1,
-  },
-  graphNodeCountText: { color: C.ink2, fontSize: 13, fontWeight: "600" },
   schemaCard: {
     marginTop: 12,
   },

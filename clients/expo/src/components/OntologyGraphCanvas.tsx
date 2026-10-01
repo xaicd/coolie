@@ -15,20 +15,31 @@ interface OntologyGraphCanvasProps {
 }
 
 /**
- * Wave239 — reusable graph canvas.
+ * Wave244 — reusable graph canvas.
  *
- * Layout strategy (agy 草图 §4 抛弃 force-graph 后的方案):
- *   1. Place the highest-degree node at the center.
- *   2. Bucket remaining nodes by entityType — each type gets a radial slot
- *      around the center.
- *   3. Within each bucket, lay out nodes on a deterministic grid so the
- *      picture is stable across renders (no jitter when re-rendering).
+ * Old (wave239) layout was a "layered shell" that scattered nodes by
+ * entityType around a center on radial shells of growing radius. With
+ * 75+ nodes and Chinese long names that fit on 14 chars per line, every
+ * shell bled into the next and the picture became a brick wall of
+ * overlapping circles — exactly what the boss screenshot showed.
  *
- * Edges use atan2 + a single rotated `View` line — same pattern as the
- * 屏 1 graph view. Long edges are clamped to canvasSize (no overflow).
+ * New layout:
+ *   1. Group nodes by entity type, drop the unused "center" anchor.
+ *   2. Each type gets a cluster center laid out on its own inscribed ring
+ *      so clusters never overlap (groups of >6 types share the inner
+ *      ring, fewer types each get a wider arc).
+ *   3. Within a cluster, nodes go on a deterministic ring around the
+ *      cluster center, one slot per node, radius bounded by `count`.
+ *   4. Node radius is `min(30, 14 + sqrt(count) * 3)` — capped so a 75-node
+ *      graph stays readable instead of growing into a donut.
+ *   5. The label is moved OUT of the node (inside the circle we now only
+ *      show an index "1..N" sized to the radius), and rendered as a
+ *      separate Text below the circle, truncated at 12 chars. This is the
+ *      key visual fix: the label never collides with the circle boundary.
  *
- * Selection state is owned by the parent (workbench keeps the "current
- * key" so re-renders don't drop focus). The canvas is otherwise pure.
+ * Edges still use atan2 + a single rotated `View` line. The workbench
+ * (屏 4) already does pan + zoom — this component stays pure so the
+ * caller (workbench / 屏 1 / 屏 2) can wrap it in any viewport.
  */
 export function OntologyGraphCanvas({
   graph,
@@ -37,7 +48,7 @@ export function OntologyGraphCanvas({
   onSelectNode,
 }: OntologyGraphCanvasProps) {
   const positions = useMemo(
-    () => computeDeterministicLayout(graph.nodes, canvasSize),
+    () => computeClusteredLayout(graph.nodes, canvasSize),
     [graph.nodes, canvasSize],
   );
 
@@ -46,6 +57,27 @@ export function OntologyGraphCanvas({
       return positions.has(e.source) && positions.has(e.target);
     });
   }, [graph.edges, positions]);
+
+  // Per-type index for the in-circle number. Stable order (alphabetical)
+  // so the picture doesn't reshuffle on every re-render.
+  const indexByKey = useMemo(() => {
+    const map = new Map<string, number>();
+    const sorted = [...graph.nodes].sort((a, b) =>
+      a.type === b.type ? a.key.localeCompare(b.key) : a.type.localeCompare(b.type),
+    );
+    let lastType = "__none__";
+    let i = 0;
+    for (const node of sorted) {
+      if (node.type !== lastType) {
+        i = 1;
+        lastType = node.type;
+      } else {
+        i += 1;
+      }
+      map.set(node.key, i);
+    }
+    return map;
+  }, [graph.nodes]);
 
   return (
     <View style={[styles.canvas, { width: canvasSize, height: canvasSize }]}>
@@ -80,6 +112,8 @@ export function OntologyGraphCanvas({
             node={node}
             x={pos.x}
             y={pos.y}
+            radius={pos.r}
+            index={indexByKey.get(node.key) ?? 0}
             selected={isSelected}
             onPress={() => onSelectNode(node.key)}
           />
@@ -101,33 +135,56 @@ function NodeBubble({
   node,
   x,
   y,
+  radius,
+  index,
   selected,
   onPress,
 }: {
   node: OntologyGraphResponseNode;
   x: number;
   y: number;
+  radius: number;
+  index: number;
   selected: boolean;
   onPress: () => void;
 }) {
   const fill = colorForType(node.type);
+  const innerFontSize = Math.max(11, Math.min(16, Math.round(radius * 0.7)));
+  // Label rendered separately under the circle so the label width is
+  // decoupled from the circle radius (was the wave239 visual bug).
+  const labelWidth = Math.max(72, radius * 2 + 36);
   return (
     <Pressable
       onPress={onPress}
       style={[
-        styles.node,
-        {
-          left: x - 26,
-          top: y - 26,
-          borderColor: selected ? C.accent : fill,
-          backgroundColor: selected ? `${fill}33` : `${fill}1f`,
-        },
+        styles.nodeWrap,
+        { left: x - labelWidth / 2, top: y - radius, width: labelWidth },
       ]}
     >
-      <Text style={styles.nodeLabel} numberOfLines={2}>
-        {truncate(node.label, 14)}
+      <View
+        style={[
+          styles.node,
+          {
+            width: radius * 2,
+            height: radius * 2,
+            borderRadius: radius,
+            borderColor: selected ? C.accent : fill,
+            backgroundColor: selected ? `${fill}33` : `${fill}1f`,
+          },
+        ]}
+      >
+        <Text
+          style={[styles.nodeIndex, { fontSize: innerFontSize, color: selected ? C.ink : fill }]}
+        >
+          {index}
+        </Text>
+      </View>
+      <Text
+        style={[styles.nodeLabel, { maxWidth: labelWidth }]}
+        numberOfLines={1}
+      >
+        {truncate(node.label, 12)}
       </Text>
-      <Text style={styles.nodeType}>{node.type}</Text>
     </Pressable>
   );
 }
@@ -168,52 +225,85 @@ function EdgeLine({
 }
 
 /**
- * Deterministic layered layout:
- *   1. Central anchor = highest-degree node (falls back to first node).
- *   2. Group remaining nodes by entityType.
- *   3. For each group, lay out nodes on a fixed-radius shell offset by
- *      `groupIdx`. Order within the group is by id (stable).
+ * Cluster-by-type layout (wave244). No global center anchor; each
+ * entity type owns one cluster. The cluster centers are placed on an
+ * outer ring so 4-6 types never overlap; the cluster inner ring
+ * distributes the type's nodes around its own center.
+ *
+ * Returns a `r` per node so the renderer can size the circle. The radius
+ * is bounded so a type with 75 nodes does not grow a circle big enough
+ * to swallow its neighbors.
  */
-function computeDeterministicLayout(
+function computeClusteredLayout(
   nodes: OntologyGraphResponseNode[],
   canvasSize: number,
-): Map<string, { x: number; y: number }> {
-  const out = new Map<string, { x: number; y: number }>();
+): Map<string, { x: number; y: number; r: number }> {
+  const out = new Map<string, { x: number; y: number; r: number }>();
   if (nodes.length === 0) return out;
   const cx = canvasSize / 2;
   const cy = canvasSize / 2;
 
-  // group by type
+  // Group nodes by type, count per type, sort types so the picture is
+  // stable across renders.
   const byType = new Map<string, OntologyGraphResponseNode[]>();
   for (const n of nodes) {
     const list = byType.get(n.type) ?? [];
     list.push(n);
     byType.set(n.type, list);
   }
-  const sortedTypes = Array.from(byType.keys()).sort();
+  const sortedTypes = Array.from(byType.entries()).sort((a, b) =>
+    a[0].localeCompare(b[0]),
+  );
+  const typeCount = sortedTypes.length;
+  if (typeCount === 0) return out;
 
-  // place center
-  const centerNode = nodes[0];
-  out.set(centerNode.key, { x: cx, y: cy });
+  // Cluster center ring radius. We want the largest inner cluster to
+  // (clusterRadius + innerMaxRadius) fit inside the canvas with a 12px
+  // margin. innerMaxRadius is bounded by NODE_MAX_RADIUS so we can
+  // pre-size the outer ring.
+  const NODE_MAX_RADIUS = 30;
+  const PAD = 12;
+  const clusterRingR = Math.max(
+    24,
+    Math.min(cx, cy) - NODE_MAX_RADIUS - PAD,
+  );
 
-  const shellCount = sortedTypes.length || 1;
-  const baseRadius = Math.min(cx, cy) * 0.55;
-  let globalIdx = 0;
-  for (let tIdx = 0; tIdx < sortedTypes.length; tIdx += 1) {
-    const type = sortedTypes[tIdx];
-    const group = byType.get(type) ?? [];
-    const shell = baseRadius * (0.4 + (tIdx / shellCount) * 0.6);
-    for (let i = 0; i < group.length; i += 1) {
+  // Place each type's cluster center on the outer ring.
+  for (let t = 0; t < sortedTypes.length; t += 1) {
+    const [type, group] = sortedTypes[t];
+    const clusterAngle = (t / Math.max(typeCount, 1)) * Math.PI * 2 - Math.PI / 2;
+    const ccx = cx + clusterRingR * Math.cos(clusterAngle);
+    const ccy = cy + clusterRingR * Math.sin(clusterAngle);
+
+    // Inner ring radius: enough room for the largest node circle.
+    // 1 node → ~16px radius; N nodes → distribute evenly on a ring
+    // around the cluster center. Ring radius scales with sqrt(N) to
+    // avoid sprawling the cluster across half the canvas.
+    const n = group.length;
+    const nodeR = Math.max(14, Math.min(NODE_MAX_RADIUS, 14 + Math.sqrt(n) * 4));
+    const innerRingR = n === 1 ? 0 : Math.max(nodeR + 6, nodeR + n * 3);
+
+    // Clamp inner ring so the cluster never leaves the canvas. If a
+    // cluster center sits on the outer ring AND the inner ring pushes
+    // outside the canvas, shrink the node radius to compensate.
+    const distFromCanvasCenter = Math.sqrt(ccx * ccx + ccy * ccy);
+    const innerMaxAllowed = Math.max(
+      nodeR,
+      Math.min(cx, cy) - PAD - distFromCanvasCenter + Math.min(cx, cy),
+    );
+    const effectiveInnerR = Math.min(innerRingR, Math.max(nodeR, innerMaxAllowed));
+
+    for (let i = 0; i < n; i += 1) {
       const node = group[i];
-      if (node.key === centerNode.key) continue;
-      // deterministic angle: split the shell evenly, offset by global index
-      // so neighbors of different shells do not perfectly overlap.
-      const angle =
-        (globalIdx / Math.max(group.length, 1)) * Math.PI * 2 + tIdx * 0.13;
-      globalIdx += 1;
+      if (n === 1) {
+        out.set(node.key, { x: ccx, y: ccy, r: nodeR });
+        continue;
+      }
+      const angle = (i / n) * Math.PI * 2;
       out.set(node.key, {
-        x: cx + shell * Math.cos(angle),
-        y: cy + shell * Math.sin(angle),
+        x: ccx + effectiveInnerR * Math.cos(angle),
+        y: ccy + effectiveInnerR * Math.sin(angle),
+        r: nodeR,
       });
     }
   }
@@ -245,27 +335,26 @@ const styles = StyleSheet.create({
     position: "relative",
     backgroundColor: "rgba(255,255,255,0.015)",
   },
-  node: {
+  nodeWrap: {
     position: "absolute",
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+    alignItems: "center",
+  },
+  node: {
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1.5,
   },
-  nodeLabel: {
-    color: C.ink,
-    fontSize: 9,
-    fontWeight: "600",
+  nodeIndex: {
+    fontWeight: "700",
     textAlign: "center",
-    lineHeight: 11,
   },
-  nodeType: {
-    color: C.ink4,
-    fontSize: 7,
-    fontFamily: "monospace",
-    marginTop: 1,
+  nodeLabel: {
+    color: C.ink2,
+    fontSize: 10,
+    fontWeight: "500",
+    textAlign: "center",
+    marginTop: 4,
+    lineHeight: 12,
   },
   edge: {
     position: "absolute",

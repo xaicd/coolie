@@ -120,6 +120,32 @@ const SPEC_KIND_LABEL: Record<string, string> = {
   task: "任务",
 };
 
+/**
+ * wave244: 节点 label 必须人类可读。raw UUID 漏出 = 老板截图前两波都栽过的
+ * 真因 (wave163 attachment/comment, wave216 instance 行, 5 类节点里
+ * project/issue/spec/agent/conversation/work_product/company 还没显式兜).
+ * 任何一段 label 落到 UUID-shaped (或空) 一律替换, 让 graph 的所有节点
+ * 都拿到一段中文/真名, 截图里再不会看见 UUID 满天飞.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function safeNodeLabel(value: string | null | undefined, fallback: string): string {
+  if (!value) return fallback;
+  if (UUID_RE.test(value)) return fallback;
+  return value;
+}
+
+/**
+ * 与 safeNodeLabel 区别: 允许字符串里嵌入 UUID 段 (例如 issue 的
+ * `PC-123 <uuid>`). 仅当整段就是 UUID-shape 才替换; 中间含 UUID 段
+ * 视为正常组合 label, 留原样.
+ */
+function safeTitle(value: string | null | undefined, fallback: string): string {
+  if (!value) return fallback;
+  if (UUID_RE.test(value)) return fallback;
+  return value;
+}
+
 /** Fire-and-forget link maintenance for the comment write path. */
 export async function recordCommentRelation(
   db: Db,
@@ -269,7 +295,7 @@ export function ontologyGraphService(db: Db) {
           type: "project",
           id: row.id,
           key: nodeKey("project", row.id),
-          label: row.name,
+          label: safeNodeLabel(row.name, "未命名项目"),
           href: `/projects/${row.id}`,
           metadata: { status: row.status },
         });
@@ -300,7 +326,9 @@ export function ontologyGraphService(db: Db) {
         type: "issue",
         id: row.id,
         key: nodeKey("issue", row.id),
-        label: row.identifier ? `${row.identifier} ${row.title}` : row.title,
+        label: row.identifier
+          ? `${row.identifier} ${safeTitle(row.title, "未命名任务")}`
+          : safeTitle(row.title, "未命名任务"),
         href: `/issues/${row.id}`,
         metadata: { status: row.status, projectId: row.projectId ?? null },
       });
@@ -312,7 +340,7 @@ export function ontologyGraphService(db: Db) {
         type: "spec",
         id: row.id,
         key: nodeKey("spec", row.id),
-        label: `${SPEC_KIND_LABEL[row.specKind] ?? row.specKind}: ${row.title}`,
+        label: `${SPEC_KIND_LABEL[row.specKind] ?? row.specKind}: ${safeTitle(row.title, "未命名规格")}`,
         href: `/issues/${row.id}/spec`,
         metadata: { specKind: row.specKind },
       });
@@ -336,7 +364,7 @@ export function ontologyGraphService(db: Db) {
           type: "conversation",
           id: row.id,
           key: nodeKey("conversation", row.id),
-          label: row.title,
+          label: safeNodeLabel(row.title, "未命名对话"),
           href: null,
           metadata: { issueId: row.issueId ?? null, projectId: row.projectId ?? null },
         });
@@ -362,7 +390,7 @@ export function ontologyGraphService(db: Db) {
           type: "work_product",
           id: row.id,
           key: nodeKey("work_product", row.id),
-          label: row.title,
+          label: safeNodeLabel(row.title, "未命名交付物"),
           href: `/issues/${row.issueId}`,
           metadata: { productType: row.type, status: row.status },
         });
@@ -459,6 +487,11 @@ export function ontologyGraphService(db: Db) {
     // board. wave216: this server-side fallback is also tightened — if the
     // resolver above somehow returned an id-shaped label (e.g. a future caller
     // forgot to populate `name`), we still won't ship a uuid to the UI.
+    // wave244: tightened one more notch — a non-deleted row that somehow
+    // resolves to a uuid-shaped label (e.g. an `agents.name` written by an
+    // upstream that left the column empty) is also caught here. The loop is
+    // the last line of defence before the JSON hits the wire, so a single
+    // pass over the assembled node list is enough.
     const PLACEHOLDER_LABEL: Record<EntityType, string> = {
       company: "已删除的公司",
       project: "已删除的项目",
@@ -470,18 +503,42 @@ export function ontologyGraphService(db: Db) {
       comment: "已删除的评论",
       agent: "已删除的智能体",
     };
+    const FALLBACK_LABEL: Record<EntityType, string> = {
+      company: "未命名公司",
+      project: "未命名项目",
+      issue: "未命名任务",
+      spec: "未命名规格",
+      conversation: "未命名对话",
+      work_product: "未命名交付物",
+      attachment: "未命名附件",
+      comment: "未命名评论",
+      agent: "未命名智能体",
+    };
     const result: OntologyGraphNode[] = [];
     for (const ref of refs) {
       const key = nodeKey(ref.type, ref.id);
-      result.push(
-        nodes.get(key) ?? {
+      const existing = nodes.get(key);
+      if (!existing) {
+        result.push({
           type: ref.type,
           id: ref.id,
           key,
           label: PLACEHOLDER_LABEL[ref.type] ?? `已删除的 ${ref.type}`,
           href: null,
-        },
-      );
+        });
+        continue;
+      }
+      // wave244: existing resolved row might still carry a UUID-shaped label
+      // (an upstream write left `name` empty and the column fell back to the
+      // row id). One last pass strips that — anything matching UUID_RE is
+      // rewritten to the type's "未命名 X" placeholder so the board never
+      // shows a bare uuid. The exact type-specific fallback beats the generic
+      // `已删除的 X` here because the row DOES exist; only the name is bad.
+      const fallback = FALLBACK_LABEL[ref.type] ?? `未命名 ${ref.type}`;
+      result.push({
+        ...existing,
+        label: UUID_RE.test(existing.label) ? fallback : existing.label,
+      });
     }
     return result;
   }
