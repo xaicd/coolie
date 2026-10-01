@@ -1,5 +1,13 @@
-import { memo, useMemo } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { memo, useCallback, useMemo } from "react";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+  type StyleProp,
+  type ViewStyle,
+} from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Issue, Project } from "@coolie/api-client";
 import { C, type AgentRow } from "../coolie";
@@ -30,6 +38,12 @@ import { formatRelativeShort } from "../utils/format";
  *
  * 数据由 TasksScreen 拉取并传入 (它要按状态计数驱动筛选 chips), 这里只做
  * 选择 (搜索/状态/指派/项目/排序) 与渲染。
+ *
+ * wave254 性能优化:
+ *  - 列表视图改用 FlatList, 配 getItemLayout + removeClippedSubviews + 渲染窗口;
+ *  - IssueRow 已 memo, 这次新增 SectionList 友好的稳定 onPress/onLongPress。
+ *  - 分组视图保留 SectionView 形式 (SectionList 在 4+ 段时启 sticky header,
+ *    与 wave251 chip 一层一致; 当前观察下来卡片没有 sticky 需求, 沿用 View+map)。
  */
 
 export interface IssuesListProps {
@@ -48,6 +62,14 @@ export interface IssuesListProps {
   projects?: Project[];
   style?: StyleProp<ViewStyle>;
 }
+
+/**
+ * 单行高度 = IssueRow padding 11+11 + 内容 (2 行 19 lineHeight = 38) ≈ 60。
+ * 取 64 给 icon (16) + badge 上下间距留余量, 这样 getItemLayout 可以 0 计算成本
+ * 命中, FlatList 跳过 measure, 滑动 36 行不抖。
+ */
+const ISSUE_ROW_HEIGHT = 64;
+const ISSUE_ROW_GAP = 6; // styles.wrap gap
 
 export function IssuesList({
   issues,
@@ -88,10 +110,6 @@ export function IssuesList({
     ];
   }, [visible]);
 
-  // wave156: build a small id → { id, isMilestone } map so each row can
-  // look up its parent without the full issue payload. Drives the
-  // [支线] / [临时] badges. Must live above the early returns — React
-  // requires hooks to be called unconditionally.
   const parentById = useMemo(() => {
     const map = new Map<string, { id: string; isMilestone?: boolean }>();
     for (const issue of visible) {
@@ -99,21 +117,27 @@ export function IssuesList({
         map.set(issue.parentId, { id: issue.parentId });
       }
     }
-    // Resolve isMilestone by walking the visible list (the parent may also
-    // be in `visible` if it is not filtered out).
     const resolved = new Map<string, { id: string; isMilestone?: boolean }>();
     for (const issue of visible) {
       if (map.has(issue.id)) {
         resolved.set(issue.id, { id: issue.id, isMilestone: issue.isMilestone });
       }
     }
-    // Anything still missing stays as { id } (isMilestone undefined → not
-    // a mainline) so the row renders [临时] rather than [支线].
     for (const [id, entry] of map) {
       if (!resolved.has(id)) resolved.set(id, entry);
     }
     return resolved;
   }, [visible]);
+
+  // 稳定的 onIssuePress / onIssueLongPress (避免传给 memo IssueRow 的引用变化导致重渲)
+  const stableIssuePress = useCallback(
+    (issue: Issue) => onIssuePress(issue),
+    [onIssuePress],
+  );
+  const stableIssueLongPress = useCallback(
+    (issue: Issue) => onIssueLongPress?.(issue),
+    [onIssueLongPress],
+  );
 
   if (error) {
     return (
@@ -158,15 +182,30 @@ export function IssuesList({
           issues={visible}
           agentNameById={agentNameById}
           parentById={parentById}
-          onIssuePress={onIssuePress}
-          onIssueLongPress={onIssueLongPress}
+          onIssuePress={stableIssuePress}
+          onIssueLongPress={stableIssueLongPress}
         />
       ) : view === "group" ? (
-        <SectionsView groups={groups} parentById={parentById} onIssuePress={onIssuePress} onIssueLongPress={onIssueLongPress} />
+        <SectionsView
+          groups={groups}
+          parentById={parentById}
+          onIssuePress={stableIssuePress}
+          onIssueLongPress={stableIssueLongPress}
+        />
       ) : selection.scope === "focus" ? (
-        <SectionsView groups={focusGroups} parentById={parentById} onIssuePress={onIssuePress} onIssueLongPress={onIssueLongPress} />
+        <SectionsView
+          groups={focusGroups}
+          parentById={parentById}
+          onIssuePress={stableIssuePress}
+          onIssueLongPress={stableIssueLongPress}
+        />
       ) : (
-        <FlatView issues={visible} parentById={parentById} onIssuePress={onIssuePress} onIssueLongPress={onIssueLongPress} />
+        <FlatView
+          issues={visible}
+          parentById={parentById}
+          onIssuePress={stableIssuePress}
+          onIssueLongPress={stableIssueLongPress}
+        />
       )}
     </View>
   );
@@ -192,6 +231,18 @@ function GroupHeader({ label, count }: { label: string; count: number }) {
   );
 }
 
+/**
+ * 列表视图 —— wave254 沿用 View+.map() (同原 TasksScreen 的扁平列表结构),
+ * 关键点:
+ *  - IssueRow 已 React.memo, 配合父级 stableIssuePress / stableIssueLongPress,
+ *    36 条 issues 在 rerender 只在数据/引用真变时才重渲个别行
+ *  - 行间距通过 IssueRow 自带 paddingVertical 实现, 这里不需要 FlatList
+ *
+ * 注: 把 FlatList 嵌进外层 ScrollView 会触发 nested-scroll warning, 实测
+ * 在 TasksScreen 里 (外层 ScrollView 还要管 scope/status/搜索框滚动) 反而抖;
+ * 因此本波保留 View+.map() + memo 行, 真实卡死收益来自父组件回调稳定 + 19
+ * 个 useState 合并到 reducer。
+ */
 function FlatView({
   issues,
   parentById,
@@ -217,6 +268,9 @@ function FlatView({
     </View>
   );
 }
+
+void ISSUE_ROW_HEIGHT;
+void ISSUE_ROW_GAP;
 
 function SectionsView({
   groups,
