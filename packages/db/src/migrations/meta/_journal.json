@@ -2073,6 +2073,55 @@
       "when": 1790752800000,
       "tag": "9013_add_ontology_properties",
       "breakpoints": true
+    },
+    {
+      "idx": 9014,
+      "version": "7",
+      "when": 1790756400000,
+      "tag": "9014_add_ontology_objects",
+      "breakpoints": true
+    },
+    {
+      "idx": 9015,
+      "version": "7",
+      "when": 1790760000000,
+      "tag": "9015_add_ontology_types",
+      "breakpoints": true
+    },
+    {
+      "idx": 9016,
+      "version": "7",
+      "when": 1790763600000,
+      "tag": "9016_extend_ontology_properties",
+      "breakpoints": true
+    },
+    {
+      "idx": 9017,
+      "version": "7",
+      "when": 1790767200000,
+      "tag": "9017_add_ontology_links",
+      "breakpoints": true
+    },
+    {
+      "idx": 9018,
+      "version": "7",
+      "when": 1790770800000,
+      "tag": "9018_create_ontology_actions_view",
+      "breakpoints": true
+    },
+    {
+      "idx": 9019,
+      "version": "7",
+      "when": 1790774400000,
+      "tag": "9019_add_ontology_functions",
+      "breakpoints": true
+    },
+    {
+      "idx": 9020,
+      "version": "7",
+      "when": 1790778000000,
+      "tag": "9020_add_ontology_branches",
+      "breakpoints": true
     }
   ]
 }

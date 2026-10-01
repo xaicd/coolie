@@ -1,0 +1,22 @@
+-- Coolie fork — wave250: Palantir Ontology primitive #3 — Property.
+--
+-- Property was first sketched in wave239 as `{ key, type, sample? }` inside
+-- the jsonb `properties` column of `ontology_properties`. The wave250 review
+-- (see `doc/SPEC.md` §本体层) found that alignment with Palantir's primitive
+-- requires three more per-entry fields:
+--
+--   * `typeRef` — when the property's value is a reference to another Type,
+--     this is the referenced type's `type_key`. Optional.
+--   * `sampleValue` — the editor's example value, JSON-typed rather than a
+--     stringified preview. Optional.
+--   * `required` — whether the property must be set on every object of this
+--     type. Defaults to false for back-compat.
+--
+-- The schema did not need new top-level columns: every one of these is a
+-- shape change on entries inside the existing jsonb array, and the column
+-- is forward-compatible (new fields are simply absent on old rows).
+--
+-- This migration records the alignment on disk so a `pg_dump` snapshot
+-- reflects the wave250 contract. The TypeScript-side change lives in
+-- `packages/db/src/schema/ontology_properties.ts` (OntologyPropertyEntry).
+-- No DDL is emitted here on purpose — the shape lives in jsonb.

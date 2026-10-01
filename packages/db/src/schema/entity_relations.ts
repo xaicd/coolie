@@ -19,6 +19,16 @@ import { companies } from "./companies.js";
  * Node identity is the PAIR `(type, id)`, never the id alone: a spec node reuses
  * its issue's id (a spec IS the issue's `spec_kind`/`spec` payload), so two
  * different nodes can share a uuid and are only distinguished by their type.
+ *
+ * ── DEPRECATED (wave250) ────────────────────────────────────────────────
+ * Palantir 7-primitive alignment renamed this to `ontology_links` (table
+ * `ontology_links`, schema `ontology_links.ts`). The new table references
+ * Object ids directly rather than `(type, id)` text pairs. This row remains
+ * read-only: writers must go to `ontology_links` and the graph API reads
+ * from both, with the new table winning. The migration in 9017 added
+ * `ontology_links`; the backfill of pre-wave250 edges lives in a follow-up
+ * migration once both Object sides exist.
+ * ─────────────────────────────────────────────────────────────────────────
  */
 export const entityRelations = pgTable(
   "entity_relations",

@@ -66,6 +66,12 @@ export {
 export { issueRelations } from "./issue_relations.js";
 export { entityRelations } from "./entity_relations.js";
 export { ontologyProperties } from "./ontology_properties.js";
+export { ontologyObjects } from "./ontology_objects.js";
+export { ontologyTypes } from "./ontology_types.js";
+export { ontologyLinks } from "./ontology_links.js";
+export { ontologyFunctions } from "./ontology_functions.js";
+export { ontologyBranches } from "./ontology_branches.js";
+export { ontologyActionsView } from "./ontology_actions_view.js";
 export { routines, routineRevisions, routineTriggers, routineWebhookTestReceipts, routineRuns } from "./routines.js";
 export { pipelines, pipelineStages, pipelineTransitions } from "./pipelines.js";
 export {

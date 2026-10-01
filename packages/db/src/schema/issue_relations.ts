@@ -3,6 +3,17 @@ import { agents } from "./agents.js";
 import { companies } from "./companies.js";
 import { issues } from "./issues.js";
 
+/**
+ * ── DEPRECATED (wave250) ────────────────────────────────────────────────
+ * Issue-to-issue edges (`blocks`) are now part of the general ontology Link
+ * layer (`ontology_links`, `ontology_links.ts`). The new row uses Object
+ * ids (`ontology_objects.id`) instead of issue ids directly, so a Link can
+ * connect any two types — not just two issues. This table stays read-only;
+ * the API layer reads from both and prefers the new one. The follow-up
+ * migration copies existing `(issue, blocks, issue)` triples onto the new
+ * schema.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
 export const issueRelations = pgTable(
   "issue_relations",
   {

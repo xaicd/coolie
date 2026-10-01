@@ -16,6 +16,18 @@ import type {
 import { companies } from "./companies.js";
 import { plugins } from "./plugins.js";
 
+/**
+ * ── DEPRECATED (wave250) ────────────────────────────────────────────────
+ * Palantir 7-primitive alignment generalised this row onto
+ * `ontology_objects` (table `ontology_objects`, schema
+ * `ontology_objects.ts`). The new table is keyed on
+ * `(company_id, type_id, external_id)` and stores the same payload in its
+ * `props` jsonb. This table stays read-only; writers must go through the
+ * ontology plugin's entity sync API which now writes to both this row and
+ * the new one. The follow-up migration copies existing rows onto the new
+ * table and freezes this one.
+ * ─────────────────────────────────────────────────────────────────────────
+ */
 export const externalObjects = pgTable(
   "external_objects",
   {
