@@ -310,3 +310,87 @@ cmd -p "<老板一句话需求>"
   + cmd 紧急兜底
 - §4.1 MCP 装载注释: claude-ds 仅 SRE 临时按量兜底 (不再是主线)
 - 算法层 `ROLE_MAPPING` 不动 — 5 员工层和算法层各自管各自的派活路由, 工具切换不影响算法层
+
+---
+
+## 9. Palantir 7 Primitives 维度 (wave245 新, 老板拍板)
+
+老板原话 (2026-10-01):
+> "分层是不是不太对, 本体的几大基础没体现" → "a 吧" = Palantir 7 primitives
+
+### 9.1 7 Primitives 完整分层
+
+之前 PM 提的 4 要素 (Object / Type / Property / Link) = Palantir 7 primitives 的前 4 项,
+**不是本体地基全貌**. 真正地基是 7 primitives:
+
+| # | Primitive | 真值 | Coolie 当前 | 主员工 | 备注 |
+|---|---|---|---|---|---|
+| 1 | **Object** | 实例 / 个体 | 80% (业务表行) | 铁匠 (`core-swe`) | 缺 global RID 物化视图 |
+| 2 | **Type** | 类 / 概念 | 60% (`ENTITY_TYPES` 硬编码) | 铁匠 (`core-swe`) | 缺动态可配置 Type |
+| 3 | **Property** | 字段 / 槽 | 70% (`ontology_properties` JSONB) | 铁匠 (`core-swe`) | 缺 Value Types 强校验 |
+| 4 | **Link** | 关系 / 边 | 85% (`entity_relations`) | 铁匠 (`core-swe`) | 缺 cardinality 基数校验 |
+| 5 | **Action** | 操作 / 突变 | 65% (REST Controller 散) | 铁匠 (`core-swe`) + 墨斗 (`fda`) | 缺 ActionRegistry 抽象 |
+| 6 | **Function** | 计算 / 派生 | 75% (MCP tools 5 个) | 百晓生 (`ds`) + 铁匠 (`core-swe`) | 缺本体图算子 SDK |
+| 7 | **Branch** | 分支 / 隔离 | ❌ **0% (大缺口)** | 铁匠 (`core-swe`) 主 + 百晓生 (`ds`) 验证 | **最大缺口** |
+
+### 9.2 主员工 × 7 Primitives 派活规则
+
+| Primitive | 主员工 | 副员工 | 派活规则 |
+|---|---|---|---|
+| **Object** | 铁匠 (`core-swe`) | 门神 (`fdse`) | wave250+ 实施 global RID 物化视图 |
+| **Type** | 铁匠 (`core-swe`) | - | ontology_types 配置表 + 动态扩展 (公司级) |
+| **Property** | 铁匠 (`core-swe`) | 百晓生 (`ds`) | ontology_properties 加 value_type 强约束 + JSON Schema 校验 |
+| **Link** | 铁匠 (`core-swe`) | - | entity_relations 加 cardinality 字段 + DB CHECK |
+| **Action** | 铁匠 (`core-swe`) | 墨斗 (`fda`) | **wave247** ActionRegistry: 抽 ontology_actions 表 + 5 个核心 controller 注册 |
+| **Function** | **百晓生 (`ds`)** | 铁匠 (`core-swe`) | **wave249** OntologyFunction SDK + MCP server 暴露, 百晓生跑图谱计算 |
+| **Branch** | 铁匠 (`core-swe`) | 百晓生 (`ds`) + 兑底渊 (`pre-sre`) | **wave246** Scenario (数据沙箱, P0) + **wave248** Proposal (Schema 分支, P1) |
+
+### 9.3 wave246+ 实施路线图 (老板拍板)
+
+```
+wave246 — OntologyScenario (P0, Branch 数据沙箱)
+  └─ 1 wave: ontology_scenarios + scenario_writes + X-Scenario-Id 路由 + 5 个 controller 跑通沙箱
+  └─ 主员工: 铁匠 (编码) + 门神 (测试) + 百晓生 (验证场景)
+
+wave247 — ActionRegistry (P1, Action 一等公民)
+  └─ 1 wave: ontology_actions 表 + 5 个核心 controller 注册 + Action audit log
+  └─ 主员工: 铁匠 + 墨斗 (流程梳理)
+
+wave248 — OntologyProposal (P1, Branch Schema 分支)
+  └─ 1 wave: ontology_proposals + schema_version + 合并审批 API
+  └─ 主员工: 铁匠 + 兑底渊 (审批流)
+
+wave249 — OntologyFunction (P2, Function SDK)
+  └─ 1 wave: ontology-functions.ts + 暴露成 MCP + 5 个 demo functions
+  └─ 主员工: 百晓生 + 铁匠 (MCP server)
+
+wave250 — Object GlobalRID (P3, Object 统一)
+  └─ 0.5 wave: 物化视图 + RID 索引 (可选, 等前 6 个 primitives 都位再做)
+  └─ 主员工: 铁匠
+```
+
+### 9.4 不动 / 反向约束
+
+- ❌ 不动 `entity_relations` schema (4 primitive Link 已稳)
+- ❌ 不动 `ENTITY_TYPES` union (2 primitive Type 已 90% 覆盖)
+- ❌ 不动 `ontology_properties` JSONB 结构 (3 primitive Property 已 70%)
+- ❌ 不动 `ENTITY_RELATION_KINDS` 8 项
+- ❌ 不动 MCP tools 5 个 (6 primitive Function 已 75%)
+- ❌ 不动 `ROLE_MAPPING` (算法层, 7 primitive 与派活无关)
+- ❌ 不动 wave234 / wave236 工具切换
+- ❌ 不动 wave244 图谱 UX (前置依赖, 不在 7 primitive 维度)
+- ❌ 不重写现有代码 (只在边上补新表/新服务)
+
+### 9.5 出处
+
+- agy 调研报告: [`docs-coolie/research/PALANTIR-ONTOLOGY-PRIMITIVES.md`](research/PALANTIR-ONTOLOGY-PRIMITIVES.md) (wave245 A)
+- 架构建议: [`docs-coolie/research/architecture-7-primitives.md`](research/architecture-7-primitives.md) (wave245 B)
+- QA 报告: [`docs-coolie/evidence/wave245/QA-REPORT.md`](evidence/wave245/QA-REPORT.md) (wave245)
+
+**本波 (wave245) 变更摘要**:
+- §9 整章新增 (7 Primitives 维度), 不改前面 §1-§8
+- 7 primitives × Coolie 现状评估表 (5 个 60-85% 完整, Branch 0%)
+- 主员工 × 7 primitives 派活表 (新增 4 个 wave 派活入口)
+- wave246+ 5 步路线图 (老板拍板)
+- 8 条不动反向约束 (保证 fork-surface gate 不增加)
+- 算法层 / 工具切换 / 图谱 UX 全部不动 — 本波只 ADDS 7 primitives 维度
