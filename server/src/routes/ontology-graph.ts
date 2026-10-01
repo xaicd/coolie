@@ -39,7 +39,14 @@ export function ontologyGraphRoutes(db: Db) {
     const companyId = req.params.companyId as string;
     assertCompanyAccess(req, companyId);
     const query = ontologyGraphQuerySchema.parse(req.query);
-    const root: EntityRef = { type: query.root_type as EntityType, id: query.root_id };
+    // wave237: root_type + root_id are both optional. When the smoke probe
+    // (or a UI "show me the company graph") calls without them, the service
+    // returns a flat company snapshot anchored at no root. An explicit pair
+    // preserves the original anchor-BFS behavior.
+    const root: EntityRef | null =
+      query.root_type && query.root_id
+        ? { type: query.root_type as EntityType, id: query.root_id }
+        : null;
     const relations = query.relations
       ? query.relations.split(",").map((entry) => entry.trim()).filter(Boolean)
       : undefined;

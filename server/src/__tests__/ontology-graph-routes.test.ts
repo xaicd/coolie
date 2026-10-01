@@ -228,6 +228,46 @@ describeEmbeddedPostgres("ontology graph routes (wave154)", () => {
     expect(badDepth.status).toBe(400);
   });
 
+  it("wave237: GET /ontology/graph without a root returns a flat company snapshot", async () => {
+    const companyId = await seedCompany("OntologyDefault");
+    const projectId = randomUUID();
+    await db.insert(projects).values({ id: projectId, companyId, name: "Snap" });
+    const issueId = randomUUID();
+    await db.insert(issues).values({
+      id: issueId,
+      companyId,
+      projectId,
+      title: "Snap issue",
+      status: "todo",
+      priority: "medium",
+    });
+    await link({
+      companyId,
+      srcType: "issue",
+      srcId: issueId,
+      relation: "belongs_to",
+      targetType: "project",
+      targetId: projectId,
+      weight: 1,
+    });
+
+    // No params at all — the 17-endpoint smoke probe lands here.
+    const flat = await request(app).get(`/api/companies/${companyId}/ontology/graph`);
+    expect(flat.status).toBe(200);
+    expect(flat.body.root).toBeNull();
+    expect(flat.body.edges.length).toBeGreaterThanOrEqual(1);
+    // Hydrated nodes for both endpoints must be present.
+    const nodeTypes = new Set((flat.body.nodes as Array<{ type: string }>).map((n) => n.type));
+    expect(nodeTypes.has("project")).toBe(true);
+    expect(nodeTypes.has("issue")).toBe(true);
+
+    // Providing only one of root_type/root_id is still a 400 (must travel together).
+    const halfRoot = await request(app).get(
+      `/api/companies/${companyId}/ontology/graph?root_type=project`,
+    );
+    expect(halfRoot.status).toBe(400);
+  });
+
   it("derives the implied links from existing rows and is idempotent (wave155)", async () => {
     const companyId = await seedCompany("Backfill");
     const projectId = randomUUID();

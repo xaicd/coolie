@@ -240,5 +240,62 @@ export function workProductsRoutes(db: Db) {
     });
   });
 
+  /**
+   * wave237: top-level `/artifacts/code` alias. The 17-endpoint smoke test
+   * (wave219 PRE-DEPLOY-STATE) calls this exact path; without it the smoke
+   * gets 404. The actual data query is identical to
+   * `/work-products/artifacts/code` above, so both paths return the same
+   * shape (`{ generatedAt, items }` of `type="code"` work-products).
+   *
+   *   GET /api/companies/:companyId/artifacts/code?limit=
+   */
+  router.get("/companies/:companyId/artifacts/code", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    assertCompanyAccess(req, companyId);
+
+    const parsed = listQuerySchema
+      .pick({ limit: true })
+      .safeParse(req.query);
+    if (!parsed.success) {
+      throw badRequest("Invalid artifacts query", parsed.error.issues);
+    }
+
+    const conditions = [
+      eq(issueWorkProducts.companyId, companyId),
+      eq(issueWorkProducts.type, "code"),
+    ];
+
+    const rows = await db
+      .select({
+        id: issueWorkProducts.id,
+        companyId: issueWorkProducts.companyId,
+        issueId: issueWorkProducts.issueId,
+        type: issueWorkProducts.type,
+        provider: issueWorkProducts.provider,
+        externalId: issueWorkProducts.externalId,
+        title: issueWorkProducts.title,
+        url: issueWorkProducts.url,
+        status: issueWorkProducts.status,
+        reviewState: issueWorkProducts.reviewState,
+        isPrimary: issueWorkProducts.isPrimary,
+        healthStatus: issueWorkProducts.healthStatus,
+        summary: issueWorkProducts.summary,
+        versionNumber: issueWorkProducts.versionNumber,
+        isLatest: issueWorkProducts.isLatest,
+        versionNote: issueWorkProducts.versionNote,
+        createdAt: issueWorkProducts.createdAt,
+        updatedAt: issueWorkProducts.updatedAt,
+      })
+      .from(issueWorkProducts)
+      .where(and(...conditions))
+      .orderBy(desc(issueWorkProducts.updatedAt))
+      .limit(parsed.data.limit ?? 50);
+
+    res.json({
+      generatedAt: new Date().toISOString(),
+      items: rows.map(serializeWorkProduct),
+    });
+  });
+
   return router;
 }

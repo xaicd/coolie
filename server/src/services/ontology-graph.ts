@@ -488,7 +488,7 @@ export function ontologyGraphService(db: Db) {
 
   async function buildView(input: {
     companyId: string;
-    root: EntityRef;
+    root: EntityRef | null;
     depth?: number;
     view?: OntologyGraphView;
     relations?: string[];
@@ -502,6 +502,20 @@ export function ontologyGraphService(db: Db) {
 
     const edgeRows = await loadEdges(input.companyId, relationFilter);
     const edges = edgeRows.map(toEdge);
+
+    // wave237: no root → return the company's flat snapshot (capped by MAX_NODES).
+    if (!input.root) {
+      const truncated = edges.length > MAX_NODES;
+      const cappedEdges = truncated ? edges.slice(0, MAX_NODES) : edges;
+      const nodeKeys = new Set<string>();
+      for (const edge of cappedEdges) {
+        nodeKeys.add(edge.source);
+        nodeKeys.add(edge.target);
+      }
+      const nodes = await hydrate(input.companyId, keysToRefs(Array.from(nodeKeys)));
+      return { root: null, depth, view, truncated, nodes, edges: cappedEdges };
+    }
+
     const rootKey = nodeKey(input.root.type, input.root.id);
     const { nodeKeys, edges: keptEdges, truncated } = bfs(edges, rootKey, depth);
     const nodes = await hydrate(input.companyId, keysToRefs(nodeKeys));
