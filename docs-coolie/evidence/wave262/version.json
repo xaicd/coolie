@@ -1,0 +1,12 @@
+{
+  "version": "0.6.19",
+  "versionCode": 619,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.19/coolie-release.apk",
+  "apkSha256": "a5d6bec8853c6f06b9eaddc3349a38000dd7d2ab697eb782f04e9234b68b5765",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "2e7d63c06857dfb115f318e36ece2945b0f4cd4259b13fea0a009a9cf6e6b4c0",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "wave258+wave261 — CMMI 30 skill 派活精准浮层 + 删 13 数字员工 + 业务本体 5 层真分层下钻 (L0 公司→L4 属性)",
+  "commitSha": "37e6b3d77ebdd519957e56de1cf0f88bb66cc4b0"
+}

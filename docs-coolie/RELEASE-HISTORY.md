@@ -9,10 +9,84 @@ Git 里程碑 tag 流水。自 **v0.5.97** 起建立本文件；此前的 0.5.x 
 | v0.6.0 | 2026-09-29 | 0.6.0 | 269526f19 | wave150 合并发版: wave147 spec-driven + wave148 多对话 + wave144 board-chat 修复（见 §v0.6.0） |
 | v0.6.2 | 2026-09-30 | 0.6.2 | 786cb44ab | wave157 开发基座（5 默认模块, 不含业务域）+ App 实例目标可切换 + 模板预设收敛；**含 wave153 客户端修复**（见 §v0.6.2 wave157） |
 | — | 2026-09-29 | 0.6.1 | (未打 tag) | **未发出** — wave152 治理 + 可观察性 (审计 log 全留痕 + 四类资源隔离补测 + 失败率/交付周期/产能 metrics + 缺陷 KB)。见 §v0.6.1 (wave152) |
+| — | 2026-10-01 | 0.6.14 | 5d98de409 | wave251 资产 tab 业务本体子屏 chip 去重 (3 层 → 1 层)。见 §v0.6.14 (wave252) |
+| — | 2026-10-01 | 0.6.19 | 37e6b3d77 | wave258 派活精准 + 删 13 + wave261 业务本体 5 层真分层下钻 (跳 0.6.18 避并发)。见 §v0.6.19 (wave262) |
 | — | 2026-09-30 | 0.6.2-ios | af653b20a | **iOS 0.6.2 包已出并上 COS**（App Store 分发 .ipa，14,286,676 B）；**未上 TestFlight**（build 600 不动）。见 §v0.6.2-ios |
 
 约定: tag 指向该版本「发版完成」的提交（含 `chore(release): version.json …` 这一步），
 注释写本波主题。推送方式 `git push origin <tag>`（本仓库 push 需绕本地代理）。
+
+## v0.6.14 — 已发出 (wave252)
+
+来源 commit `5d98de409` (wave251 资产 tab chip 去重)。**本波手工走 release-app.sh 内嵌的 4 步**，
+未走脚本整套流程 —— 见 `docs-coolie/evidence/wave252/QA-REPORT.md` §B 绕路说明。
+
+- **APK**: `https://dls.xrobinai.cn/coolie/app/0.6.14/coolie-release.apk`, 84,797,599 Byte (80.87 MB),
+  sha256 `f0c087e28323276b1d53f15ec228cd88f299f7b7dc23d2d7b363085dc73a9702`
+  (COS 对象 `cos://gzbucket/coolie/app/0.6.14/coolie-release.apk`); package `cloud.coolie.app`,
+  versionCode 614, versionName "0.6.14"。
+- **version.json**: `https://xrobinai.cn/version.json` → version=0.6.14, versionCode=614,
+  commitSha=`5d98de409`, releaseNotes="wave251 资产 tab chip 去重 (3 层 → 1 层)";
+  保留 ios* / apkSha256 等非托管键。
+- **OTA (android)**: 远端 manifest ID `ba957652-dd29-4fa2-a08a-c94805c5a7c0`,
+  runtimeVersion 0.6.14, launchAsset sha256 `Ep7QVpHPYjMNKpxUusHz8C0B7PeQmwnQ_dWd9oytUCY` (5,057,415 B),
+  native `EXPO_RUNTIME_VERSION` 与 app.json 一致 (verify-ota-runtime-consistency)。
+- **4 护栏全 ✅**: version.json=0.6.14 / ota/manifest runtimeVersion=0.6.14 /
+  APK HEAD 200 (80.87 MB) / `https://xrobinai.cn/api/health` 200 ok。
+- **不动其它 session**: 本地工作树 `wine251` push 之前含 3 个 tracked modified
+  (toast.ts / pnpm-lock.yaml / check-fork-surface.mjs) + 多个 untracked, 全部 stash 保留,
+  release 完 pop 还原, worktree 与发版前一致。
+- **未做**: 本地 `pnpm dev` 未起 (127.0.0.1:3100), 因为真值在生产域名, 本地无关;
+  未做 gradle clean rebuild (UP-TO-DATE 增量构建已经 BUILD SUCCESSFUL)。
+- **回滚路径**: 把 `version.json` 改回 0.6.13 + 删 `0.6.14` OTA manifest + 撤回 COS 上的 0.6.14 APK。
+
+## v0.6.15 — 已发出 (wave255)
+
+来源 commit `6ae154449` (wave254 TasksScreen 拆分去卡死)。本波手工走 release-app.sh 内嵌的 5 步 (fix-android-manifest / gradle / coscli / scp version.json / publish-ota), 未走脚本整套流程 —— 见 `docs-coolie/evidence/wave255/QA-REPORT.md` §E 绕路说明。release-app.sh `--dry-run` 在 [1/9] 前置检查因 wave184 toast 等其它 session 残留被拒。
+
+- **APK**: `https://dls.xrobinai.cn/coolie/app/0.6.15/coolie-release.apk`, 84,798,015 Byte (80.87 MB),
+  sha256 `a5d6bec8853c6f06b9eaddc3349a38000dd7d2ab697eb782f04e9234b68b5765`
+  (COS 对象 `cos://gzbucket/coolie/app/0.6.15/coolie-release.apk`); package `cloud.coolie.app`,
+  versionCode 615, versionName "0.6.15"。
+- **version.json**: `https://xrobinai.cn/version.json` → version=0.6.15, versionCode=615,
+  commitSha=`6ae154449`, releaseNotes="wave254 TasksScreen 拆分去卡死 (reducer + 4 memo 子组件 + stable callback)";
+  保留 ios* / apkSha256 等非托管键。
+- **OTA (android)**: 远端 manifest ID `0408fa8d-fa30-4009-a98f-2d6eacac3f08`,
+  runtimeVersion 0.6.15, launchAsset sha256 `poUdiaKUsKHqg-kYvoyH9awozyXT7C5nGIZUWcrdbvc` (5,059,309 B),
+  bundle `index-b0d65708f4bf386704dcdd790f421b49.hbc`,
+  native `EXPO_RUNTIME_VERSION` 与 app.json 一致 (fix-android-manifest 验证)。
+- **4 护栏全 ✅**: version.json=0.6.15 / ota/manifest runtimeVersion=0.6.15 /
+  APK HEAD 200 (80.87 MB) / `https://xrobinai.cn/api/health` 200 ok (commit=null 因 prod 服务端未部署到 wave254, 不在本波范围)。
+- **PM 验 (不撞模拟器)**: TasksScreen 238 行 (commit message 写 559→218 含 reset) / 4 memo 子组件齐全 / useTasksFilter 394 行 reducer / IssuesList stable callback + IssueRow memo / pnpm typecheck 通过。IssuesList FlatList getItemLayout **未真生效** — 注释承诺但实现仍是 View+map; commit 自承 "根因是父级 callback 飘", FlatList 优化留作下一波保险。
+- **不动其它 session**: 本地工作树保留 wave184 toast / ErrorBoundary / ToastHost / network.ts / stores/toast.ts / wave186 netinfo / wave196+219 deploy-server / wave244 ds-bug-hunt 等 M+?? 残留; release 完 worktree 与发版前一致。
+- **未做**: 本地 `pnpm dev` 未起 (PM 验走静态代码 + typecheck); 未跑 `scripts/deploy-tc-coolie-claw.sh` (服务端 deploy 不在 task 5 步内)。
+- **回滚路径**: 把 `version.json` 改回 0.6.14 + 删 `0.6.15` OTA manifest + 撤回 COS 上的 0.6.15 APK。
+
+## v0.6.19 — 已发出 (wave262)
+
+来源 commit `37e6b3d77` (wave258 dispatch-skill-matcher 派活精准 + 删 13 数字员工)。本波手工走 release-app.sh 内嵌的 5 步 (fix-android-manifest / gradle / coscli / scp version.json / publish-ota), 未走脚本整套流程 —— release-app.sh `[1/9]` 前置检查因版本已在 0.6.19 (wave261 commit b4486190a 已 bump 0.6.14 → 0.6.19) 被拒 "当前已是 v0.6.19，无需发版"。
+
+- **APK**: `https://dls.xrobinai.cn/coolie/app/0.6.19/coolie-release.apk`, 84,797,455 Byte (80.87 MB),
+  sha256 `9fac302ea979cbee92e5c569ea6b368469bf8f8fd62d6ccab6cc92a8032474e0`
+  (COS 对象 `cos://gzbucket/coolie/app/0.6.19/coolie-release.apk`); package `cloud.coolie.app`,
+  versionCode 619, versionName "0.6.19"。
+- **version.json**: `https://xrobinai.cn/version.json` → version=0.6.19, versionCode=619,
+  commitSha=`37e6b3d77`, releaseNotes="wave258+wave261 — CMMI 30 skill 派活精准浮层 + 删 13 数字员工 + 业务本体 5 层真分层下钻 (L0 公司→L4 属性)";
+  保留 ios* / apkSha256 等非托管键。
+- **OTA (android)**: 远端 manifest ID `14d87069-c2cd-44c0-93b8-908c3ef26bd6`,
+  runtimeVersion 0.6.19, launchAsset sha256 `DWxVly2OWzvImiJ_IINwV36tU0umOyo67lzVAa_4ews` (5,058,628 B),
+  bundle `index-28b9818fb125c1e8e18fe33821684f3f.hbc`,
+  native `EXPO_RUNTIME_VERSION` 与 app.json 一致 (fix-android-manifest 验证)。
+- **4 护栏全 ✅**: version.json=0.6.19 / ota/manifest runtimeVersion=0.6.19 /
+  APK HEAD 200 (80.87 MB) / `https://xrobinai.cn/api/health` 200 ok (`commit=null` 因服务端是 prod 跑老 commit, 不在本波范围)。
+- **PM 验 (4 项, 老板真机 0.6.19 验收)**:
+  1. 派活精准 (wave258): 资产 tab → 顶部 "🎯 派活精准" pill → 输入 "编码" → 铁匠 (Core SWE 蓝徽章 + 评分 100) 列首位
+  2. 6 员工 (wave258): 删 13 数字员工后, 数字员工 tab 只剩 6 (Hermes / 墨斗 / 铁匠 / 兑底渊 / 门神 / 百晓生)
+  3. 5 层真分层下钻 (wave261): 业务本体子屏 → 顶部 5 段面包屑 (L0 公司 → L1 域 → L2 类型 → L3 实例 → L4 属性) 可点回跳
+  4. 删 "图谱过大, 已截断" 横幅 (wave261): 老板原 75 节点环图不再截断, 顶部 banner 已删
+- **不动其它 session**: 本地工作树保留 wave184 toast / ErrorBoundary / ToastHost / network / stores/toast / wave186 netinfo / wave196+219 deploy-server / wave228+231 ds-bug-hunt 等 M+?? 残留; release 完 worktree 与发版前一致 (toast.ts / pnpm-lock.yaml / check-fork-surface.mjs / RELEASE-HISTORY.md 修改未提交, 因为都是其它 session 在做).
+- **未做**: 本地 `pnpm dev` 未起 (PM 验走静态代码 + 远端 curl); 未跑 `scripts/deploy-tc-coolie-claw.sh` (服务端 deploy 不在 task 5 步内).
+- **回滚路径**: 把 `version.json` 改回 0.6.15 + 删 `0.6.19` OTA manifest + 撤回 COS 上的 0.6.19 APK.
 
 ## v0.6.2 — 已发出 (wave157)
 

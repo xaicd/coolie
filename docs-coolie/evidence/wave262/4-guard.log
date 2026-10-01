@@ -1,0 +1,35 @@
+
+=== [guard 1] version.json ===
+  version: 0.6.19
+  versionCode: 619
+  downloadUrl: https://dls.xrobinai.cn/coolie/app/0.6.19/coolie-release.apk
+  commitSha: 37e6b3d77ebd
+  releaseNotes: wave258+wave261 — CMMI 30 skill 派活精准浮层 + 删 13 数字员工 + 业务本体 5 层真分层下钻 (L0 公司→L4 属性)
+  RESULT: PASS
+
+=== [guard 2] ota/manifest ===
+  id: 14d87069-c2cd-44c0-93b8-908c3ef26bd6
+  runtimeVersion: 0.6.19
+  launchAsset.hash: DWxVly2OWzvImiJ_...
+  launchAsset.fileSize: 5058628
+  RESULT: PASS
+
+=== [guard 3] APK HEAD ===
+HTTP/1.1 200 Connection established
+
+HTTP/1.1 200 OK
+Content-Type: application/vnd.android.package-archive
+Content-Length: 84797455
+Connection: keep-alive
+Accept-Ranges: bytes
+Date: Thu, 01 Oct 2026 11:52:10 GMT
+  APK content-length: 84797455
+  RESULT: PASS (need > 80000000)
+
+=== [guard 4] /api/health ===
+{"status":"ok","deploymentMode":"authenticated","deploymentExposure":"public","localAiLoginSupported":false,"commit":null,"bootstrapStatus":"ready","bootstrapInviteActive":false,"databaseBackup":{"enabled":true,"status":"ok","warnings":[]}}
+
+=== summary ===
+  ('version.json', 'loaded')
+  ('ota/manifest', 'loaded')
+  ('api/health', 'loaded')
