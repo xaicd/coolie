@@ -4,7 +4,24 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
-## v0.6.10
+## v0.6.14
+
+> Released: 2026-10-01 · Android release APK + OTA bundle
+
+### 更新
+
+- **wave251** — 资产 tab 业务本体子屏去重 (3 层 chip → 1 层):
+  - **删 `OntologyDomainListScreen` 第 2 层 CATEGORY_CHIPS** (wave239 加, "全部 / 业务本体 / 项目中心 / 数字员工 / 交付产物"): 与 `OrgAssetsScreen` 顶部 SegmentedControl (`TAB_OPTIONS` 🧠 业务本体 / 📁 项目中心 / 👥 数字员工 / 📦 交付产物) 字面 + 语义完全重复; 真机打开资产 tab 出现 "3 层 chip 重复" 就是这个。
+  - **保留**: `OntologyDomainListScreen` 第 3 层 `DomainFilter` SegmentedControl (全部 / 生产 / 草稿 / 已归档) — 这是生命周期状态过滤, 与一级分类不冲突, 留。
+  - 删 `OntologyCategoryFilter` 类型 / `CATEGORY_CHIPS` 常量 / `categoryFilter` state / 顶部 chip ScrollView / 过滤逻辑 `.filter((d) => categoryFilter === ...)` / 4 个孤儿样式。
+  - **范围确认**: 全面扫 13 屏 (`Dashboard / Tasks / TaskKanban / Agents / Artifacts / Projects / BoardChat / Inbox / OntologyDomainList / OrgAssets / Notifications / Search / WhatsNew`), 只有 OntologyDomainListScreen 真正字面重复; 其它屏 chip 行 (TasksScreen 4 行, ArtifactsScreen 3 行, TaskKanbanScreen 3 行) 是不同维度 (scope / 状态 / 筛选 / 视图), 保留。
+  - 不动 wave241 报告里的其它 P0/P1 (P0-1 注释 / P0-2 SettingsSheet / P0-3 InboxScreen+TasksScreen 死代码 / P1-1 双层 tab / 等) — 那些是另立任务。
+- **bump 0.6.13 → 0.6.14** (`app.json` + `android/app/build.gradle` versionCode 613 → 614). 备注: v0.6.13 已被 wave188 native modules 占用 (2026-09-30 发布), 顺延 1 个版本号。
+- 无服务端改动
+
+---
+
+## v0.6.13
 
 > Released: 2026-10-01 · Android release APK + OTA bundle
 

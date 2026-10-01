@@ -103,25 +103,13 @@ const LIFECYCLE_CONFIG: Record<
 export type DomainFilter = "all" | "active" | "draft" | "archived" | "locked";
 export type OntologyViewMode = "list" | "detail" | "graph";
 
-/**
- * Wave239 — 屏 1 顶部的 4 类横向 chip (agy 草图 §1).
- * 类别值与 `OntologyDomain.category` 字段对齐 (server 在创建/seed 时写入).
- * "all" 是兜底 (无 category 或未知 category 的域归到 "all" 这列).
- */
-export type OntologyCategoryFilter =
-  | "all"
-  | "业务本体"
-  | "项目中心"
-  | "数字员工"
-  | "交付产物";
-
-const CATEGORY_CHIPS: Array<{ key: OntologyCategoryFilter; label: string }> = [
-  { key: "all", label: "全部" },
-  { key: "业务本体", label: "业务本体" },
-  { key: "项目中心", label: "项目中心" },
-  { key: "数字员工", label: "数字员工" },
-  { key: "交付产物", label: "交付产物" },
-];
+// wave251 — 删去 wave239 顶部 4 类横向 chip (agy 草图 §1):
+//   业务本体 / 项目中心 / 数字员工 / 交付产物
+// 这 4 个分类与资产 tab 顶部的 SegmentedControl (`OrgAssetsScreen.tsx:67-72`
+// TAB_OPTIONS, 即 🧠 业务本体 / 📁 项目中心 / 👥 数字员工 / 📦 交付产物)
+// 字面/语义完全重复; 真机打开资产 tab 出现"3 层 chip"就是这个。
+// 现在 OrgAssetsScreen 已经把"分类切换"接到了顶层, 本屏只保留生命周期
+// SegmentedControl (全部 / 生产 / 草稿 / 已归档) 这 1 层过滤。
 
 // wave216: 真修节点 UUID 显示 — 之前 wave163 只在 server 端把 id 换成 label,
 // 但 Expo 端 `OntologyDomainListScreen` 把 `nodeTypeId` (UUID) 当 typeKey,
@@ -169,8 +157,8 @@ export function OntologyDomainListScreen({
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<DomainFilter>("all");
   const [viewMode, setViewMode] = useState<OntologyViewMode>("list");
-  // wave239 — 屏 1 顶部 4 chip 类别过滤
-  const [categoryFilter, setCategoryFilter] = useState<OntologyCategoryFilter>("all");
+  // wave251 — 删去 4 类 categoryFilter: 分类切换由 OrgAssetsScreen 顶部
+  // SegmentedControl 接管 (TAB_OPTIONS), 本屏不再重复。
   const [seedingSample, setSeedingSample] = useState(false);
   const [selectedNodeTypeKey, setSelectedNodeTypeKey] = useState<string | null>(null);
 
@@ -478,12 +466,6 @@ export function OntologyDomainListScreen({
         d.lifecycle_state === "locked"
       );
     return true;
-  }).filter((d) => {
-    // wave239 — 顶部 4 chip 类别过滤. "all" 不限; 其它按 category 字段精确匹配
-    // (server 在 seed / create 时写入). 缺失 category 的域被归到 "all" 列里,
-    // 不让一个数据缺陷把整行吞掉。
-    if (categoryFilter === "all") return true;
-    return d.category === categoryFilter;
   });
 
   // 第三层: 关系图谱交互浏览 (Graph View)
@@ -826,40 +808,8 @@ export function OntologyDomainListScreen({
           </View>
         </View>
 
-        {/* wave239 — 顶部 4 chip 类别过滤 (agy 草图 §1).
-            横滑 ScrollView 让 5 个 chip 都能容纳, 选中态用 accent 底色 + 字色. */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoryChipRow}
-          keyboardShouldPersistTaps="handled"
-        >
-          {CATEGORY_CHIPS.map((opt) => {
-            const active = categoryFilter === opt.key;
-            return (
-              <Pressable
-                key={opt.key}
-                onPress={() => setCategoryFilter(opt.key)}
-                hitSlop={4}
-                style={[styles.categoryChip, active && styles.categoryChipActive]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: active }}
-              >
-                <Text
-                  style={[
-                    styles.categoryChipText,
-                    active && styles.categoryChipTextActive,
-                  ]}
-                  numberOfLines={1}
-                >
-                  {opt.label}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        {/* 顶部过滤切换器 */}
+        {/* 顶部过滤切换器 — wave251 删去上面那层 CATEGORY_CHIPS 后,
+            现在业务本体子屏只剩 1 层过滤 chip, 与资产 tab 顶部分段不再重复。 */}
         <SegmentedControl
           value={filter}
           onChange={(key) => setFilter(key as DomainFilter)}
@@ -1586,35 +1536,6 @@ const styles = StyleSheet.create({
   },
   filterSwitcher: {
     marginTop: 12,
-  },
-  // wave239 — 顶部 4 chip 类别过滤条
-  categoryChipRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    paddingHorizontal: 16,
-    paddingTop: 12,
-  },
-  categoryChip: {
-    paddingHorizontal: 14,
-    paddingVertical: 6,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: C.lineSubtle,
-    backgroundColor: C.panel,
-  },
-  categoryChipActive: {
-    borderColor: C.accent,
-    backgroundColor: "rgba(94, 106, 210, 0.18)",
-  },
-  categoryChipText: {
-    color: C.ink3,
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  categoryChipTextActive: {
-    color: C.accent,
-    fontWeight: "600",
   },
   listContent: {
     padding: 16,
