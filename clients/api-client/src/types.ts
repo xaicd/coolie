@@ -931,6 +931,84 @@ export interface OntologyGraphSnapshot {
   edges: OntologyGraphEdge[];
 }
 
+/**
+ * Wave239 — control-plane ontology graph response. Distinct from
+ * `OntologyGraphSnapshot` (which is the plugin-worker shape): this one
+ * returns `root` (nullable) + `view` + flat `nodes`/`edges` (capped by
+ * MAX_NODES=400). Mirrors `OntologyGraphResponse` in `@paperclipai/shared`
+ * — duplicated here so the api-client stays framework-free (it does not
+ * depend on `@paperclipai/shared`).
+ *
+ * The edge shape is intentionally distinct from `OntologyGraphEdge`
+ * (plugin-worker): shared uses `source`/`target` (just node-key strings),
+ * the plugin uses `sourceNodeId`/`targetNodeId`. The App talks to both,
+ * so we keep both shapes side by side rather than merging them.
+ */
+export interface OntologyGraphResponseEdge {
+  key: string;
+  source: string;
+  target: string;
+  relation: string;
+  weight: number;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyGraphResponseNode {
+  type: string;
+  id: string;
+  key: string;
+  label: string;
+  href?: string | null;
+  metadata?: Record<string, unknown>;
+}
+
+export interface OntologyGraphResponse {
+  root: { type: string; id: string } | null;
+  depth: number;
+  view?: string;
+  truncated: boolean;
+  nodes: OntologyGraphResponseNode[];
+  edges: OntologyGraphResponseEdge[];
+}
+
+/**
+ * Wave239 — 屏 2 (instance graph). One row per object of the requested
+ * type. `ownerId` is pulled from the `assigned_to` edge when present.
+ */
+export interface OntologyInstanceRow {
+  id: string;
+  label: string;
+  ownerId: string | null;
+  ownerLabel: string | null;
+  metadata: Record<string, unknown>;
+}
+
+export interface OntologyInstancesResponse {
+  companyId: string;
+  entityType: string;
+  totalCount: number;
+  instances: OntologyInstanceRow[];
+}
+
+/**
+ * Wave239 — 屏 3 (schema editor). The saved property list for one type;
+ * empty array when the type was never edited. The route is idempotent —
+ * PATCH replaces the whole list, not a diff.
+ */
+export interface OntologyPropertyEntry {
+  key: string;
+  type: string;
+  sample?: string;
+}
+
+export interface OntologyPropertiesResponse {
+  companyId: string;
+  typeId: string;
+  properties: OntologyPropertyEntry[];
+  schemaVersion: number;
+  updatedAt: string;
+}
+
 export interface SetDomainLifecycleOptions {
   actor?: string;
   reason?: string;

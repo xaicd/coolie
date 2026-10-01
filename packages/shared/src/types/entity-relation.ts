@@ -153,3 +153,49 @@ export interface OntologyStatsResponse {
   /** 2 * edges / nodes — how wired the company's objects are on average. */
   averageDegree: number;
 }
+
+/**
+ * Wave239 — list a single entity-type's instances for the App's instance
+ * graph (屏 2). One row per object the company owns of that type, with
+ * an optional owner derived from the `assigned_to` edge.
+ */
+export interface OntologyInstanceRow {
+  /** Same id as the underlying row's primary key. */
+  id: string;
+  /** Display label — best-effort name/title/status; falls back to the
+   *  truncated id when the row has no human-readable column. */
+  label: string;
+  /** Optional owner id (the agent or user this instance is assigned to). */
+  ownerId: string | null;
+  /** Optional owner label (the agent's display name). */
+  ownerLabel: string | null;
+  /** Small, display-only facts (status, kind, filename, project id). */
+  metadata: Record<string, unknown>;
+}
+
+export interface OntologyInstancesResponse {
+  companyId: string;
+  entityType: EntityType;
+  totalCount: number;
+  instances: OntologyInstanceRow[];
+}
+
+/**
+ * Wave239 — schema-editor (屏 3). The server returns the property list
+ * the company has stored for a given type; an empty array means "never
+ * edited". This shape mirrors the validator entry so the App can render
+ * straight from the response.
+ */
+export interface OntologyPropertyEntry {
+  key: string;
+  type: string;
+  sample?: string;
+}
+
+export interface OntologyPropertiesResponse {
+  companyId: string;
+  typeId: string;
+  properties: OntologyPropertyEntry[];
+  schemaVersion: number;
+  updatedAt: string;
+}

@@ -25,7 +25,12 @@ import {
   type OntologyDomain,
   type OntologyDomainLifecycleState,
   type OntologyGraphCounts,
+  type OntologyGraphResponse,
   type OntologyGraphSnapshot,
+  type OntologyInstancesResponse,
+  type OntologyPropertiesResponse,
+  type OntologyPropertyEntry,
+  type OntologyInstanceRow,
   type PluginRecord,
   type PluginStatus,
   type PluginConfig,
@@ -995,6 +1000,88 @@ export class CoolieClient {
       }
       throw err;
     }
+  }
+
+  /**
+   * Wave239 — call the control-plane ontology graph endpoint directly.
+   * Bypasses the plugin-worker round-trip because wave237 made this the
+   * primary, smoke-tested shape (`root` optional, capped by MAX_NODES=400).
+   *
+   * Returns the generic `OntologyGraphResponse` from `@paperclipai/shared`
+   * (root / depth / view / nodes / edges), not the plugin-specific
+   * `OntologyGraphSnapshot` — the App builds its display from this shape
+   * for 屏 4 (workbench).
+   */
+  async getOntologyGraph(
+    companyId: string,
+    opts: {
+      rootType?: string;
+      rootId?: string;
+      depth?: number;
+      view?: string;
+    } = {},
+  ): Promise<OntologyGraphResponse> {
+    const q = new URLSearchParams({ companyId });
+    if (opts.rootType) q.set("root_type", opts.rootType);
+    if (opts.rootId) q.set("root_id", opts.rootId);
+    if (opts.depth !== undefined) q.set("depth", String(opts.depth));
+    if (opts.view) q.set("view", opts.view);
+    return this.request<OntologyGraphResponse>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/ontology/graph?${q.toString()}`,
+    );
+  }
+
+  /**
+   * Wave239 — 屏 2 (instance graph). List one entity-type's rows with an
+   * optional owner filter. Bounded by the route's limit/offset validator.
+   */
+  async listOntologyInstances(
+    companyId: string,
+    opts: {
+      entityType: string;
+      ownerId?: string;
+      limit?: number;
+      offset?: number;
+    },
+  ): Promise<OntologyInstancesResponse> {
+    const q = new URLSearchParams({ companyId, entityType: opts.entityType });
+    if (opts.ownerId) q.set("ownerId", opts.ownerId);
+    if (opts.limit !== undefined) q.set("limit", String(opts.limit));
+    if (opts.offset !== undefined) q.set("offset", String(opts.offset));
+    return this.request<OntologyInstancesResponse>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/ontology/instances?${q.toString()}`,
+    );
+  }
+
+  /**
+   * Wave239 — 屏 3 (schema editor).
+   *
+   * GET returns the property list (or empty when the type was never edited).
+   * PATCH replaces the whole list (idempotent — caller should GET, mutate in
+   * memory, then PATCH the result).
+   */
+  async getOntologyTypeProperties(
+    companyId: string,
+    typeId: string,
+  ): Promise<OntologyPropertiesResponse> {
+    return this.request<OntologyPropertiesResponse>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/ontology/types/${encodeURIComponent(typeId)}/properties`,
+    );
+  }
+
+  async updateOntologyTypeProperties(
+    companyId: string,
+    typeId: string,
+    properties: OntologyPropertyEntry[],
+  ): Promise<OntologyPropertiesResponse> {
+    return this.request<OntologyPropertiesResponse>(
+      "PATCH",
+      `/api/companies/${encodeURIComponent(companyId)}/ontology/types/${encodeURIComponent(typeId)}/properties`,
+      { properties },
+    );
   }
 
   /**

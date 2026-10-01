@@ -40,6 +40,19 @@ interface OntologyDomainListScreenProps {
   company: Company;
   whoami?: string;
   onOpenWebOntology?: () => void;
+  /**
+   * Wave239 — 屏 3 schema editor. The App passes a callback that opens the
+   * per-type property editor. The domain's `id` is forwarded as the typeId
+   * for the new PATCH endpoint; the screen falls back to the slug when no id
+   * exists (built-in domains).
+   */
+  onOpenSchemaEditor?: (typeId: string, displayName: string) => void;
+  /**
+   * Wave239 — 屏 2 instance graph. Long-press on a domain card opens the
+   * instance list for that domain. The full ontology graph is forwarded so
+   * the instance screen can hydrate nodes.
+   */
+  onOpenInstanceGraph?: (typeId: string, displayName: string) => void;
 }
 
 const LIFECYCLE_CONFIG: Record<
@@ -86,6 +99,26 @@ const LIFECYCLE_CONFIG: Record<
 export type DomainFilter = "all" | "active" | "draft" | "archived" | "locked";
 export type OntologyViewMode = "list" | "detail" | "graph";
 
+/**
+ * Wave239 — 屏 1 顶部的 4 类横向 chip (agy 草图 §1).
+ * 类别值与 `OntologyDomain.category` 字段对齐 (server 在创建/seed 时写入).
+ * "all" 是兜底 (无 category 或未知 category 的域归到 "all" 这列).
+ */
+export type OntologyCategoryFilter =
+  | "all"
+  | "业务本体"
+  | "项目中心"
+  | "数字员工"
+  | "交付产物";
+
+const CATEGORY_CHIPS: Array<{ key: OntologyCategoryFilter; label: string }> = [
+  { key: "all", label: "全部" },
+  { key: "业务本体", label: "业务本体" },
+  { key: "项目中心", label: "项目中心" },
+  { key: "数字员工", label: "数字员工" },
+  { key: "交付产物", label: "交付产物" },
+];
+
 // wave216: 真修节点 UUID 显示 — 之前 wave163 只在 server 端把 id 换成 label,
 // 但 Expo 端 `OntologyDomainListScreen` 把 `nodeTypeId` (UUID) 当 typeKey,
 // 而且把 typeKey 当 label 的 fallback, 结果 5 个节点类型下面全显示 UUID。
@@ -123,6 +156,8 @@ export function OntologyDomainListScreen({
   company,
   whoami = "管理员",
   onOpenWebOntology,
+  onOpenSchemaEditor,
+  onOpenInstanceGraph,
 }: OntologyDomainListScreenProps) {
   const [domains, setDomains] = useState<OntologyDomain[]>([]);
   const [loading, setLoading] = useState(true);
@@ -130,6 +165,8 @@ export function OntologyDomainListScreen({
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<DomainFilter>("all");
   const [viewMode, setViewMode] = useState<OntologyViewMode>("list");
+  // wave239 — 屏 1 顶部 4 chip 类别过滤
+  const [categoryFilter, setCategoryFilter] = useState<OntologyCategoryFilter>("all");
   const [seedingSample, setSeedingSample] = useState(false);
   const [selectedNodeTypeKey, setSelectedNodeTypeKey] = useState<string | null>(null);
 
@@ -437,6 +474,12 @@ export function OntologyDomainListScreen({
         d.lifecycle_state === "locked"
       );
     return true;
+  }).filter((d) => {
+    // wave239 — 顶部 4 chip 类别过滤. "all" 不限; 其它按 category 字段精确匹配
+    // (server 在 seed / create 时写入). 缺失 category 的域被归到 "all" 列里,
+    // 不让一个数据缺陷把整行吞掉。
+    if (categoryFilter === "all") return true;
+    return d.category === categoryFilter;
   });
 
   // 第三层: 关系图谱交互浏览 (Graph View)
@@ -773,6 +816,24 @@ export function OntologyDomainListScreen({
               {selectedDomain.display_name || selectedDomain.displayName || selectedDomain.slug}
             </Text>
             <Text style={styles.heroSub}>标识: {selectedDomain.slug}</Text>
+            {/*
+              wave239 — 真名 + UUID 双展示. 默认显示真名 (业务本体), 长按才会
+              单独把 UUID 复制到剪贴板. 这里在主标题下追加一行小型 UUID 提示,
+              让运维 / 排障的人有 1 秒就能定位.
+            */}
+            {selectedDomain.id ? (
+              <Pressable
+                onLongPress={() => {
+                  // 不引 expo-clipboard (避免再加 native module); 用 Alert 文本即可
+                  Alert.alert("UUID", selectedDomain.id);
+                }}
+                hitSlop={4}
+              >
+                <Text style={styles.heroUuid} numberOfLines={1}>
+                  UUID · {truncate(selectedDomain.id, 36)}
+                </Text>
+              </Pressable>
+            ) : null}
             {selectedDomain.description ? (
               <Text style={styles.heroDesc}>{selectedDomain.description}</Text>
             ) : null}
@@ -1034,6 +1095,39 @@ export function OntologyDomainListScreen({
           </View>
         </View>
 
+        {/* wave239 — 顶部 4 chip 类别过滤 (agy 草图 §1).
+            横滑 ScrollView 让 5 个 chip 都能容纳, 选中态用 accent 底色 + 字色. */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoryChipRow}
+          keyboardShouldPersistTaps="handled"
+        >
+          {CATEGORY_CHIPS.map((opt) => {
+            const active = categoryFilter === opt.key;
+            return (
+              <Pressable
+                key={opt.key}
+                onPress={() => setCategoryFilter(opt.key)}
+                hitSlop={4}
+                style={[styles.categoryChip, active && styles.categoryChipActive]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: active }}
+              >
+                <Text
+                  style={[
+                    styles.categoryChipText,
+                    active && styles.categoryChipTextActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
         {/* 顶部过滤切换器 */}
         <SegmentedControl
           value={filter}
@@ -1136,6 +1230,38 @@ export function OntologyDomainListScreen({
               <AppCard
                 style={[styles.domainCard, isLocked && styles.domainCardLocked]}
                 onPress={() => openDomainDetail(item)}
+                // wave239 — 长按域卡片弹"实例图谱 / 编辑字段"动作卡.
+                // 不开 onLongPress 时仍然可以单击进 detail; long press 只是快捷入口.
+                onLongPress={
+                  onOpenSchemaEditor || onOpenInstanceGraph
+                    ? () => {
+                        const displayName =
+                          item.display_name || item.displayName || item.slug;
+                        Alert.alert(
+                          displayName,
+                          "选择此域的下一步操作",
+                          [
+                            onOpenInstanceGraph
+                              ? {
+                                  text: "实例图谱",
+                                  onPress: () =>
+                                    onOpenInstanceGraph(item.id, displayName),
+                                }
+                              : { text: "实例图谱", style: "cancel" },
+                            onOpenSchemaEditor
+                              ? {
+                                  text: "编辑字段",
+                                  onPress: () =>
+                                    onOpenSchemaEditor(item.id, displayName),
+                                }
+                              : { text: "编辑字段", style: "cancel" },
+                            { text: "取消", style: "cancel" },
+                          ],
+                          { cancelable: true },
+                        );
+                      }
+                    : undefined
+                }
               >
                 {/* 头部标题与状态徽标 */}
                 <View style={styles.cardHeader}>
@@ -1439,6 +1565,35 @@ const styles = StyleSheet.create({
   filterSwitcher: {
     marginTop: 12,
   },
+  // wave239 — 顶部 4 chip 类别过滤条
+  categoryChipRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 12,
+  },
+  categoryChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+    backgroundColor: C.panel,
+  },
+  categoryChipActive: {
+    borderColor: C.accent,
+    backgroundColor: "rgba(94, 106, 210, 0.18)",
+  },
+  categoryChipText: {
+    color: C.ink3,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  categoryChipTextActive: {
+    color: C.accent,
+    fontWeight: "600",
+  },
   listContent: {
     padding: 16,
     paddingBottom: 32,
@@ -1511,6 +1666,13 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: "monospace",
     marginTop: 2,
+  },
+  heroUuid: {
+    color: C.ink4,
+    fontSize: 10,
+    fontFamily: "monospace",
+    marginTop: 4,
+    letterSpacing: 0.2,
   },
   heroDesc: {
     color: C.ink2,

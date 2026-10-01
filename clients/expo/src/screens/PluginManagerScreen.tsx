@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Alert,
-  FlatList,
   Pressable,
   RefreshControl,
+  SectionList,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
@@ -82,6 +83,8 @@ export function PluginManagerScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<"all" | PluginStatus>("all");
   const [pendingId, setPendingId] = useState<string | null>(null);
+  // wave239 — 顶部搜索 (agy 草图 §5)
+  const [searchQuery, setSearchQuery] = useState("");
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -106,9 +109,40 @@ export function PluginManagerScreen({
 
   const filtered = useMemo(() => {
     if (!plugins) return [];
-    if (filter === "all") return plugins;
-    return plugins.filter((p) => p.status === filter);
-  }, [plugins, filter]);
+    let list = plugins;
+    if (filter !== "all") {
+      list = list.filter((p) => p.status === filter);
+    }
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+      list = list.filter((p) => {
+        const name = (p.displayName ?? p.pluginKey ?? "").toLowerCase();
+        const key = (p.pluginKey ?? "").toLowerCase();
+        return name.includes(q) || key.includes(q);
+      });
+    }
+    return list;
+  }, [plugins, filter, searchQuery]);
+
+  // wave239 — 分组 (agy 草图 §5): 已启用 / 已停用.
+  // SectionList 接受 section[].data[]; 当搜索时不分组 (单组, 名为 "搜索结果")
+  // 避免来回切换时整屏闪烁.
+  const sections = useMemo(() => {
+    if (searchQuery.trim().length > 0) {
+      return [{ title: `搜索结果 (${filtered.length})`, data: filtered }];
+    }
+    const enabled: PluginRecord[] = [];
+    const disabled: PluginRecord[] = [];
+    for (const p of filtered) {
+      const isEnabled = (p.enabled ?? p.status === "ready") && p.status !== "disabled";
+      if (isEnabled) enabled.push(p);
+      else disabled.push(p);
+    }
+    const out: Array<{ title: string; data: PluginRecord[] }> = [];
+    if (enabled.length > 0) out.push({ title: `已启用 (${enabled.length})`, data: enabled });
+    if (disabled.length > 0) out.push({ title: `可用但已停用 (${disabled.length})`, data: disabled });
+    return out;
+  }, [filtered, searchQuery]);
 
   const onToggle = useCallback(
     async (plugin: PluginRecord) => {
@@ -178,6 +212,27 @@ export function PluginManagerScreen({
         }
       />
 
+      {/* wave239 — 顶部搜索栏 (agy 草图 §5) */}
+      <View style={styles.searchRow}>
+        <View style={styles.searchInputWrap}>
+          <Ionicons name="search" size={14} color={C.ink4} style={{ marginRight: 6 }} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="搜索插件名…"
+            placeholderTextColor={C.ink4}
+            style={styles.searchInput}
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          {searchQuery.length > 0 ? (
+            <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
+              <Ionicons name="close-circle" size={14} color={C.ink4} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
+
       <View style={styles.filterRow}>
         {STATUS_FILTERS.map((opt) => {
           const active = filter === opt.key;
@@ -203,19 +258,28 @@ export function PluginManagerScreen({
       ) : filtered.length === 0 ? (
         <EmptyState
           icon={<Ionicons name="apps-outline" size={36} color={C.ink3} />}
-          title={filter === "all" ? "暂无插件" : "没有该状态的插件"}
+          title={
+            searchQuery
+              ? "没有匹配的插件"
+              : filter === "all"
+              ? "暂无插件"
+              : "没有该状态的插件"
+          }
           subtitle={
-            filter === "all"
+            searchQuery
+              ? "换一个关键词试试, 或者清空搜索."
+              : filter === "all"
               ? "老板可以在 Web 端「设置 → 插件」安装新插件, 装完这里就能看到."
               : "换个筛选条件试试."
           }
         />
       ) : (
-        <FlatList
-          data={filtered}
+        <SectionList
+          sections={sections}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
           ItemSeparatorComponent={() => <View style={{ height: SPACING.sm }} />}
+          SectionSeparatorComponent={() => <View style={{ height: SPACING.xs }} />}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -223,6 +287,11 @@ export function PluginManagerScreen({
               tintColor={C.accent}
             />
           }
+          renderSectionHeader={({ section }) => (
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionHeaderText}>{section.title}</Text>
+            </View>
+          )}
           renderItem={({ item }) => {
             const display = pluginStatusDisplay(item.status, item.enabled);
             const isBusy = busy && pendingId === item.id;
@@ -316,6 +385,38 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
     backgroundColor: C.bg,
+  },
+  // wave239 — 搜索栏
+  searchRow: {
+    paddingHorizontal: SPACING.md,
+    paddingTop: SPACING.sm,
+  },
+  searchInputWrap: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    backgroundColor: C.panel,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  searchInput: {
+    flex: 1,
+    color: C.ink,
+    fontSize: 13,
+    padding: 0,
+  },
+  sectionHeader: {
+    paddingVertical: SPACING.xs,
+    paddingHorizontal: SPACING.xs,
+  },
+  sectionHeaderText: {
+    color: C.ink3,
+    fontSize: 11,
+    fontWeight: "600",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
   },
   filterRow: {
     flexDirection: "row",

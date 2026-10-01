@@ -57,6 +57,9 @@ import { Sheet } from "./src/ui/Sheet";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
 import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen";
+import { OntologyInstanceGraphScreen } from "./src/screens/OntologyInstanceGraphScreen";
+import { OntologySchemaEditorScreen } from "./src/screens/OntologySchemaEditorScreen";
+import { OntologyGraphWorkbenchScreen } from "./src/screens/OntologyGraphWorkbenchScreen";
 import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
 import { OrgAssetsScreen } from "./src/screens/OrgAssetsScreen";
 import { PluginManagerScreen } from "./src/screens/PluginManagerScreen";
@@ -825,6 +828,18 @@ function HomeScreen({
   // wave235 — 插件管理 + 单插件设置 (App 内模态屏, 复用 Shell 模式)
   const [pluginManagerOpen, setPluginManagerOpen] = useState(false);
   const [pluginSettingsId, setPluginSettingsId] = useState<string | null>(null);
+  // wave239 — 本体插件 5 屏集成 (屏 2/3/4 入口):
+  //   * schemaEditorType: 屏 3 schema editor 屏. typeId 是 OntologyDomain.id.
+  //   * instanceGraphType: 屏 2 instance graph. typeId 同上, defaultEntityType
+  //     路由/project/issue/agent 之一 (屏 1 长按 Alert 选).
+  //   * ontologyWorkbenchOpen: 屏 4 workbench. 全图视图.
+  const [schemaEditorType, setSchemaEditorType] = useState<
+    { typeId: string; displayName: string } | null
+  >(null);
+  const [instanceGraphType, setInstanceGraphType] = useState<
+    { typeId: string; displayName: string; entityType?: string } | null
+  >(null);
+  const [ontologyWorkbenchOpen, setOntologyWorkbenchOpen] = useState(false);
   // wave188 — 6 个 expo-* 原生模块最小集成 demo 入口 (设置 → 原生模块)
   const [nativeModulesOpen, setNativeModulesOpen] = useState(false);
   const ota = useOTA();
@@ -981,6 +996,11 @@ function HomeScreen({
     if (gitCredentialsOpen) return setGitCredentialsOpen(false), true;
     if (pluginManagerOpen) return setPluginManagerOpen(false), true;
     if (pluginSettingsId) return setPluginSettingsId(null), true;
+    // wave239 — 屏 3/2/4 倒序退栈 (最深的先退)
+    if (ontologyWorkbenchOpen)
+      return setOntologyWorkbenchOpen(false), true;
+    if (instanceGraphType) return setInstanceGraphType(null), true;
+    if (schemaEditorType) return setSchemaEditorType(null), true;
     if (selected) return setSelected(null), true;
     if (composeOpen) return setComposeOpen(false), true;
     if (settingsOpen) return setSettingsOpen(false), true;
@@ -1075,7 +1095,11 @@ function HomeScreen({
       projectsOpen ||
       gitCredentialsOpen ||
       pluginManagerOpen ||
-      pluginSettingsId,
+      pluginSettingsId ||
+      // wave239 — 3 个本体子屏占位时不显示全局顶栏
+      schemaEditorType ||
+      instanceGraphType ||
+      ontologyWorkbenchOpen,
     );
 
     content = (
@@ -1244,6 +1268,30 @@ function HomeScreen({
               pluginId={pluginSettingsId}
               onBack={() => setPluginSettingsId(null)}
             />
+          ) : schemaEditorType ? (
+            // wave239 — 屏 3 (SchemaEditor) 渲染.
+            <OntologySchemaEditorScreen
+              company={company}
+              typeId={schemaEditorType.typeId}
+              displayName={schemaEditorType.displayName}
+              onBack={() => setSchemaEditorType(null)}
+            />
+          ) : instanceGraphType ? (
+            // wave239 — 屏 2 (InstanceGraph) 渲染.
+            <OntologyInstanceGraphScreen
+              company={company}
+              typeId={instanceGraphType.typeId}
+              displayName={instanceGraphType.displayName}
+              defaultEntityType={instanceGraphType.entityType ?? "project"}
+              onBack={() => setInstanceGraphType(null)}
+              onOpenWorkbench={() => setOntologyWorkbenchOpen(true)}
+            />
+          ) : ontologyWorkbenchOpen ? (
+            // wave239 — 屏 4 (Workbench) 渲染.
+            <OntologyGraphWorkbenchScreen
+              company={company}
+              onBack={() => setOntologyWorkbenchOpen(false)}
+            />
           ) : tab === "dashboard" ? (
             <DashboardScreen
               company={company}
@@ -1304,6 +1352,12 @@ function HomeScreen({
               }
               onOpenWebOntology={(subPath?: string, title?: string) =>
                 setWebContainerTarget({ path: subPath || "/ontology", title: title || "本体可视化设计器" })
+              }
+              onOpenSchemaEditor={(typeId, displayName) =>
+                setSchemaEditorType({ typeId, displayName })
+              }
+              onOpenInstanceGraph={(typeId, displayName) =>
+                setInstanceGraphType({ typeId, displayName })
               }
               onOpenWebWorkbench={(subPath?: string, title?: string) =>
                 setWebContainerTarget({ path: subPath || "/dashboard", title: title || "控制台" })

@@ -14,6 +14,7 @@ export { issueRoutes } from "./issues.js";
 export { issueTreeControlRoutes } from "./issue-tree-control.js";
 export { issueSpecRoutes } from "./issue-specs.js";
 export { ontologyGraphRoutes } from "./ontology-graph.js";
+export { ontologyExtrasRoutes } from "./ontology-extras.js";
 export { onboardingRoutes } from "./onboarding.js";
 export { auditLogRoutes } from "./audit-log.js";
 export { metricsRoutes } from "./metrics.js";

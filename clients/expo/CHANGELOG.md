@@ -4,6 +4,30 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.6.10
+
+> Released: 2026-10-01 · Android release APK + OTA bundle
+
+### 更新
+
+- wave239 — 抄 web 端 本体/插件/图谱 5 屏到 App (按 agy wave238 草图):
+  - **屏 1 类型级图谱** (`OntologyDomainListScreen` 增强): 顶部 4 chip (全部 / 业务本体 / 项目中心 / 数字员工 / 交付产物) 横滑过滤; 详情卡加 UUID 行 (长按单独弹出全 UUID); 长按域卡 → Alert 选「实例图谱 / 编辑字段」动作入口。
+  - **屏 2 实例级图谱** (`OntologyInstanceGraphScreen`, 新): 实体类型 chip 切换 (project/issue/agent) + 负责人 chip 过滤; 选中节点 1 跳邻居高亮 + 详情卡; 实例列表 + 右下「工作台」FAB。
+  - **屏 3 属性编辑** (`OntologySchemaEditorScreen`, 新): SectionList 字段卡 + 增/改/删 + 类型徽标 (String/Enum/Ref/DateTime/Array/Number/Boolean) + 顶部「放弃 / 保存」按钮 (dirty 状态); 实时校验 key (正则) / type 长度 / sample 长度。
+  - **屏 4 图谱工作台** (`OntologyGraphWorkbenchScreen`, 新): 沉浸式大画布 + PanResponder 单指拖 + 双指捏合 (scale 0.4-2.5); 顶部 4 chip 视图切换 (类型 / 实例 / 对话 / 混合 — 后三个复用 wave155 视图预设); 左下浮动工具盘 (放大/缩小/居中/全屏); 右下图例按 entityType 颜色分桶; `truncated: true` 时顶部 banner 提示已截断。
+  - **屏 5 插件管理** (`PluginManagerScreen` 增强): 顶部搜索栏 + SectionList 分组 (已启用 / 已停用; 搜索时退化为单组)。
+- server 新端点 (3 个, 已在 server/src/__tests__/ontology-extras-routes.test.ts 6 个用例覆盖):
+  - `GET /api/companies/:id/ontology/instances?entityType=&ownerId=` — 单类型实例列表 + 负责人过滤
+  - `GET /api/companies/:id/ontology/types/:typeId/properties` — 类型字段定义
+  - `PATCH /api/companies/:id/ontology/types/:typeId/properties` — 字段定义 upsert (Board-only, 写 `ontology.properties.update` 活动日志)
+- 新数据库迁移 `9013_add_ontology_properties.sql` + 新表 `ontology_properties` (公司 × 类型唯一约束, jsonb 字段定义 + schemaVersion)
+- api-client 加 4 方法: `getOntologyGraph` / `listOntologyInstances` / `getOntologyTypeProperties` / `updateOntologyTypeProperties`
+- 新组件 2: `OntologyGraphCanvas` (deterministic 层级布局 + 类型着色, wave239 workbench / instance graph 共用), `SchemaPropertyRow` (字段卡行)
+- App.tsx 加 3 个 screen state (`schemaEditorType` / `instanceGraphType` / `ontologyWorkbenchOpen`) + 倒序退栈 + hasSubHeader 屏蔽
+- **不动**: wave235 已抄 5 屏其他部分 / wave237 修的 3 端点 / wave230 chip / wave213 Kanban / wave222 算法层; iOS TestFlight 不 bump (老板原话)
+
+---
+
 ## v0.6.13
 
 > Released: 2026-09-30 · Android release APK + OTA bundle

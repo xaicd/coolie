@@ -44,6 +44,10 @@ interface OrgAssetsScreenProps {
   onCreateTaskForProject?: (project: Project) => void;
   onOpenWebProjects?: (path?: string, title?: string) => void;
   onOpenWebOntology?: (path?: string, title?: string) => void;
+  // wave239 — 屏 3 (schema editor) 入口. typeId 是 OntologyDomain.id.
+  onOpenSchemaEditor?: (typeId: string, displayName: string) => void;
+  // wave239 — 屏 2 (instance graph) 入口.
+  onOpenInstanceGraph?: (typeId: string, displayName: string) => void;
   onOpenWebWorkbench?: (path?: string, title?: string) => void;
   onOpenSandbox?: (
     url: string,
@@ -88,6 +92,8 @@ export function OrgAssetsScreen({
   onCreateTaskForProject,
   onOpenWebProjects,
   onOpenWebOntology,
+  onOpenSchemaEditor,
+  onOpenInstanceGraph,
   onOpenWebWorkbench,
   onOpenSandbox,
   onOpenDiff,
@@ -182,6 +188,8 @@ export function OrgAssetsScreen({
             company={company}
             whoami={whoami}
             onOpenWebOntology={() => onOpenWebOntology?.("/ontology", "本体可视化设计器")}
+            onOpenSchemaEditor={onOpenSchemaEditor}
+            onOpenInstanceGraph={onOpenInstanceGraph}
           />
         )}
 

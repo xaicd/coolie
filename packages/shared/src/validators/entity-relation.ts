@@ -14,6 +14,69 @@ export const entityRelationKindSchema = z.enum(ENTITY_RELATION_KINDS);
 export const ontologyGraphViewSchema = z.enum(ONTOLOGY_GRAPH_VIEWS);
 
 /**
+ * `key` regex kept narrow on purpose: identifiers in this app follow a
+ * camelCase / snake_case convention. We reject whitespace, brackets, and
+ * the Chinese colon separator that the legacy UI used so the App cannot
+ * smuggle a UUID-looking key into a display row.
+ */
+const ONTOLOGY_PROPERTY_KEY = /^[a-zA-Z_][a-zA-Z0-9_]{0,63}$/;
+
+/**
+ * Single field on a type. Matches the agy 草图's row shape (key / type /
+ * sample). The App renders these straight to a SectionList row.
+ */
+export const ontologyPropertyEntrySchema = z.object({
+  key: z.string().regex(ONTOLOGY_PROPERTY_KEY, "key must match /^[a-zA-Z_][a-zA-Z0-9_]{0,63}$/"),
+  type: z.string().min(1).max(32),
+  sample: z.string().max(200).optional(),
+});
+export type OntologyPropertyEntry = z.infer<typeof ontologyPropertyEntrySchema>;
+
+/**
+ * `GET /api/companies/:companyId/ontology/types/:typeId/properties`.
+ *
+ * No body. Returns the property list (or an empty array when the type has
+ * never been edited — the route does NOT 404 in that case, the absence of
+ * a row is semantically "no custom properties".
+ */
+export const ontologyPropertiesQuerySchema = z.object({
+  companyId: z.string().uuid(),
+  typeId: z.string().uuid(),
+});
+export type OntologyPropertiesQuery = z.infer<typeof ontologyPropertiesQuerySchema>;
+
+/**
+ * `PATCH /api/companies/:companyId/ontology/types/:typeId/properties`.
+ *
+ * `properties` is the full new list, not a diff — clients are expected
+ * to GET, mutate in memory, then PATCH the result. This makes the route
+ * trivially idempotent (the new list IS the new state).
+ */
+export const ontologyPropertiesUpdateSchema = z.object({
+  properties: z.array(ontologyPropertyEntrySchema).max(64),
+});
+export type OntologyPropertiesUpdate = z.infer<typeof ontologyPropertiesUpdateSchema>;
+
+/**
+ * `GET /api/companies/:companyId/ontology/instances`.
+ *
+ * `entityType` is required (one type at a time — the type graph is in
+ * 屏 1, the instance graph in 屏 2). `ownerId` filters by the linked
+ * `assigned_to` edge when present. `limit` is bounded so a noisy type
+ * cannot return 50k rows.
+ */
+export const ontologyInstancesQuerySchema = z
+  .object({
+    companyId: z.string().uuid(),
+    entityType: entityTypeSchema,
+    ownerId: z.string().uuid().optional(),
+    limit: z.coerce.number().int().min(1).max(200).optional().default(80),
+    offset: z.coerce.number().int().min(0).max(10000).optional().default(0),
+  })
+  .strict();
+export type OntologyInstancesQuery = z.infer<typeof ontologyInstancesQuerySchema>;
+
+/**
  * `GET /api/companies/:companyId/ontology/graph`.
  *
  * `view` names a preset (`depth` + `relations` recipe). An explicit `depth`

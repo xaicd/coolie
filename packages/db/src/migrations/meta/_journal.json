@@ -2066,6 +2066,13 @@
       "when": 1790749200000,
       "tag": "9012_add_company_metadata",
       "breakpoints": true
+    },
+    {
+      "idx": 9013,
+      "version": "7",
+      "when": 1790752800000,
+      "tag": "9013_add_ontology_properties",
+      "breakpoints": true
     }
   ]
 }

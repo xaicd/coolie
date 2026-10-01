@@ -2868,8 +2868,12 @@ export {
   type OntologyGraphResponse,
   type OntologyGraphRoot,
   type OntologyGraphView,
+  type OntologyInstanceRow,
+  type OntologyInstancesResponse,
   type OntologyPath,
   type OntologyPathsResponse,
+  type OntologyPropertiesResponse,
+  type OntologyPropertyEntry,
   type OntologyStatsResponse,
   type OntologyTypeCount,
 } from "./types/entity-relation.js";
@@ -2879,8 +2883,15 @@ export {
   ontologyGraphQuerySchema,
   ontologyGraphViewSchema,
   ontologyPathsQuerySchema,
+  ontologyInstancesQuerySchema,
+  ontologyPropertiesQuerySchema,
+  ontologyPropertiesUpdateSchema,
+  ontologyPropertyEntrySchema,
   type OntologyGraphQuery,
   type OntologyPathsQuery,
+  type OntologyInstancesQuery,
+  type OntologyPropertiesQuery,
+  type OntologyPropertiesUpdate,
 } from "./validators/entity-relation.js";
 
 // Company onboarding (wave155): the 3-step first-run state.
