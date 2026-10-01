@@ -1,0 +1,10 @@
+=== agy prototype run started at $(date -u +"%Y-%m-%dT%H:%M:%SZ") ===
+command: docker exec agy-ubuntu-container bash -c "agy -p \"\$(cat /tmp/agy-prompt.txt)\" --output-format text"
+prompt bytes: 5071
+output: /tmp/wave238-prototypes.md (live)
+=== agy prototype run finished at 2026-10-01T01:06:14Z ===
+exit_code: 0
+output_lines:      374
+output_bytes:    32177
+screens_found: 5
+summary_found: 1
