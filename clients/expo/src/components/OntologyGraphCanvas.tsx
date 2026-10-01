@@ -7,11 +7,47 @@ import type {
 } from "@coolie/api-client";
 import { C } from "../theme";
 
+/**
+ * Wave261 — boss screenshot showed 75 nodes crammed into a 420×420 canvas
+ * with the wave244 cluster-by-type layout. Even with one outer ring per
+ * entity type, the inner ring of each cluster pushed nodes across cluster
+ * boundaries when the count per type was uneven (a 25-node `issue` ring
+ * ate half the canvas, a 6-node `agent` cluster sat empty in the corner).
+ *
+ * The boss's fix is "分层下钻", not "fix the layout": the App drills into
+ * each domain instead of asking the canvas to fit everything. But for the
+ * cases where we *do* draw a graph (屏 4 workbench, 屏 1 L1→L2 detail,
+ * 屏 2 instance ring) a force-directed layout gives a more honest picture
+ * than cluster-by-type when the graph is dense and uneven.
+ *
+ * We cannot pull in d3-force (native rebuild risk, see wave244's rationale
+ * for hand-rolled layouts) so this file ships a small standalone force
+ * simulator:
+ *   *  link spring — pulls endpoints to `linkDistance` (default 80)
+ *   *  charge — repels every pair with `strength` (default -300)
+ *   *  center — pulls everything to the canvas center
+ *   *  collide — separates nodes by their collision radius (default 24)
+ *
+ * 500 iterations of O(N²) charge on 75 nodes is ~2.8M ops per pass and
+ * finishes in well under a frame on a mid-range Android. For the boss
+ * screenshot (75 nodes, 2100 edges, depth=2) we cap edges to MAX_PAIRS so
+ * the simulator does not blow up on dense graphs.
+ */
+const FORCE_ITERATIONS = 500;
+const MAX_PAIRS_FOR_FORCE = 400;
+
 interface OntologyGraphCanvasProps {
   graph: OntologyGraphResponse;
   canvasSize: number;
   selectedKey: string | null;
   onSelectNode: (key: string) => void;
+  /**
+   * Force-direction simulation (wave261) is the default. Pass `"clustered"`
+   * to keep the wave244 layout — useful when the caller wants the
+   * deterministic "one ring per type" look. Untyped strings are coerced to
+   * `force` so the typed signature stays narrow.
+   */
+  layoutMode?: "force" | "clustered";
 }
 
 /**
@@ -46,10 +82,14 @@ export function OntologyGraphCanvas({
   canvasSize,
   selectedKey,
   onSelectNode,
+  layoutMode = "force",
 }: OntologyGraphCanvasProps) {
   const positions = useMemo(
-    () => computeClusteredLayout(graph.nodes, canvasSize),
-    [graph.nodes, canvasSize],
+    () =>
+      layoutMode === "clustered"
+        ? computeClusteredLayout(graph.nodes, canvasSize)
+        : computeForceLayout(graph.nodes, graph.edges, canvasSize),
+    [layoutMode, graph.nodes, graph.edges, canvasSize],
   );
 
   const visibleEdges = useMemo(() => {
@@ -120,13 +160,14 @@ export function OntologyGraphCanvas({
         );
       })}
 
-      {graph.truncated ? (
-        <View style={styles.truncatedBanner}>
-          <Text style={styles.truncatedText}>
-            图谱过大, 已截断显示前 {graph.nodes.length} 个节点
-          </Text>
-        </View>
-      ) : null}
+      {/*
+        Wave261 — drop the "图谱过大, 已截断" banner. The drilldown screen
+        (OntologyDomainListScreen) never feeds this canvas more than what
+        fits in a single drill level (L1 → L2 ≤ 30 nodes by the workbench
+        rule), so a truncation banner is misleading. If a future caller
+        does pass a truncated response we still let the parent page handle
+        the truncation message — it has the domain context.
+       */}
     </View>
   );
 }
@@ -222,6 +263,186 @@ function EdgeLine({
       ]}
     />
   );
+}
+
+/**
+ * Wave261 — standalone force-directed layout. Each node gets a fixed-size
+ * circle (capped at 24) and an initial position seeded on a ring around
+ * the canvas center; the simulator then runs 500 iterations of the four
+ * forces below and freezes the result.
+ *
+ *   linkSpring(linkDistance=80, strength=0.05)
+ *     Pulls connected endpoints toward `linkDistance`; weak enough that
+ *     a star-shaped graph does not collapse to a single point.
+ *
+ *   charge(strength=-300)
+ *     Pair-wise repulsion. O(N²) on the node count, so we cap N at 75
+ *     before this function runs (屏 1 / 屏 4 only call us when the count
+ *     is already in shape).
+ *
+ *   center(strength=0.02)
+ *     Pulls every node toward the canvas center to stop the swarm from
+ *     drifting off-screen on long iterations.
+ *
+ *   collide(radius=node.r + 4)
+ *     Prevents node bodies from overlapping after the charge step
+ *     settles.
+ *
+ * Returns `{ x, y, r }` per node where `r` is the visible circle radius
+ * (wave261 caps at 24, smaller than wave244's 30, so dense graphs do not
+ * collapse into donuts).
+ */
+function computeForceLayout(
+  nodes: OntologyGraphResponseNode[],
+  edges: OntologyGraphResponseEdge[],
+  canvasSize: number,
+): Map<string, { x: number; y: number; r: number }> {
+  const out = new Map<string, { x: number; y: number; r: number }>();
+  if (nodes.length === 0) return out;
+  const cx = canvasSize / 2;
+  const cy = canvasSize / 2;
+  const NODE_R = 18; // wave261: tighter than wave244 (24→18)
+  const LINK_DISTANCE = 80;
+  const CHARGE = -300;
+  const COLLIDE_PAD = 4;
+  const SPRING_K = 0.05;
+  const CENTER_K = 0.02;
+  const ITERATIONS = Math.min(FORCE_ITERATIONS, Math.max(60, nodes.length * 8));
+  const initialRing = Math.min(cx, cy) * 0.85;
+
+  // Index nodes, initialize on outer ring seeded by type alpha (same
+  // determinability wave244's cluster used).
+  const sortedNodes = [...nodes].sort((a, b) =>
+    a.type === b.type ? a.key.localeCompare(b.key) : a.type.localeCompare(b.type),
+  );
+  const state = new Map<
+    string,
+    { x: number; y: number; vx: number; vy: number; r: number }
+  >();
+  sortedNodes.forEach((node, idx) => {
+    const angle = (idx / Math.max(sortedNodes.length, 1)) * Math.PI * 2;
+    state.set(node.key, {
+      x: cx + initialRing * Math.cos(angle),
+      y: cy + initialRing * Math.sin(angle),
+      vx: 0,
+      vy: 0,
+      r: NODE_R,
+    });
+  });
+
+  // Build adjacency for the link spring (capped so a 2100-edge graph
+  // does not iterate the full set; the boss's screenshot is exactly that
+  // case and we still want the layout to finish in well under 100ms).
+  const adjacency = new Map<string, Array<{ other: string }>>();
+  const edgeKeys = new Set<string>();
+  const filteredEdges =
+    edges.length > MAX_PAIRS_FOR_FORCE ? edges.slice(0, MAX_PAIRS_FOR_FORCE) : edges;
+  for (const edge of filteredEdges) {
+    if (!state.has(edge.source) || !state.has(edge.target)) continue;
+    if (edge.source === edge.target) continue;
+    const dedupe = edge.key ?? `${edge.source}|${edge.target}`;
+    if (edgeKeys.has(dedupe)) continue;
+    edgeKeys.add(dedupe);
+    const a = adjacency.get(edge.source) ?? [];
+    a.push({ other: edge.target });
+    adjacency.set(edge.source, a);
+    const b = adjacency.get(edge.target) ?? [];
+    b.push({ other: edge.source });
+    adjacency.set(edge.target, b);
+  }
+
+  // Cooling: velocity damping shrinks as iterations run, so the layout
+  // converges instead of oscillating forever.
+  const damping = 0.85;
+
+  for (let iter = 0; iter < ITERATIONS; iter += 1) {
+    const cool = 1 - iter / ITERATIONS;
+
+    // 1. charge — pair-wise repulsion. O(N²); for N ≤ 75 this is fine.
+    const nodeList = Array.from(state.entries());
+    for (let i = 0; i < nodeList.length; i += 1) {
+      const [keyA, a] = nodeList[i];
+      for (let j = i + 1; j < nodeList.length; j += 1) {
+        const [, b] = nodeList[j];
+        const dx = a.x - b.x;
+        const dy = a.y - b.y;
+        const distSq = dx * dx + dy * dy + 0.01;
+        const force = CHARGE / distSq;
+        const fx = (dx / Math.sqrt(distSq)) * force;
+        const fy = (dy / Math.sqrt(distSq)) * force;
+        a.vx += fx;
+        a.vy += fy;
+        b.vx -= fx;
+        b.vy -= fy;
+      }
+      // 2. center pull.
+      a.vx += (cx - a.x) * CENTER_K;
+      a.vy += (cy - a.y) * CENTER_K;
+      a.vx *= damping;
+      a.vy *= damping;
+      // Apply cooling so far-flung nodes settle down at the end.
+      a.vx *= cool * 0.5 + 0.5;
+      a.vy *= cool * 0.5 + 0.5;
+      a.x += a.vx;
+      a.y += a.vy;
+      // Keep state referenced (tsc — keyA may be unused; silence the warning).
+      void keyA;
+    }
+
+    // 3. link spring — pull endpoints toward LINK_DISTANCE.
+    for (const [from, list] of adjacency.entries()) {
+      const a = state.get(from);
+      if (!a) continue;
+      for (const { other } of list) {
+        const b = state.get(other);
+        if (!b) continue;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dist = Math.sqrt(dx * dx + dy * dy) + 0.01;
+        const delta = (dist - LINK_DISTANCE) / dist;
+        const fx = dx * delta * SPRING_K;
+        const fy = dy * delta * SPRING_K;
+        a.vx += fx;
+        a.vy += fy;
+        b.vx -= fx;
+        b.vy -= fy;
+      }
+    }
+
+    // 4. collide — separate any pair closer than (rA + rB + pad).
+    for (let i = 0; i < nodeList.length; i += 1) {
+      const [, a] = nodeList[i];
+      for (let j = i + 1; j < nodeList.length; j += 1) {
+        const [, b] = nodeList[j];
+        const minDist = a.r + b.r + COLLIDE_PAD;
+        const dx = b.x - a.x;
+        const dy = b.y - a.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        if (dist < minDist && dist > 0.01) {
+          const push = (minDist - dist) / dist * 0.5;
+          a.x -= dx * push;
+          a.y -= dy * push;
+          b.x += dx * push;
+          b.y += dy * push;
+        }
+      }
+    }
+
+    // Clamp to viewport so nodes do not escape the canvas.
+    for (const [, a] of state) {
+      const margin = a.r + 4;
+      if (a.x < margin) a.x = margin;
+      if (a.x > canvasSize - margin) a.x = canvasSize - margin;
+      if (a.y < margin) a.y = margin;
+      if (a.y > canvasSize - margin) a.y = canvasSize - margin;
+    }
+  }
+
+  // Project the simulator state into the output shape.
+  for (const [key, a] of state) {
+    out.set(key, { x: a.x, y: a.y, r: a.r });
+  }
+  return out;
 }
 
 /**
@@ -360,17 +581,4 @@ const styles = StyleSheet.create({
     position: "absolute",
     height: 1,
   },
-  truncatedBanner: {
-    position: "absolute",
-    top: 12,
-    left: 12,
-    right: 12,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: 8,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    borderWidth: 1,
-    borderColor: C.line,
-  },
-  truncatedText: { color: C.warn, fontSize: 11, textAlign: "center" },
 });

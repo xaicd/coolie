@@ -31,6 +31,7 @@ import {
   type OntologyPropertiesResponse,
   type OntologyPropertyEntry,
   type OntologyInstanceRow,
+  type OntologyLevelsResponse,
   type PluginRecord,
   type PluginStatus,
   type PluginConfig,
@@ -1029,6 +1030,21 @@ export class CoolieClient {
     return this.request<OntologyGraphResponse>(
       "GET",
       `/api/companies/${encodeURIComponent(companyId)}/ontology/graph?${q.toString()}`,
+    );
+  }
+
+  /**
+   * Wave261 — five-level drilldown summary (L0 totals / L1 domain / L2
+   * entityType / L3 instance counts per type / L4 property schema refs).
+   * Returns the real (uncapped) totals so the App can decide whether the
+   * graph view will fit (≤ 30 nodes) or fall back to a list. Read-only; any
+   * actor with company access can call it.
+   */
+  async getOntologyLevels(companyId: string): Promise<OntologyLevelsResponse> {
+    const q = new URLSearchParams({ companyId });
+    return this.request<OntologyLevelsResponse>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/ontology/levels?${q.toString()}`,
     );
   }
 

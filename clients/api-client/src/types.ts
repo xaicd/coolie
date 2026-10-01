@@ -998,6 +998,42 @@ export interface OntologyGraphResponse {
 }
 
 /**
+ * Wave261 — five-level drilldown summary. Mirrors
+ * `OntologyLevelsResponse` in `@paperclipai/shared`. The App receives the
+ * real totals (no MAX_NODES cap) bucketed by domain + entityType so it can
+ * pick between graph view (≤ 30 nodes) and list view (> 30 nodes).
+ *
+ * Domain → entityType mapping is server-side; the App treats each
+ * `byDomain[]` entry as one "chip" in the L1 row, and each
+ * `byEntityType[]` entry as one row in L2.
+ */
+export interface OntologyEntityTypeLevel {
+  entityType: string;
+  count: number;
+  edgeCount: number;
+}
+
+export interface OntologyDomainLevel {
+  /** category label ("业务" / "项目" / "员工" / "资产" / "模板") or
+   *  "uncategorized". Stable id within the L1 row. */
+  domainId: string;
+  displayName: string;
+  category: string;
+  lifecycleState: string;
+  typeCount: number;
+  instanceCount: number;
+  edgeCount: number;
+}
+
+export interface OntologyLevelsResponse {
+  companyId: string;
+  totalNodes: number;
+  totalEdges: number;
+  byEntityType: OntologyEntityTypeLevel[];
+  byDomain: OntologyDomainLevel[];
+}
+
+/**
  * Wave239 — 屏 2 (instance graph). One row per object of the requested
  * type. `ownerId` is pulled from the `assigned_to` edge when present.
  */

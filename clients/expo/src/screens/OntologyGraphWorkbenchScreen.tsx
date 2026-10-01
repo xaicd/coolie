@@ -52,7 +52,32 @@ export function OntologyGraphWorkbenchScreen({
   company,
   onBack,
 }: OntologyGraphWorkbenchScreenProps) {
-  const [view, setView] = useState<"project_tree" | "agent_dashboard" | "conversation_thread" | "mixed">("project_tree");
+  const [view, setView] = useState<
+    "project_tree" | "agent_dashboard" | "conversation_thread" | "mixed"
+  >("project_tree");
+  /**
+   * Wave261 — five-level drilldown workbench presets. Each preset maps to
+   * one level from the L0/L1/L2/L3/L4 ladder so the immersive canvas here
+   * mirrors the 屏 1 breadcrumb.
+   *
+   *   L0 公司 — `project_tree`, depth 2 (default whole-company topology)
+   *   L1 域   — `mixed`, depth 1, no root (cluster-by-category layout)
+   *   L2 类型 — `project_tree`, depth 1, narrower relations
+   *   L3 实例 — `agent_dashboard`, depth 2 (instance graph with ring)
+   *   L4 属性 — `conversation_thread`, depth 1 (single hop neighborhood)
+   *
+   * The canvas uses wave261 force layout (replaces wave244 cluster-by-type)
+   * so the picture stays readable at 30 nodes while still scaling to the
+   * 1600-pixel canvas when zoomed in.
+   */
+  const DRILL_PRESETS = [
+    { key: "L0" as const, label: "L0 公司", depth: 2, view: "project_tree" as const },
+    { key: "L1" as const, label: "L1 域", depth: 1, view: "mixed" as const },
+    { key: "L2" as const, label: "L2 类型", depth: 1, view: "project_tree" as const },
+    { key: "L3" as const, label: "L3 实例", depth: 2, view: "agent_dashboard" as const },
+    { key: "L4" as const, label: "L4 属性", depth: 1, view: "conversation_thread" as const },
+  ];
+  const [drillPreset, setDrillPreset] = useState<(typeof DRILL_PRESETS)[number]["key"]>("L0");
   const [data, setData] = useState<OntologyGraphResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -68,14 +93,20 @@ export function OntologyGraphWorkbenchScreen({
   const initialDistance = useRef<number | null>(null);
 
   const load = useCallback(
-    async (currentView: typeof view) => {
+    async (
+      currentView: typeof view,
+      presetKey: (typeof DRILL_PRESETS)[number]["key"],
+    ) => {
       setError(null);
       try {
+        const preset = DRILL_PRESETS.find((p) => p.key === presetKey);
+        const depth = preset?.depth ?? 2;
         const res =
           currentView === "mixed"
-            ? await coolie.getOntologyGraph(company.id, { depth: 2 })
+            ? await coolie.getOntologyGraph(company.id, { depth })
             : await coolie.getOntologyGraph(company.id, {
                 view: currentView,
+                depth,
               });
         setData(res);
       } catch (e) {
@@ -89,19 +120,19 @@ export function OntologyGraphWorkbenchScreen({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void load(view).finally(() => {
+    void load(view, drillPreset).finally(() => {
       if (!cancelled) setLoading(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [load, view]);
+  }, [load, view, drillPreset]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await load(view);
+    await load(view, drillPreset);
     setRefreshing(false);
-  }, [load, view]);
+  }, [load, view, drillPreset]);
 
   const reset = useCallback(() => {
     pan.setValue({ x: 0, y: 0 });
@@ -116,8 +147,9 @@ export function OntologyGraphWorkbenchScreen({
     // Compute a coarse scale based on node count so a small graph stays
     // readable and a large graph gets zoomed out.
     if (!data) return;
+    // Wave261 — wider zoom range (0.5x - 4x) for drilldown.
     const count = data.nodes.length;
-    const target = Math.max(0.4, Math.min(1.4, 400 / Math.max(count, 1) + 0.4));
+    const target = Math.max(0.5, Math.min(1.6, 400 / Math.max(count, 1) + 0.4));
     scale.setValue(target);
     lastScale.current = target;
     pan.setValue({ x: 0, y: 0 });
@@ -150,7 +182,8 @@ export function OntologyGraphWorkbenchScreen({
               initialDistance.current = distance;
             } else {
               const ratio = distance / initialDistance.current;
-              const next = Math.max(0.4, Math.min(2.5, lastScale.current * ratio));
+              // Wave261 — wider zoom range (0.5x - 4x).
+              const next = Math.max(0.5, Math.min(4, lastScale.current * ratio));
               scale.setValue(next);
             }
           } else {
@@ -205,30 +238,26 @@ export function OntologyGraphWorkbenchScreen({
         }
       />
 
-      {/* 视图切换 chip 行 (agy 草图 §4 顶部) */}
+      {/* 视图切换 chip 行 (wave261: 5 视图预设 L0/L1/L2/L3/L4) */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.viewRow}
       >
-        {(
-          [
-            { key: "project_tree", label: "类型" },
-            { key: "agent_dashboard", label: "实例" },
-            { key: "conversation_thread", label: "对话" },
-            { key: "mixed", label: "混合" },
-          ] as const
-        ).map((opt) => (
+        {DRILL_PRESETS.map((opt) => (
           <Pressable
             key={opt.key}
-            onPress={() => setView(opt.key)}
+            onPress={() => {
+              setDrillPreset(opt.key);
+              setView(opt.view);
+            }}
             hitSlop={4}
-            style={[styles.viewChip, view === opt.key && styles.viewChipActive]}
+            style={[styles.viewChip, drillPreset === opt.key && styles.viewChipActive]}
           >
             <Text
               style={[
                 styles.viewChipText,
-                view === opt.key && styles.viewChipTextActive,
+                drillPreset === opt.key && styles.viewChipTextActive,
               ]}
             >
               {opt.label}
@@ -240,7 +269,7 @@ export function OntologyGraphWorkbenchScreen({
       {loading ? (
         <LoadingState text="加载图谱…" />
       ) : error ? (
-        <ErrorRetry message={error} onRetry={() => void load(view)} />
+        <ErrorRetry message={error} onRetry={() => void load(view, drillPreset)} />
       ) : (
         <View style={styles.canvasWrap} {...responder.panHandlers}>
           <Animated.View
@@ -279,12 +308,12 @@ export function OntologyGraphWorkbenchScreen({
           {/* 左下浮动工具盘 */}
           <View style={styles.toolPalette}>
             <ToolButton icon="add-outline" onPress={() => {
-              const next = Math.min(2.5, lastScale.current + 0.2);
+              const next = Math.min(4, lastScale.current + 0.2);
               scale.setValue(next);
               lastScale.current = next;
             }} />
             <ToolButton icon="remove-outline" onPress={() => {
-              const next = Math.max(0.4, lastScale.current - 0.2);
+              const next = Math.max(0.5, lastScale.current - 0.2);
               scale.setValue(next);
               lastScale.current = next;
             }} />

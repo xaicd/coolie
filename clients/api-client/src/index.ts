@@ -128,6 +128,10 @@ export type {
   OntologyInstancesResponse,
   OntologyPropertyEntry,
   OntologyPropertiesResponse,
+  // wave261: drilldown summary
+  OntologyEntityTypeLevel,
+  OntologyDomainLevel,
+  OntologyLevelsResponse,
   SetDomainLifecycleOptions,
   CompanyArtifactSource,
   CompanyArtifactMediaKind,

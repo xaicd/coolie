@@ -8,6 +8,7 @@ import {
   type Issue,
   type IssueStatus,
   type OntologyDomain,
+  type OntologyLevelsResponse,
   type Project,
   type SessionUser,
 } from "@coolie/api-client";

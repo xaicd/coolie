@@ -228,6 +228,13 @@ export function OntologyInstanceGraphScreen({
   );
 
   const headerSubtitle = `${instances.length} 个实例 · 类型 ${entityType}`;
+  // Wave261 — boss screenshot showed 75 nodes crammed into a 360×360 ring
+  // (wave244 cluster-by-type). Anything above GRAPH_NODE_LIMIT defaults to
+  // the list card; the boss's drilldown screen now feeds the type-level
+  // pick instead, so this is the last line of defense for callers that
+  // arrive here directly (long-press from 屏 1's L1 chip row).
+  const GRAPH_NODE_LIMIT = 30;
+  const showGraph = instances.length > 0 && instances.length <= GRAPH_NODE_LIMIT;
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -308,99 +315,115 @@ export function OntologyInstanceGraphScreen({
             />
           }
         >
-          {/* 实例图谱 (mini graph) */}
-          <AppCard variant="surface" padding={SPACING.md} style={styles.canvasCard}>
-            <View style={styles.canvasHeader}>
-              <Text style={styles.canvasTitle}>实例拓扑</Text>
-              <Text style={styles.canvasSub}>
-                {instances.length} 个节点 · 选中节点高亮 1 跳邻居 · 双指缩放 / 单指拖动
-              </Text>
-            </View>
-            <View style={styles.canvasViewport} {...viewportResponder.panHandlers}>
-              <Animated.View
-                style={{
-                  width: 420,
-                  height: 420,
-                  transform: [
-                    { translateX: pan.x },
-                    { translateY: pan.y },
-                    { scale },
-                  ],
-                }}
-              >
-                {/* 连线 (1 跳邻居) */}
-                {selectedId
-                  ? instances
-                      .filter((row) => linkedNodes.has(row.id))
-                      .map((row) => {
-                        const a = positions.get(selectedId);
-                        const b = positions.get(row.id);
-                        if (!a || !b) return null;
-                        return (
-                          <Edge
-                            key={`e-${selectedId}-${row.id}`}
-                            ax={a.x}
-                            ay={a.y}
-                            bx={b.x}
-                            by={b.y}
-                          />
-                        );
-                      })
-                  : null}
-                {/* 节点气泡: 内圈显示 1..N 序号, label 移出到节点下方独立 Text. */}
-                {instances.map((row, idx) => {
-                  const pos = positions.get(row.id);
-                  if (!pos) return null;
-                  const isSelected = row.id === selectedId;
-                  const isLinked = linkedNodes.has(row.id);
-                  return (
-                    <Pressable
-                      key={`n-${row.id}`}
-                      onPress={() => setSelectedId((prev) => (prev === row.id ? null : row.id))}
-                      onLongPress={() => onDelete(row)}
-                      hitSlop={6}
-                      style={[
-                        styles.nodeWrap,
-                        {
-                          left: pos.x - pos.r - 18,
-                          top: pos.y - pos.r,
-                          width: pos.r * 2 + 36,
-                        },
-                      ]}
-                    >
-                      <View
+          {showGraph ? (
+            <AppCard variant="surface" padding={SPACING.md} style={styles.canvasCard}>
+              <View style={styles.canvasHeader}>
+                <Text style={styles.canvasTitle}>实例拓扑</Text>
+                <Text style={styles.canvasSub}>
+                  {instances.length} 个节点 · 选中节点高亮 1 跳邻居 · 双指缩放 / 单指拖动
+                </Text>
+              </View>
+              <View style={styles.canvasViewport} {...viewportResponder.panHandlers}>
+                <Animated.View
+                  style={{
+                    width: 420,
+                    height: 420,
+                    transform: [
+                      { translateX: pan.x },
+                      { translateY: pan.y },
+                      { scale },
+                    ],
+                  }}
+                >
+                  {/* 连线 (1 跳邻居) */}
+                  {selectedId
+                    ? instances
+                        .filter((row) => linkedNodes.has(row.id))
+                        .map((row) => {
+                          const a = positions.get(selectedId);
+                          const b = positions.get(row.id);
+                          if (!a || !b) return null;
+                          return (
+                            <Edge
+                              key={`e-${selectedId}-${row.id}`}
+                              ax={a.x}
+                              ay={a.y}
+                              bx={b.x}
+                              by={b.y}
+                            />
+                          );
+                        })
+                    : null}
+                  {/* 节点气泡: 内圈显示 1..N 序号, label 移出到节点下方独立 Text. */}
+                  {instances.map((row, idx) => {
+                    const pos = positions.get(row.id);
+                    if (!pos) return null;
+                    const isSelected = row.id === selectedId;
+                    const isLinked = linkedNodes.has(row.id);
+                    return (
+                      <Pressable
+                        key={`n-${row.id}`}
+                        onPress={() => setSelectedId((prev) => (prev === row.id ? null : row.id))}
+                        onLongPress={() => onDelete(row)}
+                        hitSlop={6}
                         style={[
-                          styles.node,
+                          styles.nodeWrap,
                           {
-                            width: pos.r * 2,
-                            height: pos.r * 2,
-                            borderRadius: pos.r,
-                            borderColor: isSelected ? C.accent : isLinked ? C.accent : C.line,
-                            backgroundColor: isSelected
-                              ? "rgba(94, 106, 210, 0.25)"
-                              : isLinked
-                              ? "rgba(94, 106, 210, 0.12)"
-                              : C.panel,
+                            left: pos.x - pos.r - 18,
+                            top: pos.y - pos.r,
+                            width: pos.r * 2 + 36,
                           },
                         ]}
                       >
-                        <Text style={styles.nodeIndex}>{idx + 1}</Text>
-                      </View>
-                      <Text
-                        style={styles.nodeLabel}
-                        numberOfLines={1}
-                      >
-                        {truncate(row.label, 12)}
-                      </Text>
-                    </Pressable>
-                  );
-                })}
-                {selectedId ? null : (
-                  <Text style={styles.canvasHint}>点击节点查看 1 跳邻居 · 长按节点查看详情</Text>
-                )}
-              </Animated.View>
-            </View>
-          </AppCard>
+                        <View
+                          style={[
+                            styles.node,
+                            {
+                              width: pos.r * 2,
+                              height: pos.r * 2,
+                              borderRadius: pos.r,
+                              borderColor: isSelected ? C.accent : isLinked ? C.accent : C.line,
+                              backgroundColor: isSelected
+                                ? "rgba(94, 106, 210, 0.25)"
+                                : isLinked
+                                ? "rgba(94, 106, 210, 0.12)"
+                                : C.panel,
+                            },
+                          ]}
+                        >
+                          <Text style={styles.nodeIndex}>{idx + 1}</Text>
+                        </View>
+                        <Text
+                          style={styles.nodeLabel}
+                          numberOfLines={1}
+                        >
+                          {truncate(row.label, 12)}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                  {selectedId ? null : (
+                    <Text style={styles.canvasHint}>点击节点查看 1 跳邻居 · 长按节点查看详情</Text>
+                  )}
+                </Animated.View>
+              </View>
+            </AppCard>
+          ) : (
+            /*
+              Wave261 — anything above GRAPH_NODE_LIMIT falls back to the
+              list card. The boss screenshot showed the cluster ring
+              collapsing at 75; this is the last line of defense for callers
+              that arrive here directly.
+             */
+            <AppCard variant="surface" padding={SPACING.md} style={styles.canvasCard}>
+              <View style={styles.canvasHeader}>
+                <Text style={styles.canvasTitle}>实例较多, 已切换为列表视图</Text>
+                <Text style={styles.canvasSub}>
+                  {instances.length} 个实例 · 超过 {GRAPH_NODE_LIMIT} 节点 · 列表模式便于检索
+                </Text>
+              </View>
+            </AppCard>
+          )}
 
           {/* 选中节点的详情卡 */}
           {selectedId ? (

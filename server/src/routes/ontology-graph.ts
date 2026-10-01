@@ -18,6 +18,7 @@ import { assertBoard, assertCompanyAccess, getActorInfo } from "./authz.js";
  *   GET  /api/companies/:companyId/ontology/graph?root_type=&root_id=&depth=&view=
  *   GET  /api/companies/:companyId/ontology/paths?src_type=&src_id=&target_type=&target_id=
  *   GET  /api/companies/:companyId/ontology/stats
+ *   GET  /api/companies/:companyId/ontology/levels   (wave261 — drilldown summary)
  *   POST /api/companies/:companyId/ontology/backfill   (wave155)
  *
  * Every route is company-scoped: `assertCompanyAccess` runs first, and the
@@ -66,6 +67,18 @@ export function ontologyGraphRoutes(db: Db) {
     const companyId = req.params.companyId as string;
     assertCompanyAccess(req, companyId);
     res.json(await svc.stats(companyId));
+  });
+
+  /**
+   * Wave261 — five-level drilldown summary. Read-only, returns the company's
+   * real (uncapped) totals bucketed by domain + entityType so the App can
+   * decide whether to enter a graph view (≤ 30 nodes) or stay in list mode.
+   * No mutating effect; any actor with company access can read it.
+   */
+  router.get("/companies/:companyId/ontology/levels", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    assertCompanyAccess(req, companyId);
+    res.json(await svc.summarizeLevels(companyId));
   });
 
   // Derive the link rows a company's existing data already implies. Idempotent

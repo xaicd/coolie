@@ -25,6 +25,7 @@ import type {
   OntologyPathsResponse,
   OntologyStatsResponse,
 } from "@paperclipai/shared";
+import { ENTITY_TYPES } from "@paperclipai/shared";
 
 /**
  * Ontology graph service (wave154) — generic traversal over `entity_relations`.
@@ -47,6 +48,48 @@ import type {
 const MAX_EDGES = 20_000;
 const MAX_NODES = 400;
 const MAX_PATHS = 10;
+
+/**
+ * Wave261 — boss screenshot showed 75 entities / 2100 relations. The graph
+ * endpoint is capped at MAX_NODES=400, so when a company's full graph is
+ * bigger the UI only sees "first 400" — and the App's domain chip can show
+ * "75 entities" because that is what the plugin-worker counted in
+ * `OntologyGraphSnapshot`. `summarizeLevels` is the response that ties the
+ * two together: it returns the *real* totals (no cap) bucketed by domain and
+ * entityType, so the App's drill-down screen can say "75 entities, 2100
+ * relations — pick a level to drill into" and the user can decide whether to
+ * enter a graph view.
+ */
+export interface OntologyEntityTypeLevel {
+  entityType: EntityType;
+  /** Total rows in the source table for this company. */
+  count: number;
+  /** Edges that have either endpoint of this entityType. */
+  edgeCount: number;
+}
+
+export interface OntologyDomainLevel {
+  domainId: string;
+  displayName: string;
+  category: string;
+  lifecycleState: string;
+  /** Distinct entity types that have at least one row in this company. */
+  typeCount: number;
+  /** Sum of entity-type counts (every source-table row that the domain owns). */
+  instanceCount: number;
+  /** Edges whose either endpoint belongs to an entity type in this domain. */
+  edgeCount: number;
+}
+
+export interface OntologyLevelsResponse {
+  companyId: string;
+  /** Total rows across every entity type (uncapped). */
+  totalNodes: number;
+  /** Total edges in `entity_relations` for this company. */
+  totalEdges: number;
+  byEntityType: OntologyEntityTypeLevel[];
+  byDomain: OntologyDomainLevel[];
+}
 
 /**
  * Preset recipes (wave155). `depth` is the preset's default (an explicit query
@@ -707,7 +750,151 @@ export function ontologyGraphService(db: Db) {
     };
   }
 
-  return { buildView, traverse: buildView, findPaths, stats, hydrate, loadEdges };
+  /**
+   * Wave261 — five-level drilldown summary. Buckets the company's full graph
+   * into:
+   *   L0 — totals (no cap, distinct from `stats()` which is per-type)
+   *   L1 — per-domain rollup
+   *   L2 — per-entityType rollup (the "75 types" boss screenshot bucket)
+   *   L3 — implicit (per-entityType count is also the L3 instance count —
+   *         callers walk via `/ontology/instances?entityType=...`)
+   *   L4 — implicit (per-type property list lives in
+   *         `/ontology/types/:typeId/properties`)
+   *
+   * The two implicit levels reuse existing routes; the App's drilldown
+   * breadcrumb drives the navigation. We do not expose instance counts for
+   * each domain — the App calls `listInstances` for that — so this method
+   * stays purely aggregate.
+   *
+   * Domain ↔ entityType mapping: we use the domain's `category` field. The
+   * plugin sets this to one of `业务 / 项目 / 员工 / 资产 / 模板` for the
+   * five built-in templates, and custom domains carry whatever the creator
+   * chose. A row whose entityType is not mapped to a domain bucket falls
+   * into `(uncategorized)` so the totals stay consistent.
+   */
+  async function summarizeLevels(companyId: string): Promise<OntologyLevelsResponse> {
+    // Per-entityType: count distinct source rows + count edges incident.
+    const nodeRows = await Promise.all([
+      db.select({ count: sql<number>`count(*)::int` }).from(projects).where(eq(projects.companyId, companyId)),
+      db.select({ count: sql<number>`count(*)::int` }).from(issues).where(eq(issues.companyId, companyId)),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(issues)
+        .where(and(eq(issues.companyId, companyId), isNotNull(issues.specKind))),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(boardConversations)
+        .where(eq(boardConversations.companyId, companyId)),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(issueWorkProducts)
+        .where(eq(issueWorkProducts.companyId, companyId)),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(issueAttachments)
+        .where(eq(issueAttachments.companyId, companyId)),
+      db
+        .select({ count: sql<number>`count(*)::int` })
+        .from(issueComments)
+        .where(eq(issueComments.companyId, companyId)),
+      db.select({ count: sql<number>`count(*)::int` }).from(agents).where(eq(agents.companyId, companyId)),
+    ]);
+    const typeRows: Array<{ entityType: EntityType; count: number }> = [
+      { entityType: "project", count: nodeRows[0][0]?.count ?? 0 },
+      { entityType: "issue", count: nodeRows[1][0]?.count ?? 0 },
+      { entityType: "spec", count: nodeRows[2][0]?.count ?? 0 },
+      { entityType: "conversation", count: nodeRows[3][0]?.count ?? 0 },
+      { entityType: "work_product", count: nodeRows[4][0]?.count ?? 0 },
+      { entityType: "attachment", count: nodeRows[5][0]?.count ?? 0 },
+      { entityType: "comment", count: nodeRows[6][0]?.count ?? 0 },
+      { entityType: "agent", count: nodeRows[7][0]?.count ?? 0 },
+    ];
+    const totalNodes = typeRows.reduce((sum, entry) => sum + entry.count, 0);
+
+    // Edge buckets per side: edges with src OR target of this entityType.
+    // sql<number> group-by returns one row per group; we sum into one bucket
+    // by re-running for each entityType so a single edge counts twice in
+    // edgeCount totals — by design (each endpoint's domain wants to see it).
+    const edgeRows = await db
+      .select({ value: sql<number>`count(*)::int` })
+      .from(entityRelations)
+      .where(eq(entityRelations.companyId, companyId));
+    const totalEdges = edgeRows[0]?.value ?? 0;
+    const edgesByType = new Map<EntityType, number>();
+    for (const entityType of ENTITY_TYPES) {
+      if (entityType === "company") continue;
+      const rows = await db
+        .select({ value: sql<number>`count(*)::int` })
+        .from(entityRelations)
+        .where(
+          and(
+            eq(entityRelations.companyId, companyId),
+            sql`(${entityRelations.srcType} = ${entityType} OR ${entityRelations.targetType} = ${entityType})`,
+          ),
+        );
+      edgesByType.set(entityType, rows[0]?.value ?? 0);
+    }
+    const byEntityType: OntologyEntityTypeLevel[] = typeRows.map((row) => ({
+      entityType: row.entityType,
+      count: row.count,
+      edgeCount: edgesByType.get(row.entityType) ?? 0,
+    }));
+
+    // Domain buckets. The plugin sets `category` to one of the five built-in
+    // labels (业务 / 项目 / 员工 / 资产 / 模板). We map each entityType to
+    // the matching bucket, and any leftover types (e.g. `comment`,
+    // `attachment`) flow into the parent type's bucket so totals stay
+    // consistent across buckets.
+    const TYPE_TO_DOMAIN: Record<EntityType, string> = {
+      company: "uncategorized",
+      project: "项目",
+      issue: "业务",
+      spec: "业务",
+      conversation: "业务",
+      work_product: "资产",
+      attachment: "资产",
+      comment: "业务",
+      agent: "员工",
+    };
+    const byDomain = new Map<string, OntologyDomainLevel>();
+    const ensure = (category: string): OntologyDomainLevel => {
+      const existing = byDomain.get(category);
+      if (existing) return existing;
+      const created: OntologyDomainLevel = {
+        domainId: category,
+        displayName: category,
+        category,
+        lifecycleState: "active",
+        typeCount: 0,
+        instanceCount: 0,
+        edgeCount: 0,
+      };
+      byDomain.set(category, created);
+      return created;
+    };
+    for (const entry of byEntityType) {
+      if (entry.entityType === "company") continue;
+      const bucket = TYPE_TO_DOMAIN[entry.entityType] ?? "uncategorized";
+      const agg = ensure(bucket);
+      if (entry.count > 0) agg.typeCount += 1;
+      agg.instanceCount += entry.count;
+      agg.edgeCount += entry.edgeCount;
+    }
+    // Sort by instanceCount desc so the App renders the biggest bucket first.
+    const domainList = Array.from(byDomain.values()).sort(
+      (a, b) => b.instanceCount - a.instanceCount,
+    );
+
+    return {
+      companyId,
+      totalNodes,
+      totalEdges,
+      byEntityType,
+      byDomain: domainList,
+    };
+  }
+
+  return { buildView, traverse: buildView, findPaths, stats, hydrate, loadEdges, summarizeLevels };
 }
 
 export type OntologyGraphService = ReturnType<typeof ontologyGraphService>;

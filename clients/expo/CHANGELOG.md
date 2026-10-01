@@ -4,6 +4,86 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.6.19
+
+> Released: 2026-10-01 · Android release APK + OTA bundle
+
+### 更新
+
+- **wave261** — 业务本体真5 层下钻 (boss 0.6.10 真机截图 18:48 — 75 实体 2100 关系挤成环 + "图谱过大, 已截断显示前 75 个节点" 横幅, boss 问 "本体分层下钻问题解决吗"):
+  - **L0 公司 → L1 域 → L2 类型 → L3 实例 → L4 属性** 5 层 UX 真实现, 老板可以一层层点进去, 不再被环图截断.
+  - 新 server route `GET /api/companies/:companyId/ontology/levels` (`server/src/services/ontology-graph.ts` `summarizeLevels` + `server/src/routes/ontology-graph.ts` 第 65 行): 返回真实 (不限 MAX_NODES=400) 的 5 域 + 8 entityType + totalNodes / totalEdges 汇总. 客户端拿到总数后决定走图还是列表.
+  - **重写 `OntologyDomainListScreen.tsx`** (2021 → 1106 行): 删 wave239/wave244 同屏内嵌环图 (`viewMode==="graph"`), 改 4 状态机 `L1-domains / L2-types / L3-instances / L4-properties`. L2 类型 FlatList 全显示 (不截断), L3 实例走 `coolie.listOntologyInstances(limit=200)` validator 上限, L4 属性 = 实例 metadata + 该 type 的 schema (复用 `getOntologyTypeProperties`).
+  - 新 `OntologyDrillBreadcrumb` 组件 (`clients/expo/src/components/OntologyDrillBreadcrumb.tsx` ~150 行): 顶部面包屑 5 段, 每段可点回跳, 末段是当前层级 (chip 高亮). token 化 (alpha(C.accent, 0.18) 当前 / C.ink3 既往 / C.ink4 分隔符 `›`).
+  - **`OntologyGraphCanvas.tsx` 替换 wave244 cluster-by-type 为 wave261 自写 force layout** (~150 行): `linkSpring(linkDistance=80)` + `charge(strength=-300)` + `center(0.02)` + `collide(r=18+4)`, 500 次迭代 O(N²) charge. N=75 节点 < 100ms 实测. 节点半径上限从 wave244 的 30 砍到 18 (避免挤压). `layoutMode="force" | "clustered"` prop 保留 cluster 算法 fallback. **不引 d3-force** (native rebuild 风险, wave244 同款原则).
+  - **`OntologyInstanceGraphScreen.tsx` ≤30 节点才显示图**: `GRAPH_NODE_LIMIT=30` 阈值, >30 节点顶部出横幅 "实例较多, 已切换为列表视图", 直接转实例列表卡 (避免老板的 75 实例环图挤爆).
+  - **`OntologyGraphWorkbenchScreen.tsx` 5 视图预设**: 顶部 chip 行从 4 项 (`project_tree / agent_dashboard / conversation_thread / mixed`) 改为 5 项 `L0 公司 / L1 域 / L2 类型 / L3 实例 / L4 属性`, 每个 map 到 server view + depth. 缩放范围 0.5x - 4x (原来 0.4x - 2.5x 放宽).
+  - api-client 扩 `getOntologyLevels()` (`clients/api-client/src/client.ts` ~17 行) + 类型 `OntologyLevelsResponse / OntologyDomainLevel / OntologyEntityTypeLevel` (`clients/api-client/src/types.ts` ~30 行 + index.ts 导出).
+  - 删 `OntologyGraphCanvas.tsx` `truncatedBanner` 样式 + "图谱过大, 已截断显示前 N 个节点" 横幅 (drilldown 后不截断, 这个横幅误导老板).
+  - **不动** wave250 (7 primitives) / wave245 (调研) / wave244 (节点文字兜底) / wave239 (5 屏存在) / wave237 (17 端点) / wave258 (派活精准) / server 业务 / ontology_properties / ontology_types 数据 / wave222 派活算法 / AGENT_ROLES enum / 13 数字员工相关 scripts / mcp server / h5 client / web ui.
+- **bump 0.6.17 → 0.6.19** (`app.json` + `package.json` + `android/app/build.gradle` versionCode 617 → 619). 跳 0.6.18 是为了和并发 session 在打的某波不撞 versionCode.
+
+---
+
+## v0.6.17
+
+> Released: 2026-10-01 · Android release APK + OTA bundle
+
+### 更新
+
+- **wave258** — CMMI 5 阶段 25 任务全 skill 清单 + 删 13 数字员工 + 派活精准浮层 (boss 原话 4 条: "cmmi 角色就挺好的, 5 员工 + 1 传话" + "中文二字技能, 把 cmmi 任务中所有包含的技能都列全了, 方便后续派活精准" + "技能不是 cli 工具, 是 skills, 得区分了" + "不要 13 员工"):
+  - 30 个中文 2 字 skill 全集 (`server/src/services/dispatch-skill-matcher.ts` `CMMI_SKILLS`): 调研 / 画图 / 选型 / 研判 / 文档 / 评审 / 立项 / 规划 / 设计 / 编码 / 重构 / 测试 / 修复 / 联调 / 部署 / 运维 / 监控 / 应急 / 命令 / 脚本 / 自动化 / 数据 / 分析 / 报告 / 派活 / 验收 / 调度 / 复盘 / 预算 / 风控. 从 CMMI 5 阶段 25 任务的派活路径反讲.
+  - 6 老板团队 skill × tools 矩阵 (`scripts/seed-agent-roles.ts` 真值表, 沿用 wave256 已就位版本):
+    - Hermes (PM): skills=[派活/验收/报告/调度/评审/复盘/立项/文档] tools=[agy, claude-glm]
+    - 墨斗 (FDA): skills=[调研/画图/选型/研判/文档/设计/立项/规划] tools=[agy, claude-glm]
+    - 铁匠 (Core SWE): skills=[编码/重构/测试/修复/联调/文档/设计/评审] tools=[cmd, claude-mm]
+    - 兑底渊 (PRE-SRE): skills=[部署/运维/监控/应急/自动化/脚本/命令/风控] tools=[cmd, claude-mm]
+    - 门神 (FDSE): skills=[命令/脚本/自动化/部署/联调/测试/调研/文档] tools=[cmd, claude-mm]
+    - 百晓生 (DS): skills=[数据/分析/报告/测试/验收/复盘/风控/评审] tools=[claude-mm, claude-glm]
+  - 删 13 数字员工 (老板 "不要 13 员工"): 新迁移 `9022_delete_13_digital_employees.sql` `DELETE FROM agents WHERE name IN ('QA Lead', 'Mobile Tester', ...)` — 直接按 name 删, 不依赖 company name. 涉及 6 QA (wave217, QA-Test-Workshop) + 7 Ops (wave220, Coolie-Ops-Control-Room). 公司本身保留, 只删员工.
+  - 派活精准匹配 (`server/src/services/dispatch-skill-matcher.ts` + `__tests__/dispatch-skill-matcher.test.ts`): 输入中文 2 字 skill (/ 分隔) → 公司内 6 老板团队 × 评分 (matched / input.length * 100), 降序排序, 平局按名字升序 (Unicode 码点, 非拼音). Hermes chat 反讲用. 算法层与 App 端 `SkillMatcherSheet` 口径一致 (10 unit test 全过).
+  - 新 `clients/expo/src/components/SkillMatcherSheet.tsx` (派活精准浮层, ~290 行): 顶部输入框 + 6 员工列表 (按评分排序, 显示 role 徽章 + matched skills 绿色 chip + 评分) + 点员工 → 复制到 clipboard + Toast 提示. 用 react-native 自带 `Clipboard` (不引 expo-clipboard 避免 native module 风险, wave244 同款原则).
+  - `OrgAssetsScreen` 顶部加 "🎯 派活精准" 入口 (跟 "更多" / "成本核算" 同级, 不抢 segmented control 的位置).
+  - **不动** wave254 (TasksScreen) / wave255 (0.6.15) / wave256 (数字员工卡基线 — `tools` 列 + 中文 2 字 skills + tool chip 行 + 详情 sheet "工具" 段 已在 wave256 113d4af21 落地) / wave244 (图谱) / wave251 (chip 去重) / wave222 (派活算法) / AGENT_ROLES enum (5 角色不变) / `.agents/skills/qa-*` `/ ops-*` 目录 / qa-bootstrap-team / qa-bootstrap-ops 脚本 (改了就违背 "不动 13 数字员工相关 scripts") / mcp server / server 业务代码.
+- **bump 0.6.16 → 0.6.17** (`app.json` + `package.json` + `android/app/build.gradle` versionCode 616 → 617).
+
+---
+
+## v0.6.16
+
+> Released: 2026-10-01 · Android release APK + OTA bundle
+
+### 更新
+
+- **wave256** — 数字员工卡显示职责 / 技能 / 真名 (boss 0.6.10 真机截图 18:22 — 5 员工都显示「空闲」+「claude_local」, 老板看不出区别, Hermes 名字被裁切):
+  - 新 `AssetsAgentCard`: 大字真名 (numberOfLines=2, flexShrink 防裁切) + 角色徽章 chip (FDA 红 / Core SWE 蓝 / PRE-SRE 绿 / FDSE 紫 / DS 橙 / 通用灰, 6 色) + 1 行职责 (responsibilities[0]) + 3-5 个技能 chip (末尾 +N 折叠) + 状态点 + 「已完成 N」软指标. 颜色全走 token (alpha() + C.xxx), 不裸写 hex.
+  - `AgentsScreen` 列表行整体替换为 `<AssetsAgentCard>`, 详情弹卡 (`AgentDetailSheet`) 头部加 roleLabel + 完整职责 chip 行 (卡片只展示 1 行, 详情展示全部).
+  - agents 表加 3 字段 (NULL-safe): `role_label` (text) / `responsibilities` (jsonb string[]) / `skills` (jsonb string[]). 新迁移 `9021_add_agent_role_responsibilities_skills.sql` (3 个 ALTER TABLE ... IF NOT EXISTS). 不破坏上游 wave65 删 title 的简化, 不动 AGENT_ROLES enum.
+  - 新 `scripts/seed-agent-roles.ts` (幂等 UPDATE WHERE id): 6 老板团队 (Hermes PM / 铁匠 Core SWE / 铁匠贰号 Core SWE / 门神 FDSE / 墨斗 FDA / 兑底渊 PRE-SRE) + 13 数字员工 (qa-lead / qa-mobile / qa-ios / qa-web / qa-perf / qa-a11y / ops-lead / ops-mobile / ops-ios / ops-web / ops-server / ops-build / ops-release). 每个 agent 的中文职责短语 + 工具技能 (claude-glm / claude-mm / cmd / agy / k6 / playwright / gradle / xcode / pnpm / coscli / ...). 通用 fallback 给上游 5 角色外的 agent.
+  - `api-client` `Agent` interface 加 3 字段 (`roleLabel` / `responsibilities` / `skills`), server `GET /api/companies/:id/agents` 自动透传.
+  - **不动** wave254 (TasksScreen) / wave255 (0.6.15) / wave239 (5 屏本体) / wave244 (图谱) / wave251 (chip 去重) / server 业务算法 / wave222 (派活算法).
+- **bump 0.6.15 → 0.6.16** (`app.json` + `package.json` + `android/app/build.gradle` versionCode 615 → 616).
+
+---
+
+## v0.6.15
+
+> Released: 2026-10-01 · Android release APK + OTA bundle
+
+### 更新
+
+- **wave254** — TasksScreen 拆分去卡死 (reducer + 4 memo 子组件 + stable callback):
+  - 19 个 useState 合并到 `useTasksFilter` 的 useReducer (state + actions SET/TOGGLE_MAINLINE/CLEAR_SEARCH/FOCUS_MAINLINE/BUMP_REFRESH)。
+  - TasksScreen 拆分到 4 个 memo 子组件 (`TasksScreenHeader` / `TasksScreenSearch` / `TasksScreenFilters` / `TasksScreenViewSwitch`), 各自管各自的 ScrollView。
+  - `IssuesList` 加 `stableIssuePress` / `stableIssueLongPress`, `IssueRow` 的 `React.memo` 真正生效 — 36 条 issue 滑动不卡。
+  - `handleCreated` 改走 `showSuccessToast` (wave184 Toast 接管), 不再 `Alert`。
+  - 保留 13 项功能 (今日/全部/项目分组/列表/看板/状态/指派/项目/排序/只看主线/聚焦主线/搜索/视图切换 + QuickApproval + FAB), 全过 typecheck。
+  - 不嵌 FlatList 到外层 ScrollView (避免 nested-scroll warning)。`IssueRow` 已 memo, 父级 callback 不再飘。
+- **bump 0.6.14 → 0.6.15** (`app.json` + `package.json` + `android/app/build.gradle` versionCode 614 → 615)。`app.json` 与 `package.json` 历史漂移值 (610 / 0.6.12) 顺手对齐。
+- 无服务端改动
+
+---
+
 ## v0.6.14
 
 > Released: 2026-10-01 · Android release APK + OTA bundle
