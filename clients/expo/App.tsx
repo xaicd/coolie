@@ -1323,30 +1323,12 @@ function HomeScreen({
                 setSelected(issue);
               }}
             />
-          ) : tab === "assets" || tab === "agents" || tab === "ontology" || tab === "artifacts" ? (
-            // wave275 (P0-NEW-5 抽屉吞 TabBar): 直接渲染 OrgAssetsScreen 真屏,
-            // 不再走任何抽屉/Modal 路径。OrgAssetsScreen 顶部 pill 行的入口
-            // 全部作为 in-screen 入口 (MoreSheet 不再 Modal 整屏覆盖)。
-            <OrgAssetsScreen
+          ) : tab === "ontology" || tab === "assets" ? (
+            <OntologyDomainListScreen
               company={company}
               whoami={whoami}
-              initialTab={tab === "agents" ? "agents" : tab === "artifacts" ? "artifacts" : "ontology"}
-              onOpenIssue={(issue) => {
-                navigateTab("tasks");
-                setSelected(issue);
-              }}
-              onOpenProjectTasks={(project) => {
-                setTasksFilterProjectId(project.id);
-                navigateTab("tasks");
-              }}
-              onCreateTaskForProject={(project) => {
-                setCreateTaskProjectId(project.id);
-              }}
-              onOpenWebProjects={(subPath?: string, title?: string) =>
-                setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" })
-              }
-              onOpenWebOntology={(subPath?: string, title?: string) =>
-                setWebContainerTarget({ path: subPath || "/ontology", title: title || "本体可视化设计器" })
+              onOpenWebOntology={() =>
+                setWebContainerTarget({ path: "/ontology", title: "本体可视化设计器" })
               }
               onOpenSchemaEditor={(typeId, displayName) =>
                 setSchemaEditorType({ typeId, displayName })
@@ -1354,25 +1336,25 @@ function HomeScreen({
               onOpenInstanceGraph={(typeId, displayName) =>
                 setInstanceGraphType({ typeId, displayName })
               }
-              // wave275 (P0-01 本体工作台): OrgAssetsScreen 顶部 pill 加直接
-              // 入口, 老板不必先经 InstanceGraph 才能进 Workbench.
-              onOpenWorkbench={() => setOntologyWorkbenchOpen(true)}
-              onOpenWebWorkbench={(subPath?: string, title?: string) =>
-                setWebContainerTarget({ path: subPath || "/dashboard", title: title || "控制台" })
-              }
+            />
+          ) : tab === "artifacts" ? (
+            <ArtifactsScreen
+              company={company}
+              whoami={whoami}
               onOpenSandbox={(url, service, wp, scope) =>
                 setSandboxContext({ url, service, workProduct: wp, scope })
               }
               onOpenDiff={(issueItem, wp) =>
                 setDiffContext({ issue: issueItem, workProduct: wp })
               }
-              onOpenPluginManager={() => setPluginManagerOpen(true)}
-              onOpenPrototypeSandbox={() => setSandboxContext({
-                url: "",
-                service: null,
-                workProduct: null,
-                scope: null,
-              })}
+            />
+          ) : tab === "agents" ? (
+            <AgentsScreen
+              company={company}
+              onOpenIssue={(issue) => {
+                navigateTab("tasks");
+                setSelected(issue);
+              }}
             />
           ) : tab === "tasks" ? (
             selected ? (

@@ -24,8 +24,9 @@ const LEFT: Slot[] = [
 
 const RIGHT: Slot[] = [
   { key: "chat", label: "工坊", icon: "chatbubble-ellipses-outline", activeIcon: "chatbubble-ellipses" },
-  { key: "assets", label: "资产", icon: "grid-outline", activeIcon: "grid" },
+  { key: "ontology", label: "本体", icon: "git-network-outline", activeIcon: "git-network" },
 ];
+
 
 function Tab({
   slot,
@@ -103,7 +104,7 @@ export function TabBar({
       {RIGHT.map((slot) => {
         const isActive =
           tab === slot.key ||
-          (slot.key === "assets" && (tab === "agents" || tab === "ontology" || tab === "artifacts"));
+          (slot.key === "ontology" && tab === "assets");
         return (
           <Tab
             key={slot.key}
