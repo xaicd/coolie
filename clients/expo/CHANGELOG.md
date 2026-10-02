@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.6.21
+
+> Released: 2026-10-02 · Android release APK
+
+### 更新
+
+- wave275 — 第一刀 P0 真修 (P0-NEW-5 抽屉吞 TabBar / P0-03 看板/列表 toggle / P0-01+P0-02 三元锁死) + 兑底渊发版 0.6.21
+
+---
+
 ## v0.6.20
 
 > Released: 2026-10-01 · Android release APK
