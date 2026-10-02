@@ -8,6 +8,8 @@
 
 set -euo pipefail
 
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/bin:$PATH"
+
 _resolved="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || node -e 'console.log(require("fs").realpathSync(process.argv[1]))' "${BASH_SOURCE[0]}")"
 REPO_ROOT="$(cd "$(dirname "$_resolved")/.." && pwd)"
 LEDGER_DIR="$REPO_ROOT/.paperclip-local/evidence-ledger"

@@ -59,6 +59,8 @@
 
 set -euo pipefail
 
+export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/bin:$PATH"
+
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 CRON_TAG="wave276-team-status"
 STUCK_THRESHOLD_HOURS="${STUCK_THRESHOLD_HOURS:-4}"
