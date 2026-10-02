@@ -65,10 +65,21 @@ PROBE_PROMPT="${PROBE_PROMPT:-回复 OK}"  # 真跑 prompt (wave279 改: '回复
 
 # macOS 没有 coreutils `timeout`, 用 perl alarm 做超时包装.
 # 用法: run_with_timeout <secs> <bash_code...>
+# 注: bash -x 会把 perl -e 自身嵌入输出污染 stderr. 用 BASH_XTRACEFD=-1
+# 临时关掉, 且 perl exec 替换子 bash 也不继承 trace.
 run_with_timeout() {
   local secs="$1"
   shift
+  local saved_x="${BASH_XTRACEFD:-}"
+  BASH_XTRACEFD=-1
+  # perl -e 'alarm ...; exec @ARGV' — exec 替换 perl 进程, 子 bash inherit
+  # BASH_XTRACEFD=-1 因此也不 trace. 这样 output 干净.
   perl -e 'alarm shift; exec @ARGV' "$secs" "$@" 2>&1
+  if [[ -n "$saved_x" ]]; then
+    BASH_XTRACEFD="$saved_x"
+  else
+    unset BASH_XTRACEFD
+  fi
 }
 
 usage() {
@@ -140,29 +151,28 @@ probe_run() {
 }
 
 # wave279 真跑 OK 探测 — 跑 `-p "回复 OK"`, 测响应时间 + 解析 ok/OK/ready
-# 返回: stdout "DURATION\tOK|FAIL\tRESPONSE_SNIPPET" (TAB 分隔, snippet 一行 ≤40 字)
+# 返回: stdout "DURATION\tOK|FAIL\t<5s|""\tRESPONSE_SNIPPET" (TAB 分隔, 4 列)
 # 规则:
 #   - 含 ok / OK / ready (大小写不敏感) → 状态 OK
-#   - 响应时长 < PROBE_FAST_SECS (5s) → tab 加 "<5s" 标记
+#   - 响应时长 < PROBE_FAST_SECS (5s) → 第 3 列 = "<5s"
 #   - 超时 / 非零退出 → FAIL (附错误信息)
 #   - 输出空 / 不含 ok → FAIL
+# 注意: 不能用 `status` (bash 4+ read-only). 用 `run_state` 替代.
+# 注意: 不能用 `_` 占位 (bash special var: last arg). 改用 read 一次只取 3 vars + awk 拆.
 probe_real_run_ok() {
   local cmd="$1"
   local prompt="$PROBE_PROMPT"
-  local start end secs out payload snippet status marker
+  local start end secs out payload snippet run_state fast_marker
   start="$(date +%s 2>/dev/null || python3 -c 'import time;print(int(time.time()))')"
-  # 转义 prompt 给单引号 shell 嵌入
-  local escaped_prompt="${prompt//\'/\'\\\'\'}"
-  # 把用户的 cmd 末尾追加 `-p "$prompt"` — 但用户 cmd 可能已含 -p, 所以由各 probe_xxx 拼好
   out="$(set +o pipefail; set +e; run_with_timeout "$PROBE_TIMEOUT" bash -c "$cmd" 2>&1; echo "exit=$?")" || true
   set -e
   end="$(date +%s 2>/dev/null || python3 -c 'import time;print(int(time.time()))')"
   secs=$(( end - start ))
   payload="${out%exit=*}"
   payload="$(printf '%s' "$payload" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
-  # 取首行 snippet
+  # 取首行 snippet (替换为单空格, 防 tab/newline 污染下游 tab 分隔)
   snippet="${payload%%$'\n'*}"
-  snippet="$(printf '%s' "$snippet" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g' | cut -c1-40)"
+  snippet="$(printf '%s' "$snippet" | tr '\t\n' '  ' | sed -E 's/^[[:space:]]+|[[:space:]]+$//g' | cut -c1-40)"
   if [[ -z "$snippet" ]]; then
     snippet="(empty)"
   fi
@@ -170,25 +180,27 @@ probe_real_run_ok() {
   local lower
   lower="$(printf '%s' "$payload" | tr '[:upper:]' '[:lower:]')"
   if printf '%s' "$lower" | grep -qE '(^|[^a-z])(ok|ready)([^a-z]|$)'; then
-    status="OK"
+    run_state="OK"
   else
-    status="FAIL"
+    run_state="FAIL"
   fi
-  marker=""
-  if [[ "$status" == "OK" ]] && (( secs <= PROBE_FAST_SECS )); then
-    marker=" <5s"
+  fast_marker=""
+  if [[ "$run_state" == "OK" ]] && (( secs <= PROBE_FAST_SECS )); then
+    fast_marker="<5s"
   fi
-  printf '%ss\t%s%s\t%s\n' "$secs" "$status" "$marker" "$snippet"
-  if [[ "$status" != "OK" ]]; then
+  printf '%ss\t%s\t%s\t%s\n' "$secs" "$run_state" "$fast_marker" "$snippet"
+  if [[ "$run_state" != "OK" ]]; then
     return 1
   fi
   return 0
 }
 
-# 输出: PATH|VERSION|RUN|STATUS (TAB 分隔)
+# 输出: PATH|RUN_PROBE|RUN_SECS|RUN_STATUS|RUN_SNIPPET|STATUS (TAB 分隔, 6 列)
+# wave279 改: 第二列是真跑探测命令 (例 "agy -p '回复 OK'"), 第三列是响应秒数,
+# 第四列是 OK/FAIL 状态, 第五列是响应 snippet (≤40 字). table 列: 工具 /
+# 路径 / 真跑探测 / 响应时间 / 状态 (snippet 在持久化 doc 详细展示).
 probe_agy_gemini38() {
-  local path version run status
-  # 1) 容器 up 检查 — 用 docker inspect + .State.Running, 比 docker ps | grep 稳
+  local path run_probe run_secs run_status run_snippet final_status
   local inspect
   inspect="$(set +o pipefail; set +e; run_with_timeout 10 docker inspect --format='{{.State.Running}}' "$DOCKER_CONTAINER" 2>&1; echo "exit=$?")" || true
   set -e
@@ -196,125 +208,118 @@ probe_agy_gemini38() {
   inspect_payload="$(printf '%s' "$inspect_payload" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
   if [[ "$inspect_payload" != "true" ]]; then
     path="docker:$DOCKER_CONTAINER"
-    version="-"
-    run="容器未运行 (inspect=$inspect_payload)"
-    status="FAIL"
+    run_probe="docker exec $DOCKER_CONTAINER agy -p '$PROBE_PROMPT'"
+    run_secs="-"
+    run_status="FAIL"
+    run_snippet="容器未运行 (inspect=$inspect_payload)"
+    final_status="FAIL"
   else
     path="docker:$DOCKER_CONTAINER (容器内 agy-gemini3.8)"
-    version="$(probe_version "docker exec $DOCKER_CONTAINER agy --version 2>&1")"
-    run="$(probe_run "docker exec $DOCKER_CONTAINER agy -p 'test' 2>&1")"
-    if [[ "$version" != "-" ]] && [[ "$run" == OK ]]; then
-      status="OK"
-    else
-      status="FAIL"
-    fi
+    run_probe="docker exec $DOCKER_CONTAINER agy -p '$PROBE_PROMPT'"
+    local result
+    result="$(probe_real_run_ok "docker exec $DOCKER_CONTAINER agy -p '$PROBE_PROMPT' 2>&1")" || true
+    run_secs=$(awk -F'\t' '{print $1}' <<<"$result" 2>/dev/null); run_status=$(awk -F'\t' '{print $2}' <<<"$result" 2>/dev/null); run_snippet=$(awk -F'\t' '{print $4}' <<<"$result" 2>/dev/null)
+    final_status="$run_status"
   fi
-  printf '%s\t%s\t%s\t%s\n' "$path" "$version" "$run" "$status"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$path" "$run_probe" "$run_secs" "$run_status" "$run_snippet" "$final_status"
 }
 
 probe_claude_mm() {
-  local path version run status
+  local path run_probe run_secs run_status run_snippet final_status
   path="$(probe_path claude)"
   if [[ "$path" == "(not in PATH)" ]]; then
-    version="-"; run="-"; status="FAIL"
+    run_probe="claude -p '$PROBE_PROMPT'"; run_secs="-"; run_status="FAIL"; run_snippet="binary not in PATH"; final_status="FAIL"
   else
-    version="$(probe_version 'ANTHROPIC_MODEL=MiniMax-M3 claude --version 2>&1')"
-    run="$(probe_run 'ANTHROPIC_MODEL=MiniMax-M3 claude --help 2>&1')"
-    if [[ "$version" != "-" ]] && [[ "$run" == OK ]]; then
-      status="OK"
-    else
-      status="FAIL"
-    fi
+    run_probe="ANTHROPIC_MODEL=MiniMax-M3 claude -p '$PROBE_PROMPT'"
+    local result
+    result="$(probe_real_run_ok "ANTHROPIC_MODEL=MiniMax-M3 claude -p '$PROBE_PROMPT' 2>&1")" || true
+    run_secs=$(awk -F'\t' '{print $1}' <<<"$result" 2>/dev/null); run_status=$(awk -F'\t' '{print $2}' <<<"$result" 2>/dev/null); run_snippet=$(awk -F'\t' '{print $4}' <<<"$result" 2>/dev/null)
+    final_status="$run_status"
   fi
-  printf '%s\t%s\t%s\t%s\n' "$path" "$version" "$run" "$status"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$path" "$run_probe" "$run_secs" "$run_status" "$run_snippet" "$final_status"
 }
 
 probe_claude_glm() {
-  local path version run status
+  local path run_probe run_secs run_status run_snippet final_status
   path="$(probe_path claude)"
   if [[ "$path" == "(not in PATH)" ]]; then
-    version="-"; run="-"; status="FAIL"
+    run_probe="ANTHROPIC_MODEL=glm-5 claude -p '$PROBE_PROMPT'"; run_secs="-"; run_status="FAIL"; run_snippet="binary not in PATH"; final_status="FAIL"
   else
-    # brief 写 ANTHROPIC_MODEL=MiniMax-M3 是示例; claude-glm 应配 GLM 系列
-    # 但 GLM 模型名会变 (GLM-4.6 / GLM-5 等), 真值取 which 拿 + check binary
-    # 同 binary, 不同模型 = 同样 --version 即可验证 binary 工作
-    version="$(probe_version 'ANTHROPIC_MODEL=glm-5 claude --version 2>&1')"
-    run="$(probe_run 'ANTHROPIC_MODEL=glm-5 claude --help 2>&1')"
-    if [[ "$version" != "-" ]] && [[ "$run" == OK ]]; then
-      status="OK"
-    else
-      status="FAIL"
-    fi
+    run_probe="ANTHROPIC_MODEL=glm-5 claude -p '$PROBE_PROMPT'"
+    local result
+    result="$(probe_real_run_ok "ANTHROPIC_MODEL=glm-5 claude -p '$PROBE_PROMPT' 2>&1")" || true
+    run_secs=$(awk -F'\t' '{print $1}' <<<"$result" 2>/dev/null); run_status=$(awk -F'\t' '{print $2}' <<<"$result" 2>/dev/null); run_snippet=$(awk -F'\t' '{print $4}' <<<"$result" 2>/dev/null)
+    final_status="$run_status"
   fi
-  printf '%s\t%s\t%s\t%s\n' "$path" "$version" "$run" "$status"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$path" "$run_probe" "$run_secs" "$run_status" "$run_snippet" "$final_status"
 }
 
 probe_cmd() {
-  local path version run status
+  local path run_probe run_secs run_status run_snippet final_status
   path="$(probe_path cmd)"
   if [[ "$path" == "(not in PATH)" ]]; then
-    version="-"; run="-"; status="FAIL"
+    run_probe="cmd -p '$PROBE_PROMPT'"; run_secs="-"; run_status="FAIL"; run_snippet="binary not in PATH"; final_status="FAIL"
   else
-    version="$(probe_version 'cmd --version 2>&1')"
-    run="$(probe_run 'cmd -p "test" 2>&1')"
-    if [[ "$version" != "-" ]] && [[ "$run" == OK ]]; then
-      status="OK"
-    else
-      status="FAIL"
-    fi
+    run_probe="cmd -p '$PROBE_PROMPT'"
+    local result
+    result="$(probe_real_run_ok "cmd -p '$PROBE_PROMPT' 2>&1")" || true
+    run_secs=$(awk -F'\t' '{print $1}' <<<"$result" 2>/dev/null); run_status=$(awk -F'\t' '{print $2}' <<<"$result" 2>/dev/null); run_snippet=$(awk -F'\t' '{print $4}' <<<"$result" 2>/dev/null)
+    final_status="$run_status"
   fi
-  printf '%s\t%s\t%s\t%s\n' "$path" "$version" "$run" "$status"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$path" "$run_probe" "$run_secs" "$run_status" "$run_snippet" "$final_status"
 }
 
 probe_copilot() {
-  local path version run status
+  local path run_probe run_secs run_status run_snippet final_status
   path="$(probe_path copilot)"
   if [[ "$path" == "(not in PATH)" ]]; then
-    version="-"; run="-"; status="FAIL"
+    run_probe="copilot -p '$PROBE_PROMPT'"; run_secs="-"; run_status="FAIL"; run_snippet="binary not in PATH"; final_status="FAIL"
   else
-    version="$(probe_version 'copilot --version 2>&1')"
-    run="$(probe_run 'copilot -p "test" 2>&1')"
-    if [[ "$version" != "-" ]] && [[ "$run" == OK ]]; then
-      status="OK"
-    else
-      status="FAIL"
-    fi
+    run_probe="copilot -p '$PROBE_PROMPT'"
+    local result
+    result="$(probe_real_run_ok "copilot -p '$PROBE_PROMPT' 2>&1")" || true
+    run_secs=$(awk -F'\t' '{print $1}' <<<"$result" 2>/dev/null); run_status=$(awk -F'\t' '{print $2}' <<<"$result" 2>/dev/null); run_snippet=$(awk -F'\t' '{print $4}' <<<"$result" 2>/dev/null)
+    final_status="$run_status"
   fi
-  printf '%s\t%s\t%s\t%s\n' "$path" "$version" "$run" "$status"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$path" "$run_probe" "$run_secs" "$run_status" "$run_snippet" "$final_status"
 }
 
 # Hermes = 当前这个 PM 进程; 工具池映射看 docs-coolie/TOOLS.md §1 (kiro-cli)
+# 真跑 OK 探测 = 本脚本正在执行 (即探测到 Hermes 响应) + dispatch-wave 跑通.
 probe_hermes() {
-  local path version run status
+  local path run_probe run_secs run_status run_snippet final_status
   path="Hermes (PM 工具: kiro-cli; 本会话响应)"
-  version="MiniMax-M3"
-  # 跑通 = 本脚本正在执行 (即探测到 Hermes 响应) + dispatch-wave 脚本存在
+  run_probe="5 字段汇报 (cron-team-status.sh)"
   local dwf="$HOME/bin/dispatch-wave277.sh"
   if [[ -e "$dwf" ]]; then
-    run="OK (本脚本 + dispatch-wave277.sh 存在)"
-    status="OK"
+    run_secs="<1s"
+    run_status="OK"
+    run_snippet="Hermes 响应 + dispatch-wave277.sh 存在"
+    final_status="OK"
   else
-    run="PARTIAL (本脚本 OK, $dwf 缺)"
-    status="WARN"
+    run_secs="-"
+    run_status="WARN"
+    run_snippet="Hermes 响应, $dwf 缺"
+    final_status="WARN"
   fi
-  printf '%s\t%s\t%s\t%s\n' "$path" "$version" "$run" "$status"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$path" "$run_probe" "$run_secs" "$run_status" "$run_snippet" "$final_status"
 }
 
 probe_kiro_cli() {
-  local path version run status
+  local path run_probe run_secs run_status run_snippet final_status
   path="$(probe_path kiro-cli)"
   if [[ "$path" == "(not in PATH)" ]]; then
-    version="-"; run="-"; status="FAIL"
+    run_probe="kiro-cli -p '$PROBE_PROMPT'"; run_secs="-"; run_status="FAIL"; run_snippet="binary not in PATH"; final_status="FAIL"
   else
-    version="$(probe_version 'kiro-cli --version 2>&1')"
-    run="$(probe_run 'kiro-cli --help 2>&1')"
-    if [[ "$version" != "-" ]] && [[ "$run" == OK ]]; then
-      status="OK"
-    else
-      status="FAIL"
-    fi
+    # boss brief 指定 kiro-cli -p '回复 OK'; kiro-cli 2.x 默认 interactive,
+    # 此探测可能 hang 或返回错误 — 都算 FAIL, PM 看修法
+    run_probe="kiro-cli -p '$PROBE_PROMPT'"
+    local result
+    result="$(probe_real_run_ok "kiro-cli -p '$PROBE_PROMPT' 2>&1")" || true
+    run_secs=$(awk -F'\t' '{print $1}' <<<"$result" 2>/dev/null); run_status=$(awk -F'\t' '{print $2}' <<<"$result" 2>/dev/null); run_snippet=$(awk -F'\t' '{print $4}' <<<"$result" 2>/dev/null)
+    final_status="$run_status"
   fi
-  printf '%s\t%s\t%s\t%s\n' "$path" "$version" "$run" "$status"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$path" "$run_probe" "$run_secs" "$run_status" "$run_snippet" "$final_status"
 }
 
 # ---------- 收集 / 渲染 ----------
@@ -340,11 +345,14 @@ collect_rows() {
   for row in "${TOOLS[@]}"; do
     local name="${row%%:*}"
     local fn="${row##*:}"
-    local result path version run status
+    local result path run_secs run_status run_snippet final_status
     result="$($fn)"
-    IFS=$'\t' read -r path version run status <<<"$result"
+    IFS=$'\t' read -r path run_probe run_secs run_status run_snippet final_status <<<"$result"
+    # 6 字段: 工具 / 路径 / 真跑探测 / 响应时间 / 响应结果 / 状态
+    # (display = status + snippet, final_status 是 OK/FAIL/WARN)
+    local display="$run_status${run_snippet:+ $run_snippet}"
     printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
-      "$name" "$path" "$version" "$run" "$status" "$NOW_LOCAL"
+      "$name" "$path" "$run_probe" "$run_secs" "$display" "$final_status"
   done
 }
 
@@ -378,28 +386,29 @@ suggest_fix() {
 
 render_table() {
   local rows="$1"
-  echo "═══ 工具池探测 (5 字段, wave277 老板原话 \"每天早上把所有工具探测做一遍\") ═══"
-  printf '%-15s %-42s %-30s %-32s %-6s\n' \
-    "工具" "路径" "版本" "探测时间" "状态"
-  echo "----------------------------------------------------------------------------------------------"
+  echo "═══ 工具池探测 (5 字段, wave279 老板原话 \"工具探测得工具对方有回复 ok 才行\") ═══"
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+    "工具" "路径" "真跑探测" "响应时间" "响应结果" "状态"
+  echo "--------------------------------------------------------------------------------------------------------"
   local fail_count=0
   if [[ -z "$rows" ]]; then
-    printf '%-15s %-42s %-30s %-32s %-6s\n' \
-      "-" "-" "-" "-" "FAIL"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "-" "-" "-" "-" "-" "FAIL"
   else
-    while IFS=$'\t' read -r name path version run status when; do
-      printf '%-15s %-42s %-30s %-32s %-6s\n' \
-        "$name" "${path:0:42}" "${version:0:30}" "$when" "$status"
-      if [[ "$status" != "OK" ]]; then
+    while IFS=$'\t' read -r name path run_probe run_secs run_result final_status; do
+      printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+        "$name" "$path" "$run_probe" "$run_secs" "$run_result" "$final_status"
+      if [[ "$final_status" != "OK" ]]; then
         fail_count=$((fail_count + 1))
-        suggest_fix "$name" "$status" >&2
+        suggest_fix "$name" "$final_status" >&2
       fi
     done <<<"$rows"
   fi
   echo ""
   echo "探测时间: $NOW_LOCAL"
-  echo "探测脚本: scripts/daily-tool-probe.sh (wave277)"
+  echo "探测脚本: scripts/daily-tool-probe.sh (wave279 — 真跑 OK 探测)"
   echo "工具真值表: docs-coolie/TOOLS.md §2 (wave272 拍板)"
+  echo "真跑规则: 输出含 ok/OK/ready → OK; 响应 < 5s 标 \"<5s\"; 超时 30s → FAIL"
   if (( fail_count > 0 )); then
     echo ""
     echo "⚠️  $fail_count 个工具状态非 OK, 见上方修法建议"
@@ -413,17 +422,29 @@ render_json() {
   echo "{"
   echo "  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
   echo "  \"source\": \"scripts/daily-tool-probe.sh\","
-  echo "  \"wave\": \"wave277\","
+  echo "  \"wave\": \"wave279\","
+  echo "  \"probe_mode\": \"real_run_ok\","
+  echo "  \"prompt\": \"$PROBE_PROMPT\","
+  echo "  \"timeout_seconds\": $PROBE_TIMEOUT,"
+  echo "  \"fast_seconds\": $PROBE_FAST_SECS,"
   echo "  \"tools\": ["
   if [[ -z "$rows" ]]; then
-    echo '    {"name": null, "path": null, "version": null, "run": null, "status": "FAIL"}'
+    echo '    {"name": null, "path": null, "run_probe": null, "run_seconds": null, "run_result": null, "status": "FAIL"}'
   else
     local first=1
-    while IFS=$'\t' read -r name path version run status when; do
+    while IFS=$'\t' read -r name path run_probe run_secs run_result final_status; do
       if [[ $first -eq 0 ]]; then echo ","; fi
       first=0
-      printf '    {"name": "%s", "path": "%s", "version": "%s", "run": "%s", "status": "%s", "probed_at": "%s"}' \
-        "$name" "$path" "$version" "$run" "$status" "$when"
+      # JSON-escape: backslash + 双引号 + 控制字符 (含 tab/newline 已 trim by probe)
+      local name_e path_e probe_e secs_e result_e status_e
+      name_e="${name//\\/\\\\}"; name_e="${name_e//\"/\\\"}"
+      path_e="${path//\\/\\\\}"; path_e="${path_e//\"/\\\"}"
+      probe_e="${run_probe//\\/\\\\}"; probe_e="${probe_e//\"/\\\"}"
+      secs_e="${run_secs//\\/\\\\}"; secs_e="${secs_e//\"/\\\"}"
+      result_e="${run_result//\\/\\\\}"; result_e="${result_e//\"/\\\"}"
+      status_e="${final_status//\\/\\\\}"; status_e="${status_e//\"/\\\"}"
+      printf '    {"name": "%s", "path": "%s", "run_probe": "%s", "run_seconds": "%s", "run_result": "%s", "status": "%s"}' \
+        "$name_e" "$path_e" "$probe_e" "$secs_e" "$result_e" "$status_e"
     done <<<"$rows"
     echo ""
   fi
@@ -439,47 +460,51 @@ write_probe_doc() {
   {
     echo "# 工具池探测 — $PROBE_DATE"
     echo ""
-    echo "> wave277 — 每天早上工具使用探测 (老板原话: \"你每天早上把所有工具"
-    echo "> 的使用探测做一遍\"). 真值表见 [docs-coolie/TOOLS.md](../TOOLS.md) §2."
+    echo "> wave279 — 改真跑 OK 探测 (老板原话: \"工具探测得工具对方有回复 ok"
+    echo "> 才行\"). 探测方式 = 真跑 \`-p '$PROBE_PROMPT'\`, 响应含 ok/OK/ready"
+    echo "> 才算 OK; 超时 ${PROBE_TIMEOUT}s = FAIL. 替换 wave277 静态 --version."
+    echo "> 真值表见 [docs-coolie/TOOLS.md](../TOOLS.md) §2."
     echo ""
     echo "- 探测时间: \`$NOW_LOCAL\`"
-    echo "- 探测脚本: \`scripts/daily-tool-probe.sh\`"
-    echo "- 探测耗时: ~$(( 7 * PROBE_TIMEOUT ))s 上限"
+    echo "- 探测脚本: \`scripts/daily-tool-probe.sh\` (wave279)"
+    echo "- 探测方式: 真跑 \`-p '$PROBE_PROMPT'\`"
+    echo "- 超时: ${PROBE_TIMEOUT}s/工具; 性能 OK 阈值: <${PROBE_FAST_SECS}s"
     echo ""
     echo "## 1. 5 字段表格"
     echo ""
-    echo "| 工具 | 路径 | 版本 | 探测时间 | 状态 |"
-    echo "|---|---|---|---|---|"
-    while IFS=$'\t' read -r name path version run status when; do
-      echo "| $name | \`$path\` | \`$version\` | $when | **$status** |"
+    echo "| 工具 | 路径 | 真跑探测 | 响应时间 | 响应结果 | 状态 |"
+    echo "|---|---|---|---|---|---|"
+    while IFS=$'\t' read -r name path run_probe run_secs run_result final_status; do
+      echo "| $name | \`$path\` | \`$run_probe\` | $run_secs | $run_result | **$final_status** |"
     done <<<"$rows"
     echo ""
     echo "## 2. 失败修法 (按工具)"
     echo ""
     local fail_count=0
-    while IFS=$'\t' read -r name path version run status when; do
-      if [[ "$status" != "OK" ]]; then
+    while IFS=$'\t' read -r name path run_probe run_secs run_result final_status; do
+      if [[ "$final_status" != "OK" ]]; then
         fail_count=$((fail_count + 1))
-        echo "### $name → $status"
+        echo "### $name → $final_status"
         echo ""
         echo "- 路径: \`$path\`"
-        echo "- 版本: \`$version\`"
-        echo "- 实跑: \`$run\`"
+        echo "- 真跑探测: \`$run_probe\`"
+        echo "- 响应时间: $run_secs"
+        echo "- 响应结果: $run_result"
         local fix
-        fix="$(suggest_fix "$name" "$status")"
+        fix="$(suggest_fix "$name" "$final_status")"
         echo "$fix"
         echo ""
       fi
     done <<<"$rows"
     if (( fail_count == 0 )); then
-      echo "全 7 工具状态 OK, 无需修法."
+      echo "全 7 工具真跑 OK 探测通过, 无需修法."
       echo ""
     fi
     echo "## 3. 关联"
     echo ""
     echo "- [docs-coolie/TOOLS.md](../TOOLS.md) §2 7 工具池真值 (wave272)"
-    echo "- [docs-coolie/DAILY-TOOL-PROBE.md](../DAILY-TOOL-PROBE.md) 操作手册"
-    echo "- \`scripts/cron-team-status.sh\` (wave276 每 30 分钟团队状态)"
+    echo "- [docs-coolie/DAILY-TOOL-PROBE.md](../DAILY-TOOL-PROBE.md) 操作手册 (wave279 真跑说明)"
+    echo "- \`scripts/cron-team-status.sh --probe\` (wave279 新增真跑探测子命令)"
     echo "- \`scripts/daily-tool-probe.sh\` (本脚本)"
   } > "$PROBE_OUT"
   echo "📝 探测报告: $PROBE_OUT"
@@ -577,7 +602,9 @@ do_unregister() {
 do_print() {
   local rows
   rows="$(collect_rows)"
-  render_table "$rows"
+  # render_table 返回 1 当 fail_count>0, set -e 让 do_print exit.
+  # 用 || true 让 write_probe_doc 仍跑 (失败也要写报告)
+  render_table "$rows" || true
   write_probe_doc "$rows"
 }
 
