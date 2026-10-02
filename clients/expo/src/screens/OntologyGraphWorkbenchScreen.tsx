@@ -72,19 +72,19 @@ export function OntologyGraphWorkbenchScreen({
    * so the picture stays readable at 30 nodes while still scaling to the
    * 1600-pixel canvas when zoomed in.
    */
-  const DRILL_PRESETS = [
-    { key: "L0" as const, label: "L0 公司", depth: 2, view: "project_tree" as const },
-    { key: "L1" as const, label: "L1 域", depth: 1, view: "mixed" as const },
-    { key: "L2" as const, label: "L2 类型", depth: 1, view: "project_tree" as const },
-    { key: "L3" as const, label: "L3 实例", depth: 2, view: "agent_dashboard" as const },
-    { key: "L4" as const, label: "L4 属性", depth: 1, view: "conversation_thread" as const },
+  const GRAPH_PRESETS = [
+    { key: "macro" as const, label: "🌐 宏观骨架", depth: 1, view: "project_tree" as const },
+    { key: "mainline" as const, label: "📌 项目主线", depth: 2, view: "project_tree" as const },
+    { key: "team" as const, label: "👥 组织协作", depth: 1, view: "agent_dashboard" as const },
+    { key: "mixed" as const, label: "🕸️ 全量探索", depth: 2, view: "mixed" as const },
   ];
-  const [drillPreset, setDrillPreset] = useState<(typeof DRILL_PRESETS)[number]["key"]>("L0");
+  const [activePreset, setActivePreset] = useState<(typeof GRAPH_PRESETS)[number]["key"]>("macro");
   const [data, setData] = useState<OntologyGraphResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
+  const [focusedKey, setFocusedKey] = useState<string | null>(null);
 
   // pan + pinch state lives in refs so PanResponder callbacks see current
   // values without re-binding the gesture on every render.
@@ -96,18 +96,17 @@ export function OntologyGraphWorkbenchScreen({
 
   const load = useCallback(
     async (
-      currentView: typeof view,
-      presetKey: (typeof DRILL_PRESETS)[number]["key"],
+      presetKey: (typeof GRAPH_PRESETS)[number]["key"],
     ) => {
       setError(null);
       try {
-        const preset = DRILL_PRESETS.find((p) => p.key === presetKey);
-        const depth = preset?.depth ?? 2;
+        const preset = GRAPH_PRESETS.find((p) => p.key === presetKey) ?? GRAPH_PRESETS[0];
+        const depth = preset.depth;
         const res =
-          currentView === "mixed"
+          preset.view === "mixed"
             ? await coolie.getOntologyGraph(company.id, { depth })
             : await coolie.getOntologyGraph(company.id, {
-                view: currentView,
+                view: preset.view,
                 depth,
               });
         setData(res);
@@ -122,19 +121,19 @@ export function OntologyGraphWorkbenchScreen({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void load(view, drillPreset).finally(() => {
+    void load(activePreset).finally(() => {
       if (!cancelled) setLoading(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [load, view, drillPreset]);
+  }, [load, activePreset]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await load(view, drillPreset);
+    await load(activePreset);
     setRefreshing(false);
-  }, [load, view, drillPreset]);
+  }, [load, activePreset]);
 
   const reset = useCallback(() => {
     pan.setValue({ x: 0, y: 0 });
@@ -218,6 +217,31 @@ export function OntologyGraphWorkbenchScreen({
       .sort((a, b) => b.count - a.count);
   }, [data]);
 
+  const displayGraph = useMemo(() => {
+    if (!data) return null;
+    if (!focusedKey) return data;
+    const ring = new Set<string>([focusedKey]);
+    for (const edge of data.edges) {
+      if (edge.source === focusedKey) ring.add(edge.target);
+      if (edge.target === focusedKey) ring.add(edge.source);
+    }
+    return {
+      ...data,
+      nodes: data.nodes.filter((n) => ring.has(n.key)),
+      edges: data.edges.filter((e) => ring.has(e.source) && ring.has(e.target)),
+    };
+  }, [data, focusedKey]);
+
+  const selectedNode = useMemo(() => {
+    if (!selectedKey || !data) return null;
+    return data.nodes.find((n) => n.key === selectedKey) ?? null;
+  }, [selectedKey, data]);
+
+  const linkedEdgesCount = useMemo(() => {
+    if (!selectedKey || !data) return 0;
+    return data.edges.filter((e) => e.source === selectedKey || e.target === selectedKey).length;
+  }, [selectedKey, data]);
+
   const headerSubtitle = data
     ? `${data.nodes.length} 节点 · ${data.edges.length} 边${
         data.truncated ? " · 已截断" : ""
@@ -244,26 +268,27 @@ export function OntologyGraphWorkbenchScreen({
         />
       )}
 
-      {/* 视图切换 chip 行 (wave261: 5 视图预设 L0/L1/L2/L3/L4) */}
+      {/* 视图切换 chip 行 */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.viewRow}
       >
-        {DRILL_PRESETS.map((opt) => (
+        {GRAPH_PRESETS.map((opt) => (
           <Pressable
             key={opt.key}
             onPress={() => {
-              setDrillPreset(opt.key);
-              setView(opt.view);
+              setActivePreset(opt.key);
+              setFocusedKey(null);
+              setSelectedKey(null);
             }}
             hitSlop={4}
-            style={[styles.viewChip, drillPreset === opt.key && styles.viewChipActive]}
+            style={[styles.viewChip, activePreset === opt.key && styles.viewChipActive]}
           >
             <Text
               style={[
                 styles.viewChipText,
-                drillPreset === opt.key && styles.viewChipTextActive,
+                activePreset === opt.key && styles.viewChipTextActive,
               ]}
             >
               {opt.label}
@@ -275,9 +300,28 @@ export function OntologyGraphWorkbenchScreen({
       {loading ? (
         <LoadingState text="加载图谱…" />
       ) : error ? (
-        <ErrorRetry message={error} onRetry={() => void load(view, drillPreset)} />
+        <ErrorRetry message={error} onRetry={() => void load(activePreset)} />
       ) : (
         <View style={styles.canvasWrap} {...responder.panHandlers}>
+          {/* 聚焦下钻提示条 */}
+          {focusedKey ? (
+            <View style={styles.focusBanner}>
+              <Ionicons name="filter-circle" size={16} color={C.accent} />
+              <Text style={styles.focusBannerText} numberOfLines={1}>
+                已聚焦「{data?.nodes.find((n) => n.key === focusedKey)?.label || "节点"}」关联子图
+              </Text>
+              <Pressable
+                style={styles.focusBannerBtn}
+                onPress={() => {
+                  setFocusedKey(null);
+                }}
+                hitSlop={6}
+              >
+                <Text style={styles.focusBannerBtnText}>返回宏观全景</Text>
+              </Pressable>
+            </View>
+          ) : null}
+
           <Animated.View
             style={[
               StyleSheet.absoluteFill,
@@ -303,10 +347,10 @@ export function OntologyGraphWorkbenchScreen({
               scrollEnabled={false}
             >
               <OntologyGraphCanvas
-                graph={data!}
+                graph={displayGraph!}
                 canvasSize={1600}
                 selectedKey={selectedKey}
-                onSelectNode={(key) => setSelectedKey(key)}
+                onSelectNode={(key) => setSelectedKey((prev) => (prev === key ? null : key))}
               />
             </ScrollView>
           </Animated.View>
@@ -346,6 +390,48 @@ export function OntologyGraphWorkbenchScreen({
               <Text style={styles.legendEmpty}>无节点</Text>
             ) : null}
           </AppCard>
+
+          {/* 选中节点详情抽屉 */}
+          {selectedNode ? (
+            <View style={styles.nodeDrawer}>
+              <View style={styles.nodeDrawerHeader}>
+                <View style={{ flex: 1, marginRight: 8 }}>
+                  <Text style={styles.nodeDrawerTitle} numberOfLines={1}>
+                    {selectedNode.label || selectedNode.key}
+                  </Text>
+                  <Text style={styles.nodeDrawerSub}>
+                    类型: {selectedNode.type} · 关联关系: {linkedEdgesCount} 条
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setSelectedKey(null)}
+                  hitSlop={8}
+                  style={styles.drawerCloseBtn}
+                >
+                  <Ionicons name="close" size={18} color={C.ink3} />
+                </Pressable>
+              </View>
+              <View style={styles.nodeDrawerActions}>
+                {focusedKey === selectedNode.key ? (
+                  <Pressable
+                    style={[styles.drawerActionBtn, styles.drawerActionBtnActive]}
+                    onPress={() => setFocusedKey(null)}
+                  >
+                    <Ionicons name="contract-outline" size={14} color={C.accent} />
+                    <Text style={styles.drawerActionBtnTextActive}>退出局部聚焦 (返回宏观)</Text>
+                  </Pressable>
+                ) : (
+                  <Pressable
+                    style={styles.drawerActionBtn}
+                    onPress={() => setFocusedKey(selectedNode.key)}
+                  >
+                    <Ionicons name="scan-outline" size={14} color={C.ink} />
+                    <Text style={styles.drawerActionBtnText}>局部下钻聚焦 (1跳)</Text>
+                  </Pressable>
+                )}
+              </View>
+            </View>
+          ) : null}
         </View>
       )}
     </Container>
@@ -454,4 +540,105 @@ const styles = StyleSheet.create({
   legendType: { color: C.ink2, fontSize: 11, flex: 1, fontFamily: "monospace" },
   legendCount: { color: C.ink4, fontSize: 11 },
   legendEmpty: { color: C.ink4, fontSize: 11 },
+  focusBanner: {
+    position: "absolute",
+    top: 12,
+    left: 12,
+    right: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(20, 22, 30, 0.94)",
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: C.accent,
+    gap: 8,
+    zIndex: 10,
+  },
+  focusBannerText: {
+    flex: 1,
+    fontSize: 12,
+    color: C.ink,
+    fontWeight: "500",
+  },
+  focusBannerBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: RADIUS.sm,
+    backgroundColor: "rgba(94, 106, 210, 0.2)",
+    borderWidth: 1,
+    borderColor: C.accent,
+  },
+  focusBannerBtnText: {
+    fontSize: 11,
+    color: C.accent,
+    fontWeight: "600",
+  },
+  nodeDrawer: {
+    position: "absolute",
+    left: 12,
+    right: 12,
+    bottom: 60,
+    backgroundColor: "rgba(20, 22, 30, 0.96)",
+    borderRadius: RADIUS.lg,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: C.line,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.35,
+    shadowRadius: 8,
+    elevation: 8,
+    zIndex: 20,
+  },
+  nodeDrawerHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: 10,
+  },
+  nodeDrawerTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  nodeDrawerSub: {
+    fontSize: 11,
+    color: C.ink3,
+    marginTop: 2,
+  },
+  drawerCloseBtn: {
+    padding: 4,
+  },
+  nodeDrawerActions: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  drawerActionBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    paddingVertical: 8,
+    borderRadius: RADIUS.md,
+    backgroundColor: C.panel,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  drawerActionBtnActive: {
+    borderColor: C.accent,
+    backgroundColor: "rgba(94, 106, 210, 0.15)",
+  },
+  drawerActionBtnText: {
+    fontSize: 12,
+    color: C.ink,
+    fontWeight: "500",
+  },
+  drawerActionBtnTextActive: {
+    fontSize: 12,
+    color: C.accent,
+    fontWeight: "600",
+  },
 });
