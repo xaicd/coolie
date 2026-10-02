@@ -82,7 +82,7 @@
 | 4 | **cmd** | `@commandcode/ai` CLI (commandcode.ai) | CLI | ✅ 主线 | 门神专属 (跑命令 / 派活 / 自动化批处理). commandcode.ai CLI 配额/队列 (wave229: 老板不亲自跑). |
 | 5 | **copilot** | GitHub Copilot CLI | CLI | ⚠️ 限制 | 兑底渊专属 (部署 / 运维 / 监控 / 应急). 月度配额重置 (cron 脚本 `scripts/cron-copilot-reset.sh`). |
 | 6 | **Hermes** | Hermes / 黑哥 / XRobinAI (人即工具) | PM | ✅ 主线 | PM 调度 + 验收 + 报告. 跑 Claude Code + MiniMax-M3 (老板账号). |
-| 7 | **kiro-cli** | AWS Kiro CLI | CLI (PM 工具) | ✅ 主线 | Hermes 不用 (Hermes = Hermes 自己). kiro-cli 是 7 工具池里独立工具, 老板备用, 不是 Hermes 的"PM 工具". **不跑代码** (紧急例外见 `PM-DISPATCH-RULES.md`). |
+| 7 | **kiro-cli** | AWS Kiro CLI | CLI (老板备用) | ✅ 主线 | Hermes 不用 (Hermes = Hermes 自己). kiro-cli 是 7 工具池里独立工具, 老板备用, 不是 Hermes 的"PM 工具". **不跑代码** (紧急例外见 `PM-DISPATCH-QUICKCARD.md`). |
 
 > **工具池 ≠ 员工**: 工具是员工的"手", 员工岗位稳定. 工具可以多样, 但员工默认 6 个 (5 + 1 PM).
 > 新工具接入时挂到现有员工 (哪个员工干最像), 不增新员工.
@@ -119,8 +119,8 @@
 1. **PM 看任务所属角色** — 查 `CMMI-EMPLOYEE-MAPPING.md` §1 (5 阶段 × 25 任务表)
 2. **PM 看角色默认工具** — 查本表 §3 真配矩阵
 3. **PM 看工具状态** — `scripts/which-tool.sh <tool>` 检查工具当前是否可用
-4. **PM 看配额定额** — 老板原话 "额度不够就切" — 见 `TOOL-USAGE.md` §1 配额表
-5. **PM 派活** — 用 `HOW-TO-DELEGATE.md` SOP, 默认派给真配矩阵里写的员工
+4. **PM 看配额定额** — 老板原话 "额度不够就切" — 见本表 §2 / `DAILY-TOOL-PROBE.md`
+5. **PM 派活** — 用 `PM-DISPATCH-QUICKCARD.md` SOP, 默认派给真配矩阵里写的员工
 
 ### 4.1 派活模板 (老板原话 wave272)
 
@@ -144,8 +144,8 @@
 | `TEAM-MAPPING.md` §2 (工具 × 员工映射) | 上游 (历史 6 工具) | ❌ 不动 (本表是 wave272 重新登记 7 工具) |
 | `CMMI-EMPLOYEE-MAPPING.md` §1 (5 阶段 × 25 任务) | 上游 (CMMI 任务分工) | ❌ 不动 (任务主员工不变, 工具列可后续按本表同步) |
 | `CMMI-EMPLOYEE-MAPPING.md` §10.2 (6 老板团队 × tools) | 平级 | ✅ 本表落地后, §10.2 同步工具列 (6 列: Hermes / agy-gemini3.8 / claude-glm / claude-mm / cmd / copilot) — wave280 起 Hermes 列 = "Hermes 自己", 删 kiro-cli |
-| `HOW-TO-DELEGATE.md` | 平级 (PM 派活 SOP) | ❌ 不动 (本波仅引用) |
-| `TOOL-USAGE.md` (wave228) | 上游 (MCP 安装规范) | ❌ 不动 (本表是工具池全貌, TOOL-USAGE 是 MCP 装载细节) |
+| `PM-DISPATCH-QUICKCARD.md` | 平级 (PM 派活 SOP) | ✅ 引用其 7 要素 brief + 派单纪律 |
+| `DAILY-TOOL-PROBE.md` | 平级 (工具健康) | ✅ 工具真跑 OK 与配额/故障修法 |
 | `ROLE_MAPPING` / `AGENT_ROLES` (算法层) | 上游 (5 角色不变) | ❌ 不动 |
 | `scripts/which-tool.sh` (本波新增) | 下游 (PM 选工具 CLI) | ✅ 新增 (帮助 PM 速查工具状态) |
 
@@ -159,7 +159,7 @@
 - 上游依据:
   - `TEAM-MAPPING.md` (wave225 + wave236) — 5 员工 + Hermes 岗位
   - `CMMI-EMPLOYEE-MAPPING.md` (wave222 + wave234 + wave236) — 25 任务分工
-  - `TOOL-USAGE.md` (wave228) — 6 工具 MCP 装载
+  - `TOOLS.md` §6 (ex `TOOL-USAGE.md`) — 6 工具 MCP 装载
 
 **本波 (wave272) 变更摘要**:
 - 7 工具池独立文档 (TOOLS.md), 之前散在 TEAM-MAPPING §2 (6 工具) + TOOL-USAGE.md (MCP 装载)

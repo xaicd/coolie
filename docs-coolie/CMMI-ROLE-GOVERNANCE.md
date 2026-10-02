@@ -1,9 +1,12 @@
-# CMMI 3 / CMMI 5 角色员工工程规范与文档基线体系
+# CMMI 3 / CMMI 5 角色员工工程规范与文档基线体系 (wave278 全清版)
 
-> **版本**: 1.0.0  
-> **更新时间**: 2026-09-25  
-> **归属**: 企业核心运营与IT基座 (`enterprise-core`)  
+> **版本**: 2.0.0 (合并 CMMI-ROLE-CARDS.md, 2026-10-02)
+> **更新时间**: 2026-09-25 (1.0.0) / 2026-10-02 (2.0.0, wave278 全清版)
+> **归属**: 企业核心运营与IT基座 (`enterprise-core`)
 > **适用范围**: 全工坊人类团队成员、AI 数字工匠（Palantir 五大角色体系 + Hermes 调度助理）及全量核心业务系统
+>
+> **wave278 变更**: 吃掉 `CMMI-ROLE-CARDS.md` (历史, 5 KB) 的 6 角色 micro-rules, 并入 §2 RACI 矩阵。ROLE-CARDS 文件已删除。
+> **不动**: `server/src/services/agent-assign.ts` / `AGENT_ROLES` enum / `ROLE_MAPPING` (算法层)
 
 ---
 
@@ -79,6 +82,45 @@ graph TD
 | **FDSE (前线全栈交付)** | **VER** (端验证)<br>**VAL** (端体验确认) | `stage_g4_eval` | 1. 《页面四态状态机规格说明书》<br>2. 《全栈交互防抖防御规范》<br>3. 《系统集成测试与缺陷总结报告》 | **G4 全栈防御与端体验门禁**<br>`node scripts/check-token-gates.mjs`<br>*标准：Loading/Empty/Error/Success 穷举、防抖防御* |
 | **PRE-SRE (产品可靠性)** | **CM** (配置管理)<br>**RSKM** (投产风控)<br>**PMC** (环境监控) | `stage_g5_deploy` | 1. 《CMDB 部署架构拓扑手册》<br>2. 《生产发版与秒级回滚 SOP》<br>3. 《不可变配置基线与双人会签单》 | **G5 不可变投产与发布门禁**<br>`node scripts/check-no-git-push.mjs`<br>*标准：不可变指纹、拨测 200 OK、严禁擅自 remote push* |
 | **Hermes (调度与风控)** | **QPM** (量化管理)<br>**CAR** (因果预防)<br>**OPM** (组织创新) | 全流程闭环 | 1. 《量化质量目标定义书 (QPPO)》<br>2. 《统计过程控制分析表 (SPC 控制图)》<br>3. 《5-Why/鱼骨图 CAR 根因分析表》 | **算力硬熔断与过程监控**<br>`flow_budget`<br>*标准：90% 预警、100% 硬熔断、缺陷根本原因消除* |
+
+### 2.1 6 角色 micro-rules (ex CMMI-ROLE-CARDS.md, 已并入)
+
+> 老板原话: "剔除所有冗余官僚废话, 零 Token 浪费, 直接作为系统提示词或日常执行 Checklist"
+
+#### DS (业务方案专家) · 需求开发与双向跟踪
+1. **原话保留**: 录入原始诉求, 不擅自修改用户与老板的第一手输入
+2. **EARS 格式化**: 验收标准必须收敛为 5 类 EARS 句式之一 (普遍/事件/状态/异常/可选), 严禁模糊副词
+3. **RTM 无悬空**: 每个 REQ-ID 必须对应确定的架构模块与验证测试用例
+4. **自检通过标准**: `node scripts/verify-reqs.mjs`, 退出码必须为 0
+
+#### FDA (前线架构师) · 架构隔离与技术决策
+1. **画死隔离防线**: 必须明确指定企业/租户数据物理隔离切面, 代码层强制 `company_id` 过滤
+2. **DAR 选型打分**: 关键选型执行 5 步量化打分, 准则权重和必须为 100%
+3. **架构防漂移**: 上游代码库变更必须 100% 登记在 `scripts/fork-surface.json` 中
+4. **自检通过标准**: `node scripts/check-fork-surface.mjs`, 结果必须为 PASS
+
+#### Core-SWE (平台核心研发) · 详细设计与静态编译
+1. **契约先行 (Contract-First)**: REST/RPC 接口必须先定义入参 Schema、出参 Envelope 与 4xx/5xx 错误码
+2. **依赖单向无环**: 底层模块严禁逆向引用上层业务, 禁止循环依赖
+3. **编译零报错**: `tsc --noEmit`、`mvn compile` 必须保持 0 错误、0 警告逃逸
+4. **自检通过标准**: `node scripts/check-contracts.mjs`, 退出码必须为 0
+
+#### FDSE (前线全栈交付) · 全栈验收与防御
+1. **四态状态机全覆盖**: Loading / Empty / Error / Success 穷举
+2. **提交防抖防御**: 核心按钮自带防抖 (Debounce), 杜绝并发与重复点击
+3. **全业务旅程集成冒烟**: 启动真实端服务跑通完整闭环, P0/P1/P2 级缺陷必须全部清零
+4. **自检通过标准**: `node scripts/run-tests.mjs`, 通过率必须为 100%
+
+#### PRE-SRE (产品可靠性) · 配置管理与不可变投产
+1. **不可变指纹 (Immutable)**: 构建产物必须生成唯一的 SHA-256 Checksum, 投产后严禁就地改动代码
+2. **秒级回滚 (RTO < 60s)**: 发布 SOP 必须具备一条命令软链秒级回切的应急预案并经沙箱演练
+3. **健康拨测与双人会签**: 服务启动后自动探测 `/api/health` 200 OK, 生产发版必须包含双人签名
+4. **自检通过标准**: `node scripts/check-release-baseline.mjs`, 校验必须 100% 成功
+
+#### Hermes (主控调度与风控总监) · 统计控制与缺陷预防
+1. **SPC 过程控制**: 采样任务吞吐耗时与缺陷率, 超出 $3\sigma$ (UCL/LCL) 立即发出预警
+2. **6M 鱼骨图与 5-Why 追溯**: 对线上或重测缺陷, 从人/机/料/法/环/测深入流程与制度根因
+3. **防退化断言固化**: 将预防措施转化为项目本地 `scripts/` 的自动化断言, 杜绝故障二次发生
 
 ---
 

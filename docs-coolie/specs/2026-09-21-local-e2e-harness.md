@@ -70,7 +70,7 @@
 - `clients/expo/replays/evidence/.gitkeep`（新建）
 - `clients/expo/package.json`（仅加 web 运行依赖；不改 version）
 - `docs-coolie/LOCAL-E2E.md`（新建，使用说明）
-- `docs-coolie/PM-AGENTS.md`（补一节"本地验收"）
+- `docs-coolie/LOCAL-E2E.md`（补一节"本地验收"）
 - `.agents/skills/`（如需新增 e2e skill，必须 `git add -f`）
 
 ## 6. 不动项

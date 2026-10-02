@@ -163,7 +163,7 @@ PM 自己被老板反问 "你怎么知道是墨斗" 时, 用本节答复.
 | `scripts/cron-team-status.sh` (wave276 新) | 本表字段的实时推断 (cron 自动跑) |
 | `scripts/which-tool.sh` (wave272 + wave276 扩) | `status` 子命令转发到 cron-team-status.sh |
 | `scripts/cron-copilot-reset.sh` (wave228) | 同模式 cron 注册脚本 (本波参考其 idempotent 写法) |
-| `docs-coolie/HOW-TO-DELEGATE.md` | PM 派活工具切换规则 (§4) |
+| `docs-coolie/PM-DISPATCH-QUICKCARD.md` | PM 派活工具切换规则 (§3 / §6) |
 
 ---
 
@@ -183,7 +183,7 @@ PM 自己被老板反问 "你怎么知道是墨斗" 时, 用本节答复.
 - `scripts/which-tool.sh` 扩 `status` 子命令
 
 **不动**:
-- `TOOLS.md` / `CMMI-EMPLOYEE-MAPPING.md` / `HOW-TO-DELEGATE.md` (本波仅引用)
+- `TOOLS.md` / `CMMI-EMPLOYEE-MAPPING.md` / `PM-DISPATCH-QUICKCARD.md` (本波仅引用)
 - `server/src/services/agent-assign.ts` / `AGENT_ROLES` enum
 - wave270 / wave271 / wave272 / wave273 / wave274 / wave275 (在跑 / 已发版)
 - v0.6.20 tag

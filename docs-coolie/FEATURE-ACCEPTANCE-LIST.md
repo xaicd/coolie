@@ -8,7 +8,7 @@
 
 - 每个功能必须**有真信号**（截图 + 断言）不是只 commit message
 - 跑前 `bash scripts/e2e-local.sh`（基础3 断言必过）
-- 跑后 `git push` + `docs-coolie/PM-AGENTS.md` 第 10 节更新
+- 跑后 `git push` + `docs-coolie/LOCAL-E2E.md` / 对应 `docs-coolie/evidence/` 报告更新
 - 失败真实记录，**不掩盖**（PM 不许把断言改松）
 - 老板装 0.5.0（v0.5.0 已发）后实测 ChatHome 预览 + 工作空间
 
@@ -120,7 +120,7 @@ cd clients/h5 && pnpm dev
 
 - [ ] `git status` 干净
 - [ ] `bash scripts/e2e-local.sh` 8/11 断言过（3 红的是真红：R3 expo chat / R1 dev 端口 / R2 鉴权 stub）
-- [ ] `docs-coolie/PM-AGENTS.md` 第 10 节更新到最新跑结果
+- [ ] `docs-coolie/LOCAL-E2E.md` 或对应 `docs-coolie/evidence/` 报告更新到最新跑结果
 - [ ] `docs-coolie/PM-DISPATCH-LOG-YYYY-MM-DD.md` 加派单记录
 - [ ] 老板 weixin 回签
 

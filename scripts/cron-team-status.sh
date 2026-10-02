@@ -14,6 +14,9 @@
 #   - tool_default_employee kiro-cli 仍 → Hermes (工具名等同 PM 视角)
 #   - 与 docs-coolie/TOOLS.md + which-tool.sh + PM-REPORTING-FORMAT.md 同步
 #
+# wave282 — 工具字段追加 sub-agent type (仍是 5 字段, 第 4 字段从"工具"
+# 扩成"工具 + sub-agent type"). 不新增第 6 字段, 避免破坏老板微信格式.
+#
 # 推断规则 (macOS `ps` 抓命令行, ETIME 已跑时长):
 #   1. 找所有 `claude`/`agy-gemini3.8`/`cmd`/`copilot`/`kiro-cli`/`hermes` 子进程
 #      (含 PPID 链路上的工具 CLI 调用)
@@ -118,6 +121,7 @@ extract_task() {
 # 真值: 这张表是 wave276 拍板的 (老板原话 "包含员工名"). 后一波 (wave277) 真派活
 # 时, 应在本表登记新 wave → 员工映射. **不**改 AGENT_ROLES enum.
 WAVE_EMPLOYEE_PRIORITY=(
+  "wave282:铁匠"     # 本波: 5 员工 sub-agent + CronCreate 固定方式实现
   "wave276:Hermes"   # 本波: 老板定时汇报脚本 (PM 拍板 + 派活模板)
   "wave275:兑底渊"   # 修第一刀 P0 + DS 发版 0.6.21 (per brief)
   "wave274:兑底渊"   # 假设 wave274 是 DS 运维波 (待补)
@@ -136,6 +140,7 @@ WAVE_EMPLOYEE_PRIORITY=(
 # 铁匠贰号 = claude-mm; 百晓生 = claude-mm. kiro-cli 是 7 工具池独立工具,
 # 老板备用, 不再是任何 wave 的"默认工具".
 WAVE_TOOL_PRIORITY=(
+  "wave282:claude-glm"  # 铁匠实现 local employee sub-agents + cron scripts
   "wave280:Hermes"     # 本波: 修 Hermes 工具配 + 补发版 0.6.21 + agy skills (Hermes PM)
   "wave276:Hermes"     # PM 派活模板 (per wave280, Hermes = Hermes 自己)
   "wave275:copilot"    # 兑底渊发版 0.6.21 (per brief)
@@ -267,6 +272,37 @@ tool_default_employee() {
   esac
 }
 
+employee_default_subagent() {
+  local employee="$1"
+  local tool="${2:-}"
+  case "$employee" in
+    Hermes|掌柜) printf 'hermes-pm\n' ;;
+    墨斗) printf 'modou-fda\n' ;;
+    铁匠)
+      if [[ "$tool" == "claude-mm" ]]; then
+        printf 'forge-ii-core-swe\n'
+      else
+        printf 'forge-core-swe\n'
+      fi
+      ;;
+    铁匠贰号) printf 'forge-ii-core-swe\n' ;;
+    门神) printf 'menshen-fdse\n' ;;
+    兑底渊) printf 'duidiyuan-pre-sre\n' ;;
+    百晓生) printf 'baixiaosheng-ds\n' ;;
+    *) printf '%s\n' '-' ;;
+  esac
+}
+
+format_tool_with_subagent() {
+  local tool="$1"
+  local subagent="$2"
+  if [[ -z "$subagent" || "$subagent" == "-" ]]; then
+    printf '%s\n' "$tool"
+  else
+    printf '%s + %s\n' "$tool" "$subagent"
+  fi
+}
+
 # 解析 ETIME 字段 (macOS ps: dd-hh:mm:ss / hh:mm:ss / mm:ss / ss)
 parse_etime_to_seconds() {
   local etime="$1"
@@ -340,19 +376,19 @@ list_relevant_processes() {
 
 render_table() {
   local rows="$1"
-  echo "═══ 团队状态 (5 字段, wave276 老板原话) ═══"
-  printf '%-7s %-12s %-12s %-14s %-12s %-6s\n' \
+  echo "═══ 团队状态 (5 字段, wave276 + wave282 sub-agent) ═══"
+  printf '%-7s %-12s %-12s %-34s %-12s %-6s\n' \
     "PID" "员工" "任务" "工具" "多长时间" "状态"
-  echo "-------------------------------------------------------------------"
+  echo "----------------------------------------------------------------------------------------"
   if [[ -z "$rows" ]]; then
-    printf '%-7s %-12s %-12s %-14s %-12s %-6s\n' \
+    printf '%-7s %-12s %-12s %-34s %-12s %-6s\n' \
       "-" "全员" "-" "-" "-" "等派活"
     echo ""
     echo "（当前无 6 个 CLI 跑进程 — Hermes/墨斗/铁匠/门神/兑底渊/百晓生 等派活）"
     return 0
   fi
   while IFS=$'\t' read -r pid etime cmd; do
-    local task employee tool dur_secs dur_human status
+    local task employee tool subagent tool_display dur_secs dur_human status
     task="$(extract_task "$cmd")"
     employee="$(infer_employee "$cmd" "$task")"
     tool="$(infer_tool "$cmd" "$task")"
@@ -360,14 +396,16 @@ render_table() {
     if [[ "$employee" == "?" ]]; then
       employee="$(tool_default_employee "$tool")"
     fi
+    subagent="$(employee_default_subagent "$employee" "$tool")"
+    tool_display="$(format_tool_with_subagent "$tool" "$subagent")"
     dur_secs="$(parse_etime_to_seconds "$etime")"
     dur_human="$(format_duration_human "$dur_secs")"
     status="$(infer_status "$dur_secs")"
-    printf '%-7s %-12s %-12s %-14s %-12s %-6s\n' \
-      "$pid" "$employee" "$task" "$tool" "$dur_human" "$status"
+    printf '%-7s %-12s %-12s %-34s %-12s %-6s\n' \
+      "$pid" "$employee" "$task" "$tool_display" "$dur_human" "$status"
   done <<<"$rows"
   echo ""
-  echo "出处: scripts/cron-team-status.sh (wave276)"
+  echo "出处: scripts/cron-team-status.sh (wave276 + wave282)"
   echo "员工/工具映射: docs-coolie/TOOLS.md (wave272 真配)"
 }
 
@@ -379,24 +417,26 @@ render_json() {
   echo "  \"wave\": \"wave276\","
   echo "  \"rows\": ["
   if [[ -z "$rows" ]]; then
-    echo "    {\"pid\": null, \"employee\": \"全员\", \"task\": \"-\", \"tool\": \"-\", \"duration\": \"-\", \"status\": \"等派活\"}"
+    echo "    {\"pid\": null, \"employee\": \"全员\", \"task\": \"-\", \"tool\": \"-\", \"raw_tool\": \"-\", \"subagent_type\": \"-\", \"duration\": \"-\", \"status\": \"等派活\"}"
   else
     local first=1
     while IFS=$'\t' read -r pid etime cmd; do
-      local task employee tool dur_secs dur_human status
+      local task employee tool subagent tool_display dur_secs dur_human status
       task="$(extract_task "$cmd")"
       employee="$(infer_employee "$cmd" "$task")"
       tool="$(infer_tool "$cmd" "$task")"
       if [[ "$employee" == "?" ]]; then
         employee="$(tool_default_employee "$tool")"
       fi
+      subagent="$(employee_default_subagent "$employee" "$tool")"
+      tool_display="$(format_tool_with_subagent "$tool" "$subagent")"
       dur_secs="$(parse_etime_to_seconds "$etime")"
       dur_human="$(format_duration_human "$dur_secs")"
       status="$(infer_status "$dur_secs")"
       if [[ $first -eq 0 ]]; then echo ","; fi
       first=0
-      printf '    {"pid": %s, "employee": "%s", "task": "%s", "tool": "%s", "duration": "%s", "duration_seconds": %s, "status": "%s"}' \
-        "$pid" "$employee" "$task" "$tool" "$dur_human" "$dur_secs" "$status"
+      printf '    {"pid": %s, "employee": "%s", "task": "%s", "tool": "%s", "raw_tool": "%s", "subagent_type": "%s", "duration": "%s", "duration_seconds": %s, "status": "%s"}' \
+        "$pid" "$employee" "$task" "$tool_display" "$tool" "$subagent" "$dur_human" "$dur_secs" "$status"
     done <<<"$rows"
     echo ""
   fi

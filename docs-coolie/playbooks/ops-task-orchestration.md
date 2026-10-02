@@ -2,7 +2,7 @@
 
 > 角色:运营总监。定位:匠人池排班、任务编排、进度追踪、断网猝死接力重派。
 > 对应 skill:`.agents/skills/ops-task-orchestration/SKILL.md`
-> 素材来源:`docs-coolie/PM-DISPATCH-RULES.md`、`docs-coolie/PM-FAILURE-CASES.md`、wave84–127 派单实况。
+> 素材来源:`docs-coolie/PM-DISPATCH-QUICKCARD.md`、`docs-coolie/PM-FAILURE-CASES.md`、wave84–127 派单实况。
 
 ## 触发条件
 

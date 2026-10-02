@@ -122,5 +122,5 @@ clients/expo/replays/evidence/*.png                    (5 张真图)
 docs-coolie/specs/2026-09-21-local-e2e-harness.md      (EARS spec)
 docs-coolie/briefs/2026-09-21-local-e2e.md              (派单 brief)
 docs-coolie/LOCAL-E2E.md                               (本文)
-docs-coolie/PM-AGENTS.md                               (本地验收章节)
+docs-coolie/PM-DISPATCH-QUICKCARD.md                   (本地验收/派单入口)
 ```

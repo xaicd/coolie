@@ -1,15 +1,15 @@
-# 5 员工 × Skills 完整映射 (wave232 + wave236 agy 恢复 + claude-ds 退出)
+# 5 员工 × Skills 完整映射 (wave278 全清版, 2026-10-02)
 
 > **目的**: 老板原话 "本地员工, 各自需要使用到的 skills 都清楚了吗" — 把 5 员工每个岗位需要的
 > skills 一行行落实, PM (Hermes) 派活时直接照表选 skill, 不靠记忆.
 >
-> **Why**: 之前 wave225 / wave227 已把 5 员工岗位 + CMMI 25 任务分工定下来
-> (见 [`TEAM-MAPPING.md`](TEAM-MAPPING.md) + [`CMMI-EMPLOYEE-MAPPING.md`](CMMI-EMPLOYEE-MAPPING.md)),
-> 但**每个员工具体用哪些 skill** 没明确. 本表补齐 skill 维度, 让 PM 派活 / 员工执行都有
-> 明确 checklist.
+> **wave278 变更** (本档瘦身, 砍 §3 缺失 11 skill 待办列表, ~3 KB):
+> - **保留**: §0 + §1 5 员工 × 全 P0/P1/P2 skill 表 (派活真值)
+> - **精简**: §3 缺失 11 skill 待办列表 — 已并入 [INDEX.md](INDEX.md) 的"波次计划"备注, 不重复列
+> - **保留不动**: §4 装载机制 + §5 PM SOP 补充 + §6 PM 自查 + §7 不动
 >
 > **适用范围**: 老板本地 (Mac) 5 员工 — 铁匠 / 门神 / 兑底渊 / 墨斗 / 百晓生.
-> 主 agent Hermes 不算员工, 派活靠本表 + HOW-TO-DELEGATE.
+> 主 agent Hermes 不算员工, 派活靠本表 + [PM-DISPATCH-QUICKCARD.md](PM-DISPATCH-QUICKCARD.md).
 >
 > **不动**: `server/src/services/agent-assign.ts` / `AGENT_ROLES` enum /
 > `ROLE_MAPPING` (wave222 算法层); `ui/` / `clients/expo/`; `server/`; `skills/` 仓库内
@@ -358,7 +358,7 @@
 | `paperclip-task` | ❌ NO — 已被 `paperclip` 覆盖 | 关闭 |
 | `paperclip-frontend-app` | ❌ NO — 已被 `frontend-design` 覆盖 | 关闭 |
 | `paperclip-deploy` | ❌ NO — 已被 `sre-release-and-deploy` + `release` 覆盖 | 关闭 |
-| `dispatch-wave` / `monitor-wave` | ❌ NO — 是 PM (Hermes) 脚本, 不是 skill | 关闭, 引用 `HOW-TO-DELEGATE.md` §2 |
+| `dispatch-wave` / `monitor-wave` | ❌ NO — 是 PM (Hermes) 脚本, 不是 skill | 关闭, 引用 `PM-DISPATCH-QUICKCARD.md` §3 |
 | `FDE-skills` | ❌ NO — 已被 `fdse` 覆盖 | 关闭 |
 | `paperclip-runbook` | ✅ YES — SRE 专属运行手册 | wave238 创建 |
 | `paperclip-system-monitor` | ✅ YES — 系统监控 (与 MCP `system-monitor` 配套) | wave239 创建 |
@@ -385,7 +385,7 @@
 
 ## 4. PM (Hermes) 派活 SOP 补充
 
-在 [`HOW-TO-DELEGATE.md`](HOW-TO-DELEGATE.md) §2 七步 SOP 第 4 步后, 加一步:
+在 [`PM-DISPATCH-QUICKCARD.md`](PM-DISPATCH-QUICKCARD.md) §3 七步 SOP 第 4 步后, 加一步:
 
 ```
 4. 看员工工具配额

@@ -1,33 +1,27 @@
-# 老板团队 = 本地 5 员工 + 1 主 agent (wave225 + wave227 DS 责任重大 + wave236 agy 恢复 + claude-ds 退出)
+# 老板团队 = 本地 5 员工 + 1 主 agent (wave278 全清版, 2026-10-02)
 
 > **目的**: 把老板自己的"5 员工 + 1 主 agent (Hermes)"落到 **本体 5 角色 (FDA / Core-SWE /
 > PRE-SRE / FDSE / DS) 维度**, 工具可换 (claude-glm / claude-mm / cmd / agy / copilot).
 > 主 agent Hermes (PM / 掌柜) 替老板接需求 + 派活 + 验收, 不写代码, 不属于 5 员工.
 >
-> **Why**: 之前 wave223 / wave224 把团队画成"6 CLI"维度 (Hermes + 5 员工 + 铁匠贰号副炉), PM
-> 反复琢磨发现粒度过细, 老板原话 "员工默认也就五个, 工具可以多样" — 工具是手段, 员工是岗位,
-> 不该把每个工具当一个员工. 因此 wave225 合并为"5 岗位 + 1 PM"规范, 铁匠贰号降级为"工具切换
-> (claude-glm → claude-mm)"而非独立员工, 百晓生 (copilot) 限额恢复岗位 (2026-09-29 弃用记录保留).
+> **wave278 变更** (本档瘦身, 砍 ~12 KB):
+> - **保留**: §0 文档约定 + §1.2 5 员工岗位档案主表 (派活路由)
+> - **精简**: §1.1 Hermes + §2 工具 × 员工映射 + §3 CMMI 25 任务汇总 + §6 sub-agent — 已并入 [EMPLOYEE-OBJECTS.md](EMPLOYEE-OBJECTS.md) (7 维度 object) + [PM-DISPATCH-QUICKCARD.md](PM-DISPATCH-QUICKCARD.md)
+> - **保留不动**: §4 PM SOP 摘要 + §5 Mac 配置 + §7 反向约束 + §8 出处
 >
-> **wave229 修正**: `cmd` 工具 = `commandcode.ai` CLI (npm 包 `@commandcode/ai`), **不是老板自己跑**.
-> 之前 wave225 误记为"老板亲自跑的 Claude Code CLI", 老板 2026-09-30 澄清. cmd 是批处理 /
-> 自动化 CLI, 老板不直接 spawn, 派给门神 (FDSE) 在 PM 调度下跑.
+> **Why 瘦身**: 5 员工档案已在 [EMPLOYEE-OBJECTS.md](EMPLOYEE-OBJECTS.md) §1-7 完整 object 化
+> (身份/工具/技能/环境/使用/数据/约束), 本档只留速查主表 + 反向约束 + 出处.
 >
-> **wave227 增**: 测试/运营/风险/部署/复盘 共 5 个 CMMI 任务主员工改百晓生 (`ds`) — 这些都是
-> "责任重大"事项, 老板原话 "建议 DS 主负责". DS 工具扩到 4 个 (claude-glm 主 / claude-mm 兜底 /
-> copilot 限 / claude-ds 按量).
+> **不动**: `server/src/services/agent-assign.ts` (wave222 5 角色算法层); `AGENT_ROLES` enum;
+> wave217 / wave220 数字员工 (Coolie 工坊公司内, 与本波本地员工概念正交); UI / clients/expo /
+> Coolie 工坊系统.
 >
-> **wave234 改**: 老板原话 "claude-glm 额度不够, 后续主要用 cmd, claude-mm 替换" — claude-glm
-> 退出主力. 铁匠主线 claude-glm → cmd (`@commandcode/ai` CLI, wave229); 百晓生主线
-> claude-glm → claude-mm (按量, 取代铁匠作为 claude-mm 主用户); claude-glm 降为老板备用
-> (GLM 充裕时百晓生仍可用). 岗位不变, 只换主线工具.
->
-> **wave236 改**: 老板原话 2 条 (2026-09-30):
-> - "agy 恢复了应该可以用" — agy (Gemini 3.8) 2026-09-23 配额耗尽, ~7 天后恢复 (09-30 配额可用).
->   **墨斗 (FDA) 默认切回 agy**, cmd 作为兜底. 选型 / 原型 / 画图 / 业务访谈都用 agy.
-> - "claude-ds 也不能用, 换 cmd, claude-mm" — claude-ds 配额紧 (PM 之前漏改).
->   **兑底渊 (PRE-SRE) 工具改 cmd + claude-mm** (替换 claude-ds). 百晓生 SRE 临时大任务
->   仍可用 claude-ds (按量兜底). claude-ds 标"不可用, 配额紧" — 不是任何员工主线.
+> **跳转**:
+> - 7 员工 object 全维: [EMPLOYEE-OBJECTS.md](EMPLOYEE-OBJECTS.md)
+> - 派活路由速查: [PM-DISPATCH-QUICKCARD.md](PM-DISPATCH-QUICKCARD.md)
+> - 7 工具池 + MCP: [TOOLS.md](TOOLS.md)
+> - 25 任务 × 5 员工: [CMMI-EMPLOYEE-MAPPING.md](CMMI-EMPLOYEE-MAPPING.md)
+> - 索引: [INDEX.md](INDEX.md)
 >
 > **不动**: `server/src/services/agent-assign.ts` (wave222 5 角色算法层); `AGENT_ROLES` enum;
 > wave217 / wave220 数字员工 (Coolie 工坊内, 与本波本地员工概念正交); UI / clients/expo /
@@ -57,7 +51,7 @@
 | 配额 | 无上限 (老板账号) |
 | 干 | 派活 + 验收 + 调度 + 拍板 (Phase 1 立项 / Phase 5 复盘) |
 | 派活渠道 | 不派活, 只接单 — 老板直接 @Hermes |
-| 不写代码 | (紧急例外见 `PM-DISPATCH-RULES.md`) |
+| 不写代码 | (紧急例外见 `PM-DISPATCH-QUICKCARD.md`) |
 
 ### 1.2 5 员工档案 (老板本地岗位, wave227 起 DS 扩工具, wave234 起 claude-glm 退出主力, **wave236 起 agy 恢复 (墨斗主线) + claude-ds 退出 (兑底渊切 cmd + claude-mm)**)
 
@@ -125,7 +119,7 @@ claude-mm, claude-glm 降为老板备用 / copilot 限 / claude-ds 按量), 但�
 
 ## 4. PM (Hermes) 派活 SOP
 
-老板对 PM 的指令 (说话讲需求) → PM 派活给 5 员工 — 完整 SOP 见 [`docs-coolie/HOW-TO-DELEGATE.md`](HOW-TO-DELEGATE.md).
+老板对 PM 的指令 (说话讲需求) → PM 派活给 5 员工 — 完整 SOP 见 [`docs-coolie/PM-DISPATCH-QUICKCARD.md`](PM-DISPATCH-QUICKCARD.md).
 
 **核心流程**:
 ```
@@ -163,7 +157,7 @@ claude-mm, claude-glm 降为老板备用 / copilot 限 / claude-ds 按量), 但�
 > 前 5 行路径都在老板本地 (Mac), 不入 git 仓库, 不上 Coolie 工坊.
 > 后 4 行是 wave228 入 git 的 install 脚本 — 它们读写老板本地 `~/.claude/settings.json`
 > 和 crontab, 但脚本本体在仓库里. 详细工具/MCP 配对见
-> [`docs-coolie/TOOL-USAGE.md`](TOOL-USAGE.md).
+> [`docs-coolie/TOOLS.md`](TOOLS.md) §6.
 
 ---
 
@@ -180,7 +174,7 @@ claude-mm, claude-glm 降为老板备用 / copilot 限 / claude-ds 按量), 但�
 | **墨斗 (agy, wave236 恢复)** | `agy-Gemini-Pro` | 强分析 sub-task | 选型研判 (DAR) + 原型 + 画图 (墨斗主跑) |
 | 门神 (cmd) | `gh CLI worker` / `coscli worker` / `ssh worker` | 命令 sub-task | 门神 spawn (`@commandcode/ai` sub-agent, wave229: 不是老板 spawn) |
 | **百晓生 (wave227 多工具, wave234 主线 claude-mm)** | `claude-mm-haiku` (文档) / `claude-ds-flash` (SRE) / `claude-glm-haiku` (备用) | 文档/SRE sub-task | 同铁匠/兑底渊下具 |
-| Hermes (PM) | (不派下具) | PM 不写代码, 不开 sub-agent | 例外见 `PM-DISPATCH-RULES.md` |
+| Hermes (PM) | (不派下具) | PM 不写代码, 不开 sub-agent | 例外见 `PM-DISPATCH-QUICKCARD.md` |
 
 > **下具 vs 数字员工** — 下具是 sub-agent (一个员工内部 spawn, 一次性, 任务结束即销毁);
 > 数字员工是 Coolie 工坊公司里常驻 agent (24×7 跑, 见 `ROLE-MAPPING.md` §3 L3). 二者不混淆.
@@ -204,13 +198,13 @@ claude-mm, claude-glm 降为老板备用 / copilot 限 / claude-ds 按量), 但�
 
 - 5 角色映射: [`docs-coolie/ROLE-MAPPING.md`](ROLE-MAPPING.md) (wave222, 不动)
 - 5 员工 × 25 任务分工: [`docs-coolie/CMMI-EMPLOYEE-MAPPING.md`](CMMI-EMPLOYEE-MAPPING.md) (wave225 + wave227 测试/运营主改 DS + **wave228 MCP 列 + §4.1**)
-- 工具使用规范: [`docs-coolie/TOOL-USAGE.md`](TOOL-USAGE.md) (**wave228 新** — 6 工具矩阵 + MCP 默认安装 + copilot 月度 cron)
-- PM 派活 SOP: [`docs-coolie/HOW-TO-DELEGATE.md`](HOW-TO-DELEGATE.md) (wave225 + wave227 路由表更新)
+- 工具使用规范: [`docs-coolie/TOOLS.md`](TOOLS.md) (7 工具池 + MCP 默认安装 + copilot 月度 cron)
+- PM 派活 SOP: [`docs-coolie/PM-DISPATCH-QUICKCARD.md`](PM-DISPATCH-QUICKCARD.md) (wave278 合订版)
 - 派活算法: `server/src/services/agent-assign.ts` (wave222, 不动)
 - 派活算法 demo: `scripts/wave222/route-demo.mjs`
 - 派活算法测试: `server/src/services/agent-assign.test.ts`
 - 数字员工 bootstrap: `scripts/wave217/qa-bootstrap-team.mjs` + `scripts/wave220/ops-bootstrap-team.mjs` (不动)
-- PM 启动手册: [`docs-coolie/PM-AGENTS.md`](PM-AGENTS.md) §0 (含铁匠/门神/墨斗/副炉别名表)
+- PM 启动/派活速查: [`docs-coolie/PM-DISPATCH-QUICKCARD.md`](PM-DISPATCH-QUICKCARD.md) §A (含项目核心信息和文件地图)
 - 老板派单日志: [`docs-coolie/PM-DISPATCH-LOG-2026-09-20.md`](PM-DISPATCH-LOG-2026-09-20.md)
 - QA 报告: [`docs-coolie/evidence/wave227/QA-REPORT.md`](evidence/wave227/QA-REPORT.md); [`docs-coolie/evidence/wave234/QA-REPORT.md`](evidence/wave234/QA-REPORT.md) (claude-glm 退出主力); [`docs-coolie/evidence/wave236/QA-REPORT.md`](evidence/wave236/QA-REPORT.md) (agy 恢复 + claude-ds 退出)
 - MCP install 脚本 (wave228 入 git): `scripts/install-agent-device-mcp.sh` / `scripts/install-agent-browser-mcp.sh` / `scripts/install-ds-mcp.sh` / `scripts/cron-copilot-reset.sh` + lib `scripts/lib/mcp-install-common.sh` + 测试 `scripts/__tests__/install-mcp-shims.test.mjs`

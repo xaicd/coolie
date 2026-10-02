@@ -137,7 +137,7 @@
 **修法：**
 - 规矩：PM 只写 docs-coolie/** 和派单相关脚本，不碰代码
 - 例外：build orchestrator（merge commit） + PM 文档（docs-coolie/PM-*.md）允许 PM 自 commit
-- 例外清单写进 PM-DISPATCH-RULES.md 让所有人看得到
+- 例外清单写进 PM-DISPATCH-QUICKCARD.md 让所有人看得到
 
 ## 复盘统计（2026-09-20 当日）
 

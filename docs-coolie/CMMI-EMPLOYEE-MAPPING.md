@@ -182,7 +182,7 @@
 
 **百晓生工具切换 (wave234 改)**:
 - 默认 → `claude-mm` (主线, wave234 起, 按量不限额) — 取代 wave227 的 claude-glm 默认
-- GLM 充裕时 → `claude-glm` (老板备用, wave234 起降级) — 配额监控见 `HOW-TO-DELEGATE.md` §4
+- GLM 充裕时 → `claude-glm` (老板备用, wave234 起降级) — 配额监控见 `TOOLS.md` / `DAILY-TOOL-PROBE.md`
 - 数据 + 文档轻任务 → `copilot` (限, 当前额度已耗尽, 待恢复)
 - 部署/监控 SRE 强任务 → `claude-ds` (按量, 与兑底渊同款)
 
@@ -190,7 +190,7 @@
 > 任务类型多样 — 文档分析 (GLM) + 长上下文 (mm) + 数据决策 (copilot) + SRE (ds), 一个员工多工具
 > 是 wave225 确立的"工具是手, 员工是岗位"原则. 不增员工, 只给 DS 加工具.
 
-完整工具切换规则见 `HOW-TO-DELEGATE.md` §4.
+完整工具切换规则见 `TOOLS.md` §3 / §4 与 `PM-DISPATCH-QUICKCARD.md` §1.
 
 ---
 
@@ -222,7 +222,7 @@ bash scripts/cron-copilot-reset.sh --register  # 每月 1 号 8:01 切 copilot �
 > 一行改完. 安装脚本今日已 idempotent, 真包到位后无需重装.
 >
 > **详细工具/MCP 配对 + 配额说明 + copilot cron 行格式** 见
-> [`docs-coolie/TOOL-USAGE.md`](TOOL-USAGE.md) (wave228 新).
+> [`docs-coolie/TOOLS.md`](TOOLS.md) §6 / §7.
 
 ---
 
@@ -271,10 +271,10 @@ cmd -p "<老板一句话需求>"
 ## 8. 出处与索引
 
 - 团队规范: [`docs-coolie/TEAM-MAPPING.md`](TEAM-MAPPING.md) (wave225 + wave227 DS 责任重大标注 + wave228 MCP 默认装)
-- PM 派活 SOP: [`docs-coolie/HOW-TO-DELEGATE.md`](HOW-TO-DELEGATE.md) (wave225 + wave227 测试/运营 → DS)
-- 工具使用规范: [`docs-coolie/TOOL-USAGE.md`](TOOL-USAGE.md) (wave228 新, 6 工具矩阵 + MCP 默认安装 + copilot 月度重置)
+- PM 派活 SOP: [`docs-coolie/PM-DISPATCH-QUICKCARD.md`](PM-DISPATCH-QUICKCARD.md) (wave278 合订版)
+- 工具使用规范: [`docs-coolie/TOOLS.md`](TOOLS.md) (7 工具池 + MCP 默认安装 + copilot 月度重置)
 - 5 角色算法层: [`docs-coolie/ROLE-MAPPING.md`](ROLE-MAPPING.md) (wave222, 不动)
-- 角色卡: [`docs-coolie/CMMI-ROLE-CARDS.md`](CMMI-ROLE-CARDS.md)
+- 角色卡 / 治理: [`docs-coolie/CMMI-ROLE-GOVERNANCE.md`](CMMI-ROLE-GOVERNANCE.md)
 - 派活算法: `server/src/services/agent-assign.ts` (wave222, 不动)
 - 派活算法 demo: `scripts/wave222/route-demo.mjs`
 - 派活算法测试: `server/src/services/agent-assign.test.ts`
@@ -303,7 +303,7 @@ cmd -p "<老板一句话需求>"
 - §4 矩阵新增 MCP 列: 4 员工装 agent-device + agent-browser (7 个工具全部装), 百晓生额外装
    system-monitor + approval + company-ops (5 MCP, DS 工具链专属)
 - §4.1 新增: 4 个 install 脚本 + copilot cron 行的速查表 + 安装命令
-- §8 索引: 链 `TOOL-USAGE.md` (wave228 新)
+- §8 索引: 链 `TOOLS.md` (含 ex `TOOL-USAGE.md`)
 - 算法层 / 员工层 / CMMI 任务分工 / wave227 全部不变; 本波仅 ADDS MCP 信息
 
 **本波 (wave236) 变更摘要**:

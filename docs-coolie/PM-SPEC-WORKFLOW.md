@@ -57,15 +57,15 @@ PM-DISPATCH-LOG 加一行 + docs-coolie/specs/ 加后续 spec
 - 文件名：`YYYY-MM-DD-<slug>.md`
 - slug：kebab-case，≤ 30 字符
 
-## 4. Spec 与 PM-DISPATCH-RULES 的关系
+## 4. Spec 与 PM-DISPATCH-QUICKCARD 的关系
 
 | 关系 | 说明 |
 |---|---|
-| PM-DISPATCH-RULES.md | **派单模板**（给匠人看的 brief 怎么写）|
+| PM-DISPATCH-QUICKCARD.md | **派单模板**（给匠人看的 brief 怎么写）|
 | docs-coolie/specs/*.md | **具体 spec**（一个 spec 一个文件）|
 | PM-RELEASE-CHECKLIST.md | **发版 gate**（24 项）|
 
-三件套配套：spec 是「做什么」，dispatch-rules 是「怎么派」，checklist 是「怎么验」。
+三件套配套：spec 是「做什么」，quickcard 是「怎么派」，checklist 是「怎么验」。
 
 ## 5. 当前已实现（DS 同款 build-on-spec 已就位）
 

@@ -7,7 +7,7 @@
 > 不按 5 角色路由. 老板说"任务派出去不知道派给谁, 派活算法按 specialty 不按角色, 老板要看
 > '哪个角色干哪个事'清单, 现在散落" — 本文档把映射集中, 把算法升级为"5 角色优先 + specialty 二次匹配".
 >
-> **5 角色职责回顾**: 5 角色出处见 `docs-coolie/CMMI-ROLE-CARDS.md` 与
+> **5 角色职责回顾**: 5 角色出处见 `docs-coolie/CMMI-ROLE-GOVERNANCE.md` 与
 > `packages/agents/role-templates/{fda,core-swe,pre-sre,fdse,ds}.ts`（不变, 本文档不重新定义角色）.
 
 ---

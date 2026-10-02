@@ -134,7 +134,7 @@ claude-mm       /opt/homebrew/bin/claude                ANTHROPIC_MODEL=MiniMax-
 claude-glm      /opt/homebrew/bin/claude                ANTHROPIC_MODEL=glm-5 claude -p '回复 OK'         4s    OK [claude-code:unrecognized_ OK
 cmd             /opt/homebrew/bin/cmd                   cmd -p '回复 OK'                                   4s    OK OK                          OK
 copilot         /opt/homebrew/bin/copilot               copilot -p '回复 OK'                                11s  OK OK                          OK
-Hermes          Hermes (PM 工具: kiro-cli; 本会话响应)   5 字段汇报 (cron-team-status.sh)                   <1s  OK Hermes 响应 + dispatch-wav OK
+Hermes          Hermes (PM 工具: Hermes 自己; 本会话响应) 5 字段汇报 (cron-team-status.sh)                   <1s  OK Hermes 响应 + dispatch-wav OK
 kiro-cli        /Users/mac/.local/bin/kiro-cli          kiro-cli -p '回复 OK'                               0s    FAIL error: unexpected argumen FAIL
   → 修法: 检查 ~/.local/bin/ 或 PATH 路径; 重新安装工具
 ```
