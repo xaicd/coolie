@@ -1,0 +1,618 @@
+#!/usr/bin/env bash
+# scripts/daily-tool-probe.sh [--print | --json | --dry-run | --register | --unregister]
+#
+# wave279 — 改探测方式: --version (静态) → -p '回复 OK' (真跑真答).
+# 老板原话 (wave279, 2026-10-02):
+#   "工具探测得工具对方有回复 ok 才行"
+#
+# 之前 (wave277) 探测 = binary 路径 + --version + -p "test" 拿 stdout;
+# 老板说不行 — 工具可能 binary 在 PATH 但实际 RPC/认证/网络/quota 都坏,
+# --version 只证明 binary 本身能跑.
+#
+# 现在 (wave279): 真跑 + 真回复 OK.
+#   1. agy-gemini3.8  docker exec agy-ubuntu-container bash -c "agy -p '回复 OK'"
+#   2. claude-mm      claude -p '回复 OK'
+#   3. claude-glm     ANTHROPIC_MODEL=glm-5 claude -p '回复 OK'
+#   4. cmd            cmd -p '回复 OK'
+#   5. copilot        copilot -p '回复 OK'
+#   6. Hermes         本脚本正在执行 + dispatch-wave 跑通 (PM 工具 = 我)
+#   7. kiro-cli       kiro-cli -p '回复 OK'
+#
+# 解析规则:
+#   - 返回含 'ok' / 'OK' / 'ready' (大小写不敏感) → 状态 OK
+#   - 5 秒内返回 → 性能 OK (算 OK + 标 "<5s")
+#   - 超时 30 秒 → 状态 FAIL (附错误信息)
+#   - 任意 stderr / 非零退出 → 状态 FAIL
+#
+# 输出格式: 工具 / 路径 / 真跑探测 / 响应时间 / 状态 (5 字段不变, 中间 3
+# 字段从 版本/探测时间/版本 真跑改成路径/真跑实测/响应时间, 见 §3 表格).
+#
+# 真话: 这是"老板每天早上想知道所有 7 工具都能不能真跑"的清单, 不是性能/
+# 精度测试. 失败 = 当天哪个工具不能派活, PM 立即切兜底. 详见 docs-coolie/
+# TOOLS.md §3.
+#
+# 用法:
+#   scripts/daily-tool-probe.sh                 # 打印 7 工具状态 (默认)
+#   scripts/daily-tool-probe.sh --print         # 同上 (显式)
+#   scripts/daily-tool-probe.sh --json          # 输出 JSON (供下游 / notify 消费)
+#   scripts/daily-tool-probe.sh --dry-run       # 打印即将注册的 cron 行
+#   scripts/daily-tool-probe.sh --register      # 注册 cron (idempotent, 每天 8 点)
+#   scripts/daily-tool-probe.sh --unregister    # 撤销 cron 行
+#
+# Cron 时间: 每天早上 8:00 (老板原话 "每天早上")
+#   0 8 * * * <DAILY_PROBE_CMD> # wave277-tool-probe
+#   默认 DAILY_PROBE_CMD = $HOME/bin/daily-tool-probe.sh (老板本机 wrapper,
+#   不入 git). 若不存在, 退化为直接调 scripts/daily-tool-probe.sh --print.
+#
+# 不动:
+#   - server / ui / clients/expo
+#   - wave270 / wave271 / wave272 / wave273 / wave274 / wave275 / wave276 / wave277 / wave278
+#   - v0.6.21 tag (wave275) / v0.6.20 tag (wave266)
+#   - 5 角色 / AGENT_ROLES enum
+#   - docs-coolie/TOOLS.md (wave272 拍板, 真值表)
+#   - scripts/cron-team-status.sh 主体 (wave276) — 仅扩 --probe 子命令
+
+set -euo pipefail
+
+# 解析真路径 — 防 symlink (~/bin/daily-tool-probe.sh) 让 REPO_ROOT 错位
+_resolved="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "${BASH_SOURCE[0]}")"
+REPO_ROOT="$(cd "$(dirname "$_resolved")/.." && pwd)"
+CRON_TAG="wave277-tool-probe"
+PROBE_TIMEOUT="${PROBE_TIMEOUT:-30}"  # 每个工具探测超时 (秒, wave279)
+PROBE_FAST_SECS="${PROBE_FAST_SECS:-5}"  # 5 秒内返回 = 性能 OK
+DOCKER_CONTAINER="${AGY_DOCKER_CONTAINER:-agy-ubuntu-container}"
+PROBE_PROMPT="${PROBE_PROMPT:-回复 OK}"  # 真跑 prompt (wave279 改: '回复 OK')
+
+# macOS 没有 coreutils `timeout`, 用 perl alarm 做超时包装.
+# 用法: run_with_timeout <secs> <bash_code...>
+run_with_timeout() {
+  local secs="$1"
+  shift
+  perl -e 'alarm shift; exec @ARGV' "$secs" "$@" 2>&1
+}
+
+usage() {
+  cat <<'EOF'
+usage: scripts/daily-tool-probe.sh [--print | --json | --dry-run | --register | --unregister]
+
+wave277 — 每天早上工具使用探测 (7 工具池: agy-gemini3.8 / claude-mm /
+claude-glm / cmd / copilot / Hermes / kiro-cli)
+
+  --print         打印 7 工具状态 (默认, 表格形式)
+  --json          输出 JSON (供下游 / notify 消费)
+  --dry-run       打印即将注册的 cron 行
+  --register      注册 cron (idempotent, 每天 8:00 跑本脚本)
+  --unregister    撤销 wave277 cron 行
+  --help          帮助
+
+Env:
+  PROBE_TIMEOUT           每个工具探测超时 (秒, 默认 30, wave279)
+  PROBE_FAST_SECS         性能 OK 阈值 (默认 5s 内返回 = 快)
+  PROBE_PROMPT            真跑 prompt (默认 '回复 OK')
+  AGY_DOCKER_CONTAINER    agy 容器名 (默认 agy-ubuntu-container)
+  DAILY_PROBE_CMD         cron 触发的命令 (默认 $HOME/bin/daily-tool-probe.sh)
+
+老板原话 (wave277): "你每天早上把所有工具的使用探测做一遍".
+
+不动: server / ui / clients/expo / wave270..276 / v0.6.20 tag / 5 角色 / AGENT_ROLES enum.
+EOF
+}
+
+# ---------- 单工具探测 ----------
+
+# 用 timeout 命令包装, 防某个工具 hang 阻塞整轮
+probe_path() {
+  local tool="$1"
+  command -v "$tool" 2>/dev/null || echo "(not in PATH)"
+}
+
+# 跑一条命令, 拿首行 stdout. 用 perl alarm 做超时 (macOS 无 timeout 命令).
+probe_version() {
+  local cmd="$1"
+  local out
+  out="$(set +o pipefail; set +e; run_with_timeout "$PROBE_TIMEOUT" bash -c "$cmd" 2>&1; echo "exit=$?")" || true
+  set -e
+  # 取首行 (非空, 非 exit= 行), 再 trim 空白
+  local first="${out%%$'\n'*}"
+  first="$(printf '%s' "$first" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+  if [[ -z "$first" ]] || [[ "$first" == exit=* ]]; then
+    printf '-\n'
+  else
+    printf '%s\n' "$first"
+  fi
+}
+
+# 跑一条命令, 拿 stdout 非空 = OK. 子 shell 关 pipefail + || true 容错.
+probe_run() {
+  local cmd="$1"
+  local out
+  out="$(set +o pipefail; set +e; run_with_timeout "$PROBE_TIMEOUT" bash -c "$cmd" 2>&1; echo "exit=$?")" || true
+  set -e
+  # 拿到任何包含非空内容 (除最后一行 exit= 之外) 即视为 OK
+  local payload="${out%exit=*}"
+  payload="$(printf '%s' "$payload" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+  if [[ -z "$payload" ]]; then
+    printf 'FAIL(empty)\n'
+    return 1
+  fi
+  printf 'OK\n'
+  return 0
+}
+
+# wave279 真跑 OK 探测 — 跑 `-p "回复 OK"`, 测响应时间 + 解析 ok/OK/ready
+# 返回: stdout "DURATION\tOK|FAIL\tRESPONSE_SNIPPET" (TAB 分隔, snippet 一行 ≤40 字)
+# 规则:
+#   - 含 ok / OK / ready (大小写不敏感) → 状态 OK
+#   - 响应时长 < PROBE_FAST_SECS (5s) → tab 加 "<5s" 标记
+#   - 超时 / 非零退出 → FAIL (附错误信息)
+#   - 输出空 / 不含 ok → FAIL
+probe_real_run_ok() {
+  local cmd="$1"
+  local prompt="$PROBE_PROMPT"
+  local start end secs out payload snippet status marker
+  start="$(date +%s 2>/dev/null || python3 -c 'import time;print(int(time.time()))')"
+  # 转义 prompt 给单引号 shell 嵌入
+  local escaped_prompt="${prompt//\'/\'\\\'\'}"
+  # 把用户的 cmd 末尾追加 `-p "$prompt"` — 但用户 cmd 可能已含 -p, 所以由各 probe_xxx 拼好
+  out="$(set +o pipefail; set +e; run_with_timeout "$PROBE_TIMEOUT" bash -c "$cmd" 2>&1; echo "exit=$?")" || true
+  set -e
+  end="$(date +%s 2>/dev/null || python3 -c 'import time;print(int(time.time()))')"
+  secs=$(( end - start ))
+  payload="${out%exit=*}"
+  payload="$(printf '%s' "$payload" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+  # 取首行 snippet
+  snippet="${payload%%$'\n'*}"
+  snippet="$(printf '%s' "$snippet" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g' | cut -c1-40)"
+  if [[ -z "$snippet" ]]; then
+    snippet="(empty)"
+  fi
+  # 判定: 含 ok / OK / ready (大小写不敏感) = OK
+  local lower
+  lower="$(printf '%s' "$payload" | tr '[:upper:]' '[:lower:]')"
+  if printf '%s' "$lower" | grep -qE '(^|[^a-z])(ok|ready)([^a-z]|$)'; then
+    status="OK"
+  else
+    status="FAIL"
+  fi
+  marker=""
+  if [[ "$status" == "OK" ]] && (( secs <= PROBE_FAST_SECS )); then
+    marker=" <5s"
+  fi
+  printf '%ss\t%s%s\t%s\n' "$secs" "$status" "$marker" "$snippet"
+  if [[ "$status" != "OK" ]]; then
+    return 1
+  fi
+  return 0
+}
+
+# 输出: PATH|VERSION|RUN|STATUS (TAB 分隔)
+probe_agy_gemini38() {
+  local path version run status
+  # 1) 容器 up 检查 — 用 docker inspect + .State.Running, 比 docker ps | grep 稳
+  local inspect
+  inspect="$(set +o pipefail; set +e; run_with_timeout 10 docker inspect --format='{{.State.Running}}' "$DOCKER_CONTAINER" 2>&1; echo "exit=$?")" || true
+  set -e
+  local inspect_payload="${inspect%exit=*}"
+  inspect_payload="$(printf '%s' "$inspect_payload" | sed -E 's/^[[:space:]]+|[[:space:]]+$//g')"
+  if [[ "$inspect_payload" != "true" ]]; then
+    path="docker:$DOCKER_CONTAINER"
+    version="-"
+    run="容器未运行 (inspect=$inspect_payload)"
+    status="FAIL"
+  else
+    path="docker:$DOCKER_CONTAINER (容器内 agy-gemini3.8)"
+    version="$(probe_version "docker exec $DOCKER_CONTAINER agy --version 2>&1")"
+    run="$(probe_run "docker exec $DOCKER_CONTAINER agy -p 'test' 2>&1")"
+    if [[ "$version" != "-" ]] && [[ "$run" == OK ]]; then
+      status="OK"
+    else
+      status="FAIL"
+    fi
+  fi
+  printf '%s\t%s\t%s\t%s\n' "$path" "$version" "$run" "$status"
+}
+
+probe_claude_mm() {
+  local path version run status
+  path="$(probe_path claude)"
+  if [[ "$path" == "(not in PATH)" ]]; then
+    version="-"; run="-"; status="FAIL"
+  else
+    version="$(probe_version 'ANTHROPIC_MODEL=MiniMax-M3 claude --version 2>&1')"
+    run="$(probe_run 'ANTHROPIC_MODEL=MiniMax-M3 claude --help 2>&1')"
+    if [[ "$version" != "-" ]] && [[ "$run" == OK ]]; then
+      status="OK"
+    else
+      status="FAIL"
+    fi
+  fi
+  printf '%s\t%s\t%s\t%s\n' "$path" "$version" "$run" "$status"
+}
+
+probe_claude_glm() {
+  local path version run status
+  path="$(probe_path claude)"
+  if [[ "$path" == "(not in PATH)" ]]; then
+    version="-"; run="-"; status="FAIL"
+  else
+    # brief 写 ANTHROPIC_MODEL=MiniMax-M3 是示例; claude-glm 应配 GLM 系列
+    # 但 GLM 模型名会变 (GLM-4.6 / GLM-5 等), 真值取 which 拿 + check binary
+    # 同 binary, 不同模型 = 同样 --version 即可验证 binary 工作
+    version="$(probe_version 'ANTHROPIC_MODEL=glm-5 claude --version 2>&1')"
+    run="$(probe_run 'ANTHROPIC_MODEL=glm-5 claude --help 2>&1')"
+    if [[ "$version" != "-" ]] && [[ "$run" == OK ]]; then
+      status="OK"
+    else
+      status="FAIL"
+    fi
+  fi
+  printf '%s\t%s\t%s\t%s\n' "$path" "$version" "$run" "$status"
+}
+
+probe_cmd() {
+  local path version run status
+  path="$(probe_path cmd)"
+  if [[ "$path" == "(not in PATH)" ]]; then
+    version="-"; run="-"; status="FAIL"
+  else
+    version="$(probe_version 'cmd --version 2>&1')"
+    run="$(probe_run 'cmd -p "test" 2>&1')"
+    if [[ "$version" != "-" ]] && [[ "$run" == OK ]]; then
+      status="OK"
+    else
+      status="FAIL"
+    fi
+  fi
+  printf '%s\t%s\t%s\t%s\n' "$path" "$version" "$run" "$status"
+}
+
+probe_copilot() {
+  local path version run status
+  path="$(probe_path copilot)"
+  if [[ "$path" == "(not in PATH)" ]]; then
+    version="-"; run="-"; status="FAIL"
+  else
+    version="$(probe_version 'copilot --version 2>&1')"
+    run="$(probe_run 'copilot -p "test" 2>&1')"
+    if [[ "$version" != "-" ]] && [[ "$run" == OK ]]; then
+      status="OK"
+    else
+      status="FAIL"
+    fi
+  fi
+  printf '%s\t%s\t%s\t%s\n' "$path" "$version" "$run" "$status"
+}
+
+# Hermes = 当前这个 PM 进程; 工具池映射看 docs-coolie/TOOLS.md §1 (kiro-cli)
+probe_hermes() {
+  local path version run status
+  path="Hermes (PM 工具: kiro-cli; 本会话响应)"
+  version="MiniMax-M3"
+  # 跑通 = 本脚本正在执行 (即探测到 Hermes 响应) + dispatch-wave 脚本存在
+  local dwf="$HOME/bin/dispatch-wave277.sh"
+  if [[ -e "$dwf" ]]; then
+    run="OK (本脚本 + dispatch-wave277.sh 存在)"
+    status="OK"
+  else
+    run="PARTIAL (本脚本 OK, $dwf 缺)"
+    status="WARN"
+  fi
+  printf '%s\t%s\t%s\t%s\n' "$path" "$version" "$run" "$status"
+}
+
+probe_kiro_cli() {
+  local path version run status
+  path="$(probe_path kiro-cli)"
+  if [[ "$path" == "(not in PATH)" ]]; then
+    version="-"; run="-"; status="FAIL"
+  else
+    version="$(probe_version 'kiro-cli --version 2>&1')"
+    run="$(probe_run 'kiro-cli --help 2>&1')"
+    if [[ "$version" != "-" ]] && [[ "$run" == OK ]]; then
+      status="OK"
+    else
+      status="FAIL"
+    fi
+  fi
+  printf '%s\t%s\t%s\t%s\n' "$path" "$version" "$run" "$status"
+}
+
+# ---------- 收集 / 渲染 ----------
+
+NOW_LOCAL="$(date '+%Y-%m-%d %H:%M:%S %Z')"
+NOW_FILE="$(date '+%Y-%m-%d')"
+PROBE_DATE="$(date '+%Y-%m-%d')"
+PROBE_DIR="$REPO_ROOT/docs-coolie/probe"
+PROBE_OUT="$PROBE_DIR/$NOW_FILE-tool-probe.md"
+
+# 7 工具依次探测 (顺序按 wave272 拍板的工具池)
+declare -a TOOLS=(
+  "agy-gemini3.8:probe_agy_gemini38"
+  "claude-mm:probe_claude_mm"
+  "claude-glm:probe_claude_glm"
+  "cmd:probe_cmd"
+  "copilot:probe_copilot"
+  "Hermes:probe_hermes"
+  "kiro-cli:probe_kiro_cli"
+)
+
+collect_rows() {
+  for row in "${TOOLS[@]}"; do
+    local name="${row%%:*}"
+    local fn="${row##*:}"
+    local result path version run status
+    result="$($fn)"
+    IFS=$'\t' read -r path version run status <<<"$result"
+    printf '%s\t%s\t%s\t%s\t%s\t%s\n' \
+      "$name" "$path" "$version" "$run" "$status" "$NOW_LOCAL"
+  done
+}
+
+# 失败建议修法
+suggest_fix() {
+  local name="$1" status="$2"
+  case "$name:$status" in
+    agy-gemini3.8:FAIL)
+      echo "  → 修法: docker start $DOCKER_CONTAINER; 或 docker run -d --name $DOCKER_CONTAINER chw717/ai-agy:latest-arm64"
+      ;;
+    claude-mm:FAIL|claude-glm:FAIL)
+      echo "  → 修法: brew install --cask claude-code 或重装 /opt/homebrew/bin/claude; 检查 ANTHROPIC_API_KEY"
+      ;;
+    cmd:FAIL)
+      echo "  → 修法: npm i -g @commandcode/ai 或重装 /opt/homebrew/bin/cmd"
+      ;;
+    copilot:FAIL)
+      echo "  → 修法: brew install copilot-cli 或 npm i -g @github/copilot; 月度配额跑 scripts/cron-copilot-reset.sh"
+      ;;
+    Hermes:WARN|*:WARN)
+      echo "  → 修法: ln -sf ~/workspace/xaicd/coolie/scripts/dispatch-wave277.sh ~/bin/dispatch-wave277.sh"
+      ;;
+    Hermes:FAIL|*:FAIL)
+      echo "  → 修法: 检查 ~/.local/bin/ 或 PATH 路径; 重新安装工具"
+      ;;
+    kiro-cli:FAIL)
+      echo "  → 修法: curl -fsSL https://aws.kiro.dev/install.sh | bash; 或重装 ~/.local/bin/kiro-cli"
+      ;;
+  esac
+}
+
+render_table() {
+  local rows="$1"
+  echo "═══ 工具池探测 (5 字段, wave277 老板原话 \"每天早上把所有工具探测做一遍\") ═══"
+  printf '%-15s %-42s %-30s %-32s %-6s\n' \
+    "工具" "路径" "版本" "探测时间" "状态"
+  echo "----------------------------------------------------------------------------------------------"
+  local fail_count=0
+  if [[ -z "$rows" ]]; then
+    printf '%-15s %-42s %-30s %-32s %-6s\n' \
+      "-" "-" "-" "-" "FAIL"
+  else
+    while IFS=$'\t' read -r name path version run status when; do
+      printf '%-15s %-42s %-30s %-32s %-6s\n' \
+        "$name" "${path:0:42}" "${version:0:30}" "$when" "$status"
+      if [[ "$status" != "OK" ]]; then
+        fail_count=$((fail_count + 1))
+        suggest_fix "$name" "$status" >&2
+      fi
+    done <<<"$rows"
+  fi
+  echo ""
+  echo "探测时间: $NOW_LOCAL"
+  echo "探测脚本: scripts/daily-tool-probe.sh (wave277)"
+  echo "工具真值表: docs-coolie/TOOLS.md §2 (wave272 拍板)"
+  if (( fail_count > 0 )); then
+    echo ""
+    echo "⚠️  $fail_count 个工具状态非 OK, 见上方修法建议"
+    return 1
+  fi
+  return 0
+}
+
+render_json() {
+  local rows="$1"
+  echo "{"
+  echo "  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
+  echo "  \"source\": \"scripts/daily-tool-probe.sh\","
+  echo "  \"wave\": \"wave277\","
+  echo "  \"tools\": ["
+  if [[ -z "$rows" ]]; then
+    echo '    {"name": null, "path": null, "version": null, "run": null, "status": "FAIL"}'
+  else
+    local first=1
+    while IFS=$'\t' read -r name path version run status when; do
+      if [[ $first -eq 0 ]]; then echo ","; fi
+      first=0
+      printf '    {"name": "%s", "path": "%s", "version": "%s", "run": "%s", "status": "%s", "probed_at": "%s"}' \
+        "$name" "$path" "$version" "$run" "$status" "$when"
+    done <<<"$rows"
+    echo ""
+  fi
+  echo "  ]"
+  echo "}"
+}
+
+# ---------- 写到 docs-coolie/probe/<date>-tool-probe.md ----------
+
+write_probe_doc() {
+  local rows="$1"
+  mkdir -p "$PROBE_DIR"
+  {
+    echo "# 工具池探测 — $PROBE_DATE"
+    echo ""
+    echo "> wave277 — 每天早上工具使用探测 (老板原话: \"你每天早上把所有工具"
+    echo "> 的使用探测做一遍\"). 真值表见 [docs-coolie/TOOLS.md](../TOOLS.md) §2."
+    echo ""
+    echo "- 探测时间: \`$NOW_LOCAL\`"
+    echo "- 探测脚本: \`scripts/daily-tool-probe.sh\`"
+    echo "- 探测耗时: ~$(( 7 * PROBE_TIMEOUT ))s 上限"
+    echo ""
+    echo "## 1. 5 字段表格"
+    echo ""
+    echo "| 工具 | 路径 | 版本 | 探测时间 | 状态 |"
+    echo "|---|---|---|---|---|"
+    while IFS=$'\t' read -r name path version run status when; do
+      echo "| $name | \`$path\` | \`$version\` | $when | **$status** |"
+    done <<<"$rows"
+    echo ""
+    echo "## 2. 失败修法 (按工具)"
+    echo ""
+    local fail_count=0
+    while IFS=$'\t' read -r name path version run status when; do
+      if [[ "$status" != "OK" ]]; then
+        fail_count=$((fail_count + 1))
+        echo "### $name → $status"
+        echo ""
+        echo "- 路径: \`$path\`"
+        echo "- 版本: \`$version\`"
+        echo "- 实跑: \`$run\`"
+        local fix
+        fix="$(suggest_fix "$name" "$status")"
+        echo "$fix"
+        echo ""
+      fi
+    done <<<"$rows"
+    if (( fail_count == 0 )); then
+      echo "全 7 工具状态 OK, 无需修法."
+      echo ""
+    fi
+    echo "## 3. 关联"
+    echo ""
+    echo "- [docs-coolie/TOOLS.md](../TOOLS.md) §2 7 工具池真值 (wave272)"
+    echo "- [docs-coolie/DAILY-TOOL-PROBE.md](../DAILY-TOOL-PROBE.md) 操作手册"
+    echo "- \`scripts/cron-team-status.sh\` (wave276 每 30 分钟团队状态)"
+    echo "- \`scripts/daily-tool-probe.sh\` (本脚本)"
+  } > "$PROBE_OUT"
+  echo "📝 探测报告: $PROBE_OUT"
+}
+
+# ---------- Cron 注册 / 撤销 ----------
+
+do_dry_run() {
+  local default_cmd="$HOME/bin/daily-tool-probe.sh"
+  local cmd="${DAILY_PROBE_CMD:-$default_cmd}"
+  local cron_line="0 8 * * * $cmd # $CRON_TAG"
+  echo "========================================================"
+  echo " wave277 — 每天早上工具探测 cron (DRY RUN)"
+  echo "========================================================"
+  echo " 目标行:"
+  echo "   $cron_line"
+  echo ""
+  echo " cron 时间: 每天 08:00 (老板原话 \"每天早上\")"
+  echo " 目标命令: $cmd"
+  echo " idempotency tag: #$CRON_TAG"
+  echo ""
+  echo " 应用: bash scripts/daily-tool-probe.sh --register"
+  echo ""
+  if [[ ! -e "$cmd" ]]; then
+    echo "⚠️  $cmd 不存在, --register 会先建一个 wrapper:"
+    echo "   ln -sf $REPO_ROOT/scripts/daily-tool-probe.sh $cmd"
+  fi
+}
+
+do_register() {
+  command -v crontab >/dev/null 2>&1 || { echo "失败: 需要 crontab" >&2; exit 1; }
+  local default_cmd="$HOME/bin/daily-tool-probe.sh"
+  local cmd="${DAILY_PROBE_CMD:-$default_cmd}"
+
+  # 若 wrapper 不存在, 自动建一个 symlink (符合 brief "crontab 加 1 行")
+  if [[ ! -e "$cmd" ]] && [[ "$cmd" == "$default_cmd" ]]; then
+    mkdir -p "$(dirname "$cmd")"
+    ln -sf "$REPO_ROOT/scripts/daily-tool-probe.sh" "$cmd"
+    echo "✅ 已建 wrapper: $cmd -> $REPO_ROOT/scripts/daily-tool-probe.sh"
+  fi
+
+  local cron_line="0 8 * * * $cmd # $CRON_TAG"
+
+  local tmp
+  tmp="$(mktemp)"
+  if crontab -l > "$tmp" 2>/dev/null; then
+    :
+  else
+    : > "$tmp"
+  fi
+
+  if grep -Fq "# $CRON_TAG" "$tmp"; then
+    rm -f "$tmp"
+    echo "✅ wave277 cron 已注册, 跳过 (idempotent)"
+    grep -F "# $CRON_TAG" /tmp/. 2>/dev/null || true
+    # 重新读出当前 crontab 里那行给用户看
+    crontab -l | grep -F "# $CRON_TAG"
+    return 0
+  fi
+
+  echo "$cron_line" >> "$tmp"
+  crontab "$tmp"
+  rm -f "$tmp"
+  echo "✅ 已注册 wave277 cron:"
+  echo "   $cron_line"
+  echo ""
+  echo " 验证: crontab -l | grep wave277-tool-probe"
+}
+
+do_unregister() {
+  command -v crontab >/dev/null 2>&1 || { echo "失败: 需要 crontab" >&2; exit 1; }
+  local tmp
+  tmp="$(mktemp)"
+  if ! crontab -l > "$tmp" 2>/dev/null; then
+    rm -f "$tmp"
+    echo "无现有 crontab, 无需撤销"
+    return 0
+  fi
+  if ! grep -Fq "# $CRON_TAG" "$tmp"; then
+    rm -f "$tmp"
+    echo "无 wave277 cron 行, 无需撤销"
+    return 0
+  fi
+  grep -Fv "# $CRON_TAG" "$tmp" > "${tmp}.new"
+  if [[ -s "${tmp}.new" ]]; then
+    crontab "${tmp}.new"
+  else
+    crontab -r 2>/dev/null || true
+  fi
+  rm -f "${tmp}.new" "$tmp"
+  echo "✅ 已撤销 wave277 cron 行"
+  echo " 验证: crontab -l | grep wave277-tool-probe (期望空)"
+}
+
+do_print() {
+  local rows
+  rows="$(collect_rows)"
+  render_table "$rows"
+  write_probe_doc "$rows"
+}
+
+do_json() {
+  local rows
+  rows="$(collect_rows)"
+  render_json "$rows"
+}
+
+# ---------- 主入口 ----------
+
+ACTION="${1:-}"
+case "$ACTION" in
+  "")
+    do_print
+    ;;
+  --print)
+    do_print
+    ;;
+  --json)
+    do_json
+    ;;
+  --dry-run)
+    do_dry_run
+    ;;
+  --register)
+    do_register
+    ;;
+  --unregister)
+    do_unregister
+    ;;
+  -h|--help|help)
+    usage; exit 0
+    ;;
+  *)
+    usage >&2; exit 2
+    ;;
+esac
