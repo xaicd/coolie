@@ -309,6 +309,12 @@ exploration often go to 墨斗 with `agy-gemini3.8` because Gemini 3.8 is strong
 for that work. Before dispatch, check the task type, tool health/quota, and the
 employee's skill needs; then choose the best available tool.
 
+Coolie's primary users are Chinese users. User-facing pages, skills, employee
+descriptions, and PM/dispatch copy must align with the Chinese short names and
+terminology in `docs-coolie/EMPLOYEE-OBJECTS.md` and `docs-coolie/TERMINOLOGY.md`.
+Use English enum/role identifiers only where the implementation or API requires
+them; otherwise keep the Chinese name visible and primary.
+
 Hermes is the PM and also its own local tool. Do not map Hermes to `kiro-cli`.
 `kiro-cli` is a separate seventh local tool and is boss-reserve unless a task
 explicitly says otherwise.
