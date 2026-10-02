@@ -374,8 +374,53 @@ list_relevant_processes() {
 
 # ---------- 表格 / JSON 渲染 ----------
 
+render_receipts_summary() {
+  local dispatch_dir="$REPO_ROOT/.paperclip-local/dispatch"
+  if [[ -d "$dispatch_dir" ]] && ls "$dispatch_dir"/*.json >/dev/null 2>&1; then
+    node -e '
+const fs = require("fs");
+const path = require("path");
+const dir = process.argv[1];
+const files = fs.readdirSync(dir).filter(f => f.endsWith(".json")).map(f => path.join(dir, f));
+files.sort((a, b) => fs.statSync(b).mtimeMs - fs.statSync(a).mtimeMs);
+
+const running = [];
+const blocked = [];
+const done = [];
+
+for (const file of files.slice(0, 10)) {
+  try {
+    const r = JSON.parse(fs.readFileSync(file, "utf8"));
+    if (r.status === "running") running.push(r);
+    else if (r.status === "blocked" || r.status === "failed") blocked.push(r);
+    else if (r.status === "done") done.push(r);
+  } catch (e) {}
+}
+
+const time = new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+console.log(`【wave进展·${time}】`);
+if (running.length > 0) {
+  const r = running[0];
+  console.log(`跑: ${r.employee} ${r.wave} (${r.tool} + ${r.subagentType || "-"})`);
+} else {
+  console.log("跑: 无 (全员等派活)");
+}
+if (blocked.length > 0) {
+  const b = blocked[0];
+  console.log(`卡: ${b.employee} ${b.wave} (${b.tool} · ${b.blockedReason || "阻塞"})`);
+}
+if (done.length > 0) {
+  const d = done[0];
+  console.log(`完: ${d.wave} (${d.employee} · ${d.commit || "完成"})`);
+}
+console.log("");
+' "$dispatch_dir"
+  fi
+}
+
 render_table() {
   local rows="$1"
+  render_receipts_summary
   echo "═══ 团队状态 (5 字段, wave276 + wave282 sub-agent) ═══"
   printf '%-7s %-12s %-12s %-34s %-12s %-6s\n' \
     "PID" "员工" "任务" "工具" "多长时间" "状态"
