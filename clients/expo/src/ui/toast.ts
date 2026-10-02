@@ -15,3 +15,7 @@ export function showSuccessToast(title: string, body?: string): void {
 export function showErrorToast(title: string, body: string): void {
   Alert.alert(title, body);
 }
+
+export function showInfoToast(title: string, body?: string): void {
+  Alert.alert(title, body);
+}

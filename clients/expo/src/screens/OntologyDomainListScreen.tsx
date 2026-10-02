@@ -30,6 +30,7 @@ import { coolie } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
 import { EmergencyKillSwitch } from "../components/EmergencyKillSwitch";
 import { OntologyDrillBreadcrumb } from "../components/OntologyDrillBreadcrumb";
+import { OntologyGraphWorkbenchScreen } from "./OntologyGraphWorkbenchScreen";
 import { AppCard } from "../ui/AppCard";
 import { RADIUS } from "../ui/tokens";
 import { EmptyState } from "../ui/EmptyState";
@@ -112,6 +113,7 @@ export function OntologyDomainListScreen({
   onOpenInstanceGraph,
 }: OntologyDomainListScreenProps) {
   // ── 顶部状态 ──
+  const [viewMode, setViewMode] = useState<"graph" | "domains">("graph");
   const [view_2, setView2] = useState<DrillLevel>("L1-domains");
   const [ctx, setCtx] = useState<DrillContext>({
     domain: null,
@@ -430,9 +432,53 @@ export function OntologyDomainListScreen({
               </Pressable>
             </View>
           </View>
+          <View style={styles.viewModeToggleRow}>
+            <Pressable
+              style={[styles.viewModeBtn, viewMode === "graph" && styles.viewModeBtnActive]}
+              onPress={() => setViewMode("graph")}
+              hitSlop={4}
+            >
+              <Ionicons
+                name="git-network-outline"
+                size={13}
+                color={viewMode === "graph" ? C.accent : C.ink3}
+              />
+              <Text
+                style={[
+                  styles.viewModeBtnText,
+                  viewMode === "graph" && styles.viewModeBtnTextActive,
+                ]}
+              >
+                🕸️ 关系图谱
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.viewModeBtn, viewMode === "domains" && styles.viewModeBtnActive]}
+              onPress={() => setViewMode("domains")}
+              hitSlop={4}
+            >
+              <Ionicons
+                name="list-outline"
+                size={13}
+                color={viewMode === "domains" ? C.accent : C.ink3}
+              />
+              <Text
+                style={[
+                  styles.viewModeBtnText,
+                  viewMode === "domains" && styles.viewModeBtnTextActive,
+                ]}
+              >
+                📑 领域清单
+              </Text>
+            </Pressable>
+          </View>
         </View>
 
-        {loading ? (
+        {viewMode === "graph" ? (
+          <View style={{ flex: 1 }}>
+            <OntologyGraphWorkbenchScreen company={company} embedded={true} />
+          </View>
+        ) : loading ? (
           <LoadingState text="正在加载业务本体域拓扑…" />
         ) : error ? (
           <ErrorRetry message={error} onRetry={loadLevels} />
@@ -1315,4 +1361,35 @@ const styles = StyleSheet.create({
   },
   confirmBtnText: { color: C.ink, fontSize: 13, fontWeight: "600" },
   btnDisabled: { opacity: 0.5 },
+  viewModeToggleRow: {
+    flexDirection: "row",
+    backgroundColor: C.panel,
+    borderRadius: 8,
+    padding: 3,
+    marginTop: 8,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+    gap: 4,
+  },
+  viewModeBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 6,
+  },
+  viewModeBtnActive: {
+    backgroundColor: C.surfaceHover,
+  },
+  viewModeBtnText: {
+    color: C.ink3,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  viewModeBtnTextActive: {
+    color: C.ink,
+    fontWeight: "600",
+  },
 });

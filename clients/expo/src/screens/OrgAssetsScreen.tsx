@@ -71,10 +71,9 @@ interface OrgAssetsScreenProps {
 
 const TAB_OPTIONS: Array<{ key: OrgAssetTab; label: string }> = [
   { key: "ontology", label: "🧠 业务本体" },
-  { key: "projects", label: "📁 项目中心" },
-  { key: "agents", label: "👥 数字员工" },
   { key: "artifacts", label: "📦 交付产物" },
 ];
+
 
 /**
  * 资产与组织中枢 (OrgAssetsScreen)。
@@ -155,37 +154,15 @@ export function OrgAssetsScreen({
             </Text>
           </View>
           <View style={styles.extraPillsRow}>
-            {/* wave235 — 组织切换器 (多公司时才有意义) */}
-            {onSwitchCompany ? (
+            {/* 组织切换器 (多公司时显示) */}
+            {onSwitchCompany && switchable.length > 1 ? (
               <PluginOrgSwitcher
                 currentCompany={company}
                 companies={switchable}
                 onSwitch={handleSwitch}
               />
             ) : null}
-            {onOpenWebWorkbench ? (
-              <Pressable
-                style={styles.extraPill}
-                onPress={() => onOpenWebWorkbench("/routines", "例行计划调度")}
-                hitSlop={6}
-                accessibilityLabel="例行计划调度"
-              >
-                <Ionicons name="time-outline" size={12} color="#06B6D4" />
-                <Text style={styles.extraPillText}>例行计划</Text>
-              </Pressable>
-            ) : null}
-            {onOpenWebWorkbench ? (
-              <Pressable
-                style={styles.extraPill}
-                onPress={() => onOpenWebWorkbench("/costs", "全景成本分析")}
-                hitSlop={6}
-                accessibilityLabel="全景成本分析"
-              >
-                <Ionicons name="cash-outline" size={12} color="#10B981" />
-                <Text style={styles.extraPillText}>成本核算</Text>
-              </Pressable>
-            ) : null}
-            {/* wave258 — 派活精准 (老板原话 "方便后续派活精准") */}
+            {/* 派活精准 */}
             <Pressable
               style={styles.extraPill}
               onPress={handleOpenSkillMatcher}
@@ -195,18 +172,6 @@ export function OrgAssetsScreen({
               <Ionicons name="sparkles-outline" size={12} color="#FACC15" />
               <Text style={styles.extraPillText}>派活精准</Text>
             </Pressable>
-            {/* wave275 (P0-01): 本体工作台直接入口, 老板不必先经 InstanceGraph */}
-            {onOpenWorkbench ? (
-              <Pressable
-                style={styles.extraPill}
-                onPress={onOpenWorkbench}
-                hitSlop={6}
-                accessibilityLabel="本体工作台"
-              >
-                <Ionicons name="git-network-outline" size={12} color="#94A3B8" />
-                <Text style={styles.extraPillText}>工作台</Text>
-              </Pressable>
-            ) : null}
             <Pressable
               style={styles.extraPill}
               onPress={() => setMoreOpen(true)}
@@ -348,6 +313,30 @@ function buildMoreItems(
   onOpenWebWorkbench?: (path?: string, title?: string) => void,
 ): MoreItem[] {
   return [
+    {
+      key: "routines",
+      icon: "time-outline",
+      color: "#06B6D4",
+      label: "例行计划调度",
+      sub: "查看和编排周期性定时运维与任务",
+      onPress: () => {
+        onClose();
+        onOpenWebWorkbench?.("/routines", "例行计划调度");
+      },
+      enabled: Boolean(onOpenWebWorkbench),
+    },
+    {
+      key: "costs",
+      icon: "cash-outline",
+      color: "#10B981",
+      label: "全景成本分析",
+      sub: "实时核算各模型与工具链调用支出",
+      onPress: () => {
+        onClose();
+        onOpenWebWorkbench?.("/costs", "全景成本分析");
+      },
+      enabled: Boolean(onOpenWebWorkbench),
+    },
     {
       key: "plugins",
       icon: "apps-outline",

@@ -29,6 +29,7 @@ import { OntologyGraphCanvas } from "../components/OntologyGraphCanvas";
 interface OntologyGraphWorkbenchScreenProps {
   company: Company;
   onBack?: () => void;
+  embedded?: boolean;
 }
 
 /**
@@ -51,6 +52,7 @@ interface OntologyGraphWorkbenchScreenProps {
 export function OntologyGraphWorkbenchScreen({
   company,
   onBack,
+  embedded = false,
 }: OntologyGraphWorkbenchScreenProps) {
   const [view, setView] = useState<
     "project_tree" | "agent_dashboard" | "conversation_thread" | "mixed"
@@ -222,21 +224,25 @@ export function OntologyGraphWorkbenchScreen({
       }`
     : "加载中…";
 
+  const Container = embedded ? View : SafeAreaView;
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <StatusBar style="light" />
-      <ScreenHeader
-        title="工作台"
-        subtitle={headerSubtitle}
-        onBack={onBack}
-        right={
-          <View style={styles.headerRight}>
-            <Pressable onPress={onRefresh} hitSlop={8} style={styles.iconBtn}>
-              <Ionicons name="download-outline" size={14} color={C.ink2} />
-            </Pressable>
-          </View>
-        }
-      />
+    <Container style={embedded ? styles.embeddedWrap : styles.safeArea}>
+      {!embedded && <StatusBar style="light" />}
+      {!embedded && (
+        <ScreenHeader
+          title="工作台"
+          subtitle={headerSubtitle}
+          onBack={onBack}
+          right={
+            <View style={styles.headerRight}>
+              <Pressable onPress={onRefresh} hitSlop={8} style={styles.iconBtn}>
+                <Ionicons name="download-outline" size={14} color={C.ink2} />
+              </Pressable>
+            </View>
+          }
+        />
+      )}
 
       {/* 视图切换 chip 行 (wave261: 5 视图预设 L0/L1/L2/L3/L4) */}
       <ScrollView
@@ -342,7 +348,7 @@ export function OntologyGraphWorkbenchScreen({
           </AppCard>
         </View>
       )}
-    </SafeAreaView>
+    </Container>
   );
 }
 
@@ -374,6 +380,7 @@ function colorForType(type: string): string {
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.bg },
+  embeddedWrap: { flex: 1, backgroundColor: C.bg },
   headerRight: { flexDirection: "row", gap: 6 },
   iconBtn: {
     width: 32,
