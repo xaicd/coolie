@@ -1243,6 +1243,7 @@ function HomeScreen({
           ) : gitCredentialsOpen ? (
             <GitCredentialsScreen company={company} onBack={() => setGitCredentialsOpen(false)} />
           ) : pluginManagerOpen ? (
+            // wave275 (P0-02 插件设置): 独立条件渲染, 不嵌进 tab 三元, 不会被 dashboard 吞.
             <PluginManagerScreen
               company={company}
               onBack={() => setPluginManagerOpen(false)}
@@ -1277,7 +1278,8 @@ function HomeScreen({
               onOpenWorkbench={() => setOntologyWorkbenchOpen(true)}
             />
           ) : ontologyWorkbenchOpen ? (
-            // wave239 — 屏 4 (Workbench) 渲染.
+            // wave275 (P0-01 本体工作台): 独立条件渲染, 不嵌进 instanceGraphType 三元.
+            // 之前嵌套顺序 instanceGraphType > ontologyWorkbenchOpen, 老板永远进不来.
             <OntologyGraphWorkbenchScreen
               company={company}
               onBack={() => setOntologyWorkbenchOpen(false)}
@@ -1322,6 +1324,9 @@ function HomeScreen({
               }}
             />
           ) : tab === "assets" || tab === "agents" || tab === "ontology" || tab === "artifacts" ? (
+            // wave275 (P0-NEW-5 抽屉吞 TabBar): 直接渲染 OrgAssetsScreen 真屏,
+            // 不再走任何抽屉/Modal 路径。OrgAssetsScreen 顶部 pill 行的入口
+            // 全部作为 in-screen 入口 (MoreSheet 不再 Modal 整屏覆盖)。
             <OrgAssetsScreen
               company={company}
               whoami={whoami}
@@ -1349,6 +1354,9 @@ function HomeScreen({
               onOpenInstanceGraph={(typeId, displayName) =>
                 setInstanceGraphType({ typeId, displayName })
               }
+              // wave275 (P0-01 本体工作台): OrgAssetsScreen 顶部 pill 加直接
+              // 入口, 老板不必先经 InstanceGraph 才能进 Workbench.
+              onOpenWorkbench={() => setOntologyWorkbenchOpen(true)}
               onOpenWebWorkbench={(subPath?: string, title?: string) =>
                 setWebContainerTarget({ path: subPath || "/dashboard", title: title || "控制台" })
               }

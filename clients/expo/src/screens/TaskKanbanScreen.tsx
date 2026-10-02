@@ -25,6 +25,7 @@ import { ELEVATION, FONT_SIZE, RADIUS, SPACING } from "../ui/tokens";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { FilterSheet, type FilterOption } from "../components/FilterSheet";
 import { QuickApprovalCard } from "../components/QuickApprovalCard";
+import { IssuesList } from "../components/IssuesList";
 import {
   countIssuesByStatus,
   type IssueSelection,
@@ -417,29 +418,44 @@ export function TaskKanbanScreen({
           <Text style={styles.error}>任务加载失败: {error}</Text>
         ) : null}
 
-        {/* 看板横向滚动区 */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.boardScroll}
-        >
-          {KANBAN_COLUMNS.map((status) => (
-            <KanbanColumnView
-              key={status}
-              status={status}
-              issues={byStatus[status] ?? []}
-              agents={agents}
-              onLayout={onColumnLayout(status)}
-              onOpenIssue={onOpenIssue}
-              dragOffsetX={dragOffsetX}
-              dragOffsetY={dragOffsetY}
-              dragIssue={dragIssue}
-              setDragIssue={setDragIssue}
-              tryDropOnColumn={tryDropOnColumn}
-              resolveDropTarget={resolveDropTarget}
-            />
-          ))}
-        </ScrollView>
+        {/* wave275 (P0-03): SegmentedControl 切换看板 / 列表, 之前只设了 view
+             state 但没在渲染处读它 — toggle 按了屏不切. 这里补 view==="board"
+             走看板拖拽区, 否则走 IssuesList 列表. */}
+        {view === "board" ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.boardScroll}
+          >
+            {KANBAN_COLUMNS.map((status) => (
+              <KanbanColumnView
+                key={status}
+                status={status}
+                issues={byStatus[status] ?? []}
+                agents={agents}
+                onLayout={onColumnLayout(status)}
+                onOpenIssue={onOpenIssue}
+                dragOffsetX={dragOffsetX}
+                dragOffsetY={dragOffsetY}
+                dragIssue={dragIssue}
+                setDragIssue={setDragIssue}
+                tryDropOnColumn={tryDropOnColumn}
+                resolveDropTarget={resolveDropTarget}
+              />
+            ))}
+          </ScrollView>
+        ) : (
+          <IssuesList
+            issues={visible}
+            loading={loading}
+            error={error}
+            onIssuePress={onOpenIssue}
+            selection={selection}
+            view={view}
+            agents={agents}
+            projects={projects}
+          />
+        )}
       </ScrollView>
 
       <QuickApprovalCard companyId={company.id} floating />

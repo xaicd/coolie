@@ -27,6 +27,8 @@ import { ArtifactsScreen } from "./ArtifactsScreen";
 import type { SandboxScope } from "./PrototypeSandboxScreen";
 import { PluginOrgSwitcher } from "../components/PluginOrgSwitcher";
 import { SkillMatcherSheet } from "../components/SkillMatcherSheet";
+import { Sheet } from "../ui/Sheet";
+import { TAB_BAR_HEIGHT } from "../components/TabBar";
 
 export type OrgAssetTab = "ontology" | "projects" | "agents" | "artifacts";
 
@@ -49,6 +51,8 @@ interface OrgAssetsScreenProps {
   onOpenSchemaEditor?: (typeId: string, displayName: string) => void;
   // wave239 — 屏 2 (instance graph) 入口.
   onOpenInstanceGraph?: (typeId: string, displayName: string) => void;
+  // wave275 (P0-01): 直接进 Workbench 入口, 不必先经 InstanceGraph.
+  onOpenWorkbench?: () => void;
   onOpenWebWorkbench?: (path?: string, title?: string) => void;
   onOpenSandbox?: (
     url: string,
@@ -95,6 +99,7 @@ export function OrgAssetsScreen({
   onOpenWebOntology,
   onOpenSchemaEditor,
   onOpenInstanceGraph,
+  onOpenWorkbench,
   onOpenWebWorkbench,
   onOpenSandbox,
   onOpenDiff,
@@ -190,6 +195,18 @@ export function OrgAssetsScreen({
               <Ionicons name="sparkles-outline" size={12} color="#FACC15" />
               <Text style={styles.extraPillText}>派活精准</Text>
             </Pressable>
+            {/* wave275 (P0-01): 本体工作台直接入口, 老板不必先经 InstanceGraph */}
+            {onOpenWorkbench ? (
+              <Pressable
+                style={styles.extraPill}
+                onPress={onOpenWorkbench}
+                hitSlop={6}
+                accessibilityLabel="本体工作台"
+              >
+                <Ionicons name="git-network-outline" size={12} color="#94A3B8" />
+                <Text style={styles.extraPillText}>工作台</Text>
+              </Pressable>
+            ) : null}
             <Pressable
               style={styles.extraPill}
               onPress={() => setMoreOpen(true)}
@@ -253,15 +270,50 @@ export function OrgAssetsScreen({
         )}
       </View>
 
-      {/* wave235 — "更多" 下拉, 4 个新入口 */}
-      <MoreSheet
-        visible={moreOpen}
-        onClose={() => setMoreOpen(false)}
-        onOpenPluginManager={onOpenPluginManager}
-        onOpenPrototypeSandbox={onOpenPrototypeSandbox}
-        onOpenOnboarding={onOpenOnboarding}
-        onOpenWebWorkbench={onOpenWebWorkbench}
-      />
+      {/* wave275 (P0-NEW-5 抽屉吞 TabBar): 改用底部抽屉 Sheet, 让出 TAB_BAR_HEIGHT
+         让底栏 5 tab 永远可见可点. 4 项内容不变, 用 buildMoreItems() 在主屏组装. */}
+      {moreOpen ? (
+        <Sheet
+          onClose={() => setMoreOpen(false)}
+          modal={true}
+          title="更多入口"
+          style={styles.moreSheetWrapper}
+        >
+          <Text style={styles.moreSubtitle}>从 web 端抄过来的 4 个组织/插件视图</Text>
+          {buildMoreItems(
+            () => setMoreOpen(false),
+            onOpenPluginManager,
+            onOpenPrototypeSandbox,
+            onOpenOnboarding,
+            onOpenWebWorkbench,
+          ).map((item) => (
+            <Pressable
+              key={item.key}
+              onPress={item.enabled ? item.onPress : undefined}
+              disabled={!item.enabled}
+              style={({ pressed }) => [
+                styles.moreItem,
+                pressed && item.enabled && styles.moreItemPressed,
+                !item.enabled && styles.moreItemDisabled,
+              ]}
+              hitSlop={4}
+            >
+              <View style={[styles.moreIcon, { backgroundColor: `${item.color}22` }]}>
+                <Ionicons name={item.icon} size={18} color={item.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.moreItemLabel}>{item.label}</Text>
+                <Text style={styles.moreItemSub}>{item.sub}</Text>
+              </View>
+              {item.enabled ? (
+                <Ionicons name="chevron-forward" size={14} color={C.ink3} />
+              ) : (
+                <Text style={styles.moreItemMuted}>未启用</Text>
+              )}
+            </Pressable>
+          ))}
+        </Sheet>
+      ) : null}
 
       {/* wave258 — 派活精准浮层 (老板原话 "方便后续派活精准") */}
       <SkillMatcherSheet
@@ -273,32 +325,29 @@ export function OrgAssetsScreen({
   );
 }
 
-interface MoreSheetProps {
-  visible: boolean;
-  onClose: () => void;
-  onOpenPluginManager?: () => void;
-  onOpenPrototypeSandbox?: () => void;
-  onOpenOnboarding?: () => void;
-  onOpenWebWorkbench?: (path?: string, title?: string) => void;
+interface MoreItem {
+  key: string;
+  icon: React.ComponentProps<typeof Ionicons>["name"];
+  color: string;
+  label: string;
+  sub: string;
+  onPress: () => void;
+  enabled: boolean;
 }
 
-function MoreSheet({
-  visible,
-  onClose,
-  onOpenPluginManager,
-  onOpenPrototypeSandbox,
-  onOpenOnboarding,
-  onOpenWebWorkbench,
-}: MoreSheetProps) {
-  const items: Array<{
-    key: string;
-    icon: React.ComponentProps<typeof Ionicons>["name"];
-    color: string;
-    label: string;
-    sub: string;
-    onPress: () => void;
-    enabled: boolean;
-  }> = [
+/**
+ * wave275 (P0-NEW-5): 把 MoreSheet 4 个入口数据抽到 OrgAssetsScreen 主屏渲染时
+ * 计算 (依赖 props), 主屏直接渲染 — 替代之前的 MoreSheet 子组件 Modal, 让
+ * 浮层从底部抽屉 Sheet 弹出, 让出 TAB_BAR_HEIGHT, 5 tab 永远在。
+ */
+function buildMoreItems(
+  onClose: () => void,
+  onOpenPluginManager?: () => void,
+  onOpenPrototypeSandbox?: () => void,
+  onOpenOnboarding?: () => void,
+  onOpenWebWorkbench?: (path?: string, title?: string) => void,
+): MoreItem[] {
+  return [
     {
       key: "plugins",
       icon: "apps-outline",
@@ -316,7 +365,7 @@ function MoreSheet({
       icon: "color-palette-outline",
       color: "#F472B6",
       label: "画图 / 原型",
-      sub: "打开原型沙箱 (PlateOrgAssets 入口)",
+      sub: "打开原型沙箱 (Plate 入口)",
       onPress: () => {
         onClose();
         onOpenPrototypeSandbox?.();
@@ -328,7 +377,7 @@ function MoreSheet({
       icon: "person-add-outline",
       color: "#22D3EE",
       label: "新增实例",
-      sub: "入职流程 (OnboardFlowEntry 入口)",
+      sub: "入职流程 (OnboardFlow 入口)",
       onPress: () => {
         onClose();
         onOpenOnboarding?.();
@@ -348,56 +397,6 @@ function MoreSheet({
       enabled: Boolean(onOpenWebWorkbench),
     },
   ];
-
-  return (
-    <Modal
-      visible={visible}
-      transparent
-      animationType="fade"
-      onRequestClose={onClose}
-    >
-      <Pressable style={styles.moreBackdrop} onPress={onClose}>
-        <Pressable
-          onPress={(e) => e.stopPropagation()}
-          style={styles.moreSheet}
-        >
-          <Text style={styles.moreTitle}>更多入口</Text>
-          <Text style={styles.moreSubtitle}>从 web 端抄过来的 4 个组织/插件视图</Text>
-          <ScrollView style={{ maxHeight: 360 }}>
-            {items.map((item) => (
-              <Pressable
-                key={item.key}
-                onPress={item.enabled ? item.onPress : undefined}
-                disabled={!item.enabled}
-                style={({ pressed }) => [
-                  styles.moreItem,
-                  pressed && item.enabled && styles.moreItemPressed,
-                  !item.enabled && styles.moreItemDisabled,
-                ]}
-                hitSlop={4}
-              >
-                <View style={[styles.moreIcon, { backgroundColor: `${item.color}22` }]}>
-                  <Ionicons name={item.icon} size={18} color={item.color} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.moreItemLabel}>{item.label}</Text>
-                  <Text style={styles.moreItemSub}>{item.sub}</Text>
-                </View>
-                {item.enabled ? (
-                  <Ionicons name="chevron-forward" size={14} color={C.ink3} />
-                ) : (
-                  <Text style={styles.moreItemMuted}>未启用</Text>
-                )}
-              </Pressable>
-            ))}
-          </ScrollView>
-          <Pressable onPress={onClose} style={styles.moreClose} hitSlop={4}>
-            <Text style={styles.moreCloseText}>关闭</Text>
-          </Pressable>
-        </Pressable>
-      </Pressable>
-    </Modal>
-  );
 }
 
 const styles = StyleSheet.create({
@@ -461,6 +460,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.55)",
     justifyContent: "flex-end",
+  },
+  // wave275 (P0-NEW-5): 抽屉覆盖层让出底栏 TabBar, 让 5 tab 永远可点.
+  moreSheetWrapper: {
+    paddingBottom: TAB_BAR_HEIGHT,
   },
   moreSheet: {
     backgroundColor: C.panel,
