@@ -58,6 +58,14 @@ VERSION_JSON_URL="${VERSION_JSON_URL:-https://xrobinai.cn/version.json}"
 export JAVA_HOME="${JAVA_HOME:-$HOME/jdk/jdk-17.0.20.1+1/Contents/Home}"
 export DEVELOPER_DIR="${DEVELOPER_DIR:-/Library/Developer/CommandLineTools}"
 
+# 自动补全 macOS homebrew / node@24 / pnpm PATH（非交互式 SSH / cron 执行时）
+if [ -d "/opt/homebrew/bin" ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || true)"
+fi
+[ -d "/opt/homebrew/opt/node@24/bin" ] && export PATH="/opt/homebrew/opt/node@24/bin:$PATH"
+[ -d "$HOME/.local/bin" ] && export PATH="$HOME/.local/bin:$PATH"
+[ -d "$HOME/bin" ] && export PATH="$HOME/bin:$PATH"
+
 DRY_RUN=0
 SKIP_SERVER_DEPLOY=0
 WITH_4_GUARD=0

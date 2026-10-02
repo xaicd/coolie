@@ -12,6 +12,14 @@
 #==============================================================================
 set -euo pipefail
 
+# 自动补全 macOS homebrew / node@24 / pnpm PATH（非交互式 SSH / cron 执行时）
+if [ -d "/opt/homebrew/bin" ]; then
+  eval "$(/opt/homebrew/bin/brew shellenv 2>/dev/null || true)"
+fi
+[ -d "/opt/homebrew/opt/node@24/bin" ] && export PATH="/opt/homebrew/opt/node@24/bin:$PATH"
+[ -d "$HOME/.local/bin" ] && export PATH="$HOME/.local/bin:$PATH"
+[ -d "$HOME/bin" ] && export PATH="$HOME/bin:$PATH"
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$EXPO_DIR"
