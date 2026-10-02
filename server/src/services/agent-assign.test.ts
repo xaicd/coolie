@@ -103,10 +103,9 @@ describe("wave222 ROLE_MAPPING", () => {
       new URL("../../../docs-coolie/ROLE-MAPPING.md", import.meta.url),
       "utf8",
     );
-    // The doc claims: fda ×5, core-swe ×14, pre-sre ×6, fdse ×4, ds ×3.
-    // (Total = 32 primary-or-secondary counts across 25 entries; primaries are 25.)
+    // The doc claims: fda ×3, core-swe ×10, pre-sre ×4, fdse ×2, ds ×6.
     expect(doc).toMatch(/合计:\s*25 任务/);
-    expect(doc).toMatch(/主角色分布 — `fda` ×5, `core-swe` ×14, `pre-sre` ×6, `fdse` ×4, `ds` ×3/);
+    expect(doc).toMatch(/主角色分布 — `fda` ×3, `core-swe` ×10, `pre-sre` ×4, `fdse` ×2, `ds` ×6/);
   });
 
   it("primary count totals to 25", () => {

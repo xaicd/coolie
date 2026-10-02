@@ -45,15 +45,20 @@ interface RoleTone {
 }
 
 /**
- * 5 CMMI 角色配色 (FDA 红 / Core SWE 蓝 / PRE-SRE 绿 / FDSE 紫 / DS 橙).
+ * 5 CMMI 角色配色 (墨斗/FDA 红 / 铁匠/Core SWE 蓝 / 兑底渊/PRE-SRE 绿 / 门神/FDSE 紫 / 百晓生/DS 橙).
  * 颜色与 web 端 role 过滤器 / PaletteId 体系不冲突 — 这是 fish-only 视觉强化,
  * 上游 wave65 删 title 时已证明数字员工卡 0 信息密度是当前最大问题.
  */
 const ROLE_TONE: Record<string, RoleTone> = {
+  墨斗: { bg: alpha("#EF4444", 0.12), fg: "#F87171", border: alpha("#EF4444", 0.4) },
   FDA: { bg: alpha("#EF4444", 0.12), fg: "#F87171", border: alpha("#EF4444", 0.4) },
+  铁匠: { bg: alpha("#3B82F6", 0.12), fg: "#60A5FA", border: alpha("#3B82F6", 0.4) },
   "Core SWE": { bg: alpha("#3B82F6", 0.12), fg: "#60A5FA", border: alpha("#3B82F6", 0.4) },
+  兑底渊: { bg: alpha("#10B981", 0.12), fg: "#34D399", border: alpha("#10B981", 0.4) },
   "PRE-SRE": { bg: alpha("#10B981", 0.12), fg: "#34D399", border: alpha("#10B981", 0.4) },
+  门神: { bg: alpha("#A78BFA", 0.12), fg: "#C4B5FD", border: alpha("#A78BFA", 0.4) },
   FDSE: { bg: alpha("#A78BFA", 0.12), fg: "#C4B5FD", border: alpha("#A78BFA", 0.4) },
+  百晓生: { bg: alpha("#F97316", 0.12), fg: "#FB923C", border: alpha("#F97316", 0.4) },
   DS: { bg: alpha("#F97316", 0.12), fg: "#FB923C", border: alpha("#F97316", 0.4) },
 };
 

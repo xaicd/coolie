@@ -10,8 +10,8 @@ import type { AgentRoleTemplate } from "../types.js";
 export const ROLE_TEMPLATE: AgentRoleTemplate = {
   role: "fdse",
   agentName: "fdse-agent",
-  title: "FDSE — 前线部署全栈工程师",
-  label: "FDSE",
+  title: "门神 — 前线部署全栈工程师 (FDSE)",
+  label: "门神",
   cli: ["cmd", "claude", "hermes"],
   model: ["glm-5.3", "claude-sonnet-4-5", "hermes-1"],
   defaultProvider: "claude",

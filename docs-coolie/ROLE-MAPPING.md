@@ -39,24 +39,24 @@
 | | 2.2 WBS 拆解 | `core-swe` | `fda` | 主线支线临时 |
 | | 2.3 Spec 编写 | `core-swe` | - | 4 类 spec schema |
 | | 2.4 工时估算 | `fdse` | `core-swe` | 评估工作量 |
-| | 2.5 风险评估 | `fda` | `pre-sre` | 风险预案 |
+| | 2.5 风险评估 | `ds` | `pre-sre` | 风险预案 |
 | **Phase 3: 设计** | 3.1 系统设计 | `core-swe` | `fda` | 架构 + 数据模型 |
 | | 3.2 API 契约 | `core-swe` | - | REST + GraphQL |
 | | 3.3 DB Schema | `core-swe` | `ds` | 数据模型 |
 | | 3.4 安全设计 | `pre-sre` | `core-swe` | 鉴权 + RBAC |
-| | 3.5 部署架构 | `pre-sre` | `core-swe` | CI/CD + 网络策略 |
+| | 3.5 部署架构 | `ds` | `pre-sre` | CI/CD + 业务风险 |
 | **Phase 4: 开发** | 4.1 编码 | `core-swe` | `fdse` | 主代码 |
 | | 4.2 单元测试 | `core-swe` | - | 自己写 |
 | | 4.3 代码审查 | `fdse` | `core-swe` | 互审 |
 | | 4.4 集成测试 | `core-swe` | `fdse` | 端到端 |
 | | 4.5 性能优化 | `pre-sre` | `core-swe` | 性能瓶颈 |
 | **Phase 5: 部署** | 5.1 部署执行 | `pre-sre` | - | systemd + OTA |
-| | 5.2 监控告警 | `pre-sre` | `ds` | 日志 + 指标 |
-| | 5.3 验收测试 | `core-swe` | `fdse` | 30 项 E2E |
+| | 5.2 监控告警 | `ds` | `pre-sre` | 日志 + 指标 + 业务信号 |
+| | 5.3 验收测试 | `ds` | `fdse` | 30 项 E2E + go/no-go |
 | | 5.4 发布说明 | `core-swe` | `fda` | release notes |
-| | 5.5 复盘 | `fda` | `ds` | 经验总结 |
+| | 5.5 复盘 | `ds` | `fda` | 经验总结 |
 
-合计: 25 任务, 主角色分布 — `fda` ×5, `core-swe` ×14, `pre-sre` ×6, `fdse` ×4, `ds` ×3
+合计: 25 任务, 主角色分布 — `fda` ×3, `core-swe` ×10, `pre-sre` ×4, `fdse` ×2, `ds` ×6
 （一个 Phase 1.4 选型研判的主角色是 `fda` — 即 demo 跑的就是这条规则）.
 
 ---

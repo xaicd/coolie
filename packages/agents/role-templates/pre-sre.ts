@@ -10,8 +10,8 @@ import type { AgentRoleTemplate } from "../types.js";
 export const ROLE_TEMPLATE: AgentRoleTemplate = {
   role: "pre-sre",
   agentName: "pre-sre-agent",
-  title: "PRE/SRE — 产品可靠性工程师",
-  label: "PRE-SRE",
+  title: "兑底渊 — 产品可靠性工程师 (PRE-SRE)",
+  label: "兑底渊",
   cli: ["cmd", "claude", "hermes"],
   model: ["glm-5.3", "claude-sonnet-4-5", "hermes-1"],
   defaultProvider: "claude",

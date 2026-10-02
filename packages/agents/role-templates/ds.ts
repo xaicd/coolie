@@ -10,8 +10,8 @@ import type { AgentRoleTemplate } from "../types.js";
 export const ROLE_TEMPLATE: AgentRoleTemplate = {
   role: "ds",
   agentName: "ds-agent",
-  title: "DS — 部署战略专家 / 业务方案专家",
-  label: "DS",
+  title: "百晓生 — 部署战略专家 / 业务方案专家 (DS)",
+  label: "百晓生",
   cli: ["cmd", "claude", "hermes"],
   model: ["glm-5.3", "claude-sonnet-4-5", "hermes-1"],
   defaultProvider: "claude",

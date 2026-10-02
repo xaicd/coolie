@@ -10,8 +10,8 @@ import type { AgentRoleTemplate } from "../types.js";
 export const ROLE_TEMPLATE: AgentRoleTemplate = {
   role: "core-swe",
   agentName: "core-swe-agent",
-  title: "Core SWE — 平台核心研发工程师",
-  label: "Core SWE",
+  title: "铁匠 — 平台核心研发工程师 (Core SWE)",
+  label: "铁匠",
   cli: ["cmd", "claude", "hermes"],
   model: ["glm-5.3", "claude-sonnet-4-5", "hermes-1"],
   defaultProvider: "claude",

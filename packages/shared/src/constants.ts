@@ -82,11 +82,11 @@ export const AGENT_ROLE_LABELS: Record<AgentRole, string> = {
   devops: "DevOps",
   researcher: "Researcher",
   general: "General",
-  fda: "FDA",
-  "core-swe": "Core SWE",
-  "pre-sre": "PRE-SRE",
-  fdse: "FDSE",
-  ds: "DS",
+  fda: "墨斗",
+  "core-swe": "铁匠",
+  "pre-sre": "兑底渊",
+  fdse: "门神",
+  ds: "百晓生",
 };
 
 export const AGENT_DEFAULT_MAX_CONCURRENT_RUNS = 20;

@@ -91,13 +91,13 @@ export const ROLE_MAPPING: ReadonlyArray<CmmiTaskRoleBinding> = [
   { phase: "phase_2_planning", task: "p2_wbs_breakdown", taskTitle: "2.2 WBS 拆解", primary: "core-swe", secondary: "fda" },
   { phase: "phase_2_planning", task: "p2_spec_write", taskTitle: "2.3 Spec 编写", primary: "core-swe", secondary: "" },
   { phase: "phase_2_planning", task: "p2_effort_estimate", taskTitle: "2.4 工时估算", primary: "fdse", secondary: "core-swe" },
-  { phase: "phase_2_planning", task: "p2_risk_assess", taskTitle: "2.5 风险评估", primary: "fda", secondary: "pre-sre" },
+  { phase: "phase_2_planning", task: "p2_risk_assess", taskTitle: "2.5 风险评估", primary: "ds", secondary: "pre-sre" },
   // Phase 3: 设计
   { phase: "phase_3_design", task: "p3_system_design", taskTitle: "3.1 系统设计", primary: "core-swe", secondary: "fda" },
   { phase: "phase_3_design", task: "p3_api_contract", taskTitle: "3.2 API 契约", primary: "core-swe", secondary: "" },
   { phase: "phase_3_design", task: "p3_db_schema", taskTitle: "3.3 DB Schema", primary: "core-swe", secondary: "ds" },
   { phase: "phase_3_design", task: "p3_security_design", taskTitle: "3.4 安全设计", primary: "pre-sre", secondary: "core-swe" },
-  { phase: "phase_3_design", task: "p3_deploy_arch", taskTitle: "3.5 部署架构", primary: "pre-sre", secondary: "core-swe" },
+  { phase: "phase_3_design", task: "p3_deploy_arch", taskTitle: "3.5 部署架构", primary: "ds", secondary: "pre-sre" },
   // Phase 4: 开发
   { phase: "phase_4_development", task: "p4_coding", taskTitle: "4.1 编码", primary: "core-swe", secondary: "fdse" },
   { phase: "phase_4_development", task: "p4_unit_test", taskTitle: "4.2 单元测试", primary: "core-swe", secondary: "" },
@@ -106,10 +106,10 @@ export const ROLE_MAPPING: ReadonlyArray<CmmiTaskRoleBinding> = [
   { phase: "phase_4_development", task: "p4_perf_opt", taskTitle: "4.5 性能优化", primary: "pre-sre", secondary: "core-swe" },
   // Phase 5: 部署
   { phase: "phase_5_deployment", task: "p5_deploy_exec", taskTitle: "5.1 部署执行", primary: "pre-sre", secondary: "" },
-  { phase: "phase_5_deployment", task: "p5_monitor_alert", taskTitle: "5.2 监控告警", primary: "pre-sre", secondary: "ds" },
-  { phase: "phase_5_deployment", task: "p5_acceptance_test", taskTitle: "5.3 验收测试", primary: "core-swe", secondary: "fdse" },
+  { phase: "phase_5_deployment", task: "p5_monitor_alert", taskTitle: "5.2 监控告警", primary: "ds", secondary: "pre-sre" },
+  { phase: "phase_5_deployment", task: "p5_acceptance_test", taskTitle: "5.3 验收测试", primary: "ds", secondary: "fdse" },
   { phase: "phase_5_deployment", task: "p5_release_notes", taskTitle: "5.4 发布说明", primary: "core-swe", secondary: "fda" },
-  { phase: "phase_5_deployment", task: "p5_retrospective", taskTitle: "5.5 复盘", primary: "fda", secondary: "ds" },
+  { phase: "phase_5_deployment", task: "p5_retrospective", taskTitle: "5.5 复盘", primary: "ds", secondary: "fda" },
 ];
 
 /** Index by `phase + task` for O(1) lookup. */

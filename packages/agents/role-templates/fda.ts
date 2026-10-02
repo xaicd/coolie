@@ -10,8 +10,8 @@ import type { AgentRoleTemplate } from "../types.js";
 export const ROLE_TEMPLATE: AgentRoleTemplate = {
   role: "fda",
   agentName: "fda-agent",
-  title: "FDA — 前线架构师",
-  label: "FDA",
+  title: "墨斗 — 前线架构师 (FDA)",
+  label: "墨斗",
   cli: ["cmd", "claude", "hermes"],
   model: ["glm-5.3", "claude-sonnet-4-5", "hermes-1"],
   defaultProvider: "claude",

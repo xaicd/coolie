@@ -59,11 +59,11 @@ describe("dispatch-skill-matcher", () => {
 
     const bossTeam: Agent[] = [
       { id: "1", name: "Hermes", roleLabel: "PM", skills: ["派活", "验收", "报告", "调度", "评审", "复盘", "立项", "文档"], status: "active" },
-      { id: "2", name: "墨斗", roleLabel: "FDA", skills: ["调研", "画图", "选型", "研判", "文档", "设计", "立项", "规划"], status: "active" },
-      { id: "3", name: "铁匠", roleLabel: "Core SWE", skills: ["编码", "重构", "测试", "修复", "联调", "文档", "设计", "评审"], status: "active" },
-      { id: "4", name: "兑底渊", roleLabel: "PRE-SRE", skills: ["部署", "运维", "监控", "应急", "自动化", "脚本", "命令", "风控"], status: "active" },
-      { id: "5", name: "门神", roleLabel: "FDSE", skills: ["命令", "脚本", "自动化", "部署", "联调", "测试", "调研", "文档"], status: "active" },
-      { id: "6", name: "百晓生", roleLabel: "DS", skills: ["数据", "分析", "报告", "测试", "验收", "复盘", "风控", "评审"], status: "active" },
+      { id: "2", name: "墨斗", roleLabel: "墨斗", skills: ["调研", "画图", "选型", "研判", "文档", "设计", "立项", "规划"], status: "active" },
+      { id: "3", name: "铁匠", roleLabel: "铁匠", skills: ["编码", "重构", "测试", "修复", "联调", "文档", "设计", "评审"], status: "active" },
+      { id: "4", name: "兑底渊", roleLabel: "兑底渊", skills: ["部署", "运维", "监控", "应急", "自动化", "脚本", "命令", "风控"], status: "active" },
+      { id: "5", name: "门神", roleLabel: "门神", skills: ["命令", "脚本", "自动化", "部署", "联调", "测试", "调研", "文档"], status: "active" },
+      { id: "6", name: "百晓生", roleLabel: "百晓生", skills: ["数据", "分析", "报告", "测试", "验收", "复盘", "风控", "评审"], status: "active" },
     ];
 
     it("单 skill 完全匹配 → 1 个员工 100 分", () => {
