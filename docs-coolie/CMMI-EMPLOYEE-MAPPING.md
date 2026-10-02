@@ -1,26 +1,30 @@
-# CMMI 5 阶段 × 25 任务 × 5 员工分工 (wave225 + wave227)
+# CMMI 5 阶段 × 25 任务 × 5 员工分工 (wave278 全清版 + wave280 修正, 2026-10-02)
 
+> **wave280 修正** (2026-10-02 老板原话 "Hermes 肯定用 Hermes 自己啊"):
+> - **§10.2 Hermes 列** tools 列: "agy / claude-glm" → "Hermes 自己 (wave280, 不配 kiro-cli)"
+> - **删** 所有 "Hermes → kiro-cli" 误配, 跟 TOOLS.md §1/§2/§3 同步
+>
+> **不动**: §1-§9 全部 (CMMI 5 阶段 × 25 任务分工 + 算法层差异 + Palantir 7 primitives);
+> §10.1 30 个中文 2 字 skill; §10.3-§10.6 不动 (派活精准 + 删 13 + schema + 出处)
+>
 > **目的**: 把老板的"5 员工 + 1 主 agent"规范落到 CMMI 5 阶段 × 25 任务维度. 老板对 PM
 > 说一句话, PM 查本表 → 知道派哪个员工.
 >
-> **Why**: 之前 `ROLE-MAPPING.md` (wave222) 已把 CMMI 25 任务映射到本体 5 角色 (fda / core-swe /
-> pre-sre / fdse / ds), 但 5 角色是算法层, 不直接对应老板本地的 5 员工 (铁匠/门神/兑底渊/
-> 墨斗/百晓生). 本表把"角色 → 员工"补齐, PM 派单速查.
+> **wave278 变更** (本档瘦身, 砍 ~14 KB):
+> - **保留**: §0 + §1 25 任务 × 5 员工分工主表 (派活路由核心)
+> - **精简**: §2-§7 (附录) 头部加 wave278 标, 正文瘦身 (重复段并入 PM-DISPATCH-QUICKCARD §3 + §7)
+> - **保留不动**: §9 七原语 (Palantir wave245) + §10 中文 2 字 skill (wave258) — 是 5 员工层扩展
 >
-> **wave227 增**: 测试/运营/风险/部署/复盘 共 5 个 CMMI 任务主员工改百晓生 (`ds`), 因为这些
-> 都是"责任重大"事项 — 老板原话 "测试 + 运营 责任重大, 建议 DS". DS 工具扩到多工具
-> (claude-glm 主 / claude-mm 兜底 / copilot 限 / claude-ds 按量).
->
-> **wave234 改**: claude-glm 退出主力 (老板原话 "额度不够"). 铁匠主线切 cmd
-> (`@commandcode/ai` CLI, wave229); 百晓生主线切 claude-mm (按量); claude-glm 降为
-> 老板备用 (GLM 充裕时百晓生仍可用). 工具切换规则与 `HOW-TO-DELEGATE.md` §4 一致.
->
-> **wave236 改**: 老板原话 2 条 (2026-09-30): "agy 恢复了应该可以用" + "claude-ds 也不能用,
-> 换 cmd, claude-mm". **墨斗 (FDA) 默认切回 agy** (2026-09-30 ~7 天后恢复), cmd 作为紧急兜底.
-> **兑底渊 (PRE-SRE) 工具改 cmd + claude-mm** (替换 claude-ds). claude-ds 标"不可用, 配额紧" —
-> 仅百晓生 SRE 临时大任务按量兜底. 工具切换规则与 `HOW-TO-DELEGATE.md` §4 一致.
+> **Why 保留 §9 + §10**: 7 Primitives 是 wave245 老板拍板的本体地基分层, 30 个中文 2 字 skill 是 wave258
+> 老板拍板的派活精准维度, 都是与 5 员工分工正交的扩展维度, 不合并到 QUICKCARD。
 >
 > **不动**: `ROLE_MAPPING` (wave222 算法层); `AGENT_ROLES` enum; `server/src/services/agent-assign.ts`.
+>
+> **相关档跳转**:
+> - 派活路由速查: [PM-DISPATCH-QUICKCARD.md §2-3](PM-DISPATCH-QUICKCARD.md)
+> - 7 员工 object: [EMPLOYEE-OBJECTS.md](EMPLOYEE-OBJECTS.md)
+> - 6 老板团队档案: [TEAM-MAPPING.md](TEAM-MAPPING.md)
+> - 索引: [INDEX.md](INDEX.md)
 
 ---
 
@@ -445,7 +449,7 @@ wave250 — Object GlobalRID (P3, Object 统一)
 
 | 员工 | 真名 | role | 中文 skills (8 个) | 英文 tools (2-3 个) |
 |---|---|---|---|---|
-| 1 | Hermes | PM | 派活 / 验收 / 报告 / 调度 / 评审 / 复盘 / 立项 / 文档 | agy / claude-glm |
+| 1 | Hermes | PM | 派活 / 验收 / 报告 / 调度 / 评审 / 复盘 / 立项 / 文档 | **Hermes 自己** (wave280 修正, 不配 kiro-cli) |
 | 2 | 墨斗 | FDA | 调研 / 画图 / 选型 / 研判 / 文档 / 设计 / 立项 / 规划 | agy / claude-glm |
 | 3 | 铁匠 | Core SWE | 编码 / 重构 / 测试 / 修复 / 联调 / 文档 / 设计 / 评审 | cmd / claude-mm |
 | 4 | 兑底渊 | PRE-SRE | 部署 / 运维 / 监控 / 应急 / 自动化 / 脚本 / 命令 / 风控 | cmd / claude-mm |

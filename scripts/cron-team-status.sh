@@ -8,6 +8,12 @@
 # wave279 — 扩 --probe 子命令 = 真跑 OK 探测 (转调 daily-tool-probe.sh).
 # 不动 wave276 主体. 老板原话: "工具探测得工具对方有回复 ok 才行".
 #
+# wave280 修正 (老板原话 "Hermes 肯定用 Hermes 自己啊, 为啥 kiro-cli"):
+#   - WAVE_TOOL_PRIORITY 表所有 wave → kiro-cli 改成 wave → Hermes
+#   - infer_tool "claude --dangerously" 兜底 kiro-cli → Hermes
+#   - tool_default_employee kiro-cli 仍 → Hermes (工具名等同 PM 视角)
+#   - 与 docs-coolie/TOOLS.md + which-tool.sh + PM-REPORTING-FORMAT.md 同步
+#
 # 推断规则 (macOS `ps` 抓命令行, ETIME 已跑时长):
 #   1. 找所有 `claude`/`agy-gemini3.8`/`cmd`/`copilot`/`kiro-cli`/`hermes` 子进程
 #      (含 PPID 链路上的工具 CLI 调用)
@@ -125,19 +131,22 @@ WAVE_EMPLOYEE_PRIORITY=(
 )
 
 # wave → 工具 显式映射. 优先级高于命令行关键词推断 (避免 wave prompt 里同时
-# 提到 7 个工具名导致误判). per wave272: Hermes PM 工具 = kiro-cli; 墨斗 = agy;
-# 兑底渊 = copilot; 门神 = cmd; 铁匠 = claude-glm; 铁匠贰号 = claude-mm; 百晓生 = claude-mm.
+# 提到 7 个工具名导致误判). per wave272 + wave280: Hermes PM 工具 = Hermes 自己
+# (不再 kiro-cli); 墨斗 = agy; 兑底渊 = copilot; 门神 = cmd; 铁匠 = claude-glm;
+# 铁匠贰号 = claude-mm; 百晓生 = claude-mm. kiro-cli 是 7 工具池独立工具,
+# 老板备用, 不再是任何 wave 的"默认工具".
 WAVE_TOOL_PRIORITY=(
-  "wave276:kiro-cli"   # 本波: Hermes PM 派活模板 (per wave272)
+  "wave280:Hermes"     # 本波: 修 Hermes 工具配 + 补发版 0.6.21 + agy skills (Hermes PM)
+  "wave276:Hermes"     # PM 派活模板 (per wave280, Hermes = Hermes 自己)
   "wave275:copilot"    # 兑底渊发版 0.6.21 (per brief)
   "wave274:copilot"    # 占位 (待 wave274 拍板)
   "wave273:agy-gemini3.8"  # 墨斗 agy 真审 (per brief)
-  "wave272:kiro-cli"   # 7 工具池拍板 (Hermes PM 拍板)
-  "wave271:kiro-cli"   # 撞机找缺陷 (Hermes PM)
+  "wave272:Hermes"     # 7 工具池拍板 (Hermes PM 拍板, wave280 改)
+  "wave271:Hermes"     # 撞机找缺陷 (Hermes PM, wave280 改)
   "wave270:agy-gemini3.8"  # agy 全量审计 (墨斗)
-  "wave277:kiro-cli"   # 假设 PM 派活拍板
-  "wave278:kiro-cli"   # 占位
-  "wave279:kiro-cli"   # 占位
+  "wave277:Hermes"     # PM 派活拍板 (wave280 改)
+  "wave278:Hermes"     # 占位 (wave280 改)
+  "wave279:Hermes"     # 占位 (wave280 改)
 )
 
 infer_employee() {
@@ -224,9 +233,9 @@ infer_tool() {
         # 兜底 — 仅当 wave 不在 WAVE_TOOL_PRIORITY 且命令 basename 真是 claude 时
         printf 'agy-gemini3.8\n'
       elif printf '%s' "$cmd" | grep -qE 'claude --dangerously'; then
-        # 老板 wave 派活的标准模式 (Claude Code CLI 跑 wave). per wave272, Hermes PM 工具
-        # 是 kiro-cli, 但实际上 Hermes 通过 Claude Code 调度 (工具池视角看 kiro-cli 即可).
-        printf 'kiro-cli\n'
+        # 老板 wave 派活的标准模式 (Claude Code CLI 跑 wave). per wave280, Hermes = Hermes 自己
+        # (不配 kiro-cli), PM 工具视角看 Hermes 即可.
+        printf 'Hermes\n'
       elif printf '%s' "$cmd" | grep -qE 'claude -c'; then
         # 交互式续 session, 默认归 Hermes 的 PM 工具 (wave272: Hermes = PM 拍板)
         printf 'Hermes\n'

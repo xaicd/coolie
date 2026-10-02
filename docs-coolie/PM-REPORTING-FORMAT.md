@@ -1,5 +1,9 @@
-# PM 汇报真格式 (wave276 老板原话)
+# PM 汇报真格式 (wave276 老板原话 + wave280 修正, 2026-10-02)
 
+> **wave280 修正** (2026-10-02 老板原话 "Hermes 肯定用 Hermes 自己啊"):
+> - **§6 5 员工 + 7 工具池真配表** Hermes 默认工具: **kiro-cli** → **Hermes** (与 TOOLS.md / CMMI-EMPLOYEE-MAPPING.md / which-tool.sh / cron-team-status.sh 同步)
+> - **不动** §1-§5 / §7-§9 全部 (5 字段汇报模板 + cron 注册 + 推断规则 + 出处)
+>
 > **目的**: 把老板要的"定时汇报真格式"落到文档. 老板原话 (wave276, 2026-10-02):
 >
 > > "咱们团队信息, 你定时回复的消息中要包含员工名, 正在进行的任务,
@@ -41,7 +45,7 @@
 ```
 | 员工 | 任务 | 多长时间 | 工具 | 状态 |
 |---|---|---|---|---|
-| Hermes | wave275 | 1h23m | kiro-cli | 跑 |
+| Hermes | wave275 | 1h23m | Hermes 自己 (wave280) | 跑 |
 | 墨斗 | wave273 | 2h15m | agy-gemini3.8 | 跑 |
 | 兑底渊 | - | - | copilot | 等派活 |
 ```
@@ -49,7 +53,7 @@
 或简洁版 (老板 weixin / cron 自动推):
 
 ```
-Hermes: wave276 / 1h23m / kiro-cli / 跑
+Hermes: wave276 / 1h23m / Hermes 自己 (wave280) / 跑
 墨斗:   wave273 / 2h15m / agy-gemini3.8 / 跑
 兑底渊: - / - / copilot / 等派活
 ```
@@ -68,7 +72,7 @@ Hermes: wave276 / 1h23m / kiro-cli / 跑
 |---|---|---|
 | "0 进程在跑" | "全员 / - / - / 等派活" | 没有"员工"信息, 老板要员工名 |
 | "进程状态 + commit + tag + APK" | 5 字段表 | 缺员工 / 任务 / 工具 / 状态 4 字段 |
-| "Hermes 在跑" | "Hermes / wave275 / 1h23m / kiro-cli / 跑" | 缺任务 / 工具 / 时长 / 状态 |
+| "Hermes 在跑" | "Hermes / wave275 / 1h23m / Hermes 自己 (wave280) / 跑" | 缺任务 / 工具 / 时长 / 状态 |
 | "在跑" | "跑" 或 "卡" | "卡" 是 ETIME > 4h 才标 (老板硬规矩: 卡 = 通知) |
 
 ---
@@ -126,7 +130,7 @@ PM 自己被老板反问 "你怎么知道是墨斗" 时, 用本节答复.
 |---|---|---|
 | 员工 | (1) wave 编号 → `WAVE_EMPLOYEE_PRIORITY` 表<br>(2) 命令行关键词 (墨斗 / 铁匠 / 兑底渊 / 门神 / 百晓生 / Hermes)<br>(3) 工具默认员工 (copilot → 兑底渊, agy → 墨斗, ...) | wave 编号 > 关键词 > 工具兜底 |
 | 任务 | 命令行里 `# waveXXX: ...` 标题 → `extract_task` | 显式 > 模糊 |
-| 工具 | (1) wave 编号 → `WAVE_TOOL_PRIORITY` 表<br>(2) 命令行二进制 basename + 子型号关键词<br>(3) `claude -c` → Hermes; `claude --dangerously` → kiro-cli | wave 编号 > 关键词 > 默认 |
+| 工具 | (1) wave 编号 → `WAVE_TOOL_PRIORITY` 表<br>(2) 命令行二进制 basename + 子型号关键词<br>(3) `claude -c` → Hermes; `claude --dangerously` → Hermes (wave280, 不再 kiro-cli) | wave 编号 > 关键词 > 默认 |
 | 多长时间 | `ps -o etime` (macOS ps 的 ELAPSED 字段, dd-hh:mm:ss / hh:mm:ss / mm:ss / ss) | 实时 |
 | 状态 | ETIME > `STUCK_THRESHOLD_HOURS` (默认 4h) → 卡; 否则跑 | 阈值 |
 
@@ -140,7 +144,7 @@ PM 自己被老板反问 "你怎么知道是墨斗" 时, 用本节答复.
 
 | 员工 | 本体角色 | 默认工具 | 兜底工具 |
 |---|---|---|---|
-| Hermes (PM) | (PM, 不算 5 角色) | **kiro-cli** | Hermes |
+| Hermes (PM) | (PM, 不算 5 角色) | **Hermes 自己** (wave280 修正, 不配 kiro-cli) | Hermes |
 | 墨斗 (Inkstick) | `fda` | **agy-gemini3.8** | cmd |
 | 铁匠 (Forge) | `core-swe` | **claude-glm** | claude-mm |
 | 铁匠贰号 (Forge II) | `core-swe` (副) | **claude-mm** | - |
