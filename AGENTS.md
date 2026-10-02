@@ -270,8 +270,8 @@ be kept in sync twice.
   team, its employee objects, tools, skills, and operating constraints.
 - `docs-coolie/PM-DISPATCH-QUICKCARD.md` — source of truth for Hermes PM dispatch:
   who to send work to, the seven-part brief shape, pacing, and acceptance discipline.
-- `docs-coolie/TOOLS.md` — source of truth for the seven local tool pool and the
-  current default/fallback tool mapping.
+- `docs-coolie/TOOLS.md` — source of truth for the seven local tool pool, package
+  availability, and recommended tool strengths for each kind of work.
 - `.agents/agents/` — versioned templates for local employee Claude Code sub-agents.
   Install them to `~/.claude/agents/` with `scripts/register-employees-cron.sh`.
 
@@ -300,6 +300,14 @@ The two layers may share role concepts (FDA, Core SWE, PRE-SRE, FDSE, DS), but
 they are not the same system. Local-team automation should stay in `docs-coolie/`,
 `.agents/`, `scripts/`, and local machine configuration unless the task explicitly
 asks to productize it.
+
+Local tools are not hard-bound to employees. If a tool has package/quota and is
+available, any local employee may use it when it is the best fit for the work.
+The documented pairings are preferred defaults based on tool strengths, not
+identity rules: for example, product prototyping and visual/architecture
+exploration often go to 墨斗 with `agy-gemini3.8` because Gemini 3.8 is strong
+for that work. Before dispatch, check the task type, tool health/quota, and the
+employee's skill needs; then choose the best available tool.
 
 Hermes is the PM and also its own local tool. Do not map Hermes to `kiro-cli`.
 `kiro-cli` is a separate seventh local tool and is boss-reserve unless a task
