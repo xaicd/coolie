@@ -266,10 +266,44 @@ be kept in sync twice.
 - `docs-coolie/specs/*.md` — Kiro-style specs (requirements + EARS acceptance
   criteria, with the technical section appended). Read one before building its feature.
 - `.agents/skills/` — our skill library (`fork-sync` is the upstream-sync playbook).
+- `docs-coolie/EMPLOYEE-OBJECTS.md` — source of truth for the local Coolie-building
+  team, its employee objects, tools, skills, and operating constraints.
+- `docs-coolie/PM-DISPATCH-QUICKCARD.md` — source of truth for Hermes PM dispatch:
+  who to send work to, the seven-part brief shape, pacing, and acceptance discipline.
+- `docs-coolie/TOOLS.md` — source of truth for the seven local tool pool and the
+  current default/fallback tool mapping.
+- `.agents/agents/` — versioned templates for local employee Claude Code sub-agents.
+  Install them to `~/.claude/agents/` with `scripts/register-employees-cron.sh`.
 
 Before changing a file upstream also owns, read the fork-surface audit: every
 intentional change to one needs an entry with a reason in `scripts/fork-surface.json`,
 because the gate it feeds only checks the files listed there.
+
+## Coolie local team vs product runtime team
+
+Do not confuse these two layers:
+
+1. **Local Coolie-building team.** Hermes plus the local employees (墨斗, 铁匠,
+   铁匠贰号, 门神, 兑底渊, 百晓生) are the construction team for building this
+   Coolie product/fork. They run on the boss's local machine and related local
+   toolchains (`claude-*`, `agy-gemini3.8`, `cmd`, `copilot`, `Hermes`, and
+   `kiro-cli`). Their receipts, dispatch helpers, cron jobs, and WeChat progress
+   reports are development/operations workflow for this repository.
+2. **Coolie product company/team system.** The product itself contains its own
+   company, team, agent, task, budget, approval, and run-log management model.
+   This is runtime product behavior implemented in `server/`, `packages/`,
+   `ui/`, and the database schema. Do not hard-code the local construction
+   team's names, CLI tools, quotas, or WeChat workflow into product runtime logic
+   unless a feature explicitly models that distinction.
+
+The two layers may share role concepts (FDA, Core SWE, PRE-SRE, FDSE, DS), but
+they are not the same system. Local-team automation should stay in `docs-coolie/`,
+`.agents/`, `scripts/`, and local machine configuration unless the task explicitly
+asks to productize it.
+
+Hermes is the PM and also its own local tool. Do not map Hermes to `kiro-cli`.
+`kiro-cli` is a separate seventh local tool and is boss-reserve unless a task
+explicitly says otherwise.
 
 ## Design system
 
