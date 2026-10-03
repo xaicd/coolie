@@ -1,6 +1,6 @@
 import { and, count, eq } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
-import { activityLog, heartbeatRuns } from "@paperclipai/db";
+import { activityLog, heartbeatRuns, issues } from "@paperclipai/db";
 import { isUuidLike, issueWriteDenialResponse } from "@paperclipai/shared";
 import { forbidden } from "../errors.js";
 import { logger } from "../middleware/logger.js";
@@ -109,11 +109,31 @@ export async function observeCrossIssueInfluence(
       throw crossIssueInfluenceRunContextError();
     }
 
-    const sourceIssueId = readRunSourceIssueId(run.contextSnapshot);
+    // A run's write scope is its wake context. Plain timer heartbeats carry no
+    // issue in the snapshot, but an open checkout is an authenticated claim by
+    // this exact run — `issues.checkout_run_id` is only written by the checkout
+    // route for the requesting run — so a write inside that checkout is
+    // same-issue work, not cross-issue influence. Without this fallback a timer
+    // run could not comment even on the issue it holds checked out.
+    const snapshotIssueId = readRunSourceIssueId(run.contextSnapshot);
+    const checkedOutIssues = snapshotIssueId
+      ? []
+      : await tx
+        .select({ id: issues.id, identifier: issues.identifier })
+        .from(issues)
+        .where(and(
+          eq(issues.companyId, input.companyId),
+          eq(issues.checkoutRunId, input.runId),
+        ));
+    const sourceIssueId = snapshotIssueId ?? checkedOutIssues[0]?.id ?? null;
     if (!sourceIssueId) throw crossIssueInfluenceRunContextError();
+    const targetIssueIdentifier = input.targetIssueIdentifier?.toUpperCase() ?? null;
     if (
       sourceIssueId === input.targetIssueId ||
-      (input.targetIssueIdentifier && sourceIssueId.toUpperCase() === input.targetIssueIdentifier.toUpperCase())
+      checkedOutIssues.some((issue) => issue.id === input.targetIssueId) ||
+      (input.targetIssueIdentifier && sourceIssueId.toUpperCase() === input.targetIssueIdentifier.toUpperCase()) ||
+      (targetIssueIdentifier !== null &&
+        checkedOutIssues.some((issue) => issue.identifier?.toUpperCase() === targetIssueIdentifier))
     ) {
       return null;
     }

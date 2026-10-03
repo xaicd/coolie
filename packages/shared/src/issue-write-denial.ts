@@ -258,7 +258,8 @@ export function describeIssueWriteDenial(
         whoCanAct: `${actor}, once the request carries its own run id.`,
         sanctionedPath:
           `Send the \`X-Paperclip-Run-Id\` header with your current run (\`$PAPERCLIP_RUN_ID\`) ` +
-          `and retry.`,
+          `and retry. A taskless heartbeat run (timer/automation wake) can also \`POST /api/issues/{id}/checkout\` ` +
+          `first — a live checkout by that same run establishes the context for writes to that issue.`,
 
       };
 
