@@ -1,0 +1,36 @@
+{
+  "data" : [ {
+    "type" : "preReleaseVersions",
+    "id" : "4b8e7150-341a-46ff-ad8e-fc4c2a1a0e05",
+    "attributes" : {
+      "version" : "0.6.0",
+      "platform" : "IOS"
+    },
+    "relationships" : {
+      "builds" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/preReleaseVersions/4b8e7150-341a-46ff-ad8e-fc4c2a1a0e05/relationships/builds",
+          "related" : "https://api.appstoreconnect.apple.com/v1/preReleaseVersions/4b8e7150-341a-46ff-ad8e-fc4c2a1a0e05/builds"
+        }
+      },
+      "app" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/preReleaseVersions/4b8e7150-341a-46ff-ad8e-fc4c2a1a0e05/relationships/app",
+          "related" : "https://api.appstoreconnect.apple.com/v1/preReleaseVersions/4b8e7150-341a-46ff-ad8e-fc4c2a1a0e05/app"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://api.appstoreconnect.apple.com/v1/preReleaseVersions/4b8e7150-341a-46ff-ad8e-fc4c2a1a0e05"
+    }
+  } ],
+  "links" : {
+    "self" : "https://api.appstoreconnect.apple.com/v1/apps/6817620959/preReleaseVersions"
+  },
+  "meta" : {
+    "paging" : {
+      "total" : 1,
+      "limit" : 50
+    }
+  }
+}

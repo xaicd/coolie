@@ -1,0 +1,32 @@
+=== [1/4] version.json (https://xrobinai.cn/version.json) ===
+{
+  "version": "0.6.14",
+  "versionCode": 614,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.14/coolie-release.apk",
+  "apkSha256": "f0c087e28323276b1d53f15ec228cd88f299f7b7dc23d2d7b363085dc73a9702",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "2e7d63c06857dfb115f318e36ece2945b0f4cd4259b13fea0a009a9cf6e6b4c0",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "wave251 资产 tab chip 去重 (3 层 → 1 层)",
+  "commitSha": "5d98de409d2d8a2eb96e2436019b7e4c7ef0181f"
+}
+
+=== [2/4] ota/manifest (https://xrobinai.cn/ota/manifest) ===
+id            : ba957652-dd29-4fa2-a08a-c94805c5a7c0
+runtimeVersion: 0.6.14
+launchAsset   : android-bundle-Ep7QVpHPYjMNKpxUusHz8C0B7PeQmwnQ_dWd9oytUCY (5,057,415 bytes)
+createdAt     : 2026-10-01T07:24:48.213Z
+(expoClient.expoClient.version = 0.6.14, policy = appVersion)
+
+=== [3/4] APK HEAD (https://dls.xrobinai.cn/coolie/app/0.6.14/coolie-release.apk) ===
+HTTP/1.1 200 OK
+Content-Type   : application/vnd.android.package-archive
+Content-Length : 84,797,599 bytes (80.87 MB)
+Server         : tencent-cos
+Last-Modified  : 2026-10-01T07:23:42 GMT
+
+=== [4/4] /api/health (https://xrobinai.cn/api/health) ===
+{"status":"ok","deploymentMode":"authenticated","deploymentExposure":"public","localAiLoginSupported":false,"commit":null,"bootstrapStatus":"ready","bootstrapInviteActive":false,"databaseBackup":{"enabled":true,"status":"ok","warnings":[]}}
+
+(本机 127.0.0.1:3100 未起, 生产域名 https://xrobinai.cn/api/health 验收通过 — 老板真机装包走的是生产通道)

@@ -1,0 +1,63 @@
+# wave158 — iOS .ipa → App Store Connect / TestFlight upload log
+# date: 2026-09-30 ~13:02–13:03 (+08:00)
+# tool: Xcode 27.0 (27A266a), altool 27.0.5 (2.1)
+# auth: App Store Connect API key WUSVUS3H3L (issuer 2e48ed69-3c55-4ccd-b991-49037b312da2), ES256
+#       key file ~/secure/asc_key.p8, copied to ~/.appstoreconnect/private_keys/AuthKey_WUSVUS3H3L.p8
+#       (altool builds the JWT internally from the .p8; no JWT pasted on the command line)
+
+## Input artifact
+URL:    https://dls.xrobinai.cn/coolie/app/0.6.0/coolie-release-ios.ipa
+size:   14274490 bytes (14.27 MB)
+sha256: bea5ad103dba0bb2a7547bbc67930af2ec0122069fb275de39cc9531872bae09
+local:  /tmp/coolie-0.6.0.ipa
+bundle: cn.xrobinai.app  (CFBundleShortVersionString 0.6.0 / CFBundleVersion 600, MinimumOSVersion 15.1)
+profile: 2630cad1-f54c-498b-912b-1965443c488b.mobileprovision  (App Store Distribution, "Coolie工坊")
+         application-identifier UU7T5893WZ.cn.xrobinai.app, beta-reports-active=true, get-task-allow=false
+
+## Step 1 — validate
+$ xcrun altool --validate-app -f /tmp/coolie-0.6.0.ipa -t ios \
+    --api-key WUSVUS3H3L --api-issuer 2e48ed69-3c55-4ccd-b991-49037b312da2 --output-format json
+VERIFY SUCCEEDED with no errors
+exit 0
+
+## Step 2 — upload
+$ xcrun altool --upload-package /tmp/coolie-0.6.0.ipa -t ios \
+    --api-key WUSVUS3H3L --api-issuer 2e48ed69-3c55-4ccd-b991-49037b312da2 --output-format json --show-progress
+
+Contacting Apple Services…
+Preparing to upload 'coolie-0.6.0.ipa'…
+Analyzing package…
+Sending analysis to App Store Connect…
+Requesting upload instructions from App Store Connect…
+Uploading to App Store Connect…
+[####################]100.00%
+Uploading "coolie-0.6.0.ipa" is complete.
+Waiting for package to begin processing…
+Uploaded package is processing.
+Upload succeeded.
+==========================================
+UPLOAD SUCCEEDED with no errors
+Delivery UUID: c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa
+Transferred 14274490 bytes in 6.733 seconds (2.1MB/s, 16.960Mbps)
+==========================================
+{
+  "details" : {
+    "delivery-uuid" : "c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa",
+    "transferred" : "14274490 bytes in 6.733 seconds (2.1MB/s, 16.960Mbps)"
+  },
+  "os-version" : "Version 27.0 (Build 26A428)",
+  "success-message" : "No errors uploading archive at '/tmp/coolie-0.6.0.ipa'.",
+  "tool-path" : "/Applications/Xcode.app/Contents/SharedFrameworks/ContentDelivery.framework/Resources",
+  "tool-version" : "27.0.5 (2.1)"
+}
+exit 0
+
+## Step 3 — ASC API post-checks (all HTTP 200, see asc-api/*.json)
+GET /v1/apps?filter[bundleId]=cn.xrobinai.app      -> 200, app id 6817620959 "Coolie工坊" zh-Hans sku=ios
+GET /v1/bundleIds?filter[identifier]=cn.xrobinai.app -> 200, A7YPTBMZZ6, seedId UU7T5893WZ
+GET /v1/builds?filter[app]=6817620959&sort=-uploadedDate -> 200
+GET /v1/builds/c6f5a5fb-7f2b-4a60-90e7-bc2f9f6eceaa -> 200, processingState=VALID, version=600,
+     usesNonExemptEncryption=false (set by us; Info.plist had no ITSAppUsesNonExemptEncryption)
+GET /v1/apps/6817620959/preReleaseVersions -> 200, 0.6.0 / IOS
+GET /v1/betaGroups?filter[app]=6817620959 -> 200, internal group "coolie" 2fe78acd-8eb1-489b-a351-a18b797dd2a5
+GET /v1/betaGroups/2fe78acd.../betaTesters -> 200, robinschen1990@gmail.com INVITED, waj_615@qq.com INVITED

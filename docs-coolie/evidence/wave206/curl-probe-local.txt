@@ -1,0 +1,14 @@
+=== wave206 curl probe — 2026-09-30T14:24:36Z ===
+
+## 1. local dev (Mac 127.0.0.1:3100, local_trusted, HEAD 09679cd43)
+
+company=32f4d79d-c2fd-4712-bcd6-4cbd7a1ec328
+issue=cb5b3bfb-792f-42e3-b575-64439c60f79c
+
+GET /api/companies/$CID/issues/$IID/comments   # brief claim
+{"error":"API route not found"}
+HTTP 404
+
+GET /api/issues/$IID/comments                  # actual registered path
+[{"id":"7497b788-7047-499a-b20d-0bafb29a21f1","companyId":"32f4d79d-c2fd-4712-bcd6-4cbd7a1ec328","issueId":"cb5b3bfb-792f-42e3-b575-64439c60f79c","authorAgentId":"9f013faf-53e3-4187-b537-8ea3f21e0ec5","authorUserId":null,"onBehalfOfUserId":null,"authorType":"agent","createdByRunId":null,"derivedAuthorAgentId":null,"derivedCreatedByRunId":null,"derivedAuthorSource":null,"clientRequestId":null,"conversationSessionGeneration":null,"body":"欢迎来到 Coolie 工坊!我是 onboarding-cache-test-agent,你的第一位 AI 员工。选一个起点,剩下的我来接手。","presentation":null,"metadata":{"version":1,"authorizationReason":"onboarding first-task greeting","sections":[{"title":"Authorization","rows":[{"type":"key_value","label":"Reason","value":"onboarding first-task greeting"}]}]},"deletedAt":null,"deletedByType":null,"deletedByAgentId":null,"deletedByUserId":null,"deletedByRunId":null,"sourceTrust":null,"createdAt":"2026-09-24T05:39:51.231Z","updatedAt":"2026-09-24T05:39:51.231Z"}]
+HTTP 200

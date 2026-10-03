@@ -1,0 +1,50 @@
+{
+  "data" : [ {
+    "type" : "bundleIds",
+    "id" : "A7YPTBMZZ6",
+    "attributes" : {
+      "name" : "ios",
+      "identifier" : "cn.xrobinai.app",
+      "platform" : "UNIVERSAL",
+      "seedId" : "UU7T5893WZ"
+    },
+    "relationships" : {
+      "bundleIdCapabilities" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/bundleIds/A7YPTBMZZ6/relationships/bundleIdCapabilities",
+          "related" : "https://api.appstoreconnect.apple.com/v1/bundleIds/A7YPTBMZZ6/bundleIdCapabilities"
+        }
+      },
+      "profiles" : {
+        "meta" : {
+          "paging" : {
+            "total" : 0,
+            "limit" : 2147483647
+          }
+        },
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/bundleIds/A7YPTBMZZ6/relationships/profiles",
+          "related" : "https://api.appstoreconnect.apple.com/v1/bundleIds/A7YPTBMZZ6/profiles"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://api.appstoreconnect.apple.com/v1/bundleIds/A7YPTBMZZ6"
+    }
+  } ],
+  "links" : {
+    "self" : "https://api.appstoreconnect.apple.com/v1/bundleIds?filter%5Bidentifier%5D=cn.xrobinai.app"
+  },
+  "meta" : {
+    "paging" : {
+      "total" : 1,
+      "limit" : 20
+    }
+  }
+}

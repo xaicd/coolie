@@ -1,0 +1,47 @@
+=== route 404 investigation ===
+
+Boss reports: GET /api/companies/4caf.../agents/heartbeat returns 404
+Boss suggests: modify server/src/routes/index.ts to mount correctly
+
+--- 1. Real paths in agents.ts (server/src/routes/agents.ts) ---
+3872:  router.get("/agents/:id/skills", async (req, res) => {
+4017:  router.get("/companies/:companyId/agents", async (req, res) => {
+4139:  router.get("/agents/me", async (req, res) => {
+4176:  router.get("/agents/me/inbox-lite", async (req, res) => {
+4225:  router.get("/agents/me/inbox/mine", async (req, res) => {
+4243:  router.get("/agents/:id", async (req, res) => {
+4270:  router.get("/agents/:id/configuration", async (req, res) => {
+4281:  router.get("/agents/:id/config-revisions", async (req, res) => {
+4293:  router.get("/agents/:id/config-revisions/:revisionId", async (req, res) => {
+4310:  router.post("/agents/:id/config-revisions/:revisionId/rollback", async (req, res) => {
+4382:  router.get("/agents/:id/runtime-state", async (req, res) => {
+4393:  router.get("/agents/:id/task-sessions", async (req, res) => {
+4409:  router.post("/agents/:id/runtime-state/reset-session", validate(resetAgentSessionSchema), async (req, res) => {
+4784:  router.post("/companies/:companyId/agents", validate(createAgentSchema), async (req, res) => {
+5191:  router.patch("/agents/:id/permissions", validate(updateAgentPermissionsSchema), async (req, res) => {
+5250:  router.patch("/agents/:id/instructions-path", validate(updateAgentInstructionsPathSchema), async (req, res) => {
+5332:  router.get("/agents/:id/instructions-bundle", async (req, res) => {
+5341:  router.patch("/agents/:id/instructions-bundle", validate(updateAgentInstructionsBundleSchema), async (req, res) => {
+5389:  router.get("/agents/:id/instructions-bundle/file", async (req, res) => {
+5405:  router.put("/agents/:id/instructions-bundle/file", validate(upsertAgentInstructionsFileSchema), async (req, res) => {
+
+--- 2. Search any literal '/agents/heartbeat' route anywhere ---
+  (none found)
+
+--- 3. Live curl: /companies/:cid/agents/heartbeat (the path the brief names) ---
+  GET /api/companies/4a5867e1-59e6-4a74-b7ea-038eefb1944f/agents/heartbeat
+    HTTP 404 body: {"error":"API route not found"}
+  GET /api/companies/b1d6850c-02a4-41cc-a716-67797fe2b494/agents/heartbeat
+    HTTP 404 body: {"error":"API route not found"}
+
+--- 4. Live curl: /agents/heartbeat (no company in path) ---
+  GET /api/agents/heartbeat HTTP 422 body: {"error":"Agent shortname lookup requires companyId query parameter"}
+
+--- 5. Live curl: /agents/heartbeat?companyId=X (catch-all as shortname) ---
+  GET /api/agents/heartbeat?companyId=4a58... HTTP 404 body: {"error":"Agent not found"}
+
+--- 6. Live curl: working heartbeat listing path ---
+  GET /api/companies/4a58.../heartbeat-runs HTTP 200 body: []
+
+--- 7. routes/index.ts consumers (grep all imports of the barrel) ---
+  (zero consumers — barrel is dead)

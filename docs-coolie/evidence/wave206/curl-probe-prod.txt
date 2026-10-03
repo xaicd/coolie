@@ -1,0 +1,9 @@
+=== A. /api/companies/:cid/issues/:iid/comments (user brief claim) ===
+{"error":"API route not found"}
+HTTP 404
+=== B. /api/issues/:iid/comments (actual registered path — issues.ts:15417) ===
+[{"id":"448783e3-81c5-4cd4-b913-3caa88bb6fb7","companyId":"b0080331-d2b6-4e44-bb7f-61d2e288c59a","issueId":"8fdcbd42-74b7-42ab-bd1d-cf2d2de8a219","authorAgentId":null,"authorUserId":"board-concierge","onBehalfOfUserId":null,"authorType":"user","createdByRunId":null,"derivedAuthorAgentId":null,"derivedCreatedByRunId":null,"derivedAuthorSource":null,"clientRequestId":null,"conversationSessionGeneration":null,"body":"工坊今日花销\n总花销:$0.00 / 月度预算 $0.00(0%)\n今日还没有任何计费活动,公司也还没设月度预算。需要我顺手设一个预算吗?","presentation":null,"metadata":null,"deletedAt":null,"deletedByType":null,"deletedByAgentId":null,"deletedByUserId":null,"deletedByRunId":null,"sourceTrust":null,"createdAt":"2026-09-28T22:36:04.685Z","updatedAt":"2026-09-28T22:36:04.685Z"},{"id":"09a09f33-b207-4fbf-af81-b9c38aac0080","companyId":"b0080331-d2b6-4e44-bb7f-61d2e288c59a","issueId":"8fdcbd42-74b7-42ab-bd1d-cf2d2de8a219","authorAgentId":null,"authorUserId":"CtCxJJuva2SacStByNr58GpQSLMiTjSi","onBehalfOfUserId":null,"authorType":"user","createdByRunId":null,"derivedAuthorAgentId":null,"derivedCreatedByRunId":null,"derivedAuthorSource":null,"clientRequestId":null,"conversationSessionGeneration":null,"body":"工坊今日花销","presentation":null,"metadata":null,"deletedAt":null,"deletedByType":null,"deletedByAgentId":null,"deletedByUserId":null,"deletedByRunId":null,"sourceTrust":null,"createdAt":"2026-09-28T22:35:45.059Z","updatedAt":"2026-09-28T22:35:45.059Z"}]
+HTTP 200
+... (body truncated, full body in -s above)
+HTTP body length:
+1519

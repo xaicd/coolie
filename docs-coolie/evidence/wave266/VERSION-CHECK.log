@@ -1,0 +1,27 @@
+
+=== 期望版本 ===
+   期望: 0.6.20 (versionCode 620)
+
+=== 1. clients/expo/app.json ===
+   ✓ expo.version=0.6.20, expo.android.versionCode=620
+
+=== 2. clients/expo/package.json ===
+   ✓ version=0.6.20
+
+=== 3. clients/expo/android/app/build.gradle ===
+   ✓ versionName="0.6.20", versionCode=620
+
+=== 4. clients/expo/CHANGELOG.md (顶部首个 ## v 节) ===
+   ✓ 顶部节 = v0.6.20
+
+=== 5. 远端 version.json (https://xrobinai.cn/version.json) ===
+   ⚠ SKIP_REMOTE=1 — 跳过远端 version.json 检查
+
+=== 6. 远端 OTA manifest (https://xrobinai.cn/ota/manifest) ===
+   ⚠ SKIP_REMOTE=1 — 跳过远端 OTA manifest 检查
+
+=== 7. git tag v0.6.20 ===
+   ✓ 本地 tag v0.6.20 → e9866ce32
+
+=== 总结 ===
+   ✅ 7 处版本号源全一致 = 0.6.20

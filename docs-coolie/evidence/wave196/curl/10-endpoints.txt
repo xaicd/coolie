@@ -1,0 +1,84 @@
+# 10 端点 curl 实测 — wave196 鉴权修复
+
+> **状态:** 当前记录的是 patch **前** prod (`/api/admin/users` 返 403).
+> Patch 后 deploy 0.6.5 server 后, 该端点也返 200 — 见 commit `wave196`.
+
+目标: prod tc-coolie-claw / 127.0.0.1:3100 (ssh remote curl, 跟本机 `pnpm dev` sandbox 不一样)
+deployment_mode: authenticated (cookie gate, 老板 PAPERCLIP_DEPLOYMENT_MODE=authenticated)
+公司 ID: b0080331-d2b6-4e44-bb7f-61d2e288c59a
+API key 长度: 64 (PAPERCLIP_API_KEY 在 /etc/coolie/secrets.env, 仅 root 可读)
+时间: 2026-09-30T13:35:00Z
+
+## A. 带 x-paperclip-api-key header (10 端点, fix 前)
+
+ENDPOINT                                                               STATUS
+--------                                                               ------
+  /api/health                                                          200
+  /api/companies                                                       200
+  /api/skills/available                                                200
+  /api/skills/index                                                    200
+  /api/admin/users                                                     403   ← 老板报的 bug
+  /api/board-api-keys                                                  200
+  /api/cli-auth/me                                                     200
+  /api/companies/b0080331-d2b6-4e44-bb7f-61d2e288c59a                  200
+  /api/companies/b0080331-d2b6-4e44-bb7f-61d2e288c59a/agents           200
+  /api/companies/b0080331-d2b6-4e44-bb7f-61d2e288c59a/dashboard        200
+
+## B. 不带 key (anonymous) — 公共端点 (prod 严格版)
+
+ENDPOINT                                                               STATUS
+--------                                                               ------
+  /api/health                                                          200
+  /api/companies                                                       403
+  /api/skills/index                                                    401
+
+注: prod 比本地 sandbox 严 — `/api/companies` 不带 cookie/key 也 403
+(sandbox local_trusted 默认 actor 是 local-board, 不代表 prod).
+
+## C. 不带 key (anonymous) — 私有端点应 401
+
+ENDPOINT                                                               STATUS
+--------                                                               ------
+  /api/admin/users                                                     401
+  /api/board-api-keys                                                  401
+  /api/cli-auth/me                                                     401
+  /api/companies/b0080331-d2b6-4e44-bb7f-61d2e288c59a/agents           401
+  /api/companies/b0080331-d2b6-4e44-bb7f-61d2e288c59a/dashboard        401
+
+## D. 错配 key (constant-time compare 拒绝)
+
+status: 401, body: {"error":"Unauthorized"}
+
+constantTimeStringEqual 拒绝错配 key, 不回退到 local-board 默认 (避免 timing attack + data leak).
+
+## E. fix 后预期 (deploy 0.6.5 server 后)
+
+§A 第 5 行 `/api/admin/users` 期望从 403 → 200 (新加 bypass 让 `api_key` source +
+`isInstanceAdmin=true` 短路 `access.assertInstanceAdmin` 的 DB membership 查询, 跟
+`authz.assertInstanceAdmin` 对齐).
+
+部署后重跑本文件 §A, 期望 10/10 端点全 200. 重跑命令:
+
+```sh
+ssh -o BatchMode=yes tc-coolie-claw "
+  KEY=\$(sudo awk -F= '/^PAPERCLIP_API_KEY=/{print \$2}' /etc/coolie/secrets.env)
+  for ep in /api/health /api/companies /api/skills/available /api/skills/index \
+            /api/admin/users /api/board-api-keys /api/cli-auth/me \
+            /api/companies/b0080331-d2b6-4e44-bb7f-61d2e288c59a \
+            /api/companies/b0080331-d2b6-4e44-bb7f-61d2e288c59a/agents \
+            /api/companies/b0080331-d2b6-4e44-bb7f-61d2e288c59a/dashboard; do
+    code=\$(curl -s -o /dev/null -w '%{http_code}' -H \"x-paperclip-api-key: \$KEY\" http://127.0.0.1:3100\$ep)
+    printf '  %-70s %s\\n' \"\$ep\" \"\$code\"
+  done
+"
+```
+
+## F. middleware 源码位置
+
+- actorMiddleware (api_key bypass): `server/src/middleware/auth.ts:268-285`
+- assertInstanceAdmin (patch 短路): `server/src/routes/access.ts:2691-2702`
+- assertCompanyPermission (patch 短路): `server/src/routes/access.ts:3046-3057`
+- assertCanGenerateOpenClawInvitePrompt (patch 短路): `server/src/routes/access.ts:3077-3078`
+- loadCompanyAccessSummary (patch 早 return): `server/src/routes/access.ts:1186-1196`
+- userId (concierge) PAPERCLIP_CONCIERGE_USER_ID: `server/src/services/responsible-user.ts`
+- authz.assertInstanceAdmin (already-对齐版, 早就有): `server/src/routes/authz.ts:67-73`

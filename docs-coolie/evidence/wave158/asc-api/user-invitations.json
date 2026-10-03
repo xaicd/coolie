@@ -1,0 +1,58 @@
+{
+  "data" : [ {
+    "type" : "userInvitations",
+    "id" : "9fd0f4ed-1d44-4597-b83e-9a79e64d6f5f",
+    "attributes" : {
+      "firstName" : "ze",
+      "lastName" : "yi",
+      "roles" : [ "ADMIN" ],
+      "allAppsVisible" : null,
+      "email" : "runze66@163.com",
+      "provisioningAllowed" : false,
+      "expirationDate" : "2026-09-10T18:56:34.766-07:00"
+    },
+    "relationships" : {
+      "visibleApps" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/userInvitations/9fd0f4ed-1d44-4597-b83e-9a79e64d6f5f/relationships/visibleApps",
+          "related" : "https://api.appstoreconnect.apple.com/v1/userInvitations/9fd0f4ed-1d44-4597-b83e-9a79e64d6f5f/visibleApps"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://api.appstoreconnect.apple.com/v1/userInvitations/9fd0f4ed-1d44-4597-b83e-9a79e64d6f5f"
+    }
+  }, {
+    "type" : "userInvitations",
+    "id" : "d1aa530b-220f-4c00-aa78-fbeeca331f84",
+    "attributes" : {
+      "firstName" : "XiaoChen",
+      "lastName" : "boss",
+      "roles" : [ "DEVELOPER" ],
+      "allAppsVisible" : null,
+      "email" : "robinschen1989@gmail.com",
+      "provisioningAllowed" : false,
+      "expirationDate" : "2026-10-02T22:06:57.75-07:00"
+    },
+    "relationships" : {
+      "visibleApps" : {
+        "links" : {
+          "self" : "https://api.appstoreconnect.apple.com/v1/userInvitations/d1aa530b-220f-4c00-aa78-fbeeca331f84/relationships/visibleApps",
+          "related" : "https://api.appstoreconnect.apple.com/v1/userInvitations/d1aa530b-220f-4c00-aa78-fbeeca331f84/visibleApps"
+        }
+      }
+    },
+    "links" : {
+      "self" : "https://api.appstoreconnect.apple.com/v1/userInvitations/d1aa530b-220f-4c00-aa78-fbeeca331f84"
+    }
+  } ],
+  "links" : {
+    "self" : "https://api.appstoreconnect.apple.com/v1/userInvitations"
+  },
+  "meta" : {
+    "paging" : {
+      "total" : 2,
+      "limit" : 50
+    }
+  }
+}

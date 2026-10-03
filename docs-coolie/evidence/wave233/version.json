@@ -1,0 +1,12 @@
+{
+  "version": "0.6.8",
+  "versionCode": 608,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.8/coolie-release.apk",
+  "apkSha256": "0e2a98a55046bdbaf6a71be898a17e976389a3e5bd28702328026dd951e1a023",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "2e7d63c06857dfb115f318e36ece2945b0f4cd4259b13fea0a009a9cf6e6b4c0",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "v0.6.8 集成 4 波 push 修法 (wave156 立项双通道+徽标/审计/wave164 OTA runtimeVersion 强制/wave213 双端 Kanban+拖拽/wave216 OntologyDomainListScreen 节点真名兜底; wave167 已 revert 不在本次)",
+  "commitSha": "6dc0f0dc14e7921d9cf36beae4b8c2aea41296aa"
+}
