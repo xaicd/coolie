@@ -96,6 +96,13 @@ export const ontologyGraphQuerySchema = z
     view: ontologyGraphViewSchema.optional().default("project_tree"),
     /** Optional comma-separated relation filter; overrides the preset's. */
     relations: z.string().optional(),
+    /**
+     * wave284: tolerated, never read. The App's api-client (wave239) echoes
+     * the path's companyId into the query string; company scoping still comes
+     * from the route param + assertCompanyAccess, so accept-and-ignore keeps
+     * OTA-lagged installs working instead of 400-ing on unrecognized_keys.
+     */
+    companyId: z.string().uuid().optional(),
   })
   .strict()
   .superRefine((value, ctx) => {

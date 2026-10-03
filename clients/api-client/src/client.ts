@@ -1022,7 +1022,10 @@ export class CoolieClient {
       view?: string;
     } = {},
   ): Promise<OntologyGraphResponse> {
-    const q = new URLSearchParams({ companyId });
+    // wave284: companyId is already in the path — echoing it into the query
+    // made the server's strict ontologyGraphQuerySchema 400 with
+    // unrecognized_keys. Only send fields the schema actually declares.
+    const q = new URLSearchParams();
     if (opts.rootType) q.set("root_type", opts.rootType);
     if (opts.rootId) q.set("root_id", opts.rootId);
     if (opts.depth !== undefined) q.set("depth", String(opts.depth));

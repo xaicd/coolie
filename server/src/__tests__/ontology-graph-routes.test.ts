@@ -22,6 +22,12 @@ import {
 } from "./helpers/embedded-postgres.js";
 import { ontologyGraphRoutes } from "../routes/ontology-graph.ts";
 import { errorHandler } from "../middleware/error-handler.ts";
+// wave284: the real App client package, reached across the tree the same way
+// other suites import scripts/ and packages/. A contract test must build the
+// query through the client, not hand-roll it — this exact bug shipped because
+// every route test here assembled its own query string and never saw what
+// getOntologyGraph actually sends.
+import { CoolieClient } from "../../../clients/api-client/src/index.ts";
 
 /**
  * Ontology graph routes end to end (wave154) against the real schema.
@@ -432,5 +438,37 @@ describeEmbeddedPostgres("ontology graph routes (wave154)", () => {
     const res = await request(agentApp)
       .post(`/api/companies/${companyId}/ontology/backfill`);
     expect(res.status).toBe(403);
+  });
+
+  // wave284: the App's api-client (wave239) echoed the path's companyId into
+  // the query string and the strict schema 400-ed with unrecognized_keys — the
+  // boss-facing 关系图谱 black screen. The schema now tolerates the extra key
+  // so OTA-lagged installs self-heal without waiting for a client release.
+  it("wave284: tolerates an extra companyId query param (legacy App shape)", async () => {
+    const companyId = await seedCompany("Wave284Legacy");
+    const res = await request(app).get(
+      `/api/companies/${companyId}/ontology/graph?companyId=${companyId}&depth=1`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.root).toBeNull();
+    expect(res.body.nodes).toEqual([]);
+    expect(res.body.edges).toEqual([]);
+  });
+
+  it("wave284: the real @coolie/api-client getOntologyGraph round-trips 200", async () => {
+    const companyId = await seedCompany("Wave284Client");
+    const server = app.listen(0, "127.0.0.1");
+    await new Promise<void>((resolve) => server.once("listening", resolve));
+    try {
+      const address = server.address();
+      if (address === null || typeof address === "string") throw new Error("expected a TCP port");
+      const client = new CoolieClient({ baseUrl: `http://127.0.0.1:${address.port}` });
+      const graph = await client.getOntologyGraph(companyId, { depth: 1 });
+      expect(graph.root).toBeNull();
+      expect(graph.nodes).toEqual([]);
+      expect(graph.edges).toEqual([]);
+    } finally {
+      await new Promise<void>((resolve) => server.close(() => resolve()));
+    }
   });
 });
