@@ -319,6 +319,9 @@ describe("HTTP logger redaction", () => {
     expect(HTTP_LOG_REDACT_PATHS).toContain('req.headers["x-xsrf-token"]');
     expect(HTTP_LOG_REDACT_PATHS).toContain('req.headers["x-api-key"]');
     expect(HTTP_LOG_REDACT_PATHS).toContain(
+      'req.headers["x-paperclip-api-key"]',
+    );
+    expect(HTTP_LOG_REDACT_PATHS).toContain(
       'req.headers["x-telegram-bot-api-secret-token"]',
     );
     expect(HTTP_LOG_REDACT_PATHS).toContain("reqBody.credentials");
@@ -427,6 +430,37 @@ describe("HTTP logger redaction", () => {
     expect(log.req.url).toBe("/runtime-tools/github/credentials");
     expect(log.res.statusCode).toBe(status);
   });
+
+  it.each([200, 401])(
+    "redacts the board-concierge API key from HTTP %i request logs",
+    async (status) => {
+      const apiKey = "paperclip-api-key-canary-9f31c2";
+      const chunks: string[] = [];
+      const stream = new Writable({
+        write(chunk, _encoding, callback) {
+          chunks.push(chunk.toString());
+          callback();
+        },
+      });
+      const app = express();
+      app.use(createHttpLogger(pino({ redact: [...HTTP_LOG_REDACT_PATHS] }, stream)));
+      app.get("/api/issues", (_req, res) => {
+        res.status(status).json({ status });
+      });
+
+      await request(app)
+        .get("/api/issues")
+        .set("X-Paperclip-Api-Key", apiKey)
+        .expect(status);
+
+      const output = chunks.join("");
+      expect(output).not.toContain(apiKey);
+      const log = JSON.parse(output.trim());
+      expect(log.req.headers["x-paperclip-api-key"]).toBe("[Redacted]");
+      expect(log.req.url).toBe("/api/issues");
+      expect(log.res.statusCode).toBe(status);
+    },
+  );
 
   it("drops OAuth callback query data from the message and structured request", async () => {
     const chunks: string[] = [];
