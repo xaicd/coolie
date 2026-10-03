@@ -137,6 +137,8 @@ register_cron() {
     cron_line_for "$agent" "$schedule" "$task" "$execute_flag" >> "${tmp}.new"
   done
   crontab "${tmp}.new"
+  rm -f "$tmp" "${tmp}.new"
+  trap - EXIT
   if [[ "$execute_flag" == "1" ]]; then
     echo "✅ 已注册 wave282 local employee cron lines (execute mode)"
   else
@@ -152,6 +154,8 @@ unregister_cron() {
   trap 'rm -f "$tmp" "${tmp}.new"' EXIT
   if ! crontab -l > "$tmp" 2>/dev/null; then
     echo "无现有 crontab, 无需撤销"
+    rm -f "$tmp"
+    trap - EXIT
     exit 0
   fi
   grep -Fv "# $CRON_TAG_PREFIX-" "$tmp" > "${tmp}.new" || true
@@ -160,6 +164,8 @@ unregister_cron() {
   else
     crontab -r 2>/dev/null || true
   fi
+  rm -f "$tmp" "${tmp}.new"
+  trap - EXIT
   echo "✅ 已撤销 wave282 local employee cron lines"
 }
 
