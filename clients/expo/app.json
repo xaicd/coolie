@@ -57,7 +57,8 @@
       "expo-task-manager",
       "expo-background-fetch",
       "expo-location",
-      "expo-notifications"
+      "expo-notifications",
+      "./plugins/withLocalCleartextAllowlist"
     ],
     "extra": {
       "deepLinks": {
