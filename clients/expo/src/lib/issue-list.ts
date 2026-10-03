@@ -118,27 +118,39 @@ export function selectIssues(issues: Issue[], sel: IssueSelection): Issue[] {
     list = list.filter((issue) => issue.isMilestone === true);
   }
   if (sel.focusMainlineId) {
-    const childrenByParent = new Map<string, Issue[]>();
-    for (const issue of list) {
-      if (!issue.parentId) continue;
-      const bucket = childrenByParent.get(issue.parentId);
-      if (bucket) bucket.push(issue);
-      else childrenByParent.set(issue.parentId, [issue]);
-    }
-    const keep = new Set<string>([sel.focusMainlineId]);
-    const stack: string[] = [sel.focusMainlineId];
-    while (stack.length > 0) {
-      const current = stack.pop()!;
-      for (const child of childrenByParent.get(current) ?? []) {
-        if (keep.has(child.id)) continue;
-        keep.add(child.id);
-        stack.push(child.id);
-      }
-    }
-    list = list.filter((issue) => keep.has(issue.id));
+    list = keepFocusMainlineSubtree(list, sel.focusMainlineId);
   }
 
   return sortIssues(list, sel.sortField, sel.sortDir);
+}
+
+/**
+ * wave156 聚焦下钻的纯函数: 只保留 focusId 及其全量后代 (parentId 树遍历)。
+ * COOA-38 抽出 —— TaskKanbanScreen (自带一份内联筛选管道, 不走 selectIssues)
+ * 长按主线时复用同一份口径, 避免两处遍历逻辑漂移。
+ */
+export function keepFocusMainlineSubtree(
+  list: Issue[],
+  focusId: string,
+): Issue[] {
+  const childrenByParent = new Map<string, Issue[]>();
+  for (const issue of list) {
+    if (!issue.parentId) continue;
+    const bucket = childrenByParent.get(issue.parentId);
+    if (bucket) bucket.push(issue);
+    else childrenByParent.set(issue.parentId, [issue]);
+  }
+  const keep = new Set<string>([focusId]);
+  const stack: string[] = [focusId];
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    for (const child of childrenByParent.get(current) ?? []) {
+      if (keep.has(child.id)) continue;
+      keep.add(child.id);
+      stack.push(child.id);
+    }
+  }
+  return list.filter((issue) => keep.has(issue.id));
 }
 
 /** 各状态可选数量 —— 忽略状态筛选本身, 其余条件照常, 用于状态 chips 的计数。 */

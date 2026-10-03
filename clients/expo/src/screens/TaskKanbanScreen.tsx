@@ -29,6 +29,7 @@ import { IssuesList } from "../components/IssuesList";
 import { fetchIssuesPage, mergeIssuesByIdStable } from "../hooks/useTasksFilter";
 import {
   countIssuesByStatus,
+  keepFocusMainlineSubtree,
   type IssueSelection,
   type IssuesScope,
   type IssuesView,
@@ -199,6 +200,16 @@ export function TaskKanbanScreen({
     [sortValue],
   );
 
+  // COOA-38: 长按主线任务聚焦下钻 (与保留屏 TasksScreen 同语义:
+  // 只留该主线及其全量后代; chip 一键退出)。看板/列表两视图共用 visible。
+  const [focusMainlineId, setFocusMainlineId] = useState<string | null>(null);
+  const onIssueLongPress = useCallback((issue: Issue) => {
+    if (!issue.isMilestone) return;
+    void Haptics.selectionAsync();
+    setFocusMainlineId(issue.id);
+  }, []);
+  const onClearFocusMainline = useCallback(() => setFocusMainlineId(null), []);
+
   const selection: IssueSelection = useMemo(
     () => ({
       search,
@@ -237,7 +248,10 @@ export function TaskKanbanScreen({
       }
       return true;
     });
-    filtered.sort((a, b) => {
+    const focused = focusMainlineId
+      ? keepFocusMainlineSubtree(filtered, focusMainlineId)
+      : filtered;
+    focused.sort((a, b) => {
       const f = selection.sortField;
       if (f === "title") {
         return selection.sortDir === "asc"
@@ -248,8 +262,8 @@ export function TaskKanbanScreen({
       const tb = new Date(f === "created" ? b.createdAt ?? 0 : b.updatedAt ?? 0).getTime();
       return selection.sortDir === "asc" ? ta - tb : tb - ta;
     });
-    return filtered;
-  }, [issues, selection, projects]);
+    return focused;
+  }, [issues, selection, projects, focusMainlineId]);
 
   const byStatus = useMemo(() => {
     const map: Record<string, Issue[]> = {};
@@ -506,6 +520,17 @@ export function TaskKanbanScreen({
             只看主线
           </Text>
         </Pressable>
+        {/* COOA-38: 聚焦下钻激活态 + 一键退出 (与 TasksScreenFilters 的「✓ 聚焦主线」同语义) */}
+        {focusMainlineId ? (
+          <Pressable
+            style={[styles.chip, styles.chipActive]}
+            onPress={onClearFocusMainline}
+          >
+            <Text style={[styles.chipText, styles.chipTextActive]}>
+              ✓ 聚焦主线 · 点按退出
+            </Text>
+          </Pressable>
+        ) : null}
       </ScrollView>
 
       <SegmentedControl
@@ -610,6 +635,7 @@ export function TaskKanbanScreen({
             loading={loading}
             error={error}
             onIssuePress={onOpenIssue}
+            onIssueLongPress={onIssueLongPress}
             selection={selection}
             view={view}
             agents={agents}
