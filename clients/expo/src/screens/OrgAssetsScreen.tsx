@@ -172,6 +172,16 @@ export function OrgAssetsScreen({
               <Ionicons name="sparkles-outline" size={12} color="#FACC15" />
               <Text style={styles.extraPillText}>派活精准</Text>
             </Pressable>
+            {/* 原型沙箱 (墨斗交互原型即时预览) */}
+            <Pressable
+              style={[styles.extraPill, { borderColor: "rgba(167, 139, 250, 0.4)", backgroundColor: "rgba(167, 139, 250, 0.12)" }]}
+              onPress={() => onOpenPrototypeSandbox?.()}
+              hitSlop={6}
+              accessibilityLabel="原型沙箱"
+            >
+              <Ionicons name="cube-outline" size={12} color="#A78BFA" />
+              <Text style={[styles.extraPillText, { color: "#A78BFA" }]}>原型沙箱</Text>
+            </Pressable>
             <Pressable
               style={styles.extraPill}
               onPress={() => setMoreOpen(true)}
@@ -351,10 +361,10 @@ function buildMoreItems(
     },
     {
       key: "prototype",
-      icon: "color-palette-outline",
-      color: "#F472B6",
-      label: "画图 / 原型",
-      sub: "打开原型沙箱 (Plate 入口)",
+      icon: "cube-outline",
+      color: "#A78BFA",
+      label: "原型沙箱",
+      sub: "墨斗交互原型免安装即时预览与交互体验",
       onPress: () => {
         onClose();
         onOpenPrototypeSandbox?.();
