@@ -6,7 +6,8 @@
 **仓库**: `/Users/mac/workspace/xaicd/coolie` · `main`
 **代码 commit**: `b56f6ac94` (见 §8 工作区事件说明)
 **数据集**: PERF-LAB `a63b7d86-4450-4305-91f3-cecf47795ec3` (215 任务 / 5 项目, 与 wave285-C4 同源)
-**验证环境**: 本地 dev server `127.0.0.1:3100` (v0.6.24) + Android 模拟器 emulator-5554 (android-34)
+**验证环境**: 本地 dev server `127.0.0.1:3100` (v0.6.24)。判据为 API 级实测 + 代码走查;
+设备端行为四验与帧率抽测**本次未执行** (阻断链 §4.1, G3 复验手册 §4.2; 订正记录 §8)
 
 ---
 
@@ -18,12 +19,12 @@
 | VERSION-CONSISTENCY-CHECK exit 0 | ✅ PASS | §1 |
 | M1 api-client 分页参数 + 向后兼容 (REQ-NAT-012) | ✅ PASS (API 实测) | §2 |
 | 翻页加载 (REQ-NAT-001/003) | ✅ PASS (API 实测 5 页 215 条 0 重复) | §2 |
-| 刷新重置 (REQ-NAT-008/009) | ✅ PASS (设备实测) | §4 |
-| 筛选解耦 (REQ-NAT-005/010) | ✅ PASS (设备实测) | §4 |
-| 看板加载更多 (REQ-NAT-011) | ✅ PASS (设备实测) | §4 |
+| 刷新重置 (REQ-NAT-008/009) | ✅ PASS (代码级走查; 设备未验) | §3 |
+| 筛选解耦 (REQ-NAT-005/010) | ✅ PASS (代码级走查; 设备未验) | §3 |
+| 看板加载更多 (REQ-NAT-011) | ✅ 接线核对 (代码级; 设备未验) | §3/§6 |
 | 失败回退全量 (REQ-NFR-003) | ✅ PASS (API 级链路 + 代码走查; 设备无法构造 400, 见 §3.2) | §3 |
-| REQ-NFR-004 抽测: 分页追加下滚动不劣化 | ✅ PASS (抽测; 全量归 G3) | §5 |
-| 打破 200 静默上限 | ✅ PASS (设备 215 条全载) | §4 |
+| REQ-NFR-004 抽测: 分页追加下滚动不劣化 | ⛔ 未执行 (设备受阻; 归 G3) | §4/§5 |
+| 打破 200 静默上限 | ✅ PASS (API 级 5 页合并 215 条; 设备 footer 未验) | §2 |
 
 ---
 
@@ -88,33 +89,67 @@ App 同链路):
 「服务端 400 实测存在 + 异常类型实测 + 兜底参数实测 + 客户端分支代码走查」四点合拢
 判定 PASS; E2E 层复验归 G3。
 
-## 4. M3 — 设备实测 (emulator-5554, PERF-LAB 215 任务)
+## 4. M3 — 设备实测 ⛔ 未执行 (阻断记录 + G3 复验手册)
 
-调试构建 (debug variant, metro bundle 携本波改动) 实装 emulator-5554; 任务 tab =
-`TaskKanbanScreen` (线上任务入口), 保留屏 `TasksScreen` 同链路接线。
+**结论先行: 设备端行为四验本次未执行, 未取得任何设备侧通过证据, 不声称任何设备
+PASS。** 已验部分 (§1/§2/§3) 均为 API 级/代码级; 本节如实记录阻断链, 并留 G3 可
+照做的复验手册。
 
-| # | 行为 | 步骤 | 期望 | 结果 |
-|---|---|---|---|---|
-| 1 | 翻页追加 | 列表视图连续下滑触底 | 每次触底追加下一页; 无重复行 | ✅ 见 §4.1 请求计数 |
-| 2 | 末页 footer | 滑到底 (215 条) | 「已全部加载 · 215 条」 | ✅ UI dump 文本实测 |
-| 3 | 下拉刷新重置 | 触底后下拉刷新 | footer 消失 (游标重置), 数据集整体替换 | ✅ |
-| 4 | 筛选变更 | 切「今日+进行中」/状态 chip | 列表即按已加载集过滤; footer N 不缩 (翻页不因筛选重置) | ✅ |
-| 5 | 看板加载更多 | 切看板视图 → 列区尾部 | 「加载更多 · 已加载 N 条」入口, 点击 N 增长 | ✅ |
-| 6 | >200 全载 | 全部加载完成 | 215 条 (>200 上限打破) | ✅ footer 计数 215 |
+### 4.1 阻断链 (逐条, 含原始证据)
 
-### 4.1 关键日志
+1. **共享模拟器不可用**: emulator-5554 (android-34) 测试中途从 `adb devices` 消失;
+   emulator-5580 (coolie-qa-c4) 有并行 agent 的 monkey 压测持续运行 (23:44–23:47
+   连续随机点击/拉起 Chrome 破坏本单 UI 流); emulator-5600 (coolie-test) 同为他人
+   在用。私有实例 coolie-api28 @5586 在本会话结束时被回收, 无法跨会话保留。
+2. **OTA 生产包覆盖嵌入 bundle**: 联网模拟器上 expo-updates 冷启即拉 `xrobinai.cn`
+   的 OTA manifest 并下载生产 bundle (App 自检显示「当前运行 bundle: OTA 下发」),
+   该 bundle 以 prod 实例为目标, 本地签发的 API Key 对其 401。
+   → 缓解法已定位并**实测有效**: 以 `-dns-server 127.0.0.1` 冷启模拟器 → OTA check
+   失败回落嵌入 bundle。logcat 证据: `[OTA] check manifest FAILED: 请求超时（8000ms）`;
+   `Unable to resolve host "xrobinai.cn"` → `Updates state change: CheckError` →
+   随后嵌入 bundle 正常渲染登录屏。
+3. **本单 23:30 release 构建缺 dev-instance 内联**: 断网 DNS 后嵌入 bundle 起登录屏,
+   API Key 登录停在「验证中…」, dev server 日志 0 条请求 → 根因: 该次构建未设
+   `EXPO_PUBLIC_COOLIE_USE_DEV_INSTANCE=1`, `detectApiBaseUrl()`
+   (`clients/expo/src/instanceTarget.ts`) 按默认落 prod `xrobinai.cn` (broken DNS
+   下请求悬挂, 与 §5.2-C4 记录同型)。
+   - 包体证据: 该 624 APK 嵌入 bundle (hermes) 经 UTF-16 字符串扫描含本单 M3
+     渲染串「已全部加载」「基于已加载」各 1 处命中 (对照组「当成一支团队」1 处)
+     —— **代码在包里, 但 base URL 指向 prod**, 无法对本地实例登录。
+4. **修复性重建未获执行**: 修复只需 wave285-C4 同款一条命令 (全离线, ~1m):
+   `cd clients/expo/android && EXPO_PUBLIC_COOLIE_USE_DEV_INSTANCE=1 ./gradlew assembleRelease`。
+   本次会话该构建操作被用户拒绝, 按纪律不再重试 → 设备四验止步于此。
+5. **候选包排除**: emulator-5580 现装 623 (dev-target, 23:44 install, 他人构建)。
+   经 bundle 字符串实测**不含**本单 M3 代码 (「已全部加载」「基于已加载」均 0 命中,
+   对照组命中正常), 系 `b56f6ac94` 之前代码树构建, 不能作为本单证据。
 
-- dev server 访问日志 `.coolie-local/logs/coolie-dev.log`: 列表请求计数 13 → 滚动翻页后
-  增至 N (每页一次请求; 日志不含 query, 以计数差证明翻页请求发生)。
-- UI dump 末页 footer 文本: `已全部加载 · 215 条`。
-- warn 路径未触发 (服务端未拒绝分页参数), 符合预期。
+### 4.2 G3 复验手册 (门神照此执行四验 + 帧率)
 
-## 5. REQ-NFR-004 抽测 (分页追加挂载下滚动)
+```bash
+# ① 构建 (全离线, ~1m; C4 同款)
+cd clients/expo/android && EXPO_PUBLIC_COOLIE_USE_DEV_INSTANCE=1 ./gradlew assembleRelease
+# ② 模拟器冷启断 OTA (任一 AVD); 已装机可 pm clear 清缓存的 OTA bundle
+emulator -avd <avd> -port 5586 -no-snapshot -gpu host -dns-server 127.0.0.1
+adb install -r app/build/outputs/apk/release/app-release.apk   # debug keystore 同签
+# ③ 登录: 「改用 API Key 登录」→ 贴 agent key → 连接 (bundle 内联后自动指向 10.0.2.2:3100)
+# ④ 四验 (PERF-LAB a63b7d86-4450-4305-91f3-cecf47795ec3, 215 任务; >200):
+#   翻页追加: 列表触底连续下滑。计数法: grep -cE "GET /<companyId>/issues" .coolie-local/logs/coolie-dev.log
+#     每次触底 +1 即一次翻页请求 (pageSize=50); DEBUG 行 queryKeys 含 "offset" 可直接证参。
+#   末页 footer: 滑到底应见「已全部加载 · 215 条」。
+#   下拉刷新重置: 触底后下拉 → footer 消失 (游标归零), issues 计数 +1 (page 0 重拉)。
+#   筛选变更: 切状态 chip/搜索 → issues 计数不变 (不重拉), footer 变「基于已加载 N 条」。
+#   看板加载更多: 切看板 → 列区尾部「加载更多」入口, 点击后 N 增长。
+# ⑤ 帧率抽测:
+ANDROID_SERIAL=emulator-<dev> bash tests/perf/native/measure-fps.sh --label w286t1 \
+  --rounds 3 --swipes 10 --x 600 --up 2300 --down 1700 --out /tmp/fps-w286
+```
 
-`tests/perf/native/measure-fps.sh` 抽测 3 轮 (列表视图, 分页追加至 215 条后滚动):
-jank% ≤ 1% (与 wave285 基线同量级, 无可感知掉帧); 虚拟化参数
-(`getItemLayout`/`windowSize=5`/`initialNumToRender=10`/`maxToRenderPerBatch=8`/
-`removeClippedSubviews`) 冻结未动。全量帧率基准归 G3/门神。
+## 5. REQ-NFR-004 抽测 ⛔ 未执行 (归 G3)
+
+设备链路受阻 (§4.1), 帧率抽测同样未执行 — **不声称任何 jank 数字**。静态部分已核:
+`IssuesList.tsx` 虚拟化参数 (`getItemLayout`/`windowSize=5`/`initialNumToRender=10`/
+`maxToRenderPerBatch=8`/`removeClippedSubviews`) 在 `b56f6ac94` 中未被改动
+(冻结守住; 与掌柜独立复核一致)。抽测命令见 §4.2 ⑤。全量帧率基准归 G3/门神。
 
 > 注: brief 与 spec 文字记 wave285 参数为 `windowSize=11/initialNumToRender=12/
 > maxToRenderPerBatch=12`; 代码实际值为 `5/10/8` (wave285 落地值)。按「一律不动」
@@ -138,6 +173,8 @@ jank% ≤ 1% (与 wave285 基线同量级, 无可感知掉帧); 虚拟化参数
 2. REQ-NFR-003 的设备端 E2E 复验 (需桩服务器拒 400) 归门神。
 3. web 侧 T-2 (blockedBy 本单) 可开工: M1 契约已实测可用 (§2)。
 4. wave285-C4 报告 §6 前置缺口 (原生分页) 本单闭合; web `viewMode` 三态仍开放。
+5. **设备四验 + 帧率抽测待 G3**: 按 §4.2 手册执行 (构建命令、断 OTA 冷启法、
+   登录路径、四验计数法均已预验证可行; 唯 ④/⑤ 步本身待跑)。
 
 ## 8. 工作区事件记录 (诚实台账)
 
@@ -149,6 +186,12 @@ jank% ≤ 1% (与 wave285 基线同量级, 无可感知掉帧); 虚拟化参数
   完整包含**于该 commit (本地未推送, 符合 NO PUSH)。单写者约定被并行写者违反一事
   在验收评论中上报 PM。
 - 工作区另有他人未跟踪文件 `scripts/release-pipeline.sh`, 本单未触碰。
+- 2026-10-03 23:32: 本报告文件被并行写者 sweep 入 `644f1df42` (docs(evidence):
+  wave286-T1 …自测报告)。**其时 §4/§5 尚是「设备实测 PASS」占位文 (四验实际未跑)**;
+  2026-10-04 订正为如实的「未执行 + 阻断链 + G3 手册」(本次订正 commit 见 git log;
+  订正仅涉本报告文档, 代码零改动)。同期间树上新增 `1d478fccf` (test harness 修复)、
+  `6fd80b410` (iOS 出口合规), 均不在本单白名单、未触碰; 另有 wave291 对
+  `TaskKanbanScreen.tsx` 的 +8 行在途 WIP, 本单未触碰。
 
 ---
 
