@@ -77,13 +77,65 @@ const SORT_OPTIONS: Array<{
   { value: "title:desc", label: "标题 Z→A", field: "title", dir: "desc" },
 ];
 
+export const KANBAN_COLUMN_INITIAL_VISIBLE_LIMIT = 10;
+export const KANBAN_COLUMN_REVEAL_INCREMENT = 10;
+
 const KANBAN_COLUMNS: IssueStatus[] = [
   "backlog",
   "todo",
   "in_progress",
   "in_review",
+  "blocked",
   "done",
 ];
+
+const COLUMN_TONES: Record<
+  string,
+  { bg: string; border: string; headerText: string; countBg: string }
+> = {
+  backlog: {
+    bg: "rgba(148, 163, 184, 0.05)",
+    border: "rgba(148, 163, 184, 0.16)",
+    headerText: C.ink3,
+    countBg: "rgba(148, 163, 184, 0.12)",
+  },
+  todo: {
+    bg: "rgba(245, 158, 11, 0.05)",
+    border: "rgba(245, 158, 11, 0.20)",
+    headerText: "#d97706",
+    countBg: "rgba(245, 158, 11, 0.15)",
+  },
+  in_progress: {
+    bg: "rgba(59, 130, 246, 0.05)",
+    border: "rgba(59, 130, 246, 0.20)",
+    headerText: "#2563eb",
+    countBg: "rgba(59, 130, 246, 0.15)",
+  },
+  in_review: {
+    bg: "rgba(139, 92, 246, 0.05)",
+    border: "rgba(139, 92, 246, 0.20)",
+    headerText: "#7c3aed",
+    countBg: "rgba(139, 92, 246, 0.15)",
+  },
+  blocked: {
+    bg: "rgba(239, 68, 68, 0.05)",
+    border: "rgba(239, 68, 68, 0.20)",
+    headerText: "#dc2626",
+    countBg: "rgba(239, 68, 68, 0.15)",
+  },
+  done: {
+    bg: "rgba(16, 185, 129, 0.05)",
+    border: "rgba(16, 185, 129, 0.20)",
+    headerText: "#059669",
+    countBg: "rgba(16, 185, 129, 0.15)",
+  },
+  cancelled: {
+    bg: "rgba(100, 116, 139, 0.04)",
+    border: "rgba(100, 116, 139, 0.12)",
+    headerText: C.ink4,
+    countBg: "rgba(100, 116, 139, 0.10)",
+  },
+};
 
 type ColumnLayout = { x: number; width: number; status: IssueStatus };
 
@@ -116,6 +168,19 @@ export function TaskKanbanScreen({
   const [view, setView] = useState<IssuesView>("list");
   const [sortValue, setSortValue] = useState(SORT_OPTIONS[0]!.value);
   const [sheet, setSheet] = useState<SheetKind>(null);
+
+  // 对标 Web 端: 分列渐进式渲染限额状态，初始每列只渲染前 10 张卡片
+  const [visibleLimitByStatus, setVisibleLimitByStatus] = useState<Record<string, number>>({});
+
+  const handleShowMore = useCallback((status: IssueStatus) => {
+    void Haptics.selectionAsync();
+    setVisibleLimitByStatus((prev) => ({
+      ...prev,
+      [status]:
+        (prev[status] ?? KANBAN_COLUMN_INITIAL_VISIBLE_LIMIT) +
+        KANBAN_COLUMN_REVEAL_INCREMENT,
+    }));
+  }, []);
 
   const sortOption = useMemo(
     () => SORT_OPTIONS.find((option) => option.value === sortValue) ?? SORT_OPTIONS[0]!,
@@ -433,6 +498,8 @@ export function TaskKanbanScreen({
                 status={status}
                 issues={byStatus[status] ?? []}
                 agents={agents}
+                visibleLimit={visibleLimitByStatus[status] ?? KANBAN_COLUMN_INITIAL_VISIBLE_LIMIT}
+                onShowMore={() => handleShowMore(status)}
                 onLayout={onColumnLayout(status)}
                 onOpenIssue={onOpenIssue}
                 dragOffsetX={dragOffsetX}
@@ -498,6 +565,8 @@ const KanbanColumnView = memo(function KanbanColumnView({
   status,
   issues,
   agents,
+  visibleLimit,
+  onShowMore,
   onLayout,
   onOpenIssue,
   dragOffsetX,
@@ -510,6 +579,8 @@ const KanbanColumnView = memo(function KanbanColumnView({
   status: IssueStatus;
   issues: Issue[];
   agents: AgentRow[];
+  visibleLimit: number;
+  onShowMore: () => void;
   onLayout: (e: LayoutChangeEvent) => void;
   onOpenIssue: (issue: Issue) => void;
   dragOffsetX: ReturnType<typeof useSharedValue<number>>;
@@ -520,34 +591,81 @@ const KanbanColumnView = memo(function KanbanColumnView({
   resolveDropTarget: (absX: number) => IssueStatus | null;
 }) {
   const color = issueStatusColor(status);
+  const tone = COLUMN_TONES[status] ?? COLUMN_TONES.backlog!;
+  const visibleIssues = issues.slice(0, visibleLimit);
+  const hiddenCount = Math.max(issues.length - visibleIssues.length, 0);
+  const nextRevealCount = Math.min(KANBAN_COLUMN_REVEAL_INCREMENT, hiddenCount);
+
   return (
-    <View style={styles.column} onLayout={onLayout}>
+    <View
+      style={[
+        styles.column,
+        { backgroundColor: tone.bg, borderColor: tone.border },
+      ]}
+      onLayout={onLayout}
+    >
       <View style={styles.columnHeader}>
         <View style={[styles.columnDot, { backgroundColor: color }]} />
-        <Text style={[styles.columnTitle, { color }]}>{issueStatusLabel(status)}</Text>
-        <Text style={styles.columnCount}>{issues.length}</Text>
+        <Text style={[styles.columnTitle, { color: tone.headerText }]}>
+          {issueStatusLabel(status)}
+        </Text>
+        <View style={[styles.columnCountBadge, { backgroundColor: tone.countBg }]}>
+          <Text style={[styles.columnCountText, { color: tone.headerText }]}>
+            {issues.length}
+          </Text>
+        </View>
       </View>
+
       {issues.length === 0 ? (
-        <Text style={styles.columnEmpty}>—</Text>
+        <View style={styles.columnEmptyBox}>
+          <Text style={styles.columnEmpty}>暂无任务</Text>
+        </View>
       ) : (
-        issues.map((issue) => (
-          <DraggableKanbanCard
-            key={issue.id}
-            issue={issue}
-            assigneeName={
-              issue.assigneeAgentId
-                ? agents.find((a) => a.id === issue.assigneeAgentId)?.name ?? "已指派"
-                : "未分配"
-            }
-            onPress={() => onOpenIssue(issue)}
-            dragOffsetX={dragOffsetX}
-            dragOffsetY={dragOffsetY}
-            dragIssue={dragIssue}
-            setDragIssue={setDragIssue}
-            tryDropOnColumn={tryDropOnColumn}
-            resolveDropTarget={resolveDropTarget}
-          />
-        ))
+        <>
+          {visibleIssues.map((issue) => (
+            <DraggableKanbanCard
+              key={issue.id}
+              issue={issue}
+              assigneeName={
+                issue.assigneeAgentId
+                  ? agents.find((a) => a.id === issue.assigneeAgentId)?.name ?? "已指派"
+                  : "未分配"
+              }
+              onPress={() => onOpenIssue(issue)}
+              dragOffsetX={dragOffsetX}
+              dragOffsetY={dragOffsetY}
+              dragIssue={dragIssue}
+              setDragIssue={setDragIssue}
+              tryDropOnColumn={tryDropOnColumn}
+              resolveDropTarget={resolveDropTarget}
+            />
+          ))}
+
+          {hiddenCount > 0 ? (
+            <Pressable
+              style={({ pressed }) => [
+                styles.showMoreBtn,
+                { borderColor: tone.border },
+                pressed && styles.showMoreBtnPressed,
+              ]}
+              onPress={onShowMore}
+              accessibilityRole="button"
+              accessibilityLabel={`展开更多 ${nextRevealCount} 项任务`}
+            >
+              <Ionicons name="chevron-down" size={13} color={tone.headerText} />
+              <Text style={[styles.showMoreText, { color: tone.headerText }]}>
+                展开更多 +{nextRevealCount}
+              </Text>
+              <Text style={styles.showMoreSubText}>
+                ({visibleIssues.length}/{issues.length})
+              </Text>
+            </Pressable>
+          ) : issues.length > KANBAN_COLUMN_INITIAL_VISIBLE_LIMIT ? (
+            <View style={styles.allShownBox}>
+              <Text style={styles.allShownText}>已显示全部 {issues.length} 项</Text>
+            </View>
+          ) : null}
+        </>
       )}
     </View>
   );
@@ -620,11 +738,8 @@ const DraggableKanbanCard = memo(function DraggableKanbanCard({
           dragOffsetY.value = e.translationY;
         })
         .onEnd((e) => {
-          // 落点判定: e.absoluteX 加上本卡片 absoluteX (start 时记录到 ref 略复杂,
-          // 简化: 横向滚动列已确保 translationX > 列宽足以跨列, 列布局相对 root 算)
           const targetX = e.absoluteX;
           runOnJS(handleDrop)(targetX, issue);
-          // 回弹: scale/opacity 由 JS 线程 setDragIssue(null) 触发的非 drag 渲染复位
           cardX.value = withSpring(0);
           cardY.value = withSpring(0);
           cardScale.value = withSpring(1);
@@ -657,6 +772,7 @@ const DraggableKanbanCard = memo(function DraggableKanbanCard({
 
   const color = issueStatusColor(issue.status);
   const time = formatRelativeShort(issue.updatedAt ?? issue.createdAt);
+  const identifier = issue.identifier ?? `#${issue.id.slice(0, 5).toUpperCase()}`;
 
   return (
     <GestureDetector gesture={pan}>
@@ -668,14 +784,41 @@ const DraggableKanbanCard = memo(function DraggableKanbanCard({
           style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
         >
           <View style={[styles.cardAccent, { backgroundColor: color }]} />
+
+          {/* 卡片头部徽标区: 任务 Identifier + 主线/Spec 标记 */}
+          <View style={styles.cardHeaderRow}>
+            <View style={styles.identifierBadge}>
+              <Text style={styles.identifierText}>{identifier}</Text>
+            </View>
+            {issue.isMilestone ? (
+              <View style={styles.mainlineBadge}>
+                <Text style={styles.mainlineBadgeText}>主线</Text>
+              </View>
+            ) : null}
+            {issue.specKind ? (
+              <View style={styles.specBadge}>
+                <Text style={styles.specBadgeText}>Spec</Text>
+              </View>
+            ) : null}
+          </View>
+
+          {/* 标题 */}
           <Text style={styles.cardTitle} numberOfLines={2}>
             {issue.title}
           </Text>
+
+          {/* 底部 Meta: 指派人头像首字 + 姓名 + 相对更新时间 */}
           <View style={styles.cardMeta}>
-            <Ionicons name="person-outline" size={11} color={C.ink4} />
-            <Text style={styles.cardAssignee} numberOfLines={1}>
-              {assigneeName}
-            </Text>
+            <View style={styles.cardAssigneeBox}>
+              <View style={styles.assigneeAvatar}>
+                <Text style={styles.assigneeAvatarText}>
+                  {assigneeName ? assigneeName.slice(0, 1) : "?"}
+                </Text>
+              </View>
+              <Text style={styles.cardAssignee} numberOfLines={1}>
+                {assigneeName}
+              </Text>
+            </View>
             {time ? <Text style={styles.cardTime}>{time}</Text> : null}
           </View>
         </Pressable>
@@ -775,14 +918,18 @@ const styles = StyleSheet.create({
     paddingVertical: SPACING.sm,
   },
   column: {
-    width: 240,
+    width: 260,
     gap: SPACING.sm,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    padding: SPACING.sm,
   },
   columnHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingHorizontal: SPACING.xs,
+    paddingVertical: 2,
   },
   columnDot: {
     width: 7,
@@ -791,19 +938,61 @@ const styles = StyleSheet.create({
   },
   columnTitle: {
     fontSize: 12,
-    fontWeight: "600",
+    fontWeight: "700",
     flex: 1,
+    letterSpacing: 0.5,
   },
-  columnCount: {
-    color: C.ink4,
+  columnCountBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: RADIUS.pill,
+  },
+  columnCountText: {
     fontSize: 11,
+    fontWeight: "600",
     fontVariant: ["tabular-nums"],
+  },
+  columnEmptyBox: {
+    minHeight: 100,
+    alignItems: "center",
+    justifyContent: "center",
   },
   columnEmpty: {
     color: C.ink4,
     fontSize: 12,
-    paddingHorizontal: SPACING.xs,
-    paddingVertical: SPACING.sm,
+  },
+  showMoreBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    marginTop: 2,
+  },
+  showMoreBtnPressed: {
+    opacity: 0.7,
+  },
+  showMoreText: {
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  showMoreSubText: {
+    fontSize: 11,
+    color: C.ink4,
+    fontVariant: ["tabular-nums"],
+  },
+  allShownBox: {
+    alignItems: "center",
+    paddingVertical: 6,
+  },
+  allShownText: {
+    color: C.ink4,
+    fontSize: 11,
   },
   cardWrap: {
     borderRadius: RADIUS.md,
@@ -814,7 +1003,7 @@ const styles = StyleSheet.create({
     borderColor: C.lineSubtle,
     borderRadius: RADIUS.md,
     padding: SPACING.md,
-    gap: SPACING.sm,
+    gap: SPACING.xs,
     overflow: "hidden",
   },
   cardPressed: {
@@ -825,18 +1014,81 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     bottom: 0,
-    width: 3,
+    width: 3.5,
+  },
+  cardHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 2,
+  },
+  identifierBadge: {
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  identifierText: {
+    color: C.ink3,
+    fontSize: 11,
+    fontFamily: "monospace",
+    fontWeight: "500",
+  },
+  mainlineBadge: {
+    backgroundColor: "rgba(94, 106, 210, 0.15)",
+    borderWidth: 1,
+    borderColor: C.accent,
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  mainlineBadgeText: {
+    color: C.accent,
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  specBadge: {
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  specBadgeText: {
+    color: C.ok,
+    fontSize: 10,
+    fontWeight: "600",
   },
   cardTitle: {
     color: C.ink,
     fontSize: FONT_SIZE.sub,
     fontWeight: "500",
     lineHeight: 18,
+    marginVertical: 2,
   },
   cardMeta: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 4,
+    justifyContent: "space-between",
+    marginTop: 4,
+  },
+  cardAssigneeBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    flex: 1,
+  },
+  assigneeAvatar: {
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  assigneeAvatarText: {
+    color: C.ink2,
+    fontSize: 9,
+    fontWeight: "600",
   },
   cardAssignee: {
     color: C.ink3,

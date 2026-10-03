@@ -50,6 +50,7 @@ export const IssueRow = memo(function IssueRow({
   const isBranch = !issue.isMilestone && !!issue.parentId && parentIssue?.isMilestone === true;
   const isAdhoc = !issue.isMilestone && !!issue.parentId && parentIssue != null && parentIssue.isMilestone === false;
   const showSpec = !!issue.specKind && (SPEC_KIND_BADGE as Record<string, string>)[issue.specKind] != null;
+  const identifier = issue.identifier ?? (issue.id ? `#${issue.id.slice(0, 5).toUpperCase()}` : null);
 
   return (
     <Pressable
@@ -70,6 +71,12 @@ export const IssueRow = memo(function IssueRow({
       >
         {done ? <Ionicons name="checkmark" size={11} color={C.bg} /> : null}
       </View>
+
+      {identifier ? (
+        <Text style={styles.identifier} numberOfLines={1}>
+          {identifier}
+        </Text>
+      ) : null}
 
       <Text
         style={[styles.title, cancelled && styles.titleCancelled]}
@@ -132,6 +139,13 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     alignItems: "center",
     justifyContent: "center",
+  },
+  identifier: {
+    color: C.ink4,
+    fontSize: 12,
+    fontFamily: "monospace",
+    fontWeight: "500",
+    marginRight: -4,
   },
   title: {
     flex: 1,
