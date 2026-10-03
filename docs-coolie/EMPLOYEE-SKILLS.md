@@ -46,6 +46,23 @@
 
 ---
 
+## 0.5 wave280-285 增补登记 (回填, 2026-10-03)
+
+> wave278 全清版之后的**新增 skill 补登**, 不改下方 §1 各员工主表。
+> 路由与引入政策见 `.agents/skills/README.md` (wave285)。
+
+| Skill (P 级) | 归属/使用员工 | 用途 | 出处 |
+|---|---|---|---|
+| `agy-gemini-cli` (P0) | 墨斗 | 用 agy-gemini3.8 (Antigravity CLI) 的操作真值 (docker exec/中文 base64/配额) | wave280 |
+| `local-team-toolchain` (P0) | 全员 (Hermes 派单必读) | 跨环境 (Docker 容器 vs Mac 宿主) 7 工具池调度权威: host-exec/dispatch/context-bus/门禁账本 | wave284 |
+| `coolie-boss-decision-log` (P1) | Hermes (PM) | 记录老板拍板决策点, 跨班次交付时对齐 | wave268 前后 |
+| `hr-agent-onboarding` (P1) | Hermes (PM) | 新员工/新 agent 入职装配流程 | wave258 |
+| `company-creator` (P2, upstream) | 墨斗/百晓生 | agentcompanies/v1 公司包脚手架 (上游资产, 不改) | upstream |
+
+**wave285 定版**: aja-pc/wenlv 系统 32 个定制 skills 曾引入后**全量回滚** (commit `36bb09d94` → `ee66f7a36`) — 老板原话「定制的 skills 就别乱学习」。定制 skill 内嵌对方环境绑定, 学习思想须基于 coolie 栈重写。
+
+---
+
 ## 1. 5 员工 × Skills 映射主表
 
 ### 1.1 铁匠 (Forge / `core-swe`) — **cmd (`@commandcode/ai` CLI) 主 (wave234 起), claude-mm 兜底**
