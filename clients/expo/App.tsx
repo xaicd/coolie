@@ -1323,7 +1323,53 @@ function HomeScreen({
                 setSelected(issue);
               }}
             />
-          ) : tab === "ontology" || tab === "assets" ? (
+          ) : tab === "assets" ? (
+            <OrgAssetsScreen
+              company={company}
+              whoami={whoami}
+              initialTab="ontology"
+              onOpenIssue={(issue) => {
+                navigateTab("tasks");
+                setSelected(issue);
+              }}
+              onOpenProjectTasks={(project) => {
+                setTasksFilterProjectId(project.id);
+                navigateTab("tasks");
+              }}
+              onCreateTaskForProject={(project) => {
+                setCreateTaskProjectId(project.id);
+              }}
+              onOpenWebProjects={(subPath?: string, title?: string) =>
+                setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" })
+              }
+              onOpenWebOntology={(subPath?: string, title?: string) =>
+                setWebContainerTarget({ path: subPath || "/ontology", title: title || "本体可视化设计器" })
+              }
+              onOpenSchemaEditor={(typeId, displayName) =>
+                setSchemaEditorType({ typeId, displayName })
+              }
+              onOpenInstanceGraph={(typeId, displayName) =>
+                setInstanceGraphType({ typeId, displayName })
+              }
+              onOpenWorkbench={() => setOntologyWorkbenchOpen(true)}
+              onOpenWebWorkbench={(subPath?: string, title?: string) =>
+                setWebContainerTarget({ path: subPath || "/dashboard", title: title || "控制台" })
+              }
+              onOpenSandbox={(url, service, wp, scope) =>
+                setSandboxContext({ url, service, workProduct: wp, scope })
+              }
+              onOpenDiff={(issueItem, wp) =>
+                setDiffContext({ issue: issueItem, workProduct: wp })
+              }
+              onOpenPluginManager={() => setPluginManagerOpen(true)}
+              onOpenPrototypeSandbox={() => setSandboxContext({
+                url: "",
+                service: null,
+                workProduct: null,
+                scope: null,
+              })}
+            />
+          ) : tab === "ontology" ? (
             <OntologyDomainListScreen
               company={company}
               whoami={whoami}

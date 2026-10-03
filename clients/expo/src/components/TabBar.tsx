@@ -24,7 +24,7 @@ const LEFT: Slot[] = [
 
 const RIGHT: Slot[] = [
   { key: "chat", label: "工坊", icon: "chatbubble-ellipses-outline", activeIcon: "chatbubble-ellipses" },
-  { key: "ontology", label: "本体", icon: "git-network-outline", activeIcon: "git-network" },
+  { key: "assets", label: "资产", icon: "layers-outline", activeIcon: "layers" },
 ];
 
 
