@@ -390,7 +390,33 @@ const running = [];
 const blocked = [];
 const done = [];
 
-for (const file of files.slice(0, 10)) {
+function formatDuration(isoStart, isoEnd) {
+  if (!isoStart) return "";
+  const start = new Date(isoStart).getTime();
+  const end = isoEnd ? new Date(isoEnd).getTime() : Date.now();
+  const diffMinutes = Math.max(1, Math.floor((end - start) / 60000));
+  if (diffMinutes < 60) return `${diffMinutes}m`;
+  const hours = Math.floor(diffMinutes / 60);
+  const mins = diffMinutes % 60;
+  return `${hours}h${mins > 0 ? `${mins}m` : ""}`;
+}
+
+function getLedgerSummary(r) {
+  if (!r.ledgerPath || !fs.existsSync(r.ledgerPath)) return "";
+  try {
+    const l = JSON.parse(fs.readFileSync(r.ledgerPath, "utf8"));
+    const gates = l.gates || {};
+    const keys = Object.keys(gates);
+    const passed = keys.filter(k => gates[k].status === "passed" || gates[k].status === "not_applicable").length;
+    const blockedGate = keys.find(k => gates[k].status === "blocked" || gates[k].status === "failed");
+    if (blockedGate) return ` | ${blockedGate} ${gates[blockedGate].status}`;
+    return ` | G1-G5: ${passed}/${keys.length}`;
+  } catch (e) {
+    return "";
+  }
+}
+
+for (const file of files.slice(0, 15)) {
   try {
     const r = JSON.parse(fs.readFileSync(file, "utf8"));
     if (r.status === "running") running.push(r);
@@ -403,17 +429,22 @@ const time = new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "
 console.log(`【wave进展·${time}】`);
 if (running.length > 0) {
   const r = running[0];
-  console.log(`跑: ${r.employee} ${r.wave} (${r.tool} + ${r.subagentType || "-"})`);
+  const dur = formatDuration(r.startedAt || r.createdAt);
+  const durStr = dur ? `${dur}, ` : "";
+  console.log(`跑: ${r.employee} ${r.wave} (${durStr}${r.tool} + ${r.subagentType || "-"})`);
 } else {
   console.log("跑: 无 (全员等派活)");
 }
 if (blocked.length > 0) {
   const b = blocked[0];
-  console.log(`卡: ${b.employee} ${b.wave} (${b.tool} · ${b.blockedReason || "阻塞"})`);
+  const dur = formatDuration(b.startedAt || b.createdAt);
+  const durStr = dur ? `${dur}, ` : "";
+  console.log(`卡: ${b.employee} ${b.wave} (${durStr}${b.tool} · ${b.blockedReason || "阻塞"})`);
 }
 if (done.length > 0) {
   const d = done[0];
-  console.log(`完: ${d.wave} (${d.employee} · ${d.commit || "完成"})`);
+  const ledger = getLedgerSummary(d);
+  console.log(`完: ${d.wave} 落仓 ${d.commit || "完成"}${ledger}`);
 }
 console.log("");
 ' "$dispatch_dir"
@@ -596,6 +627,9 @@ do_probe() {
 
 ACTION="${1:-}"
 case "$ACTION" in
+  --compact|--receipts)
+    render_receipts_summary
+    ;;
   "")
     do_print
     ;;

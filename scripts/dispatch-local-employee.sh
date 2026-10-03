@@ -29,6 +29,14 @@ BLOCKED_REASON=""
 SHOW_RECEIPT=""
 LIST_RECEIPTS=0
 
+UPDATE_RECEIPT=""
+UPDATE_STATUS=""
+UPDATE_COMMIT=""
+UPDATE_EVIDENCE=""
+UPDATE_VERIFICATION=""
+UPDATE_BLOCKED_REASON=""
+UPDATE_LEDGER=""
+
 usage() {
   cat <<'EOF'
 usage: scripts/dispatch-local-employee.sh [options]
@@ -46,6 +54,13 @@ Options:
   --print              print prompt only; do not record
   --list               list recent receipts in .paperclip-local/dispatch/
   --show <id>          show details of a specific receipt
+  --update <id>        update an existing receipt
+  --status <status>    update status (queued|running|done|blocked|failed|cancelled)
+  --commit <hash>      attach completed commit hash
+  --evidence <path>    attach verification evidence or artifact path
+  --verification <cmd> record verification command that passed
+  --blocked-reason <r> set reason for blocked/failed status
+  --ledger <path>      link G1-G5 evidence ledger path
   --help               show this help
 
 Agents:
@@ -71,6 +86,13 @@ while [[ $# -gt 0 ]]; do
     --print) PRINT_ONLY=1; shift ;;
     --list) LIST_RECEIPTS=1; shift ;;
     --show) SHOW_RECEIPT="${2:-}"; shift 2 ;;
+    --update) UPDATE_RECEIPT="${2:-}"; shift 2 ;;
+    --status) UPDATE_STATUS="${2:-}"; shift 2 ;;
+    --commit) UPDATE_COMMIT="${2:-}"; shift 2 ;;
+    --evidence) UPDATE_EVIDENCE="${2:-}"; shift 2 ;;
+    --verification) UPDATE_VERIFICATION="${2:-}"; shift 2 ;;
+    --blocked-reason) UPDATE_BLOCKED_REASON="${2:-}"; shift 2 ;;
+    --ledger) UPDATE_LEDGER="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'unknown arg: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
@@ -95,6 +117,65 @@ if [[ -n "$SHOW_RECEIPT" ]]; then
     printf 'receipt not found: %s\n' "$SHOW_RECEIPT" >&2
     exit 1
   fi
+fi
+
+if [[ -n "$UPDATE_RECEIPT" ]]; then
+  target_file="$dispatch_dir/$UPDATE_RECEIPT"
+  [[ -f "$target_file" ]] || target_file="$dispatch_dir/${UPDATE_RECEIPT}.json"
+  if [[ ! -f "$target_file" ]]; then
+    printf 'receipt to update not found: %s\n' "$UPDATE_RECEIPT" >&2
+    exit 1
+  fi
+
+  now_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+  node -e '
+const fs = require("fs");
+const file = process.argv[1];
+const status = process.argv[2];
+const commit = process.argv[3];
+const evidence = process.argv[4];
+const verification = process.argv[5];
+const blockedReason = process.argv[6];
+const ledger = process.argv[7];
+const nowIso = process.argv[8];
+
+const r = JSON.parse(fs.readFileSync(file, "utf8"));
+if (status) {
+  r.status = status;
+  if ((status === "done" || status === "failed" || status === "cancelled") && !r.completedAt) {
+    r.completedAt = nowIso;
+  }
+  if (status === "running" && !r.startedAt) {
+    r.startedAt = nowIso;
+  }
+}
+if (commit) {
+  r.commit = commit;
+}
+if (blockedReason) {
+  r.blockedReason = blockedReason;
+} else if (status === "done" || status === "running") {
+  r.blockedReason = null;
+}
+if (ledger) {
+  r.ledgerPath = ledger;
+}
+if (evidence) {
+  r.evidence = Array.isArray(r.evidence) ? r.evidence : [];
+  if (!r.evidence.includes(evidence)) {
+    r.evidence.push(evidence);
+  }
+}
+if (verification) {
+  r.verification = Array.isArray(r.verification) ? r.verification : [];
+  if (!r.verification.includes(verification)) {
+    r.verification.push(verification);
+  }
+}
+fs.writeFileSync(file, JSON.stringify(r, null, 2) + "\n", "utf8");
+console.log(`[dispatch] updated receipt: ${file} (status=${r.status || "unchanged"})`);
+' "$target_file" "$UPDATE_STATUS" "$UPDATE_COMMIT" "$UPDATE_EVIDENCE" "$UPDATE_VERIFICATION" "$UPDATE_BLOCKED_REASON" "$UPDATE_LEDGER" "$now_iso"
+  exit 0
 fi
 
 case "$AGENT" in
