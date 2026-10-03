@@ -37,7 +37,7 @@ const NOT_VERIFIED = "NOT VERIFIED";
 const NOT_RUN = "NOT RUN";
 
 const LINES = [
-  { name: "app-json", title: "app.json 的 runtimeVersion 跟随 version" },
+  { name: "app-json", title: "app.json 的 runtimeVersion 意图 (appVersion→version / fingerprint→哈希)" },
   { name: "apk", title: "APK 原生 EXPO_RUNTIME_VERSION == app.json" },
   { name: "remote", title: "生产 manifest.runtimeVersion == APK 原生" },
 ];
@@ -60,6 +60,12 @@ async function checkAppJson() {
       value,
       detail: `intent=${value} (policy=appVersion → 跟随 version ${expo.version})`,
     };
+  }
+  if (typeof rv === "object" && rv.policy === "fingerprint") {
+    const ok = typeof value === "string" && /^[0-9a-f]{40}$/.test(value);
+    return ok
+      ? { name: "app-json", status: VERIFIED, value, detail: `intent=${value} (policy=fingerprint → 原生状态哈希)` }
+      : { name: "app-json", status: FAIL, value, detail: `fingerprint 意图值形态异常: ${value}` };
   }
   if (rv === value) {
     return { name: "app-json", status: VERIFIED, value, detail: `intent=${value} (字面量, 与 version 一致)` };

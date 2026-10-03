@@ -49,7 +49,11 @@ export function readAppJson(path = APP_JSON) {
  * 纯函数：app.json 声明的意图值。
  *
  * policy=appVersion 是「运行时=版本号」的显式声明；字面量则原样返回。
- * 其它 policy（nativeVersion/fingerprint/custom）本 App 不使用 —— 猜测会制造出
+ * policy=fingerprint（wave292）返回项目原生状态哈希（@expo/fingerprint，经
+ * expo-updates CLI 的 fingerprint:generate 计算口径，哈希口径统一声明在
+ * clients/expo/fingerprint.config.js：版本字段与本地 android/、ios/ 构建目录
+ * 不参与，否则每次发版 runtime 都变，「OTA 跨 minor 自动拉」落空）。
+ * 其它 policy（nativeVersion/custom）本 App 不使用 —— 猜测会制造出
  * 正是本模块要消除的那种静默漂移，所以这里直接报错而不是硬塞一个值。
  */
 export function resolveIntent(expo) {
@@ -60,9 +64,42 @@ export function resolveIntent(expo) {
   if (typeof rv === "string") return rv;
   if (typeof rv === "object" && typeof rv.policy === "string") {
     if (rv.policy === "appVersion") return version;
+    if (rv.policy === "fingerprint") return resolveFingerprintRuntimeVersion();
     throw new Error(`不支持的 expo.runtimeVersion.policy: ${rv.policy}`);
   }
   throw new Error("无法识别的 expo.runtimeVersion 形态");
+}
+
+/**
+ * wave292: policy=fingerprint 的意图值 = 项目原生状态哈希（40 位 hex）。
+ *
+ * 经 expo-updates CLI（fingerprint:generate）走 @expo/fingerprint 的
+ * createFingerprintAsync，与未来任何原生侧计算路径保持同一口径；fingerprint.config.js
+ * 的 sourceSkips/ignorePaths 由该 CLI 自动加载。同步实现（execFileSync）：
+ * publish-ota.sh / release-app.sh / fix-android-manifest.sh 的调用面无需改动。
+ */
+function resolveFingerprintRuntimeVersion() {
+  const out = execFileSync(
+    process.execPath,
+    [
+      resolve(EXPO_DIR, "node_modules/expo-updates/bin/cli.js"),
+      "fingerprint:generate",
+      "--platform",
+      "android",
+    ],
+    { cwd: EXPO_DIR, encoding: "utf8", maxBuffer: 64 * 1024 * 1024 },
+  );
+  const lastLine = out.trim().split("\n").pop() ?? "";
+  let hash;
+  try {
+    hash = JSON.parse(lastLine).hash;
+  } catch {
+    throw new Error(`fingerprint:generate 输出无法解析: ${lastLine.slice(0, 200)}`);
+  }
+  if (typeof hash !== "string" || !/^[0-9a-f]{40}$/.test(hash)) {
+    throw new Error(`fingerprint 哈希形态异常: ${hash}`);
+  }
+  return hash;
 }
 
 /** app.json 的 runtimeVersion 是否以「跟随版本号」的方式声明。 */
