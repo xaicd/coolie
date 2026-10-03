@@ -1,0 +1,66 @@
+Applications Graphics Acceleration Info:
+Uptime: 2677463 Realtime: 2677463
+
+** Graphics info for pid 4464 [cloud.coolie.app] **
+
+Stats since: 2663252395227ns
+Total frames rendered: 658
+Janky frames: 25 (3.80%)
+Janky frames (legacy): 251 (38.15%)
+50th percentile: 18ms
+90th percentile: 21ms
+95th percentile: 22ms
+99th percentile: 29ms
+Number Missed Vsync: 0
+Number High input latency: 995
+Number Slow UI thread: 0
+Number Slow bitmap uploads: 0
+Number Slow issue draw commands: 23
+Number Frame deadline missed: 25
+Number Frame deadline missed (legacy): 1
+HISTOGRAM: 5ms=8 6ms=2 7ms=2 8ms=0 9ms=0 10ms=0 11ms=0 12ms=2 13ms=0 14ms=1 15ms=12 16ms=92 17ms=187 18ms=41 19ms=140 20ms=94 21ms=35 22ms=19 23ms=4 24ms=5 25ms=3 26ms=3 27ms=1 28ms=0 29ms=2 30ms=0 31ms=1 32ms=1 34ms=1 36ms=0 38ms=0 40ms=0 42ms=0 44ms=0 46ms=0 48ms=0 53ms=0 57ms=0 61ms=0 65ms=0 69ms=1 73ms=0 77ms=0 81ms=1 85ms=0 89ms=0 93ms=0 97ms=0 101ms=0 105ms=0 109ms=0 113ms=0 117ms=0 121ms=0 125ms=0 129ms=0 133ms=0 150ms=0 200ms=0 250ms=0 300ms=0 350ms=0 400ms=0 450ms=0 500ms=0 550ms=0 600ms=0 650ms=0 700ms=0 750ms=0 800ms=0 850ms=0 900ms=0 950ms=0 1000ms=0 1050ms=0 1100ms=0 1150ms=0 1200ms=0 1250ms=0 1300ms=0 1350ms=0 1400ms=0 1450ms=0 1500ms=0 1550ms=0 1600ms=0 1650ms=0 1700ms=0 1750ms=0 1800ms=0 1850ms=0 1900ms=0 1950ms=0 2000ms=0 2050ms=0 2100ms=0 2150ms=0 2200ms=0 2250ms=0 2300ms=0 2350ms=0 2400ms=0 2450ms=0 2500ms=0 2550ms=0 2600ms=0 2650ms=0 2700ms=0 2750ms=0 2800ms=0 2850ms=0 2900ms=0 2950ms=0 3000ms=0 3050ms=0 3100ms=0 3150ms=0 3200ms=0 3250ms=0 3300ms=0 3350ms=0 3400ms=0 3450ms=0 3500ms=0 3550ms=0 3600ms=0 3650ms=0 3700ms=0 3750ms=0 3800ms=0 3850ms=0 3900ms=0 3950ms=0 4000ms=0 4050ms=0 4100ms=0 4150ms=0 4200ms=0 4250ms=0 4300ms=0 4350ms=0 4400ms=0 4450ms=0 4500ms=0 4550ms=0 4600ms=0 4650ms=0 4700ms=0 4750ms=0 4800ms=0 4850ms=0 4900ms=0 4950ms=0
+50th gpu percentile: 16ms
+90th gpu percentile: 19ms
+95th gpu percentile: 20ms
+99th gpu percentile: 25ms
+GPU HISTOGRAM: 1ms=9 2ms=4 3ms=4 4ms=1 5ms=0 6ms=1 7ms=0 8ms=0 9ms=5 10ms=4 11ms=3 12ms=8 13ms=28 14ms=83 15ms=144 16ms=73 17ms=83 18ms=125 19ms=44 20ms=12 21ms=12 22ms=1 23ms=3 24ms=2 25ms=5 4950ms=4
+
+Pipeline=Skia (OpenGL)
+Memory policy:
+  Max surface area: 2592000
+  Max resource usage: 124.42MB (x48)
+  Background retention: 50% (altUiHidden = true)
+  GPU Context timeout: 10
+Contexts: 1 (stopped = 0)
+CPU Caches:
+  Glyph Cache: 1.46 MB (1 entry)
+  Glyph Count: 223 
+Total CPU memory usage:
+  1526030 bytes, 1.46 MB (0.00 bytes is purgeable)
+GPU Caches:
+  Other:
+    Other: 44.88 KB (1 entry)
+    Buffer Object: 11.50 KB (5 entries)
+    StencilAttachment: 159.00 KB (6 entries)
+  Image:
+    Texture: 144.00 KB (1 entry)
+  Scratch:
+    RenderTarget: 5.69 MB (7 entries)
+    Texture: 4.11 MB (6 entries)
+    Buffer Object: 174.00 KB (5 entries)
+Total GPU memory usage:
+  10824488 bytes, 10.32 MB (5.91 MB is purgeable)
+
+Profile data in ms:
+
+	cloud.coolie.app/cloud.coolie.app.MainActivity/android.view.ViewRootImpl@742b5a5 (visibility=0)
+View hierarchy:
+
+  cloud.coolie.app/cloud.coolie.app.MainActivity/android.view.ViewRootImpl@742b5a5
+  114 views, 237.70 kB of render nodes
+
+
+Total ViewRootImpl   : 1
+Total attached Views : 114
+Total RenderNode     : 237.70 kB (used) / 800.91 kB (capacity)
+
