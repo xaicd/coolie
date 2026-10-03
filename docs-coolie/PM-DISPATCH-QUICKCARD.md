@@ -9,7 +9,7 @@
 > - `PM-AGENTS.md` (8K) → §A 项目信息 + §D 文件地图 + §E 仓库纪律 + §F 故障树 + §G 老板说话
 > - `PM-DISPATCH-RULES.md` (4K) → §6 brief 模板 + §H 反例/决策树 + §5.2 频率限制
 >
-> **保留 7 份权威 (跳转)**: `EMPLOYEE-OBJECTS.md` / `TEAM-MAPPING.md` / `CMMI-EMPLOYEE-MAPPING.md` / `EMPLOYEE-SKILLS.md` / `TOOLS.md` / `CMMI-ROLE-GOVERNANCE.md` / `ROLE-MAPPING.md` / `PM-REPORTING-FORMAT.md`
+> **保留 8 份权威 (跳转)**: `EMPLOYEE-OBJECTS.md` / `TEAM-MAPPING.md` / `CMMI-EMPLOYEE-MAPPING.md` / `EMPLOYEE-SKILLS.md` / `TOOLS.md` / `CMMI-ROLE-GOVERNANCE.md` / `ROLE-MAPPING.md` / `FIVE-ROLE-DISCIPLINE.md` (wave286 五角色强制技能纪律) / `PM-REPORTING-FORMAT.md`
 >
 > **索引**: [INDEX.md](INDEX.md)
 >

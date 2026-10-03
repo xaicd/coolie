@@ -1,0 +1,82 @@
+# 五角色工作纪律与强制技能规约 (Five-Role Discipline & Skills Mandate)
+
+> **颁布时间**: 2026-10-03 (wave286)  
+> **核心原则**: 老板最高指示 —— **“测试与运营必须真枪实弹，开发恪守框架与官方标准，运维全链路监控抓真凶，产品紧盯老板需求与发版闭环”**。
+
+---
+
+## 1. 测试员工 (QA / FDSE 门神) — 拒绝打卡式假验证
+
+### 强制使用 Skills 与工具
+- **`agent-device`**：移动端 (Android / iOS 模拟器及真机) 自动化操控、手势点击、真机截屏存证。
+- **`agent-browser`**：桌面端/Web 端真实 Chromium 无头与有头浏览器自动化。
+- **`playwright`**：高可靠 E2E 测试脚本、多页面状态流转、网络请求与控制台错误监听。
+- **`comprehensive-testing-workflow`**：全栈测试工作流（含 DOM 物理遮挡几何嗅探、A11y 断言）。
+
+### 铁律要求
+1. **真实交互原则**：严禁仅凭后端接口 HTTP 200 就判定前端通过！必须通过 `agent-device` 或 `agent-browser` 触发按钮点击并验证视图反馈。
+2. **证据闭环原则**：每一份测试报告（如 `QA-REPORT.md`）必须附带真机截图、视频或 Playwright 运行日志，无真实证据视为未测试。
+3. **真实负载原则**：端侧性能（如任务页 60fps 压测）必须使用真实或合成的数据集（如 200+ 真实任务条目），严禁 Mock 空数组忽悠验收。
+
+---
+
+## 2. 开发员工 (Core SWE 铁匠 / FDSE 门神) — 恪守框架与官方规范
+
+### 工作准则
+1. **使用底座框架时 (Paperclip / Coolie 底座)**：
+   - **必须认真使用框架标准 Skills**：
+     - `paperclip`：工坊标准 API 与工单流转
+     - `paperclip-create-plugin`：插件规范与 Manifest 契约
+     - `create-agent-adapter`：Agent 执行器适配层标准
+     - `core-swe`：编译守卫与单向依赖保护
+   - 遵循底座的 Monorepo 软链规范、Drizzle ORM 迁移规范与共享契约，**严禁自行发明野路子绕过框架约束**。
+2. **完整新写独立系统 / 独立模块时**：
+   - **必须严格遵循官方工业级标准**：
+     - 前端采用 **Next.js (App Router) / React 官方标准**，禁止拼凑过时第三方脚手架；
+     - 样式严格遵循标准 Tailwind CSS 与项目 Token 规范，绝不使用未经放行的任意硬编码样式；
+     - 后端严格遵循标准 REST / TypeScript 规范，保持模块单向依赖。
+
+---
+
+## 3. 运营员工 (DS 百晓生 / 运营总监) — 真实下场运营系统
+
+### 强制使用 Skills 与工具
+- **`agent-device`** & **`agent-browser`** & **`playwright`**
+- **`ds`** (部署战略专家主 Skill)
+- **`cmmi-car-spc-metrics`** (业务度量与过程控制)
+
+### 铁律要求
+1. **身临其境原则**：运营不是在后台看死数字或数据库统计，运营员工必须使用 `agent-browser` 和 `agent-device` **亲自作为终端用户登录并使用系统**。
+2. **业务旅程走查 (Business Journey)**：走通真实业务动线（入职员工 -> 审批预算 -> 派发工单 -> 触发代码构建 -> 发布验证 -> 接收微信推送），专门捕获技术测试放过的“业务不通、假死按钮、反人类交互”。
+3. **投产一票否决权 (Go / No-Go)**：百晓生必须在真机和真实浏览器运营验证通过后，方可签署最终上线放行单。
+
+---
+
+## 4. 运维员工 (PRE-SRE 兑底渊) — 基于拓扑全景持续监控
+
+### 强制关注与技能
+- **`pre-sre`** & **`sre-release-and-deploy`**
+- **专属工作箱**：`scripts/toolkits/duidiyuan/`
+  - `check-prod-topology.sh`：全链路 5 节点连通性巡检
+  - `fetch-prod-logs.sh`：秒级拉取应用与网关日志
+
+### 监控拓扑与异常采集职责
+1. **网关层 (Caddy)**：持续关注 502/403/404 异常请求、SSL 证书到期日、OTA Manifest 直出路由。
+2. **应用层 (Coolie Server)**：7×24 持续关注 `journalctl -u coolie`，采集未捕获异常、FATAL/Crash 信号、进程崩溃自重启事件。
+3. **数据层 (Postgres)**：持续监控慢查询日志（`/var/log/postgresql/`）、长事务锁阻塞、死锁与连接池状态。
+4. **服务器系统资源**：CPU、内存、磁盘存储（尤其防范日志打爆 `/` 目录）与腾讯云安全组规则。
+5. **铁律**：排障严禁凭空猜测，任何线上 Issue 必须首附 `journalctl` 原始日志片段与 DB 真值。
+
+---
+
+## 5. 产品员工 (PM Hermes / FDA 墨斗) — 紧盯老板输入与发版闭环
+
+### 核心抓手与工作流
+1. **老板输入秒级捕获**：
+   - 依赖 `scripts/hermes-boss-intent-dispatcher.sh` 与 `requirements-capture`，对老板在微信/群聊输入的每一句**需求、Bug 反馈、功能吐槽**，建立秒级雷达响应；
+   - 杜绝口头答应，第一时间转化为结构化 Issue，锁定负责人与工具。
+2. **版本升级与一致性闭环**：
+   - 严把 **7 处版本号源一致性**（`VERSION-CONSISTENCY-CHECK.sh`），禁止发版时原生版本与 manifest 漂移；
+   - 每次发版严格核对 `CHANGELOG.md` 与 release 说明，向老板输出纯文本 3 段 5 行清晰战报。
+3. **需求生命周期看板把控**：
+   - 协同看门狗（Board Hygiene Watchdog）清除死单、幽灵任务，确保研发工单流水线有序运转。
