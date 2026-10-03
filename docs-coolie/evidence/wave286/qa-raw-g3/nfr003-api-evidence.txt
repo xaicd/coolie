@@ -1,0 +1,13 @@
+=== REQ-NFR-003 API 层证据 (重采, 仅状态码+短体) 2026-10-04 base=http://127.0.0.1:3100 ===
+?limit=400  →  HTTP 200  (200, items=215)
+?limit=1001  →  HTTP 200  (200, items=215)
+?limit=1000  →  HTTP 200  (200, items=215)
+?sortField=__bogus__  →  HTTP 400  {"error":"sortField must be 'updated' or 'id' when provided"}
+?offset=50&limit=100  →  HTTP 200  (200, items=100)
+?offset=-5  →  HTTP 400  {"error":"offset must be a non-negative integer"}
+?status=__bogus__  →  HTTP 200  (200, items=0)
+?limit=abc  →  HTTP 400  {"error":"limit must be a positive integer up to 1000"}
+canonical 计数: 215 issues (limit=1000)
+客户端缺陷注记: RN0.76.5 URLSearchParams polyfill 无 size getter → clients/api-client client.ts 的 q.size>0 恒 false
+→ 列表请求从不携带 limit/offset/sortField/sortDir (wire 抓包见 proxy-log-live-flood.ndjson: 100% 裸 /issues GET)
+→ native 侧 400/422 回退与分页参数注入不可达 (无门可注), 本文件 API 层直验服务端参数合同本身。

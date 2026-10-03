@@ -1,0 +1,30 @@
+W3 samples: [
+ {
+  "fcpMs": 1168,
+  "issuesFetchEndMs": 54,
+  "issuesFetchDurMs": 30,
+  "issuesRespBytes": 57789,
+  "firstRowAfterNavMs": 2031
+ },
+ {
+  "fcpMs": 1080,
+  "issuesFetchEndMs": 192,
+  "issuesFetchDurMs": 152,
+  "issuesRespBytes": 57789,
+  "firstRowAfterNavMs": 1543
+ },
+ {
+  "fcpMs": 960,
+  "issuesFetchEndMs": 213,
+  "issuesFetchDurMs": 175,
+  "issuesRespBytes": 57789,
+  "firstRowAfterNavMs": 1623
+ }
+]
+B6 grabs: [
+ {
+  "scrollY": 1034,
+  "key": "d67483cc-69b4-493a-894e-10b6f0daa92b",
+  "x": 264,
+  "y": 145,
+  "w": 1063,

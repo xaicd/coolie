@@ -1,0 +1,341 @@
+{
+  "ts": "2026-10-03T19:36:56.369Z",
+  "url": "http://127.0.0.1:3100/PER/issues",
+  "results": [
+    {
+      "id": "W1",
+      "desc": "issues 页可直达 (200)",
+      "pass": true,
+      "detail": [
+        200,
+        200,
+        200,
+        200,
+        200
+      ]
+    },
+    {
+      "id": "W2",
+      "desc": "REQ-NFR-005: FCP ≤ 1500ms (5 次冷启中位数)",
+      "pass": true,
+      "detail": {
+        "fcpMedian": 1100,
+        "fcpSamples": [
+          1468,
+          1308,
+          1100,
+          884,
+          804
+        ],
+        "retryBlock": null
+      }
+    },
+    {
+      "id": "W3",
+      "desc": "REQ-NFR-005: 首页拉取+首帧 ≤ 1500ms (中位数; firstRow 可见时点另附为观测)",
+      "pass": true,
+      "detail": {
+        "fetchEndMedian": 149,
+        "fcpMedian": 1100,
+        "fcpSamples": [
+          1468,
+          1308,
+          1100,
+          884,
+          804
+        ],
+        "firstRowMsSamples": [
+          1964,
+          1792,
+          1622,
+          1552,
+          1492
+        ],
+        "retryBlock": null
+      }
+    },
+    {
+      "id": "A1",
+      "desc": "切换器三态按钮齐全",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "id": "A2",
+      "desc": "默认视图 = 列表 (aria-pressed)",
+      "pass": true,
+      "detail": {
+        "pressed": "true"
+      }
+    },
+    {
+      "id": "A3",
+      "desc": "列表视图无项目节头 (groupBy 未污染)",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "id": "D0",
+      "desc": "滚加载全量 215 行 (canonical PERF-LAB 数据集)",
+      "pass": true,
+      "detail": {
+        "rows": 215
+      }
+    },
+    {
+      "id": "B1",
+      "desc": "group 节头出现 (5 项目组)",
+      "pass": true,
+      "detail": {
+        "n": 5,
+        "keys": [
+          "d67483cc-69b4-493a-894e-10b6f0daa92b",
+          "141b1867-f6a2-4480-b133-38422edba595",
+          "51a20586-81c1-492d-b82e-64befee7052a",
+          "4a84f4f8-8062-4679-8d95-c8daf3dadcad",
+          "599a367a-5392-41d0-b060-5a4f7b5dd12b"
+        ]
+      }
+    },
+    {
+      "id": "B2",
+      "desc": "节头计数按项目分组 (和=全量)",
+      "pass": true,
+      "detail": {
+        "counts": [
+          46,
+          42,
+          43,
+          43,
+          41
+        ]
+      }
+    },
+    {
+      "id": "B3",
+      "desc": "计数和 = 215",
+      "pass": true,
+      "detail": {
+        "sum": 215
+      }
+    },
+    {
+      "id": "B4",
+      "desc": "节头 position=sticky",
+      "pass": true,
+      "detail": {
+        "pos": [
+          "sticky",
+          "sticky",
+          "sticky",
+          "sticky",
+          "sticky"
+        ]
+      }
+    },
+    {
+      "id": "B5",
+      "desc": "节头 z-index=10",
+      "pass": true,
+      "detail": {
+        "z": [
+          "10",
+          "10",
+          "10",
+          "10",
+          "10"
+        ]
+      }
+    },
+    {
+      "id": "B6",
+      "desc": "吸顶实测: 距顶≤2px / alpha=1 / 零透行",
+      "pass": true,
+      "detail": {
+        "stuck": true,
+        "topDelta": 0,
+        "alpha": 1,
+        "leakRows": 0,
+        "z": "10"
+      }
+    },
+    {
+      "id": "C1",
+      "desc": "弹层选项 = All + 5 项目 + No project (7)",
+      "pass": true,
+      "detail": {
+        "n": 7,
+        "options": [
+          "All projects",
+          "PERF 项目-1",
+          "PERF 项目-2",
+          "PERF 项目-3",
+          "PERF 项目-4",
+          "PERF 项目-5",
+          "No project"
+        ]
+      }
+    },
+    {
+      "id": "C2",
+      "desc": "选中即收起, chip 显示项目名",
+      "pass": true,
+      "detail": {
+        "chipLabel": "Project filter: PERF 项目-1"
+      }
+    },
+    {
+      "id": "C3",
+      "desc": "选中后弹层收起",
+      "pass": true,
+      "detail": {
+        "popAfterSelect": 0
+      }
+    },
+    {
+      "id": "C5",
+      "desc": "过滤后 DOM 行数 = 项目-1 全量 (46)",
+      "pass": true,
+      "detail": {
+        "rows46": 46
+      }
+    },
+    {
+      "id": "C4",
+      "desc": "过滤后 group 计数和 = 行数",
+      "pass": true,
+      "detail": {
+        "counts": [
+          46
+        ],
+        "sum": 46
+      }
+    },
+    {
+      "id": "C6",
+      "desc": "X 清除不弹开弹层",
+      "pass": true,
+      "detail": {
+        "popAfterClear": 0
+      }
+    },
+    {
+      "id": "C7a",
+      "desc": "清除后 chip 入口消失 (回到未滤态)",
+      "pass": true,
+      "detail": null
+    },
+    {
+      "id": "C7",
+      "desc": "清除后恢复全量 215 行",
+      "pass": true,
+      "detail": {
+        "rowsAfterClear": 215
+      }
+    },
+    {
+      "id": "C10",
+      "desc": "REQ-NFR-006: chip 选择/清除 0 新增 issues 请求",
+      "pass": true,
+      "detail": {
+        "reqDelta": 0
+      }
+    },
+    {
+      "id": "C9",
+      "desc": "No project → 仅空 __no_project 组, 不崩",
+      "pass": true,
+      "detail": {
+        "noProjKeys": []
+      }
+    },
+    {
+      "id": "E1",
+      "desc": "board 渲染卡片",
+      "pass": true,
+      "detail": {
+        "cards": 30
+      }
+    },
+    {
+      "id": "E2",
+      "desc": "board + 项目过滤: 列计数徽标和 = 项目-1 行数 (46)",
+      "pass": true,
+      "detail": {
+        "badges": [
+          0,
+          1,
+          0,
+          0,
+          34,
+          11,
+          0
+        ],
+        "badgeSum": 46
+      }
+    },
+    {
+      "id": "E3",
+      "desc": "board 下 X 清除不弹层且过滤复位",
+      "pass": true,
+      "detail": {
+        "popAfterBoardClear": 0,
+        "filterCleared": true
+      }
+    },
+    {
+      "id": "D1",
+      "desc": "刷新后 group 视图保持 (viewState 持久化)",
+      "pass": true,
+      "detail": {
+        "groupAfterReload": 5
+      }
+    },
+    {
+      "id": "W5",
+      "desc": "REQ-NFR-006: 视图/筛选切换点击→绘制 < 100ms (每控件 3 采样取中位数)",
+      "pass": false,
+      "detail": {
+        "error": "chip 入口未出现 (诊断快照)",
+        "diag": {
+          "url": "http://127.0.0.1:3100/PER/issues",
+          "boardPressed": "true",
+          "toolbarLabels": [
+            "New Task",
+            "List view",
+            "Project group view",
+            "Board view",
+            null,
+            null,
+            null,
+            null,
+            null,
+            null,
+            "Project filter: PERF 项目-2",
+            null
+          ],
+          "popovers": 0,
+          "rows": 0
+        }
+      }
+    },
+    {
+      "id": "W6",
+      "desc": "REQ-NFR-006: 二次进入 board 零新增 issues 请求 (缓存命中)",
+      "pass": true,
+      "detail": {
+        "boardFirstEntryReqs": 7,
+        "boardSecondEntryReqs": 0
+      }
+    },
+    {
+      "id": "W4",
+      "desc": "REQ-NFR-006: 无 ≥100ms 主线程长任务",
+      "pass": true,
+      "detail": {
+        "sampled": [],
+        "over100": []
+      }
+    }
+  ]
+}

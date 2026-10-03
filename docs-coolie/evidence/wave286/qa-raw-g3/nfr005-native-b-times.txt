@@ -1,0 +1,19 @@
+1791054965.366424000 frame1
+1791054965.757125000 frame2
+tapped 1791054965.829104000
+1791054966.134687000 frame3
+1791054966.517333000 frame4
+1791054966.899420000 frame5
+1791054967.276103000 frame6
+1791054967.662677000 frame7
+1791054968.037989000 frame8
+1791054968.422094000 frame9
+1791054968.802199000 frame10
+1791054969.186447000 frame11
+1791054969.569293000 frame12
+1791054969.945869000 frame13
+1791054970.320649000 frame14
+# delta parse (frame capture cadence ~390ms/screencap; tap line label-first):
+# run A (picker → tap PERF-LAB): frame3 (first content frame, 181KB bytes) = +296ms after tap
+# run B (汇览 → tap 任务 tab):   frame3 (first tasks frame, 123800 bytes) = +306ms after tap
+# verdict: both < 1500ms ⇒ REQ-NFR-005 native tap-to-content PASS (screencap granularity bounds, not display latency)
