@@ -25,8 +25,10 @@ const apiPrefixes: Record<string, string> = {
   "attention.ts": "/api",
   "approvals.ts": "/api",
   "assets.ts": "/api",
+  "audit-log.ts": "/api",
   "auth.ts": "/api/auth",
   "board-chat.ts": "/api",
+  "build.ts": "/api",
   "built-in-agents.ts": "/api",
   "chat-channels.ts": "/api",
   "slack-tools.ts": "/api",
@@ -37,33 +39,50 @@ const apiPrefixes: Record<string, string> = {
   "company-skill-policy.ts": "/api",
   "connection-intents.ts": "/api",
   "costs.ts": "/api",
+  "cycle-time.ts": "/api",
   "dashboard.ts": "/api",
   "decision-queues.ts": "/api",
   "decisions.ts": "/api",
   "decision-training.ts": "/api",
+  "defect-kb.ts": "/api",
+  "dispatch.ts": "/api",
   "environments.ts": "/api",
   "execution-workspaces.ts": "/api",
   "file-resources.ts": "/api",
   "folders.ts": "/api",
+  "git-credentials.ts": "/api",
   "goals.ts": "/api",
   "health.ts": "/api/health",
   "inbox-agent-policy.ts": "/api",
   "inbox-dismissals.ts": "/api",
+  "inbox.ts": "/api",
   "instance-database-backups.ts": "/api",
   "instance-settings.ts": "/api",
+  "issue-specs.ts": "/api",
   "issues.ts": "/api",
   "issue-tree-control.ts": "/api",
   "llms.ts": "/api",
   "managed-agent-profiles.ts": "/api",
+  "metrics.ts": "/api",
+  "milestones.ts": "/api",
+  "notifications.ts": "/api",
   "onboarding-seed.ts": "/api",
+  "onboarding.ts": "/api",
+  "ontology-extras.ts": "/api",
+  "ontology-graph.ts": "/api",
+  "ota-manifest.ts": "/api/ota",
+  "quotas.ts": "/api",
   "openapi.ts": "/api",
   "plugin-ui-static.ts": "/api",
   "plugins.ts": "/api",
   "projects.ts": "/api",
   "project-tools.ts": "/api",
+  "release-notes.ts": "/api/release-notes",
   "resource-memberships.ts": "/api",
   "remote-agent-profiles.ts": "/api",
   "routines.ts": "/api",
+  "sandboxes.ts": "/api",
+  "search.ts": "/api",
   "secrets.ts": "/api",
   "sidebar-badges.ts": "/api",
   "sidebar-preferences.ts": "/api",
@@ -73,6 +92,7 @@ const apiPrefixes: Record<string, string> = {
   "tool-access.ts": "/api",
   "tool-gateway.ts": "/api",
   "user-profiles.ts": "/api",
+  "work-products.ts": "/api",
 };
 
 const ROUTE_LITERAL_PATTERN =
@@ -88,7 +108,14 @@ const HTTP_METHODS = new Set([
   "patch",
   "trace",
 ]);
-const explicitOpenApiCoverageExclusions = new Set<string>();
+// tasks-host-preview serves host-preview content through `router.get` with
+// RegExp paths (an authenticated passthrough proxy), so the literal route
+// scan below cannot see its operations. The routes stay documented ad hoc
+// until they move to string literals; excluded here to keep the file-level
+// index honest instead of flagging it "unknown" forever.
+const explicitOpenApiCoverageExclusions = new Set<string>([
+  "tasks-host-preview.ts",
+]);
 
 const explicitOpenApiOperationCoverageExclusions = new Set([
   // This endpoint is authenticated by the provider signature rather than by a
@@ -146,7 +173,12 @@ function resolveMountedPath(file: string, prefix: string, routePath: string) {
   ) {
     return routePath;
   }
-  if ((file === "companies.ts" || file === "health.ts") && routePath === "/") {
+  if (
+    (file === "companies.ts" ||
+      file === "health.ts" ||
+      file === "release-notes.ts") &&
+    routePath === "/"
+  ) {
     return prefix;
   }
   if (file === "companies.ts" || file === "health.ts") {

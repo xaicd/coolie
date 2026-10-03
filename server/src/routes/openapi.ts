@@ -288,6 +288,18 @@ import {
   resolveChatPublicationSchema,
   replaceChatEndpointResourcesSchema,
   updateChatEndpointSchema,
+  // Previously-undocumented mounted routes (COOA-35 spec coverage)
+  createBoardConversationSchema,
+  updateBoardConversationSchema,
+  emergencyStopSchema,
+  registerCompanyRolesSchema,
+  createSpecFromTemplateSchema,
+  issueSpecDraftSchema,
+  issueSpecSchema,
+  onboardingStepSchema,
+  ontologyPropertiesUpdateSchema,
+  specTreeQuerySchema,
+  ISSUE_STATUSES,
 } from "@paperclipai/shared";
 import {
   COMPANY_IMPORT_TRANSFERS_API_PATH,
@@ -2095,6 +2107,73 @@ registry.registerPath({
   responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
 });
 
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/templates",
+  tags: ["companies"],
+  summary: "List company templates",
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+// DS production veto (gate G4): board-only read of whether the company's most
+// recent issue carries a DS `go` decision. The release script calls this
+// before shipping.
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/release-gate/ds-approval",
+  tags: ["companies"],
+  summary: "Check the DS release-gate approval",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized, 403: r.forbidden },
+});
+
+// wave105 公司级紧急熔断: flips companies.status to paused so heartbeat
+// dispatch gates stop assigning. Board-only on purpose — 熔断是不可逆敏感动作.
+registry.registerPath({
+  method: "post",
+  path: "/api/companies/{companyId}/emergency-stop",
+  tags: ["companies"],
+  summary: "Pause the company (emergency stop)",
+  description:
+    "Board-only. Idempotent when already paused; 409 for an archived company. Requires a stop reason which is activity-logged.",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    body: jsonBody(emergencyStopSchema),
+  },
+  responses: {
+    200: r.ok(),
+    400: r.badRequest,
+    401: r.unauthorized,
+    403: r.forbidden,
+    404: r.notFound,
+    409: r.conflict,
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/companies/{companyId}/emergency-resume",
+  tags: ["companies"],
+  summary: "Resume the company after an emergency stop",
+  description: "Board-only. Flips companies.status back to active.",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: {
+    200: r.ok(),
+    401: r.unauthorized,
+    403: r.forbidden,
+    404: r.notFound,
+  },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/companies/{companyId}/board-hygiene/audit",
+  tags: ["companies"],
+  summary: "Run the board hygiene audit",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
 // Explicit task-bound email. Board setup and agent actions share the same vaulted
 // connection, while automatic chat publication never applies to these endpoints.
 for (const [method, path, summary, body, success] of [
@@ -3156,6 +3235,28 @@ registry.registerPath({
   responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
 });
 
+// Bulk-create agents from a role list (how a template company gets its five
+// employees). The full roles.length is budgeted up front, so an over-quota
+// request fails cleanly with 429 instead of half-creating.
+registry.registerPath({
+  method: "post",
+  path: "/api/companies/{companyId}/agents/bulk",
+  tags: ["agents"],
+  summary: "Bulk-create agents from company roles",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    body: jsonBody(registerCompanyRolesSchema),
+  },
+  responses: {
+    200: r.ok(),
+    400: r.badRequest,
+    401: r.unauthorized,
+    403: r.forbidden,
+    404: r.notFound,
+    429: r.tooManyRequests,
+  },
+});
+
 registry.registerPath({
   method: "post",
   path: "/api/companies/{companyId}/agent-hires",
@@ -3899,6 +4000,48 @@ registry.registerPath({
   responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound },
 });
 
+// Dedicated status endpoint (kanban drag path). Kept separate from the generic
+// PATCH because transitions carry their own guards — backlog→todo needs an
+// assignee and in_progress→done needs a work product — and violations answer
+// 422 so clients can optimistically roll back with a real reason.
+registry.registerPath({
+  method: "patch",
+  path: "/api/issues/{id}/status",
+  tags: ["issues"],
+  summary: "Update an issue status",
+  request: {
+    params: z.object({ id: z.string() }),
+    body: jsonBody(z.object({ status: z.enum(ISSUE_STATUSES) })),
+  },
+  responses: {
+    200: r.ok(),
+    400: r.badRequest,
+    401: r.unauthorized,
+    404: r.notFound,
+    422: r.unprocessable,
+  },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/api/companies/{companyId}/issues/{id}/status",
+  tags: ["issues"],
+  summary: "Update an issue status (company-scoped alias)",
+  description:
+    "Same transition guards as PATCH /api/issues/{id}/status; 404 when the issue does not belong to the company.",
+  request: {
+    params: z.object({ companyId: z.string(), id: z.string() }),
+    body: jsonBody(z.object({ status: z.enum(ISSUE_STATUSES) })),
+  },
+  responses: {
+    200: r.ok(),
+    400: r.badRequest,
+    401: r.unauthorized,
+    404: r.notFound,
+    422: r.unprocessable,
+  },
+});
+
 registry.registerPath({
   method: "get",
   path: "/api/issues/{id}/heartbeat-context",
@@ -4048,6 +4191,34 @@ registry.registerPath({
   summary: "Delete a work product",
   request: { params: z.object({ id: z.string() }) },
   responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+// wave141 deliverable version chain — read history, activate (roll back to) a
+// version. Activation is a mutation and activity-logged server-side.
+registry.registerPath({
+  method: "get",
+  path: "/api/work-products/{id}/versions",
+  tags: ["issues"],
+  summary: "List work product versions",
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/work-products/{id}/versions/{versionId}/activate",
+  tags: ["issues"],
+  summary: "Activate a work product version",
+  request: {
+    params: z.object({ id: z.string(), versionId: z.string() }),
+  },
+  responses: {
+    200: r.ok(),
+    401: r.unauthorized,
+    403: r.forbidden,
+    404: r.notFound,
+    422: r.unprocessable,
+  },
 });
 
 registry.registerPath({
@@ -4403,6 +4574,98 @@ registry.registerPath({
 });
 
 // ─── Projects ────────────────────────────────────────────────────────────────
+
+// wave140 CMMI WBS 拆解 + 里程碑主线: the draft is produced off the request
+// path and stored on `projects.wbsDraft`; these routes are the human side —
+// read the mainline, adopt the draft into real issues, or dismiss it.
+// Adoption is never automatic.
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/projects/{projectId}/wbs",
+  tags: ["projects"],
+  summary: "Get a project WBS mainline and draft",
+  request: {
+    params: z.object({ companyId: z.string(), projectId: z.string() }),
+  },
+  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/companies/{companyId}/projects/{projectId}/wbs/adopt",
+  tags: ["projects"],
+  summary: "Adopt the WBS draft into milestone issues",
+  description:
+    "409 when there is no draft to adopt or the project already adopted one.",
+  request: {
+    params: z.object({ companyId: z.string(), projectId: z.string() }),
+  },
+  responses: {
+    200: r.ok(),
+    401: r.unauthorized,
+    404: r.notFound,
+    409: r.conflict,
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/companies/{companyId}/projects/{projectId}/wbs/draft",
+  tags: ["projects"],
+  summary: "Dismiss the WBS draft",
+  request: {
+    params: z.object({ companyId: z.string(), projectId: z.string() }),
+  },
+  responses: {
+    204: r.noContent,
+    401: r.unauthorized,
+    404: r.notFound,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/projects/{projectId}/documents",
+  tags: ["projects"],
+  summary: "List project documents",
+  request: {
+    params: z.object({ companyId: z.string(), projectId: z.string() }),
+  },
+  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/companies/{companyId}/projects/{projectId}/documents",
+  tags: ["projects"],
+  summary: "Upload a project document",
+  description:
+    "Multipart upload in the `file` field, same size cap as issue attachments.",
+  request: {
+    params: z.object({ companyId: z.string(), projectId: z.string() }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/companies/{companyId}/projects/analyze-document",
+  tags: ["projects"],
+  summary: "Analyze an uploaded requirement document for project prefill",
+  description:
+    "Multipart upload in the `file` field. Deterministic and local — no LLM call: the title/H1 becomes the display name and an ASCII slug is derived against existing project names.",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized, 422: r.unprocessable },
+});
+
+// Default PAT target for provisioning org-hosted project remotes.
+registry.registerPath({
+  method: "get",
+  path: "/api/git-pat/target",
+  tags: ["projects"],
+  summary: "Get the default GitHub PAT target",
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
 
 registry.registerPath({
   method: "get",
@@ -5406,6 +5669,15 @@ registry.registerPath({
   responses: { 200: r.ok(), 401: r.unauthorized },
 });
 
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/metrics/cockpit",
+  tags: ["dashboard"],
+  summary: "Get the company cockpit metrics summary",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
 // ─── Sidebar ─────────────────────────────────────────────────────────────────
 
 registry.registerPath({
@@ -6266,6 +6538,170 @@ registry.registerPath({
   },
 });
 
+// wave148 workshop conversations. Every conversation is company-scoped and
+// cross-tenant ids answer the same 404 as missing ones.
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/board/conversations",
+  tags: ["instance"],
+  summary: "List board conversations (newest first)",
+  description:
+    "Metadata only — does not require the conference-room flag. Pass includeArchived=1 to include archived conversations.",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: z.object({ includeArchived: z.string().optional() }),
+  },
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/companies/{companyId}/board/conversations",
+  tags: ["instance"],
+  summary: "Create a board conversation",
+  description:
+    "Creates the conversation and eagerly anchors its issue so files can be attached before the first message (requires enableConferenceRoomChat).",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    body: jsonBody(createBoardConversationSchema),
+  },
+  responses: {
+    201: r.ok(),
+    400: r.badRequest,
+    401: r.unauthorized,
+    403: r.forbidden,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/board/conversations/{conversationId}",
+  tags: ["instance"],
+  summary: "Get a board conversation",
+  request: {
+    params: z.object({
+      companyId: z.string(),
+      conversationId: z.string(),
+    }),
+  },
+  responses: {
+    200: r.ok(),
+    401: r.unauthorized,
+    403: r.forbidden,
+    404: r.notFound,
+  },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/api/companies/{companyId}/board/conversations/{conversationId}",
+  tags: ["instance"],
+  summary: "Rename or archive a board conversation",
+  description:
+    "A rename keeps the anchored issue's title in step; `archived: true` soft-deletes the conversation.",
+  request: {
+    params: z.object({
+      companyId: z.string(),
+      conversationId: z.string(),
+    }),
+    body: jsonBody(updateBoardConversationSchema),
+  },
+  responses: {
+    200: r.ok(),
+    400: r.badRequest,
+    401: r.unauthorized,
+    403: r.forbidden,
+    404: r.notFound,
+  },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/companies/{companyId}/board/conversations/{conversationId}",
+  tags: ["instance"],
+  summary: "Archive (soft-delete) a board conversation",
+  request: {
+    params: z.object({
+      companyId: z.string(),
+      conversationId: z.string(),
+    }),
+  },
+  responses: {
+    200: r.ok(),
+    401: r.unauthorized,
+    403: r.forbidden,
+    404: r.notFound,
+  },
+});
+
+// Boss 面板「清空对话」: hard-deletes the chat comments under the conversation's
+// issue (wave115) so the history really clears instead of leaving tombstones.
+registry.registerPath({
+  method: "delete",
+  path: "/api/board/chat/conversation/{id}",
+  tags: ["instance"],
+  summary: "Clear a board conversation's message history",
+  description:
+    "Hard-deletes the comment rows under the conversation's issue (including legacy soft-delete tombstones). The issue itself is kept. Requires the `companyId` query parameter (requires enableConferenceRoomChat).",
+  request: {
+    params: z.object({ id: z.string() }),
+    query: z.object({ companyId: z.string() }),
+  },
+  responses: {
+    200: r.ok(),
+    400: r.badRequest,
+    401: r.unauthorized,
+    403: r.forbidden,
+  },
+});
+
+// Bulk cleanup: hard-delete conversations and their messages older than the
+// `before` cutoff within one company.
+registry.registerPath({
+  method: "delete",
+  path: "/api/board/chat/conversations",
+  tags: ["instance"],
+  summary: "Delete board conversations and messages before a cutoff",
+  description:
+    "Requires `before` (ISO date/datetime) and `companyId` query parameters. Returns the deleted message/conversation counts and the cutoff.",
+  request: {
+    query: z.object({ before: z.string(), companyId: z.string() }),
+  },
+  responses: {
+    200: r.ok(),
+    400: r.badRequest,
+    401: r.unauthorized,
+    403: r.forbidden,
+  },
+});
+
+// Resolve the conversation a chat upload targets and the Board Operations
+// issue behind it — same resolution as the stream path, without streaming.
+registry.registerPath({
+  method: "post",
+  path: "/api/board/chat/issue",
+  tags: ["instance"],
+  summary: "Resolve the board conversation and issue for a chat upload",
+  description:
+    "Requires `companyId` in the body; an unknown explicit conversationId answers 404, otherwise the newest active (or default) conversation is used (requires enableConferenceRoomChat).",
+  request: {
+    body: jsonBody(
+      z.object({
+        companyId: z.string(),
+        taskId: z.string().optional(),
+        conversationId: z.string().optional(),
+      }),
+    ),
+  },
+  responses: {
+    200: r.ok(),
+    400: r.badRequest,
+    401: r.unauthorized,
+    403: r.forbidden,
+    404: r.notFound,
+  },
+});
+
 // ─── Access / invites / members ───────────────────────────────────────────────
 
 registry.registerPath({
@@ -6565,6 +7001,49 @@ registry.registerPath({
   tags: ["auth"],
   summary: "Get current session",
   responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+// App↔web login bridge: replays a signed session token and lands the caller
+// on the board with the session cookie set.
+registry.registerPath({
+  method: "get",
+  path: "/api/auth/exchange",
+  tags: ["auth"],
+  summary: "Exchange a session token for a web session",
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+// Returns the active Better Auth session token signed the way the session
+// cookie is signed (`<token>.<base64 HMAC>`), so callers can replay it
+// through /api/auth/exchange. Board authentication required.
+registry.registerPath({
+  method: "get",
+  path: "/api/auth/session-token",
+  tags: ["auth"],
+  summary: "Get the active board session token",
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+// Email+password sign-up: creates the user, their company, and the owner
+// membership, then returns the session the sign-in flow would (session cookie
+// already set). Unavailable on instances booted without Better Auth (e.g.
+// local_trusted).
+registry.registerPath({
+  method: "post",
+  path: "/api/auth/register",
+  tags: ["auth"],
+  summary: "Register a user and create their company",
+  request: {
+    body: jsonBody(
+      z.object({
+        email: z.string(),
+        password: z.string(),
+        name: z.string(),
+        companyName: z.string(),
+      }),
+    ),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
 });
 
 registry.registerPath({
@@ -11431,4 +11910,651 @@ registerCurrentRoute({
   tags: ["ai-connections"], summary: "Check the local operator's subscription sign-in without saving a connection",
   body: localAiConnectionSchema,
   responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden, 404: r.notFound, 422: r.unprocessable },
+});
+
+// ─── COOA-35: routes that were mounted but never documented ─────────────────
+//
+// The route files below were live in app.ts but absent from this registry, so
+// the published spec under-reported the API surface and the coverage test
+// carried a permanent red. Documented from the request handlers as landed;
+// tasks-host-preview is the one mount still excluded (RegExp proxy routes the
+// literal scan cannot see).
+
+// audit-log.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/audit-log",
+  tags: ["activity"],
+  summary: "Query the company audit log",
+  description: "Board-only, with action/target/actor/date filters and cursor paging.",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: z.object({
+      action: z.string().optional(),
+      targetType: z.string().optional(),
+      targetId: z.string().optional(),
+      actorAgentId: z.string().optional(),
+      from: z.string().optional(),
+      to: z.string().optional(),
+      limit: z.string().optional(),
+      cursor: z.string().optional(),
+    }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+// build.ts (build mode)
+registry.registerPath({
+  method: "post",
+  path: "/api/build/start",
+  tags: ["instance"],
+  summary: "Start a build plan from a natural-language prompt",
+  description:
+    "Board-only and deployment-gated. Rejects prompts that are not build requests with 400 NOT_A_BUILD_TRIGGER.",
+  request: {
+    body: jsonBody(
+      z.object({
+        companyId: z.string(),
+        prompt: z.string(),
+        projectId: z.string().optional(),
+      }),
+    ),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/build/spec/start",
+  tags: ["instance"],
+  summary: "Start an ontology spec plan from a domain prompt",
+  description:
+    "Board-only and deployment-gated. Rejects prompts that are not domain requests with 400 NOT_A_DOMAIN_TRIGGER.",
+  request: {
+    body: jsonBody(z.object({ companyId: z.string(), prompt: z.string() })),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized, 403: r.forbidden },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/build/spec/{specId}",
+  tags: ["instance"],
+  summary: "Get an ontology spec draft and its approvals",
+  description: "The specId is the anchor issue id holding the spec document.",
+  request: { params: z.object({ specId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized, 403: r.forbidden, 404: r.notFound },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/build/spec/{specId}/instantiate",
+  tags: ["instance"],
+  summary: "Instantiate an approved ontology spec",
+  description:
+    "Writes the approved model and creates the build chain; gated on the ontology_spec approval, so an unapproved proposal cannot change anything.",
+  request: { params: z.object({ specId: z.string() }) },
+  responses: {
+    200: r.ok(),
+    401: r.unauthorized,
+    403: r.forbidden,
+    404: r.notFound,
+    409: r.conflict,
+  },
+});
+
+// cycle-time.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/cycle-time",
+  tags: ["dashboard"],
+  summary: "Get completed-issue cycle-time buckets",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: z.object({ period: z.string().optional(), bucket: z.string().optional() }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+// defect-kb.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/defect-kb",
+  tags: ["dashboard"],
+  summary: "List recurring-defect knowledge base entries",
+  description: "Board-only. Returns the playbook threshold alongside the entries.",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: z.object({ limit: z.string().optional(), minCount: z.string().optional() }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+// dispatch.ts
+registry.registerPath({
+  method: "post",
+  path: "/api/companies/{companyId}/dispatch",
+  tags: ["issues"],
+  summary: "Dispatch an issue from a minimal payload",
+  description: "Creates an issue with optional assignees, priority, labels, and wake.",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    body: jsonBody(
+      z.object({
+        title: z.string(),
+        description: z.string().optional(),
+        projectId: z.string().optional(),
+        assigneeAgentId: z.string().optional(),
+        assigneeUserId: z.string().optional(),
+        priority: z.string().optional(),
+        labels: z.array(z.string()).optional(),
+        wake: z.boolean().optional(),
+      }),
+    ),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/dispatch",
+  tags: ["issues"],
+  summary: "List recent dispatch issues",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: z.object({ limit: z.string().optional() }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+// git-credentials.ts
+registry.registerPath({
+  method: "post",
+  path: "/api/git-credentials",
+  tags: ["secrets"],
+  summary: "Save an encrypted git credential",
+  description:
+    "Tokens are stored encrypted; 422 when the server has no GIT_CREDENTIAL_ENCRYPTION_KEY configured (plaintext storage is refused).",
+  request: {
+    body: jsonBody(
+      z.object({
+        provider: z.string(),
+        token: z.string(),
+        repoUrl: z.string().optional(),
+        companyId: z.string().optional(),
+      }),
+    ),
+  },
+  responses: {
+    200: r.ok(),
+    400: r.badRequest,
+    401: r.unauthorized,
+    403: r.forbidden,
+    422: r.unprocessable,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/git-credentials",
+  tags: ["secrets"],
+  summary: "List the current user's saved git credentials",
+  responses: { 200: r.ok(), 401: r.unauthorized, 422: r.unprocessable },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/git-credentials/{repoId}",
+  tags: ["secrets"],
+  summary: "Get one git credential's metadata",
+  description: "Ownership-checked; never returns the token itself.",
+  request: { params: z.object({ repoId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound, 422: r.unprocessable },
+});
+
+registry.registerPath({
+  method: "delete",
+  path: "/api/git-credentials/{repoId}",
+  tags: ["secrets"],
+  summary: "Delete a saved git credential",
+  request: { params: z.object({ repoId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound },
+});
+
+// inbox.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/inbox",
+  tags: ["inbox"],
+  summary: "Get the board inbox feed",
+  description:
+    "Board-only. Aggregates pending approvals, failures, and mentions for one company.",
+  request: {
+    query: z.object({ companyId: z.string(), limit: z.string().optional() }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+// issue-specs.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/issues/{id}/spec",
+  tags: ["issues"],
+  summary: "Get an issue's spec document",
+  request: { params: z.object({ id: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/issues/{id}/spec",
+  tags: ["issues"],
+  summary: "Write an issue's spec document",
+  description:
+    "Pass draft=1 (or draft=true) to store a draft shape instead of the full spec.",
+  request: {
+    params: z.object({ id: z.string() }),
+    query: z.object({ draft: z.string().optional() }),
+    body: jsonBody(z.union([issueSpecSchema, issueSpecDraftSchema])),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized, 404: r.notFound },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/specs/tree",
+  tags: ["issues"],
+  summary: "Get the company spec tree",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: specTreeQuerySchema,
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/companies/{companyId}/specs/from-template",
+  tags: ["issues"],
+  summary: "Create a spec issue from a template skeleton",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    body: jsonBody(createSpecFromTemplateSchema),
+  },
+  responses: {
+    200: r.ok(),
+    400: r.badRequest,
+    401: r.unauthorized,
+    422: r.unprocessable,
+  },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/issue-specs",
+  tags: ["issues"],
+  summary: "List the company's spec issues",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: specTreeQuerySchema,
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+// metrics.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/metrics",
+  tags: ["dashboard"],
+  summary: "Get delivery efficiency metric windows",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/metrics/overview",
+  tags: ["dashboard"],
+  summary: "Get the metrics overview with series",
+  description: "Board-only.",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: z.object({ period: z.string().optional(), series: z.string().optional() }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+// milestones.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/milestones",
+  tags: ["projects"],
+  summary: "List milestone issues",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: z.object({
+      status: z.string().optional(),
+      gate: z.string().optional(),
+      projectId: z.string().optional(),
+      limit: z.string().optional(),
+    }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/milestones/{id}",
+  tags: ["projects"],
+  summary: "Get one milestone issue",
+  request: {
+    params: z.object({ companyId: z.string(), id: z.string() }),
+  },
+  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound },
+});
+
+// notifications.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/notifications",
+  tags: ["inbox"],
+  summary: "Get the board notification feed with read state",
+  request: {
+    query: z.object({ companyId: z.string(), limit: z.string().optional() }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/api/notifications/{id}/read",
+  tags: ["inbox"],
+  summary: "Mark a notification read for the current user",
+  request: {
+    params: z.object({ id: z.string() }),
+    query: z.object({ companyId: z.string() }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+// onboarding.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/onboarding/state",
+  tags: ["companies"],
+  summary: "Get the company onboarding state",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/companies/{companyId}/onboarding/step",
+  tags: ["companies"],
+  summary: "Advance one onboarding step",
+  description: "Board-only.",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    body: jsonBody(onboardingStepSchema),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/companies/{companyId}/onboarding/complete",
+  tags: ["companies"],
+  summary: "Complete onboarding",
+  description: "Board-only.",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+// ontology-extras.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/ontology/instances",
+  tags: ["ontology"],
+  summary: "List ontology entity instances",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/ontology/types/{typeId}/properties",
+  tags: ["ontology"],
+  summary: "Get an ontology type's property definitions",
+  request: {
+    params: z.object({ companyId: z.string(), typeId: z.string() }),
+  },
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "patch",
+  path: "/api/companies/{companyId}/ontology/types/{typeId}/properties",
+  tags: ["ontology"],
+  summary: "Update an ontology type's property definitions",
+  description: "Board-only and activity-logged.",
+  request: {
+    params: z.object({ companyId: z.string(), typeId: z.string() }),
+    body: jsonBody(ontologyPropertiesUpdateSchema),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+// ontology-graph.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/ontology/graph",
+  tags: ["ontology"],
+  summary: "Build the company ontology graph view",
+  description:
+    "root_type+root_id are both optional: without them the service returns a flat company snapshot; with them it anchors a BFS at the entity.",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: z.object({
+      root_type: z.string().optional(),
+      root_id: z.string().optional(),
+      depth: z.string().optional(),
+      view: z.string().optional(),
+      relations: z.string().optional(),
+    }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/ontology/paths",
+  tags: ["ontology"],
+  summary: "Find ontology relation paths",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/ontology/stats",
+  tags: ["ontology"],
+  summary: "Get ontology entity/relation stats",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/ontology/levels",
+  tags: ["ontology"],
+  summary: "Get the ontology level catalog",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/companies/{companyId}/ontology/backfill",
+  tags: ["ontology"],
+  summary: "Backfill ontology relations from existing rows",
+  description: "Board-only and activity-logged.",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+// ota-manifest.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/ota/manifest",
+  tags: ["instance"],
+  summary: "Get the OTA update manifest",
+  responses: { 200: r.ok() },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/ota/manifest.json",
+  tags: ["instance"],
+  summary: "Get the OTA update manifest (extension alias)",
+  responses: { 200: r.ok() },
+});
+
+// quotas.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/quotas",
+  tags: ["costs"],
+  summary: "Get provider quota windows",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "post",
+  path: "/api/companies/{companyId}/quotas/refresh",
+  tags: ["costs"],
+  summary: "Refresh provider quota windows",
+  description: "Optionally filters to a provider list in the body.",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    body: jsonBody(
+      z.object({ providers: z.array(z.string()).optional() }).optional(),
+    ),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/usage",
+  tags: ["costs"],
+  summary: "Get provider usage (quotas alias)",
+  request: { params: z.object({ companyId: z.string() }) },
+  responses: { 200: r.ok(), 401: r.unauthorized },
+});
+
+// release-notes.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/release-notes",
+  tags: ["instance"],
+  summary: "Get the bundled release notes",
+  responses: { 200: r.ok() },
+});
+
+// sandboxes.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/sandboxes",
+  tags: ["execution-workspaces"],
+  summary: "List company sandboxes (execution workspaces)",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: z.object({
+      status: z.string().optional(),
+      projectId: z.string().optional(),
+      limit: z.string().optional(),
+    }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/sandboxes/{id}",
+  tags: ["execution-workspaces"],
+  summary: "Get one sandbox",
+  request: {
+    params: z.object({ companyId: z.string(), id: z.string() }),
+  },
+  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound },
+});
+
+// search.ts
+registry.registerPath({
+  method: "get",
+  path: "/api/search",
+  tags: ["search"],
+  summary: "Search agents, tasks, and documents in one company",
+  description:
+    "Board-only. Requires `companyId`; empty `q` returns empty result groups.",
+  request: {
+    query: z.object({ companyId: z.string(), q: z.string().optional() }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+// work-products.ts (company-scoped list/detail views; the issue-scoped
+// mutations live in issues.ts above)
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/work-products",
+  tags: ["issues"],
+  summary: "List company work products",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: z.object({
+      type: z.string().optional(),
+      agentId: z.string().optional(),
+      issueId: z.string().optional(),
+      limit: z.string().optional(),
+      refreshPullRequests: z.string().optional(),
+    }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/work-products/{id}",
+  tags: ["issues"],
+  summary: "Get one company work product",
+  request: {
+    params: z.object({ companyId: z.string(), id: z.string() }),
+  },
+  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/work-products/artifacts/code",
+  tags: ["issues"],
+  summary: "List commit-type work products",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: z.object({ limit: z.string().optional() }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
+});
+
+registry.registerPath({
+  method: "get",
+  path: "/api/companies/{companyId}/artifacts/code",
+  tags: ["issues"],
+  summary: "List commit-type artifacts (legacy alias)",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: z.object({ limit: z.string().optional() }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
 });
