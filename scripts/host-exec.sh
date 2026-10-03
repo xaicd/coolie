@@ -22,18 +22,27 @@ if [[ ! -f "/.dockerenv" ]] && ! grep -q 'containerd' /proc/1/cgroup 2>/dev/null
   exec "$@"
 fi
 
-# We are in container; resolve Mac host IP
-TARGET_HOST="${MAC_HOST_IP:-192.168.3.85}"
-
-# Ensure route to selected host bypasses clash TUN
-if command -v ip >/dev/null 2>&1 && [[ "$TARGET_HOST" =~ ^192\.168\. ]]; then
-  ip route replace "$TARGET_HOST" via 172.19.0.1 dev eth0 2>/dev/null || true
-fi
-
 HOST_USER="${HOST_USER:-mac}"
 
-# Encode full remote script in base64 to avoid shell quoting and injection traps
-RAW_SCRIPT="export PATH=\"/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:\$PATH\"; cd /Users/mac/workspace/xaicd/coolie 2>/dev/null || true; $*"
+# Ensure route to LAN bypasses clash TUN before probing
+if command -v ip >/dev/null 2>&1; then
+  ip rule add to 192.168.0.0/16 lookup main prio 8000 2>/dev/null || true
+  ip route replace 192.168.0.0/16 via 172.19.0.1 dev eth0 2>/dev/null || true
+fi
+
+# We are in container; resolve Mac host IP
+TARGET_HOST="${MAC_HOST_IP:-}"
+if [[ -z "$TARGET_HOST" ]]; then
+  for candidate in "192.168.3.90" "192.168.3.85" "100.84.124.71"; do
+    if ssh -o StrictHostKeyChecking=no -o ConnectTimeout=1 -o BatchMode=yes -i "$SSH_KEY" "$HOST_USER@$candidate" "true" 2>/dev/null; then
+      TARGET_HOST="$candidate"
+      break
+    fi
+  done
+  [[ -n "$TARGET_HOST" ]] || TARGET_HOST="192.168.3.90"
+fi
+
+RAW_SCRIPT="export PATH=\"/opt/homebrew/Cellar/node@24/24.20.0/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:\$PATH\"; cd /Users/mac/workspace/xaicd/coolie 2>/dev/null || true; $*"
 B64_SCRIPT="$(printf '%s' "$RAW_SCRIPT" | base64 | tr -d '\r\n')"
 
 exec ssh -o StrictHostKeyChecking=no \
@@ -43,6 +52,9 @@ exec ssh -o StrictHostKeyChecking=no \
   -o ConnectTimeout=5 \
   -o ServerAliveInterval=15 \
   -o ServerAliveCountMax=2 \
+  -o ControlMaster=auto \
+  -o ControlPath=/tmp/ssh-cm-%r@%h:%p \
+  -o ControlPersist=10m \
   -i "$SSH_KEY" \
   "$HOST_USER@$TARGET_HOST" \
   "echo $B64_SCRIPT | base64 -d | bash"

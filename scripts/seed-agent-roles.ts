@@ -10,7 +10,7 @@
  *   - `tools` 列:  英文 cli (cmd / agy / claude-glm / claude-mm / copilot),
  *                 老板原话 "工具不是 skill", 独立一列, 每个员工 1-3 个.
  *
- * 13 数字员工 (qa-*/ops-*) 老板原话 "不要 13 员工" — 本脚本**不**再标它们,
+ * 13 数字员工 (qa-* / ops-*) 老板原话 "不要 13 员工" — 本脚本**不**再标它们,
  * 由 migration 9023 直接 DELETE FROM agents WHERE name IN (...) 兜底.
  *
  * 用法:
@@ -26,6 +26,7 @@ import { eq } from "drizzle-orm";
 import postgres from "postgres";
 
 import { agents } from "../packages/db/src/schema/agents.js";
+import { resolveMigrationConnection } from "../packages/db/src/migration-runtime.js";
 
 interface RoleProfile {
   roleLabel: string;
@@ -130,10 +131,12 @@ function profileFor(name: string): RoleProfile {
 async function main() {
   const dryRun = process.argv.includes("--dry-run");
 
-  const url = process.env.DATABASE_URL;
+  let url = process.env.DATABASE_URL;
+  let migrationConn: { stop: () => Promise<void> } | null = null;
   if (!url) {
-    console.error("[seed-agent-roles] DATABASE_URL 未设置 — 跳过 (生产部署脚本期望运维手跑).");
-    process.exit(0);
+    const resolved = await resolveMigrationConnection();
+    url = resolved.connectionString;
+    migrationConn = resolved;
   }
 
   const client = postgres(url, { max: 1, onnotice: () => {} });
@@ -169,6 +172,9 @@ async function main() {
   }
 
   await client.end();
+  if (migrationConn) {
+    await migrationConn.stop();
+  }
   console.log(`[seed-agent-roles] 完成: updated=${updated}`);
 }
 

@@ -493,19 +493,16 @@ console.log("");
 render_who_is_doing_what() {
   local dispatch_dir="${COOLIE_LOCAL_DIR:-$REPO_ROOT/.coolie-local}/dispatch"
   [[ -d "$dispatch_dir" || ! -d "$REPO_ROOT/.paperclip-local/dispatch" ]] || dispatch_dir="$REPO_ROOT/.paperclip-local/dispatch"
+  # wave285 名册驱动: 员工全景从 team-roster 读取, 不再硬编码本机六人组。
+  local roster_payload
+  roster_payload="$(bash -c 'source "$1/lib/team-roster.sh" >/dev/null 2>&1 && roster_json' _ "$REPO_ROOT" 2>/dev/null || printf '{}')"
   node -e '
 const fs = require("fs");
 const path = require("path");
 const dir = process.argv[1];
+const roster = JSON.parse(process.argv[2] || "{}");
 
-const employees = [
-  { name: "墨斗", role: "FDA (前线架构师)", defaultTool: "agy-gemini3.8", env: "Docker 容器" },
-  { name: "铁匠", role: "Core SWE (核心研发)", defaultTool: "claude-glm", env: "Mac 宿主机" },
-  { name: "门神", role: "FDSE (前线全栈部署)", defaultTool: "cmd", env: "Mac 宿主机" },
-  { name: "兑底渊", role: "PRE-SRE (产品可靠性)", defaultTool: "copilot", env: "Mac 宿主机" },
-  { name: "百晓生", role: "DS (部署战略专家)", defaultTool: "claude-glm", env: "Mac 宿主机" },
-  { name: "Hermes", role: "PM (掌柜)", defaultTool: "Hermes 调度脚本", env: "通用" }
-];
+const employees = roster.employees || [];
 
 let receipts = [];
 if (fs.existsSync(dir)) {

@@ -1,0 +1,80 @@
+{
+  "schemaVersion": 1,
+  "team": "coolie-mac",
+  "note": "本机默认名册 (coolie-mac 六人组)。换团队不改脚本: 覆盖顺序 $TEAM_ROSTER > .coolie-local/team-roster.json > 本文件。",
+  "employees": [
+    {
+      "agentId": "hermes-pm",
+      "name": "Hermes",
+      "role": "PM (掌柜)",
+      "defaultTool": "hermes",
+      "fallbackTools": ["kiro-cli"],
+      "env": "通用"
+    },
+    {
+      "agentId": "modou-fda",
+      "name": "墨斗",
+      "role": "FDA (前线架构师)",
+      "defaultTool": "agy-gemini3.8",
+      "fallbackTools": ["claude-glm", "cmd"],
+      "env": "Docker 容器"
+    },
+    {
+      "agentId": "forge-core-swe",
+      "name": "铁匠",
+      "role": "Core SWE (核心研发)",
+      "defaultTool": "claude-glm",
+      "fallbackTools": ["claude-mm", "cmd"],
+      "env": "Mac 宿主机"
+    },
+    {
+      "agentId": "forge-ii-core-swe",
+      "name": "铁匠贰号",
+      "role": "Core SWE (核心研发兜底)",
+      "defaultTool": "cmd",
+      "fallbackTools": ["claude-mm"],
+      "env": "Mac 宿主机"
+    },
+    {
+      "agentId": "menshen-fdse",
+      "name": "门神",
+      "role": "FDSE (前线全栈部署)",
+      "defaultTool": "cmd",
+      "fallbackTools": ["claude-mm", "copilot"],
+      "env": "Mac 宿主机"
+    },
+    {
+      "agentId": "duidiyuan-pre-sre",
+      "name": "兑底渊",
+      "role": "PRE-SRE (产品可靠性)",
+      "defaultTool": "copilot",
+      "fallbackTools": ["claude-glm", "cmd"],
+      "env": "Mac 宿主机"
+    },
+    {
+      "agentId": "baixiaosheng-ds",
+      "name": "百晓生",
+      "role": "DS (部署战略专家)",
+      "defaultTool": "claude-glm",
+      "fallbackTools": ["claude-mm", "agy-gemini3.8"],
+      "env": "Mac 宿主机"
+    }
+  ],
+  "gateOwners": {
+    "G1_Arch": "墨斗",
+    "G2_Design": "铁匠",
+    "G3_Build": "铁匠",
+    "G4_Val": "百晓生",
+    "G5_Release": "兑底渊",
+    "G7_Biz": "百晓生"
+  },
+  "tools": [
+    "agy-gemini3.8",
+    "claude-glm",
+    "claude-mm",
+    "cmd",
+    "copilot",
+    "hermes",
+    "kiro-cli"
+  ]
+}
