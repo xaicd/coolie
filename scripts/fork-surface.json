@@ -1212,6 +1212,18 @@
       "maxNetLines": 320,
       "maxTotalLines": 350,
       "reason": "wave281: 2-hour tool health monitor with live probe and 15min TTL cache."
+    },
+    {
+      "path": "scripts/cron-team-status.sh",
+      "maxNetLines": 720,
+      "maxTotalLines": 750,
+      "reason": "wave278: Hermes local team status reporter and WeChat progress notifier."
+    },
+    {
+      "path": "scripts/event-trigger.sh",
+      "maxNetLines": 260,
+      "maxTotalLines": 290,
+      "reason": "wave280: Event-driven WeChat notification trigger with true silence rule."
     }
   ]
 }
