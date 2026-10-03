@@ -1152,6 +1152,12 @@
       "maxNetLines": 360,
       "maxTotalLines": 400,
       "reason": "wave284: Multi-Tool Context Bus helper for chaining context across 7 tools and heterogeneous host/container environments."
+    },
+    {
+      "path": "scripts/host-exec.sh",
+      "maxNetLines": 80,
+      "maxTotalLines": 100,
+      "reason": "wave284: Transparent SSH execution proxy from container sandbox to macOS host CLI tools."
     }
   ]
 }
