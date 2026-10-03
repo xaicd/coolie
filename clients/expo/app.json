@@ -33,7 +33,8 @@
       "bundleIdentifier": "cn.xrobinai.app",
       "infoPlist": {
         "NSMicrophoneUsageDescription": "Coolie uses the microphone to dispatch tasks by voice.",
-        "NSLocationWhenInUseUsageDescription": "Coolie uses your location to tag where you are when dispatching tasks."
+        "NSLocationWhenInUseUsageDescription": "Coolie uses your location to tag where you are when dispatching tasks.",
+        "ITSAppUsesNonExemptEncryption": false
       }
     },
     "android": {
