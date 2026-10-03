@@ -88,10 +88,15 @@ curl -s -X POST -H "Authorization: Bearer $KEY" -H "Content-Type: application/js
 
 | 探针 | 执行人 | 结果 | 时间 |
 |---|---|---|---|
-| A1 | — | — | — |
-| A2 | — | — | — |
-| B1 | — | — | — |
-| B2 | — | — | — |
-| B3 | — | — | — |
-| C1 | — | — | — |
-| D1 | — | — | — |
+| A1 | 墨斗 | **200** ✅ (旧进程 500) | 2026-10-04 22:43Z |
+| A2 | 墨斗 | **200** ✅ (旧进程 500) | 2026-10-04 22:43Z |
+| B1 | 墨斗 | **True, 772 paths** ✅ | 2026-10-04 22:43Z |
+| B2 | 墨斗 | **403** ✅ (负向探针, 文档-行为一致) | 2026-10-04 22:43Z |
+| B3 | 墨斗 | **400** ✅ | 2026-10-04 22:43Z |
+| C1 | 墨斗 | **nonempty** ✅ (create-issue requestBody 有真实 schema) | 2026-10-04 22:43Z |
+| D1 | 墨斗 | **True** ✅ (orphanIssues 字段在) | 2026-10-04 22:43Z |
+
+**全部通过 (7/7)**。重启由兑底渊执行 (pid 11951 → **26355**, 平台正门 `POST /api/health/dev-server/restart`
+热重启, requestId 16e575d6, 冒烟 OTA manifest 200 + A1 独立复核 200, 见 COOA-4 评论 70050877 / COOA-45 记录 fc78f6da)。
+诊断修正 (兑底渊): `/api/health` `devServer.autoRestartEnabled=false` — 重启门积压的根因是 dev 模式自动重启本就关闭,
+非心跳节奏饥饿; 积压只能靠手动正门请求清。探针脚本: workspace scratch `post-restart-probes.sh` (一键复跑)。
