@@ -88,5 +88,12 @@ bash tests/perf/native/measure-fps.sh --label board --rounds 3 --swipes 10 --out
 adb shell dumpsys activity activities | grep -i topResumedActivity  # =cloud.coolie.app/.MainActivity
 ```
 
+## 9. 收口补遗 (2026-10-03 续跑核验)
+
+- **v0.6.24 出厂产物结转核验**: 出厂 release APK v0.6.24 (VC624, 19:54 `assembleRelease`, 源 commit `12676f2a8`) 与本轮被测 build (`b276e54a3`) 的 wave285 关键文件 `IssuesList.tsx` / `TasksScreen.tsx` / `TaskKanbanScreen.tsx` **逐字节一致** (`git diff b276e54a3..12676f2a8 -- <三文件>` 为空) —— §3 全部帧率实测结论原样结转至出厂产物, 无需重测。
+- **原始数据落库**: §3 各轮 `dumpsys gfxinfo` 原始 dump (3 视图 × 3 轮) 自易失性 `/tmp/fps3/` 迁入本目录 `fps-raw/` (12 个文件, 含汇总与 raw), 满足「证据目录可复现」要求; 后续引用以 `docs-coolie/evidence/wave285/fps-raw/` 为准。
+- **工单侧闭环**: 掌柜已核验本报告并回贴工单侧逐项结论 (COOA-16 评论 `d4375a70`, 22:41), 工单置 `done`; 两条已记录口径 (AVD 代理 / 未采改造前基线) 与 §6 未闭合前置 (归 wave286) 均不阻塞。
+- **范围边界**: `b276e54a3..main` 后续 wave290 提交对 `IssuesList.tsx` (+39) / `TaskKanbanScreen.tsx` (+418) 的改动**不属 wave285 验收范围**, 由 wave290 自身 QA 覆盖。
+
 *门神 (FDSE) · wave285-C4 实测 · 2026-10-03*
 ---
