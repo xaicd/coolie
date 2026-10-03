@@ -22,7 +22,8 @@ import { ScreenHeader } from "../ui/ScreenHeader";
  * Pipeline 列表 (任务页顶部 [🛤️ Pipeline] 的落地屏)。
  *
  * 只读: 列公司的 pipeline (GET /api/companies/:id/pipelines, paperclip 上游路由)。
- * 新建与编辑仍在 Coolie Web 的 PipelineEditor (`/pipelines/new`, `/pipelines/:id`),
+ * 新建与编辑仍在 Coolie Web (新建入口是列表页 `/pipelines` 的 [New pipeline]
+ * 对话框, 编辑在 `/pipelines/:id` —— Web 端没有 `/pipelines/new` 路由),
  * 这里不重发明编辑器 —— 点 [+] / 点某条即用系统浏览器打开对应 Web 页。
  */
 export function PipelinesScreen({
@@ -81,7 +82,7 @@ export function PipelinesScreen({
         style={styles.header}
         right={
           <Pressable
-            onPress={() => openWeb("/pipelines/new", "无法打开 Pipeline 编辑器")}
+            onPress={() => openWeb("/pipelines", "无法打开 Pipeline 列表")}
             hitSlop={8}
             style={styles.addBtn}
             accessibilityLabel="新建 Pipeline"

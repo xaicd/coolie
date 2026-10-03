@@ -2,7 +2,8 @@
  * Pipeline 列表 (h5) —— Coolie工坊 App 的 PipelinesScreen 的 Web 镜像。
  *
  * 只读: 列公司的 pipeline (GET /api/companies/:id/pipelines, paperclip 上游路由)。
- * 新建与编辑仍在 Coolie Web 的 PipelineEditor (/pipelines/new, /pipelines/:id),
+ * 新建与编辑仍在 Coolie Web (新建入口是列表页 /pipelines 的 [New pipeline]
+ * 对话框, 编辑在 /pipelines/:id —— Web 端没有 /pipelines/new 路由),
  * 这里点 [+] / 点某条即开新窗口进入对应 Web 页, 不重发明编辑器。
  *
  * 公司取 `coolie.listCompanies()` 的第一家 (h5 暂无公司选择器, 与 TasksScreen /
@@ -94,7 +95,7 @@ export function PipelinesScreen({ style }: { style?: CSSProperties }) {
         <button
           type="button"
           style={styles.primaryBtn}
-          onClick={() => window.open("/pipelines/new", "_blank", "noopener")}
+          onClick={() => window.open("/pipelines", "_blank", "noopener")}
         >
           + 新建
         </button>
@@ -105,7 +106,7 @@ export function PipelinesScreen({ style }: { style?: CSSProperties }) {
       ) : loading ? (
         <div style={styles.empty}>正在加载…</div>
       ) : rows.length === 0 ? (
-        <div style={styles.empty}>暂无 pipeline — 点右上角 [+ 新建] 去 Pipeline 编辑器创建。</div>
+        <div style={styles.empty}>暂无 pipeline — 点右上角 [+ 新建] 去 Coolie Web 列表页创建。</div>
       ) : (
         <div style={styles.list}>
           {rows.map((row) => {
