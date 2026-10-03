@@ -1,12 +1,5 @@
 import { useCallback } from "react";
-import {
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import type { Company, Issue } from "@coolie/api-client";
 import { showSuccessToast } from "../ui/toast";
@@ -32,6 +25,12 @@ import { useTasksFilter } from "../hooks/useTasksFilter";
  *  3. IssueRow 已 memo, 这里配套父组件稳定回调, 让引用变化不触发布局
  *  4. 子组件 (Header / Search / Filters / ViewSwitch) 全部 memo, 只在 props 真变才重渲
  *
+ * wave285 性能优化 (boss「原生的太卡」):
+ *  - 最外层 ScrollView 拆掉 —— 以前整屏 (含 36+ 任务全量渲染的列表) 都在
+ *    ScrollView 里, 下拉刷新/滚动把主线程整屏重排; 现在标题/搜索/筛选/
+ *    视图切换固定在顶部, 滚动 + 下拉刷新交给 IssuesList 的真
+ *    FlatList/SectionList 本体 (VirtualizedList 自己窗口化渲染)。
+ *
  * 保留功能 (老板原话「今日, 项目分组筛选等功能留」):
  *  - 今日+进行中 / 全部
  *  - 列表 / 分组 / 看板
@@ -56,7 +55,7 @@ export function TasksScreen({
 }) {
   const t = useTasksFilter(company, refreshToken, initialProjectId);
 
-  // 顶部 Pull-to-refresh 用 loadIssues(true)
+  // 顶部 Pull-to-refresh 用 loadIssues(true) —— wave285 后由 IssuesList 本体挂载
   const onPullRefresh = useCallback(() => {
     void t.loadIssues(true);
   }, [t]);
@@ -97,18 +96,8 @@ export function TasksScreen({
 
   return (
     <View style={styles.screen}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={t.refreshing}
-            onRefresh={onPullRefresh}
-            tintColor={C.accent}
-          />
-        }
-      >
+      {/* wave285: 筛选区固定顶栏, 不随列表滚动 (原来整屏一个 ScrollView) */}
+      <View style={styles.header}>
         <TasksScreenHeader
           companyName={company.name}
           scopeLabel={t.issueScopeLabel}
@@ -134,20 +123,25 @@ export function TasksScreen({
         />
 
         <TasksScreenViewSwitch value={t.view} onChange={t.setView} />
+      </View>
 
-        <IssuesList
-          issues={t.issues}
-          loading={t.loading}
-          error={t.error}
-          onRetry={onRetryLoad}
-          onIssuePress={onOpenIssue}
-          onIssueLongPress={onIssueLongPress}
-          selection={t.selection}
-          view={t.view}
-          agents={t.agents}
-          projects={t.projects}
-        />
-      </ScrollView>
+      {/* 列表本体 (FlatList/SectionList) 持有滚动 + 下拉刷新 */}
+      <IssuesList
+        issues={t.issues}
+        loading={t.loading}
+        error={t.error}
+        onRetry={onRetryLoad}
+        onIssuePress={onOpenIssue}
+        onIssueLongPress={onIssueLongPress}
+        selection={t.selection}
+        view={t.view}
+        agents={t.agents}
+        projects={t.projects}
+        refreshing={t.refreshing}
+        onRefresh={onPullRefresh}
+        contentContainerStyle={styles.listContent}
+        style={styles.listArea}
+      />
 
       {/* 待审批快捷卡 (沿用旧任务页的浮动审批入口, 不因换 UI 丢能力) */}
       <QuickApprovalCard companyId={company.id} floating={true} />
@@ -203,13 +197,18 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: C.bg,
   },
-  scroll: {
+  header: {
+    paddingHorizontal: SPACING.lg,
+    paddingTop: SPACING.lg,
+    paddingBottom: SPACING.sm,
+    gap: SPACING.md,
+  },
+  listArea: {
     flex: 1,
   },
-  content: {
-    padding: SPACING.lg,
-    paddingBottom: 96,
-    gap: SPACING.md,
+  listContent: {
+    paddingHorizontal: SPACING.lg,
+    paddingBottom: 96, // 给 FAB 让位 (原 content paddingBottom)
   },
   fab: {
     position: "absolute",

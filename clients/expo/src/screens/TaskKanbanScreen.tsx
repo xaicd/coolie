@@ -317,111 +317,120 @@ export function TaskKanbanScreen({
 
   const totalCount = visible.length;
 
+  // wave285 (原生任务页下拉刷新性能优化): 筛选区两种视图共用。
+  // board 走整屏竖向滚动 (列高可超屏, 原结构不动, 拖拽零改动);
+  // list 走固定顶栏 + IssuesList 真列表本体 (FlatList/SectionList) 自己
+  // 持有滚动与下拉刷新 —— VirtualizedList 不再嵌在外层 ScrollView 里
+  // (嵌套会让窗口化失效 + 下拉刷新整屏重排, 是「原生太卡」的根因)。
+  const headerCluster = (
+    <>
+      <View style={styles.titleRow}>
+        <View style={styles.titleBlock}>
+          <Text style={styles.h1}>任务看板</Text>
+          <Text style={styles.subtitle} numberOfLines={1}>
+            {company.name} · {totalCount} 个任务 · 拖卡片换列
+          </Text>
+        </View>
+        <Pressable
+          style={styles.refreshBtn}
+          onPress={() => void loadIssues(true)}
+          hitSlop={8}
+          accessibilityLabel="刷新任务"
+        >
+          <Ionicons name="refresh-outline" size={16} color={C.ink3} />
+        </Pressable>
+      </View>
+
+      <View style={styles.scopeRow}>
+        {SCOPE_OPTIONS.map((option) => (
+          <Pressable
+            key={option.key}
+            style={({ pressed }) => [
+              styles.chip,
+              scope === option.key && styles.chipActive,
+              pressed && styles.chipPressed,
+            ]}
+            onPress={() => setScope(option.key)}
+          >
+            <Text
+              style={[
+                styles.chipText,
+                scope === option.key && styles.chipTextActive,
+              ]}
+            >
+              {option.label}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.chipRow}
+      >
+        <Pressable
+          style={[styles.chip, assignee !== "all" && styles.chipActive]}
+          onPress={() => setSheet("assignee")}
+        >
+          <Text style={[styles.chipText, assignee !== "all" && styles.chipTextActive]}>
+            指派 · {assigneeLabel}
+          </Text>
+          <Ionicons name="chevron-down" size={12} color={C.ink3} />
+        </Pressable>
+        <Pressable
+          style={[styles.chip, project !== "all" && styles.chipActive]}
+          onPress={() => setSheet("project")}
+        >
+          <Text style={[styles.chipText, project !== "all" && styles.chipTextActive]}>
+            项目 · {projectLabel}
+          </Text>
+          <Ionicons name="chevron-down" size={12} color={C.ink3} />
+        </Pressable>
+        <Pressable style={styles.chip} onPress={() => setSheet("sort")}>
+          <Text style={styles.chipText}>排序 · {sortOption.label}</Text>
+          <Ionicons name="chevron-down" size={12} color={C.ink3} />
+        </Pressable>
+        <Pressable
+          style={[styles.chip, mainline && styles.chipActive]}
+          onPress={() => setMainline((v) => !v)}
+        >
+          <Text style={[styles.chipText, mainline && styles.chipTextActive]}>
+            只看主线
+          </Text>
+        </Pressable>
+      </ScrollView>
+
+      <SegmentedControl
+        options={VIEW_OPTIONS.map((o) => ({ key: o.key, label: o.label }))}
+        value={view}
+        onChange={(key) => setView(key as IssuesView)}
+      />
+
+      {error ? (
+        <Text style={styles.error}>任务加载失败: {error}</Text>
+      ) : null}
+    </>
+  );
+
   return (
     <View style={styles.screen}>
-      <ScrollView
-        style={styles.scroll}
-        contentContainerStyle={styles.content}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={() => void loadIssues(true)}
-            tintColor={C.accent}
-          />
-        }
-      >
-        <View style={styles.titleRow}>
-          <View style={styles.titleBlock}>
-            <Text style={styles.h1}>任务看板</Text>
-            <Text style={styles.subtitle} numberOfLines={1}>
-              {company.name} · {totalCount} 个任务 · 拖卡片换列
-            </Text>
-          </View>
-          <Pressable
-            style={styles.refreshBtn}
-            onPress={() => void loadIssues(true)}
-            hitSlop={8}
-            accessibilityLabel="刷新任务"
-          >
-            <Ionicons name="refresh-outline" size={16} color={C.ink3} />
-          </Pressable>
-        </View>
-
-        <View style={styles.scopeRow}>
-          {SCOPE_OPTIONS.map((option) => (
-            <Pressable
-              key={option.key}
-              style={({ pressed }) => [
-                styles.chip,
-                scope === option.key && styles.chipActive,
-                pressed && styles.chipPressed,
-              ]}
-              onPress={() => setScope(option.key)}
-            >
-              <Text
-                style={[
-                  styles.chipText,
-                  scope === option.key && styles.chipTextActive,
-                ]}
-              >
-                {option.label}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-
+      {/* wave275 (P0-03) 语义保留: view==="board" 走看板拖拽区, 否则走 IssuesList。
+           wave285: 列表分支不再把 IssuesList 垫在外层 ScrollView 里。 */}
+      {view === "board" ? (
         <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
+          style={styles.scroll}
+          contentContainerStyle={styles.content}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => void loadIssues(true)}
+              tintColor={C.accent}
+            />
+          }
         >
-          <Pressable
-            style={[styles.chip, assignee !== "all" && styles.chipActive]}
-            onPress={() => setSheet("assignee")}
-          >
-            <Text style={[styles.chipText, assignee !== "all" && styles.chipTextActive]}>
-              指派 · {assigneeLabel}
-            </Text>
-            <Ionicons name="chevron-down" size={12} color={C.ink3} />
-          </Pressable>
-          <Pressable
-            style={[styles.chip, project !== "all" && styles.chipActive]}
-            onPress={() => setSheet("project")}
-          >
-            <Text style={[styles.chipText, project !== "all" && styles.chipTextActive]}>
-              项目 · {projectLabel}
-            </Text>
-            <Ionicons name="chevron-down" size={12} color={C.ink3} />
-          </Pressable>
-          <Pressable style={styles.chip} onPress={() => setSheet("sort")}>
-            <Text style={styles.chipText}>排序 · {sortOption.label}</Text>
-            <Ionicons name="chevron-down" size={12} color={C.ink3} />
-          </Pressable>
-          <Pressable
-            style={[styles.chip, mainline && styles.chipActive]}
-            onPress={() => setMainline((v) => !v)}
-          >
-            <Text style={[styles.chipText, mainline && styles.chipTextActive]}>
-              只看主线
-            </Text>
-          </Pressable>
-        </ScrollView>
-
-        <SegmentedControl
-          options={VIEW_OPTIONS.map((o) => ({ key: o.key, label: o.label }))}
-          value={view}
-          onChange={(key) => setView(key as IssuesView)}
-        />
-
-        {error ? (
-          <Text style={styles.error}>任务加载失败: {error}</Text>
-        ) : null}
-
-        {/* wave275 (P0-03): SegmentedControl 切换看板 / 列表, 之前只设了 view
-             state 但没在渲染处读它 — toggle 按了屏不切. 这里补 view==="board"
-             走看板拖拽区, 否则走 IssuesList 列表. */}
-        {view === "board" ? (
+          {headerCluster}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -444,7 +453,10 @@ export function TaskKanbanScreen({
               />
             ))}
           </ScrollView>
-        ) : (
+        </ScrollView>
+      ) : (
+        <View style={styles.listLayout}>
+          {headerCluster}
           <IssuesList
             issues={visible}
             loading={loading}
@@ -454,9 +466,12 @@ export function TaskKanbanScreen({
             view={view}
             agents={agents}
             projects={projects}
+            refreshing={refreshing}
+            onRefresh={() => void loadIssues(true)}
+            contentContainerStyle={styles.listContent}
           />
-        )}
-      </ScrollView>
+        </View>
+      )}
 
       <QuickApprovalCard companyId={company.id} floating />
 
@@ -690,6 +705,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.xxl,
     gap: SPACING.md,
+  },
+  // wave285: 列表视图布局 —— 固定顶栏 (标题/chip/切换) + 列表本体占满剩余
+  // 高度; 内边距对齐原 content, 列表底部留白由 listContent 给 FAB 让位。
+  listLayout: {
+    flex: 1,
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.md,
+  },
+  listContent: {
+    paddingBottom: SPACING.xxl,
   },
   titleRow: {
     flexDirection: "row",

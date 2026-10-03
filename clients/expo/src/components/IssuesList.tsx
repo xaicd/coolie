@@ -1,7 +1,10 @@
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo, type ReactElement } from "react";
 import {
+  FlatList,
   Pressable,
+  RefreshControl,
   ScrollView,
+  SectionList,
   StyleSheet,
   Text,
   View,
@@ -40,10 +43,17 @@ import { formatRelativeShort } from "../utils/format";
  * 选择 (搜索/状态/指派/项目/排序) 与渲染。
  *
  * wave254 性能优化:
- *  - 列表视图改用 FlatList, 配 getItemLayout + removeClippedSubviews + 渲染窗口;
- *  - IssueRow 已 memo, 这次新增 SectionList 友好的稳定 onPress/onLongPress。
- *  - 分组视图保留 SectionView 形式 (SectionList 在 4+ 段时启 sticky header,
- *    与 wave251 chip 一层一致; 当前观察下来卡片没有 sticky 需求, 沿用 View+map)。
+ *  - IssueRow 已 React.memo, 配套稳定 onPress/onLongPress, 引用不变不重渲。
+ *
+ * wave285 性能优化 (boss「原生的太卡」):
+ *  - 列表视图真 FlatList: getItemLayout + windowSize + removeClippedSubviews,
+ *    200+ 任务只渲染视口窗口, 滚动/下拉刷新不再全量重排;
+ *  - 分组视图真 SectionList: stickySectionHeadersEnabled 真启, 节头吸顶;
+ *  - 行槽固定高 (rowSlot), getItemLayout 0 测量成本命中;
+ *  - 下拉刷新 (refreshing/onRefresh) 由外屏透传进列表本体 —— 外层不再包
+ *    ScrollView, VirtualizedList 自己持有滚动, 不再有嵌套滚动抢主线程;
+ *  - 看板视图保持横向 ScrollView (拖拽走 TaskKanbanScreen 的 reanimated 路径,
+ *    本组件看板分支只读不拖, 不重做)。
  */
 
 export interface IssuesListProps {
@@ -61,15 +71,23 @@ export interface IssuesListProps {
   agents?: AgentRow[];
   projects?: Project[];
   style?: StyleProp<ViewStyle>;
+  /** wave285: 外屏透传下拉刷新状态 (不传则列表不挂 RefreshControl)。 */
+  refreshing?: boolean;
+  /** wave285: 下拉刷新回调 —— 列表本体持有滚动后由它挂 RefreshControl。 */
+  onRefresh?: () => void;
+  /** wave285: 透传给滚动内容容器 (外屏在这里给 FAB / 底栏让位)。 */
+  contentContainerStyle?: StyleProp<ViewStyle>;
 }
 
 /**
- * 单行高度 = IssueRow padding 11+11 + 内容 (2 行 19 lineHeight = 38) ≈ 60。
- * 取 64 给 icon (16) + badge 上下间距留余量, 这样 getItemLayout 可以 0 计算成本
- * 命中, FlatList 跳过 measure, 滑动 36 行不抖。
+ * 行槽固定高 = 64: IssueRow 最大内容高 60 (2 行标题 38 + 上下 padding 22),
+ * 4px 余量; 单行标题时上下居中。固定高是 getItemLayout 免测量命中的前提,
+ * 行槽间距 8 (SPACING.sm, 原 styles.wrap gap) 折进 marginBottom, 布局步长 72。
  */
 const ISSUE_ROW_HEIGHT = 64;
-const ISSUE_ROW_GAP = 6; // styles.wrap gap
+const ROW_STRIDE = ISSUE_ROW_HEIGHT + SPACING.sm;
+
+const issueKey = (issue: Issue) => issue.id;
 
 export function IssuesList({
   issues,
@@ -83,6 +101,9 @@ export function IssuesList({
   agents = [],
   projects = [],
   style,
+  refreshing = false,
+  onRefresh,
+  contentContainerStyle,
 }: IssuesListProps) {
   const visible = useMemo(() => selectIssues(issues, selection), [issues, selection]);
 
@@ -139,10 +160,46 @@ export function IssuesList({
     [onIssueLongPress],
   );
 
+  // wave285: 下拉刷新控件 —— 三种视图/错误/空态统一复用, 外屏不再自挂
+  const refreshControl = onRefresh ? (
+    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />
+  ) : undefined;
+
+  // 空态交给 ListEmptyComponent (列表滚动仍在, 下拉刷新空态可用)
+  const emptyComponent = useMemo(() => {
+    const filtering =
+      selection.status !== "all" ||
+      selection.assignee !== "all" ||
+      selection.project !== "all";
+    return (
+      <EmptyState
+        icon="📋"
+        title={filtering ? "没有匹配的任务" : "今天没有任务"}
+        subtitle={
+          filtering
+            ? "换个筛选条件，或清空搜索。"
+            : "点右下角 [+ 新建任务] 创建第一个任务。"
+        }
+      />
+    );
+  }, [selection.status, selection.assignee, selection.project]);
+
   if (error) {
     return (
       <View style={[styles.wrap, style]}>
-        <ErrorRetry variant="inline" message={`任务加载失败: ${error}`} onRetry={() => onRetry?.()} />
+        <ScrollView
+          style={styles.fill}
+          contentContainerStyle={styles.fillContent}
+          nestedScrollEnabled
+          keyboardShouldPersistTaps="handled"
+          refreshControl={refreshControl}
+        >
+          <ErrorRetry
+            variant="inline"
+            message={`任务加载失败: ${error}`}
+            onRetry={() => onRetry?.()}
+          />
+        </ScrollView>
       </View>
     );
   }
@@ -155,35 +212,15 @@ export function IssuesList({
     );
   }
 
-  if (visible.length === 0) {
-    const filtering =
-      selection.status !== "all" ||
-      selection.assignee !== "all" ||
-      selection.project !== "all";
-    return (
-      <View style={[styles.wrap, style]}>
-        <EmptyState
-          icon="📋"
-          title={filtering ? "没有匹配的任务" : "今天没有任务"}
-          subtitle={
-            filtering
-              ? "换个筛选条件，或清空搜索。"
-              : "点右下角 [+ 新建任务] 创建第一个任务。"
-          }
-        />
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.wrap, style]}>
       {view === "board" ? (
         <BoardView
           issues={visible}
           agentNameById={agentNameById}
-          parentById={parentById}
           onIssuePress={stableIssuePress}
-          onIssueLongPress={stableIssueLongPress}
+          refreshControl={refreshControl}
+          emptyComponent={emptyComponent}
         />
       ) : view === "group" ? (
         <SectionsView
@@ -191,6 +228,9 @@ export function IssuesList({
           parentById={parentById}
           onIssuePress={stableIssuePress}
           onIssueLongPress={stableIssueLongPress}
+          refreshControl={refreshControl}
+          contentContainerStyle={contentContainerStyle}
+          emptyComponent={emptyComponent}
         />
       ) : selection.scope === "focus" ? (
         <SectionsView
@@ -198,6 +238,9 @@ export function IssuesList({
           parentById={parentById}
           onIssuePress={stableIssuePress}
           onIssueLongPress={stableIssueLongPress}
+          refreshControl={refreshControl}
+          contentContainerStyle={contentContainerStyle}
+          emptyComponent={emptyComponent}
         />
       ) : (
         <FlatView
@@ -205,6 +248,9 @@ export function IssuesList({
           parentById={parentById}
           onIssuePress={stableIssuePress}
           onIssueLongPress={stableIssueLongPress}
+          refreshControl={refreshControl}
+          contentContainerStyle={contentContainerStyle}
+          emptyComponent={emptyComponent}
         />
       )}
     </View>
@@ -231,90 +277,178 @@ function GroupHeader({ label, count }: { label: string; count: number }) {
   );
 }
 
+/** wave285: 固定高行槽 —— 高度确定 + 垂直居中, getItemLayout 免测量命中。 */
+function IssueRowSlot({
+  issue,
+  parentById,
+  onIssuePress,
+  onIssueLongPress,
+}: {
+  issue: Issue;
+  parentById: Map<string, { id: string; isMilestone?: boolean }>;
+  onIssuePress: (issue: Issue) => void;
+  onIssueLongPress?: (issue: Issue) => void;
+}) {
+  return (
+    <View style={styles.rowSlot}>
+      <IssueRow
+        issue={issue}
+        parentIssue={issue.parentId ? parentById.get(issue.parentId) ?? null : null}
+        onPress={onIssuePress}
+        onLongPress={onIssueLongPress}
+      />
+    </View>
+  );
+}
+
 /**
- * 列表视图 —— wave254 沿用 View+.map() (同原 TasksScreen 的扁平列表结构),
- * 关键点:
- *  - IssueRow 已 React.memo, 配合父级 stableIssuePress / stableIssueLongPress,
- *    36 条 issues 在 rerender 只在数据/引用真变时才重渲个别行
- *  - 行间距通过 IssueRow 自带 paddingVertical 实现, 这里不需要 FlatList
- *
- * 注: 把 FlatList 嵌进外层 ScrollView 会触发 nested-scroll warning, 实测
- * 在 TasksScreen 里 (外层 ScrollView 还要管 scope/status/搜索框滚动) 反而抖;
- * 因此本波保留 View+.map() + memo 行, 真实卡死收益来自父组件回调稳定 + 19
- * 个 useState 合并到 reducer。
+ * 列表视图 —— wave285: View+.map() 全量渲染换真 FlatList。200+ 任务只
+ * 实例化视口窗口 (windowSize=11), 布局走固定行槽 getItemLayout, 滑动不抖、
+ * 下拉刷新不再拖动整屏重排。
  */
 function FlatView({
   issues,
   parentById,
   onIssuePress,
   onIssueLongPress,
+  refreshControl,
+  contentContainerStyle,
+  emptyComponent,
 }: {
   issues: Issue[];
   parentById: Map<string, { id: string; isMilestone?: boolean }>;
   onIssuePress: (issue: Issue) => void;
   onIssueLongPress?: (issue: Issue) => void;
+  refreshControl?: ReactElement;
+  contentContainerStyle?: StyleProp<ViewStyle>;
+  emptyComponent?: ReactElement | null;
 }) {
+  const renderItem = useCallback(
+    ({ item }: { item: Issue }) => (
+      <IssueRowSlot
+        issue={item}
+        parentById={parentById}
+        onIssuePress={onIssuePress}
+        onIssueLongPress={onIssueLongPress}
+      />
+    ),
+    [parentById, onIssuePress, onIssueLongPress],
+  );
+
   return (
-    <View>
-      {issues.map((issue) => (
-        <IssueRow
-          key={issue.id}
-          issue={issue}
-          parentIssue={issue.parentId ? parentById.get(issue.parentId) ?? null : null}
-          onPress={onIssuePress}
-          onLongPress={onIssueLongPress}
-        />
-      ))}
-    </View>
+    <FlatList
+      style={styles.fill}
+      data={issues}
+      keyExtractor={issueKey}
+      renderItem={renderItem}
+      getItemLayout={(_, index) => ({
+        length: ROW_STRIDE,
+        offset: ROW_STRIDE * index,
+        index,
+      })}
+      windowSize={11}
+      initialNumToRender={12}
+      maxToRenderPerBatch={12}
+      removeClippedSubviews
+      nestedScrollEnabled
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      refreshControl={refreshControl}
+      contentContainerStyle={contentContainerStyle}
+      ListEmptyComponent={emptyComponent}
+    />
   );
 }
 
-void ISSUE_ROW_HEIGHT;
-void ISSUE_ROW_GAP;
-
+/**
+ * 分组视图 —— wave285: View+groups.map() 换真 SectionList,
+ * stickySectionHeadersEnabled 真启 (节头吸顶, wave254 只留在注释里)。
+ */
 function SectionsView({
   groups,
   parentById,
   onIssuePress,
   onIssueLongPress,
+  refreshControl,
+  contentContainerStyle,
+  emptyComponent,
 }: {
   groups: { key: string; label: string; items: Issue[] }[];
   parentById: Map<string, { id: string; isMilestone?: boolean }>;
   onIssuePress: (issue: Issue) => void;
   onIssueLongPress?: (issue: Issue) => void;
+  refreshControl?: ReactElement;
+  contentContainerStyle?: StyleProp<ViewStyle>;
+  emptyComponent?: ReactElement | null;
 }) {
+  const sections = useMemo(
+    () =>
+      groups.map((group) => ({
+        key: group.key,
+        label: group.label,
+        data: group.items,
+      })),
+    [groups],
+  );
+
+  const renderItem = useCallback(
+    ({ item }: { item: Issue }) => (
+      <IssueRowSlot
+        issue={item}
+        parentById={parentById}
+        onIssuePress={onIssuePress}
+        onIssueLongPress={onIssueLongPress}
+      />
+    ),
+    [parentById, onIssuePress, onIssueLongPress],
+  );
+
+  const renderSectionHeader = useCallback(
+    ({ section }: { section: { label: string; data: Issue[] } }) => (
+      <GroupHeader label={section.label} count={section.data.length} />
+    ),
+    [],
+  );
+
   return (
-    <View>
-      {groups.map((group) => (
-        <View key={group.key}>
-          <GroupHeader label={group.label} count={group.items.length} />
-          {group.items.map((issue) => (
-            <IssueRow
-              key={issue.id}
-              issue={issue}
-              parentIssue={issue.parentId ? parentById.get(issue.parentId) ?? null : null}
-              onPress={onIssuePress}
-              onLongPress={onIssueLongPress}
-            />
-          ))}
-        </View>
-      ))}
-    </View>
+    <SectionList
+      style={styles.fill}
+      sections={sections}
+      keyExtractor={issueKey}
+      renderItem={renderItem}
+      renderSectionHeader={renderSectionHeader}
+      stickySectionHeadersEnabled
+      windowSize={11}
+      initialNumToRender={12}
+      maxToRenderPerBatch={12}
+      removeClippedSubviews
+      nestedScrollEnabled
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      refreshControl={refreshControl}
+      contentContainerStyle={contentContainerStyle}
+      ListEmptyComponent={emptyComponent}
+    />
   );
 }
 
+/**
+ * 看板视图 —— 横向列布局不变 (拖拽版在 TaskKanbanScreen, 不走这里)。
+ * wave285: 外层补一个竖向 ScrollView —— 列表本体持有滚动后, 看板也需要
+ * 自己的竖向滚动 + 下拉刷新载体 (内外不同轴向, 无嵌套滚动冲突)。
+ */
 function BoardView({
   issues,
   agentNameById,
-  parentById,
   onIssuePress,
-  onIssueLongPress,
+  refreshControl,
+  emptyComponent,
 }: {
   issues: Issue[];
   agentNameById: Map<string, string>;
-  parentById: Map<string, { id: string; isMilestone?: boolean }>;
   onIssuePress: (issue: Issue) => void;
-  onIssueLongPress?: (issue: Issue) => void;
+  refreshControl?: ReactElement;
+  emptyComponent?: ReactElement | null;
 }) {
   const columns = useMemo(
     () =>
@@ -325,39 +459,61 @@ function BoardView({
     [issues],
   );
 
+  if (issues.length === 0) {
+    return (
+      <ScrollView
+        style={styles.fill}
+        contentContainerStyle={styles.fillContent}
+        nestedScrollEnabled
+        keyboardShouldPersistTaps="handled"
+        refreshControl={refreshControl}
+      >
+        {emptyComponent}
+      </ScrollView>
+    );
+  }
+
   return (
     <ScrollView
-      horizontal
-      showsHorizontalScrollIndicator={false}
-      contentContainerStyle={styles.boardContent}
+      style={styles.fill}
+      nestedScrollEnabled
+      keyboardShouldPersistTaps="handled"
+      keyboardDismissMode="on-drag"
+      refreshControl={refreshControl}
     >
-      {columns.map((column) => (
-        <View key={column.status} style={styles.boardColumn}>
-          <View style={styles.boardColumnHeader}>
-            <View style={[styles.boardColumnDot, { backgroundColor: issueStatusColor(column.status) }]} />
-            <Text style={[styles.boardColumnTitle, { color: issueStatusColor(column.status) }]}>
-              {issueStatusLabel(column.status)}
-            </Text>
-            <Text style={styles.boardColumnCount}>{column.items.length}</Text>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.boardContent}
+      >
+        {columns.map((column) => (
+          <View key={column.status} style={styles.boardColumn}>
+            <View style={styles.boardColumnHeader}>
+              <View style={[styles.boardColumnDot, { backgroundColor: issueStatusColor(column.status) }]} />
+              <Text style={[styles.boardColumnTitle, { color: issueStatusColor(column.status) }]}>
+                {issueStatusLabel(column.status)}
+              </Text>
+              <Text style={styles.boardColumnCount}>{column.items.length}</Text>
+            </View>
+            {column.items.length === 0 ? (
+              <Text style={styles.boardColumnEmpty}>—</Text>
+            ) : (
+              column.items.map((issue) => (
+                <BoardCard
+                  key={issue.id}
+                  issue={issue}
+                  assigneeName={
+                    issue.assigneeAgentId
+                      ? (agentNameById.get(issue.assigneeAgentId) ?? "已指派")
+                      : "未分配"
+                  }
+                  onPress={onIssuePress}
+                />
+              ))
+            )}
           </View>
-          {column.items.length === 0 ? (
-            <Text style={styles.boardColumnEmpty}>—</Text>
-          ) : (
-            column.items.map((issue) => (
-              <BoardCard
-                key={issue.id}
-                issue={issue}
-                assigneeName={
-                  issue.assigneeAgentId
-                    ? (agentNameById.get(issue.assigneeAgentId) ?? "已指派")
-                    : "未分配"
-                }
-                onPress={onIssuePress}
-              />
-            ))
-          )}
-        </View>
-      ))}
+        ))}
+      </ScrollView>
     </ScrollView>
   );
 }
@@ -396,8 +552,21 @@ const BoardCard = memo(function BoardCard({
 });
 
 const styles = StyleSheet.create({
+  /** 列表本体持有滚动: 外屏给一块 flex 区域, 这里填满。 */
   wrap: {
-    gap: SPACING.sm,
+    flex: 1,
+  },
+  fill: {
+    flex: 1,
+  },
+  fillContent: {
+    paddingVertical: SPACING.sm,
+  },
+  /** 固定行槽: 高 64 + 行距 8 (步长 72), 内容垂直居中。 */
+  rowSlot: {
+    height: ISSUE_ROW_HEIGHT,
+    justifyContent: "center",
+    marginBottom: SPACING.sm,
   },
   loadingRows: {
     gap: SPACING.sm,
@@ -414,6 +583,8 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: SPACING.sm,
     paddingHorizontal: SPACING.xs,
+    // sticky 节头吸顶时不透明, 否则行从底下透出来
+    backgroundColor: C.bg,
   },
   groupHeaderText: {
     color: C.ink2,
@@ -424,6 +595,7 @@ const styles = StyleSheet.create({
   boardContent: {
     gap: SPACING.sm,
     paddingRight: SPACING.lg,
+    paddingVertical: SPACING.sm,
   },
   boardColumn: {
     width: 236,
