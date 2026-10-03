@@ -1140,6 +1140,18 @@
       "maxNetLines": 200,
       "maxTotalLines": 600,
       "reason": "wave132 baseline 30 (1 entry). Each new hand-written migration appends one entry. wave245/wave250/wave256 cumulative +5 (9017-9021 + ontology snapshot). wave258 -1 cleanup (was 9022_add_agent_tools + 9023_delete_13 in wave256 stale journal, wave258 removed 9022_add_agent_tools draft + renumbered 9023_delete → 9022_delete; tools was already in 9021). net +4 from wave245/250/256 + wave258 cleanup (the journal shrunk by 1 entry because the stale 9022_add_agent_tools is gone and 9023_delete was renumbered to 9022_delete)."
+    },
+    {
+      "path": "scripts/dispatch-local-employee.sh",
+      "maxNetLines": 420,
+      "maxTotalLines": 450,
+      "reason": "wave282: Hermes fixed employee dispatch helper with structured receipt, context bus handover, and status lifecycle."
+    },
+    {
+      "path": "scripts/context-bus.sh",
+      "maxNetLines": 360,
+      "maxTotalLines": 400,
+      "reason": "wave284: Multi-Tool Context Bus helper for chaining context across 7 tools and heterogeneous host/container environments."
     }
   ]
 }

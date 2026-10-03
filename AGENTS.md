@@ -247,7 +247,28 @@ A change is done when all are true:
    - 远端 `https://xrobinai.cn/version.json` (version + versionCode)
    - 远端 `https://xrobinai.cn/ota/manifest` (runtimeVersion)
    - git tag (v<version>)
-   `bash scripts/VERSION-CONSISTENCY-CHECK.sh` 一键校验, 退出码 0 = 通过.
+    `bash scripts/VERSION-CONSISTENCY-CHECK.sh` 一键校验, 退出码 0 = 通过.
+
+## 13. 多工具协同与跨环境上下文接力规范 (wave282-wave284)
+
+1. **宿主机 (Host) 与容器沙箱工具池物理分布**
+   - **宿主机环境 (`/opt/homebrew/bin`)**：Claude (`claude-glm`, `claude-mm`)、`cmd` (`@commandcode/ai`)、`copilot`、`kiro-cli` 真实部署在老板的 Mac 宿主机上，依赖 Homebrew 环境。
+   - **容器沙箱环境**：`agy-gemini3.8` (Antigravity CLI + Gemini 3.8) 运行于 Docker 容器中。
+   - 宿主机与容器沙箱挂载共享代码仓库（`/host-workspace/xaicd/coolie`），工具探测或执行脚本时**严禁把宿主机 CLI 误判为全局缺失**。
+
+2. **多工具上下文接力总线 (Context Bus)**
+   - 跨工具/跨工种接力（如 墨斗 FDA -> 铁匠 Core SWE -> 门神 FDSE -> 兑底渊 PRE-SRE -> 百晓生 DS）严禁口头传话与手动复制；
+   - 统一由 `scripts/context-bus.sh` 在 `.paperclip-local/context-bus/<wave>.json` 记录不可变流转轨迹；
+   - 派单 `scripts/dispatch-local-employee.sh` 默认开启上下文继承，自动将上游最新 Commit、修改文件、交付 Spec 与交接嘱托注入给下游工具的 Prompt，实现零摩擦交接。
+
+3. **派单 Receipt 规范与状态机**
+   - 每次派单必在 `.paperclip-local/dispatch/<id>.json` 生成结构化 Receipt；
+   - 严格遵循状态机跃迁：`queued -> running -> done | blocked | failed`；
+   - 任务完成后必须回写 commit hash、验证命令与交付物证据。
+
+4. **CMMI G1-G5 角色证据隔离账本**
+   - 每一波交付必须通过 `scripts/gate-evidence-ledger.sh` 在 `.paperclip-local/evidence-ledger/<wave>.json` 落盘；
+   - FDA (G1) / Core SWE (G2) / FDSE (G3) / DS (G4) / PRE-SRE (G5) 五角色各自提交独立证据，严禁跨角色借用。
 
 ## This fork's own conventions
 
@@ -265,6 +286,10 @@ be kept in sync twice.
 - `doc/plans/*.md` — dated plan and design records.
 - `docs-coolie/specs/*.md` — Kiro-style specs (requirements + EARS acceptance
   criteria, with the technical section appended). Read one before building its feature.
+  - `docs-coolie/specs/2026-10-02-local-dispatch-receipt.md` — 派单 Receipt 规范
+  - `docs-coolie/specs/2026-10-02-tool-health-monitor.md` — 工具健康监控规范
+  - `docs-coolie/specs/2026-10-02-g1-g5-evidence-ledger.md` — G1-G5 证据账本规范
+  - `docs-coolie/specs/2026-10-03-multi-tool-context-bus.md` — 多工具上下文接力总线规范
 - `.agents/skills/` — our skill library (`fork-sync` is the upstream-sync playbook).
 - `docs-coolie/EMPLOYEE-OBJECTS.md` — source of truth for the local Coolie-building
   team, its employee objects, tools, skills, and operating constraints.
