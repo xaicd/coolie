@@ -77,6 +77,44 @@ if [[ "$MODE" == "unregister" ]]; then
 fi
 
 # Real probe helper
+probe_agy() {
+  local start_ms end_ms latency output
+  start_ms="$(node -e 'console.log(Date.now())')"
+
+  # 1. 优先检查当前环境 (容器内) 是否有 agy
+  if command -v agy >/dev/null 2>&1; then
+    if output="$(agy --help 2>&1)"; then
+      end_ms="$(node -e 'console.log(Date.now())')"
+      latency=$((end_ms - start_ms))
+      first_line="$(printf '%s' "$output" | head -n 1 | cut -c1-40)"
+      printf 'ok\t%d\tcontainer: %s' "$latency" "$first_line"
+      return 0
+    fi
+  fi
+
+  # 2. 如果在宿主机运行，检查 docker exec 容器内的 agy
+  if command -v docker >/dev/null 2>&1 && docker inspect agy-ubuntu-container >/dev/null 2>&1; then
+    if docker exec agy-ubuntu-container bash -c 'command -v /root/.local/bin/agy >/dev/null 2>&1 || command -v agy >/dev/null 2>&1' 2>/dev/null; then
+      end_ms="$(node -e 'console.log(Date.now())')"
+      latency=$((end_ms - start_ms))
+      printf 'ok\t%d\tdocker: agy-ubuntu-container active' "$latency"
+      return 0
+    fi
+  fi
+
+  # 3. 跨桥梁 host-exec 探测宿主机的 docker 容器
+  if [[ -x "$REPO_ROOT/scripts/host-exec.sh" ]]; then
+    if "$REPO_ROOT/scripts/host-exec.sh" "docker exec agy-ubuntu-container /root/.local/bin/agy --help >/dev/null 2>&1" 2>/dev/null; then
+      end_ms="$(node -e 'console.log(Date.now())')"
+      latency=$((end_ms - start_ms))
+      printf 'ok\t%d\thost-docker: agy active' "$latency"
+      return 0
+    fi
+  fi
+
+  printf 'fail\t999\tagy container or binary unreachable'
+}
+
 probe_tool() {
   local bin="$1"
   local test_cmd="$2"
@@ -132,8 +170,8 @@ try {
     fi
   fi
 
-  # 1. agy probe
-  IFS=$'\t' read -r agy_status agy_latency agy_reason <<< "$(probe_tool "agy" "--version")"
+  # 1. agy probe (专用跨环境探测, 识别 dockerized agy)
+  IFS=$'\t' read -r agy_status agy_latency agy_reason <<< "$(probe_agy)"
   [[ -n "$agy_latency" ]] || agy_latency=120
 
   # 2. claude probe (for claude-glm and claude-mm)

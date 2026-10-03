@@ -34,15 +34,29 @@ EOF
 fi
 
 EXPERT_MODE=0
-if [[ "$1" == "--expert" ]]; then
-  EXPERT_MODE=1
-  shift
-  INPUT="${*:-}"
-fi
+EXECUTE_FLAG=""
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --expert)
+      EXPERT_MODE=1
+      shift
+      ;;
+    --execute)
+      EXECUTE_FLAG="--execute"
+      shift
+      ;;
+    *)
+      break
+      ;;
+  esac
+done
+
+INPUT="${*:-}"
 
 # 0. 待办查询直接直通 Coolie Dev Server 任务大盘
 if [[ "$INPUT" =~ (待办|有哪些任务|任务列表|工单列表|未完成|有啥活|还有什么活|看下任务) ]]; then
-  exec "$SCRIPT_DIR/coolie-dev-task.sh" list
+  exec "$SCRIPT_DIR/coolie-dev-task.mjs" list
 fi
 
 # 1. 意图分类与特征提取
@@ -205,14 +219,26 @@ else
   echo "⚠️ Dev Server (3100) 任务同步未完成 (仅落本地 Receipt)"
 fi
 
-# 5. 调用本地派单脚本，生成 Receipt
-"$SCRIPT_DIR/dispatch-local-employee.sh" \
-  --agent "$AGENT" \
-  --task "$SAFE_TASK" \
-  --wave "$LATEST_WAVE" \
+# 5. 调用本地派单脚本，生成 Receipt (若带 --execute 或 AUTO_EXECUTE=1 则直通执行)
+DISPATCH_ARGS=(
+  --agent "$AGENT"
+  --task "$SAFE_TASK"
+  --wave "$LATEST_WAVE"
   --tool "$TOOL"
+)
+if [[ -n "$EXECUTE_FLAG" || "${AUTO_EXECUTE:-0}" == "1" ]]; then
+  DISPATCH_ARGS+=(--execute)
+fi
+
+"$SCRIPT_DIR/dispatch-local-employee.sh" "${DISPATCH_ARGS[@]}"
 
 echo ""
-echo "✅ 已生成结构化派单收据 (Receipt)，已加入本地执行队列！"
-echo "微信 5 字段实时状态:"
-echo "$EMPLOYEE: $LATEST_WAVE / 0m / $TOOL / 跑 (queued -> running)"
+if [[ -n "$EXECUTE_FLAG" || "${AUTO_EXECUTE:-0}" == "1" ]]; then
+  echo "✅ 任务已直通执行并生成执行凭据！"
+  echo "微信 5 字段实时状态:"
+  echo "$EMPLOYEE: $LATEST_WAVE / 0m / $TOOL / 跑 (running -> done)"
+else
+  echo "✅ 已生成结构化派单收据 (Receipt)，已加入本地执行队列！"
+  echo "微信 5 字段实时状态:"
+  echo "$EMPLOYEE: $LATEST_WAVE / 0m / $TOOL / 跑 (queued -> running)"
+fi
