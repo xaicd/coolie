@@ -223,17 +223,26 @@ function registerModuleMocks() {
 }
 
 function createDbStub(options: { requireBoardApprovalForNewAgents?: boolean } = {}) {
+  const companyRow = [{
+    id: companyId,
+    name: "Paperclip",
+    requireBoardApprovalForNewAgents: options.requireBoardApprovalForNewAgents ?? false,
+  }];
+  const thenable = () =>
+    vi.fn((resolve: (rows: typeof companyRow) => unknown) =>
+      Promise.resolve(resolve(companyRow)),
+    );
   return {
     select: vi.fn().mockReturnValue({
       from: vi.fn().mockReturnValue({
         where: vi.fn().mockReturnValue({
-          then: vi.fn((resolve) =>
-            Promise.resolve(resolve([{
-              id: companyId,
-              name: "Paperclip",
-              requireBoardApprovalForNewAgents: options.requireBoardApprovalForNewAgents ?? false,
-            }])),
-          ),
+          then: thenable(),
+          // wave226's assertAgentQuota reads company.metadata via
+          // select(...).from(companies).where(...).limit(1) — the stub needs a
+          // limit hop or every create/hire test 500s on the quota guard.
+          limit: vi.fn().mockReturnValue({
+            then: thenable(),
+          }),
         }),
       }),
     }),

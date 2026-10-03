@@ -999,6 +999,9 @@ describe("agent issue mutation checkout ownership", () => {
     expect(mockAccessService.decide).toHaveBeenCalledWith(expect.objectContaining({ action: "issue:read" }));
     expect(mockIssueService.listComments).toHaveBeenCalledWith(issueId, {
       afterCommentId: null,
+      // The route always passes includeDeleted (eca2623b7): cleared board-chat
+      // history is dropped unless the caller asks for it explicitly.
+      includeDeleted: true,
       order: "desc",
       limit: null,
     });
