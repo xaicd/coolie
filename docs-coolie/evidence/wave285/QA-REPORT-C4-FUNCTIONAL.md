@@ -70,13 +70,19 @@
 - [x] **飞行模式错误态 PTR + 恢复 — ❌ 证实 D7 + 新增 D8**: 错误态 PTR 亦死 ×2 (shots 67–68); 且 **D8 (新, moderate)**: 离线错误卡是原位恢复死路 — 飞行模式关闭、网络恢复 (ping 10.0.2.2 0% loss) 后重试 ×2 仍失败, 同 JS runtime 重进 (dashboard→tasks) 即正常、冷启正常 → 仅错误卡自身卡死, 需 remount/导航离开才恢复; 且出错时已加载列表被清空 (陈旧内容不保留)。(shots 66–73)
 - [x] **第二台 AVD (coolie-test) 抽查 — 跳过 (合理)**: 5554 已不存在于 adb devices; 四项检查在 5580 均有覆盖, 无增量信息。
 
-### 5.1 新增缺陷 (并行会话发现, 待开缺陷单)
+**收尾补测 (门神主会话, emulator-5600 = coolie-test, 构建 B 净装, 2026-10-04 00:45–00:55)** — 补上表「跳过」项并覆盖原清单未勾的「只看主线」:
 
-| ID | 级别 | 摘要 | 关键定位 |
-|----|------|------|----------|
-| **D8** | moderate | 离线错误卡原位恢复死路: 网络恢复后重试仍失败, 仅 remount/冷启可恢复; 出错时已加载列表被清空 | 错误态重载路径; dashboard 同 runtime 正常加载排除全局网络停摆 |
-| **D7** (佐证) | — | PTR 在空态与错误态均死, RefreshControl 仅随列表内容激活 | IssuesList RefreshControl 挂载条件 |
-| **D9** | low | 主线任务长按下钻未接线于线上任务页 — IssuesList 未传 `onIssueLongPress` (`TaskKanbanScreen.tsx:460-472`), 功能仅在保留的 `TasksScreen.tsx:74-80` | **wave213 前置缺陷, 非 wave285 回归** (wave285 不触碰该文件); 主线 badge 渲染正常 (API PATCH 实测, 已还原) |
+- [x] **只看主线 toggle — PASS (5600 交叉复测)**: DB 直插主线探针 (`C4主线探针-backfill`, `wbs_type='task'`, 数据集 211→212) → 线上任务页点「只看主线」chip → 列表恰显示该 1 条 (chips 高亮), 与 DB 口径 `total=212 / mainline=1` 一致; 关闭后恢复全量。(shot `19-backfill-03-5600-mainline-only.png`)
+- [x] **第二台 AVD (coolie-test/5600) 抽查 — 补验 PASS**: 构建 B 净装 → 装机自检 (v0.6.23 / OTA 未启用 / APK 内嵌, shot `18-backfill-01-5600-selfcheck.png`) → UI 登录 → 公司选择 → 大盘 → 任务 tab 全链路可用; 列表/任务卡渲染正常, 探针任务即时可见。(shot `18-backfill-02-5600-tasks-default.png`)
+- **附注**: 5600 净装上列表分支 chips 行**未复现** §4 巨型拉伸 (正常 ~80px 单行) — 与「flex 拉伸随布局竞态出现」的定性一致, 修复 `8fdecf24c` 后应稳定为正常态; 5580 上的原始复现记录 (§4 + `18-backfill-00`) 不受影响。探针任务已 DELETE 还原数据集 211。
+
+### 5.1 新增缺陷 (已开缺陷单, 2026-10-04 收尾归档)
+
+| ID | 级别 | 系统缺陷单 | 摘要 | 关键定位 |
+|----|------|------|----------|----------|
+| **D8** | moderate | `fd76d3b8` (P2, todo, 3 截图附件) | 离线错误卡原位恢复死路: 网络恢复后重试仍失败, 仅 remount/冷启可恢复; 出错时已加载列表被清空 | 错误态重载路径; dashboard 同 runtime 正常加载排除全局网络停摆 |
+| **D7** (佐证) | — | `5ef90e84` (P3, todo, 1 截图附件) | PTR 在空态与错误态均死, RefreshControl 仅随列表内容激活 | IssuesList RefreshControl 挂载条件 |
+| **D9** | low | `ada659d3` (P3, todo) | 主线任务长按下钻未接线于线上任务页 — IssuesList 未传 `onIssueLongPress` (`TaskKanbanScreen.tsx:460-472`), 功能仅在保留的 `TasksScreen.tsx:74-80` | **wave213 前置缺陷, 非 wave285 回归** (wave285 不触碰该文件); 主线 badge 渲染正常 (API PATCH 实测, 已还原) |
 
 ### 5.2 环境附注 (归档)
 
@@ -98,7 +104,7 @@
 
 ## 8. 证据清单
 
-`docs-coolie/evidence/wave285/functional-evidence/`: 00–17 系列截图 ×19 (登录/列表/分组深滚/sticky 中滚/PTR/排序/搜索/详情/指派弹层/指派命中/空态 ×2/PTR ×2/项目筛选/缺陷对比) + `gfx/` 帧率原始 dump ×5; COOA-28 修复前后对照 ×4 (`cooa28-before-fix / after-fix / after-ptr / after-board.png`, 索引见 `FIX-COOA-28-VERIFICATION.md`)。并行会话设备截图 51–73 为临时目录 (`/tmp/c4-evidence/`), 结论已折叠入 §5。
+`docs-coolie/evidence/wave285/functional-evidence/`: 00–17 系列截图 ×19 (登录/列表/分组深滚/sticky 中滚/PTR/排序/搜索/详情/指派弹层/指派命中/空态 ×2/PTR ×2/项目筛选/缺陷对比) + `gfx/` 帧率原始 dump ×5; COOA-28 修复前后对照 ×4 (`cooa28-before-fix / after-fix / after-ptr / after-board.png`, 索引见 `FIX-COOA-28-VERIFICATION.md`); 并行会话设备截图 66–73 (D7/D8 错误态/恢复链) 已自临时目录 (`/tmp/c4-evidence/`) 迁入本目录持久保存; 收尾补测 `18-backfill-00…02` + `19-backfill-03` ×4 (5580 缺陷现场 / 5600 自检 / 5600 任务页 / 5600 只看主线)。
 服务端日志: 本地 QA 实例 (3102) GET/PATCH 时序, 引用点已随文标注 (00:05 后日志被回收, 改 API diff 法, 见 §5.2/N2)。
 
 *门神 (FDSE) · wave285-C4 功能补充走查 · 2026-10-03*
