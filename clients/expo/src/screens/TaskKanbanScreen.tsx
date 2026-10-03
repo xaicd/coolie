@@ -467,6 +467,7 @@ export function TaskKanbanScreen({
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.chipScroller}
         contentContainerStyle={styles.chipRow}
       >
         <Pressable
@@ -982,6 +983,13 @@ const styles = StyleSheet.create({
   scopeRow: {
     flexDirection: "row",
     gap: SPACING.sm,
+  },
+  // COOA-28 (wave285-回归): RN ScrollView 基础样式自带 flexGrow:1, 列表分支里
+  // headerCluster 直接铺在 listLayout (flex:1 固定高度容器) 内, 横滚 chips 条
+  // 会沿主轴吃掉列表区剩余高度 (实测 ~700px 竖长拉伸)。显式关掉 grow, 按内容
+  // 高布局; board 分支垫在外层 ScrollView 内容容器里, 父高即内容高, 不受影响。
+  chipScroller: {
+    flexGrow: 0,
   },
   chipRow: {
     gap: SPACING.sm,
