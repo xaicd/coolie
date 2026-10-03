@@ -4,7 +4,7 @@
 # wave282 + 2026-10-02-local-dispatch-receipt spec
 #
 # This script gives Hermes one stable command shape for every local employee.
-# By default it records a structured JSON receipt under `.paperclip-local/dispatch/`
+# By default it records a structured JSON receipt under `.coolie-local/dispatch/`
 # alongside a prompt file, and prints the exact Hermes/Agent instruction.
 # When `--execute` is passed, it executes the tool and records started/done status.
 
@@ -58,7 +58,7 @@ Options:
   --print              print prompt only; do not record
   --no-context         do not inject upstream context bus into prompt
   --note <text>        handover note for context bus
-  --list               list recent receipts in .paperclip-local/dispatch/
+  --list               list recent receipts in .coolie-local/dispatch/
   --queued             list only queued (pending) receipts
   --show <id>          show details of a specific receipt
   --update <id>        update an existing receipt
@@ -110,7 +110,8 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-dispatch_dir="$REPO_ROOT/.paperclip-local/dispatch"
+dispatch_dir="${COOLIE_LOCAL_DIR:-$REPO_ROOT/.coolie-local}/dispatch"
+[[ -d "$dispatch_dir" || ! -d "$REPO_ROOT/.paperclip-local/dispatch" ]] || dispatch_dir="$REPO_ROOT/.paperclip-local/dispatch"
 mkdir -p "$dispatch_dir"
 
 if [[ "$LIST_RECEIPTS" -eq 1 ]]; then
@@ -194,7 +195,9 @@ if [[ -n "$UPDATE_RECEIPT" ]]; then
       receipt_wave="${BASH_REMATCH[0]}"
     fi
     if [[ -n "$receipt_wave" && -x "$SCRIPT_DIR/gate-evidence-ledger.sh" ]]; then
-      ledger_file="$REPO_ROOT/.paperclip-local/evidence-ledger/${receipt_wave}.json"
+      local_base="${COOLIE_LOCAL_DIR:-$REPO_ROOT/.coolie-local}"
+      [[ -d "$local_base/evidence-ledger" || ! -d "$REPO_ROOT/.paperclip-local/evidence-ledger" ]] || local_base="$REPO_ROOT/.paperclip-local"
+      ledger_file="$local_base/evidence-ledger/${receipt_wave}.json"
       if [[ -f "$ledger_file" ]]; then
         printf '[dispatch] 正在验证 %s 的 G1-G5 门禁证据账本...\n' "$receipt_wave"
         if ! bash "$SCRIPT_DIR/gate-evidence-ledger.sh" --verify "$receipt_wave"; then

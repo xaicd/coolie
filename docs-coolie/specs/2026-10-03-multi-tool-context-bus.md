@@ -18,17 +18,17 @@
 
 ### 1.2 四大设计原则
 1. **单一数据底座 (Single Source of Truth)**：
-   - 上下文接力状态落盘在共享工作空间目录 `.paperclip-local/context-bus/<wave>.json`，任何宿主（Host / Container）均可读写。
+   - 上下文接力状态落盘在共享工作空间目录 `.coolie-local/context-bus/<wave>.json`，任何宿主（Host / Container）均可读写。
 2. **前向自动继承 (Zero-Friction Inheritance)**：
    - 下游工具派单时，自动继承上游工具的所有成果（Commit、修改文件列表、Spec 契约、待办清单），自动拼装成「前序交接上下文（Handover Brief）」。
 3. **不可变审计链 (Immutable Audit Trail)**：
    - 记录工具演进链（Tool Trace）：`Tool A -> Tool B -> Tool C`，每一步都有明确的执行者、工具、环境、产物与时间戳。
 4. **与 CMMI G1-G5 门禁无缝联动**：
-   - 上下文总线与 `.paperclip-local/evidence-ledger/` 强绑定，上游门禁未满足时，下游接力能清晰识别当前缺少的证据。
+   - 上下文总线与 `.coolie-local/evidence-ledger/` 强绑定，上游门禁未满足时，下游接力能清晰识别当前缺少的证据。
 
 ---
 
-## 2. 数据结构规范 (`.paperclip-local/context-bus/<wave>.json`)
+## 2. 数据结构规范 (`.coolie-local/context-bus/<wave>.json`)
 
 ```json
 {

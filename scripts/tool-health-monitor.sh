@@ -4,7 +4,7 @@
 # wave281 / 2026-10-02-tool-health-monitor spec
 #
 # 2-hour tool health monitor for Hermes local construction tools.
-# Probes tool liveliness and writes `.paperclip-local/tool-health/latest.json`.
+# Probes tool liveliness and writes `.coolie-local/tool-health/latest.json`.
 
 set -euo pipefail
 
@@ -12,7 +12,8 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/bin:$PATH"
 
 _resolved="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || node -e 'console.log(require("fs").realpathSync(process.argv[1]))' "${BASH_SOURCE[0]}")"
 REPO_ROOT="$(cd "$(dirname "$_resolved")/.." && pwd)"
-STATE_DIR="$REPO_ROOT/.paperclip-local/tool-health"
+STATE_DIR="${COOLIE_LOCAL_DIR:-$REPO_ROOT/.coolie-local}/tool-health"
+[[ -d "$STATE_DIR" || ! -d "$REPO_ROOT/.paperclip-local/tool-health" ]] || STATE_DIR="$REPO_ROOT/.paperclip-local/tool-health"
 LATEST_JSON="$STATE_DIR/latest.json"
 CRON_TAG="wave281-tool-health-monitor"
 

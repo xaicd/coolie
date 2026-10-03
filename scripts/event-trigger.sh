@@ -18,7 +18,8 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/bin:$PATH"
 
 _resolved="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || node -e 'console.log(require("fs").realpathSync(process.argv[1]))' "${BASH_SOURCE[0]}")"
 REPO_ROOT="$(cd "$(dirname "$_resolved")/.." && pwd)"
-STATE_DIR="$REPO_ROOT/.paperclip-local/event-trigger"
+STATE_DIR="${COOLIE_LOCAL_DIR:-$REPO_ROOT/.coolie-local}/event-trigger"
+[[ -d "$STATE_DIR" || ! -d "$REPO_ROOT/.paperclip-local/event-trigger" ]] || STATE_DIR="$REPO_ROOT/.paperclip-local/event-trigger"
 LAST_STATE_FILE="$STATE_DIR/last-state.json"
 CRON_TAG="wave280-event-trigger"
 NOTIFY_CMD="${TEAM_STATUS_CMD:-$HOME/bin/team-status-notify.sh}"
@@ -93,7 +94,10 @@ const fs = require("fs");
 const path = require("path");
 const repoRoot = process.argv[1];
 
-const dispatchDir = path.join(repoRoot, ".paperclip-local/dispatch");
+let dispatchDir = path.join(repoRoot, ".coolie-local/dispatch");
+if (!fs.existsSync(dispatchDir) && fs.existsSync(path.join(repoRoot, ".paperclip-local/dispatch"))) {
+  dispatchDir = path.join(repoRoot, ".paperclip-local/dispatch");
+}
 const running = [];
 const blocked = [];
 const done = [];

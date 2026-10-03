@@ -16,7 +16,7 @@
 ### 2.1 本地证据账本
 
 ```text
-.paperclip-local/evidence-ledger/
+.coolie-local/evidence-ledger/
   wave283.json
 ```
 
@@ -78,7 +78,7 @@
 1. 新增 ledger helper
    - 白名单：`scripts/gate-evidence-ledger.sh`
    - 支持 `--init <wave>` / `--set <gate> <status>` / `--print <wave>`。
-   - 写 `.paperclip-local/evidence-ledger/<wave>.json`。
+   - 写 `.coolie-local/evidence-ledger/<wave>.json`。
 
 2. 接入 dispatch receipt
    - 白名单：`scripts/dispatch-local-employee.sh`

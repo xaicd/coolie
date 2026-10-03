@@ -87,7 +87,7 @@ Coolie 工坊最终 SHALL 成为：
 
 1. `dispatch-local-employee.sh` 写结构化 receipt。
 2. `cron-team-status.sh` 优先读 receipt，再读 active process。
-3. 新建轻量 `tool-health-monitor.sh`，每 2 小时真跑工具并写 `.paperclip-local/tool-health/latest.json`。
+3. 新建轻量 `tool-health-monitor.sh`，每 2 小时真跑工具并写 `.coolie-local/tool-health/latest.json`。
 4. 事件驱动推送新派单、卡死、完成、失败。
 5. 完工时 receipt 补 commit、测试、QA report、artifact。
 

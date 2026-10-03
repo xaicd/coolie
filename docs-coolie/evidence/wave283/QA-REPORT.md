@@ -4,7 +4,7 @@
 - [`docs-coolie/specs/2026-10-02-local-dispatch-receipt.md`](file:///host-workspace/xaicd/coolie/docs-coolie/specs/2026-10-02-local-dispatch-receipt.md)
 
 ## 2. 验收目标
-1. Hermes 通过本地派单脚本派单给任一本地员工时，系统在 `.paperclip-local/dispatch/` 写入结构化 JSON receipt 与 prompt 文件。
+1. Hermes 通过本地派单脚本派单给任一本地员工时，系统在 `.coolie-local/dispatch/` 写入结构化 JSON receipt 与 prompt 文件。
 2. 派单支持动态流转状态：`queued` → `running` → `blocked` / `failed` → `done`。
 3. 任务完成时，支持向 receipt 回写 commit、验证命令、QA 报告、artifact/evidence 路径以及 G1-G5 证据账本（ledger）。
 4. `cron-team-status.sh` 在读取状态时，优先从 receipt 提取状态并以精炼的 3 行格式输出（跑 / 卡 / 完），无调试噪音。
@@ -54,7 +54,7 @@
   bash scripts/gate-evidence-ledger.sh --set G3_FDSE --status passed --summary "真机防遮挡走查通过"
   bash scripts/gate-evidence-ledger.sh --set G4_DS --status passed --summary "业务旅程走通"
   bash scripts/gate-evidence-ledger.sh --set G5_PRE --status not_applicable --summary "无需发版"
-  bash scripts/dispatch-local-employee.sh --update 20261003T001805Z-wave283-forge-core-swe --status done --commit "e06a144ea" --evidence "docs-coolie/evidence/wave283/QA-REPORT.md" --ledger ".paperclip-local/evidence-ledger/wave283.json"
+  bash scripts/dispatch-local-employee.sh --update 20261003T001805Z-wave283-forge-core-swe --status done --commit "e06a144ea" --evidence "docs-coolie/evidence/wave283/QA-REPORT.md" --ledger ".coolie-local/evidence-ledger/wave283.json"
   bash scripts/cron-team-status.sh --compact
   ```
 - **输出**:

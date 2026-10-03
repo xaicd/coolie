@@ -11,7 +11,8 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/bin:$PATH"
 
 _resolved="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || node -e 'console.log(require("fs").realpathSync(process.argv[1]))' "${BASH_SOURCE[0]}")"
 REPO_ROOT="$(cd "$(dirname "$_resolved")/.." && pwd)"
-BUS_DIR="$REPO_ROOT/.paperclip-local/context-bus"
+BUS_DIR="${COOLIE_LOCAL_DIR:-$REPO_ROOT/.coolie-local}/context-bus"
+[[ -d "$BUS_DIR" || ! -d "$REPO_ROOT/.paperclip-local/context-bus" ]] || BUS_DIR="$REPO_ROOT/.paperclip-local/context-bus"
 
 ACTION="pull"
 WAVE=""

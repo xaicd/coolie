@@ -4,7 +4,7 @@
 # wave283 / 2026-10-02-g1-g5-evidence-ledger spec
 #
 # G1-G5 role gate evidence ledger helper.
-# Records immutable role evidence under `.paperclip-local/evidence-ledger/<wave>.json`.
+# Records immutable role evidence under `.coolie-local/evidence-ledger/<wave>.json`.
 
 set -euo pipefail
 
@@ -12,7 +12,8 @@ export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/bin:$PATH"
 
 _resolved="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || node -e 'console.log(require("fs").realpathSync(process.argv[1]))' "${BASH_SOURCE[0]}")"
 REPO_ROOT="$(cd "$(dirname "$_resolved")/.." && pwd)"
-LEDGER_DIR="$REPO_ROOT/.paperclip-local/evidence-ledger"
+LEDGER_DIR="${COOLIE_LOCAL_DIR:-$REPO_ROOT/.coolie-local}/evidence-ledger"
+[[ -d "$LEDGER_DIR" || ! -d "$REPO_ROOT/.paperclip-local/evidence-ledger" ]] || LEDGER_DIR="$REPO_ROOT/.paperclip-local/evidence-ledger"
 
 WAVE=""
 TASK_NAME="任务交付"

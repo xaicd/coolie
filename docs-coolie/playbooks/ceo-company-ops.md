@@ -2,7 +2,7 @@
 
 > 角色:公司负责人(老板)。定位:定需求、批资源、看大盘、验收、必要时熔断。
 > 对应 skill:`.agents/skills/ceo-company-ops/SKILL.md`
-> 素材来源:wave84–127 生产实查 + `.paperclip-local/credentials.md`。
+> 素材来源:wave84–127 生产实查 + `.coolie-local/credentials.md`。
 
 ## 触发条件
 
@@ -17,7 +17,7 @@
   本地 `local_trusted` 实例在 `127.0.0.1` 上无需密钥即可读。
 - 公司 id:生产 `4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e`(xrobinai);本地示例
   `b1d6850c-02a4-41cc-a716-67797fe2b494`。下文用 `$CID`。
-- 写接口的板级密钥来源见 `.paperclip-local/credentials.md`
+- 写接口的板级密钥来源见 `.coolie-local/credentials.md`
   「临时管理员 token 的合法造法」(造 `pcp_board_<48hex>`,用完 `DELETE`)。
   **密钥只在环境变量里用,不抄进任何提交。**
 

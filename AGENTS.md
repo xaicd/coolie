@@ -258,16 +258,16 @@ A change is done when all are true:
 
 2. **多工具上下文接力总线 (Context Bus)**
    - 跨工具/跨工种接力（如 墨斗 FDA -> 铁匠 Core SWE -> 门神 FDSE -> 兑底渊 PRE-SRE -> 百晓生 DS）严禁口头传话与手动复制；
-   - 统一由 `scripts/context-bus.sh` 在 `.paperclip-local/context-bus/<wave>.json` 记录不可变流转轨迹；
+   - 统一由 `scripts/context-bus.sh` 在 `.coolie-local/context-bus/<wave>.json` 记录不可变流转轨迹；
    - 派单 `scripts/dispatch-local-employee.sh` 默认开启上下文继承，自动将上游最新 Commit、修改文件、交付 Spec 与交接嘱托注入给下游工具的 Prompt，实现零摩擦交接。
 
 3. **派单 Receipt 规范与状态机**
-   - 每次派单必在 `.paperclip-local/dispatch/<id>.json` 生成结构化 Receipt；
+   - 每次派单必在 `.coolie-local/dispatch/<id>.json` 生成结构化 Receipt；
    - 严格遵循状态机跃迁：`queued -> running -> done | blocked | failed`；
    - 任务完成后必须回写 commit hash、验证命令与交付物证据。
 
 4. **CMMI G1-G5 角色证据隔离账本**
-   - 每一波交付必须通过 `scripts/gate-evidence-ledger.sh` 在 `.paperclip-local/evidence-ledger/<wave>.json` 落盘；
+   - 每一波交付必须通过 `scripts/gate-evidence-ledger.sh` 在 `.coolie-local/evidence-ledger/<wave>.json` 落盘；
    - FDA (G1) / Core SWE (G2) / FDSE (G3) / DS (G4) / PRE-SRE (G5) 五角色各自提交独立证据，严禁跨角色借用。
 
 ## This fork's own conventions

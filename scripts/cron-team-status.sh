@@ -377,7 +377,8 @@ list_relevant_processes() {
 # ---------- 表格 / JSON 渲染 ----------
 
 render_receipts_summary() {
-  local dispatch_dir="$REPO_ROOT/.paperclip-local/dispatch"
+  local dispatch_dir="${COOLIE_LOCAL_DIR:-$REPO_ROOT/.coolie-local}/dispatch"
+  [[ -d "$dispatch_dir" || ! -d "$REPO_ROOT/.paperclip-local/dispatch" ]] || dispatch_dir="$REPO_ROOT/.paperclip-local/dispatch"
   if [[ -d "$dispatch_dir" ]] && ls "$dispatch_dir"/*.json >/dev/null 2>&1; then
     node -e '
 const fs = require("fs");

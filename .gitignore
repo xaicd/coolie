@@ -57,6 +57,7 @@ diagnostics/
 .vscode/
 .claude/settings.local.json
 .paperclip-local/
+.coolie-local/
 .paperclip-runtime/
 /.idea/
 /.agents/

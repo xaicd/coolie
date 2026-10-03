@@ -18,7 +18,7 @@
 先做本地 JSON，不直接上 DB。
 
 ```text
-.paperclip-local/tool-health/latest.json
+.coolie-local/tool-health/latest.json
 ```
 
 ### 2.2 JSON schema
@@ -79,7 +79,7 @@
    - 白名单：`scripts/tool-health-monitor.sh`
    - 支持 `--check` / `--print` / `--json` / `--register` / `--unregister`。
    - 默认 `--print`。
-   - 写 `.paperclip-local/tool-health/latest.json`。
+   - 写 `.coolie-local/tool-health/latest.json`。
 
 2. 复用 `scripts/daily-tool-probe.sh`
    - 白名单：`scripts/daily-tool-probe.sh`

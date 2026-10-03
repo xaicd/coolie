@@ -3,7 +3,7 @@
 > **报告版本**: wave284-fda-audit  
 > **审计角色**: 墨斗 (FDA 前线架构师) · agy-gemini3.8 (Antigravity + Gemini 3.8)  
 > **审计触发**: 老板对当前 5 大基建评分与 7 大架构拷问  
-> **审查对象**: `scripts/dispatch-local-employee.sh`、`scripts/context-bus.sh`、`scripts/gate-evidence-ledger.sh`、`scripts/tool-health-monitor.sh`、`scripts/host-exec.sh` 及 `.paperclip-local/` 边界  
+> **审查对象**: `scripts/dispatch-local-employee.sh`、`scripts/context-bus.sh`、`scripts/gate-evidence-ledger.sh`、`scripts/tool-health-monitor.sh`、`scripts/host-exec.sh` 及 `.coolie-local/` 边界  
 
 ---
 
@@ -25,7 +25,7 @@
 
 #### 1.1 现状审查
 - **物理与代码边界**：
-  - **清晰之处**：本地施工队（Hermes、墨斗、铁匠、铁匠贰号、门神、兑底渊、百晓生）的派单脚本、Cron、Receipt、Context-Bus 均严格收敛在 `scripts/`、`.agents/` 与 `.paperclip-local/` 中，未侵入 `server/src/routes/` 和客户端视图。
+  - **清晰之处**：本地施工队（Hermes、墨斗、铁匠、铁匠贰号、门神、兑底渊、百晓生）的派单脚本、Cron、Receipt、Context-Bus 均严格收敛在 `scripts/`、`.agents/` 与 `.coolie-local/` 中，未侵入 `server/src/routes/` 和客户端视图。
   - **模糊红线**：历史迁移文件 `packages/db/src/migrations/9022_delete_13_digital_employees.sql` 与 `dispatch-skill-matcher.ts` 中曾出现过将本地员工逻辑反哺到产品 DB 的痕迹。
 - **FDA 架构红线**：
   - **产品运行时 (Product Runtime)** 是交付给客户的企业级 AI 员工协同管控平台，其概念模型是 `companies -> teams -> agents -> tasks -> budgets -> approvals`。
@@ -61,12 +61,12 @@
 
 ---
 
-### 命题 3：哪些留在 `.paperclip-local`，哪些未来产品化？
+### 命题 3：哪些留在 `.coolie-local`，哪些未来产品化？
 
 | 对象 / 能力 | 归宿划分 | Rationale (理由) |
 |---|---|---|
-| **host-exec (SSH 穿透桥接)** | **纯本地 (.paperclip-local)** | 依赖宿主物理机 IP 与本机私钥，纯属特定开发沙箱环境的物理胶水，不可进入产品运行时。 |
-| **tool-health 宿主机探针** | **纯本地 (.paperclip-local)** | 检测老板 Mac 上的 `/opt/homebrew/bin` 工具，属于本地建设环境特化逻辑。 |
+| **host-exec (SSH 穿透桥接)** | **纯本地 (.coolie-local)** | 依赖宿主物理机 IP 与本机私钥，纯属特定开发沙箱环境的物理胶水，不可进入产品运行时。 |
+| **tool-health 宿主机探针** | **纯本地 (.coolie-local)** | 检测老板 Mac 上的 `/opt/homebrew/bin` 工具，属于本地建设环境特化逻辑。 |
 | **G1-G5 角色证据隔离账本** | **未来产品化 (Product Core)** | 企业级交付必须具备的门禁能力，未来应转化为 `company_gate_ledgers` 数据库表与审批流原生卡片。 |
 | **多工具上下文总线 (Context Bus)** | **未来产品化 (Product Core)** | 跨不同大模型、跨异构 Agent 协同工作的核心是不可变 Handover Packet，未来应作为 Coolie Workflow 的标准协议。 |
 | **结构化派单 Receipt 状态机** | **未来产品化 (Product Core)** | 当前任务系统的底层执行轨迹，未来应与 `heartbeat_run_events` 和任务执行状态机深度融合。 |
@@ -97,7 +97,7 @@
    - 判定断言：响应包含 OK
 
 > **防烧 Token 与防风控机制**：
-> - 探针增加 15 分钟结果缓存（TTL = 900s），未过期直接读取 `.paperclip-local/tool-health/latest.json`，仅在 `--force-probe` 或定时巡检时发起真实推理请求。
+> - 探针增加 15 分钟结果缓存（TTL = 900s），未过期直接读取 `.coolie-local/tool-health/latest.json`，仅在 `--force-probe` 或定时巡检时发起真实推理请求。
 
 ---
 
@@ -160,7 +160,7 @@ dispatch_tool_runner() {
 
 **落地机制**：
 在 `dispatch-local-employee.sh --update <id> --status done` 时：
-1. 必须检查关联的 `.paperclip-local/evidence-ledger/<wave>.json`；
+1. 必须检查关联的 `.coolie-local/evidence-ledger/<wave>.json`；
 2. 如果指定了 `--strict-gate`（默认建议开启），只要当前波次的核心门禁（G1/G2）处于 `failed` 或 `blocked`，脚本立即以退出码 1 终止并报错，**阻止非法标记 done**！
 
 ---

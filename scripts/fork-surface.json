@@ -45,9 +45,9 @@
     },
     {
       "path": "scripts/fork-surface.json",
-      "maxNetLines": 200,
-      "reason": "This manifest itself, and entirely ours — it does not exist upstream. It sits under scripts/ only because that is where the gate is wired (package.json and check-testing-defenses.mjs call it), and that path prefix is the only reason the gate asks about it. The budget is loose on purpose: the file grows by one entry per upstream file we intentionally change, and that growth is the file working, not creep. Raised from 360 when the ontology-spec workflow and the DSH/coolie-native adapters were declared in one batch; raised again to 900 for the wave132 defect feature, whose one hand-written migration carries a ~48k-line generated drizzle snapshot. Raised to 1100 for wave148 (工坊多对话), which declares three new files and raises four budgets.",
-      "maxTotalLines": 1100
+      "maxNetLines": 260,
+      "reason": "This manifest itself, and entirely ours — it does not exist upstream. It sits under scripts/ only because that is where the gate is wired (package.json and check-testing-defenses.mjs call it), and that path prefix is the only reason the gate asks about it. The budget is loose on purpose: the file grows by one entry per upstream file we intentionally change, and that growth is the file working, not creep. Raised from 360 when the ontology-spec workflow and the DSH/coolie-native adapters were declared in one batch; raised again to 900 for the wave132 defect feature, whose one hand-written migration carries a ~48k-line generated drizzle snapshot. Raised to 1100 for wave148 (工坊多对话), which declares three new files and raises four budgets. Raised to 1300 for wave284 (多工具与门禁账本体系加固).",
+      "maxTotalLines": 1300
     },
     {
       "path": "ui/index.html",
@@ -1200,6 +1200,18 @@
       "maxNetLines": 210,
       "maxTotalLines": 240,
       "reason": "wave282: idempotent local employee agent installer and crontab registration helper."
+    },
+    {
+      "path": "scripts/gate-evidence-ledger.sh",
+      "maxNetLines": 320,
+      "maxTotalLines": 350,
+      "reason": "wave283: G1-G5 role gate evidence ledger helper with verify guard."
+    },
+    {
+      "path": "scripts/tool-health-monitor.sh",
+      "maxNetLines": 320,
+      "maxTotalLines": 350,
+      "reason": "wave281: 2-hour tool health monitor with live probe and 15min TTL cache."
     }
   ]
 }
