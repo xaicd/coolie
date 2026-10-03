@@ -10,7 +10,8 @@
 
 - server 注册路由: **933** (routes/*.ts 字面量 + 常量注册 + app.ts 嵌套挂载前缀)
 - 客户端字面量: **750** (归一化 739)
-- 粗孤儿: **87** → 逐族定性后: **13 假阳性 + ~44 machine-facing 合法 + ~15 真未接线 (5 族) + 尾量杂项**
+- 粗孤儿: **87** → 逐族定性 (含同日复核修正): **13 假阳性 + ~74 machine-facing 合法 (含 agent-invoked/
+  cloud-control 改判 3 族) + 真未接线 2 小族 + 6 单条, 全 P3**
 - **结论: 无「假按钮」级缺陷; 真未接线全是 P3 级「建了没人调」的能力面**, 无需当場修, 留属主/产品裁决 (retire or wire)。
 
 ## 真未接线 (P3, 建议属主确认 retire or wire)
@@ -33,8 +34,6 @@
 | plugins jobs | `/api/plugins/:id/jobs`、`/jobs/:jobId/runs`、`/jobs/:jobId/trigger` | 插件任务调度面 UI 未接 (PluginPage 装/卸/启停/健康/logs 都在役) |
 
 单条杂项 (P3): `/api/cases/:id/links`、`/:id/attachments` (数据经 case GET payload 内嵌, 专用端点冗余)、`/api/companies/issues` (跨司列表)、`/api/environments/:id/leases`、`/api/tool-connections/:id/usage`。`/api/companies/templates` 服务建司模板 (onboarding 面)。
-
-杂项观察 (单条, 不成族): `/api/cases/:id/links`、`/:id/attachments` (数据经 case GET payload 内嵌到达, 专用端点冗余)、`/api/companies/templates`、`/api/companies/issues` (跨司)、`/api/environments/:id/leases`、`/api/tool-connections/:id/usage`。
 
 ## Machine-facing 合法孤儿 (样例, 勿立券)
 
