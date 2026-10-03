@@ -23,26 +23,11 @@ if [[ ! -f "/.dockerenv" ]] && ! grep -q 'containerd' /proc/1/cgroup 2>/dev/null
 fi
 
 # We are in container; resolve Mac host IP
-TARGET_HOST=""
-CANDIDATE_HOSTS=("host.docker.internal" "192.168.5.2" "172.19.0.1")
+TARGET_HOST="${MAC_HOST_IP:-192.168.3.85}"
 
-for h in "${CANDIDATE_HOSTS[@]}"; do
-  if node -e "
-const net = require('net');
-const s = new net.Socket();
-s.setTimeout(800);
-s.on('connect', () => { process.exit(0); });
-s.on('timeout', () => { process.exit(1); });
-s.on('error', () => { process.exit(1); });
-s.connect(22, '$h');
-" 2>/dev/null; then
-    TARGET_HOST="$h"
-    break
-  fi
-done
-
-if [[ -z "$TARGET_HOST" ]]; then
-  TARGET_HOST="host.docker.internal"
+# Ensure route to Mac host bypasses clash TUN
+if command -v ip >/dev/null 2>&1; then
+  ip route replace "$TARGET_HOST" via 172.19.0.1 dev eth0 2>/dev/null || true
 fi
 
 HOST_USER="${HOST_USER:-mac}"

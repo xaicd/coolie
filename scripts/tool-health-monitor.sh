@@ -91,13 +91,46 @@ run_check() {
     hermes_reason="cron-team-status.sh missing"
   fi
 
-  # Call probe script if available for real status
-  if [[ -x "$REPO_ROOT/scripts/daily-tool-probe.sh" ]]; then
-    # We run a fast probe or check command availability
-    command -v claude >/dev/null 2>&1 || { glm_status="warn"; glm_reason="binary not in local PATH (runs on host)"; }
-    command -v cmd >/dev/null 2>&1 || { cmd_status="warn"; cmd_reason="binary not in local PATH (runs on host)"; }
-    command -v copilot >/dev/null 2>&1 || { copilot_status="warn"; copilot_reason="binary not in local PATH (runs on host)"; }
-    command -v kiro-cli >/dev/null 2>&1 || { kiro_status="warn"; kiro_reason="binary not in local PATH (runs on host)"; }
+  # Probe tools locally or via host bridge
+  check_tool() {
+    local bin="$1"
+    if command -v "$bin" >/dev/null 2>&1; then
+      printf "local"
+    elif [[ -x "$REPO_ROOT/scripts/host-exec.sh" ]] && "$REPO_ROOT/scripts/host-exec.sh" "command -v $bin" >/dev/null 2>&1; then
+      printf "host"
+    else
+      printf "missing"
+    fi
+  }
+
+  local claude_env; claude_env="$(check_tool claude)"
+  if [[ "$claude_env" == "missing" ]]; then
+    glm_status="fail"; glm_reason="claude not found on local or host"
+    mm_status="fail"; mm_reason="claude not found on local or host"
+  elif [[ "$claude_env" == "host" ]]; then
+    glm_status="ok"; glm_reason="host bridge (192.168.3.85)"
+    mm_status="ok"; mm_reason="host bridge (192.168.3.85)"
+  fi
+
+  local cmd_env; cmd_env="$(check_tool cmd)"
+  if [[ "$cmd_env" == "missing" ]]; then
+    cmd_status="fail"; cmd_reason="cmd not found on local or host"
+  elif [[ "$cmd_env" == "host" ]]; then
+    cmd_status="ok"; cmd_reason="host bridge (192.168.3.85)"
+  fi
+
+  local copilot_env; copilot_env="$(check_tool copilot)"
+  if [[ "$copilot_env" == "missing" ]]; then
+    copilot_status="fail"; copilot_reason="copilot not found on local or host"
+  elif [[ "$copilot_env" == "host" ]]; then
+    copilot_status="ok"; copilot_reason="host bridge (192.168.3.85)"
+  fi
+
+  local kiro_env; kiro_env="$(check_tool kiro-cli)"
+  if [[ "$kiro_env" == "missing" ]]; then
+    kiro_status="warn"; kiro_reason="kiro-cli reserve (not in PATH)"
+  elif [[ "$kiro_env" == "host" ]]; then
+    kiro_status="ok"; kiro_reason="host bridge (192.168.3.85)"
   fi
 
   node -e '

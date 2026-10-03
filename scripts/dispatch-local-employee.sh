@@ -381,18 +381,23 @@ if [[ "$EXECUTE" -eq 0 ]]; then
 fi
 
 CLAUDE_BIN="${CLAUDE_BIN:-claude}"
-command -v "$CLAUDE_BIN" >/dev/null 2>&1 || {
-  printf 'cannot execute: %s not found\n' "$CLAUDE_BIN" >&2
+EXEC_CMD=()
+if command -v "$CLAUDE_BIN" >/dev/null 2>&1; then
+  EXEC_CMD=("$CLAUDE_BIN")
+elif [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
+  EXEC_CMD=("$SCRIPT_DIR/host-exec.sh" "$CLAUDE_BIN")
+else
+  printf 'cannot execute: %s not found on local or host\n' "$CLAUDE_BIN" >&2
   write_receipt "failed" "" "" "$now_iso" "" "command not found: $CLAUDE_BIN"
   exit 1
-}
+fi
 
 # Update receipt to running
 started_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 write_receipt "running" "$$" "$started_iso" "" "" ""
 
-printf '[dispatch] running with pid=%s tool=%s...\n' "$$" "$CLAUDE_BIN"
-if "$CLAUDE_BIN" -p "$(cat "$prompt_file")"; then
+printf '[dispatch] running with pid=%s tool=%s...\n' "$$" "${EXEC_CMD[*]}"
+if "${EXEC_CMD[@]}" -p "$(cat "$prompt_file")"; then
   completed_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   latest_hash="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || printf '')"
   write_receipt "done" "$$" "$started_iso" "$completed_iso" "$latest_hash" ""
