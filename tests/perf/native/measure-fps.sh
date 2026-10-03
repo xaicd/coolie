@@ -6,8 +6,10 @@
 # 不做导航 —— 视图切换由走查人在轮次之间手动完成。
 #
 # 用法:
-#   bash tests/perf/native/measure-fps.sh --label list --rounds 3 --out /tmp/fps
+#   bash tests/perf/native/measure-fps.sh --label list --rounds 3 --out /tmp/fps [--swipes N] [--x <px>] [--up <px>] [--down <px>]
 # 输出: ${OUT}/${LABEL}-r<N>.txt (原始 dumpsys) + ${OUT}/${LABEL}-summary.md
+# 说明: 滑动带由 --x/--up/--down 控制 (默认 540/1400/400), 需完全落在可滚动列表内容内,
+#       否则命中静态头部 → gfxinfo Total frames rendered: 0。
 set -euo pipefail
 
 PKG="cloud.coolie.app"
@@ -16,8 +18,9 @@ ROUNDS=3
 OUT="/tmp/fps"
 SWIPES=12          # 每轮来回滚动次数
 DUR=550            # 单次 swipe 时长 ms (≈匀速)
-UP_DOWN=1400       # 向上滑行程 (px, 1080p 参考值, 小屏可调)
-DOWN_UP=400
+SWIPE_X=540        # 滑动 x 坐标 (px, 可用 --x 覆盖)
+UP_DOWN=1400       # 滑带下沿 y (px, 可用 --up 覆盖)
+DOWN_UP=400        # 滑带上沿 y (px, 可用 --down 覆盖)
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -25,6 +28,9 @@ while [[ $# -gt 0 ]]; do
     --rounds) ROUNDS="$2"; shift 2 ;;
     --out) OUT="$2"; shift 2 ;;
     --swipes) SWIPES="$2"; shift 2 ;;
+    --x) SWIPE_X="$2"; shift 2 ;;
+    --up) UP_DOWN="$2"; shift 2 ;;
+    --down) DOWN_UP="$2"; shift 2 ;;
     *) echo "未知参数 $1"; exit 2 ;;
   esac
 done
@@ -43,21 +49,24 @@ for r in $(seq 1 "$ROUNDS"); do
   sleep 1
   # 预热一轮 + 正式滚动: 下到底再回顶, 模拟连续快滑
   for i in $(seq 1 "$SWIPES"); do
-    adb shell input swipe 540 "$UP_DOWN" 540 "$DOWN_UP" "$DUR"
+    adb shell input swipe "$SWIPE_X" "$UP_DOWN" "$SWIPE_X" "$DOWN_UP" "$DUR"
   done
   for i in $(seq 1 "$SWIPES"); do
-    adb shell input swipe 540 "$DOWN_UP" 540 "$UP_DOWN" "$DUR"
+    adb shell input swipe "$SWIPE_X" "$DOWN_UP" "$SWIPE_X" "$UP_DOWN" "$DUR"
   done
   sleep 1
   raw="$OUT/$LABEL-r$r.txt"
   adb shell dumpsys gfxinfo "$PKG" > "$raw"
 
-  total=$(grep -m1 "Total frames rendered" "$raw" | grep -oE "[0-9]+" || echo 0)
-  janky=$(grep -m1 "Janky frames" "$raw" | head -1 | grep -oE "[0-9]+" || echo 0)
-  p50=$(grep -m1 "50th percentile" "$raw" | grep -oE "[0-9]+" || echo "-")
-  p90=$(grep -m1 "90th percentile" "$raw" | grep -oE "[0-9]+" || echo "-")
-  p95=$(grep -m1 "95th percentile" "$raw" | grep -oE "[0-9]+" || echo "-")
-  p99=$(grep -m1 "99th percentile" "$raw" | grep -oE "[0-9]+" || echo "-")
+  # Total/Janky 取行首整数; percentile 需取 "percentile:" 之后的整数 (行首的 50/90/95/99 是标签前缀, 不是帧耗时)
+  first_int() { grep -m1 "$1" "$raw" | sed -E 's/[^0-9]*([0-9]+).*/\1/' || true; }
+  pct_val() { grep -m1 "$1" "$raw" | sed -E 's/.*percentile: *([0-9]+).*/\1/' || true; }
+  total=$(first_int "Total frames rendered"); [[ "$total" =~ ^[0-9]+$ ]] || total=0
+  janky=$(first_int "Janky frames"); [[ "$janky" =~ ^[0-9]+$ ]] || janky=0
+  p50=$(pct_val "50th percentile"); [[ "$p50" =~ ^[0-9]+$ ]] || p50="-"
+  p90=$(pct_val "90th percentile"); [[ "$p90" =~ ^[0-9]+$ ]] || p90="-"
+  p95=$(pct_val "95th percentile"); [[ "$p95" =~ ^[0-9]+$ ]] || p95="-"
+  p99=$(pct_val "99th percentile"); [[ "$p99" =~ ^[0-9]+$ ]] || p99="-"
   pct="-"
   if [[ "$total" -gt 0 && "$janky" =~ ^[0-9]+$ ]]; then
     pct=$(awk "BEGIN{printf \"%.2f\", $janky*100/$total}")

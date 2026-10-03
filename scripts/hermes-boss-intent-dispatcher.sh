@@ -94,6 +94,33 @@ else
   AGENT_ID="02cab729-c5b7-4a14-9ce9-5a34885c336a"
 fi
 
+# 1.1 梯次分流与 Token 控制判定 (L1 / L2 / L3)
+TASK_LEVEL="L2-标准"
+TOKEN_ESTIMATE="中等 (~2-5万 Tokens)"
+DISCIPLINE_RULES=""
+
+if [[ "$INPUT" =~ (文案|改下字|单点|错别字|微调|查日志|看下状态) ]]; then
+  TASK_LEVEL="L1-快车道(轻量)"
+  TOKEN_ESTIMATE="极低 (~3k-8k Tokens, 单兵直出)"
+  DISCIPLINE_RULES="【L1 轻量铁律】单兵直出，先跑 scripts/toolkits/fast-precheck.sh 自检，严禁冗长上下文。"
+elif [[ "$INPUT" =~ (重构|新系统|多租户|架构重写|商业闭环) ]]; then
+  TASK_LEVEL="L3-重大架构(全量CMMI)"
+  TOKEN_ESTIMATE="高 (严格阶段门禁 G1-G5)"
+  DISCIPLINE_RULES="【L3 架构铁律】严格遵从 Next.js/React 官方工业级标准与多企业隔离防线，产出完整 SRS 与 LLD。"
+else
+  TASK_LEVEL="L2-标准功能"
+  TOKEN_ESTIMATE="中等 (~2-5万 Tokens)"
+fi
+
+# 如果是测试验收类任务，强制附加真机/真浏览器铁律
+if [[ "$CATEGORY" =~ (qa-gate|ds) ]]; then
+  DISCIPLINE_RULES="$DISCIPLINE_RULES\n【CMMI G4 强制军规】必须使用 agent-device 或 agent-browser 真实启动设备/浏览器，严禁 Mock 假数据，必须附带真机截图或控制台真实日志，否则验收直接退单！"
+elif [[ "$CATEGORY" == "dev" ]]; then
+  DISCIPLINE_RULES="$DISCIPLINE_RULES\n【CMMI G3 强制军规】使用底座框架时严格遵从现有 shared 契约与 Drizzle schema，提交前先跑 fast-precheck.sh 确保 0 报错！"
+elif [[ "$CATEGORY" == "ops" ]]; then
+  DISCIPLINE_RULES="$DISCIPLINE_RULES\n【CMMI G5 强制军规】必须基于 Caddy/Node/Postgres 全拓扑探测，排查线上首附 journalctl 真实日志片段与 DB 真值！"
+fi
+
 # 2. 如果是专家解读类诉求
 if [[ "$CATEGORY" == "expert" ]]; then
   cat <<EOF
@@ -127,6 +154,8 @@ echo "【Hermes 微信秒级接单】"
 echo "────────────────────────────────────────"
 echo "👤 责任员工: $EMPLOYEE ($AGENT)"
 echo "🛠️ 推荐工具: $TOOL"
+echo "🚦 梯次分流: $TASK_LEVEL"
+echo "💰 算力预估: $TOKEN_ESTIMATE"
 echo "📌 CMMI 映射: $CMMI_PHASE"
 echo "⚡ 任务目标: $SAFE_TASK"
 echo "🏷️ 当前波次: $LATEST_WAVE"
@@ -139,7 +168,7 @@ ISSUE_URL=""
 
 create_issue_on_dev() {
   local title="[$LATEST_WAVE] $SAFE_TASK"
-  local desc="由 Hermes 从老板微信/终端直通派发\n- 责任员工: $EMPLOYEE\n- 工具: $TOOL\n- CMMI 门禁: $CMMI_PHASE"
+  local desc="由 Hermes 从老板微信/终端直通派发\n- 责任员工: $EMPLOYEE\n- 工具: $TOOL\n- 梯次分流: $TASK_LEVEL\n- 算力预估: $TOKEN_ESTIMATE\n- CMMI 门禁: $CMMI_PHASE\n- 守卫军规:\n$DISCIPLINE_RULES"
   
   local json_payload
   json_payload="$(node -e '
