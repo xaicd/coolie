@@ -954,6 +954,7 @@ export function OntologyDomainListScreen({
         description={newDomainDescription}
         setDescription={setNewDomainDescription}
         directoryPath={newDomainDirectoryPath}
+        setDirectoryPath={setNewDomainDirectoryPath}
         onPickDirectory={handlePickDirectoryFile}
         onSubmit={handleCreateDomain}
         creating={creatingDomain}
@@ -974,6 +975,7 @@ function NewDomainModal({
   description,
   setDescription,
   directoryPath,
+  setDirectoryPath,
   onPickDirectory,
   onSubmit,
   creating,
@@ -989,6 +991,7 @@ function NewDomainModal({
   description: string;
   setDescription: (v: string) => void;
   directoryPath: string;
+  setDirectoryPath: (v: string) => void;
   onPickDirectory: () => void;
   onSubmit: () => void;
   creating: boolean;
@@ -1040,7 +1043,7 @@ function NewDomainModal({
                     placeholder="如 /workspace/orders 或选取工程文件"
                     placeholderTextColor={C.ink4}
                     value={directoryPath}
-                    onChangeText={setDisplayName}
+                    onChangeText={setDirectoryPath}
                   />
                   <Pressable style={styles.dirBrowseBtn} onPress={onPickDirectory}>
                     <Ionicons name="folder-open-outline" size={16} color={C.ink} />
