@@ -62,7 +62,6 @@ import {
   ArrowDown,
   AlertTriangle,
   Tag,
-  Calendar,
   Paperclip,
   FileText,
   Flag,
@@ -2478,14 +2477,9 @@ export function NewIssueDialog() {
                 <div className="my-1 border-t border-border" />
               </div>
               )}
-              <button className="flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded hover:bg-accent/50 text-muted-foreground">
-                <Calendar className="h-3 w-3" />
-                Start date
-              </button>
-              <button className="flex items-center gap-2 w-full px-2 py-1.5 text-xs rounded hover:bg-accent/50 text-muted-foreground">
-                <Calendar className="h-3 w-3" />
-                Due date
-              </button>
+              {/* No start/due-date entries here: the issue model has no date
+                  fields yet, so any button would render but do nothing. Add
+                  them together with the model + API support. */}
             </PopoverContent>
           </Popover>
         </div>
