@@ -1158,6 +1158,42 @@
       "maxNetLines": 80,
       "maxTotalLines": 100,
       "reason": "wave284: Transparent SSH execution proxy from container sandbox to macOS host CLI tools."
+    },
+    {
+      "path": "scripts/ds-bug-hunt.mjs",
+      "maxNetLines": 600,
+      "maxTotalLines": 650,
+      "reason": "wave228: 百晓生 (DS) automated defect hunter and acceptance runner."
+    },
+    {
+      "path": "scripts/__tests__/ds-bug-hunt.test.mjs",
+      "maxNetLines": 250,
+      "maxTotalLines": 280,
+      "reason": "wave228: node:test suite for ds-bug-hunt.mjs defect hunter harness."
+    },
+    {
+      "path": "scripts/cron-copilot-reset.sh",
+      "maxNetLines": 150,
+      "maxTotalLines": 180,
+      "reason": "wave228: monthly copilot quota reset crontab helper."
+    },
+    {
+      "path": "scripts/install-agent-browser-mcp.sh",
+      "maxNetLines": 120,
+      "maxTotalLines": 150,
+      "reason": "wave228: agent-browser MCP install shim."
+    },
+    {
+      "path": "scripts/install-agent-device-mcp.sh",
+      "maxNetLines": 120,
+      "maxTotalLines": 150,
+      "reason": "wave228: agent-device MCP install shim."
+    },
+    {
+      "path": "scripts/install-ds-mcp.sh",
+      "maxNetLines": 130,
+      "maxTotalLines": 160,
+      "reason": "wave228: DS toolchain MCP servers install shim."
     }
   ]
 }
