@@ -15,13 +15,24 @@
 
 ## 真未接线 (P3, 建议属主确认 retire or wire)
 
+**复核修正 (同日第二轮)**: 首轮判为真孤儿的 3 族经服务端内部调用链核查后改判 machine-facing —
+- status-cards `query`/`summary`: **agent-invoked** — server 把 `PUT /api/status-cards/:id/query|summary`
+  注入 Summarizer 指令 (services/status-cards.ts:91,129-130);
+- instance `task-drain`/`lifecycle` ×5: **cloud-control 平面专用** (middleware/cloud-control.ts:11-19);
+- cases `breakdown`: **agent-invoked** — pipeline stage 指令注入 `POST /api/cases/:id/breakdown`
+  (services/pipelines.ts:2340); `context-pack`: 服务端 buildPipelineCaseContextPack 构建后随 run
+  投递, GET 端点为按需取用 — agent-runtime 面。
+- **审计方法补盲区 ⑧: agent-invoked 路由只出现在 server 指令注入字符串里, 六个客户端面都扫不到;
+  反向 sweep 的「真孤儿」必须再过一遍 server 侧指令/中间件字符串才能定谳。**
+
+修正后真未接线 (2 小族 + 单条, 全 P3):
+
 | 族 | 路由 | 说明 |
 |---|---|---|
-| status-cards | GET/POST `/api/status-cards/:id/query`、GET `/:id/summary` | ui wrapper (statusCards.ts) 覆盖 CRUD/updates/summary-revisions/refresh/recompile/dry-run, 唯 query+summary 落单 |
-| instance ops | `/api/instance/task-drain` ×3、`/api/instance/lifecycle` ×2、`/lifecycle/unarchive-primary` | **全仓零调用者** (cli/ui/scripts 均无) — 疑 ops 预留 |
 | decision-training | GET/PATCH/DELETE `/api/decision-training/:id` 三连 | ui 无 decisionTraining wrapper、无 detail 页; 列表面在役 |
-| cases | `/api/cases/:id/breakdown`、`/api/cases/:caseId/context-pack` | pipeline-liveness.ts 状态机认识 `breakdown_pending` 词汇但无客户端调用 — 疑 server/automation 内部或 agent-MCP 触发, 需属主确认 |
 | plugins jobs | `/api/plugins/:id/jobs`、`/jobs/:jobId/runs`、`/jobs/:jobId/trigger` | 插件任务调度面 UI 未接 (PluginPage 装/卸/启停/健康/logs 都在役) |
+
+单条杂项 (P3): `/api/cases/:id/links`、`/:id/attachments` (数据经 case GET payload 内嵌, 专用端点冗余)、`/api/companies/issues` (跨司列表)、`/api/environments/:id/leases`、`/api/tool-connections/:id/usage`。`/api/companies/templates` 服务建司模板 (onboarding 面)。
 
 杂项观察 (单条, 不成族): `/api/cases/:id/links`、`/:id/attachments` (数据经 case GET payload 内嵌到达, 专用端点冗余)、`/api/companies/templates`、`/api/companies/issues` (跨司)、`/api/environments/:id/leases`、`/api/tool-connections/:id/usage`。
 
