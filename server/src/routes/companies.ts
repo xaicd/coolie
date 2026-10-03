@@ -70,6 +70,7 @@ import {
   workTimelineService,
 } from "../services/index.js";
 import { isCloudManagedInstance } from "../services/cloud-instance.js";
+import { boardHygieneWatchdogService } from "../services/board-hygiene-watchdog.js";
 import { getHiddenSettings } from "../services/settings-visibility.js";
 import type { StorageService } from "../storage/types.js";
 import { assertBoard, assertCompanyAccess, assertInstanceAdmin, getActorInfo, hasCompanyAccess } from "./authz.js";
@@ -1476,6 +1477,14 @@ export function companyRoutes(db: Db, storage?: StorageService, options?: Compan
       details: {},
     });
     res.json({ ok: true, company: updated });
+  });
+
+  router.post("/:companyId/board-hygiene/audit", async (req: Request, res: Response) => {
+    const companyId = String(req.params.companyId);
+    assertCompanyAccess(req, companyId);
+    const watchdog = boardHygieneWatchdogService(db);
+    const result = await watchdog.auditCompany(companyId);
+    res.json(result);
   });
 
   return router;

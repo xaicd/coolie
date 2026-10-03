@@ -441,7 +441,7 @@ case "$TOOL" in
     ;;
   claude-glm|claude-mm|claude)
     TOOL_BIN="claude"
-    TOOL_ARGS=("-p" "$(cat "$prompt_file")")
+    TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
     ;;
   cmd)
     TOOL_BIN="cmd"

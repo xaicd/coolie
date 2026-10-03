@@ -66,18 +66,34 @@ async function seed() {
     const issues = [];
     for (let i = 0; i < PER; i++) {
       const w = WORDS[(p * PER + i) % WORDS.length];
+      const status = STATUSES[(p + i) % STATUSES.length];
       issues.push({
         title: `${PREFIX} 任务 ${p + 1}-${i + 1}: ${w}走查样例`,
         description: "wave285-C4 帧率基准造数任务, 无实际工作内容。",
         projectId,
-        status: STATUSES[(p + i) % STATUSES.length],
+        status,
+        // 实例校验: in_progress 必须有 assignee
+        ...(status === "in_progress" ? { assigneeUserId: "local-board" } : {}),
       });
     }
-    const created = await api("POST", "/issues/bulk", { issues });
-    const rows = Array.isArray(created) ? created : created.issues ?? created.items ?? [];
+    let rows;
+    try {
+      const created = await api("POST", "/issues/bulk", { issues });
+      rows = Array.isArray(created) ? created : created.issues ?? created.items ?? [];
+    } catch (e) {
+      if (!/-> 404/.test(String(e))) throw e; // 老实例无 bulk 路由: 逐条建
+      rows = [];
+      for (const it of issues) {
+        try {
+          rows.push(await api("POST", "/issues", it));
+        } catch (e2) {
+          console.error(`✗ ${it.title}: ${String(e2).slice(0, 120)}`);
+        }
+      }
+    }
     const ids = rows.map((r) => r.id).filter(Boolean);
     if (ids.length !== PER) {
-      console.error(`⚠ 项目 ${name} 只确认 ${ids.length}/${PER} 条任务 id (响应形状见上)`);
+      console.error(`⚠ 项目 ${name} 只确认 ${ids.length}/${PER} 条任务 id`);
     }
     manifest.projects.push({ projectId, name, issueIds: ids });
     console.log(`✓ ${name}: ${ids.length} 任务`);

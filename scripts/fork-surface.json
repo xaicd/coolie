@@ -1236,6 +1236,42 @@
       "maxNetLines": 250,
       "maxTotalLines": 250,
       "reason": "Local dev workshop runner for native host management and team dogfooding."
+    },
+    {
+      "path": "packages/shared/src/issue-write-denial.ts",
+      "maxNetLines": 10,
+      "maxTotalLines": 20,
+      "reason": "Issue write denial helper contract for role isolation."
+    },
+    {
+      "path": "server/src/__tests__/cross-issue-influence-limit.test.ts",
+      "maxNetLines": 100,
+      "maxTotalLines": 120,
+      "reason": "Test for cross-issue influence limit guard."
+    },
+    {
+      "path": "server/src/services/cross-issue-influence-limit.ts",
+      "maxNetLines": 40,
+      "maxTotalLines": 60,
+      "reason": "Cross-issue influence limit guard for multi-agent isolation."
+    },
+    {
+      "path": "server/src/index.ts",
+      "maxNetLines": 50,
+      "maxTotalLines": 80,
+      "reason": "Adaptive bundled plugin catalog root fallback and board hygiene watchdog scheduler."
+    },
+    {
+      "path": "server/src/routes/companies.ts",
+      "maxNetLines": 20,
+      "maxTotalLines": 30,
+      "reason": "Company board hygiene watchdog audit trigger endpoint."
+    },
+    {
+      "path": "scripts/dev-runner.ts",
+      "maxNetLines": 10,
+      "maxTotalLines": 20,
+      "reason": "Local bundled plugin catalog directory detection for dev runner."
     }
   ]
 }

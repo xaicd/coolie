@@ -167,9 +167,11 @@ if (bindMode === "custom" && !bindHost) {
 // first page load in a fresh browser profile stays blank forever (PAP-18043).
 const explicitUiDevMiddleware = process.env.PAPERCLIP_UI_DEV_MIDDLEWARE;
 const serveBuiltUiForManagedRuntime = managedRuntimeExposure && explicitUiDevMiddleware === undefined;
+const localPluginsDir = path.resolve(repoRoot, "packages/plugins");
 const env: NodeJS.ProcessEnv = {
   ...process.env,
   PAPERCLIP_UI_DEV_MIDDLEWARE: explicitUiDevMiddleware ?? (serveBuiltUiForManagedRuntime ? "false" : "true"),
+  ...(existsSync(localPluginsDir) && !process.env.PAPERCLIP_BUNDLED_PLUGIN_ROOT ? { PAPERCLIP_BUNDLED_PLUGIN_ROOT: localPluginsDir } : {}),
 };
 
 if (mode === "dev") {

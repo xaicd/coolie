@@ -19,7 +19,7 @@ fi
 # Detect if we are already on host
 if [[ ! -f "/.dockerenv" ]] && ! grep -q 'containerd' /proc/1/cgroup 2>/dev/null; then
   # We are on the host directly
-  exec "$@"
+  exec bash -c "$*"
 fi
 
 HOST_USER="${HOST_USER:-mac}"

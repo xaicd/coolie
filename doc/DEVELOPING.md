@@ -1611,3 +1611,42 @@ disconnected, visible active queries refresh every 15 seconds. This fallback
 stops when the socket opens, the tab is hidden, or the provider unmounts. A
 reconnected socket also refreshes visible queries to recover missed events.
 Run log views retain their existing HTTP polling fallback.
+
+## Dual MCP (dev / prod)
+
+The Paperclip platform supports two MCP (Model Context Protocol) endpoints:
+
+| Environment variable | MCP mode | API base URL | Typical use |
+|---|---|---|---|
+| `PAPERCLIP_MCP=dev` (default) | Development | `http://127.0.0.1:3100` | Local dev server (run `pnpm dev`). |
+| `PAPERCLIP_MCP=prod` | Production | `https://xrobinai.cn` | Interact with the live production instance. |
+
+### Switching MCP
+
+Set the variable in your shell before invoking any Paperclip CLI or script, e.g.:
+```sh
+export PAPERCLIP_MCP=prod
+```
+Or on a single command:
+```sh
+PAPERCLIP_MCP=prod paperclipai <command>
+```
+The variable is read by the dev helper scripts and the demo script below.
+
+### Demo script
+
+A helper `scripts/dual-mcp-demo.sh` is provided to quickly run a skill against the selected MCP. See the script for usage details.
+
+### Security notes
+
+- Production API keys must have a non‑null `responsible_user_id` in the database and must never be committed to the repository.
+- Do not expose production tokens in environment files that are checked in.
+- When using the demo script, ensure `PAPERCLIP_PROD_API_KEY` is set only in a secure location (e.g. your shell profile, secret manager).
+
+### Common pitfalls
+
+| Symptom | Likely cause | Fix |
+|---|---|---|
+| `RESPONSIBLE_USER_UNAVAILABLE` error | Production API key missing `responsible_user_id` | Run the DB update (already done) or create a new key linked to a user. |
+| Health check fails after switching to prod | `PAPERCLIP_API_URL` still points to dev endpoint | Export `PAPERCLIP_API_URL` or let the demo script set it via `PAPERCLIP_MCP`. |
+| CLI commands use dev token while `PAPERCLIP_MCP=prod` | Token environment variable not updated | Set `PAPERCLIP_PROD_API_KEY` and/or unset `PAPERCLIP_DEV_API_KEY`. |

@@ -55,6 +55,7 @@ import {
   type ManagedInstanceConfig,
 } from "./services/managed-config.js";
 import { getOperatorSettingDefaults } from "./services/setting-defaults.js";
+import { boardHygieneWatchdogService } from "./services/board-hygiene-watchdog.js";
 import { setupEnvironmentCustomImageTerminalWebSocketServer } from "./realtime/environment-custom-image-terminal-ws.js";
 import { setupLiveEventsWebSocketServer } from "./realtime/live-events-ws.js";
 import { setupRunnerPrpWebSocketServer } from "./realtime/runner-prp-ws.js";
@@ -884,6 +885,11 @@ async function startServerWithDatabaseTeardown(
   // document parsed fail-closed above (`plugins.autoInstall`). Absent env means
   // self-hosted: createApp falls back to its built-in kubernetes-only default.
   const managedPluginAutoInstall = managedConfig?.plugins.autoInstall ?? null;
+  const devBundledCatalogRoot = [
+    process.env.PAPERCLIP_BUNDLED_PLUGIN_ROOT,
+    resolve(process.cwd(), "packages/plugins"),
+    resolve(process.cwd(), "../packages/plugins"),
+  ].find((p) => p && existsSync(p));
   const app = await createApp(db as any, {
     uiMode,
     serverPort: listenPort,
@@ -924,6 +930,7 @@ async function startServerWithDatabaseTeardown(
     pluginWorkerManager,
     decisionServiceOptions,
     managedPluginAutoInstall,
+    bundledPluginCatalogRoot: devBundledCatalogRoot,
   });
   const server = createServer(app as unknown as Parameters<typeof createServer>[0]);
 
@@ -1143,6 +1150,7 @@ async function startServerWithDatabaseTeardown(
   }>) | null = null;
   let heartbeatSchedulerStopped = false;
   let heartbeatSchedulerInterval: ReturnType<typeof setInterval> | null = null;
+  let boardHygieneScheduler: { stop: () => void } | null = null;
   const heartbeatSchedulerInFlight = new Set<Promise<void>>();
   const trackHeartbeatSchedulerWork = (work: Promise<unknown>) => {
     let tracked: Promise<void>;
@@ -1627,6 +1635,9 @@ async function startServerWithDatabaseTeardown(
     };
     await runRetentionSweep();
 
+    const boardHygieneWatchdog = boardHygieneWatchdogService(db as any);
+    boardHygieneScheduler = boardHygieneWatchdog.startPeriodicAudit(30 * 60 * 1000);
+
     startHeartbeatSchedulerInterval(() => {
       // Track the outer async callback as well as the work it starts. Shutdown
       // can then wait through an already-running suppression check before it
@@ -1926,6 +1937,8 @@ async function startServerWithDatabaseTeardown(
       clearInterval(heartbeatSchedulerInterval);
       heartbeatSchedulerInterval = null;
     }
+    boardHygieneScheduler?.stop();
+    boardHygieneScheduler = null;
 
     const heartbeatShutdown = await coordinateHeartbeatSchedulerShutdown({
       signal,
