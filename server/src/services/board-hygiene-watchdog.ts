@@ -140,6 +140,95 @@ export function boardHygieneWatchdogService(db: Db) {
           "Board hygiene watchdog cleaned invalid issue",
         );
       }
+
+      // 规则 4: 孤儿假死检测 (dogfooding 发现②: issue-bound 唤醒重试耗尽后无
+      // 兜底, 工单停留 in_progress 假死 40+ 分钟无人认领, 只能靠人工评论接力)。
+      // 判据: todo/in_progress (blocked/in_review 有原生等待路径不算假死)、
+      // 最近一次动作是终态失败、其后无活跃 run 接续、且失败距今超过宽限期
+      // (覆盖引擎自身的有界重试窗口)。只上报不取消: 这些是真实工单, 需要的
+      // 是接力唤醒而非删除; 巡检结果经 audit API 与 activity_log 浮出, 由
+      // 值班/掌柜按既有评论接力路径复活。
+      if (
+        !shouldClean &&
+        (issue.status === "todo" || issue.status === "in_progress") &&
+        now - new Date(issue.updatedAt).getTime() > ORPHAN_FAKE_DEATH_THRESHOLD_MS
+      ) {
+        const issueRuns = await db
+          .select({
+            id: heartbeatRuns.id,
+            status: heartbeatRuns.status,
+            agentId: heartbeatRuns.agentId,
+            finishedAt: heartbeatRuns.finishedAt,
+            createdAt: heartbeatRuns.createdAt,
+            error: heartbeatRuns.error,
+          })
+          .from(heartbeatRuns)
+          .where(
+            and(
+              eq(heartbeatRuns.companyId, companyId),
+              sql`(${heartbeatRuns.contextSnapshot} ->> 'issueId') = ${issue.id}
+                or (${heartbeatRuns.contextSnapshot} ->> 'taskId') = ${issue.id}`,
+            ),
+          )
+          .orderBy(
+            desc(sql`coalesce(${heartbeatRuns.finishedAt}, ${heartbeatRuns.createdAt})`),
+          )
+          .limit(20);
+
+        const hasActiveRun = issueRuns.some((run) => ACTIVE_RUN_STATUSES.includes(run.status));
+        const latestRun = issueRuns[0];
+        if (
+          latestRun &&
+          FAILED_RUN_STATUSES.includes(latestRun.status) &&
+          !hasActiveRun &&
+          now -
+            new Date(latestRun.finishedAt ?? latestRun.createdAt).getTime() >
+            ORPHAN_FAKE_DEATH_THRESHOLD_MS
+        ) {
+          const orphanEntry = {
+            id: issue.id,
+            identifier: issue.identifier,
+            title: issue.title,
+            failedRunId: latestRun.id,
+            failedRunStatus: latestRun.status,
+            failedAt: new Date(latestRun.finishedAt ?? latestRun.createdAt).toISOString(),
+            agentId: latestRun.agentId,
+            checkoutRunId: issue.checkoutRunId,
+          };
+          result.orphanIssues.push(orphanEntry);
+
+          await logActivity(db, {
+            companyId,
+            actorType: "system",
+            actorId: "board-hygiene-watchdog",
+            action: "board.orphan_issue_detected",
+            entityType: "issue",
+            entityId: issue.id,
+            details: {
+              identifier: issue.identifier,
+              title: issue.title,
+              failedRunId: latestRun.id,
+              failedRunStatus: latestRun.status,
+              failedAt: orphanEntry.failedAt,
+              agentId: latestRun.agentId,
+              checkoutRunId: issue.checkoutRunId,
+              error: latestRun.error ? latestRun.error.slice(0, 300) : null,
+            },
+          }).catch((err) => {
+            logger.warn({ err, issueId: issue.id }, "Failed to log orphan issue activity");
+          });
+
+          logger.info(
+            {
+              companyId,
+              issueId: issue.id,
+              identifier: issue.identifier,
+              failedRunId: latestRun.id,
+            },
+            "Board hygiene watchdog detected orphan fake-death issue",
+          );
+        }
+      }
     }
 
     return result;
