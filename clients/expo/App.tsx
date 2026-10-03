@@ -918,7 +918,7 @@ function HomeScreen({
 
   const companyId = company.id;
 
-  /** 新会话页打开时才需要的员工列表 (CreateTaskModal 的「负责人」下拉要用)。 */
+  /** 新建弹窗打开时才需要的员工列表 (CreateTaskModal 的「负责人」下拉要用)。 */
   const [composerAgents, setComposerAgents] = useState<AgentRow[]>([]);
 
   useEffect(() => {

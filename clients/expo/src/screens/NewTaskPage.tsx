@@ -43,6 +43,11 @@ function notifyDraftDiscarded(): void {
  *
  * 语音走 wave21 那条 transcribe-only 链路 (`voiceTranscribe`): 只出文字, 服务端
  * **不建任务** —— 建单必须由用户显式点「创建任务」。
+ *
+ * ⚠️ 停用预留 (2026-10-04 走查注): 方案1 (`b56f6ac94`「+号直通两张卡建单」) 上线后,
+ * 中央「+」与项目卡直通 CreateTaskModal, 本页全仓 import 零消费者, 连同其私有组件
+ * doubao/{ModeSwitch,QuickActionsRow,HoldToTalkButton,useVoiceInput} 一并停用。
+ * 退役或恢复 (方案2 语音优先入口) 待产品裁决, 勿当现役链路引用。
  */
 export function NewTaskPage({
   companyId,

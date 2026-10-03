@@ -6,7 +6,8 @@ import { ELEVATION, RADIUS, SPACING } from "../../ui/tokens";
  * 豆包式的两档切换 (boss 09-22「像豆包一样, 新会话」)。
  *
  * 「对话」离开本页进工坊会话 (BoardChatScreen), 「工作」留在新会话页派活 ——
- * 两个模式对应两条真实存在的链路, 不是装饰。
+ * 两个模式对应两条真实存在的链路, 不是装饰。(该页自方案1 `b56f6ac94` 起未挂载,
+ * 本组件随之停用预留。)
  */
 export type NewTaskMode = "chat" | "work";
 

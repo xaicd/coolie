@@ -83,8 +83,9 @@ function specSkeleton(kind: SpecKind): Record<string, unknown> {
  * 模型选项) 不铺开上屏 —— 精简的是入口密度, 不是能力: 建单仍走同一份
  * `useComposerFields` (与上游 `NewIssueDialog` 字段一一对应)。
  *
- * 表单本体不再复用 `ComposeScreen`: 新会话页 (NewTaskPage) 是「空状态 + 按住说话」
- * 的入口, 真正填字段发生在这里。
+ * 表单本体不再复用 `ComposeScreen`。入口走方案1 (`b56f6ac94`): 中央「+」与项目卡
+ * 直通本弹窗; 「空状态 + 按住说话」的新会话页 (NewTaskPage) 是被方案1 替代的前代
+ * 入口, 现未挂载 (停用预留), 勿当现役链路引用。
  *
  * 提交走 `coolie.createIssue` → `POST /api/companies/:id/issues` (现有接口)。
  */
@@ -102,9 +103,9 @@ export function CreateTaskModal({
   visible: boolean;
   companyId: string;
   agents: AgentRow[];
-  /** 新会话页带上来的标题 (转写或手打), 打开即预填。 */
+  /** 预填标题 (转写或手打) —— 仅未挂载的 NewTaskPage 传, 现役入口 (+/项目卡) 不传。 */
   initialTitle?: string;
-  /** 新会话页上先挑好的附件 (选图), 打开即并入待传列表。 */
+  /** 预填附件 (选图) —— 仅未挂载的 NewTaskPage 传, 现役入口不传。 */
   initialAttachments?: StagedAttachment[];
   /** 项目卡「创建任务」带上来的项目 —— 打开即预选 (boss: 项目要已经选好)。 */
   initialProjectId?: string | null;

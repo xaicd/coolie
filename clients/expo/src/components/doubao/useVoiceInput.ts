@@ -16,6 +16,9 @@ const MIN_VOICE_HOLD_MS = 300;
  *
  * 转写**只出文字**: `voiceTranscribe` 走 `mode: "transcribe-only"`, 服务端不建任务。
  * 文字交给 `onTranscript`, 由页面决定落到哪 (新会话页 = 标题输入框)。
+ *
+ * ⚠️ 停用预留: 唯一消费者 NewTaskPage 自方案1 (`b56f6ac94`) 起未挂载, 本 hook 随之
+ * 停用; 工坊/新建弹窗的语音链路不经此处。
  */
 export function useVoiceInput({
   companyId,
