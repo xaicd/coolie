@@ -495,7 +495,7 @@ render_who_is_doing_what() {
   [[ -d "$dispatch_dir" || ! -d "$REPO_ROOT/.paperclip-local/dispatch" ]] || dispatch_dir="$REPO_ROOT/.paperclip-local/dispatch"
   # wave285 名册驱动: 员工全景从 team-roster 读取, 不再硬编码本机六人组。
   local roster_payload
-  roster_payload="$(bash -c 'source "$1/lib/team-roster.sh" >/dev/null 2>&1 && roster_json' _ "$REPO_ROOT" 2>/dev/null || printf '{}')"
+  roster_payload="$(bash -c 'source "$1/scripts/lib/team-roster.sh" >/dev/null 2>&1 && roster_json' _ "$REPO_ROOT" 2>/dev/null || printf '{}')"
   node -e '
 const fs = require("fs");
 const path = require("path");
@@ -554,7 +554,7 @@ employees.forEach(emp => {
   console.log(`   📊 状态: ${statusText}`);
   console.log("");
 });
-' "$dispatch_dir"
+' "$dispatch_dir" "$roster_payload"
 }
 
 render_table() {

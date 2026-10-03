@@ -261,10 +261,9 @@ console.log(`[dispatch] updated receipt: ${file} (status=${r.status || "unchange
 fi
 
 case "$AGENT" in
-  hermes-pm|modou-fda|forge-core-swe|forge-ii-core-swe|menshen-fdse|duidiyuan-pre-sre|baixiaosheng-ds) ;;
   "") printf 'missing --agent\n' >&2; usage >&2; exit 2 ;;
-  *) printf 'invalid --agent: %s\n' "$AGENT" >&2; usage >&2; exit 2 ;;
 esac
+# wave285: 合法 agentId 不再枚举硬编码, 由名册 (team-roster.sh) 判定, 见下方 roster_lookup 块。
 
 if [[ -z "$TASK" ]]; then
   printf 'missing --task\n' >&2
@@ -278,44 +277,19 @@ if [[ ! -f "$agent_template" ]]; then
   exit 1
 fi
 
-# Map agent to employee and default tool per docs-coolie/TOOLS.md
-case "$AGENT" in
-  hermes-pm)
-    EMPLOYEE="Hermes"
-    DEFAULT_TOOL="hermes"
-    FALLBACK_TOOLS='["kiro-cli"]'
-    ;;
-  modou-fda)
-    EMPLOYEE="墨斗"
-    DEFAULT_TOOL="agy-gemini3.8"
-    FALLBACK_TOOLS='["claude-glm", "cmd"]'
-    ;;
-  forge-core-swe)
-    EMPLOYEE="铁匠"
-    DEFAULT_TOOL="claude-glm"
-    FALLBACK_TOOLS='["claude-mm", "cmd"]'
-    ;;
-  forge-ii-core-swe)
-    EMPLOYEE="铁匠贰号"
-    DEFAULT_TOOL="cmd"
-    FALLBACK_TOOLS='["claude-mm"]'
-    ;;
-  menshen-fdse)
-    EMPLOYEE="门神"
-    DEFAULT_TOOL="cmd"
-    FALLBACK_TOOLS='["claude-mm", "copilot"]'
-    ;;
-  duidiyuan-pre-sre)
-    EMPLOYEE="兑底渊"
-    DEFAULT_TOOL="copilot"
-    FALLBACK_TOOLS='["claude-glm", "cmd"]'
-    ;;
-  baixiaosheng-ds)
-    EMPLOYEE="百晓生"
-    DEFAULT_TOOL="claude-glm"
-    FALLBACK_TOOLS='["claude-mm", "agy-gemini3.8"]'
-    ;;
-esac
+# Map agent to employee and default tool via team roster (wave285 名册驱动).
+# 换团队不改脚本: 名册覆盖顺序 $TEAM_ROSTER > .coolie-local/team-roster.json
+# > scripts/lib/default-roster.json (本仓默认 = coolie-mac 六人组)。
+# shellcheck source=scripts/lib/team-roster.sh
+source "$REPO_ROOT/scripts/lib/team-roster.sh"
+EMPLOYEE="$(roster_lookup "$AGENT" name)"
+DEFAULT_TOOL="$(roster_lookup "$AGENT" defaultTool)"
+FALLBACK_TOOLS="$(roster_lookup "$AGENT" fallbackTools)"
+if [[ -z "$EMPLOYEE" ]]; then
+  printf 'unknown agent: %s\n已登记的 agentId (名册可换, 见 scripts/lib/team-roster.sh):\n' "$AGENT" >&2
+  roster_agent_ids >&2
+  exit 1
+fi
 
 TOOL="${TOOL:-$DEFAULT_TOOL}"
 

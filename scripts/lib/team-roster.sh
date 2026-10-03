@@ -16,8 +16,11 @@
 #   roster_gate_owners     打印 gateOwners JSON (无则 {})
 #   roster_agent_ids       打印全部 agentId (每行一个)
 
-# source 时一次性解析本文件所在目录 (函数调用期 BASH_SOURCE 为空, 不能在函数里取)
-_TEAM_ROSTER_LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# source 时一次性解析本文件所在目录 (函数调用期 BASH_SOURCE 为空, 且 $() 子 shell 里取不到, 先直赋再展开)
+_roster_src="${BASH_SOURCE[0]}"
+_TEAM_ROSTER_LIB_DIR="$(cd "$(dirname "$_roster_src")" && pwd)"
+# 兜底: 奇异 source 上下文 (stdin/eval) 里 BASH_SOURCE 解析失真时, 按 cwd 定位
+[[ -f "$_TEAM_ROSTER_LIB_DIR/team-roster.sh" ]] || _TEAM_ROSTER_LIB_DIR="$PWD/scripts/lib"
 
 _roster_lib_repo_root() {
   printf '%s' "$(cd "$_TEAM_ROSTER_LIB_DIR/../.." && pwd)"

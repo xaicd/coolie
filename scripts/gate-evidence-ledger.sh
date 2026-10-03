@@ -134,7 +134,7 @@ ledger_file="$LEDGER_DIR/${WAVE}.json"
 
 if [[ "$ACTION" == "init" ]]; then
   # wave285 名册驱动: 门禁归属 (signoffEmployee) 可由名册 gateOwners 覆盖。
-  gate_owners_json="$(bash -c 'source "$1/lib/team-roster.sh" >/dev/null 2>&1 && roster_gate_owners' _ "$REPO_ROOT" 2>/dev/null || printf '{}')"
+  gate_owners_json="$(bash -c 'source "$1/scripts/lib/team-roster.sh" >/dev/null 2>&1 && roster_gate_owners' _ "$REPO_ROOT" 2>/dev/null || printf '{}')"
   node -e '
 const fs = require("fs");
 const [file, wave, task, receiptId, template, ownersRaw] = process.argv.slice(1);

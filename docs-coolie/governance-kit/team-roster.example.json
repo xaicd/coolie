@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "team": "YOUR-TEAM-NAME",
+  "note": "拷到 .coolie-local/team-roster.json 后填你自己的员工。agentId = .agents/agents/<agentId>.md 文件名。",
+  "employees": [
+    {
+      "agentId": "pm-lead",
+      "name": "你的PM名字",
+      "role": "PM (派单/验收/拍板)",
+      "defaultTool": "你的PM工具",
+      "fallbackTools": [],
+      "env": "宿主机"
+    },
+    {
+      "agentId": "arch-fda",
+      "name": "你的架构师名字",
+      "role": "FDA (前线架构师)",
+      "defaultTool": "原型/选型最强工具",
+      "fallbackTools": ["备选工具"],
+      "env": "宿主机"
+    },
+    {
+      "agentId": "core-swe",
+      "name": "你的核心研发名字",
+      "role": "Core SWE (核心研发)",
+      "defaultTool": "写码最强工具",
+      "fallbackTools": ["备选1", "备选2"],
+      "env": "宿主机"
+    },
+    {
+      "agentId": "deploy-fdse",
+      "name": "你的部署验证名字",
+      "role": "FDSE (前线全栈部署)",
+      "defaultTool": "执行/E2E最强工具",
+      "fallbackTools": ["备选"],
+      "env": "宿主机"
+    },
+    {
+      "agentId": "reliability-sre",
+      "name": "你的可靠性名字",
+      "role": "PRE-SRE (产品可靠性)",
+      "defaultTool": "发版/巡检最强工具",
+      "fallbackTools": ["备选"],
+      "env": "宿主机"
+    },
+    {
+      "agentId": "strategy-ds",
+      "name": "你的战略名字",
+      "role": "DS (部署战略/业务验收)",
+      "defaultTool": "复盘/报告最强工具",
+      "fallbackTools": ["备选"],
+      "env": "宿主机"
+    }
+  ],
+  "gateOwners": {
+    "G1_Arch": "你的架构师名字",
+    "G2_Design": "你的核心研发名字",
+    "G3_Build": "你的核心研发名字",
+    "G4_Val": "你的战略名字",
+    "G5_Release": "你的可靠性名字",
+    "G7_Biz": "你的战略名字"
+  },
+  "tools": ["工具1", "工具2", "工具3"]
+}
