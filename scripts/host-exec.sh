@@ -23,25 +23,7 @@ if [[ ! -f "/.dockerenv" ]] && ! grep -q 'containerd' /proc/1/cgroup 2>/dev/null
 fi
 
 # We are in container; resolve Mac host IP
-TARGET_HOST="${MAC_HOST_IP:-}"
-if [[ -z "$TARGET_HOST" ]]; then
-  # Try candidates in order: static LAN IP, container gateway
-  default_gateway="$(ip route show default 2>/dev/null | awk '/default/ {print $3}' | head -n 1 || printf '')"
-  for candidate in "192.168.3.85" "$default_gateway" "host.docker.internal"; do
-    [[ -n "$candidate" ]] || continue
-    # Ensure route to candidate bypasses clash TUN if using 192.168.x
-    if command -v ip >/dev/null 2>&1 && [[ "$candidate" =~ ^192\.168\. ]]; then
-      ip route replace "$candidate" via 172.19.0.1 dev eth0 2>/dev/null || true
-    fi
-    # Quick probe port 22 with nc or bash /dev/tcp with 1s timeout
-    if (timeout 1 bash -c "cat < /dev/null > /dev/tcp/$candidate/22" 2>/dev/null); then
-      TARGET_HOST="$candidate"
-      break
-    fi
-  done
-  # Fallback to default
-  [[ -n "$TARGET_HOST" ]] || TARGET_HOST="192.168.3.85"
-fi
+TARGET_HOST="${MAC_HOST_IP:-192.168.3.85}"
 
 # Ensure route to selected host bypasses clash TUN
 if command -v ip >/dev/null 2>&1 && [[ "$TARGET_HOST" =~ ^192\.168\. ]]; then
