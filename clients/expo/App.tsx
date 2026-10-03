@@ -1306,6 +1306,10 @@ function HomeScreen({
             <BoardChatScreen
               company={company}
               whoami={whoami}
+              // COOA-4 走查注 (2026-10-04): 不加 navigateTab 是对的 — focusedApprovalId
+              // 的浮层分支在上层三元链里先于 tab 分支求值 (见下方 ApprovalFocusDetail),
+              // chat 里点「查看详情」直接盖到当前 tab 上, 返回键回到 chat。补 navigateTab
+              // 反而会改变返回落点。
               onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
               onOpenIssue={(issue) => {
                 navigateTab("tasks");
