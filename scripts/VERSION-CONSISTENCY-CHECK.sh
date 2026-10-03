@@ -13,7 +13,10 @@
 #   3. clients/expo/android/app/build.gradle  → versionName + versionCode
 #   4. clients/expo/CHANGELOG.md              → 顶部首个 `## v` 节
 #   5. 远端 version.json                      → https://xrobinai.cn/version.json (version + versionCode)
-#   6. 远端 OTA manifest                      → runtimeVersion (curl https://xrobinai.cn/ota/manifest)
+#   6. 远端 OTA manifest                      → runtimeVersion (期望值按 app.json 的
+#                                                expo.runtimeVersion.policy 分支, wave292:
+#                                                fingerprint → 本地同口径哈希 + 真客户端头探针;
+#                                                appVersion/缺省/字面量 → 版本号/字面量, 回滚兼容)
 #   7. git tag                                 → v<version> 存在 (本地 tag 即可, push 单独管)
 #
 # 退出码:
@@ -55,6 +58,59 @@ if [ -z "$EXPECT" ]; then
 fi
 EXPECT_CODE="$(python3 -c "v='$EXPECT'.split('.'); print(int(v[0])*10000+int(v[1])*100+int(v[2]))")"
 printf '   期望: %s (versionCode %s)\n' "$EXPECT" "$EXPECT_CODE"
+
+# 第 6 项的期望 runtimeVersion — 按 app.json 的 expo.runtimeVersion 声明分支 (wave292)。
+#   fingerprint → 期望值 = 本地同口径哈希: clients/expo/scripts/runtime-version.mjs
+#                 --app-json (内部 expo-updates fingerprint:generate, 哈希口径统一声明在
+#                 clients/expo/fingerprint.config.js), 探针带真客户端头 (expo-platform/
+#                 expo-runtime-version/expo-channel-name), 与装机 App 的检查请求同一条
+#                 服务端路径 (wave86 动态分发)。
+#   appVersion / 缺省 / 字面量 → wave265 时代口径 (期望 = 版本号 / 字面量), 回滚兼容。
+# 本地算不出哈希 (无 node / expo-updates) 时第 6 项降级为警告 — 与远端两项既有哲学一致。
+RV_MODE="$(python3 -c '
+import json
+rv = json.load(open("'"$APP_JSON"'"))["expo"].get("runtimeVersion")
+if rv is None or rv == "appVersion" or (isinstance(rv, dict) and rv.get("policy") == "appVersion"):
+    print("appVersion")
+elif isinstance(rv, str):
+    print("literal")
+elif isinstance(rv, dict) and rv.get("policy") == "fingerprint":
+    print("fingerprint")
+elif isinstance(rv, dict) and isinstance(rv.get("policy"), str):
+    print("unsupported:" + rv["policy"])
+else:
+    print("unknown")
+' 2>/dev/null || echo unknown)"
+
+WANT_RT=""
+case "$RV_MODE" in
+  appVersion)
+    WANT_RT="$EXPECT" ;;
+  literal)
+    WANT_RT="$(python3 -c 'import json; print(json.load(open("'"$APP_JSON"'"))["expo"]["runtimeVersion"])')" ;;
+  fingerprint)
+    RT_ERR="$(mktemp -t coolie-fperr.XXXXXX)"
+    if command -v node >/dev/null 2>&1 \
+       && WANT_RT="$(node "$EXPO_DIR/scripts/runtime-version.mjs" --app-json 2>"$RT_ERR")"; then
+      if printf '%s' "$WANT_RT" | grep -qE '^[0-9a-f]{40}$'; then
+        printf '   runtimeVersion 期望: %s (policy=fingerprint 本地同口径哈希)\n' "$WANT_RT"
+      else
+        warn "本地 fingerprint 哈希形态异常 ($WANT_RT) — 第 6 项仅警告"
+        WANT_RT=""
+      fi
+    else
+      warn "无法本地计算 fingerprint 哈希 ($(tail -1 "$RT_ERR" 2>/dev/null || echo 'node/expo-updates 不可用')) — 第 6 项仅警告"
+      WANT_RT=""
+    fi
+    rm -f "$RT_ERR"
+    ;;
+  unsupported:*)
+    fail "expo.runtimeVersion.policy=${RV_MODE#unsupported:} 不支持 (runtime-version.mjs 同样会拒绝)"
+    ;;
+  *)
+    fail "无法识别的 expo.runtimeVersion 形态"
+    ;;
+esac
 
 step "1. clients/expo/app.json"
 V1="$(python3 -c 'import json; print(json.load(open("'"$APP_JSON"'"))["expo"]["version"])')"
@@ -115,12 +171,20 @@ rm -f "$VJSON"
 step "6. 远端 OTA manifest ($OTA_MANIFEST_URL)"
 OTA_BODY="$(mktemp -t coolie-ota.XXXXXX)"
 HTTP_CODE=""
+# fingerprint 政策下探针带真客户端头, 走装机 App 同一条服务端动态分发路径 (wave86);
+# 其余政策保留裸取 (回滚兼容)。值均为无空格的 token, 可安全走无引号展开 (bash 3.2 兼容)。
+OTA_CURL_HDRS=""
+if [ "$RV_MODE" = "fingerprint" ] && [ -n "$WANT_RT" ]; then
+  OTA_CURL_HDRS="-H expo-platform:android -H expo-runtime-version:$WANT_RT -H expo-channel-name:production"
+fi
 if [ "$SKIP_REMOTE" = "1" ]; then
   warn "SKIP_REMOTE=1 — 跳过远端 OTA manifest 检查"
-elif ! HTTP_CODE="$(curl -sS -m 8 -o "$OTA_BODY" -w '%{http_code}' "$OTA_MANIFEST_URL" 2>/dev/null)"; then
+elif [ -z "$WANT_RT" ]; then
+  warn "期望 runtimeVersion 未知 (见「期望版本」段的 policy 分支) — 跳过比对, 仅警告"
+elif ! HTTP_CODE="$(curl -sS -m 8 $OTA_CURL_HDRS -o "$OTA_BODY" -w '%{http_code}' "$OTA_MANIFEST_URL" 2>/dev/null)"; then
   warn "OTA manifest 抓取超时 — 发版前可能 OTA 还没上线, 仅警告"
 elif [ "$HTTP_CODE" != "200" ]; then
-  warn "OTA manifest HTTP $HTTP_CODE — 仅警告 (期望 $EXPECT 未上线)"
+  warn "OTA manifest HTTP $HTTP_CODE — 仅警告 (期望 $WANT_RT 未上线)"
 else
   if have_jq; then
     OTA_RT="$(jq -r '.runtimeVersion // empty' < "$OTA_BODY" 2>/dev/null || true)"
@@ -129,10 +193,14 @@ else
   fi
   if [ -z "$OTA_RT" ]; then
     warn "OTA manifest 200 但解析不到 runtimeVersion — 仅警告"
-  elif [ "$OTA_RT" = "$EXPECT" ]; then
-    ok "runtimeVersion=$OTA_RT"
+  elif [ "$OTA_RT" = "$WANT_RT" ]; then
+    if [ -n "$OTA_CURL_HDRS" ]; then
+      ok "runtimeVersion=$OTA_RT (真客户端头探针, policy=$RV_MODE)"
+    else
+      ok "runtimeVersion=$OTA_RT"
+    fi
   else
-    fail "OTA manifest runtimeVersion=$OTA_RT (want $EXPECT)"
+    fail "OTA manifest runtimeVersion=$OTA_RT (want $WANT_RT)"
   fi
 fi
 rm -f "$OTA_BODY"
