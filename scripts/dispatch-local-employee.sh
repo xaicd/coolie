@@ -469,7 +469,7 @@ if [[ "$TOOL" == "agy-gemini3.8" || "$TOOL" == "agy" ]]; then
   docker cp "$TMP_B64" "$AGY_CONTAINER:$CT_PROMPT"
 
   # Step c: 容器内 runner 脚本 — LANG/LC_ALL 必须在容器内 export
-  # (docker exec -e LANG=... 验过不可靠, 不用); 以 bash <script> 方式调, 免 chmod。
+  # 增加网络瞬时抖动 (如 profile picture EOF) 自动重试自愈机制
   cat > "$TMP_RUNNER" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
@@ -477,7 +477,20 @@ export LANG=C.UTF-8
 export LC_ALL=C.UTF-8
 cd /workspace
 PROMPT="\$(base64 -d "$CT_PROMPT")"
-"$AGY_BIN" --dangerously-skip-permissions --output-format text --print-timeout "$AGY_PRINT_TIMEOUT" -p "\$PROMPT" 2>&1 | tee "$CT_LOG"
+
+run_agy() {
+  "$AGY_BIN" --dangerously-skip-permissions --output-format text --print-timeout "$AGY_PRINT_TIMEOUT" -p "\$PROMPT"
+}
+
+if ! run_agy 2>&1 | tee "$CT_LOG"; then
+  if grep -q "Eligibility check failed.*EOF" "$CT_LOG" 2>/dev/null; then
+    echo "⚠️ 检测到 Google 头像拉取瞬时 EOF 抖动，等待 2 秒自动重试..." >&2
+    sleep 2
+    run_agy 2>&1 | tee "$CT_LOG"
+  else
+    exit 1
+  fi
+fi
 EOF
   docker cp "$TMP_RUNNER" "$AGY_CONTAINER:$CT_RUNNER"
   rm -f "$TMP_B64" "$TMP_RUNNER" "$TMP_MK"
