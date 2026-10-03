@@ -159,6 +159,42 @@ describeEmbeddedPostgres("ontology extras routes (wave239)", () => {
     expect(res.status).toBe(400);
   });
 
+  // wave284 收尾: the App's api-client (wave239) echoes the path's companyId
+  // into its query strings — on /ontology/graph that met a strict schema and
+  // 400-ed (the prod 关系图谱 black screen). /instances must stay tolerant:
+  // the route overrides the query key with the path param, so an OTA-lagged
+  // build sending `?companyId=...` keeps working — and the redundant key can
+  // never cross company scoping.
+  it("wave284: /instances tolerates a redundant companyId query and scopes by the path", async () => {
+    const companyId = await seedCompany();
+    // seedCompany() relies on the shared default issue_prefix (unique index),
+    // so the foreign company gets its own explicit prefix.
+    const otherCompanyId = randomUUID();
+    await db.insert(companies).values({
+      id: otherCompanyId,
+      name: "Coolie Other",
+      slug: "coolie-other",
+      createdByUserId: "test-board",
+      issuePrefix: "COOA",
+    });
+    const mineId = randomUUID();
+    const theirsId = randomUUID();
+    await db.insert(projects).values([
+      { id: mineId, companyId, name: "Mine", identifier: "mine" },
+      { id: theirsId, companyId: otherCompanyId, name: "Theirs", identifier: "theirs" },
+    ]);
+
+    const res = await request(app).get(
+      `/api/companies/${companyId}/ontology/instances?entityType=project&companyId=${otherCompanyId}`,
+    );
+    expect(res.status).toBe(200);
+    // The path param wins: rows come from the caller's company only.
+    expect(res.body.companyId).toBe(companyId);
+    const labels = (res.body.instances as Array<{ label: string }>).map((row) => row.label);
+    expect(labels).toContain("Mine");
+    expect(labels).not.toContain("Theirs");
+  });
+
   it("GET /ontology/types/:id/properties returns empty array when never edited", async () => {
     const companyId = await seedCompany();
     const typeId = randomUUID();

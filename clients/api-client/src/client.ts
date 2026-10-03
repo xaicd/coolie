@@ -953,6 +953,10 @@ export class CoolieClient {
    * 对应 GET /api/plugins/paperclipai.plugin-ontology/api/domains
    */
   async listOntologyDomains(companyId: string): Promise<OntologyDomain[]> {
+    // wave284 收尾: NOT the same wart as getOntologyGraph — the plugin
+    // manifest resolves the company from this query key
+    // (companyResolution: { from: "query", key: "companyId" }), so removing
+    // it would break the call rather than clean it up.
     const q = new URLSearchParams({ companyId });
     const res = await this.request<{ domains?: OntologyDomain[] } | OntologyDomain[]>(
       "GET",
@@ -1044,7 +1048,11 @@ export class CoolieClient {
    * actor with company access can call it.
    */
   async getOntologyLevels(companyId: string): Promise<OntologyLevelsResponse> {
-    const q = new URLSearchParams({ companyId });
+    // wave284 收尾: companyId is already in the path and the /levels route
+    // scopes by that param (it parses no query schema today) — echoing it
+    // here is dead weight that a future strict query schema would reject
+    // with unrecognized_keys, exactly like the getOntologyGraph 400.
+    const q = new URLSearchParams();
     return this.request<OntologyLevelsResponse>(
       "GET",
       `/api/companies/${encodeURIComponent(companyId)}/ontology/levels?${q.toString()}`,
