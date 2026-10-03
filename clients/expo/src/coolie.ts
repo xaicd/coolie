@@ -185,7 +185,8 @@ export async function getWebExchangeToken(): Promise<string | null> {
  * 员工(agents)行。
  *
  * 形状来自 `@coolie/api-client` 的 `Agent` —— 与 Coolie Web 的 `agentsApi.list`
- * 同一个端点/同一份字段, 组件层 (ForRow / IssuesList 等) 30+ 处仍照旧名字引用。
+ * 同一个端点/同一份字段, IssuesList 等组件层仍照旧名字引用。
+ * (2026-10-04 走查注: 原注提到的 ForRow 已零挂载 — composer 精简后遗留, 见 COOA-4。)
  */
 export type AgentRow = Agent;
 
