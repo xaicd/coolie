@@ -18,7 +18,7 @@ import { StatusBar } from "expo-status-bar";
 import * as DocumentPicker from "expo-document-picker";
 import type {
   Company,
-  OntologyDomain,
+  OntologyDomainLevel,
   OntologyEntityTypeLevel,
   OntologyLevelsResponse,
   OntologyInstanceRow,
@@ -26,13 +26,38 @@ import type {
 } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
 import { OntologyGraphWorkbenchScreen } from "./OntologyGraphWorkbenchScreen";
+import { OntologyDrillBreadcrumb } from "../components/OntologyDrillBreadcrumb";
+import type { OntologyDrillLevel } from "../components/OntologyDrillBreadcrumb";
 import { AppCard } from "../ui/AppCard";
-import { RADIUS, SPACING } from "../ui/tokens";
+import { RADIUS } from "../ui/tokens";
 import { EmptyState } from "../ui/EmptyState";
 import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
 import { Pill } from "../ui/Pill";
 import { SectionHeader } from "../ui/SectionHeader";
+
+/**
+ * wave293 — 业务本体回归 v0.6.19 经典纯列表风格 (原型
+ * `docs-coolie/protos/2026-10-04-wave293-ontology-redesign.md` §2/§3)。
+ *
+ *   默认路径   — 纯列表: L1 域 chip 行 + L2 类型列表 (原型 §2.1)
+ *   L3 下钻   — 点类型行进入实例列表, breadcrumb 可回退 (原型 §2.2)
+ *   图谱      — 右上角 [列表|图谱] toggle, 默认不打开 (原型 §2.3);
+ *               `OntologyGraphWorkbenchScreen` 保留但移出默认路径
+ *   稀疏门禁  — 实体 < 30 时提示「实体太少，不建议图谱」, 一键切回
+ *
+ * 状态机沿用原型 §3.1: viewMode 默认 "list" — 数据稀疏 (<30) 时无需判断,
+ * 默认即列表, 满足 C-2「数据稀疏自动默认列表」。
+ */
+type OntologyViewMode = "list" | "graph";
+type TypeSortKey = "count" | "name";
+
+/** 原型 §3.2 — 稀疏数据门禁阈值 */
+const SPARSE_GRAPH_THRESHOLD = 30;
+
+function isGraphSparse(totalInstances: number): boolean {
+  return totalInstances < SPARSE_GRAPH_THRESHOLD;
+}
 
 interface OntologyDomainListScreenProps {
   company: Company;
@@ -42,58 +67,118 @@ interface OntologyDomainListScreenProps {
   onOpenInstanceGraph?: (typeId: string, displayName: string) => void;
 }
 
-interface EntityCategoryConfig {
-  entityType: string;
+interface EntityTypeMeta {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   desc: string;
   color: string;
 }
 
-const ENTITY_CATEGORIES: EntityCategoryConfig[] = [
-  {
-    entityType: "project",
+/** L2 类型行的中文元数据 — 覆盖 server `ENTITY_TYPES` 全集, 未收录类型走 fallback */
+const ENTITY_TYPE_META: Record<string, EntityTypeMeta> = {
+  company: {
+    label: "企业主体",
+    icon: "business-outline",
+    desc: "物理租户主控",
+    color: "#5E6AD2",
+  },
+  project: {
     label: "业务项目",
     icon: "folder-outline",
     desc: "核心业务微服务与研发工程",
     color: "#5E6AD2",
   },
-  {
-    entityType: "issue",
+  issue: {
     label: "任务工单",
     icon: "list-outline",
     desc: "正在流转与协同处理的业务任务",
     color: "#39A275",
   },
-  {
-    entityType: "work_product",
+  work_product: {
     label: "交付产物",
     icon: "cube-outline",
     desc: "各阶段产出的交付物与技术工件",
     color: "#E0A030",
   },
-  {
-    entityType: "agent",
+  agent: {
     label: "数字员工",
     icon: "people-outline",
     desc: "参与研发、运维与管理的智能体角色",
     color: "#7A6FD6",
   },
-  {
-    entityType: "spec",
+  spec: {
     label: "系统规范",
     icon: "document-text-outline",
     desc: "业务需求、系统设计与验收规范",
     color: "#4FA1D9",
   },
-  {
-    entityType: "conversation",
+  conversation: {
     label: "工坊会话",
     icon: "chatbubbles-outline",
     desc: "工坊会话与多智能体协同记录",
     color: "#C95757",
   },
-];
+  comment: {
+    label: "协作评论",
+    icon: "chatbubble-ellipses-outline",
+    desc: "实体上的讨论与批注",
+    color: "#C97A57",
+  },
+  attachment: {
+    label: "附件",
+    icon: "attach-outline",
+    desc: "挂载在实体上的文件资产",
+    color: "#8A8F98",
+  },
+};
+
+const FALLBACK_TYPE_META: EntityTypeMeta = {
+  label: "",
+  icon: "layers-outline",
+  desc: "业务实体类型",
+  color: "#8A8F98",
+};
+
+function typeMeta(entityType: string): EntityTypeMeta {
+  const meta = ENTITY_TYPE_META[entityType];
+  return meta ? meta : { ...FALLBACK_TYPE_META, label: entityType };
+}
+
+/** L1 域 chip 图标 (v0.6.19 同款, server 按 category 聚合出的 5 域) */
+const DOMAIN_ICON: Record<string, keyof typeof Ionicons.glyphMap> = {
+  业务: "briefcase-outline",
+  项目: "folder-outline",
+  员工: "people-outline",
+  资产: "cube-outline",
+  模板: "layers-outline",
+  uncategorized: "help-circle-outline",
+};
+
+/**
+ * Map a domain bucket to the entityType list that belongs to it. Mirrors
+ * the server-side `TYPE_TO_DOMAIN` map in `ontology-graph.ts` (v0.6.19 同
+ * 款约定: 两端按 category 保持同步); 未收录的自定义域返回全部类型兜底。
+ */
+function filterEntityTypesForDomain(
+  allTypes: OntologyEntityTypeLevel[],
+  domainId: string,
+): OntologyEntityTypeLevel[] {
+  const MAP: Record<string, string[]> = {
+    业务: ["issue", "spec", "conversation", "comment"],
+    项目: ["project"],
+    员工: ["agent"],
+    资产: ["work_product", "attachment"],
+    模板: [],
+  };
+  const allowed = MAP[domainId];
+  if (!allowed) return allTypes;
+  if (allowed.length === 0) {
+    // 空桶 (模板): 只给未归类类型, 不回退到全部
+    const bucketed = new Set(Object.values(MAP).flat());
+    return allTypes.filter((et) => !bucketed.has(et.entityType));
+  }
+  return allTypes.filter((et) => allowed.includes(et.entityType));
+}
 
 export function OntologyDomainListScreen({
   company,
@@ -102,13 +187,15 @@ export function OntologyDomainListScreen({
   onOpenSchemaEditor,
   onOpenInstanceGraph,
 }: OntologyDomainListScreenProps) {
-  // ── 顶部主视图切换: 关系图谱 (默认) vs 实体清单 ──
-  const [viewMode, setViewMode] = useState<"graph" | "entities">("graph");
+  // ── wave293 视图状态机 (原型 §3.1): 默认纯列表, 图谱默认不打开 ──
+  const [viewMode, setViewMode] = useState<OntologyViewMode>("list");
+  const [activeDomainId, setActiveDomainId] = useState<string | null>(null); // null = 全部
+  const [selectedType, setSelectedType] = useState<OntologyEntityTypeLevel | null>(null); // null = L2, 非 null = L3 下钻
+  const [typeSort, setTypeSort] = useState<TypeSortKey>("count");
+  const [sparseBannerDismissed, setSparseBannerDismissed] = useState(false);
 
-  // ── 业务实体状态: 选中的类型与实例 ──
-  const [selectedEntityType, setSelectedEntityType] = useState<EntityCategoryConfig | null>(null);
-  const [selectedInstance, setSelectedInstance] = useState<OntologyInstanceRow | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedInstance, setSelectedInstance] = useState<OntologyInstanceRow | null>(null);
 
   const [levels, setLevels] = useState<OntologyLevelsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -155,9 +242,9 @@ export function OntologyDomainListScreen({
     void loadLevels();
   }, [loadLevels]);
 
-  // 加载选定类型的实例列表
+  // 加载选定类型的实例列表 (L3)
   useEffect(() => {
-    if (!selectedEntityType) {
+    if (!selectedType) {
       setInstances([]);
       return;
     }
@@ -165,7 +252,7 @@ export function OntologyDomainListScreen({
     setInstancesLoading(true);
     void coolie
       .listOntologyInstances(companyId, {
-        entityType: selectedEntityType.entityType,
+        entityType: selectedType.entityType,
         limit: 150,
       })
       .then((res) => {
@@ -180,18 +267,18 @@ export function OntologyDomainListScreen({
     return () => {
       cancelled = true;
     };
-  }, [selectedEntityType, companyId]);
+  }, [selectedType, companyId]);
 
-  // 加载选中实例的属性
+  // 加载选中实例对应类型的属性契约
   useEffect(() => {
-    if (!selectedInstance || !selectedEntityType) {
+    if (!selectedInstance || !selectedType) {
       setTypeProperties(null);
       return;
     }
     let cancelled = false;
     setTypePropertiesLoading(true);
     void coolie
-      .getOntologyTypeProperties(companyId, selectedEntityType.entityType)
+      .getOntologyTypeProperties(companyId, selectedType.entityType)
       .then((res) => {
         if (!cancelled) setTypeProperties(res);
       })
@@ -204,9 +291,51 @@ export function OntologyDomainListScreen({
     return () => {
       cancelled = true;
     };
-  }, [selectedInstance, selectedEntityType, companyId]);
+  }, [selectedInstance, selectedType, companyId]);
 
-  // 过滤后的实例列表
+  // ── 导航动作 ──
+  const exitToTypeList = useCallback(() => {
+    setSelectedType(null);
+    setSearchQuery("");
+  }, []);
+
+  const selectDomain = useCallback((domainId: string | null) => {
+    setActiveDomainId(domainId);
+    setSelectedType(null); // 切域回到 L2 列表
+    setSearchQuery("");
+    setSparseBannerDismissed(false); // 域作用域变化, 稀疏提示重新生效
+  }, []);
+
+  const openGraph = useCallback(() => {
+    setSparseBannerDismissed(false);
+    setViewMode("graph");
+  }, []);
+
+  // ── L2 类型列表: 域过滤 + 排序 ──
+  const activeDomain = useMemo(
+    () => levels?.byDomain.find((d) => d.domainId === activeDomainId) ?? null,
+    [levels, activeDomainId],
+  );
+
+  // 稀疏判定作用域: 选中域按域实例数, 「全部」按全公司实体数 (原型 §2.3)
+  const graphScopeCount = activeDomain ? activeDomain.instanceCount : (levels?.totalNodes ?? 0);
+  const graphSparse = isGraphSparse(graphScopeCount);
+
+  const visibleTypes = useMemo(() => {
+    if (!levels) return [];
+    const filtered = activeDomain
+      ? filterEntityTypesForDomain(levels.byEntityType, activeDomain.domainId)
+      : levels.byEntityType;
+    const sorted = [...filtered];
+    sorted.sort(
+      typeSort === "count"
+        ? (a, b) => b.count - a.count
+        : (a, b) => a.entityType.localeCompare(b.entityType),
+    );
+    return sorted;
+  }, [levels, activeDomain, typeSort]);
+
+  // 过滤后的实例列表 (L3)
   const filteredInstances = useMemo(() => {
     const q = searchQuery.trim().toLowerCase();
     if (!q) return instances;
@@ -217,7 +346,28 @@ export function OntologyDomainListScreen({
     );
   }, [instances, searchQuery]);
 
-  // 新建域
+  // L3 breadcrumb (原型 §2.2): 业务本体 / [域] / 类型 (N)
+  const breadcrumbLevels = useMemo<OntologyDrillLevel[]>(() => {
+    if (!selectedType) return [];
+    const segs: OntologyDrillLevel[] = [
+      { id: "L2-root", label: "业务本体", onPress: exitToTypeList },
+    ];
+    if (activeDomain) {
+      segs.push({
+        id: `L1-${activeDomain.domainId}`,
+        label: activeDomain.displayName,
+        onPress: exitToTypeList,
+      });
+    }
+    segs.push({
+      id: `L3-${selectedType.entityType}`,
+      label: `${typeMeta(selectedType.entityType).label} (${filteredInstances.length})`,
+      icon: typeMeta(selectedType.entityType).icon,
+    });
+    return segs;
+  }, [selectedType, activeDomain, filteredInstances.length, exitToTypeList]);
+
+  // ── 新建域 ──
   const handlePickDirectoryFile = useCallback(async () => {
     try {
       const res = await DocumentPicker.getDocumentAsync({
@@ -294,11 +444,33 @@ export function OntologyDomainListScreen({
     }
   }, [companyId, loadLevels]);
 
+  // ── L2 类型行长按: 实例图谱 / 编辑字段 (v0.6.19 入口, 不占默认路径) ──
+  const handleTypeLongPress = useCallback(
+    (item: OntologyEntityTypeLevel) => {
+      if (!onOpenInstanceGraph) return;
+      const meta = typeMeta(item.entityType);
+      Alert.alert(meta.label || item.entityType, "选择下一步操作", [
+        {
+          text: "实例图谱",
+          onPress: () => onOpenInstanceGraph(item.entityType, `${meta.label} 实例图谱`),
+        },
+        onOpenSchemaEditor
+          ? {
+              text: "编辑字段",
+              onPress: () => onOpenSchemaEditor(item.entityType, meta.label || item.entityType),
+            }
+          : { text: "编辑字段", style: "cancel" as const },
+        { text: "取消", style: "cancel" as const },
+      ]);
+    },
+    [onOpenInstanceGraph, onOpenSchemaEditor],
+  );
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
 
-      {/* 顶部标题与轻量控制行 */}
+      {/* 顶部标题 + 右上角 [列表|图谱] toggle (原型 §2.1) */}
       <View style={styles.header}>
         <View style={styles.headerRow}>
           <View style={{ flex: 1 }}>
@@ -310,6 +482,50 @@ export function OntologyDomainListScreen({
             </Text>
           </View>
           <View style={styles.headerActions}>
+            <View style={styles.viewModeToggle}>
+              <Pressable
+                style={[styles.viewModeBtn, viewMode === "list" && styles.viewModeBtnActive]}
+                onPress={() => setViewMode("list")}
+                hitSlop={4}
+                accessibilityRole="button"
+                accessibilityLabel="切换到列表视图"
+              >
+                <Ionicons
+                  name="list-outline"
+                  size={12}
+                  color={viewMode === "list" ? C.accent : C.ink3}
+                />
+                <Text
+                  style={[
+                    styles.viewModeBtnText,
+                    viewMode === "list" && styles.viewModeBtnTextActive,
+                  ]}
+                >
+                  列表
+                </Text>
+              </Pressable>
+              <Pressable
+                style={[styles.viewModeBtn, viewMode === "graph" && styles.viewModeBtnActive]}
+                onPress={openGraph}
+                hitSlop={4}
+                accessibilityRole="button"
+                accessibilityLabel="切换到图谱视图"
+              >
+                <Ionicons
+                  name="git-network-outline"
+                  size={12}
+                  color={viewMode === "graph" ? C.accent : C.ink3}
+                />
+                <Text
+                  style={[
+                    styles.viewModeBtnText,
+                    viewMode === "graph" && styles.viewModeBtnTextActive,
+                  ]}
+                >
+                  图谱
+                </Text>
+              </Pressable>
+            </View>
             {onOpenWebOntology ? (
               <Pressable
                 onPress={onOpenWebOntology}
@@ -342,83 +558,115 @@ export function OntologyDomainListScreen({
           </View>
         </View>
 
-        {/* 顶部直观双模式切换 */}
-        <View style={styles.viewModeToggleRow}>
-          <Pressable
-            style={[styles.viewModeBtn, viewMode === "graph" && styles.viewModeBtnActive]}
-            onPress={() => setViewMode("graph")}
-            hitSlop={4}
+        {/* L1 域 chip 行 — 仅列表模式的 L2 层显示 (原型 §2.1) */}
+        {viewMode === "list" && !selectedType ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.domainChipScroll}
+            contentContainerStyle={styles.domainChipRow}
           >
-            <Ionicons
-              name="git-network-outline"
-              size={13}
-              color={viewMode === "graph" ? C.accent : C.ink3}
-            />
-            <Text
-              style={[
-                styles.viewModeBtnText,
-                viewMode === "graph" && styles.viewModeBtnTextActive,
-              ]}
+            <Pressable
+              style={[styles.domainChip, activeDomainId === null && styles.domainChipActive]}
+              onPress={() => selectDomain(null)}
+              accessibilityRole="button"
+              accessibilityLabel="全部域"
             >
-              🕸️ 关系图谱
-            </Text>
-          </Pressable>
-          <Pressable
-            style={[styles.viewModeBtn, viewMode === "entities" && styles.viewModeBtnActive]}
-            onPress={() => setViewMode("entities")}
-            hitSlop={4}
-          >
-            <Ionicons
-              name="list-outline"
-              size={13}
-              color={viewMode === "entities" ? C.accent : C.ink3}
-            />
-            <Text
-              style={[
-                styles.viewModeBtnText,
-                viewMode === "entities" && styles.viewModeBtnTextActive,
-              ]}
+              <Text
+                style={[
+                  styles.domainChipText,
+                  activeDomainId === null && styles.domainChipTextActive,
+                ]}
+              >
+                全部{levels ? ` (${levels.byEntityType.length})` : ""}
+              </Text>
+            </Pressable>
+            {(levels?.byDomain ?? []).map((d) => (
+              <Pressable
+                key={d.domainId}
+                style={[styles.domainChip, activeDomainId === d.domainId && styles.domainChipActive]}
+                onPress={() => selectDomain(d.domainId)}
+                accessibilityRole="button"
+                accessibilityLabel={`域 ${d.displayName}`}
+              >
+                <Ionicons
+                  name={DOMAIN_ICON[d.domainId] ?? "layers-outline"}
+                  size={11}
+                  color={activeDomainId === d.domainId ? C.accent : C.ink3}
+                />
+                <Text
+                  style={[
+                    styles.domainChipText,
+                    activeDomainId === d.domainId && styles.domainChipTextActive,
+                  ]}
+                >
+                  {d.displayName}
+                </Text>
+              </Pressable>
+            ))}
+            <Pressable
+              style={[styles.domainChip, styles.domainChipNew]}
+              onPress={() => setNewDomainModalOpen(true)}
+              accessibilityRole="button"
+              accessibilityLabel="新增本体域"
             >
-              📑 业务实体
-            </Text>
-          </Pressable>
-        </View>
+              <Ionicons name="add" size={12} color={C.accent} />
+              <Text style={[styles.domainChipText, styles.domainChipTextNew]}>新域</Text>
+            </Pressable>
+          </ScrollView>
+        ) : null}
       </View>
 
       {/* 页面主内容区 */}
       {viewMode === "graph" ? (
         <View style={{ flex: 1 }}>
+          {/* wave293 稀疏门禁 (原型 §2.3 [SPARSE-GUARD]) */}
+          {graphSparse && !sparseBannerDismissed ? (
+            <View style={styles.sparseBanner}>
+              <Text style={styles.sparseBannerTitle}>⚠️ 实体太少，不建议图谱</Text>
+              <Text style={styles.sparseBannerBody}>
+                当前{activeDomain ? `域「${activeDomain.displayName}」` : "工坊"}共{" "}
+                {graphScopeCount}/{SPARSE_GRAPH_THRESHOLD} 个实体，难以形成聚类效果，建议优先使用列表视图进行维护。
+              </Text>
+              <View style={styles.sparseBannerActions}>
+                <Pressable
+                  style={styles.sparseBannerPrimary}
+                  onPress={() => setViewMode("list")}
+                  accessibilityRole="button"
+                  accessibilityLabel="一键切回纯列表"
+                >
+                  <Text style={styles.sparseBannerPrimaryText}>↩️ 一键切回纯列表</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.sparseBannerSecondary}
+                  onPress={() => setSparseBannerDismissed(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="忽略并继续查看画布"
+                >
+                  <Text style={styles.sparseBannerSecondaryText}>忽略并继续查看画布</Text>
+                </Pressable>
+              </View>
+            </View>
+          ) : null}
+          {/* OntologyGraphWorkbenchScreen 保留 — 仅经右上角 toggle 进入, 不在默认路径 */}
           <OntologyGraphWorkbenchScreen company={company} embedded={true} />
         </View>
       ) : loading ? (
         <LoadingState text="正在加载业务本体…" />
       ) : error ? (
         <ErrorRetry message={error} onRetry={loadLevels} />
-      ) : selectedEntityType ? (
-        /* 选中实体分类后的实例列表 */
+      ) : selectedType ? (
+        /* L3 实例下钻 — breadcrumb + 检索 + 实例列表 (原型 §2.2) */
         <View style={{ flex: 1 }}>
-          <View style={styles.subListHeader}>
-            <Pressable
-              style={styles.backBtn}
-              onPress={() => {
-                setSelectedEntityType(null);
-                setSearchQuery("");
-              }}
-              hitSlop={6}
-            >
-              <Ionicons name="chevron-back" size={18} color={C.accent} />
-              <Text style={styles.backBtnText}>返回实体分类</Text>
-            </Pressable>
-            <Text style={styles.subListTitle}>
-              {selectedEntityType.label} ({filteredInstances.length})
-            </Text>
+          <View style={styles.breadcrumbHeader}>
+            <OntologyDrillBreadcrumb levels={breadcrumbLevels} />
           </View>
 
           <View style={styles.searchBox}>
             <Ionicons name="search" size={14} color={C.ink4} />
             <TextInput
               style={styles.searchInput}
-              placeholder={`搜索 ${selectedEntityType.label}…`}
+              placeholder={`搜索 ${typeMeta(selectedType.entityType).label}…`}
               placeholderTextColor={C.ink4}
               value={searchQuery}
               onChangeText={setSearchQuery}
@@ -431,12 +679,12 @@ export function OntologyDomainListScreen({
           </View>
 
           {instancesLoading ? (
-            <LoadingState text={`正在加载 ${selectedEntityType.label} 列表…`} />
+            <LoadingState text={`正在加载 ${typeMeta(selectedType.entityType).label} 列表…`} />
           ) : filteredInstances.length === 0 ? (
             <EmptyState
-              icon={selectedEntityType.icon}
-              title={`暂无 ${selectedEntityType.label}`}
-              subtitle={searchQuery ? "未找到匹配的实例" : "当前分类暂无实例数据"}
+              icon={typeMeta(selectedType.entityType).icon}
+              title={`暂无 ${typeMeta(selectedType.entityType).label}`}
+              subtitle={searchQuery ? "未找到匹配的实例" : "当前类型暂无实例数据"}
             />
           ) : (
             <FlatList
@@ -444,21 +692,21 @@ export function OntologyDomainListScreen({
               keyExtractor={(item) => item.id}
               contentContainerStyle={styles.listContent}
               renderItem={({ item }) => (
-                <AppCard
-                  style={styles.instanceCard}
-                  onPress={() => setSelectedInstance(item)}
-                >
+                <AppCard style={styles.instanceCard} onPress={() => setSelectedInstance(item)}>
                   <View style={styles.instanceRow}>
                     <View
                       style={[
                         styles.instanceIconBox,
-                        { backgroundColor: `${selectedEntityType.color}15`, borderColor: selectedEntityType.color },
+                        {
+                          backgroundColor: `${typeMeta(selectedType.entityType).color}15`,
+                          borderColor: typeMeta(selectedType.entityType).color,
+                        },
                       ]}
                     >
                       <Ionicons
-                        name={selectedEntityType.icon}
+                        name={typeMeta(selectedType.entityType).icon}
                         size={16}
-                        color={selectedEntityType.color}
+                        color={typeMeta(selectedType.entityType).color}
                       />
                     </View>
                     <View style={{ flex: 1, marginRight: 8 }}>
@@ -466,7 +714,8 @@ export function OntologyDomainListScreen({
                         {item.label}
                       </Text>
                       <Text style={styles.instanceSub} numberOfLines={1}>
-                        {item.ownerLabel ? `负责人: ${item.ownerLabel} · ` : ""}ID: {item.id.slice(0, 8)}…
+                        {item.ownerLabel ? `负责人: ${item.ownerLabel} · ` : ""}ID:{" "}
+                        {item.id.slice(0, 8)}…
                       </Text>
                     </View>
                     <Ionicons name="chevron-forward" size={16} color={C.ink4} />
@@ -476,53 +725,111 @@ export function OntologyDomainListScreen({
             />
           )}
         </View>
+      ) : !levels || levels.byEntityType.length === 0 ? (
+        <EmptyState
+          variant="standalone"
+          icon="🌐"
+          title="暂无业务本体实体"
+          subtitle="当前工坊尚未初始化任何业务本体。您可以一键注入官方示例本体域。"
+          action={
+            <View style={styles.emptyActionRow}>
+              <Pressable
+                style={styles.primaryBtn}
+                onPress={() => setNewDomainModalOpen(true)}
+              >
+                <Text style={styles.primaryBtnText}>+ 新建本体</Text>
+              </Pressable>
+              <Pressable
+                style={styles.secondaryBtn}
+                disabled={seedingSample}
+                onPress={() => void handleSeedSample()}
+              >
+                {seedingSample ? (
+                  <ActivityIndicator size="small" color={C.accent} />
+                ) : (
+                  <Text style={styles.secondaryBtnText}>✨ 注入示例域</Text>
+                )}
+              </Pressable>
+            </View>
+          }
+        />
       ) : (
-        /* 实体分类总览大卡片 */
-        <ScrollView
+        /* L2 类型列表 — 默认页主体 (原型 §2.1) */
+        <FlatList
+          data={visibleTypes}
+          keyExtractor={(item) => item.entityType}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />
           }
-        >
-          <SectionHeader
-            emphasis
-            title="核心业务实体"
-            hint="点击查看实体实例与属性字段"
-          />
-
-          {ENTITY_CATEGORIES.map((cat) => {
-            const count =
-              levels?.byEntityType.find((e) => e.entityType === cat.entityType)?.count ?? 0;
+          ListHeaderComponent={
+            <SectionHeader
+              emphasis
+              title={activeDomain ? `${activeDomain.displayName} · 类型` : "类型"}
+              count={visibleTypes.length}
+              hint="点击下钻 L3 实例列表 · 长按看图谱/字段"
+              right={
+                <Pressable
+                  style={styles.sortBtn}
+                  onPress={() => setTypeSort(typeSort === "count" ? "name" : "count")}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel="切换排序方式"
+                >
+                  <Text style={styles.sortBtnText}>
+                    排序: {typeSort === "count" ? "实例量" : "名称"} ▼
+                  </Text>
+                </Pressable>
+              }
+            />
+          }
+          ListEmptyComponent={
+            <EmptyState
+              icon="📦"
+              title="该域暂无类型"
+              subtitle="该域没有关联任何实体类型，换个域看看。"
+            />
+          }
+          renderItem={({ item }) => {
+            const meta = typeMeta(item.entityType);
             return (
               <AppCard
-                key={cat.entityType}
-                style={styles.categoryCard}
-                onPress={() => setSelectedEntityType(cat)}
+                style={styles.typeCard}
+                onPress={() => {
+                  setSelectedType(item);
+                  setSearchQuery("");
+                }}
+                onLongPress={() => handleTypeLongPress(item)}
               >
-                <View style={styles.categoryRow}>
+                <View style={styles.typeRow}>
                   <View
                     style={[
-                      styles.categoryIconWrap,
-                      { backgroundColor: `${cat.color}15`, borderColor: `${cat.color}40` },
+                      styles.typeIconBox,
+                      { backgroundColor: `${meta.color}15`, borderColor: `${meta.color}40` },
                     ]}
                   >
-                    <Ionicons name={cat.icon} size={22} color={cat.color} />
+                    <Ionicons name={meta.icon} size={20} color={meta.color} />
                   </View>
                   <View style={{ flex: 1, marginRight: 10 }}>
-                    <View style={styles.categoryTitleRow}>
-                      <Text style={styles.categoryTitle}>{cat.label}</Text>
-                      <Pill label={`${count} 实体`} size="sm" tone={count > 0 ? "accent" : "muted"} />
-                    </View>
-                    <Text style={styles.categoryDesc} numberOfLines={1}>
-                      {cat.desc}
+                    <Text style={styles.typeTitle}>{meta.label}</Text>
+                    <Text style={styles.typeSub} numberOfLines={1}>
+                      标识: {item.entityType} · {meta.desc}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color={C.ink4} />
+                  <View style={styles.typeStats}>
+                    <Pill
+                      label={`${item.count} 实例`}
+                      size="sm"
+                      tone={item.count > 0 ? "accent" : "muted"}
+                    />
+                    <Pill label={`${item.edgeCount} 关联`} size="sm" />
+                  </View>
+                  <Ionicons name="chevron-forward" size={16} color={C.ink4} />
                 </View>
               </AppCard>
             );
-          })}
-        </ScrollView>
+          }}
+        />
       )}
 
       {/* 实例属性详情抽屉/弹层 */}
@@ -533,10 +840,7 @@ export function OntologyDomainListScreen({
           animationType="slide"
           onRequestClose={() => setSelectedInstance(null)}
         >
-          <Pressable
-            style={styles.modalBackdrop}
-            onPress={() => setSelectedInstance(null)}
-          >
+          <Pressable style={styles.modalBackdrop} onPress={() => setSelectedInstance(null)}>
             <Pressable style={styles.detailDrawer} onPress={(e) => e.stopPropagation()}>
               <View style={styles.drawerHeader}>
                 <View style={{ flex: 1 }}>
@@ -544,7 +848,7 @@ export function OntologyDomainListScreen({
                     {selectedInstance.label}
                   </Text>
                   <Text style={styles.drawerSub}>
-                    类型: {selectedEntityType?.label || selectedInstance.id}
+                    类型: {selectedType ? typeMeta(selectedType.entityType).label : selectedInstance.id}
                   </Text>
                 </View>
                 <Pressable
@@ -567,9 +871,7 @@ export function OntologyDomainListScreen({
                   {selectedInstance.ownerLabel ? (
                     <View style={styles.metaChip}>
                       <Text style={styles.metaChipLabel}>责任人</Text>
-                      <Text style={styles.metaChipValue}>
-                        {selectedInstance.ownerLabel}
-                      </Text>
+                      <Text style={styles.metaChipValue}>{selectedInstance.ownerLabel}</Text>
                     </View>
                   ) : null}
                 </View>
@@ -579,22 +881,17 @@ export function OntologyDomainListScreen({
                 {selectedInstance.metadata &&
                 Object.keys(selectedInstance.metadata).length > 0 ? (
                   <View style={styles.propsContainer}>
-                    {Object.entries(selectedInstance.metadata).map(
-                      ([key, val], idx, arr) => (
-                        <View
-                          key={key}
-                          style={[
-                            styles.propRow,
-                            idx < arr.length - 1 ? styles.propRowBorder : null,
-                          ]}
-                        >
-                          <Text style={styles.propKey}>{key}</Text>
-                          <Text style={styles.propVal} numberOfLines={2}>
-                            {typeof val === "object" ? JSON.stringify(val) : String(val)}
-                          </Text>
-                        </View>
-                      ),
-                    )}
+                    {Object.entries(selectedInstance.metadata).map(([key, val], idx, arr) => (
+                      <View
+                        key={key}
+                        style={[styles.propRow, idx < arr.length - 1 ? styles.propRowBorder : null]}
+                      >
+                        <Text style={styles.propKey}>{key}</Text>
+                        <Text style={styles.propVal} numberOfLines={2}>
+                          {typeof val === "object" ? JSON.stringify(val) : String(val)}
+                        </Text>
+                      </View>
+                    ))}
                   </View>
                 ) : (
                   <Text style={styles.emptyHint}>该实例暂无附加属性键值。</Text>
@@ -627,7 +924,7 @@ export function OntologyDomainListScreen({
                 <Pressable
                   style={styles.drilldownGraphBtn}
                   onPress={() => {
-                    const typeId = selectedEntityType?.entityType ?? "project";
+                    const typeId = selectedType?.entityType ?? "project";
                     const label = selectedInstance.label;
                     setSelectedInstance(null);
                     onOpenInstanceGraph(typeId, `${label} 拓扑图`);
@@ -726,10 +1023,7 @@ function NewDomainModal({
               onPress={() => setMode("manual")}
             >
               <Text
-                style={[
-                  styles.modalTabBtnText,
-                  mode === "manual" && styles.modalTabBtnTextActive,
-                ]}
+                style={[styles.modalTabBtnText, mode === "manual" && styles.modalTabBtnTextActive]}
               >
                 ✏️ 空白手动定义
               </Text>
@@ -839,6 +1133,28 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: "600", color: C.ink },
   headerSub: { fontSize: 12, color: C.ink3, marginTop: 2 },
   headerActions: { flexDirection: "row", alignItems: "center", gap: 6 },
+  viewModeToggle: {
+    flexDirection: "row",
+    backgroundColor: C.bg,
+    borderRadius: RADIUS.pill,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  viewModeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: RADIUS.pill,
+    gap: 3,
+  },
+  viewModeBtnActive: {
+    backgroundColor: C.panel,
+  },
+  viewModeBtnText: { fontSize: 12, color: C.ink3, fontWeight: "500" },
+  viewModeBtnTextActive: { color: C.accent, fontWeight: "600" },
   iconActionBtn: {
     width: 32,
     height: 32,
@@ -859,89 +1175,88 @@ const styles = StyleSheet.create({
     backgroundColor: C.accent,
   },
   newDomainBtnText: { color: "#FFFFFF", fontSize: 12, fontWeight: "600" },
-  viewModeToggleRow: {
-    flexDirection: "row",
-    backgroundColor: C.bg,
-    borderRadius: RADIUS.pill,
-    padding: 2,
-    borderWidth: 1,
-    borderColor: C.line,
-  },
-  viewModeBtn: {
-    flex: 1,
+  domainChipScroll: { flexGrow: 0 },
+  domainChipRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 2,
+  },
+  domainChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 11,
     paddingVertical: 5,
     borderRadius: RADIUS.pill,
-    gap: 4,
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: C.bg,
   },
-  viewModeBtnActive: {
-    backgroundColor: C.panel,
+  domainChipActive: {
+    borderColor: C.accent,
+    backgroundColor: "rgba(94, 106, 210, 0.14)",
   },
-  viewModeBtnText: { fontSize: 12, color: C.ink3, fontWeight: "500" },
-  viewModeBtnTextActive: { color: C.ink, fontWeight: "600" },
+  domainChipNew: {
+    borderStyle: "dashed",
+  },
+  domainChipText: { fontSize: 12, color: C.ink3, fontWeight: "500" },
+  domainChipTextActive: { color: C.accent, fontWeight: "600" },
+  domainChipTextNew: { color: C.accent },
   listContent: {
     padding: 16,
     paddingBottom: 40,
     gap: 10,
   },
-  categoryCard: {
+  typeCard: {
     borderRadius: RADIUS.md,
     padding: 14,
   },
-  categoryRow: {
+  typeRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 12,
   },
-  categoryIconWrap: {
-    width: 44,
-    height: 44,
+  typeIconBox: {
+    width: 42,
+    height: 42,
     borderRadius: RADIUS.md,
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 1,
   },
-  categoryTitleRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 4,
-  },
-  categoryTitle: {
+  typeTitle: {
     fontSize: 15,
     fontWeight: "600",
     color: C.ink,
   },
-  categoryDesc: {
+  typeSub: {
     fontSize: 12,
     color: C.ink3,
+    marginTop: 3,
   },
-  subListHeader: {
+  typeStats: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
+    gap: 6,
+    marginRight: 2,
+  },
+  sortBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: RADIUS.sm,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  sortBtnText: {
+    fontSize: 11,
+    color: C.ink3,
+  },
+  breadcrumbHeader: {
+    backgroundColor: C.panel,
     borderBottomWidth: 1,
     borderBottomColor: C.lineSubtle,
-    backgroundColor: C.panel,
-  },
-  backBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 2,
-  },
-  backBtnText: {
-    fontSize: 13,
-    color: C.accent,
-    fontWeight: "600",
-  },
-  subListTitle: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: C.ink,
   },
   searchBox: {
     flexDirection: "row",
@@ -962,6 +1277,84 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: C.ink,
     padding: 0,
+  },
+  sparseBanner: {
+    margin: 12,
+    marginBottom: 0,
+    padding: 12,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: "#E0A03055",
+    backgroundColor: "rgba(224, 160, 48, 0.12)",
+    gap: 6,
+  },
+  sparseBannerTitle: {
+    fontSize: 13,
+    fontWeight: "700",
+    color: "#E0A030",
+  },
+  sparseBannerBody: {
+    fontSize: 12,
+    color: C.ink2,
+    lineHeight: 17,
+  },
+  sparseBannerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginTop: 4,
+  },
+  sparseBannerPrimary: {
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: RADIUS.md,
+    backgroundColor: "#E0A030",
+  },
+  sparseBannerPrimaryText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  sparseBannerSecondary: {
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: C.bg,
+  },
+  sparseBannerSecondaryText: {
+    fontSize: 12,
+    color: C.ink3,
+  },
+  emptyActionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 12,
+  },
+  primaryBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: RADIUS.md,
+    backgroundColor: C.accent,
+  },
+  primaryBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  secondaryBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: C.bg,
+  },
+  secondaryBtnText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: C.accent,
   },
   instanceCard: {
     padding: 12,
