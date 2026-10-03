@@ -285,7 +285,7 @@ export function IssuesList({
           onIssuePress={stableIssuePress}
           onIssueLongPress={stableIssueLongPress}
           refreshControl={refreshControl}
-          contentContainerStyle={contentContainerStyle}
+          contentContainerStyle={[styles.fillContent, contentContainerStyle]}
           emptyComponent={emptyComponent}
           onEndReached={handleEndReached}
           footer={listFooter}
@@ -297,7 +297,7 @@ export function IssuesList({
           onIssuePress={stableIssuePress}
           onIssueLongPress={stableIssueLongPress}
           refreshControl={refreshControl}
-          contentContainerStyle={contentContainerStyle}
+          contentContainerStyle={[styles.fillContent, contentContainerStyle]}
           emptyComponent={emptyComponent}
           onEndReached={handleEndReached}
           footer={listFooter}
@@ -309,7 +309,7 @@ export function IssuesList({
           onIssuePress={stableIssuePress}
           onIssueLongPress={stableIssueLongPress}
           refreshControl={refreshControl}
-          contentContainerStyle={contentContainerStyle}
+          contentContainerStyle={[styles.fillContent, contentContainerStyle]}
           emptyComponent={emptyComponent}
           onEndReached={handleEndReached}
           footer={listFooter}
@@ -762,6 +762,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   fillContent: {
+    // COOA-36: 空/短列表时 contentContainer 也要占满视口, 否则空白区手势落不进
+    // FlatList/ScrollView, RefreshControl 只在「有列表内容处」可拉 (QA D7 实测症状)。
+    flexGrow: 1,
     paddingVertical: SPACING.sm,
   },
   /** 固定行槽: 高 64 + 行距 8 (步长 72), 内容垂直居中。 */

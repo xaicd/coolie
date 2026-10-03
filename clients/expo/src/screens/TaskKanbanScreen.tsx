@@ -636,6 +636,7 @@ export function TaskKanbanScreen({
             error={error}
             onIssuePress={onOpenIssue}
             onIssueLongPress={onIssueLongPress}
+            onRetry={() => void loadIssues()}
             selection={selection}
             view={view}
             agents={agents}
@@ -974,6 +975,8 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
+    // COOA-36: 同 IssuesList fillContent — 空看板时也要占满视口, 下拉刷新手势才有触碰面。
+    flexGrow: 1,
     paddingHorizontal: SPACING.lg,
     paddingBottom: SPACING.xxl,
     gap: SPACING.md,
