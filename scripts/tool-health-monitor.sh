@@ -27,6 +27,7 @@ usage: scripts/tool-health-monitor.sh [--print | --check | --json | --register |
 Options:
   --print         print concise 3-line status for WeChat/terminal (default)
   --check         run live probes and update latest.json
+  --force         force real live probe ignoring 15-minute TTL cache
   --json          output latest health JSON
   --register      register crontab (every 2 hours: 0 */2 * * *)
   --unregister    unregister crontab
@@ -34,10 +35,13 @@ Options:
 EOF
 }
 
+FORCE=0
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --print) MODE="print"; shift ;;
     --check) MODE="check"; shift ;;
+    --force) FORCE=1; shift ;;
     --json) MODE="json"; shift ;;
     --register) MODE="register"; shift ;;
     --unregister) MODE="unregister"; shift ;;
@@ -71,66 +75,89 @@ if [[ "$MODE" == "unregister" ]]; then
   exit 0
 fi
 
+# Real probe helper
+probe_tool() {
+  local bin="$1"
+  local test_cmd="$2"
+  local start_ms end_ms latency output code=0
+
+  start_ms="$(node -e 'console.log(Date.now())')"
+  if command -v "$bin" >/dev/null 2>&1; then
+    if output="$(eval "$bin $test_cmd" 2>&1)"; then
+      end_ms="$(node -e 'console.log(Date.now())')"
+      latency=$((end_ms - start_ms))
+      first_line="$(printf '%s' "$output" | head -n 1 | cut -c1-40)"
+      printf 'ok\t%d\tlocal: %s' "$latency" "$first_line"
+    else
+      printf 'fail\t999\tlocal execution failed'
+    fi
+  elif [[ -x "$REPO_ROOT/scripts/host-exec.sh" ]]; then
+    if output="$("$REPO_ROOT/scripts/host-exec.sh" "$bin $test_cmd" 2>&1)"; then
+      end_ms="$(node -e 'console.log(Date.now())')"
+      latency=$((end_ms - start_ms))
+      first_line="$(printf '%s' "$output" | head -n 1 | cut -c1-40)"
+      printf 'ok\t%d\thost: %s' "$latency" "$first_line"
+    else
+      printf 'fail\t999\thost bridge probe failed'
+    fi
+  else
+    printf 'fail\t999\tnot found on local or host'
+  fi
+}
+
 # Run check / probes
 run_check() {
+  local force="${1:-0}"
   local now_iso
   now_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
-  # Quick live probes (bounded timeout)
-  local agy_status="ok" agy_latency=120 agy_reason=""
-  local glm_status="ok" glm_latency=350 glm_reason=""
-  local mm_status="ok" mm_latency=280 mm_reason=""
-  local cmd_status="ok" cmd_latency=410 cmd_reason=""
-  local copilot_status="ok" copilot_latency=520 copilot_reason=""
-  local hermes_status="ok" hermes_latency=50 hermes_reason=""
-  local kiro_status="ok" kiro_latency=600 kiro_reason=""
+  # Check 15-minute cache unless force is specified
+  if [[ "$force" -eq 0 && -f "$LATEST_JSON" ]]; then
+    local cache_valid
+    cache_valid="$(node -e '
+const fs = require("fs");
+try {
+  const data = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  const checkedAt = new Date(data.checkedAt).getTime();
+  const now = Date.now();
+  // Valid if checked within 15 minutes (900000 ms)
+  console.log(now - checkedAt < 900000 ? "1" : "0");
+} catch (e) {
+  console.log("0");
+}
+' "$LATEST_JSON")"
+    if [[ "$cache_valid" == "1" ]]; then
+      return 0
+    fi
+  fi
 
-  # Test if hermes script exists
+  # 1. agy probe
+  IFS=$'\t' read -r agy_status agy_latency agy_reason <<< "$(probe_tool "agy" "--version")"
+  [[ -n "$agy_latency" ]] || agy_latency=120
+
+  # 2. claude probe (for claude-glm and claude-mm)
+  IFS=$'\t' read -r claude_status claude_latency claude_reason <<< "$(probe_tool "claude" "--version")"
+  local glm_status="$claude_status" glm_latency="$claude_latency" glm_reason="$claude_reason"
+  local mm_status="$claude_status" mm_latency="$claude_latency" mm_reason="$claude_reason"
+
+  # 3. cmd probe
+  IFS=$'\t' read -r cmd_status cmd_latency cmd_reason <<< "$(probe_tool "cmd" "--version")"
+
+  # 4. copilot probe
+  IFS=$'\t' read -r copilot_status copilot_latency copilot_reason <<< "$(probe_tool "copilot" "--version")"
+
+  # 5. hermes probe
+  local hermes_status="ok" hermes_latency=10 hermes_reason="scripts verified"
   if [[ ! -f "$REPO_ROOT/scripts/cron-team-status.sh" ]]; then
     hermes_status="fail"
     hermes_reason="cron-team-status.sh missing"
   fi
 
-  # Probe tools locally or via host bridge
-  check_tool() {
-    local bin="$1"
-    if command -v "$bin" >/dev/null 2>&1; then
-      printf "local"
-    elif [[ -x "$REPO_ROOT/scripts/host-exec.sh" ]] && "$REPO_ROOT/scripts/host-exec.sh" "command -v $bin" >/dev/null 2>&1; then
-      printf "host"
-    else
-      printf "missing"
-    fi
-  }
-
-  local claude_env; claude_env="$(check_tool claude)"
-  if [[ "$claude_env" == "missing" ]]; then
-    glm_status="fail"; glm_reason="claude not found on local or host"
-    mm_status="fail"; mm_reason="claude not found on local or host"
-  elif [[ "$claude_env" == "host" ]]; then
-    glm_status="ok"; glm_reason="host bridge (192.168.3.85)"
-    mm_status="ok"; mm_reason="host bridge (192.168.3.85)"
-  fi
-
-  local cmd_env; cmd_env="$(check_tool cmd)"
-  if [[ "$cmd_env" == "missing" ]]; then
-    cmd_status="fail"; cmd_reason="cmd not found on local or host"
-  elif [[ "$cmd_env" == "host" ]]; then
-    cmd_status="ok"; cmd_reason="host bridge (192.168.3.85)"
-  fi
-
-  local copilot_env; copilot_env="$(check_tool copilot)"
-  if [[ "$copilot_env" == "missing" ]]; then
-    copilot_status="fail"; copilot_reason="copilot not found on local or host"
-  elif [[ "$copilot_env" == "host" ]]; then
-    copilot_status="ok"; copilot_reason="host bridge (192.168.3.85)"
-  fi
-
-  local kiro_env; kiro_env="$(check_tool kiro-cli)"
-  if [[ "$kiro_env" == "missing" ]]; then
-    kiro_status="warn"; kiro_reason="kiro-cli reserve (not in PATH)"
-  elif [[ "$kiro_env" == "host" ]]; then
-    kiro_status="ok"; kiro_reason="host bridge (192.168.3.85)"
+  # 6. kiro-cli probe
+  IFS=$'\t' read -r kiro_status kiro_latency kiro_reason <<< "$(probe_tool "kiro-cli" "--version")"
+  if [[ "$kiro_status" == "fail" ]]; then
+    kiro_status="warn"
+    kiro_reason="boss reserve (not deployed in PATH)"
   fi
 
   node -e '
@@ -229,7 +256,7 @@ fs.writeFileSync(argv[23], JSON.stringify(data, null, 2), "utf8");
 }
 
 if [[ "$MODE" == "check" || ! -f "$LATEST_JSON" ]]; then
-  run_check
+  run_check "$FORCE"
   if [[ "$MODE" == "check" ]]; then
     printf 'updated %s\n' "$LATEST_JSON"
     exit 0

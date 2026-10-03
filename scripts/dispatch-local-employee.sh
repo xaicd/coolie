@@ -28,6 +28,8 @@ COMMIT=""
 BLOCKED_REASON=""
 SHOW_RECEIPT=""
 LIST_RECEIPTS=0
+LIST_QUEUED_ONLY=0
+FORCE=0
 
 UPDATE_RECEIPT=""
 UPDATE_STATUS=""
@@ -57,9 +59,11 @@ Options:
   --no-context         do not inject upstream context bus into prompt
   --note <text>        handover note for context bus
   --list               list recent receipts in .paperclip-local/dispatch/
+  --queued             list only queued (pending) receipts
   --show <id>          show details of a specific receipt
   --update <id>        update an existing receipt
   --status <status>    update status (queued|running|done|blocked|failed|cancelled)
+  --force              force update status to done even if gate ledger is not verified
   --commit <hash>      attach completed commit hash
   --evidence <path>    attach verification evidence or artifact path
   --verification <cmd> record verification command that passed
@@ -89,6 +93,8 @@ while [[ $# -gt 0 ]]; do
     --execute) EXECUTE=1; shift ;;
     --print) PRINT_ONLY=1; shift ;;
     --list) LIST_RECEIPTS=1; shift ;;
+    --queued) LIST_RECEIPTS=1; LIST_QUEUED_ONLY=1; shift ;;
+    --force) FORCE=1; shift ;;
     --show) SHOW_RECEIPT="${2:-}"; shift 2 ;;
     --update) UPDATE_RECEIPT="${2:-}"; shift 2 ;;
     --status) UPDATE_STATUS="${2:-}"; shift 2 ;;
@@ -108,8 +114,56 @@ dispatch_dir="$REPO_ROOT/.paperclip-local/dispatch"
 mkdir -p "$dispatch_dir"
 
 if [[ "$LIST_RECEIPTS" -eq 1 ]]; then
-  printf 'Recent dispatch receipts under %s:\n' "$dispatch_dir"
-  ls -lt "$dispatch_dir"/*.json 2>/dev/null | head -n 15 || printf 'No receipts found.\n'
+  node -e '
+const fs = require("fs");
+const path = require("path");
+const dir = process.argv[1];
+const queuedOnly = process.argv[2] === "1";
+
+const files = fs.readdirSync(dir)
+  .filter(f => f.endsWith(".json"))
+  .map(f => path.join(dir, f))
+  .map(f => {
+    try {
+      const stat = fs.statSync(f);
+      const data = JSON.parse(fs.readFileSync(f, "utf8"));
+      return { file: f, mtime: stat.mtimeMs, data };
+    } catch (e) {
+      return null;
+    }
+  })
+  .filter(Boolean)
+  .sort((a, b) => b.mtime - a.mtime);
+
+const filtered = queuedOnly ? files.filter(x => x.data.status === "queued") : files.slice(0, 15);
+
+console.log(queuedOnly ? "【待处理工单队列 (QUEUED)】" : "【最近派单记录 (Dispatch Receipts)】");
+if (filtered.length === 0) {
+  console.log("暂无匹配的派单记录。");
+  process.exit(0);
+}
+
+let queuedCount = 0;
+files.forEach(x => { if (x.data.status === "queued") queuedCount++; });
+
+filtered.forEach(x => {
+  const d = x.data;
+  let tag = `[${d.status.toUpperCase()}]`;
+  if (d.status === "done") tag = "[✅ DONE]";
+  else if (d.status === "queued") tag = "[⏳ QUEUED]";
+  else if (d.status === "running") tag = "[🚀 RUNNING]";
+  else if (d.status === "failed") tag = "[❌ FAILED]";
+  else if (d.status === "blocked") tag = "[⛔ BLOCKED]";
+
+  const time = d.createdAt ? d.createdAt.substring(11, 19) : "";
+  console.log(`${tag} ${d.id} | ${d.employee || d.subagentType} (${d.tool}) | ${d.task}`);
+  if (d.status === "queued") {
+    console.log(`   └─ 执行命令: scripts/dispatch-local-employee.sh --agent ${d.subagentType} --task "${d.task}" --execute`);
+  }
+});
+
+console.log(`\n统计: 待执行(queued)=${queuedCount} | 显示数=${filtered.length} | 目录=${dir}`);
+' "$dispatch_dir" "$LIST_QUEUED_ONLY"
   exit 0
 fi
 
@@ -131,6 +185,25 @@ if [[ -n "$UPDATE_RECEIPT" ]]; then
   if [[ ! -f "$target_file" ]]; then
     printf 'receipt to update not found: %s\n' "$UPDATE_RECEIPT" >&2
     exit 1
+  fi
+
+  # Gate blocking guard: when marking done, verify gate evidence ledger unless --force is specified
+  if [[ "$UPDATE_STATUS" == "done" && "$FORCE" -eq 0 ]]; then
+    receipt_wave="$(node -e 'try { console.log(JSON.parse(require("fs").readFileSync(process.argv[1])).wave || ""); } catch(e){}' "$target_file")"
+    if [[ -z "$receipt_wave" && "$UPDATE_RECEIPT" =~ wave[0-9]+ ]]; then
+      receipt_wave="${BASH_REMATCH[0]}"
+    fi
+    if [[ -n "$receipt_wave" && -x "$SCRIPT_DIR/gate-evidence-ledger.sh" ]]; then
+      ledger_file="$REPO_ROOT/.paperclip-local/evidence-ledger/${receipt_wave}.json"
+      if [[ -f "$ledger_file" ]]; then
+        printf '[dispatch] 正在验证 %s 的 G1-G5 门禁证据账本...\n' "$receipt_wave"
+        if ! bash "$SCRIPT_DIR/gate-evidence-ledger.sh" --verify "$receipt_wave"; then
+          printf '\n[dispatch] ⛔ 门禁阻断: 当前任务关联的门禁尚未闭环，禁止将工单标记为 done！\n' >&2
+          printf '提示: 请先使用 scripts/gate-evidence-ledger.sh 闭环门禁，或使用 --force 强制覆盖。\n' >&2
+          exit 1
+        fi
+      fi
+    fi
   fi
 
   now_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -380,15 +453,58 @@ if [[ "$EXECUTE" -eq 0 ]]; then
   exit 0
 fi
 
-CLAUDE_BIN="${CLAUDE_BIN:-claude}"
+# Tool-aware execution router
+TOOL_BIN=""
+TOOL_ARGS=()
+
+case "$TOOL" in
+  agy-gemini3.8|agy)
+    TOOL_BIN="agy"
+    TOOL_ARGS=("-p" "$(cat "$prompt_file")")
+    ;;
+  claude-glm|claude-mm|claude)
+    TOOL_BIN="claude"
+    TOOL_ARGS=("-p" "$(cat "$prompt_file")")
+    ;;
+  cmd)
+    TOOL_BIN="cmd"
+    TOOL_ARGS=("-p" "$(cat "$prompt_file")")
+    ;;
+  copilot)
+    TOOL_BIN="copilot"
+    TOOL_ARGS=("-p" "$(cat "$prompt_file")")
+    ;;
+  kiro-cli)
+    TOOL_BIN="kiro-cli"
+    TOOL_ARGS=("-p" "$(cat "$prompt_file")")
+    ;;
+  hermes)
+    TOOL_BIN="bash"
+    TOOL_ARGS=("$REPO_ROOT/scripts/cron-team-status.sh" "--dispatch-check")
+    ;;
+  *)
+    TOOL_BIN="$TOOL"
+    TOOL_ARGS=("-p" "$(cat "$prompt_file")")
+    ;;
+esac
+
 EXEC_CMD=()
-if command -v "$CLAUDE_BIN" >/dev/null 2>&1; then
-  EXEC_CMD=("$CLAUDE_BIN")
+EXEC_ENV="local"
+
+if command -v "$TOOL_BIN" >/dev/null 2>&1; then
+  EXEC_CMD=("$TOOL_BIN")
+  EXEC_ENV="local"
 elif [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
-  EXEC_CMD=("$SCRIPT_DIR/host-exec.sh" "$CLAUDE_BIN")
-else
-  printf 'cannot execute: %s not found on local or host\n' "$CLAUDE_BIN" >&2
-  write_receipt "failed" "" "" "$now_iso" "" "command not found: $CLAUDE_BIN"
+  # Probe if tool exists on macOS host
+  if "$SCRIPT_DIR/host-exec.sh" "command -v $TOOL_BIN" >/dev/null 2>&1; then
+    EXEC_CMD=("$SCRIPT_DIR/host-exec.sh" "$TOOL_BIN")
+    EXEC_ENV="host"
+  fi
+fi
+
+if [[ ${#EXEC_CMD[@]} -eq 0 ]]; then
+  printf 'cannot execute: tool %s (%s) not found on local or host\n' "$TOOL" "$TOOL_BIN" >&2
+  write_receipt "failed" "" "" "$now_iso" "" "command not found: $TOOL_BIN ($TOOL)"
   exit 1
 fi
 
@@ -396,8 +512,8 @@ fi
 started_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 write_receipt "running" "$$" "$started_iso" "" "" ""
 
-printf '[dispatch] running with pid=%s tool=%s...\n' "$$" "${EXEC_CMD[*]}"
-if "${EXEC_CMD[@]}" -p "$(cat "$prompt_file")"; then
+printf '[dispatch] running with pid=%s tool=%s (%s via %s)...\n' "$$" "$TOOL" "$TOOL_BIN" "$EXEC_ENV"
+if "${EXEC_CMD[@]}" "${TOOL_ARGS[@]}"; then
   completed_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   latest_hash="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || printf '')"
   write_receipt "done" "$$" "$started_iso" "$completed_iso" "$latest_hash" ""
@@ -408,3 +524,4 @@ else
   printf '[dispatch] execution failed: status=failed\n' >&2
   exit 1
 fi
+

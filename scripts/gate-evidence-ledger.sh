@@ -37,6 +37,8 @@ Options:
   --status <status>        gate status (passed | blocked | failed | not_applicable | pending)
   --summary <text>         gate summary explanation
   --evidence <path>        evidence file path or URL
+  --verify [wave]          verify gate closure (exit 0 on pass, non-zero if blocked)
+  --strict                 strict mode for verify (requires all 5 gates passed/N.A.)
   --print <wave>           print human-readable gate ledger
   --json <wave>            output ledger JSON
   --help                   show this help
@@ -50,6 +52,8 @@ Gates:
 EOF
 }
 
+STRICT=0
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --init) ACTION="init"; WAVE="${2:-}"; shift 2 ;;
@@ -59,6 +63,16 @@ while [[ $# -gt 0 ]]; do
     --status) STATUS="${2:-}"; shift 2 ;;
     --summary) SUMMARY="${2:-}"; shift 2 ;;
     --evidence) EVIDENCE="${2:-}"; shift 2 ;;
+    --verify)
+      ACTION="verify"
+      if [[ $# -ge 2 && ! "$2" =~ ^-- ]]; then
+        WAVE="$2"
+        shift 2
+      else
+        shift
+      fi
+      ;;
+    --strict) STRICT=1; shift ;;
     --print) ACTION="print"; WAVE="${2:-}"; shift 2 ;;
     --json) ACTION="json"; WAVE="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
@@ -189,6 +203,55 @@ if [[ "$ACTION" == "json" ]]; then
     exit 1
   fi
   exit 0
+fi
+
+if [[ "$ACTION" == "verify" ]]; then
+  if [[ ! -f "$ledger_file" ]]; then
+    printf '【G1-G5 门禁校验失败】未找到 %s 的证据账本文件 (%s)。\n' "$WAVE" "$ledger_file" >&2
+    printf '提示: 请先使用 scripts/gate-evidence-ledger.sh --init %s 初始化并记录门禁证据。\n' "$WAVE" >&2
+    exit 1
+  fi
+
+  node -e '
+const fs = require("fs");
+const file = process.argv[1];
+const strict = process.argv[2] === "1";
+const data = JSON.parse(fs.readFileSync(file, "utf8"));
+
+const gates = data.gates || {};
+const blockedOrFailed = [];
+const pendingGates = [];
+
+for (const [key, g] of Object.entries(gates)) {
+  if (g.status === "blocked" || g.status === "failed") {
+    blockedOrFailed.push(`${key} (${g.status}): ${g.summary || "无说明"}`);
+  } else if (g.status === "pending") {
+    pendingGates.push(key);
+  }
+}
+
+if (blockedOrFailed.length > 0) {
+  console.error(`[gate-ledger] 门禁拦截: 存在失败或阻断门禁:\n  - ${blockedOrFailed.join("\n  - ")}`);
+  process.exit(1);
+}
+
+// In standard mode, G2_CoreSWE must not be pending unless not applicable
+const g2 = gates["G2_CoreSWE"];
+if (!g2 || (g2.status !== "passed" && g2.status !== "not_applicable")) {
+  console.error(`[gate-ledger] 门禁拦截: G2_CoreSWE 核心研发门禁未通过 (当前状态: ${g2 ? g2.status : "missing"})`);
+  console.error(`  提示: 必须先完成 typecheck/test/commit 并通过 --set G2_CoreSWE --status passed 记账。`);
+  process.exit(1);
+}
+
+if (strict && pendingGates.length > 0) {
+  console.error(`[gate-ledger] 严格模式拦截: 尚有未决门禁:\n  - ${pendingGates.join("\n  - ")}`);
+  process.exit(1);
+}
+
+console.log(`[gate-ledger] 验证通过: ${data.wave} 关键交付门禁已闭环 (G2=${g2.status})。`);
+process.exit(0);
+' "$ledger_file" "$STRICT"
+  exit $?
 fi
 
 # Print report
