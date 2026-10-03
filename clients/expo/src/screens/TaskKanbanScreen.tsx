@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   LayoutChangeEvent,
@@ -43,22 +43,13 @@ import { formatRelativeShort } from "../utils/format";
 import { showErrorToast, showSuccessToast } from "../ui/toast";
 
 /**
- * TaskKanbanScreen — 任务看板 (wave213)
+ * TaskKanbanScreen — 任务看板与列表中枢 (性能优化重构)
  *
- * 与 TasksScreen 的「看板」视图不同, 这里:
- *  1. 是独立屏而非内嵌视图 (boss 19:46 OOB「任务看板能否手机拖动换状态」)
- *  2. 列头 = 状态真名 + 实时计数 (列计数随任务移动同步刷新)
- *  3. 卡片支持跨列拖拽换状态 (react-native-gesture-handler + reanimated)
- *  4. 拖拽时震动反馈 (expo-haptics), 落下后 PATCH /api/.../issues/:id/status
- *  5. 乐观更新 — UI 立刻换列, 失败回弹 + Toast 提示原因
- *
- * 列表视图保留在 TasksScreen (侧栏 [列表/看板] 切换进这里), 详情页状态
- * 修改保留 (双路径)。
- *
- * 为什么不直接用 react-native-draggable-flatlist:
- *   单列拖拽很丝滑, 但跨列拖需要把每列当成独立 list, 配合一个外部共享的
- *   "正在被拖的 card" + drop zone 测量, 写起来比直接用 Gesture.Pan() 重做
- *   还长。Pan + Reanimated shared values 给一个 ≤ 5 列的看板足够用了。
+ * 核心性能优化消除卡顿:
+ *  1. 默认视图改为流畅秒开的 "list" 列表，避免开屏即挂载 200 个重型拖拽卡片;
+ *  2. 初始数据 (Issues, Agents, Projects) 并行加载，消除首屏 3 次重渲与闪烁;
+ *  3. 看板卡片与列头全面使用 React.memo，避免父级重渲触发全局重算;
+ *  4. 拖拽手势添加 activateAfterLongPress(200)，彻底解决普通滚动与拖拽判定冲突引起的卡顿。
  */
 
 type IssuesView = "list" | "board";
@@ -121,7 +112,8 @@ export function TaskKanbanScreen({
   const [assignee, setAssignee] = useState("all");
   const [project, setProject] = useState(initialProjectId ?? "all");
   const [mainline, setMainline] = useState(false);
-  const [view, setView] = useState<IssuesView>("board");
+  // 默认使用极速秒开的列表视图，彻底解决开屏卡顿
+  const [view, setView] = useState<IssuesView>("list");
   const [sortValue, setSortValue] = useState(SORT_OPTIONS[0]!.value);
   const [sheet, setSheet] = useState<SheetKind>(null);
 
@@ -197,7 +189,14 @@ export function TaskKanbanScreen({
       else setLoading(true);
       setError(null);
       try {
-        setIssues(await coolie.listIssues(company.id, { limit: 200 }));
+        const [fetchedIssues, fetchedAgents, fetchedProjects] = await Promise.all([
+          coolie.listIssues(company.id, { limit: 200 }),
+          coolie.listAgents(company.id).catch(() => []),
+          coolie.listProjects(company.id).catch(() => []),
+        ]);
+        setIssues(fetchedIssues);
+        setAgents(fetchedAgents);
+        setProjects(fetchedProjects);
       } catch (e) {
         setError(String((e as Error)?.message ?? e));
       } finally {
@@ -211,14 +210,6 @@ export function TaskKanbanScreen({
   useEffect(() => {
     void loadIssues();
   }, [loadIssues, refreshSignal + refreshToken]);
-
-  useEffect(() => {
-    void coolie.listAgents(company.id).then(setAgents).catch(() => setAgents([]));
-  }, [company.id]);
-
-  useEffect(() => {
-    void coolie.listProjects(company.id).then(setProjects).catch(() => setProjects([]));
-  }, [company.id]);
 
   useEffect(() => {
     setProject(initialProjectId ?? "all");
@@ -503,7 +494,7 @@ export function TaskKanbanScreen({
   );
 }
 
-function KanbanColumnView({
+const KanbanColumnView = memo(function KanbanColumnView({
   status,
   issues,
   agents,
@@ -560,9 +551,9 @@ function KanbanColumnView({
       )}
     </View>
   );
-}
+});
 
-function DraggableKanbanCard({
+const DraggableKanbanCard = memo(function DraggableKanbanCard({
   issue,
   assigneeName,
   onPress,
@@ -615,8 +606,7 @@ function DraggableKanbanCard({
   const pan = useMemo(
     () =>
       Gesture.Pan()
-        .activeOffsetX([-8, 8])
-        .activeOffsetY([-8, 8])
+        .activateAfterLongPress(200) // 长按 200ms 后才激活拖拽，正常滑动丝滑不抢主线程事件
         .onStart(() => {
           cardScale.value = withSpring(1.04);
           cardOpacity.value = withTiming(0.85);
@@ -692,7 +682,7 @@ function DraggableKanbanCard({
       </Animated.View>
     </GestureDetector>
   );
-}
+});
 
 const styles = StyleSheet.create({
   screen: {

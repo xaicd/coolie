@@ -346,9 +346,9 @@ function FlatView({
         offset: ROW_STRIDE * index,
         index,
       })}
-      windowSize={11}
-      initialNumToRender={12}
-      maxToRenderPerBatch={12}
+      windowSize={5}
+      initialNumToRender={10}
+      maxToRenderPerBatch={8}
       removeClippedSubviews
       nestedScrollEnabled
       keyboardShouldPersistTaps="handled"
@@ -418,9 +418,9 @@ function SectionsView({
       renderItem={renderItem}
       renderSectionHeader={renderSectionHeader}
       stickySectionHeadersEnabled
-      windowSize={11}
-      initialNumToRender={12}
-      maxToRenderPerBatch={12}
+      windowSize={5}
+      initialNumToRender={10}
+      maxToRenderPerBatch={8}
       removeClippedSubviews
       nestedScrollEnabled
       keyboardShouldPersistTaps="handled"
