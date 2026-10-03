@@ -1,5 +1,7 @@
+import { createHash } from "node:crypto";
 import {
   agents,
+  assets,
   boardConversations,
   companies,
   entityRelations,
@@ -12,13 +14,14 @@ import {
 } from "@paperclipai/db";
 import type { Db } from "@paperclipai/db";
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
-import type {
-  EntityType,
-  OntologyInstanceRow,
-  OntologyInstancesResponse,
-  OntologyPropertyEntry,
-  OntologyPropertiesResponse,
-  OntologyPropertiesUpdate,
+import {
+  ENTITY_TYPES,
+  type EntityType,
+  type OntologyInstanceRow,
+  type OntologyInstancesResponse,
+  type OntologyPropertyEntry,
+  type OntologyPropertiesResponse,
+  type OntologyPropertiesUpdate,
 } from "@paperclipai/shared";
 
 /**
@@ -65,7 +68,10 @@ const ENTITY_LABEL_COLUMN = {
   spec: null,
   conversation: "title",
   work_product: "title",
-  attachment: "filename",
+  // wave293-G3 D2: `issue_attachments` has no filename column — the display
+  // name lives in `assets.original_filename`. `listInstances` serves this
+  // type through a dedicated join branch below instead of a label column.
+  attachment: null,
   comment: "body",
   agent: "name",
 } as const satisfies Partial<Record<EntityType, string | null>>;
@@ -92,9 +98,20 @@ export function ontologyInstancesService(db: Db) {
         | typeof issues
         | typeof agents
         | null;
-      const labelColumn = ENTITY_LABEL_COLUMN[input.entityType];
 
-      if (!table || !labelColumn) {
+      if (!table) {
+        return {
+          companyId: input.companyId,
+          entityType: input.entityType,
+          totalCount: 0,
+          instances: [],
+        };
+      }
+      // attachment is served by the join branch below (its label lives in
+      // `assets.original_filename`, not on `issue_attachments`), so only the
+      // remaining label-less type (`spec`) short-circuits to an empty page.
+      const labelColumn = ENTITY_LABEL_COLUMN[input.entityType];
+      if (input.entityType !== "attachment" && !labelColumn) {
         return {
           companyId: input.companyId,
           entityType: input.entityType,
@@ -156,7 +173,6 @@ export function ontologyInstancesService(db: Db) {
       // adding an `updated_at` dependency that some tables lack.
       const companyIdCol = (table as unknown as { companyId: unknown }).companyId;
       const idCol = (table as unknown as { id: unknown }).id;
-      const labelCol = (table as unknown as Record<string, unknown>)[labelColumn];
 
       const where = and(
         eq(companyIdCol as never, input.companyId),
@@ -165,13 +181,33 @@ export function ontologyInstancesService(db: Db) {
           : sql`true`,
       );
 
-      const rows = await db
-        .select({ id: idCol as never, label: labelCol as never })
-        .from(table as never)
-        .where(where)
-        .orderBy(desc(idCol as never))
-        .limit(input.limit)
-        .offset(input.offset);
+      // wave293-G3 D2: attachment labels live one join away — the file name
+      // is `assets.original_filename` (nullable), so a missing name degrades
+      // to `(未命名)` via labelFromRow like every other blank label.
+      let rows: Array<{ id: string; label: unknown }>;
+      if (input.entityType === "attachment") {
+        rows = await db
+          .select({ id: issueAttachments.id, label: assets.originalFilename })
+          .from(issueAttachments)
+          .leftJoin(assets, eq(assets.id, issueAttachments.assetId))
+          .where(where)
+          .orderBy(desc(issueAttachments.id))
+          .limit(input.limit)
+          .offset(input.offset);
+      } else {
+        rows = await db
+          .select({
+            id: idCol as never,
+            label: (table as unknown as Record<string, unknown>)[
+              ENTITY_LABEL_COLUMN[input.entityType] as string
+            ] as never,
+          })
+          .from(table as never)
+          .where(where)
+          .orderBy(desc(idCol as never))
+          .limit(input.limit)
+          .offset(input.offset);
+      }
 
       const totalRow = await db
         .select({ n: count() })
@@ -233,6 +269,49 @@ export function ontologyInstancesService(db: Db) {
         instances,
       };
     },
+  };
+}
+
+/**
+ * The property routes' `:typeId` segment accepts two shapes (wave293-G3 D1):
+ *
+ *   1. a raw UUID — the historical contract (the ontology plugin's node-type
+ *      id, resolved by the caller);
+ *   2. a built-in entityType business key (`issue`, `attachment`, …) — what
+ *      the App actually has on its drilldown rows. `OntologyEntityTypeLevel`
+ *      carries only `{entityType, count, edgeCount}`, so the App cannot send
+ *      a UUID even if it wanted to; before wave293 this shape hit
+ *      `eq(ontologyProperties.typeId, "issue")` against a uuid column and
+ *      500-ed (PG 22P02) on every call.
+ *
+ * Business keys resolve to a deterministic per-company UUID (SHA-256 of
+ * `companyId:entityType`, shaped with v5-style version/variant nibbles) so
+ * GET and PATCH land in the same `ontology_properties` bucket without a
+ * lookup round trip to the plugin's database. Anything else is a client
+ * error, not a 500.
+ */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function entityTypeTypeId(companyId: string, entityType: EntityType): string {
+  const hex = createHash("sha256")
+    .update(`coolie:ontology-type:${companyId}:${entityType}`)
+    .digest("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-5${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
+
+export function resolveOntologyTypeRef(
+  companyId: string,
+  raw: string,
+): { ok: true; typeId: string } | { ok: false; message: string } {
+  if (UUID_RE.test(raw)) {
+    return { ok: true, typeId: raw };
+  }
+  if ((ENTITY_TYPES as readonly string[]).includes(raw)) {
+    return { ok: true, typeId: entityTypeTypeId(companyId, raw as EntityType) };
+  }
+  return {
+    ok: false,
+    message: `typeId must be a uuid or an entityType key (${ENTITY_TYPES.join(" / ")})`,
   };
 }
 

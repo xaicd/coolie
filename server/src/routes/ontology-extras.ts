@@ -6,7 +6,11 @@ import {
   type EntityType,
 } from "@paperclipai/shared";
 import { logActivity } from "../services/activity-log.js";
-import { ontologyInstancesService, ontologyPropertiesService } from "../services/ontology-extras.js";
+import {
+  ontologyInstancesService,
+  ontologyPropertiesService,
+  resolveOntologyTypeRef,
+} from "../services/ontology-extras.js";
 import { assertBoard, assertCompanyAccess, getActorInfo } from "./authz.js";
 
 /**
@@ -24,6 +28,9 @@ import { assertBoard, assertCompanyAccess, getActorInfo } from "./authz.js";
  *   the company has saved for that type. PATCH is gated to Board actors
  *   (matching the audit posture of `ontology.backfill`) and writes one
  *   activity-log entry per save with the property count delta.
+ *   `:typeId` accepts a raw uuid or an entityType business key — the App's
+ *   drilldown rows only carry the business key (wave293-G3 D1); a value
+ *   that is neither answers 400 instead of letting PG's 22P02 become a 500.
  *
  * `/graph` already exists (wave154 + wave237) and is not touched here.
  */
@@ -51,20 +58,28 @@ export function ontologyExtrasRoutes(db: Db) {
 
   router.get("/companies/:companyId/ontology/types/:typeId/properties", async (req, res) => {
     const companyId = req.params.companyId as string;
-    const typeId = req.params.typeId as string;
     assertCompanyAccess(req, companyId);
-    const result = await properties.getProperties({ companyId, typeId });
+    const ref = resolveOntologyTypeRef(companyId, req.params.typeId as string);
+    if (!ref.ok) {
+      res.status(400).json({ error: ref.message });
+      return;
+    }
+    const result = await properties.getProperties({ companyId, typeId: ref.typeId });
     res.json(result);
   });
 
   router.patch("/companies/:companyId/ontology/types/:typeId/properties", async (req, res) => {
     const companyId = req.params.companyId as string;
-    const typeId = req.params.typeId as string;
     assertCompanyAccess(req, companyId);
     assertBoard(req);
+    const ref = resolveOntologyTypeRef(companyId, req.params.typeId as string);
+    if (!ref.ok) {
+      res.status(400).json({ error: ref.message });
+      return;
+    }
     const body = ontologyPropertiesUpdateSchema.parse(req.body ?? {});
-    const before = await properties.getProperties({ companyId, typeId });
-    const result = await properties.updateProperties({ companyId, typeId, update: body });
+    const before = await properties.getProperties({ companyId, typeId: ref.typeId });
+    const result = await properties.updateProperties({ companyId, typeId: ref.typeId, update: body });
 
     const actor = getActorInfo(req);
     await logActivity(db, {
@@ -78,7 +93,7 @@ export function ontologyExtrasRoutes(db: Db) {
       entityType: "company",
       entityId: companyId,
       details: {
-        typeId,
+        typeId: ref.typeId,
         beforeCount: before.properties.length,
         afterCount: result.properties.length,
         schemaVersion: result.schemaVersion,

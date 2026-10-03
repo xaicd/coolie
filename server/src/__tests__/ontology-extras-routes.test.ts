@@ -9,6 +9,7 @@ import {
   companies,
   createDb,
   entityRelations,
+  issueAttachments,
   issues,
   ontologyProperties,
   projects,
@@ -63,6 +64,7 @@ describeEmbeddedPostgres("ontology extras routes (wave239)", () => {
   }, 30_000);
 
   afterEach(async () => {
+    await db.delete(issueAttachments);
     await db.delete(ontologyProperties);
     await db.delete(entityRelations);
     await db.delete(activityLog);
@@ -245,6 +247,99 @@ describeEmbeddedPostgres("ontology extras routes (wave239)", () => {
     const res = await request(app)
       .patch(`/api/companies/${companyId}/ontology/types/${typeId}/properties`)
       .send({ properties: [{ key: "1-bad-key", type: "String" }] });
+    expect(res.status).toBe(400);
+  });
+
+  // wave293-G3 D2: `entityType=attachment` used to 500 on every company —
+  // the label query referenced an `issue_attachments.filename` column that
+  // does not exist (the name lives in `assets.original_filename`). The QA
+  // repro was the *empty* case, so assert that first, then the labels.
+  it("GET /ontology/instances?entityType=attachment returns 200 and joins asset filenames", async () => {
+    const companyId = await seedCompany();
+
+    // The QA curl repro: a company with zero attachments must 200, not 500.
+    const empty = await request(app).get(
+      `/api/companies/${companyId}/ontology/instances?entityType=attachment`,
+    );
+    expect(empty.status).toBe(200);
+    expect(empty.body.totalCount).toBe(0);
+    expect(empty.body.instances).toEqual([]);
+
+    const issueId = randomUUID();
+    await db.insert(issues).values({ id: issueId, companyId, title: "附证件" });
+    const named = randomUUID();
+    const anonymous = randomUUID();
+    await db.insert(assets).values([
+      {
+        id: named,
+        companyId,
+        provider: "local",
+        objectKey: `wave293/${named}`,
+        contentType: "application/pdf",
+        byteSize: 10,
+        sha256: "a".repeat(64),
+        originalFilename: "报告.pdf",
+      },
+      {
+        id: anonymous,
+        companyId,
+        provider: "local",
+        objectKey: `wave293/${anonymous}`,
+        contentType: "application/pdf",
+        byteSize: 10,
+        sha256: "b".repeat(64),
+        originalFilename: null,
+      },
+    ]);
+    await db.insert(issueAttachments).values([
+      { id: randomUUID(), companyId, issueId, assetId: named },
+      { id: randomUUID(), companyId, issueId, assetId: anonymous },
+    ]);
+
+    const res = await request(app).get(
+      `/api/companies/${companyId}/ontology/instances?entityType=attachment`,
+    );
+    expect(res.status).toBe(200);
+    expect(res.body.totalCount).toBe(2);
+    const labels = (res.body.instances as Array<{ id: string; label: string }>).sort((a, b) =>
+      a.label.localeCompare(b.label),
+    );
+    expect(labels.map((row) => row.label)).toEqual(["(未命名)", "报告.pdf"]);
+  });
+
+  // wave293-G3 D1: the App's drilldown rows only carry the entityType
+  // business key, so the properties routes must accept it directly — before
+  // this the uuid column met `"issue"` and every call 500-ed (PG 22P02).
+  it("GET/PATCH /ontology/types/issue/properties round-trips via the business key", async () => {
+    const companyId = await seedCompany();
+
+    const first = await request(app).get(
+      `/api/companies/${companyId}/ontology/types/issue/properties`,
+    );
+    expect(first.status).toBe(200);
+    expect(first.body.properties).toEqual([]);
+    expect(first.body.schemaVersion).toBe(0);
+
+    const patch = await request(app)
+      .patch(`/api/companies/${companyId}/ontology/types/issue/properties`)
+      .send({ properties: [{ key: "displayName", type: "String", sample: "任务工单" }] });
+    expect(patch.status).toBe(200);
+    expect(patch.body.properties).toHaveLength(1);
+    expect(patch.body.schemaVersion).toBe(1);
+
+    const roundTrip = await request(app).get(
+      `/api/companies/${companyId}/ontology/types/issue/properties`,
+    );
+    expect(roundTrip.status).toBe(200);
+    expect(roundTrip.body.properties).toHaveLength(1);
+    expect(roundTrip.body.properties[0].key).toBe("displayName");
+  });
+
+  it("GET /ontology/types/:id/properties answers 400 for a non-uuid non-entityType id", async () => {
+    const companyId = await seedCompany();
+    const res = await request(app).get(
+      `/api/companies/${companyId}/ontology/types/not-a-uuid-or-key/properties`,
+    );
     expect(res.status).toBe(400);
   });
 });
