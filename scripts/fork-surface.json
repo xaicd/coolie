@@ -1224,6 +1224,18 @@
       "maxNetLines": 260,
       "maxTotalLines": 290,
       "reason": "wave280: Event-driven WeChat notification trigger with true silence rule."
+    },
+    {
+      "path": "server/src/services/companies.ts",
+      "maxNetLines": 30,
+      "maxTotalLines": 40,
+      "reason": "Fix foreign key cascading deletion order when removing companies (costEvents/financeEvents before heartbeatRuns, projects before goals)."
+    },
+    {
+      "path": "scripts/coolie-local-dev.sh",
+      "maxNetLines": 250,
+      "maxTotalLines": 250,
+      "reason": "Local dev workshop runner for native host management and team dogfooding."
     }
   ]
 }

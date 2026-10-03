@@ -13,7 +13,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 LOCAL_DIR="${COOLIE_LOCAL_DIR:-$REPO_ROOT/.coolie-local}"
 LOG_DIR="$LOCAL_DIR/logs"
-DEV_LOG="$LOG_DIR/coolie-dev.log"
+DEV_LOG_REL=".coolie-local/logs/coolie-dev.log"
+DEV_PID_REL=".coolie-local/coolie-dev.pid"
+DEV_LOG="$LOCAL_DIR/logs/coolie-dev.log"
 DEV_PID_FILE="$LOCAL_DIR/coolie-dev.pid"
 PORT="${COOLIE_DEV_PORT:-3100}"
 HOST_API_BASE="http://127.0.0.1:$PORT"
@@ -68,7 +70,7 @@ cmd_start() {
   fi
 
   echo "🚀 在 Mac 宿主机后台启动原生 dev 服务..."
-  bash "$SCRIPT_DIR/host-exec.sh" "nohup pnpm dev:once > '$DEV_LOG' 2>&1 & echo \$! > '$DEV_PID_FILE'"
+  bash "$SCRIPT_DIR/host-exec.sh" "mkdir -p .coolie-local/logs && nohup pnpm dev:once > '$DEV_LOG_REL' 2>&1 & echo \$! > '$DEV_PID_REL'"
 
   echo "⏳ 等待服务健康检查就绪 (最多等待 30 秒)..."
   local waited=0
@@ -89,7 +91,7 @@ cmd_start() {
     cmd_url
   else
     echo "❌ 启动超时，请检查日志: $DEV_LOG"
-    bash "$SCRIPT_DIR/host-exec.sh" "tail -n 25 '$DEV_LOG'" || true
+    bash "$SCRIPT_DIR/host-exec.sh" "tail -n 25 '$DEV_LOG_REL'" || true
     return 1
   fi
 }
@@ -97,12 +99,12 @@ cmd_start() {
 cmd_stop() {
   echo "=== [Coolie Local Dev] 停止本地工坊环境 ==="
   bash "$SCRIPT_DIR/host-exec.sh" "
-    if [[ -f '$DEV_PID_FILE' ]]; then
-      pid=\$(cat '$DEV_PID_FILE' 2>/dev/null || true)
+    if [[ -f '$DEV_PID_REL' ]]; then
+      pid=\$(cat '$DEV_PID_REL' 2>/dev/null || true)
       if [[ -n \"\$pid\" ]] && kill -0 \"\$pid\" 2>/dev/null; then
         kill \"\$pid\" 2>/dev/null || true
       fi
-      rm -f '$DEV_PID_FILE'
+      rm -f '$DEV_PID_REL'
     fi
     # Also stop any dev service records
     pnpm dev:stop 2>/dev/null || true
