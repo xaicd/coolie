@@ -10840,7 +10840,13 @@ export function issueService(db: Db) {
         !nextAssigneeAgentId &&
         !nextAssigneeUserId
       ) {
-        throw unprocessable("in_progress issues require an assignee");
+        // Same code as the kanban status endpoint's coded backlog→todo check:
+        // the board's drag-to-In-Progress surfaces this through the shared
+        // error handler, and the UI maps the code to an assignee-first toast
+        // instead of the raw message.
+        throw unprocessable("in_progress issues require an assignee", {
+          code: "status_transition_requires_assignee",
+        });
       }
       if (patch.status === "in_progress") {
         const dependencyReadiness =

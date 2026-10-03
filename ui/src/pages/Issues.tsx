@@ -214,7 +214,7 @@ export function Issues() {
       const code = body?.code ?? "";
       const reason =
         code === "status_transition_requires_assignee"
-          ? "请先指派负责人, 再移到 Todo。"
+          ? "请先指派负责人, 再移动该工单 (Todo 与 In Progress 都需要指派)。"
           : code === "status_transition_requires_deliverable"
           ? "需要至少一个交付物才能移到 Done。"
           : body?.error ?? "状态更新失败, 已回滚。";
@@ -256,8 +256,8 @@ export function Issues() {
       onLoadMoreIssues={loadMoreServerIssues}
       onUpdateIssue={(id, data) => {
         // Kanban 拖拽换状态: 走专门 status 端点, 校验状态转换合法性
-        // (backlog→todo 需指派 / in_progress→done 需产物)。其它字段 (assigneeAgentId 等)
-        // 仍然走通用 updateIssue。
+        // (backlog→todo 需指派 / →in_progress 需指派 / in_progress→done 需产物)。
+        // 其它字段 (assigneeAgentId 等) 仍然走通用 updateIssue。
         if (
           data &&
           typeof data === "object" &&
