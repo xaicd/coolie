@@ -207,12 +207,18 @@ export class CoolieClient {
     const text = await res.text();
     const parsed = text ? safeJson(text) : null;
     if (!res.ok) {
-      const code = isRecord(parsed) && typeof parsed.error === "string" ? parsed.error : undefined;
+      // `code` is the server's machine-readable key (e.g.
+      // status_transition_requires_assignee) that surfaces map UX to;
+      // `error` is its human-readable text and only feeds the message
+      // fallback. The two used to be conflated here, which left coded
+      // 4xx responses un-mappable on native clients.
+      const errorCode = isRecord(parsed) && typeof parsed.code === "string" ? parsed.code : undefined;
+      const errorText = isRecord(parsed) && typeof parsed.error === "string" ? parsed.error : undefined;
       const message =
         (isRecord(parsed) && typeof parsed.message === "string" && parsed.message) ||
-        code ||
+        errorText ||
         `Request failed: ${res.status}`;
-      throw new CoolieApiError(res.status, message, code, parsed);
+      throw new CoolieApiError(res.status, message, errorCode ?? errorText, parsed);
     }
     return parsed as T;
   }

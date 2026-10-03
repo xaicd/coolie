@@ -364,7 +364,13 @@ export function TaskKanbanScreen({
             it.id === issue.id ? { ...it, status: prevStatus } : it,
           ),
         );
-        const msg = (e as Error)?.message ?? "未知错误";
+        // 服务端 422 带机器码时映射成固定中文 (与 web Issues.tsx 8437af145 的
+        // 列位无关文案一致); 其余错误维持原文。
+        const code = (e as { code?: string })?.code;
+        const msg =
+          code === "status_transition_requires_assignee"
+            ? "请先指派负责人, 再移动该工单 (Todo 与 In Progress 都需要指派)。"
+            : ((e as Error)?.message ?? "未知错误");
         showErrorToast("无法换列", msg);
       }
     },
