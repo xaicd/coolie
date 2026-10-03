@@ -268,11 +268,20 @@ function LoadingRows() {
 }
 
 function GroupHeader({ label, count }: { label: string; count: number }) {
+  const isNone = label === "未归属项目";
   return (
     <View style={styles.groupHeader}>
-      <Text style={styles.groupHeaderText}>
-        {label} · {count}
+      <Ionicons
+        name={isNone ? "folder-open-outline" : "folder-outline"}
+        size={14}
+        color={isNone ? C.ink4 : C.accent}
+      />
+      <Text style={[styles.groupHeaderText, isNone && { color: C.ink3 }]} numberOfLines={1}>
+        {label}
       </Text>
+      <View style={styles.groupBadge}>
+        <Text style={styles.groupBadgeText}>{count}</Text>
+      </View>
     </View>
   );
 }
@@ -588,9 +597,21 @@ const styles = StyleSheet.create({
   },
   groupHeaderText: {
     color: C.ink2,
-    fontSize: 12,
+    fontSize: 13,
     fontWeight: "600",
     flex: 1,
+  },
+  groupBadge: {
+    backgroundColor: ELEVATION.soft,
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: RADIUS.pill,
+  },
+  groupBadgeText: {
+    color: C.ink3,
+    fontSize: 11,
+    fontWeight: "600",
+    fontVariant: ["tabular-nums"],
   },
   boardContent: {
     gap: SPACING.sm,

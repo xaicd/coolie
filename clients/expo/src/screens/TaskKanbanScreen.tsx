@@ -30,6 +30,7 @@ import {
   countIssuesByStatus,
   type IssueSelection,
   type IssuesScope,
+  type IssuesView,
   type IssueSortDir,
   type IssueSortField,
   type StatusFilter,
@@ -43,20 +44,20 @@ import { formatRelativeShort } from "../utils/format";
 import { showErrorToast, showSuccessToast } from "../ui/toast";
 
 /**
- * TaskKanbanScreen — 任务看板与列表中枢 (性能优化重构)
+ * TaskKanbanScreen — 任务看板、项目分组与列表中枢 (全能高性能)
  *
- * 核心性能优化消除卡顿:
- *  1. 默认视图改为流畅秒开的 "list" 列表，避免开屏即挂载 200 个重型拖拽卡片;
- *  2. 初始数据 (Issues, Agents, Projects) 并行加载，消除首屏 3 次重渲与闪烁;
- *  3. 看板卡片与列头全面使用 React.memo，避免父级重渲触发全局重算;
+ * 核心功能与性能设计:
+ *  1. 默认秒开列表视图，同时支持「项目分组」与「状态看板」三大视图随时自由切换;
+ *  2. 项目分组基于原生高性能 SectionList + 吸顶标题，直观呈现不同项目下所有任务分布;
+ *  3. 看板采用 Web 版同款「分列渐进式渲染」(每列默认 10 张 + 展开更多)，消除卡顿;
  *  4. 拖拽手势添加 activateAfterLongPress(200)，彻底解决普通滚动与拖拽判定冲突引起的卡顿。
  */
 
-type IssuesView = "list" | "board";
 type SheetKind = "assignee" | "project" | "sort" | null;
 
 const VIEW_OPTIONS: Array<{ key: IssuesView; label: string }> = [
   { key: "list", label: "列表" },
+  { key: "group", label: "项目分组" },
   { key: "board", label: "看板" },
 ];
 
@@ -498,6 +499,7 @@ export function TaskKanbanScreen({
                 status={status}
                 issues={byStatus[status] ?? []}
                 agents={agents}
+                projects={projects}
                 visibleLimit={visibleLimitByStatus[status] ?? KANBAN_COLUMN_INITIAL_VISIBLE_LIMIT}
                 onShowMore={() => handleShowMore(status)}
                 onLayout={onColumnLayout(status)}
@@ -565,6 +567,7 @@ const KanbanColumnView = memo(function KanbanColumnView({
   status,
   issues,
   agents,
+  projects,
   visibleLimit,
   onShowMore,
   onLayout,
@@ -579,6 +582,7 @@ const KanbanColumnView = memo(function KanbanColumnView({
   status: IssueStatus;
   issues: Issue[];
   agents: AgentRow[];
+  projects: Project[];
   visibleLimit: number;
   onShowMore: () => void;
   onLayout: (e: LayoutChangeEvent) => void;
@@ -631,6 +635,11 @@ const KanbanColumnView = memo(function KanbanColumnView({
                   ? agents.find((a) => a.id === issue.assigneeAgentId)?.name ?? "已指派"
                   : "未分配"
               }
+              projectName={
+                issue.projectId
+                  ? projects.find((p) => p.id === issue.projectId)?.name ?? null
+                  : null
+              }
               onPress={() => onOpenIssue(issue)}
               dragOffsetX={dragOffsetX}
               dragOffsetY={dragOffsetY}
@@ -674,6 +683,7 @@ const KanbanColumnView = memo(function KanbanColumnView({
 const DraggableKanbanCard = memo(function DraggableKanbanCard({
   issue,
   assigneeName,
+  projectName,
   onPress,
   dragOffsetX,
   dragOffsetY,
@@ -684,6 +694,7 @@ const DraggableKanbanCard = memo(function DraggableKanbanCard({
 }: {
   issue: Issue;
   assigneeName: string;
+  projectName?: string | null;
   onPress: () => void;
   dragOffsetX: ReturnType<typeof useSharedValue<number>>;
   dragOffsetY: ReturnType<typeof useSharedValue<number>>;
@@ -785,11 +796,19 @@ const DraggableKanbanCard = memo(function DraggableKanbanCard({
         >
           <View style={[styles.cardAccent, { backgroundColor: color }]} />
 
-          {/* 卡片头部徽标区: 任务 Identifier + 主线/Spec 标记 */}
+          {/* 卡片头部徽标区: 任务 Identifier + 主线/Spec + 项目标记 */}
           <View style={styles.cardHeaderRow}>
             <View style={styles.identifierBadge}>
               <Text style={styles.identifierText}>{identifier}</Text>
             </View>
+            {projectName ? (
+              <View style={styles.projectBadge}>
+                <Ionicons name="folder-outline" size={10} color={C.ink3} />
+                <Text style={styles.projectBadgeText} numberOfLines={1}>
+                  {projectName}
+                </Text>
+              </View>
+            ) : null}
             {issue.isMilestone ? (
               <View style={styles.mainlineBadge}>
                 <Text style={styles.mainlineBadgeText}>主线</Text>
@@ -1032,6 +1051,21 @@ const styles = StyleSheet.create({
     color: C.ink3,
     fontSize: 11,
     fontFamily: "monospace",
+    fontWeight: "500",
+  },
+  projectBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 4,
+    maxWidth: 110,
+  },
+  projectBadgeText: {
+    color: C.ink3,
+    fontSize: 10,
     fontWeight: "500",
   },
   mainlineBadge: {
