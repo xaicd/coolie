@@ -462,7 +462,8 @@ if (running.length > 0) {
   const dur = formatDuration(r.startedAt || r.createdAt);
   const durStr = dur ? `${dur}, ` : "";
   const tBadge = getToolHealthBadge(r.tool);
-  console.log(`跑: ${r.employee} ${r.wave} (${durStr}${r.tool}${tBadge} + ${r.subagentType || "-"})`);
+  const taskDesc = r.task ? ` · ${r.task}` : "";
+  console.log(`跑: ${r.employee} (${r.tool}${tBadge})${taskDesc} [${durStr}${r.wave}]`);
 } else {
   console.log("跑: 无 (全员等派活)");
 }
@@ -471,12 +472,14 @@ if (blocked.length > 0) {
   const dur = formatDuration(b.startedAt || b.createdAt);
   const durStr = dur ? `${dur}, ` : "";
   const tBadge = getToolHealthBadge(b.tool);
-  console.log(`卡: ${b.employee} ${b.wave} (${durStr}${b.tool}${tBadge} · ${b.blockedReason || "阻塞"})`);
+  const taskDesc = b.task ? ` · ${b.task}` : "";
+  console.log(`卡: ${b.employee} (${b.tool}${tBadge})${taskDesc} [${durStr}${b.blockedReason || "阻塞"}]`);
 }
 if (done.length > 0) {
   const d = done[0];
   const ledger = getLedgerSummary(d);
-  console.log(`完: ${d.wave} 落仓 ${d.commit || "完成"}${ledger}`);
+  const taskDesc = d.task ? ` · ${d.task}` : "";
+  console.log(`完: ${d.employee || d.wave}${taskDesc} (${d.commit || "完成"}${ledger})`);
 }
 const alert = getToolHealthAlert();
 if (alert) {
@@ -485,6 +488,76 @@ if (alert) {
 console.log("");
 ' "$dispatch_dir"
   fi
+}
+
+render_who_is_doing_what() {
+  local dispatch_dir="${COOLIE_LOCAL_DIR:-$REPO_ROOT/.coolie-local}/dispatch"
+  [[ -d "$dispatch_dir" || ! -d "$REPO_ROOT/.paperclip-local/dispatch" ]] || dispatch_dir="$REPO_ROOT/.paperclip-local/dispatch"
+  node -e '
+const fs = require("fs");
+const path = require("path");
+const dir = process.argv[1];
+
+const employees = [
+  { name: "墨斗", role: "FDA (前线架构师)", defaultTool: "agy-gemini3.8", env: "Docker 容器" },
+  { name: "铁匠", role: "Core SWE (核心研发)", defaultTool: "claude-glm", env: "Mac 宿主机" },
+  { name: "门神", role: "FDSE (前线全栈部署)", defaultTool: "cmd", env: "Mac 宿主机" },
+  { name: "兑底渊", role: "PRE-SRE (产品可靠性)", defaultTool: "copilot", env: "Mac 宿主机" },
+  { name: "百晓生", role: "DS (部署战略专家)", defaultTool: "claude-glm", env: "Mac 宿主机" },
+  { name: "Hermes", role: "PM (掌柜)", defaultTool: "Hermes 调度脚本", env: "通用" }
+];
+
+let receipts = [];
+if (fs.existsSync(dir)) {
+  const files = fs.readdirSync(dir).filter(f => f.endsWith(".json")).map(f => path.join(dir, f));
+  receipts = files.map(f => {
+    try {
+      const data = JSON.parse(fs.readFileSync(f, "utf8"));
+      data._mtime = fs.statSync(f).mtimeMs;
+      return data;
+    } catch (e) {
+      return null;
+    }
+  }).filter(Boolean);
+  receipts.sort((a, b) => b._mtime - a._mtime);
+}
+
+const time = new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
+console.log(`【谁在用什么工具干什么 · 实时全景 (${time})】`);
+console.log("--------------------------------------------------------------------------------");
+
+employees.forEach(emp => {
+  const active = receipts.find(r => (r.employee === emp.name || r.subagentType === emp.name) && r.status === "running");
+  const lastDone = receipts.find(r => (r.employee === emp.name || r.subagentType === emp.name) && r.status === "done");
+  const blocked = receipts.find(r => (r.employee === emp.name || r.subagentType === emp.name) && (r.status === "blocked" || r.status === "failed"));
+
+  let statusText = "待命中";
+  let actionText = "等待 Hermes 派工";
+  let toolUsed = emp.defaultTool;
+  let icon = "🟡";
+
+  if (active) {
+    statusText = "执行中";
+    actionText = active.task || "进行中任务";
+    toolUsed = active.tool || emp.defaultTool;
+    icon = "🟢";
+  } else if (blocked) {
+    statusText = "阻塞/卡死";
+    actionText = `${blocked.task || "任务"} (原因: ${blocked.blockedReason || "未知"})`;
+    toolUsed = blocked.tool || emp.defaultTool;
+    icon = "⛔";
+  } else if (lastDone) {
+    actionText = `待命中 (上一产出: ${lastDone.task || lastDone.wave})`;
+    toolUsed = lastDone.tool || emp.defaultTool;
+  }
+
+  console.log(`${icon} 👤 ${emp.name} (${emp.role})`);
+  console.log(`   🛠️ 工具: ${toolUsed} [${emp.env}]`);
+  console.log(`   📝 事项: ${actionText}`);
+  console.log(`   📊 状态: ${statusText}`);
+  console.log("");
+});
+' "$dispatch_dir"
 }
 
 render_table() {
@@ -663,6 +736,9 @@ do_probe() {
 
 ACTION="${1:-}"
 case "$ACTION" in
+  --who|--who-is-doing-what)
+    render_who_is_doing_what
+    ;;
   --compact|--receipts)
     render_receipts_summary
     ;;
