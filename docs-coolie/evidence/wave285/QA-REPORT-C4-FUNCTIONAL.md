@@ -55,18 +55,34 @@
 - **根因 (代码定位)**: `TaskKanbanScreen.tsx` 的 wave285 改造把列表分支改为 `{headerCluster}` + `IssuesList` 平铺在新 `listLayout` (`:742-746`, `flex:1` 固定头) 内; `headerCluster` 中的横向 chips `ScrollView` 仅有 `contentContainerStyle`、无高度约束, 在 flex 容器内沿交叉轴被拉伸至填充剩余高度。`git log -S` 证实 `listLayout` 与 `headerCluster` 均由 `d4620810e` (wave285) 引入, `d4620810e^` 无此结构。
 - **影响**: 功能可用 (chips 仍可点, 弹层正常), 但视觉严重破损、且把列表区压掉近半屏 — 用户可感知。与工单清单 #2「无外层 ScrollView 造成的布局异常」相悖, EXECUTED 报告的 fps/代码形状口径未覆盖此面。
 - **证据**: `functional-evidence/03-defect-listview-chips-stretched.png` (对比: 看板分支截图同排正常)
-- **处置**: 缺陷单 **`75d74921-2ead-4eb0-ba6d-efa30289f308`** ([wave285-回归] 原生任务页列表分支筛选 chips 巨型拉伸, status=todo, 挂 wave285 实现单 `b3efa17f` 之下); 修复建议给 chips 横向 ScrollView 显式高度或移出 flex 拉伸上下文。
+- **处置**: 缺陷单 **`75d74921-2ead-4eb0-ba6d-efa30289f308`** ([wave285-回归] 原生任务页列表分支筛选 chips 巨型拉伸, 挂 wave285 实现单 `b3efa17f` 之下); 修复建议给 chips 横向 ScrollView 显式高度或移出 flex 拉伸上下文。
+  **已修复并验证** (2026-10-04): `8fdecf24c` 采纳「移出 flex 拉伸上下文」路线 — chips 横向 ScrollView 加 `style={styles.chipScroller}` (`{flexGrow: 0}`; RN `baseHorizontal` 基础样式自带 `flexGrow:1`, 传入样式经 `StyleSheet.compose` 覆盖之)。同机 (emulator-5580) 装机前后对照通过: chips 行 703px 巨 pill → ~56px 正常行, 筛选/分段/全部 7 任务同屏, fling 误触面随 pill 消失 (列表中部起甩、释放于旧 pill 区不开弹层), PTR 与看板分支无回归。详报 **`FIX-COOA-28-VERIFICATION.md`**; 证据 `cooa28-before-fix / after-fix / after-ptr / after-board.png`。⚠️ v0.6.25 (`017a4ef5d`) 出库早于修复, 仍含此缺陷, 随下一版出库 (亦见 QA-REPORT-C4-CROSSCHECK.md §4)。
 
-## 5. 回填区 (并行走查会话执行中)
+## 5. 回填区 (并行走查会话 — 已完成, 2026-10-04 折叠归档)
 
-以下项由并行走查会话 (同一 agent id 的第二会话, 分工: 它持设备/我持案头) 在构建 B 上执行, 完成后回填:
-- [ ] 只看主线 toggle
-- [ ] FAB 新建 (+服务端核验)
-- [ ] 长按主线任务下钻
-- [ ] 看板拖拽换列 (+PATCH 200 + 状态还原)
-- [ ] 空态 PTR 重测 (隔离输入竞争后)
-- [ ] 飞行模式错误态 PTR + 恢复
-- [ ] 第二台 AVD (coolie-test) 抽查
+并行会话 (同一 agent id 第二会话, 持设备) 在构建 B (0.6.23/623, emulator-5580, canonical 211 数据集) 上执行完毕。原始终据 `/tmp/c4-evidence/device-findings-5580.txt` + 截图 51–73 为临时目录, 结论折叠于此:
+
+- [x] **FAB 新建 (+服务端核验) — PASS**: FAB → 新会话页 → CreateTaskModal 默认值 → 提交, 服务端 211→212 (id `ecc9a26e…`), header 计数实时 159→160, 「今日·1」新行; 清理 DELETE 200, 数据集还原 211。(shots 55–59)
+- [x] **看板拖拽换列 (+PATCH 200 + 状态还原) — PASS**: 压测任务141 待处理→待办池, 原生对话框确认; API diff 恰一次 mutation (todo→backlog), 无附带变更; 已还原并全量 diff 比对。(shots 64–65)
+- [x] **午夜滚动跨日 — PASS (附注)**: 00:00 前后 今日+进行中 scope 计数 211→159 (10-03 到期的 52 条 todo 移出「今日」), 干净重过滤, 无陈旧 UI/崩溃。scope 计数依赖查询时刻, 报告数字须带时间脚注。(shots 53–54)
+- [x] **长按非主线行 — PASS (无动作 no-op)**: 不导航/不崩溃/不变更状态, 符合代码路径; 主线长按下钻见 D9。
+- [x] **空态 PTR 重测 — ❌ 证实 D7**: 空列表 PTR 无效 ×2 — RefreshControl 仅在有列表内容时激活, 唯一出口是重试按钮。
+- [x] **飞行模式错误态 PTR + 恢复 — ❌ 证实 D7 + 新增 D8**: 错误态 PTR 亦死 ×2 (shots 67–68); 且 **D8 (新, moderate)**: 离线错误卡是原位恢复死路 — 飞行模式关闭、网络恢复 (ping 10.0.2.2 0% loss) 后重试 ×2 仍失败, 同 JS runtime 重进 (dashboard→tasks) 即正常、冷启正常 → 仅错误卡自身卡死, 需 remount/导航离开才恢复; 且出错时已加载列表被清空 (陈旧内容不保留)。(shots 66–73)
+- [x] **第二台 AVD (coolie-test) 抽查 — 跳过 (合理)**: 5554 已不存在于 adb devices; 四项检查在 5580 均有覆盖, 无增量信息。
+
+### 5.1 新增缺陷 (并行会话发现, 待开缺陷单)
+
+| ID | 级别 | 摘要 | 关键定位 |
+|----|------|------|----------|
+| **D8** | moderate | 离线错误卡原位恢复死路: 网络恢复后重试仍失败, 仅 remount/冷启可恢复; 出错时已加载列表被清空 | 错误态重载路径; dashboard 同 runtime 正常加载排除全局网络停摆 |
+| **D7** (佐证) | — | PTR 在空态与错误态均死, RefreshControl 仅随列表内容激活 | IssuesList RefreshControl 挂载条件 |
+| **D9** | low | 主线任务长按下钻未接线于线上任务页 — IssuesList 未传 `onIssueLongPress` (`TaskKanbanScreen.tsx:460-472`), 功能仅在保留的 `TasksScreen.tsx:74-80` | **wave213 前置缺陷, 非 wave285 回归** (wave285 不触碰该文件); 主线 badge 渲染正常 (API PATCH 实测, 已还原) |
+
+### 5.2 环境附注 (归档)
+
+- **N1**: 23:54:30 `POST /api/board/chat/issue` → 403 `FEATURE_DISABLED` (后端 flag 关闭, 非 app 缺陷); 设备空闲时段发生, APK sha256 未变、无崩溃 — 外因 (外部驱动/探针) 未定, 仅记录。
+- **N2**: qa-server.log 随其 run scratch 目录被回收 (~00:05), 此后 :3102 存活但请求日志不可读; 后续验证均改为 API diff 法 (手势前后 issues 列表快照)。
+- 5580 上 5600 次 ANR 记录为模拟器渲染线程停顿 (`HardwareRenderer.nSetStopped`, 宿主负载 8→15), 非 app 缺陷 (见 CROSSCHECK §6.3)。
 
 ## 6. 走查环境事项 (如实记录)
 
@@ -82,7 +98,7 @@
 
 ## 8. 证据清单
 
-`docs-coolie/evidence/wave285/functional-evidence/`: 00–17 系列截图 ×19 (登录/列表/分组深滚/sticky 中滚/PTR/排序/搜索/详情/指派弹层/指派命中/空态 ×2/PTR ×2/项目筛选/缺陷对比) + `gfx/` 帧率原始 dump ×5。
-服务端日志: 本地 QA 实例 (3102) GET/PATCH 时序, 引用点已随文标注。
+`docs-coolie/evidence/wave285/functional-evidence/`: 00–17 系列截图 ×19 (登录/列表/分组深滚/sticky 中滚/PTR/排序/搜索/详情/指派弹层/指派命中/空态 ×2/PTR ×2/项目筛选/缺陷对比) + `gfx/` 帧率原始 dump ×5; COOA-28 修复前后对照 ×4 (`cooa28-before-fix / after-fix / after-ptr / after-board.png`, 索引见 `FIX-COOA-28-VERIFICATION.md`)。并行会话设备截图 51–73 为临时目录 (`/tmp/c4-evidence/`), 结论已折叠入 §5。
+服务端日志: 本地 QA 实例 (3102) GET/PATCH 时序, 引用点已随文标注 (00:05 后日志被回收, 改 API diff 法, 见 §5.2/N2)。
 
 *门神 (FDSE) · wave285-C4 功能补充走查 · 2026-10-03*
