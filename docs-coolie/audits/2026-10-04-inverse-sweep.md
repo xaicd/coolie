@@ -35,6 +35,8 @@
 
 单条杂项 (P3): `/api/cases/:id/links`、`/:id/attachments` (数据经 case GET payload 内嵌, 专用端点冗余)、`/api/companies/issues` (跨司列表)、`/api/environments/:id/leases`、`/api/tool-connections/:id/usage`。`/api/companies/templates` 服务建司模板 (onboarding 面)。
 
+**挂载史 (b1196a5d 补, 复跑验证通过 933/846/87)**: 真孤儿全部 2.5–7 个月龄, 是「长期未接线的能力面」而非近期 build-ahead — plugins jobs 三条 2026-03-13 (插件框架 #80cdbdbd4)、environments leases 2026-04-23 (SSH 环境 #4358)、cases links/attachments 2026-07-09 (实验性 case 对象 #9198)、decision-training `:id` 三连 2026-07-17 (#9779 恢复 decision training library+inspector)、tool-connections usage 2026-07-21 (#9982 runtime subjects)。倾向 **retire**; 若产品要这些面, 应该是带 UI 的 wire 而非维持裸端点。
+
 ## Machine-facing 合法孤儿 (样例, 勿立券)
 
 MCP 协议 (tool-gateway 8 条含 `gateways/:id/mcp`、`tools/call`)、**connection runtime-tools 5 条
