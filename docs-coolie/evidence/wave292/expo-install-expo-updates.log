@@ -1,0 +1,27 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+› Installing 1 SDK 52.0.0 compatible native module using pnpm
+> pnpm add expo-updates@~0.27.5
+(node:42514) [DEP0169] DeprecationWarning: `url.parse()` behavior is not standardized and prone to errors that have security implications. Use the WHATWG URL API instead. CVEs are not issued for `url.parse()` vulnerabilities.
+(Use `node --trace-deprecation ...` to show where the warning was created)
+ ERR_PNPM_UNEXPECTED_STORE  Unexpected store location
+
+The dependencies at "/Users/mac/workspace/xaicd/coolie/clients/expo/node_modules" are currently linked from the store at "/Users/mac/Library/pnpm/store/v11".
+
+pnpm now wants to use the store at "/Users/mac/Library/pnpm/store/v3" to link dependencies.
+
+If you want to use the new store location, reinstall your dependencies with "pnpm install".
+
+You may change the global store location by running "pnpm config set store-dir <dir> --global".
+(This error may happen if the node_modules was installed with a different major version of pnpm)
+Error: pnpm add expo-updates@~0.27.5 exited with non-zero code: 1
+Error: pnpm add expo-updates@~0.27.5 exited with non-zero code: 1
+    at ChildProcess.completionListener (/Users/mac/workspace/xaicd/coolie/clients/expo/node_modules/@expo/spawn-async/build/spawnAsync.js:113:23)
+    at ChildProcess.wrapper (node:events:639:12)
+    at ChildProcess.emit (node:events:514:28)
+    at ChildProcess._handle.onexit (node:internal/child_process:295:12)
+    ...
+    at spawnAsync (/Users/mac/workspace/xaicd/coolie/clients/expo/node_modules/@expo/spawn-async/build/spawnAsync.js:9:23)
+    at PnpmPackageManager.runAsync (/Users/mac/workspace/xaicd/coolie/clients/expo/node_modules/@expo/package-manager/build/node/BasePackageManager.js:41:42)
+    at PnpmPackageManager.addAsync (/Users/mac/workspace/xaicd/coolie/clients/expo/node_modules/@expo/package-manager/build/node/PnpmPackageManager.js:36:21)
+    at installPackagesAsync (/Users/mac/workspace/xaicd/coolie/clients/expo/node_modules/@expo/cli/build/src/install/installAsync.js:183:30)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)

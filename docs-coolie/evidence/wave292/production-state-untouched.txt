@@ -1,0 +1,25 @@
+# 生产只读探测 @ 2026-10-03T17:03:29Z — C-3 未执行, 生产应停在 v0.6.25 (证明「未动生产」)
+
+## https://xrobinai.cn/version.json
+{
+  "version": "0.6.25",
+  "versionCode": 625,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.25/coolie-release.apk",
+  "apkSha256": "c0af1ab730b2515111eacf845be654e9fb2f647ff81adee651ba618c74087478",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "2e7d63c06857dfb115f318e36ece2945b0f4cd4259b13fea0a009a9cf6e6b4c0",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "原生任务列表分页流式加载 (60fps 200+ 任务) + 底部栏重构 (+ 号直通两张卡建单) + 原生项目分组视图 + 看板对齐 web 架构 (增量分页/状态色调/卡片徽章) + 看门狗健康巡检 + 看板 422 needs-assignee 修 + release-pipeline skill 沉淀 + agy health probe fix + v0.6.24 SHA 修复",
+  "commitSha": "017a4ef5db4011bde9404f44fb38ba783bb9c8a9"
+}
+
+## https://xrobinai.cn/ota/manifest (runtimeVersion 字段)
+{
+  "id": "4a8482d0-f167-497d-802d-0033218268c5",
+  "createdAt": "2026-10-03T16:21:23.259Z",
+  "runtimeVersion": "0.6.25"
+}
+
+## https://xrobinai.cn/api/health
+{"status":"ok","deploymentMode":"authenticated","deploymentExposure":"public","localAiLoginSupported":false,"commit":null,"bootstrapStatus":"ready","bootstrapInviteActive":false,"databaseBackup":{"ena

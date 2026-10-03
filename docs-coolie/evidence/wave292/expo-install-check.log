@@ -1,0 +1,6 @@
+npm warn Unknown project config "node-linker". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+The following packages should be updated for best compatibility with the installed expo version:
+  react-native@0.76.5 - expected version: 0.76.9
+  react-native-webview@14.0.1 - expected version: 13.12.5
+Your project may not work correctly until you install the expected versions of the packages.
+Found outdated dependencies

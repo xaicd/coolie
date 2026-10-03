@@ -1,0 +1,16 @@
+# C-1 commit a8e7d868e 的完整 diff
+a8e7d868e7e64beb2c3931c4b8838a4d1fe75269 feat(expo): wave292 — runtimeVersion 政策 appVersion→fingerprint
+
+diff --git a/clients/expo/app.json b/clients/expo/app.json
+index dc0de8571..395786f2b 100644
+--- a/clients/expo/app.json
++++ b/clients/expo/app.json
+@@ -26,7 +26,7 @@
+       }
+     },
+     "runtimeVersion": {
+-      "policy": "appVersion"
++      "policy": "fingerprint"
+     },
+     "ios": {
+       "supportsTablet": true,

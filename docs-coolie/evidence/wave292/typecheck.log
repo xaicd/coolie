@@ -1,0 +1,22 @@
+# G2 pnpm -r typecheck (wave292) — 2026-10-03T17:03:38Z
+# 首跑 packages/db 报 tsx IPC listen EINVAL (沙盒 TMPDIR unix socket 路径过长, 环境问题非代码)
+# 按预案 TMPDIR=$(mktemp -d /tmp/ck.XXXXXX) 重跑:
+# exit code: 0, error TS 计数: 0
+
+命令: TMPDIR=$(mktemp -d /tmp/ck.XXXXXX) pnpm -r typecheck
+typecheck-exit=0
+grep -cE 'error TS' → 0
+
+—— 输出尾部 ——
+server typecheck:     --> crates/runner-core/src/provider_bridge.rs:1043:4
+server typecheck:      |
+server typecheck: 1043 | fn validate_tool_result_contract(
+server typecheck:      |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+server typecheck: warning: `paperclip-runner-core` (lib) generated 3 warnings
+server typecheck:     Finished `release` profile [optimized] target(s) in 0.38s
+server typecheck: Replay golden snapshots and parity summaries are current.
+server typecheck: > @paperclipai/plugin-sdk@1.0.0 ensure-build-deps /Users/mac/workspace/xaicd/coolie/packages/plugins/sdk
+server typecheck: > node ../../../scripts/ensure-plugin-build-deps.mjs
+server typecheck: Done
+cli typecheck$ tsc --noEmit
+cli typecheck: Done
