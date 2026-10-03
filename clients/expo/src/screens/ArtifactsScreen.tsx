@@ -36,6 +36,7 @@ import { LoadingState } from "../ui/LoadingState";
 import { Pill } from "../ui/Pill";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { SegmentedControl } from "../ui/SegmentedControl";
+import { RADIUS } from "../ui/tokens";
 import { ExternalOpenSheet } from "../components/ExternalOpenSheet";
 import { FilterSheet, type FilterOption } from "../components/FilterSheet";
 import { ArtifactVersionSheet } from "../components/ArtifactVersionSheet";
@@ -53,6 +54,7 @@ export interface ArtifactsScreenProps {
     workProduct?: IssueWorkProduct | null,
     scope?: SandboxScope | null,
   ) => void;
+  onOpenPrototypeSandbox?: () => void;
   onOpenDiff?: (issue: Issue, workProduct?: IssueWorkProduct | null) => void;
 }
 
@@ -171,6 +173,7 @@ export function ArtifactsScreen({
   initialProjectId,
   onBack,
   onOpenSandbox,
+  onOpenPrototypeSandbox,
   onOpenDiff,
 }: ArtifactsScreenProps) {
   const [artifacts, setArtifacts] = useState<CompanyArtifact[]>([]);
@@ -529,6 +532,35 @@ export function ArtifactsScreen({
           data={filteredList}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContent}
+          ListHeaderComponent={
+            <Pressable
+              style={styles.sandboxHeroCard}
+              onPress={() => {
+                if (onOpenPrototypeSandbox) {
+                  onOpenPrototypeSandbox();
+                } else {
+                  onOpenSandbox?.("", null, null, null);
+                }
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="进入原型沙箱"
+            >
+              <View style={styles.sandboxHeroLeft}>
+                <View style={styles.sandboxHeroBadge}>
+                  <Ionicons name="cube" size={13} color="#A78BFA" />
+                  <Text style={styles.sandboxHeroBadgeText}>墨斗高保真交互</Text>
+                </View>
+                <Text style={styles.sandboxHeroTitle}>🎨 原型沙箱 · 即刻免安装体验</Text>
+                <Text style={styles.sandboxHeroDesc}>
+                  在线预览墨斗输出的最新设计原型、Plate 组件调试与真实交互效果
+                </Text>
+              </View>
+              <View style={styles.sandboxHeroBtn}>
+                <Text style={styles.sandboxHeroBtnText}>体验</Text>
+                <Ionicons name="chevron-forward" size={14} color="#FFF" />
+              </View>
+            </Pressable>
+          }
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -1319,5 +1351,61 @@ const styles = StyleSheet.create({
     color: C.ink2,
     fontSize: 12,
     fontWeight: "500",
+  },
+  sandboxHeroCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "rgba(167, 139, 250, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(167, 139, 250, 0.3)",
+    borderRadius: RADIUS.lg,
+    padding: 14,
+    marginBottom: 14,
+    gap: 12,
+  },
+  sandboxHeroLeft: {
+    flex: 1,
+    gap: 4,
+  },
+  sandboxHeroBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(167, 139, 250, 0.16)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+    marginBottom: 2,
+  },
+  sandboxHeroBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#C4B5FD",
+  },
+  sandboxHeroTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: C.ink,
+  },
+  sandboxHeroDesc: {
+    fontSize: 11,
+    color: C.ink3,
+    lineHeight: 16,
+  },
+  sandboxHeroBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "#8B5CF6",
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: RADIUS.md,
+  },
+  sandboxHeroBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#FFFFFF",
   },
 });

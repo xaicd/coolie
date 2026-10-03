@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Platform,
@@ -21,6 +21,7 @@ import { QuickActionsRow, type QuickAction } from "../components/doubao/QuickAct
 import { HoldToTalkButton } from "../components/doubao/HoldToTalkButton";
 import { useVoiceInput } from "../components/doubao/useVoiceInput";
 import type { StagedAttachment } from "../components/composer/UploadRow";
+import { matchIntentToAgent } from "../utils/intentMatcher";
 
 /** 丢弃草稿的回执 —— Android 用系统 toast (不打断), iOS 没 toast 才退化为弹窗。 */
 function notifyDraftDiscarded(): void {
@@ -115,6 +116,8 @@ export function NewTaskPage({
     { key: "photo", icon: "📷", label: "拍照上传", onPress: () => void pickImage() },
   ];
 
+  const detectedIntent = useMemo(() => matchIntentToAgent(title, agents), [title, agents]);
+
   const showComposer = editing || title.trim().length > 0;
 
   return (
@@ -156,6 +159,15 @@ export function NewTaskPage({
               multiline
               autoFocus={editing && title.length === 0}
             />
+            {detectedIntent.recommendedAgent ? (
+              <View style={styles.intentBadge}>
+                <Ionicons name="sparkles" size={11} color="#FACC15" />
+                <Text style={styles.intentBadgeText}>
+                  💡 意图识别: 建议派给 {detectedIntent.recommendedAgent.name} (
+                  {detectedIntent.detectedSkills.join("·")})
+                </Text>
+              </View>
+            ) : null}
             <Text style={styles.titleHint}>确认或补充后再点「创建任务」</Text>
             {attachments.length > 0 ? (
               <Text style={styles.attachHint}>📎 已选 {attachments.length} 个附件</Text>
@@ -210,6 +222,7 @@ export function NewTaskPage({
           agents={agents}
           initialTitle={title}
           initialAttachments={attachments}
+          initialAssigneeId={detectedIntent.recommendedAgent?.id}
           onClose={() => setCreateOpen(false)}
           onCreated={(issue) => {
             setCreateOpen(false);
@@ -372,5 +385,24 @@ const styles = StyleSheet.create({
   auxLabel: {
     color: C.ink4,
     fontSize: 11,
+  },
+  intentBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(250, 204, 21, 0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(250, 204, 21, 0.25)",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: RADIUS.sm,
+    alignSelf: "flex-start",
+    marginTop: 6,
+    marginBottom: 4,
+  },
+  intentBadgeText: {
+    fontSize: 11,
+    color: "#FACC15",
+    fontWeight: "500",
   },
 });

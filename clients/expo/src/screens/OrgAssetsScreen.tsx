@@ -26,11 +26,10 @@ import { AgentsScreen } from "./AgentsScreen";
 import { ArtifactsScreen } from "./ArtifactsScreen";
 import type { SandboxScope } from "./PrototypeSandboxScreen";
 import { PluginOrgSwitcher } from "../components/PluginOrgSwitcher";
-import { SkillMatcherSheet } from "../components/SkillMatcherSheet";
 import { Sheet } from "../ui/Sheet";
 import { TAB_BAR_HEIGHT } from "../components/TabBar";
 
-export type OrgAssetTab = "ontology" | "projects" | "agents" | "artifacts";
+export type OrgAssetTab = "artifacts" | "ontology" | "agents" | "projects";
 
 interface OrgAssetsScreenProps {
   company: Company;
@@ -70,26 +69,24 @@ interface OrgAssetsScreenProps {
 }
 
 const TAB_OPTIONS: Array<{ key: OrgAssetTab; label: string }> = [
+  { key: "artifacts", label: "🎨 产物与原型" },
   { key: "ontology", label: "🧠 业务本体" },
-  { key: "artifacts", label: "📦 交付产物" },
+  { key: "agents", label: "👥 数字员工" },
+  { key: "projects", label: "📁 微服务项目" },
 ];
-
 
 /**
  * 资产与组织中枢 (OrgAssetsScreen)。
- * 彻底解决「本体藏太深、员工进不去、项目无治理」的痛点:
- * 将公司核心数字资产(业务本体、微服务项目、数字员工、交付产物、例行计划、成本核算)
- * 全部汇聚于 Tab 5, 一键秒级平滑切换, 能力 100% 完整具备, 零功能缩水。
- *
- * wave235 新增: 顶部"组织切换器" (单公司场景下隐), 4 个新 pill 入口
- * (插件 / 画图 / 入职 / 完整市场) 收进"更多"下拉, 不抢 segmented control 的位置。
+ * 彻底解决「资产混乱、本体难寻、员工失焦、原型被藏」的痛点:
+ * 汇聚四大核心数字资产: 产物与原型、业务本体、数字员工、微服务项目，
+ * 顶层直达墨斗原型沙箱，去除多余生硬按钮，回归纯粹资产管理。
  */
 export function OrgAssetsScreen({
   company,
   switchableCompanies,
   onSwitchCompany,
   whoami,
-  initialTab = "ontology",
+  initialTab = "artifacts",
   initialArtifactsProjectId,
   onOpenIssue,
   onOpenProjectTasks,
@@ -113,23 +110,6 @@ export function OrgAssetsScreen({
   );
   // wave235 — "更多"下拉.
   const [moreOpen, setMoreOpen] = useState(false);
-  // wave258 — "派活精准" 浮层 (老板原话 "方便后续派活精准").
-  const [skillMatcherOpen, setSkillMatcherOpen] = useState(false);
-  const [skillMatcherAgents, setSkillMatcherAgents] = useState<AgentRow[]>([]);
-
-  const handleOpenSkillMatcher = useMemo(
-    () => async () => {
-      try {
-        const list = await coolie.listAgents(company.id);
-        setSkillMatcherAgents(list);
-        setSkillMatcherOpen(true);
-      } catch (e) {
-        // listAgents 失败时静默; UI 已经把按钮 disable, 不必弹 alert
-        setSkillMatcherAgents([]);
-      }
-    },
-    [company.id],
-  );
 
   const switchable = useMemo<Company[]>(
     () => switchableCompanies ?? [company],
@@ -162,26 +142,26 @@ export function OrgAssetsScreen({
                 onSwitch={handleSwitch}
               />
             ) : null}
-            {/* 派活精准 */}
-            <Pressable
-              style={styles.extraPill}
-              onPress={handleOpenSkillMatcher}
-              hitSlop={6}
-              accessibilityLabel="派活精准"
-            >
-              <Ionicons name="sparkles-outline" size={12} color="#FACC15" />
-              <Text style={styles.extraPillText}>派活精准</Text>
-            </Pressable>
             {/* 原型沙箱 (墨斗交互原型即时预览) */}
-            <Pressable
-              style={[styles.extraPill, { borderColor: "rgba(167, 139, 250, 0.4)", backgroundColor: "rgba(167, 139, 250, 0.12)" }]}
-              onPress={() => onOpenPrototypeSandbox?.()}
-              hitSlop={6}
-              accessibilityLabel="原型沙箱"
-            >
-              <Ionicons name="cube-outline" size={12} color="#A78BFA" />
-              <Text style={[styles.extraPillText, { color: "#A78BFA" }]}>原型沙箱</Text>
-            </Pressable>
+            {onOpenPrototypeSandbox ? (
+              <Pressable
+                style={[
+                  styles.extraPill,
+                  {
+                    borderColor: "rgba(167, 139, 250, 0.4)",
+                    backgroundColor: "rgba(167, 139, 250, 0.12)",
+                  },
+                ]}
+                onPress={() => onOpenPrototypeSandbox?.()}
+                hitSlop={6}
+                accessibilityLabel="原型沙箱"
+              >
+                <Ionicons name="cube-outline" size={12} color="#A78BFA" />
+                <Text style={[styles.extraPillText, { color: "#A78BFA", fontWeight: "600" }]}>
+                  🎨 原型沙箱
+                </Text>
+              </Pressable>
+            ) : null}
             <Pressable
               style={styles.extraPill}
               onPress={() => setMoreOpen(true)}
@@ -203,6 +183,17 @@ export function OrgAssetsScreen({
 
       {/* 核心内容区: 四大核心资产无缝呈现 */}
       <View style={styles.content}>
+        {activeTab === "artifacts" && (
+          <ArtifactsScreen
+            company={company}
+            whoami={whoami}
+            initialProjectId={artifactsProjectId}
+            onOpenSandbox={(url, service, wp, scope) => onOpenSandbox?.(url, service, wp, scope)}
+            onOpenPrototypeSandbox={onOpenPrototypeSandbox}
+            onOpenDiff={(issue, wp) => onOpenDiff?.(issue, wp)}
+          />
+        )}
+
         {activeTab === "ontology" && (
           <OntologyDomainListScreen
             company={company}
@@ -213,20 +204,6 @@ export function OrgAssetsScreen({
           />
         )}
 
-        {activeTab === "projects" && (
-          <ProjectsScreen
-            company={company}
-            onBack={() => setActiveTab("ontology")}
-            onOpenProjectTasks={onOpenProjectTasks}
-            onCreateTaskForProject={onCreateTaskForProject}
-            onOpenProjectArtifacts={(project) => {
-              setArtifactsProjectId(project.id);
-              setActiveTab("artifacts");
-            }}
-            onOpenWebProjects={onOpenWebProjects}
-          />
-        )}
-
         {activeTab === "agents" && (
           <AgentsScreen
             company={company}
@@ -234,13 +211,17 @@ export function OrgAssetsScreen({
           />
         )}
 
-        {activeTab === "artifacts" && (
-          <ArtifactsScreen
+        {activeTab === "projects" && (
+          <ProjectsScreen
             company={company}
-            whoami={whoami}
-            initialProjectId={artifactsProjectId}
-            onOpenSandbox={(url, service, wp, scope) => onOpenSandbox?.(url, service, wp, scope)}
-            onOpenDiff={(issue, wp) => onOpenDiff?.(issue, wp)}
+            onBack={() => setActiveTab("artifacts")}
+            onOpenProjectTasks={onOpenProjectTasks}
+            onCreateTaskForProject={onCreateTaskForProject}
+            onOpenProjectArtifacts={(project) => {
+              setArtifactsProjectId(project.id);
+              setActiveTab("artifacts");
+            }}
+            onOpenWebProjects={onOpenWebProjects}
           />
         )}
       </View>
@@ -289,13 +270,6 @@ export function OrgAssetsScreen({
           ))}
         </Sheet>
       ) : null}
-
-      {/* wave258 — 派活精准浮层 (老板原话 "方便后续派活精准") */}
-      <SkillMatcherSheet
-        visible={skillMatcherOpen}
-        agents={skillMatcherAgents}
-        onClose={() => setSkillMatcherOpen(false)}
-      />
     </SafeAreaView>
   );
 }

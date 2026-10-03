@@ -21,6 +21,7 @@ import { AgentPickerSheet } from "./AgentPickerSheet";
 import { useComposerFields } from "./composer/useComposerFields";
 import { UploadRow, type StagedAttachment } from "./composer/UploadRow";
 import { ISSUE_PRIORITIES, PRIORITY_COLOR, PRIORITY_LABEL } from "./issue-status";
+import { matchIntentToAgent } from "../utils/intentMatcher";
 
 /** 单选用「空 value」表示清除 (自动派发 / 无项目)。 */
 const NONE = "";
@@ -94,6 +95,7 @@ export function CreateTaskModal({
   initialTitle = "",
   initialAttachments,
   initialProjectId,
+  initialAssigneeId,
   onClose,
   onCreated,
 }: {
@@ -106,6 +108,8 @@ export function CreateTaskModal({
   initialAttachments?: StagedAttachment[];
   /** 项目卡「创建任务」带上来的项目 —— 打开即预选 (boss: 项目要已经选好)。 */
   initialProjectId?: string | null;
+  /** 意图识别预推荐负责人 id */
+  initialAssigneeId?: string | null;
   onClose: () => void;
   onCreated: (issue: Issue) => void;
 }) {
@@ -121,7 +125,14 @@ export function CreateTaskModal({
   const [assigneeOpen, setAssigneeOpen] = useState(false);
 
   const fields = useComposerFields(companyId, agents);
-  const { reset: resetFields, setAttachments, setProjectId } = fields;
+  const { reset: resetFields, setAttachments, setProjectId, setAssigneeAgentId } = fields;
+
+  /** 意图精准识别匹配结果 (根据输入的标题与描述即时推测) */
+  const intentResult = useMemo(() => {
+    const query = `${title} ${description}`.trim();
+    if (!query) return null;
+    return matchIntentToAgent(query, agents);
+  }, [title, description, agents]);
 
   // 入口页先挑好的附件并进 composer 的待传列表。上传要 issue id, 所以这里只暂存,
   // 建单成功后由 useComposerFields 统一 flush。
@@ -138,6 +149,13 @@ export function CreateTaskModal({
       setProjectId(initialProjectId);
     }
   }, [visible, initialProjectId, setProjectId]);
+
+  // 初始预选推荐负责人
+  useEffect(() => {
+    if (visible && initialAssigneeId && !fields.assigneeAgentId) {
+      setAssigneeAgentId(initialAssigneeId);
+    }
+  }, [visible, initialAssigneeId, fields.assigneeAgentId, setAssigneeAgentId]);
 
   const reset = useCallback(() => {
     setTitle("");
@@ -246,6 +264,56 @@ export function CreateTaskModal({
                 multiline
               />
             </SectionCard>
+
+            {/* 意图精准识别与责任人智能推荐 */}
+            {intentResult?.recommendedAgent ? (
+              <Pressable
+                style={styles.intentCard}
+                onPress={() => fields.setAssigneeAgentId(intentResult.recommendedAgent?.id ?? null)}
+                accessibilityRole="button"
+                accessibilityLabel="采纳推荐负责人"
+              >
+                <View style={styles.intentHeader}>
+                  <View style={styles.intentBadge}>
+                    <Ionicons name="sparkles" size={12} color="#FACC15" />
+                    <Text style={styles.intentBadgeText}>意图精准识别</Text>
+                  </View>
+                  <View style={styles.intentSkillsRow}>
+                    {intentResult.detectedSkills.slice(0, 4).map((s) => (
+                      <View key={s} style={styles.intentSkillPill}>
+                        <Text style={styles.intentSkillPillText}>{s}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+                <View style={styles.intentBody}>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Text style={styles.intentRecName} numberOfLines={1}>
+                      推荐: {intentResult.recommendedAgent.name}
+                      <Text style={styles.intentRecRole}>
+                        {" "}
+                        ({intentResult.recommendedAgent.roleLabel ?? "员工"} · {intentResult.score}% 匹配)
+                      </Text>
+                    </Text>
+                  </View>
+                  <View
+                    style={[
+                      styles.intentActionBtn,
+                      fields.assigneeAgentId === intentResult.recommendedAgent.id && styles.intentActionBtnActive,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.intentActionBtnText,
+                        fields.assigneeAgentId === intentResult.recommendedAgent.id && styles.intentActionBtnTextActive,
+                      ]}
+                    >
+                      {fields.assigneeAgentId === intentResult.recommendedAgent.id ? "✓ 已采纳" : "采纳推荐"}
+                    </Text>
+                  </View>
+                </View>
+              </Pressable>
+            ) : null}
 
             <SectionCard title="指派">
               <View style={styles.assigneeRow}>
@@ -628,5 +696,79 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.4,
+  },
+  intentCard: {
+    backgroundColor: "rgba(250, 204, 21, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(250, 204, 21, 0.3)",
+    borderRadius: RADIUS.lg,
+    padding: 12,
+    marginBottom: SPACING.md,
+    gap: 8,
+  },
+  intentHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  intentBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(250, 204, 21, 0.16)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+  },
+  intentBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: "#FACC15",
+  },
+  intentSkillsRow: {
+    flexDirection: "row",
+    gap: 4,
+  },
+  intentSkillPill: {
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: RADIUS.sm,
+  },
+  intentSkillPillText: {
+    fontSize: 10,
+    color: C.ink3,
+  },
+  intentBody: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  intentRecName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  intentRecRole: {
+    fontSize: 11,
+    color: C.ink3,
+    fontWeight: "normal",
+  },
+  intentActionBtn: {
+    backgroundColor: "rgba(250, 204, 21, 0.2)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: RADIUS.md,
+  },
+  intentActionBtnActive: {
+    backgroundColor: "#10B981",
+  },
+  intentActionBtnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: "#FACC15",
+  },
+  intentActionBtnTextActive: {
+    color: "#FFFFFF",
   },
 });
