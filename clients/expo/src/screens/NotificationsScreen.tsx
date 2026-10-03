@@ -96,8 +96,16 @@ export function NotificationsScreen({
         return;
       }
       const known = issueById.get(item.target.id);
+      // 若本地尚未缓存，由 TaskDetailScreen 落地立即异步拉取最新真实 Issue 实体
       onOpenIssue(
-        known ?? ({ id: item.target.id, title: item.title, status: "todo", priority: "medium", companyId: company.id } as Issue),
+        known ??
+          ({
+            id: item.target.id,
+            title: item.title,
+            status: "backlog",
+            priority: "medium",
+            companyId: company.id,
+          } as Issue),
       );
     },
     [markRead, issueById, onOpenIssue, onOpenApproval, company.id],

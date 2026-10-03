@@ -91,6 +91,7 @@ export function TaskDetailScreen({
   /** wave153 — 打开 App 原生 spec 编辑器。 */
   onOpenSpec?: (issue: Issue) => void;
 }) {
+  const [currentIssue, setCurrentIssue] = useState<Issue>(issue);
   const [comments, setComments] = useState<IssueComment[]>([]);
   const [agents, setAgents] = useState<AgentRow[]>([]);
   // wave70 — git-ops PR 显示: 拉 work products, 抽出 type === "pull_request" 那条
@@ -120,6 +121,15 @@ export function TaskDetailScreen({
       if (!silent) setLoading(true);
       try {
         await Promise.all([
+          coolie
+            .getIssue(issue.id)
+            .then((fresh) => {
+              if (fresh && fresh.id) {
+                setCurrentIssue(fresh);
+                setAssigneeId(fresh.assigneeAgentId ?? null);
+              }
+            })
+            .catch(() => {}),
           loadComments(),
           issue.companyId
             ? coolie.listAgents(issue.companyId).then(setAgents).catch(() => setAgents([]))
@@ -144,8 +154,9 @@ export function TaskDetailScreen({
     void load();
   }, [load]);
 
-  // 外层换任务 (同一实例被复用) 时, 把改派状态重新对齐到新任务的当前负责人。
+  // 外层换任务 (同一实例被复用) 时, 把改派状态与快照重新对齐
   useEffect(() => {
+    setCurrentIssue(issue);
     setAssigneeId(issue.assigneeAgentId ?? null);
     setPickerOpen(false);
   }, [issue.id, issue.assigneeAgentId]);
@@ -235,22 +246,22 @@ export function TaskDetailScreen({
         >
           <ScreenHeader onBack={onBack} backLabel="返回任务列表" />
 
-          <Text style={styles.title}>{issue.title}</Text>
+          <Text style={styles.title}>{currentIssue.title}</Text>
 
           <View style={styles.metaRow}>
             <Pill
-              label={STATUS_LABEL[issue.status] ?? issue.status}
-              dotColor={STATUS_DOT[issue.status] ?? C.ink3}
+              label={STATUS_LABEL[currentIssue.status] ?? currentIssue.status}
+              dotColor={STATUS_DOT[currentIssue.status] ?? C.ink3}
               mono
             />
             <Pill
-              label={PRIORITY_LABEL[issue.priority] ?? issue.priority}
-              dotColor={PRIORITY_DOT[issue.priority] ?? C.ink3}
+              label={PRIORITY_LABEL[currentIssue.priority] ?? currentIssue.priority}
+              dotColor={PRIORITY_DOT[currentIssue.priority] ?? C.ink3}
               mono
             />
-            {issue.defect ? (
+            {currentIssue.defect ? (
               <Pill
-                label={`缺陷 ${issue.defect.severity}`}
+                label={`缺陷 ${currentIssue.defect.severity}`}
                 dotColor={C.err}
                 mono
               />
@@ -274,22 +285,22 @@ export function TaskDetailScreen({
             </Pressable>
             <KeyValueRow
               label="状态"
-              value={STATUS_LABEL[issue.status] ?? issue.status}
-              valueColor={STATUS_DOT[issue.status] ?? C.ink}
+              value={STATUS_LABEL[currentIssue.status] ?? currentIssue.status}
+              valueColor={STATUS_DOT[currentIssue.status] ?? C.ink}
             />
             <KeyValueRow
               label="优先级"
-              value={PRIORITY_LABEL[issue.priority] ?? issue.priority}
-              valueColor={PRIORITY_DOT[issue.priority] ?? C.ink}
+              value={PRIORITY_LABEL[currentIssue.priority] ?? currentIssue.priority}
+              valueColor={PRIORITY_DOT[currentIssue.priority] ?? C.ink}
             />
-            <KeyValueRow label="编号" value={issue.id} mono />
+            <KeyValueRow label="编号" value={currentIssue.id} mono />
           </AppCard>
 
-          {issue.description ? (
+          {currentIssue.description ? (
             <View style={styles.section}>
               <SectionHeader title="描述" />
               <AppCard padding={16} style={styles.descriptionCard}>
-                <Text style={styles.description}>{issue.description}</Text>
+                <Text style={styles.description}>{currentIssue.description}</Text>
               </AppCard>
             </View>
           ) : null}

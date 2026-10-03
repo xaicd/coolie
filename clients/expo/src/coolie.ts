@@ -580,6 +580,14 @@ export class CoolieClient extends BaseCoolieClient {
     );
   }
 
+  /** GET /api/issues/:id — 获取单个任务真实实体 */
+  async getIssue(issueId: string): Promise<Issue> {
+    return this.request<Issue>(
+      "GET",
+      `/api/issues/${encodeURIComponent(issueId)}`,
+    );
+  }
+
   /** GET /api/issues/:id/comments — 获取任务评论列表 */
   async getIssueComments(issueId: string): Promise<IssueComment[]> {
     return this.request<IssueComment[]>(

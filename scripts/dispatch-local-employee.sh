@@ -36,6 +36,8 @@ UPDATE_EVIDENCE=""
 UPDATE_VERIFICATION=""
 UPDATE_BLOCKED_REASON=""
 UPDATE_LEDGER=""
+NO_CONTEXT=0
+HANDOVER_NOTE=""
 
 usage() {
   cat <<'EOF'
@@ -52,6 +54,8 @@ Options:
   --brief <path>       path to brief document
   --execute            run command after recording receipt
   --print              print prompt only; do not record
+  --no-context         do not inject upstream context bus into prompt
+  --note <text>        handover note for context bus
   --list               list recent receipts in .paperclip-local/dispatch/
   --show <id>          show details of a specific receipt
   --update <id>        update an existing receipt
@@ -93,6 +97,8 @@ while [[ $# -gt 0 ]]; do
     --verification) UPDATE_VERIFICATION="${2:-}"; shift 2 ;;
     --blocked-reason) UPDATE_BLOCKED_REASON="${2:-}"; shift 2 ;;
     --ledger) UPDATE_LEDGER="${2:-}"; shift 2 ;;
+    --no-context) NO_CONTEXT=1; shift ;;
+    --note) HANDOVER_NOTE="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'unknown arg: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
@@ -275,6 +281,14 @@ Branch: $(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || printf 
 Use the Claude Code Agent tool with:
   subagent_type="${AGENT}"
 
+EOF
+
+  if [[ "$NO_CONTEXT" -eq 0 && -f "$SCRIPT_DIR/context-bus.sh" ]]; then
+    bash "$SCRIPT_DIR/context-bus.sh" --prompt "$WAVE" --target-agent "$AGENT" 2>/dev/null || true
+    printf '\n'
+  fi
+
+  cat <<EOF
 Seven-part brief requirements:
 1. Background: boss requested fixed local employee dispatch.
 2. Target: run the task above using the named employee semantics.
