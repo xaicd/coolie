@@ -12099,7 +12099,8 @@ registry.registerPath({
   path: "/api/git-credentials",
   tags: ["secrets"],
   summary: "List the current user's saved git credentials",
-  responses: { 200: r.ok(), 401: r.unauthorized, 422: r.unprocessable },
+  description: "Board-only (the whole git-credentials router requires board access).",
+  responses: { 200: r.ok(), 401: r.unauthorized, 403: r.forbidden },
 });
 
 registry.registerPath({
@@ -12107,9 +12108,15 @@ registry.registerPath({
   path: "/api/git-credentials/{repoId}",
   tags: ["secrets"],
   summary: "Get one git credential's metadata",
-  description: "Ownership-checked; never returns the token itself.",
+  description:
+    "Board-only. Ownership-checked; never returns the token itself.",
   request: { params: z.object({ repoId: z.string() }) },
-  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound, 422: r.unprocessable },
+  responses: {
+    200: r.ok(),
+    401: r.unauthorized,
+    403: r.forbidden,
+    404: r.notFound,
+  },
 });
 
 registry.registerPath({
@@ -12117,8 +12124,9 @@ registry.registerPath({
   path: "/api/git-credentials/{repoId}",
   tags: ["secrets"],
   summary: "Delete a saved git credential",
+  description: "Board-only.",
   request: { params: z.object({ repoId: z.string() }) },
-  responses: { 200: r.ok(), 401: r.unauthorized, 404: r.notFound },
+  responses: { 200: r.ok(), 401: r.unauthorized, 403: r.forbidden, 404: r.notFound },
 });
 
 // inbox.ts
@@ -12316,8 +12324,18 @@ registry.registerPath({
   path: "/api/companies/{companyId}/ontology/instances",
   tags: ["ontology"],
   summary: "List ontology entity instances",
-  request: { params: z.object({ companyId: z.string() }) },
-  responses: { 200: r.ok(), 401: r.unauthorized },
+  description:
+    "`entityType` is required (one of company, project, issue, spec, conversation, work_product, attachment, comment, agent); results are capped at 200 per page.",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: z.object({
+      entityType: z.string(),
+      ownerId: z.string().optional(),
+      limit: z.string().optional(),
+      offset: z.string().optional(),
+    }),
+  },
+  responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
 });
 
 registry.registerPath({
@@ -12360,6 +12378,7 @@ registry.registerPath({
       depth: z.string().optional(),
       view: z.string().optional(),
       relations: z.string().optional(),
+      companyId: z.string().optional(),
     }),
   },
   responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
@@ -12369,8 +12388,19 @@ registry.registerPath({
   method: "get",
   path: "/api/companies/{companyId}/ontology/paths",
   tags: ["ontology"],
-  summary: "Find ontology relation paths",
-  request: { params: z.object({ companyId: z.string() }) },
+  summary: "Find ontology relation paths between two entities",
+  description:
+    "Both endpoints are required: src_type/src_id and target_type/target_id; max_depth caps the search (1-5, default 5).",
+  request: {
+    params: z.object({ companyId: z.string() }),
+    query: z.object({
+      src_type: z.string(),
+      src_id: z.string(),
+      target_type: z.string(),
+      target_id: z.string(),
+      max_depth: z.string().optional(),
+    }),
+  },
   responses: { 200: r.ok(), 400: r.badRequest, 401: r.unauthorized },
 });
 
