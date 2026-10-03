@@ -374,11 +374,29 @@ export class CoolieClient {
   // --- tasks (issues) -----------------------------------------------------
   // Issues are company-scoped in the path. `/api/issues?companyId=…` does not
   // exist and answers 400 — this called it, so every task call used to fail.
-  async listIssues(companyId: string, opts?: { status?: string; limit?: number; projectId?: string }): Promise<Issue[]> {
+  /**
+   * wave286 (REQ-NAT-012): 新增可选 `offset` / `sortField` / `sortDir` —— offset
+   * 分页 + 服务端排序锚 (`updated|id` × `asc|desc`, 与 server services/issues 的
+   * 白名单一致)。全部不传时 query 与既往逐字节一致, 既有调用方零影响。
+   */
+  async listIssues(
+    companyId: string,
+    opts?: {
+      status?: string;
+      limit?: number;
+      projectId?: string;
+      offset?: number;
+      sortField?: "updated" | "id";
+      sortDir?: "asc" | "desc";
+    },
+  ): Promise<Issue[]> {
     const q = new URLSearchParams();
     if (opts?.status) q.set("status", opts.status);
     if (opts?.limit) q.set("limit", String(opts.limit));
     if (opts?.projectId) q.set("projectId", opts.projectId);
+    if (opts?.offset) q.set("offset", String(opts.offset));
+    if (opts?.sortField) q.set("sortField", opts.sortField);
+    if (opts?.sortDir) q.set("sortDir", opts.sortDir);
     const suffix = q.size > 0 ? `?${q.toString()}` : "";
     const body = await this.request<{ issues?: Issue[] } | Issue[]>(
       "GET",

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useReducer, useState } from "react";
-import type { Company, Issue, Project } from "@coolie/api-client";
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import { CoolieApiError, type Company, type Issue, type Project } from "@coolie/api-client";
 import { coolie, type AgentRow } from "../coolie";
 import type { FilterOption } from "../components/FilterSheet";
 import {
@@ -41,6 +41,79 @@ export const VIEW_OPTIONS: Array<{ key: IssuesView; label: string }> = [
   { key: "group", label: "分组" },
   { key: "board", label: "看板" },
 ];
+
+// ── wave286 分页流式加载 (REQ-NAT-001..009, REQ-NFR-003) ─────────────────
+// 常量与纯函数放在这里 (而非 lib/issue-list), 让 TaskKanbanScreen 只 import 这
+// 一个文件就能复用同一套翻页口径 —— 与本文件已有的 re-export 惯例一致。
+
+/** 页大小 (REQ-NAT-001, DAR-2 裁定 50)。 */
+export const ISSUES_PAGE_SIZE = 50;
+/** 服务端排序锚: offset 翻页必须锚定确定序 (REQ-NAT-001)。 */
+export const ISSUES_PAGE_SORT_FIELD = "updated" as const;
+export const ISSUES_PAGE_SORT_DIR = "desc" as const;
+/** 兜底单次大页上限 (REQ-NFR-003; 服务端 ISSUE_LIST_MAX_LIMIT 同值)。 */
+export const ISSUES_FALLBACK_LIMIT = 1000;
+
+export interface IssuesPage {
+  issues: Issue[];
+  /** 满页 (== pageSize) 才可能还有下一页; 兜底全量拉取后恒 false。 */
+  hasMore: boolean;
+}
+
+/** 服务端拒绝分页参数 (REQ-NFR-003 的触发条件)。 */
+export function isPaginationRejected(e: unknown): boolean {
+  return e instanceof CoolieApiError && (e.status === 400 || e.status === 422);
+}
+
+let warnedPaginationFallback = false;
+
+/**
+ * 拉取一页任务: 锚定 `updated:desc` + offset。服务端 400/422 拒绝分页参数时
+ * 回退 `limit=1000` 单次全量并 warn 一次 (REQ-NFR-003), 保证功能可用。
+ */
+export async function fetchIssuesPage(
+  companyId: string,
+  offset: number,
+  pageSize: number = ISSUES_PAGE_SIZE,
+): Promise<IssuesPage> {
+  try {
+    const issues = await coolie.listIssues(companyId, {
+      limit: pageSize,
+      offset,
+      sortField: ISSUES_PAGE_SORT_FIELD,
+      sortDir: ISSUES_PAGE_SORT_DIR,
+    });
+    return { issues, hasMore: issues.length >= pageSize };
+  } catch (e) {
+    if (!isPaginationRejected(e)) throw e;
+    if (!warnedPaginationFallback) {
+      warnedPaginationFallback = true;
+      console.warn(
+        `[TasksPaging] 分页参数被服务端拒绝 (${(e as Error)?.message ?? e}), 回退 limit=${ISSUES_FALLBACK_LIMIT} 全量拉取`,
+      );
+    }
+    const issues = await coolie.listIssues(companyId, { limit: ISSUES_FALLBACK_LIMIT });
+    return { issues, hasMore: false };
+  }
+}
+
+/**
+ * 按 id 去重合并新页 (REQ-NAT-006, 与 web `mergeIssuePagesStable` 同语义):
+ * 既有条目**保留原引用** (已渲染行不因重拉换引用, 保护 IssueRow 的 React.memo),
+ * 只追加新 id —— offset 页间漂移产生的重复行在此收敛。
+ */
+export function mergeIssuesByIdStable(existing: Issue[], incoming: Issue[]): Issue[] {
+  if (incoming.length === 0) return existing;
+  const seen = new Set<string>();
+  for (const issue of existing) seen.add(issue.id);
+  let appended: Issue[] | null = null;
+  for (const issue of incoming) {
+    if (seen.has(issue.id)) continue;
+    seen.add(issue.id);
+    (appended ??= []).push(issue);
+  }
+  return appended ? [...existing, ...appended] : existing;
+}
 
 export type SheetKind = "assignee" | "project" | "sort" | null;
 
@@ -127,10 +200,16 @@ export interface UseTasksFilterResult {
   // 数据
   agents: AgentRow[];
   projects: Project[];
+  /** 已加载数据集 (wave286 起为分页去重合并结果; 筛选仍由 selectIssues 客户端执行)。 */
   issues: Issue[];
   loading: boolean;
   refreshing: boolean;
   error: string | null;
+
+  // wave286 分页 (REQ-NAT-001..009)
+  hasMore: boolean;
+  loadingMore: boolean;
+  loadError: string | null;
 
   // 回调 (稳定)
   setSearch: (value: string) => void;
@@ -147,6 +226,8 @@ export interface UseTasksFilterResult {
   setCreateOpen: (open: boolean) => void;
   refresh: () => Promise<void>;
   loadIssues: (isRefresh?: boolean) => Promise<void>;
+  /** 加载下一页; 在途/无更多/失败重试共用入口 (失败页游标不推进, 重拉同页)。 */
+  loadMore: () => Promise<void>;
   handleCreated: (issue: Issue) => void;
 }
 
@@ -223,14 +304,35 @@ export function useTasksFilter(
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // wave286 分页游标与锁: ref 持有真值 (避免回调身份抖动), state 只做渲染镜像。
+  // offset 仅在成功返回后推进 (REQ-NAT-007: 失败页不推进, 重试重拉同页);
+  // epoch 在每次整页重置时 +1, 让在途的翻页响应过期作废 (防刷新/翻页竞态 R2)。
+  const pagingOffsetRef = useRef(0);
+  const pagingHasMoreRef = useRef(true);
+  const pagingBusyRef = useRef(false);
+  const pagingEpochRef = useRef(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const loadIssues = useCallback(
     async (isRefresh = false) => {
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
       setError(null);
+      setLoadError(null);
+      // REQ-NAT-008/009: 游标重置 + 首页重拉 + 整体替换 (下拉刷新 / 刷新信号同路)。
+      pagingEpochRef.current += 1;
+      const epoch = pagingEpochRef.current;
       try {
-        setIssues(await coolie.listIssues(company.id, { limit: 200 }));
+        const first = await fetchIssuesPage(company.id, 0);
+        if (epoch !== pagingEpochRef.current) return; // 期间又被重置: 丢弃过期页
+        pagingOffsetRef.current = first.issues.length;
+        pagingHasMoreRef.current = first.hasMore;
+        setHasMore(first.hasMore);
+        setIssues(first.issues);
       } catch (e) {
+        if (epoch !== pagingEpochRef.current) return;
         setError(String((e as Error)?.message ?? e));
       } finally {
         setLoading(false);
@@ -241,6 +343,29 @@ export function useTasksFilter(
   );
 
   const refresh = useCallback(() => loadIssues(true), [loadIssues]);
+
+  const loadMore = useCallback(async () => {
+    // 在途锁 (REQ-NAT-007 / R2): 首屏/刷新/翻页任一在途即忽略新触发。
+    if (pagingBusyRef.current || !pagingHasMoreRef.current) return;
+    pagingBusyRef.current = true;
+    setLoadingMore(true);
+    setLoadError(null);
+    const epoch = pagingEpochRef.current;
+    try {
+      const page = await fetchIssuesPage(company.id, pagingOffsetRef.current);
+      if (epoch !== pagingEpochRef.current) return; // 期间刷新重置: 过期页不合并
+      pagingOffsetRef.current += page.issues.length;
+      pagingHasMoreRef.current = page.hasMore;
+      setHasMore(page.hasMore);
+      setIssues((prev) => mergeIssuesByIdStable(prev, page.issues));
+    } catch (e) {
+      if (epoch !== pagingEpochRef.current) return;
+      setLoadError(String((e as Error)?.message ?? e));
+    } finally {
+      pagingBusyRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [company.id]);
 
   useEffect(() => {
     void loadIssues();
@@ -376,6 +501,10 @@ export function useTasksFilter(
     refreshing,
     error,
 
+    hasMore,
+    loadingMore,
+    loadError,
+
     setSearch,
     clearSearch,
     setScope,
@@ -390,6 +519,7 @@ export function useTasksFilter(
     setCreateOpen,
     refresh,
     loadIssues,
+    loadMore,
     handleCreated,
   };
 }

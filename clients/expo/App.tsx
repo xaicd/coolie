@@ -47,7 +47,6 @@ import { AppBar } from "./src/components/AppBar";
 import { EdgeSwipeBack } from "./src/components/EdgeSwipeBack";
 import { TabBar, TAB_BAR_HEIGHT } from "./src/components/TabBar";
 import { StatusDot } from "./src/components/StatusDot";
-import { NewTaskPage } from "./src/screens/NewTaskPage";
 import { CreateTaskModal } from "./src/components/CreateTaskModal";
 import { AppCard } from "./src/ui/AppCard";
 import { ErrorRetry } from "./src/ui/ErrorRetry";
@@ -992,6 +991,7 @@ function HomeScreen({
     if (instanceGraphType) return setInstanceGraphType(null), true;
     if (schemaEditorType) return setSchemaEditorType(null), true;
     if (selected) return setSelected(null), true;
+    if (createTaskProjectId) return setCreateTaskProjectId(null), true;
     if (composeOpen) return setComposeOpen(false), true;
     if (settingsOpen) return setSettingsOpen(false), true;
     if (nativeModulesOpen) return setNativeModulesOpen(false), true;
@@ -1466,45 +1466,24 @@ function HomeScreen({
           }}
           onCreate={() => setComposeOpen(true)}
         />
-      {/* 中央 "+" 打开的「新会话」页 (内容区浮层, 让出底部 TabBar) */}
-      {composeOpen ? (
-        <EdgeSwipeBack style={styles.composeOverlay} onBack={() => setComposeOpen(false)}>
-          <NewTaskPage
-            companyId={companyId}
-            agents={composerAgents}
-            onClose={() => setComposeOpen(false)}
-            onOpenChat={() => {
-              setComposeOpen(false);
-              navigateTab("chat");
-            }}
-            onOpenAiCreate={() => {
-              setComposeOpen(false);
-              navigateTab("chat");
-              exportBoardPrompt("build 一个演示项目：Coolie 工坊看板");
-            }}
-            onCreated={() => {
-              setComposeOpen(false);
-              setTasksRefreshToken((value) => value + 1);
-              navigateTab("tasks");
-            }}
-          />
-        </EdgeSwipeBack>
-      ) : null}
-      {/* 项目卡「创建任务」: 直接打开建单弹窗, 并把该项目预选好 (boss 20:42) */}
-      {createTaskProjectId ? (
-        <CreateTaskModal
-          visible={createTaskProjectId !== null}
-          companyId={companyId}
-          agents={composerAgents}
-          initialProjectId={createTaskProjectId}
-          onClose={() => setCreateTaskProjectId(null)}
-          onCreated={(issue) => {
-            setCreateTaskProjectId(null);
-            setTasksRefreshToken((value) => value + 1);
-            Alert.alert("任务已创建", issue.title);
-          }}
-        />
-      ) : null}
+      {/* 方案1: 中央 "+" 与项目快捷建单统一呼出极速新建任务弹窗 (两张卡: 主要内容 + 指派) */}
+      <CreateTaskModal
+        visible={composeOpen || createTaskProjectId !== null}
+        companyId={companyId}
+        agents={composerAgents}
+        initialProjectId={createTaskProjectId}
+        onClose={() => {
+          setComposeOpen(false);
+          setCreateTaskProjectId(null);
+        }}
+        onCreated={(issue) => {
+          setComposeOpen(false);
+          setCreateTaskProjectId(null);
+          setTasksRefreshToken((value) => value + 1);
+          Alert.alert("任务已创建", issue.title);
+          navigateTab("tasks");
+        }}
+      />
     </SafeAreaView>
     </GestureHandlerRootView>
     );

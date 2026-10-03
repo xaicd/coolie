@@ -26,6 +26,7 @@ import { SegmentedControl } from "../ui/SegmentedControl";
 import { FilterSheet, type FilterOption } from "../components/FilterSheet";
 import { QuickApprovalCard } from "../components/QuickApprovalCard";
 import { IssuesList } from "../components/IssuesList";
+import { fetchIssuesPage, mergeIssuesByIdStable } from "../hooks/useTasksFilter";
 import {
   countIssuesByStatus,
   type IssueSelection,
@@ -161,6 +162,16 @@ export function TaskKanbanScreen({
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // wave286 分页流式 (REQ-NAT-001..009): 游标/锁存 ref (防回调身份抖动), state 只做渲染镜像。
+  // offset 仅在成功返回后推进 (REQ-NAT-007 失败页不推进); epoch 让刷新后在途的翻页响应作废。
+  const pagingOffsetRef = useRef(0);
+  const pagingHasMoreRef = useRef(true);
+  const pagingBusyRef = useRef(false);
+  const pagingEpochRef = useRef(0);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
   const [scope, setScope] = useState<IssuesScope>("focus");
   const [assignee, setAssignee] = useState("all");
   const [project, setProject] = useState(initialProjectId ?? "all");
@@ -254,16 +265,25 @@ export function TaskKanbanScreen({
       if (isRefresh) setRefreshing(true);
       else setLoading(true);
       setError(null);
+      setLoadError(null);
+      // wave286 REQ-NAT-008/009: 游标重置 + 首页重拉 + 整体替换 (刷新/新建任务同路)。
+      pagingEpochRef.current += 1;
+      const epoch = pagingEpochRef.current;
       try {
-        const [fetchedIssues, fetchedAgents, fetchedProjects] = await Promise.all([
-          coolie.listIssues(company.id, { limit: 200 }),
+        const [first, fetchedAgents, fetchedProjects] = await Promise.all([
+          fetchIssuesPage(company.id, 0),
           coolie.listAgents(company.id).catch(() => []),
           coolie.listProjects(company.id).catch(() => []),
         ]);
-        setIssues(fetchedIssues);
+        if (epoch !== pagingEpochRef.current) return; // 期间又被重置: 丢弃过期页
+        pagingOffsetRef.current = first.issues.length;
+        pagingHasMoreRef.current = first.hasMore;
+        setHasMore(first.hasMore);
+        setIssues(first.issues);
         setAgents(fetchedAgents);
         setProjects(fetchedProjects);
       } catch (e) {
+        if (epoch !== pagingEpochRef.current) return;
         setError(String((e as Error)?.message ?? e));
       } finally {
         setLoading(false);
@@ -272,6 +292,29 @@ export function TaskKanbanScreen({
     },
     [company.id],
   );
+
+  const loadMore = useCallback(async () => {
+    // 在途锁 (R2): 首屏/刷新/翻页任一在途即忽略新触发。
+    if (pagingBusyRef.current || !pagingHasMoreRef.current) return;
+    pagingBusyRef.current = true;
+    setLoadingMore(true);
+    setLoadError(null);
+    const epoch = pagingEpochRef.current;
+    try {
+      const page = await fetchIssuesPage(company.id, pagingOffsetRef.current);
+      if (epoch !== pagingEpochRef.current) return; // 期间刷新重置: 过期页不合并
+      pagingOffsetRef.current += page.issues.length;
+      pagingHasMoreRef.current = page.hasMore;
+      setHasMore(page.hasMore);
+      setIssues((prev) => mergeIssuesByIdStable(prev, page.issues));
+    } catch (e) {
+      if (epoch !== pagingEpochRef.current) return;
+      setLoadError(String((e as Error)?.message ?? e));
+    } finally {
+      pagingBusyRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [company.id]);
 
   useEffect(() => {
     void loadIssues();
@@ -513,6 +556,44 @@ export function TaskKanbanScreen({
               />
             ))}
           </ScrollView>
+          {/* wave286 REQ-NAT-011: 看板列区尾部的加载更多入口 (不进列渲染/拖拽路径)。 */}
+          {hasMore || loadingMore || loadError ? (
+            <View style={styles.boardLoadMoreBox}>
+              {loadingMore ? (
+                <Text style={styles.boardLoadEndText}>正在加载更多…</Text>
+              ) : loadError ? (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.boardLoadMoreBtn,
+                    pressed && styles.boardLoadMoreBtnPressed,
+                  ]}
+                  onPress={() => void loadMore()}
+                  accessibilityRole="button"
+                  accessibilityLabel="重试加载更多任务"
+                >
+                  <Ionicons name="refresh-outline" size={13} color={C.err} />
+                  <Text style={[styles.boardLoadMoreText, { color: C.err }]}>
+                    加载更多失败, 点按重试 (已加载 {issues.length} 条)
+                  </Text>
+                </Pressable>
+              ) : (
+                <Pressable
+                  style={({ pressed }) => [
+                    styles.boardLoadMoreBtn,
+                    pressed && styles.boardLoadMoreBtnPressed,
+                  ]}
+                  onPress={() => void loadMore()}
+                  accessibilityRole="button"
+                  accessibilityLabel="加载更多任务"
+                >
+                  <Ionicons name="chevron-down" size={13} color={C.ink3} />
+                  <Text style={styles.boardLoadMoreText}>
+                    加载更多 · 已加载 {issues.length} 条
+                  </Text>
+                </Pressable>
+              )}
+            </View>
+          ) : null}
         </ScrollView>
       ) : (
         <View style={styles.listLayout}>
@@ -529,6 +610,12 @@ export function TaskKanbanScreen({
             refreshing={refreshing}
             onRefresh={() => void loadIssues(true)}
             contentContainerStyle={styles.listContent}
+            hasMore={hasMore}
+            loadingMore={loadingMore}
+            loadError={loadError}
+            onLoadMore={loadMore}
+            onRetryLoadMore={loadMore}
+            loadedCount={issues.length}
           />
         </View>
       )}
@@ -935,6 +1022,35 @@ const styles = StyleSheet.create({
     gap: SPACING.md,
     paddingRight: SPACING.lg,
     paddingVertical: SPACING.sm,
+  },
+  /** wave286 REQ-NAT-011: 看板列区尾部加载更多入口。 */
+  boardLoadMoreBox: {
+    alignItems: "center",
+    paddingVertical: SPACING.sm,
+  },
+  boardLoadMoreBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: C.lineSubtle,
+    backgroundColor: ELEVATION.soft,
+  },
+  boardLoadMoreBtnPressed: {
+    backgroundColor: ELEVATION.hover,
+  },
+  boardLoadMoreText: {
+    color: C.ink3,
+    fontSize: FONT_SIZE.meta,
+    fontWeight: "600",
+  },
+  boardLoadEndText: {
+    color: C.ink4,
+    fontSize: FONT_SIZE.meta,
   },
   column: {
     width: 260,

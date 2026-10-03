@@ -61,11 +61,10 @@ function Tab({
 }
 
 /**
- * 底部 tab bar — 对齐 Coolie Web 的 Home / Tasks / New / Agents / Inbox:
- * 汇览 · 任务 · [+] · 员工 · 收件箱, 中央 "+" 是新建任务的圆型 FAB。
- *
- * 工坊(对话) / 本体 / 产物 不占底部栏 (wave10 只保留 5 项), 仍从任务页顶部
- * 的图标行进入, 能力不减。
+ * 底部 tab bar:
+ * 汇览 · 任务 · [+] · 工坊 · 资产
+ * 中央 "+" 是新建任务的圆型 FAB (极速新建任务表单)。
+ * 工坊是 AI 高管中枢与自然语言/语音派单会议室。
  */
 export function TabBar({
   tab,
@@ -95,7 +94,7 @@ export function TabBar({
             onCreate();
           }}
           hitSlop={8}
-          accessibilityLabel="新建与语音派单"
+          accessibilityLabel="新建任务"
         >
           <Ionicons name="add" size={26} color="#FFFFFF" />
         </Pressable>

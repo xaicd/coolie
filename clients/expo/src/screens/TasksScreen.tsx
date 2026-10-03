@@ -141,6 +141,11 @@ export function TasksScreen({
         onRefresh={onPullRefresh}
         contentContainerStyle={styles.listContent}
         style={styles.listArea}
+        hasMore={t.hasMore}
+        loadingMore={t.loadingMore}
+        loadError={t.loadError}
+        onLoadMore={() => void t.loadMore()}
+        onRetryLoadMore={() => void t.loadMore()}
       />
 
       {/* 待审批快捷卡 (沿用旧任务页的浮动审批入口, 不因换 UI 丢能力) */}

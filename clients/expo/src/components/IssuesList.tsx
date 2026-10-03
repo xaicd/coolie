@@ -1,4 +1,4 @@
-import { memo, useCallback, useMemo, type ReactElement } from "react";
+import { memo, useCallback, useMemo, useState, type ReactElement } from "react";
 import {
   FlatList,
   Pressable,
@@ -8,6 +8,7 @@ import {
   StyleSheet,
   Text,
   View,
+  type LayoutChangeEvent,
   type StyleProp,
   type ViewStyle,
 } from "react-native";
@@ -77,6 +78,19 @@ export interface IssuesListProps {
   onRefresh?: () => void;
   /** wave285: 透传给滚动内容容器 (外屏在这里给 FAB / 底栏让位)。 */
   contentContainerStyle?: StyleProp<ViewStyle>;
+  // ── wave286 无限滚动 (REQ-NAT-003/004/007/010/011) —— 全部可选, 不传 = 既有行为 ──
+  /** 还有下一页; false 时列表尾部显示「已全部加载 · N 条」。 */
+  hasMore?: boolean;
+  /** 下一页请求在途 (尾部骨架行)。 */
+  loadingMore?: boolean;
+  /** 翻页失败原因 (尾部重试入口, 与首屏 error 分离; REQ-NAT-007)。 */
+  loadError?: string | null;
+  /** 滚动近底部 (≈10 行槽) 自动加载下一页 (REQ-NAT-003); 看板视图为「加载更多」入口。 */
+  onLoadMore?: () => void;
+  /** 翻页失败后的重试入口 (不传退回 onLoadMore)。 */
+  onRetryLoadMore?: () => void;
+  /** 尾部计数 N (已加载数据集大小); 默认取 issues.length, 外层传筛选后集合时需显式给。 */
+  loadedCount?: number;
 }
 
 /**
@@ -104,6 +118,12 @@ export function IssuesList({
   refreshing = false,
   onRefresh,
   contentContainerStyle,
+  hasMore = true,
+  loadingMore = false,
+  loadError = null,
+  onLoadMore,
+  onRetryLoadMore,
+  loadedCount,
 }: IssuesListProps) {
   const visible = useMemo(() => selectIssues(issues, selection), [issues, selection]);
 
@@ -165,6 +185,35 @@ export function IssuesList({
     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />
   ) : undefined;
 
+  // ── wave286 无限滚动 (REQ-NAT-003/004/007/010) ──────────────────────────
+  // onEndReached 统一入口: 无 onLoadMore / 无更多 / 在途 / 失败 时静默
+  // (失败停在尾部重试入口, 不自动重试, 防失败风暴)。
+  const handleEndReached = useCallback(() => {
+    if (!onLoadMore || !hasMore || loadingMore || loadError) return;
+    onLoadMore();
+  }, [onLoadMore, hasMore, loadingMore, loadError]);
+
+  // REQ-NAT-010: 搜索激活或非默认排序 (锚定序 updated:desc 之外) 时, 尾部提示
+  // 「基于已加载 N 条」; 默认排序到末页显示「已全部加载 · N 条」。
+  const anchorSort = selection.sortField === "updated" && selection.sortDir === "desc";
+  const loadedHint = selection.search.trim() !== "" || !anchorSort;
+  const footerCount = loadedCount ?? issues.length;
+
+  const listFooter = useMemo(
+    () =>
+      onLoadMore ? (
+        <ListFooter
+          loadingMore={loadingMore}
+          loadError={loadError}
+          hasMore={hasMore}
+          loadedCount={footerCount}
+          hintLoadedOnly={loadedHint}
+          onRetry={onRetryLoadMore ?? onLoadMore}
+        />
+      ) : null,
+    [onLoadMore, onRetryLoadMore, loadingMore, loadError, hasMore, footerCount, loadedHint],
+  );
+
   // 空态交给 ListEmptyComponent (列表滚动仍在, 下拉刷新空态可用)
   const emptyComponent = useMemo(() => {
     const filtering =
@@ -221,6 +270,13 @@ export function IssuesList({
           onIssuePress={stableIssuePress}
           refreshControl={refreshControl}
           emptyComponent={emptyComponent}
+          onLoadMore={onLoadMore}
+          loadingMore={loadingMore}
+          loadError={loadError}
+          onRetryLoadMore={onRetryLoadMore}
+          hasMore={hasMore}
+          loadedCount={footerCount}
+          hintLoadedOnly={loadedHint}
         />
       ) : view === "group" ? (
         <SectionsView
@@ -231,6 +287,8 @@ export function IssuesList({
           refreshControl={refreshControl}
           contentContainerStyle={contentContainerStyle}
           emptyComponent={emptyComponent}
+          onEndReached={handleEndReached}
+          footer={listFooter}
         />
       ) : selection.scope === "focus" ? (
         <SectionsView
@@ -241,6 +299,8 @@ export function IssuesList({
           refreshControl={refreshControl}
           contentContainerStyle={contentContainerStyle}
           emptyComponent={emptyComponent}
+          onEndReached={handleEndReached}
+          footer={listFooter}
         />
       ) : (
         <FlatView
@@ -251,6 +311,8 @@ export function IssuesList({
           refreshControl={refreshControl}
           contentContainerStyle={contentContainerStyle}
           emptyComponent={emptyComponent}
+          onEndReached={handleEndReached}
+          footer={listFooter}
         />
       )}
     </View>
@@ -265,6 +327,69 @@ function LoadingRows() {
       ))}
     </View>
   );
+}
+
+/**
+ * wave286 尾部三态 (REQ-NAT-004/007/010): 加载中骨架行 / 失败重试 / 到底提示;
+ * 平时静默 (null)。memo 化避免翻页重渲拖累滚动 (R6)。
+ */
+const ListFooter = memo(function ListFooter({
+  loadingMore,
+  loadError,
+  hasMore,
+  loadedCount,
+  hintLoadedOnly,
+  onRetry,
+}: {
+  loadingMore: boolean;
+  loadError: string | null;
+  hasMore: boolean;
+  loadedCount: number;
+  hintLoadedOnly: boolean;
+  onRetry: () => void;
+}) {
+  if (loadingMore) {
+    return (
+      <View style={styles.footerBox}>
+        <View style={styles.skeletonRow} />
+      </View>
+    );
+  }
+  if (loadError) {
+    return (
+      <View style={styles.footerBox}>
+        <ErrorRetry variant="inline" message={`加载更多失败: ${loadError}`} onRetry={onRetry} />
+      </View>
+    );
+  }
+  if (!hasMore) {
+    return (
+      <View style={styles.footerBox}>
+        <Text style={styles.footerText}>
+          {hintLoadedOnly ? `基于已加载 ${loadedCount} 条` : `已全部加载 · ${loadedCount} 条`}
+        </Text>
+      </View>
+    );
+  }
+  return null;
+});
+
+/**
+ * REQ-NAT-003: 距底不足 10 个行槽 (≈720px) 触发翻页。FlatList 的
+ * onEndReachedThreshold 单位是「视口高度倍数」, 用实际列表高度换算
+ * (布局前回退 0.9)。
+ */
+const END_REACHED_PX = ROW_STRIDE * 10;
+
+function useEndReachedThreshold() {
+  const [viewportH, setViewportH] = useState(0);
+  const onListLayout = useCallback((e: LayoutChangeEvent) => {
+    const h = e.nativeEvent.layout.height;
+    setViewportH((prev) => (Math.abs(prev - h) > 1 ? h : prev));
+  }, []);
+  const threshold =
+    viewportH > 0 ? Math.min(1, Math.max(0.3, END_REACHED_PX / viewportH)) : 0.9;
+  return { onListLayout, threshold };
 }
 
 function GroupHeader({ label, count }: { label: string; count: number }) {
@@ -323,6 +448,8 @@ function FlatView({
   refreshControl,
   contentContainerStyle,
   emptyComponent,
+  onEndReached,
+  footer,
 }: {
   issues: Issue[];
   parentById: Map<string, { id: string; isMilestone?: boolean }>;
@@ -331,6 +458,8 @@ function FlatView({
   refreshControl?: ReactElement;
   contentContainerStyle?: StyleProp<ViewStyle>;
   emptyComponent?: ReactElement | null;
+  onEndReached?: () => void;
+  footer?: ReactElement | null;
 }) {
   const renderItem = useCallback(
     ({ item }: { item: Issue }) => (
@@ -343,6 +472,9 @@ function FlatView({
     ),
     [parentById, onIssuePress, onIssueLongPress],
   );
+
+  // wave286: 距底 ≈10 行槽预取 (REQ-NAT-003); 虚拟化参数冻结 (REQ-NFR-004)。
+  const { onListLayout, threshold } = useEndReachedThreshold();
 
   return (
     <FlatList
@@ -365,6 +497,10 @@ function FlatView({
       refreshControl={refreshControl}
       contentContainerStyle={contentContainerStyle}
       ListEmptyComponent={emptyComponent}
+      ListFooterComponent={footer}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={threshold}
+      onLayout={onListLayout}
     />
   );
 }
@@ -381,6 +517,8 @@ function SectionsView({
   refreshControl,
   contentContainerStyle,
   emptyComponent,
+  onEndReached,
+  footer,
 }: {
   groups: { key: string; label: string; items: Issue[] }[];
   parentById: Map<string, { id: string; isMilestone?: boolean }>;
@@ -389,6 +527,8 @@ function SectionsView({
   refreshControl?: ReactElement;
   contentContainerStyle?: StyleProp<ViewStyle>;
   emptyComponent?: ReactElement | null;
+  onEndReached?: () => void;
+  footer?: ReactElement | null;
 }) {
   const sections = useMemo(
     () =>
@@ -419,6 +559,9 @@ function SectionsView({
     [],
   );
 
+  // wave286: 与 FlatView 同一预取口径 (REQ-NAT-003); 虚拟化参数冻结 (REQ-NFR-004)。
+  const { onListLayout, threshold } = useEndReachedThreshold();
+
   return (
     <SectionList
       style={styles.fill}
@@ -437,6 +580,10 @@ function SectionsView({
       refreshControl={refreshControl}
       contentContainerStyle={contentContainerStyle}
       ListEmptyComponent={emptyComponent}
+      ListFooterComponent={footer}
+      onEndReached={onEndReached}
+      onEndReachedThreshold={threshold}
+      onLayout={onListLayout}
     />
   );
 }
@@ -452,12 +599,26 @@ function BoardView({
   onIssuePress,
   refreshControl,
   emptyComponent,
+  onLoadMore,
+  loadingMore = false,
+  loadError = null,
+  onRetryLoadMore,
+  hasMore = true,
+  loadedCount,
+  hintLoadedOnly = false,
 }: {
   issues: Issue[];
   agentNameById: Map<string, string>;
   onIssuePress: (issue: Issue) => void;
   refreshControl?: ReactElement;
   emptyComponent?: ReactElement | null;
+  onLoadMore?: () => void;
+  loadingMore?: boolean;
+  loadError?: string | null;
+  onRetryLoadMore?: () => void;
+  hasMore?: boolean;
+  loadedCount?: number;
+  hintLoadedOnly?: boolean;
 }) {
   const columns = useMemo(
     () =>
@@ -481,6 +642,11 @@ function BoardView({
       </ScrollView>
     );
   }
+
+  // REQ-NAT-011: 看板列区尾部的「加载更多」入口 (横向 ScrollView 无
+  // onEndReached, 走手动入口); 不传 onLoadMore 时不渲染, 既有调用方零变化。
+  const footerVisible = Boolean(onLoadMore);
+  const footerCount = loadedCount ?? issues.length;
 
   return (
     <ScrollView
@@ -523,6 +689,33 @@ function BoardView({
           </View>
         ))}
       </ScrollView>
+      {footerVisible ? (
+        <View style={styles.footerBox}>
+          {loadingMore ? (
+            <Text style={styles.footerText}>正在加载更多…</Text>
+          ) : loadError ? (
+            <ErrorRetry
+              variant="inline"
+              message={`加载更多失败: ${loadError}`}
+              onRetry={() => (onRetryLoadMore ?? onLoadMore)?.()}
+            />
+          ) : hasMore ? (
+            <Pressable
+              style={({ pressed }) => [styles.boardLoadMoreBtn, pressed && styles.boardLoadMoreBtnPressed]}
+              onPress={onLoadMore}
+              accessibilityRole="button"
+              accessibilityLabel="加载更多任务"
+            >
+              <Ionicons name="chevron-down" size={13} color={C.ink3} />
+              <Text style={styles.boardLoadMoreText}>加载更多 · 已加载 {footerCount} 条</Text>
+            </Pressable>
+          ) : (
+            <Text style={styles.footerText}>
+              {hintLoadedOnly ? `基于已加载 ${footerCount} 条` : `已全部加载 · ${footerCount} 条`}
+            </Text>
+          )}
+        </View>
+      ) : null}
     </ScrollView>
   );
 }
@@ -585,6 +778,37 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: RADIUS.md,
     backgroundColor: ELEVATION.raised,
+  },
+  /** wave286 尾部三态容器 (加载中 / 失败重试 / 到底提示)。 */
+  footerBox: {
+    alignItems: "center",
+    paddingVertical: SPACING.sm,
+    paddingHorizontal: SPACING.lg,
+    gap: SPACING.sm,
+  },
+  footerText: {
+    color: C.ink4,
+    fontSize: 12,
+  },
+  boardLoadMoreBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 8,
+    paddingHorizontal: SPACING.md,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderStyle: "dashed",
+    borderColor: C.lineSubtle,
+    backgroundColor: ELEVATION.soft,
+  },
+  boardLoadMoreBtnPressed: {
+    backgroundColor: ELEVATION.hover,
+  },
+  boardLoadMoreText: {
+    color: C.ink3,
+    fontSize: 12,
+    fontWeight: "600",
   },
   groupHeader: {
     flexDirection: "row",

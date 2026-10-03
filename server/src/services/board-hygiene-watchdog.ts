@@ -1,6 +1,6 @@
-import { and, eq, notInArray } from "drizzle-orm";
+import { and, desc, eq, notInArray, sql } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
-import { companies, issues } from "@paperclipai/db";
+import { companies, heartbeatRuns, issues } from "@paperclipai/db";
 import { logger } from "../middleware/logger.js";
 import { logActivity } from "./activity-log.js";
 
@@ -12,6 +12,13 @@ export const WIZARD_JUNK_TITLES: readonly string[] = [
   "复盘并更新看板",
 ];
 
+// 与 heartbeat 引擎自身的活跃判定保持一致 (queued/scheduled_retry/running),
+// 终态失败三种状态视为"最近一次动作失败"。
+const ACTIVE_RUN_STATUSES: readonly string[] = ["queued", "scheduled_retry", "running"];
+const FAILED_RUN_STATUSES: readonly string[] = ["failed", "timed_out", "interrupted"];
+// 假死宽限期: 失败后这么久仍无活跃接续才上报, 覆盖引擎自身的有界重试窗口。
+export const ORPHAN_FAKE_DEATH_THRESHOLD_MS = 15 * 60 * 1000;
+
 export interface BoardHygieneAuditResult {
   companyId: string;
   scannedCount: number;
@@ -22,13 +29,26 @@ export interface BoardHygieneAuditResult {
     title: string;
     reason: string;
   }>;
+  orphanIssues: Array<{
+    id: string;
+    identifier: string | null;
+    title: string;
+    failedRunId: string;
+    failedRunStatus: string;
+    failedAt: string;
+    agentId: string;
+    checkoutRunId: string | null;
+  }>;
 }
 
 export function boardHygieneWatchdogService(db: Db) {
   /**
    * 针对指定公司执行看板质量巡检与自动化垃圾清洗
    */
-  async function auditCompany(companyId: string): Promise<BoardHygieneAuditResult> {
+  async function auditCompany(
+    companyId: string,
+    options: { now?: Date } = {},
+  ): Promise<BoardHygieneAuditResult> {
     const activeIssues = await db
       .select({
         id: issues.id,
@@ -38,6 +58,8 @@ export function boardHygieneWatchdogService(db: Db) {
         status: issues.status,
         assigneeAgentId: issues.assigneeAgentId,
         createdAt: issues.createdAt,
+        updatedAt: issues.updatedAt,
+        checkoutRunId: issues.checkoutRunId,
       })
       .from(issues)
       .where(
@@ -47,12 +69,13 @@ export function boardHygieneWatchdogService(db: Db) {
         ),
       );
 
-    const now = Date.now();
+    const now = options.now?.getTime() ?? Date.now();
     const result: BoardHygieneAuditResult = {
       companyId,
       scannedCount: activeIssues.length,
       cleanedCount: 0,
       cleanedIssues: [],
+      orphanIssues: [],
     };
 
     for (const issue of activeIssues) {
