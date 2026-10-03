@@ -132,6 +132,21 @@ export interface SeedDomainSamplesResult {
 }
 
 /**
+ * URLSearchParams 参数判空 —— wave286-G3 (COOA-43): RN 0.76.5 的 polyfill
+ * (`Libraries/Blob/URLSearchParams.js`) 没有 `size` getter, `q.size > 0` 在
+ * native 恒为 false, query 从不上 wire (分页/过滤/排序全丢, 空 focus 视图
+ * loadMore 请求洪水)。改用 forEach 计数: web 上与标准 `size` 语义一致
+ * (键值对总数, 含重复键); RN polyfill 走其已实现的 forEach, 双平台同判。
+ */
+function hasQueryParams(q: URLSearchParams): boolean {
+  let count = 0;
+  q.forEach(() => {
+    count += 1;
+  });
+  return count > 0;
+}
+
+/**
  * Framework-agnostic Coolie REST client covering the mobile/web happy path:
  * auth, companies, tasks, and voice dispatch. Used by both clients/expo and
  * clients/h5. For the full API, generate from /api/openapi.json.
@@ -355,7 +370,7 @@ export class CoolieClient {
   ): Promise<AdapterModel[]> {
     const params = new URLSearchParams();
     if (opts?.provider) params.set("provider", opts.provider);
-    const query = params.size > 0 ? `?${params.toString()}` : "";
+    const query = hasQueryParams(params) ? `?${params.toString()}` : "";
     const body = await this.request<AdapterModel[] | { models?: AdapterModel[] }>(
       "GET",
       `/api/companies/${encodeURIComponent(companyId)}/adapters/${encodeURIComponent(type)}/models${query}`,
@@ -403,7 +418,7 @@ export class CoolieClient {
     if (opts?.offset) q.set("offset", String(opts.offset));
     if (opts?.sortField) q.set("sortField", opts.sortField);
     if (opts?.sortDir) q.set("sortDir", opts.sortDir);
-    const suffix = q.size > 0 ? `?${q.toString()}` : "";
+    const suffix = hasQueryParams(q) ? `?${q.toString()}` : "";
     const body = await this.request<{ issues?: Issue[] } | Issue[]>(
       "GET",
       `/api/companies/${encodeURIComponent(companyId)}/issues${suffix}`,
@@ -783,7 +798,7 @@ export class CoolieClient {
     if (opts?.issueId) q.set("issueId", opts.issueId);
     if (opts?.projectId) q.set("projectId", opts.projectId);
     if (opts?.status) q.set("status", opts.status);
-    const suffix = q.size > 0 ? `?${q.toString()}` : "";
+    const suffix = hasQueryParams(q) ? `?${q.toString()}` : "";
     const body = await this.request<ExecutionWorkspace[]>(
       "GET",
       `/api/companies/${encodeURIComponent(companyId)}/execution-workspaces${suffix}`,
@@ -801,7 +816,7 @@ export class CoolieClient {
   ): Promise<IssueWorkProduct[]> {
     const q = new URLSearchParams();
     if (opts?.refreshPullRequests) q.set("refreshPullRequests", "true");
-    const suffix = q.size > 0 ? `?${q.toString()}` : "";
+    const suffix = hasQueryParams(q) ? `?${q.toString()}` : "";
     const body = await this.request<IssueWorkProduct[]>(
       "GET",
       `/api/issues/${encodeURIComponent(issueId)}/work-products${suffix}`,
@@ -896,7 +911,7 @@ export class CoolieClient {
     if (query?.limit !== undefined) q.set("limit", String(query.limit));
     if (query?.cursor) q.set("cursor", query.cursor);
 
-    const suffix = q.size > 0 ? `?${q.toString()}` : "";
+    const suffix = hasQueryParams(q) ? `?${q.toString()}` : "";
     const res = await this.request<CompanyArtifactsResponse | { artifacts?: CompanyArtifact[] }>(
       "GET",
       `/api/companies/${encodeURIComponent(companyId)}/artifacts${suffix}`,

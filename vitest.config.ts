@@ -24,6 +24,7 @@ export default defineConfig({
       "server",
       "ui",
       "cli",
+      "clients/api-client",
       "tests/ota-runtime",
     ],
   },
