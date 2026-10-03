@@ -71,8 +71,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
-import { CircleDot, Plus, ArrowUpDown, Layers, Check, ChevronRight, List, ListTree, User, Search, CircleSlash2, ChevronsDownUp, PanelTopClose, RotateCcw, ListCollapse,
-  SquareKanban,
+import { CircleDot, Plus, ArrowUpDown, Folder, Layers, Check, ChevronRight, List, ListTree, User, Search, CircleSlash2, ChevronsDownUp, PanelTopClose, RotateCcw, ListCollapse,
+  SquareKanban, X,
 } from "lucide-react";
 import {
   KanbanBoard,
@@ -185,7 +185,10 @@ export type IssueViewState = IssueFilterState & {
   sortField: IssueSortField;
   sortDir: "asc" | "desc";
   groupBy: "status" | "priority" | "assignee" | "project" | "workspace" | "parent" | "none";
-  viewMode: "list" | "board";
+  // wave286 T-2: "group" anchors project grouping (对齐原生 列表/项目分组/看板 三视图).
+  viewMode: "list" | "group" | "board";
+  // wave286 T-2 project filter chip: "all" | projectId | "__no_project".
+  projectFilter: string;
   nestingEnabled: boolean;
   showDateGroupSeparators: boolean;
   collapsedGroups: string[];
@@ -201,6 +204,7 @@ const defaultViewState: IssueViewState = {
   sortDir: "desc",
   groupBy: "none",
   viewMode: "list",
+  projectFilter: "all",
   nestingEnabled: true,
   showDateGroupSeparators: true,
   collapsedGroups: [],
@@ -237,7 +241,11 @@ function normalizeIssueViewState(value: unknown): IssueViewState {
     groupBy: ["status", "priority", "assignee", "project", "workspace", "parent", "none"].includes(parsed.groupBy ?? "")
       ? parsed.groupBy as IssueViewState["groupBy"]
       : defaultViewState.groupBy,
-    viewMode: parsed.viewMode === "board" ? "board" : "list",
+    // wave286 T-2 REQ-WEB-008: 存量 viewState 无 "group" 态 → 归一化回退 list, 不报错。
+    viewMode: parsed.viewMode === "board" ? "board" : parsed.viewMode === "group" ? "group" : "list",
+    projectFilter: typeof parsed.projectFilter === "string" && parsed.projectFilter.length > 0
+      ? parsed.projectFilter
+      : defaultViewState.projectFilter,
     nestingEnabled: parsed.nestingEnabled !== false,
     showDateGroupSeparators: parsed.showDateGroupSeparators !== false,
     collapsedGroups: Array.isArray(parsed.collapsedGroups)
@@ -824,6 +832,8 @@ function StreamlinedIssuesList({
   const [assigneePickerIssueId, setAssigneePickerIssueId] = useState<string | null>(null);
   const [assigneeSearch, setAssigneeSearch] = useState("");
   const [issueSearch, setIssueSearch] = useState(initialSearch ?? "");
+  // wave286 T-2: 项目 chip 受控开关 — 选中即收起, X 清除不触发开关。
+  const [projectFilterOpen, setProjectFilterOpen] = useState(false);
   const [renderedIssueRowLimit, setRenderedIssueRowLimit] = useState(INITIAL_ISSUE_ROW_RENDER_LIMIT);
   const [visibleIssueColumns, setVisibleIssueColumns] = useState<InboxIssueColumn[]>(initialPreferences.columns);
   const renderedIssueIdsRef = useRef("");
@@ -879,6 +889,15 @@ function StreamlinedIssuesList({
     if (!experimentalSettingsLoaded || externalObjectsEnabled || viewState.externalObjectStatuses.length === 0) return;
     updateView({ externalObjectStatuses: [] });
   }, [experimentalSettingsLoaded, externalObjectsEnabled, updateView, viewState.externalObjectStatuses.length]);
+
+  // wave286 T-2: 分组视图 ("group") 渲染上等同 list, 但分组维度锚定 project;
+  // 不改写用户 list 模式的 groupBy 偏好, 退出恢复 (spec §5.5-3 / R5)。
+  const isBoardMode = viewState.viewMode === "board";
+  const isGroupMode = viewState.viewMode === "group";
+  const isListLike = viewState.viewMode !== "board";
+  const effectiveGroupBy: IssueViewState["groupBy"] = isGroupMode ? "project" : viewState.groupBy;
+  // wave286 T-2 REQ-WEB-002: 项目 chip 客户端过滤已加载集合, "all" 即未激活。
+  const hasProjectFilter = viewState.projectFilter !== "all" && viewState.projectFilter.length > 0;
 
   // Prune stale IDs from collapsedParents whenever the issue list changes.
   // Deleted or reassigned issues leave orphan IDs in localStorage; this keeps
@@ -1174,10 +1193,10 @@ function StreamlinedIssuesList({
   );
   const hasExternalObjectStatusFilters = viewState.externalObjectStatuses.length > 0;
   const issueIdsForExternalObjectSummaries = useMemo(
-    () => (viewState.viewMode === "list" || hasExternalObjectStatusFilters
+    () => (isListLike || hasExternalObjectStatusFilters
       ? searchScopedIssues.map((issue) => issue.id)
       : []),
-    [hasExternalObjectStatusFilters, searchScopedIssues, viewState.viewMode],
+    [hasExternalObjectStatusFilters, isListLike, searchScopedIssues],
   );
   const {
     summaries: externalObjectSummaryByIssueId,
@@ -1205,7 +1224,15 @@ function StreamlinedIssuesList({
       liveIssueIds,
       issueFilterContext,
     );
-    return sortIssues(filteredByControls, viewState);
+    // wave286 T-2 REQ-WEB-002/003: projectFilter chip 客户端过滤, 作用于已加载集合,
+    // 在 groupBy 分桶与看板渲染之前生效; 与 filters 弹层条件并存 (AND)。
+    let projectFiltered = filteredByControls;
+    if (hasProjectFilter) {
+      projectFiltered = viewState.projectFilter === "__no_project"
+        ? filteredByControls.filter((issue) => issue.projectId == null)
+        : filteredByControls.filter((issue) => issue.projectId === viewState.projectFilter);
+    }
+    return sortIssues(projectFiltered, viewState);
   }, [
     searchScopedIssues,
     viewState,
@@ -1213,6 +1240,7 @@ function StreamlinedIssuesList({
     enableRoutineVisibilityFilter,
     liveIssueIds,
     issueFilterContext,
+    hasProjectFilter,
   ]);
 
   const progressSummary = useMemo(
@@ -1224,8 +1252,8 @@ function StreamlinedIssuesList({
   const checklistAffordanceEnabled = useMemo(
     () =>
       defaultSortField === "workflow"
-      && viewState.groupBy === "none",
-    [defaultSortField, viewState.groupBy],
+      && effectiveGroupBy === "none",
+    [defaultSortField, effectiveGroupBy],
   );
   const workflowChecklistMeta = useMemo(() => {
     if (!checklistAffordanceEnabled) return null;
@@ -1268,7 +1296,13 @@ function StreamlinedIssuesList({
     enabled: !!selectedCompanyId,
   });
 
-  const activeFilterCount = countActiveIssueFilters(viewState, enableRoutineVisibilityFilter);
+  const activeFilterCount = countActiveIssueFilters(viewState, enableRoutineVisibilityFilter)
+    + (hasProjectFilter ? 1 : 0);
+  const projectFilterLabel = !hasProjectFilter
+    ? "Project"
+    : viewState.projectFilter === "__no_project"
+      ? "No project"
+      : (projectById.get(viewState.projectFilter)?.name ?? "Project");
   const boardHighVolume = viewState.viewMode === "board" && filtered.length > KANBAN_BOARD_HIGH_VOLUME_THRESHOLD;
   const boardCompactCards =
     viewState.boardCardDensity === "compact"
@@ -1287,22 +1321,22 @@ function StreamlinedIssuesList({
     || viewState.boardColumnPageSize !== KANBAN_COLUMN_DEFAULT_PAGE_SIZE;
 
   const groupedContent = useMemo(() => {
-    if (viewState.groupBy === "none") {
+    if (effectiveGroupBy === "none") {
       return [{ key: "__all", label: null as string | null, items: filtered }];
     }
-    if (viewState.groupBy === "status") {
+    if (effectiveGroupBy === "status") {
       const groups = groupBy(filtered, (i) => i.status);
       return issueStatusOrder
         .filter((s) => groups[s]?.length)
         .map((s) => ({ key: s, label: issueFilterLabel(s), items: groups[s]! }));
     }
-    if (viewState.groupBy === "priority") {
+    if (effectiveGroupBy === "priority") {
       const groups = groupBy(filtered, (i) => i.priority);
       return issuePriorityOrder
         .filter((p) => groups[p]?.length)
         .map((p) => ({ key: p, label: issueFilterLabel(p), items: groups[p]! }));
     }
-    if (viewState.groupBy === "workspace") {
+    if (effectiveGroupBy === "workspace") {
       const groups = groupBy(
         filtered,
         (issue) => resolveIssueFilterWorkspaceId(issue, issueFilterWorkspaceContext) ?? "__no_workspace",
@@ -1320,7 +1354,7 @@ function StreamlinedIssuesList({
           items: groups[key]!,
         }));
     }
-    if (viewState.groupBy === "project") {
+    if (effectiveGroupBy === "project") {
       const groups = groupBy(filtered, (issue) => issue.projectId ?? "__no_project");
       return Object.keys(groups)
         .sort((a, b) => {
@@ -1336,7 +1370,7 @@ function StreamlinedIssuesList({
           items: groups[key]!,
         }));
     }
-    if (viewState.groupBy === "parent") {
+    if (effectiveGroupBy === "parent") {
       const groups = groupBy(filtered, (i) => i.parentId ?? "__no_parent");
       return Object.keys(groups)
         .sort((a, b) => {
@@ -1369,7 +1403,7 @@ function StreamlinedIssuesList({
   }, [
     filtered,
     issueFilterWorkspaceContext,
-    viewState.groupBy,
+    effectiveGroupBy,
     agents,
     agentName,
     currentUserId,
@@ -1385,7 +1419,7 @@ function StreamlinedIssuesList({
   // rows the way the progressive renderer consumes its budget (collapsed
   // groups still consume rows; collapsed parents' subtrees do not).
   const flatNavEntries = useMemo(() => {
-    if (viewState.viewMode !== "list") return [] as IssuesListNavEntry[];
+    if (!isListLike) return [] as IssuesListNavEntry[];
     const out: IssuesListNavEntry[] = [];
     let budgetCount = 0;
     for (const group of groupedContent) {
@@ -1414,7 +1448,7 @@ function StreamlinedIssuesList({
     return out;
   }, [
     groupedContent,
-    viewState.viewMode,
+    isListLike,
     viewState.collapsedGroups,
     viewState.collapsedParents,
     viewState.nestingEnabled,
@@ -1469,7 +1503,7 @@ function StreamlinedIssuesList({
         return;
       }
       const st = listNavStateRef.current;
-      if (st.viewMode !== "list" || st.flatNavEntries.length === 0) return;
+      if (st.viewMode === "board" || st.flatNavEntries.length === 0) return;
       // The row a keystroke acts on: the hovered row when the mouse moved since
       // the last key nav (so "hover a row → press Arrow/Enter" acts on it),
       // otherwise the keyboard selection. Hover no longer writes selection
@@ -1563,7 +1597,7 @@ function StreamlinedIssuesList({
   }, [findSelectedNavElement, renderedIssueRowLimit, selectedNavKey]);
 
   useEffect(() => {
-    if (viewState.viewMode !== "list") return;
+    if (!isListLike) return;
     const nextIssueIds = filtered.map((issue) => issue.id).join("|");
     const previousIssueIds = renderedIssueIdsRef.current;
     renderedIssueIdsRef.current = nextIssueIds;
@@ -1576,12 +1610,12 @@ function StreamlinedIssuesList({
       if (listAppended) return Math.min(filtered.length, Math.max(current, nextInitialLimit));
       return nextInitialLimit;
     });
-  }, [filtered, viewState.viewMode]);
+  }, [filtered, isListLike]);
 
-  const hasMoreRenderedRows = viewState.viewMode === "list" && renderedIssueRowLimit < filtered.length;
+  const hasMoreRenderedRows = isListLike && renderedIssueRowLimit < filtered.length;
   const remainingIssueRowCount = Math.max(filtered.length - renderedIssueRowLimit, 0);
   const loadMoreIssueRows = useCallback(() => {
-    if (viewState.viewMode !== "list") return;
+    if (!isListLike) return;
     if (hasMoreRenderedRows) {
       setRenderedIssueRowLimit((current) => Math.min(filtered.length, current + ISSUE_ROW_RENDER_BATCH_SIZE));
       return;
@@ -1594,11 +1628,11 @@ function StreamlinedIssuesList({
     hasMoreIssues,
     hasMoreRenderedRows,
     isLoadingMoreIssues,
+    isListLike,
     onLoadMoreIssues,
-    viewState.viewMode,
   ]);
 
-  const canLoadMoreIssues = viewState.viewMode === "list"
+  const canLoadMoreIssues = isListLike
     && !isLoading
     && (hasMoreRenderedRows || (hasMoreIssues && !isLoadingMoreIssues));
 
@@ -1648,14 +1682,14 @@ function StreamlinedIssuesList({
     const defaults: Record<string, unknown> = { ...(baseCreateIssueDefaults ?? {}) };
     if (projectId && defaults.projectId === undefined) defaults.projectId = projectId;
     if (groupKey) {
-      if (viewState.groupBy === "status") defaults.status = groupKey;
-      else if (viewState.groupBy === "priority") defaults.priority = groupKey;
-      else if (viewState.groupBy === "assignee" && groupKey !== "__unassigned") {
+      if (effectiveGroupBy === "status") defaults.status = groupKey;
+      else if (effectiveGroupBy === "priority") defaults.priority = groupKey;
+      else if (effectiveGroupBy === "assignee" && groupKey !== "__unassigned") {
         if (groupKey.startsWith("__user:")) defaults.assigneeUserId = groupKey.slice("__user:".length);
         else defaults.assigneeAgentId = groupKey;
       }
-      else if (viewState.groupBy === "project" && groupKey !== "__no_project") defaults.projectId = groupKey;
-      else if (viewState.groupBy === "workspace" && groupKey !== "__no_workspace") {
+      else if (effectiveGroupBy === "project" && groupKey !== "__no_project") defaults.projectId = groupKey;
+      else if (effectiveGroupBy === "workspace" && groupKey !== "__no_workspace") {
         const representativeIssue = group?.items.find((issue) =>
           issue.executionWorkspaceId === groupKey || issue.projectWorkspaceId === groupKey,
         ) ?? null;
@@ -1678,7 +1712,7 @@ function StreamlinedIssuesList({
           }
         }
       }
-      else if (viewState.groupBy === "parent" && groupKey !== "__no_parent") {
+      else if (effectiveGroupBy === "parent" && groupKey !== "__no_parent") {
         const parentIssue = issueById.get(groupKey);
         if (parentIssue) Object.assign(defaults, buildSubIssueDefaultsForViewer(parentIssue, currentUserId));
         else defaults.parentId = groupKey;
@@ -1688,11 +1722,11 @@ function StreamlinedIssuesList({
   }, [
     baseCreateIssueDefaults,
     currentUserId,
+    effectiveGroupBy,
     executionWorkspaceById,
     issueById,
     projectId,
     projectWorkspaceById,
-    viewState.groupBy,
   ]);
 
   const createActionLabel = createIssueLabel ? `Create ${createIssueLabel}` : "Create Task";
@@ -1734,7 +1768,7 @@ function StreamlinedIssuesList({
     setAssigneeSearch("");
   }, [onUpdateIssue]);
 
-  let remainingRowsToRender = viewState.viewMode === "list" ? renderedIssueRowLimit : Number.POSITIVE_INFINITY;
+  let remainingRowsToRender = isListLike ? renderedIssueRowLimit : Number.POSITIVE_INFINITY;
   const IssuesToolbar = toolbarPresentation === "collection" ? CollectionToolbar : LegacyIssuesToolbar;
 
   return (
@@ -1768,7 +1802,7 @@ function StreamlinedIssuesList({
         )}
         controls={(
           <>
-          {/* View mode toggle */}
+          {/* View mode toggle — wave286 T-2: 列表 / 项目分组 / 看板 三态 (对齐原生 VIEW_OPTIONS) */}
           <div className="flex items-center border border-border rounded-md overflow-hidden mr-1" role="group" aria-label="View mode">
             <button
               className={`flex h-8 w-8 items-center justify-center transition-colors ${viewState.viewMode === "list" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"}`}
@@ -1778,6 +1812,15 @@ function StreamlinedIssuesList({
               aria-pressed={viewState.viewMode === "list"}
             >
               <List className="h-3.5 w-3.5" />
+            </button>
+            <button
+              className={`flex h-8 w-8 items-center justify-center transition-colors ${viewState.viewMode === "group" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+              onClick={() => updateView({ viewMode: "group" })}
+              title="Project group view"
+              aria-label="Project group view"
+              aria-pressed={viewState.viewMode === "group"}
+            >
+              <Folder className="h-3.5 w-3.5" />
             </button>
             <button
               className={`flex h-8 w-8 items-center justify-center transition-colors ${viewState.viewMode === "board" ? "bg-accent text-foreground" : "text-muted-foreground hover:text-foreground"}`}
@@ -1790,7 +1833,7 @@ function StreamlinedIssuesList({
             </button>
           </div>
 
-          {viewState.viewMode === "list" && (
+          {isListLike && (
             <Button
               type="button"
               variant="outline"
@@ -1909,8 +1952,86 @@ function StreamlinedIssuesList({
             presentation={rowPresentation === "task" ? "streamlined" : "legacy"}
           />
 
-          {/* Sort (list view only) */}
-          {viewState.viewMode === "list" && (
+          {/* wave286 T-2 REQ-WEB-001..005: 项目筛选 chip — 全部/各项目(色点)/未归属,
+              客户端过滤已加载集合, 与 filters 弹层并存; X 即清除入口。 */}
+          <Popover open={projectFilterOpen} onOpenChange={setProjectFilterOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className={cn("h-8 shrink-0 gap-1.5 px-2", hasProjectFilter && "bg-accent")}
+                title="Filter by project"
+                aria-label={hasProjectFilter ? `Project filter: ${projectFilterLabel}` : "Filter by project"}
+              >
+                <Folder className="h-3.5 w-3.5" />
+                <span className="hidden max-w-36 truncate text-xs sm:inline">{projectFilterLabel}</span>
+                {hasProjectFilter && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    aria-label="Clear project filter"
+                    className="-mr-1 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-sm text-muted-foreground transition-colors hover:bg-background/60 hover:text-foreground"
+                    onPointerDown={(e) => {
+                      // Radix PopoverTrigger opens on pointerdown (touch parity);
+                      // X 只清除, 不得连带弹开筛选弹层。
+                      e.preventDefault();
+                      e.stopPropagation();
+                    }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      updateView({ projectFilter: "all" });
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" || e.key === " ") {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        updateView({ projectFilter: "all" });
+                      }
+                    }}
+                  >
+                    <X className="h-3 w-3" />
+                  </span>
+                )}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-52 p-0">
+              <div className="p-2 space-y-0.5">
+                {(
+                  [
+                    { id: "all", name: "All projects", color: null as string | null },
+                    ...(projects ?? []).map((project) => ({ id: project.id, name: project.name, color: project.color ?? null })),
+                    { id: "__no_project", name: "No project", color: null as string | null },
+                  ]
+                ).map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    className={cn(
+                      "flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm",
+                      viewState.projectFilter === option.id ? "bg-accent/50 text-foreground" : "text-muted-foreground hover:bg-accent/50",
+                    )}
+                    onClick={() => {
+                      updateView({ projectFilter: option.id });
+                      setProjectFilterOpen(false);
+                    }}
+                  >
+                    <span
+                      className="h-2 w-2 shrink-0 rounded-full border border-border/60"
+                      style={option.color ? { backgroundColor: option.color } : undefined}
+                      aria-hidden="true"
+                    />
+                    <span className="min-w-0 flex-1 truncate text-left">{option.name}</span>
+                    {viewState.projectFilter === option.id && <Check className="h-3.5 w-3.5" />}
+                  </button>
+                ))}
+              </div>
+            </PopoverContent>
+          </Popover>
+
+          {/* Sort (list and group views; board has fixed status lanes) */}
+          {isListLike && (
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" title="Sort">
@@ -2009,7 +2130,7 @@ function StreamlinedIssuesList({
           Some board columns are showing up to {ISSUE_BOARD_COLUMN_RESULT_LIMIT} tasks. Refine filters or search to reveal the rest.
         </p>
       )}
-      {!isLoading && !externalObjectFilterLoading && filtered.length === 0 && viewState.viewMode === "list" && (
+      {!isLoading && !externalObjectFilterLoading && filtered.length === 0 && isListLike && (
         <EmptyState
           icon={CircleDot}
           message="No tasks match the current filters or search."
@@ -2049,9 +2170,20 @@ function StreamlinedIssuesList({
               // Left inset aligns the header chevron with the nested task
               // chevrons: tasks-list rows sit at pl-1 before their chevron
               // (no unread column), so the band adds no extra left inset.
+              // wave286 T-2 REQ-WEB-006: 分组视图节头吸顶, 背景不透明 (行内容不得透出)。
               <div
                 data-issues-group-key={group.key}
-                className={cn("rounded-lg px-3 sm:pl-0 sm:pr-4", selectedNavKey === `group:${group.key}` ? "bg-accent/50" : "hover:bg-accent/50")}
+                className={cn(
+                  "rounded-lg px-3 sm:pl-0 sm:pr-4",
+                  // wave286 T-2 REQ-WEB-006: 分组视图节头吸顶。sticky 相对滚动容器
+                  // (<main class="p-4 md:p-6">) 的 content 边缘定位, 若 top-0 会在
+                  // padding 区露出滚过的行内容 → 负 top 抵消 main 的 padding,
+                  // 让节头贴住滚动视口顶边, 行内容从节头上缘消失。
+                  isGroupMode && "sticky -top-4 z-10 bg-background md:-top-6",
+                  selectedNavKey === `group:${group.key}`
+                    ? (isGroupMode ? "bg-accent" : "bg-accent/50")
+                    : (isGroupMode ? "hover:bg-accent" : "hover:bg-accent/50"),
+                )}
                 onClick={() => setSelectedNavKey(`group:${group.key}`)}
                 onMouseEnter={() => setNavSelectionFromPointer(`group:${group.key}`)}
               >
@@ -2067,16 +2199,27 @@ function StreamlinedIssuesList({
                   });
                 }}
                 trailing={(
-                  <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    className="-mr-2 text-muted-foreground"
-                    title={`New task in ${group.label}`}
-                    aria-label={`New task in ${group.label}`}
-                    onClick={() => openCreateIssueDialog(group)}
-                  >
-                    <Plus className="h-3 w-3" />
-                  </Button>
+                  <span className="inline-flex items-center">
+                    {/* wave286 T-2 REQ-WEB-005: 分组视图节头显示项目任务计数 */}
+                    {isGroupMode && (
+                      <span
+                        className="mr-1 text-xs tabular-nums text-muted-foreground"
+                        data-testid="issue-group-count"
+                      >
+                        {group.items.length}
+                      </span>
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon-xs"
+                      className="-mr-2 text-muted-foreground"
+                      title={`New task in ${group.label}`}
+                      aria-label={`New task in ${group.label}`}
+                      onClick={() => openCreateIssueDialog(group)}
+                    >
+                      <Plus className="h-3 w-3" />
+                    </Button>
+                  </span>
                 )}
               />
               </div>
