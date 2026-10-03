@@ -1,0 +1,12 @@
+{
+  "version": "0.6.26",
+  "versionCode": 626,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.26/coolie-release.apk",
+  "apkSha256": "c0af1ab730b2515111eacf845be654e9fb2f647ff81adee651ba618c74087478",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "2e7d63c06857dfb115f318e36ece2945b0f4cd4259b13fea0a009a9cf6e6b4c0",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "runtimeVersion 政策 appVersion→fingerprint, 一次安装后 v0.6.x 全走 OTA",
+  "commitSha": "56b93f92dcd7e907b292a1ebcded05f64b2f544e"
+}

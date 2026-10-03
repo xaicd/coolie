@@ -1,0 +1,12 @@
+# wave86 动态分发 (Caddyfile: /ota/manifest → Express /api/ota/manifest) 按客户端头回写 — 探测实录 2026-10-03T17:30:17Z
+# 服务器磁盘 /opt/coolie/ui/ota/manifest (mtime 2026-10-04 01:21:41 +0800) = 本次发版发布的哈希版 manifest (id 4b468561…, runtimeVersion 59398d8c…)
+
+== 请求头 expo-runtime-version: 59398d8c10ad4c5e23044387b1c9912920e63692
+{"runtimeVersion": "59398d8c10ad4c5e23044387b1c9912920e63692", "bundleKey": "android-bundle-3ABMH0H0IBmiVvvc4J40h47wuZsL5QYZLn7Cz9jthpo", "createdAt": "2026-10-03T17:21:41.029Z"}
+== 请求头 expo-runtime-version: 0.6.25
+{"runtimeVersion": "0.6.25", "bundleKey": "android-bundle-3ABMH0H0IBmiVvvc4J40h47wuZsL5QYZLn7Cz9jthpo", "createdAt": "2026-10-07T21:46:41.029Z"}
+== 请求头 expo-runtime-version: 0.6.26
+{"runtimeVersion": "0.6.26", "bundleKey": "android-bundle-3ABMH0H0IBmiVvvc4J40h47wuZsL5QYZLn7Cz9jthpo", "createdAt": "2026-10-07T21:47:41.029Z"}
+
+结论: 真实 expo-updates 客户端 (0.6.26 装机, 内嵌 runtime 59398d8c…) 拿到哈希版 manifest, 字段与磁盘文件一致;
+未匹配版本回显客户端版本 = wave86 防搁浅既有策略 (本次未改)。裸 curl (无头) 的 fallback 响应即 ota-manifest.json 护栏证据。
