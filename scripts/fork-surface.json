@@ -1194,6 +1194,12 @@
       "maxNetLines": 130,
       "maxTotalLines": 160,
       "reason": "wave228: DS toolchain MCP servers install shim."
+    },
+    {
+      "path": "scripts/register-employees-cron.sh",
+      "maxNetLines": 210,
+      "maxTotalLines": 240,
+      "reason": "wave282: idempotent local employee agent installer and crontab registration helper."
     }
   ]
 }

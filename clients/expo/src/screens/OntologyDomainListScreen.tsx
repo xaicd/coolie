@@ -621,6 +621,24 @@ export function OntologyDomainListScreen({
                   </>
                 ) : null}
               </ScrollView>
+
+              {/* wave284: 修复 P1 5 层下钻路由断链 — 实例详情下钻至关系拓扑图 (L3 -> L4) */}
+              {onOpenInstanceGraph ? (
+                <Pressable
+                  style={styles.drilldownGraphBtn}
+                  onPress={() => {
+                    const typeId = selectedEntityType?.entityType ?? "project";
+                    const label = selectedInstance.label;
+                    setSelectedInstance(null);
+                    onOpenInstanceGraph(typeId, `${label} 拓扑图`);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="查看该实例关系拓扑"
+                >
+                  <Ionicons name="git-network-outline" size={16} color="#FFFFFF" />
+                  <Text style={styles.drilldownGraphBtnText}>查看该实例关系拓扑 (L4 下钻)</Text>
+                </Pressable>
+              ) : null}
             </Pressable>
           </Pressable>
         </Modal>
@@ -1181,6 +1199,22 @@ const styles = StyleSheet.create({
   },
   submitBtnText: {
     fontSize: 13,
+    color: "#FFFFFF",
+    fontWeight: "600",
+  },
+  drilldownGraphBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginTop: 18,
+    marginBottom: 6,
+    paddingVertical: 12,
+    borderRadius: RADIUS.md,
+    backgroundColor: C.accent,
+  },
+  drilldownGraphBtnText: {
+    fontSize: 14,
     color: "#FFFFFF",
     fontWeight: "600",
   },
