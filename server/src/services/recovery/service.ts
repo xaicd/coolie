@@ -830,10 +830,13 @@ function isStrandedIssueRecoveryIssue(
 /**
  * True when the issue's latest run was cancelled by a board operator (the
  * board cancel route stamps the attribution; interrupt-by-comment uses the
- * operator_interrupted error code). While such a run is the latest activity
- * on an issue, recovery stands down entirely: the operator deliberately
- * stopped the agent, and re-waking it — or escalating "stranding" — would
- * fight the human. Any newer run or wake supersedes the exemption.
+ * operator_interrupted error code) or by the owning agent itself (the cancel
+ * route stamps cancelledByActorType "agent" for owner self-cancels — e.g. an
+ * agent clearing its own run orphaned by a server bounce). While such a run
+ * is the latest activity on an issue, recovery stands down entirely: whoever
+ * deliberately stopped the run, re-waking it — or escalating "stranding" —
+ * would fight that decision; the heartbeat timer re-engages work instead.
+ * Any newer run or wake supersedes the exemption.
  */
 function isOperatorCancelledRun(
   latestRun: LatestIssueRun,
@@ -852,7 +855,8 @@ function isOperatorCancelledRun(
   const result = parseObject(latestRun.resultJson);
   return (
     result.cancelledByActorType === "user" ||
-    result.cancelledByActorType === "board"
+    result.cancelledByActorType === "board" ||
+    result.cancelledByActorType === "agent"
   );
 }
 

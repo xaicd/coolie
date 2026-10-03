@@ -715,6 +715,35 @@ describeEmbeddedPostgres("issue recovery actions", () => {
     expect(enqueueWakeup).not.toHaveBeenCalled();
   });
 
+  it("stands down while the latest run was cancelled by the owning agent itself", async () => {
+    // Owner self-cancel (e.g. an agent clearing its own run orphaned by a
+    // server bounce) is a deliberate stop by the run's own agent — recovery
+    // must not classify it as stranding and re-wake mid-decision. The
+    // heartbeat timer re-engages the work instead.
+    const { companyId, coderId, sourceIssueId } = await seedCompany();
+    await db.insert(heartbeatRuns).values({
+      id: randomUUID(),
+      companyId,
+      agentId: coderId,
+      invocationSource: "manual",
+      status: "cancelled",
+      error: "Cancelled by the owning agent",
+      errorCode: "cancelled",
+      resultJson: { cancelledByActorType: "agent", cancelledByAgentId: coderId },
+      startedAt: new Date("2026-07-15T20:00:00.000Z"),
+      finishedAt: new Date("2026-07-15T20:01:00.000Z"),
+      contextSnapshot: { issueId: sourceIssueId },
+    });
+    const enqueueWakeup = vi.fn(async () => null);
+    const recovery = recoveryService(db, { enqueueWakeup });
+
+    const result = await recovery.reconcileStrandedAssignedIssues();
+
+    expect(result.operatorCancelExempted).toBe(1);
+    expect(await db.select().from(issueRecoveryActions)).toHaveLength(0);
+    expect(enqueueWakeup).not.toHaveBeenCalled();
+  });
+
   it("still recovers system-cancelled runs with no operator attribution", async () => {
     const { companyId, coderId, sourceIssueId } = await seedCompany();
     await db.insert(heartbeatRuns).values({

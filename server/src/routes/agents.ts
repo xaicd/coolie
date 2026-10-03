@@ -7080,25 +7080,42 @@ export function agentRoutes(
   });
 
   router.post("/heartbeat-runs/:runId/cancel", async (req, res) => {
-    assertBoard(req);
     const runId = readHeartbeatRunId(req);
     const existing = await getAccessibleResource(req, res, heartbeat.getRun(runId), "Heartbeat run not found");
     if (!existing) return;
-    // Stamp the cancellation as operator-initiated (this route is board-only).
-    // Recovery reads this to stand down instead of classifying the cancelled
-    // run as agent stranding and re-waking the agent the operator just stopped.
-    const run = await heartbeat.cancelRun(runId, "Cancelled by a board operator", {
-      resultJson: {
-        cancelledByActorType: "user",
-        cancelledByUserId: req.actor.userId ?? null,
+    // The owning agent may cancel its own run: without this an agent whose
+    // run was orphaned by a server bounce (stuck status=running, no live
+    // process) has no self-healing path, and the orphan blocks issue checkout
+    // takeover until an operator intervenes. Everyone else stays board-only.
+    const ownerAgent =
+      req.actor.type === "agent" && existing.agentId === req.actor.agentId;
+    if (!ownerAgent) assertBoard(req);
+    // Stamp who cancelled. Recovery reads this to stand down instead of
+    // classifying the cancelled run as agent stranding and re-waking whoever
+    // (operator or the owning agent itself) deliberately stopped it.
+    const run = await heartbeat.cancelRun(
+      runId,
+      ownerAgent ? "Cancelled by the owning agent" : "Cancelled by a board operator",
+      {
+        resultJson: ownerAgent
+          ? {
+              cancelledByActorType: "agent",
+              cancelledByAgentId: req.actor.agentId ?? null,
+            }
+          : {
+              cancelledByActorType: "user",
+              cancelledByUserId: req.actor.userId ?? null,
+            },
       },
-    });
+    );
 
     if (run) {
       await logActivity(db, {
         companyId: run.companyId,
-        actorType: "user",
-        actorId: req.actor.userId ?? "board",
+        actorType: ownerAgent ? "agent" : "user",
+        actorId: ownerAgent
+          ? req.actor.agentId ?? "agent"
+          : req.actor.userId ?? "board",
         action: "heartbeat.cancelled",
         entityType: "heartbeat_run",
         entityId: run.id,
