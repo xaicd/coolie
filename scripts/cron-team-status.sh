@@ -416,6 +416,35 @@ function getLedgerSummary(r) {
   }
 }
 
+function getToolHealthBadge(toolName) {
+  const healthFile = path.join(dir, "..", "tool-health", "latest.json");
+  if (!fs.existsSync(healthFile)) return "";
+  try {
+    const th = JSON.parse(fs.readFileSync(healthFile, "utf8"));
+    const t = th.tools && th.tools[toolName];
+    if (t && t.status && t.status !== "ok") {
+      return `·${t.status}`;
+    }
+  } catch (e) {}
+  return "";
+}
+
+function getToolHealthAlert() {
+  const healthFile = path.join(dir, "..", "tool-health", "latest.json");
+  if (!fs.existsSync(healthFile)) return "";
+  try {
+    const th = JSON.parse(fs.readFileSync(healthFile, "utf8"));
+    const tools = th.tools || {};
+    const warns = [];
+    for (const [name, t] of Object.entries(tools)) {
+      if (t.status === "fail") warns.push(`${name}故障`);
+      else if (t.status === "warn" && t.reason && !t.reason.includes("PATH")) warns.push(`${name}预警`);
+    }
+    if (warns.length > 0) return `警: 工具健康关注 (${warns.join(" / ")})`;
+  } catch (e) {}
+  return "";
+}
+
 for (const file of files.slice(0, 15)) {
   try {
     const r = JSON.parse(fs.readFileSync(file, "utf8"));
@@ -431,7 +460,8 @@ if (running.length > 0) {
   const r = running[0];
   const dur = formatDuration(r.startedAt || r.createdAt);
   const durStr = dur ? `${dur}, ` : "";
-  console.log(`跑: ${r.employee} ${r.wave} (${durStr}${r.tool} + ${r.subagentType || "-"})`);
+  const tBadge = getToolHealthBadge(r.tool);
+  console.log(`跑: ${r.employee} ${r.wave} (${durStr}${r.tool}${tBadge} + ${r.subagentType || "-"})`);
 } else {
   console.log("跑: 无 (全员等派活)");
 }
@@ -439,12 +469,17 @@ if (blocked.length > 0) {
   const b = blocked[0];
   const dur = formatDuration(b.startedAt || b.createdAt);
   const durStr = dur ? `${dur}, ` : "";
-  console.log(`卡: ${b.employee} ${b.wave} (${durStr}${b.tool} · ${b.blockedReason || "阻塞"})`);
+  const tBadge = getToolHealthBadge(b.tool);
+  console.log(`卡: ${b.employee} ${b.wave} (${durStr}${b.tool}${tBadge} · ${b.blockedReason || "阻塞"})`);
 }
 if (done.length > 0) {
   const d = done[0];
   const ledger = getLedgerSummary(d);
   console.log(`完: ${d.wave} 落仓 ${d.commit || "完成"}${ledger}`);
+}
+const alert = getToolHealthAlert();
+if (alert) {
+  console.log(alert);
 }
 console.log("");
 ' "$dispatch_dir"
@@ -629,6 +664,9 @@ ACTION="${1:-}"
 case "$ACTION" in
   --compact|--receipts)
     render_receipts_summary
+    ;;
+  --health|--tools)
+    bash "$REPO_ROOT/scripts/tool-health-monitor.sh" --print
     ;;
   "")
     do_print
