@@ -330,10 +330,15 @@ function unwrapSchema(schema: z.ZodTypeAny): z.ZodTypeAny {
   ) {
     return unwrapSchema(def.innerType as z.ZodTypeAny);
   }
-  // A `.transform()` or `.pipe()` becomes a pipe. Read the input schema so the
-  // published contract describes the value a client sends.
+  // A `.transform()` or `.pipe()` becomes a pipe. `.schema.transform(fn)` keeps
+  // the client-facing shape on `in`, but `z.preprocess(fn, .schema)` (e.g. the
+  // create-issue status default) puts an opaque transform on `in` and the real
+  // validated object on `out` — reading `in` there degraded the whole body to
+  // `{}` in the published spec. Read whichever side is not the transform.
   if (def.type === "pipe") {
-    return unwrapSchema(def.in as z.ZodTypeAny);
+    const inType = zodDef(def.in as z.ZodTypeAny).type;
+    const shapeSide = inType === "transform" ? def.out : def.in;
+    return unwrapSchema(shapeSide as z.ZodTypeAny);
   }
   return schema;
 }
@@ -348,7 +353,10 @@ function isOptionalSchema(schema: z.ZodTypeAny): boolean {
     return true;
   }
   if (def.type === "pipe") {
-    return isOptionalSchema(def.in as z.ZodTypeAny);
+    // Mirror unwrapSchema: on a preprocess pipe the shape lives on `out`.
+    const inType = zodDef(def.in as z.ZodTypeAny).type;
+    const shapeSide = inType === "transform" ? def.out : def.in;
+    return isOptionalSchema(shapeSide as z.ZodTypeAny);
   }
   if (def.type === "nullable") {
     return isOptionalSchema(def.innerType as z.ZodTypeAny);

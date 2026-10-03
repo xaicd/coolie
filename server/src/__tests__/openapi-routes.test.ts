@@ -257,6 +257,30 @@ describe("openapi routes", () => {
     expect(wake.responses["409"]).toBeDefined();
     expect(wake.description).toContain("durable queued/deferred receipt");
   });
+
+  it("publishes preprocess-piped create-issue bodies as object schemas", () => {
+    const { spec } = loadSpecRoutes();
+    // createIssueSchema / createChildIssueSchema are
+    // z.preprocess(status default, object).superRefine(...). Reading the pipe's
+    // transform side used to degrade both request bodies to {} in the spec.
+    const create = spec.paths["/api/companies/{companyId}/issues"].post;
+    const createSchema = create.requestBody.content["application/json"].schema;
+    expect(createSchema.type).toBe("object");
+    expect(createSchema.properties.title).toMatchObject({
+      type: "string",
+      minLength: 1,
+    });
+    expect(createSchema.required).toContain("title");
+    const createChild = spec.paths["/api/issues/{id}/children"].post;
+    const childSchema =
+      createChild.requestBody.content["application/json"].schema;
+    expect(childSchema.type).toBe("object");
+    expect(childSchema.properties.title).toMatchObject({
+      type: "string",
+      minLength: 1,
+    });
+  });
+
   it("serves the generated OpenAPI document", async () => {
     const res = await request(createApp()).get("/api/openapi.json");
 
