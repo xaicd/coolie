@@ -59,6 +59,12 @@
 
 ## 5. 遗留与移交
 
-- owner: §4 决策 (A/B/C) → 轮换执行与 agent 注入同步。
+- ~~owner: §4 决策 (A/B/C)~~ → 已裁定, 见 §6 补记。
 - 铁匠 (在途, 不阻塞本单): round-2 `board-hygiene-watchdog.ts` WIP 落地后随常规 wave 投产即可 (届时 host 已回 commit 基线, 正常 sync 增量)。
 - 复核命令模板沿用 [[coolie-production-environment]]; 泄漏计数复验: 对 journal 全量 grep 完整 key 值 (经 stdin 传 pattern, 勿入 argv/输出)。
+
+## 6. 补记 (23:0x) — 交付 3 已裁定, 本单关单
+
+- 本报告成文同时, 并行 COOA-19 验收 run (22:52 板上评论) 已就交付 3 裁定: **不立即轮换** (key 仅宿主机 journal 读权限者可见, 无提权面, 轮换同步成本 > 即时收益)、**不 vacuum** (保留诊断价值)、**自然过期** (含 key 行约 10/17–18 自动消失)、**下次维护窗随发版轮换** (纵深防御, 当值 deployer 执行并同步消费方)。与 §4 方案 C + 纵深防御项一致; 本单 request_confirmation 因此无需创建 (issue 已 done, 挂交互已被服务端拒绝)。
+- **部署时刻更正**: 本单投产 (快照 `d32203114`, deploy 脚本全绿) 的现网重启实际为 **22:49:39 CST**; 19:57:55 的重启是其前一轮含 `67f802d02` 的树。两份验收记录 (并行 run 22:47 smoke / 本报告 §3 22:52 smoke) 对同一现网状态独立实测, 结论一致。
+- 后续值守要点: 下个发版单捎带 `PAPERCLIP_API_KEY` 轮换时, 轮换后复核 = 旧值全量 401 + journal 新行仍 `[Redacted]` + 各 agent 注入同步完成。
