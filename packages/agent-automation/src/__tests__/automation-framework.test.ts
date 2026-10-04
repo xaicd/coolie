@@ -97,7 +97,7 @@ describe("Agent Automation Framework (@paperclipai/agent-automation)", () => {
 
   describe("3. Playbook Scenarios Registry", () => {
     it("should register all 8 legacy core playbooks (4 testing + 4 operations)", () => {
-      expect(ALL_PLAYBOOKS.length).toBe(8);
+      expect(ALL_PLAYBOOKS.length).toBe(10);
 
       const testPb = findPlaybook("test-governance-waiver");
       expect(testPb.kind).toBe("testing");
@@ -106,6 +106,10 @@ describe("Agent Automation Framework (@paperclipai/agent-automation)", () => {
       const opsPb = findPlaybook("ops-governance-patrol");
       expect(opsPb.kind).toBe("operations");
       expect(opsPb.preferredPersona).toBe("pre-sre");
+
+      const prodVerifyPb = findPlaybook("prod-go-live-verification");
+      expect(prodVerifyPb.kind).toBe("prod-verification");
+      expect(prodVerifyPb.preferredPersona).toBe("ds");
     });
   });
 
@@ -169,6 +173,33 @@ describe("Agent Automation Framework (@paperclipai/agent-automation)", () => {
       const report = await runner.run(mobileOtaCheckOpsPlaybook, "pre-sre");
       expect(report.status).toBe("passed");
       expect(report.persona).toContain("兑底渊");
+    });
+
+    it("should support Stage 1: Production Go-Live Verification by QA (百晓生 DS) and issue Sign-Off", async () => {
+      const prodVerifyPb = findPlaybook("prod-go-live-verification");
+      const report = await runner.run(prodVerifyPb, "ds");
+
+      expect(report.status).toBe("passed");
+      expect(report.environment).toBe("production");
+      expect(report.kind).toBe("prod-verification");
+      expect(report.persona).toContain("百晓生");
+      expect(report.lifecycleStage).toBe("verified_ready");
+      expect(report.signOffReceipt).toBeDefined();
+      expect(report.signOffReceipt?.verdict).toBe("passed");
+      expect(report.signOffReceipt?.handoffToOpsApproved).toBe(true);
+      expect(report.signOffReceipt?.verifierPersona).toContain("百晓生");
+    });
+
+    it("should support Stage 2: Continuous Operations by Web Ops after production verification", async () => {
+      const continuousPb = findPlaybook("prod-continuous-patrol");
+      const report = await runner.run(continuousPb, "ops-web");
+
+      expect(report.status).toBe("passed");
+      expect(report.environment).toBe("production");
+      expect(report.kind).toBe("operations");
+      expect(report.lifecycleStage).toBe("continuous_operations");
+      expect(report.persona).toContain("Web 运营");
+      expect(report.steps.length).toBe(3);
     });
   });
 });

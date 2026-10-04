@@ -34,8 +34,9 @@ export class PlaybookRunner {
     const startedAt = new Date().toISOString();
     const startTime = Date.now();
 
-    // 核心环境决策：测试默认 local，运营默认 production
+    // 核心环境决策：prod-verification 强制 production，operations 默认 production，testing 默认 local
     const environment: AutomationEnvironment = this.options.environment
+      ?? (playbook.kind === "prod-verification" ? "production" : undefined)
       ?? (playbook.targetEnvironment && playbook.targetEnvironment !== "both" ? playbook.targetEnvironment : undefined)
       ?? (playbook.kind === "operations" ? "production" : "local");
 
@@ -123,6 +124,47 @@ export class PlaybookRunner {
     const completedAt = new Date().toISOString();
     const totalDurationMs = Date.now() - startTime;
 
+    // 生产两阶段生命周期状态判定与签收单 (Sign-off) 出具
+    let lifecycleStage: import("../types.js").ProductionLifecycleStage | undefined;
+    let signOffReceipt: import("../types.js").ProductionSignOffReceipt | undefined;
+
+    if (environment === "production") {
+      const isVerificationPhase = playbook.kind === "prod-verification" || playbook.kind === "testing";
+      if (isVerificationPhase) {
+        if (playbookPassed) {
+          lifecycleStage = "verified_ready";
+          signOffReceipt = {
+            receiptId: `signoff-${playbook.id}-${Date.now()}`,
+            verifierPersona: `${persona.name} (${persona.title})`,
+            environment: "production",
+            targetDomain: playbook.targetDomain,
+            verifiedAt: completedAt,
+            verdict: "passed",
+            smokeChecksCount: stepResults.length,
+            screenshots: screenshots.map((s) => s.path),
+            findingsSummary: `测试员工 ${persona.name} 在生产环境完成核心路径验真，确认资产加载正常、无白屏无阻塞，正式签发上线绿灯。`,
+            handoffToOpsApproved: true,
+          };
+        } else {
+          lifecycleStage = "verification_failed";
+          signOffReceipt = {
+            receiptId: `signoff-${playbook.id}-${Date.now()}`,
+            verifierPersona: `${persona.name} (${persona.title})`,
+            environment: "production",
+            targetDomain: playbook.targetDomain,
+            verifiedAt: completedAt,
+            verdict: "rejected",
+            smokeChecksCount: stepResults.length,
+            screenshots: screenshots.map((s) => s.path),
+            findingsSummary: `测试员工 ${persona.name} 在生产环境发现阻塞缺陷，拒绝签发上线绿灯，阻断交接并建议触发回滚/止血。`,
+            handoffToOpsApproved: false,
+          };
+        }
+      } else {
+        lifecycleStage = "continuous_operations";
+      }
+    }
+
     return {
       playbookId: playbook.id,
       kind: playbook.kind,
@@ -130,6 +172,8 @@ export class PlaybookRunner {
       engine: playbook.engine,
       environment,
       targetDomain: playbook.targetDomain,
+      lifecycleStage,
+      signOffReceipt,
       status: playbookPassed ? "passed" : "failed",
       startedAt,
       completedAt,
