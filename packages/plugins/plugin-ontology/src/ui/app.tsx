@@ -627,9 +627,9 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
         <DomainList
           companyId={companyId}
           activeDomainId={activeDomainId}
-          onOpenGraph={(id) => {
+          onOpenGraph={(id, targetView) => {
             setSelectedDomainId(id);
-            selectView("graph");
+            selectView(targetView ?? "graph");
           }}
           onOpenNewDomain={() => setShowNewDomain(true)}
           onImportLegacy={(domainId) => {
@@ -679,9 +679,9 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
           setActionFormPrefill={setActionFormPrefill}
           onDomainsChanged={refreshDomains}
           onRequestView={selectView}
-          onOpenDomain={(id) => {
+          onOpenDomain={(id, targetView) => {
             setSelectedDomainId(id);
-            selectView("graph");
+            selectView(targetView ?? "graph");
           }}
           onImportLegacy={() => setWizardOpen(true)}
         />
@@ -1331,7 +1331,7 @@ function DomainWorkspace({
   onRequestView?: (view: WorkbenchView) => void;
   /** Select a different domain and land on its graph. The domain picker lives in
       the parent, so the bridge is the only way a panel in here can move it. */
-  onOpenDomain?: (domainId: string) => void;
+  onOpenDomain?: (domainId: string, targetView?: WorkbenchView) => void;
   /** Bridge to open the legacy-system import wizard from inside the cockpit. */
   onImportLegacy?: () => void;
 }): ReactElement {
@@ -1802,7 +1802,7 @@ function DomainWorkspace({
           <DomainList
             companyId={companyId}
             activeDomainId={domainId}
-            onOpenGraph={(id) => onOpenDomain?.(id)}
+            onOpenGraph={(id, targetView) => onOpenDomain?.(id, targetView)}
             onImportLegacy={(dId) => onImportLegacy?.()}
           />
         )}
@@ -3475,7 +3475,7 @@ function DomainList({
 }: {
   companyId: string;
   activeDomainId: string | null;
-  onOpenGraph: (domainId: string) => void;
+  onOpenGraph: (domainId: string, targetView?: WorkbenchView) => void;
   onOpenNewDomain?: () => void;
   onImportLegacy?: (domainId?: string) => void;
   onSeedDomains?: (only?: string[]) => Promise<void>;
@@ -3749,7 +3749,7 @@ function DomainList({
             {
               key: "actions",
               header: t("操作", "Actions"),
-              width: "320px",
+              width: "480px",
               render: (_v, row) => {
                 const d = row as unknown as OntologyDomain;
                 const rowBusy = busyRowId === d.id;
@@ -3758,12 +3758,42 @@ function DomainList({
                   <div className="flex flex-wrap items-center gap-1.5">
                     {/* 【图谱】 button */}
                     <button
-                      className="flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-(length:--text-nano) font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
-                      onClick={() => onOpenGraph(d.id)}
-                      title={t("进入此本体域的图谱、概念对象与数据流工作台", "Open domain graph workbench")}
+                      className="flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-(length:--text-nano) font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+                      onClick={() => onOpenGraph(d.id, "graph")}
+                      title={t("进入此本体域的图谱工作台", "Open domain graph workbench")}
                     >
-                      <span className="text-[12px] leading-none">⬡</span>
+                      <span className="text-[11px] leading-none">⬡</span>
                       {t("图谱", "Graph")}
+                    </button>
+
+                    {/* 【表格】 button */}
+                    <button
+                      className="flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+                      onClick={() => onOpenGraph(d.id, "table")}
+                      title={t("查看此本体域的数据对象表格", "Open domain data table")}
+                    >
+                      <span className="text-[11px] leading-none">⊞</span>
+                      {t("表格", "Table")}
+                    </button>
+
+                    {/* 【Schema】 button */}
+                    <button
+                      className="flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+                      onClick={() => onOpenGraph(d.id, "schema")}
+                      title={t("管理此本体域的 Schema 元模型定义", "Open domain schema view")}
+                    >
+                      <span className="text-[11px] leading-none">⚙</span>
+                      Schema
+                    </button>
+
+                    {/* 【驾驶舱】 button */}
+                    <button
+                      className="flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-(length:--text-nano) font-medium text-amber-600 dark:text-amber-400 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+                      onClick={() => onOpenGraph(d.id, "sandbox")}
+                      title={t("进入智能驾驶舱、沙箱与模拟演练", "Open cockpit and simulation sandbox")}
+                    >
+                      <span className="text-[11px] leading-none">🤝</span>
+                      {t("驾驶舱", "Cockpit")}
                     </button>
 
                     {/* 【编辑】 button */}
