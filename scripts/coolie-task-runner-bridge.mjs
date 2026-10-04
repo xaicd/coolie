@@ -8,8 +8,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 
-const COMPANY_ID = "da2e705c-c80a-411b-b2ae-e39372b1251f"; // Coolie 本地施工总社
-const REPO_ROOT = "/Users/mac/workspace/xaicd/coolie";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+const COMPANY_ID = process.env.COOLIE_COMPANY_ID || "da2e705c-c80a-411b-b2ae-e39372b1251f"; // Coolie 本地施工总社
+const REPO_ROOT = process.env.COOLIE_REPO_ROOT || path.resolve(__dirname, "..");
 const LOCK_DIR = path.join(REPO_ROOT, ".coolie-local/locks");
 const LOG_DIR = path.join(REPO_ROOT, ".coolie-local/logs");
 

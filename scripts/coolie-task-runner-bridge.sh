@@ -14,7 +14,7 @@ case "$ACTION" in
   --start|start)
     echo "正在宿主机启动 Coolie Task Runner Bridge..."
     if [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
-      "$SCRIPT_DIR/host-exec.sh" "nohup node /Users/mac/workspace/xaicd/coolie/scripts/coolie-task-runner-bridge.mjs > /Users/mac/workspace/xaicd/coolie/.coolie-local/logs/runner-bridge.log 2>&1 & echo \$! > /Users/mac/workspace/xaicd/coolie/.coolie-local/runner-bridge.pid"
+      "$SCRIPT_DIR/host-exec.sh" "nohup node scripts/coolie-task-runner-bridge.mjs > .coolie-local/logs/runner-bridge.log 2>&1 & echo \$! > .coolie-local/runner-bridge.pid"
     else
       nohup node "$SCRIPT_DIR/coolie-task-runner-bridge.mjs" > "$REPO_ROOT/.coolie-local/logs/runner-bridge.log" 2>&1 &
       echo $! > "$REPO_ROOT/.coolie-local/runner-bridge.pid"
