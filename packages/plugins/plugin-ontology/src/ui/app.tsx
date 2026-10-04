@@ -406,221 +406,231 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-      {/* ── Row 1 — primary chrome: domain · primary views · actions ── */}
-      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
-        {view !== "domains" ? (
-          <button
-            onClick={() => selectView("domains")}
-            className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-(length:--text-compact) font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
-            title={t("返回本体域列表", "Back to ontology domain list")}
-          >
-            <span className="text-[12px]">←</span>
-            {t("本体列表", "Ontology List")}
-          </button>
-        ) : (
+      {/* ── Top Header ── */}
+      {view === "domains" ? (
+        /* Single-row header for Domain Management */
+        <div className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-card px-4">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary text-[15px] font-semibold">
+              ◫
+            </span>
+            <div className="flex items-center gap-2">
+              <span className="text-(length:--text-compact) font-semibold text-foreground">
+                {t("业务本体库", "Ontology Catalog")}
+              </span>
+              <span className="rounded-full bg-muted px-2 py-0.5 text-(length:--text-nano) font-medium text-muted-foreground">
+                {domains.length} {t("个本体域", "domains")}
+              </span>
+            </div>
+          </div>
+
           <div className="flex items-center gap-2">
-            <span className="flex h-6 w-6 items-center justify-center rounded-md bg-primary/10 text-primary text-[14px]">◫</span>
-            <span className="text-(length:--text-compact) font-semibold text-foreground">{t("业务本体库", "Ontology Catalog")}</span>
-          </div>
-        )}
-
-        <div className="mx-1 h-5 w-px bg-border" />
-
-        {domainsLoading ? (
-          <span className="text-(length:--text-compact) text-muted-foreground">…</span>
-        ) : (
-          <div className="flex items-center gap-1.5 rounded-md border border-border bg-card px-1.5 py-0.5">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-muted-foreground" aria-hidden>
-              <circle cx="12" cy="5" r="2" /><circle cx="5" cy="19" r="2" /><circle cx="19" cy="19" r="2" />
-              <path d="M12 7v3M12 10 6.5 17M12 10 17.5 17" />
-            </svg>
-            <select
-              value={activeDomainId ?? ""}
-              onChange={e => {
-                const id = e.target.value || null;
-                setSelectedDomainId(id);
-                if (id && view === "domains") {
-                  selectView("graph");
-                }
-              }}
-              className="h-6 bg-transparent pr-1 text-(length:--text-compact) font-medium text-foreground outline-none"
+            {/* 企业基座域 — initializes the enterprise core context and CMDB domain */}
+            <button
+              onClick={() => { void runSeedDomains(["enterprise-core"]); }}
+              disabled={seeding}
+              title={t(
+                "初始化企业组织架构、员工/数字工匠、审批流、资料与CMDB基础设施底座核心域",
+                "Initialize enterprise core domain (organizations, employees/agents, approvals, documentation, CMDB & infra)",
+              )}
+              className="flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-(length:--text-compact) font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
             >
-              {domains.length === 0 && <option value="">{t("无域", "No domains")}</option>}
-              {domains.map(d => (
-                <option key={d.id} value={d.id}>{d.display_name} · v{d.version}</option>
+              <span className="text-[13px] leading-none">🏢</span>
+              {t("企业基座域", "Enterprise Core")}
+            </button>
+
+            {/* 行业样例 */}
+            <button
+              onClick={() => { void runSeedDomains(); }}
+              disabled={seeding}
+              title={t(
+                "载入内置行业样例域(零售、电商、金融、医疗、制造、教育、供应链)。已存在的域会被跳过,不会覆盖。",
+                "Load the built-in industry sample domains (retail, e-commerce, finance, healthcare, manufacturing, education, supply chain). Existing domains are skipped, never overwritten.",
+              )}
+              className="flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1 text-(length:--text-compact) font-medium text-foreground hover:border-primary hover:text-primary disabled:opacity-50"
+            >
+              <span className="text-[13px] leading-none">✨</span>
+              {t("行业样例", "Samples")}
+            </button>
+            {seedMsg && (
+              <span className="text-(length:--text-nano) text-muted-foreground">{seedMsg}</span>
+            )}
+
+            {/* 接入旧系统 */}
+            <button
+              onClick={() => setWizardOpen(true)}
+              title={t("4 步接入存量旧系统", "4-step legacy import wizard")}
+              className="flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1 text-(length:--text-compact) font-medium text-foreground hover:border-primary hover:text-primary"
+            >
+              <span className="text-[13px] leading-none">⚡</span>
+              {t("接入旧系统", "Import")}
+            </button>
+
+            {/* 新建本体域 */}
+            <button
+              onClick={() => setShowNewDomain(true)}
+              title={t("新建本体域", "Create a new ontology domain")}
+              className="flex items-center gap-1 rounded-md border border-dashed border-primary/50 bg-primary/5 px-2.5 py-1 text-(length:--text-compact) font-medium text-primary transition-colors hover:bg-primary/10"
+            >
+              <span className="text-[13px] leading-none">＋</span>
+              {t("新建本体域", "New Domain")}
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* Two-row header for Domain Workbench */
+        <>
+          {/* Row 1 — Back to list · Domain switcher · Primary 4 views (Graph, Table, Schema, Cockpit) · Actions */}
+          <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
+            <button
+              onClick={() => selectView("domains")}
+              className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2.5 py-1 text-(length:--text-compact) font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+              title={t("返回本体域列表", "Back to ontology domain list")}
+            >
+              <span className="text-[12px]">←</span>
+              {t("本体列表", "Ontology List")}
+            </button>
+
+            <div className="mx-1 h-5 w-px bg-border" />
+
+            {domainsLoading ? (
+              <span className="text-(length:--text-compact) text-muted-foreground">…</span>
+            ) : (
+              <div className="flex items-center gap-1.5 rounded-md border border-border bg-card px-1.5 py-0.5">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="shrink-0 text-muted-foreground" aria-hidden>
+                  <circle cx="12" cy="5" r="2" /><circle cx="5" cy="19" r="2" /><circle cx="19" cy="19" r="2" />
+                  <path d="M12 7v3M12 10 6.5 17M12 10 17.5 17" />
+                </svg>
+                <select
+                  value={activeDomainId ?? ""}
+                  onChange={e => {
+                    const id = e.target.value || null;
+                    setSelectedDomainId(id);
+                  }}
+                  className="h-6 bg-transparent pr-1 text-(length:--text-compact) font-medium text-foreground outline-none"
+                >
+                  {domains.length === 0 && <option value="">{t("无域", "No domains")}</option>}
+                  {domains.map(d => (
+                    <option key={d.id} value={d.id}>{d.display_name} · v{d.version}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            {activeDomain && (
+              <span className={[
+                "rounded-full px-2 py-0.5 text-(length:--text-nano) font-medium",
+                activeDomain.status === "active" ? "bg-emerald-500/15 text-emerald-500" : "bg-muted text-muted-foreground",
+              ].join(" ")}>
+                {activeDomain.status}
+              </span>
+            )}
+
+            <div className="mx-1 h-5 w-px bg-border" />
+
+            {/* Primary view strip — 图谱, 表格, Schema, 驾驶舱 */}
+            <div className="flex items-center gap-0.5">
+              {PRIMARY_VIEWS.map(v => (
+                <button
+                  key={v.id}
+                  onClick={() => selectView(v.id)}
+                  className={[
+                    "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-(length:--text-compact) font-medium transition-colors",
+                    view === v.id && activeGroup === null ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  ].join(" ")}
+                >
+                  <span className="text-[13px]">{v.icon}</span>
+                  {v.label}
+                </button>
               ))}
-            </select>
-          </div>
-        )}
+            </div>
 
-        {view !== "domains" && activeDomain && (
-          <span className={[
-            "rounded-full px-2 py-0.5 text-(length:--text-nano) font-medium",
-            activeDomain.status === "active" ? "bg-emerald-500/15 text-emerald-500" : "bg-muted text-muted-foreground",
-          ].join(" ")}>
-            {activeDomain.status}
-          </span>
-        )}
-
-        <div className="mx-1 h-5 w-px bg-border" />
-
-        {/* Primary view strip — domains + primary 4 views */}
-        <div className="flex items-center gap-0.5">
-          <button
-            onClick={() => selectView("domains")}
-            className={[
-              "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-(length:--text-compact) font-medium transition-colors",
-              view === "domains" && activeGroup === null ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-accent hover:text-foreground",
-            ].join(" ")}
-          >
-            <span className="text-[13px]">◫</span>
-            {t("本体列表", "Domains")}
-          </button>
-          {PRIMARY_VIEWS.map(v => (
-            <button
-              key={v.id}
-              onClick={() => {
-                if (!activeDomainId && domains.length > 0) {
-                  setSelectedDomainId(domains[0]!.id);
-                }
-                selectView(v.id);
-              }}
-              className={[
-                "flex items-center gap-1.5 rounded-md px-2.5 py-1 text-(length:--text-compact) font-medium transition-colors",
-                view === v.id && activeGroup === null ? "bg-primary text-primary-foreground shadow-sm" : "text-muted-foreground hover:bg-accent hover:text-foreground",
-              ].join(" ")}
-            >
-              <span className="text-[13px]">{v.icon}</span>
-              {v.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="ml-auto flex items-center gap-2">
-          {/* 企业基座域 — initializes the enterprise core context and CMDB domain */}
-          <button
-            onClick={() => { void runSeedDomains(["enterprise-core"]); }}
-            disabled={seeding}
-            title={t(
-              "初始化企业组织架构、员工/数字工匠、审批流、资料与CMDB基础设施底座核心域",
-              "Initialize enterprise core domain (organizations, employees/agents, approvals, documentation, CMDB & infra)",
-            )}
-            className="flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-(length:--text-compact) font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
-          >
-            <span className="text-[13px] leading-none">🏢</span>
-            {t("企业基座域", "Enterprise Core")}
-          </button>
-
-          {/* 接入 — opens the legacy-system import wizard. Reachable from
-              any view so the user doesn't have to back out to start one. */}
-          <button
-            onClick={() => { void runSeedDomains(); }}
-            disabled={seeding}
-            title={t(
-              "载入内置行业样例域(零售、电商、金融、医疗、制造、教育、供应链)。已存在的域会被跳过,不会覆盖。",
-              "Load the built-in industry sample domains (retail, e-commerce, finance, healthcare, manufacturing, education, supply chain). Existing domains are skipped, never overwritten.",
-            )}
-            className="flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-(length:--text-compact) font-medium text-foreground hover:border-primary hover:text-primary disabled:opacity-50"
-          >
-            <span className="text-[13px] leading-none">✨</span>
-            {t("行业样例", "Samples")}
-          </button>
-          {seedMsg && (
-            <span className="text-(length:--text-nano) text-muted-foreground">{seedMsg}</span>
-          )}
-          <button
-            onClick={() => setWizardOpen(true)}
-            title={t("4 步接入存量旧系统", "4-step legacy import wizard")}
-            className="flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-(length:--text-compact) font-medium text-foreground hover:border-primary hover:text-primary"
-          >
-            <span className="text-[13px] leading-none">⚡</span>
-            {t("接入", "Import")}
-          </button>
-          {/* New domain — secondary affordance; primary "create a domain"
-              flows through NoDomainState / OnlineAppsPortal so we keep it
-              light here. Border-dashed signals "container, not action". */}
-          <button
-            onClick={() => setShowNewDomain(true)}
-            title={t("新建本体域", "Create a new ontology domain")}
-            className="flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-(length:--text-compact) font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
-          >
-            <span className="text-[13px] leading-none">＋</span>
-            {t("新建", "New")}
-          </button>
-          {/* Collapse the object-type tree — reclaims 192px for the canvas. */}
-          {(view === "graph" || view === "table" || view === "schema") && (
-            <button
-              onClick={() => setTreeOpen(o => !o)}
-              title={treeOpen
-                ? t("收起类型树", "Collapse type tree")
-                : t("展开类型树", "Expand type tree")}
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M9 3v18" />
-              </svg>
-            </button>
-          )}
-          {/* The cockpit has no right panel to toggle — see DomainWorkspace. */}
-          {view !== "sandbox" && (
-            <button
-              onClick={() => setRightOpen(o => !o)}
-              title={t("切换右侧面板", "Toggle right panel")}
-              className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M15 3v18" />
-              </svg>
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* ── Row 2 — group menus + status. Compact (h-9), same surface so
-          the two rows read as one continuous toolbar but the long tail
-          stays out of the way until the user picks a group. */}
-      <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-3 text-(length:--text-compact)">
-        <div className="flex items-center gap-0.5">
-          {VIEW_GROUPS.map(g => {
-            const isOn = activeGroup === g.id;
-            return (
+            <div className="ml-auto flex items-center gap-2">
               <button
-                key={g.id}
-                onClick={() => {
-                  if (isOn) {
-                    // Toggling the same group off — return to whichever
-                    // primary view the user was last on (default: graph).
-                    setActiveGroup(null);
-                    if (!PRIMARY_VIEWS.some(p => p.id === view)) setView("graph");
-                  } else {
-                    setActiveGroup(g.id);
-                    // If we're landing on the group from a primary view,
-                    // also flip `view` to the group's first child so the
-                    // content area doesn't go blank.
-                    if (activeGroup === null) setView(g.views[0]!.id);
-                  }
-                }}
-                className={[
-                  "flex items-center gap-1.5 rounded-md px-2 py-1 font-medium transition-colors",
-                  isOn
-                    ? "bg-primary/15 text-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                ].join(" ")}
+                onClick={() => setWizardOpen(true)}
+                title={t("4 步接入存量旧系统", "4-step legacy import wizard")}
+                className="flex items-center gap-1 rounded-md border border-border bg-card px-2 py-1 text-(length:--text-compact) font-medium text-foreground hover:border-primary hover:text-primary"
               >
-                <span className="text-[13px]">{g.icon}</span>
-                {g.label}
-                <span className="text-(length:--text-nano) text-muted-foreground/70">{g.views.length}</span>
+                <span className="text-[13px] leading-none">⚡</span>
+                {t("接入", "Import")}
               </button>
-            );
-          })}
-        </div>
+              <button
+                onClick={() => setShowNewDomain(true)}
+                title={t("新建本体域", "Create a new ontology domain")}
+                className="flex items-center gap-1 rounded-md border border-dashed border-border px-2 py-1 text-(length:--text-compact) font-medium text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+              >
+                <span className="text-[13px] leading-none">＋</span>
+                {t("新建", "New")}
+              </button>
+              {/* Collapse the object-type tree — reclaims 192px for the canvas. */}
+              {(view === "graph" || view === "table" || view === "schema") && (
+                <button
+                  onClick={() => setTreeOpen(o => !o)}
+                  title={treeOpen
+                    ? t("收起类型树", "Collapse type tree")
+                    : t("展开类型树", "Expand type tree")}
+                  className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M9 3v18" />
+                  </svg>
+                </button>
+              )}
+              {/* The cockpit has no right panel to toggle — see DomainWorkspace. */}
+              {view !== "sandbox" && (
+                <button
+                  onClick={() => setRightOpen(o => !o)}
+                  title={t("切换右侧面板", "Toggle right panel")}
+                  className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <rect x="3" y="3" width="18" height="18" rx="2" />
+                    <path d="M15 3v18" />
+                  </svg>
+                </button>
+              )}
+            </div>
+          </div>
 
-        <div className="ml-auto flex items-center gap-2">
-          <TopStatusBar companyId={companyId} domain={activeDomain} onSnapshot={refreshDomains} />
-        </div>
-      </div>
+          {/* Row 2 — group menus + status */}
+          <div className="flex h-9 shrink-0 items-center gap-2 border-b border-border bg-muted/30 px-3 text-(length:--text-compact)">
+            <div className="flex items-center gap-0.5">
+              {VIEW_GROUPS.map(g => {
+                const isOn = activeGroup === g.id;
+                return (
+                  <button
+                    key={g.id}
+                    onClick={() => {
+                      if (isOn) {
+                        setActiveGroup(null);
+                        if (!PRIMARY_VIEWS.some(p => p.id === view)) setView("graph");
+                      } else {
+                        setActiveGroup(g.id);
+                        if (activeGroup === null) setView(g.views[0]!.id);
+                      }
+                    }}
+                    className={[
+                      "flex items-center gap-1.5 rounded-md px-2 py-1 font-medium transition-colors",
+                      isOn
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    ].join(" ")}
+                  >
+                    <span className="text-[13px]">{g.icon}</span>
+                    {g.label}
+                    <span className="text-(length:--text-nano) text-muted-foreground/70">{g.views.length}</span>
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="ml-auto flex items-center gap-2">
+              <TopStatusBar companyId={companyId} domain={activeDomain} onSnapshot={refreshDomains} />
+            </div>
+          </div>
+        </>
+      )}
 
       {/* ── Body ── */}
       {view === "domains" ? (
