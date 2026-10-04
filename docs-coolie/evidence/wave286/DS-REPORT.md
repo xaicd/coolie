@@ -153,6 +153,34 @@ ls /var/mail/mac; ls ~/bin/team-status-notify.sh; ls /tmp/team-status.log   # �
 git log --oneline -3                    # 90a04d948 (bridge 固化, 运行中落库) / 301461256 / 5812bf750
 ```
 
+## 补遗 · 21:55 重复派单活体案例（第二腿，R10）
+
+腿1 报告完成后，Bridge 机制缺陷当场产生一例活体重复派单，本腿即第二腿，判定记录如下。
+
+**时间线与证据**（.coolie-local/logs/COOA-50.log + 两份 receipt + API 实查）：
+
+- 21:47:12 旧 Bridge 认领 COOA-50 派腿1（receipt `20261004T134712Z`，dispatch pid 17772）
+- 21:49:12 Bridge 重启为现进程 22231（腿1进行中重启，其 child close 收口绑定随旧进程丢失）
+- 21:55:23 腿1退出 receipt 置 done；同一秒新 Bridge 轮询（5s 周期）见 COOA-50 仍 in_progress 且 `.coolie-local/locks/COOA-50.lock` 内 pid 17772 已死 → unlink 后重派第二腿（receipt `20261004T135523Z`，pid 35864）
+- COOA-50 终态 `done`（API 实查 id 99053b4b…，completedAt 2026-10-04T13:56:24.102Z）；锁现值 35864 → 本腿退出后 Bridge 再 PATCH done（幂等），循环到此终止
+- Bridge 日志摘录：`[dispatch] running with pid=17772 tool=claude-glm` 与 `[dispatch] running with pid=35864 tool=claude-glm` 两段连续并存
+
+**根因**（R1-R9 之外的新机制缺陷）：「子进程退出 → PATCH 工单 done」的收口绑定只存在于 Bridge 进程内（child.on close）；重认领只查锁 pid 活性，不查同 task 是否已有 done receipt；锁亦不承载收口状态。三者叠加：Bridge 中途重启 → 孤儿腿 → 腿一完成即被重派。
+
+**R10（高 / 机制缺陷）**：Bridge 重启产生孤儿腿并引发同任务重复派单。建议修法：认领前查同 task 最新 receipt，已 done 则直接收口不重派；或将收口状态落盘（receipt/lock），使新 Bridge 进程可继承收口责任。
+
+**本腿（135523Z）receipt 回填命令**（留给下一外层会话，本腿退出后执行）：
+
+```sh
+bash scripts/dispatch-local-employee.sh \
+  --update 20261004T135523Z-wave286-baixiaosheng-ds \
+  --status done \
+  --evidence docs-coolie/evidence/wave286/DS-REPORT.md \
+  --verification "ps -p 35864 (ppid 22231) / -p 22231 (21:49:12 起) 实活; COOA-50 done (completedAt 13:56:24.102Z); Bridge 日志双派单段(17772/35864); 腿1 receipt 134712Z 已回填"
+```
+
+腿1 判定不变：链路 GO（有条件），业务 G3 维持 NO-GO；R10 并入条件项。
+
 ---
 
 *百晓生 (DS) · wave286 派单链路测试 · 2026-10-04 · COOA-50*
