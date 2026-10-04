@@ -570,6 +570,7 @@ type PluginDataTableColumn = {
   header: string;
   render?: (value: unknown, row: Record<string, unknown>) => ReactNode;
   width?: string;
+  align?: "left" | "center" | "right";
 };
 
 type PluginDataTableProps = {
@@ -588,29 +589,33 @@ function PluginSdkDataTable({ columns, rows, loading, emptyMessage = "No rows." 
     { className: "overflow-x-auto rounded-md border" },
     createElement(
       "div",
-      {
-        className: "hidden border-b bg-muted/35 px-2.5 py-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid md:[grid-template-columns:var(--plugin-grid-cols)]",
-        style: { "--plugin-grid-cols": gridColumns },
-      },
-      columns.map((column) => createElement("div", { key: column.key, className: "truncate" }, column.header)),
-    ),
-    createElement(
-      "div",
-      { className: "divide-y" },
-      rows.map((row, index) => createElement(
+      { className: "min-w-fit w-full" },
+      createElement(
         "div",
         {
-          key: String(row.id ?? index),
-          className: "grid gap-1.5 px-2.5 py-1.5 md:items-center md:[grid-template-columns:var(--plugin-grid-cols)]",
+          className: "hidden border-b bg-muted/35 px-2.5 py-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid md:gap-1.5 md:items-center md:[grid-template-columns:var(--plugin-grid-cols)]",
           style: { "--plugin-grid-cols": gridColumns },
         },
-        columns.map((column) => createElement(
+        columns.map((column) => createElement("div", { key: column.key, className: `truncate ${column.key === "actions" || column.align === "right" ? "text-right" : ""}` }, column.header)),
+      ),
+      createElement(
+        "div",
+        { className: "divide-y" },
+        rows.map((row, index) => createElement(
           "div",
-          { key: column.key, className: "min-w-0 text-xs" },
-          createElement("div", { className: "mb-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:hidden" }, column.header),
-          column.render ? column.render(row[column.key], row) : String(row[column.key] ?? ""),
+          {
+            key: String(row.id ?? index),
+            className: "grid gap-1.5 px-2.5 py-1.5 md:items-center md:[grid-template-columns:var(--plugin-grid-cols)]",
+            style: { "--plugin-grid-cols": gridColumns },
+          },
+          columns.map((column) => createElement(
+            "div",
+            { key: column.key, className: `min-w-0 text-xs ${column.key === "actions" || column.align === "right" ? "text-right" : ""}` },
+            createElement("div", { className: "mb-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:hidden" }, column.header),
+            column.render ? column.render(row[column.key], row) : String(row[column.key] ?? ""),
+          )),
         )),
-      )),
+      ),
     ),
   );
 }

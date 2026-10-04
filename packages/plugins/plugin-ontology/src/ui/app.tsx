@@ -3574,16 +3574,7 @@ function DomainList({
   const [renameValue, setRenameValue] = useState("");
   const [rowError, setRowError] = useState<string | null>(null);
   const [detailDomain, setDetailDomain] = useState<OntologyDomain | null>(null);
-  const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(new Set());
-
-  const toggleExpandRow = (id: string) => {
-    setExpandedRowIds(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const [domainViewMode, setDomainViewMode] = useState<"table" | "card">("table");
 
   const submit = useCallback(async () => {
     setBusy(true);
@@ -3644,6 +3635,123 @@ function DomainList({
     void runOnRow(d.id, () => deleteDomain({ companyId, domainId: d.id }));
   };
 
+  const renderDomainActions = (d: OntologyDomain) => {
+    const rowBusy = busyRowId === d.id;
+    const next = DOMAIN_STATE_TRANSITIONS[d.lifecycle_state as DomainLifecycleState] ?? [];
+    return (
+      <div className="flex w-full items-center justify-end gap-1 overflow-x-auto whitespace-nowrap py-0.5 [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]">
+        {/* 【详情】 button */}
+        <button
+          className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+          onClick={() => setDetailDomain(d)}
+          title={t("查看全量无截断详情", "View full un-truncated details")}
+        >
+          <span className="text-[11px] leading-none">🔍</span>
+          {t("详情", "Detail")}
+        </button>
+
+        {/* 【图谱】 button */}
+        <button
+          className="flex shrink-0 items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-(length:--text-nano) font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+          onClick={() => onOpenGraph(d.id, "graph")}
+          title={t("进入此本体域的图谱工作台", "Open domain graph workbench")}
+        >
+          <span className="text-[11px] leading-none">⬡</span>
+          {t("图谱", "Graph")}
+        </button>
+
+        {/* 【表格】 button */}
+        <button
+          className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+          onClick={() => onOpenGraph(d.id, "table")}
+          title={t("查看此本体域的数据对象表格", "Open domain data table")}
+        >
+          <span className="text-[11px] leading-none">⊞</span>
+          {t("表格", "Table")}
+        </button>
+
+        {/* 【结构】 (Schema) button */}
+        <button
+          className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+          onClick={() => onOpenGraph(d.id, "schema")}
+          title={t("管理此本体域的 Schema 元模型定义", "Open domain schema view")}
+        >
+          <span className="text-[11px] leading-none">⊙</span>
+          {t("结构", "Schema")}
+        </button>
+
+        {/* 【驾驶】 (Cockpit) button */}
+        <button
+          className="flex shrink-0 items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-(length:--text-nano) font-medium text-amber-600 dark:text-amber-400 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+          onClick={() => onOpenGraph(d.id, "sandbox")}
+          title={t("进入智能驾驶舱、沙箱与模拟演练", "Open cockpit and simulation sandbox")}
+        >
+          <span className="text-[11px] leading-none">🤝</span>
+          {t("驾驶", "Cockpit")}
+        </button>
+
+        {/* 【编辑】 button */}
+        {renamingId === d.id ? (
+          <div className="flex shrink-0 items-center gap-1">
+            <input
+              autoFocus
+              value={renameValue}
+              placeholder={t("显示名称", "Display name")}
+              onChange={(e) => setRenameValue(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") submitRename(d);
+                if (e.key === "Escape") setRenamingId(null);
+              }}
+              className="w-24 rounded border border-border bg-background px-1.5 py-0.5 text-(length:--text-nano) text-foreground outline-none"
+            />
+            <button className={ROW_BTN + " shrink-0"} disabled={rowBusy} onClick={() => submitRename(d)}>
+              {t("保存","Save")}
+            </button>
+            <button className={ROW_BTN + " shrink-0"} disabled={rowBusy} onClick={() => setRenamingId(null)}>
+              {t("取消","Cancel")}
+            </button>
+          </div>
+        ) : (
+          <button className={ROW_BTN + " shrink-0"} disabled={rowBusy} onClick={() => rename(d)} title={t("重命名本体域", "Rename domain")}>
+            <span className="mr-0.5 text-[11px]">✏️</span>
+            {t("编辑", "Edit")}
+          </button>
+        )}
+
+        {/* 【接入】 button */}
+        <button
+          className={ROW_BTN + " shrink-0"}
+          disabled={rowBusy}
+          onClick={() => onImportLegacy ? onImportLegacy(d.id) : null}
+          title={t("接入旧系统 SQL DDL / OpenAPI 架构到此域", "Import legacy app schema into this domain")}
+        >
+          <span className="mr-0.5 text-[11px]">⚡</span>
+          {t("接入", "Import")}
+        </button>
+
+        {/* Lifecycle transitions */}
+        {next.map((state) => {
+          const stateLabel =
+            state === "active" ? t("生效", "Active") :
+            state === "deprecated" ? t("废弃", "Deprecate") :
+            state === "archived" ? t("归档", "Archive") :
+            state === "draft" ? t("草稿", "Draft") :
+            t("推进", "Advance");
+          return (
+            <button key={state} className={ROW_BTN + " shrink-0"} disabled={rowBusy} onClick={() => advance(d, state)} title={t(`推进到 ${state}`, `Advance to ${state}`)}>
+              {stateLabel}
+            </button>
+          );
+        })}
+
+        {/* 【注销】 button */}
+        <button className={ROW_DANGER_BTN + " shrink-0"} disabled={rowBusy} onClick={() => retire(d)} title={t("注销本体域", "Retire domain")}>
+          {t("注销", "Retire")}
+        </button>
+      </div>
+    );
+  };
+
   return (
     <div className="flex h-full min-h-0 flex-1 flex-col overflow-y-auto bg-background p-6">
       {/* ── Top Header Bar ── */}
@@ -3662,6 +3770,36 @@ function DomainList({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* 模式切换 (列表 / 卡片) */}
+          <div className="flex items-center rounded-lg border border-border bg-muted/40 p-0.5 mr-1">
+            <button
+              type="button"
+              onClick={() => setDomainViewMode("table")}
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-(length:--text-compact) font-medium transition-colors ${
+                domainViewMode === "table"
+                  ? "bg-card text-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title={t("列表视图：紧凑表格，单行对齐", "Table view: compact, single-line alignment")}
+            >
+              <span>☰</span>
+              <span>{t("列表", "List")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setDomainViewMode("card")}
+              className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-(length:--text-compact) font-medium transition-colors ${
+                domainViewMode === "card"
+                  ? "bg-card text-foreground shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              title={t("卡片视图：网格卡片，适合多信息浏览", "Card view: grid layout")}
+            >
+              <span>⊞</span>
+              <span>{t("卡片", "Cards")}</span>
+            </button>
+          </div>
+
           {/* ＋ 新建 */}
           <button
             onClick={() => {
@@ -3736,23 +3874,117 @@ function DomainList({
 
       {rowError && <div className={CARD + " text-destructive mb-4"}>{rowError}</div>}
 
-      <div className="rounded-xl border border-border bg-card overflow-hidden">
-        <DataTable
-          loading={loading}
-          emptyMessage={error ? `${t("失败","Failed")}: ${error.message}` : t("还没有本体域,先在上方新建一个或导入行业样例。", "No ontology domains yet.")}
-          rows={domains as unknown as Record<string, unknown>[]}
-          columns={[
-            {
-              key: "display_name",
-              header: t("本体名称", "Domain Name"),
-              width: "220px",
-              render: (_v, row) => {
-                const d = row as unknown as OntologyDomain;
-                const icon = d.icon || (d.category === "enterprise" ? "🏢" : "📦");
-                const isExpanded = expandedRowIds.has(d.id);
-                return (
-                  <div className="flex flex-col py-0.5">
-                    <div className="flex items-center gap-1.5">
+      {/* ── Domain Views: Table vs Card ── */}
+      {domainViewMode === "card" ? (
+        loading ? (
+          <div className="rounded-xl border border-border bg-card p-12 text-center text-xs text-muted-foreground">
+            {t("正在载入本体域...", "Loading ontology domains...")}
+          </div>
+        ) : domains.length === 0 ? (
+          <div className="rounded-xl border border-border bg-card p-12 text-center text-xs text-muted-foreground">
+            {error ? `${t("失败","Failed")}: ${error.message}` : t("还没有本体域,先在上方新建一个或导入行业样例。", "No ontology domains yet.")}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+            {domains.map((d) => {
+              const icon = d.icon || (d.category === "enterprise" ? "🏢" : "📦");
+              return (
+                <div
+                  key={d.id}
+                  className="flex flex-col justify-between rounded-xl border border-border bg-card p-4 transition-all hover:border-primary/50 hover:shadow-xs"
+                >
+                  <div>
+                    {/* Top Row: Icon + Name + Slug + Status */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span
+                          className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary text-[18px] cursor-pointer"
+                          onClick={() => setDetailDomain(d)}
+                          title={t("点击查看完整详情", "Click to view full details")}
+                        >
+                          {icon}
+                        </span>
+                        <div className="min-w-0">
+                          <button
+                            className="text-left font-bold text-foreground hover:text-primary transition-colors hover:underline text-(length:--text-compact) truncate block max-w-[170px]"
+                            onClick={() => onOpenGraph(d.id)}
+                            title={t("点击进入图谱工作台", "Click to open graph workbench")}
+                          >
+                            {d.display_name}
+                          </button>
+                          <div className="flex items-center gap-1.5 mt-0.5">
+                            <code
+                              className="text-[11px] px-1 py-0.2 bg-muted rounded font-mono text-muted-foreground shrink-0 cursor-pointer max-w-[100px] truncate"
+                              onClick={() => setDetailDomain(d)}
+                              title={d.slug}
+                            >
+                              {d.slug}
+                            </code>
+                            <span className="font-mono text-[11px] text-muted-foreground">
+                              v{d.version}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex flex-col items-end gap-1 shrink-0">
+                        {d.id === activeDomainId && (
+                          <span className="rounded-full bg-primary/10 text-primary px-1.5 py-0.2 text-[10px] font-semibold">
+                            {t("激活", "Active")}
+                          </span>
+                        )}
+                        <StatusBadge label={d.status === "active" ? t("活跃","Active") : d.status} status={d.status === "active" ? "ok" : "pending"} />
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    <p
+                      className="mt-2.5 text-xs text-muted-foreground/90 line-clamp-2 min-h-[32px] cursor-pointer hover:text-foreground transition-colors"
+                      onClick={() => setDetailDomain(d)}
+                      title={d.description || t("暂无描述", "No description")}
+                    >
+                      {d.description || t("暂无描述，点击可在右侧操作栏编辑或补充说明。", "No description provided.")}
+                    </p>
+
+                    {/* Metadata chips */}
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground border-t border-border/40 pt-2.5">
+                      <span className="rounded bg-muted/60 px-1.5 py-0.5">
+                        {renderDomainCategory(d)}
+                      </span>
+                      <span className="rounded bg-muted/60 px-1.5 py-0.5">
+                        {renderDomainCreator(d)}
+                      </span>
+                      <span className="ml-auto font-mono text-[10px] text-muted-foreground/75">
+                        {formatDomainTime(d.updated_at)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Bottom Action Bar: pushed to bottom right */}
+                  <div className="mt-3 border-t border-border/60 pt-2.5">
+                    {renderDomainActions(d)}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )
+      ) : (
+        <div className="rounded-xl border border-border bg-card overflow-hidden">
+          <DataTable
+            loading={loading}
+            emptyMessage={error ? `${t("失败","Failed")}: ${error.message}` : t("还没有本体域,先在上方新建一个或导入行业样例。", "No ontology domains yet.")}
+            rows={domains as unknown as Record<string, unknown>[]}
+            columns={[
+              {
+                key: "display_name",
+                header: t("本体名称", "Domain Name"),
+                width: "220px",
+                render: (_v, row) => {
+                  const d = row as unknown as OntologyDomain;
+                  const icon = d.icon || (d.category === "enterprise" ? "🏢" : "📦");
+                  return (
+                    <div className="flex items-center gap-1.5 py-0.5 whitespace-nowrap min-w-0">
                       <span
                         className="text-[15px] leading-none shrink-0 cursor-pointer"
                         onClick={() => setDetailDomain(d)}
@@ -3761,261 +3993,130 @@ function DomainList({
                         {icon}
                       </span>
                       <button
-                        className={`text-left font-semibold text-foreground hover:text-primary transition-colors hover:underline text-(length:--text-compact) ${
-                          isExpanded ? "whitespace-normal break-words" : "truncate max-w-[150px]"
-                        }`}
+                        className="text-left font-semibold text-foreground hover:text-primary transition-colors hover:underline text-(length:--text-compact) truncate max-w-[110px]"
                         onClick={() => onOpenGraph(d.id)}
-                        title={t("点击进入图谱工作台", "Click to open graph workbench")}
+                        title={`${d.display_name} (${d.slug})`}
                       >
                         {d.display_name}
                       </button>
+                      <code
+                        className="text-[11px] px-1 py-0.2 bg-muted rounded font-mono text-muted-foreground shrink-0 cursor-pointer max-w-[70px] truncate"
+                        onClick={() => setDetailDomain(d)}
+                        title={d.slug}
+                      >
+                        {d.slug}
+                      </code>
                       {d.id === activeDomainId && (
                         <span className="rounded-full bg-primary/10 text-primary px-1.5 py-0.2 text-[10px] font-medium shrink-0">
                           {t("激活", "Active")}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 mt-0.5">
-                      <code
-                        className="text-[11px] px-1 py-0.2 bg-muted rounded font-mono text-muted-foreground shrink-0 cursor-pointer"
-                        onClick={() => setDetailDomain(d)}
-                        title={t("点击查看完整详情", "Click to view full details")}
-                      >
-                        {d.slug}
-                      </code>
-                      {d.description && (
-                        <span
-                          className={`text-xs text-muted-foreground/80 cursor-pointer hover:text-foreground transition-colors ${
-                            isExpanded ? "whitespace-normal break-words" : "truncate max-w-[130px]"
-                          }`}
-                          onClick={() => toggleExpandRow(d.id)}
-                          title={t("点击展开/收起全文，或在右侧操作栏点击【详情】查看全量信息", "Click to expand/collapse, or click Detail")}
-                        >
-                          {d.description}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                );
+                  );
+                },
               },
-            },
-            {
-              key: "category",
-              header: t("类型", "Category"),
-              width: "105px",
-              render: (_v, row) => {
-                const d = row as unknown as OntologyDomain;
-                return (
-                  <div
-                    className="truncate cursor-pointer"
-                    onClick={() => setDetailDomain(d)}
-                    title={t("点击查看完整详情", "Click to view full details")}
-                  >
-                    {renderDomainCategory(d)}
-                  </div>
-                );
-              },
-            },
-            {
-              key: "version",
-              header: t("版本", "Version"),
-              width: "55px",
-              render: (v) => <span className="font-mono text-xs text-muted-foreground truncate">v{String(v)}</span>,
-            },
-            {
-              key: "status",
-              header: t("状态", "Status"),
-              width: "125px",
-              render: (_v, row) => {
-                const d = row as unknown as OntologyDomain;
-                return (
-                  <div
-                    className="flex items-center gap-1 truncate cursor-pointer"
-                    onClick={() => setDetailDomain(d)}
-                    title={t("点击查看完整详情", "Click to view full details")}
-                  >
-                    <StatusBadge label={d.status === "active" ? t("活跃","Active") : d.status} status={d.status === "active" ? "ok" : "pending"} />
-                    <StatusBadge label={String(d.lifecycle_state)} status={domainLifecycleKind(String(d.lifecycle_state))} />
-                  </div>
-                );
-              },
-            },
-            {
-              key: "created_by",
-              header: t("创建人", "Created By"),
-              width: "95px",
-              render: (_v, row) => {
-                const d = row as unknown as OntologyDomain;
-                return (
-                  <div
-                    className="truncate cursor-pointer"
-                    onClick={() => setDetailDomain(d)}
-                    title={t("点击查看完整详情", "Click to view full details")}
-                  >
-                    {renderDomainCreator(d)}
-                  </div>
-                );
-              },
-            },
-            {
-              key: "created_at",
-              header: t("创建时间", "Created At"),
-              width: "105px",
-              render: (_v, row) => {
-                const d = row as unknown as OntologyDomain;
-                return (
-                  <span
-                    className="font-mono text-xs text-muted-foreground whitespace-nowrap truncate cursor-pointer block"
-                    onClick={() => setDetailDomain(d)}
-                    title={formatDomainTime(d.created_at)}
-                  >
-                    {formatDomainTime(d.created_at)}
-                  </span>
-                );
-              },
-            },
-            {
-              key: "updated_at",
-              header: t("更新时间", "Updated At"),
-              width: "105px",
-              render: (_v, row) => {
-                const d = row as unknown as OntologyDomain;
-                return (
-                  <span
-                    className="font-mono text-xs text-muted-foreground whitespace-nowrap truncate cursor-pointer block"
-                    onClick={() => setDetailDomain(d)}
-                    title={formatDomainTime(d.updated_at)}
-                  >
-                    {formatDomainTime(d.updated_at)}
-                  </span>
-                );
-              },
-            },
-            {
-              key: "actions",
-              header: t("操作", "Actions"),
-              width: "380px",
-              render: (_v, row) => {
-                const d = row as unknown as OntologyDomain;
-                const rowBusy = busyRowId === d.id;
-                const next = DOMAIN_STATE_TRANSITIONS[d.lifecycle_state as DomainLifecycleState] ?? [];
-                return (
-                  <div className="flex w-full items-center gap-1 overflow-x-auto whitespace-nowrap py-1 [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]">
-                    {/* 【详情】 button */}
-                    <button
-                      className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+              {
+                key: "category",
+                header: t("类型", "Category"),
+                width: "85px",
+                render: (_v, row) => {
+                  const d = row as unknown as OntologyDomain;
+                  return (
+                    <div
+                      className="truncate whitespace-nowrap cursor-pointer text-xs"
                       onClick={() => setDetailDomain(d)}
-                      title={t("查看全量无截断详情", "View full un-truncated details")}
+                      title={t("点击查看完整详情", "Click to view full details")}
                     >
-                      <span className="text-[11px] leading-none">🔍</span>
-                      {t("详情", "Detail")}
-                    </button>
-
-                    {/* 【图谱】 button */}
-                    <button
-                      className="flex shrink-0 items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-(length:--text-nano) font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
-                      onClick={() => onOpenGraph(d.id, "graph")}
-                      title={t("进入此本体域的图谱工作台", "Open domain graph workbench")}
-                    >
-                      <span className="text-[11px] leading-none">⬡</span>
-                      {t("图谱", "Graph")}
-                    </button>
-
-                    {/* 【表格】 button */}
-                    <button
-                      className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
-                      onClick={() => onOpenGraph(d.id, "table")}
-                      title={t("查看此本体域的数据对象表格", "Open domain data table")}
-                    >
-                      <span className="text-[11px] leading-none">⊞</span>
-                      {t("表格", "Table")}
-                    </button>
-
-                    {/* 【结构】 (Schema) button */}
-                    <button
-                      className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
-                      onClick={() => onOpenGraph(d.id, "schema")}
-                      title={t("管理此本体域的 Schema 元模型定义", "Open domain schema view")}
-                    >
-                      <span className="text-[11px] leading-none">⊙</span>
-                      {t("结构", "Schema")}
-                    </button>
-
-                    {/* 【驾驶】 (Cockpit) button */}
-                    <button
-                      className="flex shrink-0 items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-(length:--text-nano) font-medium text-amber-600 dark:text-amber-400 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
-                      onClick={() => onOpenGraph(d.id, "sandbox")}
-                      title={t("进入智能驾驶舱、沙箱与模拟演练", "Open cockpit and simulation sandbox")}
-                    >
-                      <span className="text-[11px] leading-none">🤝</span>
-                      {t("驾驶", "Cockpit")}
-                    </button>
-
-                    {/* 【编辑】 button */}
-                    {renamingId === d.id ? (
-                      <div className="flex shrink-0 items-center gap-1">
-                        <input
-                          autoFocus
-                          value={renameValue}
-                          placeholder={t("显示名称", "Display name")}
-                          onChange={(e) => setRenameValue(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") submitRename(d);
-                            if (e.key === "Escape") setRenamingId(null);
-                          }}
-                          className="w-24 rounded border border-border bg-background px-1.5 py-0.5 text-(length:--text-nano) text-foreground outline-none"
-                        />
-                        <button className={ROW_BTN + " shrink-0"} disabled={rowBusy} onClick={() => submitRename(d)}>
-                          {t("保存","Save")}
-                        </button>
-                        <button className={ROW_BTN + " shrink-0"} disabled={rowBusy} onClick={() => setRenamingId(null)}>
-                          {t("取消","Cancel")}
-                        </button>
-                      </div>
-                    ) : (
-                      <button className={ROW_BTN + " shrink-0"} disabled={rowBusy} onClick={() => rename(d)} title={t("重命名本体域", "Rename domain")}>
-                        <span className="mr-0.5 text-[11px]">✏️</span>
-                        {t("编辑", "Edit")}
-                      </button>
-                    )}
-
-                    {/* 【接入】 button */}
-                    <button
-                      className={ROW_BTN + " shrink-0"}
-                      disabled={rowBusy}
-                      onClick={() => onImportLegacy ? onImportLegacy(d.id) : null}
-                      title={t("接入旧系统 SQL DDL / OpenAPI 架构到此域", "Import legacy app schema into this domain")}
-                    >
-                      <span className="mr-0.5 text-[11px]">⚡</span>
-                      {t("接入", "Import")}
-                    </button>
-
-                    {/* Lifecycle transitions */}
-                    {next.map((state) => {
-                      const stateLabel =
-                        state === "active" ? t("生效", "Active") :
-                        state === "deprecated" ? t("废弃", "Deprecate") :
-                        state === "archived" ? t("归档", "Archive") :
-                        state === "draft" ? t("草稿", "Draft") :
-                        t("推进", "Advance");
-                      return (
-                        <button key={state} className={ROW_BTN + " shrink-0"} disabled={rowBusy} onClick={() => advance(d, state)} title={t(`推进到 ${state}`, `Advance to ${state}`)}>
-                          {stateLabel}
-                        </button>
-                      );
-                    })}
-
-                    {/* 【注销】 button */}
-                    <button className={ROW_DANGER_BTN + " shrink-0"} disabled={rowBusy} onClick={() => retire(d)} title={t("注销本体域", "Retire domain")}>
-                      {t("注销", "Retire")}
-                    </button>
-                  </div>
-                );
+                      {renderDomainCategory(d)}
+                    </div>
+                  );
+                },
               },
-            },
-          ]}
-        />
-      </div>
+              {
+                key: "version",
+                header: t("版本", "Version"),
+                width: "55px",
+                render: (v) => <span className="font-mono text-xs text-muted-foreground whitespace-nowrap truncate block">v{String(v)}</span>,
+              },
+              {
+                key: "status",
+                header: t("状态", "Status"),
+                width: "125px",
+                render: (_v, row) => {
+                  const d = row as unknown as OntologyDomain;
+                  return (
+                    <div
+                      className="flex items-center gap-1 whitespace-nowrap truncate cursor-pointer"
+                      onClick={() => setDetailDomain(d)}
+                      title={t("点击查看完整详情", "Click to view full details")}
+                    >
+                      <StatusBadge label={d.status === "active" ? t("活跃","Active") : d.status} status={d.status === "active" ? "ok" : "pending"} />
+                      <StatusBadge label={String(d.lifecycle_state)} status={domainLifecycleKind(String(d.lifecycle_state))} />
+                    </div>
+                  );
+                },
+              },
+              {
+                key: "created_by",
+                header: t("创建人", "Created By"),
+                width: "85px",
+                render: (_v, row) => {
+                  const d = row as unknown as OntologyDomain;
+                  return (
+                    <div
+                      className="truncate whitespace-nowrap cursor-pointer text-xs"
+                      onClick={() => setDetailDomain(d)}
+                      title={t("点击查看完整详情", "Click to view full details")}
+                    >
+                      {renderDomainCreator(d)}
+                    </div>
+                  );
+                },
+              },
+              {
+                key: "created_at",
+                header: t("创建时间", "Created At"),
+                width: "105px",
+                render: (_v, row) => {
+                  const d = row as unknown as OntologyDomain;
+                  return (
+                    <span
+                      className="font-mono text-xs text-muted-foreground whitespace-nowrap truncate cursor-pointer block"
+                      onClick={() => setDetailDomain(d)}
+                      title={formatDomainTime(d.created_at)}
+                    >
+                      {formatDomainTime(d.created_at)}
+                    </span>
+                  );
+                },
+              },
+              {
+                key: "updated_at",
+                header: t("更新时间", "Updated At"),
+                width: "105px",
+                render: (_v, row) => {
+                  const d = row as unknown as OntologyDomain;
+                  return (
+                    <span
+                      className="font-mono text-xs text-muted-foreground whitespace-nowrap truncate cursor-pointer block"
+                      onClick={() => setDetailDomain(d)}
+                      title={formatDomainTime(d.updated_at)}
+                    >
+                      {formatDomainTime(d.updated_at)}
+                    </span>
+                  );
+                },
+              },
+              {
+                key: "actions",
+                header: t("操作", "Actions"),
+                width: "minmax(380px, 1fr)",
+                render: (_v, row) => renderDomainActions(row as unknown as OntologyDomain),
+              },
+            ]}
+          />
+        </div>
+      )}
 
       {detailDomain && (
         <DomainDetailModal
