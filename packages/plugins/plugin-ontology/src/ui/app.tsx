@@ -263,8 +263,8 @@ type WorkbenchGroup = "data-flow" | "assets" | "ops";
 const PRIMARY_VIEWS: { id: WorkbenchView; label: string; icon: string }[] = [
   { id: "graph", label: t("图谱", "Graph"), icon: "⬡" },
   { id: "table", label: t("表格", "Table"), icon: "⊞" },
-  { id: "schema", label: "Schema", icon: "⊙" },
-  { id: "sandbox", label: t("驾驶舱", "Cockpit"), icon: "🤝" },
+  { id: "schema", label: t("结构", "Schema"), icon: "⊙" },
+  { id: "sandbox", label: t("驾驶", "Cockpit"), icon: "🤝" },
 ];
 
 const VIEW_GROUPS: {
@@ -417,7 +417,7 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
               title={t("返回本体域列表", "Back to ontology domain list")}
             >
               <span className="text-[12px]">←</span>
-              {t("本体列表", "Ontology List")}
+              {t("列表", "List")}
             </button>
 
             <div className="mx-1 h-5 w-px bg-border" />
@@ -3519,29 +3519,30 @@ function DomainList({
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          {/* ＋ 新建本体域 */}
+          {/* ＋ 新建 */}
           <button
             onClick={() => {
               if (onOpenNewDomain) onOpenNewDomain();
               else setShowInlineCreate(c => !c);
             }}
             className="flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-(length:--text-compact) font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary/90"
+            title={t("新建本体域", "New Domain")}
           >
             <span className="text-[14px] leading-none">＋</span>
-            {t("新建本体域", "New Domain")}
+            {t("新建", "New")}
           </button>
 
-          {/* ⚡ 接入旧系统 */}
+          {/* ⚡ 接入 */}
           <button
             onClick={() => onImportLegacy?.()}
             className="flex items-center gap-1.5 rounded-md border border-border bg-card px-3 py-1.5 text-(length:--text-compact) font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
             title={t("4 步向导：导入 SQL DDL / OpenAPI 存量旧系统生成本体", "4-step wizard: Import legacy SQL / API to ontology")}
           >
             <span className="text-[13px] leading-none">⚡</span>
-            {t("接入旧系统", "Import System")}
+            {t("接入", "Import")}
           </button>
 
-          {/* 🏢 企业基座域 */}
+          {/* 🏢 基座 */}
           <button
             onClick={() => { void onSeedDomains?.(["enterprise-core"]); }}
             disabled={seeding}
@@ -3549,10 +3550,10 @@ function DomainList({
             title={t("初始化企业组织架构、员工/数字工匠、审批流、资料与CMDB基础设施底座核心域", "Initialize enterprise core domain")}
           >
             <span className="text-[13px] leading-none">🏢</span>
-            {t("企业基座域", "Enterprise Core")}
+            {t("基座", "Enterprise Core")}
           </button>
 
-          {/* ✨ 行业样例 */}
+          {/* ✨ 样例 */}
           <button
             onClick={() => { void onSeedDomains?.(); }}
             disabled={seeding}
@@ -3560,7 +3561,7 @@ function DomainList({
             title={t("载入内置零售、金融、医疗、制造等行业样例域", "Load industry sample domains")}
           >
             <span className="text-[13px] leading-none">✨</span>
-            {t("行业样例", "Samples")}
+            {t("样例", "Samples")}
           </button>
         </div>
       </div>
@@ -3583,7 +3584,7 @@ function DomainList({
             <input className={INPUT} placeholder={t("显示名称 (如 客户关系管理)", "display name")} value={displayName} onChange={(e) => setDisplayName(e.target.value)} />
             <input className={INPUT + " flex-1 min-w-[200px]"} placeholder={t("描述 (可选)", "description (optional)")} value={description} onChange={(e) => setDescription(e.target.value)} />
             <button className={BTN} disabled={busy || !slug || !displayName} onClick={submit}>
-              {busy ? "…" : t("创建本体域", "Create Domain")}
+              {busy ? "…" : t("创建", "Create")}
             </button>
           </div>
           {formError && <div className={MUTED + " mt-2 text-destructive"}>{formError}</div>}
@@ -3601,30 +3602,31 @@ function DomainList({
             {
               key: "display_name",
               header: t("本体名称", "Domain Name"),
+              width: "minmax(160px, 1.2fr)",
               render: (_v, row) => {
                 const d = row as unknown as OntologyDomain;
                 const icon = d.icon || (d.category === "enterprise" ? "🏢" : "📦");
                 return (
                   <div className="flex flex-col py-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[16px] leading-none shrink-0">{icon}</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[15px] leading-none shrink-0">{icon}</span>
                       <button
-                        className="text-left font-semibold text-foreground hover:text-primary transition-colors hover:underline text-(length:--text-compact)"
+                        className="truncate text-left font-semibold text-foreground hover:text-primary transition-colors hover:underline text-(length:--text-compact)"
                         onClick={() => onOpenGraph(d.id)}
                         title={t("点击进入图谱工作台", "Click to open graph workbench")}
                       >
                         {d.display_name}
                       </button>
                       {d.id === activeDomainId && (
-                        <span className="rounded-full bg-primary/10 text-primary px-2 py-0.2 text-[10px] font-medium shrink-0">
-                          {t("当前激活", "Active")}
+                        <span className="rounded-full bg-primary/10 text-primary px-1.5 py-0.2 text-[10px] font-medium shrink-0">
+                          {t("激活", "Active")}
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <code className="text-[11px] px-1.5 py-0.2 bg-muted rounded font-mono text-muted-foreground">{d.slug}</code>
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <code className="text-[11px] px-1 py-0.2 bg-muted rounded font-mono text-muted-foreground">{d.slug}</code>
                       {d.description && (
-                        <span className="text-xs text-muted-foreground/80 truncate max-w-[280px]" title={d.description}>
+                        <span className="text-xs text-muted-foreground/80 truncate max-w-[220px]" title={d.description}>
                           {d.description}
                         </span>
                       )}
@@ -3635,24 +3637,24 @@ function DomainList({
             },
             {
               key: "category",
-              header: t("类型 / 领域", "Category"),
-              width: "140px",
+              header: t("类型", "Category"),
+              width: "110px",
               render: (_v, row) => renderDomainCategory(row as unknown as OntologyDomain),
             },
             {
               key: "version",
               header: t("版本", "Version"),
-              width: "70px",
+              width: "55px",
               render: (v) => <span className="font-mono text-xs text-muted-foreground">v{String(v)}</span>,
             },
             {
               key: "status",
-              header: t("状态 / 生命周期", "Status & Lifecycle"),
-              width: "160px",
+              header: t("状态", "Status"),
+              width: "130px",
               render: (_v, row) => {
                 const d = row as unknown as OntologyDomain;
                 return (
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex items-center gap-1">
                     <StatusBadge label={d.status === "active" ? t("活跃","Active") : d.status} status={d.status === "active" ? "ok" : "pending"} />
                     <StatusBadge label={String(d.lifecycle_state)} status={domainLifecycleKind(String(d.lifecycle_state))} />
                   </div>
@@ -3662,15 +3664,15 @@ function DomainList({
             {
               key: "created_by",
               header: t("创建人", "Created By"),
-              width: "120px",
+              width: "90px",
               render: (_v, row) => renderDomainCreator(row as unknown as OntologyDomain),
             },
             {
               key: "created_at",
               header: t("创建时间", "Created At"),
-              width: "135px",
+              width: "105px",
               render: (_v, row) => (
-                <span className="font-mono text-xs text-muted-foreground">
+                <span className="font-mono text-xs text-muted-foreground whitespace-nowrap">
                   {formatDomainTime((row as unknown as OntologyDomain).created_at)}
                 </span>
               ),
@@ -3678,9 +3680,9 @@ function DomainList({
             {
               key: "updated_at",
               header: t("更新时间", "Updated At"),
-              width: "135px",
+              width: "105px",
               render: (_v, row) => (
-                <span className="font-mono text-xs text-muted-foreground">
+                <span className="font-mono text-xs text-muted-foreground whitespace-nowrap">
                   {formatDomainTime((row as unknown as OntologyDomain).updated_at)}
                 </span>
               ),
@@ -3688,16 +3690,16 @@ function DomainList({
             {
               key: "actions",
               header: t("操作", "Actions"),
-              width: "480px",
+              width: "minmax(280px, 1.5fr)",
               render: (_v, row) => {
                 const d = row as unknown as OntologyDomain;
                 const rowBusy = busyRowId === d.id;
                 const next = DOMAIN_STATE_TRANSITIONS[d.lifecycle_state as DomainLifecycleState] ?? [];
                 return (
-                  <div className="flex flex-wrap items-center gap-1.5">
+                  <div className="flex w-full items-center gap-1 overflow-x-auto whitespace-nowrap py-1 [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]">
                     {/* 【图谱】 button */}
                     <button
-                      className="flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-(length:--text-nano) font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+                      className="flex shrink-0 items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-(length:--text-nano) font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
                       onClick={() => onOpenGraph(d.id, "graph")}
                       title={t("进入此本体域的图谱工作台", "Open domain graph workbench")}
                     >
@@ -3707,7 +3709,7 @@ function DomainList({
 
                     {/* 【表格】 button */}
                     <button
-                      className="flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+                      className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
                       onClick={() => onOpenGraph(d.id, "table")}
                       title={t("查看此本体域的数据对象表格", "Open domain data table")}
                     >
@@ -3715,29 +3717,29 @@ function DomainList({
                       {t("表格", "Table")}
                     </button>
 
-                    {/* 【Schema】 button */}
+                    {/* 【结构】 (Schema) button */}
                     <button
-                      className="flex items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
+                      className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:bg-accent disabled:opacity-50"
                       onClick={() => onOpenGraph(d.id, "schema")}
                       title={t("管理此本体域的 Schema 元模型定义", "Open domain schema view")}
                     >
-                      <span className="text-[11px] leading-none">⚙</span>
-                      Schema
+                      <span className="text-[11px] leading-none">⊙</span>
+                      {t("结构", "Schema")}
                     </button>
 
-                    {/* 【驾驶舱】 button */}
+                    {/* 【驾驶】 (Cockpit) button */}
                     <button
-                      className="flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-(length:--text-nano) font-medium text-amber-600 dark:text-amber-400 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
+                      className="flex shrink-0 items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-0.5 text-(length:--text-nano) font-medium text-amber-600 dark:text-amber-400 transition-colors hover:bg-amber-500/20 disabled:opacity-50"
                       onClick={() => onOpenGraph(d.id, "sandbox")}
                       title={t("进入智能驾驶舱、沙箱与模拟演练", "Open cockpit and simulation sandbox")}
                     >
                       <span className="text-[11px] leading-none">🤝</span>
-                      {t("驾驶舱", "Cockpit")}
+                      {t("驾驶", "Cockpit")}
                     </button>
 
                     {/* 【编辑】 button */}
                     {renamingId === d.id ? (
-                      <>
+                      <div className="flex shrink-0 items-center gap-1">
                         <input
                           autoFocus
                           value={renameValue}
@@ -3747,17 +3749,17 @@ function DomainList({
                             if (e.key === "Enter") submitRename(d);
                             if (e.key === "Escape") setRenamingId(null);
                           }}
-                          className="w-28 rounded border border-border bg-background px-1.5 py-0.5 text-(length:--text-nano) text-foreground outline-none"
+                          className="w-24 rounded border border-border bg-background px-1.5 py-0.5 text-(length:--text-nano) text-foreground outline-none"
                         />
-                        <button className={ROW_BTN} disabled={rowBusy} onClick={() => submitRename(d)}>
+                        <button className={ROW_BTN + " shrink-0"} disabled={rowBusy} onClick={() => submitRename(d)}>
                           {t("保存","Save")}
                         </button>
-                        <button className={ROW_BTN} disabled={rowBusy} onClick={() => setRenamingId(null)}>
+                        <button className={ROW_BTN + " shrink-0"} disabled={rowBusy} onClick={() => setRenamingId(null)}>
                           {t("取消","Cancel")}
                         </button>
-                      </>
+                      </div>
                     ) : (
-                      <button className={ROW_BTN} disabled={rowBusy} onClick={() => rename(d)} title={t("重命名本体域", "Rename domain")}>
+                      <button className={ROW_BTN + " shrink-0"} disabled={rowBusy} onClick={() => rename(d)} title={t("重命名本体域", "Rename domain")}>
                         <span className="mr-0.5 text-[11px]">✏️</span>
                         {t("编辑", "Edit")}
                       </button>
@@ -3765,7 +3767,7 @@ function DomainList({
 
                     {/* 【接入】 button */}
                     <button
-                      className={ROW_BTN}
+                      className={ROW_BTN + " shrink-0"}
                       disabled={rowBusy}
                       onClick={() => onImportLegacy ? onImportLegacy(d.id) : null}
                       title={t("接入旧系统 SQL DDL / OpenAPI 架构到此域", "Import legacy app schema into this domain")}
@@ -3775,14 +3777,22 @@ function DomainList({
                     </button>
 
                     {/* Lifecycle transitions */}
-                    {next.map((state) => (
-                      <button key={state} className={ROW_BTN} disabled={rowBusy} onClick={() => advance(d, state)}>
-                        →{state}
-                      </button>
-                    ))}
+                    {next.map((state) => {
+                      const stateLabel =
+                        state === "active" ? t("生效", "Active") :
+                        state === "deprecated" ? t("废弃", "Deprecate") :
+                        state === "archived" ? t("归档", "Archive") :
+                        state === "draft" ? t("草稿", "Draft") :
+                        t("推进", "Advance");
+                      return (
+                        <button key={state} className={ROW_BTN + " shrink-0"} disabled={rowBusy} onClick={() => advance(d, state)} title={t(`推进到 ${state}`, `Advance to ${state}`)}>
+                          {stateLabel}
+                        </button>
+                      );
+                    })}
 
                     {/* 【注销】 button */}
-                    <button className={ROW_DANGER_BTN} disabled={rowBusy} onClick={() => retire(d)} title={t("注销本体域", "Retire domain")}>
+                    <button className={ROW_DANGER_BTN + " shrink-0"} disabled={rowBusy} onClick={() => retire(d)} title={t("注销本体域", "Retire domain")}>
                       {t("注销", "Retire")}
                     </button>
                   </div>

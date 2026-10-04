@@ -580,19 +580,19 @@ type PluginDataTableProps = {
 };
 
 function PluginSdkDataTable({ columns, rows, loading, emptyMessage = "No rows." }: PluginDataTableProps) {
-  if (loading) return createElement("div", { className: "text-sm text-muted-foreground" }, "Loading...");
-  if (!rows.length) return createElement("div", { className: "text-sm text-muted-foreground" }, emptyMessage);
+  if (loading) return createElement("div", { className: "text-xs text-muted-foreground py-2" }, "Loading...");
+  if (!rows.length) return createElement("div", { className: "text-xs text-muted-foreground py-2" }, emptyMessage);
   const gridColumns = columns.map((column) => column.width ?? "minmax(0, 1fr)").join(" ");
   return createElement(
     "div",
-    { className: "overflow-hidden rounded-md border" },
+    { className: "overflow-x-auto rounded-md border" },
     createElement(
       "div",
       {
-        className: "hidden border-b bg-muted/35 px-3 py-2 text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid md:[grid-template-columns:var(--plugin-grid-cols)]",
+        className: "hidden border-b bg-muted/35 px-2.5 py-1.5 text-xs font-medium uppercase tracking-wide text-muted-foreground md:grid md:[grid-template-columns:var(--plugin-grid-cols)]",
         style: { "--plugin-grid-cols": gridColumns },
       },
-      columns.map((column) => createElement("div", { key: column.key }, column.header)),
+      columns.map((column) => createElement("div", { key: column.key, className: "truncate" }, column.header)),
     ),
     createElement(
       "div",
@@ -601,13 +601,13 @@ function PluginSdkDataTable({ columns, rows, loading, emptyMessage = "No rows." 
         "div",
         {
           key: String(row.id ?? index),
-          className: "grid gap-2 px-3 py-3 md:items-center md:[grid-template-columns:var(--plugin-grid-cols)]",
+          className: "grid gap-1.5 px-2.5 py-1.5 md:items-center md:[grid-template-columns:var(--plugin-grid-cols)]",
           style: { "--plugin-grid-cols": gridColumns },
         },
         columns.map((column) => createElement(
           "div",
-          { key: column.key, className: "min-w-0 text-sm" },
-          createElement("div", { className: "mb-1 text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:hidden" }, column.header),
+          { key: column.key, className: "min-w-0 text-xs" },
+          createElement("div", { className: "mb-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:hidden" }, column.header),
           column.render ? column.render(row[column.key], row) : String(row[column.key] ?? ""),
         )),
       )),
