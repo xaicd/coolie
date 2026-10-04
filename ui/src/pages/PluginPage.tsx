@@ -170,8 +170,8 @@ export function PluginPage() {
   const fillsViewport = pageSlot.layout === "fill";
 
   return (
-    <div className={fillsViewport ? "flex h-full min-h-0 flex-col gap-4" : "space-y-4"}>
-      {!routeSidebarActive && (
+    <div className={fillsViewport ? "flex h-full min-h-0 flex-col" : "space-y-4"}>
+      {!routeSidebarActive && !fillsViewport && (
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="sm" asChild>
             <Link to={companyPrefix ? `/${companyPrefix}/dashboard` : "/dashboard"}>

@@ -113,6 +113,9 @@ export interface OntologyDomainRow {
    * change has been recorded yet.
    */
   schema_version: number;
+  created_by?: string;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface OntologyNodeInput {
@@ -2117,7 +2120,7 @@ export class PostgresGraphStore implements GraphStore {
   private static readonly DOMAIN_COLS =
     "id, company_id, slug, display_name, description, status, version, icon, category, " +
     "is_built_in, forked_from, lifecycle_state, bootstrap_source, seed_schema_version, " +
-    "schema_version";
+    "schema_version, created_by, created_at, updated_at";
 
   private static readonly NODE_COLS =
     "id, company_id, domain_id, node_type_id, key, label, lifecycle_state, version, properties";
