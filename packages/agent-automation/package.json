@@ -1,0 +1,33 @@
+{
+  "name": "@paperclipai/agent-automation",
+  "version": "0.1.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./drivers": "./src/drivers/index.ts",
+    "./personas": "./src/personas/index.ts",
+    "./runner": "./src/runner/index.ts",
+    "./scenarios": "./src/scenarios/index.ts"
+  },
+  "files": [
+    "src/**/*.ts"
+  ],
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@paperclipai/shared": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "typescript": "^7.0.2",
+    "vitest": "^2.1.8"
+  },
+  "engines": {
+    "node": ">=24.11.0"
+  }
+}

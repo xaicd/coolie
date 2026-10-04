@@ -1,0 +1,129 @@
+import type {
+  AutomationContext,
+  PlaybookDefinition,
+  PlaybookExecutionReport,
+  StepExecutionResult,
+} from "../types.js";
+import { BrowserDriver } from "../drivers/browser-driver.js";
+import { DeviceDriver } from "../drivers/device-driver.js";
+import { getPersona } from "../personas/catalog.js";
+
+export interface RunnerOptions {
+  baseUrl?: string;
+  companyId?: string;
+  dryRun?: boolean;
+  evidenceLedgerDir?: string;
+  mockMode?: boolean;
+}
+
+export class PlaybookRunner {
+  private readonly options: RunnerOptions;
+
+  constructor(options: RunnerOptions = {}) {
+    this.options = {
+      baseUrl: options.baseUrl ?? "http://localhost:3100",
+      mockMode: options.mockMode ?? true,
+      ...options,
+    };
+  }
+
+  async run(playbook: PlaybookDefinition, personaOverride?: string): Promise<PlaybookExecutionReport> {
+    const personaId = personaOverride ?? playbook.preferredPersona;
+    const persona = getPersona(personaId);
+    const startedAt = new Date().toISOString();
+    const startTime = Date.now();
+
+    const browser = (playbook.engine === "browser" || playbook.engine === "hybrid")
+      ? new BrowserDriver({ mockMode: this.options.mockMode })
+      : undefined;
+
+    const device = (playbook.engine === "device" || playbook.engine === "hybrid")
+      ? new DeviceDriver({ mockMode: this.options.mockMode })
+      : undefined;
+
+    const state = new Map<string, unknown>();
+    const screenshots: Array<{ name: string; path: string }> = [];
+
+    const context: AutomationContext = {
+      baseUrl: this.options.baseUrl!,
+      companyId: this.options.companyId,
+      personaId: persona.id,
+      engine: playbook.engine,
+      dryRun: this.options.dryRun,
+      browser,
+      device,
+      state,
+      log: (msg) => {
+        // 可插拔日志输出
+      },
+      recordScreenshot: (name, path) => {
+        screenshots.push({ name, path });
+      },
+    };
+
+    const stepResults: StepExecutionResult[] = [];
+    let playbookPassed = true;
+
+    for (const step of playbook.steps) {
+      const stepStart = Date.now();
+      try {
+        const actionResult = await step.execute(context);
+        if (!actionResult.success) {
+          throw new Error(actionResult.error ?? "执行步骤失败");
+        }
+
+        if (step.assert) {
+          await step.assert(context, actionResult);
+        }
+
+        stepResults.push({
+          stepName: step.name,
+          status: "passed",
+          durationMs: Date.now() - stepStart,
+          details: { action: actionResult.action, target: actionResult.target },
+        });
+      } catch (err) {
+        playbookPassed = false;
+        const errMsg = err instanceof Error ? err.message : String(err);
+        let screenshotPath: string | undefined;
+
+        if (browser && persona.tolerance.requireScreenshots) {
+          screenshotPath = await browser.takeScreenshot(`failure-${step.name}`);
+        } else if (device && persona.tolerance.requireScreenshots) {
+          screenshotPath = await device.takeDeviceScreenshot(`failure-${step.name}`);
+        }
+
+        stepResults.push({
+          stepName: step.name,
+          status: "failed",
+          durationMs: Date.now() - stepStart,
+          error: errMsg,
+          screenshotPath,
+        });
+
+        if (persona.tolerance.failFast) {
+          break;
+        }
+      }
+    }
+
+    const completedAt = new Date().toISOString();
+    const totalDurationMs = Date.now() - startTime;
+
+    return {
+      playbookId: playbook.id,
+      kind: playbook.kind,
+      persona: `${persona.name} (${persona.title})`,
+      engine: playbook.engine,
+      targetDomain: playbook.targetDomain,
+      status: playbookPassed ? "passed" : "failed",
+      startedAt,
+      completedAt,
+      totalDurationMs,
+      steps: stepResults,
+      summary: playbookPassed
+        ? `[${persona.name}] 成功完成 ${playbook.title}，所有 ${stepResults.length} 个步骤全部通过。`
+        : `[${persona.name}] 执行 ${playbook.title} 发现缺陷并阻断，请核对失败详情。`,
+    };
+  }
+}
