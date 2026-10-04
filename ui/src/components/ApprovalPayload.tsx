@@ -7,6 +7,7 @@ export const typeLabel: Record<string, string> = {
   approve_ceo_strategy: "CEO Strategy",
   budget_override_required: "Budget Override",
   request_board_approval: "Board Approval",
+  governance_gate_waiver: "质量门禁特批会签",
 };
 
 function firstNonEmptyString(...values: unknown[]): string | null {
@@ -42,6 +43,7 @@ export const typeIcon: Record<string, typeof UserPlus> = {
   approve_ceo_strategy: Lightbulb,
   budget_override_required: ShieldAlert,
   request_board_approval: ShieldCheck,
+  governance_gate_waiver: ShieldCheck,
 };
 
 export const defaultTypeIcon = ShieldCheck;
@@ -238,6 +240,44 @@ function BoardApprovalPayloadContent({ payload }: { payload: Record<string, unkn
   );
 }
 
+export function GovernanceWaiverPayload({ payload }: { payload: Record<string, unknown> }) {
+  const gateName = firstNonEmptyString(payload.gateName) ?? "质量门禁";
+  const gateId = firstNonEmptyString(payload.gateId);
+  const projectId = firstNonEmptyString(payload.projectId);
+  const reason = firstNonEmptyString(payload.reason);
+
+  return (
+    <div className="mt-3 space-y-3 text-sm">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-semibold text-foreground text-sm">{gateName}</span>
+        {gateId && (
+          <span className="rounded bg-muted px-2 py-0.5 font-mono text-(length:--text-micro) text-muted-foreground uppercase">
+            门禁代号: {gateId}
+          </span>
+        )}
+        <span className="rounded bg-primary/10 text-primary px-2 py-0.5 text-xs font-medium">
+          {projectId ? `关联项目: ${projectId}` : "作用域: 企业全域有效"}
+        </span>
+      </div>
+
+      {reason && (
+        <div className="rounded-lg border border-purple-500/20 bg-purple-500/5 px-3.5 py-3 dark:bg-purple-950/20">
+          <p className="text-(length:--text-micro) font-medium uppercase tracking-(--tracking-label) text-purple-700 dark:text-purple-300">
+            特批放行理由与安全承诺
+          </p>
+          <div className="mt-1 leading-6 text-foreground text-sm whitespace-pre-wrap">
+            {reason}
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-md border border-border/60 bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
+        审批裁决影响：核准通过后，该门禁在【架构与质量治理控制台】将标记为紫色特批放行态（Waived），解除流水线与发版阻断。
+      </div>
+    </div>
+  );
+}
+
 export function ApprovalPayloadRenderer({
   type,
   payload,
@@ -251,6 +291,9 @@ export function ApprovalPayloadRenderer({
   if (type === "budget_override_required") return <BudgetOverridePayload payload={payload} />;
   if (type === "request_board_approval") {
     return <BoardApprovalPayload payload={payload} hideTitle={hidePrimaryTitle} />;
+  }
+  if (type === "governance_gate_waiver") {
+    return <GovernanceWaiverPayload payload={payload} />;
   }
   return <CeoStrategyPayload payload={payload} />;
 }

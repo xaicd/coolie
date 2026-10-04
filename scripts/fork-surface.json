@@ -1272,6 +1272,18 @@
       "maxNetLines": 10,
       "maxTotalLines": 20,
       "reason": "Local bundled plugin catalog directory detection for dev runner."
+    },
+    {
+      "path": "server/src/routes/governance.ts",
+      "maxNetLines": 30,
+      "maxTotalLines": 50,
+      "reason": "Architecture and quality governance CMMI gate overview and waiver route."
+    },
+    {
+      "path": "ui/src/components/ApprovalPayload.tsx",
+      "maxNetLines": 60,
+      "maxTotalLines": 80,
+      "reason": "Support governance_gate_waiver quality gate approval card rendering."
     }
   ]
 }
