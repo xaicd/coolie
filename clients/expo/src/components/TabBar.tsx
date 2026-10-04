@@ -2,8 +2,8 @@ import { Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { C } from "../theme";
 
-/** 底部 tab bar 的四个落点 + 中央新建 FAB。 */
-export type BarTabKey = "dashboard" | "tasks" | "chat" | "assets" | "agents" | "ontology" | "artifacts";
+/** 底部 tab bar 的落点 + 中央新建 FAB。 */
+export type BarTabKey = "dashboard" | "tasks" | "inbox" | "chat" | "assets" | "agents" | "ontology" | "artifacts";
 
 /**
  * 底栏高度。铺满底部的浮层必须让出这一段。
@@ -23,6 +23,7 @@ const LEFT: Slot[] = [
 ];
 
 const RIGHT: Slot[] = [
+  { key: "inbox", label: "收件箱", icon: "mail-outline", activeIcon: "mail" },
   { key: "chat", label: "工坊", icon: "chatbubble-ellipses-outline", activeIcon: "chatbubble-ellipses" },
   { key: "assets", label: "资产", icon: "layers-outline", activeIcon: "layers" },
 ];

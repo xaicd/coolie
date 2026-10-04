@@ -54,6 +54,7 @@ import { LoadingState } from "./src/ui/LoadingState";
 import { ScreenHeader } from "./src/ui/ScreenHeader";
 import { Sheet } from "./src/ui/Sheet";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
+import { InboxScreen } from "./src/screens/InboxScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
 import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen";
 import { OntologyInstanceGraphScreen } from "./src/screens/OntologyInstanceGraphScreen";
@@ -152,7 +153,7 @@ import { setupOTAListener } from "./src/OTA";
  * - 状态点呼吸灯
  */
 
-type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "artifacts" | "ontology" | "assets";
+type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "artifacts" | "ontology" | "assets" | "inbox";
 
 /**
  * 底部栏只有 5 项 (汇览 / 任务 / [+] / 员工 / 收件箱, 见 src/components/TabBar.tsx)。
@@ -1300,6 +1301,18 @@ function HomeScreen({
               onOpenApproval={(approvalId) => {
                 navigateTab("tasks");
                 setFocusedApprovalId(approvalId);
+              }}
+            />
+          ) : tab === "inbox" ? (
+            <InboxScreen
+              company={company}
+              onOpenApproval={(approvalId) => {
+                navigateTab("tasks");
+                setFocusedApprovalId(approvalId);
+              }}
+              onOpenIssue={(issue) => {
+                navigateTab("tasks");
+                setSelected(issue);
               }}
             />
           ) : tab === "chat" ? (

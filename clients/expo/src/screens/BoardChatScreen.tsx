@@ -181,6 +181,12 @@ function drainBoardPromptQueue(): string[] {
   return boardPromptQueue.splice(0, boardPromptQueue.length);
 }
 
+function displayConvTitle(title: string | null | undefined): string | null {
+  if (!title) return null;
+  if (title === "Board Operations") return "工坊操作";
+  return title;
+}
+
 interface ApprovalFeedItem {
   approval: Approval;
   decision: "approve" | "reject" | null;
@@ -1679,7 +1685,7 @@ export function BoardChatScreen({
         <ChatHeader
           timestamp={latestAssistantTimestamp}
           embedded={embedded}
-          title={activeConversation?.title ?? null}
+          title={displayConvTitle(activeConversation?.title)}
           onRequestClear={() => setConfirmClear(true)}
           onOpenConversations={() => setConversationsOpen(true)}
           onNewConversation={openNewConversation}
@@ -1991,7 +1997,7 @@ export function BoardChatScreen({
                             style={[styles.convRowTitle, active && styles.convRowTitleActive]}
                             numberOfLines={1}
                           >
-                            {conversation.title}
+                            {displayConvTitle(conversation.title) ?? "新对话"}
                           </Text>
                           <Text style={styles.convRowMeta} numberOfLines={1}>
                             {formatTime(conversation.lastMessageAt)}
