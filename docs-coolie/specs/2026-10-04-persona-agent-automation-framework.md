@@ -68,20 +68,30 @@ flowchart TD
 
 ---
 
-## 4. 双引擎抽象层 (Dual Driver Contract)
+## 4. 双引擎抽象层与平台能力划分 (Dual Driver Contract)
 
-### 4.1 BrowserDriver (agent-browser 包装)
+### 4.1 BrowserDriver (封装 agent-browser，专注 Web / PC / H5)
+`agent-browser` 是面向所有 **基于网页与浏览器渲染形态（Web / PC / H5）** 的核心驱动手眼：
+- **PC 端桌面页面**：专注 1440px+ 宽屏控制台、多列看板、侧边栏折叠展开、大屏本体力导向图谱、悬停 Tooltip 及复杂鼠标交互；
+- **Web 响应式页面**：专注 1280px 标准视口自适应、SPA 路由流转、企业多租户数据大盘、收件箱批量操作；
+- **H5 移动端网页**：专注 375px/390px 窄屏触控流、微信/企微内置浏览器 H5 容器、原生 App 嵌内 WebView 页面、移动触控手势仿真与软键盘弹起响应。
+
 统一封装以下能力：
-- `navigate(url: string)`: 页面路由直达与就绪等待；
-- `click(selector: string, options?: ClickOptions)`: 智能元素点击（支持防抖检测与 A11y 名称匹配）；
+- `setProfile(profile: "pc" | "web" | "h5")`: 快速切换 PC 大屏、标准 Web 与 H5 视口预设；
+- `navigate(url: string)`: 页面路由直达与网络静默就绪等待；
+- `click(selector: string, options?: ClickOptions)`: 智能元素点击（支持防抖检测与 A11y 语义标记匹配）；
 - `fill(selector: string, value: string)`: 输入框填充与变更事件触发；
 - `assertVisible(selector: string, timeoutMs?: number)`: 元素可见性断言；
 - `assertText(selector: string, expectedPattern: string | RegExp)`: 文本真值校验；
 - `takeScreenshot(name: string)`: 屏幕快照存证并保存至产物目录；
-- `getA11ySnapshot()`: 获取无障碍可达树，用于无头嗅探死穴；
+- `getA11ySnapshot()`: 获取无障碍可达树（`snapshot -i`），提炼精简可交互语义树；
 - `checkVisualOverlap()`: 几何坐标重叠计算，审查是否存在浮层遮挡。
 
-### 4.2 DeviceDriver (agent-device 包装)
+### 4.2 DeviceDriver (封装 agent-device，专注原生 Android / iOS 移动端设备)
+`agent-device` 则是面向所有 **原生操作系统与移动真机/模拟器设备** 的具身操作中枢：
+- **原生 App 容器**：专门驱动 Expo / React Native 原生客户端（`cloud.coolie.app`）；
+- **设备级特性**：原生返回键、Home 键、物理方向旋转、深链协议唤起（`coolie://`）、原生权限弹窗、系统通知栏；
+- **原生与混合交互**：原生底栏与内嵌 WebView 的登录态穿透与生命周期管理。
 统一封装以下能力：
 - `launchApp(appId: string)`: 启动原生/Expo 客户端应用；
 - `pressKey(key: "back" | "home" | "enter")`: 系统物理键事件注入；

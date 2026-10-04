@@ -63,6 +63,16 @@ describe("Agent Automation Framework (@paperclipai/agent-automation)", () => {
       const visual = await driver.inspectVisuals();
       expect(visual.hasWhiteScreen).toBe(false);
       expect(visual.hasVisualOverlap).toBe(false);
+
+      // 验证针对 PC / Web / H5 的多形态支持
+      driver.setProfile("pc");
+      expect(driver.getProfile()).toBe("pc");
+
+      driver.setProfile("h5");
+      expect(driver.getProfile()).toBe("h5");
+
+      driver.setProfile("web");
+      expect(driver.getProfile()).toBe("web");
     });
 
     it("DeviceDriver should execute app launch, gestures and screen assertions", async () => {
