@@ -513,8 +513,8 @@ function Step1Body({
         <div className="flex flex-col gap-2">
           <div className="text-(length:--text-nano) text-muted-foreground">
             {t(
-              "选择工程目录。支持 Java/Kotlin(Spring、JPA、MyBatis-Plus 注解)、.proto(gRPC message/service)、SQL DDL、以及 js/ts/py/go。会识别 Maven/Gradle 模块与 spring.application.name 作为服务边界。",
-              "Pick a project directory. Reads Java/Kotlin (Spring, JPA, MyBatis-Plus annotations), .proto message/service, SQL DDL, and js/ts/py/go. Detects Maven/Gradle modules and spring.application.name as service boundaries.",
+              "选择工程目录。支持 Node.js/TypeScript (pnpm workspace、package.json)、Java/Kotlin (Spring、JPA、MyBatis)、.proto、SQL DDL、以及 Python/Go。自动识别 Monorepo 微服务、进程边界与端口配置。",
+              "Pick a project directory. Supports Node.js/TypeScript (pnpm workspace, package.json), Java/Kotlin (Spring, JPA, MyBatis), .proto, SQL DDL, and Python/Go. Automatically detects monorepo microservices, process boundaries and port configurations.",
             )}
           </div>
           <label className="flex cursor-pointer items-center gap-2 rounded-md border border-dashed border-border bg-background px-3 py-2 text-(length:--text-nano) hover:bg-accent">

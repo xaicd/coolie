@@ -117,9 +117,209 @@ async function ensureEnterpriseDomain(companyId: string, store: GraphStore): Pro
   if (!companyId || ensuredEnterpriseCompanies.has(companyId)) return;
   try {
     await seedSampleDomains(companyId, store, { only: ["enterprise-core"] });
+    await seedEnterprisePlatformServices(companyId, store);
     ensuredEnterpriseCompanies.add(companyId);
   } catch (err) {
     activeContext?.logger.warn(`[ontology-worker] ensureEnterpriseDomain failed for ${companyId}: ${err}`);
+  }
+}
+
+async function seedEnterprisePlatformServices(companyId: string, store: GraphStore): Promise<void> {
+  try {
+    const existing = await store.listDomainSubProjects(companyId, "enterprise-core");
+    if (existing.length > 0) return;
+
+    const domain = await store.getDomain(companyId, "enterprise-core");
+    const domainId = domain?.id ?? null;
+
+    const systems = await store.listBusinessSystems(companyId);
+    let system = systems.find(
+      (s) => s.code === "coolie-platform" || (domainId && s.ontology_domain_id === domainId),
+    );
+    if (!system) {
+      system = await store.createBusinessSystem({
+        companyId,
+        code: "coolie-platform",
+        name: "Coolie 协同智能体平台核心系统",
+        description: "Coolie/Paperclip 全栈 Node.js Monorepo 平台核心微服务与运行基座",
+        ontologyDomainId: domainId,
+        domain: "other",
+        targetRole: "全栈中枢",
+      });
+    }
+
+    const PLATFORM_SERVICES: Array<{
+      name: string;
+      code: string;
+      microserviceLayer: "L0" | "L1" | "L2" | "L3" | "L4";
+      techStack: string[];
+      type: "frontend" | "mobile-rn" | "backend" | "microservice" | "other";
+      dependencies: Array<{ toServiceKey: string; targetHint?: string; type?: string }>;
+      metadata: Record<string, unknown>;
+    }> = [
+      {
+        name: "控制台大盘前端 (paperclip-ui)",
+        code: "paperclip-ui",
+        microserviceLayer: "L0",
+        techStack: ["React 19", "Vite", "TailwindCSS"],
+        type: "frontend",
+        dependencies: [
+          { toServiceKey: "paperclip-server", targetHint: "paperclip-server", type: "http/rest" },
+        ],
+        metadata: {
+          deploy: {
+            envs: ["dev", "test", "prod"],
+            ports: [3100],
+            replicas: 2,
+            namespace: "coolie-web",
+          },
+        },
+      },
+      {
+        name: "移动端智能驾驶舱 (expo-client)",
+        code: "expo-client",
+        microserviceLayer: "L0",
+        techStack: ["React Native", "Expo SDK 52", "TypeScript"],
+        type: "mobile-rn",
+        dependencies: [
+          { toServiceKey: "paperclip-server", targetHint: "paperclip-server", type: "http/rest" },
+        ],
+        metadata: {
+          deploy: {
+            envs: ["dev", "test", "prod"],
+            replicas: 1,
+            namespace: "coolie-mobile",
+          },
+        },
+      },
+      {
+        name: "控制面核心服务 (paperclip-server)",
+        code: "paperclip-server",
+        microserviceLayer: "L1",
+        techStack: ["Node.js 22", "Express", "TypeScript"],
+        type: "backend",
+        dependencies: [
+          { toServiceKey: "ai-gateway", targetHint: "ai-gateway", type: "rpc" },
+          { toServiceKey: "plugin-ontology", targetHint: "plugin-ontology", type: "plugin-ipc" },
+          { toServiceKey: "plugin-governance", targetHint: "plugin-governance", type: "plugin-ipc" },
+          { toServiceKey: "pglite-db", targetHint: "pglite-db", type: "sql/postgres" },
+        ],
+        metadata: {
+          deploy: {
+            envs: ["dev", "test", "prod"],
+            ports: [3100],
+            replicas: 3,
+            namespace: "coolie-core",
+          },
+        },
+      },
+      {
+        name: "多模型聚合网关 (ai-gateway)",
+        code: "ai-gateway",
+        microserviceLayer: "L1",
+        techStack: ["Node.js", "DeepSeek", "Claude", "MiniMax"],
+        type: "microservice",
+        dependencies: [],
+        metadata: {
+          deploy: {
+            envs: ["dev", "test", "prod"],
+            ports: [8080],
+            replicas: 2,
+            namespace: "coolie-ai",
+          },
+        },
+      },
+      {
+        name: "本体认知与图谱引擎 (plugin-ontology)",
+        code: "plugin-ontology",
+        microserviceLayer: "L2",
+        techStack: ["TypeScript", "GraphStore", "ReactFlow", "MCP"],
+        type: "backend",
+        dependencies: [
+          { toServiceKey: "pglite-db", targetHint: "pglite-db", type: "sql/postgres" },
+          { toServiceKey: "runner-bridge", targetHint: "runner-bridge", type: "event-bus" },
+        ],
+        metadata: {
+          deploy: {
+            envs: ["dev", "test", "prod"],
+            replicas: 2,
+            namespace: "coolie-plugins",
+          },
+        },
+      },
+      {
+        name: "架构与质量治理中心 (plugin-governance)",
+        code: "plugin-governance",
+        microserviceLayer: "L2",
+        techStack: ["TypeScript", "CMMI G1-G5", "SkyWalking"],
+        type: "backend",
+        dependencies: [
+          { toServiceKey: "pglite-db", targetHint: "pglite-db", type: "sql/postgres" },
+        ],
+        metadata: {
+          deploy: {
+            envs: ["dev", "test", "prod"],
+            replicas: 2,
+            namespace: "coolie-plugins",
+          },
+        },
+      },
+      {
+        name: "异步工单执行调度器 (runner-bridge)",
+        code: "runner-bridge",
+        microserviceLayer: "L3",
+        techStack: ["Node.js", "Crontab", "ContextBus", "Subprocess"],
+        type: "backend",
+        dependencies: [
+          { toServiceKey: "paperclip-server", targetHint: "paperclip-server", type: "api-sync" },
+        ],
+        metadata: {
+          deploy: {
+            envs: ["dev", "test", "prod"],
+            replicas: 1,
+            namespace: "coolie-runner",
+          },
+        },
+      },
+      {
+        name: "统一元数据与业务数据库 (pglite-db)",
+        code: "pglite-db",
+        microserviceLayer: "L4",
+        techStack: ["PostgreSQL", "WASM PGlite", "Drizzle ORM"],
+        type: "other",
+        dependencies: [],
+        metadata: {
+          deploy: {
+            envs: ["dev", "test", "prod"],
+            ports: [5432],
+            replicas: 1,
+            namespace: "coolie-data",
+          },
+        },
+      },
+    ];
+
+    for (const svc of PLATFORM_SERVICES) {
+      await store.createSubProject({
+        companyId,
+        businessSystemId: system.id,
+        name: svc.name,
+        code: svc.code,
+        type: svc.type,
+        techStack: svc.techStack,
+        dependencies: svc.dependencies,
+        microserviceLayer: svc.microserviceLayer,
+        metadata: svc.metadata,
+        buildConfig: {
+          buildCommand: "pnpm build",
+          testCommand: "pnpm test",
+          startCommand: "pnpm dev",
+          envType: "node22",
+        },
+      });
+    }
+  } catch (err) {
+    activeContext?.logger.warn(`[ontology-worker] seedEnterprisePlatformServices failed for ${companyId}: ${err}`);
   }
 }
 
@@ -1806,12 +2006,21 @@ const plugin = definePlugin({
     // node-types + relation-types + a bounded graph snapshot in one payload.
     ctx.data.register("domain-detail", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
-      const domainId = requireString(params.domainId, "domainId");
-      if (domainId === "enterprise-core") {
+      const domainInput = requireString(params.domainId, "domainId");
+      if (domainInput === "enterprise-core") {
         await ensureEnterpriseDomain(companyId, store);
       }
-      const [domain, nodeTypes, relationTypes, graph, services] = await Promise.all([
-        store.getDomain(companyId, domainId),
+      const domain = await store.getDomain(companyId, domainInput);
+      const domainId = domain ? domain.id : domainInput;
+
+      if (domain?.slug === "enterprise-core" || domainInput === "enterprise-core") {
+        const checkServices = await store.listDomainSubProjects(companyId, domainId);
+        if (checkServices.length === 0) {
+          await seedEnterprisePlatformServices(companyId, store);
+        }
+      }
+
+      const [nodeTypes, relationTypes, graph, services] = await Promise.all([
         store.listNodeTypes(companyId, domainId),
         store.listRelationTypes(companyId, domainId),
         store.getGraphSnapshot(companyId, domainId),

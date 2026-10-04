@@ -273,13 +273,27 @@ function GraphCanvas({
   // DS "关系过滤" — show only edges of one relation key (null = all).
   const [relationFilter, setRelationFilter] = useState<string | null>(null);
   // DS layout modes: radial / layered (by graph depth) / grid.
-  const [layout, setLayout] = useState<"radial" | "layered" | "grid">("radial");
+  const [layout, setLayout] = useState<"radial" | "layered" | "grid">(structural ? "radial" : "grid");
   // Connect mode toggle — surfaces node handles for drag-to-link.
   const [connectMode, setConnectMode] = useState(false);
   // Soft cluster by nodeType — off / group nodes of the same type together in
   // a deterministic grid / paint them with a per-type tint. Client-side only;
   // no algorithm, no dep. Works on top of whatever `layout` is active.
   const [clusterMode, setClusterMode] = useState<"off" | "byType" | "colorByType">("off");
+
+  // Adapt layout and trigger fitView when switching between structural perspectives and instances
+  useEffect(() => {
+    if (!structural) {
+      setLayout("grid");
+    }
+  }, [structural]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void fitView({ padding: 0.15, duration: 250 });
+    }, 150);
+    return () => clearTimeout(timer);
+  }, [structural, rawNodes.length, layout, fitView]);
 
   // Node-level properties editor — opened from the node right-click menu.
   // We model it as inline popup state rather than reusing the right-inspector
@@ -298,22 +312,28 @@ function GraphCanvas({
   }, [rawNodeTypes]);
 
   // View-only layout positions (not persisted). Three strategies:
-  //  - radial:  even circle (good for small dense graphs)
+  //  - radial:  even circle with dynamic radius scaling to prevent node clumping
   //  - layered: topological depth by incoming edges (DAG-ish flows)
-  //  - grid:    fixed grid (predictable scanning)
+  //  - grid:    clean responsive grid matrix
   const positions = useMemo(() => {
     const pos = new Map<string, { x: number; y: number }>();
     const n = rawNodes.length || 1;
 
     if (layout === "radial") {
+      const rx = Math.max(380, n * 24);
+      const ry = Math.max(280, n * 18);
+      const cx = rx + 80;
+      const cy = ry + 60;
       rawNodes.forEach((nd, i) => {
         const a = (2 * Math.PI * i) / n;
-        pos.set(nd.id, { x: 360 + Math.cos(a) * 260, y: 260 + Math.sin(a) * 200 });
+        pos.set(nd.id, { x: cx + Math.cos(a) * rx, y: cy + Math.sin(a) * ry });
       });
     } else if (layout === "grid") {
-      const cols = Math.ceil(Math.sqrt(n));
+      const cols = Math.max(4, Math.ceil(Math.sqrt(n * 1.6)));
+      const cellW = 260;
+      const cellH = 140;
       rawNodes.forEach((nd, i) => {
-        pos.set(nd.id, { x: 80 + (i % cols) * 240, y: 60 + Math.floor(i / cols) * 130 });
+        pos.set(nd.id, { x: 80 + (i % cols) * cellW, y: 60 + Math.floor(i / cols) * cellH });
       });
     } else {
       // layered: compute depth = longest incoming path (BFS from roots)
@@ -345,7 +365,7 @@ function GraphCanvas({
       }
       for (const [level, ids] of byLevel) {
         ids.forEach((id, i) => {
-          pos.set(id, { x: 100 + i * 220, y: 60 + level * 140 });
+          pos.set(id, { x: 100 + i * 260, y: 60 + level * 160 });
         });
       }
     }
@@ -412,19 +432,65 @@ function GraphCanvas({
     return Array.from(set).sort();
   }, [rawEdges]);
 
-  const flowEdges: Edge[] = useMemo(
-    () =>
-      rawEdges
-        .filter((e) => relationFilter == null || e.relationKey === relationFilter)
-        .map((e) => ({
-          id: e.id,
-          source: e.sourceNodeId,
-          target: e.targetNodeId,
-          label: e.relationKey ?? undefined,
-          markerEnd: { type: MarkerType.ArrowClosed },
-        })),
-    [rawEdges, relationFilter],
-  );
+  const isDense = rawEdges.length > 50;
+
+  const flowEdges: Edge[] = useMemo(() => {
+    const filtered = rawEdges.filter(
+      (e) => relationFilter == null || e.relationKey === relationFilter,
+    );
+
+    return filtered.map((e) => {
+      const isIncident =
+        selectedNodeId != null &&
+        (e.sourceNodeId === selectedNodeId || e.targetNodeId === selectedNodeId);
+
+      // Only show edge labels when:
+      // 1. Graph is sparse (< 50 edges), OR
+      // 2. An explicit relationFilter is active, OR
+      // 3. This edge connects to the currently selected/focused node
+      const showLabel = !isDense || relationFilter != null || isIncident;
+
+      // When a node is selected, dim unrelated edges and highlight connected ones
+      let opacity = 0.45;
+      let strokeWidth = 1.2;
+      let stroke = "hsl(var(--muted-foreground) / 0.4)";
+      let animated = false;
+
+      if (selectedNodeId != null) {
+        if (isIncident) {
+          opacity = 0.95;
+          strokeWidth = 2.5;
+          stroke = "hsl(var(--primary))";
+          animated = true;
+        } else {
+          opacity = 0.08;
+          strokeWidth = 0.8;
+          stroke = "hsl(var(--muted-foreground) / 0.15)";
+        }
+      } else if (isDense) {
+        opacity = 0.22;
+        strokeWidth = 1.0;
+      }
+
+      return {
+        id: e.id,
+        source: e.sourceNodeId,
+        target: e.targetNodeId,
+        label: showLabel ? (e.relationKey ?? undefined) : undefined,
+        animated,
+        style: {
+          stroke,
+          strokeWidth,
+          opacity,
+          transition: "opacity 0.2s ease, stroke-width 0.2s ease",
+        },
+        markerEnd: {
+          type: MarkerType.ArrowClosed,
+          color: isIncident ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.4)",
+        },
+      };
+    });
+  }, [rawEdges, relationFilter, selectedNodeId, isDense]);
 
   const run = useCallback(
     async (fn: () => Promise<unknown>) => {

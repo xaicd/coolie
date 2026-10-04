@@ -2143,7 +2143,7 @@ export class PostgresGraphStore implements GraphStore {
     const rows = await this.db.query<OntologyDomainRow>(
       `SELECT ${PostgresGraphStore.DOMAIN_COLS}
          FROM ${this.table("ontology_domains")}
-        WHERE company_id = $1 AND id = $2 AND is_deleted = false`,
+        WHERE company_id = $1 AND (id::text = $2 OR slug = $2) AND is_deleted = false`,
       [companyId, domainId],
     );
     return rows[0] ?? null;
@@ -4440,9 +4440,12 @@ export class PostgresGraphStore implements GraphStore {
          FROM ${this.table("ontology_sub_projects")} sp
          JOIN ${this.table("ontology_business_systems")} bs
            ON bs.company_id = sp.company_id AND bs.id = sp.business_system_id
+         JOIN ${this.table("ontology_domains")} d
+           ON d.company_id = bs.company_id AND d.id = bs.ontology_domain_id
         WHERE sp.company_id = $1
-          AND bs.ontology_domain_id = $2
+          AND (d.id::text = $2 OR d.slug = $2)
           AND sp.is_deleted = false
+          AND d.is_deleted = false
         ORDER BY sp.name ASC`,
       [companyId, domainId],
     );

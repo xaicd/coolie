@@ -450,7 +450,7 @@ describe("retiring a domain", () => {
     await expect(store.deleteDomain(COMPANY_ID, DOMAIN_ID)).resolves.toBe(true);
 
     const update = issued.find(
-      (s) => /UPDATE/i.test(s.sql) && s.sql.includes("ontology_domains"),
+      (s) => /\bUPDATE\s+/i.test(s.sql) && s.sql.includes("ontology_domains"),
     );
     expect(update?.sql).toContain("is_deleted = true");
     expect(update?.sql).toContain("deleted_at = now()");
@@ -481,7 +481,7 @@ describe("retiring a domain", () => {
 
     await expect(store.deleteDomain(COMPANY_ID, DOMAIN_ID)).resolves.toBe(false);
 
-    expect(issued.some((s) => /UPDATE/i.test(s.sql))).toBe(false);
+    expect(issued.some((s) => /\bUPDATE\s+/i.test(s.sql))).toBe(false);
     expect(issued.some((s) => s.sql.includes("ontology_audit_logs"))).toBe(false);
   });
 });

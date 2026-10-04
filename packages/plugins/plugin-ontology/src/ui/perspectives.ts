@@ -216,7 +216,7 @@ function resolveRuntime(input: PerspectiveInput): PerspectiveGraph {
       legend: [],
       legendAxis: "layer",
       emptyReason:
-        "还没有服务记录 — 目录扫描会识别 Maven/Gradle 模块与 spring.application.name,并在接入时写入。",
+        "还没有服务记录 — 目录扫描支持 Node.js/TypeScript (pnpm monorepo、package.json)、Java (Spring/Maven/Gradle)、Python、Go 微服务进程，可在「接入」中扫描工程目录或导入架构。",
     };
   }
 
@@ -279,7 +279,8 @@ function resolveDeployment(input: PerspectiveInput): PerspectiveGraph {
       edges: [],
       legend: [],
       legendAxis: "environment",
-      emptyReason: "还没有服务记录,因此没有可部署的对象。",
+      emptyReason:
+        "还没有服务记录，因此没有可部署的对象 — 可在「接入」中扫描工程目录或配置服务部署拓扑。",
     };
   }
 
