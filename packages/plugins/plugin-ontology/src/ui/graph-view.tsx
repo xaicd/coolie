@@ -141,26 +141,51 @@ import { relationEndpoints } from "@paperclipai/ontology-core/relationEndpoints.
 import { VIEW_ROLES } from "@paperclipai/ontology-core/views.js";
 import { describeProvenance, readSourceFiles } from "@paperclipai/ontology-core/provenance.js";
 
-type OntologyNodeData = { label: string; nodeKey: string; tone: string; typeName: string | null; dimmed?: boolean; fill?: string | null };
+type OntologyNodeData = {
+  label: string;
+  nodeKey: string;
+  tone: string;
+  typeName: string | null;
+  description?: string | null;
+  dimmed?: boolean;
+  fill?: string | null;
+};
 
 /**
  * Custom node: rounded card with a type-colored left accent bar and a type dot,
  * source/target handles for linking, and a native title tooltip showing the key
  * and type on hover.
  */
-const OntologyNode = memo(function OntologyNode({ data, selected }: NodeProps): ReactElement {
+const OntologyNode = memo(function OntologyNode({
+  data,
+  selected,
+  sourcePosition = Position.Right,
+  targetPosition = Position.Left,
+}: NodeProps): ReactElement {
   const d = data as OntologyNodeData;
-  const tip = d.typeName ? `${d.label} · ${d.nodeKey} · ${d.typeName}` : `${d.label} · ${d.nodeKey}`;
+  const tip = d.typeName
+    ? `${d.label} (${d.nodeKey}) · ${d.typeName}${d.description ? `\n${d.description}` : ""}`
+    : `${d.label} (${d.nodeKey})${d.description ? `\n${d.description}` : ""}`;
   // Cluster mode paints a tinted background behind the card so nodes of the
   // same type visually cluster even when their positions are layout-driven.
   const fillStyle = d.fill
     ? { background: `linear-gradient(180deg, ${d.fill}26, ${d.fill}10)` }
     : undefined;
+
+  // Subtitle display:
+  // In conceptual/architecture views, show a human-readable description or type category
+  // rather than a raw snake_case database table name.
+  const subtitle = d.description
+    ? d.description
+    : (d.typeName && d.typeName !== d.label)
+      ? d.typeName
+      : d.nodeKey;
+
   return (
     <div
       title={tip}
       className={[
-        "relative rounded-lg border px-3 py-2 pl-3.5 min-w-[128px] max-w-[220px] shadow-sm transition-colors",
+        "relative rounded-lg border px-3 py-2 pl-3.5 min-w-[130px] max-w-[240px] shadow-sm transition-colors",
         "bg-card text-foreground",
         selected ? "border-primary ring-1 ring-primary" : "border-border",
         d.dimmed ? "opacity-30" : "",
@@ -172,13 +197,15 @@ const OntologyNode = memo(function OntologyNode({ data, selected }: NodeProps): 
         className="absolute left-0 top-0 h-full w-1 rounded-l-lg"
         style={{ background: d.tone }}
       />
-      <Handle type="target" position={Position.Left} className="!h-2 !w-2 !border !border-border !bg-muted-foreground" />
+      <Handle type="target" position={targetPosition} className="!h-2 !w-2 !border !border-border !bg-muted-foreground" />
       <div className="flex items-center gap-1.5">
         <span aria-hidden className="h-2 w-2 shrink-0 rounded-full" style={{ background: d.tone }} />
         <span className="truncate text-(length:--text-compact) font-medium">{d.label}</span>
       </div>
-      <div className="truncate text-(length:--text-nano) text-muted-foreground">{d.nodeKey}</div>
-      <Handle type="source" position={Position.Right} className="!h-2 !w-2 !border !border-border !bg-muted-foreground" />
+      <div className="truncate text-(length:--text-nano) text-muted-foreground" title={d.description || d.nodeKey}>
+        {subtitle}
+      </div>
+      <Handle type="source" position={sourcePosition} className="!h-2 !w-2 !border !border-border !bg-muted-foreground" />
     </div>
   );
 });
@@ -208,6 +235,7 @@ function GraphCanvas({
   nodes: rawNodes,
   edges: rawEdges,
   nodeTypes: rawNodeTypes,
+  relationTypes: rawRelationTypes = [],
   onChanged,
   selectedNodeId,
   onSelectNode,
@@ -225,6 +253,7 @@ function GraphCanvas({
   nodes: GraphNode[];
   edges: GraphEdge[];
   nodeTypes: GraphNodeType[];
+  relationTypes?: GraphNodeType[];
   onChanged: () => void;
   selectedNodeId?: string | null;
   onSelectNode?: (nodeId: string | null) => void;
@@ -273,7 +302,7 @@ function GraphCanvas({
   // DS "关系过滤" — show only edges of one relation key (null = all).
   const [relationFilter, setRelationFilter] = useState<string | null>(null);
   // DS layout modes: radial / layered (by graph depth) / grid.
-  const [layout, setLayout] = useState<"radial" | "layered" | "grid">(structural ? "radial" : "grid");
+  const [layout, setLayout] = useState<"radial" | "layered" | "grid">(structural ? "layered" : "grid");
   // Connect mode toggle — surfaces node handles for drag-to-link.
   const [connectMode, setConnectMode] = useState(false);
   // Soft cluster by nodeType — off / group nodes of the same type together in
@@ -283,7 +312,9 @@ function GraphCanvas({
 
   // Adapt layout and trigger fitView when switching between structural perspectives and instances
   useEffect(() => {
-    if (!structural) {
+    if (structural) {
+      setLayout("layered");
+    } else {
       setLayout("grid");
     }
   }, [structural]);
@@ -311,9 +342,15 @@ function GraphCanvas({
     return m;
   }, [rawNodeTypes]);
 
+  const relTypeByKey = useMemo(() => {
+    const m = new Map<string, GraphNodeType>();
+    for (const rt of rawRelationTypes) m.set(rt.key, rt);
+    return m;
+  }, [rawRelationTypes]);
+
   // View-only layout positions (not persisted). Three strategies:
   //  - radial:  even circle with dynamic radius scaling to prevent node clumping
-  //  - layered: topological depth by incoming edges (DAG-ish flows)
+  //  - layered: topological depth by incoming edges (DAG-ish flows) with centered tier balance
   //  - grid:    clean responsive grid matrix
   const positions = useMemo(() => {
     const pos = new Map<string, { x: number; y: number }>();
@@ -336,7 +373,7 @@ function GraphCanvas({
         pos.set(nd.id, { x: 80 + (i % cols) * cellW, y: 60 + Math.floor(i / cols) * cellH });
       });
     } else {
-      // layered: compute depth = longest incoming path (BFS from roots)
+      // layered: compute depth = topological depth by incoming edges, with domain-aware hierarchy for conceptual architecture
       const incoming = new Map<string, string[]>();
       const outgoing = new Map<string, string[]>();
       for (const nd of rawNodes) { incoming.set(nd.id, []); outgoing.set(nd.id, []); }
@@ -344,14 +381,43 @@ function GraphCanvas({
         if (incoming.has(e.targetNodeId)) incoming.get(e.targetNodeId)!.push(e.sourceNodeId);
         if (outgoing.has(e.sourceNodeId)) outgoing.get(e.sourceNodeId)!.push(e.targetNodeId);
       }
+
+      // Domain-aware tier rankings for standard enterprise architecture layers:
+      const ARCH_TIERS: Record<string, number> = {
+        // Tier 0: 组织与主权
+        company_entity: 0,
+        department: 0,
+        // Tier 1: 人员与角色
+        employee: 1,
+        job_role: 1,
+        // Tier 2: 核心业务系统与资产
+        cmdb_business_system: 2,
+        skill_template: 2,
+        knowledge_document: 2,
+        // Tier 3: 授权、风控与治理
+        approval_workflow: 3,
+        governance_gate: 3,
+        approval_authority: 3,
+        // Tier 4: 执行、任务与基础设施
+        process_stage: 4,
+        work_task: 4,
+        cmdb_environment: 4,
+        cmdb_infrastructure_resource: 4,
+      };
+
       const depth = new Map<string, number>();
       const visiting = new Set<string>();
       const computeDepth = (id: string): number => {
         if (depth.has(id)) return depth.get(id)!;
+        const nd = rawNodes.find((n) => n.id === id);
+        if (nd && ARCH_TIERS[nd.key] !== undefined) {
+          depth.set(id, ARCH_TIERS[nd.key]);
+          return ARCH_TIERS[nd.key];
+        }
         if (visiting.has(id)) return 0; // cycle guard
         visiting.add(id);
         const parents = incoming.get(id) ?? [];
-        const d = parents.length === 0 ? 0 : 1 + Math.max(...parents.map(computeDepth));
+        const d = parents.length === 0 ? 0 : 1 + Math.max(0, ...parents.map(computeDepth));
         visiting.delete(id);
         depth.set(id, d);
         return d;
@@ -363,11 +429,21 @@ function GraphCanvas({
         if (!byLevel.has(d)) byLevel.set(d, []);
         byLevel.get(d)!.push(nd.id);
       }
-      for (const [level, ids] of byLevel) {
+
+      const sortedLevels = [...byLevel.keys()].sort((a, b) => a - b);
+      const maxNodesInLevel = Math.max(...[...byLevel.values()].map((v) => v.length), 1);
+      const cellW = 280;
+      const cellH = 150;
+      const totalW = maxNodesInLevel * cellW;
+
+      sortedLevels.forEach((level, rowIdx) => {
+        const ids = byLevel.get(level)!;
+        const rowW = ids.length * cellW;
+        const startX = Math.max(80, 80 + (totalW - rowW) / 2);
         ids.forEach((id, i) => {
-          pos.set(id, { x: 100 + i * 260, y: 60 + level * 160 });
+          pos.set(id, { x: startX + i * cellW, y: 60 + rowIdx * cellH });
         });
-      }
+      });
     }
 
     // Soft cluster: when active, snap each node's x/y into a deterministic
@@ -412,18 +488,21 @@ function GraphCanvas({
         id: nd.id,
         type: "ontology",
         position: positions.get(nd.id) ?? { x: 0, y: 0 },
+        sourcePosition: layout === "layered" ? Position.Bottom : Position.Right,
+        targetPosition: layout === "layered" ? Position.Top : Position.Left,
         selected: selectedNodeId != null && nd.id === selectedNodeId,
         data: {
           label: nd.label || nd.key,
           nodeKey: nd.key,
           tone: toneFor(nd.nodeTypeId),
           typeName: nt ? (nt.display_name || nt.key) : null,
+          description: typeof nd.properties?.description === "string" ? nd.properties.description : null,
           dimmed,
           fill: clusterTint,
         },
       } satisfies Node;
     });
-  }, [rawNodes, typeById, selectedNodeId, focusNodeTypeId, positions, clusterMode]);
+  }, [rawNodes, typeById, selectedNodeId, focusNodeTypeId, positions, clusterMode, layout]);
 
   // Distinct relation keys present on edges (for the filter dropdown).
   const relationKeys = useMemo(() => {
@@ -450,33 +529,37 @@ function GraphCanvas({
       // 3. This edge connects to the currently selected/focused node
       const showLabel = !isDense || relationFilter != null || isIncident;
 
+      const relDef = e.relationKey ? relTypeByKey.get(e.relationKey) : undefined;
+      const edgeLabel = relDef?.display_name || e.relationKey || undefined;
+
       // When a node is selected, dim unrelated edges and highlight connected ones
-      let opacity = 0.45;
-      let strokeWidth = 1.2;
-      let stroke = "hsl(var(--muted-foreground) / 0.4)";
+      let opacity = isDense ? 0.35 : 0.65;
+      let strokeWidth = 1.4;
+      let stroke = "var(--muted-foreground)";
       let animated = false;
 
       if (selectedNodeId != null) {
         if (isIncident) {
-          opacity = 0.95;
+          opacity = 1;
           strokeWidth = 2.5;
-          stroke = "hsl(var(--primary))";
+          stroke = "var(--primary)";
           animated = true;
         } else {
-          opacity = 0.08;
-          strokeWidth = 0.8;
-          stroke = "hsl(var(--muted-foreground) / 0.15)";
+          opacity = 0.12;
+          strokeWidth = 1.0;
+          stroke = "var(--muted-foreground)";
         }
-      } else if (isDense) {
-        opacity = 0.22;
-        strokeWidth = 1.0;
       }
 
       return {
         id: e.id,
         source: e.sourceNodeId,
         target: e.targetNodeId,
-        label: showLabel ? (e.relationKey ?? undefined) : undefined,
+        label: showLabel ? edgeLabel : undefined,
+        labelStyle: { fill: "var(--foreground)", fontSize: 11, fontWeight: 500 },
+        labelBgStyle: { fill: "var(--card)", fillOpacity: 0.9 },
+        labelBgPadding: [4, 2] as [number, number],
+        labelBgBorderRadius: 4,
         animated,
         style: {
           stroke,
@@ -486,11 +569,13 @@ function GraphCanvas({
         },
         markerEnd: {
           type: MarkerType.ArrowClosed,
-          color: isIncident ? "hsl(var(--primary))" : "hsl(var(--muted-foreground) / 0.4)",
+          color: isIncident ? "var(--primary)" : "var(--muted-foreground)",
+          width: 14,
+          height: 14,
         },
       };
     });
-  }, [rawEdges, relationFilter, selectedNodeId, isDense]);
+  }, [rawEdges, relationFilter, selectedNodeId, isDense, relTypeByKey]);
 
   const run = useCallback(
     async (fn: () => Promise<unknown>) => {
@@ -734,7 +819,10 @@ function GraphCanvas({
                 className="h-7 bg-transparent px-1 text-(length:--text-nano) text-foreground outline-none"
               >
                 <option value="">{t("全部关系", "All relations")}</option>
-                {relationKeys.map((rk) => <option key={rk} value={rk}>{rk}</option>)}
+                {relationKeys.map((rk) => {
+                  const label = relTypeByKey.get(rk)?.display_name || rk;
+                  return <option key={rk} value={rk}>{label}</option>;
+                })}
               </select>
             </div>
           )}
@@ -1343,6 +1431,7 @@ export function GraphView(props: GraphViewProps): ReactElement {
               nodes={structural ? perspectiveGraph!.nodes : props.nodes}
               edges={structural ? perspectiveGraph!.edges : props.edges}
               nodeTypes={structural ? perspectiveGraph!.legend : nodeTypeDefs}
+              relationTypes={relationTypeDefs}
               fill={embedded}
               structural={structural}
               isDomainEmpty={props.isDomainEmpty}
