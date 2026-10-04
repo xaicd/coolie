@@ -1362,6 +1362,9 @@ function HomeScreen({
               onOpenWebOntology={(subPath?: string, title?: string) =>
                 setWebContainerTarget({ path: subPath || "/ontology", title: title || "本体可视化设计器" })
               }
+              onOpenWebGovernance={(subPath?: string, title?: string) =>
+                setWebContainerTarget({ path: subPath || "/governance", title: title || "架构治理工作台" })
+              }
               onOpenSchemaEditor={(typeId, displayName) =>
                 setSchemaEditorType({ typeId, displayName })
               }

@@ -13,13 +13,14 @@ import { C } from "../coolie";
 import { RADIUS } from "../ui/tokens";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { OntologyDomainListScreen } from "./OntologyDomainListScreen";
+import { ArchitectureGovernanceScreen } from "./ArchitectureGovernanceScreen";
 import { ProjectsScreen } from "./ProjectsScreen";
 import { AgentsScreen } from "./AgentsScreen";
 import { ArtifactsScreen } from "./ArtifactsScreen";
 import type { SandboxScope } from "./PrototypeSandboxScreen";
 import { PluginOrgSwitcher } from "../components/PluginOrgSwitcher";
 
-export type OrgAssetTab = "ontology" | "projects" | "agents" | "artifacts";
+export type OrgAssetTab = "ontology" | "architecture" | "projects" | "agents" | "artifacts";
 
 interface OrgAssetsScreenProps {
   company: Company;
@@ -33,6 +34,7 @@ interface OrgAssetsScreenProps {
   onCreateTaskForProject?: (project: Project) => void;
   onOpenWebProjects?: (path?: string, title?: string) => void;
   onOpenWebOntology?: (path?: string, title?: string) => void;
+  onOpenWebGovernance?: (path?: string, title?: string) => void;
   onOpenSchemaEditor?: (typeId: string, displayName: string) => void;
   onOpenInstanceGraph?: (typeId: string, displayName: string) => void;
   onOpenWorkbench?: () => void;
@@ -50,10 +52,11 @@ interface OrgAssetsScreenProps {
 }
 
 const TAB_OPTIONS: Array<{ key: OrgAssetTab; label: string }> = [
-  { key: "ontology", label: "🧠 业务本体" },
-  { key: "projects", label: "📁 项目中心" },
-  { key: "agents", label: "👥 数字员工" },
-  { key: "artifacts", label: "📦 交付产物" },
+  { key: "ontology", label: "🧠 本体" },
+  { key: "architecture", label: "📐 架构" },
+  { key: "projects", label: "📁 项目" },
+  { key: "agents", label: "👥 员工" },
+  { key: "artifacts", label: "📦 产物" },
 ];
 
 /**
@@ -75,6 +78,7 @@ export function OrgAssetsScreen({
   onCreateTaskForProject,
   onOpenWebProjects,
   onOpenWebOntology,
+  onOpenWebGovernance,
   onOpenSchemaEditor,
   onOpenInstanceGraph,
   onOpenWorkbench,
@@ -160,6 +164,16 @@ export function OrgAssetsScreen({
             onOpenWebOntology={() => onOpenWebOntology?.("/ontology", "本体可视化设计器")}
             onOpenSchemaEditor={onOpenSchemaEditor}
             onOpenInstanceGraph={onOpenInstanceGraph}
+          />
+        )}
+
+        {activeTab === "architecture" && (
+          <ArchitectureGovernanceScreen
+            company={company}
+            whoami={whoami}
+            onOpenProjectTasks={onOpenProjectTasks}
+            onOpenWebGovernance={onOpenWebGovernance}
+            onOpenWebOntology={onOpenWebOntology}
           />
         )}
 

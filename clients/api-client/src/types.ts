@@ -1371,3 +1371,53 @@ export interface InboxFeed {
   mentionedBy: InboxMentionItem[];
 }
 
+/** CMMI 架构治理单项检查条目 */
+export interface GovernanceGateCheck {
+  id: string;
+  title: string;
+  passed: boolean;
+  standard: string;
+  evidenceRef?: string | null;
+}
+
+/** CMMI 架构治理单道门禁 (G1~G5) */
+export interface GovernanceGate {
+  id: string;
+  name: string;
+  code: string;
+  role: string;
+  status: "passed" | "blocked" | "pending" | "waived";
+  description: string;
+  checks: GovernanceGateCheck[];
+  waiverApproval?: {
+    id: string;
+    status: string;
+    decisionNote?: string | null;
+    decidedByUserId?: string | null;
+    createdAt: string;
+  } | null;
+}
+
+/** CMMI 架构治理大盘态势与指标数据 */
+export interface GovernanceSummary {
+  companyId: string;
+  projectId: string | null;
+  projectName: string;
+  metrics: {
+    totalIssues: number;
+    completedIssues: number;
+    blockedIssues: number;
+    inProgressIssues: number;
+    milestoneCount: number;
+    healthScore: number;
+  };
+  gates: GovernanceGate[];
+  recentWaivers?: Array<{
+    id: string;
+    gateId: string;
+    status: string;
+    decisionNote?: string | null;
+    createdAt: string;
+  }>;
+}
+

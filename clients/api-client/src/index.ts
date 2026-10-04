@@ -171,5 +171,8 @@ export type {
   PluginStatus,
   PluginConfig,
   PluginConfigField,
+  GovernanceGateCheck,
+  GovernanceGate,
+  GovernanceSummary,
 } from "./types";
 

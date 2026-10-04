@@ -60,6 +60,7 @@ import {
   type ResolveApprovalOptions,
   type GitCredential,
   type SaveGitCredentialInput,
+  type GovernanceSummary,
 } from "./types";
 import { isRenderableBoardMessage } from "./board-chat";
 
@@ -1044,6 +1045,21 @@ export class CoolieClient {
       }
       throw err;
     }
+  }
+
+  /**
+   * CMMI 架构治理大盘态势与质量门禁概览
+   * GET /api/companies/:companyId/governance/summary?projectId=...
+   */
+  async getGovernanceSummary(
+    companyId: string,
+    projectId?: string | null,
+  ): Promise<GovernanceSummary> {
+    const q = projectId ? `?projectId=${encodeURIComponent(projectId)}` : "";
+    return this.request<GovernanceSummary>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/governance/summary${q}`,
+    );
   }
 
   /**
