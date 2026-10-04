@@ -180,15 +180,15 @@
 1. 听老板说 → 关键字 → 查 §3 一句话派活表
 2. 锁定 CMMI Phase + 任务 → 查 §2 25 任务路由表
 3. 取"主员工" → 查 §1 工具真值
-4. 写 brief 7 要素 (§6 模板) → 存 ~/bin/dispatch-waveXXX.sh
-5. 跑 bash ~/bin/dispatch-waveXXX.sh
-6. ~/bin/monitor-waveXXX.sh 看跑完
+4. 写 brief 7 要素 (§6 模板)
+5. 派活并轨: 调 bash scripts/hermes-boss-intent-dispatcher.sh "<老板需求>" 秒级建立 Dev Server (3100) 工单，由宿主机后台 Runner Bridge 自动认领执行 (严禁在 Hermes terminal 同步阻塞干等)
+6. 查看进度: 通过 /api/companies/.../issues 或 cron 监控自动回读状态
 7. 5 字段表回报老板 (§7)
 ```
 
 ---
 
-## 5. 派单纪律 — 4 条硬规矩
+## 5. 派单纪律 — 5 条硬规矩
 
 | # | 规矩 | 来源 |
 |---|---|---|
@@ -196,8 +196,10 @@
 | 2 | brief 7 要素缺一 → cmd 拒接 | PM-DISPATCH-RULES §1 (已并入 §6) |
 | 3 | 老板说"紧急" → 切门神 cmd, 老板不亲自跑 | wave229 修正 |
 | 4 | 老板金标 = 1% 装真机 → 门神 cmd 跑通, 老板看 PM 截图/录屏 | wave229 |
+| 5 | **派活通道并轨控制面**: 严禁在 Hermes 终端同步阻塞运行代码执行(必受180s超时强杀); 统一生成 Dev Server 工单, 由后台 Runner Bridge 异步调度消费 | wave297 架构方案 B |
 
 ### 5.1 PM 反向约束 (ex HOW-TO-DELEGATE §8)
+- **PM 不在终端直接阻塞跑大活** — 微信终端工具仅限 0.5s 秒级派单/查询，工程执行交给后台 Runner
 - **PM 不写代码** — 紧急例外见 §I
 - **老板不直接派员工** — 老板只对 Hermes, 不直接 @员工 (wave229)
 - **员工不互派** — 5 员工之间不直接派活, 都走 PM
