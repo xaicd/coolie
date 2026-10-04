@@ -406,79 +406,8 @@ function OntologyWorkbench({ companyId }: { companyId: string }): ReactElement {
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-      {/* ── Top Header ── */}
-      {view === "domains" ? (
-        /* Single-row header for Domain Management */
-        <div className="flex h-11 shrink-0 items-center justify-between border-b border-border bg-card px-4">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary text-[15px] font-semibold">
-              ◫
-            </span>
-            <div className="flex items-center gap-2">
-              <span className="text-(length:--text-compact) font-semibold text-foreground">
-                {t("业务本体库", "Ontology Catalog")}
-              </span>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-(length:--text-nano) font-medium text-muted-foreground">
-                {domains.length} {t("个本体域", "domains")}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2">
-            {/* 企业基座域 — initializes the enterprise core context and CMDB domain */}
-            <button
-              onClick={() => { void runSeedDomains(["enterprise-core"]); }}
-              disabled={seeding}
-              title={t(
-                "初始化企业组织架构、员工/数字工匠、审批流、资料与CMDB基础设施底座核心域",
-                "Initialize enterprise core domain (organizations, employees/agents, approvals, documentation, CMDB & infra)",
-              )}
-              className="flex items-center gap-1 rounded-md border border-primary/30 bg-primary/10 px-2.5 py-1 text-(length:--text-compact) font-medium text-primary hover:bg-primary/20 disabled:opacity-50"
-            >
-              <span className="text-[13px] leading-none">🏢</span>
-              {t("企业基座域", "Enterprise Core")}
-            </button>
-
-            {/* 行业样例 */}
-            <button
-              onClick={() => { void runSeedDomains(); }}
-              disabled={seeding}
-              title={t(
-                "载入内置行业样例域(零售、电商、金融、医疗、制造、教育、供应链)。已存在的域会被跳过,不会覆盖。",
-                "Load the built-in industry sample domains (retail, e-commerce, finance, healthcare, manufacturing, education, supply chain). Existing domains are skipped, never overwritten.",
-              )}
-              className="flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1 text-(length:--text-compact) font-medium text-foreground hover:border-primary hover:text-primary disabled:opacity-50"
-            >
-              <span className="text-[13px] leading-none">✨</span>
-              {t("行业样例", "Samples")}
-            </button>
-            {seedMsg && (
-              <span className="text-(length:--text-nano) text-muted-foreground">{seedMsg}</span>
-            )}
-
-            {/* 接入旧系统 */}
-            <button
-              onClick={() => setWizardOpen(true)}
-              title={t("4 步接入存量旧系统", "4-step legacy import wizard")}
-              className="flex items-center gap-1 rounded-md border border-border bg-background px-2.5 py-1 text-(length:--text-compact) font-medium text-foreground hover:border-primary hover:text-primary"
-            >
-              <span className="text-[13px] leading-none">⚡</span>
-              {t("接入旧系统", "Import")}
-            </button>
-
-            {/* 新建本体域 */}
-            <button
-              onClick={() => setShowNewDomain(true)}
-              title={t("新建本体域", "Create a new ontology domain")}
-              className="flex items-center gap-1 rounded-md border border-dashed border-primary/50 bg-primary/5 px-2.5 py-1 text-(length:--text-compact) font-medium text-primary transition-colors hover:bg-primary/10"
-            >
-              <span className="text-[13px] leading-none">＋</span>
-              {t("新建本体域", "New Domain")}
-            </button>
-          </div>
-        </div>
-      ) : (
-        /* Two-row header for Domain Workbench */
+      {/* ── Top Header (Only rendered in Domain Workbench when viewing a specific domain) ── */}
+      {view !== "domains" && (
         <>
           {/* Row 1 — Back to list · Domain switcher · Primary 4 views (Graph, Table, Schema, Cockpit) · Actions */}
           <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
