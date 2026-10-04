@@ -20,6 +20,7 @@ import {
   useMemo,
   useRef,
   useState,
+  memo,
   type DragEvent as ReactDragEvent,
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
@@ -147,7 +148,7 @@ type OntologyNodeData = { label: string; nodeKey: string; tone: string; typeName
  * source/target handles for linking, and a native title tooltip showing the key
  * and type on hover.
  */
-function OntologyNode({ data, selected }: NodeProps): ReactElement {
+const OntologyNode = memo(function OntologyNode({ data, selected }: NodeProps): ReactElement {
   const d = data as OntologyNodeData;
   const tip = d.typeName ? `${d.label} · ${d.nodeKey} · ${d.typeName}` : `${d.label} · ${d.nodeKey}`;
   // Cluster mode paints a tinted background behind the card so nodes of the
@@ -159,7 +160,7 @@ function OntologyNode({ data, selected }: NodeProps): ReactElement {
     <div
       title={tip}
       className={[
-        "relative rounded-lg border px-3 py-2 pl-3.5 min-w-[128px] max-w-[220px] shadow-sm transition-all",
+        "relative rounded-lg border px-3 py-2 pl-3.5 min-w-[128px] max-w-[220px] shadow-sm transition-colors",
         "bg-card text-foreground",
         selected ? "border-primary ring-1 ring-primary" : "border-border",
         d.dimmed ? "opacity-30" : "",
@@ -180,7 +181,7 @@ function OntologyNode({ data, selected }: NodeProps): ReactElement {
       <Handle type="source" position={Position.Right} className="!h-2 !w-2 !border !border-border !bg-muted-foreground" />
     </div>
   );
-}
+});
 
 const nodeTypes = { ontology: OntologyNode };
 
@@ -576,6 +577,11 @@ function GraphCanvas({
         nodeTypes={nodeTypes}
         onConnect={onConnect}
         nodesConnectable={connectMode}
+        nodesDraggable={!connectMode}
+        onlyRenderVisibleElements
+        elevateNodesOnSelect={false}
+        minZoom={0.15}
+        maxZoom={2.5}
         fitView
         proOptions={{ hideAttribution: true }}
         onNodeClick={(_e, node) => onSelectNode?.(node.id)}
