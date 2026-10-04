@@ -115,6 +115,7 @@ describe("Agent Automation Framework (@paperclipai/agent-automation)", () => {
     it("should execute Governance Waiver test playbook end-to-end via FDSE (门神)", async () => {
       const report = await runner.run(governanceWaiverTestPlaybook, "fdse");
       expect(report.status).toBe("passed");
+      expect(report.environment).toBe("local"); // 测试作业绑定本地环境
       expect(report.persona).toContain("门神");
       expect(report.steps.length).toBe(6);
       expect(report.steps.every((s) => s.status === "passed")).toBe(true);
@@ -123,6 +124,7 @@ describe("Agent Automation Framework (@paperclipai/agent-automation)", () => {
     it("should execute Governance Patrol ops playbook via PRE-SRE (兑底渊)", async () => {
       const report = await runner.run(governancePatrolOpsPlaybook, "pre-sre");
       expect(report.status).toBe("passed");
+      expect(report.environment).toBe("production"); // 运营巡检绑定生产环境
       expect(report.persona).toContain("兑底渊");
       expect(report.steps.length).toBe(3);
     });
@@ -130,6 +132,7 @@ describe("Agent Automation Framework (@paperclipai/agent-automation)", () => {
     it("should execute Inbox & Approvals test playbook via DS (百晓生)", async () => {
       const report = await runner.run(inboxApprovalsTestPlaybook, "ds");
       expect(report.status).toBe("passed");
+      expect(report.environment).toBe("local"); // 测试作业绑定本地环境
       expect(report.persona).toContain("百晓生");
       expect(report.steps.length).toBe(3);
     });
@@ -137,6 +140,7 @@ describe("Agent Automation Framework (@paperclipai/agent-automation)", () => {
     it("should execute Inbox Triage ops playbook via Web Ops", async () => {
       const report = await runner.run(inboxTriageOpsPlaybook, "ops-web");
       expect(report.status).toBe("passed");
+      expect(report.environment).toBe("production"); // 运营打理绑定生产环境
       expect(report.persona).toContain("Web 运营");
     });
 

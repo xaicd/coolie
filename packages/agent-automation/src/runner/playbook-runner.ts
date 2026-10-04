@@ -1,5 +1,6 @@
 import type {
   AutomationContext,
+  AutomationEnvironment,
   PlaybookDefinition,
   PlaybookExecutionReport,
   StepExecutionResult,
@@ -9,6 +10,7 @@ import { DeviceDriver } from "../drivers/device-driver.js";
 import { getPersona } from "../personas/catalog.js";
 
 export interface RunnerOptions {
+  environment?: AutomationEnvironment; // 显式指定环境：local | production
   baseUrl?: string;
   companyId?: string;
   dryRun?: boolean;
@@ -21,7 +23,6 @@ export class PlaybookRunner {
 
   constructor(options: RunnerOptions = {}) {
     this.options = {
-      baseUrl: options.baseUrl ?? "http://localhost:3100",
       mockMode: options.mockMode ?? true,
       ...options,
     };
@@ -32,6 +33,16 @@ export class PlaybookRunner {
     const persona = getPersona(personaId);
     const startedAt = new Date().toISOString();
     const startTime = Date.now();
+
+    // 核心环境决策：测试默认 local，运营默认 production
+    const environment: AutomationEnvironment = this.options.environment
+      ?? (playbook.targetEnvironment && playbook.targetEnvironment !== "both" ? playbook.targetEnvironment : undefined)
+      ?? (playbook.kind === "operations" ? "production" : "local");
+
+    const effectiveBaseUrl = this.options.baseUrl
+      ?? (environment === "production"
+        ? (process.env.PROD_API_BASE ?? "https://xrobinai.cn")
+        : (process.env.LOCAL_API_BASE ?? "http://localhost:3100"));
 
     const browser = (playbook.engine === "browser" || playbook.engine === "hybrid")
       ? new BrowserDriver({ mockMode: this.options.mockMode })
@@ -45,15 +56,17 @@ export class PlaybookRunner {
     const screenshots: Array<{ name: string; path: string }> = [];
 
     const context: AutomationContext = {
-      baseUrl: this.options.baseUrl!,
+      environment,
+      baseUrl: effectiveBaseUrl,
       companyId: this.options.companyId,
       personaId: persona.id,
       engine: playbook.engine,
       dryRun: this.options.dryRun,
+      isProductionReadOnly: environment === "production",
       browser,
       device,
       state,
-      log: (msg) => {
+      log: (_msg) => {
         // 可插拔日志输出
       },
       recordScreenshot: (name, path) => {
@@ -115,6 +128,7 @@ export class PlaybookRunner {
       kind: playbook.kind,
       persona: `${persona.name} (${persona.title})`,
       engine: playbook.engine,
+      environment,
       targetDomain: playbook.targetDomain,
       status: playbookPassed ? "passed" : "failed",
       startedAt,

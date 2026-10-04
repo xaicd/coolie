@@ -1,5 +1,7 @@
 export type AutomationEngine = "browser" | "device" | "hybrid";
 
+export type AutomationEnvironment = "local" | "production";
+
 export type PlaybookKind = "testing" | "operations";
 
 export interface DriverActionOptions {
@@ -39,6 +41,7 @@ export interface PlaybookMetadata {
   targetDomain: string; // e.g. "governance", "inbox", "ontology", "mobile-app"
   kind: PlaybookKind;
   preferredPersona: string; // e.g. "ds", "fdse", "pre-sre", "fda", "ops-web", "ops-mobile"
+  targetEnvironment?: AutomationEnvironment | "both"; // 测试默认 local，运营默认 production
   engine: AutomationEngine;
   tags: string[];
 }
@@ -61,6 +64,7 @@ export interface PlaybookExecutionReport {
   kind: PlaybookKind;
   persona: string;
   engine: AutomationEngine;
+  environment: AutomationEnvironment;
   targetDomain: string;
   status: "passed" | "failed";
   startedAt: string;
@@ -72,11 +76,13 @@ export interface PlaybookExecutionReport {
 }
 
 export interface AutomationContext {
+  environment: AutomationEnvironment;
   baseUrl: string;
   companyId?: string;
   personaId: string;
   engine: AutomationEngine;
   dryRun?: boolean;
+  isProductionReadOnly?: boolean;
   browser?: import("./drivers/browser-driver.js").BrowserDriver;
   device?: import("./drivers/device-driver.js").DeviceDriver;
   state: Map<string, unknown>;

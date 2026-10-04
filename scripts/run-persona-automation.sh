@@ -12,6 +12,7 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PERSONA="all"
 SCENARIO=""
 KIND=""
+TARGET_ENV=""
 DRY_RUN="false"
 
 while [[ $# -gt 0 ]]; do
@@ -28,6 +29,10 @@ while [[ $# -gt 0 ]]; do
       KIND="${1#*=}"
       shift
       ;;
+    --env=*)
+      TARGET_ENV="${1#*=}"
+      shift
+      ;;
     --dry-run)
       DRY_RUN="true"
       shift
@@ -39,16 +44,27 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       echo "未知参数: $1"
-      echo "用法: scripts/run-persona-automation.sh [--persona=ds|fdse|pre-sre|fda|ops-web|ops-mobile] [--scenario=<id>] [--all]"
+      echo "用法: scripts/run-persona-automation.sh [--env=local|production] [--persona=ds|fdse|pre-sre|fda|ops-web|ops-mobile] [--scenario=<id>] [--all]"
       exit 1
       ;;
   esac
 done
 
+if [[ -z "$TARGET_ENV" ]]; then
+  if [[ "$KIND" == "testing" ]]; then
+    TARGET_ENV="local (本地靶场 http://localhost:3100)"
+  elif [[ "$KIND" == "operations" ]]; then
+    TARGET_ENV="production (生产环境 https://xrobinai.cn)"
+  else
+    TARGET_ENV="auto (测试作业->本地 local，运营巡检->生产 production)"
+  fi
+fi
+
 echo "=== [Coolie Persona Automation] 数字员工自动化测试与运营调度器 ==="
-echo "Persona:   $PERSONA"
-echo "Scenario:  ${SCENARIO:-"(自动匹配)"}"
-echo "Kind:      ${KIND:-"(全量)"}"
+echo "Environment: $TARGET_ENV"
+echo "Persona:     $PERSONA"
+echo "Scenario:    ${SCENARIO:-"(自动匹配)"}"
+echo "Kind:        ${KIND:-"(全量)"}"
 echo "--------------------------------------------------------"
 
 # 运行 Vitest 测试套件
