@@ -33,6 +33,9 @@ description: >
 4. **自己写测试**
    - 自己写单测与 E2E，不外包给「测试角色」。
    - 理由：写测试的人不知道边界在哪，就会写出只覆盖 happy path 的测试。
+5. **Agent-Native 语义与防穿透 (wave296)**
+   - 交互元素必带 `data-agent-target` 与 `data-agent-state`，移动端必带结构化 `testID`；
+   - 多层弹窗必挂 `inert` 或 `accessibilityViewIsModal`，杜绝节点噪声与触控穿透。
 
 ## 二、门禁（Gate G3 自测）
 
@@ -43,6 +46,8 @@ description: >
 | 状态分支 | 每个非默认分支都有覆盖证据 |
 | 死穴按钮 | 无「渲染了但无行为」的动作 |
 | 异常 | 无未捕获异常，每个失败有明确去向 |
+| Token 规范 | 运行 `pnpm check:token-gates` 0 违规 |
+| Agent 规范 | 运行 `bash scripts/check-agent-native-ui.sh` 新增组件 100% 标注 |
 | 证据 | 真实例（浏览器 / 真库）证据，非仅单测 |
 
 **G3 的证据必须独立于 G2 的 typecheck；「编译过了」不等于「自测过了」。**
@@ -56,11 +61,15 @@ grep -rn "onClick" ui/src --include="*.tsx" | grep -i "console\|开发中\|TODO"
 # 2. 找缺失失败去向的 await
 grep -rn "await " ui/src server/src --include="*.ts*" | grep -v "catch\|try" | head -20
 
-# 3. 跑自己写的单测 + E2E
+# 3. 检查 UI Token 规范与 Agent-Native 符合度
+pnpm check:token-gates
+bash scripts/check-agent-native-ui.sh
+
+# 4. 跑自己写的单测 + E2E
 pnpm test && pnpm test:e2e
 ```
 
-判据：第 1 条出现即红；第 2 条需逐条确认有失败去向；第 3 条非零退出即红。
+判据：第 1 条出现即红；第 2 条需逐条确认有失败去向；第 3 条非零退出即红；第 4 条单测与 E2E 必须跑绿。
 
 ## 四、必交付物
 

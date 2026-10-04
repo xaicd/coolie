@@ -69,3 +69,26 @@ Use active voice as default. A CTA says exactly what happens when it is used: "S
 Treat failure and emptiness as moments for direction, not mood. Explain what went wrong and how to fix it, in the interface's voice rather than a person's. Errors don't apologize, and they are never vague about what happened. An empty screen is an invitation to act.
 
 Keep the tone conversational: plain verbs, sentence case, no filler, with tone matched to the brand and the audience. Let each written element do exactly one job.
+
+---
+
+## Coolie 专属设计系统与工程铁律 (Coolie Design System)
+
+在本项目（Coolie / Paperclip）中进行前端开发，除了通用审美，**必须严格遵守以下三大硬核工程规范**（见 `DESIGN.md` 与 `AGENTS.md`）：
+
+### 1. Token-Only 铁律（严禁硬编码色值与间距）
+- 唯一 Token 来源：`ui/src/index.css`（Tailwind v4 `@theme`）。
+- 严禁在组件中内联十六进制色值（`#FFFFFF`）、裸像素值（`16px`、`w-[240px]`）或裸字体大小。
+- 门禁守卫：提交前必须运行 `pnpm check:token-gates`，违规立即阻断。
+
+### 2. Form & Wizard Footers 左右对齐铁律
+- 表单、向导和抽屉的底部操作栏：**Save & exit（或取消/返回）必须居左，主操作（保存/继续/连接）必须居右**，处于同一垂直居中对齐的单行容器中。
+- 每个步骤拥有自己完整的 footer，严禁在下方追加多余的独立操作行。
+
+### 3. Agent-Native 交互与弹窗隔离协议 (wave296)
+所有前端组件必须对自动化 Agent 友好：
+- **Web 目标契约**：所有可点击控件提供 `data-agent-target="<module>:<action>"` 与 `data-agent-state="ready|loading|disabled"`；
+- **作用域隔离**：容器提供 `data-agent-scope="<scope-id>"`，根节点提供 `data-agent-page-ready="true"`；
+- **弹窗遮挡剪枝**：多层 Modal / Drawer 打开时，底层非活跃容器必须打上 `inert` 属性，消除 DOM 噪声；
+- **移动端原生**：使用 `[Screen]__[Component]__[Action]` 的结构化 `testID`，Modal 必须声明 `accessibilityViewIsModal={true}`；
+- **门禁守卫**：运行 `bash scripts/check-agent-native-ui.sh` 审查合规率。
