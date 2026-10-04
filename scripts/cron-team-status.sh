@@ -449,7 +449,26 @@ function getToolHealthAlert() {
 for (const file of files.slice(0, 15)) {
   try {
     const r = JSON.parse(fs.readFileSync(file, "utf8"));
-    if (r.status === "running") running.push(r);
+    if (r.status === "running") {
+      let isAlive = false;
+      if (r.pid && !isNaN(Number(r.pid))) {
+        try {
+          process.kill(Number(r.pid), 0);
+          isAlive = true;
+        } catch (e) {
+          isAlive = false;
+        }
+      }
+      if (isAlive) {
+        running.push(r);
+      } else {
+        r.status = "failed";
+        r.blockedReason = r.blockedReason || "进程意外终止(已退出)";
+        r.completedAt = r.completedAt || new Date().toISOString();
+        try { fs.writeFileSync(file, JSON.stringify(r, null, 2), "utf8"); } catch (e) {}
+        blocked.push(r);
+      }
+    }
     else if (r.status === "blocked" || r.status === "failed") blocked.push(r);
     else if (r.status === "done") done.push(r);
   } catch (e) {}
