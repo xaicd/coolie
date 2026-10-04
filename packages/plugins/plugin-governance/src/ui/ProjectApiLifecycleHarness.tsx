@@ -210,98 +210,97 @@ export function ProjectApiLifecycleHarness({
   }, [selectedApi, codeStubTarget]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* 头部导航与战略指引 */}
-      <div className="rounded-lg border border-border bg-card p-5">
+      <div className="rounded-lg border border-border bg-card p-3">
         <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center justify-center rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
-                DSH 核心能力
-              </span>
-              <h3 className="text-base font-semibold text-foreground">
-                API 全生命周期研发与交付体系 ({projectName})
-              </h3>
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              业务最细粒度交付单元 · 强绑定领域本体 · 支持 HTTP / gRPC / Dubbo / MQ · 自动投影 MCP Tools · CMMI G1~G5 闭环
-            </p>
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center rounded bg-primary/10 px-1.5 py-0.2 text-[10px] font-semibold text-primary">
+              DSH
+            </span>
+            <h3 className="text-xs font-bold text-foreground">
+              API 全生命周期研发体系 ({projectName})
+            </h3>
+            <span className="text-[11px] text-muted-foreground hidden sm:inline">
+              · 绑定领域本体 · 投影 MCP Tools · CMMI G1~G5 闭环
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
               onClick={handleSimulateMock}
-              className="inline-flex items-center gap-1.5 rounded-md bg-secondary px-3 py-1.5 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors"
+              className="inline-flex items-center gap-1 rounded border border-border bg-secondary px-2.5 py-1 text-xs font-medium text-secondary-foreground hover:bg-secondary/80 transition-colors cursor-pointer shrink-0"
+              title="DSH 智能 Mock 联调"
             >
-              <span>⚡</span> DSH 智能 Mock 联调
+              <span>测试</span>
             </button>
           </div>
         </div>
 
         {/* 态势统计横条 */}
-        <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-6 border-t border-border pt-4">
-          <div className="rounded-md border border-border/60 bg-muted/30 p-2.5">
-            <div className="text-xs text-muted-foreground">API 契约总数</div>
-            <div className="text-lg font-bold text-foreground">{stats.total} 个</div>
+        <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-6 border-t border-border pt-2.5">
+          <div className="rounded border border-border/60 bg-muted/30 p-2">
+            <div className="text-[10px] text-muted-foreground">API 总数</div>
+            <div className="text-sm font-bold text-foreground">{stats.total}</div>
           </div>
-          <div className="rounded-md border border-border/60 bg-muted/30 p-2.5">
-            <div className="text-xs text-muted-foreground">联调 Mock 态</div>
-            <div className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{stats.mocking} 个</div>
+          <div className="rounded border border-border/60 bg-muted/30 p-2">
+            <div className="text-[10px] text-muted-foreground">联调态</div>
+            <div className="text-sm font-bold text-yellow-600 dark:text-yellow-400">{stats.mocking}</div>
           </div>
-          <div className="rounded-md border border-border/60 bg-muted/30 p-2.5">
-            <div className="text-xs text-muted-foreground">已编码实现</div>
-            <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{stats.implemented} 个</div>
+          <div className="rounded border border-border/60 bg-muted/30 p-2">
+            <div className="text-[10px] text-muted-foreground">实现态</div>
+            <div className="text-sm font-bold text-blue-600 dark:text-blue-400">{stats.implemented}</div>
           </div>
-          <div className="rounded-md border border-border/60 bg-muted/30 p-2.5">
-            <div className="text-xs text-muted-foreground">契约验证通过 (G4)</div>
-            <div className="text-lg font-bold text-emerald-600 dark:text-emerald-400">{stats.verified} 个</div>
+          <div className="rounded border border-border/60 bg-muted/30 p-2">
+            <div className="text-[10px] text-muted-foreground">已验收</div>
+            <div className="text-sm font-bold text-emerald-600 dark:text-emerald-400">{stats.verified}</div>
           </div>
-          <div className="rounded-md border border-border/60 bg-muted/30 p-2.5">
-            <div className="text-xs text-muted-foreground">已投产交付 (G5)</div>
-            <div className="text-lg font-bold text-primary">{stats.delivered} 个</div>
+          <div className="rounded border border-border/60 bg-muted/30 p-2">
+            <div className="text-[10px] text-muted-foreground">已交付</div>
+            <div className="text-sm font-bold text-primary">{stats.delivered}</div>
           </div>
-          <div className="rounded-md border border-border/60 bg-muted/30 p-2.5">
-            <div className="text-xs text-muted-foreground">DSH MCP 投影</div>
-            <div className="text-lg font-bold text-purple-600 dark:text-purple-400">{stats.mcpCount} 个工具</div>
+          <div className="rounded border border-border/60 bg-muted/30 p-2">
+            <div className="text-[10px] text-muted-foreground">MCP 投影</div>
+            <div className="text-sm font-bold text-purple-600 dark:text-purple-400">{stats.mcpCount}</div>
           </div>
         </div>
       </div>
 
-      {/* 协议与阶段筛选栏 */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground mr-1">传输协议:</span>
+      {/* 协议与阶段筛选栏 (单行横滑，杜绝跨行) */}
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-none py-0.5">
+          <span className="text-[11px] font-medium text-muted-foreground mr-0.5">协议:</span>
           {(["all", "http", "dubbo", "grpc", "mq"] as const).map((proto) => (
             <button
               key={proto}
               type="button"
               onClick={() => setProtocolFilter(proto)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+              className={`rounded px-2 py-0.5 text-xs font-medium transition-colors cursor-pointer shrink-0 ${
                 protocolFilter === proto
                   ? "bg-primary text-primary-foreground"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
-              {proto === "all" ? "全部协议" : proto.toUpperCase()}
+              {proto === "all" ? "全部" : proto.toUpperCase()}
             </button>
           ))}
         </div>
 
-        <div className="flex flex-wrap items-center gap-1.5">
-          <span className="text-xs font-medium text-muted-foreground mr-1">生命周期:</span>
+        <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-none py-0.5">
+          <span className="text-[11px] font-medium text-muted-foreground mr-0.5">阶段:</span>
           {(["all", "design", "mocking", "implemented", "verified", "delivered"] as const).map((stg) => (
             <button
               key={stg}
               type="button"
               onClick={() => setStageFilter(stg)}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+              className={`rounded px-2 py-0.5 text-xs font-medium transition-colors cursor-pointer shrink-0 ${
                 stageFilter === stg
                   ? "bg-foreground text-background"
                   : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
-              {stg === "all" ? "全部阶段" : stg}
+              {stg === "all" ? "全部" : stg === "design" ? "设计" : stg === "mocking" ? "联调" : stg === "implemented" ? "实现" : stg === "verified" ? "验收" : "交付"}
             </button>
           ))}
         </div>
@@ -413,51 +412,51 @@ export function ProjectApiLifecycleHarness({
                 </div>
               </div>
 
-              {/* 内部 Tab 切换：契约透视 / MCP 工具定义 / 代码存根 / Mock 响应 */}
-              <div className="flex items-center gap-2 border-b border-border pb-2 text-xs font-medium">
+              {/* 内部 Tab 切换：严格两个字 (契约 / 投影 / 存根 / 响应) */}
+              <div className="flex items-center gap-1.5 border-b border-border pb-1.5 text-xs font-medium overflow-x-auto whitespace-nowrap scrollbar-none">
                 <button
                   type="button"
                   onClick={() => setActiveSubTab("contract")}
-                  className={`pb-1 transition-colors ${
+                  className={`px-2.5 py-1 rounded transition-colors cursor-pointer shrink-0 ${
                     activeSubTab === "contract"
-                      ? "border-b-2 border-primary text-foreground font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  📋 Request / Response 细粒度契约
+                  契约
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveSubTab("mcp")}
-                  className={`pb-1 transition-colors ${
+                  className={`px-2.5 py-1 rounded transition-colors cursor-pointer shrink-0 ${
                     activeSubTab === "mcp"
-                      ? "border-b-2 border-primary text-foreground font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  🤖 DSH MCP 自动投影
+                  投影
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveSubTab("codegen")}
-                  className={`pb-1 transition-colors ${
+                  className={`px-2.5 py-1 rounded transition-colors cursor-pointer shrink-0 ${
                     activeSubTab === "codegen"
-                      ? "border-b-2 border-primary text-foreground font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  💻 代码存根生成
+                  存根
                 </button>
                 <button
                   type="button"
                   onClick={() => setActiveSubTab("mock")}
-                  className={`pb-1 transition-colors ${
+                  className={`px-2.5 py-1 rounded transition-colors cursor-pointer shrink-0 ${
                     activeSubTab === "mock"
-                      ? "border-b-2 border-primary text-foreground font-semibold"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-primary text-primary-foreground font-semibold shadow-xs"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
                   }`}
                 >
-                  ⚡ Mock 响应预览
+                  响应
                 </button>
               </div>
 
@@ -609,20 +608,20 @@ export function ProjectApiLifecycleHarness({
               {activeSubTab === "codegen" && (
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs text-muted-foreground">目标框架:</span>
+                    <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-none py-0.5">
+                      <span className="text-[11px] text-muted-foreground mr-0.5">框架:</span>
                       {(["spring_boot", "dubbo_interface", "grpc_proto", "rocketmq_listener"] as const).map((t) => (
                         <button
                           key={t}
                           type="button"
                           onClick={() => setCodeStubTarget(t)}
-                          className={`rounded-md px-2 py-1 text-xs font-medium transition-colors ${
+                          className={`rounded px-2 py-0.5 text-xs font-medium transition-colors cursor-pointer shrink-0 ${
                             codeStubTarget === t
                               ? "bg-primary text-primary-foreground"
                               : "bg-muted text-muted-foreground hover:bg-muted/80"
                           }`}
                         >
-                          {t === "spring_boot" ? "Spring Boot Web" : t === "dubbo_interface" ? "Dubbo RPC" : t === "grpc_proto" ? "gRPC Protobuf" : "RocketMQ 消费端"}
+                          {t === "spring_boot" ? "Spring" : t === "dubbo_interface" ? "Dubbo" : t === "grpc_proto" ? "gRPC" : "MQ"}
                         </button>
                       ))}
                     </div>
@@ -630,9 +629,9 @@ export function ProjectApiLifecycleHarness({
                     <button
                       type="button"
                       onClick={() => navigator.clipboard?.writeText(selectedCodeStub)}
-                      className="rounded-md border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors"
+                      className="rounded border border-border bg-background px-2.5 py-1 text-xs font-medium text-foreground hover:bg-muted transition-colors cursor-pointer shrink-0"
                     >
-                      复制代码
+                      复制
                     </button>
                   </div>
 
@@ -647,14 +646,14 @@ export function ProjectApiLifecycleHarness({
                 <div className="space-y-4">
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-foreground">
-                      DSH Mock Engine 高保真响应报文
+                      DSH Mock 响应报文
                     </span>
                     <button
                       type="button"
                       onClick={handleSimulateMock}
-                      className="text-primary hover:underline text-xs"
+                      className="text-primary hover:underline text-xs cursor-pointer"
                     >
-                      重新生成 Mock 报文
+                      刷新
                     </button>
                   </div>
 

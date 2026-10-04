@@ -145,64 +145,65 @@ export function ProjectCmmiRtm({ projectId: _projectId, projectName }: ProjectCm
   );
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* 头部面板与过滤器 */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <GitBranch className="h-6 w-6" />
+      <div className="rounded-lg border border-border bg-card p-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+              <GitBranch className="h-4 w-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-semibold text-foreground">交互式 RTM 需求双向穿透树</h3>
-                <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-xs font-medium text-emerald-500">
-                  双向追溯覆盖率 100%
+                <h3 className="text-xs font-bold text-foreground">交互式 RTM 需求双向穿透树</h3>
+                <span className="rounded-full bg-emerald-500/10 px-2 py-0.2 text-[10px] font-medium text-emerald-500">
+                  全链路 100%
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-[11px] text-muted-foreground mt-0.5">
                 项目：{projectName} · 业务需求 (REQ) ↔ 架构概要 (HLD) ↔ 代码契约 (LLD) ↔ 验收用例 (TC) ↔ 制品交付 (ART)
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             <Button
               size="sm"
               variant="outline"
               onClick={() => setDirection(direction === "forward" ? "backward" : "forward")}
-              className="gap-1.5 text-xs"
+              className="gap-1 text-xs h-7 px-2.5 cursor-pointer"
+              title={direction === "forward" ? "当前正向追溯 (需求→代码)" : "当前逆向追溯 (测试→需求)"}
             >
-              <ArrowRightLeft className="h-3.5 w-3.5" />
-              {direction === "forward" ? "正向追溯 (需求→代码)" : "逆向追溯 (测试→需求)"}
+              <ArrowRightLeft className="h-3 w-3" />
+              <span>{direction === "forward" ? "正向" : "逆向"}</span>
             </Button>
           </div>
         </div>
 
-        <div className="mt-4 flex items-center gap-3">
+        <div className="mt-3 flex items-center gap-2">
           <div className="relative flex-1">
-            <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
+            <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               placeholder="搜索需求编号、模块或代码文件..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 h-9 text-xs"
+              className="pl-8 h-7 text-xs"
             />
           </div>
         </div>
       </div>
 
       {/* 穿透层级引导条 */}
-      <div className="grid grid-cols-5 gap-2 text-xs font-medium text-center">
-        <div className="rounded-md border border-border bg-accent/30 py-2 text-foreground">1. 业务需求 (REQ)</div>
-        <div className="rounded-md border border-border bg-accent/30 py-2 text-foreground">2. 概要架构 (HLD)</div>
-        <div className="rounded-md border border-border bg-accent/30 py-2 text-foreground">3. 代码与契约 (LLD)</div>
-        <div className="rounded-md border border-border bg-accent/30 py-2 text-foreground">4. 验收用例 (TC)</div>
-        <div className="rounded-md border border-border bg-accent/30 py-2 text-foreground">5. 归档制品 (ART)</div>
+      <div className="grid grid-cols-5 gap-1.5 text-[11px] font-medium text-center">
+        <div className="rounded border border-border bg-accent/30 py-1 text-foreground">1. 需求 (REQ)</div>
+        <div className="rounded border border-border bg-accent/30 py-1 text-foreground">2. 架构 (HLD)</div>
+        <div className="rounded border border-border bg-accent/30 py-1 text-foreground">3. 契约 (LLD)</div>
+        <div className="rounded border border-border bg-accent/30 py-1 text-foreground">4. 用例 (TC)</div>
+        <div className="rounded border border-border bg-accent/30 py-1 text-foreground">5. 制品 (ART)</div>
       </div>
 
       {/* 树状穿透列表 */}
-      <div className="space-y-4">
+      <div className="space-y-2.5">
         {filteredData.map((req) => {
           const isExpanded = expandedReqs[req.code] ?? false;
 

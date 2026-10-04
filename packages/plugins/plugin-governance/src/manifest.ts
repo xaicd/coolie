@@ -39,6 +39,7 @@ const manifest: PaperclipPluginManifestV1 = {
         displayName: "架构与质量治理",
         exportName: "GovernancePage",
         routePath: "governance",
+        layout: "fill",
       },
       {
         type: "detailTab",

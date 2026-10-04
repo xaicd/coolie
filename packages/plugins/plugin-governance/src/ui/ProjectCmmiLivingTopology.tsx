@@ -136,119 +136,119 @@ export function ProjectCmmiLivingTopology({ projectId: _projectId, projectName }
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* 头部控制台与三态模式切换器 */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <GitFork className="h-6 w-6" />
+      <div className="rounded-lg border border-border bg-card p-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+              <GitFork className="h-4 w-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-semibold text-foreground">三态活本体拓扑控制台</h3>
-                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                  动态对账模式
+                <h3 className="text-xs font-bold text-foreground">三态活本体拓扑控制台</h3>
+                <span className="rounded-full bg-primary/10 px-2 py-0.2 text-[10px] font-medium text-primary">
+                  动态对账
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-[11px] text-muted-foreground mt-0.5">
                 项目：{projectName} · 统一打通【设计态 (HLD)】、【运行态 (SkyWalking)】与【演练态 (Chaosblade)】
               </p>
             </div>
           </div>
 
-          {/* 三态切换 Pills */}
-          <div className="flex items-center gap-1 rounded-lg border border-border bg-muted/40 p-1 self-start md:self-auto">
+          {/* 三态切换 Pills (严格两个字) */}
+          <div className="flex items-center gap-1 rounded-md border border-border bg-muted/40 p-0.5 self-start md:self-auto shrink-0">
             <Button
               size="sm"
               variant={viewMode === "design" ? "default" : "ghost"}
-              className="gap-1.5 text-xs h-8"
+              className="gap-1 text-xs h-7 px-2.5 cursor-pointer"
               onClick={() => setViewMode("design")}
             >
-              <Layers className="h-3.5 w-3.5" />
-              设计态 (HLD)
+              <Layers className="h-3 w-3" />
+              <span>设计</span>
             </Button>
             <Button
               size="sm"
               variant={viewMode === "runtime" ? "default" : "ghost"}
-              className="gap-1.5 text-xs h-8"
+              className="gap-1 text-xs h-7 px-2.5 cursor-pointer"
               onClick={() => setViewMode("runtime")}
             >
-              <Activity className="h-3.5 w-3.5" />
-              运行态 (SkyWalking)
+              <Activity className="h-3 w-3" />
+              <span>运行</span>
             </Button>
             <Button
               size="sm"
               variant={viewMode === "chaos" ? "default" : "ghost"}
-              className="gap-1.5 text-xs h-8"
+              className="gap-1 text-xs h-7 px-2.5 cursor-pointer"
               onClick={() => setViewMode("chaos")}
             >
-              <Zap className="h-3.5 w-3.5" />
-              演练态 (Chaosblade)
+              <Zap className="h-3 w-3" />
+              <span>演练</span>
             </Button>
           </div>
         </div>
 
         {/* 动态对账与异常摘要横幅 */}
-        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-border">
-          <div className="flex items-center gap-2 text-xs">
-            <Radio className="h-4 w-4 text-primary" />
-            <span className="text-muted-foreground">设计声明链路:</span>
-            <span className="font-semibold text-foreground">12 条契约规约</span>
+        <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2 pt-2 border-t border-border">
+          <div className="flex items-center gap-1.5 text-xs">
+            <Radio className="h-3.5 w-3.5 text-primary" />
+            <span className="text-muted-foreground">设计声明:</span>
+            <span className="font-semibold text-foreground">12 条契约</span>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
-            <Activity className="h-4 w-4 text-primary" />
-            <span className="text-muted-foreground">SkyWalking 捕获:</span>
-            <span className="font-semibold text-primary">13 条实时链路</span>
-            <span className="rounded bg-destructive/10 px-1.5 py-0.5 text-destructive font-mono">
-              1 影子依赖
+          <div className="flex items-center gap-1.5 text-xs">
+            <Activity className="h-3.5 w-3.5 text-primary" />
+            <span className="text-muted-foreground">SkyWalking:</span>
+            <span className="font-semibold text-primary">13 条链路</span>
+            <span className="rounded bg-destructive/10 px-1 py-0.2 text-[10px] text-destructive font-mono">
+              1 影子
             </span>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
-            <ShieldCheck className="h-4 w-4 text-primary" />
-            <span className="text-muted-foreground">Chaos 容灾通过率:</span>
-            <span className="font-semibold text-foreground">85% (3/4 熔断合格)</span>
+          <div className="flex items-center gap-1.5 text-xs">
+            <ShieldCheck className="h-3.5 w-3.5 text-primary" />
+            <span className="text-muted-foreground">Chaos 容灾:</span>
+            <span className="font-semibold text-foreground">85% (3/4 合格)</span>
           </div>
         </div>
       </div>
 
       {/* 视图模式情境提示卡 */}
-      <div className="rounded-lg border border-border bg-card/60 p-4 text-xs">
+      <div className="rounded-lg border border-border bg-card/60 p-3 text-xs">
         {viewMode === "design" && (
           <div className="flex items-center gap-2 text-muted-foreground">
-            <Layers className="h-4 w-4 text-primary shrink-0" />
+            <Layers className="h-3.5 w-3.5 text-primary shrink-0" />
             <span>
-              <strong>设计态视图</strong>：展示架构师在 <code>02-hld.md</code> 中定义的标准系统拓扑、接口契约与依赖边界，作为研发阶段的防腐化指南。
+              <strong>设计态视图</strong>：展示架构师在 <code>02-hld.md</code> 中定义的标准系统拓扑、接口契约与依赖边界。
             </span>
           </div>
         )}
         {viewMode === "runtime" && (
           <div className="flex items-center gap-2 text-muted-foreground">
-            <Activity className="h-4 w-4 text-primary shrink-0" />
+            <Activity className="h-3.5 w-3.5 text-primary shrink-0" />
             <span>
-              <strong>运行态视图</strong>：实时接入 SkyWalking APM 链路探针，高亮当前流量吞吐（QPS）与 P99 耗时，并在检测到<strong>未在 HLD 报备的影子调用</strong>时触发预警。
+              <strong>运行态视图</strong>：实时接入 SkyWalking APM 链路探针，高亮吞吐 (QPS) 与耗时，未报备的影子调用高亮标红。
             </span>
           </div>
         )}
         {viewMode === "chaos" && (
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2 text-muted-foreground">
-              <Flame className="h-4 w-4 text-destructive shrink-0" />
+              <Flame className="h-3.5 w-3.5 text-destructive shrink-0" />
               <span>
-                <strong>演练态视图</strong>：通过 Chaosblade 注入断网、延迟与突发流量，验证 Sentinel 熔断器是否能在 500ms 内生效并触发优雅降级。
+                <strong>演练态视图</strong>：通过 Chaosblade 注入断网、延迟与突发流量，验证 Sentinel 熔断器是否触发优雅降级。
               </span>
             </div>
             <Button
               size="sm"
               variant="default"
-              className="gap-1.5 text-xs h-7 self-start sm:self-auto"
+              className="gap-1 text-xs h-7 px-2.5 self-start sm:self-auto cursor-pointer shrink-0"
               onClick={handleTriggerChaos}
               disabled={chaosSimulating}
             >
               <Zap className="h-3 w-3" />
-              {chaosSimulating ? "演练注入中 (3000ms延迟)..." : "一键模拟故障注入 (Chaosblade)"}
+              <span>{chaosSimulating ? "演练中" : "演练"}</span>
             </Button>
           </div>
         )}

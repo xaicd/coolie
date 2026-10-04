@@ -242,80 +242,81 @@ export function ProjectCmmiBaseline({ projectId: _projectId, projectName }: Proj
   };
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* 头部基线摘要卡 */}
-      <div className="rounded-xl border border-border bg-card p-5">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Archive className="h-6 w-6" />
+      <div className="rounded-lg border border-border bg-card p-3">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary shrink-0">
+              <Archive className="h-4 w-4" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h3 className="text-base font-semibold text-foreground">5+2 黄金文档基线库</h3>
-                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-                  已全部基线化
+                <h3 className="text-xs font-bold text-foreground">5+2 黄金文档基线库</h3>
+                <span className="rounded-full bg-primary/10 px-2 py-0.2 text-[10px] font-medium text-primary">
+                  已基线化
                 </span>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">
+              <p className="text-[11px] text-muted-foreground mt-0.5">
                 项目：{projectName} · 固化研发过程工程资产，支持一键导出外审合规包
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Button size="sm" variant="default" className="gap-1.5 text-xs font-medium" onClick={handleExportPackage}>
-              <Download className="h-3.5 w-3.5" />
-              导出合规外审包 (JSON)
+          <div className="flex items-center gap-2 shrink-0">
+            <Button size="sm" variant="default" className="gap-1 text-xs h-7 px-2.5 font-medium cursor-pointer" onClick={handleExportPackage}>
+              <Download className="h-3 w-3" />
+              <span>导出</span>
             </Button>
           </div>
         </div>
       </div>
 
       {/* 黄金文档列表 */}
-      <div className="grid grid-cols-1 gap-3">
+      <div className="grid grid-cols-1 gap-2">
         {goldenDocs.map((doc) => (
           <div
             key={doc.id}
-            className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-lg border border-border bg-card p-4 hover:border-foreground/20 transition-colors"
+            className="flex flex-col md:flex-row md:items-center justify-between gap-2.5 rounded-lg border border-border bg-card p-3 hover:border-foreground/20 transition-colors"
           >
-            <div className="flex items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-accent text-accent-foreground mt-0.5">
-                <FileText className="h-5 w-5 text-primary" />
+            <div className="flex items-start gap-2.5 min-w-0">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-accent text-accent-foreground mt-0.5">
+                <FileText className="h-4 w-4 text-primary" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-semibold text-sm text-foreground">{doc.name}</span>
-                  <span className="rounded bg-accent px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-xs text-foreground">{doc.name}</span>
+                  <span className="rounded bg-accent px-1.5 py-0.2 font-mono text-[10px] text-muted-foreground">
                     {doc.code}
                   </span>
-                  <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                  <span className="rounded bg-primary/10 px-1.5 py-0.2 text-[10px] font-medium text-primary">
                     {doc.version}
                   </span>
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">{doc.summary}</p>
-                <div className="mt-2 flex flex-wrap items-center gap-4 text-xs text-muted-foreground font-mono">
+                <p className="text-[11px] text-muted-foreground mt-0.5 line-clamp-1">{doc.summary}</p>
+                <div className="mt-1 flex flex-wrap items-center gap-3 text-[10px] text-muted-foreground font-mono">
                   <span>标准: {doc.standard}</span>
                   <span className="flex items-center gap-1">
-                    <Clock className="h-3 w-3" />
-                    更新: {doc.updatedAt}
+                    <Clock className="h-2.5 w-2.5" />
+                    {doc.updatedAt}
                   </span>
                   <span className="flex items-center gap-1">
-                    <Shield className="h-3 w-3 text-primary" />
-                    SHA-256: {doc.sha256.slice(0, 16)}...
+                    <Shield className="h-2.5 w-2.5 text-primary" />
+                    {doc.sha256.slice(0, 12)}...
                   </span>
                 </div>
               </div>
             </div>
 
-            <div className="flex items-center gap-2 self-end md:self-auto shrink-0">
-              <Button size="sm" variant="outline" className="gap-1 text-xs" onClick={() => setSelectedDoc(doc)}>
+            {/* 操作栏：单行横向滚动，严格不换行 (别跨行) */}
+            <div className="flex items-center gap-1.5 self-end md:self-auto shrink-0 overflow-x-auto whitespace-nowrap">
+              <Button size="sm" variant="outline" className="gap-1 text-xs h-7 px-2 cursor-pointer shrink-0" onClick={() => setSelectedDoc(doc)}>
                 <Eye className="h-3 w-3" />
-                在线调阅
+                <span>调阅</span>
               </Button>
-              <Button size="sm" variant="ghost" className="gap-1 text-xs text-muted-foreground" onClick={() => handleDownloadSingle(doc)}>
+              <Button size="sm" variant="ghost" className="gap-1 text-xs h-7 px-2 text-muted-foreground hover:text-foreground cursor-pointer shrink-0" onClick={() => handleDownloadSingle(doc)}>
                 <Download className="h-3 w-3" />
-                下载
+                <span>下载</span>
               </Button>
             </div>
           </div>
@@ -324,11 +325,11 @@ export function ProjectCmmiBaseline({ projectId: _projectId, projectName }: Proj
 
       {/* 在线调阅模态窗 */}
       <Dialog open={!!selectedDoc} onOpenChange={(open) => !open && setSelectedDoc(null)}>
-        <DialogContent className="max-w-3xl max-h-full flex flex-col">
+        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
           <DialogHeader>
             <div className="flex items-center gap-2">
-              <DialogTitle>{selectedDoc?.name}</DialogTitle>
-              <span className="rounded bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+              <DialogTitle className="text-sm">{selectedDoc?.name}</DialogTitle>
+              <span className="rounded bg-primary/10 px-1.5 py-0.2 text-xs font-medium text-primary">
                 {selectedDoc?.version}
               </span>
             </div>
@@ -337,18 +338,23 @@ export function ProjectCmmiBaseline({ projectId: _projectId, projectName }: Proj
             </DialogDescription>
           </DialogHeader>
 
-          <div className="flex-1 overflow-y-auto p-4 rounded-lg border border-border bg-muted/30 font-mono text-xs whitespace-pre-wrap">
+          <div className="flex-1 overflow-y-auto p-3 rounded-lg border border-border bg-muted/30 font-mono text-xs whitespace-pre-wrap max-h-[50vh]">
             {selectedDoc?.content}
           </div>
 
           <div className="flex items-center justify-between pt-2">
-            <span className="text-xs text-muted-foreground">状态：已基线化 (不可变存证)</span>
-            {selectedDoc && (
-              <Button size="sm" variant="outline" className="gap-1 text-xs" onClick={() => handleDownloadSingle(selectedDoc)}>
-                <Download className="h-3.5 w-3.5" />
-                下载本篇 Markdown
+            <span className="text-[11px] text-muted-foreground">状态：已基线化 (不可变存证)</span>
+            <div className="flex items-center gap-2">
+              {selectedDoc && (
+                <Button size="sm" variant="outline" className="gap-1 text-xs h-7 px-2.5 cursor-pointer" onClick={() => handleDownloadSingle(selectedDoc)}>
+                  <Download className="h-3 w-3" />
+                  <span>下载</span>
+                </Button>
+              )}
+              <Button size="sm" variant="ghost" className="text-xs h-7 px-2.5 cursor-pointer" onClick={() => setSelectedDoc(null)}>
+                <span>关闭</span>
               </Button>
-            )}
+            </div>
           </div>
         </DialogContent>
       </Dialog>

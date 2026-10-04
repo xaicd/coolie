@@ -1,6 +1,6 @@
 import { useState, useEffect, type ReactElement } from "react";
-import type { PluginPageProps } from "@paperclipai/plugin-sdk/ui";
-import { ShieldCheck, FileText, GitBranch, Activity, Layers, Code2, FolderGit2 } from "lucide-react";
+import { useHostNavigation, type PluginPageProps } from "@paperclipai/plugin-sdk/ui";
+import { ShieldCheck, FileText, GitBranch, Activity, Layers, Code2, FolderGit2, RefreshCw, Share2 } from "lucide-react";
 import { ProjectCmmiGovernance } from "./ProjectCmmiGovernance.js";
 import { ProjectCmmiBaseline } from "./ProjectCmmiBaseline.js";
 import { ProjectCmmiRtm } from "./ProjectCmmiRtm.js";
@@ -17,9 +17,11 @@ interface ProjectOption {
 
 export function GovernancePage({ context }: PluginPageProps): ReactElement {
   const [activeTab, setActiveTab] = useState<GovernanceTabKey>("governance");
+  const [refreshKey, setRefreshKey] = useState(0);
   const companyId = context.companyId;
   const [projectsList, setProjectsList] = useState<ProjectOption[]>([]);
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(context.projectId ?? null);
+  const nav = useHostNavigation();
 
   useEffect(() => {
     if (!companyId) return;
@@ -39,104 +41,121 @@ export function GovernancePage({ context }: PluginPageProps): ReactElement {
   const projectName = currentProject ? currentProject.name : "公司全域综合治理态势";
 
   const tabs: Array<{ key: GovernanceTabKey; label: string; icon: typeof ShieldCheck }> = [
-    { key: "governance", label: "CMMI 质量门禁", icon: ShieldCheck },
-    { key: "baseline", label: "5+2 黄金文档", icon: FileText },
-    { key: "rtm", label: "RTM 需求穿透", icon: GitBranch },
-    { key: "spc", label: "SPC 过程度量", icon: Activity },
-    { key: "topology", label: "活态拓扑 (微服务边界)", icon: Layers },
-    { key: "api", label: "API 契约中心 (DSH)", icon: Code2 },
+    { key: "governance", label: "门禁", icon: ShieldCheck },
+    { key: "baseline", label: "基线", icon: FileText },
+    { key: "rtm", label: "跟踪", icon: GitBranch },
+    { key: "spc", label: "度量", icon: Activity },
+    { key: "topology", label: "拓扑", icon: Layers },
+    { key: "api", label: "契约", icon: Code2 },
   ];
 
   return (
-    <div className="space-y-6 p-6 max-w-7xl mx-auto">
-      {/* 头部介绍与真实项目选择器 */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-border pb-4">
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="p-2 rounded-lg bg-primary/10 text-primary">
-              <ShieldCheck className="h-6 w-6" />
-            </span>
-            <div>
-              <h1 className="text-xl font-bold text-foreground">架构与质量治理控制台</h1>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                CMMI-L5 门禁证据链 · 双轨制双人会签特批 · 真实架构与实体边界守卫
-              </p>
-            </div>
-          </div>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+      {/* ── 顶部单行工具栏 (高度 h-11，紧凑无缝) ── */}
+      <div className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3 bg-card/40">
+        <div className="flex items-center gap-1.5 text-foreground font-semibold text-xs shrink-0">
+          <ShieldCheck className="h-4 w-4 text-primary" />
+          <span>架构治理</span>
         </div>
 
-        {/* 真实项目联动选择器 */}
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-muted/40 border border-border px-3 py-1.5 rounded-lg text-xs">
-            <FolderGit2 className="h-4 w-4 text-muted-foreground" />
-            <span className="text-muted-foreground font-medium">当前范围:</span>
-            <select
-              value={selectedProjectId ?? ""}
-              onChange={(e) => setSelectedProjectId(e.target.value ? e.target.value : null)}
-              className="bg-transparent border-none text-foreground font-medium focus:outline-none cursor-pointer"
-            >
-              <option value="">全公司态势 (全量汇总)</option>
-              {projectsList.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+        <div className="mx-1 h-5 w-px bg-border shrink-0" />
+
+        {/* 范围/项目下拉选择器 */}
+        <div className="flex items-center gap-1.5 rounded-md border border-border bg-card px-2 py-0.5 shrink-0">
+          <FolderGit2 className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+          <select
+            value={selectedProjectId ?? ""}
+            onChange={(e) => setSelectedProjectId(e.target.value ? e.target.value : null)}
+            className="h-6 bg-transparent text-xs font-medium text-foreground outline-none cursor-pointer max-w-[150px] truncate"
+          >
+            <option value="">全公司态势</option>
+            {projectsList.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="mx-1 h-5 w-px bg-border shrink-0" />
+
+        {/* 六大治理子页面标签 (严格两个字) */}
+        <div className="flex items-center gap-1 overflow-x-auto whitespace-nowrap scrollbar-none">
+          {tabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.key;
+            return (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => setActiveTab(tab.key)}
+                className={`flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer shrink-0 ${
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-xs"
+                    : "border border-border bg-card text-muted-foreground hover:border-primary hover:text-foreground"
+                }`}
+              >
+                <Icon className="h-3.5 w-3.5" />
+                <span>{tab.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="flex-1" />
+
+        {/* 右侧工具操作区：图谱双向穿透、数据同步指示灯、刷新 */}
+        <div className="flex items-center gap-1.5 shrink-0">
+          <a
+            {...nav.linkProps("/ontology")}
+            className="flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary hover:text-primary no-underline shrink-0 cursor-pointer"
+            title="跳转到本体知识图谱"
+          >
+            <Share2 className="h-3.5 w-3.5 text-primary" />
+            <span>图谱</span>
+          </a>
+
+          <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-mono border border-border px-2 py-0.5 rounded-md text-muted-foreground shrink-0 bg-card">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Live</span>
           </div>
 
-          <div className="flex items-center gap-2 text-xs font-mono bg-muted/50 border border-border px-3 py-1.5 rounded-lg text-muted-foreground">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>Live Data Sync</span>
-          </div>
+          <button
+            type="button"
+            onClick={() => setRefreshKey((k) => k + 1)}
+            className="flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground transition-colors hover:border-primary hover:text-primary cursor-pointer shrink-0"
+            title="刷新当前视图数据"
+          >
+            <RefreshCw className="h-3.5 w-3.5" />
+            <span>刷新</span>
+          </button>
         </div>
       </div>
 
-      {/* 顶部 Tab 切换 */}
-      <div className="flex items-center gap-2 border-b border-border pb-px overflow-x-auto">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={`flex items-center gap-2 px-3 py-2 text-xs font-medium rounded-t-lg transition-colors cursor-pointer border-b-2 ${
-                isActive
-                  ? "border-primary text-primary bg-primary/5"
-                  : "border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/30"
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              <span>{tab.label}</span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* 内容区域 */}
-      <div className="pt-2">
+      {/* ── 主体工作台内容区域 (独立滚动) ── */}
+      <div className="flex-1 min-h-0 overflow-y-auto p-4">
         {activeTab === "governance" && (
           <ProjectCmmiGovernance
+            key={refreshKey}
             companyId={companyId}
             projectId={selectedProjectId}
             projectName={projectName}
           />
         )}
         {activeTab === "baseline" && (
-          <ProjectCmmiBaseline projectId={selectedProjectId ?? "company-wide"} projectName={projectName} />
+          <ProjectCmmiBaseline key={refreshKey} projectId={selectedProjectId ?? "company-wide"} projectName={projectName} />
         )}
         {activeTab === "rtm" && (
-          <ProjectCmmiRtm projectId={selectedProjectId ?? "company-wide"} projectName={projectName} />
+          <ProjectCmmiRtm key={refreshKey} projectId={selectedProjectId ?? "company-wide"} projectName={projectName} />
         )}
         {activeTab === "spc" && (
-          <ProjectCmmiSpc projectId={selectedProjectId ?? "company-wide"} projectName={projectName} />
+          <ProjectCmmiSpc key={refreshKey} projectId={selectedProjectId ?? "company-wide"} projectName={projectName} />
         )}
         {activeTab === "topology" && (
-          <ProjectCmmiLivingTopology projectId={selectedProjectId ?? "company-wide"} projectName={projectName} />
+          <ProjectCmmiLivingTopology key={refreshKey} projectId={selectedProjectId ?? "company-wide"} projectName={projectName} />
         )}
         {activeTab === "api" && (
-          <ProjectApiLifecycleHarness projectId={selectedProjectId ?? "company-wide"} projectName={projectName} />
+          <ProjectApiLifecycleHarness key={refreshKey} projectId={selectedProjectId ?? "company-wide"} projectName={projectName} />
         )}
       </div>
     </div>
