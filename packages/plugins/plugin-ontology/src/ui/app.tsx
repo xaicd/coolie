@@ -3399,6 +3399,138 @@ function renderDomainCreator(d: OntologyDomain): ReactElement {
 }
 
 /**
+ * Full details modal for viewing complete un-truncated domain information,
+ * metadata, and quick navigation.
+ */
+function DomainDetailModal({
+  domain,
+  onClose,
+  onOpenGraph,
+}: {
+  domain: OntologyDomain;
+  onClose: () => void;
+  onOpenGraph: (id: string, targetView?: WorkbenchView) => void;
+}): ReactElement {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = (text: string) => {
+    if (typeof navigator !== "undefined" && navigator.clipboard) {
+      void navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="w-[min(38rem,calc(100vw-2rem))] max-h-[85vh] flex flex-col rounded-xl border border-border bg-card p-5 shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-border pb-3">
+          <div className="flex items-center gap-2">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary text-[18px]">
+              {domain.icon || (domain.category === "enterprise" ? "🏢" : "📦")}
+            </span>
+            <div>
+              <h2 className="text-base font-bold text-foreground flex items-center gap-2">
+                <span>{domain.display_name}</span>
+                <span className="font-mono text-xs text-muted-foreground font-normal">v{domain.version}</span>
+              </h2>
+              <span className="text-[11px] font-mono text-muted-foreground">{domain.slug}</span>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground transition-colors"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto py-4 space-y-3 text-xs">
+          <div>
+            <div className="text-[11px] font-medium text-muted-foreground mb-1">{t("业务描述 (全量)", "Full Description")}</div>
+            <div className="relative rounded-lg border border-border bg-muted/30 p-3 text-foreground whitespace-pre-wrap break-words leading-relaxed select-text">
+              {domain.description || t("暂无业务描述", "No description provided.")}
+              {domain.description && (
+                <button
+                  onClick={() => handleCopy(domain.description || "")}
+                  className="absolute top-2 right-2 rounded px-2 py-0.5 text-[10px] border border-border bg-card text-muted-foreground hover:text-foreground hover:border-primary transition-colors"
+                >
+                  {copied ? t("已复制", "Copied") : t("复制", "Copy")}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg border border-border bg-card p-2.5">
+              <span className="text-muted-foreground text-[11px] block">{t("类型领域", "Category")}</span>
+              <span className="font-medium mt-0.5 block">{domain.category || t("通用业务", "General")}</span>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-2.5">
+              <span className="text-muted-foreground text-[11px] block">{t("运行状态", "Status & Lifecycle")}</span>
+              <span className="font-medium mt-0.5 block">{domain.status} · {domain.lifecycle_state}</span>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-2.5">
+              <span className="text-muted-foreground text-[11px] block">{t("创建人", "Created By")}</span>
+              <span className="font-medium mt-0.5 block">{domain.created_by || t("系统预置", "System")}</span>
+            </div>
+            <div className="rounded-lg border border-border bg-card p-2.5">
+              <span className="text-muted-foreground text-[11px] block">{t("创建时间", "Created At")}</span>
+              <span className="font-mono text-muted-foreground mt-0.5 block">{formatDomainTime(domain.created_at)}</span>
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-card p-2.5">
+            <span className="text-muted-foreground text-[11px] block">{t("更新时间", "Updated At")}</span>
+            <span className="font-mono text-muted-foreground mt-0.5 block">{formatDomainTime(domain.updated_at)}</span>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between border-t border-border pt-3">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => { onClose(); onOpenGraph(domain.id, "graph"); }}
+              className="flex items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/20 transition-colors"
+            >
+              ⬡ {t("图谱", "Graph")}
+            </button>
+            <button
+              onClick={() => { onClose(); onOpenGraph(domain.id, "table"); }}
+              className="flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+            >
+              ⊞ {t("表格", "Table")}
+            </button>
+            <button
+              onClick={() => { onClose(); onOpenGraph(domain.id, "schema"); }}
+              className="flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+            >
+              ⊙ {t("结构", "Schema")}
+            </button>
+            <button
+              onClick={() => { onClose(); onOpenGraph(domain.id, "sandbox"); }}
+              className="flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-colors"
+            >
+              🤝 {t("驾驶", "Cockpit")}
+            </button>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-md border border-border bg-card px-3 py-1 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+          >
+            {t("关闭", "Close")}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
  * Domain list management: every ontology domain in the company, and what can be
  * done to one.
  */
@@ -3441,6 +3573,17 @@ function DomainList({
   const [renamingId, setRenamingId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
   const [rowError, setRowError] = useState<string | null>(null);
+  const [detailDomain, setDetailDomain] = useState<OntologyDomain | null>(null);
+  const [expandedRowIds, setExpandedRowIds] = useState<Set<string>>(new Set());
+
+  const toggleExpandRow = (id: string) => {
+    setExpandedRowIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const submit = useCallback(async () => {
     setBusy(true);
@@ -3602,16 +3745,25 @@ function DomainList({
             {
               key: "display_name",
               header: t("本体名称", "Domain Name"),
-              width: "minmax(160px, 1.2fr)",
+              width: "220px",
               render: (_v, row) => {
                 const d = row as unknown as OntologyDomain;
                 const icon = d.icon || (d.category === "enterprise" ? "🏢" : "📦");
+                const isExpanded = expandedRowIds.has(d.id);
                 return (
                   <div className="flex flex-col py-0.5">
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[15px] leading-none shrink-0">{icon}</span>
+                      <span
+                        className="text-[15px] leading-none shrink-0 cursor-pointer"
+                        onClick={() => setDetailDomain(d)}
+                        title={t("点击查看完整详情", "Click to view full details")}
+                      >
+                        {icon}
+                      </span>
                       <button
-                        className="truncate text-left font-semibold text-foreground hover:text-primary transition-colors hover:underline text-(length:--text-compact)"
+                        className={`text-left font-semibold text-foreground hover:text-primary transition-colors hover:underline text-(length:--text-compact) ${
+                          isExpanded ? "whitespace-normal break-words" : "truncate max-w-[150px]"
+                        }`}
                         onClick={() => onOpenGraph(d.id)}
                         title={t("点击进入图谱工作台", "Click to open graph workbench")}
                       >
@@ -3624,9 +3776,21 @@ function DomainList({
                       )}
                     </div>
                     <div className="flex items-center gap-1 mt-0.5">
-                      <code className="text-[11px] px-1 py-0.2 bg-muted rounded font-mono text-muted-foreground">{d.slug}</code>
+                      <code
+                        className="text-[11px] px-1 py-0.2 bg-muted rounded font-mono text-muted-foreground shrink-0 cursor-pointer"
+                        onClick={() => setDetailDomain(d)}
+                        title={t("点击查看完整详情", "Click to view full details")}
+                      >
+                        {d.slug}
+                      </code>
                       {d.description && (
-                        <span className="text-xs text-muted-foreground/80 truncate max-w-[220px]" title={d.description}>
+                        <span
+                          className={`text-xs text-muted-foreground/80 cursor-pointer hover:text-foreground transition-colors ${
+                            isExpanded ? "whitespace-normal break-words" : "truncate max-w-[130px]"
+                          }`}
+                          onClick={() => toggleExpandRow(d.id)}
+                          title={t("点击展开/收起全文，或在右侧操作栏点击【详情】查看全量信息", "Click to expand/collapse, or click Detail")}
+                        >
                           {d.description}
                         </span>
                       )}
@@ -3638,23 +3802,38 @@ function DomainList({
             {
               key: "category",
               header: t("类型", "Category"),
-              width: "110px",
-              render: (_v, row) => renderDomainCategory(row as unknown as OntologyDomain),
+              width: "105px",
+              render: (_v, row) => {
+                const d = row as unknown as OntologyDomain;
+                return (
+                  <div
+                    className="truncate cursor-pointer"
+                    onClick={() => setDetailDomain(d)}
+                    title={t("点击查看完整详情", "Click to view full details")}
+                  >
+                    {renderDomainCategory(d)}
+                  </div>
+                );
+              },
             },
             {
               key: "version",
               header: t("版本", "Version"),
               width: "55px",
-              render: (v) => <span className="font-mono text-xs text-muted-foreground">v{String(v)}</span>,
+              render: (v) => <span className="font-mono text-xs text-muted-foreground truncate">v{String(v)}</span>,
             },
             {
               key: "status",
               header: t("状态", "Status"),
-              width: "130px",
+              width: "125px",
               render: (_v, row) => {
                 const d = row as unknown as OntologyDomain;
                 return (
-                  <div className="flex items-center gap-1">
+                  <div
+                    className="flex items-center gap-1 truncate cursor-pointer"
+                    onClick={() => setDetailDomain(d)}
+                    title={t("点击查看完整详情", "Click to view full details")}
+                  >
                     <StatusBadge label={d.status === "active" ? t("活跃","Active") : d.status} status={d.status === "active" ? "ok" : "pending"} />
                     <StatusBadge label={String(d.lifecycle_state)} status={domainLifecycleKind(String(d.lifecycle_state))} />
                   </div>
@@ -3664,39 +3843,74 @@ function DomainList({
             {
               key: "created_by",
               header: t("创建人", "Created By"),
-              width: "90px",
-              render: (_v, row) => renderDomainCreator(row as unknown as OntologyDomain),
+              width: "95px",
+              render: (_v, row) => {
+                const d = row as unknown as OntologyDomain;
+                return (
+                  <div
+                    className="truncate cursor-pointer"
+                    onClick={() => setDetailDomain(d)}
+                    title={t("点击查看完整详情", "Click to view full details")}
+                  >
+                    {renderDomainCreator(d)}
+                  </div>
+                );
+              },
             },
             {
               key: "created_at",
               header: t("创建时间", "Created At"),
               width: "105px",
-              render: (_v, row) => (
-                <span className="font-mono text-xs text-muted-foreground whitespace-nowrap">
-                  {formatDomainTime((row as unknown as OntologyDomain).created_at)}
-                </span>
-              ),
+              render: (_v, row) => {
+                const d = row as unknown as OntologyDomain;
+                return (
+                  <span
+                    className="font-mono text-xs text-muted-foreground whitespace-nowrap truncate cursor-pointer block"
+                    onClick={() => setDetailDomain(d)}
+                    title={formatDomainTime(d.created_at)}
+                  >
+                    {formatDomainTime(d.created_at)}
+                  </span>
+                );
+              },
             },
             {
               key: "updated_at",
               header: t("更新时间", "Updated At"),
               width: "105px",
-              render: (_v, row) => (
-                <span className="font-mono text-xs text-muted-foreground whitespace-nowrap">
-                  {formatDomainTime((row as unknown as OntologyDomain).updated_at)}
-                </span>
-              ),
+              render: (_v, row) => {
+                const d = row as unknown as OntologyDomain;
+                return (
+                  <span
+                    className="font-mono text-xs text-muted-foreground whitespace-nowrap truncate cursor-pointer block"
+                    onClick={() => setDetailDomain(d)}
+                    title={formatDomainTime(d.updated_at)}
+                  >
+                    {formatDomainTime(d.updated_at)}
+                  </span>
+                );
+              },
             },
             {
               key: "actions",
               header: t("操作", "Actions"),
-              width: "minmax(280px, 1.5fr)",
+              width: "380px",
               render: (_v, row) => {
                 const d = row as unknown as OntologyDomain;
                 const rowBusy = busyRowId === d.id;
                 const next = DOMAIN_STATE_TRANSITIONS[d.lifecycle_state as DomainLifecycleState] ?? [];
                 return (
                   <div className="flex w-full items-center gap-1 overflow-x-auto whitespace-nowrap py-1 [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]">
+                    {/* 【详情】 button */}
+                    <button
+                      className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
+                      onClick={() => setDetailDomain(d)}
+                      title={t("查看全量无截断详情", "View full un-truncated details")}
+                    >
+                      <span className="text-[11px] leading-none">🔍</span>
+                      {t("详情", "Detail")}
+                    </button>
+
                     {/* 【图谱】 button */}
                     <button
                       className="flex shrink-0 items-center gap-1 rounded-md border border-primary/40 bg-primary/10 px-2 py-0.5 text-(length:--text-nano) font-medium text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
@@ -3802,6 +4016,14 @@ function DomainList({
           ]}
         />
       </div>
+
+      {detailDomain && (
+        <DomainDetailModal
+          domain={detailDomain}
+          onClose={() => setDetailDomain(null)}
+          onOpenGraph={onOpenGraph}
+        />
+      )}
     </div>
   );
 }
