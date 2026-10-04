@@ -461,7 +461,7 @@ export function SpecEditorScreen({
                   style={[styles.btnDraft, saving && styles.btnDisabled]}
                   disabled={saving}
                   onPress={() => void save(true)}
-                  testID="spec-save-draft"
+                  testID="SpecEditor__ActionBar__SaveDraftBtn"
                 >
                   <Text style={styles.btnDraftText}>存草稿</Text>
                 </Pressable>
@@ -469,7 +469,7 @@ export function SpecEditorScreen({
                   style={[styles.btnPrimary, (!ready || saving) && styles.btnDisabled]}
                   disabled={!ready || saving}
                   onPress={() => void save(false)}
-                  testID="spec-save"
+                  testID="SpecEditor__ActionBar__SaveSubmitBtn"
                 >
                   <Ionicons name="save-outline" size={15} color="#FFFFFF" />
                   <Text style={styles.btnPrimaryText}>{saving ? "保存中…" : "保存"}</Text>

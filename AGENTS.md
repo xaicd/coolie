@@ -270,6 +270,25 @@ A change is done when all are true:
    - 每一波交付必须通过 `scripts/gate-evidence-ledger.sh` 在 `.coolie-local/evidence-ledger/<wave>.json` 落盘；
    - FDA (G1) / Core SWE (G2) / FDSE (G3) / DS (G4) / PRE-SRE (G5) 五角色各自提交独立证据，严禁跨角色借用。
 
+## 14. Agent-Native UI 开发框架与交互规范 (wave296)
+
+老板原话: 「所有 UI 组件必须强制具备 Agent-Native 属性：Web 交互元素必带 `data-agent-target='模块:动作'`、作用域 `data-agent-scope` 与状态 `data-agent-state`；移动端必带 `[Screen]__[Component]__[Action]` 命名空间的 `testID`；多层弹窗打开时底层容器必须打上 `inert`/`accessibilityViewIsModal` 实现节点剪枝隔离；页面顶层必须暴露 `data-agent-page-ready` 就绪信号，严禁纯依靠无文本 CSS/坐标让 Agent 盲猜。」
+
+1. **Web 端 (agent-browser) 契约协议**：
+   - **交互目标**：交互按钮、链接与输入框必须带 `data-agent-target="<module>:<action>"`（如 `governance:approve-btn`），严禁使用易碎 CSS class 或纯 XPath；
+   - **作用域隔离**：复杂表单与弹窗内部必须带 `data-agent-scope="<scope-id>"`，杜绝多层级嵌套下的识别迷航；
+   - **状态信号灯**：可点击控件提供 `data-agent-state="ready|loading|disabled|completed"`，页面根节点暴露 `data-agent-page-ready="true"`，防止异步竞态无脑狂点；
+   - **遮挡剪枝**：二级/多级 Modal、Drawer 打开时，底层失焦容器必须挂载 `inert` 属性，强制将底层无关 DOM 树剪枝。
+
+2. **移动原生端 (agent-device) 契约协议**：
+   - **命名空间 testID**：所有可点击原生组件强制提供结构化 `testID`，格式统一为 `[Screen]__[Component]__[Action]`（如 `SpecEditor__RequirementTab__SubmitBtn`）；
+   - **弹窗独占**：所有 Modal 必须显式声明 `accessibilityViewIsModal={true}`，杜绝穿透点击；
+   - **键盘防遮挡**：表单组件必须包裹 `KeyboardAvoidingView` 与输入自动聚焦滚屏，防止按钮被虚拟键盘顶出物理盲区。
+
+3. **合规度量与自动化检查**：
+   - 运行 `bash scripts/check-agent-native-ui.sh` 实时检查 Web 与移动端组件的 Agent-Native 符合度；
+   - CMMI G3 门禁前必须检查新增交互组件的属性合规。
+
 ## This fork's own conventions
 
 This repository is a fork of Paperclip. The rules above are upstream's; these are ours.

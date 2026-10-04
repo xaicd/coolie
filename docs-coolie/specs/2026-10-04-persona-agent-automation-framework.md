@@ -175,13 +175,35 @@ sequenceDiagram
 
 ## 5. 代码开发同步左移规范 (Shift-Left Contract)
 
-从本波次（wave296+）开始，凡在仓库内新增业务功能，研发人员（Core SWE / FDSE）必须遵循 **「三位一体交付铁律」**：
+从本波次（wave296+）开始，凡在仓库内新增或重构业务功能，研发人员（Core SWE / FDSE）必须遵循 **「三位一体交付铁律」**：
 1. **代码实体**：业务前端与后端代码（`ui/`、`server/`、`clients/expo/` 等）；
 2. **自动化测试用例**：放置在 `packages/agent-automation/src/scenarios/testing/` 下，命名为 `<feature-domain>.test.ts`；
 3. **自动化运营剧本**：放置在 `packages/agent-automation/src/scenarios/operations/` 下，命名为 `<feature-domain>.ops.ts`。
 
+### 5.1 Agent-Native 前端组件强制规范
+
+为了彻底消除 `agent-browser` 与 `agent-device` 在复杂多层级 UI 上的定位盲区与识别漂移，前端底座与业务组件必须严格遵循以下契约：
+
+```
+┌────────────────────────────────────────────────────────────────────────┐
+│                    Agent-Native UI 前端标准属性契约                    │
+├─────────────────┬─────────────────────┬────────────────────────────────┤
+│ 属性/特征       │ 适用平台            │ 作用与语义说明                 │
+├─────────────────┼─────────────────────┼────────────────────────────────┤
+│ data-agent-target│ Web (agent-browser) │ 语义化交互目标，格式: 模块:动作 │
+│ data-agent-scope │ Web (agent-browser) │ 作用域隔离，区分多层弹窗/Drawer│
+│ data-agent-state │ Web (agent-browser) │ 状态信号: ready/loading/disabled│
+│ data-agent-page-ready Web (agent-browser) │ 页面/路由异步加载完成信号灯    │
+│ inert           │ Web (agent-browser) │ 多层弹窗打开时底层容器剪枝隔离  │
+├─────────────────┼─────────────────────┼────────────────────────────────┤
+│ testID          │ Mobile (agent-device) 结构化命名: [Screen]__[Comp]__[Action] │
+│ accessibilityViewIsModal Mobile (device)│ 原生弹窗独占，屏蔽下层触控穿透│
+│ KeyboardAvoidingView Mobile (device) │ 表单安全区防护，杜绝键盘物理遮挡│
+└─────────────────┴─────────────────────┴────────────────────────────────┘
+```
+
 **CMMI 门禁强制阻断规则**：
-- **G3 详细设计契约门禁**：校验是否存在对应的 test-spec 签名；
+- **G3 详细设计契约门禁**：运行 `bash scripts/check-agent-native-ui.sh` 扫描交互元素 Agent 属性合规性；
 - **G4 全栈验收门禁**：必须由门神（FDSE）或百晓生（DS）以 Persona 身份调用 `agent-browser` / `agent-device` 跑通该用例，并将执行成功证据写进 `.coolie-local/evidence-ledger/`，否则禁止进入 G5 投产阶段。
 
 ---

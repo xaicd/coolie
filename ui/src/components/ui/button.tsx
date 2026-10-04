@@ -44,15 +44,23 @@ const Button = React.forwardRef<
   React.ComponentProps<"button"> &
     VariantProps<typeof buttonVariants> & {
       asChild?: boolean
+      agentTarget?: string
+      agentScope?: string
+      agentState?: "ready" | "loading" | "disabled" | "completed"
     }
 >(function Button({
   className,
   variant = "default",
   size = "default",
   asChild = false,
+  agentTarget,
+  agentScope,
+  agentState,
+  disabled,
   ...props
 }, ref) {
   const Comp = asChild ? Slot.Root : "button"
+  const computedAgentState = agentState ?? (disabled ? "disabled" : undefined)
 
   return (
     <Comp
@@ -60,6 +68,10 @@ const Button = React.forwardRef<
       data-slot="button"
       data-variant={variant}
       data-size={size}
+      data-agent-target={agentTarget ?? (props as Record<string, unknown>)["data-agent-target"]}
+      data-agent-scope={agentScope ?? (props as Record<string, unknown>)["data-agent-scope"]}
+      data-agent-state={computedAgentState ?? (props as Record<string, unknown>)["data-agent-state"]}
+      disabled={disabled}
       className={cn(buttonVariants({ variant, size, className }))}
       {...props}
     />

@@ -2397,7 +2397,12 @@ function StreamlinedInbox() {
       ? "Active statuses — open tasks, whether or not an agent is running."
       : null;
   return (
-    <div className="space-y-6">
+    <div
+      className="space-y-6"
+      data-testid="inbox-container"
+      data-agent-scope="inbox:main"
+      data-agent-page-ready="true"
+    >
       <InboxCollectionToolbar
         streamlined={streamlinedUiEnabled}
         ariaLabel="Inbox controls"

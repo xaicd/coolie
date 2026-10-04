@@ -34,6 +34,7 @@ Existing tiers already in index.css (~80+ tokens) — extraction maps to these o
 6. **Machine values look machine-made.** IDs, costs, token counts, timestamps, and log output use the monospace token and consistent formatting helpers. Never format these ad hoc per screen.
 7. **Words are part of the system.** One name per concept across the entire UI — the canonical term is *task* (never *issue* or *ticket* in copy, labels, or empty states). Buttons name the action ("Approve hire," not "Submit"). Errors say what happened and what to do. Empty states say what to do first. **Note:** enforcing the task rename is a visible change and is explicitly OUT of the zero-visual-change extraction run; it happens in its own follow-up run.
 8. **Agent-modifiable by design.** The system must be changeable via instructions: single token source, lint rules that enforce it, and this document kept current. A correct change should be expressible as "edit tokens + run checks," not "visit 40 files."
+9. **Agent-Native interaction protocol (Web & Mobile).** Every interactive element must be navigable by autonomous digital agents (`agent-browser` / `agent-device`) with zero visual guessing. Web components must provide `data-agent-target="<module>:<action>"`, `data-agent-scope`, and `data-agent-state`. Mobile components must provide namespaced `testID="[Screen]__[Component]__[Action]"`. Multi-layer overlays (modals/drawers) must attach `inert` (Web) or `accessibilityViewIsModal={true}` (Mobile) to prune background noise.
 
 ## Form and wizard footers
 
