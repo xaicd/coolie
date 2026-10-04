@@ -127,6 +127,7 @@ async function checkAndExecuteNextTask() {
 
     const child = spawn("bash", args, {
       cwd: REPO_ROOT,
+      stdio: ["ignore", "pipe", "pipe"],
       env: { ...process.env, PATH: `/opt/homebrew/bin:/usr/local/bin:${process.env.PATH}` }
     });
 

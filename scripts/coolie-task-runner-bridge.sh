@@ -22,6 +22,14 @@ case "$ACTION" in
     echo "✅ Coolie Task Runner Bridge 已在宿主机后台常驻启动！"
     ;;
 
+  --check|check)
+    if [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
+      "$SCRIPT_DIR/host-exec.sh" "pgrep -f 'coolie-task-runner-bridge.mjs' >/dev/null 2>&1"
+    else
+      pgrep -f 'coolie-task-runner-bridge.mjs' >/dev/null 2>&1
+    fi
+    ;;
+
   --status|status)
     if [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
       "$SCRIPT_DIR/host-exec.sh" "ps aux | grep -E 'coolie-task-runner-bridge' | grep -v grep" || echo "未在运行"
