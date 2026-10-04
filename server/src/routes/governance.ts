@@ -1,4 +1,4 @@
-import { Router } from "express";
+import { Router, type Request, type Response } from "express";
 import type { Db } from "@paperclipai/db";
 import { assertCompanyAccess, getActorInfo } from "./authz.js";
 import { governanceService } from "../services/governance.js";
@@ -7,11 +7,7 @@ export function governanceRoutes(db: Db) {
   const router = Router();
   const service = governanceService(db);
 
-  /**
-   * GET /api/companies/:companyId/governance/summary?projectId=...
-   * 获取指定公司 (及可选指定项目) 的真实治理态势、门禁状态与真实关联工单
-   */
-  router.get("/companies/:companyId/governance/summary", async (req, res) => {
+  const getSummaryHandler = async (req: Request, res: Response) => {
     const companyId = req.params.companyId as string;
     assertCompanyAccess(req, companyId);
     const projectId = typeof req.query.projectId === "string" ? req.query.projectId : null;
@@ -22,7 +18,19 @@ export function governanceRoutes(db: Db) {
     } catch (err: any) {
       res.status(500).json({ error: err.message || "Failed to fetch governance summary" });
     }
-  });
+  };
+
+  /**
+   * GET /api/companies/:companyId/governance/gates?projectId=...
+   * Spec REQ-GOV-002 规定的真实门禁证据接口 (与 /summary 同源数据)
+   */
+  router.get("/companies/:companyId/governance/gates", getSummaryHandler);
+
+  /**
+   * GET /api/companies/:companyId/governance/summary?projectId=...
+   * 获取指定公司 (及可选指定项目) 的真实治理态势、门禁状态与真实关联工单
+   */
+  router.get("/companies/:companyId/governance/summary", getSummaryHandler);
 
   /**
    * POST /api/companies/:companyId/governance/gates/:gateId/waiver

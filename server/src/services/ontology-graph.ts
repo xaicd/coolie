@@ -26,6 +26,7 @@ import type {
   OntologyStatsResponse,
 } from "@paperclipai/shared";
 import { ENTITY_TYPES } from "@paperclipai/shared";
+import { ontologyBackfillService } from "./ontology-backfill.js";
 
 /**
  * Ontology graph service (wave154) — generic traversal over `entity_relations`.
@@ -600,20 +601,74 @@ export function ontologyGraphService(db: Db) {
     const relations = input.relations && input.relations.length > 0 ? input.relations : preset.relations;
     const relationFilter = relations && relations.length > 0 ? new Set(relations) : undefined;
 
-    const edgeRows = await loadEdges(input.companyId, relationFilter);
+    let edgeRows = await loadEdges(input.companyId, relationFilter);
+    // 工业级自生引擎 (Auto-Bootstrapper): 首次访问若无任何关系，自动基于公司员工、项目与任务自生基础设施图谱
+    if (edgeRows.length === 0 && !input.root) {
+      try {
+        const backfillSvc = ontologyBackfillService(db);
+        const backfilled = await backfillSvc.backfill(input.companyId);
+        if (backfilled.totalInserted > 0) {
+          edgeRows = await loadEdges(input.companyId, relationFilter);
+        }
+      } catch (err) {
+        // 自生失败降级走空图谱
+      }
+    }
+
     const edges = edgeRows.map(toEdge);
 
-    // wave237: no root → return the company's flat snapshot (capped by MAX_NODES).
+    // 工业级大图防爆防御策略 (Safe Backbone Sampling & Edge Bundling):
+    // 当全域关系巨大 (>60) 时，杜绝全量 2000+ 边并发导致前端 DOM/Canvas/Webview 崩溃卡死。
+    // 自动切换为「中心度骨干采样」：优先保留度数最高的 Top 40 个枢纽节点，并对同向连边做智能聚合。
     if (!input.root) {
-      const truncated = edges.length > MAX_NODES;
-      const cappedEdges = truncated ? edges.slice(0, MAX_NODES) : edges;
+      const isHugeGraph = edges.length > 60;
+      let safeEdges: OntologyGraphEdge[] = edges;
+      let truncated = edges.length > MAX_NODES;
+
+      if (isHugeGraph) {
+        truncated = true;
+        // 1. 统计节点度数 (Degree Centrality)
+        const degrees = new Map<string, number>();
+        for (const e of edges) {
+          degrees.set(e.source, (degrees.get(e.source) ?? 0) + 1);
+          degrees.set(e.target, (degrees.get(e.target) ?? 0) + 1);
+        }
+
+        // 2. 按中心度排序，提取前 40 个核心枢纽节点 (Top Hubs)
+        const sortedHubKeys = Array.from(degrees.entries())
+          .sort((a, b) => b[1] - a[1])
+          .slice(0, 40)
+          .map(([k]) => k);
+        const hubSet = new Set(sortedHubKeys);
+
+        // 3. 筛选连接核心节点的边
+        const candidateEdges = edges.filter(
+          (e) => hubSet.has(e.source) && hubSet.has(e.target),
+        );
+
+        // 4. 边聚合 (Edge Bundling): 对相同 (source, target) 的重复边合并为一条聚合复合边
+        const bundledMap = new Map<string, OntologyGraphEdge>();
+        for (const e of candidateEdges) {
+          const pairKey = `${e.source}->${e.target}`;
+          const existing = bundledMap.get(pairKey);
+          if (!existing) {
+            bundledMap.set(pairKey, { ...e });
+          } else {
+            existing.weight += e.weight;
+          }
+        }
+        safeEdges = Array.from(bundledMap.values());
+      } else if (truncated) {
+        safeEdges = edges.slice(0, MAX_NODES);
+      }
+
       const nodeKeys = new Set<string>();
-      for (const edge of cappedEdges) {
+      for (const edge of safeEdges) {
         nodeKeys.add(edge.source);
         nodeKeys.add(edge.target);
       }
       const nodes = await hydrate(input.companyId, keysToRefs(Array.from(nodeKeys)));
-      return { root: null, depth, view, truncated, nodes, edges: cappedEdges };
+      return { root: null, depth, view, truncated, nodes, edges: safeEdges };
     }
 
     const rootKey = nodeKey(input.root.type, input.root.id);
