@@ -1,3 +1,7 @@
+/**
+ * [停用预留 · d5e3fac7 问②B 裁决] 零消费工具, 保留不删 (2026-10-04 复核仍零消费,
+ * 全仓唯一提及是死件注释)。勿为「消灭未用导出」顺手删 — 裁决口径为预留。
+ */
 import { useCallback, useEffect, useRef, useState, type DependencyList, type Dispatch, type SetStateAction } from "react";
 
 export interface UseAsyncResult<T> {

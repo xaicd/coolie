@@ -1,3 +1,8 @@
+/**
+ * [停用预留 · d5e3fac7 问②B 裁决] 零挂载死件, 保留不删 (2026-10-04 复核仍零消费)。
+ * wave20 建 (8e9a8373b) → wave96 精简 (3a503b1e6) 砍宿主留组件 —「缺一跳」家族
+ * 变体 (COOA-4 评论 1a5edf60)。勿当现役链路引用; 复活需先接回挂载点。
+ */
 import { useCallback, useEffect, useState } from "react";
 import {
   ActivityIndicator,
