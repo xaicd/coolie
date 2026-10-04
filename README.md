@@ -46,6 +46,14 @@ It looks like a task manager. Under the hood: org charts, budgets, governance, g
 
 <br/>
 
+> ### 🏮 Coolie Fork 本地工坊与异步派单中枢 (快速复刻)
+> 本项目为深度自用的 Paperclip Fork（代号 Coolie）。内建了「本地施工总社」6 大数字员工（Hermes/铁匠/门神/墨斗/兑底渊/百晓生）与微信/IM 秒级直通异步派单体系：
+> - **一键新机复刻**：新主机（Mac/Linux）克隆仓库后，运行 `bash scripts/bootstrap-coolie-dev-host.sh` 即可在 30 秒内全自动拉起内嵌 PGlite Dev Server (3100)、初始化企业与 6 大员工并挂载 Runner Bridge 看门狗。
+> - **异步控制面调度**：微信/终端秒级建单（0.8s 回执），后台 `Runner Bridge` 独立认领执行，彻底消除了终端 180s 超时中断与幽灵虚报。
+> - **权威指南**：参见 [AGENTS.md §15](AGENTS.md) 与 [跨主机复刻手册 (docs-coolie/playbooks/coolie-dev-host-replication.md)](docs-coolie/playbooks/coolie-dev-host-replication.md)。
+
+<br/>
+
 <div align="center">
 <table>
   <tr>

@@ -289,6 +289,23 @@ A change is done when all are true:
    - 运行 `bash scripts/check-agent-native-ui.sh` 实时检查 Web 与移动端组件的 Agent-Native 符合度；
    - CMMI G3 门禁前必须检查新增交互组件的属性合规。
 
+## 15. Coolie Dev 本地工坊异步调度与一键跨机复刻规范 (wave297)
+
+老板原话: 「微信派单绝不能在终端前台同步阻塞等，必须并轨控制面工单池；后台由 Runner Bridge 异步接单消费；死进程必须自动探活自愈，杜绝幽灵虚报；这套体系部署到别的主机必须一键复制，零卡点复刻。」
+
+1. **异步控制面并轨铁律**：
+   - **禁止前台阻塞**：严禁在 Hermes 会话或终端中同步阻塞执行长耗时代码（必受 180s 超时截杀）；
+   - **控制面入库**：所有微信/IM 指令统一调用 `scripts/hermes-boss-intent-dispatcher.sh`，0.8 秒内建立 Dev Server 工单（COOA-XX）并返回回执；
+   - **后台异步认领**：宿主机后台常驻守护 `scripts/coolie-task-runner-bridge.mjs`，每 5 秒轮询并认领工单执行，独立日志流落盘 `.coolie-local/logs/${task}.log`。
+
+2. **活体探活与自愈铁律**：
+   - 团队状态与监控脚本（`scripts/cron-team-status.sh`）强制执行 `kill -0 $PID` 存活检测；
+   - 进程一旦异常退出，状态机必须自动修正为 `failed` 并落盘自愈，严禁向微信播报虚假运行时长。
+
+3. **跨主机一键复刻 (One-Click Bootstrap)**：
+   - 任何新主机（Mac / Linux / 云主机）克隆仓库后，运行 `bash scripts/bootstrap-coolie-dev-host.sh` 即可在 30 秒内全自动拉起 PGlite Dev Server (3100)、初始化「Coolie 本地施工总社」、注入 6 大数字员工并注册 crontab 看门狗保活。
+   - 详见 `docs-coolie/playbooks/coolie-dev-host-replication.md`。
+
 ## This fork's own conventions
 
 This repository is a fork of Paperclip. The rules above are upstream's; these are ours.
@@ -302,6 +319,7 @@ be kept in sync twice.
   own `ontology_tenants` is an inert leftover of the cancelled standalone deployment.
 - `docs-coolie/FORK-SURFACE-AUDIT.md` — how far this fork actually diverges from
   upstream, and which resolution each part needs.
+- `docs-coolie/playbooks/coolie-dev-host-replication.md` — Coolie Dev 跨主机一键复刻与异步派单守护 SOP。
 - `doc/plans/*.md` — dated plan and design records.
 - `docs-coolie/specs/*.md` — Kiro-style specs (requirements + EARS acceptance
   criteria, with the technical section appended). Read one before building its feature.
