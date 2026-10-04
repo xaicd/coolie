@@ -87,7 +87,9 @@ cmd_start() {
   echo ""
 
   if [[ $ready -eq 1 ]]; then
-    echo "🎉 本地 Coolie 工坊 Dev 环境启动成功！"
+    # 确保自动热重启特性 (autoRestartDevServerWhenIdle) 开启，代码更新时后台静默热重载，严禁弹窗阻断打扰老板
+    bash "$SCRIPT_DIR/host-exec.sh" "curl -sf -X PATCH '$HOST_API_BASE/api/instance/settings/experimental' -H 'Content-Type: application/json' -d '{\"autoRestartDevServerWhenIdle\": true}' >/dev/null 2>&1" || true
+    echo "🎉 本地 Coolie 工坊 Dev 环境启动成功！(已启用后台静默热重载)"
     cmd_url
   else
     echo "❌ 启动超时，请检查日志: $DEV_LOG"
