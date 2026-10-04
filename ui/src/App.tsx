@@ -325,7 +325,7 @@ function boardRoutes(streamlinedUiEnabled: boolean) {
       <Route path="issues/:issueId" element={<IssueDetail />} />
       <Route path="issues/:issueId/spec" element={<IssueSpecPage />} />
       <Route path="specs" element={<SpecTreePage />} />
-      <Route path="ontology" element={<OntologyGraphPage />} />
+      <Route path="graph" element={<OntologyGraphPage />} />
       {import.meta.env.DEV ? (
         <Route path="tests/perf/long-thread" element={<IssueChatLongThreadPerf />} />
       ) : null}
