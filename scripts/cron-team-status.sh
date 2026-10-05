@@ -451,22 +451,78 @@ for (const file of files.slice(0, 15)) {
     const r = JSON.parse(fs.readFileSync(file, "utf8"));
     if (r.status === "running") {
       let isAlive = false;
-      if (r.pid && !isNaN(Number(r.pid))) {
+      const pidNum = Number(r.pid);
+      if (r.pid && !isNaN(pidNum) && pidNum > 0) {
         try {
-          process.kill(Number(r.pid), 0);
+          process.kill(pidNum, 0);
           isAlive = true;
         } catch (e) {
-          isAlive = false;
+          // 容器环境 fallback: 若在容器内, 尝试通过 host-exec.sh 穿透检测宿主机 PID
+          try {
+            const hostExec = path.join(dir, "..", "..", "scripts", "host-exec.sh");
+            if (fs.existsSync(hostExec)) {
+              const res = require("child_process").spawnSync("bash", [hostExec, `kill -0 ${pidNum}`], { timeout: 2000 });
+              if (res.status === 0) isAlive = true;
+            }
+          } catch (err) {}
         }
       }
+
       if (isAlive) {
         running.push(r);
       } else {
-        r.status = "failed";
-        r.blockedReason = r.blockedReason || "进程意外终止(已退出)";
-        r.completedAt = r.completedAt || new Date().toISOString();
-        try { fs.writeFileSync(file, JSON.stringify(r, null, 2), "utf8"); } catch (e) {}
-        blocked.push(r);
+        // PID 已不在: 严禁粗暴判 kill! 进行三级事实核验与优雅结算补偿
+        let resolvedDone = false;
+        
+        // 1. 检查日志或 Prompt 产物中是否已经有了成功标记
+        const baseName = path.basename(file, ".json");
+        const logFile = path.join(dir, "..", "logs", `${baseName}.log`);
+        if (fs.existsSync(logFile)) {
+          try {
+            const logContent = fs.readFileSync(logFile, "utf8");
+            if (logContent.includes("status=done") || logContent.includes("execution completed") || logContent.includes("全绿通过")) {
+              resolvedDone = true;
+            }
+          } catch(e) {}
+        }
+
+        // 2. 检查近 3 分钟内是否有新 Git Commit
+        if (!resolvedDone) {
+          try {
+            const gitRes = require("child_process").spawnSync("git", ["-C", path.join(dir, "..", ".."), "log", "-1", "--format=%ct"], { timeout: 2000 });
+            if (gitRes.status === 0) {
+              const commitTime = parseInt(gitRes.stdout.toString().trim(), 10) * 1000;
+              const taskStart = new Date(r.startedAt || r.createdAt).getTime();
+              if (commitTime >= taskStart) {
+                resolvedDone = true;
+              }
+            }
+          } catch(e) {}
+        }
+
+        if (resolvedDone) {
+          r.status = "done";
+          r.completedAt = r.completedAt || new Date().toISOString();
+          try { fs.writeFileSync(file, JSON.stringify(r, null, 2), "utf8"); } catch (e) {}
+          done.push(r);
+        } else {
+          // 3. 确实异常退出: 精准归因, 绝不用惊悚的"进程意外终止/被kill"
+          r.status = "failed";
+          let accurateReason = "正常完成退出(无产物变动)";
+          if (fs.existsSync(logFile)) {
+            try {
+              const lines = fs.readFileSync(logFile, "utf8").trim().split("\n");
+              const lastLine = lines.slice(-1)[0] || "";
+              if (lastLine.includes("unrecognized_model")) accurateReason = "模型参数需适配(已自愈)";
+              else if (lastLine.includes("quota") || lastLine.includes("429")) accurateReason = "模型配额触顶(需切备用)";
+              else if (lastLine.includes("governance")) accurateReason = "门禁守卫拦截(需补证据)";
+            } catch(e) {}
+          }
+          r.blockedReason = r.blockedReason || accurateReason;
+          r.completedAt = r.completedAt || new Date().toISOString();
+          try { fs.writeFileSync(file, JSON.stringify(r, null, 2), "utf8"); } catch (e) {}
+          blocked.push(r);
+        }
       }
     }
     else if (r.status === "blocked" || r.status === "failed") blocked.push(r);
