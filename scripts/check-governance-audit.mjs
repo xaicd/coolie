@@ -19,9 +19,9 @@ function assertRule(name, condition, detail = '') {
 }
 
 // -----------------------------------------------------------------------------
-// 1. CMMI 六大截断产物标准规范目录审计 (G0-G5 Artifacts)
+// 1. CMMI 六大阶段门禁基线产物标准规范目录审计 (G0-G5 Artifacts)
 // -----------------------------------------------------------------------------
-console.log('📁 1. CMMI 全生命周期截断产物规范目录审计:');
+console.log('📁 1. CMMI 全生命周期六大阶段门禁产物规范目录审计:');
 const g0Briefs = fs.existsSync('docs-coolie/briefs') && fs.readdirSync('docs-coolie/briefs').length > 0;
 const g0Specs = fs.existsSync('docs-coolie/specs') && fs.readdirSync('docs-coolie/specs').length > 0;
 assertRule('G0_Req: 需求简报与 EARS 规格说明书规范归档', g0Briefs && g0Specs, 'docs-coolie/briefs/ 或 specs/ 缺失');
@@ -149,8 +149,8 @@ const noClaudeAgentsInstall = !registerScriptContent.includes('cp "$src" "$dst"'
 console.log('\n📜 7. Coolie 根本大纲与工程宪法 (党章级法典) 审计:');
 const constitutionExists = fs.existsSync('docs-coolie/research/2026-10-05-coolie-constitution-and-palantir-master-spec.md');
 const constitutionContent = constitutionExists ? fs.readFileSync('docs-coolie/research/2026-10-05-coolie-constitution-and-palantir-master-spec.md', 'utf8') : '';
-const hasTwentyOneArticles = constitutionContent.includes('第二十一条') && constitutionContent.includes('Palantir');
-assertRule('根本大纲与工程宪法已沉淀: docs-coolie/research/2026-10-05-coolie-constitution-and-palantir-master-spec.md', constitutionExists && hasTwentyOneArticles, '党章级法典缺失或条款不全');
+const hasTwentyTwoArticles = constitutionContent.includes('第二十二条') && constitutionContent.includes('Palantir');
+assertRule('根本大纲与工程宪法已沉淀: docs-coolie/research/2026-10-05-coolie-constitution-and-palantir-master-spec.md', constitutionExists && hasTwentyTwoArticles, '党章级法典缺失或条款不全');
 
 const agentsMdContent = fs.existsSync('AGENTS.md') ? fs.readFileSync('AGENTS.md', 'utf8') : '';
 const hasChapter18 = agentsMdContent.includes('## 18. Coolie 工坊唯一核心北极星目标与真业务本体物理并轨铁律');
