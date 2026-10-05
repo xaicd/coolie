@@ -784,6 +784,87 @@ const noContent = (): MutationOutcome => ({ status: 204, payload: {} });
 const notFound = (error: string): MutationOutcome => ({ status: 404, payload: { error } });
 const badRequest = (error: string): MutationOutcome => ({ status: 400, payload: { error } });
 
+const RESOURCE_KINDS: readonly OntologyResourceKind[] = ["project", "project_workspace", "business_system"];
+
+function readResourceKind(value: unknown): OntologyResourceKind | null {
+  return typeof value === "string" && (RESOURCE_KINDS as readonly string[]).includes(value)
+    ? (value as OntologyResourceKind)
+    : null;
+}
+
+/**
+ * Link a resource (project / workspace / business system) to a domain.
+ *
+ * One implementation behind both the `link-ontology-resource` action and the
+ * `POST /resource-links` route. Both the domain and — for projects — the host
+ * project must belong to the calling company; a cross-company id is a 404, not
+ * a silently created dangling link.
+ */
+async function linkResourceMutation(
+  store: GraphStore,
+  ctx: PluginContext,
+  call: MutationCall,
+): Promise<MutationOutcome> {
+  const resourceKind = readResourceKind(call.fields.resourceKind);
+  if (!resourceKind) return badRequest("resourceKind must be project, project_workspace or business_system");
+  const resourceId = optionalString(call.fields.resourceId)?.trim();
+  if (!resourceId) return badRequest("resourceId is required");
+  const domainId = optionalString(call.fields.domainId)?.trim();
+  if (!domainId) return badRequest("domainId is required");
+
+  const domain = await store.getDomain(call.companyId, domainId);
+  if (!domain) return notFound("Domain not found");
+
+  let label = optionalString(call.fields.resourceLabel) ?? "";
+  if (resourceKind === "project") {
+    const project = await ctx.projects.get(resourceId, call.companyId).catch(() => null);
+    if (!project) return notFound("Project not found in this company");
+    if (label === "") label = str((project as unknown as Record<string, unknown>).name) || "";
+  }
+
+  const link = await store.linkResource({
+    companyId: call.companyId,
+    domainId,
+    resourceKind,
+    resourceId,
+    resourceLabel: label,
+    role: call.fields.role === "owner" ? "owner" : "consumer",
+    createdBy: "board",
+  });
+  await ctx.activity.log({
+    companyId: call.companyId,
+    message: `Linked ${resourceKind} ${label || resourceId} to ontology domain ${domain.display_name}`,
+    entityType: "ontology_resource_link",
+    entityId: link.id,
+  });
+  return ok({ link });
+}
+
+/** Detach a resource from a domain. Soft delete; logs only when something changed. */
+async function unlinkResourceMutation(
+  store: GraphStore,
+  ctx: PluginContext,
+  call: MutationCall,
+): Promise<MutationOutcome> {
+  const resourceKind = readResourceKind(call.fields.resourceKind);
+  if (!resourceKind) return badRequest("resourceKind must be project, project_workspace or business_system");
+  const resourceId = optionalString(call.fields.resourceId)?.trim();
+  if (!resourceId) return badRequest("resourceId is required");
+  const domainId = optionalString(call.fields.domainId)?.trim();
+  if (!domainId) return badRequest("domainId is required");
+
+  const removed = await store.unlinkResource(call.companyId, resourceKind, resourceId, domainId);
+  if (removed) {
+    await ctx.activity.log({
+      companyId: call.companyId,
+      message: `Unlinked ${resourceKind} ${resourceId} from ontology domain ${domainId}`,
+      entityType: "ontology_domain",
+      entityId: domainId,
+    });
+  }
+  return ok({ removed });
+}
+
 function optionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
@@ -1652,6 +1733,8 @@ const MUTATION_HANDLERS: Record<string, MutationHandler> = {
   "run-transform": runTransformMutation,
   "extract-document": extractDocumentMutation,
   "create-business-system": createBusinessSystemMutation,
+  "link-resource": linkResourceMutation,
+  "unlink-resource": unlinkResourceMutation,
 };
 
 /** Wraps a shared handler as a `ctx.actions` handler: payload out, throw on error. */
@@ -2422,47 +2505,10 @@ const plugin = definePlugin({
 
     // ── Resource links (project / application ↔ ontology domain) ──
     //
-    // A domain is the anchor; projects and applications reference it. `link`
-    // is idempotent so a re-run (or a repeated import) is safe.
-    ctx.actions.register("link-ontology-resource", async (params) => {
-      const call = readMutationCall(params);
-      const resourceKind = requireString(call.fields.resourceKind, "resourceKind") as OntologyResourceKind;
-      const resourceId = requireString(call.fields.resourceId, "resourceId");
-      let label = optionalString(call.fields.resourceLabel) ?? "";
-      if (label === "" && resourceKind === "project") {
-        const project = await ctx.projects
-          .get(resourceId, call.companyId)
-          .catch(() => null);
-        label = str((project as unknown as Record<string, unknown> | null)?.name) || "";
-      }
-      const link = await store.linkResource({
-        companyId: call.companyId,
-        domainId: requireString(call.fields.domainId, "domainId"),
-        resourceKind,
-        resourceId,
-        resourceLabel: label,
-        role: call.fields.role === "owner" ? "owner" : "consumer",
-        createdBy: "board",
-      });
-      await ctx.activity.log({
-        companyId: call.companyId,
-        message: `Linked ${resourceKind} ${resourceId} to ontology domain ${link.domain_id}`,
-        entityType: "ontology_resource_link",
-        entityId: link.id,
-      });
-      return { link };
-    });
-
-    ctx.actions.register("unlink-ontology-resource", async (params) => {
-      const call = readMutationCall(params);
-      const removed = await store.unlinkResource(
-        call.companyId,
-        requireString(call.fields.resourceKind, "resourceKind") as OntologyResourceKind,
-        requireString(call.fields.resourceId, "resourceId"),
-        requireString(call.fields.domainId, "domainId"),
-      );
-      return { removed };
-    });
+    // A domain is the anchor; projects and applications reference it.
+    // `link-ontology-resource` / `unlink-ontology-resource` are registered via
+    // MUTATION_HANDLERS (linkResourceMutation / unlinkResourceMutation) so the
+    // action surface and the HTTP `/resource-links` routes share one path.
 
     ctx.actions.register("suggest-ontology-domains", async (params) => {
       const call = readMutationCall(params);
@@ -2481,6 +2527,31 @@ const plugin = definePlugin({
       const companyId = requireString(params.companyId, "companyId");
       const domainId = requireString(params.domainId, "domainId");
       return { links: await store.listLinksForDomain(companyId, domainId) };
+    });
+
+    /** Every domain↔project link in the company — backs the 关联项目 column. */
+    ctx.data.register("domain-project-links", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      return { links: await store.listLinksByKind(companyId, "project") };
+    });
+
+    /** Host projects list for linking dropdowns in UI. */
+    ctx.data.register("company-projects", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      try {
+        const res = await ctx.projects.list({ companyId, limit: 200, offset: 0 });
+        const list = Array.isArray(res) ? res : [];
+        return {
+          projects: list.map((p) => ({
+            id: p.id,
+            name: p.name,
+            description: p.description ?? null,
+            status: p.status ?? "active",
+          })),
+        };
+      } catch {
+        return { projects: [] };
+      }
     });
 
     /** Backs the project page's 「本体域」 tab. */
@@ -4277,6 +4348,27 @@ const plugin = definePlugin({
           requireString(input.params.domainId, "domainId"),
         );
         return { body: { snapshots } };
+      }
+
+      case "list-resource-links": {
+        const domainId = optionalString(input.query.domainId);
+        const resourceKind = readResourceKind(input.query.resourceKind) ?? "project";
+        if (domainId) {
+          const links = await store.listLinksForDomain(companyId, domainId);
+          return { body: { links } };
+        }
+        const links = await store.listLinksByKind(companyId, resourceKind);
+        return { body: { links } };
+      }
+
+      case "link-resource": {
+        const outcome = await linkResourceMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
+      }
+
+      case "unlink-resource": {
+        const outcome = await unlinkResourceMutation(store, ctx, httpMutationCall(companyId, input));
+        return { status: outcome.status, body: outcome.payload };
       }
 
       case "list-functions": {

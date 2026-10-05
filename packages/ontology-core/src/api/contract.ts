@@ -189,6 +189,9 @@ export const CORE_API: CoreApiRoute[] = [
   r("create-capability-gap", "governance", false, "新建能力缺口"),
   r("acquire-capability", "governance", false, "获取能力(写回解析来源)"),
   r("list-capability-resolutions", "governance", true, "能力缺口的解析轨迹"),
+  r("list-resource-links", "governance", false, "列出本体域与外部资源(项目/系统)的关联"),
+  r("link-resource", "governance", false, "关联本体域与外部资源"),
+  r("unlink-resource", "governance", false, "解除本体域与外部资源的关联"),
 
   // --- bench: the evaluation apparatus (DS parity) --------------------------
   r("list-prompt-templates", "bench", false, "列出提示词模板"),

@@ -3558,10 +3558,34 @@ function DomainList({
     { companyId },
   );
   const domains = data?.domains ?? [];
+  const { data: linksData, refresh: refreshLinks } = usePluginData<{
+    links: Array<{
+      id: string;
+      domain_id: string;
+      resource_kind: string;
+      resource_id: string;
+      resource_label: string;
+      role: string;
+      is_deleted?: boolean;
+    }>;
+  }>("domain-project-links", { companyId });
+  const links = linksData?.links ?? [];
+
+  const { data: projectsData } = usePluginData<{
+    projects: Array<{
+      id: string;
+      name: string;
+      status?: string;
+    }>;
+  }>("company-projects", { companyId });
+  const projects = projectsData?.projects ?? [];
+
   const createDomain = usePluginAction("create-domain");
   const updateDomain = usePluginAction("update-domain");
   const transitionDomain = usePluginAction("transition-domain");
   const deleteDomain = usePluginAction("delete-domain");
+  const linkResource = usePluginAction("link-resource");
+  const unlinkResource = usePluginAction("unlink-resource");
   const [showInlineCreate, setShowInlineCreate] = useState(false);
   const [slug, setSlug] = useState("");
   const [displayName, setDisplayName] = useState("");
@@ -3633,6 +3657,77 @@ function DomainList({
     );
     if (!window.confirm(message)) return;
     void runOnRow(d.id, () => deleteDomain({ companyId, domainId: d.id }));
+  };
+
+  const renderLinkedProjectCell = (d: OntologyDomain) => {
+    const link = links.find((l) => l.domain_id === d.id && !l.is_deleted);
+    const linkedProject = link ? projects.find((p) => p.id === link.resource_id) : null;
+    const isRowBusy = busyRowId === d.id;
+
+    if (link) {
+      return (
+        <div className="flex items-center justify-between gap-1 max-w-[170px] rounded bg-primary/5 border border-primary/20 px-1.5 py-0.5 text-xs">
+          <div className="flex items-center gap-1 min-w-0" title={`${linkedProject?.name || link.resource_label} (${link.role})`}>
+            <span className="text-[12px] leading-none shrink-0">📁</span>
+            <span className="font-medium text-foreground truncate text-(length:--text-nano)">
+              {linkedProject?.name || link.resource_label}
+            </span>
+          </div>
+          <button
+            type="button"
+            disabled={isRowBusy}
+            className="text-[11px] text-muted-foreground hover:text-destructive shrink-0 px-0.5 leading-none rounded hover:bg-muted transition-colors disabled:opacity-50"
+            title={t("解除此本体域与项目的关联", "Unlink this project from domain")}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (!window.confirm(t(`确定解除与项目「${linkedProject?.name || link.resource_label}」的关联？`, `Unlink project "${linkedProject?.name || link.resource_label}"?`))) return;
+              void runOnRow(d.id, async () => {
+                await unlinkResource({
+                  companyId,
+                  domainId: d.id,
+                  resourceKind: "project",
+                  resourceId: link.resource_id,
+                });
+                refreshLinks();
+              });
+            }}
+          >
+            ✕
+          </button>
+        </div>
+      );
+    }
+
+    return (
+      <select
+        disabled={isRowBusy}
+        className="w-full max-w-[160px] text-(length:--text-nano) bg-muted/40 border border-border/60 rounded px-1.5 py-0.5 text-muted-foreground hover:text-foreground focus:outline-none cursor-pointer disabled:opacity-50"
+        value=""
+        onChange={(e) => {
+          const val = e.target.value;
+          if (!val) return;
+          const proj = projects.find((p) => p.id === val);
+          void runOnRow(d.id, async () => {
+            await linkResource({
+              companyId,
+              domainId: d.id,
+              resourceKind: "project",
+              resourceId: val,
+              resourceLabel: proj?.name || val,
+              role: "owner",
+            });
+            refreshLinks();
+          });
+        }}
+      >
+        <option value="">{t("+ 关联项目...", "+ Link project...")}</option>
+        {projects.map((p) => (
+          <option key={p.id} value={p.id}>
+            {p.name}
+          </option>
+        ))}
+      </select>
+    );
   };
 
   const renderDomainActions = (d: OntologyDomain) => {
@@ -3946,6 +4041,14 @@ function DomainList({
                       {d.description || t("暂无描述，点击可在右侧操作栏编辑或补充说明。", "No description provided.")}
                     </p>
 
+                    {/* Linked Project */}
+                    <div className="mt-2.5 flex items-center justify-between border-t border-border/40 pt-2 text-xs">
+                      <span className="text-muted-foreground text-[11px] shrink-0 font-medium">{t("关联项目", "Project")}</span>
+                      <div className="flex-1 min-w-0 ml-2 flex justify-end">
+                        {renderLinkedProjectCell(d)}
+                      </div>
+                    </div>
+
                     {/* Metadata chips */}
                     <div className="mt-3 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground border-t border-border/40 pt-2.5">
                       <span className="rounded bg-muted/60 px-1.5 py-0.5">
@@ -4055,6 +4158,12 @@ function DomainList({
                     </div>
                   );
                 },
+              },
+              {
+                key: "linked_project",
+                header: t("关联项目", "Linked Project"),
+                width: "175px",
+                render: (_v, row) => renderLinkedProjectCell(row as unknown as OntologyDomain),
               },
               {
                 key: "created_by",

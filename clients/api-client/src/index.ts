@@ -174,5 +174,10 @@ export type {
   GovernanceGateCheck,
   GovernanceGate,
   GovernanceSummary,
+  OntologyResourceKind,
+  OntologyResourceRole,
+  OntologyResourceLink,
+  LinkOntologyResourceInput,
+  UnlinkOntologyResourceInput,
 } from "./types";
 

@@ -1558,6 +1558,11 @@ export interface GraphStore {
   ): Promise<boolean>;
   /** Everything attached to one domain. */
   listLinksForDomain(companyId: string, domainId: string): Promise<OntologyResourceLinkRow[]>;
+  /**
+   * Every live link of one kind across the company (e.g. all domain↔project
+   * links), so a list view can show each domain's linked resources in one query.
+   */
+  listLinksByKind(companyId: string, resourceKind: OntologyResourceKind): Promise<OntologyResourceLinkRow[]>;
   /** Everything one resource is attached to. */
   listLinksForResource(
     companyId: string,
@@ -4019,6 +4024,25 @@ export class PostgresGraphStore implements GraphStore {
         WHERE company_id = $1 AND domain_id = $2 AND is_deleted = false
         ORDER BY resource_kind ASC, resource_label ASC`,
       [companyId, domainId],
+    );
+  }
+
+  /** Every live link of one kind across the company. */
+  async listLinksByKind(
+    companyId: string,
+    resourceKind: OntologyResourceKind,
+  ): Promise<OntologyResourceLinkRow[]> {
+    // Joined to live domains so a retired domain's links do not surface.
+    return this.db.query<OntologyResourceLinkRow>(
+      `SELECT l.id, l.company_id, l.domain_id, l.resource_kind, l.resource_id,
+              l.resource_label, l.role, l.is_deleted
+         FROM ${this.table("ontology_resource_links")} l
+         JOIN ${this.table("ontology_domains")} d
+           ON d.id = l.domain_id AND d.company_id = l.company_id
+        WHERE l.company_id = $1 AND l.resource_kind = $2 AND l.is_deleted = false
+          AND d.is_deleted = false
+        ORDER BY l.created_at ASC`,
+      [companyId, resourceKind],
     );
   }
 

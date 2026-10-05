@@ -61,6 +61,10 @@ import {
   type GitCredential,
   type SaveGitCredentialInput,
   type GovernanceSummary,
+  type OntologyResourceKind,
+  type OntologyResourceLink,
+  type LinkOntologyResourceInput,
+  type UnlinkOntologyResourceInput,
 } from "./types";
 import { isRenderableBoardMessage } from "./board-chat";
 
@@ -1059,6 +1063,72 @@ export class CoolieClient {
     return this.request<GovernanceSummary>(
       "GET",
       `/api/companies/${encodeURIComponent(companyId)}/governance/summary${q}`,
+    );
+  }
+
+  /**
+   * 查询本体域与项目/工作区等外部资源的关联列表
+   * GET /api/plugins/paperclipai.plugin-ontology/api/resource-links
+   */
+  async listOntologyResourceLinks(
+    companyId: string,
+    opts?: { domainId?: string; resourceKind?: OntologyResourceKind },
+  ): Promise<OntologyResourceLink[]> {
+    const q = new URLSearchParams({ companyId });
+    if (opts?.domainId) q.set("domainId", opts.domainId);
+    if (opts?.resourceKind) q.set("resourceKind", opts.resourceKind);
+    const res = await this.request<{ links?: OntologyResourceLink[] } | OntologyResourceLink[]>(
+      "GET",
+      `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/resource-links?${q.toString()}`,
+    );
+    if (Array.isArray(res)) return res;
+    if (isRecord(res) && Array.isArray(res.links)) return res.links;
+    return [];
+  }
+
+  /**
+   * 关联本体域与外部资源 (如关联项目)
+   * POST /api/plugins/paperclipai.plugin-ontology/api/resource-links
+   */
+  async linkOntologyResource(
+    companyId: string,
+    input: LinkOntologyResourceInput,
+  ): Promise<OntologyResourceLink> {
+    const res = await this.request<{ link?: OntologyResourceLink } | OntologyResourceLink>(
+      "POST",
+      `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/resource-links`,
+      {
+        companyId,
+        domainId: input.domainId,
+        resourceKind: input.resourceKind,
+        resourceId: input.resourceId,
+        ...(input.resourceLabel ? { resourceLabel: input.resourceLabel } : {}),
+        ...(input.role ? { role: input.role } : {}),
+      },
+    );
+    if (isRecord(res) && "link" in res && res.link) {
+      return res.link as OntologyResourceLink;
+    }
+    return res as OntologyResourceLink;
+  }
+
+  /**
+   * 解除本体域与外部资源的关联
+   * POST /api/plugins/paperclipai.plugin-ontology/api/resource-links/unlink
+   */
+  async unlinkOntologyResource(
+    companyId: string,
+    input: UnlinkOntologyResourceInput,
+  ): Promise<{ unlinked: boolean }> {
+    return this.request<{ unlinked: boolean }>(
+      "POST",
+      `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/resource-links/unlink`,
+      {
+        companyId,
+        domainId: input.domainId,
+        resourceKind: input.resourceKind,
+        resourceId: input.resourceId,
+      },
     );
   }
 

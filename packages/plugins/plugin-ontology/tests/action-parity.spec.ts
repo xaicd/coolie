@@ -127,6 +127,8 @@ const MUTATION_HANDLER_KEYS = new Set([
   "run-transform",
   "extract-document",
   "create-business-system",
+  "link-resource",
+  "unlink-resource",
 ]);
 
 async function bootWorkerHarness() {

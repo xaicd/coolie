@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
+  ActivityIndicator,
+  Alert,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
   SafeAreaView,
@@ -17,6 +20,7 @@ import type {
   GovernanceGate,
   GovernanceSummary,
   OntologyDomain,
+  OntologyResourceLink,
   Project,
 } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
@@ -41,15 +45,15 @@ type StatusFilter = "all" | "passed" | "waived" | "attention";
 /**
  * 一个架构治理目标 = 本体域 + 关联项目。
  *
- * 诚实边界 (wave299-A): 后端暂无「本体域 ↔ 项目」关联字段, 关联只能按 slug
- * 与项目名匹配推测; 匹配不到时 project 为 null, 门禁回落到公司全域汇总。
- * 页面上用 projectSource 明示这一点, 不伪装成精确绑定。
+ * 精准绑定 (wave299-B): 优先采用 ontology_resource_links 的真实绑定关系;
+ * 未手动绑定时, 降级为按 slug/名称匹配推测; 无匹配时回落到公司全域汇总。
+ * 页面上用 projectSource (explicit-link / slug-match / none) 诚实明示。
  */
 interface GovernanceTarget {
   id: string;
   domain: OntologyDomain;
   project: Project | null;
-  projectSource: "slug-match" | "none";
+  projectSource: "explicit-link" | "slug-match" | "none";
 }
 
 const GATE_KEYS = ["g1", "g2", "g3", "g4", "g5"] as const;
@@ -99,6 +103,9 @@ export function ArchitectureGovernanceScreen({
 
   const [domains, setDomains] = useState<OntologyDomain[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [resourceLinks, setResourceLinks] = useState<OntologyResourceLink[]>([]);
+  const [linkingDomain, setLinkingDomain] = useState<OntologyDomain | null>(null);
+  const [linkingLoading, setLinkingLoading] = useState(false);
   // key: projectId, 或 "" 表示公司全域汇总
   const [summaries, setSummaries] = useState<Record<string, GovernanceSummary | null>>({});
 
@@ -111,18 +118,28 @@ export function ArchitectureGovernanceScreen({
   const loadData = useCallback(async () => {
     setError(null);
     try {
-      const [domainList, projectList] = await Promise.all([
+      const [domainList, projectList, linkList] = await Promise.all([
         coolie.listOntologyDomains(company.id),
         coolie.listProjects(company.id),
+        coolie
+          .listOntologyResourceLinks(company.id, { resourceKind: "project" })
+          .catch(() => [] as OntologyResourceLink[]),
       ]);
       setDomains(domainList);
       setProjects(projectList);
+      setResourceLinks(linkList);
 
       // 只拉实际被关联到的项目 + 公司全域, 每个只拉一次
       const keys = new Set<string>([""]);
       for (const d of domainList) {
-        const p = matchProject(d, projectList);
-        if (p) keys.add(p.id);
+        const link = linkList.find((l) => l.domain_id === d.id && !l.is_deleted);
+        if (link) {
+          const p = projectList.find((proj) => proj.id === link.resource_id);
+          if (p) keys.add(p.id);
+        } else {
+          const p = matchProject(d, projectList);
+          if (p) keys.add(p.id);
+        }
       }
       const entries = await Promise.all(
         [...keys].map(async (key) => {
@@ -151,19 +168,66 @@ export function ArchitectureGovernanceScreen({
     void loadData();
   }, [loadData]);
 
-  const targets = useMemo<GovernanceTarget[]>(
-    () =>
-      domains.map((domain) => {
-        const project = matchProject(domain, projects);
-        return {
-          id: domain.id,
-          domain,
-          project,
-          projectSource: project ? "slug-match" : "none",
-        };
-      }),
-    [domains, projects],
-  );
+  const targets = useMemo<GovernanceTarget[]>(() => {
+    return domains.map((domain) => {
+      const link = resourceLinks.find((l) => l.domain_id === domain.id && !l.is_deleted);
+      if (link) {
+        const project = projects.find((p) => p.id === link.resource_id);
+        if (project) {
+          return {
+            id: domain.id,
+            domain,
+            project,
+            projectSource: "explicit-link",
+          };
+        }
+      }
+      const project = matchProject(domain, projects);
+      return {
+        id: domain.id,
+        domain,
+        project,
+        projectSource: project ? "slug-match" : "none",
+      };
+    });
+  }, [domains, projects, resourceLinks]);
+
+  const handleLinkProject = async (domainId: string, projectId: string) => {
+    setLinkingLoading(true);
+    try {
+      const proj = projects.find((p) => p.id === projectId);
+      await coolie.linkOntologyResource(company.id, {
+        domainId,
+        resourceKind: "project",
+        resourceId: projectId,
+        resourceLabel: proj?.name || projectId,
+        role: "owner",
+      });
+      setLinkingDomain(null);
+      await loadData();
+    } catch (e) {
+      Alert.alert("关联失败", String((e as Error)?.message ?? e));
+    } finally {
+      setLinkingLoading(false);
+    }
+  };
+
+  const handleUnlinkProject = async (domainId: string, projectId: string) => {
+    setLinkingLoading(true);
+    try {
+      await coolie.unlinkOntologyResource(company.id, {
+        domainId,
+        resourceKind: "project",
+        resourceId: projectId,
+      });
+      setLinkingDomain(null);
+      await loadData();
+    } catch (e) {
+      Alert.alert("解除关联失败", String((e as Error)?.message ?? e));
+    } finally {
+      setLinkingLoading(false);
+    }
+  };
 
   const summaryFor = useCallback(
     (t: GovernanceTarget): GovernanceSummary | null => summaries[t.project?.id ?? ""] ?? null,
@@ -191,6 +255,127 @@ export function ArchitectureGovernanceScreen({
 
   const companySummary = summaries[""] ?? null;
   const linkedCount = targets.filter((t) => t.project).length;
+
+  const renderProjectPickerModal = () => (
+    <Modal
+      visible={!!linkingDomain}
+      animationType="slide"
+      transparent
+      accessibilityViewIsModal={true}
+      onRequestClose={() => setLinkingDomain(null)}
+    >
+      <Pressable style={styles.modalOverlay} onPress={() => setLinkingDomain(null)}>
+        <Pressable style={styles.modalSheet} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.modalHeader}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.modalTitle}>
+                关联项目 · {linkingDomain ? domainName(linkingDomain) : ""}
+              </Text>
+              <Text style={styles.modalSubtitle}>
+                选择一个真实项目与该本体域建立唯一绑定
+              </Text>
+            </View>
+            <Pressable
+              testID="ArchGovernance__Modal__CloseBtn"
+              onPress={() => setLinkingDomain(null)}
+              hitSlop={8}
+              style={styles.modalCloseBtn}
+            >
+              <Ionicons name="close" size={20} color={C.ink2} />
+            </Pressable>
+          </View>
+
+          {linkingLoading ? (
+            <View style={styles.modalLoadingBox}>
+              <ActivityIndicator size="small" color={C.accent} />
+              <Text style={styles.modalLoadingText}>正在更新关联...</Text>
+            </View>
+          ) : (
+            <ScrollView style={styles.modalProjectList} contentContainerStyle={{ paddingBottom: 24 }}>
+              {(() => {
+                if (!linkingDomain) return null;
+                const currentLink = resourceLinks.find(
+                  (l) => l.domain_id === linkingDomain.id && !l.is_deleted,
+                );
+                if (!currentLink) return null;
+                return (
+                  <Pressable
+                    testID="ArchGovernance__Modal__UnlinkOption"
+                    style={styles.unlinkOptionRow}
+                    onPress={() => handleUnlinkProject(linkingDomain.id, currentLink.resource_id)}
+                  >
+                    <Ionicons name="trash-outline" size={15} color={C.err} />
+                    <Text style={styles.unlinkOptionText}>解除关联 (恢复显示公司全域汇总)</Text>
+                  </Pressable>
+                );
+              })()}
+
+              {projects.length === 0 ? (
+                <View style={styles.modalEmptyBox}>
+                  <Text style={styles.modalEmptyText}>该公司暂无可关联的项目</Text>
+                </View>
+              ) : (
+                projects.map((proj) => {
+                  const currentLink = linkingDomain
+                    ? resourceLinks.find(
+                        (l) =>
+                          l.domain_id === linkingDomain.id &&
+                          l.resource_id === proj.id &&
+                          !l.is_deleted,
+                      )
+                    : null;
+                  return (
+                    <Pressable
+                      key={proj.id}
+                      testID={`ArchGovernance__Modal__ProjectItem__${proj.id}`}
+                      style={[
+                        styles.projectOptionRow,
+                        currentLink ? styles.projectOptionRowActive : null,
+                      ]}
+                      onPress={() => {
+                        if (linkingDomain) {
+                          handleLinkProject(linkingDomain.id, proj.id);
+                        }
+                      }}
+                    >
+                      <View style={{ flex: 1, minWidth: 0 }}>
+                        <View style={styles.projectOptionNameRow}>
+                          <Text
+                            style={[
+                              styles.projectOptionName,
+                              currentLink ? styles.projectOptionNameActive : null,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {proj.name}
+                          </Text>
+                          {currentLink ? (
+                            <View style={styles.currentLinkTag}>
+                              <Text style={styles.currentLinkTagText}>当前绑定</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                        {proj.description ? (
+                          <Text style={styles.projectOptionDesc} numberOfLines={1}>
+                            {proj.description}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Ionicons
+                        name={currentLink ? "checkmark-circle" : "chevron-forward"}
+                        size={18}
+                        color={currentLink ? C.ok : C.ink3}
+                      />
+                    </Pressable>
+                  );
+                })
+              )}
+            </ScrollView>
+          )}
+        </Pressable>
+      </Pressable>
+    </Modal>
+  );
 
   // ---------------------------------------------------------------------------
   // 视图 1: 治理目标列表 (本体域 + 关联项目)
@@ -347,21 +532,42 @@ export function ArchitectureGovernanceScreen({
                       <Text style={styles.projectLinkName} numberOfLines={1}>
                         {item.project ? item.project.name : "未关联 · 显示公司全域门禁"}
                       </Text>
-                      {item.project ? (
-                        <View style={styles.inferredTag}>
-                          <Text style={styles.inferredTagText}>名称匹配</Text>
+                      {item.projectSource === "explicit-link" ? (
+                        <View style={styles.explicitTag}>
+                          <Text style={styles.explicitTagText}>已绑定</Text>
                         </View>
+                      ) : item.projectSource === "slug-match" ? (
+                        <View style={styles.inferredTag}>
+                          <Text style={styles.inferredTagText}>推测匹配</Text>
+                        </View>
+                      ) : (
+                        <View style={styles.inferredTag}>
+                          <Text style={styles.inferredTagText}>未绑定</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View style={styles.projectLinkActionsRow}>
+                      <Pressable
+                        testID={`ArchGovernance__Card__LinkBtn__${item.id}`}
+                        onPress={() => setLinkingDomain(item.domain)}
+                        hitSlop={6}
+                        style={styles.linkChangeBtn}
+                      >
+                        <Ionicons name="link-outline" size={12} color={C.accent} />
+                        <Text style={styles.linkChangeBtnText}>
+                          {item.projectSource === "explicit-link" ? "更换" : "绑定"}
+                        </Text>
+                      </Pressable>
+                      {item.project && onOpenProjectTasks ? (
+                        <Pressable
+                          testID={`ArchGovernance__Card__OpenTasks__${item.id}`}
+                          onPress={() => onOpenProjectTasks(item.project!)}
+                          hitSlop={6}
+                        >
+                          <Text style={styles.projectTaskLink}>工单 ›</Text>
+                        </Pressable>
                       ) : null}
                     </View>
-                    {item.project && onOpenProjectTasks ? (
-                      <Pressable
-                        testID={`ArchGovernance__Card__OpenTasks__${item.id}`}
-                        onPress={() => onOpenProjectTasks(item.project!)}
-                        hitSlop={6}
-                      >
-                        <Text style={styles.projectTaskLink}>工单 ›</Text>
-                      </Pressable>
-                    ) : null}
                   </View>
 
                   {item.domain.description ? (
@@ -417,6 +623,7 @@ export function ArchitectureGovernanceScreen({
             }}
           />
         )}
+        {renderProjectPickerModal()}
       </SafeAreaView>
     );
   }
@@ -466,8 +673,21 @@ export function ArchitectureGovernanceScreen({
         <View style={styles.workbenchSubInfoRow}>
           <Text style={styles.workbenchSubInfoLabel}>关联项目：</Text>
           <Text style={styles.workbenchSubInfoValue} numberOfLines={1}>
-            {selected.project ? `${selected.project.name}（名称匹配）` : "未关联 · 公司全域汇总"}
+            {selected.project
+              ? `${selected.project.name}（${selected.projectSource === "explicit-link" ? "已绑定" : "推测匹配"}）`
+              : "未关联 · 公司全域汇总"}
           </Text>
+          <Pressable
+            testID="ArchGovernance__Workbench__ChangeLinkBtn"
+            style={styles.workbenchChangeLinkBtn}
+            onPress={() => setLinkingDomain(selected.domain)}
+            hitSlop={6}
+          >
+            <Ionicons name="link-outline" size={12} color={C.accent} />
+            <Text style={styles.workbenchChangeLinkBtnText}>
+              {selected.projectSource === "explicit-link" ? "更换绑定" : "绑定项目"}
+            </Text>
+          </Pressable>
         </View>
 
         <View style={styles.workbenchTabsRow}>
@@ -611,6 +831,7 @@ export function ArchitectureGovernanceScreen({
           </View>
         )}
       </ScrollView>
+      {renderProjectPickerModal()}
     </SafeAreaView>
   );
 }
@@ -752,6 +973,26 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255, 255, 255, 0.06)",
   },
   inferredTagText: { fontSize: 9, color: C.ink3 },
+  explicitTag: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+    borderWidth: 1,
+    borderColor: "rgba(16, 185, 129, 0.3)",
+  },
+  explicitTagText: { fontSize: 9, color: C.ok, fontWeight: "600" },
+  projectLinkActionsRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  linkChangeBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    backgroundColor: "rgba(167, 139, 250, 0.12)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+  },
+  linkChangeBtnText: { fontSize: 10, color: C.accent, fontWeight: "600" },
   projectTaskLink: { fontSize: 11, color: C.accent, fontWeight: "500" },
   domainDesc: { fontSize: 12, color: C.ink3, lineHeight: 16, marginBottom: 8 },
   gatesBar: { flexDirection: "row", gap: 5, marginBottom: 8, flexWrap: "wrap" },
@@ -893,4 +1134,96 @@ const styles = StyleSheet.create({
     borderRadius: RADIUS.sm,
   },
   waiverText: { fontSize: 11, color: C.warn, fontWeight: "500" },
+
+  workbenchChangeLinkBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: "rgba(167, 139, 250, 0.15)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.sm,
+    marginLeft: 6,
+  },
+  workbenchChangeLinkBtnText: { fontSize: 11, color: C.accent, fontWeight: "600" },
+
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.65)",
+    justifyContent: "flex-end",
+  },
+  modalSheet: {
+    backgroundColor: C.panel,
+    borderTopLeftRadius: RADIUS.md,
+    borderTopRightRadius: RADIUS.md,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderColor: C.lineSubtle,
+    maxHeight: "75%",
+    paddingTop: 16,
+    paddingHorizontal: 16,
+  },
+  modalHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderBottomColor: C.lineSubtle,
+    paddingBottom: 12,
+  },
+  modalTitle: { fontSize: 15, fontWeight: "700", color: C.ink },
+  modalSubtitle: { fontSize: 11, color: C.ink3, marginTop: 2 },
+  modalCloseBtn: { padding: 4 },
+  modalLoadingBox: {
+    paddingVertical: 36,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+  },
+  modalLoadingText: { fontSize: 12, color: C.ink3 },
+  modalProjectList: { paddingTop: 12 },
+  modalEmptyBox: { paddingVertical: 28, alignItems: "center" },
+  modalEmptyText: { fontSize: 12, color: C.ink3 },
+  unlinkOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.sm,
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(239, 68, 68, 0.2)",
+    marginBottom: 10,
+  },
+  unlinkOptionText: { fontSize: 12, color: C.err, fontWeight: "600" },
+  projectOptionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.sm,
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+    marginBottom: 8,
+  },
+  projectOptionRowActive: {
+    backgroundColor: "rgba(16, 185, 129, 0.08)",
+    borderColor: "rgba(16, 185, 129, 0.3)",
+  },
+  projectOptionNameRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  projectOptionName: { fontSize: 13, fontWeight: "600", color: C.ink },
+  projectOptionNameActive: { color: C.ok },
+  projectOptionDesc: { fontSize: 11, color: C.ink3, marginTop: 2 },
+  currentLinkTag: {
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+    backgroundColor: "rgba(16, 185, 129, 0.15)",
+  },
+  currentLinkTagText: { fontSize: 9, color: C.ok, fontWeight: "600" },
 });

@@ -1421,3 +1421,31 @@ export interface GovernanceSummary {
   }>;
 }
 
+export type OntologyResourceKind = "project" | "project_workspace" | "business_system";
+export type OntologyResourceRole = "owner" | "consumer";
+
+export interface OntologyResourceLink {
+  id: string;
+  company_id: string;
+  domain_id: string;
+  resource_kind: OntologyResourceKind;
+  resource_id: string;
+  resource_label: string;
+  role: OntologyResourceRole;
+  is_deleted: boolean;
+}
+
+export interface LinkOntologyResourceInput {
+  domainId: string;
+  resourceKind: OntologyResourceKind;
+  resourceId: string;
+  resourceLabel?: string;
+  role?: OntologyResourceRole;
+}
+
+export interface UnlinkOntologyResourceInput {
+  domainId: string;
+  resourceKind: OntologyResourceKind;
+  resourceId: string;
+}
+
