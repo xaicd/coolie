@@ -45,6 +45,7 @@ import {
 } from "./src/coolie";
 import { AppBar } from "./src/components/AppBar";
 import { EdgeSwipeBack } from "./src/components/EdgeSwipeBack";
+import { BreadcrumbBar } from "./src/components/BreadcrumbBar";
 import { TabBar, TAB_BAR_HEIGHT } from "./src/components/TabBar";
 import { StatusDot } from "./src/components/StatusDot";
 import { CreateTaskModal } from "./src/components/CreateTaskModal";
@@ -154,6 +155,80 @@ import { setupOTAListener } from "./src/OTA";
  */
 
 type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "artifacts" | "ontology" | "assets" | "inbox";
+
+// ── wave302 — 全局页面栈 (精准返回 + 面包屑 + 滑动返回) ────────────────────────
+//
+// 老板 10-04: 「所有页面都要有自己的页码吧, 要支持精准返回, 滑动返回也要支持」。
+// 触发 bug: 铃铛 → 收件箱 → 任务详情 → 返回, 落到空任务看板而不是收件箱 ——
+// 旧实现里每个子屏只清自己的 state, 不记「从哪来」。
+//
+// 修法: 进入更深一层界面前, 把「当前页面」的完整导航状态快照成一帧入栈;
+// 返回 (返回键 / 左缘右滑 / 系统 back) 弹栈整层还原; 面包屑点任一级 = 跳回该层。
+
+/** 帧的来源页身份 —— 面包屑 chip 语义 + 定位用; 还原走 {@link ScreenFrame.context}。 */
+type ScreenFrameSource =
+  | TabKey
+  | "search"
+  | "sandbox"
+  | "agent"
+  | "pipeline"
+  | "plan"
+  | "project"
+  | "plugin";
+
+/** 还原一帧所需的导航快照 —— HomeScreen 全部页面层 state 的镜像。 */
+interface ScreenFrameContext {
+  tab: TabKey;
+  selected: Issue | null;
+  tasksFilterProjectId: string | null;
+  notificationsOpen: boolean;
+  searchOpen: boolean;
+  agentDetail: AgentRow | null;
+  pipelinesOpen: boolean;
+  plansOpen: boolean;
+  projectsOpen: boolean;
+  gitCredentialsOpen: boolean;
+  pluginManagerOpen: boolean;
+  pluginSettingsId: string | null;
+  focusedApprovalId: string | null;
+  schemaEditorType: { typeId: string; displayName: string } | null;
+  instanceGraphType: { typeId: string; displayName: string; entityType?: string } | null;
+  ontologyWorkbenchOpen: boolean;
+  webContainerTarget: { path?: string; url?: string; title: string } | null;
+  sandboxContext: {
+    url?: string | null;
+    service?: WorkspaceRuntimeService | null;
+    workProduct?: IssueWorkProduct | null;
+    scope?: SandboxScope | null;
+    issue?: Issue | null;
+  } | null;
+  diffContext: { issue?: Issue | null; workProduct?: IssueWorkProduct | null } | null;
+  specIssue: Issue | null;
+}
+
+/** 全局页面栈的一帧: 「被留在下面的那一页」。 */
+interface ScreenFrame {
+  source: ScreenFrameSource;
+  /** 面包屑 chip 文案 (汇览 / 收件箱 / COOA-28)。 */
+  title: string;
+  context?: ScreenFrameContext;
+}
+
+/** tab 根的面包屑名 (与底栏 5 项 / 隐藏 tab 屏标题同源)。 */
+const TAB_FRAME_TITLES: Record<TabKey, string> = {
+  dashboard: "汇览",
+  tasks: "任务",
+  chat: "工坊",
+  agents: "员工",
+  inbox: "收件箱",
+  assets: "资产",
+  artifacts: "产物",
+  ontology: "业务本体",
+};
+
+/** 任务在面包屑里的短名: 优先单号 (COOA-28), 没有就用标题。 */
+const issueFrameTitle = (issue: Issue | null): string =>
+  issue ? (issue.identifier ?? issue.title) : "任务";
 
 /**
  * 底部栏只有 5 项 (汇览 / 任务 / [+] / 员工 / 收件箱, 见 src/components/TabBar.tsx)。
@@ -871,6 +946,7 @@ function HomeScreen({
 
   useEffect(() => {
     if (!demoRequested) return;
+    setScreenStack([]);
     navigateTab("chat");
     exportBoardPrompt("build 一个演示项目：Coolie 工坊看板");
     onDemoHandled?.();
@@ -883,6 +959,7 @@ function HomeScreen({
       const path = url.replace(/^coolie:\/\//i, "").replace(/^\/+/, "");
       const [route, ...rest] = path.split("/");
       if (route === "chat") {
+        setScreenStack([]);
         navigateTab("chat");
         if (rest[0] === "build") {
           const title = decodeURIComponent(rest.slice(1).join("/")).trim();
@@ -962,16 +1039,161 @@ function HomeScreen({
     }
   }, []);
 
+  // ── wave302 — 全局页面栈 ────────────────────────────────────────────────
+  /** 记录「从哪里进来」。进入更深一层界面前 push, 返回 pop, 面包屑点任一级跳级。 */
+  const [screenStack, setScreenStack] = useState<ScreenFrame[]>([]);
+
+  /** 面包屑叶子名: 当前最上层界面 (与渲染三元链同序判定, 谁在展示谁就是叶子)。 */
+  const currentScreenTitle = onboardingOpen
+    ? "新手引导"
+    : sandboxContext
+      ? "沙箱"
+      : diffContext
+        ? "代码 Diff"
+        : specIssue
+          ? "Spec"
+          : webContainerTarget
+            ? webContainerTarget.title
+            : focusedApprovalId
+              ? "审批裁决"
+              : searchOpen
+                ? "搜索"
+                : notificationsOpen
+                  ? "收件箱"
+                  : agentDetail
+                    ? agentDetail.name
+                    : pipelinesOpen
+                      ? "流水线"
+                      : plansOpen
+                        ? "计划"
+                        : projectsOpen
+                          ? "项目中心"
+                          : gitCredentialsOpen
+                            ? "Git 凭证"
+                            : pluginManagerOpen
+                              ? "插件中心"
+                              : pluginSettingsId
+                                ? "插件设置"
+                                : schemaEditorType
+                                  ? schemaEditorType.displayName
+                                  : instanceGraphType
+                                    ? instanceGraphType.displayName
+                                    : ontologyWorkbenchOpen
+                                      ? "本体工作台"
+                                      : selected
+                                        ? issueFrameTitle(selected)
+                                        : TAB_FRAME_TITLES[tab];
+
   /**
-   * 左缘右滑 / 系统返回键 的落点: 从最上层的浮层/详情开始逐层退, 退到最后才回上一个 tab。
-   * 顺序 = 堆叠顺序 (composeOverlay zIndex 110 > 设置抽屉 100 > 详情页整屏)。
+   * 把「此刻这层页面」快照成一帧 (入栈用)。必须在导航 setState 之前调用 ——
+   * 事件闭包里读到的还是跳转前的旧值, 恰好是「来源页」的完整状态。
+   */
+  const snapshotScreen = (source: ScreenFrameSource, title: string): ScreenFrame => ({
+    source,
+    title,
+    context: {
+      tab,
+      selected,
+      tasksFilterProjectId,
+      notificationsOpen,
+      searchOpen,
+      agentDetail,
+      pipelinesOpen,
+      plansOpen,
+      projectsOpen,
+      gitCredentialsOpen,
+      pluginManagerOpen,
+      pluginSettingsId,
+      focusedApprovalId,
+      schemaEditorType,
+      instanceGraphType,
+      ontologyWorkbenchOpen,
+      webContainerTarget,
+      sandboxContext,
+      diffContext,
+      specIssue,
+    },
+  });
+
+  /** 进入更深一层界面前, 先把当前页入栈。 */
+  const pushScreen = (source: ScreenFrameSource, title: string) => {
+    setScreenStack((stack) => [...stack, snapshotScreen(source, title)]);
+  };
+
+  /** 铃铛 / 搜索这类「从当前页顶部再盖一层」的入口: 帧标题取当前页叶子名。 */
+  const pushCurrentScreen = () => {
+    pushScreen(tab, currentScreenTitle);
+  };
+
+  /** 把一帧快照整层写回导航 state —— 精准还原来源页 (含 tab / 浮层 / 任务选中)。 */
+  const restoreFrame = (frame: ScreenFrame) => {
+    const ctx = frame.context;
+    if (!ctx) return;
+    // 直接落 tab (不走 navigateTab): 还原是「回到那一页」, 不再记 tab 历史。
+    tabRef.current = ctx.tab;
+    setTab(ctx.tab);
+    setSelected(ctx.selected);
+    setTasksFilterProjectId(ctx.tasksFilterProjectId);
+    setNotificationsOpen(ctx.notificationsOpen);
+    setSearchOpen(ctx.searchOpen);
+    setAgentDetail(ctx.agentDetail);
+    setPipelinesOpen(ctx.pipelinesOpen);
+    setPlansOpen(ctx.plansOpen);
+    setProjectsOpen(ctx.projectsOpen);
+    setGitCredentialsOpen(ctx.gitCredentialsOpen);
+    setPluginManagerOpen(ctx.pluginManagerOpen);
+    setPluginSettingsId(ctx.pluginSettingsId);
+    setFocusedApprovalId(ctx.focusedApprovalId);
+    setSchemaEditorType(ctx.schemaEditorType);
+    setInstanceGraphType(ctx.instanceGraphType);
+    setOntologyWorkbenchOpen(ctx.ontologyWorkbenchOpen);
+    setWebContainerTarget(ctx.webContainerTarget);
+    setSandboxContext(ctx.sandboxContext);
+    setDiffContext(ctx.diffContext);
+    setSpecIssue(ctx.specIssue);
+  };
+
+  /** 面包屑跳级: 回到第 index 帧那一层, 其上的帧全部丢弃。 */
+  const jumpToFrame = (index: number) => {
+    const frame = screenStack[index];
+    if (!frame) return;
+    restoreFrame(frame);
+    setScreenStack(screenStack.slice(0, index));
+  };
+
+  /** 跨层进任务详情: 来源页入栈 → 关来源浮层 → 落到任务 tab 的详情。 */
+  const openIssue = (
+    issue: Issue,
+    source: ScreenFrameSource,
+    sourceTitle: string,
+    closeSource?: () => void,
+  ) => {
+    pushScreen(source, sourceTitle);
+    closeSource?.();
+    navigateTab("tasks");
+    setSelected(issue);
+  };
+
+  /**
+   * 全局返回 (子屏返回键 / 左缘右滑 / 系统 back 的统一落点):
+   * ① 绝对定位模态浮层最优先 (它们压在页面栈之上: 建单 110 / 设置 100);
+   * ② 页面栈有帧 → 精准弹回来源页 (铃铛→收件箱→任务详情→返回 真回收件箱);
+   * ③ 栈空 → 原有逐层兜底, 退到最后回上一个 tab。
    *
    * 返回 true = 事件已被 App 消化 (确实退了一层); false = 已经在最外层 (汇览 root),
    * 没有可退的层。调用方据此决定是「吃掉事件」还是「交回系统」—— 见 backHandler。
    */
-  const swipeBack = (): boolean => {
+  const popScreen = (): boolean => {
     if (onboardingOpen) return setOnboardingOpen(false), true;
     if (createTaskProjectId) return setCreateTaskProjectId(null), true;
+    if (settingsOpen) return setSettingsOpen(false), true;
+    if (nativeModulesOpen) return setNativeModulesOpen(false), true;
+    if (composeOpen) return setComposeOpen(false), true;
+    if (screenStack.length > 0) {
+      restoreFrame(screenStack[screenStack.length - 1]);
+      setScreenStack(screenStack.slice(0, -1));
+      return true;
+    }
     if (webContainerTarget) return setWebContainerTarget(null), true;
     if (sandboxContext) return setSandboxContext(null), true;
     if (specIssue) return setSpecIssue(null), true;
@@ -992,10 +1214,6 @@ function HomeScreen({
     if (instanceGraphType) return setInstanceGraphType(null), true;
     if (schemaEditorType) return setSchemaEditorType(null), true;
     if (selected) return setSelected(null), true;
-    if (createTaskProjectId) return setCreateTaskProjectId(null), true;
-    if (composeOpen) return setComposeOpen(false), true;
-    if (settingsOpen) return setSettingsOpen(false), true;
-    if (nativeModulesOpen) return setNativeModulesOpen(false), true;
     if (tabHistoryRef.current.length > 0) return goBackTab(), true;
     return false;
   };
@@ -1009,12 +1227,12 @@ function HomeScreen({
   // 到了最外层 (汇览 root) 不直接退出: 第一次只给 toast, 2s 内再按一次才真的退出
   // (Android 常规的「再按一次退出」手势)。既满足「滑一下不会掉出 App」, 也不把用户关在
   // App 里出不来。
-  const swipeBackRef = useRef(swipeBack);
-  swipeBackRef.current = swipeBack;
+  const popScreenRef = useRef(popScreen);
+  popScreenRef.current = popScreen;
   const lastRootBackAtRef = useRef(0);
   useEffect(() => {
     const subscription = BackHandler.addEventListener("hardwareBackPress", () => {
-      if (swipeBackRef.current()) return true;
+      if (popScreenRef.current()) return true;
       const now = Date.now();
       if (now - lastRootBackAtRef.current < 2000) return false;
       lastRootBackAtRef.current = now;
@@ -1030,16 +1248,21 @@ function HomeScreen({
    * 任务详情在当前 tab 内渲染 (wave51, boss 09-22 24:27 「又是没底部导航了」):
    * 不再整屏覆盖内容区, 底栏 5 个 tab 始终可见。由 tab 决定是否显示 ——
    * 任务/收件箱两个 tab 选中 issue 时用它替换列表, 其余早退浮层 (搜索/通知/沙箱等)
-   * 仍是整屏。返回统一走 setSelected(null): 顶部 [← 返回] / 左缘右滑 / 系统 back 三种。
+   * 仍是整屏。返回统一走 popScreen() (wave302 全局页面栈, 精准回来源页):
+   * 顶部 [← 返回] / 左缘右滑 / 系统 back 三种落点一致。
    */
   const taskDetail = selected ? (
     <TaskDetailScreen
       issue={selected}
       company={company}
-      onBack={() => setSelected(null)}
-      onOpenSpec={(issue) => setSpecIssue(issue)}
+      onBack={popScreen}
+      onOpenSpec={(issue) => {
+        pushScreen("tasks", issueFrameTitle(issue));
+        setSpecIssue(issue);
+      }}
       onOpenSandbox={(issueItem) => {
         void (async () => {
+          pushScreen("tasks", issueFrameTitle(issueItem));
           const workProducts = await coolie
             .listWorkProducts(issueItem.id)
             .catch(() => [] as IssueWorkProduct[]);
@@ -1101,10 +1324,31 @@ function HomeScreen({
         {!hasSubHeader && (
           <AppBar
             unreadCount={unreadCount}
-            onOpenNotifications={() => setNotificationsOpen(true)}
-            onOpenSearch={() => setSearchOpen(true)}
+            onOpenNotifications={() => {
+              // wave302 — 从当前页顶部盖收件箱: 当前页入栈, 返回时精准回这里。
+              pushCurrentScreen();
+              setNotificationsOpen(true);
+            }}
+            onOpenSearch={() => {
+              pushCurrentScreen();
+              setSearchOpen(true);
+            }}
           />
         )}
+        {/* wave302 — 全局面包屑: 有页面栈时显示完整路径 (汇览 › 收件箱 › COOA-28),
+            点任一级精准跳回该层; 叶子 (当前页) 高亮不可点。 */}
+        {(hasSubHeader || selected) && screenStack.length > 0 ? (
+          <BreadcrumbBar
+            levels={[
+              ...screenStack.map((frame, index) => ({
+                id: `${frame.source}-${index}`,
+                label: frame.title,
+                onPress: () => jumpToFrame(index),
+              })),
+              { id: "current", label: currentScreenTitle },
+            ]}
+          />
+        ) : null}
         <View style={styles.shellContent}>
           {onboardingOpen ? (
             <WebContainerScreen
@@ -1124,7 +1368,7 @@ function HomeScreen({
               service={sandboxContext.service}
               workProduct={sandboxContext.workProduct}
               scope={sandboxContext.scope}
-              onBack={() => setSandboxContext(null)}
+              onBack={popScreen}
               onCreateTask={() => {
                 setSandboxContext(null);
                 setComposeOpen(true);
@@ -1134,14 +1378,13 @@ function HomeScreen({
                   ? () => {
                       const entryIssue = sandboxContext.issue;
                       if (!entryIssue) return;
-                      setSandboxContext(null);
-                      navigateTab("tasks");
-                      setSelected(entryIssue);
+                      openIssue(entryIssue, "sandbox", "沙箱", () => setSandboxContext(null));
                     }
                   : undefined
               }
               onOpenArtifacts={() => {
                 setSandboxContext(null);
+                setScreenStack([]);
                 navigateTab("artifacts");
               }}
             />
@@ -1150,37 +1393,36 @@ function HomeScreen({
               company={company}
               issue={diffContext.issue}
               workProduct={diffContext.workProduct}
-              onBack={() => setDiffContext(null)}
+              onBack={popScreen}
             />
           ) : specIssue ? (
             <SpecEditorScreen
               issue={specIssue}
               company={company}
-              onBack={() => setSpecIssue(null)}
+              onBack={popScreen}
             />
           ) : webContainerTarget ? (
             <WebContainerScreen
               initialPath={webContainerTarget.path}
               initialUrl={webContainerTarget.url}
               title={webContainerTarget.title}
-              onBack={() => setWebContainerTarget(null)}
+              onBack={popScreen}
             />
           ) : focusedApprovalId ? (
             <ApprovalFocusDetail
               companyId={companyId}
               approvalId={focusedApprovalId}
-              onBack={() => setFocusedApprovalId(null)}
+              onBack={popScreen}
             />
           ) : searchOpen ? (
             <SearchScreen
               company={company}
-              onBack={() => setSearchOpen(false)}
-              onOpenIssue={(issueItem) => {
-                setSearchOpen(false);
-                navigateTab("tasks");
-                setSelected(issueItem);
-              }}
+              onBack={popScreen}
+              onOpenIssue={(issueItem) =>
+                openIssue(issueItem, "search", "搜索", () => setSearchOpen(false))
+              }
               onOpenAgent={(agent: SearchAgentResult) => {
+                pushScreen("search", "搜索");
                 setSearchOpen(false);
                 setAgentDetail(agent);
               }}
@@ -1188,18 +1430,18 @@ function HomeScreen({
           ) : notificationsOpen ? (
             <InboxScreen
               company={company}
-              onBack={() => setNotificationsOpen(false)}
-              onOpenIssue={(issueItem) => {
-                setNotificationsOpen(false);
-                navigateTab("tasks");
-                setSelected(issueItem);
-              }}
+              onBack={popScreen}
+              onOpenIssue={(issueItem) =>
+                openIssue(issueItem, "inbox", "收件箱", () => setNotificationsOpen(false))
+              }
               onOpenApproval={(approvalId) => {
+                pushScreen("inbox", "收件箱");
                 setNotificationsOpen(false);
                 setFocusedApprovalId(approvalId);
               }}
               onOpenWorkshop={() => {
                 setNotificationsOpen(false);
+                setScreenStack([]);
                 navigateTab("chat");
               }}
             />
@@ -1207,53 +1449,58 @@ function HomeScreen({
             <AgentDetailScreen
               company={company}
               agent={agentDetail}
-              onBack={() => setAgentDetail(null)}
-              onOpenIssue={(issueItem) => {
-                setAgentDetail(null);
-                navigateTab("tasks");
-                setSelected(issueItem);
-              }}
+              onBack={popScreen}
+              onOpenIssue={(issueItem) =>
+                openIssue(issueItem, "agent", agentDetail?.name ?? "员工", () =>
+                  setAgentDetail(null),
+                )
+              }
             />
           ) : pipelinesOpen ? (
             <PipelinesScreen
               company={company}
-              onBack={() => setPipelinesOpen(false)}
-              onOpenWeb={(path, title) =>
-                setWebContainerTarget({ path, title: title ?? "流水线" })
-              }
+              onBack={popScreen}
+              onOpenWeb={(path, title) => {
+                pushScreen("pipeline", "流水线");
+                setWebContainerTarget({ path, title: title ?? "流水线" });
+              }}
             />
           ) : plansOpen ? (
             <PlansScreen
               company={company}
-              onBack={() => setPlansOpen(false)}
-              onOpenPlan={(issue) => {
-                setPlansOpen(false);
-                navigateTab("tasks");
-                setSelected(issue);
-              }}
+              onBack={popScreen}
+              onOpenPlan={(issue) =>
+                openIssue(issue, "plan", "计划", () => setPlansOpen(false))
+              }
             />
           ) : projectsOpen ? (
             <ProjectsScreen
               company={company}
-              onBack={() => setProjectsOpen(false)}
-              onOpenWebProjects={(subPath?: string, title?: string) =>
-                setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" })
-              }
+              onBack={popScreen}
+              onOpenWebProjects={(subPath?: string, title?: string) => {
+                pushScreen("project", "项目中心");
+                setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" });
+              }}
               onOpenProjectTasks={(project) => {
                 setProjectsOpen(false);
                 setTasksFilterProjectId(project.id);
+                setScreenStack([]);
                 navigateTab("tasks");
               }}
             />
           ) : gitCredentialsOpen ? (
-            <GitCredentialsScreen company={company} onBack={() => setGitCredentialsOpen(false)} />
+            <GitCredentialsScreen company={company} onBack={popScreen} />
           ) : pluginManagerOpen ? (
             // wave275 (P0-02 插件设置): 独立条件渲染, 不嵌进 tab 三元, 不会被 dashboard 吞.
             <PluginManagerScreen
               company={company}
-              onBack={() => setPluginManagerOpen(false)}
-              onOpenPluginSettings={(p) => setPluginSettingsId(p.id)}
+              onBack={popScreen}
+              onOpenPluginSettings={(p) => {
+                pushScreen("plugin", "插件中心");
+                setPluginSettingsId(p.id);
+              }}
               onOpenWebPluginManager={() => {
+                pushScreen("plugin", "插件中心");
                 setWebContainerTarget({ path: "/plugins", title: "插件中心" });
                 setPluginManagerOpen(false);
               }}
@@ -1262,7 +1509,7 @@ function HomeScreen({
             <PluginSettingsScreen
               company={company}
               pluginId={pluginSettingsId}
-              onBack={() => setPluginSettingsId(null)}
+              onBack={popScreen}
             />
           ) : schemaEditorType ? (
             // wave239 — 屏 3 (SchemaEditor) 渲染.
@@ -1270,7 +1517,7 @@ function HomeScreen({
               company={company}
               typeId={schemaEditorType.typeId}
               displayName={schemaEditorType.displayName}
-              onBack={() => setSchemaEditorType(null)}
+              onBack={popScreen}
             />
           ) : instanceGraphType ? (
             // wave239 — 屏 2 (InstanceGraph) 渲染.
@@ -1279,30 +1526,36 @@ function HomeScreen({
               typeId={instanceGraphType.typeId}
               displayName={instanceGraphType.displayName}
               defaultEntityType={instanceGraphType.entityType ?? "project"}
-              onBack={() => setInstanceGraphType(null)}
-              onOpenWorkbench={() => setOntologyWorkbenchOpen(true)}
+              onBack={popScreen}
+              onOpenWorkbench={() => {
+                pushScreen("ontology", instanceGraphType?.displayName ?? "业务本体");
+                setOntologyWorkbenchOpen(true);
+              }}
             />
           ) : ontologyWorkbenchOpen ? (
             // wave275 (P0-01 本体工作台): 独立条件渲染, 不嵌进 instanceGraphType 三元.
             // 之前嵌套顺序 instanceGraphType > ontologyWorkbenchOpen, 老板永远进不来.
             <OntologyGraphWorkbenchScreen
               company={company}
-              onBack={() => setOntologyWorkbenchOpen(false)}
+              onBack={popScreen}
             />
           ) : tab === "dashboard" ? (
             <DashboardScreen
               company={company}
-              onOpenWebWorkbench={(path, title) =>
-                setWebContainerTarget({ path: path || "/dashboard", title: title || "控制台" })
-              }
+              onOpenWebWorkbench={(path, title) => {
+                pushScreen("dashboard", "汇览");
+                setWebContainerTarget({ path: path || "/dashboard", title: title || "控制台" });
+              }}
               onOpenApprovals={() => {
                 setSelected(null);
                 setDiffContext(null);
                 setSandboxContext(null);
                 setFocusedApprovalId(null);
+                setScreenStack([]);
                 navigateTab("tasks");
               }}
               onOpenApproval={(approvalId) => {
+                pushScreen("dashboard", "汇览");
                 navigateTab("tasks");
                 setFocusedApprovalId(approvalId);
               }}
@@ -1311,13 +1564,11 @@ function HomeScreen({
             <InboxScreen
               company={company}
               onOpenApproval={(approvalId) => {
+                pushScreen("inbox", "收件箱");
                 navigateTab("tasks");
                 setFocusedApprovalId(approvalId);
               }}
-              onOpenIssue={(issue) => {
-                navigateTab("tasks");
-                setSelected(issue);
-              }}
+              onOpenIssue={(issue) => openIssue(issue, "inbox", "收件箱")}
             />
           ) : tab === "chat" ? (
             <BoardChatScreen
@@ -1327,11 +1578,12 @@ function HomeScreen({
               // 的浮层分支在上层三元链里先于 tab 分支求值 (见下方 ApprovalFocusDetail),
               // chat 里点「查看详情」直接盖到当前 tab 上, 返回键回到 chat。补 navigateTab
               // 反而会改变返回落点。
-              onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
-              onOpenIssue={(issue) => {
-                navigateTab("tasks");
-                setSelected(issue);
+              // wave302: 入栈的 chat 帧快照 tab=chat, pop 后同样精准回工坊, 落点不变。
+              onOpenApproval={(approvalId) => {
+                pushScreen("chat", "工坊");
+                setFocusedApprovalId(approvalId);
               }}
+              onOpenIssue={(issue) => openIssue(issue, "chat", "工坊")}
               onOpenPipeline={(pipelineId) => {
                 void Linking.openURL(
                   `${COOLIE_BASE_URL}/pipelines/${encodeURIComponent(pipelineId)}`,
@@ -1339,92 +1591,106 @@ function HomeScreen({
                   Alert.alert("无法打开 Pipeline", "请在浏览器里打开 Coolie Web 查看该 pipeline。");
                 });
               }}
-              onOpenPlan={(issue) => {
-                navigateTab("tasks");
-                setSelected(issue);
-              }}
+              onOpenPlan={(issue) => openIssue(issue, "chat", "工坊")}
             />
           ) : tab === "assets" ? (
             <OrgAssetsScreen
               company={company}
               whoami={whoami}
               initialTab="ontology"
-              onOpenIssue={(issue) => {
-                navigateTab("tasks");
-                setSelected(issue);
-              }}
+              onOpenIssue={(issue) => openIssue(issue, "assets", "资产")}
               onOpenProjectTasks={(project) => {
                 setTasksFilterProjectId(project.id);
+                setScreenStack([]);
                 navigateTab("tasks");
               }}
               onCreateTaskForProject={(project) => {
                 setCreateTaskProjectId(project.id);
               }}
-              onOpenWebProjects={(subPath?: string, title?: string) =>
-                setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" })
-              }
-              onOpenWebOntology={(subPath?: string, title?: string) =>
-                setWebContainerTarget({ path: subPath || "/ontology", title: title || "本体可视化设计器" })
-              }
-              onOpenWebGovernance={(subPath?: string, title?: string) =>
-                setWebContainerTarget({ path: subPath || "/governance", title: title || "架构治理工作台" })
-              }
-              onOpenSchemaEditor={(typeId, displayName) =>
-                setSchemaEditorType({ typeId, displayName })
-              }
-              onOpenInstanceGraph={(typeId, displayName) =>
-                setInstanceGraphType({ typeId, displayName })
-              }
-              onOpenWorkbench={() => setOntologyWorkbenchOpen(true)}
-              onOpenWebWorkbench={(subPath?: string, title?: string) =>
-                setWebContainerTarget({ path: subPath || "/dashboard", title: title || "控制台" })
-              }
-              onOpenSandbox={(url, service, wp, scope) =>
-                setSandboxContext({ url, service, workProduct: wp, scope })
-              }
-              onOpenDiff={(issueItem, wp) =>
-                setDiffContext({ issue: issueItem, workProduct: wp })
-              }
-              onOpenPluginManager={() => setPluginManagerOpen(true)}
-              onOpenPrototypeSandbox={() => setSandboxContext({
-                url: "",
-                service: null,
-                workProduct: null,
-                scope: null,
-              })}
+              onOpenWebProjects={(subPath?: string, title?: string) => {
+                pushScreen("assets", "资产");
+                setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" });
+              }}
+              onOpenWebOntology={(subPath?: string, title?: string) => {
+                pushScreen("assets", "资产");
+                setWebContainerTarget({ path: subPath || "/ontology", title: title || "本体可视化设计器" });
+              }}
+              onOpenWebGovernance={(subPath?: string, title?: string) => {
+                pushScreen("assets", "资产");
+                setWebContainerTarget({ path: subPath || "/governance", title: title || "架构治理工作台" });
+              }}
+              onOpenSchemaEditor={(typeId, displayName) => {
+                pushScreen("assets", "资产");
+                setSchemaEditorType({ typeId, displayName });
+              }}
+              onOpenInstanceGraph={(typeId, displayName) => {
+                pushScreen("assets", "资产");
+                setInstanceGraphType({ typeId, displayName });
+              }}
+              onOpenWorkbench={() => {
+                pushScreen("assets", "资产");
+                setOntologyWorkbenchOpen(true);
+              }}
+              onOpenWebWorkbench={(subPath?: string, title?: string) => {
+                pushScreen("assets", "资产");
+                setWebContainerTarget({ path: subPath || "/dashboard", title: title || "控制台" });
+              }}
+              onOpenSandbox={(url, service, wp, scope) => {
+                pushScreen("assets", "资产");
+                setSandboxContext({ url, service, workProduct: wp, scope });
+              }}
+              onOpenDiff={(issueItem, wp) => {
+                pushScreen("assets", "资产");
+                setDiffContext({ issue: issueItem, workProduct: wp });
+              }}
+              onOpenPluginManager={() => {
+                pushScreen("assets", "资产");
+                setPluginManagerOpen(true);
+              }}
+              onOpenPrototypeSandbox={() => {
+                pushScreen("assets", "资产");
+                setSandboxContext({
+                  url: "",
+                  service: null,
+                  workProduct: null,
+                  scope: null,
+                });
+              }}
             />
           ) : tab === "ontology" ? (
             <OntologyDomainListScreen
               company={company}
               whoami={whoami}
-              onOpenWebOntology={() =>
-                setWebContainerTarget({ path: "/ontology", title: "本体可视化设计器" })
-              }
-              onOpenSchemaEditor={(typeId, displayName) =>
-                setSchemaEditorType({ typeId, displayName })
-              }
-              onOpenInstanceGraph={(typeId, displayName) =>
-                setInstanceGraphType({ typeId, displayName })
-              }
+              onOpenWebOntology={() => {
+                pushScreen("ontology", "业务本体");
+                setWebContainerTarget({ path: "/ontology", title: "本体可视化设计器" });
+              }}
+              onOpenSchemaEditor={(typeId, displayName) => {
+                pushScreen("ontology", "业务本体");
+                setSchemaEditorType({ typeId, displayName });
+              }}
+              onOpenInstanceGraph={(typeId, displayName) => {
+                pushScreen("ontology", "业务本体");
+                setInstanceGraphType({ typeId, displayName });
+              }}
             />
           ) : tab === "artifacts" ? (
             <ArtifactsScreen
               company={company}
               whoami={whoami}
-              onOpenSandbox={(url, service, wp, scope) =>
-                setSandboxContext({ url, service, workProduct: wp, scope })
-              }
-              onOpenDiff={(issueItem, wp) =>
-                setDiffContext({ issue: issueItem, workProduct: wp })
-              }
+              onOpenSandbox={(url, service, wp, scope) => {
+                pushScreen("artifacts", "产物");
+                setSandboxContext({ url, service, workProduct: wp, scope });
+              }}
+              onOpenDiff={(issueItem, wp) => {
+                pushScreen("artifacts", "产物");
+                setDiffContext({ issue: issueItem, workProduct: wp });
+              }}
             />
           ) : tab === "agents" ? (
             <AgentsScreen
               company={company}
-              onOpenIssue={(issue) => {
-                navigateTab("tasks");
-                setSelected(issue);
-              }}
+              onOpenIssue={(issue) => openIssue(issue, "agents", "员工")}
             />
           ) : tab === "tasks" ? (
             selected ? (
@@ -1434,7 +1700,7 @@ function HomeScreen({
                 company={company}
                 refreshToken={tasksRefreshToken}
                 initialProjectId={tasksFilterProjectId}
-                onOpenIssue={setSelected}
+                onOpenIssue={(issue) => openIssue(issue, "tasks", "任务")}
               />
             )
           ) : null}
@@ -1466,6 +1732,8 @@ function HomeScreen({
           tab={tab}
           onChange={(key) => {
             // 切 tab 时重置子页面，直达所选 tab 根界面 (boss: APP 底部导航要固定起来的)
+            // wave302: 页面栈一并清空 —— 直达 tab 根是「新起点」, 旧栈帧全部作废。
+            setScreenStack([]);
             setComposeOpen(false);
             setSelected(null);
             setProjectsOpen(false);
@@ -1504,6 +1772,7 @@ function HomeScreen({
           setComposeOpen(false);
           setCreateTaskProjectId(null);
           setTasksRefreshToken((value) => value + 1);
+          setScreenStack([]);
           Alert.alert("任务已创建", issue.title);
           navigateTab("tasks");
         }}
@@ -1513,8 +1782,9 @@ function HomeScreen({
     );
   }
 
-  // 左缘右滑的顶层包裹: 所有路由 (详情/浮层/tab) 都在它里面, 由 swipeBack 决定退到哪。
-  return <EdgeSwipeBack onBack={swipeBack}>{content}</EdgeSwipeBack>;
+  // 左缘右滑的顶层包裹: 所有路由 (详情/浮层/tab) 都在它里面, 由 popScreen (wave302
+  // 全局页面栈) 决定退到哪 —— 子屏返回键 / 左缘右滑 / 系统 back 三种落点一致。
+  return <EdgeSwipeBack onBack={popScreen}>{content}</EdgeSwipeBack>;
 }
 
 function approvalLabel(approval: Approval): string {

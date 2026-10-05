@@ -8,24 +8,26 @@ import { PanResponder, View, type StyleProp, type ViewStyle } from "react-native
  * 不能直接退出 app」。Android 默认没有这个手势 (系统左缘右滑 = 系统返回,
  * 在 root 页会直接退到桌面), 这里补一个 App 内的实现。
  *
- * 与 brief §3.3 的差别 (有意): brief 假设本客户端走 React Navigation + 
- * react-native-gesture-handler。实际 `clients/expo` 是手写的状态机导航
- * (`App.tsx` 的 HomeScreen 用 useState 表示 tab/浮层/详情, 没有 NavigationContainer,
- * 也没装 gesture-handler)。所以这里用 RN 内置的 `PanResponder` 实现同样的手势 ——
- * 不引入新原生依赖, 也不改动既有导航结构。
+ * 与 brief §3.3 的差别 (有意): brief 假设本客户端走 React Navigation。
+ * 实际 `clients/expo` 是手写的状态机导航 (`App.tsx` 的 HomeScreen 用 useState
+ * 表示 tab/浮层/详情, 没有 NavigationContainer)。仓库现在装了
+ * react-native-gesture-handler (GestureHandlerRootView / 看板拖拽在用), 但这里
+ * 仍保留 RN 内置的 `PanResponder` 实现 —— 零原生耦合、与内部 ScrollView 共存
+ * 稳定, 不为一个返回手势引入原生依赖。
  *
  * 手势判定 (只认右滑, 不误触发):
  * - 起手点必须在屏幕左缘 {@link EDGE_WIDTH} 内 (`gestureState.x0`), 否则不抢 responder;
  * - 水平位移必须明显大于垂直位移 (1.5x), 否则交给内部 ScrollView 去滚;
- * - 释放时位移 >= {@link BACK_DISTANCE} 或 (位移 >= {@link FLING_DISTANCE} 且
- *   甩动速度 >= {@link FLING_VELOCITY}) 才算「返回」。
+ * - 释放时位移 >= {@link BACK_DISTANCE}, 或快甩 (位移 >= {@link FLING_DISTANCE} 且
+ *   整段手势在 {@link FLING_WINDOW_MS} 内完成) 才算「返回」。
+ *   (wave302 口径: 左缘 50px + 位移 80px + 300ms 快甩窗口。)
  *
  * 没触发阈值时什么都不做 —— 不会退出 App, 也不会误翻页。
  */
-const EDGE_WIDTH = 32;
-const BACK_DISTANCE = 70;
+const EDGE_WIDTH = 50;
+const BACK_DISTANCE = 80;
 const FLING_DISTANCE = 40;
-const FLING_VELOCITY = 0.4;
+const FLING_WINDOW_MS = 300;
 
 export function EdgeSwipeBack({
   onBack,
@@ -46,6 +48,8 @@ export function EdgeSwipeBack({
   onBackRef.current = onBack;
   const enabledRef = useRef(enabled);
   enabledRef.current = enabled;
+  // 快甩判定的计时起点 (onPanResponderGrant 记, release 时算耗时)。
+  const grantAtRef = useRef(0);
 
   const responder = useMemo(
     () =>
@@ -61,10 +65,16 @@ export function EdgeSwipeBack({
           Math.abs(gesture.dx) > Math.abs(gesture.dy) * 1.5,
         onMoveShouldSetPanResponderCapture: () => false,
         onPanResponderTerminationRequest: () => false,
+        onPanResponderGrant: () => {
+          grantAtRef.current = Date.now();
+        },
         onPanResponderRelease: (_event, gesture) => {
           const farEnough = gesture.dx >= BACK_DISTANCE;
-          const flung = gesture.dx >= FLING_DISTANCE && gesture.vx >= FLING_VELOCITY;
-          if (farEnough || flung) onBackRef.current();
+          // 快甩: 位移过半且整段手势在 300ms 内完成 (wave302 口径, 替代旧的速度阈值)。
+          const quickFling =
+            gesture.dx >= FLING_DISTANCE &&
+            Date.now() - grantAtRef.current <= FLING_WINDOW_MS;
+          if (farEnough || quickFling) onBackRef.current();
         },
       }),
     [],
