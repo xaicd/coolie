@@ -530,23 +530,27 @@ fi
 # Tool-aware execution router
 TOOL_BIN=""
 TOOL_ARGS=()
-TOOL_ENV=()
+PRE_CMD=""
 
 case "$TOOL" in
   claude-mm)
     TOOL_BIN="claude"
     TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
-    TOOL_ENV=("CLAUDE_CONFIG_DIR=$HOME/.claude-mm")
+    PRE_CMD="ln -sf ~/.claude/settings.jsonmm ~/.claude/settings.json 2>/dev/null || true"
     ;;
   claude-glm)
     TOOL_BIN="claude"
     TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
-    TOOL_ENV=("CLAUDE_CONFIG_DIR=$HOME/.claude-glm")
+    PRE_CMD="ln -sf ~/.claude/settings.jsonglm ~/.claude/settings.json 2>/dev/null || true"
+    ;;
+  claude-ds)
+    TOOL_BIN="claude"
+    TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
+    PRE_CMD="ln -sf ~/.claude/settings.jsonds ~/.claude/settings.json 2>/dev/null || true"
     ;;
   claude)
     TOOL_BIN="claude"
     TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
-    TOOL_ENV=("CLAUDE_CONFIG_DIR=$HOME/.claude")
     ;;
   cmd)
     TOOL_BIN="cmd"
@@ -574,17 +578,14 @@ EXEC_CMD=()
 EXEC_ENV="local"
 
 if command -v "$TOOL_BIN" >/dev/null 2>&1; then
-  if [[ ${#TOOL_ENV[@]} -gt 0 ]]; then
-    EXEC_CMD=("env" "${TOOL_ENV[@]}" "$TOOL_BIN")
-  else
-    EXEC_CMD=("$TOOL_BIN")
-  fi
+  [[ -n "$PRE_CMD" ]] && eval "$PRE_CMD"
+  EXEC_CMD=("$TOOL_BIN")
   EXEC_ENV="local"
 elif [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
   # Probe if tool exists on macOS host
   if "$SCRIPT_DIR/host-exec.sh" "command -v $TOOL_BIN" >/dev/null 2>&1; then
-    if [[ ${#TOOL_ENV[@]} -gt 0 ]]; then
-      EXEC_CMD=("$SCRIPT_DIR/host-exec.sh" "${TOOL_ENV[*]} $TOOL_BIN")
+    if [[ -n "$PRE_CMD" ]]; then
+      EXEC_CMD=("$SCRIPT_DIR/host-exec.sh" "$PRE_CMD && $TOOL_BIN")
     else
       EXEC_CMD=("$SCRIPT_DIR/host-exec.sh" "$TOOL_BIN")
     fi
