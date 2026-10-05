@@ -156,14 +156,7 @@ export function OrgAssetsScreen({
       {/* 核心内容区：四大核心资产平滑呈现，零层级遮挡 */}
       <View style={styles.content}>
         {activeTab === "ontology" && (
-          <OntologyCockpitScreen
-            company={company}
-            whoami={whoami}
-            onOpenWebOntology={() => onOpenWebOntology?.("/ontology", "本体可视化设计器")}
-            onOpenSchemaEditor={onOpenSchemaEditor}
-            onOpenWorkbench={onOpenWorkbench}
-            onOpenPrototypeSandbox={onOpenPrototypeSandbox}
-          />
+          <OntologyCockpitScreen company={company} />
         )}
 
         {activeTab === "architecture" && (
