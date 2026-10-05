@@ -41,7 +41,7 @@ interface OntologyDomainListScreenProps {
   whoami?: string;
   onOpenWebOntology?: () => void;
   onOpenSchemaEditor?: (typeId: string, displayName: string) => void;
-  onOpenInstanceGraph?: (typeId: string, displayName: string) => void;
+  onOpenWorkbench?: () => void;
 }
 
 const LIFECYCLE_CONFIG: Record<
@@ -86,12 +86,14 @@ const LIFECYCLE_CONFIG: Record<
 };
 
 export type DomainFilter = "all" | "active" | "draft" | "archived" | "locked";
-export type OntologyViewMode = "list" | "detail" | "graph";
+export type OntologyViewMode = "list" | "detail";
 
 export function OntologyDomainListScreen({
   company,
   whoami = "管理员",
   onOpenWebOntology,
+  onOpenSchemaEditor,
+  onOpenWorkbench,
 }: OntologyDomainListScreenProps) {
   const [domains, setDomains] = useState<OntologyDomain[]>([]);
   const [loading, setLoading] = useState(true);
@@ -408,265 +410,6 @@ export function OntologyDomainListScreen({
     return true;
   });
 
-  // 第三层: 关系图谱交互浏览 (Graph View)
-  if (viewMode === "graph" && selectedDomain) {
-    const nodeTypesList = (() => {
-      const map = new Map<
-        string,
-        {
-          key: string;
-          label: string;
-          count: number;
-          sampleProperties: Record<string, unknown>;
-        }
-      >();
-      if (snapshot?.counts?.byNodeType) {
-        for (const [k, count] of Object.entries(snapshot.counts.byNodeType)) {
-          if (k) map.set(k, { key: k, label: k, count, sampleProperties: {} });
-        }
-      }
-      for (const n of snapshot?.nodes || []) {
-        const typeKey = n.nodeTypeId || n.label || n.key;
-        if (!map.has(typeKey)) {
-          map.set(typeKey, {
-            key: typeKey,
-            label: n.label || typeKey,
-            count: 1,
-            sampleProperties: (n.properties as Record<string, unknown>) || {},
-          });
-        } else {
-          const item = map.get(typeKey)!;
-          if (n.properties && Object.keys(item.sampleProperties).length === 0) {
-            item.sampleProperties = n.properties as Record<string, unknown>;
-          }
-        }
-      }
-      if (map.size === 0) {
-        map.set(selectedDomain.slug, {
-          key: selectedDomain.slug,
-          label: selectedDomain.display_name || selectedDomain.displayName || selectedDomain.slug,
-          count: snapshot?.counts?.nodes ?? 0,
-          sampleProperties: {
-            domainId: selectedDomain.id,
-            slug: selectedDomain.slug,
-            category: selectedDomain.category || "业务本体",
-            version: selectedDomain.schema_version ?? 1,
-          },
-        });
-      }
-      return Array.from(map.values());
-    })();
-
-    const activeSelectedKey = selectedNodeTypeKey || nodeTypesList[0]?.key;
-    const selectedNt =
-      nodeTypesList.find((nt) => nt.key === activeSelectedKey) || nodeTypesList[0];
-
-    const N = nodeTypesList.length;
-    const canvasSize = 340;
-    const cx = canvasSize / 2;
-    const cy = canvasSize / 2;
-    const R = Math.min(100, 48 + N * 8);
-
-    // 节点半径随实例数缩放 (sqrt 抑制极端值), fontScale 下也留足内空间
-    const nodeRadiusOf = (count: number) =>
-      Math.round(Math.min(34, 20 + Math.sqrt(Math.max(count - 1, 0)) * 5));
-
-    const positions = nodeTypesList.map((nt, idx) => {
-      const angle = (2 * Math.PI * idx) / Math.max(N, 1) - Math.PI / 2;
-      const r = nodeRadiusOf(nt.count);
-      return {
-        key: nt.key,
-        r,
-        x: cx + R * Math.cos(angle),
-        y: cy + R * Math.sin(angle),
-      };
-    });
-    const posByKey = new Map(positions.map((p) => [p.key, p]));
-
-    // 真实关系连线: 快照采样节点 id -> 实体类型, 两端都能解析的边才画。
-    // 旧版画的是「环上相邻假连线」, 看着像关系链, 实际与业务关系无关。
-    const nodeIdType = new Map<string, string>();
-    for (const n of snapshot?.nodes || []) {
-      nodeIdType.set(n.id, n.nodeTypeId || n.label || n.key);
-    }
-    const typeEdges = (() => {
-      const seen = new Set<string>();
-      const out: Array<{ fromKey: string; toKey: string }> = [];
-      for (const e of snapshot?.edges || []) {
-        const a = nodeIdType.get(e.sourceNodeId);
-        const b = nodeIdType.get(e.targetNodeId);
-        if (!a || !b || a === b) continue;
-        const dedupe = [a, b].sort().join("→");
-        if (seen.has(dedupe)) continue;
-        seen.add(dedupe);
-        out.push({ fromKey: a, toKey: b });
-      }
-      return out;
-    })();
-
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar style="light" />
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled"
-        >
-          {/* 顶部返回条 */}
-          <ScreenHeader
-            onBack={() => setViewMode("detail")}
-            backLabel="返回"
-            style={styles.detailNav}
-            right={
-              <Text style={styles.graphNavTitle}>
-                {selectedDomain.display_name || selectedDomain.displayName || selectedDomain.slug} · 关系图谱
-              </Text>
-            }
-          />
-
-          {/* 拓扑画布容器 */}
-          <AppCard variant="surface" style={styles.graphCanvasCard}>
-            <View style={styles.graphCanvasHeader}>
-              <View>
-                <Text style={styles.graphCanvasTitle}>实体关系拓扑</Text>
-                <Text style={styles.graphCanvasSub}>
-                  {nodeTypesList.length} 个实体类型 · {snapshot?.counts?.edges ?? 0} 条关系 · 节点大小=实例数
-                </Text>
-              </View>
-              <View style={styles.graphLegend}>
-                <View style={[styles.graphLegendDot, { backgroundColor: C.accent }]} />
-                <Text style={styles.graphLegendText}>实体类型</Text>
-              </View>
-            </View>
-
-            <View style={[styles.graphCanvas, { width: canvasSize, height: canvasSize, alignSelf: "center" }]}>
-              {/* 真实关系连线 (类型级, 快照采样) */}
-              {typeEdges.map(({ fromKey, toKey }) => {
-                const posA = posByKey.get(fromKey);
-                const posB = posByKey.get(toKey);
-                if (!posA || !posB) return null;
-                const dx = posB.x - posA.x;
-                const dy = posB.y - posA.y;
-                const length = Math.sqrt(dx * dx + dy * dy);
-                if (length <= posA.r + posB.r) return null;
-                const angle = Math.atan2(dy, dx);
-                const midX = (posA.x + posB.x) / 2;
-                const midY = (posA.y + posB.y) / 2;
-                const isEdgeActive =
-                  fromKey === activeSelectedKey || toKey === activeSelectedKey;
-
-                return (
-                  <View
-                    key={`edge-${fromKey}-${toKey}`}
-                    style={[
-                      styles.graphEdgeLine,
-                      {
-                        left: midX - length / 2,
-                        top: midY,
-                        width: length,
-                        backgroundColor: isEdgeActive ? C.accent : C.line,
-                        opacity: isEdgeActive ? 0.85 : 0.45,
-                        transform: [{ rotate: `${angle}rad` }],
-                      },
-                    ]}
-                  />
-                );
-              })}
-              {typeEdges.length === 0 && snapshot?.counts?.edges ? (
-                <Text style={styles.graphEdgesHint}>
-                  关系连线需实体采样数据 (当前快照抽样不足, 显示 {snapshot.counts.edges} 条关系统计)
-                </Text>
-              ) : null}
-
-              {/* 节点气泡: 实例数在圆内, 名称标签在圆下方 */}
-              {positions.map((pos) => {
-                const nt = nodeTypesList.find((n) => n.key === pos.key)!;
-                const isSelected = nt.key === activeSelectedKey;
-
-                return (
-                  <React.Fragment key={`node-${pos.key}`}>
-                    <Pressable
-                      style={[
-                        styles.graphNodeCircle,
-                        {
-                          left: pos.x - pos.r,
-                          top: pos.y - pos.r,
-                          width: pos.r * 2,
-                          height: pos.r * 2,
-                          borderRadius: pos.r,
-                          borderColor: isSelected ? C.accent : C.line,
-                          backgroundColor: isSelected ? C.surfaceHover : C.panel,
-                        },
-                      ]}
-                      onPress={() => setSelectedNodeTypeKey(nt.key)}
-                    >
-                      <Text
-                        style={[
-                          styles.graphNodeCountText,
-                          isSelected && { color: C.ink, fontWeight: "600" },
-                        ]}
-                      >
-                        {nt.count}
-                      </Text>
-                    </Pressable>
-                    <Text
-                      style={[
-                        styles.graphNodeCaption,
-                        { left: pos.x - 46, top: pos.y + pos.r + 4 },
-                      ]}
-                      numberOfLines={1}
-                    >
-                      {nt.label}
-                    </Text>
-                  </React.Fragment>
-                );
-              })}
-            </View>
-          </AppCard>
-
-          {/* Properties Schema 属性检视卡片 */}
-          {Boolean(selectedNt) && (
-            <AppCard variant="surface" style={styles.schemaCard}>
-              <View style={styles.schemaCardHeader}>
-                <View style={styles.schemaTitleRow}>
-                  <Ionicons name="cube-outline" size={16} color={C.accent} style={{ marginRight: 6 }} />
-                  <Text style={styles.schemaCardTitle}>
-                    {selectedNt.label} ({selectedNt.key})
-                  </Text>
-                </View>
-                <Pill label={`${selectedNt.count} 实例`} tone="brand" size="sm" />
-              </View>
-
-              <Text style={styles.schemaSectionTitle}>属性定义 (Properties Schema)</Text>
-              {Object.keys(selectedNt.sampleProperties).length === 0 ? (
-                <Text style={styles.schemaEmptyText}>
-                  暂无自定义属性字段，该类型由系统缺省元数据驱动。
-                </Text>
-              ) : (
-                <View style={styles.schemaPropsList}>
-                  {Object.entries(selectedNt.sampleProperties).map(([propKey, propVal]) => (
-                    <View key={propKey} style={styles.schemaPropRow}>
-                      <Text style={styles.schemaPropKey}>{propKey}</Text>
-                      <Text style={styles.schemaPropType}>
-                        {typeof propVal === "object"
-                          ? "object"
-                          : typeof propVal === "number"
-                          ? "number"
-                          : typeof propVal === "boolean"
-                          ? "boolean"
-                          : "string"}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              )}
-            </AppCard>
-          )}
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
   // 第二层: 域详情与快照摘要 (Snapshot Summary View)
   if (selectedDomain) {
     const isLocked =
@@ -747,7 +490,7 @@ export function OntologyDomainListScreen({
           <AppCard
             variant="surface"
             row
-            onPress={() => setViewMode("graph")}
+            onPress={() => onOpenWorkbench?.()}
             style={styles.graphEntryBtn}
           >
             <View style={styles.graphEntryLeft}>
@@ -758,9 +501,9 @@ export function OntologyDomainListScreen({
                 style={{ marginRight: 10 }}
               />
               <View>
-                <Text style={styles.graphEntryTitle}>关系图谱拓扑</Text>
+                <Text style={styles.graphEntryTitle}>图谱工作台</Text>
                 <Text style={styles.graphEntrySub}>
-                  实体对象类型与关系连线交互浏览
+                  全景对象拓扑网络与因果下钻
                 </Text>
               </View>
             </View>

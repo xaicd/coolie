@@ -36,7 +36,6 @@ interface OrgAssetsScreenProps {
   onOpenWebOntology?: (path?: string, title?: string) => void;
   onOpenWebGovernance?: (path?: string, title?: string) => void;
   onOpenSchemaEditor?: (typeId: string, displayName: string) => void;
-  onOpenInstanceGraph?: (typeId: string, displayName: string) => void;
   onOpenWorkbench?: () => void;
   onOpenWebWorkbench?: (path?: string, title?: string) => void;
   onOpenSandbox?: (
@@ -80,7 +79,6 @@ export function OrgAssetsScreen({
   onOpenWebOntology,
   onOpenWebGovernance,
   onOpenSchemaEditor,
-  onOpenInstanceGraph,
   onOpenWorkbench,
   onOpenWebWorkbench,
   onOpenSandbox,
@@ -163,7 +161,6 @@ export function OrgAssetsScreen({
             whoami={whoami}
             onOpenWebOntology={() => onOpenWebOntology?.("/ontology", "本体可视化设计器")}
             onOpenSchemaEditor={onOpenSchemaEditor}
-            onOpenInstanceGraph={onOpenInstanceGraph}
             onOpenWorkbench={onOpenWorkbench}
             onOpenPrototypeSandbox={onOpenPrototypeSandbox}
           />

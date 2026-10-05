@@ -42,54 +42,37 @@ interface OntologyGraphCanvasProps {
   selectedKey: string | null;
   onSelectNode: (key: string) => void;
   /**
-   * Force-direction simulation (wave261) is the default. Pass `"clustered"`
-   * to keep the wave244 layout — useful when the caller wants the
-   * deterministic "one ring per type" look. Untyped strings are coerced to
-   * `force` so the typed signature stays narrow.
+   * Concentric BFS ring layout (Web-parity) is the default: deterministic,
+   * never overlaps, center-aligned, zero NaN risk.
    */
-  layoutMode?: "force" | "clustered";
+  layoutMode?: "concentric" | "force" | "clustered";
 }
 
 /**
- * Wave244 — reusable graph canvas.
- *
- * Old (wave239) layout was a "layered shell" that scattered nodes by
- * entityType around a center on radial shells of growing radius. With
- * 75+ nodes and Chinese long names that fit on 14 chars per line, every
- * shell bled into the next and the picture became a brick wall of
- * overlapping circles — exactly what the boss screenshot showed.
- *
- * New layout:
- *   1. Group nodes by entity type, drop the unused "center" anchor.
- *   2. Each type gets a cluster center laid out on its own inscribed ring
- *      so clusters never overlap (groups of >6 types share the inner
- *      ring, fewer types each get a wider arc).
- *   3. Within a cluster, nodes go on a deterministic ring around the
- *      cluster center, one slot per node, radius bounded by `count`.
- *   4. Node radius is `min(30, 14 + sqrt(count) * 3)` — capped so a 75-node
- *      graph stays readable instead of growing into a donut.
- *   5. The label is moved OUT of the node (inside the circle we now only
- *      show an index "1..N" sized to the radius), and rendered as a
- *      separate Text below the circle, truncated at 12 chars. This is the
- *      key visual fix: the label never collides with the circle boundary.
- *
- * Edges still use atan2 + a single rotated `View` line. The workbench
- * (屏 4) already does pan + zoom — this component stays pure so the
- * caller (workbench / 屏 1 / 屏 2) can wrap it in any viewport.
+ * Wave304 — 对齐 Web 端的对象关系图谱画布 (OntologyGraphCanvas)。
+ * 核心升级:
+ * 1. 引入 Web 端同款同心圆环 BFS 布局算法 (computeConcentricLayout)，彻底解决力导向跑飞与节点挤爆变形
+ * 2. 修正 EdgeLine 几何坐标中心旋转算法，线条 100% 严丝合缝对齐圆心
+ * 3. 支持高对比度焦点高亮与实体类型色彩映射
  */
 export function OntologyGraphCanvas({
   graph,
   canvasSize,
   selectedKey,
   onSelectNode,
-  layoutMode = "force",
+  layoutMode = "concentric",
 }: OntologyGraphCanvasProps) {
   const positions = useMemo(
-    () =>
-      layoutMode === "clustered"
-        ? computeClusteredLayout(graph.nodes, canvasSize)
-        : computeForceLayout(graph.nodes, graph.edges, canvasSize),
-    [layoutMode, graph.nodes, graph.edges, canvasSize],
+    () => {
+      if (layoutMode === "clustered") {
+        return computeClusteredLayout(graph.nodes, canvasSize);
+      }
+      if (layoutMode === "force") {
+        return computeForceLayout(graph.nodes, graph.edges, canvasSize);
+      }
+      return computeConcentricLayout(graph.nodes, graph.edges, graph.root, canvasSize);
+    },
+    [layoutMode, graph.nodes, graph.edges, graph.root, canvasSize],
   );
 
   const visibleEdges = useMemo(() => {
@@ -248,21 +231,147 @@ function EdgeLine({
   const length = Math.sqrt(dx * dx + dy * dy);
   if (length < 1) return null;
   const angle = Math.atan2(dy, dx);
+  const midX = (ax + bx) / 2;
+  const midY = (ay + by) / 2;
+  const thickness = highlight ? 2.5 : 1.2;
+
   return (
     <View
       style={[
         styles.edge,
         {
-          left: ax + dx / 2 - length / 2,
-          top: ay + dy / 2,
+          left: midX - length / 2,
+          top: midY - thickness / 2,
           width: length,
+          height: thickness,
           transform: [{ rotate: `${angle}rad` }],
-          backgroundColor: highlight ? C.accent : C.line,
-          opacity: highlight ? 0.85 : 0.4,
+          backgroundColor: highlight ? C.accent : "rgba(255, 255, 255, 0.12)",
+          opacity: highlight ? 0.95 : 0.6,
         },
       ]}
     />
   );
+}
+
+/**
+ * Web 同款同心环 BFS 布局算法 (来自 ui/src/components/OntologyGraphView.tsx)
+ * 1. 建立无向拓扑邻接表
+ * 2. 选取中心锚点节点 (优先使用 graph.root，无指定则自动选取全图度数最高的核心节点)
+ * 3. 执行 BFS 层次遍历，计算每个节点与中心锚点的拓扑层级 (depth)
+ * 4. 同心圆环等分排布，环半径由节点容量自适应拓展，彻底根除节点挤爆、文字重叠与力导向跑飞！
+ */
+function computeConcentricLayout(
+  nodes: OntologyGraphResponseNode[],
+  edges: OntologyGraphResponseEdge[],
+  root: { type: string; id: string } | null,
+  canvasSize: number,
+): Map<string, { x: number; y: number; r: number }> {
+  const out = new Map<string, { x: number; y: number; r: number }>();
+  if (nodes.length === 0) return out;
+
+  const cx = canvasSize / 2;
+  const cy = canvasSize / 2;
+
+  // 1. 拓扑邻接与度数统计
+  const adjacency = new Map<string, string[]>();
+  const degree = new Map<string, number>();
+  for (const edge of edges) {
+    if (!adjacency.has(edge.source)) adjacency.set(edge.source, []);
+    if (!adjacency.has(edge.target)) adjacency.set(edge.target, []);
+    adjacency.get(edge.source)!.push(edge.target);
+    adjacency.get(edge.target)!.push(edge.source);
+    degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
+    degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
+  }
+
+  // 2. 确定根节点锚点 (Root Anchor)
+  let rootKey: string | null = null;
+  if (root) {
+    const candidate = `${root.type}:${root.id}`;
+    if (nodes.some((n) => n.key === candidate)) {
+      rootKey = candidate;
+    }
+  }
+  if (!rootKey) {
+    let maxDeg = -1;
+    for (const node of nodes) {
+      const d = degree.get(node.key) ?? 0;
+      if (d > maxDeg) {
+        maxDeg = d;
+        rootKey = node.key;
+      }
+    }
+  }
+  if (!rootKey && nodes.length > 0) {
+    rootKey = nodes[0].key;
+  }
+
+  // 3. BFS 拓扑分层
+  const depthOf = new Map<string, number>();
+  if (rootKey) {
+    depthOf.set(rootKey, 0);
+    let frontier = [rootKey];
+    while (frontier.length > 0) {
+      const next: string[] = [];
+      for (const curr of frontier) {
+        const currDepth = depthOf.get(curr) ?? 0;
+        for (const neighbor of adjacency.get(curr) ?? []) {
+          if (!depthOf.has(neighbor)) {
+            depthOf.set(neighbor, currDepth + 1);
+            next.push(neighbor);
+          }
+        }
+      }
+      frontier = next;
+    }
+  }
+
+  // 4. 按层分组
+  const byDepth = new Map<number, OntologyGraphResponseNode[]>();
+  for (const node of nodes) {
+    const d = depthOf.get(node.key) ?? 1;
+    if (!byDepth.has(d)) byDepth.set(d, []);
+    byDepth.get(d)!.push(node);
+  }
+
+  let previousRadius = 0;
+  const sortedDepths = Array.from(byDepth.entries()).sort((a, b) => a[0] - b[0]);
+
+  for (const [depth, ring] of sortedDepths) {
+    if (depth === 0 && ring.length === 1) {
+      const node = ring[0];
+      out.set(node.key, { x: cx, y: cy, r: 26 });
+      continue;
+    }
+
+    const step = (Math.PI * 2) / Math.max(ring.length, 1);
+    const offset = -Math.PI / 2;
+    const neededForSpacing = (ring.length * 80) / (Math.PI * 2);
+    const radius = Math.max(140 + (depth - 1) * 160, previousRadius + 140, neededForSpacing);
+    previousRadius = radius;
+
+    ring.forEach((node, index) => {
+      const angle = offset + index * step;
+      out.set(node.key, {
+        x: cx + Math.cos(angle) * radius,
+        y: cy + Math.sin(angle) * radius,
+        r: 18,
+      });
+    });
+  }
+
+  // 兜底孤立节点
+  for (const node of nodes) {
+    if (!out.has(node.key)) {
+      out.set(node.key, {
+        x: cx + (Math.random() - 0.5) * previousRadius,
+        y: cy + (Math.random() - 0.5) * previousRadius,
+        r: 18,
+      });
+    }
+  }
+
+  return out;
 }
 
 /**
@@ -579,6 +688,5 @@ const styles = StyleSheet.create({
   },
   edge: {
     position: "absolute",
-    height: 1,
   },
 });

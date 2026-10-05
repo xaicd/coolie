@@ -38,7 +38,6 @@ interface OntologyCockpitScreenProps {
   whoami?: string;
   onOpenWebOntology?: () => void;
   onOpenSchemaEditor?: (typeId: string, displayName: string) => void;
-  onOpenInstanceGraph?: (typeId: string, displayName: string) => void;
   onOpenWorkbench?: () => void;
   onOpenPrototypeSandbox?: () => void;
 }
@@ -174,7 +173,6 @@ export function OntologyCockpitScreen({
   whoami,
   onOpenWebOntology,
   onOpenSchemaEditor,
-  onOpenInstanceGraph,
   onOpenWorkbench,
   onOpenPrototypeSandbox,
 }: OntologyCockpitScreenProps) {
@@ -337,11 +335,11 @@ export function OntologyCockpitScreen({
                       </Text>
                       <Pressable
                         style={styles.cardActionPill}
-                        onPress={() => onOpenInstanceGraph?.(item.type, meta.label)}
+                        onPress={() => setActiveTab("graph")}
                         hitSlop={6}
-                        accessibilityLabel="实例"
+                        accessibilityLabel="图谱"
                       >
-                        <Text style={styles.cardActionPillText}>实例</Text>
+                        <Text style={styles.cardActionPillText}>图谱</Text>
                         <Ionicons name="chevron-forward" size={12} color={C.accent} />
                       </Pressable>
                     </View>
