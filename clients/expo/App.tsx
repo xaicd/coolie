@@ -1186,7 +1186,7 @@ function HomeScreen({
               }}
             />
           ) : notificationsOpen ? (
-            <NotificationsScreen
+            <InboxScreen
               company={company}
               onBack={() => setNotificationsOpen(false)}
               onOpenIssue={(issueItem) => {
@@ -1197,6 +1197,10 @@ function HomeScreen({
               onOpenApproval={(approvalId) => {
                 setNotificationsOpen(false);
                 setFocusedApprovalId(approvalId);
+              }}
+              onOpenWorkshop={() => {
+                setNotificationsOpen(false);
+                navigateTab("chat");
               }}
             />
           ) : agentDetail ? (

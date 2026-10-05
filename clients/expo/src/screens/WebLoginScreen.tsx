@@ -314,11 +314,11 @@ export function WebLoginScreen({ onSignedIn, onFallbackNative }: WebLoginScreenP
                 }}
               >
                 <Ionicons name="refresh" size={14} color="#FFF" style={{ marginRight: 4 }} />
-                <Text style={styles.retryBtnText}>重新加载</Text>
+                <Text style={styles.retryBtnText}>重载</Text>
               </Pressable>
               {onFallbackNative ? (
                 <Pressable style={styles.fallbackBtn} onPress={onFallbackNative}>
-                  <Text style={styles.fallbackBtnText}>使用原生表单登录</Text>
+                  <Text style={styles.fallbackBtnText}>原生</Text>
                 </Pressable>
               ) : null}
             </View>

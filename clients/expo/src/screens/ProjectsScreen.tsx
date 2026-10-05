@@ -554,7 +554,7 @@ export function ProjectsScreen({
                           onPress={() => onOpenProjectTasks(project)}
                         >
                           <Ionicons name="list" size={14} color={C.ink} />
-                          <Text style={styles.actionBtnTextPrimary}>查看任务</Text>
+                          <Text style={styles.actionBtnTextPrimary}>任务</Text>
                         </Pressable>
                       ) : null}
 
@@ -564,7 +564,7 @@ export function ProjectsScreen({
                           onPress={() => onCreateTaskForProject(project)}
                         >
                           <Ionicons name="add" size={14} color={C.accent} />
-                          <Text style={styles.actionBtnTextSecondary}>创建任务</Text>
+                          <Text style={styles.actionBtnTextSecondary}>建单</Text>
                         </Pressable>
                       ) : null}
 
@@ -575,7 +575,7 @@ export function ProjectsScreen({
                           accessibilityLabel="查看该项目交付产物"
                         >
                           <Ionicons name="cube-outline" size={14} color={C.accent} />
-                          <Text style={styles.actionBtnTextSecondary}>查看产物</Text>
+                          <Text style={styles.actionBtnTextSecondary}>产物</Text>
                         </Pressable>
                       ) : null}
                     </View>
@@ -587,14 +587,14 @@ export function ProjectsScreen({
         )}
       </ScrollView>
 
-      {/* 右下角浮起 [+ 极速立项] */}
+      {/* 右下角浮起 [+ 立项] */}
       <Pressable
         style={({ pressed }) => [styles.fab, pressed && styles.fabPressed]}
         onPress={() => setShowCreateSheet(true)}
-        accessibilityLabel="极速立项"
+        accessibilityLabel="立项"
       >
         <Ionicons name="add" size={20} color="#FFFFFF" />
-        <Text style={styles.fabText}>极速立项</Text>
+        <Text style={styles.fabText}>立项</Text>
       </Pressable>
 
       {/* 原生极速立项与多源工作区挂载抽屉 */}

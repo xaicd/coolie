@@ -476,7 +476,7 @@ export function CreateTaskModal({
               onPress={() => void submit()}
               accessibilityRole="button"
             >
-              <Text style={styles.createText}>{busy ? "创建中…" : "创建任务"}</Text>
+              <Text style={styles.createText}>{busy ? "创建中…" : "创建"}</Text>
             </Pressable>
           </View>
         </KeyboardAvoidingView>

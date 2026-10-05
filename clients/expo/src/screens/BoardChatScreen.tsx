@@ -361,7 +361,7 @@ function InlineApprovalBubble({
           onPress={onOpenDetail}
           onLongPress={onOpenDetail}
         >
-          <Text style={styles.approvalDetailLinkText}>查看详情 ›</Text>
+          <Text style={styles.approvalDetailLinkText}>详情 ›</Text>
         </Pressable>
       </Pressable>
     </View>

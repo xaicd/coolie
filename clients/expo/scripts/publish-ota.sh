@@ -218,6 +218,7 @@ const updated = {
   version,
   versionCode,
   downloadUrl: `https://dls.xrobinai.cn/coolie/app/${version}/coolie-release.apk`,
+  releaseNotes: process.env.OTA_RELEASE_NOTES || base.releaseNotes || '增量更新',
   commitSha: commitSha || base.commitSha || '',
 };
 fs.writeFileSync(tmpPath, JSON.stringify(updated, null, 2) + '\n');

@@ -173,7 +173,7 @@ export function NewTaskPage({
                 </Text>
               </View>
             ) : null}
-            <Text style={styles.titleHint}>确认或补充后再点「创建任务」</Text>
+            <Text style={styles.titleHint}>确认或补充后再点「创建」</Text>
             {attachments.length > 0 ? (
               <Text style={styles.attachHint}>📎 已选 {attachments.length} 个附件</Text>
             ) : null}
@@ -192,7 +192,7 @@ export function NewTaskPage({
         )}
       </ScrollView>
 
-      {/* 底部: [创建任务] (有标题才出现) + 主输入「按住说话」+ 辅助 row */}
+      {/* 底部: [创建] (有标题才出现) + 主输入「按住说话」+ 辅助 row */}
       <View style={styles.footer}>
         {title.trim() ? (
           <Pressable
@@ -200,7 +200,7 @@ export function NewTaskPage({
             onPress={() => setCreateOpen(true)}
             accessibilityRole="button"
           >
-            <Text style={styles.createText}>创建任务</Text>
+            <Text style={styles.createText}>创建</Text>
           </Pressable>
         ) : null}
 

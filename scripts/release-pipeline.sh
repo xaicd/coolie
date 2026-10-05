@@ -103,7 +103,7 @@ case "$ACTION" in
     echo " 更新说明: $NOTES"
     echo "=========================================================="
 
-    CMD="bash scripts/publish-ota.sh $*"
+    CMD="OTA_RELEASE_NOTES=\"$NOTES\" bash scripts/publish-ota.sh android $*"
     run_on_host_if_needed "$CMD"
     ;;
 

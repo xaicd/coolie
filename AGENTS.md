@@ -306,6 +306,23 @@ A change is done when all are true:
    - 任何新主机（Mac / Linux / 云主机）克隆仓库后，运行 `bash scripts/bootstrap-coolie-dev-host.sh` 即可在 30 秒内全自动拉起 PGlite Dev Server (3100)、初始化「Coolie 本地施工总社」、注入 6 大数字员工并注册 crontab 看门狗保活。
    - 详见 `docs-coolie/playbooks/coolie-dev-host-replication.md`。
 
+## 16. 极简两字交互、CMMI 资产与高管治理全面审计守卫规范 (wave298)
+
+老板原话: 「按理说 那些 要求 都是 审计过程 要 全面 管局的」
+
+1. **制度必须由编译器与自动化守卫硬拦截**：
+   - 任何涉及移动端与 Web 交互改动，严禁停留在口头规范或 PR 人肉 Review；
+   - 运行 `pnpm check:governance`（或 `bash scripts/check-governance-audit.sh`），必须 100% 全绿（Exit 0）才允许放行交付。
+
+2. **四大硬性管局维度**：
+   - **两字按钮铁律**：核心操作按钮严禁口语化长文案（如【创建任务】、【查看详情】、【原型沙箱】），必须收敛为【创建】、【查看】、【沙箱】等标准 2 汉字；
+   - **移动端 5 槽位绝对对称底栏**：严格保持左2 + 中1 + 右2（汇览 · 任务 · [+] · 工坊 · 资产）对称布局，严禁底栏包含收件箱造成重复入口；
+   - **高管审批三大快道直通**：顶栏 🔔 铃铛直达全功能 `InboxScreen`（含审批/阻塞Tab），工坊会话常驻悬浮审批横幅，大盘具备红灯指标直达；
+   - **CMMI 六大截断产物物理落盘**：G0 需求、G1 架构、G2 详细设计、G3 构建、G4 验收证据、G5 投产基线必须严格落在对应规范目录，严禁产物游离。
+
+3. **双轨映射调度原则**：
+   - 物理项目工作区 (`project_workspaces.cwd`) 是代码与 WBS 任务树基底；工坊会话 (`board_conversations`) 是高管时序意图流；通过意图分发器转译并在物理目录中调度数字员工。
+
 ## This fork's own conventions
 
 This repository is a fork of Paperclip. The rules above are upstream's; these are ours.

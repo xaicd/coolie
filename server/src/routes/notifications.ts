@@ -161,6 +161,9 @@ async function buildFeed(db: Db, companyId: string, limit: number): Promise<Noti
       } else if (row.action === "issue.updated") {
         title = `任务动态：${issueTitle ?? "工单更新"}`;
         body = typeof d?.status === "string" ? `状态更新为：${d.status}` : (issueIdent ? `工号 ${issueIdent} 有新进展` : "任务已有最新进展");
+      } else if (row.action === "issue.execution_recovery_settled") {
+        title = `进程自愈：${issueTitle ? `「${issueTitle}」已自动恢复` : "任务进程已自愈恢复"}`;
+        body = issueIdent ? `工单 ${issueIdent} 异常已由看门狗自愈接管` : "此前执行中断的任务已由系统自动恢复推进";
       } else {
         title = `${row.actorType === "agent" ? "员工" : "系统"}：${row.action}`;
         body = `${row.entityType} · ${row.entityId}`;

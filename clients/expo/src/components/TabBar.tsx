@@ -23,7 +23,6 @@ const LEFT: Slot[] = [
 ];
 
 const RIGHT: Slot[] = [
-  { key: "inbox", label: "收件箱", icon: "mail-outline", activeIcon: "mail" },
   { key: "chat", label: "工坊", icon: "chatbubble-ellipses-outline", activeIcon: "chatbubble-ellipses" },
   { key: "assets", label: "资产", icon: "layers-outline", activeIcon: "layers" },
 ];

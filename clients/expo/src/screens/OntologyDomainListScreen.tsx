@@ -940,16 +940,6 @@ export function OntologyDomainListScreen({
         <View style={styles.listActionBar}>
           <View style={{ flex: 1 }} />
           <View style={styles.listActionBarBtns}>
-            {onOpenWebOntology ? (
-              <Pressable
-                onPress={onOpenWebOntology}
-                hitSlop={8}
-                style={styles.iconActionBtn}
-                accessibilityLabel="打开 Web 端可视化图谱"
-              >
-                <Ionicons name="open-outline" size={16} color={C.accent} />
-              </Pressable>
-            ) : null}
             <Pressable onPress={onRefresh} hitSlop={8} style={styles.iconActionBtn} accessibilityLabel="刷新本体域列表">
               <Ionicons name="refresh-outline" size={16} color={C.ink3} />
             </Pressable>
@@ -1039,7 +1029,7 @@ export function OntologyDomainListScreen({
                 style={[styles.refreshBtn, { marginTop: 12 }]}
                 onPress={() => setFilter("all")}
               >
-                <Text style={styles.refreshBtnText}>查看全部域</Text>
+                <Text style={styles.refreshBtnText}>全部</Text>
               </Pressable>
             )
           }

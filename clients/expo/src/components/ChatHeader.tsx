@@ -66,11 +66,9 @@ export function ChatHeader({
           </Pressable>
         ) : null}
         <View style={styles.titleStack}>
-          {title ? (
-            <Text style={styles.titleText} numberOfLines={1}>
-              {title}
-            </Text>
-          ) : null}
+          <Text style={styles.titleText} numberOfLines={1}>
+            {title && title.trim() ? title : "工坊协同会话"}
+          </Text>
           {subtitle || thinking ? (
             <View style={styles.subtitleRow}>
               <StatusDot

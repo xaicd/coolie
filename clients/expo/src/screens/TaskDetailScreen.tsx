@@ -337,7 +337,7 @@ export function TaskDetailScreen({
                             size={14}
                             color={C.accent}
                           />
-                          <Text style={styles.prBtnText}>查看 PR</Text>
+                          <Text style={styles.prBtnText}>查看</Text>
                         </Pressable>
                       ) : null}
                     </View>
@@ -357,17 +357,17 @@ export function TaskDetailScreen({
               {onOpenSandbox ? (
                 <Pressable style={[styles.btnGhost, { flex: 1 }]} onPress={() => onOpenSandbox(issue)}>
                   <Ionicons name="play-circle-outline" size={16} color={C.accent} />
-                  <Text style={styles.btnGhostText}>原型沙箱</Text>
+                  <Text style={styles.btnGhostText}>沙箱</Text>
                 </Pressable>
               ) : null}
               {onOpenSpec ? (
                 <Pressable
                   style={[styles.btnGhost, { flex: 1 }]}
                   onPress={() => onOpenSpec(issue)}
-                  accessibilityLabel="打开 Spec 编辑器"
+                  accessibilityLabel="打开规范"
                 >
                   <Ionicons name="documents-outline" size={16} color={C.accent} />
-                  <Text style={styles.btnGhostText}>Spec 编辑器</Text>
+                  <Text style={styles.btnGhostText}>规范</Text>
                 </Pressable>
               ) : null}
             </View>

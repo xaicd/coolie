@@ -158,7 +158,7 @@ export function TasksScreen({
         accessibilityLabel="新建任务"
       >
         <Ionicons name="add" size={20} color="#FFFFFF" />
-        <Text style={styles.fabText}>新建任务</Text>
+        <Text style={styles.fabText}>新建</Text>
       </Pressable>
 
       <FilterSheet

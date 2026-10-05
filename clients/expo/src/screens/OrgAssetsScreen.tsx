@@ -126,7 +126,7 @@ export function OrgAssetsScreen({
               >
                 <Ionicons name="cube-outline" size={12} color="#A78BFA" />
                 <Text style={[styles.extraPillText, { color: "#A78BFA", fontWeight: "600" }]}>
-                  原型沙箱
+                  沙箱
                 </Text>
               </Pressable>
             ) : null}
@@ -140,7 +140,7 @@ export function OrgAssetsScreen({
                 accessibilityLabel="全景成本分析"
               >
                 <Ionicons name="cash-outline" size={12} color="#10B981" />
-                <Text style={styles.extraPillText}>成本核算</Text>
+                <Text style={styles.extraPillText}>成本</Text>
               </Pressable>
             ) : null}
           </View>

@@ -402,10 +402,10 @@ export function WebContainerScreen({
             <Text style={styles.errorSubtitle}>{error}</Text>
             <View style={styles.errorActions}>
               <Pressable style={styles.retryBtn} onPress={handleReload}>
-                <Text style={styles.retryBtnText}>重新加载</Text>
+                <Text style={styles.retryBtnText}>重载</Text>
               </Pressable>
               <Pressable style={styles.externalBtn} onPress={handleOpenExternal}>
-                <Text style={styles.externalBtnText}>外部浏览器打开</Text>
+                <Text style={styles.externalBtnText}>打开</Text>
               </Pressable>
             </View>
           </View>

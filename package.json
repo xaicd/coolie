@@ -46,6 +46,8 @@
     "check:no-git-push": "node scripts/check-no-git-push.mjs",
     "check:module-boundaries": "node scripts/check-module-boundaries.mjs",
     "check:security": "node scripts/check-security-audit.mjs",
+    "check:governance": "node scripts/check-governance-audit.mjs",
+    "audit:governance": "node scripts/check-governance-audit.mjs",
     "audit:security": "pnpm audit --audit-level=critical",
     "audit:security:high": "pnpm audit --audit-level=high",
     "test:check-no-git-push": "node --test scripts/check-no-git-push.test.mjs",

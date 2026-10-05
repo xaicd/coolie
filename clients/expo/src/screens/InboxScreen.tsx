@@ -129,12 +129,14 @@ export function InboxScreen({
   onOpenApproval,
   onOpenSettings,
   onOpenWorkshop,
+  onBack,
 }: {
   company: { id: string; name: string };
   onOpenIssue: (issue: Issue) => void;
   onOpenApproval: (approvalId: string) => void;
   onOpenSettings?: () => void;
   onOpenWorkshop?: () => void;
+  onBack?: () => void;
 }) {
   const [tab, setTab] = useState<InboxTab>("all");
   const [issues, setIssues] = useState<Issue[]>([]);
@@ -371,6 +373,16 @@ export function InboxScreen({
     >
       <StatusBar style="light" />
       <View style={styles.header}>
+        {onBack ? (
+          <Pressable
+            onPress={onBack}
+            hitSlop={12}
+            style={{ marginRight: 10, paddingVertical: 4 }}
+            accessibilityLabel="返回"
+          >
+            <Ionicons name="chevron-back" size={24} color={C.ink} />
+          </Pressable>
+        ) : null}
         <View style={{ flex: 1 }}>
           <Text style={styles.h1}>收件箱</Text>
           <View style={styles.capsule}>

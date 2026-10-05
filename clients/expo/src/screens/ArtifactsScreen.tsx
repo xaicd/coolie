@@ -702,7 +702,7 @@ export function ArtifactsScreen({
                       onPress={() => setPreviewArtifact(item)}
                     >
                       <Text style={styles.actionBtnTextSecondary}>
-                        🔍 预览大图
+                        预览
                       </Text>
                     </Pressable>
                   ) : isWorkProduct ? (
@@ -730,7 +730,7 @@ export function ArtifactsScreen({
                         }}
                       >
                         <Text style={styles.actionBtnTextPrimary}>
-                          🎮 交互原型沙箱 ›
+                          沙箱
                         </Text>
                       </Pressable>
                       {item.version ? (
@@ -739,7 +739,7 @@ export function ArtifactsScreen({
                           onPress={() => setVersionArtifact(item)}
                         >
                           <Text style={styles.actionBtnTextGhost}>
-                            版本历史 ({item.version.count})
+                            历史 ({item.version.count})
                           </Text>
                         </Pressable>
                       ) : null}
@@ -757,7 +757,7 @@ export function ArtifactsScreen({
                           }
                         >
                           <Text style={styles.actionBtnTextGhost}>
-                            审查代码 Diff
+                            代码
                           </Text>
                         </Pressable>
                       )}
@@ -790,7 +790,7 @@ export function ArtifactsScreen({
                           }}
                         >
                           <Text style={styles.actionBtnTextSecondary}>
-                            🚀 外部应用打开
+                            打开
                           </Text>
                         </Pressable>
                       )}
@@ -851,7 +851,7 @@ export function ArtifactsScreen({
                     color={C.accent}
                     style={{ marginRight: 4 }}
                   />
-                  <Text style={styles.modalDownloadBtnText}>外部应用 / QQ打开</Text>
+                  <Text style={styles.modalDownloadBtnText}>打开</Text>
                 </Pressable>
               )}
               <Pressable
@@ -859,7 +859,7 @@ export function ArtifactsScreen({
                 hitSlop={12}
                 style={styles.modalCloseBtn}
               >
-                <Text style={styles.modalCloseText}>✕ 关闭</Text>
+                <Text style={styles.modalCloseText}>关闭</Text>
               </Pressable>
             </View>
           </View>
