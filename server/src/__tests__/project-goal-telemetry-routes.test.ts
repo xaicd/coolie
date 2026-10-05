@@ -36,6 +36,12 @@ vi.mock("../telemetry.js", () => ({
   getTelemetryClient: mockGetTelemetryClient,
 }));
 
+vi.mock("../services/project-ontology-bootstrap.js", () => ({
+  // wave302: the real bootstrap issues drizzle queries on the route's
+  // transaction; these stub-db tests only exercise validation and gating.
+  ensureProjectOntologyDomain: async () => ({ status: "skipped", reason: "plugin-inactive" }),
+}));
+
 vi.mock("../services/index.js", () => ({
   accessService: () => mockAccessService,
   environmentService: () => mockEnvironmentService,

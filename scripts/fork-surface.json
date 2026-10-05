@@ -1284,6 +1284,42 @@
       "maxNetLines": 60,
       "maxTotalLines": 80,
       "reason": "Support governance_gate_waiver quality gate approval card rendering."
+    },
+    {
+      "path": "server/src/__tests__/project-routes-env.test.ts",
+      "maxNetLines": 10,
+      "reason": "wave302 (项目进厂即本体域): the create-project route now calls the fork's project-ontology-bootstrap service on its transaction. This stub-db test mocks every service the route touches, so it gains one vi.mock block returning plugin-inactive; without it the real service would issue drizzle queries against the {} transaction stub and 500. Append-only mock, no assertions changed.",
+      "maxTotalLines": 20
+    },
+    {
+      "path": "server/src/__tests__/project-goal-telemetry-routes.test.ts",
+      "maxNetLines": 10,
+      "reason": "wave302 (项目进厂即本体域): the create-project route now calls the fork's project-ontology-bootstrap service on its transaction. This stub-db test mocks every service the route touches, so it gains one vi.mock block returning plugin-inactive; without it the real service would issue drizzle queries against the {} transaction stub and 500. Append-only mock, no assertions changed.",
+      "maxTotalLines": 20
+    },
+    {
+      "path": "server/src/__tests__/project-workspace-managed-sandbox-routes.test.ts",
+      "maxNetLines": 10,
+      "reason": "wave302 (项目进厂即本体域): the create-project route now calls the fork's project-ontology-bootstrap service on its transaction. This stub-db test mocks every service the route touches, so it gains one vi.mock block returning plugin-inactive; without it the real service would issue drizzle queries against the {} transaction stub and 500. Append-only mock, no assertions changed.",
+      "maxTotalLines": 20
+    },
+    {
+      "path": "server/src/__tests__/environment-selection-route-guards.test.ts",
+      "maxNetLines": 10,
+      "reason": "wave302 (项目进厂即本体域): the create-project route now calls the fork's project-ontology-bootstrap service on its transaction. This stub-db test mocks every service the route touches, so it gains one vi.mock block returning plugin-inactive; without it the real service would issue drizzle queries against the {} transaction stub and 500. Append-only mock, no assertions changed.",
+      "maxTotalLines": 20
+    },
+    {
+      "path": "server/src/services/project-ontology-bootstrap.ts",
+      "maxNetLines": 170,
+      "reason": "wave302 (constitution art. 2, 项目进厂即本体域): new file, no upstream counterpart. Atomically initializes the project's same-named ontology domain + project→domain resource link inside the create-project transaction, writing directly to plugin-ontology's host-owned namespace (same columns as PostgresGraphStore.createDomain/linkResource) so the invariant holds without new tables or plugin RPC. Sits under services/ because it needs the caller's drizzle transaction — a plugin worker cannot join it.",
+      "maxTotalLines": 170
+    },
+    {
+      "path": "server/src/__tests__/project-ontology-bootstrap.test.ts",
+      "maxNetLines": 310,
+      "reason": "wave302: new file, no upstream counterpart. Runs the REAL plugin-ontology migrations on the embedded-Postgres harness and proves the bootstrap's atomicity, rollback, degrade paths, slug disambiguation and replay adoption.",
+      "maxTotalLines": 310
     }
   ]
 }

@@ -57,6 +57,7 @@ import { appendWithCap } from "../adapters/utils.js";
 import { assertEnvironmentSelectionForCompany } from "./environment-selection.js";
 import { environmentService } from "../services/environments.js";
 import { secretService } from "../services/secrets.js";
+import { ensureProjectOntologyDomain } from "../services/project-ontology-bootstrap.js";
 
 const WORKSPACE_CONTROL_OUTPUT_MAX_CHARS = 256 * 1024;
 const SHARED_WORKSPACE_STOP_AND_RESTART_ACTIONS = new Set(["stop", "restart"]);
@@ -338,6 +339,18 @@ export function projectRoutes(db: Db) {
       }
       const createdWorkspace = workspace ? await service.createWorkspace(project.id, workspace) : null;
       if (workspace && !createdWorkspace) throw unprocessable("Invalid project workspace payload");
+      // wave302 宪法第2条：项目进厂即本体域。Rides this same transaction, so the
+      // project, its same-named ontology domain, and the project→domain link
+      // commit together or not at all. Skips (never fails) when the ontology
+      // plugin is absent on this instance.
+      const ontologyDomain = await ensureProjectOntologyDomain(tx as unknown as Db, {
+        companyId,
+        projectId: project.id,
+        projectName: project.name,
+        description: project.description,
+        icon: project.icon,
+        createdBy: actor.actorId,
+      });
       const hydrated = await service.getById(project.id);
       const activity = await persistActivity(tx as unknown as Db, {
         companyId, actorType: actor.actorType, actorId: actor.actorId, agentId: actor.agentId,
@@ -351,6 +364,9 @@ export function projectRoutes(db: Db) {
           ],
           workspaceId: createdWorkspace?.id ?? null,
           envKeys: project.env ? Object.keys(project.env).sort() : [],
+          ontologyDomain: ontologyDomain.status === "created"
+            ? { id: ontologyDomain.domainId, slug: ontologyDomain.slug }
+            : { skipped: ontologyDomain.reason },
           ...(receiptKey ? { idempotencyKey: receiptKey, fingerprint } : {}),
         },
       });
