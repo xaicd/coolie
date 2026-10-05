@@ -12,8 +12,7 @@ import type {
 import { C } from "../coolie";
 import { RADIUS } from "../ui/tokens";
 import { SegmentedControl } from "../ui/SegmentedControl";
-import { OntologyDomainListScreen } from "./OntologyDomainListScreen";
-import { OntologyGraphWorkbenchScreen } from "./OntologyGraphWorkbenchScreen";
+import { OntologyCockpitScreen } from "./OntologyCockpitScreen";
 import { ArchitectureGovernanceScreen } from "./ArchitectureGovernanceScreen";
 import { ProjectsScreen } from "./ProjectsScreen";
 import { AgentsScreen } from "./AgentsScreen";
@@ -22,11 +21,6 @@ import type { SandboxScope } from "./PrototypeSandboxScreen";
 import { PluginOrgSwitcher } from "../components/PluginOrgSwitcher";
 
 export type OrgAssetTab = "ontology" | "architecture" | "projects" | "agents" | "artifacts";
-
-const ONTOLOGY_SUB_OPTIONS: Array<{ key: "graph" | "domains"; label: string }> = [
-  { key: "graph", label: "图谱" },
-  { key: "domains", label: "域录" },
-];
 
 interface OrgAssetsScreenProps {
   company: Company;
@@ -96,7 +90,6 @@ export function OrgAssetsScreen({
   onOpenOnboarding,
 }: OrgAssetsScreenProps) {
   const [activeTab, setActiveTab] = useState<OrgAssetTab>(initialTab);
-  const [ontologySubTab, setOntologySubTab] = useState<"graph" | "domains">("graph");
   const [artifactsProjectId, setArtifactsProjectId] = useState<string | null>(
     initialArtifactsProjectId ?? null,
   );
@@ -165,32 +158,15 @@ export function OrgAssetsScreen({
       {/* 核心内容区：四大核心资产平滑呈现，零层级遮挡 */}
       <View style={styles.content}>
         {activeTab === "ontology" && (
-          <View style={{ flex: 1 }}>
-            {/* 本体二级子分段: 【图谱】(对齐 Web 端) 与 【域录】 */}
-            <View style={styles.subTabBar}>
-              <SegmentedControl
-                options={ONTOLOGY_SUB_OPTIONS}
-                value={ontologySubTab}
-                onChange={(val) => setOntologySubTab(val as "graph" | "domains")}
-                style={styles.subSegmentedControl}
-              />
-            </View>
-            {ontologySubTab === "graph" ? (
-              <OntologyGraphWorkbenchScreen
-                company={company}
-                embedded={true}
-                onOpenFullscreen={onOpenWorkbench}
-              />
-            ) : (
-              <OntologyDomainListScreen
-                company={company}
-                whoami={whoami}
-                onOpenWebOntology={() => onOpenWebOntology?.("/ontology", "本体可视化设计器")}
-                onOpenSchemaEditor={onOpenSchemaEditor}
-                onOpenInstanceGraph={onOpenInstanceGraph}
-              />
-            )}
-          </View>
+          <OntologyCockpitScreen
+            company={company}
+            whoami={whoami}
+            onOpenWebOntology={() => onOpenWebOntology?.("/ontology", "本体可视化设计器")}
+            onOpenSchemaEditor={onOpenSchemaEditor}
+            onOpenInstanceGraph={onOpenInstanceGraph}
+            onOpenWorkbench={onOpenWorkbench}
+            onOpenPrototypeSandbox={onOpenPrototypeSandbox}
+          />
         )}
 
         {activeTab === "architecture" && (
@@ -298,16 +274,5 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  subTabBar: {
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    backgroundColor: C.panel,
-    borderBottomWidth: 1,
-    borderBottomColor: C.lineSubtle,
-    alignItems: "center",
-  },
-  subSegmentedControl: {
-    width: 180,
   },
 });
