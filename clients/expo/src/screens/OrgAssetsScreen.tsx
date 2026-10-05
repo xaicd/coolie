@@ -12,7 +12,7 @@ import type {
 import { C } from "../coolie";
 import { RADIUS } from "../ui/tokens";
 import { SegmentedControl } from "../ui/SegmentedControl";
-import { OntologyCockpitScreen } from "./OntologyCockpitScreen";
+import { OntologyDomainListScreen } from "./OntologyDomainListScreen";
 import { ArchitectureGovernanceScreen } from "./ArchitectureGovernanceScreen";
 import { ProjectsScreen } from "./ProjectsScreen";
 import { AgentsScreen } from "./AgentsScreen";
@@ -156,7 +156,13 @@ export function OrgAssetsScreen({
       {/* 核心内容区：四大核心资产平滑呈现，零层级遮挡 */}
       <View style={styles.content}>
         {activeTab === "ontology" && (
-          <OntologyCockpitScreen company={company} />
+          <OntologyDomainListScreen
+            company={company}
+            whoami={whoami}
+            onOpenWebOntology={onOpenWebOntology}
+            onOpenSchemaEditor={onOpenSchemaEditor}
+            onOpenWorkbench={onOpenWorkbench}
+          />
         )}
 
         {activeTab === "architecture" && (
