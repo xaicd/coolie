@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   RefreshControl,
   ScrollView,
@@ -9,8 +9,6 @@ import {
 import type {
   Company,
   OntologyDomain,
-  OntologyLevelsResponse,
-  OntologyStatsResponse,
 } from "@coolie/api-client";
 import { coolie } from "../coolie";
 import { C } from "../theme";
@@ -34,8 +32,6 @@ import { StatusBadge } from "../ui/StatusBadge";
  * 任何变更/操作都走工坊或 web 控制面 (宪法定海神针)。
  */
 export function OntologyCockpitScreen({ company }: { company: Company }) {
-  const [stats, setStats] = useState<OntologyStatsResponse | null>(null);
-  const [levels, setLevels] = useState<OntologyLevelsResponse | null>(null);
   const [domains, setDomains] = useState<OntologyDomain[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -44,13 +40,9 @@ export function OntologyCockpitScreen({ company }: { company: Company }) {
   const loadData = useCallback(async () => {
     setError(null);
     try {
-      const [statsRes, levelsRes, domainsRes] = await Promise.all([
-        coolie.getOntologyStats(company.id).catch(() => null),
-        coolie.getOntologyLevels(company.id).catch(() => null),
-        coolie.listOntologyDomains(company.id).catch(() => []),
-      ]);
-      if (statsRes) setStats(statsRes);
-      if (levelsRes) setLevels(levelsRes);
+      const domainsRes = await coolie
+        .listOntologyDomains(company.id)
+        .catch(() => []);
       setDomains(domainsRes);
     } catch (e) {
       setError(String((e as Error)?.message ?? e));
@@ -69,28 +61,6 @@ export function OntologyCockpitScreen({ company }: { company: Company }) {
     void loadData();
   }, [loadData]);
 
-  // 仅聚合各类型实体 count 与 edge count (展示用, 不触发任何动作)
-  const objectCounts = useMemo(() => {
-    const map = new Map<string, { type: string; count: number; edgeCount: number }>();
-    if (levels?.byEntityType) {
-      for (const item of levels.byEntityType) {
-        map.set(item.entityType, {
-          type: item.entityType,
-          count: item.count,
-          edgeCount: item.edgeCount,
-        });
-      }
-    }
-    if (stats?.nodeCounts) {
-      for (const nc of stats.nodeCounts) {
-        if (!map.has(nc.entityType)) {
-          map.set(nc.entityType, { type: nc.entityType, count: nc.count, edgeCount: 0 });
-        }
-      }
-    }
-    return Array.from(map.values()).sort((a, b) => b.count - a.count);
-  }, [levels, stats]);
-
   if (loading) {
     return <LoadingState text="业务本体载入中..." />;
   }
@@ -105,27 +75,9 @@ export function OntologyCockpitScreen({ company }: { company: Company }) {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />}
     >
       {/* 老板 wave315: 图谱更要删 — 砍掉只读图谱视图 */}
+      {/* 老板 wave317: 本体下不要对象实例 — 砍掉对象计数区, 只留业务域 */}
 
-      {/* 1. 只读对象计数 (Objects) */}
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>对象实例</Text>
-        <Text style={styles.sectionSub}>各业务对象类型在台下的实例与关联度</Text>
-        <View style={styles.list}>
-          {objectCounts.map((item) => (
-            <View key={item.type} style={styles.row}>
-              <Text style={styles.rowLabel}>{item.type}</Text>
-              <Text style={styles.rowCount}>
-                {item.count} 实例 · {item.edgeCount} 关联
-              </Text>
-            </View>
-          ))}
-          {objectCounts.length === 0 && (
-            <EmptyState title="暂无对象" subtitle="从工坊创建实体后自动出现" />
-          )}
-        </View>
-      </View>
-
-      {/* 3. 只读业务域录 (Domains) */}
+      {/* 1. 只读业务域录 (Domains) */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>业务域</Text>
         <Text style={styles.sectionSub}>租户隔离的领域边界与版本指纹</Text>
