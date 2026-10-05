@@ -149,8 +149,8 @@ const noClaudeAgentsInstall = !registerScriptContent.includes('cp "$src" "$dst"'
 console.log('\n📜 7. Coolie 根本大纲与工程宪法 (党章级法典) 审计:');
 const constitutionExists = fs.existsSync('docs-coolie/research/2026-10-05-coolie-constitution-and-palantir-master-spec.md');
 const constitutionContent = constitutionExists ? fs.readFileSync('docs-coolie/research/2026-10-05-coolie-constitution-and-palantir-master-spec.md', 'utf8') : '';
-const hasTwentyTwoArticles = constitutionContent.includes('第二十二条') && constitutionContent.includes('Palantir');
-assertRule('根本大纲与工程宪法已沉淀: docs-coolie/research/2026-10-05-coolie-constitution-and-palantir-master-spec.md', constitutionExists && hasTwentyTwoArticles, '党章级法典缺失或条款不全');
+const hasTwentyOneArticles = constitutionContent.includes('第 21 条') && constitutionContent.includes('现有能力组合优先');
+assertRule('根本大纲与工程宪法已沉淀: docs-coolie/research/2026-10-05-coolie-constitution-and-palantir-master-spec.md', constitutionExists && hasTwentyOneArticles, '党章级法典缺失或条款不全');
 
 const agentsMdContent = fs.existsSync('AGENTS.md') ? fs.readFileSync('AGENTS.md', 'utf8') : '';
 const hasChapter18 = agentsMdContent.includes('## 18. Coolie 工坊唯一核心北极星目标与真业务本体物理并轨铁律');
