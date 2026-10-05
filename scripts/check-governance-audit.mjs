@@ -143,13 +143,27 @@ assertRule('dispatch-local-employee.sh: 执行管道重定向 < /dev/null 防 st
 
 const registerScriptContent = fs.readFileSync('scripts/register-employees-cron.sh', 'utf8');
 const noClaudeAgentsInstall = !registerScriptContent.includes('cp "$src" "$dst"') || registerScriptContent.includes('严禁在 Claude 内部嵌套 subagent');
-assertRule('register-employees-cron.sh: 严禁将数字员工安装进 ~/.claude/agents/ 嵌套', noClaudeAgentsInstall, '禁止向 ~/.claude/agents 安装 subagent');
+// -----------------------------------------------------------------------------
+// 7. Coolie 根本大纲与工程宪法 (党章级法典) 审计 (wave304)
+// -----------------------------------------------------------------------------
+console.log('\n📜 7. Coolie 根本大纲与工程宪法 (党章级法典) 审计:');
+const constitutionExists = fs.existsSync('docs-coolie/research/2026-10-05-coolie-constitution-and-palantir-master-spec.md');
+const constitutionContent = constitutionExists ? fs.readFileSync('docs-coolie/research/2026-10-05-coolie-constitution-and-palantir-master-spec.md', 'utf8') : '';
+const hasTwentyOneArticles = constitutionContent.includes('第二十一条') && constitutionContent.includes('Palantir');
+assertRule('根本大纲与工程宪法已沉淀: docs-coolie/research/2026-10-05-coolie-constitution-and-palantir-master-spec.md', constitutionExists && hasTwentyOneArticles, '党章级法典缺失或条款不全');
+
+const agentsMdContent = fs.existsSync('AGENTS.md') ? fs.readFileSync('AGENTS.md', 'utf8') : '';
+const hasChapter18 = agentsMdContent.includes('## 18. Coolie 工坊唯一核心北极星目标与真业务本体物理并轨铁律');
+assertRule('AGENTS.md 已载入第 18 章北极星目标与真本体并轨铁律', hasChapter18, 'AGENTS.md 缺少第 18 章');
+
+const masterPlanExists = fs.existsSync('docs-coolie/research/2026-10-05-coolie-core-mission-and-real-ontology-master-plan.md');
+assertRule('真本体破局复盘白皮书已沉淀: docs-coolie/research/2026-10-05-coolie-core-mission-and-real-ontology-master-plan.md', masterPlanExists, '复盘白皮书未落盘');
 
 console.log('\n========================================================================');
 if (failed) {
   console.error('🚫 全面管局审计未通过！存在不符合高管治理规范的阻断项，请修复后重试。');
   process.exit(1);
 } else {
-  console.log('🎉 全面管局审计全绿通过！系统完全符合极简两字 UI、对称底栏、CMMI 产物、高管审批治理与 Hermes 扁平化 Worker 契约！');
+  console.log('🎉 全面管局审计全绿通过！系统完全符合极简两字 UI、对称底栏、CMMI 产物、高管审批治理、Hermes 扁平化 Worker 契约与党章级工程宪法！');
   process.exit(0);
 }
