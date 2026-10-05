@@ -32,6 +32,7 @@ import {
   type OntologyPropertyEntry,
   type OntologyInstanceRow,
   type OntologyLevelsResponse,
+  type OntologyStatsResponse,
   type PluginRecord,
   type PluginStatus,
   type PluginConfig,
@@ -1162,6 +1163,17 @@ export class CoolieClient {
     return this.request<OntologyGraphResponse>(
       "GET",
       `/api/companies/${encodeURIComponent(companyId)}/ontology/graph?${q.toString()}`,
+    );
+  }
+
+  /**
+   * GET /api/companies/:id/ontology/stats
+   * 获取公司级对象图谱宏观统计数据 (节点总数、关系总数、平均度、各类对象分布)
+   */
+  async getOntologyStats(companyId: string): Promise<OntologyStatsResponse> {
+    return this.request<OntologyStatsResponse>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/ontology/stats`,
     );
   }
 

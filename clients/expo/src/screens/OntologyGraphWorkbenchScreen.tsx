@@ -16,6 +16,7 @@ import { StatusBar } from "expo-status-bar";
 import type {
   Company,
   OntologyGraphResponse,
+  OntologyStatsResponse,
 } from "@coolie/api-client";
 import { coolie } from "../coolie";
 import { C } from "../theme";
@@ -30,64 +31,51 @@ interface OntologyGraphWorkbenchScreenProps {
   company: Company;
   onBack?: () => void;
   embedded?: boolean;
+  onOpenFullscreen?: () => void;
 }
 
+const TYPE_LABEL_MAP: Record<string, string> = {
+  company: "公司",
+  project: "项目",
+  issue: "任务",
+  spec: "规格",
+  conversation: "对话",
+  work_product: "交付物",
+  attachment: "附件",
+  comment: "评论",
+  agent: "员工",
+};
+
 /**
- * Wave239 — 屏 4 (graph workbench, agy 草图 §4).
- *
- * Immersive single-canvas view with:
- *   * PanResponder single-touch pan + pinch-style two-finger scaling
- *     (react-native-gesture-handler is already a dep but not pinned to
- *     `GestureDetector` for native rebuilds; PanResponder is the safer
- *     cross-version path that wave213 Kanban also uses).
- *   * View presets (wave155): project_tree / agent_dashboard /
- *     conversation_thread, plus "混合" (no preset = full graph).
- *   * Left-bottom floating tool palette (zoom / center / fit).
- *   * Right-bottom legend showing the entity-type color codes.
- *
- * Heavy viewport: up to MAX_NODES=400 from the wave237 endpoint, so the
- * canvas clamps `scale ∈ [0.4, 2.5]`. Drawing 400 nodes via absolute
- * `View` is still cheap — each node is a 60×60 box.
+ * Wave304 — 对齐 Web 端的对象关系图谱工作台 (OntologyGraphWorkbenchScreen)。
+ * 1. 顶部提供宏观统计看板 (Stats Banner: 对象总数、关系总数、平均度、各类对象分布)
+ * 2. 经典 4 视图预设 (全景 / 协作 / 脉络 / 全量) 与 深度选择 (1层 / 2层 / 3层)
+ * 3. 沉浸式手势平移 (Pan) 与 缩放 (Pinch-to-zoom) 画布
+ * 4. 彻底贯彻两字极简交互 (放大 / 缩小 / 复位 / 适应 / 聚焦 / 还原 / 全屏)
  */
 export function OntologyGraphWorkbenchScreen({
   company,
   onBack,
   embedded = false,
+  onOpenFullscreen,
 }: OntologyGraphWorkbenchScreenProps) {
-  const [view, setView] = useState<
-    "project_tree" | "agent_dashboard" | "conversation_thread" | "mixed"
-  >("project_tree");
-  /**
-   * Wave261 — five-level drilldown workbench presets. Each preset maps to
-   * one level from the L0/L1/L2/L3/L4 ladder so the immersive canvas here
-   * mirrors the 屏 1 breadcrumb.
-   *
-   *   L0 公司 — `project_tree`, depth 2 (default whole-company topology)
-   *   L1 域   — `mixed`, depth 1, no root (cluster-by-category layout)
-   *   L2 类型 — `project_tree`, depth 1, narrower relations
-   *   L3 实例 — `agent_dashboard`, depth 2 (instance graph with ring)
-   *   L4 属性 — `conversation_thread`, depth 1 (single hop neighborhood)
-   *
-   * The canvas uses wave261 force layout (replaces wave244 cluster-by-type)
-   * so the picture stays readable at 30 nodes while still scaling to the
-   * 1600-pixel canvas when zoomed in.
-   */
   const GRAPH_PRESETS = [
-    { key: "macro" as const, label: "🌐 宏观骨架", depth: 1, view: "project_tree" as const },
-    { key: "mainline" as const, label: "📌 项目主线", depth: 2, view: "project_tree" as const },
-    { key: "team" as const, label: "👥 组织协作", depth: 1, view: "agent_dashboard" as const },
-    { key: "mixed" as const, label: "🕸️ 全量探索", depth: 2, view: "mixed" as const },
+    { key: "macro" as const, label: "全景", depth: 2, view: "project_tree" as const },
+    { key: "team" as const, label: "协作", depth: 1, view: "agent_dashboard" as const },
+    { key: "thread" as const, label: "脉络", depth: 1, view: "conversation_thread" as const },
+    { key: "mixed" as const, label: "全量", depth: 2, view: "mixed" as const },
   ];
   const [activePreset, setActivePreset] = useState<(typeof GRAPH_PRESETS)[number]["key"]>("macro");
+  const [selectedDepth, setSelectedDepth] = useState<number>(2);
   const [data, setData] = useState<OntologyGraphResponse | null>(null);
+  const [stats, setStats] = useState<OntologyStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selectedKey, setSelectedKey] = useState<string | null>(null);
   const [focusedKey, setFocusedKey] = useState<string | null>(null);
 
-  // pan + pinch state lives in refs so PanResponder callbacks see current
-  // values without re-binding the gesture on every render.
+  // pan + pinch state
   const pan = useRef(new Animated.ValueXY({ x: 0, y: 0 })).current;
   const scale = useRef(new Animated.Value(1)).current;
   const lastPan = useRef({ x: 0, y: 0 });
@@ -97,19 +85,23 @@ export function OntologyGraphWorkbenchScreen({
   const load = useCallback(
     async (
       presetKey: (typeof GRAPH_PRESETS)[number]["key"],
+      depthOverride?: number,
     ) => {
       setError(null);
       try {
         const preset = GRAPH_PRESETS.find((p) => p.key === presetKey) ?? GRAPH_PRESETS[0];
-        const depth = preset.depth;
-        const res =
+        const depth = depthOverride ?? preset.depth;
+        const [graphRes, statsRes] = await Promise.all([
           preset.view === "mixed"
-            ? await coolie.getOntologyGraph(company.id, { depth })
-            : await coolie.getOntologyGraph(company.id, {
+            ? coolie.getOntologyGraph(company.id, { depth })
+            : coolie.getOntologyGraph(company.id, {
                 view: preset.view,
                 depth,
-              });
-        setData(res);
+              }),
+          coolie.getOntologyStats(company.id).catch(() => null),
+        ]);
+        setData(graphRes);
+        if (statsRes) setStats(statsRes);
       } catch (e) {
         setError(String((e as Error)?.message ?? e));
         setData(null);
@@ -121,19 +113,19 @@ export function OntologyGraphWorkbenchScreen({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void load(activePreset).finally(() => {
+    void load(activePreset, selectedDepth).finally(() => {
       if (!cancelled) setLoading(false);
     });
     return () => {
       cancelled = true;
     };
-  }, [load, activePreset]);
+  }, [load, activePreset, selectedDepth]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    await load(activePreset);
+    await load(activePreset, selectedDepth);
     setRefreshing(false);
-  }, [load, activePreset]);
+  }, [load, activePreset, selectedDepth]);
 
   const reset = useCallback(() => {
     pan.setValue({ x: 0, y: 0 });
@@ -255,52 +247,158 @@ export function OntologyGraphWorkbenchScreen({
       {!embedded && <StatusBar style="light" />}
       {!embedded && (
         <ScreenHeader
-          title="工作台"
+          title="图谱"
           subtitle={headerSubtitle}
           onBack={onBack}
           right={
             <View style={styles.headerRight}>
-              <Pressable onPress={onRefresh} hitSlop={8} style={styles.iconBtn}>
-                <Ionicons name="download-outline" size={14} color={C.ink2} />
+              <Pressable
+                onPress={onRefresh}
+                hitSlop={8}
+                style={styles.iconBtn}
+                accessibilityLabel="刷新"
+                testID="OntologyGraph__Refresh__Btn"
+              >
+                <Ionicons name="refresh-outline" size={16} color={C.ink2} />
               </Pressable>
             </View>
           }
         />
       )}
 
-      {/* 视图切换 chip 行 */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.viewRow}
-      >
-        {GRAPH_PRESETS.map((opt) => (
-          <Pressable
-            key={opt.key}
-            onPress={() => {
-              setActivePreset(opt.key);
-              setFocusedKey(null);
-              setSelectedKey(null);
-            }}
-            hitSlop={4}
-            style={[styles.viewChip, activePreset === opt.key && styles.viewChipActive]}
-          >
-            <Text
-              style={[
-                styles.viewChipText,
-                activePreset === opt.key && styles.viewChipTextActive,
-              ]}
+      {/* 宏观统计大盘 (对齐 Web 端 stats) */}
+      <View style={styles.statsBanner} testID="OntologyGraph__StatsBanner">
+        <View style={styles.statsMetricRow}>
+          <View style={styles.metricItem}>
+            <Text style={styles.metricValue}>{stats?.totalNodes ?? data?.nodes.length ?? 0}</Text>
+            <Text style={styles.metricLabel}>对象</Text>
+          </View>
+          <View style={styles.metricDivider} />
+          <View style={styles.metricItem}>
+            <Text style={styles.metricValue}>{stats?.totalRelations ?? data?.edges.length ?? 0}</Text>
+            <Text style={styles.metricLabel}>关系</Text>
+          </View>
+          <View style={styles.metricDivider} />
+          <View style={styles.metricItem}>
+            <Text style={styles.metricValue}>{stats?.averageDegree ?? "—"}</Text>
+            <Text style={styles.metricLabel}>平均度</Text>
+          </View>
+
+          {/* 右侧动作胶囊 */}
+          <View style={styles.statsActionCol}>
+            {embedded && onOpenFullscreen ? (
+              <Pressable
+                style={styles.actionPill}
+                onPress={onOpenFullscreen}
+                hitSlop={6}
+                accessibilityLabel="全屏"
+                testID="OntologyGraph__Fullscreen__Btn"
+              >
+                <Ionicons name="scan-outline" size={13} color={C.accent} />
+                <Text style={styles.actionPillText}>全屏</Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              style={styles.actionPill}
+              onPress={onRefresh}
+              hitSlop={6}
+              accessibilityLabel="刷新"
+              testID="OntologyGraph__RefreshSmall__Btn"
             >
-              {opt.label}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
+              <Ionicons name="refresh-outline" size={13} color={C.ink2} />
+              <Text style={[styles.actionPillText, { color: C.ink2 }]}>刷新</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* 节点类型分布标签横向滚动 */}
+        {stats?.nodeCounts && stats.nodeCounts.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.typeTagRow}
+          >
+            {stats.nodeCounts
+              .filter((c) => c.count > 0)
+              .map((c) => (
+                <View key={c.entityType} style={styles.typeTag}>
+                  <View
+                    style={[
+                      styles.typeTagDot,
+                      { backgroundColor: colorForType(c.entityType) },
+                    ]}
+                  />
+                  <Text style={styles.typeTagLabel}>
+                    {TYPE_LABEL_MAP[c.entityType] ?? c.entityType} {c.count}
+                  </Text>
+                </View>
+              ))}
+          </ScrollView>
+        ) : null}
+      </View>
+
+      {/* 控制条: 4 视图预设 + 深度选择 */}
+      <View style={styles.controlsRow}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.presetScroll}
+        >
+          {GRAPH_PRESETS.map((opt) => (
+            <Pressable
+              key={opt.key}
+              onPress={() => {
+                setActivePreset(opt.key);
+                setSelectedDepth(opt.depth);
+                setFocusedKey(null);
+                setSelectedKey(null);
+              }}
+              hitSlop={4}
+              style={[styles.viewChip, activePreset === opt.key && styles.viewChipActive]}
+              testID={`OntologyGraph__Preset__${opt.key}`}
+            >
+              <Text
+                style={[
+                  styles.viewChipText,
+                  activePreset === opt.key && styles.viewChipTextActive,
+                ]}
+              >
+                {opt.label}
+              </Text>
+            </Pressable>
+          ))}
+
+          <View style={styles.depthDivider} />
+
+          {/* 深度选项 1/2/3 */}
+          {[1, 2, 3].map((d) => (
+            <Pressable
+              key={`depth-${d}`}
+              onPress={() => {
+                setSelectedDepth(d);
+                setFocusedKey(null);
+              }}
+              hitSlop={4}
+              style={[styles.depthChip, selectedDepth === d && styles.depthChipActive]}
+              testID={`OntologyGraph__Depth__${d}`}
+            >
+              <Text
+                style={[
+                  styles.depthChipText,
+                  selectedDepth === d && styles.depthChipTextActive,
+                ]}
+              >
+                {d}层
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
 
       {loading ? (
         <LoadingState text="加载图谱…" />
       ) : error ? (
-        <ErrorRetry message={error} onRetry={() => void load(activePreset)} />
+        <ErrorRetry message={error} onRetry={() => void load(activePreset, selectedDepth)} />
       ) : (
         <View style={styles.canvasWrap} {...responder.panHandlers}>
           {/* 聚焦下钻提示条 */}
@@ -308,7 +406,7 @@ export function OntologyGraphWorkbenchScreen({
             <View style={styles.focusBanner}>
               <Ionicons name="filter-circle" size={16} color={C.accent} />
               <Text style={styles.focusBannerText} numberOfLines={1}>
-                已聚焦「{data?.nodes.find((n) => n.key === focusedKey)?.label || "节点"}」关联子图
+                聚焦「{data?.nodes.find((n) => n.key === focusedKey)?.label || "节点"}」
               </Text>
               <Pressable
                 style={styles.focusBannerBtn}
@@ -316,8 +414,9 @@ export function OntologyGraphWorkbenchScreen({
                   setFocusedKey(null);
                 }}
                 hitSlop={6}
+                testID="OntologyGraph__Unfocus__Btn"
               >
-                <Text style={styles.focusBannerBtnText}>返回宏观全景</Text>
+                <Text style={styles.focusBannerBtnText}>还原</Text>
               </Pressable>
             </View>
           ) : null}
@@ -357,18 +456,38 @@ export function OntologyGraphWorkbenchScreen({
 
           {/* 左下浮动工具盘 */}
           <View style={styles.toolPalette}>
-            <ToolButton icon="add-outline" onPress={() => {
-              const next = Math.min(4, lastScale.current + 0.2);
-              scale.setValue(next);
-              lastScale.current = next;
-            }} />
-            <ToolButton icon="remove-outline" onPress={() => {
-              const next = Math.max(0.5, lastScale.current - 0.2);
-              scale.setValue(next);
-              lastScale.current = next;
-            }} />
-            <ToolButton icon="locate-outline" onPress={reset} />
-            <ToolButton icon="expand-outline" onPress={fit} />
+            <ToolButton
+              icon="add-outline"
+              label="放大"
+              testID="OntologyGraph__ZoomIn__Btn"
+              onPress={() => {
+                const next = Math.min(4, lastScale.current + 0.2);
+                scale.setValue(next);
+                lastScale.current = next;
+              }}
+            />
+            <ToolButton
+              icon="remove-outline"
+              label="缩小"
+              testID="OntologyGraph__ZoomOut__Btn"
+              onPress={() => {
+                const next = Math.max(0.5, lastScale.current - 0.2);
+                scale.setValue(next);
+                lastScale.current = next;
+              }}
+            />
+            <ToolButton
+              icon="locate-outline"
+              label="复位"
+              testID="OntologyGraph__Reset__Btn"
+              onPress={reset}
+            />
+            <ToolButton
+              icon="expand-outline"
+              label="适应"
+              testID="OntologyGraph__Fit__Btn"
+              onPress={fit}
+            />
           </View>
 
           {/* 右下图例 */}
@@ -382,7 +501,7 @@ export function OntologyGraphWorkbenchScreen({
                     { backgroundColor: colorForType(entry.type) },
                   ]}
                 />
-                <Text style={styles.legendType}>{entry.type}</Text>
+                <Text style={styles.legendType}>{TYPE_LABEL_MAP[entry.type] ?? entry.type}</Text>
                 <Text style={styles.legendCount}>{entry.count}</Text>
               </View>
             ))}
@@ -400,13 +519,14 @@ export function OntologyGraphWorkbenchScreen({
                     {selectedNode.label || selectedNode.key}
                   </Text>
                   <Text style={styles.nodeDrawerSub}>
-                    类型: {selectedNode.type} · 关联关系: {linkedEdgesCount} 条
+                    类型: {TYPE_LABEL_MAP[selectedNode.type] ?? selectedNode.type} · 关联关系: {linkedEdgesCount} 条
                   </Text>
                 </View>
                 <Pressable
                   onPress={() => setSelectedKey(null)}
                   hitSlop={8}
                   style={styles.drawerCloseBtn}
+                  accessibilityLabel="关闭"
                 >
                   <Ionicons name="close" size={18} color={C.ink3} />
                 </Pressable>
@@ -416,17 +536,19 @@ export function OntologyGraphWorkbenchScreen({
                   <Pressable
                     style={[styles.drawerActionBtn, styles.drawerActionBtnActive]}
                     onPress={() => setFocusedKey(null)}
+                    testID="OntologyGraph__DrawerUnfocus__Btn"
                   >
                     <Ionicons name="contract-outline" size={14} color={C.accent} />
-                    <Text style={styles.drawerActionBtnTextActive}>退出局部聚焦 (返回宏观)</Text>
+                    <Text style={styles.drawerActionBtnTextActive}>还原</Text>
                   </Pressable>
                 ) : (
                   <Pressable
                     style={styles.drawerActionBtn}
                     onPress={() => setFocusedKey(selectedNode.key)}
+                    testID="OntologyGraph__DrawerFocus__Btn"
                   >
                     <Ionicons name="scan-outline" size={14} color={C.ink} />
-                    <Text style={styles.drawerActionBtnText}>局部下钻聚焦 (1跳)</Text>
+                    <Text style={styles.drawerActionBtnText}>聚焦</Text>
                   </Pressable>
                 )}
               </View>
@@ -438,9 +560,25 @@ export function OntologyGraphWorkbenchScreen({
   );
 }
 
-function ToolButton({ icon, onPress }: { icon: keyof typeof Ionicons.glyphMap; onPress: () => void }) {
+function ToolButton({
+  icon,
+  label,
+  testID,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  testID?: string;
+  onPress: () => void;
+}) {
   return (
-    <Pressable onPress={onPress} hitSlop={6} style={styles.toolBtn}>
+    <Pressable
+      onPress={onPress}
+      hitSlop={6}
+      style={styles.toolBtn}
+      accessibilityLabel={label}
+      testID={testID}
+    >
       <Ionicons name={icon} size={18} color={C.ink} />
     </Pressable>
   );
@@ -477,6 +615,128 @@ const styles = StyleSheet.create({
     borderColor: C.line,
     alignItems: "center",
     justifyContent: "center",
+  },
+  statsBanner: {
+    backgroundColor: C.panel,
+    borderBottomWidth: 1,
+    borderBottomColor: C.line,
+    paddingHorizontal: SPACING.md,
+    paddingVertical: 10,
+    gap: 8,
+  },
+  statsMetricRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  metricItem: {
+    alignItems: "flex-start",
+    paddingRight: 14,
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: C.ink,
+  },
+  metricLabel: {
+    fontSize: 11,
+    color: C.ink3,
+    marginTop: 1,
+  },
+  metricDivider: {
+    width: 1,
+    height: 20,
+    backgroundColor: C.line,
+    marginRight: 14,
+  },
+  statsActionCol: {
+    flex: 1,
+    flexDirection: "row",
+    justifyContent: "flex-end",
+    alignItems: "center",
+    gap: 6,
+  },
+  actionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: RADIUS.pill,
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  actionPillText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: C.accent,
+  },
+  typeTagRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingTop: 2,
+  },
+  typeTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.sm,
+    backgroundColor: "rgba(255,255,255,0.03)",
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+  },
+  typeTagDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  typeTagLabel: {
+    fontSize: 10,
+    color: C.ink3,
+  },
+  controlsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 6,
+    backgroundColor: C.bg,
+    borderBottomWidth: 1,
+    borderBottomColor: C.lineSubtle,
+  },
+  presetScroll: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: SPACING.md,
+  },
+  depthDivider: {
+    width: 1,
+    height: 16,
+    backgroundColor: C.line,
+    marginHorizontal: 4,
+  },
+  depthChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: RADIUS.sm,
+    backgroundColor: C.panel,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+  },
+  depthChipActive: {
+    borderColor: C.accent,
+    backgroundColor: "rgba(94, 106, 210, 0.15)",
+  },
+  depthChipText: {
+    fontSize: 11,
+    color: C.ink3,
+    fontWeight: "500",
+  },
+  depthChipTextActive: {
+    color: C.accent,
+    fontWeight: "600",
   },
   viewRow: {
     flexDirection: "row",

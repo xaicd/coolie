@@ -132,6 +132,8 @@ export type {
   OntologyEntityTypeLevel,
   OntologyDomainLevel,
   OntologyLevelsResponse,
+  OntologyStatsResponse,
+  OntologyTypeCount,
   SetDomainLifecycleOptions,
   CompanyArtifactSource,
   CompanyArtifactMediaKind,

@@ -515,7 +515,7 @@ export function OntologyDomainListScreen({
           {/* 顶部返回条 */}
           <ScreenHeader
             onBack={() => setViewMode("detail")}
-            backLabel="返回域详情"
+            backLabel="返回"
             style={styles.detailNav}
             right={
               <Text style={styles.graphNavTitle}>
@@ -698,7 +698,7 @@ export function OntologyDomainListScreen({
               setViewMode("list");
               setSelectedDomain(null);
             }}
-            backLabel="返回本体域列表"
+            backLabel="返回"
             style={styles.detailNav}
             right={
               <StatusBadge

@@ -997,6 +997,20 @@ export interface OntologyGraphResponse {
   edges: OntologyGraphResponseEdge[];
 }
 
+export interface OntologyTypeCount {
+  entityType: string;
+  count: number;
+}
+
+export interface OntologyStatsResponse {
+  companyId: string;
+  nodeCounts: OntologyTypeCount[];
+  totalNodes: number;
+  relationCounts: Array<{ relation: string; count: number }>;
+  totalRelations: number;
+  averageDegree: number;
+}
+
 /**
  * Wave261 — five-level drilldown summary. Mirrors
  * `OntologyLevelsResponse` in `@paperclipai/shared`. The App receives the

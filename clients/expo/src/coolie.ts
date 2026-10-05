@@ -9,11 +9,12 @@ import {
   type IssueStatus,
   type OntologyDomain,
   type OntologyLevelsResponse,
+  type OntologyStatsResponse,
   type Project,
   type SessionUser,
 } from "@coolie/api-client";
 
-export type { Project };
+export type { Project, OntologyStatsResponse };
 
 // ── Linear 设计系统色彩令牌 ─────────────────────────────────────────
 // 单一来源在 src/theme.ts (与 Coolie Web 对齐); 这里再导出, 让 30+ 个
