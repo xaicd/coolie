@@ -386,6 +386,12 @@
       "maxTotalLines": 600
     },
     {
+      "path": "scripts/check-governance-audit.mjs",
+      "maxNetLines": 220,
+      "reason": "Fork script: wave298 全面管局 governance auditor (两字按钮/对称底栏/CMMI/扁平化契约). wave302 adds section 8 anti-regression guards for the constitution art.2 项目进厂即本体域 invariant (route hook, caller-tx atomicity, owner resource link, guard tests). No upstream counterpart.",
+      "maxTotalLines": 260
+    },
+    {
       "path": "ui/src/App.tsx",
       "maxNetLines": 35,
       "reason": "Mount project governance, 5+2 baseline, RTM, SPC, Living Topology, and API Lifecycle routes (/projects/:id/{governance,baseline,rtm,spc,living-topology,api-lifecycle}) for CMMI quality governance.",

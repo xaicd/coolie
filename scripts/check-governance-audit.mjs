@@ -159,6 +159,38 @@ assertRule('AGENTS.md 已载入第 18 章北极星目标与真本体并轨铁律
 const masterPlanExists = fs.existsSync('docs-coolie/research/2026-10-05-coolie-core-mission-and-real-ontology-master-plan.md');
 assertRule('真本体破局复盘白皮书已沉淀: docs-coolie/research/2026-10-05-coolie-core-mission-and-real-ontology-master-plan.md', masterPlanExists, '复盘白皮书未落盘');
 
+// -----------------------------------------------------------------------------
+// 8. 宪法第 2 条「项目进厂即本体域」防退化守卫 (wave302)
+// -----------------------------------------------------------------------------
+console.log('\n🏗️ 8. 宪法第 2 条「项目进厂即本体域」防退化守卫:');
+const ontologyBootstrapPath = 'server/src/services/project-ontology-bootstrap.ts';
+const ontologyBootstrapContent = fs.existsSync(ontologyBootstrapPath) ? fs.readFileSync(ontologyBootstrapPath, 'utf8') : '';
+const projectsRouteContent = fs.existsSync('server/src/routes/projects.ts') ? fs.readFileSync('server/src/routes/projects.ts', 'utf8') : '';
+
+assertRule(
+  '第2条_挂钩: 项目创建路由在事务内调用 ensureProjectOntologyDomain (杜绝裸项目)',
+  projectsRouteContent.includes('ensureProjectOntologyDomain'),
+  'server/src/routes/projects.ts 未挂钩本体域原子初始化',
+);
+
+assertRule(
+  '第2条_原子性: 本体域写入随调用方事务原子提交 (project + domain + resource_link 同生共死)',
+  ontologyBootstrapContent.includes("caller's transaction") && ontologyBootstrapContent.includes('to_regclass'),
+  'project-ontology-bootstrap.ts 丢失事务内原子写入或就绪探测',
+);
+
+assertRule(
+  '第2条_血缘: 写入 project→domain owner 资源链 (ontology_resource_links, role=owner)',
+  ontologyBootstrapContent.includes('ontology_resource_links') && ontologyBootstrapContent.includes('"owner"'),
+  '缺少 project→domain 资源链写入',
+);
+
+assertRule(
+  '第2条_防退化: 原子性/回滚/降级/重放/撞名守卫测试就位 (project-ontology-bootstrap.test.ts)',
+  fs.existsSync('server/src/__tests__/project-ontology-bootstrap.test.ts'),
+  '防退化测试文件缺失',
+);
+
 console.log('\n========================================================================');
 if (failed) {
   console.error('🚫 全面管局审计未通过！存在不符合高管治理规范的阻断项，请修复后重试。');
