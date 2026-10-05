@@ -218,4 +218,28 @@ describe("OTA manifest route — 响应头契约", () => {
     expect(res.headers["expo-protocol-version"]).toBe("0");
     expect(res.headers["cache-control"]).toBe("no-cache");
   });
+
+  it("manifest 原生采用 fingerprint 40位哈希时, 严禁被 version.json 的 semver 覆盖 (wave302)", async () => {
+    const fingerprintHash = "59398d8c10ad4c5e23044387b1c9912920e63692";
+    const fpManifest = { ...SAMPLE_MANIFEST, runtimeVersion: fingerprintHash };
+    writeFileSync(join(SHARED_MANIFEST_DIR, "manifest"), JSON.stringify(fpManifest));
+    writeFileSync(join(SHARED_MANIFEST_DIR, "manifest.json"), JSON.stringify(fpManifest));
+    await writeVersionJson({ version: "0.6.27", versionCode: 627 });
+    const handle = await buildApp();
+    app = handle.app;
+
+    // 1. 无头探测请求不被 version.json 覆盖
+    const res = await request(app).get("/api/ota/manifest");
+    expect(res.status).toBe(200);
+    expect(res.body.runtimeVersion).toBe(fingerprintHash);
+
+    // 2. 带同样 fingerprint 头的客户端正常拿到 fingerprint
+    const res2 = await request(app)
+      .get("/api/ota/manifest")
+      .set("expo-runtime-version", fingerprintHash)
+      .set("expo-platform", "android");
+    expect(res2.status).toBe(200);
+    expect(res2.body.runtimeVersion).toBe(fingerprintHash);
+  });
 });
+

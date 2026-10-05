@@ -88,7 +88,13 @@ function recallClient(ip: string): RememberedClient | undefined {
   return entry;
 }
 
+const FINGERPRINT_RE = /^[0-9a-f]{40}$/i;
+function isFingerprint(val: string | null | undefined): boolean {
+  return typeof val === "string" && FINGERPRINT_RE.test(val.trim());
+}
+
 function compareSemver(a: string, b: string): number {
+  if (isFingerprint(a) || isFingerprint(b)) return 0;
   const pa = a.split(".").map((n) => Number.parseInt(n, 10) || 0);
   const pb = b.split(".").map((n) => Number.parseInt(n, 10) || 0);
   for (let i = 0; i < 3; i += 1) {
@@ -118,6 +124,9 @@ function derivedUUID(seed: string): string {
 
 /** runtime 的数值序号 (0.5.58 → 58), 用于给派生 manifest 错开 createdAt */
 function runtimeOrdinal(runtime: string): number {
+  if (isFingerprint(runtime)) {
+    return Number.parseInt(runtime.slice(0, 6), 16) % 10000;
+  }
   const parts = runtime.split(".").map((n) => Number.parseInt(n, 10) || 0);
   return (parts[1] ?? 0) * 1000 + (parts[2] ?? 0);
 }
@@ -240,26 +249,31 @@ export function otaManifestRoutes(): Router {
     }
 
     const publishedRuntime = typeof manifest.runtimeVersion === "string" ? manifest.runtimeVersion : "?";
+    const publishedIsFingerprint = isFingerprint(publishedRuntime);
+
     // wave164: 把生产 version.json 的 version 视为 canonical runtimeVersion。
     // 找不到任何 version.json 时 canonical=null, 此时维持文件原值不动。
+    // wave292/wave302: 若 manifest 原生已采用 fingerprint 哈希口径, 严禁用 semver 版本号覆盖。
     const canonical = loadCanonicalRuntime();
     let servedRuntime = publishedRuntime;
     let canonicalSyncApplied = false;
 
     // 决定本次实际要送出的 runtimeVersion:
-    //   - 默认 = canonical (wave164)
-    //   - 如果客户端声明了旧 runtime 且 ≥ MIN_SUPPORTED_OTA_RUNTIME, 走 wave86 向后兼容,
-    //     让旧原生层拉到自己的 runtimeVersion 才能加载 bundle
-    // 注意: wave86 的旧规则是比较 clientRuntime !== publishedRuntime, 但 publishedRuntime
-    // 现在已经被 canonical 覆盖过 (见下面 rewrite); 这里提前比较「客户端是否需要 BC」
-    // 应当看 clientRuntime !== canonical —— 不然会被 wave164 canonical 同步「盖掉」回写意图。
+    //   - 若 published 已经是 fingerprint 策略，默认维持 publishedRuntime；
+    //   - 若 published 是传统 semver，默认 = canonical (wave164)；
+    //   - 如果客户端声明了旧 semver runtime 且 ≥ MIN_SUPPORTED_OTA_RUNTIME, 走 wave86 向后兼容。
+    const defaultRuntime = publishedIsFingerprint
+      ? publishedRuntime
+      : (canonical.runtime ?? publishedRuntime);
+
+    const clientIsFingerprint = isFingerprint(clientRuntime);
     const needsBackwardCompat =
       typeof clientRuntime === "string" &&
+      !clientIsFingerprint &&
       compareSemver(clientRuntime, MIN_SUPPORTED_OTA_RUNTIME) >= 0 &&
-      canonical.runtime !== null &&
-      clientRuntime !== canonical.runtime;
+      clientRuntime !== defaultRuntime;
 
-    const targetRuntime = needsBackwardCompat ? clientRuntime! : canonical.runtime ?? publishedRuntime;
+    const targetRuntime = needsBackwardCompat ? clientRuntime! : defaultRuntime;
 
     if (targetRuntime !== publishedRuntime) {
       // 回写 runtime, 并派生独立 (id, createdAt):

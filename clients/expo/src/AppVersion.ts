@@ -47,18 +47,26 @@ export function nativeRuntimeVersion(): string | null {
   return Updates.isEnabled ? Updates.runtimeVersion ?? null : null;
 }
 
+const FINGERPRINT_RE = /^[0-9a-f]{40}$/i;
+function isFingerprint(val: string | null | undefined): boolean {
+  return typeof val === "string" && FINGERPRINT_RE.test(val.trim());
+}
+
 /**
  * 比较本机原生 runtime 与远端 OTA manifest 的 runtimeVersion。
  *   本机 >= 远端 → 视为「已是最新」(native 已能加载现网 bundle, 无意义再升)
  *   本机 < 远端  → 远端声明更新 (但仅作信号, 不在本函数内触发下载)
  *
- * 真值示例 (wave243): 老板真机 native=0.6.10 (wave239 bump 608→610), 远端
- * manifest 旧版本停留在 0.6.8 → native ≥ remote → 不应再显示「升级」按钮。
- * 旧实现只用 Constants.expoConfig.version 与 version.json 比, 看不到 native 已
- * bump 过的真实情况, 把已升过级的老板又当成「待升级」。
+ * wave302 修复:
+ * 当 runtimeVersion 采用 policy=fingerprint（40 位哈希）时，不能走 cmpVersion 做数值比较！
+ * 1. 如果任一方或双方是 fingerprint，不可比较大小，不压制更新（返回 false）。
+ * 2. 只有当二者均为传统的纯 semver（如 "0.6.10" vs "0.6.8"）时，才执行 cmpVersion 比较。
  */
 export function isNativeAheadOfManifest(nativeRuntime: string | null, manifestRuntime: string | null): boolean {
   if (!nativeRuntime || !manifestRuntime) return false;
+  if (isFingerprint(nativeRuntime) || isFingerprint(manifestRuntime)) {
+    return false;
+  }
   return cmpVersion(nativeRuntime, manifestRuntime) >= 0;
 }
 
@@ -131,9 +139,10 @@ export async function checkAppVersion(
       const manifestUrl = (Constants.expoConfig as { updates?: { url?: string } } | undefined)
         ?.updates?.url;
       if (manifestUrl) {
-        const res = await fetch(manifestUrl, {
-          headers: { "expo-channel-name": "production" },
-        });
+        const headers: Record<string, string> = { "expo-channel-name": "production" };
+        const rt = nativeRuntimeVersion();
+        if (rt) headers["expo-runtime-version"] = rt;
+        const res = await fetch(manifestUrl, { headers });
         if (res.ok) {
           const m = (await res.json()) as { runtimeVersion?: string };
           if (typeof m.runtimeVersion === "string") {

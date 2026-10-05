@@ -29,6 +29,9 @@ SSH_TARGET="${SSH_TARGET:-tc-coolie-claw}"
 # 的 SPA 兜底 —— 所以这里和 /etc/caddy/Caddyfile 的 root 必须一致。
 REMOTE_OTA_DIR="${REMOTE_OTA_DIR:-/opt/coolie/ui/ota}"
 OTA_BASE_URL="${OTA_BASE_URL:-https://xrobinai.cn/ota}"
+REMOTE_VERSION_JSON="${REMOTE_VERSION_JSON:-/opt/coolie/ui/dist/version.json}"
+VERSION_JSON_URL="${VERSION_JSON_URL:-https://xrobinai.cn/version.json}"
+SYNC_VERSION_JSON="${SYNC_VERSION_JSON:-1}"
 PLATFORMS="${1:-all}"
 DIST_DIR="$EXPO_DIR/dist"
 
@@ -37,6 +40,7 @@ echo " Coolie Mobile OTA Publisher"
 echo " 目标平台:  $PLATFORMS"
 echo " 目标服务器: $SSH_TARGET:$REMOTE_OTA_DIR"
 echo " 更新源地址: $OTA_BASE_URL/manifest"
+echo " 版本清单:   $VERSION_JSON_URL (sync: $SYNC_VERSION_JSON)"
 echo "========================================================"
 
 echo "=== [1/4] 清理并导出 Expo 离线 Bundle (expo export) ==="
@@ -186,6 +190,43 @@ ssh "$SSH_TARGET" "mkdir -p $REMOTE_OTA_DIR"
 rsync -avz --delete \
   --exclude 'paperclip-web' \
   "$DIST_DIR/" "$SSH_TARGET:$REMOTE_OTA_DIR/"
+
+if [ "$SYNC_VERSION_JSON" = "1" ]; then
+  echo "=== [3.5/4] 同步更新远端 version.json ==="
+  TMP_VJSON="$(mktemp -t coolie-vjson.XXXXXX)"
+  BASE_VJSON="$(mktemp -t coolie-vbase.XXXXXX)"
+  curl -sS -m 8 "$VERSION_JSON_URL" -o "$BASE_VJSON" 2>/dev/null || true
+  if [ ! -s "$BASE_VJSON" ]; then
+    cp "$EXPO_DIR/../../version.json" "$BASE_VJSON" 2>/dev/null || true
+  fi
+  node - "$TMP_VJSON" "$BASE_VJSON" "$EXPO_DIR/app.json" << 'VEOF'
+const fs = require('fs');
+const [,, tmpPath, basePath, appJsonPath] = process.argv;
+let base = {};
+try {
+  if (fs.existsSync(basePath)) base = JSON.parse(fs.readFileSync(basePath, 'utf8'));
+} catch {}
+const app = JSON.parse(fs.readFileSync(appJsonPath, 'utf8'));
+const version = app.expo?.version || '0.6.27';
+const versionCode = app.expo?.android?.versionCode || 627;
+let commitSha = '';
+try {
+  commitSha = require('child_process').execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+} catch {}
+const updated = {
+  ...base,
+  version,
+  versionCode,
+  downloadUrl: `https://dls.xrobinai.cn/coolie/app/${version}/coolie-release.apk`,
+  commitSha: commitSha || base.commitSha || '',
+};
+fs.writeFileSync(tmpPath, JSON.stringify(updated, null, 2) + '\n');
+VEOF
+  scp "$TMP_VJSON" "$SSH_TARGET:$REMOTE_VERSION_JSON"
+  ssh "$SSH_TARGET" "chmod 644 '$REMOTE_VERSION_JSON'"
+  echo "   ✓ 已同步远端 version.json ($VERSION_JSON_URL)"
+  rm -f "$TMP_VJSON" "$BASE_VJSON"
+fi
 
 echo "=== [4/4] 验证远端更新源有效性 ==="
 ssh "$SSH_TARGET" "if [ -f $REMOTE_OTA_DIR/manifest ]; then echo '✓ 远端 manifest 已更新就绪:'; head -n 12 $REMOTE_OTA_DIR/manifest; else echo '❌ 远端未找到 manifest'; exit 1; fi"
