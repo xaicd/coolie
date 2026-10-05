@@ -74,16 +74,32 @@ APK 原生值 ≠ `app.json` → 这份 APK 永远加载不了声称那个 runti
   所以现装机 App 的 OTA 能照常跑通 —— 这不是掩盖，是让 manifest 说实话；重建后
   两边自动对齐。
 
-## 5. 抓到的真事件（wave16, 2026-09-21）
+## 5. 抓到的真事件
 
+### 案例 A：wave16 (2026-09-21) — appVersion 策略漂移
 ```
 0.5.7 APK: aapt2 dump xmltree → EXPO_RUNTIME_VERSION=0.5.5, versionName=0.5.7
 0.5.7 装机 App: 下载 manifest.runtimeVersion=0.5.7 的 bundle → 只下载不加载
 wave15 曾把生产 manifest 手改成 0.5.5 迁就 APK → 但 publish-ota.sh 一跑又写回 0.5.7
 ```
-
-门禁当场把三处摆出来（1 OK / 2 FAIL / 3 VERIFIED），第 2 条即根因。
 修复：`fix-android-manifest.sh` 每次重写 + `release-app.sh` 断言 + `publish-ota.sh` 读 APK 真值。
+
+### 案例 B：wave302 (2026-10-05) — fingerprint 指纹策略与服务端覆写陷阱
+```
+现象：原生发布新包后，后续发 OTA 客户端永远收不到增量更新，也不弹窗。
+排查发现两个致命双杀陷阱：
+1. 服务端 manifest 篡改：server/src/routes/ota-manifest.ts 曾存留历史逻辑，
+   把所有请求里的 manifest.runtimeVersion 强行用 version.json (semver 如 "0.6.26") 覆写。
+   由于 Expo 项目已升级为 policy: "fingerprint"（40 位 sha1 哈希如 "59398d8c10ad4c5e..."），
+   导致客户端 expo-updates 比对本地哈希与服务端 semver 不匹配，直接静默丢弃更新。
+   修复：ota-manifest.ts 增加 isFingerprint() 正则检测，凡是 40 位哈希一律保留原样，禁止覆写。
+2. 客户端版本数值误判：AppVersion.ts 中 isNativeAheadOfManifest 曾使用 parseInt()
+   解析 runtimeVersion。当遇到 40 位十六进制哈希时，parseInt("59398d...", 10) 算出 59398，
+   错误认为原生版本超前服务端，从而主动抑制了更新提示。
+   修复：AppVersion.ts 识别到 fingerprint 时跳过数值大小比对，且请求头显式附带 expo-runtime-version。
+3. version.json 联动同步：clients/expo/scripts/publish-ota.sh 每次发 OTA 时，
+   自动同步更新远端 version.json 的 commitSha 与 releaseNotes，保证客户端探测与 OTA manifest 真实同步。
+```
 
 ## 6. 这个门禁**抓不到**什么
 
