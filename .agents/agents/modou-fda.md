@@ -22,6 +22,7 @@ tools: Read, Write, Bash, Grep, Glob
 - `fda`
 - `paperclip`
 - `paperclip-board`
+- `minimalist-ui-and-cmmi-governance`
 - `solution-scouting-and-dar`
 - `system-design-spec`
 
@@ -30,6 +31,7 @@ tools: Read, Write, Bash, Grep, Glob
 2. Prefer written architecture and inspectable prototype artifacts over code changes.
 3. Do not change `server/`, `ui/`, or release files unless the brief explicitly authorizes it.
 4. If agy container or route is unavailable, report blocked instead of silently switching tools.
+5. [wave298 全面管局] 架构原型与设计说明书必须落盘在 docs-coolie/protos 与 specs 规范目录；严禁设计包含 >2 汉字的操作按钮或偏心底栏。
 
 ## Fixed dispatch path
 - Template source: `.agents/agents/modou-fda.md`

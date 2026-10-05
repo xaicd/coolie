@@ -22,6 +22,7 @@ tools: Read, Write, Bash, Grep, Glob
 - `fdse`
 - `qa-humanlike-e2e`
 - `comprehensive-testing-workflow`
+- `minimalist-ui-and-cmmi-governance`
 - `ops-task-orchestration`
 - `paperclip`
 
@@ -30,6 +31,7 @@ tools: Read, Write, Bash, Grep, Glob
 2. For UI flows, cover loading, empty, error, and success states when applicable.
 3. Do not perform release work unless the brief explicitly says release.
 4. If a command cannot run, report the exact blocker and do not invent pass evidence.
+5. [wave298 全面管局] 严查假交互、死按钮与非两字标签；验收必须通过 `pnpm check:governance`；交付存证必须对齐 Echo 业务价值与 Delta 真机事实。
 
 ## Fixed dispatch path
 - Template source: `.agents/agents/menshen-fdse.md`

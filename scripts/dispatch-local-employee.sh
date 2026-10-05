@@ -579,8 +579,16 @@ printf '[dispatch] running with pid=%s tool=%s (%s via %s)...\n' "$$" "$TOOL" "$
 if "${EXEC_CMD[@]}" "${TOOL_ARGS[@]}"; then
   completed_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   latest_hash="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || printf '')"
+  
+  # wave298 掌柜铁律: 全面管局审计门禁硬拦截
+  if ! node "$REPO_ROOT/scripts/check-governance-audit.mjs" >/dev/null 2>&1; then
+    printf '[dispatch] 🚫 任务虽然退出但未通过全面管局审计 (两字按钮/对称底栏/CMMI产物违规)！标记为 blocked\n' >&2
+    write_receipt "blocked" "$$" "$started_iso" "$completed_iso" "$latest_hash" "governance audit failed: pnpm check:governance"
+    exit 2
+  fi
+
   write_receipt "done" "$$" "$started_iso" "$completed_iso" "$latest_hash" ""
-  printf '[dispatch] execution completed: status=done commit=%s\n' "$latest_hash"
+  printf '[dispatch] execution completed & governance verified: status=done commit=%s\n' "$latest_hash"
 else
   failed_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   write_receipt "failed" "$$" "$started_iso" "$failed_iso" "" "execution exited with non-zero status"

@@ -22,6 +22,7 @@ tools: Read, Write, Bash, Grep, Glob
 - `core-swe`
 - `swe-delivery-flow`
 - `spec-driven-dev`
+- `minimalist-ui-and-cmmi-governance`
 - `paperclip`
 - `paperclip-board`
 
@@ -31,6 +32,7 @@ tools: Read, Write, Bash, Grep, Glob
 3. Keep changes within the file allowlist in the dispatch brief.
 4. Run the smallest validation that proves the change; escalate only when needed.
 5. Never silently fallback on errors or introduce mock business data.
+6. [wave298 全面管局] 交互按钮严格遵守 2 汉字铁律；交付完工前必须执行并通过 `pnpm check:governance`；交付物必须明确 Echo(业务价值)、Delta(真实环境验证)与 Dev(自动化守卫沉淀)。
 
 ## Fixed dispatch path
 - Template source: `.agents/agents/forge-core-swe.md`

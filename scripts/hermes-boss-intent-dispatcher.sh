@@ -59,6 +59,19 @@ if [[ "$INPUT" =~ (待办|有哪些任务|任务列表|工单列表|未完成|�
   exec "$SCRIPT_DIR/coolie-dev-task.mjs" list
 fi
 
+# 0.1 模糊意图检测与 Echo 澄清追问门禁 (Palantir Echo Clarification Gate)
+if [[ "$INPUT" =~ ^(修一下|改改|改一下|看下|弄下|加个|处理下|搞一下|修|改|看)$ ]]; then
+  cat <<EOF
+【Hermes · Echo 意图澄清追问】
+掌柜，您的指令「$INPUT」范围较模糊，请直接回复序号或补充上下文：
+  [1] 移动端原生体验修复（两字按钮/底栏/布局塌陷）
+  [2] 后台服务与控制面逻辑修复（审批流/多租户/数据库）
+  [3] 生产发布与 OTA 增量同步问题（版本号/Caddy/缓存）
+或直接在微信回复更具体的业务目标（例如：“修一下工单审批流卡死”）。
+EOF
+  exit 0
+fi
+
 # 1. 意图分类与特征提取
 AGENT="forge-core-swe"
 EMPLOYEE="铁匠"
@@ -113,14 +126,19 @@ TASK_LEVEL="L2-标准"
 TOKEN_ESTIMATE="中等 (~2-5万 Tokens)"
 DISCIPLINE_RULES=""
 
+# 自动生成 Palantir Echo-Delta-Dev 三元工程指导
+ECHO_OUTCOME="明确解决的核心业务阻碍与高管交付 Outcome"
+DELTA_VERIFY="必须在真实模拟器/Web 或生产接口跑通，提供真机快照或命令结果存证"
+DEV_BACKPROP="完工前必须通过 pnpm check:governance 并固化防退化自动化守卫"
+
 if [[ "$INPUT" =~ (文案|改下字|单点|错别字|微调|查日志|看下状态) ]]; then
   TASK_LEVEL="L1-快车道(轻量)"
   TOKEN_ESTIMATE="极低 (~3k-8k Tokens, 单兵直出)"
-  DISCIPLINE_RULES="【L1 轻量铁律】单兵直出，先跑 scripts/toolkits/fast-precheck.sh 自检，严禁冗长上下文。"
+  DISCIPLINE_RULES="【L1 轻量铁律】单兵直出，先跑 scripts/check-governance-audit.sh 自检，严禁冗长上下文。"
 elif [[ "$INPUT" =~ (重构|新系统|多租户|架构重写|商业闭环) ]]; then
   TASK_LEVEL="L3-重大架构(全量CMMI)"
   TOKEN_ESTIMATE="高 (严格阶段门禁 G1-G5)"
-  DISCIPLINE_RULES="【L3 架构铁律】严格遵从 Next.js/React 官方工业级标准与多企业隔离防线，产出完整 SRS 与 LLD。"
+  DISCIPLINE_RULES="【L3 架构铁律】严格遵从工业级标准与多租户隔离防线，产出完整 SRS 与 LLD。"
 else
   TASK_LEVEL="L2-标准功能"
   TOKEN_ESTIMATE="中等 (~2-5万 Tokens)"
@@ -130,7 +148,7 @@ fi
 if [[ "$CATEGORY" =~ (qa-gate|ds) ]]; then
   DISCIPLINE_RULES="$DISCIPLINE_RULES\n【CMMI G4 强制军规】必须使用 agent-device 或 agent-browser 真实启动设备/浏览器，严禁 Mock 假数据，必须附带真机截图或控制台真实日志，否则验收直接退单！"
 elif [[ "$CATEGORY" == "dev" ]]; then
-  DISCIPLINE_RULES="$DISCIPLINE_RULES\n【CMMI G3 强制军规】使用底座框架时严格遵从现有 shared 契约与 Drizzle schema，提交前先跑 fast-precheck.sh 确保 0 报错！"
+  DISCIPLINE_RULES="$DISCIPLINE_RULES\n【CMMI G3 强制军规】使用底座框架时严格遵从两字按钮与 shared 契约，完工前必须运行 pnpm check:governance 确保 0 报错！"
 elif [[ "$CATEGORY" == "ops" ]]; then
   DISCIPLINE_RULES="$DISCIPLINE_RULES\n【CMMI G5 强制军规】必须基于 Caddy/Node/Postgres 全拓扑探测，排查线上首附 journalctl 真实日志片段与 DB 真值！"
 fi
@@ -173,6 +191,9 @@ echo "💰 算力预估: $TOKEN_ESTIMATE"
 echo "📌 CMMI 映射: $CMMI_PHASE"
 echo "⚡ 任务目标: $SAFE_TASK"
 echo "🏷️ 当前波次: $LATEST_WAVE"
+echo "🎯 Echo 价值: $ECHO_OUTCOME"
+echo "🧪 Delta 验证: $DELTA_VERIFY"
+echo "🛡️ Dev 守卫: $DEV_BACKPROP"
 echo "────────────────────────────────────────"
 
 # 4. 同步联动 Coolie Dev Server 建立 Issue
@@ -182,7 +203,17 @@ ISSUE_URL=""
 
 create_issue_on_dev() {
   local title="[$LATEST_WAVE] $SAFE_TASK"
-  local desc="由 Hermes 从老板微信/终端直通派发\n- 责任员工: $EMPLOYEE\n- 工具: $TOOL\n- 梯次分流: $TASK_LEVEL\n- 算力预估: $TOKEN_ESTIMATE\n- CMMI 门禁: $CMMI_PHASE\n- 守卫军规:\n$DISCIPLINE_RULES"
+  local desc="由 Hermes 从老板微信/终端直通派发
+- 责任员工: $EMPLOYEE
+- 工具: $TOOL
+- 梯次分流: $TASK_LEVEL
+- 算力预估: $TOKEN_ESTIMATE
+- CMMI 门禁: $CMMI_PHASE
+- 【Echo 价值定义】: $ECHO_OUTCOME
+- 【Delta 真实验证】: $DELTA_VERIFY
+- 【Dev 反向传播】: $DEV_BACKPROP
+- 守卫军规:
+$DISCIPLINE_RULES"
   
   local json_payload
   json_payload="$(node -e '
