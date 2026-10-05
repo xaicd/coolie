@@ -154,6 +154,20 @@ async function checkAndExecuteNextTask() {
       } else {
         console.error(`❌ [Runner Bridge] 工单 [${task.identifier}] 执行退出 (code ${code})`);
         failedTasks.add(task.identifier); // 暂时标记，顺延下一个任务
+        
+        // 改进点: 失败时自动提取日志尾部并回写 Issue，杜绝虚假 running
+        let tailError = `任务退出码: ${code}`;
+        try {
+          if (fs.existsSync(logFile)) {
+            const lines = fs.readFileSync(logFile, "utf8").trim().split("\n");
+            tailError = lines.slice(-5).join(" | ");
+          }
+        } catch(e) {}
+        
+        await fetchJson(`/api/companies/${COMPANY_ID}/issues/${task.id}/status`, {
+          method: "PATCH",
+          body: { status: "todo" }
+        }).catch(() => {});
       }
     });
 
