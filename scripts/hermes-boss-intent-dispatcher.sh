@@ -72,6 +72,58 @@ EOF
   exit 0
 fi
 
+# 0.2 长任务 18-20 分钟断点续接门禁 (Long-Running Task Continuation & Baton Relay)
+if [[ "$INPUT" =~ ^(继续|接着干|继续做|继续跑|接着跑|继续干|未完继续|断点续跑)$ ]]; then
+  DISPATCH_DIR="${COOLIE_LOCAL_DIR:-$REPO_ROOT/.coolie-local}/dispatch"
+  LATEST_RECEIPT="$(ls -t "$DISPATCH_DIR"/*.json 2>/dev/null | head -1 || true)"
+  
+  if [[ -z "$LATEST_RECEIPT" || ! -f "$LATEST_RECEIPT" ]]; then
+    echo "【Hermes 微信播报】未检测到历史未结单任务，当前队列全员空闲，请直接下达新需求！"
+    exit 0
+  fi
+
+  # 提取上一棒任务元数据
+  PREV_TASK="$(node -e 'try { const r = JSON.parse(require("fs").readFileSync(process.argv[1])); console.log(r.task || ""); } catch(e){}' "$LATEST_RECEIPT")"
+  PREV_AGENT="$(node -e 'try { const r = JSON.parse(require("fs").readFileSync(process.argv[1])); console.log(r.agent || "forge-core-swe"); } catch(e){}' "$LATEST_RECEIPT")"
+  PREV_EMPLOYEE="$(node -e 'try { const r = JSON.parse(require("fs").readFileSync(process.argv[1])); console.log(r.employee || "铁匠"); } catch(e){}' "$LATEST_RECEIPT")"
+  PREV_TOOL="$(node -e 'try { const r = JSON.parse(require("fs").readFileSync(process.argv[1])); console.log(r.tool || "claude-glm"); } catch(e){}' "$LATEST_RECEIPT")"
+  PREV_WAVE="$(node -e 'try { const r = JSON.parse(require("fs").readFileSync(process.argv[1])); console.log(r.wave || "wave302"); } catch(e){}' "$LATEST_RECEIPT")"
+
+  # 清理可能存在的前置 "【断点接力】" 前缀，避免层层嵌套
+  CLEAN_TASK="${PREV_TASK#【断点接力续跑】}"
+  CLEAN_TASK="${CLEAN_TASK#【断点续跑】}"
+
+  echo "【Hermes 微信秒级断点续跑接力】"
+  echo "────────────────────────────────────────"
+  echo "🔄 触发模式: 18-20 分钟长任务断点接力 (Pass-the-Baton)"
+  echo "👤 责任员工: $PREV_EMPLOYEE ($PREV_AGENT)"
+  echo "🛠️ 执行工具: $PREV_TOOL"
+  echo "🏷️ 当前波次: $PREV_WAVE"
+  echo "⚡ 延续任务: $CLEAN_TASK"
+  echo "📦 工作区状态: 100% 继承当前 Git 工作区半成品，坚决不推倒重来！"
+  echo "────────────────────────────────────────"
+
+  RELAY_TASK="【断点接力续跑】这是上游 18-20 分钟长耗时任务的延续。上游已产生部分代码修改，请在现有工作区基础上直接继续完成剩余逻辑、执行 pnpm check:governance 并收尾结单！原任务: $CLEAN_TASK"
+
+  DISPATCH_ARGS=(
+    --agent "$PREV_AGENT"
+    --task "$RELAY_TASK"
+    --wave "$PREV_WAVE"
+    --tool "$PREV_TOOL"
+  )
+  if [[ -n "$EXECUTE_FLAG" || "${AUTO_EXECUTE:-0}" == "1" ]]; then
+    DISPATCH_ARGS+=(--execute)
+  fi
+
+  "$SCRIPT_DIR/dispatch-local-employee.sh" "${DISPATCH_ARGS[@]}"
+
+  echo ""
+  echo "✅ 已成功唤醒第 2 棒续跑！工作区上下文已无缝注入，上游成果 100% 保留！"
+  echo "微信 5 字段实时状态:"
+  echo "$PREV_EMPLOYEE: $PREV_WAVE / 0m / $PREV_TOOL / 跑 (接力续跑中)"
+  exit 0
+fi
+
 # 1. 意图分类与特征提取
 AGENT="forge-core-swe"
 EMPLOYEE="铁匠"
