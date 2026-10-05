@@ -339,6 +339,33 @@ A change is done when all are true:
      - `claude`：必须显式传递 `--dangerously-skip-permissions`；
      - 管道执行强制添加 `< /dev/null` 重定向，杜绝因无 TTY stdin 悬空而等待 3 秒或 hang 死。
 
+## 18. Coolie 工坊唯一核心北极星目标与真业务本体物理并轨铁律 (wave304)
+
+老板原话: 「还是 重新看看 建设这个 coolie系统的 核心目标吧， 总感觉 搞着搞着 就 乱了，到现在为止，本体功能 系统本身 没有用上， 新项目/会话/任务 建设 更没有用上， 感觉建设了 假东西，请 认真复盘，并且 重新给出一个 coolie工坊建设的 全面目标，然后让AI AGENT 持续为了同一个目标 做深做透」
+
+详尽复盘白皮书见 `docs-coolie/research/2026-10-05-coolie-core-mission-and-real-ontology-master-plan.md`。
+
+1. **唯一核心北极星目标**：
+   - **战略定义**：建设以「活体业务本体 (Living Ontology)」为唯一控制与决策中枢、由「高管自然语言工坊」直通驱动、全流程调度「数字员工团队」、实现「零培训、免代码、不可变真机证据交付」的企业级 AI 软件工程控制面！
+   - **消灭两张皮**：彻底终结“本体在底层孤岛空转、工坊在上层打字闲聊、看板在离散派单”的割裂假象，本体必须成为系统的神经脊梁。
+
+2. **三大物理并轨铁律 (三大契约)**：
+   - **项目进厂即本体域 (Project as Domain)**：创建 Project 必须原子初始化同名 `ontology_domains`；上传需求文档/SQL 必须自动触发 `RepoCognitionJob` 提取核心实体与动作草案，严禁无本体的孤立项目；
+   - **工坊会话即本体演进 (Conversation as Proposal)**：工坊 (Board Chat) 是本体演进的飞行摇杆。高管自然语言诉求通过 Hermes 实时澄清 (Echo) 并物化为结构化 Proposal 卡片 (Delta)，老板两字确认即落盘快照并自动派单；
+   - **任务施工即动作跃迁与不可变血缘 (Task as Action Execution & Provenance)**：WBS 任务必须挂靠本体 ActionType / ObjectType；代码 Commit、接口契约与真机测试快照（四态）直接作为本体节点的不可变 WorkProduct 证据链。
+
+3. **六大数字员工的“本体靶心”工作法**：
+   - **Hermes**：专职将高管意图转译为本体 Proposal，并反向编排 WBS 任务树；
+   - **墨斗 (FDA)**：专职负责 `ontology_domains` 架构设计、租户物理隔离与实体定义（G1 门禁）；
+   - **铁匠 (Core SWE)**：专职按 ActionType 契约编写代码与静态测试，保持 0 编译报错（G2/G3 门禁）；
+   - **门神 (FDSE)**：专职通过 `agent-device` 捕获真机模拟器快照，作为本体节点的交互证据（G4 门禁）；
+   - **百晓生 (DS)**：专职沿着 `ontology_find_path` 业务因果链进行全流程端到端业务验收；
+   - **兑底渊 (PRE-SRE)**：专职基于 `ontology_find_impact` 扫描变更影响面，实施零风险不可变投产（G5 门禁）。
+
+4. **极简主义与防乱加功能守卫**：
+   - 坚决贯彻“极简两字交互”与“对称 5 槽位底栏”，消灭同屏重复创建入口；
+   - 100% 榨干系统已有 50+ 张物理表与本体引擎，严禁因碎片功能随意扩表或增加复杂菜单，持续做深做透核心闭环。
+
 ## This fork's own conventions
 
 This repository is a fork of Paperclip. The rules above are upstream's; these are ours.
