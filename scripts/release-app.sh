@@ -312,6 +312,10 @@ if [ "$BUILD_OK" -eq 0 ]; then
   die "gradle assembleRelease 失败，已回退 commit（未上传任何产物）"
 fi
 [ -f "$APK_SRC" ] || dry || die "未找到构建产物: $APK_SRC"
+# 算 APK SHA256 (v0.6.32 wave310 fix — 之前版本没算, 老板装后「下载了升级但手动 sed 修」一直工作).
+APK_SHA256="$(shasum -a 256 "$APK_SRC" 2>/dev/null | awk '{print $1}')"
+[ -n "$APK_SHA256" ] || die "算不出 APK SHA256: $APK_SRC"
+echo "   ✓ APK SHA256: $APK_SHA256"
 echo "   ✓ 产物就绪: $APK_SRC"
 
 step "[7/9] 上传 APK 到 COS ($COS_OBJECT)"
@@ -335,16 +339,16 @@ if ! dry; then
 fi
 if dry; then
   echo "   [dry-run] 生成 version.json (保留既有 ios* 等非托管键):"
-  printf '   [dry-run]   { "version": "%s", "versionCode": %s, "downloadUrl": "%s", "releaseNotes": "%s", "commitSha": "%s", <既有键保留> }\n' \
-    "$VERSION" "$VERSION_CODE" "$APK_URL" "$NOTES" "$RELEASE_COMMIT"
+  printf '   [dry-run]   { "version": "%s", "versionCode": %s, "downloadUrl": "%s", "releaseNotes": "%s", "commitSha": "%s", "apkSha256": "%s", <既有键保留> }\n' \
+    "$VERSION" "$VERSION_CODE" "$APK_URL" "$NOTES" "$RELEASE_COMMIT" "$APK_SHA256"
   echo "   [dry-run] scp <tmp>/version.json $SSH_TARGET:$REMOTE_VERSION_JSON"
 else
-  python3 - "$TMP_JSON" "$BASE_JSON" "$VERSION" "$VERSION_CODE" "$APK_URL" "$NOTES" "$RELEASE_COMMIT" <<'PY'
+  python3 - "$TMP_JSON" "$BASE_JSON" "$VERSION" "$VERSION_CODE" "$APK_URL" "$NOTES" "$RELEASE_COMMIT" "$APK_SHA256" <<'PY'
 import json
 import os
 import sys
 
-path, base, version, code, url, notes, commit = sys.argv[1:8]
+path, base, version, code, url, notes, commit, apk_sha = sys.argv[1:9]
 data = {}
 if os.path.exists(base):
     try:
@@ -354,7 +358,7 @@ if os.path.exists(base):
             data = loaded
     except (OSError, ValueError):
         data = {}
-# 脚本管理的 5 个键覆盖之; 其余键 (iOS 字段等) 原样保留。
+# 脚本管理的 6 个键覆盖之; 其余键 (iOS 字段等) 原样保留。
 data.update(
     {
         "version": version,
@@ -362,6 +366,7 @@ data.update(
         "downloadUrl": url,
         "releaseNotes": notes,
         "commitSha": commit,
+        "apkSha256": apk_sha,
     }
 )
 with open(path, "w", encoding="utf-8") as handle:
