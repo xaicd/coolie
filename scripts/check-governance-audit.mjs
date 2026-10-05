@@ -127,11 +127,29 @@ assertRule('高管提示词库已沉淀: docs-coolie/playbooks/executive-prompts
 const skillExists = fs.existsSync('.agents/skills/minimalist-ui-and-cmmi-governance/SKILL.md');
 assertRule('治理规范技能已沉淀: .agents/skills/minimalist-ui-and-cmmi-governance/SKILL.md', skillExists, '治理技能未落盘');
 
+// -----------------------------------------------------------------------------
+// 6. Hermes 一级 Worker 拓扑与后台免交互权限硬审计 (wave302)
+// -----------------------------------------------------------------------------
+console.log('\n🤖 6. Hermes 一级 Worker 拓扑与后台免交互权限硬审计:');
+const dispatchScriptContent = fs.readFileSync('scripts/dispatch-local-employee.sh', 'utf8');
+const cmdHasYolo = dispatchScriptContent.includes('cmd') && dispatchScriptContent.includes('--yolo') && dispatchScriptContent.includes('--tools-all');
+assertRule('dispatch-local-employee.sh: cmd 拥有 --yolo 与 --tools-all 最大自主权限', cmdHasYolo, 'cmd 缺少 --yolo 或 --tools-all，后台执行将被权限门禁卡死');
+
+const claudeHasSkipPerms = dispatchScriptContent.includes('--dangerously-skip-permissions');
+assertRule('dispatch-local-employee.sh: claude 拥有 --dangerously-skip-permissions 免交互权限', claudeHasSkipPerms, 'claude 缺少 --dangerously-skip-permissions');
+
+const hasDevNullRedirect = dispatchScriptContent.includes('< /dev/null');
+assertRule('dispatch-local-employee.sh: 执行管道重定向 < /dev/null 防 stdin 悬空死锁', hasDevNullRedirect, '未重定向 stdin，后台无 TTY 管道易挂起');
+
+const registerScriptContent = fs.readFileSync('scripts/register-employees-cron.sh', 'utf8');
+const noClaudeAgentsInstall = !registerScriptContent.includes('cp "$src" "$dst"') || registerScriptContent.includes('严禁在 Claude 内部嵌套 subagent');
+assertRule('register-employees-cron.sh: 严禁将数字员工安装进 ~/.claude/agents/ 嵌套', noClaudeAgentsInstall, '禁止向 ~/.claude/agents 安装 subagent');
+
 console.log('\n========================================================================');
 if (failed) {
   console.error('🚫 全面管局审计未通过！存在不符合高管治理规范的阻断项，请修复后重试。');
   process.exit(1);
 } else {
-  console.log('🎉 全面管局审计全绿通过！系统完全符合极简两字 UI、对称底栏、CMMI 产物与高管审批治理契约！');
+  console.log('🎉 全面管局审计全绿通过！系统完全符合极简两字 UI、对称底栏、CMMI 产物、高管审批治理与 Hermes 扁平化 Worker 契约！');
   process.exit(0);
 }

@@ -531,11 +531,11 @@ case "$TOOL" in
     ;;
   cmd)
     TOOL_BIN="cmd"
-    TOOL_ARGS=("-p" "$(cat "$prompt_file")")
+    TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--yolo" "--tools-all" "-t")
     ;;
   copilot)
     TOOL_BIN="copilot"
-    TOOL_ARGS=("-p" "$(cat "$prompt_file")")
+    TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--yolo")
     ;;
   kiro-cli)
     TOOL_BIN="kiro-cli"
@@ -576,7 +576,7 @@ started_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 write_receipt "running" "$$" "$started_iso" "" "" ""
 
 printf '[dispatch] running with pid=%s tool=%s (%s via %s)...\n' "$$" "$TOOL" "$TOOL_BIN" "$EXEC_ENV"
-if "${EXEC_CMD[@]}" "${TOOL_ARGS[@]}"; then
+if "${EXEC_CMD[@]}" "${TOOL_ARGS[@]}" < /dev/null; then
   completed_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   latest_hash="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || printf '')"
   

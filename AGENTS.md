@@ -323,6 +323,22 @@ A change is done when all are true:
 3. **双轨映射调度原则**：
    - 物理项目工作区 (`project_workspaces.cwd`) 是代码与 WBS 任务树基底；工坊会话 (`board_conversations`) 是高管时序意图流；通过意图分发器转译并在物理目录中调度数字员工。
 
+## 17. Hermes 唯一总指挥与扁平化 Worker 铁律 (wave302)
+
+老板原话: 「Claude 经常停止，kill 这些问题 如何彻底解决，是不是 授权太小了，claude 自己就别 再配置agents ,subagent了， 按照本系统的 规范来的话，就是 claude,cmd,agy,copilot 这些都是 Hermes的 子agent 成员才对」
+
+1. **扁平化拓扑与杜绝嵌套套娃**：
+   - **Hermes 是唯一 PM 总调度**：负责意图澄清追问、WBS 任务派发与工序收口；
+   - **一级子 Agent 成员**：6 大数字员工（墨斗 FDA、铁匠 Core SWE、门神 FDSE、兑底渊 PRE-SRE、百晓生 DS）是 Hermes 的下属子 Agent；
+   - **底层工具引擎 (Worker Engines)**：`claude` (claude-glm / claude-mm)、`cmd`、`agy`、`copilot`、`kiro-cli` 仅作为数字员工执行任务的底层 CLI 工具；
+   - **严禁 Claude 内部再配置 agents/subagent**：宿主机 `~/.claude/agents/` 必须保持清空，严禁将员工模板拷贝给 Claude 作为 subagent 造成架构倒挂与无 TTY 递归死锁。
+
+2. **后台免交互最大自主授权 (Permissions)**：
+   - 非交互调度执行后台任务必须赋予最大自主权限，消灭等待终端确认引起的死锁：
+     - `cmd`：必须显式传递 `--yolo --tools-all -t`，全面放开文件写入、命令执行与项目信任；
+     - `claude`：必须显式传递 `--dangerously-skip-permissions`；
+     - 管道执行强制添加 `< /dev/null` 重定向，杜绝因无 TTY stdin 悬空而等待 3 秒或 hang 死。
+
 ## This fork's own conventions
 
 This repository is a fork of Paperclip. The rules above are upstream's; these are ours.
@@ -351,8 +367,10 @@ be kept in sync twice.
   who to send work to, the seven-part brief shape, pacing, and acceptance discipline.
 - `docs-coolie/TOOLS.md` — source of truth for the seven local tool pool, package
   availability, and recommended tool strengths for each kind of work.
-- `.agents/agents/` — versioned templates for local employee Claude Code sub-agents.
-  Install them to `~/.claude/agents/` with `scripts/register-employees-cron.sh`.
+- `.agents/agents/` — versioned templates for Coolie local employee role objects.
+  Hermes is the sole PM orchestrator; digital employees are first-tier workers reporting
+  to Hermes. Claude, cmd, agy, copilot, and kiro-cli are underlying worker tools.
+  NEVER install subagents into `~/.claude/agents/` — Claude must run clean without nesting.
 
 Before changing a file upstream also owns, read the fork-surface audit: every
 intentional change to one needs an entry with a reason in `scripts/fork-surface.json`,

@@ -19,8 +19,9 @@ usage() {
 usage: scripts/register-employees-cron.sh [--dry-run | --install-agents | --register | --register-execute | --unregister | --all]
 
 wave282 fixed local employees:
-  1. install templates from .agents/agents/*.md into ~/.claude/agents/
+  1. manage local employee schedules for scripts/dispatch-local-employee.sh
   2. register idempotent cron lines that call scripts/dispatch-local-employee.sh
+  (Note: Claude Code subagents are strictly prohibited; all workers report to Hermes directly)
 
 Actions:
   --dry-run          print planned installs and cron lines (default)
@@ -93,28 +94,12 @@ print_plan() {
 }
 
 install_agents() {
-  mkdir -p "$AGENT_DIR"
-  local stamp
-  stamp="$(date -u +%Y%m%dT%H%M%SZ)"
-  local file src dst
-  for file in "${AGENT_FILES[@]}"; do
-    src="$REPO_ROOT/.agents/agents/$file"
-    dst="$AGENT_DIR/$file"
-    if [[ ! -f "$src" ]]; then
-      printf 'missing template: %s\n' "$src" >&2
-      exit 1
-    fi
-    if [[ -f "$dst" ]] && cmp -s "$src" "$dst"; then
-      printf '[wave282-agents] noop %s\n' "$dst"
-    else
-      if [[ -e "$dst" ]]; then
-        cp "$dst" "$dst.bak-wave282-$stamp"
-        printf '[wave282-agents] backup %s\n' "$dst.bak-wave282-$stamp"
-      fi
-      cp "$src" "$dst"
-      printf '[wave282-agents] installed %s\n' "$dst"
-    fi
-  done
+  # wave302 掌柜铁律: Claude 本身是 Hermes 的一级 Worker，严禁在 Claude 内部嵌套 subagent
+  if [[ -d "$AGENT_DIR" ]]; then
+    printf '[wave302] 正在清理 %s 中的旧 subagent 文件，确保 Claude 单兵运行不套娃...\n' "$AGENT_DIR"
+    rm -rf "$AGENT_DIR"
+  fi
+  printf '[wave302] ✅ Claude Code 干净运行保护生效：严禁嵌套 subagent，所有员工直属于 Hermes。\n'
 }
 
 register_cron() {
