@@ -100,7 +100,13 @@
 - 宿主机（Homebrew 工具池）与沙箱（Docker）共享代码库，后台免交互执行配置 `--yolo` / `--dangerously-skip-permissions` 并 `< /dev/null` 重定向；
 - 跨工种接力走不可变 Context Bus；微信/工坊派单 0.8s 入库，Bridge 异步消费，`kill -0` 探活自愈。
 
-### 第 18 条 【7 处版本绝对一致与不可变发版】
+### 第 18 条 【全 Adapter 长任务防护与断点接力】
+- 平台所有执行器统领于 Adapter 体系（`claude_local`, `codex_local`, `cursor`, `gemini_local` 等）；
+- 废黜死硬超时截杀，对活跃产出进程实施**滑动续期窗口**；
+- 运行超 18-20 分钟退出时，100% 原地保留 Git 工作区并生成 `continue_conversation_v1` 断点延续信封；
+- 微信/工坊下达【继续】指令直接直通 Adapter 唤醒通道，跨轮次无缝接力。
+
+### 第 19 条 【7 处版本绝对一致与不可变发版】
 - `app.json` / `package.json` / `build.gradle` / `CHANGELOG.md` / 远端 `version.json` / `ota/manifest` / `Git Tag` 7 处版本号源铁律一致；
 - 每次发版必打 Tag 并精准指向发版 Commit；不发版不 bump 版本号；部署安全 rsync 杜绝覆盖；支持 60 秒极速回滚。
 
@@ -108,11 +114,11 @@
 
 ## 第七章 附则：立法机制与容错纠偏
 
-### 第 19 条 【编译器与守卫硬拦截】
+### 第 20 条 【编译器与守卫硬拦截】
 所有条款由 TypeScript 0 报错、测试套件与 `scripts/check-governance-audit.sh` 物理拦截，严禁口头豁免。
 
-### 第 20 条 【持续演进机制】
+### 第 21 条 【持续演进机制】
 掌柜战略意图由 Hermes 统一增量修订，确保法典历久弥新。
 
-### 第 21 条 【掌柜指令审校与容错纠偏】
+### 第 22 条 【掌柜指令审校与容错纠偏】
 掌柜敏捷输入常伴同音字、拼音错字或口语倒装（如“阶段”误作“截断”、“对齐”误作“对江”、“Prompt”误作“promot”等）。**所有 AI Agent 必须具备语义穿透与自动纠偏校准能力，严禁机械照搬错别字进正式资产库！**
