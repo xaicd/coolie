@@ -319,18 +319,28 @@ prompt_file="$dispatch_dir/${receipt_id}.md"
 
 make_prompt() {
   cat <<EOF
-【wave282 fixed dispatch】
+【Hermes 扁平化数字员工调度令 · Role System Prompt 注入】
 
-Sub-agent type: ${AGENT}
-Employee: ${EMPLOYEE}
-Task: ${TASK}
-Wave: ${WAVE}
-Tool: ${TOOL}
-Repository: ${REPO_ROOT}
-Branch: $(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || printf 'unknown')
+你是当前执行任务的直属员工：【${EMPLOYEE}】（角色代码: ${AGENT}）
+你直接受命于项目总指挥 Hermes，以最高专业度独立完成本项任务。
+所属团队：Coolie 平台研发工程组
+当前任务：${TASK}
+波次编号：${WAVE}
+底层引擎：${TOOL}
+工作仓库：${REPO_ROOT}
+当前分支：$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || printf 'unknown')
 
-Use the Claude Code Agent tool with:
-  subagent_type="${AGENT}"
+================================================================================
+👑【老板亲自定调的最高交付与使用主义总则（Boss Delivery & UX Commandments）】
+================================================================================
+1. 极简使用主义：系统界面与交互必须直观，绝对不能有重复功能入口；傻瓜式使用最好，用户零培训即可快速上手。
+2. 零功能膨胀（杜绝乱加功能）：严禁随意新增冗余功能，必须充分将系统本就具备的功能 100% 用起来、打通打透。
+3. 聚焦核心与质量：聚焦产品核心业务主线，聚焦 AI 高效交付，聚焦代码与交付全栈质量。
+4. 全维度严肃审计：站在新型软件交付公司负责人、Palantir FDE 体系与产品总监的严肃视角，全方位验证业务功能、排查功能缺陷，同时深度审视界面设计、空间布局与产品架构缺陷。
+================================================================================
+
+【你必须严格遵守的员工角色档案与行为准则 (Role System Prompt)】:
+$(cat "$agent_template")
 
 EOF
 
@@ -348,9 +358,6 @@ Seven-part brief requirements:
 5. Steps: inspect relevant docs, implement only requested scope, validate narrowly.
 6. Acceptance: produce a concise report with changed files and verification.
 7. Rules: single writer, no secret output, no mock business data, report stuck after 4h.
-
-Agent template:
-$(sed 's/^/> /' "$agent_template")
 EOF
 }
 
@@ -523,11 +530,23 @@ fi
 # Tool-aware execution router
 TOOL_BIN=""
 TOOL_ARGS=()
+TOOL_ENV=()
 
 case "$TOOL" in
-  claude-glm|claude-mm|claude)
+  claude-mm)
     TOOL_BIN="claude"
     TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
+    TOOL_ENV=("CLAUDE_CONFIG_DIR=$HOME/.claude-mm")
+    ;;
+  claude-glm)
+    TOOL_BIN="claude"
+    TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
+    TOOL_ENV=("CLAUDE_CONFIG_DIR=$HOME/.claude-glm")
+    ;;
+  claude)
+    TOOL_BIN="claude"
+    TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
+    TOOL_ENV=("CLAUDE_CONFIG_DIR=$HOME/.claude")
     ;;
   cmd)
     TOOL_BIN="cmd"
@@ -555,12 +574,20 @@ EXEC_CMD=()
 EXEC_ENV="local"
 
 if command -v "$TOOL_BIN" >/dev/null 2>&1; then
-  EXEC_CMD=("$TOOL_BIN")
+  if [[ ${#TOOL_ENV[@]} -gt 0 ]]; then
+    EXEC_CMD=("env" "${TOOL_ENV[@]}" "$TOOL_BIN")
+  else
+    EXEC_CMD=("$TOOL_BIN")
+  fi
   EXEC_ENV="local"
 elif [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
   # Probe if tool exists on macOS host
   if "$SCRIPT_DIR/host-exec.sh" "command -v $TOOL_BIN" >/dev/null 2>&1; then
-    EXEC_CMD=("$SCRIPT_DIR/host-exec.sh" "$TOOL_BIN")
+    if [[ ${#TOOL_ENV[@]} -gt 0 ]]; then
+      EXEC_CMD=("$SCRIPT_DIR/host-exec.sh" "${TOOL_ENV[*]} $TOOL_BIN")
+    else
+      EXEC_CMD=("$SCRIPT_DIR/host-exec.sh" "$TOOL_BIN")
+    fi
     EXEC_ENV="host"
   fi
 fi
