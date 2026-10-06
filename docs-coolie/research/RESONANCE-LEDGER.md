@@ -54,7 +54,7 @@
 | 15 | 三层架构：语义层→决策层→行动层 | 信通院报告1.0 §02 | 三大并轨契约：Project as Domain(语义) / Conversation as Proposal(决策) / Task as Action(行动) | ✅ | AGENTS.md §18；独立体系同构互证（2026-10-06 扩容源首产） | 304 |
 | 16 | 本体 = 大模型的「硬知识约束层」（神经符号融合主流路线） | 信通院报告1.0 §01 | 守卫拦截的是流程铁律；员工 LLM 输出尚无形式化本体推理校验（如 Action 参数/对象引用合法性） | ⚠️ | 缺"输出过本体校验"一环——下一个真正的 Delta 方向 | — |
 
-| 17 | 本体不推理，只做 LLM 上下文语义资料库；推理=溯因（abduction） | 人月聊IT 05+CSDN 拆解 | coolie 实际分工（本体域+Proposal 定语义，LLM 员工干活）接近此路线，但北极星叙事引用 Palantir「决策中枢」 | ⚠️ | **三方分歧**：何明璐(上下文库) vs 信通院#16(硬约束层) vs Palantir#1(决策中枢)——coolie 夹在中间，真机验证后再站队 | — |
+| 17 | 本体不推理，只做 LLM 上下文语义资料库；推理=溯因（abduction） | 人月聊IT 05+CSDN 拆解 | coolie 实际分工（本体域+Proposal 定语义，LLM 员工干活）接近此路线，但北极星叙事引用 Palantir「决策中枢」 | ⚠️ | **三方分歧**：何明璐(上下文库/语义锚点) vs 信通院#16(硬约束层) vs Palantir#1(决策中枢)。01 篇精化：Palantir 实为**运筹学逆向寻优**（为达成 B 反推调哪些 A，非逻辑学溯因，描述逻辑推理器做不了）——coolie 夹在中间，真机验证后再站队。配套守则：LLM 不生成数字只引用（→梯度⑥） | — |
 | 18 | 指导书=业务经验显性化，挂在本体模型上（Markdown/Skills 包） | 人月聊IT 05 | AGENTS.md 铁律（老板原话）+ .agents/ skills + 派单 brief | ✅ | 独立作者同构互证；升级为"域挂指导书"= 梯度④（`2026-10-06-renyue-he-minglu-ontology-digest.md`） | — |
 | 19 | What-If 变更影响预演（场景模型/假设分析） | 人月聊IT CSDN 拆解 | 无——RepoCognitionJob 只做进厂认知，Link 图未被用于影响分析 | ❌ | **台账首个 ❌**：本体语义存量（Link/Action 图）未被任何推理消费；最小切口=梯度⑤ 变更影响预演卡 | — |
 
@@ -78,7 +78,7 @@
 | **T1 一手官方** | Palantir 自己怎么定义 | palantir.com（`/platforms/ontology/` 独立产品页、`/q2-2026-letter/` 季度信、`/palantir-explained/`、`/platforms/aip/agentcamp/`）；官方 docs / Architecture Center changelog；S-1 与季度财报电话会（Ontology 是投资者叙事核心） | 月度；sitemap `palantir.com/sitemap.xml` 已验证（2026-09-10 抓取快照） | ⚠️ URL 已锚定，全文待入库 |
 | **T2 亲历者一手** | 干过的人怎么说 | Nabeel Qureshi（`nabeelqu.substack.com`，8 年 FDE）；Akshay Krishnaswamy 谈话/推文（14 年 FDE，product primitives 出处）；其他 ex-Palantir / ex-OpenAI FDE 的长文（发现即入库） | 季度 + 见到即抓 | ⚠️ Nabeel 主文已读，其余待补 |
 | **T3 英文深度拆解** | 第三方替你做的功课 | Lenny's Podcast 那期（transcript）；a16z《Forward Deployed Engineers, Explained》；PuppyGraph《Palantir Ontology: Architecture & Benefits》；dev.to《Palantir's Secret Weapon Isn't AI—It's Ontology》；Aakash Gupta 系列；Akash Dogra《Inside Palantir AIP》 | 月度 | ⚠️ URL 已验证，全文待入库 |
-| **T4 中文圈** | 母语深读 + 国内落地视角 | 汪小东（「本体智能」/「壹号讲狮」全套：解剖 Palantir FDE 01-05 ✅已入库、Glean 狭义本体系列、AI 狭义本体论、对象本体论、OPD、本体智能简报）；**人月聊IT（何明璐）✅2 篇入库**（`sources/renyue-he-minglu/`，2026-10-06，老板指定源：本体建模平台实操者，兼具 T6 反方属性，系列 01-04 待抓）；**信通院《本体智能研究报告(1.0)》✅已入库**（`sources/cn-industry/`，2026-10-06，数十家央企/厂商参编的行业权威）；TalkingData 语义中间层文；知乎 Wolfgang 等万字长文；InfoQ / 甲子光年 / 晚点 LatePost | 月度，搜狗微信法（易限流，间隔抓）；Glean 系列 2026-10-06 两次尝试均被搜狗反爬拦截，站外无转载，待解封重试 | ✅ 3 源/作者入库 |
+| **T4 中文圈** | 母语深读 + 国内落地视角 | 汪小东（「本体智能」/「壹号讲狮」全套：解剖 Palantir FDE 01-05 ✅已入库、Glean 狭义本体系列、AI 狭义本体论、对象本体论、OPD、本体智能简报）；**人月聊IT（何明璐）✅13 篇入库**（`sources/renyue-he-minglu/`，2026-10-06，老板指定源：本体建模平台实操者，兼具 T6 反方属性；语料清单见该目录 `INDEX.md`，含系列 01/02/05 + Palantir 专题 + OWL 工程实操，另 4-6 篇已定位待抓）；**信通院《本体智能研究报告(1.0)》✅已入库**（`sources/cn-industry/`，2026-10-06，数十家央企/厂商参编的行业权威）；TalkingData 语义中间层文；知乎 Wolfgang 等万字长文；InfoQ / 甲子光年 / 晚点 LatePost | 月度，搜狗微信法（易限流，间隔抓）；Glean 系列 2026-10-06 两次尝试均被搜狗反爬拦截，站外无转载，待解封重试 | ✅ 3 源/作者入库 |
 | **T5 学术与谱系** | 防止"Palantir 发明了 X"错觉 | Gruber 1993《ontology = specification of a conceptualization》；语义网谱系 RDF/OWL/SPARQL；**NIST Meystel 2001（narrow/shallow ontology 之辨，已定位）**；TBox/ABox 分离（狭义本体≈TBox，简书 AI Ontology 已定位）；Dietz DEMO 企业本体论；DDD（Evans）与 Event Sourcing；data mesh / 语义层（dbt/Cube/AtScale）对照 | 季度 1 篇（强制配额） | ⚠️ 线索已锚定，全文待入库 |
 | **T6 反方与批评** | 防确认偏误（唯一能杀死回音室的层） | 熊方研报（"Ontology 叙事溢价"质疑）；"FDE = 高级咨询换皮"论战；国内"为什么 Palantir 模式难复制"文；企业自建 FDE 团队失败复盘；搜狗已见线索：「如果 Ontology 真是革命性智能平台，为何还需数千名斯坦福/MIT 工程师长期驻扎」 | 季度 1 篇（强制配额） | ❌ 空层，待开天窗 |
 

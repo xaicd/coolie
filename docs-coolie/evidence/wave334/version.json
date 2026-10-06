@@ -1,0 +1,12 @@
+{
+  "version": "0.6.39",
+  "versionCode": 639,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.39/coolie-release.apk",
+  "apkSha256": "e396d09cc7809563eff1a5ccf2debd48ff324460ad4cad723bcdd495afe552d1",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "wave333 原生本体插件全能力 (9 client API + 241 行 types 跨 44 接口)",
+  "commitSha": "ba1b7bf7f4892f763f34904d90d0a868b03fa99e"
+}

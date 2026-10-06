@@ -1,0 +1,12 @@
+HTTP/1.1 200 OK
+Content-Type: application/vnd.android.package-archive
+Content-Length: 84827887
+Connection: keep-alive
+Accept-Ranges: bytes
+Date: Mon, 05 Oct 2026 14:10:58 GMT
+ETag: "ea6e49548f71fa419761ef4c2b3d4bf4-3"
+Last-Modified: Mon, 05 Oct 2026 14:09:34 GMT
+Server: tencent-cos
+x-cos-hash-crc64ecma: 14809681714594405767
+x-cos-request-id: NmFjM2FmZjJfY2RkMjMwMGJfMThjNmZfMTEyYjQ5Nw==
+

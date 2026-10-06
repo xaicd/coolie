@@ -1,0 +1,15 @@
+SOURCE: 知乎专栏「数字化转型和云原生」人月聊IT（何明璐）
+URL: https://zhuanlan.zhihu.com/p/2014293274903455485
+PUBLISHED: 2026-03-09
+FETCHED: 2026-10-06（webReader 代理）
+层级: 台账 T4/T5（OWL/SWRL 工程实操）
+
+【工具链】斯坦福 Protégé（protege.stanford.edu，OWL 2 编辑器，HermiT/Pellet 推理机）+ WebProtégé 在线版 + WebVOWL 可视化（service.tib.eu/webvowl）。合同管理本体完整实操：原始需求 → 提示词 → AI 生成 OWL 文件 → 导入 Protégé 检查。
+
+【OWL 对象属性 vs 数据库外键（四大差异）】①数据库单向，OWL 可双向（inverseOf 推理器自动维护反向）②数据库违反约束报错，OWL 域/值域违反不报错而是推断新类型归属 ③OWL 可描述属性逻辑特征（FunctionalProperty=唯一外键/minCardinality）④数据库只能查已有数据，OWL 推理器可推断新事实（存在未收款开票→自动归入 UnreceivedInvoiceContract 类）。
+
+【规则两层】静态约束用 owl:Restriction（基数/值域）；复杂 IF-THEN 用 SWRL（Body/Head 原子：ClassAtom/DatavaluedPropertyAtom/ObjectPropertyAtom/BuiltinAtom）。
+
+【状态触发的三方案】①SWRL 比较总金额（需外部写入 totalReceivedAmount，纯 OWL 无 SUM）②OWL 等价类分类（受开放世界假设限制，无闭包不敢断言）③实际工程主流=SPARQL CONSTRUCT/UPDATE 在图数据库层跑规则引擎。
+
+【事件本体模式（对台账#17 的输入）】OWL 擅长描述名词不擅长动词——把行为/事件定义为一等公民实体类（Event Ontology），SWRL 静态串联。但纯 SWRL 推导的行为节点无执行力，**实际架构=知识图谱（描述静态语义规则）+业务流引擎（执行动态变更）**：推理机打标签（CompletedContract）→ 软件系统 SPARQL 轮询/监听变化 → 组装事件调真实代码。OWL 里事件是时间节点实体静态连接；代码里事件是内存数据流触发执行方法。"把状态流转抽象为一等公民是最高级最解耦的做法，两种体系殊途同归。"

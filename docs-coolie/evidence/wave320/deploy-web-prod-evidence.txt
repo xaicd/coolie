@@ -1,0 +1,31 @@
+# wave320 web deploy evidence — 2026-10-05T15:55:37Z
+
+## remote /opt/coolie/ui/dist (rsynced, fresh)
+-rw-r--r-- 1 ubuntu ubuntu  523237 10月  5 23:51 index-c3_1zF8a.css
+-rw-r--r-- 1 ubuntu ubuntu 6534560 10月  5 23:51 index-O8EBiygP.js
+index.html mtime: 2026-10-05 23:51:02.000000000 +0800
+
+## remote /opt/coolie/server/ui-dist (Express-served root, refreshed)
+-rw-r--r-- 1 ubuntu ubuntu  523237 10月  5 23:51 index-c3_1zF8a.css
+-rw-r--r-- 1 ubuntu ubuntu 6534560 10月  5 23:51 index-O8EBiygP.js
+index.html mtime: 2026-10-05 23:51:34.914832915 +0800
+
+## health + service
+{"status":"ok","deploymentMode":"authenticated","deploymentExposure":"public","localAiLoginSupported":false,"commit":null,"bootstrapStatus":"ready","bootstrapInviteActive":false,"databaseBackup":{"enabled":true,"status":"ok","warnings":[]}}
+active
+
+## public live /index.html bundle refs
+assets/index-O8EBiygP.js
+assets/index-c3_1zF8a.css
+
+## public status codes
+https://xrobinai.cn/ -> 200
+https://xrobinai.cn/api/health -> 200
+assets/index-O8EBiygP.js -> 200
+version.json -> 200
+ota/manifest -> 200
+
+## deployed commits (ancestors of HEAD)
+HEAD d5a0a7e60 release: v0.6.35 — wave317 本体下不要对象实例 (资产>本体下只留业务域只读)
+bd67b23aa 2026-10-05 00:25:52 +0800 feat(ontology): support list/card dual view, align fixed table columns and pin actions right
+068041b9d 2026-10-05 00:00:19 +0800 feat(ontology): enforce two-character button labels, compact table layout, and horizontal scroll for row actions

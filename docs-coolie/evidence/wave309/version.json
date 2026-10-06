@@ -1,0 +1,12 @@
+{
+  "version": "0.6.32",
+  "versionCode": 632,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.32/coolie-release.apk",
+  "apkSha256": "bfaa9ca32f97b2396d794be38367ae15e1bc0bd2b818a9713b4e3870005c14a7",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "wave308 OntologyCockpitScreen 整合图谱+域录+关系进单一 cockpit",
+  "commitSha": "33f9914855fa4d9755ce882c5d4ae4a00309bd93"
+}

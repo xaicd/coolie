@@ -1,0 +1,17 @@
+SOURCE: 知乎专栏「数字化转型和云原生」人月聊IT（何明璐）
+URL: https://zhuanlan.zhihu.com/p/2014642206942712701
+PUBLISHED: 2026-03-10（合同管理本体 Contract Management Ontology 完整定义）
+FETCHED: 2026-10-06（webReader 代理，全文）
+层级: 台账 T4（方法论实战样例篇）
+
+【方法论流程】自然语言按对象/行为/规则三维度构建本体元模型 Markdown → 与 LLM 交互 → 输出符合 OWL 标准的完整本体文件（Protégé 可导入校验）。
+
+【CMO 本体结构（完整 worked example）】
+- 8 个互斥顶层类：Contract/PaymentTerm/InvoiceRecord/InvoicePaymentTermLink/Product/Customer/Department/Person（AllDisjointClasses=语义质量门）
+- M:N 核销难题的 Reification 解法：InvoicePaymentTermLink 中间关联类（linksInvoice + linksPaymentTerm 各基数=1），精确追踪"一张大额发票对应哪些付款阶段"
+- 推理推断子类（不手动赋值）：TaxRateMismatchInvoice（R4：开票税率≠合同税率自动归类预警）/ UnreceivedInvoiceContract（R5：存在未收款发票→合同自动进应收催收看板）
+- SWRL 规则五条：R1 已收款必须填实收金额 / R2 付款比例之和=1.0（SPARQL HAVING）/ R3 责任人必须属合同部门 / R4 R5 如上
+- SPARQL 查询模板四组：模糊查询/开票收款汇总/付款阶段与开票对应/未收款合同穿透（责任人与部门联系方式）
+- 基数约束全显式：Contract 的 hasProduct/hasCustomer/hasDepartment/hasResponsiblePerson 均=1，hasPaymentTerm≥1，contractTotalAmount=1
+
+【价值主张】传统 SQL 查"技术部针对政府客户且存在税率异常的服务合同"需 5+ 表多次 Join；SPARQL 路径导航直接实现。模型可伸缩：未来无缝集成"合同状态机"或"审批流路径"，无需改底层物理存储。

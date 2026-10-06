@@ -1,0 +1,171 @@
+#!/usr/bin/env node
+/**
+ * docker-agy-acp.mjs
+ * 
+ * Standardized Agent Client Protocol (ACP) adapter for Google Antigravity (agy).
+ * Bridges ACP JSON-RPC 2.0 stdio into:
+ *   1) Local agy binary (if running inside container or dev environment with agy)
+ *   2) Docker agy-ubuntu-container (if running on host with Docker)
+ *   3) Fallback host-exec
+ */
+
+import * as acp from "@agentclientprotocol/sdk";
+import { Readable, Writable } from "node:stream";
+import { spawn, execSync } from "node:child_process";
+import fs from "node:fs";
+
+class AgyAcpAgent {
+  sessions = new Map();
+
+  async initialize(_params) {
+    return {
+      protocolVersion: acp.PROTOCOL_VERSION,
+      agentCapabilities: {
+        loadSession: false,
+      },
+      serverInfo: {
+        name: "docker-agy-acp",
+        version: "1.0.0",
+      },
+    };
+  }
+
+  async newSession(_params) {
+    const sessionId = "agy-" + Math.random().toString(36).slice(2, 10);
+    this.sessions.set(sessionId, { activeProcess: null });
+    return { sessionId };
+  }
+
+  async authenticate(_params) {
+    return {};
+  }
+
+  async setSessionMode(_params) {
+    return {};
+  }
+
+  async prompt(params, cx) {
+    const session = this.sessions.get(params.sessionId);
+    if (!session) {
+      throw new Error(`Session ${params.sessionId} not found`);
+    }
+
+    let promptText = "";
+    if (typeof params.prompt === "string") {
+      promptText = params.prompt;
+    } else if (Array.isArray(params.prompt)) {
+      promptText = params.prompt
+        .map((b) => (typeof b === "string" ? b : b.text || ""))
+        .filter(Boolean)
+        .join("\n");
+    }
+
+    if (!promptText.trim()) {
+      promptText = "No task prompt provided.";
+    }
+
+    // Determine execution strategy
+    let bin = "";
+    let args = [];
+
+    if (fs.existsSync("/root/.local/bin/agy")) {
+      bin = "/root/.local/bin/agy";
+      args = ["-p", promptText, "--dangerously-skip-permissions"];
+    } else {
+      // Check Docker container
+      let dockerRunning = false;
+      try {
+        const out = execSync("docker inspect -f '{{.State.Running}}' agy-ubuntu-container 2>/dev/null", { encoding: "utf8" }).trim();
+        dockerRunning = (out === "true");
+      } catch {
+        dockerRunning = false;
+      }
+
+      if (dockerRunning) {
+        bin = "docker";
+        args = ["exec", "-i", "-e", "LANG=C.UTF-8", "agy-ubuntu-container", "/root/.local/bin/agy", "-p", promptText, "--dangerously-skip-permissions"];
+      } else {
+        bin = "agy";
+        args = ["-p", promptText, "--dangerously-skip-permissions"];
+      }
+    }
+
+    return new Promise((resolve, reject) => {
+      const proc = spawn(bin, args, {
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+
+      session.activeProcess = proc;
+
+      proc.stdout.on("data", async (chunk) => {
+        const text = chunk.toString("utf8");
+        try {
+          await cx.notify(acp.methods.client.session.update, {
+            sessionId: params.sessionId,
+            update: {
+              sessionUpdate: "agent_message_chunk",
+              content: {
+                type: "text",
+                text,
+              },
+            },
+          });
+        } catch {
+          // ignore notify failure
+        }
+      });
+
+      proc.stderr.on("data", async (chunk) => {
+        const text = chunk.toString("utf8");
+        try {
+          await cx.notify(acp.methods.client.session.update, {
+            sessionId: params.sessionId,
+            update: {
+              sessionUpdate: "agent_message_chunk",
+              content: {
+                type: "text",
+                text: `[stderr] ${text}`,
+              },
+            },
+          });
+        } catch {
+          // ignore notify failure
+        }
+      });
+
+      proc.on("error", (err) => {
+        session.activeProcess = null;
+        reject(err);
+      });
+
+      proc.on("close", (code) => {
+        session.activeProcess = null;
+        resolve({
+          stopReason: code === 0 ? "end_turn" : "error",
+        });
+      });
+    });
+  }
+
+  async cancel(params) {
+    const session = this.sessions.get(params.sessionId);
+    if (session?.activeProcess) {
+      session.activeProcess.kill("SIGTERM");
+    }
+  }
+}
+
+const input = Writable.toWeb(process.stdout);
+const output = Readable.toWeb(process.stdin);
+const stream = acp.ndJsonStream(input, output);
+const agent = new AgyAcpAgent();
+
+acp
+  .agent({ name: "docker-agy-acp" })
+  .onRequest("initialize", (ctx) => agent.initialize(ctx.params))
+  .onRequest("session/new", (ctx) => agent.newSession(ctx.params))
+  .onRequest("authenticate", (ctx) => agent.authenticate(ctx.params))
+  .onRequest("session/set_mode", (ctx) => agent.setSessionMode(ctx.params))
+  .onRequest("session/prompt", (ctx) => agent.prompt(ctx.params, ctx.client))
+  .onNotification("session/cancel", (ctx) => agent.cancel(ctx.params))
+  .connect(stream);

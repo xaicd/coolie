@@ -1,0 +1,12 @@
+{
+  "version": "0.6.34",
+  "versionCode": 634,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.34/coolie-release.apk",
+  "apkSha256": "769b0fa9105b3c04e6caf8c4fbb35a6de520595fe878ec814b32acbb581dc555",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "wave315 图谱更要删 + 资产本体下所有功能清空",
+  "commitSha": "be3428b9189604d334c9766ff12212dc510f5678"
+}

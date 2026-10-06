@@ -1,0 +1,12 @@
+{
+  "version": "0.6.35",
+  "versionCode": 635,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.35/coolie-release.apk",
+  "apkSha256": "fb618a6bf7eb14596ac5b440fa62dfa0cd427b8c355a74dd6158467dd7f1c175",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "wave317 本体下不要对象实例 (资产>本体下只留业务域只读)",
+  "commitSha": "d5a0a7e607988e9a5f1f511ee577dce11debc2cc"
+}

@@ -1,0 +1,12 @@
+{
+  "version": "0.6.40",
+  "versionCode": 640,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.40/coolie-release.apk",
+  "apkSha256": "c42e74190dec4632eb87c75b9bb455d334d63d2d1113318aaf17ce278295a4be",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "wave335 原生本体插件全能力 - 补 8 个 create-* 写入 API + 之前 9 读 API + 3 graph API",
+  "commitSha": "1e872f96a8da6e207deabe112bb5a528a467744d"
+}

@@ -1,0 +1,12 @@
+{
+  "version": "0.6.33",
+  "versionCode": 633,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.33/coolie-release.apk",
+  "apkSha256": "17d3640f3cef2eb355f54212428657fedd700401165f00e19776657f19694503",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "wave312 concentric BFS ring 布局 (Web-parity) + 删 OntologyInstanceGraphScreen 残留",
+  "commitSha": "276c745b78100034697c513af3896d245e2cb8d7"
+}

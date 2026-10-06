@@ -170,34 +170,33 @@ try {
     fi
   fi
 
-  # 1. agy probe (专用跨环境探测, 识别 dockerized agy)
-  IFS=$'\t' read -r agy_status agy_latency agy_reason <<< "$(probe_agy)"
-  [[ -n "$agy_latency" ]] || agy_latency=120
-
-  # 2. claude probe (for claude-glm and claude-mm)
-  IFS=$'\t' read -r claude_status claude_latency claude_reason <<< "$(probe_tool "claude" "--version")"
-  local glm_status="$claude_status" glm_latency="$claude_latency" glm_reason="$claude_reason"
-  local mm_status="$claude_status" mm_latency="$claude_latency" mm_reason="$claude_reason"
-
-  # 3. cmd probe
-  IFS=$'\t' read -r cmd_status cmd_latency cmd_reason <<< "$(probe_tool "cmd" "--version")"
-
-  # 4. copilot probe
-  IFS=$'\t' read -r copilot_status copilot_latency copilot_reason <<< "$(probe_tool "copilot" "--version")"
-
-  # 5. hermes probe
-  local hermes_status="ok" hermes_latency=10 hermes_reason="scripts verified"
-  if [[ ! -f "$REPO_ROOT/scripts/cron-team-status.sh" ]]; then
-    hermes_status="fail"
-    hermes_reason="cron-team-status.sh missing"
+  # 1. Source smart env-detector
+  local lib_env="$REPO_ROOT/scripts/lib/env-detector.sh"
+  if [[ -f "$lib_env" ]]; then
+    # shellcheck source=scripts/lib/env-detector.sh
+    source "$lib_env"
   fi
 
-  # 6. kiro-cli probe
-  IFS=$'\t' read -r kiro_status kiro_latency kiro_reason <<< "$(probe_tool "kiro-cli" "--version")"
-  if [[ "$kiro_status" == "fail" ]]; then
-    kiro_status="warn"
-    kiro_reason="boss reserve (not deployed in PATH)"
-  fi
+  # 1. agy probe
+  IFS=$'\t' read -r agy_status agy_latency agy_reason <<< "$(smart_probe_artisan_tool agy-gemini3.8)"
+
+  # 2. claude-glm probe
+  IFS=$'\t' read -r glm_status glm_latency glm_reason <<< "$(smart_probe_claude glm)"
+
+  # 3. claude-mm probe
+  IFS=$'\t' read -r mm_status mm_latency mm_reason <<< "$(smart_probe_claude mm)"
+
+  # 4. cmd probe
+  IFS=$'\t' read -r cmd_status cmd_latency cmd_reason <<< "$(smart_probe_artisan_tool cmd)"
+
+  # 5. copilot probe
+  IFS=$'\t' read -r copilot_status copilot_latency copilot_reason <<< "$(smart_probe_artisan_tool copilot)"
+
+  # 6. hermes probe
+  IFS=$'\t' read -r hermes_status hermes_latency hermes_reason <<< "$(smart_probe_hermes)"
+
+  # 7. kiro-cli probe
+  IFS=$'\t' read -r kiro_status kiro_latency kiro_reason <<< "$(smart_probe_artisan_tool kiro-cli)"
 
   node -e '
 const fs = require("fs");
@@ -319,12 +318,15 @@ const data = JSON.parse(fs.readFileSync(file, "utf8"));
 const time = new Date(data.checkedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
 
 const okList = [];
+const standbyList = [];
 const warnList = [];
 const failList = [];
 
 for (const [name, info] of Object.entries(data.tools)) {
   if (info.status === "ok") {
     okList.push(name);
+  } else if (info.status === "standby") {
+    standbyList.push(name);
   } else if (info.status === "warn") {
     warnList.push(`${name} (${info.reason || "注意配额"})`);
   } else {
@@ -334,6 +336,9 @@ for (const [name, info] of Object.entries(data.tools)) {
 
 console.log(`【工具健康·${time}】`);
 console.log(`可用: ${okList.length > 0 ? okList.join(" / ") : "无"}`);
+if (standbyList.length > 0) {
+  console.log(`免载: ${standbyList.join(" / ")} (生产免载)`);
+}
 if (warnList.length > 0) {
   console.log(`注意: ${warnList.join("；")}`);
 }

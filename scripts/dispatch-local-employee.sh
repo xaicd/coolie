@@ -454,164 +454,125 @@ if [[ "$EXECUTE" -eq 0 ]]; then
   exit 0
 fi
 
-# wave290: agy-gemini3.8 / agy 专用 docker exec 执行路径 (墨斗 modou-fda 的默认工具, 高频路径)。
-# 本机没有 agy binary — agy 跑在 docker 容器里 (见 .agents/skills/agy-gemini-cli/SKILL.md):
-# 中文 prompt 直接进 docker exec bash argv 会被替换成 '?', 必须宿主机 base64 包装 →
-# docker cp → 容器内 LANG=C.UTF-8 + base64 -d 还原后再调 agy (SKILL.md 三步流程)。
-# agy 永不落入下方通用 local/host 探测 (agy 绝不在宿主机上, host-exec.sh 探测对 agy 无意义)。
-# 容器名 / 容器内可执行名 / print 超时可用环境变量覆盖: AGY_CONTAINER / AGY_BIN /
-# AGY_PRINT_TIMEOUT (默认 agy-ubuntu-container / agy / 1800s, 便于 stub 测试)。
-if [[ "$TOOL" == "agy-gemini3.8" || "$TOOL" == "agy" ]]; then
-  AGY_CONTAINER="${AGY_CONTAINER:-agy-ubuntu-container}"
-  AGY_BIN="${AGY_BIN:-agy}"
-  AGY_PRINT_TIMEOUT="${AGY_PRINT_TIMEOUT:-1800s}"
+# ═══ Coolie 标准 ACP (Agent Client Protocol) 调度中枢 ═══
+# 彻底消除「平台走 acpx、线下走脚本」两张皮割裂，统一所有工具走标准 ACP 适配器
 
-  agy_probe_fail() {
-    printf 'cannot execute agy: %s\n' "$1" >&2
-    write_receipt "failed" "" "" "$now_iso" "" "agy probe failed: $1 (tool=$TOOL container=$AGY_CONTAINER bin=$AGY_BIN)"
-    exit 1
-  }
-
-  # 探测顺序: 宿主机 docker → 容器在跑 → 容器内 agy 存在; 任一失败按通用路径的
-  # 既有模式写 failed receipt 并退出 1 (blockedReason 写清楚缺哪一环)。
-  command -v docker >/dev/null 2>&1 || agy_probe_fail "docker CLI not found on host"
-  docker inspect "$AGY_CONTAINER" >/dev/null 2>&1 || agy_probe_fail "container $AGY_CONTAINER is not running"
-  docker exec "$AGY_CONTAINER" true >/dev/null 2>&1 || agy_probe_fail "container $AGY_CONTAINER is not accepting docker exec"
-  docker exec "$AGY_CONTAINER" bash -c 'command -v "$1" >/dev/null 2>&1' _ "$AGY_BIN" \
-    || agy_probe_fail "agy binary '$AGY_BIN' not found inside container $AGY_CONTAINER"
-
-  # Step a+b: 宿主机 base64 包装 prompt (macOS base64), docker cp 进容器。
-  # 容器内文件名带 receipt_id, 防并行 agy 抢同一个 tmp 文件 (SKILL.md 坑 3)。
-  TMP_MK="$(mktemp -t agy-prompt.XXXXXX)"
-  TMP_B64="${TMP_MK}.b64"
-  TMP_RUNNER="$(mktemp -t agy-runner.XXXXXX)"
-  CT_PROMPT="/tmp/agy-prompt-${receipt_id}.b64"
-  CT_RUNNER="/tmp/agy-runner-${receipt_id}.sh"
-  CT_LOG="/tmp/${receipt_id}-agy.log"
-  base64 -i "$prompt_file" -o "$TMP_B64"
-  docker cp "$TMP_B64" "$AGY_CONTAINER:$CT_PROMPT"
-
-  # Step c: 容器内 runner 脚本 — LANG/LC_ALL 必须在容器内 export
-  # 增加网络瞬时抖动 (如 profile picture EOF) 自动重试自愈机制
-  cat > "$TMP_RUNNER" <<EOF
-#!/usr/bin/env bash
-set -euo pipefail
-export LANG=C.UTF-8
-export LC_ALL=C.UTF-8
-cd /workspace
-PROMPT="\$(base64 -d "$CT_PROMPT")"
-
-run_agy() {
-  "$AGY_BIN" --dangerously-skip-permissions --output-format text --print-timeout "$AGY_PRINT_TIMEOUT" -p "\$PROMPT"
-}
-
-if ! run_agy 2>&1 | tee "$CT_LOG"; then
-  if grep -q "Eligibility check failed.*EOF" "$CT_LOG" 2>/dev/null; then
-    echo "⚠️ 检测到 Google 头像拉取瞬时 EOF 抖动，等待 2 秒自动重试..." >&2
-    sleep 2
-    run_agy 2>&1 | tee "$CT_LOG"
-  else
-    exit 1
-  fi
+ACPX_BIN=""
+if command -v acpx >/dev/null 2>&1; then
+  ACPX_BIN="$(command -v acpx)"
+elif [[ -x "$REPO_ROOT/node_modules/.bin/acpx" ]]; then
+  ACPX_BIN="$REPO_ROOT/node_modules/.bin/acpx"
+elif [[ -x "$REPO_ROOT/packages/adapter-utils/node_modules/.bin/acpx" ]]; then
+  ACPX_BIN="$REPO_ROOT/packages/adapter-utils/node_modules/.bin/acpx"
+elif [[ -x "/opt/coolie/node_modules/.bin/acpx" ]]; then
+  ACPX_BIN="/opt/coolie/node_modules/.bin/acpx"
+elif [[ -x "/opt/coolie/packages/adapter-utils/node_modules/.bin/acpx" ]]; then
+  ACPX_BIN="/opt/coolie/packages/adapter-utils/node_modules/.bin/acpx"
 fi
-EOF
-  docker cp "$TMP_RUNNER" "$AGY_CONTAINER:$CT_RUNNER"
-  rm -f "$TMP_B64" "$TMP_RUNNER" "$TMP_MK"
-
-  started_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-  write_receipt "running" "$$" "$started_iso" "" "" ""
-  printf '[dispatch] running with pid=%s tool=%s (agy via docker exec %s; container log=%s:%s)...\n' \
-    "$$" "$TOOL" "$AGY_CONTAINER" "$AGY_CONTAINER" "$CT_LOG"
-
-  # Step e: 同步执行, stdout 直接回宿主机, 容器内 tee 留日志; runner 里 pipefail
-  # 让 agy 真实退出码穿透 docker exec 回宿主机, 据此写 done/failed receipt。
-  if docker exec "$AGY_CONTAINER" bash "$CT_RUNNER"; then
-    docker exec "$AGY_CONTAINER" rm -f "$CT_PROMPT" "$CT_RUNNER" >/dev/null 2>&1 || true
-    completed_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-    latest_hash="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || printf '')"
-    write_receipt "done" "$$" "$started_iso" "$completed_iso" "$latest_hash" ""
-    printf '[dispatch] execution completed: status=done commit=%s (container log=%s:%s)\n' \
-      "$latest_hash" "$AGY_CONTAINER" "$CT_LOG"
-  else
-    agy_rc=$?
-    docker exec "$AGY_CONTAINER" rm -f "$CT_PROMPT" "$CT_RUNNER" >/dev/null 2>&1 || true
-    failed_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
-    write_receipt "failed" "$$" "$started_iso" "$failed_iso" "" "agy exited with status $agy_rc (container log: $AGY_CONTAINER:$CT_LOG)"
-    printf '[dispatch] execution failed: status=failed (container log: %s:%s)\n' "$AGY_CONTAINER" "$CT_LOG" >&2
-    exit 1
-  fi
-  exit 0
-fi
-
-# Tool-aware execution router
-TOOL_BIN=""
-TOOL_ARGS=()
-PRE_CMD=""
-
-case "$TOOL" in
-  claude-mm)
-    TOOL_BIN="claude"
-    TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
-    PRE_CMD="ln -sf ~/.claude/settings.jsonmm ~/.claude/settings.json 2>/dev/null || true"
-    ;;
-  claude-glm)
-    TOOL_BIN="claude"
-    TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
-    PRE_CMD="ln -sf ~/.claude/settings.jsonglm ~/.claude/settings.json 2>/dev/null || true"
-    ;;
-  claude-ds)
-    TOOL_BIN="claude"
-    TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
-    PRE_CMD="ln -sf ~/.claude/settings.jsonds ~/.claude/settings.json 2>/dev/null || true"
-    ;;
-  claude)
-    TOOL_BIN="claude"
-    TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
-    ;;
-  cmd)
-    TOOL_BIN="cmd"
-    TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--yolo" "--tools-all" "-t")
-    ;;
-  copilot)
-    TOOL_BIN="copilot"
-    TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--yolo")
-    ;;
-  kiro-cli)
-    TOOL_BIN="kiro-cli"
-    TOOL_ARGS=("-p" "$(cat "$prompt_file")")
-    ;;
-  hermes)
-    TOOL_BIN="bash"
-    TOOL_ARGS=("$REPO_ROOT/scripts/cron-team-status.sh" "--dispatch-check")
-    ;;
-  *)
-    TOOL_BIN="$TOOL"
-    TOOL_ARGS=("-p" "$(cat "$prompt_file")")
-    ;;
-esac
 
 EXEC_CMD=()
-EXEC_ENV="local"
+EXEC_ENV="acpx"
 
-if command -v "$TOOL_BIN" >/dev/null 2>&1; then
-  [[ -n "$PRE_CMD" ]] && eval "$PRE_CMD"
-  EXEC_CMD=("$TOOL_BIN")
-  EXEC_ENV="local"
-elif [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
-  # Probe if tool exists on macOS host
-  if "$SCRIPT_DIR/host-exec.sh" "command -v $TOOL_BIN" >/dev/null 2>&1; then
-    if [[ -n "$PRE_CMD" ]]; then
-      EXEC_CMD=("$SCRIPT_DIR/host-exec.sh" "$PRE_CMD && $TOOL_BIN")
-    else
-      EXEC_CMD=("$SCRIPT_DIR/host-exec.sh" "$TOOL_BIN")
+if [[ -n "$ACPX_BIN" ]]; then
+  case "$TOOL" in
+    agy-gemini3.8|agy)
+      ADAPTER="$SCRIPT_DIR/adapters/docker-agy-acp.sh"
+      EXEC_CMD=("$ACPX_BIN" "--agent" "$ADAPTER" "exec" "-f" "$prompt_file")
+      EXEC_ENV="acpx:docker-agy"
+      ;;
+    claude-mm)
+      ADAPTER="$SCRIPT_DIR/adapters/claude-mm-acp.sh"
+      EXEC_CMD=("$ACPX_BIN" "--agent" "$ADAPTER" "exec" "-f" "$prompt_file")
+      EXEC_ENV="acpx:claude-mm"
+      ;;
+    claude-glm)
+      ADAPTER="$SCRIPT_DIR/adapters/claude-glm-acp.sh"
+      EXEC_CMD=("$ACPX_BIN" "--agent" "$ADAPTER" "exec" "-f" "$prompt_file")
+      EXEC_ENV="acpx:claude-glm"
+      ;;
+    cmd)
+      ADAPTER="$SCRIPT_DIR/adapters/cmd-acp.sh"
+      EXEC_CMD=("$ACPX_BIN" "--agent" "$ADAPTER" "exec" "-f" "$prompt_file")
+      EXEC_ENV="acpx:cmd"
+      ;;
+    copilot)
+      ADAPTER="$SCRIPT_DIR/adapters/copilot-acp.sh"
+      EXEC_CMD=("$ACPX_BIN" "copilot" "exec" "-f" "$prompt_file")
+      EXEC_ENV="acpx:copilot"
+      ;;
+    codex)
+      ADAPTER="$SCRIPT_DIR/adapters/codex-acp.sh"
+      EXEC_CMD=("$ACPX_BIN" "codex" "exec" "-f" "$prompt_file")
+      EXEC_ENV="acpx:codex"
+      ;;
+    *)
+      # 其他工具 fallback
+      ;;
+  esac
+fi
+
+# Fallback: 若未找到 acpx 或非标准工具，退回原生 CLI
+if [[ ${#EXEC_CMD[@]} -eq 0 ]]; then
+  TOOL_BIN=""
+  TOOL_ARGS=()
+  PRE_CMD=""
+
+  case "$TOOL" in
+    agy-gemini3.8|agy)
+      TOOL_BIN="docker"
+      TOOL_ARGS=("exec" "-i" "-e" "LANG=C.UTF-8" "agy-ubuntu-container" "/root/.local/bin/agy" "-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
+      ;;
+    claude-mm)
+      TOOL_BIN="claude"
+      TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
+      PRE_CMD="ln -sf ~/.claude/settings.jsonmm ~/.claude/settings.json 2>/dev/null || true"
+      ;;
+    claude-glm)
+      TOOL_BIN="claude"
+      TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
+      PRE_CMD="ln -sf ~/.claude/settings.jsonglm ~/.claude/settings.json 2>/dev/null || true"
+      ;;
+    cmd)
+      TOOL_BIN="cmd"
+      TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--yolo" "--tools-all" "-t")
+      ;;
+    copilot)
+      TOOL_BIN="copilot"
+      TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--yolo")
+      ;;
+    kiro-cli)
+      TOOL_BIN="kiro-cli"
+      TOOL_ARGS=("-p" "$(cat "$prompt_file")")
+      ;;
+    hermes)
+      TOOL_BIN="bash"
+      TOOL_ARGS=("$REPO_ROOT/scripts/cron-team-status.sh" "--dispatch-check")
+      ;;
+    *)
+      TOOL_BIN="$TOOL"
+      TOOL_ARGS=("-p" "$(cat "$prompt_file")")
+      ;;
+  esac
+
+  if command -v "$TOOL_BIN" >/dev/null 2>&1; then
+    [[ -n "$PRE_CMD" ]] && eval "$PRE_CMD"
+    EXEC_CMD=("$TOOL_BIN" "${TOOL_ARGS[@]}")
+    EXEC_ENV="local-cli"
+  elif [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
+    if "$SCRIPT_DIR/host-exec.sh" "command -v $TOOL_BIN" >/dev/null 2>&1; then
+      if [[ -n "$PRE_CMD" ]]; then
+        EXEC_CMD=("$SCRIPT_DIR/host-exec.sh" "$PRE_CMD && $TOOL_BIN ${TOOL_ARGS[*]}")
+      else
+        EXEC_CMD=("$SCRIPT_DIR/host-exec.sh" "$TOOL_BIN ${TOOL_ARGS[*]}")
+      fi
+      EXEC_ENV="host-cli"
     fi
-    EXEC_ENV="host"
   fi
 fi
 
 if [[ ${#EXEC_CMD[@]} -eq 0 ]]; then
-  printf 'cannot execute: tool %s (%s) not found on local or host\n' "$TOOL" "$TOOL_BIN" >&2
-  write_receipt "failed" "" "" "$now_iso" "" "command not found: $TOOL_BIN ($TOOL)"
+  printf 'cannot execute: tool %s (%s) not found on local or host\n' "$TOOL" "${TOOL_BIN:-acpx}" >&2
+  write_receipt "failed" "" "" "$now_iso" "" "command not found for $TOOL"
   exit 1
 fi
 
@@ -619,8 +580,8 @@ fi
 started_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 write_receipt "running" "$$" "$started_iso" "" "" ""
 
-printf '[dispatch] running with pid=%s tool=%s (%s via %s)...\n' "$$" "$TOOL" "$TOOL_BIN" "$EXEC_ENV"
-if "${EXEC_CMD[@]}" "${TOOL_ARGS[@]}" < /dev/null; then
+printf '[dispatch] running with pid=%s tool=%s (%s)...\n' "$$" "$TOOL" "$EXEC_ENV"
+if "${EXEC_CMD[@]}" < /dev/null; then
   completed_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   latest_hash="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || printf '')"
   

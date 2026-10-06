@@ -9,17 +9,26 @@ description: 本地施工队（本体团队：Hermes/铁匠/墨斗/门神/兑底
 
 ---
 
-## 1. 物理环境与 7 工具池真实分布
+## 1. 物理环境与 7 工具池真实分布与调用契约
 
-| 工具名称 (`--tool`) | 真实物理分布 | 调用方式 | 最强工种 / 场景 |
-|---|---|---|---|
-| **`agy-gemini3.8`** (或 `agy`) | **Docker 容器内** (`agy 1.2.15`) | 本地直接调用 `agy -p ...` | 墨斗 (FDA) — 原型、选型研判、长篇中文审计 |
-| **`claude-glm`** | **Mac 宿主机** (`/opt/homebrew/bin/claude 2.1.287`) | `bash scripts/host-exec.sh claude -p ...` | 铁匠 (Core SWE) / 百晓生 (DS) — 核心业务代码、契约守护 |
-| **`claude-mm`** | **Mac 宿主机** (`/opt/homebrew/bin/claude`) | `bash scripts/host-exec.sh claude -p ...` | 铁匠 (Core SWE) — 长文本、备用大模型调度 |
-| **`cmd`** | **Mac 宿主机** (`/opt/homebrew/bin/cmd 1.74.0`) | `bash scripts/host-exec.sh cmd -p ...` | 门神 (FDSE) / 铁匠贰号 — 单测、E2E、自动化批处理 |
-| **`copilot`** | **Mac 宿主机** (`/opt/homebrew/bin/copilot 1.0.91`) | `bash scripts/host-exec.sh copilot -p ...` | 兑底渊 (PRE-SRE) — 发版校验、OTA、监控、巡检 |
-| **`Hermes`** | **通用（宿主/容器均有）** | 调度脚本 (`cron-team-status.sh` 等) | Hermes (PM / 掌柜) — 派单、进度核查、门禁汇总 |
-| **`kiro-cli`** | **Mac 宿主机（老板专属保留）** | `bash scripts/host-exec.sh kiro-cli` | Hermes / 墨斗 — 架构设计、Spec 驱动大重构 |
+> **核心哲学（消灭万能网桥卡点）**：不搞重型中间件网桥/Proxy，以“透明工具规范 + 严格物理调用说明 + 免交互自愈脚本”直调底层 CLI。
+
+| 工具名称 (`--tool`) | 真实物理分布 | 底层二进制与配置文件 | 标准调用方式 (必须带防挂死标志) | 最强工种 / 场景 |
+|---|---|---|---|---|
+| **`agy-gemini3.8`** (或 `agy`) | **Mac 宿主 Docker 容器** (`agy-ubuntu-container`) | 容器内 `/root/.local/bin/agy` (v1.3.0) + Gemini 3.8 | 宿主 base64 包装 Prompt -> `docker cp` -> 容器内 `LANG=C.UTF-8` + `base64 -d` -> `agy --dangerously-skip-permissions -p "$PROMPT"` | 墨斗 (FDA) — 原型草图、选型研判、长篇中文文档审计 |
+| **`claude-glm`** | **Mac 宿主机** (`/opt/homebrew/bin/claude 2.1.287`) | **单一 `claude` CLI** + `~/.claude/settings.jsonglm` | `ln -sf ~/.claude/settings.jsonglm ~/.claude/settings.json && claude -p "$PROMPT" --dangerously-skip-permissions < /dev/null` (BigModel `glm-5.3[1m]`) | 铁匠 (Core SWE) / 百晓生 (DS) — 核心业务代码、契约守护 |
+| **`claude-mm`** | **Mac 宿主机** (`/opt/homebrew/bin/claude 2.1.287`) | **单一 `claude` CLI** + `~/.claude/settings.jsonmm` | `ln -sf ~/.claude/settings.jsonmm ~/.claude/settings.json && claude -p "$PROMPT" --dangerously-skip-permissions < /dev/null` (MiniMax `MiniMax-M3`) | 铁匠贰号 (Core SWE 兜底) — 长输出、抗并发 |
+| **`cmd`** | **Mac 宿主机** (`/opt/homebrew/bin/cmd 1.74.3`) | `@commandcode/ai` CLI | `cmd -p "$PROMPT" --yolo --tools-all -t < /dev/null` | 门神 (FDSE) / 铁匠贰号 — 单测、E2E、自动化批处理 |
+| **`copilot`** | **Mac 宿主机** (`/opt/homebrew/bin/copilot 1.0.91`) | GitHub Copilot CLI | `copilot -p "$PROMPT" --yolo < /dev/null` | 兑底渊 (PRE-SRE) — 发版校验、OTA、监控、巡检 |
+| **`Hermes`** | **通用（宿主/容器均有）** | Hermes 会话引擎（人即工具） | `scripts/dispatch-local-employee.sh` 调度派发 | Hermes (PM / 掌柜) — 派单、进度核查、门禁汇总 |
+| **`kiro-cli`** | **Mac 宿主机（老板专属保留）** | AWS Kiro CLI | `kiro-cli -p "$PROMPT" < /dev/null` | Hermes / 墨斗 — 架构设计、Spec 驱动大重构 |
+
+### 1.1 `claude-*` 工具族配置文件软链接切换铁律
+机器上**没有任何名为 `claude-glm` 或 `claude-mm` 的独立二进制程序**，只有官方 `claude` CLI。
+- 调 GLM (铁匠)：`ln -sf ~/.claude/settings.jsonglm ~/.claude/settings.json`（指向智谱 `glm-5.3[1m]`，1M 上下文）
+- 调 MiniMax (铁匠贰号)：`ln -sf ~/.claude/settings.jsonmm ~/.claude/settings.json`（指向 MiniMax `MiniMax-M3`，32k 输出）
+- 调 DeepSeek (备用)：`ln -sf ~/.claude/settings.jsonds ~/.claude/settings.json`（指向 `deepseek-v4-pro`）
+- **两大执行铁律**：末尾必须带 `< /dev/null` 阻断 stdin 挂起；必须带 `--dangerously-skip-permissions` 跳过交互式询问。
 
 ---
 

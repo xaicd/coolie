@@ -856,6 +856,17 @@ async function resolveBuiltInAgentCommand(input: {
     // rather than a flag (gemini) or a dedicated bin (claude/codex).
     return { command: "kimi acp", shellCommand: "kimi acp" };
   }
+  if (agent === "copilot") {
+    return { command: "copilot --acp --stdio", shellCommand: "copilot --acp --stdio" };
+  }
+  if (agent === "agy") {
+    const scriptPath = path.resolve(packageRootDir, "../../scripts/adapters/docker-agy-acp.sh");
+    return { command: scriptPath, shellCommand: shellQuote(scriptPath) };
+  }
+  if (agent === "cmd") {
+    const scriptPath = path.resolve(packageRootDir, "../../scripts/adapters/cmd-acp.sh");
+    return { command: scriptPath, shellCommand: shellQuote(scriptPath) };
+  }
   const binName = agent === "claude" ? "claude-agent-acp" : agent === "codex" ? "codex-acp" : null;
   if (!binName) return null;
   if (executionTargetIsRemote) {

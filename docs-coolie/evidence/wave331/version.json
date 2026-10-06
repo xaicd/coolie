@@ -1,0 +1,12 @@
+{
+  "version": "0.6.38",
+  "versionCode": 638,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.38/coolie-release.apk",
+  "apkSha256": "b9ace563c73ed07c860056327b5fc6ae5d15e1a18f9a6f30aead33223042b473",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "wave330 修原生本体图谱节点挤一起 bug (graphData 补 root + type 防御映射)",
+  "commitSha": "fb5569ac7f6a914818bf299e81c830a3fe97caf3"
+}

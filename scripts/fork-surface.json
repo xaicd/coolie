@@ -1326,6 +1326,84 @@
       "maxNetLines": 310,
       "reason": "wave302: new file, no upstream counterpart. Runs the REAL plugin-ontology migrations on the embedded-Postgres harness and proves the bootstrap's atomicity, rollback, degrade paths, slug disambiguation and replay adoption.",
       "maxTotalLines": 310
+    },
+    {
+      "path": "packages/adapter-utils/src/acpx-engine/constants.ts",
+      "maxNetLines": 20,
+      "reason": "wave356 (ACP 全协议栈标准化并轨): 注册 copilot_local, agy_local, cmd_local 进 ACPX_ADAPTER_AGENT_IDS，支持以 ACP 标准协议拉起上述数字员工底层执行工具。",
+      "maxTotalLines": 30
+    },
+    {
+      "path": "packages/adapter-utils/src/acpx-engine/execute.ts",
+      "maxNetLines": 30,
+      "reason": "wave356 (ACP 全协议栈标准化并轨): resolveBuiltInAgentCommand 支持 copilot, agy, cmd 对应 ACP 启动命令与标准适配器脚本。",
+      "maxTotalLines": 40
+    },
+    {
+      "path": "scripts/which-tool.sh",
+      "maxNetLines": 250,
+      "reason": "wave357: 工具链智能环境探测与 ACP 矩阵检查。",
+      "maxTotalLines": 300
+    },
+    {
+      "path": "scripts/daily-tool-probe.sh",
+      "maxNetLines": 180,
+      "reason": "wave357: 工具日常真实探活与健康巡检脚本。",
+      "maxTotalLines": 220
+    },
+    {
+      "path": "scripts/lib/env-detector.sh",
+      "maxNetLines": 280,
+      "reason": "wave357: 多环境（Mac宿主机、Docker容器、云服务器）智能环境与工具探针库。",
+      "maxTotalLines": 320
+    },
+    {
+      "path": "scripts/adapters/claude-glm-acp.sh",
+      "maxNetLines": 30,
+      "reason": "wave357: 智谱 GLM-5.3 专属配置标准 ACP 驱动适配器。",
+      "maxTotalLines": 40
+    },
+    {
+      "path": "scripts/adapters/claude-mm-acp.sh",
+      "maxNetLines": 30,
+      "reason": "wave357: MiniMax-M3 专属配置标准 ACP 驱动适配器。",
+      "maxTotalLines": 40
+    },
+    {
+      "path": "scripts/adapters/cmd-acp.mjs",
+      "maxNetLines": 200,
+      "reason": "wave357: Command Code 标准 ACP JSON-RPC 服务端驱动。",
+      "maxTotalLines": 250
+    },
+    {
+      "path": "scripts/adapters/cmd-acp.sh",
+      "maxNetLines": 15,
+      "reason": "wave357: Command Code 标准 ACP 启动入口。",
+      "maxTotalLines": 20
+    },
+    {
+      "path": "scripts/adapters/codex-acp.sh",
+      "maxNetLines": 20,
+      "reason": "wave357: Codex 标准 ACP 启动入口。",
+      "maxTotalLines": 30
+    },
+    {
+      "path": "scripts/adapters/copilot-acp.sh",
+      "maxNetLines": 30,
+      "reason": "wave357: GitHub Copilot CLI 标准 ACP 启动入口。",
+      "maxTotalLines": 40
+    },
+    {
+      "path": "scripts/adapters/docker-agy-acp.mjs",
+      "maxNetLines": 220,
+      "reason": "wave357: Antigravity CLI (Gemini 3.8) 标准 ACP JSON-RPC 包装器。",
+      "maxTotalLines": 260
+    },
+    {
+      "path": "scripts/adapters/docker-agy-acp.sh",
+      "maxNetLines": 15,
+      "reason": "wave357: Antigravity Docker ACP 启动入口。",
+      "maxTotalLines": 20
     }
   ]
 }

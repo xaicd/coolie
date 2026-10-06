@@ -50,6 +50,7 @@ which-tool.sh — PM 选工具 CLI (wave272 + wave276 + wave280)
   scripts/which-tool.sh <tool>          单工具状态 + 默认员工
   scripts/which-tool.sh <员工>           单员工 → 工具 (默认 + 兜底)
   scripts/which-tool.sh check           7 工具 CLI 可执行性 (which)
+  scripts/which-tool.sh acp             6 大工具 ACP (Agent Client Protocol) 适配矩阵
   scripts/which-tool.sh status          5 字段团队状态 (PM 问"什么进展"用, wave276)
   scripts/which-tool.sh --help           帮助
 
@@ -105,6 +106,40 @@ lookup_tool() {
       echo "工具: $name"
       echo "  默认员工: $emp"
       echo "  状态: $status"
+      if [[ "$name" == "claude-glm" ]]; then
+        echo "  物理本质: Mac 宿主机 /opt/homebrew/bin/claude (Anthropic 官方 CLI)"
+        echo "  配置文件: ~/.claude/settings.jsonglm"
+        echo "  模型与端点: 智谱 BigModel glm-5.3[1m] (https://open.bigmodel.cn/api/anthropic)"
+        echo "  切换机制: ln -sf ~/.claude/settings.jsonglm ~/.claude/settings.json"
+        echo "  CLI 调用: ln -sf ~/.claude/settings.jsonglm ~/.claude/settings.json && claude -p \"\$PROMPT\" --dangerously-skip-permissions < /dev/null"
+        echo "  ACP 驱动: scripts/adapters/claude-glm-acp.sh -> acpx claude \"\$PROMPT\""
+      elif [[ "$name" == "claude-mm" ]]; then
+        echo "  物理本质: Mac 宿主机 /opt/homebrew/bin/claude (Anthropic 官方 CLI)"
+        echo "  配置文件: ~/.claude/settings.jsonmm"
+        echo "  模型与端点: MiniMax MiniMax-M3 (https://api.minimaxi.com/anthropic)"
+        echo "  切换机制: ln -sf ~/.claude/settings.jsonmm ~/.claude/settings.json"
+        echo "  CLI 调用: ln -sf ~/.claude/settings.jsonmm ~/.claude/settings.json && claude -p \"\$PROMPT\" --dangerously-skip-permissions < /dev/null"
+        echo "  ACP 驱动: scripts/adapters/claude-mm-acp.sh -> acpx claude \"\$PROMPT\""
+      elif [[ "$name" == "agy-gemini3.8" ]]; then
+        echo "  物理本质: Mac 宿主机 Docker 容器 agy-ubuntu-container 内 /root/.local/bin/agy"
+        echo "  编码管道: 宿主 base64 包装 -> docker cp -> 容器内 LANG=C.UTF-8 + base64 -d"
+        echo "  CLI 调用: docker exec agy-ubuntu-container agy --dangerously-skip-permissions -p \"\$PROMPT\""
+        echo "  ACP 驱动: scripts/adapters/docker-agy-acp.sh -> acpx --agent scripts/adapters/docker-agy-acp.sh \"\$PROMPT\""
+      elif [[ "$name" == "cmd" ]]; then
+        echo "  物理本质: Mac 宿主机 /opt/homebrew/bin/cmd (@commandcode/ai CLI)"
+        echo "  CLI 调用: cmd -p \"\$PROMPT\" --yolo --tools-all -t < /dev/null"
+        echo "  ACP 驱动: scripts/adapters/cmd-acp.sh -> acpx --agent scripts/adapters/cmd-acp.sh \"\$PROMPT\""
+      elif [[ "$name" == "copilot" ]]; then
+        echo "  物理本质: Mac 宿主机 /opt/homebrew/bin/copilot (GitHub Copilot CLI)"
+        echo "  CLI 调用: copilot -p \"\$PROMPT\" --yolo < /dev/null"
+        echo "  ACP 驱动: scripts/adapters/copilot-acp.sh -> acpx copilot \"\$PROMPT\""
+      elif [[ "$name" == "Hermes" ]]; then
+        echo "  物理本质: PM 唯一调度会话中枢 (人即工具)"
+        echo "  派单模板: scripts/dispatch-local-employee.sh --agent <agent> --task <task> --execute"
+      elif [[ "$name" == "kiro-cli" ]]; then
+        echo "  物理本质: Mac 宿主机 AWS Kiro CLI (老板架构大重构专属保留)"
+        echo "  CLI 调用: kiro-cli -p \"\$PROMPT\" < /dev/null"
+      fi
       found=1
     fi
   done
@@ -139,23 +174,108 @@ lookup_employee() {
 }
 
 check_tools() {
-  echo "== 7 工具 CLI 可执行性 (which) =="
+  local lib_env="$REPO_ROOT/scripts/lib/env-detector.sh"
+  if [[ -f "$lib_env" ]]; then
+    # shellcheck source=scripts/lib/env-detector.sh
+    source "$lib_env"
+  fi
+
+  local env_desc=""
+  if command -v describe_coolie_env >/dev/null 2>&1; then
+    env_desc="$(describe_coolie_env)"
+  else
+    env_desc="$(uname -s) $(uname -m)"
+  fi
+
+  echo "== Coolie 智能环境感知与工具健康探测 =="
+  echo "当前运行宿主: $env_desc"
+  echo "----------------------------------------------------------------"
   local ok=0
-  local total=0
-  for row in "${TOOLS[@]}"; do
-    IFS='|' read -r name _ _ status <<<"$row"
-    total=$((total+1))
-    if command -v "$name" >/dev/null 2>&1; then
-      printf "  ✅ %-15s %s\n" "$name" "$(command -v "$name")"
-      ok=$((ok+1))
-    else
-      printf "  ❌ %-15s (未安装)\n" "$name"
-    fi
-  done
-  echo ""
-  echo "通过: $ok / ${total} (Hermes / kairo-cli 装 = 老板本地有, 不一定需要 PATH)"
+  local total=7
+
+  # 1. Hermes (PM调度总指挥 / 原生实体)
+  IFS=$'\t' read -r h_status h_lat h_detail <<< "$(smart_probe_hermes)"
+  if [[ "$h_status" == "ok" ]]; then
+    printf "  ✅ %-15s %s\n" "Hermes" "$h_detail"
+    ok=$((ok+1))
+  else
+    printf "  ❌ %-15s %s\n" "Hermes" "$h_detail"
+  fi
+
+  # 2. claude-glm (智谱 GLM-5.3 1M)
+  IFS=$'\t' read -r glm_status glm_lat glm_detail <<< "$(smart_probe_claude glm)"
+  if [[ "$glm_status" == "ok" ]]; then
+    printf "  ✅ %-15s %s\n" "claude-glm" "$glm_detail"
+    ok=$((ok+1))
+  elif [[ "$glm_status" == "warn" ]]; then
+    printf "  ⚠️  %-15s %s\n" "claude-glm" "$glm_detail"
+    ok=$((ok+1))
+  else
+    printf "  ❌ %-15s %s\n" "claude-glm" "$glm_detail"
+  fi
+
+  # 3. claude-mm (MiniMax-M3)
+  IFS=$'\t' read -r mm_status mm_lat mm_detail <<< "$(smart_probe_claude mm)"
+  if [[ "$mm_status" == "ok" ]]; then
+    printf "  ✅ %-15s %s\n" "claude-mm" "$mm_detail"
+    ok=$((ok+1))
+  elif [[ "$mm_status" == "warn" ]]; then
+    printf "  ⚠️  %-15s %s\n" "claude-mm" "$mm_detail"
+    ok=$((ok+1))
+  else
+    printf "  ❌ %-15s %s\n" "claude-mm" "$mm_detail"
+  fi
+
+  # 4. cmd (@commandcode/ai)
+  IFS=$'\t' read -r cmd_status cmd_lat cmd_detail <<< "$(smart_probe_artisan_tool cmd)"
+  if [[ "$cmd_status" == "ok" ]]; then
+    printf "  ✅ %-15s %s\n" "cmd" "$cmd_detail"
+    ok=$((ok+1))
+  elif [[ "$cmd_status" == "standby" ]]; then
+    printf "  ⏸️  %-15s %s\n" "cmd" "$cmd_detail"
+    ok=$((ok+1))
+  else
+    printf "  ❌ %-15s %s\n" "cmd" "$cmd_detail"
+  fi
+
+  # 5. copilot (GitHub Copilot CLI)
+  IFS=$'\t' read -r cp_status cp_lat cp_detail <<< "$(smart_probe_artisan_tool copilot)"
+  if [[ "$cp_status" == "ok" ]]; then
+    printf "  ✅ %-15s %s\n" "copilot" "$cp_detail"
+    ok=$((ok+1))
+  elif [[ "$cp_status" == "standby" ]]; then
+    printf "  ⏸️  %-15s %s\n" "copilot" "$cp_detail"
+    ok=$((ok+1))
+  else
+    printf "  ❌ %-15s %s\n" "copilot" "$cp_detail"
+  fi
+
+  # 6. agy-gemini3.8 (Antigravity CLI / Docker)
+  IFS=$'\t' read -r agy_status agy_lat agy_detail <<< "$(smart_probe_artisan_tool agy-gemini3.8)"
+  if [[ "$agy_status" == "ok" ]]; then
+    printf "  ✅ %-15s %s\n" "agy-gemini3.8" "$agy_detail"
+    ok=$((ok+1))
+  elif [[ "$agy_status" == "standby" ]]; then
+    printf "  ⏸️  %-15s %s\n" "agy-gemini3.8" "$agy_detail"
+    ok=$((ok+1))
+  else
+    printf "  ❌ %-15s %s\n" "agy-gemini3.8" "$agy_detail"
+  fi
+
+  # 7. kiro-cli (老板专属保留)
+  IFS=$'\t' read -r kiro_status kiro_lat kiro_detail <<< "$(smart_probe_artisan_tool kiro-cli)"
+  if [[ "$kiro_status" == "ok" ]]; then
+    printf "  ✅ %-15s %s\n" "kiro-cli" "$kiro_detail"
+    ok=$((ok+1))
+  else
+    printf "  ⚠️  %-15s %s\n" "kiro-cli" "$kiro_detail"
+    ok=$((ok+1))
+  fi
+
+  echo "----------------------------------------------------------------"
+  echo "物理探针健康率: $ok / ${total}"
   if [[ -f "$TOOLS_DOC" ]]; then
-    echo "完整出处: $TOOLS_DOC"
+    echo "详细使用说明与物理调用手册: $TOOLS_DOC"
   fi
 }
 
@@ -171,6 +291,22 @@ team_status() {
   bash "$team_script" --print
 }
 
+# 标准化 ACP (Agent Client Protocol) 调度矩阵
+acp_tools() {
+  echo "═══ Coolie 标准化 ACP (Agent Client Protocol) 调度矩阵 ═══"
+  printf "%-15s %-36s %s\n" "工具" "ACP 启动脚本" "acpx 驱动命令"
+  echo "-------------------------------------------------------------------------------------------------"
+  printf "%-15s %-36s %s\n" "docker agy" "scripts/adapters/docker-agy-acp.sh" "acpx --agent scripts/adapters/docker-agy-acp.sh \"...\""
+  printf "%-15s %-36s %s\n" "cmd" "scripts/adapters/cmd-acp.sh" "acpx --agent scripts/adapters/cmd-acp.sh \"...\""
+  printf "%-15s %-36s %s\n" "copilot" "scripts/adapters/copilot-acp.sh" "acpx copilot \"...\""
+  printf "%-15s %-36s %s\n" "codex" "scripts/adapters/codex-acp.sh" "acpx codex \"...\""
+  printf "%-15s %-36s %s\n" "claude-mm" "scripts/adapters/claude-mm-acp.sh" "acpx claude \"...\" (MiniMax Profile)"
+  printf "%-15s %-36s %s\n" "claude-glm" "scripts/adapters/claude-glm-acp.sh" "acpx claude \"...\" (GLM Profile)"
+  echo "-------------------------------------------------------------------------------------------------"
+  echo "技术基石: 基于 JSON-RPC 2.0 stdio 结构化流式传输，彻底消灭 PTY 终端刮取与挂死"
+  echo "出处与完整手册: docs-coolie/TOOLS.md §8"
+}
+
 # 主入口
 case "${1:-}" in
   "")
@@ -181,6 +317,9 @@ case "${1:-}" in
     ;;
   check)
     check_tools
+    ;;
+  acp)
+    acp_tools
     ;;
   status)
     # wave276: 5 字段团队状态, 转发到 cron-team-status.sh
