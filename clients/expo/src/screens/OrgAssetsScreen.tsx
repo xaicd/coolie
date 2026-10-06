@@ -13,6 +13,7 @@ import { C } from "../coolie";
 import { RADIUS } from "../ui/tokens";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { ArchitectureGovernanceScreen } from "./ArchitectureGovernanceScreen";
+import { AssetOntologyScreen } from "./AssetOntologyScreen";
 import { ProjectsScreen } from "./ProjectsScreen";
 import { AgentsScreen } from "./AgentsScreen";
 import { ArtifactsScreen } from "./ArtifactsScreen";
@@ -156,12 +157,15 @@ export function OrgAssetsScreen({
             按 §18 北极星「工坊会话即本体演进」: 本体的查看与演进入口收敛到
             工坊对话 (chat), 资产页不再长驻原生本体视图。 */}
         {activeTab === "ontology" && (
-          <View style={styles.ontologyPlaceholder} testID="OrgAssets__OntologyTab__Root">
-            <Text style={styles.ontologyPlaceholderTitle}>业务本体</Text>
-            <Text style={styles.ontologyPlaceholderSubtitle}>
-              请到工坊对话询问 AI 副手 (按 §18 北极星: 工坊会话即本体演进)
-            </Text>
-          </View>
+          <AssetOntologyScreen
+            company={company}
+            whoami={whoami}
+            onOpenIssue={onOpenIssue}
+            onOpenProjectTasks={onOpenProjectTasks}
+            onCreateTaskForProject={onCreateTaskForProject}
+            onOpenWebOntology={onOpenWebOntology}
+            onOpenSandbox={onOpenSandbox}
+          />
         )}
 
         {activeTab === "architecture" && (

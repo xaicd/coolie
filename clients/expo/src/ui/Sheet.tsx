@@ -37,7 +37,12 @@ export function Sheet({
   if (!modal) return body;
 
   return (
-    <Modal transparent animationType="slide" onRequestClose={onClose}>
+    <Modal
+      transparent
+      animationType="slide"
+      onRequestClose={onClose}
+      accessibilityViewIsModal={true}
+    >
       {body}
     </Modal>
   );

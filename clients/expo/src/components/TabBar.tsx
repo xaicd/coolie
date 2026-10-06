@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { C } from "../theme";
 
 /** 底部 tab bar 的落点 + 中央新建 FAB。 */
-export type BarTabKey = "dashboard" | "tasks" | "inbox" | "chat" | "assets" | "agents" | "ontology" | "artifacts";
+export type BarTabKey = "dashboard" | "tasks" | "inbox" | "chat" | "assets" | "agents" | "artifacts";
 
 /**
  * 底栏高度。铺满底部的浮层必须让出这一段。
@@ -103,7 +103,7 @@ export function TabBar({
       {RIGHT.map((slot) => {
         const isActive =
           tab === slot.key ||
-          (slot.key === "ontology" && tab === "assets");
+          (slot.key === "assets" && tab === "ontology");
         return (
           <Tab
             key={slot.key}

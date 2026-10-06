@@ -1295,7 +1295,6 @@ export function BoardChatScreen({
       stagedAttachments,
       uploadStagedAttachment,
       scrollToBottom,
-      startSpec,
       startBuild,
       startPipeline,
       startPlan,
