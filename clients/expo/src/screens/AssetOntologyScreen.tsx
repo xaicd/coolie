@@ -274,23 +274,32 @@ export function AssetOntologyScreen({
 
   const handleActionClick = (actionName: string, item: LivingObjectItem) => {
     setSelectedObject(null);
+    // COOA-4 假按钮修复 (2026-10-06): 非 project 对象的 推进/派单 兜底原文案谎称
+    // 「已向 Hermes 注入指令」「已建立派单通道」— 实际无任何调用, 属编造反馈。
+    // 改为如实告知 + 指路工坊; 原生一键派单是否要做属产品决策, 勿在文案层假装已做。
     if (actionName === "推进") {
       if (item.id === "project" && projects[0] && onOpenProjectTasks) {
         onOpenProjectTasks(projects[0]);
       } else {
-        Alert.alert("推进操作", `已向 Hermes 注入【${item.name}】推进指令，请在工坊查看。`);
+        Alert.alert(
+          "暂不支持一键推进",
+          `【${item.name}】暂无原生一键推进入口。请到「工坊」用自然语言派单推进。`,
+        );
       }
     } else if (actionName === "派单") {
       if (item.id === "project" && projects[0] && onCreateTaskForProject) {
         onCreateTaskForProject(projects[0]);
       } else {
-        Alert.alert("派单操作", `已为【${item.name}】建立快速派单通道。`);
+        Alert.alert(
+          "暂不支持一键派单",
+          `【${item.name}】暂无原生一键派单入口。请到「工坊」用自然语言建单。`,
+        );
       }
     } else if (actionName === "查看") {
       if (onOpenWebOntology) {
         onOpenWebOntology("/ontology", "业务本体设计器");
       } else {
-        Alert.alert("查看详情", `【${item.name}】当前处于健康运行态。`);
+        Alert.alert("查看详情", `请在 Web 端「业务本体设计器」查看【${item.name}】。`);
       }
     }
   };
