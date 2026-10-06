@@ -84,6 +84,7 @@ import { WorkspaceGitToggle } from "./src/components/WorkspaceGitToggle";
 import { CoolieLogo } from "./src/components/CoolieLogo";
 import { useNotificationsStore } from "./src/stores/notifications";
 import { BoardChatScreen, exportBoardEcho, exportBoardPrompt } from "./src/screens/BoardChatScreen";
+import { ScreenErrorBoundary } from "./src/components/ScreenErrorBoundary";
 import { AgentsScreen } from "./src/screens/AgentsScreen";
 import { useOTA } from "./src/OTA";
 import {
@@ -1273,30 +1274,32 @@ function HomeScreen({
               }}
             />
           ) : tab === "chat" ? (
-            <BoardChatScreen
-              company={company}
-              whoami={whoami}
-              // COOA-4 走查注 (2026-10-04): 不加 navigateTab 是对的 — focusedApprovalId
-              // 的浮层分支在上层三元链里先于 tab 分支求值 (见下方 ApprovalFocusDetail),
-              // chat 里点「查看详情」直接盖到当前 tab 上, 返回键回到 chat。补 navigateTab
-              // 反而会改变返回落点。
-              onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
-              onOpenIssue={(issue) => {
-                navigateTab("tasks");
-                setSelected(issue);
-              }}
-              onOpenPipeline={(pipelineId) => {
-                void Linking.openURL(
-                  `${COOLIE_BASE_URL}/pipelines/${encodeURIComponent(pipelineId)}`,
-                ).catch(() => {
-                  Alert.alert("无法打开 Pipeline", "请在浏览器里打开 Coolie Web 查看该 pipeline。");
-                });
-              }}
-              onOpenPlan={(issue) => {
-                navigateTab("tasks");
-                setSelected(issue);
-              }}
-            />
+            <ScreenErrorBoundary fallbackTitle="工坊协同加载异常">
+              <BoardChatScreen
+                company={company}
+                whoami={whoami}
+                // COOA-4 走查注 (2026-10-04): 不加 navigateTab 是对的 — focusedApprovalId
+                // 的浮层分支在上层三元链里先于 tab 分支求值 (见下方 ApprovalFocusDetail),
+                // chat 里点「查看详情」直接盖到当前 tab 上, 返回键回到 chat。补 navigateTab
+                // 反而会改变返回落点。
+                onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
+                onOpenIssue={(issue) => {
+                  navigateTab("tasks");
+                  setSelected(issue);
+                }}
+                onOpenPipeline={(pipelineId) => {
+                  void Linking.openURL(
+                    `${COOLIE_BASE_URL}/pipelines/${encodeURIComponent(pipelineId)}`,
+                  ).catch(() => {
+                    Alert.alert("无法打开 Pipeline", "请在浏览器里打开 Coolie Web 查看该 pipeline。");
+                  });
+                }}
+                onOpenPlan={(issue) => {
+                  navigateTab("tasks");
+                  setSelected(issue);
+                }}
+              />
+            </ScreenErrorBoundary>
           ) : tab === "assets" ? (
             <OrgAssetsScreen
               company={company}

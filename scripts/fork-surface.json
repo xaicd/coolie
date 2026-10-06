@@ -380,6 +380,18 @@
       "maxTotalLines": 600
     },
     {
+      "path": "scripts/bootstrap-coolie-dev-host.sh",
+      "maxNetLines": 300,
+      "reason": "Fork script: one-click bootstrapping for Coolie Dev host replication and asynchronous dispatch guard. No upstream counterpart.",
+      "maxTotalLines": 400
+    },
+    {
+      "path": "scripts/inject-wave358-dev-tasks.mjs",
+      "maxNetLines": 200,
+      "reason": "Fork script: injects wave358 outstanding tasks to Coolie Dev server. No upstream counterpart.",
+      "maxTotalLines": 250
+    },
+    {
       "path": "scripts/reverse-scaffold-legacy-project.mjs",
       "maxNetLines": 520,
       "reason": "Fork script: reverse-engineers legacy complex systems (RuoYi-Vue-Pro, JeecgBoot, Spring Cloud) SQL schema and pom.xml into CMMI 5+2 baselines and door-check scripts. No upstream counterpart.",

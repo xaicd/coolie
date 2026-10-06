@@ -231,6 +231,7 @@ function InlineApprovalBubble({
   onOpenDetail,
   onOpenIssue,
 }: InlineApprovalBubbleProps) {
+  if (!approval) return null;
   if (decision) {
     return (
       <View style={styles.approvalRow}>
@@ -485,9 +486,11 @@ export function BoardChatScreen({
   const refreshConversations = useCallback(async (): Promise<BoardConversation[]> => {
     try {
       const list = await coolie.listBoardConversations(company.id);
-      setConversations(list);
-      return list;
+      const safeList = Array.isArray(list) ? list : [];
+      setConversations(safeList);
+      return safeList;
     } catch {
+      setConversations([]);
       return [] as BoardConversation[];
     }
   }, [company.id]);
@@ -502,7 +505,9 @@ export function BoardChatScreen({
     setHistoryReady(false);
     void (async () => {
       const list = await refreshConversations();
-      if (list.length > 0) setActiveConversationId(list[0].id);
+      if (Array.isArray(list) && list.length > 0 && list[0]?.id) {
+        setActiveConversationId(list[0].id);
+      }
     })();
   }, [company.id, refreshConversations]);
 
@@ -516,11 +521,11 @@ export function BoardChatScreen({
         company.id,
         activeConversationId ?? undefined,
       );
-      if (history.issueId) {
+      if (history?.issueId) {
         setBoardIssueId(history.issueId);
       }
       if (
-        history.conversationId &&
+        history?.conversationId &&
         history.conversationId !== activeConversationId
       ) {
         setActiveConversationId(history.conversationId);
@@ -528,7 +533,8 @@ export function BoardChatScreen({
       }
       // wave115: 防御性过滤 —— 历史里若有空 content 行或状态提示伪消息
       // (「正在连接会话助手…」类), 一律不渲染; 过滤后为空则回到欢迎语。
-      const clean = history.messages.filter(isRenderableBoardMessage);
+      const rawMessages = Array.isArray(history?.messages) ? history.messages : [];
+      const clean = rawMessages.filter(isRenderableBoardMessage);
       setMessages(clean.length > 0 ? clean : [WELCOME_MESSAGE]);
     } catch {
       // 保持当前显示
@@ -549,12 +555,14 @@ export function BoardChatScreen({
     setEditorProjectId(null);
     setEditorOpen(true);
     setConversationsOpen(false);
-    if (projects.length === 0) {
+    if (!Array.isArray(projects) || projects.length === 0) {
       void (async () => {
         try {
-          setProjects(await coolie.listProjects(company.id));
+          const list = await coolie.listProjects(company.id);
+          setProjects(Array.isArray(list) ? list : []);
         } catch {
           // 项目列表拿不到就不显示项目选择, 不影响新建对话
+          setProjects([]);
         }
       })();
     }
@@ -834,24 +842,27 @@ export function BoardChatScreen({
   const fetchPendingApprovals = useCallback(async () => {
     try {
       const list = await coolie.listApprovals(company.id, { status: "pending" });
-      const pending = list.filter((a) => a.status === "pending");
+      const pending = Array.isArray(list) ? list.filter((a) => a && a.status === "pending") : [];
 
       setApprovalFeed((prev) => {
-        const decided = prev.filter((item) => item.decision !== null);
-        const decidedIds = new Set(decided.map((item) => item.approval.id));
+        const safePrev = Array.isArray(prev) ? prev : [];
+        const decided = safePrev.filter((item) => item && item.decision !== null);
+        const decidedIds = new Set(
+          decided.map((item) => item?.approval?.id).filter(Boolean) as string[],
+        );
         const fresh: ApprovalFeedItem[] = pending
-          .filter((a) => !decidedIds.has(a.id))
+          .filter((a) => a && !decidedIds.has(a.id))
           .map((a) => ({ approval: a, decision: null }));
         return [...fresh, ...decided].slice(-8);
       });
 
-      const missing = pending.filter((a) => !(a.id in linkedIssueCache.current));
+      const missing = pending.filter((a) => a && !(a.id in linkedIssueCache.current));
       if (missing.length > 0) {
         const resolved = await Promise.all(
           missing.map(async (a) => {
             try {
               const issues = await coolie.getApprovalIssues(a.id);
-              return [a.id, issues[0] ?? null] as const;
+              return [a.id, Array.isArray(issues) && issues[0] ? issues[0] : null] as const;
             } catch {
               return [a.id, null] as const;
             }
@@ -1371,12 +1382,14 @@ export function BoardChatScreen({
    * 用户消息不计入, 因为头部的「上一回」始终是工坊的回复时间。
    */
   const latestAssistantTimestamp = useMemo(() => {
+    if (!Array.isArray(messages)) return null;
     for (let i = messages.length - 1; i >= 0; i--) {
       const m = messages[i];
-      if (m.role === "assistant" || m.role === "system") {
-        return typeof m.createdAt === "string"
-          ? m.createdAt
-          : m.createdAt.toISOString();
+      if (m && (m.role === "assistant" || m.role === "system")) {
+        if (typeof m.createdAt === "string") return m.createdAt;
+        if (m.createdAt instanceof Date) return m.createdAt.toISOString();
+        if (typeof m.createdAt === "number") return new Date(m.createdAt).toISOString();
+        return null;
       }
     }
     return null;
@@ -1390,7 +1403,7 @@ export function BoardChatScreen({
 
   /** wave148: 当前对话行 (头部标题 / 列表高亮共用)。 */
   const activeConversation = useMemo(
-    () => conversations.find((c) => c.id === activeConversationId) ?? null,
+    () => (Array.isArray(conversations) ? conversations.find((c) => c && c.id === activeConversationId) ?? null : null),
     [conversations, activeConversationId],
   );
 
@@ -1454,14 +1467,16 @@ export function BoardChatScreen({
   }
 
   function parseMessageSegments(rawText: string): MessageSegment[] {
+    const text = typeof rawText === "string" ? rawText : "";
+    if (!text) return [{ type: "text", content: "" }];
     const codeBlockRegex = /```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```/g;
     const parts: MessageSegment[] = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
 
-    while ((match = codeBlockRegex.exec(rawText)) !== null) {
+    while ((match = codeBlockRegex.exec(text)) !== null) {
       if (match.index > lastIndex) {
-        const textChunk = rawText.slice(lastIndex, match.index);
+        const textChunk = text.slice(lastIndex, match.index);
         if (textChunk.trim()) {
           parts.push({ type: "text", content: textChunk });
         }
@@ -1476,24 +1491,26 @@ export function BoardChatScreen({
       lastIndex = match.index + match[0].length;
     }
 
-    if (lastIndex < rawText.length) {
-      const trailing = rawText.slice(lastIndex);
+    if (lastIndex < text.length) {
+      const trailing = text.slice(lastIndex);
       if (trailing.trim() || parts.length === 0) {
         parts.push({ type: "text", content: trailing });
       }
     }
 
-    return parts.length > 0 ? parts : [{ type: "text", content: rawText }];
+    return parts.length > 0 ? parts : [{ type: "text", content: text }];
   }
 
   const renderMessageItem = ({ item }: { item: BoardChatMessage }) => {
+    if (!item) return null;
     const isUser = item.role === "user";
+    const rawText = typeof item.text === "string" ? item.text : "";
 
     if (item.role === "system") {
       return (
         <View style={styles.systemRow}>
           <View style={styles.systemBubble}>
-            <Text style={styles.systemText}>{item.text}</Text>
+            <Text style={styles.systemText}>{rawText}</Text>
           </View>
         </View>
       );
@@ -1504,17 +1521,17 @@ export function BoardChatScreen({
         <View style={styles.userRow}>
           <Pressable
             style={styles.userBubble}
-            onLongPress={() => copyToClipboard(item.text)}
+            onLongPress={() => copyToClipboard(rawText)}
             delayLongPress={300}
           >
-            <Text style={styles.userText}>{item.text}</Text>
+            <Text style={styles.userText}>{rawText}</Text>
           </Pressable>
         </View>
       );
     }
 
     // 摘出总办回复里夹带的内嵌预览标签, 正文只留 cleanText
-    const { cleanText, previews } = parseInlineTags(item.text, item.id);
+    const { cleanText, previews } = parseInlineTags(rawText, item.id);
     const segments = parseMessageSegments(cleanText);
 
     return (
@@ -1524,7 +1541,7 @@ export function BoardChatScreen({
         </View>
         <Pressable
           style={styles.assistantBubble}
-          onLongPress={() => copyToClipboard(item.text)}
+          onLongPress={() => copyToClipboard(rawText)}
           delayLongPress={300}
         >
           <View style={styles.assistantHeader}>
@@ -1615,25 +1632,28 @@ export function BoardChatScreen({
           onContentSizeChange={() => scrollToBottom(false)}
           onLayout={() => scrollToBottom(false)}
           ListHeaderComponent={
-            approvalFeed.length > 0 ? (
+            Array.isArray(approvalFeed) && approvalFeed.length > 0 ? (
               <View style={styles.approvalStack}>
-                {approvalFeed.map((item) => (
-                  <InlineApprovalBubble
-                    key={item.approval.id}
-                    approval={item.approval}
-                    decision={item.decision}
-                    busy={approvalBusy[item.approval.id] ?? null}
-                    linkedIssue={approvalIssues[item.approval.id] ?? null}
-                    onApprove={() =>
-                      void handleApprovalDecision(item.approval, "approve")
-                    }
-                    onReject={() =>
-                      void handleApprovalDecision(item.approval, "reject")
-                    }
-                    onOpenDetail={() => onOpenApproval?.(item.approval.id)}
-                    onOpenIssue={(issue) => onOpenIssue?.(issue)}
-                  />
-                ))}
+                {approvalFeed.map((item) => {
+                  if (!item?.approval) return null;
+                  return (
+                    <InlineApprovalBubble
+                      key={item.approval.id}
+                      approval={item.approval}
+                      decision={item.decision}
+                      busy={approvalBusy[item.approval.id] ?? null}
+                      linkedIssue={approvalIssues[item.approval.id] ?? null}
+                      onApprove={() =>
+                        void handleApprovalDecision(item.approval, "approve")
+                      }
+                      onReject={() =>
+                        void handleApprovalDecision(item.approval, "reject")
+                      }
+                      onOpenDetail={() => onOpenApproval?.(item.approval.id)}
+                      onOpenIssue={(issue) => onOpenIssue?.(issue)}
+                    />
+                  );
+                })}
               </View>
             ) : null
           }
@@ -1871,10 +1891,11 @@ export function BoardChatScreen({
               </View>
 
               <ScrollView style={styles.convList} keyboardShouldPersistTaps="handled">
-                {conversations.length === 0 ? (
+                {!Array.isArray(conversations) || conversations.length === 0 ? (
                   <Text style={styles.convEmpty}>还没有对话, 点「新建」开始。</Text>
                 ) : (
                   conversations.map((conversation) => {
+                    if (!conversation) return null;
                     const active = conversation.id === activeConversationId;
                     return (
                       <Pressable
@@ -1950,7 +1971,7 @@ export function BoardChatScreen({
                 onSubmitEditing={() => void handleEditorSubmit()}
               />
 
-              {editorMode === "new" && projects.length > 0 ? (
+              {editorMode === "new" && Array.isArray(projects) && projects.length > 0 ? (
                 <>
                   <Text style={styles.editorLabel}>归属项目 (可空)</Text>
                   <ScrollView
@@ -1975,6 +1996,7 @@ export function BoardChatScreen({
                       </Text>
                     </Pressable>
                     {projects.map((project) => {
+                      if (!project) return null;
                       const active = editorProjectId === project.id;
                       return (
                         <Pressable
