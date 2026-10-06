@@ -40,9 +40,10 @@ done
 REMOTE
 ```
 
-## 3. deploy-tc-coolie-claw.sh 自动跑这步
+## 3. deploy-tc-coolie-claw-server.sh 自动跑这步
 
-`scripts/deploy-tc-coolie-claw.sh` 必须含上面 §2 步，不能省。
+`scripts/deploy-tc-coolie-claw-server.sh` (wave349 拆段后的 server 段,
+由编排器 `scripts/deploy-tc-coolie-claw.sh` 调用) 必须含上面 §2 步，不能省。
 
 ## 4. 已知 /opt/coolie 不是 git 仓库
 

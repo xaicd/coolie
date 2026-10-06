@@ -71,9 +71,14 @@ cd clients/expo && bash scripts/publish-ota.sh android
 
 ## B. server 部署(`scripts/deploy-tc-coolie-claw.sh`)
 
+wave349 起本体拆为三段 (server / web / app), 本脚本是编排器:
+
 ```sh
-bash scripts/deploy-tc-coolie-claw.sh            # 本地构建 UI → rsync → 远端构建 → 重启 → 健康
+bash scripts/deploy-tc-coolie-claw.sh            # 默认 --all: server → web → app 三段全跑
 bash scripts/deploy-tc-coolie-claw.sh --skip-build
+bash scripts/deploy-tc-coolie-claw.sh --server-only   # 只 rsync 代码 + install + 重启 (不动 UI)
+bash scripts/deploy-tc-coolie-claw.sh --web-only      # 只构建 + rsync ui/ (不重启 server)
+bash scripts/deploy-tc-coolie-claw.sh --app-only      # 只 rsync android/ + 重启刷新 OTA
 ```
 
 **安全 rsync excludes(铁律,防 `--delete` 抹掉生产配置/资产)**:
