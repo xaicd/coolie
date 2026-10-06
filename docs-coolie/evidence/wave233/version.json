@@ -1,12 +1,12 @@
 {
-  "version": "0.6.42",
-  "versionCode": 642,
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.42/coolie-release.apk",
-  "apkSha256": "816a4b19eceadfc3dc0f0249c3111fb44a8a8b4631fb413bc0738b93847e3750",
+  "version": "0.6.43",
+  "versionCode": 643,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.43/coolie-release.apk",
+  "apkSha256": "a57d3e7f0ca25dad926b9f063589f72c972d89d9cbdd994d914a7a7c0f39780d",
   "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
   "iosBundleId": "cn.xrobinai.app",
   "iosSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
   "iosTestFlightUrl": null,
-  "releaseNotes": "wave339 修 rootId 不匹配 (域 id 与 project id 不在同一 id 空间)",
-  "commitSha": "b4e16628a46dfd5228ca89464377933471bf5ae3"
+  "releaseNotes": "wave342 原生本体工作台 5 视图组 14 视图",
+  "commitSha": "a737221ff74718f86b819af2e1983be0d0d4b34c"
 }
