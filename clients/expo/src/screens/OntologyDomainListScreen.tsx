@@ -24,6 +24,13 @@ import type {
 import { C, coolie } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
 import { EmergencyKillSwitch } from "../components/EmergencyKillSwitch";
+import { OntologyGraphView } from "../components/OntologyGraphView";
+import type {
+  OntologyEntityType,
+  OntologyGraphData,
+  OntologyGraphEdge,
+  OntologyGraphNode,
+} from "../components/OntologyGraphView";
 import { AppCard } from "../ui/AppCard";
 import { RADIUS } from "../ui/tokens";
 import { EmptyState } from "../ui/EmptyState";
@@ -87,6 +94,8 @@ const LIFECYCLE_CONFIG: Record<
 
 export type DomainFilter = "all" | "active" | "draft" | "archived" | "locked";
 export type OntologyViewMode = "list" | "detail";
+/** 本体 tab 顶层双视图: 图谱 (wave329 接入 OntologyGraphView) vs 域卡片列表 */
+export type OntologyDomainViewMode = "graph" | "list";
 
 export function OntologyDomainListScreen({
   company,
@@ -103,6 +112,13 @@ export function OntologyDomainListScreen({
   const [viewMode, setViewMode] = useState<OntologyViewMode>("list");
   const [seedingSample, setSeedingSample] = useState(false);
   const [selectedNodeTypeKey, setSelectedNodeTypeKey] = useState<string | null>(null);
+
+  // 图谱/列表双视图 (wave329): 默认直达图谱
+  const [domainViewMode, setDomainViewMode] = useState<OntologyDomainViewMode>("graph");
+  const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
+  const [graphSnapshot, setGraphSnapshot] = useState<OntologyGraphSnapshot | null>(null);
+  const [graphLoading, setGraphLoading] = useState(false);
+  const [graphError, setGraphError] = useState<string | null>(null);
 
   // 新建本体域弹层状态
   const [newDomainModalOpen, setNewDomainModalOpen] = useState(false);
@@ -164,6 +180,61 @@ export function OntologyDomainListScreen({
     setRefreshing(true);
     void loadDomains();
   }, [loadDomains]);
+
+  // 图谱视图锚定域: 默认取第一个本体域, 选中域被删后自动回落
+  useEffect(() => {
+    if (domains.length === 0) return;
+    if (selectedDomainId && domains.some((d) => d.id === selectedDomainId)) return;
+    setSelectedDomainId(domains[0]!.id);
+  }, [domains, selectedDomainId]);
+
+  // 拉取选中域的图快照 (api-client 现有方法 getOntologySnapshot,
+  // 返回 OntologyGraphSnapshot: nodes/edges/counts)
+  const loadGraph = useCallback(async () => {
+    if (!selectedDomainId) return;
+    setGraphLoading(true);
+    setGraphError(null);
+    try {
+      const snap = await coolie.getOntologySnapshot(companyId, selectedDomainId, 200);
+      setGraphSnapshot(snap);
+    } catch (e) {
+      setGraphError(String((e as Error)?.message ?? e));
+    } finally {
+      setGraphLoading(false);
+    }
+  }, [companyId, selectedDomainId]);
+
+  // 仅图谱视图且已锚定域时拉取, 列表视图不发冗余请求
+  useEffect(() => {
+    if (domainViewMode === "graph" && selectedDomainId) void loadGraph();
+  }, [domainViewMode, selectedDomainId, loadGraph]);
+
+  // 快照 (插件形态: sourceNodeId/targetNodeId) → 图谱组件 (source/target = 节点 key)
+  const graphData: OntologyGraphData | null = useMemo(() => {
+    if (!graphSnapshot) return null;
+    const nodes: OntologyGraphNode[] = graphSnapshot.nodes.map((n) => ({
+      key: n.key || n.id,
+      id: n.id,
+      // wave325 组件类型表仅覆盖控制面 9 类实体, 域实例节点没有对应类型:
+      // 统一按 work_product 上色, 真实类型语义保留在节点 label 与 metadata
+      type: "work_product" as OntologyEntityType,
+      label: n.label,
+      metadata: {
+        ...(n.properties ?? {}),
+        ...(n.lifecycleState ? { lifecycleState: n.lifecycleState } : {}),
+      },
+    }));
+    const keyById = new Map(nodes.map((n) => [n.id, n.key]));
+    const edges: OntologyGraphEdge[] = [];
+    for (const e of graphSnapshot.edges) {
+      const source = keyById.get(e.sourceNodeId);
+      const target = keyById.get(e.targetNodeId);
+      // nodeLimit 截断后悬空的半边直接丢弃, 不渲染断线
+      if (!source || !target || source === target) continue;
+      edges.push({ key: e.id, source, target, weight: e.weight });
+    }
+    return { nodes, edges };
+  }, [graphSnapshot]);
 
   // 打开域快照详情
   const openDomainDetail = useCallback(
@@ -700,25 +771,95 @@ export function OntologyDomainListScreen({
           </View>
         </View>
 
-        {/* 顶部过滤切换器 */}
+        {/* 图谱/列表双视图切换 (wave329, 两字铁律) */}
         <SegmentedControl
-          value={filter}
-          onChange={(key) => setFilter(key as DomainFilter)}
+          value={domainViewMode}
+          onChange={(key) => setDomainViewMode(key as OntologyDomainViewMode)}
           options={[
-            { key: "all", label: `全部 (${domains.length})` },
-            { key: "active", label: `生产 (${activeCount})` },
-            { key: "draft", label: `草稿 (${draftCount})` },
-            {
-              key: "archived",
-              label: `已归档 (${archivedCount})`,
-              color: archivedCount > 0 ? C.err : undefined,
-            },
+            { key: "graph", label: "图谱" },
+            { key: "list", label: "列表" },
           ]}
-          style={styles.filterSwitcher}
+          style={styles.viewSwitcher}
         />
+
+        {/* 顶部过滤切换器 (仅列表视图, 图谱视图按单域锚定无需过滤) */}
+        {domainViewMode === "list" ? (
+          <SegmentedControl
+            value={filter}
+            onChange={(key) => setFilter(key as DomainFilter)}
+            options={[
+              { key: "all", label: `全部 (${domains.length})` },
+              { key: "active", label: `生产 (${activeCount})` },
+              { key: "draft", label: `草稿 (${draftCount})` },
+              {
+                key: "archived",
+                label: `已归档 (${archivedCount})`,
+                color: archivedCount > 0 ? C.err : undefined,
+              },
+            ]}
+            style={styles.filterSwitcher}
+          />
+        ) : null}
       </View>
 
-      {loading ? (
+      {domainViewMode === "graph" && domains.length > 0 ? (
+        <ScrollView
+          style={styles.container}
+          contentContainerStyle={styles.graphScrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                onRefresh();
+                void loadGraph();
+              }}
+              tintColor={C.accent}
+            />
+          }
+        >
+          {/* 域锚定切换 chips: 图谱随选中域联动 */}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.domainChipRow}
+          >
+            {domains.map((d) => {
+              const active = d.id === selectedDomainId;
+              return (
+                <Pressable
+                  key={d.id}
+                  style={[styles.domainChip, active && styles.domainChipActive]}
+                  onPress={() => setSelectedDomainId(d.id)}
+                  hitSlop={4}
+                  accessibilityLabel={`切换本体域 ${d.display_name || d.slug}`}
+                >
+                  <Text
+                    style={[styles.domainChipText, active && styles.domainChipTextActive]}
+                    numberOfLines={1}
+                  >
+                    {d.display_name || d.displayName || d.slug}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          <OntologyGraphView
+            graph={graphData}
+            loading={graphLoading}
+            error={graphError}
+          />
+
+          {/* 快照计数摘要: 与图谱同源 (graphSnapshot.counts) */}
+          <View style={styles.graphCountsRow}>
+            <Text style={styles.graphCountsText}>
+              节点 {graphSnapshot?.counts?.nodes ?? "--"} · 关系{" "}
+              {graphSnapshot?.counts?.edges ?? "--"} · 类型{" "}
+              {graphSnapshot?.counts?.nodeTypes ?? "--"}
+            </Text>
+          </View>
+        </ScrollView>
+      ) : loading ? (
         <LoadingState text="正在加载业务本体域拓扑…" />
       ) : error ? (
         <ErrorRetry message={error} onRetry={loadDomains} />
@@ -1104,6 +1245,47 @@ const styles = StyleSheet.create({
   },
   filterSwitcher: {
     marginTop: 12,
+  },
+  viewSwitcher: {
+    marginTop: 12,
+  },
+  graphScrollContent: {
+    padding: 16,
+    paddingBottom: 40,
+  },
+  domainChipRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingBottom: 12,
+  },
+  domainChip: {
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: RADIUS.sm,
+    backgroundColor: C.panel,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  domainChipActive: {
+    borderColor: C.accent,
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
+  },
+  domainChipText: {
+    color: C.ink3,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  domainChipTextActive: {
+    color: C.accent,
+    fontWeight: "600",
+  },
+  graphCountsRow: {
+    marginTop: 10,
+    alignItems: "center",
+  },
+  graphCountsText: {
+    color: C.ink4,
+    fontSize: 11,
   },
   listContent: {
     padding: 16,
