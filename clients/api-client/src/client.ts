@@ -160,6 +160,25 @@ export interface SeedDomainSamplesResult {
 }
 
 /**
+ * wave335 — update-node-type 的可改字段 (PATCH /node-types/:nodeTypeId)。
+ * 与 worker `updateNodeTypeMutation` 读取的字段一一对应: `propertyRenames`
+ * 声明被删属性改名去向 (实例值跟随), `allowOrphaned` 是明知会孤儿值时的
+ * 放行开关 — 不给时 store 拒绝该编辑而非静默丢值。
+ */
+export interface UpdateOntologyNodeTypeParams {
+  displayName?: string;
+  /** 传 null 清空。 */
+  description?: string | null;
+  propertiesSchema?: Record<string, unknown>;
+  propertyOrder?: string[];
+  metadata?: Record<string, unknown>;
+  /** { 旧属性名: 新属性名 } — 重命名时既有实例值跟随。 */
+  propertyRenames?: Record<string, string>;
+  /** 允许编辑产生孤儿实例值 (默认拒绝)。 */
+  allowOrphaned?: boolean;
+}
+
+/**
  * URLSearchParams 参数判空 —— wave286-G3 (COOA-43): RN 0.76.5 的 polyfill
  * (`Libraries/Blob/URLSearchParams.js`) 没有 `size` getter, `q.size > 0` 在
  * native 恒为 false, query 从不上 wire (分页/过滤/排序全丢, 空 focus 视图
@@ -1268,6 +1287,176 @@ export class CoolieClient {
       `/api/companies/${encodeURIComponent(companyId)}/ontology/types/${encodeURIComponent(typeId)}/properties`,
       { properties },
     );
+  }
+
+  // ── wave335: 本体域 schema 写入面 (7× create + node-type update) ──
+  //
+  // 走本体插件 HTTP 面 (`/api/plugins/{ONTOLOGY_PLUGIN_ID}/api/*`), 与 web 端
+  // SchemaTab 同一契约: company 从 body 解析, 路由 auth: "board" — 写入需
+  // board 会话。worker 把行包成 { nodeType } / { dataset } 等 key 返回,
+  // 这里统一解包; 兼容未来裸返行。
+
+  /**
+   * 新建对象类型 (board)
+   * POST /api/plugins/paperclipai.plugin-ontology/api/node-types → 201 { nodeType }
+   */
+  async createOntologyNodeType(
+    companyId: string,
+    domainId: string,
+    params: Omit<CreateOntologyNodeTypeInput, "domainId">,
+  ): Promise<OntologyNodeType> {
+    const res = await this.request<{ nodeType?: OntologyNodeType } | OntologyNodeType>(
+      "POST",
+      `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/node-types`,
+      { companyId, domainId, ...params },
+    );
+    if (isRecord(res) && "nodeType" in res && res.nodeType) {
+      return res.nodeType as OntologyNodeType;
+    }
+    return res as OntologyNodeType;
+  }
+
+  /**
+   * 新建关系类型 (board)
+   * POST /api/plugins/paperclipai.plugin-ontology/api/relation-types → 201 { relationType }
+   */
+  async createOntologyRelationType(
+    companyId: string,
+    domainId: string,
+    params: Omit<CreateOntologyRelationTypeInput, "domainId">,
+  ): Promise<OntologyRelationType> {
+    const res = await this.request<{ relationType?: OntologyRelationType } | OntologyRelationType>(
+      "POST",
+      `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/relation-types`,
+      { companyId, domainId, ...params },
+    );
+    if (isRecord(res) && "relationType" in res && res.relationType) {
+      return res.relationType as OntologyRelationType;
+    }
+    return res as OntologyRelationType;
+  }
+
+  /**
+   * 新建函数 (board)
+   * POST /api/plugins/paperclipai.plugin-ontology/api/functions → 201 { function }
+   */
+  async createOntologyFunction(
+    companyId: string,
+    domainId: string,
+    params: Omit<CreateOntologyFunctionInput, "domainId">,
+  ): Promise<OntologyFunction> {
+    const res = await this.request<{ function?: OntologyFunction } | OntologyFunction>(
+      "POST",
+      `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/functions`,
+      { companyId, domainId, ...params },
+    );
+    if (isRecord(res) && "function" in res && res.function) {
+      return res.function as OntologyFunction;
+    }
+    return res as OntologyFunction;
+  }
+
+  /**
+   * 新建接口 (board)
+   * POST /api/plugins/paperclipai.plugin-ontology/api/interfaces → 201 { interface }
+   */
+  async createOntologyInterface(
+    companyId: string,
+    domainId: string,
+    params: Omit<CreateOntologyInterfaceInput, "domainId">,
+  ): Promise<OntologyInterface> {
+    const res = await this.request<{ interface?: OntologyInterface } | OntologyInterface>(
+      "POST",
+      `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/interfaces`,
+      { companyId, domainId, ...params },
+    );
+    if (isRecord(res) && "interface" in res && res.interface) {
+      return res.interface as OntologyInterface;
+    }
+    return res as OntologyInterface;
+  }
+
+  /**
+   * 新建数据集 (board)
+   * POST /api/plugins/paperclipai.plugin-ontology/api/datasets → 201 { dataset }
+   */
+  async createOntologyDataset(
+    companyId: string,
+    domainId: string,
+    params: Omit<CreateOntologyDatasetInput, "domainId">,
+  ): Promise<OntologyDataset> {
+    const res = await this.request<{ dataset?: OntologyDataset } | OntologyDataset>(
+      "POST",
+      `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/datasets`,
+      { companyId, domainId, ...params },
+    );
+    if (isRecord(res) && "dataset" in res && res.dataset) {
+      return res.dataset as OntologyDataset;
+    }
+    return res as OntologyDataset;
+  }
+
+  /**
+   * 新建连接器 (board)
+   * POST /api/plugins/paperclipai.plugin-ontology/api/connectors → 201 { connector }
+   */
+  async createOntologyConnector(
+    companyId: string,
+    domainId: string,
+    params: Omit<CreateOntologyConnectorInput, "domainId">,
+  ): Promise<OntologyConnector> {
+    const res = await this.request<{ connector?: OntologyConnector } | OntologyConnector>(
+      "POST",
+      `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/connectors`,
+      { companyId, domainId, ...params },
+    );
+    if (isRecord(res) && "connector" in res && res.connector) {
+      return res.connector as OntologyConnector;
+    }
+    return res as OntologyConnector;
+  }
+
+  /**
+   * 新建转换 (board)
+   * POST /api/plugins/paperclipai.plugin-ontology/api/transforms → 201 { transform }
+   */
+  async createOntologyTransform(
+    companyId: string,
+    domainId: string,
+    params: Omit<CreateOntologyTransformInput, "domainId">,
+  ): Promise<OntologyTransform> {
+    const res = await this.request<{ transform?: OntologyTransform } | OntologyTransform>(
+      "POST",
+      `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/transforms`,
+      { companyId, domainId, ...params },
+    );
+    if (isRecord(res) && "transform" in res && res.transform) {
+      return res.transform as OntologyTransform;
+    }
+    return res as OntologyTransform;
+  }
+
+  /**
+   * 更新对象类型 (board) — worker 按 nodeTypeId 定位 (domainId 仅供请求
+   * 语义完整, 服务端不读)。`propertyRenames` 不给时, 删属性产生的孤儿
+   * 实例值会被 store 拒绝, 除非 `allowOrphaned: true`。
+   * PATCH /api/plugins/paperclipai.plugin-ontology/api/node-types/:typeId → { nodeType }
+   */
+  async updateOntologyNodeType(
+    companyId: string,
+    domainId: string,
+    typeId: string,
+    params: UpdateOntologyNodeTypeParams,
+  ): Promise<OntologyNodeType> {
+    const res = await this.request<{ nodeType?: OntologyNodeType } | OntologyNodeType>(
+      "PATCH",
+      `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/node-types/${encodeURIComponent(typeId)}`,
+      { companyId, domainId, ...params },
+    );
+    if (isRecord(res) && "nodeType" in res && res.nodeType) {
+      return res.nodeType as OntologyNodeType;
+    }
+    return res as OntologyNodeType;
   }
 
   /**
