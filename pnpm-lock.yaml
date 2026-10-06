@@ -187,8 +187,8 @@ importers:
         specifier: ~3.16.1
         version: 3.16.7(@babel/core@7.29.7)(react-native@0.76.5(@babel/core@7.29.7)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
       react-native-svg:
-        specifier: 15.8.0
-        version: 15.8.0(react-native@0.76.5(@babel/core@7.29.7)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
+        specifier: 15.11.0
+        version: 15.11.0(react-native@0.76.5(@babel/core@7.29.7)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
       react-native-webview:
         specifier: ~14.0.1
         version: 14.0.1(react-native@0.76.5(@babel/core@7.29.7)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1)
@@ -10930,8 +10930,8 @@ packages:
       react: '*'
       react-native: '*'
 
-  react-native-svg@15.8.0:
-    resolution: {integrity: sha512-KHJzKpgOjwj1qeZzsBjxNdoIgv2zNCO9fVcoq2TEhTRsVV5DGTZ9JzUZwybd7q4giT/H3RdtqC3u44dWdO0Ffw==}
+  react-native-svg@15.11.0:
+    resolution: {integrity: sha512-IJN0wcGHXpCbi7+TUgnjrPJTmk70t2IsEgyqCp/6x4Sy/PXz0+dB75jyUnPC0JZ1oTN1FsxnJEZChDMmhs6tzw==}
     peerDependencies:
       react: '*'
       react-native: '*'
@@ -22838,7 +22838,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  react-native-svg@15.8.0(react-native@0.76.5(@babel/core@7.29.7)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1):
+  react-native-svg@15.11.0(react-native@0.76.5(@babel/core@7.29.7)(@types/react@18.3.31)(react@18.3.1))(react@18.3.1):
     dependencies:
       css-select: 5.2.2
       css-tree: 1.1.3
