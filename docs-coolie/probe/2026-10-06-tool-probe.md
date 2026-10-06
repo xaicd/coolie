@@ -5,7 +5,7 @@
 > 才算 OK; 超时 30s = FAIL. 替换 wave277 静态 --version.
 > 真值表见 [docs-coolie/TOOLS.md](../TOOLS.md) §2.
 
-- 探测时间: `2026-10-06 08:00:00 CST`
+- 探测时间: `2026-10-06 21:21:30 CST`
 - 探测脚本: `scripts/daily-tool-probe.sh` (wave279)
 - 探测方式: 真跑 `-p '回复 OK'`
 - 超时: 30s/工具; 性能 OK 阈值: <5s
@@ -14,54 +14,22 @@
 
 | 工具 | 路径 | 真跑探测 | 响应时间 | 响应结果 | 状态 |
 |---|---|---|---|---|---|
-| agy-gemini3.8 | `docker:agy-ubuntu-container` | `docker exec agy-ubuntu-container agy -p '回复 OK'` | - | FAIL 容器未运行 (inspect=) | **FAIL** |
-| claude-mm | `(not in PATH)` | `claude -p '回复 OK'` | - | FAIL binary not in PATH | **FAIL** |
-| claude-glm | `(not in PATH)` | `ANTHROPIC_MODEL=glm-5 claude -p '回复 OK'` | - | FAIL binary not in PATH | **FAIL** |
-| cmd | `(not in PATH)` | `cmd -p '回复 OK'` | - | FAIL binary not in PATH | **FAIL** |
-| copilot | `(not in PATH)` | `copilot -p '回复 OK'` | - | FAIL binary not in PATH | **FAIL** |
-| Hermes | `Hermes (PM 工具: kiro-cli; 本会话响应)` | `5 字段汇报 (cron-team-status.sh)` | <1s | OK Hermes 响应 + dispatch-wave277.sh 存在 | **OK** |
+| agy-gemini3.8 | `docker:agy-ubuntu-container (容器内 agy-gemini3.8)` | `docker exec agy-ubuntu-container agy -p '回复 OK'` | 16s | OK OK | **OK** |
+| claude-mm | `/opt/homebrew/bin/claude` | `ln -sf ~/.claude/settings.jsonmm ~/.claude/settings.json && claude -p '回复 OK'` | 6s | OK "MiniMax-M3" isn't described by this ver | **OK** |
+| claude-glm | `/opt/homebrew/bin/claude` | `ln -sf ~/.claude/settings.jsonglm ~/.claude/settings.json && claude -p '回复 OK'` | 7s | OK [claude-code:unrecognized_model] {"model | **OK** |
+| cmd | `/opt/homebrew/bin/cmd` | `cmd -p '回复 OK'` | 7s | OK OK | **OK** |
+| copilot | `/opt/homebrew/bin/copilot` | `copilot -p '回复 OK'` | 18s | FAIL (empty) | **FAIL** |
+| Hermes | `Hermes (PM 主调度中枢, 人即工具)` | `调度脚本 (dispatch-local-employee.sh)` | <1s | OK Hermes 调度中枢在线 | **OK** |
 | kiro-cli | `(not in PATH)` | `kiro-cli -p '回复 OK'` | - | FAIL binary not in PATH | **FAIL** |
 
 ## 2. 失败修法 (按工具)
 
-### agy-gemini3.8 → FAIL
-
-- 路径: `docker:agy-ubuntu-container`
-- 真跑探测: `docker exec agy-ubuntu-container agy -p '回复 OK'`
-- 响应时间: -
-- 响应结果: FAIL 容器未运行 (inspect=)
-  → 修法: docker start agy-ubuntu-container; 或 docker run -d --name agy-ubuntu-container chw717/ai-agy:latest-arm64
-
-### claude-mm → FAIL
-
-- 路径: `(not in PATH)`
-- 真跑探测: `claude -p '回复 OK'`
-- 响应时间: -
-- 响应结果: FAIL binary not in PATH
-  → 修法: brew install --cask claude-code 或重装 /opt/homebrew/bin/claude; 检查 ANTHROPIC_API_KEY
-
-### claude-glm → FAIL
-
-- 路径: `(not in PATH)`
-- 真跑探测: `ANTHROPIC_MODEL=glm-5 claude -p '回复 OK'`
-- 响应时间: -
-- 响应结果: FAIL binary not in PATH
-  → 修法: brew install --cask claude-code 或重装 /opt/homebrew/bin/claude; 检查 ANTHROPIC_API_KEY
-
-### cmd → FAIL
-
-- 路径: `(not in PATH)`
-- 真跑探测: `cmd -p '回复 OK'`
-- 响应时间: -
-- 响应结果: FAIL binary not in PATH
-  → 修法: npm i -g @commandcode/ai 或重装 /opt/homebrew/bin/cmd
-
 ### copilot → FAIL
 
-- 路径: `(not in PATH)`
+- 路径: `/opt/homebrew/bin/copilot`
 - 真跑探测: `copilot -p '回复 OK'`
-- 响应时间: -
-- 响应结果: FAIL binary not in PATH
+- 响应时间: 18s
+- 响应结果: FAIL (empty)
   → 修法: brew install copilot-cli 或 npm i -g @github/copilot; 月度配额跑 scripts/cron-copilot-reset.sh
 
 ### kiro-cli → FAIL

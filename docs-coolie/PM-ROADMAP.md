@@ -17,7 +17,7 @@
 |---|---|---|---|---|
 | **门神**（cmd）| `commandcode` CLI | 180s | `clients/expo/**` + `clients/api-client/**` + Android 构建 + 发版脚本 + keystore | 装机敏感（速率限制）|
 | **铁匠**（claude）| `claude -p` | 30s | `server/**` + `tests/**` + 安全 + e2e | sandbox 限制（要 commit 需在外面）|
-| **墨斗**（agy）| Gemini 配额 | 待 09-23 | 模型调用 + 远端容器 | 等配额恢复 |
+| **墨斗**（agy）| Gemini 3.8 / ACP | 30s | 选型研判 + 原型设计 + 架构规划 | ✅ 正常可用 (docker 容器 + ACP打通) |
 | **匠人副炉**（mm）| Claude Sonnet | 待派 | 与铁匠并行 | 备用 |
 | **掌柜**（Hermes 自己）| — | — | `docs-coolie/**` + 路线图 + 派单规则 + 验收 + 老板对话 | 派单 + 验证 + 文档 |
 

@@ -68,15 +68,37 @@ EOF
 }
 
 list_all() {
+  local lib_env="$REPO_ROOT/scripts/lib/env-detector.sh"
+  if [[ -f "$lib_env" ]]; then
+    # shellcheck source=scripts/lib/env-detector.sh
+    source "$lib_env"
+  fi
+
   echo "═══ 7 工具池 (wave272 拍板) ═══"
-  printf "%-3s %-15s %-30s %-12s %s\n" "#" "工具" "默认员工" "状态" "可执行 (which)"
-  echo "----------------------------------------------------------------"
+  printf "%-3s %-15s %-30s %-12s %s\n" "#" "工具" "默认员工" "状态" "物理宿主 / 驱动模式"
+  echo "----------------------------------------------------------------------------------------"
   local i=1
   for row in "${TOOLS[@]}"; do
     IFS='|' read -r name cli emp status <<<"$row"
     local bin=""
-    if command -v "$cli" >/dev/null 2>&1; then
+    if [[ "$name" =~ agy ]]; then
+      IFS=$'\t' read -r s lat d <<< "$(smart_probe_artisan_tool agy-gemini3.8)"
+      bin="$d"
+    elif [[ "$name" =~ claude-glm ]]; then
+      IFS=$'\t' read -r s lat d <<< "$(smart_probe_claude glm)"
+      bin="$d"
+    elif [[ "$name" =~ claude-mm ]]; then
+      IFS=$'\t' read -r s lat d <<< "$(smart_probe_claude mm)"
+      bin="$d"
+    elif [[ "$name" == "Hermes" ]]; then
+      IFS=$'\t' read -r s lat d <<< "$(smart_probe_hermes)"
+      bin="$d"
+    elif [[ "$name" == "kiro-cli" ]]; then
+      bin="老板专属保留 (未放入全局 PATH)"
+    elif command -v "$cli" >/dev/null 2>&1; then
       bin="$(command -v "$cli")"
+    elif [[ -x "$REPO_ROOT/scripts/host-exec.sh" ]] && res="$("$REPO_ROOT/scripts/host-exec.sh" "command -v $cli" 2>/dev/null)" && [[ -n "$res" ]]; then
+      bin="$res"
     else
       bin="(未安装)"
     fi

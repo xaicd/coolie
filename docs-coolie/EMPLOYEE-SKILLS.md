@@ -212,9 +212,9 @@
     ops-task-orchestration, ota-*, apk-installation-cache, ...
 ```
 
-### 1.4 墨斗 (Inkstick / `fda`) — **agy (Gemini 3.8 按量, wave236 恢复) + cmd 紧急兜底**
+### 1.4 墨斗 (Inkstick / `fda`) — **agy (Gemini 3.8 / ACP 打通, 正常可用) + cmd 紧急兜底**
 
-**岗位**: 选型研判 + 原型 + 画图 + 竞品分析 + License 扫描 (Phase 1.1/1.2/1.3/1.4). **wave236 恢复**: agy 2026-09-23 配额耗尽, ~7 天后 2026-09-30 配额恢复, 墨斗默认切回 agy (老板原话 "agy 恢复了应该可以用"). 偶尔用 cmd (`@commandcode/ai`) 作为紧急兜底.
+**岗位**: 选型研判 + 原型 + 画图 + 竞品分析 + License 扫描 (Phase 1.1/1.2/1.3/1.4). **当前状态**: agy Gemini 3.8 跑在 Docker 容器 `agy-ubuntu-container` 中，ACP 适配器已打通，墨斗默认使用 agy。偶尔用 cmd (`@commandcode/ai`) 作为紧急兜底.
 
 | Skill | 路径 | 状态 | P | 使用场景 |
 |---|---|---|---|---|
@@ -246,9 +246,7 @@
 ~/.cmd/skills/    (紧急兜底; wave236 起, 墨斗偶尔切 cmd)
 ```
 
-> **agy 现状 (wave236)**: agy 2026-09-30 ~7 天后配额恢复 (2026-09-23 耗尽), **墨斗默认切回 agy**
-> (老板原话 "agy 恢复了应该可以用"). agy CLI 仍不像 Claude Code 自动从 `~/.agy/skills/` 加载,
-> fda skill 内容直接走 prompt, 不靠软链. 偶尔用 cmd 作为紧急兜底 (老板原话 "偶尔用 cmd").
+> **agy 现状 (wave357)**: agy Gemini 3.8 跑在 Docker 容器 `agy-ubuntu-container`，ACP 协议已打通，实测真跑 OK，**墨斗默认使用 agy**。偶尔用 cmd 作为紧急兜底。
 
 ### 1.5 百晓生 (Sage / `ds`) — **claude-mm 主 (wave234 起), claude-glm 备用, claude-ds 按量, copilot 限**
 

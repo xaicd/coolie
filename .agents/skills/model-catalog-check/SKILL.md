@@ -24,7 +24,7 @@ Claude Code 用 MiniMax-M3 → 自动 catalog 错误 → turn 被吞掉 → 空�
 | CLI | 推荐 model | 真值 |
 |---|---|---|
 | **cmd (1.58.1)** | 任意 | ✅ cmd 用自家 catalog，不撞 Anthropic 枚举 |
-| **agy (容器)** | Gemini 官方 | ✅ 但 agy 09-23 恢复前不可用 |
+| **agy (容器)** | Gemini 官方 (Gemini 3.8) | ✅ 正常可用 (docker 容器 agy-ubuntu-container, ACP协议已打通) |
 | **claude (铁匠)** | Claude 官方 | ❌ 我们用 MiniMax-M3 会撞 |
 | **claude + settings.json override** | 任意 | ⚠️ 可能能 map 但不稳定 |
 
@@ -35,7 +35,7 @@ Claude Code 用 MiniMax-M3 → 自动 catalog 错误 → turn 被吞掉 → 空�
 
 if cmd: 直接派 (model catalog 不会撞)
 if claude: 必须用 Claude 官方 model (claude-3-5-sonnet-...); 不派 MiniMax-M3 / GLM 任务
-if agy: 等 09-23 恢复后再说
+if agy: 正常派 (墨斗 FDA 默认工具，已打通 ACP 驱动与 docker 宿主映射)
 ```
 
 ## 5. fallback
@@ -55,7 +55,7 @@ PM 拍板：**以后 Coolie fork 默认派 cmd，不用 claude。** claude 只�
 `~/.hermes/skills/autonomous-ai-agents/ai-workshop-dispatch` 的匠人映射要更新：
 - cmd → 优先 (1.58.1)
 - claude → 备用（仅 Claude 官方 model 任务）
-- agy → 等 09-23 恢复
+- agy → 正常可用 (墨斗 FDA 默认工具，已打通 ACP)
 
 ## 7. 实操流程
 
