@@ -212,15 +212,30 @@ export function OntologyDomainListScreen({
 
   // 拉取选中域的控制面图谱 (wave337: api-client getOntologyGraph, 与 web 端
   // ontologyGraphApi.graph 同一端点; 返回 OntologyGraphResponse:
-  // root/depth/view/truncated/nodes/edges)
+  // root/depth/view/truncated/nodes/edges)。
+  // wave339 修 rootId 不匹配: 服务端按 (type=project, 业务行 id) 拼根键
+  // BFS, 域 id (ontology_domains) 与 project id 不在同一 id 空间, 直接拿
+  // selectedDomainId 当 rootId 只会得到空图。先经 listOntologyInstances
+  // (entityType=project; 该接口按 company 圈定, 无域过滤参数) 换出真实
+  // project 实例 id 再锚定; 公司没有任何 project 实例时直接置空态,
+  // 不发 graph 请求。
   const loadGraph = useCallback(async () => {
     if (!selectedDomainId) return;
     setGraphLoading(true);
     setGraphError(null);
     try {
+      const { instances } = await coolie.listOntologyInstances(companyId, {
+        entityType: "project",
+        limit: 1,
+      });
+      const rootId = instances[0]?.id;
+      if (!rootId) {
+        setGraphSnapshot(null);
+        return;
+      }
       const snap = await coolie.getOntologyGraph(companyId, {
         rootType: "project",
-        rootId: selectedDomainId,
+        rootId,
         view: "project_tree",
         depth: 2,
       });
