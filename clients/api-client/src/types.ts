@@ -1463,3 +1463,244 @@ export interface UnlinkOntologyResourceInput {
   resourceId: string;
 }
 
+// --- wave333: web 本体插件全能力对齐 (ontology plugin worker 全列) ---
+//
+// 行形状镜像 `@paperclipai/ontology-core` GraphStore 的 *Row 接口
+// (HTTP 面按数据库蛇形列名返回); `OntologyDomain` 一样保留 camelCase
+// 冗余位, 因为 domain-detail 数据面会补挂 propertiesSchema/propertyOrder。
+
+export interface OntologyNodeType {
+  id: string;
+  company_id?: string;
+  domain_id: string;
+  key: string;
+  display_name: string;
+  description?: string | null;
+  layer?: string;
+  properties_schema?: Record<string, unknown> | null;
+  /** domain-detail / list-node-types 数据面附加的驼峰镜像。 */
+  propertiesSchema?: Record<string, unknown> | null;
+  property_order?: string[] | null;
+  propertyOrder?: string[] | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface OntologyRelationType {
+  id: string;
+  company_id?: string;
+  domain_id: string;
+  key: string;
+  display_name: string;
+  description?: string | null;
+  directed?: boolean;
+  cardinality?: string;
+  metadata?: Record<string, unknown> | null;
+}
+
+export interface OntologyActionType {
+  id: string;
+  company_id?: string;
+  domain_id: string;
+  key: string;
+  display_name: string;
+  description?: string | null;
+  kind?: string;
+  applies_to_node_type_id?: string | null;
+  idempotent?: boolean;
+  status?: string;
+}
+
+export interface OntologyFunction {
+  id: string;
+  company_id?: string;
+  domain_id: string;
+  name: string;
+  type?: string;
+  version?: string;
+  description?: string | null;
+  status?: string;
+}
+
+export interface OntologyInterface {
+  id: string;
+  company_id?: string;
+  domain_id: string;
+  key: string;
+  display_name: string;
+  description?: string | null;
+}
+
+export interface OntologyDataset {
+  id: string;
+  company_id?: string;
+  domain_id: string;
+  key: string;
+  name: string;
+  format?: string;
+  current_version?: number;
+  lifecycle_state?: string;
+}
+
+export interface OntologyConnector {
+  id: string;
+  company_id?: string;
+  domain_id: string;
+  key: string;
+  name: string;
+  connector_type?: string;
+  dataset_id?: string | null;
+  status?: string;
+}
+
+export interface OntologyTransform {
+  id: string;
+  company_id?: string;
+  domain_id: string;
+  key: string;
+  name: string;
+  transform_type?: string;
+  output_dataset_id?: string | null;
+  status?: string;
+  version?: number;
+}
+
+/** 运行/部署架构视角的服务行 (domain-detail 的 `services`)。 */
+export interface OntologySubProject {
+  id: string;
+  company_id?: string;
+  business_system_id: string;
+  name: string;
+  code: string;
+  type?: string;
+  status?: string;
+  microservice_layer?: string | null;
+  tech_stack?: string[] | null;
+  dependencies?: unknown[] | null;
+  metadata?: Record<string, unknown> | null;
+}
+
+/** 宿主项目下拉 (company-projects 数据面)。 */
+export interface OntologyCompanyProject {
+  id: string;
+  name: string;
+  description: string | null;
+  status: string;
+}
+
+/** domain-detail 数据面的聚合返回。 */
+export interface OntologyDomainDetail {
+  domain: OntologyDomain | null;
+  nodeTypes: OntologyNodeType[];
+  relationTypes: OntologyRelationType[];
+  services: OntologySubProject[];
+  graph: OntologyGraphSnapshot;
+}
+
+// --- wave333: 创建入参 (与 worker mutation 接收字段一一对应) ---
+
+export interface CreateOntologyNodeTypeInput {
+  domainId: string;
+  key: string;
+  displayName: string;
+  description?: string;
+  layer?: string;
+  propertiesSchema?: Record<string, unknown>;
+  propertyOrder?: string[];
+  metadata?: Record<string, unknown>;
+}
+
+export interface CreateOntologyRelationTypeInput {
+  domainId: string;
+  key: string;
+  displayName: string;
+  description?: string;
+  directed?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
+export interface CreateOntologyFunctionInput {
+  domainId: string;
+  name: string;
+  type?: string;
+  version?: string;
+  description?: string;
+  inputSchema?: Record<string, unknown>;
+  outputSchema?: Record<string, unknown>;
+  implementation?: Record<string, unknown>;
+  permissions?: Record<string, unknown>;
+}
+
+export interface CreateOntologyInterfaceInput {
+  domainId: string;
+  key: string;
+  displayName: string;
+  description?: string;
+  propertiesSchema?: Record<string, unknown>;
+  extendsInterfaces?: string[];
+}
+
+export interface CreateOntologyDatasetInput {
+  domainId: string;
+  key: string;
+  name: string;
+  description?: string;
+  format?: string;
+  dataSchema?: Record<string, unknown>;
+  storageConfig?: Record<string, unknown>;
+  syncConfig?: Record<string, unknown>;
+}
+
+export interface CreateOntologyConnectorInput {
+  domainId: string;
+  key: string;
+  name: string;
+  connectorType: string;
+  datasetId?: string | null;
+  config?: Record<string, unknown>;
+  syncSchedule?: string | null;
+  syncStrategy?: string | null;
+}
+
+export interface CreateOntologyTransformInput {
+  domainId: string;
+  key: string;
+  name: string;
+  description?: string;
+  transformType?: string;
+  inputDatasetIds?: string[];
+  outputDatasetId?: string | null;
+  code?: string;
+  config?: Record<string, unknown>;
+}
+
+/** import-architecture 动作: 把扫描产物落到 sub-projects (按 code 幂等更新)。 */
+export interface ImportOntologyArchitectureInput {
+  businessSystemId: string;
+  services?: unknown[];
+  dependencies?: unknown[];
+}
+
+export interface OntologyArchitectureImportResult {
+  created: number;
+  updated: number;
+  total: number;
+}
+
+/** suggest-ontology-domains 动作的候选域信号。 */
+export interface SuggestOntologyDomainsInput {
+  projectId?: string;
+  projectName?: string;
+  projectRef?: string;
+  repoName?: string;
+}
+
+export interface OntologyDomainSuggestion {
+  signals: string[];
+  candidates: Array<{
+    domain: { id: string; slug: string; display_name: string };
+    score: number;
+    reason: string;
+    recommended: boolean;
+  }>;
+}
+
