@@ -46,8 +46,8 @@
     {
       "path": "scripts/fork-surface.json",
       "maxNetLines": 260,
-      "reason": "This manifest itself, and entirely ours — it does not exist upstream. It sits under scripts/ only because that is where the gate is wired (package.json and check-testing-defenses.mjs call it), and that path prefix is the only reason the gate asks about it. The budget is loose on purpose: the file grows by one entry per upstream file we intentionally change, and that growth is the file working, not creep. Raised from 360 when the ontology-spec workflow and the DSH/coolie-native adapters were declared in one batch; raised again to 900 for the wave132 defect feature, whose one hand-written migration carries a ~48k-line generated drizzle snapshot. Raised to 1100 for wave148 (工坊多对话), which declares three new files and raises four budgets. Raised to 1300 for wave284 (多工具与门禁账本体系加固).",
-      "maxTotalLines": 1300
+      "reason": "This manifest itself, and entirely ours — it does not exist upstream. It sits under scripts/ only because that is where the gate is wired (package.json and check-testing-defenses.mjs call it), and that path prefix is the only reason the gate asks about it. The budget is loose on purpose: the file grows by one entry per upstream file we intentionally change, and that growth is the file working, not creep. Raised from 360 when the ontology-spec workflow and the DSH/coolie-native adapters were declared in one batch; raised again to 900 for the wave132 defect feature, whose one hand-written migration carries a ~48k-line generated drizzle snapshot. Raised to 1100 for wave148 (工坊多对话), which declares three new files and raises four budgets. Raised to 1300 for wave284 (多工具与门禁账本体系加固). Raised to 1600 for wave357 (ACP 与员工资产规范).",
+      "maxTotalLines": 1600
     },
     {
       "path": "ui/index.html",
@@ -1404,6 +1404,18 @@
       "maxNetLines": 15,
       "reason": "wave357: Antigravity Docker ACP 启动入口。",
       "maxTotalLines": 20
+    },
+    {
+      "path": "scripts/init-local-workshop.mjs",
+      "maxNetLines": 50,
+      "reason": "wave357: 本地工坊初始化与标准数字员工角色自动创建脚本。",
+      "maxTotalLines": 200
+    },
+    {
+      "path": "scripts/seed-agent-roles.ts",
+      "maxNetLines": 100,
+      "reason": "wave357: 平台核心数字员工角色契约、中文简称、CMMI 头衔与 ACP 状态重置脚本。",
+      "maxTotalLines": 280
     }
   ]
 }

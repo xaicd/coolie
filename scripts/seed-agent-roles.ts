@@ -29,7 +29,10 @@ import { agents } from "../packages/db/src/schema/agents.js";
 import { resolveMigrationConnection } from "../packages/db/src/migration-runtime.js";
 
 interface RoleProfile {
+  canonicalName?: string;
+  role: string;
   roleLabel: string;
+  title: string;
   responsibilities: string[];
   /** 中文 2 字 skill (wave258) — 跟英文 cli 工具拆开. */
   skills: string[];
@@ -48,8 +51,11 @@ const MATCHERS: NameMatcher[] = [
   {
     match: (n) => /hermes/i.test(n),
     profile: {
+      canonicalName: "Hermes",
+      role: "pm",
       roleLabel: "PM",
-      responsibilities: ["调度派活", "验收交付", "汇总报告"],
+      title: "项目总调度掌柜",
+      responsibilities: ["调度派活", "验收交付", "汇总报告", "CMMI阶段管理"],
       skills: ["派活", "验收", "报告", "调度", "评审", "复盘", "立项", "文档"],
       tools: ["agy", "claude-glm"],
     },
@@ -57,35 +63,47 @@ const MATCHERS: NameMatcher[] = [
   {
     match: (n) => /铁匠贰号|forge-2|forgetwo|forge2/i.test(n),
     profile: {
+      canonicalName: "铁匠贰号",
+      role: "core-swe",
       roleLabel: "Core SWE",
+      title: "代码开发兜底",
       responsibilities: ["代码开发兜底", "PR 评审", "Bug 修复"],
       skills: ["编码", "重构", "修复", "测试", "联调", "文档", "评审", "设计"],
       tools: ["claude-mm", "cmd"],
     },
   },
   {
-    match: (n) => /铁匠|forger|forge/i.test(n),
+    match: (n) => /铁匠|forger|forge|core-swe/i.test(n),
     profile: {
+      canonicalName: "铁匠",
+      role: "core-swe",
       roleLabel: "Core SWE",
-      responsibilities: ["代码开发主力", "功能实现", "PR 主写"],
+      title: "平台核心研发",
+      responsibilities: ["代码开发主力", "功能实现", "PR 主写", "缺陷修复"],
       skills: ["编码", "重构", "测试", "修复", "联调", "文档", "设计", "评审"],
-      tools: ["cmd", "claude-mm"],
+      tools: ["cmd", "claude-mm", "claude-glm"],
     },
   },
   {
-    match: (n) => /门神|gatekeeper|gate/i.test(n),
+    match: (n) => /门神|gatekeeper|gate|fdse/i.test(n),
     profile: {
+      canonicalName: "门神",
+      role: "fdse",
       roleLabel: "FDSE",
-      responsibilities: ["自动化脚本", "命令编排", "部署执行"],
+      title: "前线部署工程师",
+      responsibilities: ["自动化脚本", "命令编排", "部署执行", "端到端联调"],
       skills: ["命令", "脚本", "自动化", "部署", "联调", "测试", "调研", "文档"],
       tools: ["cmd", "claude-mm"],
     },
   },
   {
-    match: (n) => /墨斗|mockr|mockup|agy/i.test(n),
+    match: (n) => /墨斗|mockr|mockup|agy|fda/i.test(n),
     profile: {
+      canonicalName: "墨斗",
+      role: "fda",
       roleLabel: "FDA",
-      responsibilities: ["画原型", "选型研判", "License 梳理"],
+      title: "前线架构师",
+      responsibilities: ["画原型", "选型研判", "License 梳理", "本体域规划"],
       skills: ["调研", "画图", "选型", "研判", "文档", "设计", "立项", "规划"],
       tools: ["agy", "claude-glm"],
     },
@@ -93,8 +111,11 @@ const MATCHERS: NameMatcher[] = [
   {
     match: (n) => /兑底渊|duidi|sre|pre-sre|presre/i.test(n),
     profile: {
+      canonicalName: "兑底渊",
+      role: "pre-sre",
       roleLabel: "PRE-SRE",
-      responsibilities: ["部署运维", "监控告警", "故障恢复"],
+      title: "产品可靠性专家",
+      responsibilities: ["部署运维", "监控告警", "故障恢复", "发版门禁守护"],
       skills: ["部署", "运维", "监控", "应急", "自动化", "脚本", "命令", "风控"],
       tools: ["cmd", "claude-mm"],
     },
@@ -103,7 +124,10 @@ const MATCHERS: NameMatcher[] = [
   {
     match: (n) => /百晓生|sage|ds-agent|ds_/i.test(n),
     profile: {
+      canonicalName: "百晓生",
+      role: "ds",
       roleLabel: "DS",
+      title: "部署战略与方案专家",
       responsibilities: ["数据决策", "测试验收", "风险评估", "复盘总结"],
       skills: ["数据", "分析", "报告", "测试", "验收", "复盘", "风控", "评审"],
       tools: ["claude-mm", "claude-glm"],
@@ -121,7 +145,9 @@ function profileFor(name: string): RoleProfile {
     if (m.match(name)) return m.profile;
   }
   return {
+    role: "general",
     roleLabel: "通用",
+    title: "通用数字员工",
     responsibilities: ["通用执行"],
     skills: [],
     tools: [],
@@ -156,17 +182,29 @@ async function main() {
   for (const row of rows) {
     const profile = profileFor(row.name);
     if (dryRun) {
-      console.log(`  [dry-run] ${row.name} -> ${profile.roleLabel} skills=[${profile.skills.join("/")}] tools=[${profile.tools.join("/")}]`);
+      console.log(`  [dry-run] ${row.name} -> ${profile.canonicalName || row.name} (${profile.title}) ${profile.roleLabel} skills=[${profile.skills.join("/")}] tools=[${profile.tools.join("/")}]`);
       continue;
     }
+    const updateValues: Record<string, unknown> = {
+      roleLabel: profile.roleLabel,
+      responsibilities: profile.responsibilities,
+      skills: profile.skills,
+      tools: profile.tools,
+      status: "idle",
+    };
+    if (profile.title) {
+      updateValues.title = profile.title;
+    }
+    if (profile.role) {
+      updateValues.role = profile.role;
+    }
+    if (profile.canonicalName) {
+      updateValues.name = profile.canonicalName;
+    }
+
     await db
       .update(agents)
-      .set({
-        roleLabel: profile.roleLabel,
-        responsibilities: profile.responsibilities,
-        skills: profile.skills,
-        tools: profile.tools,
-      })
+      .set(updateValues)
       .where(eq(agents.id, row.id));
     updated += 1;
   }
