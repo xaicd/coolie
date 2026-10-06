@@ -1,0 +1,28 @@
+═══ Coolie 标准化 ACP (Agent Client Protocol) 调度矩阵 ═══
+工具          ACP 启动脚本                     acpx 驱动命令
+-------------------------------------------------------------------------------------------------
+docker agy      scripts/adapters/docker-agy-acp.sh   acpx --agent scripts/adapters/docker-agy-acp.sh "..."
+cmd             scripts/adapters/cmd-acp.sh          acpx --agent scripts/adapters/cmd-acp.sh "..."
+copilot         scripts/adapters/copilot-acp.sh      acpx copilot "..."
+codex           scripts/adapters/codex-acp.sh        acpx codex "..."
+claude-mm       scripts/adapters/claude-mm-acp.sh    acpx claude "..." (MiniMax Profile)
+claude-glm      scripts/adapters/claude-glm-acp.sh   acpx claude "..." (GLM Profile)
+-------------------------------------------------------------------------------------------------
+技术基石: 基于 JSON-RPC 2.0 stdio 结构化流式传输，彻底消灭 PTY 终端刮取与挂死
+出处与完整手册: docs-coolie/TOOLS.md §8
+---
+$ acpx --version
+0.13.1
+$ docker inspect agy-ubuntu-container
+true 2026-09-25T13:45:24.237091226Z
+$ bash -n dispatch-local-employee.sh && adapters executable check
+dispatch syntax OK
+total 80
+-rwxr-xr-x claude-glm-acp.sh
+-rwxr-xr-x claude-mm-acp.sh
+-rwxr-xr-x cmd-acp.mjs
+-rwxr-xr-x cmd-acp.sh
+-rwxr-xr-x codex-acp.sh
+-rwxr-xr-x copilot-acp.sh
+-rwxr-xr-x docker-agy-acp.mjs
+-rwxr-xr-x docker-agy-acp.sh

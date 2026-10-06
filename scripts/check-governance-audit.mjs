@@ -191,6 +191,83 @@ assertRule(
   '防退化测试文件缺失',
 );
 
+// -----------------------------------------------------------------------------
+// 9. wave357 标准 ACP 调度协议栈防退化守卫 (架构设计: docs-coolie/specs/2026-10-06-wave357-acp-dispatch-architecture.md)
+// -----------------------------------------------------------------------------
+console.log('\n🔌 9. wave357 标准 ACP (Agent Client Protocol) 调度协议栈防退化守卫:');
+const ACP_ADAPTER_LAUNCHERS = [
+  'scripts/adapters/docker-agy-acp.sh',
+  'scripts/adapters/cmd-acp.sh',
+  'scripts/adapters/claude-mm-acp.sh',
+  'scripts/adapters/claude-glm-acp.sh',
+  'scripts/adapters/copilot-acp.sh',
+  'scripts/adapters/codex-acp.sh',
+];
+const adapterLaunchersOk = ACP_ADAPTER_LAUNCHERS.every((p) => {
+  try {
+    fs.accessSync(p, fs.constants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+});
+assertRule(
+  'R1_适配器族: 6 大 ACP 适配器启动脚本存在且可执行',
+  adapterLaunchersOk,
+  '适配器文件缺失或丢失可执行位: scripts/adapters/*.sh',
+);
+
+const acpRoutesOk = ['docker-agy-acp.sh', 'cmd-acp.sh', 'claude-mm-acp.sh', 'claude-glm-acp.sh', 'copilot-acp.sh', 'codex-acp.sh']
+  .every((adapter) => dispatchScriptContent.includes(adapter));
+assertRule(
+  'R2_派单选路: dispatch-local-employee.sh 经 acpx 按 6 工具路由标准适配器 (杜绝退化回逐工具内联 argv)',
+  dispatchScriptContent.includes('ACPX_BIN') && acpRoutesOk,
+  '派单脚本 acpx 选路段缺失或适配器路由不全',
+);
+
+const acpxConstantsPath = 'packages/adapter-utils/src/acpx-engine/constants.ts';
+const acpxConstants = fs.existsSync(acpxConstantsPath) ? fs.readFileSync(acpxConstantsPath, 'utf8') : '';
+const acpxExecutePath = 'packages/adapter-utils/src/acpx-engine/execute.ts';
+const acpxExecute = fs.existsSync(acpxExecutePath) ? fs.readFileSync(acpxExecutePath, 'utf8') : '';
+const controlPlaneOk =
+  acpxConstants.includes('agy_local') && acpxConstants.includes('cmd_local') && acpxConstants.includes('copilot_local') &&
+  acpxExecute.includes('docker-agy-acp.sh') && acpxExecute.includes('cmd-acp.sh');
+assertRule(
+  'R3_并轨: 控制面注册 agy_local/cmd_local/copilot_local 且与脚本面共用同一适配器 (两张皮不复活)',
+  controlPlaneOk,
+  'acpx-engine constants/execute 与 scripts/adapters 并轨断裂',
+);
+
+const agyAdapter = fs.readFileSync('scripts/adapters/docker-agy-acp.mjs', 'utf8');
+const cmdAdapter = fs.readFileSync('scripts/adapters/cmd-acp.mjs', 'utf8');
+const autonomyOk =
+  agyAdapter.includes('--dangerously-skip-permissions') &&
+  cmdAdapter.includes('--yolo') && cmdAdapter.includes('--tools-all');
+assertRule(
+  'R5_自主权限: 适配器保后台免交互旗标 (agy --dangerously-skip-permissions / cmd --yolo --tools-all)',
+  autonomyOk,
+  '适配器丢失自主权限旗标, 后台执行将被权限门禁卡死',
+);
+
+const protocolOk =
+  agyAdapter.includes('PROTOCOL_VERSION') && agyAdapter.includes('initialize') && agyAdapter.includes('session/prompt') &&
+  cmdAdapter.includes('PROTOCOL_VERSION') && cmdAdapter.includes('initialize') && cmdAdapter.includes('session/prompt');
+assertRule(
+  'R6_协议面: 自建适配器保持 ACP 握手/会话/提示方法面 (不塌缩成裸 PTY spawn)',
+  protocolOk,
+  '适配器丢失 PROTOCOL_VERSION/initialize/session/prompt 协议面',
+);
+
+const whichToolContent = fs.readFileSync('scripts/which-tool.sh', 'utf8');
+const toolsDocContent = fs.readFileSync('docs-coolie/TOOLS.md', 'utf8');
+const matrixOk =
+  whichToolContent.includes('acp_tools') && toolsDocContent.includes('Agent Client Protocol');
+assertRule(
+  'R7_矩阵在册: which-tool.sh acp 探针与 TOOLS.md ACP 矩阵章节不漂移',
+  matrixOk,
+  '工具矩阵探针或 TOOLS.md ACP 手册被删, 文档与实现漂移',
+);
+
 console.log('\n========================================================================');
 if (failed) {
   console.error('🚫 全面管局审计未通过！存在不符合高管治理规范的阻断项，请修复后重试。');

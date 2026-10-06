@@ -1,0 +1,8 @@
+$ acpx --timeout 150 --agent scripts/adapters/docker-agy-acp.sh exec -f acp-smoke-prompt.txt
+[client] initialize (running)
+
+[client] session/new (running)
+OK
+
+[done] end_turn
+$ exit code: 0

@@ -1,0 +1,61 @@
+
+> paperclip@ check:governance /Users/mac/workspace/xaicd/coolie
+> node scripts/check-governance-audit.mjs
+
+========================================================================
+🏛️  Coolie 高管级全生命周期交付与交互审计守卫 (Governance Audit Gate)
+   原则: 制度必须由编译器与自动化守卫全面管局，杜绝口头规范与人肉记忆
+========================================================================
+
+📁 1. CMMI 全生命周期六大阶段门禁产物规范目录审计:
+  ✅ [PASS] G0_Req: 需求简报与 EARS 规格说明书规范归档
+  ✅ [PASS] G1_Arch: 架构原型与系统演进设计文档规范归档
+  ✅ [PASS] G2_Design: 详细设计物理 Drizzle 模型规范落盘 (>50 表)
+  ✅ [PASS] G3_Build: 服务端控制面与移动原生端核心实现就绪
+  ✅ [PASS] G4_Val: 全栈验收、真机快照与 QA 报告不可变证据归档
+  ✅ [PASS] G5_Release: 全局唯一版本指纹与 7 处一致性守卫就绪
+
+📱 2. 移动端经典 5 槽位绝对对称底栏与防重复入口审计:
+  ✅ [PASS] 底栏单一职责守卫: 严禁在底栏放置收件箱槽位 (统一由顶栏 🔔 统领)
+  ✅ [PASS] 底栏对称美学守卫: 严格保持 2 + 1 + 2 = 5 槽位绝对居中对称 (当前: 左2 + 中1 + 右2)
+  ✅ [PASS] 底栏文案两字守卫: 底栏标签 100% 两个字 (汇览 · 任务 · 工坊 · 资产)
+
+⚖️ 3. 高管控制面审批三大直达快道审计:
+  ✅ [PASS] 快道 1 (收件中枢): 顶栏 🔔 铃铛直达全功能 InboxScreen 并支持返回
+  ✅ [PASS] 收件箱能力完备性: InboxScreen 必须包含【审批】Tab 且支持 onBack 模态返回
+  ✅ [PASS] 快道 2 (开会协同): 工坊 (Board-Chat) 会话顶栏必须具备常驻待办审批横幅
+  ✅ [PASS] 快道 3 (大盘预警): 汇览 (Dashboard) 态势大盘具备待办审批指标与红灯穿透
+
+🔤 4. 极简主义两字按钮与交互降噪审计:
+  ✅ [PASS] 全局两字按钮契约: 核心操作按钮完全收敛，禁止口语化与技术泄露长文案
+
+📚 5. 高管提示词资产与方法论手册落盘审计:
+  ✅ [PASS] 高管提示词库已沉淀: docs-coolie/playbooks/executive-prompts-and-governance.md
+  ✅ [PASS] 治理规范技能已沉淀: .agents/skills/minimalist-ui-and-cmmi-governance/SKILL.md
+
+🤖 6. Hermes 一级 Worker 拓扑与后台免交互权限硬审计:
+  ✅ [PASS] dispatch-local-employee.sh: cmd 拥有 --yolo 与 --tools-all 最大自主权限
+  ✅ [PASS] dispatch-local-employee.sh: claude 拥有 --dangerously-skip-permissions 免交互权限
+  ✅ [PASS] dispatch-local-employee.sh: 执行管道重定向 < /dev/null 防 stdin 悬空死锁
+
+📜 7. Coolie 根本大纲与工程宪法 (党章级法典) 审计:
+  ✅ [PASS] 根本大纲与工程宪法已沉淀: docs-coolie/research/2026-10-05-coolie-constitution-and-palantir-master-spec.md
+  ✅ [PASS] AGENTS.md 已载入第 18 章北极星目标与真本体并轨铁律
+  ✅ [PASS] 真本体破局复盘白皮书已沉淀: docs-coolie/research/2026-10-05-coolie-core-mission-and-real-ontology-master-plan.md
+
+🏗️ 8. 宪法第 2 条「项目进厂即本体域」防退化守卫:
+  ✅ [PASS] 第2条_挂钩: 项目创建路由在事务内调用 ensureProjectOntologyDomain (杜绝裸项目)
+  ✅ [PASS] 第2条_原子性: 本体域写入随调用方事务原子提交 (project + domain + resource_link 同生共死)
+  ✅ [PASS] 第2条_血缘: 写入 project→domain owner 资源链 (ontology_resource_links, role=owner)
+  ✅ [PASS] 第2条_防退化: 原子性/回滚/降级/重放/撞名守卫测试就位 (project-ontology-bootstrap.test.ts)
+
+🔌 9. wave357 标准 ACP (Agent Client Protocol) 调度协议栈防退化守卫:
+  ✅ [PASS] R1_适配器族: 6 大 ACP 适配器启动脚本存在且可执行
+  ✅ [PASS] R2_派单选路: dispatch-local-employee.sh 经 acpx 按 6 工具路由标准适配器 (杜绝退化回逐工具内联 argv)
+  ✅ [PASS] R3_并轨: 控制面注册 agy_local/cmd_local/copilot_local 且与脚本面共用同一适配器 (两张皮不复活)
+  ✅ [PASS] R5_自主权限: 适配器保后台免交互旗标 (agy --dangerously-skip-permissions / cmd --yolo --tools-all)
+  ✅ [PASS] R6_协议面: 自建适配器保持 ACP 握手/会话/提示方法面 (不塌缩成裸 PTY spawn)
+  ✅ [PASS] R7_矩阵在册: which-tool.sh acp 探针与 TOOLS.md ACP 矩阵章节不漂移
+
+========================================================================
+🎉 全面管局审计全绿通过！系统完全符合极简两字 UI、对称底栏、CMMI 产物、高管审批治理、Hermes 扁平化 Worker 契约与党章级工程宪法！
