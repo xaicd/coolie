@@ -19,6 +19,7 @@ import * as DocumentPicker from "expo-document-picker";
 import type {
   Company,
   OntologyDomain,
+  OntologyGraphResponse,
   OntologyGraphSnapshot,
 } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
@@ -51,8 +52,8 @@ interface OntologyDomainListScreenProps {
   onOpenWorkbench?: () => void;
 }
 
-// wave330: 图谱组件类型表仅覆盖控制面 9 类实体, 域实例节点线上形状没有
-// type 字段 (只有域内 nodeTypeId UUID)。防御性读取: 命中 9 类才采纳,
+// 图谱组件类型表仅覆盖控制面 9 类实体 (wave330)。wave337 起图谱走控制面
+// /ontology/graph, 节点自带 type 字符串; 防御性读取: 命中 9 类才采纳,
 // 否则 fallback work_product (真实类型语义仍保留在 label 与 metadata)
 const CONTROL_PLANE_ENTITY_TYPES: readonly OntologyEntityType[] = [
   "project",
@@ -66,13 +67,9 @@ const CONTROL_PLANE_ENTITY_TYPES: readonly OntologyEntityType[] = [
   "company",
 ];
 
-function toControlPlaneEntityType(
-  node: OntologyGraphSnapshot["nodes"][number],
-): OntologyEntityType {
-  const raw = (node as { type?: unknown }).type;
-  return typeof raw === "string" &&
-    (CONTROL_PLANE_ENTITY_TYPES as readonly string[]).includes(raw)
-    ? (raw as OntologyEntityType)
+function toControlPlaneEntityType(type: string): OntologyEntityType {
+  return (CONTROL_PLANE_ENTITY_TYPES as readonly string[]).includes(type)
+    ? (type as OntologyEntityType)
     : "work_product";
 }
 
@@ -141,7 +138,7 @@ export function OntologyDomainListScreen({
   // 图谱/列表双视图 (wave329): 默认直达图谱
   const [domainViewMode, setDomainViewMode] = useState<OntologyDomainViewMode>("graph");
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
-  const [graphSnapshot, setGraphSnapshot] = useState<OntologyGraphSnapshot | null>(null);
+  const [graphSnapshot, setGraphSnapshot] = useState<OntologyGraphResponse | null>(null);
   const [graphLoading, setGraphLoading] = useState(false);
   const [graphError, setGraphError] = useState<string | null>(null);
 
@@ -213,14 +210,20 @@ export function OntologyDomainListScreen({
     setSelectedDomainId(domains[0]!.id);
   }, [domains, selectedDomainId]);
 
-  // 拉取选中域的图快照 (api-client 现有方法 getOntologySnapshot,
-  // 返回 OntologyGraphSnapshot: nodes/edges/counts)
+  // 拉取选中域的控制面图谱 (wave337: api-client getOntologyGraph, 与 web 端
+  // ontologyGraphApi.graph 同一端点; 返回 OntologyGraphResponse:
+  // root/depth/view/truncated/nodes/edges)
   const loadGraph = useCallback(async () => {
     if (!selectedDomainId) return;
     setGraphLoading(true);
     setGraphError(null);
     try {
-      const snap = await coolie.getOntologySnapshot(companyId, selectedDomainId, 200);
+      const snap = await coolie.getOntologyGraph(companyId, {
+        rootType: "project",
+        rootId: selectedDomainId,
+        view: "project_tree",
+        depth: 2,
+      });
       setGraphSnapshot(snap);
     } catch (e) {
       setGraphError(String((e as Error)?.message ?? e));
@@ -234,39 +237,41 @@ export function OntologyDomainListScreen({
     if (domainViewMode === "graph" && selectedDomainId) void loadGraph();
   }, [domainViewMode, selectedDomainId, loadGraph]);
 
-  // 快照 (插件形态: sourceNodeId/targetNodeId) → 图谱组件 (source/target = 节点 key)
-  // wave330: ① key 统一 `${type}:${id}` 对齐组件 nodeKey 契约, 并把首节点
-  //          传成 root — layoutGraph 的 BFS 才能从根算层深, 节点分散到
-  //          多层同心圆环 (修「全部挤在一圈」); ② type 走 9 类实体映射
+  // 控制面图谱响应 → 图谱组件。wave337: 响应节点自带 type/key, 边直接引用
+  // 节点 key; key 仍按 9 类映射后的 `${type}:${id}` 重算, 保证与 rootKey
+  // 查找一致 (未知类型 fallback work_product 时服务端 key 会漂移)。
+  // 截断/深度透传给组件, root 用服务端根 (project 节点), 不再取首节点。
   const graphData: OntologyGraphData | null = useMemo(() => {
     if (!graphSnapshot) return null;
     const nodes: OntologyGraphNode[] = graphSnapshot.nodes.map((n) => {
-      const type = toControlPlaneEntityType(n);
+      const type = toControlPlaneEntityType(n.type);
       return {
         key: `${type}:${n.id}`,
         id: n.id,
         type,
         label: n.label,
-        metadata: {
-          ...(n.properties ?? {}),
-          ...(n.lifecycleState ? { lifecycleState: n.lifecycleState } : {}),
-        },
+        metadata: { ...(n.metadata ?? {}) },
       };
     });
-    const keyById = new Map(nodes.map((n) => [n.id, n.key]));
+    const keySet = new Set(nodes.map((n) => n.key));
     const edges: OntologyGraphEdge[] = [];
     for (const e of graphSnapshot.edges) {
-      const source = keyById.get(e.sourceNodeId);
-      const target = keyById.get(e.targetNodeId);
-      // nodeLimit 截断后悬空的半边直接丢弃, 不渲染断线
-      if (!source || !target || source === target) continue;
-      edges.push({ key: e.id, source, target, weight: e.weight });
+      // truncated 截断或类型 fallback 后悬空的半边直接丢弃, 不渲染断线
+      if (!keySet.has(e.source) || !keySet.has(e.target) || e.source === e.target) {
+        continue;
+      }
+      edges.push({ key: e.key, source: e.source, target: e.target, weight: e.weight });
     }
-    // 首节点作根 (当前域实例节点统一映射 work_product); 空快照不设 root
-    const first = nodes[0];
-    return first
-      ? { nodes, edges, root: { type: first.type, id: first.id } }
-      : { nodes, edges };
+    const root = graphSnapshot.root
+      ? { type: toControlPlaneEntityType(graphSnapshot.root.type), id: graphSnapshot.root.id }
+      : undefined;
+    return {
+      nodes,
+      edges,
+      root,
+      depth: graphSnapshot.depth,
+      truncated: graphSnapshot.truncated,
+    };
   }, [graphSnapshot]);
 
   // 打开域快照详情
@@ -883,12 +888,15 @@ export function OntologyDomainListScreen({
             error={graphError}
           />
 
-          {/* 快照计数摘要: 与图谱同源 (graphSnapshot.counts) */}
+          {/* 计数摘要: 与图谱同源 (控制面响应无 counts, 就地派生) */}
           <View style={styles.graphCountsRow}>
             <Text style={styles.graphCountsText}>
-              节点 {graphSnapshot?.counts?.nodes ?? "--"} · 关系{" "}
-              {graphSnapshot?.counts?.edges ?? "--"} · 类型{" "}
-              {graphSnapshot?.counts?.nodeTypes ?? "--"}
+              节点 {graphSnapshot?.nodes.length ?? "--"} · 关系{" "}
+              {graphSnapshot?.edges.length ?? "--"} · 类型{" "}
+              {graphSnapshot
+                ? new Set(graphSnapshot.nodes.map((n) => n.type)).size
+                : "--"}
+              {graphSnapshot?.truncated ? " · 已截断" : ""}
             </Text>
           </View>
         </ScrollView>
