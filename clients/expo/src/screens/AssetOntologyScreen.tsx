@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,6 +13,7 @@ import type {
   Company,
   Issue,
   IssueWorkProduct,
+  OntologyInstanceRow,
   OntologyLevelsResponse,
   OntologyStatsResponse,
   Project,
@@ -110,6 +112,36 @@ export function AssetOntologyScreen({
   const [levels, setLevels] = useState<OntologyLevelsResponse | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [selectedObject, setSelectedObject] = useState<LivingObjectItem | null>(null);
+  const [selectedDataset, setSelectedDataset] = useState<LivingDatasetItem | null>(null);
+
+  const [instances, setInstances] = useState<OntologyInstanceRow[]>([]);
+  const [loadingInstances, setLoadingInstances] = useState(false);
+
+  useEffect(() => {
+    if (!selectedObject) {
+      setInstances([]);
+      return;
+    }
+    let cancelled = false;
+    setLoadingInstances(true);
+    const entityType = selectedObject.id === "artifact" ? "work_product" : selectedObject.id;
+    coolie
+      .listOntologyInstances(company.id, { entityType, limit: 6 })
+      .then((res) => {
+        if (!cancelled) {
+          setInstances(res.instances ?? []);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setInstances([]);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingInstances(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedObject, company.id]);
 
   const loadData = useCallback(async () => {
     try {
@@ -305,6 +337,35 @@ export function AssetOntologyScreen({
     },
   ];
 
+  const handleInstanceClick = (instance: OntologyInstanceRow, objectItem: LivingObjectItem) => {
+    setSelectedObject(null);
+    if (objectItem.id === "project") {
+      const match = projects.find((p) => p.id === instance.id);
+      if (match && onOpenProjectTasks) {
+        onOpenProjectTasks(match);
+      } else {
+        onNavigateToTasks?.();
+      }
+    } else if (objectItem.id === "issue") {
+      if (onOpenIssue) {
+        onOpenIssue({
+          id: instance.id,
+          title: instance.label,
+          status: (instance.metadata?.status as any) || "todo",
+          companyId: company.id,
+        } as Issue);
+      } else {
+        onNavigateToTasks?.();
+      }
+    } else if (objectItem.id === "agent") {
+      onNavigateToChat?.(`Hermes 请调度在岗员工【${instance.label}】推进当前任务`);
+    } else if (objectItem.id === "artifact") {
+      onNavigateToTab?.("artifacts");
+    } else if (objectItem.id === "conversation") {
+      onNavigateToChat?.();
+    }
+  };
+
   const handleActionClick = (actionName: string, item: LivingObjectItem) => {
     setSelectedObject(null);
 
@@ -350,11 +411,7 @@ export function AssetOntologyScreen({
       if (item.id === "project") {
         onNavigateToTab?.("projects");
       } else if (item.id === "issue") {
-        if (onNavigateToTasks) {
-          onNavigateToTasks();
-        } else if (onOpenWebOntology) {
-          onOpenWebOntology("/projects", "任务列表");
-        }
+        onNavigateToTasks?.();
       } else if (item.id === "conversation") {
         onNavigateToChat?.();
       } else if (item.id === "agent") {
@@ -501,7 +558,13 @@ export function AssetOntologyScreen({
 
             <View style={styles.cardList}>
               {datasetItems.map((ds) => (
-                <View key={ds.id} style={styles.datasetCard}>
+                <Pressable
+                  key={ds.id}
+                  style={styles.datasetCard}
+                  onPress={() => setSelectedDataset(ds)}
+                  hitSlop={4}
+                  testID={`AssetOntology__DatasetCard__${ds.id}`}
+                >
                   <View style={styles.datasetHeader}>
                     <View style={styles.datasetTitleRow}>
                       <Text style={styles.datasetName}>{ds.tableName}</Text>
@@ -531,7 +594,7 @@ export function AssetOntologyScreen({
                       <Text style={styles.datasetFooterValue}>{ds.boundObject.split(" ")[0]}</Text>
                     </View>
                   </View>
-                </View>
+                </Pressable>
               ))}
             </View>
           </View>
@@ -605,6 +668,52 @@ export function AssetOntologyScreen({
               </View>
             </View>
 
+            {/* 活体实例穿透 (Live Instances) - 真实业务下钻 */}
+            <View style={styles.lineageBlock}>
+              <View style={styles.instanceHeaderRow}>
+                <Text style={styles.blockTitle}>
+                  活体实例 ({selectedObject.count}) · 点击穿透
+                </Text>
+                {loadingInstances && (
+                  <ActivityIndicator size="small" color={C.accent} />
+                )}
+              </View>
+
+              {instances.length === 0 && !loadingInstances ? (
+                <Text style={styles.emptyInstanceText}>暂无活体实例数据</Text>
+              ) : (
+                <View style={styles.instanceList}>
+                  {instances.slice(0, 5).map((inst) => (
+                    <Pressable
+                      key={inst.id}
+                      style={styles.instanceRow}
+                      onPress={() => handleInstanceClick(inst, selectedObject)}
+                      hitSlop={4}
+                      testID={`AssetOntology__Instance__${inst.id}`}
+                    >
+                      <View style={styles.instanceIconBox}>
+                        <Text style={{ fontSize: 13 }}>{selectedObject.icon}</Text>
+                      </View>
+                      <View style={styles.instanceMain}>
+                        <Text style={styles.instanceTitle} numberOfLines={1}>
+                          {inst.label}
+                        </Text>
+                        {inst.ownerLabel ? (
+                          <Text style={styles.instanceOwner} numberOfLines={1}>
+                            负责: {inst.ownerLabel}
+                          </Text>
+                        ) : null}
+                      </View>
+                      <View style={styles.instanceActionPill}>
+                        <Text style={styles.instanceActionText}>查看</Text>
+                        <Ionicons name="chevron-forward" size={12} color={C.accent} />
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              )}
+            </View>
+
             {/* 一控：合法业务动词 (Bound Actions) */}
             <View style={styles.actionBlock}>
               <Text style={styles.blockTitle}>合法业务动词 (BOUND ACTIONS)</Text>
@@ -626,6 +735,122 @@ export function AssetOntologyScreen({
                   onPress={() => setSelectedObject(null)}
                   hitSlop={6}
                   testID="AssetOntology__Action__Close"
+                >
+                  <Text style={styles.actionBtnSecondaryText}>关闭</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Sheet>
+      )}
+
+      {/* 6. 管道 360 穿透抽屉 (Dataset Pipeline 360) */}
+      {selectedDataset && (
+        <Sheet
+          onClose={() => setSelectedDataset(null)}
+          title={`数据源流 · ${selectedDataset.tableName}`}
+        >
+          <View style={styles.sheetBody}>
+            <View style={styles.sheetHeaderCard}>
+              <View style={styles.sheetIconRow}>
+                <View style={styles.sheetIconBox}>
+                  <Text style={{ fontSize: 18 }}>⊞</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.sheetTitle}>{selectedDataset.tableName}</Text>
+                  <Text style={styles.sheetCategory}>PostgreSQL 物理存储管道</Text>
+                </View>
+                <StatusBadge
+                  tone={selectedDataset.status === "active" ? "ok" : "muted"}
+                  label={selectedDataset.syncType}
+                />
+              </View>
+              <Text style={styles.sheetDescText}>{selectedDataset.description}</Text>
+            </View>
+
+            <View style={styles.lineageBlock}>
+              <Text style={styles.blockTitle}>管道指标 (PIPELINE METRICS)</Text>
+              <View style={styles.specGrid}>
+                <View style={styles.specItem}>
+                  <Text style={styles.specLabel}>活体吞吐量</Text>
+                  <Text style={styles.specValue}>{selectedDataset.recordCount}</Text>
+                </View>
+                <View style={styles.specItem}>
+                  <Text style={styles.specLabel}>同步延迟</Text>
+                  <Text style={styles.specValue}>{selectedDataset.latency}</Text>
+                </View>
+                <View style={styles.specItem}>
+                  <Text style={styles.specLabel}>对象映射</Text>
+                  <Text style={styles.specValue}>{selectedDataset.boundObject}</Text>
+                </View>
+                <View style={styles.specItem}>
+                  <Text style={styles.specLabel}>物理引擎</Text>
+                  <Text style={styles.specValue}>{selectedDataset.engine}</Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.lineageBlock}>
+              <Text style={styles.blockTitle}>数据契约与血缘保障 (DATA CONTRACT)</Text>
+              <View style={styles.contractRow}>
+                <Ionicons name="shield-checkmark-outline" size={14} color="#10B981" />
+                <Text style={styles.contractText}>
+                  企业租户物理隔离 (eq companyId 索引守卫，杜绝越权)
+                </Text>
+              </View>
+              <View style={styles.contractRow}>
+                <Ionicons name="git-commit-outline" size={14} color={C.accent} />
+                <Text style={styles.contractText}>
+                  不可变审计时间戳与因果变更凭证 (版本溯源)
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.actionBlock}>
+              <Text style={styles.blockTitle}>管道操作动词 (BOUND ACTIONS)</Text>
+              <View style={styles.actionButtonsRow}>
+                <Pressable
+                  style={styles.actionBtnPrimary}
+                  onPress={() => {
+                    const targetObjId =
+                      selectedDataset.id === "ds-issues"
+                        ? "issue"
+                        : selectedDataset.id === "ds-projects"
+                        ? "project"
+                        : selectedDataset.id === "ds-agents"
+                        ? "agent"
+                        : selectedDataset.id === "ds-work-products"
+                        ? "artifact"
+                        : "issue";
+                    const targetObj = objectItems.find((o) => o.id === targetObjId);
+                    setSelectedDataset(null);
+                    if (targetObj) {
+                      setSelectedObject(targetObj);
+                    }
+                  }}
+                  hitSlop={6}
+                  testID="AssetOntology__DatasetAction__Penetrate"
+                >
+                  <Text style={styles.actionBtnPrimaryText}>穿透</Text>
+                </Pressable>
+
+                <Pressable
+                  style={styles.actionBtnPrimary}
+                  onPress={() => {
+                    setSelectedDataset(null);
+                    handleRefresh();
+                  }}
+                  hitSlop={6}
+                  testID="AssetOntology__DatasetAction__Refresh"
+                >
+                  <Text style={styles.actionBtnPrimaryText}>刷新</Text>
+                </Pressable>
+
+                <Pressable
+                  style={styles.actionBtnSecondary}
+                  onPress={() => setSelectedDataset(null)}
+                  hitSlop={6}
+                  testID="AssetOntology__DatasetAction__Close"
                 >
                   <Text style={styles.actionBtnSecondaryText}>关闭</Text>
                 </Pressable>
@@ -1010,5 +1235,96 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "600",
     color: C.ink2,
+  },
+  specGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  specItem: {
+    width: "48%",
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderRadius: RADIUS.sm,
+    padding: 8,
+  },
+  specLabel: {
+    fontSize: 10,
+    color: C.ink3,
+    marginBottom: 2,
+  },
+  specValue: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  contractRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginTop: 6,
+  },
+  contractText: {
+    fontSize: 11,
+    color: C.ink2,
+    flex: 1,
+  },
+  instanceHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  emptyInstanceText: {
+    fontSize: 11,
+    color: C.ink3,
+    paddingVertical: 8,
+  },
+  instanceList: {
+    gap: 6,
+    marginTop: 6,
+  },
+  instanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderRadius: RADIUS.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    gap: 8,
+  },
+  instanceIconBox: {
+    width: 24,
+    height: 24,
+    borderRadius: RADIUS.sm,
+    backgroundColor: "rgba(94, 106, 210, 0.15)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  instanceMain: {
+    flex: 1,
+    minWidth: 0,
+  },
+  instanceTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  instanceOwner: {
+    fontSize: 10,
+    color: C.ink3,
+    marginTop: 1,
+  },
+  instanceActionPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: RADIUS.sm,
+  },
+  instanceActionText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: C.accent,
   },
 });
