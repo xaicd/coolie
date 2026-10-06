@@ -1,7 +1,7 @@
 # DigitalStaff 的本体驱动 + Spec 驱动开发模式 → Coolie 落地审计
 
 - 审计日期：2026-09-20
-- 仓库：`/Users/mac/workspace/xaicd/coolie`
+- 仓库：`$REPO_ROOT`
 - 检出状态：`main` @ `2023ae59e`（v0.3.5 热修）。`release/0.5.0` @ `0df489620` 是另一条线，
   见 §1.3「本审计的两份代码基线」。
 - 性质：**只读审计，未改动任何源码**。唯一新增文件是本报告。

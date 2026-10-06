@@ -57,9 +57,9 @@ P1 (后续 wave):
 
 ```bash
 # DS 真源
-DS_SRC=/Users/mac/workspace/xaicd/DigitalStaff/backend/modules/git-ops
+DS_SRC=${DS_SRC:-$HOME/workspace/xaicd/DigitalStaff/backend/modules/git-ops}
 # Coolie fork 目标
-DST=/Users/mac/workspace/xaicd/coolie/packages/adapters/git-ops
+DST=$REPO_ROOT/packages/adapters/git-ops
 
 mkdir -p $DST/services $DST/models
 cp $DS_SRC/services/GitCredentialService.js $DST/services/GitCredentialService.ts  # 转 TS

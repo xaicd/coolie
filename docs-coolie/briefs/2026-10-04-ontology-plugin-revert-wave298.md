@@ -12,7 +12,7 @@
 | 项 | 值 |
 |---|---|
 | 项目 | Coolie (paperclip fork) |
-| 仓库 | `/Users/mac/workspace/xaicd/coolie` |
+| 仓库 | `$REPO_ROOT` |
 | 主分支 | `main` (HEAD `f75ff62ea`) |
 | 当前 wave298 已 checkout 1 文件 | `packages/plugins/plugin-ontology/src/samples/enterprise-domain.ts` (modified) |
 | 原型基线 | **v0.6.19 commit `37e6b3d77`**（10-01 22:08 = 7 天前）|

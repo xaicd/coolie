@@ -14,14 +14,14 @@ ACTION="${1:---audit}"
 case "$ACTION" in
   --audit|audit)
     if [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
-      exec "$SCRIPT_DIR/host-exec.sh" "node /Users/mac/workspace/xaicd/coolie/scripts/board-hygiene-watchdog.mjs"
+      exec "$SCRIPT_DIR/host-exec.sh" "node scripts/board-hygiene-watchdog.mjs"
     else
       exec node "$SCRIPT_DIR/board-hygiene-watchdog.mjs"
     fi
     ;;
 
   --register|register)
-    CRON_LINE="*/30 * * * * bash /Users/mac/workspace/xaicd/coolie/scripts/board-hygiene-watchdog.sh --audit >/dev/null 2>&1 # wave286-board-watchdog"
+    CRON_LINE="*/30 * * * * cd \${COOLIE_DIR:-\$HOME/workspace/xaicd/coolie} && bash scripts/board-hygiene-watchdog.sh --audit >/dev/null 2>&1 # wave286-board-watchdog"
     echo "正在将看板审计看门狗注册到 Mac 宿主机 crontab..."
     if [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
       "$SCRIPT_DIR/host-exec.sh" "(crontab -l 2>/dev/null | grep -v 'wave286-board-watchdog' ; echo '$CRON_LINE') | crontab -"

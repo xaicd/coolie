@@ -13,16 +13,16 @@
 │  - 物理局域网 IP: 192.168.3.85 (或宿主机网桥 172.19.0.1)  │
 │  - 工具目录: /opt/homebrew/bin/                         │
 │    (claude, cmd, copilot, kiro-cli)                    │
-│  - 仓库真实路径: /Users/mac/workspace/xaicd/coolie      │
+│  - 宿主机仓库路径: $HOST_WORKSPACE (默认 ~/workspace/xaicd/coolie)      │
 └───────────────────────────▲────────────────────────────┘
                             │ SSH (Port 22, ed25519)
                             │ 旁路 Clash TUN 路由
 ┌───────────────────────────▼────────────────────────────┐
 │              Docker 容器沙箱 (Ubuntu/Debian)            │
 │  - 用户名: root                                         │
-│  - 挂载工作区: /host-workspace/xaicd/coolie            │
+│  - 挂载工作区: $CONTAINER_WORKSPACE (如 /workspace/coolie) │
 │  - 身份私钥: /root/.ssh/id_ed25519                      │
-│  - 本地运行态: /host-workspace/xaicd/coolie/.coolie-local │
+│  - 本地运行态: $CONTAINER_WORKSPACE/.coolie-local         │
 │  - 本地工具: agy (Antigravity CLI 1.2.15)              │
 │  - 调度代理: scripts/host-exec.sh                       │
 └────────────────────────────────────────────────────────┘
@@ -84,7 +84,7 @@ bash scripts/host-exec.sh "pnpm -r typecheck"
 `scripts/host-exec.sh` 将命令在本地先做 Base64 编码，再通过 SSH 管道解码执行：
 ```bash
 # 原理等价于：
-RAW_SCRIPT="export PATH=\"/opt/homebrew/bin:\$PATH\"; cd /Users/mac/workspace/xaicd/coolie; $COMMAND"
+RAW_SCRIPT="export PATH=\"/opt/homebrew/bin:\$PATH\"; cd \${HOST_WORKSPACE:-\$HOME/workspace/xaicd/coolie}; $COMMAND"
 B64=$(printf '%s' "$RAW_SCRIPT" | base64 | tr -d '\r\n')
 ssh mac@192.168.3.85 "echo $B64 | base64 -d | bash"
 ```

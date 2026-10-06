@@ -35,7 +35,7 @@
 
 ## 3. 任务分级与分类模型 (Domain Model)
 
-任务基于统一的 [`issues`](file:///host-workspace/xaicd/coolie/packages/db/src/schema/issues.ts) 实体承载，通过正交字段组合定义三级四类任务：
+任务基于统一的 [`issues`](../../packages/db/src/schema/issues.ts) 实体承载，通过正交字段组合定义三级四类任务：
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐

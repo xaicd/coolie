@@ -189,8 +189,8 @@ flowchart TD
 为保证全团队（人类与所有 AI 工具）在每一次新开会话时不再从零顺拐，两项制度已永久生效：
 
 1. **协议规范落盘**：
-   - 路径：[`.agents/rules/HIGH-ORDER-INVERSE-THINKING.md`](file:///host-workspace/xaicd/coolie/.agents/rules/HIGH-ORDER-INVERSE-THINKING.md)
+   - 路径：[`.agents/rules/HIGH-ORDER-INVERSE-THINKING.md`](../../.agents/rules/HIGH-ORDER-INVERSE-THINKING.md)
    - 规定了当老板说“修 bug”、“加功能”、“做原型”时，AI 必须自动执行的四步反向穿透框架；
 2. **写入最高工程法典**：
-   - 路径：[`AGENTS.md`](file:///host-workspace/xaicd/coolie/AGENTS.md) 第 19 章；
+   - 路径：[`AGENTS.md`](../../AGENTS.md) 第 19 章；
    - 任何新会话（Antigravity、Claude、Hermes、CMD）在启动时自动读取本章，永久保持顶级架构师与 Palantir FDE 心智！

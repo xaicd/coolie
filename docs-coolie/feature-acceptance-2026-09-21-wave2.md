@@ -180,4 +180,4 @@ clients/h5/replays/evidence/wave2-2-quota.png
 clients/h5/replays/evidence/wave2-11-ontology.png
 ```
 
-绝对路径：`/Users/mac/workspace/xaicd/coolie/clients/h5/replays/evidence/`
+本地路径：`$REPO_ROOT/clients/h5/replays/evidence/`

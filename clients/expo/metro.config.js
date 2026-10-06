@@ -11,7 +11,7 @@ const config = getDefaultConfig(projectRoot);
 
 // Covers the sibling package (clients/api-client) while this app stays standalone.
 // wave188 — also add the workspace root so files under
-// /Users/mac/workspace/xaicd/coolie/node_modules (e.g. @ide/backoff, transitively
+// <repo_root>/node_modules (e.g. @ide/backoff, transitively
 // pulled by expo-notifications) can be hashed & served by metro.
 config.watchFolders = [
   path.resolve(projectRoot, ".."),

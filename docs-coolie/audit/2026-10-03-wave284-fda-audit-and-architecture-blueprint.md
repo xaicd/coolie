@@ -185,7 +185,7 @@ dispatch_tool_runner() {
      ```
    - 彻底避免双重引号转义灾难与转义丢失。
 3. **宿主机工作目录严格限定**：
-   - 远程执行前固定锁定 `cd /Users/mac/workspace/xaicd/coolie`，严禁越界访问 Mac 用户个人私有目录（如 Downloads、Documents）。
+   - 远程执行前固定锁定进入仓库工作区 `$REPO_ROOT`，严禁越界访问宿主用户个人私有目录（如 Downloads、Documents）。
 
 ---
 

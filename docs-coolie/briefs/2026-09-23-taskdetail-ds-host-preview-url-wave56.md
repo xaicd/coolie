@@ -11,7 +11,7 @@ Boss 09-23 24:40 第三次纠正任务详情原型沙箱的真值来源:
 
 ## DS PreviewWebView.tsx 真值 (134 行)
 
-源: `/Users/mac/workspace/xaicd/DigitalStaff/clients/expo/src/PreviewWebView.tsx`
+源: `~/workspace/xaicd/DigitalStaff/clients/expo/src/PreviewWebView.tsx`
 
 - 工具条 `[关闭] + URL tag (LIVE/SNAPSHOT) + Refresh + 浏览器打开` — **没有 viewport 切换, 没有 logs panel, 没有 footer 安全提示**
 - 同源代理 `GET /api/tasks/host-preview/<sessionId>/?token=<jwt>&_t=<bust>` —— DS 后端能力

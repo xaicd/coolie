@@ -83,7 +83,7 @@ Hermes: wave276 / 1h23m / Hermes 自己 (wave280) / 跑
 每 30 分钟打印 5 字段表:
 
 ```cron
-*/30 * * * * bash /Users/mac/workspace/xaicd/coolie/scripts/cron-team-status.sh --print # wave276-team-status
+*/30 * * * * bash $REPO_ROOT/scripts/cron-team-status.sh --print # wave276-team-status
 ```
 
 通知路径 (`TEAM_STATUS_CMD` 环境变量, 默认 `$HOME/bin/team-status-notify.sh`):

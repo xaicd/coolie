@@ -83,7 +83,7 @@ Worker: cmd
 
 ```bash
 no_proxy=.myqcloud.com coscli cp \
-  /Users/mac/workspace/xaicd/coolie/docs-coolie/mockups/doubao-new-task-page.html \
+  $REPO_ROOT/docs-coolie/mockups/doubao-new-task-page.html \
   cos://gzbucket/coolie/mockups/doubao-new-task-page.html
 ```
 

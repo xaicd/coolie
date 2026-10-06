@@ -1,7 +1,7 @@
 # 规格说明书：运营商级 CMMI 双轨体系、前置 DAR 选型整改、主线-支线任务收敛与审计治理闭环
 
 > **文档编号**：`SPEC-20260930-WAVE156-CARRIER-TASK-DAR-AUDIT`  
-> **基线 Commit**：[`899b45ea56`](file:///host-workspace/xaicd/coolie)  
+> **基线 Commit**：[`899b45ea56`](../..)  
 > **制定日期**：2026-09-30  
 > **状态**：正式确立 (Approved & Ready for Implementation)  
 > **适用范围**：Coolie 平台、CMMI 治理引擎、项目立项中心、任务管理与生产投产系统
@@ -13,7 +13,7 @@
 在本次深度技术评审与系统全量代码审计中，面对真实工业界与电信运营商级（移动/联通/电信/金融）交付场景，识别并收敛出四大层次的核心矛盾与整改任务：
 
 1. **项目立项倒置缺陷（前置选型整改 · 核心整改项）**：
-   - **痛点**：当前新建项目（[`NewProjectDialog`](file:///host-workspace/xaicd/coolie/ui/src/components/NewProjectDialog.tsx)）直接要求用户在第一步盲选“预设模板”或手工填入 Git 地址，属于典型的**“需求未明、先定框架”**的流程倒置。
+   - **痛点**：当前新建项目（[`NewProjectDialog`](../../ui/src/components/NewProjectDialog.tsx)）直接要求用户在第一步盲选“预设模板”或手工填入 Git 地址，属于典型的**“需求未明、先定框架”**的流程倒置。
    - **根因**：跳过了本应存在于立项前的 **Phase 0（前置方案研判）与 CMMI DAR（决策分析与解决）**。没有竞品对标、没有开源生态扫描、没有开源协议（License）安全合规排查，极易导致“选错底座后期推倒重来”或“陷入商业侵权风险”。
    - **整改**：在立项前确立 **G0 选型门禁**，重构新建项目交互为 **“极速模式（已知标品）” 与 “智能进件研判模式（标书/客户项目）”** 双通道。
 2. **运营商级实施落地层（双轨 WBS · 实施作为一等公民）**：
@@ -24,9 +24,9 @@
    - **整改**：确立 **“主线是树干、支线是树枝、临时是树叶”** 的统一树形继承体系。任何子任务必须通过 `parentId` 向上归集到一条主线上；列表补齐徽标并支持“一键聚焦下钻此主线”。
 4. **工程治理与审计缺陷（Audit 闭环）**：
    - **整改**：
-     - 将 `wave154`/`wave155` 上游改动的 19 个文件及预算纳管进 [`scripts/fork-surface.json`](file:///host-workspace/xaicd/coolie/scripts/fork-surface.json)，恢复 CI 0 报错；
-     - 修复 [`ui/src/App.tsx`](file:///host-workspace/xaicd/coolie/ui/src/App.tsx) 中 `CompanyRootRedirect` 异步加载竞态，防穿透进入 dashboard；
-     - 在 [`server/src/routes/onboarding.ts`](file:///host-workspace/xaicd/coolie/server/src/routes/onboarding.ts) 增加 `assertBoard(req)`，在 `backfill` 中补齐 `logActivity` 审计留痕。
+     - 将 `wave154`/`wave155` 上游改动的 19 个文件及预算纳管进 [`scripts/fork-surface.json`](../../scripts/fork-surface.json)，恢复 CI 0 报错；
+     - 修复 [`ui/src/App.tsx`](../../ui/src/App.tsx) 中 `CompanyRootRedirect` 异步加载竞态，防穿透进入 dashboard；
+     - 在 [`server/src/routes/onboarding.ts`](../../server/src/routes/onboarding.ts) 增加 `assertBoard(req)`，在 `backfill` 中补齐 `logActivity` 审计留痕。
 
 ---
 
@@ -49,7 +49,7 @@
 
 ### 1. 立项交互整改：前置 DAR 研判与双通道立项 (Phase 0 · G0 门禁)
 
-重构 [`ui/src/components/NewProjectDialog.tsx`](file:///host-workspace/xaicd/coolie/ui/src/components/NewProjectDialog.tsx)，拆分为 **Tab 双通道**：
+重构 [`ui/src/components/NewProjectDialog.tsx`](../../ui/src/components/NewProjectDialog.tsx)，拆分为 **Tab 双通道**：
 
 ```
                     【新建项目双通道向导 (NewProjectDialog)】
@@ -97,7 +97,7 @@ Phase 6: 上线移交           最终发布制品构建与指纹生成         
 
 ### 3. 任务四维分类体系 (Task Model)
 
-任务基于统一的 [`issues`](file:///host-workspace/xaicd/coolie/packages/db/src/schema/issues.ts) 实体承载，字段正交组合：
+任务基于统一的 [`issues`](../../packages/db/src/schema/issues.ts) 实体承载，字段正交组合：
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
@@ -159,14 +159,14 @@ Phase 6: 上线移交           最终发布制品构建与指纹生成         
 
 | 模块 | 文件路径 | 职责与变更说明 |
 | :--- | :--- | :--- |
-| **立项向导** | [`ui/src/components/NewProjectDialog.tsx`](file:///host-workspace/xaicd/coolie/ui/src/components/NewProjectDialog.tsx) | 整改立项流程：重构为极速模式 vs 智能进件研判 (DAR) 双通道模式。 |
-| **CI 门禁** | [`scripts/fork-surface.json`](file:///host-workspace/xaicd/coolie/scripts/fork-surface.json) | 登记 19 个 wave154/155 上游文件及行数预算，恢复 CI 0 报错。 |
-| **前端路由** | [`ui/src/App.tsx`](file:///host-workspace/xaicd/coolie/ui/src/App.tsx) | 修复 `CompanyRootRedirect` 异步加载竞态，防穿透进入 dashboard。 |
-| **任务视图** | [`ui/src/components/IssuesList.tsx`](file:///host-workspace/xaicd/coolie/ui/src/components/IssuesList.tsx) | 补全 `[Spec · 任务]` 徽章与主线下钻过滤操作。 |
-| **新建交互** | [`ui/src/components/NewIssueDialog.tsx`](file:///host-workspace/xaicd/coolie/ui/src/components/NewIssueDialog.tsx) | 新建任务时提供活跃主线任务默认挂载推荐（防孤儿单）。 |
-| **服务端路由** | [`server/src/routes/onboarding.ts`](file:///host-workspace/xaicd/coolie/server/src/routes/onboarding.ts) | 变异接口补充 `assertBoard(req)` 权限拦截。 |
-| **服务端路由** | [`server/src/routes/ontology-graph.ts`](file:///host-workspace/xaicd/coolie/server/src/routes/ontology-graph.ts) | Backfill 补充 `assertBoard(req)` 与 `logActivity` 审计留痕。 |
-| **服务端单测** | [`server/src/__tests__/onboarding-routes.test.ts`](file:///host-workspace/xaicd/coolie/server/src/__tests__/onboarding-routes.test.ts) | 补充 Agent 调用返回 403 的安全单测。 |
+| **立项向导** | [`ui/src/components/NewProjectDialog.tsx`](../../ui/src/components/NewProjectDialog.tsx) | 整改立项流程：重构为极速模式 vs 智能进件研判 (DAR) 双通道模式。 |
+| **CI 门禁** | [`scripts/fork-surface.json`](../../scripts/fork-surface.json) | 登记 19 个 wave154/155 上游文件及行数预算，恢复 CI 0 报错。 |
+| **前端路由** | [`ui/src/App.tsx`](../../ui/src/App.tsx) | 修复 `CompanyRootRedirect` 异步加载竞态，防穿透进入 dashboard。 |
+| **任务视图** | [`ui/src/components/IssuesList.tsx`](../../ui/src/components/IssuesList.tsx) | 补全 `[Spec · 任务]` 徽章与主线下钻过滤操作。 |
+| **新建交互** | [`ui/src/components/NewIssueDialog.tsx`](../../ui/src/components/NewIssueDialog.tsx) | 新建任务时提供活跃主线任务默认挂载推荐（防孤儿单）。 |
+| **服务端路由** | [`server/src/routes/onboarding.ts`](../../server/src/routes/onboarding.ts) | 变异接口补充 `assertBoard(req)` 权限拦截。 |
+| **服务端路由** | [`server/src/routes/ontology-graph.ts`](../../server/src/routes/ontology-graph.ts) | Backfill 补充 `assertBoard(req)` 与 `logActivity` 审计留痕。 |
+| **服务端单测** | [`server/src/__tests__/onboarding-routes.test.ts`](../../server/src/__tests__/onboarding-routes.test.ts) | 补充 Agent 调用返回 403 的安全单测。 |
 
 ---
 

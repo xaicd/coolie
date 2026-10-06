@@ -129,30 +129,30 @@ graph TD
 在工坊的本体库中，每个核心业务系统（CMDB 业务系统）和本体域均已永久固化对应的文档节点：
 
 ### 3.1 控制台主系统 (Paperclip Control Plane - `sys_control_plane`)
-- **SRS & RTM**: `doc_cp_srs`（[`doc/SPEC-implementation.md`](file:///host-workspace/xaicd/coolie/doc/SPEC-implementation.md)）—— 责任人：`emp_ds`
-- **HLD 概要设计**: `doc_cp_hld`（[`docs-coolie/Coolie-FORK-BOUNDARY.md`](file:///host-workspace/xaicd/coolie/docs-coolie/Coolie-FORK-BOUNDARY.md)）—— 责任人：`emp_fda`
-- **LLD 详细设计**: `doc_cp_lld`（[`doc/DATABASE.md`](file:///host-workspace/xaicd/coolie/doc/DATABASE.md)）—— 责任人：`emp_swe`
-- **测试验收报告**: `doc_cp_test`（[`docs-coolie/LOCAL-E2E.md`](file:///host-workspace/xaicd/coolie/docs-coolie/LOCAL-E2E.md)）—— 责任人：`emp_swe`
-- **部署运维 SOP**: `doc_release_sop`（[`docs-coolie/release-flow.md`](file:///host-workspace/xaicd/coolie/docs-coolie/release-flow.md)）—— 责任人：`emp_sre`
+- **SRS & RTM**: `doc_cp_srs`（[`doc/SPEC-implementation.md`](../doc/SPEC-implementation.md)）—— 责任人：`emp_ds`
+- **HLD 概要设计**: `doc_cp_hld`（[`docs-coolie/Coolie-FORK-BOUNDARY.md`](../docs-coolie/Coolie-FORK-BOUNDARY.md)）—— 责任人：`emp_fda`
+- **LLD 详细设计**: `doc_cp_lld`（[`doc/DATABASE.md`](../doc/DATABASE.md)）—— 责任人：`emp_swe`
+- **测试验收报告**: `doc_cp_test`（[`docs-coolie/LOCAL-E2E.md`](../docs-coolie/LOCAL-E2E.md)）—— 责任人：`emp_swe`
+- **部署运维 SOP**: `doc_release_sop`（[`docs-coolie/release-flow.md`](../docs-coolie/release-flow.md)）—— 责任人：`emp_sre`
 
 ### 3.2 业务后台中台系统 (RuoYi Backend - `sys_backend`)
-- **SRS 需求规格**: `doc_backend_srs`（[`docs-coolie/specs/backend-srs.md`](file:///host-workspace/xaicd/coolie/docs-coolie/specs/backend-srs.md)）—— 责任人：`emp_ds`
-- **HLD 微服务架构**: `doc_backend_hld`（[`docs-coolie/specs/backend-architecture-hld.md`](file:///host-workspace/xaicd/coolie/docs-coolie/specs/backend-architecture-hld.md)）—— 责任人：`emp_fda`
-- **API 契约说明**: `doc_backend_api`（[`docs-coolie/specs/backend-api-contract.md`](file:///host-workspace/xaicd/coolie/docs-coolie/specs/backend-api-contract.md)）—— 责任人：`emp_swe`
-- **集成测试报告**: `doc_backend_test`（[`docs-coolie/specs/backend-test-report.md`](file:///host-workspace/xaicd/coolie/docs-coolie/specs/backend-test-report.md)）—— 责任人：`emp_fdse`
-- **部署与应急手册**: `doc_backend_deploy`（[`docs-coolie/specs/backend-deployment-sop.md`](file:///host-workspace/xaicd/coolie/docs-coolie/specs/backend-deployment-sop.md)）—— 责任人：`emp_sre`
+- **SRS 需求规格**: `doc_backend_srs`（[`docs-coolie/specs/backend-srs.md`](../docs-coolie/specs/backend-srs.md)）—— 责任人：`emp_ds`
+- **HLD 微服务架构**: `doc_backend_hld`（[`docs-coolie/specs/backend-architecture-hld.md`](../docs-coolie/specs/backend-architecture-hld.md)）—— 责任人：`emp_fda`
+- **API 契约说明**: `doc_backend_api`（[`docs-coolie/specs/backend-api-contract.md`](../docs-coolie/specs/backend-api-contract.md)）—— 责任人：`emp_swe`
+- **集成测试报告**: `doc_backend_test`（[`docs-coolie/specs/backend-test-report.md`](../docs-coolie/specs/backend-test-report.md)）—— 责任人：`emp_fdse`
+- **部署与应急手册**: `doc_backend_deploy`（[`docs-coolie/specs/backend-deployment-sop.md`](../docs-coolie/specs/backend-deployment-sop.md)）—— 责任人：`emp_sre`
 
 ### 3.3 移动端工匠驾驶舱 (Expo Mobile - `sys_mobile`)
-- **PRD 交互原型**: `doc_mobile_prd`（[`docs-coolie/APP-PAGES-AUDIT.md`](file:///host-workspace/xaicd/coolie/docs-coolie/APP-PAGES-AUDIT.md)）—— 责任人：`emp_ds`
-- **HLD 移动端架构**: `doc_mobile_arch`（[`docs-coolie/P2-NATIVE-ENGINE-AND-WORKFLOW-PLAN.md`](file:///host-workspace/xaicd/coolie/docs-coolie/P2-NATIVE-ENGINE-AND-WORKFLOW-PLAN.md)）—— 责任人：`emp_fda`
-- **LLD 状态机与防抖**: `doc_mobile_state_machine`（[`docs-coolie/TASKDETAIL-AUDIT.md`](file:///host-workspace/xaicd/coolie/docs-coolie/TASKDETAIL-AUDIT.md)）—— 责任人：`emp_fdse`
-- **多端真机测试**: `doc_mobile_test`（[`docs-coolie/RTK-L1-VALIDATION.md`](file:///host-workspace/xaicd/coolie/docs-coolie/RTK-L1-VALIDATION.md)）—— 责任人：`emp_fdse`
-- **双轨热更 SOP**: `doc_mobile_ota_sop`（[`docs-coolie/OTA-TRIGGERED.md`](file:///host-workspace/xaicd/coolie/docs-coolie/OTA-TRIGGERED.md)）—— 责任人：`emp_sre`
+- **PRD 交互原型**: `doc_mobile_prd`（[`docs-coolie/APP-PAGES-AUDIT.md`](../docs-coolie/APP-PAGES-AUDIT.md)）—— 责任人：`emp_ds`
+- **HLD 移动端架构**: `doc_mobile_arch`（[`docs-coolie/P2-NATIVE-ENGINE-AND-WORKFLOW-PLAN.md`](../docs-coolie/P2-NATIVE-ENGINE-AND-WORKFLOW-PLAN.md)）—— 责任人：`emp_fda`
+- **LLD 状态机与防抖**: `doc_mobile_state_machine`（[`docs-coolie/TASKDETAIL-AUDIT.md`](../docs-coolie/TASKDETAIL-AUDIT.md)）—— 责任人：`emp_fdse`
+- **多端真机测试**: `doc_mobile_test`（[`docs-coolie/RTK-L1-VALIDATION.md`](../docs-coolie/RTK-L1-VALIDATION.md)）—— 责任人：`emp_fdse`
+- **双轨热更 SOP**: `doc_mobile_ota_sop`（[`docs-coolie/OTA-TRIGGERED.md`](../docs-coolie/OTA-TRIGGERED.md)）—— 责任人：`emp_sre`
 
 ### 3.4 CMMI 5 高成熟度全组织度量与预防资料
-- **量化与 SPC 控制**: `doc_cmmi_qpm_spc`（[`docs-coolie/metrics/spc-control-charts.md`](file:///host-workspace/xaicd/coolie/docs-coolie/metrics/spc-control-charts.md)）—— 责任人：`emp_hermes`
-- **因果分析与缺陷预防**: `doc_cmmi_car_prevention`（[`docs-coolie/metrics/car-defect-prevention.md`](file:///host-workspace/xaicd/coolie/docs-coolie/metrics/car-defect-prevention.md)）—— 责任人：`emp_hermes`
-- **组织级上下文基座**: `doc_company_context`（[`docs-coolie/ENTERPRISE-CONTEXT.md`](file:///host-workspace/xaicd/coolie/docs-coolie/ENTERPRISE-CONTEXT.md)）—— 责任人：`emp_fda`
+- **量化与 SPC 控制**: `doc_cmmi_qpm_spc`（[`docs-coolie/metrics/spc-control-charts.md`](../docs-coolie/metrics/spc-control-charts.md)）—— 责任人：`emp_hermes`
+- **因果分析与缺陷预防**: `doc_cmmi_car_prevention`（[`docs-coolie/metrics/car-defect-prevention.md`](../docs-coolie/metrics/car-defect-prevention.md)）—— 责任人：`emp_hermes`
+- **组织级上下文基座**: `doc_company_context`（[`docs-coolie/ENTERPRISE-CONTEXT.md`](../docs-coolie/ENTERPRISE-CONTEXT.md)）—— 责任人：`emp_fda`
 
 ---
 

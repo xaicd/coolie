@@ -13,6 +13,7 @@
  */
 import process from "node:process";
 import fs from "node:fs/promises";
+import path from "node:path";
 
 const API_BASE = process.env.API_BASE ?? "https://xrobinai.cn/api";
 const TOKEN = process.env.PAPERCLIP_API_KEY ?? "pcp_board_099d6a31f8ebf4c46f4b129d6e62296a161f3e12764cdc62";
@@ -25,8 +26,9 @@ const HEADERS = {
   "Content-Type": "application/json",
 };
 
-const EVIDENCE_DIR = "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/wave240";
-const REPORT_PATH = "/Users/mac/workspace/xaicd/coolie/docs-coolie/QA/2026-10-01-boss-find-v.md";
+const REPO_ROOT = process.env.REPO_ROOT ?? path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
+const EVIDENCE_DIR = path.join(REPO_ROOT, "docs-coolie/evidence/wave240");
+const REPORT_PATH = path.join(REPO_ROOT, "docs-coolie/QA/2026-10-01-boss-find-v.md");
 
 // 缺陷池 — 每条都有: severity (P0/P1/P2/P3), source, screen, repro, expected, actual, screenshot
 const DEFECTS = [

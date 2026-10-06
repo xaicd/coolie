@@ -78,7 +78,7 @@ flowchart TD
 ## 3. 脚手架与定制化工程落地
 
 为了让新项目或纳管的业务系统快速获得 CMMI 全套能力，系统提供了自动化脚手架工具：
-[`scripts/scaffold-project-cmmi-skills.mjs`](file:///host-workspace/xaicd/coolie/scripts/scaffold-project-cmmi-skills.mjs)。
+[`scripts/scaffold-project-cmmi-skills.mjs`](../../scripts/scaffold-project-cmmi-skills.mjs)。
 
 ### 3.1 脚手架执行命令
 ```bash

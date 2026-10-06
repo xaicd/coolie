@@ -5,7 +5,7 @@ Fixes over v1: (a) mount prefix bound via import-line (file stem -> local var
 """
 import re, os, glob, collections
 
-ROOT = "/Users/mac/workspace/xaicd/coolie"
+ROOT = os.environ.get("REPO_ROOT", os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 app_ts = open(f"{ROOT}/server/src/app.ts").read()
 prefix_by_var = {}

@@ -15,6 +15,7 @@
  * 3299 with its own data dir (see playwright.config.ts). Each test run gets a
  * brand-new company + plugin install, so there is no auth, no shared state.
  */
+import path from "node:path";
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 
 const COMPANY_NAME = `Ontology AI ${Date.now()}`;
@@ -65,7 +66,7 @@ test.beforeAll(async ({ request }) => {
 
   const install = await request.post("/api/plugins/install", {
     data: {
-      packageName: "/Users/mac/workspace/xaicd/coolie/packages/plugins/plugin-ontology",
+      packageName: path.resolve(__dirname, "../../packages/plugins/plugin-ontology"),
       isLocalPath: true,
     },
   });

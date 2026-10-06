@@ -42,9 +42,9 @@ E. 老板装 0.5.30 验证不报"未包含任何证书"
 # 仓库内
 find . -name "release.keystore" -o -name "*.jks" 2>/dev/null | head
 
-# /Users/mac 本机 (boss 之前可能放过)
-ls -la /Users/mac/.keystore /Users/mac/keystore /Users/mac/Documents/keystore 2>&1 | head
-find /Users/mac -name "release.keystore" 2>/dev/null | head
+# $HOME 本机 (boss 之前可能放过)
+ls -la ~/.keystore ~/keystore ~/Documents/keystore 2>&1 | head
+find ~ -name "release.keystore" 2>/dev/null | head
 ```
 
 期望: 找到 0.3.4 时用的 release.keystore (RSA 4096).

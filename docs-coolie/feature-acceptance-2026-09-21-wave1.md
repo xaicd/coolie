@@ -27,7 +27,7 @@
 
 | # | 项 | 结论 | 证据 |
 |---|---|---|---|
-| 2 | 看额度 | **FAIL（h5 面）** / 有公司级支出卡（board UI 面） | `/Users/mac/workspace/xaicd/coolie/clients/h5/replays/evidence/feat-2-quota.png`（h5 无额度卡）；`.../feat-2-quota-boardui.png`（`:3100` 仪表盘 `$0.00 本月支出 Unlimited budget`） |
+| 2 | 看额度 | **FAIL（h5 面）** / 有公司级支出卡（board UI 面） | `$REPO_ROOT/clients/h5/replays/evidence/feat-2-quota.png`（h5 无额度卡）；`.../feat-2-quota-boardui.png`（`:3100` 仪表盘 `$0.00 本月支出 Unlimited budget`） |
 | 5 | 看原型 | **PASS** | `.../feat-5-prototype.png` |
 | 11 | 本体驱动 | **FAIL（h5 面）** / **PASS（board UI 面，7 域）** | `.../feat-11-ontology.png`（h5 无本体页）；`.../feat-11-ontology-boardui.png`（`:3100/COO/ontology` 7 域） |
 
@@ -128,7 +128,7 @@ drwxr-xr-x   3 mac  staff      96 Sep 21 11:27 ..
 -rw-r--r--   1 mac  staff  359176 Sep 21 12:32 feat-5-prototype.png
 ```
 
-**本地绝对路径**：`/Users/mac/workspace/xaicd/coolie/clients/h5/replays/evidence/`
+**本地路径**：`$REPO_ROOT/clients/h5/replays/evidence/`
 **git 状态**：`clients/*/replays/evidence/` 已在 `.gitignore`（`git check-ignore` 命中），
 截图不入库。本次 commit 只带 `.md`（报告 + 红表 + PM 节）。
 

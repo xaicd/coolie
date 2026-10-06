@@ -1,11 +1,13 @@
 // Coolie (Paperclip fork) 本地常驻配置 — pm2
 // 启动:  pm2 start ecosystem.config.cjs   （在仓库根目录执行）
 // 日常:  pm2 restart coolie | pm2 logs coolie | pm2 status
+const path = require("node:path");
+
 module.exports = {
   apps: [
     {
       name: "coolie",
-      cwd: "/Users/mac/workspace/xaicd/coolie/server",
+      cwd: path.resolve(__dirname, "server"),
       script: "./node_modules/.bin/tsx",
       args: "src/index.ts",
       // 注意：不能用 node dist/index.js —— workspace 包(@paperclipai/db 等)的

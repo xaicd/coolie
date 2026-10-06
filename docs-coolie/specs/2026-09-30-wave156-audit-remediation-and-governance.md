@@ -8,11 +8,11 @@
 
 在针对系统近期一系列交付（`v0.6.0` / `wave152` ~ `wave155`）进行全量代码审计与 Palantir 五角色（FDA / Core SWE / PRE-SRE / FDSE / DS）工程走查中，发现并锁定了影响生产合规与交付体验的三大核心问题：
 
-1. **Fork Surface 门禁阻断 (Core SWE / SRE)**：`wave154`/`wave155` 在上游属主目录下新增与修改了 19 个文件（DB 迁移、shared 类型契约、服务端路由及前端组件），未在 [`scripts/fork-surface.json`](file:///host-workspace/xaicd/coolie/scripts/fork-surface.json) 中登记，导致 `node scripts/check-fork-surface.mjs --range=946c9fd7f3..899b45ea56` 报 19 项 undeclared 失败。
-2. **Onboarding 重定向 UX 竞态缺陷 (FDSE / DS)**：[`ui/src/App.tsx`](file:///host-workspace/xaicd/coolie/ui/src/App.tsx) 中 `CompanyRootRedirect` 组件在 `useQuery` 尚处于 loading 状态时（`data: onboarding` 为 `undefined`），无条件回退并立即执行 `<Navigate to="/${targetCompany.issuePrefix}/dashboard" replace />`。这导致新企业首次登录时，在网络请求返回前组件就已卸载并跳转至控制台，使新手 3 步引导向导 (`/getting-started`) 被永久静默跳过。
+1. **Fork Surface 门禁阻断 (Core SWE / SRE)**：`wave154`/`wave155` 在上游属主目录下新增与修改了 19 个文件（DB 迁移、shared 类型契约、服务端路由及前端组件），未在 [`scripts/fork-surface.json`](../../scripts/fork-surface.json) 中登记，导致 `node scripts/check-fork-surface.mjs --range=946c9fd7f3..899b45ea56` 报 19 项 undeclared 失败。
+2. **Onboarding 重定向 UX 竞态缺陷 (FDSE / DS)**：[`ui/src/App.tsx`](../../ui/src/App.tsx) 中 `CompanyRootRedirect` 组件在 `useQuery` 尚处于 loading 状态时（`data: onboarding` 为 `undefined`），无条件回退并立即执行 `<Navigate to="/${targetCompany.issuePrefix}/dashboard" replace />`。这导致新企业首次登录时，在网络请求返回前组件就已卸载并跳转至控制台，使新手 3 步引导向导 (`/getting-started`) 被永久静默跳过。
 3. **RBAC 鉴权缺位与审计缺失 (FDA / Core SWE)**：
-   - [`server/src/routes/onboarding.ts`](file:///host-workspace/xaicd/coolie/server/src/routes/onboarding.ts) 中推进向导步骤 (`POST /step`) 和完成向导 (`POST /complete`) 仅校验了企业成员权限，未校验 Board 操作员权限 (`assertBoard(req)`)，违背了 [`AGENTS.md`](file:///host-workspace/xaicd/coolie/AGENTS.md) 规则 8（变异性操作必须区分 board 与 agent 身份）。
-   - [`server/src/routes/ontology-graph.ts`](file:///host-workspace/xaicd/coolie/server/src/routes/ontology-graph.ts) 中触发批量链接生成的 `POST /ontology/backfill` 虽已实现幂等，但缺少 `logActivity` 审计留痕。
+   - [`server/src/routes/onboarding.ts`](../../server/src/routes/onboarding.ts) 中推进向导步骤 (`POST /step`) 和完成向导 (`POST /complete`) 仅校验了企业成员权限，未校验 Board 操作员权限 (`assertBoard(req)`)，违背了 [`AGENTS.md`](../../AGENTS.md) 规则 8（变异性操作必须区分 board 与 agent 身份）。
+   - [`server/src/routes/ontology-graph.ts`](../../server/src/routes/ontology-graph.ts) 中触发批量链接生成的 `POST /ontology/backfill` 虽已实现幂等，但缺少 `logActivity` 审计留痕。
 
 本 Spec 遵循 Spec-Driven 开发链，旨在收敛并一次性闭环解决上述审计缺陷。
 
@@ -60,11 +60,11 @@
 
 本任务仅允许对以下既有文件进行编辑修改：
 
-1. [`ui/src/App.tsx`](file:///host-workspace/xaicd/coolie/ui/src/App.tsx) —— 修复 `CompanyRootRedirect` 加载竞态逻辑。
-2. [`server/src/routes/onboarding.ts`](file:///host-workspace/xaicd/coolie/server/src/routes/onboarding.ts) —— 补充 `assertBoard(req)` 门禁。
-3. [`server/src/routes/ontology-graph.ts`](file:///host-workspace/xaicd/coolie/server/src/routes/ontology-graph.ts) —— 补充 `assertBoard(req)` 与 `logActivity` 审计。
-4. [`scripts/fork-surface.json`](file:///host-workspace/xaicd/coolie/scripts/fork-surface.json) —— 登记 19 个 wave154/155 文件与合理预算。
-5. [`server/src/__tests__/onboarding-routes.test.ts`](file:///host-workspace/xaicd/coolie/server/src/__tests__/onboarding-routes.test.ts) —— 补齐 403 Board 权限拦截单测。
+1. [`ui/src/App.tsx`](../../ui/src/App.tsx) —— 修复 `CompanyRootRedirect` 加载竞态逻辑。
+2. [`server/src/routes/onboarding.ts`](../../server/src/routes/onboarding.ts) —— 补充 `assertBoard(req)` 门禁。
+3. [`server/src/routes/ontology-graph.ts`](../../server/src/routes/ontology-graph.ts) —— 补充 `assertBoard(req)` 与 `logActivity` 审计。
+4. [`scripts/fork-surface.json`](../../scripts/fork-surface.json) —— 登记 19 个 wave154/155 文件与合理预算。
+5. [`server/src/__tests__/onboarding-routes.test.ts`](../../server/src/__tests__/onboarding-routes.test.ts) —— 补齐 403 Board 权限拦截单测。
 
 ---
 

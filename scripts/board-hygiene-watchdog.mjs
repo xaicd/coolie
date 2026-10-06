@@ -7,8 +7,9 @@ import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
 
+const REPO_ROOT = process.env.REPO_ROOT || path.resolve(path.dirname(new URL(import.meta.url).pathname), "..");
 const COMPANY_ID = "da2e705c-c80a-411b-b2ae-e39372b1251f"; // Coolie 本地施工总社
-const LOG_FILE = "/Users/mac/workspace/xaicd/coolie/.coolie-local/logs/board-hygiene-audit.log";
+const LOG_FILE = path.join(REPO_ROOT, ".coolie-local/logs/board-hygiene-audit.log");
 
 function fetchJson(urlPath, options = {}) {
   return new Promise((resolve, reject) => {

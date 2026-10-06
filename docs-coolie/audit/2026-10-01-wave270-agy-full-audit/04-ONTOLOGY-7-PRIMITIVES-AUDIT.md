@@ -588,6 +588,6 @@ PM wave261 的 5 层下钻 (L0-L4) 在 PM 视角是 "导航友好度" 工作, �
 ---
 
 **审计结束. 报告人: agy (wave270 audit 4/4)**
-**报告路径**: `/Users/mac/workspace/xaicd/coolie/docs-coolie/audit/2026-10-01-wave270-agy-full-audit/04-ONTOLOGY-7-PRIMITIVES-AUDIT.md`
+**报告路径**: `$REPO_ROOT/docs-coolie/audit/2026-10-01-wave270-agy-full-audit/04-ONTOLOGY-7-PRIMITIVES-AUDIT.md`
 **审计范围**: 只读, 0 改动
 **给老板的话**: 「Property 真做完 (1/7), Link/Type/Object 走旧实现 (3/7), Branch/Action/Function 没做 (3/7)。L0-L4 是导航路径不是 Palantir primitives。」

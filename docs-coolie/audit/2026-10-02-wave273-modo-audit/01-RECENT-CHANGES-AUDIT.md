@@ -404,8 +404,8 @@
 
 | 类型 | 路径 |
 |---|---|
-| **本报告** | `/Users/mac/workspace/xaicd/coolie/docs-coolie/audit/2026-10-02-wave273-modo-audit/01-RECENT-CHANGES-AUDIT.md` |
-| 老板拍板文件 | `/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/wave273/QA-REPORT.md` (由本报告结论摘出) |
+| **本报告** | `$REPO_ROOT/docs-coolie/audit/2026-10-02-wave273-modo-audit/01-RECENT-CHANGES-AUDIT.md` |
+| 老板拍板文件 | `$REPO_ROOT/docs-coolie/evidence/wave273/QA-REPORT.md` (由本报告结论摘出) |
 
 ### 7.2 期望老板下一步
 

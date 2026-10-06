@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # [墨斗 FDA 专属] 架构边界与公司作用域隔离安全扫描
 set -euo pipefail
-cd "/host-workspace/xaicd/coolie"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+cd "$REPO_ROOT"
 
 echo "=== [1/2] 扫描非法绕过 companyId 的路由实体 ==="
 # 检查 server/src/routes 下是否存在漏掉 companyId 鉴权的直接操作

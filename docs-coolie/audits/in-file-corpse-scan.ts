@@ -8,7 +8,7 @@ import { parse } from '@babel/parser';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const ROOT = process.argv[2] || '/Users/mac/workspace/xaicd/coolie/ui/src';
+const ROOT = process.argv[2] || path.resolve(__dirname, '../../ui/src');
 
 function walk(dir: string, out: string[] = []): string[] {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

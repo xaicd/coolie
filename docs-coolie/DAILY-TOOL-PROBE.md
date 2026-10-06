@@ -87,8 +87,8 @@ bash scripts/daily-tool-probe.sh --register
 
 会做两件事:
 
-1. **建 wrapper** `/Users/mac/bin/daily-tool-probe.sh -> $REPO_ROOT/scripts/daily-tool-probe.sh` (如缺).
-2. **追加 cron 行** `0 8 * * * /Users/mac/bin/daily-tool-probe.sh # wave277-tool-probe` (如缺, idempotent 跳过).
+1. **建 wrapper** `~/bin/daily-tool-probe.sh -> $REPO_ROOT/scripts/daily-tool-probe.sh` (如缺).
+2. **追加 cron 行** `0 8 * * * $HOME/bin/daily-tool-probe.sh # wave277-tool-probe` (如缺, idempotent 跳过).
 
 ### 2.3 撤销 cron
 
@@ -135,7 +135,7 @@ claude-glm      /opt/homebrew/bin/claude                ANTHROPIC_MODEL=glm-5 cl
 cmd             /opt/homebrew/bin/cmd                   cmd -p '回复 OK'                                   4s    OK OK                          OK
 copilot         /opt/homebrew/bin/copilot               copilot -p '回复 OK'                                11s  OK OK                          OK
 Hermes          Hermes (PM 工具: Hermes 自己; 本会话响应) 5 字段汇报 (cron-team-status.sh)                   <1s  OK Hermes 响应 + dispatch-wav OK
-kiro-cli        /Users/mac/.local/bin/kiro-cli          kiro-cli -p '回复 OK'                               0s    FAIL error: unexpected argumen FAIL
+kiro-cli        ~/.local/bin/kiro-cli          kiro-cli -p '回复 OK'                               0s    FAIL error: unexpected argumen FAIL
   → 修法: 检查 ~/.local/bin/ 或 PATH 路径; 重新安装工具
 ```
 

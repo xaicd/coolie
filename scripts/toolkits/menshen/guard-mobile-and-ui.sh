@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # [门神 FDSE 专属] 7 处版本号一致性与 UI Token 门禁检查
 set -euo pipefail
-cd "/host-workspace/xaicd/coolie"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+cd "$REPO_ROOT"
 
 echo "=== [1/2] 校验移动端与线上 7 处版本号一致性 ==="
 if [ -f "scripts/VERSION-CONSISTENCY-CHECK.sh" ]; then

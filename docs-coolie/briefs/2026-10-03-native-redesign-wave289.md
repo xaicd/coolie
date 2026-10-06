@@ -12,7 +12,7 @@
 | 项 | 值 |
 |---|---|
 | 项目 | Coolie (paperclip fork) |
-| 仓库 | `/Users/mac/workspace/xaicd/coolie` |
+| 仓库 | `$REPO_ROOT` |
 | 主分支 | `main` (HEAD `12676f2a8` release v0.6.24) |
 | 原型 | **v0.6.19 commit `37e6b3d77`** (10-01 22:08, 4 天前) |
 | 真值源 | `docs-coolie/EMPLOYEE-OBJECTS.md` + `TOOLS.md` |

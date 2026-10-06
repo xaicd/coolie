@@ -155,8 +155,8 @@ export interface IStorageDriver {
 
 在企业本体域中，交付物已全面融入拓扑结构：
 1. **实体扩展**：
-   - [`knowledge_document`](file:///host-workspace/xaicd/coolie/packages/plugins/plugin-ontology/src/samples/enterprise-domain.ts#L105) 扩展了 `storageBackend`、`storageUri`、`fileSize` 与 `checksum` 属性；
-   - [`cmdb_infrastructure_resource`](file:///host-workspace/xaicd/coolie/packages/plugins/plugin-ontology/src/samples/enterprise-domain.ts#L170) 扩充了 `git_repository` 资源类型支持。
+   - [`knowledge_document`](../../packages/plugins/plugin-ontology/src/samples/enterprise-domain.ts#L105) 扩展了 `storageBackend`、`storageUri`、`fileSize` 与 `checksum` 属性；
+   - [`cmdb_infrastructure_resource`](../../packages/plugins/plugin-ontology/src/samples/enterprise-domain.ts#L170) 扩充了 `git_repository` 资源类型支持。
 2. **拓扑关系**：
    - `stored_in_resource`（交付物 $\rightarrow$ 物理存储介质：`res_local_disk` / `res_git_repo` / `res_oss_bucket`）；
    - `documents_system`（交付物 $\rightarrow$ 业务系统）；

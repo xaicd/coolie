@@ -1416,6 +1416,72 @@
       "maxNetLines": 100,
       "reason": "wave357: 平台核心数字员工角色契约、中文简称、CMMI 头衔与 ACP 状态重置脚本。",
       "maxTotalLines": 280
+    },
+    {
+      "path": "ecosystem.config.cjs",
+      "maxNetLines": 50,
+      "reason": "wave280: pm2 configuration for local persistent dev server.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "scripts/board-hygiene-watchdog.mjs",
+      "maxNetLines": 150,
+      "reason": "wave286: Board hygiene watchdog script for auditing tasks.",
+      "maxTotalLines": 160
+    },
+    {
+      "path": "scripts/board-hygiene-watchdog.sh",
+      "maxNetLines": 50,
+      "reason": "wave286: Shell wrapper for board hygiene watchdog.",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "scripts/coolie-dev-task.sh",
+      "maxNetLines": 20,
+      "reason": "wave286: Proxy runner for coolie-dev-task.mjs.",
+      "maxTotalLines": 25
+    },
+    {
+      "path": "scripts/e2e/wave129/explore-web.mjs",
+      "maxNetLines": 60,
+      "reason": "wave129: Playwright E2E exploration script for web board.",
+      "maxTotalLines": 70
+    },
+    {
+      "path": "scripts/e2e/wave129/lib.mjs",
+      "maxNetLines": 60,
+      "reason": "wave129: Shared Playwright helper lib for web board.",
+      "maxTotalLines": 70
+    },
+    {
+      "path": "scripts/qa-boss-find-v.mjs",
+      "maxNetLines": 750,
+      "reason": "wave240: QA boss findings verification script.",
+      "maxTotalLines": 780
+    },
+    {
+      "path": "scripts/toolkits/baixiaosheng/audit-board-and-spc.sh",
+      "maxNetLines": 60,
+      "reason": "wave284: Baixiaosheng DS toolkit script for board and SPC auditing.",
+      "maxTotalLines": 70
+    },
+    {
+      "path": "scripts/toolkits/menshen/guard-mobile-and-ui.sh",
+      "maxNetLines": 30,
+      "reason": "wave284: Menshen FDSE toolkit script for version consistency and UI tokens.",
+      "maxTotalLines": 40
+    },
+    {
+      "path": "scripts/toolkits/modou/scan-arch-boundaries.sh",
+      "maxNetLines": 30,
+      "reason": "wave284: Modou FDA toolkit script for architectural boundary scanning.",
+      "maxTotalLines": 40
+    },
+    {
+      "path": "scripts/toolkits/tiejiang/guard-code-integrity.sh",
+      "maxNetLines": 40,
+      "reason": "wave284: Tiejiang Core SWE toolkit script for code integrity guard.",
+      "maxTotalLines": 50
     }
   ]
 }

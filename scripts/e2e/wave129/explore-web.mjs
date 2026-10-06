@@ -3,11 +3,13 @@
 import pw from "/opt/homebrew/lib/node_modules/playwright/index.js";
 const { chromium } = pw;
 import fs from "node:fs";
+import path from "node:path";
 
+const REPO_ROOT = process.env.REPO_ROOT ?? path.resolve(path.dirname(new URL(import.meta.url).pathname), "../../..");
 const BASE = process.env.WEB_BASE ?? "https://www.xrobinai.cn/XROA";
 const EMAIL = process.env.WEB_EMAIL ?? "robinschen1989@gmail.com";
 const PASSWORD = process.env.WEB_PASSWORD ?? "Cx-TWzbcbpOSLCxb4";
-const OUT = process.env.WEB_OUT ?? "/Users/mac/workspace/xaicd/coolie/docs-coolie/evidence/wave129/web";
+const OUT = process.env.WEB_OUT ?? path.join(REPO_ROOT, "docs-coolie/evidence/wave129/web");
 const STATE = process.env.WEB_STATE ?? "/tmp/ad-wave129/web-state.json";
 
 const dump = async (page, tag) => {

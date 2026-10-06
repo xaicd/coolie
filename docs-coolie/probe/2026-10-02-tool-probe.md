@@ -20,13 +20,13 @@
 | cmd | `/opt/homebrew/bin/cmd` | `cmd -p '回复 OK'` | 4s | OK OK | **OK** |
 | copilot | `/opt/homebrew/bin/copilot` | `copilot -p '回复 OK'` | 12s | OK OK | **OK** |
 | Hermes | `Hermes (PM 工具: Hermes 自己; 本会话响应)` | `5 字段汇报 (cron-team-status.sh)` | <1s | OK Hermes 响应 + dispatch-wave277.sh 存在 | **OK** |
-| kiro-cli | `/Users/mac/.local/bin/kiro-cli` | `kiro-cli -p '回复 OK'` | 0s | FAIL error: unexpected argument '-p' found | **FAIL** |
+| kiro-cli | `~/.local/bin/kiro-cli` | `kiro-cli -p '回复 OK'` | 0s | FAIL error: unexpected argument '-p' found | **FAIL** |
 
 ## 2. 失败修法 (按工具)
 
 ### kiro-cli → FAIL
 
-- 路径: `/Users/mac/.local/bin/kiro-cli`
+- 路径: `~/.local/bin/kiro-cli`
 - 真跑探测: `kiro-cli -p '回复 OK'`
 - 响应时间: 0s
 - 响应结果: FAIL error: unexpected argument '-p' found

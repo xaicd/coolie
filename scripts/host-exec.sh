@@ -42,7 +42,7 @@ if [[ -z "$TARGET_HOST" ]]; then
   [[ -n "$TARGET_HOST" ]] || TARGET_HOST="192.168.3.90"
 fi
 
-RAW_SCRIPT="export PATH=\"/opt/homebrew/Cellar/node@24/24.20.0/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:\$PATH\"; cd /Users/mac/workspace/xaicd/coolie 2>/dev/null || true; $*"
+RAW_SCRIPT="export PATH=\"/opt/homebrew/Cellar/node@24/24.20.0/bin:/opt/homebrew/bin:/opt/homebrew/sbin:/usr/local/bin:\$PATH\"; cd \"\${HOST_WORKSPACE:-\$HOME/workspace/xaicd/coolie}\" 2>/dev/null || true; $*"
 B64_SCRIPT="$(printf '%s' "$RAW_SCRIPT" | base64 | tr -d '\r\n')"
 
 exec ssh -o StrictHostKeyChecking=no \

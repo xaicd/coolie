@@ -16,7 +16,7 @@
 | `agent-device` CLI | ✅ 已装 `/opt/homebrew/bin/agent-device`（69 commands） |
 | `agent-device devices` | ⚠️ 空（无任何可用设备） |
 | iOS 模拟器 | ❌ 无（`xcrun simctl` 不可用，本机只有 CommandLineTools，无 Xcode） |
-| Android SDK | ⚠️ `/Users/mac/android-sdk` 有 build-tools/platform-tools/ndk/platforms，但**无 emulator、无 system-images** |
+| Android SDK | ⚠️ `~/android-sdk` 有 build-tools/platform-tools/ndk/platforms，但**无 emulator、无 system-images** |
 | `adb devices` | ⚠️ 空（无真机连接） |
 | agent-device web 后端 | ❌ `agent-device web doctor` → `TOOL_MISSING: Managed web browser backend is not installed` |
 | `clients/expo/replays/coolie-flow.ad` | ⚠️ 存在但在 `agent-device/e2e-ios` 分支，且 `open cloud.coolie.app`（**域名错**，生产是 xrobinai.cn） |

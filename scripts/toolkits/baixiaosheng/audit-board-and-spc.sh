@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # [百晓生 DS 专属] 看板质量巡检、死任务审计与 Go/No-Go 数据核验
 set -euo pipefail
-cd "/host-workspace/xaicd/coolie"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+cd "$REPO_ROOT"
 
 EXEC_CMD="curl -s http://127.0.0.1:3100/api/companies"
 if [ -f "scripts/host-exec.sh" ] && [ -f "/.dockerenv" ]; then

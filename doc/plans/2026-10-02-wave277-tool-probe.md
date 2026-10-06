@@ -5,7 +5,7 @@
 ## 1. 范围
 
 - **新增** `scripts/daily-tool-probe.sh` (7 工具探测 + 5 字段表格 + 失败修法 + cron 注册/撤销 + JSON 输出)
-- **新增** `/Users/mac/bin/daily-tool-probe.sh` symlink wrapper (cron 触发)
+- **新增** `~/bin/daily-tool-probe.sh` symlink wrapper (cron 触发)
 - **新增** `docs-coolie/probe/2026-10-02-tool-probe.md` (第一次跑出来的报告)
 - **新增** `docs-coolie/DAILY-TOOL-PROBE.md` (操作手册)
 - **新增** `docs-coolie/evidence/wave277/QA-REPORT.md` (本报告)
@@ -30,7 +30,7 @@
 | 4 | cmd | /opt/homebrew/bin/cmd | cmd --version + -p "test" |
 | 5 | copilot | /opt/homebrew/bin/copilot | copilot --version + -p "test" |
 | 6 | Hermes | Hermes (PM) | 本会话响应 + ~/bin/dispatch-wave<NNN>.sh 存在 |
-| 7 | kiro-cli | /Users/mac/.local/bin/kiro-cli | kiro-cli --version + --help |
+| 7 | kiro-cli | ~/.local/bin/kiro-cli | kiro-cli --version + --help |
 
 ## 4. 5 字段表格 (老板硬规矩)
 
@@ -52,7 +52,7 @@
 ## 6. Cron
 
 ```
-0 8 * * * /Users/mac/bin/daily-tool-probe.sh # wave277-tool-probe
+0 8 * * * ~/bin/daily-tool-probe.sh # wave277-tool-probe
 ```
 
 与 wave276 `*/30 * * * * cron-team-status.sh` 并存, 老板早上 8 点看工具 OK/FAIL.

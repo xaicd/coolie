@@ -72,12 +72,12 @@ bash scripts/tool-health-monitor.sh --help
 **改 crontab** (PM 不动老板本机, 写 brief 给铁匠告诉老板怎么加):
 
 ```
-*/120 * * * * /Users/mac/bin/tool-health-monitor.sh --print >> /tmp/tool-health.log 2>&1 # wave281-tool-health
+*/120 * * * * ~/bin/tool-health-monitor.sh --print >> /tmp/tool-health.log 2>&1 # wave281-tool-health
 ```
 
 **注**: 老板现有 cron 2 行:
 - `*/30 * * * * bash scripts/cron-team-status.sh --print` (wave276)
-- `0 8 * * * /Users/mac/bin/daily-tool-probe.sh` (wave277)
+- `0 8 * * * ~/bin/daily-tool-probe.sh` (wave277)
 
 **新加 1 行** (每 2 小时), 保留 daily-tool-probe.sh (每天 8:00 早起详细探测).
 

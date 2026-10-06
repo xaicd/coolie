@@ -58,7 +58,7 @@ graph TD
 
 ### 支柱一：元模型演进与存量实例自愈迁移 (Schema Evolution & Data Backfill)
 
-在系统底层 [`packages/ontology-core/src/schemaEvolution.ts`](file:///host-workspace/xaicd/coolie/packages/ontology-core/src/schemaEvolution.ts) 中，早已沉淀了核心演进逻辑：
+在系统底层 [`packages/ontology-core/src/schemaEvolution.ts`](../../packages/ontology-core/src/schemaEvolution.ts) 中，早已沉淀了核心演进逻辑：
 1. **模式差异探测 (`diffPropertySchemas`)**：
    - 比较演进前后的 `properties_schema`，精准切分出 `removed`（弃用）与 `added`（新增）键集合；
 2. **重命名与映射调度 (`planPropertyRenames`)**：
@@ -94,7 +94,7 @@ graph TD
 
 ### 支柱四：数据血缘与全生命周期因果溯源 (Provenance & Lineage)
 
-依据 [`packages/ontology-core/src/provenance.ts`](file:///host-workspace/xaicd/coolie/packages/ontology-core/src/provenance.ts) 的设计：
+依据 [`packages/ontology-core/src/provenance.ts`](../../packages/ontology-core/src/provenance.ts) 的设计：
 1. **一切对象皆有出处 (Provenance Binding)**：
    - 每个实体均绑有 `origin: { namespace, module, service, table }` 与 `sourceFiles`；
 2. **全流程因果回放 (Causal Playback)**：

@@ -35,7 +35,7 @@
 |---|---|---|---|
 | 1 | **终端 180s 超时杀进程** | Hermes 微信内部终端工具为前台同步等待，3分钟超时直接 SIGKILL 铁匠 | **解耦异步**：Hermes 仅建工单；由后台常驻 Runner Bridge 独立执行，不受微信超时限制 |
 | 2 | **幽灵虚报 (跑了10小时)** | 进程被杀后 Receipt 仍停在 running，监控脚本只认 JSON 文本 | **活体探活**：`cron-team-status.sh` 加入 `kill -0 $PID` 检测，死进程自动置为 failed 自愈 |
-| 3 | **路径与用户名写死** | 脚本硬编码 `/Users/mac/...`，换机器/换用户直接路径报错 | **动态寻径**：全部改用 `path.resolve(__dirname, "..")` 与 `REPO_ROOT` 动态定位 |
+| 3 | **路径与用户名写死** | 脚本硬编码 `/Users/<username>/...`，换机器/换用户直接路径报错 | **动态寻径**：全部改用 `path.resolve(__dirname, "..")` 与 `REPO_ROOT` 动态定位 |
 | 4 | **外部 DB 依赖过重** | 以为跑 Dev Server 必须配 Postgres / Docker DB | **零配置内嵌**：不设 `DATABASE_URL` 时自动启动内嵌式 PGlite，数据秒级拉起 |
 | 5 | **守护进程漂移掉线** | Mac 休眠或重启后 Bridge 掉线，没人消费新工单 | **Crontab 看门狗**：每 5 分钟自动检测进程，挂掉秒级自动拉活 |
 

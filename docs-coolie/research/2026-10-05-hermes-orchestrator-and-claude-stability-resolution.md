@@ -93,7 +93,7 @@ graph TD
 ### 3.2 彻底清理并封死 Claude 内部 Subagent
 - **宿主机环境清理**：彻底删除宿主机 `~/.claude/agents/` 目录，实测验证已清空；
 - **脚本防护改造**：改造 `scripts/register-employees-cron.sh`，严禁向 `~/.claude/agents/` 写入任何 subagent 文件，转为向外广播保护提示；
-- **法典最高守卫**：在最高法典 [`AGENTS.md`](file:///host-workspace/xaicd/coolie/AGENTS.md) 确立第 17 章《Hermes 唯一总指挥与扁平化 Worker 铁律》。
+- **法典最高守卫**：在最高法典 [`AGENTS.md`](../../AGENTS.md) 确立第 17 章《Hermes 唯一总指挥与扁平化 Worker 铁律》。
 
 ### 3.3 自动化编译审计全面管局
 在 `scripts/check-governance-audit.mjs` 中新增第 6 大维度守卫：

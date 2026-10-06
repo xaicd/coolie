@@ -36,10 +36,10 @@
 
 | 交付线 (Subagent 域) | 审查重点与覆盖范围 | 现状与核心发现 | 交叉验证结论 | 责任文件与行号 |
 |---|---|---|---|---|
-| **01 导航与路由核心** | `App.tsx` (1976行) 单体路由、31 屏调度、回退栈、深链 | 采用单一平面 20+ 个 `useState` 嵌套三元渲染。存在 2 处致命的三元条件遮蔽，子页面无法弹出；深链仅支持单条 prompt；回退栈与渲染优先级倒置。 | **未达标 (G1 阻断)**：缺乏统一栈式路由，状态互斥混乱。 | [`App.tsx:1245-1277`](file:///host-workspace/xaicd/coolie/clients/expo/App.tsx#L1245-L1277)<br>[`App.tsx:880-896`](file:///host-workspace/xaicd/coolie/clients/expo/App.tsx#L880-L896) |
-| **02 任务与协作体系** | `TasksScreen`、`TaskKanbanScreen`、`TaskDetailScreen`、`CreateTaskModal` | wave254 重构的 `TasksScreen` 被 `App.tsx` 抛弃，强制单看板；看板内视图切换为假按钮；通知点入任务详情不拉接口，显示虚假默认值。 | **未达标 (G4 阻断)**：业务旅程断裂，用户无法在手机查看完整任务列表。 | [`TaskKanbanScreen.tsx:410-440`](file:///host-workspace/xaicd/coolie/clients/expo/src/screens/TaskKanbanScreen.tsx#L410-L440)<br>[`App.tsx:1369-1380`](file:///host-workspace/xaicd/coolie/clients/expo/App.tsx#L1369-L1380)<br>[`TaskDetailScreen.tsx:90-130`](file:///host-workspace/xaicd/coolie/clients/expo/src/screens/TaskDetailScreen.tsx#L90-L130) |
-| **03 资产与交付物** | `OrgAssetsScreen`、`ArtifactsScreen`、`PrototypeSandboxScreen`、`CodeDiff` | `OrgAssetsScreen` 的 `activeTab` 状态与外层 `initialTab` 缺乏同步（未重置/未加 key），导致外部直达交付物或员工失败；沙箱缺少任务反向导航闭环。 | **部分达标 (G4 警告)**：渲染通道通畅，但跨屏导航状态存在 React 状态冻结。 | [`OrgAssetsScreen.tsx:105`](file:///host-workspace/xaicd/coolie/clients/expo/src/screens/OrgAssetsScreen.tsx#L105)<br>[`App.tsx:1324-1335`](file:///host-workspace/xaicd/coolie/clients/expo/App.tsx#L1324-L1335) |
-| **04 Palantir 7 原语** | 7 张 DB 表、`server/src/routes/ontology*`、5 个本体前端屏 | 数据库建了 7 表/视图，但 `ontology-graph` 仍读写废弃的 `entityRelations`；Action/Function/Branch 在前后端均属于「未接通」状态。 | **严重断层 (G2/G3 阻断)**：伪 7 原语，表面宣称支持，实际仅消费了 Object/Property/Link。 | [`packages/db/src/schema/ontology_*.ts`](file:///host-workspace/xaicd/coolie/packages/db/src/schema/)<br>[`server/src/services/ontology-graph.ts:12`](file:///host-workspace/xaicd/coolie/server/src/services/ontology-graph.ts#L12) |
+| **01 导航与路由核心** | `App.tsx` (1976行) 单体路由、31 屏调度、回退栈、深链 | 采用单一平面 20+ 个 `useState` 嵌套三元渲染。存在 2 处致命的三元条件遮蔽，子页面无法弹出；深链仅支持单条 prompt；回退栈与渲染优先级倒置。 | **未达标 (G1 阻断)**：缺乏统一栈式路由，状态互斥混乱。 | [`App.tsx:1245-1277`](../../../clients/expo/App.tsx#L1245-L1277)<br>[`App.tsx:880-896`](../../../clients/expo/App.tsx#L880-L896) |
+| **02 任务与协作体系** | `TasksScreen`、`TaskKanbanScreen`、`TaskDetailScreen`、`CreateTaskModal` | wave254 重构的 `TasksScreen` 被 `App.tsx` 抛弃，强制单看板；看板内视图切换为假按钮；通知点入任务详情不拉接口，显示虚假默认值。 | **未达标 (G4 阻断)**：业务旅程断裂，用户无法在手机查看完整任务列表。 | [`TaskKanbanScreen.tsx:410-440`](../../../clients/expo/src/screens/TaskKanbanScreen.tsx#L410-L440)<br>[`App.tsx:1369-1380`](../../../clients/expo/App.tsx#L1369-L1380)<br>[`TaskDetailScreen.tsx:90-130`](../../../clients/expo/src/screens/TaskDetailScreen.tsx#L90-L130) |
+| **03 资产与交付物** | `OrgAssetsScreen`、`ArtifactsScreen`、`PrototypeSandboxScreen`、`CodeDiff` | `OrgAssetsScreen` 的 `activeTab` 状态与外层 `initialTab` 缺乏同步（未重置/未加 key），导致外部直达交付物或员工失败；沙箱缺少任务反向导航闭环。 | **部分达标 (G4 警告)**：渲染通道通畅，但跨屏导航状态存在 React 状态冻结。 | [`OrgAssetsScreen.tsx:105`](../../../clients/expo/src/screens/OrgAssetsScreen.tsx#L105)<br>[`App.tsx:1324-1335`](../../../clients/expo/App.tsx#L1324-L1335) |
+| **04 Palantir 7 原语** | 7 张 DB 表、`server/src/routes/ontology*`、5 个本体前端屏 | 数据库建了 7 表/视图，但 `ontology-graph` 仍读写废弃的 `entityRelations`；Action/Function/Branch 在前后端均属于「未接通」状态。 | **严重断层 (G2/G3 阻断)**：伪 7 原语，表面宣称支持，实际仅消费了 Object/Property/Link。 | [`packages/db/src/schema/ontology_*.ts`](../../../packages/db/src/schema/)<br>[`server/src/services/ontology-graph.ts:12`](../../../server/src/services/ontology-graph.ts#L12) |
 
 ---
 
@@ -49,7 +49,7 @@
 
 ### 3.1 致命的 React 状态机遮蔽：三元表达式顺序引发的「屏幕死锁」
 在 `App.tsx` 中，由于没有使用标准导航容器（如 React Navigation），所有屏都在一个庞大的三元表达式里判断：
-1. **本体工作台死锁**（[`App.tsx:1262-1277`](file:///host-workspace/xaicd/coolie/clients/expo/App.tsx#L1262-L1277)）：
+1. **本体工作台死锁**（[`App.tsx:1262-1277`](../../../clients/expo/App.tsx#L1262-L1277)）：
    ```tsx
    ) : instanceGraphType ? (
      <OntologyInstanceGraphScreen
@@ -61,7 +61,7 @@
    )
    ```
    **根因**：用户在实例图点击「打开工作台」时，只执行了 `setOntologyWorkbenchOpen(true)`，但 `instanceGraphType` 仍然为真！三元表达式直接在第一分支短路，工作台组件**永远轮不到执行**！老板在手机上点破屏幕也进不去工作台！
-2. **插件设置死锁**（[`App.tsx:1245-1258`](file:///host-workspace/xaicd/coolie/clients/expo/App.tsx#L1245-L1258)）：
+2. **插件设置死锁**（[`App.tsx:1245-1258`](../../../clients/expo/App.tsx#L1245-L1258)）：
    同样逻辑，`pluginManagerOpen` 排在 `pluginSettingsId` 之前，打开设置未关闭管理器，导致设置屏永远无法露脸。
 
 ### 3.2 乐观更新无版本防线：任务并发覆盖（Silent Overwrite）
@@ -92,16 +92,16 @@ onOpenIssue(
 
 | 优先级 | 编号 | 缺陷标题 | 缺陷特征与危害 | 精确位置 (文件及行号) |
 |---|---|---|---|---|
-| **P0** | P0-01 | **本体工作台（Workbench）屏幕被路由优先级锁死** | 用户在实例图点击「打开工作台」，三元表达式被 `instanceGraphType` 拦截，工作台绝对无法渲染。 | [`clients/expo/App.tsx:1262-1277`](file:///host-workspace/xaicd/coolie/clients/expo/App.tsx#L1262-L1277) |
-| **P0** | P0-02 | **插件设置屏（PluginSettings）无法弹出** | `pluginManagerOpen` 未置 false 导致三元分支无法下渗到 `pluginSettingsId`，插件无法配置。 | [`clients/expo/App.tsx:1245-1258`](file:///host-workspace/xaicd/coolie/clients/expo/App.tsx#L1245-L1258) |
-| **P0** | P0-03 | **看板 SegmentedControl 视图切换为死交互，真实列表屏被架空** | 点击「列表」完全不切视图；`App.tsx` 硬编码 `TaskKanbanScreen`，导致精心重构的 `TasksScreen` 无法访问。 | [`TaskKanbanScreen.tsx:410-440`](file:///host-workspace/xaicd/coolie/clients/expo/src/screens/TaskKanbanScreen.tsx#L410-L440)<br>[`App.tsx:1369-1380`](file:///host-workspace/xaicd/coolie/clients/expo/App.tsx#L1369-L1380) |
-| **P1** | P1-01 | **通知中心跳转伪造假 Issue 且详情页不拉真值** | 通知未命中缓存时伪造 `status: "todo"`，`TaskDetailScreen` 不更新实体，老板看到虚假任务状态。 | [`NotificationsScreen.tsx:98-101`](file:///host-workspace/xaicd/coolie/clients/expo/src/screens/NotificationsScreen.tsx#L98-L101)<br>[`TaskDetailScreen.tsx:90-130`](file:///host-workspace/xaicd/coolie/clients/expo/src/screens/TaskDetailScreen.tsx#L90-L130) |
-| **P1** | P1-02 | **OrgAssetsScreen 内部 tab 与外部 props 状态脱节** | `useState(initialTab)` 仅在挂载时生效，无同步且无 `key`，导致从沙箱等外部跳「交付产物」直接失效。 | [`OrgAssetsScreen.tsx:105`](file:///host-workspace/xaicd/coolie/clients/expo/src/screens/OrgAssetsScreen.tsx#L105)<br>[`App.tsx:1324-1335`](file:///host-workspace/xaicd/coolie/clients/expo/App.tsx#L1324-L1335) |
-| **P1** | P1-03 | **Palantir 7 原语在后端与前端实质性断层** | `ontology-graph` 仍走废弃表；Action/Function/Branch 三个原语无接口、无前端页面，原语支持率仅 57%。 | [`ontology-graph.ts:12`](file:///host-workspace/xaicd/coolie/server/src/services/ontology-graph.ts#L12)<br>[`schema/ontology_*.ts`](file:///host-workspace/xaicd/coolie/packages/db/src/schema/) |
-| **P1** | P1-04 | **InboxScreen 42KB 巨型屏幕沦为孤儿代码** | 页面完整实现收件箱归档、审批、批量操作，但在 `App.tsx` 零引用，底栏也移除了入口，造成代码死沉淀。 | [`clients/expo/src/screens/InboxScreen.tsx:126`](file:///host-workspace/xaicd/coolie/clients/expo/src/screens/InboxScreen.tsx#L126) |
-| **P2** | P2-01 | **深链能力贫瘠仅支持工坊 prompt** | 仅支持 `coolie://chat/build`，缺少任务详情、审批流直达等企业级协作深链。 | [`clients/expo/App.tsx:880-896`](file:///host-workspace/xaicd/coolie/clients/expo/App.tsx#L880-L896) |
-| **P2** | P2-02 | **看板状态拖拽缺乏并发版本校验机制** | 直接覆盖后端 status，多端并发或 Agent 运行中易发生静默覆盖。 | [`TaskKanbanScreen.tsx:280-320`](file:///host-workspace/xaicd/coolie/clients/expo/src/screens/TaskKanbanScreen.tsx#L280-L320) |
-| **P2** | P2-03 | **TabBar 注释与实现不符的口径漂移** | 注释称保留 5 项（含员工和收件箱），代码实际只有 4 项（收件箱完全剔除）。 | [`clients/expo/src/components/TabBar.tsx:26-54`](file:///host-workspace/xaicd/coolie/clients/expo/src/components/TabBar.tsx#L26-L54) |
+| **P0** | P0-01 | **本体工作台（Workbench）屏幕被路由优先级锁死** | 用户在实例图点击「打开工作台」，三元表达式被 `instanceGraphType` 拦截，工作台绝对无法渲染。 | [`clients/expo/App.tsx:1262-1277`](../../../clients/expo/App.tsx#L1262-L1277) |
+| **P0** | P0-02 | **插件设置屏（PluginSettings）无法弹出** | `pluginManagerOpen` 未置 false 导致三元分支无法下渗到 `pluginSettingsId`，插件无法配置。 | [`clients/expo/App.tsx:1245-1258`](../../../clients/expo/App.tsx#L1245-L1258) |
+| **P0** | P0-03 | **看板 SegmentedControl 视图切换为死交互，真实列表屏被架空** | 点击「列表」完全不切视图；`App.tsx` 硬编码 `TaskKanbanScreen`，导致精心重构的 `TasksScreen` 无法访问。 | [`TaskKanbanScreen.tsx:410-440`](../../../clients/expo/src/screens/TaskKanbanScreen.tsx#L410-L440)<br>[`App.tsx:1369-1380`](../../../clients/expo/App.tsx#L1369-L1380) |
+| **P1** | P1-01 | **通知中心跳转伪造假 Issue 且详情页不拉真值** | 通知未命中缓存时伪造 `status: "todo"`，`TaskDetailScreen` 不更新实体，老板看到虚假任务状态。 | [`NotificationsScreen.tsx:98-101`](../../../clients/expo/src/screens/NotificationsScreen.tsx#L98-L101)<br>[`TaskDetailScreen.tsx:90-130`](../../../clients/expo/src/screens/TaskDetailScreen.tsx#L90-L130) |
+| **P1** | P1-02 | **OrgAssetsScreen 内部 tab 与外部 props 状态脱节** | `useState(initialTab)` 仅在挂载时生效，无同步且无 `key`，导致从沙箱等外部跳「交付产物」直接失效。 | [`OrgAssetsScreen.tsx:105`](../../../clients/expo/src/screens/OrgAssetsScreen.tsx#L105)<br>[`App.tsx:1324-1335`](../../../clients/expo/App.tsx#L1324-L1335) |
+| **P1** | P1-03 | **Palantir 7 原语在后端与前端实质性断层** | `ontology-graph` 仍走废弃表；Action/Function/Branch 三个原语无接口、无前端页面，原语支持率仅 57%。 | [`ontology-graph.ts:12`](../../../server/src/services/ontology-graph.ts#L12)<br>[`schema/ontology_*.ts`](../../../packages/db/src/schema/) |
+| **P1** | P1-04 | **InboxScreen 42KB 巨型屏幕沦为孤儿代码** | 页面完整实现收件箱归档、审批、批量操作，但在 `App.tsx` 零引用，底栏也移除了入口，造成代码死沉淀。 | [`clients/expo/src/screens/InboxScreen.tsx:126`](../../../clients/expo/src/screens/InboxScreen.tsx#L126) |
+| **P2** | P2-01 | **深链能力贫瘠仅支持工坊 prompt** | 仅支持 `coolie://chat/build`，缺少任务详情、审批流直达等企业级协作深链。 | [`clients/expo/App.tsx:880-896`](../../../clients/expo/App.tsx#L880-L896) |
+| **P2** | P2-02 | **看板状态拖拽缺乏并发版本校验机制** | 直接覆盖后端 status，多端并发或 Agent 运行中易发生静默覆盖。 | [`TaskKanbanScreen.tsx:280-320`](../../../clients/expo/src/screens/TaskKanbanScreen.tsx#L280-L320) |
+| **P2** | P2-03 | **TabBar 注释与实现不符的口径漂移** | 注释称保留 5 项（含员工和收件箱），代码实际只有 4 项（收件箱完全剔除）。 | [`clients/expo/src/components/TabBar.tsx:26-54`](../../../clients/expo/src/components/TabBar.tsx#L26-L54) |
 
 ---
 

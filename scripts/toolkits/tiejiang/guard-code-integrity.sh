@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # [铁匠 Core SWE 专属] 增量代码完整性、编译与依赖守卫
 set -euo pipefail
-cd "/host-workspace/xaicd/coolie"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+cd "$REPO_ROOT"
 
 echo "=== [1/3] 检查 Monorepo 内部依赖与插件软链 ==="
 if [ -d "server/node_modules/@paperclipai" ]; then

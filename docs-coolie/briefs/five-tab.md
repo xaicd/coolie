@@ -1,7 +1,7 @@
 # 任务简报：Coolie工坊 App 五导航页全面审计改造（对齐 happy 参考系）
 
 ## 仓库
-/host-workspace/xaicd/coolie（已挂载，与宿主同份）。App 代码在 clients/expo/。
+`$REPO_ROOT`（已挂载，与宿主同份）。App 代码在 clients/expo/。
 先 `git pull`。改完 `npx tsc --noEmit -p .` 必须 0 错误。**不要跑 pnpm install / gradle**（宿主机代跑）。
 
 ## 背景

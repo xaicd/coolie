@@ -13,7 +13,7 @@
 - 命令：`agent-device open http://localhost:5173` → 文本框贴
   `<code-diff file="x.ts" lang="ts">+added\n-removed</code-diff>` → 发送
 - 真实观察：该标签**原样作为纯文本**渲染在气泡里（截图
-  `/Users/mac/workspace/xaicd/coolie/clients/h5/replays/evidence/feat-15-code-diff.png`），
+  `$REPO_ROOT/clients/h5/replays/evidence/feat-15-code-diff.png`），
   没有语法高亮、没有行号、没有红绿。
 - 真实 stdout（agent-device）：
 
