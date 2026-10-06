@@ -201,28 +201,6 @@ export const I18N_PATCH: Record<string, string> = {
   "No projects yet": "暂无项目",
   "Project settings": "项目设置",
 
-  // —— 本体建模与设计器 (Ontology Studio) ——
-  "Ontology": "本体",
-  "Ontology Studio": "本体设计器",
-  "Domain Model": "领域模型",
-  "Object Types": "对象类型",
-  "Relation Types": "关系类型",
-  "Object Type": "对象类型",
-  "Relation Type": "关系类型",
-  "Add Object Type": "添加对象类型",
-  "Add Relation Type": "添加关系类型",
-  "Properties": "属性列表",
-  "Property name": "属性名称",
-  "Data type": "数据类型",
-  "Cardinality": "基数关系",
-  "Import Ontology": "导入本体",
-  "Export Ontology": "导出本体",
-  "Legacy Import Wizard": "历史数据导入向导",
-  "Ontology Playground": "本体实验场",
-  "Graph view": "图谱视图",
-  "Tree view": "树形视图",
-  "Save model": "保存模型",
-
   // —— 流水线 / 自动化页 (Pipelines) ——
   Pipelines: "流水线",
   Pipeline: "流水线",
