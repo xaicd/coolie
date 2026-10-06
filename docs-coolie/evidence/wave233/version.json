@@ -1,12 +1,12 @@
 {
-  "version": "0.6.36",
-  "versionCode": 636,
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.36/coolie-release.apk",
-  "apkSha256": "15b54d6149852f70d4a5a12c5b9bd42a11fa6ab6012517d7f748b51752104352",
+  "version": "0.6.41",
+  "versionCode": 641,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.41/coolie-release.apk",
+  "apkSha256": "c154fce9f23e471b8d106d77bfceff9519d069f84b433e2511452dc604d53c19",
   "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
   "iosBundleId": "cn.xrobinai.app",
   "iosSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
   "iosTestFlightUrl": null,
-  "releaseNotes": "原生本体改造 (react-native-svg 15.8.0 同心圆环图谱 + OntologyDomainListScreen CRUD 取代 cockpit)",
-  "commitSha": "b0e523dd044e2c50d94f2a1497d44b4c1003b29f"
+  "releaseNotes": "wave337 原生本体图谱走控制面 (替换 plugin snapshot → web ontologyGraphApi.graph 端点)",
+  "commitSha": "02ba61331753a90d4d72d17ab7181bd31d2ef173"
 }
