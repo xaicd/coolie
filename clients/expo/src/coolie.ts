@@ -7,25 +7,11 @@ import {
   type Company,
   type Issue,
   type IssueStatus,
-  type OntologyDomain,
-  type OntologyGraphResponse,
-  type OntologyGraphResponseEdge,
-  type OntologyLevelsResponse,
-  type OntologyStatsResponse,
   type Project,
   type SessionUser,
-  // wave342: 本体工作台 14 视图只读行类型
-  type OntologyActionType,
-  type OntologyConnector,
-  type OntologyDataset,
-  type OntologyFunction,
-  type OntologyInterface,
-  type OntologyNodeType,
-  type OntologyRelationType,
-  type OntologyTransform,
 } from "@coolie/api-client";
 
-export type { OntologyGraphResponse, Project, OntologyStatsResponse };
+export type { Project };
 
 // ── Linear 设计系统色彩令牌 ─────────────────────────────────────────
 // 单一来源在 src/theme.ts (与 Coolie Web 对齐); 这里再导出, 让 30+ 个
@@ -383,17 +369,6 @@ export interface IssueAttachment {
   downloadPath?: string;
 }
 
-/** 示例域骨架注入的逐域结果 — POST .../actions/seed-sample-domains */
-export interface SeededDomainSummary {
-  slug: string;
-  displayName: string;
-  status: "created" | "skipped-existing" | "failed";
-  nodeTypes?: number;
-  relationTypes?: number;
-  withEndpoints?: number;
-  reason?: string;
-}
-
 /**
  * 一条 pipeline 列表行 — GET /api/companies/:id/pipelines
  * (paperclip 上游路由, 只读复用; 这里只取列表要展示的字段)
@@ -413,73 +388,10 @@ export interface PipelineListRow {
   updatedAt?: string | null;
 }
 
-/** 示例域骨架注入报告 — POST .../actions/seed-sample-domains */
-export interface SeedSampleDomainsReport {
-  domains: SeededDomainSummary[];
-  created: number;
-  skipped: number;
-  failed: number;
-}
-
-// ── 本体图谱控制面契约 (wave332) ────────────────────────────────────────
-// 镜像 `@paperclipai/shared` 的本体图谱契约 (web 端 ui/src/api/ontologyGraph.ts
-// 消费的同一份)。api-client 刻意不依赖 shared (见其 types.ts 的 mirror 先例),
-// App 层沿用同一做法; 源头变更时先改 packages/shared 再同步这里。
-
-/** 关系可指向的对象种类 — 镜像 shared 的 ENTITY_TYPES / EntityType。 */
-export type EntityType =
-  | "company"
-  | "project"
-  | "issue"
-  | "spec"
-  | "conversation"
-  | "work_product"
-  | "attachment"
-  | "comment"
-  | "agent";
-
-/** 图谱预设视图 — 镜像 shared 的 ONTOLOGY_GRAPH_VIEWS / OntologyGraphView。 */
-export type OntologyGraphView =
-  | "project_tree"
-  | "agent_dashboard"
-  | "conversation_thread";
-
-/** src→target 的一条关系路径 — 镜像 shared 的 OntologyPath (边即图谱响应的边)。 */
-export interface OntologyPath {
-  /** 节点键 (`type:id`) 依次排列, src 开头 / target 结尾。 */
-  nodeKeys: string[];
-  edges: OntologyGraphResponseEdge[];
-  length: number;
-}
-
-/** GET /ontology/paths 响应 — 镜像 shared 的 OntologyPathsResponse。 */
-export interface OntologyPathsResponse {
-  src: { type: EntityType; id: string } | null;
-  target: { type: EntityType; id: string } | null;
-  maxDepth: number;
-  paths: OntologyPath[];
-}
-
-/** wave342: 认知扫描任务行 (镜像 ontology-core 的 OntologyCognitionJobRow 投影) */
-export interface OntologyCognitionJobRow {
-  id: string;
-  job_key: string;
-  app_name: string;
-  root_path: string;
-  status: string;
-  stage_label: string;
-  progress_pct: number;
-}
-
-/** wave342: 能力缺口行 (镜像 ontology-core 的 CapabilityGapRow 投影) */
-export interface OntologyCapabilityGapRow {
-  id: string;
-  gap_key: string;
-  title: string;
-  status: string;
-  priority: string;
-  detected_from: string;
-}
+// wave354 — 本体图谱/插件 API 面的方法与镜像契约随原生本体视图一并移除
+// (老板批: 真全删 + 全新设计)。保留的架构治理绑定走基类
+// (listOntologyDomains / listOntologyResourceLinks / linkOntologyResource /
+// unlinkOntologyResource, 见 clients/api-client/src/client.ts)。
 
 export class CoolieClient extends BaseCoolieClient {
   /**

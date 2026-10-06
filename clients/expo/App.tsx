@@ -56,10 +56,6 @@ import { Sheet } from "./src/ui/Sheet";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { InboxScreen } from "./src/screens/InboxScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
-import { OntologyDomainListScreen } from "./src/screens/OntologyDomainListScreen";
-import { OntologySchemaEditorScreen } from "./src/screens/OntologySchemaEditorScreen";
-// wave352 — 恢复 v0.6.22 全屏图谱工作台 (wave315 删, 老板拍砍回 v0.6.22 极简度)
-import { OntologyGraphWorkbenchScreen } from "./src/screens/OntologyGraphWorkbenchScreen";
 import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
 import { OrgAssetsScreen } from "./src/screens/OrgAssetsScreen";
 import { PluginManagerScreen } from "./src/screens/PluginManagerScreen";
@@ -153,12 +149,15 @@ import { setupOTAListener } from "./src/OTA";
  * - 状态点呼吸灯
  */
 
-type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "artifacts" | "ontology" | "assets" | "inbox";
+type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "artifacts" | "assets" | "inbox";
 
 /**
  * 底部栏只有 5 项 (汇览 / 任务 / [+] / 员工 / 收件箱, 见 src/components/TabBar.tsx)。
- * 工坊(chat) / 本体(ontology) / 产物(artifacts) 不再占底部栏, 仍从任务页顶部的
- * 图标行进入 —— 入口换了位置, 能力没减。
+ * 工坊(chat) / 产物(artifacts) 不再占底部栏, 仍从任务页顶部的图标行进入 ——
+ * 入口换了位置, 能力没减。
+ *
+ * wave354 — 本体原生视图 (ontology tab / SchemaEditor / 图谱工作台) 真全删;
+ * 资产→本体 只留极简占位, 本体查看与演进收敛到工坊对话 (§18 北极星)。
  *
  * 任务页本体 (列表 / 看板 / 分组) 已迁到 src/screens/TasksScreen.tsx +
  * src/components/IssuesList.tsx (wave18, 对齐 Coolie Web Tasks 页)。
@@ -818,14 +817,6 @@ function HomeScreen({
   // wave235 — 插件管理 + 单插件设置 (App 内模态屏, 复用 Shell 模式)
   const [pluginManagerOpen, setPluginManagerOpen] = useState(false);
   const [pluginSettingsId, setPluginSettingsId] = useState<string | null>(null);
-  // wave239 — 本体插件集成 (屏 3 SchemaEditor 入口):
-  //   * schemaEditorType: schema editor 屏. typeId 是 OntologyDomain.id.
-  //   * ontologyWorkbenchOpen: 屏 4 workbench. 全图视图.
-  //     (wave315 曾删, wave352 老板拍砍回 v0.6.22 极简度后恢复)
-  const [schemaEditorType, setSchemaEditorType] = useState<
-    { typeId: string; displayName: string } | null
-  >(null);
-  const [ontologyWorkbenchOpen, setOntologyWorkbenchOpen] = useState(false);
   // wave188 — 6 个 expo-* 原生模块最小集成 demo 入口 (设置 → 原生模块)
   const [nativeModulesOpen, setNativeModulesOpen] = useState(false);
   const ota = useOTA();
@@ -982,9 +973,6 @@ function HomeScreen({
     if (gitCredentialsOpen) return setGitCredentialsOpen(false), true;
     if (pluginManagerOpen) return setPluginManagerOpen(false), true;
     if (pluginSettingsId) return setPluginSettingsId(null), true;
-    // 本体子屏倒序退栈 (最深的先退; wave352 恢复 workbench 全屏图谱)
-    if (ontologyWorkbenchOpen) return setOntologyWorkbenchOpen(false), true;
-    if (schemaEditorType) return setSchemaEditorType(null), true;
     if (selected) return setSelected(null), true;
     if (createTaskProjectId) return setCreateTaskProjectId(null), true;
     if (composeOpen) return setComposeOpen(false), true;
@@ -1079,10 +1067,7 @@ function HomeScreen({
       plansOpen ||
       projectsOpen ||
       gitCredentialsOpen ||
-      pluginManagerOpen ||
-      // 本体子屏占位时不显示全局顶栏 (wave352 恢复 ontologyWorkbench 全屏图谱)
-      schemaEditorType ||
-      ontologyWorkbenchOpen,
+      pluginManagerOpen,
     );
 
     content = (
@@ -1257,21 +1242,6 @@ function HomeScreen({
               pluginId={pluginSettingsId}
               onBack={() => setPluginSettingsId(null)}
             />
-          ) : schemaEditorType ? (
-            // wave239 — 屏 3 (SchemaEditor) 渲染.
-            <OntologySchemaEditorScreen
-              company={company}
-              typeId={schemaEditorType.typeId}
-              displayName={schemaEditorType.displayName}
-              onBack={() => setSchemaEditorType(null)}
-            />
-          ) : ontologyWorkbenchOpen ? (
-            // wave352 — 屏 4 (workbench 全屏图谱) 恢复 (v0.6.22 原样):
-            // 独立条件渲染不嵌进 tab 三元, 入口在 资产→本体 (OrgAssetsScreen 图谱 pill)。
-            <OntologyGraphWorkbenchScreen
-              company={company}
-              onBack={() => setOntologyWorkbenchOpen(false)}
-            />
           ) : tab === "dashboard" ? (
             <DashboardScreen
               company={company}
@@ -1352,10 +1322,6 @@ function HomeScreen({
               onOpenWebGovernance={(subPath?: string, title?: string) =>
                 setWebContainerTarget({ path: subPath || "/governance", title: title || "架构治理工作台" })
               }
-              onOpenSchemaEditor={(typeId, displayName) =>
-                setSchemaEditorType({ typeId, displayName })
-              }
-              onOpenGraphWorkbench={() => setOntologyWorkbenchOpen(true)}
               onOpenWebWorkbench={(subPath?: string, title?: string) =>
                 setWebContainerTarget({ path: subPath || "/dashboard", title: title || "控制台" })
               }
@@ -1372,17 +1338,6 @@ function HomeScreen({
                 workProduct: null,
                 scope: null,
               })}
-            />
-          ) : tab === "ontology" ? (
-            <OntologyDomainListScreen
-              company={company}
-              whoami={whoami}
-              onOpenWebOntology={() =>
-                setWebContainerTarget({ path: "/ontology", title: "本体可视化设计器" })
-              }
-              onOpenSchemaEditor={(typeId, displayName) =>
-                setSchemaEditorType({ typeId, displayName })
-              }
             />
           ) : tab === "artifacts" ? (
             <ArtifactsScreen

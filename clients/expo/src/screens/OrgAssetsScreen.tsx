@@ -12,7 +12,6 @@ import type {
 import { C } from "../coolie";
 import { RADIUS } from "../ui/tokens";
 import { SegmentedControl } from "../ui/SegmentedControl";
-import { OntologyDomainListScreen } from "./OntologyDomainListScreen";
 import { ArchitectureGovernanceScreen } from "./ArchitectureGovernanceScreen";
 import { ProjectsScreen } from "./ProjectsScreen";
 import { AgentsScreen } from "./AgentsScreen";
@@ -35,9 +34,6 @@ interface OrgAssetsScreenProps {
   onOpenWebProjects?: (path?: string, title?: string) => void;
   onOpenWebOntology?: (path?: string, title?: string) => void;
   onOpenWebGovernance?: (path?: string, title?: string) => void;
-  onOpenSchemaEditor?: (typeId: string, displayName: string) => void;
-  /** wave352 — 打开 v0.6.22 全屏图谱工作台 (OntologyGraphWorkbenchScreen) */
-  onOpenGraphWorkbench?: () => void;
   onOpenWebWorkbench?: (path?: string, title?: string) => void;
   onOpenSandbox?: (
     url: string,
@@ -61,10 +57,12 @@ const TAB_OPTIONS: Array<{ key: OrgAssetTab; label: string }> = [
 
 /**
  * 资产与组织中枢 (OrgAssetsScreen)。
- * 彻底恢复 5 天前经典极简、清爽好看的原生大盘架构：
+ * 极简原生大盘架构：
  * 1. 顶部 Header 极简克制，左侧标题，右侧仅保留高频直达胶囊（🎨 原型沙箱 / 成本核算）。
- * 2. 四大 Tab 齐整齐平（业务本体、项目中心、数字员工、交付产物），拒绝任何二级抽屉遮挡。
- * 3. 彻底消除伪功能和按钮堆砌，能力 100% 具备，零功能缩水。
+ * 2. 五大 Tab 齐整齐平（业务本体占位、架构治理、项目中心、数字员工、交付产物），
+ *    拒绝任何二级抽屉遮挡。
+ * 3. wave354 — 本体 tab 真全删后只留极简占位：本体的查看与演进按 §18 北极星
+ *    收敛到工坊对话 (工坊会话即本体演进)，资产页不再长驻原生本体视图。
  */
 export function OrgAssetsScreen({
   company,
@@ -79,8 +77,6 @@ export function OrgAssetsScreen({
   onOpenWebProjects,
   onOpenWebOntology,
   onOpenWebGovernance,
-  onOpenSchemaEditor,
-  onOpenGraphWorkbench,
   onOpenWebWorkbench,
   onOpenSandbox,
   onOpenDiff,
@@ -113,22 +109,6 @@ export function OrgAssetsScreen({
                 companies={switchableCompanies}
                 onSwitch={onSwitchCompany}
               />
-            ) : null}
-
-            {/* wave352 — 全屏图谱直达 (仅本体 tab 显示, 两字铁律) */}
-            {activeTab === "ontology" && onOpenGraphWorkbench ? (
-              <Pressable
-                style={[styles.extraPill, styles.extraPillGraph]}
-                onPress={() => onOpenGraphWorkbench()}
-                hitSlop={6}
-                accessibilityLabel="查看全屏图谱"
-                testID="OrgAssets__Header__GraphBtn"
-              >
-                <Ionicons name="git-network-outline" size={12} color={C.accent} />
-                <Text style={[styles.extraPillText, { color: C.accent, fontWeight: "600" }]}>
-                  图谱
-                </Text>
-              </Pressable>
             ) : null}
 
             {/* 🎨 原型沙箱一级直达通道 */}
@@ -172,13 +152,16 @@ export function OrgAssetsScreen({
 
       {/* 核心内容区：四大核心资产平滑呈现，零层级遮挡 */}
       <View style={styles.content}>
+        {/* wave354 — 本体 tab 极简占位 (老板批: 真全删 + 全新设计)。
+            按 §18 北极星「工坊会话即本体演进」: 本体的查看与演进入口收敛到
+            工坊对话 (chat), 资产页不再长驻原生本体视图。 */}
         {activeTab === "ontology" && (
-          <OntologyDomainListScreen
-            company={company}
-            whoami={whoami}
-            onOpenWebOntology={onOpenWebOntology}
-            onOpenSchemaEditor={onOpenSchemaEditor}
-          />
+          <View style={styles.ontologyPlaceholder} testID="OrgAssets__OntologyTab__Root">
+            <Text style={styles.ontologyPlaceholderTitle}>业务本体</Text>
+            <Text style={styles.ontologyPlaceholderSubtitle}>
+              请到工坊对话询问 AI 副手 (按 §18 北极星: 工坊会话即本体演进)
+            </Text>
+          </View>
         )}
 
         {activeTab === "architecture" && (
@@ -276,10 +259,6 @@ const styles = StyleSheet.create({
     borderColor: "rgba(167, 139, 250, 0.35)",
     backgroundColor: "rgba(167, 139, 250, 0.12)",
   },
-  extraPillGraph: {
-    borderColor: "rgba(94, 106, 210, 0.35)",
-    backgroundColor: "rgba(94, 106, 210, 0.12)",
-  },
   extraPillText: {
     fontSize: 11,
     color: C.ink2,
@@ -290,5 +269,23 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
+  },
+  ontologyPlaceholder: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 32,
+    gap: 8,
+  },
+  ontologyPlaceholderTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  ontologyPlaceholderSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    textAlign: "center",
+    color: C.ink3,
   },
 });
