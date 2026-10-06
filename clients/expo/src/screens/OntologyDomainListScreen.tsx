@@ -51,6 +51,31 @@ interface OntologyDomainListScreenProps {
   onOpenWorkbench?: () => void;
 }
 
+// wave330: 图谱组件类型表仅覆盖控制面 9 类实体, 域实例节点线上形状没有
+// type 字段 (只有域内 nodeTypeId UUID)。防御性读取: 命中 9 类才采纳,
+// 否则 fallback work_product (真实类型语义仍保留在 label 与 metadata)
+const CONTROL_PLANE_ENTITY_TYPES: readonly OntologyEntityType[] = [
+  "project",
+  "issue",
+  "agent",
+  "spec",
+  "conversation",
+  "work_product",
+  "attachment",
+  "comment",
+  "company",
+];
+
+function toControlPlaneEntityType(
+  node: OntologyGraphSnapshot["nodes"][number],
+): OntologyEntityType {
+  const raw = (node as { type?: unknown }).type;
+  return typeof raw === "string" &&
+    (CONTROL_PLANE_ENTITY_TYPES as readonly string[]).includes(raw)
+    ? (raw as OntologyEntityType)
+    : "work_product";
+}
+
 const LIFECYCLE_CONFIG: Record<
   string,
   { label: string; status: "ok" | "err" | "idle"; color: string; bg: string; border: string }
@@ -210,20 +235,24 @@ export function OntologyDomainListScreen({
   }, [domainViewMode, selectedDomainId, loadGraph]);
 
   // 快照 (插件形态: sourceNodeId/targetNodeId) → 图谱组件 (source/target = 节点 key)
+  // wave330: ① key 统一 `${type}:${id}` 对齐组件 nodeKey 契约, 并把首节点
+  //          传成 root — layoutGraph 的 BFS 才能从根算层深, 节点分散到
+  //          多层同心圆环 (修「全部挤在一圈」); ② type 走 9 类实体映射
   const graphData: OntologyGraphData | null = useMemo(() => {
     if (!graphSnapshot) return null;
-    const nodes: OntologyGraphNode[] = graphSnapshot.nodes.map((n) => ({
-      key: n.key || n.id,
-      id: n.id,
-      // wave325 组件类型表仅覆盖控制面 9 类实体, 域实例节点没有对应类型:
-      // 统一按 work_product 上色, 真实类型语义保留在节点 label 与 metadata
-      type: "work_product" as OntologyEntityType,
-      label: n.label,
-      metadata: {
-        ...(n.properties ?? {}),
-        ...(n.lifecycleState ? { lifecycleState: n.lifecycleState } : {}),
-      },
-    }));
+    const nodes: OntologyGraphNode[] = graphSnapshot.nodes.map((n) => {
+      const type = toControlPlaneEntityType(n);
+      return {
+        key: `${type}:${n.id}`,
+        id: n.id,
+        type,
+        label: n.label,
+        metadata: {
+          ...(n.properties ?? {}),
+          ...(n.lifecycleState ? { lifecycleState: n.lifecycleState } : {}),
+        },
+      };
+    });
     const keyById = new Map(nodes.map((n) => [n.id, n.key]));
     const edges: OntologyGraphEdge[] = [];
     for (const e of graphSnapshot.edges) {
@@ -233,7 +262,11 @@ export function OntologyDomainListScreen({
       if (!source || !target || source === target) continue;
       edges.push({ key: e.id, source, target, weight: e.weight });
     }
-    return { nodes, edges };
+    // 首节点作根 (当前域实例节点统一映射 work_product); 空快照不设 root
+    const first = nodes[0];
+    return first
+      ? { nodes, edges, root: { type: first.type, id: first.id } }
+      : { nodes, edges };
   }, [graphSnapshot]);
 
   // 打开域快照详情
