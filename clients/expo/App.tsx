@@ -1089,6 +1089,7 @@ function HomeScreen({
             unreadCount={unreadCount}
             onOpenNotifications={() => setNotificationsOpen(true)}
             onOpenSearch={() => setSearchOpen(true)}
+            onOpenSettings={() => setSettingsOpen(true)}
           />
         )}
         <View style={styles.shellContent}>

@@ -6,7 +6,7 @@ import { CoolieLogo } from "./CoolieLogo";
 /**
  * 全局顶栏 — Linear 暗黑设计系统风格：
  * - 左侧/居中品牌 Logo 与标题 "Coolie工坊"
- * - 右侧聚焦高频原生操作：[🔍 全局搜索] 与 [🔔 收件箱通知]
+ * - 右侧聚焦高频原生操作：[🔍 全局搜索]、[🔔 收件箱通知] 与 [⚙️ 设置]
  * - 彻底移除冗余生硬的独立 Web 按钮，还给用户纯净高质感界面
  */
 export function AppBar({
@@ -14,11 +14,13 @@ export function AppBar({
   unreadCount = 0,
   onOpenNotifications,
   onOpenSearch,
+  onOpenSettings,
 }: {
   title?: string;
   unreadCount?: number;
   onOpenNotifications?: () => void;
   onOpenSearch?: () => void;
+  onOpenSettings?: () => void;
 }) {
   return (
     <View style={styles.bar}>
@@ -49,6 +51,16 @@ export function AppBar({
                 </Text>
               </View>
             ) : null}
+          </Pressable>
+        ) : null}
+        {onOpenSettings ? (
+          <Pressable
+            testID="AppBar__Settings__OpenBtn"
+            style={styles.iconBtn}
+            hitSlop={10}
+            onPress={onOpenSettings}
+          >
+            <Ionicons name="settings-outline" size={20} color={C.ink2} />
           </Pressable>
         ) : null}
       </View>
