@@ -221,150 +221,53 @@ A change is done when all are true:
 4. Docs updated when behavior or commands change
 5. PR description follows the [PR template](.github/PULL_REQUEST_TEMPLATE.md) with all sections filled in (including Model Used)
 
-## 12. PM commit + 发版 tag 规范 (wave265)
+## 12. 平台核心公理体系与最高工程法典 (Coolie Engineering Axioms)
 
-老板原话: 「代码要完成任务就提交, 每次发版版本号同时推一个 git tag」「版本号码要一致」.
+### 公理一：活体本体即中枢 (Living Ontology as Nervous System)
+1. **唯一核心北极星目标**：以「活体业务本体」为唯一控制与决策中枢，消灭“本体孤岛空转、工坊离散聊天、看板盲目派单”的两张皮割裂。
+2. **业务双核**：Object Types（现实世界活体孪生/态势感知）+ Action Types（合法业务动词/闭环灵魂）。
+3. **三大物理并轨契约**：
+   - **项目进厂即本体域 (Project as Domain)**：创建 Project 原子初始化 Domain，杜绝无本体的孤立项目；
+   - **工坊会话即本体演进 (Conversation as Proposal)**：Hermes 将诉求转译为结构化 Proposal 卡片，两字确认即落盘；
+   - **任务施工挂契约血缘 (Task as Action Execution & Provenance)**：WBS 任务强绑 ActionType，Commit/真机快照即不可变 Evidence。
+4. **全盘资产 263 表硬约束**：严禁因碎片功能随意扩表或增加复杂菜单，100% 榨干现有管网与 263 张物理表。
+5. **六大数字员工本体靶心**：FDA 架构建模、Core SWE 契约编码、FDSE 真机四态快照、DS 因果闭环验收、PRE-SRE 影响面发布。
 
-1. **每次发版必打 tag** — `bash scripts/release-app.sh <version> "<notes>"`
-   自 `[12/12]` 起自动 `git tag -a v<version> -m "v<version> release"
-   <release-commit>` + `git push origin v<version>`. 失败仅警告不阻断
-   (APK / OTA 已发, 回滚代价 >> 补打 tag). 补打方式:
-   `git tag -a v<version> -m "..." <release-commit> && git push origin v<version>`.
+### 公理二：极简主义与人机工程学 (Minimalist Ergonomics)
+1. **移动端去拓扑化**：6 寸手机屏坚决不画全景网状图，只提供以业务对象为中心的“局部一跳因果卡片流 (Local 1-Hop Chain)”。
+2. **两字按钮铁律**：核心操作按钮收敛为纯 2 汉字（【创建】、【查看】、【沙箱】、【确认】、【放弃】、【发布】），严禁口语化长文案。
+3. **5 槽位绝对对称底栏**：严格保持 `[汇览] [任务] [+] [工坊] [资产]` 黄金对称，零重复入口，收件箱统一由顶栏 🔔 统领。
+4. **Agent-Native 契约**：Web 元素必带 `data-agent-target`，移动端必带 `testID=[Screen]__[Component]__[Action]`，弹窗独占加 `accessibilityViewIsModal`/`inert`，输入组件包裹防键盘遮挡。
+5. **大胆做减法**：现有能力是错的直接真全删（由老板审批即可），杜绝打补丁式功能膨胀。
 
-2. **tag 指向「发版完成」的 commit** — 即 `release: v<version> — ...`
-   这一笔 (含 version.json bump + CHANGELOG + 其它发版产物), 不是后续
-   docs commit. 例: v0.6.19 → `37e6b3d77` (wave258 feat), 不是 `92796a123`
-   (docs(wave262)).
+### 公理三：不可变证据与硬门禁管局 (Immutable Evidence & G1-G5)
+1. **编译器与自动化守卫硬拦截**：制度严禁口头化，交付前必须 100% 通过 `bash scripts/check-governance-audit.sh`。
+2. **CMMI 六阶段门禁物理落盘**：G0 需求、G1 架构、G2 详细设计、G3 构建、G4 验收证据、G5 投产基线严格归档对应目录。
+3. **发版 7 处版本一致性**：每次发版必打 tag 并指向发版 commit，7 处版本号源（app.json, package.json, build.gradle, CHANGELOG, version.json, manifest, git tag）必须一致（`bash scripts/VERSION-CONSISTENCY-CHECK.sh`）。
 
-3. **不发版不 bump 版本号** — 例: wave152 / wave245 / wave261 中只有 wave261
-   顺手 bump 了 0.6.14 → 0.6.19 (老板没发现). 重构 PR 不动 `app.json.version`.
+## 13. 扁平化 Worker 拓扑与免交互调度法则 (Operating Disciplines)
+1. **Hermes 唯一总指挥**：Hermes 是唯一 PM 总调度，6 大数字员工是一级下属，底层 CLI (`claude`, `cmd`, `agy`, `copilot`, `kiro-cli`) 仅作为工作引擎，严禁内部套娃配置 subagent。
+2. **后台免交互最大自主授权**：`cmd` 必带 `--yolo --tools-all -t`，`claude` 必带 `--dangerously-skip-permissions`，管道执行必带 `< /dev/null` 重定向防 stdin 悬空死锁。
+3. **异步控制面并轨与跨机一键复刻**：微信指令秒级入库 Dev Server 工单（COOA-XX），由后台 Runner Bridge 异步消费；跨机复刻统一执行 `bash scripts/bootstrap-coolie-dev-host.sh`。
 
-4. **7 处版本号源必须一致** — 见 `docs-coolie/VERSION-CONSISTENCY.md`:
-   - `clients/expo/app.json` (expo.version + expo.android.versionCode)
-   - `clients/expo/package.json` (version)
-   - `clients/expo/android/app/build.gradle` (versionName + versionCode)
-   - `clients/expo/CHANGELOG.md` (顶部 `## v...`)
-   - 远端 `https://xrobinai.cn/version.json` (version + versionCode)
-   - 远端 `https://xrobinai.cn/ota/manifest` (runtimeVersion)
-   - git tag (v<version>)
-    `bash scripts/VERSION-CONSISTENCY-CHECK.sh` 一键校验, 退出码 0 = 通过.
+## 18. Coolie 工坊唯一核心北极星目标与真业务本体物理并轨铁律
+详见本法典「公理一：活体本体即中枢」及白皮书 `docs-coolie/research/2026-10-05-coolie-core-mission-and-real-ontology-master-plan.md`。
 
-## 13. 多工具协同与跨环境上下文接力规范 (wave282-wave284)
+## 19. 全局高阶反向思维与老板意图升维响应铁律 (wave356)
+老板原话: 「每次打开一个新IDE新会话，感觉都是从零开始，能否写个东西让 AI 对话时候，自动反向站在更高的角度去响应我的输入，比如我说修bug」
 
-1. **宿主机 (Host) 与容器沙箱工具池物理分布**
-   - **宿主机环境 (`/opt/homebrew/bin`)**：Claude (`claude-glm`, `claude-mm`)、`cmd` (`@commandcode/ai`)、`copilot`、`kiro-cli` 真实部署在老板的 Mac 宿主机上，依赖 Homebrew 环境。
-   - **容器沙箱环境**：`agy-gemini3.8` (Antigravity CLI + Gemini 3.8) 运行于 Docker 容器中。
-   - 宿主机与容器沙箱挂载共享代码仓库（`/host-workspace/xaicd/coolie`），工具探测或执行脚本时**严禁把宿主机 CLI 误判为全局缺失**。
+1. **四大合一最高审视视角**：
+   - **新型软件交付公司负责人**：算交付人效比、客户零培训上手、拒绝系统空转两张皮；
+   - **Palantir 体系**：业务双核驱动 (Object + Action)，消灭死报表与死图谱；
+   - **OpenAI/Palantir FDE**：深入一线现场、真机模拟器四态验证、敢于彻底删除错误功能；
+   - **顶级产品总监**：极简使用主义、两字操作铁律、5 槽位底栏、零重复入口。
 
-2. **多工具上下文接力总线 (Context Bus)**
-   - 跨工具/跨工种接力（如 墨斗 FDA -> 铁匠 Core SWE -> 门神 FDSE -> 兑底渊 PRE-SRE -> 百晓生 DS）严禁口头传话与手动复制；
-   - 统一由 `scripts/context-bus.sh` 在 `.coolie-local/context-bus/<wave>.json` 记录不可变流转轨迹；
-   - 派单 `scripts/dispatch-local-employee.sh` 默认开启上下文继承，自动将上游最新 Commit、修改文件、交付 Spec 与交接嘱托注入给下游工具的 Prompt，实现零摩擦交接。
-
-3. **派单 Receipt 规范与状态机**
-   - 每次派单必在 `.coolie-local/dispatch/<id>.json` 生成结构化 Receipt；
-   - 严格遵循状态机跃迁：`queued -> running -> done | blocked | failed`；
-   - 任务完成后必须回写 commit hash、验证命令与交付物证据。
-
-4. **CMMI G1-G5 角色证据隔离账本**
-   - 每一波交付必须通过 `scripts/gate-evidence-ledger.sh` 在 `.coolie-local/evidence-ledger/<wave>.json` 落盘；
-   - FDA (G1) / Core SWE (G2) / FDSE (G3) / DS (G4) / PRE-SRE (G5) 五角色各自提交独立证据，严禁跨角色借用。
-
-## 14. Agent-Native UI 开发框架与交互规范 (wave296)
-
-老板原话: 「所有 UI 组件必须强制具备 Agent-Native 属性：Web 交互元素必带 `data-agent-target='模块:动作'`、作用域 `data-agent-scope` 与状态 `data-agent-state`；移动端必带 `[Screen]__[Component]__[Action]` 命名空间的 `testID`；多层弹窗打开时底层容器必须打上 `inert`/`accessibilityViewIsModal` 实现节点剪枝隔离；页面顶层必须暴露 `data-agent-page-ready` 就绪信号，严禁纯依靠无文本 CSS/坐标让 Agent 盲猜。」
-
-1. **Web 端 (agent-browser) 契约协议**：
-   - **交互目标**：交互按钮、链接与输入框必须带 `data-agent-target="<module>:<action>"`（如 `governance:approve-btn`），严禁使用易碎 CSS class 或纯 XPath；
-   - **作用域隔离**：复杂表单与弹窗内部必须带 `data-agent-scope="<scope-id>"`，杜绝多层级嵌套下的识别迷航；
-   - **状态信号灯**：可点击控件提供 `data-agent-state="ready|loading|disabled|completed"`，页面根节点暴露 `data-agent-page-ready="true"`，防止异步竞态无脑狂点；
-   - **遮挡剪枝**：二级/多级 Modal、Drawer 打开时，底层失焦容器必须挂载 `inert` 属性，强制将底层无关 DOM 树剪枝。
-
-2. **移动原生端 (agent-device) 契约协议**：
-   - **命名空间 testID**：所有可点击原生组件强制提供结构化 `testID`，格式统一为 `[Screen]__[Component]__[Action]`（如 `SpecEditor__RequirementTab__SubmitBtn`）；
-   - **弹窗独占**：所有 Modal 必须显式声明 `accessibilityViewIsModal={true}`，杜绝穿透点击；
-   - **键盘防遮挡**：表单组件必须包裹 `KeyboardAvoidingView` 与输入自动聚焦滚屏，防止按钮被虚拟键盘顶出物理盲区。
-
-3. **合规度量与自动化检查**：
-   - 运行 `bash scripts/check-agent-native-ui.sh` 实时检查 Web 与移动端组件的 Agent-Native 符合度；
-   - CMMI G3 门禁前必须检查新增交互组件的属性合规。
-
-## 15. Coolie Dev 本地工坊异步调度与一键跨机复刻规范 (wave297)
-
-老板原话: 「微信派单绝不能在终端前台同步阻塞等，必须并轨控制面工单池；后台由 Runner Bridge 异步接单消费；死进程必须自动探活自愈，杜绝幽灵虚报；这套体系部署到别的主机必须一键复制，零卡点复刻。」
-
-1. **异步控制面并轨铁律**：
-   - **禁止前台阻塞**：严禁在 Hermes 会话或终端中同步阻塞执行长耗时代码（必受 180s 超时截杀）；
-   - **控制面入库**：所有微信/IM 指令统一调用 `scripts/hermes-boss-intent-dispatcher.sh`，0.8 秒内建立 Dev Server 工单（COOA-XX）并返回回执；
-   - **后台异步认领**：宿主机后台常驻守护 `scripts/coolie-task-runner-bridge.mjs`，每 5 秒轮询并认领工单执行，独立日志流落盘 `.coolie-local/logs/${task}.log`。
-
-2. **活体探活与自愈铁律**：
-   - 团队状态与监控脚本（`scripts/cron-team-status.sh`）强制执行 `kill -0 $PID` 存活检测；
-   - 进程一旦异常退出，状态机必须自动修正为 `failed` 并落盘自愈，严禁向微信播报虚假运行时长。
-
-3. **跨主机一键复刻 (One-Click Bootstrap)**：
-   - 任何新主机（Mac / Linux / 云主机）克隆仓库后，运行 `bash scripts/bootstrap-coolie-dev-host.sh` 即可在 30 秒内全自动拉起 PGlite Dev Server (3100)、初始化「Coolie 本地施工总社」、注入 6 大数字员工并注册 crontab 看门狗保活。
-   - 详见 `docs-coolie/playbooks/coolie-dev-host-replication.md`。
-
-## 16. 极简两字交互、CMMI 资产与高管治理全面审计守卫规范 (wave298)
-
-老板原话: 「按理说 那些 要求 都是 审计过程 要 全面 管局的」
-
-1. **制度必须由编译器与自动化守卫硬拦截**：
-   - 任何涉及移动端与 Web 交互改动，严禁停留在口头规范或 PR 人肉 Review；
-   - 运行 `pnpm check:governance`（或 `bash scripts/check-governance-audit.sh`），必须 100% 全绿（Exit 0）才允许放行交付。
-
-2. **四大硬性管局维度**：
-   - **两字按钮铁律**：核心操作按钮严禁口语化长文案（如【创建任务】、【查看详情】、【原型沙箱】），必须收敛为【创建】、【查看】、【沙箱】等标准 2 汉字；
-   - **移动端 5 槽位绝对对称底栏**：严格保持左2 + 中1 + 右2（汇览 · 任务 · [+] · 工坊 · 资产）对称布局，严禁底栏包含收件箱造成重复入口；
-   - **高管审批三大快道直通**：顶栏 🔔 铃铛直达全功能 `InboxScreen`（含审批/阻塞Tab），工坊会话常驻悬浮审批横幅，大盘具备红灯指标直达；
-   - **CMMI 六大阶段门禁产物物理落盘 (Phase-Gate Baselines)**：G0 需求、G1 架构、G2 详细设计、G3 构建、G4 验收证据、G5 投产基线必须严格落在对应规范目录，严禁产物游离。
-
-3. **双轨映射调度原则**：
-   - 物理项目工作区 (`project_workspaces.cwd`) 是代码与 WBS 任务树基底；工坊会话 (`board_conversations`) 是高管时序意图流；通过意图分发器转译并在物理目录中调度数字员工。
-
-## 17. Hermes 唯一总指挥与扁平化 Worker 铁律 (wave302)
-
-老板原话: 「Claude 经常停止，kill 这些问题 如何彻底解决，是不是 授权太小了，claude 自己就别 再配置agents ,subagent了， 按照本系统的 规范来的话，就是 claude,cmd,agy,copilot 这些都是 Hermes的 子agent 成员才对」
-
-1. **扁平化拓扑与杜绝嵌套套娃**：
-   - **Hermes 是唯一 PM 总调度**：负责意图澄清追问、WBS 任务派发与工序收口；
-   - **一级子 Agent 成员**：6 大数字员工（墨斗 FDA、铁匠 Core SWE、门神 FDSE、兑底渊 PRE-SRE、百晓生 DS）是 Hermes 的下属子 Agent；
-   - **底层工具引擎 (Worker Engines)**：`claude` (claude-glm / claude-mm)、`cmd`、`agy`、`copilot`、`kiro-cli` 仅作为数字员工执行任务的底层 CLI 工具；
-   - **严禁 Claude 内部再配置 agents/subagent**：宿主机 `~/.claude/agents/` 必须保持清空，严禁将员工模板拷贝给 Claude 作为 subagent 造成架构倒挂与无 TTY 递归死锁。
-
-2. **后台免交互最大自主授权 (Permissions)**：
-   - 非交互调度执行后台任务必须赋予最大自主权限，消灭等待终端确认引起的死锁：
-     - `cmd`：必须显式传递 `--yolo --tools-all -t`，全面放开文件写入、命令执行与项目信任；
-     - `claude`：必须显式传递 `--dangerously-skip-permissions`；
-     - 管道执行强制添加 `< /dev/null` 重定向，杜绝因无 TTY stdin 悬空而等待 3 秒或 hang 死。
-
-## 18. Coolie 工坊唯一核心北极星目标与真业务本体物理并轨铁律 (wave304)
-
-老板原话: 「还是 重新看看 建设这个 coolie系统的 核心目标吧， 总感觉 搞着搞着 就 乱了，到现在为止，本体功能 系统本身 没有用上， 新项目/会话/任务 建设 更没有用上， 感觉建设了 假东西，请 认真复盘，并且 重新给出一个 coolie工坊建设的 全面目标，然后让AI AGENT 持续为了同一个目标 做深做透」
-
-详尽复盘白皮书见 `docs-coolie/research/2026-10-05-coolie-core-mission-and-real-ontology-master-plan.md`。
-
-1. **唯一核心北极星目标**：
-   - **战略定义**：建设以「活体业务本体 (Living Ontology)」为唯一控制与决策中枢、由「高管自然语言工坊」直通驱动、全流程调度「数字员工团队」、实现「零培训、免代码、不可变真机证据交付」的企业级 AI 软件工程控制面！
-   - **消灭两张皮**：彻底终结“本体在底层孤岛空转、工坊在上层打字闲聊、看板在离散派单”的割裂假象，本体必须成为系统的神经脊梁。
-
-2. **三大物理并轨铁律 (三大契约)**：
-   - **项目进厂即本体域 (Project as Domain)**：创建 Project 必须原子初始化同名 `ontology_domains`；上传需求文档/SQL 必须自动触发 `RepoCognitionJob` 提取核心实体与动作草案，严禁无本体的孤立项目；
-   - **工坊会话即本体演进 (Conversation as Proposal)**：工坊 (Board Chat) 是本体演进的飞行摇杆。高管自然语言诉求通过 Hermes 实时澄清 (Echo) 并物化为结构化 Proposal 卡片 (Delta)，老板两字确认即落盘快照并自动派单；
-   - **任务施工即动作跃迁与不可变血缘 (Task as Action Execution & Provenance)**：WBS 任务必须挂靠本体 ActionType / ObjectType；代码 Commit、接口契约与真机测试快照（四态）直接作为本体节点的不可变 WorkProduct 证据链。
-
-3. **六大数字员工的“本体靶心”工作法**：
-   - **Hermes**：专职将高管意图转译为本体 Proposal，并反向编排 WBS 任务树；
-   - **墨斗 (FDA)**：专职负责 `ontology_domains` 架构设计、租户物理隔离与实体定义（G1 门禁）；
-   - **铁匠 (Core SWE)**：专职按 ActionType 契约编写代码与静态测试，保持 0 编译报错（G2/G3 门禁）；
-   - **门神 (FDSE)**：专职通过 `agent-device` 捕获真机模拟器快照，作为本体节点的交互证据（G4 门禁）；
-   - **百晓生 (DS)**：专职沿着 `ontology_find_path` 业务因果链进行全流程端到端业务验收；
-   - **兑底渊 (PRE-SRE)**：专职基于 `ontology_find_impact` 扫描变更影响面，实施零风险不可变投产（G5 门禁）。
-
-4. **极简主义与防乱加功能守卫**：
-   - 坚决贯彻“极简两字交互”与“对称 5 槽位底栏”，消灭同屏重复创建入口；
-   - 100% 榨干系统已有 50+ 张物理表与本体引擎，严禁因碎片功能随意扩表或增加复杂菜单，持续做深做透核心闭环。
+2. **面对“修 bug / 加功能”的四步反向穿透协议**：
+   - **Step 1 业务本体溯源**：查明破坏了哪个「业务实体 (Object)」或「动作契约 (Action)」？根因是不是业务规则与实体状态机错位？
+   - **Step 2 极简减法原则**：能删代码修绝不加补丁，能收敛逻辑绝不外挂新配置，严禁由于修 bug 产生代码膨胀；
+   - **Step 3 真实人机场景复原**：审视修法在移动端 6 寸屏上是否符合极简两字、防遮挡与单手盲操；
+   - **Step 4 不可变交付证据闭环**：必须完成 0 编译报错，并固化真机端到端证据，杜绝历史 bug 在新会话中反复复活。
+   - 详见规范文档 `.agents/rules/HIGH-ORDER-INVERSE-THINKING.md`。
 
 ## This fork's own conventions
 

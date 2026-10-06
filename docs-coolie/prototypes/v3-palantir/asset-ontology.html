@@ -1,0 +1,889 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>资产>本体 · Palantir 2 核 1 板 · 原生 App 原型</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'PingFang SC', 'SF Pro SC', 'SF Pro Display', sans-serif;
+  background: #000;
+  color: #e5e5e5;
+  min-height: 100vh;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+.phone-frame {
+  max-width: 440px;
+  margin: 0 auto;
+  background: #0a0a0a;
+  min-height: 100vh;
+  position: relative;
+  padding-bottom: 80px;
+}
+
+/* AppBar */
+.app-bar {
+  height: 56px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid #1f1f1f;
+  background: #0f0f0f;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand-logo {
+  width: 20px; height: 20px;
+  border-radius: 5px;
+  background: linear-gradient(135deg, #5e6ad2 0%, #a78bfa 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; color: white;
+}
+.brand-name { font-size: 15px; font-weight: 600; color: #fafafa; }
+.bar-icons { display: flex; gap: 4px; }
+.icon-btn {
+  width: 36px; height: 36px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 8px;
+  color: #a1a1a1;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  font-size: 18px;
+}
+.icon-btn:active { background: #1a1a1a; }
+.icon-btn .dot {
+  position: absolute; top: 6px; right: 6px;
+  width: 6px; height: 6px; border-radius: 50%;
+  background: #ef4444;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+  padding: 8px 16px;
+  font-size: 12px;
+  color: #71717a;
+  display: flex; align-items: center; gap: 4px;
+}
+.breadcrumb .crumb-sep { color: #3f3f46; }
+.breadcrumb .crumb-current { color: #a1a1a1; font-weight: 500; }
+.breadcrumb .crumb-back { color: #71717a; background: none; border: none; padding: 0; cursor: pointer; font-size: 12px; }
+
+/* Header block */
+.header-block {
+  padding: 8px 16px 16px;
+}
+.title-row {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 4px;
+}
+.title { font-size: 22px; font-weight: 700; color: #fafafa; letter-spacing: -0.3px; }
+.title-meta { font-size: 13px; color: #71717a; font-weight: 500; }
+.subtitle { font-size: 13px; color: #a1a1a1; line-height: 1.4; margin-bottom: 12px; }
+
+/* Tab strip — Palantir 3 关 */
+.tab-strip {
+  display: flex;
+  padding: 4px;
+  background: #1a1a1a;
+  border-radius: 10px;
+  margin: 0 16px 12px;
+  gap: 2px;
+}
+.tab-pill {
+  flex: 1;
+  padding: 8px 12px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 500;
+  color: #a1a1a1;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+}
+.tab-pill:active { transform: scale(0.97); }
+.tab-pill.active {
+  background: #2a2a2a;
+  color: #fafafa;
+  font-weight: 600;
+}
+.tab-icon { font-size: 14px; }
+.tab-label { font-size: 11px; }
+
+/* Sections */
+.section {
+  padding: 12px 16px;
+}
+.section + .section { padding-top: 0; }
+.section-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: #71717a;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+  display: flex; align-items: center; gap: 6px;
+}
+.section-title .palantir-num {
+  font-size: 9px;
+  background: #1f1f1f;
+  color: #5e6ad2;
+  border-radius: 4px;
+  padding: 2px 5px;
+  font-weight: 700;
+}
+
+/* Cards list */
+.cards-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* Object card */
+.object-card {
+  background: linear-gradient(180deg, #18181b 0%, #131316 100%);
+  border: 1px solid #27272a;
+  border-radius: 10px;
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+}
+.object-card:active { background: #1f1f23; }
+.object-card.healthy::before {
+  content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px;
+  background: #10b981;
+}
+.object-card.warn::before { background: #f59e0b; }
+.object-card.critical::before { background: #ef4444; }
+.object-card.idle::before { background: #71717a; }
+
+.obj-icon {
+  width: 36px; height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #5e6ad2 0%, #a78bfa 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; color: white;
+  flex-shrink: 0;
+}
+.obj-info { flex: 1; min-width: 0; }
+.obj-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fafafa;
+  margin-bottom: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.obj-meta {
+  font-size: 11px;
+  color: #71717a;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.obj-meta-sep { color: #3f3f46; }
+.obj-status {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  letter-spacing: 0.3px;
+}
+.obj-status.healthy { background: rgba(16,185,129,0.15); color: #10b981; }
+.obj-status.warn { background: rgba(245,158,11,0.15); color: #f59e0b; }
+.obj-status.critical { background: rgba(239,68,68,0.15); color: #ef4444; }
+.obj-status.idle { background: rgba(113,113,122,0.15); color: #a1a1a1; }
+
+.obj-action {
+  width: 28px; height: 28px;
+  border-radius: 6px;
+  background: transparent;
+  color: #71717a;
+  border: none;
+  cursor: pointer;
+  font-size: 16px;
+}
+.obj-action:active { background: #27272a; }
+
+/* Dataset card */
+.dataset-card {
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 10px;
+  padding: 12px;
+  cursor: pointer;
+}
+.dataset-card:active { background: #1f1f23; }
+.dataset-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fafafa;
+  margin-bottom: 4px;
+  display: flex; align-items: center; gap: 6px;
+}
+.dataset-format {
+  font-size: 9px;
+  background: #27272a;
+  color: #a1a1a1;
+  padding: 2px 5px;
+  border-radius: 4px;
+  font-weight: 600;
+}
+.dataset-row {
+  display: flex; align-items: center; gap: 8px;
+  margin-top: 6px;
+  font-size: 11px;
+  color: #71717a;
+}
+.dataset-bar {
+  flex: 1;
+  height: 4px;
+  background: #1f1f23;
+  border-radius: 2px;
+  overflow: hidden;
+}
+.dataset-bar-fill {
+  height: 100%;
+  background: #5e6ad2;
+  border-radius: 2px;
+}
+
+/* Today's change banner */
+.today-banner {
+  background: linear-gradient(135deg, rgba(94,106,210,0.15) 0%, rgba(167,139,250,0.15) 100%);
+  border: 1px solid rgba(94,106,210,0.3);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin: 0 16px 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: #c4b5fd;
+}
+.today-icon {
+  width: 24px; height: 24px;
+  border-radius: 6px;
+  background: rgba(94,106,210,0.25);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px;
+  color: #c4b5fd;
+}
+.today-metric {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 600;
+}
+.today-metric.up { color: #10b981; }
+.today-metric.down { color: #ef4444; }
+
+/* Detail drawer (slide-up) */
+.detail-backdrop {
+  position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.7);
+  z-index: 100;
+  display: none;
+  align-items: flex-end;
+  justify-content: center;
+}
+.detail-backdrop.open { display: flex; }
+.detail-drawer {
+  background: #18181b;
+  width: 100%;
+  max-width: 440px;
+  border-top-left-radius: 16px;
+  border-top-right-radius: 16px;
+  padding: 16px;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: slideUp 0.25s ease-out;
+}
+@keyframes slideUp { from { transform: translateY(100%); } to { transform: translateY(0); } }
+.drawer-handle {
+  width: 40px; height: 4px;
+  background: #3f3f46;
+  border-radius: 2px;
+  margin: 0 auto 16px;
+}
+.drawer-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fafafa;
+  margin-bottom: 4px;
+}
+.drawer-meta {
+  font-size: 12px;
+  color: #71717a;
+  margin-bottom: 16px;
+}
+.drawer-section {
+  margin-bottom: 16px;
+}
+.drawer-section-title {
+  font-size: 10px;
+  font-weight: 700;
+  color: #71717a;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+.drawer-row {
+  display: flex; justify-content: space-between;
+  padding: 8px 0;
+  font-size: 13px;
+  border-bottom: 1px solid #1f1f23;
+}
+.drawer-row:last-child { border-bottom: none; }
+.drawer-row .label { color: #a1a1a1; }
+.drawer-row .value { color: #fafafa; font-weight: 500; }
+
+.drawer-relations {
+  display: flex; gap: 6px; flex-wrap: wrap;
+  margin-top: 6px;
+}
+.rel-pill {
+  padding: 4px 8px;
+  background: #1f1f23;
+  border-radius: 6px;
+  font-size: 11px;
+  color: #a1a1a1;
+  border: 1px solid #27272a;
+}
+
+.drawer-actions {
+  display: flex; gap: 8px;
+  margin-top: 16px;
+}
+.action-primary {
+  flex: 1;
+  padding: 12px;
+  background: #5e6ad2;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.action-primary:active { background: #4d59b8; }
+.action-secondary {
+  padding: 12px 16px;
+  background: #27272a;
+  color: #fafafa;
+  border: none;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.action-secondary:active { background: #3f3f46; }
+
+/* Bottom Nav */
+.bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 440px;
+  height: 72px;
+  background: rgba(10,10,10,0.95);
+  backdrop-filter: blur(20px);
+  border-top: 1px solid #1f1f1f;
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  padding: 0 16px 16px;
+  z-index: 50;
+}
+.nav-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  color: #71717a;
+  cursor: pointer;
+  padding: 4px 0;
+  font-size: 10px;
+}
+.nav-item.active { color: #fafafa; }
+.nav-item.active .nav-icon {
+  background: #5e6ad2;
+  color: white;
+}
+.nav-icon {
+  width: 36px; height: 36px;
+  border-radius: 10px;
+  background: #1f1f23;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px;
+  color: inherit;
+}
+.nav-center {
+  position: relative;
+  flex: 0;
+}
+.nav-center .nav-icon {
+  width: 48px; height: 48px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, #5e6ad2 0%, #a78bfa 100%);
+  color: white;
+  font-size: 24px;
+  font-weight: 300;
+  box-shadow: 0 4px 16px rgba(94,106,210,0.4);
+  margin-top: -16px;
+}
+
+/* Toggle for view demos */
+.demo-controls {
+  position: fixed;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  z-index: 200;
+}
+.demo-btn {
+  padding: 8px 12px;
+  background: #5e6ad2;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+}
+.demo-btn:active { background: #4d59b8; }
+
+/* View toggle */
+.view-toggle {
+  display: flex;
+  padding: 4px;
+  background: #1a1a1a;
+  border-radius: 10px;
+  margin: 0 16px 12px;
+  gap: 2px;
+}
+
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.fade-in { animation: fadeIn 0.2s ease-out; }
+
+/* Tag */
+.tag {
+  display: inline-block;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 600;
+  background: #27272a;
+  color: #a1a1a1;
+}
+.tag.green { background: rgba(16,185,129,0.15); color: #10b981; }
+.tag.amber { background: rgba(245,158,11,0.15); color: #f59e0b; }
+</style>
+</head>
+<body>
+
+<div class="demo-controls">
+  <button class="demo-btn" onclick="setView('object')">1️⃣ Object</button>
+  <button class="demo-btn" onclick="setView('dataset')">2️⃣ Dataset</button>
+  <button class="demo-btn" onclick="setView('ontology')">3️⃣ Ontology</button>
+  <button class="demo-btn" onclick="openDetail()">📋 详情抽屉</button>
+</div>
+
+<div class="phone-frame">
+
+  <!-- AppBar -->
+  <div class="app-bar">
+    <div class="brand">
+      <div class="brand-logo">C</div>
+      <div class="brand-name">Coolie工坊</div>
+    </div>
+    <div class="bar-icons">
+      <button class="icon-btn">🔧</button>
+      <button class="icon-btn">🔔<span class="dot"></span></button>
+      <button class="icon-btn">⚙️</button>
+    </div>
+  </div>
+
+  <!-- Breadcrumb -->
+  <div class="breadcrumb">
+    <button class="crumb-back">资产</button>
+    <span class="crumb-sep">›</span>
+    <span class="crumb-current">本体</span>
+  </div>
+
+  <!-- Header -->
+  <div class="header-block">
+    <div class="title-row">
+      <div class="title">业务本体</div>
+      <div class="title-meta">8 段 · 145 节点</div>
+    </div>
+    <div class="subtitle">让业务对象即交互体 · 数据即真相</div>
+  </div>
+
+  <!-- Tab strip — Palantir 3 关 -->
+  <div class="tab-strip" id="tab-strip">
+    <button class="tab-pill active" data-tab="object" onclick="setView('object')">
+      <span class="tab-icon">⬡</span>
+      <span class="tab-label">Object</span>
+    </button>
+    <button class="tab-pill" data-tab="dataset" onclick="setView('dataset')">
+      <span class="tab-icon">⊞</span>
+      <span class="tab-label">Dataset</span>
+    </button>
+    <button class="tab-pill" data-tab="ontology" onclick="setView('ontology')">
+      <span class="tab-icon">⊙</span>
+      <span class="tab-label">本体</span>
+    </button>
+  </div>
+
+  <!-- View 1: Object (default) -->
+  <div id="view-object" class="fade-in">
+    <div class="section">
+      <div class="section-title">
+        <span class="palantir-num">第3关</span>
+        Object · 业务对象
+      </div>
+      <div class="cards-list">
+
+        <div class="object-card healthy" onclick="openDetail('project')">
+          <div class="obj-icon">📁</div>
+          <div class="obj-info">
+            <div class="obj-name">企业核心运 v1.2.3</div>
+            <div class="obj-meta">
+              <span>11 节点</span>
+              <span class="obj-meta-sep">·</span>
+              <span>17 关</span>
+              <span class="obj-meta-sep">·</span>
+              <span>6:40 更新</span>
+              <span class="obj-meta-sep">·</span>
+              <span class="obj-status healthy">健康</span>
+            </div>
+          </div>
+          <button class="obj-action">›</button>
+        </div>
+
+        <div class="object-card healthy" onclick="openDetail('fourth')">
+          <div class="obj-icon" style="background: linear-gradient(135deg, #10b981 0%, #34d399 100%);">🍵</div>
+          <div class="obj-info">
+            <div class="obj-name">Fourth Coffee v1.0.0</div>
+            <div class="obj-meta">
+              <span>8 节点</span>
+              <span class="obj-meta-sep">·</span>
+              <span>9 关</span>
+              <span class="obj-meta-sep">·</span>
+              <span>6:35 更新</span>
+              <span class="obj-meta-sep">·</span>
+              <span class="obj-status healthy">健康</span>
+            </div>
+          </div>
+          <button class="obj-action">›</button>
+        </div>
+
+        <div class="object-card healthy" onclick="openDetail('ecommerce')">
+          <div class="obj-icon" style="background: linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%);">🛒</div>
+          <div class="obj-info">
+            <div class="obj-name">E-Commerce v0.9.0</div>
+            <div class="obj-meta">
+              <span>6 节点</span>
+              <span class="obj-meta-sep">·</span>
+              <span>4 关</span>
+              <span class="obj-meta-sep">·</span>
+              <span>6:20 更新</span>
+              <span class="obj-meta-sep">·</span>
+              <span class="obj-status healthy">健康</span>
+            </div>
+          </div>
+          <button class="obj-action">›</button>
+        </div>
+
+        <div class="object-card warn" onclick="openDetail('banking')">
+          <div class="obj-icon" style="background: linear-gradient(135deg, #ec4899 0%, #f472b6 100%);">🏦</div>
+          <div class="obj-info">
+            <div class="obj-name">Banking v2.1.0</div>
+            <div class="obj-meta">
+              <span>5 节点</span>
+              <span class="obj-meta-sep">·</span>
+              <span>3 关</span>
+              <span class="obj-meta-sep">·</span>
+              <span>6:18 更新</span>
+              <span class="obj-meta-sep">·</span>
+              <span class="obj-status warn">注意</span>
+            </div>
+          </div>
+          <button class="obj-action">›</button>
+        </div>
+
+        <div class="object-card idle" onclick="openDetail('healthcare')">
+          <div class="obj-icon" style="background: linear-gradient(135deg, #94a3b8 0%, #cbd5e1 100%);">🏥</div>
+          <div class="obj-info">
+            <div class="obj-name">Healthcare v0.1.0</div>
+            <div class="obj-meta">
+              <span>0 节点</span>
+              <span class="obj-meta-sep">·</span>
+              <span>0 关</span>
+              <span class="obj-meta-sep">·</span>
+              <span>5:30 更新</span>
+              <span class="obj-meta-sep">·</span>
+              <span class="obj-status idle">空草</span>
+            </div>
+          </div>
+          <button class="obj-action">›</button>
+        </div>
+
+        <div class="object-card critical" onclick="openDetail('mallorder')">
+          <div class="obj-icon" style="background: linear-gradient(135deg, #06b6d4 0%, #22d3ee 100%);">📋</div>
+          <div class="obj-info">
+            <div class="obj-name">商城订单 v1.5.0</div>
+            <div class="obj-meta">
+              <span>42 节点</span>
+              <span class="obj-meta-sep">·</span>
+              <span>38 关</span>
+              <span class="obj-meta-sep">·</span>
+              <span>4:00 更新</span>
+              <span class="obj-meta-sep">·</span>
+              <span class="obj-status critical">熔断</span>
+            </div>
+          </div>
+          <button class="obj-action">›</button>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="today-banner">
+      <div class="today-icon">↑</div>
+      <div>本日变化</div>
+      <div class="today-metric up">+3 节点</div>
+      <div class="today-metric up">+1 关</div>
+    </div>
+  </div>
+
+  <!-- View 2: Dataset -->
+  <div id="view-dataset" style="display:none" class="fade-in">
+    <div class="section">
+      <div class="section-title">
+        <span class="palantir-num">第1关</span>
+        Dataset · 数据集
+      </div>
+      <div class="cards-list">
+
+        <div class="dataset-card" onclick="openDetail('ds_users')">
+          <div class="dataset-name">
+            📊 SysUser 用户表 <span class="dataset-format">POSTGRES</span>
+          </div>
+          <div class="dataset-row">
+            <span>1.2万 行</span>
+            <span class="obj-meta-sep">·</span>
+            <span>6 列</span>
+            <div class="dataset-bar"><div class="dataset-bar-fill" style="width: 78%"></div></div>
+            <span class="tag green">同步</span>
+          </div>
+        </div>
+
+        <div class="dataset-card" onclick="openDetail('ds_orders')">
+          <div class="dataset-name">
+            📋 MallOrder 主订单 <span class="dataset-format">POSTGRES</span>
+          </div>
+          <div class="dataset-row">
+            <span>8.4万 行</span>
+            <span class="obj-meta-sep">·</span>
+            <span>14 列</span>
+            <div class="dataset-bar"><div class="dataset-bar-fill" style="width: 92%"></div></div>
+            <span class="tag green">同步</span>
+          </div>
+        </div>
+
+        <div class="dataset-card" onclick="openDetail('ds_payments')">
+          <div class="dataset-name">
+            💳 UserAccount 资金账户 <span class="dataset-format">POSTGRES</span>
+          </div>
+          <div class="dataset-row">
+            <span>0.9万 行</span>
+            <span class="obj-meta-sep">·</span>
+            <span>10 列</span>
+            <div class="dataset-bar"><div class="dataset-bar-fill" style="width: 45%"></div></div>
+            <span class="tag amber">落后</span>
+          </div>
+        </div>
+
+        <div class="dataset-card" onclick="openDetail('ds_csv')">
+          <div class="dataset-name">
+            📁 客户列表.csv <span class="dataset-format">CSV</span>
+          </div>
+          <div class="dataset-row">
+            <span>234 行</span>
+            <span class="obj-meta-sep">·</span>
+            <span>5 列</span>
+            <div class="dataset-bar"><div class="dataset-bar-fill" style="width: 20%"></div></div>
+            <span class="tag">原始</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="today-banner">
+      <div class="today-icon">⇆</div>
+      <div>本周转换</div>
+      <div class="today-metric up">+5 列</div>
+      <div class="today-metric up">+2 表</div>
+    </div>
+  </div>
+
+  <!-- View 3: Ontology overview -->
+  <div id="view-ontology" style="display:none" class="fade-in">
+    <div class="section">
+      <div class="section-title">
+        <span class="palantir-num">第2关</span>
+        Ontology · 本体概览
+      </div>
+      <div class="cards-list">
+
+        <div class="dataset-card" onclick="openDetail('ont_overview')">
+          <div class="dataset-name">📐 本体全貌</div>
+          <div class="dataset-row">
+            <span style="color:#fafafa;font-weight:600">145 节点</span>
+            <span class="obj-meta-sep">·</span>
+            <span style="color:#fafafa;font-weight:600">85 关</span>
+          </div>
+        </div>
+
+        <div class="dataset-card" onclick="openDetail('ont_actions')">
+          <div class="dataset-name">⚡ Actions · 动作类型</div>
+          <div class="dataset-row">
+            <span>7 类型</span>
+            <span class="obj-meta-sep">·</span>
+            <span class="tag green">可用</span>
+          </div>
+        </div>
+
+        <div class="dataset-card" onclick="openDetail('ont_dyn')">
+          <div class="dataset-name">🔌 Connectors · 连接器</div>
+          <div class="dataset-row">
+            <span>4 类型</span>
+            <span class="obj-meta-sep">·</span>
+            <span class="tag amber">2 滞后</span>
+          </div>
+        </div>
+
+        <div class="dataset-card" onclick="openDetail('ont_ai')">
+          <div class="dataset-name">🤖 AI · 副手</div>
+          <div class="dataset-row">
+            <span>3 副手</span>
+            <span class="obj-meta-sep">·</span>
+            <span class="tag green">活跃</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Detail Drawer -->
+<div class="detail-backdrop" id="drawer-backdrop" onclick="closeDetail()">
+  <div class="detail-drawer" onclick="event.stopPropagation()">
+    <div class="drawer-handle"></div>
+    <div class="drawer-title" id="drawer-title">企业核心运</div>
+    <div class="drawer-meta" id="drawer-meta">v1.2.3 · 运行中 · 11 节点</div>
+
+    <div class="drawer-section">
+      <div class="drawer-section-title">基础</div>
+      <div class="drawer-row"><span class="label">slug</span><span class="value">enterprise-core</span></div>
+      <div class="drawer-row"><span class="label">版本</span><span class="value">v1.2.3</span></div>
+      <div class="drawer-row"><span class="label">状态</span><span class="value tag green">健康</span></div>
+      <div class="drawer-row"><span class="label">创建</span><span class="value">2026-08-12</span></div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-section-title">统计</div>
+      <div class="drawer-row"><span class="label">对象类型</span><span class="value">5</span></div>
+      <div class="drawer-row"><span class="label">对象数</span><span class="value">11</span></div>
+      <div class="drawer-row"><span class="label">关系数</span><span class="value">17</span></div>
+      <div class="drawer-row"><span class="label">最后更新</span><span class="value">6:40 PM</span></div>
+    </div>
+
+    <div class="drawer-section">
+      <div class="drawer-section-title">关联对象</div>
+      <div class="drawer-relations">
+        <span class="rel-pill">project</span>
+        <span class="rel-pill">issue</span>
+        <span class="rel-pill">spec</span>
+        <span class="rel-pill">conversation</span>
+        <span class="rel-pill">work_product</span>
+      </div>
+    </div>
+
+    <div class="drawer-actions">
+      <button class="action-primary" onclick="alert('跳转工坊会话 (BoardChatScreen): 副手接管')">查看详情</button>
+      <button class="action-secondary">熔断</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom Nav -->
+<nav class="bottom-nav">
+  <button class="nav-item">
+    <div class="nav-icon">🏠</div>
+    <span>汇览</span>
+  </button>
+  <button class="nav-item">
+    <div class="nav-icon">📋</div>
+    <span>任务</span>
+  </button>
+  <button class="nav-center">
+    <div class="nav-icon">+</div>
+  </button>
+  <button class="nav-item">
+    <div class="nav-icon">💬</div>
+    <span>工坊</span>
+  </button>
+  <button class="nav-item active">
+    <div class="nav-icon">📦</div>
+    <span>资产</span>
+  </button>
+</nav>
+
+<script>
+function setView(view) {
+  document.querySelectorAll('#view-object, #view-dataset, #view-ontology').forEach(el => el.style.display = 'none');
+  document.getElementById('view-' + view).style.display = 'block';
+  document.querySelectorAll('.tab-pill').forEach(el => {
+    el.classList.toggle('active', el.dataset.tab === view);
+  });
+  // Scroll to top
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function openDetail(id) {
+  document.getElementById('drawer-backdrop').classList.add('open');
+}
+function closeDetail() {
+  document.getElementById('drawer-backdrop').classList.remove('open');
+}
+</script>
+
+</body>
+</html>
