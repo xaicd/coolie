@@ -409,7 +409,7 @@ export function ontologyGraphService(db: Db) {
           id: row.id,
           key: nodeKey("conversation", row.id),
           label: safeNodeLabel(row.title, "未命名对话"),
-          href: null,
+          href: row.projectId ? `/projects/${row.projectId}/chat` : `/board-chat`,
           metadata: { issueId: row.issueId ?? null, projectId: row.projectId ?? null },
         });
       }

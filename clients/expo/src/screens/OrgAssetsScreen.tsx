@@ -46,6 +46,8 @@ interface OrgAssetsScreenProps {
   onOpenPluginManager?: () => void;
   onOpenPrototypeSandbox?: () => void;
   onOpenOnboarding?: () => void;
+  onNavigateToChat?: (prompt?: string) => void;
+  onNavigateToTasks?: () => void;
 }
 
 const TAB_OPTIONS: Array<{ key: OrgAssetTab; label: string }> = [
@@ -84,6 +86,8 @@ export function OrgAssetsScreen({
   onOpenPluginManager,
   onOpenPrototypeSandbox,
   onOpenOnboarding,
+  onNavigateToChat,
+  onNavigateToTasks,
 }: OrgAssetsScreenProps) {
   const [activeTab, setActiveTab] = useState<OrgAssetTab>(initialTab);
   const [artifactsProjectId, setArtifactsProjectId] = useState<string | null>(
@@ -165,6 +169,17 @@ export function OrgAssetsScreen({
             onCreateTaskForProject={onCreateTaskForProject}
             onOpenWebOntology={onOpenWebOntology}
             onOpenSandbox={onOpenSandbox}
+            onNavigateToChat={onNavigateToChat}
+            onNavigateToTasks={onNavigateToTasks}
+            onNavigateToTab={(target) => {
+              if (target === "agents" || target === "projects" || target === "architecture" || target === "artifacts" || target === "ontology") {
+                setActiveTab(target as OrgAssetTab);
+              } else if (target === "tasks") {
+                onNavigateToTasks?.();
+              } else if (target === "chat") {
+                onNavigateToChat?.();
+              }
+            }}
           />
         )}
 

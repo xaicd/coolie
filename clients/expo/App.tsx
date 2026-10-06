@@ -1316,6 +1316,13 @@ function HomeScreen({
               onCreateTaskForProject={(project) => {
                 setCreateTaskProjectId(project.id);
               }}
+              onNavigateToChat={(prompt?: string) => {
+                if (prompt) exportBoardPrompt(prompt);
+                navigateTab("chat");
+              }}
+              onNavigateToTasks={() => {
+                navigateTab("tasks");
+              }}
               onOpenWebProjects={(subPath?: string, title?: string) =>
                 setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" })
               }
