@@ -8,13 +8,15 @@ import {
   type Issue,
   type IssueStatus,
   type OntologyDomain,
+  type OntologyGraphResponse,
+  type OntologyGraphResponseEdge,
   type OntologyLevelsResponse,
   type OntologyStatsResponse,
   type Project,
   type SessionUser,
 } from "@coolie/api-client";
 
-export type { Project, OntologyStatsResponse };
+export type { OntologyGraphResponse, Project, OntologyStatsResponse };
 
 // ── Linear 设计系统色彩令牌 ─────────────────────────────────────────
 // 单一来源在 src/theme.ts (与 Coolie Web 对齐); 这里再导出, 让 30+ 个
@@ -410,6 +412,45 @@ export interface SeedSampleDomainsReport {
   failed: number;
 }
 
+// ── 本体图谱控制面契约 (wave332) ────────────────────────────────────────
+// 镜像 `@paperclipai/shared` 的本体图谱契约 (web 端 ui/src/api/ontologyGraph.ts
+// 消费的同一份)。api-client 刻意不依赖 shared (见其 types.ts 的 mirror 先例),
+// App 层沿用同一做法; 源头变更时先改 packages/shared 再同步这里。
+
+/** 关系可指向的对象种类 — 镜像 shared 的 ENTITY_TYPES / EntityType。 */
+export type EntityType =
+  | "company"
+  | "project"
+  | "issue"
+  | "spec"
+  | "conversation"
+  | "work_product"
+  | "attachment"
+  | "comment"
+  | "agent";
+
+/** 图谱预设视图 — 镜像 shared 的 ONTOLOGY_GRAPH_VIEWS / OntologyGraphView。 */
+export type OntologyGraphView =
+  | "project_tree"
+  | "agent_dashboard"
+  | "conversation_thread";
+
+/** src→target 的一条关系路径 — 镜像 shared 的 OntologyPath (边即图谱响应的边)。 */
+export interface OntologyPath {
+  /** 节点键 (`type:id`) 依次排列, src 开头 / target 结尾。 */
+  nodeKeys: string[];
+  edges: OntologyGraphResponseEdge[];
+  length: number;
+}
+
+/** GET /ontology/paths 响应 — 镜像 shared 的 OntologyPathsResponse。 */
+export interface OntologyPathsResponse {
+  src: { type: EntityType; id: string } | null;
+  target: { type: EntityType; id: string } | null;
+  maxDepth: number;
+  paths: OntologyPath[];
+}
+
 export class CoolieClient extends BaseCoolieClient {
   /**
    * Point this client at another instance, at runtime.
@@ -672,6 +713,60 @@ export class CoolieClient extends BaseCoolieClient {
       throw new Error("创建本体域失败: 服务端未返回有效域对象");
     }
     return domain;
+  }
+
+  /**
+   * GET /api/companies/:id/ontology/graph — 控制面本体图谱 (wave332, 与 web
+   * 端 `ontologyGraphApi.graph` 同一端点)。参数收窄成共享契约的联合类型;
+   * 查询串拼接仍走基类 wave239 实现 —— 那里沉淀着 wave284 教训 (companyId
+   * 已在路径里, 回显进 query 会被严格 schema 400)。
+   */
+  async getOntologyGraph(
+    companyId: string,
+    params: {
+      rootType: EntityType;
+      rootId: string;
+      depth?: number;
+      view?: OntologyGraphView;
+    },
+  ): Promise<OntologyGraphResponse> {
+    return super.getOntologyGraph(companyId, params);
+  }
+
+  /**
+   * GET /api/companies/:id/ontology/paths — 两对象间的本体关系路径 (wave332,
+   * 与 web 端 `ontologyGraphApi.paths` 同一端点)。maxDepth 缺省 5 与 web 一致。
+   */
+  async getOntologyPaths(
+    companyId: string,
+    params: {
+      srcType: EntityType;
+      srcId: string;
+      targetType: EntityType;
+      targetId: string;
+      maxDepth?: number;
+    },
+  ): Promise<OntologyPathsResponse> {
+    const q = new URLSearchParams({
+      src_type: params.srcType,
+      src_id: params.srcId,
+      target_type: params.targetType,
+      target_id: params.targetId,
+      max_depth: String(params.maxDepth ?? 5),
+    });
+    return this.request<OntologyPathsResponse>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/ontology/paths?${q.toString()}`,
+    );
+  }
+
+  /**
+   * GET /api/companies/:id/ontology/stats — 图谱宏观统计 (wave332, 与 web 端
+   * `ontologyGraphApi.stats` 同一端点)。基类 wave239 已有 `getOntologyStats`
+   * 打同一端点, 这里按派单命名委托, 不重复拼 URL。
+   */
+  async getOntologyGraphStats(companyId: string): Promise<OntologyStatsResponse> {
+    return this.getOntologyStats(companyId);
   }
 
   /**
