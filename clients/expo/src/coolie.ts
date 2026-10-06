@@ -14,6 +14,15 @@ import {
   type OntologyStatsResponse,
   type Project,
   type SessionUser,
+  // wave342: 本体工作台 14 视图只读行类型
+  type OntologyActionType,
+  type OntologyConnector,
+  type OntologyDataset,
+  type OntologyFunction,
+  type OntologyInterface,
+  type OntologyNodeType,
+  type OntologyRelationType,
+  type OntologyTransform,
 } from "@coolie/api-client";
 
 export type { OntologyGraphResponse, Project, OntologyStatsResponse };
@@ -451,6 +460,27 @@ export interface OntologyPathsResponse {
   paths: OntologyPath[];
 }
 
+/** wave342: 认知扫描任务行 (镜像 ontology-core 的 OntologyCognitionJobRow 投影) */
+export interface OntologyCognitionJobRow {
+  id: string;
+  job_key: string;
+  app_name: string;
+  root_path: string;
+  status: string;
+  stage_label: string;
+  progress_pct: number;
+}
+
+/** wave342: 能力缺口行 (镜像 ontology-core 的 CapabilityGapRow 投影) */
+export interface OntologyCapabilityGapRow {
+  id: string;
+  gap_key: string;
+  title: string;
+  status: string;
+  priority: string;
+  detected_from: string;
+}
+
 export class CoolieClient extends BaseCoolieClient {
   /**
    * Point this client at another instance, at runtime.
@@ -713,6 +743,103 @@ export class CoolieClient extends BaseCoolieClient {
       throw new Error("创建本体域失败: 服务端未返回有效域对象");
     }
     return domain;
+  }
+
+  // ── wave342: 本体工作台 14 视图只读数据面 ──────────────────────────
+  // 8 个域级 list GET (node-types / relation-types / action-types /
+  // functions / interfaces / datasets / connectors / transforms) + 2 个
+  // 公司级 list GET (cognition-jobs / capability-gaps), 全部走插件 HTTP
+  // 面 /api/plugins/paperclipai.plugin-ontology/api/<path> —— 与 web 端
+  // usePluginData 同一批 worker handler, 响应一律 { <key>: rows } 包裹,
+  // 展开方式与基类 listOntologyDomains 同款 (防插件包装漂移)。
+
+  /** GET 插件 api 面: query 统一带 companyId (+domainId), 取响应中的数组字段 */
+  private async pluginApiList<T>(
+    path: string,
+    key: string,
+    companyId: string,
+    domainId?: string,
+    extra?: Record<string, string>,
+  ): Promise<T[]> {
+    const q = new URLSearchParams({ companyId });
+    if (domainId) q.set("domainId", domainId);
+    for (const [k, v] of Object.entries(extra ?? {})) q.set(k, v);
+    const res = await this.request<Record<string, unknown>>(
+      "GET",
+      `/api/plugins/paperclipai.plugin-ontology/api/${path}?${q.toString()}`,
+    );
+    const rows = res?.[key];
+    return Array.isArray(rows) ? (rows as T[]) : [];
+  }
+
+  /** GET …/api/node-types — 对象类型 (结构视图) */
+  listOntologyNodeTypes(companyId: string, domainId: string) {
+    return this.pluginApiList<OntologyNodeType>(
+      "node-types", "nodeTypes", companyId, domainId,
+    );
+  }
+
+  /** GET …/api/relation-types — 关系类型 (结构视图) */
+  listOntologyRelationTypes(companyId: string, domainId: string) {
+    return this.pluginApiList<OntologyRelationType>(
+      "relation-types", "relationTypes", companyId, domainId,
+    );
+  }
+
+  /** GET …/api/action-types — 动作类型 (动作视图) */
+  listOntologyActionTypes(companyId: string, domainId: string) {
+    return this.pluginApiList<OntologyActionType>(
+      "action-types", "actionTypes", companyId, domainId,
+    );
+  }
+
+  /** GET …/api/functions — 函数 (函数视图) */
+  listOntologyFunctions(companyId: string, domainId: string) {
+    return this.pluginApiList<OntologyFunction>(
+      "functions", "functions", companyId, domainId,
+    );
+  }
+
+  /** GET …/api/interfaces — 接口 (接口视图) */
+  listOntologyInterfaces(companyId: string, domainId: string) {
+    return this.pluginApiList<OntologyInterface>(
+      "interfaces", "interfaces", companyId, domainId,
+    );
+  }
+
+  /** GET …/api/datasets — 数据集 (数据集视图) */
+  listOntologyDatasets(companyId: string, domainId: string) {
+    return this.pluginApiList<OntologyDataset>(
+      "datasets", "datasets", companyId, domainId,
+    );
+  }
+
+  /** GET …/api/connectors — 连接器 (连接器视图) */
+  listOntologyConnectors(companyId: string, domainId: string) {
+    return this.pluginApiList<OntologyConnector>(
+      "connectors", "connectors", companyId, domainId,
+    );
+  }
+
+  /** GET …/api/transforms — 转换 (转换视图) */
+  listOntologyTransforms(companyId: string, domainId: string) {
+    return this.pluginApiList<OntologyTransform>(
+      "transforms", "transforms", companyId, domainId,
+    );
+  }
+
+  /** GET …/api/cognition-jobs — 认知扫描任务 (公司级, 认知视图) */
+  listOntologyCognitionJobs(companyId: string, limit = 50) {
+    return this.pluginApiList<OntologyCognitionJobRow>(
+      "cognition-jobs", "jobs", companyId, undefined, { limit: String(limit) },
+    );
+  }
+
+  /** GET …/api/capability-gaps — 能力缺口 (公司级, 能力视图) */
+  listOntologyCapabilityGaps(companyId: string, limit = 100) {
+    return this.pluginApiList<OntologyCapabilityGapRow>(
+      "capability-gaps", "gaps", companyId, undefined, { limit: String(limit) },
+    );
   }
 
   /**

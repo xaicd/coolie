@@ -134,6 +134,16 @@ export type {
   OntologyLevelsResponse,
   OntologyStatsResponse,
   OntologyTypeCount,
+  // wave342: 本体工作台只读视图要渲染的行类型 (types.ts wave333/335 已
+  // 定义, 供 client.ts 内部使用; 原生 App 的 14 视图组同样需要, 补导出)
+  OntologyNodeType,
+  OntologyRelationType,
+  OntologyActionType,
+  OntologyFunction,
+  OntologyInterface,
+  OntologyDataset,
+  OntologyConnector,
+  OntologyTransform,
   SetDomainLifecycleOptions,
   CompanyArtifactSource,
   CompanyArtifactMediaKind,

@@ -43,6 +43,18 @@ import { SectionHeader } from "../ui/SectionHeader";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { StatTile } from "../ui/StatTile";
 import { StatusBadge } from "../ui/StatusBadge";
+import { ActionsView } from "../components/ontology/ActionsView";
+import { CapabilitiesView } from "../components/ontology/CapabilitiesView";
+import { CognitionView } from "../components/ontology/CognitionView";
+import { ConnectorsView } from "../components/ontology/ConnectorsView";
+import { DatasetsView } from "../components/ontology/DatasetsView";
+import { FunctionsView } from "../components/ontology/FunctionsView";
+import { InterfacesView } from "../components/ontology/InterfacesView";
+import { ManageView } from "../components/ontology/ManageView";
+import { SandboxView } from "../components/ontology/SandboxView";
+import { SchemaView } from "../components/ontology/SchemaView";
+import { TableView } from "../components/ontology/TableView";
+import { TransformsView } from "../components/ontology/TransformsView";
 
 interface OntologyDomainListScreenProps {
   company: Company;
@@ -116,8 +128,92 @@ const LIFECYCLE_CONFIG: Record<
 
 export type DomainFilter = "all" | "active" | "draft" | "archived" | "locked";
 export type OntologyViewMode = "list" | "detail";
-/** 本体 tab 顶层双视图: 图谱 (wave329 接入 OntologyGraphView) vs 域卡片列表 */
-export type OntologyDomainViewMode = "graph" | "list";
+
+/**
+ * wave342 本体工作台 14 视图 —— 对齐 web 端 plugin-ontology 的
+ * WorkbenchView 枚举 (app.tsx)。web 枚举中的 dialogue (对话) 不搬:
+ * App 工坊 tab 已承载会话流, 重复入口违反极简使用主义。
+ */
+export type OntologyWorkbenchView =
+  | "graph"
+  | "table"
+  | "sandbox"
+  | "schema"
+  | "domains"
+  | "datasets"
+  | "connectors"
+  | "transforms"
+  | "cognition"
+  | "capabilities"
+  | "actions"
+  | "functions"
+  | "interfaces"
+  | "manage";
+
+type WorkbenchGroupId = "overview" | "structure" | "data" | "assets" | "ops";
+
+/** 5 视图组 → 14 视图 (label 与 web 端一致) */
+const WORKBENCH_GROUPS: {
+  id: WorkbenchGroupId;
+  label: string;
+  views: { id: OntologyWorkbenchView; label: string }[];
+}[] = [
+  {
+    id: "overview",
+    label: "总览",
+    views: [
+      { id: "graph", label: "图谱" },
+      { id: "table", label: "表格" },
+      { id: "sandbox", label: "驾驶" },
+    ],
+  },
+  {
+    id: "structure",
+    label: "结构",
+    views: [
+      { id: "schema", label: "结构" },
+      { id: "domains", label: "本体域" },
+    ],
+  },
+  {
+    id: "data",
+    label: "数据",
+    views: [
+      { id: "datasets", label: "数据集" },
+      { id: "connectors", label: "连接器" },
+      { id: "transforms", label: "转换" },
+    ],
+  },
+  {
+    id: "assets",
+    label: "资产",
+    views: [
+      { id: "cognition", label: "认知" },
+      { id: "capabilities", label: "能力" },
+      { id: "actions", label: "动作" },
+      { id: "functions", label: "函数" },
+      { id: "interfaces", label: "接口" },
+    ],
+  },
+  {
+    id: "ops",
+    label: "运维",
+    views: [{ id: "manage", label: "治理" }],
+  },
+];
+
+/** 需要锚定本体域的视图 (其余走公司级数据) */
+const DOMAIN_SCOPED_VIEWS = new Set<OntologyWorkbenchView>([
+  "graph",
+  "sandbox",
+  "schema",
+  "datasets",
+  "connectors",
+  "transforms",
+  "actions",
+  "functions",
+  "interfaces",
+]);
 
 export function OntologyDomainListScreen({
   company,
@@ -135,8 +231,8 @@ export function OntologyDomainListScreen({
   const [seedingSample, setSeedingSample] = useState(false);
   const [selectedNodeTypeKey, setSelectedNodeTypeKey] = useState<string | null>(null);
 
-  // 图谱/列表双视图 (wave329): 默认直达图谱
-  const [domainViewMode, setDomainViewMode] = useState<OntologyDomainViewMode>("graph");
+  // 14 视图工作台 (wave342): 默认图谱, 与 web 端 WorkbenchView 对齐
+  const [view, setView] = useState<OntologyWorkbenchView>("graph");
   const [selectedDomainId, setSelectedDomainId] = useState<string | null>(null);
   const [graphSnapshot, setGraphSnapshot] = useState<OntologyGraphResponse | null>(null);
   const [graphLoading, setGraphLoading] = useState(false);
@@ -247,10 +343,17 @@ export function OntologyDomainListScreen({
     }
   }, [companyId, selectedDomainId]);
 
-  // 仅图谱视图且已锚定域时拉取, 列表视图不发冗余请求
+  // 仅图谱视图且已锚定域时拉取, 其余视图不发冗余请求
   useEffect(() => {
-    if (domainViewMode === "graph" && selectedDomainId) void loadGraph();
-  }, [domainViewMode, selectedDomainId, loadGraph]);
+    if (view === "graph" && selectedDomainId) void loadGraph();
+  }, [view, selectedDomainId, loadGraph]);
+
+  // 当前视图所属的组 (驱动第二行视图 chips)
+  const activeGroup = useMemo(
+    () =>
+      WORKBENCH_GROUPS.find((g) => g.views.some((v) => v.id === view))?.id ?? "overview",
+    [view],
+  );
 
   // 控制面图谱响应 → 图谱组件。wave337: 响应节点自带 type/key, 边直接引用
   // 节点 key; key 仍按 9 类映射后的 `${type}:${id}` 重算, 保证与 rootKey
@@ -797,6 +900,37 @@ export function OntologyDomainListScreen({
     );
   }
 
+  // wave342 只读视图路由: 公司级视图直通; 域级视图需已锚定域 (未锚定回落
+  // 到下方 加载/空态/列表 链)。graph / domains 两视图保留原有专属渲染。
+  const renderReadonlyView = () => {
+    if (view === "table") return <TableView companyId={companyId} />;
+    if (view === "cognition") return <CognitionView companyId={companyId} />;
+    if (view === "capabilities") return <CapabilitiesView companyId={companyId} />;
+    if (view === "manage") return <ManageView companyId={companyId} />;
+    if (!selectedDomainId) return null;
+    switch (view) {
+      case "sandbox":
+        return <SandboxView companyId={companyId} domainId={selectedDomainId} />;
+      case "schema":
+        return <SchemaView companyId={companyId} domainId={selectedDomainId} />;
+      case "datasets":
+        return <DatasetsView companyId={companyId} domainId={selectedDomainId} />;
+      case "connectors":
+        return <ConnectorsView companyId={companyId} domainId={selectedDomainId} />;
+      case "transforms":
+        return <TransformsView companyId={companyId} domainId={selectedDomainId} />;
+      case "actions":
+        return <ActionsView companyId={companyId} domainId={selectedDomainId} />;
+      case "functions":
+        return <FunctionsView companyId={companyId} domainId={selectedDomainId} />;
+      case "interfaces":
+        return <InterfacesView companyId={companyId} domainId={selectedDomainId} />;
+      default:
+        return null;
+    }
+  };
+  const readonlyView = renderReadonlyView();
+
   // 列表视图 (Domain Card List)
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -824,19 +958,75 @@ export function OntologyDomainListScreen({
           </View>
         </View>
 
-        {/* 图谱/列表双视图切换 (wave329, 两字铁律) */}
+        {/* 5 视图组切换 (wave342, 组名两字铁律) */}
         <SegmentedControl
-          value={domainViewMode}
-          onChange={(key) => setDomainViewMode(key as OntologyDomainViewMode)}
-          options={[
-            { key: "graph", label: "图谱" },
-            { key: "list", label: "列表" },
-          ]}
+          value={activeGroup}
+          onChange={(key) => {
+            const group = WORKBENCH_GROUPS.find((g) => g.id === key);
+            const first = group?.views[0];
+            if (first) setView(first.id);
+          }}
+          options={WORKBENCH_GROUPS.map((g) => ({ key: g.id, label: g.label }))}
           style={styles.viewSwitcher}
         />
 
-        {/* 顶部过滤切换器 (仅列表视图, 图谱视图按单域锚定无需过滤) */}
-        {domainViewMode === "list" ? (
+        {/* 组内视图 chips: 14 视图逐个直达 */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.viewChipRow}
+        >
+          {(WORKBENCH_GROUPS.find((g) => g.id === activeGroup)?.views ?? []).map((v) => {
+            const active = v.id === view;
+            return (
+              <Pressable
+                key={v.id}
+                style={[styles.viewChip, active && styles.viewChipActive]}
+                onPress={() => setView(v.id)}
+                hitSlop={4}
+                testID={`OntologyWorkbench__ViewChip__${v.id}`}
+                accessibilityLabel={`切换到${v.label}视图`}
+              >
+                <Text style={[styles.viewChipText, active && styles.viewChipTextActive]}>
+                  {v.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {/* 域锚定 chips: 仅域级视图显示, 图谱/结构/数据/资产随域联动 */}
+        {DOMAIN_SCOPED_VIEWS.has(view) && domains.length > 0 ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.domainChipRowHeader}
+          >
+            {domains.map((d) => {
+              const active = d.id === selectedDomainId;
+              return (
+                <Pressable
+                  key={d.id}
+                  style={[styles.domainChip, active && styles.domainChipActive]}
+                  onPress={() => setSelectedDomainId(d.id)}
+                  hitSlop={4}
+                  testID={`OntologyWorkbench__DomainChip__${d.slug}`}
+                  accessibilityLabel={`切换本体域 ${d.display_name || d.slug}`}
+                >
+                  <Text
+                    style={[styles.domainChipText, active && styles.domainChipTextActive]}
+                    numberOfLines={1}
+                  >
+                    {d.display_name || d.displayName || d.slug}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        ) : null}
+
+        {/* 顶部过滤切换器 (仅本体域视图) */}
+        {view === "domains" ? (
           <SegmentedControl
             value={filter}
             onChange={(key) => setFilter(key as DomainFilter)}
@@ -855,7 +1045,7 @@ export function OntologyDomainListScreen({
         ) : null}
       </View>
 
-      {domainViewMode === "graph" && domains.length > 0 ? (
+      {view === "graph" && domains.length > 0 && selectedDomainId ? (
         <ScrollView
           style={styles.container}
           contentContainerStyle={styles.graphScrollContent}
@@ -870,33 +1060,6 @@ export function OntologyDomainListScreen({
             />
           }
         >
-          {/* 域锚定切换 chips: 图谱随选中域联动 */}
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.domainChipRow}
-          >
-            {domains.map((d) => {
-              const active = d.id === selectedDomainId;
-              return (
-                <Pressable
-                  key={d.id}
-                  style={[styles.domainChip, active && styles.domainChipActive]}
-                  onPress={() => setSelectedDomainId(d.id)}
-                  hitSlop={4}
-                  accessibilityLabel={`切换本体域 ${d.display_name || d.slug}`}
-                >
-                  <Text
-                    style={[styles.domainChipText, active && styles.domainChipTextActive]}
-                    numberOfLines={1}
-                  >
-                    {d.display_name || d.displayName || d.slug}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-
           <OntologyGraphView
             graph={graphData}
             loading={graphLoading}
@@ -915,6 +1078,8 @@ export function OntologyDomainListScreen({
             </Text>
           </View>
         </ScrollView>
+      ) : readonlyView ? (
+        readonlyView
       ) : loading ? (
         <LoadingState text="正在加载业务本体域拓扑…" />
       ) : error ? (
@@ -1309,10 +1474,36 @@ const styles = StyleSheet.create({
     padding: 16,
     paddingBottom: 40,
   },
-  domainChipRow: {
+  viewChipRow: {
     flexDirection: "row",
     gap: 8,
-    paddingBottom: 12,
+    marginTop: 10,
+  },
+  viewChip: {
+    borderWidth: 1,
+    borderColor: C.line,
+    borderRadius: RADIUS.sm,
+    backgroundColor: C.panel,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  viewChipActive: {
+    borderColor: C.accent,
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
+  },
+  viewChipText: {
+    color: C.ink3,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  viewChipTextActive: {
+    color: C.accent,
+    fontWeight: "600",
+  },
+  domainChipRowHeader: {
+    flexDirection: "row",
+    gap: 8,
+    marginTop: 10,
   },
   domainChip: {
     borderWidth: 1,
