@@ -1,0 +1,12 @@
+{
+  "version": "0.6.37",
+  "versionCode": 637,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.37/coolie-release.apk",
+  "apkSha256": "645a8d8ca8c368054ce6ceacefd13556ea4ded61aa0397379179ab95006c92fc",
+  "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+  "iosBundleId": "cn.xrobinai.app",
+  "iosSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
+  "iosTestFlightUrl": null,
+  "releaseNotes": "本体 tab 双视图: 图谱/列表. 接入原生 OntologyGraphView 同心圆环图谱, 域 chips 切换联动, 默认进图谱",
+  "commitSha": "b35b6521c4eeb55856d1ea74743800fdb01ff348"
+}
