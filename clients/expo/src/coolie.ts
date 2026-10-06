@@ -847,12 +847,17 @@ export class CoolieClient extends BaseCoolieClient {
    * 端 `ontologyGraphApi.graph` 同一端点)。参数收窄成共享契约的联合类型;
    * 查询串拼接仍走基类 wave239 实现 —— 那里沉淀着 wave284 教训 (companyId
    * 已在路径里, 回显进 query 会被严格 schema 400)。
+   *
+   * wave352 — rootType/rootId 放宽回可选, 与服务端契约 (root_type/root_id
+   * 均 optional, 缺省返回全公司扁平快照) 和基类签名对齐: v0.6.22 图谱工作
+   * 台的「全量探索」预置就是无 root 全图调用, 之前的必填写法把它类型层面
+   * 误杀。锚定 BFS 的调用方继续传 rootType+rootId。
    */
   async getOntologyGraph(
     companyId: string,
     params: {
-      rootType: EntityType;
-      rootId: string;
+      rootType?: EntityType;
+      rootId?: string;
       depth?: number;
       view?: OntologyGraphView;
     },

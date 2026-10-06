@@ -15,166 +15,130 @@ import {
   View,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
-import type { Company, OntologyDomain, OntologyGraphResponse } from "@coolie/api-client";
-import { C, coolie } from "../coolie";
-import { StatusDot } from "../components/StatusDot";
-import { EmergencyKillSwitch } from "../components/EmergencyKillSwitch";
-import { OntologyGraphView } from "../components/OntologyGraphView";
+import * as DocumentPicker from "expo-document-picker";
 import type {
-  OntologyEntityType,
-  OntologyGraphData,
-  OntologyGraphEdge,
-  OntologyGraphNode,
-} from "../components/OntologyGraphView";
+  Company,
+  OntologyDomain,
+  OntologyEntityTypeLevel,
+  OntologyLevelsResponse,
+  OntologyInstanceRow,
+  OntologyPropertiesResponse,
+} from "@coolie/api-client";
+import { C, coolie } from "../coolie";
+import { OntologyGraphWorkbenchScreen } from "./OntologyGraphWorkbenchScreen";
 import { AppCard } from "../ui/AppCard";
-import { RADIUS } from "../ui/tokens";
+import { RADIUS, SPACING } from "../ui/tokens";
 import { EmptyState } from "../ui/EmptyState";
 import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
 import { Pill } from "../ui/Pill";
-import { ScreenHeader } from "../ui/ScreenHeader";
 import { SectionHeader } from "../ui/SectionHeader";
-import { StatusBadge } from "../ui/StatusBadge";
 
+// wave352 — 整屏砍回 v0.6.22 极简度 (老板拍): wave350 的 5 组 SegmentedControl
+// + 14 视图选择器与 14 view 渲染全部撤编, 只保留 v0.6.22 的 2 视图; 通往
+// InstanceGraph 屏的 onOpenInstanceGraph 入参随该屏 (wave315 已删) 一并移除。
 interface OntologyDomainListScreenProps {
   company: Company;
   whoami?: string;
   onOpenWebOntology?: () => void;
   onOpenSchemaEditor?: (typeId: string, displayName: string) => void;
-  onOpenWorkbench?: () => void;
 }
 
-const LIFECYCLE_CONFIG: Record<
-  string,
-  { label: string; status: "ok" | "err" | "idle"; color: string; bg: string; border: string }
-> = {
-  active: {
-    label: "运行中",
-    status: "ok",
-    color: C.ok,
-    bg: "rgba(39, 166, 68, 0.1)",
-    border: "rgba(39, 166, 68, 0.25)",
-  },
-  archived: {
-    label: "已锁定",
-    status: "err",
-    color: C.err,
-    bg: "rgba(239, 68, 68, 0.1)",
-    border: "rgba(239, 68, 68, 0.28)",
-  },
-  locked: {
-    label: "已锁定",
-    status: "err",
-    color: C.err,
-    bg: "rgba(239, 68, 68, 0.1)",
-    border: "rgba(239, 68, 68, 0.28)",
-  },
-  deprecated: {
-    label: "弃用锁死",
-    status: "idle",
-    color: C.warn,
-    bg: "rgba(245, 158, 11, 0.1)",
-    border: "rgba(245, 158, 11, 0.25)",
-  },
-  draft: {
-    label: "草稿中",
-    status: "idle",
-    color: C.ink3,
-    bg: C.lineSubtle,
-    border: C.line,
-  },
-};
+interface EntityCategoryConfig {
+  entityType: string;
+  label: string;
+  icon: keyof typeof Ionicons.glyphMap;
+  desc: string;
+  color: string;
+}
 
-// 图谱组件类型表仅覆盖控制面 9 类实体 (wave330)。wave337 起图谱走控制面
-// /ontology/graph, 节点自带 type 字符串; 防御性读取: 命中 9 类才采纳,
-// 否则 fallback work_product (真实类型语义仍保留在 label 与 metadata)
-const CONTROL_PLANE_ENTITY_TYPES: readonly OntologyEntityType[] = [
-  "project",
-  "issue",
-  "agent",
-  "spec",
-  "conversation",
-  "work_product",
-  "attachment",
-  "comment",
-  "company",
+const ENTITY_CATEGORIES: EntityCategoryConfig[] = [
+  {
+    entityType: "project",
+    label: "业务项目",
+    icon: "folder-outline",
+    desc: "核心业务微服务与研发工程",
+    color: "#5E6AD2",
+  },
+  {
+    entityType: "issue",
+    label: "任务工单",
+    icon: "list-outline",
+    desc: "正在流转与协同处理的业务任务",
+    color: "#39A275",
+  },
+  {
+    entityType: "work_product",
+    label: "交付产物",
+    icon: "cube-outline",
+    desc: "各阶段产出的交付物与技术工件",
+    color: "#E0A030",
+  },
+  {
+    entityType: "agent",
+    label: "数字员工",
+    icon: "people-outline",
+    desc: "参与研发、运维与管理的智能体角色",
+    color: "#7A6FD6",
+  },
+  {
+    entityType: "spec",
+    label: "系统规范",
+    icon: "document-text-outline",
+    desc: "业务需求、系统设计与验收规范",
+    color: "#4FA1D9",
+  },
+  {
+    entityType: "conversation",
+    label: "工坊会话",
+    icon: "chatbubbles-outline",
+    desc: "工坊会话与多智能体协同记录",
+    color: "#C95757",
+  },
 ];
 
-function toControlPlaneEntityType(type: string): OntologyEntityType {
-  return (CONTROL_PLANE_ENTITY_TYPES as readonly string[]).includes(type)
-    ? (type as OntologyEntityType)
-    : "work_product";
-}
-
-/**
- * wave351 真精简 (老板批: 按 Palantir FDE 视角删回极简)。wave350 的
- * 5 组 SegmentedControl + 组内 14 视图 chips + 域锚定横滑 + 12 只读视图
- * (sandBox/schema/datasets/transforms/cognition/capabilities/actions/
- * functions/interfaces/manage/table 等) 与快照统计装饰层全部拆除。
- * 本屏收敛为两件事 ——
- *   第一层: 业务本体域卡片列表 (listOntologyDomains), 唯一写入口 右上 新建;
- *   第二层: 点域卡自动进图谱 (OntologyGraphView, 控制面图谱取数) +
- *           高危安全闸门 (EmergencyKillSwitch / 解锁恢复)。
- */
 export function OntologyDomainListScreen({
   company,
   whoami = "管理员",
+  onOpenWebOntology,
+  onOpenSchemaEditor,
 }: OntologyDomainListScreenProps) {
-  const [domains, setDomains] = useState<OntologyDomain[]>([]);
+  // ── 顶部主视图切换: 关系图谱 (默认) vs 实体清单 (v0.6.22 极简 2 视图) ──
+  const [viewMode, setViewMode] = useState<"graph" | "entities">("graph");
+
+  // ── 业务实体状态: 选中的类型与实例 ──
+  const [selectedEntityType, setSelectedEntityType] = useState<EntityCategoryConfig | null>(null);
+  const [selectedInstance, setSelectedInstance] = useState<OntologyInstanceRow | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  const [levels, setLevels] = useState<OntologyLevelsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [seedingSample, setSeedingSample] = useState(false);
 
-  // 第二层: 选中域 → 自动展示图谱
-  const [selectedDomain, setSelectedDomain] = useState<OntologyDomain | null>(null);
-  const [graphSnapshot, setGraphSnapshot] = useState<OntologyGraphResponse | null>(null);
-  const [graphLoading, setGraphLoading] = useState(false);
-  const [graphError, setGraphError] = useState<string | null>(null);
-  const [domainStats, setDomainStats] = useState<
-    Record<string, { nodes: number; edges: number }>
-  >({});
-
-  // 新建本体域弹层状态 (wave344: 收敛为 web 端 create-domain 同款三字段)
+  // ── 域 CRUD modal ──
   const [newDomainModalOpen, setNewDomainModalOpen] = useState(false);
+  const [newDomainMode, setNewDomainMode] = useState<"directory" | "manual">("directory");
   const [newDomainDisplayName, setNewDomainDisplayName] = useState("");
   const [newDomainSlug, setNewDomainSlug] = useState("");
   const [newDomainDescription, setNewDomainDescription] = useState("");
+  const [newDomainDirectoryPath, setNewDomainDirectoryPath] = useState("");
   const [creatingDomain, setCreatingDomain] = useState(false);
+  const [seedingSample, setSeedingSample] = useState(false);
+
+  // ── 实例与属性 ──
+  const [instances, setInstances] = useState<OntologyInstanceRow[]>([]);
+  const [instancesLoading, setInstancesLoading] = useState(false);
+  const [typeProperties, setTypeProperties] = useState<OntologyPropertiesResponse | null>(null);
+  const [typePropertiesLoading, setTypePropertiesLoading] = useState(false);
 
   const companyId = company.id;
 
-  const loadDomains = useCallback(async () => {
+  const loadLevels = useCallback(async () => {
     setError(null);
     try {
-      // wave344: 真实控制面 API + 网络抖动自动重试 1 次, 两次都失败才落错误态
-      let list: OntologyDomain[];
-      try {
-        list = await coolie.listOntologyDomains(companyId);
-      } catch {
-        list = await coolie.listOntologyDomains(companyId);
-      }
-      setDomains(list);
-
-      // 异步预拉取前几个域的简要计数 (卡片 节点/关系 Pill 数据)
-      for (const d of list.slice(0, 5)) {
-        coolie
-          .getOntologySnapshot(companyId, d.id, 50)
-          .then((snap) => {
-            if (snap?.counts) {
-              setDomainStats((prev) => ({
-                ...prev,
-                [d.id]: {
-                  nodes: snap.counts.nodes ?? 0,
-                  edges: snap.counts.edges ?? 0,
-                },
-              }));
-            }
-          })
-          .catch(() => {
-            // ignore prefetch errors
-          });
-      }
+      const res = await coolie.getOntologyLevels(companyId);
+      setLevels(res);
     } catch (e) {
       setError(String((e as Error)?.message ?? e));
     } finally {
@@ -184,370 +148,184 @@ export function OntologyDomainListScreen({
   }, [companyId]);
 
   useEffect(() => {
-    void loadDomains();
-  }, [loadDomains]);
+    void loadLevels();
+  }, [loadLevels]);
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
-    void loadDomains();
-  }, [loadDomains]);
+    void loadLevels();
+  }, [loadLevels]);
 
-  // 拉取控制面图谱 (wave337: 与 web 端 ontologyGraphApi.graph 同一端点,
-  // 返回 root/depth/view/truncated/nodes/edges)。wave339 修 rootId 不匹配:
-  // 服务端按 (type=project, 业务行 id) 拼根键 BFS, 域 id (ontology_domains)
-  // 与 project id 不在同一 id 空间, 直接拿域 id 当 rootId 只会得到空图。
-  // 先经 listOntologyInstances (entityType=project; 该接口按 company 圈定)
-  // 换出真实 project 实例 id 再锚定; 公司没有任何 project 实例时直接置空态,
-  // 不发 graph 请求。
-  const loadGraph = useCallback(async () => {
-    setGraphLoading(true);
-    setGraphError(null);
-    try {
-      const { instances } = await coolie.listOntologyInstances(companyId, {
-        entityType: "project",
-        limit: 1,
-      });
-      const rootId = instances[0]?.id;
-      if (!rootId) {
-        setGraphSnapshot(null);
-        return;
-      }
-      const snap = await coolie.getOntologyGraph(companyId, {
-        rootType: "project",
-        rootId,
-        view: "project_tree",
-        depth: 2,
-      });
-      setGraphSnapshot(snap);
-    } catch (e) {
-      setGraphError(String((e as Error)?.message ?? e));
-    } finally {
-      setGraphLoading(false);
-    }
-  }, [companyId]);
-
-  // 进第二层时自动拉图谱, 返回列表后再进另一域则重拉
+  // 加载选定类型的实例列表
   useEffect(() => {
-    if (selectedDomain) void loadGraph();
-  }, [selectedDomain, loadGraph]);
-
-  // 控制面图谱响应 → 图谱组件。wave337: 响应节点自带 type/key, 边直接引用
-  // 节点 key; key 仍按 9 类映射后的 `${type}:${id}` 重算, 保证与 rootKey
-  // 查找一致 (未知类型 fallback work_product 时服务端 key 会漂移)。
-  // 截断/深度透传给组件, root 用服务端根 (project 节点), 不再取首节点。
-  const graphData: OntologyGraphData | null = useMemo(() => {
-    if (!graphSnapshot) return null;
-    const nodes: OntologyGraphNode[] = graphSnapshot.nodes.map((n) => {
-      const type = toControlPlaneEntityType(n.type);
-      return {
-        key: `${type}:${n.id}`,
-        id: n.id,
-        type,
-        label: n.label,
-        metadata: { ...(n.metadata ?? {}) },
-      };
-    });
-    const keySet = new Set(nodes.map((n) => n.key));
-    const edges: OntologyGraphEdge[] = [];
-    for (const e of graphSnapshot.edges) {
-      // truncated 截断或类型 fallback 后悬空的半边直接丢弃, 不渲染断线
-      if (!keySet.has(e.source) || !keySet.has(e.target) || e.source === e.target) {
-        continue;
-      }
-      edges.push({ key: e.key, source: e.source, target: e.target, weight: e.weight });
+    if (!selectedEntityType) {
+      setInstances([]);
+      return;
     }
-    const root = graphSnapshot.root
-      ? { type: toControlPlaneEntityType(graphSnapshot.root.type), id: graphSnapshot.root.id }
-      : undefined;
-    return {
-      nodes,
-      edges,
-      root,
-      depth: graphSnapshot.depth,
-      truncated: graphSnapshot.truncated,
+    let cancelled = false;
+    setInstancesLoading(true);
+    void coolie
+      .listOntologyInstances(companyId, {
+        entityType: selectedEntityType.entityType,
+        limit: 150,
+      })
+      .then((res) => {
+        if (!cancelled) setInstances(res.instances);
+      })
+      .catch((e: Error) => {
+        if (!cancelled) setError(String(e.message ?? e));
+      })
+      .finally(() => {
+        if (!cancelled) setInstancesLoading(false);
+      });
+    return () => {
+      cancelled = true;
     };
-  }, [graphSnapshot]);
+  }, [selectedEntityType, companyId]);
 
-  // 新建本体域: 与 web 端 create-domain 完全一致的三字段契约
+  // 加载选中实例的属性
+  useEffect(() => {
+    if (!selectedInstance || !selectedEntityType) {
+      setTypeProperties(null);
+      return;
+    }
+    let cancelled = false;
+    setTypePropertiesLoading(true);
+    void coolie
+      .getOntologyTypeProperties(companyId, selectedEntityType.entityType)
+      .then((res) => {
+        if (!cancelled) setTypeProperties(res);
+      })
+      .catch(() => {
+        if (!cancelled) setTypeProperties(null);
+      })
+      .finally(() => {
+        if (!cancelled) setTypePropertiesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedInstance, selectedEntityType, companyId]);
+
+  // 过滤后的实例列表
+  const filteredInstances = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return instances;
+    return instances.filter(
+      (inst) =>
+        inst.label.toLowerCase().includes(q) ||
+        (inst.ownerLabel && inst.ownerLabel.toLowerCase().includes(q)),
+    );
+  }, [instances, searchQuery]);
+
+  // 新建域
+  const handlePickDirectoryFile = useCallback(async () => {
+    try {
+      const res = await DocumentPicker.getDocumentAsync({
+        type: "*/*",
+        copyToCacheDirectory: false,
+      });
+      if (res.canceled) return;
+      const asset = res.assets[0];
+      if (asset) {
+        const path = asset.uri.replace(/^file:\/\//, "");
+        const dir = path.substring(0, path.lastIndexOf("/")) || asset.name;
+        setNewDomainDirectoryPath(dir);
+        if (!newDomainDisplayName) {
+          const namePart = asset.name.split(".")[0];
+          setNewDomainDisplayName(namePart);
+          setNewDomainSlug(namePart.toLowerCase().replace(/[^a-z0-9_-]/g, "_"));
+        }
+      }
+    } catch (e) {
+      Alert.alert("选择失败", String((e as Error)?.message ?? e));
+    }
+  }, [newDomainDisplayName]);
+
   const handleCreateDomain = useCallback(async () => {
-    const displayName = newDomainDisplayName.trim();
-    const slug = newDomainSlug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_");
-    if (!displayName || !slug) return;
+    if (!newDomainDisplayName.trim() || !newDomainSlug.trim()) {
+      Alert.alert("请填写完整", "本体域名称与标识为必填项");
+      return;
+    }
     setCreatingDomain(true);
     try {
       const created = await coolie.createOntologyDomain(companyId, {
-        displayName,
-        slug,
+        displayName: newDomainDisplayName.trim(),
+        slug: newDomainSlug.trim().toLowerCase().replace(/[^a-z0-9_-]/g, "_"),
         description: newDomainDescription.trim() || undefined,
+        category: newDomainDirectoryPath.trim() ? "legacy-system" : "custom",
       });
       setNewDomainModalOpen(false);
       setNewDomainDisplayName("");
       setNewDomainSlug("");
       setNewDomainDescription("");
-      await loadDomains();
+      setNewDomainDirectoryPath("");
+      await loadLevels();
       Alert.alert(
         "创建成功",
-        `业务本体域「${created.display_name || created.displayName || created.slug}」已创建`,
+        `业务本体域「${created.display_name || created.displayName || created.slug}」已成功创建`,
       );
     } catch (e) {
       Alert.alert("创建失败", String((e as Error)?.message ?? e));
     } finally {
       setCreatingDomain(false);
     }
-  }, [companyId, newDomainDisplayName, newDomainSlug, newDomainDescription, loadDomains]);
+  }, [
+    companyId,
+    newDomainDisplayName,
+    newDomainSlug,
+    newDomainDescription,
+    newDomainDirectoryPath,
+    loadLevels,
+  ]);
 
-  // 一键注入官方示例本体域:骨架接口只建域,实例节点/边要逐个域补种
   const handleSeedSample = useCallback(async () => {
     setSeedingSample(true);
     try {
       const report = await coolie.seedSampleDomains(companyId);
-      const createdDomains = report.domains.filter((d) => d.status === "created");
-
-      // 骨架报告里只有 slug,没有 domainId:刷新一次列表把 slug 映射回 id
-      const idBySlug = new Map(
-        createdDomains.length > 0
-          ? (await coolie.listOntologyDomains(companyId)).map((d) => [d.slug, d.id])
-          : [],
-      );
-
-      let injectedDomains = 0;
-      let injectedNodes = 0;
-      for (const created of createdDomains) {
-        const domainId = idBySlug.get(created.slug);
-        if (!domainId) continue;
-        try {
-          const result = await coolie.seedDomainSamples(companyId, domainId);
-          if (result.seeded) {
-            injectedDomains += 1;
-            injectedNodes += result.created?.nodes ?? result.counts?.nodes ?? 0;
-          }
-        } catch {
-          // 单个域失败跳过,不影响其余域
-        }
-      }
-
-      await loadDomains();
       Alert.alert(
         "注入完成",
-        `已注入 ${injectedDomains} 个域 · ${injectedNodes} 个实例节点`,
+        `已创建 ${report.created} 个示例域 (跳过 ${report.skipped}, 失败 ${report.failed})`,
       );
+      await loadLevels();
     } catch (e) {
       Alert.alert("注入失败", String((e as Error)?.message ?? e));
     } finally {
       setSeedingSample(false);
     }
-  }, [companyId, loadDomains]);
+  }, [companyId, loadLevels]);
 
-  // 执行熔断
-  const triggerKillSwitch = useCallback(
-    async (domain: OntologyDomain) => {
-      try {
-        await coolie.setDomainLifecycle(companyId, domain.id, "locked", {
-          actor: whoami,
-          reason: "移动端掌上紧急熔断 (EMERGENCY_LOCKED)",
-          deviceInfo: "Coolie-Mobile-Expo",
-        });
-
-        // 立即就地更新状态
-        setDomains((prev) =>
-          prev.map((item) =>
-            item.id === domain.id
-              ? { ...item, lifecycle_state: "archived" }
-              : item,
-          ),
-        );
-
-        if (selectedDomain?.id === domain.id) {
-          setSelectedDomain({
-            ...selectedDomain,
-            lifecycle_state: "archived",
-          });
-        }
-
-        Alert.alert(
-          "🚨 紧急熔断生效",
-          `本体域「${domain.display_name || domain.displayName || domain.slug}」已进入锁死状态 (ARCHIVED/LOCKED)。后续读写已即刻拦截，审计事件已写入 ontology_audit_logs。`,
-        );
-      } catch (e) {
-        throw e;
-      }
-    },
-    [companyId, whoami, selectedDomain],
-  );
-
-  // 解锁/恢复运行 (操作员二次确认)
-  const unlockDomain = useCallback(
-    (domain: OntologyDomain) => {
-      Alert.alert(
-        "解除安全锁定",
-        `确认将本体域「${domain.display_name || domain.slug}」恢复为运行中 (active) 状态吗？恢复后将允许 Agent 继续访问。`,
-        [
-          { text: "取消", style: "cancel" },
-          {
-            text: "确认恢复",
-            style: "default",
-            onPress: async () => {
-              try {
-                await coolie.setDomainLifecycle(companyId, domain.id, "active", {
-                  actor: whoami,
-                  reason: "移动控制台操作员手动解除熔断锁定",
-                });
-                setDomains((prev) =>
-                  prev.map((item) =>
-                    item.id === domain.id
-                      ? { ...item, lifecycle_state: "active" }
-                      : item,
-                  ),
-                );
-                if (selectedDomain?.id === domain.id) {
-                  setSelectedDomain({
-                    ...selectedDomain,
-                    lifecycle_state: "active",
-                  });
-                }
-                Alert.alert("已解除锁定", "本体域状态已恢复为 active");
-              } catch (e) {
-                Alert.alert("解除锁定失败", String((e as Error)?.message ?? e));
-              }
-            },
-          },
-        ],
-      );
-    },
-    [companyId, whoami, selectedDomain],
-  );
-
-  // ── 第二层: 域图谱详情 (选域后自动展示图谱 + 高危安全闸门) ──
-  if (selectedDomain) {
-    const isLocked =
-      selectedDomain.lifecycle_state === "archived" ||
-      selectedDomain.lifecycle_state === "deprecated" ||
-      selectedDomain.lifecycle_state === "locked";
-    const cfg =
-      LIFECYCLE_CONFIG[selectedDomain.lifecycle_state] || LIFECYCLE_CONFIG.draft;
-
-    return (
-      <SafeAreaView style={styles.safeArea}>
-        <StatusBar style="light" />
-        <ScrollView
-          style={styles.container}
-          contentContainerStyle={styles.detailScrollContent}
-          keyboardShouldPersistTaps="handled"
-          refreshControl={
-            <RefreshControl
-              refreshing={graphLoading}
-              onRefresh={() => void loadGraph()}
-              tintColor={C.accent}
-            />
-          }
-        >
-          {/* 顶部返回条: 域名 + 生命周期徽标 */}
-          <ScreenHeader
-            onBack={() => setSelectedDomain(null)}
-            backLabel="返回"
-            title={
-              selectedDomain.display_name || selectedDomain.displayName || selectedDomain.slug
-            }
-            subtitle={<Text style={styles.detailSlug}>标识: {selectedDomain.slug}</Text>}
-            style={styles.detailNav}
-            right={
-              <StatusBadge
-                label={cfg.label}
-                color={cfg.color}
-                bg={cfg.bg}
-                border={cfg.border}
-                dotStatus={cfg.status}
-              />
-            }
-          />
-
-          {/* 本体图谱 (选域自动展示, 下拉刷新重拉) */}
-          <OntologyGraphView
-            graph={graphData}
-            loading={graphLoading}
-            error={graphError}
-          />
-
-          {/* 计数摘要: 与图谱同源 (控制面响应无 counts, 就地派生) */}
-          <View style={styles.graphCountsRow}>
-            <Text style={styles.graphCountsText}>
-              节点 {graphSnapshot?.nodes.length ?? "--"} · 关系{" "}
-              {graphSnapshot?.edges.length ?? "--"} · 类型{" "}
-              {graphSnapshot
-                ? new Set(graphSnapshot.nodes.map((n) => n.type)).size
-                : "--"}
-              {graphSnapshot?.truncated ? " · 已截断" : ""}
-            </Text>
-          </View>
-
-          {/* 高危熔断控制闸门区 */}
-          <View style={styles.sectionBlock}>
-            <SectionHeader
-              emphasis
-              title="高危安全闸门"
-              style={styles.sectionHeaderMargin}
-            />
-
-            {isLocked ? (
-              <View style={styles.lockedNoticeCard}>
-                <View style={styles.lockedNoticeRow}>
-                  <StatusDot status="err" size={8} />
-                  <Text style={styles.lockedNoticeTitle}>
-                    当前本体域已处于安全锁死状态 (LOCKED)
-                  </Text>
-                </View>
-                <Text style={styles.lockedNoticeDesc}>
-                  所有相关智能体对该域的写入权限已强制熔断，已拦截潜在数据污染风险。
-                </Text>
-                <Pressable
-                  style={styles.unlockBtn}
-                  onPress={() => unlockDomain(selectedDomain)}
-                >
-                  <Text style={styles.unlockBtnText}>解除锁死并恢复运行</Text>
-                </Pressable>
-              </View>
-            ) : (
-              <View style={styles.killSwitchContainer}>
-                <View style={styles.killNotice}>
-                  <Text style={styles.killNoticeTitle}>
-                    突发异常应急保护 · 一键熔断
-                  </Text>
-                  <Text style={styles.killNoticeDesc}>
-                    如发现模型产生幻觉批量改写资产或发生业务冲突，向右滑脱即可在 50ms 内置为锁死归档，并写死审计日志。
-                  </Text>
-                </View>
-                <EmergencyKillSwitch
-                  domainId={selectedDomain.id}
-                  domainName={
-                    selectedDomain.display_name || selectedDomain.slug
-                  }
-                  isLocked={isLocked}
-                  actor={whoami}
-                  onTrigger={() => triggerKillSwitch(selectedDomain)}
-                />
-              </View>
-            )}
-          </View>
-        </ScrollView>
-      </SafeAreaView>
-    );
-  }
-
-  // ── 第一层: 业务本体域列表 (唯一写入口 右上 新建) ──
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar style="light" />
+
+      {/* 顶部标题与轻量控制行 */}
       <View style={styles.header}>
-        {/* 紧凑操作行: 外层资产页已有标题, 这里只保留 刷新 + 新建。 */}
-        <View style={styles.listActionBar}>
-          <View style={{ flex: 1 }} />
-          <View style={styles.listActionBarBtns}>
+        <View style={styles.headerRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>业务本体</Text>
+            <Text style={styles.headerSub}>
+              {levels
+                ? `${levels.totalNodes} 个实体 · ${levels.totalEdges} 条关系`
+                : "加载中…"}
+            </Text>
+          </View>
+          <View style={styles.headerActions}>
+            {onOpenWebOntology ? (
+              <Pressable
+                onPress={onOpenWebOntology}
+                hitSlop={8}
+                style={styles.iconActionBtn}
+                accessibilityLabel="打开 Web 端可视化图谱"
+              >
+                <Ionicons name="open-outline" size={16} color={C.accent} />
+              </Pressable>
+            ) : null}
             <Pressable
               onPress={onRefresh}
               hitSlop={8}
               style={styles.iconActionBtn}
-              accessibilityLabel="刷新本体域列表"
-              testID="OntologyDomainList__ActionBar__Refresh"
+              accessibilityLabel="刷新业务本体"
             >
               <Ionicons name="refresh-outline" size={16} color={C.ink3} />
             </Pressable>
@@ -556,7 +334,6 @@ export function OntologyDomainListScreen({
               hitSlop={8}
               style={styles.newDomainBtn}
               accessibilityLabel="新建本体域"
-              testID="OntologyDomainList__ActionBar__Create"
             >
               <Ionicons name="add" size={15} color={C.ink} />
               <Text style={styles.newDomainBtnText} numberOfLines={1}>
@@ -565,146 +342,405 @@ export function OntologyDomainListScreen({
             </Pressable>
           </View>
         </View>
+
+        {/* 顶部直观双模式切换 */}
+        <View style={styles.viewModeToggleRow}>
+          <Pressable
+            style={[styles.viewModeBtn, viewMode === "graph" && styles.viewModeBtnActive]}
+            onPress={() => setViewMode("graph")}
+            hitSlop={4}
+          >
+            <Ionicons
+              name="git-network-outline"
+              size={13}
+              color={viewMode === "graph" ? C.accent : C.ink3}
+            />
+            <Text
+              style={[
+                styles.viewModeBtnText,
+                viewMode === "graph" && styles.viewModeBtnTextActive,
+              ]}
+            >
+              🕸️ 关系图谱
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.viewModeBtn, viewMode === "entities" && styles.viewModeBtnActive]}
+            onPress={() => setViewMode("entities")}
+            hitSlop={4}
+          >
+            <Ionicons
+              name="list-outline"
+              size={13}
+              color={viewMode === "entities" ? C.accent : C.ink3}
+            />
+            <Text
+              style={[
+                styles.viewModeBtnText,
+                viewMode === "entities" && styles.viewModeBtnTextActive,
+              ]}
+            >
+              📑 业务实体
+            </Text>
+          </Pressable>
+        </View>
       </View>
 
-      {loading ? (
-        <LoadingState text="正在加载业务本体域拓扑…" />
+      {/* 页面主内容区 */}
+      {viewMode === "graph" ? (
+        <View style={{ flex: 1 }}>
+          <OntologyGraphWorkbenchScreen company={company} embedded={true} />
+        </View>
+      ) : loading ? (
+        <LoadingState text="正在加载业务本体…" />
       ) : error ? (
-        <ErrorRetry message={error} onRetry={loadDomains} />
-      ) : domains.length === 0 ? (
-        <EmptyState
-          variant="standalone"
-          icon="🌐"
-          title="暂无业务本体域"
-          subtitle="当前工坊尚未初始化任何业务本体。您可以一键注入官方示例本体域。"
-          action={
+        <ErrorRetry message={error} onRetry={loadLevels} />
+      ) : selectedEntityType ? (
+        /* 选中实体分类后的实例列表 */
+        <View style={{ flex: 1 }}>
+          <View style={styles.subListHeader}>
             <Pressable
-              style={[styles.refreshBtn, styles.seedBtn, { marginTop: 12 }]}
-              disabled={seedingSample}
-              onPress={() => void handleSeedSample()}
+              style={styles.backBtn}
+              onPress={() => {
+                setSelectedEntityType(null);
+                setSearchQuery("");
+              }}
+              hitSlop={6}
             >
-              {seedingSample ? (
-                <ActivityIndicator size="small" color={C.accent} />
-              ) : (
-                <Text style={styles.seedBtnText}>注入示例域</Text>
-              )}
+              <Ionicons name="chevron-back" size={18} color={C.accent} />
+              <Text style={styles.backBtnText}>返回实体分类</Text>
             </Pressable>
-          }
-        />
+            <Text style={styles.subListTitle}>
+              {selectedEntityType.label} ({filteredInstances.length})
+            </Text>
+          </View>
+
+          <View style={styles.searchBox}>
+            <Ionicons name="search" size={14} color={C.ink4} />
+            <TextInput
+              style={styles.searchInput}
+              placeholder={`搜索 ${selectedEntityType.label}…`}
+              placeholderTextColor={C.ink4}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+            />
+            {searchQuery ? (
+              <Pressable onPress={() => setSearchQuery("")} hitSlop={6}>
+                <Ionicons name="close-circle" size={14} color={C.ink4} />
+              </Pressable>
+            ) : null}
+          </View>
+
+          {instancesLoading ? (
+            <LoadingState text={`正在加载 ${selectedEntityType.label} 列表…`} />
+          ) : filteredInstances.length === 0 ? (
+            <EmptyState
+              icon={selectedEntityType.icon}
+              title={`暂无 ${selectedEntityType.label}`}
+              subtitle={searchQuery ? "未找到匹配的实例" : "当前分类暂无实例数据"}
+            />
+          ) : (
+            <FlatList
+              data={filteredInstances}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={styles.listContent}
+              renderItem={({ item }) => (
+                <AppCard
+                  style={styles.instanceCard}
+                  onPress={() => setSelectedInstance(item)}
+                >
+                  <View style={styles.instanceRow}>
+                    <View
+                      style={[
+                        styles.instanceIconBox,
+                        { backgroundColor: `${selectedEntityType.color}15`, borderColor: selectedEntityType.color },
+                      ]}
+                    >
+                      <Ionicons
+                        name={selectedEntityType.icon}
+                        size={16}
+                        color={selectedEntityType.color}
+                      />
+                    </View>
+                    <View style={{ flex: 1, marginRight: 8 }}>
+                      <Text style={styles.instanceLabel} numberOfLines={1}>
+                        {item.label}
+                      </Text>
+                      <Text style={styles.instanceSub} numberOfLines={1}>
+                        {item.ownerLabel ? `负责人: ${item.ownerLabel} · ` : ""}ID: {item.id.slice(0, 8)}…
+                      </Text>
+                    </View>
+                    <Ionicons name="chevron-forward" size={16} color={C.ink4} />
+                  </View>
+                </AppCard>
+              )}
+            />
+          )}
+        </View>
       ) : (
-        <FlatList
-          data={domains}
-          keyExtractor={(item) => item.id}
+        /* 实体分类总览大卡片 */
+        <ScrollView
           contentContainerStyle={styles.listContent}
           refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor={C.accent}
-            />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={C.accent} />
           }
-          renderItem={({ item }) => {
-            const isLocked =
-              item.lifecycle_state === "archived" ||
-              item.lifecycle_state === "deprecated" ||
-              item.lifecycle_state === "locked";
-            const cfg =
-              LIFECYCLE_CONFIG[item.lifecycle_state] || LIFECYCLE_CONFIG.draft;
-            const stats = domainStats[item.id];
+        >
+          <SectionHeader
+            emphasis
+            title="核心业务实体"
+            hint="点击查看实体实例与属性字段"
+          />
 
+          {ENTITY_CATEGORIES.map((cat) => {
+            const count =
+              levels?.byEntityType.find((e) => e.entityType === cat.entityType)?.count ?? 0;
             return (
               <AppCard
-                style={[styles.domainCard, isLocked && styles.domainCardLocked]}
-                onPress={() => setSelectedDomain(item)}
+                key={cat.entityType}
+                style={styles.categoryCard}
+                onPress={() => setSelectedEntityType(cat)}
               >
-                {/* 头部标题与状态徽标 */}
-                <View style={styles.cardHeader}>
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <Text style={styles.domainTitle} numberOfLines={1}>
-                      {item.display_name || item.displayName || item.slug}
+                <View style={styles.categoryRow}>
+                  <View
+                    style={[
+                      styles.categoryIconWrap,
+                      { backgroundColor: `${cat.color}15`, borderColor: `${cat.color}40` },
+                    ]}
+                  >
+                    <Ionicons name={cat.icon} size={22} color={cat.color} />
+                  </View>
+                  <View style={{ flex: 1, marginRight: 10 }}>
+                    <View style={styles.categoryTitleRow}>
+                      <Text style={styles.categoryTitle}>{cat.label}</Text>
+                      <Pill label={`${count} 实体`} size="sm" tone={count > 0 ? "accent" : "muted"} />
+                    </View>
+                    <Text style={styles.categoryDesc} numberOfLines={1}>
+                      {cat.desc}
                     </Text>
-                    <Text style={styles.domainSlug}>标识: {item.slug}</Text>
                   </View>
-                  <StatusBadge
-                    label={cfg.label}
-                    color={cfg.color}
-                    bg={cfg.bg}
-                    border={cfg.border}
-                    dotStatus={cfg.status}
-                  />
+                  <Ionicons name="chevron-forward" size={18} color={C.ink4} />
                 </View>
-
-                {/* 描述文案 */}
-                {item.description ? (
-                  <Text style={styles.domainDesc} numberOfLines={2}>
-                    {item.description}
-                  </Text>
-                ) : null}
-
-                {/* 指标与标签卡脚 */}
-                <View style={styles.cardFooter}>
-                  <View style={styles.footerPills}>
-                    <Pill
-                      label="节点"
-                      value={stats ? String(stats.nodes) : "--"}
-                      size="sm"
-                      mono
-                    />
-                    <Pill
-                      label="关系"
-                      value={stats ? String(stats.edges) : "--"}
-                      size="sm"
-                      mono
-                    />
-                    <Pill
-                      label={`v${item.schema_version ?? item.version ?? 1}`}
-                      size="sm"
-                    />
-                  </View>
-
-                  <Text style={styles.enterChevron}>图谱 ›</Text>
-                </View>
-
-                {/* 如果处于活跃状态，卡片底部展示快速熔断器 */}
-                {item.lifecycle_state === "active" ? (
-                  <View style={styles.cardKillSwitchWrap}>
-                    <EmergencyKillSwitch
-                      domainId={item.id}
-                      domainName={item.display_name || item.slug}
-                      compact
-                      actor={whoami}
-                      onTrigger={() => triggerKillSwitch(item)}
-                    />
-                  </View>
-                ) : null}
               </AppCard>
             );
-          }}
-        />
+          })}
+        </ScrollView>
       )}
 
-      {/* 新建本体域弹层 (wave344: 与 web 端 create-domain 同款三字段) */}
-      <Modal
-        visible={newDomainModalOpen}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setNewDomainModalOpen(false)}
-      >
-        <Pressable
-          style={styles.modalBackdrop}
-          onPress={() => setNewDomainModalOpen(false)}
+      {/* 实例属性详情抽屉/弹层 */}
+      {selectedInstance ? (
+        <Modal
+          visible={true}
+          transparent
+          animationType="slide"
+          onRequestClose={() => setSelectedInstance(null)}
         >
-          <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>新建业务本体</Text>
-              <Pressable
-                onPress={() => setNewDomainModalOpen(false)}
-                hitSlop={8}
-                testID="OntologyDomainList__CreateModal__Close"
+          <Pressable
+            style={styles.modalBackdrop}
+            onPress={() => setSelectedInstance(null)}
+          >
+            <Pressable style={styles.detailDrawer} onPress={(e) => e.stopPropagation()}>
+              <View style={styles.drawerHeader}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.drawerTitle} numberOfLines={1}>
+                    {selectedInstance.label}
+                  </Text>
+                  <Text style={styles.drawerSub}>
+                    类型: {selectedEntityType?.label || selectedInstance.id}
+                  </Text>
+                </View>
+                <Pressable
+                  onPress={() => setSelectedInstance(null)}
+                  hitSlop={8}
+                  style={styles.drawerCloseBtn}
+                >
+                  <Ionicons name="close" size={20} color={C.ink3} />
+                </Pressable>
+              </View>
+
+              <ScrollView style={{ maxHeight: 420 }}>
+                <View style={styles.metaRow}>
+                  <View style={styles.metaChip}>
+                    <Text style={styles.metaChipLabel}>实例 ID</Text>
+                    <Text style={styles.metaChipValue} numberOfLines={1}>
+                      {selectedInstance.id}
+                    </Text>
+                  </View>
+                  {selectedInstance.ownerLabel ? (
+                    <View style={styles.metaChip}>
+                      <Text style={styles.metaChipLabel}>责任人</Text>
+                      <Text style={styles.metaChipValue}>
+                        {selectedInstance.ownerLabel}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+
+                {/* 字段属性 */}
+                <Text style={styles.sectionTitle}>属性详情</Text>
+                {selectedInstance.metadata &&
+                Object.keys(selectedInstance.metadata).length > 0 ? (
+                  <View style={styles.propsContainer}>
+                    {Object.entries(selectedInstance.metadata).map(
+                      ([key, val], idx, arr) => (
+                        <View
+                          key={key}
+                          style={[
+                            styles.propRow,
+                            idx < arr.length - 1 ? styles.propRowBorder : null,
+                          ]}
+                        >
+                          <Text style={styles.propKey}>{key}</Text>
+                          <Text style={styles.propVal} numberOfLines={2}>
+                            {typeof val === "object" ? JSON.stringify(val) : String(val)}
+                          </Text>
+                        </View>
+                      ),
+                    )}
+                  </View>
+                ) : (
+                  <Text style={styles.emptyHint}>该实例暂无附加属性键值。</Text>
+                )}
+
+                {/* Schema 字段定义 */}
+                {typeProperties && typeProperties.properties.length > 0 ? (
+                  <>
+                    <Text style={[styles.sectionTitle, { marginTop: 16 }]}>类型契约字段</Text>
+                    <View style={styles.propsContainer}>
+                      {typeProperties.properties.map((p, idx, arr) => (
+                        <View
+                          key={p.key}
+                          style={[
+                            styles.propRow,
+                            idx < arr.length - 1 ? styles.propRowBorder : null,
+                          ]}
+                        >
+                          <Text style={styles.propKey}>{p.key}</Text>
+                          <Pill label={p.type} size="sm" tone="accent" />
+                        </View>
+                      ))}
+                    </View>
+                  </>
+                ) : null}
+              </ScrollView>
+            </Pressable>
+          </Pressable>
+        </Modal>
+      ) : null}
+
+      {/* 新建本体模态框 */}
+      <NewDomainModal
+        visible={newDomainModalOpen}
+        onClose={() => setNewDomainModalOpen(false)}
+        mode={newDomainMode}
+        setMode={setNewDomainMode}
+        displayName={newDomainDisplayName}
+        setDisplayName={setNewDomainDisplayName}
+        slug={newDomainSlug}
+        setSlug={setNewDomainSlug}
+        description={newDomainDescription}
+        setDescription={setNewDomainDescription}
+        directoryPath={newDomainDirectoryPath}
+        onPickDirectory={handlePickDirectoryFile}
+        onSubmit={handleCreateDomain}
+        creating={creatingDomain}
+      />
+    </SafeAreaView>
+  );
+}
+
+function NewDomainModal({
+  visible,
+  onClose,
+  mode,
+  setMode,
+  displayName,
+  setDisplayName,
+  slug,
+  setSlug,
+  description,
+  setDescription,
+  directoryPath,
+  onPickDirectory,
+  onSubmit,
+  creating,
+}: {
+  visible: boolean;
+  onClose: () => void;
+  mode: "directory" | "manual";
+  setMode: (m: "directory" | "manual") => void;
+  displayName: string;
+  setDisplayName: (v: string) => void;
+  slug: string;
+  setSlug: (v: string) => void;
+  description: string;
+  setDescription: (v: string) => void;
+  directoryPath: string;
+  onPickDirectory: () => void;
+  onSubmit: () => void;
+  creating: boolean;
+}) {
+  return (
+    <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
+      <Pressable style={styles.modalBackdrop} onPress={onClose}>
+        <Pressable style={styles.modalCard} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>新建业务本体</Text>
+            <Pressable onPress={onClose} hitSlop={8}>
+              <Ionicons name="close" size={20} color={C.ink3} />
+            </Pressable>
+          </View>
+
+          <View style={styles.modalTabRow}>
+            <Pressable
+              style={[styles.modalTabBtn, mode === "directory" && styles.modalTabBtnActive]}
+              onPress={() => setMode("directory")}
+            >
+              <Text
+                style={[
+                  styles.modalTabBtnText,
+                  mode === "directory" && styles.modalTabBtnTextActive,
+                ]}
               >
-                <Ionicons name="close" size={20} color={C.ink3} />
-              </Pressable>
-            </View>
+                📁 文件夹目录接入
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[styles.modalTabBtn, mode === "manual" && styles.modalTabBtnActive]}
+              onPress={() => setMode("manual")}
+            >
+              <Text
+                style={[
+                  styles.modalTabBtnText,
+                  mode === "manual" && styles.modalTabBtnTextActive,
+                ]}
+              >
+                ✏️ 空白手动定义
+              </Text>
+            </Pressable>
+          </View>
+
+          <ScrollView style={{ maxHeight: 380 }} keyboardShouldPersistTaps="handled">
+            {mode === "directory" ? (
+              <View style={styles.dirSelectBox}>
+                <Text style={styles.fieldLabel}>代码工程 / 文件夹目录</Text>
+                <View style={styles.dirInputRow}>
+                  <TextInput
+                    style={[styles.input, { flex: 1 }]}
+                    placeholder="如 /workspace/orders 或选取工程文件"
+                    placeholderTextColor={C.ink4}
+                    value={directoryPath}
+                    onChangeText={setDisplayName}
+                  />
+                  <Pressable style={styles.dirBrowseBtn} onPress={onPickDirectory}>
+                    <Ionicons name="folder-open-outline" size={16} color={C.ink} />
+                    <Text style={styles.dirBrowseText}>选择</Text>
+                  </Pressable>
+                </View>
+                <Text style={styles.fieldTip}>
+                  支持 Java/Spring Boot、.proto、SQL DDL、TS/JS 等工程目录。
+                </Text>
+              </View>
+            ) : null}
 
             <View style={styles.fieldGroup}>
               <Text style={styles.fieldLabel}>显示名称 *</Text>
@@ -712,14 +748,11 @@ export function OntologyDomainListScreen({
                 style={styles.input}
                 placeholder="如：订单核心系统、电商交易域"
                 placeholderTextColor={C.ink4}
-                value={newDomainDisplayName}
+                value={displayName}
                 onChangeText={(val) => {
-                  setNewDomainDisplayName(val);
-                  if (!newDomainSlug) {
-                    setNewDomainSlug(val.toLowerCase().replace(/[^a-z0-9_-]/g, "_"));
-                  }
+                  setDisplayName(val);
+                  if (!slug) setSlug(val.toLowerCase().replace(/[^a-z0-9_-]/g, "_"));
                 }}
-                testID="OntologyDomainList__CreateModal__DisplayNameInput"
               />
             </View>
 
@@ -727,374 +760,429 @@ export function OntologyDomainListScreen({
               <Text style={styles.fieldLabel}>标识 (Slug) *</Text>
               <TextInput
                 style={styles.input}
-                placeholder="如：orders, trade_center"
+                placeholder="如 orders、trading_domain"
                 placeholderTextColor={C.ink4}
-                value={newDomainSlug}
-                onChangeText={setNewDomainSlug}
+                value={slug}
+                onChangeText={setSlug}
                 autoCapitalize="none"
-                testID="OntologyDomainList__CreateModal__SlugInput"
               />
             </View>
 
             <View style={styles.fieldGroup}>
-              <Text style={styles.fieldLabel}>业务描述 (可选)</Text>
+              <Text style={styles.fieldLabel}>描述说明</Text>
               <TextInput
-                style={[styles.input, styles.textArea]}
-                placeholder="例：涵盖账户、交易订单、履约配送三类实体模型与关系"
+                style={[styles.input, { height: 60, textAlignVertical: "top" }]}
+                placeholder="简述该本体域包含的核心概念与职责"
                 placeholderTextColor={C.ink4}
-                value={newDomainDescription}
-                onChangeText={setNewDomainDescription}
+                value={description}
+                onChangeText={setDescription}
                 multiline
-                numberOfLines={3}
-                testID="OntologyDomainList__CreateModal__DescriptionInput"
               />
             </View>
+          </ScrollView>
 
-            <View style={styles.modalFooter}>
-              <Pressable
-                style={styles.cancelBtn}
-                onPress={() => setNewDomainModalOpen(false)}
-                testID="OntologyDomainList__CreateModal__Cancel"
-              >
-                <Text style={styles.cancelBtnText}>取消</Text>
-              </Pressable>
-              <Pressable
-                style={[
-                  styles.confirmBtn,
-                  (!newDomainDisplayName.trim() || !newDomainSlug.trim() || creatingDomain) &&
-                    styles.btnDisabled,
-                ]}
-                disabled={
-                  !newDomainDisplayName.trim() || !newDomainSlug.trim() || creatingDomain
-                }
-                onPress={() => void handleCreateDomain()}
-                testID="OntologyDomainList__CreateModal__Submit"
-              >
-                {creatingDomain ? (
-                  <ActivityIndicator size="small" color={C.ink} />
-                ) : (
-                  <Text style={styles.confirmBtnText}>创建</Text>
-                )}
-              </Pressable>
-            </View>
-          </Pressable>
+          <View style={styles.modalActions}>
+            <Pressable style={styles.cancelBtn} onPress={onClose} disabled={creating}>
+              <Text style={styles.cancelBtnText}>取消</Text>
+            </Pressable>
+            <Pressable
+              style={[styles.submitBtn, creating && styles.submitBtnDisabled]}
+              onPress={onSubmit}
+              disabled={creating}
+            >
+              {creating ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Text style={styles.submitBtnText}>确认创建</Text>
+              )}
+            </Pressable>
+          </View>
         </Pressable>
-      </Modal>
-    </SafeAreaView>
+      </Pressable>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
-    backgroundColor: C.bg,
-  },
-  container: {
-    flex: 1,
-    backgroundColor: C.bg,
-  },
+  safeArea: { flex: 1, backgroundColor: C.bg },
   header: {
     paddingHorizontal: 16,
-    paddingTop: 12,
+    paddingTop: 8,
     paddingBottom: 8,
+    backgroundColor: C.panel,
     borderBottomWidth: 1,
     borderBottomColor: C.lineSubtle,
   },
-  refreshBtn: {
-    backgroundColor: C.lineSubtle,
-    borderColor: C.line,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-  },
-  listActionBar: {
+  headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 2,
+    justifyContent: "space-between",
+    marginBottom: 8,
   },
-  listActionBarBtns: {
+  headerTitle: { fontSize: 18, fontWeight: "600", color: C.ink },
+  headerSub: { fontSize: 12, color: C.ink3, marginTop: 2 },
+  headerActions: { flexDirection: "row", alignItems: "center", gap: 6 },
+  iconActionBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: C.bg,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  newDomainBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RADIUS.md,
+    backgroundColor: C.accent,
+  },
+  newDomainBtnText: { color: "#FFFFFF", fontSize: 12, fontWeight: "600" },
+  viewModeToggleRow: {
+    flexDirection: "row",
+    backgroundColor: C.bg,
+    borderRadius: RADIUS.pill,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  viewModeBtn: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 5,
+    borderRadius: RADIUS.pill,
+    gap: 4,
+  },
+  viewModeBtnActive: {
+    backgroundColor: C.panel,
+  },
+  viewModeBtnText: { fontSize: 12, color: C.ink3, fontWeight: "500" },
+  viewModeBtnTextActive: { color: C.ink, fontWeight: "600" },
+  listContent: {
+    padding: 16,
+    paddingBottom: 40,
+    gap: 10,
+  },
+  categoryCard: {
+    borderRadius: RADIUS.md,
+    padding: 14,
+  },
+  categoryRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  categoryIconWrap: {
+    width: 44,
+    height: 44,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+  },
+  categoryTitleRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 8,
-    flexShrink: 0,
+    marginBottom: 4,
   },
-  iconActionBtn: {
+  categoryTitle: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  categoryDesc: {
+    fontSize: 12,
+    color: C.ink3,
+  },
+  subListHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: C.lineSubtle,
+    backgroundColor: C.panel,
+  },
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  backBtnText: {
+    fontSize: 13,
+    color: C.accent,
+    fontWeight: "600",
+  },
+  subListTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  searchBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginHorizontal: 16,
+    marginTop: 10,
+    marginBottom: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    backgroundColor: C.panel,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 13,
+    color: C.ink,
+    padding: 0,
+  },
+  instanceCard: {
+    padding: 12,
+    borderRadius: RADIUS.md,
+  },
+  instanceRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  instanceIconBox: {
     width: 32,
     height: 32,
     borderRadius: RADIUS.sm,
     borderWidth: 1,
-    borderColor: C.line,
     alignItems: "center",
     justifyContent: "center",
+    marginRight: 10,
   },
-  newDomainBtn: {
-    height: 32,
-    paddingHorizontal: 10,
-    borderRadius: RADIUS.sm,
-    backgroundColor: C.accent,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 2,
-    flexShrink: 0,
-  },
-  newDomainBtnText: {
-    fontSize: 12,
-    fontWeight: "600",
+  instanceLabel: {
+    fontSize: 14,
+    fontWeight: "500",
     color: C.ink,
   },
-  detailScrollContent: {
-    padding: 16,
-    paddingBottom: 40,
-  },
-  detailNav: {
-    marginBottom: 16,
-  },
-  detailSlug: {
-    color: C.ink4,
+  instanceSub: {
     fontSize: 11,
-    fontFamily: "monospace",
+    color: C.ink4,
     marginTop: 2,
   },
-  graphCountsRow: {
-    marginTop: 10,
-    alignItems: "center",
-  },
-  graphCountsText: {
-    color: C.ink4,
-    fontSize: 11,
-  },
-  seedBtn: {
-    backgroundColor: "rgba(94, 106, 210, 0.12)",
-    borderColor: "rgba(94, 106, 210, 0.35)",
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-  },
-  seedBtnText: {
-    color: C.accent,
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  listContent: {
-    padding: 16,
-    paddingBottom: 32,
-  },
-  domainCard: {
-    marginBottom: 12,
-  },
-  domainCardLocked: {
-    borderColor: "rgba(239, 68, 68, 0.22)",
-  },
-  cardHeader: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-  },
-  domainTitle: {
-    color: C.ink,
-    fontSize: 16,
-    fontWeight: "600",
-    letterSpacing: -0.3,
-  },
-  domainSlug: {
-    color: C.ink4,
-    fontSize: 11,
-    fontFamily: "monospace",
-    marginTop: 2,
-  },
-  domainDesc: {
-    color: C.ink3,
-    fontSize: 13,
-    lineHeight: 18,
-    marginTop: 8,
-  },
-  cardFooter: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    marginTop: 12,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: C.lineSubtle,
-  },
-  footerPills: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  enterChevron: {
-    color: C.accent,
-    fontSize: 12,
-    fontWeight: "500",
-  },
-  cardKillSwitchWrap: {
-    marginTop: 10,
-  },
-  sectionBlock: {
-    marginBottom: 20,
-  },
-  sectionHeaderMargin: {
-    marginBottom: 10,
-  },
-  killSwitchContainer: {
-    backgroundColor: "rgba(239, 68, 68, 0.04)",
-    borderColor: "rgba(239, 68, 68, 0.2)",
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-  },
-  killNotice: {
-    marginBottom: 8,
-  },
-  killNoticeTitle: {
-    color: C.err,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  killNoticeDesc: {
-    color: C.ink3,
-    fontSize: 11,
-    lineHeight: 16,
-    marginTop: 2,
-  },
-  lockedNoticeCard: {
-    backgroundColor: "rgba(239, 68, 68, 0.08)",
-    borderColor: "rgba(239, 68, 68, 0.28)",
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-  },
-  lockedNoticeRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  lockedNoticeTitle: {
-    color: C.err,
-    fontSize: 13,
-    fontWeight: "600",
-  },
-  lockedNoticeDesc: {
-    color: C.ink3,
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: 6,
-    marginBottom: 12,
-  },
-  unlockBtn: {
-    backgroundColor: C.lineSubtle,
-    borderColor: C.line,
-    borderWidth: 1,
-    borderRadius: 8,
-    paddingVertical: 8,
-    alignItems: "center",
-  },
-  unlockBtnText: {
-    color: C.ink2,
-    fontSize: 12,
-    fontWeight: "500",
-  },
-
-  // ── 新建本体域弹层 (Modal) ──
   modalBackdrop: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    justifyContent: "center",
+    backgroundColor: "rgba(0,0,0,0.65)",
+    justifyContent: "flex-end",
+  },
+  detailDrawer: {
+    backgroundColor: C.panel,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    padding: 16,
+    paddingBottom: 32,
+    borderTopWidth: 1,
+    borderTopColor: C.line,
+  },
+  drawerHeader: {
+    flexDirection: "row",
     alignItems: "center",
-    padding: 20,
+    justifyContent: "space-between",
+    marginBottom: 12,
+  },
+  drawerTitle: {
+    fontSize: 17,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  drawerSub: {
+    fontSize: 12,
+    color: C.ink3,
+    marginTop: 2,
+  },
+  drawerCloseBtn: {
+    padding: 4,
+  },
+  metaRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 14,
+  },
+  metaChip: {
+    flex: 1,
+    padding: 8,
+    backgroundColor: C.bg,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  metaChipLabel: {
+    fontSize: 10,
+    color: C.ink4,
+    marginBottom: 2,
+  },
+  metaChipValue: {
+    fontSize: 12,
+    color: C.ink2,
+    fontWeight: "500",
+  },
+  sectionTitle: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: C.ink2,
+    marginBottom: 8,
+  },
+  propsContainer: {
+    backgroundColor: C.bg,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: C.line,
+    paddingHorizontal: 12,
+  },
+  propRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: 10,
+  },
+  propRowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: C.lineSubtle,
+  },
+  propKey: {
+    fontSize: 12,
+    color: C.ink3,
+    fontFamily: "monospace",
+  },
+  propVal: {
+    fontSize: 12,
+    color: C.ink,
+    fontWeight: "500",
+    maxWidth: "60%",
+    textAlign: "right",
+  },
+  emptyHint: {
+    fontSize: 12,
+    color: C.ink4,
+    fontStyle: "italic",
+    paddingVertical: 8,
   },
   modalCard: {
-    width: "100%",
-    maxWidth: 480,
-    backgroundColor: C.surface,
-    borderColor: C.line,
-    borderWidth: 1,
-    borderRadius: 14,
-    padding: 18,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 16,
-    elevation: 8,
+    backgroundColor: C.panel,
+    borderTopLeftRadius: RADIUS.xl,
+    borderTopRightRadius: RADIUS.xl,
+    padding: 16,
+    paddingBottom: 24,
   },
   modalHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingBottom: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: C.lineSubtle,
     marginBottom: 14,
   },
-  modalTitle: {
-    color: C.ink,
-    fontSize: 16,
+  modalTitle: { fontSize: 16, fontWeight: "600", color: C.ink },
+  modalTabRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginBottom: 12,
+  },
+  modalTabBtn: {
+    flex: 1,
+    paddingVertical: 8,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: C.line,
+    backgroundColor: C.bg,
+  },
+  modalTabBtnActive: {
+    borderColor: C.accent,
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
+  },
+  modalTabBtnText: {
+    fontSize: 12,
+    color: C.ink3,
+  },
+  modalTabBtnTextActive: {
+    color: C.accent,
     fontWeight: "600",
+  },
+  dirSelectBox: {
+    marginBottom: 12,
+  },
+  dirInputRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  dirBrowseBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    borderRadius: RADIUS.md,
+    backgroundColor: C.lineSubtle,
+  },
+  dirBrowseText: {
+    fontSize: 12,
+    color: C.ink,
+  },
+  fieldTip: {
+    fontSize: 11,
+    color: C.ink4,
+    marginTop: 4,
   },
   fieldGroup: {
-    marginBottom: 14,
+    marginBottom: 12,
   },
   fieldLabel: {
-    color: C.ink2,
     fontSize: 12,
-    fontWeight: "500",
-    marginBottom: 6,
+    color: C.ink3,
+    marginBottom: 4,
   },
   input: {
-    backgroundColor: C.panel,
-    borderColor: C.line,
+    backgroundColor: C.bg,
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 9,
-    color: C.ink,
+    borderColor: C.line,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     fontSize: 13,
+    color: C.ink,
   },
-  textArea: {
-    height: 64,
-    textAlignVertical: "top",
-    paddingTop: 8,
-  },
-  modalFooter: {
+  modalActions: {
     flexDirection: "row",
-    justifyContent: "flex-end",
     gap: 10,
-    marginTop: 16,
-    paddingTop: 14,
-    borderTopWidth: 1,
-    borderTopColor: C.lineSubtle,
+    marginTop: 14,
   },
   cancelBtn: {
-    backgroundColor: "transparent",
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: RADIUS.md,
+    alignItems: "center",
+    backgroundColor: C.bg,
     borderWidth: 1,
     borderColor: C.line,
-    borderRadius: 8,
-    paddingHorizontal: 16,
-    paddingVertical: 9,
-    alignItems: "center",
-    justifyContent: "center",
   },
   cancelBtnText: {
-    color: C.ink3,
     fontSize: 13,
-    fontWeight: "500",
+    color: C.ink2,
   },
-  confirmBtn: {
-    backgroundColor: C.accent,
-    borderRadius: 8,
-    paddingHorizontal: 18,
-    paddingVertical: 9,
+  submitBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: RADIUS.md,
     alignItems: "center",
-    justifyContent: "center",
-    minWidth: 96,
+    backgroundColor: C.accent,
   },
-  confirmBtnText: {
-    color: C.ink,
+  submitBtnDisabled: {
+    opacity: 0.6,
+  },
+  submitBtnText: {
     fontSize: 13,
+    color: "#FFFFFF",
     fontWeight: "600",
-  },
-  btnDisabled: {
-    opacity: 0.5,
   },
 });

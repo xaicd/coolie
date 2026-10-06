@@ -36,7 +36,8 @@ interface OrgAssetsScreenProps {
   onOpenWebOntology?: (path?: string, title?: string) => void;
   onOpenWebGovernance?: (path?: string, title?: string) => void;
   onOpenSchemaEditor?: (typeId: string, displayName: string) => void;
-  onOpenWorkbench?: () => void;
+  /** wave352 — 打开 v0.6.22 全屏图谱工作台 (OntologyGraphWorkbenchScreen) */
+  onOpenGraphWorkbench?: () => void;
   onOpenWebWorkbench?: (path?: string, title?: string) => void;
   onOpenSandbox?: (
     url: string,
@@ -79,7 +80,7 @@ export function OrgAssetsScreen({
   onOpenWebOntology,
   onOpenWebGovernance,
   onOpenSchemaEditor,
-  onOpenWorkbench,
+  onOpenGraphWorkbench,
   onOpenWebWorkbench,
   onOpenSandbox,
   onOpenDiff,
@@ -112,6 +113,22 @@ export function OrgAssetsScreen({
                 companies={switchableCompanies}
                 onSwitch={onSwitchCompany}
               />
+            ) : null}
+
+            {/* wave352 — 全屏图谱直达 (仅本体 tab 显示, 两字铁律) */}
+            {activeTab === "ontology" && onOpenGraphWorkbench ? (
+              <Pressable
+                style={[styles.extraPill, styles.extraPillGraph]}
+                onPress={() => onOpenGraphWorkbench()}
+                hitSlop={6}
+                accessibilityLabel="查看全屏图谱"
+                testID="OrgAssets__Header__GraphBtn"
+              >
+                <Ionicons name="git-network-outline" size={12} color={C.accent} />
+                <Text style={[styles.extraPillText, { color: C.accent, fontWeight: "600" }]}>
+                  图谱
+                </Text>
+              </Pressable>
             ) : null}
 
             {/* 🎨 原型沙箱一级直达通道 */}
@@ -161,7 +178,6 @@ export function OrgAssetsScreen({
             whoami={whoami}
             onOpenWebOntology={onOpenWebOntology}
             onOpenSchemaEditor={onOpenSchemaEditor}
-            onOpenWorkbench={onOpenWorkbench}
           />
         )}
 
@@ -259,6 +275,10 @@ const styles = StyleSheet.create({
   extraPillSandbox: {
     borderColor: "rgba(167, 139, 250, 0.35)",
     backgroundColor: "rgba(167, 139, 250, 0.12)",
+  },
+  extraPillGraph: {
+    borderColor: "rgba(94, 106, 210, 0.35)",
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
   },
   extraPillText: {
     fontSize: 11,
