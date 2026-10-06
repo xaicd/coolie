@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "archetype": "echo",
+  "deployEnv": "local",
+  "projectName": "Coolie 本地施工总社",
+  "baseName": "Hermes",
+  "role": "PM (掌柜)",
+  "note": "本机默认身份 (Palantir Echo 业务战略与价值中枢)。换机不改脚本 (wave358): 覆盖顺序 $COOLIE_ENV_IDENTITY > .coolie-local/env-identity.json > 本文件。archetype 取值: echo (Palantir Echo 业务战略/掌柜) | delta (Palantir Delta 前线工程/现场攻坚) | dev (Palantir Dev 底座抽象/平台演进)。deployEnv 取值 (正交物理部署网络): local (本地研发) | staging (预发测试) | prod (生产网)。projectName/baseName/role 驱动 Hermes 动态改名: 显示名 = baseName·Codename (例 Hermes·Echo), 徽记 = 【显示名·战略标签·职责】 (例 【Hermes·Echo·业务战略·PM掌柜】)。"
+}

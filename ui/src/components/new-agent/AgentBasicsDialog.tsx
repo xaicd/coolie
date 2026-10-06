@@ -132,6 +132,30 @@ export function AgentBasicsDialog({
       !["process", "http"].includes(adapter.type) &&
       !getAdapterDisplay(adapter.type).comingSoon,
   );
+  function recommendAdapterForName(inputName: string, availableChoices: typeof choices): string {
+    const lower = inputName.trim().toLowerCase();
+    const available = new Set(availableChoices.map((c) => c.type));
+    if (/hermes|pm|调度|掌柜/i.test(lower) && available.has("hermes_local")) {
+      return "hermes_local";
+    }
+    if (/墨斗|fda|架构|原型|inkstick/i.test(lower) && available.has("gemini_local")) {
+      return "gemini_local";
+    }
+    if (/门神|fdse|部署|自动化|gatekeeper/i.test(lower) && available.has("opencode_local")) {
+      return "opencode_local";
+    }
+    if (/兑底渊|sre|pre-sre|operator/i.test(lower) && available.has("codex_local")) {
+      return "codex_local";
+    }
+    if (/铁匠|forge|core-swe|研发|编码/i.test(lower) && available.has("claude_local")) {
+      return "claude_local";
+    }
+    if (/百晓生|ds|sage|验收/i.test(lower) && available.has("claude_local")) {
+      return "claude_local";
+    }
+    return availableChoices[0]?.type ?? "";
+  }
+
   const validAdapter = choices.some((adapter) => adapter.type === adapterType);
   return (
     <Dialog
@@ -167,9 +191,15 @@ export function AgentBasicsDialog({
           onSubmit={(event) => {
             event.preventDefault();
             if (!name.trim()) return;
-            if (step === "name") setStep("adapter");
-            else if (validAdapter)
+            if (step === "name") {
+              if (!adapterType || !validAdapter) {
+                const rec = recommendAdapterForName(name, choices);
+                if (rec) setAdapterType(rec);
+              }
+              setStep("adapter");
+            } else if (validAdapter) {
               onContinue({ name: name.trim(), adapterType, runnerProvider });
+            }
           }}
         >
           <div className="flex min-h-0 flex-col gap-7 overflow-y-auto px-6 pb-8 sm:px-10">
@@ -254,6 +284,11 @@ export function AgentBasicsDialog({
                           <span className="text-sm font-medium">
                             {display.label}
                           </span>
+                          {recommendAdapterForName(name, choices) === adapter.type && (
+                            <span className="text-xs px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-normal">
+                              推荐
+                            </span>
+                          )}
                           {adapterType === adapter.type && (
                             <Check className="absolute right-2 top-2 size-3.5" />
                           )}

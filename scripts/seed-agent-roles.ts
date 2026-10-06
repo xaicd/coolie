@@ -38,6 +38,8 @@ interface RoleProfile {
   skills: string[];
   /** 英文 cli / tool (wave258) — 跟中文 skill 拆开. */
   tools: string[];
+  /** 平台适配器类型 (如 hermes_local, gemini_local, claude_local, process 等). */
+  adapterType?: string;
 }
 
 interface NameMatcher {
@@ -45,9 +47,9 @@ interface NameMatcher {
   profile: RoleProfile;
 }
 
-/** 6 老板团队的真值 (wave258 中文 2 字 skill × 英文 cli tool). */
+/** 6 老板团队的真值 (wave258 中文 2 字 skill × 英文 cli tool × 真实 adapterType). */
 const MATCHERS: NameMatcher[] = [
-  // ===== 6 老板团队 (boss 6 员工, wave222 物理层 + wave258 中文 2 字) =====
+  // ===== 6 老板团队 (boss 6 员工, wave222 物理层 + wave258 中文 2 字 + wave272/280 工具真配) =====
   {
     match: (n) => /hermes/i.test(n),
     profile: {
@@ -57,7 +59,8 @@ const MATCHERS: NameMatcher[] = [
       title: "项目总调度掌柜",
       responsibilities: ["调度派活", "验收交付", "汇总报告", "CMMI阶段管理"],
       skills: ["派活", "验收", "报告", "调度", "评审", "复盘", "立项", "文档"],
-      tools: ["agy", "claude-glm"],
+      tools: ["hermes"],
+      adapterType: "hermes_local",
     },
   },
   {
@@ -70,6 +73,7 @@ const MATCHERS: NameMatcher[] = [
       responsibilities: ["代码开发兜底", "PR 评审", "Bug 修复"],
       skills: ["编码", "重构", "修复", "测试", "联调", "文档", "评审", "设计"],
       tools: ["claude-mm", "cmd"],
+      adapterType: "claude_local",
     },
   },
   {
@@ -81,7 +85,8 @@ const MATCHERS: NameMatcher[] = [
       title: "平台核心研发",
       responsibilities: ["代码开发主力", "功能实现", "PR 主写", "缺陷修复"],
       skills: ["编码", "重构", "测试", "修复", "联调", "文档", "设计", "评审"],
-      tools: ["cmd", "claude-mm", "claude-glm"],
+      tools: ["claude-glm", "claude-mm"],
+      adapterType: "claude_local",
     },
   },
   {
@@ -94,6 +99,7 @@ const MATCHERS: NameMatcher[] = [
       responsibilities: ["自动化脚本", "命令编排", "部署执行", "端到端联调"],
       skills: ["命令", "脚本", "自动化", "部署", "联调", "测试", "调研", "文档"],
       tools: ["cmd", "claude-mm"],
+      adapterType: "process",
     },
   },
   {
@@ -105,7 +111,8 @@ const MATCHERS: NameMatcher[] = [
       title: "前线架构师",
       responsibilities: ["画原型", "选型研判", "License 梳理", "本体域规划"],
       skills: ["调研", "画图", "选型", "研判", "文档", "设计", "立项", "规划"],
-      tools: ["agy", "claude-glm"],
+      tools: ["agy-gemini3.8", "cmd"],
+      adapterType: "gemini_local",
     },
   },
   {
@@ -117,7 +124,8 @@ const MATCHERS: NameMatcher[] = [
       title: "产品可靠性专家",
       responsibilities: ["部署运维", "监控告警", "故障恢复", "发版门禁守护"],
       skills: ["部署", "运维", "监控", "应急", "自动化", "脚本", "命令", "风控"],
-      tools: ["cmd", "claude-mm"],
+      tools: ["copilot", "claude-mm"],
+      adapterType: "process",
     },
   },
   // ===== 百晓生 (DS) =====
@@ -130,7 +138,8 @@ const MATCHERS: NameMatcher[] = [
       title: "部署战略与方案专家",
       responsibilities: ["数据决策", "测试验收", "风险评估", "复盘总结"],
       skills: ["数据", "分析", "报告", "测试", "验收", "复盘", "风控", "评审"],
-      tools: ["claude-mm", "claude-glm"],
+      tools: ["claude-glm", "claude-mm", "agy-gemini3.8"],
+      adapterType: "claude_local",
     },
   },
 
@@ -200,6 +209,9 @@ async function main() {
     }
     if (profile.canonicalName) {
       updateValues.name = profile.canonicalName;
+    }
+    if (profile.adapterType) {
+      updateValues.adapterType = profile.adapterType;
     }
 
     await db

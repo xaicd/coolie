@@ -27,6 +27,14 @@
 | `fdse` | FDSE | **Forward Deployed Software Engineer** | 前线全栈交付 | 跑命令 / 派活 / 撞机 / E2E 金标 |
 | `ds` | DS | **Deployment Strategist / Business Solution Specialist** | 部署战略 / 业务方案专家 | **双 slash 全称**, 既管部署战略又管业务方案; 老板的"百晓生"= DS, 注意不是"Data Scientist" |
 
+### -1.1b Palantir 三元作战力量 (Echo, Delta, Dev) ↔ 6 大员工精准映射表 (wave358 严肃审计锁定)
+
+| Palantir 作战力量 | 核心使命与时间尺度 | 战略/架构主导 (Lead/Spec) | 工程/执行落地 (Build/Exec) | 协同闭环逻辑 |
+|---|---|---|---|---|
+| **Echo** (业务战略与价值中枢) | “Echos win”<br>追求业务 Outcome<br>离客户痛点最近 | **掌柜 (Hermes / PM)**<br>• 全层级翻译 (Translation)<br>• WBS 拆解与 7 要素派单<br>• 算力 ROI 与全盘统筹 | **百晓生 (Sage / DS)**<br>• 用户视角主审官<br>• 真实业务旅程探路<br>• 死交互与假按钮一票否决 | **战略双核**：Hermes 负责把需求变成任务，百晓生负责把交付验证回真实 Outcome。 |
+| **Delta** (前线工程攻坚与现场交付) | “Deltas build”<br>突破现实客观约束<br>One customer, many capabilities | **墨斗 (Inkstick / FDA)**<br>• 前线架构与领域规划<br>• 租户隔离/RBAC/守恒边界<br>• G0/G1 原型与 DAR 选型 | **门神 (Guardian / FDSE)**<br>• 前线全栈交付第一责任人<br>• 防御性 UI 与全栈实现<br>• 页面四态覆盖与真机快照 | **前线双核**：墨斗画死数据隔离与领域边界，门神在前线真实真机上把功能与 UI 完整跑通。 |
+| **Dev** (平台底座抽象与规模化演进) | “Devs create / Devs scale”<br>人工反向传播<br>One capability, many customers | **铁匠 (Forge / Core SWE)**<br>• 平台核心研发与能力沉淀<br>• 增量编译 0 报错与 AST 守卫<br>• 核心底层状态机与共享契约 | **兑底渊 (Operator / PRE-SRE)**<br>• 平台可靠性与发布自动化<br>• 环境指纹握手与不可变制品<br>• 健康拨测与秒级应急回滚 | **底座双核**：铁匠通过编译器让错误写不出来，兑底渊通过发布管网确保上线的制品绝对可信。 |
+
 ### -1.2 6 老板团队中文员工 (Mac 本地岗位)
 
 | 中文员工 | 英文别名 | 对应 enum | CMMI 主任务数 | 默认工具 | 备注 |

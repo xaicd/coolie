@@ -50,8 +50,8 @@ async function main() {
 
   const tasksToInject = [
     {
-      title: "[wave358] 多环境 Hermes 动态命名与角色标识支持 (Palantir Echo/Delta/Dev 矩阵)",
-      description: "根据老板指示：这套系统安装到各个电脑，根据项目名称与职责属性支持 Hermes 动态改名，能一眼识别是 Palantir 体系下的 Echo (生产网)、Delta (前线交付)、Dev (本地开发)，并在工坊会话、微信与派单 Header 中自适应透出环境与职责标识。",
+      title: "[wave358] 多宿主 Hermes 动态改名与角色标识 (Palantir Echo/Delta/Dev 作战矩阵)",
+      description: "根据老板指示：这套系统安装到各个电脑，根据项目名称与职责属性支持 Hermes 动态改名，能一眼识别是 Palantir 体系下的 Echo (业务战略与价值中枢)、Delta (前线全栈工程攻坚)、Dev (平台底座抽象演进)，并将作战属性与正交物理部署宿主 (prod/staging/local) 在工坊会话、微信与派单 Header 中自适应透出。",
       priority: "high",
       status: "todo",
       assigneeAgentId: agentMap["铁匠"] || null,

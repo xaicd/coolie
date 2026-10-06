@@ -66,12 +66,12 @@ async function main() {
   const existingNames = new Set(existingAgents.map(a => a.name));
 
   const TARGET_AGENTS = [
-    { name: "Hermes", role: "pm", title: "项目总调度掌柜", adapterType: "hermes_local" },
-    { name: "墨斗", role: "fda", title: "前线架构师", adapterType: "acpx_local" },
-    { name: "铁匠", role: "core-swe", title: "平台核心研发", adapterType: "acpx_local" },
-    { name: "门神", role: "fdse", title: "前线部署工程师", adapterType: "acpx_local" },
-    { name: "兑底渊", role: "pre-sre", title: "产品可靠性专家", adapterType: "acpx_local" },
-    { name: "百晓生", role: "ds", title: "部署战略与方案专家", adapterType: "acpx_local" }
+    { name: "Hermes", role: "pm", title: "项目总调度掌柜", adapterType: "hermes_local", tools: ["hermes"] },
+    { name: "墨斗", role: "fda", title: "前线架构师", adapterType: "gemini_local", tools: ["agy-gemini3.8", "cmd"] },
+    { name: "铁匠", role: "core-swe", title: "平台核心研发", adapterType: "claude_local", tools: ["claude-glm", "claude-mm"] },
+    { name: "门神", role: "fdse", title: "前线部署工程师", adapterType: "process", tools: ["cmd", "claude-mm"] },
+    { name: "兑底渊", role: "pre-sre", title: "产品可靠性专家", adapterType: "process", tools: ["copilot", "claude-mm"] },
+    { name: "百晓生", role: "ds", title: "部署战略与方案专家", adapterType: "claude_local", tools: ["claude-glm", "claude-mm", "agy-gemini3.8"] }
   ];
 
   for (const ag of TARGET_AGENTS) {

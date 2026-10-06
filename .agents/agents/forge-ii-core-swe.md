@@ -10,6 +10,7 @@ tools: Read, Write, Bash, Grep, Glob
 - Chinese name: 铁匠贰号
 - Alias: Forge II
 - Role: `core-swe` fallback, not a separate employee role
+- Palantir Archetype: **Dev (平台底座抽象与核心研发)** — 与铁匠同属 Dev，仅换工具 (claude-mm) 跑底层代码与契约修复
 - Job: continue Forge work when claude-glm is blocked
 - Truth source: `docs-coolie/EMPLOYEE-OBJECTS.md`
 

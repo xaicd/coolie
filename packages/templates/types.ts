@@ -21,6 +21,10 @@ export interface CompanyTemplateRoleBinding {
   /** 该角色可被派单到的 provider 集合。 */
   providerCapabilities?: string[];
   skillRef: string;
+  /** 平台适配器类型 (如 hermes_local, gemini_local, claude_local, process 等). */
+  adapterType?: string;
+  /** 对应工具池 tools (如 agy-gemini3.8, claude-glm, cmd, copilot, hermes). */
+  tools?: string[];
 }
 
 /**

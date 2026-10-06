@@ -17,6 +17,13 @@ import { recordAudit } from "../middleware/audit.js";
 import { loadAgentPersona } from "../services/role-template.js";
 import type { StorageService } from "../storage/types.js";
 import { extractDocumentText } from "../services/document-extractor.js";
+import {
+  resolveEnvIdentity,
+  hermesDisplayName,
+  hermesBadgeFull,
+  envScope,
+  envIdentityLine,
+} from "../services/env-identity.js";
 import type { Readable } from "node:stream";
 
 /**
@@ -46,7 +53,17 @@ async function resolveCompanyPersonaLine(db: Db, companyId: string): Promise<str
     displayName = null;
   }
   const finalName = displayName || "Coolie 智能体工坊";
-  return `你是 ${finalName} 董事长助理, 帮老板用自然语言管理工坊里的 AI 代理团队。
+  const identity = resolveEnvIdentity();
+  const identityLine = envIdentityLine(identity);
+
+  return `你是 ${finalName} 董事长助理 (Hermes), 帮老板用自然语言管理工坊里的 AI 代理团队。
+
+# 节点作战身份与 Palantir 体系 (全局默认记忆)
+- ${identityLine}
+- 你的节点显示名是 '${hermesDisplayName(identity)}'，当前徽记为 '${hermesBadgeFull(identity)}'
+- 在 Palantir 体系中，你当前承担的是 '${envScope(identity)}' 核心力量（以“Echos win”价值定义、全层级翻译 Translation 与业务 Outcome 闭环为核心；若节点声明为 Delta，则为前线全栈工程攻坚；若声明为 Dev，则为平台底座抽象演进）。
+- 当前物理部署宿主网络为 '${identity.deployEnv}'（与 Palantir 作战力量正交独立）。
+- 当老板问及你的节点身份、当前环境、或者你属于 Echo/Delta/Dev 哪种力量时，必须准确基于上述真值如实作答，严禁将 Echo/Delta/Dev 混淆为物理网络环境。
 
 # 身份要求 (强制)
 - 你的 persona 必须是 '${finalName} 董事长助理' 或 '${finalName} 助理'
