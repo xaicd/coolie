@@ -416,10 +416,86 @@ description: [${options.projectCode}] 定制的 ${skill.title} 核心技能。
   const profilePath = path.join(options.targetDir, "cmmi-profile.json");
   writeFile(profilePath, JSON.stringify(profile, null, 2), options.dryRun);
 
+  // 5. 生成项目专属进化监督 Rules 与 IDE 守卫 (.agents/rules/HIGH-ORDER-INVERSE-THINKING.md, AGENTS.md, .cursorrules)
+  const inverseThinkingContent = `# HIGH-ORDER-INVERSE-THINKING.md
+# ${options.projectName} (${options.projectCode}) 高阶反向思维与进化提升协议
+
+> **所属业务系统**：${options.projectName} (\`${options.projectCode}\`)  
+> **所属本体域**：\`${options.domainKey}\`  
+> **技术栈**：\`${options.techStack}\`  
+> **核心定位**：AI 助手/人类工程师在响应任何开发、修 bug 或加功能指令时，严禁就事论事贴补丁，必须以**「交付负责人 + Palantir 业务双核 + 极简人机」**的最高视角反向穿透。
+
+---
+
+## 一、 四大合一最高审视视角
+
+1. **业务交付负责人视角**：杜绝两张皮空转，交付必有可用证据；关注系统全生命周期演进，不制造技术债。
+2. **Palantir 业务双核驱动 (Object + Action)**：查实体状态机；所有业务变更必须收敛到合法的动作契约，禁止绕过契约私改数据库。
+3. **前线工程师 (FDE) 真实作风**：敢于做减法，能删代码修绝不加补丁；加载、成功、空状态、异常四态闭环。
+4. **极简主义与人机体验**：界面操作保持极简，杜绝遮挡、死交互与盲点。
+
+---
+
+## 二、 面对“修 bug / 加功能”的四步反向穿透协议
+
+### Step 1. 业务对象与模型溯源
+- 报错是表象，查明根因是不是实体状态机与业务规则错位？
+
+### Step 2. 极简减法原则（绝不打补丁）
+- 严禁加 if-else 绕过错误！能删代码解决就绝不加新逻辑。
+
+### Step 3. 真实使用场景复原
+- 验证界面防抖、输入防穿透、异常捕获与友好反馈。
+
+### Step 4. 不可变交付证据闭环
+- 必须通过本地门禁脚本验证：
+  - 需求规格守卫: \`node scripts/verify-reqs.mjs\`
+  - 静态契约守卫: \`node scripts/check-contracts.mjs\`
+  - 全栈测试验证: \`node scripts/run-tests.mjs\`
+`;
+
+  const agentsMdContent = `# AGENTS.md — ${options.projectName} (${options.projectCode}) 工程宪法与治理守卫
+
+## 1. 目标与规范
+本项目为 ${options.projectName}，业务本体域归属于 ${options.domainKey}。
+所有智能体与开发者必须遵循以下工程规则。
+
+## 2. CMMI 五大门禁验证
+在提交代码或完成任务前，必须执行对应门禁：
+- G1 需求门禁: \`node scripts/verify-reqs.mjs\`
+- G2 架构门禁: 查阅 \`docs/cmmi/02-hld.md\`
+- G3 契约门禁: \`node scripts/check-contracts.mjs\`
+- G4 验收门禁: \`node scripts/run-tests.mjs\`
+- G5 投产门禁: \`node scripts/check-release-baseline.mjs\`
+
+## 3. 高阶反向思维守卫
+所有新会话必须遵循 \`.agents/rules/HIGH-ORDER-INVERSE-THINKING.md\`。
+以业务双核 (Object + Action) 驱动，严禁无本体乱扩表，严禁打补丁式修 bug。
+`;
+
+  const cursorrulesContent = `# Cursor Rules for ${options.projectName} (${options.projectCode})
+
+You are the lead architect and FDE for ${options.projectName}.
+Always adopt High-Order Inverse Thinking per \`.agents/rules/HIGH-ORDER-INVERSE-THINKING.md\`:
+1. When asked to fix a bug or add a feature, DO NOT just patch the code. Trace the root cause in the business ontology (Objects & Actions).
+2. Follow the Minimalist Subtraction Principle: prefer deleting obsolete code over adding patch logic.
+3. Verify all four UI states (loading, empty, data, error) and ensure defensive interaction.
+4. Always run verification scripts before finalizing changes:
+   - \`node scripts/verify-reqs.mjs\`
+   - \`node scripts/check-contracts.mjs\`
+   - \`node scripts/run-tests.mjs\`
+`;
+
+  writeFile(path.join(options.targetDir, ".agents/rules/HIGH-ORDER-INVERSE-THINKING.md"), inverseThinkingContent, options.dryRun);
+  writeFile(path.join(options.targetDir, "AGENTS.md"), agentsMdContent, options.dryRun);
+  writeFile(path.join(options.targetDir, ".cursorrules"), cursorrulesContent, options.dryRun);
+
   console.log("\n🎉 脚手架搭建与定制完成！");
   console.log(`- 技能库路径: ${path.join(options.targetDir, ".agents/skills/")}`);
   console.log(`- 检查脚本路径: ${path.join(options.targetDir, "scripts/")}`);
   console.log(`- CMMI 文档路径: ${path.join(options.targetDir, "docs/cmmi/")}`);
+  console.log(`- 进化监督规则: ${path.join(options.targetDir, ".agents/rules/HIGH-ORDER-INVERSE-THINKING.md")}`);
+  console.log(`- IDE 守卫规则: ${path.join(options.targetDir, ".cursorrules")} & AGENTS.md`);
   console.log(`- 档案元数据: ${profilePath}\n`);
 }
 

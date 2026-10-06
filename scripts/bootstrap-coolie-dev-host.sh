@@ -37,6 +37,11 @@ if [[ "$NODE_MAJOR" -lt 20 ]]; then
 fi
 echo "✅ 基础依赖命令检查通过 (Node: $(node -v), pnpm: $(pnpm -v))"
 
+if [[ ! -d "$REPO_ROOT/node_modules" ]]; then
+  echo "📦 安装项目根依赖 (pnpm install)..."
+  (cd "$REPO_ROOT" && pnpm install)
+fi
+
 # 2. 状态目录与凭据初始化
 echo "📁 [2/6] 创建本地运行状态与日志目录..."
 mkdir -p "$REPO_ROOT/.coolie-local/logs" \
@@ -47,12 +52,26 @@ mkdir -p "$REPO_ROOT/.coolie-local/logs" \
          "$REPO_ROOT/.coolie-local/tool-health"
 echo "✅ 目录创建完成: .coolie-local/*"
 
-# 3. 注册员工 Sub-agent 模板到本机 ~/.claude/agents/
-echo "👤 [3/6] 同步数字员工模板与技能到本地..."
-if [[ -d "$REPO_ROOT/.agents/agents" ]]; then
-  mkdir -p "$HOME/.claude/agents"
-  cp "$REPO_ROOT/.agents/agents/"*.md "$HOME/.claude/agents/" 2>/dev/null || true
-  echo "✅ 已同步 6 大员工模板至 ~/.claude/agents/"
+# 3. 校验并预热 ACP 协议栈与进化监督规则
+echo "👤 [3/6] 校验 ACP 调度协议栈与项目进化监督宪法..."
+chmod +x "$REPO_ROOT/scripts/adapters/"*.sh 2>/dev/null || true
+
+# 清理历史残留的 Claude 嵌套 subagent（遵从 AGENTS.md 第 13/19 条扁平化铁律）
+if [[ -d "$HOME/.claude/agents" ]]; then
+  rm -f "$HOME/.claude/agents/"*.md 2>/dev/null || true
+  echo "🧹 已清理 ~/.claude/agents/ 历史残留模板，确保 Claude 扁平无嵌套干净运行"
+fi
+
+# 检查 ACP 客户端可用性
+if command -v acpx >/dev/null 2>&1 || (cd "$REPO_ROOT" && pnpm exec acpx --version >/dev/null 2>&1); then
+  echo "✅ ACP 客户端 (acpx) 就绪"
+else
+  echo "⚠️ 未检测到全局 acpx，将通过 pnpm exec 运行项目内依赖"
+fi
+
+# 检查高阶反向思维规则就绪
+if [[ -f "$REPO_ROOT/.agents/rules/HIGH-ORDER-INVERSE-THINKING.md" ]]; then
+  echo "✅ 平台高阶反向思维守卫已就绪 (.agents/rules/HIGH-ORDER-INVERSE-THINKING.md)"
 fi
 
 # 4. 启动 Coolie Dev Server (3100, 嵌入式 PGlite)
