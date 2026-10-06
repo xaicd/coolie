@@ -1,12 +1,12 @@
 {
-  "version": "0.6.41",
-  "versionCode": 641,
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.41/coolie-release.apk",
-  "apkSha256": "c154fce9f23e471b8d106d77bfceff9519d069f84b433e2511452dc604d53c19",
+  "version": "0.6.42",
+  "versionCode": 642,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.42/coolie-release.apk",
+  "apkSha256": "816a4b19eceadfc3dc0f0249c3111fb44a8a8b4631fb413bc0738b93847e3750",
   "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
   "iosBundleId": "cn.xrobinai.app",
   "iosSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
   "iosTestFlightUrl": null,
-  "releaseNotes": "wave337 原生本体图谱走控制面 (替换 plugin snapshot → web ontologyGraphApi.graph 端点)",
-  "commitSha": "02ba61331753a90d4d72d17ab7181bd31d2ef173"
+  "releaseNotes": "wave339 修 rootId 不匹配 (域 id 与 project id 不在同一 id 空间)",
+  "commitSha": "b4e16628a46dfd5228ca89464377933471bf5ae3"
 }
