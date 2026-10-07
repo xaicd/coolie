@@ -1,12 +1,12 @@
 {
-  "version": "0.6.44",
-  "versionCode": 644,
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.44/coolie-release.apk",
-  "apkSha256": "8c3ed3bb2162c366bb52a5c0f9098351f39fdef4dcdb3ace1433a74f32573ad7",
+  "version": "0.6.51",
+  "versionCode": 651,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.51/coolie-release.apk",
+  "apkSha256": "315257090a436768aa9a4166c9d7a792e392f94d00c2261f226983540dbbaeba",
   "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
   "iosBundleId": "cn.xrobinai.app",
   "iosSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
   "iosTestFlightUrl": null,
-  "releaseNotes": "wave348 AppBar 加设置入口齿轮按钮 (老板拍: 设置页能看版本信息 + 检查更新)",
-  "commitSha": "c6afbb03c36e91a5783f05603e3a441b8e7dd044"
+  "releaseNotes": "wave358-359 ACP dispatch upgrade, agy credential auto-degrade, Palantir triple force governance, COOA-58 workshop tab crash fix",
+  "commitSha": "81469c6a894d31fe32bafe08d5c968f3146ba64d"
 }
