@@ -441,6 +441,26 @@ if [[ "$PRINT_ONLY" -eq 1 ]]; then
   exit 0
 fi
 
+# ═══ wave358 PRE-SRE: 入队去重 ─ 防止同一 (wave, agent, task) 重复派发 ═══
+# 老板硬规矩: 凭据过期 → 派单自动降级, 禁止反复弹微信;
+# 同样禁止同一 brief 反复入队消耗 dispatch 资源 + 触发重复 worker run。
+# 命中键: wave == $WAVE && task == $TASK && subagentType == $AGENT && status == "done"。
+# --force 覆盖此守护 (用于后续 review 重跑 / 复盘)。
+if [[ "$FORCE" -eq 0 ]]; then
+  DEDUP_NODE="${DEDUP_NODE:-$SCRIPT_DIR/lib/dispatch-dedup-check.mjs}"
+  if [[ -x "$DEDUP_NODE" || -f "$DEDUP_NODE" ]]; then
+    dedup_hit="$(node "$DEDUP_NODE" "$dispatch_dir" "$WAVE" "$AGENT" "$TASK" 2>/dev/null)"
+    if [[ -n "$dedup_hit" ]]; then
+      dedup_id="$(printf '%s' "$dedup_hit" | node -e 'try{const o=JSON.parse(require("fs").readFileSync(0,"utf8"));process.stdout.write(o.id||"")}catch(e){}' 2>/dev/null)"
+      dedup_commit="$(printf '%s' "$dedup_hit" | node -e 'try{const o=JSON.parse(require("fs").readFileSync(0,"utf8"));process.stdout.write(o.commit||"")}catch(e){}' 2>/dev/null)"
+      printf '[dispatch] ⏭️  入队去重: 同 (wave=%s agent=%s task=%s) 已存在 done receipt=%s commit=%s\n' \
+        "$WAVE" "$AGENT" "$TASK" "$dedup_id" "${dedup_commit:-无}"
+      printf '[dispatch]    跳过重复派单; 如需复跑请加 --force。\n'
+      exit 0
+    fi
+  fi
+fi
+
 # Write prompt file and initial receipt (queued)
 make_prompt > "$prompt_file"
 write_receipt "queued" "" "" "" "" ""
