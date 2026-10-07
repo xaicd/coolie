@@ -268,6 +268,20 @@ assertRule(
   '工具矩阵探针或 TOOLS.md ACP 手册被删, 文档与实现漂移',
 );
 
+console.log('\n🌐 10. Dev 与 Prod 环境职责红线与项目绝对物理隔离审计:');
+const agentsMd = fs.readFileSync('AGENTS.md', 'utf8');
+const terminologyMd = fs.readFileSync('docs-coolie/TERMINOLOGY.md', 'utf8');
+assertRule(
+  '环境隔离法典守卫: AGENTS.md 必须载入第 20 条 Dev/Prod 物理隔离铁律',
+  agentsMd.includes('## 20. Dev 与 Prod 环境职责红线与项目绝对物理隔离铁律'),
+  'AGENTS.md 丢失第 20 条 Dev 与 Prod 环境隔离铁律',
+);
+assertRule(
+  '业务边界定义守卫: TERMINOLOGY.md 必须明确 Dev 专事工坊建设、Prod 专事实体交付',
+  terminologyMd.includes('Dev 与 Prod 环境定位与项目边界'),
+  'TERMINOLOGY.md 丢失 Dev 与 Prod 环境定位与项目边界定义',
+);
+
 console.log('\n========================================================================');
 if (failed) {
   console.error('🚫 全面管局审计未通过！存在不符合高管治理规范的阻断项，请修复后重试。');

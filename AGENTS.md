@@ -269,6 +269,19 @@ A change is done when all are true:
    - **Step 4 不可变交付证据闭环**：必须完成 0 编译报错，并固化真机端到端证据，杜绝历史 bug 在新会话中反复复活。
    - 详见规范文档 `.agents/rules/HIGH-ORDER-INVERSE-THINKING.md`。
 
+## 20. Dev 与 Prod 环境职责红线与项目绝对物理隔离铁律
+老板原话: 「生产环境 就不要 有 coolie项目了，dev 专门 建设 coolie工坊的」
+
+1. **Dev 环境定位（工坊自身建设面）**：
+   - 专属于「Coolie 本地施工总社」（`localhost:3100` / 内嵌 PGlite）；
+   - 专属负责 Coolie 平台本体迭代、数字员工能力自举、COOA-XX 工单消费与代码构建；
+   - 承载 `coolie工坊` 自身造物项目。
+
+2. **Prod 环境定位（真实业务交付面）**：
+   - 专属于企业客户与外部商业项目（`tc-coolie-claw` / `https://xrobinai.cn`）；
+   - 仅承载真实客户商业交付项目（如产融智能体平台等）；
+   - **绝对物理禁令**：生产环境严禁创建、存在或同步 `coolie工坊` 自身开发项目，严禁将 Dev 施工工单与本地测试数据泄露至生产环境，确保客户与高管交付大盘 100% 纯粹真实！
+
 ## This fork's own conventions
 
 This repository is a fork of Paperclip. The rules above are upstream's; these are ours.
