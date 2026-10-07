@@ -282,6 +282,15 @@ A change is done when all are true:
    - 仅承载真实客户商业交付项目（如产融智能体平台等）；
    - **绝对物理禁令**：生产环境严禁创建、存在或同步 `coolie工坊` 自身开发项目，严禁将 Dev 施工工单与本地测试数据泄露至生产环境，确保客户与高管交付大盘 100% 纯粹真实！
 
+## 21. 移动端无感就地导航与调用栈完整性铁律 (wave363)
+老板原话: 「我看很多 按钮都 乱跳功能页」
+
+1. **实体检视就地覆盖，绝不横跳底栏 (Inspect In-Place)**：在收件箱、搜索、工坊、产物、计划等任何页面点击工单或业务实体，必须作为全局顶层抽屉就地浮层覆盖，严禁调用 `navigateTab("tasks")` 篡改底栏 Tab；
+2. **父级上下文不可变与状态提升 (Immutable Context & Controlled Sub-Tabs)**：关闭实体详情必须精确退回原父级页面，保持搜索词、过滤项与滚动位置完好无损；复合屏（如资产页、收件箱）必须通过受控 `activeTab` 记忆状态，子模态（代码对比/沙箱）关闭后绝不跌落回默认 Tab；
+3. **严格先进后出 LIFO 调用栈 (Strict LIFO Stack)**：返回处理器严格按渲染层级逆序出栈，根页面执行双击退出保护，代码中彻底消灭已删除的孤儿死路由（如 `navigateTab("artifacts")`）；
+4. **大盘指标 100% 语义精确穿透 (Exact Semantic Deep-Link)**：大盘待审批必须直达收件箱审批 Tab 并支持返回，严禁“图省事”近似跳转到普通任务看板；
+详见规范文档 `.agents/rules/MOBILE-NAVIGATION-STACK-INTEGRITY.md` 与技能 `.agents/skills/mobile-navigation-and-stack-audit/SKILL.md`，交付前必须 100% 通过 `bash scripts/check-governance-audit.sh` 第 12 项硬门禁。
+
 ## This fork's own conventions
 
 This repository is a fork of Paperclip. The rules above are upstream's; these are ours.

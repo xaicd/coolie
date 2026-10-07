@@ -310,11 +310,43 @@ assertRule(
   'OTA.ts 缺失会话防重或两字按钮规范',
 );
 
+console.log('\n🧭 12. 移动端无感就地导航与调用栈完整性守卫 (wave363):');
+const taskDetailTs = fs.readFileSync('clients/expo/src/screens/TaskDetailScreen.tsx', 'utf8');
+
+const selectedAboveTabs = appContent.indexOf('selected ? (\n            taskDetail') > 0 &&
+  appContent.indexOf('selected ? (\n            taskDetail') < appContent.indexOf('tab === "dashboard"');
+assertRule(
+  '实体详情全局顶层抽屉化: selected 任务详情必须在外层求值，严禁嵌死在 tasks tab 内部',
+  selectedAboveTabs,
+  'App.tsx 任务详情未提升至顶层三元链，导致非 tasks tab 无法就地查看实体',
+);
+
+const hasArtifactsDeadRoute = appContent.includes('navigateTab("artifacts")');
+assertRule(
+  '消灭孤儿死路由: 严禁在代码中调用已从底栏移除的 navigateTab("artifacts")',
+  !hasArtifactsDeadRoute,
+  'App.tsx 仍残留 navigateTab("artifacts") 孤儿路由',
+);
+
+const assetsTabControlled = appContent.includes('activeTab={assetsTab}') && appContent.includes('onTabChange={setAssetsTab}');
+assertRule(
+  '复合屏状态受控与跨模态记忆: OrgAssetsScreen 必须受控绑定 activeTab 与 onTabChange',
+  assetsTabControlled,
+  'App.tsx 未对 OrgAssetsScreen 进行受控管理，关闭子模态时将导致用户被莫名踢回本体',
+);
+
+const taskDetailHeaderTwoChar = taskDetailTs.includes('backLabel="返回"');
+assertRule(
+  '任务详情返回文案纯两字: TaskDetailScreen 头部返回按钮必须收敛为【‹ 返回】',
+  taskDetailHeaderTwoChar,
+  'TaskDetailScreen 头部返回文案仍包含口语化长词（如"返回任务列表"）',
+);
+
 console.log('\n========================================================================');
 if (failed) {
   console.error('🚫 全面管局审计未通过！存在不符合高管治理规范的阻断项，请修复后重试。');
   process.exit(1);
 } else {
-  console.log('🎉 全面管局审计全绿通过！系统完全符合极简两字 UI、对称底栏、CMMI 产物、高管审批治理、Hermes 扁平化 Worker 契约与党章级工程宪法！');
+  console.log('🎉 全面管局审计全绿通过！系统完全符合极简两字 UI、对称底栏、CMMI 产物、高管审批治理、Hermes 扁平化 Worker 契约、就地导航调用栈与党章级工程宪法！');
   process.exit(0);
 }
