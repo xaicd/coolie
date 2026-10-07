@@ -77,42 +77,104 @@ if [[ "$MODE" == "unregister" ]]; then
 fi
 
 # Real probe helper
+# wave358: agy 健康度判定升级 — 同时检查 (1) 容器可达 (2) OAuth 凭据状态
+# (3) 真跑运行时错误. 凭据过期 → cooldown, 容器不可达 → fail. 不再"binary
+# 在 PATH 即 OK" 假阳性.
+# 输出 4 字段 (TAB 分隔): status<TAB>latency_ms<TAB>reason<TAB>expires_at_iso
 probe_agy() {
-  local start_ms end_ms latency output
+  local start_ms end_ms latency
+  local token_state token_remaining token_expiry token_source
+  local probe_state probe_latency probe_snippet probe_err
+
   start_ms="$(node -e 'console.log(Date.now())')"
 
-  # 1. 优先检查当前环境 (容器内) 是否有 agy
+  # 0. 阶段 1: 凭据状态 (基于 OAuth token 文件的 expiry 字段)
+  local lib_token="$REPO_ROOT/scripts/lib/agy-token-state.sh"
+  if [[ -f "$lib_token" ]]; then
+    # shellcheck source=scripts/lib/agy-token-state.sh
+    source "$lib_token"
+    local token_line
+    token_line="$(agy_token_status 2 2>/dev/null || true)"
+    if [[ -n "$token_line" ]]; then
+      IFS=$'\t' read -r token_state token_remaining token_expiry token_source <<<"$token_line"
+    fi
+  fi
+
+  # 1. 阶段 2: 容器 / binary 可达性 + 真跑探测 (捕获 401 / Session expired / Unauthorized)
+  local reachable=0 runtime_output=""
   if command -v agy >/dev/null 2>&1; then
-    if output="$(agy --help 2>&1)"; then
-      end_ms="$(node -e 'console.log(Date.now())')"
-      latency=$((end_ms - start_ms))
-      first_line="$(printf '%s' "$output" | head -n 1 | cut -c1-40)"
-      printf 'ok\t%d\tcontainer: %s' "$latency" "$first_line"
-      return 0
+    runtime_output="$(set +o pipefail; set +e; agy --print 'ping' 2>&1; echo "exit=$?")" || true
+    set -o pipefail
+    set -e
+    reachable=1
+  elif command -v docker >/dev/null 2>&1 && docker inspect agy-ubuntu-container >/dev/null 2>&1; then
+    if command -v timeout >/dev/null 2>&1; then
+      runtime_output="$(set +o pipefail; set +e; timeout 10 docker exec agy-ubuntu-container /root/.local/bin/agy --print 'ping' 2>&1; echo "exit=$?")" || true
+    else
+      runtime_output="$(set +o pipefail; set +e; perl -e 'alarm shift; exec @ARGV' 10 docker exec agy-ubuntu-container /root/.local/bin/agy --print 'ping' 2>&1; echo "exit=$?")" || true
+    fi
+    set -o pipefail
+    set -e
+    reachable=1
+  elif [[ -x "$REPO_ROOT/scripts/host-exec.sh" ]]; then
+    if "$REPO_ROOT/scripts/host-exec.sh" "docker exec agy-ubuntu-container /root/.local/bin/agy --print 'ping' >/dev/null 2>&1" 2>/dev/null; then
+      runtime_output="$("$REPO_ROOT/scripts/host-exec.sh" "docker exec agy-ubuntu-container /root/.local/bin/agy --print 'ping' 2>&1")" || true
+      reachable=1
     fi
   fi
 
-  # 2. 如果在宿主机运行，检查 docker exec 容器内的 agy
-  if command -v docker >/dev/null 2>&1 && docker inspect agy-ubuntu-container >/dev/null 2>&1; then
-    if docker exec agy-ubuntu-container bash -c 'command -v /root/.local/bin/agy >/dev/null 2>&1 || command -v agy >/dev/null 2>&1' 2>/dev/null; then
-      end_ms="$(node -e 'console.log(Date.now())')"
-      latency=$((end_ms - start_ms))
-      printf 'ok\t%d\tdocker: agy-ubuntu-container active' "$latency"
-      return 0
-    fi
+  end_ms="$(node -e 'console.log(Date.now())')"
+  latency=$((end_ms - start_ms))
+
+  # 2. 阶段 3: 综合判定
+  if [[ "$reachable" -eq 0 ]]; then
+    printf 'fail\t%d\tagy 容器或 binary 不可达 (token=%s)\t%s' "$latency" "${token_state:-n/a}" "${token_expiry:-—}"
+    return 0
   fi
 
-  # 3. 跨桥梁 host-exec 探测宿主机的 docker 容器
-  if [[ -x "$REPO_ROOT/scripts/host-exec.sh" ]]; then
-    if "$REPO_ROOT/scripts/host-exec.sh" "docker exec agy-ubuntu-container /root/.local/bin/agy --help >/dev/null 2>&1" 2>/dev/null; then
-      end_ms="$(node -e 'console.log(Date.now())')"
-      latency=$((end_ms - start_ms))
-      printf 'ok\t%d\thost-docker: agy active' "$latency"
-      return 0
-    fi
+  # 2a. 凭据过期优先 (老板硬规矩: 401/Session expired 立即冷却, 派单自动降级)
+  if [[ "$token_state" == "expired" ]]; then
+    local snippet="${runtime_output%exit=*}"
+    snippet="$(printf '%s' "$snippet" | tr '\n' ' ' | cut -c1-60)"
+    [[ -z "$snippet" ]] && snippet="OAuth token 已过期"
+    printf 'cooldown\t%d\tOAuth 过期 (剩余 %s 分钟, expiry=%s) → 派单将自动降级\t%s' \
+      "$latency" "$token_remaining" "$token_expiry" "$token_expiry"
+    return 0
   fi
 
-  printf 'fail\t999\tagy container or binary unreachable'
+  # 2b. 凭据即将过期 (预警, 仍可派但 PM 知晓)
+  if [[ "$token_state" == "expiring" ]]; then
+    local snippet="${runtime_output%exit=*}"
+    snippet="$(printf '%s' "$snippet" | tr '\n' ' ' | cut -c1-60)"
+    [[ -z "$snippet" ]] && snippet="OAuth 即将过期"
+    printf 'warn\t%d\tOAuth 即将过期 (剩余 %s 分钟, expiry=%s) — 趁早续期\t%s' \
+      "$latency" "$token_remaining" "$token_expiry" "$token_expiry"
+    return 0
+  fi
+
+  # 2c. 凭据正常, 检查真跑是否返回 401 / Session expired
+  if [[ -n "$runtime_output" ]]; then
+    local err_class
+    err_class="$(agy_extract_oauth_error "${runtime_output%exit=*}")"
+    case "$err_class" in
+      expired|unauthorized)
+        printf 'cooldown\t%d\t真跑返回 %s (token=%s, expiry=%s) → 派单将自动降级\t%s' \
+          "$latency" "$err_class" "${token_state:-n/a}" "$token_expiry" "$token_expiry"
+        return 0
+        ;;
+    esac
+  fi
+
+  # 2d. 一切正常 (生产环境 agy binary 直接可达, 不走 docker)
+  if command -v agy >/dev/null 2>&1 && [[ "${AGY_DOCKER_CONTAINER:-agy-ubuntu-container}" == "agy-ubuntu-container" ]] && ! command -v docker >/dev/null 2>&1; then
+    printf 'ok\t%d\tlocal-cli: agy binary (无 docker 容器, token=%s)\t%s' "$latency" "${token_state:-n/a}" "${token_expiry:-—}"
+  elif [[ "${token_source:-}" == docker:* ]]; then
+    printf 'ok\t%d\tdocker: agy-ubuntu-container (token=%s, 剩余 %sm)\t%s' \
+      "$latency" "${token_state:-ok}" "$token_remaining" "$token_expiry"
+  else
+    printf 'ok\t%d\t%s (token=%s, 剩余 %sm)\t%s' \
+      "$latency" "local: agy" "${token_state:-ok}" "$token_remaining" "${token_expiry:-—}"
+  fi
 }
 
 probe_tool() {
@@ -177,8 +239,16 @@ try {
     source "$lib_env"
   fi
 
-  # 1. agy probe
-  IFS=$'\t' read -r agy_status agy_latency agy_reason <<< "$(smart_probe_artisan_tool agy-gemini3.8)"
+  # 0. Source agy-token-state (wave358: 凭据状态 + 真跑错误双探测)
+  local lib_token="$REPO_ROOT/scripts/lib/agy-token-state.sh"
+  if [[ -f "$lib_token" ]]; then
+    # shellcheck source=scripts/lib/agy-token-state.sh
+    source "$lib_token"
+  fi
+
+  # 1. agy probe (wave358: 替换 smart_probe_artisan_tool agy-gemini3.8,
+  #    新探针内置凭据状态 + 真跑错误捕获, 输出可能含 cooldown / warn / ok / fail)
+  IFS=$'\t' read -r agy_status agy_latency agy_reason agy_expires_at agy_token_state <<< "$(probe_agy 2>&1 || true)"
 
   # 2. claude-glm probe
   IFS=$'\t' read -r glm_status glm_latency glm_reason <<< "$(smart_probe_claude glm)"
@@ -198,6 +268,11 @@ try {
   # 7. kiro-cli probe
   IFS=$'\t' read -r kiro_status kiro_latency kiro_reason <<< "$(smart_probe_artisan_tool kiro-cli)"
 
+  # 取 expiry 字段 (来自 agy-token-state 的 token_expiry)
+  if [[ "${agy_token_state:-}" == "ok" || "${agy_token_state:-}" == "expiring" ]]; then
+    agy_expires_at="$(agy_token_status 2 2>/dev/null | awk -F'\t' '{print $3}' || true)"
+  fi
+
   node -e '
 const fs = require("fs");
 const argv = process.argv;
@@ -213,7 +288,7 @@ const data = {
       recommendedEmployees: ["墨斗"],
       quota: null,
       resetAt: null,
-      expiresAt: null,
+      expiresAt: argv[24] && argv[24] !== "-" ? argv[24] : null,
       latencyMs: Number(argv[3]) || null,
       reason: argv[4] || null
     },
@@ -290,7 +365,8 @@ fs.writeFileSync(argv[23], JSON.stringify(data, null, 2), "utf8");
     "$copilot_status" "$copilot_latency" "$copilot_reason" \
     "$hermes_status" "$hermes_latency" "$hermes_reason" \
     "$kiro_status" "$kiro_latency" "$kiro_reason" \
-    "$LATEST_JSON"
+    "$LATEST_JSON" \
+    "${agy_expires_at:-}"
 }
 
 if [[ "$MODE" == "check" || ! -f "$LATEST_JSON" ]]; then
@@ -320,6 +396,7 @@ const time = new Date(data.checkedAt).toLocaleTimeString("zh-CN", { hour: "2-dig
 const okList = [];
 const standbyList = [];
 const warnList = [];
+const cooldownList = [];
 const failList = [];
 
 for (const [name, info] of Object.entries(data.tools)) {
@@ -329,6 +406,9 @@ for (const [name, info] of Object.entries(data.tools)) {
     standbyList.push(name);
   } else if (info.status === "warn") {
     warnList.push(`${name} (${info.reason || "注意配额"})`);
+  } else if (info.status === "cooldown") {
+    // wave358: 凭据过期 → 派单自动降级, PM 需在 WeChat 看到冷却原因
+    cooldownList.push(`${name} (${info.reason || "凭据过期"})`);
   } else {
     failList.push(`${name} (${info.reason || "连接失败"})`);
   }
@@ -338,6 +418,9 @@ console.log(`【工具健康·${time}】`);
 console.log(`可用: ${okList.length > 0 ? okList.join(" / ") : "无"}`);
 if (standbyList.length > 0) {
   console.log(`免载: ${standbyList.join(" / ")} (生产免载)`);
+}
+if (cooldownList.length > 0) {
+  console.log(`冷却: ${cooldownList.join("；")}`);
 }
 if (warnList.length > 0) {
   console.log(`注意: ${warnList.join("；")}`);

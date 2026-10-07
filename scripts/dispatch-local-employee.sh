@@ -576,6 +576,179 @@ if [[ ${#EXEC_CMD[@]} -eq 0 ]]; then
   exit 1
 fi
 
+# ═══ wave358: 调度前健康度检查 + 凭据过期自动降级 ═══
+# 老板硬规矩: agy / 任何工具若处于 cooldown (凭据过期), 派单自动降级到名册里
+# 第一个 fallback, 禁止反复弹微信. 降级全过程必须落 receipt.
+ORIGINAL_TOOL="$TOOL"
+DEGRADED=0
+DEGRADE_REASON=""
+
+# Source agy-token-state for direct callable check (tool-health-monitor 2h TTL 可能过期)
+local_lib_token="$REPO_ROOT/scripts/lib/agy-token-state.sh"
+[[ -f "$local_lib_token" ]] && source "$local_lib_token"
+
+check_tool_health() {
+  # 输出: state<TAB>latency_ms<TAB>reason<TAB>expires_at
+  # 优先调用 tool-health-monitor --json (2h 内最新); 否则读 latest.json 现场判
+  local tool_name="$1"
+  local health_json="$REPO_ROOT/.coolie-local/tool-health/latest.json"
+  [[ -f "$health_json" || ! -f "$REPO_ROOT/.paperclip-local/tool-health/latest.json" ]] || health_json="$REPO_ROOT/.paperclip-local/tool-health/latest.json"
+
+  if [[ -f "$health_json" ]]; then
+    local line
+    line="$(node -e '
+const fs = require("fs");
+const file = process.argv[1];
+const tool = process.argv[2];
+try {
+  const d = JSON.parse(fs.readFileSync(file, "utf8"));
+  const t = (d.tools || {})[tool];
+  if (!t) { console.log("unknown\t0\ttool not in health ledger\t"); process.exit(0); }
+  console.log((t.status || "unknown") + "\t" + (t.latencyMs || 0) + "\t" + (t.reason || "") + "\t" + (t.expiresAt || ""));
+} catch (e) {
+  console.log("unknown\t0\tparse error\t");
+}
+' "$health_json" "$tool_name" 2>/dev/null)"
+    printf '%s' "$line"
+    return 0
+  fi
+
+  printf 'unknown\t0\tno health ledger\t'
+}
+
+try_degrade() {
+  local tool_name="$1"
+  local result state exp
+  IFS=$'\t' read -r state _reason exp <<< ""
+  result="$(check_tool_health "$tool_name")"
+  IFS=$'\t' read -r state _reason exp <<< "$result"
+  if [[ "$state" == "cooldown" ]]; then
+    return 0
+  fi
+  # agy 特例: 凭据级深度检查 (保鲜度比 2h 缓存更高)
+  if [[ "$tool_name" == "agy-gemini3.8" ]] && declare -f agy_token_status >/dev/null 2>&1; then
+    local fresh
+    fresh="$(agy_token_status 2 2>/dev/null || true)"
+    local fresh_state="${fresh%%$'\t'*}"
+    if [[ "$fresh_state" == "expired" ]]; then
+      return 0
+    fi
+  fi
+  return 1
+}
+
+# 仅当默认工具不可用时, 按名册 fallback 顺序逐个探测
+if try_degrade "$TOOL"; then
+  DEGRADE_REASON="$(check_tool_health "$TOOL" | awk -F'\t' '{print $3}')"
+  [[ -z "$DEGRADE_REASON" ]] && DEGRADE_REASON="tool in cooldown/fail"
+
+  printf '[dispatch] ⚠️  主工具 %s 进入冷却/不可用: %s\n' "$TOOL" "$DEGRADE_REASON"
+
+  # 优先从名册 fallbackTools 顺序试, 第一个非 cooldown 即选
+  chosen=""
+  fallback_arr=()
+  if [[ -n "$FALLBACK_TOOLS" ]]; then
+    # FALLBACK_TOOLS 是 JSON 数组字符串 (例如 ["claude-glm", "cmd"])
+    # 用 node 安全解析
+    while IFS= read -r t; do
+      [[ -n "$t" ]] && fallback_arr+=("$t")
+    done < <(node -e 'try { console.log((JSON.parse(process.argv[1]) || []).join("\n")); } catch(e) { console.log(""); }' "$FALLBACK_TOOLS" 2>/dev/null)
+  fi
+
+  for fb in "${fallback_arr[@]}"; do
+    [[ -z "$fb" || "$fb" == "$TOOL" ]] && continue
+    if ! try_degrade "$fb"; then
+      chosen="$fb"
+      break
+    fi
+  done
+
+  if [[ -n "$chosen" ]]; then
+    printf '[dispatch] ↪ 自动降级: %s → %s\n' "$TOOL" "$chosen"
+    DEGRADED=1
+    TOOL="$chosen"
+    # 重建 EXEC_CMD / EXEC_ENV (复用上方 case TOOL)
+    EXEC_CMD=()
+    EXEC_ENV=""
+    if [[ -n "$ACPX_BIN" ]]; then
+      case "$TOOL" in
+        agy-gemini3.8|agy)
+          ADAPTER="$SCRIPT_DIR/adapters/docker-agy-acp.sh"
+          EXEC_CMD=("$ACPX_BIN" "--agent" "$ADAPTER" "exec" "-f" "$prompt_file")
+          EXEC_ENV="acpx:docker-agy"
+          ;;
+        claude-mm)
+          ADAPTER="$SCRIPT_DIR/adapters/claude-mm-acp.sh"
+          EXEC_CMD=("$ACPX_BIN" "--agent" "$ADAPTER" "exec" "-f" "$prompt_file")
+          EXEC_ENV="acpx:claude-mm"
+          ;;
+        claude-glm)
+          ADAPTER="$SCRIPT_DIR/adapters/claude-glm-acp.sh"
+          EXEC_CMD=("$ACPX_BIN" "--agent" "$ADAPTER" "exec" "-f" "$prompt_file")
+          EXEC_ENV="acpx:claude-glm"
+          ;;
+        cmd)
+          ADAPTER="$SCRIPT_DIR/adapters/cmd-acp.sh"
+          EXEC_CMD=("$ACPX_BIN" "--agent" "$ADAPTER" "exec" "-f" "$prompt_file")
+          EXEC_ENV="acpx:cmd"
+          ;;
+        copilot)
+          ADAPTER="$SCRIPT_DIR/adapters/copilot-acp.sh"
+          EXEC_CMD=("$ACPX_BIN" "copilot" "exec" "-f" "$prompt_file")
+          EXEC_ENV="acpx:copilot"
+          ;;
+        codex)
+          ADAPTER="$SCRIPT_DIR/adapters/codex-acp.sh"
+          EXEC_CMD=("$ACPX_BIN" "codex" "exec" "-f" "$prompt_file")
+          EXEC_ENV="acpx:codex"
+          ;;
+      esac
+    fi
+    if [[ ${#EXEC_CMD[@]} -eq 0 ]]; then
+      # Fallback 原生 CLI
+      case "$TOOL" in
+        agy-gemini3.8|agy)
+          TOOL_BIN="docker"
+          TOOL_ARGS=("exec" "-i" "-e" "LANG=C.UTF-8" "agy-ubuntu-container" "/root/.local/bin/agy" "-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
+          ;;
+        claude-mm)
+          TOOL_BIN="claude"
+          TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions" "--settings" "$HOME/.claude/settings.jsonmm")
+          ;;
+        claude-glm)
+          TOOL_BIN="claude"
+          TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions" "--settings" "$HOME/.claude/settings.jsonglm" "--model" "glm-5")
+          ;;
+        cmd)
+          TOOL_BIN="cmd"
+          TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--yolo" "--tools-all" "-t")
+          ;;
+        copilot)
+          TOOL_BIN="copilot"
+          TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--yolo")
+          ;;
+      esac
+      if command -v "$TOOL_BIN" >/dev/null 2>&1; then
+        EXEC_CMD=("$TOOL_BIN" "${TOOL_ARGS[@]}")
+        EXEC_ENV="local-cli"
+      fi
+    fi
+
+    if [[ ${#EXEC_CMD[@]} -eq 0 ]]; then
+      printf '[dispatch] ⛔ 降级失败: %s 也找不到可执行通道 (fallback=%s)\n' "$chosen" "$chosen" >> "$GLOBAL_RECEIPT_LOG" 2>/dev/null || true
+      printf '[dispatch] ⛔ 降级失败: %s 也找不到可执行通道 (fallback=%s)\n' "$chosen" "$chosen" >&2
+      BLOCKED_REASON="auto-degrade failed: $TOOL → $chosen 仍无执行通道 (cooldown 链耗尽)"
+      write_receipt "blocked" "" "" "$now_iso" "" "$BLOCKED_REASON"
+      exit 4
+    fi
+  else
+    printf '[dispatch] ⛔ 名册 fallback 链全部处于 cooldown/fail: %s → %s\n' "$TOOL" "$FALLBACK_TOOLS" >&2
+    BLOCKED_REASON="auto-degrade chain exhausted: $TOOL 冷却, fallback [${FALLBACK_TOOLS}] 也冷却"
+    write_receipt "blocked" "" "" "$now_iso" "" "$BLOCKED_REASON"
+    exit 3
+  fi
+fi
+
 # Update receipt to running
 started_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 write_receipt "running" "$$" "$started_iso" "" "" ""
