@@ -338,7 +338,14 @@ function mapWorkProduct(
   versionCount: number,
 ): SandboxDeliverable {
   if (latest) {
-    const url = absoluteUrl(latest.openPath || latest.contentPath);
+    const url = absoluteUrl(
+      latest.openPath ||
+        latest.contentPath ||
+        wp.url ||
+        (latest as unknown as { url?: string }).url ||
+        metaString(wp, "contentPath") ||
+        metaString(wp, "openPath"),
+    );
     return {
       key: `wp:${wp.id}`,
       title: latest.originalFilename || wp.title || latest.title,
