@@ -15,29 +15,51 @@ export interface OTAState {
   error: string | null;
 }
 
+let isRestartPromptActive = false;
+let promptedSessionUpdateId: string | null = null;
+
 /**
- * 弹出提示用户立即重启生效或稍后生效
+ * 弹出提示用户立即重启生效或稍后生效（单会话防重复打扰，两字按钮规范）
  */
 export function promptRestart(
-  title = "发现新版本",
-  message = "新版本已下载完成，是否立即重启应用以生效？",
+  title = "更新就绪",
+  message = "新版本已在后台就绪，是否立即重启生效？",
+  updateId?: string | null,
 ): void {
+  if (isRestartPromptActive) return;
+  if (updateId && updateId === promptedSessionUpdateId) return;
+
+  isRestartPromptActive = true;
+  if (updateId) promptedSessionUpdateId = updateId;
+
   Alert.alert(
     title,
     message,
     [
-      { text: "稍后", style: "cancel" },
       {
-        text: "立即重启",
+        text: "稍后",
+        style: "cancel",
+        onPress: () => {
+          isRestartPromptActive = false;
+        },
+      },
+      {
+        text: "重启",
         style: "default",
         onPress: () => {
+          isRestartPromptActive = false;
           void Updates.reloadAsync().catch((err: unknown) => {
             console.warn("[OTA] reloadAsync error:", err);
           });
         },
       },
     ],
-    { cancelable: true },
+    {
+      cancelable: true,
+      onDismiss: () => {
+        isRestartPromptActive = false;
+      },
+    },
   );
 }
 
@@ -120,9 +142,14 @@ export function setupOTAListener(onUpdateDownloaded?: () => void): () => void {
         if (onUpdateDownloaded) {
           onUpdateDownloaded();
         } else {
+          const latestId =
+            (event.context as any)?.latestUpdate?.updateId ??
+            Updates.updateId ??
+            "pending-update";
           promptRestart(
             "更新就绪",
-            "应用新版本已在后台静默下载完毕，是否立即重启生效？",
+            "新版本已在后台就绪，是否立即重启生效？",
+            latestId,
           );
         }
       } else if (!event.context.isUpdatePending) {
@@ -330,26 +357,8 @@ export function useOTA() {
   const [lastCheckedAt, setLastCheckedAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  // 绑定 expo-updates 响应式状态
+  // 绑定 expo-updates 响应式状态 (全局后台监听已由 App 顶层 setupOTAListener 接管)
   const nativeUpdates = Updates.useUpdates();
-
-  useEffect(() => {
-    // 监听后台就绪事件
-    const unsubscribe = setupOTAListener();
-    return () => {
-      unsubscribe();
-    };
-  }, []);
-
-  // 监听 nativeUpdates.isUpdatePending 状态变化
-  useEffect(() => {
-    if (nativeUpdates.isUpdatePending) {
-      promptRestart(
-        "更新就绪",
-        "应用新版本已在后台下载完毕，是否立即重启以体验最新功能？",
-      );
-    }
-  }, [nativeUpdates.isUpdatePending]);
 
   const triggerCheck = useCallback(async (interactive = true) => {
     setIsChecking(true);

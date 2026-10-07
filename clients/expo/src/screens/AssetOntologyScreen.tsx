@@ -13,6 +13,9 @@ import type {
   Company,
   Issue,
   IssueWorkProduct,
+  OntologyDomain,
+  OntologyGraphNode,
+  OntologyGraphSnapshot,
   OntologyInstanceRow,
   OntologyLevelsResponse,
   OntologyStatsResponse,
@@ -20,14 +23,31 @@ import type {
   WorkspaceRuntimeService,
 } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
-import { RADIUS, SPACING } from "../ui/tokens";
+import { ELEVATION, RADIUS, SPACING } from "../ui/tokens";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { AppCard } from "../ui/AppCard";
 import { StatusBadge } from "../ui/StatusBadge";
 import { Sheet } from "../ui/Sheet";
 import { LoadingState } from "../ui/LoadingState";
 import { ErrorRetry } from "../ui/ErrorRetry";
+import { showErrorToast, showSuccessToast } from "../ui/toast";
 import type { SandboxScope } from "./PrototypeSandboxScreen";
+
+export interface DomainItem {
+  id: string;
+  name: string;
+  slug: string;
+  category: string;
+  icon: string;
+  isSystem: boolean;
+  description: string;
+  lifecycleState: "active" | "draft" | "locked" | "archived";
+  nodeCount: number;
+  edgeCount: number;
+  rawDomain?: OntologyDomain;
+  projectId?: string;
+  projectName?: string;
+}
 
 export interface AssetOntologyScreenProps {
   company: Company;
@@ -111,6 +131,13 @@ export function AssetOntologyScreen({
   const [stats, setStats] = useState<OntologyStatsResponse | null>(null);
   const [levels, setLevels] = useState<OntologyLevelsResponse | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [domains, setDomains] = useState<DomainItem[]>([]);
+  const [activeDomainId, setActiveDomainId] = useState<string>("__system__");
+  const [domainSnapshot, setDomainSnapshot] = useState<OntologyGraphSnapshot | null>(null);
+  const [loadingSnapshot, setLoadingSnapshot] = useState(false);
+  const [domainSheetVisible, setDomainSheetVisible] = useState(false);
+  const [selectedDomainNode, setSelectedDomainNode] = useState<OntologyGraphNode | null>(null);
+
   const [selectedObject, setSelectedObject] = useState<LivingObjectItem | null>(null);
   const [selectedDataset, setSelectedDataset] = useState<LivingDatasetItem | null>(null);
 
@@ -146,21 +173,105 @@ export function AssetOntologyScreen({
   const loadData = useCallback(async () => {
     try {
       setError(null);
-      const [statsRes, levelsRes, projectsRes] = await Promise.allSettled([
+      const [statsRes, levelsRes, projectsRes, domainsRes] = await Promise.allSettled([
         coolie.getOntologyStats(company.id),
         coolie.getOntologyLevels(company.id),
         coolie.listProjects(company.id),
+        coolie.listOntologyDomains(company.id),
       ]);
+
+      let curStats: OntologyStatsResponse | null = null;
+      let curLevels: OntologyLevelsResponse | null = null;
+      let curProjects: Project[] = [];
+      let curDomains: OntologyDomain[] = [];
 
       if (statsRes.status === "fulfilled") {
         setStats(statsRes.value);
+        curStats = statsRes.value;
       }
       if (levelsRes.status === "fulfilled") {
         setLevels(levelsRes.value);
+        curLevels = levelsRes.value;
       }
       if (projectsRes.status === "fulfilled") {
         setProjects(projectsRes.value);
+        curProjects = projectsRes.value;
       }
+      if (domainsRes.status === "fulfilled" && Array.isArray(domainsRes.value)) {
+        curDomains = domainsRes.value;
+      }
+
+      // 组装本体域总表 (系统总域 + 各业务本体域 + 项目关联域)
+      const pCount = curProjects.length || curLevels?.byEntityType?.find((e) => e.entityType === "project")?.count || 1;
+      const iCount = curLevels?.byEntityType?.find((e) => e.entityType === "issue")?.count ?? curStats?.nodeCounts?.find((n) => n.entityType === "issue")?.count ?? 0;
+      const aCount = curLevels?.byEntityType?.find((e) => e.entityType === "agent")?.count ?? curStats?.nodeCounts?.find((n) => n.entityType === "agent")?.count ?? 6;
+      const wpCount = curLevels?.byEntityType?.find((e) => e.entityType === "work_product")?.count ?? curStats?.nodeCounts?.find((n) => n.entityType === "work_product")?.count ?? 0;
+      const cCount = curLevels?.byEntityType?.find((e) => e.entityType === "conversation")?.count ?? curStats?.nodeCounts?.find((n) => n.entityType === "conversation")?.count ?? 0;
+      const tNodes = curStats?.totalNodes ?? curLevels?.totalNodes ?? (pCount + iCount + aCount + wpCount + cCount);
+      const tEdges = curStats?.totalRelations ?? curLevels?.totalEdges ?? 0;
+
+      const domainItems: DomainItem[] = [
+        {
+          id: "__system__",
+          name: "工坊中枢本体域",
+          slug: "coolie_system",
+          category: "系统中枢",
+          icon: "⚙️",
+          isSystem: true,
+          description: "工坊施工队、任务契约与不可变证据中枢",
+          lifecycleState: "active",
+          nodeCount: tNodes,
+          edgeCount: tEdges,
+        },
+      ];
+
+      for (const d of curDomains) {
+        const matchProject = curProjects.find(
+          (p) =>
+            p.name === (d.displayName || d.display_name || d.slug) ||
+            (p as any)?.metadata?.domainId === d.id,
+        );
+        domainItems.push({
+          id: d.id,
+          name: d.displayName || d.display_name || d.slug || "业务本体域",
+          slug: d.slug,
+          category: d.category || "业务领域",
+          icon: d.icon || "⬡",
+          isSystem: false,
+          description: d.description || "项目业务对象孪生与因果动作闭环",
+          lifecycleState: (d.lifecycleState || d.lifecycle_state || "active") as any,
+          nodeCount: (d as any).nodeCount ?? (d as any).typeCount ?? 0,
+          edgeCount: (d as any).edgeCount ?? 0,
+          rawDomain: d,
+          projectId: matchProject?.id,
+          projectName: matchProject?.name,
+        });
+      }
+
+      for (const p of curProjects) {
+        const slug = p.name.toLowerCase().replace(/[^a-z0-9_-]+/g, "_");
+        const exists = domainItems.some(
+          (item) => item.projectId === p.id || item.slug === slug || item.id === p.id,
+        );
+        if (!exists) {
+          domainItems.push({
+            id: `proj-${p.id}`,
+            name: `${p.name} 业务域`,
+            slug: slug || `proj_${p.id.slice(0, 6)}`,
+            category: "项目业务域",
+            icon: "📁",
+            isSystem: false,
+            description: p.description || `项目【${p.name}】的业务实体模型与动作执行域`,
+            lifecycleState: "active",
+            nodeCount: 0,
+            edgeCount: 0,
+            projectId: p.id,
+            projectName: p.name,
+          });
+        }
+      }
+
+      setDomains(domainItems);
     } catch (e) {
       setError(e instanceof Error ? e.message : "获取本体数据失败");
     } finally {
@@ -169,14 +280,101 @@ export function AssetOntologyScreen({
     }
   }, [company.id]);
 
+  const loadDomainSnapshot = useCallback(
+    async (domain: DomainItem) => {
+      if (domain.isSystem) {
+        setDomainSnapshot(null);
+        return;
+      }
+      setLoadingSnapshot(true);
+      try {
+        const targetId = domain.rawDomain?.id || domain.slug;
+        const snap = await coolie.getOntologySnapshot(company.id, targetId, 100);
+        setDomainSnapshot(snap);
+      } catch {
+        setDomainSnapshot(null);
+      } finally {
+        setLoadingSnapshot(false);
+      }
+    },
+    [company.id],
+  );
+
   useEffect(() => {
     void loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    const cur = domains.find((d) => d.id === activeDomainId);
+    if (cur && !cur.isSystem) {
+      void loadDomainSnapshot(cur);
+    } else {
+      setDomainSnapshot(null);
+    }
+  }, [activeDomainId, domains, loadDomainSnapshot]);
+
   const handleRefresh = useCallback(() => {
     setRefreshing(true);
     void loadData();
-  }, [loadData]);
+    const cur = domains.find((d) => d.id === activeDomainId);
+    if (cur && !cur.isSystem) {
+      void loadDomainSnapshot(cur);
+    }
+  }, [loadData, domains, activeDomainId, loadDomainSnapshot]);
+
+  const handleToggleLifecycle = async (dom: DomainItem) => {
+    if (!dom.rawDomain) return;
+    const target = dom.lifecycleState === "locked" || dom.lifecycleState === "archived" ? "active" : "locked";
+    try {
+      await coolie.setDomainLifecycle(company.id, dom.id, target);
+      showSuccessToast(target === "locked" ? "已熔断" : "已恢复", `本体域【${dom.name}】状态已变更为 ${target}`);
+      void loadData();
+    } catch (e) {
+      showErrorToast("操作失败", (e as Error)?.message ?? String(e));
+    }
+  };
+
+  const handleSeedSamples = async (dom: DomainItem) => {
+    if (!dom.rawDomain) return;
+    try {
+      await coolie.seedDomainSamples(company.id, dom.id);
+      showSuccessToast("样本就绪", `已为【${dom.name}】载入业务本体示例`);
+      void loadData();
+      void loadDomainSnapshot(dom);
+    } catch (e) {
+      showErrorToast("注入失败", (e as Error)?.message ?? String(e));
+    }
+  };
+
+  const handleEvolveDomainInChat = (dom: DomainItem) => {
+    onNavigateToChat?.(`Hermes 请为业务本体域【${dom.name}】(${dom.slug}) 规划核心业务实体、因果动作与下一阶段交付物`);
+  };
+
+  const handleDispatchForDomain = (dom: DomainItem) => {
+    if (dom.projectId) {
+      const matched = projects.find((p) => p.id === dom.projectId);
+      if (matched && onCreateTaskForProject) {
+        onCreateTaskForProject(matched);
+        return;
+      }
+    }
+    if (projects[0] && onCreateTaskForProject) {
+      onCreateTaskForProject(projects[0]);
+    } else {
+      onNavigateToChat?.(`Hermes 请为本体域【${dom.name}】创建并指派下一条工作任务`);
+    }
+  };
+
+  const handleViewDomain = (dom: DomainItem) => {
+    if (dom.projectId) {
+      const matched = projects.find((p) => p.id === dom.projectId);
+      if (matched && onOpenProjectTasks) {
+        onOpenProjectTasks(matched);
+        return;
+      }
+    }
+    onNavigateToTasks?.();
+  };
 
   // 从真实数据库聚合指标提取实体实例数与因果关系数 (反造数硬约束)
   const projectCount = projects.length || levels?.byEntityType?.find((e) => e.entityType === "project")?.count || (levels?.byDomain?.length ?? 1);
@@ -422,6 +620,19 @@ export function AssetOntologyScreen({
     }
   };
 
+  const currentDomain = domains.find((d) => d.id === activeDomainId) ?? domains[0] ?? {
+    id: "__system__",
+    name: "工坊中枢本体域",
+    slug: "coolie_system",
+    category: "系统中枢",
+    icon: "⚙️",
+    isSystem: true,
+    description: "工坊施工队、任务契约与不可变证据中枢",
+    lifecycleState: "active" as const,
+    nodeCount: totalNodes,
+    edgeCount: totalEdges,
+  };
+
   if (loading && !refreshing) {
     return <LoadingState text="加载业务本体活体态势..." />;
   }
@@ -444,160 +655,441 @@ export function AssetOntologyScreen({
           />
         }
       >
-        {/* 1. 顶栏态势横幅 (Enterprise Living Overview) */}
-        <View style={styles.banner}>
-          <View style={styles.bannerHeader}>
-            <View style={styles.bannerBadge}>
-              <View style={styles.pulseDot} />
-              <Text style={styles.bannerBadgeText}>活体中枢 · 实时运转</Text>
+        {/* 0. 本体领域选择器 (Domain Selector Bar) */}
+        <View style={styles.domainSelectorWrap}>
+          <View style={styles.domainSelectorHeader}>
+            <View style={styles.domainHeaderTitleRow}>
+              <Text style={styles.domainSelectorTitle}>本体领域 (DOMAINS)</Text>
+              <View style={styles.domainCountBadge}>
+                <Text style={styles.domainCountBadgeText}>{domains.length} 域</Text>
+              </View>
             </View>
             <Pressable
-              style={styles.refreshBtn}
-              onPress={handleRefresh}
+              style={styles.domainManageBtn}
+              onPress={() => setDomainSheetVisible(true)}
               hitSlop={6}
-              accessibilityLabel="刷新本体态势"
-              testID="AssetOntology__Header__RefreshBtn"
+              accessibilityRole="button"
+              accessibilityLabel="切换或管理本体域"
+              testID="AssetOntology__DomainManageBtn"
             >
-              <Ionicons name="refresh-outline" size={13} color={C.ink2} />
-              <Text style={styles.refreshBtnText}>刷新</Text>
+              <Ionicons name="grid-outline" size={13} color={C.accent} />
+              <Text style={styles.domainManageBtnText}>域表</Text>
             </Pressable>
           </View>
 
-          <Text style={styles.bannerTitle}>企业活体全貌</Text>
-          <Text style={styles.bannerSubtitle}>
-            业务对象即交互体 · 数据源流即真相 · 动词直通施工
-          </Text>
-
-          <View style={styles.metricsRow}>
-            <View style={styles.metricItem}>
-              <Text style={styles.metricValue}>{totalNodes}</Text>
-              <Text style={styles.metricLabel}>核心对象</Text>
-            </View>
-            <View style={styles.metricDivider} />
-            <View style={styles.metricItem}>
-              <Text style={styles.metricValue}>{totalEdges}</Text>
-              <Text style={styles.metricLabel}>因果连线</Text>
-            </View>
-            <View style={styles.metricDivider} />
-            <View style={styles.metricItem}>
-              <Text style={styles.metricValue}>5 流</Text>
-              <Text style={styles.metricLabel}>数据管网</Text>
-            </View>
-            <View style={styles.metricDivider} />
-            <View style={styles.metricItem}>
-              <Text style={styles.metricValue}>v1.4</Text>
-              <Text style={styles.metricLabel}>本体版本</Text>
-            </View>
-          </View>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.domainChipsScroll}
+          >
+            {domains.map((dom) => {
+              const active = dom.id === activeDomainId;
+              return (
+                <Pressable
+                  key={dom.id}
+                  style={[styles.domainChip, active && styles.domainChipActive]}
+                  onPress={() => setActiveDomainId(dom.id)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`切换至${dom.name}`}
+                  testID={`AssetOntology__DomainChip__${dom.id}`}
+                >
+                  <Text style={styles.domainChipIcon}>{dom.icon}</Text>
+                  <Text
+                    style={[styles.domainChipText, active && styles.domainChipTextActive]}
+                    numberOfLines={1}
+                  >
+                    {dom.name}
+                  </Text>
+                  {dom.lifecycleState === "locked" ? (
+                    <View style={styles.domainChipLockedDot} />
+                  ) : null}
+                </Pressable>
+              );
+            })}
+          </ScrollView>
         </View>
 
-        {/* 2. 两核切换控制器 */}
-        <SegmentedControl
-          options={SUB_TABS}
-          value={subTab}
-          onChange={(val) => setSubTab(val as SubTab)}
-          style={styles.subTabControl}
-        />
-
-        {/* 3. 核一：业务对象 (Object Explorer) */}
-        {subTab === "objects" && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>业务对象 (OBJECT EXPLORER)</Text>
-              <Text style={styles.sectionMeta}>{objectItems.length} 类核心实体</Text>
-            </View>
-
-            <View style={styles.cardList}>
-              {objectItems.map((item) => (
+        {currentDomain.isSystem ? (
+          <>
+            {/* 1. 顶栏态势横幅 (Enterprise Living Overview) */}
+            <View style={styles.banner}>
+              <View style={styles.bannerHeader}>
+                <View style={styles.bannerBadge}>
+                  <View style={styles.pulseDot} />
+                  <Text style={styles.bannerBadgeText}>活体中枢 · 实时运转</Text>
+                </View>
                 <Pressable
-                  key={item.id}
-                  style={styles.objectCard}
-                  onPress={() => setSelectedObject(item)}
-                  testID={`AssetOntology__ObjectCard__${item.id}`}
+                  style={styles.refreshBtn}
+                  onPress={handleRefresh}
+                  hitSlop={6}
+                  accessibilityLabel="刷新本体态势"
+                  testID="AssetOntology__Header__RefreshBtn"
                 >
-                  <View style={styles.objectIconWrap}>
-                    <Text style={styles.objectIconText}>{item.icon}</Text>
-                  </View>
-
-                  <View style={styles.objectInfo}>
-                    <View style={styles.objectNameRow}>
-                      <Text style={styles.objectName}>{item.name}</Text>
-                      <StatusBadge
-                        tone={item.status === "healthy" ? "ok" : item.status === "warn" ? "warn" : "muted"}
-                        label={item.statusText}
-                      />
-                    </View>
-                    <Text style={styles.objectDesc} numberOfLines={1}>
-                      {item.description}
-                    </Text>
-                    <View style={styles.objectMetaRow}>
-                      <Text style={styles.objectMetaTag}>{item.category}</Text>
-                      <Text style={styles.objectMetaSep}>·</Text>
-                      <Text style={styles.objectMeta}>{item.count} 实例</Text>
-                      <Text style={styles.objectMetaSep}>·</Text>
-                      <Text style={styles.objectMeta}>{item.edgeCount} 因果连线</Text>
-                    </View>
-                  </View>
-
-                  <View style={styles.objectArrowWrap}>
-                    <Ionicons name="chevron-forward" size={16} color={C.ink3} />
-                  </View>
+                  <Ionicons name="refresh-outline" size={13} color={C.ink2} />
+                  <Text style={styles.refreshBtnText}>刷新</Text>
                 </Pressable>
-              ))}
-            </View>
-          </View>
-        )}
+              </View>
 
-        {/* 4. 核二：数据源流 (Dataset Explorer) */}
-        {subTab === "datasets" && (
-          <View style={styles.section}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>数据源流 (DATASET PIPELINES)</Text>
-              <Text style={styles.sectionMeta}>{datasetItems.length} 条主干管道</Text>
+              <Text style={styles.bannerTitle}>企业活体全貌</Text>
+              <Text style={styles.bannerSubtitle}>
+                业务对象即交互体 · 数据源流即真相 · 动词直通施工
+              </Text>
+
+              <View style={styles.metricsRow}>
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricValue}>{totalNodes}</Text>
+                  <Text style={styles.metricLabel}>核心对象</Text>
+                </View>
+                <View style={styles.metricDivider} />
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricValue}>{totalEdges}</Text>
+                  <Text style={styles.metricLabel}>因果连线</Text>
+                </View>
+                <View style={styles.metricDivider} />
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricValue}>5 流</Text>
+                  <Text style={styles.metricLabel}>数据管网</Text>
+                </View>
+                <View style={styles.metricDivider} />
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricValue}>v1.4</Text>
+                  <Text style={styles.metricLabel}>本体版本</Text>
+                </View>
+              </View>
             </View>
 
-            <View style={styles.cardList}>
-              {datasetItems.map((ds) => (
-                <Pressable
-                  key={ds.id}
-                  style={styles.datasetCard}
-                  onPress={() => setSelectedDataset(ds)}
-                  hitSlop={4}
-                  testID={`AssetOntology__DatasetCard__${ds.id}`}
-                >
-                  <View style={styles.datasetHeader}>
-                    <View style={styles.datasetTitleRow}>
-                      <Text style={styles.datasetName}>{ds.tableName}</Text>
-                      <View style={styles.engineBadge}>
-                        <Text style={styles.engineBadgeText}>{ds.engine}</Text>
+            {/* 2. 两核切换控制器 */}
+            <SegmentedControl
+              options={SUB_TABS}
+              value={subTab}
+              onChange={(val) => setSubTab(val as SubTab)}
+              style={styles.subTabControl}
+            />
+
+            {/* 3. 核一：业务对象 (Object Explorer) */}
+            {subTab === "objects" && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>业务对象 (OBJECT EXPLORER)</Text>
+                  <Text style={styles.sectionMeta}>{objectItems.length} 类核心实体</Text>
+                </View>
+
+                <View style={styles.cardList}>
+                  {objectItems.map((item) => (
+                    <Pressable
+                      key={item.id}
+                      style={styles.objectCard}
+                      onPress={() => setSelectedObject(item)}
+                      testID={`AssetOntology__ObjectCard__${item.id}`}
+                    >
+                      <View style={styles.objectIconWrap}>
+                        <Text style={styles.objectIconText}>{item.icon}</Text>
                       </View>
-                    </View>
-                    <StatusBadge
-                      tone={ds.status === "active" ? "ok" : "muted"}
-                      label={ds.syncType}
-                    />
-                  </View>
 
-                  <Text style={styles.datasetDesc}>{ds.description}</Text>
+                      <View style={styles.objectInfo}>
+                        <View style={styles.objectNameRow}>
+                          <Text style={styles.objectName}>{item.name}</Text>
+                          <StatusBadge
+                            tone={item.status === "healthy" ? "ok" : item.status === "warn" ? "warn" : "muted"}
+                            label={item.statusText}
+                          />
+                        </View>
+                        <Text style={styles.objectDesc} numberOfLines={1}>
+                          {item.description}
+                        </Text>
+                        <View style={styles.objectMetaRow}>
+                          <Text style={styles.objectMetaTag}>{item.category}</Text>
+                          <Text style={styles.objectMetaSep}>·</Text>
+                          <Text style={styles.objectMeta}>{item.count} 实例</Text>
+                          <Text style={styles.objectMetaSep}>·</Text>
+                          <Text style={styles.objectMeta}>{item.edgeCount} 因果连线</Text>
+                        </View>
+                      </View>
 
-                  <View style={styles.datasetFooter}>
-                    <View style={styles.datasetFooterItem}>
-                      <Text style={styles.datasetFooterLabel}>吞吐量:</Text>
-                      <Text style={styles.datasetFooterValue}>{ds.recordCount}</Text>
-                    </View>
-                    <View style={styles.datasetFooterItem}>
-                      <Text style={styles.datasetFooterLabel}>同步延迟:</Text>
-                      <Text style={styles.datasetFooterValue}>{ds.latency}</Text>
-                    </View>
-                    <View style={styles.datasetFooterItem}>
-                      <Text style={styles.datasetFooterLabel}>对象映射:</Text>
-                      <Text style={styles.datasetFooterValue}>{ds.boundObject.split(" ")[0]}</Text>
-                    </View>
-                  </View>
+                      <View style={styles.objectArrowWrap}>
+                        <Ionicons name="chevron-forward" size={16} color={C.ink3} />
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
+
+            {/* 4. 核二：数据源流 (Dataset Explorer) */}
+            {subTab === "datasets" && (
+              <View style={styles.section}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>数据源流 (DATASET PIPELINES)</Text>
+                  <Text style={styles.sectionMeta}>{datasetItems.length} 条主干管道</Text>
+                </View>
+
+                <View style={styles.cardList}>
+                  {datasetItems.map((ds) => (
+                    <Pressable
+                      key={ds.id}
+                      style={styles.datasetCard}
+                      onPress={() => setSelectedDataset(ds)}
+                      hitSlop={4}
+                      testID={`AssetOntology__DatasetCard__${ds.id}`}
+                    >
+                      <View style={styles.datasetHeader}>
+                        <View style={styles.datasetTitleRow}>
+                          <Text style={styles.datasetName}>{ds.tableName}</Text>
+                          <View style={styles.engineBadge}>
+                            <Text style={styles.engineBadgeText}>{ds.engine}</Text>
+                          </View>
+                        </View>
+                        <StatusBadge
+                          tone={ds.status === "active" ? "ok" : "muted"}
+                          label={ds.syncType}
+                        />
+                      </View>
+
+                      <Text style={styles.datasetDesc}>{ds.description}</Text>
+
+                      <View style={styles.datasetFooter}>
+                        <View style={styles.datasetFooterItem}>
+                          <Text style={styles.datasetFooterLabel}>吞吐量:</Text>
+                          <Text style={styles.datasetFooterValue}>{ds.recordCount}</Text>
+                        </View>
+                        <View style={styles.datasetFooterItem}>
+                          <Text style={styles.datasetFooterLabel}>同步延迟:</Text>
+                          <Text style={styles.datasetFooterValue}>{ds.latency}</Text>
+                        </View>
+                        <View style={styles.datasetFooterItem}>
+                          <Text style={styles.datasetFooterLabel}>对象映射:</Text>
+                          <Text style={styles.datasetFooterValue}>{ds.boundObject.split(" ")[0]}</Text>
+                        </View>
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            )}
+          </>
+        ) : (
+          <>
+            {/* 1. 业务本体域横幅 */}
+            <View style={styles.banner}>
+              <View style={styles.bannerHeader}>
+                <View style={styles.bannerBadge}>
+                  <View
+                    style={[
+                      styles.pulseDot,
+                      currentDomain.lifecycleState === "locked" && { backgroundColor: "#EF4444" },
+                    ]}
+                  />
+                  <Text style={styles.bannerBadgeText}>
+                    {currentDomain.category} · {currentDomain.lifecycleState === "locked" ? "已熔断" : "实时运转"}
+                  </Text>
+                </View>
+                <Pressable
+                  style={styles.refreshBtn}
+                  onPress={() => {
+                    void loadData();
+                    void loadDomainSnapshot(currentDomain);
+                  }}
+                  hitSlop={6}
+                  accessibilityRole="button"
+                  accessibilityLabel="刷新当前域态势"
+                  testID="AssetOntology__Domain__RefreshBtn"
+                >
+                  <Ionicons name="refresh-outline" size={13} color={C.ink2} />
+                  <Text style={styles.refreshBtnText}>刷新</Text>
                 </Pressable>
-              ))}
+              </View>
+
+              <Text style={styles.bannerTitle}>{currentDomain.name}</Text>
+              <Text style={styles.bannerSubtitle}>{currentDomain.description}</Text>
+
+              <View style={styles.metricsRow}>
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricValue}>
+                    {domainSnapshot?.nodes?.length ?? currentDomain.nodeCount}
+                  </Text>
+                  <Text style={styles.metricLabel}>业务实体</Text>
+                </View>
+                <View style={styles.metricDivider} />
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricValue}>
+                    {domainSnapshot?.edges?.length ?? currentDomain.edgeCount}
+                  </Text>
+                  <Text style={styles.metricLabel}>因果连线</Text>
+                </View>
+                <View style={styles.metricDivider} />
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricValue}>
+                    {currentDomain.lifecycleState === "locked" ? "锁定" : "活跃"}
+                  </Text>
+                  <Text style={styles.metricLabel}>运行状态</Text>
+                </View>
+                <View style={styles.metricDivider} />
+                <View style={styles.metricItem}>
+                  <Text style={styles.metricValue} numberOfLines={1}>
+                    {currentDomain.projectName ?? "独立域"}
+                  </Text>
+                  <Text style={styles.metricLabel}>关联工程</Text>
+                </View>
+              </View>
+
+              {/* 业务本体域标准两字操作条 */}
+              <View style={styles.domainActionRow}>
+                <Pressable
+                  style={styles.domainActionBtn}
+                  onPress={() => handleViewDomain(currentDomain)}
+                  accessibilityRole="button"
+                  accessibilityLabel="查看任务与工程"
+                  testID="AssetOntology__DomainAction__View"
+                >
+                  <Ionicons name="eye-outline" size={13} color={C.ink} />
+                  <Text style={styles.domainActionBtnText}>查看</Text>
+                </Pressable>
+
+                <Pressable
+                  style={styles.domainActionBtn}
+                  onPress={() => handleDispatchForDomain(currentDomain)}
+                  accessibilityRole="button"
+                  accessibilityLabel="指派派单"
+                  testID="AssetOntology__DomainAction__Dispatch"
+                >
+                  <Ionicons name="paper-plane-outline" size={13} color={C.ink} />
+                  <Text style={styles.domainActionBtnText}>派单</Text>
+                </Pressable>
+
+                <Pressable
+                  style={[styles.domainActionBtn, styles.domainActionBtnAccent]}
+                  onPress={() => handleEvolveDomainInChat(currentDomain)}
+                  accessibilityRole="button"
+                  accessibilityLabel="在工坊演进本体"
+                  testID="AssetOntology__DomainAction__Chat"
+                >
+                  <Ionicons name="chatbubbles-outline" size={13} color="#FFFFFF" />
+                  <Text style={[styles.domainActionBtnText, { color: "#FFFFFF" }]}>工坊</Text>
+                </Pressable>
+
+                {currentDomain.rawDomain ? (
+                  <Pressable
+                    style={styles.domainActionBtn}
+                    onPress={() => handleToggleLifecycle(currentDomain)}
+                    accessibilityRole="button"
+                    accessibilityLabel="切换熔断与活跃"
+                    testID="AssetOntology__DomainAction__Lifecycle"
+                  >
+                    <Ionicons
+                      name={currentDomain.lifecycleState === "locked" ? "play-outline" : "pause-outline"}
+                      size={13}
+                      color={currentDomain.lifecycleState === "locked" ? "#10B981" : "#EF4444"}
+                    />
+                    <Text style={styles.domainActionBtnText}>
+                      {currentDomain.lifecycleState === "locked" ? "恢复" : "熔断"}
+                    </Text>
+                  </Pressable>
+                ) : null}
+
+                {currentDomain.rawDomain ? (
+                  <Pressable
+                    style={styles.domainActionBtn}
+                    onPress={() => handleSeedSamples(currentDomain)}
+                    accessibilityRole="button"
+                    accessibilityLabel="注入本体示例"
+                    testID="AssetOntology__DomainAction__Seed"
+                  >
+                    <Ionicons name="sparkles-outline" size={13} color={C.accent} />
+                    <Text style={styles.domainActionBtnText}>样本</Text>
+                  </Pressable>
+                ) : null}
+              </View>
             </View>
-          </View>
+
+            {/* 2. 业务领域对象列表 (Object Types) */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>业务对象 (OBJECT EXPLORER)</Text>
+                <Text style={styles.sectionMeta}>
+                  {domainSnapshot?.nodes?.length ?? 0} 个活体实体
+                </Text>
+              </View>
+
+              {loadingSnapshot ? (
+                <LoadingState text="加载域实体模型..." />
+              ) : domainSnapshot?.nodes && domainSnapshot.nodes.length > 0 ? (
+                <View style={styles.cardList}>
+                  {domainSnapshot.nodes.map((node) => (
+                    <Pressable
+                      key={node.id}
+                      style={styles.objectCard}
+                      onPress={() => setSelectedDomainNode(node)}
+                      accessibilityRole="button"
+                      testID={`AssetOntology__DomainNode__${node.id}`}
+                    >
+                      <View style={styles.objectIconWrap}>
+                        <Text style={styles.objectIconText}>⬡</Text>
+                      </View>
+                      <View style={styles.objectInfo}>
+                        <View style={styles.objectNameRow}>
+                          <Text style={styles.objectName}>{node.label || node.key}</Text>
+                          <StatusBadge
+                            tone={node.lifecycleState === "locked" ? "warn" : "ok"}
+                            label={node.lifecycleState === "locked" ? "锁定" : "活跃"}
+                          />
+                        </View>
+                        <Text style={styles.objectDesc} numberOfLines={1}>
+                          标识契约: {node.key}
+                        </Text>
+                        <View style={styles.objectMetaRow}>
+                          <Text style={styles.objectMetaTag}>{node.nodeTypeId || "业务实体"}</Text>
+                          <Text style={styles.objectMetaSep}>·</Text>
+                          <Text style={styles.objectMeta}>
+                            {Object.keys(node.properties || {}).length} 个属性
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.objectArrowWrap}>
+                        <Ionicons name="chevron-forward" size={16} color={C.ink3} />
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : (
+                <View style={styles.domainEmptyBox}>
+                  <View style={styles.domainEmptyIconBox}>
+                    <Text style={{ fontSize: 28 }}>{currentDomain.icon}</Text>
+                  </View>
+                  <Text style={styles.domainEmptyTitle}>
+                    本体域【{currentDomain.name}】已就绪
+                  </Text>
+                  <Text style={styles.domainEmptyDesc}>
+                    尚未建立独立实体节点。可在工坊会话中让 AI 辅助建模，或直接为该域派发工作任务。
+                  </Text>
+                  <View style={styles.domainEmptyActionRow}>
+                    <Pressable
+                      style={[styles.actionBtnPrimary, { flex: undefined, paddingHorizontal: 16 }]}
+                      onPress={() => handleEvolveDomainInChat(currentDomain)}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.actionBtnPrimaryText}>工坊</Text>
+                    </Pressable>
+                    <Pressable
+                      style={[styles.actionBtnSecondary, { flex: undefined, paddingHorizontal: 16 }]}
+                      onPress={() => handleDispatchForDomain(currentDomain)}
+                      accessibilityRole="button"
+                    >
+                      <Text style={styles.actionBtnSecondaryText}>派单</Text>
+                    </Pressable>
+                    {currentDomain.rawDomain ? (
+                      <Pressable
+                        style={[styles.actionBtnSecondary, { flex: undefined, paddingHorizontal: 16 }]}
+                        onPress={() => handleSeedSamples(currentDomain)}
+                        accessibilityRole="button"
+                      >
+                        <Text style={[styles.actionBtnSecondaryText, { color: C.accent }]}>样本</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                </View>
+              )}
+            </View>
+          </>
         )}
       </ScrollView>
 
@@ -851,6 +1343,193 @@ export function AssetOntologyScreen({
                   onPress={() => setSelectedDataset(null)}
                   hitSlop={6}
                   testID="AssetOntology__DatasetAction__Close"
+                >
+                  <Text style={styles.actionBtnSecondaryText}>关闭</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Sheet>
+      )}
+
+      {/* 6. 业务本体实体 360 抽屉 */}
+      {selectedDomainNode && (
+        <Sheet
+          onClose={() => setSelectedDomainNode(null)}
+          title={`实体 360 · ${selectedDomainNode.label || selectedDomainNode.key}`}
+        >
+          <View style={styles.sheetBody}>
+            <View style={styles.sheetHeaderCard}>
+              <View style={styles.sheetIconRow}>
+                <View style={styles.sheetIconBox}>
+                  <Text style={{ fontSize: 22 }}>⬡</Text>
+                </View>
+                <View style={{ flex: 1, marginLeft: 12 }}>
+                  <Text style={styles.sheetTitle}>{selectedDomainNode.label || selectedDomainNode.key}</Text>
+                  <Text style={styles.sheetCategory}>
+                    契约键: {selectedDomainNode.key} · {currentDomain.name}
+                  </Text>
+                </View>
+                <StatusBadge
+                  tone={selectedDomainNode.lifecycleState === "locked" ? "warn" : "ok"}
+                  label={selectedDomainNode.lifecycleState === "locked" ? "锁定" : "活跃"}
+                />
+              </View>
+            </View>
+
+            {/* 实体属性清单 */}
+            <View style={styles.lineageBlock}>
+              <Text style={styles.blockTitle}>实体属性字段 (PROPERTIES)</Text>
+              {selectedDomainNode.properties && Object.keys(selectedDomainNode.properties).length > 0 ? (
+                <View style={styles.specGrid}>
+                  {Object.entries(selectedDomainNode.properties).map(([k, v]) => (
+                    <View key={k} style={styles.specItem}>
+                      <Text style={styles.specLabel}>{k}</Text>
+                      <Text style={styles.specValue} numberOfLines={1}>
+                        {typeof v === "object" ? JSON.stringify(v) : String(v)}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text style={styles.emptyInstanceText}>暂无附加自定义属性</Text>
+              )}
+            </View>
+
+            {/* 局部因果关联 */}
+            <View style={styles.lineageBlock}>
+              <Text style={styles.blockTitle}>局部一跳因果关联 (RELATIONS)</Text>
+              {(() => {
+                const incidentEdges = (domainSnapshot?.edges || []).filter(
+                  (e) => e.sourceNodeId === selectedDomainNode.id || e.targetNodeId === selectedDomainNode.id,
+                );
+                if (incidentEdges.length === 0) {
+                  return <Text style={styles.emptyInstanceText}>当前实体尚无关联因果边</Text>;
+                }
+                return (
+                  <View style={styles.instanceList}>
+                    {incidentEdges.slice(0, 5).map((edge) => (
+                      <View key={edge.id} style={styles.instanceRow}>
+                        <Ionicons name="git-network-outline" size={14} color={C.accent} />
+                        <Text style={styles.instanceTitle} numberOfLines={1}>
+                          {edge.relationKey || "关联"} → {edge.targetNodeId === selectedDomainNode.id ? edge.sourceNodeId : edge.targetNodeId}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                );
+              })()}
+            </View>
+
+            {/* 操作动词 */}
+            <View style={styles.actionBlock}>
+              <Text style={styles.blockTitle}>业务操作动词 (ACTIONS)</Text>
+              <View style={styles.actionButtonsRow}>
+                <Pressable
+                  style={styles.actionBtnPrimary}
+                  onPress={() => {
+                    const nodeLabel = selectedDomainNode.label || selectedDomainNode.key;
+                    setSelectedDomainNode(null);
+                    onNavigateToChat?.(`Hermes 请为实体【${nodeLabel}】推进关联业务工单与提案`);
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.actionBtnPrimaryText}>工坊</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.actionBtnSecondary}
+                  onPress={() => {
+                    setSelectedDomainNode(null);
+                    handleDispatchForDomain(currentDomain);
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.actionBtnSecondaryText}>派单</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.actionBtnSecondary}
+                  onPress={() => setSelectedDomainNode(null)}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.actionBtnSecondaryText}>关闭</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Sheet>
+      )}
+
+      {/* 7. 本体领域总表管理与切换抽屉 */}
+      {domainSheetVisible && (
+        <Sheet
+          onClose={() => setDomainSheetVisible(false)}
+          title="本体领域总表"
+        >
+          <View style={styles.sheetBody}>
+            <Text style={styles.sheetDescText}>
+              以活体业务本体为控制中枢，支持多领域实体模型管理与状态切换。
+            </Text>
+            <View style={styles.instanceList}>
+              {domains.map((dom) => {
+                const isCur = dom.id === activeDomainId;
+                return (
+                  <Pressable
+                    key={dom.id}
+                    style={[
+                      styles.domainManageCard,
+                      isCur && styles.domainManageCardActive,
+                    ]}
+                    onPress={() => {
+                      setActiveDomainId(dom.id);
+                      setDomainSheetVisible(false);
+                    }}
+                    accessibilityRole="button"
+                    testID={`AssetOntology__DomainManageItem__${dom.id}`}
+                  >
+                    <View style={styles.domainManageIconBox}>
+                      <Text style={{ fontSize: 18 }}>{dom.icon}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                        <Text style={styles.domainManageName}>{dom.name}</Text>
+                        <StatusBadge
+                          tone={dom.lifecycleState === "locked" ? "warn" : "ok"}
+                          label={dom.lifecycleState === "locked" ? "锁定" : dom.isSystem ? "中枢" : "活跃"}
+                        />
+                      </View>
+                      <Text style={styles.domainManageDesc} numberOfLines={1}>
+                        {dom.description}
+                      </Text>
+                      <Text style={styles.domainManageMeta}>
+                        {dom.category} · {dom.nodeCount} 实体 · {dom.edgeCount} 连线
+                      </Text>
+                    </View>
+                    <View style={[styles.domainSelectPill, isCur && styles.domainSelectPillActive]}>
+                      <Text style={[styles.domainSelectPillText, isCur && styles.domainSelectPillTextActive]}>
+                        {isCur ? "当前" : "进入"}
+                      </Text>
+                    </View>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+            <View style={styles.actionBlock}>
+              <View style={styles.actionButtonsRow}>
+                <Pressable
+                  style={styles.actionBtnPrimary}
+                  onPress={() => {
+                    setDomainSheetVisible(false);
+                    onNavigateToChat?.("Hermes 请为当前企业规划并创建新的业务本体领域 (Ontology Domain)");
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.actionBtnPrimaryText}>工坊</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.actionBtnSecondary}
+                  onPress={() => setDomainSheetVisible(false)}
+                  accessibilityRole="button"
                 >
                   <Text style={styles.actionBtnSecondaryText}>关闭</Text>
                 </Pressable>
@@ -1326,5 +2005,207 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: "600",
     color: C.accent,
+  },
+  domainSelectorWrap: {
+    backgroundColor: ELEVATION.raised,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+    padding: SPACING.md,
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  domainSelectorHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  domainHeaderTitleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  domainSelectorTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.ink3,
+    letterSpacing: 0.5,
+  },
+  domainCountBadge: {
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: RADIUS.pill,
+  },
+  domainCountBadgeText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: C.accent,
+  },
+  domainManageBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: RADIUS.pill,
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+  },
+  domainManageBtnText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: C.ink2,
+  },
+  domainChipsScroll: {
+    gap: 8,
+    paddingVertical: 2,
+  },
+  domainChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: RADIUS.pill,
+    backgroundColor: "rgba(255, 255, 255, 0.04)",
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+  },
+  domainChipActive: {
+    backgroundColor: "rgba(94, 106, 210, 0.16)",
+    borderColor: C.accent,
+  },
+  domainChipIcon: {
+    fontSize: 13,
+  },
+  domainChipText: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: C.ink3,
+  },
+  domainChipTextActive: {
+    color: C.ink,
+    fontWeight: "600",
+  },
+  domainChipLockedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#EF4444",
+  },
+  domainActionRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginTop: SPACING.md,
+    paddingTop: SPACING.sm,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(255, 255, 255, 0.06)",
+  },
+  domainActionBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: RADIUS.md,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+  },
+  domainActionBtnAccent: {
+    backgroundColor: C.accent,
+  },
+  domainActionBtnText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  domainEmptyBox: {
+    alignItems: "center",
+    justifyContent: "center",
+    padding: SPACING.xl,
+    backgroundColor: ELEVATION.raised,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+    gap: SPACING.sm,
+  },
+  domainEmptyIconBox: {
+    width: 52,
+    height: 52,
+    borderRadius: RADIUS.pill,
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  domainEmptyTitle: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  domainEmptyDesc: {
+    fontSize: 12,
+    color: C.ink3,
+    textAlign: "center",
+    lineHeight: 18,
+    maxWidth: 280,
+  },
+  domainEmptyActionRow: {
+    flexDirection: "row",
+    gap: 10,
+    marginTop: 8,
+  },
+  domainManageCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    padding: SPACING.md,
+    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+  },
+  domainManageCardActive: {
+    backgroundColor: "rgba(94, 106, 210, 0.10)",
+    borderColor: C.accent,
+  },
+  domainManageIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: RADIUS.sm,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  domainManageName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  domainManageDesc: {
+    fontSize: 11,
+    color: C.ink3,
+    marginTop: 2,
+  },
+  domainManageMeta: {
+    fontSize: 10,
+    color: C.ink4,
+    marginTop: 2,
+  },
+  domainSelectPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: RADIUS.pill,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+  },
+  domainSelectPillActive: {
+    backgroundColor: C.accent,
+  },
+  domainSelectPillText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: C.ink2,
+  },
+  domainSelectPillTextActive: {
+    color: "#FFFFFF",
   },
 });

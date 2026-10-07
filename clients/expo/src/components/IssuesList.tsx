@@ -101,7 +101,8 @@ export interface IssuesListProps {
 const ISSUE_ROW_HEIGHT = 64;
 const ROW_STRIDE = ISSUE_ROW_HEIGHT + SPACING.sm;
 
-const issueKey = (issue: Issue) => issue.id;
+const issueKey = (issue: Issue, index?: number) =>
+  issue?.id ? String(issue.id) : `issue-fallback-${index ?? 0}`;
 
 export function IssuesList({
   issues,
@@ -476,21 +477,20 @@ function FlatView({
   // wave286: 距底 ≈10 行槽预取 (REQ-NAT-003); 虚拟化参数冻结 (REQ-NFR-004)。
   const { onListLayout, threshold } = useEndReachedThreshold();
 
+  const safeIssues = useMemo(
+    () => issues.filter((item): item is Issue => Boolean(item && item.id)),
+    [issues],
+  );
+
   return (
     <FlatList
       style={styles.fill}
-      data={issues}
+      data={safeIssues}
       keyExtractor={issueKey}
       renderItem={renderItem}
-      getItemLayout={(_, index) => ({
-        length: ROW_STRIDE,
-        offset: ROW_STRIDE * index,
-        index,
-      })}
-      windowSize={5}
-      initialNumToRender={10}
-      maxToRenderPerBatch={8}
-      removeClippedSubviews
+      windowSize={7}
+      initialNumToRender={12}
+      maxToRenderPerBatch={10}
       nestedScrollEnabled
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
@@ -535,7 +535,7 @@ function SectionsView({
       groups.map((group) => ({
         key: group.key,
         label: group.label,
-        data: group.items,
+        data: group.items.filter((item): item is Issue => Boolean(item && item.id)),
       })),
     [groups],
   );
@@ -570,10 +570,9 @@ function SectionsView({
       renderItem={renderItem}
       renderSectionHeader={renderSectionHeader}
       stickySectionHeadersEnabled
-      windowSize={5}
-      initialNumToRender={10}
-      maxToRenderPerBatch={8}
-      removeClippedSubviews
+      windowSize={7}
+      initialNumToRender={12}
+      maxToRenderPerBatch={10}
       nestedScrollEnabled
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"

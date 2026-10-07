@@ -42,15 +42,15 @@ export const IssueRow = memo(function IssueRow({
   timestamp?: string | Date | null;
   showStatusLabel?: boolean;
 }) {
-  const color = issueStatusColor(issue.status);
-  const done = issue.status === "done";
-  const cancelled = issue.status === "cancelled";
-  const time = formatRelativeShort(timestamp ?? issue.updatedAt ?? issue.createdAt);
+  const color = issueStatusColor(issue?.status);
+  const done = issue?.status === "done";
+  const cancelled = issue?.status === "cancelled";
+  const time = formatRelativeShort(timestamp ?? issue?.updatedAt ?? issue?.createdAt);
 
-  const isBranch = !issue.isMilestone && !!issue.parentId && parentIssue?.isMilestone === true;
-  const isAdhoc = !issue.isMilestone && !!issue.parentId && parentIssue != null && parentIssue.isMilestone === false;
-  const showSpec = !!issue.specKind && (SPEC_KIND_BADGE as Record<string, string>)[issue.specKind] != null;
-  const identifier = issue.identifier ?? (issue.id ? `#${issue.id.slice(0, 5).toUpperCase()}` : null);
+  const isBranch = !issue?.isMilestone && !!issue?.parentId && parentIssue?.isMilestone === true;
+  const isAdhoc = !issue?.isMilestone && !!issue?.parentId && parentIssue != null && parentIssue.isMilestone === false;
+  const showSpec = !!issue?.specKind && (SPEC_KIND_BADGE as Record<string, string>)[issue.specKind] != null;
+  const identifier = issue?.identifier ?? (issue?.id ? `#${String(issue.id).slice(0, 5).toUpperCase()}` : null);
 
   return (
     <Pressable
@@ -59,8 +59,8 @@ export const IssueRow = memo(function IssueRow({
       onLongPress={onLongPress ? () => onLongPress(issue) : undefined}
       delayLongPress={350}
       accessibilityRole="button"
-      accessibilityLabel={issue.title}
-      accessibilityHint={onLongPress && issue.isMilestone ? "长按可聚焦下钻此主线" : undefined}
+      accessibilityLabel={issue?.title ?? "任务"}
+      accessibilityHint={onLongPress && issue?.isMilestone ? "长按可聚焦下钻此主线" : undefined}
     >
       <View
         style={[
@@ -82,7 +82,7 @@ export const IssueRow = memo(function IssueRow({
         style={[styles.title, cancelled && styles.titleCancelled]}
         numberOfLines={2}
       >
-        {issue.title}
+        {issue?.title ?? "（无标题任务）"}
       </Text>
 
       {issue.isMilestone ? (

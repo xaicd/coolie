@@ -282,6 +282,34 @@ assertRule(
   'TERMINOLOGY.md 丢失 Dev 与 Prod 环境定位与项目边界定义',
 );
 
+console.log('\n🚀 11. 移动端版本决策与静默热更人机工程守卫 (wave360):');
+const appVersionTs = fs.readFileSync('clients/expo/src/AppVersion.ts', 'utf8');
+const otaTs = fs.readFileSync('clients/expo/src/OTA.ts', 'utf8');
+
+assertRule(
+  '原生 versionCode 优先门禁: localCode >= info.versionCode 绝对不弹整包升级',
+  appVersionTs.includes('localCode >= info.versionCode'),
+  'AppVersion.ts 缺失 localCode >= info.versionCode 原生优先判定',
+);
+
+assertRule(
+  'OTA 原生运行时对齐判定: isNativeAheadOfManifest 必须支持 fingerprint 对齐直接兼容',
+  appVersionTs.includes('nativeRuntime.trim() === manifestRuntime.trim()'),
+  'AppVersion.ts 丢失 fingerprint 运行时对齐判定，将导致同哈希误报升级',
+);
+
+assertRule(
+  'OTA 增量静默压制: 具备 OTA 能力时压制整包 APK 弹窗打扰',
+  appVersionTs.includes('otaCapable'),
+  'AppVersion.ts 丢失 OTA 覆盖压制逻辑',
+);
+
+assertRule(
+  'OTA 重启提示防刷防重与两字按钮规范: promptRestart 具备会话防重与【稍后】/【重启】按钮',
+  otaTs.includes('promptedSessionUpdateId') && otaTs.includes('重启'),
+  'OTA.ts 缺失会话防重或两字按钮规范',
+);
+
 console.log('\n========================================================================');
 if (failed) {
   console.error('🚫 全面管局审计未通过！存在不符合高管治理规范的阻断项，请修复后重试。');

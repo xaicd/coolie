@@ -226,7 +226,7 @@ function AppUpdateCard({ info, onClose }: { info: RemoteVersionInfo; onClose: ()
   }
 
   return (
-    <View style={styles.updateBanner}>
+    <View style={styles.updateBanner} testID="App__UpdateCard__Banner">
       <View style={{ flex: 1 }}>
         <Text style={styles.updateTitle}>📦 新版本 v{info.version}</Text>
         {info.releaseNotes ? (
@@ -236,6 +236,7 @@ function AppUpdateCard({ info, onClose }: { info: RemoteVersionInfo; onClose: ()
         ) : null}
       </View>
       <Pressable
+        testID="App__UpdateCard__DownloadBtn"
         style={[styles.updateBtn, downloading && styles.btnDisabled]}
         disabled={downloading}
         onPress={async () => {
@@ -247,7 +248,7 @@ function AppUpdateCard({ info, onClose }: { info: RemoteVersionInfo; onClose: ()
       >
         <Text style={styles.updateBtnText}>{downloading ? "拉起中…" : "升级"}</Text>
       </Pressable>
-      <Pressable onPress={onClose} hitSlop={8}>
+      <Pressable testID="App__UpdateCard__CloseBtn" onPress={onClose} hitSlop={8}>
         <Ionicons name="close" size={18} color={C.ink4} />
       </Pressable>
     </View>
@@ -1372,12 +1373,14 @@ function HomeScreen({
             selected ? (
               taskDetail
             ) : (
-              <TaskKanbanScreen
-                company={company}
-                refreshToken={tasksRefreshToken}
-                initialProjectId={tasksFilterProjectId}
-                onOpenIssue={setSelected}
-              />
+              <ScreenErrorBoundary fallbackTitle="任务看板加载异常">
+                <TaskKanbanScreen
+                  company={company}
+                  refreshToken={tasksRefreshToken}
+                  initialProjectId={tasksFilterProjectId}
+                  onOpenIssue={setSelected}
+                />
+              </ScreenErrorBoundary>
             )
           ) : null}
         </View>

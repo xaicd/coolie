@@ -225,10 +225,11 @@ export function TaskKanbanScreen({
   );
 
   const visible = useMemo(() => {
-    const filtered = issues.filter((issue) => {
+    const filtered = (issues ?? []).filter((issue): issue is Issue => {
+      if (!issue || !issue.id) return false;
       if (selection.search) {
         const q = selection.search.toLowerCase();
-        if (!issue.title.toLowerCase().includes(q)) return false;
+        if (!(issue.title ?? "").toLowerCase().includes(q)) return false;
       }
       if (selection.assignee !== "all" && issue.assigneeAgentId !== selection.assignee)
         return false;
@@ -255,12 +256,14 @@ export function TaskKanbanScreen({
       const f = selection.sortField;
       if (f === "title") {
         return selection.sortDir === "asc"
-          ? a.title.localeCompare(b.title)
-          : b.title.localeCompare(a.title);
+          ? (a?.title ?? "").localeCompare(b?.title ?? "", "zh-Hans-CN")
+          : (b?.title ?? "").localeCompare(a?.title ?? "", "zh-Hans-CN");
       }
-      const ta = new Date(f === "created" ? a.createdAt ?? 0 : a.updatedAt ?? 0).getTime();
-      const tb = new Date(f === "created" ? b.createdAt ?? 0 : b.updatedAt ?? 0).getTime();
-      return selection.sortDir === "asc" ? ta - tb : tb - ta;
+      const ta = new Date(f === "created" ? a?.createdAt ?? 0 : a?.updatedAt ?? 0).getTime();
+      const tb = new Date(f === "created" ? b?.createdAt ?? 0 : b?.updatedAt ?? 0).getTime();
+      const safeTa = Number.isNaN(ta) ? 0 : ta;
+      const safeTb = Number.isNaN(tb) ? 0 : tb;
+      return selection.sortDir === "asc" ? safeTa - safeTb : safeTb - safeTa;
     });
     return focused;
   }, [issues, selection, projects, focusMainlineId]);

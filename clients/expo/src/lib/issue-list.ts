@@ -65,7 +65,8 @@ export function isToday(input?: string | Date | null): boolean {
 
 function matchesSearch(issue: Issue, needle: string): boolean {
   if (!needle) return true;
-  return [issue.title, issue.identifier ?? "", issue.id].some((value) =>
+  if (!issue) return false;
+  return [issue.title ?? "", issue.identifier ?? "", issue.id ?? ""].some((value) =>
     value.toLowerCase().includes(needle),
   );
 }
@@ -79,22 +80,25 @@ function sortIssues(
   return [...list].sort((a, b) => {
     let cmp: number;
     if (field === "title") {
-      cmp = a.title.localeCompare(b.title, "zh-Hans-CN");
+      cmp = (a?.title ?? "").localeCompare(b?.title ?? "", "zh-Hans-CN");
     } else if (field === "created") {
-      cmp = timeMs(a.createdAt) - timeMs(b.createdAt);
+      cmp = timeMs(a?.createdAt) - timeMs(b?.createdAt);
     } else {
       cmp =
-        timeMs(a.updatedAt ?? a.createdAt) - timeMs(b.updatedAt ?? b.createdAt);
+        timeMs(a?.updatedAt ?? a?.createdAt) - timeMs(b?.updatedAt ?? b?.createdAt);
     }
-    if (cmp === 0) cmp = a.id.localeCompare(b.id);
+    if (cmp === 0) cmp = (a?.id ?? "").localeCompare(b?.id ?? "");
     return sign * cmp;
   });
 }
 
 /** 搜索 + 范围 + 状态/指派/项目筛选 + 排序, 一步得到要渲染的任务。 */
 export function selectIssues(issues: Issue[], sel: IssueSelection): Issue[] {
-  const needle = sel.search.trim().toLowerCase();
-  let list = issues.filter((issue) => matchesSearch(issue, needle));
+  const needle = (sel.search ?? "").trim().toLowerCase();
+  let list = (issues ?? []).filter((issue): issue is Issue => Boolean(issue && issue.id));
+  if (needle) {
+    list = list.filter((issue) => matchesSearch(issue, needle));
+  }
 
   if (sel.scope === "focus") {
     list = list.filter(

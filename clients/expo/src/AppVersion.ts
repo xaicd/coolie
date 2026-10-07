@@ -27,9 +27,15 @@ export function localVersion(): string {
 }
 
 export function localVersionCode(): number {
-  // android.versionCode 由原生 BuildConfig 提供；退化用版本字符串
-  const native = (Constants as Record<string, any>).manifest?.androidConfig?.versionCode;
-  const fromNative = Number(native);
+  // android.versionCode 由原生 BuildConfig/expoConfig 提供；退化用版本字符串
+  const c = Constants as Record<string, any>;
+  const cand =
+    c.platform?.android?.versionCode ??
+    c.nativeBuildVersion ??
+    c.expoConfig?.android?.versionCode ??
+    c.manifest?.androidConfig?.versionCode ??
+    c.manifest2?.extra?.expoClient?.android?.versionCode;
+  const fromNative = Number(cand);
   if (Number.isFinite(fromNative) && fromNative > 0) return fromNative;
   const parts = localVersion().split(".").map((p) => parseInt(p, 10) || 0);
   return parts[0] * 10000 + parts[1] * 100 + parts[2];
@@ -54,16 +60,20 @@ function isFingerprint(val: string | null | undefined): boolean {
 
 /**
  * 比较本机原生 runtime 与远端 OTA manifest 的 runtimeVersion。
- *   本机 >= 远端 → 视为「已是最新」(native 已能加载现网 bundle, 无意义再升)
- *   本机 < 远端  → 远端声明更新 (但仅作信号, 不在本函数内触发下载)
+ *   本机 == 远端 → 视为「完全兼容/已是最新」(native 能无缝加载现网 bundle, 优先走静默 OTA)
+ *   本机 >= 远端 (semver) → 视为「已是最新」(native 已能加载现网 bundle)
+ *   本机 != 远端 (fingerprint) → 发生原生断代，必须整包升级 APK
  *
- * wave302 修复:
- * 当 runtimeVersion 采用 policy=fingerprint（40 位哈希）时，不能走 cmpVersion 做数值比较！
- * 1. 如果任一方或双方是 fingerprint，不可比较大小，不压制更新（返回 false）。
- * 2. 只有当二者均为传统的纯 semver（如 "0.6.10" vs "0.6.8"）时，才执行 cmpVersion 比较。
+ * wave302 / wave360 修复:
+ * 1. 无论是 fingerprint 还是 semver，只要两端完全一致，即代表原生环境完全对齐，返回 true 允许 OTA 接管。
+ * 2. 只有当 fingerprint 不匹配时才判定无法 OTA（返回 false），迫使整包升级。
+ * 3. 双方均为标准 semver 时，按 cmpVersion 比较大小。
  */
 export function isNativeAheadOfManifest(nativeRuntime: string | null, manifestRuntime: string | null): boolean {
   if (!nativeRuntime || !manifestRuntime) return false;
+  if (nativeRuntime.trim() === manifestRuntime.trim()) {
+    return true;
+  }
   if (isFingerprint(nativeRuntime) || isFingerprint(manifestRuntime)) {
     return false;
   }
@@ -111,15 +121,14 @@ export function fetchVersionJson(): Promise<RemoteVersionInfo | null> {
   return cachedVersionJson;
 }
 
-/** 检查远端新版本（静默失败返回无更新）。
+/** 检查是否需要整包下载升级 APK/原生包（静默失败返回无更新）。
  *
- * wave243 增量: 本机原生 runtime (Updates.runtimeVersion) 已 ≥ 远端 OTA
- * manifest 的 runtimeVersion 时, 即便 version.json 的 version 字符串更高
- * (常见于 OTA 跟 APK bump 抢跑 — 远端 manifest 还没重推), 也按「无更新」处理,
- * 不显示升级提示卡。native 已是 upgrade 卡的真值边界 (boss 09-30 实测:
- * 装了 0.6.10 真机被提示升级到 0.6.8, 因为 Constants.expoConfig.version
- * 在 OTA 加载后被回写成 0.6.8, 而 version.json 同样是 0.6.8; 升级链路看
- * 不到 native 0.6.10 已 bump 这一事实)。
+ * 核心设计契约 (wave360 极简人机工程学):
+ * 1. 本地原生装机包 versionCode 已追平或超前远端 info.versionCode 时，绝对判定为无更新，彻底根除刚装完新包仍弹升级提示的严重负体验。
+ * 2. 远端 minSupportedVersionCode 强制原生断代时，触发 forceUpdate。
+ * 3. 远端有更高版本时，优先感知 OTA 能力：若设备支持 OTA 且原生 runtimeVersion 与远端 OTA manifest 对齐，
+ *    则升级由后台静默 OTA 接管，绝不弹窗打扰用户去浏览器下载 80MB 的整包 APK！
+ * 4. 只有在 OTA 未启用、或 OTA 原生运行时断代无法热更时，才展示整包 APK 升级卡片。
  */
 export async function checkAppVersion(
   endpoint = DEFAULT_VERSION_ENDPOINT,
@@ -130,11 +139,33 @@ export async function checkAppVersion(
   if (!info) {
     return { updateAvailable: false, forceUpdate: false, info: null };
   }
-  // 先按 version.json 算是否有新版 (旧逻辑); 再用 OTA manifest 做 native
-  // 边界压制 — 两个信号都允许「已是最新」才算无更新。
-  const newerByJson = cmpVersion(info.version, localVersion()) > 0;
-  let nativeAhead = false;
-  if (newerByJson) {
+
+  const localCode = localVersionCode();
+  const localVer = localVersion();
+
+  // 1. 本地原生 versionCode 已大于等于远端发布包 versionCode：说明本地装机包已是最新的，绝对不弹 APK 升级
+  if (typeof info.versionCode === "number" && localCode >= info.versionCode) {
+    return { updateAvailable: false, forceUpdate: false, info };
+  }
+
+  // 2. 远端强制最低版本限制：本地低于 minSupportedVersionCode 必须整包强制升级
+  if (
+    typeof info.minSupportedVersionCode === "number" &&
+    localCode < info.minSupportedVersionCode
+  ) {
+    return { updateAvailable: true, forceUpdate: true, info };
+  }
+
+  // 3. 远端版本号字符串比对
+  const newerByJson = cmpVersion(info.version, localVer) > 0;
+  if (!newerByJson) {
+    return { updateAvailable: false, forceUpdate: false, info };
+  }
+
+  // 4. 若启用了 OTA，优先检查远端 OTA manifest 能否覆盖此次更新
+  //    如果本机原生 runtime 与远端 OTA manifest 对齐（isNativeAheadOfManifest 为 true），
+  //    则该更新可通过静默 OTA 增量完成，无需打扰用户去浏览器下载整包 APK！
+  if (Updates.isEnabled) {
     try {
       const manifestUrl = (Constants.expoConfig as { updates?: { url?: string } } | undefined)
         ?.updates?.url;
@@ -146,20 +177,21 @@ export async function checkAppVersion(
         if (res.ok) {
           const m = (await res.json()) as { runtimeVersion?: string };
           if (typeof m.runtimeVersion === "string") {
-            nativeAhead = isNativeAheadOfManifest(nativeRuntimeVersion(), m.runtimeVersion);
+            const otaCapable = isNativeAheadOfManifest(nativeRuntimeVersion(), m.runtimeVersion);
+            if (otaCapable) {
+              // OTA 能够无缝热更此版本，压制整包 APK 弹窗
+              return { updateAvailable: false, forceUpdate: false, info };
+            }
           }
         }
       }
     } catch {
-      // manifest 拉不到时回退到纯 version.json 判断 (旧行为)
+      // manifest 拉取异常时，降级按纯 version.json 判定
     }
   }
-  const newer = newerByJson && !nativeAhead;
-  const force =
-    newer
-    && typeof info.minSupportedVersionCode === "number"
-    && localVersionCode() < info.minSupportedVersionCode;
-  return { updateAvailable: newer, forceUpdate: force, info };
+
+  // 5. OTA 未启用，或原生 runtimeVersion 不匹配（发生了原生代码断代），必须整包下载 APK
+  return { updateAvailable: true, forceUpdate: false, info };
 }
 
 /** 拉起系统下载（浏览器/APK 安装器接管） */
