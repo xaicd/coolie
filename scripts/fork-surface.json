@@ -1494,6 +1494,18 @@
       "maxNetLines": 40,
       "reason": "wave284: Tiejiang Core SWE toolkit script for code integrity guard.",
       "maxTotalLines": 50
+    },
+    {
+      "path": "scripts/lib/dispatch-dedup-check.mjs",
+      "maxNetLines": 80,
+      "reason": "wave358: PRE-SRE dispatch dedup checker helper for local employee dispatch bus.",
+      "maxTotalLines": 100
+    },
+    {
+      "path": "scripts/lib/dispatch-dedup-check.test.mjs",
+      "maxNetLines": 320,
+      "reason": "wave358: Test suite for dispatch dedup checker helper.",
+      "maxTotalLines": 350
     }
   ]
 }

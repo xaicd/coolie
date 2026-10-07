@@ -20,6 +20,7 @@ import {
   type AgentConfiguration,
   type AgentRow,
   type AgentSkillsSnapshot,
+  type HeartbeatRunRow,
 } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
 import { AppCard } from "../ui/AppCard";
@@ -40,6 +41,26 @@ const STATUS_LABEL: Record<string, string> = {
   pending_approval: "待审批",
   disabled: "停用",
 };
+
+const RUN_STATUS_LABEL: Record<string, string> = {
+  succeeded: "成功",
+  running: "运行",
+  queued: "排队",
+  failed: "失败",
+  timed_out: "超时",
+  cancelled: "取消",
+};
+
+function formatRunDuration(startStr?: string | null, endStr?: string | null): string | null {
+  if (!startStr) return null;
+  const start = new Date(startStr).getTime();
+  const end = endStr ? new Date(endStr).getTime() : Date.now();
+  if (isNaN(start) || isNaN(end)) return null;
+  const sec = Math.max(0, Math.round((end - start) / 1000));
+  if (sec < 60) return `${sec}秒`;
+  const min = Math.floor(sec / 60);
+  return `${min}分${sec % 60}秒`;
+}
 
 const STATUS_DOT: Record<string, "ok" | "idle" | "err"> = {
   active: "ok",
@@ -99,6 +120,7 @@ export function AgentDetailScreen({
   const [config, setConfig] = useState<AgentConfiguration | null>(null);
   const [assigned, setAssigned] = useState<Issue[]>([]);
   const [artifacts, setArtifacts] = useState<CompanyArtifact[]>([]);
+  const [runs, setRuns] = useState<HeartbeatRunRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -108,11 +130,12 @@ export function AgentDetailScreen({
       if (!silent) setLoading(true);
       setError(null);
       try {
-        const [skillsData, configData, issues, artifactRes] = await Promise.all([
+        const [skillsData, configData, issues, artifactRes, runsData] = await Promise.all([
           coolie.getAgentSkills(agent.id).catch(() => null),
           coolie.getAgentConfiguration(agent.id).catch(() => null),
           coolie.listIssues(company.id, { limit: 50 }).catch(() => [] as Issue[]),
           coolie.listArtifacts(company.id, { limit: 50 }).catch(() => ({ artifacts: [] })),
+          coolie.listHeartbeatRuns(company.id, agent.id, 5).catch(() => [] as HeartbeatRunRow[]),
         ]);
         setSkills(skillsData);
         setConfig(configData);
@@ -123,6 +146,7 @@ export function AgentDetailScreen({
           ),
         );
         setArtifacts(artifactRes.artifacts.filter((a) => a.createdByAgent?.id === agent.id));
+        setRuns(runsData);
       } catch (e) {
         setError(String((e as Error)?.message ?? e));
       } finally {
@@ -142,6 +166,7 @@ export function AgentDetailScreen({
   const currentTask = assigned.find((i) => i.status === "in_progress") ?? null;
   const recentTasks = assigned.slice(0, 5);
   const recentArtifacts = artifacts.slice(0, 5);
+  const recentRuns = runs.slice(0, 5);
 
   if (loading && assigned.length === 0 && !config && !skills) {
     return (
@@ -221,6 +246,55 @@ export function AgentDetailScreen({
             </AppCard>
           ) : (
             <Text style={styles.emptyText}>当前没有进行中的任务</Text>
+          )}
+        </View>
+
+        <View style={styles.section}>
+          <SectionHeader title="执行态势" count={recentRuns.length} />
+          {recentRuns.length === 0 ? (
+            <Text style={styles.emptyText}>暂无执行记录</Text>
+          ) : (
+            recentRuns.map((run) => {
+              const duration = formatRunDuration(run.startedAt, run.finishedAt);
+              const model = run.usageJson?.model || "默认模型";
+              const tokens =
+                run.usageJson?.totalTokens ||
+                (Number(run.usageJson?.inputTokens || 0) + Number(run.usageJson?.outputTokens || 0));
+              const cost = run.usageJson?.costUsd
+                ? `$${Number(run.usageJson.costUsd).toFixed(4)}`
+                : null;
+              const summary =
+                typeof run.resultJson?.summary === "string" && run.resultJson.summary.trim()
+                  ? run.resultJson.summary.trim().split("\n")[0]
+                  : (run.error || `${run.invocationSource || "自动"} 运行`);
+              const isOk = run.status === "succeeded";
+              const isErr = run.status === "failed" || run.status === "timed_out" || run.status === "cancelled";
+
+              return (
+                <AppCard key={run.id} variant="surface" row style={styles.row}>
+                  <StatusDot
+                    status={isOk ? "ok" : isErr ? "err" : "idle"}
+                    size={7}
+                    pulse={run.status === "running"}
+                  />
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <Text style={styles.rowTitle} numberOfLines={1}>
+                        {summary}
+                      </Text>
+                      <View style={[styles.runTag, isOk ? styles.runTagOk : isErr ? styles.runTagErr : styles.runTagIdle]}>
+                        <Text style={[styles.runTagText, isOk ? styles.runTagTextOk : isErr ? styles.runTagTextErr : styles.runTagTextIdle]}>
+                          {RUN_STATUS_LABEL[run.status] ?? "完成"}
+                        </Text>
+                      </View>
+                    </View>
+                    <Text style={styles.rowMeta}>
+                      {model}{duration ? ` · ${duration}` : ""}{tokens > 0 ? ` · ${tokens.toLocaleString()} tokens` : ""}{cost ? ` · ${cost}` : ""} · {formatRelativeTime(run.createdAt)}
+                    </Text>
+                  </View>
+                </AppCard>
+              );
+            })
           )}
         </View>
 
@@ -367,4 +441,29 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
   },
   chipText: { color: C.ink2, fontSize: 11 },
+  runTag: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+  },
+  runTagOk: {
+    backgroundColor: "rgba(39, 166, 68, 0.12)",
+    borderColor: "rgba(39, 166, 68, 0.3)",
+  },
+  runTagErr: {
+    backgroundColor: "rgba(239, 68, 68, 0.12)",
+    borderColor: "rgba(239, 68, 68, 0.3)",
+  },
+  runTagIdle: {
+    backgroundColor: "rgba(245, 158, 11, 0.12)",
+    borderColor: "rgba(245, 158, 11, 0.3)",
+  },
+  runTagText: {
+    fontSize: 10,
+    fontWeight: "600",
+  },
+  runTagTextOk: { color: C.ok },
+  runTagTextErr: { color: C.err },
+  runTagTextIdle: { color: C.warn },
 });

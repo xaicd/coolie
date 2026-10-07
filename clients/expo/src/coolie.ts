@@ -227,6 +227,33 @@ export interface LiveRunRow {
   adapterType?: string | null;
 }
 
+/** 历史执行运行记录 — GET /api/companies/:id/heartbeat-runs */
+export interface HeartbeatRunRow {
+  id: string;
+  agentId: string;
+  companyId: string;
+  status: "succeeded" | "failed" | "running" | "queued" | "cancelled" | "timed_out" | string;
+  invocationSource: string;
+  triggerDetail?: string | null;
+  startedAt?: string | null;
+  finishedAt?: string | null;
+  createdAt: string;
+  error?: string | null;
+  usageJson?: {
+    model?: string;
+    inputTokens?: number;
+    outputTokens?: number;
+    cachedInputTokens?: number;
+    totalTokens?: number;
+    costUsd?: number;
+    [key: string]: unknown;
+  } | null;
+  resultJson?: {
+    summary?: string;
+    [key: string]: unknown;
+  } | null;
+}
+
 /** 事件时间线活动者 */
 export interface WorkTimelineActor {
   id: string;
@@ -528,6 +555,21 @@ export class CoolieClient extends BaseCoolieClient {
     return this.request<LiveRunRow[]>(
       "GET",
       `/api/companies/${encodeURIComponent(companyId)}/live-runs`,
+    );
+  }
+
+  /** GET /api/companies/:id/heartbeat-runs — 历史运行审计列表 */
+  async listHeartbeatRuns(
+    companyId: string,
+    agentId?: string,
+    limit: number = 10,
+  ): Promise<HeartbeatRunRow[]> {
+    const qs = new URLSearchParams();
+    if (agentId) qs.set("agentId", agentId);
+    qs.set("limit", String(limit));
+    return this.request<HeartbeatRunRow[]>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/heartbeat-runs?${qs.toString()}`,
     );
   }
 

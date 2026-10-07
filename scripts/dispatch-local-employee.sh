@@ -773,6 +773,64 @@ fi
 started_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 write_receipt "running" "$$" "$started_iso" "" "" ""
 
+sync_dispatch_to_dev_server() {
+  local exec_status="$1"
+  local c_hash="${2:-}"
+  local s_iso="${3:-$started_iso}"
+  local e_iso="${4:-}"
+  local err_msg="${5:-}"
+
+  local dev_company="da2e705c-c80a-411b-b2ae-e39372b1251f"
+  local dev_agent_id=""
+
+  case "$AGENT" in
+    modou-fda) dev_agent_id="09af00a0-f1cd-4a17-8ef5-3a8bcba381d7" ;;
+    forge-core-swe|forge-ii-core-swe) dev_agent_id="02cab729-c5b7-4a14-9ce9-5a34885c336a" ;;
+    menshen-fdse) dev_agent_id="58dc794d-ae28-47f4-9e6e-5e798ef55df2" ;;
+    duidiyuan-pre-sre) dev_agent_id="8a288a46-8598-4c68-b52e-545360e11929" ;;
+    baixiaosheng-ds) dev_agent_id="58bb5a96-c241-4b35-babb-1cc1771d5dd5" ;;
+    hermes-pm) dev_agent_id="5419bef9-6b72-477b-a5e4-0fe19aac5b77" ;;
+    *) dev_agent_id="02cab729-c5b7-4a14-9ce9-5a34885c336a" ;;
+  esac
+
+  local payload
+  payload="$(node -e '
+    const status = process.argv[1];
+    const task = process.argv[2];
+    const tool = process.argv[3];
+    const commit = process.argv[4];
+    const started = process.argv[5];
+    const finished = process.argv[6];
+    const agentId = process.argv[7];
+    const err = process.argv[8];
+    console.log(JSON.stringify({
+      actorType: "agent",
+      actorId: "local-cli",
+      action: "tool_dispatch.executed",
+      entityType: "agent",
+      entityId: agentId,
+      agentId: agentId,
+      details: {
+        task,
+        tool,
+        status,
+        commit: commit || null,
+        startedAt: started || null,
+        finishedAt: finished || null,
+        error: err || null
+      }
+    }));
+  ' "$exec_status" "$TASK" "$TOOL" "$c_hash" "$s_iso" "$e_iso" "$dev_agent_id" "$err_msg" 2>/dev/null || true)"
+
+  if [[ -n "$payload" ]]; then
+    if [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
+      "$SCRIPT_DIR/host-exec.sh" "curl -s -X POST 'http://localhost:3100/api/companies/$dev_company/activity' -H 'Content-Type: application/json' -d '$payload' >/dev/null 2>&1" 2>/dev/null || true
+    elif command -v curl >/dev/null 2>&1; then
+      curl -s -X POST "http://localhost:3100/api/companies/$dev_company/activity" -H 'Content-Type: application/json' -d "$payload" >/dev/null 2>&1 || true
+    fi
+  fi
+}
+
 printf '[dispatch] running with pid=%s tool=%s (%s)...\n' "$$" "$TOOL" "$EXEC_ENV"
 if "${EXEC_CMD[@]}" < /dev/null; then
   completed_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
@@ -782,14 +840,17 @@ if "${EXEC_CMD[@]}" < /dev/null; then
   if ! node "$REPO_ROOT/scripts/check-governance-audit.mjs" >/dev/null 2>&1; then
     printf '[dispatch] 🚫 任务虽然退出但未通过全面管局审计 (两字按钮/对称底栏/CMMI产物违规)！标记为 blocked\n' >&2
     write_receipt "blocked" "$$" "$started_iso" "$completed_iso" "$latest_hash" "governance audit failed: pnpm check:governance"
+    sync_dispatch_to_dev_server "blocked" "$latest_hash" "$started_iso" "$completed_iso" "governance audit failed: pnpm check:governance"
     exit 2
   fi
 
   write_receipt "done" "$$" "$started_iso" "$completed_iso" "$latest_hash" ""
+  sync_dispatch_to_dev_server "done" "$latest_hash" "$started_iso" "$completed_iso" ""
   printf '[dispatch] execution completed & governance verified: status=done commit=%s\n' "$latest_hash"
 else
   failed_iso="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
   write_receipt "failed" "$$" "$started_iso" "$failed_iso" "" "execution exited with non-zero status"
+  sync_dispatch_to_dev_server "failed" "" "$started_iso" "$failed_iso" "execution exited with non-zero status"
   printf '[dispatch] execution failed: status=failed\n' >&2
   exit 1
 fi
