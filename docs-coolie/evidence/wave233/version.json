@@ -8,5 +8,5 @@
   "iosSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
   "iosTestFlightUrl": null,
   "releaseNotes": "wave358-359 ACP dispatch upgrade, agy credential auto-degrade, Palantir triple force governance, COOA-58 workshop tab crash fix",
-  "commitSha": "81469c6a894d31fe32bafe08d5c968f3146ba64d"
+  "commitSha": "d1d350e1c0bf2f580b9067e571f515a653c3f9df"
 }
