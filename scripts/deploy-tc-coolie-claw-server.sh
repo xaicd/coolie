@@ -49,6 +49,12 @@ rsync -az --delete \
   --exclude '/ui' \
   ./ "$SSH_TARGET:$REMOTE_DIR/"
 
+COMMIT_SHA="$(git rev-parse HEAD 2>/dev/null || echo '')"
+if [ -n "$COMMIT_SHA" ]; then
+  echo "写入生产版本指纹 commit: $COMMIT_SHA ..."
+  ssh "$SSH_TARGET" "echo '$COMMIT_SHA' > $REMOTE_DIR/.paperclip-build-commit"
+fi
+
 # 仅对 PAT 配置进行无损增量合并，绝不覆盖远端已有的 DATABASE_URL、SECRET 等生产关键变量
 if [ -f .env ]; then
   for key in GITEE_PAT GITHUB_PAT GIT_PAT GITEE_TOKEN GITHUB_TOKEN; do
