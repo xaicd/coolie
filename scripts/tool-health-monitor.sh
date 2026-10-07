@@ -248,7 +248,7 @@ try {
 
   # 1. agy probe (wave358: 替换 smart_probe_artisan_tool agy-gemini3.8,
   #    新探针内置凭据状态 + 真跑错误捕获, 输出可能含 cooldown / warn / ok / fail)
-  IFS=$'\t' read -r agy_status agy_latency agy_reason agy_expires_at agy_token_state <<< "$(probe_agy 2>&1 || true)"
+  IFS=$'\t' read -r agy_status agy_latency agy_reason agy_expires_at <<< "$(probe_agy 2>&1 || true)"
 
   # 2. claude-glm probe
   IFS=$'\t' read -r glm_status glm_latency glm_reason <<< "$(smart_probe_claude glm)"
@@ -268,10 +268,8 @@ try {
   # 7. kiro-cli probe
   IFS=$'\t' read -r kiro_status kiro_latency kiro_reason <<< "$(smart_probe_artisan_tool kiro-cli)"
 
-  # 取 expiry 字段 (来自 agy-token-state 的 token_expiry)
-  if [[ "${agy_token_state:-}" == "ok" || "${agy_token_state:-}" == "expiring" ]]; then
-    agy_expires_at="$(agy_token_status 2 2>/dev/null | awk -F'\t' '{print $3}' || true)"
-  fi
+  # 注意: probe_agy 已输出 expires_at_iso 至第 4 字段, agy_expires_at 直接复用,
+  #       无需再次探测 token_state (wave358 PRE-SRE 遗留清理)
 
   node -e '
 const fs = require("fs");
