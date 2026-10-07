@@ -136,6 +136,7 @@ export function AssetOntologyScreen({
   const [domainSnapshot, setDomainSnapshot] = useState<OntologyGraphSnapshot | null>(null);
   const [loadingSnapshot, setLoadingSnapshot] = useState(false);
   const [domainSheetVisible, setDomainSheetVisible] = useState(false);
+  const [graphSheetVisible, setGraphSheetVisible] = useState(false);
   const [selectedDomainNode, setSelectedDomainNode] = useState<OntologyGraphNode | null>(null);
 
   const [selectedObject, setSelectedObject] = useState<LivingObjectItem | null>(null);
@@ -226,20 +227,28 @@ export function AssetOntologyScreen({
       ];
 
       for (const d of curDomains) {
-        const matchProject = curProjects.find(
-          (p) =>
-            p.name === (d.displayName || d.display_name || d.slug) ||
-            (p as any)?.metadata?.domainId === d.id,
-        );
+        const dName = (d.displayName || (d as any).display_name || d.slug || "").trim();
+        const matchProject = curProjects.find((p) => {
+          const pName = (p.name || "").trim();
+          if (!pName) return false;
+          return (
+            pName === dName ||
+            pName === d.slug ||
+            (p as any)?.metadata?.domainId === d.id ||
+            (p as any)?.metadata?.domainSlug === d.slug ||
+            (dName && (pName.includes(dName) || dName.includes(pName))) ||
+            (d.description && d.description.includes(pName))
+          );
+        });
         domainItems.push({
           id: d.id,
-          name: d.displayName || d.display_name || d.slug || "业务本体域",
+          name: d.displayName || (d as any).display_name || d.slug || "业务本体域",
           slug: d.slug,
           category: d.category || "业务领域",
           icon: d.icon || "⬡",
           isSystem: false,
           description: d.description || "项目业务对象孪生与因果动作闭环",
-          lifecycleState: (d.lifecycleState || d.lifecycle_state || "active") as any,
+          lifecycleState: (d.lifecycleState || (d as any).lifecycle_state || "active") as any,
           nodeCount: (d as any).nodeCount ?? (d as any).typeCount ?? 0,
           edgeCount: (d as any).edgeCount ?? 0,
           rawDomain: d,
@@ -251,7 +260,7 @@ export function AssetOntologyScreen({
       for (const p of curProjects) {
         const slug = p.name.toLowerCase().replace(/[^a-z0-9_-]+/g, "_");
         const exists = domainItems.some(
-          (item) => item.projectId === p.id || item.slug === slug || item.id === p.id,
+          (item) => item.projectId === p.id || item.name.includes(p.name) || p.name.includes(item.name),
         );
         if (!exists) {
           domainItems.push({
@@ -271,7 +280,29 @@ export function AssetOntologyScreen({
         }
       }
 
-      setDomains(domainItems);
+      // 最高工程法典与老板铁律：优先展示已经关联项目的本体靠左！
+      const sortedDomains = [...domainItems].sort((a, b) => {
+        const aHasProj = Boolean(a.projectId);
+        const bHasProj = Boolean(b.projectId);
+        if (aHasProj && !bHasProj) return -1;
+        if (!aHasProj && bHasProj) return 1;
+        if (aHasProj && bHasProj) {
+          return (a.name || "").localeCompare(b.name || "", "zh-CN");
+        }
+        if (a.isSystem) return -1;
+        if (b.isSystem) return 1;
+        return 0;
+      });
+
+      setDomains(sortedDomains);
+      // 默认选中最靠左侧已关联项目的核心本体域
+      setActiveDomainId((prev) => {
+        if (prev && prev !== "__system__" && sortedDomains.some((d) => d.id === prev)) {
+          return prev;
+        }
+        const firstWithProject = sortedDomains.find((d) => Boolean(d.projectId));
+        return firstWithProject ? firstWithProject.id : sortedDomains[0]?.id || "__system__";
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : "获取本体数据失败");
     } finally {
@@ -334,38 +365,17 @@ export function AssetOntologyScreen({
     }
   };
 
-  const handleSeedSamples = async (dom: DomainItem) => {
-    if (!dom.rawDomain) return;
-    try {
-      await coolie.seedDomainSamples(company.id, dom.id);
-      showSuccessToast("样本就绪", `已为【${dom.name}】载入业务本体示例`);
-      void loadData();
-      void loadDomainSnapshot(dom);
-    } catch (e) {
-      showErrorToast("注入失败", (e as Error)?.message ?? String(e));
-    }
+  const handleViewGraph = (dom: DomainItem) => {
+    setGraphSheetVisible(true);
   };
 
   const handleEvolveDomainInChat = (dom: DomainItem) => {
-    onNavigateToChat?.(`Hermes 请为业务本体域【${dom.name}】(${dom.slug}) 规划核心业务实体、因果动作与下一阶段交付物`);
+    onNavigateToChat?.(
+      `Hermes 请为业务本体域【${dom.name}】(${dom.slug}) 进行本体演进与编辑：根据最新业务诉求调整业务实体(Object Types)、属性字段与合法因果动词(Action Types)，并在确认后实时落盘生效，同步生成关联工程代码变更任务。`,
+    );
   };
 
-  const handleDispatchForDomain = (dom: DomainItem) => {
-    if (dom.projectId) {
-      const matched = projects.find((p) => p.id === dom.projectId);
-      if (matched && onCreateTaskForProject) {
-        onCreateTaskForProject(matched);
-        return;
-      }
-    }
-    if (projects[0] && onCreateTaskForProject) {
-      onCreateTaskForProject(projects[0]);
-    } else {
-      onNavigateToChat?.(`Hermes 请为本体域【${dom.name}】创建并指派下一条工作任务`);
-    }
-  };
-
-  const handleViewDomain = (dom: DomainItem) => {
+  const handleOpenProject = (dom: DomainItem) => {
     if (dom.projectId) {
       const matched = projects.find((p) => p.id === dom.projectId);
       if (matched && onOpenProjectTasks) {
@@ -373,7 +383,13 @@ export function AssetOntologyScreen({
         return;
       }
     }
-    onNavigateToTasks?.();
+    if (projects.length > 0 && onOpenProjectTasks) {
+      onOpenProjectTasks(projects[0]);
+    } else {
+      onNavigateToChat?.(
+        `Hermes 请为业务本体域【${dom.name}】(${dom.slug}) 初始化同名项目工程并建立代码仓库与 WBS 交付流水线。`,
+      );
+    }
   };
 
   // 从真实数据库聚合指标提取实体实例数与因果关系数 (反造数硬约束)
@@ -408,7 +424,7 @@ export function AssetOntologyScreen({
       upstreamRel: "立项规划",
       downstream: "Issue (任务工单)",
       downstreamRel: "WBS 拆解",
-      actions: ["推进", "派单", "查看"],
+      actions: ["图谱", "演进", "工程"],
     },
     {
       id: "issue",
@@ -424,7 +440,7 @@ export function AssetOntologyScreen({
       upstreamRel: "归属任务",
       downstream: "Artifact (交付产物)",
       downstreamRel: "施工交付",
-      actions: ["推进", "派单", "查看"],
+      actions: ["图谱", "演进", "工程"],
     },
     {
       id: "conversation",
@@ -440,7 +456,7 @@ export function AssetOntologyScreen({
       upstreamRel: "战略意图",
       downstream: "Issue (任务工单)",
       downstreamRel: "提案落盘",
-      actions: ["推进", "派单", "查看"],
+      actions: ["图谱", "演进", "工程"],
     },
     {
       id: "agent",
@@ -456,7 +472,7 @@ export function AssetOntologyScreen({
       upstreamRel: "雇佣在岗",
       downstream: "Issue (认领工单)",
       downstreamRel: "异步认领",
-      actions: ["推进", "查看"],
+      actions: ["图谱", "演进"],
     },
     {
       id: "artifact",
@@ -472,7 +488,7 @@ export function AssetOntologyScreen({
       upstreamRel: "执行生成",
       downstream: "Release (生产投产)",
       downstreamRel: "指纹会签",
-      actions: ["推进", "查看"],
+      actions: ["图谱", "演进"],
     },
   ];
 
@@ -567,56 +583,14 @@ export function AssetOntologyScreen({
   const handleActionClick = (actionName: string, item: LivingObjectItem) => {
     setSelectedObject(null);
 
-    if (actionName === "推进") {
-      if (item.id === "project") {
-        if (projects[0] && onOpenProjectTasks) {
-          onOpenProjectTasks(projects[0]);
-        } else if (onNavigateToTasks) {
-          onNavigateToTasks();
-        } else {
-          onNavigateToChat?.(`Hermes 请为当前项目【${projects[0]?.name || "主线项目"}】规划下一阶段任务`);
-        }
-      } else if (item.id === "issue") {
-        if (onNavigateToTasks) {
-          onNavigateToTasks();
-        } else {
-          onNavigateToChat?.("Hermes 请汇报当前在办任务工单的推进情况与阻塞");
-        }
-      } else if (item.id === "conversation") {
-        onNavigateToChat?.("Hermes 请汇报当前工坊各数字员工的任务推进态势与阻碍");
-      } else if (item.id === "agent") {
-        onNavigateToChat?.("Hermes 请调度在岗数字员工加速推进当前在办事项");
-      } else if (item.id === "artifact") {
-        onNavigateToChat?.("Hermes 请组织 DS 与 SRE 对最新交付产物进行 CMMI 验收与门禁会签");
-      }
-    } else if (actionName === "派单") {
-      if (item.id === "project") {
-        if (projects[0] && onCreateTaskForProject) {
-          onCreateTaskForProject(projects[0]);
-        } else {
-          onNavigateToChat?.(`Hermes 请为项目【${projects[0]?.name || "当前项目"}】创建并派发 WBS 任务工单`);
-        }
-      } else if (item.id === "issue") {
-        if (projects[0] && onCreateTaskForProject) {
-          onCreateTaskForProject(projects[0]);
-        } else {
-          onNavigateToChat?.("Hermes 请为当前主线工单创建并派发关联子任务");
-        }
-      } else if (item.id === "conversation") {
-        onNavigateToChat?.("Hermes 请根据当前本体态势进行意图理解并生成提案 Proposal");
-      }
-    } else if (actionName === "查看") {
-      if (item.id === "project") {
-        onNavigateToTab?.("projects");
-      } else if (item.id === "issue") {
-        onNavigateToTasks?.();
-      } else if (item.id === "conversation") {
-        onNavigateToChat?.();
-      } else if (item.id === "agent") {
-        onNavigateToTab?.("agents");
-      } else if (item.id === "artifact") {
-        onNavigateToTab?.("artifacts");
-      }
+    if (actionName === "图谱") {
+      setGraphSheetVisible(true);
+    } else if (actionName === "演进") {
+      onNavigateToChat?.(
+        `Hermes 请为业务实体【${item.name}】进行本体演进与因果动作扩展：提出新的属性定义与合法业务动作，并在确认后实时落盘生效，同步生成关联工程代码变更任务。`,
+      );
+    } else if (actionName === "工程") {
+      handleOpenProject(currentDomain);
     }
   };
 
@@ -684,10 +658,15 @@ export function AssetOntologyScreen({
           >
             {domains.map((dom) => {
               const active = dom.id === activeDomainId;
+              const hasProject = Boolean(dom.projectId);
               return (
                 <Pressable
                   key={dom.id}
-                  style={[styles.domainChip, active && styles.domainChipActive]}
+                  style={[
+                    styles.domainChip,
+                    active && styles.domainChipActive,
+                    hasProject && styles.domainChipHasProject,
+                  ]}
                   onPress={() => setActiveDomainId(dom.id)}
                   accessibilityRole="button"
                   accessibilityLabel={`切换至${dom.name}`}
@@ -700,6 +679,11 @@ export function AssetOntologyScreen({
                   >
                     {dom.name}
                   </Text>
+                  {hasProject ? (
+                    <View style={styles.domainChipProjectBadge}>
+                      <Text style={styles.domainChipProjectBadgeText}>工程</Text>
+                    </View>
+                  ) : null}
                   {dom.lifecycleState === "locked" ? (
                     <View style={styles.domainChipLockedDot} />
                   ) : null}
@@ -932,28 +916,17 @@ export function AssetOntologyScreen({
                 </View>
               </View>
 
-              {/* 业务本体域标准两字操作条 */}
+              {/* 业务本体域标准两字操作条 (纯两字契约: 图谱、工坊、工程、恢复/熔断) */}
               <View style={styles.domainActionRow}>
                 <Pressable
                   style={styles.domainActionBtn}
-                  onPress={() => handleViewDomain(currentDomain)}
+                  onPress={() => handleViewGraph(currentDomain)}
                   accessibilityRole="button"
-                  accessibilityLabel="查看任务与工程"
-                  testID="AssetOntology__DomainAction__View"
+                  accessibilityLabel="查看本体图谱"
+                  testID="AssetOntology__DomainAction__Graph"
                 >
-                  <Ionicons name="eye-outline" size={13} color={C.ink} />
-                  <Text style={styles.domainActionBtnText}>查看</Text>
-                </Pressable>
-
-                <Pressable
-                  style={styles.domainActionBtn}
-                  onPress={() => handleDispatchForDomain(currentDomain)}
-                  accessibilityRole="button"
-                  accessibilityLabel="指派派单"
-                  testID="AssetOntology__DomainAction__Dispatch"
-                >
-                  <Ionicons name="paper-plane-outline" size={13} color={C.ink} />
-                  <Text style={styles.domainActionBtnText}>派单</Text>
+                  <Ionicons name="git-network-outline" size={13} color={C.accent} />
+                  <Text style={[styles.domainActionBtnText, { color: C.accent }]}>图谱</Text>
                 </Pressable>
 
                 <Pressable
@@ -965,6 +938,17 @@ export function AssetOntologyScreen({
                 >
                   <Ionicons name="chatbubbles-outline" size={13} color="#FFFFFF" />
                   <Text style={[styles.domainActionBtnText, { color: "#FFFFFF" }]}>工坊</Text>
+                </Pressable>
+
+                <Pressable
+                  style={styles.domainActionBtn}
+                  onPress={() => handleOpenProject(currentDomain)}
+                  accessibilityRole="button"
+                  accessibilityLabel="查看关联项目工程"
+                  testID="AssetOntology__DomainAction__Project"
+                >
+                  <Ionicons name="folder-outline" size={13} color={C.ink} />
+                  <Text style={styles.domainActionBtnText}>工程</Text>
                 </Pressable>
 
                 {currentDomain.rawDomain ? (
@@ -983,19 +967,6 @@ export function AssetOntologyScreen({
                     <Text style={styles.domainActionBtnText}>
                       {currentDomain.lifecycleState === "locked" ? "恢复" : "熔断"}
                     </Text>
-                  </Pressable>
-                ) : null}
-
-                {currentDomain.rawDomain ? (
-                  <Pressable
-                    style={styles.domainActionBtn}
-                    onPress={() => handleSeedSamples(currentDomain)}
-                    accessibilityRole="button"
-                    accessibilityLabel="注入本体示例"
-                    testID="AssetOntology__DomainAction__Seed"
-                  >
-                    <Ionicons name="sparkles-outline" size={13} color={C.accent} />
-                    <Text style={styles.domainActionBtnText}>样本</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -1071,20 +1042,11 @@ export function AssetOntologyScreen({
                     </Pressable>
                     <Pressable
                       style={[styles.actionBtnSecondary, { flex: undefined, paddingHorizontal: 16 }]}
-                      onPress={() => handleDispatchForDomain(currentDomain)}
+                      onPress={() => handleOpenProject(currentDomain)}
                       accessibilityRole="button"
                     >
-                      <Text style={styles.actionBtnSecondaryText}>派单</Text>
+                      <Text style={styles.actionBtnSecondaryText}>工程</Text>
                     </Pressable>
-                    {currentDomain.rawDomain ? (
-                      <Pressable
-                        style={[styles.actionBtnSecondary, { flex: undefined, paddingHorizontal: 16 }]}
-                        onPress={() => handleSeedSamples(currentDomain)}
-                        accessibilityRole="button"
-                      >
-                        <Text style={[styles.actionBtnSecondaryText, { color: C.accent }]}>样本</Text>
-                      </Pressable>
-                    ) : null}
                   </View>
                 </View>
               )}
@@ -1421,7 +1383,7 @@ export function AssetOntologyScreen({
               })()}
             </View>
 
-            {/* 操作动词 */}
+            {/* 操作动词 (纯两字契约: 工坊、工程、关闭) */}
             <View style={styles.actionBlock}>
               <Text style={styles.blockTitle}>业务操作动词 (ACTIONS)</Text>
               <View style={styles.actionButtonsRow}>
@@ -1430,7 +1392,9 @@ export function AssetOntologyScreen({
                   onPress={() => {
                     const nodeLabel = selectedDomainNode.label || selectedDomainNode.key;
                     setSelectedDomainNode(null);
-                    onNavigateToChat?.(`Hermes 请为实体【${nodeLabel}】推进关联业务工单与提案`);
+                    onNavigateToChat?.(
+                      `Hermes 请为业务实体【${nodeLabel}】推进关联业务工单、属性演进与工程代码变更`,
+                    );
                   }}
                   accessibilityRole="button"
                 >
@@ -1440,11 +1404,11 @@ export function AssetOntologyScreen({
                   style={styles.actionBtnSecondary}
                   onPress={() => {
                     setSelectedDomainNode(null);
-                    handleDispatchForDomain(currentDomain);
+                    handleOpenProject(currentDomain);
                   }}
                   accessibilityRole="button"
                 >
-                  <Text style={styles.actionBtnSecondaryText}>派单</Text>
+                  <Text style={styles.actionBtnSecondaryText}>工程</Text>
                 </Pressable>
                 <Pressable
                   style={styles.actionBtnSecondary}
@@ -1492,6 +1456,11 @@ export function AssetOntologyScreen({
                     <View style={{ flex: 1 }}>
                       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
                         <Text style={styles.domainManageName}>{dom.name}</Text>
+                        {dom.projectId ? (
+                          <View style={styles.domainChipProjectBadge}>
+                            <Text style={styles.domainChipProjectBadgeText}>工程</Text>
+                          </View>
+                        ) : null}
                         <StatusBadge
                           tone={dom.lifecycleState === "locked" ? "warn" : "ok"}
                           label={dom.lifecycleState === "locked" ? "锁定" : dom.isSystem ? "中枢" : "活跃"}
@@ -1529,6 +1498,226 @@ export function AssetOntologyScreen({
                 <Pressable
                   style={styles.actionBtnSecondary}
                   onPress={() => setDomainSheetVisible(false)}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.actionBtnSecondaryText}>关闭</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </Sheet>
+      )}
+
+      {/* 8. 全功能本体图谱与代码并轨抽屉 (Graph Sheet) */}
+      {graphSheetVisible && (
+        <Sheet
+          onClose={() => setGraphSheetVisible(false)}
+          title={`本体图谱 · ${currentDomain.name}`}
+        >
+          <View style={styles.sheetBody}>
+            {/* 顶栏因果并轨提示 (Core Axiom: Living Ontology as Nervous System) */}
+            <View style={styles.graphNoticeBox}>
+              <View style={styles.graphNoticeHeader}>
+                <Ionicons name="git-network" size={14} color={C.accent} />
+                <Text style={styles.graphNoticeTag}>活体本体与代码空间并轨</Text>
+              </View>
+              <Text style={styles.graphNoticeText}>
+                本体在工坊中与 Hermes 对话实时演进落盘；本体语义变更后，关联的项目代码自动派发【开发 ➔ 测试 ➔ 运维 ➔ 上线】全链路 WBS 任务。
+              </Text>
+            </View>
+
+            {/* 关联物理工程与 CMMI 交付流水线 */}
+            <View style={styles.graphProjectCard}>
+              <View style={styles.graphProjectHeader}>
+                <View>
+                  <Text style={styles.blockTitle}>关联物理工程 (LINKED CODEBASE)</Text>
+                  <Text style={styles.graphProjectName}>
+                    {currentDomain.projectName || (currentDomain.projectId ? "已挂载工程代码" : "未绑定独立工程")}
+                  </Text>
+                </View>
+                {currentDomain.projectId ? (
+                  <StatusBadge tone="ok" label="代码已挂载" />
+                ) : (
+                  <StatusBadge tone="neutral" label="工坊中枢" />
+                )}
+              </View>
+
+              <View style={styles.cmmiPipelineRow}>
+                <View style={styles.cmmiPipelineStep}>
+                  <Text style={styles.cmmiPipelineStepNum}>G1-G2</Text>
+                  <Text style={styles.cmmiPipelineStepText}>开发 (Dev)</Text>
+                  <Text style={styles.cmmiPipelineStepRole}>Core SWE</Text>
+                </View>
+                <Text style={styles.cmmiPipelineArrow}>➔</Text>
+                <View style={styles.cmmiPipelineStep}>
+                  <Text style={styles.cmmiPipelineStepNum}>G3-G4</Text>
+                  <Text style={styles.cmmiPipelineStepText}>测试 (Test)</Text>
+                  <Text style={styles.cmmiPipelineStepRole}>FDSE 真机</Text>
+                </View>
+                <Text style={styles.cmmiPipelineArrow}>➔</Text>
+                <View style={styles.cmmiPipelineStep}>
+                  <Text style={styles.cmmiPipelineStepNum}>G5</Text>
+                  <Text style={styles.cmmiPipelineStepText}>运维 (Ops)</Text>
+                  <Text style={styles.cmmiPipelineStepRole}>PRE-SRE</Text>
+                </View>
+                <Text style={styles.cmmiPipelineArrow}>➔</Text>
+                <View style={styles.cmmiPipelineStep}>
+                  <Text style={styles.cmmiPipelineStepNum}>闭环</Text>
+                  <Text style={styles.cmmiPipelineStepText}>上线 (Prod)</Text>
+                  <Text style={styles.cmmiPipelineStepRole}>DS 验收</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* 业务实体节点拓扑流 (OBJECT TYPES) */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.blockTitle}>业务实体节点 (OBJECT NODES)</Text>
+                <Text style={styles.sectionMeta}>
+                  {domainSnapshot?.nodes?.length ?? objectItems.length} 个活体节点
+                </Text>
+              </View>
+              <View style={styles.graphNodeGrid}>
+                {domainSnapshot?.nodes && domainSnapshot.nodes.length > 0
+                  ? domainSnapshot.nodes.map((node) => (
+                      <View key={node.id} style={styles.graphNodeCard}>
+                        <View style={styles.graphNodeIconBox}>
+                          <Text style={styles.graphNodeIcon}>⬡</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                            <Text style={styles.graphNodeTitle}>{node.label || node.key}</Text>
+                            <StatusBadge
+                              tone={node.lifecycleState === "locked" ? "warn" : "ok"}
+                              label={node.lifecycleState === "locked" ? "锁定" : "活跃"}
+                            />
+                          </View>
+                          <Text style={styles.graphNodeKey} numberOfLines={1}>
+                            契约: {node.key} · {Object.keys(node.properties || {}).length} 个属性
+                          </Text>
+                        </View>
+                      </View>
+                    ))
+                  : objectItems.map((item) => (
+                      <View key={item.id} style={styles.graphNodeCard}>
+                        <View style={styles.graphNodeIconBox}>
+                          <Text style={styles.graphNodeIcon}>{item.icon}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                            <Text style={styles.graphNodeTitle}>{item.name}</Text>
+                            <StatusBadge tone="ok" label={item.statusText} />
+                          </View>
+                          <Text style={styles.graphNodeKey} numberOfLines={1}>
+                            {item.category} · {item.count} 实例 · {item.edgeCount} 关系
+                          </Text>
+                        </View>
+                      </View>
+                    ))}
+              </View>
+            </View>
+
+            {/* 因果连线血缘 (CAUSAL EDGES) */}
+            <View style={styles.section}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.blockTitle}>因果血缘网络 (CAUSALITY FLOW)</Text>
+              </View>
+              {domainSnapshot?.edges && domainSnapshot.edges.length > 0 ? (
+                domainSnapshot.edges.slice(0, 6).map((edge, idx) => {
+                  const sourceNode = domainSnapshot.nodes?.find(
+                    (n) => n.id === edge.sourceNodeId || n.key === edge.sourceNodeId,
+                  );
+                  const targetNode = domainSnapshot.nodes?.find(
+                    (n) => n.id === edge.targetNodeId || n.key === edge.targetNodeId,
+                  );
+                  const fromLabel = sourceNode?.label || sourceNode?.key || edge.sourceNodeId || "实体";
+                  const toLabel = targetNode?.label || targetNode?.key || edge.targetNodeId || "目标";
+                  const relationLabel = edge.relationKey || "因果关联";
+
+                  return (
+                    <View key={edge.id || idx} style={styles.graphEdgeRow}>
+                      <Text style={styles.graphEdgeFrom} numberOfLines={1}>
+                        {fromLabel}
+                      </Text>
+                      <Ionicons name="arrow-forward" size={10} color={C.accent} />
+                      <View style={styles.graphEdgeLabelBox}>
+                        <Text style={styles.graphEdgeLabel}>{relationLabel}</Text>
+                      </View>
+                      <Ionicons name="arrow-forward" size={10} color={C.accent} />
+                      <Text style={styles.graphEdgeTo} numberOfLines={1}>
+                        {toLabel}
+                      </Text>
+                    </View>
+                  );
+                })
+              ) : (
+                <>
+                  <View style={styles.graphEdgeRow}>
+                    <Text style={styles.graphEdgeFrom}>业务本体域 (Domain)</Text>
+                    <Ionicons name="arrow-forward" size={10} color={C.accent} />
+                    <View style={styles.graphEdgeLabelBox}>
+                      <Text style={styles.graphEdgeLabel}>立项派生</Text>
+                    </View>
+                    <Ionicons name="arrow-forward" size={10} color={C.accent} />
+                    <Text style={styles.graphEdgeTo}>工程代码 (Project)</Text>
+                  </View>
+                  <View style={styles.graphEdgeRow}>
+                    <Text style={styles.graphEdgeFrom}>工程代码 (Project)</Text>
+                    <Ionicons name="arrow-forward" size={10} color={C.accent} />
+                    <View style={styles.graphEdgeLabelBox}>
+                      <Text style={styles.graphEdgeLabel}>WBS 拆解</Text>
+                    </View>
+                    <Ionicons name="arrow-forward" size={10} color={C.accent} />
+                    <Text style={styles.graphEdgeTo}>动作契约 (Issue)</Text>
+                  </View>
+                  <View style={styles.graphEdgeRow}>
+                    <Text style={styles.graphEdgeFrom}>动作契约 (Issue)</Text>
+                    <Ionicons name="arrow-forward" size={10} color={C.accent} />
+                    <View style={styles.graphEdgeLabelBox}>
+                      <Text style={styles.graphEdgeLabel}>执行生成</Text>
+                    </View>
+                    <Ionicons name="arrow-forward" size={10} color={C.accent} />
+                    <Text style={styles.graphEdgeTo}>不可变证据 (Artifact)</Text>
+                  </View>
+                  <View style={styles.graphEdgeRow}>
+                    <Text style={styles.graphEdgeFrom}>不可变证据 (Artifact)</Text>
+                    <Ionicons name="arrow-forward" size={10} color={C.accent} />
+                    <View style={styles.graphEdgeLabelBox}>
+                      <Text style={styles.graphEdgeLabel}>指纹验证</Text>
+                    </View>
+                    <Ionicons name="arrow-forward" size={10} color={C.accent} />
+                    <Text style={styles.graphEdgeTo}>生产投产 (Release)</Text>
+                  </View>
+                </>
+              )}
+            </View>
+
+            {/* 纯两字操作按钮 */}
+            <View style={styles.actionBlock}>
+              <View style={styles.actionButtonsRow}>
+                <Pressable
+                  style={styles.actionBtnPrimary}
+                  onPress={() => {
+                    setGraphSheetVisible(false);
+                    handleEvolveDomainInChat(currentDomain);
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.actionBtnPrimaryText}>工坊</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.actionBtnSecondary}
+                  onPress={() => {
+                    setGraphSheetVisible(false);
+                    handleOpenProject(currentDomain);
+                  }}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.actionBtnSecondaryText}>工程</Text>
+                </Pressable>
+                <Pressable
+                  style={styles.actionBtnSecondary}
+                  onPress={() => setGraphSheetVisible(false)}
                   accessibilityRole="button"
                 >
                   <Text style={styles.actionBtnSecondaryText}>关闭</Text>
@@ -2207,5 +2396,171 @@ const styles = StyleSheet.create({
   },
   domainSelectPillTextActive: {
     color: "#FFFFFF",
+  },
+  domainChipHasProject: {
+    borderColor: "rgba(94, 106, 210, 0.4)",
+    backgroundColor: "rgba(94, 106, 210, 0.06)",
+  },
+  domainChipProjectBadge: {
+    backgroundColor: "rgba(94, 106, 210, 0.2)",
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 3,
+    marginLeft: 3,
+  },
+  domainChipProjectBadgeText: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: C.accent,
+  },
+  graphNoticeBox: {
+    backgroundColor: "rgba(94, 106, 210, 0.08)",
+    borderWidth: 1,
+    borderColor: "rgba(94, 106, 210, 0.25)",
+    borderRadius: RADIUS.md,
+    padding: 12,
+    marginBottom: 12,
+  },
+  graphNoticeHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 6,
+  },
+  graphNoticeTag: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.accent,
+  },
+  graphNoticeText: {
+    fontSize: 11,
+    color: C.ink2,
+    lineHeight: 16,
+  },
+  graphProjectCard: {
+    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+    padding: 12,
+    marginBottom: 12,
+  },
+  graphProjectHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
+  graphProjectName: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: C.ink,
+    marginTop: 2,
+  },
+  cmmiPipelineRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
+    paddingTop: 10,
+    borderTopWidth: 1,
+    borderTopColor: C.lineSubtle,
+  },
+  cmmiPipelineStep: {
+    alignItems: "center",
+    flex: 1,
+  },
+  cmmiPipelineStepNum: {
+    fontSize: 9,
+    fontWeight: "700",
+    color: C.accent,
+    backgroundColor: "rgba(94, 106, 210, 0.15)",
+    borderRadius: 8,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  cmmiPipelineStepText: {
+    fontSize: 10,
+    fontWeight: "600",
+    color: C.ink2,
+    marginTop: 3,
+  },
+  cmmiPipelineStepRole: {
+    fontSize: 8,
+    color: C.ink4,
+    marginTop: 1,
+  },
+  cmmiPipelineArrow: {
+    color: C.ink4,
+    fontSize: 10,
+  },
+  graphNodeGrid: {
+    gap: 8,
+    marginTop: 8,
+  },
+  graphNodeCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    padding: 10,
+    backgroundColor: "rgba(255, 255, 255, 0.03)",
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+  },
+  graphNodeIconBox: {
+    width: 28,
+    height: 28,
+    borderRadius: 6,
+    backgroundColor: "rgba(94, 106, 210, 0.12)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  graphNodeIcon: {
+    fontSize: 13,
+    color: C.accent,
+  },
+  graphNodeTitle: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  graphNodeKey: {
+    fontSize: 10,
+    color: C.ink4,
+    marginTop: 1,
+  },
+  graphEdgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    borderRadius: RADIUS.sm,
+    marginBottom: 4,
+  },
+  graphEdgeFrom: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: C.ink2,
+    flex: 1,
+  },
+  graphEdgeLabelBox: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+    backgroundColor: "rgba(94, 106, 210, 0.15)",
+  },
+  graphEdgeLabel: {
+    fontSize: 9,
+    fontWeight: "600",
+    color: C.accent,
+  },
+  graphEdgeTo: {
+    fontSize: 11,
+    fontWeight: "500",
+    color: C.ink2,
+    flex: 1,
+    textAlign: "right",
   },
 });
