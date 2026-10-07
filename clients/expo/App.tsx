@@ -80,7 +80,7 @@ import { GitCredentialsScreen } from "./src/screens/GitCredentialsScreen";
 import { ProjectsScreen } from "./src/screens/ProjectsScreen";
 import { WebContainerScreen } from "./src/screens/WebContainerScreen";
 import { WebLoginScreen } from "./src/screens/WebLoginScreen";
-import { WorkspaceGitToggle } from "./src/components/WorkspaceGitToggle";
+import { SettingsScreen } from "./src/screens/SettingsScreen";
 import { CoolieLogo } from "./src/components/CoolieLogo";
 import { useNotificationsStore } from "./src/stores/notifications";
 import { BoardChatScreen, exportBoardEcho, exportBoardPrompt } from "./src/screens/BoardChatScreen";
@@ -99,41 +99,6 @@ import {
   markWhatsNewSeen,
   shouldShowWhatsNew,
 } from "./src/screens/WhatsNewScreen";
-
-/** 统计并清理 App 缓存目录，返回可读大小 */
-async function clearAppCache(): Promise<string> {
-  try {
-    const FS = await import("expo-file-system");
-    const cacheDir = FS.cacheDirectory;
-    if (!cacheDir) return "0 KB";
-    await FS.deleteAsync(cacheDir, { idempotent: true });
-    return "已全部清理";
-  } catch {
-    return "清理失败";
-  }
-}
-
-async function measureCache(): Promise<string> {
-  try {
-    const FS = await import("expo-file-system");
-    const cacheDir = FS.cacheDirectory;
-    if (!cacheDir) return "0 KB";
-    let total = 0;
-    const walk = async (dir: string) => {
-      const items = await FS.readDirectoryAsync(dir);
-      for (const name of items) {
-        const full = dir.endsWith("/") ? dir + name : `${dir}/${name}`;
-        const info = await FS.getInfoAsync(full);
-        if (info.exists && !info.isDirectory) total += info.size ?? 0;
-        else if (info.exists && info.isDirectory) await walk(full + "/");
-      }
-    };
-    await walk(cacheDir);
-    return total > 1048576 ? `${(total / 1048576).toFixed(1)} MB` : `${Math.ceil(total / 1024)} KB`;
-  } catch {
-    return "-";
-  }
-}
 import { QuickApprovalCard } from "./src/components/QuickApprovalCard";
 import { setupOTAListener } from "./src/OTA";
 
@@ -255,103 +220,7 @@ function AppUpdateCard({ info, onClose }: { info: RemoteVersionInfo; onClose: ()
   );
 }
 
-function SettingsSheet({
-  whoami,
-  ota,
-  onClose,
-  onSignOut,
-  workspaceGitEnabled,
-  onToggleWorkspaceGit,
-  onOpenGitCredentials,
-  onOpenNativeModules,
-}: {
-  whoami: string;
-  ota: ReturnType<typeof useOTA>;
-  onClose: () => void;
-  onSignOut: () => void;
-  workspaceGitEnabled: boolean;
-  onToggleWorkspaceGit: (next: boolean) => void;
-  onOpenGitCredentials: () => void;
-  onOpenNativeModules: () => void;
-}) {
-  const [cacheSize, setCacheSize] = useState<string | null>(null);
-  const [clearing, setClearing] = useState(false);
-  const appVer = localVersion();
 
-  useEffect(() => {
-    void measureCache().then(setCacheSize);
-  }, []);
-
-  return (
-    <Sheet onClose={onClose} modal={false} title="设置" style={styles.settingsBackdrop}>
-      {/* 我的名片 */}
-      <View style={styles.profileCard}>
-        <View style={styles.profileAvatar}>
-          <Text style={styles.profileAvatarText}>{whoami.slice(0, 1).toUpperCase()}</Text>
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.profileName} numberOfLines={1}>
-            {whoami}
-          </Text>
-          <Text style={styles.profileMeta}>Coolie工坊 · 管理员</Text>
-        </View>
-        <View style={styles.versionChip}>
-          <Text style={styles.versionChipText}>v{appVer}</Text>
-        </View>
-      </View>
-
-      {/* App 设置分组 */}
-      <Text style={styles.settingsGroup}>应用</Text>
-      <Pressable
-        style={styles.settingsRow}
-        disabled={ota.isChecking}
-        onPress={() => void ota.checkUpdate(true)}
-      >
-        <Ionicons name="cloud-download-outline" size={20} color={C.ink3} />
-        <Text style={styles.settingsRowLabel}>版本与更新 (OTA)</Text>
-        <Text style={styles.settingsRowValue}>
-          {ota.isChecking ? "检查中…" : (ota.runtimeVersion ?? appVer)}
-        </Text>
-      </Pressable>
-      <Pressable
-        style={styles.settingsRow}
-        disabled={clearing}
-        onPress={async () => {
-          setClearing(true);
-          const size = await clearAppCache();
-          setCacheSize(size);
-          setClearing(false);
-          Alert.alert("缓存已清理", `释放 ${size}`);
-        }}
-      >
-        <Ionicons name="trash-outline" size={20} color={C.ink3} />
-        <Text style={styles.settingsRowLabel}>清理缓存</Text>
-        <Text style={styles.settingsRowValue}>
-          {clearing ? "清理中…" : (cacheSize ?? "计算中…")}
-        </Text>
-      </Pressable>
-
-      {/* wave70 — git-ops App 端 UI 4 屏之 Workspace Git Toggle. */}
-      <Text style={styles.settingsGroup}>开发者</Text>
-      <WorkspaceGitToggle
-        enabled={workspaceGitEnabled}
-        onToggle={onToggleWorkspaceGit}
-        onOpenCredentials={onOpenGitCredentials}
-      />
-
-      {/* wave188 — 6 个 expo-* 原生模块最小集成 demo 入口。 */}
-      <Pressable style={styles.settingsRow} onPress={onOpenNativeModules}>
-        <Ionicons name="hardware-chip-outline" size={20} color={C.ink3} />
-        <Text style={styles.settingsRowLabel}>原生模块 (6 expo-*)</Text>
-        <Text style={styles.settingsRowValue}>demo</Text>
-      </Pressable>
-
-      <Pressable style={styles.settingsSignOut} onPress={onSignOut}>
-        <Text style={styles.settingsSignOutText}>退出登录</Text>
-      </Pressable>
-    </Sheet>
-  );
-}
 
 export default function App() {
   const [credential, setCredential] = useState<Credential | null | undefined>(undefined);
@@ -439,6 +308,7 @@ export default function App() {
         onSignOut={signOut}
         demoRequested={pendingDemo}
         onDemoHandled={handleDemoHandled}
+        onOpenWhatsNew={() => setWhatsNewOpen(true)}
       />
     );
   } else if (registering) {
@@ -491,11 +361,13 @@ function CompanyGate({
   onSignOut,
   demoRequested,
   onDemoHandled,
+  onOpenWhatsNew,
 }: {
   credential: Credential;
   onSignOut: () => void;
   demoRequested?: boolean;
   onDemoHandled?: () => void;
+  onOpenWhatsNew?: () => void;
 }) {
   const [companies, setCompanies] = useState<Company[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -522,6 +394,7 @@ function CompanyGate({
         onSignOut={onSignOut}
         demoRequested={demoRequested}
         onDemoHandled={onDemoHandled}
+        onOpenWhatsNew={onOpenWhatsNew}
       />
     );
   }
@@ -782,12 +655,14 @@ function HomeScreen({
   onSignOut,
   demoRequested,
   onDemoHandled,
+  onOpenWhatsNew,
 }: {
   company: Company;
   whoami: string;
   onSignOut: () => void;
   demoRequested?: boolean;
   onDemoHandled?: () => void;
+  onOpenWhatsNew?: () => void;
 }) {
   const [tab, setTab] = useState<TabKey>("dashboard");
   /** 中央 "+" 打开的新建任务浮层 */
@@ -1069,7 +944,8 @@ function HomeScreen({
       plansOpen ||
       projectsOpen ||
       gitCredentialsOpen ||
-      pluginManagerOpen,
+      pluginManagerOpen ||
+      settingsOpen,
     );
 
     content = (
@@ -1244,6 +1120,36 @@ function HomeScreen({
               pluginId={pluginSettingsId}
               onBack={() => setPluginSettingsId(null)}
             />
+          ) : settingsOpen ? (
+            <SettingsScreen
+              company={company}
+              whoami={whoami}
+              ota={ota}
+              onBack={() => setSettingsOpen(false)}
+              onSignOut={onSignOut}
+              workspaceGitEnabled={workspaceGitEnabled}
+              onToggleWorkspaceGit={setWorkspaceGitEnabled}
+              onOpenGitCredentials={() => {
+                setSettingsOpen(false);
+                setGitCredentialsOpen(true);
+              }}
+              onOpenPluginManager={() => {
+                setSettingsOpen(false);
+                setPluginManagerOpen(true);
+              }}
+              onOpenNativeModules={() => {
+                setSettingsOpen(false);
+                setNativeModulesOpen(true);
+              }}
+              onViewWhatsNew={
+                onOpenWhatsNew
+                  ? () => {
+                      setSettingsOpen(false);
+                      onOpenWhatsNew();
+                    }
+                  : undefined
+              }
+            />
           ) : tab === "dashboard" ? (
             <DashboardScreen
               company={company}
@@ -1385,24 +1291,6 @@ function HomeScreen({
           ) : null}
         </View>
         {appUpdate ? <AppUpdateCard info={appUpdate} onClose={() => setAppUpdate(null)} /> : null}
-        {settingsOpen ? (
-          <SettingsSheet
-            whoami={whoami}
-            ota={ota}
-            onClose={() => setSettingsOpen(false)}
-            onSignOut={onSignOut}
-            workspaceGitEnabled={workspaceGitEnabled}
-            onToggleWorkspaceGit={setWorkspaceGitEnabled}
-            onOpenGitCredentials={() => {
-              setSettingsOpen(false);
-              setGitCredentialsOpen(true);
-            }}
-            onOpenNativeModules={() => {
-              setSettingsOpen(false);
-              setNativeModulesOpen(true);
-            }}
-          />
-        ) : null}
         {nativeModulesOpen ? (
           <NativeModulesScreen onClose={() => setNativeModulesOpen(false)} />
         ) : null}
@@ -1418,6 +1306,9 @@ function HomeScreen({
             setPlansOpen(false);
             setAgentDetail(null);
             setGitCredentialsOpen(false);
+            setPluginManagerOpen(false);
+            setPluginSettingsId(null);
+            setSettingsOpen(false);
             setSearchOpen(false);
             setNotificationsOpen(false);
             setFocusedApprovalId(null);
@@ -1599,61 +1490,7 @@ const styles = StyleSheet.create({
   updateIosHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   updateIosActions: { flexDirection: "row", gap: 8, marginTop: 10 },
   updateBtnGhost: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line },
-  settingsBackdrop: {
-    ...StyleSheet.absoluteFillObject,
-    zIndex: 100,
-  },
-  profileCard: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    backgroundColor: C.surface,
-    borderRadius: 12,
-    padding: 14,
-    marginBottom: 6,
-  },
-  profileAvatar: {
-    width: 44,
-    height: 44,
-    borderRadius: 12,
-    backgroundColor: C.brand,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  profileAvatarText: { color: C.ink, fontSize: 18, fontWeight: "700" },
-  profileName: { color: C.ink, fontSize: 16, fontWeight: "700" },
-  profileMeta: { color: C.ink3, fontSize: 12, marginTop: 2 },
-  versionChip: {
-    backgroundColor: C.panel,
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  versionChipText: { color: C.accent, fontSize: 11, fontWeight: "600" },
-  settingsGroup: {
-    color: C.ink4,
-    fontSize: 11,
-    fontWeight: "700",
-    marginTop: 14,
-    marginBottom: 4,
-    textTransform: "uppercase",
-  },
-  settingsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 10,
-    paddingVertical: 13,
-  },
-  settingsRowLabel: { color: C.ink2, fontSize: 15, flex: 1 },
-  settingsRowValue: { color: C.ink3, fontSize: 13, flexShrink: 1 },
-  settingsSignOut: {
-    marginTop: 10,
-    backgroundColor: C.surface,
-    borderRadius: 10,
-    paddingVertical: 13,
-    alignItems: "center",
-  },
-  settingsSignOutText: { color: C.err, fontSize: 15, fontWeight: "600" },
+
   composeOverlay: {
     ...StyleSheet.absoluteFillObject,
     // 让出底部 TabBar: absoluteFill 的 bottom:0 会把 5 个 tab 整个盖住, 底栏就点不到了
