@@ -524,12 +524,12 @@ if [[ ${#EXEC_CMD[@]} -eq 0 ]]; then
       ;;
     claude-mm)
       TOOL_BIN="claude"
-      TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
+      TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions" "--settings" "$HOME/.claude/settings.jsonmm")
       PRE_CMD="ln -sf ~/.claude/settings.jsonmm ~/.claude/settings.json 2>/dev/null || true"
       ;;
     claude-glm)
       TOOL_BIN="claude"
-      TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
+      TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions" "--settings" "$HOME/.claude/settings.jsonglm" "--model" "glm-5")
       PRE_CMD="ln -sf ~/.claude/settings.jsonglm ~/.claude/settings.json 2>/dev/null || true"
       ;;
     cmd)

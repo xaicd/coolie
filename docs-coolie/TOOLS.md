@@ -268,8 +268,8 @@ Hermes (PM / Hermes自己) ─┼───> 门神 (FDSE)      ───> cmd (M
 | **`cmd`** | [`scripts/adapters/cmd-acp.sh`](../scripts/adapters/cmd-acp.sh) | 封装 `@agentclientprotocol/sdk`，驱动 CommandCode (`cmd`) 非交互流式执行 | `acpx --agent scripts/adapters/cmd-acp.sh "<prompt>"` |
 | **`copilot`** | [`scripts/adapters/copilot-acp.sh`](../scripts/adapters/copilot-acp.sh) | 原生支持 `copilot --acp --stdio` 协议端点 | `acpx copilot "<prompt>"` |
 | **`codex`** | [`scripts/adapters/codex-acp.sh`](../scripts/adapters/codex-acp.sh) | 官方 `@agentclientprotocol/codex-acp` 适配器 | `acpx codex "<prompt>"` |
-| **`claude-mm`** | [`scripts/adapters/claude-mm-acp.sh`](../scripts/adapters/claude-mm-acp.sh) | 自动加载 MiniMax 配置 (`settings.jsonmm`)，驱动 `@agentclientprotocol/claude-agent-acp` | `acpx claude "<prompt>"` (MiniMax Profile) |
-| **`claude-glm`** | [`scripts/adapters/claude-glm-acp.sh`](../scripts/adapters/claude-glm-acp.sh) | 自动加载 GLM 配置 (`settings.jsonglm`)，驱动 `@agentclientprotocol/claude-agent-acp` | `acpx claude "<prompt>"` (GLM Profile) |
+| **`claude-mm`** | [`scripts/adapters/claude-mm-acp.sh`](../scripts/adapters/claude-mm-acp.sh) | 自动加载 MiniMax 配置 (`settings.jsonmm`)，通过 `claude-profile-acp.mjs` 注入 `--settings` 驱动 Claude | `acpx --agent scripts/adapters/claude-mm-acp.sh exec "<prompt>"` (MiniMax Profile) |
+| **`claude-glm`** | [`scripts/adapters/claude-glm-acp.sh`](../scripts/adapters/claude-glm-acp.sh) | 自动加载 GLM 配置 (`settings.jsonglm`)，通过 `claude-profile-acp.mjs` 注入 `--settings` 驱动 Claude | `acpx --agent scripts/adapters/claude-glm-acp.sh exec "<prompt>"` (GLM Profile) |
 
 ### 8.3 双模使用指南
 1. **模式 A：Tier 1 ACP 结构化流式模式（系统生产/工单长会话推荐）**：

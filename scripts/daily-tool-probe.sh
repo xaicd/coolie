@@ -261,9 +261,9 @@ probe_claude_mm() {
       run_probe="claude -p '$PROBE_PROMPT'"; run_secs="-"; run_status="FAIL"; run_snippet="binary not in PATH"; final_status="FAIL"
     fi
   else
-    run_probe="ln -sf ~/.claude/settings.jsonmm ~/.claude/settings.json && claude -p '$PROBE_PROMPT'"
+    run_probe="claude --settings ~/.claude/settings.jsonmm -p '$PROBE_PROMPT'"
     local result
-    result="$(probe_real_run_ok "ln -sf ~/.claude/settings.jsonmm ~/.claude/settings.json 2>/dev/null || true; claude --dangerously-skip-permissions -p '$PROBE_PROMPT' < /dev/null 2>&1")" || true
+    result="$(probe_real_run_ok "claude --dangerously-skip-permissions --settings ~/.claude/settings.jsonmm -p '$PROBE_PROMPT' < /dev/null 2>&1")" || true
     run_secs=$(awk -F'\t' '{print $1}' <<<"$result" 2>/dev/null); run_status=$(awk -F'\t' '{print $2}' <<<"$result" 2>/dev/null); run_snippet=$(awk -F'\t' '{print $4}' <<<"$result" 2>/dev/null)
     final_status="$run_status"
   fi
@@ -286,12 +286,12 @@ probe_claude_glm() {
       run_snippet="Node 24 ACP 引擎 + settings.jsonglm 就绪"
       final_status="OK"
     else
-      run_probe="ln -sf ~/.claude/settings.jsonglm ~/.claude/settings.json && claude -p '$PROBE_PROMPT'"; run_secs="-"; run_status="FAIL"; run_snippet="binary not in PATH"; final_status="FAIL"
+      run_probe="claude --settings ~/.claude/settings.jsonglm -p '$PROBE_PROMPT'"; run_secs="-"; run_status="FAIL"; run_snippet="binary not in PATH"; final_status="FAIL"
     fi
   else
-    run_probe="ln -sf ~/.claude/settings.jsonglm ~/.claude/settings.json && claude -p '$PROBE_PROMPT'"
+    run_probe="claude --settings ~/.claude/settings.jsonglm -p '$PROBE_PROMPT'"
     local result
-    result="$(probe_real_run_ok "ln -sf ~/.claude/settings.jsonglm ~/.claude/settings.json 2>/dev/null || true; claude --dangerously-skip-permissions -p '$PROBE_PROMPT' < /dev/null 2>&1")" || true
+    result="$(probe_real_run_ok "claude --dangerously-skip-permissions --settings ~/.claude/settings.jsonglm -p '$PROBE_PROMPT' < /dev/null 2>&1")" || true
     run_secs=$(awk -F'\t' '{print $1}' <<<"$result" 2>/dev/null); run_status=$(awk -F'\t' '{print $2}' <<<"$result" 2>/dev/null); run_snippet=$(awk -F'\t' '{print $4}' <<<"$result" 2>/dev/null)
     final_status="$run_status"
   fi
