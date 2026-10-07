@@ -731,13 +731,13 @@ export function BoardChatScreen({
     [appendEcho],
   );
 
+  const handleSendRef = useRef<((textToSend?: string) => Promise<void>) | null>(null);
+
   /**
-   * 会话内语音 (长按 mic): 按下开始录音, 松开自动转文字并**填入输入框**,
-   * 由用户确认后再走既有发送流程。这里不建任务、不自动派发 —— 转写只产出文本。
-   *
-   * 竞态: onPressIn 里的 startRecording 是异步的 (要权限 + 起录音机), 用户可能
-   * 在它完成前就松手。所以按下时先存一个启动承诺, 松开时先 await 它, 再停止录音,
-   * 避免「松手时 recording 还是 false -> 录音机继续空转」。
+   * 会话内语音 (按住说话):
+   * - 居中松开 (action === "send"): 识别后直接作为消息发送给 Hermes，极致极速派单！
+   * - 右滑松开 (action === "transcribe"): 识别后转为文字填入输入框，由用户确认或编辑后再发。
+   * - 左滑取消 (handleMicCancel): 彻底切断丢弃录音。
    */
   const handleMicPressIn = useCallback(() => {
     // 保护: 如果已经在录音中，再次按下代表用户希望强制停止卡死的录音
@@ -752,7 +752,7 @@ export function BoardChatScreen({
     voicePressRef.current.promise = (async () => {
       try {
         await startRecording();
-        setVoiceStatus("🎤 录音中… 松开转文字");
+        setVoiceStatus("🎤 录音中… (松开发送 · 左滑取消 · 右滑转文字)");
         return true;
       } catch (e) {
         Alert.alert("录音失败", String((e as Error)?.message ?? e));
@@ -761,7 +761,7 @@ export function BoardChatScreen({
     })();
   }, [recording, forceStop, voiceBusy, sending, startRecording]);
 
-  const handleMicPressOut = useCallback(async () => {
+  const handleMicPressOut = useCallback(async (action: "send" | "transcribe" = "send") => {
     const press = voicePressRef.current;
     if (!press.promise) {
       // 容错: 如果当前还在录音但 promise 丢了，强制切断
@@ -775,18 +775,18 @@ export function BoardChatScreen({
     voicePressRef.current.promise = null;
 
     setVoiceBusy(true);
-    setVoiceStatus("识别中…");
+    setVoiceStatus(action === "send" ? "识别发送中…" : "识别转文字中…");
     try {
       const started = await press.promise;
       if (!started) return;
 
       const { base64, format } = await stopRecording();
       if (!base64) {
-        pushSystemEcho("🎤 未采集到有效声音, 请长按麦克风说话后松开");
+        pushSystemEcho("🎤 未采集到有效声音, 请长按说话");
         return;
       }
       if (Date.now() - press.startedAt < MIN_VOICE_HOLD_MS) {
-        pushSystemEcho("🎤 按太短了, 请长按说话");
+        pushSystemEcho("🎤 说话时间太短, 请长按说话");
         return;
       }
 
@@ -799,8 +799,18 @@ export function BoardChatScreen({
 
       const text = (res.text ?? res.transcription?.text ?? "").trim();
       if (text) {
-        setInput((prev) => (prev ? `${prev} ${text}` : text));
-        pushSystemEcho(`🎤 已转写: ${text}`);
+        if (action === "send") {
+          // 居中松开: 直接发送给 Hermes！
+          if (handleSendRef.current) {
+            await handleSendRef.current(text);
+          } else {
+            setInput(text);
+          }
+        } else {
+          // 右滑松开: 转为文字填入输入框，让用户编辑确认
+          setInput((prev) => (prev ? `${prev} ${text}` : text));
+          pushSystemEcho(`🎤 已转为文字: ${text}`);
+        }
       } else {
         pushSystemEcho("🎤 没听清, 请再说一次");
       }
@@ -1312,6 +1322,7 @@ export function BoardChatScreen({
       startPr,
     ],
   );
+  handleSendRef.current = handleSend;
 
   // 外部入口 (「查看演示」/ 深链) 投递的待发送 prompt：历史加载完成后自动发出。
   useEffect(() => {
@@ -1812,7 +1823,7 @@ export function BoardChatScreen({
           recording={recording}
           voiceBusy={voiceBusy}
           onMicPressIn={handleMicPressIn}
-          onMicPressOut={() => void handleMicPressOut()}
+          onMicPressOut={(action) => void handleMicPressOut(action)}
           onMicCancel={() => void handleMicCancel()}
           onSend={() => void handleSend()}
           onStop={handleStop}
