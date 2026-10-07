@@ -57,7 +57,7 @@ import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { InboxScreen } from "./src/screens/InboxScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
 import { ArtifactsScreen } from "./src/screens/ArtifactsScreen";
-import { OrgAssetsScreen } from "./src/screens/OrgAssetsScreen";
+import { OrgAssetsScreen, type OrgAssetTab } from "./src/screens/OrgAssetsScreen";
 import { PluginManagerScreen } from "./src/screens/PluginManagerScreen";
 import { PluginSettingsScreen } from "./src/screens/PluginSettingsScreen";
 import {
@@ -672,6 +672,8 @@ function HomeScreen({
   const [appUpdate, setAppUpdate] = useState<RemoteVersionInfo | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
+  const [inboxInitialTab, setInboxInitialTab] = useState<"all" | "mine" | "approvals" | "blocked">("all");
+  const [assetsTab, setAssetsTab] = useState<OrgAssetTab>("ontology");
   const [agentDetail, setAgentDetail] = useState<AgentRow | null>(null);
   // 任务页顶部编排按钮组 (wave20) 的落地屏: Pipeline 列表 / Plan 列表 / 项目中心
   const [pipelinesOpen, setPipelinesOpen] = useState(false);
@@ -841,17 +843,16 @@ function HomeScreen({
     if (specIssue) return setSpecIssue(null), true;
     if (diffContext) return setDiffContext(null), true;
     if (focusedApprovalId) return setFocusedApprovalId(null), true;
+    if (selected) return setSelected(null), true;
+    if (agentDetail) return setAgentDetail(null), true;
     if (searchOpen) return setSearchOpen(false), true;
     if (notificationsOpen) return setNotificationsOpen(false), true;
-    if (agentDetail) return setAgentDetail(null), true;
     if (pipelinesOpen) return setPipelinesOpen(false), true;
     if (plansOpen) return setPlansOpen(false), true;
     if (projectsOpen) return setProjectsOpen(false), true;
     if (gitCredentialsOpen) return setGitCredentialsOpen(false), true;
     if (pluginManagerOpen) return setPluginManagerOpen(false), true;
     if (pluginSettingsId) return setPluginSettingsId(null), true;
-    if (selected) return setSelected(null), true;
-    if (createTaskProjectId) return setCreateTaskProjectId(null), true;
     if (composeOpen) return setComposeOpen(false), true;
     if (settingsOpen) return setSettingsOpen(false), true;
     if (nativeModulesOpen) return setNativeModulesOpen(false), true;
@@ -937,9 +938,10 @@ function HomeScreen({
       diffContext ||
       webContainerTarget ||
       focusedApprovalId ||
+      selected ||
+      agentDetail ||
       searchOpen ||
       notificationsOpen ||
-      agentDetail ||
       pipelinesOpen ||
       plansOpen ||
       projectsOpen ||
@@ -991,14 +993,14 @@ function HomeScreen({
                       const entryIssue = sandboxContext.issue;
                       if (!entryIssue) return;
                       setSandboxContext(null);
-                      navigateTab("tasks");
                       setSelected(entryIssue);
                     }
                   : undefined
               }
               onOpenArtifacts={() => {
                 setSandboxContext(null);
-                navigateTab("artifacts");
+                setAssetsTab("artifacts");
+                navigateTab("assets");
               }}
             />
           ) : diffContext ? (
@@ -1027,47 +1029,42 @@ function HomeScreen({
               approvalId={focusedApprovalId}
               onBack={() => setFocusedApprovalId(null)}
             />
-          ) : searchOpen ? (
-            <SearchScreen
-              company={company}
-              onBack={() => setSearchOpen(false)}
-              onOpenIssue={(issueItem) => {
-                setSearchOpen(false);
-                navigateTab("tasks");
-                setSelected(issueItem);
-              }}
-              onOpenAgent={(agent: SearchAgentResult) => {
-                setSearchOpen(false);
-                setAgentDetail(agent);
-              }}
-            />
-          ) : notificationsOpen ? (
-            <InboxScreen
-              company={company}
-              onBack={() => setNotificationsOpen(false)}
-              onOpenIssue={(issueItem) => {
-                setNotificationsOpen(false);
-                navigateTab("tasks");
-                setSelected(issueItem);
-              }}
-              onOpenApproval={(approvalId) => {
-                setNotificationsOpen(false);
-                setFocusedApprovalId(approvalId);
-              }}
-              onOpenWorkshop={() => {
-                setNotificationsOpen(false);
-                navigateTab("chat");
-              }}
-            />
+          ) : selected ? (
+            taskDetail
           ) : agentDetail ? (
             <AgentDetailScreen
               company={company}
               agent={agentDetail}
               onBack={() => setAgentDetail(null)}
               onOpenIssue={(issueItem) => {
-                setAgentDetail(null);
-                navigateTab("tasks");
                 setSelected(issueItem);
+              }}
+            />
+          ) : searchOpen ? (
+            <SearchScreen
+              company={company}
+              onBack={() => setSearchOpen(false)}
+              onOpenIssue={(issueItem) => {
+                setSelected(issueItem);
+              }}
+              onOpenAgent={(agent: SearchAgentResult) => {
+                setAgentDetail(agent);
+              }}
+            />
+          ) : notificationsOpen ? (
+            <InboxScreen
+              company={company}
+              initialTab={inboxInitialTab}
+              onBack={() => setNotificationsOpen(false)}
+              onOpenIssue={(issueItem) => {
+                setSelected(issueItem);
+              }}
+              onOpenApproval={(approvalId) => {
+                setFocusedApprovalId(approvalId);
+              }}
+              onOpenWorkshop={() => {
+                setNotificationsOpen(false);
+                navigateTab("chat");
               }}
             />
           ) : pipelinesOpen ? (
@@ -1083,8 +1080,6 @@ function HomeScreen({
               company={company}
               onBack={() => setPlansOpen(false)}
               onOpenPlan={(issue) => {
-                setPlansOpen(false);
-                navigateTab("tasks");
                 setSelected(issue);
               }}
             />
@@ -1157,14 +1152,10 @@ function HomeScreen({
                 setWebContainerTarget({ path: path || "/dashboard", title: title || "控制台" })
               }
               onOpenApprovals={() => {
-                setSelected(null);
-                setDiffContext(null);
-                setSandboxContext(null);
-                setFocusedApprovalId(null);
-                navigateTab("tasks");
+                setInboxInitialTab("approvals");
+                setNotificationsOpen(true);
               }}
               onOpenApproval={(approvalId) => {
-                navigateTab("tasks");
                 setFocusedApprovalId(approvalId);
               }}
             />
@@ -1172,11 +1163,9 @@ function HomeScreen({
             <InboxScreen
               company={company}
               onOpenApproval={(approvalId) => {
-                navigateTab("tasks");
                 setFocusedApprovalId(approvalId);
               }}
               onOpenIssue={(issue) => {
-                navigateTab("tasks");
                 setSelected(issue);
               }}
             />
@@ -1186,12 +1175,10 @@ function HomeScreen({
                 company={company}
                 whoami={whoami}
                 // COOA-4 走查注 (2026-10-04): 不加 navigateTab 是对的 — focusedApprovalId
-                // 的浮层分支在上层三元链里先于 tab 分支求值 (见下方 ApprovalFocusDetail),
-                // chat 里点「查看详情」直接盖到当前 tab 上, 返回键回到 chat。补 navigateTab
-                // 反而会改变返回落点。
+                // 与 selected 的浮层分支在上层三元链里先于 tab 分支求值,
+                // chat 里点任务/审批直接盖到当前 tab 上, 返回键回到 chat。
                 onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
                 onOpenIssue={(issue) => {
-                  navigateTab("tasks");
                   setSelected(issue);
                 }}
                 onOpenPipeline={(pipelineId) => {
@@ -1202,7 +1189,6 @@ function HomeScreen({
                   });
                 }}
                 onOpenPlan={(issue) => {
-                  navigateTab("tasks");
                   setSelected(issue);
                 }}
               />
@@ -1211,9 +1197,9 @@ function HomeScreen({
             <OrgAssetsScreen
               company={company}
               whoami={whoami}
-              initialTab="ontology"
+              activeTab={assetsTab}
+              onTabChange={setAssetsTab}
               onOpenIssue={(issue) => {
-                navigateTab("tasks");
                 setSelected(issue);
               }}
               onOpenProjectTasks={(project) => {
@@ -1271,23 +1257,18 @@ function HomeScreen({
             <AgentsScreen
               company={company}
               onOpenIssue={(issue) => {
-                navigateTab("tasks");
                 setSelected(issue);
               }}
             />
           ) : tab === "tasks" ? (
-            selected ? (
-              taskDetail
-            ) : (
-              <ScreenErrorBoundary fallbackTitle="任务看板加载异常">
-                <TaskKanbanScreen
-                  company={company}
-                  refreshToken={tasksRefreshToken}
-                  initialProjectId={tasksFilterProjectId}
-                  onOpenIssue={setSelected}
-                />
-              </ScreenErrorBoundary>
-            )
+            <ScreenErrorBoundary fallbackTitle="任务看板加载异常">
+              <TaskKanbanScreen
+                company={company}
+                refreshToken={tasksRefreshToken}
+                initialProjectId={tasksFilterProjectId}
+                onOpenIssue={setSelected}
+              />
+            </ScreenErrorBoundary>
           ) : null}
         </View>
         {appUpdate ? <AppUpdateCard info={appUpdate} onClose={() => setAppUpdate(null)} /> : null}

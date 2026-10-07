@@ -28,6 +28,8 @@ interface OrgAssetsScreenProps {
   onSwitchCompany?: (next: Company) => void;
   whoami?: string;
   initialTab?: OrgAssetTab;
+  activeTab?: OrgAssetTab;
+  onTabChange?: (tab: OrgAssetTab) => void;
   initialArtifactsProjectId?: string | null;
   onOpenIssue: (issue: Issue) => void;
   onOpenProjectTasks?: (project: Project) => void;
@@ -73,6 +75,8 @@ export function OrgAssetsScreen({
   onSwitchCompany,
   whoami,
   initialTab = "ontology",
+  activeTab: controlledActiveTab,
+  onTabChange,
   initialArtifactsProjectId,
   onOpenIssue,
   onOpenProjectTasks,
@@ -89,7 +93,12 @@ export function OrgAssetsScreen({
   onNavigateToChat,
   onNavigateToTasks,
 }: OrgAssetsScreenProps) {
-  const [activeTab, setActiveTab] = useState<OrgAssetTab>(initialTab);
+  const [internalActiveTab, setInternalActiveTab] = useState<OrgAssetTab>(initialTab);
+  const activeTab = controlledActiveTab ?? internalActiveTab;
+  const setActiveTab = (nextTab: OrgAssetTab) => {
+    onTabChange?.(nextTab);
+    setInternalActiveTab(nextTab);
+  };
   const [artifactsProjectId, setArtifactsProjectId] = useState<string | null>(
     initialArtifactsProjectId ?? null,
   );

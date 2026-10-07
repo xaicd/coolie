@@ -244,7 +244,7 @@ export function TaskDetailScreen({
             />
           }
         >
-          <ScreenHeader onBack={onBack} backLabel="返回任务列表" />
+          <ScreenHeader onBack={onBack} backLabel="返回" />
 
           <Text style={styles.title}>{currentIssue.title}</Text>
 

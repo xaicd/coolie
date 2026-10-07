@@ -125,6 +125,7 @@ function countActiveFilters(filters: InboxFilters): number {
  */
 export function InboxScreen({
   company,
+  initialTab = "all",
   onOpenIssue,
   onOpenApproval,
   onOpenSettings,
@@ -132,13 +133,20 @@ export function InboxScreen({
   onBack,
 }: {
   company: { id: string; name: string };
+  initialTab?: InboxTab;
   onOpenIssue: (issue: Issue) => void;
   onOpenApproval: (approvalId: string) => void;
   onOpenSettings?: () => void;
   onOpenWorkshop?: () => void;
   onBack?: () => void;
 }) {
-  const [tab, setTab] = useState<InboxTab>("all");
+  const [tab, setTab] = useState<InboxTab>(initialTab);
+
+  useEffect(() => {
+    if (initialTab) {
+      setTab(initialTab);
+    }
+  }, [initialTab]);
   const [issues, setIssues] = useState<Issue[]>([]);
   const [mentions, setMentions] = useState<InboxMentionItem[]>([]);
   const [approvals, setApprovals] = useState<InboxApprovalItem[]>([]);
