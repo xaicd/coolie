@@ -66,6 +66,18 @@ CRON_TAG="wave276-team-status"
 STUCK_THRESHOLD_HOURS="${STUCK_THRESHOLD_HOURS:-4}"
 TEAM_STATUS_CMD="${TEAM_STATUS_CMD:-$HOME/bin/team-status-notify.sh}"
 
+# ═══ wave358: 多环境 Hermes 动态命名与角色标识 (Palantir Echo/Delta/Dev 矩阵) ═══
+# 微信汇报标题与 JSON 自适应透出本机作战身份 (archetype) 与正交物理部署宿主
+# (deployEnv)。换机不改脚本: 身份文件覆盖链见 scripts/lib/env-identity.sh。
+source "$REPO_ROOT/scripts/lib/env-identity.sh"
+PM_DISPLAY="$(hermes_display_name)"
+PM_BADGE_FULL="$(hermes_badge_full)"
+PM_ARCHETYPE="$(env_archetype)"
+DEPLOY_ENV="$(deploy_env)"
+# 微信标题用短徽记 (显示名·作战标签, 去方括号): 例 "Hermes·Echo·业务战略·宿主local"
+PM_WECHAT_TAG="$(printf '%s·宿主%s' "$(hermes_badge | tr -d '【】')" "$DEPLOY_ENV")"
+PM_IDENTITY="$(env_header_value)"
+
 usage() {
   cat <<'EOF'
 usage: scripts/cron-team-status.sh [--print | --json | --dry-run | --register | --unregister]
@@ -531,7 +543,7 @@ for (const file of files.slice(0, 15)) {
 }
 
 const time = new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
-console.log(`【wave进展·${time}】`);
+console.log(`【wave进展·${time}·${process.argv[2] || ""}】`);
 if (running.length > 0) {
   const r = running[0];
   const dur = formatDuration(r.startedAt || r.createdAt);
@@ -561,7 +573,7 @@ if (alert) {
   console.log(alert);
 }
 console.log("");
-' "$dispatch_dir"
+' "$dispatch_dir" "$PM_WECHAT_TAG"
   fi
 }
 
@@ -595,7 +607,10 @@ if (fs.existsSync(dir)) {
 }
 
 const time = new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", hour12: false });
-console.log(`【谁在用什么工具干什么 · 实时全景 (${time})】`);
+const pmName = process.argv[3] || "Hermes";
+const pmIdentityLine = process.argv[4] || "";
+console.log(`【谁在用什么工具干什么 · ${pmName} 实时全景 (${time})】`);
+if (pmIdentityLine) console.log(`调度节点: ${pmIdentityLine}`);
 console.log("--------------------------------------------------------------------------------");
 
 employees.forEach(emp => {
@@ -604,7 +619,7 @@ employees.forEach(emp => {
   const blocked = receipts.find(r => (r.employee === emp.name || r.subagentType === emp.name) && (r.status === "blocked" || r.status === "failed"));
 
   let statusText = "待命中";
-  let actionText = "等待 Hermes 派工";
+  let actionText = `等待 ${pmName} 派工`;
   let toolUsed = emp.defaultTool;
   let icon = "🟡";
 
@@ -629,7 +644,7 @@ employees.forEach(emp => {
   console.log(`   📊 状态: ${statusText}`);
   console.log("");
 });
-' "$dispatch_dir" "$roster_payload"
+' "$dispatch_dir" "$roster_payload" "$PM_DISPLAY" "${PM_BADGE_FULL} · 宿主: ${DEPLOY_ENV}"
 }
 
 render_table() {
@@ -674,6 +689,10 @@ render_json() {
   echo "  \"timestamp\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\","
   echo "  \"source\": \"scripts/cron-team-status.sh\","
   echo "  \"wave\": \"wave276\","
+  echo "  \"pm\": \"${PM_DISPLAY}\","
+  echo "  \"archetype\": \"${PM_ARCHETYPE}\","
+  echo "  \"deployEnv\": \"${DEPLOY_ENV}\","
+  echo "  \"pmIdentity\": \"${PM_IDENTITY}\","
   echo "  \"rows\": ["
   if [[ -z "$rows" ]]; then
     echo "    {\"pid\": null, \"employee\": \"全员\", \"task\": \"-\", \"tool\": \"-\", \"raw_tool\": \"-\", \"subagent_type\": \"-\", \"duration\": \"-\", \"status\": \"等派活\"}"

@@ -1163,7 +1163,7 @@
       "path": "scripts/dispatch-local-employee.sh",
       "maxNetLines": 420,
       "maxTotalLines": 450,
-      "reason": "wave282: Hermes fixed employee dispatch helper with structured receipt, context bus handover, and status lifecycle."
+      "reason": "wave282: Hermes fixed employee dispatch helper with structured receipt, context bus handover, and status lifecycle. wave358: 调度令 Header 与 receipt 自适应透出多环境 Palantir 作战身份 (scripts/lib/env-identity.sh)。"
     },
     {
       "path": "scripts/context-bus.sh",
@@ -1235,7 +1235,7 @@
       "path": "scripts/cron-team-status.sh",
       "maxNetLines": 720,
       "maxTotalLines": 750,
-      "reason": "wave278: Hermes local team status reporter and WeChat progress notifier."
+      "reason": "wave278: Hermes local team status reporter and WeChat progress notifier. wave358: 微信汇报标题与 JSON 自适应透出多环境 Palantir 作战身份 (scripts/lib/env-identity.sh)。"
     },
     {
       "path": "scripts/event-trigger.sh",
@@ -1506,6 +1506,24 @@
       "maxNetLines": 320,
       "reason": "wave358: Test suite for dispatch dedup checker helper.",
       "maxTotalLines": 350
+    },
+    {
+      "path": "scripts/lib/env-identity.sh",
+      "maxNetLines": 220,
+      "reason": "wave358: 多环境 Hermes 动态命名与环境身份共享层 (Palantir Echo/Delta/Dev 作战力量 × prod/staging/local 部署宿主正交矩阵)。与 team-roster.sh (谁干活) 互补: 这里回答「这台机器是谁、在哪个作战维度」。派单 Header、微信汇报与工坊会话 (server/src/services/env-identity.ts) 三面共用同一套矩阵。",
+      "maxTotalLines": 240
+    },
+    {
+      "path": "scripts/lib/default-env-identity.json",
+      "maxNetLines": 20,
+      "reason": "wave358: 仓库默认节点身份 (本机 = Hermes 掌柜 Echo / local)。换机不改脚本: 覆盖顺序 $COOLIE_ENV_IDENTITY > .coolie-local/env-identity.json > 本文件。",
+      "maxTotalLines": 20
+    },
+    {
+      "path": "scripts/lib/env-identity.test.mjs",
+      "maxNetLines": 210,
+      "reason": "wave358: Test suite for env-identity helper — 默认身份 / 全矩阵覆盖 / 三层优先级 / 非法值兜底 / 老字段兼容 / 动态命名公式。",
+      "maxTotalLines": 230
     }
   ]
 }

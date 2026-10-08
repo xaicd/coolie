@@ -292,6 +292,19 @@ if [[ -z "$EMPLOYEE" ]]; then
   exit 1
 fi
 
+# ═══ wave358: 多环境 Hermes 动态命名与角色标识 (Palantir Echo/Delta/Dev 矩阵) ═══
+# 派单 Header 与 receipt 自适应透出本机作战身份 (archetype) 与正交物理部署宿主
+# (deployEnv)。换机不改脚本: 身份文件覆盖链见 scripts/lib/env-identity.sh
+# ($COOLIE_ENV_IDENTITY > .coolie-local/env-identity.json > 仓库默认)。
+source "$REPO_ROOT/scripts/lib/env-identity.sh"
+PM_DISPLAY="$(hermes_display_name)"
+PM_BADGE="$(hermes_badge)"
+PM_BADGE_FULL="$(hermes_badge_full)"
+PM_SCOPE="$(env_scope)"
+DEPLOY_ENV="$(deploy_env)"
+PM_PROJECT="$(env_field projectName)" || true
+PM_IDENTITY="$(env_header_value)"
+
 TOOL="${TOOL:-$DEFAULT_TOOL}"
 
 # Auto-detect wave if not explicitly passed
@@ -319,16 +332,18 @@ prompt_file="$dispatch_dir/${receipt_id}.md"
 
 make_prompt() {
   cat <<EOF
-【Hermes 扁平化数字员工调度令 · Role System Prompt 注入】
+【${PM_DISPLAY} 扁平化数字员工调度令 · Role System Prompt 注入】
 
 你是当前执行任务的直属员工：【${EMPLOYEE}】（角色代码: ${AGENT}）
-你直接受命于项目总指挥 Hermes，以最高专业度独立完成本项任务。
+你直接受命于项目总指挥 ${PM_DISPLAY}（${PM_BADGE}），以最高专业度独立完成本项任务。
 所属团队：Coolie 平台研发工程组
 当前任务：${TASK}
 波次编号：${WAVE}
 底层引擎：${TOOL}
 工作仓库：${REPO_ROOT}
 当前分支：$(git -C "$REPO_ROOT" rev-parse --abbrev-ref HEAD 2>/dev/null || printf 'unknown')
+调度节点身份：${PM_BADGE_FULL} · ${PM_SCOPE} · 宿主: ${DEPLOY_ENV} · 项目: ${PM_PROJECT:-未声明}
+身份Header：${PM_IDENTITY}
 
 ================================================================================
 👑【老板亲自定调的最高交付与使用主义总则（Boss Delivery & UX Commandments）】
@@ -394,7 +409,8 @@ const data = {
   wave: argv[2],
   createdAt: argv[3],
   bossInput: argv[4],
-  pm: "Hermes",
+  pm: argv[20] || "Hermes",
+  pmIdentity: argv[21] || null,
   employee: argv[5],
   subagentType: argv[6],
   task: argv[7],
@@ -433,7 +449,9 @@ fs.writeFileSync(argv[19], JSON.stringify(data, null, 2), "utf8");
     "$p_completed_at" \
     "$p_commit" \
     "$p_reason" \
-    "$json_file"
+    "$json_file" \
+    "$PM_DISPLAY" \
+    "$PM_IDENTITY"
 }
 
 if [[ "$PRINT_ONLY" -eq 1 ]]; then
