@@ -134,3 +134,8 @@ docs-coolie/evidence/**/*.webm
 docs-coolie/evidence/**/*.zip
 docs-coolie/evidence/e2e/**/html-report/
 docs-coolie/evidence/e2e/**/artifacts/
+
+# Office document review copies (local viewing only, not tracked in git per engineering discipline)
+*.docx
+*.xlsx
+*.pptx
