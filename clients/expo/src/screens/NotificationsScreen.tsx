@@ -1,7 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  ActivityIndicator,
-  Pressable,
   RefreshControl,
   SafeAreaView,
   ScrollView,
@@ -126,11 +124,6 @@ export function NotificationsScreen({
           title="通知中心"
           onBack={onBack}
           backLabel="返回"
-          right={
-            <View style={styles.unreadChip}>
-              <Text style={styles.unreadChipText}>{unreadCount} 未读</Text>
-            </View>
-          }
         />
         <SegmentedControl
           style={{ marginTop: 10 }}
@@ -211,13 +204,6 @@ export function NotificationsScreen({
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.bg },
   header: { paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8 },
-  unreadChip: {
-    backgroundColor: "rgba(239, 68, 68, 0.15)",
-    borderRadius: 999,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  unreadChipText: { color: C.err, fontSize: 11, fontWeight: "600", fontVariant: ["tabular-nums"] },
   loader: { flex: 0, marginTop: 32, padding: 0 },
   errorCard: { marginTop: 16, backgroundColor: C.surface, borderRadius: 14, borderWidth: 0 },
   list: { padding: 16, paddingBottom: 32, gap: 10 },
