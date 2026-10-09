@@ -19,6 +19,7 @@ import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
 import type { Agent, Issue, Project } from "@coolie/api-client";
 import { C, coolie, type InboxApprovalItem, type InboxMentionItem } from "../coolie";
+import { useNotificationsStore } from "../stores/notifications";
 import { StatusDot } from "../components/StatusDot";
 import { AppCard } from "../ui/AppCard";
 import { EmptyState } from "../ui/EmptyState";
@@ -141,6 +142,8 @@ export function InboxScreen({
   onBack?: () => void;
 }) {
   const [tab, setTab] = useState<InboxTab>(initialTab);
+  const unreadCount = useNotificationsStore((s) => s.unreadCount);
+  const markAllRead = useNotificationsStore((s) => s.markAllRead);
 
   useEffect(() => {
     if (initialTab) {
@@ -368,6 +371,12 @@ export function InboxScreen({
     [issueById, onOpenIssue, company.id],
   );
 
+  // wave364 — 点任务卡即已读: 收件箱不再有独立"已读"按钮, 单条任务点击 = markAllRead。
+  // 用 unreadCount > 0 守卫, 已读状态下点击不触发冗余写入。
+  const tapRead = useCallback(() => {
+    if (unreadCount > 0) void markAllRead();
+  }, [unreadCount, markAllRead]);
+
   const activeFilterCount = countActiveFilters(filters);
   const showBlocked = tab === "blocked";
   const isBlockedViewBlocked = showBlocked && blockedRows.length === 0;
@@ -503,7 +512,10 @@ export function InboxScreen({
                       issue.assigneeAgentId ? agentNameById.get(issue.assigneeAgentId) ?? "员工" : null
                     }
                     projectName={issue.projectId ? projectNameById.get(issue.projectId) ?? null : null}
-                    onPress={() => onOpenIssue(issue)}
+                    onPress={() => {
+                      tapRead();
+                      onOpenIssue(issue);
+                    }}
                     onLongPress={() => setActionIssue(issue)}
                   />
                 </SwipeToArchive>
@@ -525,7 +537,10 @@ export function InboxScreen({
                   key={item.id}
                   variant="surface"
                   style={styles.mentionCard}
-                  onPress={() => openMention(item)}
+                  onPress={() => {
+                    tapRead();
+                    openMention(item);
+                  }}
                 >
                   <View style={styles.mentionHeader}>
                     <Text style={styles.mentionAuthor} numberOfLines={1}>
@@ -559,7 +574,10 @@ export function InboxScreen({
                   variant="surface"
                   row
                   style={styles.approvalRow}
-                  onPress={() => onOpenApproval(item.id)}
+                  onPress={() => {
+                    tapRead();
+                    onOpenApproval(item.id);
+                  }}
                 >
                   <View style={[styles.rowDot, { backgroundColor: C.warn }]} />
                   <View style={{ flex: 1, gap: 3 }}>
@@ -591,7 +609,10 @@ export function InboxScreen({
                   <BlockedRow
                     key={row.issue.id}
                     row={row}
-                    onPress={() => onOpenIssue(row.issue)}
+                    onPress={() => {
+                      tapRead();
+                      onOpenIssue(row.issue);
+                    }}
                     onLongPress={() => setActionIssue(row.issue)}
                   />
                 ))}
@@ -606,7 +627,10 @@ export function InboxScreen({
                     <BlockedRow
                       key={row.issue.id}
                       row={row}
-                      onPress={() => onOpenIssue(row.issue)}
+                      onPress={() => {
+                        tapRead();
+                        onOpenIssue(row.issue);
+                      }}
                       onLongPress={() => setActionIssue(row.issue)}
                     />
                   ))}
