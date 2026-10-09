@@ -13,6 +13,11 @@ import * as acp from "@agentclientprotocol/sdk";
 import { Readable, Writable } from "node:stream";
 import { spawn, execSync } from "node:child_process";
 import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(__dirname, "../..");
 
 class AgyAcpAgent {
   sessions = new Map();
@@ -45,9 +50,10 @@ class AgyAcpAgent {
   }
 
   async prompt(params, cx) {
-    const session = this.sessions.get(params.sessionId);
+    let session = this.sessions.get(params.sessionId);
     if (!session) {
-      throw new Error(`Session ${params.sessionId} not found`);
+      session = { activeProcess: null };
+      this.sessions.set(params.sessionId, session);
     }
 
     let promptText = "";
@@ -67,6 +73,7 @@ class AgyAcpAgent {
     // Determine execution strategy
     let bin = "";
     let args = [];
+    let promptFilePath = null;
 
     if (fs.existsSync("/root/.local/bin/agy")) {
       bin = "/root/.local/bin/agy";
@@ -83,7 +90,43 @@ class AgyAcpAgent {
 
       if (dockerRunning) {
         bin = "docker";
-        args = ["exec", "-i", "-e", "LANG=C.UTF-8", "agy-ubuntu-container", "/root/.local/bin/agy", "-p", promptText, "--dangerously-skip-permissions"];
+        const repoTmpDir = path.resolve(repoRoot, ".coolie-local/tmp");
+        if (!fs.existsSync(repoTmpDir)) {
+          try { fs.mkdirSync(repoTmpDir, { recursive: true }); } catch {}
+        }
+        promptFilePath = path.join(repoTmpDir, `agy-prompt-${params.sessionId}.md`);
+        fs.writeFileSync(promptFilePath, promptText, "utf8");
+
+        // Map Mac host repo path /Users/mac/workspace/... -> /host-workspace/... in container
+        const containerRepoRoot = repoRoot.replace(/^\/Users\/mac\/workspace/, "/host-workspace");
+        const containerPromptFile = path.join(containerRepoRoot, ".coolie-local/tmp", `agy-prompt-${params.sessionId}.md`);
+
+        // CWD calculation: if host CWD is under /Users/mac/workspace, map it; otherwise fall back to containerRepoRoot
+        const hostCwd = process.cwd();
+        let containerCwd = containerRepoRoot;
+        if (hostCwd.startsWith("/Users/mac/workspace")) {
+          containerCwd = hostCwd.replace(/^\/Users\/mac\/workspace/, "/host-workspace");
+        }
+
+        const envFlags = [
+          "-e", "LANG=C.UTF-8",
+          "-e", "LC_ALL=C.UTF-8",
+        ];
+        for (const [k, v] of Object.entries(process.env)) {
+          if (k.startsWith("PAPERCLIP_") || k === "DATABASE_URL") {
+            envFlags.push("-e", `${k}=${v}`);
+          }
+        }
+
+        args = [
+          "exec",
+          "-i",
+          ...envFlags,
+          "agy-ubuntu-container",
+          "bash",
+          "-c",
+          `cd "${containerCwd}" 2>/dev/null || cd "${containerRepoRoot}"; exec /root/.local/bin/agy -p "$(< "${containerPromptFile}")" --dangerously-skip-permissions`
+        ];
       } else {
         bin = "agy";
         args = ["-p", promptText, "--dangerously-skip-permissions"];
@@ -96,6 +139,13 @@ class AgyAcpAgent {
       });
 
       session.activeProcess = proc;
+
+      const cleanup = () => {
+        if (promptFilePath) {
+          try { fs.unlinkSync(promptFilePath); } catch {}
+          promptFilePath = null;
+        }
+      };
 
       proc.stdout.on("data", async (chunk) => {
         const text = chunk.toString("utf8");
@@ -134,11 +184,13 @@ class AgyAcpAgent {
       });
 
       proc.on("error", (err) => {
+        cleanup();
         session.activeProcess = null;
         reject(err);
       });
 
       proc.on("close", (code) => {
+        cleanup();
         session.activeProcess = null;
         resolve({
           stopReason: code === 0 ? "end_turn" : "error",
