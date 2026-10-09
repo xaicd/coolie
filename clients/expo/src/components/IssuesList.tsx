@@ -283,6 +283,7 @@ export function IssuesList({
         <SectionsView
           groups={groups}
           parentById={parentById}
+          agentNameById={agentNameById}
           onIssuePress={stableIssuePress}
           onIssueLongPress={stableIssueLongPress}
           refreshControl={refreshControl}
@@ -295,6 +296,7 @@ export function IssuesList({
         <SectionsView
           groups={focusGroups}
           parentById={parentById}
+          agentNameById={agentNameById}
           onIssuePress={stableIssuePress}
           onIssueLongPress={stableIssueLongPress}
           refreshControl={refreshControl}
@@ -307,6 +309,7 @@ export function IssuesList({
         <FlatView
           issues={visible}
           parentById={parentById}
+          agentNameById={agentNameById}
           onIssuePress={stableIssuePress}
           onIssueLongPress={stableIssueLongPress}
           refreshControl={refreshControl}
@@ -416,19 +419,25 @@ function GroupHeader({ label, count }: { label: string; count: number }) {
 function IssueRowSlot({
   issue,
   parentById,
+  agentNameById,
   onIssuePress,
   onIssueLongPress,
 }: {
   issue: Issue;
   parentById: Map<string, { id: string; isMilestone?: boolean }>;
+  agentNameById?: Map<string, string>;
   onIssuePress: (issue: Issue) => void;
   onIssueLongPress?: (issue: Issue) => void;
 }) {
+  const assigneeName = issue.assigneeAgentId
+    ? (agentNameById?.get(issue.assigneeAgentId) ?? null)
+    : null;
   return (
     <View style={styles.rowSlot}>
       <IssueRow
         issue={issue}
         parentIssue={issue.parentId ? parentById.get(issue.parentId) ?? null : null}
+        assigneeName={assigneeName}
         onPress={onIssuePress}
         onLongPress={onIssueLongPress}
       />
@@ -444,6 +453,7 @@ function IssueRowSlot({
 function FlatView({
   issues,
   parentById,
+  agentNameById,
   onIssuePress,
   onIssueLongPress,
   refreshControl,
@@ -454,6 +464,7 @@ function FlatView({
 }: {
   issues: Issue[];
   parentById: Map<string, { id: string; isMilestone?: boolean }>;
+  agentNameById?: Map<string, string>;
   onIssuePress: (issue: Issue) => void;
   onIssueLongPress?: (issue: Issue) => void;
   refreshControl?: ReactElement;
@@ -467,11 +478,12 @@ function FlatView({
       <IssueRowSlot
         issue={item}
         parentById={parentById}
+        agentNameById={agentNameById}
         onIssuePress={onIssuePress}
         onIssueLongPress={onIssueLongPress}
       />
     ),
-    [parentById, onIssuePress, onIssueLongPress],
+    [parentById, agentNameById, onIssuePress, onIssueLongPress],
   );
 
   // wave286: 距底 ≈10 行槽预取 (REQ-NAT-003); 虚拟化参数冻结 (REQ-NFR-004)。
@@ -512,6 +524,7 @@ function FlatView({
 function SectionsView({
   groups,
   parentById,
+  agentNameById,
   onIssuePress,
   onIssueLongPress,
   refreshControl,
@@ -522,6 +535,7 @@ function SectionsView({
 }: {
   groups: { key: string; label: string; items: Issue[] }[];
   parentById: Map<string, { id: string; isMilestone?: boolean }>;
+  agentNameById?: Map<string, string>;
   onIssuePress: (issue: Issue) => void;
   onIssueLongPress?: (issue: Issue) => void;
   refreshControl?: ReactElement;
@@ -545,11 +559,12 @@ function SectionsView({
       <IssueRowSlot
         issue={item}
         parentById={parentById}
+        agentNameById={agentNameById}
         onIssuePress={onIssuePress}
         onIssueLongPress={onIssueLongPress}
       />
     ),
-    [parentById, onIssuePress, onIssueLongPress],
+    [parentById, agentNameById, onIssuePress, onIssueLongPress],
   );
 
   const renderSectionHeader = useCallback(

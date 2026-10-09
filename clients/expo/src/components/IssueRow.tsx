@@ -27,6 +27,7 @@ const SPEC_KIND_BADGE: Record<IssueSpecKind, string> = {
 export const IssueRow = memo(function IssueRow({
   issue,
   parentIssue,
+  assigneeName,
   onPress,
   onLongPress,
   timestamp,
@@ -36,6 +37,7 @@ export const IssueRow = memo(function IssueRow({
   /** Optional parent issue (for 支线 / 临时 判定). TasksScreen 不传时,
    * 这两个徽标不会渲染, 只会看到 [主线] 和 [Spec · ...]。 */
   parentIssue?: Pick<Issue, "id" | "isMilestone"> | null;
+  assigneeName?: string | null;
   onPress: (issue: Issue) => void;
   /** wave156: long-press on a mainline row sets the "聚焦下钻此主线" filter. */
   onLongPress?: (issue: Issue) => void;
@@ -113,6 +115,14 @@ export const IssueRow = memo(function IssueRow({
         <Text style={[styles.statusLabel, { color }]} numberOfLines={1}>
           {issue.status}
         </Text>
+      ) : null}
+
+      {assigneeName ? (
+        <View style={styles.assigneeBadge}>
+          <Text style={styles.assigneeBadgeText} numberOfLines={1}>
+            {assigneeName}
+          </Text>
+        </View>
       ) : null}
 
       {time ? <Text style={styles.time}>{time}</Text> : null}
@@ -213,5 +223,16 @@ const styles = StyleSheet.create({
     color: C.ink4,
     fontSize: 12,
     fontVariant: ["tabular-nums"],
+  },
+  assigneeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 1.5,
+    backgroundColor: "rgba(255, 255, 255, 0.08)",
+    borderRadius: RADIUS.pill,
+  },
+  assigneeBadgeText: {
+    color: C.ink3,
+    fontSize: 10,
+    fontWeight: "500",
   },
 });
