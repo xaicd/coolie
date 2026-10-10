@@ -26,7 +26,7 @@ class AgyAcpAgent {
     return {
       protocolVersion: acp.PROTOCOL_VERSION,
       agentCapabilities: {
-        loadSession: false,
+        loadSession: true,
       },
       serverInfo: {
         name: "docker-agy-acp",
@@ -39,6 +39,16 @@ class AgyAcpAgent {
     const sessionId = "agy-" + Math.random().toString(36).slice(2, 10);
     this.sessions.set(sessionId, { activeProcess: null });
     return { sessionId };
+  }
+
+  async loadSession(params) {
+    const sessionId = params?.sessionId || ("agy-" + Math.random().toString(36).slice(2, 10));
+    this.sessions.set(sessionId, { activeProcess: null });
+    return { sessionId };
+  }
+
+  async resumeSession(params) {
+    return this.loadSession(params);
   }
 
   async authenticate(_params) {
@@ -216,6 +226,8 @@ acp
   .agent({ name: "docker-agy-acp" })
   .onRequest("initialize", (ctx) => agent.initialize(ctx.params))
   .onRequest("session/new", (ctx) => agent.newSession(ctx.params))
+  .onRequest("session/load", (ctx) => agent.loadSession(ctx.params))
+  .onRequest("session/resume", (ctx) => agent.resumeSession(ctx.params))
   .onRequest("authenticate", (ctx) => agent.authenticate(ctx.params))
   .onRequest("session/set_mode", (ctx) => agent.setSessionMode(ctx.params))
   .onRequest("session/prompt", (ctx) => agent.prompt(ctx.params, ctx.client))
