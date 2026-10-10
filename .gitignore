@@ -61,7 +61,6 @@ diagnostics/
 .coolie-local/
 .paperclip-runtime/
 /.idea/
-/.agents/
 
 # Doc maintenance cursor
 .doc-review-cursor
@@ -139,3 +138,7 @@ docs-coolie/evidence/e2e/**/artifacts/
 *.docx
 *.xlsx
 *.pptx
+
+# Client delivery project workspaces (independent git repos / isolated workspaces managed by Paperclip)
+projects/sys-jiuxia-smart/
+projects/sys-yunnan-wecom/

@@ -1,6 +1,13 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { execSync } from 'node:child_process';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const REPO_ROOT = path.resolve(__dirname, '..');
+process.chdir(REPO_ROOT);
 
 console.log('========================================================================');
 console.log('🏛️  Coolie 高管级全生命周期交付与交互审计守卫 (Governance Audit Gate)');
@@ -153,11 +160,33 @@ const hasTwentyTwoArticles = constitutionContent.includes('第 22 条') && const
 assertRule('根本大纲与工程宪法已沉淀: docs-coolie/research/2026-10-05-coolie-constitution-and-palantir-master-spec.md', constitutionExists && hasTwentyTwoArticles, '党章级法典缺失或条款不全');
 
 const agentsMdContent = fs.existsSync('AGENTS.md') ? fs.readFileSync('AGENTS.md', 'utf8') : '';
-const hasChapter18 = agentsMdContent.includes('## 18. Coolie 工坊唯一核心北极星目标与真业务本体物理并轨铁律');
-assertRule('AGENTS.md 已载入第 18 章北极星目标与真本体并轨铁律', hasChapter18, 'AGENTS.md 缺少第 18 章');
+const hasOntologyAxiom = agentsMdContent.includes('公理三：活体业务本体即中枢与真业务物理并轨铁律') || agentsMdContent.includes('北极星目标与真业务本体物理并轨铁律');
+assertRule('AGENTS.md 已载入真业务本体并轨法典 (公理三)', hasOntologyAxiom, 'AGENTS.md 缺少真本体并轨法典');
 
 const masterPlanExists = fs.existsSync('docs-coolie/research/2026-10-05-coolie-core-mission-and-real-ontology-master-plan.md');
 assertRule('真本体破局复盘白皮书已沉淀: docs-coolie/research/2026-10-05-coolie-core-mission-and-real-ontology-master-plan.md', masterPlanExists, '复盘白皮书未落盘');
+
+const oddRulePath = '.agents/rules/ONTOLOGY-DRIVEN-DEVELOPMENT.md';
+const oddRuleContent = fs.existsSync(oddRulePath) ? fs.readFileSync(oddRulePath, 'utf8') : '';
+assertRule(
+  'ODD 活体本体驱动开发规则落盘守卫: .agents/rules/ONTOLOGY-DRIVEN-DEVELOPMENT.md',
+  fs.existsSync(oddRulePath) && oddRuleContent.includes('Object Types') && oddRuleContent.includes('Action Types'),
+  '.agents/rules/ONTOLOGY-DRIVEN-DEVELOPMENT.md 未落盘或缺少业务双核定义',
+);
+
+const prescriptiveRulePath = '.agents/rules/PRESCRIPTIVE-ENGINEERING-CONTRACTS.md';
+const prescriptiveContent = fs.existsSync(prescriptiveRulePath) ? fs.readFileSync(prescriptiveRulePath, 'utf8') : '';
+assertRule(
+  '正向建设性工程契约最高法典已沉淀: .agents/rules/PRESCRIPTIVE-ENGINEERING-CONTRACTS.md',
+  fs.existsSync(prescriptiveRulePath) && prescriptiveContent.includes('RFC 2119') && prescriptiveContent.includes('Negation Blindness'),
+  '.agents/rules/PRESCRIPTIVE-ENGINEERING-CONTRACTS.md 缺失或未包含 RFC 2119 / 反否定盲区契约',
+);
+
+assertRule(
+  'AGENTS.md 已载入正向建设性工程契约与反否定盲区法典 (公理十二)',
+  agentsMdContent.includes('公理十二：正向建设性工程契约与反否定盲区铁律'),
+  'AGENTS.md 缺少公理十二',
+);
 
 // -----------------------------------------------------------------------------
 // 8. 宪法第 2 条「项目进厂即本体域」防退化守卫 (wave302)
@@ -272,9 +301,9 @@ console.log('\n🌐 10. Dev 与 Prod 环境职责红线与项目绝对物理隔�
 const agentsMd = fs.readFileSync('AGENTS.md', 'utf8');
 const terminologyMd = fs.readFileSync('docs-coolie/TERMINOLOGY.md', 'utf8');
 assertRule(
-  '环境隔离法典守卫: AGENTS.md 必须载入第 20 条 Dev/Prod 物理隔离铁律',
-  agentsMd.includes('## 20. Dev 与 Prod 环境职责红线与项目绝对物理隔离铁律'),
-  'AGENTS.md 丢失第 20 条 Dev 与 Prod 环境隔离铁律',
+  '环境隔离法典守卫: AGENTS.md 必须载入 Dev/Prod 物理隔离铁律 (公理七)',
+  agentsMd.includes('Dev 与 Prod 环境职责红线与项目绝对物理隔离铁律'),
+  'AGENTS.md 丢失 Dev 与 Prod 环境隔离铁律',
 );
 assertRule(
   '业务边界定义守卫: TERMINOLOGY.md 必须明确 Dev 专事工坊建设、Prod 专事实体交付',
@@ -342,11 +371,262 @@ assertRule(
   'TaskDetailScreen 头部返回文案仍包含口语化长词（如"返回任务列表"）',
 );
 
+console.log('\n🏢 13. AI 原生软件交付工厂与 CMMI 0-1 工程资产法典审计 (wave364):');
+const quickCardMd = fs.readFileSync('docs-coolie/PM-DISPATCH-QUICKCARD.md', 'utf8');
+const cmmiArtifactsRuleExists = fs.existsSync('.agents/rules/CMMI-SPEC-FIRST-ARTIFACTS.md');
+
+assertRule(
+  '工厂最高生态位法典守卫: AGENTS.md 必须载入公理一(商业软件交付工厂与三层隔离)与公理四(CMMI工程资产)',
+  agentsMd.includes('AI 原生商业软件交付工厂最高生态位与三层物理隔离铁律') &&
+  agentsMd.includes('CMMI 0-1 软件工程交付资产与 Spec-First 实体产物铁律'),
+  'AGENTS.md 缺失交付工厂与 CMMI 资产法典',
+);
+
+assertRule(
+  'CMMI Spec-First 规则落盘守卫: .agents/rules/CMMI-SPEC-FIRST-ARTIFACTS.md 必须存在且包含 No Artifact, No Done 铁律',
+  cmmiArtifactsRuleExists && fs.readFileSync('.agents/rules/CMMI-SPEC-FIRST-ARTIFACTS.md', 'utf8').includes('No Artifact, No Done'),
+  '.agents/rules/CMMI-SPEC-FIRST-ARTIFACTS.md 规则缺失或未声明 No Artifact, No Done 铁律',
+);
+
+assertRule(
+  '生命周期术语隔离守卫: TERMINOLOGY.md 必须明确区分 CMMI 0-1 软件工程资产 与 运行时业务数据/产物',
+  terminologyMd.includes('CMMI 0-1 软件工程资产') && terminologyMd.includes('运行时业务数据/产物'),
+  'TERMINOLOGY.md 缺失工程交付资产与运行时业务数据严格区分定义',
+);
+
+assertRule(
+  'Hermes 派工 8 要素与结项门禁守卫: PM-DISPATCH-QUICKCARD.md 必须升级为 8 要素模板且包含 No Artifact, No Done',
+  quickCardMd.includes('brief 8 要素模板') && quickCardMd.includes('No Artifact, No Done 铁律'),
+  'PM-DISPATCH-QUICKCARD.md 未升级 brief 8 要素模板或缺失结项硬门禁',
+);
+
+assertRule(
+  '项目目录结构与基座自适应法典守卫: AGENTS.md 必须载入公理五(默认 PNPM monorepo/开源基座自适应/废弃.coolie-cmmi全面采用docs-specs扁平规范)',
+  agentsMd.includes('项目目录结构规范与开源基座自适应物理归宿铁律') &&
+  agentsMd.includes('PNPM workspace monorepo') &&
+  agentsMd.includes('docs/specs'),
+  'AGENTS.md 缺失项目目录结构与 docs/specs 扁平规范铁律',
+);
+
+const cmmiRuleContent = cmmiArtifactsRuleExists ? fs.readFileSync('.agents/rules/CMMI-SPEC-FIRST-ARTIFACTS.md', 'utf8') : '';
+assertRule(
+  'CMMI 过程文档 docs/specs/ 扁平物理归宿守卫: 规范必须彻底废弃 .coolie/cmmi 转向 docs/specs/ 与 docs/architecture/',
+  cmmiRuleContent.includes('docs/specs/') &&
+  cmmiRuleContent.includes('docs/architecture/') &&
+  (cmmiRuleContent.includes('废弃') || cmmiRuleContent.includes('弃用')),
+  '.agents/rules/CMMI-SPEC-FIRST-ARTIFACTS.md 缺失 docs/specs 扁平归宿或未明确废弃 .coolie/cmmi',
+);
+
+// -----------------------------------------------------------------------------
+// 14. 仓库防通胀与目录自清洁守卫 (Anti-Inflation & Anti-Entropy Gate)
+// -----------------------------------------------------------------------------
+console.log('\n🧹 14. 仓库防通胀与目录自清洁守卫:');
+const noDuplicateAuditsDir = !fs.existsSync('docs-coolie/audits');
+assertRule('消灭双胞胎目录: docs-coolie/audits/ 必须已合并入 audit/ (严禁双胞胎复活)', noDuplicateAuditsDir, 'docs-coolie/audits/ 残留');
+
+const noDuplicatePrototypesDir = !fs.existsSync('docs-coolie/prototypes');
+assertRule('消灭双胞胎目录: docs-coolie/prototypes/ 必须已合并入 protos/ (严禁双胞胎复活)', noDuplicatePrototypesDir, 'docs-coolie/prototypes/ 残留');
+
+const ALLOWED_ROOT_DIRS = new Set([
+  'server',
+  'ui',
+  'packages',
+  'cli',
+  'skills',
+  'doc',
+  'docs',
+  'docs-coolie',
+  'clients',
+  'scripts',
+  'wiki',
+  'openwiki',
+  'specs',
+  'evals',
+  'tests',
+  'templates',
+  'patches',
+  'docker',
+  'design',
+  'releases',
+  'announcements',
+  'tools',
+  'report',
+  'skills-releases',
+  'projects',
+  '.agents',
+  '.claude',
+  '.codex',
+  '.commandcode',
+  '.devin',
+  '.github',
+  '.kiro',
+  '.specify',
+]);
+
+let unknownTopDirs = [];
+try {
+  const trackedFiles = execSync('git ls-files', { encoding: 'utf8' }).split('\n').filter(Boolean);
+  const unknownSet = new Set();
+  for (const rawFile of trackedFiles) {
+    const f = rawFile.replace(/^"/, '').replace(/"$/, '');
+    const parts = f.split('/');
+    if (parts.length > 1 && !ALLOWED_ROOT_DIRS.has(parts[0])) {
+      unknownSet.add(parts[0]);
+    }
+  }
+  unknownTopDirs = Array.from(unknownSet);
+} catch {}
+
+assertRule(
+  '根目录标准骨架白名单守卫: 平台 Git 跟踪的顶级目录必须 100% 属于受管骨架，严禁乱建非标目录',
+  unknownTopDirs.length === 0,
+  `发现未授权顶级目录被 Git 跟踪: ${unknownTopDirs.join(', ')}`
+);
+
+// -----------------------------------------------------------------------------
+// 15. CMMI 00~09 阶段化 Skills 装配与 OpenWiki (LLM-Wiki) 动态自愈知识大脑守卫
+// -----------------------------------------------------------------------------
+console.log('\n🧠 15. CMMI 00~09 阶段化 Skills 装配与 OpenWiki (LLM-Wiki) 动态自愈守卫:');
+const wikiIndexExists = fs.existsSync('wiki/index.md');
+assertRule('OpenWiki 根索引守卫: wiki/index.md 必须存在且定义全生命周期阶段与领域导航', wikiIndexExists, 'wiki/index.md 缺失');
+
+const openwikiSymlinkExists = fs.existsSync('openwiki');
+assertRule('RFC 8615 规范守卫: openwiki -> wiki 软链接必须存在', openwikiSymlinkExists, 'openwiki 软链接缺失');
+
+const syncOpenwikiExists = fs.existsSync('scripts/sync-openwiki.mjs');
+assertRule('自愈同步引擎守卫: scripts/sync-openwiki.mjs 必须存在且支持动态自愈与漂移校验', syncOpenwikiExists, 'scripts/sync-openwiki.mjs 缺失');
+
+const skillsReadmeContent = fs.existsSync('.agents/skills/README.md') ? fs.readFileSync('.agents/skills/README.md', 'utf8') : '';
+assertRule(
+  'CMMI 00~09 阶段化装配守卫: .agents/skills/README.md 必须包含 00~09 截断交付与专属 Skills 矩阵',
+  skillsReadmeContent.includes('CMMI 00~09 全生命周期阶段化装配矩阵') && skillsReadmeContent.includes('OpenWiki'),
+  '.agents/skills/README.md 未包含 CMMI 00~09 装配矩阵或 OpenWiki 规范',
+);
+
+const agentsHasOpenWiki = agentsMd.includes('OpenWiki (LLM-Wiki) 动态自愈知识大脑铁律');
+assertRule('最高法典守卫: AGENTS.md 必须载入 OpenWiki First 动态自愈知识大脑铁律', agentsHasOpenWiki, 'AGENTS.md 缺失 OpenWiki 铁律');
+
+let openwikiCheckOk = false;
+try {
+  const checkOutput = execSync('node scripts/sync-openwiki.mjs --check', { encoding: 'utf8' });
+  openwikiCheckOk = checkOutput.includes('PASS');
+} catch (e) {
+  openwikiCheckOk = false;
+}
+assertRule('OpenWiki 零漂移守卫: node scripts/sync-openwiki.mjs --check 必须通过 (0 漂移)', openwikiCheckOk, 'OpenWiki 知识库内容存在漂移');
+
+// -----------------------------------------------------------------------------
+// 16. CMMI 01~09 完整规范目录与在制项目守卫 (CMMI 01~09 Full Specification Gate)
+// -----------------------------------------------------------------------------
+console.log('\n📐 16. CMMI 01~09 完整规范目录与在制项目守卫:');
+const hatchScriptContent = fs.existsSync('scripts/hatch-client-project.sh') ? fs.readFileSync('scripts/hatch-client-project.sh', 'utf8') : '';
+assertRule(
+  '立项脚手架 01~09 覆盖守卫: hatch-client-project.sh 必须生成完整的 01_management ~ 09_operations',
+  hatchScriptContent.includes('01_management') && hatchScriptContent.includes('09_operations') && hatchScriptContent.includes('software-requirements.md'),
+  'hatch-client-project.sh 缺失 01~09 阶段目录生成逻辑',
+);
+
+const ynDocsExists = fs.existsSync('projects/sys-yunnan-wecom/docs/01_management') && fs.existsSync('projects/sys-yunnan-wecom/docs/09_operations');
+const ynNoOldCmmi = !fs.existsSync('projects/sys-yunnan-wecom/docs/cmmi');
+assertRule(
+  '在制项目规范守卫 (云南移动企微): 具备完整 01~09 目录且旧 cmmi/ 已彻底清退',
+  ynDocsExists && ynNoOldCmmi,
+  'projects/sys-yunnan-wecom 缺失 01~09 目录或旧 cmmi/ 未清退',
+);
+
+const jxDocsExists = fs.existsSync('projects/sys-jiuxia-smart/docs/01_management') && fs.existsSync('projects/sys-jiuxia-smart/docs/09_operations');
+const jxNoOldCmmi = !fs.existsSync('projects/sys-jiuxia-smart/docs/cmmi');
+assertRule(
+  '在制项目规范守卫 (九夏智居中台): 具备完整 01~09 目录且旧 cmmi/ 已彻底清退',
+  jxDocsExists && jxNoOldCmmi,
+  'projects/sys-jiuxia-smart 缺失 01~09 目录或旧 cmmi/ 未清退',
+);
+
+const cmmiScaffoldExists = fs.existsSync('scripts/cmmi-asset-scaffold.cjs');
+assertRule('CMMI 资产脚手架引擎守卫: scripts/cmmi-asset-scaffold.cjs 必须存在且支持 01~09 阶段 26 种标准资产', cmmiScaffoldExists, 'scripts/cmmi-asset-scaffold.cjs 缺失');
+
+const cmmiAuthoringSkillContent = fs.existsSync('.agents/skills/cmmi-asset-authoring/SKILL.md')
+  ? fs.readFileSync('.agents/skills/cmmi-asset-authoring/SKILL.md', 'utf8')
+  : '';
+assertRule(
+  'CMMI 01~09 SOP 与 Skill 固化矩阵守卫: .agents/skills/cmmi-asset-authoring/SKILL.md 必须定义完整 SOP 矩阵与防假门禁',
+  cmmiAuthoringSkillContent.includes('CMMI 01~09 全生命周期工序与顶级 Skill 固化矩阵') &&
+  cmmiAuthoringSkillContent.includes('Zero Fake Demos'),
+  'cmmi-asset-authoring/SKILL.md 缺失或未包含 01~09 SOP 矩阵',
+);
+
+let cmmiCheckOk = false;
+try {
+  const cmmiOut = execSync('node scripts/cmmi-asset-scaffold.cjs check', { encoding: 'utf8' });
+  cmmiCheckOk = cmmiOut.includes('全部通过');
+} catch (e) {
+  cmmiCheckOk = false;
+}
+assertRule('CMMI 标准资产反造假扫描守卫: node scripts/cmmi-asset-scaffold.cjs check 必须通过 (0 散落、0 假 Demo)', cmmiCheckOk, 'cmmi-asset-scaffold check 失败');
+
+// -----------------------------------------------------------------------------
+// 17. Spec-Kit 统一全类型 SDD 规格引擎守卫 (Unified Spec-Kit SDD Engine Gate)
+// -----------------------------------------------------------------------------
+console.log('\n⚙️ 17. Spec-Kit 统一全类型 SDD 规格引擎守卫:');
+const speckitExists = fs.existsSync('scripts/speckit.cjs');
+assertRule('Spec-Kit 引擎实体守卫: scripts/speckit.cjs 必须存在且具备执行能力', speckitExists, 'scripts/speckit.cjs 缺失');
+
+const pkgJson = JSON.parse(fs.readFileSync('package.json', 'utf8'));
+const pkgHasSpeckit = Boolean(pkgJson.scripts && pkgJson.scripts['speckit'] && pkgJson.scripts['speckit:new']);
+assertRule('CLI 快捷指令守卫: package.json 必须配置 speckit 与 speckit:new 指令', pkgHasSpeckit, 'package.json 缺失 speckit 相关脚本配置');
+
+let specHealthOk = false;
+try {
+  const healthOutput = execSync('node scripts/speckit.cjs health', { encoding: 'utf8' });
+  specHealthOk = healthOutput.includes('全盘扫描通过');
+} catch (e) {
+  specHealthOk = false;
+}
+assertRule('全仓规格防污染扫描守卫: node scripts/speckit.cjs health 必须通过 (0 散落、0 污染)', specHealthOk, 'speckit health 扫描发现不合规项');
+
+// -----------------------------------------------------------------------------
+// 18. OpenMuse Sentinel 零信任看门狗与全 Agent 驱动守卫 (Sentinel & Sovereign Gate)
+// -----------------------------------------------------------------------------
+console.log('\n🛡️ 18. OpenMuse Sentinel 零信任看门狗与全 Agent 驱动守卫:');
+const agentsHasAxiom10 = agentsMd.includes('公理十：全能力 AI Agent 闭环驱动与实事求是 0 假 Demo 铁律');
+const agentsHasAxiom11 = agentsMd.includes('公理十一：Sentinel 零信任看门狗自主安全防御铁律');
+assertRule('宪法级法典守卫: AGENTS.md 必须载入公理十与公理十一', agentsHasAxiom10 && agentsHasAxiom11, 'AGENTS.md 缺失公理十或公理十一');
+
+const sentinelWhitepaperExists = fs.existsSync('docs-coolie/research/2026-10-10-openmuse-sentinel-and-foundry-guardrails.md');
+const sentinelWikiExists = fs.existsSync('wiki/architecture/sentinel-guardrails.md');
+assertRule('Sentinel 理论与架构词条守卫: 白皮书与 Wiki 词条必须落盘', sentinelWhitepaperExists && sentinelWikiExists, 'Sentinel 白皮书或架构词条缺失');
+
+const noWeakPasswordsInCode = !hatchScriptContent.includes('admin123') && !hatchScriptContent.includes('123456');
+assertRule('高熵凭据守卫: 脚手架与核心脚本杜绝 admin123/123456 等弱口令', noWeakPasswordsInCode, '检测到弱口令残留');
+
+// -----------------------------------------------------------------------------
+// 19. Paperclip 控制面与 ruoyi-all-next 正交并轨守卫 (Orthogonal Integration Gate)
+// -----------------------------------------------------------------------------
+console.log('\n⚖️ 19. Paperclip 控制面与 ruoyi-all-next 正交并轨守卫:');
+const agentsHasAxiom13 = agentsMd.includes('公理十三：Paperclip 控制面与 ruoyi-all-next 商业交付工程法典正交并轨铁律');
+assertRule('宪法级法典守卫: AGENTS.md 必须载入公理十三 (正交并轨铁律)', agentsHasAxiom13, 'AGENTS.md 缺失公理十三');
+
+const orthogonalRuleExists = fs.existsSync('.agents/rules/RUOYI-PAPERCLIP-ORTHOGONAL-INTEGRATION.md');
+assertRule('仲裁手册守卫: .agents/rules/RUOYI-PAPERCLIP-ORTHOGONAL-INTEGRATION.md 必须落盘', orthogonalRuleExists, 'RUOYI-PAPERCLIP-ORTHOGONAL-INTEGRATION.md 缺失');
+
+const scaffoldScriptContent = fs.readFileSync('scripts/scaffold-project-cmmi-skills.mjs', 'utf8');
+const scaffoldHasNoProjectsDefault = !scaffoldScriptContent.includes('targetDir = path.join(repoRoot, "projects"');
+const scaffoldHasNestingGuard = scaffoldScriptContent.includes('[架构红线拦截]');
+assertRule(
+  '脚手架外部工作区守卫: scaffold-project-cmmi-skills.mjs 严禁默认 projects/ 且包含仓库嵌套拦截',
+  scaffoldHasNoProjectsDefault && scaffoldHasNestingGuard,
+  '脚手架脚本仍残留默认 projects/ 路径或缺乏嵌套拦截',
+);
+
+const hatchHasNestingGuard = hatchScriptContent.includes('[架构红线拦截]');
+assertRule('孵化器仓库嵌套拦截守卫: hatch-client-project.sh 必须包含平台仓库嵌套拦截', hatchHasNestingGuard, 'hatch-client-project.sh 缺失仓库嵌套拦截');
+
 console.log('\n========================================================================');
 if (failed) {
   console.error('🚫 全面管局审计未通过！存在不符合高管治理规范的阻断项，请修复后重试。');
   process.exit(1);
 } else {
-  console.log('🎉 全面管局审计全绿通过！系统完全符合极简两字 UI、对称底栏、CMMI 产物、高管审批治理、Hermes 扁平化 Worker 契约、就地导航调用栈与党章级工程宪法！');
+  console.log('🎉 全面管局审计全绿通过！系统完全符合极简两字 UI、对称底栏、CMMI 01~09 规范产物、Spec-Ops SDD 引擎、Sentinel 零信任看门狗、全能力 Agent 驱动、高管审批治理、Hermes 扁平化 Worker 契约、就地导航调用栈、党章级工程宪法、AI 原生软件交付工厂与 OpenWiki 动态知识大脑硬门禁！');
   process.exit(0);
 }
+

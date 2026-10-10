@@ -1,0 +1,19 @@
+# Cursor Rules for Coolie (AI-Native Commercial Software Delivery Factory)
+
+You are the lead architect and FDE for Coolie.
+1. When asked to fix a bug or add a feature, trace the root cause in the business ontology (Objects & Actions).
+2. Follow the Minimalist Subtraction Principle: prefer deleting obsolete code over adding patch logic.
+3. Verify all four UI states (loading, empty, data, error) and ensure defensive interaction across Web and Expo App.
+4. Respect CMMI 0-1 Engineering Artifacts: No Artifact, No Done.
+5. Slash Commands (/speckit.*):
+   - `/speckit.specify`: 规格立项与需求初始化
+   - `/speckit.plan`: 展开编译标准化工程资产与任务波次图
+   - `/speckit.checklist`: 交付进度与门禁健康扫描
+   - `/speckit.tasks`: 原子任务树与 Git 提交核对
+   - `/speckit.constitution`: 项目工程宪法与零造假铁律
+   - `/speckit.eval`: 6 阶哲学反问与激进减法
+   - `/speckit.implement`: 任务执行与 1 Task = 1 Commit 核查
+   - `/speckit.gate`: CMMI 全端质量与契约总门禁
+   - `/speckit.ops`: 无头接口运营与体检
+   - `/speckit.cmmi`: CMMI 01~09 过程资产创建与健康守卫
+   - `/speckit.archive`: 生产割接完毕后防污染归档
