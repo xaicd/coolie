@@ -504,7 +504,134 @@ function handleBuild() {
 }
 
 // ============================================================================
-// 3. 命令：speckit sync (将 SDD 规格文档双向同步到 Paperclip 任务与工件总线)
+// 3. 命令：speckit tasks / task (Kiro 任务依赖、原子提交与 Git 证据核验)
+// ============================================================================
+function handleTasks() {
+  const name = getArg("--spec") || getArg("--name") || getArg("--feature")
+  const taskOnly = getArg("--task")
+  const commit = getArg("--commit") ?? "HEAD"
+
+  if (!name) {
+    console.error("❌ 用法错误: node scripts/speckit.cjs tasks --spec <规格名> [--task T1] [--summary]")
+    process.exit(2)
+  }
+
+  const dir = resolveSpecDir(name)
+  if (!dir) {
+    console.error(`❌ [speckit] 找不到规格: ${name}（在 docs/specs 与 docs/features 中均未找到）`)
+    process.exit(2)
+  }
+
+  const tasksFile = path.join(dir, "tasks.md")
+  if (!fs.existsSync(tasksFile)) {
+    console.error(`❌ [speckit] 找不到 ${path.relative(ROOT, tasksFile)}，请先运行 speckit build`)
+    process.exit(2)
+  }
+
+  const cellsOf = (line) => line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((cell) => cell.trim())
+  const tasks = fs
+    .readFileSync(tasksFile, "utf8")
+    .split("\n")
+    .filter((line) => line.trim().startsWith("|"))
+    .filter((line) => !cellsOf(line).includes("ID"))
+    .filter((line) => !cellsOf(line).every((cell) => /^:?-+:?$/.test(cell)))
+    .map(cellsOf)
+    .filter((cells) => cells.length >= 4 && /^T\d/.test(cells[0]))
+    .map((cells) => ({ id: cells[0], parent: cells[1], title: cells[2], whitelist: cells[3], status: cells[4] ?? "未开始" }))
+
+  if (tasks.length === 0) {
+    console.log(`⚠️  [speckit] ${path.relative(ROOT, tasksFile)} 中未检测到有效任务表格。`)
+    process.exit(0)
+  }
+
+  const git = (gitArgs) => {
+    try {
+      const res = spawnSync("git", gitArgs, { cwd: ROOT, encoding: "utf8" })
+      return (res.stdout || "").trim()
+    } catch {
+      return ""
+    }
+  }
+
+  const isGitRepo = fs.existsSync(path.join(ROOT, ".git"))
+  let logLines = []
+  if (isGitRepo) {
+    const rawLog = git(["log", "--pretty=%H%x09%s", "-n", "300"])
+    logLines = rawLog ? rawLog.split("\n").filter(Boolean) : []
+  }
+
+  if (taskOnly) {
+    const targetTask = tasks.find(t => t.id === taskOnly)
+    if (!targetTask) {
+      console.error(`❌ [speckit] 找不到任务 ${taskOnly}（可选任务: ${tasks.map(t => t.id).join(", ")}）`)
+      process.exit(2)
+    }
+
+    if (!isGitRepo) {
+      console.error("❌ [speckit] 这不是 Git 仓库，任务痕迹必须基于真实 Git 提交追溯")
+      process.exit(2)
+    }
+
+    const message = git(["log", "-1", "--pretty=%s%n%b", commit])
+    const files = git(["show", "--name-only", "--pretty=format:", commit]).split("\n").filter(Boolean)
+    const problems = []
+
+    if (!message.includes(`[${targetTask.id}]`)) {
+      problems.push(`commit message 里没有 [${targetTask.id}] —— 「1 Task = 1 Commit」要求提交能追溯到任务（需使用 [${targetTask.id}] 方括号标记）`)
+    }
+
+    if (targetTask.whitelist !== "-") {
+      const toRegExp = (pattern) => {
+        const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*\*\//g, "\u0000").replace(/\*\*/g, "\u0001").replace(/\*/g, "[^/]*")
+        return new RegExp("^" + escaped.replace(/\u0000/g, "(?:.*/)?").replace(/\u0001/g, ".*") + "$")
+      }
+      const patterns = targetTask.whitelist.split(",").map(i => i.trim()).filter(Boolean).map(toRegExp)
+      const outside = files.filter(f => !patterns.some(regex => regex.test(f)))
+      if (outside.length > 0) {
+        problems.push(`改动了白名单之外的文件: ${outside.slice(0, 5).join(", ")}${outside.length > 5 ? ` 等 ${outside.length} 个` : ""}`)
+      }
+    }
+
+    console.log(`\n🔍 [speckit task] 任务单项核验: ${targetTask.id} ${targetTask.title}`)
+    console.log(`   Commit: ${commit}`)
+    console.log(`   变更文件 (${files.length} 个):`)
+    for (const f of files.slice(0, 8)) console.log(`     - ${f}`)
+    if (files.length > 8) console.log(`     … 还有 ${files.length - 8} 个文件`)
+
+    if (problems.length === 0) {
+      console.log(`\n🎉 [PASS] 任务 ${targetTask.id} 核验通过: 提交严格对应 [${targetTask.id}]，且变更落在白名单内！\n`)
+      process.exit(0)
+    } else {
+      console.error(`\n❌ [FAIL] 任务 ${targetTask.id} 核验未通过:`)
+      for (const p of problems) console.error(`     ✗ ${p}`)
+      console.log("")
+      process.exit(1)
+    }
+  }
+
+  console.log(`\n=== 📋 Spec-Kit SDD 任务面板: ${name} (共 ${tasks.length} 项原子任务) ===\n`)
+  console.log(`| 任务ID | 状态 (Git取证) | 任务名称 | 白名单限制 | 提交证据 |`)
+  console.log(`|---|---|---|---|---|`)
+
+  let touched = 0
+  for (const t of tasks) {
+    const hits = logLines.filter(line => (line.split("\t")[1] ?? "").includes(`[${t.id}]`))
+    const isDone = hits.length > 0
+    if (isDone) touched++
+
+    const statusBadge = isDone ? "✅ 已完成 (Git)" : "⏳ 待执行"
+    const evidence = isDone ? `${hits.length} 个提交 (${hits[0].split("\t")[0].slice(0, 7)})` : "无物理提交"
+    console.log(`| ${t.id} | ${statusBadge} | ${t.title} | \`${t.whitelist}\` | ${evidence} |`)
+  }
+
+  const percent = ((touched / tasks.length) * 100).toFixed(1)
+  console.log(`\n📊 真实完成度进度: ${touched}/${tasks.length} (${percent}%)`)
+  console.log(`💡 铁律原则: 1 Task = 1 Commit，提交信息必须包含 [T<ID>]，改动文件严禁超出白名单`)
+  console.log(`🚀 单项核验: node scripts/speckit.cjs tasks --spec ${name} --task T1\n`)
+}
+
+// ============================================================================
+// 4. 命令：speckit sync (将 SDD 规格文档双向同步到 Paperclip 任务与工件总线)
 // ============================================================================
 async function handleSync() {
   const specName = getArg("--spec") || getArg("--name")
@@ -905,6 +1032,7 @@ Spec-Kit 原生与企业扩展命令:
   constitution 查看或审查项目核心工程宪法 (.specify/memory/constitution.md)
   specify/new 创建新规格骨架 (feature | bugfix | enhancement | refactor | security)
   plan/build  从 brief.json 展开编译生成完备 Markdown 规格与任务波次图
+  tasks/task  查看任务大盘、波次依赖与基于真实 Git 历史核实 1 Task = 1 Commit
   sync        双向同步规格文档到 Paperclip 控制面工单、子任务与工件总线
   check       检查规格交付进度与门禁完成度
   list        列出全域所有规格状态与路径
@@ -918,6 +1046,8 @@ Spec-Kit 原生与企业扩展命令:
   node scripts/speckit.cjs constitution
   node scripts/speckit.cjs new --name fix-pay-lock --domain pay --title "修复支付回调重放" --type bugfix
   node scripts/speckit.cjs build --name fix-pay-lock
+  node scripts/speckit.cjs tasks --spec fix-pay-lock
+  node scripts/speckit.cjs tasks --spec fix-pay-lock --task T1
   node scripts/speckit.cjs sync --spec fix-pay-lock
   node scripts/speckit.cjs check --spec fix-pay-lock
   node scripts/speckit.cjs list
@@ -942,6 +1072,10 @@ switch (command) {
   case "plan":
   case "build":
     handleBuild()
+    break
+  case "tasks":
+  case "task":
+    handleTasks()
     break
   case "sync":
     handleSync().catch((err) => {

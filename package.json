@@ -62,6 +62,8 @@
     "speckit:specify": "node scripts/speckit.cjs new",
     "speckit:build": "node scripts/speckit.cjs build",
     "speckit:plan": "node scripts/speckit.cjs build",
+    "speckit:tasks": "node scripts/speckit.cjs tasks",
+    "speckit:task": "node scripts/speckit.cjs tasks",
     "speckit:sync": "node scripts/speckit.cjs sync",
     "speckit:list": "node scripts/speckit.cjs list",
     "speckit:check": "node scripts/speckit.cjs check",
