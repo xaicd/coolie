@@ -1,0 +1,73 @@
+{
+  "name": "cmmi-full-lifecycle",
+  "description": "CMMI 01~09 全生命周期多智能体递进式商业软件交付工作流 (G1 需求规格 -> G2 概要架构 -> G3 静态契约 -> G4 全栈验收 -> G5 不可变投产 -> G6 SRE稳定性 -> G7 持续运营)",
+  "inputs": {
+    "name": "prompt",
+    "domain": "prompt",
+    "title": "prompt"
+  },
+  "steps": [
+    {
+      "type": "step",
+      "id": "g1-spec",
+      "agent": "wf-planner",
+      "gate": "gate_g1_spec",
+      "doc": "docs/02_requirements/software-requirements.md",
+      "prompt": "【G1·需求规格】由 Hermes / 百晓生 (DS) 驱动。基于客户现场业务诉求，编写 EARS 语法规范的软件需求规格说明书 (SRS) 与双向需求跟踪矩阵 (RTM)。必须消除二义性并锚定用户验收准则。"
+    },
+    {
+      "type": "step",
+      "id": "g2-arch",
+      "agent": "wf-architect",
+      "dependsOn": ["g1-spec"],
+      "gate": "gate_g2_arch",
+      "doc": "docs/03_design/architecture-design-hld.md",
+      "prompt": "【G2·架构设计】由 墨斗 (前线架构师 FDA) 驱动。在写代码前确立微服务领域边界、租户物理隔离策略、DAR 选型加权决策矩阵与架构决策记录 (ADR)。"
+    },
+    {
+      "type": "step",
+      "id": "g3-code-contracts",
+      "agent": "wf-coder",
+      "dependsOn": ["g2-arch"],
+      "gate": "gate_g3_compile",
+      "doc": "docs/03_design/interface-contracts/api-definitions.md",
+      "prompt": "【G3·契约与编码】由 铁匠 (平台研发 Core SWE) 驱动。固化 OpenAPI 接口契约协议、数据库实体关系 (ERD) 与领域实现。强制执行单向依赖与变异测试防假 Mock 守卫，保障全栈增量编译 0 Error。"
+    },
+    {
+      "type": "step",
+      "id": "g4-verification",
+      "agent": "wf-tester",
+      "dependsOn": ["g3-code-contracts"],
+      "gate": "gate_g4_eval",
+      "doc": "docs/05_verification/test-summary-report.md",
+      "prompt": "【G4·真机验收】由 门神 (真机验收 FDSE) 驱动。基于真实数据运行端到端集成测试，拟真人走查四态界面与零假死按钮，出具验收测试总结报告与真机截图不可变存证。"
+    },
+    {
+      "type": "step",
+      "id": "g5-immutable-release",
+      "agent": "wf-reviewer",
+      "dependsOn": ["g4-verification"],
+      "gate": "gate_g5_release",
+      "doc": "docs/07_release/system-deployment-sop.md",
+      "prompt": "【G5·不可变投产】由 兜底渊 (投产守卫 PRE-SRE) 驱动。提取发布制品不可变指纹，校验 7 处版本一致性，落盘生产部署拓扑与秒级回滚应急 SOP。"
+    },
+    {
+      "type": "step",
+      "id": "g6-sre-resilience",
+      "agent": "wf-reviewer",
+      "dependsOn": ["g5-immutable-release"],
+      "gate": "gate_g6_sre",
+      "doc": "docs/08_sre/01_slo_sli_metrics/SLO-SLI-ERROR-BUDGET-MATRIX.md",
+      "prompt": "【G6·韧性保障】由 兜底渊 (投产守卫 PRE-SRE) 驱动。制定服务等级目标 (SLO) 与错误预算燃烧率矩阵，配置告警阈值与 5-Whys 故障演练复盘预案。"
+    },
+    {
+      "type": "step",
+      "id": "g7-operations",
+      "agent": "wf-planner",
+      "dependsOn": ["g6-sre-resilience"],
+      "gate": "gate_g7_ops",
+      "doc": "docs/09_operations/tenant-governance.md",
+      "prompt": "【G7·商业运营】由 百晓生 / 掌柜 (DS) 驱动。建立商业化多租户配额开通治理机制、日常巡检台账与运营资金轧差平账规范。"
+    }
+  ]
+}
