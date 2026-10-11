@@ -4,6 +4,16 @@ Coolie工坊移动驾驶舱 App（React Native + Expo）版本流水。
 
 ---
 
+## v0.6.56
+
+> Released: 2026-10-11 · Android release APK
+
+### 更新
+
+- v0.6.55+收件箱对齐全 web P0 9 件 (老板拍'按审计结果开始干'): Mine Tab 重做 / 未读蓝点 / 单条标已读 / 一键全读 / 即时搜索 / 归档 5 秒撤销 / TODAY/YESTERDAY 日期分段
+
+---
+
 ## v0.6.55
 
 > Released: 2026-10-11 · Android release APK
