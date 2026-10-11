@@ -63,14 +63,14 @@
 | 铁匠贰号 | Forge II | `core-swe` (副) | 0 (计入铁匠) | cmd / claude-glm (兜底) | **同角色换工具, 不是新员工** |
 | 门神 | Guardian | `fdse` | 1 + 金标兜底 (Phase 4.3 / 5.3) | claude-mm (老板拍板测试首选 claude-mm) | cmd 兜底 (wave229) |
 | 兑底渊 | Operator | `pre-sre` | 4 (Phase 2.1 / 3.4 / 4.5 / 5.1) | copilot v1.0.91 | wave272 拍板 |
-| 百晓生 | Sage | `ds` | 5 (Phase 2.5 / 3.5 / 5.2 / 5.3 / 5.5) | claude-mm (主线, wave234) | **责任重大** (wave227) |
+| 百晓生 | Sage | `ds` | 5 + G7运营 (Phase 2.5 / 5.3 / 9.0) | claude-mm (老板拍板测试与运营统一首选) | **责任重大** (测试/运营主线) |
 
 ### -1.3 7 工具池 (wave272 拍板)
 
 | 工具 | 类型 | 默认员工 | 兜底员工 | 凭据 / 重置 |
 |---|---|---|---|---|
 | agy-gemini3.8 | CLI (容器) | 墨斗 / 铁匠 | cmd 紧急 | Antigravity 账号 |
-| claude-mm | API (按量) | 门神 (测试) / 百晓生 (验收) | 铁匠贰号 | MiniMax-M3 SDK 不限 |
+| claude-mm | API (按量) | 门神 (测试) / 百晓生 (测试/运营) | 铁匠贰号 | MiniMax-M3 SDK 不限 (测试/运营首选) |
 | claude-glm | API (按量) | 铁匠 (备用) | 百晓生 (备用) | GLM-5.3 每日配额, 重置 |
 | cmd `@commandcode/ai` | CLI | 门神 (兜底) | 兑底渊 | commandcode.ai 配额 / 队列 |
 | copilot | CLI | 兑底渊 | claude-mm | 月度配额, 1 号 8:00 重置 |

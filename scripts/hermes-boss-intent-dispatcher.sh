@@ -55,7 +55,7 @@ INPUT="${POSITIONAL_ARGS[*]:-}"
 
 # 0. 待办查询直接直通 Coolie Dev Server 任务大盘
 if [[ "$INPUT" =~ (待办|有哪些任务|任务列表|工单列表|未完成|有啥活|还有什么活|看下任务) ]]; then
-  exec "$SCRIPT_DIR/coolie-dev-task.mjs" list
+  exec node "$SCRIPT_DIR/coolie-dev-task.mjs" list
 fi
 
 # 0.1 模糊意图检测与 Echo 澄清追问门禁 (Palantir Echo Clarification Gate)
@@ -148,19 +148,19 @@ elif [[ "$INPUT" =~ (部署|发版|OTA|上线|运维|manifest|tag|重启) ]]; th
   CATEGORY="ops"
   CMMI_PHASE="Phase 5.1 部署执行"
   AGENT_ID="8a288a46-8598-4c68-b52e-545360e11929"
-elif [[ "$INPUT" =~ (审查|review|金标|真机|验收金标|紧急跑|单测|端到端) ]]; then
+elif [[ "$INPUT" =~ (审查|review|金标|真机|验收金标|紧急跑|单测|端到端|测试用例|压测) ]]; then
   AGENT="menshen-fdse"
   EMPLOYEE="门神"
   TOOL="claude-mm"
   CATEGORY="qa-gate"
   CMMI_PHASE="Phase 4.3 代码审查 / 5.3 验收金标"
   AGENT_ID="58dc794d-ae28-47f4-9e6e-5e798ef55df2"
-elif [[ "$INPUT" =~ (验收|监控|告警|风控|数据分析|测试|撞机|走查|复盘|回归) ]]; then
+elif [[ "$INPUT" =~ (验收|监控|告警|风控|数据分析|测试|撞机|走查|复盘|回归|运营|对账|平账|多租户开通|业务巡检) ]]; then
   AGENT="baixiaosheng-ds"
   EMPLOYEE="百晓生"
   TOOL="claude-mm"
   CATEGORY="ds"
-  CMMI_PHASE="Phase 2.5 风险评估 / 5.3 验收测试 / 5.5 复盘"
+  CMMI_PHASE="Phase 2.5 风险评估 / 5.3 验收测试 / Phase 9 商业运营"
   AGENT_ID="58bb5a96-c241-4b35-babb-1cc1771d5dd5"
 else
   # 默认代码实现、性能优化、修bug -> 铁匠 (老板拍板统一默认使用 agy)

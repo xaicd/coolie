@@ -324,12 +324,12 @@ if [[ "$DO_CHECK" -eq 1 ]]; then
   probe_tool "Hermes"        "hermes"  "掌柜"   "PM 调度中枢"
   probe_tool "agy"           "agy"     "铁匠/墨斗" "Core SWE / FDA"
   probe_tool "claude-glm"    "claude"  "铁匠(备用)" "Core SWE 备选"
-  probe_tool "claude-mm"     "claude"  "门神/百晓生" "FDSE(测试) / DS"
+  probe_tool "claude-mm"     "claude"  "门神/百晓生" "测试 / 运营 (首选)"
   probe_tool "cmd"           "cmd"     "门神(兜底)" "FDSE 回归兜底"
   probe_tool "copilot"       "copilot" "兑底渊"  "PRE-SRE 可靠性"
   probe_tool "kiro-cli"      "kiro-cli" "掌柜(保留)" "架构大重构"
   echo "--------------------------------------------------------------------------------------------------------"
 
   echo -e "\n${BOLD}${GREEN}🎉 Coolie CLI 工具链一键安装与装配执行完毕！${NC}"
-  echo -e "说明: 门神与百晓生已全面切换升级为 ${GREEN}claude-mm${NC}（测试/验收首选），铁匠主力工具为 ${GREEN}agy${NC}。"
+  echo -e "说明: 测试与运营已全面统一收拢首选 ${GREEN}claude-mm${NC}（门神/百晓生），铁匠主力工具为 ${GREEN}agy${NC}。"
 fi
