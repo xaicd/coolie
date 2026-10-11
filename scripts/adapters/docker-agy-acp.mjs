@@ -128,6 +128,9 @@ class AgyAcpAgent {
           }
         }
 
+        const timeoutArg = process.env.AGY_TIMEOUT ? `--print-timeout "${process.env.AGY_TIMEOUT}"` : `--print-timeout 0s`;
+        const continueFlag = (promptText.includes("【断点接力续跑】") || promptText.includes("【断点续跑】")) ? "-c" : "";
+
         args = [
           "exec",
           "-i",
@@ -135,11 +138,12 @@ class AgyAcpAgent {
           "agy-ubuntu-container",
           "bash",
           "-c",
-          `cd "${containerCwd}" 2>/dev/null || cd "${containerRepoRoot}"; exec /root/.local/bin/agy -p "$(< "${containerPromptFile}")" --dangerously-skip-permissions`
+          `cd "${containerCwd}" 2>/dev/null || cd "${containerRepoRoot}"; exec /root/.local/bin/agy ${continueFlag} ${timeoutArg} -p "$(< "${containerPromptFile}")" --dangerously-skip-permissions`
         ];
       } else {
         bin = "agy";
-        args = ["-p", promptText, "--dangerously-skip-permissions"];
+        const timeoutArg = process.env.AGY_TIMEOUT ? ["--print-timeout", process.env.AGY_TIMEOUT] : ["--print-timeout", "0s"];
+        args = ["-p", promptText, ...timeoutArg, "--dangerously-skip-permissions"];
       }
     }
 
@@ -150,7 +154,33 @@ class AgyAcpAgent {
 
       session.activeProcess = proc;
 
+      let lastOutputTime = Date.now();
+      const startTime = Date.now();
+
+      // 长任务心跳保活定时器: 每隔 25 秒静默时向控制面发送轻量进度心跳，防止连接超时假死
+      const heartbeatTimer = setInterval(async () => {
+        const idleSec = Math.round((Date.now() - lastOutputTime) / 1000);
+        const elapsedMin = ((Date.now() - startTime) / 60000).toFixed(1);
+        if (idleSec >= 25) {
+          try {
+            await cx.notify(acp.methods.client.session.update, {
+              sessionId: params.sessionId,
+              update: {
+                sessionUpdate: "agent_message_chunk",
+                content: {
+                  type: "text",
+                  text: `\n[agy-heartbeat] 长任务正在执行中 (已耗时 ${elapsedMin} 分钟，当前容器静默 ${idleSec}s，仍在计算中)...\n`,
+                },
+              },
+            });
+          } catch {
+            // 忽略通知失败
+          }
+        }
+      }, 15000);
+
       const cleanup = () => {
+        clearInterval(heartbeatTimer);
         if (promptFilePath) {
           try { fs.unlinkSync(promptFilePath); } catch {}
           promptFilePath = null;
@@ -158,6 +188,7 @@ class AgyAcpAgent {
       };
 
       proc.stdout.on("data", async (chunk) => {
+        lastOutputTime = Date.now();
         const text = chunk.toString("utf8");
         try {
           await cx.notify(acp.methods.client.session.update, {
@@ -176,6 +207,7 @@ class AgyAcpAgent {
       });
 
       proc.stderr.on("data", async (chunk) => {
+        lastOutputTime = Date.now();
         const text = chunk.toString("utf8");
         try {
           await cx.notify(acp.methods.client.session.update, {
