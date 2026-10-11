@@ -12,17 +12,22 @@ import { useNotificationsStore } from "../stores/notifications";
  */
 export function AppBar({
   title = "Coolie工坊",
-  unreadCount = 0,
+  unreadCount: unreadCountProp,
   onOpenNotifications,
   onOpenSearch,
   onOpenSettings,
 }: {
   title?: string;
+  /** @deprecated read live from `useNotificationsStore` so the badge updates
+   *  the moment `markRead`/`markAllRead` mutates the store. Kept for callers
+   *  that still pass a number; falls back to the live store value. */
   unreadCount?: number;
   onOpenNotifications?: () => void;
   onOpenSearch?: () => void;
   onOpenSettings?: () => void;
 }) {
+  const storeUnread = useNotificationsStore((s) => s.unreadCount);
+  const unread = unreadCountProp ?? storeUnread;
   return (
     <View style={styles.bar}>
       <View style={styles.titleContainer}>
@@ -45,10 +50,10 @@ export function AppBar({
             hitSlop={10}
             onPress={onOpenNotifications}
             onLongPress={() => {
-              if (unreadCount <= 0) return;
+              if (unread <= 0) return;
               Alert.alert(
                 "清空所有未读",
-                `当前 ${unreadCount} 条未读消息, 全部标记为已读?`,
+                `当前 ${unread} 条未读消息, 全部标记为已读?`,
                 [
                   { text: "取消", style: "cancel" },
                   {
@@ -63,10 +68,10 @@ export function AppBar({
             }}
           >
             <Ionicons name="notifications-outline" size={20} color={C.ink2} />
-            {unreadCount > 0 ? (
+            {unread > 0 ? (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>
-                  {unreadCount > 99 ? "99+" : unreadCount}
+                  {unread > 99 ? "99+" : unread}
                 </Text>
               </View>
             ) : null}
