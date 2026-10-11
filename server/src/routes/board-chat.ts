@@ -173,6 +173,11 @@ interface DirectActionResult {
   isTerminal?: boolean;
 }
 
+interface ClientSourceInfo {
+  channel: "app" | "web" | "wechat";
+  senderName?: string;
+}
+
 /**
  * Coolie fork: Detect high-frequency conversational actions (reassign, wakeup,
  * tool switching, status transitions, and time-boxed dispatch) from the boss's
@@ -186,6 +191,7 @@ async function detectAndExecuteDirectAction(
   userMessage: string,
   effectiveProjectId?: string | null,
   actorUserId?: string | null,
+  clientSource?: ClientSourceInfo,
 ): Promise<DirectActionResult> {
   const text = userMessage.trim();
   if (!text) return { handled: false };
@@ -349,10 +355,15 @@ async function detectAndExecuteDirectAction(
           };
         }
 
+        const channelTag = clientSource?.channel === "app" ? "工坊App" : (clientSource?.channel === "wechat" ? "微信" : "工坊Web");
+        const sender = clientSource?.senderName || "掌柜";
+        const timeboxTag = timeboxMinutes ? `·⏱️${timeboxMinutes}m` : "";
+        const formattedTitle = `【${channelTag}·${sender}${timeboxTag}】${rawTaskTitle}`;
+
         const issuesApi = issueService(db);
         const created = await issuesApi.create(companyId, {
-          title: rawTaskTitle,
-          description: `掌柜工坊直驱派发${timeboxMinutes ? `（限时 ${timeboxMinutes} 分钟 AIP Bootcamp Time-Box 探针）` : ""}`,
+          title: formattedTitle,
+          description: `由 ${sender} 从 ${channelTag} 直驱派发${timeboxMinutes ? `（限时 ${timeboxMinutes} 分钟 AIP Bootcamp Time-Box 探针）` : ""}`,
           projectId: targetProjectId,
           assigneeAgentId: targetAgent.id,
           status: "todo",
@@ -389,7 +400,7 @@ async function detectAndExecuteDirectAction(
             assigneeAgentId: targetAgent.id,
             status: "todo",
           },
-          reason: `掌柜工坊直驱派发${timeboxMinutes ? `（${timeboxMinutes}分钟时间盒）` : ""}: ${rawTaskTitle}`,
+          reason: `掌柜工坊直驱派发${timeboxMinutes ? `（${timeboxMinutes}分钟时间盒）` : ""}: ${formattedTitle}`,
           mutation: "assign",
           contextSource: "board-chat",
           requestedByActorType: "user",
@@ -400,6 +411,7 @@ async function detectAndExecuteDirectAction(
           `| 字段 | 真实状态 |\n` +
           `| :--- | :--- |\n` +
           `| **工单编号** | \`${created.identifier}\` (${created.title}) |\n` +
+          `| **派单来源** | 📱 **${channelTag}** (${sender} 发起) |\n` +
           `| **受派匠人** | 👤 **${targetAgent.name}** (\`${targetAgent.roleLabel || targetAgent.role}\`) |\n` +
           (timeboxMinutes
             ? `| **时间盒 (Time-Box)** | ⏱️ **${timeboxMinutes} 分钟** (预计截止 ${deadlineStr}) |\n` +
@@ -1593,6 +1605,18 @@ export function boardChatRoutes(
       ? `\n\n[当前项目上下文]\n项目ID: ${effectiveProjectId}\n用户当前处于该项目工坊中，所有派活、build 指令、CMMI 交付物均默认归属于该项目。\n[/当前项目上下文]`
       : "";
 
+    const userAgent = (req.headers["user-agent"] || "").toLowerCase();
+    const isApp =
+      userAgent.includes("okhttp") ||
+      userAgent.includes("expo") ||
+      userAgent.includes("mobile") ||
+      userAgent.includes("android") ||
+      userAgent.includes("cfnetwork") ||
+      userAgent.includes("darwin") ||
+      req.headers["x-coolie-client"] === "expo";
+    const channel: "app" | "web" = isApp ? "app" : "web";
+    const senderName = "掌柜";
+
     // ── Coolie fork: Conversational AI-Agent-Driven Direct Action Execution ──
     const directAction = await detectAndExecuteDirectAction(
       db,
@@ -1600,6 +1624,10 @@ export function boardChatRoutes(
       message,
       effectiveProjectId,
       actor.actorId,
+      {
+        channel,
+        senderName,
+      },
     );
     const directActionBlock = directAction.handled && directAction.injectedContext
       ? `\n\n[底层调度已执行结果]\n${directAction.injectedContext}\n系统已完成物理更新与心跳脉冲投递，请在此事实基础上继续回答老板的指令或问题。\n[/底层调度已执行结果]`

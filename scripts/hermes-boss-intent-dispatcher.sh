@@ -253,8 +253,9 @@ ISSUE_IDENTIFIER=""
 ISSUE_URL=""
 
 create_issue_on_dev() {
-  local title="[$LATEST_WAVE] $SAFE_TASK"
+  local title="【微信·老板·$LATEST_WAVE】$SAFE_TASK"
   local desc="由 Hermes 从老板微信/终端直通派发
+- 来源渠道: 📱 微信 (老板直接发话)
 - 责任员工: $EMPLOYEE
 - 工具: $TOOL
 - 梯次分流: $TASK_LEVEL
