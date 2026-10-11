@@ -1,7 +1,8 @@
-import { Pressable, StyleSheet, Text, View } from "react-native";
+import { Alert, Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { C } from "../theme";
 import { CoolieLogo } from "./CoolieLogo";
+import { useNotificationsStore } from "../stores/notifications";
 
 /**
  * 全局顶栏 — Linear 暗黑设计系统风格：
@@ -39,9 +40,27 @@ export function AppBar({
         ) : null}
         {onOpenNotifications ? (
           <Pressable
+            testID="AppBar__Bell__ClearBtn"
             style={styles.iconBtn}
             hitSlop={10}
             onPress={onOpenNotifications}
+            onLongPress={() => {
+              if (unreadCount <= 0) return;
+              Alert.alert(
+                "清空所有未读",
+                `当前 ${unreadCount} 条未读消息, 全部标记为已读?`,
+                [
+                  { text: "取消", style: "cancel" },
+                  {
+                    text: "清空",
+                    style: "destructive",
+                    onPress: () => {
+                      void useNotificationsStore.getState().markAllRead();
+                    },
+                  },
+                ],
+              );
+            }}
           >
             <Ionicons name="notifications-outline" size={20} color={C.ink2} />
             {unreadCount > 0 ? (
