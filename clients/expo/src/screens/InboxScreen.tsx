@@ -29,6 +29,7 @@ import {
   type InboxJoinRequestItem,
   type InboxMentionItem,
 } from "../coolie";
+import { useNotificationsStore } from "../stores/notifications";
 import { StatusDot } from "../components/StatusDot";
 import { QuickApprovalCard } from "../components/QuickApprovalCard";
 import { AppCard } from "../ui/AppCard";
@@ -1171,6 +1172,10 @@ export function InboxScreen({
     return unreadWorkItems.length;
   }, [unreadWorkItems]);
 
+  // 数据一致 (wave373): 收件箱头「未读」与顶栏铃铛共用同一通知未读数
+  // (store.unreadCount, 服务端权威), 消除「铃铛通知口径 vs 收件箱未读工单口径」两套数。
+  const notificationUnreadCount = useNotificationsStore((s) => s.unreadCount);
+
   return (
     <SafeAreaView
       style={[
@@ -1200,7 +1205,7 @@ export function InboxScreen({
               {company.name}
             </Text>
             <Text style={styles.capsuleSub}>
-              · 任务 {activeIssues.length} · 待办 {mineWorkItems.length} · 未读 {currentUnreadCount}
+              · 任务 {activeIssues.length} · 待办 {mineWorkItems.length} · 未读 {notificationUnreadCount}
             </Text>
           </View>
         </View>
