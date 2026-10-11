@@ -1,0 +1,32 @@
+model_type: FLOW
+version: '1.0'
+domain: core
+flows:
+  - id: FLOW_FRAUD_DUAL_APPROVAL_APPROVAL
+    name: 可疑高危交易双人复核会签 审批协同流
+    flowType: APPROVAL
+    ownerEntity: AGG_CORE_FRAUD_DUAL_APPROVAL
+    startState: 草稿
+    endStates:
+      - 生效中
+      - 已废弃
+    activities:
+      - id: ACT_01
+        name: 经办人提交
+        activityType: USER_TASK
+        roleRef: ROLE_FRAUD_DUAL_APPROVAL_OPERATOR
+        behaviorRef: fraud-dual-approval_submit
+        next:
+          - ACT_GATE_01
+      - id: ACT_GATE_01
+        name: 提审完整性网关
+        activityType: GATEWAY
+        ruleRef: RULE_FRAUD_DUAL_APPROVAL_SUBMIT_CHECK
+        next:
+          - ACT_02
+      - id: ACT_02
+        name: 掌柜/总监复核
+        activityType: USER_TASK
+        roleRef: ROLE_FRAUD_DUAL_APPROVAL_APPROVER
+        next:
+          - END

@@ -1,0 +1,44 @@
+model_type: BEHAVIOR
+version: '1.0'
+domain: core
+behaviors:
+  - id: fraud-dual-approval_save_draft
+    name: 保存草稿
+    ownerEntity: AGG_CORE_FRAUD_DUAL_APPROVAL
+    behaviorType: COMMAND
+    triggerType: USER_ACTION
+    summary: 经办人暂存业务单据草稿
+    apiContract:
+      httpMethod: POST
+      routePath: /api/v1/core/fraud-dual-approval/draft
+    preconditions:
+      - status in ('草稿', '已驳回')
+    postconditions:
+      - field: status
+        setValue: 草稿
+    appliedRules:
+      - RULE_FRAUD_DUAL_APPROVAL_MULTI_TENANT_ISOLATION
+    requiredPermissions:
+      - perm:core:fraud-dual-approval:create
+    syncTriggers: []
+  - id: fraud-dual-approval_submit
+    name: 提交审批
+    ownerEntity: AGG_CORE_FRAUD_DUAL_APPROVAL
+    behaviorType: COMMAND
+    triggerType: USER_ACTION
+    summary: 提交单据进入跨角色审批流
+    apiContract:
+      httpMethod: POST
+      routePath: /api/v1/core/fraud-dual-approval/submit
+    preconditions:
+      - status == '草稿'
+      - title != null && title != ''
+    postconditions:
+      - field: status
+        setValue: 待审批
+    appliedRules:
+      - RULE_FRAUD_DUAL_APPROVAL_MULTI_TENANT_ISOLATION
+      - RULE_FRAUD_DUAL_APPROVAL_SUBMIT_CHECK
+    requiredPermissions:
+      - perm:core:fraud-dual-approval:submit
+    syncTriggers: []

@@ -1,0 +1,21 @@
+model_type: UI
+version: '1.0'
+domain: core
+screens:
+  - id: SCR_FRAUD_DUAL_APPROVAL_CONSOLE
+    name: 可疑高危交易双人复核会签 移动/Web 极简工作台
+    routePath: /core/fraud-dual-approval
+    targetEntity: AGG_CORE_FRAUD_DUAL_APPROVAL
+    screenType: FORM_EDIT
+    actionPoints:
+      - id: btn_save
+        label: 保存
+        behaviorRef: fraud-dual-approval_save_draft
+        style: SECONDARY
+        isDraftOrSubmit: true
+      - id: btn_submit
+        label: 提交
+        behaviorRef: fraud-dual-approval_submit
+        style: PRIMARY
+        confirmPrompt: 确认提交进入审批流？
+        isDraftOrSubmit: true

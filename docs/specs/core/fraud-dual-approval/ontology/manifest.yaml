@@ -1,0 +1,13 @@
+model_type: MANIFEST
+version: '1.0'
+domain: core
+project: fraud-dual-approval
+title: 可疑高危交易双人复核会签
+framework: ontology_modeling_framework_v9.md
+model_files:
+  - m1-objects.yaml
+  - m2-behaviors.yaml
+  - m3-rules.yaml
+  - m5-actors.yaml
+  - m6-flows.yaml
+  - mu-views.yaml

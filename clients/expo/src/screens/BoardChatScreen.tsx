@@ -836,7 +836,7 @@ export function BoardChatScreen({
     voicePressRef.current.promise = (async () => {
       try {
         await startRecording();
-        setVoiceStatus("🎤 录音中… (松开发送 · 左滑取消 · 右滑转文字)");
+        setVoiceStatus("🎤 录音中… (松开发送 · 左滑取消 · 上滑/右滑转文字)");
         return true;
       } catch (e) {
         Alert.alert("录音失败", String((e as Error)?.message ?? e));

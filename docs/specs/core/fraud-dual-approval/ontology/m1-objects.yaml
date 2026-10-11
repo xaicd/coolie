@@ -1,0 +1,54 @@
+model_type: OBJECT
+version: '1.0'
+domain: core
+aggregates:
+  - id: AGG_CORE_FRAUD_DUAL_APPROVAL
+    name: 可疑高危交易双人复核会签
+    alias: fraud-dual-approval
+    aggregateType: AGGREGATE_ROOT
+    description: 可疑高危交易双人复核会签 核心业务聚合根
+    lifecycle:
+      - 草稿
+      - 待审批
+      - 生效中
+      - 已结项
+      - 已废弃
+    tags:
+      - 业务核心
+      - core
+    attributes:
+      - name: id
+        label: 主键 ID
+        type: String
+        required: true
+        unique: true
+      - name: company_id
+        label: 租户企业 ID
+        type: String
+        required: true
+      - name: biz_no
+        label: 业务单号
+        type: String
+        required: true
+        unique: true
+      - name: status
+        label: 生命周期状态
+        type: String
+        required: true
+      - name: title
+        label: 标题说明
+        type: String
+        required: true
+      - name: amount
+        label: 结算金额
+        type: Decimal
+        required: false
+      - name: created_at
+        label: 创建时间
+        type: DateTime
+        required: true
+      - name: updated_at
+        label: 更新时间
+        type: DateTime
+        required: true
+    relations: []

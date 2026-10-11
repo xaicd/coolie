@@ -78,8 +78,9 @@ export function ChatInput({
   // 模式切换: "text" (文字输入) vs "voice" (全宽按住说话长条)
   const [inputMode, setInputMode] = useState<"text" | "voice">("text");
 
-  // 录音中的实时三态: "send" (居中发送) | "cancel" (左滑取消) | "transcribe" (右滑转文字)
+  // 录音中的实时三态: "send" (居中发送) | "cancel" (左滑取消) | "transcribe" (右滑/上滑转文字)
   const [gestureMode, setGestureMode] = useState<"send" | "cancel" | "transcribe">("send");
+  const gestureModeRef = useRef<"send" | "cancel" | "transcribe">("send");
 
   // 录音秒数计时器 (00:03)
   const [recordSeconds, setRecordSeconds] = useState(0);
@@ -250,22 +251,33 @@ export function ChatInput({
   // 响应中严禁锁定输入框: 用户可自由输入下一句提问、准备附件或切换语音
   const canEdit = !disabled;
 
-  // 微信/飞书动态手势识别器: 宽阔居中按压，支持连续跟手位移
+  // 微信/飞书动态手势识别器: 宽阔居中按压，支持连续跟手位移 (二维向量判定: 上滑/右滑转文字，左滑取消)
+  const resolveGesture = useCallback((dx: number, dy: number): "send" | "cancel" | "transcribe" => {
+    if (dx < -35) return "cancel";
+    if (dx > 35 || dy < -35) return "transcribe";
+    return "send";
+  }, []);
+
   const panResponder = useMemo(
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => canEdit && !voiceBusy,
         onMoveShouldSetPanResponder: () => canEdit && !voiceBusy,
+        onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
+          gestureModeRef.current = "send";
           setGestureMode("send");
           cancelScaleAnim.setValue(1);
           transcribeScaleAnim.setValue(1);
           onMicPressIn?.();
         },
         onPanResponderMove: (_, gestureState) => {
-          const { dx } = gestureState;
-          if (dx < -45) {
-            setGestureMode("cancel");
+          const { dx, dy } = gestureState;
+          const mode = resolveGesture(dx, dy);
+          gestureModeRef.current = mode;
+          setGestureMode(mode);
+
+          if (mode === "cancel") {
             Animated.spring(cancelScaleAnim, {
               toValue: 1.35,
               useNativeDriver: true,
@@ -276,8 +288,7 @@ export function ChatInput({
               useNativeDriver: true,
               friction: 6,
             }).start();
-          } else if (dx > 45) {
-            setGestureMode("transcribe");
+          } else if (mode === "transcribe") {
             Animated.spring(transcribeScaleAnim, {
               toValue: 1.35,
               useNativeDriver: true,
@@ -289,7 +300,6 @@ export function ChatInput({
               friction: 6,
             }).start();
           } else {
-            setGestureMode("send");
             Animated.spring(cancelScaleAnim, {
               toValue: 1,
               useNativeDriver: true,
@@ -303,33 +313,44 @@ export function ChatInput({
           }
         },
         onPanResponderRelease: (_, gestureState) => {
-          const { dx } = gestureState;
+          const { dx, dy } = gestureState;
           cancelScaleAnim.setValue(1);
           transcribeScaleAnim.setValue(1);
+          const finalMode =
+            gestureModeRef.current !== "send"
+              ? gestureModeRef.current
+              : resolveGesture(dx, dy);
 
-          if (dx < -45) {
+          gestureModeRef.current = "send";
+          setGestureMode("send");
+
+          if (finalMode === "cancel") {
             // 左滑松手: 彻底取消
-            setGestureMode("send");
             onMicCancel?.();
-          } else if (dx > 45) {
-            // 右滑松手: 转文字并填入输入框，切回键盘模式
-            setGestureMode("send");
+          } else if (finalMode === "transcribe") {
+            // 上滑/右滑松手: 转文字并填入输入框，切回键盘模式
             onMicPressOut?.("transcribe");
             setInputMode("text");
           } else {
             // 居中松手: 直接发送！
-            setGestureMode("send");
             onMicPressOut?.("send");
           }
         },
         onPanResponderTerminate: () => {
           cancelScaleAnim.setValue(1);
           transcribeScaleAnim.setValue(1);
+          const finalMode = gestureModeRef.current;
+          gestureModeRef.current = "send";
           setGestureMode("send");
-          onMicCancel?.();
+          if (finalMode === "transcribe") {
+            onMicPressOut?.("transcribe");
+            setInputMode("text");
+          } else {
+            onMicCancel?.();
+          }
         },
       }),
-    [canEdit, voiceBusy, onMicPressIn, onMicPressOut, onMicCancel, cancelScaleAnim, transcribeScaleAnim],
+    [canEdit, voiceBusy, onMicPressIn, onMicPressOut, onMicCancel, cancelScaleAnim, transcribeScaleAnim, resolveGesture],
   );
 
   // 格式化秒数
@@ -422,7 +443,7 @@ export function ChatInput({
                   ? "⚠️ 松开手指，取消发送"
                   : gestureMode === "transcribe"
                   ? "✏️ 松开手指，转文字并预览"
-                  : "松开 发送 (←左滑取消 · 右滑转文字→)"}
+                  : "松开 发送 (←左滑取消 · 上滑/右滑转文字→)"}
               </Text>
             </View>
 

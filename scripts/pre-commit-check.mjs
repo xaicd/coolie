@@ -58,6 +58,7 @@ const ALLOWED_ROOT_DIRS = new Set([
   'skills',
   'doc',
   'docs-coolie',
+  'docs',
   'clients',
   'scripts',
   'wiki',

@@ -68,8 +68,8 @@ function rawNotificationId(feedId: string): string {
  */
 async function computeUnreadCount(db: Db, companyId: string, userId: string): Promise<number> {
   const items = await buildFeed(db, companyId, 50);
-  const persistedDismissals = await dismissalSvc.listDismissals(companyId, userId);
-  const dismissedKeys = new Set(persistedDismissals.map((d) => d.itemKey));
+  const persistedDismissals = await inboxDismissalService(db).list(companyId, userId);
+  const dismissedKeys = new Set(persistedDismissals.map((d: any) => d.itemKey));
   const memoryRead = readSetFor(userId);
   const notifications = items.map((item) => ({
     ...item,

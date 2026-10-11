@@ -31,8 +31,11 @@ import {
 } from "../services/ontology-spec-store.js";
 import { approvalService } from "../services/approvals.js";
 import { documentService } from "../services/documents.js";
-import { issueApprovalService } from "../services/issue-approvals.js";
-import { issueService } from "../services/index.js";
+import { issueService, projectService, issueApprovalService } from "../services/index.js";
+import { ensureProjectOntologyDomain } from "../services/project-ontology-bootstrap.js";
+import { ensureProjectBoardConversation } from "../services/project-board-conversation.js";
+import { BUILD_TRIGGER_PATTERN } from "../services/build-orchestrator.js";
+import { logger } from "../middleware/logger.js";
 import type { PluginWorkerManager } from "../services/plugin-worker-manager.js";
 import type { IssueAssignmentWakeupDeps } from "../services/issue-assignment-wakeup.js";
 import { assertBoard, assertCompanyAccess, getActorInfo } from "./authz.js";
@@ -120,21 +123,58 @@ export function buildRoutes(
       });
     }
 
+    const buildActor = actorFromRequest(req);
+
+    let effectiveProjectId = projectId;
+    let createdProjectName = "";
+
+    // 立项管网归一铁律：工坊对话立项绝不创建无主孤儿任务！
+    // 若调用方未显式传入 projectId，则从 prompt 智能提取项目名并原子创建 Project 实体与专属本体域。
+    if (!effectiveProjectId) {
+      try {
+        const projSvc = projectService(db);
+        const rawName = prompt.trim().replace(BUILD_TRIGGER_PATTERN, "").trim();
+        const projName = rawName ? rawName.slice(0, 60) : `商业交付项目-${Date.now().toString().slice(-4)}`;
+        const newProject = await projSvc.create(companyId, {
+          name: projName,
+          description: `由工坊对话指令自动立项: ${prompt.trim()}`,
+        });
+        effectiveProjectId = newProject.id;
+        createdProjectName = newProject.name;
+
+        // 原子绑定本体域与工坊会话
+        await ensureProjectOntologyDomain(db, {
+          companyId,
+          projectId: effectiveProjectId,
+          projectName: createdProjectName,
+          description: prompt.trim(),
+          createdBy: buildActor.actorId || "board",
+        });
+        await ensureProjectBoardConversation(db, {
+          companyId,
+          projectId: effectiveProjectId,
+          projectName: createdProjectName,
+        });
+      } catch (err: any) {
+        logger.warn({ err, companyId, prompt }, "Failed to auto-provision project during build/start");
+      }
+    }
+
     const { plan, source } = await generateBuildPlan({
       companyId,
       prompt: prompt.trim(),
       apiUrl: opts.apiUrl,
     });
 
-    const buildActor = actorFromRequest(req);
-
     const result = await createBuildPlanIssues(
       { db, heartbeat: opts.heartbeat },
-      { companyId, prompt: prompt.trim(), plan, actor: buildActor, projectId },
+      { companyId, prompt: prompt.trim(), plan, actor: buildActor, projectId: effectiveProjectId },
     );
 
     res.status(201).json({
       buildId: result.buildId,
+      projectId: effectiveProjectId,
+      projectName: createdProjectName || undefined,
       plan: result.plan,
       planSource: source,
       unassignedAgentTypes: result.unassignedAgentTypes,
@@ -305,7 +345,7 @@ export function buildRoutes(
       spec: stored?.spec ?? null,
       documentId: stored?.documentId ?? null,
       revisionNumber: stored?.revisionNumber ?? null,
-      approvals: linked.map((row) => ({
+      approvals: linked.map((row: any) => ({
         id: row.id,
         type: row.type,
         status: row.status,
@@ -336,7 +376,7 @@ export function buildRoutes(
     if (!stored) throw notFound("This issue holds no ontology spec");
 
     const linked = await issueApprovals.listApprovalsForIssue(specId);
-    const specApproval = linked.find((row) => row.type === "ontology_spec");
+    const specApproval = linked.find((row: any) => row.type === "ontology_spec");
     if (!specApproval) {
       throw conflict("This spec has no approval attached", { code: "SPEC_APPROVAL_MISSING" });
     }
