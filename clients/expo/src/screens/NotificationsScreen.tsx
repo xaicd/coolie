@@ -169,31 +169,35 @@ export function NotificationsScreen({
               style={styles.emptyBox}
             />
           ) : (
-            visible.map((item) => (
-              <AppCard
-                key={item.id}
-                variant="surface"
-                row
-                style={[styles.row, !item.read && styles.rowUnread]}
-                onPress={() => openNotification(item)}
-              >
-                <View style={styles.iconBox}>
-                  <Ionicons name={KIND_ICON[item.type]} size={18} color={KIND_COLOR[item.type]} />
-                </View>
-                <View style={{ flex: 1, gap: 3 }}>
-                  <Text style={styles.rowTitle} numberOfLines={2}>
-                    {item.title}
-                  </Text>
-                  {item.body ? (
-                    <Text style={styles.rowBody} numberOfLines={2}>
-                      {item.body}
+            visible.map((item) => {
+              const isUnread = !item.read;
+              return (
+                <AppCard
+                  key={item.id}
+                  variant="surface"
+                  row
+                  style={[styles.row, isUnread ? styles.rowUnread : styles.rowRead]}
+                  onPress={() => openNotification(item)}
+                >
+                  {isUnread ? <View style={styles.leftBar} /> : <View style={styles.leftBarSpacer} />}
+                  <View style={styles.iconBox}>
+                    <Ionicons name={KIND_ICON[item.type]} size={18} color={KIND_COLOR[item.type]} />
+                  </View>
+                  <View style={{ flex: 1, gap: 3 }}>
+                    <Text style={[styles.rowTitle, isUnread ? styles.rowTitleUnread : styles.rowTitleRead]} numberOfLines={2}>
+                      {item.title}
                     </Text>
-                  ) : null}
-                  <Text style={styles.rowMeta}>{formatRelativeTime(item.createdAt)}</Text>
-                </View>
-                {!item.read ? <View style={styles.unreadDot} /> : null}
-              </AppCard>
-            ))
+                    {item.body ? (
+                      <Text style={[styles.rowBody, !isUnread && styles.rowBodyRead]} numberOfLines={2}>
+                        {item.body}
+                      </Text>
+                    ) : null}
+                    <Text style={styles.rowMeta}>{formatRelativeTime(item.createdAt)}</Text>
+                  </View>
+                  {isUnread ? <View style={styles.unreadDot} /> : null}
+                </AppCard>
+              );
+            })
           )}
         </ScrollView>
       )}
@@ -209,7 +213,10 @@ const styles = StyleSheet.create({
   list: { padding: 16, paddingBottom: 32, gap: 10 },
   emptyBox: { marginTop: 8, backgroundColor: C.surface, borderRadius: 14, borderWidth: 0 },
   row: { gap: 10 },
-  rowUnread: { backgroundColor: "rgba(94, 106, 210, 0.06)" },
+  rowUnread: { backgroundColor: "rgba(94, 106, 210, 0.18)" },
+  rowRead: { backgroundColor: "transparent", opacity: 0.62 },
+  leftBar: { width: 3, alignSelf: "stretch", borderRadius: 2, backgroundColor: C.accent, marginRight: -7 },
+  leftBarSpacer: { width: 3, marginRight: -7 },
   iconBox: {
     width: 34,
     height: 34,
@@ -219,7 +226,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   rowTitle: { color: C.ink, fontSize: 14, fontWeight: "500" },
+  rowTitleUnread: { fontWeight: "700", color: C.ink },
+  rowTitleRead: { fontWeight: "400", color: C.ink3 },
   rowBody: { color: C.ink3, fontSize: 12, lineHeight: 17 },
+  rowBodyRead: { color: C.ink4 },
   rowMeta: { color: C.ink4, fontSize: 11, fontVariant: ["tabular-nums"] },
-  unreadDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: C.err },
+  unreadDot: { width: 10, height: 10, borderRadius: 5, backgroundColor: C.err, marginLeft: 6 },
 });
