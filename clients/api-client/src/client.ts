@@ -456,6 +456,10 @@ export class CoolieClient {
       offset?: number;
       sortField?: "updated" | "id";
       sortDir?: "asc" | "desc";
+      touchedByUserId?: string;
+      inboxArchivedByUserId?: string;
+      unreadForUserId?: string;
+      assigneeUserId?: string;
     },
   ): Promise<Issue[]> {
     const q = new URLSearchParams();
@@ -465,6 +469,10 @@ export class CoolieClient {
     if (opts?.offset) q.set("offset", String(opts.offset));
     if (opts?.sortField) q.set("sortField", opts.sortField);
     if (opts?.sortDir) q.set("sortDir", opts.sortDir);
+    if (opts?.touchedByUserId) q.set("touchedByUserId", opts.touchedByUserId);
+    if (opts?.inboxArchivedByUserId) q.set("inboxArchivedByUserId", opts.inboxArchivedByUserId);
+    if (opts?.unreadForUserId) q.set("unreadForUserId", opts.unreadForUserId);
+    if (opts?.assigneeUserId) q.set("assigneeUserId", opts.assigneeUserId);
     const suffix = hasQueryParams(q) ? `?${q.toString()}` : "";
     const body = await this.request<{ issues?: Issue[] } | Issue[]>(
       "GET",
@@ -539,6 +547,27 @@ export class CoolieClient {
     return this.request<{ id: string; archivedAt: string | Date } | { ok: true }>(
       "DELETE",
       `/api/issues/${encodeURIComponent(issueId)}/inbox-archive`,
+    );
+  }
+
+  /** 将任务标记为已读 (`POST /api/issues/:id/read`)。 */
+  async markIssueRead(
+    issueId: string,
+  ): Promise<{ id: string; lastReadAt: string | Date }> {
+    return this.request<{ id: string; lastReadAt: string | Date }>(
+      "POST",
+      `/api/issues/${encodeURIComponent(issueId)}/read`,
+      {},
+    );
+  }
+
+  /** 将任务重新标记为未读 (`DELETE /api/issues/:id/read`)。 */
+  async markIssueUnread(
+    issueId: string,
+  ): Promise<{ id: string; removed: boolean }> {
+    return this.request<{ id: string; removed: boolean }>(
+      "DELETE",
+      `/api/issues/${encodeURIComponent(issueId)}/read`,
     );
   }
 

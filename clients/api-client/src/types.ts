@@ -434,6 +434,8 @@ export interface Issue {
   workMode?: IssueWorkMode;
   createdAt?: string | Date;
   updatedAt?: string | Date;
+  isUnreadForMe?: boolean;
+  lastActivityAt?: string | Date;
 }
 
 export interface SessionUser {
@@ -1385,6 +1387,17 @@ export interface InboxFeed {
   pendingApprovals: InboxApprovalItem[];
   failures: InboxFailureItem[];
   mentionedBy: InboxMentionItem[];
+}
+
+/** 运行状态摘要 — GET /companies/:companyId/heartbeat-runs */
+export interface HeartbeatRunSummary {
+  id: string;
+  agentId: string;
+  companyId: string;
+  status: string;
+  error?: string | null;
+  createdAt: string;
+  finishedAt?: string | null;
 }
 
 /** CMMI 架构治理单项检查条目 */

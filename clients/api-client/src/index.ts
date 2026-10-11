@@ -176,6 +176,7 @@ export type {
   InboxFailureItem,
   InboxMentionItem,
   InboxFeed,
+  HeartbeatRunSummary,
   GitProvider,
   GitCredential,
   SaveGitCredentialInput,
