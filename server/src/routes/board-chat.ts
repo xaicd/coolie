@@ -154,6 +154,8 @@ async function resolveLiveFoundryContext(
       `  * 控制面第一方 MCP (76 项): list_issues, create_work_product, checkout_task_lock, get_company_dashboard, approve_request, pause_on_budget_exceeded, update_issue 等\n` +
       `  * 活体业务本体 MCP (22 项): ontology_list_object_types, ontology_find_impact (因果影响面分析), ontology_architecture_diagram, ontology_propose_change 等\n` +
       `- 📐 规格驱动开发 (Spec-Kit SDD): 支持 node scripts/speckit.cjs new/build/tasks/sync/callchain 全流程\n` +
+      `- 🔍 需求工程与竞品雷达 (G0 Scouting DoD): 接收到任何新需求/新功能时，必须首先启动竞品与开源底座雷达（至少对标 2 个行业标杆产品，扫描 GitHub/Gitee 高星开源，提炼行业隐性需求与 80/20 借力策略），输出作为需求规格书 (SRS) 第 0 节，严禁凭空手搓与闭门造车。\n` +
+      `- ⏱️ AIP Bootcamp 时间盒派单 (Time-Boxed Task): 支持自然语言“让<员工>在<N>分钟内搞定<任务>”，系统自动绑定 executionPolicy 与 monitorNextCheckAt 倒计时硬熔断，以 Time to Truth 倒逼真实证据交付。\n` +
       `- 📜 ODD 活体本体声明式 YAML: 支持 M1 (Objects), M2 (Behaviors), M3 (Rules), M5 (Actors), M6 (Flows) 声明式纯文本建模 (spec-ontology-driver.cjs)\n` +
       `- 🏭 商业交付项目孵化: 支持 bash scripts/hatch-client-project.sh <path> --profile quad-terminal (Spring Boot 3 + Vue3 Admin + 微信小程序 + Expo App 四位一体)\n` +
       `【强制约束】当老板咨询工坊问题（如当前项目、员工状态、任务进展、cwall算力节点、MCP工具池、Spec交付、本体建模）时，必须严格基于上述真值如实汇报，严禁无中生有或推脱未知。\n`
@@ -165,7 +167,7 @@ async function resolveLiveFoundryContext(
 
 interface DirectActionResult {
   handled: boolean;
-  actionKind?: "reassign" | "wakeup" | "switch_tool" | "status_change";
+  actionKind?: "reassign" | "wakeup" | "switch_tool" | "status_change" | "dispatch";
   markdownReply?: string;
   injectedContext?: string;
   isTerminal?: boolean;
@@ -173,8 +175,8 @@ interface DirectActionResult {
 
 /**
  * Coolie fork: Detect high-frequency conversational actions (reassign, wakeup,
- * tool switching, status transitions) from the boss's natural language input
- * and execute them directly against the database and heartbeat queue.
+ * tool switching, status transitions, and time-boxed dispatch) from the boss's
+ * natural language input and execute them directly against the database and heartbeat queue.
  *
  * Prevents the "empty verbal promise without execution" anti-pattern.
  */
@@ -228,6 +230,111 @@ async function detectAndExecuteDirectAction(
           a.role.toLowerCase() === q,
       );
     };
+
+    // 0. 新建并指派工单（支持 Palantir AIP Bootcamp 风格 Time-Box 倒计时时间盒派单）
+    // 例: "让铁匠在 30 分钟内搞定退款接口", "派墨斗在 1 小时内输出架构设计", "安排门神跑一遍真机快照测试", "让百晓生做竞品调研"
+    const dispatchMatch = text.match(
+      /^(?:请|帮我)?\s*(?:让|派|叫|安排)\s*([^\s,，。!！?？]+?)\s*(?:在\s*(\d+)\s*(分钟|小时|分|h|min|m)内)?\s*(?:去|来|执行|搞定|完成|做|跑|输出|编写|进行)?\s*(.+)$/i,
+    );
+    if (dispatchMatch && !text.includes("改派给") && !text.includes("转交给") && !text.includes("的工具")) {
+      const agentQuery = dispatchMatch[1];
+      const targetAgent = resolveAgent(agentQuery);
+      const rawTaskTitle = dispatchMatch[4].trim().replace(/^[，,。.!！\s]+/, "");
+
+      if (targetAgent && rawTaskTitle.length >= 2 && !/[?？]$/.test(rawTaskTitle)) {
+        let timeboxMinutes: number | null = null;
+        if (dispatchMatch[2]) {
+          const rawNum = parseInt(dispatchMatch[2], 10);
+          const unit = dispatchMatch[3]?.toLowerCase() || "";
+          if (unit.includes("小") || unit === "h") {
+            timeboxMinutes = rawNum * 60;
+          } else {
+            timeboxMinutes = rawNum;
+          }
+        }
+
+        let targetProjectId = effectiveProjectId ?? null;
+        if (!targetProjectId) {
+          const projList = await db
+            .select({ id: projects.id })
+            .from(projects)
+            .where(eq(projects.companyId, companyId))
+            .orderBy(desc(projects.createdAt))
+            .limit(1);
+          if (projList.length > 0) {
+            targetProjectId = projList[0].id;
+          }
+        }
+
+        const issuesApi = issueService(db);
+        const created = await issuesApi.create(companyId, {
+          title: rawTaskTitle,
+          description: `掌柜工坊直驱派发${timeboxMinutes ? `（限时 ${timeboxMinutes} 分钟 AIP Bootcamp Time-Box 探针）` : ""}`,
+          projectId: targetProjectId,
+          assigneeAgentId: targetAgent.id,
+          status: "todo",
+          priority: timeboxMinutes ? "high" : "normal",
+        });
+
+        let deadlineStr = "";
+        if (timeboxMinutes) {
+          const timeoutMs = timeboxMinutes * 60 * 1000;
+          const deadline = new Date(Date.now() + timeoutMs);
+          deadlineStr = deadline.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+
+          await db
+            .update(issues)
+            .set({
+              executionPolicy: {
+                timeoutMs,
+                timebox: true,
+                timeboxMinutes,
+                autoPauseOnTimeout: true,
+                targetDeadline: deadline.toISOString(),
+              },
+              monitorNextCheckAt: deadline,
+              monitorScheduledBy: "timebox",
+              updatedAt: new Date(),
+            })
+            .where(eq(issues.id, created.id));
+        }
+
+        void queueIssueAssignmentWakeup({
+          heartbeat,
+          issue: {
+            id: created.id,
+            assigneeAgentId: targetAgent.id,
+            status: "todo",
+          },
+          reason: `掌柜工坊直驱派发${timeboxMinutes ? `（${timeboxMinutes}分钟时间盒）` : ""}: ${rawTaskTitle}`,
+          mutation: "assign",
+          contextSource: "board-chat",
+          requestedByActorType: "user",
+          requestedByActorId: actorUserId ?? null,
+        });
+
+        const card = `### ⚡ 指令已执行：工单已创建并直驱下发\n\n` +
+          `| 字段 | 真实状态 |\n` +
+          `| :--- | :--- |\n` +
+          `| **工单编号** | \`${created.identifier}\` (${created.title}) |\n` +
+          `| **受派匠人** | 👤 **${targetAgent.name}** (\`${targetAgent.roleLabel || targetAgent.role}\`) |\n` +
+          (timeboxMinutes
+            ? `| **时间盒 (Time-Box)** | ⏱️ **${timeboxMinutes} 分钟** (预计截止 ${deadlineStr}) |\n` +
+              `| **熔断机制** | Palantir AIP Bootcamp: 倒计时结束硬熔断留存证据 (Time to Truth) |\n`
+            : `| **执行模式** | 🚀 敏捷推进 |\n`) +
+          `| **调度通道** | 心跳队列 (\`heartbeat_runs\`) 优先级即刻唤醒 |\n` +
+          `| **工单状态** | \`todo\` ➔ \`in_progress\` |\n\n` +
+          `> 平台已在底层数据库原子建单${timeboxMinutes ? `并锁定 ${timeboxMinutes} 分钟时间盒` : ""}，**${targetAgent.name}** 即刻认领并执行该工单。`;
+
+        return {
+          handled: true,
+          actionKind: "dispatch",
+          markdownReply: card,
+          injectedContext: `已成功创建工单 ${created.identifier} (${created.title}) 并指派给 ${targetAgent.name}${timeboxMinutes ? `，锁定 ${timeboxMinutes} 分钟时间盒` : ""}。`,
+          isTerminal: true,
+        };
+      }
+    }
 
     // 1. 改派工单: "把 COOA-99 派给铁匠", "指派 COOA-12 给墨斗", "把 任务5 交给门神"
     const reassignMatch = text.match(
