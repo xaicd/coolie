@@ -57,8 +57,34 @@ function extractSevenModels(specDirs = []) {
       const specName = data.name || path.basename(sDir);
       const domain = data.domain || "core";
 
+      // 优先从该规格的 ontology/ 目录加载声明式七模型 YAML
+      const ontologyDir = path.join(sDir, "ontology");
+      let yamlBundle = null;
+      if (fs.existsSync(ontologyDir)) {
+        try {
+          const { loadOntologyYaml } = require("./spec-ontology-driver.cjs");
+          yamlBundle = loadOntologyYaml(ontologyDir);
+        } catch (e) {
+          // YAML 读取失败降级回 JSON
+        }
+      }
+
       // 1. 抽取 Aggregates (M1)
-      if (Array.isArray(data.aggregates) && data.aggregates.length > 0) {
+      if (yamlBundle && yamlBundle.objects?.aggregates) {
+        for (const agg of yamlBundle.objects.aggregates) {
+          modelRegistry.aggregates.push({
+            id: agg.id,
+            name: agg.name,
+            alias: agg.alias || agg.id,
+            domain,
+            spec: specName,
+            description: agg.description || "YAML 声明式业务实体",
+            lifecycle: agg.lifecycle || ["草稿", "生效", "归档"],
+            attributes: agg.attributes || [],
+          });
+        }
+      } else if (Array.isArray(data.aggregates) && data.aggregates.length > 0) {
+
         for (const agg of data.aggregates) {
           modelRegistry.aggregates.push({
             id: agg.id || `AGG-${specName.toUpperCase()}-${agg.alias || "ROOT"}`,

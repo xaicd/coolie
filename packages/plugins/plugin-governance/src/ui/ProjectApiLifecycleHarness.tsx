@@ -149,17 +149,182 @@ const INITIAL_MOCK_APIS: ApiContractDefinition[] = [
   },
 ];
 
+const COMMUNITY_LIFE_APIS: ApiContractDefinition[] = [
+  {
+    id: "api_com_001",
+    companyId: "comp_default",
+    projectId: "2288f08d-349d-46b0-abf4-5d4d7502f79a",
+    name: "房源上架发布接口",
+    apiKey: "house.room.create",
+    protocol: "http",
+    endpoint: "/admin-api/house/room/create",
+    httpMethod: "POST",
+    stage: "verified",
+    version: "v1.0.0",
+    description: "房源资产录入与上架发布，强绑定 HouseRoom 活体本体与多租户隔离",
+    requestSchema: [
+      { name: "title", type: "string", required: true, description: "房源对外推广标题", ontologyEntityKey: "HouseRoom", ontologyPropertyKey: "title", example: "金星小区精装朝南两居室" },
+      { name: "roomNo", type: "string", required: true, description: "房源唯一门牌编号", ontologyEntityKey: "HouseRoom", ontologyPropertyKey: "room_no", example: "JX-12-302" },
+      { name: "monthlyRent", type: "decimal", required: true, description: "月租金金额 (需 > 0)", ontologyEntityKey: "HouseRoom", ontologyPropertyKey: "monthly_rent", example: 3200.00, validationRule: "@Min(100.00)" },
+      { name: "floorArea", type: "decimal", required: true, description: "建筑面积 (平方米)", ontologyEntityKey: "HouseRoom", ontologyPropertyKey: "floor_area", example: 88.50 },
+      { name: "layoutCode", type: "string", required: true, description: "户型编码 (如 2R1L1B)", ontologyEntityKey: "HouseRoom", ontologyPropertyKey: "layout_code", example: "2R1L1B" },
+    ],
+    responseSchema: [
+      { name: "id", type: "string", required: true, description: "房源全局唯一 ID", ontologyEntityKey: "HouseRoom", ontologyPropertyKey: "id", example: "room_992104" },
+      { name: "status", type: "string", required: true, description: "房源当前状态 (待租/已租)", ontologyEntityKey: "HouseRoom", ontologyPropertyKey: "status", example: "AVAILABLE" },
+      { name: "listingTime", type: "datetime", required: true, description: "发布上线时间戳", example: "2026-10-11T12:00:00Z" },
+    ],
+    errorContracts: [
+      { code: "ROOM_NO_DUPLICATED", message: "门牌编号已存在", scenario: "同小区下门牌号重复" },
+      { code: "RENT_AMOUNT_INVALID", message: "租金格式或数值非法", scenario: "月租金小于最低准入 100 元" },
+    ],
+    mcpExposed: true,
+    mcpToolName: "call_house_room_create",
+    idempotent: true,
+    tenantIsolated: true,
+    createdAt: "2026-10-11T10:00:00Z",
+    updatedAt: "2026-10-11T15:00:00Z",
+  },
+  {
+    id: "api_com_002",
+    companyId: "comp_default",
+    projectId: "2288f08d-349d-46b0-abf4-5d4d7502f79a",
+    name: "家政标准化履约提单接口",
+    apiKey: "housekeeping.order.create",
+    protocol: "http",
+    endpoint: "/admin-api/housekeeping/order/create",
+    httpMethod: "POST",
+    stage: "verified",
+    version: "v1.0.0",
+    description: "用户提交保洁/维修等家政服务履约订单，生成预约时间与唯一核销码",
+    requestSchema: [
+      { name: "serviceId", type: "string", required: true, description: "家政类目 ID", ontologyEntityKey: "HousekeepingService", ontologyPropertyKey: "id", example: "srv_clean_deep_01" },
+      { name: "serviceTime", type: "datetime", required: true, description: "预约上门服务时间", example: "2026-10-12T09:00:00Z" },
+      { name: "serviceAddress", type: "string", required: true, description: "上门服务详细地址", example: "金星小区 12 栋 302 室" },
+      { name: "payAmount", type: "decimal", required: true, description: "实付订单金额", ontologyEntityKey: "HousekeepingOrder", ontologyPropertyKey: "pay_amount", example: 180.00 },
+      { name: "contactPhone", type: "string", required: true, description: "预约联系电话", example: "13800138000" },
+    ],
+    responseSchema: [
+      { name: "orderNo", type: "string", required: true, description: "家政履约订单号", ontologyEntityKey: "HousekeepingOrder", ontologyPropertyKey: "order_no", example: "HK202610110001" },
+      { name: "status", type: "string", required: true, description: "履约状态 (待派单/待上门)", ontologyEntityKey: "HousekeepingOrder", ontologyPropertyKey: "status", example: "WAIT_DISPATCH" },
+      { name: "verifyCode", type: "string", required: true, description: "阿姨上门 6 位核销码", ontologyEntityKey: "HousekeepingOrder", ontologyPropertyKey: "verify_code", example: "882190" },
+    ],
+    errorContracts: [
+      { code: "SERVICE_TIME_SLOT_FULL", message: "该时间段服务已约满", scenario: "同一片区该工时内服务人员全部饱和" },
+      { code: "SERVICE_AREA_OUT_OF_RANGE", message: "超出服务网格范围", scenario: "录入地址不在当前运营网格内" },
+    ],
+    mcpExposed: true,
+    mcpToolName: "call_housekeeping_order_create",
+    idempotent: true,
+    tenantIsolated: true,
+    createdAt: "2026-10-11T11:00:00Z",
+    updatedAt: "2026-10-11T15:00:00Z",
+  },
+  {
+    id: "api_com_003",
+    companyId: "comp_default",
+    projectId: "2288f08d-349d-46b0-abf4-5d4d7502f79a",
+    name: "社区公告与物业通知广播",
+    apiKey: "community.notice.publish",
+    protocol: "mq",
+    endpoint: "COMMUNITY_NOTICE_TOPIC",
+    mqTopic: "COMMUNITY_NOTICE_TOPIC",
+    mqTag: "NOTICE_PUBLISH",
+    stage: "implemented",
+    version: "v1.0.0",
+    description: "物业检修/活动公告发布，异步广播至小程序订阅消息与 PC 管理大盘",
+    requestSchema: [
+      { name: "noticeId", type: "string", required: true, description: "公告全局 ID", ontologyEntityKey: "CommunityNotice", ontologyPropertyKey: "id", example: "not_20261011_01" },
+      { name: "title", type: "string", required: true, description: "公告标题", ontologyEntityKey: "CommunityNotice", ontologyPropertyKey: "title", example: "关于周末供水管道检修的温馨通告" },
+      { name: "category", type: "string", required: true, description: "公告类目 (MAINTENANCE/ACTIVITY)", ontologyEntityKey: "CommunityNotice", ontologyPropertyKey: "category", example: "MAINTENANCE" },
+      { name: "targetBuildings", type: "array", required: true, description: "覆盖楼栋范围", example: ["1栋", "2栋", "12栋"] },
+    ],
+    responseSchema: [
+      { name: "ackStatus", type: "string", required: true, description: "MQ 消息消费与广播状态", example: "BROADCAST_SUCCESS" },
+    ],
+    errorContracts: [
+      { code: "NOTICE_CONTENT_SENSITIVE", message: "公告内容包含违禁敏感词", scenario: "经文本风控检测未通过" },
+    ],
+    mcpExposed: true,
+    mcpToolName: "broadcast_community_notice",
+    idempotent: true,
+    tenantIsolated: true,
+    createdAt: "2026-10-11T13:00:00Z",
+    updatedAt: "2026-10-11T15:00:00Z",
+  },
+  {
+    id: "api_com_004",
+    companyId: "comp_default",
+    projectId: "2288f08d-349d-46b0-abf4-5d4d7502f79a",
+    name: "租约签署与定金冻结 Dubbo RPC",
+    apiKey: "house.lease.sign.rpc",
+    protocol: "dubbo",
+    endpoint: "com.ruoyi.house.api.HouseLeaseDubboService#signLease",
+    rpcService: "com.ruoyi.house.api.HouseLeaseDubboService",
+    rpcMethod: "signLease",
+    stage: "verified",
+    version: "v1.0.0",
+    description: "租客端在线确认电子合同，原子冻结首期押金与锁定房源状态",
+    requestSchema: [
+      { name: "leaseId", type: "string", required: true, description: "租约单据 ID", ontologyEntityKey: "HouseLeaseOrder", ontologyPropertyKey: "id", example: "lease_88921" },
+      { name: "roomId", type: "string", required: true, description: "关联合同房源 ID", ontologyEntityKey: "HouseRoom", ontologyPropertyKey: "id", example: "room_992104" },
+      { name: "tenantUserId", type: "string", required: true, description: "承租人用户 ID", ontologyEntityKey: "SysUser", ontologyPropertyKey: "id", example: "usr_7721" },
+      { name: "depositAmount", type: "decimal", required: true, description: "首期押金金额", ontologyEntityKey: "HouseLeaseOrder", ontologyPropertyKey: "deposit", example: 3200.00 },
+    ],
+    responseSchema: [
+      { name: "success", type: "boolean", required: true, description: "签署与冻结执行结果", example: true },
+      { name: "contractPdfUrl", type: "string", required: true, description: "生成的有效电子合同 PDF 地址", example: "https://cos.coolie.ai/lease/contract_88921.pdf" },
+    ],
+    errorContracts: [
+      { code: "ROOM_ALREADY_LEASED", message: "房源已被他人签约抢锁", scenario: "并发签约冲突，房源状态非 AVAILABLE" },
+      { code: "DEPOSIT_HOLD_FAILED", message: "押金预授权冻结失败", scenario: "支付渠道余额不足或风控拦截" },
+    ],
+    mcpExposed: true,
+    mcpToolName: "call_house_lease_sign_rpc",
+    idempotent: true,
+    tenantIsolated: true,
+    createdAt: "2026-10-11T14:00:00Z",
+    updatedAt: "2026-10-11T15:30:00Z",
+  },
+];
+
 export function ProjectApiLifecycleHarness({
   projectId,
   projectName,
 }: ProjectApiLifecycleHarnessProps) {
-  const [apis, setApis] = useState<ApiContractDefinition[]>(INITIAL_MOCK_APIS);
-  const [selectedApiId, setSelectedApiId] = useState<string>("api_001");
+  const isCommunityProject = useMemo(() => {
+    return (
+      (projectName && (projectName.includes("社区") || projectName.includes("生活服务"))) ||
+      projectId === "2288f08d-349d-46b0-abf4-5d4d7502f79a"
+    );
+  }, [projectName, projectId]);
+
+  const [activeCatalog, setActiveCatalog] = useState<"community" | "mall">(
+    isCommunityProject ? "community" : "mall"
+  );
+
+  const [apis, setApis] = useState<ApiContractDefinition[]>(
+    isCommunityProject ? COMMUNITY_LIFE_APIS : INITIAL_MOCK_APIS
+  );
+  const [selectedApiId, setSelectedApiId] = useState<string>(
+    isCommunityProject ? "api_com_001" : "api_001"
+  );
   const [protocolFilter, setProtocolFilter] = useState<ApiProtocol | "all">("all");
   const [stageFilter, setStageFilter] = useState<ApiLifecycleStage | "all">("all");
   const [mockOutput, setMockOutput] = useState<string | null>(null);
   const [codeStubTarget, setCodeStubTarget] = useState<"spring_boot" | "grpc_proto" | "dubbo_interface" | "rocketmq_listener">("spring_boot");
   const [activeSubTab, setActiveSubTab] = useState<"contract" | "mcp" | "codegen" | "mock">("contract");
+
+  const handleSwitchCatalog = (cat: "community" | "mall") => {
+    setActiveCatalog(cat);
+    if (cat === "community") {
+      setApis(COMMUNITY_LIFE_APIS);
+      setSelectedApiId("api_com_001");
+    } else {
+      setApis(INITIAL_MOCK_APIS);
+      setSelectedApiId("api_001");
+    }
+  };
 
   const filteredApis = useMemo(() => {
     return apis.filter((api) => {
@@ -227,6 +392,15 @@ export function ProjectApiLifecycleHarness({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            <span className="text-2xs text-muted-foreground">基准契约:</span>
+            <select
+              value={activeCatalog}
+              onChange={(e) => handleSwitchCatalog(e.target.value as "community" | "mall")}
+              className="h-6 rounded border border-border bg-card px-1.5 text-xs text-foreground cursor-pointer"
+            >
+              <option value="community">社区生活服务中台 (House/Community)</option>
+              <option value="mall">通用电商中台 (Mall/Order)</option>
+            </select>
             <button
               type="button"
               onClick={handleSimulateMock}
@@ -236,6 +410,28 @@ export function ProjectApiLifecycleHarness({
               <span>测试</span>
             </button>
           </div>
+        </div>
+
+        {/* 活体本体实体血缘徽标 */}
+        <div className="mt-2 flex items-center gap-1.5 overflow-x-auto whitespace-nowrap pt-2 border-t border-border/40 text-2xs text-muted-foreground">
+          <span className="font-semibold text-primary">活体本体已绑定:</span>
+          {activeCatalog === "community" ? (
+            <>
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-primary">HouseRoom (房源实体)</span>
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-primary">HouseLeaseOrder (租约单据)</span>
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-primary">HousekeepingService (家政类目)</span>
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-primary">HousekeepingOrder (履约单据)</span>
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-primary">CommunityNotice (社群公告)</span>
+              <span className="rounded bg-muted px-1.5 py-0.5 font-mono">SysUser (用户中心)</span>
+            </>
+          ) : (
+            <>
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-primary">MallOrder (商品订单)</span>
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-primary">MallOrderItem (订单明细)</span>
+              <span className="rounded bg-primary/10 px-1.5 py-0.5 font-mono text-primary">UserAccount (资金账户)</span>
+              <span className="rounded bg-muted px-1.5 py-0.5 font-mono">SysUser (用户中心)</span>
+            </>
+          )}
         </div>
 
         {/* 态势统计横条 */}

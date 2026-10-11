@@ -257,3 +257,44 @@ export type {
   ApiErrorContract,
   ApiContractDefinition,
 } from "./api/lifecycle.js";
+
+// Declarative Ontology YAML suite (ODD 7-models + Foundry primitives)
+export type {
+  OntologyManifestYaml,
+  ModelAttribute,
+  ModelAggregate,
+  M1ObjectModelYaml,
+  ModelBehavior,
+  M2BehaviorModelYaml,
+  ModelRule,
+  M3RuleModelYaml,
+  ModelRole,
+  ModelPermission,
+  M5ActorModelYaml,
+  FlowActivity,
+  ModelFlow,
+  M6FlowModelYaml,
+  ModelReport,
+  M7ReportModelYaml,
+  UiActionPoint,
+  UiViewScreen,
+  MuUiModelYaml,
+  OntologyYamlBundle,
+} from "./document/OntologyYamlTypes.js";
+
+export {
+  parseYamlText,
+  dumpYamlText,
+  parseOntologyYamlBundle,
+  yamlBundleToOntologyDocument,
+  yamlBundleToMermaid,
+} from "./document/OntologyYamlParser.js";
+
+export {
+  lintOntologyYamlBundle,
+} from "./document/lintOntologyYaml.js";
+export type {
+  YamlFinding,
+  LintSeverity,
+} from "./document/lintOntologyYaml.js";
+

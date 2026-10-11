@@ -36,6 +36,7 @@ interface MicroserviceNode {
   latency?: number;
   status: "healthy" | "warning" | "injected_fault";
   hasShadowDependency?: boolean;
+  ontologyTypes?: string[];
 }
 
 interface ServiceEdge {
@@ -57,74 +58,156 @@ interface ServiceEdge {
 
 export function ProjectCmmiLivingTopology({ projectId: _projectId, projectName }: ProjectCmmiLivingTopologyProps) {
   const [viewMode, setViewMode] = useState<ViewStateMode>("runtime");
-  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>("e-mall-pay");
   const [chaosSimulating, setChaosSimulating] = useState(false);
 
-  const nodes: MicroserviceNode[] = [
-    { id: "n-ingress", name: "APISIX 动态网关", code: "apisix-gateway", layer: "ingress", port: 9080, qps: 450, latency: 4, status: "healthy" },
-    { id: "n-sys", name: "系统与权限服务", code: "system-service", layer: "service", port: 8080, qps: 180, latency: 18, status: "healthy" },
-    { id: "n-bpm", name: "工作流中心", code: "bpm-service", layer: "service", port: 8081, qps: 65, latency: 32, status: "healthy" },
-    { id: "n-pay", name: "支付交易中台", code: "pay-service", layer: "service", port: 8082, qps: 210, latency: chaosSimulating ? 2850 : 26, status: chaosSimulating ? "injected_fault" : "healthy" },
-    { id: "n-mall", name: "电商业务微服务", code: "mall-service", layer: "service", port: 8083, qps: 280, latency: 45, status: "warning", hasShadowDependency: true },
-    { id: "n-nacos", name: "Nacos 注册与配置", code: "nacos-cluster", layer: "middleware", port: 8848, qps: 120, latency: 5, status: "healthy" },
-    { id: "n-redis", name: "Redis 缓存集群", code: "redis-sentinel", layer: "middleware", port: 6379, qps: 1200, latency: 2, status: "healthy" },
-    { id: "n-mysql", name: "MySQL 8.0 业务库", code: "mysql-mha", layer: "database", port: 3306, qps: 340, latency: 12, status: "healthy" },
-  ];
+  const isCommunityProject = Boolean(
+    (projectName && (projectName.includes("社区") || projectName.includes("生活服务"))) ||
+    _projectId === "2288f08d-349d-46b0-abf4-5d4d7502f79a"
+  );
 
-  const edges: ServiceEdge[] = [
-    {
-      id: "e-gw-mall",
-      source: "n-ingress",
-      target: "n-mall",
-      type: "http_route",
-      designDeclared: true,
-      runtimeQps: 280,
-      runtimeLatency: 5,
-    },
-    {
-      id: "e-mall-pay",
-      source: "n-mall",
-      target: "n-pay",
-      type: "feign_rpc",
-      designDeclared: true,
-      runtimeQps: 210,
-      runtimeLatency: chaosSimulating ? 2850 : 24,
-      chaosExperiment: {
-        faultType: "latency_delay",
-        val: "注入 3000ms 网络延迟 (Chaosblade)",
-        sentinelBreakerActive: true,
-        gracefulFallback: true,
-      },
-    },
-    {
-      id: "e-mall-db-shadow",
-      source: "n-mall",
-      target: "n-mysql",
-      type: "db_read_write",
-      designDeclared: false, // 架构设计未允许！越权直连数据库
-      runtimeQps: 45,
-      runtimeLatency: 15,
-      isShadow: true,
-    },
-    {
-      id: "e-pay-nacos",
-      source: "n-pay",
-      target: "n-nacos",
-      type: "nacos_reg",
-      designDeclared: true,
-      runtimeQps: 12,
-      runtimeLatency: 6,
-    },
-    {
-      id: "e-pay-redis",
-      source: "n-pay",
-      target: "n-redis",
-      type: "db_read_write",
-      designDeclared: true,
-      runtimeQps: 650,
-      runtimeLatency: 2,
-    },
-  ];
+  const nodes: MicroserviceNode[] = isCommunityProject
+    ? [
+        { id: "n-caddy", name: "双机热备 Caddy 网关", code: "caddy-gateway", layer: "ingress", port: 48080, qps: 380, latency: 3, status: "healthy" },
+        { id: "n-sys", name: "系统底座服务", code: "system-service", layer: "service", port: 48081, qps: 120, latency: 15, status: "healthy", ontologyTypes: ["SysUser", "SysRole", "SysTenant"] },
+        { id: "n-house", name: "房源租赁微服务", code: "house-biz", layer: "service", port: 48082, qps: 260, latency: 22, status: "healthy", ontologyTypes: ["HouseRoom", "HouseLeaseOrder"] },
+        { id: "n-housekeeping", name: "家政履约微服务", code: "housekeeping-biz", layer: "service", port: 48083, qps: 195, latency: chaosSimulating ? 2950 : 25, status: chaosSimulating ? "injected_fault" : "healthy", ontologyTypes: ["HousekeepingService", "HousekeepingOrder"] },
+        { id: "n-community", name: "邻里社群微服务", code: "community-biz", layer: "service", port: 48084, qps: 140, latency: 30, status: "warning", hasShadowDependency: true, ontologyTypes: ["CommunityNotice", "CommunityTopic"] },
+        { id: "n-redis", name: "Redis 7.0 Sentinel 集群", code: "redis-sentinel", layer: "middleware", port: 6379, qps: 1500, latency: 2, status: "healthy" },
+        { id: "n-mysql", name: "MySQL 8.0 业务数据库", code: "mysql-master-slave", layer: "database", port: 3306, qps: 420, latency: 10, status: "healthy" },
+      ]
+    : [
+        { id: "n-ingress", name: "APISIX 动态网关", code: "apisix-gateway", layer: "ingress", port: 9080, qps: 450, latency: 4, status: "healthy" },
+        { id: "n-sys", name: "系统与权限服务", code: "system-service", layer: "service", port: 8080, qps: 180, latency: 18, status: "healthy", ontologyTypes: ["SysUser"] },
+        { id: "n-bpm", name: "工作流中心", code: "bpm-service", layer: "service", port: 8081, qps: 65, latency: 32, status: "healthy" },
+        { id: "n-pay", name: "支付交易中台", code: "pay-service", layer: "service", port: 8082, qps: 210, latency: chaosSimulating ? 2850 : 26, status: chaosSimulating ? "injected_fault" : "healthy", ontologyTypes: ["UserAccount"] },
+        { id: "n-mall", name: "电商业务微服务", code: "mall-service", layer: "service", port: 8083, qps: 280, latency: 45, status: "warning", hasShadowDependency: true, ontologyTypes: ["MallOrder", "MallOrderItem"] },
+        { id: "n-nacos", name: "Nacos 注册与配置", code: "nacos-cluster", layer: "middleware", port: 8848, qps: 120, latency: 5, status: "healthy" },
+        { id: "n-redis", name: "Redis 缓存集群", code: "redis-sentinel", layer: "middleware", port: 6379, qps: 1200, latency: 2, status: "healthy" },
+        { id: "n-mysql", name: "MySQL 8.0 业务库", code: "mysql-mha", layer: "database", port: 3306, qps: 340, latency: 12, status: "healthy" },
+      ];
+
+  const edges: ServiceEdge[] = isCommunityProject
+    ? [
+        {
+          id: "e-gw-house",
+          source: "n-caddy",
+          target: "n-house",
+          type: "http_route",
+          designDeclared: true,
+          runtimeQps: 260,
+          runtimeLatency: 4,
+        },
+        {
+          id: "e-gw-housekeeping",
+          source: "n-caddy",
+          target: "n-housekeeping",
+          type: "http_route",
+          designDeclared: true,
+          runtimeQps: 195,
+          runtimeLatency: 5,
+        },
+        {
+          id: "e-house-pay",
+          source: "n-house",
+          target: "n-housekeeping",
+          type: "feign_rpc",
+          designDeclared: true,
+          runtimeQps: 180,
+          runtimeLatency: chaosSimulating ? 2950 : 24,
+          chaosExperiment: {
+            faultType: "latency_delay",
+            val: "注入 3000ms 家政履约延迟 (Chaosblade)",
+            sentinelBreakerActive: true,
+            gracefulFallback: true,
+          },
+        },
+        {
+          id: "e-comm-db-shadow",
+          source: "n-community",
+          target: "n-mysql",
+          type: "db_read_write",
+          designDeclared: false,
+          runtimeQps: 35,
+          runtimeLatency: 12,
+          isShadow: true,
+        },
+        {
+          id: "e-house-redis",
+          source: "n-house",
+          target: "n-redis",
+          type: "db_read_write",
+          designDeclared: true,
+          runtimeQps: 890,
+          runtimeLatency: 2,
+        },
+        {
+          id: "e-housekeeping-redis",
+          source: "n-housekeeping",
+          target: "n-redis",
+          type: "db_read_write",
+          designDeclared: true,
+          runtimeQps: 510,
+          runtimeLatency: 2,
+        },
+      ]
+    : [
+        {
+          id: "e-gw-mall",
+          source: "n-ingress",
+          target: "n-mall",
+          type: "http_route",
+          designDeclared: true,
+          runtimeQps: 280,
+          runtimeLatency: 5,
+        },
+        {
+          id: "e-mall-pay",
+          source: "n-mall",
+          target: "n-pay",
+          type: "feign_rpc",
+          designDeclared: true,
+          runtimeQps: 210,
+          runtimeLatency: chaosSimulating ? 2850 : 24,
+          chaosExperiment: {
+            faultType: "latency_delay",
+            val: "注入 3000ms 网络延迟 (Chaosblade)",
+            sentinelBreakerActive: true,
+            gracefulFallback: true,
+          },
+        },
+        {
+          id: "e-mall-db-shadow",
+          source: "n-mall",
+          target: "n-mysql",
+          type: "db_read_write",
+          designDeclared: false,
+          runtimeQps: 45,
+          runtimeLatency: 15,
+          isShadow: true,
+        },
+        {
+          id: "e-pay-nacos",
+          source: "n-pay",
+          target: "n-nacos",
+          type: "nacos_reg",
+          designDeclared: true,
+          runtimeQps: 12,
+          runtimeLatency: 6,
+        },
+        {
+          id: "e-pay-redis",
+          source: "n-pay",
+          target: "n-redis",
+          type: "db_read_write",
+          designDeclared: true,
+          runtimeQps: 650,
+          runtimeLatency: 2,
+        },
+      ];
+
+  const [selectedEdgeId, setSelectedEdgeId] = useState<string | null>(
+    isCommunityProject ? "e-house-pay" : "e-mall-pay"
+  );
 
   const selectedEdge = edges.find((e) => e.id === selectedEdgeId);
 
@@ -261,9 +344,11 @@ export function ProjectCmmiLivingTopology({ projectId: _projectId, projectName }
           <div className="flex items-center justify-between">
             <div className="font-semibold text-sm text-foreground flex items-center gap-2">
               <Server className="h-4 w-4 text-primary" />
-              <span>五层架构微服务节点群</span>
+              <span>微服务活拓扑节点群 ({isCommunityProject ? "社区生活服务" : "全域电商"})</span>
             </div>
-            <span className="text-xs text-muted-foreground font-mono">共 8 个实体节点 · 5 条核心调用链路</span>
+            <span className="text-xs text-muted-foreground font-mono">
+              共 {nodes.length} 个服务节点 · {edges.length} 条调用链路 · 活体本体已绑定
+            </span>
           </div>
 
           {/* 节点层级排列卡片 */}
@@ -298,6 +383,15 @@ export function ProjectCmmiLivingTopology({ projectId: _projectId, projectName }
 
                   <div className="font-semibold text-xs text-foreground mt-2 truncate">{node.name}</div>
                   <div className="font-mono text-xs text-muted-foreground mt-0.5 truncate">{node.code}</div>
+                  {node.ontologyTypes && node.ontologyTypes.length > 0 && (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                      {node.ontologyTypes.map((ot) => (
+                        <span key={ot} className="rounded bg-primary/10 px-1 py-0.2 font-mono text-[9px] text-primary">
+                          {ot}
+                        </span>
+                      ))}
+                    </div>
+                  )}
 
                   {viewMode === "runtime" && (
                     <div className="mt-3 pt-2 border-t border-border/40 flex items-center justify-between text-xs font-mono">
