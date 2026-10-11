@@ -1,0 +1,26 @@
+{
+  "name": "sys-chanrong-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "产融数字供应链智居中台系统 - Coolie Spec-Kit SDD Enabled Project",
+  "scripts": {
+    "check:contracts": "node scripts/check-contracts.mjs",
+    "check:baseline": "node scripts/check-release-baseline.mjs",
+    "test": "node scripts/run-tests.mjs",
+    "speckit": "node scripts/speckit.cjs",
+    "speckit:init": "node scripts/speckit.cjs init",
+    "speckit:constitution": "node scripts/speckit.cjs constitution",
+    "speckit:new": "node scripts/speckit.cjs new",
+    "speckit:specify": "node scripts/speckit.cjs new",
+    "speckit:build": "node scripts/speckit.cjs build",
+    "speckit:plan": "node scripts/speckit.cjs build",
+    "speckit:tasks": "node scripts/speckit.cjs tasks",
+    "speckit:task": "node scripts/speckit.cjs tasks",
+    "speckit:sync": "node scripts/speckit.cjs sync",
+    "speckit:list": "node scripts/speckit.cjs list",
+    "speckit:check": "node scripts/speckit.cjs check",
+    "speckit:health": "node scripts/speckit.cjs health",
+    "speckit:archive": "node scripts/speckit.cjs archive",
+    "speckit:cmmi": "node scripts/speckit.cjs cmmi"
+  }
+}

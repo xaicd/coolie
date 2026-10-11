@@ -3,7 +3,7 @@ import { and, desc, eq, ilike, isNotNull } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
 import { agents, approvals, issueComments, issues } from "@paperclipai/db";
 import { badRequest } from "../errors.js";
-import { assertBoard, assertCompanyAccess } from "./authz.js";
+import { assertBoardOrAgent, assertCompanyAccess } from "./authz.js";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
@@ -34,7 +34,7 @@ export function inboxRoutes(db: Db) {
   const router = Router();
 
   router.get("/inbox", async (req, res) => {
-    assertBoard(req);
+    assertBoardOrAgent(req);
     const companyId = readCompanyId(req.query.companyId);
     assertCompanyAccess(req, companyId);
     const limit = readLimit(req.query.limit);

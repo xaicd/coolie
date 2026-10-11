@@ -2,7 +2,7 @@ import { Router } from "express";
 import { and, desc, eq, ilike } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
 import { agents, documents, issues } from "@paperclipai/db";
-import { assertBoard, assertCompanyAccess } from "./authz.js";
+import { assertAuthenticated, assertCompanyAccess } from "./authz.js";
 
 const MAX_QUERY_LENGTH = 100;
 const PER_KIND_LIMIT = 10;
@@ -13,8 +13,8 @@ function readParam(value: unknown, field: string): string {
 }
 
 /**
- * Global mobile search across the three things a board user looks for by name:
- * agents, tasks, and documents. Deliberately simpler than the full
+ * Global mobile search across the three things a board or mobile user looks for
+ * by name: agents, tasks, and documents. Deliberately simpler than the full
  * `/companies/:id/search` (no relevance ranking, filters, or snippet
  * highlights) — the app needs a fast, grouped top-N lookup to jump to a detail
  * screen, not the web search surface.
@@ -23,7 +23,7 @@ export function searchRoutes(db: Db) {
   const router = Router();
 
   router.get("/search", async (req, res) => {
-    assertBoard(req);
+    assertAuthenticated(req);
     const companyId = readParam(req.query.companyId, "companyId");
     if (!companyId) {
       res.status(400).json({ error: "companyId is required" });

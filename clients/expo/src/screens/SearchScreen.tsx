@@ -63,6 +63,7 @@ export function SearchScreen({
   const [results, setResults] = useState<SearchResults | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryNonce, setRetryNonce] = useState(0);
 
   useEffect(() => {
     const q = query.trim();
@@ -94,7 +95,7 @@ export function SearchScreen({
       cancelled = true;
       clearTimeout(handle);
     };
-  }, [query, company.id]);
+  }, [query, company.id, retryNonce]);
 
   const openTask = useCallback(
     (task: SearchTaskResult) => {
@@ -153,7 +154,7 @@ export function SearchScreen({
             style={styles.emptyBox}
           />
         ) : error ? (
-          <ErrorRetry variant="inline" message={`搜索失败: ${error}`} onRetry={() => setQuery(query)} />
+          <ErrorRetry variant="inline" message={`搜索失败: ${error}`} onRetry={() => setRetryNonce((n) => n + 1)} />
         ) : loading && !results ? (
           <ActivityIndicator color={C.accent} style={{ marginTop: 24 }} />
         ) : totalResults === 0 ? (

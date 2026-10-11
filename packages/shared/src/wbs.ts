@@ -33,10 +33,21 @@ export interface WbsIssueLike {
 /** Parse a WBS number ("1.2.3") into its numeric segments. Non-numeric → []. */
 export function wbsSegments(code: string | null | undefined): number[] {
   if (!code) return [];
-  return code
+  const direct = code
     .split(".")
     .map((part) => Number.parseInt(part.trim(), 10))
     .filter((value) => Number.isFinite(value));
+  if (direct.length > 0) return direct;
+
+  // Defensive fallback for codes like "P1-WBS-G1", "P2-WBS-G4", "G1", etc.
+  const gateMatch = code.match(/G([1-5])/i);
+  if (gateMatch) {
+    const gateNum = Number.parseInt(gateMatch[1], 10);
+    // Map G1->1 (requirements), G2->2 (arch), G3->4 (dev/compile), G4->5 (acceptance), G5->6 (handover)
+    const phaseMap: Record<number, number> = { 1: 1, 2: 2, 3: 4, 4: 5, 5: 6 };
+    return [phaseMap[gateNum] ?? gateNum, 0];
+  }
+  return [];
 }
 
 /** lexicographic-but-numeric compare of two WBS numbers ("1.2" before "1.10"). */

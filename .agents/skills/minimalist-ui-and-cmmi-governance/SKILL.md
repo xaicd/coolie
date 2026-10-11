@@ -58,28 +58,42 @@ description: Coolie 平台极简主义两字 UI 交互规范、移动端经典�
 
 ---
 
-## 3. CMMI 六大截断产物标准规范目录 (CMMI G0-G5 Artifacts)
+## 3. CMMI 全生命周期交付物与机器证据库规范目录 (CMMI G1-G7 & Artifacts)
 
-平台严禁产物游离，每一波交付（Wave）与各个阶段的工程证据必须严格落盘在规范目录：
+平台严禁产物游离，全生命周期工程真资产与敏捷特性包必须严格按规范结构落盘：
 
 ```
+docs/ (全生命周期工程资产 + 敏捷特性全息包，全面对齐 ruoyi-all-next 规范)
+├── 01_management/              # [G0_Init 项目立项与管理] 项目范围、立项章程、里程碑计划 (project-plan.md, rskm-risk-ledger.md)
+├── 02_requirements/            # [G1_Req 敏捷需求基线] EARS 语法需求规格说明书 (software-requirements.md) 与双向跟踪矩阵 (RTM)
+├── 03_design/                  # [G2_Arch 概要设计与选型] 微服务拓扑与多租户隔离架构 (architecture-design-hld.md)、DAR 决策表、接口契约
+├── 04_implementation/          # [G3_Build 编码与实现] 编码规范、防假 Mock 守卫与变异测试指南
+├── 05_verification/            # [G4_Val 全栈验收] 界面四态状态机、宿主机拟真人真机快照与端到端测试总结 (test-summary-report.md)
+├── 06_cmmi_audit/              # [CMMI 5 过程控制与缺陷预防] 统计过程控制 (spc-control-chart.md)、CAR 根因预防 (car-5whys-rca.md)
+├── 07_release/                 # [G5_Release 生产投产] 不可变制品指纹、部署架构拓扑与秒级回滚 SOP (system-deployment-sop.md)
+├── 08_sre/                     # [G6_SRE 韧性保障] SLO/SLI 度量矩阵、APM 链路追踪与熔断演练
+├── 09_operations/              # [G7_Ops 持续运营] 多租户开通审批 SOP、日终财务平账台账 (tenant-governance.md)
+└── specs/                      # [Kiro SDD 敏捷特性全息内聚包，按域隔离]
+    └── <domain>/<feature-slug>/# 如 core/init-baseline/、pay/fix-replay/
+        ├── brief.json          # 需求声明显式真源 (<500 Tokens)
+        ├── requirements.md     # EARS 规范展开需求
+        ├── design.md           # 架构拓扑与数据契约
+        ├── tasks.md            # 任务 DAG 与 Kiro Waves 波次图
+        ├── spec.json           # 规格元数据与状态机
+        └── runbook.json        # 部署与回滚运行手册
+
+docs/artifacts/ (不可篡改机器证据库)
+├── security-scan-result.json # 静态与动态 12 项真实安全合规审计报告 (CVE/漏洞扫描)
+├── load-test-result.json    # 高并发压力测试吞吐 (QPS)、P95/P99 延迟与资源消耗曲线
+├── env-fingerprint.json     # Node/PNPM/OS/构建依赖的唯一 SHA256 指纹与容器镜像 Digest
+└── harness-trace-latest.json# 架构门禁守卫追踪、分层边界断言与循环依赖检测日志
+
 docs-coolie/
-├── briefs/                  # [G0_Req 需求] 需求简报与自然语言派单上下文 (如 docs-coolie/briefs/)
-├── specs/                   # [G0_Req 需求] EARS 语法标准化规格说明书 (如 2026-xx-xx-feature.md)
+├── briefs/                  # [G0_Req 需求] 需求简报与自然语言派单上下文
+├── specs/                   # [G0_Req 需求] 演进功能规格说明书
 ├── protos/                  # [G1_Arch 架构] 业务本体/页面拓扑架构原型 (ASCII/UI草案)
-├── evidence/                # [G4_Val 验收] 拟真人全业务走查、真机快照、QA 验收报告 (如 evidence/<wave>/)
-├── VERSION-CONSISTENCY.md   # [G5_Release 投产] 7 处版本一致性守卫契约
-doc/
-└── plans/                   # [G1_Arch 架构] 系统级技术演进设计文档 (YYYY-MM-DD-slug.md)
-packages/
-├── db/src/schema/           # [G2_Design 详细设计] Drizzle 数据物理模型与约束 (115+ 表)
-└── shared/src/              # [G2_Design 详细设计] 共享 DTO、状态机枚举与跨端契约
-server/src/                  # [G3_Build 构建] 控制面核心编排与业务实现
-clients/expo/src/            # [G3_Build 构建] 移动原生端 25+ 屏幕全覆盖
-.coolie-local/
-├── evidence-ledger/         # [G4_Val 验收] 五角色不可变证据隔离账本 (<wave>.json)
-└── context-bus/             # [G1-G5 串联] 跨工具/跨角色上下文接力轨迹
-version.json                 # [G5_Release 投产] 全局唯一制品指纹基准
+├── evidence/                # [G4_Val 验收] 拟真人全业务走查、真机快照、QA 验收报告
+└── VERSION-CONSISTENCY.md   # [G5_Release 投产] 7 处版本一致性守卫契约
 ```
 
 ---

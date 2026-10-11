@@ -117,12 +117,12 @@ describe("buildWbsMainline", () => {
       task("t2b", "2.3", { status: "done" }),
     ]);
 
-    expect(mainline.phases).toHaveLength(6);
+    expect(mainline.phases).toHaveLength(8);
     expect(mainline.phases[0]).toMatchObject({ name: "需求确认", gate: "gate_g1_spec", issueCount: 1, doneCount: 0 });
     expect(mainline.phases[0].milestone).toMatchObject({ status: "achieved", approver: "掌柜" });
     expect(mainline.phases[1]).toMatchObject({ name: "架构/设计", issueCount: 2, doneCount: 1 });
     expect(mainline.phases[2]).toMatchObject({ name: "详细设计", gate: null, milestone: null, issueCount: 0 });
-    expect(mainline.totalGates).toBe(5);
+    expect(mainline.totalGates).toBe(7);
     expect(mainline.achievedGates).toBe(1);
     // Phase 2 (index 1) is the earliest gated phase whose milestone is unmet.
     expect(mainline.currentPhaseIndex).toBe(1);

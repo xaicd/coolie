@@ -206,7 +206,7 @@ export function PluginManagerScreen({
           onOpenWebPluginManager ? (
             <Pressable onPress={onOpenWebPluginManager} hitSlop={8} style={styles.webLink}>
               <Ionicons name="open-outline" size={14} color={C.accent} />
-              <Text style={styles.webLinkText}>完整市场</Text>
+              <Text style={styles.webLinkText}>市场</Text>
             </Pressable>
           ) : undefined
         }

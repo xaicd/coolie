@@ -61,7 +61,7 @@ lives in `ui/src/components/new-agent/`, with real hiring, subscription login,
 secret storage, provider probes, and task assignment. OpenCode and Pi support
 provider environment variables, including saved OpenRouter secrets. The real
 configuration page uses the same compact test card and shared settings styles.
-See `docs/specs/agent-config-ui.md` for the current workflow. Environment choices
+See `doc/archive/specs/agent-config-ui.md` for the current workflow. Environment choices
 in Storybook remain fixtures.
 
 ## Configuration checks and task assignment

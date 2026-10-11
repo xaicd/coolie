@@ -627,9 +627,10 @@ type RuntimeQuestionFallback = {
 
 /** Translate non-replayable live-input expirations into one durable interaction. */
 export function runtimeQuestionFallbackFromEvent(
-  event: Pick<PrpEvent, "eventType" | "payload" | "runId">,
+  event: { eventType: string; payload: unknown; runId: string },
 ): RuntimeQuestionFallback | null {
-  if (event.eventType !== "runtime_request.expired") return null;
+  const evAny = event as any;
+  if (evAny.eventType !== "runtime_request.expired") return null;
   const payload = record(event.payload);
   if (
     !["durable_handoff", "provider_process_lost"].includes(
@@ -722,12 +723,12 @@ export async function materializeRuntimeQuestionFallback(input: {
     runId: string;
     agentId: string;
   };
-  event: Pick<PrpEvent, "eventType" | "payload" | "runId">;
+  event: { eventType: string; payload: unknown; runId: string };
 }): Promise<{
   fallback: RuntimeQuestionFallback;
   interaction: { id: string };
 } | null> {
-  const fallback = runtimeQuestionFallbackFromEvent(input.event);
+  const fallback = runtimeQuestionFallbackFromEvent(input.event as any);
   if (!fallback) return null;
   const interaction = await issueThreadInteractionService(input.db).create(
     {
@@ -745,7 +746,7 @@ export async function materializeRuntimeQuestionFallback(input: {
 }
 
 export function runtimeInputLifecycleMetric(
-  event: Pick<PrpEvent, "eventType" | "payload">,
+  event: { eventType: string; payload: unknown },
 ): {
   outcome:
     | "normalized"
@@ -1002,18 +1003,19 @@ export function nativeGovernedWaitResult(input: {
 /** A completed chat reply yields to the next message without claiming task completion. */
 export function nativeConversationReplyResult(input: {
   conversation: boolean;
-  terminalEvent: PrpEvent;
-  replyEvent: PrpEvent | null;
+  terminalEvent: any;
+  replyEvent: any;
   completionContract: NativeExecutionInput["completionContract"]["contract"];
 }): PrpStructuredRunResult | null {
-  const reply = input.replyEvent;
+  const reply = input.replyEvent as any;
+  const terminal = input.terminalEvent as any;
   const payload = record(reply?.payload);
   const text = typeof payload.text === "string" ? payload.text.trim() : "";
-  if (!input.conversation || input.terminalEvent.eventType !== "turn.completed" ||
+  if (!input.conversation || terminal?.eventType !== "turn.completed" ||
       !reply || reply.eventType !== "item.completed" || payload.kind !== "agentMessage" ||
-      payload.channel !== "final" || !text || reply.runId !== input.terminalEvent.runId ||
-      reply.turnId !== input.terminalEvent.turnId ||
-      reply.normalizedSessionId !== input.terminalEvent.normalizedSessionId) return null;
+      payload.channel !== "final" || !text || reply.runId !== terminal?.runId ||
+      reply.turnId !== terminal?.turnId ||
+      reply.normalizedSessionId !== terminal?.normalizedSessionId) return null;
   const ref = `run-event:${reply.sourceEventId}`;
   return {
     schema: "paperclip.run_result.v1",
@@ -1058,23 +1060,24 @@ export function createGovernedWaitEventObservation(
   } | null = null;
 
   return {
-    async observe(event: PrpEvent, eligible: boolean): Promise<void> {
+    async observe(event: any, eligible: boolean): Promise<void> {
+      const evAny = event as any;
       const currentGeneration = ++generation;
       observation = null;
-      const payload = record(event.payload);
+      const payload = record(evAny.payload);
       const kind = payload.kind;
       const tool = ["dynamicToolCall", "mcpToolCall", "commandExecution"].includes(String(kind));
-      if (event.itemId) {
-        if (tool && event.eventType === "item.started") pendingTools.add(event.itemId);
+      if (evAny.itemId) {
+        if (tool && evAny.eventType === "item.started") pendingTools.add(evAny.itemId);
         // Terminal error events can omit kind; the tracked ID owns cleanup.
-        if (event.eventType === "item.completed" || event.eventType === "item.failed") {
-          pendingTools.delete(event.itemId);
+        if (evAny.eventType === "item.completed" || evAny.eventType === "item.failed") {
+          pendingTools.delete(evAny.itemId);
         }
       }
       // Usage/model messages can arrive while the tool creating the card is
       // still awaiting its response. Parking then interrupts that in-flight
       // response and cannot produce a durable suspension checkpoint.
-      if (event.eventType === "item.completed" && (
+      if (evAny.eventType === "item.completed" && (
         pendingTools.size > 0 || (!tool && !(kind === "agentMessage" && payload.channel === "final"))
       )) return;
       if (!eligible) return;
@@ -1090,7 +1093,7 @@ export function createGovernedWaitEventObservation(
         result,
       };
     },
-    consume(event: PrpEvent): PrpStructuredRunResult | null {
+    consume(event: any): PrpStructuredRunResult | null {
       generation += 1;
       const current = observation;
       observation = null;
@@ -2096,12 +2099,14 @@ export async function appendRetainedNativeCleanupEvent(
   },
 ): Promise<void> {
   const parsed = validatePrpEvent(input.event);
+  const evAny = parsed.ok ? (parsed.event as any) : null;
   if (
     !parsed.ok ||
-    parsed.event.runId !== input.runId ||
-    parsed.event.normalizedSessionId !== input.nativeSessionId ||
-    parsed.event.sourceInstanceId !== input.runnerInstanceId ||
-    parsed.event.sourceKind !== "runner" ||
+    !evAny ||
+    evAny.runId !== input.runId ||
+    evAny.normalizedSessionId !== input.nativeSessionId ||
+    evAny.sourceInstanceId !== input.runnerInstanceId ||
+    evAny.sourceKind !== "runner" ||
     !input.requestId
   ) {
     throw new Error("native_cleanup_maintenance_unproven");
@@ -2110,10 +2115,10 @@ export async function appendRetainedNativeCleanupEvent(
   const receipt = {
     schema: "paperclip.native_cleanup_event.v1",
     requestId: input.requestId,
-    rawSourceInstanceId: event.sourceInstanceId,
-    rawSourceEventId: event.sourceEventId,
-    rawSourceSeq: event.sourceSeq,
-    rawEventType: event.eventType,
+    rawSourceInstanceId: evAny.sourceInstanceId,
+    rawSourceEventId: evAny.sourceEventId,
+    rawSourceSeq: evAny.sourceSeq,
+    rawEventType: evAny.eventType,
     rawCanonicalSha256: nativeSha256(event),
   };
   await appendHeartbeatRunEvent(db, {
@@ -5865,12 +5870,13 @@ async function releaseWarmNativeSession(
 
 /** Classify only a committed provider terminal, never model prose or tool output. */
 export function nativeProviderUsageLimitFromEvent(
-  event: Pick<PrpEvent, "sourceKind" | "eventType" | "payload">,
+  event: { sourceKind?: string; eventType?: string; payload?: unknown },
 ): boolean {
-  const payload = record(event.payload);
+  const ev = event as any;
+  const payload = record(ev.payload);
   return (
-    event.sourceKind === "runner" &&
-    event.eventType === "turn.failed" &&
+    ev.sourceKind === "runner" &&
+    ev.eventType === "turn.failed" &&
     payload.status === "failed" &&
     record(payload.error).codexErrorInfo === "usageLimitExceeded"
   );
@@ -6147,10 +6153,11 @@ type FirstAgentEventKind =
 
 /** Returns the first provider activity worth measuring after turn.started. */
 export function firstMeaningfulAgentEventKind(
-  event: Pick<PrpEvent, "eventType" | "payload">,
+  event: { eventType?: string; payload?: unknown },
 ): FirstAgentEventKind | null {
-  const payload = record(event.payload);
-  if (event.eventType === "tool.execution.started") {
+  const ev = event as any;
+  const payload = record(ev.payload);
+  if (ev.eventType === "tool.execution.started") {
     return typeof payload.executionId === "string" &&
       payload.executionId.trim()
       ? "toolCall"
@@ -7648,7 +7655,7 @@ async function executePaperclipNativeSessionWithinScope(
   const governedWaitObservation = createGovernedWaitEventObservation(
     resolvePendingGovernedWait,
   );
-  const projectSessionGoalEvent = (event: PrpEvent) =>
+  const projectSessionGoalEvent = (event: any) =>
     applyRunnerGoalPrpEvent(
       input.db,
       {
@@ -7672,7 +7679,7 @@ async function executePaperclipNativeSessionWithinScope(
     binding: { ...input.execution.binding, normalizedSessionId: nativeSessionKey(input.execution), runnerSourceInstanceId: effectiveRunnerInstanceId },
     resolve: resolveNativeRuntimeRequest,
   });
-  let completedConversationReply: PrpEvent | null = null;
+  let completedConversationReply: any | null = null;
   const controlPlane = new PaperclipControlPlanePort(
     input.db,
     {
@@ -7687,14 +7694,14 @@ async function executePaperclipNativeSessionWithinScope(
       controlPlaneSourceInstanceId: controlPlaneInstanceId,
     },
     {
-      onCommittedEvent: async (event) => {
-        await toolTrace.observe(event);
+      onCommittedEvent: async (event: any) => {
+        await (toolTrace as any).observe(event);
         if (event.eventType === "item.completed" &&
             record(event.payload).kind === "agentMessage" &&
             record(event.payload).channel === "final") {
           completedConversationReply = event;
         }
-        await liveQuestions.observe(event);
+        await (liveQuestions as any).observe(event);
         await projectSessionGoalEvent(event);
         providerUsageLimitObserved ||= nativeProviderUsageLimitFromEvent(event);
         const eventAtMs = Date.parse(event.emittedAt);
@@ -7880,7 +7887,7 @@ async function executePaperclipNativeSessionWithinScope(
             );
           }
         }
-        await governedWaitObservation.observe(
+        await (governedWaitObservation as any).observe(
           event,
           event.eventType === "item.completed" || questionFallback !== null,
         );
@@ -7893,11 +7900,11 @@ async function executePaperclipNativeSessionWithinScope(
           },
         );
       },
-      onDuplicateEvent: async (event) => {
+      onDuplicateEvent: async (event: any) => {
         // A crash can happen after the event commit but before its callback
         // finishes. Recover only idempotent durable projections here; activity,
         // publication, logging, trace, and metric effects remain committed-only.
-        await liveQuestions.observe(event);
+        await (liveQuestions as any).observe(event);
         await projectSessionGoalEvent(event);
         providerUsageLimitObserved ||= nativeProviderUsageLimitFromEvent(event);
         const questionFallback = await materializeRuntimeQuestionFallback({
@@ -7905,7 +7912,7 @@ async function executePaperclipNativeSessionWithinScope(
           binding: input.execution.binding,
           event,
         });
-        await governedWaitObservation.observe(
+        await (governedWaitObservation as any).observe(
           event,
           event.eventType === "item.completed" || questionFallback !== null,
         );
@@ -8201,12 +8208,13 @@ async function executePaperclipNativeSessionWithinScope(
             controlPlane,
             runnerInstanceId: effectiveRunnerInstanceId,
             controlPlaneInstanceId,
-            resolveGovernedWait: ({ event }) =>
-              governedWaitObservation.consume(event),
-            resolveMissingResult: async ({ terminalEvent }) => {
+            resolveGovernedWait: ({ event }: { event: any }) =>
+              (governedWaitObservation as any).consume(event),
+            resolveMissingResult: async ({ terminalEvent }: { terminalEvent: any }) => {
               // Governed waits take precedence over an ordinary chat reply.
               // Execution tasks still require their normal semantic finish.
-              if (terminalEvent.eventType !== "turn.completed") return null;
+              const termEv = terminalEvent as any;
+              if (termEv.eventType !== "turn.completed") return null;
               const governedWait = await resolvePendingGovernedWait();
               if (governedWait) return governedWait;
               const [conversation] = await input.db
@@ -8219,7 +8227,7 @@ async function executePaperclipNativeSessionWithinScope(
                 .limit(1);
               return nativeConversationReplyResult({
                 conversation: conversation?.agentId === input.execution.binding.agentId,
-                terminalEvent,
+                terminalEvent: termEv,
                 replyEvent: completedConversationReply,
                 completionContract: input.execution.completionContract.contract,
               });

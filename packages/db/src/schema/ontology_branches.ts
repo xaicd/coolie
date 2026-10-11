@@ -28,6 +28,9 @@ import { companies } from "./companies.js";
  * - `metadata` carries per-branch knobs (TTL, copy-verb, replica count) as
  *   free-form jsonb; the schema is intentionally permissive because branch
  *   strategies grow new knobs faster than we can keep migrations current.
+ *
+ * @deprecated [DEPRECATED / CORPSE SWEEP] wave250 legacy ontology table (0 references in server/shared).
+ * Kept for backward schema compatibility; do NOT use in new code. Living ontology now uses dynamic projection from core physical tables.
  */
 export const ontologyBranches = pgTable(
   "ontology_branches",

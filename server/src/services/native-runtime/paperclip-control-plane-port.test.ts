@@ -448,7 +448,7 @@ describe("PaperclipControlPlanePort conformance", () => {
       backendKind: "mock",
       sourceInstanceId: runnerInstanceId,
     });
-    const progressEvent: PrpEvent = {
+    const progressEvent: any = {
       schema: "paperclip.prp.event.v1",
       sourceEventId: "safe-progress-signal:1",
       sourceSeq: 1,
@@ -512,7 +512,7 @@ describe("PaperclipControlPlanePort conformance", () => {
           ...progressEvent,
           sourceEventId: "safe-progress-signal:2",
           sourceSeq: 2,
-        })).resolves.toMatchObject({ disposition: "committed" });
+        } as any)).resolves.toMatchObject({ disposition: "committed" });
       } finally {
         unsubscribeThrowingListener();
       }
@@ -528,7 +528,7 @@ describe("PaperclipControlPlanePort conformance", () => {
         sourceSeq: 3,
         eventType: "turn.started",
         payload: {},
-      })).resolves.toMatchObject({ disposition: "committed" });
+      } as any)).resolves.toMatchObject({ disposition: "committed" });
       expect(observed).toHaveLength(1);
       expect(committedCallbacks).toEqual([
         "safe-progress-signal:1",
@@ -600,7 +600,7 @@ describe("PaperclipControlPlanePort conformance", () => {
       sourceInstanceId: runnerInstanceId,
       controlPlaneSourceInstanceId: "runtime-question-recovery-control",
     };
-    const questionEvent: PrpEvent = {
+    const questionEvent: any = {
       schema: "paperclip.prp.event.v1",
       sourceEventId: "runtime-question-recovery:1",
       sourceSeq: 1,
@@ -651,8 +651,8 @@ describe("PaperclipControlPlanePort conformance", () => {
       onCommittedEvent: async () => {
         throw new Error("simulated_post_commit_crash");
       },
-      onDuplicateEvent: async (event) => {
-        await materializeRuntimeQuestionFallback({ db, binding, event });
+      onDuplicateEvent: async (event: any) => {
+        await materializeRuntimeQuestionFallback({ db, binding, event: event as any });
       },
     });
     await port.openRun({
@@ -698,7 +698,7 @@ describe("PaperclipControlPlanePort conformance", () => {
     taskResult.completionClaim.criteria[0]!.evidenceRefs = [evidenceRef];
     taskResult.evidence = [{ kind: "work_product", ref: evidenceRef }];
     taskResult.verification[0]!.artifactRef = evidenceRef;
-    const event = (sourceSeq: number, eventType: PrpEvent["eventType"], payload: Record<string, unknown>): PrpEvent => ({
+    const event = (sourceSeq: number, eventType: string, payload: Record<string, unknown>): any => ({
       schema: "paperclip.prp.event.v1",
       sourceEventId: `phase6-task:${sourceSeq}`,
       sourceSeq,

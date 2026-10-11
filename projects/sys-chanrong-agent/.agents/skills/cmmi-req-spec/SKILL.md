@@ -8,13 +8,17 @@ description: CMMI 3 需求开发与管理 (RD/REQM) 核心技能。用 EARS 规�
 > **CMMI 过程域**: Requirements Development (RD) & Requirements Management (REQM)  
 > **门禁对应**: G1 需求与业务旅程门禁 (`gate_g1_spec`)  
 > **主责工匠角色**: DS 业务方案专家 (`emp_ds`)  
-> **核心产出**: 《用户需求说明书 (URD)》、《软件需求规格说明书 (SRS)》、《需求双向跟踪矩阵 (RTM)》
+> **核心产出**: 0-1 软件工程资产包 —— 《用户需求说明书 (URD)》、《软件需求规格说明书 (SRS)》、《需求双向跟踪矩阵 (RTM)》
 
 ---
 
 ## 1. 技能定位与核心原则
 
-传统 CMMI 需求文档最大的痛点是“需求脱节、文字模糊、验收无据”。本技能通过 **EARS (Easy Approach to Requirements Syntax)** 句式，将自然语言需求固化为无歧义的逻辑断言，并强制建立**从业务需求 -> 系统功能 -> 架构设计 -> 测试用例 -> 交付物**的全链路双向追踪矩阵 (RTM)。
+传统 CMMI 需求文档最大的痛点是“需求脱节、文字模糊、验收无据、把运行时业务数据错当工程产物”。本技能确立以下原则：
+1. **0-1 软件工程资产本质**：G1 的唯一使命是定义**该软件系统本身的功能规格与业务边界**。**绝对禁止**将系统上线后产生的运行时业务数据（如板材利用率、客户订单、制造图纸等）当成工程产物充数！
+2. **EARS 无歧义断言**：通过 **EARS (Easy Approach to Requirements Syntax)** 句式，将自然语言需求固化为 0 歧义的逻辑断言。
+3. **全链路双向追踪 (RTM)**：强制建立**从业务需求 -> 系统功能 -> 架构设计 -> 测试用例 -> 交付物**的全链路双向追踪矩阵 (RTM)。
+4. **No Artifact, No Done 铁律**：产出的 SRS/RTM 必须作为物理 Work Product 挂载到工单，无实体文件严禁点 Done。
 
 ### EARS 核心语法模式
 所有功能需求必须归纳为以下 5 类 EARS 模式之一：
@@ -33,24 +37,25 @@ flowchart TD
   A["输入: 老板需求/用户原话/Issue"] --> B["解析业务角色与价值故事 (User Story)"]
   B --> C["EARS 结构化转译 (0 歧义句式)"]
   C --> D["构建需求双向跟踪矩阵 (RTM Table)"]
-  D --> E["生成 SRS 规格文件 (docs/cmmi/01-srs.md)"]
+  D --> E["生成 SRS 规格文件 (docs/02_requirements/software-requirements.md)"]
   E --> F["执行本地 G1 门禁校验: node scripts/verify-reqs.mjs"]
 ```
 
-1. **需求捕获**: 提取原始诉求，不擅自修改用户意图，保留原话。
-2. **拆解用户故事**: 遵循 `作为 <角色>, 我想要 <功能>, 以便 <达成商业价值>`。
-3. **EARS 格式化**: 将每个验收条目转换为 EARS 语法，分配全局唯一标识符（例如 `REQ-SYS-001`）。
-4. **生成双向追踪矩阵 (RTM)**:
+1. **资产双轨映射**: 优先通过 Paperclip 原生 API 挂载至工单富文本文档（`POST /api/issues/:id/documents`，key: `requirements`），在控制面实现富文本预览与在线批注；本地代码工作区采用 CMMI 标准工程目录 `docs/02_requirements/software-requirements.md`（敏捷特性全息包位于 `docs/specs/<domain>/<feature-slug>/`），并通过 `issue_work_products` 登记索引。开源基座（如 RuoYi 等）100% 保持基座原生目录结构。
+2. **需求捕获**: 提取原始诉求，不擅自修改用户意图，保留原话。
+3. **拆解用户故事**: 遵循 `作为 <角色>, 我想要 <功能>, 以便 <达成商业价值>`。
+4. **EARS 格式化**: 将每个验收条目转换为 EARS 语法，分配全局唯一标识符（例如 `REQ-SYS-001`）。
+5. **生成双向追踪矩阵 (RTM)**:
    - 需求编号 (`REQ-ID`)
    - 需求描述
    - 对应架构模块 (`HLD-Module`)
    - 对应验证用例 (`TEST-Case`)
    - 满足门禁 (`Gate`)
-5. **本地门禁校验**: 运行项目本地 `scripts/verify-reqs.mjs`，确保所有需求均有双向映射且 0 悬空。
+6. **本地门禁校验**: 运行项目本地 `scripts/verify-reqs.mjs`，确保所有需求均有双向映射且 0 悬空。
 
 ---
 
-## 3. 产物模板基线 (`docs/cmmi/01-srs.md`)
+## 3. 产物模板基线 (`docs/02_requirements/software-requirements.md`)
 
 ```markdown
 # [系统名称] 软件需求规格说明书 (SRS & RTM)
@@ -78,6 +83,8 @@ flowchart TD
 ## 4. G1 门禁通过准则 (Definition of Done)
 - [ ] 所有需求项均符合 EARS 语法规则，无“尽量”、“大致”等歧义副词。
 - [ ] 需求双向跟踪矩阵覆盖率 100%（每个需求必有对应测试项和模块负责人）。
+- [ ] 严禁以运行时业务数据充数，必须为软件系统本身的 0-1 需求说明与矩阵。
+- [ ] 必须将 SRS/RTM 作为物理 Work Product (kind: artifact/document) 挂载至工单 (No Artifact, No Done)。
 - [ ] `node scripts/verify-reqs.mjs` 退出码为 0。
 
 ---

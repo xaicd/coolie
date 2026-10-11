@@ -267,8 +267,23 @@ export function actorMiddleware(db: Db, opts: ActorMiddlewareOptions): RequestHa
     // configured key is honoured even on `authenticated` production
     // (otherwise the concierge would 401 behind the cookie gate).
     const runIdHeader = req.header("x-paperclip-run-id");
+    const rawAuthHeader = req.header("authorization");
+    const bearerCandidate = rawAuthHeader && /^bearer\s+/i.test(rawAuthHeader)
+      ? rawAuthHeader.replace(/^bearer\s+/i, "").trim()
+      : null;
+    const queryToken = typeof req.query.token === "string"
+      ? req.query.token.trim()
+      : typeof req.query.access_token === "string"
+        ? req.query.access_token.trim()
+        : typeof req.query.api_key === "string"
+          ? req.query.api_key.trim()
+          : null;
+
     if (expectedApiKey) {
-      const presentedApiKey = req.header("x-paperclip-api-key");
+      const presentedApiKey =
+        req.header("x-paperclip-api-key") ||
+        (bearerCandidate && constantTimeStringEqual(bearerCandidate, expectedApiKey) ? bearerCandidate : null) ||
+        (queryToken && constantTimeStringEqual(queryToken, expectedApiKey) ? queryToken : null);
       if (presentedApiKey && constantTimeStringEqual(presentedApiKey, expectedApiKey)) {
         req.actor = {
           type: "board",
@@ -284,7 +299,11 @@ export function actorMiddleware(db: Db, opts: ActorMiddlewareOptions): RequestHa
       }
     }
 
-    const authHeader = req.header("authorization");
+    if (queryToken && !req.header("cookie")) {
+      req.headers["cookie"] = `__Secure-paperclip-default.session_token=${encodeURIComponent(queryToken)}; paperclip-default.session_token=${encodeURIComponent(queryToken)}`;
+    }
+
+    let authHeader = rawAuthHeader;
     const hasBearerCredentials = /^bearer(?:\s|$)/i.test(authHeader ?? "");
 
     // Public MCP gateway protocol requests carry a pcgw_* bearer that is
@@ -346,9 +365,13 @@ export function actorMiddleware(db: Db, opts: ActorMiddlewareOptions): RequestHa
           return;
         }
       }
-      if (runIdHeader) req.actor.runId = runIdHeader;
-      next();
-      return;
+      if (queryToken && !authHeader) {
+        authHeader = `Bearer ${queryToken}`;
+      } else {
+        if (runIdHeader) req.actor.runId = runIdHeader;
+        next();
+        return;
+      }
     }
 
     const token = authHeader!.slice("bearer".length).trim();

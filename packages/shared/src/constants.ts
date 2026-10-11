@@ -41,6 +41,7 @@ export const AGENT_ADAPTER_TYPES = [
   "cursor",
   "openclaw_gateway",
   "dsh",
+  "agy_local",
 ] as const;
 export type AgentAdapterType = (typeof AGENT_ADAPTER_TYPES)[number] | (string & {});
 
@@ -268,6 +269,8 @@ export const CMMI_GATE_KEYS = [
   "gate_g3_compile",
   "gate_g4_eval",
   "gate_g5_release",
+  "gate_g6_sre",
+  "gate_g7_ops",
 ] as const;
 export type CmmiGateKey = (typeof CMMI_GATE_KEYS)[number];
 
@@ -277,18 +280,20 @@ export interface CmmiGateDefinition {
   label: string;
   /** 主责工匠角色 (emp_*). */
   role: string;
-  /** The gate's owning artifact under docs/cmmi/. */
+  /** The gate's owning artifact under docs/specs/ or docs/. */
   doc: string;
   /** G1 closure means the requirement set is frozen; used for ordering. */
   order: number;
 }
 
 export const CMMI_GATES: readonly CmmiGateDefinition[] = [
-  { key: "gate_g1_spec", label: "G1 需求门禁", role: "emp_ds", doc: "docs/cmmi/01-srs.md", order: 1 },
-  { key: "gate_g2_arch", label: "G2 架构门禁", role: "emp_fda", doc: "docs/cmmi/02-hld.md", order: 2 },
-  { key: "gate_g3_compile", label: "G3 静态编译门禁", role: "emp_swe", doc: "docs/cmmi/03-lld-api.md", order: 3 },
-  { key: "gate_g4_eval", label: "G4 验收门禁", role: "emp_fdse", doc: "docs/cmmi/04-test-report.md", order: 4 },
-  { key: "gate_g5_release", label: "G5 投产门禁", role: "emp_sre", doc: "docs/cmmi/05-deploy-sop.md", order: 5 },
+  { key: "gate_g1_spec", label: "G1 需求门禁", role: "emp_ds", doc: "docs/02_requirements/software-requirements.md", order: 1 },
+  { key: "gate_g2_arch", label: "G2 架构门禁", role: "emp_fda", doc: "docs/03_design/architecture-design-hld.md", order: 2 },
+  { key: "gate_g3_compile", label: "G3 静态编译门禁", role: "emp_swe", doc: "docs/03_design/interface-contracts/", order: 3 },
+  { key: "gate_g4_eval", label: "G4 验收门禁", role: "emp_fdse", doc: "docs/05_verification/test-summary-report.md", order: 4 },
+  { key: "gate_g5_release", label: "G5 投产门禁", role: "emp_sre", doc: "docs/07_release/system-deployment-sop.md", order: 5 },
+  { key: "gate_g6_sre", label: "G6 韧性门禁", role: "emp_sre", doc: "docs/08_sre/01_slo_sli_metrics/SLO-SLI-ERROR-BUDGET-MATRIX.md", order: 6 },
+  { key: "gate_g7_ops", label: "G7 运营门禁", role: "emp_ds", doc: "docs/09_operations/tenant-governance.md", order: 7 },
 ];
 
 const CMMI_GATE_BY_KEY = new Map<CmmiGateKey, CmmiGateDefinition>(CMMI_GATES.map((gate) => [gate.key, gate]));
@@ -310,7 +315,7 @@ export interface CmmiWbsPhaseTemplate {
 }
 
 /**
- * The six CMMI WBS phases, in order (需求确认 → … → 上线移交). Each phase 收口
+ * The eight CMMI WBS phases, in order (需求确认 → … → 持续运营). Each phase 收口
  * produces a milestone; phases that sit on a gate boundary carry its key.
  */
 export const CMMI_WBS_PHASES: readonly CmmiWbsPhaseTemplate[] = [
@@ -320,6 +325,8 @@ export const CMMI_WBS_PHASES: readonly CmmiWbsPhaseTemplate[] = [
   { key: "development", name: "开发实现", gate: "gate_g3_compile", acceptance: "编译与类型检查 0 Error，核心用例全绿，G3 静态门禁通过。" },
   { key: "acceptance", name: "测试验收", gate: "gate_g4_eval", acceptance: "四态覆盖、0 假死按钮，集成用例全绿，P0-P2 缺陷清零。" },
   { key: "handover", name: "上线移交", gate: "gate_g5_release", acceptance: "制品唯一不可变指纹归档，秒级回滚 SOP 演练通过。" },
+  { key: "sre_resilience", name: "韧性保障", gate: "gate_g6_sre", acceptance: "SLO/SLI 监控拓扑与混沌容灾演练通过，具备 5-Whys 无指责复盘机制。" },
+  { key: "operations_governance", name: "持续运营", gate: "gate_g7_ops", acceptance: "多租户开通隔离 SOP、日终平账与常态化巡检就绪，数字员工运营准入。" },
 ];
 
 export const ISSUE_REVIEW_POLICIES = ["anyone", "not_creator", "human_only"] as const;

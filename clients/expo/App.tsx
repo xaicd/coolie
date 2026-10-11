@@ -683,6 +683,8 @@ function HomeScreen({
   const [createTaskProjectId, setCreateTaskProjectId] = useState<string | null>(null);
   /** 项目卡「查看任务」带过来的项目 id —— 任务页落地时套用为项目筛选。 */
   const [tasksFilterProjectId, setTasksFilterProjectId] = useState<string | null>(null);
+  /** 项目卡「工坊」带过来的项目 id —— 工坊落地时自动选中该项目的专属会话。 */
+  const [chatInitialProjectId, setChatInitialProjectId] = useState<string | null>(null);
   // 全功能 Web 容器 (Hybrid WebContainer): 零重复开发复用 Web 端能力
   const [webContainerTarget, setWebContainerTarget] = useState<{
     path?: string;
@@ -1095,6 +1097,11 @@ function HomeScreen({
                 setTasksFilterProjectId(project.id);
                 navigateTab("tasks");
               }}
+              onOpenProjectChat={(project) => {
+                setProjectsOpen(false);
+                setChatInitialProjectId(project.id);
+                navigateTab("chat");
+              }}
             />
           ) : gitCredentialsOpen ? (
             <GitCredentialsScreen company={company} onBack={() => setGitCredentialsOpen(false)} />
@@ -1174,12 +1181,26 @@ function HomeScreen({
               <BoardChatScreen
                 company={company}
                 whoami={whoami}
+                initialProjectId={chatInitialProjectId}
                 // COOA-4 走查注 (2026-10-04): 不加 navigateTab 是对的 — focusedApprovalId
                 // 与 selected 的浮层分支在上层三元链里先于 tab 分支求值,
                 // chat 里点任务/审批直接盖到当前 tab 上, 返回键回到 chat。
                 onOpenApproval={(approvalId) => setFocusedApprovalId(approvalId)}
+                onOpenApprovals={() => {
+                  setInboxInitialTab("approvals");
+                  setNotificationsOpen(true);
+                }}
                 onOpenIssue={(issue) => {
                   setSelected(issue);
+                }}
+                onOpenSandbox={(scope) => {
+                  setSandboxContext({
+                    url: scope?.url ?? null,
+                    service: null,
+                    workProduct: scope?.workProduct ?? null,
+                    scope: scope ?? null,
+                    issue: scope?.issue ?? null,
+                  });
                 }}
                 onOpenPipeline={(pipelineId) => {
                   void Linking.openURL(
@@ -1209,8 +1230,9 @@ function HomeScreen({
               onCreateTaskForProject={(project) => {
                 setCreateTaskProjectId(project.id);
               }}
-              onNavigateToChat={(prompt?: string) => {
+              onNavigateToChat={(prompt?: string, projectId?: string) => {
                 if (prompt) exportBoardPrompt(prompt);
+                if (projectId) setChatInitialProjectId(projectId);
                 navigateTab("chat");
               }}
               onNavigateToTasks={() => {

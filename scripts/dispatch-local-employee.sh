@@ -41,6 +41,7 @@ UPDATE_BLOCKED_REASON=""
 UPDATE_LEDGER=""
 NO_CONTEXT=0
 HANDOVER_NOTE=""
+MAX_TURNS="${COOLIE_MAX_TURNS:-}"
 
 usage() {
   cat <<'EOF'
@@ -106,6 +107,7 @@ while [[ $# -gt 0 ]]; do
     --ledger) UPDATE_LEDGER="${2:-}"; shift 2 ;;
     --no-context) NO_CONTEXT=1; shift ;;
     --note) HANDOVER_NOTE="${2:-}"; shift 2 ;;
+    --max-turns|--max-steps) MAX_TURNS="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'unknown arg: %s\n' "$1" >&2; usage >&2; exit 2 ;;
   esac
@@ -488,7 +490,7 @@ printf '[dispatch] recorded prompt:  %s\n' "$prompt_file"
 printf '[dispatch] employee=%s agent=%s tool=%s task=%s\n' "$EMPLOYEE" "$AGENT" "$TOOL" "$TASK"
 
 if [[ "$EXECUTE" -eq 0 ]]; then
-  printf '[dispatch] status=queued. To execute: %s --agent %s --task %q --execute\n' "$0" "$AGENT" "$TASK"
+  printf "[dispatch] status=queued. To execute: %s --agent %s --task '%s' --execute\n" "$0" "$AGENT" "$TASK"
   exit 0
 fi
 
@@ -547,6 +549,9 @@ if [[ -n "$ACPX_BIN" ]]; then
       # 其他工具 fallback
       ;;
   esac
+  if [[ ${#EXEC_CMD[@]} -gt 0 && -n "$MAX_TURNS" ]]; then
+    EXEC_CMD+=("--max-turns" "$MAX_TURNS")
+  fi
 fi
 
 # Fallback: 若未找到 acpx 或非标准工具，退回原生 CLI
@@ -559,6 +564,9 @@ if [[ ${#EXEC_CMD[@]} -eq 0 ]]; then
     agy-gemini3.8|agy)
       TOOL_BIN="docker"
       TOOL_ARGS=("exec" "-i" "-e" "LANG=C.UTF-8" "agy-ubuntu-container" "/root/.local/bin/agy" "-p" "$(cat "$prompt_file")" "--dangerously-skip-permissions")
+      if [[ -n "$MAX_TURNS" ]]; then
+        TOOL_ARGS+=("--print-timeout" "$((MAX_TURNS * 15))s")
+      fi
       ;;
     claude-mm)
       TOOL_BIN="claude"
@@ -573,10 +581,16 @@ if [[ ${#EXEC_CMD[@]} -eq 0 ]]; then
     cmd)
       TOOL_BIN="cmd"
       TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--yolo" "--tools-all" "-t")
+      if [[ -n "$MAX_TURNS" ]]; then
+        TOOL_ARGS+=("--max-turns" "$MAX_TURNS")
+      fi
       ;;
     copilot)
       TOOL_BIN="copilot"
       TOOL_ARGS=("-p" "$(cat "$prompt_file")" "--yolo")
+      if [[ -n "$MAX_TURNS" ]]; then
+        TOOL_ARGS+=("--max-autopilot-continues" "$MAX_TURNS")
+      fi
       ;;
     kiro-cli)
       TOOL_BIN="kiro-cli"
@@ -855,7 +869,7 @@ if "${EXEC_CMD[@]}" < /dev/null; then
   latest_hash="$(git -C "$REPO_ROOT" rev-parse --short HEAD 2>/dev/null || printf '')"
   
   # wave298 掌柜铁律: 全面管局审计门禁硬拦截
-  if ! node "$REPO_ROOT/scripts/check-governance-audit.mjs" >/dev/null 2>&1; then
+  if ! (cd "$REPO_ROOT" && node "$REPO_ROOT/scripts/check-governance-audit.mjs") >/dev/null 2>&1; then
     printf '[dispatch] 🚫 任务虽然退出但未通过全面管局审计 (两字按钮/对称底栏/CMMI产物违规)！标记为 blocked\n' >&2
     write_receipt "blocked" "$$" "$started_iso" "$completed_iso" "$latest_hash" "governance audit failed: pnpm check:governance"
     sync_dispatch_to_dev_server "blocked" "$latest_hash" "$started_iso" "$completed_iso" "governance audit failed: pnpm check:governance"

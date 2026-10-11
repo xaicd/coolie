@@ -13,7 +13,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-SSH_TARGET="tc-coolie-claw"
+SSH_TARGET="${SSH_TARGET:-ubuntu@xrobinai.cn}"
 REMOTE_DIR="/opt/coolie"
 
 echo "=== [server 1/5] rsync 代码 (server/packages/cli, 不含 ui/ 与 clients/expo) ==="
@@ -46,6 +46,7 @@ rsync -az --delete \
   --exclude 'clients/expo' \
   --exclude 'doc/plans' \
   --exclude 'version.json' \
+  --exclude 'core*' \
   --exclude '/ui' \
   ./ "$SSH_TARGET:$REMOTE_DIR/"
 

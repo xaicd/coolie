@@ -8,6 +8,7 @@ import {
   agents,
   companies,
   createDb,
+  heartbeatRunEvents,
   heartbeatRuns,
   issueComments,
   issueRelations,
@@ -45,6 +46,7 @@ describeEmbeddedPostgres("stale issue execution lock routes", () => {
     await db.delete(issueRelations);
     await db.delete(activityLog);
     await db.delete(issues);
+    await db.delete(heartbeatRunEvents);
     await db.delete(heartbeatRuns);
     await db.delete(agents);
     await db.delete(companies);
@@ -537,6 +539,120 @@ describeEmbeddedPostgres("stale issue execution lock routes", () => {
     expect(row).toEqual({
       status: "in_progress",
       assigneeAgentId: otherAgentId,
+      checkoutRunId: currentRunId,
+      executionRunId: currentRunId,
+    });
+  });
+
+  it("self-heals a process-less zombie checkout owner on checkout (COOA-21)", async () => {
+    // A server bounce kills a run before it records its pid, so the run stays
+    // status=running with no process backing and pins checkoutRunId. Adoption
+    // only yields to a terminal run, so without the on-demand reclaim in the
+    // checkout route this POST 409s forever until an operator intervenes.
+    const { companyId, agentId, currentRunId } = await seedCompanyAgentAndRuns();
+    const zombieRunId = randomUUID();
+    const issueId = randomUUID();
+    await db.insert(heartbeatRuns).values({
+      id: zombieRunId,
+      companyId,
+      agentId,
+      status: "running",
+      invocationSource: "assignment",
+      // No pid/group recorded, and silent past the processless-orphan window.
+      startedAt: new Date(Date.now() - 10 * 60 * 1000),
+    });
+    await db.insert(issues).values({
+      id: issueId,
+      companyId,
+      title: "Zombie checkout owner",
+      status: "in_progress",
+      priority: "high",
+      assigneeAgentId: agentId,
+      checkoutRunId: zombieRunId,
+      executionRunId: zombieRunId,
+      executionAgentNameKey: "codexcoder",
+      executionLockedAt: new Date(Date.now() - 10 * 60 * 1000),
+    });
+
+    const res = await request(createApp(agentActor(companyId, agentId, currentRunId)))
+      .post(`/api/issues/${issueId}/checkout`)
+      .send({
+        agentId,
+        expectedStatuses: ["todo", "backlog", "blocked", "in_review"],
+      });
+
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+
+    const row = await db
+      .select({
+        status: issues.status,
+        assigneeAgentId: issues.assigneeAgentId,
+        checkoutRunId: issues.checkoutRunId,
+        executionRunId: issues.executionRunId,
+      })
+      .from(issues)
+      .where(eq(issues.id, issueId))
+      .then((rows) => rows[0]);
+    expect(row).toEqual({
+      status: "in_progress",
+      assigneeAgentId: agentId,
+      checkoutRunId: currentRunId,
+      executionRunId: currentRunId,
+    });
+
+    // The zombie is reclaimed to a factual terminal status by the self-heal.
+    const zombie = await db
+      .select({ status: heartbeatRuns.status })
+      .from(heartbeatRuns)
+      .where(eq(heartbeatRuns.id, zombieRunId))
+      .then((rows) => rows[0]);
+    expect(zombie?.status).toBe("interrupted");
+  });
+
+  it("self-heals a process-less zombie checkout owner during PATCH takeover (COOA-21)", async () => {
+    // The takeover path for mutations goes through assertCheckoutOwner, which
+    // also only yields to a terminal run and rejects with "Issue run ownership
+    // conflict" for a zombie. The same on-demand reclaim must clear it here.
+    const { companyId, agentId, currentRunId } = await seedCompanyAgentAndRuns();
+    const zombieRunId = randomUUID();
+    const issueId = randomUUID();
+    await db.insert(heartbeatRuns).values({
+      id: zombieRunId,
+      companyId,
+      agentId,
+      status: "running",
+      invocationSource: "assignment",
+      startedAt: new Date(Date.now() - 10 * 60 * 1000),
+    });
+    await db.insert(issues).values({
+      id: issueId,
+      companyId,
+      title: "Zombie mutation owner",
+      status: "in_progress",
+      priority: "high",
+      assigneeAgentId: agentId,
+      checkoutRunId: zombieRunId,
+      executionRunId: zombieRunId,
+      executionAgentNameKey: "codexcoder",
+      executionLockedAt: new Date(Date.now() - 10 * 60 * 1000),
+    });
+
+    const res = await request(createApp(agentActor(companyId, agentId, currentRunId)))
+      .patch(`/api/issues/${issueId}`)
+      .send({ title: "Recovered zombie mutation owner" });
+
+    expect(res.status, JSON.stringify(res.body)).toBe(200);
+    expect(res.body.title).toBe("Recovered zombie mutation owner");
+
+    const row = await db
+      .select({
+        checkoutRunId: issues.checkoutRunId,
+        executionRunId: issues.executionRunId,
+      })
+      .from(issues)
+      .where(eq(issues.id, issueId))
+      .then((rows) => rows[0]);
+    expect(row).toEqual({
       checkoutRunId: currentRunId,
       executionRunId: currentRunId,
     });

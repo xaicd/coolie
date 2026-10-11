@@ -1,0 +1,10 @@
+{
+  "feature": "fraud-dual-approval",
+  "domain": "core",
+  "type": "enhancement",
+  "created": "2026-10-10T06:21:30.835Z",
+  "trace": {
+    "brief": "brief.json",
+    "spec": "spec.json"
+  }
+}

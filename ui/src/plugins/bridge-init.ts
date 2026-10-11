@@ -610,7 +610,7 @@ function PluginSdkDataTable({ columns, rows, loading, emptyMessage = "No rows." 
           },
           columns.map((column) => createElement(
             "div",
-            { key: column.key, className: `min-w-0 text-xs ${column.key === "actions" || column.align === "right" ? "text-right" : ""}` },
+            { key: column.key, className: `min-w-0 overflow-hidden text-xs ${column.key === "actions" || column.align === "right" ? "text-right" : ""}` },
             createElement("div", { className: "mb-0.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground md:hidden" }, column.header),
             column.render ? column.render(row[column.key], row) : String(row[column.key] ?? ""),
           )),

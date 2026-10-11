@@ -1,0 +1,13 @@
+{
+  "name": "@sys-chanrong/shared",
+  "version": "1.0.0",
+  "private": true,
+  "description": "产融商业保理与供应链金融智能体系统 · 统一 API 契约与 DTO (SYS_CHANRONG_AGENT / enterprise-core)",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./api": "./src/api/index.ts",
+    "./dto": "./src/dto/index.ts",
+    "./*": "./src/*.ts"
+  }
+}

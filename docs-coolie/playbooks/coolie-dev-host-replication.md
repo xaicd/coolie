@@ -95,3 +95,26 @@ bash scripts/bootstrap-coolie-dev-host.sh
 | **Runner 守护** | `bash scripts/coolie-task-runner-bridge.sh --status` | 正常显示进程在运行 |
 | **探活与自愈** | `bash scripts/cron-team-status.sh --print` | 显示当前真值状态，无虚假时长 |
 | **模拟微信派单** | `bash scripts/hermes-boss-intent-dispatcher.sh "测试任务"` | 1秒建单并显示 `COOA-XX`，Bridge 自动认领 |
+
+---
+
+## 五、AI Agent 全自主交付能力点火验收 (Autonomous Canary Commissioning)
+
+> **核心军规**：Web 服务启动成功仅仅是“物理通电”，**绝不代表交付工厂能完成商业交付**！  
+> 安装完成后的终验，必须由 **AI 数字员工（兜底渊 PRE-SRE + 门神 FDSE）** 全自主驱动金丝雀工作流，从“需求 ➔ 编译 ➔ 测试 ➔ 快照 ➔ 工件”穿透走完，并签发不可变合格证。
+
+### 1. 触发方式（零人工干预）
+- **工坊一句话触发**：掌柜在手机/网页工坊输入：“`检查新机器交付能力`”；
+- **命令行直驱**：
+  ```bash
+  node scripts/workflow-engine.cjs run --recipe foundry-readiness-canary --name canary --domain core --title "新节点自检"
+  ```
+
+### 2. 自动化金丝雀验收标准
+工作流配方收拢于 [`.agents/workflows/foundry-readiness-canary.workflow.json`](../../.agents/workflows/foundry-readiness-canary.workflow.json)，五大员工接力执行：
+1. **7 大工具池真跑探测**：claude-glm, cmd, copilot, agy 等带 `--yolo` 真跑回包 ≤ 5s，异常自动触发 Docker/进程自愈；
+2. **多语言编译器扫描**：Java JDK 17, Node 24, pnpm, Docker, ADB 依赖无缺失；
+3. **Spec-Kit SDD 双向贯通**：自动执行 `speckit new` ➔ `build` ➔ `sync`，验证控制面工单派生；
+4. **无头真实 UI 快照**：启动无头 Chromium 渲染页面并抓取快照存证，验证真机快照测试能力；
+5. **不可变工件与合格证签发**：自动校验 `No Artifact, No Done`，生成《交付工厂就绪核销单》并向掌柜移动端推送就绪卡片。
+

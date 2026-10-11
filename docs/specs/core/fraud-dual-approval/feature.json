@@ -1,0 +1,12 @@
+{
+  "name": "fraud-dual-approval",
+  "domain": "core",
+  "title": "高危反诈双人会签",
+  "type": "enhancement",
+  "status": "PLAN_APPROVED",
+  "stories": 3,
+  "acceptance": 2,
+  "invariants": 1,
+  "tasks": 3,
+  "updatedAt": "2026-10-10T06:21:30.878Z"
+}

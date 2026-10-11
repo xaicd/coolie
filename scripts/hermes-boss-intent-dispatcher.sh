@@ -35,24 +35,23 @@ fi
 
 EXPERT_MODE=0
 EXECUTE_FLAG=""
+POSITIONAL_ARGS=()
 
-while [[ $# -gt 0 ]]; do
-  case "$1" in
+for arg in "$@"; do
+  case "$arg" in
     --expert)
       EXPERT_MODE=1
-      shift
       ;;
     --execute)
       EXECUTE_FLAG="--execute"
-      shift
       ;;
     *)
-      break
+      POSITIONAL_ARGS+=("$arg")
       ;;
   esac
 done
 
-INPUT="${*:-}"
+INPUT="${POSITIONAL_ARGS[*]:-}"
 
 # 0. 待办查询直接直通 Coolie Dev Server 任务大盘
 if [[ "$INPUT" =~ (待办|有哪些任务|任务列表|工单列表|未完成|有啥活|还有什么活|看下任务) ]]; then
@@ -279,16 +278,18 @@ $DISCIPLINE_RULES"
   ' "$title" "$desc" "$AGENT_ID")"
 
   local res=""
-  if [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
-    res="$("$SCRIPT_DIR/host-exec.sh" "curl -fsS -X POST http://localhost:3100/api/companies/$DEV_COMPANY_ID/issues -H 'Content-Type: application/json' -d '$json_payload'" 2>/dev/null || true)"
-  elif command -v curl >/dev/null 2>&1; then
-    res="$(curl -fsS -X POST "http://localhost:3100/api/companies/$DEV_COMPANY_ID/issues" -H 'Content-Type: application/json' -d "$json_payload" 2>/dev/null || true)"
+  if curl -fsS "http://127.0.0.1:3100/api/health" >/dev/null 2>&1; then
+    res="$(printf '%s' "$json_payload" | curl -fsS -X POST "http://127.0.0.1:3100/api/companies/$DEV_COMPANY_ID/issues" -H 'Content-Type: application/json' -d @- 2>/dev/null || true)"
+  elif [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
+    local b64_payload
+    b64_payload="$(printf '%s' "$json_payload" | base64 | tr -d '\r\n')"
+    res="$("$SCRIPT_DIR/host-exec.sh" "echo '$b64_payload' | base64 -d | curl -fsS -X POST http://127.0.0.1:3100/api/companies/$DEV_COMPANY_ID/issues -H 'Content-Type: application/json' -d @-" 2>/dev/null || true)"
   fi
 
   if [[ -n "$res" ]]; then
     ISSUE_IDENTIFIER="$(node -e 'try { console.log(JSON.parse(process.argv[1]).identifier || ""); } catch(e){}' "$res")"
     if [[ -n "$ISSUE_IDENTIFIER" ]]; then
-      ISSUE_URL="http://localhost:3100/issues/$ISSUE_IDENTIFIER"
+      ISSUE_URL="http://127.0.0.1:3100/issues/$ISSUE_IDENTIFIER"
     fi
   fi
 }

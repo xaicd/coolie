@@ -146,7 +146,7 @@ step "3. 既有公司 snapshot 不迁移"
 
 if ssh -o BatchMode=yes -o ConnectTimeout=5 "$PROD_HOST" true 2>/dev/null; then
   EXISTING_COMMENT="$(ssh -o BatchMode=yes "$PROD_HOST" \
-    'sudo PGPASSWORD=2cad07f100771f3425a5f969f55414f5df845eff268fbfa9 psql -U coolie -h 127.0.0.1 -d coolie -tAc "SELECT COALESCE(string_agg(c.body, E'"'"'\n---\n'"'"') , '"'"''"'"') FROM issue_comments c JOIN issues i ON i.id = c.issue_id WHERE i.company_id = '"'"'4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e'"'"' AND c.author_type = '"'"'agent'"'"' LIMIT 5"' 2>/dev/null || true)"
+    'sudo PGPASSWORD="${COOLIE_DB_PASSWORD:-}" psql -U coolie -h 127.0.0.1 -d coolie -tAc "SELECT COALESCE(string_agg(c.body, E'"'"'\n---\n'"'"') , '"'"''"'"') FROM issue_comments c JOIN issues i ON i.id = c.issue_id WHERE i.company_id = '"'"'4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e'"'"' AND c.author_type = '"'"'agent'"'"' LIMIT 5"' 2>/dev/null || true)"
   if [[ -n "$EXISTING_COMMENT" ]]; then
     pass "prod xrobinai 既有 agent comment 已查询 (snapshot 不迁移, 不动)"
     echo "    (上线前已有公司 issue comment 不会被 source 文件改动反向同步)"

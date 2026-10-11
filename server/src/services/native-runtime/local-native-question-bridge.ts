@@ -46,8 +46,9 @@ export function createLocalNativeQuestionBridge(input: {
       await flushNativeQuestionResponses(input.db, input.binding.runId);
     },
     async observe(event: PrpEvent) {
-      const request = event.payload.request as Record<string, unknown> | undefined;
-      if (event.eventType !== "runtime_request.created" || request?.type !== "input") return;
+      const evAny = event as any;
+      const request = evAny.payload?.request as Record<string, unknown> | undefined;
+      if (evAny.eventType !== "runtime_request.created" || request?.type !== "input") return;
       await projectNativeRuntimeRequest({ db: input.db, binding: input.binding, event });
     },
   };

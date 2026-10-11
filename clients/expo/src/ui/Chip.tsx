@@ -57,6 +57,8 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: C.ink3,
     fontWeight: "500",
+    maxWidth: 220,
+    flexShrink: 1,
   },
   chipLabelActive: {
     color: C.accent,

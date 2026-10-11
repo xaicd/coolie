@@ -3542,6 +3542,20 @@ export function issueRoutes(
     opts.stalledReviewDecisionEnqueueWakeup ?? heartbeat.wakeup;
   const enqueueRecoveryActionWakeup =
     opts.recoveryActionEnqueueWakeup ?? heartbeat.wakeup;
+  // COOA-21: on-demand self-heal for a zombie checkout/execution run. A run
+  // orphaned by a server bounce keeps status=running with no live process and
+  // pins the issue's checkout/execution lock, dead-locking takeover because
+  // adoption only yields to a terminal run. Reclaim any such run through the
+  // stale-lock sweep and report whether this issue's lock was cleared, so the
+  // caller can retry instead of waiting for the periodic sweep or an operator.
+  const reclaimStaleIssueLockOnConflict = async (
+    issueId: string,
+    error: unknown,
+  ): Promise<boolean> => {
+    if (!(error instanceof HttpError) || error.status !== 409) return false;
+    const reclaimed = await heartbeat.sweepStaleIssueLocks();
+    return reclaimed.issueIds.includes(issueId);
+  };
   const feedback = feedbackService(db);
   const companiesSvc = companyService(db);
   let searchSvc = opts.searchService ?? null;
@@ -5391,11 +5405,13 @@ export function issueRoutes(
     }
     const runId = requireAgentRunId(req, res);
     if (!runId) return false;
-    const ownership = await svc.assertCheckoutOwner(
-      issue.id,
-      actorAgentId,
-      runId,
-    );
+    let ownership: Awaited<ReturnType<typeof svc.assertCheckoutOwner>>;
+    try {
+      ownership = await svc.assertCheckoutOwner(issue.id, actorAgentId, runId);
+    } catch (error) {
+      if (!(await reclaimStaleIssueLockOnConflict(issue.id, error))) throw error;
+      ownership = await svc.assertCheckoutOwner(issue.id, actorAgentId, runId);
+    }
     if (ownership.adoptedFromRunId) {
       const actor = getActorInfo(req);
       await logActivity(db, {
@@ -9757,6 +9773,43 @@ export function issueRoutes(
       includeSystem: req.query.includeSystem === "true",
     });
     res.json(docs);
+  });
+
+  router.get("/issues/:id/documents/:key/raw", async (req, res) => {
+    const id = req.params.id as string;
+    const issue = await getAccessibleResource(
+      req,
+      res,
+      getIssueById(req, id),
+      "Issue not found",
+    );
+    if (!issue) return;
+    if (!(await assertIssueReadAllowed(req, res, issue))) return;
+    const keyParsed = issueDocumentKeySchema.safeParse(
+      String(req.params.key ?? "")
+        .trim()
+        .toLowerCase(),
+    );
+    if (!keyParsed.success) {
+      res.status(400).json({
+        error: "Invalid document key",
+        details: keyParsed.error.issues,
+      });
+      return;
+    }
+    const doc = await documentsSvc.getIssueDocumentByKey(
+      issue.id,
+      keyParsed.data,
+    );
+    if (!doc) {
+      res.status(404).send("Document not found");
+      return;
+    }
+    const isDownload = req.query.download === "true" || req.query.download === "1";
+    const filename = `${encodeURIComponent(doc.title || keyParsed.data)}.md`;
+    res.setHeader("Content-Type", "text/markdown; charset=utf-8");
+    res.setHeader("Content-Disposition", `${isDownload ? "attachment" : "inline"}; filename="${filename}"`);
+    res.send(doc.body ?? "");
   });
 
   router.get("/issues/:id/documents/:key", async (req, res) => {
@@ -15273,7 +15326,19 @@ export function issueRoutes(
           });
           return;
         }
-        throw error;
+        // COOA-21: reclaim a zombie run this issue still references, then
+        // retry once, so an agent taking over a dead-locked issue has a
+        // self-healing path instead of waiting for the periodic sweep.
+        if (await reclaimStaleIssueLockOnConflict(issue.id, error)) {
+          updated = await svc.checkout(
+            id,
+            req.body.agentId,
+            req.body.expectedStatuses,
+            checkoutRunId,
+          );
+        } else {
+          throw error;
+        }
       }
       const actor = getActorInfo(req);
       if (updated?.harnessKind === "skill_test") {

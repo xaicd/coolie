@@ -281,12 +281,13 @@ export function runnerPrpCoordinator(
         expectedRunnerDigest: input.runnerDigest,
         connectionLeaseTtlMs,
         onCommittedEvent: async (event) => {
+          const evAny = event as any;
           await nativeStore.appendEvent(event);
-          if (event.eventType === "runtime_request.created") {
+          if (evAny.eventType === "runtime_request.created") {
             await projectNativeRuntimeRequest({ db, binding: storeBinding, event });
           }
           await nativeStore.reconcileTerminalEvent(event);
-          if (event.eventType === "run.terminal") {
+          if (evAny.eventType === "run.terminal") {
             const stored = await nativeStore.readCompletedRun();
             if (!stored) throw new Error("native_terminal_result_missing");
             completedRun = await withProviderSession(stored);

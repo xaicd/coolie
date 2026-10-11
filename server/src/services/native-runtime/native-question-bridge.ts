@@ -206,11 +206,12 @@ export async function projectNativeRuntimeRequest(input: {
   binding: Pick<NativeRunStoreBinding, "companyId" | "issueId" | "runId" | "agentId" | "normalizedSessionId" | "runnerSourceInstanceId">;
   event: PrpEvent;
 }): Promise<AskUserQuestionsInteraction | null> {
-  if (input.event.eventType !== "runtime_request.created") return null;
+  const evAny = input.event as any;
+  if (evAny.eventType !== "runtime_request.created") return null;
   if (
-    input.event.runId !== input.binding.runId
-    || input.event.normalizedSessionId !== input.binding.normalizedSessionId
-    || input.event.sourceInstanceId !== input.binding.runnerSourceInstanceId
+    evAny.runId !== input.binding.runId
+    || evAny.normalizedSessionId !== input.binding.normalizedSessionId
+    || evAny.sourceInstanceId !== input.binding.runnerSourceInstanceId
   ) {
     throw new Error("native_runtime_request_binding_mismatch");
   }

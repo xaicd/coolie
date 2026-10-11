@@ -130,7 +130,7 @@ export function ProjectMilestones({
               accessibilityRole="button"
               accessibilityLabel="采纳 WBS 草案"
             >
-              <Text style={styles.actionPrimaryText}>一键采纳</Text>
+              <Text style={styles.actionPrimaryText}>采纳</Text>
             </Pressable>
             <Pressable
               style={[styles.actionSecondary, busy && styles.actionDisabled]}

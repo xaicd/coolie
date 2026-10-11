@@ -29,19 +29,20 @@ flowchart TD
   B --> C["识别失控点 (点落在控制限外 / 连续7点同侧)"]
   C --> D["启动 CAR 5-Why 鱼骨图根因分析"]
   D --> E["制定防退化整改措施与固化自动化测试脚本"]
-  E --> F["输出 SPC 与 CAR 文档 (docs/cmmi/06-spc-metrics.md & 07-car.md)"]
+  E --> F["输出 SPC 与 CAR 文档 (docs/architecture/spc-metrics.md & car-prevention.md)"]
   F --> G["反哺项目定制 scripts 与组织 Skills 模板"]
 ```
 
-1. **量化采样**: 收集任务生命周期数据（任务执行用时、Token 消耗、门禁一次通过率、静态检查缺陷数）。
-2. **绘制 SPC 控制图**: 标记异常波动任务（超出 $3\sigma$ 警戒线），自动发出预警。
-3. **CAR 根因深挖**: 对严重缺陷或异常任务，执行 5-Why 分析，追问到制度、流程、工具设计根源。
-4. **防退化固化**: 在项目的 `scripts/` 中新增一条特定的守卫断言（如新增 Token Gate、新增 API 字段检查）。
-5. **归档文档**: 写入 `docs/cmmi/06-spc-metrics.md` 与 `docs/cmmi/07-car-prevention.md`。
+1. **资产双轨映射**: 优先通过 Paperclip 原生 API 挂载至工单富文本文档（`POST /api/issues/:id/documents`，key: `quality`），在控制面实现富文本度量报告展示；本地代码工作区采用工程标准 `docs/architecture/` 目录（如 `docs/architecture/spc-metrics.md` 与 `docs/architecture/car-prevention.md`，彻底弃用 `.coolie/cmmi/` 隐藏单文件），并通过 `issue_work_products` 登记索引。开源基座 100% 保持基座原生目录结构。
+2. **量化采样**: 收集任务生命周期数据（任务执行用时、Token 消耗、门禁一次通过率、静态检查缺陷数）。
+3. **绘制 SPC 控制图**: 标记异常波动任务（超出 $3\sigma$ 警戒线），自动发出预警。
+4. **CAR 根因深挖**: 对严重缺陷或异常任务，执行 5-Why 分析，追问到制度、流程、工具设计根源。
+5. **防退化固化**: 在项目的 `scripts/` 中新增一条特定的守卫断言（如新增 Token Gate、新增 API 字段检查）。
+6. **归档文档**: 写入 `docs/architecture/spc-metrics.md` 与 `docs/architecture/car-prevention.md`。
 
 ---
 
-## 3. 产物模板基线 (`docs/cmmi/07-car-prevention.md`)
+## 3. 产物模板基线 (`docs/architecture/car-prevention.md`)
 
 ```markdown
 # [系统名称] 因果分析与系统性缺陷预防表 (CMMI 5 CAR)

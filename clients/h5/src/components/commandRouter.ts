@@ -15,8 +15,8 @@
  * 与 server/src/services/build-orchestrator.ts 的正则同形。
  */
 
-/** 「build xxx」/「开发 xxx」/「做 xxx」 */
-export const BUILD_TRIGGER_PATTERN = /^(?:build|开发|做)\s+/i;
+/** 「build xxx」/「开发 xxx」/「做 xxx」/「立项 xxx」/「极速立项 xxx」 */
+export const BUILD_TRIGGER_PATTERN = /^(?:build|开发|做|立项|极速立项|商业立项)\s+/i;
 /** 「建域 xxx」/「建模 xxx」/「domain xxx」 */
 export const DOMAIN_TRIGGER_PATTERN = /^(?:建域|建模|domain)\s+/i;
 /** 「建 pipeline xxx」/「创建 pipeline xxx」/「新建 pipeline xxx」 */

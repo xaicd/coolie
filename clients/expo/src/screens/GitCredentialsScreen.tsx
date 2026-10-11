@@ -121,9 +121,9 @@ export function GitCredentialsScreen({
             style={styles.emptyAction}
             onPress={() => setCreateOpen(true)}
             accessibilityRole="button"
-            accessibilityLabel="新建凭证"
+            accessibilityLabel="新建"
           >
-            <Text style={styles.emptyActionText}>新建凭证</Text>
+            <Text style={styles.emptyActionText}>新建</Text>
           </Pressable>
         }
       />

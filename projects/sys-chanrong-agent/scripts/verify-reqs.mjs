@@ -5,9 +5,14 @@
 import fs from "node:fs";
 import path from "node:path";
 
-const srsPath = path.resolve(process.cwd(), "docs/cmmi/01-srs.md");
-if (!fs.existsSync(srsPath)) {
-  console.error("❌ G1 门禁失败: 未找到 docs/cmmi/01-srs.md 需求规格说明书。");
+const srsCandidates = [
+  path.resolve(process.cwd(), "docs/02_requirements/software-requirements.md"),
+  path.resolve(process.cwd(), "docs/02_requirements/user-requirements.md"),
+  path.resolve(process.cwd(), "docs/specs/core/init-baseline/requirements.md"),
+];
+const srsPath = srsCandidates.find(p => fs.existsSync(p));
+if (!srsPath) {
+  console.error("❌ G1 门禁失败: 未找到 docs/02_requirements/ 下的需求规格说明书。");
   process.exit(1);
 }
 

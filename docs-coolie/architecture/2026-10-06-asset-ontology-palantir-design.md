@@ -1,7 +1,7 @@
 # 资产 > 本体 端到端架构设计 · Palantir 双核版
 
 **基线**: 老板 2026-10-06 拍板 · `HEAD 51d92c24a` (v0.6.50)
-**基线原型**: `docs-coolie/prototypes/v3-palantir/asset-ontology.html` (25 KB)
+**基线原型**: `docs-coolie/protos/v3-palantir/asset-ontology.html` (25 KB)
 **北极星**: AGENTS.md §18 (活体本体即中枢, 工坊会话即本体演进)
 **宪法版本**: v1 · 22 条 + 通用底座
 

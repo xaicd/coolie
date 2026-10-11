@@ -36,7 +36,7 @@
 | OTA | xrobinai.cn/ota/manifest (JS-only, runtimeVersion 不变) |
 | APK COS 桶 | gzbucket = sls-cloudfunction-ap-guangzhou-code-1258019043 |
 | APK 下载 | https://dls.xrobinai.cn/<key> |
-| 当前生产 | v0.6.20 (wave266, commit 49e86bde9) |
+| 当前生产 | v0.6.27 (wave366, versionCode 627) |
 | 老板 | 陈伟 (xaicd GitHub 组织, xrobinai.cn 站长) |
 | 老板微信 | o9cq80_tfu-U-ON3wZcJEw@im.wechat (不要猜) |
 | PM | Hermes Agent (掌柜, 老板派单 + 验收 + 写文档) |
@@ -360,7 +360,7 @@ ps aux | grep -E "[c]md -p|[c]laude -p" | grep -v grep | head -5
 
 ---
 
-## 6. brief 7 要素模板 (派单必填, 缺一项 cmd 拒)
+## 6. brief 8 要素模板 (派单必填, 缺一项 cmd 拒, wave364 升级版)
 
 ```
 # waveXXX: <一行动词任务标题>
@@ -384,9 +384,22 @@ ps aux | grep -E "[c]md -p|[c]laude -p" | grep -v grep | head -5
 3. grep -rn "<key>" src/ | head -5
 4. <fix 描述>
 
-## 验收
+## 交付资产（第8要素 · 严禁口头交差）
+- 必须归属 0-1 软件工程真资产（五选一）：
+  1. 可交互沙箱原型 (HTML/3D/RN Bundle)
+  2. 结构化工程配置/契约 (OpenAPI Swagger / EARS Spec / DDL)
+  3. 编译 0 报错的代码 Commit 与自动化测试脚本
+  4. 真机 1080P 操作回归存证快照
+  5. 生产部署/回滚 SOP 手册
+- 必须遵循超级集成体双轨闭环规范：
+  - 控制面原生第一公民承载：过程文档优先挂载为 `issue_documents` (`key: "srs"/"hld"/"lld"`)；真机快照/视频/二进制优先通过 `register_deliverable` 上传为持久化 Attachment；
+  - 代码库工程映射：源码及工作区文件通过 `issue_work_products` 登记 `resourceRef: { kind: "workspace_file", relativePath: "..." }`；
+- 严禁将系统上线后的业务运行数据（如玄关柜图纸、数控 G 代码）充作工程交付物！
+
+## 验收 (No Artifact, No Done 铁律)
 - tsc 0 errors
 - commit "fix(...): ..."
+- 物理交付物挂载：POST /api/issues/:id/work-products 或 attachments 成功（无交付物禁止点 done）
 - output: <APK URL / file list / root cause>
 
 ## 规则
@@ -396,6 +409,7 @@ ps aux | grep -E "[c]md -p|[c]laude -p" | grep -v grep | head -5
 
 ## 参考
 - <docs-coolie/briefs/*.md 或 /tmp/cmd-brief-*.md 路径>
+- `.agents/rules/CMMI-SPEC-FIRST-ARTIFACTS.md`
 ```
 
 ### 6.1 反例 (门神会拒, ex PM-DISPATCH-RULES §2)
@@ -406,6 +420,8 @@ ps aux | grep -E "[c]md -p|[c]laude -p" | grep -v grep | head -5
 - ❌ 派活时人在 release/0.5.0 但 brief 写「发 0.3.6」 — 版本号与分支错位
 - ❌ 简报里写 heredoc 反引号 — zsh 会拆碎, 匠人 shell 退出
 - ❌ "修一下" + 立刻跑 release-app.sh — 没确认 bug 真存在就发版
+- ❌ 任务点 Done 但没有任何交付物挂载 — 违反 `No Artifact, No Done`，系统 422 物理阻断
+- ❌ 拿业务运行数据（算料结果/导出清单）当交付物充数 — 属于层级混乱，判定为无效交工
 
 ### 6.2 派单决策树 (ex PM-DISPATCH-RULES §3)
 

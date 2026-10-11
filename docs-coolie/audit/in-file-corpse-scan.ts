@@ -3,7 +3,7 @@
 // referenced outside their own declaration span (covers the OrgTreeNode class of
 // dead code that file-level orphan scans structurally miss).
 // Parser: @babel/parser (repo root ships TS7 native, which exposes no compiler API).
-// Run: node_modules/.bin/tsx docs-coolie/audits/in-file-corpse-scan.ts [rootDir]
+// Run: node_modules/.bin/tsx docs-coolie/audit/in-file-corpse-scan.ts [rootDir]
 import { parse } from '@babel/parser';
 import * as fs from 'fs';
 import * as path from 'path';

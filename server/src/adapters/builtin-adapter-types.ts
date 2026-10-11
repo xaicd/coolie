@@ -20,4 +20,5 @@ export const BUILTIN_ADAPTER_TYPES = new Set([
   "http",
   "coolie_native",
   "dsh",
+  "agy_local",
 ]);

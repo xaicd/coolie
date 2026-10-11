@@ -48,7 +48,7 @@ interface OrgAssetsScreenProps {
   onOpenPluginManager?: () => void;
   onOpenPrototypeSandbox?: () => void;
   onOpenOnboarding?: () => void;
-  onNavigateToChat?: (prompt?: string) => void;
+  onNavigateToChat?: (prompt?: string, projectId?: string) => void;
   onNavigateToTasks?: () => void;
 }
 
@@ -213,6 +213,9 @@ export function OrgAssetsScreen({
               setActiveTab("artifacts");
             }}
             onOpenWebProjects={onOpenWebProjects}
+            onOpenProjectChat={(project) => {
+              onNavigateToChat?.(undefined, project.id);
+            }}
           />
         )}
 

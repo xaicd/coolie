@@ -1107,8 +1107,43 @@ switch (command) {
   case "workflow":
     handleWorkflows()
     break
+  case "ontology":
+    handleOntology()
+    break
   case "help":
   default:
     handleHelp()
     break
 }
+
+function handleOntology() {
+  const { extractSevenModels, generateCallChainHtml } = require("./lib/ontology-callchain-engine.cjs")
+  const subAction = args[1] || "callchain"
+
+  if (subAction === "inspect") {
+    console.log("\n🔍 正在全域扫描提取七模型 (M1/M2/M3/M5/M6/M7/MU) 规范...")
+    const registry = extractSevenModels()
+    console.log(`\n=== 七模型全盘规格统计 ===`)
+    console.log(`- 界面总数 (MU): ${registry.screens.length}`)
+    console.log(`- 聚合实体 (M1): ${registry.aggregates.length}`)
+    console.log(`- 行为指令 (M2): ${registry.behaviors.length}`)
+    console.log(`- 业务规则 (M3): ${registry.rules.length}`)
+    console.log(`- 协同流程 (M6): ${registry.flows.length}`)
+    return
+  }
+
+  // 默认: 生成调用链工作台 HTML
+  console.log("\n⚡ 正在从全盘业务规格编译生成《全时序因果调用链追踪工作台》HTML...")
+  const registry = extractSevenModels()
+  const htmlContent = generateCallChainHtml(registry)
+  const outDir = path.join(ROOT, "docs/artifacts")
+  fs.mkdirSync(outDir, { recursive: true })
+  const outFile = path.join(outDir, "ontology-callchain-workbench.html")
+  fs.writeFileSync(outFile, htmlContent, "utf8")
+
+  console.log(`\n🎉 [speckit ontology] 全时序因果调用链追踪工作台生成成功！`)
+  console.log(`   📄 交付物路径: ${outFile}`)
+  console.log(`   💡 覆盖: ${registry.screens.length} 个交互入口, ${registry.behaviors.length} 个行为指令, ${registry.rules.length} 条业务规则, ${registry.aggregates.length} 个实体模型, ${registry.flows.length} 个流程时序。`)
+  console.log(`   🚀 双击该文件即可直接在本地浏览器或 Web/APP 工作台中全时序穿透查看！\n`)
+}
+

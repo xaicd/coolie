@@ -27,9 +27,9 @@ import { companies } from "./companies.js";
  * - `props` is the free-form property bag the ontology schema editor (屏 3)
  *   defines on the type. Storing it per-row keeps the table generic — the
  *   schema is on `ontology_types`, the values are here.
- * - This table is the destination for the deprecated `external_objects` table
- *   (wave250 backfill); the old table stays read-only behind a `deprecated`
- *   alias on this schema.
+/**
+ * @deprecated [DEPRECATED / CORPSE SWEEP] wave250 legacy ontology table (0 references in server/shared).
+ * Kept for backward schema compatibility; do NOT use in new code. Living ontology now uses dynamic projection from core physical tables.
  */
 export const ontologyObjects = pgTable(
   "ontology_objects",

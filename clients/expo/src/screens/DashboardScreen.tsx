@@ -184,7 +184,7 @@ export function DashboardScreen({
         />
         {onBack ? (
           <Pressable style={{ marginTop: 16 }} onPress={onBack}>
-            <Text style={styles.linkText}>‹ 返回任务列表</Text>
+            <Text style={styles.linkText}>‹ 返回</Text>
           </Pressable>
         ) : null}
       </SafeAreaView>
@@ -293,7 +293,7 @@ export function DashboardScreen({
               accessibilityLabel="解除公司紧急熔断"
             >
               <Text style={styles.emergencyResumeBtnText}>
-                {emergencyBusy ? "处理中…" : "解除熔断"}
+                {emergencyBusy ? "处理中…" : "恢复"}
               </Text>
             </Pressable>
           </View>
@@ -313,7 +313,7 @@ export function DashboardScreen({
           >
             <Ionicons name="warning-outline" size={14} color={C.ink} />
             <Text style={styles.emergencyChipText} numberOfLines={1}>
-              {emergencyBusy ? "熔断中…" : "🚨 紧急熔断"}
+              {emergencyBusy ? "熔断中…" : "🚨 熔断"}
             </Text>
           </Pressable>
         ) : null}

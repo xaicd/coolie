@@ -168,7 +168,7 @@ describe("native provider capacity failure persistence", () => {
         interactionResponses: [],
         credentialBindings: [],
       };
-      const event: PrpEvent = {
+      const event: any = {
         schema: "paperclip.prp.event.v1",
         runId,
         normalizedSessionId: native.normalizedSessionId,

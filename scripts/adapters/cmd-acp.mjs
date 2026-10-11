@@ -63,8 +63,12 @@ class CmdAcpAgent {
       promptText = "No task prompt provided.";
     }
 
+    const maxTurns = process.env.COOLIE_MAX_TURNS || null;
     let bin = "cmd";
     let args = ["-p", promptText, "--yolo", "--tools-all", "-t"];
+    if (maxTurns) {
+      args.push("--max-turns", String(maxTurns));
+    }
 
     // Check if cmd is in PATH or host-exec needed
     let cmdFound = false;
@@ -79,7 +83,8 @@ class CmdAcpAgent {
       bin = "/opt/homebrew/bin/cmd";
     } else if (!cmdFound && fs.existsSync("scripts/host-exec.sh")) {
       bin = "bash";
-      args = ["scripts/host-exec.sh", `cmd -p ${JSON.stringify(promptText)} --yolo --tools-all -t < /dev/null`];
+      const maxTurnsFlag = maxTurns ? ` --max-turns ${maxTurns}` : "";
+      args = ["scripts/host-exec.sh", `cmd -p ${JSON.stringify(promptText)} --yolo --tools-all -t${maxTurnsFlag} < /dev/null`];
     }
 
     return new Promise((resolve, reject) => {

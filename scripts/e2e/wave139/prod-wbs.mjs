@@ -7,7 +7,7 @@ import fs from "node:fs";
 const BASE = process.env.WEB_BASE ?? "https://www.xrobinai.cn/XROA";
 const ORIGIN = new URL(BASE).origin;
 const EMAIL = process.env.WEB_EMAIL ?? "robinschen1989@gmail.com";
-const PASSWORD = process.env.WEB_PASSWORD ?? "Cx-TWzbcbpOSLCxb4";
+const PASSWORD = process.env.WEB_PASSWORD || "";
 const CID = process.env.CID ?? "4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e";
 const PID = process.env.PID ?? "b0e465c4-3a06-49e6-93cc-e97ca3eebf9f";
 const STATE = "/tmp/ad-wave139/web-state.json";

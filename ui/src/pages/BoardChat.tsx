@@ -28,7 +28,21 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Activity, Archive, ArrowDown, History, MessageSquarePlus, Pencil, X } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  Activity,
+  Archive,
+  ArrowDown,
+  CheckCircle,
+  GitBranch,
+  History,
+  Laptop,
+  MessageSquarePlus,
+  Pencil,
+  Rocket,
+  Sparkles,
+  X,
+} from "lucide-react";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { ChatComposer, type ChatComposerHandle } from "../components/ChatComposer";
 import {
@@ -48,6 +62,11 @@ import {
   type BuildCardState,
   type BuildStartResponse,
 } from "../components/BuildPlanCard";
+import { FleetPipelineStrip } from "../components/FleetPipelineStrip";
+import {
+  FoundryProposalCard,
+  type FoundryProposalData,
+} from "../components/FoundryProposalCard";
 import { cn, formatDateTime } from "../lib/utils";
 import type { BoardConversation, FeedbackVoteValue, IssueAttachment } from "@paperclipai/shared";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -238,6 +257,9 @@ export function BoardChat({
   /** Coolie fork: build-plan card for "做 xxx" / "build xxx" asks. */
   const [buildCard, setBuildCard] = useState<BuildCardState | null>(null);
   const [boardIssueId, setBoardIssueId] = useState<string | null>(null);
+  /** Coolie fork: commercial delivery proposal card state */
+  const [activeProposal, setActiveProposal] = useState<FoundryProposalData | null>(null);
+  const [proposalBusy, setProposalBusy] = useState(false);
 
   /**
    * wave148: workshop conversations. `activeConversationId` selects which
@@ -368,14 +390,19 @@ export function BoardChat({
 
   // Default the active conversation to the newest (the list is newest-first) and
   // drop a stale selection whose conversation no longer exists (e.g. archived).
+  // If a projectId is provided (e.g. project chat surface), prioritize the conversation
+  // belonging to that project!
   useEffect(() => {
     if (!conversations) return;
-    setActiveConversationId((prev) =>
-      prev && conversations.some((c) => c.id === prev)
-        ? prev
-        : conversations[0]?.id ?? null,
-    );
-  }, [conversations]);
+    setActiveConversationId((prev) => {
+      if (prev && conversations.some((c) => c.id === prev)) return prev;
+      if (projectId) {
+        const projectConv = conversations.find((c) => c.projectId === projectId);
+        if (projectConv) return projectConv.id;
+      }
+      return conversations[0]?.id ?? null;
+    });
+  }, [conversations, projectId]);
 
   const activeConversation = useMemo(
     () => (conversations ?? []).find((c) => c.id === activeConversationId) ?? null,
@@ -754,6 +781,90 @@ export function BoardChat({
     [selectedCompanyId, queryClient, projectId],
   );
 
+  const FOUNDRY_ACTIONS = useMemo(
+    () => [
+      {
+        id: "proposal",
+        title: "商业极速立项",
+        desc: "80/20 开源基座对标 · WBS五步链决策提案",
+        badge: "立项",
+        icon: <Rocket className="h-3.5 w-3.5 text-blue-500" />,
+      },
+      {
+        id: "scouting",
+        title: "开源竞品对标",
+        desc: "调研顶级开源方案 · DAR加权决策矩阵",
+        badge: "对标",
+        icon: <GitBranch className="h-3.5 w-3.5 text-blue-500" />,
+      },
+      {
+        id: "sandbox",
+        title: "真机沙箱试玩",
+        desc: "就地运行交互原型 · 全真体验验收",
+        badge: "沙箱",
+        icon: <Laptop className="h-3.5 w-3.5 text-blue-500" />,
+      },
+      {
+        id: "approval",
+        title: "交付审批核销",
+        desc: "客户终验核销单 · 待办决裁一键处理",
+        badge: "核销",
+        icon: <CheckCircle className="h-3.5 w-3.5 text-emerald-500" />,
+      },
+    ],
+    [],
+  );
+
+  const handleConfirmProposal = useCallback(
+    async (proposal: FoundryProposalData) => {
+      setProposalBusy(true);
+      try {
+        setActiveProposal((prev) => (prev ? { ...prev, status: "confirmed" } : null));
+        await startBuild(`立项 ${proposal.title}`);
+      } catch (e) {
+        setErrorText(e instanceof Error ? e.message : "立项执行失败");
+      } finally {
+        setProposalBusy(false);
+      }
+    },
+    [startBuild],
+  );
+
+  const handleDismissProposal = useCallback((proposal: FoundryProposalData) => {
+    setActiveProposal((prev) => (prev ? { ...prev, status: "dismissed" } : null));
+  }, []);
+
+  const handleFoundryAction = useCallback((id: string) => {
+    if (id === "proposal") {
+      setActiveProposal({
+        id: `proposal-${Date.now()}`,
+        title: "产融智能数字员工运营中台与商业软件全生命周期系统",
+        domainSlug: "fin-corp-ops",
+        targetDescription: "打造企业级端到端商业软件交付工厂，贯通需求、架构、契约、真机四态验收与投产SOP。",
+        openSourceBase: "ruoyi-all-next + semantica (开源微服务中台与本体网络)",
+        leverageRatio: "🎯 80% 开源成熟能力开箱即用 + 20% 领域核心业务深度自研",
+        darComparison: "DAR 加权评分: ruoyi-all-next(89分) 胜出，相比从零自研交付周期缩短 65%",
+        milestones: [
+          { step: 1, gate: "G1", title: "EARS 规范需求规格说明书 (SRS)", agentName: "墨斗 (FDA)", deliverable: "01-srs.md" },
+          { step: 2, gate: "G2", title: "开源基座集成架构概要设计 (HLD)", agentName: "墨斗 (FDA)", deliverable: "02-hld.md" },
+          { step: 3, gate: "G3", title: "统一 OpenAPI 接口契约与代码构建", agentName: "铁匠 (SWE)", deliverable: "03-lld-api.md" },
+          { step: 4, gate: "G4", title: "真机四态快照与全栈集成验收报告", agentName: "门神 (FDSE)", deliverable: "04-test-report.md" },
+          { step: 5, gate: "G5", title: "不可变发版指纹与秒级回滚 SOP", agentName: "兑底渊 (SRE)", deliverable: "05-deploy-sop.md" },
+          { step: 6, gate: "G6", title: "SLO/SLI 韧性保障与双活容灾演练", agentName: "兑底渊 (SRE)", deliverable: "08-sre.md" },
+          { step: 7, gate: "G7", title: "多租户治理与日终平账持续运营 SOP", agentName: "百晓生 (DS)", deliverable: "09-operations.md" },
+        ],
+        status: "pending",
+      });
+    } else if (id === "scouting") {
+      setInput("调研行业标杆开源中台与微服务基座，生成 DAR 技术选型加权决策分析矩阵");
+      composerRef.current?.focus();
+    } else if (id === "sandbox") {
+      window.open("/api/plugins/ontology/sandbox", "_blank");
+    } else if (id === "approval") {
+      window.location.hash = "#approvals";
+    }
+  }, []);
+
   // wave148: create a conversation and switch to it immediately.
   const handleCreateConversation = useCallback(async () => {
     const title = newConversationTitle.trim();
@@ -1023,6 +1134,15 @@ export function BoardChat({
               </Tooltip>
             </div>
           </div>
+
+          {/* 数字员工交付舰队流水线横幅 */}
+          <FleetPipelineStrip
+            onConsultEmployee={(emp) => {
+              setInput((prev) => `@${emp.name} ${prev}`.trim());
+              composerRef.current?.focus();
+            }}
+          />
+
           {/* Messages — scroll viewport flush right so the scrollbar sits on the pane/divider edge */}
           <div className="relative min-h-0 min-w-0 flex-1">
           <div
@@ -1032,6 +1152,35 @@ export function BoardChat({
             {/* pb clears the floating glass dock (PAP-131) so the last bubble can
                  scroll fully above the composer. */}
             <div className="flex flex-col gap-4 px-6 pt-3 pb-32">
+              {/* 商业软件交付工厂 · 核心行动卡组 */}
+              {sortedComments.length <= 1 && !sending && (
+                <div className="mx-auto w-full max-w-(--pct-85) my-1 rounded-xl border border-border/80 bg-muted/20 p-3 space-y-2">
+                  <div className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                    <span>商业软件交付工厂 · 核心行动</span>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {FOUNDRY_ACTIONS.map((action) => (
+                      <button
+                        key={action.id}
+                        type="button"
+                        onClick={() => handleFoundryAction(action.id)}
+                        className="flex flex-col items-start gap-1 rounded-lg border border-border/60 bg-card/80 p-2.5 text-left transition hover:border-primary/50 hover:bg-accent cursor-pointer"
+                      >
+                        <div className="flex items-center justify-between w-full">
+                          <div className="flex items-center gap-1.5 font-medium text-xs text-foreground">
+                            {action.icon}
+                            <span>{action.title}</span>
+                          </div>
+                          <Badge variant="outline" className="text-[10px] px-1 py-0">{action.badge}</Badge>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground">{action.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Typing bubble — shown unconditionally until the reveal
                    timer fires, so the animation is guaranteed to be
                    visible even while agent/goal data is still loading. */}
@@ -1052,6 +1201,10 @@ export function BoardChat({
                 );
 
                 const chips: Array<{ label: string; prompt: string }> = [
+                  {
+                    label: "规划特性与波次 (Spec-Kit)",
+                    prompt: `使用 Spec-Kit SDD 规范为 ${companyName} 规划本项目的首期核心特性、需求规格 (SRS) 与波次任务大盘。`,
+                  },
                   {
                     label: "Draft an Organization Brief",
                     prompt: `Draft a one-page Organization Brief for ${companyName} — include our mission, team roster, and first priorities.`,
@@ -1214,6 +1367,16 @@ export function BoardChat({
                   problems={specCard.problems}
                   approvalStatus={specCard.approvalStatus}
                   domainId={specCard.domainId}
+                />
+              )}
+
+              {/* Coolie fork: commercial delivery proposal card */}
+              {activeProposal && (
+                <FoundryProposalCard
+                  proposal={activeProposal}
+                  onConfirm={handleConfirmProposal}
+                  onDismiss={handleDismissProposal}
+                  busy={proposalBusy}
                 />
               )}
 

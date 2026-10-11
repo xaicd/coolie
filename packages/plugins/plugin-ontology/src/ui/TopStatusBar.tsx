@@ -72,15 +72,15 @@ export function TopStatusBar({
       <div className="flex items-center gap-1.5 rounded-full bg-muted/40 px-2 py-0.5 text-(length:--text-nano)">
         <span className="font-medium text-foreground">v{domain?.version ?? "—"}</span>
         {flashing ? (
-          <StatusBadge label={t("已快照", "Snapshotted")} status="ok" />
+          <StatusBadge label={t("已保存", "Saved")} status="ok" />
         ) : (
           <button
             disabled={!domain}
             onClick={() => { void runSnapshot(); }}
-            title={t("对当前 schema 做一个不可变快照", "Take an immutable snapshot of the current schema")}
+            title={t("保存当前本体结构为不可变版本快照", "Save current schema as an immutable snapshot")}
             className="rounded-full bg-primary/10 px-2 py-0.5 font-medium text-primary transition-colors hover:bg-primary/20 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            {t("快照", "Snapshot")}
+            {t("保存", "Save")}
           </button>
         )}
       </div>

@@ -22,15 +22,26 @@ interface GitUrlItem {
 }
 
 // 开发基座：唯一预设，和 App (clients/expo CreateProjectSheet) 保持一致。
-// 基座是「空壳 + 5 默认模块」，不含业务域，客户按标书在其上快速定制。
-// 旧的 4 个全栈/微服务框架预设 (RuoYi-All-Next 全量 / Spring Cloud Alibaba /
-// RuoYi-Vue-Pro / JeecgBoot) 已删除：预装用不上的业务域会拖慢每个项目。
+// 开发基座：采用 ruoyi-all-next Zero-Git-History Hatch 引擎 (npx degit 秒级骨架派生)
+// 支持按 Profile (base/minimal/standard) 极速孵化独立工程，开箱即用 SQLite 与高熵加密。
 const TEMPLATE_PRESETS = [
   {
-    name: "Coolie 开发基座",
+    name: "Coolie 核心底座 (base)",
     url: "https://github.com/xaicd/ruoyi-all-next.git",
-    tag: "5 默认模块 + 客户定制",
-    desc: "内置 SQLite/Prisma/认证/权限/审计，无业务域；客户按标书快速定制",
+    tag: "degit极速派生 · 核心地基",
+    desc: "npx degit 10秒派生，含 shared+system+infra 极轻白板与本地 SQLite",
+  },
+  {
+    name: "Coolie 智能工作台 (minimal)",
+    url: "https://github.com/xaicd/ruoyi-all-next.git",
+    tag: "低代码+AI网关",
+    desc: "核心地基 + online 低代码引擎 + ai / aigw 大模型网关",
+  },
+  {
+    name: "Coolie 全功能中台 (standard)",
+    url: "https://github.com/xaicd/ruoyi-all-next.git",
+    tag: "17域全能力",
+    desc: "全量 17 域与 Expo 跨端移动底座 (BPM/Pay/Mall/CRM/ERP/WMS/MES/IoT)",
   },
 ];
 

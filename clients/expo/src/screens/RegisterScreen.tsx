@@ -156,12 +156,12 @@ export function RegisterScreen({
           {busy ? (
             <ActivityIndicator size="small" color={C.ink} />
           ) : (
-            <Text style={styles.btnPrimaryText}>注册并进入</Text>
+            <Text style={styles.btnPrimaryText}>注册</Text>
           )}
         </Pressable>
 
         <Pressable onPress={onBack} style={styles.linkWrapper}>
-          <Text style={styles.link}>已有账号？返回登录</Text>
+          <Text style={styles.link}>登录</Text>
         </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>

@@ -309,7 +309,7 @@ export function CreateTaskModal({
                         fields.assigneeAgentId === intentResult.recommendedAgent.id && styles.intentActionBtnTextActive,
                       ]}
                     >
-                      {fields.assigneeAgentId === intentResult.recommendedAgent.id ? "✓ 已采纳" : "采纳推荐"}
+                      {fields.assigneeAgentId === intentResult.recommendedAgent.id ? "已选" : "采纳"}
                     </Text>
                   </View>
                 </View>

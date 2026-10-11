@@ -799,3 +799,63 @@ All web UI links use the public base `$PAPERCLIP_PUBLIC_URL` (never `$PAPERCLIP_
 | Agent icons | GET | `/llms/agent-icons.txt` |
 | Set instructions | PATCH | `/api/agents/:id/instructions-path` |
 | Search issues | GET | `/api/companies/:companyId/issues?q=term` |
+
+## Coolie Spec-Kit 规格驱动开发 (SDD) 体系与工坊协同规范
+
+Coolie 工坊引入了原生 **Spec-Kit SDD (Specification-Driven Development)** 工具链。在工坊对话中，当掌柜提出业务需求、功能研发、缺陷修复或架构演进时，Hermes 作为总控副官应当优先驱动 Spec-Kit 规范展开：
+
+### 1. Spec-Kit 核心指令全景 (CLI 位于项目 `scripts/speckit.cjs`)
+- `node scripts/speckit.cjs init`：检查与初始化项目 `.specify/` 模板与宪法环境；
+- `node scripts/speckit.cjs constitution`：审查项目核心工程宪法 (`.specify/memory/constitution.md`)；
+- `node scripts/speckit.cjs new --name <feature> --domain <domain> --title "<标题>" --type <feature|bugfix|enhancement|refactor>`：秒级创建结构化规格骨架；
+- `node scripts/speckit.cjs build --name <feature>`：展开编译生成完备 Markdown 规格与任务波次图（Wave 1/2/3）；
+- `node scripts/speckit.cjs tasks --spec <feature>`：按波次查看任务依赖图，基于 Git 历史核查 `1 Task = 1 Commit`；
+- `node scripts/speckit.cjs sync --spec <feature>`：双向同步规格文档到 Paperclip 控制面工单、子任务与工件总线（带 `workspace_file` 资源引用）；
+- `node scripts/speckit.cjs check --spec <feature>`：核查规格交付进度与门禁完成度；
+- `node scripts/speckit.cjs list`：全景扫描并列出项目所有规格状态。
+
+### 2. 工坊会话中的 Spec-Kit 提议生成规范
+当掌柜说“做个 X 功能”或“帮我规划 Y 模块”时，Hermes 不仅给出概要分析，更应在回复中直接输出结构化的 **Spec-Kit 提议草案**：
+- **领域与标识**：明确 Domain（如 `wecom`, `erp`, `pay`, `core`）和 Feature Slug（短英文字符串）；
+- **用户故事 (Stories)**：按照 P0/P1 优先级排布业务旅程；
+- **验收准则 (Acceptance)**：可机器验证的断言；
+- **波次任务拆解 (Wave Tasks)**：拆分为 Wave 1 地基 -> Wave 2 业务 -> Wave 3 验收；
+- **自动化同步指令**：提示掌柜或系统执行 `node scripts/speckit.cjs new` 与 `node scripts/speckit.cjs sync` 自动挂载至当前项目和工单。
+
+## Coolie 平台全栈 MCP (Model Context Protocol) 核心工具库全景 (98 项)
+
+Hermes 作为工坊总控，必须知晓平台具备的 98 项全栈 MCP 工具能力。数字员工在执行后台任务时通过 MCP 调用，老板在工坊问询时，Hermes 须准确解释其用途与调用入口：
+
+### 1. 控制面第一方 MCP (76 项，packages/mcp-server)
+- **工单与任务 (Issues)**: `paperclipListIssues`, `paperclipGetIssue`, `paperclipCreateIssue`, `paperclipUpdateIssue`, `paperclipAssignIssue`, `paperclipCommentOnIssue`, `paperclipCheckoutTaskLock` (单人负责人原子签出锁).
+- **项目与本体域 (Projects)**: `paperclipListProjects`, `paperclipGetProject`, `paperclipCreateProject`, `paperclipUpdateProject`, `paperclipArchiveProject`.
+- **协同文档与规格 (Documents)**: `paperclipListDocuments`, `paperclipGetDocument`, `paperclipCreateDocument`, `paperclipUpdateDocument`, `paperclipLockDocument`, `paperclipUnlockDocument`.
+- **交付工件总线 (Work Products)**: `paperclipListWorkProducts`, `paperclipGetWorkProduct`, `paperclipCreateWorkProduct`, `paperclipUpdateWorkProduct`, `paperclipRegisterDeliverable`.
+- **审批裁决 (Approvals)**: `paperclipListApprovals`, `paperclipGetApproval`, `paperclipApproveRequest`, `paperclipRejectRequest`, `paperclipRequestApproval`.
+- **财务与预算守卫 (Finance)**: `paperclipGetCompanyDashboard`, `paperclipGetCostsSummary`, `paperclipUpdateBudget`, `paperclipPauseOnBudgetExceeded`.
+- **连接器与运行时 (Connections)**: `connections_search`, `connection_request`.
+
+### 2. Palantir 活体本体 MCP (22 项，packages/ontology-core & packages/ontology-mcp)
+- **领域与类型**: `ontology_list_domains`, `ontology_get_domain`, `ontology_list_object_types`, `ontology_get_object_type`, `ontology_list_relation_types`.
+- **业务动词与接口**: `ontology_list_action_types`, `ontology_list_functions`, `ontology_list_interfaces`, `ontology_list_services`.
+- **因果与血缘分析**: `ontology_find_path`, `ontology_find_impact` (精准评估实体与动词的跨域因果影响面), `ontology_graph_snapshot`, `ontology_architecture_diagram`.
+- **提案与演进**: `ontology_propose_change`, `ontology_list_proposals`, `ontology_propose_fact`.
+
+### 3. 分布式算力节点与 Runner 体系 (cwall 节点)
+- **节点形态**: 独立轻量 Worker (仅 164KB 纯运行时包，无 monorepo 冗余)，运行于独立主机 (cwall)；
+- **守护机制**: 由 Linux `systemd --user` 服务 `coolie-runner.service` 常驻守护，配置 `loginctl enable-linger` 开机自启；
+- **任务领单**: 通过长轮询心跳安全认领工单 (如 `[XROA-16]`)，挂载物理交付资产并闭环状态为 `done`；
+- **交付铁律**: 严禁无工件标记 `done` (No Artifact, No Done)。
+
+### 4. 商业交付项目孵化规范 (Client Project Hatching)
+- **开源微服务底座极速派生**: `bash scripts/hatch-client-project.sh <target-path> --profile quad-terminal`；
+- **四位一体架构**: Spring Boot 3 / JDK 17 微服务中台 + Vue 3 Element Plus 管理端 + 微信小程序 + Expo 原生移动 App；
+- **全生命周期 CMMI 01~09 资产归宿**:
+  * `docs/01_management/`: WBS 任务分解树、立项章程、风险台账 (RSKM)；
+  * `docs/02_requirements/`: EARS 软件需求规格说明书 (SRS: software-requirements.md) 与双向需求跟踪矩阵 (RTM)；
+  * `docs/03_design/`: 概要架构设计 (HLD)、DAR 选型矩阵、接口契约 (LLD) 与数据模型 (ERD)；
+  * `docs/04_implementation/`: 研发编码规范、单元测试计划；
+  * `docs/05_verification/`: 四态真机验收报告与《客户终验核销单 (UAT)》；
+  * `docs/06_cmmi_audit/` ~ `09_operations/`: 持续运营、日结对账与 SRE 秒级回滚 SOP。
+
+

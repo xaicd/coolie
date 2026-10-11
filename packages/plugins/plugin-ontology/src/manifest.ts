@@ -45,7 +45,7 @@ const manifest: PaperclipPluginManifestV1 = {
   database: {
     namespaceSlug: "ontology",
     migrationsDir: "migrations",
-    coreReadTables: ["companies"],
+    coreReadTables: ["companies", "agents", "projects", "issues"],
   },
   // Derived from the core's catalogue rather than maintained here: a tool
   // declared but not handled, or handled but not declared, is a call an agent

@@ -31,7 +31,7 @@ import {
   updateProjectWorkspaceSchema,
   workspaceRuntimeControlTargetSchema,
 } from "@paperclipai/shared";
-import type { WorkspaceRuntimeDesiredState, WorkspaceRuntimeServiceStateMap } from "@paperclipai/shared";
+import type { WorkspaceRuntimeDesiredState, WorkspaceRuntimeServiceStateMap, CmmiGateKey } from "@paperclipai/shared";
 import { trackProjectCreated } from "@paperclipai/shared/telemetry";
 import { validate } from "../middleware/validate.js";
 import { accessService, issueService, projectService, logActivity, workspaceOperationService } from "../services/index.js";
@@ -58,6 +58,8 @@ import { assertEnvironmentSelectionForCompany } from "./environment-selection.js
 import { environmentService } from "../services/environments.js";
 import { secretService } from "../services/secrets.js";
 import { ensureProjectOntologyDomain } from "../services/project-ontology-bootstrap.js";
+import { ensureProjectBoardConversation } from "../services/project-board-conversation.js";
+import { advanceProjectCmmiStage } from "../services/project-cmmi-wbs-bootstrap.js";
 
 const WORKSPACE_CONTROL_OUTPUT_MAX_CHARS = 256 * 1024;
 const SHARED_WORKSPACE_STOP_AND_RESTART_ACTIONS = new Set(["stop", "restart"]);
@@ -351,6 +353,24 @@ export function projectRoutes(db: Db) {
         icon: project.icon,
         createdBy: actor.actorId,
       });
+
+      // wave365: 项目立项即建工坊 (Project as Workshop Conversation)。
+      // 为新项目原子伴生专属的 Board Conversation（工坊会话）并锚定 Issue，开工即进会议室。
+      let projectChat: Awaited<ReturnType<typeof ensureProjectBoardConversation>> | null = null;
+      try {
+        projectChat = await ensureProjectBoardConversation(tx as unknown as Db, {
+          companyId,
+          projectId: project.id,
+          projectName: project.name,
+          createdByUserId: actor.actorType === "user" ? actor.actorId : null,
+        });
+      } catch (chatErr) {
+        console.warn("[project-board-conversation] Failed to auto-create board conversation:", chatErr);
+      }
+
+      // CMMI 首发需求主线任务 (G1 SRS) 由 ensureProjectBoardConversation 在同一事务内
+      // 幂等引导，解决项目立项后无任务、无工件绑定的断层问题，并让历史项目打开工坊即自愈。
+
       const hydrated = await service.getById(project.id);
       const activity = await persistActivity(tx as unknown as Db, {
         companyId, actorType: actor.actorType, actorId: actor.actorId, agentId: actor.agentId,
@@ -367,6 +387,12 @@ export function projectRoutes(db: Db) {
           ontologyDomain: ontologyDomain.status === "created"
             ? { id: ontologyDomain.domainId, slug: ontologyDomain.slug }
             : { skipped: ontologyDomain.reason },
+          boardConversation: projectChat
+            ? { id: projectChat.conversationId, title: projectChat.title, status: projectChat.status }
+            : null,
+          cmmiWbs: projectChat?.cmmiWbs
+            ? { status: projectChat.cmmiWbs.status, count: projectChat.cmmiWbs.count }
+            : null,
           ...(receiptKey ? { idempotencyKey: receiptKey, fingerprint } : {}),
         },
       });
@@ -646,6 +672,66 @@ export function projectRoutes(db: Db) {
       details: { itemCount: project.wbsDraft.items.length },
     });
     res.status(204).end();
+  });
+
+  // ── wave366: CMMI 阶段因果推进 (Progressive Lifecycle Pipeline Stage Advance) ───
+  // 门禁达成（或掌柜/数字员工推进）时，按因果流转激活下一阶段的 WBS 任务与工件总线
+  router.post("/companies/:companyId/projects/:projectId/stage/advance", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    const projectId = req.params.projectId as string;
+    assertCompanyAccess(req, companyId);
+    const project = await loadWbsProject(req, res, companyId, projectId);
+    if (!project) return;
+
+    const completedGate = req.body?.completedGate as string | undefined;
+    const validGates: readonly string[] = [
+      "gate_g1_spec",
+      "gate_g2_arch",
+      "gate_g3_compile",
+      "gate_g4_eval",
+      "gate_g5_release",
+      "gate_g6_sre",
+      "gate_g7_ops",
+    ];
+    if (!completedGate || !validGates.includes(completedGate)) {
+      res.status(400).json({
+        error: `Invalid or missing completedGate. Expected one of: ${validGates.join(", ")}`,
+      });
+      return;
+    }
+
+    const actor = getActorInfo(req);
+    const actorUserId = actor.actorType === "user" ? actor.actorId : null;
+
+    try {
+      const advanceResult = await advanceProjectCmmiStage(db, {
+        companyId,
+        projectId,
+        completedGate: completedGate as CmmiGateKey,
+        actorUserId,
+      });
+
+      await logActivity(db, {
+        companyId,
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        agentId: actor.agentId,
+        runId: actor.runId,
+        action: "project.stage_advanced",
+        entityType: "project",
+        entityId: project.id,
+        details: {
+          completedGate,
+          status: advanceResult.status,
+          count: advanceResult.count,
+          issueIds: advanceResult.status === "created" ? advanceResult.issueIds : [],
+        },
+      });
+
+      res.status(200).json(advanceResult);
+    } catch (err: any) {
+      res.status(400).json({ error: err.message || "Failed to advance CMMI stage" });
+    }
   });
 
   // Auto-recognize an uploaded requirement doc so the create-project flow can

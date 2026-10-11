@@ -81,6 +81,10 @@
     "paperclipListSchedulerHeartbeats",
     "paperclipEmergencyStopCompany",
     "paperclipEmergencyResumeCompany",
+    "paperclipGetCompanyOntologyGraph",
+    "paperclipGetCompanyOntologyStats",
+    "paperclipListPluginTools",
+    "paperclipExecutePluginTool",
     "spec_create",
     "spec_tree",
     "spec_template_apply"

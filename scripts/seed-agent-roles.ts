@@ -40,6 +40,7 @@ interface RoleProfile {
   tools: string[];
   /** 平台适配器类型 (如 hermes_local, gemini_local, claude_local, process 等). */
   adapterType?: string;
+  adapterConfig?: Record<string, unknown>;
 }
 
 interface NameMatcher {
@@ -100,6 +101,7 @@ const MATCHERS: NameMatcher[] = [
       skills: ["命令", "脚本", "自动化", "部署", "联调", "测试", "调研", "文档"],
       tools: ["cmd", "claude-mm"],
       adapterType: "process",
+      adapterConfig: { command: "cmd" },
     },
   },
   {
@@ -112,7 +114,8 @@ const MATCHERS: NameMatcher[] = [
       responsibilities: ["画原型", "选型研判", "License 梳理", "本体域规划"],
       skills: ["调研", "画图", "选型", "研判", "文档", "设计", "立项", "规划"],
       tools: ["agy-gemini3.8", "cmd"],
-      adapterType: "gemini_local",
+      adapterType: "agy_local",
+      adapterConfig: { agentCommand: "scripts/adapters/docker-agy-acp.sh" },
     },
   },
   {
@@ -126,6 +129,7 @@ const MATCHERS: NameMatcher[] = [
       skills: ["部署", "运维", "监控", "应急", "自动化", "脚本", "命令", "风控"],
       tools: ["copilot", "claude-mm"],
       adapterType: "process",
+      adapterConfig: { command: "copilot" },
     },
   },
   // ===== 百晓生 (DS) =====
@@ -200,6 +204,7 @@ async function main() {
       skills: profile.skills,
       tools: profile.tools,
       status: "idle",
+      errorReason: null,
     };
     if (profile.title) {
       updateValues.title = profile.title;
@@ -212,6 +217,9 @@ async function main() {
     }
     if (profile.adapterType) {
       updateValues.adapterType = profile.adapterType;
+    }
+    if (profile.adapterConfig) {
+      updateValues.adapterConfig = profile.adapterConfig;
     }
 
     await db

@@ -3,7 +3,7 @@
  * [SYS_CHANRONG_AGENT] G2 架构隔离与治理门禁校验脚本
  *
  * 对应门禁: gate_g2_arch  (cmmi-profile.json → gates.g2)
- * 受检文档: docs/cmmi/02-hld.md
+ * 受检文档: docs/03_design/architecture-design-hld.md (标准规范基线, 回退 docs/cmmi/02-hld.md)
  * 主责角色: emp_fda (前线架构师) / 技能: cmmi-tech-solution
  *
  * 背景: `cmmi-profile.json` 一直把 g2 指向本文件名,但仓库里从未提供该脚本,
@@ -13,20 +13,26 @@
  *   1. 架构分层清晰,对外契约明确
  *   2. 企业/租户数据隔离机制有强制防线
  *   3. 关键技术选型附带 DAR 加权评估矩阵(而非仅文字对比)
- *   4. 01-srs.md 的每条需求都在 HLD 的选型落地表中登记
+ *   4. SRS 的每条需求都在 HLD 的选型落地表中登记
  */
 import fs from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const hldPath = path.resolve(root, "docs/cmmi/02-hld.md");
-const srsPath = path.resolve(root, "docs/cmmi/01-srs.md");
+const hldPath = [
+  path.resolve(root, "docs/03_design/architecture-design-hld.md"),
+  path.resolve(root, "docs/cmmi/02-hld.md"),
+].find((p) => fs.existsSync(p));
+const srsPath = [
+  path.resolve(root, "docs/02_requirements/software-requirements.md"),
+  path.resolve(root, "docs/cmmi/01-srs.md"),
+].find((p) => fs.existsSync(p));
 
 const failures = [];
 const notes = [];
 
-if (!fs.existsSync(hldPath)) {
-  console.error("❌ G2 门禁失败: 未找到 docs/cmmi/02-hld.md 概要设计说明书。");
+if (!hldPath || !fs.existsSync(hldPath)) {
+  console.error("❌ G2 门禁失败: 未找到 docs/03_design/architecture-design-hld.md 概要设计说明书。");
   process.exit(1);
 }
 const hld = fs.readFileSync(hldPath, "utf-8");
@@ -59,7 +65,7 @@ const criteriaHit = ["权重"].some((k) => hld.includes(k));
 if (!criteriaHit) failures.push("DAR 矩阵缺少评价准则权重列。");
 
 // 4. 需求覆盖:01-srs.md 的每条 REQ 必须在 HLD 选型落地表中登记
-if (fs.existsSync(srsPath)) {
+if (srsPath && fs.existsSync(srsPath)) {
   const srs = fs.readFileSync(srsPath, "utf-8");
   const reqIds = [...new Set((srs.match(/REQ-CR-\d{3}/g) ?? []))].sort();
   if (reqIds.length === 0) {

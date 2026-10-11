@@ -834,7 +834,7 @@ function projectInit(options = {}) {
   
   // 1. 重写 package.json 与应用名称
   // 2. 配置 SQLite WAL 数据库连接与 8 大审计底座字段
-  // 3. 注入超级管理员账号 supervip
+  // 3. 注入高熵安全管理员账号 supervip (凭据持久化于 .env.local，杜绝 admin/123456 等弱口令)
   // 4. 运行 10 大 SpaceX 质量门禁守卫
   console.log("[FOUNDRY] 门禁自检: npm run check 10/10 PASS!");
 }

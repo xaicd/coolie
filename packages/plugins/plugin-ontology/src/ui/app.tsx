@@ -44,6 +44,8 @@ import { BootstrapPanel } from "./BootstrapPanel.js";
 import { t } from "./isZh.js";
 import { LegacyImportWizardModal, type ParsedSource } from "./LegacyImportWizardModal.js";
 import { DatasetsTab } from "./DatasetsTab.js";
+import { EventsTab } from "./EventsTab.js";
+import { CallChainTab } from "./CallChainTab.js";
 import { ConnectorsTab } from "./ConnectorsTab.js";
 import { TransformsTab } from "./TransformsTab.js";
 import { applyOperations, type MutationCall } from "../aide/editOps.js";
@@ -246,24 +248,29 @@ export function OntologyPage({ context }: PluginPageProps): ReactElement {
   return <OntologyWorkbench companyId={companyId} />;
 }
 
-type WorkbenchView = "graph" | "table" | "schema" | "cognition" | "capabilities" | "dialogue" | "sandbox" | "actions" | "functions" | "interfaces" | "datasets" | "connectors" | "transforms" | "domains" | "manage";
-type WorkbenchGroup = "data-flow" | "assets" | "ops";
+type WorkbenchView = "graph" | "table" | "schema" | "callchain" | "actions" | "events" | "cognition" | "capabilities" | "dialogue" | "sandbox" | "functions" | "interfaces" | "datasets" | "connectors" | "transforms" | "domains" | "manage";
+type WorkbenchGroup = "data-flow" | "ops";
 
 /**
  * View layout — split into primary (always visible in the top row) and
- * groups (collapsed into 3 chip-style menus: 数据流 / 资产 / 运维).
+ * groups (collapsed into 2 clean pipeline menus: 数据流 / 运维).
  *
- * The original 14-tab horizontal strip overflowed a 1280px viewport on
- * this plugin's cockpit; users reported it as "太密集". Grouping keeps
- * the top bar under 6 chrome elements and pushes the long tail into a
- * sub-tab strip that renders *inside* the content area when a group
- * is active. Selecting a primary view also closes any open group so
- * only one mode is visible at a time.
+ * Core living-ontology pillars (Graph, Table, Schema, Actions, Events, Cockpit)
+ * are elevated to primary views to enforce the Object + Action + Event closed loop.
+ *
+ * Confusing technical grab-bags like "资产" (with cognition/capabilities/dialogue)
+ * have been audited and removed/simplified:
+ * - Code reverse-engineering ("认知") is properly placed under 运维 as "代码导入".
+ * - Fake placeholders ("对话") and isolated dead-ends ("能力缺口") are completely purged.
+ * - Action types remain first-class in primary views.
  */
 const PRIMARY_VIEWS: { id: WorkbenchView; label: string; icon: string }[] = [
   { id: "graph", label: t("图谱", "Graph"), icon: "⬡" },
   { id: "table", label: t("表格", "Table"), icon: "⊞" },
   { id: "schema", label: t("结构", "Schema"), icon: "⊙" },
+  { id: "callchain", label: t("因果", "CallChain"), icon: "🔗" },
+  { id: "actions", label: t("动作", "Actions"), icon: "⚙" },
+  { id: "events", label: t("事件", "Events"), icon: "⚡" },
   { id: "sandbox", label: t("驾驶", "Cockpit"), icon: "🤝" },
 ];
 
@@ -284,26 +291,12 @@ const VIEW_GROUPS: {
     ],
   },
   {
-    id: "assets",
-    label: t("资产", "Assets"),
-    icon: "◈",
-    views: [
-      { id: "cognition", label: t("认知", "Cognition"), icon: "⚡" },
-      { id: "capabilities", label: t("能力", "Capabilities"), icon: "◈" },
-      { id: "actions", label: t("动作", "Actions"), icon: "⚙" },
-      { id: "functions", label: t("函数", "Functions"), icon: "λ" },
-      { id: "interfaces", label: t("接口", "Interfaces"), icon: "⌘" },
-      { id: "dialogue", label: t("对话", "Dialogue"), icon: "💬" },
-    ],
-  },
-  {
     id: "ops",
     label: t("运维", "Ops"),
     icon: "🛠",
     views: [
-      // Listed before 治理: this is the view you reach for when a domain is in the
-      // way, and it used to require the API.
       { id: "domains", label: t("本体域", "Domains"), icon: "◫" },
+      { id: "cognition", label: t("代码导入", "Code Import"), icon: "📥" },
       { id: "manage", label: t("治理", "Manage"), icon: "📋" },
     ],
   },
@@ -1714,12 +1707,22 @@ function DomainWorkspace({
             onImportLegacy={onImportLegacy}
           />
         )}
+        {view === "callchain" && domainId && (
+          <CallChainTab companyId={companyId} domainId={domainId} />
+        )}
         {view === "actions" && (
           <ActionsTab
             companyId={companyId}
             domainId={domainId}
             initialPrefill={actionFormPrefill}
             onConsumePrefill={() => setActionFormPrefill?.(null)}
+          />
+        )}
+        {view === "events" && domainId && (
+          <EventsTab
+            companyId={companyId}
+            domainId={domainId}
+            onNavigateToAction={() => onSelectView("actions")}
           />
         )}
         {view === "functions" && (
@@ -2179,26 +2182,28 @@ function CognitionTab({ companyId }: { companyId: string }): ReactElement {
   return (
     <>
       <div className={CARD}>
-        <div className="mb-1 font-semibold">New cognition job</div>
+        <div className="mb-1 font-semibold">{t("代码逆向导入", "Reverse-engineer from code")}</div>
         <div className="mb-2 text-xs text-muted-foreground">
-          Reverse-engineer an ontology draft from source code (TS/JS/Vue/Py/Go/Java/SQL).
+          {t("从源码仓库 (TS/JS/Vue/Py/Go/Java/SQL) 扫描逆向生成实体与属性草稿。", "Reverse-engineer an ontology draft from source code (TS/JS/Vue/Py/Go/Java/SQL).")}
         </div>
-        <input className={INPUT} placeholder="app name (optional)" value={appName} onChange={(e) => setAppName(e.target.value)} />
-        <input className={INPUT} placeholder="root path (e.g. .)" value={rootPath} onChange={(e) => setRootPath(e.target.value)} />
-        <button className={BTN} disabled={busy} onClick={submit}>
-          {busy ? "…" : t("创建","Create")}
-        </button>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <input className={INPUT + " w-44"} placeholder={t("模块名 (可选)", "module name (optional)")} value={appName} onChange={(e) => setAppName(e.target.value)} />
+          <input className={INPUT + " min-w-44 flex-1"} placeholder={t("源码根路径 (如 .)", "root path (e.g. .)")} value={rootPath} onChange={(e) => setRootPath(e.target.value)} />
+          <button className={BTN} disabled={busy} onClick={submit}>
+            {busy ? "…" : t("扫描", "Scan")}
+          </button>
+        </div>
         {err && <div className="mt-2 text-sm text-muted-foreground">{err}</div>}
       </div>
 
       <DataTable
         loading={loading}
-        emptyMessage={error ? `Failed: ${error.message}` : "No cognition jobs yet."}
+        emptyMessage={error ? `${t("失败", "Failed")}: ${error.message}` : t("暂无代码导入任务。", "No code import jobs yet.")}
         rows={jobs as unknown as Record<string, unknown>[]}
         columns={[
           {
             key: "app_name",
-            header: "Job",
+            header: t("任务", "Job"),
             render: (_v, row) => (
               <button className={GHOST_BTN} onClick={() => setOpenJobId((row as unknown as CognitionJob).id)}>
                 {(row as unknown as CognitionJob).app_name || (row as unknown as CognitionJob).job_key}
@@ -3512,6 +3517,18 @@ function DomainDetailModal({
               ⊙ {t("结构", "Schema")}
             </button>
             <button
+              onClick={() => { onClose(); onOpenGraph(domain.id, "actions"); }}
+              className="flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:border-primary hover:text-primary transition-colors"
+            >
+              ⚙ {t("动作", "Actions")}
+            </button>
+            <button
+              onClick={() => { onClose(); onOpenGraph(domain.id, "events"); }}
+              className="flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1 text-xs font-medium text-foreground hover:border-primary hover:text-primary transition-colors"
+            >
+              ⚡ {t("事件", "Events")}
+            </button>
+            <button
               onClick={() => { onClose(); onOpenGraph(domain.id, "sandbox"); }}
               className="flex items-center gap-1 rounded-md border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-400 hover:bg-amber-500/20 transition-colors"
             >
@@ -3734,7 +3751,7 @@ function DomainList({
     const rowBusy = busyRowId === d.id;
     const next = DOMAIN_STATE_TRANSITIONS[d.lifecycle_state as DomainLifecycleState] ?? [];
     return (
-      <div className="flex w-full items-center justify-end gap-1 overflow-x-auto whitespace-nowrap py-0.5 [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]">
+      <div className="flex w-full items-center justify-start gap-1 overflow-x-auto whitespace-nowrap py-0.5 [scrollbar-width:thin] [-webkit-overflow-scrolling:touch]">
         {/* 【详情】 button */}
         <button
           className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:border-primary hover:text-primary"
@@ -3773,6 +3790,26 @@ function DomainList({
         >
           <span className="text-[11px] leading-none">⊙</span>
           {t("结构", "Schema")}
+        </button>
+
+        {/* 【动作】 (Actions) button */}
+        <button
+          className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+          onClick={() => onOpenGraph(d.id, "actions")}
+          title={t("查看并编排此本体域的业务动作 (Action Types)", "Open domain action types")}
+        >
+          <span className="text-[11px] leading-none">⚙</span>
+          {t("动作", "Actions")}
+        </button>
+
+        {/* 【事件】 (Events) button */}
+        <button
+          className="flex shrink-0 items-center gap-1 rounded-md border border-border bg-card px-2 py-0.5 text-(length:--text-nano) font-medium text-foreground transition-colors hover:border-primary hover:text-primary disabled:opacity-50"
+          onClick={() => onOpenGraph(d.id, "events")}
+          title={t("查看此本体域的事件流、触发规则与审计账本", "Open domain events & audit stream")}
+        >
+          <span className="text-[11px] leading-none">⚡</span>
+          {t("事件", "Events")}
         </button>
 
         {/* 【驾驶】 (Cockpit) button */}
@@ -4219,7 +4256,7 @@ function DomainList({
               {
                 key: "actions",
                 header: t("操作", "Actions"),
-                width: "minmax(380px, 1fr)",
+                width: "minmax(420px, 1fr)",
                 render: (_v, row) => renderDomainActions(row as unknown as OntologyDomain),
               },
             ]}

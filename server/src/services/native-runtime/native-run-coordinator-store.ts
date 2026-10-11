@@ -204,11 +204,12 @@ export class NativeRunCoordinatorStore {
     const validated = validatePrpEvent(value);
     if (!validated.ok) throw new Error("native_event_schema_invalid");
     const event = validated.event;
+    const evAny = event as any;
     if (
-      event.runId !== this.#binding.runId ||
-      event.normalizedSessionId !== this.#binding.normalizedSessionId ||
-      event.sourceKind !== "runner" ||
-      event.sourceInstanceId !== this.#binding.runnerSourceInstanceId
+      evAny.runId !== this.#binding.runId ||
+      evAny.normalizedSessionId !== this.#binding.normalizedSessionId ||
+      evAny.sourceKind !== "runner" ||
+      evAny.sourceInstanceId !== this.#binding.runnerSourceInstanceId
     ) {
       throw new Error("native_event_binding_mismatch");
     }
@@ -298,15 +299,15 @@ export class NativeRunCoordinatorStore {
           runId: this.#binding.runId,
           agentId: this.#binding.agentId,
           seq: cursor,
-          eventType: event.eventType,
+          eventType: evAny.eventType,
           stream: "system",
-          level: event.eventType.includes("failed") ? "error" : "info",
+          level: String(evAny.eventType).includes("failed") ? "error" : "info",
           payload: { prpEvent: canonicalPayload },
-          sourceInstanceId: event.sourceInstanceId,
-          sourceEventId: event.sourceEventId,
-          sourceSeq: event.sourceSeq,
+          sourceInstanceId: evAny.sourceInstanceId,
+          sourceEventId: evAny.sourceEventId,
+          sourceSeq: evAny.sourceSeq,
           sourcePayloadSha256: payloadDigest,
-          protocolSchemaVersion: event.schemaVersion,
+          protocolSchemaVersion: evAny.schemaVersion,
         })
         .returning({ seq: heartbeatRunEvents.seq });
       if (!inserted) throw new Error("native_event_not_persisted");
@@ -434,11 +435,12 @@ export class NativeRunCoordinatorStore {
     readonly disposition: "committed" | "duplicate";
     readonly resultId: string;
   } | null> {
-    if (event.eventType !== "run.terminal") return null;
+    const evAny = event as any;
+    if (evAny.eventType !== "run.terminal") return null;
     if (
-      event.runId !== this.#binding.runId ||
-      event.normalizedSessionId !== this.#binding.normalizedSessionId ||
-      event.sourceInstanceId !== this.#binding.runnerSourceInstanceId
+      evAny.runId !== this.#binding.runId ||
+      evAny.normalizedSessionId !== this.#binding.normalizedSessionId ||
+      evAny.sourceInstanceId !== this.#binding.runnerSourceInstanceId
     ) {
       throw new Error("native_terminal_binding_mismatch");
     }

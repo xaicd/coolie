@@ -90,3 +90,42 @@ describe("the role vocabulary", () => {
     expect(knownRoles(["modeler", "admin", "reviewer", ""])).toEqual(["modeler", "reviewer"]);
   });
 });
+
+describe("memberStore integration with digital employees (agents)", () => {
+  it("projects agents from public.agents as first-class Digital Employees", async () => {
+    const { createMemberStore } = await import("@paperclipai/ontology-core/auth/memberStore.js");
+    const mockDb: any = {
+      namespace: "plugin_ontology",
+      query: async (queryText: string, params?: any[]) => {
+        if (queryText.includes("public.agents")) {
+          const all = [
+            { id: "agent-1", company_id: "t-1", name: "墨斗", role: "fda", title: "前线架构师", status: "idle" },
+            { id: "agent-2", company_id: "t-1", name: "铁匠", role: "core-swe", title: "平台核心研发", status: "idle" },
+          ];
+          if (params && params[1]) {
+            return all.filter((a) => a.id === params[1]);
+          }
+          return all;
+        }
+        return [];
+      },
+      execute: async () => ({ rowCount: 1 }),
+    };
+
+    const store = createMemberStore(mockDb);
+    const members = await store.list("t-1");
+    expect(members).toHaveLength(2);
+    expect(members[0].id).toBe("agent-1");
+    expect(members[0].actor_ref).toBe("agent:agent-1");
+    expect(members[0].display_name).toBe("墨斗 (前线架构师)");
+    expect(members[0].roles).toEqual(["fda"]);
+    expect(members[0].status).toBe("active");
+
+    const single = await store.getById("t-1", "agent-1");
+    expect(single?.display_name).toBe("墨斗 (前线架构师)");
+
+    const byRef = await store.getByRef("t-1", "agent:agent-2");
+    expect(byRef?.display_name).toBe("铁匠 (平台核心研发)");
+  });
+});
+

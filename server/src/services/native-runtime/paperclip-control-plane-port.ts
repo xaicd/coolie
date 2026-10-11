@@ -40,10 +40,11 @@ export interface PaperclipControlPlaneBinding {
 }
 
 function isPrpEvent(value: NativeRunEvent | PrpEvent): value is PrpEvent {
-  return "schema" in value && [
+  const v = value as any;
+  return "schema" in v && [
     "paperclip.prp.event.v1",
     "paperclip.prp.event.v2",
-  ].includes(value.schema);
+  ].includes(v.schema);
 }
 
 function isCompleteInput(value: NativeRunResult | CompleteControlPlaneRunInput): value is CompleteControlPlaneRunInput {
@@ -184,28 +185,29 @@ export class PaperclipControlPlanePort implements ControlPlanePort {
     const validated = validatePrpEvent(value);
     if (!validated.ok) throw new Error(`native_event_schema_invalid:${validated.issues[0]?.message ?? "unknown"}`);
     const event = validated.event;
-    if (event.runId !== this.#binding.runId || (this.#sessionId && event.normalizedSessionId !== this.#sessionId)) {
+    const evAny = event as any;
+    if (evAny.runId !== this.#binding.runId || (this.#sessionId && evAny.normalizedSessionId !== this.#sessionId)) {
       throw new Error("native_event_binding_mismatch");
     }
-    const expectedSourceInstanceId = event.sourceKind === "control_plane"
+    const expectedSourceInstanceId = evAny.sourceKind === "control_plane"
       ? this.#binding.controlPlaneSourceInstanceId
       : this.#binding.sourceInstanceId;
-    if (event.sourceInstanceId !== expectedSourceInstanceId) {
+    if (evAny.sourceInstanceId !== expectedSourceInstanceId) {
       throw new Error("native_event_source_binding_mismatch");
     }
     const persisted = await appendHeartbeatRunEvent(this.#db, {
       companyId: this.#binding.companyId,
       runId: this.#binding.runId,
       agentId: this.#binding.agentId,
-      eventType: event.eventType,
+      eventType: evAny.eventType,
       stream: "system",
-      level: event.eventType.includes("failed") ? "error" : "info",
+      level: String(evAny.eventType).includes("failed") ? "error" : "info",
       payload: { prpEvent: event as unknown as Record<string, unknown> },
       nativeSource: {
-        sourceInstanceId: event.sourceInstanceId,
-        sourceEventId: event.sourceEventId,
-        sourceSeq: event.sourceSeq,
-        protocolSchemaVersion: event.schemaVersion,
+        sourceInstanceId: evAny.sourceInstanceId,
+        sourceEventId: evAny.sourceEventId,
+        sourceSeq: evAny.sourceSeq,
+        protocolSchemaVersion: evAny.schemaVersion,
         canonicalPayload: event as unknown as Record<string, unknown>,
       },
     });
@@ -216,7 +218,7 @@ export class PaperclipControlPlanePort implements ControlPlanePort {
         runId: this.#binding.runId,
         agentId: this.#binding.agentId,
         seq: persisted.row.seq,
-        eventType: event.eventType,
+        eventType: evAny.eventType,
       });
       await this.#onCommittedEvent?.(event);
     } else {

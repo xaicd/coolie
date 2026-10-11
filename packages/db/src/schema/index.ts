@@ -65,6 +65,8 @@ export {
 } from "./chat_channels.js";
 export { issueRelations } from "./issue_relations.js";
 export { entityRelations } from "./entity_relations.js";
+// [DEPRECATED / CORPSE SWEEP] wave250 legacy ontology schemas (0 references in server/shared).
+// Kept for backward schema compatibility; do NOT use in new code. Living ontology now uses dynamic projection.
 export { ontologyProperties } from "./ontology_properties.js";
 export { ontologyObjects } from "./ontology_objects.js";
 export { ontologyTypes } from "./ontology_types.js";

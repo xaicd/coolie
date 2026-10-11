@@ -1,0 +1,39 @@
+{
+  "feature": "init-baseline",
+  "domain": "core",
+  "type": "feature",
+  "created": "2026-10-10T05:31:53.179Z",
+  "baselineFrozenAt": "2026-10-11T00:00:00.000Z",
+  "status": "BASELINE_FROZEN",
+  "baselineVersion": "v1.0.0-BASELINE",
+  "artifacts": {
+    "requirements": "docs/02_requirements/software-requirements.md",
+    "hld": "docs/03_design/architecture-design-hld.md",
+    "erd": "docs/03_design/database-design-erd.md",
+    "specPackage": "docs/specs/core/init-baseline/",
+    "releaseNotes": "docs/07_release/release-notes.md",
+    "configurationAudit": "docs/06_quality_assurance/configuration-audit.md",
+    "gateEvidence": "docs/artifacts/baseline-gate-evidence.json"
+  },
+  "cmmiTopology": {
+    "complete": true,
+    "stages": ["01_management", "02_requirements", "03_design", "04_implementation", "05_verification", "06_quality_assurance", "07_release", "08_sre", "09_operations"],
+    "note": "本波次补齐 04_implementation 后，CMMI 01~09 拓扑完整"
+  },
+  "gates": {
+    "g1": "node scripts/verify-reqs.mjs",
+    "g2": "node scripts/check-fork-surface.mjs",
+    "g3": "node scripts/check-contracts.mjs",
+    "g4": "node scripts/run-tests.mjs",
+    "g5": "node scripts/check-release-baseline.mjs"
+  },
+  "gateResults": {
+    "g1": "PASS",
+    "g2": "PASS",
+    "g3": "PASS",
+    "g4": "PASS (空集，待实现阶段补齐真实用例)",
+    "g5": "PASS"
+  },
+  "tasksDone": ["T5"],
+  "frozenBy": "modou-fda"
+}

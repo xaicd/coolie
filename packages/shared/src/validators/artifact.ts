@@ -11,7 +11,7 @@ export const companyArtifactMediaKindSchema = z.enum(["image", "video", "text", 
 export const companyArtifactGroupBySchema = z.enum(["none", "task", "parent_task"]);
 
 export const companyArtifactsQuerySchema = z.object({
-  kind: z.enum(["image", "video", "text", "document", "file", "all"]).optional().default("all"),
+  kind: z.enum(["image", "video", "text", "document", "file", "all", "cmmi_baseline"]).optional().default("all"),
   projectId: z.string().guid().optional(),
   q: z.string().trim().max(COMPANY_ARTIFACTS_MAX_QUERY_LENGTH).optional(),
   groupBy: companyArtifactGroupBySchema.optional().default("none"),

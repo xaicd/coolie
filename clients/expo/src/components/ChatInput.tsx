@@ -246,8 +246,9 @@ export function ChatInput({
     }
   }, [onPickAttachment]);
 
-  const showSend = value.trim().length > 0 && !sending;
-  const canEdit = !sending && !disabled;
+  const showSend = value.trim().length > 0;
+  // 响应中严禁锁定输入框: 用户可自由输入下一句提问、准备附件或切换语音
+  const canEdit = !disabled;
 
   // 微信/飞书动态手势识别器: 宽阔居中按压，支持连续跟手位移
   const panResponder = useMemo(
@@ -588,8 +589,8 @@ export function ChatInput({
           </View>
         )}
 
-        {/* 4. 发送 / 停止按钮 */}
-        {sending && onStop ? (
+        {/* 4. 发送 / 停止按钮: 响应中若输入框为空显示停止方块，输入文字后转为发送箭头支持抢先发出下一问 */}
+        {sending && onStop && !showSend ? (
           <Pressable
             onPress={onStop}
             hitSlop={6}

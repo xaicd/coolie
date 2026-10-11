@@ -16,7 +16,11 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 PORT="${COOLIE_DEV_PORT:-3100}"
 HOST_API_BASE="http://127.0.0.1:$PORT"
 
-export PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/bin:$PATH"
+for bin_dir in "/opt/homebrew/bin" "/usr/local/bin" "$HOME/.local/bin" "$HOME/bin"; do
+  if [[ -d "$bin_dir" ]] && [[ ":$PATH:" != *":$bin_dir:"* ]]; then
+    export PATH="$bin_dir:$PATH"
+  fi
+done
 
 echo "=================================================================="
 echo "🚀 [Coolie Dev] 开始一键部署与初始化本地开发与派单体系..."
@@ -60,6 +64,47 @@ chmod +x "$REPO_ROOT/scripts/adapters/"*.sh 2>/dev/null || true
 if [[ -d "$HOME/.claude/agents" ]]; then
   rm -f "$HOME/.claude/agents/"*.md 2>/dev/null || true
   echo "🧹 已清理 ~/.claude/agents/ 历史残留模板，确保 Claude 扁平无嵌套干净运行"
+fi
+
+# 确保 Claude 多模型配置模板与自适应软链接就绪 (遵从 wave272 + wave280 多模型路由法典)
+mkdir -p "$HOME/.claude"
+if [[ ! -f "$HOME/.claude/settings.jsonglm" ]]; then
+  cat > "$HOME/.claude/settings.jsonglm" <<'EOF'
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://open.bigmodel.cn/api/anthropic",
+    "API_TIMEOUT_MS": "3000000",
+    "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1,
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-5-turbo",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1048576",
+    "ANTHROPIC_MODEL": "glm-5"
+  }
+}
+EOF
+  echo "📝 初始化 ~/.claude/settings.jsonglm 模板"
+fi
+
+if [[ ! -f "$HOME/.claude/settings.jsonmm" ]]; then
+  cat > "$HOME/.claude/settings.jsonmm" <<'EOF'
+{
+  "env": {
+    "ANTHROPIC_BASE_URL": "https://api.minimaxi.com/anthropic",
+    "ANTHROPIC_MODEL": "MiniMax-M3",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "MiniMax-M3",
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "MiniMax-M3",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "MiniMax-M3",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "MiniMax-M3"
+  }
+}
+EOF
+  echo "📝 初始化 ~/.claude/settings.jsonmm 模板"
+fi
+
+if [[ ! -e "$HOME/.claude/settings.json" ]]; then
+  ln -sf "$HOME/.claude/settings.jsonmm" "$HOME/.claude/settings.json" 2>/dev/null || true
+  echo "🔗 已建立初始符号链接: ~/.claude/settings.json -> settings.jsonmm"
 fi
 
 # 检查 ACP 客户端可用性
@@ -112,6 +157,11 @@ EXISTING_CRON="$(crontab -l 2>/dev/null || true)"
 if ! printf '%s\n' "$EXISTING_CRON" | grep -q "$CRON_TAG"; then
   printf '%s\n%s\n' "$EXISTING_CRON" "$WATCHDOG_CMD" | grep -v '^$' | crontab -
   echo "✅ 已向 crontab 注册 5 分钟 Runner Bridge 看门狗保活"
+# 7. 运行 7 工具池实时健康探针
+if [[ -f "$SCRIPT_DIR/tool-health-monitor.sh" ]]; then
+  echo ""
+  echo "🩺 [7/7] 运行工具池实时健康探针..."
+  bash "$SCRIPT_DIR/tool-health-monitor.sh" --print 2>/dev/null || true
 fi
 
 echo ""

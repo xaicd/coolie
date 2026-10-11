@@ -67,9 +67,11 @@ git diff HEAD~1 HEAD --stat     # 复核只有白名单
 GIT_SSH_COMMAND='ssh -o ProxyCommand=none' git push origin main
 ```
 
-### 6 回报
+### 6 挂载物理 Work Product 与汇报 (No Artifact, No Done)
 
-`任务 / 根因 / 修改 / 验证 / 产出 / 未做`。
+- 必须挂载真实产物：调用 `skills/paperclip/scripts/paperclip-upload-artifact.sh` 上传 inspectable 附件，或挂载 `commit` / `pull_request` / `artifact` Work Product。
+- 严禁口头声明“做完了”而不挂实体交付物。
+- 回报格式：`任务 / 根因 / 修改 / 验证 / 物理产物链接 / 未做`。
 
 ## 已知坑（编自 PM-FAILURE-CASES）
 
@@ -80,6 +82,7 @@ GIT_SSH_COMMAND='ssh -o ProxyCommand=none' git push origin main
 5. 紧急跳过 typecheck 就发版 → 必跑 `pnpm -r typecheck` + prod 烟测。
 6. 密码进 transcript → 用环境变量/secret 注入，泄露即轮换。
 7. 别人的 WIP 不能动、不能提交。
+8. **无产物点 Done** → 严重违纪，触发治理门禁审计拦截。
 
 ## 验收标准
 
@@ -88,12 +91,14 @@ GIT_SSH_COMMAND='ssh -o ProxyCommand=none' git push origin main
 3. `pnpm -r typecheck` 0 报错，相关测试绿。
 4. commit 只含白名单文件，信息说清因果与验证。
 5. 有状态特性做了写入-回读实证。
+6. **必须挂载物理 Work Product (No Artifact, No Done)**，无不可变实体产物禁止关闭工单。
 
 ## 反例
 
 - 没复现就改，"看起来修好了"。
 - 一个 commit 大扫除。
 - 单测绿就宣布能用。
+- 无 Work Product 挂载直接关闭工单。
 
 ## 关联
 

@@ -50,28 +50,72 @@ import { Pill } from "../ui/Pill";
 import { formatTime } from "../utils/format";
 import { parseInlineTags } from "../components/board-inline/tagParser";
 import { InlinePreviewPanel } from "../components/board-inline/InlinePreviewPanel";
+import { FleetPipelineStrip, type FleetEmployee } from "../components/FleetPipelineStrip";
+import {
+  FoundryProposalCard,
+  type FoundryProposalData,
+} from "../components/FoundryProposalCard";
 
 export interface BoardChatScreenProps {
   company: Company;
   whoami?: string;
   /** 气泡「查看详情」深链: 打开审批裁决页 (companyId + approvalId) */
   onOpenApproval?: (approvalId: string) => void;
+  /** 快捷打开全功能审批中心 (InboxScreen approvals tab) */
+  onOpenApprovals?: () => void;
   /** 气泡「关联任务」链接: 打开任务详情页 */
   onOpenIssue?: (issue: Issue) => void;
   /** 「建 pipeline xxx」创建成功后跳编辑器, 由 App.tsx 注入 */
   onOpenPipeline?: (pipelineId: string) => void;
   /** 「plan xxx」创建成功后跳计划详情, 由 App.tsx 注入 */
   onOpenPlan?: (issue: Issue) => void;
+  /** 快捷打开真机交互原型沙箱 (PrototypeSandboxScreen) */
+  onOpenSandbox?: (scope?: any) => void;
   /** 嵌入模式: 工作空间「对话」Tab 里复用本屏内容区, 不套整屏页头 */
   embedded?: boolean;
+  /** wave365: 初始定位的项目 ID，自动激活该项目的专属工坊会话 */
+  initialProjectId?: string | null;
 }
 
-const QUICK_PROMPTS = [
-  "工坊今日花销",
-  "员工都在忙啥",
-  "有哪些待审批",
-  "本周交付了什么",
+export interface FoundryActionItem {
+  id: "proposal" | "scouting" | "sandbox" | "approval";
+  title: string;
+  desc: string;
+  badge: string;
+  icon: keyof typeof Ionicons.glyphMap;
+}
+
+const FOUNDRY_ACTIONS: FoundryActionItem[] = [
+  {
+    id: "proposal",
+    title: "商业极速立项",
+    desc: "80/20 开源基座对标 · WBS五步链决策提案",
+    badge: "立项",
+    icon: "rocket-outline",
+  },
+  {
+    id: "scouting",
+    title: "开源竞品对标",
+    desc: "调研顶级开源方案 · DAR加权决策矩阵",
+    badge: "对标",
+    icon: "git-network-outline",
+  },
+  {
+    id: "sandbox",
+    title: "真机沙箱试玩",
+    desc: "就地运行交互原型 · 全真体验验收",
+    badge: "沙箱",
+    icon: "phone-portrait-outline",
+  },
+  {
+    id: "approval",
+    title: "交付审批核销",
+    desc: "客户终验核销单 · 待办决裁一键处理",
+    badge: "核销",
+    icon: "checkmark-done-circle-outline",
+  },
 ];
+
 
 /** 长按录音的最短时长: 短于此视为误触 (300ms), 不送 ASR。 */
 const MIN_VOICE_HOLD_MS = 300;
@@ -82,7 +126,7 @@ const MIN_VOICE_HOLD_MS = 300;
  * 「可重试」的错误气泡 —— 而不是让老板一直看着转圈。服务端自己的 first-token
  * watchdog 也是 30s 量级, 谁先到都能收场。
  */
-const FIRST_TOKEN_TIMEOUT_MS = 30_000;
+const FIRST_TOKEN_TIMEOUT_MS = 60_000;
 
 type BoardEchoListener = (message: BoardChatMessage) => void;
 
@@ -147,6 +191,7 @@ interface LiveBoardChatState {
   companyId: string;
   accumulated: string;
   status: string;
+  startedAt?: number;
 }
 let liveBoardChat: LiveBoardChatState | null = null;
 let liveBoardChatAbort: AbortController | null = null;
@@ -344,7 +389,7 @@ function InlineApprovalBubble({
 const WELCOME_MESSAGE: BoardChatMessage = {
   id: "welcome-init",
   role: "assistant",
-  text: "掌柜您好！我是您的董事长助理 (Board Concierge)。关于智能体派发、额度消耗、交付进度或待办审批，请随时向我吩咐。",
+  text: "掌柜您好！我是您的商业交付工厂总指挥 Hermes。关于商业极速立项、80/20开源对标、数字员工调度或交付审批核销，请随时向我吩咐。",
   createdAt: new Date().toISOString(),
 };
 
@@ -361,10 +406,13 @@ export function BoardChatScreen({
   company,
   whoami: _whoami,
   onOpenApproval,
+  onOpenApprovals,
   onOpenIssue,
   onOpenPipeline,
   onOpenPlan,
+  onOpenSandbox,
   embedded = false,
+  initialProjectId,
 }: BoardChatScreenProps) {
   const [messages, setMessages] = useState<BoardChatMessage[]>([WELCOME_MESSAGE]);
   const [input, setInput] = useState("");
@@ -376,6 +424,10 @@ export function BoardChatScreen({
   const [boardIssueId, setBoardIssueId] = useState<string | null>(null);
   const [historyReady, setHistoryReady] = useState(false);
   const [cursorVisible, setCursorVisible] = useState(true);
+
+  /** 商业交付决策提案卡状态 (工坊会话即提议) */
+  const [activeProposal, setActiveProposal] = useState<FoundryProposalData | null>(null);
+  const [proposalBusy, setProposalBusy] = useState(false);
 
   /**
    * wave148: 工坊多对话 (boss 09-29 实机: 「工坊对话要支持新建对话, 不能老在一个
@@ -505,11 +557,29 @@ export function BoardChatScreen({
     setHistoryReady(false);
     void (async () => {
       const list = await refreshConversations();
-      if (Array.isArray(list) && list.length > 0 && list[0]?.id) {
-        setActiveConversationId(list[0].id);
+      if (Array.isArray(list) && list.length > 0) {
+        if (initialProjectId) {
+          const match = list.find((c) => c.projectId === initialProjectId);
+          if (match?.id) {
+            setActiveConversationId(match.id);
+            return;
+          }
+        }
+        if (list[0]?.id) {
+          setActiveConversationId(list[0].id);
+        }
       }
     })();
-  }, [company.id, refreshConversations]);
+  }, [company.id, refreshConversations, initialProjectId]);
+
+  useEffect(() => {
+    if (initialProjectId && conversations.length > 0) {
+      const match = conversations.find((c) => c.projectId === initialProjectId);
+      if (match?.id && match.id !== activeConversationId) {
+        setActiveConversationId(match.id);
+      }
+    }
+  }, [initialProjectId, conversations, activeConversationId]);
 
   // 加载当前对话的持久化历史。activeConversationId 为空时由服务端解析默认对话
   // (全新公司会被创建出 "Board Operations"), 解析结果回填到 activeConversationId,
@@ -681,6 +751,14 @@ export function BoardChatScreen({
   useEffect(() => {
     const listener = (state: LiveBoardChatState | null) => {
       if (state && state.companyId === company.id) {
+        // wave366: 若超过 90 秒无下文，判定为历史异常断连残留，自动收场解锁，绝不让用户永久卡在「响应中」
+        if (state.startedAt && Date.now() - state.startedAt > 90_000) {
+          publishLiveBoardChat(null);
+          setSending(false);
+          setStreamingText("");
+          setStatusText("");
+          return;
+        }
         setSending(true);
         setStreamingText(state.accumulated);
         setStatusText(state.status);
@@ -693,7 +771,13 @@ export function BoardChatScreen({
       }
     };
     liveBoardChatListeners.add(listener);
-    listener(liveBoardChat);
+    if (liveBoardChat && liveBoardChat.companyId === company.id) {
+      if (liveBoardChat.startedAt && Date.now() - liveBoardChat.startedAt > 90_000) {
+        publishLiveBoardChat(null);
+      } else {
+        listener(liveBoardChat);
+      }
+    }
     return () => {
       liveBoardChatListeners.delete(listener);
     };
@@ -929,6 +1013,15 @@ export function BoardChatScreen({
   );
 
   /**
+   * wave369: 项目工坊极速流水线补挂项目。当前会话若绑定了项目 (wave365 项目工坊),
+   * build / pipeline / plan / pr 四条 0-Token 快速指令产出的单据必须落回该项目域 ——
+   * 与 web 端 BoardChat 传 projectId 给 /api/build/start 的既有契约对齐,
+   * 否则老板在项目工坊里说的话建出来的任务全部游离在项目之外。
+   */
+  const activeConversationProjectId =
+    conversations.find((c) => c && c.id === activeConversationId)?.projectId ?? null;
+
+  /**
    * 构建模式: "build xxx" 触发一张构建计划卡 (五步链) 进聊天流。
    * 计划创建与总办问答相互独立 —— 聊天流照常回答, 这里只追加进度卡。
    */
@@ -945,7 +1038,13 @@ export function BoardChatScreen({
         const result = await coolie.request<BuildStartResponse>(
           "POST",
           "/api/build/start",
-          { companyId: company.id, prompt },
+          {
+            companyId: company.id,
+            prompt,
+            ...(activeConversationProjectId
+              ? { projectId: activeConversationProjectId }
+              : {}),
+          },
         );
         setBuildCard({
           prompt,
@@ -964,7 +1063,7 @@ export function BoardChatScreen({
         });
       }
     },
-    [company.id],
+    [company.id, activeConversationProjectId],
   );
 
   /**
@@ -979,17 +1078,24 @@ export function BoardChatScreen({
         const created = await coolie.request<{ id: string; name: string }>(
           "POST",
           `/api/companies/${encodeURIComponent(company.id)}/pipelines`,
-          { key: pipelineKeyFromName(subject), name: subject },
+          {
+            key: pipelineKeyFromName(subject),
+            name: subject,
+            ...(activeConversationProjectId
+              ? { projectId: activeConversationProjectId }
+              : {}),
+          },
         );
         pushSystemEcho(
-          `✅ ${tCommand("Pipeline created")} · ${created.name} (#${created.id.slice(0, 8)})`,
+          `✅ ${tCommand("Pipeline created")} · ${created.name} (#${created.id.slice(0, 8)})` +
+            (activeConversationProjectId ? " · 已挂项目" : ""),
         );
         onOpenPipeline?.(created.id);
       } catch (e) {
         pushSystemEcho(`❌ Pipeline 创建失败: ${String((e as Error)?.message ?? e)}`);
       }
     },
-    [company.id, pushSystemEcho, onOpenPipeline],
+    [company.id, pushSystemEcho, onOpenPipeline, activeConversationProjectId],
   );
 
   /**
@@ -1004,16 +1110,20 @@ export function BoardChatScreen({
           companyId: company.id,
           title: `Plan: ${subject}`,
           description: `由工坊对话创建的计划任务 (Plan mode)\n\n目标: ${subject}`,
+          ...(activeConversationProjectId
+            ? { projectId: activeConversationProjectId }
+            : {}),
         });
         pushSystemEcho(
-          `✅ ${tCommand("Plan created")} · #${issue.id.slice(0, 6)} ${issue.title}`,
+          `✅ ${tCommand("Plan created")} · #${issue.id.slice(0, 6)} ${issue.title}` +
+            (activeConversationProjectId ? " · 已挂项目" : ""),
         );
         onOpenPlan?.(issue);
       } catch (e) {
         pushSystemEcho(`❌ Plan 创建失败: ${String((e as Error)?.message ?? e)}`);
       }
     },
-    [company.id, pushSystemEcho, onOpenPlan],
+    [company.id, pushSystemEcho, onOpenPlan, activeConversationProjectId],
   );
 
   /**
@@ -1028,16 +1138,55 @@ export function BoardChatScreen({
           companyId: company.id,
           title: `PR: ${subject}`,
           description: `由工坊对话触发 GitHub PR workflow (标签意图: pr-workflow)\n\n改动: ${subject}`,
+          ...(activeConversationProjectId
+            ? { projectId: activeConversationProjectId }
+            : {}),
         });
         pushSystemEcho(
-          `✅ ${tCommand("PR workflow triggered")} · #${issue.id.slice(0, 6)} ${issue.title}`,
+          `✅ ${tCommand("PR workflow triggered")} · #${issue.id.slice(0, 6)} ${issue.title}` +
+            (activeConversationProjectId ? " · 已挂项目" : ""),
         );
       } catch (e) {
         pushSystemEcho(`❌ PR workflow 触发失败: ${String((e as Error)?.message ?? e)}`);
       }
     },
-    [company.id, pushSystemEcho],
+    [company.id, pushSystemEcho, activeConversationProjectId],
   );
+
+  /**
+   * wave368-fix-mm: 项目列表意图的客户端拦截回答。
+   * 直接调 `coolie.listProjects(company.id)` → `GET /api/companies/:id/projects`
+   * 真查, 按老板期望的措辞模板回复:
+   *   - 0 个 → "暂无项目, 要我帮您新建吗?"
+   *   - N 个 → "已为您查询到 N 个项目: 1.x 2.y 3.z, 请到资产>本体查看"
+   * 不再让 LLM 抛 "拉一下,先看接口" 的伪回复。
+   */
+  const handleListProjects = useCallback(async () => {
+    try {
+      const list = await coolie.listProjects(company.id);
+      const projects = Array.isArray(list) ? list.filter((p) => p && p.id && p.name) : [];
+      const count = projects.length;
+      const reply =
+        count === 0
+          ? "暂无项目, 要我帮您新建吗?"
+          : `已为您查询到 ${count} 个项目: ${projects
+              .slice(0, 12)
+              .map((p, i) => `${i + 1}.${p.name}`)
+              .join(" ")}${count > 12 ? " …" : ""}, 请到资产>本体查看`;
+      const assistantMsg: BoardChatMessage = {
+        id: `assistant-projects-${Date.now()}`,
+        role: "assistant",
+        text: reply,
+        createdAt: new Date().toISOString(),
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+      scrollToBottom();
+    } catch (e) {
+      pushSystemEcho(
+        `❌ 项目列表查询失败: ${String((e as Error)?.message ?? e ?? "未知错误")}`,
+      );
+    }
+  }, [company.id, pushSystemEcho, scrollToBottom]);
 
   /**
    * wave135: 把一个 staged 附件上传成服务端 attachment.id。
@@ -1106,10 +1255,50 @@ export function BoardChatScreen({
     [boardIssueId, activeConversationId, company.id],
   );
 
+  const handleStop = useCallback(() => {
+    // wave144: 重挂载后本组件的 ref 里已经没有 controller —— 用模块里那条在飞
+    // 的 (liveBoardChatAbort), 这样「切走又切回来」后的取消键仍能中止原来的流。
+    const controller = abortControllerRef.current ?? liveBoardChatAbort;
+    if (controller) {
+      try {
+        controller.abort();
+      } catch {}
+    }
+    if (firstTokenTimerRef.current) {
+      clearTimeout(firstTokenTimerRef.current);
+      firstTokenTimerRef.current = null;
+    }
+    setSending(false);
+    const partial = accumulatedRef.current.trim();
+    if (partial) {
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: `assistant-stopped-${Date.now()}`,
+          role: "assistant",
+          text: `${partial}\n\n*(已手动停止生成)*`,
+          createdAt: new Date().toISOString(),
+        },
+      ]);
+    }
+    setStreamingText("");
+    setStatusText("");
+    accumulatedRef.current = "";
+    abortControllerRef.current = null;
+    liveBoardChatAbort = null;
+    liveBoardChat = null;
+    publishLiveBoardChat(null);
+  }, []);
+
   const handleSend = useCallback(
     async (textToSend?: string) => {
       const prompt = (textToSend ?? input).trim();
-      if (!prompt || sending) return;
+      if (!prompt) return;
+
+      // wave366: 严禁锁定对话！若当前助手正在响应，优雅中止上一轮，立即接力发出新提问
+      if (sending) {
+        handleStop();
+      }
 
       // wave71/wave135: 附件 — 发问前把 staged 的本地文件全部上传成 attachment.id,
       // 一起随 message 走 POST /api/board/chat/stream (server 端会反向 link
@@ -1162,13 +1351,16 @@ export function BoardChatScreen({
       setStagedAttachments([]);
 
       // "build xxx" 追加构建计划卡, 与总办回答并行推进;
-      // pipeline / plan / pr 只走各自编排分发 (不再进问答流)。
+      // pipeline / plan / pr 只走各自编排分发 (不再进问答流);
+      // projects (wave368-fix-mm) 客户端拦截, 调 GET /api/companies/:id/projects
+      // 真查真回, 杜绝 LLM 抛"拉一下,先看接口"伪回复。
       if (command.kind === "build") void startBuild(prompt);
       else if (command.kind === "pipeline") void startPipeline(command.subject);
       else if (command.kind === "plan") void startPlan(command.subject);
       else if (command.kind === "pr") void startPr(command.subject);
+      else if (command.kind === "projects") void handleListProjects();
 
-      if (isOrchestrationCommand) return;
+      if (isOrchestrationCommand || command.kind === "projects") return;
 
       setStreamingText("");
       setStatusText("正在连接会话助手…");
@@ -1320,9 +1512,120 @@ export function BoardChatScreen({
       startPipeline,
       startPlan,
       startPr,
+      handleListProjects,
+      handleStop,
     ],
   );
   handleSendRef.current = handleSend;
+
+  /**
+   * 商业交付决策提案卡确认:
+   * 触发五步链自主施工 + 标记提案已确认 + 追加系统提示
+   */
+  const handleConfirmProposal = useCallback(
+    async (proposal: FoundryProposalData) => {
+      setProposalBusy(true);
+      try {
+        setActiveProposal((prev) => (prev ? { ...prev, status: "confirmed" } : null));
+        appendEcho({
+          id: `echo-confirm-${Date.now()}`,
+          role: "system",
+          text: `✅ 商业立项提案「${proposal.title}」已由掌柜确认！Hermes 正在调度五步链任务…`,
+          createdAt: new Date().toISOString(),
+        });
+        await startBuild(`立项 ${proposal.title}`);
+      } catch (e) {
+        Alert.alert("立项执行失败", String((e as Error)?.message ?? e));
+      } finally {
+        setProposalBusy(false);
+      }
+    },
+    [appendEcho, startBuild],
+  );
+
+  /**
+   * 商业交付决策提案卡放弃:
+   * 标记提案已放弃 + 追加系统提示
+   */
+  const handleDismissProposal = useCallback(
+    (proposal: FoundryProposalData) => {
+      setActiveProposal((prev) => (prev ? { ...prev, status: "dismissed" } : null));
+      appendEcho({
+        id: `echo-dismiss-${Date.now()}`,
+        role: "system",
+        text: `⚪ 已放弃立项提案「${proposal.title}」`,
+        createdAt: new Date().toISOString(),
+      });
+    },
+    [appendEcho],
+  );
+
+  /**
+   * 工坊核心行动派发:
+   * - proposal: 极速生成并展开 80/20 开源对标与 WBS 提案卡
+   * - scouting: 发起开源方案与竞品 DAR 加权决策调研
+   * - sandbox: 就地唤起真机交互原型沙箱
+   * - approval: 快捷直达审批核销中心
+   */
+  const handleFoundryAction = useCallback(
+    (actionId: FoundryActionItem["id"]) => {
+      if (actionId === "proposal") {
+        const freshProposal: FoundryProposalData = {
+          id: `proposal-${Date.now()}`,
+          title: "商业交付工程 (极速立项)",
+          domainSlug: "foundry-core",
+          targetDescription: "以活体业务本体为中枢，基于开源成熟基座，全自主交付商用系统",
+          openSourceBase: "ruoyi-all-next / Semantica (80% 现成资产复用)",
+          leverageRatio: "80% 开源基座沉淀 + 20% 自研业务闭环",
+          darComparison: "DAR 选型加权: 88分 (基座完备性 92 / 社区成熟度 86 / 隔离性 85)",
+          milestones: [
+            { step: 1, gate: "G1", title: "需求梳理", agentName: "墨斗 (FDA)", deliverable: "01-srs.md (EARS规范需求)" },
+            { step: 2, gate: "G2", title: "方案选型", agentName: "墨斗 (FDA)", deliverable: "02-hld.md (DAR加权选型)" },
+            { step: 3, gate: "G3", title: "编码实现", agentName: "铁匠 (SWE)", deliverable: "03-lld-api.md (OpenAPI契约)" },
+            { step: 4, gate: "G4", title: "测试验收", agentName: "门神 (QA)", deliverable: "04-test-report.md (真机四态)" },
+            { step: 5, gate: "G5", title: "发布上线", agentName: "兜底渊 (SRE)", deliverable: "05-deploy-sop.md (不可变制品)" },
+          ],
+          status: "pending",
+        };
+        setActiveProposal(freshProposal);
+        scrollToBottom();
+      } else if (actionId === "scouting") {
+        void handleSend("对标 分析当前商业交付场景下的顶级开源基座与标杆竞品，给出 80/20 选型策略与 DAR 加权决策矩阵");
+      } else if (actionId === "sandbox") {
+        if (onOpenSandbox) {
+          onOpenSandbox();
+        } else {
+          appendEcho({
+            id: `echo-sandbox-${Date.now()}`,
+            role: "system",
+            text: "🎮 沙箱试玩环境已就绪，正在准备交互式运行时原型…",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      } else if (actionId === "approval") {
+        if (onOpenApprovals) {
+          onOpenApprovals();
+        } else {
+          void fetchPendingApprovals();
+          appendEcho({
+            id: `echo-approval-${Date.now()}`,
+            role: "system",
+            text: "📋 已刷新待办审批与客户终验核销单列表",
+            createdAt: new Date().toISOString(),
+          });
+        }
+      }
+    },
+    [handleSend, onOpenSandbox, onOpenApprovals, appendEcho, fetchPendingApprovals, scrollToBottom],
+  );
+
+  /**
+   * 点击舰队横幅员工快捷咨询
+   */
+  const handleConsultEmployee = useCallback((emp: FleetEmployee) => {
+    setInput(`@${emp.name} 请从${emp.title}视角审视：`);
+  }, []);
+
 
   // 外部入口 (「查看演示」/ 深链) 投递的待发送 prompt：历史加载完成后自动发出。
   useEffect(() => {
@@ -1418,33 +1721,6 @@ export function BoardChatScreen({
     [conversations, activeConversationId],
   );
 
-  const handleStop = () => {
-    // wave144: 重挂载后本组件的 ref 里已经没有 controller —— 用模块里那条在飞
-    // 的 (liveBoardChatAbort), 这样「切走又切回来」后的取消键仍能中止原来的流。
-    const controller = abortControllerRef.current ?? liveBoardChatAbort;
-    if (!controller) return;
-    if (firstTokenTimerRef.current) {
-      clearTimeout(firstTokenTimerRef.current);
-      firstTokenTimerRef.current = null;
-    }
-    controller.abort();
-    setSending(false);
-    const partial = accumulatedRef.current.trim();
-    if (partial) {
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `assistant-stopped-${Date.now()}`,
-          role: "assistant",
-          text: `${partial}\n\n*(已手动停止生成)*`,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
-    }
-    setStreamingText("");
-    setStatusText("");
-    publishLiveBoardChat(null);
-  };
 
   /**
    * 构建进度卡点击某环节 -> 打开对应任务详情。
@@ -1633,6 +1909,9 @@ export function BoardChatScreen({
           onNewConversation={openNewConversation}
         />
 
+        {/* 五大数字员工协同流水线横幅 */}
+        <FleetPipelineStrip onConsultEmployee={handleConsultEmployee} />
+
         {/* 问答对话列表 */}
         <FlatList
           ref={flatListRef}
@@ -1670,34 +1949,44 @@ export function BoardChatScreen({
           }
           ListFooterComponent={
             <>
-              {/* 空状态快捷提问气泡 (无历史或仅有欢迎消息时展示) */}
+              {/* 空状态交付指令卡片组 (无历史或仅有欢迎消息时展示) */}
               {messages.length <= 1 && !sending && (
-                <View style={styles.emptyPromptSection}>
-                  <Text style={styles.emptyPromptTitle}>您可以尝试这样提问：</Text>
-                  <View style={styles.emptyPromptGrid}>
-                    {QUICK_PROMPTS.map((prompt) => (
-                      <AppCard
-                        key={prompt}
-                        row
-                        radius={8}
-                        padding={8}
-                        onPress={() => void handleSend(prompt)}
-                        style={styles.emptyPromptCard}
+                <View style={styles.foundryActionsSection}>
+                  <Text style={styles.foundryActionsTitle}>商业软件交付工厂 · 核心行动：</Text>
+                  <View style={styles.foundryActionsGrid}>
+                    {FOUNDRY_ACTIONS.map((action) => (
+                      <Pressable
+                        key={action.id}
+                        onPress={() => handleFoundryAction(action.id)}
+                        style={styles.foundryActionCard}
                       >
-                        <Ionicons
-                          name="sparkles-outline"
-                          size={14}
-                          color={C.accent}
-                          style={{ marginRight: 6 }}
-                        />
-                        <Text style={styles.emptyPromptCardText}>{prompt}</Text>
-                      </AppCard>
+                        <View style={styles.foundryActionCardHeader}>
+                          <Ionicons
+                            name={action.icon}
+                            size={16}
+                            color={C.accent}
+                          />
+                          <Text style={styles.foundryActionCardTitle}>{action.title}</Text>
+                          <Pill label={action.badge} size="sm" style={styles.actionPill} />
+                        </View>
+                        <Text style={styles.foundryActionCardDesc}>{action.desc}</Text>
+                      </Pressable>
                     ))}
                   </View>
                 </View>
               )}
 
-              {/* 构建计划进度卡 (由 "build xxx" 触发) */}
+              {/* 商业交付立项决策提案卡 (工坊会话即提议) */}
+              {activeProposal && (
+                <FoundryProposalCard
+                  proposal={activeProposal}
+                  onConfirm={handleConfirmProposal}
+                  onDismiss={handleDismissProposal}
+                  busy={proposalBusy}
+                />
+              )}
+
+              {/* 构建计划进度卡 (由 "build xxx" / "立项 xxx" 触发) */}
               {buildCard && (
                 <BuildProgressCard
                   prompt={buildCard.prompt}
@@ -1733,11 +2022,23 @@ export function BoardChatScreen({
                       </Text>
                     ) : (
                       // wave71: thinking 态用三点动画 (TypingBubbleText) 替
-                      // 换 ActivityIndicator, 更轻、更像 ChatGPT 风格
-                      <TypingBubbleText
-                        text={statusText || "会话助手正在处理并调取数据…"}
-                        visible={loadingState === "thinking"}
-                      />
+                      // 换 ActivityIndicator, 更轻、更像 ChatGPT 风格; 并配就地【中止】按钮
+                      <View style={styles.thinkingBubbleRow}>
+                        <TypingBubbleText
+                          text={statusText || "会话助手正在处理并调取数据…"}
+                          visible={loadingState === "thinking"}
+                        />
+                        <Pressable
+                          onPress={handleStop}
+                          hitSlop={8}
+                          accessibilityRole="button"
+                          accessibilityLabel="中止"
+                          style={styles.thinkingStopBtn}
+                          testID="BoardChat__ThinkingStopBtn"
+                        >
+                          <Text style={styles.thinkingStopBtnText}>中止</Text>
+                        </Pressable>
+                      </View>
                     )}
                   </View>
                 </View>
@@ -2538,6 +2839,25 @@ const styles = StyleSheet.create({
     color: C.ink3,
     fontSize: 12,
   },
+  thinkingBubbleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  thinkingStopBtn: {
+    marginLeft: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 4,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: "rgba(255, 255, 255, 0.12)",
+  },
+  thinkingStopBtnText: {
+    fontSize: 11,
+    color: C.ink3,
+    fontWeight: "500",
+  },
   errorAvatarBox: {
     backgroundColor: "rgba(239, 68, 68, 0.12)",
     borderColor: "rgba(239, 68, 68, 0.3)",
@@ -2698,31 +3018,50 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontVariant: ["tabular-nums"],
   },
-  emptyPromptSection: {
-    paddingHorizontal: 16,
+  foundryActionsSection: {
+    paddingHorizontal: 14,
     paddingVertical: 12,
-    marginTop: 8,
-  },
-  emptyPromptTitle: {
-    color: C.ink3,
-    fontSize: 12,
-    fontWeight: "500",
-    marginBottom: 8,
-  },
-  emptyPromptGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
+    marginTop: 6,
     gap: 8,
   },
-  emptyPromptCard: {
-    backgroundColor: C.panel,
-    paddingHorizontal: 10,
-    maxWidth: "48%",
-    flexGrow: 1,
-  },
-  emptyPromptCardText: {
-    color: C.ink2,
+  foundryActionsTitle: {
+    color: C.ink3,
     fontSize: 12,
-    fontWeight: "500",
+    fontWeight: "600",
+    marginBottom: 4,
+  },
+  foundryActionsGrid: {
+    gap: 8,
+  },
+  foundryActionCard: {
+    backgroundColor: C.surface,
+    borderColor: C.lineSubtle,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    gap: 4,
+  },
+  foundryActionCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+  },
+  foundryActionCardTitle: {
+    color: C.ink,
+    fontSize: 13,
+    fontWeight: "600",
+    flex: 1,
+  },
+  actionPill: {
+    backgroundColor: "rgba(59, 130, 246, 0.12)",
+    borderColor: "rgba(59, 130, 246, 0.3)",
+    paddingVertical: 1,
+    paddingHorizontal: 6,
+  },
+  foundryActionCardDesc: {
+    color: C.ink3,
+    fontSize: 11,
+    lineHeight: 16,
   },
 });

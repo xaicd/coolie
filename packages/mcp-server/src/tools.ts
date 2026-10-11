@@ -1187,5 +1187,82 @@ export function createToolDefinitions(client: PaperclipApiClient): ToolDefinitio
           body: { ...specTemplateSkeleton(templateName), parentSpecId: parentSpecId ?? null },
         }),
     ),
+    makeTool(
+      "paperclipGetCompanyOntologyGraph",
+      "Fetch the living ontology link graph of the company (relationships between agents, projects, issues, work products, attachments, comments, and specs)",
+      ontologyGraphToolSchema,
+      async ({ companyId, rootType, rootId, depth, view, relations }) => {
+        const queryParams = new URLSearchParams();
+        if (rootType) queryParams.set("root_type", rootType);
+        if (rootId) queryParams.set("root_id", rootId);
+        if (depth !== undefined) queryParams.set("depth", String(depth));
+        if (view) queryParams.set("view", view);
+        if (relations) queryParams.set("relations", relations);
+        const query = queryParams.toString() ? `?${queryParams.toString()}` : "";
+        return client.requestJson(
+          "GET",
+          `/companies/${client.resolveCompanyId(companyId)}/ontology/graph${query}`,
+        );
+      },
+    ),
+    makeTool(
+      "paperclipGetCompanyOntologyStats",
+      "Get counts and statistics of living ontology entities and relations in the company",
+      ontologyStatsToolSchema,
+      async ({ companyId }) =>
+        client.requestJson(
+          "GET",
+          `/companies/${client.resolveCompanyId(companyId)}/ontology/stats`,
+        ),
+    ),
+    makeTool(
+      "paperclipListPluginTools",
+      "List all plugin-contributed agent tools (including ontology domain tools from plugin-ontology)",
+      listPluginToolsSchema,
+      async ({ pluginId }) => {
+        const query = pluginId ? `?pluginId=${encodeURIComponent(pluginId)}` : "";
+        return client.requestJson("GET", `/plugins/tools${query}`);
+      },
+    ),
+    makeTool(
+      "paperclipExecutePluginTool",
+      "Execute a plugin-contributed tool (such as ontology query, blast radius impact, or domain modeling)",
+      executePluginToolSchema,
+      async ({ tool, parameters }) => {
+        return client.requestJson("POST", "/plugins/tools/execute", {
+          body: {
+            tool,
+            parameters,
+            runContext: {
+              companyId: client.defaults.companyId,
+              agentId: client.defaults.agentId,
+              runId: client.defaults.runId,
+            },
+          },
+        });
+      },
+    ),
   ];
 }
+
+const ontologyGraphToolSchema = z.object({
+  companyId: companyIdOptional,
+  rootType: z.enum(["company", "project", "issue", "spec", "conversation", "work_product", "attachment", "comment", "agent"]).optional(),
+  rootId: z.string().optional(),
+  depth: z.number().int().min(1).max(5).optional(),
+  view: z.string().optional(),
+  relations: z.string().optional(),
+});
+
+const ontologyStatsToolSchema = z.object({
+  companyId: companyIdOptional,
+});
+
+const listPluginToolsSchema = z.object({
+  pluginId: z.string().optional(),
+});
+
+const executePluginToolSchema = z.object({
+  tool: z.string().min(1),
+  parameters: z.record(z.string(), z.unknown()).default({}),
+});

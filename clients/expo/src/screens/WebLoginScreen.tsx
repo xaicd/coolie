@@ -243,7 +243,7 @@ export function WebLoginScreen({ onSignedIn, onFallbackNative }: WebLoginScreenP
             accessibilityLabel="切换到原生表单或 Key 登录"
           >
             <Ionicons name="key-outline" size={13} color={C.accent} style={{ marginRight: 3 }} />
-            <Text style={styles.switchBtnText}>Key/表单登录</Text>
+            <Text style={styles.switchBtnText}>原生</Text>
           </Pressable>
         ) : null}
       </View>

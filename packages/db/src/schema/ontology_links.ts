@@ -20,6 +20,9 @@ import { companies } from "./companies.js";
  * - The deprecated `entity_relations` table stays read-only; the backfill in
  *   9017 maps every `(src_type, src_id) → (target_type, target_id)` pair onto
  *   the new `ontology_objects` rows.
+ *
+ * @deprecated [DEPRECATED / CORPSE SWEEP] wave250 legacy ontology table (0 references in server/shared).
+ * Kept for backward schema compatibility; do NOT use in new code. Living ontology now uses dynamic projection from core physical tables.
  */
 export const ontologyLinks = pgTable(
   "ontology_links",

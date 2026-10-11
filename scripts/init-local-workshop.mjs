@@ -20,9 +20,27 @@ const REPO_ROOT = path.resolve(SCRIPT_DIR, "..");
 const PORT = process.env.COOLIE_DEV_PORT || 3100;
 const HOST_API = `http://127.0.0.1:${PORT}`;
 
+const isDirectReachable = (() => {
+  try {
+    execSync(`curl -sf "${HOST_API}/api/health"`, { stdio: "ignore" });
+    return true;
+  } catch (e) {
+    return false;
+  }
+})();
+
 function hostCurlGet(apiPath) {
   const cmd = `curl -s "${HOST_API}${apiPath}"`;
-  const raw = execSync(`bash "${SCRIPT_DIR}/host-exec.sh" "${cmd}"`, { encoding: "utf8" });
+  let raw = "";
+  if (isDirectReachable) {
+    try {
+      raw = execSync(cmd, { encoding: "utf8" });
+    } catch (e) {
+      raw = "";
+    }
+  } else {
+    raw = execSync(`bash "${SCRIPT_DIR}/host-exec.sh" "${cmd}"`, { encoding: "utf8" });
+  }
   try {
     return JSON.parse(raw);
   } catch (err) {
@@ -33,7 +51,16 @@ function hostCurlGet(apiPath) {
 function hostCurlPost(apiPath, body) {
   const b64 = Buffer.from(JSON.stringify(body || {})).toString("base64");
   const cmd = `echo '${b64}' | base64 -d | curl -s -X POST '${HOST_API}${apiPath}' -H 'Content-Type: application/json' -d @-`;
-  const raw = execSync(`bash "${SCRIPT_DIR}/host-exec.sh" "${cmd}"`, { encoding: "utf8" });
+  let raw = "";
+  if (isDirectReachable) {
+    try {
+      raw = execSync(cmd, { encoding: "utf8" });
+    } catch (e) {
+      raw = "";
+    }
+  } else {
+    raw = execSync(`bash "${SCRIPT_DIR}/host-exec.sh" "${cmd}"`, { encoding: "utf8" });
+  }
   try {
     return JSON.parse(raw);
   } catch (err) {
@@ -67,10 +94,10 @@ async function main() {
 
   const TARGET_AGENTS = [
     { name: "Hermes", role: "pm", title: "项目总调度掌柜", adapterType: "hermes_local", tools: ["hermes"] },
-    { name: "墨斗", role: "fda", title: "前线架构师", adapterType: "gemini_local", tools: ["agy-gemini3.8", "cmd"] },
+    { name: "墨斗", role: "fda", title: "前线架构师", adapterType: "agy_local", adapterConfig: { agentCommand: "scripts/adapters/docker-agy-acp.sh" }, tools: ["agy-gemini3.8", "cmd"] },
     { name: "铁匠", role: "core-swe", title: "平台核心研发", adapterType: "claude_local", tools: ["claude-glm", "claude-mm"] },
-    { name: "门神", role: "fdse", title: "前线部署工程师", adapterType: "process", tools: ["cmd", "claude-mm"] },
-    { name: "兑底渊", role: "pre-sre", title: "产品可靠性专家", adapterType: "process", tools: ["copilot", "claude-mm"] },
+    { name: "门神", role: "fdse", title: "前线部署工程师", adapterType: "process", adapterConfig: { command: "cmd" }, tools: ["cmd", "claude-mm"] },
+    { name: "兑底渊", role: "pre-sre", title: "产品可靠性专家", adapterType: "process", adapterConfig: { command: "copilot" }, tools: ["copilot", "claude-mm"] },
     { name: "百晓生", role: "ds", title: "部署战略与方案专家", adapterType: "claude_local", tools: ["claude-glm", "claude-mm", "agy-gemini3.8"] }
   ];
 
@@ -91,7 +118,12 @@ async function main() {
   // 3. 运行角色档案与技能工具灌注
   console.log("🎨 运行角色档案与技能工具灌注 (中文 2 字 Skills × 英文 Tools)...");
   try {
-    const seedOutput = execSync(`bash "${SCRIPT_DIR}/host-exec.sh" "pnpm tsx scripts/seed-agent-roles.ts"`, { encoding: "utf8" });
+    let seedOutput = "";
+    if (isDirectReachable) {
+      seedOutput = execSync(`pnpm tsx scripts/seed-agent-roles.ts`, { cwd: REPO_ROOT, encoding: "utf8" });
+    } else {
+      seedOutput = execSync(`bash "${SCRIPT_DIR}/host-exec.sh" "pnpm tsx scripts/seed-agent-roles.ts"`, { encoding: "utf8" });
+    }
     console.log(seedOutput.trim());
   } catch (err) {
     console.warn("⚠️ seed-agent-roles 执行异常:", err.message);

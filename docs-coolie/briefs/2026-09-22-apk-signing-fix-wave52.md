@@ -134,7 +134,7 @@ APK 签名: Verified using v2 scheme (APK Signature Scheme v2) + cert subject CN
 ## 7. 若找不到旧 keystore 又不能新生成怎么办?
 
 老板拍板:
-- A. PM 自生成新 release.keystore (默认密码写 ~/.coolie-secrets/keystore.env)
+- A. PM 自生成新 release.keystore (安全高熵凭据持久化于 ~/.coolie-secrets/keystore.env，杜绝弱口令)
 - B. 老板给旧 0.3.4 release.keystore 文件路径 (boss 已知)
 - C. 老板重新装 Coolie工坊 用 0.3.4 旧版本 (回滚)
 

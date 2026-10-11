@@ -124,19 +124,21 @@ description: >-
 
 ## 8. 与 cmmi-* 技能的衔接
 
-WBS 是骨架，各门禁交付物是骨架上的肉：
+WBS 是骨架，各门禁 0-1 软件工程资产交付物是骨架上的肉（以 Paperclip 原生文档总线与工件总线为第一真理源；工作区代码默认采用 PNPM workspace monorepo，若选择开源基座以基座原生目录结构为准，项目级过程文档标准落盘于 `docs/01_management` ~ `docs/09_operations`，敏捷特性全息内聚包位于 `docs/specs/<domain>/<feature-slug>/`）：
 
-| 阶段收口 | 门禁 | 交付物 / 负责技能 | 主责角色 |
+| 阶段收口 | 门禁 | 0-1 软件工程交付物 / 负责技能 | 主责角色 |
 |---|---|---|---|
-| 需求确认 | G1 | `docs/cmmi/01-srs.md` — `cmmi-req-spec` | `emp_ds` |
-| 架构/设计 | G2 | `docs/cmmi/02-hld.md` — `cmmi-tech-solution` | `emp_fda` |
-| 开发实现 | G3 | `docs/cmmi/03-lld-api.md` — `cmmi-detailed-contracts` | `emp_swe` |
-| 测试验收 | G4 | `docs/cmmi/04-test-report.md` — `cmmi-ver-val` | `emp_fdse` |
-| 上线移交 | G5 | `docs/cmmi/05-deploy-sop.md` — `cmmi-immutable-release` | `emp_sre` |
-| 持续 | — | `docs/cmmi/06-spc-metrics.md`, `07-car-prevention.md` — `cmmi-car-spc-metrics` | `emp_hermes` |
+| 需求确认 | G1 | `docs/02_requirements/software-requirements.md` (SRS & RTM) — `cmmi-req-spec` | `emp_ds` |
+| 架构设计 | G2 | `docs/03_design/architecture-design-hld.md` (HLD & DAR) — `cmmi-tech-solution` | `emp_fda` |
+| 开发实现 | G3 | `docs/03_design/interface-contracts/` (LLD, OpenAPI & 0 报错 Repo) — `cmmi-detailed-contracts` | `emp_swe` |
+| 测试验收 | G4 | `docs/05_verification/test-summary-report.md` (真机四态快照 & E2E) — `cmmi-ver-val` | `emp_fdse` |
+| 生产投产 | G5 | `docs/07_release/system-deployment-sop.md` (不可变 Checksum 制品 & SOP) — `cmmi-immutable-release` | `emp_sre` |
+| 韧性保障 | G6 | `docs/08_sre/01_slo_sli_metrics/SLO-SLI-ERROR-BUDGET-MATRIX.md` (SLO/SLI 矩阵) — `sre-slo-manager` | `emp_sre` |
+| 持续运营 | G7 | `docs/09_operations/tenant-governance.md` (多租户治理与平账) — `financial-reconciliation-agent` | `emp_hermes` |
+| 过程控制 | — | `docs/06_cmmi_audit/spc-control-chart.md`, `car-5whys-rca.md` — `cmmi-car-spc-metrics` | `emp_hermes` |
 
 **用法**：里程碑的「判定证据」应指向对应阶段的门禁交付物或门禁命令输出
-（如 G3 的 `node scripts/check-contracts.mjs` 退出码 0）。
+（如 G3 的 `node scripts/check-contracts.mjs` 退出码 0），且必须物理挂载为 Work Product，资产凭证由软件工程交付物实体组成。
 
 ## 9. Definition of Done
 
@@ -145,3 +147,4 @@ WBS 是骨架，各门禁交付物是骨架上的肉：
 - [ ] 工作包大小可估工，需求确认阶段的工作包对应文档目标。
 - [ ] 草案路径下：未采纳前不产生真实任务；幂等（同项目不重复建）。
 - [ ] 门禁联动可验证：上游里程碑未达成时，后续阶段任务被标受阻（或显式豁免并留痕）。
+- [ ] 里程碑达成必须挂载真实的 0-1 软件工程资产 Work Product (No Artifact, No Done)。

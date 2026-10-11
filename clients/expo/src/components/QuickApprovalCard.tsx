@@ -407,7 +407,7 @@ export function QuickApprovalCard({
               {busyAction === "reject" ? (
                 <ActivityIndicator size="small" color={C.err} />
               ) : (
-                <Text style={styles.btnConfirmRejectText}>确认驳回</Text>
+                <Text style={styles.btnConfirmRejectText}>驳回</Text>
               )}
             </Pressable>
           </View>
@@ -425,7 +425,7 @@ export function QuickApprovalCard({
             {busyAction === "approve" ? (
               <ActivityIndicator size="small" color={C.ok} />
             ) : (
-              <Text style={styles.btnApproveText}>一键批准</Text>
+              <Text style={styles.btnApproveText}>批准</Text>
             )}
           </Pressable>
 

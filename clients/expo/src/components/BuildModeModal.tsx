@@ -121,12 +121,12 @@ export function BuildModeModal({
             style={[styles.submit, (submitting || !prompt.trim()) && styles.disabled]}
             onPress={() => void submit()}
             disabled={submitting || !prompt.trim()}
-            accessibilityLabel="启动构建计划"
+            accessibilityLabel="启动"
           >
             {submitting ? (
               <ActivityIndicator size="small" color={C.ink} />
             ) : (
-              <Text style={styles.submitText}>启动构建计划</Text>
+              <Text style={styles.submitText}>启动</Text>
             )}
           </Pressable>
 

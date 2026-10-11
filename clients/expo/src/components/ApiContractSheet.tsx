@@ -108,7 +108,7 @@ export function ApiContractSheet({
           </Text>
           {onOpenFullWeb ? (
             <Pressable style={styles.webBtn} onPress={onOpenFullWeb}>
-              <Text style={styles.webBtnText}>打开桌面全功能 ↗</Text>
+              <Text style={styles.webBtnText}>打开</Text>
             </Pressable>
           ) : null}
         </View>

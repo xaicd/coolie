@@ -10,10 +10,10 @@ import { t } from "./isZh.js";
 export function ChatTab(): ReactElement {
   return (
     <PlaceholderTab
-      title={t("对话", "Dialogue")}
+      title={t("工坊会话", "Workshop")}
       description={t(
-        "对话视图占位 — 后续将流式推送来自 ontology worker 的消息。",
-        "Dialogue view placeholder — will stream messages from the ontology worker.",
+        "本体交互已全面并轨至系统顶栏/底栏【工坊】（会话即提案，两字确认即落盘），杜绝本体孤岛会话。请前往工坊发起本体演进与交互。",
+        "Ontology interaction is fully integrated into the Workshop (Conversation as Proposal). Please visit Workshop for ontology evolution.",
       )}
       futureChannel="ontology.dialogue"
     />

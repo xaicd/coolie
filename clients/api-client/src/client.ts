@@ -1397,6 +1397,31 @@ export class CoolieClient {
   }
 
   /**
+   * 列出数据集 (board or agent)
+   * GET /api/plugins/paperclipai.plugin-ontology/api/datasets?companyId=...&domainId=...
+   */
+  async listOntologyDatasets(
+    companyId: string,
+    domainId?: string,
+  ): Promise<OntologyDataset[]> {
+    const q = new URLSearchParams({ companyId });
+    if (domainId) q.set("domainId", domainId);
+    try {
+      const res = await this.request<{ datasets?: OntologyDataset[] } | OntologyDataset[]>(
+        "GET",
+        `/api/plugins/${ONTOLOGY_PLUGIN_ID}/api/datasets?${q.toString()}`,
+      );
+      if (isRecord(res) && "datasets" in res && Array.isArray(res.datasets)) {
+        return res.datasets;
+      }
+      if (Array.isArray(res)) return res;
+      return [];
+    } catch {
+      return [];
+    }
+  }
+
+  /**
    * 新建连接器 (board)
    * POST /api/plugins/paperclipai.plugin-ontology/api/connectors → 201 { connector }
    */
@@ -1714,6 +1739,118 @@ export class CoolieClient {
     };
     if (this.originHeader) headers.Origin = this.originHeader;
     Object.assign(headers, await this.getAuthHeader());
+
+    const isReactNative =
+      typeof navigator !== "undefined" && (navigator as any)?.product === "ReactNative";
+
+    if (isReactNative && typeof XMLHttpRequest !== "undefined") {
+      return new Promise((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        let seenIndex = 0;
+        let buffer = "";
+        let fullText = "";
+        let resolvedIssueId: string | undefined = input.taskId;
+        let resolvedConversationId: string | undefined = input.conversationId;
+
+        const dispatchLine = (line: string) => {
+          const trimmed = line.trim();
+          if (!trimmed.startsWith("data:")) return;
+          const jsonStr = trimmed.replace(/^data:\s*/, "");
+          if (!jsonStr) return;
+          try {
+            const event = JSON.parse(jsonStr) as BoardChatStreamEvent;
+            callbacks?.onEvent?.(event);
+            if (event.type === "start") {
+              resolvedIssueId = event.issueId;
+              if (event.conversationId) resolvedConversationId = event.conversationId;
+              callbacks?.onStart?.(event.issueId, resolvedConversationId);
+            } else if (event.type === "status") {
+              callbacks?.onStatus?.(event.text);
+            } else if (event.type === "chunk") {
+              fullText += event.text;
+              callbacks?.onChunk?.(event.text);
+            } else if (event.type === "done") {
+              if (event.issueId) resolvedIssueId = event.issueId;
+              if (event.conversationId) resolvedConversationId = event.conversationId;
+              callbacks?.onDone?.(event);
+            } else if (event.type === "error") {
+              callbacks?.onError?.(event.message);
+            }
+          } catch {
+            // Ignore partial/unparseable SSE lines
+          }
+        };
+
+        xhr.open("POST", `${this.baseUrl}/api/board/chat/stream`);
+        for (const [k, v] of Object.entries(headers)) {
+          xhr.setRequestHeader(k, v);
+        }
+        xhr.withCredentials = true;
+
+        if (input.signal) {
+          if (input.signal.aborted) {
+            resolve({ fullText: "", issueId: resolvedIssueId, conversationId: resolvedConversationId });
+            return;
+          }
+          input.signal.addEventListener("abort", () => {
+            xhr.abort();
+            resolve({ fullText, issueId: resolvedIssueId, conversationId: resolvedConversationId });
+          });
+        }
+
+        xhr.onreadystatechange = () => {
+          if (xhr.readyState === 3 || xhr.readyState === 4) {
+            const text = xhr.responseText || "";
+            if (text.length > seenIndex) {
+              const chunk = text.slice(seenIndex);
+              seenIndex = text.length;
+              buffer += chunk;
+              const lines = buffer.split("\n");
+              buffer = lines.pop() ?? "";
+              for (const line of lines) {
+                dispatchLine(line);
+              }
+            }
+          }
+          if (xhr.readyState === 4) {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              if (buffer.trim()) {
+                dispatchLine(buffer);
+              }
+              resolve({ fullText, issueId: resolvedIssueId, conversationId: resolvedConversationId });
+            } else {
+              const text = xhr.responseText || "";
+              const parsed = text ? safeJson(text) : null;
+              const msg =
+                (isRecord(parsed) && typeof parsed.message === "string" && parsed.message) ||
+                (isRecord(parsed) && typeof parsed.error === "string" && parsed.error) ||
+                `Board chat stream request failed: ${xhr.status}`;
+              const err = new CoolieApiError(xhr.status, msg, undefined, parsed);
+              callbacks?.onError?.(err);
+              reject(err);
+            }
+          }
+        };
+
+        xhr.onerror = () => {
+          const err = new Error("Network request failed");
+          callbacks?.onError?.(err);
+          reject(err);
+        };
+
+        xhr.send(
+          JSON.stringify({
+            companyId: input.companyId,
+            message: input.message,
+            taskId: input.taskId,
+            ...(input.conversationId ? { conversationId: input.conversationId } : {}),
+            ...(input.attachmentIds && input.attachmentIds.length > 0
+              ? { attachmentIds: input.attachmentIds }
+              : {}),
+          }),
+        );
+      });
+    }
 
     const res = await this.fetchImpl(`${this.baseUrl}/api/board/chat/stream`, {
       method: "POST",

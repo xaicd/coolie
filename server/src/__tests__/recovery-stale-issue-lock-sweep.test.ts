@@ -333,6 +333,86 @@ describeEmbeddedPostgres("recovery sweepStaleIssueLocks", () => {
     );
   });
 
+  it("terminalizes a process-less running run silent past the orphan window, then clears the lock", async () => {
+    // COOA-21 server-bounce zombie: no pid/group was ever recorded (the
+    // previous server died before the run stored its process metadata), so the
+    // recorded-pid process-death authority can never fire. The run has been
+    // silent past the processless-orphan window and the issue is not terminal,
+    // so the bounded process-less authority must reclaim it.
+    const { companyId, agentId, runningRunId } = await seed();
+    await db
+      .update(heartbeatRuns)
+      .set({
+        startedAt: new Date(Date.now() - 10 * 60 * 1000),
+        lastOutputAt: null,
+        processStartedAt: null,
+      })
+      .where(eq(heartbeatRuns.id, runningRunId));
+    const issueId = randomUUID();
+    await db.insert(issues).values({
+      id: issueId,
+      companyId,
+      title: "Process-less zombie — terminalize then clear",
+      status: "in_progress",
+      priority: "high",
+      assigneeAgentId: agentId,
+      checkoutRunId: runningRunId,
+      executionRunId: runningRunId,
+      executionLockedAt: new Date(),
+    });
+
+    const result = await heartbeatService(db).sweepStaleIssueLocks();
+
+    expect(result.terminalizedRunIds).toEqual([runningRunId]);
+    expect(result.cleared).toBe(1);
+
+    const run = await db
+      .select({ status: heartbeatRuns.status, errorCode: heartbeatRuns.errorCode })
+      .from(heartbeatRuns)
+      .where(eq(heartbeatRuns.id, runningRunId))
+      .then((rows) => rows[0]);
+    // Outcome unknown, so the backstop uses "interrupted".
+    expect(run?.status).toBe("interrupted");
+    expect(run?.errorCode).toBe("orphaned_running_run");
+
+    const lock = await db
+      .select({ checkoutRunId: issues.checkoutRunId, executionRunId: issues.executionRunId })
+      .from(issues)
+      .where(eq(issues.id, issueId))
+      .then((rows) => rows[0]);
+    expect(lock).toEqual({ checkoutRunId: null, executionRunId: null });
+  });
+
+  it("preserves a freshly started process-less running run", async () => {
+    // startedAt defaults to now in seed(), so the run is still inside the
+    // processless-orphan window and may simply not have recorded its pid yet.
+    const { companyId, agentId, runningRunId } = await seed();
+    const issueId = randomUUID();
+    await db.insert(issues).values({
+      id: issueId,
+      companyId,
+      title: "Fresh process-less run — preserve",
+      status: "in_progress",
+      priority: "high",
+      assigneeAgentId: agentId,
+      checkoutRunId: runningRunId,
+      executionRunId: runningRunId,
+      executionLockedAt: new Date(),
+    });
+
+    const result = await heartbeatService(db).sweepStaleIssueLocks();
+
+    expect(result.terminalizedRunIds).toEqual([]);
+    expect(result.cleared).toBe(0);
+    await expect(
+      db
+        .select({ status: heartbeatRuns.status })
+        .from(heartbeatRuns)
+        .where(eq(heartbeatRuns.id, runningRunId))
+        .then((rows) => rows[0]?.status),
+    ).resolves.toBe("running");
+  });
+
   it.each(["in_progress", "done"])("preserves a live legacy controller lease when the issue is %s", async (status) => {
     const { companyId, agentId, runningRunId } = await seed();
     await db.update(heartbeatRuns).set({

@@ -154,7 +154,7 @@ export function ArtifactVersionSheet({
                     onPress={() => void activate(version)}
                   >
                     <Text style={styles.actionTextPrimary}>
-                      {activatingId === version.id ? "处理中…" : "设为最新"}
+                      {activatingId === version.id ? "处理中…" : "最新"}
                     </Text>
                   </Pressable>
                 ) : null}

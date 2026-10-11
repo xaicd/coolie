@@ -78,9 +78,12 @@ THEN <system> SHALL <behavior>
 - [ ] 用户故事 acceptance 全过
 - [ ] commit 模板: feat(...)
 - [ ] 老板 weixin 回签
+
+## 8. 交付资产形态 (Work Product 五选一, No Artifact, No Done)
+- [ ] 源码提交 / 契约定义 / 真实端录屏快照 / 发布制品 / 规格文档
 ```
 
-第 7 节（技术方案）由 `system-design-spec` skill 接手,本 spec 不写。
+第 9 节（技术方案）由 `system-design-spec` skill 接手，本 spec 需求阶段不写。
 
 ## Process
 
@@ -135,6 +138,8 @@ THEN <system> SHALL <behavior>
 - ❌ 文件白名单写"相关模块" → 必须绝对路径
 - ❌ 老板原话改写 → 信息丢失
 - ❌ 一个 spec 包多个不相关需求 → 拆
+- ❌ 把上线后的运行时业务数据（如板材尺寸/客户名单）错当系统 0-1 需求交付物
+- ❌ 无 Work Product 物理产物直接口头声明已完成 (违反 No Artifact, No Done)
 
 ## Output 模板(完整)
 

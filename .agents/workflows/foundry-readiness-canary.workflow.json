@@ -1,0 +1,55 @@
+{
+  "name": "foundry-readiness-canary",
+  "description": "新环境/新节点 AI 交付工厂全自主端到端金丝雀验收与自愈工作流 (7大工具池真跑探测 -> 编译器与运行时自检 -> Spec-Kit SDD闭环 -> 模拟多语言构建 -> 无头快照测试 -> 交付能力合格证签发)",
+  "inputs": {
+    "nodeName": "canary-node",
+    "deployEnv": "dev",
+    "triggerReason": "new-machine-bootstrap"
+  },
+  "steps": [
+    {
+      "type": "step",
+      "id": "step1-probe-tools",
+      "agent": "wf-security",
+      "gate": "gate_tool_probe",
+      "doc": "docs/artifacts/canary-tool-probe-result.json",
+      "prompt": "【Step 1·工具池与编译器真跑探测】由 兜底渊 (PRE-SRE) 驱动。全自动探测 7 大工具池 (claude-glm, cmd, copilot, agy, hermes 等) 免交互执行能力，探测 JDK 17, Node 24, pnpm, Docker, ADB 编译器与环境依赖。若发现容器未启动或临时状态异常，尝试自主执行容器拉起与轻量自愈。"
+    },
+    {
+      "type": "step",
+      "id": "step2-canary-spec",
+      "agent": "wf-planner",
+      "dependsOn": ["step1-probe-tools"],
+      "gate": "gate_canary_spec",
+      "doc": "docs/specs/core/canary-probe/requirements.md",
+      "prompt": "【Step 2·全自主金丝雀立项】由 Hermes / 墨斗 (FDA) 驱动。自动触发 node scripts/speckit.cjs new 与 build，建立合成金丝雀交付规格，确立 EARS 验收断言与 Wave 1/2/3 任务图，随后自动执行 speckit sync，在控制面派生出带物理白名单的微型工单树。"
+    },
+    {
+      "type": "step",
+      "id": "step3-canary-build",
+      "agent": "wf-coder",
+      "dependsOn": ["step2-canary-spec"],
+      "gate": "gate_canary_compile",
+      "doc": "docs/specs/core/canary-probe/design.md",
+      "prompt": "【Step 3·合成代码构建与类型守卫】由 铁匠 (Core SWE) 驱动。执行单人原子签出锁，完成微型代码变更并验证全栈 typecheck 0 报错，遵循 1 Task = 1 Commit 提交一次合成 Git 记录。"
+    },
+    {
+      "type": "step",
+      "id": "step4-canary-test",
+      "agent": "wf-tester",
+      "dependsOn": ["step3-canary-build"],
+      "gate": "gate_canary_eval",
+      "doc": "docs/artifacts/canary-e2e-evidence.png",
+      "prompt": "【Step 4·无头真机快照与佐证取证】由 门神 (FDSE) 驱动。启动无头浏览器执行真实页面渲染，抓取无遮挡页面快照存证，验证真机快照能力未退化。"
+    },
+    {
+      "type": "step",
+      "id": "step5-certify-and-report",
+      "agent": "wf-reviewer",
+      "dependsOn": ["step4-canary-test"],
+      "gate": "gate_readiness_cert",
+      "doc": "docs/05_verification/foundry-readiness-certificate.md",
+      "prompt": "【Step 5·不可变交付合格证签发】由 兜底渊 (PRE-SRE) / 百晓生 (DS) 联合签署。验证不可变工件总线完整性（No Artifact, No Done），自动生成《交付工厂就绪核销单》，并向掌柜移动端推送结构化就绪卡片。"
+    }
+  ]
+}

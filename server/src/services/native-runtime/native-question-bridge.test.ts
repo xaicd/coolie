@@ -144,7 +144,7 @@ describeEmbeddedPostgres("native question bridge", () => {
     });
   }
 
-  function runtimeRequestEvent(): PrpEvent {
+  function runtimeRequestEvent(): any {
     return {
       schema: "paperclip.prp.event.v1",
       sourceEventId: "runtime-question-1",

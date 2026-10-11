@@ -1,0 +1,213 @@
+{
+  "schema": "https://schema.coolie.ai/cmmi/baseline-gate-evidence-v1.json",
+  "project": "SYS_CHANRONG_AGENT",
+  "projectPath": "projects/sys-chanrong-agent",
+  "feature": "init-baseline",
+  "baselineVersion": "v1.0.0-BASELINE",
+  "generatedAt": "2026-10-11T05:33:06.895Z",
+  "generatedBy": "modou-fda",
+  "status": "PASSED",
+  "coverageDefinition": "docs/01_management ~ docs/09_operations, docs/specs/, scripts/ (不含 docs/artifacts/ 证据记录本身)",
+  "fingerprintAlgorithm": "per-file SHA-256; then SHA-256 over sorted lines \"{sha256}  {path}\"",
+  "ciCount": 40,
+  "baselineManifestSha256": "282ada0bcf8a0075da4eac0512e38102c62d69047d0a4ed4673865dccc5d51a9",
+  "gates": [
+    {
+      "id": "G1",
+      "name": "需求与 RTM 跟踪门禁",
+      "command": "node scripts/verify-reqs.mjs",
+      "exitCode": 0,
+      "output": "✅ G1 需求门禁校验通过: 需求项符合 EARS 结构化定义，RTM 映射正常。"
+    },
+    {
+      "id": "G2",
+      "name": "架构隔离与治理门禁",
+      "command": "node scripts/check-fork-surface.mjs",
+      "exitCode": 0,
+      "output": "· 需求覆盖校验通过:12 条 REQ-CR-### 均已登记。\n✅ G2 架构门禁通过: 分层拓扑完整、隔离防线明确、DAR 加权矩阵齐备、需求全覆盖、待决事项已登记。"
+    },
+    {
+      "id": "G3",
+      "name": "静态契约与编译守卫",
+      "command": "node scripts/check-contracts.mjs",
+      "exitCode": 0,
+      "output": "🔍 执行 G3 静态契约与编译检查...\n✅ G3 静态契约检查通过: 0 编译报错。"
+    },
+    {
+      "id": "G4",
+      "name": "全栈验收与集成测试",
+      "command": "node scripts/run-tests.mjs",
+      "exitCode": 0,
+      "output": "🧪 启动 G4 全栈验收与集成测试用例...\nℹ️ G4: 地基阶段尚无测试用例，按空集通过（待实现阶段补齐真实数据库测试）。"
+    },
+    {
+      "id": "G5",
+      "name": "不可变发布基线守卫",
+      "command": "node scripts/check-release-baseline.mjs",
+      "exitCode": 0,
+      "output": "✅ G5 不可变生产发布门禁通过: 具备制品校验和与秒级回滚保障。"
+    }
+  ],
+  "configurationItems": [
+    {
+      "path": "docs/01_management/project-charter.md",
+      "sha256": "9c490dc266ded231a0bcc4d21f209cca7a4012a990194725dfd54bf0b9b5ae00"
+    },
+    {
+      "path": "docs/01_management/project-plan.md",
+      "sha256": "ffb34cde979fc793225a03f3b7e0fab1835319f0c0c4a9c3d82e87aa9f8760a6"
+    },
+    {
+      "path": "docs/01_management/risk-register.md",
+      "sha256": "bb055c4bee57884b67a180e700dba10dc362cd786d0f6a7530ea28922e219071"
+    },
+    {
+      "path": "docs/02_requirements/rtm-traceability-matrix.md",
+      "sha256": "23e877c3473ce03cd933e3753ad4751f6dc5449b0ee0a718f4e8d0047da4a3f6"
+    },
+    {
+      "path": "docs/02_requirements/software-requirements.md",
+      "sha256": "1f7e70f599a9838f9af74af08b5e6227ade5491f7ac20817b681fe3362ff4a99"
+    },
+    {
+      "path": "docs/02_requirements/uat-acceptance-certificate.md",
+      "sha256": "2f55a04083dacaf22a917a1eeb0339b445a5787c57d2b685a905123721e22d2a"
+    },
+    {
+      "path": "docs/02_requirements/user-requirements.md",
+      "sha256": "d35c732757c3796dc24b58a886308000d9341ce141444c338bf60ae6f0b41978"
+    },
+    {
+      "path": "docs/03_design/architecture-design-hld.md",
+      "sha256": "cf5db659c3bce39c13f3cb1dba59bbb84bbfe7015b4743e502fb9eff13e75237"
+    },
+    {
+      "path": "docs/03_design/database-design-erd.md",
+      "sha256": "da82a0a477434bd1204290a510a399401c2e5799ff6ec48d7d7f7e02969d5be5"
+    },
+    {
+      "path": "docs/04_implementation/coding-standards.md",
+      "sha256": "6f6be8f9e44d016359e49447d16df43df4be05d18a35adbcce3a22508e1c5fc0"
+    },
+    {
+      "path": "docs/04_implementation/mutation-testing-guide.md",
+      "sha256": "7217b3fb73257ca2bdb6ab6df77cbe64634d227c17ddbf3acc158f5ac1153454"
+    },
+    {
+      "path": "docs/05_verification/test-summary-report.md",
+      "sha256": "9f7b6d373bcb2901f62c426988e909b05131f59971c2d0d336d3d7bc95cb4cd9"
+    },
+    {
+      "path": "docs/06_quality_assurance/car-prevention.md",
+      "sha256": "f743d952b85c53fe6a802f089d3b0e5e3851bc7895f83f1da45ad90251d1173e"
+    },
+    {
+      "path": "docs/06_quality_assurance/configuration-audit.md",
+      "sha256": "63a113672f0dea40094b8813ef697c2d02c27f7c3180644ee1d40b6bf4bc8349"
+    },
+    {
+      "path": "docs/07_release/release-notes.md",
+      "sha256": "56b2636091ed3441409976251293efa076f2978fbec1b3b55b2925ea2b169336"
+    },
+    {
+      "path": "docs/07_release/system-deployment-sop.md",
+      "sha256": "97bffb41b02ddd4b78075c4b40c6c76deea3240c6a06c9b9f1c38d9abd84e7fb"
+    },
+    {
+      "path": "docs/08_sre/01_slo_sli_metrics/SLO-SLI-ERROR-BUDGET-MATRIX.md",
+      "sha256": "4104cac6261c71cf79a1db5cc8d989b3150decac64c5973d7199945a459ee548"
+    },
+    {
+      "path": "docs/09_operations/tenant-governance.md",
+      "sha256": "56dfc3e15e6ae62b3e6f75d5ffee7430c9483d66a1b8bc2dbadfed013e38ab6c"
+    },
+    {
+      "path": "docs/specs/core/init-baseline/brief.json",
+      "sha256": "204022305c38bf5d0ef90e44bba88be69bdcb09576c8e86e7dac489ef4dcf194"
+    },
+    {
+      "path": "docs/specs/core/init-baseline/bugs.md",
+      "sha256": "ba18728fe3d67eaf9a8a1b09948f72078630903f2b292b8c9687570868e5e407"
+    },
+    {
+      "path": "docs/specs/core/init-baseline/design.md",
+      "sha256": "f2f80e00daf85eb25bd40f7cc9dcb01ba1224171fd2f6fd607c8ea66443e2ab9"
+    },
+    {
+      "path": "docs/specs/core/init-baseline/evidence.json",
+      "sha256": "c9d3af4791dccf118e2ea58e690f47272f58c8fc0a7187e6a80a7a5974b75783"
+    },
+    {
+      "path": "docs/specs/core/init-baseline/feature.json",
+      "sha256": "ec3c9db562da6e1cd4df22f216dc3962ff8f1c880bbe116aea7b2a95af362373"
+    },
+    {
+      "path": "docs/specs/core/init-baseline/prototype.md",
+      "sha256": "a08c89981cd50f885872050deacaa40daea56474a086cb607e1d6559fb7a0364"
+    },
+    {
+      "path": "docs/specs/core/init-baseline/requirements.md",
+      "sha256": "7fb56b3f9ad56eb8d758c4744005ebf65a5f4cc0c25713bf4e5aafc357ddf42d"
+    },
+    {
+      "path": "docs/specs/core/init-baseline/runbook.json",
+      "sha256": "e2fe5ec7ade99287de4b13cd5622b68df7dc176fadf2ee60997fe5baa226b1d7"
+    },
+    {
+      "path": "docs/specs/core/init-baseline/selection.md",
+      "sha256": "fc4e0c632c7101b98fe6cfe606b79aeae11b5e64395c6399606fb126c074c1e2"
+    },
+    {
+      "path": "docs/specs/core/init-baseline/spec.json",
+      "sha256": "fb55f6a636e4ca32a73566c14d6edd2ea99238b2a3a9137ab0a81eebf7ce66e7"
+    },
+    {
+      "path": "docs/specs/core/init-baseline/tasks.md",
+      "sha256": "a741dfdce68943673b5ddb5df3792c2d3c7eede1d2d0f62ed98aa28be7407e6e"
+    },
+    {
+      "path": "scripts/archive-spec.cjs",
+      "sha256": "7d93122701e1402917b983ad098ae2fe083c31296b72fc506b6e403ba5c79bab"
+    },
+    {
+      "path": "scripts/check-contracts.mjs",
+      "sha256": "221811a3b6be0e275eeba184005c12706a03d02204a5c0763ef80f0218671def"
+    },
+    {
+      "path": "scripts/check-fork-surface.mjs",
+      "sha256": "acdfda23136329b45860be98a66ec163a6504a18737423d023e8f03a5a32fb64"
+    },
+    {
+      "path": "scripts/check-release-baseline.mjs",
+      "sha256": "77a27168d4f9c25c309a0f8a8db5a6c0b25e2ff5ed582566a112bde92e7f143d"
+    },
+    {
+      "path": "scripts/check-specs-health.cjs",
+      "sha256": "6ebc5be0aa8435a705d5aa3a64b0dea6b9c739bfda0adbc55bfb85aa04373b57"
+    },
+    {
+      "path": "scripts/cmmi-asset-scaffold.cjs",
+      "sha256": "0cac3595db340133ed1d1927986cfbd228339c18f5a6b1e6690de428817d4335"
+    },
+    {
+      "path": "scripts/lib/ontology-callchain-engine.cjs",
+      "sha256": "65914029a06537dc0d1f21964cb2426d4a26a67c5736221c190769f206b67cac"
+    },
+    {
+      "path": "scripts/lib/spec-resolver.cjs",
+      "sha256": "80e0c29b2258ae453950056f481236b089a92dfde9dacfd690e2ad6f8f53c678"
+    },
+    {
+      "path": "scripts/run-tests.mjs",
+      "sha256": "c72a536cedcbeda4483745d7ba3a783f13c2768e8ba80a40479c912b7d77d12e"
+    },
+    {
+      "path": "scripts/speckit.cjs",
+      "sha256": "a53368e858e53091b5b9968491ac4d08c5dd51890ed12268a73c2b89b3955d4d"
+    },
+    {
+      "path": "scripts/verify-reqs.mjs",
+      "sha256": "98344637bcf37b170433f6f7c7bf141f602416f9abd1d47455214baf1e6f910a"
+    }
+  ]
+}

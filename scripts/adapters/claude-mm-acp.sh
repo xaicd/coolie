@@ -15,5 +15,7 @@ fi
 # Export MiniMax API endpoint defaults if not set
 export ANTHROPIC_BASE_URL="${ANTHROPIC_BASE_URL:-https://api.minimaxi.com/anthropic}"
 export ANTHROPIC_MODEL="${ANTHROPIC_MODEL:-MiniMax-M3}"
+export CLAUDE_CODE_DISABLE_UNKNOWN_MODEL_WINDOW_ENFORCEMENT=1
+export CLAUDE_CODE_MAX_CONTEXT_TOKENS=1000000
 
 exec node "${DIR}/claude-profile-acp.mjs" --settings "$SETTINGS_PATH" --model "$ANTHROPIC_MODEL" "$@"

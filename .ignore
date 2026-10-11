@@ -1,0 +1,27 @@
+# .ignore / .rgignore
+# -----------------------------------------------------------------------------
+# Ripgrep & AI Agent Search Engine Ignore Filter
+# 
+# 作用: 
+# 1. 本文件中的路径依然正常受 Git 跟踪与提交 (不影响 Git 版本控制);
+# 2. 但 Claude Code, Cursor, VS Code, ripgrep (rg) 等 AI 工具执行默认全局代码搜索时,
+#    会自动跳过本文件列出的文档与产物目录, 彻底消除 GREP 搜索污染!
+# 3. 若需显式检索文档, 只需指定目录: 如 `rg "keyword" docs-coolie/`
+# -----------------------------------------------------------------------------
+
+# 文档、白皮书、历史计划与规范库 (防止代码搜索被文档刷屏)
+docs-coolie/
+doc/
+releases/
+screenshots/
+.agents/
+
+# 构建产物、缓存与临时数据
+dist/
+build/
+*.tsbuildinfo
+.turbo/
+.cache/
+coverage/
+data/
+*.log

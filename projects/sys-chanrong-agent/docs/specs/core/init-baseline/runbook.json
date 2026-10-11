@@ -1,0 +1,33 @@
+{
+  "feature": "init-baseline",
+  "domain": "core",
+  "type": "feature",
+  "windowMinutes": 60,
+  "steps": [
+    {
+      "name": "G1 需求门禁预检",
+      "command": "node scripts/verify-reqs.mjs",
+      "rollback": null
+    },
+    {
+      "name": "G2 架构隔离与治理门禁",
+      "command": "node scripts/check-fork-surface.mjs",
+      "rollback": null
+    },
+    {
+      "name": "G3 静态契约与编译守卫",
+      "command": "node scripts/check-contracts.mjs",
+      "rollback": "git checkout -- ."
+    },
+    {
+      "name": "G4 全栈验收测试",
+      "command": "node scripts/run-tests.mjs",
+      "rollback": "git checkout -- ."
+    },
+    {
+      "name": "G5 不可变发布基线守卫",
+      "command": "node scripts/check-release-baseline.mjs",
+      "rollback": "git checkout -- ."
+    }
+  ]
+}

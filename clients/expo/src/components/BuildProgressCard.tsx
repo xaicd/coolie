@@ -13,7 +13,7 @@ import type { StatusDotKind } from "../components/StatusDot";
  * BUILD_TRIGGER_PATTERN 必须保持一致 —— 客户端决定何时打出这张卡,
  * 服务端决定是否接受这次请求, 两边都按同一个正则判定。
  */
-export const BUILD_TRIGGER_PATTERN = /^(?:build|开发|做)\s+/i;
+export const BUILD_TRIGGER_PATTERN = /^(?:build|开发|做|立项|极速立项|商业立项)\s+/i;
 
 export function isBuildPrompt(text: string): boolean {
   return BUILD_TRIGGER_PATTERN.test(text.trim());

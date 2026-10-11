@@ -90,7 +90,10 @@ test-results/
 
 # A crash dump is not an artifact: `core` was 1.3 GB of one here. `coscli` writes
 # its log and output beside the checkout, and both are run output, not source.
-core
+# Anchor the dump rule to the repo root (`/core`): a bare `core` also swallowed
+# every `docs/specs/core/` spec-domain directory (platform specs and per-project
+# init-baseline specs), which are real tracked source.
+/core
 coscli.log
 coscli_output/
 
@@ -142,3 +145,5 @@ docs-coolie/evidence/e2e/**/artifacts/
 # Client delivery project workspaces (independent git repos / isolated workspaces managed by Paperclip)
 projects/sys-jiuxia-smart/
 projects/sys-yunnan-wecom/
+
+/ontology/

@@ -730,6 +730,25 @@ const geminiLocalAdapter: ServerAdapterModule = {
   getConfigSchema: getGeminiConfigSchema,
 };
 
+const agyLocalAdapter: ServerAdapterModule = {
+  ...geminiLocalAdapter,
+  type: "agy_local",
+  acp: {
+    agentId: "agy",
+    skillsMode: "ephemeral",
+    prerequisites: {
+      nodeRange: ">=24.11.0",
+      packages: [],
+    },
+  },
+  sessionManagement: getAdapterSessionManagement("agy_local") ?? undefined,
+  getRuntimeCommandSpec: (config) => ({
+    command: readConfiguredCommand(config, "scripts/adapters/docker-agy-acp.sh"),
+    detectCommand: readConfiguredCommand(config, "scripts/adapters/docker-agy-acp.sh"),
+    installCommand: null,
+  }),
+};
+
 const grokLocalAdapter: ServerAdapterModule = {
   type: "grok_local",
   runtimeToolDelivery: "environment",
@@ -872,6 +891,7 @@ function registerBuiltInAdapters() {
     httpAdapter,
     coolieNativeAdapter,
     dshAdapter,
+    agyLocalAdapter,
   ]) {
     adaptersByType.set(adapter.type, adapter);
   }

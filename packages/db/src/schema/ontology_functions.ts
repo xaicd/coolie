@@ -27,6 +27,9 @@ import { plugins } from "./plugins.js";
  * - `pluginId` is the provider that registered the function. NULL means it is
  *   defined by the control plane itself (e.g. "create issue", "transition
  *   issue status").
+ *
+ * @deprecated [DEPRECATED / CORPSE SWEEP] wave250 legacy ontology table (0 references in server/shared).
+ * Kept for backward schema compatibility; do NOT use in new code. Living ontology now uses dynamic projection from core physical tables.
  */
 export const ontologyFunctions = pgTable(
   "ontology_functions",

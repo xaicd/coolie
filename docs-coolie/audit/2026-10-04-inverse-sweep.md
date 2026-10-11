@@ -2,7 +2,7 @@
 
 **方向**: 前几轮审计都是 client→server (客户端调的都活着)。本轮反向: server 注册的 933 条路由里,
 哪些**没有任何客户端调用** — 即「建成但不可达」的产品面 (InboxScreen 型孤儿的服务端镜像)。
-复跑方式: `python3 docs-coolie/audits/inverse-sweep.py` (纯静态, 无需起服务)。
+复跑方式: `python3 docs-coolie/audit/inverse-sweep.py` (纯静态, 无需起服务)。
 
 **客户端面 (6)**: api-client SDK / ui (web, 含 ui/src/api/* 相对路径层) / h5 / expo / cli / expo-paperclip-web。
 

@@ -25,6 +25,15 @@ export const PIPELINE_TRIGGER_PATTERN = /^(?:建|创建|新建)\s*pipeline\s+(.+
 export const PLAN_TRIGGER_PATTERN = /^(?:plan|规划|设计)\s+(.+)$/i;
 /** 「开 pr xxx」/「提交 pr xxx」/「建 pr xxx」 */
 export const PR_TRIGGER_PATTERN = /^(?:开|提交|建)\s*pr\s+(.+)$/i;
+/**
+ * wave368-fix-mm: 老板问项目列表时的客户端拦截触发词。
+ * 含 "项目列表"/"我的项目"/"有哪些项目"/"项目有哪"/"项目呢"/
+ * 「看下项目/看看项目/列下项目」/「show projects / list projects」。
+ * 命中后客户端直接调 `GET /api/companies/:id/projects` 真查真回,
+ * 杜绝数字员工回 "拉一下,先看接口" 的伪回复 (违反 AGENTS.md §6 极简主义)。
+ */
+export const PROJECTS_TRIGGER_PATTERN =
+  /(项目列表|我的项目|有哪些项目|项目有哪|项目呢|看[一下]?项目|列[一下]?项目|show\s+projects?|list\s+projects?)/i;
 
 /**
  * wave19 指令分发回执文案. 英文 key 对齐 i18n 约定, 值即 App 里展示的中文。
@@ -43,7 +52,7 @@ export function tCommand(key: string): string {
   return COMMAND_MESSAGES[key] ?? key;
 }
 
-export type CommandKind = "build" | "pipeline" | "plan" | "pr" | "chat";
+export type CommandKind = "build" | "pipeline" | "plan" | "pr" | "projects" | "chat";
 
 export interface ParsedCommand {
   kind: CommandKind;
@@ -69,6 +78,11 @@ export function parseCommand(rawText: string): ParsedCommand {
 
   if (isBuildPrompt(text)) {
     return { kind: "build", subject: text.replace(BUILD_TRIGGER_PATTERN, "").trim() };
+  }
+
+  // wave368-fix-mm: 老板问项目列表时, 客户端直接拦下走 listProjects, 不进 LLM 流。
+  if (PROJECTS_TRIGGER_PATTERN.test(text)) {
+    return { kind: "projects", subject: text };
   }
 
   return { kind: "chat", subject: text };

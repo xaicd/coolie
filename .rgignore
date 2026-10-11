@@ -1,0 +1,19 @@
+# .rgignore
+# -----------------------------------------------------------------------------
+# Ripgrep & AI Agent Search Engine Ignore Filter
+# -----------------------------------------------------------------------------
+
+docs-coolie/
+doc/
+releases/
+screenshots/
+.agents/
+
+dist/
+build/
+*.tsbuildinfo
+.turbo/
+.cache/
+coverage/
+data/
+*.log

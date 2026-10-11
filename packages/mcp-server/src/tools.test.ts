@@ -764,5 +764,66 @@ describe("spec-driven MCP tools (wave147)", () => {
     expect(Array.isArray(body.task.files)).toBe(true);
     expect(body.parentSpecId).toBeNull();
   });
+
+  it("paperclipGetCompanyOntologyGraph fetches graph with parameters", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ nodes: [], edges: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getTool("paperclipGetCompanyOntologyGraph").execute({
+      rootType: "agent",
+      rootId: "22222222-2222-2222-2222-222222222222",
+      depth: 2,
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(
+      `http://localhost:3100/api/companies/${COMPANY_A}/ontology/graph?root_type=agent&root_id=22222222-2222-2222-2222-222222222222&depth=2`,
+    );
+    expect(init.method).toBe("GET");
+  });
+
+  it("paperclipGetCompanyOntologyStats fetches stats", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ totalEntities: 10, totalRelations: 20 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getTool("paperclipGetCompanyOntologyStats").execute({});
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(
+      `http://localhost:3100/api/companies/${COMPANY_A}/ontology/stats`,
+    );
+    expect(init.method).toBe("GET");
+  });
+
+  it("paperclipListPluginTools lists plugin tools with optional pluginId", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ name: "plugin-ontology:query" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getTool("paperclipListPluginTools").execute({ pluginId: "plugin-ontology" });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/plugins/tools?pluginId=plugin-ontology");
+    expect(init.method).toBe("GET");
+  });
+
+  it("paperclipExecutePluginTool posts to execute endpoint with run context", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ result: "ok" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getTool("paperclipExecutePluginTool").execute({
+      tool: "plugin-ontology:query",
+      parameters: { domain: "scm" },
+    });
+
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/plugins/tools/execute");
+    expect(init.method).toBe("POST");
+    const body = JSON.parse(String(init.body));
+    expect(body.tool).toBe("plugin-ontology:query");
+    expect(body.parameters).toEqual({ domain: "scm" });
+    expect(body.runContext.companyId).toBe(COMPANY_A);
+    expect(body.runContext.agentId).toBe("22222222-2222-2222-2222-222222222222");
+    expect(body.runContext.runId).toBe("33333333-3333-3333-3333-333333333333");
+  });
 });
 

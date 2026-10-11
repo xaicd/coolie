@@ -99,7 +99,9 @@
 - ✅ **契约 5【大盘活体穿透契约 (Penetrative Living Metrics)】**：驾驶舱与大盘的所有指标必须具备本体可解释性，支持点击任意视标一键下钻穿透至底层的真实 Object 记录与 Action 履约流；
 - ✅ **契约 6【真实沙箱验证契约 (Real-DB Sandbox)】**：涉及本体业务规则与状态机流转的测试，必须运行在本地 PGlite 嵌入式数据库或物理库之上，基于真实数据执行断言；
 - ✅ **契约 7【全盘模型内聚契约 (Schema Cohesion)】**：优先深度复用全盘 263 张物理表成熟模型与业务管网，保持系统的高内聚、低熵演进与极简人机交互；
-- ✅ **契约 8【Schema 受控迁移契约 (Controlled Migration)】**：本体元数据与数据表演进必须统一通过 Drizzle migration 脚本进行声明式版本管理，确保生产环境变更平滑有序。
+- ✅ **契约 8【Schema 受控迁移契约 (Controlled Migration)】**：本体元数据与数据表演进必须统一通过 Drizzle migration 脚本进行声明式版本管理，确保生产环境变更平滑有序；
+- ✅ **契约 9【消除死报表与动词闭环契约 (Anti-Dashboard Kinetic Loop)】**：严禁出现只看不干、无法发起行动的孤岛页面或假大屏。任何业务洞察（Insights）必须物理一跳就地收敛为一个可确认、可回写的闭环 `ActionType`；
+- ✅ **契约 10【分支沙箱与平行演练契约 (What-If Branching Simulation)】**：涉及高危业务调度与重大资产决策的操作，必须支持在本体隔离分支（Branching）中模拟推演并比对损益（Simulate before Execute），确保真实物理世界不受未经演练的高危扰动。
 
 ---
 

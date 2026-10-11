@@ -8,8 +8,41 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { Company, Project } from "@coolie/api-client";
+import type { Company, Project, ProjectWbsView } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
+
+function getGateChipStyle(status?: string | null) {
+  if (status === "achieved") {
+    return {
+      bg: "rgba(16, 185, 129, 0.12)",
+      border: C.ok,
+      color: C.ok,
+      suffix: " ✓",
+    };
+  }
+  if (status === "in_progress") {
+    return {
+      bg: "rgba(94, 106, 210, 0.12)",
+      border: C.accent,
+      color: C.accent,
+      suffix: " …",
+    };
+  }
+  if (status === "blocked") {
+    return {
+      bg: "rgba(239, 68, 68, 0.12)",
+      border: C.err,
+      color: C.err,
+      suffix: " ✕",
+    };
+  }
+  return {
+    bg: C.lineSubtle,
+    border: C.line,
+    color: C.ink4,
+    suffix: "",
+  };
+}
 import { RADIUS, SPACING } from "../ui/tokens";
 import { AppCard } from "../ui/AppCard";
 import { EmptyState } from "../ui/EmptyState";
@@ -75,6 +108,8 @@ interface ProjectsScreenProps {
   /** wave153 — 直达该项目的交付产物列表。 */
   onOpenProjectArtifacts?: (project: Project) => void;
   onOpenWebProjects?: (path?: string, title?: string) => void;
+  /** wave365 — 直达该项目专属工坊会话。 */
+  onOpenProjectChat?: (project: Project) => void;
 }
 
 /**
@@ -92,8 +127,10 @@ export function ProjectsScreen({
   onCreateTaskForProject,
   onOpenProjectArtifacts,
   onOpenWebProjects,
+  onOpenProjectChat,
 }: ProjectsScreenProps) {
   const [projects, setProjects] = useState<Project[]>([]);
+  const [wbsByProject, setWbsByProject] = useState<Record<string, ProjectWbsView>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -110,6 +147,21 @@ export function ProjectsScreen({
       try {
         const list = await coolie.listProjects(company.id);
         setProjects(list);
+
+        // 并行加载各项目的 CMMI WBS 里程碑与质量门禁真实达成态势
+        const wbsResults = await Promise.allSettled(
+          list.map(async (p) => {
+            const wbs = await coolie.getProjectWbs(company.id, p.id);
+            return [p.id, wbs] as const;
+          }),
+        );
+        const map: Record<string, ProjectWbsView> = {};
+        for (const res of wbsResults) {
+          if (res.status === "fulfilled" && res.value) {
+            map[res.value[0]] = res.value[1];
+          }
+        }
+        setWbsByProject(map);
       } catch (e) {
         setError(String((e as Error)?.message ?? e));
       } finally {
@@ -236,7 +288,7 @@ export function ProjectsScreen({
           >
             <Ionicons name="add-circle-outline" size={15} color={C.ink} style={{ marginRight: 4 }} />
             <Text style={styles.newProjectBtnText} numberOfLines={1}>
-              极速立项 / 导入代码库
+              立项
             </Text>
           </Pressable>
         </AppCard>
@@ -262,6 +314,19 @@ export function ProjectsScreen({
             const statusColor = projectStatusColor(project.status);
             const workspaces = project.workspaces ?? [];
             const primaryWorkspace = project.primaryWorkspace ?? workspaces[0];
+            const projWbs = wbsByProject[project.id];
+            const phases = projWbs?.mainline?.phases;
+            const g1Status = phases ? phases[0]?.milestone?.status : (project.taskCount ? "achieved" : null);
+            const g2Status = phases ? phases[1]?.milestone?.status : (project.taskCount ? "achieved" : null);
+            const g3Status = phases ? phases[3]?.milestone?.status : (project.taskCount ? "achieved" : null);
+            const g4Status = phases ? phases[4]?.milestone?.status : (project.taskCount ? "achieved" : null);
+            const g5Status = phases ? phases[5]?.milestone?.status : (project.taskCount ? "achieved" : null);
+
+            const g1Style = getGateChipStyle(g1Status);
+            const g2Style = getGateChipStyle(g2Status);
+            const g3Style = getGateChipStyle(g3Status);
+            const g4Style = getGateChipStyle(g4Status);
+            const g5Style = getGateChipStyle(g5Status);
 
             return (
               <AppCard
@@ -359,22 +424,22 @@ export function ProjectsScreen({
                   </View>
                 ) : null}
 
-                {/* CMMI 质量门禁状态条 (G1~G5) */}
+                {/* CMMI 质量门禁状态条 (G1~G5 动态联动) */}
                 <View style={styles.cmmiGateBar}>
-                  <View style={[styles.cmmiGateChip, { backgroundColor: "rgba(16, 185, 129, 0.12)", borderColor: C.ok }]}>
-                    <Text style={[styles.cmmiGateText, { color: C.ok }]}>G1 需求 ✓</Text>
+                  <View style={[styles.cmmiGateChip, { backgroundColor: g1Style.bg, borderColor: g1Style.border }]}>
+                    <Text style={[styles.cmmiGateText, { color: g1Style.color }]}>G1 需求{g1Style.suffix}</Text>
                   </View>
-                  <View style={[styles.cmmiGateChip, { backgroundColor: "rgba(16, 185, 129, 0.12)", borderColor: C.ok }]}>
-                    <Text style={[styles.cmmiGateText, { color: C.ok }]}>G2 方案 ✓</Text>
+                  <View style={[styles.cmmiGateChip, { backgroundColor: g2Style.bg, borderColor: g2Style.border }]}>
+                    <Text style={[styles.cmmiGateText, { color: g2Style.color }]}>G2 方案{g2Style.suffix}</Text>
                   </View>
-                  <View style={[styles.cmmiGateChip, { backgroundColor: "rgba(94, 106, 210, 0.12)", borderColor: C.accent }]}>
-                    <Text style={[styles.cmmiGateText, { color: C.accent }]}>G3 契约/0报错</Text>
+                  <View style={[styles.cmmiGateChip, { backgroundColor: g3Style.bg, borderColor: g3Style.border }]}>
+                    <Text style={[styles.cmmiGateText, { color: g3Style.color }]}>G3 契约{g3Style.suffix}</Text>
                   </View>
-                  <View style={[styles.cmmiGateChip, { backgroundColor: C.lineSubtle, borderColor: C.line }]}>
-                    <Text style={[styles.cmmiGateText, { color: C.ink3 }]}>G4 验收</Text>
+                  <View style={[styles.cmmiGateChip, { backgroundColor: g4Style.bg, borderColor: g4Style.border }]}>
+                    <Text style={[styles.cmmiGateText, { color: g4Style.color }]}>G4 验收{g4Style.suffix}</Text>
                   </View>
-                  <View style={[styles.cmmiGateChip, { backgroundColor: C.lineSubtle, borderColor: C.line }]}>
-                    <Text style={[styles.cmmiGateText, { color: C.ink4 }]}>G5 投产</Text>
+                  <View style={[styles.cmmiGateChip, { backgroundColor: g5Style.bg, borderColor: g5Style.border }]}>
+                    <Text style={[styles.cmmiGateText, { color: g5Style.color }]}>G5 投产{g5Style.suffix}</Text>
                   </View>
                 </View>
 
@@ -530,7 +595,7 @@ export function ProjectsScreen({
                       </View>
                     </View>
 
-                    {/* 操作动作按钮组 */}
+                    {/* 操作动作按钮组: 统一严格遵循两字按钮公理，去除与底部导航重复的冗余建单 */}
                     <View style={styles.actionButtonsRow}>
                       {onOpenWebProjects ? (
                         <Pressable
@@ -541,10 +606,10 @@ export function ProjectsScreen({
                               `${project.name} · 控制台`,
                             )
                           }
-                          accessibilityLabel="打开项目全量控制台"
+                          accessibilityLabel="打开项目控制台"
                         >
                           <Ionicons name="desktop-outline" size={14} color={C.accent} />
-                          <Text style={styles.actionBtnTextSecondary}>项目控制台</Text>
+                          <Text style={styles.actionBtnTextSecondary}>控制</Text>
                         </Pressable>
                       ) : null}
 
@@ -552,19 +617,21 @@ export function ProjectsScreen({
                         <Pressable
                           style={styles.actionBtnPrimary}
                           onPress={() => onOpenProjectTasks(project)}
+                          accessibilityLabel="查看项目任务"
                         >
                           <Ionicons name="list" size={14} color={C.ink} />
                           <Text style={styles.actionBtnTextPrimary}>任务</Text>
                         </Pressable>
                       ) : null}
 
-                      {onCreateTaskForProject ? (
+                      {onOpenProjectChat ? (
                         <Pressable
                           style={styles.actionBtnSecondary}
-                          onPress={() => onCreateTaskForProject(project)}
+                          onPress={() => onOpenProjectChat(project)}
+                          accessibilityLabel="进入该项目专属工坊"
                         >
-                          <Ionicons name="add" size={14} color={C.accent} />
-                          <Text style={styles.actionBtnTextSecondary}>建单</Text>
+                          <Ionicons name="chatbubbles-outline" size={14} color={C.accent} />
+                          <Text style={styles.actionBtnTextSecondary}>工坊</Text>
                         </Pressable>
                       ) : null}
 

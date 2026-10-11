@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import os from "node:os";
 
 /**
  * The one-shot `hermes chat` call the build-mode planners share.
@@ -58,6 +59,7 @@ export async function requestHermesOneShot(input: HermesOneShotInput): Promise<s
         cwd: input.cwd ?? "/tmp",
         env: {
           ...process.env,
+          PATH: `${os.homedir()}/.local/bin:${os.homedir()}/.cargo/bin:/opt/homebrew/bin:/usr/local/bin:${process.env.PATH ?? ""}`,
           ...(input.apiUrl ? { PAPERCLIP_API_URL: input.apiUrl } : {}),
           PAPERCLIP_COMPANY_ID: input.companyId,
           // Coolie fork: optional persona name passthrough. Only set when

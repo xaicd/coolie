@@ -35,6 +35,9 @@ import { companies } from "./companies.js";
  *   absent (the jsonb column is forward-compatible).
  * - `schemaVersion` bumps on every write so a listener can replay changes
  *   without diffing the whole blob.
+ *
+ * @deprecated [DEPRECATED / CORPSE SWEEP] wave250 legacy ontology table (0 references in server/shared).
+ * Kept for backward schema compatibility; do NOT use in new code. Living ontology now uses dynamic projection from core physical tables.
  */
 export const ontologyProperties = pgTable(
   "ontology_properties",

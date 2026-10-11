@@ -311,7 +311,7 @@ beforeEach(() => {
 
 describe("first meaningful native agent event", () => {
   const event = (eventType: string, payload: Record<string, unknown>) =>
-    ({ eventType, payload }) as PrpEvent;
+    ({ eventType, payload }) as any;
 
   it("accepts nonempty assistant and reasoning deltas", () => {
     expect(
@@ -4370,7 +4370,7 @@ describe("provider plan synchronization", () => {
 });
 
 describe("native conversation replies", () => {
-  const reply: PrpEvent = {
+  const reply: any = {
     schema: "paperclip.prp.event.v1", sourceInstanceId: "runner-1",
     sourceEventId: "runner-1:run-1:8", sourceSeq: 8, sourceKind: "runner",
     runId: "run-1", normalizedSessionId: "session-1", turnId: "turn-1",
@@ -4379,7 +4379,7 @@ describe("native conversation replies", () => {
     payload: { kind: "agentMessage", channel: "final", text: "Which project should own this?" },
   };
   const terminal = { ...reply, sourceEventId: "runner-1:run-1:9", sourceSeq: 9,
-    eventType: "turn.completed", payload: { status: "completed" } } as PrpEvent;
+    eventType: "turn.completed", payload: { status: "completed" } } as any;
   const input = { conversation: true, replyEvent: reply, terminalEvent: terminal,
     completionContract: { revision: "1", objective: "Ongoing conversation",
       criteria: [{ id: "objective", requirement: "Help the user" }] } };
@@ -4396,7 +4396,7 @@ describe("native conversation replies", () => {
   it.each(["turn.failed", "turn.cancelled", "turn.interrupted"])(
     "does not reinterpret a %s provider turn as a chat reply", (eventType) => {
       expect(nativeConversationReplyResult({ ...input,
-        terminalEvent: { ...terminal, eventType } as PrpEvent })).toBeNull();
+        terminalEvent: { ...terminal, eventType } as any })).toBeNull();
     },
   );
 
@@ -4523,7 +4523,7 @@ describe("native governed waits", () => {
     const observation = createGovernedWaitEventObservation(
       async () => waitResult,
     );
-    const replayedEvent: PrpEvent = {
+    const replayedEvent: any = {
       schema: "paperclip.prp.event.v1" as const,
       sourceInstanceId: "runner-recovered",
       sourceEventId: "runner-recovered:item:7",

@@ -1,0 +1,18 @@
+{
+  "feature": "fraud-dual-approval",
+  "domain": "core",
+  "type": "enhancement",
+  "windowMinutes": 10,
+  "steps": [
+    {
+      "name": "门禁预检",
+      "command": "npm test",
+      "rollback": null
+    },
+    {
+      "name": "实施与自动化测试",
+      "command": "npm test",
+      "rollback": "git checkout -- ."
+    }
+  ]
+}

@@ -463,7 +463,7 @@ export function SpecEditorScreen({
                   onPress={() => void save(true)}
                   testID="SpecEditor__ActionBar__SaveDraftBtn"
                 >
-                  <Text style={styles.btnDraftText}>存草稿</Text>
+                  <Text style={styles.btnDraftText}>草稿</Text>
                 </Pressable>
                 <Pressable
                   style={[styles.btnPrimary, (!ready || saving) && styles.btnDisabled]}

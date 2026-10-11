@@ -671,6 +671,14 @@ export class CoolieClient extends BaseCoolieClient {
     );
   }
 
+  /** POST /api/notifications/read-all — 一键全部标记已读 */
+  async markAllNotificationsRead(companyId: string): Promise<{ success: boolean; unreadCount: number }> {
+    return this.request<{ success: boolean; unreadCount: number }>(
+      "POST",
+      `/api/notifications/read-all?companyId=${encodeURIComponent(companyId)}`,
+    );
+  }
+
   /**
    * GET /api/companies/:id/pipelines — 公司全部 pipeline (只读)。
    *

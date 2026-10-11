@@ -292,11 +292,11 @@ export function WhatsNewScreen({ visible, onClose, onViewDemo }: WhatsNewScreenP
             {onViewDemo ? (
               <Pressable style={[styles.btn, styles.btnGhost]} onPress={onViewDemo}>
                 <Ionicons name="play-circle-outline" size={18} color={C.accent} />
-                <Text style={styles.btnGhostText}>查看演示</Text>
+                <Text style={styles.btnGhostText}>演示</Text>
               </Pressable>
             ) : null}
             <Pressable style={[styles.btn, styles.btnPrimary]} onPress={onClose}>
-              <Text style={styles.btnPrimaryText}>我知道了</Text>
+              <Text style={styles.btnPrimaryText}>明白</Text>
             </Pressable>
           </View>
         </ScrollView>

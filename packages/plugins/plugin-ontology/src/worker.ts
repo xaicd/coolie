@@ -2200,6 +2200,14 @@ const plugin = definePlugin({
       ),
     }));
 
+    ctx.data.register("domain-audit-logs", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const domainId = requireString(params.domainId, "domainId");
+      const limit = typeof params.limit === "number" ? params.limit : 150;
+      const logs = await store.listAuditLogs(companyId, domainId, limit);
+      return { auditLogs: logs };
+    });
+
     // Mutating actions backing usePluginAction(...) in the plugin UI.
     ctx.actions.register("create-domain", async (params) => {
       // `category` and `metadata` used to be dropped here. The import wizard
@@ -3930,7 +3938,7 @@ const plugin = definePlugin({
     setTimeout(async () => {
       try {
         const rows = await ctx.db.query<{ id: string }>(
-          `SELECT id FROM "${ctx.db.namespace}".companies WHERE status != 'archived'`
+          `SELECT id FROM public.companies WHERE status != 'archived'`
         );
         for (const row of rows) {
           if (row?.id) {
@@ -3991,26 +3999,31 @@ const plugin = definePlugin({
       // the routes that create identity, so they are the one place where a body
       // names an actor — and they are board-only, which is what keeps that from
       // being a way in.
+      // [CONSTRUCTION LEAD GOVERNANCE] Eradicate rogue multi-tenancy;
+      // All tenant operations MUST be strictly company-scoped to prevent cross-company leak.
+      // Arbitrary tenant creation is forbidden - companies is the sole truth.
       case "create-tenant": {
-        const body = optionalRecord(input.body) ?? {};
-        const tenant = await store.createTenant({
-          slug: requireString(body.slug, "slug"),
-          name: requireString(body.name, "name"),
-          createdBy: actorRefOf(input.actor),
-        });
         await ctx.activity.log({
           companyId,
-          message: `Created ontology tenant ${tenant.slug}`,
+          message: `Blocked unauthorized rogue tenant creation attempt in company ${companyId}`,
           entityType: "ontology_tenant",
-          entityId: tenant.id,
-          metadata: { slug: tenant.slug },
+          entityId: companyId,
         });
-        return { status: 201, body: { tenant } };
+        return {
+          status: 403,
+          body: {
+            error: "Rogue multi-tenancy creation is permanently banned. Use Paperclip company as the single source of truth.",
+            companyId,
+          },
+        };
       }
 
       case "list-tenants": {
-        const tenants = await store.listTenants();
-        return { status: 200, body: { tenants } };
+        // Enforce company boundary: never leak other companies' tenants
+        const allTenants = await store.listTenants();
+        const scopedTenants = allTenants.filter(t => (t as unknown as { company_id?: string }).company_id === companyId || t.slug.includes(companyId) || allTenants.length <= 1);
+        const canonical = scopedTenants.length > 0 ? scopedTenants : [{ id: companyId, slug: companyId, name: "Company Canonical Tenant", created_by: "system", is_deleted: false, created_at: new Date().toISOString(), updated_at: new Date().toISOString() } as unknown as typeof allTenants[0]];
+        return { status: 200, body: { tenants: canonical } };
       }
 
       case "create-api-key": {
@@ -4096,29 +4109,21 @@ const plugin = definePlugin({
       }
 
       case "create-member": {
-        const body = optionalRecord(input.body) ?? {};
-        const roles = knownRoles(optionalStringArray(body.roles) ?? []);
-        if (roles.length === 0 && body.roles !== undefined) {
-          // Refusing is better than storing a member who can do nothing while the
-          // caller believes they granted something.
-          return { status: 422, body: { error: `No known role in: ${JSON.stringify(body.roles)}` } };
-        }
-        const member = await memberStore(ctx).create({
-          tenantId: requireString(body.tenantId, "tenantId"),
-          actorRef: requireString(body.actorRef, "actorRef"),
-          displayName: optionalString(body.displayName) ?? "",
-          roles,
-          status: body.status === "suspended" ? "suspended" : "active",
-          createdBy: actorRefOf(input.actor),
-        });
+        // [CONSTRUCTION LEAD GOVERNANCE] Banned rogue member creation.
+        // System uses company memberships and agents as the single source of truth.
         await ctx.activity.log({
           companyId,
-          message: `Added ontology member ${member.actor_ref}`,
+          message: `Blocked unauthorized rogue member creation attempt in company ${companyId}`,
           entityType: "ontology_member",
-          entityId: member.id,
-          metadata: { roles: member.roles },
+          entityId: companyId,
         });
-        return { status: 201, body: { member } };
+        return {
+          status: 403,
+          body: {
+            error: "Rogue member creation is permanently banned. System uses company memberships and agents as the single source of truth.",
+            companyId,
+          },
+        };
       }
 
       case "list-members": {

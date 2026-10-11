@@ -29,6 +29,9 @@ import { plugins } from "./plugins.js";
  * - `pluginId`/`source` describe where the row came from. `source` is free
  *   text on purpose: "internal" / "plugin:<id>" / "imported" — there is no
  *   fixed enumeration of sources yet.
+ *
+ * @deprecated [DEPRECATED / CORPSE SWEEP] wave250 legacy ontology table (0 references in server/shared).
+ * Kept for backward schema compatibility; do NOT use in new code. Living ontology now uses dynamic projection from core physical tables.
  */
 export const ontologyTypes = pgTable(
   "ontology_types",

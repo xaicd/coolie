@@ -92,13 +92,13 @@ docker cp agy-ubuntu-container:/workspace/docs-coolie/research/wave280-palantir-
 
 | 类型 | 路径 |
 |---|---|
-| 原型 / 选型表 | `docs-coolie/prototypes/<YYYY-MM-DD>-<slug>.md` |
+| 原型 / 选型表 | `docs-coolie/protos/<YYYY-MM-DD>-<slug>.md` |
 | 调研报告 | `docs-coolie/research/<slug>.md` |
 | Audit 报告 | `docs-coolie/audit/<YYYY-MM-DD>-<slug>/<files>.md` |
 | Evidence | `docs-coolie/evidence/wave<NNN>/PROMPT-AGY.md` (原 prompt) + `agy-runner.sh` (wrapper) + 报告 cp 出来的成品 |
 
 跑完一份 agy 报告必走:
-1. `docs-coolie/prototypes/` / `docs-coolie/research/` 落到本地仓库
+1. `docs-coolie/protos/` / `docs-coolie/research/` 落到本地仓库
 2. `docs-coolie/evidence/wave<NNN>/PROMPT-AGY.md` 留原 prompt (老板复审用)
 3. 真跑验证: `head -5 <报告>` 应看到中文不乱码 (验 UTF-8 包装成功)
 

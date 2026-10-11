@@ -31,8 +31,8 @@ import {
  * resume path advances the chain. Nothing in this module schedules work itself.
  */
 
-/** "build xxx" / "开发 xxx" / "做 xxx" at the start of a board message. */
-export const BUILD_TRIGGER_PATTERN = /^(?:build|开发|做)\s+/i;
+/** "build xxx" / "开发 xxx" / "做 xxx" / "立项 xxx" / "极速立项 xxx" at the start of a board message. */
+export const BUILD_TRIGGER_PATTERN = /^(?:build|开发|做|立项|极速立项|商业立项)\s+/i;
 
 export const BUILD_STEP_KINDS = [
   "requirements",
@@ -48,7 +48,7 @@ export type BuildStepKind = (typeof BUILD_STEP_KINDS)[number];
  * hires `engineer`/`designer`/`qa`/`pm` agents, and `BUILD_AGENT_TYPE_ROLE_CHAIN`
  * maps a phase owner onto the roles that can staff it.
  */
-export const BUILD_AGENT_TYPES = ["arch", "dev", "qa", "pm"] as const;
+export const BUILD_AGENT_TYPES = ["arch", "dev", "qa", "pm", "sre"] as const;
 export type BuildAgentType = (typeof BUILD_AGENT_TYPES)[number];
 
 export const BUILD_STEP_AGENT_TYPE: Record<BuildStepKind, BuildAgentType> = {
@@ -56,7 +56,7 @@ export const BUILD_STEP_AGENT_TYPE: Record<BuildStepKind, BuildAgentType> = {
   design: "arch",
   impl: "dev",
   test: "qa",
-  release: "pm",
+  release: "sre",
 };
 
 export const BUILD_AGENT_TYPE_LABELS: Record<BuildAgentType, string> = {
@@ -64,6 +64,7 @@ export const BUILD_AGENT_TYPE_LABELS: Record<BuildAgentType, string> = {
   dev: "研发",
   qa: "测试",
   pm: "产品",
+  sre: "发布",
 };
 
 /**
@@ -71,12 +72,17 @@ export const BUILD_AGENT_TYPE_LABELS: Record<BuildAgentType, string> = {
  * `general` so a company staffed with only generic agents can still run a build
  * instead of silently creating an unassigned chain that never advances — an
  * unassigned step is never woken, because the wake path requires an assignee.
+ * 
+ * Coolie fork: Palantir Foundry roles (fda, core-swe, fdse, pre-sre, ds) take
+ * precedence so that the factory's real digital employee fleet (墨斗, 铁匠, 门神, 兑底渊, 百晓生)
+ * are assigned first.
  */
 export const BUILD_AGENT_TYPE_ROLE_CHAIN: Record<BuildAgentType, AgentRole[]> = {
-  arch: ["cto", "designer", "engineer", "general"],
-  dev: ["engineer", "cto", "designer", "general"],
-  qa: ["qa", "engineer", "general"],
-  pm: ["pm", "general"],
+  arch: ["fda", "cto", "designer", "engineer", "general"],
+  dev: ["core-swe", "engineer", "cto", "designer", "general"],
+  qa: ["fdse", "qa", "engineer", "general"],
+  pm: ["pm", "ds", "general"],
+  sre: ["pre-sre", "devops", "pm", "general"],
 };
 
 /** Templated titles, used when the planner is unavailable or half-answers. */

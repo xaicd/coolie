@@ -26,9 +26,10 @@ import type {
   Project,
   WorkspaceRuntimeService,
 } from "@coolie/api-client";
-import { C, COOLIE_BASE_URL, coolie, getAuthToken } from "../coolie";
+import { C, COOLIE_BASE_URL, coolie, getAuthToken, getSessionCookieHeaderValue } from "../coolie";
 import { CodeViewerWebView } from "../components/CodeViewerWebView";
 import { openInExternalApp } from "../utils/openExternalApp";
+import { downloadAndShareFile } from "../utils/fileDownloader";
 import { AppCard } from "../ui/AppCard";
 import { Chip } from "../ui/Chip";
 import { EmptyState } from "../ui/EmptyState";
@@ -40,6 +41,7 @@ import { RADIUS } from "../ui/tokens";
 import { ExternalOpenSheet } from "../components/ExternalOpenSheet";
 import { FilterSheet, type FilterOption } from "../components/FilterSheet";
 import { ArtifactVersionSheet } from "../components/ArtifactVersionSheet";
+import { ProjectDirectoryTree } from "../components/ProjectDirectoryTree";
 import type { SandboxScope } from "./PrototypeSandboxScreen";
 
 export interface ArtifactsScreenProps {
@@ -66,6 +68,38 @@ function sandboxScopeFor(artifact: CompanyArtifact): SandboxScope {
     projectId: artifact.project?.id ?? null,
     projectName: artifact.project?.name ?? null,
   };
+}
+
+export function isBinaryArtifact(item?: CompanyArtifact | null): boolean {
+  if (!item) return false;
+  const ct = (item.contentType ?? "").toLowerCase();
+  const title = (item.title ?? "").toLowerCase();
+  const path = (item.openPath || item.downloadPath || "").toLowerCase();
+  return (
+    ct.includes("word") ||
+    ct.includes("officedocument") ||
+    ct.includes("pdf") ||
+    ct.includes("excel") ||
+    ct.includes("spreadsheet") ||
+    ct.includes("powerpoint") ||
+    ct.includes("presentation") ||
+    ct.includes("zip") ||
+    ct.includes("octet-stream") ||
+    ct.includes("android.package-archive") ||
+    ct.includes("gzip") ||
+    title.endsWith(".docx") ||
+    title.endsWith(".doc") ||
+    title.endsWith(".xlsx") ||
+    title.endsWith(".pptx") ||
+    title.endsWith(".pdf") ||
+    title.endsWith(".zip") ||
+    title.endsWith(".apk") ||
+    title.endsWith(".tar.gz") ||
+    path.endsWith(".apk") ||
+    path.endsWith(".tar.gz") ||
+    path.endsWith(".pdf") ||
+    path.endsWith(".zip")
+  );
 }
 
 type FilterKind = "all" | "cmmi_baseline" | "image" | "document" | "work_product";
@@ -184,6 +218,13 @@ export function ArtifactsScreen({
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     initialProjectId ?? null,
   );
+  const [viewMode, setViewMode] = useState<"tree" | "cards">("tree");
+
+  useEffect(() => {
+    if (selectedProjectId || filter === "work_product") {
+      setViewMode("tree");
+    }
+  }, [selectedProjectId, filter]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectSheetOpen, setProjectSheetOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -193,6 +234,9 @@ export function ArtifactsScreen({
   const [showExternalSheet, setShowExternalSheet] = useState(false);
   const [externalSheetUrl, setExternalSheetUrl] = useState<string | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [fullContent, setFullContent] = useState<string | null>(null);
+  const [fetchingContent, setFetchingContent] = useState(false);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   /**
    * wave153 — 请求序号。`projectId`/`q`/`filter` 变化会重发请求, 但响应可能乱序
    * 到达: 例如挂载时的「全部产物」请求慢于用户随后选项目发的请求, 「全部产物」
@@ -208,6 +252,48 @@ export function ArtifactsScreen({
   }, []);
 
   useEffect(() => {
+    if (!previewArtifact) {
+      setFullContent(null);
+      setFetchingContent(false);
+      return;
+    }
+    const path = previewArtifact.openPath || previewArtifact.contentPath;
+    const isTextDoc =
+      previewArtifact.contentType?.includes("markdown") ||
+      previewArtifact.contentType?.includes("json") ||
+      previewArtifact.contentType?.includes("text") ||
+      previewArtifact.source === "document" ||
+      previewArtifact.mediaKind === "text";
+
+    if (path && isTextDoc) {
+      setFetchingContent(true);
+      const url = path.startsWith("/") ? `${COOLIE_BASE_URL}${path}` : path;
+      void (async () => {
+        try {
+          const token = await getAuthToken();
+          const cookie = await getSessionCookieHeaderValue();
+          const headers: Record<string, string> = {};
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          if (cookie) headers["Cookie"] = cookie;
+          const res = await fetch(url, { headers });
+          if (res.ok) {
+            const body = await res.text();
+            setFullContent(body);
+          } else {
+            setFullContent(previewArtifact.previewText || null);
+          }
+        } catch {
+          setFullContent(previewArtifact.previewText || null);
+        } finally {
+          setFetchingContent(false);
+        }
+      })();
+    } else {
+      setFullContent(previewArtifact.previewText || null);
+    }
+  }, [previewArtifact]);
+
+  useEffect(() => {
     void coolie
       .listProjects(companyId)
       .then(setProjects)
@@ -217,11 +303,13 @@ export function ArtifactsScreen({
   const loadArtifacts = useCallback(async () => {
     const seq = ++reqSeqRef.current;
     try {
-      const kindParam: CompanyArtifactMediaKind | "all" | undefined =
+      const kindParam: any =
         filter === "work_product"
           ? undefined
           : filter === "all"
           ? "all"
+          : filter === "cmmi_baseline"
+          ? "cmmi_baseline"
           : (filter as CompanyArtifactMediaKind);
 
       const res = await coolie.listArtifacts(companyId, {
@@ -349,6 +437,25 @@ export function ArtifactsScreen({
       return;
     }
 
+    if (isBinaryArtifact(artifact)) {
+      const url = resolveMediaUrl(artifact.downloadPath || artifact.contentPath || artifact.openPath);
+      if (url) {
+        let dlFilename = artifact.title;
+        const cleanPath = (artifact.openPath || artifact.downloadPath || "");
+        const urlMatch = cleanPath.match(/\/([^\/?#]+\.(apk|tar\.gz|pdf|zip|yml))$/i);
+        if (urlMatch && urlMatch[1]) {
+          dlFilename = urlMatch[1];
+        }
+        void downloadAndShareFile({
+          url,
+          filename: dlFilename,
+          title: artifact.title,
+          mimeType: artifact.contentType ?? undefined,
+        });
+        return;
+      }
+    }
+
     // 若为代码/原型产物，且包含 URL 或原型特征，可引导前往沙箱或 Diff
     if (artifact.source === "work_product") {
       let targetUrl = artifact.openPath || artifact.contentPath || "";
@@ -469,12 +576,63 @@ export function ArtifactsScreen({
           />
           {selectedProjectId ? (
             <Chip
-              label="清除项目筛选"
+              label="清除"
               active={false}
               onPress={() => setSelectedProjectId(null)}
             />
           ) : null}
         </ScrollView>
+
+        {/* wave282 — 视图模式切换 (目录 vs 卡片) */}
+        <View style={styles.viewModeRow}>
+          <Text style={styles.viewModeTitle} numberOfLines={1} ellipsizeMode="tail">
+            {selectedProjectId ? `项目全景 · ${projectLabel}` : "产物形态"}
+          </Text>
+          <View style={styles.viewModeToggleGroup}>
+            <Pressable
+              style={[
+                styles.viewModeToggleBtn,
+                viewMode === "tree" && styles.viewModeToggleBtnActive,
+              ]}
+              onPress={() => setViewMode("tree")}
+            >
+              <Ionicons
+                name="folder-open"
+                size={12}
+                color={viewMode === "tree" ? "#FFF" : C.ink3}
+              />
+              <Text
+                style={[
+                  styles.viewModeToggleText,
+                  viewMode === "tree" && styles.viewModeToggleTextActive,
+                ]}
+              >
+                目录
+              </Text>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.viewModeToggleBtn,
+                viewMode === "cards" && styles.viewModeToggleBtnActive,
+              ]}
+              onPress={() => setViewMode("cards")}
+            >
+              <Ionicons
+                name="grid"
+                size={12}
+                color={viewMode === "cards" ? "#FFF" : C.ink3}
+              />
+              <Text
+                style={[
+                  styles.viewModeToggleText,
+                  viewMode === "cards" && styles.viewModeToggleTextActive,
+                ]}
+              >
+                卡片
+              </Text>
+            </Pressable>
+          </View>
+        </View>
 
         {/* 按智能体筛选胶囊行 */}
         {distinctAgents.length > 0 && (
@@ -496,7 +654,7 @@ export function ArtifactsScreen({
                   selectedAgentId === null && styles.agentChipTextActive,
                 ]}
               >
-                全部员工
+                全员
               </Text>
             </Pressable>
             {distinctAgents.map((ag) => {
@@ -524,9 +682,125 @@ export function ArtifactsScreen({
         )}
       </View>
 
-      {/* 产物卡片流列表 */}
+      {/* 产物列表 / 目录树 */}
       {loading ? (
         <LoadingState text="加载交付产物中…" />
+      ) : viewMode === "tree" ? (
+        <ScrollView
+          style={styles.treeScrollView}
+          contentContainerStyle={styles.treeScrollContent}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={C.accent}
+              colors={[C.accent]}
+            />
+          }
+        >
+          {selectedProjectId ? (
+            <ProjectDirectoryTree
+              project={
+                projects.find((p) => p.id === selectedProjectId) || {
+                  id: selectedProjectId,
+                  name: projectLabel,
+                }
+              }
+              artifacts={artifacts.filter(
+                (a) => a.project?.id === selectedProjectId
+              )}
+              onOpenFile={({ title, path, content, language, artifact }) => {
+                if (artifact) {
+                  setPreviewArtifact(artifact);
+                } else {
+                  setPreviewArtifact({
+                    id: path,
+                    title,
+                    previewText: content || "",
+                    contentType: "text/plain",
+                    contentPath: null,
+                    openPath: null,
+                    downloadPath: null,
+                    source: "work_product",
+                    mediaKind: "text",
+                    issue: {
+                      id: "tree-view",
+                      identifier: "CODE",
+                      title: path,
+                    },
+                    project: {
+                      id: selectedProjectId,
+                      name: projectLabel,
+                    },
+                    createdByAgent: null,
+                    version: null,
+                    updatedAt: new Date().toISOString(),
+                    href: "",
+                  });
+                  setFullContent(content || "");
+                }
+              }}
+              onOpenSandbox={(url, title, artifact) => {
+                onOpenSandbox?.(
+                  url,
+                  null,
+                  artifact
+                    ? ({
+                        id: artifact.id,
+                        title: artifact.title,
+                        summary: artifact.previewText || artifact.title,
+                        url,
+                      } as any)
+                    : null,
+                  artifact ? sandboxScopeFor(artifact) : null
+                );
+              }}
+              onDownload={({ url, filename, title, mimeType, sizeText }) => {
+                void downloadAndShareFile({
+                  url,
+                  filename,
+                  title,
+                  mimeType,
+                  sizeText,
+                });
+              }}
+            />
+          ) : (
+            <View style={styles.treeSelectContainer}>
+              <View style={styles.treePickerHeader}>
+                <Text style={styles.treePickerTitle}>📁 请选择交付项目展开工程目录树</Text>
+                <Text style={styles.treePickerDesc}>
+                  每个在制交付项目拥有完整的物理工程目录结构 (wiki · docs/specs · src · deploy)
+                </Text>
+              </View>
+              {projects.map((p) => (
+                <Pressable
+                  key={p.id}
+                  style={styles.projectTreePickCard}
+                  onPress={() => setSelectedProjectId(p.id)}
+                >
+                  <View style={styles.projectTreePickTop}>
+                    <View style={styles.projectTreePickLeft}>
+                      <Text style={styles.projectTreePickIcon}>📦</Text>
+                      <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
+                        <Text style={styles.projectTreePickName} numberOfLines={1} ellipsizeMode="tail">
+                          {p.name}
+                        </Text>
+                        <Text style={styles.projectTreePickSub} numberOfLines={1} ellipsizeMode="tail">
+                          {p.description || "在制商业交付工程项目资产总线"}
+                        </Text>
+                      </View>
+                    </View>
+                    <View style={styles.projectTreePickBtn}>
+                      <Text style={styles.projectTreePickBtnText}>展开</Text>
+                      <Ionicons name="chevron-forward" size={13} color="#FFF" />
+                    </View>
+                  </View>
+                </Pressable>
+              ))}
+            </View>
+          )}
+        </ScrollView>
       ) : (
         <FlatList
           data={filteredList}
@@ -584,7 +858,7 @@ export function ArtifactsScreen({
                     style={styles.emptyActionBtn}
                     onPress={() => setSelectedProjectId(null)}
                   >
-                    <Text style={styles.emptyActionText}>清除项目筛选</Text>
+                    <Text style={styles.emptyActionText}>清除</Text>
                   </Pressable>
                 ) : undefined
               }
@@ -697,14 +971,33 @@ export function ArtifactsScreen({
                 {/* 卡片底端快捷交互 */}
                 <View style={styles.cardFooter}>
                   {isImage ? (
-                    <Pressable
-                      style={styles.actionBtnSecondary}
-                      onPress={() => setPreviewArtifact(item)}
-                    >
-                      <Text style={styles.actionBtnTextSecondary}>
-                        预览
-                      </Text>
-                    </Pressable>
+                    <View style={styles.actionGroup}>
+                      <Pressable
+                        style={styles.actionBtnSecondary}
+                        onPress={() => setPreviewArtifact(item)}
+                      >
+                        <Text style={styles.actionBtnTextSecondary}>预览</Text>
+                      </Pressable>
+                      {Boolean(resolveMediaUrl(item.downloadPath || item.contentPath || item.openPath)) && (
+                        <Pressable
+                          style={styles.actionBtnSecondary}
+                          onPress={() => {
+                            const url = resolveMediaUrl(item.downloadPath || item.contentPath || item.openPath);
+                            if (url) {
+                              let dlFilename = item.title;
+                              const cleanPath = (item.openPath || item.downloadPath || "");
+                              const urlMatch = cleanPath.match(/\/([^\/?#]+\.(apk|tar\.gz|pdf|zip|yml))$/i);
+                              if (urlMatch && urlMatch[1]) {
+                                dlFilename = urlMatch[1];
+                              }
+                              void downloadAndShareFile({ url, filename: dlFilename, title: item.title, mimeType: item.contentType ?? undefined });
+                            }
+                          }}
+                        >
+                          <Text style={styles.actionBtnTextSecondary}>下载</Text>
+                        </Pressable>
+                      )}
+                    </View>
                   ) : isWorkProduct ? (
                     <View style={styles.actionGroup}>
                       <Pressable
@@ -714,8 +1007,6 @@ export function ArtifactsScreen({
                           if (targetUrl && targetUrl.startsWith("/")) {
                             targetUrl = `${COOLIE_BASE_URL}${targetUrl}`;
                           }
-                          // wave138c: 即使没有直开 URL 也进沙箱(列表视图按任务上下文
-                          // 列出全部交付物/附件), 不再导到「预览未就绪」空屏。
                           onOpenSandbox?.(
                             targetUrl,
                             null,
@@ -729,18 +1020,33 @@ export function ArtifactsScreen({
                           );
                         }}
                       >
-                        <Text style={styles.actionBtnTextPrimary}>
-                          沙箱
-                        </Text>
+                        <Text style={styles.actionBtnTextPrimary}>沙箱</Text>
                       </Pressable>
+                      {Boolean(resolveMediaUrl(item.downloadPath || item.contentPath || item.openPath)) && (
+                        <Pressable
+                          style={styles.actionBtnSecondary}
+                          onPress={() => {
+                            const url = resolveMediaUrl(item.downloadPath || item.contentPath || item.openPath);
+                            if (url) {
+                              let dlFilename = item.title;
+                              const cleanPath = (item.openPath || item.downloadPath || "");
+                              const urlMatch = cleanPath.match(/\/([^\/?#]+\.(apk|tar\.gz|pdf|zip|yml))$/i);
+                              if (urlMatch && urlMatch[1]) {
+                                dlFilename = urlMatch[1];
+                              }
+                              void downloadAndShareFile({ url, filename: dlFilename, title: item.title, mimeType: item.contentType ?? undefined });
+                            }
+                          }}
+                        >
+                          <Text style={styles.actionBtnTextSecondary}>下载</Text>
+                        </Pressable>
+                      )}
                       {item.version ? (
                         <Pressable
                           style={styles.actionBtnGhost}
                           onPress={() => setVersionArtifact(item)}
                         >
-                          <Text style={styles.actionBtnTextGhost}>
-                            历史 ({item.version.count})
-                          </Text>
+                          <Text style={styles.actionBtnTextGhost}>历史 ({item.version.count})</Text>
                         </Pressable>
                       ) : null}
                       {onOpenDiff && (
@@ -756,42 +1062,39 @@ export function ArtifactsScreen({
                             })
                           }
                         >
-                          <Text style={styles.actionBtnTextGhost}>
-                            代码
-                          </Text>
+                          <Text style={styles.actionBtnTextGhost}>代码</Text>
                         </Pressable>
                       )}
                     </View>
                   ) : (
                     <View style={styles.actionGroup}>
-                      <View style={styles.fileInfoRow}>
-                        <Text style={styles.fileInfoText}>
-                          {item.contentType || "标准交付资产"}
-                        </Text>
-                      </View>
-                      {Boolean(
-                        resolveMediaUrl(item.downloadPath || item.contentPath || item.openPath),
-                      ) && (
+                      {isBinaryArtifact(item) ? (
+                        <Pressable
+                          style={styles.actionBtnPrimary}
+                          onPress={() => {
+                            const url = resolveMediaUrl(item.downloadPath || item.contentPath || item.openPath);
+                            if (url) void downloadAndShareFile({ url, filename: item.title, title: item.title, mimeType: item.contentType ?? undefined });
+                          }}
+                        >
+                          <Text style={styles.actionBtnTextPrimary}>打开</Text>
+                        </Pressable>
+                      ) : (
+                        <Pressable
+                          style={styles.actionBtnSecondary}
+                          onPress={() => setPreviewArtifact(item)}
+                        >
+                          <Text style={styles.actionBtnTextSecondary}>预览</Text>
+                        </Pressable>
+                      )}
+                      {Boolean(resolveMediaUrl(item.downloadPath || item.contentPath || item.openPath)) && (
                         <Pressable
                           style={styles.actionBtnSecondary}
                           onPress={() => {
-                            const url = resolveMediaUrl(
-                              item.downloadPath || item.contentPath || item.openPath,
-                            );
-                            if (!url) return;
-                            // QA 报告 D02 (wave107): 直接走外部应用, QQ 浏览器优先,
-                            // fallback 到系统浏览器. 不再弹选择 sheet (选择 sheet
-                            // 给用户感觉「App 没帮我打开, 还要我做选择」, 跳出感强).
-                            // 想要三选 (QQ / 系统 / 复制) 的入口保留在预览浮层里.
-                            void openInExternalApp(url, true).catch(() => {
-                              setExternalSheetUrl(url);
-                              setShowExternalSheet(true);
-                            });
+                            const url = resolveMediaUrl(item.downloadPath || item.contentPath || item.openPath);
+                            if (url) void downloadAndShareFile({ url, filename: item.title, title: item.title, mimeType: item.contentType ?? undefined });
                           }}
                         >
-                          <Text style={styles.actionBtnTextSecondary}>
-                            打开
-                          </Text>
+                          <Text style={styles.actionBtnTextSecondary}>下载</Text>
                         </Pressable>
                       )}
                     </View>
@@ -836,22 +1139,24 @@ export function ArtifactsScreen({
                         previewArtifact?.contentPath ||
                         previewArtifact?.openPath,
                     );
-                    if (!url) return;
-                    void openInExternalApp(url, true).catch(() => {
-                      setExternalSheetUrl(url);
-                      setShowExternalSheet(true);
+                    if (!url || !previewArtifact) return;
+                    void downloadAndShareFile({
+                      url,
+                      filename: previewArtifact.title,
+                      title: previewArtifact.title,
+                      mimeType: previewArtifact.contentType,
                     });
                   }}
                   hitSlop={8}
                   style={styles.modalDownloadBtn}
                 >
                   <Ionicons
-                    name="open-outline"
+                    name="download-outline"
                     size={14}
                     color={C.accent}
                     style={{ marginRight: 4 }}
                   />
-                  <Text style={styles.modalDownloadBtnText}>打开</Text>
+                  <Text style={styles.modalDownloadBtnText}>下载</Text>
                 </Pressable>
               )}
               <Pressable
@@ -878,11 +1183,42 @@ export function ArtifactsScreen({
                   contentFit="contain"
                   transition={300}
                 />
+              ) : isBinaryArtifact(previewArtifact) ? (
+                <View style={styles.binaryFileContainer}>
+                  <Text style={styles.binaryFileIcon}>📄</Text>
+                  <Text style={styles.binaryFileTitle}>{previewArtifact.title}</Text>
+                  <Text style={styles.binaryFileSubtitle}>
+                    {previewArtifact.contentType || "标准工程文档"}
+                  </Text>
+                  <Pressable
+                    style={styles.binaryDownloadBtn}
+                    onPress={() => {
+                      const url = resolveMediaUrl(
+                        previewArtifact?.downloadPath ||
+                          previewArtifact?.contentPath ||
+                          previewArtifact?.openPath,
+                      );
+                      if (url) {
+                        void downloadAndShareFile({
+                          url,
+                          filename: previewArtifact.title,
+                          title: previewArtifact.title,
+                          mimeType: previewArtifact.contentType ?? undefined,
+                        });
+                      }
+                    }}
+                  >
+                    <Text style={styles.binaryDownloadBtnText}>下载</Text>
+                  </Pressable>
+                </View>
               ) : (
                 <CodeViewerWebView
                   code={
-                    previewArtifact.previewText ||
-                    `// 交付资产：${previewArtifact.title}\n// 来源：${previewArtifact.source}\n// 路径：${previewArtifact.openPath || previewArtifact.contentPath || "无固定路径"}\n// 类型：${previewArtifact.contentType || "纯文本"}`
+                    fetchingContent
+                      ? "// 正在拉取文档全文内容，请稍候...\n"
+                      : (fullContent ||
+                        previewArtifact.previewText ||
+                        `// 交付资产：${previewArtifact.title}\n// 来源：${previewArtifact.source}\n// 路径：${previewArtifact.openPath || previewArtifact.contentPath || "无固定路径"}\n// 类型：${previewArtifact.contentType || "纯文本"}`)
                   }
                   language={
                     previewArtifact.contentType?.includes("json")
@@ -891,6 +1227,8 @@ export function ArtifactsScreen({
                       ? "javascript"
                       : previewArtifact.contentType?.includes("diff")
                       ? "diff"
+                      : previewArtifact.contentType?.includes("markdown")
+                      ? "markdown"
                       : "typescript"
                   }
                   isDiff={previewArtifact.contentType?.includes("diff")}
@@ -1406,6 +1744,158 @@ const styles = StyleSheet.create({
   sandboxHeroBtnText: {
     fontSize: 12,
     fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  binaryFileContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    gap: 12,
+  },
+  binaryFileIcon: {
+    fontSize: 56,
+    marginBottom: 8,
+  },
+  binaryFileTitle: {
+    color: C.ink,
+    fontSize: 16,
+    fontWeight: "600",
+    textAlign: "center",
+  },
+  binaryFileSubtitle: {
+    color: C.ink3,
+    fontSize: 13,
+    textAlign: "center",
+    marginBottom: 12,
+  },
+  binaryDownloadBtn: {
+    backgroundColor: C.brand,
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  binaryDownloadBtnText: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "600",
+  },
+  viewModeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 4,
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  viewModeTitle: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: C.ink2,
+    flex: 1,
+    marginRight: 8,
+  },
+  viewModeToggleGroup: {
+    flexDirection: "row",
+    backgroundColor: "rgba(255, 255, 255, 0.05)",
+    borderRadius: RADIUS.sm,
+    padding: 2,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+    flexShrink: 0,
+  },
+  viewModeToggleBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  viewModeToggleBtnActive: {
+    backgroundColor: C.accent,
+  },
+  viewModeToggleText: {
+    fontSize: 11,
+    fontWeight: "600",
+    color: C.ink3,
+  },
+  viewModeToggleTextActive: {
+    color: "#FFFFFF",
+  },
+  treeScrollView: {
+    flex: 1,
+  },
+  treeScrollContent: {
+    paddingBottom: 40,
+  },
+  treeSelectContainer: {
+    padding: 16,
+    gap: 12,
+  },
+  treePickerHeader: {
+    marginBottom: 8,
+  },
+  treePickerTitle: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: C.ink,
+    marginBottom: 4,
+  },
+  treePickerDesc: {
+    fontSize: 12,
+    color: C.ink3,
+    lineHeight: 18,
+  },
+  projectTreePickCard: {
+    backgroundColor: C.surface,
+    borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: C.line,
+    padding: 14,
+    marginBottom: 8,
+  },
+  projectTreePickTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  projectTreePickLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    flex: 1,
+    minWidth: 0,
+    marginRight: 8,
+  },
+  projectTreePickIcon: {
+    fontSize: 22,
+  },
+  projectTreePickName: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: C.ink,
+    marginBottom: 2,
+    flexShrink: 1,
+  },
+  projectTreePickSub: {
+    fontSize: 11,
+    color: C.ink3,
+    flexShrink: 1,
+  },
+  projectTreePickBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: C.accent,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: RADIUS.sm,
+    flexShrink: 0,
+  },
+  projectTreePickBtnText: {
+    fontSize: 11,
+    fontWeight: "700",
     color: "#FFFFFF",
   },
 });

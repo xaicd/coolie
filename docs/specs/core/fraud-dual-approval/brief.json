@@ -1,0 +1,131 @@
+{
+  "name": "fraud-dual-approval",
+  "domain": "core",
+  "title": "高危反诈双人会签",
+  "type": "enhancement",
+  "goal": "<!-- 待填: 一句话说清『性能/容量/可用性优化目标与量化指标』 -->",
+  "baselineMetric": "<!-- 待填: 当前基线表现（如 p95 响应时间、吞吐 RPS、CPU 使用率） -->",
+  "targetMetric": "<!-- 待填: 优化后的目标指标（如 p95 < 50ms, RPS > 10,000） -->",
+  "roles": [
+    {
+      "role": "终端访问用户",
+      "can": "享受极速流畅的接口响应与毫秒级渲染"
+    },
+    {
+      "role": "SRE 稳定性工程师",
+      "can": "确信高并发峰值期系统具备充足容量与熔断护栏"
+    }
+  ],
+  "stories": [
+    {
+      "priority": "P0",
+      "text": "<!-- 待填: 建立标准性能测试基准用例 (Benchmark) -->"
+    },
+    {
+      "priority": "P0",
+      "text": "<!-- 待填: 消除热点锁竞争/慢查询/冗余 I/O -->"
+    },
+    {
+      "priority": "P1",
+      "text": "<!-- 待填: 运行真实压测验证吞吐与耗时达标 -->"
+    }
+  ],
+  "constraints": [
+    "容量护栏：高负载下不得发生内存泄露或连接池耗尽。",
+    "数据强一致性：性能优化绝不能牺牲事务隔离性与多租户安全。"
+  ],
+  "acceptance": [
+    {
+      "check": "`npm run check` exit=0"
+    },
+    {
+      "check": "<!-- 待填: 压测报告显示达成目标指标（RPS / p95） -->"
+    }
+  ],
+  "nonGoals": [
+    "不在本次优化中改动核心业务数据模型"
+  ],
+  "architecture": "<!-- 待填: 性能加速链路（如 局部缓存、非阻塞 I/O） -->",
+  "entities": [
+    {
+      "table": "<!-- 待填: 涉及的表名 -->",
+      "note": "<!-- 待填 -->"
+    }
+  ],
+  "invariants": [
+    {
+      "name": "数据幂等与一致性",
+      "how": "高并发场景下防超卖与防脏读"
+    }
+  ],
+  "ui": [
+    "<!-- 待填: 响应提速体感优化 -->"
+  ],
+  "ops": [
+    "<!-- 待填: 压测脚本、监控指标与限流熔断阈值 -->"
+  ],
+  "risks": [
+    {
+      "risk": "缓存穿透/击穿/雪崩",
+      "mitigation": "设置随机 TTL 与互斥锁兜底"
+    }
+  ],
+  "screens": [
+    {
+      "name": "性能大盘",
+      "wireframe": "监控仪表盘"
+    }
+  ],
+  "interactions": [
+    "保持既有交互不变"
+  ],
+  "states": [
+    "加载中：正常展示。",
+    "空数据：正常展示。",
+    "出错：正常展示。",
+    "成功：正常展示。"
+  ],
+  "candidates": [
+    {
+      "name": "本地缓存与索引优化",
+      "type": "自研",
+      "license": "MIT",
+      "risk": "无"
+    }
+  ],
+  "benchmarks": [
+    "Google SRE 容量管理实践"
+  ],
+  "scan": [
+    "链路性能 Profile 与 FlameGraph 分析"
+  ],
+  "licenseConclusion": "可商用，无合规风险",
+  "tasks": [
+    {
+      "id": "T1",
+      "parent": "main",
+      "title": "建立压测性能基线 (Baseline Benchmark)",
+      "files": [
+        "<!-- 待填: 测试文件 -->"
+      ]
+    },
+    {
+      "id": "T2",
+      "parent": "T1",
+      "title": "实现性能优化与瓶颈消解",
+      "files": [
+        "<!-- 待填: 核心优化代码 -->"
+      ]
+    },
+    {
+      "id": "T3",
+      "parent": "main",
+      "title": "运行对照压测并验证达标",
+      "files": [
+        "-"
+      ]
+    }
+  ],
+  "dependencies": "T1 → T2 → T3",
+  "windowMinutes": 10
+}

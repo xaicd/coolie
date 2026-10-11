@@ -8,16 +8,18 @@ description: CMMI 3 技术解决方案与架构选型 (TS/DAR/RSKM) 核心技能
 > **CMMI 过程域**: Technical Solution (TS), Decision Analysis and Resolution (DAR), Risk Management (RSKM)  
 > **门禁对应**: G2 架构隔离与治理门禁 (`gate_g2_arch`)  
 > **主责工匠角色**: FDA 前线架构师 (`emp_fda`)  
-> **核心产出**: 《系统概要设计说明书 (HLD)》、《多企业数据隔离方案》、《技术选型决策分析表 (DAR)》
+> **核心产出**: 0-1 软件工程资产包 —— 《系统概要设计说明书 (HLD)》、《多企业/租户数据物理隔离方案》、《技术选型决策分析表 (DAR 加权打分)》
 
 ---
 
 ## 1. 技能定位与核心原则
 
 在 CMMI 体系与高可靠架构工程中，任何代码实现之前必须确立不可逾越的边界约束：
-1. **隔离边界必须强校验**: 企业隔离（Company Scoping）、租户与组织隔离、角色权限控制（RBAC）必须在架构与持久化层有强制防线，不允许靠自觉。
-2. **决策必须有量化依据 (DAR)**: 关键技术选型（框架、存储选型、通信协议、模型选型）不得拍脑袋，必须采用 CMMI 5 推荐的多准则加权打分法（Weighted Decision Matrix）。
-3. **架构不可擅自越界**: 任何涉及跨服务依赖、第三方集成、上游分支代码修改，必须在架构图与变更面中 100% 显式登记。
+1. **0-1 软件架构资产本质**: G2 交付的是**软件系统自身的拓扑架构、物理隔离实现切面与选型量化依据**，必须有代码/Schema 级的物理落点，绝不是运行时生产数据。
+2. **隔离边界必须强校验**: 企业隔离（Company Scoping）、租户与组织隔离、角色权限控制（RBAC）必须在架构与持久化层有强制防线，不允许靠自觉。
+3. **决策必须有量化依据 (DAR)**: 关键技术选型（框架、存储选型、通信协议、模型选型）不得拍脑袋，必须采用 CMMI 5 推荐的多准则加权打分法（Weighted Decision Matrix）。
+4. **架构不可擅自越界**: 任何涉及跨服务依赖、第三方集成、上游分支代码修改，必须在架构图与变更面中 100% 显式登记。
+5. **No Artifact, No Done 铁律**: HLD 与 DAR 方案必须作为物理 Work Product 挂载到工单，未挂载实体产物严禁通过 G2 门禁。
 
 ---
 
@@ -29,22 +31,23 @@ flowchart TD
   B --> C["定义数据流与多企业物理/逻辑隔离方案"]
   C --> D["执行技术选型加权决策分析 (DAR Matrix)"]
   D --> E["识别技术风险与制定应急预案 (RSKM)"]
-  E --> F["输出 HLD 架构规约 (docs/cmmi/02-hld.md)"]
+  E --> F["输出 HLD 架构规约 (docs/architecture/architecture-hld.md)"]
   F --> G["执行本地 G2 门禁校验: node scripts/check-fork-surface.mjs"]
 ```
 
-1. **架构拓扑绘制**: 明确展现服务接入层、网关层、业务逻辑层、存储底座与外部系统依赖。
-2. **多企业隔离规约**: 标明每个实体表 `company_id` 过滤逻辑、RPC 鉴权上下文传递链路、隔离越权拦截策略。
-3. **技术选型 DAR 打分**:
+1. **资产双轨映射**: 优先通过 Paperclip 原生 API 挂载至工单富文本文档（`POST /api/issues/:id/documents`，key: `architecture`），在控制面实现富文本预览与批注；本地代码工作区采用工程标准 `docs/architecture/` 目录（如 `docs/architecture/architecture-hld.md` 与 `dar-decision-records.md`，彻底弃用 `.coolie/cmmi/` 隐藏单文件），并通过 `issue_work_products` 登记索引。开源基座（如 RuoYi、Semantica 等）100% 保持基座原生目录结构。
+2. **架构拓扑绘制**: 明确展现服务接入层、网关层、业务逻辑层、存储底座与外部系统依赖。
+3. **多企业隔离规约**: 标明每个实体表 `company_id` 过滤逻辑、RPC 鉴权上下文传递链路、隔离越权拦截策略。
+4. **技术选型 DAR 打分**:
    - 候选方案（方案 A、方案 B、方案 C）
    - 评价准则（性能、可维护性、成本、团队熟悉度、生态成熟度）及权重
    - 综合打分与选型裁定。
-4. **输出标准文档**: 编写 `docs/cmmi/02-hld.md`。
-5. **门禁命令执行**: 运行项目本地 `scripts/check-fork-surface.mjs` 或架构检查脚本，确认架构无越权、边界无漂移。
+5. **输出标准文档**: 编写 `docs/architecture/architecture-hld.md` 与 `docs/architecture/dar-decision-records.md`。
+6. **门禁命令执行**: 运行项目本地 `scripts/check-fork-surface.mjs` 或架构检查脚本，确认架构无越权、边界无漂移。
 
 ---
 
-## 3. 产物模板基线 (`docs/cmmi/02-hld.md`)
+## 3. 产物模板基线 (`docs/architecture/architecture-hld.md`)
 
 ```markdown
 # [系统名称] 系统概要设计与架构决策说明书 (HLD & DAR)
@@ -79,8 +82,9 @@ graph TD
 
 ## 4. G2 门禁通过准则 (Definition of Done)
 - [ ] 架构分层清晰，对外暴露契约协议明确。
-- [ ] 企业/租户数据隔离机制通过安全性推演与静态审查。
-- [ ] 核心技术选型附带完整 DAR 加权评估表。
+- [ ] 企业/租户数据物理隔离机制通过代码层检验与静态审查。
+- [ ] 核心技术选型附带完整 DAR 加权评估表（权重和为 100%）。
+- [ ] 必须将 HLD / DAR 架构说明书作为物理 Work Product (kind: artifact/document) 挂载至工单 (No Artifact, No Done)。
 - [ ] G2 检查脚本（如 `check-fork-surface.mjs`）验证通过，无未登记漂移。
 
 ---

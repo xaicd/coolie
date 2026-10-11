@@ -92,21 +92,70 @@ export function createMemberStore(db: SqlClient): MemberStore {
       return created;
     },
 
-    getById: (tenantId, id) =>
-      read(`SELECT ${MEMBER_COLS} FROM ${table} WHERE tenant_id = $1 AND id = $2 AND is_deleted = false`, [tenantId, id]),
+    async getById(tenantId, id) {
+      const row = await read(`SELECT ${MEMBER_COLS} FROM ${table} WHERE tenant_id = $1 AND id = $2 AND is_deleted = false`, [tenantId, id]);
+      if (row) return row;
+      try {
+        const agentRows = await db.query<Record<string, unknown>>(
+          `SELECT id, company_id, name, role, title, status FROM public.agents WHERE company_id = $1 AND id = $2 AND status != 'terminated'`,
+          [tenantId, id],
+        );
+        if (agentRows[0]) {
+          const a = agentRows[0];
+          return {
+            id: String(a.id),
+            tenant_id: String(a.company_id),
+            actor_ref: `agent:${a.id}`,
+            display_name: `${a.name}${a.title ? ` (${a.title})` : ` (${a.role})`}`,
+            roles: [String(a.role || "modeler")],
+            status: a.status === "error" ? "suspended" : "active",
+            is_deleted: false,
+          };
+        }
+      } catch {}
+      return null;
+    },
 
-    getByRef: (tenantId, actorRef) =>
-      read(
+    async getByRef(tenantId, actorRef) {
+      const row = await read(
         `SELECT ${MEMBER_COLS} FROM ${table} WHERE tenant_id = $1 AND actor_ref = $2 AND is_deleted = false`,
         [tenantId, actorRef],
-      ),
+      );
+      if (row) return row;
+      if (actorRef.startsWith("agent:")) {
+        const agentId = actorRef.slice(6);
+        return this.getById(tenantId, agentId);
+      }
+      return null;
+    },
 
     async list(tenantId) {
-      const rows = await db.query<Record<string, unknown>>(
-        `SELECT ${MEMBER_COLS} FROM ${table} WHERE tenant_id = $1 AND is_deleted = false ORDER BY actor_ref`,
-        [tenantId],
-      );
-      return rows.map(toRecord);
+      const out: MemberRecord[] = [];
+      try {
+        const agentRows = await db.query<Record<string, unknown>>(
+          `SELECT id, company_id, name, role, title, status FROM public.agents WHERE company_id = $1 AND status != 'terminated' ORDER BY name`,
+          [tenantId],
+        );
+        for (const a of agentRows) {
+          out.push({
+            id: String(a.id),
+            tenant_id: String(a.company_id),
+            actor_ref: `agent:${a.id}`,
+            display_name: `${a.name}${a.title ? ` (${a.title})` : ` (${a.role})`}`,
+            roles: [String(a.role || "modeler")],
+            status: a.status === "error" ? "suspended" : "active",
+            is_deleted: false,
+          });
+        }
+      } catch {}
+      try {
+        const rows = await db.query<Record<string, unknown>>(
+          `SELECT ${MEMBER_COLS} FROM ${table} WHERE tenant_id = $1 AND is_deleted = false ORDER BY actor_ref`,
+          [tenantId],
+        );
+        out.push(...rows.map(toRecord));
+      } catch {}
+      return out;
     },
 
     async update(tenantId, id, update) {

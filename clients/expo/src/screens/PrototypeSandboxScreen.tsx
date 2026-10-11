@@ -39,6 +39,7 @@ import { ScreenHeader } from "../ui/ScreenHeader";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { ExternalOpenSheet } from "../components/ExternalOpenSheet";
 import { openInExternalApp } from "../utils/openExternalApp";
+import { downloadAndShareFile } from "../utils/fileDownloader";
 
 /** 当前沙箱上下文 —— 决定列表视图列出哪些交付物与附件。 */
 export interface SandboxScope {
@@ -81,6 +82,7 @@ interface SandboxDeliverable {
   downloadUrl: string | null;
   source: "work_product" | "attachment" | "document";
   versionLabel: string | null;
+  previewText?: string | null;
 }
 
 // ── 展示辅助 ────────────────────────────────────────────────────────────────
@@ -217,7 +219,7 @@ function resolvePreviewUrl(
 // connect-src 'none' 断脚本外发; sandbox 只能由响应头下发, meta 不支持, 所以这里
 // 退一步只约束资源与网络, 页面仍在 App 自己的 WebView 内执行。
 const INLINE_HTML_CSP =
-  "default-src 'none'; img-src 'self' data: blob:; style-src 'unsafe-inline'; script-src 'unsafe-inline'; font-src 'self' data:; media-src 'self' blob: data:; connect-src 'none'";
+  "default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; img-src * data: blob:; style-src * 'unsafe-inline'; script-src * 'unsafe-inline' 'unsafe-eval' blob:; font-src * data:; media-src * blob: data:;";
 
 function withInlineHtmlCsp(html: string): string {
   const meta = `<meta http-equiv="Content-Security-Policy" content="${INLINE_HTML_CSP}">`;
@@ -361,6 +363,7 @@ function mapWorkProduct(
         versionCount > 1
           ? `v${latest.versionNumber} · 共${versionCount}版`
           : `v${latest.versionNumber}`,
+      previewText: wp.summary ?? null,
     };
   }
   const ct = metaString(wp, "contentType");
@@ -377,6 +380,7 @@ function mapWorkProduct(
     downloadUrl: absoluteUrl(metaString(wp, "downloadPath")) ?? url,
     source: "work_product",
     versionLabel: wp.versionNumber ? `v${wp.versionNumber}` : null,
+    previewText: wp.summary ?? null,
   };
 }
 
@@ -423,12 +427,64 @@ export function PrototypeSandboxScreen({
   onOpenTask,
   onOpenArtifacts,
 }: PrototypeSandboxScreenProps) {
-  const [view, setView] = useState<ViewMode>("list");
+  const [view, setView] = useState<ViewMode>(() => {
+    return (initialUrl && initialUrl.length > 0) || (workProduct && extractPreviewUrl(workProduct))
+      ? "preview"
+      : "list";
+  });
   const [kindFilter, setKindFilter] = useState<KindFilter>("all");
   const [deliverables, setDeliverables] = useState<SandboxDeliverable[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [listError, setListError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<SandboxDeliverable | null>(null);
+  const [selected, setSelected] = useState<SandboxDeliverable | null>(() => {
+    const entryUrl = (initialUrl && initialUrl.length > 0)
+      ? initialUrl
+      : (workProduct ? extractPreviewUrl(workProduct) : null);
+    if (!entryUrl) return null;
+    const title = workProduct?.title || entryUrl.split("/").pop() || "原型沙箱";
+    const kind = classifyKind(
+      (workProduct?.metadata as any)?.contentType || "text/html",
+      title,
+      entryUrl
+    );
+    return {
+      key: `init:${entryUrl}`,
+      title,
+      kind,
+      contentType: (workProduct?.metadata as any)?.contentType || "text/html",
+      size: null,
+      createdAt: null,
+      producer: null,
+      url: entryUrl,
+      downloadUrl: entryUrl,
+      source: "work_product",
+      versionLabel: null,
+      previewText: workProduct?.summary ?? null,
+    };
+  });
+
+  // 当从目录树或产物列表点击特定原型 HTML 传入 initialUrl 时，强制直接切到预览模式，精准渲染该原型
+  useEffect(() => {
+    if (initialUrl && initialUrl.length > 0) {
+      setView("preview");
+      const title = initialUrl.split("/").pop() || "原型沙箱";
+      const kind = classifyKind("text/html", title, initialUrl);
+      setSelected({
+        key: `url:${initialUrl}`,
+        title,
+        kind,
+        contentType: "text/html",
+        size: null,
+        createdAt: null,
+        producer: null,
+        url: initialUrl,
+        downloadUrl: initialUrl,
+        source: "work_product",
+        versionLabel: null,
+        previewText: null,
+      });
+    }
+  }, [initialUrl]);
 
   const [bust, setBust] = useState<number>(() => Date.now());
   const [loading, setLoading] = useState<boolean>(true);
@@ -487,7 +543,7 @@ export function PrototypeSandboxScreen({
         setDeliverables(items);
       } else if (scope?.projectId) {
         const res = await coolie
-          .listArtifacts(company.id, { projectId: scope.projectId, limit: 100 })
+          .listArtifacts(company.id, { projectId: scope.projectId, kind: "all", limit: 100 })
           .catch(() => null);
         const items: SandboxDeliverable[] = (res?.artifacts ?? []).map((a) => {
           const entryUrl = absoluteUrl(a.openPath || a.contentPath);
@@ -519,32 +575,68 @@ export function PrototypeSandboxScreen({
                 ? `v${a.version.number} · 共${a.version.count}版`
                 : `v${a.version.number}`
               : null,
+            previewText: a.previewText ?? null,
           };
         });
         items.sort(byNewest);
         setDeliverables(items);
       } else {
-        // 无上下文: 列表只含入口交付物(如果有), 否则空。
+        // 无特定上下文时（例如从产物中心顶部或汇览直入沙箱）：
+        // 全量加载公司产物，确保沙箱列表有内容可交互、有点可点！
+        const res = await coolie
+          .listArtifacts(company.id, { kind: "all", limit: 100 })
+          .catch(() => null);
+        const items: SandboxDeliverable[] = (res?.artifacts ?? []).map((a) => {
+          const entryUrl = absoluteUrl(a.openPath || a.contentPath);
+          const mapped: DeliverableKind =
+            a.mediaKind === "image" ||
+            a.mediaKind === "video" ||
+            a.mediaKind === "document" ||
+            a.mediaKind === "text"
+              ? (a.mediaKind as DeliverableKind)
+              : classifyKind(a.contentType, a.title, entryUrl);
+          return {
+            key: a.id,
+            title: a.title,
+            kind: mapped,
+            contentType: a.contentType,
+            size: null,
+            createdAt: a.updatedAt,
+            producer: a.createdByAgent?.name ?? null,
+            url: entryUrl,
+            downloadUrl: absoluteUrl(a.downloadPath || a.contentPath) ?? entryUrl,
+            source:
+              a.source === "work_product"
+                ? "work_product"
+                : a.source === "document"
+                  ? "document"
+                  : "attachment",
+            versionLabel: a.version
+              ? a.version.count > 1
+                ? `v${a.version.number} · 共${a.version.count}版`
+                : `v${a.version.number}`
+              : null,
+            previewText: a.previewText ?? null,
+          };
+        });
         const entryUrl = extractPreviewUrl(workProduct) || initialUrl || null;
-        setDeliverables(
-          workProduct && entryUrl
-            ? [
-                {
-                  key: `wp:${workProduct.id}`,
-                  title: workProduct.title || "当前交付物",
-                  kind: classifyKind(metaString(workProduct, "contentType"), null, entryUrl),
-                  contentType: metaString(workProduct, "contentType"),
-                  size: metaNumber(workProduct, "byteSize"),
-                  createdAt: null,
-                  producer: null,
-                  url: entryUrl,
-                  downloadUrl: entryUrl,
-                  source: "work_product",
-                  versionLabel: null,
-                },
-              ]
-            : [],
-        );
+        if (workProduct && entryUrl && !items.some((it) => it.key === `wp:${workProduct.id}`)) {
+          items.unshift({
+            key: `wp:${workProduct.id}`,
+            title: workProduct.title || "当前交付物",
+            kind: classifyKind(metaString(workProduct, "contentType"), null, entryUrl),
+            contentType: metaString(workProduct, "contentType"),
+            size: metaNumber(workProduct, "byteSize"),
+            createdAt: null,
+            producer: null,
+            url: entryUrl,
+            downloadUrl: entryUrl,
+            source: "work_product",
+            versionLabel: null,
+          });
+        }
+        items.sort(byNewest);
+        setDeliverables(items);
       }
     } catch (e) {
       setListError(String((e as Error)?.message ?? e));
@@ -577,6 +669,35 @@ export function PrototypeSandboxScreen({
       cancelled = true;
     };
   }, [workProductId]);
+
+  // 当传入 initialUrl 时立即切至预览视图并选中目标原型
+  useEffect(() => {
+    if (initialUrl && initialUrl.length > 0) {
+      setView("preview");
+      const title = workProduct?.title || initialUrl.split("/").pop() || "原型沙箱";
+      const kind = classifyKind(
+        (workProduct?.metadata as any)?.contentType || "text/html",
+        title,
+        initialUrl
+      );
+      setSelected({
+        key: `init:${initialUrl}`,
+        title,
+        kind,
+        contentType: (workProduct?.metadata as any)?.contentType || "text/html",
+        size: null,
+        createdAt: null,
+        producer: null,
+        url: initialUrl,
+        downloadUrl: initialUrl,
+        source: "work_product",
+        versionLabel: null,
+        previewText: workProduct?.summary ?? null,
+      });
+      setError(null);
+      setBust(Date.now());
+    }
+  }, [initialUrl, workProduct]);
 
   // 附件内容端点需要鉴权。两种登录方式各有各的凭据 (wave136 真值):
   //   · API Key 登录 → SecureStore 里的 bearer token, 直接塞进 WebView 请求头;
@@ -618,7 +739,7 @@ export function PrototypeSandboxScreen({
     let cancelled = false;
     const raw = resolvePreviewUrl(_service, workProduct, initialUrl, bust, overrideUrl);
     const entryUrl = raw.url && raw.url.startsWith("/") ? `${COOLIE_BASE_URL}${raw.url}` : raw.url;
-    const target = selected ? selected.url : entryUrl;
+    const target = selected ? (selected.url || selected.downloadUrl) : entryUrl;
     const targetIsSnapshot = selected ? true : raw.isSnapshot;
     setResolved({ url: target, isSnapshot: targetIsSnapshot });
     setLoading(false);
@@ -626,14 +747,26 @@ export function PrototypeSandboxScreen({
     setHtmlDoc(null);
 
     const applySummaryFallback = () => {
-      if (workProduct?.summary && (!target || target.endsWith(".md"))) {
-        setMarkdownHtml(generateMarkdownHtml(workProduct.title ?? "产物概览", workProduct.summary));
+      const summaryText = selected?.previewText || workProduct?.summary;
+      if (summaryText) {
+        setMarkdownHtml(
+          generateMarkdownHtml(selected?.title ?? workProduct?.title ?? "产物概览", summaryText),
+        );
       }
     };
 
     const isTextDocUrl =
       !!target &&
-      (target.endsWith(".md") || target.endsWith(".txt") || target.includes("/docs/"));
+      (target.endsWith(".md") ||
+        target.endsWith(".txt") ||
+        target.endsWith(".html") ||
+        target.endsWith(".htm") ||
+        target.includes(".html?") ||
+        target.includes(".htm?") ||
+        target.includes("/docs/") ||
+        target.includes("/documents/") ||
+        target.includes("/raw") ||
+        target.includes("/sandbox/"));
     const isAttachmentUrl = !!target && target.includes("/attachments/");
     const kind = selected?.kind ?? null;
     const shouldProbeText =
@@ -655,8 +788,14 @@ export function PrototypeSandboxScreen({
           if (cancelled) return;
           if (!res.ok) return; // 鉴权/网络失败时交给 WebView(桥/头部)去处理
           const contentType = (res.headers.get("content-type") ?? "").toLowerCase();
-          if (kind === "document" || contentType.includes("pdf")) {
-            return; // 二进制文档不适合文本渲染 — 交给 WebView/外部应用
+          const isBinary =
+            contentType.includes("pdf") ||
+            contentType.includes("octet-stream") ||
+            contentType.includes("zip") ||
+            contentType.includes("msword") ||
+            contentType.includes("officedocument");
+          if (isBinary) {
+            return; // 二进制文档交给外部应用/专用视图
           }
           const text = await res.text();
           if (cancelled) return;
@@ -695,17 +834,50 @@ export function PrototypeSandboxScreen({
   const handleOpenExternal = useCallback(() => {
     const target = selected?.downloadUrl || selected?.url || url;
     if (!target) return;
+    const isBinaryDoc =
+      selected?.kind === "document" &&
+      !markdownHtml &&
+      !htmlDoc;
+    if (isBinaryDoc) {
+      void downloadAndShareFile({
+        url: target,
+        filename: selected?.title || workProduct?.title,
+        title: selected?.title || workProduct?.title,
+        mimeType: selected?.contentType,
+      });
+      return;
+    }
     void openInExternalApp(target, true).catch(() => {
       setShowExternalSheet(true);
     });
-  }, [url, selected]);
+  }, [url, selected, markdownHtml, htmlDoc, workProduct]);
+
+  const handleDownloadCurrent = useCallback(() => {
+    const target = selected?.downloadUrl || selected?.url || url;
+    if (!target) return;
+    void downloadAndShareFile({
+      url: target,
+      filename: selected?.title || workProduct?.title,
+      title: selected?.title || workProduct?.title,
+      mimeType: selected?.contentType,
+    });
+  }, [url, selected, workProduct]);
 
   const openDeliverable = useCallback((item: SandboxDeliverable) => {
-    if (!item.url && !item.downloadUrl) {
+    const targetUrl = item.url || item.downloadUrl;
+    if (!targetUrl) {
+      if (item.previewText || item.source === "document") {
+        setSelected(item);
+        setView("preview");
+        setError(null);
+        setBust(Date.now());
+        return;
+      }
       Alert.alert("无法预览", "该文件没有可用的预览或下载地址。");
       return;
     }
-    setSelected(item);
+    const normalizedItem = item.url ? item : { ...item, url: targetUrl };
+    setSelected(normalizedItem);
     setView("preview");
     setError(null);
     setBust(Date.now());
@@ -733,7 +905,14 @@ export function PrototypeSandboxScreen({
     return { all: deliverables.length, html, image, video, document };
   }, [deliverables]);
 
-  const canWebView = (!!url || !!markdownHtml || !!htmlDoc) && Platform.OS !== "web";
+  const isBinaryDocument =
+    selected?.kind === "document" &&
+    !markdownHtml &&
+    !htmlDoc;
+  const canWebView =
+    !isBinaryDocument &&
+    (!!url || !!markdownHtml || !!htmlDoc) &&
+    Platform.OS !== "web";
   const selectedKind = selected?.kind ?? null;
   const showImage = !!selected && selectedKind === "image" && !!selected.url;
   const showVideo = !!selected && selectedKind === "video" && !!selected.url;
@@ -828,7 +1007,7 @@ export function PrototypeSandboxScreen({
                   <View style={styles.emptyActions}>
                     {kindFilter !== "all" ? (
                       <Pressable style={styles.emptyBtn} onPress={() => setKindFilter("all")}>
-                        <Text style={styles.emptyBtnText}>查看全部</Text>
+                        <Text style={styles.emptyBtnText}>全部</Text>
                       </Pressable>
                     ) : null}
                     {scope?.issueId && onOpenTask ? (
@@ -836,17 +1015,17 @@ export function PrototypeSandboxScreen({
                         style={styles.emptyBtnPrimary}
                         onPress={() => onOpenTask(scope.issueId as string)}
                       >
-                        <Text style={styles.emptyBtnPrimaryText}>查看任务</Text>
+                        <Text style={styles.emptyBtnPrimaryText}>查看</Text>
                       </Pressable>
                     ) : null}
                     {!scope?.issueId && onCreateTask ? (
                       <Pressable style={styles.emptyBtnPrimary} onPress={onCreateTask}>
-                        <Text style={styles.emptyBtnPrimaryText}>去创建任务</Text>
+                        <Text style={styles.emptyBtnPrimaryText}>创建</Text>
                       </Pressable>
                     ) : null}
                     {onOpenArtifacts ? (
                       <Pressable style={styles.emptyBtn} onPress={onOpenArtifacts}>
-                        <Text style={styles.emptyBtnText}>去交付产物中心</Text>
+                        <Text style={styles.emptyBtnText}>产物</Text>
                       </Pressable>
                     ) : null}
                     <Pressable style={styles.emptyBtn} onPress={onBack}>
@@ -947,11 +1126,18 @@ export function PrototypeSandboxScreen({
                 <Text style={styles.barBtn}>刷新</Text>
               </Pressable>
               <Pressable
+                onPress={handleDownloadCurrent}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                style={styles.toolBtn}
+              >
+                <Text style={styles.barBtn}>下载</Text>
+              </Pressable>
+              <Pressable
                 onPress={handleOpenExternal}
                 hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 style={styles.toolBtn}
               >
-                <Text style={styles.barBtn}>浏览器打开</Text>
+                <Text style={styles.barBtn}>打开</Text>
               </Pressable>
             </View>
           </View>
@@ -1052,7 +1238,7 @@ export function PrototypeSandboxScreen({
             <View style={styles.center}>
               <Text style={styles.hint}>Web 端不内嵌 WebView</Text>
               <Pressable style={styles.primaryBtn} onPress={handleOpenExternal}>
-                <Text style={styles.primaryBtnText}>在浏览器打开预览</Text>
+                <Text style={styles.primaryBtnText}>打开</Text>
               </Pressable>
             </View>
           ) : (
@@ -1062,14 +1248,19 @@ export function PrototypeSandboxScreen({
               </Text>
               <Text style={styles.hint}>
                 {selected && (selected.kind === "document" || selected.kind === "file")
-                  ? "该文件无法内嵌渲染，可用外部应用打开。"
+                  ? "该文件为独立工程文档，可下载到手机或用 WPS / 外部应用打开。"
                   : error || "暂无可用预览"}
               </Text>
               <View style={styles.emptyActions}>
                 {selected?.downloadUrl || selected?.url ? (
-                  <Pressable style={styles.primaryBtn} onPress={handleOpenExternal}>
-                    <Text style={styles.primaryBtnText}>外部应用打开</Text>
-                  </Pressable>
+                  <>
+                    <Pressable style={styles.primaryBtn} onPress={handleDownloadCurrent}>
+                      <Text style={styles.primaryBtnText}>下载</Text>
+                    </Pressable>
+                    <Pressable style={styles.emptyBtn} onPress={handleOpenExternal}>
+                      <Text style={styles.emptyBtnText}>打开</Text>
+                    </Pressable>
+                  </>
                 ) : null}
                 <Pressable style={styles.emptyBtn} onPress={handleRefresh}>
                   <Text style={styles.emptyBtnText}>重试</Text>

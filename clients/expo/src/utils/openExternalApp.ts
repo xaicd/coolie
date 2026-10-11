@@ -75,16 +75,28 @@ export async function openInExternalApp(
   url: string,
   preferQQ: boolean = false,
 ): Promise<boolean> {
-  if (!url) return false;
+  let targetUrl = url;
+  try {
+    const { getAuthToken, getSessionToken } = require("../coolie");
+    const token = await getAuthToken();
+    const sessionToken = await getSessionToken();
+    const activeToken = token || sessionToken;
+    if (activeToken && !targetUrl.includes("token=") && (targetUrl.includes("/api/") || targetUrl.startsWith("/"))) {
+      const sep = targetUrl.includes("?") ? "&" : "?";
+      targetUrl = `${targetUrl}${sep}token=${encodeURIComponent(activeToken)}`;
+    }
+  } catch {
+    // best-effort
+  }
 
   if (preferQQ) {
-    const openedWithQQ = await openInQQBrowser(url);
+    const openedWithQQ = await openInQQBrowser(targetUrl);
     if (openedWithQQ) return true;
   }
 
   // 默认通过系统应用选择器打开（由用户选择系统浏览器、Chrome 或已安装的应用）
   try {
-    await Linking.openURL(url);
+    await Linking.openURL(targetUrl);
     return true;
   } catch {
     Alert.alert("无法打开外部应用", "未能呼起外部浏览器，请检查手机网络或安全权限设置。");

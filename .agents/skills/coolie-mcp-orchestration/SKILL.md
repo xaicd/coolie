@@ -106,7 +106,7 @@ Coolie 平台具备从控制面核心、活体业务本体、高管治理网关�
         "kind": "document",
         "resourceRef": {
           "kind": "workspace_file",
-          "relativePath": ".coolie/cmmi/01-srs.md"
+          "relativePath": "docs/02_requirements/software-requirements.md"
         }
       }
     }
@@ -118,10 +118,17 @@ Coolie 平台具备从控制面核心、活体业务本体、高管治理网关�
     "mcpServers": {
       "coolie-control-plane": {
         "command": "node",
-        "args": ["/opt/coolie/packages/mcp-server/dist/index.js"],
+        "args": ["--import", "tsx", "/path/to/coolie/packages/mcp-server/src/stdio.ts"],
         "env": {
           "COOLIE_API_URL": "http://127.0.0.1:3100",
           "COOLIE_AGENT_KEY": "pcp_..."
+        }
+      },
+      "coolie-ontology": {
+        "command": "node",
+        "args": ["/path/to/coolie/packages/ontology-mcp/dist/stdio.js"],
+        "env": {
+          "DATABASE_URL": "postgresql://..."
         }
       }
     }

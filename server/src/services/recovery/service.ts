@@ -156,6 +156,27 @@ const UNSUCCESSFUL_HEARTBEAT_RUN_TERMINAL_STATUSES = [
 export const ACTIVE_RUN_OUTPUT_SUSPICION_THRESHOLD_MS = 60 * 60 * 1000;
 export const ACTIVE_RUN_OUTPUT_CRITICAL_THRESHOLD_MS = 4 * 60 * 60 * 1000;
 export const ACTIVE_RUN_OUTPUT_CONTINUE_REARM_MS = 30 * 60 * 1000;
+// COOA-21: a running run that never persisted process metadata (pid/group) has
+// no process-death observation available, so the stale-lock sweep cannot prove
+// it is gone the way it can for a recorded dead pid. A server bounce (kill /
+// restart) kills a run before it records its pid, and without a bound that run
+// pins its issue's checkout lock forever and blocks takeover. A process-less
+// run silent past this window, with no live owner, is therefore treated as
+// orphaned. The window mirrors the periodic orphan reaper's staleness
+// threshold, so a run that is merely still starting up keeps its process.
+export const ORPHANED_RUN_PROCESSLESS_SILENCE_MS = 5 * 60 * 1000;
+
+function isProcesslessRunSilentPastOrphanThreshold(run: {
+  lastOutputAt?: Date | null;
+  processStartedAt?: Date | null;
+  startedAt?: Date | null;
+  createdAt?: Date | null;
+}): boolean {
+  const reference =
+    run.lastOutputAt ?? run.processStartedAt ?? run.startedAt ?? run.createdAt;
+  if (!reference) return false;
+  return Date.now() - reference.getTime() >= ORPHANED_RUN_PROCESSLESS_SILENCE_MS;
+}
 const STRANDED_ISSUE_RECOVERY_ORIGIN_KIND =
   RECOVERY_ORIGIN_KINDS.strandedIssueRecovery;
 const DEFERRED_WAKE_CONTEXT_KEY = "_paperclipWakeContext";
@@ -5592,8 +5613,9 @@ export function recoveryService(
     // Process-death authority. The run is live while either its adapter process
     // or the enclosing heartbeat execution/finalization still owns it. Check
     // that full in-process lifecycle first, then the recorded pid and process
-    // group. Require recorded process metadata, so this authority never fires
-    // on a run that has not yet stored its pid.
+    // group. Prefer recorded process metadata, so a run that is still starting
+    // up keeps its process; a run that never recorded any (the server-bounce
+    // zombie) is covered only past the processless-orphan silence window.
     let processGone = false;
     const hasLiveExecution =
       deps.liveRunExecutions?.has(run.id) ?? runningProcesses.has(run.id);
@@ -5604,6 +5626,14 @@ export function recoveryService(
           (typeof processGroupId === "number" &&
             isProcessGroupAlive(processGroupId));
         processGone = !processAlive;
+      } else if (isProcesslessRunSilentPastOrphanThreshold(run)) {
+        // No process metadata was ever persisted. A run that has not yet stored
+        // its pid is normally still starting up, so only a run that has stayed
+        // silent beyond the processless-orphan window is treated as gone. This
+        // is the server-bounce zombie: the previous server died before the run
+        // recorded its pid, so no process-death observation is possible and
+        // the recorded-pid branch above can never fire.
+        processGone = true;
       }
     }
 

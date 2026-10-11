@@ -69,6 +69,11 @@ curl -fsS -X POST "${H[@]}" -H 'Content-Type: application/json' \
   "$API/projects/$PID/workspaces"
 ```
 
+**项目目录结构与交付资产规约**：
+- **自研默认结构**：自研及全栈商业项目默认采用 **PNPM workspace monorepo**；
+- **开源基座自适应**：选择开源基座时，100% 保持开源基座原生目录结构，尊重并继承开源生态；
+- **控制面与本地双轨文档归宿**：过程规格统一优先写入 Paperclip 原生 `issue_documents` 与 `issue_work_products`；工作区本地文档归宿于开放扁平的 `docs/specs/`（敏捷特性需求）与 `docs/architecture/`（总体架构与契约），彻底废弃 `.coolie/cmmi/` 隐藏单文件。
+
 ### 5 验收标准写进工单 `plan` 文档
 
 ```sh
@@ -91,13 +96,16 @@ curl -fsS -X PUT "${H[@]}" -H 'Content-Type: application/json' \
 2. 项目可回读 `targetDate`。
 3. 需求文档落档且能被列出来（写进去读得出）。
 4. 工单依赖顺序正确，每条有 `plan` 文档承载验收标准。
-5. 走查能见到真产物附件，不是一句"已完成"。
+5. **走查能见到真实 0-1 软件工程资产附件 (Work Product)**，落实 `No Artifact, No Done` 铁律，绝非口头“已完成”。
+6. 严格物理隔离：工程交付资产为软件本身的代码、契约与测试报告，严禁拿上线运行后的业务数据充数。
 
 ## 反例
 
 - 凭文件名拍脑袋填项目名。
 - 需求只在对话里，系统里查无此项目。
 - 把整包需求丢给一个人，不拆依赖、不写验收标准。
+- 把系统上线后用户录入的业务数据（如板材利用率/客户列表）当成项目交付产物。
+- 工单无物理 Work Product 附件直接点 Done。
 
 ## 关联
 

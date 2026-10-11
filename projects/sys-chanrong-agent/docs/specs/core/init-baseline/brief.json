@@ -1,0 +1,42 @@
+{
+  "name": "init-baseline",
+  "domain": "core",
+  "title": "产融商业保理与供应链金融智能体系统 初始工程地基与规范基线",
+  "type": "feature",
+  "status": "PLAN_APPROVED",
+  "goal": "在 0→1 阶段把产融智能体系统的工程地基（多企业隔离持久化层、统一 API 契约、离线私有化运行时门禁、管理面/编排面物理边界、不可篡改审计链）与 CMMI 01~09 规范基线一次性立死，使后续 G1→G5 阶段有唯一可断言的真源。",
+  "roles": [
+    { "role": "掌柜 / 交付总监", "can": "在移动端驾驶舱实时检视工程资产与两字审批" },
+    { "role": "前线 FDE / 核心工程师", "can": "基于 CMMI 01~09 资产与统一 OpenAPI 契约高效交付" },
+    { "role": "产融风控 / 业务经理", "can": "以只读或建议权限调用智能体，资金/额度动作保留人类复核" }
+  ],
+  "stories": [
+    { "priority": "P0", "text": "搭建多企业租户物理隔离地基与数据库访问层（强制注入 company_id）" },
+    { "priority": "P0", "text": "固化统一 OpenAPI 契约与静态 TypeScript 编译守卫" },
+    { "priority": "P0", "text": "划定管理面 / 编排面运行时边界并落地离线私有化运行时门禁" },
+    { "priority": "P1", "text": "配置端到端集成测试套件与自动化门禁（真实数据库、反假 Mock）" }
+  ],
+  "constraints": [
+    "多租户隔离：严禁跨企业租户数据穿透，客户端租户标识永不可信。",
+    "反假 Mock：必须使用真实数据库事务测试，禁止伪造业务数据。",
+    "极简人机：核心操作按钮 ≤2 汉字，底栏 5 槽位绝对对称。"
+  ],
+  "acceptance": [
+    { "check": "G1~G5 门禁脚本全部退出码 0（verify-reqs / check-fork-surface / check-contracts / run-tests / check-release-baseline）" },
+    { "check": "全生命周期 CMMI 01~09 资产齐全在位，docs/ 根目录 0 孤儿文件" },
+    { "check": "npx tsc --noEmit 0 编译报错" }
+  ],
+  "invariants": [
+    { "name": "多企业数据强隔离", "how": "仓储基类统一注入 WHERE company_id = :ctxCompanyId；网关覆盖请求体 companyId；越权返回 403 并落审计" },
+    { "name": "资金/额度守恒", "how": "额度与发票抵扣变动处于同一原子事务，进出双向对账、防重复冲销" },
+    { "name": "人类复核不可绕过", "how": "智能体仅只读/建议权限；资金/额度/放款状态变更保留人类双人复核（提案≠批准）" },
+    { "name": "离线不出域", "how": "推理/检索/OCR 内网脱机运行；启动校验硬件指纹与离线 License，失败 fail-fast" }
+  ],
+  "tasks": [
+    { "id": "T1", "parent": "main", "title": "初始化数据库结构与多企业隔离审计底座列", "files": ["packages/db/**", "docs/03_design/database-design-erd.md"] },
+    { "id": "T2", "parent": "T1", "title": "建立统一 API 契约与 DTO 封装", "files": ["packages/shared/**"] },
+    { "id": "T3", "parent": "T1", "title": "固化管理面/编排面模块边界与适配层", "files": ["server/src/**"] },
+    { "id": "T4", "parent": "T2,T3", "title": "落地运行时门禁与不可篡改审计链", "files": ["server/src/services/**"] },
+    { "id": "T5", "parent": "main", "title": "执行门禁校验与首期规范基线冻结", "files": ["docs/**", "scripts/**"] }
+  ]
+}

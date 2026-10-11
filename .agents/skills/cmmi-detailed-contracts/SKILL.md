@@ -8,16 +8,18 @@ description: CMMI 3 详细设计与静态契约守卫 (TS/VER) 核心技能。�
 > **CMMI 过程域**: Technical Solution (TS Detailed Design), Verification (VER Unit Verification)  
 > **门禁对应**: G3 静态守卫编译门禁 (`gate_g3_compile`)  
 > **主责工匠角色**: Core-SWE 平台核心研发工程师 (`emp_swe`)  
-> **核心产出**: 《系统详细设计说明书 (LLD)》、《统一 API 契约协议规范》、《模块边界与单测覆盖报告》
+> **核心产出**: 0-1 软件工程资产包 —— 《系统详细设计说明书 (LLD)》、《统一 API 契约协议规范 (OpenAPI / Schema / DTO)》、《编译 0 报错源码 Repo 提交与单测覆盖报告》
 
 ---
 
 ## 1. 技能定位与核心原则
 
 在 CMMI 3 研发标准中，研发实现必须严格依据契约先行（Contract-First）：
-1. **统一契约防漂移**: 数据传输对象 (DTO)、REST API 路径、状态机枚举、数据库 Schema 必须跨层强类型同步，严禁前后端/跨服务自行定义私有协议。
-2. **模块依赖单向干净**: 遵循分层架构原则，禁止循环依赖（Circular Dependencies）与反向越级调用。
-3. **编译器零容忍**: 增量编译 `tsc` / `mvn compile` 必须保持 **0 报错、0 警告逃逸**。
+1. **0-1 代码与契约资产本质**: G3 交付的是**软件系统自身的实体源码 Commit、类型定义、API 契约文件与自动化单测**。绝对禁止拿未编译通过的半成品或空口承诺充当交付物。
+2. **统一契约防漂移**: 数据传输对象 (DTO)、REST API 路径、状态机枚举、数据库 Schema 必须跨层强类型同步，严禁前后端/跨服务自行定义私有协议。
+3. **模块依赖单向干净**: 遵循分层架构原则，禁止循环依赖（Circular Dependencies）与反向越级调用。
+4. **编译器零容忍**: 增量编译 `tsc` / `mvn compile` 必须保持 **0 报错、0 警告逃逸**。
+5. **No Artifact, No Done 铁律**: 任务结项必须挂载物理 Commit 或契约文件 Work Product，无有效代码产物严禁点 Done。
 
 ---
 
@@ -28,19 +30,20 @@ flowchart TD
   A["输入: 02-hld.md (概要设计)"] --> B["设计模块详细算法与实体 Schema (LLD)"]
   B --> C["定义 REST/RPC 接口契约与错误码清单"]
   C --> D["编写单元测试用例与边界断言 (Unit Tests)"]
-  D --> E["输出 LLD 与 API 契约文档 (docs/cmmi/03-lld-api.md)"]
+  D --> E["输出 LLD 与 API 契约文档 (docs/architecture/interface-contracts.md)"]
   E --> F["执行本地 G3 静态门禁: node scripts/check-contracts.mjs"]
 ```
 
-1. **详细设计细化**: 确定类图、核心算法流程图、数据库 DDL 及索引策略。
-2. **API 契约声明**: 严格声明 HTTP Method、URI、入参 JSON Schema、响应 Payload 及标准错误码（400/401/403/404/409/422/500）。
-3. **单元验证用例编写**: 针对核心纯函数、数据转换逻辑、安全校验点编写覆盖全面的自动化单测。
-4. **编译与类型审查**: 运行技术栈原生静态检查命令，确保 0 语法与类型缺陷。
-5. **归档文档**: 写入 `docs/cmmi/03-lld-api.md`。
+1. **资产双轨映射**: 优先通过 Paperclip 原生 API 挂载至工单富文本文档（`POST /api/issues/:id/documents`，key: `contracts`），在控制面实现富文本预览与批注；本地代码工作区采用工程标准 `docs/architecture/` 目录（如 `docs/architecture/interface-contracts.md` 或标准 `docs/openapi.yaml`，彻底弃用 `.coolie/cmmi/` 隐藏单文件），并通过 `issue_work_products` 登记索引。开源基座（如 RuoYi 等）100% 保持基座原生目录结构。
+2. **详细设计细化**: 确定类图、核心算法流程图、数据库 DDL 及索引策略。
+3. **API 契约声明**: 严格声明 HTTP Method、URI、入参 JSON Schema、响应 Payload 及标准错误码（400/401/403/404/409/422/500）。
+4. **单元验证用例编写**: 针对核心纯函数、数据转换逻辑、安全校验点编写覆盖全面的自动化单测。
+5. **编译与类型审查**: 运行技术栈原生静态检查命令，确保 0 语法与类型缺陷。
+6. **归档文档**: 写入 `docs/architecture/interface-contracts.md`。
 
 ---
 
-## 3. 产物模板基线 (`docs/cmmi/03-lld-api.md`)
+## 3. 产物模板基线 (`docs/architecture/interface-contracts.md`)
 
 ```markdown
 # [系统名称] 系统详细设计与统一 API 契约规范 (LLD & API Spec)
@@ -87,6 +90,7 @@ flowchart TD
 - [ ] 详细设计与代码实现完全一致，无死接口与未实现契约。
 - [ ] 编译器与类型检查 0 Error（如 `pnpm -r typecheck`）。
 - [ ] 核心业务算法单元测试全部绿色通过。
+- [ ] 必须将源码 Commit SHA 或契约定义作为物理 Work Product (kind: commit / artifact) 挂载至工单 (No Artifact, No Done)。
 - [ ] G3 静态检查脚本（如 `check-contracts.mjs`）校验 100% 成功。
 
 ---

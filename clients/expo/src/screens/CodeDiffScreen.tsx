@@ -356,7 +356,7 @@ export function CodeDiffScreen({
                   viewMode === "working-tree" && styles.viewModeTextActive,
                 ]}
               >
-                工作树未提交 (Working Tree)
+                变动
               </Text>
             </Pressable>
             <Pressable
@@ -372,7 +372,7 @@ export function CodeDiffScreen({
                   viewMode === "head" && styles.viewModeTextActive,
                 ]}
               >
-                最新提交 (HEAD)
+                提交
               </Text>
             </Pressable>
           </View>
@@ -397,10 +397,10 @@ export function CodeDiffScreen({
             </View>
             <View style={styles.statColActions}>
               <Pressable onPress={expandAll} hitSlop={8} style={styles.actionBtn}>
-                <Text style={styles.actionBtnText}>展开全部</Text>
+                <Text style={styles.actionBtnText}>展开</Text>
               </Pressable>
               <Pressable onPress={collapseAll} hitSlop={8} style={styles.actionBtn}>
-                <Text style={styles.actionBtnText}>折叠全部</Text>
+                <Text style={styles.actionBtnText}>折叠</Text>
               </Pressable>
             </View>
           </View>
@@ -516,7 +516,7 @@ export function CodeDiffScreen({
             }
             action={
               <Pressable style={styles.benchBtn} onPress={toggleBenchmark}>
-                <Text style={styles.benchBtnText}>⚡ 运行 2500 行虚拟滚动基准测试</Text>
+                <Text style={styles.benchBtnText}>测试</Text>
               </Pressable>
             }
             style={styles.emptyBox}

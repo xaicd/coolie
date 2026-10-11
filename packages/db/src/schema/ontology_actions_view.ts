@@ -22,6 +22,9 @@ import { pgView, text, uuid, jsonb, timestamp } from "drizzle-orm/pg-core";
  * The view is read-only by design — Action is the audit-layer projection,
  * not a destination table. Drizzle's `pgView` types the columns so a query
  * builder sees the union shape, but writes still go to the source tables.
+ *
+ * @deprecated [DEPRECATED / CORPSE SWEEP] wave250 legacy ontology view (0 references in server/shared).
+ * Kept for backward schema compatibility; do NOT use in new code. Living ontology now uses dynamic projection from core physical tables.
  */
 export const ontologyActionsView = pgView("ontology_actions_view", {
   id: text("id").notNull(),

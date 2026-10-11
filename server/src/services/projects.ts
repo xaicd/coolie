@@ -5,6 +5,9 @@ import {
   projectGoals,
   goals,
   issues,
+  boardConversations,
+  costEvents,
+  financeEvents,
   budgetPolicies,
   pluginManagedResources,
   plugins,
@@ -962,16 +965,22 @@ export function projectService(db: Db) {
       return cleared;
     },
 
+    // Deleting a project must first clear the child rows that reference it through
+    // a NO ACTION foreign key. Since wave365 every project is anchored by a workshop
+    // conversation issue, and `issues.project_id` has no `onDelete`, so a plain
+    // `delete from projects` aborts on the FK for every project. Clear the project's
+    // own children in FK-safe order inside one transaction, then drop the project.
     remove: (id: string) =>
-      db
-        .delete(projects)
-        .where(eq(projects.id, id))
-        .returning()
-        .then((rows) => {
-          const row = rows[0] ?? null;
-          if (!row) return null;
-          return { ...row, urlKey: deriveProjectUrlKey(row.name, row.id) };
-        }),
+      db.transaction(async (tx) => {
+        await tx.delete(costEvents).where(eq(costEvents.projectId, id));
+        await tx.delete(financeEvents).where(eq(financeEvents.projectId, id));
+        await tx.delete(boardConversations).where(eq(boardConversations.projectId, id));
+        await tx.delete(issues).where(eq(issues.projectId, id));
+        const rows = await tx.delete(projects).where(eq(projects.id, id)).returning();
+        const row = rows[0] ?? null;
+        if (!row) return null;
+        return { ...row, urlKey: deriveProjectUrlKey(row.name, row.id) };
+      }),
 
     listWorkspaces: async (projectId: string): Promise<ProjectWorkspace[]> => {
       const rows = await db

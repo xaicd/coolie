@@ -83,7 +83,7 @@ const terminal: PrpTerminalState = {
   reportedWorkDisposition: "done",
 };
 
-function runnerEvent(seed: SeededNativeRun, sourceSeq = 1): PrpEvent {
+function runnerEvent(seed: SeededNativeRun, sourceSeq = 1): any {
   return {
     schema: "paperclip.prp.event.v1",
     sourceEventId: `event-${sourceSeq}`,
@@ -356,7 +356,7 @@ describeEmbeddedPostgres("hidden runner PRP coordinator", () => {
       outputDigest: `sha256:${createHash("sha256").update(output).digest("hex")}`,
       exitCode: 0,
     };
-    const event: PrpEvent = {
+    const event: any = {
       ...runnerEvent(seed),
       eventType: "tool.execution.completed",
       payload,
@@ -438,12 +438,12 @@ describeEmbeddedPostgres("hidden runner PRP coordinator", () => {
       ...runnerEvent(seed, 2),
       eventType: "run.result.proposed",
       payload: result,
-    } as PrpEvent;
+    } as any;
     const terminalEvent = {
       ...runnerEvent(seed, 3),
       eventType: "run.terminal",
       payload: terminal,
-    } as PrpEvent;
+    } as any;
     await nativeStore.appendEvent(resultEvent);
     await nativeStore.appendEvent(terminalEvent);
     const firstResult = await nativeStore.reconcileTerminalEvent(terminalEvent);

@@ -38,7 +38,9 @@ export type CmmiGateKey =
   | "gate_g2_arch"
   | "gate_g3_compile"
   | "gate_g4_eval"
-  | "gate_g5_release";
+  | "gate_g5_release"
+  | "gate_g6_sre"
+  | "gate_g7_ops";
 
 /**
  * Milestone metadata for a 主线 task (wave140). Only present together with

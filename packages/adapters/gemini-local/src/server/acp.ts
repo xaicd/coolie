@@ -1,4 +1,5 @@
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -95,7 +96,11 @@ function firstNonEmptyString(...values: unknown[]): string | undefined {
 export function buildGeminiAcpConfig(config: Record<string, unknown>): Record<string, unknown> {
   const configuredAgentCommand = firstNonEmptyString(config.agentCommand, config.acpAgentCommand);
   const configuredGeminiCommand = firstNonEmptyString(config.command);
-  const agentCommand = configuredAgentCommand ?? (configuredGeminiCommand ? `${configuredGeminiCommand} --acp` : undefined);
+  const resolvedCommand = resolveGeminiAcpCommand(config);
+  const agentCommand =
+    configuredAgentCommand || configuredGeminiCommand || resolvedCommand !== "gemini --acp"
+      ? resolvedCommand
+      : undefined;
   const stateDir = firstNonEmptyString(config.stateDir, config.acpStateDir);
   const mode = firstNonEmptyString(config.mode, config.acpMode) ?? DEFAULT_ACP_ENGINE_MODE;
   const permissionMode =
@@ -312,6 +317,19 @@ function resolveConfigPath(config: Record<string, unknown>): string {
     : process.env.PATH ?? "";
 }
 
+function findRepoScript(relPath: string): string | null {
+  const candidates = [
+    path.resolve(packageRootDir, "../../..", relPath),
+    path.resolve(packageRootDir, "../..", relPath),
+    path.resolve(process.cwd(), relPath),
+    path.resolve(process.cwd(), "..", relPath),
+  ];
+  for (const c of candidates) {
+    if (fsSync.existsSync(c)) return c;
+  }
+  return null;
+}
+
 async function commandIsResolvable(
   command: string,
   pathValue = process.env.PATH ?? "",
@@ -336,15 +354,35 @@ async function commandIsResolvable(
       return false;
     }
   }
-  if (path.isAbsolute(token) || hasPathSeparator(token)) return pathExists(token);
+  if (path.isAbsolute(token) || hasPathSeparator(token)) {
+    if (await pathExists(token)) return true;
+    if (findRepoScript(token)) return true;
+    return false;
+  }
   return (await findCommandOnPath(token, pathValue)) !== null;
 }
 
 function resolveGeminiAcpCommand(config: Record<string, unknown>): string {
   const configured = firstNonEmptyString(config.agentCommand, config.acpAgentCommand);
-  if (configured) return configured;
-  const geminiCommand = firstNonEmptyString(config.command) ?? "gemini";
-  return `${geminiCommand} --acp`;
+  if (configured) {
+    if (!path.isAbsolute(configured) && hasPathSeparator(configured)) {
+      const script = findRepoScript(configured);
+      if (script) return script;
+    }
+    return configured;
+  }
+  const geminiCommand = firstNonEmptyString(config.command);
+  if (geminiCommand) return `${geminiCommand} --acp`;
+  // Coolie fork: if native gemini is not on PATH, fallback to docker-agy-acp.sh
+  const agyScript = findRepoScript("scripts/adapters/docker-agy-acp.sh");
+  if (agyScript) {
+    const pathEnv = process.env.PATH ?? "";
+    const hasNativeGemini = pathEnv.split(path.delimiter).some((seg) => fsSync.existsSync(path.join(seg, "gemini")));
+    if (!hasNativeGemini) {
+      return agyScript;
+    }
+  }
+  return "gemini --acp";
 }
 
 function sandboxTargetHasProcessSessionBridge(

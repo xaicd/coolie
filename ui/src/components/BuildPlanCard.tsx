@@ -2,7 +2,7 @@ import { Hammer } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /** Coolie fork: detect "build xxx" / "做 xxx" / "开发 xxx" — mirrors server BUILD_TRIGGER_PATTERN. */
-export const BUILD_TRIGGER_PATTERN = /^(?:build|开发|做)\s+/i;
+export const BUILD_TRIGGER_PATTERN = /^(?:build|开发|做|立项|极速立项|商业立项)\s+/i;
 export function isBuildPrompt(text: string): boolean {
   return BUILD_TRIGGER_PATTERN.test(text.trim());
 }

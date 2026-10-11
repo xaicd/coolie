@@ -348,7 +348,7 @@ export function companyArtifactsService(db: Db, storage?: StorageService) {
       const artifactSortDates = new Map<string, string>();
       const workProductAttachmentIds = new Set<string>();
 
-      if (query.kind === "all" || query.kind === "document") {
+      if (query.kind === "all" || query.kind === "document" || query.kind === "cmmi_baseline") {
         const createdAgent = alias(agents, "document_created_agent");
         const updatedAgent = alias(agents, "document_updated_agent");
         const documentArtifactId = sql<string>`concat('document:', ${documents.id})`;
@@ -380,6 +380,12 @@ export function companyArtifactsService(db: Db, storage?: StorageService) {
             OR ${documents.latestBody} ILIKE ${q} ESCAPE '\\'
             OR coalesce(${issues.identifier}, '') ILIKE ${q} ESCAPE '\\'
             OR ${issues.title} ILIKE ${q} ESCAPE '\\'
+          )`);
+        }
+        if (query.kind === "cmmi_baseline") {
+          documentConditions.push(sql`(
+            coalesce(${documents.title}, '') ~* 'srs|hld|lld|atp|cmp|car|decision|需求|概要设计|详细设计|验收|投产|合规|门禁|基线|5\\+2'
+            OR ${issueDocuments.key} ~* 'requirements|architecture|design|test_plan|deployment|cmmi'
           )`);
         }
 
@@ -450,6 +456,7 @@ export function companyArtifactsService(db: Db, storage?: StorageService) {
 
         for (const row of documentRows) {
           const identifier = row.issueIdentifier ?? row.issueId;
+          const rawDocPath = `/api/issues/${row.issueId}/documents/${encodeURIComponent(row.key)}/raw`;
           artifactSortDates.set(row.artifactId, (row.starredAt ?? row.updatedAt).toISOString());
           artifacts.push({
             id: row.artifactId,
@@ -458,9 +465,9 @@ export function companyArtifactsService(db: Db, storage?: StorageService) {
             title: row.title ?? row.key,
             previewText: normalizePreviewText(row.latestBody),
             contentType: "text/markdown",
-            contentPath: null,
-            openPath: null,
-            downloadPath: null,
+            contentPath: rawDocPath,
+            openPath: rawDocPath,
+            downloadPath: rawDocPath,
             issue: { id: row.issueId, identifier, title: row.issueTitle },
             project: row.projectId && row.projectName ? { id: row.projectId, name: row.projectName } : null,
             createdByAgent: row.createdByAgentId && row.createdByAgentName
@@ -514,6 +521,14 @@ export function companyArtifactsService(db: Db, storage?: StorageService) {
           )`;
           workProductBaseConditions.push(searchCondition);
           workProductConditions.push(searchCondition);
+        }
+        if (query.kind === "cmmi_baseline") {
+          const cmmiWorkProductCondition = sql`(
+            ${issueWorkProducts.title} ~* 'srs|hld|lld|atp|cmp|car|decision|需求|概要设计|详细设计|验收|投产|合规|门禁|基线|5\\+2'
+            OR coalesce(${issueWorkProducts.summary}, '') ~* 'srs|hld|lld|atp|cmp|car|decision|需求|概要设计|详细设计|验收|投产|合规|门禁|基线|5\\+2'
+          )`;
+          workProductBaseConditions.push(cmmiWorkProductCondition);
+          workProductConditions.push(cmmiWorkProductCondition);
         }
 
         const workProductRowsQuery = db
@@ -647,6 +662,12 @@ export function companyArtifactsService(db: Db, storage?: StorageService) {
             coalesce(${assets.originalFilename}, '') ILIKE ${q} ESCAPE '\\'
             OR coalesce(${issues.identifier}, '') ILIKE ${q} ESCAPE '\\'
             OR ${issues.title} ILIKE ${q} ESCAPE '\\'
+          )`);
+        }
+        if (query.kind === "cmmi_baseline") {
+          attachmentConditions.push(sql`(
+            coalesce(${assets.originalFilename}, '') ~* 'srs|hld|lld|atp|cmp|car|decision|需求|概要设计|详细设计|验收|投产|合规|门禁|基线|5\\+2|docx|doc'
+            OR ${issues.title} ~* 'srs|hld|lld|atp|cmp|car|decision|需求|概要设计|详细设计|验收|投产|合规|门禁|基线|5\\+2'
           )`);
         }
 

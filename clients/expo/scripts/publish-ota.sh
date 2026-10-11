@@ -24,7 +24,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$EXPO_DIR"
 
-SSH_TARGET="${SSH_TARGET:-tc-coolie-claw}"
+SSH_TARGET="${SSH_TARGET:-ubuntu@xrobinai.cn}"
 # Caddy 用 `handle_path /ota/*` + file_server 直接读这个目录，不经过 Express
 # 的 SPA 兜底 —— 所以这里和 /etc/caddy/Caddyfile 的 root 必须一致。
 REMOTE_OTA_DIR="${REMOTE_OTA_DIR:-/opt/coolie/ui/ota}"

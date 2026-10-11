@@ -1108,7 +1108,7 @@ export function GitHubChatPreview({
                           </p>
                           <Input
                             id="GitHub App ID"
-                            placeholder="123456"
+                            placeholder="849201"
                             value={appId}
                             onChange={(e) => setAppId(e.target.value)}
                           />

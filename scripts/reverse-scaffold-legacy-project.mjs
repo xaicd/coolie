@@ -56,10 +56,25 @@ function parseArgs() {
     }
   }
 
+  if (!options.projectName) options.projectName = "示例业务系统";
+  if (!options.projectCode) options.projectCode = "SYS_LEGACY_APP";
   if (!options.targetDir) {
-    options.targetDir = path.join(repoRoot, "projects", options.projectCode.toLowerCase().replace(/_/g, "-"));
+    options.targetDir = path.resolve(repoRoot, "..", options.projectCode.toLowerCase().replace(/_/g, "-"));
   } else if (!path.isAbsolute(options.targetDir)) {
-    options.targetDir = path.resolve(repoRoot, options.targetDir);
+    options.targetDir = path.resolve(process.cwd(), options.targetDir);
+  }
+
+  // 架构红线守卫: 交付项目必须是独立工作区/仓库，严禁嵌套在平台仓库内部 (公理五)
+  if (
+    !options.dryRun &&
+    (options.targetDir.startsWith(path.join(repoRoot, "projects")) ||
+      options.targetDir === repoRoot ||
+      options.targetDir.startsWith(repoRoot + path.sep))
+  ) {
+    console.error(
+      `\n❌ [架构红线拦截] 存量交付项目必须输出至独立工作区/仓库（如 ../${options.projectCode.toLowerCase().replace(/_/g, "-")}），严禁嵌套在平台代码仓库内部！\n`
+    );
+    process.exit(1);
   }
 
   return options;
@@ -75,7 +90,7 @@ Coolie 智能体工坊 — 存量老项目逆向文档萃取器与 CMMI 基线�
   --source-dir <path>        存量系统代码根目录 (可选，自动检测 pom.xml/package.json)
   --sql-file <path>          存量数据库 DDL SQL 文件路径 (可选，自动解析表结构)
   --tech-stack <stack>       主要技术栈: java | node | go | python (默认: java)
-  --target-dir <path>        输出项目工作区目录 (默认: projects/<code-slug>)
+  --target-dir <path>        输出项目工作区目录 (默认: ../<code-slug> 独立平级仓库)
   --author <artisan>         负责逆向审计的工匠角色 (默认: "emp_fda")
   --dry-run                  仅输出分析报告，不写磁盘
   --help, -h                 显示帮助信息
