@@ -62,6 +62,22 @@ function rawNotificationId(feedId: string): string {
   return feedId.includes(":") ? feedId.split(":").pop()! : feedId;
 }
 
+/**
+ * 服务端权威 unreadCount 计算 (与 GET /notifications 同一口径)。
+ * 用 dismissal table (持久化) + 内存 readSet (进程级) 合并判断每条 read 状态。
+ */
+async function computeUnreadCount(db: Db, companyId: string, userId: string): Promise<number> {
+  const items = await buildFeed(db, companyId, 50);
+  const persistedDismissals = await dismissalSvc.listDismissals(companyId, userId);
+  const dismissedKeys = new Set(persistedDismissals.map((d) => d.itemKey));
+  const memoryRead = readSetFor(userId);
+  const notifications = items.map((item) => ({
+    ...item,
+    read: dismissedKeys.has(rawNotificationId(item.id)) || memoryRead.has(item.id),
+  }));
+  return notifications.filter((item) => !item.read).length;
+}
+
 function approvalTitle(payload: Record<string, unknown> | null, fallback: string): string {
   if (payload && typeof payload.title === "string" && payload.title) return payload.title;
   if (payload && typeof payload.name === "string" && payload.name) return payload.name;
@@ -232,10 +248,9 @@ export function notificationRoutes(db: Db) {
       };
     });
 
-    res.json({
-      notifications,
-      unreadCount: notifications.filter((item) => !item.read).length,
-    });
+    // 数据一致: unreadCount 走同一个服务端权威函数, 与 PATCH /:id/read 返回值同源
+    const unreadCount = notifications.filter((item) => !item.read).length;
+    res.json({ notifications, unreadCount });
   });
 
   router.patch("/notifications/:id/read", async (req, res) => {
@@ -253,7 +268,9 @@ export function notificationRoutes(db: Db) {
     } catch {
       // 容错持久化
     }
-    res.json({ id, read: true });
+    // 数据一致: 返回服务端最新 unreadCount, 客户端以服务端为权威值覆盖乐观值
+    const unreadCount = await computeUnreadCount(db, companyId, userId);
+    res.json({ id, read: true, unreadCount });
   });
 
   const handleReadAll = async (req: any, res: any) => {

@@ -37,6 +37,9 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
       const feed = await coolie.listNotifications(companyId);
       set({
         items: feed.notifications,
+        // 数据一致: unreadCount 由服务端为单一可信源 (service-authoritative),
+        // 服务端持久化 dismissal table + 内存 readSet, 远比客户端本地 count 准.
+        // 客户端仅在 markRead/markAllRead 乐观更新时使用本地 count.
         unreadCount: feed.unreadCount,
         error: null,
         loading: false,
@@ -47,28 +50,38 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
   },
 
   markRead: async (id) => {
-    const { companyId, items } = get();
+    const { companyId, items, unreadCount } = get();
     // 精准幂等: 已读条目直接 return, 避免重复 API 调用和状态抖动
     const existing = items.find((item) => item.id === id);
     if (existing?.read) return;
+    // 乐观更新: 本地立刻 -1 (与服务端同步写入并行)
     const next = items.map((item) => (item.id === id ? { ...item, read: true } : item));
-    // 乐观更新: 点开即时消红点, 服务端写入失败也不回滚(下次 load 会纠正)。
-    set({ items: next, unreadCount: countUnread(next) });
+    const nextUnread = Math.max(0, unreadCount - 1);
+    set({ items: next, unreadCount: nextUnread });
     if (!companyId) return;
     try {
-      await coolie.markNotificationRead(id, companyId);
+      // 服务端返回最新 unreadCount 作为权威值, 覆盖乐观值, 保证数据一致
+      const result = await coolie.markNotificationRead(id, companyId);
+      if (typeof result?.unreadCount === "number") {
+        set({ unreadCount: result.unreadCount });
+      }
     } catch {
-      // 已读写入是尽力而为, 失败不打扰用户。
+      // 已读写入是尽力而为, 失败不打扰用户; 下次 load 会纠正
     }
   },
 
   markAllRead: async () => {
     const { companyId, items } = get();
+    // 乐观更新: 本地立刻清零
     const next = items.map((item) => ({ ...item, read: true }));
     set({ items: next, unreadCount: 0 });
     if (!companyId) return;
     try {
-      await coolie.markAllNotificationsRead(companyId);
+      // 服务端返回最新 unreadCount 作为权威值 (理论上应该是 0)
+      const result = await coolie.markAllNotificationsRead(companyId);
+      if (typeof result?.unreadCount === "number") {
+        set({ unreadCount: result.unreadCount });
+      }
     } catch {
       // 尽力而为
     }

@@ -663,9 +663,9 @@ export class CoolieClient extends BaseCoolieClient {
     );
   }
 
-  /** PATCH /api/notifications/:id/read — 标记单条已读 */
-  async markNotificationRead(id: string, companyId: string): Promise<{ id: string; read: boolean }> {
-    return this.request<{ id: string; read: boolean }>(
+  /** PATCH /api/notifications/:id/read — 标记单条已读 (返回服务端最新 unreadCount, 保证数据一致) */
+  async markNotificationRead(id: string, companyId: string): Promise<{ id: string; read: boolean; unreadCount: number }> {
+    return this.request<{ id: string; read: boolean; unreadCount: number }>(
       "PATCH",
       `/api/notifications/${encodeURIComponent(id)}/read?companyId=${encodeURIComponent(companyId)}`,
     );
