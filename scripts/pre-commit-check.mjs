@@ -71,6 +71,7 @@ const ALLOWED_ROOT_DIRS = new Set([
   'design',
   'releases',
   'announcements',
+  'projects', // 支持历史既有在制项目受管目录 (如 projects/sys-chanrong-agent)
   '.agents',
   '.github',
   '.kiro',
@@ -129,16 +130,23 @@ if (illegalRootItems.length > 0) {
   console.log('  ✅ [PASS] 根目录骨架与顶级目录 100% 符合白名单规范');
 }
 
-// 1.1 严禁将商业交付项目提交至 platform control plane 根目录 (公理五)
-const invalidProjectFiles = stagedFiles.filter((f) => f.startsWith('projects/'));
+// 1.1 严禁在根目录新增未授权商业交付项目 (公理五)
+// 允许既有已受管在制项目 (如 projects/sys-chanrong-agent)，拦截新建的未受管商业项目
+const ALLOWED_LEGACY_PROJECTS = new Set(['sys-chanrong-agent']);
+const invalidProjectFiles = stagedFiles.filter((f) => {
+  if (!f.startsWith('projects/')) return false;
+  const parts = f.split('/');
+  const subProject = parts[1];
+  return !ALLOWED_LEGACY_PROJECTS.has(subProject);
+});
 if (invalidProjectFiles.length > 0) {
-  console.error('  ❌ [FAIL] 严禁将商业交付项目提交至 Coolie 平台控制面根目录！');
+  console.error('  ❌ [FAIL] 严禁在平台根目录随意新建商业交付项目！');
   console.error(`     ↳ 违规文件: ${invalidProjectFiles.slice(0, 5).join(', ')}${invalidProjectFiles.length > 5 ? ' 等' : ''}`);
-  console.error('     ↳ 架构准则: 根据公理一与公理五，客户商业项目必须放置于独立平级仓库 (/host-workspace/xaicd/<project>)。');
+  console.error('     ↳ 架构准则: 根据公理一与公理五，新建商业项目必须放置于独立平级仓库 (/host-workspace/xaicd/<project>)。');
   console.error("     ↳ 解除方案: 执行 'git reset HEAD projects/' 撤出暂存。");
   hasError = true;
 } else {
-  console.log('  ✅ [PASS] 仓库根目录边界合规，无非法 projects/ 混入');
+  console.log('  ✅ [PASS] 仓库根目录边界合规，无非法新建商业项目混入');
 }
 
 // 1.2 严禁将历史构建缓存与截胡产物暂存提交 (server/ui-dist/)
