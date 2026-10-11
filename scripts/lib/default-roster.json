@@ -23,16 +23,16 @@
       "agentId": "forge-core-swe",
       "name": "铁匠",
       "role": "Core SWE (核心研发)",
-      "defaultTool": "claude-glm",
-      "fallbackTools": ["claude-mm", "cmd"],
-      "env": "Mac 宿主机"
+      "defaultTool": "agy-gemini3.8",
+      "fallbackTools": ["cmd", "claude-glm", "claude-mm"],
+      "env": "Docker 容器 / Mac 宿主机"
     },
     {
       "agentId": "forge-ii-core-swe",
       "name": "铁匠贰号",
       "role": "Core SWE (核心研发兜底)",
       "defaultTool": "cmd",
-      "fallbackTools": ["claude-mm"],
+      "fallbackTools": ["agy-gemini3.8", "claude-mm"],
       "env": "Mac 宿主机"
     },
     {

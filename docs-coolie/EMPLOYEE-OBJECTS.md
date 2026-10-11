@@ -59,8 +59,8 @@
 |---|---|---|---|---|---|
 | 掌柜 | Hermes | (PM, 不算 5 角色) | 2 (1.5 / 5.5 拍板) | **Hermes 自己** (Claude Code v2.1.287 + MiniMax-M3 SDK) | 老板原话 "Hermes 肯定用 Hermes 自己啊, 为啥 kiro-cli" (wave279b 微信会话实证), **Hermes 本身就是工具, 不配别的工具** |
 | 墨斗 | Inkstick | `fda` | 3 + 1 双主 (Phase 1) | agy-gemini3.8 v1.2.14 | 跑在 Docker 容器 (agy-ubuntu-container) |
-| 铁匠 | Forge | `core-swe` | 11 (Phase 3+4 全 + 5.4) | claude-glm (GLM-5.3) | 主力 44% |
-| 铁匠贰号 | Forge II | `core-swe` (副) | 0 (计入铁匠) | claude-mm (MiniMax-M3 SDK) | **同角色换工具, 不是新员工** |
+| 铁匠 | Forge | `core-swe` | 11 (Phase 3+4 全 + 5.4) | agy-gemini3.8 (老板拍板升级为 agy 主力) | 主力 44%，支持 Docker 容器与 Mac 宿主机 |
+| 铁匠贰号 | Forge II | `core-swe` (副) | 0 (计入铁匠) | cmd / claude-glm (兜底) | **同角色换工具, 不是新员工** |
 | 门神 | Guardian | `fdse` | 1 + 金标兜底 (Phase 4.3 / 5.3) | cmd v1.73.4 | 老板不亲自跑 (wave229) |
 | 兑底渊 | Operator | `pre-sre` | 4 (Phase 2.1 / 3.4 / 4.5 / 5.1) | copilot v1.0.91 | wave272 拍板 |
 | 百晓生 | Sage | `ds` | 5 (Phase 2.5 / 3.5 / 5.2 / 5.3 / 5.5) | claude-mm (主线, wave234) | **责任重大** (wave227) |

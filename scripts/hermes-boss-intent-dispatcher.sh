@@ -126,7 +126,7 @@ fi
 # 1. 意图分类与特征提取
 AGENT="forge-core-swe"
 EMPLOYEE="铁匠"
-TOOL="claude-glm"
+TOOL="agy"
 CATEGORY="dev"
 CMMI_PHASE="Phase 4.1 编码"
 AGENT_ID="02cab729-c5b7-4a14-9ce9-5a34885c336a"
@@ -163,10 +163,10 @@ elif [[ "$INPUT" =~ (验收|监控|告警|风控|数据分析|测试|撞机|走�
   CMMI_PHASE="Phase 2.5 风险评估 / 5.3 验收测试 / 5.5 复盘"
   AGENT_ID="58bb5a96-c241-4b35-babb-1cc1771d5dd5"
 else
-  # 默认代码实现、性能优化、修bug -> 铁匠
+  # 默认代码实现、性能优化、修bug -> 铁匠 (老板拍板统一默认使用 agy)
   AGENT="forge-core-swe"
   EMPLOYEE="铁匠"
-  TOOL="claude-glm"
+  TOOL="agy"
   CATEGORY="dev"
   CMMI_PHASE="Phase 4.1 编码"
   AGENT_ID="02cab729-c5b7-4a14-9ce9-5a34885c336a"
