@@ -17,9 +17,10 @@ import {
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
-import type { Agent, Issue, Project } from "@coolie/api-client";
+import type { Agent, Approval, Issue, Project } from "@coolie/api-client";
 import { C, coolie, type InboxApprovalItem, type InboxMentionItem } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
+import { QuickApprovalCard } from "../components/QuickApprovalCard";
 import { AppCard } from "../ui/AppCard";
 import { EmptyState } from "../ui/EmptyState";
 import { ErrorRetry } from "../ui/ErrorRetry";
@@ -131,6 +132,7 @@ export function InboxScreen({
   onOpenSettings,
   onOpenWorkshop,
   onBack,
+  onResolved,
 }: {
   company: { id: string; name: string };
   initialTab?: InboxTab;
@@ -139,8 +141,11 @@ export function InboxScreen({
   onOpenSettings?: () => void;
   onOpenWorkshop?: () => void;
   onBack?: () => void;
+  /** 内嵌 QuickApprovalCard 裁决完成后的回调 (审批/驳回后从列表移除) */
+  onResolved?: (approvalId: string, decision: "approve" | "reject") => void;
 }) {
   const [tab, setTab] = useState<InboxTab>(initialTab);
+  const [expandedApprovalId, setExpandedApprovalId] = useState<string | null>(null);
 
   useEffect(() => {
     if (initialTab) {
@@ -553,26 +558,44 @@ export function InboxScreen({
                 style={styles.emptyBox}
               />
             ) : (
-              approvals.map((item) => (
-                <AppCard
-                  key={item.id}
-                  variant="surface"
-                  row
-                  style={styles.approvalRow}
-                  onPress={() => onOpenApproval(item.id)}
-                >
-                  <View style={[styles.rowDot, { backgroundColor: C.warn }]} />
-                  <View style={{ flex: 1, gap: 3 }}>
-                    <Text style={styles.rowTitle} numberOfLines={2}>
-                      {item.title}
-                    </Text>
-                    <Text style={styles.metaText} numberOfLines={1}>
-                      {item.type} · {formatRelativeTime(item.createdAt)}
-                    </Text>
+              approvals.map((item) => {
+                const isOpen = expandedApprovalId === item.id;
+                return (
+                  <View key={item.id}>
+                    <AppCard
+                      variant="surface"
+                      row
+                      style={styles.approvalRow}
+                      onPress={() => setExpandedApprovalId(isOpen ? null : item.id)}
+                    >
+                      <View style={[styles.rowDot, { backgroundColor: C.warn }]} />
+                      <View style={{ flex: 1, gap: 3 }}>
+                        <Text style={styles.rowTitle} numberOfLines={2}>
+                          {item.title}
+                        </Text>
+                        <Text style={styles.metaText} numberOfLines={1}>
+                          {item.type} · {formatRelativeTime(item.createdAt)}
+                        </Text>
+                      </View>
+                      <Text style={styles.chevron}>{isOpen ? "▾" : "›"}</Text>
+                    </AppCard>
+                    {isOpen ? (
+                      <View style={styles.approvalDetail}>
+                        <QuickApprovalCard
+                          companyId={company.id}
+                          approval={item as unknown as Approval}
+                          floating={false}
+                          onResolved={(approvalId, decision) => {
+                            void onResolved?.(approvalId, decision);
+                            setExpandedApprovalId(null);
+                          }}
+                          onDismiss={() => setExpandedApprovalId(null)}
+                        />
+                      </View>
+                    ) : null}
                   </View>
-                  <Text style={styles.chevron}>›</Text>
-                </AppCard>
-              ))
+                );
+              })
             )
           ) : null}
 
@@ -1153,7 +1176,8 @@ const styles = StyleSheet.create({
   metaTime: { color: C.ink4, fontSize: 11, fontVariant: ["tabular-nums"] },
   blockedAction: { color: C.ink3, fontSize: 12, marginTop: 2 },
   chevron: { color: C.ink4, fontSize: 20 },
-  approvalRow: { gap: 10, marginBottom: 8 },
+  approvalRow: { gap: 10, marginBottom: 4 },
+  approvalDetail: { marginBottom: 12 },
   mentionCard: { gap: 6, marginBottom: 8 },
   mentionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   mentionAuthor: { color: C.ok, fontSize: 12, fontWeight: "600", flex: 1 },
