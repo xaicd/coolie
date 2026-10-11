@@ -1405,6 +1405,8 @@ export interface InboxFailedRunItem {
   companyId: string;
   status: string;
   error?: string | null;
+  /** 该失败运行关联的工单 id (从 contextSnapshot 提取), 便于就地导航与重试。 */
+  issueId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

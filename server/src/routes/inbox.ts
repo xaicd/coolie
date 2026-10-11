@@ -108,6 +108,7 @@ export function inboxRoutes(db: Db) {
           companyId: heartbeatRuns.companyId,
           status: heartbeatRuns.status,
           error: heartbeatRuns.error,
+          contextSnapshot: heartbeatRuns.contextSnapshot,
           createdAt: heartbeatRuns.createdAt,
           updatedAt: heartbeatRuns.updatedAt,
         })
@@ -158,16 +159,26 @@ export function inboxRoutes(db: Db) {
         createdAt: row.createdAt.toISOString(),
         updatedAt: row.updatedAt.toISOString(),
       })),
-      failedRuns: failedHeartbeatRuns.map((row) => ({
-        id: row.id,
-        agentId: row.agentId,
-        agentName: row.agentName ?? "员工",
-        companyId: row.companyId,
-        status: row.status,
-        error: row.error,
-        createdAt: row.createdAt.toISOString(),
-        updatedAt: row.updatedAt?.toISOString() ?? row.createdAt.toISOString(),
-      })),
+      failedRuns: failedHeartbeatRuns.map((row) => {
+        const snapshot = (row.contextSnapshot ?? {}) as Record<string, unknown>;
+        const issueId =
+          typeof snapshot.issueId === "string"
+            ? snapshot.issueId
+            : typeof snapshot.taskId === "string"
+              ? snapshot.taskId
+              : null;
+        return {
+          id: row.id,
+          agentId: row.agentId,
+          agentName: row.agentName ?? "员工",
+          companyId: row.companyId,
+          status: row.status,
+          error: row.error,
+          issueId,
+          createdAt: row.createdAt.toISOString(),
+          updatedAt: row.updatedAt?.toISOString() ?? row.createdAt.toISOString(),
+        };
+      }),
     });
   });
 

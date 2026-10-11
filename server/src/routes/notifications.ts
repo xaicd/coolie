@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { and, desc, eq, ilike, isNotNull } from "drizzle-orm";
+import { and, desc, eq, ilike, isNotNull, or } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
-import { agents, approvals, issueComments, issues } from "@paperclipai/db";
+import { agents, approvals, heartbeatRuns, issueComments, issues } from "@paperclipai/db";
 import { badRequest } from "../errors.js";
 import { assertBoard, assertCompanyAccess } from "./authz.js";
 import { inboxDismissalService } from "../services/inbox-dismissals.js";
@@ -85,7 +85,7 @@ function approvalTitle(payload: Record<string, unknown> | null, fallback: string
 }
 
 async function buildFeed(db: Db, companyId: string, limit: number): Promise<NotificationItem[]> {
-  const [pending, failures, mentions] = await Promise.all([
+  const [pending, failures, mentions, failedRuns] = await Promise.all([
     db
       .select({
         id: approvals.id,
@@ -128,6 +128,25 @@ async function buildFeed(db: Db, companyId: string, limit: number): Promise<Noti
       )
       .orderBy(desc(issueComments.createdAt))
       .limit(limit),
+    db
+      .select({
+        id: heartbeatRuns.id,
+        agentName: agents.name,
+        status: heartbeatRuns.status,
+        error: heartbeatRuns.error,
+        contextSnapshot: heartbeatRuns.contextSnapshot,
+        createdAt: heartbeatRuns.createdAt,
+      })
+      .from(heartbeatRuns)
+      .leftJoin(agents, eq(agents.id, heartbeatRuns.agentId))
+      .where(
+        and(
+          eq(heartbeatRuns.companyId, companyId),
+          or(eq(heartbeatRuns.status, "failed"), eq(heartbeatRuns.status, "timed_out")),
+        ),
+      )
+      .orderBy(desc(heartbeatRuns.createdAt))
+      .limit(limit),
   ]);
 
   const items: NotificationItem[] = [
@@ -155,6 +174,23 @@ async function buildFeed(db: Db, companyId: string, limit: number): Promise<Noti
       target: { kind: "issue" as const, id: row.issueId },
       createdAt: row.createdAt.toISOString(),
     })),
+    ...failedRuns.map((row) => {
+      const snapshot = (row.contextSnapshot ?? {}) as Record<string, unknown>;
+      const issueId =
+        typeof snapshot.issueId === "string"
+          ? snapshot.issueId
+          : typeof snapshot.taskId === "string"
+            ? snapshot.taskId
+            : null;
+      return {
+        id: `failure:${row.id}`,
+        type: "failure" as const,
+        title: `运行失败：${row.agentName ?? "员工"}`,
+        body: row.error ?? "该运行已失败，可在收件箱就地重试。",
+        target: issueId ? { kind: "issue" as const, id: issueId } : null,
+        createdAt: row.createdAt.toISOString(),
+      };
+    }),
   ];
 
   items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));

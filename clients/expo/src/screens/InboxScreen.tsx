@@ -59,7 +59,7 @@ import {
   type BlockedInboxSort,
 } from "../lib/blockedInbox";
 
-export type InboxTab = "all" | "mine" | "recent" | "unread" | "approvals" | "blocked";
+export type InboxTab = "all" | "mine" | "recent" | "unread" | "approvals" | "failed" | "blocked";
 export type InboxCategory =
   | "everything"
   | "issues"
@@ -123,6 +123,7 @@ const TAB_OPTIONS: { key: InboxTab; label: string }[] = [
   { key: "recent", label: "最近" },
   { key: "unread", label: "未读" },
   { key: "approvals", label: "审批" },
+  { key: "failed", label: "失败" },
   { key: "blocked", label: "阻塞" },
 ];
 
@@ -872,47 +873,78 @@ export function InboxScreen({
     return items;
   }, [activeIssues, approvals, failures, joinRequests, debouncedQuery]);
 
-  // P1-1: Unread Tab (未读待办)
+  // 通知源与顶栏铃铛同源 (useNotificationsStore), 用于让「未读」Tab 与铃铛数字恒等。
+  const notifItems = useNotificationsStore((s) => s.items);
+
+  // P1-1: Unread Tab —— 与顶栏铃铛同一通知口径 (buildFeed)。
+  // 铃铛 unreadCount = 通知未读条数; 本 Tab 直接按同一份通知逐条渲染, 保证
+  // 「铃铛 N = 收件箱未读 N」, 消灭「铃铛 7 / 进去 0」的数据不一致。
   const unreadWorkItems = useMemo((): MobileInboxWorkItem[] => {
     const items: MobileInboxWorkItem[] = [];
+    for (const n of notifItems) {
+      if (n.read) continue;
+      const ts = new Date(n.createdAt).getTime();
+      const rawId = n.id.includes(":") ? n.id.split(":").pop()! : n.id;
 
-    // 未读工单
-    for (const issue of activeIssues) {
-      if (getIsUnread(issue)) {
-        const ts = new Date(issue.lastActivityAt ?? issue.updatedAt ?? issue.createdAt ?? 0).getTime();
-        items.push({ kind: "issue", id: issue.id, issue, timestamp: Number.isFinite(ts) ? ts : 0 });
+      if (n.target?.kind === "approval") {
+        const approval =
+          approvals.find((a) => a.id === n.target!.id) ??
+          ({
+            id: n.target.id,
+            title: n.title,
+            type: n.body ?? "approval",
+            status: "pending",
+            createdAt: n.createdAt,
+          } as InboxApprovalItem);
+        items.push({ kind: "approval", id: approval.id, approval, timestamp: Number.isFinite(ts) ? ts : 0 });
+        continue;
       }
+
+      if (n.type === "failure") {
+        const run = failures.find((f) => f.id === rawId);
+        if (run) {
+          items.push({ kind: "failed_run", id: run.id, run, timestamp: Number.isFinite(ts) ? ts : 0 });
+          continue;
+        }
+        const issue = issueById.get(rawId);
+        if (issue) {
+          items.push({ kind: "issue", id: issue.id, issue, timestamp: Number.isFinite(ts) ? ts : 0 });
+          continue;
+        }
+        items.push({ kind: "alert", id: n.id, title: n.title, description: n.body ?? "", timestamp: Number.isFinite(ts) ? ts : 0, tone: "err" });
+        continue;
+      }
+
+      if (n.type === "mention") {
+        const mention = mentions.find((m) => m.id === rawId);
+        if (mention) {
+          items.push({ kind: "mention", id: `mention:${mention.id}`, mention, timestamp: Number.isFinite(ts) ? ts : 0 });
+          continue;
+        }
+      }
+
+      const targetIssueId = n.target?.kind === "issue" ? n.target.id : null;
+      const issue = targetIssueId ? issueById.get(targetIssueId) : undefined;
+      if (issue) {
+        items.push({ kind: "issue", id: issue.id, issue, timestamp: Number.isFinite(ts) ? ts : 0 });
+        continue;
+      }
+      items.push({ kind: "alert", id: n.id, title: n.title, description: n.body ?? "", timestamp: Number.isFinite(ts) ? ts : 0, tone: "warn" });
     }
 
-    // 待裁决审批
-    for (const approval of approvals) {
-      const ts = new Date(approval.createdAt).getTime();
-      items.push({ kind: "approval", id: approval.id, approval, timestamp: Number.isFinite(ts) ? ts : 0 });
-    }
+    const filtered = debouncedQuery
+      ? items.filter((item) => {
+          if (item.kind === "issue") return item.issue.title.toLowerCase().includes(debouncedQuery);
+          if (item.kind === "approval") return item.approval.title.toLowerCase().includes(debouncedQuery);
+          if (item.kind === "mention") return item.mention.body.toLowerCase().includes(debouncedQuery);
+          if (item.kind === "alert") return item.title.toLowerCase().includes(debouncedQuery);
+          return true;
+        })
+      : items;
 
-    // 失败运行
-    for (const failure of failures) {
-      const ts = new Date(failure.updatedAt).getTime();
-      items.push({ kind: "failed_run", id: failure.id, run: failure, timestamp: Number.isFinite(ts) ? ts : 0 });
-    }
-
-    // 加群申请
-    for (const jr of joinRequests) {
-      const ts = new Date(jr.createdAt).getTime();
-      items.push({ kind: "join_request", id: jr.id, joinRequest: jr, timestamp: Number.isFinite(ts) ? ts : 0 });
-    }
-
-    if (debouncedQuery) {
-      return items.filter((item) => {
-        if (item.kind === "issue") return item.issue.title.toLowerCase().includes(debouncedQuery);
-        if (item.kind === "approval") return item.approval.title.toLowerCase().includes(debouncedQuery);
-        return true;
-      });
-    }
-
-    items.sort((a, b) => b.timestamp - a.timestamp);
-    return items;
-  }, [activeIssues, approvals, failures, joinRequests, debouncedQuery, getIsUnread]);
+    filtered.sort((a, b) => b.timestamp - a.timestamp);
+    return filtered;
+  }, [notifItems, approvals, failures, mentions, issueById, debouncedQuery]);
 
   // P1-3: All 全盘跨实体聚合工作项 (根据 allCategoryFilter 过滤)
   const allTabWorkItems = useMemo((): MobileInboxWorkItem[] => {
@@ -922,6 +954,7 @@ export function InboxScreen({
     const showApprovals = allCategoryFilter === "everything" || allCategoryFilter === "approvals";
     const showFailures = allCategoryFilter === "everything" || allCategoryFilter === "failed_runs";
     const showJoinRequests = allCategoryFilter === "everything" || allCategoryFilter === "join_requests";
+    const showMentions = allCategoryFilter === "everything";
     const showAlerts = allCategoryFilter === "everything" || allCategoryFilter === "alerts";
 
     if (showIssues) {
@@ -952,6 +985,18 @@ export function InboxScreen({
       }
     }
 
+    if (showMentions) {
+      for (const mention of mentions) {
+        const ts = new Date(mention.createdAt).getTime();
+        items.push({
+          kind: "mention",
+          id: `mention:${mention.id}`,
+          mention,
+          timestamp: Number.isFinite(ts) ? ts : 0,
+        });
+      }
+    }
+
     if (showAlerts && failures.length > 0) {
       items.push({
         kind: "alert",
@@ -965,7 +1010,7 @@ export function InboxScreen({
 
     items.sort((a, b) => b.timestamp - a.timestamp);
     return items;
-  }, [allCategoryFilter, filteredIssues, approvals, failures, joinRequests]);
+  }, [allCategoryFilter, filteredIssues, approvals, failures, joinRequests, mentions]);
 
   // 审批 Tab 独立工作项
   const approvalWorkItems = useMemo((): MobileInboxWorkItem[] => {
@@ -985,14 +1030,37 @@ export function InboxScreen({
     }));
   }, [approvals, debouncedQuery]);
 
+  // 失败 Tab: 失败/异常运行 (外露「重试」两字按钮)
+  const failedWorkItems = useMemo((): MobileInboxWorkItem[] => {
+    let list = failures;
+    if (debouncedQuery) {
+      list = failures.filter((run) => {
+        const title = "title" in run && run.title ? run.title : "";
+        const name = "agentName" in run && run.agentName ? run.agentName : "";
+        return (
+          title.toLowerCase().includes(debouncedQuery) ||
+          name.toLowerCase().includes(debouncedQuery) ||
+          run.status.toLowerCase().includes(debouncedQuery)
+        );
+      });
+    }
+    return list.map((run) => ({
+      kind: "failed_run",
+      id: run.id,
+      run,
+      timestamp: new Date(run.updatedAt).getTime(),
+    }));
+  }, [failures, debouncedQuery]);
+
   // 当前选中 Tab 的基础工作项集合
   const currentTabItems = useMemo((): MobileInboxWorkItem[] => {
     if (tab === "mine") return mineWorkItems;
     if (tab === "recent") return recentWorkItems;
     if (tab === "unread") return unreadWorkItems;
     if (tab === "approvals") return approvalWorkItems;
+    if (tab === "failed") return failedWorkItems;
     return allTabWorkItems;
-  }, [tab, mineWorkItems, recentWorkItems, unreadWorkItems, approvalWorkItems, allTabWorkItems]);
+  }, [tab, mineWorkItems, recentWorkItems, unreadWorkItems, approvalWorkItems, failedWorkItems, allTabWorkItems]);
 
   // P1-4: 远端搜索补全项目
   const supplementIssues = useMemo((): Issue[] => {
@@ -1120,6 +1188,21 @@ export function InboxScreen({
 
   // P0-4: 全部标记为已读
   const markAllRead = useCallback(async () => {
+    // 未读 Tab 与铃铛同源: 全读 = 通知全部标已读 (与铃铛红点同一份数据)。
+    if (tab === "unread") {
+      const unreadNotif = notifItems.filter((n) => !n.read).length;
+      if (unreadNotif === 0) {
+        setToast("没有未读项目");
+        return;
+      }
+      setToast(`已全部标为已读 (${unreadNotif} 条)`);
+      try {
+        await useNotificationsStore.getState().markAllRead();
+      } catch {
+        // 尽力而为
+      }
+      return;
+    }
     const targetIssues = tab === "mine" ? mineIssues : activeIssues;
     const unreadIssues = targetIssues.filter((i) => !archivedIds.has(i.id) && getIsUnread(i));
     if (unreadIssues.length === 0) {
@@ -1142,7 +1225,7 @@ export function InboxScreen({
     } catch {
       // 批量降级
     }
-  }, [tab, mineIssues, activeIssues, archivedIds, getIsUnread]);
+  }, [tab, mineIssues, activeIssues, archivedIds, getIsUnread, notifItems]);
 
   // P1-8: 分组循环切换
   const cycleGroupBy = useCallback(() => {
@@ -1229,6 +1312,7 @@ export function InboxScreen({
             if (opt.key === "mine") badgeText = ` (${mineWorkItems.length})`;
             if (opt.key === "unread") badgeText = ` (${unreadWorkItems.length})`;
             if (opt.key === "approvals") badgeText = ` (${approvals.length})`;
+            if (opt.key === "failed") badgeText = ` (${failedWorkItems.length})`;
             if (opt.key === "blocked") badgeText = ` (${blockedRows.length})`;
 
             return (
@@ -1526,7 +1610,11 @@ export function InboxScreen({
                       isRetrying={retryingRunId === item.id}
                       onRetry={() => void handleRetryRun(item.run)}
                       onPress={() => {
-                        const known = issueById.get(item.run.id);
+                        // 优先用运行关联的工单 id 导航; 退回 run.id (受阻任务兜底)。
+                        const runIssueId = "issueId" in item.run ? item.run.issueId : null;
+                        const known =
+                          (runIssueId ? issueById.get(runIssueId) : undefined) ??
+                          issueById.get(item.run.id);
                         if (known) onOpenIssue(known);
                         else onOpenWorkshop?.();
                       }}
@@ -1589,9 +1677,11 @@ export function InboxScreen({
                       ? "✨"
                       : tab === "approvals"
                         ? "✅"
-                        : tab === "recent"
-                          ? "🕒"
-                          : "📥"
+                        : tab === "failed"
+                          ? "🧯"
+                          : tab === "recent"
+                            ? "🕒"
+                            : "📥"
                   }
                   title={
                     debouncedQuery
@@ -1600,11 +1690,13 @@ export function InboxScreen({
                         ? "收件箱已清空 (Inbox Zero)"
                         : tab === "approvals"
                           ? "没有待审批"
-                          : tab === "recent"
-                            ? "最近 7 天没有新活动"
-                            : tab === "mine"
-                              ? "当前没有与你相关的待办"
-                              : "当前没有可处理的任务"
+                          : tab === "failed"
+                            ? "没有失败运行"
+                            : tab === "recent"
+                              ? "最近 7 天没有新活动"
+                              : tab === "mine"
+                                ? "当前没有与你相关的待办"
+                                : "当前没有可处理的任务"
                   }
                   subtitle={
                     debouncedQuery
