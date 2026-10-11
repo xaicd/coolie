@@ -1382,11 +1382,40 @@ export interface InboxMentionItem {
   createdAt: string;
 }
 
-/** 收件箱三段聚合 — GET /api/inbox */
+/** 收件箱企业加群申请条目 */
+export interface InboxJoinRequestItem {
+  id: string;
+  companyId: string;
+  requestType: string;
+  status: string;
+  requestIp: string;
+  requestingUserId: string | null;
+  requestEmailSnapshot: string | null;
+  agentName: string | null;
+  adapterType: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 收件箱失败运行条目 */
+export interface InboxFailedRunItem {
+  id: string;
+  agentId: string;
+  agentName: string;
+  companyId: string;
+  status: string;
+  error?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** 收件箱多段聚合 — GET /api/inbox */
 export interface InboxFeed {
   pendingApprovals: InboxApprovalItem[];
   failures: InboxFailureItem[];
   mentionedBy: InboxMentionItem[];
+  joinRequests?: InboxJoinRequestItem[];
+  failedRuns?: InboxFailedRunItem[];
 }
 
 /** 运行状态摘要 — GET /companies/:companyId/heartbeat-runs */

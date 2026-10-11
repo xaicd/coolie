@@ -290,6 +290,8 @@ export type {
   InboxApprovalItem,
   InboxFailureItem,
   InboxMentionItem,
+  InboxJoinRequestItem,
+  InboxFailedRunItem,
   InboxFeed,
 } from "@coolie/api-client";
 

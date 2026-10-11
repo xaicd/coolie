@@ -175,6 +175,8 @@ export type {
   InboxApprovalItem,
   InboxFailureItem,
   InboxMentionItem,
+  InboxJoinRequestItem,
+  InboxFailedRunItem,
   InboxFeed,
   HeartbeatRunSummary,
   GitProvider,

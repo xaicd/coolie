@@ -1,7 +1,7 @@
 import { Router } from "express";
-import { and, desc, eq, ilike, isNotNull } from "drizzle-orm";
+import { and, desc, eq, ilike, isNotNull, or } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
-import { agents, approvals, issueComments, issues } from "@paperclipai/db";
+import { agents, approvals, heartbeatRuns, issueComments, issues, joinRequests } from "@paperclipai/db";
 import { badRequest } from "../errors.js";
 import { assertBoardOrAgent, assertCompanyAccess } from "./authz.js";
 
@@ -22,13 +22,9 @@ function readCompanyId(value: unknown): string {
 }
 
 /**
- * The mobile inbox: one company-scoped feed of the three things a board user
+ * The mobile inbox: one company-scoped feed of the things a user
  * opens the app to act on — approvals waiting on a decision, tasks that have
- * stalled (`blocked`), and agent comments that mention someone with `@`.
- *
- * Each bucket is queried independently and returned whole; the screen renders
- * them as three lists rather than a merged stream, so no cross-bucket ordering
- * is attempted here.
+ * stalled (`blocked`), failed runs needing retry, join requests, and agent mentions.
  */
 export function inboxRoutes(db: Db) {
   const router = Router();
@@ -39,7 +35,7 @@ export function inboxRoutes(db: Db) {
     assertCompanyAccess(req, companyId);
     const limit = readLimit(req.query.limit);
 
-    const [pendingApprovals, failures, mentionedBy] = await Promise.all([
+    const [pendingApprovals, failures, mentionedBy, pendingJoinRequests, failedHeartbeatRuns] = await Promise.all([
       db
         .select({
           id: approvals.id,
@@ -86,6 +82,45 @@ export function inboxRoutes(db: Db) {
         )
         .orderBy(desc(issueComments.createdAt))
         .limit(limit),
+      db
+        .select({
+          id: joinRequests.id,
+          companyId: joinRequests.companyId,
+          requestType: joinRequests.requestType,
+          status: joinRequests.status,
+          requestIp: joinRequests.requestIp,
+          requestingUserId: joinRequests.requestingUserId,
+          requestEmailSnapshot: joinRequests.requestEmailSnapshot,
+          agentName: joinRequests.agentName,
+          adapterType: joinRequests.adapterType,
+          createdAt: joinRequests.createdAt,
+          updatedAt: joinRequests.updatedAt,
+        })
+        .from(joinRequests)
+        .where(and(eq(joinRequests.companyId, companyId), eq(joinRequests.status, "pending_approval")))
+        .orderBy(desc(joinRequests.createdAt))
+        .limit(limit),
+      db
+        .select({
+          id: heartbeatRuns.id,
+          agentId: heartbeatRuns.agentId,
+          agentName: agents.name,
+          companyId: heartbeatRuns.companyId,
+          status: heartbeatRuns.status,
+          error: heartbeatRuns.error,
+          createdAt: heartbeatRuns.createdAt,
+          updatedAt: heartbeatRuns.updatedAt,
+        })
+        .from(heartbeatRuns)
+        .leftJoin(agents, eq(agents.id, heartbeatRuns.agentId))
+        .where(
+          and(
+            eq(heartbeatRuns.companyId, companyId),
+            or(eq(heartbeatRuns.status, "failed"), eq(heartbeatRuns.status, "timed_out")),
+          ),
+        )
+        .orderBy(desc(heartbeatRuns.createdAt))
+        .limit(limit),
     ]);
 
     res.json({
@@ -109,6 +144,29 @@ export function inboxRoutes(db: Db) {
         body: row.body,
         authorName: row.authorName ?? "员工",
         createdAt: row.createdAt,
+      })),
+      joinRequests: pendingJoinRequests.map((row) => ({
+        id: row.id,
+        companyId: row.companyId,
+        requestType: row.requestType,
+        status: row.status,
+        requestIp: row.requestIp,
+        requestingUserId: row.requestingUserId,
+        requestEmailSnapshot: row.requestEmailSnapshot,
+        agentName: row.agentName,
+        adapterType: row.adapterType,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt.toISOString(),
+      })),
+      failedRuns: failedHeartbeatRuns.map((row) => ({
+        id: row.id,
+        agentId: row.agentId,
+        agentName: row.agentName ?? "员工",
+        companyId: row.companyId,
+        status: row.status,
+        error: row.error,
+        createdAt: row.createdAt.toISOString(),
+        updatedAt: row.updatedAt?.toISOString() ?? row.createdAt.toISOString(),
       })),
     });
   });

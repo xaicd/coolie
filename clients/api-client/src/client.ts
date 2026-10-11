@@ -22,6 +22,9 @@ import {
   type IssueWorkProduct,
   type WorkProductVersionsResponse,
   type InboxFeed,
+  type InboxJoinRequestItem,
+  type InboxFailedRunItem,
+  type HeartbeatRunSummary,
   type OntologyDomain,
   type OntologyDomainLifecycleState,
   type OntologyGraphCounts,
@@ -460,6 +463,7 @@ export class CoolieClient {
       inboxArchivedByUserId?: string;
       unreadForUserId?: string;
       assigneeUserId?: string;
+      q?: string;
     },
   ): Promise<Issue[]> {
     const q = new URLSearchParams();
@@ -473,6 +477,7 @@ export class CoolieClient {
     if (opts?.inboxArchivedByUserId) q.set("inboxArchivedByUserId", opts.inboxArchivedByUserId);
     if (opts?.unreadForUserId) q.set("unreadForUserId", opts.unreadForUserId);
     if (opts?.assigneeUserId) q.set("assigneeUserId", opts.assigneeUserId);
+    if (opts?.q) q.set("q", opts.q);
     const suffix = hasQueryParams(q) ? `?${q.toString()}` : "";
     const body = await this.request<{ issues?: Issue[] } | Issue[]>(
       "GET",
@@ -626,6 +631,53 @@ export class CoolieClient {
     return this.request<InboxFeed>(
       "GET",
       `/api/inbox?companyId=${encodeURIComponent(companyId)}&limit=${limit}`,
+    );
+  }
+
+  /** 重试失败运行 (Wakeup agent to retry failed run) */
+  async retryFailedRun(
+    agentId: string,
+    failedRunId: string,
+    companyId?: string,
+  ): Promise<{ runId?: string; issueId?: string }> {
+    const q = companyId ? `?companyId=${encodeURIComponent(companyId)}` : "";
+    return this.request<{ runId?: string; issueId?: string }>(
+      "POST",
+      `/api/agents/${encodeURIComponent(agentId)}/wakeup${q}`,
+      {
+        source: "on_demand",
+        triggerDetail: "manual",
+        reason: "retry_failed_run",
+        failedRunId,
+      },
+    );
+  }
+
+  /** 获取企业加群申请列表 (GET /api/companies/:companyId/join-requests) */
+  async listJoinRequests(companyId: string, status = "pending_approval"): Promise<InboxJoinRequestItem[]> {
+    const query = status ? `?status=${encodeURIComponent(status)}` : "";
+    const body = await this.request<InboxJoinRequestItem[]>(
+      "GET",
+      `/api/companies/${encodeURIComponent(companyId)}/join-requests${query}`,
+    );
+    return Array.isArray(body) ? body : [];
+  }
+
+  /** 批准企业加群申请 (POST /api/companies/:companyId/join-requests/:requestId/approve) */
+  async approveJoinRequest(companyId: string, requestId: string): Promise<unknown> {
+    return this.request(
+      "POST",
+      `/api/companies/${encodeURIComponent(companyId)}/join-requests/${encodeURIComponent(requestId)}/approve`,
+      {},
+    );
+  }
+
+  /** 拒绝企业加群申请 (POST /api/companies/:companyId/join-requests/:requestId/reject) */
+  async rejectJoinRequest(companyId: string, requestId: string): Promise<unknown> {
+    return this.request(
+      "POST",
+      `/api/companies/${encodeURIComponent(companyId)}/join-requests/${encodeURIComponent(requestId)}/reject`,
+      {},
     );
   }
 

@@ -24,7 +24,9 @@ import {
   C,
   coolie,
   type InboxApprovalItem,
+  type InboxFailedRunItem,
   type InboxFailureItem,
+  type InboxJoinRequestItem,
   type InboxMentionItem,
 } from "../coolie";
 import { StatusDot } from "../components/StatusDot";
@@ -34,7 +36,6 @@ import { EmptyState } from "../ui/EmptyState";
 import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
 import { Pill } from "../ui/Pill";
-import { SegmentedControl } from "../ui/SegmentedControl";
 import { ELEVATION, RADIUS, SPACING } from "../ui/tokens";
 import { formatRelativeShort, formatRelativeTime } from "../utils/format";
 import {
@@ -57,10 +58,18 @@ import {
   type BlockedInboxSort,
 } from "../lib/blockedInbox";
 
-export type InboxTab = "all" | "mine" | "approvals" | "blocked";
+export type InboxTab = "all" | "mine" | "recent" | "unread" | "approvals" | "blocked";
+export type InboxCategory =
+  | "everything"
+  | "issues"
+  | "approvals"
+  | "failed_runs"
+  | "alerts"
+  | "join_requests";
+export type InboxGroupBy = "none" | "status" | "assignee" | "project";
 type DateRange = "all" | "today" | "7d" | "30d";
 
-export type DateSectionTitle = "TODAY" | "YESTERDAY" | "EARLIER";
+export type DateSectionTitle = "TODAY" | "YESTERDAY" | "EARLIER" | string;
 
 export interface DateSection<T> {
   title: DateSectionTitle;
@@ -70,8 +79,17 @@ export interface DateSection<T> {
 export type MobileInboxWorkItem =
   | { kind: "issue"; id: string; issue: Issue; timestamp: number }
   | { kind: "approval"; id: string; approval: InboxApprovalItem; timestamp: number }
-  | { kind: "failed_run"; id: string; run: InboxFailureItem; timestamp: number }
-  | { kind: "mention"; id: string; mention: InboxMentionItem; timestamp: number };
+  | { kind: "failed_run"; id: string; run: InboxFailedRunItem | InboxFailureItem; timestamp: number }
+  | { kind: "join_request"; id: string; joinRequest: InboxJoinRequestItem; timestamp: number }
+  | { kind: "mention"; id: string; mention: InboxMentionItem; timestamp: number }
+  | {
+      kind: "alert";
+      id: string;
+      title: string;
+      description: string;
+      timestamp: number;
+      tone?: "warn" | "err";
+    };
 
 interface InboxFilters {
   statuses: string[];
@@ -96,6 +114,24 @@ const DATE_RANGE_OPTIONS: { key: DateRange; label: string }[] = [
   { key: "today", label: "今天" },
   { key: "7d", label: "近 7 天" },
   { key: "30d", label: "近 30 天" },
+];
+
+const TAB_OPTIONS: { key: InboxTab; label: string }[] = [
+  { key: "all", label: "全部" },
+  { key: "mine", label: "与我" },
+  { key: "recent", label: "最近" },
+  { key: "unread", label: "未读" },
+  { key: "approvals", label: "审批" },
+  { key: "blocked", label: "阻塞" },
+];
+
+const CATEGORY_OPTIONS: { key: InboxCategory; label: string }[] = [
+  { key: "everything", label: "全部" },
+  { key: "issues", label: "工单" },
+  { key: "approvals", label: "审批" },
+  { key: "failed_runs", label: "失败" },
+  { key: "alerts", label: "警报" },
+  { key: "join_requests", label: "加群" },
 ];
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -137,7 +173,7 @@ function countActiveFilters(filters: InboxFilters): number {
 function resolveDateCategory(
   value: Date | string | number | null | undefined,
   now = new Date(),
-): DateSectionTitle {
+): "TODAY" | "YESTERDAY" | "EARLIER" {
   if (!value) return "EARLIER";
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) return "EARLIER";
@@ -175,17 +211,119 @@ function buildDateSections<T>(
 }
 
 /**
- * 收件箱 —— `Coolie Web Inbox` (`ui/src/pages/Inbox.tsx`) 的 RN 适配版。
- * wave372 审计对齐 P0 9 件:
- * - P0-1: Mine Tab 重做 (聚合工单/审批/失败Run/提及, 7天最近过滤)
- * - P0-2: 未读蓝点 (左侧 8x8 蓝色圆点)
- * - P0-3: 单条标记已读/未读 (点击蓝点切 read)
- * - P0-4: 一键全标已读 (顶栏右按钮 + 确认弹窗)
- * - P0-5: 即时搜索框 (内嵌 TextInput, 300ms debounce)
- * - P0-6: 归档撤销 (归档后 5 秒 Snackbar/Toast 撤销)
- * - P0-7: 日期分段 (TODAY / YESTERDAY / EARLIER 灰线分割, SectionList 改造)
- * - P0-8: Blocked Tab ✅ (保持不变)
- * - P0-9: 左滑归档 ✅ (保持不变)
+ * P1-4: 远端搜索补全逻辑 (对齐 Web getInboxSearchSupplementIssues 规范)
+ */
+export function getInboxSearchSupplementIssues({
+  query,
+  remoteIssues,
+  visibleIssueIds,
+}: {
+  query: string;
+  remoteIssues: Issue[];
+  visibleIssueIds: ReadonlySet<string>;
+}): Issue[] {
+  const normalized = query.trim().toLowerCase();
+  if (!normalized) return [];
+  return remoteIssues.filter((issue) => !visibleIssueIds.has(issue.id));
+}
+
+/**
+ * P1-8: 多维分组纯函数算法 (支持 无 / 状态 / 负责人 / 项目)
+ */
+export function buildGroupedSections(
+  items: MobileInboxWorkItem[],
+  groupBy: InboxGroupBy,
+  agentNameById: Map<string, string>,
+  projectNameById: Map<string, string>,
+): DateSection<MobileInboxWorkItem>[] {
+  if (groupBy === "none") {
+    return buildDateSections(items, (item) => item.timestamp);
+  }
+
+  if (groupBy === "status") {
+    const map = new Map<string, MobileInboxWorkItem[]>();
+    for (const item of items) {
+      let label = "其他";
+      if (item.kind === "issue") {
+        label = ISSUE_STATUS_LABEL[item.issue.status] ?? item.issue.status;
+      } else if (item.kind === "approval") {
+        label = "待办审批";
+      } else if (item.kind === "failed_run") {
+        label = "异常运行";
+      } else if (item.kind === "join_request") {
+        label = "加群申请";
+      } else if (item.kind === "alert") {
+        label = "系统警报";
+      } else if (item.kind === "mention") {
+        label = "评论提及";
+      }
+      const list = map.get(label) ?? [];
+      list.push(item);
+      map.set(label, list);
+    }
+    const sections: DateSection<MobileInboxWorkItem>[] = [];
+    for (const [title, data] of map.entries()) {
+      sections.push({ title, data });
+    }
+    return sections;
+  }
+
+  if (groupBy === "assignee") {
+    const map = new Map<string, MobileInboxWorkItem[]>();
+    for (const item of items) {
+      let label = "未指派";
+      if (item.kind === "issue") {
+        if (item.issue.assigneeAgentId) {
+          label = agentNameById.get(item.issue.assigneeAgentId) ?? "员工";
+        } else if (item.issue.assigneeUserId) {
+          label = "负责人";
+        }
+      } else if (item.kind === "failed_run") {
+        label = ("agentName" in item.run && item.run.agentName ? item.run.agentName : null) ?? "智能体";
+      }
+      const list = map.get(label) ?? [];
+      list.push(item);
+      map.set(label, list);
+    }
+    const sections: DateSection<MobileInboxWorkItem>[] = [];
+    for (const [title, data] of map.entries()) {
+      sections.push({ title, data });
+    }
+    return sections;
+  }
+
+  if (groupBy === "project") {
+    const map = new Map<string, MobileInboxWorkItem[]>();
+    for (const item of items) {
+      let label = "无所属项目";
+      if (item.kind === "issue" && item.issue.projectId) {
+        label = projectNameById.get(item.issue.projectId) ?? "项目";
+      }
+      const list = map.get(label) ?? [];
+      list.push(item);
+      map.set(label, list);
+    }
+    const sections: DateSection<MobileInboxWorkItem>[] = [];
+    for (const [title, data] of map.entries()) {
+      sections.push({ title, data });
+    }
+    return sections;
+  }
+
+  return buildDateSections(items, (item) => item.timestamp);
+}
+
+/**
+ * 收件箱 —— Coolie Web Inbox (`ui/src/pages/Inbox.tsx`) 原生移动端全量对齐版。
+ * wave372 (P0 9 件) + wave373 (P1 8 件):
+ * - P1-1: Unread Tab (看 server 返 isUnreadForMe)
+ * - P1-2: Recent Tab (最近 7 天触碰)
+ * - P1-3: All 全盘 + 跨实体分类筛选 (everything/issues/approvals/failed_runs/alerts/join_requests)
+ * - P1-4: 远端搜索补全 (getInboxSearchSupplementIssues)
+ * - P1-5: 行内审批签发 (审批卡片外露 Approve/Reject 两字按钮)
+ * - P1-6: 失败运行就地重试 (FailedRunCard 加「重试」两字按钮)
+ * - P1-7: 加群申请裁决 (JoinRequestCard 加 Approve/Reject 按钮)
+ * - P1-8: 多维分组 (group-by none/status/assignee/project 可切)
  */
 export function InboxScreen({
   company,
@@ -208,6 +346,8 @@ export function InboxScreen({
   onResolved?: (approvalId: string, decision: "approve" | "reject") => void;
 }) {
   const [tab, setTab] = useState<InboxTab>(initialTab);
+  const [allCategoryFilter, setAllCategoryFilter] = useState<InboxCategory>("everything");
+  const [groupBy, setGroupBy] = useState<InboxGroupBy>("none");
   const [expandedApprovalId, setExpandedApprovalId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -220,7 +360,8 @@ export function InboxScreen({
   const [mineIssues, setMineIssues] = useState<Issue[]>([]);
   const [mentions, setMentions] = useState<InboxMentionItem[]>([]);
   const [approvals, setApprovals] = useState<InboxApprovalItem[]>([]);
-  const [failures, setFailures] = useState<InboxFailureItem[]>([]);
+  const [failures, setFailures] = useState<(InboxFailedRunItem | InboxFailureItem)[]>([]);
+  const [joinRequests, setJoinRequests] = useState<InboxJoinRequestItem[]>([]);
   const [agents, setAgents] = useState<Agent[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
   const [archivedIds, setArchivedIds] = useState<Set<string>>(() => new Set());
@@ -232,7 +373,7 @@ export function InboxScreen({
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
 
-  // P0-5 & 8: 即时搜索框与 300ms debounce
+  // P0-5 & P1-4: 即时搜索框与 300ms debounce
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   useEffect(() => {
@@ -242,6 +383,27 @@ export function InboxScreen({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // P1-4: 远端搜索补全结果
+  const [remoteSearchResults, setRemoteSearchResults] = useState<Issue[]>([]);
+  useEffect(() => {
+    if (!debouncedQuery) {
+      setRemoteSearchResults([]);
+      return;
+    }
+    let cancelled = false;
+    coolie
+      .listIssues(company.id, { q: debouncedQuery, limit: 25 })
+      .then((rows) => {
+        if (!cancelled) setRemoteSearchResults(rows);
+      })
+      .catch(() => {
+        if (!cancelled) setRemoteSearchResults([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [company.id, debouncedQuery]);
+
   // P0-6: 5秒归档撤销窗口
   const [undoState, setUndoState] = useState<{
     issue: Issue;
@@ -249,7 +411,7 @@ export function InboxScreen({
   } | null>(null);
   const undoTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // P0-4 & 9: 全部标已读确认对话框
+  // P0-4: 全部标已读确认对话框
   const [markAllConfirmOpen, setMarkAllConfirmOpen] = useState(false);
 
   const [filters, setFilters] = useState<InboxFilters>(DEFAULT_FILTERS);
@@ -258,6 +420,7 @@ export function InboxScreen({
   const [blockedSortBy, setBlockedSortBy] = useState<BlockedInboxSort>("urgency");
   const [actionIssue, setActionIssue] = useState<Issue | null>(null);
   const [assignIssue, setAssignIssue] = useState<Issue | null>(null);
+  const [retryingRunId, setRetryingRunId] = useState<string | null>(null);
 
   const loadReqIdRef = useRef(0);
   const abortRef = useRef<AbortController | null>(null);
@@ -275,24 +438,30 @@ export function InboxScreen({
       for (let attempt = 0; attempt <= maxRetries; attempt++) {
         if (controller.signal.aborted) return;
         try {
-          const [nextIssues, mineResp, feed, nextAgents, nextProjects] = await Promise.all([
-            coolie.listIssues(company.id, { limit: 200 }),
-            coolie
-              .listIssues(company.id, {
-                touchedByUserId: "me",
-                inboxArchivedByUserId: "me",
-                status: INBOX_MINE_STATUS_FILTER,
-                limit: 200,
-              })
-              .catch(() => [] as Issue[]),
-            coolie.getInbox(company.id).catch(() => ({
-              pendingApprovals: [],
-              failures: [],
-              mentionedBy: [],
-            })),
-            coolie.listAgents(company.id).catch(() => [] as Agent[]),
-            coolie.listProjects(company.id).catch(() => [] as Project[]),
-          ]);
+          const [nextIssues, mineResp, feed, nextAgents, nextProjects, nextJoinRequests] =
+            await Promise.all([
+              coolie.listIssues(company.id, { limit: 200 }),
+              coolie
+                .listIssues(company.id, {
+                  touchedByUserId: "me",
+                  inboxArchivedByUserId: "me",
+                  status: INBOX_MINE_STATUS_FILTER,
+                  limit: 200,
+                })
+                .catch(() => [] as Issue[]),
+              coolie.getInbox(company.id).catch(() => ({
+                pendingApprovals: [],
+                failures: [],
+                mentionedBy: [],
+                joinRequests: [],
+                failedRuns: [],
+              })),
+              coolie.listAgents(company.id).catch(() => [] as Agent[]),
+              coolie.listProjects(company.id).catch(() => [] as Project[]),
+              coolie
+                .listJoinRequests(company.id, "pending_approval")
+                .catch(() => [] as InboxJoinRequestItem[]),
+            ]);
           if (controller.signal.aborted) return;
           if (loadReqIdRef.current !== reqId) return;
 
@@ -300,15 +469,21 @@ export function InboxScreen({
           for (const issue of mineResp) {
             if (issue.isUnreadForMe) unreadIdSet.add(issue.id);
           }
-          const mergedNextIssues = unreadIdSet.size > 0
-            ? nextIssues.map((i) => (unreadIdSet.has(i.id) ? { ...i, isUnreadForMe: true } : i))
-            : nextIssues;
+          const mergedNextIssues =
+            unreadIdSet.size > 0
+              ? nextIssues.map((i) => (unreadIdSet.has(i.id) ? { ...i, isUnreadForMe: true } : i))
+              : nextIssues;
 
           setIssues(mergedNextIssues);
           setMineIssues(mineResp.length > 0 ? mineResp : mergedNextIssues);
           setMentions(feed.mentionedBy ?? []);
           setApprovals(feed.pendingApprovals ?? []);
-          setFailures(feed.failures ?? []);
+          setFailures(
+            feed.failedRuns?.length
+              ? feed.failedRuns
+              : (feed.failures as unknown as InboxFailureItem[]) ?? [],
+          );
+          setJoinRequests(feed.joinRequests?.length ? feed.joinRequests : nextJoinRequests);
           setAgents(nextAgents);
           setProjects(nextProjects);
           setError(null);
@@ -380,7 +555,7 @@ export function InboxScreen({
     [issues, archivedIds],
   );
 
-  // P0-2 & 4: 未读状态判定
+  // P0-2: 未读状态判定
   const getIsUnread = useCallback(
     (issue: Issue): boolean => {
       if (readIds.has(issue.id)) return false;
@@ -422,32 +597,6 @@ export function InboxScreen({
     },
     [getIsUnread],
   );
-
-  // P0-4 & 9: 全部标记为已读
-  const markAllRead = useCallback(async () => {
-    const targetIssues = tab === "mine" ? mineIssues : activeIssues;
-    const unreadIssues = targetIssues.filter((i) => !archivedIds.has(i.id) && getIsUnread(i));
-    if (unreadIssues.length === 0) {
-      setToast("没有未读项目");
-      return;
-    }
-    setReadIds((prev) => {
-      const next = new Set(prev);
-      for (const issue of unreadIssues) next.add(issue.id);
-      return next;
-    });
-    setUnreadIds((prev) => {
-      const next = new Set(prev);
-      for (const issue of unreadIssues) next.delete(issue.id);
-      return next;
-    });
-    setToast(`已全部标为已读 (${unreadIssues.length} 条)`);
-    try {
-      await Promise.all(unreadIssues.map((issue) => coolie.markIssueRead(issue.id).catch(() => null)));
-    } catch {
-      // 批量接口降级
-    }
-  }, [tab, mineIssues, activeIssues, archivedIds, getIsUnread]);
 
   // 全部 Tab 的工单过滤 (支持 filters 与搜索)
   const filteredIssues = useMemo(() => {
@@ -496,7 +645,92 @@ export function InboxScreen({
     return result;
   }, [activeIssues, filters, debouncedQuery, agentNameById, projectNameById]);
 
-  // P0-1 & 3: Mine Tab 聚合工作项 (工单 + 待审批 + 失败Run + 评论@我, 7天最近过滤)
+  // P1-5: 行内审批签发
+  const handleApproveApproval = useCallback(
+    async (approvalId: string, title?: string) => {
+      setApprovals((prev) => prev.filter((a) => a.id !== approvalId));
+      setToast(`已批准: ${title || "审批单"}`);
+      try {
+        await coolie.approveApproval(approvalId);
+        onResolved?.(approvalId, "approve");
+      } catch (e) {
+        setToast(`批准失败: ${String((e as Error)?.message ?? e)}`);
+        void load(true);
+      }
+    },
+    [onResolved, load],
+  );
+
+  const handleRejectApproval = useCallback(
+    async (approvalId: string, title?: string) => {
+      setApprovals((prev) => prev.filter((a) => a.id !== approvalId));
+      setToast(`已驳回: ${title || "审批单"}`);
+      try {
+        await coolie.rejectApproval(approvalId);
+        onResolved?.(approvalId, "reject");
+      } catch (e) {
+        setToast(`驳回失败: ${String((e as Error)?.message ?? e)}`);
+        void load(true);
+      }
+    },
+    [onResolved, load],
+  );
+
+  // P1-6: 失败运行就地重试
+  const handleRetryRun = useCallback(
+    async (run: InboxFailedRunItem | InboxFailureItem) => {
+      const agentId = "agentId" in run ? run.agentId : null;
+      if (!agentId) {
+        setToast("无法重试: 缺少 Agent 信息");
+        return;
+      }
+      setRetryingRunId(run.id);
+      try {
+        await coolie.retryFailedRun(agentId, run.id, company.id);
+        const name = "agentName" in run && run.agentName ? run.agentName : "智能体";
+        setToast(`已触发重试: ${name}`);
+        setTimeout(() => {
+          void load(true);
+        }, 1200);
+      } catch (e) {
+        setToast(`重试失败: ${String((e as Error)?.message ?? e)}`);
+      } finally {
+        setRetryingRunId(null);
+      }
+    },
+    [company.id, load],
+  );
+
+  // P1-7: 加群申请裁决
+  const handleApproveJoinRequest = useCallback(
+    async (requestId: string) => {
+      setJoinRequests((prev) => prev.filter((r) => r.id !== requestId));
+      setToast("已批准加群申请");
+      try {
+        await coolie.approveJoinRequest(company.id, requestId);
+      } catch (e) {
+        setToast(`批准失败: ${String((e as Error)?.message ?? e)}`);
+        void load(true);
+      }
+    },
+    [company.id, load],
+  );
+
+  const handleRejectJoinRequest = useCallback(
+    async (requestId: string) => {
+      setJoinRequests((prev) => prev.filter((r) => r.id !== requestId));
+      setToast("已拒绝加群申请");
+      try {
+        await coolie.rejectJoinRequest(company.id, requestId);
+      } catch (e) {
+        setToast(`拒绝失败: ${String((e as Error)?.message ?? e)}`);
+        void load(true);
+      }
+    },
+    [company.id, load],
+  );
+
+  // P0-1: Mine Tab 聚合工作项
   const mineWorkItems = useMemo((): MobileInboxWorkItem[] => {
     const items: MobileInboxWorkItem[] = [];
     const now = Date.now();
@@ -521,7 +755,7 @@ export function InboxScreen({
       items.push({ kind: "issue", id: issue.id, issue, timestamp: Number.isFinite(ts) ? ts : 0 });
     }
 
-    // 2. 审批流
+    // 2. 待办审批
     for (const approval of approvals) {
       const ts = new Date(approval.createdAt).getTime();
       items.push({ kind: "approval", id: approval.id, approval, timestamp: Number.isFinite(ts) ? ts : 0 });
@@ -537,6 +771,12 @@ export function InboxScreen({
     for (const mention of mentions) {
       const ts = new Date(mention.createdAt).getTime();
       items.push({ kind: "mention", id: mention.id, mention, timestamp: Number.isFinite(ts) ? ts : 0 });
+    }
+
+    // 5. 加群申请
+    for (const jr of joinRequests) {
+      const ts = new Date(jr.createdAt).getTime();
+      items.push({ kind: "join_request", id: jr.id, joinRequest: jr, timestamp: Number.isFinite(ts) ? ts : 0 });
     }
 
     // 搜索过滤
@@ -557,9 +797,17 @@ export function InboxScreen({
           );
         }
         if (item.kind === "failed_run") {
+          const runTitle = "title" in item.run ? item.run.title : item.run.id;
           return (
-            item.run.title.toLowerCase().includes(debouncedQuery) ||
+            runTitle.toLowerCase().includes(debouncedQuery) ||
             item.run.status.toLowerCase().includes(debouncedQuery)
+          );
+        }
+        if (item.kind === "join_request") {
+          return (
+            (item.joinRequest.agentName?.toLowerCase().includes(debouncedQuery) ?? false) ||
+            (item.joinRequest.requestEmailSnapshot?.toLowerCase().includes(debouncedQuery) ?? false) ||
+            item.joinRequest.requestType.toLowerCase().includes(debouncedQuery)
           );
         }
         if (item.kind === "mention") {
@@ -573,41 +821,215 @@ export function InboxScreen({
       });
     }
 
-    // 时间降序
     filtered.sort((a, b) => b.timestamp - a.timestamp);
     return filtered;
-  }, [mineIssues, archivedIds, filters, approvals, failures, mentions, debouncedQuery, getIsUnread]);
+  }, [mineIssues, archivedIds, filters, approvals, failures, mentions, joinRequests, debouncedQuery, getIsUnread]);
 
-  // 审批 Tab 过滤
-  const filteredApprovals = useMemo(() => {
-    if (!debouncedQuery) return approvals;
-    return approvals.filter(
-      (a) =>
-        a.title.toLowerCase().includes(debouncedQuery) ||
-        a.type.toLowerCase().includes(debouncedQuery),
-    );
+  // P1-2: Recent Tab (最近 7 天触碰)
+  const recentWorkItems = useMemo((): MobileInboxWorkItem[] => {
+    const items: MobileInboxWorkItem[] = [];
+    const now = Date.now();
+
+    for (const issue of activeIssues) {
+      const at = issue.lastActivityAt ?? issue.updatedAt ?? issue.createdAt;
+      const ms = at ? new Date(at as string).getTime() : 0;
+      if (Number.isFinite(ms) && now - ms <= MINE_RECENT_MS) {
+        items.push({ kind: "issue", id: issue.id, issue, timestamp: ms });
+      }
+    }
+
+    for (const approval of approvals) {
+      const ms = new Date(approval.createdAt).getTime();
+      if (Number.isFinite(ms) && now - ms <= MINE_RECENT_MS) {
+        items.push({ kind: "approval", id: approval.id, approval, timestamp: ms });
+      }
+    }
+
+    for (const failure of failures) {
+      const ms = new Date(failure.updatedAt).getTime();
+      if (Number.isFinite(ms) && now - ms <= MINE_RECENT_MS) {
+        items.push({ kind: "failed_run", id: failure.id, run: failure, timestamp: ms });
+      }
+    }
+
+    for (const jr of joinRequests) {
+      const ms = new Date(jr.createdAt).getTime();
+      if (Number.isFinite(ms) && now - ms <= MINE_RECENT_MS) {
+        items.push({ kind: "join_request", id: jr.id, joinRequest: jr, timestamp: ms });
+      }
+    }
+
+    if (debouncedQuery) {
+      return items.filter((item) => {
+        if (item.kind === "issue") return item.issue.title.toLowerCase().includes(debouncedQuery);
+        if (item.kind === "approval") return item.approval.title.toLowerCase().includes(debouncedQuery);
+        return true;
+      });
+    }
+
+    items.sort((a, b) => b.timestamp - a.timestamp);
+    return items;
+  }, [activeIssues, approvals, failures, joinRequests, debouncedQuery]);
+
+  // P1-1: Unread Tab (未读待办)
+  const unreadWorkItems = useMemo((): MobileInboxWorkItem[] => {
+    const items: MobileInboxWorkItem[] = [];
+
+    // 未读工单
+    for (const issue of activeIssues) {
+      if (getIsUnread(issue)) {
+        const ts = new Date(issue.lastActivityAt ?? issue.updatedAt ?? issue.createdAt ?? 0).getTime();
+        items.push({ kind: "issue", id: issue.id, issue, timestamp: Number.isFinite(ts) ? ts : 0 });
+      }
+    }
+
+    // 待裁决审批
+    for (const approval of approvals) {
+      const ts = new Date(approval.createdAt).getTime();
+      items.push({ kind: "approval", id: approval.id, approval, timestamp: Number.isFinite(ts) ? ts : 0 });
+    }
+
+    // 失败运行
+    for (const failure of failures) {
+      const ts = new Date(failure.updatedAt).getTime();
+      items.push({ kind: "failed_run", id: failure.id, run: failure, timestamp: Number.isFinite(ts) ? ts : 0 });
+    }
+
+    // 加群申请
+    for (const jr of joinRequests) {
+      const ts = new Date(jr.createdAt).getTime();
+      items.push({ kind: "join_request", id: jr.id, joinRequest: jr, timestamp: Number.isFinite(ts) ? ts : 0 });
+    }
+
+    if (debouncedQuery) {
+      return items.filter((item) => {
+        if (item.kind === "issue") return item.issue.title.toLowerCase().includes(debouncedQuery);
+        if (item.kind === "approval") return item.approval.title.toLowerCase().includes(debouncedQuery);
+        return true;
+      });
+    }
+
+    items.sort((a, b) => b.timestamp - a.timestamp);
+    return items;
+  }, [activeIssues, approvals, failures, joinRequests, debouncedQuery, getIsUnread]);
+
+  // P1-3: All 全盘跨实体聚合工作项 (根据 allCategoryFilter 过滤)
+  const allTabWorkItems = useMemo((): MobileInboxWorkItem[] => {
+    const items: MobileInboxWorkItem[] = [];
+
+    const showIssues = allCategoryFilter === "everything" || allCategoryFilter === "issues";
+    const showApprovals = allCategoryFilter === "everything" || allCategoryFilter === "approvals";
+    const showFailures = allCategoryFilter === "everything" || allCategoryFilter === "failed_runs";
+    const showJoinRequests = allCategoryFilter === "everything" || allCategoryFilter === "join_requests";
+    const showAlerts = allCategoryFilter === "everything" || allCategoryFilter === "alerts";
+
+    if (showIssues) {
+      for (const issue of filteredIssues) {
+        const ts = new Date(issue.lastActivityAt ?? issue.updatedAt ?? issue.createdAt ?? 0).getTime();
+        items.push({ kind: "issue", id: issue.id, issue, timestamp: Number.isFinite(ts) ? ts : 0 });
+      }
+    }
+
+    if (showApprovals) {
+      for (const approval of approvals) {
+        const ts = new Date(approval.createdAt).getTime();
+        items.push({ kind: "approval", id: approval.id, approval, timestamp: Number.isFinite(ts) ? ts : 0 });
+      }
+    }
+
+    if (showFailures) {
+      for (const failure of failures) {
+        const ts = new Date(failure.updatedAt).getTime();
+        items.push({ kind: "failed_run", id: failure.id, run: failure, timestamp: Number.isFinite(ts) ? ts : 0 });
+      }
+    }
+
+    if (showJoinRequests) {
+      for (const jr of joinRequests) {
+        const ts = new Date(jr.createdAt).getTime();
+        items.push({ kind: "join_request", id: jr.id, joinRequest: jr, timestamp: Number.isFinite(ts) ? ts : 0 });
+      }
+    }
+
+    if (showAlerts && failures.length > 0) {
+      items.push({
+        kind: "alert",
+        id: "alert:failures",
+        title: "数字员工集群警报",
+        description: `当前有 ${failures.length} 个异常或受阻运行，需及时介入排障。`,
+        timestamp: Date.now(),
+        tone: "warn",
+      });
+    }
+
+    items.sort((a, b) => b.timestamp - a.timestamp);
+    return items;
+  }, [allCategoryFilter, filteredIssues, approvals, failures, joinRequests]);
+
+  // 审批 Tab 独立工作项
+  const approvalWorkItems = useMemo((): MobileInboxWorkItem[] => {
+    let list = approvals;
+    if (debouncedQuery) {
+      list = approvals.filter(
+        (a) =>
+          a.title.toLowerCase().includes(debouncedQuery) ||
+          a.type.toLowerCase().includes(debouncedQuery),
+      );
+    }
+    return list.map((approval) => ({
+      kind: "approval",
+      id: approval.id,
+      approval,
+      timestamp: new Date(approval.createdAt).getTime(),
+    }));
   }, [approvals, debouncedQuery]);
+
+  // 当前选中 Tab 的基础工作项集合
+  const currentTabItems = useMemo((): MobileInboxWorkItem[] => {
+    if (tab === "mine") return mineWorkItems;
+    if (tab === "recent") return recentWorkItems;
+    if (tab === "unread") return unreadWorkItems;
+    if (tab === "approvals") return approvalWorkItems;
+    return allTabWorkItems;
+  }, [tab, mineWorkItems, recentWorkItems, unreadWorkItems, approvalWorkItems, allTabWorkItems]);
+
+  // P1-4: 远端搜索补全项目
+  const supplementIssues = useMemo((): Issue[] => {
+    if (!debouncedQuery || remoteSearchResults.length === 0) return [];
+    const visibleIds = new Set<string>();
+    for (const item of currentTabItems) {
+      if (item.kind === "issue") visibleIds.add(item.id);
+    }
+    for (const id of archivedIds) visibleIds.add(id);
+    return getInboxSearchSupplementIssues({
+      query: debouncedQuery,
+      remoteIssues: remoteSearchResults,
+      visibleIssueIds: visibleIds,
+    });
+  }, [debouncedQuery, remoteSearchResults, currentTabItems, archivedIds]);
+
+  // P1-8: 多维分组聚合 Section 列表
+  const currentSections = useMemo((): DateSection<MobileInboxWorkItem>[] => {
+    const baseSections = buildGroupedSections(currentTabItems, groupBy, agentNameById, projectNameById);
+    if (supplementIssues.length > 0) {
+      const suppItems: MobileInboxWorkItem[] = supplementIssues.map((issue) => ({
+        kind: "issue",
+        id: `supp:${issue.id}`,
+        issue,
+        timestamp: new Date(issue.updatedAt ?? issue.createdAt ?? 0).getTime(),
+      }));
+      baseSections.push({
+        title: `其他搜索结果 (${supplementIssues.length})`,
+        data: suppItems,
+      });
+    }
+    return baseSections;
+  }, [currentTabItems, groupBy, agentNameById, projectNameById, supplementIssues]);
 
   // P0-8: 阻塞视图保持不变
   const blockedRows = useMemo(() => buildBlockedRows(filteredIssues), [filteredIssues]);
 
-  // P0-7: SectionList 日期分段构建
-  const allSections = useMemo(
-    () => buildDateSections(filteredIssues, (i) => i.updatedAt ?? i.createdAt),
-    [filteredIssues],
-  );
-
-  const mineSections = useMemo(
-    () => buildDateSections(mineWorkItems, (item) => item.timestamp),
-    [mineWorkItems],
-  );
-
-  const approvalSections = useMemo(
-    () => buildDateSections(filteredApprovals, (a) => a.createdAt),
-    [filteredApprovals],
-  );
-
-  // P0-6 & P0-9: 归档与 5 秒撤销
+  // P0-6: 归档与 5 秒撤销
   const archive = useCallback(async (issue: Issue) => {
     setActionIssue(null);
     setArchivedIds((prev) => new Set(prev).add(issue.id));
@@ -695,55 +1117,59 @@ export function InboxScreen({
     [issueById, onOpenIssue, company.id],
   );
 
+  // P0-4: 全部标记为已读
+  const markAllRead = useCallback(async () => {
+    const targetIssues = tab === "mine" ? mineIssues : activeIssues;
+    const unreadIssues = targetIssues.filter((i) => !archivedIds.has(i.id) && getIsUnread(i));
+    if (unreadIssues.length === 0) {
+      setToast("没有未读项目");
+      return;
+    }
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      for (const issue of unreadIssues) next.add(issue.id);
+      return next;
+    });
+    setUnreadIds((prev) => {
+      const next = new Set(prev);
+      for (const issue of unreadIssues) next.delete(issue.id);
+      return next;
+    });
+    setToast(`已全部标为已读 (${unreadIssues.length} 条)`);
+    try {
+      await Promise.all(unreadIssues.map((issue) => coolie.markIssueRead(issue.id).catch(() => null)));
+    } catch {
+      // 批量降级
+    }
+  }, [tab, mineIssues, activeIssues, archivedIds, getIsUnread]);
+
+  // P1-8: 分组循环切换
+  const cycleGroupBy = useCallback(() => {
+    setGroupBy((current) => {
+      if (current === "none") {
+        setToast("已切换分组: 按状态");
+        return "status";
+      }
+      if (current === "status") {
+        setToast("已切换分组: 按员工");
+        return "assignee";
+      }
+      if (current === "assignee") {
+        setToast("已切换分组: 按项目");
+        return "project";
+      }
+      setToast("已切换分组: 按时间 (无)");
+      return "none";
+    });
+  }, []);
+
   const activeFilterCount = countActiveFilters(filters);
   const showBlocked = tab === "blocked";
   const isBlockedViewBlocked = showBlocked && blockedRows.length === 0;
 
   const currentUnreadCount = useMemo(() => {
-    const list = tab === "mine" ? mineIssues : activeIssues;
-    return list.filter((i) => !archivedIds.has(i.id) && getIsUnread(i)).length;
-  }, [tab, mineIssues, activeIssues, archivedIds, getIsUnread]);
-
-  // 审批卡片渲染辅助
-  const renderApprovalItem = (item: InboxApprovalItem) => {
-    const isOpen = expandedApprovalId === item.id;
-    return (
-      <View key={item.id}>
-        <AppCard
-          variant="surface"
-          row
-          style={styles.approvalRow}
-          onPress={() => setExpandedApprovalId(isOpen ? null : item.id)}
-        >
-          <View style={[styles.rowDot, { backgroundColor: C.warn }]} />
-          <View style={{ flex: 1, gap: 3 }}>
-            <Text style={styles.rowTitle} numberOfLines={2}>
-              {item.title}
-            </Text>
-            <Text style={styles.metaText} numberOfLines={1}>
-              {item.type} · {formatRelativeTime(item.createdAt)}
-            </Text>
-          </View>
-          <Text style={styles.chevron}>{isOpen ? "▾" : "›"}</Text>
-        </AppCard>
-        {isOpen ? (
-          <View style={styles.approvalDetail}>
-            <QuickApprovalCard
-              companyId={company.id}
-              approval={item as unknown as Approval}
-              floating={false}
-              onResolved={(approvalId, decision) => {
-                void onResolved?.(approvalId, decision);
-                setExpandedApprovalId(null);
-                setApprovals((prev) => prev.filter((a) => a.id !== approvalId));
-              }}
-              onDismiss={() => setExpandedApprovalId(null)}
-            />
-          </View>
-        ) : null}
-      </View>
-    );
-  };
+    return unreadWorkItems.length;
+  }, [unreadWorkItems]);
 
   return (
     <SafeAreaView
@@ -785,18 +1211,36 @@ export function InboxScreen({
         ) : null}
       </View>
 
-      {/* 四大 Tab */}
-      <SegmentedControl
-        style={styles.tabs}
-        value={tab}
-        onChange={(key) => setTab(key as InboxTab)}
-        options={[
-          { key: "all", label: "全部" },
-          { key: "mine", label: `与我 (${mineWorkItems.length})` },
-          { key: "approvals", label: `审批 (${approvals.length})` },
-          { key: "blocked", label: `阻塞 (${blockedRows.length})` },
-        ]}
-      />
+      {/* P1-1 & P1-2: 6 大 Tab 水平滑动栏 (全部 / 与我 / 最近 / 未读 / 审批 / 阻塞) */}
+      <View style={styles.tabBarWrap}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.tabScrollContent}
+        >
+          {TAB_OPTIONS.map((opt) => {
+            const selected = tab === opt.key;
+            let badgeText = "";
+            if (opt.key === "mine") badgeText = ` (${mineWorkItems.length})`;
+            if (opt.key === "unread") badgeText = ` (${unreadWorkItems.length})`;
+            if (opt.key === "approvals") badgeText = ` (${approvals.length})`;
+            if (opt.key === "blocked") badgeText = ` (${blockedRows.length})`;
+
+            return (
+              <Pressable
+                key={opt.key}
+                onPress={() => setTab(opt.key)}
+                style={[styles.tabPill, selected && styles.tabPillActive]}
+              >
+                <Text style={[styles.tabPillText, selected && styles.tabPillTextActive]}>
+                  {opt.label}
+                  {badgeText}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </ScrollView>
+      </View>
 
       {/* P0-5: 内嵌即时搜索框 */}
       <View style={styles.searchBar}>
@@ -819,7 +1263,33 @@ export function InboxScreen({
         ) : null}
       </View>
 
-      {/* 工具栏: 过滤 / 全读 / 刷新 */}
+      {/* P1-3: All 全盘跨实体二级分类筛选标签 */}
+      {tab === "all" ? (
+        <View style={styles.catBarWrap}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.catScrollContent}
+          >
+            {CATEGORY_OPTIONS.map((cat) => {
+              const selected = allCategoryFilter === cat.key;
+              return (
+                <Pressable
+                  key={cat.key}
+                  onPress={() => setAllCategoryFilter(cat.key)}
+                  style={[styles.catChip, selected && styles.catChipActive]}
+                >
+                  <Text style={[styles.catChipText, selected && styles.catChipTextActive]}>
+                    {cat.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </View>
+      ) : null}
+
+      {/* 工具栏: 过滤 / 全读 / 分组 / 刷新 */}
       <View style={styles.toolbar}>
         <Pressable
           onPress={() => setFiltersOpen(true)}
@@ -832,7 +1302,7 @@ export function InboxScreen({
           </Text>
         </Pressable>
 
-        {/* P0-4 & 9: 一键全标已读按钮 */}
+        {/* P0-4: 一键全标已读按钮 */}
         <Pressable
           onPress={() => setMarkAllConfirmOpen(true)}
           style={styles.toolBtn}
@@ -848,13 +1318,39 @@ export function InboxScreen({
           </Text>
         </Pressable>
 
+        {/* P1-8: 多维分组切换按钮 */}
+        {!showBlocked ? (
+          <Pressable
+            onPress={cycleGroupBy}
+            style={[styles.toolBtn, groupBy !== "none" && styles.toolBtnActive]}
+            accessibilityLabel="分组"
+          >
+            <Ionicons name="grid-outline" size={14} color={groupBy !== "none" ? C.ink : C.ink3} />
+            <Text style={[styles.toolBtnText, groupBy !== "none" && styles.toolBtnTextActive]}>
+              {groupBy === "none"
+                ? "分组: 无"
+                : groupBy === "status"
+                  ? "分组: 状态"
+                  : groupBy === "assignee"
+                    ? "分组: 员工"
+                    : "分组: 项目"}
+            </Text>
+          </Pressable>
+        ) : null}
+
         {showBlocked ? (
           <>
-            <Pressable onPress={() => cycleBlockedGroup(blockedGroupBy, setBlockedGroupBy)} style={styles.toolBtn}>
+            <Pressable
+              onPress={() => cycleBlockedGroup(blockedGroupBy, setBlockedGroupBy)}
+              style={styles.toolBtn}
+            >
               <Ionicons name="layers-outline" size={14} color={C.ink3} />
               <Text style={styles.toolBtnText}>{labelOf(BLOCKED_GROUP_OPTIONS, blockedGroupBy)}</Text>
             </Pressable>
-            <Pressable onPress={() => cycleBlockedSort(blockedSortBy, setBlockedSortBy)} style={styles.toolBtn}>
+            <Pressable
+              onPress={() => cycleBlockedSort(blockedSortBy, setBlockedSortBy)}
+              style={styles.toolBtn}
+            >
               <Ionicons name="swap-vertical-outline" size={14} color={C.ink3} />
               <Text style={styles.toolBtnText}>{labelOf(BLOCKED_SORT_OPTIONS, blockedSortBy)}</Text>
             </Pressable>
@@ -888,177 +1384,7 @@ export function InboxScreen({
             <ErrorRetry variant="inline" message={`刷新失败: ${error}`} onRetry={() => void load(true)} />
           ) : null}
 
-          {/* Tab 1: 全部 */}
-          {tab === "all" ? (
-            <SectionList<Issue, DateSection<Issue>>
-              sections={allSections}
-              keyExtractor={(item) => item.id}
-              stickySectionHeadersEnabled={false}
-              contentContainerStyle={styles.list}
-              keyboardShouldPersistTaps="handled"
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={() => {
-                    setRefreshing(true);
-                    void load(true);
-                  }}
-                  tintColor={C.accent}
-                />
-              }
-              renderSectionHeader={({ section: { title } }) => <DateSectionHeader title={title} />}
-              renderItem={({ item: issue }) => (
-                <SwipeToArchive key={issue.id} onArchive={() => void archive(issue)}>
-                  <InboxIssueRow
-                    issue={issue}
-                    isUnread={getIsUnread(issue)}
-                    onToggleRead={() => void toggleRead(issue)}
-                    assigneeName={
-                      issue.assigneeAgentId ? agentNameById.get(issue.assigneeAgentId) ?? "员工" : null
-                    }
-                    projectName={issue.projectId ? projectNameById.get(issue.projectId) ?? null : null}
-                    onPress={() => onOpenIssue(issue)}
-                    onLongPress={() => setActionIssue(issue)}
-                  />
-                </SwipeToArchive>
-              )}
-              ListEmptyComponent={
-                <EmptyState
-                  icon="📥"
-                  title={activeFilterCount > 0 || debouncedQuery ? "没有匹配的任务" : "收件箱已清空"}
-                  subtitle={activeFilterCount > 0 || debouncedQuery ? "换个过滤或搜索条件试试。" : "当前没有可处理的任务。"}
-                  style={styles.emptyBox}
-                />
-              }
-            />
-          ) : null}
-
-          {/* Tab 2: 与我相关 (P0-1 重做) */}
-          {tab === "mine" ? (
-            <SectionList<MobileInboxWorkItem, DateSection<MobileInboxWorkItem>>
-              sections={mineSections}
-              keyExtractor={(item) => `${item.kind}:${item.id}`}
-              stickySectionHeadersEnabled={false}
-              contentContainerStyle={styles.list}
-              keyboardShouldPersistTaps="handled"
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={() => {
-                    setRefreshing(true);
-                    void load(true);
-                  }}
-                  tintColor={C.accent}
-                />
-              }
-              renderSectionHeader={({ section: { title } }) => <DateSectionHeader title={title} />}
-              renderItem={({ item }) => {
-                if (item.kind === "issue") {
-                  const issue = item.issue;
-                  return (
-                    <SwipeToArchive key={issue.id} onArchive={() => void archive(issue)}>
-                      <InboxIssueRow
-                        issue={issue}
-                        isUnread={getIsUnread(issue)}
-                        onToggleRead={() => void toggleRead(issue)}
-                        assigneeName={
-                          issue.assigneeAgentId
-                            ? agentNameById.get(issue.assigneeAgentId) ?? "员工"
-                            : null
-                        }
-                        projectName={
-                          issue.projectId ? projectNameById.get(issue.projectId) ?? null : null
-                        }
-                        onPress={() => onOpenIssue(issue)}
-                        onLongPress={() => setActionIssue(issue)}
-                      />
-                    </SwipeToArchive>
-                  );
-                }
-                if (item.kind === "approval") {
-                  return renderApprovalItem(item.approval);
-                }
-                if (item.kind === "failed_run") {
-                  return (
-                    <FailedRunRow
-                      key={item.id}
-                      run={item.run}
-                      onPress={() => {
-                        const known = issueById.get(item.run.id);
-                        if (known) onOpenIssue(known);
-                        else onOpenWorkshop?.();
-                      }}
-                    />
-                  );
-                }
-                if (item.kind === "mention") {
-                  return (
-                    <AppCard
-                      key={item.id}
-                      variant="surface"
-                      style={styles.mentionCard}
-                      onPress={() => openMention(item.mention)}
-                    >
-                      <View style={styles.mentionHeader}>
-                        <Text style={styles.mentionAuthor} numberOfLines={1}>
-                          {item.mention.authorName}
-                        </Text>
-                        <Text style={styles.metaTime}>{formatRelativeTime(item.mention.createdAt)}</Text>
-                      </View>
-                      <Text style={styles.rowTitle} numberOfLines={1}>
-                        {item.mention.issueTitle}
-                      </Text>
-                      <Text style={styles.mentionBody} numberOfLines={2}>
-                        {item.mention.body}
-                      </Text>
-                    </AppCard>
-                  );
-                }
-                return null;
-              }}
-              ListEmptyComponent={
-                <EmptyState
-                  icon="🎯"
-                  title={debouncedQuery ? "没有匹配的项目" : "当前没有与你相关的待办"}
-                  subtitle={debouncedQuery ? "换个关键词搜索试试。" : "所有分配给你的任务、审批与提醒都会在此汇聚。"}
-                  style={styles.emptyBox}
-                />
-              }
-            />
-          ) : null}
-
-          {/* Tab 3: 审批 */}
-          {tab === "approvals" ? (
-            <SectionList<InboxApprovalItem, DateSection<InboxApprovalItem>>
-              sections={approvalSections}
-              keyExtractor={(item) => item.id}
-              stickySectionHeadersEnabled={false}
-              contentContainerStyle={styles.list}
-              keyboardShouldPersistTaps="handled"
-              refreshControl={
-                <RefreshControl
-                  refreshing={refreshing}
-                  onRefresh={() => {
-                    setRefreshing(true);
-                    void load(true);
-                  }}
-                  tintColor={C.accent}
-                />
-              }
-              renderSectionHeader={({ section: { title } }) => <DateSectionHeader title={title} />}
-              renderItem={({ item }) => renderApprovalItem(item)}
-              ListEmptyComponent={
-                <EmptyState
-                  icon="✅"
-                  title="没有待审批"
-                  subtitle="需要你拍板的审批会出现在这里。"
-                  style={styles.emptyBox}
-                />
-              }
-            />
-          ) : null}
-
-          {/* Tab 4: 阻塞 (P0-8 不改) */}
+          {/* 阻塞 Tab 独立渲染 */}
           {tab === "blocked" ? (
             <ScrollView
               contentContainerStyle={styles.list}
@@ -1111,7 +1437,184 @@ export function InboxScreen({
                 ))
               )}
             </ScrollView>
-          ) : null}
+          ) : (
+            /* 统一 SectionList 渲染 (All / Mine / Recent / Unread / Approvals) */
+            <SectionList<MobileInboxWorkItem, DateSection<MobileInboxWorkItem>>
+              sections={currentSections}
+              keyExtractor={(item) => `${item.kind}:${item.id}`}
+              stickySectionHeadersEnabled={false}
+              contentContainerStyle={styles.list}
+              keyboardShouldPersistTaps="handled"
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={() => {
+                    setRefreshing(true);
+                    void load(true);
+                  }}
+                  tintColor={C.accent}
+                />
+              }
+              renderSectionHeader={({ section: { title } }) => <DateSectionHeader title={title} />}
+              renderItem={({ item }) => {
+                if (item.kind === "issue") {
+                  const issue = item.issue;
+                  return (
+                    <SwipeToArchive key={issue.id} onArchive={() => void archive(issue)}>
+                      <InboxIssueRow
+                        issue={issue}
+                        isUnread={getIsUnread(issue)}
+                        onToggleRead={() => void toggleRead(issue)}
+                        assigneeName={
+                          issue.assigneeAgentId
+                            ? agentNameById.get(issue.assigneeAgentId) ?? "员工"
+                            : null
+                        }
+                        projectName={
+                          issue.projectId ? projectNameById.get(issue.projectId) ?? null : null
+                        }
+                        onPress={() => onOpenIssue(issue)}
+                        onLongPress={() => setActionIssue(issue)}
+                      />
+                    </SwipeToArchive>
+                  );
+                }
+
+                if (item.kind === "approval") {
+                  const approval = item.approval;
+                  const isOpen = expandedApprovalId === approval.id;
+                  return (
+                    <ApprovalInboxRowItem
+                      key={approval.id}
+                      item={approval}
+                      isOpen={isOpen}
+                      onToggleExpand={() =>
+                        setExpandedApprovalId(isOpen ? null : approval.id)
+                      }
+                      onApprove={() =>
+                        void handleApproveApproval(approval.id, approval.title)
+                      }
+                      onReject={() =>
+                        void handleRejectApproval(approval.id, approval.title)
+                      }
+                    >
+                      <QuickApprovalCard
+                        companyId={company.id}
+                        approval={approval as unknown as Approval}
+                        floating={false}
+                        onResolved={(approvalId, decision) => {
+                          void onResolved?.(approvalId, decision);
+                          setExpandedApprovalId(null);
+                          setApprovals((prev) => prev.filter((a) => a.id !== approvalId));
+                        }}
+                        onDismiss={() => setExpandedApprovalId(null)}
+                      />
+                    </ApprovalInboxRowItem>
+                  );
+                }
+
+                if (item.kind === "failed_run") {
+                  return (
+                    <FailedRunRow
+                      key={item.id}
+                      run={item.run}
+                      isRetrying={retryingRunId === item.id}
+                      onRetry={() => void handleRetryRun(item.run)}
+                      onPress={() => {
+                        const known = issueById.get(item.run.id);
+                        if (known) onOpenIssue(known);
+                        else onOpenWorkshop?.();
+                      }}
+                    />
+                  );
+                }
+
+                if (item.kind === "join_request") {
+                  return (
+                    <JoinRequestRow
+                      key={item.id}
+                      item={item.joinRequest}
+                      onApprove={() => void handleApproveJoinRequest(item.id)}
+                      onReject={() => void handleRejectJoinRequest(item.id)}
+                    />
+                  );
+                }
+
+                if (item.kind === "alert") {
+                  return (
+                    <AlertRow
+                      key={item.id}
+                      title={item.title}
+                      description={item.description}
+                      tone={item.tone}
+                    />
+                  );
+                }
+
+                if (item.kind === "mention") {
+                  return (
+                    <AppCard
+                      key={item.id}
+                      variant="surface"
+                      style={styles.mentionCard}
+                      onPress={() => openMention(item.mention)}
+                    >
+                      <View style={styles.mentionHeader}>
+                        <Text style={styles.mentionAuthor} numberOfLines={1}>
+                          {item.mention.authorName}
+                        </Text>
+                        <Text style={styles.metaTime}>{formatRelativeTime(item.mention.createdAt)}</Text>
+                      </View>
+                      <Text style={styles.rowTitle} numberOfLines={1}>
+                        {item.mention.issueTitle}
+                      </Text>
+                      <Text style={styles.mentionBody} numberOfLines={2}>
+                        {item.mention.body}
+                      </Text>
+                    </AppCard>
+                  );
+                }
+
+                return null;
+              }}
+              ListEmptyComponent={
+                <EmptyState
+                  icon={
+                    tab === "unread"
+                      ? "✨"
+                      : tab === "approvals"
+                        ? "✅"
+                        : tab === "recent"
+                          ? "🕒"
+                          : "📥"
+                  }
+                  title={
+                    debouncedQuery
+                      ? "没有匹配的项目"
+                      : tab === "unread"
+                        ? "收件箱已清空 (Inbox Zero)"
+                        : tab === "approvals"
+                          ? "没有待审批"
+                          : tab === "recent"
+                            ? "最近 7 天没有新活动"
+                            : tab === "mine"
+                              ? "当前没有与你相关的待办"
+                              : "当前没有可处理的任务"
+                  }
+                  subtitle={
+                    debouncedQuery
+                      ? "换个搜索关键词试试。"
+                      : tab === "unread"
+                        ? "太棒了！所有需要你处理的待办都已完成。"
+                        : tab === "approvals"
+                          ? "所有申请均已裁决完毕。"
+                          : "新的任务、审批或运行异常会在此汇聚。"
+                  }
+                  style={styles.emptyBox}
+                />
+              }
+            />
+          )}
         </View>
       )}
 
@@ -1152,7 +1655,7 @@ export function InboxScreen({
         }}
       />
 
-      {/* P0-4 & 9: 全部标为已读确认弹层 */}
+      {/* P0-4: 全部标为已读确认弹层 */}
       <Modal
         transparent
         visible={markAllConfirmOpen}
@@ -1300,8 +1803,8 @@ function cycleBlockedSort(current: BlockedInboxSort, set: (next: BlockedInboxSor
   if (next) set(next[0]);
 }
 
-/** P0-7: 日期段落头部 (TODAY / YESTERDAY / EARLIER 带灰线) */
-function DateSectionHeader({ title }: { title: DateSectionTitle }) {
+/** P0-7: 日期与分组段落头部 */
+function DateSectionHeader({ title }: { title: string }) {
   return (
     <View style={styles.dateHeaderWrap}>
       <View style={styles.dateHeaderLine} />
@@ -1328,7 +1831,7 @@ function StatusGlyph({ status }: { status: string }) {
   );
 }
 
-/** P0-2 & 3: 工单行包含 8x8 未读蓝点 */
+/** P0-2: 工单行包含 8x8 未读蓝点 */
 function InboxIssueRow({
   issue,
   assigneeName,
@@ -1406,39 +1909,198 @@ function InboxIssueRow({
   );
 }
 
-/** 失败/异常 Run 行 */
-function FailedRunRow({
-  run,
-  onPress,
+/** P1-5: 审批行外露「批准」与「驳回」两字按钮 */
+function ApprovalInboxRowItem({
+  item,
+  onApprove,
+  onReject,
+  onToggleExpand,
+  isOpen,
+  children,
 }: {
-  run: InboxFailureItem;
-  onPress?: () => void;
+  item: InboxApprovalItem;
+  onApprove: () => void;
+  onReject: () => void;
+  onToggleExpand: () => void;
+  isOpen: boolean;
+  children?: React.ReactNode;
 }) {
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
-      accessibilityRole="button"
-      accessibilityLabel={run.title}
-    >
-      <View style={styles.unreadSlot}>
-        <View style={[styles.unreadDot, { backgroundColor: C.err }]} />
-      </View>
-      <View style={[styles.glyph, { borderColor: C.err, backgroundColor: "rgba(239, 68, 68, 0.15)" }]}>
-        <Ionicons name="alert" size={10} color={C.err} />
-      </View>
-      <View style={styles.rowBody}>
-        <Text style={styles.rowTitle} numberOfLines={2}>
-          {run.title} (受阻/失败)
-        </Text>
-        <View style={styles.metaRow}>
-          <Pill label={run.status} tone="err" size="sm" mono />
-          <Pill label={run.priority} tone="warn" size="sm" mono />
-          <View style={{ flex: 1 }} />
-          <Text style={styles.metaTime}>{formatRelativeTime(run.updatedAt)}</Text>
+    <View style={{ marginBottom: 6 }}>
+      <AppCard variant="surface" style={styles.approvalCard}>
+        <Pressable onPress={onToggleExpand} style={styles.approvalCardHeader}>
+          <View style={[styles.rowDot, { backgroundColor: C.warn, marginTop: 4 }]} />
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text style={styles.rowTitle} numberOfLines={2}>
+              {item.title}
+            </Text>
+            <Text style={styles.metaText} numberOfLines={1}>
+              {item.type} · {formatRelativeTime(item.createdAt)}
+            </Text>
+          </View>
+          <Text style={styles.chevron}>{isOpen ? "▾" : "›"}</Text>
+        </Pressable>
+        <View style={styles.inlineActionRow}>
+          <Pressable
+            style={[styles.miniBtn, styles.miniBtnReject]}
+            onPress={onReject}
+            hitSlop={6}
+            accessibilityLabel="驳回"
+          >
+            <Text style={styles.miniBtnTextReject}>驳回</Text>
+          </Pressable>
+          <Pressable
+            style={[styles.miniBtn, styles.miniBtnApprove]}
+            onPress={onApprove}
+            hitSlop={6}
+            accessibilityLabel="批准"
+          >
+            <Text style={styles.miniBtnTextApprove}>批准</Text>
+          </Pressable>
+        </View>
+      </AppCard>
+      {isOpen ? <View style={styles.approvalDetail}>{children}</View> : null}
+    </View>
+  );
+}
+
+/** P1-6: 失败/异常运行行包含「重试」两字按钮 */
+function FailedRunRow({
+  run,
+  onRetry,
+  onPress,
+  isRetrying,
+}: {
+  run: InboxFailedRunItem | InboxFailureItem;
+  onRetry: () => void;
+  onPress?: () => void;
+  isRetrying?: boolean;
+}) {
+  const agentName = ("agentName" in run && run.agentName ? run.agentName : null) ?? "智能体";
+  const errorText = ("error" in run && run.error ? run.error : null) ?? run.status;
+  const title = "title" in run && run.title ? run.title : `${agentName} 执行异常`;
+
+  return (
+    <AppCard variant="surface" style={styles.failedRunCard} onPress={onPress}>
+      <View style={styles.failedRunHeader}>
+        <View style={[styles.glyph, { borderColor: C.err, backgroundColor: "rgba(239, 68, 68, 0.15)" }]}>
+          <Ionicons name="alert" size={10} color={C.err} />
+        </View>
+        <View style={{ flex: 1, gap: 3 }}>
+          <Text style={styles.rowTitle} numberOfLines={2}>
+            {title}
+          </Text>
+          {errorText ? (
+            <Text style={styles.failedErrorText} numberOfLines={1}>
+              {errorText}
+            </Text>
+          ) : null}
+          <View style={styles.metaRow}>
+            <Pill label={run.status} tone="err" size="sm" mono />
+            <Text style={styles.metaText}>{agentName}</Text>
+            <View style={{ flex: 1 }} />
+            <Text style={styles.metaTime}>{formatRelativeTime(run.updatedAt)}</Text>
+          </View>
         </View>
       </View>
-    </Pressable>
+      <View style={styles.inlineActionRow}>
+        <View style={{ flex: 1 }} />
+        <Pressable
+          style={[styles.miniBtn, styles.miniBtnRetry]}
+          onPress={onRetry}
+          disabled={isRetrying}
+          hitSlop={6}
+          accessibilityLabel="重试"
+        >
+          {isRetrying ? (
+            <ActivityIndicator size="small" color={C.accent} style={{ marginRight: 4 }} />
+          ) : (
+            <Ionicons name="reload-outline" size={12} color={C.accent} style={{ marginRight: 4 }} />
+          )}
+          <Text style={styles.miniBtnTextRetry}>{isRetrying ? "重试中" : "重试"}</Text>
+        </Pressable>
+      </View>
+    </AppCard>
+  );
+}
+
+/** P1-7: 企业加群申请行外露「批准」与「驳回」两字按钮 */
+function JoinRequestRow({
+  item,
+  onApprove,
+  onReject,
+}: {
+  item: InboxJoinRequestItem;
+  onApprove: () => void;
+  onReject: () => void;
+}) {
+  const isAgent = item.requestType !== "human";
+  const title = isAgent
+    ? `智能体加群: ${item.agentName || "未知智能体"}`
+    : `成员加群: ${item.requestEmailSnapshot || item.requestingUserId || "新成员"}`;
+
+  return (
+    <AppCard variant="surface" style={styles.joinCard}>
+      <View style={styles.joinHeader}>
+        <View style={[styles.glyph, { borderColor: C.accent, backgroundColor: "rgba(59, 130, 246, 0.12)" }]}>
+          <Ionicons name={isAgent ? "hardware-chip-outline" : "person-add-outline"} size={11} color={C.accent} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <Text style={styles.rowTitle} numberOfLines={1}>
+            {title}
+          </Text>
+          <Text style={styles.metaText} numberOfLines={1}>
+            来源 IP: {item.requestIp || "未知"} · {formatRelativeTime(item.createdAt)}
+          </Text>
+        </View>
+      </View>
+      <View style={styles.inlineActionRow}>
+        <Pressable
+          style={[styles.miniBtn, styles.miniBtnReject]}
+          onPress={onReject}
+          hitSlop={6}
+          accessibilityLabel="驳回"
+        >
+          <Text style={styles.miniBtnTextReject}>驳回</Text>
+        </Pressable>
+        <Pressable
+          style={[styles.miniBtn, styles.miniBtnApprove]}
+          onPress={onApprove}
+          hitSlop={6}
+          accessibilityLabel="批准"
+        >
+          <Text style={styles.miniBtnTextApprove}>批准</Text>
+        </Pressable>
+      </View>
+    </AppCard>
+  );
+}
+
+/** P1-3: 系统警报行 */
+function AlertRow({
+  title,
+  description,
+  tone = "warn",
+}: {
+  title: string;
+  description: string;
+  tone?: "warn" | "err";
+}) {
+  const isErr = tone === "err";
+  return (
+    <AppCard
+      variant="surface"
+      style={[
+        styles.alertCard,
+        { borderColor: isErr ? "rgba(239, 68, 68, 0.4)" : "rgba(234, 179, 8, 0.4)" },
+      ]}
+    >
+      <View style={styles.alertHeader}>
+        <Ionicons name={isErr ? "alert-circle" : "warning"} size={16} color={isErr ? C.err : C.warn} />
+        <Text style={styles.alertTitle}>{title}</Text>
+      </View>
+      <Text style={styles.alertBody}>{description}</Text>
+    </AppCard>
   );
 }
 
@@ -1717,7 +2379,69 @@ const styles = StyleSheet.create({
   },
   capsuleText: { color: C.ink2, fontSize: 12, maxWidth: 140 },
   capsuleSub: { color: C.ink3, fontSize: 12 },
-  tabs: { marginHorizontal: 16 },
+
+  // P1-1 & P1-2: 6 Tab 水平滚动栏
+  tabBarWrap: {
+    marginHorizontal: 16,
+    marginBottom: 4,
+  },
+  tabScrollContent: {
+    gap: 6,
+    paddingVertical: 4,
+  },
+  tabPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: RADIUS.pill,
+    backgroundColor: ELEVATION.base,
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  tabPillActive: {
+    backgroundColor: ELEVATION.active,
+    borderColor: C.brand,
+  },
+  tabPillText: {
+    color: C.ink3,
+    fontSize: 12,
+    fontWeight: "500",
+  },
+  tabPillTextActive: {
+    color: C.ink,
+    fontWeight: "600",
+  },
+
+  // P1-3: All 分类筛选芯片栏
+  catBarWrap: {
+    marginHorizontal: 16,
+    marginTop: 6,
+    marginBottom: 2,
+  },
+  catScrollContent: {
+    gap: 6,
+    paddingVertical: 2,
+  },
+  catChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: RADIUS.sm,
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: C.line,
+  },
+  catChipActive: {
+    backgroundColor: "rgba(94, 106, 210, 0.18)",
+    borderColor: C.brand,
+  },
+  catChipText: {
+    color: C.ink4,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  catChipTextActive: {
+    color: C.brand,
+    fontWeight: "600",
+  },
 
   // P0-5: 搜索栏
   searchBar: {
@@ -1726,7 +2450,7 @@ const styles = StyleSheet.create({
     backgroundColor: C.surface,
     borderRadius: RADIUS.md,
     marginHorizontal: 16,
-    marginTop: 8,
+    marginTop: 6,
     borderWidth: 1,
     borderColor: C.line,
     height: 36,
@@ -1746,7 +2470,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: SPACING.sm,
     paddingHorizontal: 16,
-    paddingVertical: 10,
+    paddingVertical: 8,
   },
   toolBtn: {
     flexDirection: "row",
@@ -1770,7 +2494,7 @@ const styles = StyleSheet.create({
   section: { gap: 6, marginBottom: 12 },
   sectionTitle: { color: C.ink3, fontSize: 13, fontWeight: "500", marginTop: 6, marginBottom: 2 },
 
-  // P0-7: 日期段落头部 (带左右细灰线)
+  // P0-7: 日期段落头部
   dateHeaderWrap: {
     flexDirection: "row",
     alignItems: "center",
@@ -1839,8 +2563,76 @@ const styles = StyleSheet.create({
   metaTime: { color: C.ink4, fontSize: 11, fontVariant: ["tabular-nums"] },
   blockedAction: { color: C.ink3, fontSize: 12, marginTop: 2 },
   chevron: { color: C.ink4, fontSize: 20 },
-  approvalRow: { gap: 10, marginBottom: 4 },
-  approvalDetail: { marginBottom: 12 },
+
+  // P1-5: 审批卡片
+  approvalCard: { gap: 8, padding: 12, borderRadius: RADIUS.md },
+  approvalCardHeader: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  approvalDetail: { marginBottom: 10 },
+
+  // P1-6: 失败运行卡片
+  failedRunCard: { gap: 8, padding: 12, borderRadius: RADIUS.md, marginBottom: 4 },
+  failedRunHeader: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+  failedErrorText: { color: C.err, fontSize: 12, lineHeight: 16 },
+
+  // P1-7: 加群卡片
+  joinCard: { gap: 8, padding: 12, borderRadius: RADIUS.md, marginBottom: 4 },
+  joinHeader: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
+
+  // P1-3: 警报卡片
+  alertCard: { gap: 6, padding: 12, borderRadius: RADIUS.md, marginBottom: 6, borderWidth: 1 },
+  alertHeader: { flexDirection: "row", alignItems: "center", gap: 6 },
+  alertTitle: { color: C.ink, fontSize: 13, fontWeight: "600" },
+  alertBody: { color: C.ink3, fontSize: 12, lineHeight: 16 },
+
+  // P1-5 & 6 & 7: 行内两字按钮样式 (极简两字)
+  inlineActionRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "flex-end",
+    gap: 8,
+    marginTop: 4,
+    paddingTop: 8,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: C.line,
+  },
+  miniBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: RADIUS.sm,
+    minWidth: 54,
+  },
+  miniBtnApprove: {
+    backgroundColor: C.ok,
+  },
+  miniBtnTextApprove: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  miniBtnReject: {
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: C.err,
+  },
+  miniBtnTextReject: {
+    color: C.err,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+  miniBtnRetry: {
+    backgroundColor: "rgba(59, 130, 246, 0.12)",
+    borderWidth: 1,
+    borderColor: C.accent,
+  },
+  miniBtnTextRetry: {
+    color: C.accent,
+    fontSize: 12,
+    fontWeight: "600",
+  },
+
   mentionCard: { gap: 6, marginBottom: 8 },
   mentionHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
   mentionAuthor: { color: C.ok, fontSize: 12, fontWeight: "600", flex: 1 },
