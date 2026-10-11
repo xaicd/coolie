@@ -53,6 +53,15 @@ function readSetFor(userId: string): Set<string> {
   return created;
 }
 
+/**
+ * Feed ids are prefixed (`approval:<uuid>`, `activity:<uuid>`, ...) while the
+ * dismissal table keys on the raw row UUID. Every read-state read and write must
+ * strip the prefix so a persisted mark survives the next server process.
+ */
+function rawNotificationId(feedId: string): string {
+  return feedId.includes(":") ? feedId.split(":").pop()! : feedId;
+}
+
 function approvalTitle(payload: Record<string, unknown> | null, fallback: string): string {
   if (payload && typeof payload.title === "string" && payload.title) return payload.title;
   if (payload && typeof payload.name === "string" && payload.name) return payload.name;
@@ -216,7 +225,7 @@ export function notificationRoutes(db: Db) {
     const memoryRead = readSetFor(userId);
     const notifications = items.map((item) => {
       // 精准数据: dismissal table 存 raw UUID, 拆分 feed item.id 后查 rawId。
-      const rawId = item.id.includes(":") ? item.id.split(":").pop()! : item.id;
+      const rawId = rawNotificationId(item.id);
       return {
         ...item,
         read: dismissedKeys.has(rawId) || memoryRead.has(item.id),
@@ -236,7 +245,7 @@ export function notificationRoutes(db: Db) {
     const id = req.params.id as string;
     // 精准数据: id 格式为 "approval:UUID" / "mention:UUID" / "activity:UUID",
     // dismissal table 存的是 raw UUID, 拆分后查询才命中。
-    const rawId = id.includes(":") ? id.split(":").pop()! : id;
+    const rawId = rawNotificationId(id);
     const userId = req.actor.userId || "board";
     readSetFor(userId).add(id);
     try {
@@ -258,7 +267,9 @@ export function notificationRoutes(db: Db) {
       items.map(async (item) => {
         memoryRead.add(item.id);
         try {
-          await dismissalSvc.dismiss(companyId, userId, item.id);
+          // 精准数据: 与单条已读及 GET 查询同一口径, 存 raw UUID 而非复合 feed id,
+          // 否则清空后下一次 GET(或进程重启)查 rawId 不命中, 铃铛复活。
+          await dismissalSvc.dismiss(companyId, userId, rawNotificationId(item.id));
         } catch {
           // 容错持久化
         }
