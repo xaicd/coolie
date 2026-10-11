@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { and, desc, eq, ilike, isNotNull } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
-import { activityLog, agents, approvals, issueComments, issues } from "@paperclipai/db";
+import { agents, approvals, issueComments, issues } from "@paperclipai/db";
 import { badRequest } from "../errors.js";
 import { assertBoard, assertCompanyAccess } from "./authz.js";
 import { inboxDismissalService } from "../services/inbox-dismissals.js";
@@ -9,7 +9,7 @@ import { inboxDismissalService } from "../services/inbox-dismissals.js";
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
 
-type NotificationType = "approval" | "failure" | "mention" | "activity";
+type NotificationType = "approval" | "failure" | "mention";
 
 type NotificationItem = {
   id: string;
@@ -25,7 +25,7 @@ type NotificationItem = {
  * Read state for a derived feed.
  *
  * Notifications are computed from existing rows (approvals, blocked issues,
- * mentions, activity) rather than stored, so there is no table to hold a `read`
+ * mentions) rather than stored, so there is no table to hold a `read`
  * flag. A per-process set is enough for the mobile badge: it resets on restart,
  * which at worst re-shows a badge, and it never blocks a decision. A durable
  * table is deliberately out of scope for this wave.
@@ -54,7 +54,7 @@ function readSetFor(userId: string): Set<string> {
 }
 
 /**
- * Feed ids are prefixed (`approval:<uuid>`, `activity:<uuid>`, ...) while the
+ * Feed ids are prefixed (`approval:<uuid>`, `mention:<uuid>`, ...) while the
  * dismissal table keys on the raw row UUID. Every read-state read and write must
  * strip the prefix so a persisted mark survives the next server process.
  */
@@ -85,7 +85,7 @@ function approvalTitle(payload: Record<string, unknown> | null, fallback: string
 }
 
 async function buildFeed(db: Db, companyId: string, limit: number): Promise<NotificationItem[]> {
-  const [pending, failures, mentions, activity] = await Promise.all([
+  const [pending, failures, mentions] = await Promise.all([
     db
       .select({
         id: approvals.id,
@@ -128,20 +128,6 @@ async function buildFeed(db: Db, companyId: string, limit: number): Promise<Noti
       )
       .orderBy(desc(issueComments.createdAt))
       .limit(limit),
-    db
-      .select({
-        id: activityLog.id,
-        action: activityLog.action,
-        entityType: activityLog.entityType,
-        entityId: activityLog.entityId,
-        actorType: activityLog.actorType,
-        details: activityLog.details,
-        createdAt: activityLog.createdAt,
-      })
-      .from(activityLog)
-      .where(eq(activityLog.companyId, companyId))
-      .orderBy(desc(activityLog.createdAt))
-      .limit(limit),
   ]);
 
   const items: NotificationItem[] = [
@@ -169,47 +155,6 @@ async function buildFeed(db: Db, companyId: string, limit: number): Promise<Noti
       target: { kind: "issue" as const, id: row.issueId },
       createdAt: row.createdAt.toISOString(),
     })),
-    ...activity.map((row) => {
-      const isIssue = row.entityType === "issue";
-      const isApproval = row.entityType === "approval";
-      let title: string;
-      let body: string | null = null;
-      const d = row.details as Record<string, unknown> | null;
-      const issueTitle = (d?.title as string) || (d?.name as string) || null;
-      const issueIdent = (d?.identifier as string) || null;
-
-      if (row.action === "issue.created") {
-        title = `Hermes 派工通知：已安排「${issueTitle ?? "新任务"}」`;
-        body = issueIdent ? `工号 ${issueIdent} 已立项，正在由责任人推进` : "任务已立项并分配责任人";
-      } else if (row.action === "issue.assigned") {
-        title = `Hermes 派工通知：${issueTitle ? `「${issueTitle}」已分配` : "任务责任人已安排"}`;
-        body = issueIdent ? `工号 ${issueIdent} 责任人已明确` : "任务责任人已变更";
-      } else if (row.action === "issue.updated") {
-        title = `任务动态：${issueTitle ?? "工单更新"}`;
-        body = typeof d?.status === "string" ? `状态更新为：${d.status}` : (issueIdent ? `工号 ${issueIdent} 有新进展` : "任务已有最新进展");
-      } else if (row.action === "issue.execution_recovery_settled") {
-        title = `进程自愈：${issueTitle ? `「${issueTitle}」已自动恢复` : "任务进程已自愈恢复"}`;
-        body = issueIdent ? `工单 ${issueIdent} 异常已由看门狗自愈接管` : "此前执行中断的任务已由系统自动恢复推进";
-      } else {
-        title = `${row.actorType === "agent" ? "员工" : "系统"}：${row.action}`;
-        body = `${row.entityType} · ${row.entityId}`;
-      }
-
-      const target = isIssue
-        ? ({ kind: "issue" as const, id: row.entityId })
-        : isApproval
-        ? ({ kind: "approval" as const, id: row.entityId })
-        : null;
-
-      return {
-        id: `activity:${row.id}`,
-        type: "activity" as const,
-        title,
-        body,
-        target,
-        createdAt: row.createdAt.toISOString(),
-      };
-    }),
   ];
 
   items.sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
