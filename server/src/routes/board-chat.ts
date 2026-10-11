@@ -266,6 +266,89 @@ async function detectAndExecuteDirectAction(
           }
         }
 
+        // 🛡️ 微信/工坊双通道单写者防重门禁 (Anti-Double-Execution Idempotency Guard)
+        // 若当前已有分配给该员工且标题高度匹配的在办任务，直接复用并加速催办，绝不重复建单
+        const existingActiveIssues = await db
+          .select({
+            id: issues.id,
+            identifier: issues.identifier,
+            title: issues.title,
+            status: issues.status,
+          })
+          .from(issues)
+          .where(
+            and(
+              eq(issues.companyId, companyId),
+              eq(issues.assigneeAgentId, targetAgent.id),
+              inArray(issues.status, ["todo", "in_progress"]),
+              or(
+                eq(issues.title, rawTaskTitle),
+                sql`${issues.title} ILIKE ${'%' + rawTaskTitle + '%'}`,
+              ),
+            ),
+          )
+          .limit(1);
+
+        if (existingActiveIssues.length > 0) {
+          const existing = existingActiveIssues[0];
+          let deadlineStr = "";
+          if (timeboxMinutes) {
+            const timeoutMs = timeboxMinutes * 60 * 1000;
+            const deadline = new Date(Date.now() + timeoutMs);
+            deadlineStr = deadline.toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" });
+
+            await db
+              .update(issues)
+              .set({
+                executionPolicy: {
+                  timeoutMs,
+                  timebox: true,
+                  timeboxMinutes,
+                  autoPauseOnTimeout: true,
+                  targetDeadline: deadline.toISOString(),
+                },
+                monitorNextCheckAt: deadline,
+                monitorScheduledBy: "timebox",
+                updatedAt: new Date(),
+              })
+              .where(eq(issues.id, existing.id));
+          }
+
+          void queueIssueAssignmentWakeup({
+            heartbeat,
+            issue: {
+              id: existing.id,
+              assigneeAgentId: targetAgent.id,
+              status: existing.status,
+            },
+            reason: `掌柜工坊防重对齐与加速催办${timeboxMinutes ? `（锁定 ${timeboxMinutes} 分钟时间盒）` : ""}: ${existing.title}`,
+            mutation: "ping",
+            contextSource: "board-chat",
+            requestedByActorType: "user",
+            requestedByActorId: actorUserId ?? null,
+          });
+
+          const card = `### 🛡️ 指令已执行：已复用现有在办工单并加速催办\n\n` +
+            `| 字段 | 真实状态 |\n` +
+            `| :--- | :--- |\n` +
+            `| **工单编号** | \`${existing.identifier}\` (${existing.title}) |\n` +
+            `| **受派匠人** | 👤 **${targetAgent.name}** (\`${targetAgent.roleLabel || targetAgent.role}\`) |\n` +
+            `| **防重策略** | ✅ 命中防双重执行护栏：检测到微信/工坊已有活跃任务，避免重复派单 |\n` +
+            (timeboxMinutes
+              ? `| **时间盒 (Time-Box)** | ⏱️ **${timeboxMinutes} 分钟** (最新截止 ${deadlineStr}) |\n`
+              : "") +
+            `| **调度状态** | 优先级队列催办脉冲已投递，要求立即加速推进 |\n\n` +
+            `> 系统已对齐现有在办工单，**${targetAgent.name}** 已收到加速唤醒信号，避免了多端并发冲突。`;
+
+          return {
+            handled: true,
+            actionKind: "dispatch",
+            markdownReply: card,
+            injectedContext: `已检测并复用已有工单 ${existing.identifier} (${existing.title})，避免了重复建单，并已向 ${targetAgent.name} 投递加速催办信号。`,
+            isTerminal: true,
+          };
+        }
+
         const issuesApi = issueService(db);
         const created = await issuesApi.create(companyId, {
           title: rawTaskTitle,

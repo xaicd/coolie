@@ -303,14 +303,25 @@ else
   echo "⚠️ Dev Server (3100) 任务同步未完成 (仅落本地 Receipt)"
 fi
 
-# 5. 调用本地派单脚本，生成 Receipt (若带 --execute 或 AUTO_EXECUTE=1 则直通执行)
+# 5. 调用本地派单脚本，生成 Receipt
+# 🛡️ 单写者防重门禁 (Single-Writer Anti-Double-Execution Guard):
+# 若 Dev Server (3100) 已经成功建单接管，除非显式传入 --execute，否则不自动抢跑本地执行，
+# 统一交由控制面心跳 Runner 推进，彻底杜绝「本地进程跑一次 + Dev Server 跑一次」的双重执行隐患！
 DISPATCH_ARGS=(
   --agent "$AGENT"
   --task "$SAFE_TASK"
   --wave "$LATEST_WAVE"
   --tool "$TOOL"
 )
-if [[ -n "$EXECUTE_FLAG" || "${AUTO_EXECUTE:-0}" == "1" ]]; then
+
+if [[ -n "$EXECUTE_FLAG" ]]; then
+  # 显式传参 --execute: 人工强制本地直跑
+  DISPATCH_ARGS+=(--execute)
+elif [[ -n "$ISSUE_IDENTIFIER" ]]; then
+  # Dev Server 已成功接单: 默认只生成本地 Receipt 留存证据，由 Dev Server 控制面负责单写者执行
+  echo "🛡️ 单写者防重机制已激活: 任务由 Dev Server 控制面统一调度，本地生成 Receipt，避免双重执行冲突。"
+elif [[ "${AUTO_EXECUTE:-0}" == "1" ]]; then
+  # 仅在 Dev Server 离线且开启了自动执行时回退本地直跑
   DISPATCH_ARGS+=(--execute)
 fi
 
