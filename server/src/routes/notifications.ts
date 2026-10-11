@@ -4,6 +4,7 @@ import type { Db } from "@paperclipai/db";
 import { activityLog, agents, approvals, issueComments, issues } from "@paperclipai/db";
 import { badRequest } from "../errors.js";
 import { assertBoard, assertCompanyAccess } from "./authz.js";
+import { inboxDismissalService } from "../services/inbox-dismissals.js";
 
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 50;
@@ -197,6 +198,7 @@ async function buildFeed(db: Db, companyId: string, limit: number): Promise<Noti
  */
 export function notificationRoutes(db: Db) {
   const router = Router();
+  const dismissalSvc = inboxDismissalService(db);
 
   router.get("/notifications", async (req, res) => {
     assertBoard(req);
@@ -204,9 +206,22 @@ export function notificationRoutes(db: Db) {
     assertCompanyAccess(req, companyId);
     const limit = readLimit(req.query.limit);
 
-    const items = await buildFeed(db, companyId, limit);
-    const read = req.actor.userId ? readSetFor(req.actor.userId) : new Set<string>();
-    const notifications = items.map((item) => ({ ...item, read: read.has(item.id) }));
+    const userId = req.actor.userId || "board";
+    const [items, persistedDismissals] = await Promise.all([
+      buildFeed(db, companyId, limit),
+      dismissalSvc.list(companyId, userId).catch(() => []),
+    ]);
+
+    const dismissedKeys = new Set(persistedDismissals.map((d) => d.itemKey));
+    const memoryRead = readSetFor(userId);
+    const notifications = items.map((item) => {
+      // 精准数据: dismissal table 存 raw UUID, 拆分 feed item.id 后查 rawId。
+      const rawId = item.id.includes(":") ? item.id.split(":").pop()! : item.id;
+      return {
+        ...item,
+        read: dismissedKeys.has(rawId) || memoryRead.has(item.id),
+      };
+    });
 
     res.json({
       notifications,
@@ -219,9 +234,41 @@ export function notificationRoutes(db: Db) {
     const companyId = readCompanyId(req.query.companyId);
     assertCompanyAccess(req, companyId);
     const id = req.params.id as string;
-    if (req.actor.userId) readSetFor(req.actor.userId).add(id);
+    // 精准数据: id 格式为 "approval:UUID" / "mention:UUID" / "activity:UUID",
+    // dismissal table 存的是 raw UUID, 拆分后查询才命中。
+    const rawId = id.includes(":") ? id.split(":").pop()! : id;
+    const userId = req.actor.userId || "board";
+    readSetFor(userId).add(id);
+    try {
+      await dismissalSvc.dismiss(companyId, userId, rawId);
+    } catch {
+      // 容错持久化
+    }
     res.json({ id, read: true });
   });
+
+  const handleReadAll = async (req: any, res: any) => {
+    assertBoard(req);
+    const companyId = readCompanyId(req.query.companyId || (req.body && req.body.companyId));
+    assertCompanyAccess(req, companyId);
+    const userId = req.actor.userId || "board";
+    const items = await buildFeed(db, companyId, 50);
+    const memoryRead = readSetFor(userId);
+    await Promise.all(
+      items.map(async (item) => {
+        memoryRead.add(item.id);
+        try {
+          await dismissalSvc.dismiss(companyId, userId, item.id);
+        } catch {
+          // 容错持久化
+        }
+      }),
+    );
+    res.json({ success: true, unreadCount: 0 });
+  };
+
+  router.post("/notifications/read-all", handleReadAll);
+  router.patch("/notifications/read-all", handleReadAll);
 
   return router;
 }

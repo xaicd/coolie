@@ -10,6 +10,7 @@ interface NotificationsState {
   companyId: string | null;
   load: (companyId: string, opts?: { silent?: boolean }) => Promise<void>;
   markRead: (id: string) => Promise<void>;
+  markAllRead: () => Promise<void>;
   reset: () => void;
 }
 
@@ -47,6 +48,9 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
 
   markRead: async (id) => {
     const { companyId, items } = get();
+    // 精准幂等: 已读条目直接 return, 避免重复 API 调用和状态抖动
+    const existing = items.find((item) => item.id === id);
+    if (existing?.read) return;
     const next = items.map((item) => (item.id === id ? { ...item, read: true } : item));
     // 乐观更新: 点开即时消红点, 服务端写入失败也不回滚(下次 load 会纠正)。
     set({ items: next, unreadCount: countUnread(next) });
@@ -55,6 +59,18 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
       await coolie.markNotificationRead(id, companyId);
     } catch {
       // 已读写入是尽力而为, 失败不打扰用户。
+    }
+  },
+
+  markAllRead: async () => {
+    const { companyId, items } = get();
+    const next = items.map((item) => ({ ...item, read: true }));
+    set({ items: next, unreadCount: 0 });
+    if (!companyId) return;
+    try {
+      await coolie.markAllNotificationsRead(companyId);
+    } catch {
+      // 尽力而为
     }
   },
 
