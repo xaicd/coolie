@@ -1,0 +1,58 @@
+# agy-ubuntu:e2e — 独立 compose 文件,与基础 agy-box 服务并行(零干扰)
+#
+# 使用方式:
+#   docker compose -f docker-compose.e2e.yml up -d --build
+#   docker attach agy-ubuntu-e2e
+#
+# KVM 注意:Windows + WSL2 默认不暴露 /dev/kvm 给嵌套容器;若不可用,
+# 容器会以 `-accel off -gpu swiftshader_indirect` 软件模式跑模拟器,启动 5-10 分钟。
+
+services:
+  agy-e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+      args:
+        AVD_NAME: ${AVD_NAME:-test30}
+        ANDROID_API_LEVEL: ${ANDROID_API_LEVEL:-30}
+    # Mac/arm64 本地构建的镜像无 :e2e 多架构 manifest,用 E2E_IMAGE 覆盖
+    # (mac: E2E_IMAGE=chw717/ai-agy:e2e-arm64,见 docker-compose.e2e.mac.yml)
+    image: ${E2E_IMAGE:-chw717/ai-agy:e2e}
+    container_name: agy-ubuntu-e2e
+    restart: always
+
+    environment:
+      TZ: Asia/Shanghai
+      CLASH_URL: ${CLASH_URL:-}
+      # E2E 开关(全部默认关闭,需手动开)
+      E2E_AUTOSTART_EMULATOR: ${E2E_AUTOSTART_EMULATOR:-0}
+      E2E_SKIP_EMULATOR: ${E2E_SKIP_EMULATOR:-0}
+      AVD_NAME: ${AVD_NAME:-test30}
+      ANDROID_API_LEVEL: ${ANDROID_API_LEVEL:-30}
+
+    # --- TUN(给 mihomo)+ KVM(给 Android emulator) ---
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+      # KVM 可选;无 KVM 时 emulator 走软件模式(slow)
+      - /dev/kvm:/dev/kvm
+
+    volumes:
+      - ./workspace:/root/workspace
+      - ./agy-home:/root/.gemini
+      # 持久化全局 Claude 登录态、命令与 Skills(容器重建不丢)
+      - ./claude:/root/.claude
+      # 静态节点文件(同 docker-compose.mac.yml;无 CLASH_URL 时 e2e 也有节点可用)
+      - ./mihomo-conf/proxies-static.yaml:/root/.config/mihomo/proxies-static.yaml:ro
+      # 跨平台:Linux 原生有 HOME;Windows 需在 PowerShell 下执行(有 $HOME)
+      - ${HOME}/.gitconfig:/root/.gitconfig-host:ro
+      - ${HOME}/.ssh:/root/.ssh-host:ro
+      # entrypoint 由宿主机挂载:改脚本立即生效,免重建镜像(文件需有可执行位)
+      - ./entrypoint.e2e.sh:/usr/local/bin/entrypoint.sh:ro
+
+    # --- 模拟器需要 privileged 启动 avd manager / qemu ---
+    privileged: false  # 保持 false,避免过度授权;KVM + NET_ADMIN 已够用
+
+    stdin_open: true
+    tty: true

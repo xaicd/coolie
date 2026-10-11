@@ -1,0 +1,11 @@
+node_modules/
+package-lock.json
+playwright-report/
+test-results/
+artifacts/
+# 运行时产物(bind 到宿主后生成)
+reports/
+playwright-report/
+test-results/
+videos/
+node_modules/

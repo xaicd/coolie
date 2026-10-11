@@ -1,0 +1,3 @@
+# mihomo 静态节点配置示例 (请在部署时填入真实的订阅节点并重命名为 proxies-static.yaml)
+proxies:
+  - { name: '美国01[示例节点]', type: trojan, server: example.com, port: 443, password: your-password, udp: true, network: ws }

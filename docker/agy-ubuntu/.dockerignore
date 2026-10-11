@@ -1,0 +1,8 @@
+# 构建上下文瘦身:只保留 Dockerfile 实际 COPY 的产物
+downloads-prepare.log
+workspace/
+agy-home/
+.git/
+.claude/
+*.log
+.wsl-*.sh

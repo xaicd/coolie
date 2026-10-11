@@ -1,0 +1,40 @@
+# agy-ubuntu — Apple Silicon (macOS arm64) 版编排
+#
+# 与 docker-compose.yml 的差异:
+#   * image 换成本地构建的 chw717/ai-agy:latest-arm64
+#   * macOS 的 Docker Desktop 自带 /dev/net/tun 支持(VirtioFS 虚拟机内可用)
+#   * 其余(TUN、NET_ADMIN、挂载、登录态持久化)与原版一致
+
+services:
+  agy-box:
+    image: chw717/ai-agy:latest-arm64
+    container_name: agy-ubuntu-container
+    restart: always
+
+    environment:
+      TZ: Asia/Shanghai
+      CLASH_URL: ${CLASH_URL:-}
+
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+
+    volumes:
+      - ./workspace:/root/workspace
+      # 宿主机仓库直挂(墨斗/雨蛙可直接读写真实代码,与宿主同步,免clone)
+      - ${HOME}/workspace:/host-workspace
+      # 持久化 agy 登录状态(重建容器不丢登录)
+      - ./agy-home:/root/.gemini
+      # 持久化全局 Claude 登录态、命令与 Skills
+      - ./claude-home:/root/.claude
+      # 共享宿主机 git 身份 + SSH 密钥
+      - ${HOME}/.gitconfig:/root/.gitconfig-host:ro
+      - ${HOME}/.ssh:/root/.ssh-host:ro
+      # entrypoint 挂载:改脚本立即生效
+      - ./entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
+      # 静态节点文件(从宿主机千陌/FlClash 导出的美日智台节点;无需订阅 URL)
+      - ./mihomo-conf/proxies-static.yaml:/root/.config/mihomo/proxies-static.yaml:ro
+
+    stdin_open: true
+    tty: true

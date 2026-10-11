@@ -1,0 +1,25 @@
+# agy-ubuntu:e2e — Apple Silicon (macOS arm64) 覆盖层
+#
+# 用法:
+#   docker compose -f docker-compose.e2e.yml -f docker-compose.e2e.mac.yml up -d
+#
+# 与 Linux 版 docker-compose.e2e.yml 的差异:
+#   * image 用本地构建的 chw717/ai-agy:e2e-arm64(仓库 :e2e 只有 amd64 manifest)
+#   * 去掉 /dev/kvm(Docker Desktop 的 VZ 虚拟机不暴露 KVM;emulator 走软件模式)
+#   * ./claude → ./claude-home(与 docker-compose.mac.yml 的目录布局一致)
+#
+# 前置: e2e-arm64 镜像已本地构建(参照 build-mac.sh 的思路构建 Dockerfile.e2e)。
+
+services:
+  agy-e2e:
+    image: ${E2E_IMAGE:-chw717/ai-agy:e2e-arm64}
+    devices: !override
+      - /dev/net/tun:/dev/net/tun
+    volumes: !override
+      - ./workspace:/root/workspace
+      - ./agy-home:/root/.gemini
+      - ./claude-home:/root/.claude
+      - ${HOME}/.gitconfig:/root/.gitconfig-host:ro
+      - ${HOME}/.ssh:/root/.ssh-host:ro
+      - ./entrypoint.e2e.sh:/usr/local/bin/entrypoint.sh:ro
+      - ./mihomo-conf/proxies-static.yaml:/root/.config/mihomo/proxies-static.yaml:ro

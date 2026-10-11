@@ -39,8 +39,8 @@
       "agentId": "menshen-fdse",
       "name": "门神",
       "role": "FDSE (前线全栈部署)",
-      "defaultTool": "cmd",
-      "fallbackTools": ["claude-mm", "copilot"],
+      "defaultTool": "claude-mm",
+      "fallbackTools": ["cmd", "copilot"],
       "env": "Mac 宿主机"
     },
     {
@@ -55,8 +55,8 @@
       "agentId": "baixiaosheng-ds",
       "name": "百晓生",
       "role": "DS (部署战略专家)",
-      "defaultTool": "claude-glm",
-      "fallbackTools": ["claude-mm", "agy-gemini3.8"],
+      "defaultTool": "claude-mm",
+      "fallbackTools": ["claude-glm", "agy-gemini3.8"],
       "env": "Mac 宿主机"
     }
   ],

@@ -1,0 +1,28 @@
+# ===== 敏感信息(绝不提交)=====
+.env
+
+# ===== 节点订阅凭据(本机代理节点,含订阅 token,绝不提交)=====
+mihomo-conf/*
+!mihomo-conf/*.example.yaml
+mihomo-extra/
+
+# ===== 大文件(离线构建所需的预下载产物,见 README)=====
+downloads/
+
+# ===== 运行时挂载目录(用户项目)=====
+workspace/
+
+# ===== agy 登录状态(敏感,持久化挂载)=====
+agy-home/
+
+# ===== 本地工具与登录态(敏感,持久化挂载) =====
+claude-home/
+claude/
+.claude/*
+!.claude/commands/
+.commandcode/
+
+# ===== 备份/杂项 =====
+*.tar
+*.tar.gz
+downloads-prepare.log

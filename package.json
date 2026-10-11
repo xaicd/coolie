@@ -55,6 +55,8 @@
     "openwiki:check": "node scripts/sync-openwiki.mjs --check",
     "ontology:ops": "node scripts/ontology-ops.cjs",
     "ontology:inspect": "node scripts/ontology-ops.cjs inspect",
+    "tools:install": "bash scripts/install-all-cli-tools.sh",
+    "tools:check": "bash scripts/install-all-cli-tools.sh --check",
     "speckit": "node scripts/speckit.cjs",
     "speckit:init": "node scripts/speckit.cjs init",
     "speckit:constitution": "node scripts/speckit.cjs constitution",

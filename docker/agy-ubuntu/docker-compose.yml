@@ -1,0 +1,48 @@
+# agy-ubuntu — isolated Mihomo (Clash Meta) TUN sandbox for the Google
+# Antigravity CLI.
+#
+# Traffic model: default bridge network only. Host networking is deliberately
+# NEVER used — every packet leaving the container is captured by the mihomo
+# TUN device (clash0) created at startup.
+
+services:
+  agy-box:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: chw717/ai-agy:latest
+    container_name: agy-ubuntu-container
+    restart: always
+
+    environment:
+      TZ: Asia/Shanghai
+      # Subscription profile URL. Set it here directly, export it on the host,
+      # or put it in a .env file next to this compose file:
+      #     CLASH_URL=https://example.com/api/v1/client/subscribe?token=...
+      CLASH_URL: ${CLASH_URL:-}
+
+    # --- Required so mihomo can create/operate the clash0 TUN device ---
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+
+    volumes:
+      - ./workspace:/root/workspace
+      # 持久化 agy 登录状态(重建容器不丢登录)
+      - ./agy-home:/root/.gemini
+      # 持久化全局 Claude 登录态、命令与 Skills(容器重建不丢)
+      - ./claude-home:/root/.claude
+      # 共享宿主机 git 身份 + SSH 密钥(容器内可 commit/push)
+      # 跨平台:Linux 原生有 HOME;Windows 需在 PowerShell 下执行(有 $HOME)
+      - ${HOME}/.gitconfig:/root/.gitconfig-host:ro
+      - ${HOME}/.ssh:/root/.ssh-host:ro
+      # entrypoint 由宿主机挂载:改脚本立即生效,免重建镜像(文件需有可执行位)
+      - ./entrypoint.sh:/usr/local/bin/entrypoint.sh:ro
+      # 本地兜底节点(从宿主机千陌/clashctl 导出的可用入口;订阅入口域名失效时兜底。
+      # 文件不存在时 Docker 会建目录,entrypoint 用 -f 判空,不会误用。见 README)
+      - ./mihomo-conf/proxies-static.yaml:/root/.config/mihomo/proxies-static.yaml:ro
+
+    # --- Interactive session support (docker attach / exec) ---
+    stdin_open: true
+    tty: true

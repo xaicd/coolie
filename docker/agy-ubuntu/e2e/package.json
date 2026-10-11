@@ -1,0 +1,19 @@
+{
+  "name": "agy-ubuntu-e2e-smoke",
+  "version": "0.1.0",
+  "description": "Smoke tests for agy-ubuntu-e2e image (Playwright + agent-device)",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "smoke:pw": "pw-init.sh playwright-smoke.spec.ts",
+    "smoke:agent": "node agent-device-smoke.mjs",
+    "smoke:emu": "bash emulator-smoke.sh",
+    "smoke:all": "npm run smoke:pw && npm run smoke:emu && npm run smoke:agent"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.49.0",
+    "@types/node": "20.10.0",
+    "playwright": "1.49.0",
+    "typescript": "5.4.5"
+  }
+}

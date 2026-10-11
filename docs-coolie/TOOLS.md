@@ -168,27 +168,28 @@ claude -p "$PROMPT" --dangerously-skip-permissions < /dev/null
 |---|---|---|---|---|---|---|
 | 1 | **Hermes (PM)** | Hermes / 黑哥 / XRobinAI | (PM 调度总指挥) | **Hermes 自己** (wave280 拍板) | - | 拍板决策、拆分意图、派单派活、验收汇总 |
 | 2 | **墨斗 (Inkstick)** | Inkstick | `fda` (前线架构师) | **`agy-gemini3.8`** (wave272 拍板) | `cmd` (紧急兜底) | 方案选型、数据隔离设计、原型草图、架构研判 |
-| 3 | **铁匠 (Forge)** | Forge | `core-swe` (核心研发) | **`claude-glm`** (wave272 恢复) | `claude-mm` (= 铁匠贰号) | 核心业务代码、契约守护、复杂逻辑集成 |
-| 4 | **铁匠贰号 (Forge II)** | Forge II | `core-swe` (副/兜底) | **`claude-mm`** (wave272 固化) | - | 铁匠主线额度见顶或并发时接力 (同角色换工具) |
-| 5 | **门神 (Guardian)** | Guardian | `fdse` (前线全栈部署) | **`cmd`** (`@commandcode/ai`) | - | 自动化脚本、全栈单测、E2E 浏览器旅程回归 |
+| 3 | **铁匠 (Forge)** | Forge | `core-swe` (核心研发) | **`agy-gemini3.8`** (老板拍板主力) | `cmd` / `claude-glm` (兜底) | 核心业务代码、契约守护、复杂逻辑集成 |
+| 4 | **铁匠贰号 (Forge II)** | Forge II | `core-swe` (副/兜底) | **`cmd`** / **`claude-mm`** | - | 铁匠主线额度见顶或并发时接力 (同角色换工具) |
+| 5 | **门神 (Guardian)** | Guardian | `fdse` (前线全栈部署/测试) | **`claude-mm`** (老板拍板测试首选) | `cmd` (回归兜底) | 自动化脚本、全栈单测、E2E 浏览器旅程回归 |
 | 6 | **兑底渊 (Operator)** | Operator | `pre-sre` (产品可靠性) | **`copilot`** (wave272 拍板) | `claude-mm` | 发版打包、OTA 巡检、容器健康、生产环境指纹 |
-| 7 | **百晓生 (Sage)** | Sage | `ds` (部署战略专家) | **`claude-glm`** / `claude-mm` | `agy-gemini3.8` | 端到端真实业务闭环验收、一票否决权 |
+| 7 | **百晓生 (Sage)** | Sage | `ds` (部署战略专家) | **`claude-mm`** (终审验收首选) | `claude-glm` / `agy-gemini3.8` | 端到端真实业务闭环验收、一票否决权 |
 
 > **关键澄清**：
-> - 铁匠与铁匠贰号是同一个 `core-swe` 岗位，铁匠贰号是“使用 `claude-mm` 兜底工具时的铁匠”；
+> - 铁匠主力使用 `agy-gemini3.8`，并发或兜底时使用 `cmd` 与 `claude-glm`；
+> - 门神与百晓生承担测试与验收重任，测试工具统一收拢首选 `claude-mm`；
 > - 百晓生拥有终审与验收一票否决权，只以真实业务用户视角审查，不以纯编译通过为结单标准。
 
 ---
 
-## 4. 6 老板团队 × 7 工具池 真配矩阵 (wave272 拍板)
+## 4. 6 老板团队 × 7 工具池 真配矩阵 (老板拍板最新矩阵)
 
 ```
                           ┌───> 墨斗 (FDA)       ───> agy-gemini3.8 (Docker 容器)
-                          ├───> 铁匠 (Core SWE)  ───> claude-glm (Mac 宿主 / GLM-5.3 1M)
-                          ├───> 铁匠贰号 (Core SWE)─> claude-mm (Mac 宿主 / MiniMax-M3)
-Hermes (PM / Hermes自己) ─┼───> 门神 (FDSE)      ───> cmd (Mac 宿主 / CommandCode)
+                          ├───> 铁匠 (Core SWE)  ───> agy-gemini3.8 (Docker / Mac)
+                          ├───> 铁匠贰号 (Core SWE)─> cmd / claude-mm (Mac 宿主)
+Hermes (PM / Hermes自己) ─┼───> 门神 (FDSE/测试) ───> claude-mm (Mac 宿主 / 测试首选)
                           ├───> 兑底渊 (PRE-SRE) ───> copilot (Mac 宿主 / Copilot CLI)
-                          └───> 百晓生 (DS)      ───> claude-glm / claude-mm (终审验收)
+                          └───> 百晓生 (DS/验收)  ───> claude-mm (Mac 宿主 / 终审验收)
                                [备用储备]        ───> kiro-cli (老板专属架构保留)
 ```
 

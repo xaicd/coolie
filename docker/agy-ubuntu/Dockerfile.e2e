@@ -1,0 +1,134 @@
+###############################################################################
+# agy-ubuntu:e2e — 扩展镜像,叠加 Playwright / agent-device / Android emulator
+#
+#   FROM 已发布的 chw717/ai-agy:latest(基础沙盒,内嵌 mihomo TUN + agy + Node)
+#   增加:
+#     - Playwright 三引擎 headless 浏览器 + 系统依赖
+#     - agent-device SDK(CLI + Node API 桥接)
+#     - JDK 17 + Android SDK + Android 模拟器(API 30 google_apis x86_64)
+#
+# OFFLINE build: 所有新二进制通过 prepare-downloads.sh 预下载到 ./downloads/。
+# 构建过程不联网。
+###############################################################################
+
+# syntax=docker/dockerfile:1.7
+FROM chw717/ai-agy:latest
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# ----- 路径 / 环境变量 -----
+# agy 已有 PATH 包含 /root/.local/bin
+ENV PLAYWRIGHT_BROWSERS_PATH=/root/.cache/ms-playwright
+ENV ANDROID_HOME=/opt/android/sdk
+ENV ANDROID_SDK_ROOT=/opt/android/sdk
+ENV JAVA_HOME=/opt/jdk-17
+ENV AVD_NAME="${AVD_NAME:-test30}"
+ENV ANDROID_API_LEVEL="${ANDROID_API_LEVEL:-30}"
+
+ENV PATH="${JAVA_HOME}/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${ANDROID_HOME}/emulator:${ANDROID_HOME}/system-tools:${PATH}"
+
+#==============================================================================
+# 1. Playwright 三引擎系统依赖(官方 nativeDeps 全集,noble t64 变体)
+#    闭包含 systemd/dbus 守护链(gstreamer 拖入),但基础镜像无 systemd,
+#    pre-depends 在 unpack 阶段对"未配置"包必失败 —— 容忍之:
+#    纯运行库 unpack 后文件即就位,ldconfig 刷新缓存;守护链留 unpacked 无害。
+#==============================================================================
+# buildkit bind-mount 传 deb(COPY 进层会永久占 210MB 死层)
+RUN --mount=type=bind,source=downloads/debs-playwright,target=/tmp/debs \
+    dpkg --unpack /tmp/debs/*.deb || true && \
+    dpkg --configure -a || true && \
+    ldconfig
+
+#==============================================================================
+# 2. JDK 17(Temurin,emulator 运行时依赖)
+#==============================================================================
+COPY downloads/jdk-17/ /opt/jdk-17/
+
+#==============================================================================
+# 3. Android SDK(platform-tools / emulator / system-image)
+#    licenses 预写 SHA1,免去运行时 sdkmanager --licenses
+#==============================================================================
+COPY downloads/android-sdk/ /opt/android/sdk/
+COPY downloads/android-sdk-licenses/ /opt/android/sdk/licenses/
+
+#==============================================================================
+# 4. Playwright 浏览器(chromium + firefox + webkit)
+#    webkit 补丁:WPE 后端在无显示环境断言崩溃(WPEBackend-fdo wayland-only),
+#    headless 改走 GTK 后端 + 常驻 Xvfb(entrypoint 启动),行为与官方镜像一致。
+#==============================================================================
+COPY downloads/pw-browsers/ /root/.cache/ms-playwright/
+RUN sed -i 's/MINIBROWSER_FOLDER="minibrowser-wpe"/MINIBROWSER_FOLDER="minibrowser-gtk"/' \
+        /root/.cache/ms-playwright/webkit-*/pw_run.sh && \
+    chmod -R +x /root/.cache/ms-playwright/
+
+#==============================================================================
+# 5. agent-device SDK(纯 tarball,零运行时依赖)
+#==============================================================================
+COPY downloads/agent-device.tgz /tmp/agent-device.tgz
+RUN npm i -g /tmp/agent-device.tgz --omit=dev && \
+    rm -f /tmp/agent-device.tgz
+
+#==============================================================================
+# 5b. playwright npm 包 tarball(pw-init.sh 首跑离线装 node_modules 用;
+#     也可在线 npm install,这里避免容器首次跑测试时依赖外网)
+#==============================================================================
+COPY downloads/pw-tarballs/ /opt/pw-tarballs/
+
+#==============================================================================
+# 6. E2E 桥接层(Node 包,封装 agent-device CLI 调用)
+#==============================================================================
+COPY scripts/agy-e2e-bridge/ /usr/local/lib/node_modules/agy-e2e-bridge/
+RUN ln -sf /usr/local/lib/node_modules/agy-e2e-bridge/cli.js /usr/local/bin/agy-e2e && \
+    chmod +x /usr/local/lib/node_modules/agy-e2e-bridge/cli.js
+
+#==============================================================================
+# 6.5 Open-AutoGLM(智谱开源手机 GUI Agent: 截屏→VLM 决策→ADB 执行循环)
+#     - 纯 Python 框架,依赖 openai/Pillow/requests 离线 wheels
+#     - 模型端点运行时注入: AUTOGLM_BASE_URL / AUTOGLM_API_KEY / AUTOGLM_MODEL
+#     - 与 agy-e2e(确定性)互补: AutoGLM 负责自主探索式任务(黑盒 App 巡检)
+#==============================================================================
+COPY downloads/open-autoglm/ /opt/open-autoglm-src/
+COPY downloads/pip-wheels/ /tmp/pip-wheels/
+RUN python3 -m pip install --no-index --find-links=/tmp/pip-wheels \
+        openai Pillow requests \
+    && mkdir -p /opt/open-autoglm \
+    && tar -xzf /opt/open-autoglm-src/open-autoglm.tar.gz -C /opt/open-autoglm --strip-components=1 \
+    && cd /opt/open-autoglm && python3 -m pip install --no-index --no-deps -e . \
+    && rm -rf /tmp/pip-wheels /opt/open-autoglm-src
+ENV PYTHONPATH=/opt/open-autoglm:${PYTHONPATH}
+# Open-AutoGLM 模型端点(默认占位,运行时覆盖;示例指向智谱 GLM 视觉模型)
+ENV AUTOGLM_BASE_URL="https://open.bigmodel.cn/api/paas/v4" \
+    AUTOGLM_MODEL="glm-4.5v"
+
+#==============================================================================
+# 7. helper scripts
+#==============================================================================
+COPY scripts/start-emulator.sh /usr/local/bin/start-emulator.sh
+COPY scripts/adb-status.sh      /usr/local/bin/adb-status.sh
+COPY scripts/pw-init.sh         /usr/local/bin/pw-init.sh
+RUN chmod +x /usr/local/bin/start-emulator.sh \
+              /usr/local/bin/adb-status.sh \
+              /usr/local/bin/pw-init.sh
+
+#==============================================================================
+# 8. E2E entrypoint(覆盖基础 entrypoint,加 mihomo DIRECT 规则 + adb server + 可选 emulator)
+#==============================================================================
+COPY entrypoint.e2e.sh /usr/local/bin/entrypoint.sh
+RUN chmod +x /usr/local/bin/entrypoint.sh
+
+#==============================================================================
+# 9. e2e 目录占位(bind-mount ./workspace:/root/workspace 后,这些子目录自动可见)
+#==============================================================================
+RUN mkdir -p /root/workspace/e2e/reports/videos \
+                /root/workspace/e2e/reports/junit \
+                /root/workspace/e2e/traces \
+                /root/workspace/e2e/recordings \
+                /root/workspace/e2e/screenshots \
+                /root/workspace/e2e/artifacts \
+                /root/workspace/e2e/smoke && \
+    echo "# E2E artifacts (bind-mounted to ./workspace/e2e on host)" \
+        > /root/workspace/e2e/README.md
+
+WORKDIR /root/workspace
+
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
