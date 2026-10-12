@@ -59,7 +59,8 @@
       "expo-background-fetch",
       "expo-location",
       "expo-notifications",
-      "./plugins/withLocalCleartextAllowlist"
+      "./plugins/withLocalCleartextAllowlist",
+      "./plugins/withZeroTrustAntiReverse"
     ],
     "extra": {
       "deepLinks": {

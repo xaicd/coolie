@@ -253,8 +253,8 @@ export function ChatInput({
 
   // 微信/飞书动态手势识别器: 宽阔居中按压，支持连续跟手位移 (二维向量判定: 上滑/右滑转文字，左滑取消)
   const resolveGesture = useCallback((dx: number, dy: number): "send" | "cancel" | "transcribe" => {
-    if (dx < -35) return "cancel";
-    if (dx > 35 || dy < -35) return "transcribe";
+    if (dx < -30) return "cancel";
+    if (dx > 30 || dy < -30) return "transcribe";
     return "send";
   }, []);
 
@@ -328,7 +328,7 @@ export function ChatInput({
             // 左滑松手: 彻底取消
             onMicCancel?.();
           } else if (finalMode === "transcribe") {
-            // 上滑/右滑松手: 转文字并填入输入框，切回键盘模式
+            // 上滑/右滑松手: 立即转文字并填入输入框，切回键盘模式
             onMicPressOut?.("transcribe");
             setInputMode("text");
           } else {
@@ -362,9 +362,9 @@ export function ChatInput({
 
   return (
     <View style={styles.wrapper} testID="ChatInput__Wrapper">
-      {/* ── 全屏/半屏沉浸式动态手势 HUD 浮层 ── */}
+      {/* ── 全屏/半屏沉浸式动态手势 HUD 浮层 (pointerEvents='none' 防止拦截底层 PanResponder 触摸事件) ── */}
       {recording ? (
-        <View style={styles.hudOverlay} testID="ChatInput__VoiceHUD">
+        <View style={styles.hudOverlay} pointerEvents="none" testID="ChatInput__VoiceHUD">
           <View style={styles.hudCard}>
             {/* 顶部: 动态秒表与计时 */}
             <View style={styles.hudHeaderRow}>

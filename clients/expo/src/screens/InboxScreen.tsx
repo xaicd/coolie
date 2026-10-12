@@ -1166,14 +1166,32 @@ export function InboxScreen({
     [agentNameById],
   );
 
+  // 🛡️ 核心修复: 点进工单自动置为已读并递减铃铛红点
+  const handleOpenIssueAndMarkRead = useCallback(
+    (issue: Issue) => {
+      if (getIsUnread(issue)) {
+        setReadIds((prev) => new Set(prev).add(issue.id));
+        setUnreadIds((prev) => {
+          const next = new Set(prev);
+          next.delete(issue.id);
+          return next;
+        });
+        void coolie.markIssueRead(issue.id).catch(() => null);
+        void useNotificationsStore.getState().markRead(issue.id).catch(() => null);
+      }
+      onOpenIssue(issue);
+    },
+    [getIsUnread, onOpenIssue],
+  );
+
   const openMention = useCallback(
     (item: InboxMentionItem) => {
       const known = issueById.get(item.issueId);
       if (known) {
-        onOpenIssue(known);
+        handleOpenIssueAndMarkRead(known);
         return;
       }
-      onOpenIssue({
+      handleOpenIssueAndMarkRead({
         id: item.issueId,
         title: item.issueTitle,
         status: "todo",
@@ -1181,7 +1199,7 @@ export function InboxScreen({
         companyId: company.id,
       } as Issue);
     },
-    [issueById, onOpenIssue, company.id],
+    [issueById, handleOpenIssueAndMarkRead, company.id],
   );
 
   // P0-4: 全部标记为已读
@@ -1444,11 +1462,11 @@ export function InboxScreen({
               ) : blockedGroupBy === "none" ? (
                 <View style={styles.section}>
                   <Text style={styles.sectionTitle}>阻塞任务 ({blockedRows.length})</Text>
-                  {sortBlockedRows(blockedRows, blockedSortBy).map((row) => (
+                   {sortBlockedRows(blockedRows, blockedSortBy).map((row) => (
                     <BlockedRow
                       key={row.issue.id}
                       row={row}
-                      onPress={() => onOpenIssue(row.issue)}
+                      onPress={() => handleOpenIssueAndMarkRead(row.issue)}
                       onLongPress={() => setActionIssue(row.issue)}
                     />
                   ))}
@@ -1463,7 +1481,7 @@ export function InboxScreen({
                       <BlockedRow
                         key={row.issue.id}
                         row={row}
-                        onPress={() => onOpenIssue(row.issue)}
+                        onPress={() => handleOpenIssueAndMarkRead(row.issue)}
                         onLongPress={() => setActionIssue(row.issue)}
                       />
                     ))}
@@ -1507,7 +1525,7 @@ export function InboxScreen({
                         projectName={
                           issue.projectId ? projectNameById.get(issue.projectId) ?? null : null
                         }
-                        onPress={() => onOpenIssue(issue)}
+                        onPress={() => handleOpenIssueAndMarkRead(issue)}
                         onLongPress={() => setActionIssue(issue)}
                       />
                     </SwipeToArchive>
@@ -1560,7 +1578,7 @@ export function InboxScreen({
                         const known =
                           (runIssueId ? issueById.get(runIssueId) : undefined) ??
                           issueById.get(item.run.id);
-                        if (known) onOpenIssue(known);
+                        if (known) handleOpenIssueAndMarkRead(known);
                         else onOpenWorkshop?.();
                       }}
                     />
@@ -1755,7 +1773,7 @@ export function InboxScreen({
               onPress={() => {
                 const issue = actionIssue;
                 setActionIssue(null);
-                if (issue) onOpenIssue(issue);
+                if (issue) handleOpenIssueAndMarkRead(issue);
               }}
             />
             <SheetItem

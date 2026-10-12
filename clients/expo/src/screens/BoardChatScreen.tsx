@@ -17,6 +17,7 @@ import {
   View,
   StatusBar as RNStatusBar,
   Modal,
+  ToastAndroid,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { isAsrNotConfigured, isRenderableBoardMessage } from "@coolie/api-client";
@@ -862,7 +863,10 @@ export function BoardChatScreen({
     setVoiceStatus(action === "send" ? "识别发送中…" : "识别转文字中…");
     try {
       const started = await press.promise;
-      if (!started) return;
+      if (!started) {
+        await forceStop();
+        return;
+      }
 
       const { base64, format } = await stopRecording();
       if (!base64) {
@@ -894,17 +898,27 @@ export function BoardChatScreen({
           // 右滑松开: 转为文字填入输入框，让用户编辑确认
           setInput((prev) => (prev ? `${prev} ${text}` : text));
           pushSystemEcho(`🎤 已转为文字: ${text}`);
+          if (Platform.OS === "android") {
+            ToastAndroid.show("已转文字并填入输入框", ToastAndroid.SHORT);
+          }
         }
       } else {
         pushSystemEcho("🎤 没听清, 请再说一次");
+        if (Platform.OS === "android") {
+          ToastAndroid.show("未识别到文字，请重试", ToastAndroid.SHORT);
+        }
       }
     } catch (e) {
       if (isAsrNotConfigured(e)) {
         pushSystemEcho("🎤 语音未配置: 该实例尚未配置腾讯 ASR 凭据, 请改用文字输入");
+        if (Platform.OS === "android") {
+          ToastAndroid.show("语音未配置，请打字输入", ToastAndroid.SHORT);
+        }
       } else {
         pushSystemEcho(`🎤 转写失败: ${String((e as Error)?.message ?? e)}`);
       }
     } finally {
+      await forceStop().catch(() => null);
       setVoiceBusy(false);
       setVoiceStatus(null);
     }

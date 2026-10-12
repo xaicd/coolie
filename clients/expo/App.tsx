@@ -53,6 +53,7 @@ import { ErrorRetry } from "./src/ui/ErrorRetry";
 import { LoadingState } from "./src/ui/LoadingState";
 import { ScreenHeader } from "./src/ui/ScreenHeader";
 import { Sheet } from "./src/ui/Sheet";
+import { performStartupSecurityAudit } from "./src/services/securityGuard";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { InboxScreen } from "./src/screens/InboxScreen";
 import { CodeDiffScreen } from "./src/screens/CodeDiffScreen";
@@ -240,6 +241,8 @@ export default function App() {
   const [pendingDemo, setPendingDemo] = useState(false);
 
   useEffect(() => {
+    // 🛡️ 顶层入口触发零信任端云联动防破壳自检
+    void performStartupSecurityAudit();
     void restoreCredential().then(setCredential);
     const unsub = setupOTAListener();
     // 启动即预热 version.json 缓存：登录前 WhatsNew / 登录后 HomeScreen 的升级
@@ -764,6 +767,13 @@ function HomeScreen({
   }, []);
 
   const [selected, setSelected] = useState<Issue | null>(null);
+  const handleOpenIssue = useCallback((issue: Issue | null) => {
+    setSelected(issue);
+    if (issue?.id) {
+      void coolie.markIssueRead(issue.id).catch(() => null);
+      void useNotificationsStore.getState().markRead(issue.id).catch(() => null);
+    }
+  }, []);
   const [focusedApprovalId, setFocusedApprovalId] = useState<string | null>(null);
   // wave153 — App 端 spec 编辑器 (3 步: 需求/缺陷 → 设计 → 任务)
   const [specIssue, setSpecIssue] = useState<Issue | null>(null);
@@ -1039,7 +1049,7 @@ function HomeScreen({
               agent={agentDetail}
               onBack={() => setAgentDetail(null)}
               onOpenIssue={(issueItem) => {
-                setSelected(issueItem);
+                handleOpenIssue(issueItem);
               }}
             />
           ) : searchOpen ? (
@@ -1047,7 +1057,7 @@ function HomeScreen({
               company={company}
               onBack={() => setSearchOpen(false)}
               onOpenIssue={(issueItem) => {
-                setSelected(issueItem);
+                handleOpenIssue(issueItem);
               }}
               onOpenAgent={(agent: SearchAgentResult) => {
                 setAgentDetail(agent);
@@ -1059,7 +1069,7 @@ function HomeScreen({
               initialTab={inboxInitialTab}
               onBack={() => setNotificationsOpen(false)}
               onOpenIssue={(issueItem) => {
-                setSelected(issueItem);
+                handleOpenIssue(issueItem);
               }}
               onOpenApproval={(approvalId) => {
                 setFocusedApprovalId(approvalId);
@@ -1082,7 +1092,7 @@ function HomeScreen({
               company={company}
               onBack={() => setPlansOpen(false)}
               onOpenPlan={(issue) => {
-                setSelected(issue);
+                handleOpenIssue(issue);
               }}
             />
           ) : projectsOpen ? (
@@ -1173,7 +1183,7 @@ function HomeScreen({
                 setFocusedApprovalId(approvalId);
               }}
               onOpenIssue={(issue) => {
-                setSelected(issue);
+                handleOpenIssue(issue);
               }}
             />
           ) : tab === "chat" ? (
@@ -1191,7 +1201,7 @@ function HomeScreen({
                   setNotificationsOpen(true);
                 }}
                 onOpenIssue={(issue) => {
-                  setSelected(issue);
+                  handleOpenIssue(issue);
                 }}
                 onOpenSandbox={(scope) => {
                   setSandboxContext({
@@ -1210,7 +1220,7 @@ function HomeScreen({
                   });
                 }}
                 onOpenPlan={(issue) => {
-                  setSelected(issue);
+                  handleOpenIssue(issue);
                 }}
               />
             </ScreenErrorBoundary>
