@@ -116,7 +116,7 @@ if [[ -z "$SESSION" ]]; then
   SESSION="$(basename "$CWD")-$AGENT"
 fi
 
-# 3. 动态继承与解析凭据 (智谱 GLM 反向代理)
+# 3. 动态继承与解析凭据 (智谱 GLM 反向代理及本地 Claude 配置)
 export ANTHROPIC_BASE_URL="${ANTHROPIC_BASE_URL:-https://open.bigmodel.cn/api/anthropic}"
 if [ -z "$ANTHROPIC_AUTH_TOKEN" ]; then
   if [ -n "$ANTHROPIC_API_KEY" ]; then
@@ -129,15 +129,45 @@ if [ -z "$ANTHROPIC_AUTH_TOKEN" ]; then
   elif [ -f "$HOME/.coolie-dev/env" ]; then
     token="$(grep -E "^(ANTHROPIC_AUTH_TOKEN|ANTHROPIC_API_KEY|GLM_API_KEY)=" "$HOME/.coolie-dev/env" 2>/dev/null | head -n 1 | cut -d '=' -f2- | tr -d ' "\r')"
     [ -n "$token" ] && export ANTHROPIC_AUTH_TOKEN="$token"
+  elif [ -f "$HOME/.claude/settings.jsonglm" ]; then
+    token="$(grep -E '"ANTHROPIC_AUTH_TOKEN":' "$HOME/.claude/settings.jsonglm" 2>/dev/null | head -n 1 | cut -d ':' -f2- | tr -d ' ",\r')"
+    [ -n "$token" ] && export ANTHROPIC_AUTH_TOKEN="$token"
+  elif [ -f "$HOME/.claude/settings.json" ]; then
+    token="$(grep -E '"ANTHROPIC_AUTH_TOKEN":' "$HOME/.claude/settings.json" 2>/dev/null | head -n 1 | cut -d ':' -f2- | tr -d ' ",\r')"
+    [ -n "$token" ] && export ANTHROPIC_AUTH_TOKEN="$token"
   elif command -v security >/dev/null 2>&1; then
     token="$(security find-generic-password -s 'paperclip-zhipu-glm' -w 2>/dev/null || echo '')"
     [ -n "$token" ] && export ANTHROPIC_AUTH_TOKEN="$token"
   fi
 fi
 
+# 4. 角色与引擎自适应路由 (自动对齐 7 工具池中的 ACP 支持)
+CUSTOM_AGENT_CMD=""
+if [[ "$ENGINE" == "auto" || "$ENGINE" == "claude" ]]; then
+  if [[ "$AGENT" =~ (modou|fda) ]]; then
+    # 墨斗默认走 agy (Antigravity)
+    ADAPTER_SH="$SCRIPT_DIR/adapters/docker-agy-acp.sh"
+    [ ! -f "$ADAPTER_SH" ] && ADAPTER_SH="$(dirname "$SCRIPT_DIR")/scripts/adapters/docker-agy-acp.sh"
+    if [ -x "$ADAPTER_SH" ]; then
+      CUSTOM_AGENT_CMD="$ADAPTER_SH"
+      ENGINE="agy"
+    fi
+  elif command -v cmd >/dev/null 2>&1; then
+    # 宿主机存在 cmd 且支持原生 ACP (cmd acp)，优先走 cmd 免去 Anthropic model catalog 校验死锁
+    CUSTOM_AGENT_CMD="cmd acp"
+    ENGINE="cmd"
+  fi
+elif [[ "$ENGINE" == "cmd" ]]; then
+  CUSTOM_AGENT_CMD="cmd acp"
+elif [[ "$ENGINE" == "agy" ]]; then
+  ADAPTER_SH="$SCRIPT_DIR/adapters/docker-agy-acp.sh"
+  [ ! -f "$ADAPTER_SH" ] && ADAPTER_SH="$(dirname "$SCRIPT_DIR")/scripts/adapters/docker-agy-acp.sh"
+  CUSTOM_AGENT_CMD="$ADAPTER_SH"
+fi
+
 echo "=== Hermes ACPX 全双工协议派工 ===" 
 echo "  AGENT       = $AGENT"
-echo "  ENGINE      = $ENGINE"
+echo "  ENGINE      = $ENGINE ${CUSTOM_AGENT_CMD:+(via: $CUSTOM_AGENT_CMD)}"
 echo "  SESSION     = $SESSION"
 echo "  ACPX_BIN    = $ACPX"
 echo "  CWD         = $CWD"
@@ -159,24 +189,35 @@ log_issue_comment() {
   fi
 }
 
-log_issue_comment "🚀 [Hermes ACPX 派工] 员工「$AGENT」已就绪，正在通过全双工 ACPX 引擎执行指令：$PROMPT"
+log_issue_comment "🚀 [Hermes ACPX 派工] 员工「$AGENT」已就绪，正在通过全双工 ACPX 引擎 ($ENGINE) 执行指令：$PROMPT"
 
-# 4. 确保 ACPX 会话存在 (自动创建或复用)
-"$ACPX" "$ENGINE" sessions ensure --name "$SESSION" >/dev/null 2>&1 || true
-
-# 5. 真调 acpx 执行 Prompt
+# 5. 执行 ACPX
 set +e
-"$ACPX" \
-  $APPROVE_ALL \
-  --auth-policy skip \
-  --format "$FORMAT" \
-  --max-turns 9999 \
-  --timeout "$TIMEOUT" \
-  --append-system-prompt "你是 Coolie 工坊全自主数字员工「$AGENT」。Hermes 掌柜派工如下。请遵循 CMMI 0-1 软件工程资产规范直接执行，不调外部 Agent 工具，不派 sub-agent。完成后报送 commit 与改动摘要。" \
-  "$ENGINE" \
-  -s "$SESSION" \
-  prompt "$PROMPT"
-EXIT_CODE=$?
+if [ -n "$CUSTOM_AGENT_CMD" ]; then
+  "$ACPX" \
+    $APPROVE_ALL \
+    --auth-policy skip \
+    --format "$FORMAT" \
+    --timeout "$TIMEOUT" \
+    --agent "$CUSTOM_AGENT_CMD" \
+    exec "$PROMPT"
+  EXIT_CODE=$?
+else
+  # 确保 ACPX 会话存在 (自动创建或复用)
+  "$ACPX" "$ENGINE" sessions ensure --name "$SESSION" >/dev/null 2>&1 || true
+
+  "$ACPX" \
+    $APPROVE_ALL \
+    --auth-policy skip \
+    --format "$FORMAT" \
+    --max-turns 9999 \
+    --timeout "$TIMEOUT" \
+    --append-system-prompt "你是 Coolie 工坊全自主数字员工「$AGENT」。Hermes 掌柜派工如下。请遵循 CMMI 0-1 软件工程资产规范直接执行，不调外部 Agent 工具，不派 sub-agent。完成后报送 commit 与改动摘要。" \
+    "$ENGINE" \
+    -s "$SESSION" \
+    prompt "$PROMPT"
+  EXIT_CODE=$?
+fi
 set -e
 
 if [ $EXIT_CODE -eq 0 ]; then

@@ -145,18 +145,14 @@ echo "✅ Dev Server 健康检查通过！"
 echo "🏢 [5/6] 检查并初始化本地施工总社企业与员工资产..."
 node "$SCRIPT_DIR/init-local-workshop.mjs"
 
-# 6. 启动 Runner Bridge 并注册看门狗
-echo "⚡ [6/6] 启动 Runner Bridge 异步消费守护进程与保活看门狗..."
-bash "$SCRIPT_DIR/coolie-task-runner-bridge.sh" --stop >/dev/null 2>&1 || true
-bash "$SCRIPT_DIR/coolie-task-runner-bridge.sh" --start
+# 6. 验证 ACPX 全双工协议总线
+echo "⚡ [6/6] 验证 ACPX 全双工协议总线..."
+if command -v acpx >/dev/null 2>&1; then
+  echo "✅ ACPX CLI: $(command -v acpx) ($(acpx -V 2>/dev/null || echo '0.12.0'))"
+else
+  echo "⚠️ 宿主机未检测到全局 acpx，请确保 /opt/homebrew/bin/acpx 或 node_modules/.bin/acpx 可用"
+fi
 
-# 注册看门狗到 crontab
-CRON_TAG="wave297-runner-bridge"
-WATCHDOG_CMD="*/5 * * * * bash $REPO_ROOT/scripts/coolie-task-runner-bridge.sh --check >/dev/null 2>&1 || bash $REPO_ROOT/scripts/coolie-task-runner-bridge.sh --start >/dev/null 2>&1 # $CRON_TAG"
-EXISTING_CRON="$(crontab -l 2>/dev/null || true)"
-if ! printf '%s\n' "$EXISTING_CRON" | grep -q "$CRON_TAG"; then
-  printf '%s\n%s\n' "$EXISTING_CRON" "$WATCHDOG_CMD" | grep -v '^$' | crontab -
-  echo "✅ 已向 crontab 注册 5 分钟 Runner Bridge 看门狗保活"
 # 7. 运行 7 工具池实时健康探针
 if [[ -f "$SCRIPT_DIR/tool-health-monitor.sh" ]]; then
   echo ""
@@ -170,7 +166,7 @@ echo "🎉 [部署成功] Coolie 本地工坊与派单调度体系已就绪！"
 echo "=================================================================="
 echo "📊 控制面板 URL:   $HOST_API_BASE"
 echo "📋 工单查询命令:   node scripts/coolie-dev-task.mjs list"
-echo "⚡ 模拟派单命令:   bash scripts/hermes-boss-intent-dispatcher.sh '<需求一句话>'"
+echo "⚡ 微信派单引擎:   bash scripts/hermes-boss-intent-dispatcher.sh '<需求一句话>'"
+echo "🚀 ACPX 派工通道:  bash scripts/hermes-acpx-dispatch.sh --agent tiejiang --prompt '<指令>'"
 echo "🔍 团队状态监控:   bash scripts/cron-team-status.sh --print"
-echo "🛠️ Runner 状态:    bash scripts/coolie-task-runner-bridge.sh --status"
 echo "=================================================================="
