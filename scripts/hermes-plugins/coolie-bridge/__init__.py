@@ -21,7 +21,7 @@ from typing import Any, Dict, Optional
 logger = logging.getLogger("hermes.plugins.coolie_bridge")
 
 COOLIE_API_URL = os.environ.get("COOLIE_API_URL", "http://127.0.0.1:3100")
-STREAM_TIMEOUT_SECONDS = float(os.environ.get("COOLIE_STREAM_TIMEOUT", "120.0"))
+STREAM_TIMEOUT_SECONDS = float(os.environ.get("COOLIE_STREAM_TIMEOUT", "600.0"))
 COOLIE_COMPANY_ID = os.environ.get("COOLIE_COMPANY_ID", "").strip() or None
 COOLIE_PROJECT_ID = os.environ.get("COOLIE_PROJECT_ID", "").strip() or None
 COOLIE_CONVERSATION_ID = os.environ.get("COOLIE_CONVERSATION_ID", "").strip() or None

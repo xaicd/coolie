@@ -1785,12 +1785,12 @@ export function boardChatRoutes(
     // BOARD_CHAT_MODEL=<glm model> in the service env, with no code change.
     const timeoutMs = (() => {
       const raw = Number(process.env.PAPERCLIP_BOARD_CHAT_TIMEOUT_MS);
-      return Number.isFinite(raw) && raw > 0 ? raw : 180_000;
+      return Number.isFinite(raw) && raw > 0 ? raw : 600_000;
     })();
 
     const firstTokenTimeoutMs = (() => {
       const raw = Number(process.env.PAPERCLIP_BOARD_CHAT_FIRST_TOKEN_TIMEOUT_MS);
-      return Number.isFinite(raw) && raw > 0 ? raw : 60_000;
+      return Number.isFinite(raw) && raw > 0 ? raw : 300_000;
     })();
 
     liveBoardChats += 1;
@@ -1997,11 +1997,21 @@ export function boardChatRoutes(
       killChild("SIGTERM");
     }, timeoutMs);
 
-    const firstTokenWatchdog = setTimeout(() => {
+    let firstTokenWatchdog: NodeJS.Timeout | null = setTimeout(() => {
       if (sawStdout) return;
       firstTokenTimedOut = true;
       killChild("SIGTERM");
     }, firstTokenTimeoutMs);
+
+    const resetFirstTokenWatchdog = () => {
+      if (sawStdout) return;
+      if (firstTokenWatchdog) clearTimeout(firstTokenWatchdog);
+      firstTokenWatchdog = setTimeout(() => {
+        if (sawStdout) return;
+        firstTokenTimedOut = true;
+        killChild("SIGTERM");
+      }, firstTokenTimeoutMs);
+    };
 
     // wave144: keep the SSE connection warm. A byte-idle stream can be dropped
     // by an intermediary, and RN's fetch gives the caller no way to tell a dead
@@ -2014,7 +2024,10 @@ export function boardChatRoutes(
 
     const cleanupTimers = () => {
       clearTimeout(timeout);
-      clearTimeout(firstTokenWatchdog);
+      if (firstTokenWatchdog) {
+        clearTimeout(firstTokenWatchdog);
+        firstTokenWatchdog = null;
+      }
       if (killGrace) clearTimeout(killGrace);
       clearInterval(heartbeat);
     };
@@ -2068,7 +2081,10 @@ export function boardChatRoutes(
       // first-token watchdog stands down.
       if (!sawStdout) {
         sawStdout = true;
-        clearTimeout(firstTokenWatchdog);
+        if (firstTokenWatchdog) {
+          clearTimeout(firstTokenWatchdog);
+          firstTokenWatchdog = null;
+        }
       }
       stdoutBuf += data.toString();
       const lines = stdoutBuf.split("\n");
@@ -2119,6 +2135,10 @@ export function boardChatRoutes(
       // Keep the tail: the terminal error line is the last thing written.
       stderrBuf = (stderrBuf + text).slice(-4000);
       console.error("[board/chat/stream stderr]", text);
+      // Hermes 在执行多轮工具/终端命令时，stdout 会被 --quiet 压制直到全部完成，
+      // 但 stderr 会持续吐出工具执行进度 (如 tool terminal completed / API call)。
+      // 只要 stderr 保持活跃，就证明子进程并未死锁，动态重置首 token 超时守卫。
+      resetFirstTokenWatchdog();
     });
 
     proc.on("close", async (exitCode, signal) => {

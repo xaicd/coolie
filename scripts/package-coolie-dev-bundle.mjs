@@ -457,6 +457,8 @@ export PAPERCLIP_MIGRATION_AUTO_APPLY="true"
 export PAPERCLIP_DEPLOYMENT_MODE="local_trusted"
 export PAPERCLIP_DEPLOYMENT_EXPOSURE="private"
 export COOLIE_ENABLE_BOARD_CHAT="\${COOLIE_ENABLE_BOARD_CHAT:-true}"
+export PAPERCLIP_BOARD_CHAT_FIRST_TOKEN_TIMEOUT_MS="\${PAPERCLIP_BOARD_CHAT_FIRST_TOKEN_TIMEOUT_MS:-300000}"
+export PAPERCLIP_BOARD_CHAT_TIMEOUT_MS="\${PAPERCLIP_BOARD_CHAT_TIMEOUT_MS:-600000}"
 export NODE_ENV="production"
 
 cd "$COOLIE_HOME/lib/server"
@@ -479,7 +481,7 @@ case "$ACTION" in
                 ln -sfn "$BRIDGE_SRC" "$BRIDGE_DEST"
                 echo "✅ 已成功安装 Hermes Gateway -> Coolie-dev 准入桥接插件: $BRIDGE_DEST"
 
-                # 确保 Hermes 激活 coolie-bridge 并在配置中延长 hook 超时以防深度态势检索中断
+                # 确保 Hermes 激活 coolie-bridge 并在配置中延长 hook 超时以防深度态势检索与工具执行中断
                 if command -v hermes >/dev/null 2>&1; then
                     hermes plugins enable coolie-bridge 2>/dev/null || true
                 elif [ -x "$HOME/.hermes/hermes-agent/.hermes/bin/hermes" ]; then
@@ -492,7 +494,9 @@ case "$ACTION" in
                             sed -i "/enabled:/a \ \ \ \ - coolie-bridge" "$CFG_FILE" 2>/dev/null || true
                         fi
                         if ! grep -q "hook_callback_timeout:" "$CFG_FILE"; then
-                            sed -i "/plugins:/a \ \ hook_callback_timeout: 180.0" "$CFG_FILE" 2>/dev/null || true
+                            sed -i "/plugins:/a \ \ hook_callback_timeout: 600.0" "$CFG_FILE" 2>/dev/null || true
+                        else
+                            sed -i "s/hook_callback_timeout:.*/hook_callback_timeout: 600.0/" "$CFG_FILE" 2>/dev/null || true
                         fi
                     fi
                 fi
