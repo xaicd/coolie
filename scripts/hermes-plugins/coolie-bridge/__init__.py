@@ -106,6 +106,22 @@ async def _stream_coolie_board_chat(text: str, platform: str, session_key: str) 
     return await asyncio.to_thread(_sync_stream_coolie, endpoint, headers, payload, STREAM_TIMEOUT_SECONDS)
 
 
+def _find_active_adapter(platform_str: str) -> Any:
+    """Finds the active platform adapter in the running Hermes Gateway process."""
+    try:
+        import gc
+        for obj in gc.get_objects():
+            if type(obj).__name__ == "GatewayRunner":
+                adapters = getattr(obj, "adapters", {})
+                for p, adapter in adapters.items():
+                    p_name = getattr(p, "value", str(p)).lower()
+                    if p_name == platform_str.lower() or platform_str.lower() in p_name:
+                        return adapter
+    except Exception:
+        pass
+    return None
+
+
 async def on_post_gateway_admission(
     session_key: str = "",
     platform: str = "",
@@ -132,7 +148,32 @@ async def on_post_gateway_admission(
         platform, session_key, len(clean_text)
     )
 
-    reply = await _stream_coolie_board_chat(clean_text, platform, session_key)
+    # 启动即时打字指示器 (Typing Indicator Loop): 在等待 Coolie-dev 回复期间持续提示“正在输入...”，消除等候空白
+    chat_id = None
+    if isinstance(source, dict):
+        chat_id = source.get("chat_id")
+    elif hasattr(source, "chat_id"):
+        chat_id = getattr(source, "chat_id")
+
+    adapter = _find_active_adapter(platform) if chat_id else None
+    typing_task = None
+    if adapter and hasattr(adapter, "send_typing"):
+        async def _keep_typing():
+            while True:
+                try:
+                    await adapter.send_typing(chat_id)
+                except Exception:
+                    pass
+                await asyncio.sleep(4.0)
+
+        typing_task = asyncio.create_task(_keep_typing())
+
+    try:
+        reply = await _stream_coolie_board_chat(clean_text, platform, session_key)
+    finally:
+        if typing_task:
+            typing_task.cancel()
+
     if reply:
         logger.info("[coolie-bridge] Successfully handled message via Coolie-dev (reply len: %d)", len(reply))
         return {
