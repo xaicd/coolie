@@ -14,11 +14,9 @@ import { reconcileSafeNativeReplacements } from "./services/native-runtime/nativ
 import { reconcileAbandonedExecutionControl } from "./services/execution-control-reconciliation.js";
 import { EXECUTION_RECONCILIATION_INTERVAL_MS } from "./services/execution-control-deadline.js";
 import { connectionIntentDeliveryService } from "./services/connection-intent-delivery.js";
-import { existsSync, readFileSync, rmSync, writeFileSync, mkdirSync } from "node:fs";
+import { existsSync, readFileSync, rmSync } from "node:fs";
 import { createServer } from "node:http";
 import { resolve } from "node:path";
-import crypto from "node:crypto";
-import { resolvePaperclipInstanceRoot } from "./home-paths.js";
 import { createInterface } from "node:readline/promises";
 import { stdin, stdout } from "node:process";
 import { pathToFileURL } from "node:url";
@@ -700,24 +698,6 @@ async function startServerWithDatabaseTeardown(
     | undefined;
   if (config.deploymentMode === "local_trusted") {
     await ensureLocalTrustedBoardPrincipal(db as any);
-    if (!process.env.PAPERCLIP_API_KEY) {
-      try {
-        const instanceRoot = resolvePaperclipInstanceRoot();
-        const keyFile = resolve(instanceRoot, "board-api-key.txt");
-        if (existsSync(keyFile)) {
-          process.env.PAPERCLIP_API_KEY = readFileSync(keyFile, "utf8").trim();
-        } else {
-          const generatedKey = `coolie_dev_${crypto.randomBytes(16).toString("hex")}`;
-          mkdirSync(instanceRoot, { recursive: true });
-          writeFileSync(keyFile, generatedKey, "utf8");
-          process.env.PAPERCLIP_API_KEY = generatedKey;
-        }
-        logger.info({ keyFile }, "Local trusted Board API key initialized");
-      } catch (err) {
-        process.env.PAPERCLIP_API_KEY = "coolie_local_trusted_board_key";
-        logger.warn({ err }, "Failed to persist local trusted board API key, used fallback key");
-      }
-    }
   }
   const accessBackfill = await backfillPrincipalAccessCompatibility(db as any);
   if (accessBackfill.agentMembershipsInserted > 0 || accessBackfill.humanGrantsInserted > 0) {
