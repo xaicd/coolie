@@ -2208,7 +2208,7 @@ export function BoardChatScreen({
                   onPress={openNewConversation}
                   hitSlop={8}
                   accessibilityRole="button"
-                  accessibilityLabel="新建对话"
+                  accessibilityLabel="新建"
                   style={styles.convNewBtn}
                 >
                   <Ionicons name="add" size={16} color={C.ink} />
@@ -2251,7 +2251,7 @@ export function BoardChatScreen({
                           hitSlop={8}
                           onPress={() => handleConversationActions(conversation)}
                           accessibilityRole="button"
-                          accessibilityLabel="对话操作"
+                          accessibilityLabel="操作"
                         >
                           <Ionicons name="ellipsis-horizontal" size={16} color={C.ink4} />
                         </Pressable>

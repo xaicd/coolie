@@ -107,19 +107,19 @@ export const TasksScreenFilters = memo(function TasksScreenFilters(
         contentContainerStyle={styles.chipRow}
       >
         <Chip
-          label={`指派 · ${assigneeLabel}`}
+          label={assigneeLabel === "全部" ? "指派" : assigneeLabel}
           active={false}
           chevron
           onPress={() => onOpenSheet("assignee")}
         />
         <Chip
-          label={`项目 · ${projectLabel}`}
+          label={projectLabel === "全部项目" ? "项目" : projectLabel}
           active={false}
           chevron
           onPress={() => onOpenSheet("project")}
         />
         <Chip
-          label={`排序 · ${sortLabel}`}
+          label="排序"
           active={false}
           chevron
           onPress={() => onOpenSheet("sort")}

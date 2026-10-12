@@ -29,6 +29,7 @@ import { AppCard } from "../ui/AppCard";
 import { ErrorRetry } from "../ui/ErrorRetry";
 import { KeyValueRow } from "../ui/KeyValueRow";
 import { LoadingState } from "../ui/LoadingState";
+import { FoldableText } from "../ui/FoldableText";
 import { Pill } from "../ui/Pill";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { SectionHeader } from "../ui/SectionHeader";
@@ -272,7 +273,7 @@ export function TaskDetailScreen({
             <Pressable
               onPress={() => setPickerOpen(true)}
               accessibilityRole="button"
-              accessibilityLabel={`分配智能体: ${assigneeName}`}
+              accessibilityLabel="指派"
               style={({ pressed }) => [
                 styles.assigneeRow,
                 pressed && styles.assigneeRowPressed,
@@ -300,7 +301,12 @@ export function TaskDetailScreen({
             <View style={styles.section}>
               <SectionHeader title="描述" />
               <AppCard padding={16} style={styles.descriptionCard}>
-                <Text style={styles.description}>{currentIssue.description}</Text>
+                <FoldableText
+                  text={currentIssue.description}
+                  maxLines={3}
+                  threshold={90}
+                  style={styles.description}
+                />
               </AppCard>
             </View>
           ) : null}
@@ -364,7 +370,7 @@ export function TaskDetailScreen({
                 <Pressable
                   style={[styles.btnGhost, { flex: 1 }]}
                   onPress={() => onOpenSpec(issue)}
-                  accessibilityLabel="打开规范"
+                  accessibilityLabel="规范"
                 >
                   <Ionicons name="documents-outline" size={16} color={C.accent} />
                   <Text style={styles.btnGhostText}>规范</Text>
@@ -410,7 +416,12 @@ export function TaskDetailScreen({
                           <Text style={styles.commentAuthor}>{author}</Text>
                           <Text style={styles.commentTime}>{formatRelativeTime(comment.createdAt)}</Text>
                         </View>
-                        <Text style={styles.commentBody}>{comment.body}</Text>
+                        <FoldableText
+                          text={comment.body}
+                          maxLines={3}
+                          threshold={120}
+                          style={styles.commentBody}
+                        />
                         <Text style={styles.commentStamp}>{formatDateTime(comment.createdAt)}</Text>
                       </View>
                     </View>

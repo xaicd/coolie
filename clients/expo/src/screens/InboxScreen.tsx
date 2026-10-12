@@ -39,6 +39,7 @@ import { LoadingState } from "../ui/LoadingState";
 import { Pill } from "../ui/Pill";
 import { ELEVATION, RADIUS, SPACING } from "../ui/tokens";
 import { formatRelativeShort, formatRelativeTime } from "../utils/format";
+import { isWakePayloadText } from "../utils/sanitize";
 import {
   ISSUE_PRIORITIES,
   ISSUE_STATUSES,
@@ -778,8 +779,9 @@ export function InboxScreen({
       items.push({ kind: "failed_run", id: failure.id, run: failure, timestamp: Number.isFinite(ts) ? ts : 0 });
     }
 
-    // 4. @我 提及流
+    // 4. @我 提及流 (过滤 Paperclip Wake Payload 调试载荷, 防 raw JSON 泄露)
     for (const mention of mentions) {
+      if (isWakePayloadText(mention.body)) continue;
       const ts = new Date(mention.createdAt).getTime();
       items.push({ kind: "mention", id: mention.id, mention, timestamp: Number.isFinite(ts) ? ts : 0 });
     }
@@ -889,6 +891,8 @@ export function InboxScreen({
     const items: MobileInboxWorkItem[] = [];
     for (const n of notifItems) {
       if (n.read) continue;
+      // P0-1: 丢弃 Paperclip Wake Payload 调试载荷通知, 杜绝 raw JSON 泄露
+      if (isWakePayloadText(n.body)) continue;
       const ts = new Date(n.createdAt).getTime();
       const rawId = n.id.includes(":") ? n.id.split(":").pop()! : n.id;
       // 乐观过滤：若已在本地已读集合中，即刻跳过，实现退出详情时未读列表秒级扣减
@@ -997,6 +1001,7 @@ export function InboxScreen({
 
     if (showMentions) {
       for (const mention of mentions) {
+        if (isWakePayloadText(mention.body)) continue;
         const ts = new Date(mention.createdAt).getTime();
         items.push({
           kind: "mention",
@@ -1421,7 +1426,7 @@ export function InboxScreen({
           <Pressable
             onPress={() => setMarkAllConfirmOpen(true)}
             style={styles.markReadBtn}
-            accessibilityLabel="全部标为已读"
+            accessibilityLabel="全读"
           >
             <Ionicons name="checkmark-done" size={13} color="#FFFFFF" />
             <Text style={styles.markReadBtnText}>全读</Text>
@@ -1638,7 +1643,7 @@ export function InboxScreen({
                       <Text style={styles.rowTitle} numberOfLines={1}>
                         {item.mention.issueTitle}
                       </Text>
-                      <Text style={styles.mentionBody} numberOfLines={2}>
+                      <Text style={styles.mentionBody} numberOfLines={2} ellipsizeMode="tail">
                         {item.mention.body}
                       </Text>
                     </AppCard>
@@ -2194,7 +2199,9 @@ function AlertRow({
         <Ionicons name={isErr ? "alert-circle" : "warning"} size={16} color={isErr ? C.err : C.warn} />
         <Text style={styles.alertTitle}>{title}</Text>
       </View>
-      <Text style={styles.alertBody}>{description}</Text>
+      <Text style={styles.alertBody} numberOfLines={2} ellipsizeMode="tail">
+        {description}
+      </Text>
     </AppCard>
   );
 }

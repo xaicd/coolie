@@ -21,6 +21,7 @@ import { LoadingState } from "../ui/LoadingState";
 import { SegmentedControl } from "../ui/SegmentedControl";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { formatRelativeTime } from "../utils/format";
+import { isWakePayloadText } from "../utils/sanitize";
 
 const KIND_ICON: Record<NotificationKind, React.ComponentProps<typeof Ionicons>["name"]> = {
   approval: "checkmark-done-outline",
@@ -109,7 +110,10 @@ export function NotificationsScreen({
     [markRead, issueById, onOpenIssue, onOpenApproval, company.id],
   );
 
-  const visible = onlyUnread ? items.filter((item) => !item.read) : items;
+  // P0-1: 通知流同样拦截 Paperclip Wake Payload 调试载荷, 防 raw JSON 泄露
+  const visible = (onlyUnread ? items.filter((item) => !item.read) : items).filter(
+    (item) => !isWakePayloadText(item.body),
+  );
 
   return (
     <SafeAreaView
@@ -184,11 +188,19 @@ export function NotificationsScreen({
                     <Ionicons name={KIND_ICON[item.type]} size={18} color={KIND_COLOR[item.type]} />
                   </View>
                   <View style={{ flex: 1, gap: 3 }}>
-                    <Text style={[styles.rowTitle, isUnread ? styles.rowTitleUnread : styles.rowTitleRead]} numberOfLines={2}>
+                    <Text
+                      style={[styles.rowTitle, isUnread ? styles.rowTitleUnread : styles.rowTitleRead]}
+                      numberOfLines={2}
+                      ellipsizeMode="tail"
+                    >
                       {item.title}
                     </Text>
                     {item.body ? (
-                      <Text style={[styles.rowBody, !isUnread && styles.rowBodyRead]} numberOfLines={2}>
+                      <Text
+                        style={[styles.rowBody, !isUnread && styles.rowBodyRead]}
+                        numberOfLines={2}
+                        ellipsizeMode="tail"
+                      >
                         {item.body}
                       </Text>
                     ) : null}

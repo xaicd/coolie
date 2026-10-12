@@ -87,6 +87,18 @@ async function computeUnreadCount(db: Db, companyId: string, userId: string): Pr
   return notifications.filter((item) => !item.read).length;
 }
 
+/**
+ * 心跳唤醒调试载荷拦截 (wave376 P0-1)。
+ *
+ * Agent 唤醒交互 (`## Paperclip Wake Payload` + 内嵌 ```text 序列化 JSON) 有时
+ * 会作为 issue comment 落到通知流, 原样推送给移动端会撑爆 6 寸屏并外泄底层调试
+ * 数据。通知总线在此口径上直接过滤, 绝不把 raw JSON 推给 UI。
+ */
+function isWakePayloadBody(body: string | null | undefined): boolean {
+  if (!body) return false;
+  return /Paperclip\s+Wake\s+Payload/.test(body.slice(0, 512));
+}
+
 function approvalTitle(payload: Record<string, unknown> | null, fallback: string): string {
   if (payload && typeof payload.title === "string" && payload.title) return payload.title;
   if (payload && typeof payload.name === "string" && payload.name) return payload.name;
@@ -175,14 +187,16 @@ async function buildFeed(db: Db, companyId: string, limit: number): Promise<Noti
       target: { kind: "issue" as const, id: row.id },
       createdAt: row.updatedAt.toISOString(),
     })),
-    ...mentions.map((row) => ({
-      id: `mention:${row.id}`,
-      type: "mention" as const,
-      title: `${row.authorName ?? "员工"} 在「${row.issueTitle}」提到了你`,
-      body: row.body,
-      target: { kind: "issue" as const, id: row.issueId },
-      createdAt: row.createdAt.toISOString(),
-    })),
+    ...mentions
+      .filter((row) => !isWakePayloadBody(row.body))
+      .map((row) => ({
+        id: `mention:${row.id}`,
+        type: "mention" as const,
+        title: `${row.authorName ?? "员工"} 在「${row.issueTitle}」提到了你`,
+        body: row.body,
+        target: { kind: "issue" as const, id: row.issueId },
+        createdAt: row.createdAt.toISOString(),
+      })),
     ...failedRuns.map((row) => {
       const snapshot = (row.contextSnapshot ?? {}) as Record<string, unknown>;
       const issueId =

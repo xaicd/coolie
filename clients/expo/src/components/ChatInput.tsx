@@ -518,7 +518,7 @@ export function ChatInput({
           disabled={!canEdit || uploading}
           hitSlop={6}
           accessibilityRole="button"
-          accessibilityLabel="添加附件"
+          accessibilityLabel="附件"
           style={({ pressed }) => [
             styles.iconBtn,
             pressed && styles.iconBtnPressed,
@@ -542,7 +542,7 @@ export function ChatInput({
           disabled={!canEdit || voiceBusy}
           hitSlop={6}
           accessibilityRole="button"
-          accessibilityLabel={inputMode === "text" ? "切换语音输入" : "切换键盘输入"}
+          accessibilityLabel={inputMode === "text" ? "语音" : "键盘"}
           style={({ pressed }) => [
             styles.iconBtn,
             inputMode === "voice" && styles.iconBtnModeActive,
@@ -616,7 +616,7 @@ export function ChatInput({
             onPress={onStop}
             hitSlop={6}
             accessibilityRole="button"
-            accessibilityLabel="停止生成"
+            accessibilityLabel="停止"
             style={styles.stopBtn}
             testID="ChatInput__StopBtn"
           >

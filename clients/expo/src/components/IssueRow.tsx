@@ -61,8 +61,12 @@ export const IssueRow = memo(function IssueRow({
       onLongPress={onLongPress ? () => onLongPress(issue) : undefined}
       delayLongPress={350}
       accessibilityRole="button"
-      accessibilityLabel={issue?.title ?? "任务"}
-      accessibilityHint={onLongPress && issue?.isMilestone ? "长按可聚焦下钻此主线" : undefined}
+      accessibilityLabel={identifier ? `任务 ${identifier}` : "任务"}
+      accessibilityHint={
+        onLongPress && issue?.isMilestone
+          ? "长按可聚焦下钻此主线"
+          : (issue?.title ?? undefined)
+      }
     >
       <View
         style={[
@@ -83,6 +87,7 @@ export const IssueRow = memo(function IssueRow({
       <Text
         style={[styles.title, cancelled && styles.titleCancelled]}
         numberOfLines={2}
+        ellipsizeMode="tail"
       >
         {issue?.title ?? "（无标题任务）"}
       </Text>

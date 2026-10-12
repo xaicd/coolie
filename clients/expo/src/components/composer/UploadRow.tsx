@@ -72,7 +72,7 @@ export function UploadRow({
           onPress={() => void pick()}
           disabled={disabled}
           accessibilityRole="button"
-          accessibilityLabel="添加附件"
+          accessibilityLabel="附件"
           style={({ pressed }) => [
             styles.uploadBtn,
             pressed && styles.uploadBtnPressed,

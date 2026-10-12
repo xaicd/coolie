@@ -253,6 +253,7 @@ export function SettingsScreen({
               style={styles.itemRow}
               onPress={onOpenGitCredentials}
               accessibilityRole="button"
+              accessibilityLabel="管理"
               testID="Settings__GitCredentials__Row"
             >
               <View style={[styles.iconBox, { backgroundColor: "rgba(94, 106, 210, 0.14)" }]}>
@@ -300,6 +301,7 @@ export function SettingsScreen({
               style={styles.itemRow}
               onPress={onOpenPluginManager}
               accessibilityRole="button"
+              accessibilityLabel="配置"
               testID="Settings__PluginManager__Row"
             >
               <View style={[styles.iconBox, { backgroundColor: "rgba(245, 158, 11, 0.14)" }]}>
@@ -329,6 +331,7 @@ export function SettingsScreen({
               disabled={ota.isChecking}
               onPress={handleCheckUpdate}
               accessibilityRole="button"
+              accessibilityLabel="检查"
               testID="Settings__OTA__Row"
             >
               <View style={[styles.iconBox, { backgroundColor: "rgba(59, 130, 246, 0.14)" }]}>
@@ -362,6 +365,7 @@ export function SettingsScreen({
               disabled={clearing}
               onPress={handleClearCache}
               accessibilityRole="button"
+              accessibilityLabel="清理"
               testID="Settings__Cache__Row"
             >
               <View style={[styles.iconBox, { backgroundColor: "rgba(239, 68, 68, 0.14)" }]}>
@@ -394,6 +398,7 @@ export function SettingsScreen({
               style={styles.itemRow}
               onPress={onOpenNativeModules}
               accessibilityRole="button"
+              accessibilityLabel="探测"
               testID="Settings__NativeModules__Row"
             >
               <View style={[styles.iconBox, { backgroundColor: "rgba(148, 163, 184, 0.14)" }]}>
@@ -421,6 +426,7 @@ export function SettingsScreen({
                   style={styles.itemRow}
                   onPress={onViewWhatsNew}
                   accessibilityRole="button"
+                  accessibilityLabel="查看"
                   testID="Settings__WhatsNew__Row"
                 >
                   <View style={[styles.iconBox, { backgroundColor: "rgba(234, 179, 8, 0.14)" }]}>
@@ -450,6 +456,7 @@ export function SettingsScreen({
               style={styles.itemRow}
               onPress={handleSignOutConfirm}
               accessibilityRole="button"
+              accessibilityLabel="退出"
               testID="Settings__SignOut__Row"
             >
               <View style={[styles.iconBox, { backgroundColor: "rgba(239, 68, 68, 0.16)" }]}>

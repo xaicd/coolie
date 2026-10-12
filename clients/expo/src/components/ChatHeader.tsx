@@ -59,7 +59,7 @@ export function ChatHeader({
             onPress={onOpenConversations}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="对话列表"
+            accessibilityLabel="列表"
             style={styles.iconBtn}
           >
             <Ionicons name="list-outline" size={18} color={C.ink2} />
@@ -91,7 +91,7 @@ export function ChatHeader({
             onPress={onNewConversation}
             hitSlop={8}
             accessibilityRole="button"
-            accessibilityLabel="新建对话"
+            accessibilityLabel="新建"
             style={styles.iconBtn}
           >
             <Ionicons name="add" size={20} color={C.ink2} />
@@ -102,7 +102,7 @@ export function ChatHeader({
             onPress={onRequestClear}
             hitSlop={10}
             accessibilityRole="button"
-            accessibilityLabel="清空对话"
+            accessibilityLabel="清空"
             style={({ pressed }) => [
               styles.clearBtn,
               pressed && styles.clearBtnPressed,

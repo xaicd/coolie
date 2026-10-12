@@ -30,6 +30,7 @@ import { StatusBadge } from "../ui/StatusBadge";
 import { Sheet } from "../ui/Sheet";
 import { LoadingState } from "../ui/LoadingState";
 import { ErrorRetry } from "../ui/ErrorRetry";
+import { FoldableText } from "../ui/FoldableText";
 import { showErrorToast, showSuccessToast } from "../ui/toast";
 import type { SandboxScope } from "./PrototypeSandboxScreen";
 import { EgoRadarGraph, type RadarNode, type RadarEdge } from "../components/EgoRadarGraph";
@@ -828,7 +829,7 @@ export function AssetOntologyScreen({
               onPress={() => setDomainSheetVisible(true)}
               hitSlop={6}
               accessibilityRole="button"
-              accessibilityLabel="切换或管理本体域"
+              accessibilityLabel="域表"
               testID="AssetOntology__DomainManageBtn"
             >
               <Ionicons name="grid-outline" size={13} color={C.accent} />
@@ -891,7 +892,7 @@ export function AssetOntologyScreen({
                   style={styles.refreshBtn}
                   onPress={handleRefresh}
                   hitSlop={6}
-                  accessibilityLabel="刷新本体态势"
+                  accessibilityLabel="刷新"
                   testID="AssetOntology__Header__RefreshBtn"
                 >
                   <Ionicons name="refresh-outline" size={13} color={C.ink2} />
@@ -983,7 +984,7 @@ export function AssetOntologyScreen({
                             label={item.statusText}
                           />
                         </View>
-                        <Text style={styles.objectDesc} numberOfLines={1}>
+                        <Text style={styles.objectDesc} numberOfLines={2} ellipsizeMode="tail">
                           {item.description}
                         </Text>
                         <View style={styles.objectMetaRow}>
@@ -1034,7 +1035,7 @@ export function AssetOntologyScreen({
                         />
                       </View>
 
-                      <Text style={styles.datasetDesc}>{ds.description}</Text>
+                      <Text style={styles.datasetDesc} numberOfLines={2} ellipsizeMode="tail">{ds.description}</Text>
 
                       <View style={styles.datasetFooter}>
                         <View style={styles.datasetFooterItem}>
@@ -1080,7 +1081,7 @@ export function AssetOntologyScreen({
                   }}
                   hitSlop={6}
                   accessibilityRole="button"
-                  accessibilityLabel="刷新当前域态势"
+                  accessibilityLabel="刷新"
                   testID="AssetOntology__Domain__RefreshBtn"
                 >
                   <Ionicons name="refresh-outline" size={13} color={C.ink2} />
@@ -1089,7 +1090,12 @@ export function AssetOntologyScreen({
               </View>
 
               <Text style={styles.bannerTitle}>{currentDomain.name}</Text>
-              <Text style={styles.bannerSubtitle}>{currentDomain.description}</Text>
+              <FoldableText
+                text={currentDomain.description}
+                maxLines={2}
+                threshold={40}
+                style={styles.bannerSubtitle}
+              />
 
               <View style={styles.metricsRow}>
                 <View style={styles.metricItem}>
@@ -1127,7 +1133,7 @@ export function AssetOntologyScreen({
                   style={[styles.domainActionBtn, styles.domainActionBtnAccent]}
                   onPress={() => handleEvolveDomainInChat(currentDomain)}
                   accessibilityRole="button"
-                  accessibilityLabel="在工坊演进本体"
+                  accessibilityLabel="工坊"
                   testID="AssetOntology__DomainAction__Chat"
                 >
                   <Ionicons name="chatbubbles-outline" size={13} color="#FFFFFF" />
@@ -1138,7 +1144,7 @@ export function AssetOntologyScreen({
                   style={styles.domainActionBtn}
                   onPress={() => handleOpenProject(currentDomain)}
                   accessibilityRole="button"
-                  accessibilityLabel="查看关联项目工程"
+                  accessibilityLabel="工程"
                   testID="AssetOntology__DomainAction__Project"
                 >
                   <Ionicons name="folder-outline" size={13} color={C.ink} />
@@ -1150,7 +1156,7 @@ export function AssetOntologyScreen({
                     style={styles.domainActionBtn}
                     onPress={() => handleToggleLifecycle(currentDomain)}
                     accessibilityRole="button"
-                    accessibilityLabel="切换熔断与活跃"
+                    accessibilityLabel={currentDomain.lifecycleState === "locked" ? "恢复" : "熔断"}
                     testID="AssetOntology__DomainAction__Lifecycle"
                   >
                     <Ionicons
@@ -1241,7 +1247,7 @@ export function AssetOntologyScreen({
                             label={node.lifecycleState === "locked" ? "锁定" : "活跃"}
                           />
                         </View>
-                        <Text style={styles.objectDesc} numberOfLines={1}>
+                        <Text style={styles.objectDesc} numberOfLines={2} ellipsizeMode="tail">
                           标识契约: {node.key}
                         </Text>
                         <View style={styles.objectMetaRow}>
@@ -1325,7 +1331,7 @@ export function AssetOntologyScreen({
                           />
                         </View>
 
-                        <Text style={styles.datasetDesc}>{ds.description}</Text>
+                        <Text style={styles.datasetDesc} numberOfLines={2} ellipsizeMode="tail">{ds.description}</Text>
 
                         <View style={styles.datasetFooter}>
                           <View style={styles.datasetFooterItem}>
