@@ -786,6 +786,10 @@ const BOARD_CHAT_STATUS_LINE_PATTERNS: readonly RegExp[] = [
   /^思考中[\s.…]*$/,
   /^Connecting[\s.]*$/,
   /^Thinking[\s.]*$/,
+  /^\[hermes-error\]/i,
+  /^Board assistant failed/i,
+  /^助手在 \d+ 秒内没有返回任何内容/,
+  /^这次生成超过 \d+ 秒仍未完成/,
 ];
 export function isBoardChatStatusLine(text: string): boolean {
   const trimmed = text.trim();
