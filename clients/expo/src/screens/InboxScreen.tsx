@@ -1955,7 +1955,11 @@ function InboxIssueRow({
       onPress={onPress}
       onLongPress={onLongPress}
       delayLongPress={320}
-      style={({ pressed }) => [styles.row, pressed && styles.rowPressed]}
+      style={({ pressed }) => [
+        styles.row,
+        isUnread ? styles.rowUnread : styles.rowRead,
+        pressed && styles.rowPressed,
+      ]}
       accessibilityRole="button"
       accessibilityLabel={issue.title}
     >
@@ -1974,11 +1978,21 @@ function InboxIssueRow({
       <StatusGlyph status={issue.status} />
 
       <View style={styles.rowBody}>
-        <Text style={[styles.rowTitle, cancelled && styles.rowTitleCancelled]} numberOfLines={2}>
+        <Text
+          style={[
+            styles.rowTitle,
+            isUnread ? styles.rowTitleUnread : styles.rowTitleRead,
+            cancelled && styles.rowTitleCancelled,
+          ]}
+          numberOfLines={2}
+        >
           {issue.title}
         </Text>
         {description ? (
-          <Text style={styles.rowDesc} numberOfLines={1}>
+          <Text
+            style={[styles.rowDesc, isUnread ? styles.rowDescUnread : styles.rowDescRead]}
+            numberOfLines={1}
+          >
             {description}
           </Text>
         ) : null}
@@ -1990,16 +2004,18 @@ function InboxIssueRow({
             size="sm"
             mono
           />
-          <Text style={styles.metaText} numberOfLines={1}>
+          <Text style={[styles.metaText, !isUnread && styles.metaTextRead]} numberOfLines={1}>
             {assigneeName ?? "未指派"}
           </Text>
           {projectName ? (
-            <Text style={styles.metaText} numberOfLines={1}>
+            <Text style={[styles.metaText, !isUnread && styles.metaTextRead]} numberOfLines={1}>
               · {projectName}
             </Text>
           ) : null}
           <View style={{ flex: 1 }} />
-          <Text style={styles.metaTime}>{formatRelativeShort(issue.updatedAt ?? issue.createdAt)}</Text>
+          <Text style={[styles.metaTime, !isUnread && styles.metaTextRead]}>
+            {formatRelativeShort(issue.updatedAt ?? issue.createdAt)}
+          </Text>
         </View>
       </View>
     </Pressable>
@@ -2618,6 +2634,20 @@ const styles = StyleSheet.create({
     paddingVertical: 11,
     paddingHorizontal: SPACING.sm,
     borderRadius: RADIUS.md,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  // 未读: 清晰高对比度, 饱和卡片背景与明晰边框
+  rowUnread: {
+    opacity: 1,
+    backgroundColor: C.surface,
+    borderColor: "rgba(255, 255, 255, 0.08)",
+  },
+  // 已读: 朦胧退后半透明效果 (对齐 Web 端清晰与朦胧反差)
+  rowRead: {
+    opacity: 0.52,
+    backgroundColor: "rgba(255, 255, 255, 0.02)",
+    borderColor: "rgba(255, 255, 255, 0.03)",
   },
   rowPressed: { backgroundColor: ELEVATION.hover },
   rowBody: { flex: 1, gap: 4 },
@@ -2638,6 +2668,11 @@ const styles = StyleSheet.create({
   },
   unreadDotActive: {
     backgroundColor: "#3B82F6",
+    shadowColor: "#3B82F6",
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.8,
+    shadowRadius: 3,
+    elevation: 2,
   },
   unreadDotInactive: {
     backgroundColor: "transparent",
@@ -2653,10 +2688,26 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   rowTitle: { color: C.ink, fontSize: 14, fontWeight: "500", lineHeight: 19 },
+  rowTitleUnread: {
+    color: "#FFFFFF",
+    fontSize: 14,
+    fontWeight: "700",
+    lineHeight: 19,
+    letterSpacing: -0.1,
+  },
+  rowTitleRead: {
+    color: C.ink3,
+    fontSize: 14,
+    fontWeight: "400",
+    lineHeight: 19,
+  },
   rowTitleCancelled: { color: C.ink4, textDecorationLine: "line-through" },
   rowDesc: { color: C.ink3, fontSize: 12, lineHeight: 16, flexShrink: 1, paddingLeft: 2 },
+  rowDescUnread: { color: C.ink2 },
+  rowDescRead: { color: C.ink4 },
   metaRow: { flexDirection: "row", alignItems: "center", gap: 6, flexWrap: "wrap" },
   metaText: { color: C.ink4, fontSize: 11 },
+  metaTextRead: { color: "rgba(148, 163, 184, 0.65)" },
   metaTime: { color: C.ink4, fontSize: 11, fontVariant: ["tabular-nums"] },
   blockedAction: { color: C.ink3, fontSize: 12, marginTop: 2 },
   chevron: { color: C.ink4, fontSize: 20 },
