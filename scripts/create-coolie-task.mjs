@@ -8,6 +8,7 @@
  */
 
 import http from "node:http";
+import { execSync } from "node:child_process";
 
 const API_BASE = process.env.COOLIE_API_URL || "http://127.0.0.1:3100/api";
 
@@ -159,6 +160,13 @@ async function main() {
     body: issuePayload
   });
 
+  let host = "127.0.0.1";
+  try {
+    const tsIp = execSync("tailscale ip -4 2>/dev/null", { encoding: "utf8" }).trim();
+    if (tsIp) host = tsIp;
+  } catch (_) {}
+  const uiHost = process.env.COOLIE_HOST || host;
+
   const output = {
     success: true,
     issueId: createdIssue.id,
@@ -167,7 +175,7 @@ async function main() {
     status: createdIssue.status,
     assignee: targetAgent ? `${targetAgent.name} (${targetAgent.title})` : "未分配",
     source: args.source,
-    url: `http://100.101.22.109:3100/${company.id}/issues/${createdIssue.identifier}`
+    url: `http://${uiHost}:3100/${company.id}/issues/${createdIssue.identifier}`
   };
 
   console.log(JSON.stringify(output, null, 2));

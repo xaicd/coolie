@@ -27,7 +27,9 @@ for n in "$HOME/.hermes/node/bin/node" "$HOME/.local/bin/node" "/opt/homebrew/bi
   fi
 done
 if [ -n "$NODE_BIN" ]; then
-  export PATH="$(dirname "$NODE_BIN"):$PATH"
+  export PATH="$(dirname "$NODE_BIN"):$HOME/.local/bin:$HOME/.npm-global/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
+else
+  export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
 fi
 
 # 2. 跨平台自适应探测 acpx 可执行文件

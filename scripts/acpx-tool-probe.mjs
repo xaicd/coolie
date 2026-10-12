@@ -32,6 +32,7 @@ const REPO_ROOT = path.resolve(__dirname, "..");
 // 优先注入所有可能的环境 PATH (兼容 Mac / aja-pc / cwall / Docker)
 const extraPaths = [
   path.join(process.env.HOME || "", ".local/bin"),
+  path.join(process.env.HOME || "", ".npm-global/bin"),
   path.join(process.env.HOME || "", ".hermes/node/bin"),
   "/opt/homebrew/bin",
   "/usr/local/bin",

@@ -386,9 +386,9 @@ fi
 # 2. 继承宿主机已有的各种 CLI 工具链与 Node 运行时 (PATH 优先，保障 sub-process 与 acpx/cmd 运行在 Node 22+)
 if [ -n "$NODE_BIN" ]; then
     NODE_DIR="$(dirname "$NODE_BIN")"
-    export PATH="$NODE_DIR:$HOME/.local/bin:$HOME/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
+    export PATH="$NODE_DIR:$HOME/.local/bin:$HOME/.npm-global/bin:$HOME/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
 else
-    export PATH="$HOME/.local/bin:$HOME/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
+    export PATH="$HOME/.local/bin:$HOME/.npm-global/bin:$HOME/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
 fi
 
 # 3. 独立嵌入式数据目录 (绝对不碰宿主机已有数据库)
@@ -417,10 +417,10 @@ HN="\$(hostname 2>/dev/null || echo "")"
 export PORT="\${COOLIE_PORT:-3100}"
 export HOST="\${COOLIE_HOST:-127.0.0.1}"
 export PAPERCLIP_BIND="loopback"
-export PAPERCLIP_ALLOWED_HOSTNAMES="\${PAPERCLIP_ALLOWED_HOSTNAMES:-100.101.22.109,127.0.0.1,localhost,\$TS_IP,\$HN,aja-pc}"
+export PAPERCLIP_ALLOWED_HOSTNAMES="\${PAPERCLIP_ALLOWED_HOSTNAMES:-100.101.22.109,100.118.232.61,100.84.124.71,127.0.0.1,localhost,\$TS_IP,\$HN,aja-pc,cwall,mac}"
 export DATABASE_URL=""
 export SERVE_UI="true"
-export PAPERCLIP_INSTANCE_NAME="coolie-dev-aja"
+export PAPERCLIP_INSTANCE_NAME="\${PAPERCLIP_INSTANCE_NAME:-coolie-dev-\${HN:-node}}"
 export PAPERCLIP_INSTANCE_DIR="$DATA_DIR"
 export PAPERCLIP_STORAGE_LOCAL_ROOT="$DATA_DIR/storage"
 export PAPERCLIP_LOG_DIR="$DATA_DIR/logs"
