@@ -232,6 +232,13 @@ try {
     fi
   fi
 
+  # 优先使用标准 ACPX 协议总线进行工具池健康探测
+  if [[ -f "$REPO_ROOT/scripts/acpx-tool-probe.mjs" ]]; then
+    if node "$REPO_ROOT/scripts/acpx-tool-probe.mjs" --save "$LATEST_JSON" >/dev/null 2>&1; then
+      return 0
+    fi
+  fi
+
   # 1. Source smart env-detector
   local lib_env="$REPO_ROOT/scripts/lib/env-detector.sh"
   if [[ -f "$lib_env" ]]; then

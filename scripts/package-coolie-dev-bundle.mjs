@@ -335,6 +335,7 @@ fs.writeFileSync(path.join(stageDir, "bin/tailscale-proxy.js"), proxyScript, { m
 // 5.2.1 拷贝 Hermes 正统全双工 ACPX 派工工具与任务创建工具
 const acpxDispatchSrc = path.resolve(repoRoot, "scripts/hermes-acpx-dispatch.sh");
 const createTaskSrc = path.resolve(repoRoot, "scripts/create-coolie-task.mjs");
+const acpxProbeSrc = path.resolve(repoRoot, "scripts/acpx-tool-probe.mjs");
 if (fs.existsSync(acpxDispatchSrc)) {
   fs.copyFileSync(acpxDispatchSrc, path.join(stageDir, "bin/hermes-acpx-dispatch"));
   fs.chmodSync(path.join(stageDir, "bin/hermes-acpx-dispatch"), 0o755);
@@ -342,6 +343,10 @@ if (fs.existsSync(acpxDispatchSrc)) {
 if (fs.existsSync(createTaskSrc)) {
   fs.copyFileSync(createTaskSrc, path.join(stageDir, "bin/create-coolie-task.mjs"));
   fs.chmodSync(path.join(stageDir, "bin/create-coolie-task.mjs"), 0o755);
+}
+if (fs.existsSync(acpxProbeSrc)) {
+  fs.copyFileSync(acpxProbeSrc, path.join(stageDir, "bin/acpx-tool-probe.mjs"));
+  fs.chmodSync(path.join(stageDir, "bin/acpx-tool-probe.mjs"), 0o755);
 }
 
 // 5.3 生成自包含生产级 CLI 启动脚本 bin/coolie-dev
@@ -490,16 +495,21 @@ case "$ACTION" in
             echo "  ⚠️ ACPX 全双工协议总线: 未检测到"
         fi
 
-        # 5. 检查宿主机底层 7 大工具池
-        echo ""
-        echo "🛠️ 底层 7 大工具池就绪审计:"
-        for tool in hermes claude cmd agy kiro-cli node git; do
-            if command -v "\$tool" >/dev/null 2>&1; then
-                echo "  • \$tool: 就绪 (\$(command -v "\$tool"))"
-            else
-                echo "  • \$tool: 缺失"
-            fi
-        done
+        # 5. 检查宿主机底层 7 大工具池 (ACP 全双工协议总线探针)
+        if [ -f "$COOLIE_HOME/bin/acpx-tool-probe.mjs" ]; then
+            echo ""
+            node "$COOLIE_HOME/bin/acpx-tool-probe.mjs" || true
+        else
+            echo ""
+            echo "🛠️ 底层 7 大工具池就绪审计:"
+            for tool in hermes claude cmd agy kiro-cli node git; do
+                if command -v "\$tool" >/dev/null 2>&1; then
+                    echo "  • \$tool: 就绪 (\$(command -v "\$tool"))"
+                else
+                    echo "  • \$tool: 缺失"
+                fi
+            done
+        fi
         echo "========================================================"
         exit 0
         ;;
@@ -600,7 +610,7 @@ mkdir -p "$TARGET_DIR"
 cp -R "$SRC_DIR/bin" "$TARGET_DIR/"
 cp -R "$SRC_DIR/conf" "$TARGET_DIR/"
 cp -R "$SRC_DIR/lib" "$TARGET_DIR/"
-chmod +x "$TARGET_DIR/bin/coolie-dev" "$TARGET_DIR/bin/link-packages.js" "$TARGET_DIR/bin/tailscale-proxy.js" "$TARGET_DIR/bin/hermes-acpx-dispatch" "$TARGET_DIR/bin/create-coolie-task.mjs" 2>/dev/null || true
+chmod +x "$TARGET_DIR/bin/coolie-dev" "$TARGET_DIR/bin/link-packages.js" "$TARGET_DIR/bin/tailscale-proxy.js" "$TARGET_DIR/bin/hermes-acpx-dispatch" "$TARGET_DIR/bin/create-coolie-task.mjs" "$TARGET_DIR/bin/acpx-tool-probe.mjs" 2>/dev/null || true
 
 # 2. 建立命令行全局快捷方式
 mkdir -p "$HOME/.local/bin"

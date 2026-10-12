@@ -202,6 +202,11 @@ check_tools() {
     source "$lib_env"
   fi
 
+  # 优先采用 ACPX 全双工协议深度探针
+  if [[ -f "$REPO_ROOT/scripts/acpx-tool-probe.mjs" ]]; then
+    exec node "$REPO_ROOT/scripts/acpx-tool-probe.mjs"
+  fi
+
   local env_desc=""
   if command -v describe_coolie_env >/dev/null 2>&1; then
     env_desc="$(describe_coolie_env)"
