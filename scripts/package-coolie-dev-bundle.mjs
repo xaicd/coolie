@@ -439,8 +439,31 @@ if [ -d "$HOME/.hermes" ] && [ -d "$COOLIE_HOME/lib/hermes-plugins/coolie-bridge
     fi
 fi
 
+# 5.2 自动加载 conf/coolie-dev.env 运行配置 (如果存在)
+CONF_ENV="$COOLIE_HOME/conf/coolie-dev.env"
+if [ -f "$CONF_ENV" ]; then
+    set -a
+    source "$CONF_ENV"
+    set +a
+fi
+
 TS_IP="\$(tailscale ip -4 2>/dev/null || echo "")"
 HN="\$(hostname 2>/dev/null || echo "")"
+
+# 5.3 确保持有稳定且合法的本地 Board API Key (持久化存储于 $DATA_DIR/board-api-key.txt)
+KEY_FILE="$DATA_DIR/board-api-key.txt"
+if [ -z "\${PAPERCLIP_API_KEY:-}" ]; then
+    if [ -f "$KEY_FILE" ]; then
+        export PAPERCLIP_API_KEY="\$(cat "$KEY_FILE" | tr -d '\r\n ')"
+    else
+        export PAPERCLIP_API_KEY="coolie_dev_\$(od -An -tx1 -N16 /dev/urandom 2>/dev/null | tr -d ' \n' || date +%s%N)"
+        mkdir -p "$DATA_DIR"
+        echo "\$PAPERCLIP_API_KEY" > "$KEY_FILE"
+    fi
+else
+    mkdir -p "$DATA_DIR"
+    echo "\$PAPERCLIP_API_KEY" > "$KEY_FILE"
+fi
 
 export PORT="\${COOLIE_PORT:-3100}"
 export HOST="\${COOLIE_HOST:-127.0.0.1}"
@@ -630,6 +653,13 @@ case "$ACTION" in
         else
             echo "  ⚪ Hermes QQ/微信控制面并轨: 未接入 (运行 coolie-dev gateway-bridge enable 即可开启)"
         fi
+
+        # 7. 检查 Board API 准入凭证与持久化
+        if [ -n "\$PAPERCLIP_API_KEY" ]; then
+            echo "  ✅ Board API 准入凭证: 正常在位 (\$KEY_FILE)"
+        else
+            echo "  ⚠️ Board API 准入凭证: 未配置"
+        fi
         echo "========================================================"
         exit 0
         ;;
@@ -795,6 +825,7 @@ const confEnv = `# Coolie Dev 运行配置文件
 COOLIE_PORT=3100
 COOLIE_HOST=127.0.0.1
 COOLIE_DATA_DIR=$HOME/.coolie-dev/data
+# PAPERCLIP_API_KEY= (可选: 留空将自动从 $COOLIE_DATA_DIR/board-api-key.txt 读取或自动生成)
 `;
 fs.writeFileSync(path.join(stageDir, "conf/coolie-dev.env"), confEnv, "utf8");
 
