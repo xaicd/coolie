@@ -118,13 +118,11 @@ const DATE_RANGE_OPTIONS: { key: DateRange; label: string }[] = [
 ];
 
 const TAB_OPTIONS: { key: InboxTab; label: string }[] = [
-  { key: "all", label: "全部" },
   { key: "mine", label: "与我" },
-  { key: "recent", label: "最近" },
   { key: "unread", label: "未读" },
-  { key: "approvals", label: "审批" },
-  { key: "failed", label: "失败" },
-  { key: "blocked", label: "阻塞" },
+  { key: "recent", label: "最近" },
+  { key: "blocked", label: "受阻" },
+  { key: "all", label: "全部" },
 ];
 
 const CATEGORY_OPTIONS: { key: InboxCategory; label: string }[] = [
@@ -347,7 +345,7 @@ export function InboxScreen({
   /** 内嵌 QuickApprovalCard 裁决完成后的回调 (审批/驳回后从列表移除) */
   onResolved?: (approvalId: string, decision: "approve" | "reject") => void;
 }) {
-  const [tab, setTab] = useState<InboxTab>(initialTab);
+  const [tab, setTab] = useState<InboxTab>(initialTab ?? "mine");
   const [allCategoryFilter, setAllCategoryFilter] = useState<InboxCategory>("everything");
   const [groupBy, setGroupBy] = useState<InboxGroupBy>("none");
   const [expandedApprovalId, setExpandedApprovalId] = useState<string | null>(null);
@@ -1268,38 +1266,39 @@ export function InboxScreen({
     >
       <StatusBar style="light" />
 
-      {/* 顶栏 */}
+      {/* 顶栏: 极简通透 (返回 + 标题 + 公司 + 未读标记) */}
       <View style={styles.header}>
         {onBack ? (
           <Pressable
             onPress={onBack}
             hitSlop={12}
-            style={{ marginRight: 10, paddingVertical: 4 }}
+            style={styles.backBtn}
             accessibilityLabel="返回"
           >
-            <Ionicons name="chevron-back" size={24} color={C.ink} />
+            <Ionicons name="chevron-back" size={22} color={C.ink} />
+            <Text style={styles.backBtnText}>返回</Text>
           </Pressable>
         ) : null}
-        <View style={{ flex: 1 }}>
+        <View style={styles.headerTitleCluster}>
           <Text style={styles.h1}>收件箱</Text>
-          <View style={styles.capsule}>
-            <StatusDot status="ok" size={6} />
-            <Text style={styles.capsuleText} numberOfLines={1}>
-              {company.name}
-            </Text>
-            <Text style={styles.capsuleSub}>
-              · 任务 {activeIssues.length} · 待办 {mineWorkItems.length} · 未读 {notificationUnreadCount}
-            </Text>
-          </View>
+          {notificationUnreadCount > 0 ? (
+            <View style={styles.headerUnreadBadge}>
+              <Text style={styles.headerUnreadBadgeText}>{notificationUnreadCount}</Text>
+            </View>
+          ) : null}
+          <Text style={styles.headerSubtitle} numberOfLines={1}>
+            {company.name}
+          </Text>
         </View>
+        <View style={{ flex: 1 }} />
         {onOpenSettings ? (
           <Pressable onPress={onOpenSettings} hitSlop={12} accessibilityLabel="设置">
-            <Ionicons name="settings-outline" size={20} color={C.ink3} />
+            <Ionicons name="settings-outline" size={19} color={C.ink3} />
           </Pressable>
         ) : null}
       </View>
 
-      {/* P1-1 & P1-2: 6 大 Tab 水平滑动栏 (全部 / 与我 / 最近 / 未读 / 审批 / 阻塞) */}
+      {/* 一级 TabBar: 严格对齐 Web 端标准 5 大 Tab (与我 · 未读 · 最近 · 受阻 · 全部) */}
       <View style={styles.tabBarWrap}>
         <ScrollView
           horizontal
@@ -1308,12 +1307,11 @@ export function InboxScreen({
         >
           {TAB_OPTIONS.map((opt) => {
             const selected = tab === opt.key;
-            let badgeText = "";
-            if (opt.key === "mine") badgeText = ` (${mineWorkItems.length})`;
-            if (opt.key === "unread") badgeText = ` (${unreadWorkItems.length})`;
-            if (opt.key === "approvals") badgeText = ` (${approvals.length})`;
-            if (opt.key === "failed") badgeText = ` (${failedWorkItems.length})`;
-            if (opt.key === "blocked") badgeText = ` (${blockedRows.length})`;
+            let count = 0;
+            if (opt.key === "mine") count = mineWorkItems.length;
+            if (opt.key === "unread") count = unreadWorkItems.length;
+            if (opt.key === "blocked") count = blockedRows.length;
+            const badgeText = count > 0 ? ` (${count})` : "";
 
             return (
               <Pressable
@@ -1331,129 +1329,76 @@ export function InboxScreen({
         </ScrollView>
       </View>
 
-      {/* P0-5: 内嵌即时搜索框 */}
-      <View style={styles.searchBar}>
-        <Ionicons name="search-outline" size={14} color={C.ink3} style={styles.searchIcon} />
-        <TextInput
-          value={searchQuery}
-          onChangeText={setSearchQuery}
-          placeholder="搜索收件箱…"
-          placeholderTextColor={C.ink4}
-          style={styles.searchInput}
-          clearButtonMode="while-editing"
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="search"
-        />
-        {searchQuery.length > 0 ? (
-          <Pressable onPress={() => setSearchQuery("")} hitSlop={8} style={styles.searchClear}>
-            <Ionicons name="close-circle" size={14} color={C.ink3} />
-          </Pressable>
-        ) : null}
-      </View>
-
-      {/* P1-3: All 全盘跨实体二级分类筛选标签 */}
-      {tab === "all" ? (
-        <View style={styles.catBarWrap}>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.catScrollContent}
-          >
-            {CATEGORY_OPTIONS.map((cat) => {
-              const selected = allCategoryFilter === cat.key;
-              return (
-                <Pressable
-                  key={cat.key}
-                  onPress={() => setAllCategoryFilter(cat.key)}
-                  style={[styles.catChip, selected && styles.catChipActive]}
-                >
-                  <Text style={[styles.catChipText, selected && styles.catChipTextActive]}>
-                    {cat.label}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </ScrollView>
-        </View>
-      ) : null}
-
-      {/* 工具栏: 过滤 / 全读 / 分组 / 刷新 */}
-      <View style={styles.toolbar}>
-        <Pressable
-          onPress={() => setFiltersOpen(true)}
-          style={[styles.toolBtn, activeFilterCount > 0 && styles.toolBtnActive]}
-          accessibilityLabel="过滤"
-        >
-          <Ionicons name="filter-outline" size={14} color={activeFilterCount > 0 ? C.ink : C.ink3} />
-          <Text style={[styles.toolBtnText, activeFilterCount > 0 && styles.toolBtnTextActive]}>
-            过滤{activeFilterCount > 0 ? ` (${activeFilterCount})` : ""}
-          </Text>
-        </Pressable>
-
-        {/* P0-4: 一键全标已读按钮 */}
-        <Pressable
-          onPress={() => setMarkAllConfirmOpen(true)}
-          style={styles.toolBtn}
-          accessibilityLabel="全部标为已读"
-        >
-          <Ionicons
-            name="checkmark-done-outline"
-            size={14}
-            color={currentUnreadCount > 0 ? C.accent : C.ink3}
+      {/* 单行极简控制栏: 搜索框 + 分组 + 过滤 + 全读 (有未读时显式) */}
+      <View style={styles.controlBarRow}>
+        <View style={styles.searchField}>
+          <Ionicons name="search-outline" size={14} color={C.ink3} style={{ marginRight: 6 }} />
+          <TextInput
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="搜索收件箱…"
+            placeholderTextColor={C.ink4}
+            style={styles.searchInput}
+            clearButtonMode="while-editing"
+            autoCapitalize="none"
+            autoCorrect={false}
+            returnKeyType="search"
           />
-          <Text style={[styles.toolBtnText, currentUnreadCount > 0 && styles.toolBtnTextActive]}>
-            全读
-          </Text>
-        </Pressable>
+          {searchQuery.length > 0 ? (
+            <Pressable onPress={() => setSearchQuery("")} hitSlop={8}>
+              <Ionicons name="close-circle" size={14} color={C.ink3} />
+            </Pressable>
+          ) : null}
+        </View>
 
-        {/* P1-8: 多维分组切换按钮 */}
+        {/* 分组按钮 */}
         {!showBlocked ? (
           <Pressable
             onPress={cycleGroupBy}
-            style={[styles.toolBtn, groupBy !== "none" && styles.toolBtnActive]}
+            style={[styles.iconToolBtn, groupBy !== "none" && styles.iconToolBtnActive]}
             accessibilityLabel="分组"
           >
-            <Ionicons name="grid-outline" size={14} color={groupBy !== "none" ? C.ink : C.ink3} />
-            <Text style={[styles.toolBtnText, groupBy !== "none" && styles.toolBtnTextActive]}>
-              {groupBy === "none"
-                ? "分组: 无"
-                : groupBy === "status"
-                  ? "分组: 状态"
-                  : groupBy === "assignee"
-                    ? "分组: 员工"
-                    : "分组: 项目"}
-            </Text>
+            <Ionicons
+              name="grid-outline"
+              size={16}
+              color={groupBy !== "none" ? C.accent : C.ink2}
+            />
+          </Pressable>
+        ) : (
+          <Pressable
+            onPress={() => cycleBlockedGroup(blockedGroupBy, setBlockedGroupBy)}
+            style={styles.iconToolBtn}
+            accessibilityLabel="分组"
+          >
+            <Ionicons name="layers-outline" size={16} color={C.ink2} />
+          </Pressable>
+        )}
+
+        {/* 过滤按钮 */}
+        <Pressable
+          onPress={() => setFiltersOpen(true)}
+          style={[styles.iconToolBtn, activeFilterCount > 0 && styles.iconToolBtnActive]}
+          accessibilityLabel="过滤"
+        >
+          <Ionicons
+            name="filter-outline"
+            size={16}
+            color={activeFilterCount > 0 ? C.accent : C.ink2}
+          />
+          {activeFilterCount > 0 ? <View style={styles.filterDot} /> : null}
+        </Pressable>
+
+        {/* 一键全读 (对齐 Web 端: 仅在有未读项时显式展示) */}
+        {currentUnreadCount > 0 ? (
+          <Pressable
+            onPress={() => setMarkAllConfirmOpen(true)}
+            style={styles.markReadBtn}
+            accessibilityLabel="全部标为已读"
+          >
+            <Ionicons name="checkmark-done" size={13} color="#FFFFFF" />
+            <Text style={styles.markReadBtnText}>全读</Text>
           </Pressable>
         ) : null}
-
-        {showBlocked ? (
-          <>
-            <Pressable
-              onPress={() => cycleBlockedGroup(blockedGroupBy, setBlockedGroupBy)}
-              style={styles.toolBtn}
-            >
-              <Ionicons name="layers-outline" size={14} color={C.ink3} />
-              <Text style={styles.toolBtnText}>{labelOf(BLOCKED_GROUP_OPTIONS, blockedGroupBy)}</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => cycleBlockedSort(blockedSortBy, setBlockedSortBy)}
-              style={styles.toolBtn}
-            >
-              <Ionicons name="swap-vertical-outline" size={14} color={C.ink3} />
-              <Text style={styles.toolBtnText}>{labelOf(BLOCKED_SORT_OPTIONS, blockedSortBy)}</Text>
-            </Pressable>
-          </>
-        ) : null}
-
-        <View style={{ flex: 1 }} />
-        <Pressable onPress={() => void load(true)} hitSlop={8} accessibilityLabel="刷新收件箱">
-          {loading ? (
-            <ActivityIndicator size="small" color={C.accent} />
-          ) : (
-            <Ionicons name="refresh" size={16} color={C.ink3} />
-          )}
-        </Pressable>
       </View>
 
       {/* 列表主体 */}
@@ -1745,9 +1690,11 @@ export function InboxScreen({
         filters={filters}
         agents={agents}
         projects={projects}
+        categoryFilter={allCategoryFilter}
         onClose={() => setFiltersOpen(false)}
-        onApply={(next) => {
+        onApply={(next, nextCategory) => {
           setFilters(next);
+          setAllCategoryFilter(nextCategory);
           setFiltersOpen(false);
         }}
       />
@@ -2345,6 +2292,7 @@ function FilterSheet({
   filters,
   agents,
   projects,
+  categoryFilter,
   onClose,
   onApply,
 }: {
@@ -2352,14 +2300,19 @@ function FilterSheet({
   filters: InboxFilters;
   agents: Agent[];
   projects: Project[];
+  categoryFilter: InboxCategory;
   onClose: () => void;
-  onApply: (next: InboxFilters) => void;
+  onApply: (next: InboxFilters, nextCategory: InboxCategory) => void;
 }) {
   const [draft, setDraft] = useState<InboxFilters>(filters);
+  const [draftCategory, setDraftCategory] = useState<InboxCategory>(categoryFilter);
 
   useEffect(() => {
-    if (visible) setDraft(filters);
-  }, [visible, filters]);
+    if (visible) {
+      setDraft(filters);
+      setDraftCategory(categoryFilter);
+    }
+  }, [visible, filters, categoryFilter]);
 
   return (
     <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
@@ -2367,12 +2320,29 @@ function FilterSheet({
         <Pressable style={styles.filterSheet} onPress={() => {}}>
           <View style={styles.filterHeader}>
             <Text style={styles.filterTitle}>过滤收件箱</Text>
-            <Pressable onPress={() => setDraft(DEFAULT_FILTERS)} hitSlop={8}>
+            <Pressable
+              onPress={() => {
+                setDraft(DEFAULT_FILTERS);
+                setDraftCategory("everything");
+              }}
+              hitSlop={8}
+            >
               <Text style={styles.filterReset}>重置</Text>
             </Pressable>
           </View>
 
           <ScrollView style={styles.filterBody} keyboardShouldPersistTaps="handled">
+            <FilterSection title="类型">
+              {CATEGORY_OPTIONS.map((cat) => (
+                <Chip
+                  key={cat.key}
+                  label={cat.label}
+                  active={draftCategory === cat.key}
+                  onPress={() => setDraftCategory(cat.key)}
+                />
+              ))}
+            </FilterSection>
+
             <FilterSection title="状态">
               {ISSUE_STATUSES.map((status) => (
                 <Chip
@@ -2442,7 +2412,7 @@ function FilterSheet({
             </FilterSection>
           </ScrollView>
 
-          <Pressable style={styles.filterApply} onPress={() => onApply(draft)}>
+          <Pressable style={styles.filterApply} onPress={() => onApply(draft, draftCategory)}>
             <Text style={styles.filterApplyText}>完成</Text>
           </Pressable>
         </Pressable>
@@ -2478,22 +2448,56 @@ function Chip({
 
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.bg },
-  header: { flexDirection: "row", paddingHorizontal: 16, paddingTop: 12, paddingBottom: 8, gap: 8 },
-  h1: { color: C.ink, fontSize: 22, fontWeight: "600", marginBottom: 8, letterSpacing: -0.4 },
-  capsule: {
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    paddingBottom: 8,
+    gap: 8,
+  },
+  backBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingRight: 6,
+  },
+  backBtnText: {
+    color: C.ink,
+    fontSize: 15,
+    fontWeight: "500",
+  },
+  headerTitleCluster: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    backgroundColor: C.surface,
-    borderRadius: RADIUS.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    alignSelf: "flex-start",
   },
-  capsuleText: { color: C.ink2, fontSize: 12, maxWidth: 140 },
-  capsuleSub: { color: C.ink3, fontSize: 12 },
+  h1: {
+    color: C.ink,
+    fontSize: 19,
+    fontWeight: "700",
+    letterSpacing: -0.3,
+  },
+  headerUnreadBadge: {
+    backgroundColor: C.err,
+    paddingHorizontal: 6,
+    paddingVertical: 1,
+    borderRadius: RADIUS.pill,
+    minWidth: 18,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerUnreadBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 11,
+    fontWeight: "700",
+  },
+  headerSubtitle: {
+    color: C.ink3,
+    fontSize: 12,
+    marginLeft: 2,
+  },
 
-  // P1-1 & P1-2: 6 Tab 水平滚动栏
+  // 一级 5 Tab 水平滑动栏
   tabBarWrap: {
     marginHorizontal: 16,
     marginBottom: 4,
@@ -2504,7 +2508,7 @@ const styles = StyleSheet.create({
   },
   tabPill: {
     paddingHorizontal: 14,
-    paddingVertical: 7,
+    paddingVertical: 6,
     borderRadius: RADIUS.pill,
     backgroundColor: ELEVATION.base,
     borderWidth: 1,
@@ -2524,81 +2528,69 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  // P1-3: All 分类筛选芯片栏
-  catBarWrap: {
-    marginHorizontal: 16,
-    marginTop: 6,
-    marginBottom: 2,
+  // 单行极简控制栏 (对齐 Web 端 Toolbar: 搜索框 + 分组 + 过滤 + 全读)
+  controlBarRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    gap: 8,
   },
-  catScrollContent: {
-    gap: 6,
-    paddingVertical: 2,
-  },
-  catChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: RADIUS.sm,
-    backgroundColor: "transparent",
-    borderWidth: 1,
-    borderColor: C.line,
-  },
-  catChipActive: {
-    backgroundColor: "rgba(94, 106, 210, 0.18)",
-    borderColor: C.brand,
-  },
-  catChipText: {
-    color: C.ink4,
-    fontSize: 11,
-    fontWeight: "500",
-  },
-  catChipTextActive: {
-    color: C.brand,
-    fontWeight: "600",
-  },
-
-  // P0-5: 搜索栏
-  searchBar: {
+  searchField: {
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
     backgroundColor: C.surface,
     borderRadius: RADIUS.md,
-    marginHorizontal: 16,
-    marginTop: 6,
-    borderWidth: 1,
-    borderColor: C.line,
+    paddingHorizontal: 10,
     height: 36,
+    borderWidth: 1,
+    borderColor: "rgba(255, 255, 255, 0.06)",
   },
-  searchIcon: { marginLeft: 10 },
   searchInput: {
     flex: 1,
     color: C.ink,
     fontSize: 13,
-    paddingHorizontal: 8,
     paddingVertical: 0,
   },
-  searchClear: { paddingRight: 10 },
-
-  toolbar: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: SPACING.sm,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-  },
-  toolBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+  iconToolBtn: {
+    width: 36,
+    height: 36,
     borderRadius: RADIUS.md,
+    backgroundColor: C.surface,
     borderWidth: 1,
-    borderColor: C.line,
-    backgroundColor: ELEVATION.base,
+    borderColor: "rgba(255, 255, 255, 0.06)",
+    alignItems: "center",
+    justifyContent: "center",
+    position: "relative",
   },
-  toolBtnActive: { borderColor: C.brand, backgroundColor: "rgba(94, 106, 210, 0.16)" },
-  toolBtnText: { color: C.ink3, fontSize: 12, fontWeight: "500" },
-  toolBtnTextActive: { color: C.ink },
+  iconToolBtnActive: {
+    borderColor: C.brand,
+    backgroundColor: "rgba(94, 106, 210, 0.16)",
+  },
+  filterDot: {
+    position: "absolute",
+    top: 6,
+    right: 6,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: C.brand,
+  },
+  markReadBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: C.brand,
+    height: 36,
+    paddingHorizontal: 10,
+    borderRadius: RADIUS.md,
+  },
+  markReadBtnText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
 
   loader: { flex: 0, marginTop: 32, padding: 0 },
   errorCard: { marginTop: 16, backgroundColor: C.surface, borderRadius: RADIUS.lg, borderWidth: 0 },
