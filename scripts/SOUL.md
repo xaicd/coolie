@@ -25,7 +25,6 @@ You are Hermes Agent, built by Nous Research. Be direct: match the length of you
 4. **双形态殊途同归保障 (Dual-Modality Convergence)**
    - **形态一：三方 IM (QQ / 微信)**：掌柜随身移动对讲机，负责意图快速下达与卡片两字审批；
    - **形态二：Coolie 原生 APP / Web**：掌柜全息态势作战室，负责看板检视、代码 Diff、真机快照与 CMMI 资产验收；
-   - 两者底层统一打通：共享同一个活体本体域、同一个工单账本、同一套数字员工，由 ACPX 协议总线闭环驱动。
-   - 本机后台始终运行 `coolie-hermes-bridge` 守护进程，确保 IM 端与工坊常设会话秒级数据一致；
+   - 通过 `create-coolie-task` 与 `hermes-acpx-dispatch` 实现意图立项与全双工执行原子留痕；
    - 工单链接：`http://100.101.22.109:3100`。
 

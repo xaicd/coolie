@@ -332,16 +332,16 @@ server.listen(PORT, TAILSCALE_IP, () => {
 `;
 fs.writeFileSync(path.join(stageDir, "bin/tailscale-proxy.js"), proxyScript, { mode: 0o755 });
 
-// 5.2.1 拷贝 Hermes 双轨实时同步守护脚本 coolie-hermes-bridge.py 与历史追溯工具
-const bridgeSrc = path.resolve(repoRoot, "scripts/coolie-hermes-bridge.py");
-const syncHistorySrc = path.resolve(repoRoot, "scripts/sync-qq-history.py");
-if (fs.existsSync(bridgeSrc)) {
-  fs.copyFileSync(bridgeSrc, path.join(stageDir, "bin/coolie-hermes-bridge.py"));
-  fs.chmodSync(path.join(stageDir, "bin/coolie-hermes-bridge.py"), 0o755);
+// 5.2.1 拷贝 Hermes 正统全双工 ACPX 派工工具与任务创建工具
+const acpxDispatchSrc = path.resolve(repoRoot, "scripts/hermes-acpx-dispatch.sh");
+const createTaskSrc = path.resolve(repoRoot, "scripts/create-coolie-task.mjs");
+if (fs.existsSync(acpxDispatchSrc)) {
+  fs.copyFileSync(acpxDispatchSrc, path.join(stageDir, "bin/hermes-acpx-dispatch"));
+  fs.chmodSync(path.join(stageDir, "bin/hermes-acpx-dispatch"), 0o755);
 }
-if (fs.existsSync(syncHistorySrc)) {
-  fs.copyFileSync(syncHistorySrc, path.join(stageDir, "bin/sync-qq-history.py"));
-  fs.chmodSync(path.join(stageDir, "bin/sync-qq-history.py"), 0o755);
+if (fs.existsSync(createTaskSrc)) {
+  fs.copyFileSync(createTaskSrc, path.join(stageDir, "bin/create-coolie-task.mjs"));
+  fs.chmodSync(path.join(stageDir, "bin/create-coolie-task.mjs"), 0o755);
 }
 
 // 5.3 生成自包含生产级 CLI 启动脚本 bin/coolie-dev
@@ -353,7 +353,7 @@ const launcherScript = `#!/usr/bin/env bash
 # 1. 零破坏: 继承宿主机已有的 hermes / claude / cmd / agy / kiro-cli，严禁覆盖或卸载
 # 2. 原地接管: 自动识别已有的文旅项目 (wenlv-next) 与 Hermes 记忆
 # 3. 独立安全: 独立嵌入式数据库与工作区，脱离源码运行
-# 4. 双轨并轨: 自动挂载 Hermes (QQ/微信) 实时同步守护桥接器 (coolie-hermes-bridge)
+# 4. 全双工驱动: 内置正统 ACPX 协议总线 (hermes-acpx-dispatch) 与任务直建 (create-coolie-task.mjs)
 # 5. 全息自检: 提供标准 health 体检子命令，杜绝通道断裂
 # ==============================================================================
 set -e
@@ -425,57 +425,19 @@ export PAPERCLIP_DEPLOYMENT_MODE="local_trusted"
 export PAPERCLIP_DEPLOYMENT_EXPOSURE="private"
 export NODE_ENV="production"
 
-BRIDGE_SCRIPT="$LAUNCHER_DIR/coolie-hermes-bridge.py"
-BRIDGE_PID_FILE="$DATA_DIR/bridge.pid"
-BRIDGE_LOG_FILE="$DATA_DIR/logs/bridge.log"
-
-start_bridge() {
-    if [ -f "$BRIDGE_SCRIPT" ]; then
-        if [ -f "$BRIDGE_PID_FILE" ] && kill -0 "\$(cat "$BRIDGE_PID_FILE" 2>/dev/null)" 2>/dev/null; then
-            echo "🟢 Hermes 实时同步守护桥接器已在运行 (PID: \$(cat "$BRIDGE_PID_FILE"))"
-        else
-            echo "🚀 正在后台拉起 Hermes 实时同步守护桥接器..."
-            nohup python3 "$BRIDGE_SCRIPT" > "$BRIDGE_LOG_FILE" 2>&1 &
-            echo \$! > "$BRIDGE_PID_FILE"
-            sleep 1
-            if kill -0 "\$(cat "$BRIDGE_PID_FILE" 2>/dev/null)" 2>/dev/null; then
-                echo "✅ Hermes 实时同步守护已就绪 (PID: \$(cat "$BRIDGE_PID_FILE"))"
-            fi
-        fi
-    fi
-}
-
-stop_bridge() {
-    if [ -f "$BRIDGE_PID_FILE" ]; then
-        BPID="\$(cat "$BRIDGE_PID_FILE" 2>/dev/null || true)"
-        if [ -n "\$BPID" ] && kill -0 "\$BPID" 2>/dev/null; then
-            kill "\$BPID" 2>/dev/null || true
-            sleep 1
-            echo "🛑 已停止 Hermes 同步桥接器 (PID: \$BPID)"
-        fi
-        rm -f "$BRIDGE_PID_FILE"
-    fi
-}
-
 cd "$COOLIE_HOME/lib/server"
 
 ACTION="\${1:-run}"
 case "$ACTION" in
     status)
-        if ss -tulpn 2>/dev/null | grep -q ":$PORT "; then
-            PID="\$(ss -tulpn 2>/dev/null | grep ":$PORT " | awk '{print \$NF}' | sed -E 's/.*pid=([0-9]+).*/\\1/' || true)"
+        if ss -tulpn 2>/dev/null | grep -q ":\$PORT "; then
+            PID="\$(ss -tulpn 2>/dev/null | grep ":\$PORT " | awk '{print \$NF}' | sed -E 's/.*pid=([0-9]+).*/\\1/' || true)"
             echo "🟢 Coolie Dev 控制面服务正在运行 (PID: \$PID, 本地端口: \$PORT)"
             if [ -n "\$TS_IP" ]; then
                 echo "  • Tailscale 直连地址: http://\$TS_IP:\$PORT"
             fi
         else
             echo "⚪ Coolie Dev 控制面服务未在运行"
-        fi
-        
-        if [ -f "$BRIDGE_PID_FILE" ] && kill -0 "\$(cat "$BRIDGE_PID_FILE" 2>/dev/null)" 2>/dev/null; then
-            echo "🟢 Hermes 双轨同步桥接守护正在运行 (PID: \$(cat "$BRIDGE_PID_FILE"))"
-        else
-            echo "⚪ Hermes 双轨同步桥接守护未在运行"
         fi
         exit 0
         ;;
@@ -484,8 +446,8 @@ case "$ACTION" in
         echo "🏥 Coolie Dev 生产级全栈环境深度健康体检"
         echo "========================================================"
         # 1. 检查控制面核心服务
-        if ss -tulpn 2>/dev/null | grep -q ":$PORT "; then
-            CP_PID="\$(ss -tulpn 2>/dev/null | grep ":$PORT " | awk '{print \$NF}' | sed -E 's/.*pid=([0-9]+).*/\\1/' || true)"
+        if ss -tulpn 2>/dev/null | grep -q ":\$PORT "; then
+            CP_PID="\$(ss -tulpn 2>/dev/null | grep ":\$PORT " | awk '{print \$NF}' | sed -E 's/.*pid=([0-9]+).*/\\1/' || true)"
             echo "  ✅ 控制面 Core Server: 正常运行 (PID: \$CP_PID, 端口: \$PORT)"
             COMPANIES="\$(curl -s -m 3 http://127.0.0.1:\$PORT/api/companies 2>/dev/null || echo "")"
             if [ -n "\$COMPANIES" ] && [ "\$COMPANIES" != "null" ]; then
@@ -514,16 +476,18 @@ case "$ACTION" in
             echo "  ⚠️ Hermes 状态库: 未检测到 (\$HOME/.hermes/state.db)"
         fi
 
-        # 4. 检查 Hermes 实时同步守护桥接器
-        if [ -f "$BRIDGE_PID_FILE" ] && kill -0 "\$(cat "$BRIDGE_PID_FILE" 2>/dev/null)" 2>/dev/null; then
-            BPID="\$(cat "$BRIDGE_PID_FILE")"
-            echo "  ✅ Hermes 双轨同步桥接器: 正常守护中 (PID: \$BPID)"
-            if [ -f "$DATA_DIR/bridge-sync-state.json" ]; then
-                LAST_ID="\$(grep -o '"last_synced_id": [0-9]*' "$DATA_DIR/bridge-sync-state.json" | awk '{print \$2}' || echo "0")"
-                echo "  • 同步水位 ID: \$LAST_ID"
+        # 4. 检查 ACPX 全双工协议总线
+        ACPX_BIN=""
+        for c in "\$(which acpx 2>/dev/null || echo "")" "\$COOLIE_HOME/lib/server/node_modules/.bin/acpx"; do
+            if [ -n "\$c" ] && [ -x "\$c" ]; then
+                ACPX_BIN="\$c"
+                break
             fi
+        done
+        if [ -n "\$ACPX_BIN" ]; then
+            echo "  ✅ ACPX 全双工协议总线: 就绪 (\$ACPX_BIN)"
         else
-            echo "  ⚠️ Hermes 双轨同步桥接器: 未在运行"
+            echo "  ⚠️ ACPX 全双工协议总线: 未检测到"
         fi
 
         # 5. 检查宿主机底层 7 大工具池
@@ -540,8 +504,7 @@ case "$ACTION" in
         exit 0
         ;;
     stop)
-        stop_bridge
-        PID="\$(ss -tulpn 2>/dev/null | grep ":$PORT " | awk '{print \$NF}' | sed -E 's/.*pid=([0-9]+).*/\\1/' || true)"
+        PID="\$(ss -tulpn 2>/dev/null | grep ":\$PORT " | awk '{print \$NF}' | sed -E 's/.*pid=([0-9]+).*/\\1/' || true)"
         if [ -n "\$PID" ]; then
             kill "\$PID" 2>/dev/null || true
             pkill -f tailscale-proxy.js 2>/dev/null || true
@@ -553,7 +516,7 @@ case "$ACTION" in
         exit 0
         ;;
     start)
-        if ss -tulpn 2>/dev/null | grep -q ":$PORT "; then
+        if ss -tulpn 2>/dev/null | grep -q ":\$PORT "; then
             echo "🟢 Coolie Dev 控制面已在运行中 (端口: \$PORT)"
         else
             echo "🚀 正在后台启动 Coolie Dev 控制面服务..."
@@ -563,8 +526,8 @@ case "$ACTION" in
                 nohup "\$NODE_BIN" "\$COOLIE_HOME/bin/tailscale-proxy.js" > "\$DATA_DIR/logs/proxy.log" 2>&1 </dev/null &
             fi
             sleep 1
-            if ss -tulpn 2>/dev/null | grep -q ":$PORT "; then
-                PID="\$(ss -tulpn 2>/dev/null | grep ":$PORT " | awk '{print \$NF}' | sed -E 's/.*pid=([0-9]+).*/\\1/' || true)"
+            if ss -tulpn 2>/dev/null | grep -q ":\$PORT "; then
+                PID="\$(ss -tulpn 2>/dev/null | grep ":\$PORT " | awk '{print \$NF}' | sed -E 's/.*pid=([0-9]+).*/\\1/' || true)"
                 echo "✅ Coolie Dev 后台启动就绪 (PID: \$PID, 端口: \$PORT)"
                 echo "  • 本机回环地址: http://127.0.0.1:\$PORT"
                 if [ -n "\$TS_IP" ]; then
@@ -575,7 +538,6 @@ case "$ACTION" in
                 echo "⏳ Coolie Dev 正在后台初始化，可通过 'coolie-dev logs' 查看进度"
             fi
         fi
-        start_bridge
         exit 0
         ;;
     restart)
@@ -638,7 +600,7 @@ mkdir -p "$TARGET_DIR"
 cp -R "$SRC_DIR/bin" "$TARGET_DIR/"
 cp -R "$SRC_DIR/conf" "$TARGET_DIR/"
 cp -R "$SRC_DIR/lib" "$TARGET_DIR/"
-chmod +x "$TARGET_DIR/bin/coolie-dev" "$TARGET_DIR/bin/link-packages.js" "$TARGET_DIR/bin/tailscale-proxy.js" "$TARGET_DIR/bin/coolie-hermes-bridge.py" "$TARGET_DIR/bin/sync-qq-history.py" 2>/dev/null || true
+chmod +x "$TARGET_DIR/bin/coolie-dev" "$TARGET_DIR/bin/link-packages.js" "$TARGET_DIR/bin/tailscale-proxy.js" "$TARGET_DIR/bin/hermes-acpx-dispatch" "$TARGET_DIR/bin/create-coolie-task.mjs" 2>/dev/null || true
 
 # 2. 建立命令行全局快捷方式
 mkdir -p "$HOME/.local/bin"
