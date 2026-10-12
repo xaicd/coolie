@@ -378,8 +378,13 @@ if [ -z "$NODE_BIN" ]; then
     NODE_BIN="$(which node 2>/dev/null || echo "node")"
 fi
 
-# 2. 继承宿主机已有的各种 CLI 工具链 (PATH 优先)
-export PATH="$HOME/.local/bin:$HOME/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
+# 2. 继承宿主机已有的各种 CLI 工具链与 Node 运行时 (PATH 优先，保障 sub-process 与 acpx/cmd 运行在 Node 22+)
+if [ -n "$NODE_BIN" ]; then
+    NODE_DIR="$(dirname "$NODE_BIN")"
+    export PATH="$NODE_DIR:$HOME/.local/bin:$HOME/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
+else
+    export PATH="$HOME/.local/bin:$HOME/bin:/usr/local/bin:/opt/homebrew/bin:$PATH"
+fi
 
 # 3. 独立嵌入式数据目录 (绝对不碰宿主机已有数据库)
 DATA_DIR="\${COOLIE_DATA_DIR:-$HOME/.coolie-dev/data}"
