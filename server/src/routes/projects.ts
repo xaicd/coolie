@@ -1,6 +1,11 @@
+import { execSync } from "node:child_process";
+import fs from "node:fs";
+import path from "node:path";
 import { createHash } from "node:crypto";
 import { and, eq, sql } from "drizzle-orm";
-import { activityLog, issues } from "@paperclipai/db";
+import { activityLog, issues, issueWorkProducts } from "@paperclipai/db";
+import { advanceProjectCmmiStage } from "../services/project-cmmi-wbs-bootstrap.js";
+import { resolveProjectCoolieDocsDir } from "../home-paths.js";
 import { projectToolContext } from "../services/project-tool-context.js";
 import { persistActivity, publishActivity } from "../services/activity-log.js";
 import { z } from "zod";
@@ -59,7 +64,6 @@ import { environmentService } from "../services/environments.js";
 import { secretService } from "../services/secrets.js";
 import { ensureProjectOntologyDomain } from "../services/project-ontology-bootstrap.js";
 import { ensureProjectBoardConversation } from "../services/project-board-conversation.js";
-import { advanceProjectCmmiStage } from "../services/project-cmmi-wbs-bootstrap.js";
 
 const WORKSPACE_CONTROL_OUTPUT_MAX_CHARS = 256 * 1024;
 const SHARED_WORKSPACE_STOP_AND_RESTART_ACTIONS = new Set(["stop", "restart"]);
@@ -731,6 +735,161 @@ export function projectRoutes(db: Db) {
       res.status(200).json(advanceResult);
     } catch (err: any) {
       res.status(400).json({ error: err.message || "Failed to advance CMMI stage" });
+    }
+  });
+
+  // ── wave367: CMMI 单阶段按需生成 (On-Demand Single-Stage Asset Generation) ───
+  router.post("/companies/:companyId/projects/:projectId/cmmi/generate-stage", async (req, res) => {
+    const companyId = req.params.companyId as string;
+    const projectId = req.params.projectId as string;
+    assertCompanyAccess(req, companyId);
+    const project = await loadWbsProject(req, res, companyId, projectId);
+    if (!project) return;
+
+    const rawStage = String(req.body?.stage || req.body?.phase || "").trim();
+    if (!rawStage) {
+      res.status(400).json({ error: "stage is required (e.g. '01' ~ '09')" });
+      return;
+    }
+
+    try {
+      const docsDir = resolveProjectCoolieDocsDir(companyId, projectId);
+      if (!fs.existsSync(docsDir)) {
+        fs.mkdirSync(docsDir, { recursive: true });
+      }
+
+      // 检查该项目是否存在关联工作区目录
+      const workspaces = await svc.listWorkspaces(projectId).catch(() => []);
+      const targetDirs = [docsDir];
+      for (const ws of workspaces) {
+        if (ws && typeof (ws as any).workspacePath === "string" && (ws as any).workspacePath) {
+          targetDirs.push((ws as any).workspacePath);
+        } else if (ws && typeof (ws as any).cwd === "string" && (ws as any).cwd) {
+          targetDirs.push((ws as any).cwd);
+        }
+      }
+
+      const scriptPath = path.resolve(process.cwd(), "scripts/generate-cmmi-stage.mjs");
+      let generatedFiles: string[] = [];
+
+      for (const tDir of targetDirs) {
+        if (!fs.existsSync(tDir)) continue;
+        if (fs.existsSync(scriptPath)) {
+          const out = execSync(`node "${scriptPath}" "${tDir}" "${rawStage}" "${project.name}"`, {
+            encoding: "utf8",
+            timeout: 10000,
+          });
+          try {
+            const lines = out.trim().split("\n");
+            const lastLine = lines[lines.length - 1];
+            const parsed = JSON.parse(lastLine);
+            if (Array.isArray(parsed.generatedFiles) && parsed.generatedFiles.length > 0) {
+              generatedFiles = parsed.generatedFiles;
+            }
+          } catch {}
+        }
+      }
+
+      // 门禁因果映射：将阶段编号映射至门禁并激活对应 WBS 任务与工件占位
+      const normalizedStageNum = rawStage.replace(/^0?(\d+).*/, "$1").padStart(2, "0");
+      const gateMap: Record<string, CmmiGateKey> = {
+        "01": "gate_g1_spec",
+        "02": "gate_g1_spec",
+        "03": "gate_g2_arch",
+        "04": "gate_g3_compile",
+        "05": "gate_g4_eval",
+        "06": "gate_g4_eval",
+        "07": "gate_g5_release",
+        "08": "gate_g6_sre",
+        "09": "gate_g7_ops",
+      };
+
+      const matchedGate = gateMap[normalizedStageNum];
+      const actor = getActorInfo(req);
+      if (matchedGate) {
+        await advanceProjectCmmiStage(db, {
+          companyId,
+          projectId,
+          completedGate: matchedGate,
+          actorUserId: actor.actorType === "user" ? actor.actorId : null,
+        }).catch(() => null);
+      }
+
+      // 将物理生成的阶段文件登记为 issueWorkProducts
+      for (const relPath of generatedFiles) {
+        const title = `[CMMI ${normalizedStageNum}] ${path.basename(relPath)}`;
+        const existingWp = await db
+          .select({ id: issueWorkProducts.id })
+          .from(issueWorkProducts)
+          .where(
+            and(
+              eq(issueWorkProducts.companyId, companyId),
+              eq(issueWorkProducts.projectId, projectId),
+              eq(issueWorkProducts.title, title),
+            ),
+          )
+          .limit(1);
+
+        if (existingWp.length === 0) {
+          const [projectIssue] = await db
+            .select({ id: issues.id })
+            .from(issues)
+            .where(
+              and(
+                eq(issues.companyId, companyId),
+                eq(issues.projectId, projectId),
+              ),
+            )
+            .limit(1);
+
+          if (projectIssue) {
+            await db.insert(issueWorkProducts).values({
+              companyId,
+              projectId,
+              issueId: projectIssue.id,
+              type: "deliverable",
+              provider: "paperclip",
+              title,
+              status: "active",
+              isPrimary: false,
+              summary: `按需单阶段生成的 CMMI 阶段规范资产：${relPath}`,
+              metadata: {
+                resourceRef: {
+                  kind: "workspace_file",
+                  relativePath: relPath,
+                  displayPath: relPath,
+                },
+                cmmiPhase: normalizedStageNum,
+              },
+            }).catch(() => null);
+          }
+        }
+      }
+
+      await logActivity(db, {
+        companyId,
+        actorType: actor.actorType,
+        actorId: actor.actorId,
+        agentId: actor.agentId,
+        runId: actor.runId,
+        action: "project.cmmi_stage_generated",
+        entityType: "project",
+        entityId: project.id,
+        details: {
+          stage: rawStage,
+          normalizedStage: normalizedStageNum,
+          generatedFiles,
+        },
+      });
+
+      res.status(200).json({
+        success: true,
+        stage: normalizedStageNum,
+        generatedFiles,
+        message: `成功生成阶段 ${normalizedStageNum} 规范资产 (${generatedFiles.length} 个文件)`,
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message || "Failed to generate CMMI stage assets" });
     }
   });
 

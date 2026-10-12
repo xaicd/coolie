@@ -384,7 +384,7 @@ export function ArtifactsScreen({
     [projects],
   );
 
-  // 统计各分类数量
+  // 统计各分类数量 (严格对齐选定项目，避免历史无项目或跨项目数据污染)
   const counts = useMemo(() => {
     let images = 0;
     let documents = 0;
@@ -394,23 +394,31 @@ export function ArtifactsScreen({
       const text = `${name ?? ""} ${desc ?? ""}`.toLowerCase();
       return /srs|hld|lld|atp|cmp|car|decision|需求|概要设计|详细设计|验收|投产|合规|门禁|基线/.test(text);
     };
-    for (const a of artifacts) {
+    const scoped = selectedProjectId
+      ? artifacts.filter((a) => a.project?.id === selectedProjectId)
+      : artifacts;
+
+    for (const a of scoped) {
       if (a.source === "work_product") workProducts += 1;
       if (a.mediaKind === "image") images += 1;
       if (a.mediaKind === "document" || a.mediaKind === "text") documents += 1;
       if (isCmmiDoc(a.title, a.previewText ?? undefined)) cmmiBaselines += 1;
     }
     return {
-      all: artifacts.length,
+      all: scoped.length,
       cmmi_baseline: cmmiBaselines,
       image: images,
       document: documents,
       work_product: workProducts,
     };
-  }, [artifacts]);
+  }, [artifacts, selectedProjectId]);
 
   const filteredList = useMemo(() => {
     let list = artifacts;
+    // 严格项目隔离：若选中了项目，则坚决过滤，杜绝历史无项目或跨项目数据污染
+    if (selectedProjectId) {
+      list = list.filter((a) => a.project?.id === selectedProjectId);
+    }
     if (filter === "cmmi_baseline") {
       const pattern = /srs|hld|lld|atp|cmp|car|decision|需求|概要设计|详细设计|验收|投产|合规|门禁|基线/i;
       list = list.filter((a) => pattern.test(`${a.title ?? ""} ${a.previewText ?? ""}`));
@@ -429,7 +437,7 @@ export function ArtifactsScreen({
     }
 
     return list;
-  }, [artifacts, filter, selectedAgentId]);
+  }, [artifacts, filter, selectedAgentId, selectedProjectId]);
 
   const handleCardPress = (artifact: CompanyArtifact) => {
     if (artifact.mediaKind === "image") {

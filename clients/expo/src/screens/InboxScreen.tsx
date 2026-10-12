@@ -461,6 +461,10 @@ export function InboxScreen({
               coolie
                 .listJoinRequests(company.id, "pending_approval")
                 .catch(() => [] as InboxJoinRequestItem[]),
+              useNotificationsStore
+                .getState()
+                .load(company.id, { silent: true })
+                .catch(() => null),
             ]);
           if (controller.signal.aborted) return;
           if (loadReqIdRef.current !== reqId) return;
@@ -555,14 +559,21 @@ export function InboxScreen({
     [issues, archivedIds],
   );
 
+  // 通知源与顶栏铃铛同源 (useNotificationsStore), 用于让「未读」Tab 与铃铛数字恒等。
+  const notifItems = useNotificationsStore((s) => s.items);
+
   // P0-2: 未读状态判定
   const getIsUnread = useCallback(
     (issue: Issue): boolean => {
       if (readIds.has(issue.id)) return false;
       if (unreadIds.has(issue.id)) return true;
-      return Boolean(issue.isUnreadForMe);
+      if (issue.isUnreadForMe) return true;
+      // 若通知列表中存在指向该工单的未读通知，亦判定为未读
+      return notifItems.some(
+        (n) => !n.read && (n.target?.id === issue.id || n.id.endsWith(issue.id)),
+      );
     },
-    [readIds, unreadIds],
+    [readIds, unreadIds, notifItems],
   );
 
   // P0-3: 单条切换已读/未读
@@ -871,9 +882,6 @@ export function InboxScreen({
     return items;
   }, [activeIssues, approvals, failures, joinRequests, debouncedQuery]);
 
-  // 通知源与顶栏铃铛同源 (useNotificationsStore), 用于让「未读」Tab 与铃铛数字恒等。
-  const notifItems = useNotificationsStore((s) => s.items);
-
   // P1-1: Unread Tab —— 与顶栏铃铛同一通知口径 (buildFeed)。
   // 铃铛 unreadCount = 通知未读条数; 本 Tab 直接按同一份通知逐条渲染, 保证
   // 「铃铛 N = 收件箱未读 N」, 消灭「铃铛 7 / 进去 0」的数据不一致。
@@ -883,6 +891,10 @@ export function InboxScreen({
       if (n.read) continue;
       const ts = new Date(n.createdAt).getTime();
       const rawId = n.id.includes(":") ? n.id.split(":").pop()! : n.id;
+      // 乐观过滤：若已在本地已读集合中，即刻跳过，实现退出详情时未读列表秒级扣减
+      if (rawId && readIds.has(rawId)) continue;
+      if (n.target?.id && readIds.has(n.target.id)) continue;
+      if (readIds.has(n.id)) continue;
 
       if (n.target?.kind === "approval") {
         const approval =
@@ -942,7 +954,7 @@ export function InboxScreen({
 
     filtered.sort((a, b) => b.timestamp - a.timestamp);
     return filtered;
-  }, [notifItems, approvals, failures, mentions, issueById, debouncedQuery]);
+  }, [notifItems, approvals, failures, mentions, issueById, debouncedQuery, readIds]);
 
   // P1-3: All 全盘跨实体聚合工作项 (根据 allCategoryFilter 过滤)
   const allTabWorkItems = useMemo((): MobileInboxWorkItem[] => {
@@ -1166,22 +1178,20 @@ export function InboxScreen({
     [agentNameById],
   );
 
-  // 🛡️ 核心修复: 点进工单自动置为已读并递减铃铛红点
+  // 🛡️ 核心修复: 点进工单自动置为已读并即刻扣减铃铛红点与未读列表
   const handleOpenIssueAndMarkRead = useCallback(
     (issue: Issue) => {
-      if (getIsUnread(issue)) {
-        setReadIds((prev) => new Set(prev).add(issue.id));
-        setUnreadIds((prev) => {
-          const next = new Set(prev);
-          next.delete(issue.id);
-          return next;
-        });
-        void coolie.markIssueRead(issue.id).catch(() => null);
-        void useNotificationsStore.getState().markRead(issue.id).catch(() => null);
-      }
+      setReadIds((prev) => new Set(prev).add(issue.id));
+      setUnreadIds((prev) => {
+        const next = new Set(prev);
+        next.delete(issue.id);
+        return next;
+      });
+      void coolie.markIssueRead(issue.id).catch(() => null);
+      void useNotificationsStore.getState().markRead(issue.id).catch(() => null);
       onOpenIssue(issue);
     },
-    [getIsUnread, onOpenIssue],
+    [onOpenIssue],
   );
 
   const openMention = useCallback(
@@ -1603,6 +1613,10 @@ export function InboxScreen({
                       title={item.title}
                       description={item.description}
                       tone={item.tone}
+                      onPress={() => {
+                        setReadIds((prev) => new Set(prev).add(item.id));
+                        void useNotificationsStore.getState().markRead(item.id).catch(() => null);
+                      }}
                     />
                   );
                 }
@@ -2159,15 +2173,18 @@ function AlertRow({
   title,
   description,
   tone = "warn",
+  onPress,
 }: {
   title: string;
   description: string;
   tone?: "warn" | "err";
+  onPress?: () => void;
 }) {
   const isErr = tone === "err";
   return (
     <AppCard
       variant="surface"
+      onPress={onPress}
       style={[
         styles.alertCard,
         { borderColor: isErr ? "rgba(239, 68, 68, 0.4)" : "rgba(234, 179, 8, 0.4)" },

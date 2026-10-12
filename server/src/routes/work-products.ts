@@ -1,6 +1,6 @@
 import { Router } from "express";
 import { z } from "zod";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, or } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
 import { issueWorkProducts, issues as issuesTable } from "@paperclipai/db";
 import { workProductService } from "../services/work-products.js";
@@ -15,7 +15,7 @@ import { badRequest, notFound } from "../errors.js";
  * exists; this adds the company-scoped list endpoint the App's boss dashboard
  * actually calls.
  *
- *   GET  /api/companies/:companyId/work-products?type=&limit=&agentId=
+ *   GET  /api/companies/:companyId/work-products?type=&limit=&agentId=&projectId=
  *   GET  /api/companies/:companyId/work-products/:id
  *   GET  /api/companies/:companyId/work-products/artifacts/code?limit=
  *
@@ -27,6 +27,7 @@ const listQuerySchema = z.object({
   type: z.string().trim().min(1).max(64).optional(),
   agentId: z.string().uuid().optional(),
   issueId: z.string().uuid().optional(),
+  projectId: z.string().uuid().optional(),
   limit: z.coerce.number().int().min(1).max(500).optional(),
   refreshPullRequests: z
     .union([z.literal("true"), z.literal("false")])
@@ -87,11 +88,19 @@ export function workProductsRoutes(db: Db) {
     if (!parsed.success) {
       throw badRequest("Invalid work-products query", parsed.error.issues);
     }
-    const { type, agentId, issueId, limit, refreshPullRequests } = parsed.data;
+    const { type, agentId, issueId, projectId, limit, refreshPullRequests } = parsed.data;
 
     const conditions = [eq(issueWorkProducts.companyId, companyId)];
     if (type) conditions.push(eq(issueWorkProducts.type, type));
     if (issueId) conditions.push(eq(issueWorkProducts.issueId, issueId));
+    if (projectId) {
+      conditions.push(
+        or(
+          eq(issueWorkProducts.projectId, projectId),
+          eq(issuesTable.projectId, projectId),
+        )!,
+      );
+    }
 
     let rows = await db
       .select({
@@ -115,6 +124,7 @@ export function workProductsRoutes(db: Db) {
         updatedAt: issueWorkProducts.updatedAt,
       })
       .from(issueWorkProducts)
+      .leftJoin(issuesTable, eq(issueWorkProducts.issueId, issuesTable.id))
       .where(and(...conditions))
       .orderBy(desc(issueWorkProducts.updatedAt))
       .limit(limit ?? 100);

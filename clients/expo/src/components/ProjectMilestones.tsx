@@ -45,6 +45,8 @@ export function ProjectMilestones({
   const [wbs, setWbs] = useState<ProjectWbsView | null>(null);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
+  const [generatingStage, setGeneratingStage] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
@@ -58,6 +60,25 @@ export function ProjectMilestones({
       setLoading(false);
     }
   }, [companyId, projectId]);
+
+  const handleGenerateStage = useCallback(
+    async (stageKey: string) => {
+      setGeneratingStage(stageKey);
+      setError(null);
+      try {
+        const res = await (coolie as any).generateProjectCmmiStage(companyId, projectId, stageKey);
+        setToast(res?.message || `阶段 ${stageKey} 规范资产已生成`);
+        setTimeout(() => setToast(null), 3000);
+        await load();
+        onChanged?.();
+      } catch (e) {
+        setError(String((e as Error)?.message ?? e));
+      } finally {
+        setGeneratingStage(null);
+      }
+    },
+    [companyId, projectId, load, onChanged],
+  );
 
   useEffect(() => {
     void load();
@@ -145,9 +166,16 @@ export function ProjectMilestones({
         </View>
       ) : null}
 
+      {toast ? (
+        <View style={styles.toastBanner}>
+          <Text style={styles.toastText}>✓ {toast}</Text>
+        </View>
+      ) : null}
+
       <View style={styles.phaseList}>
         {wbs.mainline.phases.map((phase) => {
           const status = phase.milestone?.status ?? "not_started";
+          const isBusyThis = generatingStage === phase.key;
           return (
             <View key={phase.key} style={styles.phaseRow}>
               <View style={styles.phaseMain}>
@@ -159,6 +187,20 @@ export function ProjectMilestones({
                   {phase.milestone ? STATUS_LABEL[status] : "未采纳"}
                 </Text>
               </View>
+              <Pressable
+                style={[
+                  styles.stageActionBtn,
+                  isBusyThis && styles.actionDisabled,
+                ]}
+                onPress={() => void handleGenerateStage(phase.key)}
+                disabled={generatingStage !== null}
+                accessibilityRole="button"
+                accessibilityLabel={`生成 ${phase.name} 规范资产`}
+              >
+                <Text style={styles.stageActionBtnText}>
+                  {isBusyThis ? "…" : phase.milestone?.status === "achieved" ? "补充" : "生成"}
+                </Text>
+              </Pressable>
             </View>
           );
         })}
@@ -285,6 +327,33 @@ const styles = StyleSheet.create({
   },
   blockedWarning: {
     color: C.err,
+    fontSize: 11,
+  },
+  stageActionBtn: {
+    borderWidth: 1,
+    borderColor: C.accent,
+    backgroundColor: "rgba(113, 112, 255, 0.1)",
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: 2,
+    minWidth: 42,
+    alignItems: "center",
+  },
+  stageActionBtnText: {
+    color: C.accent,
+    fontSize: 11,
+    fontWeight: "600",
+  },
+  toastBanner: {
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
+    borderWidth: 1,
+    borderColor: C.ok,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: SPACING.sm,
+    paddingVertical: SPACING.xs,
+  },
+  toastText: {
+    color: C.ok,
     fontSize: 11,
   },
 });

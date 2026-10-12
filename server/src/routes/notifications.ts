@@ -71,10 +71,19 @@ async function computeUnreadCount(db: Db, companyId: string, userId: string): Pr
   const persistedDismissals = await inboxDismissalService(db).list(companyId, userId);
   const dismissedKeys = new Set(persistedDismissals.map((d: any) => d.itemKey));
   const memoryRead = readSetFor(userId);
-  const notifications = items.map((item) => ({
-    ...item,
-    read: dismissedKeys.has(rawNotificationId(item.id)) || memoryRead.has(item.id),
-  }));
+  const notifications = items.map((item) => {
+    const raw = rawNotificationId(item.id);
+    const isRead =
+      dismissedKeys.has(raw) ||
+      (item.target?.id ? dismissedKeys.has(item.target.id) : false) ||
+      memoryRead.has(item.id) ||
+      memoryRead.has(raw) ||
+      (item.target?.id ? memoryRead.has(item.target.id) : false);
+    return {
+      ...item,
+      read: isRead,
+    };
+  });
   return notifications.filter((item) => !item.read).length;
 }
 
@@ -221,16 +230,21 @@ export function notificationRoutes(db: Db) {
     const dismissedKeys = new Set(persistedDismissals.map((d) => d.itemKey));
     const memoryRead = readSetFor(userId);
     const notifications = items.map((item) => {
-      // 精准数据: dismissal table 存 raw UUID, 拆分 feed item.id 后查 rawId。
-      const rawId = rawNotificationId(item.id);
+      const raw = rawNotificationId(item.id);
+      const isRead =
+        dismissedKeys.has(raw) ||
+        (item.target?.id ? dismissedKeys.has(item.target.id) : false) ||
+        memoryRead.has(item.id) ||
+        memoryRead.has(raw) ||
+        (item.target?.id ? memoryRead.has(item.target.id) : false);
       return {
         ...item,
-        read: dismissedKeys.has(rawId) || memoryRead.has(item.id),
+        read: isRead,
       };
     });
 
     // 数据一致: unreadCount 走同一个服务端权威函数, 与 PATCH /:id/read 返回值同源
-    const unreadCount = notifications.filter((item) => !item.read).length;
+    const unreadCount = await computeUnreadCount(db, companyId, userId);
     res.json({ notifications, unreadCount });
   });
 
@@ -239,16 +253,38 @@ export function notificationRoutes(db: Db) {
     const companyId = readCompanyId(req.query.companyId);
     assertCompanyAccess(req, companyId);
     const id = req.params.id as string;
-    // 精准数据: id 格式为 "approval:UUID" / "mention:UUID" / "activity:UUID",
-    // dismissal table 存的是 raw UUID, 拆分后查询才命中。
     const rawId = rawNotificationId(id);
     const userId = req.actor.userId || "board";
-    readSetFor(userId).add(id);
+    const mem = readSetFor(userId);
+    mem.add(id);
+    mem.add(rawId);
     try {
       await dismissalSvc.dismiss(companyId, userId, rawId);
     } catch {
       // 容错持久化
     }
+
+    // 联动清除：若传入的是 issueId 或 raw UUID，同时将所有关联的通知项标记已读
+    try {
+      const feedItems = await buildFeed(db, companyId, 50);
+      for (const item of feedItems) {
+        const itemRaw = rawNotificationId(item.id);
+        const matches =
+          item.id === id ||
+          itemRaw === id ||
+          itemRaw === rawId ||
+          (item.target?.id && (item.target.id === id || item.target.id === rawId));
+        if (matches) {
+          mem.add(item.id);
+          mem.add(itemRaw);
+          if (item.target?.id) mem.add(item.target.id);
+          try {
+            await dismissalSvc.dismiss(companyId, userId, itemRaw);
+          } catch {}
+        }
+      }
+    } catch {}
+
     // 数据一致: 返回服务端最新 unreadCount, 客户端以服务端为权威值覆盖乐观值
     const unreadCount = await computeUnreadCount(db, companyId, userId);
     res.json({ id, read: true, unreadCount });

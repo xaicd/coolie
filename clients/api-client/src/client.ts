@@ -732,6 +732,19 @@ export class CoolieClient {
     );
   }
 
+  /** 按需单阶段生成 CMMI 规范资产与工作产品。 */
+  async generateProjectCmmiStage(
+    companyId: string,
+    projectId: string,
+    stage: string,
+  ): Promise<{ success: boolean; stage: string; generatedFiles: string[]; message?: string }> {
+    return this.request<{ success: boolean; stage: string; generatedFiles: string[]; message?: string }>(
+      "POST",
+      `/api/companies/${encodeURIComponent(companyId)}/projects/${encodeURIComponent(projectId)}/cmmi/generate-stage`,
+      { stage },
+    );
+  }
+
   /**
    * Labels a task can carry — `GET /companies/:id/labels`.
    *

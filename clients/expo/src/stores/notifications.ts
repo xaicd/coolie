@@ -51,22 +51,34 @@ export const useNotificationsStore = create<NotificationsState>((set, get) => ({
 
   markRead: async (id) => {
     const { companyId, items, unreadCount } = get();
-    // 精准幂等: 已读条目直接 return, 避免重复 API 调用和状态抖动
-    const existing = items.find((item) => item.id === id);
-    if (existing?.read) return;
-    // 乐观更新: 本地立刻 -1 (与服务端同步写入并行)
-    const next = items.map((item) => (item.id === id ? { ...item, read: true } : item));
-    const nextUnread = Math.max(0, unreadCount - 1);
+    // 灵活匹配：id 可以是完整复合 ID (如 "failure:UUID")、raw UUID 或 target.id (如关联的 issueId)
+    const matches = (item: NotificationItem) => {
+      if (item.id === id) return true;
+      if (item.id.includes(":") && item.id.split(":").pop() === id) return true;
+      if (item.target?.id === id) return true;
+      return false;
+    };
+
+    const matchingItems = items.filter(matches);
+    const unreadMatches = matchingItems.filter((i) => !i.read);
+    // 精准幂等: 若没有匹配到未读条目，直接 return
+    if (unreadMatches.length === 0) return;
+
+    // 乐观更新: 匹配项全部置为已读，未读计数精准扣减
+    const next = items.map((item) => (matches(item) ? { ...item, read: true } : item));
+    const nextUnread = Math.max(0, unreadCount - unreadMatches.length);
     set({ items: next, unreadCount: nextUnread });
+
     if (!companyId) return;
     try {
-      // 服务端返回最新 unreadCount 作为权威值, 覆盖乐观值, 保证数据一致
-      const result = await coolie.markNotificationRead(id, companyId);
+      // 向服务端回写已读状态 (优先使用具体通知项 ID，服务端会联动清除)
+      const targetIdToSend = unreadMatches[0]?.id || id;
+      const result = await coolie.markNotificationRead(targetIdToSend, companyId);
       if (typeof result?.unreadCount === "number") {
         set({ unreadCount: result.unreadCount });
       }
     } catch {
-      // 已读写入是尽力而为, 失败不打扰用户; 下次 load 会纠正
+      // 已读写入尽力而为
     }
   },
 
