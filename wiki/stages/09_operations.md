@@ -1,7 +1,7 @@
 # 阶段交付百科：09_operations 商业化持续运营与对账平账 (Ops & Reconciliation)
 
 > **所属生命周期**：CMMI 截断阶段 09 | **主责数字员工**：百晓生 (DS) / 掌柜 (CEO)  
-> **核心专属 Skills**：`cmmi-asset-authoring`, `financial-reconciliation-agent`, `ceo-company-ops`, `finance-budget-guard`
+> **核心专属 Skills**：`cmmi-asset-authoring`, `financial-reconciliation-agent`, `ceo-company-ops`, `finance-budget-guard`, `agent-device-browser-automation`
 
 ---
 

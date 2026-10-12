@@ -58,6 +58,7 @@
 | `coolie-boss-decision-log` (P1) | Hermes (PM) | 记录老板拍板决策点, 跨班次交付时对齐 | wave268 前后 |
 | `hr-agent-onboarding` (P1) | Hermes (PM) | 新员工/新 agent 入职装配流程 | wave258 |
 | `company-creator` (P2, upstream) | 墨斗/百晓生 | agentcompanies/v1 公司包脚手架 (上游资产, 不改) | upstream |
+| `agent-device-browser-automation` (P0) | 门神 / 百晓生 | agent-device 与 agent-browser 双端真机自动化测试、G4/G5 门禁验证与常态化巡检运营 | wave375 |
 
 **wave285 定版**: aja-pc/wenlv 系统 32 个定制 skills 曾引入后**全量回滚** (commit `36bb09d94` → `ee66f7a36`) — 老板原话「定制的 skills 就别乱学习」。定制 skill 内嵌对方环境绑定, 学习思想须基于 coolie 栈重写。
 

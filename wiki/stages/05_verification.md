@@ -1,7 +1,7 @@
 # 阶段交付百科：05_verification 变异测试打假与全栈验收 (Anti-Fake Mock)
 
 > **所属生命周期**：CMMI 截断阶段 05 | **主责数字员工**：门神 (FDSE) / 百晓生 (DS)  
-> **核心专属 Skills**：`cmmi-asset-authoring`, `cmmi-ver-val`, `mutation-tester`, `comprehensive-testing-workflow`, `qa-humanlike-e2e`
+> **核心专属 Skills**：`cmmi-asset-authoring`, `cmmi-ver-val`, `mutation-tester`, `comprehensive-testing-workflow`, `qa-humanlike-e2e`, `agent-device-browser-automation`
 
 ---
 

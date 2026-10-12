@@ -22,6 +22,8 @@
    - 核心操作严格收敛为两字按钮，底栏保持 2+1+2 = 5 槽位绝对居中对称，实体检视就地浮层覆盖。
 7. **Dev 与 Prod 物理隔离铁律 (公理七)**：
    - Dev 专事工坊自身建设，Prod 专事实体交付。
+8. **自动化测试、真机验证与常态化运营 (公理十七)**：
+   - 依托 agent-device 与 agent-browser，四态穷举、几何遮挡审查，机器存证入链 (No Artifact, No Done)。
 
 ---
 
@@ -49,11 +51,11 @@
 | **02** | 需求工程与规格 | 百晓生 (DS) / Hermes | `cmmi-asset-authoring`, `ears-spec-writer`, `cmmi-req-spec`, `spec-driven-dev` | [02_requirements.md](stages/02_requirements.md) |
 | **03** | 架构设计与契约 | 墨斗 (FDA) / 铁匠 (CoreSWE) | `cmmi-asset-authoring`, `cmmi-tech-solution`, `adr-architect`, `archify`, `cmmi-detailed-contracts` | [03_design.md](stages/03_design.md) |
 | **04** | 编码实现与防假 | 铁匠 (CoreSWE) | `cmmi-asset-authoring`, `core-swe`, `swe-delivery-flow`, `mutation-tester`, `mcp-builder` | [04_implementation.md](stages/04_implementation.md) |
-| **05** | 变异测试与全栈验收 | 门神 (FDSE) / 百晓生 (DS) | `cmmi-asset-authoring`, `cmmi-ver-val`, `mutation-tester`, `comprehensive-testing-workflow`, `qa-humanlike-e2e` | [05_verification.md](stages/05_verification.md) |
+| **05** | 变异测试与全栈验收 | 门神 (FDSE) / 百晓生 (DS) | `cmmi-asset-authoring`, `cmmi-ver-val`, `mutation-tester`, `comprehensive-testing-workflow`, `qa-humanlike-e2e`, `agent-device-browser-automation` | [05_verification.md](stages/05_verification.md) |
 | **06** | 质量门禁与过程控制 | 门神 (FDSE) / Hermes | `cmmi-asset-authoring`, `cmmi-car-spc-metrics`, `check-governance` | [06_quality_assurance.md](stages/06_quality_assurance.md) |
 | **07** | 容器交付与不可变投产 | 兜底渊 (SRE) | `cmmi-asset-authoring`, `cmmi-immutable-release`, `app-release-pipeline`, `sre-release-and-deploy` | [07_release.md](stages/07_release.md) |
 | **08** | SRE 可靠性与事故复盘 | 兜底渊 (SRE) | `cmmi-asset-authoring`, `sre-slo-manager`, `postmortem-analyzer`, `strix-penetration-testing`, `pre-sre` | [08_sre.md](stages/08_sre.md) |
-| **09** | 持续运营与对账平账 | 百晓生 (DS) / 掌柜 (CEO) | `cmmi-asset-authoring`, `financial-reconciliation-agent`, `ceo-company-ops`, `finance-budget-guard` | [09_operations.md](stages/09_operations.md) |
+| **09** | 持续运营与对账平账 | 百晓生 (DS) / 掌柜 (CEO) | `cmmi-asset-authoring`, `financial-reconciliation-agent`, `ceo-company-ops`, `finance-budget-guard`, `agent-device-browser-automation` | [09_operations.md](stages/09_operations.md) |
 
 ---
 

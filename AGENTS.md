@@ -496,3 +496,20 @@ explicitly says otherwise.
      host-exec "ssh tc-coolie-claw '<cmd>'"
      ```
 
+## 17. 自动化测试、真机验证与常态化运营公理 (Agent-Device & Agent-Browser Verification & Operations Axiom)
+
+1. **真实硬件与网络环境直连铁律**：
+   - 移动端自动化必须依托 `agent-device` 物理连接真实的 Android 模拟器 (Pixel/AVD) 或真机，容器内统一使用 `host-exec "agent-device <args>"` 穿透驱动；
+   - Web 端自动化必须依托 `agent-browser` (Playwright) 直连真实服务端口与 API 网络上下文，严禁纯静态脱机 Mock。
+2. **状态机四态穷举与假死按钮零容忍**：
+   - 页面与表单必须遍历四态：空态 (Empty)、加载态 (Loading)、成功态 (Success)、异常态 (Error)；
+   - 严禁存在点击无实质性网络请求或界面响应的“死穴假按钮”，一经发现立即阻断 G4 验收。
+3. **物理几何遮挡防伪审查**：
+   - 可交互性必须经由 `document.elementFromPoint(x, y)` 与 `getBoundingClientRect` 几何计算，严禁单纯依赖 DOM `isVisible()`；
+   - 彻底杜绝 Fixed 底部导航栏盖住提交按钮、悬浮层穿透、以及移动端软键盘呼出遮挡输入框/提交按钮的缺陷。
+4. **不可篡改机器存证与工件上链 (No Artifact, No Done)**：
+   - 每次测试、门禁走查或长效巡检必须输出结构化 JSON 报告 (`evidence/automation-run-report.json`) 与真机高保真截屏，并挂载至 Paperclip 控制面工件总线 (`issue_work_products`)。
+5. **双轨生命周期严格隔离**：
+   - 明确区分【阶段一：G4/G5 交付验收准出门禁】与【阶段二：生产长效常态化巡检运营】；详见 `.agents/rules/AGENT-DEVICE-BROWSER-VERIFICATION.md` 与 `.agents/skills/agent-device-browser-automation/SKILL.md`。
+
+
