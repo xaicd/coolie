@@ -142,6 +142,19 @@ async function resolveLiveFoundryContext(
       .map((i) => `[${i.identifier}] ${i.title} (${i.status})`)
       .join("; ") || "暂无进行中工单";
 
+    let hermesMemoryBlock = "";
+    const hermesMemFile =
+      process.env.HERMES_MEMORY_PATH ||
+      path.join(os.homedir(), ".hermes/memories/MEMORY.md");
+    if (fs.existsSync(hermesMemFile)) {
+      try {
+        const mem = fs.readFileSync(hermesMemFile, "utf-8").trim();
+        if (mem) {
+          hermesMemoryBlock = `\n\n# Hermes 宿主机历史常驻记忆 (Host Historical Memory)\n${mem.slice(0, 4000)}\n`;
+        }
+      } catch {}
+    }
+
     return (
       `\n\n# 实时工坊底座感知 (Live Ground-Truth State)\n` +
       `- 🏢 归属企业/公司 ID: ${companyId}\n` +
@@ -158,7 +171,8 @@ async function resolveLiveFoundryContext(
       `- ⏱️ AIP Bootcamp 时间盒派单 (Time-Boxed Task): 支持自然语言“让<员工>在<N>分钟内搞定<任务>”，系统自动绑定 executionPolicy 与 monitorNextCheckAt 倒计时硬熔断，以 Time to Truth 倒逼真实证据交付。\n` +
       `- 📜 ODD 活体本体声明式 YAML: 支持 M1 (Objects), M2 (Behaviors), M3 (Rules), M5 (Actors), M6 (Flows) 声明式纯文本建模 (spec-ontology-driver.cjs)\n` +
       `- 🏭 商业交付项目孵化: 支持 bash scripts/hatch-client-project.sh <path> --profile quad-terminal (Spring Boot 3 + Vue3 Admin + 微信小程序 + Expo App 四位一体)\n` +
-      `【强制约束】当老板咨询工坊问题（如当前项目、员工状态、任务进展、cwall算力节点、MCP工具池、Spec交付、本体建模）时，必须严格基于上述真值如实汇报，严禁无中生有或推脱未知。\n`
+      `【强制约束】当老板咨询工坊问题（如当前项目、员工状态、任务进展、cwall算力节点、MCP工具池、Spec交付、本体建模）时，必须严格基于上述真值如实汇报，严禁无中生有或推脱未知。\n` +
+      hermesMemoryBlock
     );
   } catch {
     return "";
