@@ -1,0 +1,14 @@
+name: coolie-bridge
+label: Coolie Dev Control Plane Bridge
+version: 1.0.0
+author: Coolie
+description: >
+  Bridges incoming QQ/WeChat messages directly to the Coolie-dev control plane
+  Board Chat. Ensures single-brain execution, project context binding, and full audit.
+provides_hooks:
+  - post_gateway_admission
+provides_tools: []
+requires_env: []
+optional_env:
+  - name: COOLIE_API_URL
+    description: "Coolie Dev backend URL (default: http://127.0.0.1:3100)"

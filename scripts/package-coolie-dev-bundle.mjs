@@ -268,6 +268,15 @@ if (fs.existsSync(pkgDir)) {
     }
   }
 }
+
+const serverNm = path.join(coolieHome, "lib/server/node_modules");
+if (fs.existsSync(serverNm)) {
+  for (const p of [path.join(coolieHome, "node_modules"), path.join(coolieHome, "lib/node_modules"), path.join(coolieHome, "lib/packages/node_modules")]) {
+    if (!fs.existsSync(p)) {
+      try { fs.symlinkSync(serverNm, p, "junction"); } catch (_) {}
+    }
+  }
+}
 `;
 fs.writeFileSync(path.join(stageDir, "bin/link-packages.js"), linkScript, { mode: 0o755 });
 
@@ -349,6 +358,16 @@ if (fs.existsSync(acpxProbeSrc)) {
   fs.chmodSync(path.join(stageDir, "bin/acpx-tool-probe.mjs"), 0o755);
 }
 
+// 5.2.2 拷贝 Hermes Gateway 控制面准入桥接插件 (QQ/微信直通控制面 Board Chat)
+const bridgePluginSrc = path.resolve(repoRoot, "scripts/hermes-plugins/coolie-bridge");
+if (fs.existsSync(bridgePluginSrc)) {
+  const targetPluginDir = path.join(stageDir, "lib/hermes-plugins/coolie-bridge");
+  fs.mkdirSync(targetPluginDir, { recursive: true });
+  for (const f of fs.readdirSync(bridgePluginSrc)) {
+    fs.copyFileSync(path.join(bridgePluginSrc, f), path.join(targetPluginDir, f));
+  }
+}
+
 // 5.3 生成自包含生产级 CLI 启动脚本 bin/coolie-dev
 const launcherScript = `#!/usr/bin/env bash
 # ==============================================================================
@@ -360,6 +379,7 @@ const launcherScript = `#!/usr/bin/env bash
 # 3. 独立安全: 独立嵌入式数据库与工作区，脱离源码运行
 # 4. 全双工驱动: 内置正统 ACPX 协议总线 (hermes-acpx-dispatch) 与任务直建 (create-coolie-task.mjs)
 # 5. 全息自检: 提供标准 health 体检子命令，杜绝通道断裂
+# 6. 单脑锁定: 内置 Hermes Gateway 准入插件，QQ/微信通信直接锁定 Coolie-dev 控制面
 # ==============================================================================
 set -e
 
@@ -411,6 +431,14 @@ if [ -f "$HERMES_MEMORY_FILE" ]; then
     export HERMES_MEMORY_PATH="$HERMES_MEMORY_FILE"
 fi
 
+# 5.1 自动装配 Hermes Gateway 控制面准入插件 (Zero-Config 开箱即用)
+if [ -d "$HOME/.hermes" ] && [ -d "$COOLIE_HOME/lib/hermes-plugins/coolie-bridge" ]; then
+    mkdir -p "$HOME/.hermes/plugins"
+    if [ ! -e "$HOME/.hermes/plugins/coolie-bridge" ]; then
+        ln -sfn "$COOLIE_HOME/lib/hermes-plugins/coolie-bridge" "$HOME/.hermes/plugins/coolie-bridge" 2>/dev/null || true
+    fi
+fi
+
 TS_IP="\$(tailscale ip -4 2>/dev/null || echo "")"
 HN="\$(hostname 2>/dev/null || echo "")"
 
@@ -428,12 +456,93 @@ export PAPERCLIP_TELEMETRY_DISABLED=1
 export PAPERCLIP_MIGRATION_AUTO_APPLY="true"
 export PAPERCLIP_DEPLOYMENT_MODE="local_trusted"
 export PAPERCLIP_DEPLOYMENT_EXPOSURE="private"
+export COOLIE_ENABLE_BOARD_CHAT="\${COOLIE_ENABLE_BOARD_CHAT:-true}"
 export NODE_ENV="production"
 
 cd "$COOLIE_HOME/lib/server"
 
 ACTION="\${1:-run}"
 case "$ACTION" in
+    gateway-bridge)
+        SUB_ACTION="\${2:-status}"
+        HERMES_PLUGINS_DIR="$HOME/.hermes/plugins"
+        BRIDGE_SRC="$COOLIE_HOME/lib/hermes-plugins/coolie-bridge"
+        BRIDGE_DEST="$HERMES_PLUGINS_DIR/coolie-bridge"
+
+        case "$SUB_ACTION" in
+            enable)
+                if [ ! -d "$HOME/.hermes" ]; then
+                    echo "❌ 未检测到 ~/.hermes 目录，请先确保已安装 Hermes。"
+                    exit 1
+                fi
+                mkdir -p "$HERMES_PLUGINS_DIR"
+                ln -sfn "$BRIDGE_SRC" "$BRIDGE_DEST"
+                echo "✅ 已成功安装 Hermes Gateway -> Coolie-dev 准入桥接插件: $BRIDGE_DEST"
+
+                # 确保 Hermes 激活 coolie-bridge 并在配置中延长 hook 超时以防深度态势检索中断
+                if command -v hermes >/dev/null 2>&1; then
+                    hermes plugins enable coolie-bridge 2>/dev/null || true
+                elif [ -x "$HOME/.hermes/hermes-agent/.hermes/bin/hermes" ]; then
+                    "$HOME/.hermes/hermes-agent/.hermes/bin/hermes" plugins enable coolie-bridge 2>/dev/null || true
+                fi
+                CFG_FILE="$HOME/.hermes/config.yaml"
+                if [ -f "$CFG_FILE" ]; then
+                    if grep -q "plugins:" "$CFG_FILE"; then
+                        if ! grep -q "coolie-bridge" "$CFG_FILE"; then
+                            sed -i "/enabled:/a \ \ \ \ - coolie-bridge" "$CFG_FILE" 2>/dev/null || true
+                        fi
+                        if ! grep -q "hook_callback_timeout:" "$CFG_FILE"; then
+                            sed -i "/plugins:/a \ \ hook_callback_timeout: 180.0" "$CFG_FILE" 2>/dev/null || true
+                        fi
+                    fi
+                fi
+
+                if systemctl --user is-active hermes-gateway.service >/dev/null 2>&1; then
+                    echo "🔄 正在平滑重启 hermes-gateway.service 使插件生效..."
+                    systemctl --user restart hermes-gateway.service
+                    echo "✅ hermes-gateway 重启完成，QQ/微信对话现已彻底锁定至 Coolie-dev 主脑！"
+                else
+                    echo "💡 提示: 请重启 hermes-gateway 进程以加载新插件。"
+                fi
+                exit 0
+                ;;
+            disable)
+                if [ -L "$BRIDGE_DEST" ] || [ -e "$BRIDGE_DEST" ]; then
+                    rm -rf "$BRIDGE_DEST"
+                    echo "🛑 已移除 Hermes Gateway -> Coolie-dev 准入桥接插件。"
+                    if systemctl --user is-active hermes-gateway.service >/dev/null 2>&1; then
+                        systemctl --user restart hermes-gateway.service
+                        echo "🔄 hermes-gateway.service 已重启，恢复独立模式。"
+                    fi
+                else
+                    echo "⚪ 桥接插件未安装，无需操作。"
+                fi
+                exit 0
+                ;;
+            status|*)
+                echo "========================================================"
+                echo "🔌 Hermes Gateway -> Coolie-dev 准入桥接状态"
+                echo "========================================================"
+                if [ -L "$BRIDGE_DEST" ] || [ -d "$BRIDGE_DEST" ]; then
+                    echo "  • 插件软链接: ✅ 已安装 (\$BRIDGE_DEST -> \$(readlink -f "\$BRIDGE_DEST" 2>/dev/null || echo "\$BRIDGE_SRC"))"
+                else
+                    echo "  • 插件软链接: ⚪ 未启用 (可运行 coolie-dev gateway-bridge enable 开启)"
+                fi
+                if systemctl --user is-active hermes-gateway.service >/dev/null 2>&1; then
+                    echo "  • Hermes Gateway 进程: 🟢 运行中"
+                else
+                    echo "  • Hermes Gateway 进程: ⚪ 未运行"
+                fi
+                if ss -tulpn 2>/dev/null | grep -q ":\$PORT "; then
+                    echo "  • Coolie-dev 控制面: 🟢 响应就绪 (端口: \$PORT)"
+                else
+                    echo "  • Coolie-dev 控制面: ❌ 未运行"
+                fi
+                echo "========================================================"
+                exit 0
+                ;;
+        esac
+        ;;
     status)
         if ss -tulpn 2>/dev/null | grep -q ":\$PORT "; then
             PID="\$(ss -tulpn 2>/dev/null | grep ":\$PORT " | awk '{print \$NF}' | sed -E 's/.*pid=([0-9]+).*/\\1/' || true)"
@@ -509,6 +618,13 @@ case "$ACTION" in
                     echo "  • \$tool: 缺失"
                 fi
             done
+        fi
+
+        # 6. 检查 Hermes Gateway 控制面并轨桥接
+        if [ -d "$HOME/.hermes/plugins/coolie-bridge" ] || [ -L "$HOME/.hermes/plugins/coolie-bridge" ]; then
+            echo "  ✅ Hermes QQ/微信控制面并轨: 已接入 (通过 \$HOME/.hermes/plugins/coolie-bridge)"
+        else
+            echo "  ⚪ Hermes QQ/微信控制面并轨: 未接入 (运行 coolie-dev gateway-bridge enable 即可开启)"
         fi
         echo "========================================================"
         exit 0
@@ -607,6 +723,7 @@ echo "========================================================"
 mkdir -p "$TARGET_DIR"
 
 # 1. 复制运行时与资源
+rm -f "$TARGET_DIR/lib/server/skills" "$TARGET_DIR/lib/server/skills-releases" 2>/dev/null || true
 cp -R "$SRC_DIR/bin" "$TARGET_DIR/"
 cp -R "$SRC_DIR/conf" "$TARGET_DIR/"
 cp -R "$SRC_DIR/lib" "$TARGET_DIR/"
@@ -616,9 +733,11 @@ chmod +x "$TARGET_DIR/bin/coolie-dev" "$TARGET_DIR/bin/link-packages.js" "$TARGE
 mkdir -p "$HOME/.local/bin"
 ln -sfn "$TARGET_DIR/bin/coolie-dev" "$HOME/.local/bin/coolie-dev"
 
-# 3. 自动检测并就地装配生产运行时依赖
-if [ ! -d "$TARGET_DIR/lib/server/node_modules/express" ]; then
-    echo ">>> 正在就地装配生产依赖 (利用高速镜像加速)..."
+# 3. 自动检测运行时依赖 (自包含零安装 Zero-Install)
+if [ -d "$TARGET_DIR/lib/server/node_modules/express" ]; then
+    echo ">>> ✅ 检测到全量预置生产运行时依赖 (Zero-Install)，免执行 npm install。"
+else
+    echo ">>> 正在装配生产依赖..."
     (
         cd "$TARGET_DIR/lib/server"
         export PATH="$HOME/.hermes/node/bin:$HOME/.local/bin:$PATH"
@@ -640,6 +759,12 @@ for tool in hermes claude cmd agy kiro-cli; do
         echo "  ℹ️  已有工具待检测: $tool"
     fi
 done
+
+# 5.1 自动激活与并轨 Hermes Gateway (Zero-Config 开箱即用)
+if [ -d "$HOME/.hermes" ] && [ -d "$TARGET_DIR/lib/hermes-plugins/coolie-bridge" ]; then
+    echo ">>> 正在自动挂载 Hermes Gateway 控制面准入插件..."
+    "$TARGET_DIR/bin/coolie-dev" gateway-bridge enable 2>/dev/null || true
+fi
 
 echo ""
 echo "========================================================"

@@ -112,6 +112,43 @@ describe("POST /api/board/chat/stream feature flag guard (PAP-137)", () => {
     expect(mockIssueService.create).not.toHaveBeenCalled();
   });
 
+  it("admits when COOLIE_ENABLE_BOARD_CHAT=true even if enableConferenceRoomChat is off", async () => {
+    mockGetExperimental.mockResolvedValue({ enableConferenceRoomChat: false });
+    const oldEnv = process.env.COOLIE_ENABLE_BOARD_CHAT;
+    process.env.COOLIE_ENABLE_BOARD_CHAT = "true";
+    try {
+      const app = await createApp();
+      const res = await request(app).post("/api/board/chat/stream").send({});
+      expect(res.status).toBe(400);
+      expect(res.body).toEqual({ error: "companyId and message are required" });
+    } finally {
+      if (oldEnv === undefined) delete process.env.COOLIE_ENABLE_BOARD_CHAT;
+      else process.env.COOLIE_ENABLE_BOARD_CHAT = oldEnv;
+    }
+  });
+
+  it("admits when x-coolie-ingress header is hermes-gateway even if enableConferenceRoomChat is off", async () => {
+    mockGetExperimental.mockResolvedValue({ enableConferenceRoomChat: false });
+    const app = await createApp();
+    const res = await request(app)
+      .post("/api/board/chat/stream")
+      .set("x-coolie-ingress", "hermes-gateway")
+      .send({});
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: "companyId and message are required" });
+  });
+
+  it("admits when x-coolie-client header is hermes-bridge even if enableConferenceRoomChat is off", async () => {
+    mockGetExperimental.mockResolvedValue({ enableConferenceRoomChat: false });
+    const app = await createApp();
+    const res = await request(app)
+      .post("/api/board/chat/stream")
+      .set("x-coolie-client", "hermes-bridge")
+      .send({});
+    expect(res.status).toBe(400);
+    expect(res.body).toEqual({ error: "companyId and message are required" });
+  });
+
   /**
    * Coolie fork divergence, stated the other way round from upstream.
    *
