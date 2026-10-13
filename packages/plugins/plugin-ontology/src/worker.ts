@@ -20,6 +20,7 @@ import { createMemberStore } from "@paperclipai/ontology-core/auth/memberStore.j
 import { knownRoles } from "@paperclipai/ontology-core/auth/members.js";
 import { scoreDomainCandidates } from "@paperclipai/ontology-core/graph/linkSuggestions.js";
 import { extractRepoDraft } from "@paperclipai/ontology-core/cognition/AstExtractor.js";
+import { extractReaBundle, type ReaAnalysisBundle } from "@paperclipai/ontology-core";
 import { AideStore, type AideCitation } from "./aide/AideStore.js";
 import { SAMPLE_SOURCE, seedSampleDomains } from "./samples/seed.js";
 import {
@@ -3196,6 +3197,40 @@ const plugin = definePlugin({
       return { job, coverage: draft.coverage };
     });
 
+    ctx.actions.register("ingest-rea-bundle", async (params) => {
+      const companyId = requireString(params.companyId, "companyId");
+      const jobId = requireString(params.jobId, "jobId");
+      const bundle = optionalRecord(params.bundle);
+      if (!bundle || typeof bundle.bundleId !== "string") {
+        throw new Error("Invalid REA bundle: bundleId is required");
+      }
+      const reaResult = extractReaBundle(bundle as unknown as ReaAnalysisBundle);
+      const job = await store.setCognitionDraft(companyId, jobId, {
+        draftPreview: {
+          coverage: reaResult.draft.coverage,
+          readiness: reaResult.readiness,
+          bundleMetadata: reaResult.bundleMetadata,
+        },
+        seedNodeTypes: reaResult.draft.seedNodeTypes,
+        seedRelationTypes: reaResult.draft.seedRelationTypes,
+        seedActions: reaResult.draft.seedActions,
+      });
+      if (!job) throw new Error("Cognition job not found");
+      await store.recordCognitionCoverage(companyId, jobId, {
+        entityCount: reaResult.draft.coverage.entityCount,
+        relationCount: reaResult.draft.coverage.relationCount,
+        actionCount: reaResult.draft.coverage.actionCount,
+        sqlFiles: reaResult.draft.coverage.sqlFiles,
+        apiFiles: reaResult.draft.coverage.apiFiles,
+      });
+      return {
+        job,
+        coverage: reaResult.draft.coverage,
+        readiness: reaResult.readiness,
+        bundleMetadata: reaResult.bundleMetadata,
+      };
+    });
+
     ctx.actions.register("publish-cognition-job", async (params) => {
       const companyId = requireString(params.companyId, "companyId");
       const jobId = requireString(params.jobId, "jobId");
@@ -4628,6 +4663,42 @@ const plugin = definePlugin({
           apiFiles: draft.coverage.apiFiles,
         });
         return { body: { job, coverage: draft.coverage } };
+      }
+
+      case "ingest-rea-bundle": {
+        const body = optionalRecord(input.body) ?? {};
+        const jobId = requireString(input.params.jobId, "jobId");
+        const bundle = optionalRecord(body.bundle);
+        if (!bundle || typeof bundle.bundleId !== "string") {
+          return { status: 400, body: { error: "Invalid REA bundle: bundleId is required" } };
+        }
+        const reaResult = extractReaBundle(bundle as unknown as ReaAnalysisBundle);
+        const job = await store.setCognitionDraft(companyId, jobId, {
+          draftPreview: {
+            coverage: reaResult.draft.coverage,
+            readiness: reaResult.readiness,
+            bundleMetadata: reaResult.bundleMetadata,
+          },
+          seedNodeTypes: reaResult.draft.seedNodeTypes,
+          seedRelationTypes: reaResult.draft.seedRelationTypes,
+          seedActions: reaResult.draft.seedActions,
+        });
+        if (!job) return { status: 404, body: { error: "Cognition job not found" } };
+        await store.recordCognitionCoverage(companyId, jobId, {
+          entityCount: reaResult.draft.coverage.entityCount,
+          relationCount: reaResult.draft.coverage.relationCount,
+          actionCount: reaResult.draft.coverage.actionCount,
+          sqlFiles: reaResult.draft.coverage.sqlFiles,
+          apiFiles: reaResult.draft.coverage.apiFiles,
+        });
+        return {
+          body: {
+            job,
+            coverage: reaResult.draft.coverage,
+            readiness: reaResult.readiness,
+            bundleMetadata: reaResult.bundleMetadata,
+          },
+        };
       }
 
       case "publish-cognition-job": {

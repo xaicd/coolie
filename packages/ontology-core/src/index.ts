@@ -298,3 +298,26 @@ export type {
   LintSeverity,
 } from "./document/lintOntologyYaml.js";
 
+// REA (Reverse Engineering Automation) Brownfield Reconstruction Suite
+export {
+  extractReaBundle,
+  evaluateReadiness,
+  mapAssetKindToExtractionKind,
+} from "./cognition/rea/index.js";
+export type {
+  ReaActionEvidence,
+  ReaAnalysisBundle,
+  ReaAssetKind,
+  ReaCallEdge,
+  ReaClassEvidence,
+  ReaColumnEvidence,
+  ReaExtractionResult,
+  ReaFieldEvidence,
+  ReaForeignKeyEvidence,
+  ReaMethodEvidence,
+  ReaRiskItem,
+  ReaStereotype,
+  ReaTableEvidence,
+  ReconstructionReadinessReport,
+} from "./cognition/rea/index.js";
+

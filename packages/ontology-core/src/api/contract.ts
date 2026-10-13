@@ -158,6 +158,7 @@ export const CORE_API: CoreApiRoute[] = [
   r("set-cognition-draft", "mapping", false, "写入抽取草稿"),
   r("publish-cognition-job", "mapping", false, "把草稿发布成本体"),
   r("ingest-cognition-shard", "mapping", false, "按分片增量抽取"),
+  r("ingest-rea-bundle", "mapping", false, "导入 REA 逆向成果包并合成草稿"),
   r("list-datasets", "mapping", false, "列出数据集"),
   r("create-dataset", "mapping", false, "新建数据集"),
   r("update-dataset", "mapping", false, "改数据集"),

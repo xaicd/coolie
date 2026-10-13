@@ -13,7 +13,18 @@
  */
 
 /** How a type was discovered. */
-export type ExtractionKind = "ddl" | "java" | "proto" | "mybatis" | "openapi" | "source";
+export type ExtractionKind =
+  | "ddl"
+  | "java"
+  | "proto"
+  | "mybatis"
+  | "openapi"
+  | "source"
+  | "rea_binary"
+  | "rea_bundle"
+  | "rea_apk"
+  | "rea_sqlite"
+  | "rea_network";
 
 /**
  * What role the source gives a type in its own codebase. Kept separate from the
@@ -46,6 +57,12 @@ export interface ExtractedOrigin {
   table?: string;
   /** What the source called this type. */
   stereotype?: SourceStereotype;
+  /** REA Immutable evidence ID trace */
+  evidenceId?: string;
+  /** SHA-256 digest of original binary/source asset */
+  sourceDigest?: string;
+  /** Confidence score between 0.0 and 1.0 */
+  confidence?: number;
 }
 
 export interface ExtractedProperty {

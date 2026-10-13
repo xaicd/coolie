@@ -503,6 +503,14 @@ const manifest: PaperclipPluginManifestV1 = {
       companyResolution: { from: "body", key: "companyId" },
     },
     {
+      routeKey: "ingest-rea-bundle",
+      method: "POST",
+      path: "/cognition-jobs/:jobId/rea-bundle",
+      auth: "board",
+      capability: "api.routes.register",
+      companyResolution: { from: "body", key: "companyId" },
+    },
+    {
       routeKey: "list-datasets",
       method: "GET",
       path: "/datasets",

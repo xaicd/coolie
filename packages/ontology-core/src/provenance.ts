@@ -39,6 +39,11 @@ const KIND_COVERAGE: Record<ExtractionKind, true> = {
   mybatis: true,
   openapi: true,
   source: true,
+  rea_binary: true,
+  rea_bundle: true,
+  rea_apk: true,
+  rea_sqlite: true,
+  rea_network: true,
 };
 const STEREOTYPE_COVERAGE: Record<SourceStereotype, true> = {
   entity: true,
@@ -85,6 +90,9 @@ export function readOrigin(metadata: unknown): ExtractedOrigin | undefined {
     ...(asString(origin.module) ? { module: asString(origin.module)! } : {}),
     ...(asString(origin.service) ? { service: asString(origin.service)! } : {}),
     ...(asString(origin.table) ? { table: asString(origin.table)! } : {}),
+    ...(asString(origin.evidenceId) ? { evidenceId: asString(origin.evidenceId)! } : {}),
+    ...(asString(origin.sourceDigest) ? { sourceDigest: asString(origin.sourceDigest)! } : {}),
+    ...(typeof origin.confidence === "number" ? { confidence: origin.confidence } : {}),
     ...(stereotype && STEREOTYPES.includes(stereotype)
       ? { stereotype: stereotype as SourceStereotype }
       : {}),
@@ -135,6 +143,11 @@ export function describeProvenance(metadata: unknown): string | undefined {
     mybatis: "MyBatis XML",
     openapi: "OpenAPI",
     source: "源码",
+    rea_binary: "REA 二进制逆向",
+    rea_bundle: "REA JS/ASAR 解包",
+    rea_apk: "REA Android/APK 反编译",
+    rea_sqlite: "REA SQLite 离线库",
+    rea_network: "REA 抓包流量",
   };
   const stereotypeLabels: Record<SourceStereotype, string> = {
     entity: "实体",
