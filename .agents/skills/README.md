@@ -1,6 +1,7 @@
 # Coolie 数字员工技能注册表与 CMMI 00~09 阶段化装配规范
 
 > **最高法典契约**：数字员工接到跨阶段需求时先读本注册表，按 CMMI 00~09 阶段严格加载专属 Skills 与输出规范工程资产，严禁跳过门禁宣称完成。  
+> **全量口语总览**：检视全库 96 个技能的口语触发词反查大纲，直达 [docs/skills-spoken-index.md](../../docs/skills-spoken-index.md)。  
 > **新 Skill 纪律**：本目录受 `.gitignore` 保护，新增技能必须执行 `git add -f .agents/skills/<name>/SKILL.md` 强制纳管。
 
 ---

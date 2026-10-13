@@ -47,6 +47,8 @@
 | 招数字员工 / 调整岗位技能 | `hr-agent-onboarding` | 招入员工、配置 5 大角色契约与专属预算 |
 | 跨端契约同步 / TS 类型生成 | `yudao-contract-sync` | OpenAPI / Knife4j 转强类型 TS SDK，多端零漂移 |
 
+> 💡 **全景反查**: 检视全库 96 个技能完整口语反查大纲: [docs/skills-spoken-index.md](docs/skills-spoken-index.md)
+
 ## 4. 全生命周期 8 环节标准作业快速唤醒 (10秒定位)
 
 > 详见完整作业指导书: [docs/lifecycle-standard-operating-procedures.md](docs/lifecycle-standard-operating-procedures.md)

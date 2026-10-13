@@ -8,6 +8,7 @@
 
 - **项目全景与口语路由**: [MEMORY.md](MEMORY.md)
 - **当前 Sprint 决策账本**: [docs/CURRENT-SPRINT.md](docs/CURRENT-SPRINT.md)
+- **全量96技能口语索引**: [docs/skills-spoken-index.md](docs/skills-spoken-index.md)
 - **平台公理与工程宪法**: [AGENTS.md](AGENTS.md)
 - **客户口语意图路由器**: [docs/intent-router.md](docs/intent-router.md)
 
