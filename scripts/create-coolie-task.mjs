@@ -8,9 +8,40 @@
  */
 
 import http from "node:http";
+import fs from "node:fs";
+import path from "node:path";
+import os from "node:os";
 import { execSync } from "node:child_process";
 
-const API_BASE = process.env.COOLIE_API_URL || "http://127.0.0.1:3100/api";
+// 自动加载 ~/.coolie-dev/conf/coolie-dev.env
+function loadEnvFile() {
+  try {
+    const envPath = path.join(os.homedir(), ".coolie-dev", "conf", "coolie-dev.env");
+    if (fs.existsSync(envPath)) {
+      const content = fs.readFileSync(envPath, "utf8");
+      for (const line of content.split("\n")) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const eqIdx = trimmed.indexOf("=");
+        if (eqIdx > 0) {
+          const key = trimmed.slice(0, eqIdx).trim();
+          const val = trimmed.slice(eqIdx + 1).trim();
+          if (!process.env[key] && val) {
+            process.env[key] = val;
+          }
+        }
+      }
+    }
+  } catch (_) {}
+}
+loadEnvFile();
+
+let rawBase = process.env.COOLIE_API_URL || process.env.PAPERCLIP_API_URL || "http://127.0.0.1:3100/api";
+rawBase = rawBase.replace(/\/+$/, "");
+if (!rawBase.endsWith("/api")) {
+  rawBase += "/api";
+}
+const API_BASE = rawBase;
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -65,12 +96,18 @@ async function request(path, options = {}) {
     const cleanPath = path.startsWith("/") ? path : `/${path}`;
     const fullUrl = `${API_BASE.replace(/\/+$/, "")}${cleanPath}`;
     const url = new URL(fullUrl);
+    const headers = {
+      "Content-Type": "application/json",
+      ...(options.headers || {})
+    };
+    const apiKey = process.env.COOLIE_API_KEY || process.env.PAPERCLIP_API_KEY;
+    if (apiKey) {
+      headers["x-paperclip-api-key"] = apiKey;
+      headers["Authorization"] = `Bearer ${apiKey}`;
+    }
     const req = http.request(url, {
       method: options.method || "GET",
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers || {})
-      }
+      headers
     }, (res) => {
       res.setEncoding("utf8");
       let data = "";
