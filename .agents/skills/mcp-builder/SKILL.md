@@ -1,6 +1,6 @@
 ---
 name: mcp-builder
-description: 高质量 MCP (Model Context Protocol) 服务端研发指南 (Node/TS SDK 或 Python FastMCP)。适用于接到「开发MCP服务」「对接新工具API」「增加MCP工具」「写MCP扩展」时启用。
+description: 高质量 MCP (Model Context Protocol) 服务端与接口对接。适用于接到「对接外部系统的MCP接口」「对接MCP」「开发MCP服务」「扩展MCP工具」时启用。
 license: Complete terms in LICENSE.txt
 ---
 

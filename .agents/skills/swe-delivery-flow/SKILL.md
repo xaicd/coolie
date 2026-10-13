@@ -1,10 +1,6 @@
 ---
 name: swe-delivery-flow
-description: >
-  研发员工（SWE）视角的交付 skill：复现优先 → 日志/DB 根因 → 最小修 → typecheck/test →
-  按显式路径 commit → SSH 直推。适用于「接一条工单改代码」「怎么定位根因」
-  「改完怎么证明没破」「怎么提交」等场景。
-  完整脚本见 docs-coolie/playbooks/swe-delivery-flow.md。
+description: 研发员工（SWE/铁匠）视角的代码交付与缺陷修复法典。适用于接到「派活给铁匠」「修bug」「修复缺陷」「接工单改代码」「最小化修复」时启用。遵循复现优先与1Task=1Commit。
 ---
 
 # SWE / 研发员工 — 复现→定位→最小修→测→提交

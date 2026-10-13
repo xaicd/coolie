@@ -1,0 +1,663 @@
+{
+  "timestamp": "2026-10-13T08:14:44.048Z",
+  "engine": "BM25 (k1=1.5, b=0.75) + Spoken-Ngram-Matcher",
+  "totalSkillsIndexed": 96,
+  "totalCasesTested": 37,
+  "metrics": {
+    "precisionAt1": "100.0%",
+    "recallAt3": "100.0%",
+    "avgLatencyMs": 0.539
+  },
+  "gateStatus": "PASSED",
+  "results": [
+    {
+      "category": "01_需求工程",
+      "query": "客户丢来一份需求文档，帮我收拢成无歧义规格",
+      "expected": [
+        "cmmi-req-spec",
+        "requirements-capture",
+        "product-project-intake"
+      ],
+      "actualTop1": "product-project-intake",
+      "actualTop3": [
+        "product-project-intake",
+        "cmmi-req-spec",
+        "ears-spec-writer"
+      ],
+      "top1Score": "35.65",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "1.317"
+    },
+    {
+      "category": "01_需求工程",
+      "query": "用 EARS 规范消除需求二义性",
+      "expected": [
+        "ears-spec-writer",
+        "cmmi-req-spec"
+      ],
+      "actualTop1": "ears-spec-writer",
+      "actualTop3": [
+        "ears-spec-writer",
+        "cmmi-req-spec",
+        "requirements-capture"
+      ],
+      "top1Score": "29.76",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "1.089"
+    },
+    {
+      "category": "01_需求工程",
+      "query": "调研同类竞品，做个技术选型打分表",
+      "expected": [
+        "solution-scouting-and-dar",
+        "dar-decision-matrix"
+      ],
+      "actualTop1": "solution-scouting-and-dar",
+      "actualTop3": [
+        "solution-scouting-and-dar",
+        "dar-decision-matrix",
+        "cmmi-tech-solution"
+      ],
+      "top1Score": "23.64",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.859"
+    },
+    {
+      "category": "02_架构设计",
+      "query": "给这个项目写个技术方案和架构概要设计",
+      "expected": [
+        "cmmi-tech-solution",
+        "system-design-spec"
+      ],
+      "actualTop1": "cmmi-tech-solution",
+      "actualTop3": [
+        "cmmi-tech-solution",
+        "system-design-spec",
+        "dar-decision-matrix"
+      ],
+      "top1Score": "38.87",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "1.146"
+    },
+    {
+      "category": "02_架构设计",
+      "query": "帮我画个架构图和业务状态机时序图",
+      "expected": [
+        "archify"
+      ],
+      "actualTop1": "archify",
+      "actualTop3": [
+        "archify",
+        "fdse",
+        "check-pr"
+      ],
+      "top1Score": "23.81",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.819"
+    },
+    {
+      "category": "02_架构设计",
+      "query": "这块业务谁负责，先把租户数据隔离和权限画死",
+      "expected": [
+        "fda"
+      ],
+      "actualTop1": "fda",
+      "actualTop3": [
+        "fda",
+        "paperclip-dev-workspace-run-verify-fix",
+        "cmmi-tech-solution"
+      ],
+      "top1Score": "28.02",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.949"
+    },
+    {
+      "category": "02_架构设计",
+      "query": "写个架构决策记录 ADR",
+      "expected": [
+        "adr-architect"
+      ],
+      "actualTop1": "adr-architect",
+      "actualTop3": [
+        "adr-architect",
+        "cmmi-asset-authoring",
+        "coolie-boss-decision-log"
+      ],
+      "top1Score": "27.90",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.717"
+    },
+    {
+      "category": "03_详细契约",
+      "query": "接口报编译报错了，统一检查 API 契约协议",
+      "expected": [
+        "cmmi-detailed-contracts",
+        "core-swe"
+      ],
+      "actualTop1": "cmmi-detailed-contracts",
+      "actualTop3": [
+        "cmmi-detailed-contracts",
+        "core-swe",
+        "paperclip-evals"
+      ],
+      "top1Score": "28.21",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.897"
+    },
+    {
+      "category": "03_详细契约",
+      "query": "Java 生成前端 TS 类型，前后端契约防漂移",
+      "expected": [
+        "yudao-contract-sync"
+      ],
+      "actualTop1": "yudao-contract-sync",
+      "actualTop3": [
+        "yudao-contract-sync",
+        "cmmi-detailed-contracts",
+        "yudao-backend-dev"
+      ],
+      "top1Score": "56.89",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.880"
+    },
+    {
+      "category": "04_研发编码",
+      "query": "派活给铁匠修个 bug",
+      "expected": [
+        "swe-delivery-flow",
+        "bug-fix-flow"
+      ],
+      "actualTop1": "swe-delivery-flow",
+      "actualTop3": [
+        "swe-delivery-flow",
+        "model-catalog-check",
+        "bug-fix-flow"
+      ],
+      "top1Score": "16.98",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.754"
+    },
+    {
+      "category": "04_研发编码",
+      "query": "按 SDD 规范从 Spec 拆解成原子任务",
+      "expected": [
+        "speckit-workflow",
+        "spec-driven-dev"
+      ],
+      "actualTop1": "speckit-workflow",
+      "actualTop3": [
+        "speckit-workflow",
+        "prepare-paperclip-pr",
+        "spec-driven-dev"
+      ],
+      "top1Score": "12.57",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.842"
+    },
+    {
+      "category": "04_研发编码",
+      "query": "把大项目拆解 WBS，排一下里程碑",
+      "expected": [
+        "cmmi-wbs-milestone",
+        "product-project-intake"
+      ],
+      "actualTop1": "cmmi-wbs-milestone",
+      "actualTop3": [
+        "cmmi-wbs-milestone",
+        "product-project-intake",
+        "speckit-workflow"
+      ],
+      "top1Score": "23.86",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.512"
+    },
+    {
+      "category": "05_移动端",
+      "query": "开发手机 App，修复 6 寸屏撑爆和刘海遮挡",
+      "expected": [
+        "yudao-expo-app"
+      ],
+      "actualTop1": "yudao-expo-app",
+      "actualTop3": [
+        "yudao-expo-app",
+        "paperclip-dev-workspace-run-verify-fix",
+        "swe-delivery-flow"
+      ],
+      "top1Score": "44.17",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.400"
+    },
+    {
+      "category": "05_移动端",
+      "query": "返回键乱跳，检查移动端导航栈",
+      "expected": [
+        "mobile-navigation-and-stack-audit"
+      ],
+      "actualTop1": "mobile-navigation-and-stack-audit",
+      "actualTop3": [
+        "mobile-navigation-and-stack-audit",
+        "agent-device-browser-automation",
+        "minimalist-ui-and-cmmi-governance"
+      ],
+      "top1Score": "36.73",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.375"
+    },
+    {
+      "category": "05_移动端",
+      "query": "修改 Vue 后台管理中台页面",
+      "expected": [
+        "yudao-admin-vue3"
+      ],
+      "actualTop1": "yudao-admin-vue3",
+      "actualTop3": [
+        "yudao-admin-vue3",
+        "pptx",
+        "add-runner-eval"
+      ],
+      "top1Score": "28.45",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.343"
+    },
+    {
+      "category": "05_移动端",
+      "query": "开发微信小程序支付授权",
+      "expected": [
+        "yudao-miniapp-dev"
+      ],
+      "actualTop1": "yudao-miniapp-dev",
+      "actualTop3": [
+        "yudao-miniapp-dev",
+        "paperclip-create-plugin",
+        "speckit-workflow"
+      ],
+      "top1Score": "41.73",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.339"
+    },
+    {
+      "category": "06_测试打假",
+      "query": "真机走查一下，多视口截屏存证",
+      "expected": [
+        "agent-device-browser-automation",
+        "qa-humanlike-e2e"
+      ],
+      "actualTop1": "agent-device-browser-automation",
+      "actualTop3": [
+        "agent-device-browser-automation",
+        "qa-humanlike-e2e",
+        "cmmi-ver-val"
+      ],
+      "top1Score": "25.59",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.417"
+    },
+    {
+      "category": "06_测试打假",
+      "query": "查空洞单测，做变异测试杀灭假 Mock",
+      "expected": [
+        "mutation-tester"
+      ],
+      "actualTop1": "mutation-tester",
+      "actualTop3": [
+        "mutation-tester",
+        "yudao-cmmi-gatekeeper",
+        "comprehensive-testing-workflow"
+      ],
+      "top1Score": "37.74",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.344"
+    },
+    {
+      "category": "06_测试打假",
+      "query": "这次改动能不能上，从用户视角走一遍业务旅程",
+      "expected": [
+        "ds",
+        "cmmi-ver-val"
+      ],
+      "actualTop1": "ds",
+      "actualTop3": [
+        "ds",
+        "spec-driven-dev",
+        "core-swe"
+      ],
+      "top1Score": "30.36",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.368"
+    },
+    {
+      "category": "06_测试打假",
+      "query": "出测试总结报告，组织客户 UAT 终验",
+      "expected": [
+        "cmmi-ver-val"
+      ],
+      "actualTop1": "cmmi-ver-val",
+      "actualTop3": [
+        "cmmi-ver-val",
+        "pr-report",
+        "product-project-intake"
+      ],
+      "top1Score": "42.44",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.360"
+    },
+    {
+      "category": "07_投产发布",
+      "query": "要发版了，打包 APK 并发布新版本",
+      "expected": [
+        "app-release-pipeline",
+        "sre-release-and-deploy",
+        "release"
+      ],
+      "actualTop1": "app-release-pipeline",
+      "actualTop3": [
+        "app-release-pipeline",
+        "release",
+        "create-paperclip-bundled-skill"
+      ],
+      "top1Score": "35.00",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.398"
+    },
+    {
+      "category": "07_投产发布",
+      "query": "部署生产服务器，走 7 步部署和秒级回滚预案",
+      "expected": [
+        "sre-release-and-deploy",
+        "cmmi-immutable-release"
+      ],
+      "actualTop1": "cmmi-immutable-release",
+      "actualTop3": [
+        "cmmi-immutable-release",
+        "sre-release-and-deploy",
+        "deploy-workspace-symlinks"
+      ],
+      "top1Score": "27.15",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.359"
+    },
+    {
+      "category": "07_投产发布",
+      "query": "发纯 JS 增量热更新补丁",
+      "expected": [
+        "ota-cache-busting",
+        "ota-launchasset-hash"
+      ],
+      "actualTop1": "ota-cache-busting",
+      "actualTop3": [
+        "ota-cache-busting",
+        "sre-release-and-deploy",
+        "app-release-pipeline"
+      ],
+      "top1Score": "47.53",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.363"
+    },
+    {
+      "category": "07_投产发布",
+      "query": "统计本次发版内容，自动生成 CHANGELOG 更新日志",
+      "expected": [
+        "release-changelog"
+      ],
+      "actualTop1": "release-changelog",
+      "actualTop3": [
+        "release-changelog",
+        "release-changelog-discord-message",
+        "yudao-contract-sync"
+      ],
+      "top1Score": "63.44",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.377"
+    },
+    {
+      "category": "08_大盘运营",
+      "query": "现在这家公司怎么样了，看服务健康和大盘",
+      "expected": [
+        "ceo-company-ops"
+      ],
+      "actualTop1": "ceo-company-ops",
+      "actualTop3": [
+        "ceo-company-ops",
+        "finance-budget-guard",
+        "ops-task-orchestration"
+      ],
+      "top1Score": "50.30",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.394"
+    },
+    {
+      "category": "08_大盘运营",
+      "query": "这个 agent 怎么不动了，钱花哪了",
+      "expected": [
+        "finance-budget-guard"
+      ],
+      "actualTop1": "finance-budget-guard",
+      "actualTop3": [
+        "finance-budget-guard",
+        "ceo-company-ops",
+        "qa-humanlike-e2e"
+      ],
+      "top1Score": "46.17",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.418"
+    },
+    {
+      "category": "08_大盘运营",
+      "query": "做日终财务对账，核查资金轧差平账",
+      "expected": [
+        "financial-reconciliation-agent"
+      ],
+      "actualTop1": "financial-reconciliation-agent",
+      "actualTop3": [
+        "financial-reconciliation-agent",
+        "xlsx",
+        "finance-budget-guard"
+      ],
+      "top1Score": "44.49",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.348"
+    },
+    {
+      "category": "08_大盘运营",
+      "query": "线上出事故了，做 5-Whys 根本原因复盘",
+      "expected": [
+        "postmortem-analyzer"
+      ],
+      "actualTop1": "postmortem-analyzer",
+      "actualTop3": [
+        "postmortem-analyzer",
+        "cmmi-car-spc-metrics",
+        "sre-release-and-deploy"
+      ],
+      "top1Score": "31.38",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.354"
+    },
+    {
+      "category": "08_大盘运营",
+      "query": "制定 SRE 的 SLO 告警阈值和错误预算",
+      "expected": [
+        "sre-slo-manager"
+      ],
+      "actualTop1": "sre-slo-manager",
+      "actualTop3": [
+        "sre-slo-manager",
+        "postmortem-analyzer",
+        "cmmi-immutable-release"
+      ],
+      "top1Score": "49.86",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.350"
+    },
+    {
+      "category": "09_控制面",
+      "query": "想开个新公司，招募几个数字员工",
+      "expected": [
+        "company-creator",
+        "hr-agent-onboarding"
+      ],
+      "actualTop1": "company-creator",
+      "actualTop3": [
+        "company-creator",
+        "hr-agent-onboarding",
+        "ceo-company-ops"
+      ],
+      "top1Score": "29.69",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.373"
+    },
+    {
+      "category": "09_控制面",
+      "query": "工单停滞了，任务死循环怎么治理",
+      "expected": [
+        "diagnose-why-work-stopped"
+      ],
+      "actualTop1": "diagnose-why-work-stopped",
+      "actualTop3": [
+        "diagnose-why-work-stopped",
+        "create-issue-interaction-ui",
+        "ops-task-orchestration"
+      ],
+      "top1Score": "33.09",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.400"
+    },
+    {
+      "category": "09_控制面",
+      "query": "帮我清理收件箱，归档过期通知红点",
+      "expected": [
+        "garden-inbox"
+      ],
+      "actualTop1": "garden-inbox",
+      "actualTop3": [
+        "garden-inbox",
+        "release-changelog-discord-message",
+        "internal-comms"
+      ],
+      "top1Score": "58.70",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.341"
+    },
+    {
+      "category": "09_控制面",
+      "query": "对接外部系统的 MCP 接口",
+      "expected": [
+        "mcp-builder",
+        "coolie-mcp-orchestration"
+      ],
+      "actualTop1": "mcp-builder",
+      "actualTop3": [
+        "mcp-builder",
+        "coolie-mcp-orchestration",
+        "cmmi-detailed-contracts"
+      ],
+      "top1Score": "42.09",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.331"
+    },
+    {
+      "category": "10_办公文档",
+      "query": "把这个月的对账单导出成 Excel 统计表",
+      "expected": [
+        "xlsx",
+        "financial-reconciliation-agent"
+      ],
+      "actualTop1": "xlsx",
+      "actualTop3": [
+        "xlsx",
+        "financial-reconciliation-agent",
+        "docx"
+      ],
+      "top1Score": "21.55",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.332"
+    },
+    {
+      "category": "10_办公文档",
+      "query": "生成一份 Word 格式的需求说明书报告",
+      "expected": [
+        "docx",
+        "cmmi-req-spec"
+      ],
+      "actualTop1": "docx",
+      "actualTop3": [
+        "docx",
+        "product-project-intake",
+        "ears-spec-writer"
+      ],
+      "top1Score": "48.88",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.420"
+    },
+    {
+      "category": "10_办公文档",
+      "query": "帮我制作一份工作汇报演示 PPT",
+      "expected": [
+        "pptx"
+      ],
+      "actualTop1": "pptx",
+      "actualTop3": [
+        "pptx",
+        "paperclip-dev-workspace-run-verify-fix",
+        "paperclip-evals"
+      ],
+      "top1Score": "19.60",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.324"
+    },
+    {
+      "category": "10_办公文档",
+      "query": "做个高保真活动前端原型 Demo",
+      "expected": [
+        "web-artifacts-builder",
+        "frontend-design"
+      ],
+      "actualTop1": "web-artifacts-builder",
+      "actualTop3": [
+        "web-artifacts-builder",
+        "requirements-capture",
+        "paperclip-page"
+      ],
+      "top1Score": "15.90",
+      "isTop1Hit": true,
+      "isTop3Hit": true,
+      "latencyMs": "0.331"
+    }
+  ]
+}

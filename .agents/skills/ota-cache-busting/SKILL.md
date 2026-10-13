@@ -1,6 +1,6 @@
 ---
 name: ota-cache-busting
-description: Expo OTA bundle hash 必须随每次发版改变，否则老用户拿不到新版本。Use when 老板装新版 APK 后仍看到老界面 / release-app.sh 自动 bump 后老用户没拉到新 bundle。
+description: Expo OTA 增量热更新与纯 JS 补丁发布指南。适用于接到「发纯JS增量热更新补丁」「发OTA」「纯JS补丁」「更新包热更」「防老版本缓存」时启用。
 ---
 
 # OTA Cache Busting — bundle hash 必须变
