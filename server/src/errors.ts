@@ -1,11 +1,18 @@
 export class HttpError extends Error {
   status: number;
   details?: unknown;
+  /**
+   * Optional i18n code (see `server/src/i18n/errors.json`). When a client
+   * requests a supported locale, the error serializer renders this code's
+   * localized message instead of the raw English `message`.
+   */
+  i18nKey?: string;
 
-  constructor(status: number, message: string, details?: unknown) {
+  constructor(status: number, message: string, details?: unknown, i18nKey?: string) {
     super(message);
     this.status = status;
     this.details = details;
+    this.i18nKey = i18nKey;
   }
 }
 

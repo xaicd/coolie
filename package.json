@@ -49,6 +49,7 @@
     "check:no-git-push": "node scripts/check-no-git-push.mjs",
     "check:module-boundaries": "node scripts/check-module-boundaries.mjs",
     "check:security": "node scripts/check-security-audit.mjs",
+    "check:server-i18n": "node scripts/check-server-i18n.mjs",
     "check:governance": "node scripts/check-governance-audit.mjs",
     "audit:governance": "node scripts/check-governance-audit.mjs",
     "openwiki:sync": "node scripts/sync-openwiki.mjs --write",

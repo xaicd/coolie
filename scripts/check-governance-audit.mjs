@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { collectExpoI18nChecks } from './check-expo-i18n.mjs';
+import { collectServerI18nChecks } from './check-server-i18n.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -762,6 +763,14 @@ assertRule('孵化器仓库嵌套拦截守卫: hatch-client-project.sh 必须包
 // -----------------------------------------------------------------------------
 console.log('\n🌐 20. Expo 移动端 i18n 契约同步防退化守卫 (Stage 5):');
 for (const check of collectExpoI18nChecks()) {
+  assertRule(check.name, check.ok, check.detail);
+}
+
+// -----------------------------------------------------------------------------
+// 21. 服务端错误码/状态机/枚举 i18n 字典契约防退化守卫 (COOA-135)
+// -----------------------------------------------------------------------------
+console.log('\n🧩 21. 服务端错误码/状态机/枚举 i18n 字典契约防退化守卫 (COOA-135):');
+for (const check of collectServerI18nChecks()) {
   assertRule(check.name, check.ok, check.detail);
 }
 

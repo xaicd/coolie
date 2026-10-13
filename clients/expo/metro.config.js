@@ -51,9 +51,11 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
   // Resolve those helpers from this app's node_modules, as the note above
   // describes.
   if (moduleName.startsWith("@babel/runtime/")) {
-    const direct = path.resolve(projectRoot, "node_modules", moduleName);
-    if (fs.existsSync(direct)) {
-      return { type: "sourceFile", filePath: direct };
+    try {
+      const resolved = require.resolve(moduleName, { paths: [projectRoot] });
+      return { type: "sourceFile", filePath: resolved };
+    } catch {
+      // Fall through to the default resolver when the helper is not present.
     }
   }
   if (originalResolveRequest) {

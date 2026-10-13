@@ -1,0 +1,142 @@
+{
+  "en": {
+    "issue.status": {
+      "backlog": "Backlog",
+      "todo": "To Do",
+      "in_progress": "In Progress",
+      "in_review": "In Review",
+      "blocked": "Blocked",
+      "done": "Done",
+      "cancelled": "Cancelled"
+    },
+    "issue.priority": {
+      "urgent": "Urgent",
+      "high": "High",
+      "medium": "Medium",
+      "low": "Low"
+    },
+    "run.status": {
+      "queued": "Queued",
+      "scheduled_retry": "Scheduled Retry",
+      "running": "Running",
+      "succeeded": "Succeeded",
+      "interrupted": "Interrupted",
+      "failed": "Failed",
+      "cancelled": "Cancelled",
+      "timed_out": "Timed Out"
+    },
+    "agent.status": {
+      "active": "Active",
+      "paused": "Paused",
+      "idle": "Idle",
+      "running": "Running",
+      "error": "Error",
+      "pending_approval": "Pending Approval",
+      "terminated": "Terminated"
+    },
+    "approval.status": {
+      "pending": "Pending",
+      "revision_requested": "Revision Requested",
+      "approved": "Approved",
+      "rejected": "Rejected",
+      "cancelled": "Cancelled"
+    },
+    "approval.type": {
+      "hire_agent": "Hire Agent",
+      "approve_ceo_strategy": "Approve CEO Strategy",
+      "budget_override_required": "Budget Override",
+      "request_board_approval": "Board Approval",
+      "ontology_spec": "Ontology Spec"
+    },
+    "routine.run.status": {
+      "received": "Received",
+      "coalesced": "Coalesced",
+      "skipped": "Skipped",
+      "issue_created": "Task Created",
+      "completed": "Completed",
+      "failed": "Failed"
+    },
+    "activity.action": {
+      "issue_created": "{{actor}} created task {{identifier}}",
+      "issue_status_changed": "{{actor}} moved {{identifier}} to {{status}}",
+      "issue_assigned": "{{actor}} assigned {{identifier}} to {{assignee}}",
+      "issue_comment_added": "{{actor}} commented on {{identifier}}",
+      "issue_completed": "{{actor}} completed {{identifier}}",
+      "approval_approved": "{{actor}} approved {{identifier}}",
+      "approval_rejected": "{{actor}} rejected {{identifier}}",
+      "agent_created": "{{actor}} added agent {{name}}",
+      "agent_deleted": "{{actor}} removed agent {{name}}",
+      "company_created": "{{actor}} created company {{name}}"
+    }
+  },
+  "zh-CN": {
+    "issue.status": {
+      "backlog": "待排期",
+      "todo": "待处理",
+      "in_progress": "进行中",
+      "in_review": "待审核",
+      "blocked": "已阻塞",
+      "done": "已完成",
+      "cancelled": "已取消"
+    },
+    "issue.priority": {
+      "urgent": "紧急",
+      "high": "高",
+      "medium": "中",
+      "low": "低"
+    },
+    "run.status": {
+      "queued": "排队中",
+      "scheduled_retry": "计划重试",
+      "running": "运行中",
+      "succeeded": "已成功",
+      "interrupted": "已中断",
+      "failed": "已失败",
+      "cancelled": "已取消",
+      "timed_out": "已超时"
+    },
+    "agent.status": {
+      "active": "在线",
+      "paused": "已暂停",
+      "idle": "空闲",
+      "running": "运行中",
+      "error": "异常",
+      "pending_approval": "待审批",
+      "terminated": "已终止"
+    },
+    "approval.status": {
+      "pending": "待审批",
+      "revision_requested": "已要求修改",
+      "approved": "已通过",
+      "rejected": "已驳回",
+      "cancelled": "已取消"
+    },
+    "approval.type": {
+      "hire_agent": "招募智能体",
+      "approve_ceo_strategy": "审批 CEO 战略",
+      "budget_override_required": "预算超限审批",
+      "request_board_approval": "董事会审批",
+      "ontology_spec": "本体规格审批"
+    },
+    "routine.run.status": {
+      "received": "已接收",
+      "coalesced": "已合并",
+      "skipped": "已跳过",
+      "issue_created": "已建工单",
+      "completed": "已完成",
+      "failed": "已失败"
+    },
+    "activity.action": {
+      "issue_created": "{{actor}} 新建了任务 {{identifier}}",
+      "issue_status_changed": "{{actor}} 将 {{identifier}} 移动到 {{status}}",
+      "issue_assigned": "{{actor}} 将 {{identifier}} 指派给 {{assignee}}",
+      "issue_comment_added": "{{actor}} 评论了 {{identifier}}",
+      "issue_completed": "{{actor}} 完成了 {{identifier}}",
+      "approval_approved": "{{actor}} 通过了 {{identifier}}",
+      "approval_rejected": "{{actor}} 驳回了 {{identifier}}",
+      "agent_created": "{{actor}} 新增智能体 {{name}}",
+      "agent_deleted": "{{actor}} 移除智能体 {{name}}",
+      "company_created": "{{actor}} 创建公司 {{name}}"
+    }
+  }
+}

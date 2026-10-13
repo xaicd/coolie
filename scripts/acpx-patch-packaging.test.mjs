@@ -5,13 +5,14 @@ import {
   lstatSync,
   mkdirSync,
   mkdtempSync,
+  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import test from "node:test";
 import { createRequire } from "node:module";
 import { runInNewContext } from "node:vm";
@@ -443,4 +444,31 @@ test("installed ACPX runtime persists and restores optional goal capabilities", 
   assert.deepEqual(JSON.parse(JSON.stringify(helpers.restoredGoalCapability(saved))), goal);
   assert.equal(helpers.persistedGoalCapability({ ...goal, version: 2 }), undefined);
   assert.equal(helpers.persistedGoalCapability({ ...goal, actions: ["set"] }), undefined);
+});
+
+test("installed ACPX runtime skips persisted key rules under any record prefix", () => {
+  const requireRunner = createRequire(new URL("../packages/paperclip-runner/package.json", import.meta.url));
+  const runtimePath = requireRunner.resolve("acpx/runtime");
+  const distDir = dirname(runtimePath);
+  const checkpointFile = readdirSync(distDir).find((name) => /^live-checkpoint-.*\.js$/.test(name));
+  assert.ok(checkpointFile, "the installed ACPX runtime must ship its session persistence chunk");
+  const checkpointSource = readFileSync(join(distDir, checkpointFile), "utf8");
+  const start = checkpointSource.indexOf("const MAP_OBJECT_PATHS = ");
+  const end = checkpointSource.indexOf("function shouldSkipDescend(", start);
+  assert.ok(start >= 0 && end > start, "the installed patch must define the persisted map-object path helpers");
+  const helpers = runInNewContext(
+    checkpointSource.slice(start, end) + ";({ shouldSkipKeyRule })",
+    {},
+  );
+  // Exact record paths keep matching.
+  assert.equal(helpers.shouldSkipKeyRule(["acpx", "session_options", "env"]), true);
+  assert.equal(helpers.shouldSkipKeyRule(["request_token_usage"]), true);
+  assert.equal(helpers.shouldSkipKeyRule(["messages", "Agent", "tool_results"]), true);
+  // Any record top-level prefix must still match the env blob...
+  assert.equal(helpers.shouldSkipKeyRule(["wrapper", "record", "acpx", "session_options", "env"]), true);
+  assert.equal(helpers.shouldSkipKeyRule(["a", "b", "c", "acpx", "session_options", "env"]), true);
+  // ...without matching sibling keys that only share a suffix.
+  assert.equal(helpers.shouldSkipKeyRule(["someacpx", "session_options", "env"]), false);
+  assert.equal(helpers.shouldSkipKeyRule(["acpx", "session_options", "envX"]), false);
+  assert.equal(helpers.shouldSkipKeyRule(["messages", "Agent"]), false);
 });

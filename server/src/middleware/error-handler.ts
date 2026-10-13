@@ -2,6 +2,11 @@ import type { Request, Response, NextFunction } from "express";
 import type { Db } from "@paperclipai/db";
 import { ZodError } from "zod";
 import { HttpError } from "../errors.js";
+import {
+  localizeHttpErrorMessage,
+  resolveRequestLocale,
+  tError,
+} from "../services/errors.js";
 import { trackErrorHandlerCrash } from "@paperclipai/shared/telemetry";
 import { getTelemetryClient } from "../telemetry.js";
 import { captureException } from "../sentry.js";
@@ -128,6 +133,10 @@ export function errorHandler(
   res: Response,
   _next: NextFunction,
 ) {
+  // Locale-aware errors are opt-in: only when the caller explicitly asked for
+  // a supported locale (`?locale=` or `Accept-Language`) do we translate, so
+  // the default English/legacy response shape is unchanged.
+  const requestLocale = resolveRequestLocale(req);
   if (err instanceof HttpError) {
     const details =
       err.details &&
@@ -181,11 +190,22 @@ export function errorHandler(
     const secretSensitiveServerError =
       err.status >= 500 &&
       isSecretSensitiveHttpRequest(req.method, req.originalUrl);
+    const localizedErrorMessage = requestLocale
+      ? localizeHttpErrorMessage(err, requestLocale)
+      : null;
     res.status(err.status).json(
       secretSensitiveServerError
         ? { error: "Internal server error" }
         : {
-            error: sanitizeSecretSensitiveResponse(req, err.message),
+            error:
+              localizedErrorMessage
+              ?? sanitizeSecretSensitiveResponse(req, err.message),
+            ...(localizedErrorMessage && requestLocale
+              ? { locale: requestLocale }
+              : {}),
+            ...(localizedErrorMessage && err.i18nKey
+              ? { i18nKey: err.i18nKey }
+              : {}),
             ...(typeof responseDetails?.code === "string"
               ? { code: responseDetails.code }
               : {}),
@@ -230,7 +250,7 @@ export function errorHandler(
   const zodIssues = readZodIssues(err);
   if (zodIssues) {
     res.status(400).json({
-      error: "Validation error",
+      error: requestLocale ? tError("validationFailed", requestLocale) : "Validation error",
       details: sanitizeSecretSensitiveResponse(req, zodIssues),
     });
     return;
@@ -244,7 +264,9 @@ export function errorHandler(
     "status" in err && err.status === 400 &&
     "type" in err && err.type === "entity.parse.failed"
   ) {
-    res.status(400).json({ error: "Invalid JSON body" });
+    res.status(400).json({
+      error: requestLocale ? tError("invalidJsonBody", requestLocale) : "Invalid JSON body",
+    });
     return;
   }
 
@@ -283,7 +305,8 @@ export function errorHandler(
   reportCrash(reportableError);
 
   res.status(500).json({
-    error: "Internal server error",
+    error: requestLocale ? tError("serverError", requestLocale) : "Internal server error",
+    ...(requestLocale ? { locale: requestLocale } : {}),
     ...(shouldExposeTrustedCloudTenantImportError(req)
       ? { message: rootError.message }
       : {}),
