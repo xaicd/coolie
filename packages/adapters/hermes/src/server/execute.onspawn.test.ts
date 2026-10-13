@@ -27,16 +27,22 @@ vi.mock("@paperclipai/adapter-utils/server-utils", async (importOriginal) => {
   };
 });
 
-// Mock fs and path resolution to avoid real file reads in execute()
-vi.mock("node:fs/promises", () => ({
-  readFile: vi.fn(async () => ""),
-  writeFile: vi.fn(async () => undefined),
-  mkdir: vi.fn(async () => undefined),
-  rm: vi.fn(async () => undefined),
-  access: vi.fn(async () => undefined),
-  readdir: vi.fn(async () => []),
-  stat: vi.fn(async () => ({ isFile: () => true, isDirectory: () => false })),
-}));
+vi.mock("node:fs/promises", () => {
+  const fns = {
+    readFile: vi.fn(async () => ""),
+    writeFile: vi.fn(async () => undefined),
+    unlink: vi.fn(async () => undefined),
+    mkdir: vi.fn(async () => undefined),
+    rm: vi.fn(async () => undefined),
+    access: vi.fn(async () => undefined),
+    readdir: vi.fn(async () => []),
+    stat: vi.fn(async () => ({ isFile: () => true, isDirectory: () => false })),
+  };
+  return {
+    ...fns,
+    default: fns,
+  };
+});
 
 import { execute } from "./execute.js";
 import * as serverUtils from "@paperclipai/adapter-utils/server-utils";
@@ -111,6 +117,16 @@ describe("hermes-local adapter onSpawn forwarding", () => {
     const call = vi.mocked(serverUtils.runChildProcess).mock.calls.at(-1)!;
     expect(call[3].env).not.toHaveProperty("PAPERCLIP_WAKE_PAYLOAD_JSON");
     expect(call[2]).toContainEqual(expect.stringContaining("Current task brief"));
+  });
+
+  it("uses --query-file when prompt exceeds 64KB to avoid spawn E2BIG", async () => {
+    const { ctx } = makeCtx();
+    const largeBrief = "A".repeat(70000);
+    const wake = { reason: "issue_assigned", issue: { id: "issue-large", description: largeBrief } };
+    await execute({ ...ctx, context: { ...ctx.context, paperclipWake: wake } } as any);
+    const call = vi.mocked(serverUtils.runChildProcess).mock.calls.at(-1)!;
+    expect(call[2]).toContain("--query-file");
+    expect(call[2]).not.toContain("-q");
   });
 
   it("runChildProcess opts type includes onSpawn", () => {

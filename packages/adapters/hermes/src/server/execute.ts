@@ -19,6 +19,7 @@
  */
 
 import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 import type {
@@ -445,7 +446,19 @@ export async function execute(
   // ── Build command args ─────────────────────────────────────────────────
   // Use -Q (quiet) to get clean output: just response + session_id line
   const useQuiet = cfgBoolean(config.quiet) === true; // default false
-  const args: string[] = ["chat", "-q", prompt];
+  let queryFilePath: string | null = null;
+  const args: string[] = ["chat"];
+  // When prompt is very large (> 64KB), pass via --query-file to avoid POSIX spawn E2BIG (ARG_MAX exceeded)
+  if (prompt && prompt.length > 65536) {
+    queryFilePath = path.join(
+      os.tmpdir(),
+      `hermes-query-${ctx.runId || Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`,
+    );
+    await fs.writeFile(queryFilePath, prompt, "utf8");
+    args.push("--query-file", queryFilePath);
+  } else {
+    args.push("-q", prompt);
+  }
   if (useQuiet) args.push("-Q");
 
   if (model) {
@@ -561,14 +574,21 @@ export async function execute(
     return ctx.onLog(stream, chunk);
   };
 
-  const result = await runChildProcess(ctx.runId, hermesCmd, args, {
-    cwd,
-    env,
-    timeoutSec,
-    graceSec,
-    onLog: wrappedOnLog,
-    onSpawn: ctx.onSpawn,
-  });
+  let result;
+  try {
+    result = await runChildProcess(ctx.runId, hermesCmd, args, {
+      cwd,
+      env,
+      timeoutSec,
+      graceSec,
+      onLog: wrappedOnLog,
+      onSpawn: ctx.onSpawn,
+    });
+  } finally {
+    if (queryFilePath) {
+      await fs.unlink(queryFilePath).catch(() => {});
+    }
+  }
 
   // ── Parse output ───────────────────────────────────────────────────────
   const parsed = parseHermesOutput(result.stdout || "", result.stderr || "");
