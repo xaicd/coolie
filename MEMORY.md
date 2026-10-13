@@ -17,21 +17,21 @@
 
 | 优先级 | 文件 | 核心用途 |
 |---|---|---|
-| ★ | **MEMORY.md** (本文件, ≤8KB) | 数字员工进场第一秒全貌与记忆中枢 |
-| ★★ | [docs/CURRENT-SPRINT.md](docs/CURRENT-SPRINT.md) | 当前 Sprint 任务看板、最新决策与掌柜原话 |
+| ★ | **MEMORY.md** (本文件, ≤8KB) | 进场第一秒全貌与记忆中枢 |
+| ★★ | [docs/CURRENT-SPRINT.md](docs/CURRENT-SPRINT.md) | Sprint 任务大盘与掌柜原话 |
 | ★★ | [docs/intent-router.md](docs/intent-router.md) | 客户口语意图路由器 (7大类 30+ 原话反查) |
-| ★★ | [AGENTS.md](AGENTS.md) (45KB) | 平台公理体系、6 大员工角色与最高工程法典 |
+| ★★ | [AGENTS.md](AGENTS.md) (45KB) | 平台公理体系与最高工程法典 |
 
 ## 3. 两大交付底座自动选型法典 (接到需求如何选型)
 
 | 交付底座 | 核心语言与架构栈 | 终端形态与场景 | 适用需求与客户规范 |
 |---|---|---|---|
-| **`yudao-quad-terminal`** | Java 17/21 + Spring Boot 3 微服务 + Vue3 + Uni-App + Expo | **四位一体**：PC中台 + 小程序 + 原生App + 网关 (19域) | 完备商用需求、指定 Java/信创、涵盖原生 App/小程序 |
-| **`ruoyi-all-next`** | TypeScript + Next.js 15 + React 19 + Prisma/Postgres | **轻全栈**：响应式Web + 移动H5 + 3200沙箱秒级预览 | 敏捷POC/极速打样、指定 TS/Node、纯 Web/轻终端 |
+| **`yudao-quad-terminal`** | Java 17/21 + Spring Boot 3 + Vue3 + Uni-App + Expo | **四位一体**：PC中台 + 小程序 + 原生App + 网关 (19域) | 完备商用需求、指定 Java/信创、涵盖原生 App/小程序 |
+| **`ruoyi-all-next`** | TypeScript + Next.js 15 + React 19 + Prisma | **轻全栈**：响应式Web + 移动H5 + 3200沙箱秒级预览 | 敏捷POC/极速打样、指定 TS/Node、纯 Web/轻终端 |
 
 > 💡 **决策漏斗**: 需原生App/小程序或Java信创 ➜ 必选 `yudao`；纯Web/快速打样 ➜ 优选 `ruoyi`。详见 `.agents/rules/FOUNDRY-BLUEPRINT-SELECTION.md`。
 
-## 4. 16 个最高频核心 Skill 路由 (客户说啥 → 用哪个 Skill)
+## 4. 17 个最高频核心 Skill 路由 (客户说啥 → 用哪个 Skill)
 
 | 客户说啥 | 命中 Skill | 1 行核心能力 |
 |---|---|---|
@@ -47,6 +47,7 @@
 | 移动真机走查 / 模拟器截图 | `agent-device-browser-automation` | host-exec穿透真机跑多视口UI断言 |
 | 变异测试打假 / 查空洞单测 | `mutation-tester` | 杀灭假Mock，验证测试充分性与断言有效性 |
 | 事故复盘 / 根因分析 | `postmortem-analyzer` | 5-Whys根因复盘，自动固化防退化断言 |
+| 老系统逆向 / 存量系统接入 | `rea-reverse-engineering` | APK/SQLite/ASAR逆向解包与就绪度评估 |
 | QQ微信机器人 / 派活失败 / 限流 | `coolie-mcp-orchestration` | 走原生MCP/API派单，严禁拦截式外挂 |
 | 调外部系统 / 配 MCP 工具 | `coolie-mcp-orchestration` | 72核心工具池、本体MCP与第三方网关 |
 | 招数字员工 / 调整岗位技能 | `hr-agent-onboarding` | 招入员工、配置5大角色契约与专属预算 |
@@ -82,10 +83,11 @@
 
 - **当前 Sprint**: `2026-sprint-10-13-foundry-context-and-paperclip-governance`
 - **最新拍板原话 (2026-10-13)**:
-  - *"不能再造轮子了,太累了"* ➜ 工坊自身演进完全并入 Paperclip 原生项目管理。
-  - *"6寸屏 这个要沉淀到原生APP开发相关技能中"* ➜ 已固化至 `yudao-expo-app` §4。
-  - *"每个环节的 标准流程 都有吗, 能否快速唤醒记忆"* ➜ 沉淀 8 环节 SOP 与 MEMORY.md 10秒快速唤醒卡。
-  - *"yudao-quad-terminal 与 ruoyi-all-next 是两个 不同语言的 开发底座规范...根据需求完整度与规范要求选择"* ➜ 建立两大底座自动选型法典。
+  - *"不能再造轮子了,太累了"* ➜ 自身演进回归原生管理。
+  - *"6寸屏 这个要沉淀到原生APP开发相关技能中"* ➜ 固化至 `yudao-expo-app` §4。
+  - *"每个环节的 标准流程 都有吗"* ➜ 沉淀 8环节 SOP 与 10秒速记卡。
+  - *"yudao-quad-terminal 与 ruoyi-all-next 是两个不同语言的底座"* ➜ 建立自动选型法典。
+  - *"当前本体插件需要支持存量项目接入...深入学习集成 rea"* ➜ 完成 REA 逆向集成与就绪度评估。
 - **详见账本**: [docs/sprint-prod/10/13.md](docs/sprint-prod/10/13.md)
 
 ## 8. 维护规则
