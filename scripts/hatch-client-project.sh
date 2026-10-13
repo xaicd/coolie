@@ -620,11 +620,10 @@ if [[ "$PROFILE" == "quad-terminal" || "$PROFILE" == "yudao" || "$PROFILE" == "y
     LOCAL_YUDAO_PATH="/Users/mac/workspace/xaicd/yudao-quad-terminal"
   fi
 
-  if [[ -n "$LOCAL_YUDAO_PATH" && -d "$LOCAL_YUDAO_PATH/.git" ]]; then
-    echo "📦 [2/4] 从本地成熟四位一体底座抽取 $JDK_BRANCH 分支 ($JDK_TITLE, Zero-Git-History 模式)..."
-    (cd "$LOCAL_YUDAO_PATH" && git archive "$JDK_BRANCH" | tar -x -C "$PROJECT_DIR") 2>/dev/null || {
-      rsync -a --exclude='.git' --exclude='node_modules' "$LOCAL_YUDAO_PATH/" "$PROJECT_DIR/"
-    }
+  if [[ -n "$LOCAL_YUDAO_PATH" && -d "$LOCAL_YUDAO_PATH" ]]; then
+    echo "📦 [2/4] 从本地成熟四位一体底座抽取 (四位一体全栈架构, Zero-Git-History 模式)..."
+    rsync -a --exclude='.git' --exclude='node_modules' "$LOCAL_YUDAO_PATH/" "$PROJECT_DIR/"
+    rm -f "$PROJECT_DIR/.gitmodules"
   else
     echo "🌐 [2/4] 通过 degit xaicd/yudao-quad-terminal#$JDK_BRANCH 极速派生 (免 Git packfile)..."
     npx --yes degit "xaicd/yudao-quad-terminal#$JDK_BRANCH" "$PROJECT_DIR" --force || {
@@ -675,6 +674,7 @@ echo "📝 [3/4] 自动化植入 CMMI 01~09 全生命周期工程规范、敏捷
 mkdir -p "$PROJECT_DIR/docs/01_management/dar-decision-records"
 mkdir -p "$PROJECT_DIR/docs/02_requirements/srs"
 mkdir -p "$PROJECT_DIR/docs/03_design/detailed-design-lld" "$PROJECT_DIR/docs/03_design/interface-contracts" "$PROJECT_DIR/docs/03_design/adr" "$PROJECT_DIR/docs/03_design/diagrams"
+mkdir -p "$PROJECT_DIR/docs/04_implementation"
 mkdir -p "$PROJECT_DIR/docs/05_verification/test-cases" "$PROJECT_DIR/docs/05_verification/peer-review-records" "$PROJECT_DIR/docs/05_verification/mutation"
 mkdir -p "$PROJECT_DIR/docs/06_quality_assurance/audit" "$PROJECT_DIR/docs/06_quality_assurance/process-audit-reports"
 mkdir -p "$PROJECT_DIR/docs/07_release"
