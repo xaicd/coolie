@@ -178,3 +178,100 @@ stateDiagram-v2
 1. **每轮循环必须更新本台账**：每个 Sprint 或重大特性完成时，百晓生与墨斗必须同步更新本文件中的 32 项特性状态、证据文件路径与最新差距分析；
 2. **拒绝主观口头结项**：任何特性从未标记为 `done` 到标记为 `done`，必须在本台账中明确记录对应的 Git Commit SHA、自动化走查截图或验收报告路径；
 3. **保持与 SRE 实时状态联动**：SRE Watchdog 产生的 `sre-status.json` 中的 Palantir Evolution 矩阵，作为本台账执行进度的自动化物理真理源。
+
+---
+
+## 五、员工视角实走实查：agent-device 与 agent-browser 深度走查发现与即时进化清单 (Wave382 Multi-Perspective Live Discovery)
+
+2026-10-13 22:45，各数字员工在本地真机与 Web 运行环境中，分别使用 `agent-device` 与 `agent-browser` 启动了新一轮全业务旅程拟真走查，沉淀了物理证据并定位了关键产品差距：
+
+```mermaid
+flowchart LR
+    subgraph MultiPerspective["数字员工专业视角与工具驱动"]
+        DS["百晓生 (DS)<br/>agent-device 移动端走查<br/>agent-browser 用户旅程"]
+        FDA["墨斗 (FDA)<br/>agent-browser 本体画布<br/>Object-Action 闭环"]
+        SWE["铁匠 (Core SWE)<br/>6寸屏防御与状态机<br/>Web 两字极简 UI"]
+        SRE["门神 (PRE-SRE)<br/>SRE Watchdog<br/>Temporal 租约与抗冻"]
+    end
+    subgraph Findings["现场深度发现与开源顶级竞品差距"]
+        F1["[DS] 移动端 401 报错为生硬英文<br/>(差距对标 Linear / GitHub Mobile)"]
+        F2["[FDA] 本体图谱缺受控动词触发<br/>(差距对标 Palantir Workshop)"]
+        F3["[SWE] 工单侧栏连续 8 个裸 None<br/>(差距对标 Linear 属性面板)"]
+        F4["[SRE] Blocked·0 blockers 语义自相矛盾<br/>(差距对标 Temporal 确定性状态)"]
+    end
+    subgraph Solutions["不偏离主题目标的持续推进任务"]
+        S1["COOA-146: 移动端 Accept-Language 透传与错误拦截转译"]
+        S2["COOA-147: Web 详情侧栏语义化与全操作两字收敛"]
+        S3["COOA-148: 本体图谱实体节点直连受控业务动词面板"]
+        S4["COOA-149: 任务阻塞状态机自愈与长任务预估心跳回显"]
+    end
+
+    DS --> F1
+    FDA --> F2
+    SWE --> F3
+    SRE --> F4
+    F1 --> S1
+    F2 --> S3
+    F3 --> S2
+    F4 --> S4
+```
+
+### 1. 现场机器物理走查凭证 (Immutable Machine Evidence)
+
+- **移动真机/模拟器 (Android emulator-5554)**：
+  - 启动走查快照：[`screenshots/live-screen.png`](file:///host-workspace/xaicd/coolie/screenshots/live-screen.png)（检视 v0.6.57 就绪与更新说明卡片）
+  - 错误与键盘避让快照：[`screenshots/mobile-error-screen.png`](file:///host-workspace/xaicd/coolie/screenshots/mobile-error-screen.png)（检视 API Key 登录鉴权报错与软键盘交互）
+- **Web 控制台 (Playwright on localhost:3100)**：
+  - 活体本体图谱快照：[`screenshots/web-ontology-graph.png`](file:///host-workspace/xaicd/coolie/screenshots/web-ontology-graph.png)（检视 14 节点、19 边业务系统与 CMDB 实体画布）
+  - 任务详情走查快照：[`screenshots/web-task-detail.png`](file:///host-workspace/xaicd/coolie/screenshots/web-task-detail.png)（检视任务属性侧栏与操作按钮文案）
+
+---
+
+### 2. 深度使用发现的具体问题与顶级竞品差距剖析
+
+#### 发现一：移动端 401 报错中英夹杂与原生英文泄露【百晓生·DS】
+- **实测复现**：通过 `agent-device fill @e60 "test_invalid_key"` 并点击连接后，界面弹出底层英文原生报错：
+  `"This instance did not accept that key (401 Agent token did not verify; obtain fresh credentials and retry)."`
+- **对标开源顶级竞品差距 (Linear Mobile / GitHub Mobile)**：
+  - Linear 等工业级 App 严禁将底层协议英文原样甩给用户，所有 4xx/5xx 均由统一的 Client Error Adapter 转译为友好人话；
+  - 移动端网络层请求头未显式注入 `Accept-Language: zh-CN`，导致服务端即便具备 i18n 能力也只能返回默认英文。
+- **不偏离商业交付工厂的解决方案 (COOA-146)**：
+  在 `clients/expo/src/services/api.ts` 中透传语言偏好头，并在客户端接入 `tError()` 统一本地化转译。
+
+#### 发现二：活体本体图谱“只看不能动”，缺乏业务动词闭环【墨斗·FDA】
+- **实测复现**：通过 `agent-browser` 深度检验 `/ontology` 画布，虽然成功渲染了企业组织、CMDB 与任务拓扑，但点击节点仅支持放大缩小，无法直接调用业务行动。
+- **对标开源顶级竞品差距 (Palantir Foundry Workshop / Object Explorer)**：
+  - Palantir 的核心护城河是“实体 (Object Types) + 动词 (Action Types)”双核闭环。在 Palantir 中，选中任何业务实体，上下文面板会立即列出该实体允许执行的受控动词（例如：`【重构空间拓扑】`、`【生成3D烘焙】`、`【发起会签审批】`）；
+  - 点击动词即可拉起强类型契约校验与表单，执行后原子生成因果审计日志。
+- **不偏离商业交付工厂的解决方案 (COOA-148)**：
+  在本体图谱侧边栏中为各实体节点挂载受控 Action Types 触发面板，点击动词自动派生受控工单或触发 API，让本体真正成为交付工厂的活体控制中枢。
+
+#### 发现三：工单详情侧栏数据空洞与残存英文操作按钮【铁匠·Core SWE / FDSE】
+- **实测复现**：通过 `agent-browser click @e420` 查看看板任务详情：
+  - 属性侧边栏展示连续 8 个毫无语义前缀的 `None`、`None`、`None`；
+  - 底部操作栏依然存在 `Edit description`, `Attach file`, `Auto mode`, `Send` 等英文操作项。
+- **对标开源顶级竞品差距 (Linear Desktop / Jira / GitHub Projects)**：
+  - Linear 即使在字段为空时，也会明确标明字段身份（如 `No Priority`, `No Estimate`, `No Cycle`），并提供统一的快捷键与下拉交互；
+  - Coolie 平台公理要求全操作收敛为两字极简交互，英文词条违背了掌柜无培训上手的交付目标。
+- **不偏离商业交付工厂的解决方案 (COOA-147)**：
+  对属性侧边栏补充键名前缀（如“优先级：无”、“里程碑：无”），并将操作栏统一收敛为【编辑】、【附件】、【自动】、【发送】两字规范。
+
+#### 发现四：任务状态机 `Blocked · 0 blockers` 语义自相矛盾【门神·PRE-SRE】
+- **实测复现**：看板与详情页中，工单状态展示为 `Blocked · 0 blockers need attention`（已阻塞，但 0 个阻塞项需处理），逻辑无法自洽。
+- **对标开源顶级竞品差距 (Temporal.io 确定性工作流 / Linear Blocker Graph)**：
+  - Linear 的阻塞关系图严格依赖有向无环图 (DAG)，当 `blockers.length === 0` 时，状态绝不会误判为 Blocked；
+  - 若为外部审批或租约等待，应显式标明原因（如“等待主管审批”、“等待心跳租约”）。
+- **不偏离商业交付工厂的解决方案 (COOA-149)**：
+  修正任务状态计算逻辑，当阻塞依赖计数为 0 时自动自愈为 `todo` 或显式指明外部等待类型，消除状态机假死表象。
+
+---
+
+### 3. 主线持续滚动推进工作包 (Continuous Rolling WBS)
+
+| 任务编号 | 责任员工 | 核心交付物 | 验收方式 | 目标结项时间 |
+| :--- | :--- | :--- | :--- | :--- |
+| **`COOA-146`** | 百晓生 (DS) / 铁匠 (SWE) | 移动端 `Accept-Language` 透传与 401/403 错误拦截转译 | `agent-device` 再次模拟错误登录，断言出现纯中文引导 | 本轮自循环 |
+| **`COOA-147`** | 铁匠 (SWE) / 门神 (FDSE) | Web 工单侧栏属性名补齐与底部操作按钮全面两字化 | `agent-browser` 走查任务详情，断言 0 孤立 None、0 英文按钮 | 本轮自循环 |
+| **`COOA-148`** | 墨斗 (FDA) | 活体本体图谱实体与受控 Action Types 交互抽屉直连 | `agent-browser` 走查本体图谱，断言点击节点呼出受控动词列表 | 下一轮自循环 |
+| **`COOA-149`** | 门神 (PRE-SRE) | 任务阻塞状态机自愈校验与长任务预估耗时心跳回显 | SRE 自动巡检断言 0 幽灵阻塞任务 | 本轮自循环 |
+
