@@ -28,11 +28,11 @@ description: CMMI 3 需求工程与 EARS 严谨需求规格收敛 (RD/REQM)。�
 4. **异常情况需求 (Unwanted behavior)**: `IF <condition/error>, THEN the <system> shall <system response>.`
 5. **可选特性需求 (Optional feature)**: `WHERE <feature is included>, the <system> shall <system response>.`
 
-### 真实业务现场三态口语 EARS 映射 (来自 real-world 实证)
-商业交付中老板与用户的指令往往不是标准的开发祈使句，必须建立三态语法转译映射：
-- **祈使动作句**（“实现xxx / 修复扫码核销并发锁 / 优化慢查询”） ➜ 映射为 **Event-driven**: `WHEN <trigger>, the system SHALL <action>.`
-- **陈述约束句**（“C 端 APP 首页 的 库存尾货 得 放着 / 顶部导航要固定”） ➜ 映射为 **State-driven / Constraint**: `WHILE <in state>, the system SHALL PRESERVE <component/behavior>.`
-- **否定纠错句**（“底部 已是最新版本Xxx，不要再提示了，设置 版本检查 才显示”） ➜ 映射为 **Unwanted behavior / Conditional**: `The system SHALL NOT <display alert>; IF <user clicks settings version check>, THEN the system SHALL <display dialog>.`
+### 通用三态口语意图 EARS 转译映射标准 (Universal Intent-to-EARS Mapping)
+商业交付中用户与决策层的输入往往不是标准的工程祈使句，必须建立通用的三态语法转译映射：
+- **祈使动作句 (Imperative Directive)**（如：“新增异步导出队列 / 优化报表慢查询性能 / 增加并发扣减防重锁”） ➜ 映射为 **Event-driven**: `WHEN <trigger>, the system SHALL <action>.`
+- **陈述约束句 (Declarative / Constraint)**（如：“列表分页栏与筛选面板必须保留 / 核心操作入口保持固定 / 既有排序逻辑维持不变”） ➜ 映射为 **State-driven / Constraint**: `WHILE <in state>, the system SHALL PRESERVE <component/behavior>.`
+- **否定纠错句 (Negative / Corrective)**（如：“默认不要自动弹出阻断式提示，用户点击检查时才展示 / 提交失败时不要重置表单”） ➜ 映射为 **Unwanted behavior / Conditional**: `The system SHALL NOT <action> UNLESS <condition>; IF <condition>, THEN the system SHALL <response>.`
 
 > **进厂入库铁律**：任何符合上述三态之一的业务诉求，第一步必须通过 MCP 原生工具 `mcp__coolie__paperclipCreateIssue` 正式立项进排期池，严禁口头承诺无痕流失，严禁跳过控制面私自在本地偷跑代码！
 

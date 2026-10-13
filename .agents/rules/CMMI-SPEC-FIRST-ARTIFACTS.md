@@ -127,11 +127,11 @@
      - 严禁将正在开发中的特性代码（包括同伴代码或前置任务代码）推入 `git stash` 暂存栈以换取构建通过；
      - 严禁在代码压在 stash 栈底时向控制面标记 `done`（虚假交付）；
      - 若遇多任务并发，必须启用工作区隔离机制（Project Workspace / Git Worktree / Feature Branch），彻底告别单目录并发踩踏。
-4. **前线全语法意图进厂与 MCP 原生直通立项 (来自真实项目口语交互实证)**：
-   - 商业软件交付必须无缝覆盖老板与甲方的三类真实口语语法：
-     - **祈使动作句**（“实现xxx/修复xxx/优化xxx” ➜ 直接转 EARS 显式需求）；
-     - **陈述约束句**（“C端首页库存尾货得放着/这个按键不能删” ➜ 转为 EARS 保持性约束需求 `The system SHALL PRESERVE...`）；
-     - **否定纠错句**（“底部已是最新版本不要再提示了，设置版本检查才显示” ➜ 转为 EARS 条件式否定需求 `The system SHALL NOT... UNLESS...`）；
+4. **前线全语法意图进厂与 MCP 原生直通立项 (通用工程标准)**：
+   - 商业软件交付必须无缝覆盖用户与管理者的三类通用口语语法模式：
+     - **祈使动作句 (Imperative Directive)**（如：“新增异步导出队列 / 优化报表分页查询性能 / 修复并发扣减事务锁” ➜ 转为 EARS 事件驱动需求 `WHEN <trigger>, the system SHALL <action>.`）；
+     - **陈述约束句 (Declarative / Constraint)**（如：“列表页分页栏需要保留 / 核心操作按键不能隐藏 / 默认排序规则需维持原状” ➜ 转为 EARS 状态保持约束 `WHILE <state>, the system SHALL PRESERVE <behavior/component>.`）；
+     - **否定纠错句 (Negative / Corrective)**（如：“默认不要自动弹出全局弹窗，用户主动点击详情时才展示 / 提交失败时不要刷新页面，需保留表单输入” ➜ 转为 EARS 条件性否定约束 `The system SHALL NOT <action> UNLESS <condition>.`）；
    - **全语法入库铁律**：任何包含业务逻辑、UI 布局或系统行为调整的诉求，必须立即通过控制面原生 MCP 工具（`mcp__coolie__paperclipCreateIssue`）正式立项进排期池（状态为 `todo` / `in_progress`），严禁口头承诺无痕流失，严禁跳过控制面私自在本地偷跑代码！
 5. **异步长耗时任务非阻塞管道与即时心跳脉冲 (来自真实项目 Docker 构建与超时实证)**：
    - 凡预期耗时超过 60 秒的重型任务（Docker build、全量 E2E 测试套件、大型镜像发布）：
