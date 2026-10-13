@@ -11,12 +11,11 @@
 - **核心**: PostgreSQL (PGlite / 原生 PG) + 263 物理表 + 活体业务本体 (Living Ontology)
 - **多机拓扑**: `mac` (指挥/模拟器/Node24) · `cwall` (4090/376G算力) · `aja-pc` (业务中台) · `tc-coolie-claw` (生产服务器)
 
-## 2. 5 个核心入口 (5 秒读完)
+## 2. 4 个核心入口 (5 秒读完)
 
 | 优先级 | 文件 | 核心用途 |
 |---|---|---|
 | ★ | **MEMORY.md** (本文件, ≤8KB) | 进场第一秒全貌与记忆中枢 |
-| ★★ | [docs/USER-TASTE.md](docs/USER-TASTE.md) | 掌柜原话全量归档与用户 Taste 哲学法典 |
 | ★★ | [docs/CURRENT-SPRINT.md](docs/CURRENT-SPRINT.md) | Sprint 任务大盘与掌柜原话 |
 | ★★ | [docs/intent-router.md](docs/intent-router.md) | 客户口语意图路由器 (7大类 30+ 原话反查) |
 | ★★ | [AGENTS.md](AGENTS.md) (45KB) | 平台公理体系与最高工程法典 |
@@ -85,8 +84,8 @@
   - *"不能再造轮子"* ➜ 回归原生管理；*"6寸屏沉淀APP技能"* ➜ `yudao-expo-app` §4。
   - *"标准流程全覆盖"* ➜ 8 环节 SOP；*"底座选型"* ➜ 4 级法典；*"本体存量接入"* ➜ REA 逆向。
   - *"循环输出验收清单持续提要求, 验收人对标顶级竞品定位差距"* ➜ 8 域 32 项清单与 Web 对标雷达。
-  - *"sre监控影响主线要修理"* ➜ SRE 幽灵心跳自愈；*"记录所有输入持续沉淀用户taste"* ➜ `USER-TASTE.md`。
-- **详见账本**: [docs/sprint-prod/10/13.md](docs/sprint-prod/10/13.md) · [docs/USER-TASTE.md](docs/USER-TASTE.md)
+  - *"sre监控影响主线要修理"* ➜ SRE 幽灵心跳自愈；*"记录所有输入持续沉淀用户taste, 严禁随意新建文档"* ➜ 100% 归属当日日结。
+- **详见账本**: [docs/sprint-prod/10/13.md](docs/sprint-prod/10/13.md)
 
 ## 8. 维护规则
 
