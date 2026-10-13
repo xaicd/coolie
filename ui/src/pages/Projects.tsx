@@ -13,7 +13,7 @@ import { MembershipAction } from "../components/MembershipAction";
 import { StarToggle } from "../components/StarToggle";
 import { EmptyState } from "../components/EmptyState";
 import { PageSkeleton } from "../components/PageSkeleton";
-import { formatDate, formatNumber, formatProjectBudget, projectUrl } from "../lib/utils";
+import { formatDate, formatProjectBudget, projectUrl } from "../lib/utils";
 import {
   isStarred,
   resourceMembershipState,
@@ -26,16 +26,17 @@ import { ArrowUpDown, Check, Hexagon, Plus, RefreshCw } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { SyncProjectDialog } from "../components/SyncProjectDialog";
 import { ontologyApi } from "../api/ontology";
+import { useTranslation } from "@/i18n";
 import { cn } from "../lib/utils";
 
 type ProjectSortField = "name" | "updated" | "created" | "targetDate";
 type ProjectSortDir = "asc" | "desc";
 
-const PROJECT_SORT_OPTIONS: Array<{ field: ProjectSortField; label: string }> = [
-  { field: "name", label: "Name" },
-  { field: "updated", label: "Updated" },
-  { field: "created", label: "Created" },
-  { field: "targetDate", label: "Target date" },
+const PROJECT_SORT_OPTIONS: Array<{ field: ProjectSortField; labelKey: string }> = [
+  { field: "name", labelKey: "projects.sortName" },
+  { field: "updated", labelKey: "projects.sortUpdated" },
+  { field: "created", labelKey: "projects.sortCreated" },
+  { field: "targetDate", labelKey: "projects.sortTargetDate" },
 ];
 
 function compareProjectNames(left: Project, right: Project) {
@@ -80,6 +81,7 @@ function sortProjects(projects: Project[], sortField: ProjectSortField, sortDir:
 }
 
 export function Projects() {
+  const { t } = useTranslation();
   const { selectedCompanyId } = useCompany();
   const { openNewProject } = useDialogActions();
   const { setBreadcrumbs } = useBreadcrumbs();
@@ -88,8 +90,8 @@ export function Projects() {
   const [syncProject, setSyncProject] = useState<Project | null>(null);
 
   useEffect(() => {
-    setBreadcrumbs([{ label: "Projects" }]);
-  }, [setBreadcrumbs]);
+    setBreadcrumbs([{ label: t("projects.breadcrumb") }]);
+  }, [setBreadcrumbs, t]);
 
   const { data: allProjects, isLoading, error } = useQuery({
     queryKey: queryKeys.projects.list(selectedCompanyId!),
@@ -131,10 +133,12 @@ export function Projects() {
 
     return groups;
   }, [membershipsQuery.data, sortedProjects]);
-  const sortLabel = PROJECT_SORT_OPTIONS.find((option) => option.field === sortField)?.label ?? "Name";
+  const sortLabel = t(
+    PROJECT_SORT_OPTIONS.find((option) => option.field === sortField)?.labelKey ?? "projects.sortName",
+  );
 
   if (!selectedCompanyId) {
-    return <EmptyState icon={Hexagon} message="Select an organization to view projects." />;
+    return <EmptyState icon={Hexagon} message={t("projects.selectOrgToView")} />;
   }
 
   if (isLoading) {
@@ -146,9 +150,9 @@ export function Projects() {
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="sm" className="w-fit text-xs" title="Sort">
+            <Button variant="ghost" size="sm" className="w-fit text-xs" title={t("projects.sort")}>
               <ArrowUpDown className="h-3.5 w-3.5 sm:h-3 sm:w-3 sm:mr-1" />
-              <span>Sort: {sortLabel}</span>
+              <span>{t("projects.sortLabel", { label: sortLabel })}</span>
             </Button>
           </PopoverTrigger>
           <PopoverContent align="start" className="w-44 p-0">
@@ -171,11 +175,11 @@ export function Projects() {
                     setSortDir(option.field === "name" || option.field === "targetDate" ? "asc" : "desc");
                   }}
                 >
-                  <span>{option.label}</span>
+                  <span>{t(option.labelKey)}</span>
                   {sortField === option.field ? (
                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
                       <Check className="h-3 w-3" />
-                      {sortDir === "asc" ? "Asc" : "Desc"}
+                      {sortDir === "asc" ? t("projects.asc") : t("projects.desc")}
                     </span>
                   ) : null}
                 </button>
@@ -185,7 +189,7 @@ export function Projects() {
         </Popover>
         <Button size="sm" variant="outline" onClick={openNewProject}>
           <Plus className="h-4 w-4 mr-1" />
-          Add Project
+          {t("projects.newProject")}
         </Button>
       </div>
 
@@ -194,8 +198,8 @@ export function Projects() {
       {!isLoading && projects.length === 0 && (
         <EmptyState
           icon={Hexagon}
-          message="No projects yet."
-          action="Add Project"
+          message={t("projects.noProjects")}
+          action={t("projects.newProject")}
           onAction={openNewProject}
         />
       )}
@@ -203,8 +207,8 @@ export function Projects() {
       {projects.length > 0 && (
         <div className="space-y-6">
           {([
-            ["My Projects", groupedProjects.mine],
-            ["Other Projects", groupedProjects.other],
+            [t("projects.myProjects"), groupedProjects.mine],
+            [t("projects.otherProjects"), groupedProjects.other],
           ] as const).map(([label, sectionProjects]) => {
             if (sectionProjects.length === 0) return null;
 
@@ -213,7 +217,7 @@ export function Projects() {
                 <div className="flex items-center justify-between">
                   <h2 className="text-sm font-medium">{label}</h2>
                   <span className="text-xs text-muted-foreground">
-                    {sectionProjects.length} project{sectionProjects.length === 1 ? "" : "s"}
+                    {t("projects.count", { count: sectionProjects.length })}
                   </span>
                 </div>
                 <Card className="block py-0 overflow-hidden divide-y divide-border">
@@ -261,10 +265,12 @@ export function Projects() {
                               )}
                               title={
                                 hasUpgrade
-                                  ? `可升级：系统绑定本体域版本 v${boundVersion}，最新版本 v${liveVersion}，点击同步升级`
+                                  ? t("projects.syncUpgradeTitle", { bound: boundVersion, live: liveVersion })
                                   : syncedSystem
-                                    ? `已同步至业务系统: ${syncedSystem.code}${boundVersion !== null ? ` (域版本 v${boundVersion})` : ""}，点击查看或变更`
-                                    : "同步到业务系统资产"
+                                    ? boundVersion !== null
+                                      ? t("projects.syncBoundVersionTitle", { code: syncedSystem.code, version: boundVersion })
+                                      : t("projects.syncBoundTitle", { code: syncedSystem.code })
+                                    : t("projects.syncToBusinessSystem")
                               }
                               onClick={(e) => {
                                 e.preventDefault();
@@ -275,10 +281,12 @@ export function Projects() {
                               <RefreshCw className={cn("size-3", syncedSystem ? "text-primary" : "text-muted-foreground")} />
                               <span>
                                 {hasUpgrade
-                                  ? `可升级 v${boundVersion}→v${liveVersion}`
+                                  ? t("projects.syncUpgradeLabel", { bound: boundVersion, live: liveVersion })
                                   : syncedSystem
-                                    ? (boundVersion !== null ? `已同步 v${boundVersion}` : "已同步")
-                                    : "同步"}
+                                    ? boundVersion !== null
+                                      ? t("projects.syncVersionLabel", { version: boundVersion })
+                                      : t("projects.synced")
+                                    : t("projects.sync")}
                               </span>
                             </Button>
                           );
@@ -328,16 +336,16 @@ export function Projects() {
                           <div className="flex items-center gap-3">
                             <span
                               className="hidden text-xs text-muted-foreground tabular-nums sm:inline"
-                              title={`${formatNumber(project.taskCount ?? 0)} task${(project.taskCount ?? 0) === 1 ? "" : "s"}`}
+                              title={t("projects.tasksCount", { count: project.taskCount ?? 0 })}
                             >
-                              {formatNumber(project.taskCount ?? 0)} task{(project.taskCount ?? 0) === 1 ? "" : "s"}
+                              {t("projects.tasksCount", { count: project.taskCount ?? 0 })}
                             </span>
                             {(project.defectCount ?? 0) > 0 && (
                               <span
                                 className="hidden text-xs text-destructive tabular-nums sm:inline"
-                                title={`${formatNumber(project.defectCount ?? 0)} defect${(project.defectCount ?? 0) === 1 ? "" : "s"}`}
+                                title={t("projects.defectsCount", { count: project.defectCount ?? 0 })}
                               >
-                                {formatNumber(project.defectCount ?? 0)} defect{(project.defectCount ?? 0) === 1 ? "" : "s"}
+                                {t("projects.defectsCount", { count: project.defectCount ?? 0 })}
                               </span>
                             )}
                             {project.budget && (

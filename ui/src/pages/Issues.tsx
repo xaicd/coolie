@@ -214,11 +214,11 @@ export function Issues() {
       const code = body?.code ?? "";
       const reason =
         code === "status_transition_requires_assignee"
-          ? "请先指派负责人, 再移动该工单 (Todo 与 In Progress 都需要指派)。"
+          ? t("issues.moveRequiresAssignee")
           : code === "status_transition_requires_deliverable"
-          ? "需要至少一个交付物才能移到 Done。"
-          : body?.error ?? "状态更新失败, 已回滚。";
-      pushToast({ title: "无法换列", body: reason, tone: "error" });
+          ? t("issues.moveRequiresDeliverable")
+          : body?.error ?? t("issues.moveUpdateFailed");
+      pushToast({ title: t("issues.moveFailedTitle"), body: reason, tone: "error" });
       queryClient.invalidateQueries({ queryKey: queryKeys.issues.list(selectedCompanyId!) });
     },
   });
