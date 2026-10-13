@@ -101,6 +101,27 @@ export async function ensureSharedLibraryAliases(libDir: string): Promise<string
   return created;
 }
 
+export async function ensurePostgresqlExtensionAliases(libDir: string): Promise<string[]> {
+  const entries = await fs.readdir(libDir, { withFileTypes: true });
+  const created: string[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isFile()) continue;
+    if (entry.name.endsWith(".dylib")) {
+      const soName = entry.name.replace(/\.dylib$/, ".so");
+      const soPath = path.join(libDir, soName);
+      try {
+        await fs.symlink(entry.name, soPath);
+        created.push(soPath);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== "EEXIST") throw error;
+      }
+    }
+  }
+
+  return created;
+}
+
 export const ensureLinuxSharedLibraryAliases = ensureSharedLibraryAliases;
 
 export async function prepareEmbeddedPostgresNativeRuntime(): Promise<void> {
@@ -118,4 +139,10 @@ export async function prepareEmbeddedPostgresNativeRuntime(): Promise<void> {
     prependPathEnv("DYLD_LIBRARY_PATH", libDir);
   }
   await ensureSharedLibraryAliases(libDir);
+
+  const postgresqlLibDir = path.join(libDir, "postgresql");
+  if (await pathExists(postgresqlLibDir)) {
+    await ensurePostgresqlExtensionAliases(postgresqlLibDir);
+  }
 }
+
