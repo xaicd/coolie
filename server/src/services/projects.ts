@@ -37,6 +37,7 @@ import { parseProjectExecutionWorkspacePolicy } from "./execution-workspace-poli
 import { mergeProjectWorkspaceRuntimeConfig, readProjectWorkspaceRuntimeConfig } from "./project-workspace-runtime-config.js";
 import { resolveManagedProjectWorkspaceDir } from "../home-paths.js";
 import { assertWorkspaceCwdAllowed } from "./workspace-path-policy.js";
+import { routineService } from "./routines.js";
 
 type ProjectRow = typeof projects.$inferSelect;
 type ProjectWorkspaceRow = typeof projectWorkspaces.$inferSelect;
@@ -621,6 +622,11 @@ export function projectService(db: Db) {
 
     const [withGoals] = await attachGoals(db, [row]);
     const [enriched] = withGoals ? await attachWorkspaces(db, [withGoals]) : [];
+
+    if (row.status === "in_progress" && !row.archivedAt) {
+      routineService(db).reconcileProjectInProgressRoutines(row.id).catch(() => {});
+    }
+
     return enriched!;
   };
 
@@ -932,6 +938,11 @@ export function projectService(db: Db) {
 
       const [withGoals] = await attachGoals(db, [row]);
       const [enriched] = withGoals ? await attachWorkspaces(db, [withGoals]) : [];
+
+      if (updates.status !== undefined || updates.archivedAt !== undefined) {
+        routineService(db).reconcileProjectInProgressRoutines(id).catch(() => {});
+      }
+
       return enriched ?? null;
     },
 

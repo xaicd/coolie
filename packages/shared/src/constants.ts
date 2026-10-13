@@ -753,6 +753,8 @@ export type EnvironmentCustomImageSetupConnectionType =
 export const ROUTINE_STATUSES = ["active", "paused", "archived"] as const;
 export type RoutineStatus = (typeof ROUTINE_STATUSES)[number];
 
+export const PROJECT_IN_PROGRESS_ROUTINE_ORIGIN_KIND = "project_in_progress_routine";
+
 export const ROUTINE_CONCURRENCY_POLICIES = ["coalesce_if_active", "always_enqueue", "skip_if_active"] as const;
 export type RoutineConcurrencyPolicy = (typeof ROUTINE_CONCURRENCY_POLICIES)[number];
 

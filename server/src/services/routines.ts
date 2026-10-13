@@ -47,6 +47,7 @@ import type {
 } from "@paperclipai/shared";
 import {
   WORKSPACE_BRANCH_ROUTINE_VARIABLE,
+  PROJECT_IN_PROGRESS_ROUTINE_ORIGIN_KIND,
   getBuiltinRoutineVariableValues,
   extractRoutineVariableNames,
   interpolateRoutineTemplate,
@@ -3169,6 +3170,8 @@ export function routineService(
           trigger: routineTriggers,
           routine: routines,
           projectPausedAt: projects.pausedAt,
+          projectStatus: projects.status,
+          projectArchivedAt: projects.archivedAt,
         })
         .from(routineTriggers)
         .innerJoin(routines, eq(routineTriggers.routineId, routines.id))
@@ -3188,6 +3191,19 @@ export function routineService(
       let triggered = 0;
       for (const row of due) {
         if (!row.trigger.nextRunAt || !row.trigger.cronExpression || !row.trigger.timezone) continue;
+
+        // Auto-archive in-progress routines when their project has ended (completed/cancelled/archived)
+        const isProjectInProgressRoutine = row.routine.originKind === PROJECT_IN_PROGRESS_ROUTINE_ORIGIN_KIND;
+        const projectEnded = !!(
+          isProjectInProgressRoutine &&
+          row.routine.projectId &&
+          (!row.projectStatus || row.projectStatus !== "in_progress" || row.projectArchivedAt !== null)
+        );
+        if (projectEnded) {
+          await db.update(routines).set({ status: "archived", updatedAt: new Date() }).where(eq(routines.id, row.routine.id));
+          await db.update(routineTriggers).set({ enabled: false, archived: true, updatedAt: new Date() }).where(eq(routineTriggers.id, row.trigger.id));
+          continue;
+        }
 
         // Suppress scheduled firings while the routine's project is paused. The tick is still
         // claimed and advanced to the next single cron tick (no backfill), so resume continues
@@ -3360,6 +3376,207 @@ export function routineService(
         });
       }
       return null;
+    },
+
+    reconcileProjectInProgressRoutines: async (targetProjectId?: string): Promise<{ created: number; reactivated: number; archived: number }> => {
+      // 1. Fetch in-progress projects (or target project)
+      const projectConditions = [
+        eq(projects.status, "in_progress"),
+        isNull(projects.archivedAt),
+      ];
+      if (targetProjectId) {
+        projectConditions.push(eq(projects.id, targetProjectId));
+      }
+
+      const activeProjects = await db
+        .select({
+          id: projects.id,
+          companyId: projects.companyId,
+          name: projects.name,
+          description: projects.description,
+          leadAgentId: projects.leadAgentId,
+          status: projects.status,
+          archivedAt: projects.archivedAt,
+        })
+        .from(projects)
+        .where(and(...projectConditions));
+
+      let created = 0;
+      let reactivated = 0;
+      let archived = 0;
+
+      for (const project of activeProjects) {
+        // Check if an in-progress routine already exists for this project
+        const existingRoutines = await db
+          .select({
+            id: routines.id,
+            status: routines.status,
+            originKind: routines.originKind,
+            assigneeAgentId: routines.assigneeAgentId,
+          })
+          .from(routines)
+          .where(
+            and(
+              eq(routines.companyId, project.companyId),
+              eq(routines.projectId, project.id),
+              or(
+                eq(routines.originKind, PROJECT_IN_PROGRESS_ROUTINE_ORIGIN_KIND),
+                eq(routines.originId, project.id),
+              ),
+            ),
+          );
+
+        if (existingRoutines.length > 0) {
+          for (const existing of existingRoutines) {
+            if (existing.status !== "active") {
+              await db
+                .update(routines)
+                .set({ status: "active", updatedAt: new Date() })
+                .where(eq(routines.id, existing.id));
+
+              await db
+                .update(routineTriggers)
+                .set({ enabled: true, archived: false, updatedAt: new Date() })
+                .where(eq(routineTriggers.routineId, existing.id));
+
+              reactivated += 1;
+            }
+          }
+        } else {
+          // Resolve assignee agent: project lead agent, or company's first assignable active agent
+          let assigneeAgentId = project.leadAgentId;
+          if (assigneeAgentId) {
+            const isAssignable = await db
+              .select({ id: agents.id })
+              .from(agents)
+              .where(
+                and(
+                  eq(agents.id, assigneeAgentId),
+                  eq(agents.companyId, project.companyId),
+                  eq(agents.status, "active"),
+                ),
+              )
+              .then((rows) => rows[0] ?? null);
+            if (!isAssignable) assigneeAgentId = null;
+          }
+
+          if (!assigneeAgentId) {
+            const fallbackAgent = await db
+              .select({ id: agents.id })
+              .from(agents)
+              .where(
+                and(
+                  eq(agents.companyId, project.companyId),
+                  eq(agents.status, "active"),
+                ),
+              )
+              .orderBy(asc(agents.createdAt))
+              .then((rows) => rows[0] ?? null);
+            assigneeAgentId = fallbackAgent?.id ?? null;
+          }
+
+          const responsibleUserId = await resolveRoutineResponsibleUserId(db, project.companyId, null, null);
+          if (!responsibleUserId) continue;
+
+          const title = `[交付主线例行巡检] ${project.name}`;
+          const description = `Coolie-dev 交付主线常驻例行任务：持续巡检 WBS 里程碑健康度、任务阻塞与缺陷，驱动数字员工持续推进交付，直到项目交付终验完成。`;
+
+          try {
+            await db.transaction(async (tx) => {
+              const txDb = tx as unknown as Db;
+              const [inserted] = await txDb
+                .insert(routines)
+                .values({
+                  companyId: project.companyId,
+                  projectId: project.id,
+                  title,
+                  description,
+                  assigneeAgentId,
+                  priority: "medium",
+                  status: "active",
+                  concurrencyPolicy: "coalesce_if_active",
+                  catchUpPolicy: "skip_missed",
+                  activityGatePolicy: "always",
+                  activityGateScope: "company",
+                  originKind: PROJECT_IN_PROGRESS_ROUTINE_ORIGIN_KIND,
+                  originId: project.id,
+                  responsibleUserId,
+                  createdByUserId: responsibleUserId,
+                })
+                .returning();
+
+              await appendRoutineRevision(txDb, inserted, { userId: responsibleUserId }, {
+                changeSummary: "Initialized in-progress project keeper routine",
+              });
+
+              const cronExpression = "0 * * * *";
+              const timezone = "Asia/Shanghai";
+              const nextRunAt = nextCronTickInTimeZone(cronExpression, timezone, new Date());
+
+              await txDb.insert(routineTriggers).values({
+                companyId: project.companyId,
+                routineId: inserted.id,
+                kind: "schedule",
+                label: "小时级交付主线巡检",
+                enabled: true,
+                cronExpression,
+                timezone,
+                nextRunAt,
+                createdByUserId: responsibleUserId,
+              });
+            });
+            created += 1;
+          } catch (err) {
+            logger.warn({ err, projectId: project.id }, "failed to create in-progress project routine");
+          }
+        }
+      }
+
+      // 2. Until project ends ("直到项目结束"):
+      // For all active routines with PROJECT_IN_PROGRESS_ROUTINE_ORIGIN_KIND,
+      // verify their associated project. If the project is no longer in_progress,
+      // or has been completed, cancelled, or archived, terminate/archive the routine!
+      const projectRoutineRows = await db
+        .select({
+          routineId: routines.id,
+          routineStatus: routines.status,
+          projectId: routines.projectId,
+          projectStatus: projects.status,
+          projectArchivedAt: projects.archivedAt,
+        })
+        .from(routines)
+        .leftJoin(projects, eq(routines.projectId, projects.id))
+        .where(
+          and(
+            eq(routines.originKind, PROJECT_IN_PROGRESS_ROUTINE_ORIGIN_KIND),
+            eq(routines.status, "active"),
+            targetProjectId ? eq(routines.projectId, targetProjectId) : sql`true`,
+          ),
+        );
+
+      for (const row of projectRoutineRows) {
+        const projectEnded =
+          !row.projectId ||
+          !row.projectStatus ||
+          row.projectStatus !== "in_progress" ||
+          row.projectArchivedAt !== null;
+
+        if (projectEnded) {
+          await db
+            .update(routines)
+            .set({ status: "archived", updatedAt: new Date() })
+            .where(eq(routines.id, row.routineId));
+
+          await db
+            .update(routineTriggers)
+            .set({ enabled: false, archived: true, updatedAt: new Date() })
+            .where(eq(routineTriggers.routineId, row.routineId));
+
+          archived += 1;
+        }
+      }
+
+      return { created, reactivated, archived };
     },
   };
 }

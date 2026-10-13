@@ -1339,6 +1339,21 @@ async function startServerWithDatabaseTeardown(
           logger.error({ err }, "merged pull-request confirmation sweep failed");
         }));
     };
+    const scheduleProjectRoutineReconciliationSweep = () => {
+      if (heartbeatSchedulerStopped) return;
+      trackHeartbeatSchedulerWork(
+        routines
+          .reconcileProjectInProgressRoutines()
+          .then((result) => {
+            if (result.created > 0 || result.reactivated > 0 || result.archived > 0) {
+              logger.info(result, "periodic in-progress project routine reconciliation sweep updated routines");
+            }
+          })
+          .catch((err) => {
+            logger.error({ err }, "periodic in-progress project routine reconciliation sweep failed");
+          }),
+      );
+    };
     // Emit a periodic signal when the reaper inspects candidates but archives
     // none, so an inert reaper that skips every candidate is never fully silent.
     // The throttle keeps the 30s cadence from flooding the log.
@@ -1635,6 +1650,19 @@ async function startServerWithDatabaseTeardown(
     };
     await runRetentionSweep();
 
+    // Reconcile project routines at startup:
+    // Every in-progress project must have an active routine to drive delivery until project completion.
+    await routines
+      .reconcileProjectInProgressRoutines()
+      .then((res) => {
+        if (res.created > 0 || res.reactivated > 0 || res.archived > 0) {
+          logger.info(res, "startup in-progress project routine reconciliation complete");
+        }
+      })
+      .catch((err) => {
+        logger.error({ err }, "startup in-progress project routine reconciliation failed");
+      });
+
     const boardHygieneWatchdog = boardHygieneWatchdogService(db as any);
     boardHygieneScheduler = boardHygieneWatchdog.startPeriodicAudit(30 * 60 * 1000);
 
@@ -1682,6 +1710,7 @@ async function startServerWithDatabaseTeardown(
         scheduleAdapterLoginReaperSweep();
         scheduleSetupTokenReaperSweep();
         scheduleEnvironmentLeaseCleanupSweep();
+        scheduleProjectRoutineReconciliationSweep();
 
         if (heartbeatSchedulerStopped) return;
         trackHeartbeatSchedulerWork(routines
