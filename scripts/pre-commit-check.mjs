@@ -22,11 +22,16 @@ console.log('   原则: 制度由编译器与自动化守卫全面管局，杜�
 console.log('========================================================================\n');
 
 const isContainer = process.platform === 'linux' && fs.existsSync('/usr/local/bin/host-exec');
+// 容器内 Paperclip 注入的 PAPERCLIP_TMPDIR 会让 node os.tmpdir() 走到沙箱路径，
+// 进而让 tsx 起 Unix socket IPC 时 EINVAL。在容器模式下统一恢复 TMPDIR=/tmp。
+const sandboxSafeEnv = isContainer
+  ? { ...process.env, TMPDIR: '/tmp' }
+  : process.env;
 function runPlatformCmd(cmd, options = {}) {
   const finalCmd = isContainer
     ? `host-exec "cd /Users/mac/workspace/xaicd/coolie && ${cmd.replace(/"/g, '\\"')}"`
     : cmd;
-  return execSync(finalCmd, { stdio: 'inherit', ...options });
+  return execSync(finalCmd, { stdio: 'inherit', env: sandboxSafeEnv, ...options });
 }
 
 let hasError = false;
@@ -36,7 +41,7 @@ let hasError = false;
 // -----------------------------------------------------------------------------
 let stagedFiles = [];
 try {
-  const stdout = execSync('git -c core.quotepath=false diff --cached --name-only', { encoding: 'utf8' }).trim();
+  const stdout = execSync('git -c core.quotepath=false diff --cached --name-only', { encoding: 'utf8', env: sandboxSafeEnv }).trim();
   stagedFiles = stdout ? stdout.split('\n').map((f) => f.trim().replace(/^"(.*)"$/, '$1')).filter(Boolean) : [];
 } catch (e) {
   console.warn('⚠️  [WARN] 无法获取 git 暂存区文件，可能不在 git 仓库中，将执行通用基线检查。');
@@ -223,7 +228,7 @@ if (oversizedFiles.length > 0) {
 // -----------------------------------------------------------------------------
 console.log('\n🔍 Gate 2: 禁用标记与敏感 Token 守卫');
 try {
-  execSync('node scripts/check-forbidden-tokens.mjs', { stdio: 'inherit' });
+  execSync('node scripts/check-forbidden-tokens.mjs', { stdio: 'inherit', env: sandboxSafeEnv });
   console.log('  ✅ [PASS] 禁用 Token 扫描通过');
 } catch {
   console.error('  ❌ [FAIL] check-forbidden-tokens 校验失败！');
@@ -235,7 +240,7 @@ try {
 // -----------------------------------------------------------------------------
 console.log('\n🧭 Gate 3: 架构模块单向依赖方向守卫');
 try {
-  execSync('node scripts/check-module-boundaries.mjs', { stdio: 'inherit' });
+  execSync('node scripts/check-module-boundaries.mjs', { stdio: 'inherit', env: sandboxSafeEnv });
   console.log('  ✅ [PASS] 模块单向依赖边界通过');
 } catch {
   console.error('  ❌ [FAIL] check-module-boundaries 依赖方向违规！');
@@ -247,7 +252,7 @@ try {
 // -----------------------------------------------------------------------------
 console.log('\n🏛️  Gate 4: 全生命周期管局硬门禁');
 try {
-  execSync('node scripts/check-governance-audit.mjs', { stdio: 'inherit' });
+  execSync('node scripts/check-governance-audit.mjs', { stdio: 'inherit', env: sandboxSafeEnv });
   console.log('  ✅ [PASS] 管局审计守卫通过');
 } catch {
   console.error('  ❌ [FAIL] check-governance-audit 审计未完全通过！');
