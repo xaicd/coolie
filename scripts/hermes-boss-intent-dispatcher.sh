@@ -229,8 +229,9 @@ EOF
   exit 0
 fi
 
-# 3. 极速自动生成 Wave 与本地派单
-LATEST_WAVE="$(git -C "$REPO_ROOT" log -1 --pretty=%B 2>/dev/null | grep -oE "wave[0-9]+" | head -1 || echo "wave286")"
+# 3. 极速自动生成 Wave 与本地派单(set -e + pipefail 下管道异常会致该赋值失败,需整体回退)
+LATEST_WAVE_RAW="$(git -C "$REPO_ROOT" log -1 --pretty=%B 2>/dev/null | grep -oE 'wave[0-9]+' | head -1 || true)"
+LATEST_WAVE="${LATEST_WAVE_RAW:-wave286}"
 SAFE_TASK="$INPUT"
 
 echo "【Hermes 微信秒级接单】"
@@ -253,19 +254,32 @@ ISSUE_IDENTIFIER=""
 ISSUE_URL=""
 
 create_issue_on_dev() {
-  local title="【微信·老板·$LATEST_WAVE】$SAFE_TASK"
+  set +u  # 函数体内嵌 local + 全局变量访问,关闭 -u 防止 unbound-variable 误报
+  local _wave="${LATEST_WAVE:-wave286}"
+  local _task="${SAFE_TASK:-未命名任务}"
+  local _employee="${EMPLOYEE:-未指派}"
+  local _tool="${TOOL:-shell}"
+  local _level="${TASK_LEVEL:-L2-标准功能}"
+  local _tokens="${TOKEN_ESTIMATE:-中等 (~2-5万 Tokens)}"
+  local _phase="${CMMI_PHASE:-Phase 4.1 编码}"
+  local _echo="${ECHO_OUTCOME:-明确的业务解决路径与高管交付 Outcome}"
+  local _delta="${DELTA_VERIFY:-必须在真实模拟器/Web 或生产接口跑通,提供真机快照或命令结果存证}"
+  local _devprop="${DEV_BACKPROP:-完工前必须通过 pnpm check:governance 并固化防退化自动化守卫}"
+  local _rules="${DISCIPLINE_RULES:-无额外军规}"
+
+  local title="【微信·老板·${_wave}】${_task}"
   local desc="由 Hermes 从老板微信/终端直通派发
 - 来源渠道: 📱 微信 (老板直接发话)
-- 责任员工: $EMPLOYEE
-- 工具: $TOOL
-- 梯次分流: $TASK_LEVEL
-- 算力预估: $TOKEN_ESTIMATE
-- CMMI 门禁: $CMMI_PHASE
-- 【Echo 价值定义】: $ECHO_OUTCOME
-- 【Delta 真实验证】: $DELTA_VERIFY
-- 【Dev 反向传播】: $DEV_BACKPROP
+- 责任员工: ${_employee}
+- 工具: ${_tool}
+- 梯次分流: ${_level}
+- 算力预估: ${_tokens}
+- CMMI 门禁: ${_phase}
+- 【Echo 价值定义】: ${_echo}
+- 【Delta 真实验证】: ${_delta}
+- 【Dev 反向传播】: ${_devprop}
 - 守卫军规:
-$DISCIPLINE_RULES"
+${_rules}"
   
   local json_payload
   json_payload="$(node -e '
@@ -293,6 +307,8 @@ $DISCIPLINE_RULES"
       ISSUE_URL="http://127.0.0.1:3100/issues/$ISSUE_IDENTIFIER"
     fi
   fi
+
+  set -u  # 恢复 nounset 防线
 }
 
 create_issue_on_dev || true

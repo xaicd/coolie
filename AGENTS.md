@@ -275,6 +275,7 @@ A change is done when all are true:
 6. **物理交付硬门禁：1 Task = 1 Commit & Clean Working Tree (严禁 git stash 掩埋假完工)**：工单标为 `done` 时必须物理绑定已推送到远端的有效 Git Commit SHA；工作树必须 0 dirty、0 untracked；严禁把未完工或同伴代码推入 `git stash` 堆栈以换取构建通过和虚假结项，根除代码悬空沉没。
 7. **全语法意图进厂与长任务非阻塞心跳 (Intent-to-Task & Anti-Freeze Protocol)**：前线进厂无缝覆盖祈使动作句、陈述约束句与否定纠错句，任何业务变更意图第一步必须通过控制面原生 MCP (`mcp__coolie__paperclipCreateIssue`) 正式立项排期，严禁脱幅私跑代码或口头无痕挂起；耗时超过 60 秒的重型任务（Docker build/全量测试）强制后台化并在 1 秒内发出预估耗时心跳，杜绝会话假死。
 8. **沉淀经验严谨性与精准增量更新铁律 (Rigorous Distillation & Surgical Incremental Update Law)**：经验沉淀必须因果实证、RFC 2119 规范化、零特性污染、门禁可机检；更新必须靶向单点归宿、遵循加法原则与最小 Diff，严禁全量推倒覆盖，确保全链路闭环同步与原子校验入库。
+9. **交付主线常驻例行任务闭环铁律 (In-Progress Project Routine Keeper Law)**：每个 coolie-dev 启动后，控制面自动扫描处于进行中 (in_progress) 状态的项目，必须自动初始化/保持一个交付主线常驻例行任务 (Routine) 与小时级巡检触发器，持续推进 WBS 里程碑与卡点；直至项目正式终验完成 (completed) 或取消 (cancelled) 时自动结束归档，彻底根除因服务重启或未主动派单导致项目冷寂停滞。
 
 ### 公理五：项目目录结构规范与开源基座自适应物理归宿铁律 (Directory Structure & Monorepo)
 1. **Paperclip 平台本体仓库目录标准 (Platform Repo Standard)**：

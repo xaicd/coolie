@@ -149,6 +149,9 @@
      - **单点靶向归宿 (Surgical In-Place Injection)**：新沉淀经验必须精准定位至现存唯一的标准工序或专属 Skill，严禁到处散落新建零散总结文档；
      - **加法原则与最小 Diff (Additive & Minimal Diff Principle)**：恪守 upstream Rule 4，严禁对战略文档、工程法典进行全量推倒重写（Anti-Wholesale Replacement），以极小且精准的 Diff 增补现有章节，完好保护既有决策基线；
      - **全链路闭环同步与原子入库 (Closed-Loop Synchronization & Clean Tree)**：增量更新必须同步对齐检查单与 OpenWiki 知识图谱，并通过全部 19 道 Pre-Commit 门禁，保持工作树 0 dirty、0 untracked 原子提交推送。
+7. **进行中项目常驻 Routine 例行巡检与生命周期自动闭环 (In-Progress Project Routine Keeper Law)**：
+   - **自举巡检生命周期 (Self-Bootstrapping Routine Lifecycle)**：每个 coolie-dev 节点启动（或调度器周期巡检）时，控制面必须自动扫描所有进行中项目（`projects.status === 'in_progress' && isNull(archivedAt)`），为每个活跃项目初始化/保活一条专属交付主线常驻 Routine（`originKind: "project_in_progress_routine"`）及小时级定时触发器（`0 * * * *`），确保持续推进 WBS 里程碑与卡点，彻底终结服务重启后交付冷寂；
+   - **项目终验自动归档 (Auto-Archive Upon Project Completion)**：当且仅当项目生命周期完结（状态变更为 `completed`、`cancelled` 或 `archivedAt` 被设置）时，控制面自动原子停用其定时触发器并将常驻 Routine 归档（`status: "archived"`），禁止孤儿例行任务在后台空转消耗资源。
 
 ---
 

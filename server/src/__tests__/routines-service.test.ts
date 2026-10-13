@@ -2886,7 +2886,7 @@ describeEmbeddedPostgres("routine service live-execution coalescing", () => {
     });
 
     // 2. Run reconciliation (simulates coolie-dev startup or sweep)
-    const initResult = await svc.reconcileProjectInProgressRoutines();
+    const initResult = await svc.reconcileProjectInProgressRoutines(projectId);
     expect(initResult.created).toBe(1);
 
     // Verify routine was created with active status and schedule trigger
@@ -2909,7 +2909,7 @@ describeEmbeddedPostgres("routine service live-execution coalescing", () => {
     await db.update(projects).set({ status: "completed" }).where(eq(projects.id, projectId));
 
     // Reconcile again
-    const finishResult = await svc.reconcileProjectInProgressRoutines();
+    const finishResult = await svc.reconcileProjectInProgressRoutines(projectId);
     expect(finishResult.archived).toBe(1);
 
     // Verify routine is now archived and trigger disabled
