@@ -13,6 +13,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import type { Company, GitCredential } from "@coolie/api-client";
 import { C, coolie, COOLIE_BASE_URL } from "../coolie";
+import { useTranslation } from "../i18n";
 import { ELEVATION, RADIUS, SPACING } from "../ui/tokens";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { localVersion } from "../AppVersion";
@@ -93,6 +94,7 @@ export function SettingsScreen({
   onViewWhatsNew,
 }: SettingsScreenProps) {
   const [cacheSize, setCacheSize] = useState<string | null>(null);
+  const { t, locale, setLocale } = useTranslation();
   const [clearing, setClearing] = useState(false);
   const [gitCredentials, setGitCredentials] = useState<GitCredential[] | null>(null);
   const [loadingGit, setLoadingGit] = useState(false);
@@ -448,7 +450,47 @@ export function SettingsScreen({
           </View>
         </View>
 
-        {/* ── 4. 账号与会话安全 (Security) ── */}
+        {/* ── 4. 外观与语言 (i18n 契约对齐) ── */}
+        <View style={styles.groupSection}>
+          <Text style={styles.groupTitle}>{t("mobile.settings.groupLanguage")}</Text>
+          <View style={styles.cardGroup}>
+            <View style={styles.itemRow} testID="Settings__Language__Row">
+              <View style={[styles.iconBox, { backgroundColor: "rgba(94, 106, 210, 0.14)" }]}>
+                <Ionicons name="language-outline" size={17} color={C.accent} />
+              </View>
+              <View style={styles.itemContent}>
+                <Text style={styles.itemTitle}>{t("mobile.settings.language")}</Text>
+                <Text style={styles.itemSubtitle}>
+                  {locale === "en" ? t("mobile.settings.langEn") : t("mobile.settings.langZh")}
+                </Text>
+              </View>
+              <View style={styles.itemActionArea}>
+                <Pressable
+                  onPress={() => void setLocale("zh-CN")}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("mobile.settings.langZh")}
+                  style={[styles.twoCharBtn, locale === "zh-CN" && styles.twoCharBtnActive]}
+                >
+                  <Text style={[styles.twoCharBtnText, locale === "zh-CN" && styles.twoCharBtnTextActive]}>
+                    {t("mobile.settings.langZh")}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void setLocale("en")}
+                  accessibilityRole="button"
+                  accessibilityLabel={t("mobile.settings.langEn")}
+                  style={[styles.twoCharBtn, locale === "en" && styles.twoCharBtnActive]}
+                >
+                  <Text style={[styles.twoCharBtnText, locale === "en" && styles.twoCharBtnTextActive]}>
+                    {t("mobile.settings.langEn")}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+
+        {/* ── 5. 账号与会话安全 (Security) ── */}
         <View style={styles.groupSection}>
           <Text style={styles.groupTitle}>账号安全 (SECURITY)</Text>
           <View style={styles.cardGroupDanger}>
@@ -724,6 +766,12 @@ const styles = StyleSheet.create({
   },
   twoCharBtnWarn: {
     backgroundColor: "rgba(239, 68, 68, 0.08)",
+  },
+  twoCharBtnActive: {
+    backgroundColor: "rgba(94, 106, 210, 0.20)",
+  },
+  twoCharBtnTextActive: {
+    color: C.accent,
   },
   twoCharBtnTextWarn: {
     color: C.err,

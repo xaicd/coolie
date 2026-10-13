@@ -19,6 +19,7 @@ import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { Pill } from "../ui/Pill";
+import { useTranslation } from "../i18n";
 
 /**
  * Coolie fork — wave70: git-ops App 端 UI 4 屏之「凭证管理」屏.
@@ -42,6 +43,7 @@ export function GitCredentialsScreen({
   company: Company;
   onBack: () => void;
 }) {
+  const { t } = useTranslation();
   const [items, setItems] = useState<GitCredential[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -221,6 +223,7 @@ function CreateCredentialSheet({
   onClose: () => void;
   onCreated: (saved: GitCredential) => void;
 }) {
+  const { t } = useTranslation();
   const [provider, setProvider] = useState<GitProvider>("github");
   const [token, setToken] = useState("");
   const [repoUrl, setRepoUrl] = useState("");
@@ -297,7 +300,7 @@ function CreateCredentialSheet({
             {PROVIDER_OPTIONS.find((o) => o.key === provider)?.help}
           </Text>
 
-          <Text style={styles.fieldLabel}>Access Token</Text>
+          <Text style={styles.fieldLabel}>{t("mobile.git.accessToken")}</Text>
           <TextInput
             style={styles.input}
             placeholder="ghp_… / glpat-…"

@@ -53,6 +53,7 @@ import { ErrorRetry } from "./src/ui/ErrorRetry";
 import { LoadingState } from "./src/ui/LoadingState";
 import { ScreenHeader } from "./src/ui/ScreenHeader";
 import { Sheet } from "./src/ui/Sheet";
+import { initExpoI18n } from "./src/i18n";
 import { performStartupSecurityAudit } from "./src/services/securityGuard";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { InboxScreen } from "./src/screens/InboxScreen";
@@ -241,6 +242,8 @@ export default function App() {
   const [pendingDemo, setPendingDemo] = useState(false);
 
   useEffect(() => {
+    // 🌐 装载移动端 i18n 语言包 (与 Web 端 zh-CN/en 契约同源): 已存选择 > 设备语言 > zh-CN。
+    void initExpoI18n();
     // 🛡️ 顶层入口触发零信任端云联动防破壳自检
     void performStartupSecurityAudit();
     void restoreCredential().then(setCredential);

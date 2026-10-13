@@ -34,6 +34,7 @@ import { Pill } from "../ui/Pill";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { SectionHeader } from "../ui/SectionHeader";
 import { formatDateTime, formatRelativeTime } from "../utils/format";
+import { useTranslation } from "../i18n";
 
 const STATUS_LABEL: Record<string, string> = {
   backlog: "待办池",
@@ -92,6 +93,7 @@ export function TaskDetailScreen({
   /** wave153 — 打开 App 原生 spec 编辑器。 */
   onOpenSpec?: (issue: Issue) => void;
 }) {
+  const { t } = useTranslation();
   const [currentIssue, setCurrentIssue] = useState<Issue>(issue);
   const [comments, setComments] = useState<IssueComment[]>([]);
   const [agents, setAgents] = useState<AgentRow[]>([]);
@@ -314,7 +316,7 @@ export function TaskDetailScreen({
           {/* wave70 — git-ops PR 显示: 列出本任务关联的 pull request */}
           {pullRequests.length > 0 ? (
             <View style={styles.section}>
-              <SectionHeader title="Pull Request" count={pullRequests.length} />
+              <SectionHeader title={t("mobile.sections.pullRequest")} count={pullRequests.length} />
               <View style={{ gap: 8 }}>
                 {pullRequests.map((pr) => (
                   <AppCard key={pr.id} padding={14}>

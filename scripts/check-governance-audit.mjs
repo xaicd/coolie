@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
+import { collectExpoI18nChecks } from './check-expo-i18n.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -69,9 +70,28 @@ const rightSlots = rightMatch ? (rightMatch[1].match(/key:\s*"/g) || []).length 
 const isSymmetric5 = leftSlots === 2 && rightSlots === 2;
 assertRule(`底栏对称美学守卫: 严格保持 2 + 1 + 2 = 5 槽位绝对居中对称 (当前: 左${leftSlots} + 中1 + 右${rightSlots})`, isSymmetric5, '底栏槽位未等分或中央加号偏心');
 
-const twoCharLabels = (tabBarContent.match(/label:\s*"([^"]+)"/g) || []).map(l => l.replace(/label:\s*"/, '').replace(/"/, ''));
-const allLabelsTwoChars = twoCharLabels.length > 0 && twoCharLabels.every(l => l.length === 2);
-assertRule(`底栏文案两字守卫: 底栏标签 100% 两个字 (${twoCharLabels.join(' · ')})`, allLabelsTwoChars, `存在非两字标签: ${twoCharLabels.join(', ')}`);
+// 底栏文案两字守卫: i18n 迁移后两字标签真源迁移至 i18n 字典 (mobile.tabs.*),
+// 守卫需解析字典后的实际渲染文案, 兼容老的 `label: "xx"` 硬编码写法。
+const legacyLabels = (tabBarContent.match(/label:\s*"([^"]+)"/g) || []).map((l) =>
+  l.replace(/label:\s*"/, "").replace(/"/, ""),
+);
+const tabLabelKeys = (tabBarContent.match(/labelKey:\s*"([^"]+)"/g) || []).map((l) =>
+  l.replace(/labelKey:\s*"/, "").replace(/"/, ""),
+);
+let twoCharLabels = legacyLabels;
+if (tabLabelKeys.length > 0) {
+  let expoZhDict = {};
+  try {
+    expoZhDict = JSON.parse(fs.readFileSync('clients/expo/src/i18n/locales/zh-CN.json', 'utf8'));
+  } catch {
+    expoZhDict = {};
+  }
+  const resolveKey = (key) =>
+    key.split('.').reduce((node, seg) => (node && typeof node === 'object' ? node[seg] : undefined), expoZhDict);
+  twoCharLabels = tabLabelKeys.map(resolveKey).filter((value) => typeof value === 'string');
+}
+const allLabelsTwoChars = twoCharLabels.length > 0 && twoCharLabels.every((l) => l.length === 2);
+assertRule(`底栏文案两字守卫: 底栏标签 100% 两个字 (${twoCharLabels.join(' · ')})`, allLabelsTwoChars, `存在非两字标签或字典缺失: ${twoCharLabels.join(', ')}`);
 
 // -----------------------------------------------------------------------------
 // 3. 高管审批治理三大直达快道审计 (Approval Governance Fast Paths)
@@ -736,6 +756,14 @@ assertRule(
 
 const hatchHasNestingGuard = hatchScriptContent.includes('[架构红线拦截]');
 assertRule('孵化器仓库嵌套拦截守卫: hatch-client-project.sh 必须包含平台仓库嵌套拦截', hatchHasNestingGuard, 'hatch-client-project.sh 缺失仓库嵌套拦截');
+
+// -----------------------------------------------------------------------------
+// 20. Expo 移动端 i18n 契约同步防退化守卫 (Stage 5 · Web zh-CN/en 对齐)
+// -----------------------------------------------------------------------------
+console.log('\n🌐 20. Expo 移动端 i18n 契约同步防退化守卫 (Stage 5):');
+for (const check of collectExpoI18nChecks()) {
+  assertRule(check.name, check.ok, check.detail);
+}
 
 console.log('\n========================================================================');
 if (failed) {

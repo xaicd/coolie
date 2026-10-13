@@ -7,6 +7,7 @@
 import { ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { C, type AgentRow } from "../../coolie";
+import { useTranslation } from "../../i18n";
 import { ELEVATION, RADIUS, SPACING } from "../../ui/tokens";
 import { ComposerChip } from "./Chip";
 
@@ -104,6 +105,7 @@ export function WatchdogRow({
   onInstructionsChange: (instructions: string) => void;
   disabled?: boolean;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.block}>
       <View style={styles.row}>
@@ -118,7 +120,7 @@ export function WatchdogRow({
           keyboardShouldPersistTaps="handled"
         >
           <ComposerChip
-            label="No watchdog agent"
+            label={t("mobile.composer.noWatchdog")}
             active={agentId === null}
             onPress={() => onAgentChange(null)}
             icon={<Ionicons name="remove-outline" size={13} color={agentId === null ? C.ink : C.ink3} />}
@@ -144,7 +146,7 @@ export function WatchdogRow({
       {agentId ? (
         <TextInput
           style={styles.instructions}
-          placeholder="What should the watchdog watch for and how should it keep work moving?"
+          placeholder={t("mobile.composer.watchdogPromptPlaceholder")}
           placeholderTextColor={C.ink4}
           value={instructions}
           onChangeText={onInstructionsChange}

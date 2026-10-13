@@ -124,7 +124,9 @@
     "deleteFailed": "删除失败。",
     "loadFailedTryAgain": "加载失败,请重试。",
     "operationFailed": "操作失败。",
-    "confirmDelete": "确认删除?此操作无法撤销。"
+    "confirmDelete": "确认删除?此操作无法撤销。",
+    "loading": "加载中…",
+    "loadMore": "加载更多"
   },
   "approvals": {
     "breadcrumb": "审批",
@@ -378,7 +380,29 @@
     "archivedAt": "归档于 {{time}}",
     "archived": "已归档",
     "deleteProject": "删除项目",
-    "confirmDeleteProject": "删除此项目及其所有数据?此操作无法撤销。"
+    "confirmDeleteProject": "删除此项目及其所有数据?此操作无法撤销。",
+    "sort": "排序",
+    "sortLabel": "排序: {{label}}",
+    "sortName": "名称",
+    "sortUpdated": "更新",
+    "sortCreated": "创建",
+    "sortTargetDate": "目标日期",
+    "asc": "升序",
+    "desc": "降序",
+    "myProjects": "我的项目",
+    "otherProjects": "其他项目",
+    "count_one": "{{count}} 个项目",
+    "count_other": "{{count}} 个项目",
+    "defectsCount_one": "{{count}} 个缺陷",
+    "defectsCount_other": "{{count}} 个缺陷",
+    "sync": "同步",
+    "synced": "已同步",
+    "syncToBusinessSystem": "同步到业务系统资产",
+    "syncUpgradeTitle": "可升级：系统绑定本体域 v{{bound}}，最新 v{{live}}，点击同步升级",
+    "syncBoundVersionTitle": "已同步至业务系统 {{code}}（域版本 v{{version}}），点击查看或变更",
+    "syncBoundTitle": "已同步至业务系统 {{code}}，点击查看或变更",
+    "syncUpgradeLabel": "可升级 v{{bound}}→v{{live}}",
+    "syncVersionLabel": "已同步 v{{version}}"
   },
   "routines": {
     "breadcrumb": "例行任务",
@@ -478,7 +502,37 @@
     "roleCoder": "工程师",
     "roleResearcher": "研究员",
     "roleQa": "测试员",
-    "roleCustom": "自定义"
+    "roleCustom": "自定义",
+    "filterActive": "运行中",
+    "filterPaused": "已暂停",
+    "filterError": "错误",
+    "filterBuiltIn": "内置",
+    "chat": "对话",
+    "setUp": "配置",
+    "invalidReportingChain": "汇报链无效",
+    "viewGroup": "智能体视图",
+    "listView": "列表视图",
+    "orgChartView": "组织视图",
+    "count_one": "{{count}} 个智能体",
+    "count_other": "{{count}} 个智能体",
+    "noMatch": "没有符合所选状态的智能体。",
+    "noOrgHierarchy": "尚未定义组织架构。",
+    "liveBadge_one": "运行中",
+    "liveBadge_other": "运行中 ({{count}})",
+    "envLocal": "本地",
+    "envCoolieHost": "Coolie 主机",
+    "envLocalTitle": "本地 - Coolie 主机",
+    "envManagedBy": "由 Coolie 托管",
+    "envSandboxProvider": "{{provider}} 沙箱供应商",
+    "envSandbox": "沙箱",
+    "envUnknown": "未知环境",
+    "envUnknownTitle": "未知环境 - {{id}}",
+    "envLoading": "正在加载环境",
+    "roleSecurity": "安全",
+    "roleEngineer": "工程师",
+    "roleDesigner": "设计师",
+    "roleDevops": "运维",
+    "roleGeneral": "通用"
   },
   "workspaces": {
     "breadcrumb": "工作区",
@@ -515,7 +569,13 @@
     "failedCreateWorkspace": "创建工作区失败",
     "failedDeleteWorkspace": "删除工作区失败",
     "noPortsExposed": "未暴露任何端口。",
-    "switchWorkspace": "切换工作区"
+    "switchWorkspace": "切换工作区",
+    "summaryTitle": "工作区摘要",
+    "summaryDescription": "摘要器追踪跨项目的工作区活动、在线服务与后续事项。",
+    "noActivity": "暂无工作区活动。",
+    "count_one": "{{count}} 个工作区",
+    "count_other": "{{count}} 个工作区",
+    "showing": "显示 {{total}} 个工作区中的 {{shown}} 个。"
   },
   "governance": {
     "title": "治理",
@@ -610,5 +670,59 @@
     "lockHeld": "此资源已被其他员工锁定。",
     "budgetExceeded": "预算已达上限,操作已暂停。",
     "approvalRequired": "需要审批后才能继续。"
+  },
+  "goals": {
+    "breadcrumb": "目标",
+    "singularGoal": "目标",
+    "newGoal": "新建目标",
+    "subGoal": "子目标",
+    "selectOrgToView": "请先选择一个组织以查看目标。",
+    "noGoals": "暂无目标。",
+    "createFirst": "创建您的第一个目标",
+    "showProperties": "显示属性",
+    "addDescription": "添加描述…",
+    "noSubGoals": "暂无子目标。",
+    "noLinkedProjects": "暂无关联项目。",
+    "noOrgSelected": "未选择组织。",
+    "subGoalsTab_one": "子目标 ({{count}})",
+    "subGoalsTab_other": "子目标 ({{count}})",
+    "projectsTab_one": "项目 ({{count}})",
+    "projectsTab_other": "项目 ({{count}})"
+  },
+  "mobile": {
+    "tabs": {
+      "dashboard": "汇览",
+      "tasks": "任务",
+      "chat": "工坊",
+      "assets": "资产",
+      "inbox": "收件箱",
+      "agents": "员工",
+      "artifacts": "产物"
+    },
+    "sections": {
+      "pullRequest": "合并请求",
+      "pipeline": "流水线",
+      "plan": "方案"
+    },
+    "composer": {
+      "modelLane": "模型",
+      "defaultModel": "默认模型",
+      "thinkingEffort": "思考力度",
+      "executionWorkspace": "执行空间",
+      "noWatchdog": "无监工员工",
+      "watchdogPromptPlaceholder": "监工要盯什么？如何持续推进？"
+    },
+    "git": {
+      "accessToken": "访问令牌"
+    },
+    "web": {
+      "title": "Coolie 网页"
+    },
+    "settings": {
+      "groupLanguage": "外观与语言",
+      "language": "语言",
+      "langZh": "中文",
+      "langEn": "EN"
+    }
   }
 }

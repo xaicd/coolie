@@ -7,6 +7,7 @@
 import { StyleSheet, Text, View } from "react-native";
 import { EXECUTION_WORKSPACE_MODES } from "@coolie/api-client";
 import { C } from "../../coolie";
+import { useTranslation } from "../../i18n";
 import { SPACING } from "../../ui/tokens";
 import { ComposerChip } from "./Chip";
 
@@ -33,9 +34,10 @@ export function ExecutionWorkspaceRow({
   value: string;
   onChange: (mode: string) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <View style={styles.block}>
-      <Text style={styles.title}>Execution workspace</Text>
+      <Text style={styles.title}>{t("mobile.composer.executionWorkspace")}</Text>
       <Text style={styles.description}>
         Control whether this task runs in the shared workspace, a new isolated workspace, or an
         existing one.

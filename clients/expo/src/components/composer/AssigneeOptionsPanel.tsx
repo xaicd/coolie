@@ -14,6 +14,7 @@ import {
   type IssueModelLane,
 } from "@coolie/api-client";
 import { C, coolie } from "../../coolie";
+import { useTranslation } from "../../i18n";
 import { ELEVATION, RADIUS, SPACING } from "../../ui/tokens";
 import { ComposerChip } from "./Chip";
 
@@ -63,6 +64,7 @@ export function AssigneeOptionsPanel({
   chrome: boolean;
   onChromeChange: (enabled: boolean) => void;
 }) {
+  const { t } = useTranslation();
   const [models, setModels] = useState<AdapterModel[]>([]);
 
   // Model list mirrors upstream's `agentsApi.adapterModels` query: fetched only
@@ -109,7 +111,7 @@ export function AssigneeOptionsPanel({
       {open ? (
         <View style={styles.panel}>
           <View style={styles.group}>
-            <Text style={styles.groupLabel}>Model lane</Text>
+            <Text style={styles.groupLabel}>{t("mobile.composer.modelLane")}</Text>
             <View style={styles.laneRow}>
               {(["primary", "custom"] as const).map((value) => {
                 const active = lane === value;
@@ -149,7 +151,7 @@ export function AssigneeOptionsPanel({
                 keyboardShouldPersistTaps="handled"
               >
                 <ComposerChip
-                  label="Default model"
+                  label={t("mobile.composer.defaultModel")}
                   active={modelOverride === ""}
                   onPress={() => onModelOverrideChange("")}
                 />
@@ -167,7 +169,7 @@ export function AssigneeOptionsPanel({
 
           {lane === "custom" ? (
             <View style={styles.group}>
-              <Text style={styles.groupLabel}>Thinking effort</Text>
+              <Text style={styles.groupLabel}>{t("mobile.composer.thinkingEffort")}</Text>
               <View style={styles.wrap}>
                 {effortOptions.map((option) => (
                   <ComposerChip

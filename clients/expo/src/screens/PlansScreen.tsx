@@ -9,6 +9,7 @@ import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { issueStatusColor, issueStatusLabel } from "../components/issue-status";
+import { useTranslation } from "../i18n";
 
 /**
  * Plan 列表 (任务页顶部 [📋 Plan] 的落地屏)。
@@ -29,6 +30,7 @@ export function PlansScreen({
   onBack: () => void;
   onOpenPlan: (issue: Issue) => void;
 }) {
+  const { t } = useTranslation();
   const [plans, setPlans] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -52,7 +54,7 @@ export function PlansScreen({
   return (
     <View style={styles.screen}>
       <ScreenHeader
-        title="Plan"
+        title={t("mobile.sections.plan")}
         subtitle={
           <Text style={styles.subtitle} numberOfLines={1}>
             {company.name} · 计划任务

@@ -17,6 +17,7 @@ import { EmptyState } from "../ui/EmptyState";
 import { ErrorRetry } from "../ui/ErrorRetry";
 import { LoadingState } from "../ui/LoadingState";
 import { ScreenHeader } from "../ui/ScreenHeader";
+import { useTranslation } from "../i18n";
 
 /**
  * Pipeline 列表 (任务页顶部 [🛤️ Pipeline] 的落地屏)。
@@ -35,6 +36,7 @@ export function PipelinesScreen({
   onBack: () => void;
   onOpenWeb?: (path: string, title?: string) => void;
 }) {
+  const { t } = useTranslation();
   const [rows, setRows] = useState<PipelineListRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -71,7 +73,7 @@ export function PipelinesScreen({
   return (
     <View style={styles.screen}>
       <ScreenHeader
-        title="Pipeline"
+        title={t("mobile.sections.pipeline")}
         subtitle={
           <Text style={styles.subtitle} numberOfLines={1}>
             {company.name} · 编排流水线

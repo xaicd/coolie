@@ -1,6 +1,7 @@
 import { Pressable, StyleSheet, Text, Vibration, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { C } from "../theme";
+import { useTranslation } from "../i18n";
 
 /** 底部 tab bar 的落点 + 中央新建 FAB。 */
 export type BarTabKey = "dashboard" | "tasks" | "inbox" | "chat" | "assets" | "agents" | "artifacts";
@@ -12,19 +13,19 @@ export const TAB_BAR_HEIGHT = 64;
 
 type Slot = {
   key: BarTabKey;
-  label: string;
+  labelKey: string;
   icon: React.ComponentProps<typeof Ionicons>["name"];
   activeIcon: React.ComponentProps<typeof Ionicons>["name"];
 };
 
 const LEFT: Slot[] = [
-  { key: "dashboard", label: "汇览", icon: "stats-chart-outline", activeIcon: "stats-chart" },
-  { key: "tasks", label: "任务", icon: "list-outline", activeIcon: "list" },
+  { key: "dashboard", labelKey: "mobile.tabs.dashboard", icon: "stats-chart-outline", activeIcon: "stats-chart" },
+  { key: "tasks", labelKey: "mobile.tabs.tasks", icon: "list-outline", activeIcon: "list" },
 ];
 
 const RIGHT: Slot[] = [
-  { key: "chat", label: "工坊", icon: "chatbubble-ellipses-outline", activeIcon: "chatbubble-ellipses" },
-  { key: "assets", label: "资产", icon: "layers-outline", activeIcon: "layers" },
+  { key: "chat", labelKey: "mobile.tabs.chat", icon: "chatbubble-ellipses-outline", activeIcon: "chatbubble-ellipses" },
+  { key: "assets", labelKey: "mobile.tabs.assets", icon: "layers-outline", activeIcon: "layers" },
 ];
 
 
@@ -37,6 +38,7 @@ function Tab({
   active: boolean;
   onPress: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <Pressable
       style={styles.tab}
@@ -54,7 +56,7 @@ function Tab({
         color={active ? C.accent : C.ink3}
       />
       <Text style={[styles.tabLabel, active && styles.tabLabelActive]}>
-        {slot.label}
+        {t(slot.labelKey)}
       </Text>
     </Pressable>
   );
