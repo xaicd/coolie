@@ -2871,4 +2871,62 @@ describeEmbeddedPostgres("routine service live-execution coalescing", () => {
 
     expect(run).toMatchObject({ source: "webhook", status: "issue_created" });
   });
+
+  it("initializes an active routine for an in-progress project and auto-archives it when the project finishes", async () => {
+    const { svc, companyId, agentId } = await seedFixture();
+    const projectId = randomUUID();
+
+    // 1. Create an in-progress project
+    await db.insert(projects).values({
+      id: projectId,
+      companyId,
+      name: "Autonomous Delivery Project",
+      status: "in_progress",
+      leadAgentId: agentId,
+    });
+
+    // 2. Run reconciliation (simulates coolie-dev startup or sweep)
+    const initResult = await svc.reconcileProjectInProgressRoutines();
+    expect(initResult.created).toBe(1);
+
+    // Verify routine was created with active status and schedule trigger
+    const createdRoutines = await db
+      .select()
+      .from(routines)
+      .where(eq(routines.projectId, projectId));
+    expect(createdRoutines).toHaveLength(1);
+    expect(createdRoutines[0].status).toBe("active");
+    expect(createdRoutines[0].originKind).toBe("project_in_progress_routine");
+
+    const triggers = await db
+      .select()
+      .from(routineTriggers)
+      .where(eq(routineTriggers.routineId, createdRoutines[0].id));
+    expect(triggers).toHaveLength(1);
+    expect(triggers[0].enabled).toBe(true);
+
+    // 3. Mark project completed ("直到项目结束")
+    await db.update(projects).set({ status: "completed" }).where(eq(projects.id, projectId));
+
+    // Reconcile again
+    const finishResult = await svc.reconcileProjectInProgressRoutines();
+    expect(finishResult.archived).toBe(1);
+
+    // Verify routine is now archived and trigger disabled
+    const archivedRoutine = await db
+      .select()
+      .from(routines)
+      .where(eq(routines.id, createdRoutines[0].id))
+      .then((rows) => rows[0]);
+    expect(archivedRoutine?.status).toBe("archived");
+
+    const archivedTrigger = await db
+      .select()
+      .from(routineTriggers)
+      .where(eq(routineTriggers.routineId, createdRoutines[0].id))
+      .then((rows) => rows[0]);
+    expect(archivedTrigger?.enabled).toBe(false);
+    expect(archivedTrigger?.archived).toBe(true);
+  });
 });
+
