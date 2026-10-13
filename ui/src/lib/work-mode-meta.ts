@@ -43,9 +43,18 @@ export function isIssueWorkMode(value: unknown): value is IssueWorkMode {
 
 function resolveIsZh(locale?: string): boolean {
   if (locale) return locale.toLowerCase().startsWith("zh");
-  if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
-    const stored = localStorage.getItem("coolie.locale");
-    if (stored) return stored.toLowerCase().startsWith("zh");
+  if (typeof window !== "undefined") {
+    if (typeof localStorage !== "undefined") {
+      const stored = localStorage.getItem("coolie.locale");
+      if (stored) return stored.toLowerCase().startsWith("zh");
+    }
+    if (typeof document !== "undefined") {
+      const htmlLang = document.documentElement.getAttribute("lang");
+      if (htmlLang) return htmlLang.toLowerCase().startsWith("zh");
+    }
+    if (typeof navigator !== "undefined" && navigator.language) {
+      return navigator.language.toLowerCase().startsWith("zh");
+    }
   }
   return false;
 }
