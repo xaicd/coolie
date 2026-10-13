@@ -26,7 +26,17 @@ function configuredWorkspaceRoots(): string[] {
 }
 
 export function allowedWorkspaceRoots(): string[] {
-  return [managedProjectsRoot(), ...configuredWorkspaceRoots()];
+  const roots = [managedProjectsRoot()];
+  // 自动纳管当前代码仓库根目录与标准多宿主工作区根目录
+  roots.push(process.cwd());
+  roots.push(path.resolve(process.cwd(), ".."));
+  if (process.env.HOME) {
+    roots.push(path.join(process.env.HOME, "workspace"));
+  }
+  roots.push("/host-workspace");
+  roots.push("/root/workspace");
+
+  return Array.from(new Set([...roots, ...configuredWorkspaceRoots()].map((entry) => path.resolve(entry))));
 }
 
 /**
@@ -61,6 +71,15 @@ export function assertWorkspaceCwdAllowed(cwd: string): string {
   }
 
   const resolved = path.resolve(trimmed);
+
+  // 严禁将临时目录 (/tmp, /private/tmp) 作为正式工作区
+  if (resolved === "/tmp" || resolved.startsWith("/tmp/") || resolved === "/private/tmp" || resolved.startsWith("/private/tmp/")) {
+    throw unprocessable("Workspace directory cannot be in a temporary directory (/tmp). Use a legitimate project workspace.", {
+      code: "workspace_cwd_in_tmp",
+      cwd: resolved,
+    });
+  }
+
   const allowedRoots = allowedWorkspaceRoots();
   if (!allowedRoots.some((root) => isInsideRoot(root, resolved))) {
     throw unprocessable(

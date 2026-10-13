@@ -180,7 +180,14 @@ class ClaudeProfileAcpAgent {
       bin = "claude"; // default attempt
     }
 
-    const workingDir = params.cwd || process.cwd();
+    // 保证工作目录严格为项目代码库目录，杜绝 /tmp 或悬空空目录
+    const repoRootDir = path.resolve(__dirname, "../..");
+    let workingDir = params.cwd || process.env.COOLIE_PROJECT_DIR || process.cwd();
+    if (!workingDir || workingDir === "/tmp" || workingDir.startsWith("/tmp/") || workingDir === "/private/tmp" || workingDir.startsWith("/private/tmp/")) {
+      workingDir = repoRootDir;
+    } else if (workingDir.includes(".paperclip/instances") && !fs.existsSync(path.join(workingDir, "package.json"))) {
+      workingDir = repoRootDir;
+    }
 
     return new Promise((resolve, reject) => {
       const proc = spawn(bin, claudeArgs, {

@@ -835,6 +835,10 @@ async function maybeAutoRestartChild() {
 
 function installDevIntervals() {
   if (mode !== "dev") return;
+  if (process.env.PAPERCLIP_DISABLE_DEV_WATCH === "true") {
+    console.log("[paperclip] dev watch & auto-restart disabled via PAPERCLIP_DISABLE_DEV_WATCH");
+    return;
+  }
 
   scanTimer = setInterval(() => {
     void scanForBackendChanges();

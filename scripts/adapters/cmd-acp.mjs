@@ -127,17 +127,27 @@ class CmdAcpAgent {
       cmdFound = false;
     }
 
+    // 保证工作目录严格为项目代码库目录，杜绝 /tmp 或悬空空目录
+    const repoRootDir = path.resolve(__dirname, "../..");
+    let workingDir = params.cwd || process.env.COOLIE_PROJECT_DIR || process.cwd();
+    if (!workingDir || workingDir === "/tmp" || workingDir.startsWith("/tmp/") || workingDir === "/private/tmp" || workingDir.startsWith("/private/tmp/")) {
+      workingDir = repoRootDir;
+    } else if (workingDir.includes(".paperclip/instances") && !fs.existsSync(path.join(workingDir, "package.json"))) {
+      workingDir = repoRootDir;
+    }
+
     if (!cmdFound && fs.existsSync("/opt/homebrew/bin/cmd")) {
       bin = "/opt/homebrew/bin/cmd";
     } else if (!cmdFound && fs.existsSync("scripts/host-exec.sh")) {
       bin = "bash";
       const maxTurnsFlag = maxTurns ? ` --max-turns ${maxTurns}` : "";
-      args = ["scripts/host-exec.sh", `cmd -p ${JSON.stringify(promptText)} --yolo --tools-all -t${maxTurnsFlag} < /dev/null`];
+      args = ["scripts/host-exec.sh", `cd ${JSON.stringify(workingDir)} && cmd -p ${JSON.stringify(promptText)} --yolo --tools-all -t${maxTurnsFlag} < /dev/null`];
     }
 
     return new Promise((resolve, reject) => {
       const proc = spawn(bin, args, {
         stdio: ["ignore", "pipe", "pipe"],
+        cwd: workingDir,
       });
 
       session.activeProcess = proc;
