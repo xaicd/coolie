@@ -1,4 +1,5 @@
 import { AgentIdentity } from "@/components/AgentIdentity";
+import { useTranslation, t } from "@/i18n";
 import { startTransition, useDeferredValue, useEffect, useMemo, useState, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
 import { useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -98,27 +99,13 @@ import {
 import { taskDateGroup, taskDateGroupSeparator, type TaskDateGroup } from "../lib/task-date-groups";
 import { deriveOriginatingActor, ISSUE_SPEC_KINDS, ISSUE_STATUSES, type Issue, type IssueSpecKind, type IssueStatus, type Project } from "@paperclipai/shared";
 
-/** wave156: short Chinese labels for the spec-driven chain kinds. */
-const SPEC_KIND_LABEL: Record<IssueSpecKind, string> = {
-  requirement: "需求",
-  bugfix: "缺陷修复",
-  design: "设计",
-  task: "任务",
-};
-
 /** wave156: badge text rendered next to spec-driven issues. */
-const SPEC_KIND_BADGE_TEXT: Record<IssueSpecKind, string> = {
-  requirement: "Spec · 需求",
-  bugfix: "Spec · 缺陷修复",
-  design: "Spec · 设计",
-  task: "Spec · 任务",
-};
-const SPEC_KIND_TITLE: Record<IssueSpecKind, string> = {
-  requirement: "Spec 需求文档 (requirement)",
-  bugfix: "Spec 缺陷修复 (bugfix)",
-  design: "Spec 设计 (design)",
-  task: "Spec 任务 (task)",
-};
+function specKindBadgeText(kind: IssueSpecKind): string {
+  return t(`issues.specBadge.${kind}`);
+}
+function specKindTitle(kind: IssueSpecKind): string {
+  return t(`issues.specTitle.${kind}`);
+}
 import { Badge } from "@/components/ui/badge";
 const ISSUE_SEARCH_DEBOUNCE_MS = 250;
 const ISSUE_SEARCH_RESULT_LIMIT = 200;
@@ -2377,9 +2364,9 @@ function StreamlinedIssuesList({
                               <Badge variant="outline"
                                 className="ml-1.5 border-violet-500/40 bg-violet-500/10 px-1.5 text-(length:--text-nano) text-violet-700 dark:text-violet-300"
                                 data-testid="issue-spec-badge"
-                                title={SPEC_KIND_TITLE[issue.specKind]}
+                                title={specKindTitle(issue.specKind)}
                               >
-                                {SPEC_KIND_BADGE_TEXT[issue.specKind]}
+                                {specKindBadgeText(issue.specKind)}
                               </Badge>
                             ) : null}
                             {issue.defect ? (

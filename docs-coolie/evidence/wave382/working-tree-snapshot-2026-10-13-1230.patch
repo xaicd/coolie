@@ -1,0 +1,862 @@
+diff --git a/packages/adapter-utils/src/acpx-engine/execute.ts b/packages/adapter-utils/src/acpx-engine/execute.ts
+index ec70501aa..ec4f74255 100644
+--- a/packages/adapter-utils/src/acpx-engine/execute.ts
++++ b/packages/adapter-utils/src/acpx-engine/execute.ts
+@@ -2918,6 +2918,21 @@ function guardEnsureSession(params: {
+   });
+ }
+ 
++// ACPX persisted sessions enforce a snake_case `session_options.env` schema.
++// Our Paperclip env keys are UPPER_SNAKE (`PAPERCLIP_*`, `ANTHROPIC_*`, etc.),
++// so the loader/store round-trip triggers a "Persisted key policy violation
++// (expected snake_case keys)" error on every resume. Normalize the keys here
++// when we hand the env to the ACPX session-options plumbing. The process-env
++// the agent actually executes under (and `buildPrompt`) keeps the original
++// UPPER_SNAKE keys — we only rewrite the snapshot fed into the ACPX store.
++export function toAcpxSessionEnv(env: Record<string, string>): Record<string, string> {
++  const normalized: Record<string, string> = {};
++  for (const [key, value] of Object.entries(env)) {
++    normalized[key.toLowerCase()] = value;
++  }
++  return normalized;
++}
++
+ function renderPaperclipEnvNote(env: Record<string, string>): string {
+   const paperclipKeys = Object.keys(env)
+     .filter((key) => key.startsWith("PAPERCLIP_"))
+@@ -4234,7 +4249,7 @@ export function createAcpxEngineExecutor(deps: AcpxEngineExecutorOptions = {}) {
+                 ...record.acpx,
+                 session_options: {
+                   ...record.acpx?.session_options,
+-                  env: { ...prepared.env },
++                  env: { ...toAcpxSessionEnv(prepared.env) },
+                 },
+               },
+             };
+@@ -4385,7 +4400,7 @@ export function createAcpxEngineExecutor(deps: AcpxEngineExecutorOptions = {}) {
+                       mode: prepared.mode,
+                       cwd: prepared.cwd,
+                       resumeSessionId,
+-                      sessionOptions: { env: prepared.env },
++                      sessionOptions: { env: toAcpxSessionEnv(prepared.env) },
+                     }),
+                   fence: handshakeFence,
+                   isTransportLost: isHandshakeTransportLost,
+@@ -4423,7 +4438,7 @@ export function createAcpxEngineExecutor(deps: AcpxEngineExecutorOptions = {}) {
+                       agent: prepared.acpxAgent,
+                       mode: prepared.mode,
+                       cwd: prepared.cwd,
+-                      sessionOptions: { env: prepared.env },
++                      sessionOptions: { env: toAcpxSessionEnv(prepared.env) },
+                     }),
+                   fence: handshakeFence,
+                   isTransportLost: isHandshakeTransportLost,
+diff --git a/ui/src/pages/Agents.tsx b/ui/src/pages/Agents.tsx
+index e347a4250..d3dbf4e5f 100644
+--- a/ui/src/pages/Agents.tsx
++++ b/ui/src/pages/Agents.tsx
+@@ -36,11 +36,27 @@ import {
+   useResourceMemberships,
+ } from "../hooks/useResourceMemberships";
+ import { usePublishSharedQueryData, useSharedPollingQuery } from "../hooks/useSharedPolling";
++import { useTranslation, t as translate } from "@/i18n";
+ 
+ import { getAdapterLabel } from "../adapters/adapter-display-registry";
+ 
+ const roleLabels = AGENT_ROLE_LABELS as Record<string, string>;
+ 
++const AGENT_ROLE_KEYS: Record<string, string> = {
++  security: "agents.roleSecurity",
++  engineer: "agents.roleEngineer",
++  designer: "agents.roleDesigner",
++  devops: "agents.roleDevops",
++  researcher: "agents.roleResearcher",
++  general: "agents.roleGeneral",
++};
++
++function agentRoleLabel(t: (key: string) => string, role: string | undefined): string {
++  if (!role) return "";
++  const key = AGENT_ROLE_KEYS[role];
++  return key ? t(key) : roleLabels[role] ?? role;
++}
++
+ // Lazy-loaded so the roster page doesn't statically pull in the full
+ // AgentConfigForm module graph (the modal reuses its adapter/model pickers).
+ const ConfigureBuiltInAgentModal = lazy(() =>
+@@ -52,12 +68,12 @@ const ConfigureBuiltInAgentModal = lazy(() =>
+ export const AGENT_FILTER_TABS = ["all", "active", "paused", "error", "builtin"] as const;
+ type FilterTab = (typeof AGENT_FILTER_TABS)[number];
+ 
+-const AGENT_FILTER_TAB_ITEMS: { value: FilterTab; label: string }[] = [
+-  { value: "all", label: "All" },
+-  { value: "active", label: "Active" },
+-  { value: "paused", label: "Paused" },
+-  { value: "error", label: "Error" },
+-  { value: "builtin", label: "Built-in" },
++const AGENT_FILTER_TAB_ITEMS: { value: FilterTab; labelKey: string }[] = [
++  { value: "all", labelKey: "common.all" },
++  { value: "active", labelKey: "agents.filterActive" },
++  { value: "paused", labelKey: "agents.filterPaused" },
++  { value: "error", labelKey: "agents.filterError" },
++  { value: "builtin", labelKey: "agents.filterBuiltIn" },
+ ];
+ 
+ function isFilterTab(value: string): value is FilterTab {
+@@ -70,17 +86,17 @@ interface EnvironmentDescriptor {
+   title: string;
+ }
+ 
+-const localEnvironmentDescriptor: EnvironmentDescriptor = {
+-  label: "Local",
+-  detail: "Paperclip host",
+-  title: "Local - Paperclip host",
+-};
++const localEnvironmentDescriptor = (t: (key: string) => string): EnvironmentDescriptor => ({
++  label: t("agents.envLocal"),
++  detail: t("agents.envCoolieHost"),
++  title: t("agents.envLocalTitle"),
++});
+ 
+-const loadingEnvironmentDescriptor: EnvironmentDescriptor = {
++const loadingEnvironmentDescriptor = (t: (key: string) => string): EnvironmentDescriptor => ({
+   label: "—",
+-  detail: "Loading environment",
+-  title: "Loading environment",
+-};
++  detail: t("agents.envLoading"),
++  title: t("agents.envLoading"),
++});
+ 
+ // Agents in these states never appear in the agents list — `terminated` is
+ // hidden like an archived company, and `pending_approval` is a hiring gate that
+@@ -125,7 +141,7 @@ function getSandboxProviderLabel(
+   const provider = typeof environment.config.provider === "string"
+     ? environment.config.provider.trim()
+     : "";
+-  if (!provider) return "Sandbox";
++  if (!provider) return translate("agents.envSandbox");
+   return capabilities?.sandboxProviders?.[provider]?.displayName ?? provider;
+ }
+ 
+@@ -134,11 +150,11 @@ function describeEnvironment(
+   capabilities?: EnvironmentCapabilities | null,
+ ): EnvironmentDescriptor {
+   const detail = isPlatformManagedEnvironment(environment)
+-    ? "Managed by Paperclip"
++    ? translate("agents.envManagedBy")
+     : environment.driver === "sandbox"
+-      ? `${getSandboxProviderLabel(environment, capabilities)} sandbox provider`
++      ? translate("agents.envSandboxProvider", { provider: getSandboxProviderLabel(environment, capabilities) })
+       : environment.driver === "local"
+-        ? "Paperclip host"
++        ? translate("agents.envCoolieHost")
+         : formatEnvironmentDriver(environment.driver);
+ 
+   return {
+@@ -150,9 +166,9 @@ function describeEnvironment(
+ 
+ function describeMissingEnvironment(environmentId: string): EnvironmentDescriptor {
+   return {
+-    label: "Unknown environment",
++    label: translate("agents.envUnknown"),
+     detail: environmentId.slice(0, 8),
+-    title: `Unknown environment - ${environmentId}`,
++    title: translate("agents.envUnknownTitle", { id: environmentId }),
+   };
+ }
+ 
+@@ -163,7 +179,7 @@ function resolveAgentEnvironment(
+   capabilities?: EnvironmentCapabilities | null,
+ ): EnvironmentDescriptor {
+   const environmentId = agent.defaultEnvironmentId ?? instanceDefaultEnvironmentId;
+-  if (!environmentId) return localEnvironmentDescriptor;
++  if (!environmentId) return localEnvironmentDescriptor(translate);
+   const environment = environmentsById.get(environmentId);
+   return environment
+     ? describeEnvironment(environment, capabilities)
+@@ -194,6 +210,7 @@ function filterOrgTree(nodes: OrgNode[], tab: FilterTab, builtInAgentIds: Set<st
+ export type AgentsView = "list" | "org";
+ 
+ export function Agents({ initialView = "list" }: { initialView?: AgentsView } = {}) {
++  const { t, i18n } = useTranslation();
+   const agentChat = useAgentChatEnabled();
+   const { selectedCompanyId } = useCompany();
+   const { openNewAgent } = useDialogActions();
+@@ -220,8 +237,11 @@ export function Agents({ initialView = "list" }: { initialView?: AgentsView } =
+   const builtInAgentsEnabled = instanceSettings?.experimental.enableBuiltInAgents === true;
+   const tab: FilterTab = requestedTab === "builtin" && !builtInAgentsEnabled ? "all" : requestedTab;
+   const visibleTabItems = useMemo(
+-    () => AGENT_FILTER_TAB_ITEMS.filter((item) => item.value !== "builtin" || builtInAgentsEnabled),
+-    [builtInAgentsEnabled],
++    () =>
++      AGENT_FILTER_TAB_ITEMS
++        .filter((item) => item.value !== "builtin" || builtInAgentsEnabled)
++        .map((item) => ({ value: item.value, label: t(item.labelKey) })),
++    [builtInAgentsEnabled, t],
+   );
+ 
+   const { data: builtInAgents } = useQuery({
+@@ -320,11 +340,11 @@ export function Agents({ initialView = "list" }: { initialView?: AgentsView } =
+       );
+     }
+     return map;
+-  }, [agents, environmentsById, environmentCapabilities, instanceSettings?.defaultEnvironmentId]);
++  }, [agents, environmentsById, environmentCapabilities, instanceSettings?.defaultEnvironmentId, i18n.language]);
+ 
+   useEffect(() => {
+-    setBreadcrumbs([{ label: "Agents" }]);
+-  }, [setBreadcrumbs]);
++    setBreadcrumbs([{ label: t("agents.breadcrumb") }]);
++  }, [setBreadcrumbs, t]);
+ 
+   useEffect(() => {
+     if (selectedCompanyId && requestedTab === "builtin" && instanceSettings && !builtInAgentsEnabled) {
+@@ -333,7 +353,7 @@ export function Agents({ initialView = "list" }: { initialView?: AgentsView } =
+   }, [builtInAgentsEnabled, instanceSettings, navigate, requestedTab, selectedCompanyId]);
+ 
+   if (!selectedCompanyId) {
+-    return <EmptyState icon={Bot} message="Select an organization to view agents." />;
++    return <EmptyState icon={Bot} message={t("agents.selectOrgToView")} />;
+   }
+ 
+   if (isLoading) {
+@@ -346,8 +366,8 @@ export function Agents({ initialView = "list" }: { initialView?: AgentsView } =
+   const showEnvironmentColumn = environmentsEnabled && (environments === undefined || environments.length > 1);
+   const resolveRenderedEnvironment = (agentId: string) => (
+     environmentDataLoading
+-      ? loadingEnvironmentDescriptor
+-      : environmentByAgentId.get(agentId) ?? localEnvironmentDescriptor
++      ? loadingEnvironmentDescriptor(t)
++      : environmentByAgentId.get(agentId) ?? localEnvironmentDescriptor(t)
+   );
+ 
+   const renderAgentRow = (agent: Agent) => {
+@@ -378,7 +398,7 @@ export function Agents({ initialView = "list" }: { initialView?: AgentsView } =
+               variant="outline"
+               onClick={() => setConfigureState(builtInState)}
+             >
+-              Set up
++              {t("agents.setUp")}
+             </Button>
+           </span>
+         )}
+@@ -391,7 +411,7 @@ export function Agents({ initialView = "list" }: { initialView?: AgentsView } =
+         titleClassName="flex-1 @5xl:flex-none @5xl:w-56"
+         titleTextClassName="truncate"
+         subtitleClassName="truncate"
+-        subtitle={`${roleLabels[agent.role] ?? agent.role}${agent.title ? ` - ${agent.title}` : ""}`}
++        subtitle={`${agentRoleLabel(t, agent.role)}${agent.title ? ` - ${agent.title}` : ""}`}
+         to={agentUrl(agent)}
+         className={cn(
+           "group py-3",
+@@ -399,7 +419,7 @@ export function Agents({ initialView = "list" }: { initialView?: AgentsView } =
+           resourceMembershipState(membershipsQuery.data, "agent", agent.id) === "left" ? "sm:text-foreground/55" : "",
+         )}
+         leading={hasInvalidOrgChain ? (
+-          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" aria-label="Invalid reporting chain" />
++          <AlertTriangle className="h-3.5 w-3.5 text-amber-500" aria-label={t("agents.invalidReportingChain")} />
+         ) : (
+           <AgentAvatar agent={agent} size={32} />
+         )}
+@@ -427,7 +447,7 @@ export function Agents({ initialView = "list" }: { initialView?: AgentsView } =
+         metaSpacerClassName="hidden @5xl:block"
+         trailing={
+           <div className="flex items-center gap-3">
+-            {agentChat.enabled && <Button variant="ghost" size="sm" onClick={event => { event.preventDefault(); event.stopPropagation(); navigate(`/chats/${agentRouteRef(agent)}`); }}>Chat</Button>}
++            {agentChat.enabled && <Button variant="ghost" size="sm" onClick={event => { event.preventDefault(); event.stopPropagation(); navigate(`/chats/${agentRouteRef(agent)}`); }}>{t("agents.chat")}</Button>}
+             <div className="hidden sm:flex items-center gap-3">
+               {liveRunByAgent.has(agent.id) && (
+                 <LiveRunIndicator
+@@ -492,15 +512,15 @@ export function Agents({ initialView = "list" }: { initialView?: AgentsView } =
+           />
+         </Tabs>
+         <div className="flex items-center gap-2">
+-          {!forceListView ? <div className="flex items-center overflow-hidden rounded-md border border-border" role="group" aria-label="Agent view">
++          {!forceListView ? <div className="flex items-center overflow-hidden rounded-md border border-border" role="group" aria-label={t("agents.viewGroup")}>
+               <Button
+                 type="button"
+                 size="icon-sm"
+                 variant={effectiveView === "list" ? "secondary" : "ghost"}
+                 className="rounded-none"
+                 onClick={() => setView("list")}
+-                title="List view"
+-                aria-label="List view"
++                title={t("agents.listView")}
++                aria-label={t("agents.listView")}
+                 aria-pressed={effectiveView === "list"}
+               >
+                 <List className="h-3.5 w-3.5" />
+@@ -511,8 +531,8 @@ export function Agents({ initialView = "list" }: { initialView?: AgentsView } =
+                 variant={effectiveView === "org" ? "secondary" : "ghost"}
+                 className="rounded-none border-l border-border"
+                 onClick={() => setView("org")}
+-                title="Org chart view"
+-                aria-label="Org chart view"
++                title={t("agents.orgChartView")}
++                aria-label={t("agents.orgChartView")}
+                 aria-pressed={effectiveView === "org"}
+               >
+                 <Network className="h-3.5 w-3.5" />
+@@ -520,13 +540,13 @@ export function Agents({ initialView = "list" }: { initialView?: AgentsView } =
+           </div> : null}
+           <Button size="sm" variant="outline" onClick={openNewAgent}>
+             <Plus className="h-3.5 w-3.5 mr-1.5" />
+-            New Agent
++            {t("agents.newAgent")}
+           </Button>
+         </div>
+       </div>
+ 
+       {filtered.length > 0 && (
+-        <p className="text-xs text-muted-foreground">{filtered.length} agent{filtered.length !== 1 ? "s" : ""}</p>
++        <p className="text-xs text-muted-foreground">{t("agents.count", { count: filtered.length })}</p>
+       )}
+ 
+       {error && <p className="text-sm text-destructive">{error.message}</p>}
+@@ -534,8 +554,8 @@ export function Agents({ initialView = "list" }: { initialView?: AgentsView } =
+       {agents && agents.length === 0 && (
+         <EmptyState
+           icon={Bot}
+-          message="Create your first agent to get started."
+-          action="New Agent"
++          message={t("agents.createFirst")}
++          action={t("agents.newAgent")}
+           onAction={openNewAgent}
+         />
+       )}
+@@ -549,7 +569,7 @@ export function Agents({ initialView = "list" }: { initialView?: AgentsView } =
+ 
+       {effectiveView === "list" && agents && agents.length > 0 && filtered.length === 0 && (
+         <p className="text-sm text-muted-foreground text-center py-8">
+-          No agents match the selected status.
++          {t("agents.noMatch")}
+         </p>
+       )}
+ 
+@@ -560,13 +580,13 @@ export function Agents({ initialView = "list" }: { initialView?: AgentsView } =
+ 
+       {effectiveView === "org" && orgTree && orgTree.length > 0 && filteredOrg.length === 0 && (
+         <p className="text-sm text-muted-foreground text-center py-8">
+-          No agents match the selected status.
++          {t("agents.noMatch")}
+         </p>
+       )}
+ 
+       {effectiveView === "org" && orgTree && orgTree.length === 0 && (
+         <p className="text-sm text-muted-foreground text-center py-8">
+-          No organizational hierarchy defined.
++          {t("agents.noOrgHierarchy")}
+         </p>
+       )}
+       {configureState && selectedCompanyId && (
+@@ -612,6 +632,7 @@ function OrgTreeNode({
+   builtInByAgentId: Map<string, BuiltInAgentState>;
+   onConfigureBuiltIn: (state: BuiltInAgentState) => void;
+ }) {
++  const { t } = useTranslation();
+   const agent = agentMap.get(node.id);
+   const builtInState = builtInByAgentId.get(node.id);
+   const showBuiltInLifecycle = builtInState?.status === "needs_setup" || builtInState?.status === "pending_approval";
+@@ -635,7 +656,7 @@ function OrgTreeNode({
+         )}
+       >
+         {hasInvalidOrgChain ? (
+-          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-label="Invalid reporting chain" />
++          <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-amber-500" aria-label={t("agents.invalidReportingChain")} />
+         ) : (
+           <AgentAvatar agent={agent ?? node} size={24} />
+         )}
+@@ -646,7 +667,7 @@ function OrgTreeNode({
+           <div className="min-w-(--sz-7rem) truncate">
+             <span className="text-sm font-medium">{node.name}</span>
+             <span className="text-xs text-muted-foreground ml-2">
+-              {roleLabels[node.role] ?? node.role}
++              {agentRoleLabel(t, node.role)}
+               {agent?.title ? ` - ${agent.title}` : ""}
+             </span>
+           </div>
+@@ -661,7 +682,7 @@ function OrgTreeNode({
+                   }}
+                 >
+                   <Button size="xs" variant="outline" onClick={() => onConfigureBuiltIn(builtInState)}>
+-                    Set up
++                    {t("agents.setUp")}
+                   </Button>
+                 </span>
+               )}
+@@ -694,8 +715,8 @@ function OrgTreeNode({
+                   agent={agent}
+                   environment={
+                     environmentDataLoading
+-                      ? loadingEnvironmentDescriptor
+-                      : environmentByAgentId.get(agent.id) ?? localEnvironmentDescriptor
++                      ? loadingEnvironmentDescriptor(t)
++                      : environmentByAgentId.get(agent.id) ?? localEnvironmentDescriptor(t)
+                   }
+                   showEnvironment={showEnvironment}
+                 />
+@@ -821,6 +842,7 @@ function LiveRunIndicator({
+   runId: string;
+   liveCount: number;
+ }) {
++  const { t } = useTranslation();
+   return (
+     <Link
+       to={`/agents/${agentRef}/runs/${runId}`}
+@@ -832,7 +854,7 @@ function LiveRunIndicator({
+         <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+       </span>
+       <span className="text-(length:--text-micro) font-medium text-blue-600 dark:text-blue-400">
+-        Live{liveCount > 1 ? ` (${liveCount})` : ""}
++        {t("agents.liveBadge", { count: liveCount })}
+       </span>
+     </Link>
+   );
+diff --git a/ui/src/pages/GoalDetail.tsx b/ui/src/pages/GoalDetail.tsx
+index e922a6e70..6dfa7c922 100644
+--- a/ui/src/pages/GoalDetail.tsx
++++ b/ui/src/pages/GoalDetail.tsx
+@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button";
+ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+ import { Plus, SlidersHorizontal } from "lucide-react";
+ import type { Goal, Project } from "@paperclipai/shared";
++import { useTranslation } from "@/i18n";
+ 
+ interface GoalPropertiesToggleButtonProps {
+   panelVisible: boolean;
+@@ -30,6 +31,7 @@ export function GoalPropertiesToggleButton({
+   panelVisible,
+   onShowProperties,
+ }: GoalPropertiesToggleButtonProps) {
++  const { t } = useTranslation();
+   return (
+     <Button
+       variant="ghost"
+@@ -39,7 +41,7 @@ export function GoalPropertiesToggleButton({
+         panelVisible ? "opacity-0 pointer-events-none w-0 overflow-hidden" : "opacity-100",
+       )}
+       onClick={onShowProperties}
+-      title="Show properties"
++      title={t("goals.showProperties")}
+     >
+       <SlidersHorizontal className="h-4 w-4" />
+     </Button>
+@@ -47,6 +49,7 @@ export function GoalPropertiesToggleButton({
+ }
+ 
+ export function GoalDetail() {
++  const { t } = useTranslation();
+   const { goalId } = useParams<{ goalId: string }>();
+   const { selectedCompanyId, setSelectedCompanyId } = useCompany();
+   const { openNewGoal } = useDialogActions();
+@@ -99,7 +102,7 @@ export function GoalDetail() {
+ 
+   const uploadImage = useMutation({
+     mutationFn: async (file: File) => {
+-      if (!resolvedCompanyId) throw new Error("No organization selected");
++      if (!resolvedCompanyId) throw new Error(t("goals.noOrgSelected"));
+       return assetsApi.uploadImage(
+         resolvedCompanyId,
+         file,
+@@ -118,10 +121,10 @@ export function GoalDetail() {
+ 
+   useEffect(() => {
+     setBreadcrumbs([
+-      { label: "Goals", href: "/goals" },
+-      { label: goal?.title ?? goalId ?? "Goal" }
++      { label: t("goals.breadcrumb"), href: "/goals" },
++      { label: goal?.title ?? goalId ?? t("goals.singularGoal") }
+     ]);
+-  }, [setBreadcrumbs, goal, goalId]);
++  }, [setBreadcrumbs, goal, goalId, t]);
+ 
+   useEffect(() => {
+     if (goal) {
+@@ -167,7 +170,7 @@ export function GoalDetail() {
+           onSave={(description) => updateGoal.mutate({ description })}
+           as="p"
+           className="text-sm text-muted-foreground"
+-          placeholder="Add a description..."
++          placeholder={t("goals.addDescription")}
+           multiline
+           imageUploadHandler={async (file) => {
+             const asset = await uploadImage.mutateAsync(file);
+@@ -179,10 +182,10 @@ export function GoalDetail() {
+       <Tabs defaultValue="children">
+         <TabsList>
+           <TabsTrigger value="children">
+-            Sub-Goals ({childGoals.length})
++            {t("goals.subGoalsTab", { count: childGoals.length })}
+           </TabsTrigger>
+           <TabsTrigger value="projects">
+-            Projects ({linkedProjects.length})
++            {t("goals.projectsTab", { count: linkedProjects.length })}
+           </TabsTrigger>
+         </TabsList>
+ 
+@@ -194,11 +197,11 @@ export function GoalDetail() {
+               onClick={() => openNewGoal({ parentId: goalId })}
+             >
+               <Plus className="h-3.5 w-3.5 mr-1.5" />
+-              Sub Goal
++              {t("goals.subGoal")}
+             </Button>
+           </div>
+           {childGoals.length === 0 ? (
+-            <p className="text-sm text-muted-foreground">No sub-goals.</p>
++            <p className="text-sm text-muted-foreground">{t("goals.noSubGoals")}</p>
+           ) : (
+             <GoalTree goals={childGoals} goalLink={(g) => `/goals/${g.id}`} />
+           )}
+@@ -206,7 +209,7 @@ export function GoalDetail() {
+ 
+         <TabsContent value="projects" className="mt-4">
+           {linkedProjects.length === 0 ? (
+-            <p className="text-sm text-muted-foreground">No linked projects.</p>
++            <p className="text-sm text-muted-foreground">{t("goals.noLinkedProjects")}</p>
+           ) : (
+             <div className="border border-border">
+               {linkedProjects.map((project) => (
+diff --git a/ui/src/pages/Goals.tsx b/ui/src/pages/Goals.tsx
+index 3c5826337..337dfc3f2 100644
+--- a/ui/src/pages/Goals.tsx
++++ b/ui/src/pages/Goals.tsx
+@@ -10,15 +10,17 @@ import { EmptyState } from "../components/EmptyState";
+ import { PageSkeleton } from "../components/PageSkeleton";
+ import { Button } from "@/components/ui/button";
+ import { Target, Plus } from "lucide-react";
++import { useTranslation } from "@/i18n";
+ 
+ export function Goals() {
++  const { t } = useTranslation();
+   const { selectedCompanyId } = useCompany();
+   const { openNewGoal } = useDialogActions();
+   const { setBreadcrumbs } = useBreadcrumbs();
+ 
+   useEffect(() => {
+-    setBreadcrumbs([{ label: "Goals" }]);
+-  }, [setBreadcrumbs]);
++    setBreadcrumbs([{ label: t("goals.breadcrumb") }]);
++  }, [setBreadcrumbs, t]);
+ 
+   const { data: goals, isLoading, error } = useQuery({
+     queryKey: queryKeys.goals.list(selectedCompanyId!),
+@@ -27,7 +29,7 @@ export function Goals() {
+   });
+ 
+   if (!selectedCompanyId) {
+-    return <EmptyState icon={Target} message="Select an organization to view goals." />;
++    return <EmptyState icon={Target} message={t("goals.selectOrgToView")} />;
+   }
+ 
+   if (isLoading) {
+@@ -41,8 +43,8 @@ export function Goals() {
+       {goals && goals.length === 0 && (
+         <EmptyState
+           icon={Target}
+-          message="No goals yet."
+-          action="Add Goal"
++          message={t("goals.noGoals")}
++          action={t("goals.newGoal")}
+           onAction={() => openNewGoal()}
+         />
+       )}
+@@ -52,7 +54,7 @@ export function Goals() {
+           <div className="flex items-center justify-start">
+             <Button size="sm" variant="outline" onClick={() => openNewGoal()}>
+               <Plus className="h-3.5 w-3.5 mr-1.5" />
+-              New Goal
++              {t("goals.newGoal")}
+             </Button>
+           </div>
+           <GoalTree goals={goals} goalLink={(goal) => `/goals/${goal.id}`} />
+diff --git a/ui/src/pages/Issues.tsx b/ui/src/pages/Issues.tsx
+index 79e1ccbf1..153d51096 100644
+--- a/ui/src/pages/Issues.tsx
++++ b/ui/src/pages/Issues.tsx
+@@ -214,11 +214,11 @@ export function Issues() {
+       const code = body?.code ?? "";
+       const reason =
+         code === "status_transition_requires_assignee"
+-          ? "请先指派负责人, 再移动该工单 (Todo 与 In Progress 都需要指派)。"
++          ? t("issues.moveRequiresAssignee")
+           : code === "status_transition_requires_deliverable"
+-          ? "需要至少一个交付物才能移到 Done。"
+-          : body?.error ?? "状态更新失败, 已回滚。";
+-      pushToast({ title: "无法换列", body: reason, tone: "error" });
++          ? t("issues.moveRequiresDeliverable")
++          : body?.error ?? t("issues.moveUpdateFailed");
++      pushToast({ title: t("issues.moveFailedTitle"), body: reason, tone: "error" });
+       queryClient.invalidateQueries({ queryKey: queryKeys.issues.list(selectedCompanyId!) });
+     },
+   });
+diff --git a/ui/src/pages/Projects.tsx b/ui/src/pages/Projects.tsx
+index 7a01b68e5..c4e50efa5 100644
+--- a/ui/src/pages/Projects.tsx
++++ b/ui/src/pages/Projects.tsx
+@@ -13,7 +13,7 @@ import { MembershipAction } from "../components/MembershipAction";
+ import { StarToggle } from "../components/StarToggle";
+ import { EmptyState } from "../components/EmptyState";
+ import { PageSkeleton } from "../components/PageSkeleton";
+-import { formatDate, formatNumber, formatProjectBudget, projectUrl } from "../lib/utils";
++import { formatDate, formatProjectBudget, projectUrl } from "../lib/utils";
+ import {
+   isStarred,
+   resourceMembershipState,
+@@ -26,16 +26,17 @@ import { ArrowUpDown, Check, Hexagon, Plus, RefreshCw } from "lucide-react";
+ import { Card } from "@/components/ui/card";
+ import { SyncProjectDialog } from "../components/SyncProjectDialog";
+ import { ontologyApi } from "../api/ontology";
++import { useTranslation } from "@/i18n";
+ import { cn } from "../lib/utils";
+ 
+ type ProjectSortField = "name" | "updated" | "created" | "targetDate";
+ type ProjectSortDir = "asc" | "desc";
+ 
+-const PROJECT_SORT_OPTIONS: Array<{ field: ProjectSortField; label: string }> = [
+-  { field: "name", label: "Name" },
+-  { field: "updated", label: "Updated" },
+-  { field: "created", label: "Created" },
+-  { field: "targetDate", label: "Target date" },
++const PROJECT_SORT_OPTIONS: Array<{ field: ProjectSortField; labelKey: string }> = [
++  { field: "name", labelKey: "projects.sortName" },
++  { field: "updated", labelKey: "projects.sortUpdated" },
++  { field: "created", labelKey: "projects.sortCreated" },
++  { field: "targetDate", labelKey: "projects.sortTargetDate" },
+ ];
+ 
+ function compareProjectNames(left: Project, right: Project) {
+@@ -80,6 +81,7 @@ function sortProjects(projects: Project[], sortField: ProjectSortField, sortDir:
+ }
+ 
+ export function Projects() {
++  const { t } = useTranslation();
+   const { selectedCompanyId } = useCompany();
+   const { openNewProject } = useDialogActions();
+   const { setBreadcrumbs } = useBreadcrumbs();
+@@ -88,8 +90,8 @@ export function Projects() {
+   const [syncProject, setSyncProject] = useState<Project | null>(null);
+ 
+   useEffect(() => {
+-    setBreadcrumbs([{ label: "Projects" }]);
+-  }, [setBreadcrumbs]);
++    setBreadcrumbs([{ label: t("projects.breadcrumb") }]);
++  }, [setBreadcrumbs, t]);
+ 
+   const { data: allProjects, isLoading, error } = useQuery({
+     queryKey: queryKeys.projects.list(selectedCompanyId!),
+@@ -131,10 +133,12 @@ export function Projects() {
+ 
+     return groups;
+   }, [membershipsQuery.data, sortedProjects]);
+-  const sortLabel = PROJECT_SORT_OPTIONS.find((option) => option.field === sortField)?.label ?? "Name";
++  const sortLabel = t(
++    PROJECT_SORT_OPTIONS.find((option) => option.field === sortField)?.labelKey ?? "projects.sortName",
++  );
+ 
+   if (!selectedCompanyId) {
+-    return <EmptyState icon={Hexagon} message="Select an organization to view projects." />;
++    return <EmptyState icon={Hexagon} message={t("projects.selectOrgToView")} />;
+   }
+ 
+   if (isLoading) {
+@@ -146,9 +150,9 @@ export function Projects() {
+       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+         <Popover>
+           <PopoverTrigger asChild>
+-            <Button variant="ghost" size="sm" className="w-fit text-xs" title="Sort">
++            <Button variant="ghost" size="sm" className="w-fit text-xs" title={t("projects.sort")}>
+               <ArrowUpDown className="h-3.5 w-3.5 sm:h-3 sm:w-3 sm:mr-1" />
+-              <span>Sort: {sortLabel}</span>
++              <span>{t("projects.sortLabel", { label: sortLabel })}</span>
+             </Button>
+           </PopoverTrigger>
+           <PopoverContent align="start" className="w-44 p-0">
+@@ -171,11 +175,11 @@ export function Projects() {
+                     setSortDir(option.field === "name" || option.field === "targetDate" ? "asc" : "desc");
+                   }}
+                 >
+-                  <span>{option.label}</span>
++                  <span>{t(option.labelKey)}</span>
+                   {sortField === option.field ? (
+                     <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                       <Check className="h-3 w-3" />
+-                      {sortDir === "asc" ? "Asc" : "Desc"}
++                      {sortDir === "asc" ? t("projects.asc") : t("projects.desc")}
+                     </span>
+                   ) : null}
+                 </button>
+@@ -185,7 +189,7 @@ export function Projects() {
+         </Popover>
+         <Button size="sm" variant="outline" onClick={openNewProject}>
+           <Plus className="h-4 w-4 mr-1" />
+-          Add Project
++          {t("projects.newProject")}
+         </Button>
+       </div>
+ 
+@@ -194,8 +198,8 @@ export function Projects() {
+       {!isLoading && projects.length === 0 && (
+         <EmptyState
+           icon={Hexagon}
+-          message="No projects yet."
+-          action="Add Project"
++          message={t("projects.noProjects")}
++          action={t("projects.newProject")}
+           onAction={openNewProject}
+         />
+       )}
+@@ -203,8 +207,8 @@ export function Projects() {
+       {projects.length > 0 && (
+         <div className="space-y-6">
+           {([
+-            ["My Projects", groupedProjects.mine],
+-            ["Other Projects", groupedProjects.other],
++            [t("projects.myProjects"), groupedProjects.mine],
++            [t("projects.otherProjects"), groupedProjects.other],
+           ] as const).map(([label, sectionProjects]) => {
+             if (sectionProjects.length === 0) return null;
+ 
+@@ -213,7 +217,7 @@ export function Projects() {
+                 <div className="flex items-center justify-between">
+                   <h2 className="text-sm font-medium">{label}</h2>
+                   <span className="text-xs text-muted-foreground">
+-                    {sectionProjects.length} project{sectionProjects.length === 1 ? "" : "s"}
++                    {t("projects.count", { count: sectionProjects.length })}
+                   </span>
+                 </div>
+                 <Card className="block py-0 overflow-hidden divide-y divide-border">
+@@ -261,10 +265,12 @@ export function Projects() {
+                               )}
+                               title={
+                                 hasUpgrade
+-                                  ? `可升级：系统绑定本体域版本 v${boundVersion}，最新版本 v${liveVersion}，点击同步升级`
++                                  ? t("projects.syncUpgradeTitle", { bound: boundVersion, live: liveVersion })
+                                   : syncedSystem
+-                                    ? `已同步至业务系统: ${syncedSystem.code}${boundVersion !== null ? ` (域版本 v${boundVersion})` : ""}，点击查看或变更`
+-                                    : "同步到业务系统资产"
++                                    ? boundVersion !== null
++                                      ? t("projects.syncBoundVersionTitle", { code: syncedSystem.code, version: boundVersion })
++                                      : t("projects.syncBoundTitle", { code: syncedSystem.code })
++                                    : t("projects.syncToBusinessSystem")
+                               }
+                               onClick={(e) => {
+                                 e.preventDefault();
+@@ -275,10 +281,12 @@ export function Projects() {
+                               <RefreshCw className={cn("size-3", syncedSystem ? "text-primary" : "text-muted-foreground")} />
+                               <span>
+                                 {hasUpgrade
+-                                  ? `可升级 v${boundVersion}→v${liveVersion}`
++                                  ? t("projects.syncUpgradeLabel", { bound: boundVersion, live: liveVersion })
+                                   : syncedSystem
+-                                    ? (boundVersion !== null ? `已同步 v${boundVersion}` : "已同步")
+-                                    : "同步"}
++                                    ? boundVersion !== null
++                                      ? t("projects.syncVersionLabel", { version: boundVersion })
++                                      : t("projects.synced")
++                                    : t("projects.sync")}
+                               </span>
+                             </Button>
+                           );
+@@ -328,16 +336,16 @@ export function Projects() {
+                           <div className="flex items-center gap-3">
+                             <span
+                               className="hidden text-xs text-muted-foreground tabular-nums sm:inline"
+-                              title={`${formatNumber(project.taskCount ?? 0)} task${(project.taskCount ?? 0) === 1 ? "" : "s"}`}
++                              title={t("projects.tasksCount", { count: project.taskCount ?? 0 })}
+                             >
+-                              {formatNumber(project.taskCount ?? 0)} task{(project.taskCount ?? 0) === 1 ? "" : "s"}
++                              {t("projects.tasksCount", { count: project.taskCount ?? 0 })}
+                             </span>
+                             {(project.defectCount ?? 0) > 0 && (
+                               <span
+                                 className="hidden text-xs text-destructive tabular-nums sm:inline"
+-                                title={`${formatNumber(project.defectCount ?? 0)} defect${(project.defectCount ?? 0) === 1 ? "" : "s"}`}
++                                title={t("projects.defectsCount", { count: project.defectCount ?? 0 })}
+                               >
+-                                {formatNumber(project.defectCount ?? 0)} defect{(project.defectCount ?? 0) === 1 ? "" : "s"}
++                                {t("projects.defectsCount", { count: project.defectCount ?? 0 })}
+                               </span>
+                             )}
+                             {project.budget && (
+diff --git a/ui/src/pages/Workspaces.tsx b/ui/src/pages/Workspaces.tsx
+index 269dcc025..15b774acb 100644
+--- a/ui/src/pages/Workspaces.tsx
++++ b/ui/src/pages/Workspaces.tsx
+@@ -13,6 +13,7 @@ import { useCompany } from "../context/CompanyContext";
+ import type { ProjectWorkspaceSummary } from "../lib/project-workspaces-tab";
+ import { queryKeys } from "../lib/queryKeys";
+ import { projectRouteRef } from "../lib/utils";
++import { useTranslation } from "@/i18n";
+ 
+ type ProjectWorkspaceGroup = {
+   projectId: string;
+@@ -77,6 +78,7 @@ function buildProjectWorkspaceGroups(items: WorkspaceOverviewItem[]): ProjectWor
+ }
+ 
+ export function Workspaces() {
++  const { t } = useTranslation();
+   const { selectedCompanyId } = useCompany();
+   const { setBreadcrumbs } = useBreadcrumbs();
+   const experimentalSettingsQuery = useQuery({
+@@ -96,8 +98,8 @@ export function Workspaces() {
+   });
+ 
+   useEffect(() => {
+-    setBreadcrumbs([{ label: "Workspaces" }]);
+-  }, [setBreadcrumbs]);
++    setBreadcrumbs([{ label: t("workspaces.breadcrumb") }]);
++  }, [setBreadcrumbs, t]);
+ 
+   const overviewPages = overviewQuery.data?.pages ?? [];
+   const overviewItems = useMemo(
+@@ -118,18 +120,18 @@ export function Workspaces() {
+   return (
+     <div className="space-y-6">
+       <div>
+-        <h2 className="text-xl font-bold">Workspaces</h2>
++        <h2 className="text-xl font-bold">{t("workspaces.breadcrumb")}</h2>
+       </div>
+ 
+       <SummarySlotCard
+         companyId={selectedCompanyId}
+         scopeKind="workspaces_overview"
+-        title="Workspace summary"
+-        description="Summarizer tracks workspace activity, live services, and follow-up needs across projects."
++        title={t("workspaces.summaryTitle")}
++        description={t("workspaces.summaryDescription")}
+       />
+ 
+       {groups.length === 0 ? (
+-        <p className="text-sm text-muted-foreground">No workspace activity yet.</p>
++        <p className="text-sm text-muted-foreground">{t("workspaces.noActivity")}</p>
+       ) : (
+         <div className="space-y-8">
+           {groups.map((group) => (
+@@ -144,7 +146,7 @@ export function Workspaces() {
+                   </Link>
+                 </div>
+                 <span className="text-xs text-muted-foreground">
+-                  {group.summaries.length} workspace{group.summaries.length === 1 ? "" : "s"}
++                  {t("workspaces.count", { count: group.summaries.length })}
+                 </span>
+               </div>
+               <ProjectWorkspacesContent
+@@ -158,7 +160,7 @@ export function Workspaces() {
+           {overviewQuery.hasNextPage ? (
+             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4">
+               <p className="text-sm text-muted-foreground">
+-                Showing {overviewItems.length} of {totalWorkspaceCount} workspaces.
++                {t("workspaces.showing", { shown: overviewItems.length, total: totalWorkspaceCount })}
+               </p>
+               <Button
+                 type="button"
+@@ -167,7 +169,7 @@ export function Workspaces() {
+                 onClick={() => void overviewQuery.fetchNextPage()}
+                 disabled={overviewQuery.isFetchingNextPage}
+               >
+-                {overviewQuery.isFetchingNextPage ? "Loading..." : "Load more"}
++                {overviewQuery.isFetchingNextPage ? t("common.loading") : t("common.loadMore")}
+               </Button>
+             </div>
+           ) : null}

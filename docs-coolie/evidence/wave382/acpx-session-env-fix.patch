@@ -1,0 +1,38 @@
+diff --git a/packages/adapter-utils/src/acpx-engine/execute.ts b/packages/adapter-utils/src/acpx-engine/execute.ts
+index ec70501aa..c82af2866 100644
+--- a/packages/adapter-utils/src/acpx-engine/execute.ts
++++ b/packages/adapter-utils/src/acpx-engine/execute.ts
+@@ -2918,6 +2918,24 @@ function guardEnsureSession(params: {
+   });
+ }
+ 
++// ACPX persisted sessions enforce a snake_case `session_options.env` schema.
++// Our Paperclip env keys are UPPER_SNAKE (`PAPERCLIP_*`, `ANTHROPIC_*`, etc.),
++// but the acpx *runtime* provider sees the original UPPER_SNAKE keys in
++// `ensureSession` input and writes them straight through. The violation we
++// are guarding against fires only on the persisted-store *load* path
++// (resumeSessionId != null): the loader hands ACPX the previously saved
++// `record.acpx.session_options`, and that's where the policy rejects the keys.
++// We normalize the keys here so the loaded snapshot satisfies the policy.
++// Fresh-session creates use the same `prepared.env` unmodified — the runtime
++// is permissive about new writes; only persisted reads trip the validator.
++function toAcpxSessionEnv(env: Record<string, string>): Record<string, string> {
++  const normalized: Record<string, string> = {};
++  for (const [key, value] of Object.entries(env)) {
++    normalized[key.toLowerCase()] = value;
++  }
++  return normalized;
++}
++
+ function renderPaperclipEnvNote(env: Record<string, string>): string {
+   const paperclipKeys = Object.keys(env)
+     .filter((key) => key.startsWith("PAPERCLIP_"))
+@@ -4234,7 +4252,7 @@ export function createAcpxEngineExecutor(deps: AcpxEngineExecutorOptions = {}) {
+                 ...record.acpx,
+                 session_options: {
+                   ...record.acpx?.session_options,
+-                  env: { ...prepared.env },
++                  env: { ...toAcpxSessionEnv(prepared.env) },
+                 },
+               },
+             };

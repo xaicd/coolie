@@ -46,6 +46,16 @@ config.resolver.resolveRequest = (context, moduleName, platform) => {
       };
     }
   }
+  // Babel emits `@babel/runtime` helper imports for files under the symlinked
+  // api-client, but that package deliberately has no node_modules of its own.
+  // Resolve those helpers from this app's node_modules, as the note above
+  // describes.
+  if (moduleName.startsWith("@babel/runtime/")) {
+    const direct = path.resolve(projectRoot, "node_modules", moduleName);
+    if (fs.existsSync(direct)) {
+      return { type: "sourceFile", filePath: direct };
+    }
+  }
   if (originalResolveRequest) {
     return originalResolveRequest(context, moduleName, platform);
   }
