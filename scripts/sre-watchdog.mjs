@@ -18,6 +18,7 @@ import { execSync } from 'node:child_process';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
+import { verifyWebEndpoint, verifyDeviceApp, reproduceAndVerify } from './sre-repro-engine.mjs';
 
 const HOME = process.env.HOME || (process.platform === 'darwin' ? '/Users/mac' : '/home/beye');
 const IS_DARWIN = process.platform === 'darwin';
@@ -563,8 +564,47 @@ async function runCheck() {
 }
 
 // 入口分流
-const isOnce = process.argv.includes('--once');
-if (isOnce) {
+if (process.argv.includes('--verify-web')) {
+  const urlIdx = process.argv.indexOf('--verify-web');
+  const customUrl = process.argv[urlIdx + 1] && !process.argv[urlIdx + 1].startsWith('--') ? process.argv[urlIdx + 1] : undefined;
+  console.log('\x1b[36m=== [SRE Watchdog] 启动 agent-browser 进行 Web 控制台真实验证 ===\x1b[0m');
+  verifyWebEndpoint({ url: customUrl }).then(res => {
+    console.log(JSON.stringify(res, null, 2));
+    process.exit(res.ok ? 0 : 1);
+  }).catch(err => {
+    console.error(err);
+    process.exit(1);
+  });
+} else if (process.argv.includes('--verify-device')) {
+  const appIdx = process.argv.indexOf('--verify-device');
+  const customApp = process.argv[appIdx + 1] && !process.argv[appIdx + 1].startsWith('--') ? process.argv[appIdx + 1] : undefined;
+  console.log('\x1b[36m=== [SRE Watchdog] 启动 agent-device 进行移动端真机/模拟器验证 ===\x1b[0m');
+  verifyDeviceApp({ appId: customApp }).then(res => {
+    console.log(JSON.stringify(res, null, 2));
+    process.exit(res.ok ? 0 : 1);
+  }).catch(err => {
+    console.error(err);
+    process.exit(1);
+  });
+} else if (process.argv.includes('--verify-all')) {
+  console.log('\x1b[36m=== [SRE Watchdog] 全链路拉起 agent-browser 与 agent-device 执行双端冒烟走查 ===\x1b[0m');
+  Promise.all([verifyWebEndpoint(), verifyDeviceApp()]).then(([web, dev]) => {
+    console.log(JSON.stringify({ web, device: dev }, null, 2));
+    process.exit((web.ok && dev.ok) ? 0 : 1);
+  }).catch(err => {
+    console.error(err);
+    process.exit(1);
+  });
+} else if (process.argv.includes('--repro')) {
+  const reproIdx = process.argv.indexOf('--repro');
+  const targetIssue = process.argv[reproIdx + 1] && !process.argv[reproIdx + 1].startsWith('--') ? process.argv[reproIdx + 1] : 'COOA-144';
+  reproduceAndVerify(targetIssue).then(res => {
+    process.exit(res.verdict === 'PASS' ? 0 : 1);
+  }).catch(err => {
+    console.error(err);
+    process.exit(1);
+  });
+} else if (process.argv.includes('--once')) {
   runCheck().then(() => process.exit(0)).catch(err => {
     console.error(err);
     process.exit(1);
@@ -573,6 +613,7 @@ if (isOnce) {
   console.log('\x1b[36m=== Starting Coolie-Dev SRE Watchdog Daemon ===\x1b[0m');
   console.log(`Monitoring: ${HEALTH_URL}, Port ${PORT_PG}`);
   console.log(`Status output: ${SRE_STATUS_PATH}`);
+  console.log(`Repro Engine: agent-browser & agent-device loaded`);
   
   // 立即执行一次
   runCheck();
