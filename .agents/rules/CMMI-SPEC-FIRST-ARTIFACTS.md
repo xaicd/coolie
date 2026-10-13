@@ -139,6 +139,16 @@
      2. 强制采用后台脱机管道执行（重定向输出至独立日志文件并后台化）；
      3. **首秒脉冲原则**：在启动后台长任务的 1 秒内，必须在会话窗口发出带预估耗时的心跳回执；
      4. 采用非阻塞轮询或事件唤醒，保持人机交互信道始终处于可响应状态。
+6. **沉淀经验严谨性与精准增量更新铁律 (Rigorous Distillation & Surgical Incremental Update Law)**：
+   - **严谨性四项准则**：
+     - **因果真实 (Empirical Proof)**：沉淀经验必须来源于真实物理执行环境、经过严格验证的复现路径或真实的生产故障复盘（5-Whys），严禁凭空假设或主观捏造；
+     - **RFC 2119 规范语义 (Normative Semantics)**：严格使用规范动词（`MUST` / `SHALL` / `SHALL NOT`），精确定义前置条件 (Preconditions)、触发时机 (Trigger) 与守恒不变量 (Invariants)；
+     - **零业务特性污染 (Pure Domain-Agnostic Abstraction)**：严禁将特定客户代号、项目临时名词写入平台通用规则/技能，必须提取为通用的软件工程与系统架构抽象；
+     - **机器可检门禁 (Machine-Verifiable Enforcement)**：经验沉淀必须最终落地为可自动断言的门禁（Pre-commit hook、Linter、AST 守卫、变异测试、状态机校验单），拒绝无法检验的空洞口号。
+   - **精准增量更新三项纪律**：
+     - **单点靶向归宿 (Surgical In-Place Injection)**：新沉淀经验必须精准定位至现存唯一的标准工序或专属 Skill，严禁到处散落新建零散总结文档；
+     - **加法原则与最小 Diff (Additive & Minimal Diff Principle)**：恪守 upstream Rule 4，严禁对战略文档、工程法典进行全量推倒重写（Anti-Wholesale Replacement），以极小且精准的 Diff 增补现有章节，完好保护既有决策基线；
+     - **全链路闭环同步与原子入库 (Closed-Loop Synchronization & Clean Tree)**：增量更新必须同步对齐检查单与 OpenWiki 知识图谱，并通过全部 19 道 Pre-Commit 门禁，保持工作树 0 dirty、0 untracked 原子提交推送。
 
 ---
 
