@@ -84,6 +84,24 @@ echo "0 / 1 / 10000 / 超长名称 / <script> / 连点两次"
 6. **自证** —— FDSE 自己宣布「业务可用」；业务可用必须由 DS 独立走一遍。
 7. **给「大概」不给决议** —— 没有明确 go/no-go，把判断留给别人。
 
+## 六、验收人开源顶级竞品 Web Search 对标定位差距规范 (Web Search Benchmark Scouting)
+
+> **最高审查法则**：坚决破除闭门造车与「近亲繁殖式」验收。验收人（百晓生 DS / 墨斗 FDA）必须放眼全球顶级工业标准，通过 Web Search 针对被验特性对标顶级开源与商业标杆，定位真实差距，倒逼研发自循环持续进化。
+
+### 1. 必查标杆矩阵 (Benchmark Matrix)
+| 业务域 | 顶级对标标杆 (Commercial & Open-Source) | 重点对标维度与高阶要求 |
+| :--- | :--- | :--- |
+| **移动 App 体验** | **Linear Mobile**, **GitHub Mobile** | 拇指热区 (Lower-Third Thumb Zone)、半屏滑动抽屉 (Contextual Bottom Sheet)、LIFO 物理导航栈、触感反馈与弹簧物理力学 |
+| **活体业务本体** | **Palantir Foundry (Workshop / Object Explorer)** | 活体数字孪生 (Object Types)、受控状态流转 (Action Types)、多路径因果血缘账本 (Provenance) |
+| **任务执行与韧性** | **Temporal.io**, **Dify**, **Dagger** | 心跳租约抗冻 (Heartbeat Leasing)、确定性幂等 Token (Idempotency Token)、断点无感接续恢复 |
+| **SRE 自愈与告警** | **Google SRE**, **Datadog**, **Keep AIOps** | 告警降噪收敛、自愈 Runbook 执行、事后免责复盘 (Blameless Postmortem) |
+
+### 2. 对标验收 4 步执行流 (The 4-Step Scouting Flow)
+1. **搜寻标杆 (Scout Leaders)**：在制定验收清单或驳回工单时，主动执行 Web Search 检索标杆设计模式与最佳实践。
+2. **定位差距 (Dissect 3 Gaps)**：对照 Coolie 当前实现，明确列出至少 3 项具象差距（如：缺少手势下划关闭、未做行级物理隔离、缺少心跳超时自愈）。
+3. **EARS 格式化 (EARS Standardization)**：严禁用“体验差”、“界面不够美观”等主观词；必须收敛为 EARS 规范 (`WHEN [event], THE SYSTEM SHALL...` / `IF [error], THEN THE SYSTEM SHALL NOT...`)。
+4. **递进压入清单 (Progressive Loop Driving)**：将新产生的差距标准直接录入 `docs-coolie/QA/` 活体验收清单，驱动下一轮自循环冲刺。
+
 ---
 
 配套自查清单：`references/ds-checklist.md`（逐项 yes/no，出现任一 no 即为一票否决）。

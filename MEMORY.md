@@ -81,13 +81,12 @@
 
 - **当前 Sprint**: `2026-sprint-10-13-foundry-context-and-paperclip-governance`
 - **最新拍板原话 (2026-10-13)**:
-  - *"不能再造轮子了"* ➜ 自身演进回归原生管理。
-  - *"6寸屏 沉淀到原生APP技能中"* ➜ 固化至 `yudao-expo-app` §4。
-  - *"每个环节的 标准流程 都有吗"* ➜ 沉淀 8 环节 SOP 与速记卡。
-  - *"yudao 与 ruoyi 是两个不同语言底座"* ➜ 建立 4 级选型法典。
-  - *"本体插件支持存量接入...集成 rea"* ➜ 完成 REA 逆向集成。
-  - *"mac coolie-dev 加长期任务, 充分利用 routines"* ➜ 挂载长任务与守护Routine。
-  - *"站对视角验证可用易用,对标顶级,模拟真实使用CMMI闭环"* ➜ 确立进阶飞轮。
+  - *"不能再造轮子"* ➜ 回归原生管理；*"6寸屏沉淀APP技能"* ➜ `yudao-expo-app` §4。
+  - *"标准流程全覆盖"* ➜ 沉淀 8 环节 SOP 与速记卡；*"底座双核选型"* ➜ 4 级选型法典。
+  - *"本体存量接入"* ➜ REA 逆向集成；*"mac加长任务与routine"* ➜ 挂载守护Routine。
+  - *"站对视角对标顶级CMMI闭环"* ➜ 确立进阶飞轮。
+  - *"做循环输出验收清单持续提要求, 验收人websearch对标顶级竞品定位差距"* ➜ 沉淀 8 域 32 项活体验收清单与 Web Search 标杆雷达 (Linear/Palantir/Temporal)。
+  - *"sre监控影响主线要修理, palantir echo-delta-dev进化"* ➜ SRE Watchdog 幽灵心跳自愈与级联解阻。
 - **详见账本**: [docs/sprint-prod/10/13.md](docs/sprint-prod/10/13.md)
 
 ## 8. 维护规则

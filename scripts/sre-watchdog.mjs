@@ -411,6 +411,24 @@ async function scanAndRemediateMainlineBlockers(client) {
         }
       }
     }
+
+    // --- 场景 4.5: 幽灵 Heartbeat Runs 自动对齐回收 (Temporal.io 租约超时与结项状态对齐) ---
+    const ghostRunsRes = await client.query(`
+      SELECT r.id, r.created_at, i.identifier, i.status as issue_status
+      FROM heartbeat_runs r
+      LEFT JOIN issues i ON i.checkout_run_id = r.id
+      WHERE r.status = 'running'
+    `);
+    for (const gr of ghostRunsRes.rows) {
+      const runAgeMinutes = (now - new Date(gr.created_at).getTime()) / (60 * 1000);
+      if (gr.issue_status === 'done' || (runAgeMinutes > 30 && (!gr.identifier || gr.issue_status !== 'in_progress'))) {
+        await client.query("UPDATE heartbeat_runs SET status = 'succeeded', finished_at = NOW() WHERE id = $1", [gr.id]);
+        const msg = `幽灵心跳 Run ${gr.id} (工单 ${gr.identifier || 'none'}:${gr.issue_status || 'unknown'}) 已超期或已结项，SRE 自动核销标记为 succeeded`;
+        logIncident('INFO', 'AUTO_HEAL_GHOST_RUN', msg);
+        actions.selfHealed.push({ task: gr.identifier || gr.id, action: 'CLOSE_GHOST_RUN', reason: 'Issue completed or run expired' });
+      }
+    }
+
     // --- 场景 5: 跨任务依赖级联解阻与收口 (Echo 价值闭环) ---
     const check118Children = await client.query(`
       SELECT status FROM issues 
