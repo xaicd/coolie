@@ -1,6 +1,6 @@
 ---
 name: cmmi-immutable-release
-description: CMMI 3 配置管理与不可变生产投产 (CM/RSKM/PMC) 核心技能。固化配置基线、部署拓扑、双人复核会签单与秒级回滚应急 SOP，实施生产指纹校验与发布安全守卫，满足 G5 投产门禁。
+description: CMMI 3 配置管理与不可变生产投产 (CM/RSKM/PMC)。适用于接到「投产上线」「生产割接」「制定秒级回滚预案」「发版前配置复核」「不可变制品校验」时启用。
 ---
 
 # CMMI 配置管理与不可变投产规范 (CM / RSKM / PMC)

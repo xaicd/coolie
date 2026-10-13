@@ -1,9 +1,6 @@
 ---
 name: create-agent-adapter
-description: >
-  Create or modify Paperclip agent adapters across server, UI, and CLI surfaces.
-  Use when adding support for a new CLI agent, API agent, custom process, or
-  adapter package.
+description: 创建或改造 Paperclip Agent 适配器 (Claude, Codex, Cursor, 自定义CLI)。适用于接到「对接新Agent」「写Agent适配器」「接入新CLI模型」时启用。
 ---
 
 # Creating a Paperclip Agent Adapter

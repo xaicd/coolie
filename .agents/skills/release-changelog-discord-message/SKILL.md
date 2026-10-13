@@ -1,9 +1,6 @@
 ---
 name: release-changelog-discord-message
-description: >
-  Write the Discord announcement for a stable Paperclip release from the release
-  changelog. Use when a release issue needs a copy-pasteable dotta-voice Discord
-  post or refreshed discord_announcement document.
+description: 根据版本更新日志自动起草对外发布通报与社区通知。适用于接到「写版本通告」「发布更新广播」「同步社群版本日志」时启用。
 ---
 
 # Release Discord Announcement Skill

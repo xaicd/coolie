@@ -1,6 +1,6 @@
 ---
 name: skill-creator
-description: "Create new skills, improve existing ones, and measure skill performance. Use when the user asks to build, package, or refine a skill."
+description: 创建新技能、调优已有技能并评估技能触发性能。适用于接到「新建技能」「开发新Skill」「修改技能配置」「优化技能命中率」时启用。
 ---
 
 # Skill Creator

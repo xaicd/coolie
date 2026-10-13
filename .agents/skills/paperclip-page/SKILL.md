@@ -1,9 +1,6 @@
 ---
 name: paperclip-page
-description: >
-  Publish static HTML pages and asset folders to the Paperclip S3/CloudFront page
-  host. Use when asked to deploy, host, or share a persistent page, viewer,
-  prototype, report, or static site without here.now.
+description: 发布静态 HTML 页面、原型预览或报告到持久化托管页面。适用于接到「发布静态预览页」「部署在线报告」「生成对外分享链接」「发布原型页面」时启用。
 ---
 
 # Paperclip Page

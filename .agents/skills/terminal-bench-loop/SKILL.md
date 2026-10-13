@@ -1,9 +1,6 @@
 ---
 name: terminal-bench-loop
-description: >
-  Run one Terminal-Bench task through a bounded Paperclip smoke/diagnosis/fix
-  loop. Use when asked to drive Terminal-Bench until it passes, rerun a
-  Terminal-Bench loop, or iterate with board-gated fixes and diagnosis.
+description: 执行 Terminal-Bench 终端基准评测并进行自动冒烟与修复循环。适用于接到「跑终端评测」「Terminal-Bench验证」「终端基准测试修复」时启用。
 ---
 
 # Terminal-Bench Loop

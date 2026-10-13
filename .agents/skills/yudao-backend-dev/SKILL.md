@@ -1,6 +1,6 @@
 ---
 name: yudao-backend-dev
-description: Yudao-Cloud (芋道后端微服务与单体开发法典)。深度拆解 Spring Boot 3 / JDK 17 底层架构，指导数字员工遵循标准的 6 层解耦规范、多企业租户物理隔离拦截器、行级数据权限 (@DataPermission)、防重幂等 (@Idempotent)、MyBatis-Plus-Join 复合查询、Knife4j OpenAPI 3 契约注释与事务缓存双写一致性标准。
+description: Yudao-Cloud 芋道后端微服务与单体开发法典 (Spring Boot 3/JDK 17)。适用于接到「写Java后端接口」「改MyBatis查询」「多租户行级隔离」「加防重幂等注解」「Knife4j契约开发」时启用。
 ---
 
 # Yudao-Cloud 核心后端架构与业务模块深度研发法典

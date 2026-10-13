@@ -1,6 +1,6 @@
 ---
 name: yudao-expo-app
-description: Yudao-Quad-Terminal 原生移动端 (Expo SDK 52 / React Native 0.76) 深度研发与发布法典。指导数字员工掌握 Monorepo 跨包解析 (Metro)、硬件级加密存储 (SecureStore)、生物识别鉴权、6 寸屏极简对称 UI、局部一跳因果卡片流、以及自建 OTA 热更新防缓存陷阱与 7 处版本一致性守卫。
+description: Yudao-Quad-Terminal 原生移动端 (Expo SDK 52/React Native) 研发与 6 寸屏防御法典。适用于接到「开发手机App」「修复6寸屏撑爆」「刘海屏遮挡」「自建OTA发版」「原生端极简UI」时启用。
 ---
 
 # Yudao-Expo-App 原生移动端深度研发与发版法典

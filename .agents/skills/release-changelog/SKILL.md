@@ -1,8 +1,6 @@
 ---
 name: release-changelog
-description: >
-  Generate the stable Paperclip release changelog at releases/vYYYY.MDD.P.md by
-  reading commits, changesets, and merged PR context since the last stable tag.
+description: 通过比对提交记录与 PR 上下文自动生成标准发版更新日志 CHANGELOG。适用于接到「生成更新日志」「写CHANGELOG」「统计本次发版内容」时启用。
 ---
 
 # Release Changelog Skill

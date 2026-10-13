@@ -1,9 +1,6 @@
 ---
 name: company-creator
-description: >
-  Create agent company packages that conform to agentcompanies/v1. Use when asked
-  to create a company, scaffold an agent team, hire agents, or turn a repo/skills
-  collection into a company package.
+description: 按 agentcompanies/v1 规范创建数字员工公司包与脚手架团队。适用于接到「建新公司」「开新公司」「初始化数字员工团队」「招募Agent」时启用。
 ---
 
 # Company Creator

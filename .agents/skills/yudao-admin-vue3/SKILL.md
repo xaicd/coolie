@@ -1,6 +1,6 @@
 ---
 name: yudao-admin-vue3
-description: Yudao-UI-Admin-Vue3 前端运营管理中台深度研发指南。深入剖析 Vue 3 + Vite + Element Plus + Pinia 架构，指导数字员工熟练运用 useCrudSchemas 统一表单/表格元数据、useTable 分页查询编排、useMessage 统一弹窗反馈、DICT 数据字典状态标签、v-hasPermi 细粒度按钮鉴权以及极简两字交互规范。
+description: Yudao-UI-Admin-Vue3 前端管理中台研发指南 (Vue3+Vite+Element Plus)。适用于接到「改Vue管理端」「加后台页面」「CRUD表格表单开发」「字典与权限配置」「后台两字UI适配」时启用。
 ---
 
 # Yudao-UI-Admin-Vue3 运营后台深度研发法典

@@ -1,6 +1,6 @@
 ---
 name: mcp-builder
-description: Guide for creating high-quality MCP (Model Context Protocol) servers that enable LLMs to interact with external services through well-designed tools. Use when building MCP servers to integrate external APIs or services, whether in Python (FastMCP) or Node/TypeScript (MCP SDK).
+description: 高质量 MCP (Model Context Protocol) 服务端研发指南 (Node/TS SDK 或 Python FastMCP)。适用于接到「开发MCP服务」「对接新工具API」「增加MCP工具」「写MCP扩展」时启用。
 license: Complete terms in LICENSE.txt
 ---
 

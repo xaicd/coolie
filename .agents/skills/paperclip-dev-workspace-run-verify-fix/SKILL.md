@@ -1,9 +1,6 @@
 ---
 name: paperclip-dev-workspace-run-verify-fix
-description: >
-  Run, verify, reseed, and repair Paperclip isolated dev workspace services. Use
-  when asked to start or fix a managed project/worktree service and prove health,
-  login readiness, cloned data, runtime visibility, and correct port ownership.
+description: 运行、验证、数据重置与修复 Paperclip 隔离开发工作区服务 (端口/登录态/数据克隆)。适用于接到「启动工作区服务」「修复开发环境」「重置测试数据」「工作区无法访问」时启用。
 ---
 
 # Paperclip Dev Workspace Run / Verify / Fix

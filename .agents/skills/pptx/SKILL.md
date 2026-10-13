@@ -1,6 +1,6 @@
 ---
 name: pptx
-description: "Create and edit PowerPoint presentations (.pptx/.potx) — slides, layouts, and content. Use whenever a deck is involved as input or output."
+description: 创建与编辑 PPT 演示文稿 (.pptx/.potx) 幻灯片与版式。适用于接到「生成汇报PPT」「制作演示胶片」「修改PPT页面」「导出述职文档」时启用。
 license: Proprietary. LICENSE.txt has complete terms
 ---
 

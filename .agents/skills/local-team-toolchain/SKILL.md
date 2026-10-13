@@ -1,6 +1,6 @@
 ---
 name: local-team-toolchain
-description: 本地施工队（本体团队：Hermes/铁匠/墨斗/门神/兑底渊/百晓生）跨环境（Docker 容器 vs Mac 宿主机）调度 6 大工具池（claude-glm, claude-mm, cmd, copilot, agy, hermes）的权威指南。涵盖 host-exec 穿透调用、dispatch 派单分流、context-bus 上下文接力总线、gate-evidence-ledger 门禁阻断与 .coolie-local 规范。
+description: 本地施工队 (Hermes/铁匠/墨斗/门神/兜底渊) 跨 Docker/Mac 调度 7 工具池权威指南。适用于接到「派单给匠人」「host-exec穿透调用」「调度工具池」「排查容器与宿主机通信」时启用。
 ---
 
 # local-team-toolchain — 本地团队跨环境工具池调度指南

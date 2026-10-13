@@ -1,10 +1,6 @@
 ---
 name: pr-gardening
-description: >
-  Discover the pull requests this Paperclip instance opened (never community
-  contributions), report what each is for and how confident we are that it is
-  merge-ready, and automatically drive the non-ready ones back to green with
-  /prepare-paperclip-pr — without ever merging.
+description: 巡检当前实例打开的所有 PR，评估合并就绪度并自动推进变绿。适用于接到「巡检PR列表」「修复未通过的PR」「推进PR合并就绪」时启用。
 compatibility: Requires Node.js 20+, gh authenticated for GitHub read access, and Paperclip run credentials.
 allowed-tools: Bash(node:*) Bash(gh:*) Bash(curl:*)
 ---

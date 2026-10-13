@@ -1,6 +1,6 @@
 ---
 name: internal-comms
-description: "Draft internal communications — announcements, newsletters, and status posts — in the company's house formats. Use for any employee-facing written comms."
+description: 起草公司内部公告、全员通报与项目进展简报。适用于接到「写全员公告」「起草内部通知」「写版本发布通报」「发布项目周报」时启用。
 license: Complete terms in LICENSE.txt
 ---
 

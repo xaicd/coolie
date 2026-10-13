@@ -1,6 +1,6 @@
 ---
 name: cmmi-tech-solution
-description: CMMI 3 技术解决方案与架构选型 (TS/DAR/RSKM) 核心技能。固化系统概要设计 (HLD)、多企业/租户数据物理隔离方案与关键技术决策分析 (DAR)，保障系统架构边界与 G2 门禁合规。
+description: CMMI 3 技术解决方案与架构概要设计 (TS/DAR/RSKM)。适用于接到「做技术方案」「写HLD概要设计」「架构选型DAR」「租户物理隔离设计」时启用。
 ---
 
 # CMMI 架构设计与技术决策分析 (TS / DAR / RSKM)

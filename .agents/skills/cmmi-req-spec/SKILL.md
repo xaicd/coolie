@@ -1,6 +1,6 @@
 ---
 name: cmmi-req-spec
-description: CMMI 3 需求开发与管理 (RD/REQM) 核心技能。用 EARS 规范语法收敛用户故事与验收标准，自动化生成软件需求规格说明书 (SRS) 与双向需求跟踪矩阵 (RTM)，满足 G1 需求风控门禁。
+description: CMMI 3 需求工程与 EARS 严谨需求规格收敛 (RD/REQM)。适用于接到「梳理需求规格」「写SRS需求文档」「双向需求跟踪矩阵RTM」「消除需求歧义」「产品需求进厂」时启用。
 ---
 
 # CMMI 需求工程与双向跟踪矩阵规范 (RD / REQM)

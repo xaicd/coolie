@@ -1,6 +1,6 @@
 ---
 name: cmmi-ver-val
-description: CMMI 3 验证与确认全栈验收 (VER/VAL) 核心技能。涵盖端到端业务旅程验证、UI 页面四态状态机穷举、交互防抖防御与系统集成测试总结，满足 G4 全栈验收门禁。
+description: CMMI 3 验证与确认全栈验收守卫 (VER/VAL)。适用于接到「验收测试」「四态UI走查」「出测试总结报告」「组织UAT终验」「防抖防御走查」时启用。
 ---
 
 # CMMI 验证与确认工程规范 (VER / VAL)

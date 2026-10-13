@@ -1,9 +1,6 @@
 ---
 name: release
-description: >
-  Coordinate a full Paperclip release across engineering verification, npm,
-  GitHub, smoke testing, and announcement follow-up. Use when leadership asks
-  to ship a release, not merely to discuss versioning.
+description: 统筹 Paperclip 全栈工程发版 (验证/npm/GitHub/冒烟测试/发布公告)。适用于接到「发版」「发布正式版本」「切Tag发版本」「执行全流程发版」时启用。
 ---
 
 # Release Coordination Skill

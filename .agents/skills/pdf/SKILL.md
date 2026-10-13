@@ -1,6 +1,6 @@
 ---
 name: pdf
-description: "Read, extract, generate, split, merge, and manipulate PDF files. Use whenever a .pdf is the input or the requested output."
+description: 读取、提取文本、生成、拆分、合并与处理 PDF 文件。适用于接到「解析PDF」「生成PDF验收单」「合并PDF报告」「提取PDF文字」时启用。
 license: Proprietary. LICENSE.txt has complete terms
 ---
 

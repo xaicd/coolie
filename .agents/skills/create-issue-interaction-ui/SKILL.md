@@ -1,9 +1,6 @@
 ---
 name: create-issue-interaction-ui
-description: >
-  Add a new Paperclip issue-thread interaction kind end-to-end. Use when repo
-  work introduces or extends interaction cards like request_confirmation,
-  checkbox confirmations, ask_user_questions, or suggest_tasks.
+description: 端到端添加 Paperclip 工单交互卡片 UI (二次确认/多选框/向用户提问/任务建议)。适用于接到「新增工单交互卡片」「增加确认弹窗」「扩展工单交互组件」时启用。
 ---
 
 # Create a new issue-thread interaction UI (Developer/maintainer skill)

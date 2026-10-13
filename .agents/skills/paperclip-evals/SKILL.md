@@ -1,6 +1,6 @@
 ---
 name: paperclip-evals
-description: Choose, inspect, validate, and report Paperclip Runner or Product E2E evaluations while preserving evidence, provenance, cost, and failure classification.
+description: 执行、检查与汇报 Paperclip Runner 协议或全栈产品级 E2E 评测。适用于接到「跑评测」「执行评估流水线」「检查评测报告」「评测失败分类」时启用。
 ---
 
 # Paperclip evals

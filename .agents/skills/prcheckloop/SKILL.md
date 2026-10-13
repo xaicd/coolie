@@ -1,9 +1,6 @@
 ---
 name: prcheckloop
-description: >
-  Iterate on a GitHub PR until latest-head checks are green or a precise blocker
-  is named. Use when a PR still has failing or pending checks after review fixes,
-  including after greploop.
+description: 循环修复并驱动 GitHub PR 最新提交的所有 CI/门禁检查全部变绿。适用于接到「把CI跑通」「解决PR检查失败」「修复Github Actions报错」时启用。
 ---
 
 # PRCheckloop

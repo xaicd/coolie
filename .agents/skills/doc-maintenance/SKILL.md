@@ -1,9 +1,6 @@
 ---
 name: doc-maintenance
-description: >
-  Audit README, SPEC, and PRODUCT docs against recent git history for drift and
-  make minimal PR-ready edits. Use when asked to review docs for accuracy, after
-  major feature merges, or on a schedule.
+description: 对照近期 Git 提交历史审计 README、SPEC 与架构文档防漂移。适用于接到「核对文档」「更新README」「修复文档与代码不一致」「文档维护」时启用。
 ---
 
 # Doc Maintenance Skill

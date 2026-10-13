@@ -1,6 +1,6 @@
 ---
 name: docx
-description: "Create, read, edit, and convert Word documents (.docx). Use when the user wants docx output, extraction, or template-driven generation."
+description: 创建、读取、编辑与转换 Word 文档 (.docx)。适用于接到「生成Word」「编辑docx」「解析合同文档」「导出Word报告」时启用。
 license: Proprietary. LICENSE.txt has complete terms
 ---
 

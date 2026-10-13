@@ -1,9 +1,6 @@
 ---
 name: pr-report
-description: >
-  Produce a maintainer-grade PR or contribution report as HTML or Markdown. Use
-  when asked to deeply review a PR, explain a design, compare systems, or prepare
-  a merge recommendation.
+description: 生成维护者级别的 PR 深度审查报告与系统架构对比报告。适用于接到「深度评审PR」「生成PR审查报告」「评估架构方案差异」时启用。
 ---
 
 # PR Report Skill

@@ -1,6 +1,6 @@
 ---
 name: prepare-paperclip-pr
-description: Prepare a Paperclip branch for PR with commits, template body, and checks.
+description: 按 Paperclip 规范准备 PR 分支、模板内容与本地检查。适用于接到「准备提PR」「按模板规范创建PR」「整理提交清单准备提单」时启用。
 ---
 # Prepare Paperclip PR
 

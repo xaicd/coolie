@@ -1,9 +1,6 @@
 ---
 name: paperclip-create-plugin
-description: >
-  Create and develop external Paperclip plugins with the CLI-first workflow. Use
-  when scaffolding a plugin, iterating on a local plugin, installing it into
-  Paperclip, or updating plugin authoring docs.
+description: 使用 CLI 脚手架创建与开发 Paperclip 外部插件。适用于接到「开发Paperclip插件」「写外部扩展包」「安装本地插件」「插件脚手架」时启用。
 ---
 
 # Create and develop a Paperclip plugin

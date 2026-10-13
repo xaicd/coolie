@@ -1,6 +1,6 @@
 ---
 name: yudao-local-stack
-description: Yudao-Quad-Terminal 本地轻量化容器与开发环境一键自闭环指南。指导数字员工熟练运用 docker-compose.local.yml 与 scripts/start-local-stack.sh 秒级拉起 Alpine Redis 与预置初始化 SQL 的轻量 MySQL 8.0 实例，消除手动搭建中间件的繁重负担，实现与 ruoyi-all-next 等价的开箱即跑体验。
+description: Yudao 轻量化本地开发容器一键自闭环 (Docker MySQL/Redis 秒级拉起)。适用于接到「起本地数据库」「一键拉起Redis」「初始化本地开发环境」「本地中间件排障」时启用。
 ---
 
 # Yudao-Local-Stack 本地容器与零配置自闭环深度研发指南

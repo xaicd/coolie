@@ -1,6 +1,6 @@
 ---
 name: yudao-miniapp-dev
-description: Yudao-Mall-UniApp 微信小程序与移动端深度研发法典。指导数字员工遵循 Uni-App Vue 3 标准规范、微信静默授权登录 (wx.login)、双 Token 自动无感刷新机制、微信支付与退款流转闭环、分包加载 (subPackages) 规避 2MB 限制、以及 iPhone 底部安全区适配规范。
+description: Yudao-Mall-UniApp 微信小程序与移动端深度研发法典 (Vue 3/Uni-App)。适用于接到「开发微信小程序」「微信授权与支付」「分包优化规避2MB」「底部安全区适配」时启用。
 ---
 
 # Yudao-Mall-UniApp 微信小程序深度研发法典

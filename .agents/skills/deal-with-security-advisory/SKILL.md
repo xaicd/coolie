@@ -1,9 +1,6 @@
 ---
 name: deal-with-security-advisory
-description: >
-  Handle confidential GitHub Security Advisory response for Paperclip. Use when
-  coordinating advisory triage, private-fork fixes, CVE/publication steps, and
-  immediate security releases.
+description: 处理 Paperclip 紧急安全漏洞与 GitHub 安全通告响应 (CVE/热修复/私有分支补丁)。适用于接到「修复安全漏洞」「处理CVE漏洞」「紧急安全发版」时启用。
 ---
 
 # Security Vulnerability Response Instructions

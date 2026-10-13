@@ -1,10 +1,6 @@
 ---
 name: create-paperclip-bundled-skill
-description: >
-  Turn an idea, tweet, or task into a skill in the Paperclip skills catalog
-  (packages/skills-catalog). Use when asked to FIND or MAKE a skill and publish
-  it as a bundled/optional catalog skill: research prior art, reference or
-  author it, add examples, regenerate the manifest, open a PR.
+description: 将功能点或想法打包发布为 Paperclip 官方技能目录内置技能。适用于接到「发布内置技能」「做个官方Skill」「制作技能包并上架目录」时启用。
 ---
 
 # Create a Paperclip Bundled Skill

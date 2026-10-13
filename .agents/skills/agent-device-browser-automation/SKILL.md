@@ -1,6 +1,6 @@
 ---
 name: agent-device-browser-automation
-description: 驱动 agent-device (移动真机/模拟器) 与 agent-browser (Web/H5 浏览器) 执行端到端自动化测试、四态与物理遮挡验收走查 (G4/G5 门禁)、以及生产常态化运营巡检的权威技能。覆盖 Playbook 编排、MCP 桥接、多模态真机截图存证与打假治理。
+description: 驱动移动真机/模拟器 (agent-device) 与 Web 浏览器 (agent-browser) 执行 E2E 自动化走查与四态截图存证。适用于接到「真机走查」「跑UI自动化」「移动端截图」「检查页面白屏」「测试多视口适配」时启用。
 ---
 
 # Agent-Device & Agent-Browser 自动化测试、真实验收与运营法典

@@ -1,6 +1,6 @@
 ---
 name: cmmi-car-spc-metrics
-description: CMMI 5 高成熟度统计过程控制与缺陷预防 (QPM/CAR/OPM) 核心技能。实施任务耗时与缺陷率的 SPC 控制图监控，通过 5-Why 鱼骨图深入溯源缺陷根本原因并自动化固化为防退化用例，实现工程质量持续闭环优化。
+description: CMMI 5 高成熟度统计过程控制与缺陷根本原因分析 (QPM/CAR)。适用于接到「做事故复盘」「分析缺陷根因」「SPC控制图度量」「5Whys溯源」「防退化固化」时启用。
 ---
 
 # CMMI 5 统计过程控制与因果缺陷预防 (QPM / CAR)

@@ -1,6 +1,6 @@
 ---
 name: yudao-cmmi-gatekeeper
-description: Yudao-Quad-Terminal CMMI 01~09 全生命周期质量门禁与变异测试打假守卫。指导数字员工 (DS 百晓生 / SRE 兜底渊) 驱动 workflow-engine.cjs 严格校验 G1 需求、G2 架构、G3 契约、G4 四态真机快照与 G5 投产回滚预案，落实 No Artifact, No Done 铁律。
+description: Yudao 四位一体 CMMI 01~09 全生命周期质量门禁与变异测试打假守卫。适用于接到「跑CMMI门禁」「G1-G5流水线检查」「变异测试打假」「验证交付物完整性」时启用。
 ---
 
 # Yudao-Quad-Terminal CMMI 质量门禁与测试打假守卫 (CMMI Gatekeeper Skill)

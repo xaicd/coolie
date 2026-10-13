@@ -1,6 +1,6 @@
 ---
 name: yudao-cloud-bootstrap
-description: Yudao-Cloud (芋道微服务底座) 自动化选型、JDK版本适配、多模块裁剪、三端多端模板装配与零报错编译启动运维指南。用于基于 Yudao-Cloud 快速启动新项目、按需裁剪业务模块、消除冗余依赖、对接微信生态与 CMMI 规范工程资产。
+description: Yudao-Cloud 芋道底座自动化选型、模块裁剪与脚手架极速派生指南。适用于接到「新建微服务工程」「裁剪无用业务模块」「搭建全新Java基座」「环境初始化」时启用。
 ---
 
 # Yudao-Cloud 工程基座选型、模块裁剪与多端装配指南 (Yudao-Cloud Bootstrap Skill)

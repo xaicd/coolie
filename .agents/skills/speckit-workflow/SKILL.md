@@ -1,6 +1,6 @@
 ---
 name: speckit-workflow
-description: Coolie Spec-Kit 规格驱动开发 (SDD) 全生命周期执行法典。涵盖初始化、宪法审查、特性与缺陷骨架创建、Markdown 规格编译、波次任务图拆解、1 Task = 1 Commit Git 核销、控制面双向同步以及 CMMI 01~09 过程资产健康门禁。
+description: Coolie Spec-Kit 规格驱动开发 (SDD) 全生命周期执行法典。适用于接到「SDD规格开发」「1Task=1Commit」「特性骨架拆解」「从Spec生成任务」「代码核销」时启用。
 ---
 
 # Coolie Spec-Kit SDD 全流程操作指南

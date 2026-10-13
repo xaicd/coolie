@@ -1,6 +1,6 @@
 ---
 name: add-runner-eval
-description: Add or extend a Paperclip Runner protocol evaluation definition, roster, assertion, or report fixture with provenance and narrow validation.
+description: 添加或扩展 Paperclip Runner 协议评测定义、花名册与断言夹具。适用于接到「增加协议评测」「Runner断言」「评测定义修改」「模型基准测试」时启用。
 ---
 
 # Add a Runner Eval

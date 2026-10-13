@@ -1,6 +1,6 @@
 ---
 name: garden-inbox
-description: Scan a Paperclip user's Mine inbox, classify reversible archive candidates, request checkbox confirmation, and archive only accepted selections. Use when asked to garden, clean up, prune, or tidy a Paperclip inbox without changing issues, branches, or workspaces.
+description: 扫描并整理用户的 Paperclip 收件箱 (Mine)，批量归档过期提醒。适用于接到「整理收件箱」「清理收件箱」「归档过期工单通知」「清理通知红点」时启用。
 ---
 
 # Garden Inbox

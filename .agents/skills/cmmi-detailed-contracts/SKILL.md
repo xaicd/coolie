@@ -1,6 +1,6 @@
 ---
 name: cmmi-detailed-contracts
-description: CMMI 3 详细设计与静态契约守卫 (TS/VER) 核心技能。固化系统详细设计说明书 (LLD)、统一 API 契约协议规范与单元验证计划，强制执行 0 编译报错与模块单向依赖，满足 G3 编译门禁。
+description: CMMI 3 详细设计与静态契约守卫 (LLD/TS/VER)。适用于接到「编译报错」「契约防漂移」「统一API接口规范」「写详细设计说明书」「接口防死穴」时启用。强制 0 编译报错。
 ---
 
 # CMMI 详细设计与静态契约守卫规范 (TS / VER)

@@ -1,6 +1,6 @@
 ---
 name: mobile-navigation-and-stack-audit
-description: Coolie 移动端无感就地导航、LIFO 调用栈完整性与防乱跳审计技能。用于排查或重构移动端页面跳转、修复实体跨 Tab 乱跳、保持调用方上下文不丢失、受控管理复合屏子 Tab 状态、以及使用 agent-device 驱动 Android/iOS 模拟器进行端到端点击快照审计。
+description: 移动端无感就地导航、LIFO 调用栈与防乱跳审计。适用于接到「修复返回键乱跳」「导航栈错乱」「子Tab丢失状态」「跨Tab跳页排查」「移动端路由混乱」时启用。
 ---
 
 # 移动端无感就地导航与调用栈完整性审计技能 (Mobile Navigation & Stack Audit)

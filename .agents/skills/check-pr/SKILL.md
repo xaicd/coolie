@@ -1,9 +1,6 @@
 ---
 name: check-pr
-description: >
-  Check a GitHub, GitLab, or Perforce PR/MR/CL for review comments, failing
-  checks, and PR-body gaps. Use when asked to inspect, fix, or prepare a change
-  for submission.
+description: 审查 GitHub/GitLab PR 状态、评审意见与失败检查。适用于接到「查PR」「检查PR状态」「修复CI报错」「审查合并请求」「提交前自查」时启用。
 license: MIT
 compatibility: Requires git and gh (GitHub CLI), glab (GitLab CLI), or p4 (Perforce CLI) installed and authenticated.
 metadata:

@@ -1,6 +1,6 @@
 ---
 name: yudao-contract-sync
-description: Yudao 跨端契约自动转译与 TypeScript 类型防漂移技能。用于将 Spring Boot / Knife4j 后端生成的 OpenAPI 规范自动化编译转译为前端强类型 TS SDK，并在三大终端 (Vue3 Admin / Uni-App 小程序 / Expo App) 间保持零漂移契约守卫。
+description: Yudao 跨端契约自动转译与 TypeScript 类型防漂移技能。适用于接到「同步前后端接口」「Java生成前端TS类型」「多端契约防漂移」「更新OpenAPI强类型SDK」时启用。
 ---
 
 # Yudao 跨端契约同步与类型防漂移深度研发法典

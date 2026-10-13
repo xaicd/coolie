@@ -1,6 +1,6 @@
 ---
 name: add-product-e2e-eval
-description: Add or extend a Paperclip full-stack runner E2E workflow, fixture, matcher, or report evidence path for local or Daytona execution.
+description: 扩展或添加 Paperclip 全栈端到端 E2E 评测流与凭据上报。适用于接到「E2E评测」「增加端到端测试用例」「全链路回归评测」「Daytona评测夹具」时启用。
 ---
 
 # Add a Product E2E Eval

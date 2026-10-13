@@ -1,6 +1,6 @@
 ---
 name: xlsx
-description: "Create, read, edit, and analyze Excel workbooks (.xlsx). Use whenever spreadsheets, formulas, or tabular data are involved."
+description: 创建、读取、编辑与分析 Excel 电子表格工作簿 (.xlsx)。适用于接到「导出Excel」「解析Excel表格」「处理对账单Excel」「生成统计报表」时启用。
 license: Proprietary. LICENSE.txt has complete terms
 ---
 

@@ -1,9 +1,6 @@
 ---
 name: diagnose-why-work-stopped
-description: >
-  Diagnose stalled, looping, or over-recovered Paperclip issue trees and propose
-  a no-code product-rule plan. Use when asked why work stopped, why it looped, or
-  how to prevent a tree from going too deep.
+description: 诊断工单停滞、死循环或异常递归恢复根因并给出产品治理方案。适用于接到「为什么停工了」「工单死循环了」「任务怎么卡住了」「树形任务失控」时启用。
 ---
 
 # Diagnose Why Work Stopped
