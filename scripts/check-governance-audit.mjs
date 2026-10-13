@@ -774,6 +774,25 @@ for (const check of collectServerI18nChecks()) {
   assertRule(check.name, check.ok, check.detail);
 }
 
+// -----------------------------------------------------------------------------
+// 22. 老板工具状态探测直通守卫 (COOA-160 · --probe-tool-status)
+// -----------------------------------------------------------------------------
+console.log('\n🩺 22. 老板 --probe-tool-status 工具池状态探测直通守卫 (COOA-160):');
+const teamStatusScriptContent = fs.readFileSync('scripts/cron-team-status.sh', 'utf8');
+const bossIntentContent = fs.readFileSync('scripts/hermes-boss-intent-dispatcher.sh', 'utf8');
+
+assertRule(
+  '工具探测子命令守卫: cron-team-status.sh 必须内建 --probe-tool-status 并复用 tool-health-monitor.sh',
+  teamStatusScriptContent.includes('--probe-tool-status') && teamStatusScriptContent.includes('tool-health-monitor.sh'),
+  'cron-team-status.sh 缺失 --probe-tool-status 子命令或未复用 tool-health-monitor.sh (重复造轮子/能力未打通)',
+);
+
+assertRule(
+  '老板直通派单守卫: hermes-boss-intent-dispatcher.sh 必须识别 --probe-tool-status 并直通探测 (杜绝误派编码任务)',
+  bossIntentContent.includes('--probe-tool-status') && bossIntentContent.includes('cron-team-status.sh'),
+  'hermes-boss-intent-dispatcher.sh 未识别 --probe-tool-status, 老板微信指令被误派为编码任务',
+);
+
 console.log('\n========================================================================');
 if (failed) {
   console.error('🚫 全面管局审计未通过！存在不符合高管治理规范的阻断项，请修复后重试。');

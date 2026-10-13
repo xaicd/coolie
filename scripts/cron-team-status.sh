@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/cron-team-status.sh [--dry-run | --register | --unregister | --print | --probe]
+# scripts/cron-team-status.sh [--dry-run | --register | --unregister | --print | --probe | --probe-tool-status]
 #
 # wave276 — 团队状态定时汇报 (老板原话 "定时回复的消息中要包含员工名,
 # 正在进行的任务, 多长时间, 使用什么工具"). 真值 = 5 字段表格 (员工 / 任务 /
@@ -90,6 +90,7 @@ wave276 — 团队状态定时汇报 (5 字段: 员工 / 任务 / 多长时间 /
   --register      注册 cron (idempotent, 每 30 分钟跑本脚本)
   --unregister    撤销 wave276-team-status cron 行
   --probe         wave279 — 真跑 OK 探测 (转调 daily-tool-probe.sh --print)
+  --probe-tool-status  wave286 — 老板直通: 强制真跑工具池健康探针并输出一屏状态 (转调 tool-health-monitor.sh)
   --help          帮助
 
 Env:
@@ -821,6 +822,25 @@ do_probe() {
   return "$rc"
 }
 
+# wave286 (COOA-160) — 老板原话 "--probe-tool-status" 直通子命令.
+# 强制刷新真实工具池健康探针 (绕过 15 分钟 TTL 缓存) 并输出一屏可读状态,
+# 复用 wave281 tool-health-monitor.sh (ACP 握手探针) 的现有能力, 不重复造轮子.
+do_probe_tool_status() {
+  local health_script="${REPO_ROOT}/scripts/tool-health-monitor.sh"
+  if [[ ! -x "$health_script" ]]; then
+    echo "❌ 找不到 $health_script" >&2
+    return 1
+  fi
+  echo "═══ wave286 老板直通 · 工具池状态探测 (--probe-tool-status) ═══"
+  # --check --force = 强制真跑探针 (不走缓存); 失败仅降级提示, 不阻断状态展示
+  if ! "$health_script" --check --force >/dev/null 2>&1; then
+    echo "⚠️  探针强制刷新未完全成功, 以下为最近一次落盘状态" >&2
+  fi
+  local rc=0
+  "$health_script" --print || rc=$?
+  return "$rc"
+}
+
 # ---------- 主入口 ----------
 
 ACTION="${1:-}"
@@ -854,6 +874,9 @@ case "$ACTION" in
     ;;
   --probe)
     do_probe
+    ;;
+  --probe-tool-status)
+    do_probe_tool_status
     ;;
   -h|--help|help)
     usage; exit 0

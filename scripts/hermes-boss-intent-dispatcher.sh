@@ -58,6 +58,14 @@ if [[ "$INPUT" =~ (待办|有哪些任务|任务列表|工单列表|未完成|�
   exec node "$SCRIPT_DIR/coolie-dev-task.mjs" list
 fi
 
+# 0.05 工具状态探测直通 (wave286 · 老板原话 "--probe-tool-status")
+# 老板微信直发该标志位 = 真跑工具池健康探针并回传一屏状态, 直通 cron-team-status.sh,
+# 严禁再误判为默认编码任务派给铁匠.
+if [[ "$INPUT" == "--probe-tool-status" || "$INPUT" == "--probe-tool" || "$INPUT" == "--probe-tools" || "$INPUT" == "--tool-status" ]]; then
+  echo "【Hermes 微信直通 · 工具池状态探测 (--probe-tool-status)】"
+  exec bash "$SCRIPT_DIR/cron-team-status.sh" --probe-tool-status
+fi
+
 # 0.1 模糊意图检测与 Echo 澄清追问门禁 (Palantir Echo Clarification Gate)
 if [[ "$INPUT" =~ ^(修一下|改改|改一下|看下|弄下|加个|处理下|搞一下|修|改|看)$ ]]; then
   cat <<EOF
