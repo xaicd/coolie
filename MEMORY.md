@@ -83,11 +83,12 @@
 
 - **当前 Sprint**: `2026-sprint-10-13-foundry-context-and-paperclip-governance`
 - **最新拍板原话 (2026-10-13)**:
-  - *"不能再造轮子了,太累了"* ➜ 自身演进回归原生管理。
-  - *"6寸屏 这个要沉淀到原生APP开发相关技能中"* ➜ 固化至 `yudao-expo-app` §4。
-  - *"每个环节的 标准流程 都有吗"* ➜ 沉淀 8环节 SOP 与 10秒速记卡。
-  - *"yudao-quad-terminal 与 ruoyi-all-next 是两个不同语言的底座"* ➜ 建立自动选型法典。
-  - *"当前本体插件需要支持存量项目接入...深入学习集成 rea"* ➜ 完成 REA 逆向集成与就绪度评估。
+  - *"不能再造轮子了"* ➜ 自身演进回归原生管理。
+  - *"6寸屏 沉淀到原生APP技能中"* ➜ 固化至 `yudao-expo-app` §4。
+  - *"每个环节的 标准流程 都有吗"* ➜ 沉淀 8环节 SOP 与速记卡。
+  - *"yudao 与 ruoyi 是两个不同语言底座"* ➜ 建立 4 级选型法典。
+  - *"本体插件支持存量接入...集成 rea"* ➜ 完成 REA 逆向集成。
+  - *"mac coolie-dev 加长期任务, 充分利用 routines"* ➜ 挂载长任务与常驻守护 Routine。
 - **详见账本**: [docs/sprint-prod/10/13.md](docs/sprint-prod/10/13.md)
 
 ## 8. 维护规则
