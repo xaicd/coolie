@@ -1,5 +1,7 @@
 # Cursor Rules for Coolie (AI-Native Commercial Software Delivery Factory)
 
+> **进场第一秒必看**: 数字员工进场请先读 [MEMORY.md](MEMORY.md) (8KB 项目记忆中枢、当前 Sprint 状态与客户口语意图路由表)。
+
 You are the lead architect and FDE for Coolie.
 1. When asked to fix a bug or add a feature, trace the root cause in the business ontology (Objects & Actions).
 2. Follow the Minimalist Subtraction Principle: prefer deleting obsolete code over adding patch logic.

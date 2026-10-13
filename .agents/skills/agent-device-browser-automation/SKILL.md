@@ -107,6 +107,26 @@ curl -fsS http://localhost:3100/api/health
   }, buttonSelector);
   expect(isOccluded).toBe(false); // 严禁被上层 Fixed 栏或浮窗遮挡
   ```
+- **移动 6 寸屏极限小视口防撑爆与状态栏防挡断言 (Mobile Viewports)**：
+  ```typescript
+  // 必须覆盖 320px~360px 极限小屏真机视口走查
+  const testViewports = [
+    { width: 332, height: 720 }, // 极限小屏 Android
+    { width: 375, height: 667 }, // iPhone SE
+    { width: 393, height: 852 }, // 现代灵动岛全面屏
+  ];
+  for (const vp of testViewports) {
+    await page.setViewportSize(vp);
+    // 断言页面横向无溢出撑爆
+    const scrollWidth = await page.evaluate(() => document.documentElement.scrollWidth);
+    expect(scrollWidth).toBeLessThanOrEqual(vp.width);
+    // 断言顶部关闭按钮/Header 不与状态栏刘海 (0-44px) 盲目重合
+    const headerRect = await page.locator('[data-testid="screen-header"]').boundingBox();
+    if (headerRect) {
+      expect(headerRect.y).toBeGreaterThanOrEqual(0);
+    }
+  }
+  ```
 
 ### 第三步：多模态截图与不可变工件存证 (Evidence Artifacts)
 - **真机截屏规范**：

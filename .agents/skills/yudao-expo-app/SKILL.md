@@ -250,3 +250,31 @@ bash scripts/VERSION-CONSISTENCY-CHECK.sh
 - `ui/dist/version.json`
 - `docs/07_release/release-notes.md`
 - Git Tag (如 `v1.0.0`)
+
+---
+
+## §4 6寸屏与极限物理视口自适应法典 (Anti-Overflow & Safe-Area)
+
+> **商业级交付教训 (源自文旅真机事故实战)**：  
+> 移动端许多严重缺陷（如二维码弹窗撑爆、关闭按钮被刘海遮挡、手势条截断保存按钮、跨路由跳转假 4xx）在 PC 浏览器和大屏测试中往往完全隐形，只有在真实 6 寸小屏（如物理 viewport 320px~360px）和真机状态栏下才会暴露。
+
+### 1. 极限小屏视口防撑爆规范 (Viewport 320px~360px)
+- **致命陷阱**：在 Dialog、Modal 或 Card 组件中写死宽度（如 `width: 384` 或 Tailwind `w-96` / `min-w-[360px]`）。在 iPhone SE 或小屏 Android 设备（物理视口宽度仅 320px~332px 时），容器直接超出屏幕边界，产生横向滚动条或右侧按钮被物理截断；
+- **标准约束**：
+  - **弹性宽度**：弹窗与浮层必须使用百分比或视口减边距：`width: 'calc(100vw - 32px)'`，同时配合 `maxWidth: 384`（小屏不撑爆，大屏不过宽）；
+  - **高度收敛与内滚动**：所有浮层与详情卡片必须设置 `maxHeight: '85vh'`，且内容包裹在 `ScrollView` 中，并配置 `keyboardShouldPersistTaps="handled"`，防止软键盘弹出或内容溢出造成死页面；
+  - **Flex-1 真正居中平铺**：核心元素（如二维码、图表、核销码）严禁绝对像素写死居中，必须使用 `flex-1 min-h-0 justify-center items-center`，确保自适应所有 DPI 屏幕。
+
+### 2. Safe-Area 独立归属与物理防遮挡铁律
+- **顶部刘海 / 灵动岛 / 状态栏遮挡 (Top Inset)**：
+  - 沉浸式弹窗、全屏 Modal 或自定义导航栏，**必须强制引入 `useSafeAreaInsets()`**；
+  - 顶部外边距/内边距必须采用动态最大值：`paddingTop: Math.max(insets.top, 16)`；
+  - **严禁**将标题栏或关闭“✕”按钮写死贴顶（如 `top: 10`），否则在真机上会被前置摄像头或系统状态栏图标完全遮挡，造成无法关闭的死穴交互。
+- **底部全面屏手势条防截断 (Bottom Inset)**：
+  - 底部操作栏（如“立即支付”、“保存凭证”）必须附加 `paddingBottom: Math.max(insets.bottom, 16)`；
+  - 在黄金 5 槽位全局底栏存在时，上层弹窗与浮层必须设置遮罩 `zIndex: 9999` 并采用全屏就地覆盖，严禁浮层底部与全局底栏物理重叠打架。
+
+### 3. 前端跨顶级隔离域防假 4xx 守卫 (Link vs <a>)
+- **致命陷阱**：在混合端（Expo Web / Next.js C端）中，如果跨顶级隔离域（例如从 C端用户中心跳往 `/admin/login` 或 `/merchant-console/login`）使用了客户端软路由组件（如 `<Link href="...">`）；
+- **根因**：前端框架会在视口可见时**自动触发路由 Prefetch（预加载）**，而管理端或商户端接口在未登录状态下会直接返回 401/403/404，导致控制台与网络监控中产生大量未登录的假 4xx 告警；
+- **标准约束**：**跨顶级系统或跨鉴权域跳转必须使用物理超链接 `<a>`，严禁使用框架内部的软路由 `<Link>`！** 只有同系统内部无需鉴权切换的页面跳转才允许使用软路由组件。

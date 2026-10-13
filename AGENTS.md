@@ -1,5 +1,7 @@
 # AGENTS.md
 
+> **项目最高记忆中枢与意图路由**: 数字员工进场请先读 [MEMORY.md](MEMORY.md) (8KB 极简全景、当前 Sprint 状态与客户口语意图路由表)。
+
 Guidance for human and AI contributors working in this repository.
 
 ## 1. Purpose

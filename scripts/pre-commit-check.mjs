@@ -97,6 +97,8 @@ const ALLOWED_ROOT_FILES = new Set([
   'tsconfig.base.json',
   'tsconfig.json',
   'version.json',
+  'MEMORY.md',
+  'CLAUDE.md',
   'vitest.config.ts',
   '.cursorrules',
   '.gitignore',
@@ -129,6 +131,18 @@ if (illegalRootItems.length > 0) {
   hasError = true;
 } else {
   console.log('  ✅ [PASS] 根目录骨架与顶级目录 100% 符合白名单规范');
+}
+
+// 1.0.1 MEMORY.md 进场首屏硬门禁 (≤ 8KB)
+if (fs.existsSync('MEMORY.md')) {
+  const memoryStat = fs.statSync('MEMORY.md');
+  if (memoryStat.size > 8192) {
+    console.error(`  ❌ [FAIL] MEMORY.md 体积超标 (${memoryStat.size} 字节 > 8192 字节 8KB 门禁)！`);
+    console.error('     ↳ 铁律: MEMORY.md 专事极简进场首屏与意图路由，必须 ≤ 8KB，详细规范请外链！');
+    hasError = true;
+  } else {
+    console.log(`  ✅ [PASS] MEMORY.md 进场首屏体积合格 (${memoryStat.size} 字节 ≤ 8KB)`);
+  }
 }
 
 // 1.1 严禁在根目录新增未授权商业交付项目 (公理五)
