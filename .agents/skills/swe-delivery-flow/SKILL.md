@@ -79,6 +79,8 @@ GIT_SSH_COMMAND='ssh -o ProxyCommand=none' git push origin main
 6. 密码进 transcript → 用环境变量/secret 注入，泄露即轮换。
 7. 别人的 WIP 不能动、不能提交。
 8. **无产物点 Done** → 严重违纪，触发治理门禁审计拦截。
+9. **`git stash` 掩埋未提交代码假完工** → 严禁把前置任务或未提交代码 stash 进堆栈以逃避编译检查；严禁代码压在 stash 栈底时向控制面标记 done。工单结项必须代码落库、工作区 clean。
+10. **同步死等耗时构建导致超时崩溃** → 严禁使用带短超时的同步 REPL (如 execute_code 300s) 死等超过 1 分钟的重型构建或测试；必须重定向后台日志并首秒透出心跳回执。
 
 ## 验收标准
 
@@ -88,6 +90,7 @@ GIT_SSH_COMMAND='ssh -o ProxyCommand=none' git push origin main
 4. commit 只含白名单文件，信息说清因果与验证。
 5. 有状态特性做了写入-回读实证。
 6. **必须挂载物理 Work Product (No Artifact, No Done)**，无不可变实体产物禁止关闭工单。
+7. **工作区洁净性验证 (Clean Working Tree)**：特性交付后工作区必须处于 0 dirty、0 untracked 状态，严禁遗留未入库代码。
 
 ## 反例
 
@@ -95,6 +98,8 @@ GIT_SSH_COMMAND='ssh -o ProxyCommand=none' git push origin main
 - 一个 commit 大扫除。
 - 单测绿就宣布能用。
 - 无 Work Product 挂载直接关闭工单。
+- 将同伴未提交代码 stash 起来逃避类型检查后强行结项（假完工）。
+- 在会话中同步死等 10 分钟 Docker 构建导致界面假死超时。
 
 ## 关联
 

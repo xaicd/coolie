@@ -272,6 +272,8 @@ A change is done when all are true:
    - 完工状态由控制面工件总线提供的实质性资产凭证作为唯一认证依据 (No Artifact, No Done)。
 4. **双轨交付映射模型**：控制面第一方真资产（`documents`/`issue_work_products`/`attachments`）与工作区本地代码文件（`metadata.resourceRef.kind: "workspace_file"`）协同归属。详见 `.agents/rules/CMMI-SPEC-FIRST-ARTIFACTS.md`。
 5. **发版 7 处版本一致性**：发版打 tag 统一指向发版 commit，7 处版本号源（app.json, package.json, build.gradle, CHANGELOG, version.json, manifest, git tag）保持严格一致（`bash scripts/VERSION-CONSISTENCY-CHECK.sh`）。
+6. **物理交付硬门禁：1 Task = 1 Commit & Clean Working Tree (严禁 git stash 掩埋假完工)**：工单标为 `done` 时必须物理绑定已推送到远端的有效 Git Commit SHA；工作树必须 0 dirty、0 untracked；严禁把未完工或同伴代码推入 `git stash` 堆栈以换取构建通过和虚假结项，根除代码悬空沉没。
+7. **全语法意图进厂与长任务非阻塞心跳 (Intent-to-Task & Anti-Freeze Protocol)**：前线进厂无缝覆盖祈使动作句、陈述约束句与否定纠错句，任何业务变更意图第一步必须通过控制面原生 MCP (`mcp__coolie__paperclipCreateIssue`) 正式立项排期，严禁脱幅私跑代码或口头无痕挂起；耗时超过 60 秒的重型任务（Docker build/全量测试）强制后台化并在 1 秒内发出预估耗时心跳，杜绝会话假死。
 
 ### 公理五：项目目录结构规范与开源基座自适应物理归宿铁律 (Directory Structure & Monorepo)
 1. **Paperclip 平台本体仓库目录标准 (Platform Repo Standard)**：
