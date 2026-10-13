@@ -4034,6 +4034,7 @@ export function createAcpxEngineExecutor(deps: AcpxEngineExecutorOptions = {}) {
       let processIdentitySink!: AcpxProcessIdentitySink;
       let resumedSession = false;
       let clearSession = false;
+      let sessionClearedForRetry = false;
       let referencedProjectStagingFailuresField:
         | { referencedProjectStagingFailures: Array<{ projectId: string; error: string }> }
         | Record<string, never> = {};
@@ -4223,6 +4224,7 @@ export function createAcpxEngineExecutor(deps: AcpxEngineExecutorOptions = {}) {
         const persistedRuntimeStore = createRuntimeStore({ stateDir: prepared.stateDir });
         const runtimeStore: AcpSessionStore = {
           async load(id) {
+            if (sessionClearedForRetry) return undefined;
             const record = await persistedRuntimeStore.load(id);
             if (!record) return undefined;
             // ACPX resumes from the stored session options rather than the
@@ -4406,6 +4408,7 @@ export function createAcpxEngineExecutor(deps: AcpxEngineExecutorOptions = {}) {
               if (!resumeSessionId || !isResumeFailure(err)) throw err;
               clearSession = true;
               resumedSession = false;
+              sessionClearedForRetry = true;
               await ctx.onLog(
                 "stdout",
                 `[paperclip] ACPX resume session "${resumeSessionId}" is unavailable; retrying with a fresh session.\n`,
