@@ -57,6 +57,8 @@ diagnostics/
 *.tmp
 .vscode/
 .claude/settings.local.json
+.claude/*.md
+.paperclip-scratch/
 .paperclip-local/
 .coolie-local/
 .paperclip-runtime/
