@@ -18,4 +18,11 @@ describe("work mode metadata", () => {
     expect(titleForPendingWorkMode("standard")).toBe("Auto mode for this submission. Click to change.");
     expect(titleForPendingWorkMode("planning")).toBe("Plan mode is on for this submission. Click to change.");
   });
+
+  it("supports Chinese localization for labels and tooltips", () => {
+    expect(workModeMetaList("zh-CN").map((mode) => mode.label)).toEqual(["自动", "规划", "询问"]);
+    expect(titleForPendingWorkMode("standard", "zh-CN")).toBe("当前为自动模式。点击切换。");
+    expect(titleForPendingWorkMode("planning", "zh-CN")).toBe("当前为规划模式。点击切换。负责人将先行拟定方案草案。");
+    expect(titleForPendingWorkMode("ask", "zh-CN")).toBe("当前为询问模式。点击切换。负责人仅在此线程中答复，不执行代码或任务变更。");
+  });
 });

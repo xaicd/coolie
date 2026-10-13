@@ -9,6 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import { cn } from "@/lib/utils";
+import { useTranslation } from "@/i18n";
 import { useComposerStop } from "@/hooks/useComposerStop";
 import { useStreamlinedTaskChatPresentation } from "./presentation-mode";
 import {
@@ -301,8 +302,30 @@ const MODE_DESCRIPTION: Partial<Record<IssueWorkMode, string>> = {
   ask: "Answer questions only, no changes",
 };
 
+const MODE_DESCRIPTION_ZH: Partial<Record<IssueWorkMode, string>> = {
+  standard: "执行变更与施工任务",
+  planning: "实施前拟定规划方案",
+  ask: "仅解答提问，不变更代码",
+};
+
 /** v7 per-mode placeholder copy; `{agent}` is the pending assignee's name. */
-function modePlaceholder(mode: IssueWorkMode, agentName: string, mobile: boolean): string {
+function modePlaceholder(mode: IssueWorkMode, agentName: string, mobile: boolean, isZh?: boolean): string {
+  if (isZh) {
+    const displayAgent = agentName === "the agent" || agentName === "Unassigned" ? "数字员工" : agentName;
+    if (mobile) {
+      if (mode === "planning") return `与 ${displayAgent} 一起规划…`;
+      if (mode === "ask") return `向 ${displayAgent} 提问…`;
+      return `给 ${displayAgent} 发送消息…`;
+    }
+    switch (mode) {
+      case "planning":
+        return `与 ${displayAgent} 规划 — 仅拟定方案草案，不修改代码…`;
+      case "ask":
+        return `向 ${displayAgent} 提问 — 仅解答疑问，不执行任务…`;
+      default:
+        return `给 ${displayAgent} 派发任务，输入 @ 提及员工…`;
+    }
+  }
   if (mobile) {
     if (mode === "planning") return `Plan with ${agentName}…`;
     if (mode === "ask") return `Ask ${agentName}…`;
@@ -620,7 +643,11 @@ export function TaskChatComposer({
     return () => window.removeEventListener("beforeunload", flushDraft);
   }, [draftKey]);
 
-  const modeMeta = workModeMetaFor(pendingMode);
+  const { i18n } = useTranslation();
+  const currentLocale = i18n?.language ?? "en";
+  const isZh = currentLocale.toLowerCase().startsWith("zh");
+
+  const modeMeta = workModeMetaFor(pendingMode, currentLocale);
   const canAcceptFiles =
     !pause &&
     !queuedEdit &&
@@ -630,28 +657,29 @@ export function TaskChatComposer({
     enableReassign && reassignOptions && reassignOptions.length > 0,
   );
   const assigneeValue = pendingAssignee ?? currentAssigneeValue;
+  const unassignedLabel = isZh ? "未指派" : "Unassigned";
   const assigneeLabel =
-    reassignOptions?.find((o) => o.id === assigneeValue)?.label ?? "Unassigned";
+    reassignOptions?.find((o) => o.id === assigneeValue)?.label ?? unassignedLabel;
   const assigneeName =
-    assigneeLabel === "Unassigned" ? "the agent" : assigneeLabel;
+    assigneeLabel === unassignedLabel ? (isZh ? "数字员工" : "the agent") : assigneeLabel;
   const effectivePlaceholder = queuedEdit
-    ? "Edit queued message…"
-    : (placeholder ?? modePlaceholder(pendingMode, assigneeName, mobile));
+    ? (isZh ? "编辑排队消息…" : "Edit queued message…")
+    : (placeholder ?? modePlaceholder(pendingMode, assigneeName, mobile, isZh));
   const goalUnavailable = runnerGoalCapability?.availability !== "available";
   const goalCommandOption: ActionCommandOption = {
     id: "action:goal",
     kind: "action",
     command: "goal",
-    name: "Goal",
+    name: isZh ? "目标主线" : "Goal",
     description:
       !runnerGoalCapability || runnerGoalCapability.verified === false
-        ? "Support will be verified when the session starts."
-        : "Pursue work across turns.",
-    aliases: ["goal", "pursue", "continue"],
+        ? (isZh ? "将在会话启动时校验支持情况。" : "Support will be verified when the session starts.")
+        : (isZh ? "跨轮次持续推进工作。" : "Pursue work across turns."),
+    aliases: ["goal", "pursue", "continue", "目标"],
     disabled: goalUnavailable && runnerGoalCapability !== null,
     disabledReason:
       runnerGoalCapability?.reason ??
-      "Session goals are unsupported by this agent.",
+      (isZh ? "该员工暂不支持会话目标。" : "Session goals are unsupported by this agent."),
   };
 
   function updatePendingAssignee(value: string | null) {
@@ -1291,17 +1319,17 @@ export function TaskChatComposer({
             >
               <CircleHelp className="h-4 w-4 shrink-0" aria-hidden />
               <span className="min-w-0 flex-1 truncate">
-                {pendingTakeover?.label ?? takeover?.label ?? "Pending input"}
+                {pendingTakeover?.label ?? takeover?.label ?? (isZh ? "待处理输入" : "Pending input")}
               </span>
               <span className="shrink-0 font-medium">
-                {pendingTakeover?.count ?? takeover?.pendingCount ?? 1} pending
+                {pendingTakeover?.count ?? takeover?.pendingCount ?? 1} {isZh ? "项待处理" : "pending"}
               </span>
             </button>
           ) : null}
           {pause && conversationMode ? (
             <div className="space-y-2">
               <TaskChatPausedTakeover {...pause} hasDraft={Boolean(body.trim() || attachments.length)} />
-              <p className="text-xs text-muted-foreground">Send /new to start a fresh session and resume this conversation.</p>
+              <p className="text-xs text-muted-foreground">{isZh ? "发送 /new 开启全新会话并恢复当前讨论。" : "Send /new to start a fresh session and resume this conversation."}</p>
             </div>
           ) : null}
           <div data-testid="task-chat-composer-input">
@@ -1311,14 +1339,14 @@ export function TaskChatComposer({
               onChange={changeBody}
               placeholder={
                 disabled
-                  ? (disabledReason ?? "Composer disabled")
+                  ? (disabledReason ?? (isZh ? "输入已禁用" : "Composer disabled"))
                   : effectivePlaceholder
               }
               readOnly={disabled || !!uncertainSubmission}
               mentions={mentions}
               actionCommands={conversationMode ? [{
-                id: "action:new", kind: "action", command: "new", name: "New session",
-                description: "Start fresh context here, preserving conversation history.", aliases: ["new"],
+                id: "action:new", kind: "action", command: "new", name: isZh ? "全新会话" : "New session",
+                description: isZh ? "在此开启全新上下文，并保留历史会话。" : "Start fresh context here, preserving conversation history.", aliases: ["new"],
                 disabled,
               }] : [goalCommandOption]}
               onSubmit={() => void submit()}
@@ -1423,8 +1451,8 @@ export function TaskChatComposer({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={disabled}
-                  title="Attach file"
-                  aria-label="Attach file"
+                  title={isZh ? "添加附件" : "Attach file"}
+                  aria-label={isZh ? "添加附件" : "Attach file"}
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
                   data-testid="task-chat-composer-attach"
                 >
@@ -1436,8 +1464,8 @@ export function TaskChatComposer({
             {queuedEdit ? (
               <span className="px-1 text-xs font-medium text-muted-foreground">
                 {queuedEdit.stale
-                  ? "Queued message changed"
-                  : "Editing queued message"}
+                  ? (isZh ? "排队消息已变更" : "Queued message changed")
+                  : (isZh ? "正在编辑排队消息" : "Editing queued message")}
               </span>
             ) : (
               <DropdownMenu>
@@ -1466,9 +1494,10 @@ export function TaskChatComposer({
                   className="flex w-(--sz-300px) flex-col gap-0.5"
                   data-testid="task-chat-composer-mode-menu"
                 >
-                  {workModeMetaList().map((m) => {
+                  {workModeMetaList(currentLocale).map((m) => {
                     const Icon = m.icon;
                     const selected = m.value === pendingMode;
+                    const desc = (isZh ? MODE_DESCRIPTION_ZH[m.value] : MODE_DESCRIPTION[m.value]) ?? "";
                     return (
                       <DropdownMenuItem
                         key={m.value}
@@ -1489,7 +1518,7 @@ export function TaskChatComposer({
                         <span className="flex min-w-0 flex-1 flex-col">
                           <span className="font-medium">{m.label}</span>
                           <span className="whitespace-nowrap text-xs text-muted-foreground">
-                            {MODE_DESCRIPTION[m.value] ?? ""}
+                            {desc}
                           </span>
                         </span>
                         {selected ? (
@@ -1508,10 +1537,10 @@ export function TaskChatComposer({
               <InlineEntitySelector
                 value={assigneeValue}
                 options={reassignOptions ?? []}
-                placeholder="Assignee"
-                noneLabel="No assignee"
-                searchPlaceholder="Search assignees…"
-                emptyMessage="No matches."
+                placeholder={isZh ? "负责人" : "Assignee"}
+                noneLabel={isZh ? "未指派" : "No assignee"}
+                searchPlaceholder={isZh ? "搜索负责人…" : "Search assignees…"}
+                emptyMessage={isZh ? "无匹配项" : "No matches."}
                 onChange={updatePendingAssignee}
                 disabled={disabled}
                 triggerTestId="task-chat-composer-assignee"
@@ -1558,7 +1587,7 @@ export function TaskChatComposer({
                 disabled={submitting}
                 className="h-8 shrink-0 rounded-md px-2.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:opacity-50"
               >
-                Cancel
+                {isZh ? "取消" : "Cancel"}
               </button>
             ) : null}
 
@@ -1579,28 +1608,28 @@ export function TaskChatComposer({
               title={
                 showStop
                   ? stopControl.stopping
-                    ? "Stopping…"
-                    : "Stop response"
+                    ? (isZh ? "正在停止…" : "Stopping…")
+                    : (isZh ? "停止响应" : "Stop response")
                   : queuedEdit
                     ? queuedEdit.stale
-                      ? "Queue as new message"
-                      : "Save queued message"
+                      ? (isZh ? "作为新消息排队" : "Queue as new message")
+                      : (isZh ? "保存排队消息" : "Save queued message")
                     : uploadPending
-                      ? "Waiting for upload to finish"
+                      ? (isZh ? "正在等待附件上传完成" : "Waiting for upload to finish")
                       : uploadFailed
-                        ? "Remove the failed attachment to send"
-                        : "Send (⌘+Enter)"
+                        ? (isZh ? "请移除失败附件后发送" : "Remove the failed attachment to send")
+                        : (isZh ? "发送 (⌘+Enter)" : "Send (⌘+Enter)")
               }
               aria-label={
                 showStop
                   ? stopControl.stopping
-                    ? "Stopping…"
-                    : "Stop"
+                    ? (isZh ? "正在停止…" : "Stopping…")
+                    : (isZh ? "停止" : "Stop")
                   : queuedEdit
                     ? queuedEdit.stale
-                      ? "Queue as new message"
-                      : "Save queued message"
-                    : "Send"
+                      ? (isZh ? "作为新消息排队" : "Queue as new message")
+                      : (isZh ? "保存排队消息" : "Save queued message")
+                    : (isZh ? "发送" : "Send")
               }
               className={cn(
                 "flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-transform hover:scale-105 disabled:scale-100",

@@ -41,25 +41,35 @@ export function isIssueWorkMode(value: unknown): value is IssueWorkMode {
   return value === "standard" || value === "ask" || value === "planning";
 }
 
-export function workModeMetaList(): WorkModeMeta[] {
+function resolveIsZh(locale?: string): boolean {
+  if (locale) return locale.toLowerCase().startsWith("zh");
+  if (typeof window !== "undefined" && typeof localStorage !== "undefined") {
+    const stored = localStorage.getItem("coolie.locale");
+    if (stored) return stored.toLowerCase().startsWith("zh");
+  }
+  return false;
+}
+
+export function workModeMetaList(locale?: string): WorkModeMeta[] {
+  const isZh = resolveIsZh(locale);
   return [
     {
       value: "standard",
-      label: "Auto mode",
+      label: isZh ? "自动" : "Auto mode",
       icon: Hammer,
       tone: "neutral",
       classes: STANDARD_CLASSES,
     },
     {
       value: "planning",
-      label: "Plan mode",
+      label: isZh ? "规划" : "Plan mode",
       icon: ClipboardList,
       tone: "planning",
       classes: PLANNING_CLASSES,
     },
     {
       value: "ask",
-      label: "Ask mode",
+      label: isZh ? "询问" : "Ask mode",
       icon: MessageCircleQuestion,
       tone: "ask",
       classes: ASK_CLASSES,
@@ -67,18 +77,28 @@ export function workModeMetaList(): WorkModeMeta[] {
   ];
 }
 
-export function workModeMetaFor(mode: IssueWorkMode): WorkModeMeta {
-  const modes = workModeMetaList();
+export function workModeMetaFor(mode: IssueWorkMode, locale?: string): WorkModeMeta {
+  const modes = workModeMetaList(locale);
   return modes.find((meta) => meta.value === mode) ?? modes[0]!;
 }
 
-export function nextWorkMode(mode: IssueWorkMode): IssueWorkMode {
-  const modes = workModeMetaList();
+export function nextWorkMode(mode: IssueWorkMode, locale?: string): IssueWorkMode {
+  const modes = workModeMetaList(locale);
   const index = modes.findIndex((meta) => meta.value === mode);
   return modes[(index + 1) % modes.length]?.value ?? "standard";
 }
 
-export function titleForPendingWorkMode(mode: IssueWorkMode): string {
+export function titleForPendingWorkMode(mode: IssueWorkMode, locale?: string): string {
+  const isZh = resolveIsZh(locale);
+  if (isZh) {
+    if (mode === "ask") {
+      return "当前为询问模式。点击切换。负责人仅在此线程中答复，不执行代码或任务变更。";
+    }
+    if (mode === "planning") {
+      return "当前为规划模式。点击切换。负责人将先行拟定方案草案。";
+    }
+    return "当前为自动模式。点击切换。";
+  }
   if (mode === "ask") {
     return "Ask mode for this submission. Click to change. The responsible will answer in this thread; no implementation work.";
   }
