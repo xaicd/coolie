@@ -715,8 +715,9 @@ export function ArtifactsScreen({
                 }
               }
               artifacts={artifacts.filter(
-                (a) => a.project?.id === selectedProjectId
+                (a) => !a.project || a.project.id === selectedProjectId
               )}
+              onResetProject={() => setSelectedProjectId(null)}
               onOpenFile={({ title, path, content, language, artifact }) => {
                 if (artifact) {
                   setPreviewArtifact(artifact);
@@ -781,31 +782,34 @@ export function ArtifactsScreen({
                   每个在制交付项目拥有完整的物理工程目录结构 (wiki · docs/specs · src · deploy)
                 </Text>
               </View>
-              {projects.map((p) => (
-                <Pressable
-                  key={p.id}
-                  style={styles.projectTreePickCard}
-                  onPress={() => setSelectedProjectId(p.id)}
-                >
-                  <View style={styles.projectTreePickTop}>
-                    <View style={styles.projectTreePickLeft}>
-                      <Text style={styles.projectTreePickIcon}>📦</Text>
-                      <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
-                        <Text style={styles.projectTreePickName} numberOfLines={1} ellipsizeMode="tail">
-                          {p.name}
-                        </Text>
-                        <Text style={styles.projectTreePickSub} numberOfLines={1} ellipsizeMode="tail">
-                          {p.description || "在制商业交付工程项目资产总线"}
-                        </Text>
+              {projects.map((p) => {
+                const count = artifacts.filter((a) => a.project?.id === p.id).length;
+                return (
+                  <Pressable
+                    key={p.id}
+                    style={styles.projectTreePickCard}
+                    onPress={() => setSelectedProjectId(p.id)}
+                  >
+                    <View style={styles.projectTreePickTop}>
+                      <View style={styles.projectTreePickLeft}>
+                        <Text style={styles.projectTreePickIcon}>📦</Text>
+                        <View style={{ flex: 1, minWidth: 0, marginRight: 8 }}>
+                          <Text style={styles.projectTreePickName} numberOfLines={1} ellipsizeMode="tail">
+                            {p.name}
+                          </Text>
+                          <Text style={styles.projectTreePickSub} numberOfLines={1} ellipsizeMode="tail">
+                            {count > 0 ? `${count} 份交付资产 · ${p.description || "在制商业交付工程项目"}` : (p.description || "在制商业交付工程项目资产总线")}
+                          </Text>
+                        </View>
+                      </View>
+                      <View style={styles.projectTreePickBtn}>
+                        <Text style={styles.projectTreePickBtnText}>展开</Text>
+                        <Ionicons name="chevron-forward" size={13} color="#FFF" />
                       </View>
                     </View>
-                    <View style={styles.projectTreePickBtn}>
-                      <Text style={styles.projectTreePickBtnText}>展开</Text>
-                      <Ionicons name="chevron-forward" size={13} color="#FFF" />
-                    </View>
-                  </View>
-                </Pressable>
-              ))}
+                  </Pressable>
+                );
+              })}
             </View>
           )}
         </ScrollView>
