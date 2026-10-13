@@ -98,6 +98,7 @@ test-results/
 /core
 coscli.log
 coscli_output/
+*.log
 
 # Command Code's own state. The shared halves of it — `.commandcode/agents/` and
 # `.commandcode/skills/` — are tracked, because they mirror `.claude/agents/` and
