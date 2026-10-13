@@ -5,6 +5,19 @@ import { cn } from "../../lib/utils";
 import { useStreamlinedUiEnabled } from "../../hooks/useStreamlinedUiEnabled";
 import { PropertyRow } from "./primitives";
 
+function extractText(node: ReactNode): string {
+  if (!node) return "";
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (typeof node === "object" && node !== null && "props" in node) {
+    const children = (node as { props?: { children?: ReactNode } }).props?.children;
+    if (typeof children === "string" || typeof children === "number") return String(children);
+    if (Array.isArray(children)) {
+      return children.map(extractText).filter(Boolean).join(" ");
+    }
+  }
+  return "";
+}
+
 /** Renders a Popover on desktop, or an inline collapsible section on mobile (inline mode). */
 export function PropertyPicker({
   inline,
@@ -41,6 +54,8 @@ export function PropertyPicker({
     streamlinedUiEnabled && "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
     triggerClassName,
   );
+  const contentText = extractText(triggerContent) || "None";
+  const buttonAriaLabel = label ? `${label}: ${contentText}` : undefined;
 
   if (separateTrigger) {
     const trigger = (
@@ -83,7 +98,12 @@ export function PropertyPicker({
     return (
       <div>
         <PropertyRow label={label} wrap={stacked}>
-          <button className={cn(btnCn, stacked && "items-start")} onClick={() => onOpenChange(!open)} aria-expanded={streamlinedUiEnabled ? open : undefined}>
+          <button
+            className={cn(btnCn, stacked && "items-start")}
+            onClick={() => onOpenChange(!open)}
+            aria-expanded={streamlinedUiEnabled ? open : undefined}
+            aria-label={buttonAriaLabel}
+          >
             {triggerContent}
             {streamlinedUiEnabled ? (
               <ChevronDown className={cn("ml-auto h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />
@@ -104,7 +124,11 @@ export function PropertyPicker({
     <PropertyRow label={label} wrap={stacked}>
       <Popover open={open} onOpenChange={onOpenChange}>
         <PopoverTrigger asChild>
-          <button className={cn(btnCn, stacked && "items-start")} aria-expanded={streamlinedUiEnabled ? open : undefined}>
+          <button
+            className={cn(btnCn, stacked && "items-start")}
+            aria-expanded={streamlinedUiEnabled ? open : undefined}
+            aria-label={buttonAriaLabel}
+          >
             {triggerContent}
             {streamlinedUiEnabled ? (
               <ChevronDown className={cn("ml-auto h-3 w-3 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")} aria-hidden />

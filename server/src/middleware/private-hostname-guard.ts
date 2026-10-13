@@ -2,7 +2,12 @@ import type { Request, RequestHandler } from "express";
 
 function isLoopbackHostname(hostname: string): boolean {
   const normalized = hostname.trim().toLowerCase();
-  return normalized === "localhost" || normalized === "127.0.0.1" || normalized === "::1";
+  return (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "::1" ||
+    normalized === "10.0.2.2"
+  );
 }
 
 function extractHostname(req: Request): string | null {
@@ -39,6 +44,7 @@ export function resolvePrivateHostnameAllowSet(opts: { allowedHostnames: string[
   allowSet.add("localhost");
   allowSet.add("127.0.0.1");
   allowSet.add("::1");
+  allowSet.add("10.0.2.2");
   return allowSet;
 }
 
@@ -71,8 +77,13 @@ export function privateHostnameGuard(opts: {
     const hostname = extractHostname(req);
     const wantsJson = req.path.startsWith("/api") || req.accepts(["json", "html", "text"]) === "json";
 
+    const acceptLang = req.header("accept-language") || "";
+    const isZh = acceptLang.toLowerCase().includes("zh");
+
     if (!hostname) {
-      const error = "Missing Host header. If you want to allow a hostname, run npx paperclipai allowed-hostname <host>.";
+      const error = isZh
+        ? "缺失 Host 请求头。如需允许特定主机名，请运行 npx paperclipai allowed-hostname <host>。"
+        : "Missing Host header. If you want to allow a hostname, run npx paperclipai allowed-hostname <host>.";
       if (wantsJson) {
         res.status(403).json({ error });
       } else {
@@ -86,7 +97,9 @@ export function privateHostnameGuard(opts: {
       return;
     }
 
-    const error = BLOCKED_HOSTNAME_MESSAGE;
+    const error = isZh
+      ? "当前主机名未经此实例授权。如需允许该主机名，请运行 npx paperclipai allowed-hostname <host>。"
+      : BLOCKED_HOSTNAME_MESSAGE;
     if (wantsJson) {
       res.status(403).json({ error });
     } else {

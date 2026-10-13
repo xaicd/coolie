@@ -3426,12 +3426,57 @@ export function routineService(
             ),
           );
 
+        // Helper to resolve an assignable agent for this project routine
+        const resolveRoutineAgentId = async (preferredAgentId?: string | null): Promise<string | null> => {
+          if (preferredAgentId) {
+            const isAssignable = await db
+              .select({ id: agents.id })
+              .from(agents)
+              .where(
+                and(
+                  eq(agents.id, preferredAgentId),
+                  eq(agents.companyId, project.companyId),
+                  ne(agents.status, "terminated"),
+                ),
+              )
+              .then((rows) => rows[0] ?? null);
+            if (isAssignable) return preferredAgentId;
+          }
+          // Pick company's best assignable agent (prefer idle/running, then error/paused)
+          const fallbackAgent = await db
+            .select({ id: agents.id })
+            .from(agents)
+            .where(
+              and(
+                eq(agents.companyId, project.companyId),
+                ne(agents.status, "terminated"),
+              ),
+            )
+            .orderBy(
+              sql`CASE WHEN ${agents.status} IN ('idle', 'running') THEN 0 ELSE 1 END`,
+              asc(agents.createdAt),
+            )
+            .then((rows) => rows[0] ?? null);
+          return fallbackAgent?.id ?? null;
+        };
+
         if (existingRoutines.length > 0) {
           for (const existing of existingRoutines) {
+            const updates: Record<string, unknown> = {};
             if (existing.status !== "active") {
+              updates.status = "active";
+            }
+            if (!existing.assigneeAgentId) {
+              const targetAgentId = await resolveRoutineAgentId(project.leadAgentId);
+              if (targetAgentId) {
+                updates.assigneeAgentId = targetAgentId;
+              }
+            }
+            if (Object.keys(updates).length > 0) {
+              updates.updatedAt = new Date();
               await db
                 .update(routines)
-                .set({ status: "active", updatedAt: new Date() })
+                .set(updates)
                 .where(eq(routines.id, existing.id));
 
               await db
@@ -3444,36 +3489,7 @@ export function routineService(
           }
         } else {
           // Resolve assignee agent: project lead agent, or company's first assignable active agent
-          let assigneeAgentId = project.leadAgentId;
-          if (assigneeAgentId) {
-            const isAssignable = await db
-              .select({ id: agents.id })
-              .from(agents)
-              .where(
-                and(
-                  eq(agents.id, assigneeAgentId),
-                  eq(agents.companyId, project.companyId),
-                  eq(agents.status, "active"),
-                ),
-              )
-              .then((rows) => rows[0] ?? null);
-            if (!isAssignable) assigneeAgentId = null;
-          }
-
-          if (!assigneeAgentId) {
-            const fallbackAgent = await db
-              .select({ id: agents.id })
-              .from(agents)
-              .where(
-                and(
-                  eq(agents.companyId, project.companyId),
-                  eq(agents.status, "active"),
-                ),
-              )
-              .orderBy(asc(agents.createdAt))
-              .then((rows) => rows[0] ?? null);
-            assigneeAgentId = fallbackAgent?.id ?? null;
-          }
+          const assigneeAgentId = await resolveRoutineAgentId(project.leadAgentId);
 
           const responsibleUserId = await resolveRoutineResponsibleUserId(db, project.companyId, null, null);
           if (!responsibleUserId) continue;

@@ -110,7 +110,7 @@ function matchDeviceLocale(): ExpoLocale | null {
   if (!tag) return null;
   const lower = tag.toLowerCase();
   if (lower.startsWith("zh")) return "zh-CN";
-  return FALLBACK_LOCALE;
+  return null;
 }
 
 /**

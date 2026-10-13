@@ -53,16 +53,19 @@ sync_remote_host() {
         fi
     done
 
-    # 3. 增量同步 skills 库、MEMORY.md 与口语索引大纲
+    # 3. 增量同步 skills 库、SRE Watchdog 探针、MEMORY.md 与口语索引大纲
     rsync -avz --delete \
         "$REPO_ROOT/.agents/skills/" "$host_alias:$remote_home/skills/"
+    rsync -avz \
+        "$REPO_ROOT/scripts/sre-watchdog.mjs" "$REPO_ROOT/scripts/sre-repro-engine.mjs" \
+        "$host_alias:$remote_home/bin/" 2>/dev/null || true
     rsync -avz \
         "$REPO_ROOT/MEMORY.md" "$REPO_ROOT/docs/skills-spoken-index.md" "$REPO_ROOT/docs/lifecycle-standard-operating-procedures.md" \
         "$host_alias:$remote_home/" 2>/dev/null || true
 
     echo "🔄 [2/3] 远程触发服务平滑重启: $host_alias..."
     ssh -o StrictHostKeyChecking=no "$host_alias" \
-        "export PATH=\"\$HOME/.local/bin:\$HOME/.hermes/node/bin:\$PATH\" && coolie-dev restart"
+        "export PATH=\"\$HOME/.local/bin:\$HOME/.hermes/node/bin:\$PATH\" && chmod +x $remote_home/bin/sre-watchdog.mjs $remote_home/bin/sre-repro-engine.mjs 2>/dev/null || true; (systemctl --user restart coolie-dev 2>/dev/null || coolie-dev restart)"
 
     echo "🩺 [3/3] 执行健康拨测: http://$tailscale_ip:3100/api/health..."
     sleep 2

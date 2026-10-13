@@ -119,6 +119,9 @@ export interface CoolieClientOptions {
    * and the minimum it can be.
    */
   originHeader?: string;
+  /** Preferred locale or locale getter, e.g. "zh-CN". Defaults to "zh-CN". */
+  locale?: string;
+  getLocale?: () => string | null | undefined;
 }
 
 export class CoolieApiError extends Error {
@@ -206,6 +209,8 @@ export class CoolieClient {
   private readonly getAuthHeader: NonNullable<CoolieClientOptions["getAuthHeader"]>;
   private readonly fetchImpl: typeof fetch;
   private readonly originHeader?: string;
+  private readonly locale?: string;
+  private readonly getLocale?: () => string | null | undefined;
 
   constructor(opts: CoolieClientOptions) {
     this.baseUrl = opts.baseUrl.replace(/\/+$/, "");
@@ -219,6 +224,14 @@ export class CoolieClient {
     if (!fetchImpl) throw new Error("No fetch available; pass fetchImpl");
     this.fetchImpl = fetchImpl;
     this.originHeader = opts.originHeader;
+    this.locale = opts.locale;
+    this.getLocale = opts.getLocale;
+  }
+
+  /** Resolve active locale header value for requests (defaults to zh-CN) */
+  private resolveLocale(): string {
+    const fromGetter = this.getLocale ? this.getLocale() : undefined;
+    return fromGetter || this.locale || "zh-CN";
   }
 
   /** @internal expo 壳层需要直接打杂项 API */
@@ -229,6 +242,8 @@ export class CoolieClient {
     opts?: { auth?: boolean },
   ): Promise<T> {
     const headers: Record<string, string> = { Accept: "application/json" };
+    const locale = this.resolveLocale();
+    if (locale) headers["Accept-Language"] = locale;
     if (body !== undefined) headers["Content-Type"] = "application/json";
     if (this.originHeader) headers.Origin = this.originHeader;
     if (opts?.auth !== false) Object.assign(headers, await this.getAuthHeader());
@@ -252,6 +267,8 @@ export class CoolieClient {
    */
   private async postForm<T>(path: string, form: FormData): Promise<T> {
     const headers: Record<string, string> = { Accept: "application/json" };
+    const locale = this.resolveLocale();
+    if (locale) headers["Accept-Language"] = locale;
     if (this.originHeader) headers.Origin = this.originHeader;
     Object.assign(headers, await this.getAuthHeader());
 
@@ -279,10 +296,26 @@ export class CoolieClient {
       // 4xx responses un-mappable on native clients.
       const errorCode = isRecord(parsed) && typeof parsed.code === "string" ? parsed.code : undefined;
       const errorText = isRecord(parsed) && typeof parsed.error === "string" ? parsed.error : undefined;
-      const message =
+      let message =
         (isRecord(parsed) && typeof parsed.message === "string" && parsed.message) ||
         errorText ||
         `Request failed: ${res.status}`;
+
+      const locale = this.resolveLocale();
+      if (locale.startsWith("zh")) {
+        const lowerMsg = (message || "").toLowerCase().trim();
+        if (res.status === 401 && (!message || lowerMsg === "unauthorized" || lowerMsg === "agent authentication required")) {
+          message = "未授权或登录已过期，请重新登录";
+        } else if (res.status === 403 && (!message || lowerMsg === "forbidden")) {
+          message = "权限不足，禁止访问";
+        } else if (res.status === 404 && (!message || lowerMsg === "not found" || lowerMsg.includes("not found"))) {
+          message = "请求的资源或接口不存在";
+        } else if (res.status === 500 && (!message || lowerMsg.includes("internal server error"))) {
+          message = "服务端内部异常，请稍后重试";
+        } else if ((res.status === 502 || res.status === 503 || res.status === 504) && (!message || lowerMsg.includes("bad gateway") || lowerMsg.includes("gateway") || lowerMsg.includes("unavailable"))) {
+          message = "服务暂时不可用或网络超时，请稍后重试";
+        }
+      }
       throw new CoolieApiError(res.status, message, errorCode ?? errorText, parsed);
     }
     return parsed as T;
@@ -302,6 +335,8 @@ export class CoolieClient {
     opts?: { auth?: boolean },
   ): Promise<{ body: T; headers: Headers }> {
     const headers: Record<string, string> = { Accept: "application/json" };
+    const locale = this.resolveLocale();
+    if (locale) headers["Accept-Language"] = locale;
     if (body !== undefined) headers["Content-Type"] = "application/json";
     if (this.originHeader) headers.Origin = this.originHeader;
     if (opts?.auth !== false) Object.assign(headers, await this.getAuthHeader());
@@ -317,10 +352,26 @@ export class CoolieClient {
     const parsed = text ? safeJson(text) : null;
     if (!res.ok) {
       const code = isRecord(parsed) && typeof parsed.error === "string" ? parsed.error : undefined;
-      const message =
+      let message =
         (isRecord(parsed) && typeof parsed.message === "string" && parsed.message) ||
         code ||
         `Request failed: ${res.status}`;
+
+      const locale = this.resolveLocale();
+      if (locale.startsWith("zh")) {
+        const lowerMsg = (message || "").toLowerCase().trim();
+        if (res.status === 401 && (!message || lowerMsg === "unauthorized" || lowerMsg === "agent authentication required")) {
+          message = "未授权或登录已过期，请重新登录";
+        } else if (res.status === 403 && (!message || lowerMsg === "forbidden")) {
+          message = "权限不足，禁止访问";
+        } else if (res.status === 404 && (!message || lowerMsg === "not found" || lowerMsg.includes("not found"))) {
+          message = "请求的资源或接口不存在";
+        } else if (res.status === 500 && (!message || lowerMsg.includes("internal server error"))) {
+          message = "服务端内部异常，请稍后重试";
+        } else if ((res.status === 502 || res.status === 503 || res.status === 504) && (!message || lowerMsg.includes("bad gateway") || lowerMsg.includes("gateway") || lowerMsg.includes("unavailable"))) {
+          message = "服务暂时不可用或网络超时，请稍后重试";
+        }
+      }
       throw new CoolieApiError(res.status, message, code, parsed);
     }
     return { body: parsed as T, headers: res.headers };
@@ -1831,6 +1882,8 @@ export class CoolieClient {
       Accept: "text/event-stream",
       "Content-Type": "application/json",
     };
+    const locale = this.resolveLocale();
+    if (locale) headers["Accept-Language"] = locale;
     if (this.originHeader) headers.Origin = this.originHeader;
     Object.assign(headers, await this.getAuthHeader());
 

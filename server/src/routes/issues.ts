@@ -55,6 +55,7 @@ import {
   pipelineCases,
   pipelineStages,
   pipelines,
+  projects,
   projectWorkspaces,
 } from "@paperclipai/db";
 import {
@@ -4952,11 +4953,27 @@ export function issueRoutes(
     projectId: string | null | undefined;
     parentIssueId?: string | null;
   }) {
-    if (input.projectId !== undefined) return input.projectId;
-    if (!input.parentIssueId) return null;
-    const parent = await svc.getById(input.parentIssueId);
-    if (!parent || parent.companyId !== input.companyId) return null;
-    return parent.projectId ?? null;
+    if (input.projectId !== undefined && input.projectId !== null) return input.projectId;
+    if (input.parentIssueId) {
+      const parent = await svc.getById(input.parentIssueId);
+      if (parent && parent.companyId === input.companyId && parent.projectId) {
+        return parent.projectId;
+      }
+    }
+    // Auto-fallback: if company has an active in-progress project, default to it
+    const activeProject = await db
+      .select({ id: projects.id })
+      .from(projects)
+      .where(
+        and(
+          eq(projects.companyId, input.companyId),
+          eq(projects.status, "in_progress"),
+          isNull(projects.archivedAt),
+        ),
+      )
+      .orderBy(desc(projects.updatedAt))
+      .then((rows) => rows[0] ?? null);
+    return activeProject?.id ?? null;
   }
 
   async function assertCanAssignTasks(
@@ -11907,8 +11924,14 @@ export function issueRoutes(
           );
         }
       }
+      const resolvedCreateProjectId = await resolveAssignmentProjectId({
+        companyId,
+        projectId: rawCreateBody.projectId,
+        parentIssueId: effectiveParentId,
+      });
       const createBody = {
         ...rawCreateBody,
+        projectId: resolvedCreateProjectId,
         parentId: effectiveParentId,
         ...(normalizedAssigneeAgentId !== undefined
           ? { assigneeAgentId: normalizedAssigneeAgentId }

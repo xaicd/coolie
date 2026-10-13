@@ -68,6 +68,26 @@ describe("StatusIcon", () => {
     expect(html).not.toContain("var(--status-task-icon-in_queue)");
   });
 
+  it("surfaces manually marked copy when attention_required has 0 blockers", () => {
+    const html = renderToStaticMarkup(
+      <StatusIcon
+        status="blocked"
+        blockerAttention={{
+          state: "needs_attention",
+          reason: "attention_required",
+          unresolvedBlockerCount: 0,
+          coveredBlockerCount: 0,
+          stalledBlockerCount: 0,
+          attentionBlockerCount: 0,
+          sampleBlockerIdentifier: null,
+          sampleStalledBlockerIdentifier: null,
+        }}
+      />,
+    );
+    expect(html).toContain("Blocked · manually marked (no active blockers)");
+    expect(html).not.toContain("0 blockers need attention");
+  });
+
   it("surfaces stalled-review blocked copy on the accessible label", () => {
     const html = renderToStaticMarkup(
       <StatusIcon

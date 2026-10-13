@@ -15,6 +15,7 @@ import {
   View,
   Platform,
   StatusBar as RNStatusBar,
+  KeyboardAvoidingView,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { Ionicons } from "@expo/vector-icons";
@@ -450,13 +451,19 @@ function Surface({ children }: { children: React.ReactNode }) {
   return (
     <SafeAreaView style={{ backgroundColor: C.bg, flex: 1, paddingTop: Platform.OS === "android" ? (RNStatusBar.currentHeight ?? 24) : 0 }}>
       <StatusBar style="light" />
-      <ScrollView
-        style={{ backgroundColor: C.bg, flex: 1 }}
-        contentContainerStyle={styles.screen}
-        keyboardShouldPersistTaps="handled"
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
-        {children}
-      </ScrollView>
+        <ScrollView
+          style={{ backgroundColor: C.bg, flex: 1 }}
+          contentContainerStyle={[styles.screen, { paddingBottom: 64 }]}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+        >
+          {children}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

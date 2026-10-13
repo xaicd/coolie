@@ -59,6 +59,7 @@ import {
 import { agentService } from "./agents.js";
 import { normalizeLegacyRunnerProvider } from "@paperclipai/adapter-utils";
 import fs from "node:fs/promises";
+import fsSync from "node:fs";
 import path from "node:path";
 import { execFile as execFileCallback } from "node:child_process";
 import { promisify } from "node:util";
@@ -12287,7 +12288,24 @@ export function heartbeatService(
     const issueProjectId = issueProjectRef?.projectId ?? null;
     const preferredProjectWorkspaceId =
       issueProjectRef?.projectWorkspaceId ?? contextProjectWorkspaceId ?? null;
-    const resolvedProjectId = issueProjectId ?? contextProjectId;
+    let resolvedProjectId = issueProjectId ?? contextProjectId;
+    if (!resolvedProjectId) {
+      const activeProject = await db
+        .select({ id: projects.id })
+        .from(projects)
+        .where(
+          and(
+            eq(projects.companyId, agent.companyId),
+            eq(projects.status, "in_progress"),
+            isNull(projects.archivedAt),
+          ),
+        )
+        .orderBy(desc(projects.updatedAt))
+        .then((rows) => rows[0] ?? null);
+      if (activeProject) {
+        resolvedProjectId = activeProject.id;
+      }
+    }
     const useProjectWorkspace = opts?.useProjectWorkspace !== false;
     const workspaceProjectId = useProjectWorkspace ? resolvedProjectId : null;
 
@@ -12314,6 +12332,69 @@ export function heartbeatService(
       repoUrl: readNonEmptyString(workspace.repoUrl),
       repoRef: readNonEmptyString(workspace.repoRef),
     }));
+
+    const resolveSafeProjectFallbackCwd = async (companyId: string, projectId: string | null): Promise<string | null> => {
+      const candidates: string[] = [];
+      if (projectId) {
+        const pw = await db
+          .select({ cwd: projectWorkspaces.cwd })
+          .from(projectWorkspaces)
+          .where(
+            and(
+              eq(projectWorkspaces.companyId, companyId),
+              eq(projectWorkspaces.projectId, projectId),
+              eq(projectWorkspaces.isPrimary, true),
+            ),
+          )
+          .then((rows) => rows[0]?.cwd);
+        if (pw) candidates.push(pw);
+      }
+      const companyPw = await db
+        .select({ cwd: projectWorkspaces.cwd })
+        .from(projectWorkspaces)
+        .where(
+          and(
+            eq(projectWorkspaces.companyId, companyId),
+            eq(projectWorkspaces.isPrimary, true),
+          ),
+        )
+        .orderBy(desc(projectWorkspaces.updatedAt))
+        .then((rows) => rows[0]?.cwd);
+      if (companyPw) candidates.push(companyPw);
+
+      if (process.env.COOLIE_PROJECT_DIR) {
+        candidates.push(process.env.COOLIE_PROJECT_DIR);
+      }
+
+      const parentRoot = path.resolve(process.cwd(), "..");
+      if (fsSync.existsSync(path.join(parentRoot, "package.json"))) {
+        candidates.push(parentRoot);
+      }
+      if (fsSync.existsSync(path.join(process.cwd(), "package.json"))) {
+        candidates.push(process.cwd());
+      }
+
+      for (const cand of candidates) {
+        const trimmed = cand?.trim();
+        if (!trimmed) continue;
+        if (
+          trimmed === "/tmp" ||
+          trimmed.startsWith("/tmp/") ||
+          trimmed === "/private/tmp" ||
+          trimmed.startsWith("/private/tmp/")
+        ) {
+          continue;
+        }
+        const isDir = await fs
+          .stat(trimmed)
+          .then((s) => s.isDirectory())
+          .catch(() => false);
+        if (isDir) {
+          return trimmed;
+        }
+      }
+      return null;
+    };
 
     if (projectWorkspaceRows.length > 0) {
       const preferredWorkspace = preferredProjectWorkspaceId
@@ -12387,8 +12468,11 @@ export function heartbeatService(
         missingProjectCwds.push(projectCwd);
       }
 
-      const fallbackCwd = resolveDefaultAgentWorkspaceDir(agent.id);
-      await fs.mkdir(fallbackCwd, { recursive: true });
+      const fallbackProjectCwd = await resolveSafeProjectFallbackCwd(agent.companyId, resolvedProjectId);
+      const fallbackCwd = fallbackProjectCwd ?? resolveDefaultAgentWorkspaceDir(agent.id);
+      if (!fallbackProjectCwd) {
+        await fs.mkdir(fallbackCwd, { recursive: true });
+      }
       const warnings = buildAnchorFallbackWorkspaceNotes({
         fallbackCwd,
         preferredWorkspaceWarning,
@@ -12453,8 +12537,11 @@ export function heartbeatService(
       }
     }
 
-    const cwd = resolveDefaultAgentWorkspaceDir(agent.id);
-    await fs.mkdir(cwd, { recursive: true });
+    const safeProjectCwd = await resolveSafeProjectFallbackCwd(agent.companyId, resolvedProjectId);
+    const cwd = safeProjectCwd ?? resolveDefaultAgentWorkspaceDir(agent.id);
+    if (!safeProjectCwd) {
+      await fs.mkdir(cwd, { recursive: true });
+    }
     const warnings: string[] = [];
     if (sessionCwd && sessionCwdLooksUnsafe) {
       warnings.push(

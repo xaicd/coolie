@@ -10,6 +10,7 @@ import {
   type Project,
   type SessionUser,
 } from "@coolie/api-client";
+import { getLocale } from "./i18n";
 
 export type { Project };
 
@@ -738,6 +739,7 @@ export class CoolieClient extends BaseCoolieClient {
 export const coolie = new CoolieClient({
   baseUrl: COOLIE_BASE_URL,
   originHeader: COOLIE_ORIGIN,
+  getLocale: () => getLocale(),
   // Explicit return type: without it the unauth branch infers as
   // `{ Authorization?: undefined }`, which is not a `Record<string, string>`.
   getAuthHeader: async (): Promise<Record<string, string>> => {
@@ -774,6 +776,7 @@ function probeWith(token: string): CoolieClient {
   return new CoolieClient({
     baseUrl: COOLIE_BASE_URL,
     originHeader: COOLIE_ORIGIN,
+    getLocale: () => getLocale(),
     getAuthHeader: () => ({ Authorization: `Bearer ${token}` }),
   });
 }
@@ -803,9 +806,13 @@ export async function classifyToken(token: string): Promise<Credential> {
     // 「服务器暂时联系不上」与「实例明确拒绝这把钥匙」。旧版把一切错误包成
     // "did not accept that key", 于是部署重启的 10 秒窗口就能把用户永久登出。
     if (!(e instanceof CoolieApiError) || e.status === 0 || e.status >= 500) throw e;
-    throw new Error(
-      `This instance did not accept that key (${e.status} ${e.message}).`,
-    );
+    const isZh = getLocale().startsWith("zh");
+    const errMsg = isZh
+      ? `当前实例拒绝了该访问凭据 (${e.status} ${e.message})。`
+      : `This instance did not accept that key (${e.status} ${e.message}).`;
+    const err = new Error(errMsg);
+    (err as unknown as { isAuthReject?: boolean }).isAuthReject = true;
+    throw err;
   }
 }
 
@@ -852,7 +859,12 @@ export async function signInWithEmail(input: {
     session = await getSessionUser();
   }
   if (!session) {
-    throw new Error("Signed in, but this instance returned no session for the account.");
+    const isZh = getLocale().startsWith("zh");
+    throw new Error(
+      isZh
+        ? "登录成功，但未获取到有效的用户会话。"
+        : "Signed in, but this instance returned no session for the account.",
+    );
   }
   return session;
 }
@@ -929,7 +941,8 @@ export async function restoreCredential(): Promise<Credential | null> {
       // 下一次冷启动自动回到已登录态。旧版任何异常都 clearAuthToken(),
       // 一次 systemctl restart coolie 就把全设备永久登出。
       const definitive =
-        e instanceof Error && /did not accept that key/i.test(e.message);
+        (e as unknown as { isAuthReject?: boolean })?.isAuthReject ||
+        (e instanceof Error && (/did not accept that key|拒绝.*凭据/i.test(e.message)));
       if (!definitive) return null;
       await clearAuthToken();
     }

@@ -52,7 +52,10 @@ function blockedAttentionLabel(blockerAttention: IssueBlockerAttention | null | 
   }
 
   if (blockerAttention.reason === "attention_required") {
-    const count = blockerAttention.attentionBlockerCount || blockerAttention.unresolvedBlockerCount;
+    const count = blockerAttention.attentionBlockerCount || blockerAttention.unresolvedBlockerCount || 0;
+    if (count === 0) {
+      return "Blocked · manually marked (no active blockers)";
+    }
     const attentionCopy = `${count} ${count === 1 ? "blocker needs" : "blockers need"} attention`;
     const coveredCount = blockerAttention.coveredBlockerCount;
     if (coveredCount > 0) {
