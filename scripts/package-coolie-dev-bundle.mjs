@@ -358,7 +358,14 @@ if (fs.existsSync(acpxProbeSrc)) {
   fs.chmodSync(path.join(stageDir, "bin/acpx-tool-probe.mjs"), 0o755);
 }
 
-// 5.2.2 拷贝 Hermes Gateway 控制面准入桥接插件 (QQ/微信直通控制面 Board Chat)
+// 5.2.2 拷贝 SRE 看门狗与错误自愈守护器
+const sreWatchdogSrc = path.resolve(repoRoot, "scripts/sre-watchdog.mjs");
+if (fs.existsSync(sreWatchdogSrc)) {
+  fs.copyFileSync(sreWatchdogSrc, path.join(stageDir, "bin/sre-watchdog.mjs"));
+  fs.chmodSync(path.join(stageDir, "bin/sre-watchdog.mjs"), 0o755);
+}
+
+// 5.2.3 拷贝 Hermes Gateway 控制面准入桥接插件 (QQ/微信直通控制面 Board Chat)
 const bridgePluginSrc = path.resolve(repoRoot, "scripts/hermes-plugins/coolie-bridge");
 if (fs.existsSync(bridgePluginSrc)) {
   const targetPluginDir = path.join(stageDir, "lib/hermes-plugins/coolie-bridge");
@@ -654,24 +661,25 @@ case "$ACTION" in
             echo "  ⚪ Hermes QQ/微信控制面并轨: 未接入 (运行 coolie-dev gateway-bridge enable 即可开启)"
         fi
 
-        # 7. 检查 Board API 准入凭证与持久化
-        if [ -n "\$PAPERCLIP_API_KEY" ]; then
-            echo "  ✅ Board API 准入凭证: 正常在位 (\$KEY_FILE)"
+        # 8. 检查 SRE Watchdog 监控守护
+        if pgrep -f sre-watchdog.mjs >/dev/null 2>&1; then
+            echo "  ✅ SRE Watchdog 监控守护: 在线运行中"
         else
-            echo "  ⚠️ Board API 准入凭证: 未配置"
+            echo "  ⚪ SRE Watchdog 监控守护: 未运行"
         fi
         echo "========================================================"
         exit 0
         ;;
     stop)
         PID="\$(ss -tulpn 2>/dev/null | grep ":\$PORT " | awk '{print \$NF}' | sed -E 's/.*pid=([0-9]+).*/\\1/' || true)"
+        pkill -f sre-watchdog.mjs 2>/dev/null || true
         if [ -n "\$PID" ]; then
             kill "\$PID" 2>/dev/null || true
             pkill -f tailscale-proxy.js 2>/dev/null || true
             sleep 1
-            echo "🛑 已停止 Coolie Dev 与网关 (PID: \$PID)"
+            echo "🛑 已停止 Coolie Dev、网关与 SRE 监控 (PID: \$PID)"
         else
-            echo "⚪ Coolie Dev 未运行"
+            echo "⚪ Coolie Dev 未运行 (已确保 SRE 监控关闭)"
         fi
         exit 0
         ;;
@@ -685,6 +693,11 @@ case "$ACTION" in
             if [ -n "\$TS_IP" ] && [ -f "\$COOLIE_HOME/bin/tailscale-proxy.js" ]; then
                 nohup "\$NODE_BIN" "\$COOLIE_HOME/bin/tailscale-proxy.js" > "\$DATA_DIR/logs/proxy.log" 2>&1 </dev/null &
             fi
+            if [ -f "\$COOLIE_HOME/bin/sre-watchdog.mjs" ]; then
+                pkill -f sre-watchdog.mjs 2>/dev/null || true
+                nohup "\$NODE_BIN" "\$COOLIE_HOME/bin/sre-watchdog.mjs" > "\$DATA_DIR/logs/sre-watchdog.log" 2>&1 </dev/null &
+                echo "  🛡️ SRE Watchdog 智能监控守护已伴随启动"
+            fi
             sleep 1
             if ss -tulpn 2>/dev/null | grep -q ":\$PORT "; then
                 PID="\$(ss -tulpn 2>/dev/null | grep ":\$PORT " | awk '{print \$NF}' | sed -E 's/.*pid=([0-9]+).*/\\1/' || true)"
@@ -694,6 +707,7 @@ case "$ACTION" in
                     echo "  • Tailscale 跨端地址: http://\$TS_IP:\$PORT"
                 fi
                 echo "  • 运行日志: \$DATA_DIR/logs/coolie-dev.log"
+                echo "  • SRE 监控日志: \$DATA_DIR/logs/sre-watchdog.log"
             else
                 echo "⏳ Coolie Dev 正在后台初始化，可通过 'coolie-dev logs' 查看进度"
             fi
@@ -709,6 +723,15 @@ case "$ACTION" in
     logs)
         tail -n 60 -f "\$DATA_DIR/logs/coolie-dev.log"
         exit 0
+        ;;
+    sre)
+        shift 2>/dev/null || true
+        if [ -f "\$COOLIE_HOME/bin/sre-watchdog.mjs" ]; then
+            exec "\$NODE_BIN" "\$COOLIE_HOME/bin/sre-watchdog.mjs" "\$@"
+        else
+            echo "❌ 未找到 SRE Watchdog 脚本"
+            exit 1
+        fi
         ;;
     run)
         shift 2>/dev/null || true
@@ -729,6 +752,11 @@ echo "========================================================"
 
 if [ -f "$COOLIE_HOME/bin/link-packages.js" ]; then
     "$NODE_BIN" "$COOLIE_HOME/bin/link-packages.js" >/dev/null 2>&1 || true
+fi
+
+if [ -f "$COOLIE_HOME/bin/sre-watchdog.mjs" ] && ! pgrep -f sre-watchdog.mjs >/dev/null 2>&1; then
+    nohup "$NODE_BIN" "$COOLIE_HOME/bin/sre-watchdog.mjs" > "$DATA_DIR/logs/sre-watchdog.log" 2>&1 </dev/null &
+    echo "  • SRE 监控守护: 已自动伴随启动"
 fi
 
 exec "$NODE_BIN" dist/index.js "$@"
@@ -761,7 +789,7 @@ rm -f "$TARGET_DIR/lib/server/skills" "$TARGET_DIR/lib/server/skills-releases" 2
 cp -R "$SRC_DIR/bin" "$TARGET_DIR/"
 cp -R "$SRC_DIR/conf" "$TARGET_DIR/"
 cp -R "$SRC_DIR/lib" "$TARGET_DIR/"
-chmod +x "$TARGET_DIR/bin/coolie-dev" "$TARGET_DIR/bin/link-packages.js" "$TARGET_DIR/bin/tailscale-proxy.js" "$TARGET_DIR/bin/hermes-acpx-dispatch" "$TARGET_DIR/bin/create-coolie-task.mjs" "$TARGET_DIR/bin/acpx-tool-probe.mjs" 2>/dev/null || true
+chmod +x "$TARGET_DIR/bin/coolie-dev" "$TARGET_DIR/bin/link-packages.js" "$TARGET_DIR/bin/tailscale-proxy.js" "$TARGET_DIR/bin/hermes-acpx-dispatch" "$TARGET_DIR/bin/create-coolie-task.mjs" "$TARGET_DIR/bin/acpx-tool-probe.mjs" "$TARGET_DIR/bin/sre-watchdog.mjs" 2>/dev/null || true
 
 # 2. 建立命令行全局快捷方式
 mkdir -p "$HOME/.local/bin"
@@ -805,13 +833,15 @@ echo "========================================================"
 echo "🎉 Coolie Dev 安装成功！"
 echo ""
 echo "使用说明:"
-echo "  1. 后台启动:   coolie-dev start"
+echo "  1. 后台启动:   coolie-dev start (自动伴生 SRE 守护)"
 echo "  2. 前台启动:   coolie-dev run"
 echo "  3. 状态查询:   coolie-dev status"
 echo "  4. 全维体检:   coolie-dev health"
-echo "  5. 停止服务:   coolie-dev stop"
-echo "  6. 实时日志:   coolie-dev logs"
-echo "  7. 控制面访问: http://127.0.0.1:3100"
+echo "  5. SRE 诊断:   coolie-dev sre --once"
+echo "  6. 停止服务:   coolie-dev stop"
+echo "  7. 实时日志:   coolie-dev logs"
+echo "  8. 监控日志:   tail -f \$TARGET_DIR/data/logs/sre-watchdog.log"
+echo "  9. 控制面访问: http://127.0.0.1:3100"
 echo "========================================================"
 echo ""
 echo ">>> 执行出厂健康诊断:"

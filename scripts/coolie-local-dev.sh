@@ -32,6 +32,7 @@ Commands:
   restart     Restart local Coolie dev server
   status      Check local Coolie dev server status and health
   health      Run structured API health check on local workshop
+  sre         Run SRE watchdog probe, health metrics & incident auto-healing
   init-team   Initialize "Coolie 本地施工总社" company, 6 digital employees & routines
   url         Print web board access URL for local browsing
   help        Show this help
@@ -90,6 +91,10 @@ cmd_start() {
     # 确保自动热重启特性 (autoRestartDevServerWhenIdle) 开启，代码更新时后台静默热重载，严禁弹窗阻断打扰老板
     bash "$SCRIPT_DIR/host-exec.sh" "curl -sf -X PATCH '$HOST_API_BASE/api/instance/settings/experimental' -H 'Content-Type: application/json' -d '{\"autoRestartDevServerWhenIdle\": true}' >/dev/null 2>&1" || true
     echo "🎉 本地 Coolie 工坊 Dev 环境启动成功！(已启用后台静默热重载)"
+    
+    echo "🛡️ 正在启动伴生 SRE 智能看门狗守护..."
+    bash "$SCRIPT_DIR/host-exec.sh" "pkill -f sre-watchdog.mjs 2>/dev/null || true; nohup node scripts/sre-watchdog.mjs > '$LOCAL_DIR/logs/sre-watchdog.log' 2>&1 &"
+    echo "✅ SRE Watchdog 已就绪 (日志: $LOCAL_DIR/logs/sre-watchdog.log)"
     cmd_url
   else
     echo "❌ 启动超时，请检查日志: $DEV_LOG"
@@ -101,6 +106,7 @@ cmd_start() {
 cmd_stop() {
   echo "=== [Coolie Local Dev] 停止本地工坊环境 ==="
   bash "$SCRIPT_DIR/host-exec.sh" "
+    pkill -f sre-watchdog.mjs 2>/dev/null || true
     if [[ -f '$DEV_PID_REL' ]]; then
       pid=\$(cat '$DEV_PID_REL' 2>/dev/null || true)
       if [[ -n \"\$pid\" ]] && kill -0 \"\$pid\" 2>/dev/null; then
@@ -116,7 +122,7 @@ cmd_stop() {
       echo \"\$pids\" | xargs kill -9 2>/dev/null || true
     fi
   "
-  echo "🛑 本地工坊服务已停止。"
+  echo "🛑 本地工坊服务与 SRE 监控已停止。"
 }
 
 cmd_restart() {
@@ -137,6 +143,26 @@ cmd_status() {
       console.log(`Git Commit: ${h.commit || "未知"}`);
       console.log(`运行模式:  ${h.deploymentMode} (${h.deploymentExposure})`);
       console.log(`启动时间:  ${h.serverInfo?.processStartedAt || "未知"}`);
+      const fs = require("fs");
+      const path = require("path");
+      try {
+        const candidatePaths = [
+          path.join(process.env.HOME || "", ".paperclip/sre-status.json"),
+          "/Users/mac/.paperclip/sre-status.json"
+        ];
+        let raw = null;
+        for (const p of candidatePaths) {
+          if (fs.existsSync(p)) { raw = fs.readFileSync(p, "utf8"); break; }
+        }
+        if (raw) {
+          const s = JSON.parse(raw);
+          console.log(`SRE 状态:  ${s.status === "HEALTHY" ? "✅ HEALTHY (看门狗持续守护中)" : "⚠️ " + s.status}`);
+        } else {
+          console.log(`SRE 状态:  ⚪ 未检测到状态快照`);
+        }
+      } catch(_) {
+        console.log(`SRE 状态:  ⚪ 未检测到状态快照`);
+      }
     ' "$health_json"
     cmd_url
   else
@@ -161,6 +187,11 @@ cmd_health() {
     echo '--- /api/companies ---'
     curl -s '$HOST_API_BASE/api/companies' | node -e 'console.log(JSON.stringify(JSON.parse(require(\"fs\").readFileSync(0, \"utf8\")), null, 2))'
   "
+}
+
+cmd_sre() {
+  echo "=== [Coolie Local Dev] SRE 运行态体检与自愈诊断 ==="
+  bash "$SCRIPT_DIR/host-exec.sh" "node scripts/sre-watchdog.mjs ${1:---once}"
 }
 
 cmd_url() {
@@ -191,6 +222,7 @@ case "$ACTION" in
   restart)    cmd_restart ;;
   status)     cmd_status ;;
   health)     cmd_health ;;
+  sre)        shift; cmd_sre "$@" ;;
   init-team)  cmd_init_team ;;
   url)        cmd_url ;;
   -h|--help|help) usage ;;
