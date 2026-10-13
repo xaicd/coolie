@@ -52,7 +52,10 @@ class CmdAcpAgent {
     return {
       protocolVersion: acp.PROTOCOL_VERSION,
       agentCapabilities: {
-        loadSession: false,
+        loadSession: true,
+        sessionCapabilities: {
+          resume: true,
+        },
       },
       serverInfo: {
         name: "cmd-acp",
@@ -67,6 +70,18 @@ class CmdAcpAgent {
     return { sessionId };
   }
 
+  async loadSession(params) {
+    const sessionId = params?.sessionId || ("cmd-" + Math.random().toString(36).slice(2, 10));
+    if (!this.sessions.has(sessionId)) {
+      this.sessions.set(sessionId, { activeProcess: null });
+    }
+    return { sessionId };
+  }
+
+  async resumeSession(params) {
+    return this.loadSession(params);
+  }
+
   async authenticate(_params) {
     return {};
   }
@@ -76,9 +91,10 @@ class CmdAcpAgent {
   }
 
   async prompt(params, cx) {
-    const session = this.sessions.get(params.sessionId);
+    let session = this.sessions.get(params.sessionId);
     if (!session) {
-      throw new Error(`Session ${params.sessionId} not found`);
+      session = { activeProcess: null };
+      this.sessions.set(params.sessionId, session);
     }
 
     let promptText = "";
@@ -193,6 +209,8 @@ acp
   .agent({ name: "cmd-acp" })
   .onRequest("initialize", (ctx) => agent.initialize(ctx.params))
   .onRequest("session/new", (ctx) => agent.newSession(ctx.params))
+  .onRequest("session/load", (ctx) => agent.loadSession(ctx.params))
+  .onRequest("session/resume", (ctx) => agent.resumeSession(ctx.params))
   .onRequest("authenticate", (ctx) => agent.authenticate(ctx.params))
   .onRequest("session/set_mode", (ctx) => agent.setSessionMode(ctx.params))
   .onRequest("session/prompt", (ctx) => agent.prompt(ctx.params, ctx.client))

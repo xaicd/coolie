@@ -12,11 +12,42 @@
  * injecting profile settings (e.g. GLM or MiniMax endpoints & auth tokens).
  */
 
-import * as acp from "@agentclientprotocol/sdk";
+import { createRequire } from "node:module";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Readable, Writable } from "node:stream";
 import { spawn, execSync } from "node:child_process";
 import fs from "node:fs";
-import path from "node:path";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const req = createRequire(import.meta.url);
+
+let acp;
+try {
+  acp = await import("@agentclientprotocol/sdk");
+} catch {
+  const rootDir = path.resolve(__dirname, "../..");
+  const candidatePaths = [
+    path.join(rootDir, "packages/paperclip-runner"),
+    path.join(rootDir, "packages/adapters/claude-local"),
+    path.join(rootDir, "packages/adapters/codex-local"),
+    path.join(rootDir, "node_modules/.pnpm/node_modules"),
+    rootDir,
+  ];
+  let resolvedPath = null;
+  for (const p of candidatePaths) {
+    try {
+      resolvedPath = req.resolve("@agentclientprotocol/sdk", { paths: [p] });
+      if (resolvedPath) break;
+    } catch {
+      // try next
+    }
+  }
+  if (!resolvedPath) {
+    throw new Error("Cannot find @agentclientprotocol/sdk in candidate paths");
+  }
+  acp = await import(resolvedPath);
+}
 
 // Parse CLI flags
 const cliArgs = process.argv.slice(2);
@@ -47,7 +78,10 @@ class ClaudeProfileAcpAgent {
     return {
       protocolVersion: acp.PROTOCOL_VERSION,
       agentCapabilities: {
-        loadSession: false,
+        loadSession: true,
+        sessionCapabilities: {
+          resume: true,
+        },
       },
       serverInfo: {
         name: "claude-profile-acp",
@@ -62,6 +96,18 @@ class ClaudeProfileAcpAgent {
     return { sessionId };
   }
 
+  async loadSession(params) {
+    const sessionId = params?.sessionId || ("claude-" + Math.random().toString(36).slice(2, 10));
+    if (!this.sessions.has(sessionId)) {
+      this.sessions.set(sessionId, { activeProcess: null });
+    }
+    return { sessionId };
+  }
+
+  async resumeSession(params) {
+    return this.loadSession(params);
+  }
+
   async authenticate(_params) {
     return {};
   }
@@ -71,9 +117,10 @@ class ClaudeProfileAcpAgent {
   }
 
   async prompt(params, cx) {
-    const session = this.sessions.get(params.sessionId);
+    let session = this.sessions.get(params.sessionId);
     if (!session) {
-      throw new Error(`Session ${params.sessionId} not found`);
+      session = { activeProcess: null };
+      this.sessions.set(params.sessionId, session);
     }
 
     let promptText = "";
@@ -210,6 +257,8 @@ acp
   .agent({ name: "claude-profile-acp" })
   .onRequest("initialize", (ctx) => agent.initialize(ctx.params))
   .onRequest("session/new", (ctx) => agent.newSession(ctx.params))
+  .onRequest("session/load", (ctx) => agent.loadSession(ctx.params))
+  .onRequest("session/resume", (ctx) => agent.resumeSession(ctx.params))
   .onRequest("authenticate", (ctx) => agent.authenticate(ctx.params))
   .onRequest("session/set_mode", (ctx) => agent.setSessionMode(ctx.params))
   .onRequest("session/prompt", (ctx) => agent.prompt(ctx.params, ctx.client))
