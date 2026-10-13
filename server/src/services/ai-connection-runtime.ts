@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { HttpError, unprocessable } from "../errors.js";
-import { mkdtemp, mkdir, writeFile, readFile, rm } from "node:fs/promises";
+import { mkdtemp, mkdir, writeFile, readFile, rm, stat } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { and, eq } from "drizzle-orm";
@@ -142,7 +142,9 @@ done`,
   }
   let directory =
     typeof config.cwd === "string" ? path.resolve(config.cwd) : process.cwd();
+  const userHome = os.homedir();
   for (;;) {
+    if (directory === userHome) break;
     for (const relative of files) {
       try {
         const content = await readFile(path.join(directory, relative), "utf8");
@@ -160,8 +162,12 @@ done`,
         if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       }
     }
+    try {
+      const gitStat = await stat(path.join(directory, ".git"));
+      if (gitStat) break;
+    } catch {}
     const parent = path.dirname(directory);
-    if (parent === directory) break;
+    if (parent === directory || parent === userHome) break;
     directory = parent;
   }
 }

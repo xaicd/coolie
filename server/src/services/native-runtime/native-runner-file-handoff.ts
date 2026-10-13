@@ -239,6 +239,31 @@ async function assertNoSymlinkComponents(
   }
 }
 
+function decodeLsofPath(raw: string): string {
+  if (!raw.includes("\\x")) return raw;
+  const bytes: number[] = [];
+  for (let i = 0; i < raw.length; ) {
+    if (raw[i] === "\\" && raw[i + 1] === "x" && i + 3 < raw.length) {
+      const hex = raw.slice(i + 2, i + 4);
+      const byte = Number.parseInt(hex, 16);
+      if (!Number.isNaN(byte)) {
+        bytes.push(byte);
+        i += 4;
+        continue;
+      }
+    }
+    const code = raw.charCodeAt(i);
+    if (code < 128) {
+      bytes.push(code);
+    } else {
+      const buf = Buffer.from(raw[i]!, "utf8");
+      for (const b of buf) bytes.push(b);
+    }
+    i++;
+  }
+  return Buffer.from(bytes).toString("utf8");
+}
+
 async function openedFilePath(fd: number): Promise<string> {
   if (process.platform === "darwin") {
     const output = await new Promise<Buffer>((resolve, reject) => {
@@ -257,7 +282,7 @@ async function openedFilePath(fd: number): Promise<string> {
           .toString("utf8")
           .split("\0")
           .filter((field) => field.startsWith("n"))
-          .map((field) => field.slice(1))
+          .map((field) => decodeLsofPath(field.slice(1)))
       : [];
     if (paths.length !== 1 || !path.isAbsolute(paths[0]!)) {
       throw new Error("paperclip_runner_file_handoff_descriptor_unverifiable");

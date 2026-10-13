@@ -1,4 +1,4 @@
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterAll, describe, expect, it } from "vitest";
@@ -53,12 +53,19 @@ describe("resolveEnvIdentity", () => {
   });
 
   it("prefers COOLIE_REPO_DIR runtime overlay over the repo default", () => {
-    const overlay = identityFile({
-      archetype: "delta",
-      deployEnv: "staging",
-      projectName: "客户 A 前线攻坚",
-    });
-    const identity = resolveEnvIdentity({ COOLIE_REPO_DIR: path.dirname(overlay) });
+    const repoDir = path.join(scratch, "repo-" + Math.random().toString(36).slice(2));
+    const overlay = path.join(repoDir, ".coolie-local", "env-identity.json");
+    mkdirSync(path.dirname(overlay), { recursive: true });
+    writeFileSync(
+      overlay,
+      JSON.stringify({
+        archetype: "delta",
+        deployEnv: "staging",
+        projectName: "客户 A 前线攻坚",
+      }),
+      "utf8",
+    );
+    const identity = resolveEnvIdentity({ COOLIE_REPO_DIR: repoDir });
     expect(identity.archetype).toBe("delta");
     expect(identity.deployEnv).toBe("staging");
     expect(identity.sourceFile).toBe(overlay);

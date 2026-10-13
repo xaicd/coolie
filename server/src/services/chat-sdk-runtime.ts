@@ -1425,7 +1425,7 @@ function createProviderAdapter(
     }
     case "discord": {
       let gatewaySequence = 0;
-      const adapterConfig: DiscordAdapterConfig = {
+      const adapterConfig: any = {
         apiUrl: config.credentials.apiUrl,
         applicationId: config.credentials.applicationId,
         botToken: config.credentials.botToken,
@@ -1435,7 +1435,7 @@ function createProviderAdapter(
         // does not need.
         webhookVerifier: async () => false,
         logger: resolvedLogger,
-        onGatewayEvent: async (event) => {
+        onGatewayEvent: async (event: any) => {
           if (
             "guildId" in event &&
             (!event.guildId || event.guildId !== config.credentials.guildId)
@@ -1455,7 +1455,7 @@ function createProviderAdapter(
           if (fatal) observeDiscordGatewayFatal?.(true);
           else if (event.type === "ready") observeDiscordGatewayFatal?.(false);
         },
-        shouldCreateThread: async (input) => {
+        shouldCreateThread: async (input: any) => {
           if (input.guildId !== config.credentials.guildId) return false;
           return (
             (await callbacks.onDiscordRootMentionAdmission?.({
@@ -1466,7 +1466,7 @@ function createProviderAdapter(
         },
         userName: config.userName,
       };
-      return createDiscordAdapter(adapterConfig);
+      return createDiscordAdapter(adapterConfig as any);
     }
     case "microsoft-teams": {
       const adapterConfig: TeamsAdapterConfig = {
@@ -1481,7 +1481,7 @@ function createProviderAdapter(
       );
     }
     case "telegram": {
-      const adapterConfig: TelegramAdapterConfig = {
+      const adapterConfig: any = {
         ...config.credentials,
         logger: resolvedLogger,
         maxDownloadBytes: config.maxDownloadBytes,

@@ -2315,7 +2315,7 @@ describe("shared ACPX engine runtime behavior", () => {
   it("routes child stderr in-process while keeping the unfiltered run log", async () => {
     const root = await makeTempRoot();
     const stateDir = path.join(root, "state");
-    let runtimeOptions: AcpRuntimeOptions | undefined;
+    let runtimeOptions: (AcpRuntimeOptions & { onAgentStderr?: (chunk: string | Buffer) => void }) | undefined;
     const execute = createAcpxEngineExecutor({
       createRuntime: (options) => {
         runtimeOptions = options;
@@ -2356,7 +2356,7 @@ describe("shared ACPX engine runtime behavior", () => {
     const root = await makeTempRoot();
     const stateDir = path.join(root, "state");
     const warmHandles = new Map();
-    let runtimeOptions: AcpRuntimeOptions | undefined;
+    let runtimeOptions: (AcpRuntimeOptions & { onAgentStderr?: (chunk: string | Buffer) => void }) | undefined;
     const execute = createAcpxEngineExecutor({
       warmHandles,
       createRuntime: (options) => {

@@ -58,7 +58,7 @@
   "sideEffects": false,
   "scripts": {
     "build": "pnpm run check:protocol-manifest && pnpm run build:typescript && pnpm run check:capability-contract && pnpm run check:capability-inventory && pnpm run check:protocol-coverage && pnpm run check:semantic-contracts && pnpm run check:runner-workflow-traceability && pnpm run build:binary && node scripts/generate-replay-goldens.mjs --check && node scripts/generate-semantic-action-catalog.mjs --check",
-    "build:typescript": "pnpm run ensure:eval-build-deps && pnpm run check:protocol-types && node ./node_modules/typescript/bin/tsc --version && node ./node_modules/typescript/bin/tsc -p tsconfig.json && node ./node_modules/typescript/bin/tsc -p tsconfig.surfaces.json && node scripts/build-verified-provider-entrypoints.mjs",
+    "build:typescript": "pnpm run ensure:eval-build-deps && pnpm run check:protocol-types && tsc --version && tsc -p tsconfig.json && tsc -p tsconfig.surfaces.json && node scripts/build-verified-provider-entrypoints.mjs",
     "build:rust": "cargo build --manifest-path runner/Cargo.toml --locked --workspace --bins",
     "build:binary": "if command -v cargo >/dev/null 2>&1; then cargo build --release --manifest-path runner/Cargo.toml --locked -p paperclip-runner-core --bin paperclip-runnerd && node scripts/stage-runner-binary.mjs; else echo 'Cargo not found, using existing prebuilt runner binary'; fi",
     "build:provider-pack": "pnpm run build:typescript && node scripts/build-provider-pack.mjs",
@@ -69,7 +69,7 @@
     "build:scenarios": "vite build --config vite.scenarios.config.ts && node scripts/check-capability-csp-bundle.mjs",
     "build:issue-thread": "vite build --config vite.issue-thread.config.ts",
     "typecheck": "pnpm run typecheck:typescript && pnpm run typecheck:rust",
-    "typecheck:typescript": "pnpm run ensure:eval-build-deps && node --check scripts/protocol-contract.mjs && node --check scripts/generate-protocol-manifest.mjs && node --check scripts/generate-protocol-schema-module.mjs && node --check scripts/generate-acpx-sidecar-contract.mjs && node --check scripts/generate-replay-goldens.mjs && node --check scripts/generate-semantic-action-catalog.mjs && pnpm run check:protocol-types && node ./node_modules/typescript/bin/tsc --version && node ./node_modules/typescript/bin/tsc -p tsconfig.json --noEmit && node ./node_modules/typescript/bin/tsc -p tsconfig.surfaces.json --noEmit",
+    "typecheck:typescript": "pnpm run ensure:eval-build-deps && node --check scripts/protocol-contract.mjs && node --check scripts/generate-protocol-manifest.mjs && node --check scripts/generate-protocol-schema-module.mjs && node --check scripts/generate-acpx-sidecar-contract.mjs && node --check scripts/generate-replay-goldens.mjs && node --check scripts/generate-semantic-action-catalog.mjs && pnpm run check:protocol-types && tsc --version && tsc -p tsconfig.json --noEmit && tsc -p tsconfig.surfaces.json --noEmit",
     "typecheck:rust": "cargo fmt --manifest-path runner/Cargo.toml --all -- --check && cargo check --manifest-path runner/Cargo.toml --locked --workspace",
     "typecheck:browser": "tsc -p tsconfig.browser.json --noEmit",
     "test": "pnpm run test:typescript && pnpm run test:rust",

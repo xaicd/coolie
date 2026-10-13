@@ -159,12 +159,13 @@ const defaultModuleDir = path.dirname(fileURLToPath(import.meta.url));
 const PAPERCLIP_MANAGED_CODEX_SKILLS_MANIFEST = ".paperclip-managed-skills.json";
 const BENIGN_NES_CLOSE_STDERR = /method: ['"]nes\/close['"].*-32601/;
 
-function routeChildStderr(state: ChildStderrState, chunk: string) {
+function routeChildStderr(state: ChildStderrState, chunk: string | Buffer) {
+  const chunkStr = typeof chunk === "string" ? chunk : chunk.toString("utf8");
   if (state.logPath) {
     fsSync.mkdirSync(path.dirname(state.logPath), { recursive: true });
-    fsSync.appendFileSync(state.logPath, chunk);
+    fsSync.appendFileSync(state.logPath, chunkStr);
   }
-  const combined = state.pendingLiveLine + chunk;
+  const combined = state.pendingLiveLine + chunkStr;
   const lastNewline = combined.lastIndexOf("\n");
   if (lastNewline < 0) {
     state.pendingLiveLine = combined;
@@ -193,6 +194,9 @@ type PaperclipAcpRuntimeOptions = AcpRuntimeOptions & {
   // turn. A detached exec reads this getter to parent to the live run span. The
   // real `createAcpRuntime` ignores this optional field.
   getRuntimeParentContext?: () => StartupSpanContext | undefined;
+  spawnCwd?: string;
+  inheritProcessEnv?: boolean;
+  onAgentStderr?: (chunk: string | Buffer) => void;
 };
 
 type AcpxRuntimeFactory = (options: PaperclipAcpRuntimeOptions) => AcpRuntime;
@@ -4260,7 +4264,7 @@ export function createAcpxEngineExecutor(deps: AcpxEngineExecutorOptions = {}) {
           // when it spawns the provider child.
           inheritProcessEnv: false,
           onAgentStderr: prepared.childStderrLogPath
-            ? (chunk) => routeChildStderr(childStderrState, chunk)
+            ? (chunk: string | Buffer) => routeChildStderr(childStderrState, chunk)
             : undefined,
           onAgentSpawn: async (meta) => {
             processIdentitySink.latest = meta;

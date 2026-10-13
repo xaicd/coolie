@@ -71,6 +71,9 @@ interface GoalAwareAcpRuntime extends AcpRuntime {
 type GoalAwareAcpRuntimeOptions = AcpRuntimeOptions & {
   onAgentInitialize?: (result: unknown) => void;
   onSessionNotification?: (notification: unknown) => void;
+  spawnEnvironment?: () => Record<string, string>;
+  spawnCwd?: string;
+  spawnAgent?: (input: { args: string[]; options?: any }) => ChildProcess;
 };
 
 interface AcpxRuntimeGoalState {
@@ -341,7 +344,7 @@ export async function openQualifiedAcpxRuntime(
         : {}),
     }),
     spawnCwd: options.cwd,
-    spawnAgent: (input) => {
+    spawnAgent: (input: { args: string[]; options?: any }) => {
       // ACPX can invoke this callback after its handshake caller has already
       // been cancelled. Check at the last host-owned boundary so a late
       // handshake cannot create a provider process after authority is gone.

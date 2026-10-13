@@ -68,7 +68,13 @@ describe("runtime skill revision cache", () => {
         });
         console.log(JSON.stringify({ source, reads }));
       `;
-      const child = spawn(process.execPath, ["--import", fileURLToPath(new URL("../../node_modules/tsx/dist/loader.mjs", import.meta.url)), "--input-type=module", "-e", code], { stdio: ["ignore", "pipe", "pipe"] });
+      let tsxLoader: string;
+      try {
+        tsxLoader = fileURLToPath(import.meta.resolve("tsx"));
+      } catch {
+        tsxLoader = fileURLToPath(new URL("../../../node_modules/tsx/dist/loader.mjs", import.meta.url));
+      }
+      const child = spawn(process.execPath, ["--import", tsxLoader, "--input-type=module", "-e", code], { stdio: ["ignore", "pipe", "pipe"] });
       let output = "", errors = "";
       child.stdout.on("data", (chunk) => { output += chunk; });
       child.stderr.on("data", (chunk) => { errors += chunk; });

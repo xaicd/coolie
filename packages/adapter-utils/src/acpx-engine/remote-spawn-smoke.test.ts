@@ -37,6 +37,7 @@ const tempRoots: string[] = [];
 type PatchedAcpRuntimeOptions = AcpRuntimeOptions & {
   onAgentSpawn?: (meta: { pid: number; startedAt: string }) => Promise<void>;
   spawnCwd?: string;
+  onAgentStderr?: (chunk: string | Buffer) => void;
 };
 
 type PatchedEnsureSessionOptions = Parameters<ReturnType<typeof createAcpRuntime>["ensureSession"]>[0];
@@ -74,7 +75,7 @@ async function ensureRealAcpSession(input: {
     agentRegistry: createAgentRegistry({ overrides: { custom: agentCommand } }),
     permissionMode: "approve-all",
     nonInteractivePermissions: "deny",
-    onAgentStderr: (chunk: string) => stderrChunks.push(chunk),
+    onAgentStderr: (chunk: string | Buffer) => { stderrChunks.push(String(chunk)); },
     onAgentSpawn: input.onAgentSpawn,
   };
   const runtime = createAcpRuntime(runtimeOptions);
