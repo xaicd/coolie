@@ -7,10 +7,14 @@
   "exports": {
     ".": "./index.ts"
   },
-  "files": [
-    "*.ts"
-  ],
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.js"
+    },
+    "main": "./dist/index.js"
+  },
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf dist"
   },

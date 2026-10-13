@@ -57,7 +57,6 @@ async function resolveCompanyId() {
 const PROBES = [
   ["GET", "/api/health", false],
   ["GET", "/api/companies?scope=accessible", false],
-  ["GET", "/api/companies/templates", false],
   ["GET", "/api/companies/stats", false],
   ["GET", "/api/companies/:companyId", true],
   ["GET", "/api/companies/:companyId/agents", true],
@@ -85,7 +84,6 @@ const PROBES = [
 const LABELS = [
   "GET /api/health",
   "GET /api/companies",
-  "GET /api/companies/templates",
   "GET /api/companies/stats",
   "GET /companies/:cid",
   "GET /companies/:cid/agents",

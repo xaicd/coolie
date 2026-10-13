@@ -1,6 +1,6 @@
 ---
 name: local-team-toolchain
-description: 本地施工队（本体团队：Hermes/铁匠/墨斗/门神/兑底渊/百晓生）跨环境（Docker 容器 vs Mac 宿主机）调度 7 大工具池（claude-glm, claude-mm, cmd, copilot, agy, kiro-cli, hermes）的权威指南。涵盖 host-exec 穿透调用、dispatch 派单分流、context-bus 上下文接力总线、gate-evidence-ledger 门禁阻断与 .coolie-local 规范。
+description: 本地施工队（本体团队：Hermes/铁匠/墨斗/门神/兑底渊/百晓生）跨环境（Docker 容器 vs Mac 宿主机）调度 6 大工具池（claude-glm, claude-mm, cmd, copilot, agy, hermes）的权威指南。涵盖 host-exec 穿透调用、dispatch 派单分流、context-bus 上下文接力总线、gate-evidence-ledger 门禁阻断与 .coolie-local 规范。
 ---
 
 # local-team-toolchain — 本地团队跨环境工具池调度指南
@@ -9,7 +9,7 @@ description: 本地施工队（本体团队：Hermes/铁匠/墨斗/门神/兑底
 
 ---
 
-## 1. 物理环境与 7 工具池真实分布与调用契约
+## 1. 物理环境与 6 工具池真实分布与调用契约
 
 > **核心哲学（消灭万能网桥卡点）**：不搞重型中间件网桥/Proxy，以“透明工具规范 + 严格物理调用说明 + 免交互自愈脚本”直调底层 CLI。
 
@@ -21,7 +21,6 @@ description: 本地施工队（本体团队：Hermes/铁匠/墨斗/门神/兑底
 | **`cmd`** | **Mac 宿主机** (`/opt/homebrew/bin/cmd 1.74.3`) | `@commandcode/ai` CLI | `cmd -p "$PROMPT" --yolo --tools-all -t < /dev/null` | 门神 (FDSE) / 铁匠贰号 — 单测、E2E、自动化批处理 |
 | **`copilot`** | **Mac 宿主机** (`/opt/homebrew/bin/copilot 1.0.91`) | GitHub Copilot CLI | `copilot -p "$PROMPT" --yolo < /dev/null` | 兑底渊 (PRE-SRE) — 发版校验、OTA、监控、巡检 |
 | **`Hermes`** | **通用（宿主/容器均有）** | Hermes 会话引擎（人即工具） | `scripts/dispatch-local-employee.sh` 调度派发 | Hermes (PM / 掌柜) — 派单、进度核查、门禁汇总 |
-| **`kiro-cli`** | **Mac 宿主机（老板专属保留）** | AWS Kiro CLI | `kiro-cli -p "$PROMPT" < /dev/null` | Hermes / 墨斗 — 架构设计、Spec 驱动大重构 |
 
 ### 1.1 `claude-*` 工具族配置文件软链接切换铁律
 机器上**没有任何名为 `claude-glm` 或 `claude-mm` 的独立二进制程序**，只有官方 `claude` CLI。

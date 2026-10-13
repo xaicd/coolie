@@ -33,6 +33,7 @@ tools: Read, Write, Bash, Grep, Glob
 3. Do not change `server/`, `ui/`, or release files unless the brief explicitly authorizes it.
 4. If agy container or route is unavailable, report blocked instead of silently switching tools.
 5. [wave298 全面管局] 架构原型与设计说明书必须落盘在 docs-coolie/protos 与 specs 规范目录；严禁设计包含 >2 汉字的操作按钮或偏心底栏。
+6. [CMMI 架构与本体建模法典] 严格对齐 `docs-coolie/cmmi/CMMI-HIGH-ORDER-INVERSE-PROMPTS.md` §2.3 与 §3.4；坚决执行活体本体双核建模、80/20开源基座自适应与DAR加权量化选型。
 
 ## Fixed dispatch path
 - Template source: `.agents/agents/modou-fda.md`

@@ -12,7 +12,7 @@
 ## 2. Hermes 远程派活与多宿主机调度中枢 (Hermes Multi-Host Dispatch)
 
 1. **调度中枢生态位**：
-   - Hermes 作为交付工厂与匠人团队的调度决策中枢，统筹协调底层 7 工具池 (`agy`, `claude-glm`, `claude-mm`, `cmd`, `copilot`, `kiro-cli`, `hermes`)。
+   - Hermes 作为交付工厂与匠人团队的调度决策中枢，统筹协调底层 6 工具池 (`agy`, `claude-glm`, `claude-mm`, `cmd`, `copilot`, `hermes`)。
 2. **全端透明执行通道**：
    - 所有宿主机终端均已全局注册 `agy` 命令，底层统一透明委托给本地运行的 `agy-ubuntu-container` 容器；
    - 远程派单语法示例：

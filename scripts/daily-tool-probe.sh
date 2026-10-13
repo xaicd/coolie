@@ -16,7 +16,6 @@
 #   4. cmd            cmd -p '回复 OK'
 #   5. copilot        copilot -p '回复 OK'
 #   6. Hermes         本脚本正在执行 + dispatch-wave 跑通 (PM 工具 = 我)
-#   7. kiro-cli       kiro-cli -p '回复 OK'
 #
 # 解析规则:
 #   - 返回含 'ok' / 'OK' / 'ready' (大小写不敏感) → 状态 OK
@@ -93,10 +92,10 @@ usage() {
   cat <<'EOF'
 usage: scripts/daily-tool-probe.sh [--print | --json | --dry-run | --register | --unregister]
 
-wave277 — 每天早上工具使用探测 (7 工具池: agy-gemini3.8 / claude-mm /
-claude-glm / cmd / copilot / Hermes / kiro-cli)
+wave277 — 每天早上工具使用探测 (6 工具池: agy-gemini3.8 / claude-mm /
+claude-glm / cmd / copilot / Hermes)
 
-  --print         打印 7 工具状态 (默认, 表格形式)
+  --print         打印 6 工具状态 (默认, 表格形式)
   --json          输出 JSON (供下游 / notify 消费)
   --dry-run       打印即将注册的 cron 行
   --register      注册 cron (idempotent, 每天 8:00 跑本脚本)
@@ -374,23 +373,6 @@ probe_hermes() {
   printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$path" "$run_probe" "$run_secs" "$run_status" "$run_snippet" "$final_status"
 }
 
-probe_kiro_cli() {
-  local path run_probe run_secs run_status run_snippet final_status
-  path="$(probe_path kiro-cli)"
-  if [[ "$path" == "(not in PATH)" ]]; then
-    run_probe="kiro-cli -p '$PROBE_PROMPT'"; run_secs="-"; run_status="FAIL"; run_snippet="binary not in PATH"; final_status="FAIL"
-  else
-    # boss brief 指定 kiro-cli -p '回复 OK'; kiro-cli 2.x 默认 interactive,
-    # 此探测可能 hang 或返回错误 — 都算 FAIL, PM 看修法
-    run_probe="kiro-cli -p '$PROBE_PROMPT'"
-    local result
-    result="$(probe_real_run_ok "kiro-cli -p '$PROBE_PROMPT' 2>&1")" || true
-    run_secs=$(awk -F'\t' '{print $1}' <<<"$result" 2>/dev/null); run_status=$(awk -F'\t' '{print $2}' <<<"$result" 2>/dev/null); run_snippet=$(awk -F'\t' '{print $4}' <<<"$result" 2>/dev/null)
-    final_status="$run_status"
-  fi
-  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$path" "$run_probe" "$run_secs" "$run_status" "$run_snippet" "$final_status"
-}
-
 # ---------- 收集 / 渲染 ----------
 
 NOW_LOCAL="$(date '+%Y-%m-%d %H:%M:%S %Z')"
@@ -399,7 +381,7 @@ PROBE_DATE="$(date '+%Y-%m-%d')"
 PROBE_DIR="$REPO_ROOT/docs-coolie/probe"
 PROBE_OUT="$PROBE_DIR/$NOW_FILE-tool-probe.md"
 
-# 7 工具依次探测 (顺序按 wave272 拍板的工具池)
+# 6 工具依次探测 (顺序按 wave272 拍板的工具池)
 declare -a TOOLS=(
   "agy-gemini3.8:probe_agy_gemini38"
   "claude-mm:probe_claude_mm"
@@ -407,7 +389,6 @@ declare -a TOOLS=(
   "cmd:probe_cmd"
   "copilot:probe_copilot"
   "Hermes:probe_hermes"
-  "kiro-cli:probe_kiro_cli"
 )
 
 collect_rows() {
@@ -446,9 +427,6 @@ suggest_fix() {
       ;;
     Hermes:FAIL|*:FAIL)
       echo "  → 修法: 检查 ~/.local/bin/ 或 PATH 路径; 重新安装工具"
-      ;;
-    kiro-cli:FAIL)
-      echo "  → 修法: curl -fsSL https://aws.kiro.dev/install.sh | bash; 或重装 ~/.local/bin/kiro-cli"
       ;;
   esac
 }

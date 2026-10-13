@@ -592,10 +592,6 @@ if [[ ${#EXEC_CMD[@]} -eq 0 ]]; then
         TOOL_ARGS+=("--max-autopilot-continues" "$MAX_TURNS")
       fi
       ;;
-    kiro-cli)
-      TOOL_BIN="kiro-cli"
-      TOOL_ARGS=("-p" "$(cat "$prompt_file")")
-      ;;
     hermes)
       TOOL_BIN="bash"
       TOOL_ARGS=("$REPO_ROOT/scripts/cron-team-status.sh" "--dispatch-check")

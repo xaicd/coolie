@@ -9,7 +9,16 @@
     "./*.js": "./src/*.ts",
     "./*": "./src/*.ts"
   },
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.js",
+      "./*.js": "./dist/*.js",
+      "./*": "./dist/*.js"
+    },
+    "main": "./dist/index.js"
+  },
   "scripts": {
+    "build": "tsc",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

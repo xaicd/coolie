@@ -2,7 +2,7 @@
 /**
  * scripts/acpx-tool-probe.mjs
  * 
- * Coolie 7 工具池 ACPX 全双工协议深度探针 (ACP-Native Tool Health Prober)
+ * Coolie 6 工具池 ACPX 全双工协议深度探针 (ACP-Native Tool Health Prober)
  * 核心公理: "怎么调的，就怎么测"
  * 
  * 职责:
@@ -272,7 +272,7 @@ function probeAcpxDeep(acpxBin, agentArg, timeoutSec = 15) {
   });
 }
 
-// 4. 定义 7 工具池探针配置与元数据 (兼容 tool-health-monitor)
+// 4. 定义 6 工具池探针配置与元数据 (兼容 tool-health-monitor)
 function getToolDefinitions() {
   const agyAdapter = resolveAdapterScript("scripts/adapters/docker-agy-acp.sh");
   const glmAdapter = resolveAdapterScript("scripts/adapters/claude-glm-acp.sh");
@@ -340,16 +340,6 @@ function getToolDefinitions() {
       deepAgent: null,
       checkBinary: "hermes",
     },
-    {
-      name: "kiro-cli",
-      title: "Kiro CLI (老板保留工具)",
-      bestFor: ["架构设计", "Spec驱动", "重构"],
-      recommendedEmployees: ["Hermes", "墨斗"],
-      quota: null,
-      adapter: null,
-      deepAgent: null,
-      checkBinary: "kiro-cli",
-    },
   ];
 }
 
@@ -389,7 +379,7 @@ async function main() {
         isPresent = Boolean(binPath);
       } catch {}
 
-      if (!isPresent && (t.name === "copilot" || t.name === "kiro-cli")) {
+      if (!isPresent && t.name === "copilot") {
         results.tools[t.name] = {
           status: "standby",
           bestFor: t.bestFor,
@@ -405,7 +395,7 @@ async function main() {
       }
     }
 
-    // 针对非 ACP 适配器的专用工具 (如 Hermes 调度中枢 / kiro-cli)
+    // 针对非 ACP 适配器的专用工具 (如 Hermes 调度中枢)
     if (!t.adapter) {
       let isPresent = false;
       let binPath = "";
@@ -483,7 +473,7 @@ async function main() {
   }
 
   console.log("==================================================================");
-  console.log(`🔌 Coolie 7 工具池 ACPX 全双工协议深度探针 [${results.mode}]`);
+  console.log(`🔌 Coolie 6 工具池 ACPX 全双工协议深度探针 [${results.mode}]`);
   console.log("==================================================================");
   console.log(`  总线引擎: ${acpxBin ? `✅ ${acpxBin} (${acpxVersion})` : "❌ 未找到 acpx"}`);
   console.log("------------------------------------------------------------------");

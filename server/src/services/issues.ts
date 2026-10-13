@@ -93,6 +93,7 @@ import type {
   IssueWatchdogSummary,
   LowTrustBoundary,
   SuccessfulRunHandoffState,
+  IssueMilestone,
 } from "@paperclipai/shared";
 import {
   clampIssueRequestDepth,
@@ -11066,6 +11067,29 @@ export function issueService(db: Db) {
                 (blockedByIssueIds !== undefined || issueData.unblockDescriptor !== undefined)))) {
           patch.statusVersion = sql`${issues.statusVersion} + 1` as unknown as number;
         }
+
+        // wave375: Automatic Milestone State Synchronization
+        // When an issue with isMilestone: true transitions in status, synchronize milestone JSON
+        if (receiptExisting.isMilestone && receiptExisting.milestone) {
+          const currentMilestone = receiptExisting.milestone as IssueMilestone;
+          const effectiveStatus = issueData.status !== undefined ? issueData.status : receiptExisting.status;
+          let nextMilestoneStatus = currentMilestone.status;
+          if (effectiveStatus === "done") {
+            nextMilestoneStatus = "achieved";
+          } else if (effectiveStatus === "in_progress" && currentMilestone.status === "not_started") {
+            nextMilestoneStatus = "in_progress";
+          } else if (effectiveStatus === "blocked") {
+            nextMilestoneStatus = "blocked";
+          }
+          if (nextMilestoneStatus !== currentMilestone.status || (effectiveStatus === "done" && !currentMilestone.completedDate)) {
+            patch.milestone = {
+              ...currentMilestone,
+              status: nextMilestoneStatus,
+              completedDate: nextMilestoneStatus === "achieved" ? (currentMilestone.completedDate ?? new Date().toISOString()) : currentMilestone.completedDate,
+            };
+          }
+        }
+
         const updated = await tx
           .update(issues)
           .set(patch)
@@ -11085,6 +11109,34 @@ export function issueService(db: Db) {
           const { issueThreadInteractionService } = await import("./issue-thread-interactions.js");
           await issueThreadInteractionService(tx).expireConnectionIntentsForOwnershipChange(updated);
         }
+
+        // wave375: CMMI Gate Milestone Progression Pipeline
+        // When a milestone task achieves its gate, automatically advance downstream CMMI stage!
+        const milestoneJustAchieved =
+          Boolean(updated.isMilestone && updated.projectId) &&
+          ((existing.status !== "done" && updated.status === "done") ||
+            ((receiptExisting.milestone as IssueMilestone | null)?.status !== "achieved" &&
+              (updated.milestone as IssueMilestone | null)?.status === "achieved"));
+
+        if (milestoneJustAchieved) {
+          const currentMilestone = updated.milestone as IssueMilestone | null;
+          if (currentMilestone?.gate) {
+            try {
+              const { advanceProjectCmmiStage } = await import("./project-cmmi-wbs-bootstrap.js");
+              await advanceProjectCmmiStage(tx as unknown as Db, {
+                companyId: updated.companyId,
+                projectId: updated.projectId!,
+                completedGate: currentMilestone.gate,
+                actorUserId: actorUserId ?? null,
+              });
+            } catch (err: any) {
+              logger.warn(
+                `[issues] advanceProjectCmmiStage auto-advance warning for gate ${currentMilestone.gate}: ${err?.message ?? err}`,
+              );
+            }
+          }
+        }
+
         if (existing.status !== updated.status) {
           if (
             (existing.status === "done" || existing.status === "cancelled") &&

@@ -19,7 +19,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TOOLS_DOC="${REPO_ROOT}/docs-coolie/TOOLS.md"
 
-# 7 工具池 (wave272 拍板 + wave280 修正 Hermes 行): name|cli-binary|employee-default|status
+# 6 工具池 (wave272 拍板 + wave280 修正 Hermes 行): name|cli-binary|employee-default|status
 TOOLS=(
   "agy-gemini3.8|agy-gemini3.8|墨斗 (FDA)|✅ 主线"
   "claude-mm|claude-mm|铁匠贰号 (Core SWE 副)|✅ 主线"
@@ -27,7 +27,6 @@ TOOLS=(
   "cmd|cmd|门神 (FDSE)|✅ 主线"
   "copilot|copilot|兑底渊 (PRE-SRE)|⚠️ 限制"
   "Hermes|hermes|Hermes (PM, 人即工具, wave280)|✅ 主线"
-  "kiro-cli|kiro-cli|老板备用 (wave280 解除 Hermes 绑定)|✅ 主线"
 )
 
 # 6 老板团队 → 工具 (默认 + 兜底), wave272 真配 + wave280 修正 Hermes 行
@@ -46,22 +45,21 @@ print_help() {
 which-tool.sh — PM 选工具 CLI (wave272 + wave276 + wave280)
 
 用法:
-  scripts/which-tool.sh                 列出 7 工具池 + 6 老板团队真配
+  scripts/which-tool.sh                 列出 6 工具池 + 6 老板团队真配
   scripts/which-tool.sh <tool>          单工具状态 + 默认员工
   scripts/which-tool.sh <员工>           单员工 → 工具 (默认 + 兜底)
-  scripts/which-tool.sh check           7 工具 CLI 可执行性 (which)
+  scripts/which-tool.sh check           6 工具 CLI 可执行性 (which)
   scripts/which-tool.sh acp             6 大工具 ACP (Agent Client Protocol) 适配矩阵
   scripts/which-tool.sh status          5 字段团队状态 (PM 问"什么进展"用, wave276)
   scripts/which-tool.sh --help           帮助
 
-7 工具池 (老板原话 wave272, wave280 修正 Hermes):
+6 工具池 (老板原话 wave272, wave280 修正 Hermes):
   1. agy-gemini3.8 — 墨斗 (画原型 / 选型 / 研判)
   2. claude-mm      — 铁匠贰号 / 百晓生 (代码 / DS 备用)
   3. claude-glm     — 铁匠 (代码开发主力, wave272 拍板)
   4. cmd            — 门神 (命令 / 派活 / 自动化)
   5. copilot        — 兑底渊 (部署 / 运维 / 监控)
   6. Hermes         — PM (人即工具, 拍板 / 派活; wave280 确认不配 kiro-cli)
-  7. kiro-cli       — 老板备用 (wave280 起解除与 Hermes 绑定)
 
 出处: docs-coolie/TOOLS.md (wave272 + wave280) + docs-coolie/PM-REPORTING-FORMAT.md (wave276 + wave280)
 EOF
@@ -74,7 +72,7 @@ list_all() {
     source "$lib_env"
   fi
 
-  echo "═══ 7 工具池 (wave272 拍板) ═══"
+  echo "═══ 6 工具池 (wave272 拍板 + wave280 修正) ═══"
   printf "%-3s %-15s %-30s %-12s %s\n" "#" "工具" "默认员工" "状态" "物理宿主 / 驱动模式"
   echo "----------------------------------------------------------------------------------------"
   local i=1
@@ -93,8 +91,6 @@ list_all() {
     elif [[ "$name" == "Hermes" ]]; then
       IFS=$'\t' read -r s lat d <<< "$(smart_probe_hermes)"
       bin="$d"
-    elif [[ "$name" == "kiro-cli" ]]; then
-      bin="老板专属保留 (未放入全局 PATH)"
     elif command -v "$cli" >/dev/null 2>&1; then
       bin="$(command -v "$cli")"
     elif [[ -x "$REPO_ROOT/scripts/host-exec.sh" ]] && res="$("$REPO_ROOT/scripts/host-exec.sh" "command -v $cli" 2>/dev/null)" && [[ -n "$res" ]]; then
@@ -107,7 +103,7 @@ list_all() {
   done
 
   echo ""
-  echo "═══ 6 老板团队 × 7 工具池 真配矩阵 (wave272) ═══"
+  echo "═══ 6 老板团队 × 6 工具池 真配矩阵 (wave272) ═══"
   printf "%-12s %-15s %s\n" "员工" "默认工具" "兜底工具"
   echo "----------------------------------------"
   for row in "${MAPPING[@]}"; do
@@ -158,16 +154,13 @@ lookup_tool() {
       elif [[ "$name" == "Hermes" ]]; then
         echo "  物理本质: PM 唯一调度会话中枢 (人即工具)"
         echo "  派单模板: scripts/dispatch-local-employee.sh --agent <agent> --task <task> --execute"
-      elif [[ "$name" == "kiro-cli" ]]; then
-        echo "  物理本质: Mac 宿主机 AWS Kiro CLI (老板架构大重构专属保留)"
-        echo "  CLI 调用: kiro-cli -p \"\$PROMPT\" < /dev/null"
       fi
       found=1
     fi
   done
   if [[ $found -eq 0 ]]; then
     echo "未找到工具: $query"
-    echo "可用工具: agy-gemini3.8 / claude-mm / claude-glm / cmd / copilot / Hermes / kiro-cli"
+    echo "可用工具: agy-gemini3.8 / claude-mm / claude-glm / cmd / copilot / Hermes"
     return 1
   fi
 }
@@ -218,7 +211,7 @@ check_tools() {
   echo "当前运行宿主: $env_desc"
   echo "----------------------------------------------------------------"
   local ok=0
-  local total=7
+  local total=6
 
   # 1. Hermes (PM调度总指挥 / 原生实体)
   IFS=$'\t' read -r h_status h_lat h_detail <<< "$(smart_probe_hermes)"
@@ -289,16 +282,6 @@ check_tools() {
     printf "  ❌ %-15s %s\n" "agy-gemini3.8" "$agy_detail"
   fi
 
-  # 7. kiro-cli (老板专属保留)
-  IFS=$'\t' read -r kiro_status kiro_lat kiro_detail <<< "$(smart_probe_artisan_tool kiro-cli)"
-  if [[ "$kiro_status" == "ok" ]]; then
-    printf "  ✅ %-15s %s\n" "kiro-cli" "$kiro_detail"
-    ok=$((ok+1))
-  else
-    printf "  ⚠️  %-15s %s\n" "kiro-cli" "$kiro_detail"
-    ok=$((ok+1))
-  fi
-
   echo "----------------------------------------------------------------"
   echo "物理探针健康率: $ok / ${total}"
   if [[ -f "$TOOLS_DOC" ]]; then
@@ -358,7 +341,7 @@ case "${1:-}" in
       "Hermes"|"墨斗"|"铁匠"|"铁匠贰号"|"门神"|"兑底渊"|"百晓生")
         lookup_employee "$1"
         ;;
-      "agy-gemini3.8"|"claude-mm"|"claude-glm"|"cmd"|"copilot"|"kiro-cli")
+      "agy-gemini3.8"|"claude-mm"|"claude-glm"|"cmd"|"copilot")
         lookup_tool "$1"
         ;;
       *)

@@ -565,6 +565,122 @@ try {
 assertRule('CMMI 标准资产反造假扫描守卫: node scripts/cmmi-asset-scaffold.cjs check 必须通过 (0 散落、0 假 Demo)', cmmiCheckOk, 'cmmi-asset-scaffold check 失败');
 
 // -----------------------------------------------------------------------------
+// 16.1 运营对账平账 (G7 / Phase 09) 三方对账能力与零假基线守卫 (wave286-COOA-110)
+// -----------------------------------------------------------------------------
+const reconSopPath = 'docs/09_operations/tenant-governance.md';
+const reconSopContent = fs.existsSync(reconSopPath) ? fs.readFileSync(reconSopPath, 'utf8') : '';
+const reconSopHasSources = ['hk_orders', 'pay_orders', '对账单'].every((k) => reconSopContent.includes(k));
+const reconSopHasInvariants =
+  reconSopContent.includes('复式记账') && reconSopContent.includes('期初余额') && reconSopContent.includes('无对账不放款');
+assertRule(
+  '运营对账平账 SOP 守卫: docs/09_operations/tenant-governance.md 必须定义三方对账源 (业务订单/支付网关/外部渠道账单) 与复式记账不变量',
+  reconSopHasSources && reconSopHasInvariants,
+  'G7 运营 SOP 缺失三方对账数据源或复式记账 / 无对账不放款不变量',
+);
+
+const reconRoots = ['docs', 'projects/sys-yunnan-wecom/docs', 'projects/sys-chanrong-agent/docs', 'projects/sys-jiuxia-smart/docs'];
+const reconFakeFiles = [];
+for (const reconRoot of reconRoots) {
+  const reconDir = path.join(reconRoot, '09_operations/02_financial_reconciliation');
+  if (!fs.existsSync(reconDir)) continue;
+  for (const entry of fs.readdirSync(reconDir)) {
+    if (entry !== '.gitkeep') reconFakeFiles.push(path.join(reconDir, entry));
+  }
+}
+assertRule(
+  '运营对账平账零假基线守卫: 真实外部流水发生前, 02_financial_reconciliation/ 仅允许 .gitkeep 占位 (真实流水启动后须同步升级本守卫)',
+  reconFakeFiles.length === 0,
+  `存在未经真实外部流水的对账产物: ${reconFakeFiles.join(', ')}`,
+);
+
+// -----------------------------------------------------------------------------
+// 16.1.1–16.1.7 运营对账硬化 (wave286-COOA-112 · F1–F7) — 反向传播防退化
+// -----------------------------------------------------------------------------
+// 取 SOP §四 (§4.*) 与 §六 (§六) 段落,精准断言 (基于行号,兼容中英标题)
+function extractSection(content, headerPattern) {
+  const lines = content.split('\n');
+  const startIdx = lines.findIndex((l) => l.startsWith(headerPattern));
+  if (startIdx < 0) return '';
+  let endIdx = lines.length;
+  for (let i = startIdx + 1; i < lines.length; i++) {
+    if (/^## \S/.test(lines[i])) {
+      endIdx = i;
+      break;
+    }
+  }
+  return lines.slice(startIdx, endIdx).join('\n');
+}
+const sopSectionFour = extractSection(reconSopContent, '## 四、 ');
+const sopSectionSix = extractSection(reconSopContent, '## 六、 ');
+const sopHeaderBlock = reconSopContent.split('\n').slice(0, 12).join('\n');
+
+// F1 · 空账期口径: §四含 is_empty_day / 空日结 / recon_date 三关键词
+assertRule(
+  'F1 空账期口径守卫: SOP §四 必须定义 is_empty_day / 空日结 / recon_date 三要素',
+  sopSectionFour.includes('is_empty_day') && sopSectionFour.includes('空日结') && sopSectionFour.includes('recon_date'),
+  'G7 SOP §四 缺失 F1 空账期口径关键词 (is_empty_day / 空日结 / recon_date)',
+);
+
+// F2 · 调账 maker-checker: §六含 ops:recon:adjust + approver != applicant + 403
+assertRule(
+  'F2 调账 maker-checker 互斥守卫: SOP §六 必须强制 approver != applicant (ops:recon:adjust + 403)',
+  sopSectionSix.includes('ops:recon:adjust') && sopSectionSix.includes('approver != applicant') && sopSectionSix.includes('403'),
+  'G7 SOP §六 缺失 F2 调账 maker-checker 互斥 (与 INV-6 不一致)',
+);
+
+// F3 · 长款 SLA/终态: §四含 force_closed / SLA / 72h
+assertRule(
+  'F3 长款处置终态守卫: SOP §四 必须定义 force_closed 终态 + SLA + 72h',
+  sopSectionFour.includes('force_closed') && sopSectionFour.includes('SLA') && sopSectionFour.includes('72h'),
+  'G7 SOP §四 缺失 F3 长款处置终态/SLA/超时兜底',
+);
+
+// F4 · 短款幂等: §四含 vendor_txn_id + 幂等
+assertRule(
+  'F4 短款补单幂等守卫: SOP §四 必须定义幂等键 vendor_txn_id',
+  sopSectionFour.includes('vendor_txn_id') && sopSectionFour.includes('幂等'),
+  'G7 SOP §四 缺失 F4 短款补单幂等键 vendor_txn_id',
+);
+
+// F5 · 跨日退款归属: §四含 vendor_settled_at + 外部渠道清算日
+assertRule(
+  'F5 跨日退款归属守卫: SOP §四 必须定义 vendor_settled_at + 外部渠道清算日',
+  sopSectionFour.includes('vendor_settled_at') && sopSectionFour.includes('外部渠道清算日'),
+  'G7 SOP §四 缺失 F5 跨日/部分退款 recon_date 归属口径',
+);
+
+// F6 · 报告指纹算法: §四含 SHA-256 + fingerprint + canonicalJSON
+assertRule(
+  'F6 报告指纹算法守卫: SOP §四 必须定义 SHA-256 校验指纹 (canonicalJSON + fingerprint)',
+  sopSectionFour.includes('SHA-256') && sopSectionFour.includes('fingerprint') && sopSectionFour.includes('canonicalJSON'),
+  'G7 SOP §四 缺失 F6 校验指纹算法 (不可伪造不可验证)',
+);
+
+// F6 配套: fingerprint lib `scripts/signature.cjs` 实体存在
+const signatureLibExists = fs.existsSync('scripts/signature.cjs');
+assertRule(
+  'F6 fingerprint lib 实体守卫: scripts/signature.cjs 必须存在并提供 computeReconciliationFingerprint()',
+  signatureLibExists,
+  'scripts/signature.cjs 缺失 (F6 校验指纹无落地实现)',
+);
+
+// F7 · 上游契约断链修复: SOP 头注不再含 02_requirements/ 字面;指向 SPEC-implementation.md 或 PRODUCT.md
+assertRule(
+  'F7 上游契约修复守卫: SOP 头注必须删除 02_requirements/ 引用并指向 SPEC-implementation.md / PRODUCT.md',
+  !sopHeaderBlock.includes('02_requirements/') &&
+    (sopHeaderBlock.includes('SPEC-implementation.md') || sopHeaderBlock.includes('PRODUCT.md')),
+  'G7 SOP 头注仍引用不存在的 02_requirements/ (合同断链未修复)',
+);
+
+// F6 配套: reconciliation 模板必须显式输出 fingerprint 字段 (对齐 SOP §4.4 "报告模板头部必须输出 fingerprint")
+const scaffoldReconTemplateSource = fs.readFileSync('scripts/cmmi-asset-scaffold.cjs', 'utf8');
+assertRule(
+  'F6 对账模板指纹输出守卫: cmmi-asset-scaffold.cjs reconciliation 模板必须显式输出 fingerprint 字段',
+  scaffoldReconTemplateSource.includes('fingerprint'),
+  'cmmi-asset-scaffold.cjs reconciliation 模板未输出 fingerprint 字段 (F6 模板未落地)',
+);
+
+// -----------------------------------------------------------------------------
 // 17. Spec-Kit 统一全类型 SDD 规格引擎守卫 (Unified Spec-Kit SDD Engine Gate)
 // -----------------------------------------------------------------------------
 console.log('\n⚙️ 17. Spec-Kit 统一全类型 SDD 规格引擎守卫:');

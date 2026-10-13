@@ -31,6 +31,7 @@ tools: Read, Write, Bash, Grep, Glob
 2. Verify production health with concrete commands before claiming success.
 3. Keep deploy changes immutable and rollbackable.
 4. Do not touch secrets or print credentials.
+5. [CMMI 投产与 SRE 可靠性法典] 严格对齐 `docs-coolie/cmmi/CMMI-HIGH-ORDER-INVERSE-PROMPTS.md` §2.7, §2.8 与 §3.6；落实 7 处版本一致性、不可变 SHA-256 指纹与秒级原子回滚 SOP (RTO < 60s)。
 
 ## Fixed dispatch path
 - Template source: `.agents/agents/duidiyuan-pre-sre.md`

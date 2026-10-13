@@ -73,17 +73,25 @@ export function isMainlineIssue(issue: Pick<WbsIssueLike, "isMilestone">): boole
   return issue.isMilestone === true;
 }
 
-/** Normalise a milestone's status (a milestone with no block counts as 未开始). */
-export function milestoneStatus(milestone: IssueMilestone | null | undefined): MilestoneStatus {
-  return milestone?.status ?? "not_started";
+/** Normalise a milestone's status (a milestone with no block counts as 未开始; issueStatus === "done" implies achieved). */
+export function milestoneStatus(
+  milestone: IssueMilestone | null | undefined,
+  issueStatus?: string | null,
+): MilestoneStatus {
+  if (issueStatus === "done") return "achieved";
+  const status = milestone?.status;
+  if ((status as any) === "completed") return "achieved";
+  return status ?? "not_started";
 }
 
 /** A gated milestone blocks its successors until it is achieved or exempted. */
 export function milestoneSatisfied(
   milestone: { status?: MilestoneStatus | null; exempted?: boolean | null } | null | undefined,
+  issueStatus?: string | null,
 ): boolean {
+  if (issueStatus === "done") return true;
   if (!milestone) return false;
-  return milestone.status === "achieved" || milestone.exempted === true;
+  return milestone.status === "achieved" || (milestone.status as any) === "completed" || milestone.exempted === true;
 }
 
 export interface WbsGateState {
@@ -122,7 +130,7 @@ export function evaluateWbsGates(issues: readonly WbsIssueLike[]): Map<string, W
       if (phase >= phaseNumber) continue;
       const definition = PHASE_BY_NUMBER.get(phase);
       if (!definition?.gate) continue;
-      if (milestoneSatisfied(milestone.milestone)) continue;
+      if (milestoneSatisfied(milestone.milestone, milestone.status)) continue;
       if (!worst || compareWbsCode(milestone.wbsCode, worst.wbsCode) < 0) worst = milestone;
     }
     return worst;
@@ -213,7 +221,7 @@ export function buildWbsMainline(issues: readonly WbsIssueLike[]): WbsMainline {
           title: milestoneIssue.title,
           gate: phase.gate,
           gateLabel: definition?.label ?? null,
-          status: milestoneStatus(milestoneIssue.milestone),
+          status: milestoneStatus(milestoneIssue.milestone, milestoneIssue.status),
           plannedDate: milestoneIssue.milestone?.plannedDate ?? null,
           completedDate: milestoneIssue.milestone?.completedDate ?? null,
           approver: milestoneIssue.milestone?.approver ?? null,

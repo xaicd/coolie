@@ -5,7 +5,7 @@
 > **归属门禁**: G7 持续商业运营门禁 (`gate_g7_ops`)
 > **责任数字员工**: 百晓生 (Sage · DS · 部署战略与业务主审) / 掌柜 (CEO)
 > **驱动 Skills**: `ceo-company-ops` · `financial-reconciliation-agent` · `finance-budget-guard`
-> **上游契约**: SRS v1.1 (`docs/02_requirements/software-requirements.md`) · HLD/ERD (`docs/03_design/`) · 部署 SOP (`docs/07_release/system-deployment-sop.md`)
+> **上游契约**: SRS v1.1 (COOA-97 · [`docs-coolie/specs/2026-10-10-cooa-97-community-life-service-mvp-srs.md`](../../docs-coolie/specs/2026-10-10-cooa-97-community-life-service-mvp-srs.md)) · V1 构建合同 ([`doc/SPEC-implementation.md`](../../doc/SPEC-implementation.md)) · 产品定位 ([`doc/PRODUCT.md`](../../doc/PRODUCT.md)) · HLD/ERD (`docs/03_design/`) · 部署 SOP (`docs/07_release/system-deployment-sop.md`)
 > **基线日期**: 2026-10-11
 > **最高原则**: 零假 Demo（未发生的运行期资金流水一律留空）· 复式记账借贷恒等 · 违规抹账一票否决
 
@@ -114,19 +114,54 @@ $$\text{期初余额} + \text{收入} - \text{支出} = \text{期末余额}$$
 
 对账引擎对所有租户资金账户执行全量扫描，出现任一单边账（不平衡）立即阻断结算通道并告警。
 
+#### 4.2.1 空账期口径与无交易日豁免 (F1 · P1)
+
+**判定**：`is_empty_day` 指当日 (Asia/Shanghai) 经三方 A/B/C 汇总后 `order_count=0 ∧ pay_count=0 ∧ refund_count=0 ∧ diff_count=0` 的日。
+
+**MUST 行为**：
+
+- 即使 `is_empty_day=TRUE`，对账作业 `runDailyBatch()` 仍 MUST 在 `pay_reconciliations` 落一条 `status=balanced`、`is_empty_day=TRUE`、`diff_count=0` 的空日结凭证以保留 `uk_tenant_recon_date` 唯一键不缺口；
+- 当日 `is_empty_day=TRUE` 时,INV-5「无对账不放款」自动对该租户当日提现闸门豁免（`reason=no_business_day`），MUST 在闸门决策日志（`pay_payout_gate_log`）记录豁免理由；
+- `is_empty_day` 与 `recon_date` 字段是同一 `pay_reconciliations` 的两个列，MUST 同时非空。
+
+#### 4.2.2 短款补单幂等与去重锚 (F4 · P2)
+
+- 短款自动补单 MUST 以**外部对账单交易号** `vendor_txn_id`（渠道侧权威唯一）作为幂等键；
+- 收到原支付回调后到达时若 `vendor_txn_id` 已存在于 `pay_recon_replay_log.replayed_vendor_txn_id`，MUST 走 NO-OP 分支并落审计（`event=skip_duplicate_replay, payload={vendor_txn_id, gate=idempotent}`），禁止双入账；
+- 补单前置读取 `pay_recon_replay_log` 并加数据库唯一约束 `uk_replay_vendor_txn (vendor_txn_id)` 兜底。
+
+#### 4.2.3 跨日/部分退款 `recon_date` 归属 (F5 · P2)
+
+- 「状态不一致」与跨日/部分退款场景下 `recon_date` 一律按**外部渠道清算日**（`vendor_settled_at` 截断到日，Asia/Shanghai）归属；
+- 一笔退款 MUST 同时出现于对应订单的台账与退款台账两侧（两侧 `recon_date` 可不同），以支持跨日冲销；
+- 修复脚本 MUST 标注 `recon_date_source=vendor_settled_at`，不可使用 `order.created_at` 兜底。
+
 ### 4.3 差错分类与处置矩阵
-| 差错类型 | 典型场景 | 处置策略 | 自动化动作 |
-|---|---|---|---|
-| 短款 (Under-credited) | 客户已扣款，内部因超时未收到回调 | 自动补单并恢复履约 | 用外部交易号补发入账事件，更新订单为已支付 |
-| 长款 (Over-credited) | 内部成功但外部无此流水 | 冻结结算并告警 | 挂起订单，生成高危审计工单，人工介入 |
-| 金额不符 | 手续费口径/折算误差/金额被篡改 | 拦截结算并差额挂账 | 差额计入暂收暂付，通知财务核实 |
-| 状态不一致 | 外部已全额退款，内部仍处部分退款中 | 状态对齐同步 | 主动向外部渠道发起查询并更正本地退款状态 |
+| 差错类型 | 典型场景 | 处置策略 | 自动化动作 | owner | SLA | 超时兜底 (fallback) | 终态 |
+|---|---|---|---|---|---|---|---|
+| 短款 (Under-credited) | 客户已扣款，内部因超时未收到回调 | 自动补单并恢复履约（**幂等键 = `vendor_txn_id`**） | 用外部交易号补发入账事件；命中已处理集合 → NO-OP | pay-batch Operator | 30min | 升级 finance_lead | `replayed` |
+| **长款 (Over-credited)** | 内部成功但外部无此流水 | 冻结结算并告警；走 `pending_review` → `resolved`(`refund`/`chargeback`/`release`) 三态 | 挂起订单，生成高危审计工单，人工介入 | **finance_lead** | **24h 首次响应 / 72h 终态** | **超时未决 → 自动升级至 platform_ops_chief, 锁定当日商户提现并落 `force_closed`** | **`pending_review` / `resolved` / `force_closed`** |
+| 金额不符 | 手续费口径/折算误差/金额被篡改 | 拦截结算并差额挂账 | 差额计入暂收暂付，通知财务核实 | finance_lead | 24h | 升级 platform_ops_chief + 上报 G7 SOP | `pending_review` → `resolved` |
+| 状态不一致 | 外部已全额退款，内部仍处部分退款中 | 状态对齐同步（按 `vendor_settled_at` 清算日归属 `recon_date`） | 主动向外部渠道发起查询并更正本地退款状态 | pay-batch Operator | 30min | 升级 finance_lead | `synced` |
+
+> 长款超时自动关闭 MUST 仍保持商户口冻结至外部渠道书面确认解冻，决不静默解冻。
+
+#### 4.3.1 状态机（F3 长款处置）
+
+```
+pending_review ──决议──▶ resolved (refund | chargeback | release)
+        │
+        └──72h 超时未决──▶ force_closed (自动升级, 商户提现锁定)
+```
+
+`pay_recon_overcredit_cases.status` 枚举：`pending_review | resolved | force_closed`，强制 `pending_review → {resolved, force_closed}` 二选一终态，禁止反向流转。
 
 ### 4.4 台账落盘规范
-- **权威台账表**：`pay_reconciliations`（`tenant_id`、`recon_date`、`total_order_count`、`total_pay_amount`、`total_refund_count`、`total_refund_amount`、`vendor_settle_amount`、`platform_fee_amount`、`diff_count`、`status`），唯一键 `uk_tenant_recon_date (tenant_id, recon_date)`；
+- **权威台账表**：`pay_reconciliations`（`tenant_id`、`recon_date`、`is_empty_day`、`total_order_count`、`total_pay_amount`、`total_refund_count`、`total_refund_amount`、`vendor_settle_amount`、`platform_fee_amount`、`diff_count`、`status`），唯一键 `uk_tenant_recon_date (tenant_id, recon_date)`；
 - **报告落盘路径**：`docs/09_operations/02_financial_reconciliation/RECONCILIATION-YYYYMMDD-<BATCH>.md`；
 - **生成命令**：`node scripts/cmmi-asset-scaffold.cjs new --phase 09 --type reconciliation --title "<对账批次>" --slug "<BATCH>" --real`（**必须带 `--real`** 确认基于真实外部流水）；
-- **幂等与签名**：每份对账报告含生成人、时间戳与校验指纹，禁止重复日期重复入账。
+- **幂等与签名**：每份对账报告 MUST 含生成人（`generator`）、ISO8601 UTC 时间戳（`generatedAt`）与 SHA-256 校验指纹（`fingerprint`），禁止重复日期重复入账；
+- **校验指纹算法（F6 · P2）**：指纹 MUST 等于 `sha256(canonicalJSON({reportId, reconDate, tenantId, totalOrderCount, totalPayAmount, totalRefundAmount, diffCount, status, generator, generatedAt})).hex()`，实现位于 `scripts/signature.cjs → computeReconciliationFingerprint(report)`；报告模板头部必须显式输出 `fingerprint=...` 一行；伪造或篡改任一字段 MUST 导致指纹与重算结果不一致；指纹校验 MUST 在 `cmmi-asset-scaffold.cjs check` 与三方上报流水线二处执行。
 
 ### 4.5 零假 Demo 铁律 (Zero-Fake Baseline)
 - 本交付当前**尚未发生任何真实外部资金流水**，故 `docs/09_operations/02_financial_reconciliation/` 目录**严格保持 `.gitkeep` 留空**；
@@ -144,6 +179,13 @@ $$\text{期初余额} + \text{收入} - \text{支出} = \text{期末余额}$$
 - [x] 对账台账权威表（`pay_reconciliations`）与报告落盘路径明确；
 - [x] 未发生真实资金流水，`02_financial_reconciliation/` 严格 `.gitkeep` 留空（零假 Demo）；
 - [x] 本 SOP 已作为 G7 核心工件（`key=ops`）挂载至控制面工件总线与工程目录（`No Artifact, No Done`）。
+- [x] **F1** 空账期（0 流水日）口径明确：即使 0 流水亦落空日结（`is_empty_day=TRUE, status=balanced`）并豁免当日提现闸门，避免无交易日提现卡死；
+- [x] **F2** 资金调账强制 maker-checker 双人复核（`approver != applicant`，违者 `403`），与 INV-6 同源；
+- [x] **F3** 长款处置含 owner / SLA（24h 响应 / 72h 终态）/ 超时兜底与终态（`refund`/`chargeback`/`release`/`force_closed`）；
+- [x] **F4** 短款自动补单以 `vendor_txn_id` 幂等去重，杜绝双入账；
+- [x] **F5** 跨日/部分退款 `recon_date` 按外部清算日 `vendor_settled_at` 归属；
+- [x] **F6** 对账报告校验指纹算法（`sha256`·`canonicalJSON`）定义、`scripts/signature.cjs` 落地并接入报告模板；
+- [x] **F7** 上游契约断链修复：头注不再引用不存在的 `02_requirements/`，指向现存法定需求真源。
 
 ## 六、 运营权限与角色 (RBAC)
 
@@ -151,5 +193,7 @@ $$\text{期初余额} + \text{收入} - \text{支出} = \text{期末余额}$$
 |---|---|---|---|
 | 租户【申请】 | `ops:tenant:create` | 平台运营管理员 | — |
 | 租户【审核】/【通过】/【驳回】 | `ops:tenant:audit` | 交付/运营负责人 | **审批人 != 申请人** |
-| 对账批次生成与差异调账 | `ops:recon:adjust` | 财务/运营负责人 | 调账必须留审计依据，禁止静默抹账 |
+| 对账批次生成与差异调账 | `ops:recon:adjust` | 财务/运营负责人 | **强校验 approver != applicant（maker-checker 互斥，对齐 INV-6）；违者 Service 层抛 `403 FORBIDDEN_SELF_APPROVE`**；调账 MUST 留审计依据（reason、event_id、证据链接），禁止静默抹账 |
 | 巡检记录与归档 | `ops:inspection:log` | 运营 | 归档前须完成当日平账 |
+
+> F2 资金调账 maker-checker SOP 锚点：`ApproverUser == ApplicantUser` 时 `/ops/recon/adjust` MUST 返回 `403` 且 `auditLog.event=self_approve_blocked`，与租户侧 INV-6 完全共用同一 `ForbiddenSelfApproveException`。

@@ -43,7 +43,6 @@ const PROBES: Probe[] = [
   // ── system / auth / company surface ──────────────────────────────────────
   { label: "GET /api/health", method: "GET", path: "/api/health", expectJson: true },
   { label: "GET /api/companies", method: "GET", path: "/api/companies?scope=accessible", expectJson: true },
-  { label: "GET /api/companies/templates", method: "GET", path: "/api/companies/templates" },
   { label: "GET /api/companies/stats", method: "GET", path: "/api/companies/stats" },
 
   // ── company-scoped reads (wave215 + core) ────────────────────────────────

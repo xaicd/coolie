@@ -10,12 +10,17 @@
     "./role-templates/*": "./role-templates/*.ts",
     "./role-templates/templates/*": "./role-templates/templates/*"
   },
-  "files": [
-    "*.ts",
-    "role-templates/*.ts",
-    "role-templates/templates/*.md"
-  ],
+  "publishConfig": {
+    "exports": {
+      ".": "./dist/index.js",
+      "./role-templates": "./dist/role-templates/index.js",
+      "./role-templates/*": "./dist/role-templates/*.js",
+      "./role-templates/templates/*": "./dist/role-templates/templates/*"
+    },
+    "main": "./dist/index.js"
+  },
   "scripts": {
+    "build": "tsc -p tsconfig.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "clean": "rm -rf dist"
   },

@@ -59,6 +59,7 @@ describe("WBS code helpers", () => {
 describe("milestoneSatisfied", () => {
   it("is satisfied only when achieved or exempted", () => {
     expect(milestoneSatisfied(milestone({ status: "achieved" }))).toBe(true);
+    expect(milestoneSatisfied(milestone({ status: "completed" as any }))).toBe(true);
     expect(milestoneSatisfied(milestone({ exempted: true }))).toBe(true);
     expect(milestoneSatisfied(milestone({ status: "blocked" }))).toBe(false);
     expect(milestoneSatisfied(null)).toBe(false);

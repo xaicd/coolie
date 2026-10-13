@@ -26,6 +26,7 @@ const MILESTONE_STATUSES = [
   "not_started",
   "in_progress",
   "blocked",
+  "achieved",
   "completed",
   "cancelled",
 ] as const;
@@ -90,9 +91,14 @@ export function milestonesRoutes(db: Db) {
     // `milestone` JSONB column.
     let filteredRows = rows;
     if (parsed.data.status) {
+      const wanted = parsed.data.status;
       filteredRows = rows.filter((r) => {
         const milestone = (r.milestone as IssueMilestone | null) ?? null;
-        return (milestone?.status ?? "not_started") === parsed.data.status;
+        const current = milestone?.status ?? "not_started";
+        if (wanted === "achieved" || wanted === "completed") {
+          return current === "achieved" || (current as any) === "completed";
+        }
+        return current === wanted;
       });
     }
     if (parsed.data.gate) {
@@ -105,7 +111,8 @@ export function milestonesRoutes(db: Db) {
 
     const allMilestoneStatus = rows.reduce<Record<string, number>>((acc, row) => {
       const milestone = (row.milestone as IssueMilestone | null) ?? null;
-      const status = milestone?.status ?? "not_started";
+      let status = milestone?.status ?? "not_started";
+      if ((status as any) === "completed") status = "achieved";
       acc[status] = (acc[status] ?? 0) + 1;
       return acc;
     }, {});

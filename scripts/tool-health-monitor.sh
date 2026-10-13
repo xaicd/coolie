@@ -272,9 +272,6 @@ try {
   # 6. hermes probe
   IFS=$'\t' read -r hermes_status hermes_latency hermes_reason <<< "$(smart_probe_hermes)"
 
-  # 7. kiro-cli probe
-  IFS=$'\t' read -r kiro_status kiro_latency kiro_reason <<< "$(smart_probe_artisan_tool kiro-cli)"
-
   # 注意: probe_agy 已输出 expires_at_iso 至第 4 字段, agy_expires_at 直接复用,
   #       无需再次探测 token_state (wave358 PRE-SRE 遗留清理)
 
@@ -293,7 +290,7 @@ const data = {
       recommendedEmployees: ["墨斗"],
       quota: null,
       resetAt: null,
-      expiresAt: argv[24] && argv[24] !== "-" ? argv[24] : null,
+      expiresAt: argv[21] && argv[21] !== "-" ? argv[21] : null,
       latencyMs: Number(argv[3]) || null,
       reason: argv[4] || null
     },
@@ -346,21 +343,11 @@ const data = {
       expiresAt: null,
       latencyMs: Number(argv[18]) || null,
       reason: argv[19] || null
-    },
-    "kiro-cli": {
-      status: argv[20],
-      bestFor: ["架构设计", "Spec驱动", "重构"],
-      recommendedEmployees: ["Hermes", "墨斗"],
-      quota: null,
-      resetAt: null,
-      expiresAt: null,
-      latencyMs: Number(argv[21]) || null,
-      reason: argv[22] || null
     }
   }
 };
 
-fs.writeFileSync(argv[23], JSON.stringify(data, null, 2), "utf8");
+fs.writeFileSync(argv[20], JSON.stringify(data, null, 2), "utf8");
 ' \
     "$now_iso" \
     "$agy_status" "$agy_latency" "$agy_reason" \
@@ -369,7 +356,6 @@ fs.writeFileSync(argv[23], JSON.stringify(data, null, 2), "utf8");
     "$cmd_status" "$cmd_latency" "$cmd_reason" \
     "$copilot_status" "$copilot_latency" "$copilot_reason" \
     "$hermes_status" "$hermes_latency" "$hermes_reason" \
-    "$kiro_status" "$kiro_latency" "$kiro_reason" \
     "$LATEST_JSON" \
     "${agy_expires_at:-}"
 }

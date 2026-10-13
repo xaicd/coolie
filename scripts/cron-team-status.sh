@@ -201,8 +201,8 @@ infer_employee() {
   if printf '%s' "$cmd" | grep -qE '铁匠|Forge[^I]?|core-swe|GLM'; then
     printf '铁匠\n'; return 0
   fi
-  # 3) Hermes / kiro-cli / PM 拍板 = 默认老板 PM 工具
-  if printf '%s' "$cmd" | grep -qE 'kiro-cli|^hermes( |$)|/hermes( |$)|Hermes|PM 拍板|派活|验收'; then
+  # 3) Hermes / PM 拍板 = 默认老板 PM 工具
+  if printf '%s' "$cmd" | grep -qE '^hermes( |$)|/hermes( |$)|Hermes|PM 拍板|派活|验收'; then
     printf 'Hermes\n'; return 0
   fi
   # 4) `claude -c` (交互式续 session, 无 wave 提示) 默认归 Hermes (PM 工具)
@@ -266,7 +266,6 @@ infer_tool() {
     agy-gemini3.8|agy) printf 'agy-gemini3.8\n' ;;
     copilot) printf 'copilot\n' ;;
     cmd) printf 'cmd\n' ;;
-    kiro-cli) printf 'kiro-cli\n' ;;
     hermes) printf 'Hermes\n' ;;
     *) printf '%s\n' "$first" ;;
   esac
@@ -281,7 +280,7 @@ tool_default_employee() {
     cmd) printf '门神\n' ;;
     claude-glm) printf '铁匠\n' ;;
     claude-mm) printf '铁匠贰号\n' ;;
-    kiro-cli|Hermes) printf 'Hermes\n' ;;
+    Hermes) printf 'Hermes\n' ;;
     *) printf '?\n' ;;
   esac
 }
@@ -374,7 +373,6 @@ list_relevant_processes() {
             || cmd ~ /agy-gemini3\.8/ \
             || cmd ~ /(^|\/)cmd( |$)/ \
             || cmd ~ /copilot/ \
-            || cmd ~ /kiro-cli/ \
             || cmd ~ /(^|\/)hermes( |$)/) {
           # 排除本脚本自身的进程 — 只在命令 basename 是 bash 且 argv 含本脚本路径时排除,
           # 不要误伤 wave prompt 里提到 cron-team-status.sh 的其他 wave (例 wave276 自己).

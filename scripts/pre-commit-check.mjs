@@ -36,8 +36,8 @@ let hasError = false;
 // -----------------------------------------------------------------------------
 let stagedFiles = [];
 try {
-  const stdout = execSync('git diff --cached --name-only', { encoding: 'utf8' }).trim();
-  stagedFiles = stdout ? stdout.split('\n').map((f) => f.trim()).filter(Boolean) : [];
+  const stdout = execSync('git -c core.quotepath=false diff --cached --name-only', { encoding: 'utf8' }).trim();
+  stagedFiles = stdout ? stdout.split('\n').map((f) => f.trim().replace(/^"(.*)"$/, '$1')).filter(Boolean) : [];
 } catch (e) {
   console.warn('⚠️  [WARN] 无法获取 git 暂存区文件，可能不在 git 仓库中，将执行通用基线检查。');
 }

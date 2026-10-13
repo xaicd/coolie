@@ -622,9 +622,9 @@ async function detectAndExecuteDirectAction(
       }
     }
 
-    // 3. 切换数字员工工具池配置: "把铁匠的工具切换为 agy", "墨斗切成 cmd", "门神改用 kiro-cli"
+    // 3. 切换数字员工工具池配置: "把铁匠的工具切换为 agy", "墨斗切成 cmd", "门神改用 copilot"
     const toolSwitchMatch = text.match(
-      /(?:把|将)?\s*([^\s,，。!！?？]+?)\s*(?:的工具|工具)?\s*(?:切换为|切成|换成|改用|设定为)\s*(agy|cmd|copilot|claude-code|kiro-cli|claude-glm|claude-mm|hermes)/i,
+      /(?:把|将)?\s*([^\s,，。!！?？]+?)\s*(?:的工具|工具)?\s*(?:切换为|切成|换成|改用|设定为)\s*(agy|cmd|copilot|claude-code|claude-glm|claude-mm|hermes)/i,
     );
     if (toolSwitchMatch) {
       const agentQuery = toolSwitchMatch[1];

@@ -134,7 +134,8 @@ claude -p "$PROMPT" --dangerously-skip-permissions < /dev/null
 | 4 | **`claude-mm`** | Mac 宿主机 | `/opt/homebrew/bin/claude` | `~/.claude/settings.jsonmm` | `ln -sf ~/.claude/settings.jsonmm ~/.claude/settings.json && claude -p "$PROMPT" --dangerously-skip-permissions < /dev/null` |
 | 5 | **`cmd`** | Mac 宿主机 | `/opt/homebrew/bin/cmd` (v1.74.3) | CommandCode CLI 全自主 | `cmd -p "$PROMPT" --yolo --tools-all -t < /dev/null` |
 | 6 | **`copilot`** | Mac 宿主机 | `/opt/homebrew/bin/copilot` (v1.0.91) | GitHub Copilot CLI | `copilot -p "$PROMPT" --yolo < /dev/null` |
-| 7 | **`kiro-cli`** | Mac 宿主机 | AWS Kiro CLI | 老板专属保留 (架构大重构) | `kiro-cli -p "$PROMPT" < /dev/null` |
+
+> **SDD 无锁化原则**: SDD (规格驱动开发) 全面解耦，绝不强制锁定外部 `kiro-cli` 工具；由平台原生 Spec-Kit、Workflow Engine 与 6 大在位工具池原生驱动。
 
 ### 2.1 各工具关键避坑与执行细节
 
@@ -181,7 +182,7 @@ claude -p "$PROMPT" --dangerously-skip-permissions < /dev/null
 
 ---
 
-## 4. 6 老板团队 × 7 工具池 真配矩阵 (老板拍板最新矩阵)
+## 4. 6 老板团队 × 6 工具池 真配矩阵 (老板拍板最新矩阵)
 
 ```
                           ┌───> 墨斗 (FDA)       ───> agy-gemini3.8 (Docker 容器)
@@ -190,7 +191,6 @@ claude -p "$PROMPT" --dangerously-skip-permissions < /dev/null
 Hermes (PM / Hermes自己) ─┼───> 门神 (FDSE/测试) ───> claude-mm (Mac 宿主 / 测试首选)
                           ├───> 兑底渊 (PRE-SRE) ───> copilot (Mac 宿主 / Copilot CLI)
                           └───> 百晓生 (DS/验收运营)───> claude-mm (Mac 宿主 / 验收与运营首选)
-                               [备用储备]        ───> kiro-cli (老板专属架构保留)
 ```
 
 ---

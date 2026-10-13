@@ -300,8 +300,9 @@ A change is done when all are true:
    - **OpenWiki (LLM-Wiki / RFC 8615) 知识大脑自愈同步**：每个交付项目统一建立 `wiki/` 目录与 `openwiki -> wiki` 软链接；由 `scripts/sync-openwiki.mjs` 从底层数据、元数据与契约自动化编译生成 `wiki/index.md`（AI 首屏检索大纲）、`wiki/stages/`（各截断交付规范与 Skills 路由）、`wiki/domains/`（领域维基词条）、`wiki/architecture/` 与 `wiki/gotchas/`；
    - **OpenWiki First 铁律**：数字员工进场接单必须优先阅读 `wiki/index.md`，基于机器可读契约与架构词条开展工作，Token 消耗直降 80%，杜绝全盘盲搜代码与文档漂移；
    - **CI 门禁守卫**：全仓与项目配置 `openwiki:sync` 与 `openwiki:check`，发现文档滞后或漂移立即阻断门禁。
-5. **Kiro SDD 原生多智能体工作流引擎与配方铁律 (Kiro Native Workflows & Recipes)**：
-   - **配方单一真源与软链接无缝桥接**：所有多智能体工作流配方统一物理收归 `.agents/workflows/*.workflow.json`（根目录通过 `.kiro/workflows` 软链接桥接），确保 Kiro IDE 原生识别与 Antigravity / 跨 Agent 平台统一标准；
+5. **规格驱动开发原生工作流引擎与配方铁律 (Native SDD Workflows & Recipes)**：
+   - **SDD 引擎自闭环与无锁化**：SDD (规格驱动开发) 绝不强制锁定外部 `kiro-cli` 工具，由平台自研 Spec-Kit / Workflow Engine (`scripts/workflow-engine.cjs`) 与各数字员工多工具池原生驱动；
+   - **配方单一真源与软链接无缝桥接**：所有多智能体工作流配方统一物理收归 `.agents/workflows/*.workflow.json`（根目录通过 `.kiro/workflows` 软链接桥接），确保标准 IDE 与 Antigravity / 跨 Agent 平台统一标准；
    - **4 大内置 SDD 工作流配方**：
      - `feature-delivery.workflow.json`（全生命周期新特性交付：scaffold ➔ requirements ➔ design ➔ plan-waves ➔ implement ➔ verify）
      - `bugfix.workflow.json`（缺陷排查与红绿验证：scaffold ➔ diagnose ➔ red-test ➔ patch ➔ verify-gate）
@@ -342,7 +343,7 @@ A change is done when all are true:
 3. **企业多租户数据严格隔离 (Company-Scoped Isolation & Least Privilege)**：全平台所有领域实体、本体域与工单 100% 强绑定 `company_id`，路由与服务层强校验组织边界，客户私域生产数据完全保持在专属企业域内。
 
 ### 公理八：扁平化 Worker 拓扑与 ACP 免交互调度法则 (Operating Disciplines & ACP)
-1. **单一调度指挥拓扑**：Hermes 作为唯一 PM 总调度，6 大数字员工作为一级执行者，底层 CLI (`claude`, `cmd`, `agy`, `copilot`, `kiro-cli`) 作为工作引擎，保持执行链路扁平清晰。
+1. **单一调度指挥拓扑**：Hermes 作为唯一 PM 总调度，6 大数字员工作为一级执行者，底层 CLI (`claude`, `cmd`, `agy`, `copilot`, `hermes`) 作为工作引擎，保持执行链路扁平清晰。
 2. **后台免交互自主授权**：`cmd` 统一配置 `--yolo --tools-all -t`，`claude` 统一配置 `--dangerously-skip-permissions`，管道执行配置 `< /dev/null` 重定向确保进程顺畅流转。
 3. **标准 ACP (Agent Client Protocol) 调度协议栈**：全面通过标准 ACP 适配器统一管理会话、握手与流式消费。
 4. **异步控制面并轨与跨机一键复刻**：微信指令秒级入库 Dev Server 工单（COOA-XX），由后台 Runner Bridge 异步消费；跨机复刻统一执行 `bash scripts/bootstrap-coolie-dev-host.sh`。
@@ -421,11 +422,11 @@ be kept in sync twice.
   team, its employee objects, tools, skills, and operating constraints.
 - `docs-coolie/PM-DISPATCH-QUICKCARD.md` — source of truth for Hermes PM dispatch:
   who to send work to, the seven-part brief shape, pacing, and acceptance discipline.
-- `docs-coolie/TOOLS.md` — source of truth for the seven local tool pool, package
+- `docs-coolie/TOOLS.md` — source of truth for the local tool pool, package
   availability, and recommended tool strengths for each kind of work.
 - `.agents/agents/` — versioned templates for Coolie local employee role objects.
   Hermes is the sole PM orchestrator; digital employees are first-tier workers reporting
-  to Hermes. Claude, cmd, agy, copilot, and kiro-cli are underlying worker tools.
+  to Hermes. Claude, cmd, agy, copilot, and hermes are underlying worker tools.
   NEVER install subagents into `~/.claude/agents/` — Claude must run clean without nesting.
 
 Before changing a file upstream also owns, read the fork-surface audit: every
@@ -439,8 +440,8 @@ Do not confuse these two layers:
 1. **Local Coolie-building team.** Hermes plus the local employees (墨斗, 铁匠,
    铁匠贰号, 门神, 兑底渊, 百晓生) are the construction team for building this
    Coolie product/fork. They run on the boss's local machine and related local
-   toolchains (`claude-*`, `agy-gemini3.8`, `cmd`, `copilot`, `Hermes`, and
-   `kiro-cli`). Their receipts, dispatch helpers, cron jobs, and WeChat progress
+   toolchains (`claude-*`, `agy-gemini3.8`, `cmd`, `copilot`, and `Hermes`).
+   Their receipts, dispatch helpers, cron jobs, and WeChat progress
    reports are development/operations workflow for this repository.
 2. **Coolie product company/team system.** The product itself contains its own
    company, team, agent, task, budget, approval, and run-log management model.
@@ -468,9 +469,9 @@ terminology in `docs-coolie/EMPLOYEE-OBJECTS.md` and `docs-coolie/TERMINOLOGY.md
 Use English enum/role identifiers only where the implementation or API requires
 them; otherwise keep the Chinese name visible and primary.
 
-Hermes is the PM and also its own local tool. Do not map Hermes to `kiro-cli`.
-`kiro-cli` is a separate seventh local tool and is boss-reserve unless a task
-explicitly says otherwise.
+Hermes is the PM and also its own local tool. SDD (Spec-Driven Development) does
+not require or lock to `kiro-cli`; it runs natively via our multi-tool fleet
+(Hermes, agy, claude, cmd, copilot) and workflow engine (`scripts/workflow-engine.cjs`).
 
 ## 15. 视觉与设计系统规范 (Design System)
 

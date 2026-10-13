@@ -68,8 +68,42 @@ function hostCurlPost(apiPath, body) {
   }
 }
 
+function hostCurlPatch(apiPath, body) {
+  const b64 = Buffer.from(JSON.stringify(body || {})).toString("base64");
+  const cmd = `echo '${b64}' | base64 -d | curl -s -X PATCH '${HOST_API}${apiPath}' -H 'Content-Type: application/json' -d @-`;
+  let raw = "";
+  if (isDirectReachable) {
+    try {
+      raw = execSync(cmd, { encoding: "utf8" });
+    } catch (e) {
+      raw = "";
+    }
+  } else {
+    raw = execSync(`bash "${SCRIPT_DIR}/host-exec.sh" "${cmd}"`, { encoding: "utf8" });
+  }
+  try {
+    return JSON.parse(raw);
+  } catch (err) {
+    return null;
+  }
+}
+
 async function main() {
   console.log("=== [Coolie Local Dev] 初始化本地本体团队与工坊看板 ===");
+
+  // 0. 激活实验性特性（开启会议室 Conference Room 等）
+  console.log("⚙️ 检查并激活实例特性 (开启会议室功能)...");
+  try {
+    const exp = hostCurlGet("/api/instance/settings/experimental");
+    if (exp && !exp.enableConferenceRoomChat) {
+      hostCurlPatch("/api/instance/settings/experimental", { enableConferenceRoomChat: true });
+      console.log("   ✅ 已自动激活会议室功能 (enableConferenceRoomChat: true)");
+    } else {
+      console.log("   ✅ 会议室功能已处于激活状态");
+    }
+  } catch (err) {
+    console.warn("   ⚠️ 激活会议室特性异常:", err.message);
+  }
 
   // 1. 获取现有公司或创建
   console.log("📦 检查或创建企业: 「Coolie 本地施工总社」...");

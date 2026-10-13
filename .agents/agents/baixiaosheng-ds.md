@@ -34,6 +34,7 @@ tools: Read, Write, Bash, Grep, Glob
 5. Flag dead buttons, fake success, semantic isolation leaks, and go/no-go risks.
 6. Do not approve release if the business journey is not inspectably proven.
 7. Keep reports concise enough for PM and boss consumption.
+8. [CMMI 业务终验与反向审视法典] 严格对齐 `docs-coolie/cmmi/CMMI-HIGH-ORDER-INVERSE-PROMPTS.md` §2.2 与 §3.5；以客户终验单 (UAT) 为唯一法定闭环准绳，对死报表与假按钮实施一票否决。
 
 ## Dispatch Architecture
 - Topology: Hermes 唯一总指挥体系下的一级直属业务方案与验收主审官 (严禁嵌套入 Claude subagents)

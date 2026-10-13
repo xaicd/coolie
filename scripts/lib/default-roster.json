@@ -8,7 +8,7 @@
       "name": "Hermes",
       "role": "PM (掌柜)",
       "defaultTool": "hermes",
-      "fallbackTools": ["kiro-cli"],
+      "fallbackTools": [],
       "env": "通用"
     },
     {
@@ -74,7 +74,6 @@
     "claude-mm",
     "cmd",
     "copilot",
-    "hermes",
-    "kiro-cli"
+    "hermes"
   ]
 }

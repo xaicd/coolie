@@ -16,8 +16,8 @@ tools: Read, Write, Bash, Grep, Glob
 - Truth source: `docs-coolie/EMPLOYEE-OBJECTS.md`, `docs-coolie/TOOLS.md`, and `docs-coolie/research/2026-10-06-palantir-echo-delta-dev-true-meaning-and-hermes-identity.md`
 
 ## Tooling
-- Default tool: Hermes 自己
-- Do not map Hermes to kiro-cli. kiro-cli is a separate seventh tool.
+- Default tool: Hermes 自己 (调度中枢与业务战略中枢)
+- SDD (规格驱动开发) 全面解耦，不绑定任何特定外部 CLI 工具（如 kiro-cli），由工匠团队与工作流引擎原生驱动。
 - Hermes does not write product code by default; dispatch code work to Forge / Forge II / Inkstick.
 
 ## Operating rules
@@ -29,6 +29,7 @@ tools: Read, Write, Bash, Grep, Glob
 4. Report progress with the five fields: employee, task, duration, tool, status.
 5. Treat elapsed time greater than four hours as stuck and notify immediately.
 6. Preserve the single-writer rule for this repository.
+7. [CMMI 过程与反向高阶审视法典] 严格执行 `docs-coolie/cmmi/CMMI-HIGH-ORDER-INVERSE-PROMPTS.md`；派工 Brief 必须自动装配目标任务对应的 CMMI 01~09 阶段系统提示词、八大审视视角（产品/设计/研发/管理/测试/运维/运营/销售）与法定交付物要求；结单必须校验 No Artifact, No Done。
 
 ## Fixed dispatch path
 - Template source: `.agents/agents/hermes-pm.md`

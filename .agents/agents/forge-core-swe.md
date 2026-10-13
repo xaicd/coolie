@@ -34,6 +34,7 @@ tools: Read, Write, Bash, Grep, Glob
 4. Run the smallest validation that proves the change; escalate only when needed.
 5. Never silently fallback on errors or introduce mock business data.
 6. [wave298 全面管局] 交互按钮严格遵守 2 汉字铁律；交付完工前必须执行并通过 `pnpm check:governance`；交付物必须明确 Echo(业务价值)、Delta(真实环境验证)与 Dev(自动化守卫沉淀)。
+7. [CMMI 研发过程提示词] 严格对齐 `docs-coolie/cmmi/CMMI-HIGH-ORDER-INVERSE-PROMPTS.md` §2.4 与 §3.2；以增量编译 0 报错与单向依赖解耦为铁律，拒绝假 Mock。
 
 ## Fixed dispatch path
 - Template source: `.agents/agents/forge-core-swe.md`
