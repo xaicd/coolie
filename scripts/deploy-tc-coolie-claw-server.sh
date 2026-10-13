@@ -47,6 +47,8 @@ rsync -az --delete \
   --exclude 'doc/plans' \
   --exclude 'version.json' \
   --exclude 'core*' \
+  --exclude '/out' \
+  --exclude 'target' \
   --exclude '/ui' \
   ./ "$SSH_TARGET:$REMOTE_DIR/"
 
