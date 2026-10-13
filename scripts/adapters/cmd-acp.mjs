@@ -8,10 +8,42 @@
  *   2) Host-exec passthrough (scripts/host-exec.sh cmd)
  */
 
-import * as acp from "@agentclientprotocol/sdk";
+import { createRequire } from "node:module";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { Readable, Writable } from "node:stream";
 import { spawn, execSync } from "node:child_process";
 import fs from "node:fs";
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const req = createRequire(import.meta.url);
+
+let acp;
+try {
+  acp = await import("@agentclientprotocol/sdk");
+} catch {
+  const rootDir = path.resolve(__dirname, "../..");
+  const candidatePaths = [
+    path.join(rootDir, "packages/paperclip-runner"),
+    path.join(rootDir, "packages/adapters/claude-local"),
+    path.join(rootDir, "packages/adapters/codex-local"),
+    path.join(rootDir, "node_modules/.pnpm/node_modules"),
+    rootDir,
+  ];
+  let resolvedPath = null;
+  for (const p of candidatePaths) {
+    try {
+      resolvedPath = req.resolve("@agentclientprotocol/sdk", { paths: [p] });
+      if (resolvedPath) break;
+    } catch {
+      // try next
+    }
+  }
+  if (!resolvedPath) {
+    throw new Error("Cannot find @agentclientprotocol/sdk in candidate paths");
+  }
+  acp = await import(resolvedPath);
+}
 
 class CmdAcpAgent {
   sessions = new Map();

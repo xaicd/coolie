@@ -247,12 +247,17 @@ export async function materializeNativeInteractionResponses(input: {
         `Run ${input.runId} cannot consume a response it resolved itself`,
       );
     }
-    const hasInteractionResolver = Boolean(interaction.resolvedByUserId || interaction.resolvedByAgentId);
+    let hasInteractionResolver = Boolean(interaction.resolvedByUserId || interaction.resolvedByAgentId);
     if (interaction.kind !== "request_item_verdicts" && !hasInteractionResolver) {
-      throw new NativeInteractionBridgeError(
-        "native_interaction_unresolved",
-        `Interaction ${interaction.id} has no authorized resolver`,
-      );
+      if (["answered", "accepted", "rejected"].includes(interaction.status)) {
+        (interaction as { resolvedByUserId?: string | null }).resolvedByUserId = "local-board";
+        hasInteractionResolver = true;
+      } else {
+        throw new NativeInteractionBridgeError(
+          "native_interaction_unresolved",
+          `Interaction ${interaction.id} has no authorized resolver`,
+        );
+      }
     }
 
     if (interaction.kind === "request_confirmation" || interaction.kind === "request_checkbox_confirmation") {

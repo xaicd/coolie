@@ -344,7 +344,7 @@ export async function openQualifiedAcpxRuntime(
         : {}),
     }),
     spawnCwd: options.cwd,
-    spawnAgent: (input: { args: string[]; options?: any }) => {
+    spawnAgent: (input: { command?: string; args: readonly string[] | string[]; options?: any }) => {
       // ACPX can invoke this callback after its handshake caller has already
       // been cancelled. Check at the last host-owned boundary so a late
       // handshake cannot create a provider process after authority is gone.
@@ -352,7 +352,7 @@ export async function openQualifiedAcpxRuntime(
       options.assertWorkspaceHeld?.();
       commandLaunches.count += 1;
       return children.add(
-        options.command.spawn(input.args, input.options, {
+        options.command.spawn(input.args as string[], input.options, {
           credentialFenceFds,
           activateCredentialFenceOwner: options.activateCredentialFenceOwner!,
         }) as ChildProcess,
