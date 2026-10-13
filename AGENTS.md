@@ -277,9 +277,17 @@ A change is done when all are true:
 1. **Paperclip 平台本体仓库目录标准 (Platform Repo Standard)**：
    - Coolie 平台本体仓库 100% 严格遵循 Paperclip 原生根目录结构（`server/`, `ui/`, `packages/`, `cli/`, `skills/`, `doc/`）；
    - **设计与规划集中收拢**：平台自身的所有长周期架构方案与演进规划，**100% 收拢在 `doc/plans/YYYY-MM-DD-slug.md`**（严格执行 upstream Rule 5）；工单执行中的 plan 优先更新工单绑定的原生 `plan` 文档（`issue_documents`）。
-2. **商业交付项目工作区自适应规范 (Client Project Workspaces)**：
+2. **商业交付项目工作区自适应规范与两大核心底座自动选型法典 (Client Project Workspaces & Blueprint Selection)**：
    - **自研默认架构 (Default Monorepo)**：自研及全栈商业项目默认采用 **PNPM workspace monorepo** 架构（根目录配置 `pnpm-workspace.yaml`，子包划分 `packages/`、`apps/` 或 `server/`、`ui/`、`clients/`）；
-   - **开源基座自适应与极速骨架派生 (Zero-Git-History Hatching)**：若项目立项选择了**开源基座**（如 `ruoyi-all-next` 微服务中台底座、`yudao-cloud` 四位一体多端基座、`semantica`、Django、Spring Boot、Next.js 官方脚手架等），**100% 保持开源基座原生目录结构**；通过 `degit xaicd/ruoyi-all-next#main` 或 `bash scripts/hatch-client-project.sh <path> --profile quad-terminal` 极速派生，按需选用 `base` (~50MB 纯白板)、`minimal` (低代码+AI)、`standard` (全量 17 域) 与 `quad-terminal` (Java 微服务 + Vue3 管理端 + Uni-App 小程序 + Expo 原生 App) 规范阶梯，秒级完成工程初始化并建立独立 git 首提交。
+   - **两大核心底座生态位与语言规范对齐 (Two Core Blueprints in Different Languages)**：
+     - **`yudao-quad-terminal` (芋道四位一体多端基座)**：**Java (JDK 17/21 LTS) + Spring Boot 3 + Spring Cloud Alibaba 微服务/单体 + Vue 3 / Element Plus (Web中台) + Uni-App (微信小程序) + Expo SDK 52 / React Native (原生移动 App)**。内建 19 大垂直行业域（ERP/MES/CRM/BPM/支付/会员等），覆盖 PC + 小程序 + 原生 App + 微服务中台全渠道闭环；
+     - **`ruoyi-all-next` (现代化全栈轻量级基座)**：**TypeScript (Node 24 / Next.js 15) + React 19 + Tailwind CSS + Prisma / SQLite / PostgreSQL**。全栈同构、极度敏捷，开箱即用支持 3200 端口沙箱实时极速预览，极低 Token 消耗与秒级热更；
+   - **AI Agent 接单自动选型决策漏斗 (Automated Selection Heuristics)**：
+     - 工坊 AI Agent 接到正式业务需求时，必须根据**需求完整度**与**具体实际的项目技术规范要求**选择底座：
+       1. **终端覆盖要求（一票命中）**：业务明确要求包含**原生手机 App (iOS/Android) 与微信小程序** ➜ **必选 `yudao-quad-terminal`**；仅需 Web 管理端与响应式 H5 ➜ 优选 `ruoyi-all-next`；
+       2. **客户语言与技术栈约束**：政企/电信/金融指定 **Java / Spring Boot 3 / 信创微服务** ➜ **必选 `yudao-quad-terminal`**；客户指定 **TypeScript / Next.js / 极速云原生** ➜ **选用 `ruoyi-all-next`**；
+       3. **需求完整度与交付周期**：需求高度完备且涉及复杂支付/BPM流程/多租户行级隔离 ➜ 选 `yudao-quad-terminal`（借力 19 域成熟资产）；需求处于早期 POC / 极速打样 ➜ 选 `ruoyi-all-next`（极轻量、改动成本低）；
+   - **开源基座自适应与极速骨架派生 (Zero-Git-History Hatching)**：确定选型后，**100% 保持开源基座原生目录结构**；通过 `bash scripts/hatch-client-project.sh <path> --profile quad-terminal` 或 `degit xaicd/ruoyi-all-next#main` 极速派生，按需选用 `base` (~50MB 纯白板)、`minimal` (低代码+AI)、`standard` (全量 17 域) 与 `quad-terminal` (Java 微服务 + Vue3 管理端 + Uni-App 小程序 + Expo 原生 App) 规范阶梯，秒级完成工程初始化并建立独立 git 首提交。详见 [`.agents/rules/FOUNDRY-BLUEPRINT-SELECTION.md`](.agents/rules/FOUNDRY-BLUEPRINT-SELECTION.md)。
 3. **控制面第一公民与全生命周期工程文档物理归宿 (`docs/01_management` ~ `09_operations` & `docs/specs/`)**：
    - **控制面第一真理源 (Paperclip Control-Plane Primacy)**：软件交付的过程规格、测试凭证与结项资产，第一法定宿主统一为 Paperclip 控制面原生实体（`issue_documents`、`issue_work_products`、`attachments`），支持富文本在线批注、版本流转与审批门禁；
    - **彻底弃用 `.coolie/cmmi` 隐藏目录与单文件方案**：单文件 `01-srs.md` 无法支持多会话、多特性的增量敏捷迭代。全面对齐 `ruoyi-all-next`，工程级资产必须严格落盘于标准 CMMI 01~09 目录：
