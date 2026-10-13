@@ -13319,6 +13319,8 @@ export function heartbeatService(
         monitorNextCheckAt: issues.monitorNextCheckAt,
         projectId: issues.projectId,
         originKind: issues.originKind,
+        parentId: issues.parentId,
+        originId: issues.originId,
       })
       .from(issues)
       .where(and(eq(issues.id, issueId), eq(issues.companyId, run.companyId)))
@@ -13498,8 +13500,14 @@ export function heartbeatService(
             .where(
               and(
                 eq(routines.companyId, issue.companyId),
-                eq(routines.parentIssueId, issue.id),
                 eq(routines.status, "active"),
+                or(
+                  eq(routines.parentIssueId, issue.id),
+                  ...(issue.parentId ? [eq(routines.parentIssueId, issue.parentId)] : []),
+                  ...(issue.originKind === "routine_execution" && issue.originId
+                    ? [eq(routines.id, issue.originId)]
+                    : []),
+                ),
               ),
             )
             .limit(1)
