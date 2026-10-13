@@ -19,13 +19,41 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 
-const PORT_APP = 3100;
-const PORT_PG = 54329;
-const HEALTH_URL = 'http://127.0.0.1:3100/api/health';
-const DEV_LOG_PATH = path.join(process.env.HOME || '/Users/mac', '.paperclip/dev.log');
-const SRE_STATUS_PATH = path.join(process.env.HOME || '/Users/mac', '.paperclip/sre-status.json');
-const SRE_INCIDENT_LOG = path.join(process.env.HOME || '/Users/mac', '.paperclip/sre-incidents.log');
-const REPO_ROOT = '/Users/mac/workspace/xaicd/coolie';
+const HOME = process.env.HOME || (process.platform === 'darwin' ? '/Users/mac' : '/home/beye');
+const IS_DARWIN = process.platform === 'darwin';
+const IS_LINUX = process.platform === 'linux';
+
+const PORT_APP = parseInt(process.env.COOLIE_PORT || process.env.PORT || '3100', 10);
+const PORT_PG = parseInt(process.env.PGPORT || '54329', 10);
+const HEALTH_URL = `http://127.0.0.1:${PORT_APP}/api/health`;
+
+let DATA_DIR = process.env.PAPERCLIP_INSTANCE_DIR;
+if (!DATA_DIR) {
+  if (fs.existsSync(path.join(HOME, '.coolie-dev/data'))) {
+    DATA_DIR = path.join(HOME, '.coolie-dev/data');
+  } else {
+    DATA_DIR = path.join(HOME, '.paperclip');
+  }
+}
+
+const DEV_LOG_PATH = fs.existsSync(path.join(DATA_DIR, 'logs/coolie-dev.log'))
+  ? path.join(DATA_DIR, 'logs/coolie-dev.log')
+  : path.join(HOME, '.paperclip/dev.log');
+const SRE_STATUS_PATH = path.join(DATA_DIR, 'sre-status.json');
+const SRE_INCIDENT_LOG = path.join(DATA_DIR, 'logs', 'sre-incidents.log');
+
+let REPO_ROOT = '/host-workspace/xaicd/coolie';
+if (IS_DARWIN && fs.existsSync('/Users/mac/workspace/xaicd/coolie')) {
+  REPO_ROOT = '/Users/mac/workspace/xaicd/coolie';
+} else if (fs.existsSync(path.join(HOME, 'workspace/coolie'))) {
+  REPO_ROOT = path.join(HOME, 'workspace/coolie');
+} else if (fs.existsSync(path.join(HOME, '.coolie-dev'))) {
+  REPO_ROOT = path.join(HOME, '.coolie-dev');
+}
+
+try {
+  fs.mkdirSync(path.dirname(SRE_INCIDENT_LOG), { recursive: true });
+} catch (_) {}
 
 let lastLogSize = 0;
 try {
@@ -120,10 +148,33 @@ function checkAndHealSymlinks() {
   return healed;
 }
 
-// 4. 增量嗅探 dev.log
+// 4. 增量嗅探运行时日志（支持 dev.log 与 Linux systemd journal）
 function sniffDevLog() {
   const newErrors = [];
   try {
+    // 优先嗅探 Linux systemd journal（若在 Linux 运行）
+    if (IS_LINUX) {
+      try {
+        const uid = process.getuid ? process.getuid() : 1000;
+        const journalCmd = `XDG_RUNTIME_DIR=/run/user/${uid} journalctl --user -u coolie-dev.service --no-pager -n 50 --output=cat`;
+        const out = execSync(journalCmd, { encoding: 'utf8', timeout: 3000 });
+        const lines = out.split('\n');
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          if (/MODULE_NOT_FOUND|Cannot find module/i.test(line)) {
+            newErrors.push({ level: 'CRITICAL', type: 'MODULE_MISSING', message: line.trim().substring(0, 200) });
+          } else if (/uncaughtException|unhandledRejection|deadlock detected/i.test(line)) {
+            newErrors.push({ level: 'CRITICAL', type: 'PROCESS_CRASH', message: line.trim().substring(0, 200) });
+          } else if (/local agent jwt secret missing/i.test(line)) {
+            newErrors.push({ level: 'WARN', type: 'JWT_SECRET_MISSING', message: line.trim().substring(0, 200) });
+          } else if (/"statusCode":500/i.test(line)) {
+            newErrors.push({ level: 'ERROR', type: 'HTTP_500', message: line.trim().substring(0, 200) });
+          }
+        }
+        if (newErrors.length > 0) return newErrors.slice(-10);
+      } catch (_) {}
+    }
+
     if (!fs.existsSync(DEV_LOG_PATH)) return newErrors;
     const stat = fs.statSync(DEV_LOG_PATH);
     if (stat.size < lastLogSize) {
@@ -160,11 +211,25 @@ function sniffDevLog() {
 // 5. 探测数据库心跳健康度
 async function checkDatabaseMetrics() {
   try {
-    const pgPkg = path.join(REPO_ROOT, 'node_modules/.pnpm/pg@8.18.0/node_modules/pg');
-    if (!fs.existsSync(pgPkg)) return { status: 'skipped', reason: 'pg package not found' };
+    const candidates = [
+      path.join(REPO_ROOT, 'node_modules/.pnpm/pg@8.18.0/node_modules/pg'),
+      path.join(HOME, '.coolie-dev/lib/server/node_modules/pg'),
+      path.join(REPO_ROOT, 'node_modules/pg'),
+      'pg'
+    ];
+    let Client = null;
+    for (const c of candidates) {
+      try {
+        const mod = require(c);
+        if (mod && mod.Client) {
+          Client = mod.Client;
+          break;
+        }
+      } catch (_) {}
+    }
+    if (!Client) return { status: 'skipped', reason: 'pg package not found' };
 
-    const { Client } = require(pgPkg);
-    const client = new Client({ connectionString: 'postgresql://paperclip:paperclip@127.0.0.1:54329/paperclip' });
+    const client = new Client({ connectionString: `postgresql://paperclip:paperclip@127.0.0.1:${PORT_PG}/paperclip` });
     await client.connect();
 
     // 最近 15 分钟运行统计
@@ -188,6 +253,9 @@ async function checkDatabaseMetrics() {
     `;
     const failRes = await client.query(latestFailQuery);
 
+    // 5.5 主线长任务阻断扫描与双轨治理（自己修理 vs 自动派单）
+    const mainlineActions = await scanAndRemediateMainlineBlockers(client);
+
     await client.end();
 
     const row = statsRes.rows[0];
@@ -203,11 +271,140 @@ async function checkDatabaseMetrics() {
       succeeded,
       failed,
       failureRate,
-      latestFailure: failRes.rows[0] || null
+      latestFailure: failRes.rows[0] || null,
+      mainlineActions
     };
   } catch (e) {
     return { status: 'error', error: e.message };
   }
+}
+
+const dispatchedIncidentCache = new Map();
+
+async function scanAndRemediateMainlineBlockers(client) {
+  const actions = {
+    selfHealed: [],
+    dispatched: []
+  };
+
+  try {
+    // 递归检索主线长任务树中所有处于 in_progress 的子工单
+    const mainlineQuery = `
+      WITH RECURSIVE task_tree AS (
+        SELECT id, identifier, title, status, parent_id, assignee_agent_id, checkout_run_id, updated_at
+        FROM issues
+        WHERE identifier = 'COOA-114'
+        UNION ALL
+        SELECT i.id, i.identifier, i.title, i.status, i.parent_id, i.assignee_agent_id, i.checkout_run_id, i.updated_at
+        FROM issues i
+        INNER JOIN task_tree t ON i.parent_id = t.id
+      )
+      SELECT 
+        t.id, t.identifier, t.title, t.status, t.assignee_agent_id, t.checkout_run_id, t.updated_at,
+        r.status as run_status, r.error as run_error, r.finished_at as run_finished_at
+      FROM task_tree t
+      LEFT JOIN heartbeat_runs r ON t.checkout_run_id = r.id
+      WHERE t.status = 'in_progress' AND t.identifier != 'COOA-114'
+      ORDER BY t.identifier ASC
+    `;
+    const res = await client.query(mainlineQuery);
+    const activeTasks = res.rows;
+    const now = Date.now();
+
+    for (const task of activeTasks) {
+      const updatedAtMs = new Date(task.updated_at).getTime();
+      const ageMinutes = (now - updatedAtMs) / (60 * 1000);
+
+      // --- 场景 1: 已有合规的验收证据落盘，自动闭环结项 (自己修理) ---
+      const evidenceCandidates = [
+        path.join(REPO_ROOT, `docs-coolie/evidence/wave380/${task.identifier}-stage5-expo-i18n-acceptance.md`),
+        path.join(REPO_ROOT, `docs-coolie/evidence/${task.identifier}-acceptance.md`)
+      ];
+      let hasEvidence = false;
+      for (const ep of evidenceCandidates) {
+        if (fs.existsSync(ep)) { hasEvidence = true; break; }
+      }
+      if (hasEvidence) {
+        await client.query("UPDATE issues SET status = 'done', updated_at = NOW() WHERE id = $1", [task.id]);
+        const msg = `${task.identifier} 验收证据已完备就绪，SRE 自动核销结项标记为 done`;
+        logIncident('INFO', 'AUTO_HEAL_DONE', msg);
+        actions.selfHealed.push({ task: task.identifier, action: 'MARK_DONE', reason: 'Evidence ready' });
+        continue;
+      }
+
+      // --- 场景 2: 绑定的 run 已 failed 且超过 3 分钟未恢复 (自己修理: 解挂僵死锁) ---
+      if (task.checkout_run_id && task.run_status === 'failed') {
+        const finishedMs = task.run_finished_at ? new Date(task.run_finished_at).getTime() : updatedAtMs;
+        if (now - finishedMs > 3 * 60 * 1000) {
+          await client.query("UPDATE issues SET status = 'todo', checkout_run_id = NULL, updated_at = NOW() WHERE id = $1", [task.id]);
+          const msg = `${task.identifier} 绑定 run ${task.checkout_run_id} 已失败超过3分钟，SRE 自动解挂重置为 todo`;
+          logIncident('WARN', 'AUTO_HEAL_UNLOCK', msg);
+          actions.selfHealed.push({ task: task.identifier, action: 'RESET_TODO', reason: 'Run failed' });
+          continue;
+        }
+      }
+
+      // --- 场景 3: 僵尸锁 (checkout_run_id 为空但停滞在 in_progress 超过 15 分钟) (自己修理) ---
+      if (!task.checkout_run_id && ageMinutes > 15) {
+        await client.query("UPDATE issues SET status = 'todo', updated_at = NOW() WHERE id = $1", [task.id]);
+        const msg = `${task.identifier} 无活跃执行且停滞超过15分钟，SRE 自动释放重置为 todo`;
+        logIncident('WARN', 'AUTO_HEAL_STALLED', msg);
+        actions.selfHealed.push({ task: task.identifier, action: 'RESET_TODO', reason: 'Stalled without run' });
+        continue;
+      }
+
+      // --- 场景 4: 连续失败且包含代码/系统错误 (发起任务修理) ---
+      if (task.assignee_agent_id) {
+        const agentRunsRes = await client.query(`
+          SELECT id, status, error, created_at 
+          FROM heartbeat_runs 
+          WHERE agent_id = $1 
+          ORDER BY created_at DESC 
+          LIMIT 3
+        `, [task.assignee_agent_id]);
+        const runs = agentRunsRes.rows;
+
+        if (runs.length >= 2 && runs[0].status === 'failed' && runs[1].status === 'failed') {
+          const latestErr = runs[0].error || '未知运行错误';
+          const errFingerprint = `${task.assignee_agent_id}:${latestErr.slice(0, 60)}`;
+
+          const lastDispatched = dispatchedIncidentCache.get(errFingerprint);
+          if (!lastDispatched || (now - lastDispatched > 60 * 60 * 1000)) {
+            const checkExistRes = await client.query(`
+              SELECT id FROM issues 
+              WHERE title LIKE $1 AND status IN ('todo', 'in_progress', 'blocked')
+            `, [`%【SRE自愈·P0】%${task.identifier}%`]);
+
+            if (checkExistRes.rows.length === 0) {
+              const maxNumRes = await client.query("SELECT COALESCE(MAX(issue_number), 150) as max_num FROM issues WHERE company_id = 'da2e705c-c80a-411b-b2ae-e39372b1251f'");
+              const nextNum = parseInt(maxNumRes.rows[0].max_num, 10) + 1;
+              const nextId = `COOA-${nextNum}`;
+              const p0Title = `【SRE自愈·P0】修复 ${task.identifier} 连续失败阻断主线推进`;
+              const p0Desc = `## SRE 自动故障排障派单\n\n### 故障概况\n- 阻断主线任务: ${task.identifier} (${task.title})\n- 责任 Agent: ${task.assignee_agent_id}\n- 连续失败次数: 2+\n- 最新错误摘要: \`${latestErr}\`\n\n### SRE 建议排障\n1. 检查代码编译及静态契约 (pnpm -r typecheck)\n2. 检查依赖与运行时环境\n3. 修复代码缺陷后执行回归验证并挂载真实凭证。`;
+
+              await client.query(`
+                INSERT INTO issues (
+                  id, company_id, project_id, parent_id, identifier, issue_number, title, description, status, priority, assignee_agent_id, created_at, updated_at
+                ) VALUES (
+                  gen_random_uuid(), 'da2e705c-c80a-411b-b2ae-e39372b1251f', 'a3b763bb-f751-4cdb-ac60-0c58a0c907cf',
+                  '179c5dfe-e531-48ac-8e29-fcfb2db2d74b', $1, $2, $3, $4, 'todo', 'urgent', $5, NOW(), NOW()
+                )
+              `, [nextId, nextNum, p0Title, p0Desc, task.assignee_agent_id]);
+
+              dispatchedIncidentCache.set(errFingerprint, now);
+              const msg = `SRE 自动为 ${task.identifier} 发起修理工单 ${nextId}: ${p0Title}`;
+              logIncident('CRITICAL', 'AUTO_DISPATCH_ISSUE', msg);
+              actions.dispatched.push({ issue: nextId, targetTask: task.identifier, error: latestErr.slice(0, 80) });
+            }
+          }
+        }
+      }
+    }
+  } catch (err) {
+    logIncident('ERROR', 'MAINLINE_SCAN_ERR', err.message);
+  }
+
+  return actions;
 }
 
 // 6. 执行单次体检与自愈
@@ -260,6 +457,15 @@ async function runCheck() {
 
   if (!isHealthy) {
     logIncident('CRITICAL', 'SERVICE_DOWN', `App: ${statusSummary.ports.app_3100}, DB: ${statusSummary.ports.postgres_54329}, API err: ${health.error || 'none'}`);
+    if (IS_LINUX && portPg && (!portApp || !health.ok)) {
+      try {
+        logIncident('INFO', 'AUTO_HEAL', 'Restarting coolie-dev.service via systemctl');
+        const uid = process.getuid ? process.getuid() : 1000;
+        execSync(`XDG_RUNTIME_DIR=/run/user/${uid} systemctl --user restart coolie-dev.service`, { timeout: 10000 });
+      } catch (err) {
+        logIncident('ERROR', 'AUTO_HEAL_FAILED', err.message);
+      }
+    }
   }
 
   return statusSummary;
