@@ -4,7 +4,7 @@ import { z } from "zod";
 import {
   CONNECTION_REQUEST_TOOL_DESCRIPTION,
   CONNECTIONS_SEARCH_TOOL_DESCRIPTION,
-  addIssueCommentSchema,
+  addIssueCommentObjectSchema, addIssueCommentSchema,
   askUserQuestionsPayloadSchema,
   checkoutIssueSchema,
   connectionRequestInputSchema,
@@ -210,7 +210,7 @@ const checkoutIssueToolSchema = z.object({
 
 const addCommentToolSchema = z.object({
   issueId: issueIdSchema,
-}).merge(addIssueCommentSchema);
+}).merge(addIssueCommentObjectSchema);
 
 const createSuggestTasksToolSchema = z.object({
   issueId: issueIdSchema,

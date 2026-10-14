@@ -1079,6 +1079,19 @@ export const issueCommentMetadataSchema = z
 
 export type IssueCommentMetadata = z.infer<typeof issueCommentMetadataSchema>;
 
+export const addIssueCommentObjectSchema = z.object({
+  clientRequestId: z.string().uuid().optional(),
+  body: multilineTextSchema.pipe(z.string().min(1)),
+  attachmentIds: issueCommentAttachmentIdsSchema.optional(),
+  onBehalfOfUserId: z.string().trim().min(1).optional().nullable(),
+  authorType: issueCommentAuthorTypeSchema.optional(),
+  presentation: issueCommentPresentationSchema.nullable().optional(),
+  metadata: issueCommentMetadataSchema.nullable().optional(),
+  reopen: z.boolean().optional(),
+  resume: z.boolean().optional(),
+  interrupt: z.boolean().optional(),
+});
+
 export const addIssueCommentSchema = z.preprocess(
   (val) => {
     if (val && typeof val === "object" && !("body" in val) && "comment" in val) {
@@ -1087,18 +1100,7 @@ export const addIssueCommentSchema = z.preprocess(
     }
     return val;
   },
-  z.object({
-    clientRequestId: z.string().uuid().optional(),
-    body: multilineTextSchema.pipe(z.string().min(1)),
-    attachmentIds: issueCommentAttachmentIdsSchema.optional(),
-    onBehalfOfUserId: z.string().trim().min(1).optional().nullable(),
-    authorType: issueCommentAuthorTypeSchema.optional(),
-    presentation: issueCommentPresentationSchema.nullable().optional(),
-    metadata: issueCommentMetadataSchema.nullable().optional(),
-    reopen: z.boolean().optional(),
-    resume: z.boolean().optional(),
-    interrupt: z.boolean().optional(),
-  }),
+  addIssueCommentObjectSchema,
 );
 
 export type AddIssueComment = z.infer<typeof addIssueCommentSchema>;

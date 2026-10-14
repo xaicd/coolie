@@ -1998,6 +1998,7 @@ export {
   issueCommentMetadataRowSchema,
   issueCommentMetadataSectionSchema,
   issueCommentMetadataSchema,
+  addIssueCommentObjectSchema,
   addIssueCommentSchema,
   issueThreadInteractionStatusSchema,
   issueThreadInteractionKindSchema,
