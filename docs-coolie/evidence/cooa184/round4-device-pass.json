@@ -1,0 +1,78 @@
+{
+  "issue": "COOA-184",
+  "round": 4,
+  "title": "移动端 M3 工坊流式/防撑破 与 M4 活体本体动词抽屉 深度实机走查",
+  "date": "2026-10-15",
+  "runner": "门神 (FDSE / claude_local)",
+  "device": {
+    "kind": "Android Emulator",
+    "avd": "emulator-5554",
+    "physical": "1080x2400",
+    "density": 420,
+    "app": "cloud.coolie.app (Expo dev client)"
+  },
+  "driver": "agent-device anthropic session (macOS host, adb)",
+  "bundle": {
+    "served": "Metro :8081",
+    "wipIncluded": true,
+    "proof": "index.bundle contains '回底' (2) and 'BoardChat__JumpToBottom' (1)"
+  },
+  "results": {
+    "M1_Dashboard": {
+      "status": "PASS",
+      "evidence": "首屏 4 大 KPI 卡片 (已启用员工 6 / 执行中任务 4 / ¥0.00 本月花费 / 0 待审批) + 近 7 天活跃度图表 (11.9 任务/天) 无滚动全览；顶栏两字 🚨熔断 入口",
+      "shot": "shots/m1-dashboard.png"
+    },
+    "M3_Workshop": {
+      "status": "PARTIAL",
+      "evidence": "ChatHome 数字员工交付舰队 + 四大业务意图胶囊 (商业极速立项/开源竞品对标/真机沙箱试玩/交付审批核销) + 会话输入栏 (附件 / 语音 / 发送) 渲染正常；智能吸底锚点 / 回底入口 / 代码块复制 三处新交互需在活跃 LLM 会话中触发，本轮未运行真实流式会话",
+      "shot": "shots/m3-workshop.png",
+      "next": "启动一次真实工坊会话, 验证流式打字机吸底 + 上滑解锚后 [回底] 出现 + 代码块右上角 [复制] Toast"
+    },
+    "M4_Ontology": {
+      "status": "PASS",
+      "evidence": "资产大厅→本体域展开后, 实体卡 (v0.6.57 / 客户终验核销单 COOA-138 / SignOffUat 签署动作 / G0 门禁) 点击一跳弹出受控 Action Drawer; 抽屉内展示上游前序 (certifies) 与下游后继 (gated_by) 因果血缘; 底部合法业务动词 [工坊][工程][关闭] 在 78% 视口内可达 (y≈2120, 未超出屏幕)",
+      "shot": "shots/m4-drawer.png",
+      "wipEffect": "Sheet maxHeight=78% 视口 + scrollable 局部滚动生效: 抽屉正文独立滚动, 底部动词保持可达"
+    }
+  },
+  "dimensions": {
+    "2.2.7_action_drawer": "PASS — 实体卡一跳弹出半屏动词抽屉, 动词可达",
+    "2.2.3_keyboard": "PASS(继承) — 输入栏在键盘上方, 本轮未回归",
+    "2.2.6_offline": "PASS(已在 clients/api-client 落地, 9 单测通过, 本轮未复跑)"
+  },
+  "defects": [
+    {
+      "id": "F4-1",
+      "severity": "Major",
+      "screen": "OrgAssetsScreen → 本体 (embedded AssetOntologyScreen)",
+      "summary": "初判中心子 Tab [⊞ 业务对象] 与中央抬起 [新建任务] FAB (+) 触点重叠被劫持",
+      "repro": "展开本体域 → 点击中心子 Tab 区域",
+      "evidence": "tap @ (540,2168) opens 新建任务",
+      "rootCause": "components/TabBar.tsx 中央 FAB (46dp, marginTop:-14, hitSlop:8)",
+      "status": "NOT_REPRODUCED",
+      "rebuttal": "本轮 (COOA-184 round4 复核) 用像素级几何重测推翻了原始结论: 子 Tab 文字带位于 y=2077..2114 (中心 y≈2095), FAB 可见圆盘 bbox y=2175..2294 (顶沿 y=2175), 二者净空 ≥60px 无重叠。tap @ (540,2095) 命中中心子 Tab → 屏幕零变化 (正确切换, 视口无位移); 只有落入 FAB hitSlop 顶沿 (y≈2154..2175) 的 tap (如 y=2155/2168/2170) 才被 FAB 劫持。原始 tap@2168 落点在子 Tab 下方 ~73px, 非子 Tab 本体。",
+      "residual": "FAB hitSlop=8dp 将不可见触点区域向上扩展 ~21px 进入滚动视口; 当前该条带内无任何可交互内容 (惰性), 不影响子 Tab 可达性。记录供产品知晓, 本轮不改动全局 TabBar 以免引入跨屏回归。",
+      "recommendation": "不纳入本轮修复 (子 Tab 已证实可达); 若后续有内容滚入 FAB 上方 21px 条带再评估收敛 hitSlop"
+    }
+  ],
+  "codeChangesThisRun": [
+    "clients/expo/src/screens/BoardChatScreen.tsx — 智能吸底锚点 (atBottomRef) + 上滑解锚 [回底] 入口 + 代码块 [复制] 按钮",
+    "clients/expo/src/ui/Sheet.tsx — 新增 scrollable 属性 (把手+标题固定, 正文独立滚动)",
+    "clients/expo/src/screens/AssetOntologyScreen.tsx — 实体 360 / 数据源流抽屉启用 maxHeight(78% 视口) + scrollable"
+  ],
+  "typecheck": "clients/expo: npx tsc --noEmit → exit 0",
+  "reviewThisRun": {
+    "by": "门神 (FDSE / claude_local), COOA-184 round4 handoff 复核",
+    "method": "adb (emulator-5554) 像素级几何复测: 色阈值定位 FAB 可见圆盘 + 行扫描定位子 Tab 文字带; 逐一 tap 采样并以帧差 (changed_ratio) 判定是否弹出模态",
+    "measurements": {
+      "fab_circle_bbox": "accent(94,106,209) x=480..599 y=2175..2294 (中心 ≈ (540,2234))",
+      "subtab_text_band": "y=2077..2114 (中心 y≈2095)",
+      "tap_2095_subtab_center": "changed_ratio 0.0003 → 未弹模态 (子 Tab 可达)",
+      "tap_2155_in_fab_hitslop": "changed_ratio 0.128 → 弹出「新建任务」(hitSlop 顶沿)",
+      "tap_2120_gap": "changed_ratio 0.0025 → 未弹模态"
+    },
+    "verdict": "F4-1 不成立 (子 Tab 可达); 残留 FAB hitSlop 上扩观察为非阻断项"
+  },
+  "conclusion": "M4 活体本体动词抽屉 (维度 2.2.7) 真机一跳弹出且底部动词可达 (PASS)。M3 工坊新交互 (智能吸底 / 上滑解锚 [回底] / 代码块 [复制]) 代码已入运行 bundle 且 typecheck exit 0, 尚需一次活跃流式会话实证。原报缺陷 F4-1 经本轮像素级复测证实不成立 (子 Tab 与 FAB 净空 ≥60px, 中心子 Tab tap 正常切换), 归档为 NOT_REPRODUCED。"
+}

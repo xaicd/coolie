@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Modal, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View, type StyleProp, type ViewStyle } from "react-native";
 import { C } from "../coolie";
 import { RADIUS, SPACING } from "./tokens";
 
@@ -11,6 +11,11 @@ export interface SheetProps {
   maxHeight?: number;
   contentStyle?: StyleProp<ViewStyle>;
   style?: StyleProp<ViewStyle>;
+  /**
+   * 内容超高时局部滚动 (把手 + 标题保持固定, 正文独立滚动)。
+   * 用于实体 360/动词抽屉等正文可能超出视口的场景, 避免底部动词按钮被推出屏幕不可达。
+   */
+  scrollable?: boolean;
 }
 
 /** 底部抽屉骨架: 遮罩 + 把手 + panel 圆角 18 (DESIGN.md 第3节) */
@@ -22,6 +27,7 @@ export function Sheet({
   maxHeight,
   contentStyle,
   style,
+  scrollable = false,
 }: SheetProps) {
   const body = (
     <View style={[styles.backdrop, modal ? styles.backdropFill : null, style]}>
@@ -29,7 +35,18 @@ export function Sheet({
       <View style={[styles.sheet, maxHeight ? { maxHeight } : null, contentStyle]}>
         <View style={styles.handle} />
         {title ? <Text style={styles.title}>{title}</Text> : null}
-        {children}
+        {scrollable ? (
+          <ScrollView
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}
+          >
+            {children}
+          </ScrollView>
+        ) : (
+          children
+        )}
       </View>
     </View>
   );
@@ -81,5 +98,11 @@ const styles = StyleSheet.create({
     fontSize: 17,
     fontWeight: "600",
     marginBottom: SPACING.sm,
+  },
+  scrollView: {
+    flexShrink: 1,
+  },
+  scrollContent: {
+    paddingBottom: SPACING.sm,
   },
 });

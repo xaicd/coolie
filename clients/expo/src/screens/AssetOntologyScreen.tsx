@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,
+  Dimensions,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -34,6 +35,12 @@ import { FoldableText } from "../ui/FoldableText";
 import { showErrorToast, showSuccessToast } from "../ui/toast";
 import type { SandboxScope } from "./PrototypeSandboxScreen";
 import { EgoRadarGraph, type RadarNode, type RadarEdge } from "../components/EgoRadarGraph";
+
+/**
+ * 实体 360 / 动词抽屉的最大高度: 收敛为半屏 BottomSheet (≤ 78% 视口),
+ * 正文在抽屉内独立滚动, 保证底部「合法业务动词」永远可达, 不被推出屏幕。
+ */
+const SHEET_MAX_HEIGHT = Math.round(Dimensions.get("window").height * 0.78);
 
 export interface DomainItem {
   id: string;
@@ -1371,6 +1378,8 @@ export function AssetOntologyScreen({
         <Sheet
           onClose={() => setSelectedObject(null)}
           title={`实体 360 · ${selectedObject.name}`}
+          maxHeight={SHEET_MAX_HEIGHT}
+          scrollable
         >
           <View style={styles.sheetBody}>
             {/* 实体基础态势 */}
@@ -1514,6 +1523,8 @@ export function AssetOntologyScreen({
         <Sheet
           onClose={() => setSelectedDataset(null)}
           title={`数据源流 · ${selectedDataset.tableName}`}
+          maxHeight={SHEET_MAX_HEIGHT}
+          scrollable
         >
           <View style={styles.sheetBody}>
             <View style={styles.sheetHeaderCard}>

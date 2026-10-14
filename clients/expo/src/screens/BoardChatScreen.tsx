@@ -18,6 +18,8 @@ import {
   StatusBar as RNStatusBar,
   Modal,
   ToastAndroid,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { isAsrNotConfigured, isRenderableBoardMessage } from "@coolie/api-client";
@@ -490,6 +492,13 @@ export function BoardChatScreen({
 
   const [buildCard, setBuildCard] = useState<BuildCardState | null>(null);
   const flatListRef = useRef<FlatList<BoardChatMessage>>(null);
+  /**
+   * 智能吸底锚点 (对齐 Claude Mobile / Cursor iOS):
+   * 只有当列表贴近底部时才跟随流式输出自动滚动; 用户手指上滑即解锚,
+   * 松开锚点后不再强制拽回底部, 回到底部后自动重新吸底。
+   */
+  const atBottomRef = useRef(true);
+  const [showJumpToBottom, setShowJumpToBottom] = useState(false);
   const abortControllerRef = useRef<AbortController | null>(null);
   const accumulatedRef = useRef("");
   /** wave144: 首 token 看门狗的表 + 是否由它触发 (区别于用户主动取消) */
@@ -789,11 +798,38 @@ export function BoardChatScreen({
     Alert.alert("已复制", "消息已复制到剪贴板");
   }, []);
 
-  const scrollToBottom = useCallback((animated = true) => {
+  /**
+   * 滚动到底部。
+   * - force=true (默认): 用户主动发问/追加消息时无条件吸底;
+   * - force=false: 流式分块 / 内容增长时仅在「仍贴着底部」时跟随, 用户上滑解锚后不再骚扰。
+   */
+  const scrollToBottom = useCallback((animated = true, force = true) => {
+    if (!force && !atBottomRef.current) return;
     setTimeout(() => {
       flatListRef.current?.scrollToEnd({ animated });
+      atBottomRef.current = true;
+      setShowJumpToBottom(false);
     }, 80);
   }, []);
+
+  /** 距底部阈值内视为「贴底」; 上滑解锚后展示【回底】入口。 */
+  const handleMessageScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      const { layoutMeasurement, contentOffset, contentSize } = e.nativeEvent;
+      const distanceFromBottom =
+        contentSize.height - (contentOffset.y + layoutMeasurement.height);
+      const nearBottom = distanceFromBottom <= 48;
+      atBottomRef.current = nearBottom;
+      setShowJumpToBottom((prev) => (prev === !nearBottom ? prev : !nearBottom));
+    },
+    [],
+  );
+
+  const jumpToBottom = useCallback(() => {
+    atBottomRef.current = true;
+    setShowJumpToBottom(false);
+    scrollToBottom(true, true);
+  }, [scrollToBottom]);
 
   // 外部系统提示气泡: 历史加载完成后再回灌队列并订阅实时推送
   const appendEcho = useCallback(
@@ -1441,7 +1477,8 @@ export function BoardChatScreen({
                 accumulated: accumulatedRef.current,
                 status: "",
               });
-              scrollToBottom(false);
+              // 流式分块: 仅在仍贴着底部时跟随 (上滑解锚后不拽回)
+              scrollToBottom(false, false);
             },
             onDone: (doneEvent) => {
               if (doneEvent.issueId) {
@@ -1865,8 +1902,21 @@ export function BoardChatScreen({
                 return (
                   <View key={`code-${idx}`} style={styles.chatCodeCard}>
                     <View style={styles.chatCodeHeader}>
-                      <Text style={styles.chatCodeLang}>{seg.language || "code"}</Text>
-                      <Text style={styles.chatCodeLines}>{lineCount} 行</Text>
+                      <View style={styles.chatCodeHeaderLeft}>
+                        <Text style={styles.chatCodeLang}>{seg.language || "code"}</Text>
+                        <Text style={styles.chatCodeLines}>{lineCount} 行</Text>
+                      </View>
+                      <Pressable
+                        onPress={() => copyToClipboard(seg.content)}
+                        hitSlop={8}
+                        accessibilityRole="button"
+                        accessibilityLabel="复制"
+                        style={styles.chatCodeCopyBtn}
+                        testID={`BoardChat__CodeCopy__${idx}`}
+                      >
+                        <Ionicons name="copy-outline" size={12} color={C.ink2} />
+                        <Text style={styles.chatCodeCopyText}>复制</Text>
+                      </Pressable>
                     </View>
                     <CodeViewerWebView
                       code={seg.content}
@@ -1933,8 +1983,9 @@ export function BoardChatScreen({
           keyExtractor={(item) => item.id}
           renderItem={renderMessageItem}
           contentContainerStyle={styles.messageList}
-          onContentSizeChange={() => scrollToBottom(false)}
-          onLayout={() => scrollToBottom(false)}
+          onContentSizeChange={() => scrollToBottom(false, false)}
+          onScroll={handleMessageScroll}
+          scrollEventThrottle={16}
           ListHeaderComponent={
             Array.isArray(approvalFeed) && approvalFeed.length > 0 ? (
               <View style={styles.approvalStack}>
@@ -2128,6 +2179,21 @@ export function BoardChatScreen({
               <Text style={styles.stagedClear}>清空</Text>
             </Pressable>
           </View>
+        ) : null}
+
+        {/* 上滑解锚后的【回底】入口: 就地一跳回到底部并重新吸底 */}
+        {showJumpToBottom && messages.length > 0 ? (
+          <Pressable
+            onPress={jumpToBottom}
+            style={styles.jumpToBottomBtn}
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel="回底"
+            testID="BoardChat__JumpToBottom"
+          >
+            <Ionicons name="arrow-down" size={13} color="#FFFFFF" />
+            <Text style={styles.jumpToBottomText}>回底</Text>
+          </Pressable>
         ) : null}
 
         {/* 底部输入框区域 (wave71 抽出到 <ChatInput/>) */}
@@ -2748,6 +2814,29 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     gap: 12,
   },
+  jumpToBottomBtn: {
+    position: "absolute",
+    right: 18,
+    bottom: 92,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 999,
+    backgroundColor: C.accent,
+    shadowColor: "#000000",
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 6,
+    zIndex: 20,
+  },
+  jumpToBottomText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "600",
+  },
   systemRow: {
     alignItems: "center",
     marginVertical: 2,
@@ -3024,6 +3113,26 @@ const styles = StyleSheet.create({
   },
   chatCodeLang: {
     color: C.accent,
+    fontSize: 11,
+    fontWeight: "500",
+  },
+  chatCodeHeaderLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexShrink: 1,
+  },
+  chatCodeCopyBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    backgroundColor: "rgba(255, 255, 255, 0.06)",
+  },
+  chatCodeCopyText: {
+    color: C.ink2,
     fontSize: 11,
     fontWeight: "500",
   },
