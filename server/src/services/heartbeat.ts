@@ -591,6 +591,7 @@ import {
   sweepExpiredHeartbeatRunRuntimeStatuses,
   touchHeartbeatRunRuntimeStatus,
 } from "./heartbeat-run-runtime-status.js";
+import { startHeartbeatRunIdleHeartbeat } from "./heartbeat-run-idle-heartbeat.js";
 import {
   findMissingHotRestartSnapshotRunIds,
   readHotRestartIntent,
@@ -20208,6 +20209,11 @@ export function heartbeatService(
       ReturnType<typeof traceStore.prepare>
     > | null = null;
     let providerTraceFinalized = false;
+    // Long-task liveness (COOA-137): while this run executes it may stream no
+    // output for minutes, so keep the console's live status fresh with a
+    // non-blocking progress tick. Declared at function scope so the `finally`
+    // below can always stop it, even on an early return or throw.
+    let stopIdleHeartbeat: (() => void) | null = null;
 
     try {
       const agent = await getAgent(run.agentId);
@@ -22848,6 +22854,19 @@ export function heartbeatService(
           stream: "system",
           level: "info",
           message: "run started",
+        });
+
+        // COOA-137 long-task heartbeat: publish a non-blocking progress tick
+        // every 10s so an adapter step that streams no output does not let the
+        // console's live runtime status expire mid-run. The tick touches only
+        // the in-memory status and re-emits it; it never blocks the run.
+        stopIdleHeartbeat = startHeartbeatRunIdleHeartbeat({
+          companyId: run.companyId,
+          agentId: run.agentId,
+          runId: run.id,
+          issueId,
+          isActive: () => isHeartbeatRunRuntimeStatusActive(run.status),
+          onTick: (status) => publishHeartbeatRunRuntimeProgress(status),
         });
 
         handle = await runLogStore.begin({
@@ -25942,6 +25961,10 @@ export function heartbeatService(
         }
       }
     } finally {
+      if (stopIdleHeartbeat) {
+        stopIdleHeartbeat();
+        stopIdleHeartbeat = null;
+      }
       if (managedAiRuntime) await managedAiRuntime.cleanup().catch(() => logger.warn({ runId: run.id }, "AI connection refresh or cleanup failed"));
       let latestRun = await getRun(run.id).catch(() => null);
       try {
