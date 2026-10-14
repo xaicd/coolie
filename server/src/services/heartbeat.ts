@@ -8290,7 +8290,7 @@ function decorateHeartbeatRunRuntimeStatus<
   };
 }
 
-function publishHeartbeatRunRuntimeProgress(status: {
+export function publishHeartbeatRunRuntimeProgress(status: {
   companyId: string;
   runId: string;
   agentId: string;

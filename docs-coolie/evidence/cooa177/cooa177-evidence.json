@@ -1,0 +1,93 @@
+{
+  "issue": "COOA-177",
+  "title": "底座自愈与防穿透端到端验收 + 高并发防重实证",
+  "parentIssue": "COOA-137",
+  "generatedAt": "2026-10-14",
+  "workPackages": [
+    {
+      "id": "WP1",
+      "claim": "kill -9 强杀持有单人工单签出锁的进程后，锁在 5 分钟租约窗口内自动解挂并写入恢复审计事件。",
+      "runner": "vitest",
+      "suite": "server/src/__tests__/cooa177-checkout-lock-selfheal-kill9.test.ts",
+      "tests": [
+        "keeps the lock while the holder process is alive, then releases it once the process is SIGKILLed and records the recovery audit"
+      ],
+      "assertions": [
+        "while the real child process is alive: sweepStaleIssueLocks().cleared === 0 and terminalizedRunIds === []",
+        "after SIGKILL + reap: sweepStaleIssueLocks().terminalizedRunIds === [runId] and cleared === 1",
+        "releasedAfterMs < 5 * 60 * 1000 (300s lease window)",
+        "heartbeat_runs.status === 'interrupted', errorCode === 'orphaned_running_run'",
+        "issues.checkoutRunId === null, executionRunId === null, executionLockedAt === null",
+        "activity_log has action 'issue.stale_lock_cleared' with details.source 'recovery.sweep_stale_issue_locks' and clearedCheckoutRunId/clearedExecutionRunId"
+      ],
+      "result": "pass"
+    },
+    {
+      "id": "WP2",
+      "claim": "静默长任务经真实 WebSocket 通道至少每 10s 收到一次 heartbeat.run.progress。",
+      "runner": "vitest",
+      "suite": "server/src/__tests__/cooa177-idle-heartbeat-ws.test.ts",
+      "tests": [
+        "pushes heartbeat.run.progress frames to a connected client while a silent run idles",
+        "keeps the production idle interval at or below the 10s console tolerance"
+      ],
+      "assertions": [
+        "a real ws client connected to /api/companies/:id/events/ws (deploymentMode local_trusted) receives >= 5 frames of type 'heartbeat.run.progress' for the run",
+        "every frame carries { companyId, payload.runId, payload.agentId, payload.issueId }",
+        "max inter-arrival gap < ACTIVE_RUN_IDLE_HEARTBEAT_INTERVAL_MS (10000)",
+        "ACTIVE_RUN_IDLE_HEARTBEAT_INTERVAL_MS === 10000"
+      ],
+      "result": "pass",
+      "seam": "exported publishHeartbeatRunRuntimeProgress from server/src/services/heartbeat.ts so the idle-heartbeat onTick wires to the real production publisher over the real socket"
+    },
+    {
+      "id": "WP3",
+      "claim": "跨公司/跨项目越权扫描：全盘 schema 的 company_id/project_id 双隔离面可机检。",
+      "runner": "vitest",
+      "suite": "packages/db/src/tenant-scope-inventory.test.ts",
+      "tests": [
+        "classifies every schema table as company-scoped or an explicit exception",
+        "keeps the pg-table inventory at or above the documented baseline (225)",
+        "treats every nullable company_id as a reviewed exception",
+        "anchors every project-scoped table to a company_id as well"
+      ],
+      "assertions": [
+        "every Drizzle table either has a company_id column or is in the reviewed NON_COMPANY_SCOPED_TABLES list",
+        "every nullable company_id column is in the reviewed NULLABLE_COMPANY_SCOPE_TABLES list (no silent new nullable tenant column)",
+        "every table carrying project_id also carries company_id (zero unanchored project rows across the whole schema barrel)"
+      ],
+      "reviewedNullableCompanyScope": [
+        "company_transfer_runs",
+        "invites",
+        "plugin_entities",
+        "plugin_job_runs",
+        "plugin_logs",
+        "plugin_webhook_deliveries"
+      ],
+      "result": "pass"
+    },
+    {
+      "id": "WP4",
+      "claim": "并发签出/派单零重复执行。",
+      "runner": "vitest",
+      "suite": "server/src/__tests__/cooa177-concurrent-checkout-dedup.test.ts",
+      "tests": [
+        "lets exactly one of many racing runs win the checkout lock",
+        "is idempotent when the same run re-checks-out concurrently"
+      ],
+      "assertions": [
+        "8 concurrent checkouts from 8 distinct live runs: exactly 1 fulfilled, 7 rejected",
+        "issue checkoutRunId/executionRunId equal the single winning runId",
+        "assertCheckoutOwner grants exactly one run (the lock holder) and rejects the rest",
+        "6 concurrent same-run re-checkouts are all fulfilled and keep the same runId (no duplicate lock flip)"
+      ],
+      "result": "pass"
+    }
+  ],
+  "verification": {
+    "dbTypecheck": "pass",
+    "serverTypecheck": "pass",
+    "targetedVitest": "pass (8 files / 52 tests, EXIT=0)",
+    "preexistingUnrelatedFailure": "packages/mcp-server typecheck fails on untouched src/tools.ts (zod type drift); not introduced by this change"
+  }
+}

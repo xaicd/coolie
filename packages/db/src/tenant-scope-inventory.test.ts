@@ -219,3 +219,70 @@ describe("COOA-137 WP3 — multi-tenant scope inventory", () => {
     expect(scopedReport.stale.length).toBe(Object.keys(NON_COMPANY_SCOPED_TABLES).length);
   });
 });
+
+/**
+ * COOA-177 WP3 — the dual (company_id + project_id) isolation surface.
+ *
+ * The company-scope inventory above proves every table carries a tenant
+ * boundary. These gates tighten the boundary across the whole schema surface,
+ * not just the handful of routes that have hand-written isolation tests:
+ *
+ *  - a nullable `company_id` cannot enforce isolation, so every table that
+ *    exposes one must be a reviewed exception with an explicit reason. A new
+ *    nullable tenant column cannot ship without an entry here;
+ *  - a project-scoped row (a table carrying a `project_id`) must also carry a
+ *    `company_id`, so a project id alone can never be the whole boundary.
+ */
+type ColumnSpec = { notNull?: boolean };
+
+const columnsOf = (table: PgTable): Record<string, ColumnSpec> =>
+  getTableColumns(table) as Record<string, ColumnSpec>;
+
+/**
+ * Tables whose `company_id` column is intentionally nullable — the row can be
+ * instance-wide (no tenant). Each entry is reviewed; keep sorted by name.
+ */
+const NULLABLE_COMPANY_SCOPE_TABLES: Record<string, string> = {
+  company_transfer_runs:
+    "A transfer run may exist before the target company row; the FK uses onDelete set null.",
+  invites: "An invite may be instance-scoped before it is bound to a target company.",
+  plugin_entities:
+    "Instance-level plugin entities carry no tenant; the (company_id, plugin_id, ...) uniqueness index uses nullsNotDistinct for that case.",
+  plugin_job_runs: "Company scope is NULL for instance-level plugin jobs.",
+  plugin_logs: "Plugin logs may be instance-level, so the company scope is NULL.",
+  plugin_webhook_deliveries:
+    "Company scope is NULL for instance-level plugin webhook deliveries.",
+};
+
+describe("COOA-177 WP3 — dual company/project isolation surface", () => {
+  it("treats every nullable company_id as a reviewed exception", () => {
+    const nullableCompanyScope = new Set<string>();
+    const unreviewed: string[] = [];
+    for (const [name, table] of tables) {
+      const companyId = columnsOf(table).companyId;
+      if (!companyId || companyId.notNull === true) continue;
+      nullableCompanyScope.add(name);
+      if (!(name in NULLABLE_COMPANY_SCOPE_TABLES)) unreviewed.push(name);
+    }
+    const stale = Object.keys(NULLABLE_COMPANY_SCOPE_TABLES).filter(
+      (name) => !nullableCompanyScope.has(name),
+    );
+    expect(unreviewed.sort()).toEqual([]);
+    expect(stale.sort()).toEqual([]);
+  });
+
+  it("anchors every project-scoped table to a company_id as well", () => {
+    const projectScoped: string[] = [];
+    const unanchoredProjects: string[] = [];
+    for (const [name, table] of tables) {
+      const columns = columnsOf(table);
+      if (!columns.projectId) continue;
+      projectScoped.push(name);
+      if (!columns.companyId) unanchoredProjects.push(name);
+    }
+    expect(unanchoredProjects.sort()).toEqual([]);
+    // Guard against a vacuous pass: the schema must genuinely carry
+    // project-scoped rows, or the assertion above proves nothing.
+    expect(projectScoped.length).toBeGreaterThan(10);
+  });
+});
