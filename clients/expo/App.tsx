@@ -873,11 +873,13 @@ function HomeScreen({
     if (plansOpen) return setPlansOpen(false), true;
     if (projectsOpen) return setProjectsOpen(false), true;
     if (gitCredentialsOpen) return setGitCredentialsOpen(false), true;
-    if (pluginManagerOpen) return setPluginManagerOpen(false), true;
+    // 插件层级: 插件设置(最上层) 必须先于 插件管理 出栈, 才能逐级 LIFO 返回
+    // (COOA-136 FDSE 真机走查: 修复「返回键跳级」)。
     if (pluginSettingsId) return setPluginSettingsId(null), true;
+    if (pluginManagerOpen) return setPluginManagerOpen(false), true;
+    if (nativeModulesOpen) return setNativeModulesOpen(false), true;
     if (composeOpen) return setComposeOpen(false), true;
     if (settingsOpen) return setSettingsOpen(false), true;
-    if (nativeModulesOpen) return setNativeModulesOpen(false), true;
     if (tabHistoryRef.current.length > 0) return goBackTab(), true;
     return false;
   };
@@ -968,6 +970,7 @@ function HomeScreen({
       plansOpen ||
       projectsOpen ||
       gitCredentialsOpen ||
+      pluginSettingsId !== null ||
       pluginManagerOpen ||
       settingsOpen,
     );
@@ -1125,6 +1128,14 @@ function HomeScreen({
             />
           ) : gitCredentialsOpen ? (
             <GitCredentialsScreen company={company} onBack={() => setGitCredentialsOpen(false)} />
+          ) : pluginSettingsId ? (
+            // 单插件设置页必须排在插件管理之前: 否则 pluginManagerOpen 为真时
+            // 会把它整块盖住, 点插件"配置"永远打不开 (COOA-136 FDSE 走查)。
+            <PluginSettingsScreen
+              company={company}
+              pluginId={pluginSettingsId}
+              onBack={() => setPluginSettingsId(null)}
+            />
           ) : pluginManagerOpen ? (
             // wave275 (P0-02 插件设置): 独立条件渲染, 不嵌进 tab 三元, 不会被 dashboard 吞.
             <PluginManagerScreen
@@ -1136,12 +1147,6 @@ function HomeScreen({
                 setPluginManagerOpen(false);
               }}
             />
-          ) : pluginSettingsId ? (
-            <PluginSettingsScreen
-              company={company}
-              pluginId={pluginSettingsId}
-              onBack={() => setPluginSettingsId(null)}
-            />
           ) : settingsOpen ? (
             <SettingsScreen
               company={company}
@@ -1152,21 +1157,19 @@ function HomeScreen({
               workspaceGitEnabled={workspaceGitEnabled}
               onToggleWorkspaceGit={setWorkspaceGitEnabled}
               onOpenGitCredentials={() => {
-                setSettingsOpen(false);
+                // 保留 settingsOpen: 让返回键逐级 LIFO 退回设置页, 而不是跳回主线
+                // (COOA-136)。子屏分支在渲染三元里先于 settingsOpen, 不会被盖住。
                 setGitCredentialsOpen(true);
               }}
               onOpenPluginManager={() => {
-                setSettingsOpen(false);
                 setPluginManagerOpen(true);
               }}
               onOpenNativeModules={() => {
-                setSettingsOpen(false);
                 setNativeModulesOpen(true);
               }}
               onViewWhatsNew={
                 onOpenWhatsNew
                   ? () => {
-                      setSettingsOpen(false);
                       onOpenWhatsNew();
                     }
                   : undefined

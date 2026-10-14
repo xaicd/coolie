@@ -1,0 +1,90 @@
+{
+  "run": "cooa-136-mobile-fdse-round2",
+  "date": "2026-10-14",
+  "agent": "门神 (FDSE)",
+  "engine": "agent-device + adb",
+  "device": {
+    "serial": "emulator-5554",
+    "model": "sdk_gphone64_arm64",
+    "physicalPx": "1080x2400",
+    "density": 420,
+    "logicalWidthDp": 411,
+    "extremeViewport": { "override": "840x1780", "logicalWidthDp": 320 }
+  },
+  "app": { "package": "cloud.coolie.app", "metro": "http://localhost:8081" },
+  "defects": [
+    {
+      "id": "F1",
+      "severity": "Critical",
+      "title": "RN raw-text warning overlay on PluginManager",
+      "detail": "Text strings must be rendered within a <Text> component.",
+      "componentStack": "ScreenHeader (created by PluginManagerScreen)",
+      "rootCause": "ScreenHeader rendered string subtitle as a bare View child",
+      "fix": "clients/expo/src/ui/ScreenHeader.tsx wrap string/number subtitle in <Text>",
+      "evidence": "screenshots/01-DEFECT-rn-text-overlay.png",
+      "verified": { "recheck": "plugin manager opened, overlay nodes = 0" }
+    },
+    {
+      "id": "F2",
+      "severity": "Critical",
+      "title": "Hardware back skips parent layer (LIFO violation)",
+      "detail": "Settings -> child -> back landed on tab root, skipping Settings",
+      "rootCause": "Settings child entry points called setSettingsOpen(false), breaking the parent layer",
+      "fix": "clients/expo/App.tsx keep settingsOpen; reorder swipeBack stack (pluginSettingsId before pluginManagerOpen; nativeModulesOpen before settingsOpen)",
+      "steps": [
+        {"action": "open Settings", "observed": "Settings__ProfileCard present"},
+        {"action": "open PluginManager (配置)", "observed": "搜索插件名 present, overlay=0"},
+        {"action": "back", "expected": "Settings", "observed": "Settings__ProfileCard present"},
+        {"action": "back", "expected": "tab root", "observed": "tab content restored"}
+      ],
+      "verified": true
+    },
+    {
+      "id": "F3",
+      "severity": "Major",
+      "title": "Plugin single-settings page unreachable",
+      "detail": "Tapping a plugin card set pluginSettingsId but PluginManager branch shadowed it",
+      "fix": "clients/expo/App.tsx move pluginSettingsId branch before pluginManagerOpen",
+      "verified": { "recheck": "tap plugin card -> PluginSettings page (公司级配置) rendered" }
+    }
+  ],
+  "dimensions": {
+    "2.2.1_viewport_overflow": {
+      "viewport_411dp": { "汇览": 0, "任务": 0, "工坊": 0, "资产": 0 },
+      "viewport_320dp": { "汇览": 0, "任务": 0, "工坊": 0, "资产": 0 },
+      "pass": true
+    },
+    "2.2.2_safe_area": { "headerTopY": 128, "statusBarHeightPx": 128, "pass": true },
+    "2.2.3_keyboard_avoid": {
+      "pass": null,
+      "status": "not_verifiable_in_env",
+      "reason": "AVD InputMethod window mHasSurface=false isVisible=false (hardware keyboard suppresses soft IME); no fabricated result"
+    },
+    "2.2.4_lifo_back": { "pass": true, "depth": 3 },
+    "2.2.5_two_word_buttons": { "pass": true, "sampled": ["管理","配置","检查","清理","探测","发送","返回","停用","重置"] },
+    "2.2.6_offline": { "pass": null, "status": "not_run" },
+    "2.2.7_ontology": { "pass": null, "status": "not_run" },
+    "2.2.8_artifact_preview": { "pass": null, "status": "not_run" }
+  },
+  "typecheck": { "cmd": "npx tsc --noEmit", "exit": 0 },
+  "screenshots": [
+    "01-DEFECT-rn-text-overlay.png",
+    "50-round2-home.png",
+    "51-round2-settings.png",
+    "51-round2-pluginmanager.png",
+    "52-round2-pluginmanager.png",
+    "53-round2-back1.png",
+    "54-round2-back2.png",
+    "55-round2-pluginsettings.png",
+    "56-round2-lifo1.png",
+    "57-round2-lifo2.png",
+    "58-round2-lifo3.png",
+    "60-tab-dashboard.png",
+    "61-tab-tasks.png",
+    "62-tab-workshop.png",
+    "63-tab-assets.png",
+    "70-320-tasks.png",
+    "71-taskdetail-nokeyboard.png",
+    "72-taskdetail-keyboard.png"
+  ]
+}

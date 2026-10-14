@@ -29,6 +29,16 @@ export function ScreenHeader({
     </Pressable>
   ) : null;
 
+  // subtitle 既接受 ReactNode (自定义富文本), 也接受纯字符串 —— 传字符串时
+  // 必须包进 <Text>, 否则 RN 会抛 "Text strings must be rendered within a
+  // <Text> component." 并把红屏警告浮层盖到界面 (COOA-136 FDSE 真机走查)。
+  const subtitleNode =
+    typeof subtitle === "string" || typeof subtitle === "number" ? (
+      <Text style={styles.subtitle}>{subtitle}</Text>
+    ) : (
+      subtitle ?? null
+    );
+
   if (!title && !subtitle && !right) {
     return <View style={[styles.backOnly, divider && styles.divider, style]}>{back}</View>;
   }
@@ -44,7 +54,7 @@ export function ScreenHeader({
             </Text>
           ) : null}
         </View>
-        {subtitle}
+        {subtitleNode}
       </View>
       {right ? <View style={styles.right}>{right}</View> : null}
     </View>
@@ -78,6 +88,12 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     gap: SPACING.sm,
+  },
+  subtitle: {
+    color: C.ink3,
+    fontSize: 13,
+    lineHeight: 18,
+    marginTop: 2,
   },
   title: {
     color: C.ink,
