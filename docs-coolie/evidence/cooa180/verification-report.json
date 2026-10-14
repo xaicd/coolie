@@ -1,0 +1,96 @@
+{
+  "issue": "COOA-180",
+  "title": "[QA·复试] routines 页 i18n 原始键修复复验 (COOA-178 闭环)",
+  "verifier": "DS (百晓生)",
+  "date": "2026-10-14",
+  "subjectCommit": "644667025eef038f0a22da07f5f66382dec62a03",
+  "subjectCommitSubject": "fix(i18n): 补齐 routines.* 全部 i18n 键 + 新增 Web 引用-定义守卫 (COOA-178)",
+  "verdict": "PASS",
+  "verdictScope": "routines 页原始 i18n 键外泄已归零 (本工单核心目标)",
+  "machineEvidence": {
+    "check_ui_i18n": {
+      "command": "pnpm check:ui-i18n",
+      "exitCode": 0,
+      "r1_defined_keys": 1013,
+      "r2_static_refs": 832,
+      "r2_undefined_refs_equals_baseline": true,
+      "r2_new_missing": 0,
+      "r3_stale_baseline": 0,
+      "result": "PASS"
+    },
+    "check_governance": {
+      "command": "pnpm check:governance",
+      "exitCode": 0,
+      "section23_R1_R2_R3": "PASS",
+      "result": "PASS"
+    },
+    "guard_unit_tests": {
+      "command": "pnpm test:check-ui-i18n",
+      "tests": 7,
+      "pass": 7,
+      "fail": 0,
+      "result": "PASS"
+    },
+    "independent_static_crosscheck": {
+      "method": "extract every \"routines.*\" string literal across ui/src (t() calls + mapping tables), resolve against ui/src/i18n/locales/{zh-CN,en}.json leaf key sets",
+      "routines_key_literals": 81,
+      "falsePositive_from_comment": ["routines.env (comment in PipelineSettings.tsx:140, not a key)"],
+      "missing_in_zh_CN": 0,
+      "missing_in_en": 0,
+      "nine_concurrency_catchup_keys_defined": true,
+      "routines_keys_in_baseline": 0
+    },
+    "ui_typecheck": {
+      "command": "pnpm --filter ui typecheck",
+      "result": "PASS (tsc -b, no errors)"
+    },
+    "routines_tests": {
+      "command": "NODE_ENV=test pnpm --filter ui exec vitest run <Routine savebar/overview/list/history tests>",
+      "files": 4,
+      "tests": 19,
+      "pass": 19,
+      "fail": 0,
+      "note": "首次以 NODE_ENV=production 运行报 act is not a function; 文档化 gotcha (.agents/skills/create-issue-interaction-ui/SKILL.md:233), 置 NODE_ENV=test 后全绿"
+    }
+  },
+  "runtimeWalkthrough": {
+    "tool": "agent-browser 0.38.1 (Chrome/CDP)",
+    "url": "http://127.0.0.1:3100/COOA/routines",
+    "zh_CN": {
+      "listPage_rawKeyHits": 0,
+      "createDialog_rawKeyHits": 0,
+      "advancedSettings_expanded_rawKeyHits": 0,
+      "concurrencyDropdownOptions": ["运行中则合并", "始终入队", "运行中则跳过"],
+      "catchUpDropdownOptions": ["跳过遗漏", "Enqueue missed (capped)"],
+      "screenshot": "zh-dialog-advanced.png"
+    },
+    "en": {
+      "listPage_rawKeyHits": 0,
+      "createDialog_rawKeyHits": 0,
+      "advancedSettings_expanded_rawKeyHits": 0,
+      "concurrencyDropdownOptions": ["Coalesce if active", "Always enqueue", "Skip if active"],
+      "catchUpDropdownOptions": ["Skip missed", "Enqueue missed (capped)"],
+      "screenshot": "en-dialog-advanced.png"
+    },
+    "rawKeyScanRegex": "\\b(?:routines|common|issues|agents|folders|app|settings|workspaces|projects|goals|costs|companies)\\.[A-Za-z][A-Za-z0-9]*\\b"
+  },
+  "outOfScopeObservations": [
+    {
+      "id": "OBS-1",
+      "severity": "low",
+      "type": "hardcoded_english_not_raw_key",
+      "preExisting": true,
+      "introducedByCOOA178": false,
+      "detail": "routines 页仍有硬编码英文文案 (非原始键外泄): Routines.tsx:1229 'Concurrency'、1289 'Create routine'/'Creating...'、1293 'Failed to create routine'、1304 'Failed to load routines'、1278 底部说明段、1314/1489 allLabel=\"All routines\"; FolderControls.tsx 'New folder'/'Unfiled'。键 routines.createRoutine 已定义但组件未 t() 引用。"
+    },
+    {
+      "id": "OBS-2",
+      "severity": "high",
+      "type": "unrelated_repo_typecheck_regression",
+      "preExisting": true,
+      "introducedByCOOA178": false,
+      "detail": "packages/mcp-server typecheck 失败, 与 COOA-178 无关 (fix commit 未触碰任何 TS 源)。packages/mcp-server/src/tools.ts:213 `.merge(addIssueCommentSchema)` 报 TS2740, :774 报 TS2345; 根因: commit bbe1ca3c7 (13 commits before HEAD) 将 addIssueCommentSchema 改为 z.preprocess, 不再是 ZodObject。导致 `pnpm -r typecheck` 非零退出。"
+    }
+  ],
+  "conclusion": "COOA-178 对 routines 页原始 i18n 键外泄的修复经静态 + 运行时双重复验通过: 0 处原始键外泄 (zh-CN / en 一致), 高级设置并发/补跑策略下拉与描述均为业务文案。放行 COOA-178。"
+}

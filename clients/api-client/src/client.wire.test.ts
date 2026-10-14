@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CoolieClient } from "./client";
+import { CoolieApiError, CoolieClient } from "./client";
 
 /**
  * wave286-G3 (COOA-43) — RN 0.76.5 URLSearchParams polyfill 的最小镜像
@@ -138,5 +138,68 @@ describe("query-string assembly without URLSearchParams.size (COOA-43)", () => {
     );
     expect(urls[2]).toBe("http://host.test:3100/api/issues/i2/work-products?refreshPullRequests=true");
     expect(urls[3]).toBe("http://host.test:3100/api/companies/co1/artifacts?kind=image&limit=20");
+  });
+});
+
+/**
+ * 维度 2.2.6 离线降级: 网络层失败 (飞行模式/断网) 绝不能把裸英文
+ * `Network request failed` / `Failed to fetch` 冒到界面。客户端统一归一为
+ * `CoolieApiError(0, 中文说明)`, 并保留 status 0 让调用方区分「联系不上服务器」
+ * 与「服务器明确拒绝」; 主动 abort 原样上抛, 不伪装成断网。
+ */
+describe("network-layer failure normalization (COOA-184 · dimension 2.2.6)", () => {
+  function makeRejectingClient(err: unknown, locale?: string): {
+    client: CoolieClient;
+    fetchStub: ReturnType<typeof vi.fn>;
+  } {
+    const fetchStub = vi.fn(async () => {
+      throw err;
+    });
+    const client = new CoolieClient({
+      baseUrl: "http://host.test:3100",
+      fetchImpl: fetchStub as unknown as typeof fetch,
+      locale,
+    });
+    return { client, fetchStub };
+  }
+
+  it("RN 'Network request failed' becomes a status-0 CoolieApiError with a Chinese message", async () => {
+    const rnError = new TypeError("Network request failed");
+    const { client } = makeRejectingClient(rnError);
+
+    await expect(client.listIssues("co1")).rejects.toMatchObject({
+      name: "CoolieApiError",
+      status: 0,
+      code: "network_unreachable",
+      message: "网络连接失败，请检查网络后重试",
+    });
+  });
+
+  it("browser 'Failed to fetch' is normalized the same way", async () => {
+    const { client } = makeRejectingClient(new TypeError("Failed to fetch"));
+
+    const err = await client.listIssues("co1").catch((e) => e);
+    expect(err).toBeInstanceOf(CoolieApiError);
+    expect(err.status).toBe(0);
+    expect(err.message).toBe("网络连接失败，请检查网络后重试");
+  });
+
+  it("English locale gets the English offline message (no raw TypeError text)", async () => {
+    const { client } = makeRejectingClient(new TypeError("Network request failed"), "en-US");
+
+    const err = await client.listIssues("co1").catch((e) => e);
+    expect(err).toBeInstanceOf(CoolieApiError);
+    expect(err.status).toBe(0);
+    expect(err.message).toBe("Network unreachable — check your connection and retry");
+  });
+
+  it("AbortError is rethrown as-is, never disguised as an offline failure", async () => {
+    const abort = new Error("The operation was aborted");
+    abort.name = "AbortError";
+    const { client } = makeRejectingClient(abort);
+
+    const err = await client.listIssues("co1").catch((e) => e);
+    expect(err).toBe(abort);
+    expect(err).not.toBeInstanceOf(CoolieApiError);
   });
 });

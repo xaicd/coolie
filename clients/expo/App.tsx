@@ -402,6 +402,8 @@ function CompanyGate({
         demoRequested={demoRequested}
         onDemoHandled={onDemoHandled}
         onOpenWhatsNew={onOpenWhatsNew}
+        switchableCompanies={companies ?? []}
+        onSwitchCompany={(c) => setChosen(c)}
       />
     );
   }
@@ -669,6 +671,8 @@ function HomeScreen({
   demoRequested,
   onDemoHandled,
   onOpenWhatsNew,
+  switchableCompanies,
+  onSwitchCompany,
 }: {
   company: Company;
   whoami: string;
@@ -676,6 +680,8 @@ function HomeScreen({
   demoRequested?: boolean;
   onDemoHandled?: () => void;
   onOpenWhatsNew?: () => void;
+  switchableCompanies?: Company[];
+  onSwitchCompany?: (company: Company) => void;
 }) {
   const [tab, setTab] = useState<TabKey>("dashboard");
   /** 中央 "+" 打开的新建任务浮层 */
@@ -1154,6 +1160,11 @@ function HomeScreen({
               ota={ota}
               onBack={() => setSettingsOpen(false)}
               onSignOut={onSignOut}
+              switchableCompanies={switchableCompanies}
+              onSwitchCompany={(c) => {
+                setSettingsOpen(false);
+                onSwitchCompany?.(c);
+              }}
               workspaceGitEnabled={workspaceGitEnabled}
               onToggleWorkspaceGit={setWorkspaceGitEnabled}
               onOpenGitCredentials={() => {
@@ -1243,6 +1254,8 @@ function HomeScreen({
               whoami={whoami}
               activeTab={assetsTab}
               onTabChange={setAssetsTab}
+              switchableCompanies={switchableCompanies}
+              onSwitchCompany={onSwitchCompany}
               onOpenIssue={(issue) => {
                 setSelected(issue);
               }}

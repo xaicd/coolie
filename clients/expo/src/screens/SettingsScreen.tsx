@@ -18,6 +18,7 @@ import { ELEVATION, RADIUS, SPACING } from "../ui/tokens";
 import { ScreenHeader } from "../ui/ScreenHeader";
 import { localVersion } from "../AppVersion";
 import type { useOTA } from "../OTA";
+import { PluginOrgSwitcher } from "../components/PluginOrgSwitcher";
 
 export interface SettingsScreenProps {
   company: Company;
@@ -31,6 +32,8 @@ export interface SettingsScreenProps {
   onOpenPluginManager: () => void;
   onOpenNativeModules: () => void;
   onViewWhatsNew?: () => void;
+  switchableCompanies?: Company[];
+  onSwitchCompany?: (company: Company) => void;
 }
 
 /** 测算缓存目录大小 */
@@ -92,6 +95,8 @@ export function SettingsScreen({
   onOpenPluginManager,
   onOpenNativeModules,
   onViewWhatsNew,
+  switchableCompanies,
+  onSwitchCompany,
 }: SettingsScreenProps) {
   const [cacheSize, setCacheSize] = useState<string | null>(null);
   const { t, locale, setLocale } = useTranslation();
@@ -204,11 +209,19 @@ export function SettingsScreen({
                 {whoami || "已登录高管"}
               </Text>
               <View style={styles.profileTagRow}>
-                <View style={styles.companyTag}>
-                  <Text style={styles.companyTagText} numberOfLines={1}>
-                    🏢 {company?.name || "当前企业"}
-                  </Text>
-                </View>
+                {onSwitchCompany && switchableCompanies && switchableCompanies.length > 1 ? (
+                  <PluginOrgSwitcher
+                    currentCompany={company}
+                    companies={switchableCompanies}
+                    onSwitch={onSwitchCompany}
+                  />
+                ) : (
+                  <View style={styles.companyTag}>
+                    <Text style={styles.companyTagText} numberOfLines={1}>
+                      🏢 {company?.name || "当前企业"}
+                    </Text>
+                  </View>
+                )}
                 <View style={styles.roleTag}>
                   <Text style={styles.roleTagText}>高管中枢</Text>
                 </View>

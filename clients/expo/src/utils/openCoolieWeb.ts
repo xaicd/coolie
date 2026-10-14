@@ -14,8 +14,10 @@ export const COOLIE_WEB_SCHEME = "coolieweb://";
 export const COOLIE_WEB_APK_URL =
   "https://dls.xrobinai.cn/coolie/app/0.6.4-paperclip-web/coolie-release.apk";
 
-/** 内置 webview 兜底加载的远端地址 (paperclip 完整 PC web)。 */
-export const COOLIE_WEB_URL = "https://www.xrobinai.cn/XROA";
+import { COOLIE_BASE_URL } from "../instanceTarget";
+
+/** 内置 webview 兜底加载的远端地址 (对齐当前实例连接端点)。 */
+export const COOLIE_WEB_URL = COOLIE_BASE_URL;
 
 /**
  * 从驾驶舱 App 跳到 Coolie Web App。

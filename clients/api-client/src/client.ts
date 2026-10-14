@@ -234,6 +234,34 @@ export class CoolieClient {
     return fromGetter || this.locale || "zh-CN";
   }
 
+  /**
+   * 发送一次 HTTP 请求, 并把「网络层失败」归一为可读中文。
+   *
+   * 飞行模式 / 拔网线 / DNS 不通时, RN 抛裸 `TypeError: Network request failed`,
+   * 浏览器抛 `TypeError: Failed to fetch`。它们不是服务器响应, 却会带着英文原文
+   * 直接冒到界面 (维度 2.2.6 离线降级禁止裸英文 `Network Error`)。这里统一改抛
+   * `CoolieApiError(0, 中文说明)`: status 0 让调用方仍能区分「联系不上服务器」与
+   * 「服务器明确拒绝」, 与 expo `coolie.ts` 里 `e.status === 0` 的瞬态故障判定保持一致。
+   * 而主动 abort (AbortError) 是用户取消, 原样上抛, 不伪装成断网。
+   */
+  private async send(url: string, init: RequestInit): Promise<Response> {
+    try {
+      return await this.fetchImpl(url, init);
+    } catch (err) {
+      if (err instanceof CoolieApiError) throw err;
+      const name = (err as { name?: string } | null | undefined)?.name;
+      if (name === "AbortError") throw err;
+      const isZh = this.resolveLocale().startsWith("zh");
+      throw new CoolieApiError(
+        0,
+        isZh
+          ? "网络连接失败，请检查网络后重试"
+          : "Network unreachable — check your connection and retry",
+        "network_unreachable",
+      );
+    }
+  }
+
   /** @internal expo 壳层需要直接打杂项 API */
   async request<T>(
     method: string,
@@ -248,7 +276,7 @@ export class CoolieClient {
     if (this.originHeader) headers.Origin = this.originHeader;
     if (opts?.auth !== false) Object.assign(headers, await this.getAuthHeader());
 
-    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+    const res = await this.send(`${this.baseUrl}${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -272,7 +300,7 @@ export class CoolieClient {
     if (this.originHeader) headers.Origin = this.originHeader;
     Object.assign(headers, await this.getAuthHeader());
 
-    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+    const res = await this.send(`${this.baseUrl}${path}`, {
       method: "POST",
       headers,
       // React Native's FormData is not a DOM `BodyInit`; the cast keeps one
@@ -341,7 +369,7 @@ export class CoolieClient {
     if (this.originHeader) headers.Origin = this.originHeader;
     if (opts?.auth !== false) Object.assign(headers, await this.getAuthHeader());
 
-    const res = await this.fetchImpl(`${this.baseUrl}${path}`, {
+    const res = await this.send(`${this.baseUrl}${path}`, {
       method,
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
@@ -1999,7 +2027,7 @@ export class CoolieClient {
       });
     }
 
-    const res = await this.fetchImpl(`${this.baseUrl}/api/board/chat/stream`, {
+    const res = await this.send(`${this.baseUrl}/api/board/chat/stream`, {
       method: "POST",
       headers,
       body: JSON.stringify({
