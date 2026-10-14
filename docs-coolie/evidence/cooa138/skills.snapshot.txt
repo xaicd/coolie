@@ -1,0 +1,184 @@
+- generic [ref=e1314] clickable [onclick]
+  - link "Skip to Main Content" [ref=e1315]
+  - StaticText "RESTART REQUIRED"
+  - paragraph
+    - StaticText "backend files changed since this server booted · updated 18m ago"
+  - StaticText "Changed: "
+  - StaticText "server/${PAPERCLIP_SCRATCH_DIR:-/tmp}/r15-comment.md"
+  - StaticText "Restart "
+  - code
+    - StaticText "pnpm dev:once"
+  - StaticText " after the active work is safe to interrupt"
+  - button "Restart now" [ref=e1316]
+    - StaticText "Restart now"
+  - generic
+    - generic
+      - complementary
+        - button "Open Coolie 本地施工总社 organization switcher" [expanded=false, ref=e1342]
+          - StaticText "C"
+          - StaticText "Coolie 本地施工总社"
+        - navigation
+          - button "新建任务" [ref=e1343]
+            - StaticText "新建任务"
+          - link "搜索" [ref=e1344]
+            - StaticText "搜索"
+          - link "仪表盘 4 live" [ref=e1345]
+            - StaticText "仪表盘"
+            - StaticText "4"
+            - StaticText " live"
+          - link "收件箱 10" [ref=e1346]
+            - StaticText "收件箱"
+            - StaticText "10"
+          - link "会议室" [ref=e1347]
+            - StaticText "会议室"
+          - generic
+            - button "Collapse 工作" [expanded=true, ref=e1348]
+            - StaticText "工作"
+          - link "任务" [ref=e1349]
+            - StaticText "任务"
+          - link "项目" [ref=e1350]
+            - StaticText "项目"
+          - link "例行任务" [ref=e1351]
+            - StaticText "例行任务"
+          - link "产物" [ref=e1352]
+            - StaticText "产物"
+          - link "Ontology" [ref=e1353]
+            - StaticText "Ontology"
+          - link "架构治理" [ref=e1354]
+            - StaticText "架构治理"
+          - generic
+            - button "Collapse 组织" [expanded=true, ref=e1355]
+            - StaticText "组织"
+          - link "智能体" [ref=e1356]
+            - StaticText "智能体"
+          - link "技能" [ref=e1357]
+            - StaticText "技能"
+          - link "连接器" [ref=e1358]
+            - StaticText "连接器"
+          - link "审计" [ref=e1359]
+            - StaticText "审计"
+      - button "Open account menu" [expanded=false, ref=e1327]
+        - StaticText "BO"
+        - StaticText "Board"
+      - link "Share feedback" [ref=e1328]
+    - separator "Resize sidebar" [ref=e1318] focusable [tabindex]: 240
+  - heading "SKILLS" [level=1, ref=e1317]
+  - complementary
+    - navigation "Skills" [ref=e1319]
+      - link "Installed" [ref=e1329]
+        - StaticText "Installed"
+      - link "Discover" [ref=e1330]
+        - StaticText "Discover"
+      - StaticText "AUTHOR"
+      - paragraph
+        - StaticText "Skills you create, edit, and test."
+      - link "My Skills" [ref=e1331]
+        - StaticText "My Skills"
+  - main
+    - heading "Installed skills" [level=1, ref=e1320]
+    - paragraph
+      - StaticText "Skills available to this organization."
+    - textbox "Search installed skills" [ref=e1321]
+    - button "Sort Most agents" [expanded=false, ref=e1322]
+      - StaticText "Sort"
+      - StaticText "Most agents"
+    - button "Scan project workspaces for skills" [ref=e1323]
+    - button "New" [expanded=false, ref=e1324]
+    - button "New folder" [ref=e1325]
+    - generic
+      - paragraph
+        - StaticText "10 skills"
+      - button "agentmail by Paperclip bundled Use your assigned AgentMail inbox to read email tasks, explicitly send or reply, and check delivery. Provided automatically by your inbox assignment. Not enabled for any agents Installed Paperclip bundled" [ref=e1332]
+        - StaticText "agentmail"
+        - generic
+          - StaticText "by Paperclip bundled"
+        - paragraph
+          - StaticText "Use your assigned AgentMail inbox to read email tasks, explicitly send or reply, and check delivery. Provided automatically by your inbox assignment."
+        - StaticText "Not enabled for any agents"
+        - StaticText "Installed"
+        - StaticText "Paperclip bundled"
+      - button "first-task by Paperclip bundled Guide the user's first Coolie 工坊 task when its description invokes /first-task. Interpret the opening answer, clarify their goal, propose a plan or a single task, and wait for approval before hiring agents or executing approved work. Not enabled for any agents Installed Paperclip bundled" [ref=e1333]
+        - StaticText "first-task"
+        - generic
+          - StaticText "by Paperclip bundled"
+        - paragraph
+          - StaticText "Guide the user's first Coolie 工坊 task when its description invokes /first-task. Interpret the opening answer, clarify their goal, propose a plan or a single task, and wait for approval before hiring agents or executing approved work."
+        - StaticText "Not enabled for any agents"
+        - StaticText "Installed"
+        - StaticText "Paperclip bundled"
+      - button "paperclip by Paperclip bundled Interact with the Paperclip control plane API for task coordination and governance. Use when checking assignments, updating issue status, posting comments, delegating work, managing routines, or calling Paperclip API endpoints. Not enabled for any agents Installed Paperclip bundled" [ref=e1334]
+        - StaticText "paperclip"
+        - generic
+          - StaticText "by Paperclip bundled"
+        - paragraph
+          - StaticText "Interact with the Paperclip control plane API for task coordination and governance. Use when checking assignments, updating issue status, posting comments, delegating work, managing routines, or calling Paperclip API endpoints."
+        - StaticText "Not enabled for any agents"
+        - StaticText "Installed"
+        - StaticText "Paperclip bundled"
+      - button "paperclip-board by Paperclip bundled Manage a Paperclip company as a board member via chat. Use when the user wants onboarding, company or agent management, approvals, task monitoring, cost oversight, or work product review in the Paperclip control plane. Not enabled for any agents Installed Paperclip bundled" [ref=e1335]
+        - StaticText "paperclip-board"
+        - generic
+          - StaticText "by Paperclip bundled"
+        - paragraph
+          - StaticText "Manage a Paperclip company as a board member via chat. Use when the user wants onboarding, company or agent management, approvals, task monitoring, cost oversight, or work product review in the Paperclip control plane."
+        - StaticText "Not enabled for any agents"
+        - StaticText "Installed"
+        - StaticText "Paperclip bundled"
+      - button "paperclip-converting-plans-to-tasks by Paperclip bundled Convert Paperclip plans into executable issue graphs. Use when asked to plan, scope, or break down Paperclip company work into assigned tasks with specialty fit, dependencies, blockers, and parallelization. Not enabled for any agents Installed Paperclip bundled" [ref=e1336]
+        - StaticText "paperclip-converting-plans-to-tasks"
+        - generic
+          - StaticText "by Paperclip bundled"
+        - paragraph
+          - StaticText "Convert Paperclip plans into executable issue graphs. Use when asked to plan, scope, or break down Paperclip company work into assigned tasks with specialty fit, dependencies, blockers, and parallelization."
+        - StaticText "Not enabled for any agents"
+        - StaticText "Installed"
+        - StaticText "Paperclip bundled"
+      - button "paperclip-create-agent by Paperclip bundled Create new agents in Paperclip with governance-aware hiring. Use when you need to inspect adapter configuration options, compare existing agent configs, draft a new agent prompt/config, and submit a hire request. Not enabled for any agents Installed Paperclip bundled" [ref=e1337]
+        - StaticText "paperclip-create-agent"
+        - generic
+          - StaticText "by Paperclip bundled"
+        - paragraph
+          - StaticText "Create new agents in Paperclip with governance-aware hiring. Use when you need to inspect adapter configuration options, compare existing agent configs, draft a new agent prompt/config, and submit a hire request."
+        - StaticText "Not enabled for any agents"
+        - StaticText "Installed"
+        - StaticText "Paperclip bundled"
+      - button "para-memory-files by Paperclip bundled Use a file-based PARA memory system to store, retrieve, and organize durable knowledge across sessions. Trigger on saving facts, daily notes, entity records, weekly synthesis, recall, tacit user patterns, or plan memory. Not enabled for any agents Installed Paperclip bundled" [ref=e1338]
+        - StaticText "para-memory-files"
+        - generic
+          - StaticText "by Paperclip bundled"
+        - paragraph
+          - StaticText "Use a file-based PARA memory system to store, retrieve, and organize durable knowledge across sessions. Trigger on saving facts, daily notes, entity records, weekly synthesis, recall, tacit user patterns, or plan memory."
+        - StaticText "Not enabled for any agents"
+        - StaticText "Installed"
+        - StaticText "Paperclip bundled"
+      - button "slack by Paperclip bundled Use the originating Slack bot to read shared discussions and collaborate in Slack during a verified Slack task. Not enabled for any agents Installed Paperclip bundled" [ref=e1339]
+        - StaticText "slack"
+        - generic
+          - StaticText "by Paperclip bundled"
+        - paragraph
+          - StaticText "Use the originating Slack bot to read shared discussions and collaborate in Slack during a verified Slack task."
+        - StaticText "Not enabled for any agents"
+        - StaticText "Installed"
+        - StaticText "Paperclip bundled"
+      - button "speckit-workflow by Paperclip bundled Coolie Spec-Kit 规格驱动开发 (SDD) 全生命周期执行法典。涵盖初始化、宪法审查、特性与缺陷骨架创建、Markdown 规格编译、波次任务图拆解、1 Task = 1 Commit Git 核销、控制面双向同步以及 CMMI 01~09 过程资产健康门禁。 Not enabled for any agents Installed Paperclip bundled" [ref=e1340]
+        - StaticText "speckit-workflow"
+        - generic
+          - StaticText "by Paperclip bundled"
+        - paragraph
+          - StaticText "Coolie Spec-Kit 规格驱动开发 (SDD) 全生命周期执行法典。涵盖初始化、宪法审查、特性与缺陷骨架创建、Markdown 规格编译、波次任务图拆解、1 Task = 1 Commit Git 核销、控制面双向同步以及 CMMI 01~09 过程资产健康门禁。"
+        - StaticText "Not enabled for any agents"
+        - StaticText "Installed"
+        - StaticText "Paperclip bundled"
+      - button "yudao-cloud-bootstrap by Paperclip bundled Yudao-Cloud (芋道微服务底座) 自动化选型、JDK版本适配、多模块裁剪、三端多端模板装配与零报错编译启动运维指南。用于基于 Yudao-Cloud 快速启动新项目、按需裁剪业务模块、消除冗余依赖、对接微信生态与 CMMI 规范工程资产。 Not enabled for any agents Installed Paperclip bundled" [ref=e1341]
+        - StaticText "yudao-cloud-bootstrap"
+        - generic
+          - StaticText "by Paperclip bundled"
+        - paragraph
+          - StaticText "Yudao-Cloud (芋道微服务底座) 自动化选型、JDK版本适配、多模块裁剪、三端多端模板装配与零报错编译启动运维指南。用于基于 Yudao-Cloud 快速启动新项目、按需裁剪业务模块、消除冗余依赖、对接微信生态与 CMMI 规范工程资产。"
+        - StaticText "Not enabled for any agents"
+        - StaticText "Installed"
+        - StaticText "Paperclip bundled"
+  - generic
+    - heading "Command Palette" [level=2, ref=e1326]
+    - paragraph
+      - StaticText "Search for a command to run..."

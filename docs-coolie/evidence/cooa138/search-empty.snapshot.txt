@@ -1,0 +1,113 @@
+- generic [ref=e1520] clickable [onclick]
+  - link "Skip to Main Content" [ref=e1521]
+  - StaticText "RESTART REQUIRED"
+  - paragraph
+    - StaticText "backend files changed since this server booted · updated 20m ago"
+  - StaticText "Changed: "
+  - StaticText "server/${PAPERCLIP_SCRATCH_DIR:-/tmp}/r15-comment.md"
+  - StaticText "Restart "
+  - code
+    - StaticText "pnpm dev:once"
+  - StaticText " after the active work is safe to interrupt"
+  - button "Restart now" [ref=e1522]
+    - StaticText "Restart now"
+  - generic
+    - generic
+      - complementary
+        - button "Open Coolie 本地施工总社 organization switcher" [expanded=false, ref=e1537]
+          - StaticText "C"
+          - StaticText "Coolie 本地施工总社"
+        - navigation
+          - button "新建任务" [ref=e1545]
+            - StaticText "新建任务"
+          - link "搜索" [ref=e1546]
+            - StaticText "搜索"
+          - link "仪表盘 4 live" [ref=e1547]
+            - StaticText "仪表盘"
+            - StaticText "4"
+            - StaticText " live"
+          - link "收件箱 10" [ref=e1548]
+            - StaticText "收件箱"
+            - StaticText "10"
+          - link "会议室" [ref=e1549]
+            - StaticText "会议室"
+          - generic
+            - button "Collapse 工作" [expanded=true, ref=e1550]
+            - StaticText "工作"
+          - link "任务" [ref=e1551]
+            - StaticText "任务"
+          - link "项目" [ref=e1552]
+            - StaticText "项目"
+          - link "例行任务" [ref=e1553]
+            - StaticText "例行任务"
+          - link "产物" [ref=e1554]
+            - StaticText "产物"
+          - link "Ontology" [ref=e1555]
+            - StaticText "Ontology"
+          - link "架构治理" [ref=e1556]
+            - StaticText "架构治理"
+          - generic
+            - button "Collapse 组织" [expanded=true, ref=e1557]
+            - StaticText "组织"
+          - link "智能体" [ref=e1558]
+            - StaticText "智能体"
+          - link "技能" [ref=e1559]
+            - StaticText "技能"
+          - link "连接器" [ref=e1560]
+            - StaticText "连接器"
+          - link "审计" [ref=e1561]
+            - StaticText "审计"
+      - button "Open account menu" [expanded=false, ref=e1532]
+        - StaticText "BO"
+        - StaticText "Board"
+      - link "Share feedback" [ref=e1533]
+    - separator "Resize sidebar" [ref=e1524] focusable [tabindex]: 240
+  - heading "SEARCH" [level=1, ref=e1523]
+  - main
+    - heading "Search" [level=1, ref=e1525]
+    - textbox "Search query" [ref=e1534]
+    - button "Insert operator status:todo" [ref=e1526]
+      - StaticText "status:todo"
+      - StaticText "Filter by task status"
+    - button "Insert operator status:blocked" [ref=e1527]
+      - StaticText "status:blocked"
+      - StaticText "Find blocked work"
+    - button "Insert operator assignee:me" [ref=e1528]
+      - StaticText "assignee:me"
+      - StaticText "Use your current board user"
+    - button "Insert operator project:\"Paperclip App\"" [ref=e1529]
+      - StaticText "project:\"Paperclip App\""
+      - StaticText "Quote multi-word project names"
+    - tablist [ref=e1535] focusable [tabindex]
+      - tab "All" [selected, ref=e1538]
+        - StaticText "All"
+      - tab "Tasks" [ref=e1539]
+        - StaticText "Tasks"
+      - tab "Comments" [ref=e1540]
+        - StaticText "Comments"
+      - tab "Documents" [ref=e1541]
+        - StaticText "Documents"
+      - tab "Artifacts" [ref=e1542]
+        - StaticText "Artifacts"
+      - tab "Agents" [ref=e1543]
+        - StaticText "Agents"
+      - tab "Projects" [ref=e1544]
+        - StaticText "Projects"
+    - tabpanel "All" [ref=e1530] focusable [tabindex]
+      - heading "Type to search organization memory." [level=2, ref=e1536]
+      - paragraph
+        - StaticText "Tasks, comments, plan documents, artifacts, agents, projects — same surface, ranked by relevance."
+      - list
+        - listitem [level=1]
+          - StaticText "Identifier lookup: type "
+          - code
+            - StaticText "PAP-123"
+          - StaticText " to jump straight to a task."
+        - listitem [level=1]
+          - StaticText "Quoted phrases: wrap a phrase in quotes to match the exact sequence."
+        - listitem [level=1]
+          - StaticText "⌘K: reopens the command palette pre-seeded with your current query."
+  - generic
+    - heading "Command Palette" [level=2, ref=e1531]
+    - paragraph
+      - StaticText "Search for a command to run..."

@@ -1,0 +1,230 @@
+- generic [ref=e1147] clickable [onclick]
+  - link "Skip to Main Content" [ref=e1148]
+  - StaticText "RESTART REQUIRED"
+  - paragraph
+    - StaticText "backend files changed since this server booted · updated 18m ago"
+  - StaticText "Changed: "
+  - StaticText "server/${PAPERCLIP_SCRATCH_DIR:-/tmp}/r15-comment.md"
+  - StaticText "Restart "
+  - code
+    - StaticText "pnpm dev:once"
+  - StaticText " after the active work is safe to interrupt"
+  - button "Restart now" [ref=e1149]
+    - StaticText "Restart now"
+  - generic
+    - generic
+      - complementary
+        - button "Open Coolie 本地施工总社 organization switcher" [expanded=false, ref=e1182]
+          - StaticText "C"
+          - StaticText "Coolie 本地施工总社"
+        - navigation
+          - button "新建任务" [ref=e1190]
+            - StaticText "新建任务"
+          - link "搜索" [ref=e1191]
+            - StaticText "搜索"
+          - link "仪表盘 4 live" [ref=e1192]
+            - StaticText "仪表盘"
+            - StaticText "4"
+            - StaticText " live"
+          - link "收件箱 10" [ref=e1193]
+            - StaticText "收件箱"
+            - StaticText "10"
+          - link "会议室" [ref=e1194]
+            - StaticText "会议室"
+          - generic
+            - button "Collapse 工作" [expanded=true, ref=e1197]
+            - StaticText "工作"
+          - link "任务" [ref=e1198]
+            - StaticText "任务"
+          - link "项目" [ref=e1199]
+            - StaticText "项目"
+          - link "例行任务" [ref=e1200]
+            - StaticText "例行任务"
+          - link "产物" [ref=e1201]
+            - StaticText "产物"
+          - link "Ontology" [ref=e1202]
+            - StaticText "Ontology"
+          - link "架构治理" [ref=e1203]
+            - StaticText "架构治理"
+          - generic
+            - button "Collapse 组织" [expanded=true, ref=e1204]
+            - StaticText "组织"
+          - link "智能体" [ref=e1205]
+            - StaticText "智能体"
+          - link "技能" [ref=e1206]
+            - StaticText "技能"
+          - link "连接器" [ref=e1207]
+            - StaticText "连接器"
+          - link "审计" [ref=e1208]
+            - StaticText "审计"
+      - button "Open account menu" [expanded=false, ref=e1162]
+        - StaticText "BO"
+        - StaticText "Board"
+      - link "Share feedback" [ref=e1163]
+    - separator "Resize sidebar" [ref=e1150] focusable [tabindex]: 240
+  - navigation "breadcrumb" [ref=e1151]
+    - list
+      - listitem [level=1]
+        - link "PLUGINS" [ref=e1195]
+      - listitem [level=1]
+        - link "架构治理" [disabled, ref=e1196]
+  - main
+    - StaticText "架构治理"
+    - combobox [expanded=false, ref=e1152]: 全公司态势
+      - MenuListPopup
+        - option "全公司态势" [selected, ref=e1183]
+        - option "示范项目" [ref=e1184]
+        - option "智能客服微服务系统" [ref=e1185]
+        - option "真实流水线因果递进项目" [ref=e1186]
+        - option "Coolie 工坊 AI 原生交付工厂本体系统" [ref=e1187]
+        - option "极速流水线验证项目" [ref=e1188]
+        - option "社区生活服务商用中台" [ref=e1189]
+    - button "门禁" [ref=e1153]
+      - StaticText "门禁"
+    - button "基线" [ref=e1154]
+      - StaticText "基线"
+    - button "跟踪" [ref=e1155]
+      - StaticText "跟踪"
+    - button "度量" [ref=e1156]
+      - StaticText "度量"
+    - button "拓扑" [ref=e1157]
+      - StaticText "拓扑"
+    - button "契约" [ref=e1158]
+      - StaticText "契约"
+    - link "图谱" [ref=e1159]
+      - StaticText "图谱"
+    - StaticText "Live"
+    - button "刷新" [ref=e1160]
+      - StaticText "刷新"
+    - StaticText "当前范围 & 实体工单"
+    - StaticText "171"
+    - StaticText "条工单"
+    - StaticText "公司全域综合治理态势"
+    - StaticText "交付闭环 / 推进中"
+    - StaticText "116"
+    - StaticText "已结 / "
+    - StaticText "6"
+    - StaticText " 进行"
+    - generic
+      - StaticText "闭环率: 68%"
+    - StaticText "质量阻塞与风险"
+    - StaticText "36"
+    - StaticText "条阻断故障"
+    - StaticText "存在一票否决级缺陷"
+    - StaticText "综合质量指数 (CMMI)"
+    - StaticText "80"
+    - StaticText "/ 100"
+    - StaticText "基于全域门禁审查计算"
+    - heading "CMMI-L5 质量控制门禁 (G1-G5)" [level=2, ref=e1164]
+    - StaticText "· 实时映射数据库真实状态"
+    - button "刷新" [ref=e1165]
+      - StaticText "刷新"
+    - heading "G1 需求门禁" [level=3, ref=e1166]
+    - StaticText "RD / REQM"
+    - StaticText "主责: "
+    - StaticText "DS (部署战略专家)"
+    - paragraph
+      - StaticText "EARS 规范需求收敛、真实工单拆解与双向需求跟踪矩阵 (RTM)"
+    - StaticText "阻断"
+    - button "特批" [ref=e1167]
+      - StaticText "特批"
+    - link "图谱" [ref=e1168]
+      - StaticText "图谱"
+    - button "查看" [ref=e1169]
+      - StaticText "查看"
+    - StaticText "全域任务录入情况 (已录入 171 条真实工单)"
+    - StaticText "规范: "
+    - StaticText "ISO/IEC/IEEE 29148"
+    - StaticText "Issues Count: 171"
+    - StaticText "业务旅程零阻塞缺陷 (无 blocked 阻断任务)"
+    - StaticText "规范: "
+    - StaticText "CMMI-DEV v2.0 REQM"
+    - StaticText "36 条工单被阻塞"
+    - StaticText "双向追溯覆盖率 (100%)"
+    - StaticText "规范: "
+    - StaticText "IEEE 29148 §9.5"
+    - StaticText "已映射至系统 Issue 关系网"
+    - heading "G2 方案门禁" [level=3, ref=e1170]
+    - StaticText "TS / DAR"
+    - StaticText "主责: "
+    - StaticText "FDA (前线架构师)"
+    - paragraph
+      - StaticText "系统概要设计、四条架构硬边界守卫与关键决策分析 (DAR)"
+    - StaticText "通过"
+    - link "图谱" [ref=e1171]
+      - StaticText "图谱"
+    - button "查看" [ref=e1172]
+      - StaticText "查看"
+    - StaticText "高优技术方案已明确 (包含 High/Urgent 核心攻坚工单)"
+    - StaticText "规范: "
+    - StaticText "IEEE 1016 HLD"
+    - StaticText "高优先级工单已排定"
+    - StaticText "公司级数据与租户隔离边界断言"
+    - StaticText "规范: "
+    - StaticText "Paperclip Company Scoping"
+    - StaticText "Company: da2e705c-c80a-411b-b2ae-e39372b1251f"
+    - StaticText "关键选型与技术路径防漂移已确认"
+    - StaticText "规范: "
+    - StaticText "CMMI DAR"
+    - StaticText "遵循 Spec 驱动开发标准"
+    - heading "G3 契约门禁" [level=3, ref=e1173]
+    - StaticText "TS / VER"
+    - StaticText "主责: "
+    - StaticText "Core SWE (核心研发)"
+    - paragraph
+      - StaticText "详细设计说明书、0 编译报错门禁与单元测试防退化守卫"
+    - StaticText "通过"
+    - link "图谱" [ref=e1174]
+      - StaticText "图谱"
+    - button "查看" [ref=e1175]
+      - StaticText "查看"
+    - StaticText "系统正在积极迭代推进 (活跃或完成状态工单数)"
+    - StaticText "规范: "
+    - StaticText "TypeScript Zero Error"
+    - StaticText "进行中: 6, 已完成: 116"
+    - StaticText "静态类型契约通过 (pnpm -r typecheck 0 报错)"
+    - StaticText "规范: "
+    - StaticText "Static Analysis L5"
+    - StaticText "已通过宿主机编译器校验"
+    - heading "G4 全栈验收门禁" [level=3, ref=e1176]
+    - StaticText "VER / VAL"
+    - StaticText "主责: "
+    - StaticText "FDSE (前线全栈部署)"
+    - paragraph
+      - StaticText "端到端业务旅程通路、防抖与界面状态机完整性验收"
+    - StaticText "通过"
+    - link "图谱" [ref=e1177]
+      - StaticText "图谱"
+    - button "查看" [ref=e1178]
+      - StaticText "查看"
+    - StaticText "实际交付闭环用例 (完成工单数: 116)"
+    - StaticText "规范: "
+    - StaticText "E2E Walkthrough"
+    - StaticText "已验收闭环 116 条"
+    - StaticText "零死穴交互与异常防御态通过"
+    - StaticText "规范: "
+    - StaticText "FDSE 防御规范"
+    - StaticText "通过"
+    - heading "G5 投产门禁" [level=3, ref=e1179]
+    - StaticText "CM / RSKM"
+    - StaticText "主责: "
+    - StaticText "PRE-SRE (产品可靠性)"
+    - paragraph
+      - StaticText "不可变生产投产、指纹基线与秒级回滚安全守卫"
+    - StaticText "特批"
+    - link "图谱" [ref=e1180]
+      - StaticText "图谱"
+    - button "查看" [ref=e1181]
+      - StaticText "查看"
+    - StaticText "工程整体完成度达标 (当前: 68%)"
+    - StaticText "规范: "
+    - StaticText "CMMI 投产基线"
+    - StaticText "116/171 达成"
+    - StaticText "零未解决阻塞性故障"
+    - StaticText "规范: "
+    - StaticText "SRE 发布一票否决"
+    - StaticText "36 故障未结"
+  - generic
+    - heading "Command Palette" [level=2, ref=e1161]
+    - paragraph
+      - StaticText "Search for a command to run..."

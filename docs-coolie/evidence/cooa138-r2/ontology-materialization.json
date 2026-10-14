@@ -1,0 +1,367 @@
+{
+  "schemaVersion": 1,
+  "evidenceKind": "living-ontology-materialization",
+  "issue": "COOA-138",
+  "title": "商业交付全流程拟真对抗走查与 CMMI 终验核销闭环 — 活体本体物化证据",
+  "generatedAt": "2026-10-14T15:32:01.910360+00:00",
+  "companyId": "da2e705c-c80a-411b-b2ae-e39372b1251f",
+  "domain": {
+    "id": "07829118-943a-4388-8638-608cbb102cd2",
+    "slug": "coolie_ai",
+    "displayName": "Coolie 工坊 AI 原生交付工厂本体系统",
+    "category": "项目"
+  },
+  "project": {
+    "id": "a3b763bb-f751-4cdb-ac60-0c58a0c907cf",
+    "name": "Coolie 工坊 AI 原生交付工厂本体系统"
+  },
+  "acceptanceBasis": {
+    "certificateNo": "COOLIE-UAT-COOA138-20261014-03",
+    "approvalId": "05690721-b702-42a3-a52a-580cce3dab84",
+    "decision": "approved",
+    "decidedBy": "local-board",
+    "signedAt": "2026-10-14T15:15:45.566Z",
+    "gateLedger": "6/6"
+  },
+  "counts": {
+    "nodeTypes": 4,
+    "relationTypes": 0,
+    "nodes": 9,
+    "edges": 8,
+    "byNodeType": {
+      "14179798-f28f-4301-a83d-9f5e9208d9c6": 1,
+      "884b1ed5-5f63-47df-994e-5f159e79aff5": 6,
+      "b23f2943-63c4-4ea0-bded-2cc1e299326d": 1,
+      "c4c13d4d-0d84-4098-a7fa-54fd9f149da6": 1
+    },
+    "crossDomainEdges": 0
+  },
+  "nodeTypes": [
+    {
+      "key": "delivery_release",
+      "displayName": "交付版本"
+    },
+    {
+      "key": "cmmi_gate",
+      "displayName": "CMMI 门禁"
+    },
+    {
+      "key": "uat_certificate",
+      "displayName": "客户终验核销单"
+    },
+    {
+      "key": "acceptance_record",
+      "displayName": "验收动作记录"
+    }
+  ],
+  "actionTypes": [
+    {
+      "key": "SignOffUat",
+      "displayName": "客户终验核销签署",
+      "kind": "modify"
+    }
+  ],
+  "nodes": [
+    {
+      "key": "gate_g0",
+      "label": "G0 门禁",
+      "id": "17d4ef7c-7964-419b-a26e-6cea26554f77",
+      "nodeTypeId": "884b1ed5-5f63-47df-994e-5f159e79aff5"
+    },
+    {
+      "key": "gate_g1",
+      "label": "G1 门禁",
+      "id": "0f1c3f6d-205c-4985-bf0e-cb5e26db75ee",
+      "nodeTypeId": "884b1ed5-5f63-47df-994e-5f159e79aff5"
+    },
+    {
+      "key": "gate_g2",
+      "label": "G2 门禁",
+      "id": "8a7e4d1b-a345-4353-83ea-bd995126dc35",
+      "nodeTypeId": "884b1ed5-5f63-47df-994e-5f159e79aff5"
+    },
+    {
+      "key": "gate_g3",
+      "label": "G3 门禁",
+      "id": "39a46cd1-3286-44ca-8fa5-b3e3a8c525e0",
+      "nodeTypeId": "884b1ed5-5f63-47df-994e-5f159e79aff5"
+    },
+    {
+      "key": "gate_g4",
+      "label": "G4 门禁",
+      "id": "8d9ef5cf-e768-4e85-ae05-8c0316bc3749",
+      "nodeTypeId": "884b1ed5-5f63-47df-994e-5f159e79aff5"
+    },
+    {
+      "key": "gate_g5",
+      "label": "G5 门禁",
+      "id": "785509fb-92f2-496a-acd6-510e4fe75df6",
+      "nodeTypeId": "884b1ed5-5f63-47df-994e-5f159e79aff5"
+    },
+    {
+      "key": "release_v0_6_57",
+      "label": "v0.6.57",
+      "id": "f8dce177-e2c1-4658-84e2-16819eba7376",
+      "nodeTypeId": "c4c13d4d-0d84-4098-a7fa-54fd9f149da6"
+    },
+    {
+      "key": "signoff_cooa138_20261014",
+      "label": "SignOffUat 签署动作 (COOA-138)",
+      "id": "bcc17ab6-bfdb-4c58-8c09-95cb7f170014",
+      "nodeTypeId": "14179798-f28f-4301-a83d-9f5e9208d9c6"
+    },
+    {
+      "key": "uat_certificate_cooa138_20261014_03",
+      "label": "客户终验核销单 COOA-138",
+      "id": "672bcfbd-44d8-4b24-b38e-057adc1a59a1",
+      "nodeTypeId": "b23f2943-63c4-4ea0-bded-2cc1e299326d"
+    }
+  ],
+  "edges": [
+    {
+      "sourceNodeId": "672bcfbd-44d8-4b24-b38e-057adc1a59a1",
+      "targetNodeId": "f8dce177-e2c1-4658-84e2-16819eba7376",
+      "relationKey": "certifies"
+    },
+    {
+      "sourceNodeId": "bcc17ab6-bfdb-4c58-8c09-95cb7f170014",
+      "targetNodeId": "672bcfbd-44d8-4b24-b38e-057adc1a59a1",
+      "relationKey": "signs_off"
+    },
+    {
+      "sourceNodeId": "f8dce177-e2c1-4658-84e2-16819eba7376",
+      "targetNodeId": "17d4ef7c-7964-419b-a26e-6cea26554f77",
+      "relationKey": "gated_by"
+    },
+    {
+      "sourceNodeId": "f8dce177-e2c1-4658-84e2-16819eba7376",
+      "targetNodeId": "0f1c3f6d-205c-4985-bf0e-cb5e26db75ee",
+      "relationKey": "gated_by"
+    },
+    {
+      "sourceNodeId": "f8dce177-e2c1-4658-84e2-16819eba7376",
+      "targetNodeId": "8a7e4d1b-a345-4353-83ea-bd995126dc35",
+      "relationKey": "gated_by"
+    },
+    {
+      "sourceNodeId": "f8dce177-e2c1-4658-84e2-16819eba7376",
+      "targetNodeId": "39a46cd1-3286-44ca-8fa5-b3e3a8c525e0",
+      "relationKey": "gated_by"
+    },
+    {
+      "sourceNodeId": "f8dce177-e2c1-4658-84e2-16819eba7376",
+      "targetNodeId": "8d9ef5cf-e768-4e85-ae05-8c0316bc3749",
+      "relationKey": "gated_by"
+    },
+    {
+      "sourceNodeId": "f8dce177-e2c1-4658-84e2-16819eba7376",
+      "targetNodeId": "785509fb-92f2-496a-acd6-510e4fe75df6",
+      "relationKey": "gated_by"
+    }
+  ],
+  "graphSnapshot": {
+    "domainId": "07829118-943a-4388-8638-608cbb102cd2",
+    "counts": {
+      "nodeTypes": 4,
+      "relationTypes": 0,
+      "nodes": 9,
+      "edges": 8,
+      "byNodeType": {
+        "14179798-f28f-4301-a83d-9f5e9208d9c6": 1,
+        "884b1ed5-5f63-47df-994e-5f159e79aff5": 6,
+        "b23f2943-63c4-4ea0-bded-2cc1e299326d": 1,
+        "c4c13d4d-0d84-4098-a7fa-54fd9f149da6": 1
+      },
+      "crossDomainEdges": 0
+    },
+    "nodes": [
+      {
+        "id": "f8dce177-e2c1-4658-84e2-16819eba7376",
+        "key": "release_v0_6_57",
+        "label": "v0.6.57",
+        "nodeTypeId": "c4c13d4d-0d84-4098-a7fa-54fd9f149da6",
+        "lifecycleState": "active",
+        "properties": {
+          "tag": "v0.6.57",
+          "version": "0.6.57",
+          "releaseDate": "2026-10-14",
+          "versionCode": 657,
+          "baselineCommit": "824e289df"
+        }
+      },
+      {
+        "id": "672bcfbd-44d8-4b24-b38e-057adc1a59a1",
+        "key": "uat_certificate_cooa138_20261014_03",
+        "label": "客户终验核销单 COOA-138",
+        "nodeTypeId": "b23f2943-63c4-4ea0-bded-2cc1e299326d",
+        "lifecycleState": "active",
+        "properties": {
+          "issue": "COOA-138",
+          "status": "effective",
+          "project": "a3b763bb-f751-4cdb-ac60-0c58a0c907cf",
+          "decision": "approved",
+          "signedAt": "2026-10-14T15:15:45.566Z",
+          "decidedBy": "local-board",
+          "approvalId": "05690721-b702-42a3-a52a-580cce3dab84",
+          "gateLedger": "6/6",
+          "certificateNo": "COOLIE-UAT-COOA138-20261014-03"
+        }
+      },
+      {
+        "id": "bcc17ab6-bfdb-4c58-8c09-95cb7f170014",
+        "key": "signoff_cooa138_20261014",
+        "label": "SignOffUat 签署动作 (COOA-138)",
+        "nodeTypeId": "14179798-f28f-4301-a83d-9f5e9208d9c6",
+        "lifecycleState": "active",
+        "properties": {
+          "at": "2026-10-14T15:15:45.566Z",
+          "actor": "local-board",
+          "subject": "COOLIE-UAT-COOA138-20261014-03",
+          "actionType": "SignOffUat"
+        }
+      },
+      {
+        "id": "17d4ef7c-7964-419b-a26e-6cea26554f77",
+        "key": "gate_g0",
+        "label": "G0 门禁",
+        "nodeTypeId": "884b1ed5-5f63-47df-994e-5f159e79aff5",
+        "lifecycleState": "active",
+        "properties": {
+          "gate": "G0"
+        }
+      },
+      {
+        "id": "0f1c3f6d-205c-4985-bf0e-cb5e26db75ee",
+        "key": "gate_g1",
+        "label": "G1 门禁",
+        "nodeTypeId": "884b1ed5-5f63-47df-994e-5f159e79aff5",
+        "lifecycleState": "active",
+        "properties": {
+          "gate": "G1"
+        }
+      },
+      {
+        "id": "8a7e4d1b-a345-4353-83ea-bd995126dc35",
+        "key": "gate_g2",
+        "label": "G2 门禁",
+        "nodeTypeId": "884b1ed5-5f63-47df-994e-5f159e79aff5",
+        "lifecycleState": "active",
+        "properties": {
+          "gate": "G2"
+        }
+      },
+      {
+        "id": "39a46cd1-3286-44ca-8fa5-b3e3a8c525e0",
+        "key": "gate_g3",
+        "label": "G3 门禁",
+        "nodeTypeId": "884b1ed5-5f63-47df-994e-5f159e79aff5",
+        "lifecycleState": "active",
+        "properties": {
+          "gate": "G3"
+        }
+      },
+      {
+        "id": "8d9ef5cf-e768-4e85-ae05-8c0316bc3749",
+        "key": "gate_g4",
+        "label": "G4 门禁",
+        "nodeTypeId": "884b1ed5-5f63-47df-994e-5f159e79aff5",
+        "lifecycleState": "active",
+        "properties": {
+          "gate": "G4"
+        }
+      },
+      {
+        "id": "785509fb-92f2-496a-acd6-510e4fe75df6",
+        "key": "gate_g5",
+        "label": "G5 门禁",
+        "nodeTypeId": "884b1ed5-5f63-47df-994e-5f159e79aff5",
+        "lifecycleState": "active",
+        "properties": {
+          "gate": "G5"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "id": "2c1e04f6-1998-4b56-b7d5-26f49779ecb5",
+        "sourceNodeId": "672bcfbd-44d8-4b24-b38e-057adc1a59a1",
+        "targetNodeId": "f8dce177-e2c1-4658-84e2-16819eba7376",
+        "relationKey": "certifies",
+        "weight": 1,
+        "sourceDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "targetDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "isCrossDomain": false
+      },
+      {
+        "id": "0451856f-76bf-4969-ab10-b794d34668b0",
+        "sourceNodeId": "bcc17ab6-bfdb-4c58-8c09-95cb7f170014",
+        "targetNodeId": "672bcfbd-44d8-4b24-b38e-057adc1a59a1",
+        "relationKey": "signs_off",
+        "weight": 1,
+        "sourceDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "targetDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "isCrossDomain": false
+      },
+      {
+        "id": "42dffe41-0ad6-41a5-8504-163bad016541",
+        "sourceNodeId": "f8dce177-e2c1-4658-84e2-16819eba7376",
+        "targetNodeId": "17d4ef7c-7964-419b-a26e-6cea26554f77",
+        "relationKey": "gated_by",
+        "weight": 1,
+        "sourceDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "targetDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "isCrossDomain": false
+      },
+      {
+        "id": "9d9236b3-ee1a-4151-b805-fb56e6c2c866",
+        "sourceNodeId": "f8dce177-e2c1-4658-84e2-16819eba7376",
+        "targetNodeId": "0f1c3f6d-205c-4985-bf0e-cb5e26db75ee",
+        "relationKey": "gated_by",
+        "weight": 1,
+        "sourceDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "targetDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "isCrossDomain": false
+      },
+      {
+        "id": "3019d1bf-168c-41e9-8816-4ecfccd877fd",
+        "sourceNodeId": "f8dce177-e2c1-4658-84e2-16819eba7376",
+        "targetNodeId": "8a7e4d1b-a345-4353-83ea-bd995126dc35",
+        "relationKey": "gated_by",
+        "weight": 1,
+        "sourceDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "targetDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "isCrossDomain": false
+      },
+      {
+        "id": "02998509-06b4-46e9-a342-69463b3b3d6e",
+        "sourceNodeId": "f8dce177-e2c1-4658-84e2-16819eba7376",
+        "targetNodeId": "39a46cd1-3286-44ca-8fa5-b3e3a8c525e0",
+        "relationKey": "gated_by",
+        "weight": 1,
+        "sourceDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "targetDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "isCrossDomain": false
+      },
+      {
+        "id": "f274ff5a-f234-487b-b0bf-3f18bbc89924",
+        "sourceNodeId": "f8dce177-e2c1-4658-84e2-16819eba7376",
+        "targetNodeId": "8d9ef5cf-e768-4e85-ae05-8c0316bc3749",
+        "relationKey": "gated_by",
+        "weight": 1,
+        "sourceDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "targetDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "isCrossDomain": false
+      },
+      {
+        "id": "44cb7987-4d3e-4b7f-8638-7f012a2fdc81",
+        "sourceNodeId": "f8dce177-e2c1-4658-84e2-16819eba7376",
+        "targetNodeId": "785509fb-92f2-496a-acd6-510e4fe75df6",
+        "relationKey": "gated_by",
+        "weight": 1,
+        "sourceDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "targetDomainId": "07829118-943a-4388-8638-608cbb102cd2",
+        "isCrossDomain": false
+      }
+    ]
+  }
+}

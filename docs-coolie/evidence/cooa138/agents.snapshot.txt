@@ -1,0 +1,137 @@
+- generic [ref=e1464] clickable [onclick]
+  - link "Skip to Main Content" [ref=e1465]
+  - StaticText "RESTART REQUIRED"
+  - paragraph
+    - StaticText "backend files changed since this server booted · updated 19m ago"
+  - StaticText "Changed: "
+  - StaticText "server/${PAPERCLIP_SCRATCH_DIR:-/tmp}/r15-comment.md"
+  - StaticText "Restart "
+  - code
+    - StaticText "pnpm dev:once"
+  - StaticText " after the active work is safe to interrupt"
+  - button "Restart now" [ref=e1466]
+    - StaticText "Restart now"
+  - generic
+    - generic
+      - complementary
+        - button "Open Coolie 本地施工总社 organization switcher" [expanded=false, ref=e1502]
+          - StaticText "C"
+          - StaticText "Coolie 本地施工总社"
+        - navigation
+          - button "新建任务" [ref=e1503]
+            - StaticText "新建任务"
+          - link "搜索" [ref=e1504]
+            - StaticText "搜索"
+          - link "仪表盘 4 live" [ref=e1505]
+            - StaticText "仪表盘"
+            - StaticText "4"
+            - StaticText " live"
+          - link "收件箱 10" [ref=e1506]
+            - StaticText "收件箱"
+            - StaticText "10"
+          - link "会议室" [ref=e1507]
+            - StaticText "会议室"
+          - generic
+            - button "Collapse 工作" [expanded=true, ref=e1508]
+            - StaticText "工作"
+          - link "任务" [ref=e1509]
+            - StaticText "任务"
+          - link "项目" [ref=e1510]
+            - StaticText "项目"
+          - link "例行任务" [ref=e1511]
+            - StaticText "例行任务"
+          - link "产物" [ref=e1512]
+            - StaticText "产物"
+          - link "Ontology" [ref=e1513]
+            - StaticText "Ontology"
+          - link "架构治理" [ref=e1514]
+            - StaticText "架构治理"
+          - generic
+            - button "Collapse 组织" [expanded=true, ref=e1515]
+            - StaticText "组织"
+          - link "智能体" [ref=e1516]
+            - StaticText "智能体"
+          - link "技能" [ref=e1517]
+            - StaticText "技能"
+          - link "连接器" [ref=e1518]
+            - StaticText "连接器"
+          - link "审计" [ref=e1519]
+            - StaticText "审计"
+      - button "Open account menu" [expanded=false, ref=e1478]
+        - StaticText "BO"
+        - StaticText "Board"
+      - link "Share feedback" [ref=e1479]
+    - separator "Resize sidebar" [ref=e1468] focusable [tabindex]: 240
+  - heading "智能体" [level=1, ref=e1467]
+  - main
+    - tablist [ref=e1469] focusable [tabindex]
+      - tab "全部" [selected, ref=e1480]
+      - tab "运行中" [ref=e1481]
+      - tab "已暂停" [ref=e1482]
+      - tab "错误" [ref=e1483]
+    - group "智能体视图"
+      - button "列表视图" [ref=e1484]
+      - button "组织视图" [ref=e1485]
+    - button "新建智能体" [ref=e1470]
+    - paragraph
+      - StaticText "6 个智能体"
+    - link "百晓生 百晓生 - 部署战略与方案专家 运行中 (1) running Star 百晓生 Leave 百晓生" [ref=e1471]
+      - StaticText "百晓生"
+      - paragraph
+        - StaticText "百晓生 - 部署战略与方案专家"
+      - link "运行中 (1)" [ref=e1486]
+        - StaticText "运行中 (1)"
+      - StaticText "running"
+      - button "Star 百晓生" [ref=e1487]
+      - button "Leave 百晓生" [ref=e1488]
+        - StaticText "Leave"
+    - link "兑底渊 兑底渊 - 产品可靠性专家 idle Star 兑底渊 Leave 兑底渊" [ref=e1472]
+      - StaticText "兑底渊"
+      - paragraph
+        - StaticText "兑底渊 - 产品可靠性专家"
+      - StaticText "idle"
+      - button "Star 兑底渊" [ref=e1489]
+      - button "Leave 兑底渊" [ref=e1490]
+        - StaticText "Leave"
+    - link "门神 门神 - 前线部署工程师 运行中 (1) running Star 门神 Leave 门神" [ref=e1473]
+      - StaticText "门神"
+      - paragraph
+        - StaticText "门神 - 前线部署工程师"
+      - link "运行中 (1)" [ref=e1491]
+        - StaticText "运行中 (1)"
+      - StaticText "running"
+      - button "Star 门神" [ref=e1492]
+      - button "Leave 门神" [ref=e1493]
+        - StaticText "Leave"
+    - link "墨斗 墨斗 - 前线架构师 error Star 墨斗 Leave 墨斗" [ref=e1474]
+      - StaticText "墨斗"
+      - paragraph
+        - StaticText "墨斗 - 前线架构师"
+      - StaticText "error"
+      - button "Star 墨斗" [ref=e1494]
+      - button "Leave 墨斗" [ref=e1495]
+        - StaticText "Leave"
+    - link "铁匠 铁匠 - 平台核心研发 运行中 (1) running Star 铁匠 Leave 铁匠" [ref=e1475]
+      - StaticText "铁匠"
+      - paragraph
+        - StaticText "铁匠 - 平台核心研发"
+      - link "运行中 (1)" [ref=e1496]
+        - StaticText "运行中 (1)"
+      - StaticText "running"
+      - button "Star 铁匠" [ref=e1497]
+      - button "Leave 铁匠" [ref=e1498]
+        - StaticText "Leave"
+    - link "Hermes PM - 项目总调度掌柜 运行中 (1) idle Star Hermes Leave Hermes" [ref=e1476]
+      - StaticText "Hermes"
+      - paragraph
+        - StaticText "PM - 项目总调度掌柜"
+      - link "运行中 (1)" [ref=e1499]
+        - StaticText "运行中 (1)"
+      - StaticText "idle"
+      - button "Star Hermes" [ref=e1500]
+      - button "Leave Hermes" [ref=e1501]
+        - StaticText "Leave"
+  - generic
+    - heading "Command Palette" [level=2, ref=e1477]
+    - paragraph
+      - StaticText "Search for a command to run..."

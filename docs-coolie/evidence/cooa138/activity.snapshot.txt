@@ -1,0 +1,671 @@
+- generic [ref=e1360] clickable [onclick]
+  - link "Skip to Main Content" [ref=e1361]
+  - StaticText "RESTART REQUIRED"
+  - paragraph
+    - StaticText "backend files changed since this server booted · updated 19m ago"
+  - StaticText "Changed: "
+  - StaticText "server/${PAPERCLIP_SCRATCH_DIR:-/tmp}/r15-comment.md"
+  - StaticText "Restart "
+  - code
+    - StaticText "pnpm dev:once"
+  - StaticText " after the active work is safe to interrupt"
+  - button "Restart now" [ref=e1362]
+    - StaticText "Restart now"
+  - generic
+    - generic
+      - complementary
+        - button "Open Coolie 本地施工总社 organization switcher" [expanded=false, ref=e1384]
+          - StaticText "C"
+          - StaticText "Coolie 本地施工总社"
+        - navigation
+          - button "新建任务" [ref=e1441]
+            - StaticText "新建任务"
+          - link "搜索" [ref=e1442]
+            - StaticText "搜索"
+          - link "仪表盘 4 live" [ref=e1443]
+            - StaticText "仪表盘"
+            - StaticText "4"
+            - StaticText " live"
+          - link "收件箱 10" [ref=e1444]
+            - StaticText "收件箱"
+            - StaticText "10"
+          - link "会议室" [ref=e1445]
+            - StaticText "会议室"
+          - generic
+            - button "Collapse 工作" [expanded=true, ref=e1452]
+            - StaticText "工作"
+          - link "任务" [ref=e1453]
+            - StaticText "任务"
+          - link "项目" [ref=e1454]
+            - StaticText "项目"
+          - link "例行任务" [ref=e1455]
+            - StaticText "例行任务"
+          - link "产物" [ref=e1456]
+            - StaticText "产物"
+          - link "Ontology" [ref=e1457]
+            - StaticText "Ontology"
+          - link "架构治理" [ref=e1458]
+            - StaticText "架构治理"
+          - generic
+            - button "Collapse 组织" [expanded=true, ref=e1459]
+            - StaticText "组织"
+          - link "智能体" [ref=e1460]
+            - StaticText "智能体"
+          - link "技能" [ref=e1461]
+            - StaticText "技能"
+          - link "连接器" [ref=e1462]
+            - StaticText "连接器"
+          - link "审计" [ref=e1463]
+            - StaticText "审计"
+      - button "Open account menu" [expanded=false, ref=e1371]
+        - StaticText "BO"
+        - StaticText "Board"
+      - link "Share feedback" [ref=e1372]
+    - separator "Resize sidebar" [ref=e1364] focusable [tabindex]: 240
+  - heading "AUDIT" [level=1, ref=e1363]
+  - main
+    - heading "Audit" [level=1, ref=e1365]
+    - paragraph
+      - StaticText "Review what happened, inspect agent runs, and understand the costs and budget controls behind your organization."
+    - tablist [ref=e1366] focusable [tabindex]
+      - tab "Activity" [selected, ref=e1373]
+      - tab "Runs" [ref=e1374]
+      - tab "Costs" [ref=e1375]
+      - tab "Budgets" [ref=e1376]
+      - tab "Timeline" [ref=e1377]
+    - tablist "Activity scope" [ref=e1367] focusable [tabindex]
+      - tab "Activity" [selected, ref=e1378]
+      - tab "Agent Actions" [ref=e1379]
+    - LabelText
+      - StaticText "Agent"
+      - combobox "Agent" [expanded=false, ref=e1380]: All agents
+        - generic [ref=e1385] clickable [onclick]
+          - StaticText "All agents"
+    - LabelText
+      - StaticText "Responsible user"
+      - combobox "Responsible user" [expanded=false, ref=e1381]: All responsible users
+        - generic [ref=e1386] clickable [onclick]
+          - StaticText "All responsible users"
+    - LabelText
+      - StaticText "Action"
+      - combobox "Action" [expanded=false, ref=e1382]: All actions
+        - generic [ref=e1387] clickable [onclick]
+          - StaticText "All actions"
+    - LabelText
+      - StaticText "Entity"
+      - combobox "Entity" [expanded=false, ref=e1383]: All entities
+        - generic [ref=e1388] clickable [onclick]
+          - StaticText "All entities"
+    - LabelText
+      - StaticText "From"
+      - Date "From date"
+        - generic
+          - spinbutton "年 年" [ref=e1446]: 0
+            - StaticText " 年 "
+          - StaticText "/"
+          - spinbutton "月 月" [ref=e1447]: 0
+            - StaticText "月"
+          - StaticText "/"
+          - spinbutton "日 日" [ref=e1448]: 0
+            - StaticText "日"
+        - button "显示日期选择器 显示日期选择器" [ref=e1389]
+    - LabelText
+      - StaticText "To"
+      - Date "To date"
+        - generic
+          - spinbutton "年 年" [ref=e1449]: 0
+            - StaticText " 年 "
+          - StaticText "/"
+          - spinbutton "月 月" [ref=e1450]: 0
+            - StaticText "月"
+          - StaticText "/"
+          - spinbutton "日 日" [ref=e1451]: 0
+            - StaticText "日"
+        - button "显示日期选择器 显示日期选择器" [ref=e1390]
+    - button "Export CSV" [ref=e1368]
+    - list "Audit activity"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1391]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "just now"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1392]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "just now"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1393]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "1m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1394]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "2m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1395]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "2m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1396]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "3m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1397]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "3m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1398]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "4m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1399]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "4m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1400]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "5m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1401]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "5m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1402]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "6m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "铁匠"
+        - StaticText "environment lease acquired"
+        - StaticText "environment_lease"
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - link "View run" [ref=e1403]
+        - StaticText "environment.lease_acquired"
+        - time
+          - StaticText "6m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "百晓生"
+        - StaticText "environment lease acquired"
+        - StaticText "environment_lease"
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - link "View run" [ref=e1404]
+        - StaticText "environment.lease_acquired"
+        - time
+          - StaticText "6m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "BO"
+          - StaticText "Board"
+        - StaticText "commented on"
+        - link "COOA-138 · [主线研发] 商业交付全流程拟真对抗走查与 CMMI 终验核销闭环" [expanded=false, ref=e1405]
+        - StaticText "issue.comment_added"
+        - time
+          - StaticText "6m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "BO"
+          - StaticText "Board"
+        - StaticText "changed status from todo to in progress on"
+        - link "COOA-138 · [主线研发] 商业交付全流程拟真对抗走查与 CMMI 终验核销闭环" [expanded=false, ref=e1406]
+        - StaticText "issue.updated"
+        - time
+          - StaticText "6m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "BO"
+          - StaticText "Board"
+        - StaticText "commented on"
+        - link "COOA-137 · [主线研发] 底座 263 表高内聚复用、原子并发锁自愈与长任务心跳管网" [expanded=false, ref=e1407]
+        - StaticText "issue.comment_added"
+        - time
+          - StaticText "6m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "BO"
+          - StaticText "Board"
+        - StaticText "changed status from todo to in progress on"
+        - link "COOA-137 · [主线研发] 底座 263 表高内聚复用、原子并发锁自愈与长任务心跳管网" [expanded=false, ref=e1408]
+        - StaticText "issue.updated"
+        - time
+          - StaticText "6m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1409]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "6m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "门神"
+        - StaticText "environment lease acquired"
+        - StaticText "environment_lease"
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - link "View run" [ref=e1410]
+        - StaticText "environment.lease_acquired"
+        - time
+          - StaticText "6m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "BO"
+          - StaticText "Board"
+        - StaticText "commented on"
+        - link "COOA-136 · [主线研发] 原生 App 6 寸屏极简体验、防撑爆防遮挡与 LIFO 路由守卫" [expanded=false, ref=e1411]
+        - StaticText "issue.comment_added"
+        - time
+          - StaticText "6m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "BO"
+          - StaticText "Board"
+        - StaticText "changed status from todo to in progress on"
+        - link "COOA-136 · [主线研发] 原生 App 6 寸屏极简体验、防撑爆防遮挡与 LIFO 路由守卫" [expanded=false, ref=e1412]
+        - StaticText "issue.updated"
+        - time
+          - StaticText "6m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1413]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "7m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1414]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "7m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1415]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "8m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1416]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "8m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1417]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "9m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1418]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "9m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1419]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "10m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1420]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "10m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1421]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "11m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1422]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "11m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1423]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "12m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1424]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "12m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1425]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "13m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1426]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "13m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1427]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "14m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1428]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "14m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1429]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "15m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1430]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "15m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1431]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "16m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "board orphan issue detected"
+        - link "COOA-120 · [服务端 i18n] 错误码与状态枚举国际化(server/src 错误字典与 middleware 改造)" [expanded=false, ref=e1432]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "board.orphan_issue_detected"
+        - time
+          - StaticText "16m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "board orphan issue detected"
+        - link "COOA-114 · [主线长任务] Coolie 工坊全生命周期持续研发与能力升级 (Continuous Evolution)" [expanded=false, ref=e1433]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "board.orphan_issue_detected"
+        - time
+          - StaticText "16m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "board orphan issue detected"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1434]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "board.orphan_issue_detected"
+        - time
+          - StaticText "16m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1435]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "16m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1436]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "17m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1437]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "17m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1438]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "18m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1439]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "18m ago"
+      - listitem [level=1]
+        - generic
+          - StaticText "SY"
+          - StaticText "System"
+        - StaticText "issue execution recovery settled"
+        - link "COOA-149 · [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1440]
+        - StaticText "on behalf of "
+        - StaticText "Board"
+        - StaticText "issue.execution_recovery_settled"
+        - time
+          - StaticText "19m ago"
+    - button "Load more" [ref=e1369]
+    - paragraph
+      - StaticText "Recorded by Paperclip — entries can't be edited. Sensitive values are never stored."
+  - generic
+    - heading "Command Palette" [level=2, ref=e1370]
+    - paragraph
+      - StaticText "Search for a command to run..."

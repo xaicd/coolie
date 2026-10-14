@@ -1,0 +1,938 @@
+- generic [ref=e398] clickable [onclick]
+  - link "Skip to Main Content" [ref=e399]
+  - StaticText "RESTART REQUIRED"
+  - paragraph
+    - StaticText "backend files changed since this server booted · updated 17m ago"
+  - StaticText "Changed: "
+  - StaticText "server/${PAPERCLIP_SCRATCH_DIR:-/tmp}/r15-comment.md"
+  - StaticText "Restart "
+  - code
+    - StaticText "pnpm dev:once"
+  - StaticText " after the active work is safe to interrupt"
+  - button "Restart now" [ref=e400]
+    - StaticText "Restart now"
+  - generic
+    - generic
+      - complementary
+        - button "Open Coolie 本地施工总社 organization switcher" [expanded=false, ref=e541]
+          - StaticText "C"
+          - StaticText "Coolie 本地施工总社"
+        - navigation
+          - button "新建任务" [ref=e729]
+            - StaticText "新建任务"
+          - link "搜索" [ref=e730]
+            - StaticText "搜索"
+          - link "仪表盘 4 live" [ref=e731]
+            - StaticText "仪表盘"
+            - StaticText "4"
+            - StaticText " live"
+          - link "收件箱 10" [ref=e732]
+            - StaticText "收件箱"
+            - StaticText "10"
+          - link "会议室" [ref=e733]
+            - StaticText "会议室"
+          - generic
+            - button "Collapse 工作" [expanded=true, ref=e736]
+            - StaticText "工作"
+          - link "任务" [ref=e737]
+            - StaticText "任务"
+          - link "项目" [ref=e738]
+            - StaticText "项目"
+          - link "例行任务" [ref=e739]
+            - StaticText "例行任务"
+          - link "产物" [ref=e740]
+            - StaticText "产物"
+          - link "Ontology" [ref=e741]
+            - StaticText "Ontology"
+          - link "架构治理" [ref=e742]
+            - StaticText "架构治理"
+          - generic
+            - button "Collapse 组织" [expanded=true, ref=e743]
+            - StaticText "组织"
+          - link "智能体" [ref=e744]
+            - StaticText "智能体"
+          - link "技能" [ref=e745]
+            - StaticText "技能"
+          - link "连接器" [ref=e746]
+            - StaticText "连接器"
+          - link "审计" [ref=e747]
+            - StaticText "审计"
+      - button "Open account menu" [expanded=false, ref=e411]
+        - StaticText "BO"
+        - StaticText "Board"
+      - link "Share feedback" [ref=e412]
+    - separator "Resize sidebar" [ref=e401] focusable [tabindex]: 240
+  - navigation "breadcrumb" [ref=e402]
+    - list
+      - listitem [level=1]
+        - link "PLUGINS" [ref=e734]
+      - listitem [level=1]
+        - link "Ontology" [disabled, ref=e735]
+  - main
+    - StaticText "◫"
+    - heading "业务本体库与域管理" [level=1, ref=e403]
+    - StaticText "共 15 个本体域"
+    - paragraph
+      - StaticText "统一治理企业全业务领域、概念实体对象、多维关系网络与存量旧系统数据模型"
+    - button "☰ 列表" [ref=e404]
+      - StaticText "☰"
+      - StaticText "列表"
+    - button "⊞ 卡片" [ref=e405]
+      - StaticText "⊞"
+      - StaticText "卡片"
+    - button "＋ 新建" [ref=e406]
+      - StaticText "＋"
+      - StaticText "新建"
+    - button "⚡ 接入" [ref=e407]
+      - StaticText "⚡"
+      - StaticText "接入"
+    - button "🏢 基座" [ref=e408]
+      - StaticText "🏢"
+      - StaticText "基座"
+    - button "✨ 样例" [ref=e409]
+      - StaticText "✨"
+      - StaticText "样例"
+    - StaticText "本体名称"
+    - StaticText "类型"
+    - StaticText "版本"
+    - StaticText "状态"
+    - StaticText "关联项目"
+    - StaticText "创建人"
+    - StaticText "创建时间"
+    - StaticText "更新时间"
+    - StaticText "操作"
+    - generic [ref=e413] clickable [cursor:pointer, onclick]
+      - StaticText "📦"
+    - button "企业核心运营与IT基座" [ref=e414]
+    - code [ref=e415] clickable [cursor:pointer, onclick]
+      - StaticText "enterprise-core"
+    - StaticText "激活"
+    - generic [ref=e416] clickable [cursor:pointer, onclick]
+      - StaticText "🏢 企业基座"
+      - StaticText "预置"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e417] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - generic
+      - StaticText "📁"
+      - StaticText "示范项目"
+    - button "✕" [ref=e418]
+    - generic [ref=e419] clickable [cursor:pointer, onclick]
+      - StaticText "⚙️"
+      - StaticText "系统预置"
+    - generic [ref=e420] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:06"
+    - generic [ref=e421] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:06"
+    - generic
+      - button "🔍 详情" [ref=e542]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e543]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e544]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e545]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e546]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e547]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e548]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e549]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e550]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e551]
+      - button "归档" [ref=e552]
+      - button "注销" [ref=e553]
+    - generic [ref=e422] clickable [cursor:pointer, onclick]
+      - StaticText "📦"
+    - button "Fourth Coffee" [ref=e423]
+    - code [ref=e424] clickable [cursor:pointer, onclick]
+      - StaticText "cosmic-coffee"
+    - generic [ref=e425] clickable [cursor:pointer, onclick]
+      - StaticText "🛒 零售电商"
+      - StaticText "预置"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e426] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - combobox [expanded=false, ref=e554]: + 关联项目...
+      - MenuListPopup
+        - option "+ 关联项目..." [selected, ref=e748]
+        - option "示范项目" [ref=e749]
+        - option "智能客服微服务系统" [ref=e750]
+        - option "真实流水线因果递进项目" [ref=e751]
+        - option "智能客服微服务系统" [ref=e752]
+        - option "Coolie 工坊 AI 原生交付工厂本体系统" [ref=e753]
+        - option "极速流水线验证项目" [ref=e754]
+        - option "社区生活服务商用中台" [ref=e755]
+    - generic [ref=e427] clickable [cursor:pointer, onclick]
+      - StaticText "⚙️"
+      - StaticText "系统预置"
+    - generic [ref=e428] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:26"
+    - generic [ref=e429] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:26"
+    - generic
+      - button "🔍 详情" [ref=e555]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e556]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e557]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e558]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e559]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e560]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e561]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e562]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e563]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e564]
+      - button "归档" [ref=e565]
+      - button "注销" [ref=e566]
+    - generic [ref=e430] clickable [cursor:pointer, onclick]
+      - StaticText "📦"
+    - button "E-Commerce Platform" [ref=e431]
+    - code [ref=e432] clickable [cursor:pointer, onclick]
+      - StaticText "ecommerce"
+    - generic [ref=e433] clickable [cursor:pointer, onclick]
+      - StaticText "🛒 零售电商"
+      - StaticText "预置"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e434] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - combobox [expanded=false, ref=e567]: + 关联项目...
+      - MenuListPopup
+        - option "+ 关联项目..." [selected, ref=e756]
+        - option "示范项目" [ref=e757]
+        - option "智能客服微服务系统" [ref=e758]
+        - option "真实流水线因果递进项目" [ref=e759]
+        - option "智能客服微服务系统" [ref=e760]
+        - option "Coolie 工坊 AI 原生交付工厂本体系统" [ref=e761]
+        - option "极速流水线验证项目" [ref=e762]
+        - option "社区生活服务商用中台" [ref=e763]
+    - generic [ref=e435] clickable [cursor:pointer, onclick]
+      - StaticText "⚙️"
+      - StaticText "系统预置"
+    - generic [ref=e436] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:26"
+    - generic [ref=e437] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:26"
+    - generic
+      - button "🔍 详情" [ref=e568]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e569]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e570]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e571]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e572]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e573]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e574]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e575]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e576]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e577]
+      - button "归档" [ref=e578]
+      - button "注销" [ref=e579]
+    - generic [ref=e438] clickable [cursor:pointer, onclick]
+      - StaticText "📦"
+    - button "Banking & Finance" [ref=e439]
+    - code [ref=e440] clickable [cursor:pointer, onclick]
+      - StaticText "finance"
+    - generic [ref=e441] clickable [cursor:pointer, onclick]
+      - StaticText "💰 金融服务"
+      - StaticText "预置"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e442] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - combobox [expanded=false, ref=e580]: + 关联项目...
+      - MenuListPopup
+        - option "+ 关联项目..." [selected, ref=e764]
+        - option "示范项目" [ref=e765]
+        - option "智能客服微服务系统" [ref=e766]
+        - option "真实流水线因果递进项目" [ref=e767]
+        - option "智能客服微服务系统" [ref=e768]
+        - option "Coolie 工坊 AI 原生交付工厂本体系统" [ref=e769]
+        - option "极速流水线验证项目" [ref=e770]
+        - option "社区生活服务商用中台" [ref=e771]
+    - generic [ref=e443] clickable [cursor:pointer, onclick]
+      - StaticText "⚙️"
+      - StaticText "系统预置"
+    - generic [ref=e444] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:26"
+    - generic [ref=e445] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:26"
+    - generic
+      - button "🔍 详情" [ref=e581]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e582]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e583]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e584]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e585]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e586]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e587]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e588]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e589]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e590]
+      - button "归档" [ref=e591]
+      - button "注销" [ref=e592]
+    - generic [ref=e446] clickable [cursor:pointer, onclick]
+      - StaticText "📦"
+    - button "Healthcare System" [ref=e447]
+    - code [ref=e448] clickable [cursor:pointer, onclick]
+      - StaticText "healthcare"
+    - generic [ref=e449] clickable [cursor:pointer, onclick]
+      - StaticText "🏥 医疗健康"
+      - StaticText "预置"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e450] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - combobox [expanded=false, ref=e593]: + 关联项目...
+      - MenuListPopup
+        - option "+ 关联项目..." [selected, ref=e772]
+        - option "示范项目" [ref=e773]
+        - option "智能客服微服务系统" [ref=e774]
+        - option "真实流水线因果递进项目" [ref=e775]
+        - option "智能客服微服务系统" [ref=e776]
+        - option "Coolie 工坊 AI 原生交付工厂本体系统" [ref=e777]
+        - option "极速流水线验证项目" [ref=e778]
+        - option "社区生活服务商用中台" [ref=e779]
+    - generic [ref=e451] clickable [cursor:pointer, onclick]
+      - StaticText "⚙️"
+      - StaticText "系统预置"
+    - generic [ref=e452] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:26"
+    - generic [ref=e453] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:26"
+    - generic
+      - button "🔍 详情" [ref=e594]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e595]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e596]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e597]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e598]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e599]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e600]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e601]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e602]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e603]
+      - button "归档" [ref=e604]
+      - button "注销" [ref=e605]
+    - generic [ref=e454] clickable [cursor:pointer, onclick]
+      - StaticText "📦"
+    - button "Smart Manufacturing" [ref=e455]
+    - code [ref=e456] clickable [cursor:pointer, onclick]
+      - StaticText "manufacturing"
+    - generic [ref=e457] clickable [cursor:pointer, onclick]
+      - StaticText "🏭 智能制造"
+      - StaticText "预置"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e458] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - combobox [expanded=false, ref=e606]: + 关联项目...
+      - MenuListPopup
+        - option "+ 关联项目..." [selected, ref=e780]
+        - option "示范项目" [ref=e781]
+        - option "智能客服微服务系统" [ref=e782]
+        - option "真实流水线因果递进项目" [ref=e783]
+        - option "智能客服微服务系统" [ref=e784]
+        - option "Coolie 工坊 AI 原生交付工厂本体系统" [ref=e785]
+        - option "极速流水线验证项目" [ref=e786]
+        - option "社区生活服务商用中台" [ref=e787]
+    - generic [ref=e459] clickable [cursor:pointer, onclick]
+      - StaticText "⚙️"
+      - StaticText "系统预置"
+    - generic [ref=e460] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:26"
+    - generic [ref=e461] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:26"
+    - generic
+      - button "🔍 详情" [ref=e607]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e608]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e609]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e610]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e611]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e612]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e613]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e614]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e615]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e616]
+      - button "归档" [ref=e617]
+      - button "注销" [ref=e618]
+    - generic [ref=e462] clickable [cursor:pointer, onclick]
+      - StaticText "📦"
+    - button "University System" [ref=e463]
+    - code [ref=e464] clickable [cursor:pointer, onclick]
+      - StaticText "university"
+    - generic [ref=e465] clickable [cursor:pointer, onclick]
+      - StaticText "🎓 高校教育"
+      - StaticText "预置"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e466] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - combobox [expanded=false, ref=e619]: + 关联项目...
+      - MenuListPopup
+        - option "+ 关联项目..." [selected, ref=e788]
+        - option "示范项目" [ref=e789]
+        - option "智能客服微服务系统" [ref=e790]
+        - option "真实流水线因果递进项目" [ref=e791]
+        - option "智能客服微服务系统" [ref=e792]
+        - option "Coolie 工坊 AI 原生交付工厂本体系统" [ref=e793]
+        - option "极速流水线验证项目" [ref=e794]
+        - option "社区生活服务商用中台" [ref=e795]
+    - generic [ref=e467] clickable [cursor:pointer, onclick]
+      - StaticText "⚙️"
+      - StaticText "系统预置"
+    - generic [ref=e468] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:26"
+    - generic [ref=e469] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:26"
+    - generic
+      - button "🔍 详情" [ref=e620]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e621]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e622]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e623]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e624]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e625]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e626]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e627]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e628]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e629]
+      - button "归档" [ref=e630]
+      - button "注销" [ref=e631]
+    - generic [ref=e470] clickable [cursor:pointer, onclick]
+      - StaticText "📦"
+    - button "Zava Grove-to-Shelf" [ref=e471]
+    - code [ref=e472] clickable [cursor:pointer, onclick]
+      - StaticText "zava-grove-to-shelf"
+    - generic [ref=e473] clickable [cursor:pointer, onclick]
+      - StaticText "🥗 食品生鲜"
+      - StaticText "预置"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e474] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - combobox [expanded=false, ref=e632]: + 关联项目...
+      - MenuListPopup
+        - option "+ 关联项目..." [selected, ref=e796]
+        - option "示范项目" [ref=e797]
+        - option "智能客服微服务系统" [ref=e798]
+        - option "真实流水线因果递进项目" [ref=e799]
+        - option "智能客服微服务系统" [ref=e800]
+        - option "Coolie 工坊 AI 原生交付工厂本体系统" [ref=e801]
+        - option "极速流水线验证项目" [ref=e802]
+        - option "社区生活服务商用中台" [ref=e803]
+    - generic [ref=e475] clickable [cursor:pointer, onclick]
+      - StaticText "⚙️"
+      - StaticText "系统预置"
+    - generic [ref=e476] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:26"
+    - generic [ref=e477] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-04 22:26"
+    - generic
+      - button "🔍 详情" [ref=e633]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e634]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e635]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e636]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e637]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e638]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e639]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e640]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e641]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e642]
+      - button "归档" [ref=e643]
+      - button "注销" [ref=e644]
+    - generic [ref=e478] clickable [cursor:pointer, onclick]
+      - StaticText "message-square"
+    - button "智能客服微服务系统" [ref=e479]
+    - code [ref=e480] clickable [cursor:pointer, onclick]
+      - StaticText "project"
+    - generic [ref=e481] clickable [cursor:pointer, onclick]
+      - StaticText "项目"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e482] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - generic
+      - StaticText "📁"
+      - StaticText "智能客服微服务系统"
+    - button "✕" [ref=e483]
+    - generic [ref=e484] clickable [cursor:pointer, onclick]
+      - StaticText "👤"
+      - StaticText "local-board"
+    - generic [ref=e485] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-08 17:20"
+    - generic [ref=e486] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-08 17:20"
+    - generic
+      - button "🔍 详情" [ref=e645]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e646]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e647]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e648]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e649]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e650]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e651]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e652]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e653]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e654]
+      - button "归档" [ref=e655]
+      - button "注销" [ref=e656]
+    - generic [ref=e487] clickable [cursor:pointer, onclick]
+      - StaticText "📦"
+    - button "智能客服微服务系统" [ref=e488]
+    - code [ref=e489] clickable [cursor:pointer, onclick]
+      - StaticText "project-c3cc44a3"
+    - generic [ref=e490] clickable [cursor:pointer, onclick]
+      - StaticText "项目"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e491] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - generic
+      - StaticText "📁"
+      - StaticText "智能客服微服务系统"
+    - button "✕" [ref=e492]
+    - generic [ref=e493] clickable [cursor:pointer, onclick]
+      - StaticText "👤"
+      - StaticText "02cab729-c5b7-4a14-9ce9-5a34885c336a"
+    - generic [ref=e494] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-08 17:20"
+    - generic [ref=e495] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-08 17:20"
+    - generic
+      - button "🔍 详情" [ref=e657]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e658]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e659]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e660]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e661]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e662]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e663]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e664]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e665]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e666]
+      - button "归档" [ref=e667]
+      - button "注销" [ref=e668]
+    - generic [ref=e496] clickable [cursor:pointer, onclick]
+      - StaticText "📦"
+    - button "Coolie 工坊 AI 原生交付工厂本体系统" [ref=e497]
+    - code [ref=e498] clickable [cursor:pointer, onclick]
+      - StaticText "coolie_ai"
+    - generic [ref=e499] clickable [cursor:pointer, onclick]
+      - StaticText "项目"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e500] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - generic
+      - StaticText "📁"
+      - StaticText "Coolie 工坊 AI 原生交付工厂本体系统"
+    - button "✕" [ref=e501]
+    - generic [ref=e502] clickable [cursor:pointer, onclick]
+      - StaticText "👤"
+      - StaticText "local-board"
+    - generic [ref=e503] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-08 17:52"
+    - generic [ref=e504] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-08 17:52"
+    - generic
+      - button "🔍 详情" [ref=e669]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e670]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e671]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e672]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e673]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e674]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e675]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e676]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e677]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e678]
+      - button "归档" [ref=e679]
+      - button "注销" [ref=e680]
+    - generic [ref=e505] clickable [cursor:pointer, onclick]
+      - StaticText "📦"
+    - button "极速流水线验证项目" [ref=e506]
+    - code [ref=e507] clickable [cursor:pointer, onclick]
+      - StaticText "project-161c2871"
+    - generic [ref=e508] clickable [cursor:pointer, onclick]
+      - StaticText "项目"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e509] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - generic
+      - StaticText "📁"
+      - StaticText "极速流水线验证项目"
+    - button "✕" [ref=e510]
+    - generic [ref=e511] clickable [cursor:pointer, onclick]
+      - StaticText "👤"
+      - StaticText "local-board"
+    - generic [ref=e512] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-10 17:23"
+    - generic [ref=e513] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-10 17:23"
+    - generic
+      - button "🔍 详情" [ref=e681]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e682]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e683]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e684]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e685]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e686]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e687]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e688]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e689]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e690]
+      - button "归档" [ref=e691]
+      - button "注销" [ref=e692]
+    - generic [ref=e514] clickable [cursor:pointer, onclick]
+      - StaticText "📦"
+    - button "真实流水线因果递进项目" [ref=e515]
+    - code [ref=e516] clickable [cursor:pointer, onclick]
+      - StaticText "project-d978fb5c"
+    - generic [ref=e517] clickable [cursor:pointer, onclick]
+      - StaticText "项目"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e518] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - generic
+      - StaticText "📁"
+      - StaticText "真实流水线因果递进项目"
+    - button "✕" [ref=e519]
+    - generic [ref=e520] clickable [cursor:pointer, onclick]
+      - StaticText "👤"
+      - StaticText "local-board"
+    - generic [ref=e521] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-10 17:24"
+    - generic [ref=e522] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-10 17:24"
+    - generic
+      - button "🔍 详情" [ref=e693]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e694]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e695]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e696]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e697]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e698]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e699]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e700]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e701]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e702]
+      - button "归档" [ref=e703]
+      - button "注销" [ref=e704]
+    - generic [ref=e523] clickable [cursor:pointer, onclick]
+      - StaticText "📦"
+    - button "流水线验证·临时冒烟-TEMP-1791693745123" [ref=e524]
+    - code [ref=e525] clickable [cursor:pointer, onclick]
+      - StaticText "-temp-1791693745123"
+    - generic [ref=e526] clickable [cursor:pointer, onclick]
+      - StaticText "项目"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e527] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - generic
+      - StaticText "📁"
+      - StaticText "流水线验证·临时冒烟-TEMP-1791693745123"
+    - button "✕" [ref=e528]
+    - generic [ref=e529] clickable [cursor:pointer, onclick]
+      - StaticText "👤"
+      - StaticText "local-board"
+    - generic [ref=e530] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-11 12:42"
+    - generic [ref=e531] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-11 12:42"
+    - generic
+      - button "🔍 详情" [ref=e705]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e706]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e707]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e708]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e709]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e710]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e711]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e712]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e713]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e714]
+      - button "归档" [ref=e715]
+      - button "注销" [ref=e716]
+    - generic [ref=e532] clickable [cursor:pointer, onclick]
+      - StaticText "📦"
+    - button "社区生活服务商用中台" [ref=e533]
+    - code [ref=e534] clickable [cursor:pointer, onclick]
+      - StaticText "project-2288f08d"
+    - generic [ref=e535] clickable [cursor:pointer, onclick]
+      - StaticText "项目"
+    - StaticText "v"
+    - StaticText "1"
+    - generic [ref=e536] clickable [cursor:pointer, onclick]
+      - StaticText "活跃"
+      - StaticText "draft"
+    - generic
+      - StaticText "📁"
+      - StaticText "社区生活服务商用中台"
+    - button "✕" [ref=e537]
+    - generic [ref=e538] clickable [cursor:pointer, onclick]
+      - StaticText "👤"
+      - StaticText "local-board"
+    - generic [ref=e539] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-11 13:02"
+    - generic [ref=e540] clickable [cursor:pointer, onclick]
+      - StaticText "2026-10-11 13:02"
+    - generic
+      - button "🔍 详情" [ref=e717]
+        - StaticText "🔍"
+        - StaticText "详情"
+      - button "⬡ 图谱" [ref=e718]
+        - StaticText "⬡"
+        - StaticText "图谱"
+      - button "⊞ 表格" [ref=e719]
+        - StaticText "⊞"
+        - StaticText "表格"
+      - button "⊙ 结构" [ref=e720]
+        - StaticText "⊙"
+        - StaticText "结构"
+      - button "⚙ 动作" [ref=e721]
+        - StaticText "⚙"
+        - StaticText "动作"
+      - button "⚡ 事件" [ref=e722]
+        - StaticText "⚡"
+        - StaticText "事件"
+      - button "🤝 驾驶" [ref=e723]
+        - StaticText "🤝"
+        - StaticText "驾驶"
+      - button "✏️编辑" [ref=e724]
+        - StaticText "✏️编辑"
+      - button "⚡接入" [ref=e725]
+        - StaticText "⚡接入"
+      - button "生效" [ref=e726]
+      - button "归档" [ref=e727]
+      - button "注销" [ref=e728]
+  - generic
+    - heading "Command Palette" [level=2, ref=e410]
+    - paragraph
+      - StaticText "Search for a command to run..."

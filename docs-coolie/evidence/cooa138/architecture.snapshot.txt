@@ -1,0 +1,79 @@
+- generic [ref=e804] clickable [onclick]
+  - link "Skip to Main Content" [ref=e805]
+  - StaticText "RESTART REQUIRED"
+  - paragraph
+    - StaticText "backend files changed since this server booted · updated 17m ago"
+  - StaticText "Changed: "
+  - StaticText "server/${PAPERCLIP_SCRATCH_DIR:-/tmp}/r15-comment.md"
+  - StaticText "Restart "
+  - code
+    - StaticText "pnpm dev:once"
+  - StaticText " after the active work is safe to interrupt"
+  - button "Restart now" [ref=e806]
+    - StaticText "Restart now"
+  - generic
+    - generic
+      - complementary
+        - button "Open Coolie 本地施工总社 organization switcher" [expanded=false, ref=e815]
+          - StaticText "C"
+          - StaticText "Coolie 本地施工总社"
+        - navigation
+          - button "新建任务" [ref=e816]
+            - StaticText "新建任务"
+          - link "搜索" [ref=e817]
+            - StaticText "搜索"
+          - link "仪表盘 4 live" [ref=e818]
+            - StaticText "仪表盘"
+            - StaticText "4"
+            - StaticText " live"
+          - link "收件箱 10" [ref=e819]
+            - StaticText "收件箱"
+            - StaticText "10"
+          - link "会议室" [ref=e820]
+            - StaticText "会议室"
+          - generic
+            - button "Collapse 工作" [expanded=true, ref=e821]
+            - StaticText "工作"
+          - link "任务" [ref=e822]
+            - StaticText "任务"
+          - link "项目" [ref=e823]
+            - StaticText "项目"
+          - link "例行任务" [ref=e824]
+            - StaticText "例行任务"
+          - link "产物" [ref=e825]
+            - StaticText "产物"
+          - link "Ontology" [ref=e826]
+            - StaticText "Ontology"
+          - link "架构治理" [ref=e827]
+            - StaticText "架构治理"
+          - generic
+            - button "Collapse 组织" [expanded=true, ref=e828]
+            - StaticText "组织"
+          - link "智能体" [ref=e829]
+            - StaticText "智能体"
+          - link "技能" [ref=e830]
+            - StaticText "技能"
+          - link "连接器" [ref=e831]
+            - StaticText "连接器"
+          - link "审计" [ref=e832]
+            - StaticText "审计"
+      - button "Open account menu" [expanded=false, ref=e813]
+        - StaticText "BO"
+        - StaticText "Board"
+      - link "Share feedback" [ref=e814]
+    - separator "Resize sidebar" [ref=e808] focusable [tabindex]: 240
+  - heading "NOT FOUND" [level=1, ref=e807]
+  - main
+    - heading "Page not found" [level=1, ref=e809]
+    - paragraph
+      - StaticText "This route does not exist."
+    - generic
+      - StaticText "Requested path: "
+      - code
+        - StaticText "/COOA/architecture"
+    - link "Open dashboard" [ref=e810]
+    - link "Go home" [ref=e811]
+  - generic
+    - heading "Command Palette" [level=2, ref=e812]
+    - paragraph
+      - StaticText "Search for a command to run..."

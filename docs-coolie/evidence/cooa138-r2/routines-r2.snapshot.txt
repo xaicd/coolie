@@ -1,0 +1,151 @@
+- generic [ref=e1] clickable [onclick]
+  - link "Skip to Main Content" [ref=e2]
+  - StaticText "RESTART REQUIRED"
+  - paragraph
+    - StaticText "backend files changed since this server booted · updated 8m ago"
+  - StaticText "Changed: "
+  - StaticText "package.json, scripts/check-governance-audit.mjs, scripts/check-ui-i18n-refs.mjs"
+  - StaticText " +2 more"
+  - StaticText "Restart "
+  - code
+    - StaticText "pnpm dev:once"
+  - StaticText " after the active work is safe to interrupt"
+  - button "Restart now" [ref=e3]
+    - StaticText "Restart now"
+  - generic
+    - generic
+      - complementary
+        - button "Open Coolie 本地施工总社 organization switcher" [expanded=false, ref=e26]
+          - StaticText "C"
+          - StaticText "Coolie 本地施工总社"
+        - navigation
+          - button "新建任务" [ref=e32]
+            - StaticText "新建任务"
+          - link "搜索" [ref=e33]
+            - StaticText "搜索"
+          - link "仪表盘 5 live" [ref=e34]
+            - StaticText "仪表盘"
+            - StaticText "5"
+            - StaticText " live"
+          - link "收件箱 14" [ref=e35]
+            - StaticText "收件箱"
+            - StaticText "14"
+          - link "会议室" [ref=e36]
+            - StaticText "会议室"
+          - generic
+            - button "Collapse 工作" [expanded=true, ref=e46]
+            - StaticText "工作"
+          - link "任务" [ref=e47]
+            - StaticText "任务"
+          - link "项目" [ref=e48]
+            - StaticText "项目"
+          - link "例行任务" [ref=e49]
+            - StaticText "例行任务"
+          - link "产物" [ref=e50]
+            - StaticText "产物"
+          - link "Ontology" [ref=e51]
+            - StaticText "Ontology"
+          - link "架构治理" [ref=e52]
+            - StaticText "架构治理"
+          - generic
+            - button "Collapse 组织" [expanded=true, ref=e53]
+            - StaticText "组织"
+          - link "智能体" [ref=e54]
+            - StaticText "智能体"
+          - link "技能" [ref=e55]
+            - StaticText "技能"
+          - link "连接器" [ref=e56]
+            - StaticText "连接器"
+          - link "审计" [ref=e57]
+            - StaticText "审计"
+      - button "Open account menu" [expanded=false, ref=e16]
+        - StaticText "BO"
+        - StaticText "Board"
+      - link "Share feedback" [ref=e17]
+    - separator "Resize sidebar" [ref=e5] focusable [tabindex]: 240
+  - heading "例行任务" [level=1, ref=e4]
+  - main
+    - heading "例行任务" [level=1, ref=e6]
+    - paragraph
+      - StaticText "按计划自动运行的例行工作。"
+    - link "查看全部执行" [ref=e7]
+    - button "创建例行任务" [ref=e8]
+    - paragraph
+      - StaticText "3 个例行任务"
+    - button "排序" [expanded=false, ref=e9]
+      - StaticText "排序"
+    - button "分组" [expanded=false, ref=e10]
+      - StaticText "分组"
+    - button "选择" [ref=e11]
+    - navigation "routines folders" [ref=e12]
+      - StaticText "FOLDERS"
+      - button "New folder" [ref=e18]
+      - button "All routines 3" [ref=e19]
+        - StaticText "All routines"
+        - StaticText "3"
+      - button "coolie-all" [ref=e20]
+        - StaticText "coolie-all"
+      - StaticText "1"
+      - button "Folder actions for coolie-all" [expanded=false, ref=e21]
+      - StaticText "SYSTEM"
+      - button "Unfiled 2" [ref=e22]
+        - StaticText "Unfiled"
+        - StaticText "2"
+    - StaticText "All routines"
+    - StaticText "3"
+    - StaticText " routine"
+    - StaticText "s"
+    - button "coolie-all" [expanded=true, ref=e13]
+      - StaticText "coolie-all"
+    - StaticText "1"
+    - link "Coolie 工坊持续研发与版本升级守护调度器 (Foundry Evolution Routine) paused Coolie 工坊 AI 原生交付工厂本体系统 Hermes 2026/10/13 20:00:14 · issue created Run now Enable Coolie 工坊持续研发与版本升级守护调度器 (Foundry Evolution Routine) Off More actions for Coolie 工坊持续研发与版本升级守护调度器 (Foundry Evolution Routine)" [ref=e23]
+      - StaticText "Coolie 工坊持续研发与版本升级守护调度器 (Foundry Evolution Routine)"
+      - StaticText "paused"
+      - StaticText "Coolie 工坊 AI 原生交付工厂本体系统"
+      - StaticText "Hermes"
+      - StaticText "2026/10/13 20:00:14"
+      - StaticText " · issue created"
+      - generic [ref=e27] clickable [cursor:pointer, onclick]
+        - button "Run now" [ref=e37]
+        - switch "Enable Coolie 工坊持续研发与版本升级守护调度器 (Foundry Evolution Routine)" [checked=false, ref=e38]
+        - StaticText "Off"
+        - button "More actions for Coolie 工坊持续研发与版本升级守护调度器 (Foundry Evolution Routine)" [expanded=false, ref=e39]
+    - button "未归档" [expanded=true, ref=e14]
+      - StaticText "未归档"
+    - StaticText "2"
+    - generic
+      - link "[交付主线例行巡检] 示范项目 示范项目 墨斗 2026/10/14 22:00:58 · issue created Run now Disable [交付主线例行巡检] 示范项目 On More actions for [交付主线例行巡检] 示范项目" [ref=e24]
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "示范项目"
+        - StaticText "墨斗"
+        - StaticText "2026/10/14 22:00:58"
+        - StaticText " · issue created"
+        - generic [ref=e28] clickable [cursor:pointer, onclick]
+          - button "Run now" [ref=e40]
+          - switch "Disable [交付主线例行巡检] 示范项目" [checked=true, ref=e41]
+          - StaticText "On"
+          - button "More actions for [交付主线例行巡检] 示范项目" [expanded=false, ref=e42]
+      - link "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统 Coolie 工坊 AI 原生交付工厂本体系统 Hermes 2026/10/14 22:00:59 · coalesced Run now Disable [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统 On More actions for [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [ref=e25]
+        - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - StaticText "Coolie 工坊 AI 原生交付工厂本体系统"
+        - StaticText "Hermes"
+        - StaticText "2026/10/14 22:00:59"
+        - StaticText " · coalesced"
+        - generic [ref=e29] clickable [cursor:pointer, onclick]
+          - button "Run now" [ref=e43]
+          - switch "Disable [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [checked=true, ref=e44]
+          - StaticText "On"
+          - button "More actions for [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e45]
+  - generic
+    - heading "Command Palette" [level=2, ref=e15]
+    - paragraph
+      - StaticText "Search for a command to run..."
+  - complementary
+    - list
+      - listitem [level=1]
+        - paragraph
+          - StaticText "门神 created COOA-184"
+        - paragraph
+          - StaticText "[COOA-136 续 · Round4] 移动端剩余 3 维度 + 剩余屏/旅程真机走查与缺陷修复"
+        - link "View COOA-184" [expanded=false, ref=e30]
+        - button "Dismiss notification" [ref=e31]

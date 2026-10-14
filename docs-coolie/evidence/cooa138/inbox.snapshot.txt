@@ -1,0 +1,1142 @@
+- generic [ref=e833] clickable [onclick]
+  - link "Skip to Main Content" [ref=e834]
+  - StaticText "RESTART REQUIRED"
+  - paragraph
+    - StaticText "backend files changed since this server booted · updated 17m ago"
+  - StaticText "Changed: "
+  - StaticText "server/${PAPERCLIP_SCRATCH_DIR:-/tmp}/r15-comment.md"
+  - StaticText "Restart "
+  - code
+    - StaticText "pnpm dev:once"
+  - StaticText " after the active work is safe to interrupt"
+  - button "Restart now" [ref=e835]
+    - StaticText "Restart now"
+  - generic
+    - generic
+      - complementary
+        - button "Open Coolie 本地施工总社 organization switcher" [expanded=false, ref=e933]
+          - StaticText "C"
+          - StaticText "Coolie 本地施工总社"
+        - navigation
+          - button "新建任务" [ref=e940]
+            - StaticText "新建任务"
+          - link "搜索" [ref=e941]
+            - StaticText "搜索"
+          - link "仪表盘 4 live" [ref=e942]
+            - StaticText "仪表盘"
+            - StaticText "4"
+            - StaticText " live"
+          - link "收件箱 10" [ref=e943]
+            - StaticText "收件箱"
+            - StaticText "10"
+          - link "会议室" [ref=e944]
+            - StaticText "会议室"
+          - generic
+            - button "Collapse 工作" [expanded=true, ref=e948]
+            - StaticText "工作"
+          - link "任务" [ref=e949]
+            - StaticText "任务"
+          - link "项目" [ref=e950]
+            - StaticText "项目"
+          - link "例行任务" [ref=e951]
+            - StaticText "例行任务"
+          - link "产物" [ref=e952]
+            - StaticText "产物"
+          - link "Ontology" [ref=e953]
+            - StaticText "Ontology"
+          - link "架构治理" [ref=e954]
+            - StaticText "架构治理"
+          - generic
+            - button "Collapse 组织" [expanded=true, ref=e955]
+            - StaticText "组织"
+          - link "智能体" [ref=e956]
+            - StaticText "智能体"
+          - link "技能" [ref=e957]
+            - StaticText "技能"
+          - link "连接器" [ref=e958]
+            - StaticText "连接器"
+          - link "审计" [ref=e959]
+            - StaticText "审计"
+      - button "Open account menu" [expanded=false, ref=e925]
+        - StaticText "BO"
+        - StaticText "Board"
+      - link "Share feedback" [ref=e926]
+    - separator "Resize sidebar" [ref=e837] focusable [tabindex]: 240
+  - heading "INBOX" [level=1, ref=e836]
+  - main
+    - toolbar "Inbox controls"
+      - tablist [ref=e927] focusable [tabindex]
+        - tab "Mine" [selected, ref=e934]
+        - tab "Recent" [ref=e935]
+        - tab "Unread" [ref=e936]
+        - tab "Blocked" [ref=e937]
+        - tab "All" [ref=e938]
+      - searchbox "Search inbox…" [ref=e939]
+      - button "Disable parent-child nesting" [ref=e928]
+      - button "Filter" [expanded=false, ref=e929]
+      - button "Group" [expanded=false, ref=e930]
+      - button "Columns" [expanded=false, ref=e931]
+      - button "Mark all as read" [ref=e932]
+    - separator "Today"
+      - StaticText "TODAY"
+    - generic [ref=e838] clickable [onclick]
+      - generic
+        - link "Open COOA-149: [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [ref=e960]
+          - StaticText "Open "
+          - StaticText "COOA-149"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - image "In Progress"
+        - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - button "Archive" [ref=e961]
+        - StaticText "COOA-149"
+        - StaticText "just now"
+    - generic [ref=e839] clickable [onclick]
+      - generic
+        - link "Open COOA-114: [主线长任务] Coolie 工坊全生命周期持续研发与能力升级 (Continuous Evolution)" [ref=e962]
+          - StaticText "Open "
+          - StaticText "COOA-114"
+          - StaticText ": "
+          - StaticText "[主线长任务] Coolie 工坊全生命周期持续研发与能力升级 (Continuous Evolution)"
+        - button "Collapse sub-tasks" [ref=e963]
+        - image "In Progress"
+        - StaticText "[主线长任务] Coolie 工坊全生命周期持续研发与能力升级 (Continuous Evolution)"
+        - StaticText "3"
+        - StaticText " live below"
+        - button "Archive" [ref=e964]
+        - StaticText "COOA-114"
+        - StaticText "14m ago"
+    - generic [ref=e840] clickable [onclick]
+      - generic
+        - link "Open COOA-137: [主线研发] 底座 263 表高内聚复用、原子并发锁自愈与长任务心跳管网" [ref=e965]
+          - StaticText "Open "
+          - StaticText "COOA-137"
+          - StaticText ": "
+          - StaticText "[主线研发] 底座 263 表高内聚复用、原子并发锁自愈与长任务心跳管网"
+        - image "In Progress"
+        - StaticText "[主线研发] 底座 263 表高内聚复用、原子并发锁自愈与长任务心跳管网"
+        - StaticText "Live"
+        - button "Archive" [ref=e966]
+        - StaticText "COOA-137"
+        - StaticText "4m ago"
+    - generic [ref=e841] clickable [onclick]
+      - generic
+        - link "Open COOA-138: [主线研发] 商业交付全流程拟真对抗走查与 CMMI 终验核销闭环" [ref=e967]
+          - StaticText "Open "
+          - StaticText "COOA-138"
+          - StaticText ": "
+          - StaticText "[主线研发] 商业交付全流程拟真对抗走查与 CMMI 终验核销闭环"
+        - image "In Progress"
+        - StaticText "[主线研发] 商业交付全流程拟真对抗走查与 CMMI 终验核销闭环"
+        - StaticText "Live"
+        - button "Archive" [ref=e968]
+        - StaticText "COOA-138"
+        - StaticText "4m ago"
+    - generic [ref=e842] clickable [onclick]
+      - generic
+        - link "Open COOA-136: [主线研发] 原生 App 6 寸屏极简体验、防撑爆防遮挡与 LIFO 路由守卫" [ref=e969]
+          - StaticText "Open "
+          - StaticText "COOA-136"
+          - StaticText ": "
+          - StaticText "[主线研发] 原生 App 6 寸屏极简体验、防撑爆防遮挡与 LIFO 路由守卫"
+        - image "In Progress"
+        - StaticText "[主线研发] 原生 App 6 寸屏极简体验、防撑爆防遮挡与 LIFO 路由守卫"
+        - StaticText "Live"
+        - button "Archive" [ref=e970]
+        - StaticText "COOA-136"
+        - StaticText "4m ago"
+    - generic [ref=e843] clickable [onclick]
+      - generic
+        - link "Open COOA-116: [主线研发] Paperclip 上游功能全量国际化与本地化支持 (Full i18n & Localization)" [ref=e971]
+          - StaticText "Open "
+          - StaticText "COOA-116"
+          - StaticText ": "
+          - StaticText "[主线研发] Paperclip 上游功能全量国际化与本地化支持 (Full i18n & Localization)"
+        - button "Collapse sub-tasks" [ref=e972]
+        - image "Todo"
+        - StaticText "[主线研发] Paperclip 上游功能全量国际化与本地化支持 (Full i18n & Localization)"
+        - button "Archive" [ref=e973]
+        - StaticText "COOA-116"
+        - StaticText "23h ago"
+    - generic [ref=e844] clickable [onclick]
+      - generic
+        - link "Open COOA-133: 【微信·老板·wave380】真机单测验收 Stage 5 Expo App i18n 语言包对齐 — 与 Web 端 zh-CN en 契约同步消除中英文混杂" [ref=e974]
+          - StaticText "Open "
+          - StaticText "COOA-133"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave380】真机单测验收 Stage 5 Expo App i18n 语言包对齐 — 与 Web 端 zh-CN en 契约同步消除中英文混杂"
+        - image "Done"
+        - StaticText "【微信·老板·wave380】真机单测验收 Stage 5 Expo App i18n 语言包对齐 — 与 Web 端 zh-CN en 契约同步消除中英文混杂"
+        - button "Archive" [ref=e975]
+        - StaticText "COOA-133"
+        - StaticText "1d ago"
+    - generic [ref=e845] clickable [onclick]
+      - generic
+        - link "Open COOA-130: 【微信·老板·wave380】派铁匠把 COOA-117 Stage 3+4 核心业务页面去硬编码全部转译完成" [ref=e976]
+          - StaticText "Open "
+          - StaticText "COOA-130"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave380】派铁匠把 COOA-117 Stage 3+4 核心业务页面去硬编码全部转译完成"
+        - image "Done"
+        - StaticText "【微信·老板·wave380】派铁匠把 COOA-117 Stage 3+4 核心业务页面去硬编码全部转译完成"
+        - button "Archive" [ref=e977]
+        - StaticText "COOA-130"
+        - StaticText "1d ago"
+    - generic [ref=e846] clickable [onclick]
+      - generic
+        - link "Open COOA-132: 【微信·老板·wave380】验收金标: Stage 5 Expo App 移动端 i18n 与 Web 端 zh-CN/en 契约对齐 — 跑真机走查消除中英文混杂" [ref=e978]
+          - StaticText "Open "
+          - StaticText "COOA-132"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave380】验收金标: Stage 5 Expo App 移动端 i18n 与 Web 端 zh-CN/en 契约对齐 — 跑真机走查消除中英文混杂"
+        - image "Done"
+        - StaticText "【微信·老板·wave380】验收金标: Stage 5 Expo App 移动端 i18n 与 Web 端 zh-CN/en 契约对齐 — 跑真机走查消除中英文混杂"
+        - button "Archive" [ref=e979]
+        - StaticText "COOA-132"
+        - StaticText "1d ago"
+    - generic [ref=e847] clickable [onclick]
+      - generic
+        - link "Open COOA-131: 【微信·老板·wave380】派门神做 Expo 移动端 i18n 语言包对齐 — 与 Web 端 zh-CN/en 契约同步消除中英文混杂" [ref=e980]
+          - StaticText "Open "
+          - StaticText "COOA-131"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave380】派门神做 Expo 移动端 i18n 语言包对齐 — 与 Web 端 zh-CN/en 契约同步消除中英文混杂"
+        - button "Mark as read" [ref=e981]
+        - image "Done"
+        - StaticText "【微信·老板·wave380】派门神做 Expo 移动端 i18n 语言包对齐 — 与 Web 端 zh-CN/en 契约同步消除中英文混杂"
+        - button "Archive" [ref=e982]
+        - StaticText "COOA-131"
+        - StaticText "1d ago"
+    - generic [ref=e848] clickable [onclick]
+      - generic
+        - link "Open COOA-163: [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [ref=e983]
+          - StaticText "Open "
+          - StaticText "COOA-163"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - button "Mark as read" [ref=e984]
+        - image "In Progress"
+        - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - StaticText "Live"
+        - button "Archive" [ref=e985]
+        - StaticText "COOA-163"
+        - StaticText "11h ago"
+    - generic [ref=e849] clickable [onclick]
+      - generic
+        - link "Open COOA-158: [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [ref=e986]
+          - StaticText "Open "
+          - StaticText "COOA-158"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - button "Mark as read" [ref=e987]
+        - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - status "Recovery needed — retries used up"
+          - StaticText "Recovery needed"
+        - button "Archive" [ref=e988]
+        - StaticText "COOA-158"
+        - StaticText "14h ago"
+    - generic [ref=e850] clickable [onclick]
+      - generic
+        - link "Open COOA-160: 【微信·老板·wave286】--probe-tool-status" [ref=e989]
+          - StaticText "Open "
+          - StaticText "COOA-160"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave286】--probe-tool-status"
+        - button "Mark as read" [ref=e990]
+        - image "Done"
+        - StaticText "【微信·老板·wave286】--probe-tool-status"
+        - button "Archive" [ref=e991]
+        - StaticText "COOA-160"
+        - StaticText "14h ago"
+    - generic [ref=e851] clickable [onclick]
+      - generic
+        - link "Open COOA-153: [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [ref=e992]
+          - StaticText "Open "
+          - StaticText "COOA-153"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - button "Mark as read" [ref=e993]
+        - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - button "Archive" [ref=e994]
+        - StaticText "COOA-153"
+        - StaticText "16h ago"
+    - generic [ref=e852] clickable [onclick]
+      - generic
+        - link "Open COOA-144: 【微信·老板·wave286】派门神立即接手 COOA-134 Stage 5 Expo App 移动端 i18n 与 Web 端 zh-CN/en 契约对齐，跑真机验收" [ref=e995]
+          - StaticText "Open "
+          - StaticText "COOA-144"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave286】派门神立即接手 COOA-134 Stage 5 Expo App 移动端 i18n 与 Web 端 zh-CN/en 契约对齐，跑真机验收"
+        - button "Mark as read" [ref=e996]
+        - image "Done"
+        - StaticText "【微信·老板·wave286】派门神立即接手 COOA-134 Stage 5 Expo App 移动端 i18n 与 Web 端 zh-CN/en 契约对齐，跑真机验收"
+        - button "Archive" [ref=e997]
+        - StaticText "COOA-144"
+        - StaticText "21h ago"
+    - separator "Yesterday"
+      - StaticText "YESTERDAY"
+    - generic [ref=e853] clickable [onclick]
+      - generic
+        - link "Open COOA-145: 【微信·老板·wave286】派兑底渊立即接手 COOA-135 服务端错误码 / 状态机 / 枚举 i18n 字典落地" [ref=e998]
+          - StaticText "Open "
+          - StaticText "COOA-145"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave286】派兑底渊立即接手 COOA-135 服务端错误码 / 状态机 / 枚举 i18n 字典落地"
+        - button "Mark as read" [ref=e999]
+        - image "Done"
+        - StaticText "【微信·老板·wave286】派兑底渊立即接手 COOA-135 服务端错误码 / 状态机 / 枚举 i18n 字典落地"
+        - button "Archive" [ref=e1000]
+        - StaticText "COOA-145"
+        - StaticText "22h ago"
+    - generic [ref=e854] clickable [onclick]
+      - generic
+        - link "Open COOA-143: 【微信·老板·wave286】派铁匠真修 patches/acpx@0.13.1.patch：用 prefix-match 改写 shouldSkipKeyRule 让 acpx.session_options.env 在任意 record 顶层前缀下都不做 snake_case key 校验。修完跑 packages/adapter-utils 下 vitest 全套验证，commit + push" [ref=e1001]
+          - StaticText "Open "
+          - StaticText "COOA-143"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave286】派铁匠真修 patches/acpx@0.13.1.patch：用 prefix-match 改写 shouldSkipKeyRule 让 acpx.session_options.env 在任意 record 顶层前缀下都不做 snake_case key 校验。修完跑 packages/adapter-utils 下 vitest 全套验证，commit + push"
+        - button "Mark as read" [ref=e1002]
+        - image "Done"
+        - StaticText "【微信·老板·wave286】派铁匠真修 patches/acpx@0.13.1.patch：用 prefix-match 改写 shouldSkipKeyRule 让 acpx.session_options.env 在任意 record 顶层前缀下都不做 snake_case key 校验。修完跑 packages/adapter-utils 下 vitest 全套验证，commit + push"
+        - button "Archive" [ref=e1003]
+        - StaticText "COOA-143"
+        - StaticText "22h ago"
+    - generic [ref=e855] clickable [onclick]
+      - generic
+        - link "Open COOA-129: 【微信·老板·wave380】smoke test 派工是否正常" [ref=e1004]
+          - StaticText "Open "
+          - StaticText "COOA-129"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave380】smoke test 派工是否正常"
+        - button "Mark as read" [ref=e1005]
+        - image "Done"
+        - StaticText "【微信·老板·wave380】smoke test 派工是否正常"
+        - button "Archive" [ref=e1006]
+        - StaticText "COOA-129"
+        - StaticText "1d ago"
+    - generic [ref=e856] clickable [onclick]
+      - generic
+        - link "Open COOA-121: 【微信·老板·wave286】派墨斗整理 wiki" [ref=e1007]
+          - StaticText "Open "
+          - StaticText "COOA-121"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave286】派墨斗整理 wiki"
+        - image "Done"
+        - StaticText "【微信·老板·wave286】派墨斗整理 wiki"
+        - button "Archive" [ref=e1008]
+        - StaticText "COOA-121"
+        - StaticText "1d ago"
+    - generic [ref=e857] clickable [onclick]
+      - generic
+        - link "Open COOA-122: 【微信·老板·wave286】派铁匠做 COOA-117 的 smoke 回归" [ref=e1009]
+          - StaticText "Open "
+          - StaticText "COOA-122"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave286】派铁匠做 COOA-117 的 smoke 回归"
+        - image "Done"
+        - StaticText "【微信·老板·wave286】派铁匠做 COOA-117 的 smoke 回归"
+        - button "Archive" [ref=e1010]
+        - StaticText "COOA-122"
+        - StaticText "1d ago"
+    - generic [ref=e858] clickable [onclick]
+      - generic
+        - link "Open 68e557c5: [G1·需求] EARS 软件需求规格说明书 (SRS + RTM)" [ref=e1011]
+          - StaticText "Open "
+          - StaticText "68e557c5"
+          - StaticText ": "
+          - StaticText "[G1·需求] EARS 软件需求规格说明书 (SRS + RTM)"
+        - button "Mark as read" [ref=e1012]
+        - image "Done"
+        - StaticText "[G1·需求] EARS 软件需求规格说明书 (SRS + RTM)"
+        - button "Archive" [ref=e1013]
+        - StaticText "68e557c5"
+        - StaticText "1d ago"
+    - separator "Earlier"
+      - StaticText "EARLIER"
+    - generic [ref=e859] clickable [onclick]
+      - generic
+        - link "Open COOA-105: Conversation 社区生活服务商用中台 工坊" [ref=e1014]
+          - StaticText "Open "
+          - StaticText "COOA-105"
+          - StaticText ": "
+          - StaticText "Conversation 社区生活服务商用中台 工坊"
+        - image "Done"
+        - StaticText "Conversation 社区生活服务商用中台 工坊"
+        - button "Archive" [ref=e1015]
+        - StaticText "COOA-105"
+        - StaticText "2d ago"
+    - generic [ref=e860] clickable [onclick]
+      - generic
+        - link "Open COOA-110: 【微信·老板·wave286】运营对账平账看下" [ref=e1016]
+          - StaticText "Open "
+          - StaticText "COOA-110"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave286】运营对账平账看下"
+        - image "Done"
+        - StaticText "【微信·老板·wave286】运营对账平账看下"
+        - button "Archive" [ref=e1017]
+        - StaticText "COOA-110"
+        - StaticText "2d ago"
+    - generic [ref=e861] clickable [onclick]
+      - generic
+        - link "Open COOA-109: 【微信·老板·wave286】测试一下已读未读" [ref=e1018]
+          - StaticText "Open "
+          - StaticText "COOA-109"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave286】测试一下已读未读"
+        - image "Done"
+        - StaticText "【微信·老板·wave286】测试一下已读未读"
+        - button "Archive" [ref=e1019]
+        - StaticText "COOA-109"
+        - StaticText "2d ago"
+    - generic [ref=e862] clickable [onclick]
+      - generic
+        - link "Open COOA-111: 【微信·老板·wave286】单测一下用户登录流程" [ref=e1020]
+          - StaticText "Open "
+          - StaticText "COOA-111"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave286】单测一下用户登录流程"
+        - image "Done"
+        - StaticText "【微信·老板·wave286】单测一下用户登录流程"
+        - button "Archive" [ref=e1021]
+        - StaticText "COOA-111"
+        - StaticText "2d ago"
+    - generic [ref=e863] clickable [onclick]
+      - generic
+        - link "Open COOA-4: 【Dogfooding】本地团队真实工单驱动平台成熟度闭环" [ref=e1022]
+          - StaticText "Open "
+          - StaticText "COOA-4"
+          - StaticText ": "
+          - StaticText "【Dogfooding】本地团队真实工单驱动平台成熟度闭环"
+        - button "Collapse sub-tasks" [ref=e1023]
+        - image "Blocked · 1 blocker needs attention; 1 covered by active work"
+        - StaticText "【Dogfooding】本地团队真实工单驱动平台成熟度闭环"
+        - button "Archive" [ref=e1024]
+        - StaticText "COOA-4"
+        - StaticText "4d ago"
+    - generic [ref=e864] clickable [onclick]
+      - generic
+        - link "Open COOA-44: P3 retire-or-wire: 12 条 server 注册但零客户端调用的孤儿路由 (2 小族 + 6 单条)" [ref=e1025]
+          - StaticText "Open "
+          - StaticText "COOA-44"
+          - StaticText ": "
+          - StaticText "P3 retire-or-wire: 12 条 server 注册但零客户端调用的孤儿路由 (2 小族 + 6 单条)"
+        - image "Blocked · manually marked (no active blockers)"
+        - StaticText "P3 retire-or-wire: 12 条 server 注册但零客户端调用的孤儿路由 (2 小族 + 6 单条)"
+        - button "Archive" [ref=e1026]
+        - StaticText "COOA-44"
+        - StaticText "2d ago"
+    - generic [ref=e865] clickable [onclick]
+      - generic
+        - link "Open COOA-21: [COOA-4] 僵尸 heartbeat run 阻塞 checkout 接管, agent 无自愈路径" [ref=e1027]
+          - StaticText "Open "
+          - StaticText "COOA-21"
+          - StaticText ": "
+          - StaticText "[COOA-4] 僵尸 heartbeat run 阻塞 checkout 接管, agent 无自愈路径"
+        - image "Done"
+        - StaticText "[COOA-4] 僵尸 heartbeat run 阻塞 checkout 接管, agent 无自愈路径"
+        - button "Archive" [ref=e1028]
+        - StaticText "COOA-21"
+        - StaticText "3d ago"
+    - generic [ref=e866] clickable [onclick]
+      - generic
+        - link "Open COOA-42: [P2][Dogfooding发现②续] issue-bound 唤醒重试耗尽后自动退避复活 — 补 wake-queue 兜底分支" [ref=e1029]
+          - StaticText "Open "
+          - StaticText "COOA-42"
+          - StaticText ": "
+          - StaticText "[P2][Dogfooding发现②续] issue-bound 唤醒重试耗尽后自动退避复活 — 补 wake-queue 兜底分支"
+        - image "In Review"
+        - StaticText "[P2][Dogfooding发现②续] issue-bound 唤醒重试耗尽后自动退避复活 — 补 wake-queue 兜底分支"
+        - button "Archive" [ref=e1030]
+        - StaticText "COOA-42"
+        - StaticText "1w ago"
+    - generic [ref=e867] clickable [onclick]
+      - generic
+        - link "Open COOA-34: wave293-C3: 业务本体 E2E 金标 + 60fps (门神, 不发版)" [ref=e1031]
+          - StaticText "Open "
+          - StaticText "COOA-34"
+          - StaticText ": "
+          - StaticText "wave293-C3: 业务本体 E2E 金标 + 60fps (门神, 不发版)"
+        - image "Done"
+        - StaticText "wave293-C3: 业务本体 E2E 金标 + 60fps (门神, 不发版)"
+        - button "Archive" [ref=e1032]
+        - StaticText "COOA-34"
+        - StaticText "1w ago"
+    - generic [ref=e868] clickable [onclick]
+      - generic
+        - link "Open COOA-33: wave293-C1+C2: OntologyDomainListScreen 回归 v0.6.19 纯列表风格 + 图谱 toggle (铁匠/贰号)" [ref=e1033]
+          - StaticText "Open "
+          - StaticText "COOA-33"
+          - StaticText ": "
+          - StaticText "wave293-C1+C2: OntologyDomainListScreen 回归 v0.6.19 纯列表风格 + 图谱 toggle (铁匠/贰号)"
+        - image "Done"
+        - StaticText "wave293-C1+C2: OntologyDomainListScreen 回归 v0.6.19 纯列表风格 + 图谱 toggle (铁匠/贰号)"
+        - button "Archive" [ref=e1034]
+        - StaticText "COOA-33"
+        - StaticText "1w ago"
+    - generic [ref=e869] clickable [onclick]
+      - generic
+        - link "Open COOA-32: wave293-C0: 业务本体页 v0.6.19 风格 ASCII 原型 (墨斗, 1 主图+2 下钻)" [ref=e1035]
+          - StaticText "Open "
+          - StaticText "COOA-32"
+          - StaticText ": "
+          - StaticText "wave293-C0: 业务本体页 v0.6.19 风格 ASCII 原型 (墨斗, 1 主图+2 下钻)"
+        - image "Done"
+        - StaticText "wave293-C0: 业务本体页 v0.6.19 风格 ASCII 原型 (墨斗, 1 主图+2 下钻)"
+        - button "Archive" [ref=e1036]
+        - StaticText "COOA-32"
+        - StaticText "1w ago"
+    - generic [ref=e870] clickable [onclick]
+      - generic
+        - link "Open COOA-56: [wave358] 腾讯云生产环境 Docker agy 镜像标准化构建与跨机分发脚本" [ref=e1037]
+          - StaticText "Open "
+          - StaticText "COOA-56"
+          - StaticText ": "
+          - StaticText "[wave358] 腾讯云生产环境 Docker agy 镜像标准化构建与跨机分发脚本"
+        - image "Done"
+        - StaticText "[wave358] 腾讯云生产环境 Docker agy 镜像标准化构建与跨机分发脚本"
+        - button "Archive" [ref=e1038]
+        - StaticText "COOA-56"
+        - StaticText "3d ago"
+    - generic [ref=e871] clickable [onclick]
+      - generic
+        - link "Open 15151664: [G6·SRE] SLO/SLI 度量矩阵与高可用容灾保障" [ref=e1039]
+          - StaticText "Open "
+          - StaticText "15151664"
+          - StaticText ": "
+          - StaticText "[G6·SRE] SLO/SLI 度量矩阵与高可用容灾保障"
+        - button "Collapse sub-tasks" [ref=e1040]
+        - image "Done"
+        - StaticText "[G6·SRE] SLO/SLI 度量矩阵与高可用容灾保障"
+        - button "Archive" [ref=e1041]
+        - StaticText "15151664"
+        - StaticText "3d ago"
+    - generic [ref=e872] clickable [onclick]
+      - generic
+        - link "Open COOA-107: [G6·OPS] 部署可观测底座并执行容灾实弹演练 (SLO 告警接入 + DR-01..08)" [ref=e1042]
+          - StaticText "Open "
+          - StaticText "COOA-107"
+          - StaticText ": "
+          - StaticText "[G6·OPS] 部署可观测底座并执行容灾实弹演练 (SLO 告警接入 + DR-01..08)"
+        - image "Done"
+        - StaticText "[G6·OPS] 部署可观测底座并执行容灾实弹演练 (SLO 告警接入 + DR-01..08)"
+        - button "Archive" [ref=e1043]
+        - StaticText "COOA-107"
+        - StaticText "3d ago"
+    - generic [ref=e873] clickable [onclick]
+      - generic
+        - link "Open b9faf330: [CMMI·审计] SPC 统计过程控制与缺陷预防 (CAR 5-Whys)" [ref=e1044]
+          - StaticText "Open "
+          - StaticText "b9faf330"
+          - StaticText ": "
+          - StaticText "[CMMI·审计] SPC 统计过程控制与缺陷预防 (CAR 5-Whys)"
+        - image "Done"
+        - StaticText "[CMMI·审计] SPC 统计过程控制与缺陷预防 (CAR 5-Whys)"
+        - button "Archive" [ref=e1045]
+        - StaticText "b9faf330"
+        - StaticText "3d ago"
+    - generic [ref=e874] clickable [onclick]
+      - generic
+        - link "Open 5d7d6f5f: [G4·验收] 四态真机测试验收报告 (Test Report)" [ref=e1046]
+          - StaticText "Open "
+          - StaticText "5d7d6f5f"
+          - StaticText ": "
+          - StaticText "[G4·验收] 四态真机测试验收报告 (Test Report)"
+        - image "Done"
+        - StaticText "[G4·验收] 四态真机测试验收报告 (Test Report)"
+        - button "Archive" [ref=e1047]
+        - StaticText "5d7d6f5f"
+        - StaticText "3d ago"
+    - generic [ref=e875] clickable [onclick]
+      - generic
+        - link "Open COOA-54: Board Operations" [ref=e1048]
+          - StaticText "Open "
+          - StaticText "COOA-54"
+          - StaticText ": "
+          - StaticText "Board Operations"
+        - image "Done"
+        - StaticText "Board Operations"
+        - button "Archive" [ref=e1049]
+        - StaticText "COOA-54"
+        - StaticText "3d ago"
+    - generic [ref=e876] clickable [onclick]
+      - generic
+        - link "Open COOA-78: 测试工单" [ref=e1050]
+          - StaticText "Open "
+          - StaticText "COOA-78"
+          - StaticText ": "
+          - StaticText "测试工单"
+        - image "Done"
+        - StaticText "测试工单"
+        - button "Archive" [ref=e1051]
+        - StaticText "COOA-78"
+        - StaticText "3d ago"
+    - generic [ref=e877] clickable [onclick]
+      - generic
+        - link "Open COOA-85: [Spec·core] 产融商业保理与供应链金融智能体系统 初始工程地基与规范基线" [ref=e1052]
+          - StaticText "Open "
+          - StaticText "COOA-85"
+          - StaticText ": "
+          - StaticText "[Spec·core] 产融商业保理与供应链金融智能体系统 初始工程地基与规范基线"
+        - button "Collapse sub-tasks" [ref=e1053]
+        - image "Done"
+        - StaticText "[Spec·core] 产融商业保理与供应链金融智能体系统 初始工程地基与规范基线"
+        - button "Archive" [ref=e1054]
+        - StaticText "COOA-85"
+        - StaticText "3d ago"
+    - generic [ref=e878] clickable [onclick]
+      - generic
+        - link "Open COOA-86: [init-baseline·T1] 初始化数据库结构与多租户审计字段" [ref=e1055]
+          - StaticText "Open "
+          - StaticText "COOA-86"
+          - StaticText ": "
+          - StaticText "[init-baseline·T1] 初始化数据库结构与多租户审计字段"
+        - image "Done"
+        - StaticText "[init-baseline·T1] 初始化数据库结构与多租户审计字段"
+        - button "Archive" [ref=e1056]
+        - StaticText "COOA-86"
+        - StaticText "3d ago"
+    - generic [ref=e879] clickable [onclick]
+      - generic
+        - link "Open COOA-87: [init-baseline·T2] 建立核心服务 API 契约与 DTO" [ref=e1057]
+          - StaticText "Open "
+          - StaticText "COOA-87"
+          - StaticText ": "
+          - StaticText "[init-baseline·T2] 建立核心服务 API 契约与 DTO"
+        - image "Done"
+        - StaticText "[init-baseline·T2] 建立核心服务 API 契约与 DTO"
+        - button "Archive" [ref=e1058]
+        - StaticText "COOA-87"
+        - StaticText "3d ago"
+    - generic [ref=e880] clickable [onclick]
+      - generic
+        - link "Open COOA-88: [init-baseline·T3] 执行门禁校验与首期基线发布" [ref=e1059]
+          - StaticText "Open "
+          - StaticText "COOA-88"
+          - StaticText ": "
+          - StaticText "[init-baseline·T3] 执行门禁校验与首期基线发布"
+        - image "Done"
+        - StaticText "[init-baseline·T3] 执行门禁校验与首期基线发布"
+        - button "Archive" [ref=e1060]
+        - StaticText "COOA-88"
+        - StaticText "3d ago"
+    - generic [ref=e881] clickable [onclick]
+      - generic
+        - link "Open COOA-90: 构建: 社区生活服务商用中台" [ref=e1061]
+          - StaticText "Open "
+          - StaticText "COOA-90"
+          - StaticText ": "
+          - StaticText "构建: 社区生活服务商用中台"
+        - button "Collapse sub-tasks" [ref=e1062]
+        - image "Done"
+        - StaticText "构建: 社区生活服务商用中台"
+        - button "Archive" [ref=e1063]
+        - StaticText "COOA-90"
+        - StaticText "3d ago"
+    - generic [ref=e882] clickable [onclick]
+      - generic
+        - link "Open COOA-91: 社区生活服务商用中台需求规格说明书" [ref=e1064]
+          - StaticText "Open "
+          - StaticText "COOA-91"
+          - StaticText ": "
+          - StaticText "社区生活服务商用中台需求规格说明书"
+        - image "In Review"
+        - StaticText "社区生活服务商用中台需求规格说明书"
+        - button "Archive" [ref=e1065]
+        - StaticText "COOA-91"
+        - StaticText "4d ago"
+    - generic [ref=e883] clickable [onclick]
+      - generic
+        - link "Open COOA-95: v1.0 商用发布与运营交付包" [ref=e1066]
+          - StaticText "Open "
+          - StaticText "COOA-95"
+          - StaticText ": "
+          - StaticText "v1.0 商用发布与运营交付包"
+        - image "Blocked · covered by active dependency COOA-91"
+        - StaticText "v1.0 商用发布与运营交付包"
+        - button "Archive" [ref=e1067]
+        - StaticText "COOA-95"
+        - StaticText "4d ago"
+    - generic [ref=e884] clickable [onclick]
+      - generic
+        - link "Open COOA-94: 全链路测试与商用上线验收报告" [ref=e1068]
+          - StaticText "Open "
+          - StaticText "COOA-94"
+          - StaticText ": "
+          - StaticText "全链路测试与商用上线验收报告"
+        - image "Blocked · covered by active dependency COOA-91"
+        - StaticText "全链路测试与商用上线验收报告"
+        - button "Archive" [ref=e1069]
+        - StaticText "COOA-94"
+        - StaticText "4d ago"
+    - generic [ref=e885] clickable [onclick]
+      - generic
+        - link "Open COOA-93: 中台核心服务与后台管理系统实现" [ref=e1070]
+          - StaticText "Open "
+          - StaticText "COOA-93"
+          - StaticText ": "
+          - StaticText "中台核心服务与后台管理系统实现"
+        - image "Blocked · covered by active dependency COOA-91"
+        - StaticText "中台核心服务与后台管理系统实现"
+        - button "Archive" [ref=e1071]
+        - StaticText "COOA-93"
+        - StaticText "4d ago"
+    - generic [ref=e886] clickable [onclick]
+      - generic
+        - link "Open COOA-92: 中台总体架构与技术设计方案" [ref=e1072]
+          - StaticText "Open "
+          - StaticText "COOA-92"
+          - StaticText ": "
+          - StaticText "中台总体架构与技术设计方案"
+        - image "Blocked · covered by active dependency COOA-91"
+        - StaticText "中台总体架构与技术设计方案"
+        - button "Archive" [ref=e1073]
+        - StaticText "COOA-92"
+        - StaticText "4d ago"
+    - generic [ref=e887] clickable [onclick]
+      - generic
+        - link "Open COOA-96: 构建: 社区生活服务商用中台" [ref=e1074]
+          - StaticText "Open "
+          - StaticText "COOA-96"
+          - StaticText ": "
+          - StaticText "构建: 社区生活服务商用中台"
+        - button "Collapse sub-tasks" [ref=e1075]
+        - image "Done"
+        - StaticText "构建: 社区生活服务商用中台"
+        - button "Archive" [ref=e1076]
+        - StaticText "COOA-96"
+        - StaticText "3d ago"
+    - generic [ref=e888] clickable [onclick]
+      - generic
+        - link "Open COOA-99: 编码实现: 社区生活服务商用中台" [ref=e1077]
+          - StaticText "Open "
+          - StaticText "COOA-99"
+          - StaticText ": "
+          - StaticText "编码实现: 社区生活服务商用中台"
+        - image "Done"
+        - StaticText "编码实现: 社区生活服务商用中台"
+        - button "Archive" [ref=e1078]
+        - StaticText "COOA-99"
+        - StaticText "3d ago"
+    - generic [ref=e889] clickable [onclick]
+      - generic
+        - link "Open COOA-98: 方案设计: 社区生活服务商用中台" [ref=e1079]
+          - StaticText "Open "
+          - StaticText "COOA-98"
+          - StaticText ": "
+          - StaticText "方案设计: 社区生活服务商用中台"
+        - image "Done"
+        - StaticText "方案设计: 社区生活服务商用中台"
+        - button "Archive" [ref=e1080]
+        - StaticText "COOA-98"
+        - StaticText "4d ago"
+    - generic [ref=e890] clickable [onclick]
+      - generic
+        - link "Open COOA-97: 需求梳理: 社区生活服务商用中台" [ref=e1081]
+          - StaticText "Open "
+          - StaticText "COOA-97"
+          - StaticText ": "
+          - StaticText "需求梳理: 社区生活服务商用中台"
+        - image "Done"
+        - StaticText "需求梳理: 社区生活服务商用中台"
+        - button "Archive" [ref=e1082]
+        - StaticText "COOA-97"
+        - StaticText "4d ago"
+    - generic [ref=e891] clickable [onclick]
+      - generic
+        - link "Open COOA-102: Conversation 极速流水线验证项目 工坊" [ref=e1083]
+          - StaticText "Open "
+          - StaticText "COOA-102"
+          - StaticText ": "
+          - StaticText "Conversation 极速流水线验证项目 工坊"
+        - image "Done"
+        - StaticText "Conversation 极速流水线验证项目 工坊"
+        - button "Archive" [ref=e1084]
+        - StaticText "COOA-102"
+        - StaticText "3d ago"
+    - generic [ref=e892] clickable [onclick]
+      - generic
+        - link "Open COOA-103: Conversation 真实流水线因果递进项目 工坊" [ref=e1085]
+          - StaticText "Open "
+          - StaticText "COOA-103"
+          - StaticText ": "
+          - StaticText "Conversation 真实流水线因果递进项目 工坊"
+        - image "Done"
+        - StaticText "Conversation 真实流水线因果递进项目 工坊"
+        - button "Archive" [ref=e1086]
+        - StaticText "COOA-103"
+        - StaticText "3d ago"
+    - generic [ref=e893] clickable [onclick]
+      - generic
+        - link "Open 4b471260: [G7·运营] 多租户开通治理与持续对账台账" [ref=e1087]
+          - StaticText "Open "
+          - StaticText "4b471260"
+          - StaticText ": "
+          - StaticText "[G7·运营] 多租户开通治理与持续对账台账"
+        - image "Done"
+        - StaticText "[G7·运营] 多租户开通治理与持续对账台账"
+        - button "Archive" [ref=e1088]
+        - StaticText "4b471260"
+        - StaticText "3d ago"
+    - generic [ref=e894] clickable [onclick]
+      - generic
+        - link "Open 2269a8ad: [G1·需求] EARS 软件需求规格说明书 (SRS + RTM)" [ref=e1089]
+          - StaticText "Open "
+          - StaticText "2269a8ad"
+          - StaticText ": "
+          - StaticText "[G1·需求] EARS 软件需求规格说明书 (SRS + RTM)"
+        - image "Done"
+        - StaticText "[G1·需求] EARS 软件需求规格说明书 (SRS + RTM)"
+        - button "Archive" [ref=e1090]
+        - StaticText "2269a8ad"
+        - StaticText "3d ago"
+    - generic [ref=e895] clickable [onclick]
+      - generic
+        - link "Open e1157d1a: [CMMI·审计] SPC 统计过程控制与缺陷预防 (CAR 5-Whys)" [ref=e1091]
+          - StaticText "Open "
+          - StaticText "e1157d1a"
+          - StaticText ": "
+          - StaticText "[CMMI·审计] SPC 统计过程控制与缺陷预防 (CAR 5-Whys)"
+        - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[CMMI·审计] SPC 统计过程控制与缺陷预防 (CAR 5-Whys)"
+        - button "Archive" [ref=e1092]
+        - StaticText "e1157d1a"
+        - StaticText "4d ago"
+    - generic [ref=e896] clickable [onclick]
+      - generic
+        - link "Open d6277389: [G5·投产] 不可变制品指纹、部署与秒级回滚 SOP" [ref=e1093]
+          - StaticText "Open "
+          - StaticText "d6277389"
+          - StaticText ": "
+          - StaticText "[G5·投产] 不可变制品指纹、部署与秒级回滚 SOP"
+        - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[G5·投产] 不可变制品指纹、部署与秒级回滚 SOP"
+        - button "Archive" [ref=e1094]
+        - StaticText "d6277389"
+        - StaticText "4d ago"
+    - generic [ref=e897] clickable [onclick]
+      - generic
+        - link "Open 659bf00e: [G6·SRE] SLO/SLI 度量矩阵与高可用容灾保障" [ref=e1095]
+          - StaticText "Open "
+          - StaticText "659bf00e"
+          - StaticText ": "
+          - StaticText "[G6·SRE] SLO/SLI 度量矩阵与高可用容灾保障"
+        - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[G6·SRE] SLO/SLI 度量矩阵与高可用容灾保障"
+        - button "Archive" [ref=e1096]
+        - StaticText "659bf00e"
+        - StaticText "4d ago"
+    - generic [ref=e898] clickable [onclick]
+      - generic
+        - link "Open b729b2ff: [G3-PRE·契约] 详细设计说明书与接口契约 (LLD + ERD)" [ref=e1097]
+          - StaticText "Open "
+          - StaticText "b729b2ff"
+          - StaticText ": "
+          - StaticText "[G3-PRE·契约] 详细设计说明书与接口契约 (LLD + ERD)"
+        - image "Done"
+        - StaticText "[G3-PRE·契约] 详细设计说明书与接口契约 (LLD + ERD)"
+        - button "Archive" [ref=e1098]
+        - StaticText "b729b2ff"
+        - StaticText "4d ago"
+    - generic [ref=e899] clickable [onclick]
+      - generic
+        - link "Open b5194eb3: [G2·架构] 概要架构设计与选型 (HLD + DAR)" [ref=e1099]
+          - StaticText "Open "
+          - StaticText "b5194eb3"
+          - StaticText ": "
+          - StaticText "[G2·架构] 概要架构设计与选型 (HLD + DAR)"
+        - image "Done"
+        - StaticText "[G2·架构] 概要架构设计与选型 (HLD + DAR)"
+        - button "Archive" [ref=e1100]
+        - StaticText "b5194eb3"
+        - StaticText "4d ago"
+    - generic [ref=e900] clickable [onclick]
+      - generic
+        - link "Open COOA-62: [G1·需求] 智能客服微服务系统 SRS 需求规格说明书 + RTM 追踪矩阵" [ref=e1101]
+          - StaticText "Open "
+          - StaticText "COOA-62"
+          - StaticText ": "
+          - StaticText "[G1·需求] 智能客服微服务系统 SRS 需求规格说明书 + RTM 追踪矩阵"
+        - image "In Review"
+        - StaticText "[G1·需求] 智能客服微服务系统 SRS 需求规格说明书 + RTM 追踪矩阵"
+        - button "Archive" [ref=e1102]
+        - StaticText "COOA-62"
+        - StaticText "4d ago"
+    - generic [ref=e901] clickable [onclick]
+      - generic
+        - link "Open COOA-77: [wave365] 让墨斗整理一份产融供应链平台原型规划" [ref=e1103]
+          - StaticText "Open "
+          - StaticText "COOA-77"
+          - StaticText ": "
+          - StaticText "[wave365] 让墨斗整理一份产融供应链平台原型规划"
+        - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[wave365] 让墨斗整理一份产融供应链平台原型规划"
+        - button "Archive" [ref=e1104]
+        - StaticText "COOA-77"
+        - StaticText "4d ago"
+    - generic [ref=e902] clickable [onclick]
+      - generic
+        - link "Open COOA-79: [wave365] 让墨斗调研ERP采购选型" [ref=e1105]
+          - StaticText "Open "
+          - StaticText "COOA-79"
+          - StaticText ": "
+          - StaticText "[wave365] 让墨斗调研ERP采购选型"
+        - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[wave365] 让墨斗调研ERP采购选型"
+        - button "Archive" [ref=e1106]
+        - StaticText "COOA-79"
+        - StaticText "4d ago"
+    - generic [ref=e903] clickable [onclick]
+      - generic
+        - link "Open COOA-84: [wave367] 老板问: 本机 Coolie Dev (Mac + Hermes + 6 数字员工 + 7 工具池 + Dev Server 3100 + agy Docker 容器) 的整套能力, 如何精准复刻到任意新主机 (Linux 服务器 / Windows / 其他 Mac)? 现在已有 docs-coolie/playbooks/coolie-dev-host-replication.md 与 scripts/bootstrap-coolie-dev-host.sh, 请墨斗深度吃透这两份, 输出一份《Coolie Dev 全栈能力跨主机复刻白皮书》, 必须涵盖: (1) 能力分层(系统层/工具层/数据层/控制面层/微信对话层/凭证层)与每层复刻颗粒度; (2) 新机零基础一键脚本设计 (跨平台 shell 兼容 + 错误自愈); (3) agy 容器 / claude settings 软链 / MCP servers / Tool Health Monitor / Runner Bridge / cron 看门狗 / OTA 增量同步 等关键模块在新机上的可移植性与避坑; (4) 凭证与会话持久化(SQLite conversation 库 + 微信对话上下文)如何同步; (5) 与现有 bootstrap-coolie-dev-host.sh 的差异补齐与可合并点; (6) 实操验证清单(GitHub repo / 工具探活 / 6 员工可见 / 派单联通 / Dev Issue 真建)。提交 docs-coolie/research/2026-10-10-coolie-dev-host-capability-replication.md, 落地真证据。" [ref=e1107]
+          - StaticText "Open "
+          - StaticText "COOA-84"
+          - StaticText ": "
+          - StaticText "[wave367] 老板问: 本机 Coolie Dev (Mac + Hermes + 6 数字员工 + 7 工具池 + Dev Server 3100 + agy Docker 容器) 的整套能力, 如何精准复刻到任意新主机 (Linux 服务器 / Windows / 其他 Mac)? 现在已有 docs-coolie/playbooks/coolie-dev-host-replication.md 与 scripts/bootstrap-coolie-dev-host.sh, 请墨斗深度吃透这两份, 输出一份《Coolie Dev 全栈能力跨主机复刻白皮书》, 必须涵盖: (1) 能力分层(系统层/工具层/数据层/控制面层/微信对话层/凭证层)与每层复刻颗粒度; (2) 新机零基础一键脚本设计 (跨平台 shell 兼容 + 错误自愈); (3) agy 容器 / claude settings 软链 / MCP servers / Tool Health Monitor / Runner Bridge / cron 看门狗 / OTA 增量同步 等关键模块在新机上的可移植性与避坑; (4) 凭证与会话持久化(SQLite conversation 库 + 微信对话上下文)如何同步; (5) 与现有 bootstrap-coolie-dev-host.sh 的差异补齐与可合并点; (6) 实操验证清单(GitHub repo / 工具探活 / 6 员工可见 / 派单联通 / Dev Issue 真建)。提交 docs-coolie/research/2026-10-10-coolie-dev-host-capability-replication.md, 落地真证据。"
+        - image "Done"
+        - StaticText "[wave367] 老板问: 本机 Coolie Dev (Mac + Hermes + 6 数字员工 + 7 工具池 + Dev Server 3100 + agy Docker 容器) 的整套能力, 如何精准复刻到任意新主机 (Linux 服务器 / Windows / 其他 Mac)? 现在已有 docs-coolie/playbooks/coolie-dev-host-replication.md 与 scripts/bootstrap-coolie-dev-host.sh, 请墨斗深度吃透这两份, 输出一份《Coolie Dev 全栈能力跨主机复刻白皮书》, 必须涵盖: (1) 能力分层(系统层/工具层/数据层/控制面层/微信对话层/凭证层)与每层复刻颗粒度; (2) 新机零基础一键脚本设计 (跨平台 shell 兼容 + 错误自愈); (3) agy 容器 / claude settings 软链 / MCP servers / Tool Health Monitor / Runner Bridge / cron 看门狗 / OTA 增量同步 等关键模块在新机上的可移植性与避坑; (4) 凭证与会话持久化(SQLite conversation 库 + 微信对话上下文)如何同步; (5) 与现有 bootstrap-coolie-dev-host.sh 的差异补齐与可合并点; (6) 实操验证清单(GitHub repo / 工具探活 / 6 员工可见 / 派单联通 / Dev Issue 真建)。提交 docs-coolie/research/2026-10-10-coolie-dev-host-capability-replication.md, 落地真证据。"
+        - button "Archive" [ref=e1108]
+        - StaticText "COOA-84"
+        - StaticText "4d ago"
+    - generic [ref=e904] clickable [onclick]
+      - generic
+        - link "Open COOA-76: [wave358] 立项一个智能客服微服务系统" [ref=e1109]
+          - StaticText "Open "
+          - StaticText "COOA-76"
+          - StaticText ": "
+          - StaticText "[wave358] 立项一个智能客服微服务系统"
+        - image "Done"
+        - StaticText "[wave358] 立项一个智能客服微服务系统"
+        - button "Archive" [ref=e1110]
+        - StaticText "COOA-76"
+        - StaticText "6d ago"
+    - generic [ref=e905] clickable [onclick]
+      - generic
+        - link "Open COOA-73: [G3·契约与实现] 工坊双端组件对齐、提案卡片落地与 0 编译报错守卫 (LLD)" [ref=e1111]
+          - StaticText "Open "
+          - StaticText "COOA-73"
+          - StaticText ": "
+          - StaticText "[G3·契约与实现] 工坊双端组件对齐、提案卡片落地与 0 编译报错守卫 (LLD)"
+        - image "Done"
+        - StaticText "[G3·契约与实现] 工坊双端组件对齐、提案卡片落地与 0 编译报错守卫 (LLD)"
+        - button "Archive" [ref=e1112]
+        - StaticText "COOA-73"
+        - StaticText "6d ago"
+    - generic [ref=e906] clickable [onclick]
+      - generic
+        - link "Open COOA-55: [wave358] 多环境 Hermes 动态命名与角色标识支持 (Palantir Echo/Delta/Dev 矩阵)" [ref=e1113]
+          - StaticText "Open "
+          - StaticText "COOA-55"
+          - StaticText ": "
+          - StaticText "[wave358] 多环境 Hermes 动态命名与角色标识支持 (Palantir Echo/Delta/Dev 矩阵)"
+        - image "Done"
+        - StaticText "[wave358] 多环境 Hermes 动态命名与角色标识支持 (Palantir Echo/Delta/Dev 矩阵)"
+        - button "Archive" [ref=e1114]
+        - StaticText "COOA-55"
+        - StaticText "6d ago"
+    - generic [ref=e907] clickable [onclick]
+      - generic
+        - link "Open COOA-60: [wave364][App-沙箱] 交付物与 3D 设计室 WebGL 预览 URL 解析 fallback 修复与真机校验" [ref=e1115]
+          - StaticText "Open "
+          - StaticText "COOA-60"
+          - StaticText ": "
+          - StaticText "[wave364][App-沙箱] 交付物与 3D 设计室 WebGL 预览 URL 解析 fallback 修复与真机校验"
+        - image "Done"
+        - StaticText "[wave364][App-沙箱] 交付物与 3D 设计室 WebGL 预览 URL 解析 fallback 修复与真机校验"
+        - button "Archive" [ref=e1116]
+        - StaticText "COOA-60"
+        - StaticText "1w ago"
+    - generic [ref=e908] clickable [onclick]
+      - generic
+        - link "Open COOA-57: [wave358] 工具健康度探测精准识别 agy 过期凭据与调度自动降级保护" [ref=e1117]
+          - StaticText "Open "
+          - StaticText "COOA-57"
+          - StaticText ": "
+          - StaticText "[wave358] 工具健康度探测精准识别 agy 过期凭据与调度自动降级保护"
+        - image "Done"
+        - StaticText "[wave358] 工具健康度探测精准识别 agy 过期凭据与调度自动降级保护"
+        - button "Archive" [ref=e1118]
+        - StaticText "COOA-57"
+        - StaticText "1w ago"
+    - generic [ref=e909] clickable [onclick]
+      - generic
+        - link "Open COOA-59: [wave286] 请用三句话确认收到微信派单指令并汇报当前状态" [ref=e1119]
+          - StaticText "Open "
+          - StaticText "COOA-59"
+          - StaticText ": "
+          - StaticText "[wave286] 请用三句话确认收到微信派单指令并汇报当前状态"
+        - image "Done"
+        - StaticText "[wave286] 请用三句话确认收到微信派单指令并汇报当前状态"
+        - button "Archive" [ref=e1120]
+        - StaticText "COOA-59"
+        - StaticText "1w ago"
+    - generic [ref=e910] clickable [onclick]
+      - generic
+        - link "Open COOA-58: [wave358] 原生 APP 点击「工坊」Tab 闪退 BUG 根治与 ErrorBoundary 容错保护" [ref=e1121]
+          - StaticText "Open "
+          - StaticText "COOA-58"
+          - StaticText ": "
+          - StaticText "[wave358] 原生 APP 点击「工坊」Tab 闪退 BUG 根治与 ErrorBoundary 容错保护"
+        - image "Done"
+        - StaticText "[wave358] 原生 APP 点击「工坊」Tab 闪退 BUG 根治与 ErrorBoundary 容错保护"
+        - button "Archive" [ref=e1122]
+        - StaticText "COOA-58"
+        - StaticText "1w ago"
+    - generic [ref=e911] clickable [onclick]
+      - generic
+        - link "Open COOA-53: [wave357] 让墨斗做下架构设计" [ref=e1123]
+          - StaticText "Open "
+          - StaticText "COOA-53"
+          - StaticText ": "
+          - StaticText "[wave357] 让墨斗做下架构设计"
+        - image "Done"
+        - StaticText "[wave357] 让墨斗做下架构设计"
+        - button "Archive" [ref=e1124]
+        - StaticText "COOA-53"
+        - StaticText "1w ago"
+    - generic [ref=e912] clickable [onclick]
+      - generic
+        - link "Open COOA-52: [wave302] 按照宪法第二章现有能力组合铁律，把项目创建路由原子化初始化同名ontology_domains" [ref=e1125]
+          - StaticText "Open "
+          - StaticText "COOA-52"
+          - StaticText ": "
+          - StaticText "[wave302] 按照宪法第二章现有能力组合铁律，把项目创建路由原子化初始化同名ontology_domains"
+        - image "Done"
+        - StaticText "[wave302] 按照宪法第二章现有能力组合铁律，把项目创建路由原子化初始化同名ontology_domains"
+        - button "Archive" [ref=e1126]
+        - StaticText "COOA-52"
+        - StaticText "1w ago"
+    - generic [ref=e913] clickable [onclick]
+      - generic
+        - link "Open COOA-51: [wave302] 修一下" [ref=e1127]
+          - StaticText "Open "
+          - StaticText "COOA-51"
+          - StaticText ": "
+          - StaticText "[wave302] 修一下"
+        - image "Done"
+        - StaticText "[wave302] 修一下"
+        - button "Archive" [ref=e1128]
+        - StaticText "COOA-51"
+        - StaticText "1w ago"
+    - generic [ref=e914] clickable [onclick]
+      - generic
+        - link "Open COOA-50: [wave286] 测试微信派单链路" [ref=e1129]
+          - StaticText "Open "
+          - StaticText "COOA-50"
+          - StaticText ": "
+          - StaticText "[wave286] 测试微信派单链路"
+        - image "Done"
+        - StaticText "[wave286] 测试微信派单链路"
+        - button "Archive" [ref=e1130]
+        - StaticText "COOA-50"
+        - StaticText "1w ago"
+    - generic [ref=e915] clickable [onclick]
+      - button "Mark as read" [ref=e945]
+      - link "质量门禁特批会签: 【质量治理特批会签】G5 投产门禁 放行申请 Approved updated 1w ago" [ref=e946]
+        - StaticText "质量门禁特批会签: 【质量治理特批会签】G5 投产门禁 放行申请"
+        - StaticText "Approved"
+        - StaticText "updated "
+        - StaticText "1w ago"
+      - button "Archive" [ref=e947]
+    - generic [ref=e916] clickable [onclick]
+      - generic
+        - link "Open COOA-48: 【主线·业务本体】多项目多域隔离与默认本体域自生引擎 (Auto-Bootstrapper)" [ref=e1131]
+          - StaticText "Open "
+          - StaticText "COOA-48"
+          - StaticText ": "
+          - StaticText "【主线·业务本体】多项目多域隔离与默认本体域自生引擎 (Auto-Bootstrapper)"
+        - image "Done"
+        - StaticText "【主线·业务本体】多项目多域隔离与默认本体域自生引擎 (Auto-Bootstrapper)"
+        - button "Archive" [ref=e1132]
+        - StaticText "COOA-48"
+        - StaticText "1w ago"
+    - generic [ref=e917] clickable [onclick]
+      - generic
+        - link "Open COOA-1: 【日晨会】本地施工队每日 09:30 晨会与工单对齐" [ref=e1133]
+          - StaticText "Open "
+          - StaticText "COOA-1"
+          - StaticText ": "
+          - StaticText "【日晨会】本地施工队每日 09:30 晨会与工单对齐"
+        - image "Todo"
+        - StaticText "【日晨会】本地施工队每日 09:30 晨会与工单对齐"
+        - button "Archive" [ref=e1134]
+        - StaticText "COOA-1"
+        - StaticText "1w ago"
+    - generic [ref=e918] clickable [onclick]
+      - generic
+        - link "Open COOA-23: [wave286-T2] Web 任务页项目筛选与分组视图 (viewMode 三态 + projectFilter chip + sticky 计数组头)" [ref=e1135]
+          - StaticText "Open "
+          - StaticText "COOA-23"
+          - StaticText ": "
+          - StaticText "[wave286-T2] Web 任务页项目筛选与分组视图 (viewMode 三态 + projectFilter chip + sticky 计数组头)"
+        - image "Done"
+        - StaticText "[wave286-T2] Web 任务页项目筛选与分组视图 (viewMode 三态 + projectFilter chip + sticky 计数组头)"
+        - button "Archive" [ref=e1136]
+        - StaticText "COOA-23"
+        - StaticText "1w ago"
+    - generic [ref=e919] clickable [onclick]
+      - generic
+        - link "Open COOA-16: [wave285-C4] 原生任务页性能真机走查验收 (60fps @ 200 任务)" [ref=e1137]
+          - StaticText "Open "
+          - StaticText "COOA-16"
+          - StaticText ": "
+          - StaticText "[wave285-C4] 原生任务页性能真机走查验收 (60fps @ 200 任务)"
+        - image "Done"
+        - StaticText "[wave285-C4] 原生任务页性能真机走查验收 (60fps @ 200 任务)"
+        - button "Archive" [ref=e1138]
+        - StaticText "COOA-16"
+        - StaticText "1w ago"
+    - generic [ref=e920] clickable [onclick]
+      - generic
+        - link "Open COOA-19: [wave284-附发现-投产] 部署 67f802d02 请求日志脱敏 + journald 复核与 key 轮换决策" [ref=e1139]
+          - StaticText "Open "
+          - StaticText "COOA-19"
+          - StaticText ": "
+          - StaticText "[wave284-附发现-投产] 部署 67f802d02 请求日志脱敏 + journald 复核与 key 轮换决策"
+        - image "Done"
+        - StaticText "[wave284-附发现-投产] 部署 67f802d02 请求日志脱敏 + journald 复核与 key 轮换决策"
+        - button "Archive" [ref=e1140]
+        - StaticText "COOA-19"
+        - StaticText "1w ago"
+    - generic [ref=e921] clickable [onclick]
+      - generic
+        - link "Open COOA-3: 【月度计划】2026年10月度核心里程碑规划与发版路线图" [ref=e1141]
+          - StaticText "Open "
+          - StaticText "COOA-3"
+          - StaticText ": "
+          - StaticText "【月度计划】2026年10月度核心里程碑规划与发版路线图"
+        - image "Done"
+        - StaticText "【月度计划】2026年10月度核心里程碑规划与发版路线图"
+        - button "Archive" [ref=e1142]
+        - StaticText "COOA-3"
+        - StaticText "1w ago"
+    - generic [ref=e922] clickable [onclick]
+      - generic
+        - link "Open COOA-15: [wave284] 让铁匠把 COOA-12 原生任务页下拉刷新性能给优化了" [ref=e1143]
+          - StaticText "Open "
+          - StaticText "COOA-15"
+          - StaticText ": "
+          - StaticText "[wave284] 让铁匠把 COOA-12 原生任务页下拉刷新性能给优化了"
+        - image "Done"
+        - StaticText "[wave284] 让铁匠把 COOA-12 原生任务页下拉刷新性能给优化了"
+        - button "Archive" [ref=e1144]
+        - StaticText "COOA-15"
+        - StaticText "1w ago"
+    - generic [ref=e923] clickable [onclick]
+      - generic
+        - link "Open COOA-14: [wave284] 生产端关系图谱 Validation Error 根因排查与修复" [ref=e1145]
+          - StaticText "Open "
+          - StaticText "COOA-14"
+          - StaticText ": "
+          - StaticText "[wave284] 生产端关系图谱 Validation Error 根因排查与修复"
+        - image "Done"
+        - StaticText "[wave284] 生产端关系图谱 Validation Error 根因排查与修复"
+        - button "Archive" [ref=e1146]
+        - StaticText "COOA-14"
+        - StaticText "1w ago"
+  - generic
+    - heading "Command Palette" [level=2, ref=e924]
+    - paragraph
+      - StaticText "Search for a command to run..."

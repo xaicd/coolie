@@ -1,0 +1,140 @@
+- generic [ref=e250] clickable [onclick]
+  - link "Skip to Main Content" [ref=e251]
+  - StaticText "RESTART REQUIRED"
+  - paragraph
+    - StaticText "backend files changed since this server booted · updated 17m ago"
+  - StaticText "Changed: "
+  - StaticText "server/${PAPERCLIP_SCRATCH_DIR:-/tmp}/r15-comment.md"
+  - StaticText "Restart "
+  - code
+    - StaticText "pnpm dev:once"
+  - StaticText " after the active work is safe to interrupt"
+  - button "Restart now" [ref=e252]
+    - StaticText "Restart now"
+  - generic
+    - generic
+      - complementary
+        - button "Open Coolie 本地施工总社 organization switcher" [expanded=false, ref=e267]
+          - StaticText "C"
+          - StaticText "Coolie 本地施工总社"
+        - navigation
+          - button "新建任务" [ref=e286]
+            - StaticText "新建任务"
+          - link "搜索" [ref=e287]
+            - StaticText "搜索"
+          - link "仪表盘 4 live" [ref=e288]
+            - StaticText "仪表盘"
+            - StaticText "4"
+            - StaticText " live"
+          - link "收件箱 10" [ref=e289]
+            - StaticText "收件箱"
+            - StaticText "10"
+          - link "会议室" [ref=e290]
+            - StaticText "会议室"
+          - generic
+            - button "Collapse 工作" [expanded=true, ref=e291]
+            - StaticText "工作"
+          - link "任务" [ref=e292]
+            - StaticText "任务"
+          - link "项目" [ref=e293]
+            - StaticText "项目"
+          - link "例行任务" [ref=e294]
+            - StaticText "例行任务"
+          - link "产物" [ref=e295]
+            - StaticText "产物"
+          - link "Ontology" [ref=e296]
+            - StaticText "Ontology"
+          - link "架构治理" [ref=e297]
+            - StaticText "架构治理"
+          - generic
+            - button "Collapse 组织" [expanded=true, ref=e298]
+            - StaticText "组织"
+          - link "智能体" [ref=e299]
+            - StaticText "智能体"
+          - link "技能" [ref=e300]
+            - StaticText "技能"
+          - link "连接器" [ref=e301]
+            - StaticText "连接器"
+          - link "审计" [ref=e302]
+            - StaticText "审计"
+      - button "Open account menu" [expanded=false, ref=e258]
+        - StaticText "BO"
+        - StaticText "Board"
+      - link "Share feedback" [ref=e259]
+    - separator "Resize sidebar" [ref=e254] focusable [tabindex]: 240
+  - heading "项目" [level=1, ref=e253]
+  - main
+    - button "排序: 名称" [expanded=false, ref=e255]
+      - StaticText "排序: 名称"
+    - button "新建项目" [ref=e256]
+    - generic
+      - heading "我的项目" [level=2, ref=e260]
+      - StaticText "6 个项目"
+      - link "极速流水线验证项目 测试立项因果递进：首发仅产生需求主线任务 2 个任务 backlog 同步 Leave 极速流水线验证项目 Star 极速流水线验证项目" [ref=e261]
+        - StaticText "极速流水线验证项目"
+        - paragraph
+          - StaticText "测试立项因果递进：首发仅产生需求主线任务"
+        - StaticText "2 个任务"
+        - StaticText "backlog"
+        - button "同步" [ref=e268]
+          - StaticText "同步"
+        - button "Leave 极速流水线验证项目" [ref=e269]
+          - StaticText "Leave"
+        - button "Star 极速流水线验证项目" [ref=e270]
+      - link "社区生活服务商用中台 商业交付项目（某单位社区生活服务平台采购项目，询比采购第二次）。主营：房源租赁闭环 + 家政服务履约闭环，三端（微信小程序 / B 端移动工作台 / PC 管理后台）。法定红线：合同签订后 90 天全功能交付并签署客户终验核销单（内控 60+30）。来源：看板“极速立项”构建 COOA-96 补走标准立项入口；已有 COOA-97 SRS v1.1、COOA-98 HLD/DAR、COOA-99 后端代码可作为输入。 12 个任务 completed 同步 Leave 社区生活服务商用中台 Star 社区生活服务商用中台" [ref=e262]
+        - StaticText "社区生活服务商用中台"
+        - paragraph
+          - StaticText "商业交付项目（某单位社区生活服务平台采购项目，询比采购第二次）。主营：房源租赁闭环 + 家政服务履约闭环，三端（微信小程序 / B 端移动工作台 / PC 管理后台）。法定红线：合同签订后 90 天全功能交付并签署客户终验核销单（内控 60+30）。来源：看板“极速立项”构建 COOA-96 补走标准立项入口；已有 COOA-97 SRS v1.1、COOA-98 HLD/DAR、COOA-99 后端代码可作为输入。"
+        - StaticText "12 个任务"
+        - StaticText "completed"
+        - button "同步" [ref=e271]
+          - StaticText "同步"
+        - button "Leave 社区生活服务商用中台" [ref=e272]
+          - StaticText "Leave"
+        - button "Star 社区生活服务商用中台" [ref=e273]
+      - link "示范项目 26 个任务 in progress 同步 Leave 示范项目 Star 示范项目" [ref=e263]
+        - StaticText "示范项目"
+        - StaticText "26 个任务"
+        - StaticText "in progress"
+        - button "同步" [ref=e274]
+          - StaticText "同步"
+        - button "Leave 示范项目" [ref=e275]
+          - StaticText "Leave"
+        - button "Star 示范项目" [ref=e276]
+      - link "真实流水线因果递进项目 测试立项因果递进：首发仅产生需求主线任务 8 个任务 backlog 同步 Leave 真实流水线因果递进项目 Star 真实流水线因果递进项目" [ref=e264]
+        - StaticText "真实流水线因果递进项目"
+        - paragraph
+          - StaticText "测试立项因果递进：首发仅产生需求主线任务"
+        - StaticText "8 个任务"
+        - StaticText "backlog"
+        - button "同步" [ref=e277]
+          - StaticText "同步"
+        - button "Leave 真实流水线因果递进项目" [ref=e278]
+          - StaticText "Leave"
+        - button "Star 真实流水线因果递进项目" [ref=e279]
+      - link "智能客服微服务系统 商业交付项目 · G1 需求阶段。立项来源: 老板原话「帮我立项一个智能客服微服务系统」(2026-10-08, Hermes·Echo 派单 wave358 / COOA-61)。定位: 面向企业客户的智能客服平台, 微服务架构; 业务范围以 G1 SRS 与老板澄清为准。交付纪律: Spec-First (G1 SRS → G2 HLD → G3 契约 → G4 测试 → G5 发版), No Artifact No Done; 商业闭环以客户 UAT 终验单为准绳。 2 个任务 planned 同步 Leave 智能客服微服务系统 Star 智能客服微服务系统" [ref=e265]
+        - StaticText "智能客服微服务系统"
+        - paragraph
+          - StaticText "商业交付项目 · G1 需求阶段。立项来源: 老板原话「帮我立项一个智能客服微服务系统」(2026-10-08, Hermes·Echo 派单 wave358 / COOA-61)。定位: 面向企业客户的智能客服平台, 微服务架构; 业务范围以 G1 SRS 与老板澄清为准。交付纪律: Spec-First (G1 SRS → G2 HLD → G3 契约 → G4 测试 → G5 发版), No Artifact No Done; 商业闭环以客户 UAT 终验单为准绳。"
+        - StaticText "2 个任务"
+        - StaticText "planned"
+        - button "同步" [ref=e280]
+          - StaticText "同步"
+        - button "Leave 智能客服微服务系统" [ref=e281]
+          - StaticText "Leave"
+        - button "Star 智能客服微服务系统" [ref=e282]
+      - link "Coolie 工坊 AI 原生交付工厂本体系统 Coolie 核心旗舰工坊端到端商业交付底座（Web + Native App 双端），全流程自主驱动从需求意图、提案卡片、六大数字员工流水线到 CMMI G1-G5 全生命周期交付与验收。 38 个任务 in progress 同步 Leave Coolie 工坊 AI 原生交付工厂本体系统 Star Coolie 工坊 AI 原生交付工厂本体系统" [ref=e266]
+        - StaticText "Coolie 工坊 AI 原生交付工厂本体系统"
+        - paragraph
+          - StaticText "Coolie 核心旗舰工坊端到端商业交付底座（Web + Native App 双端），全流程自主驱动从需求意图、提案卡片、六大数字员工流水线到 CMMI G1-G5 全生命周期交付与验收。"
+        - StaticText "38 个任务"
+        - StaticText "in progress"
+        - button "同步" [ref=e283]
+          - StaticText "同步"
+        - button "Leave Coolie 工坊 AI 原生交付工厂本体系统" [ref=e284]
+          - StaticText "Leave"
+        - button "Star Coolie 工坊 AI 原生交付工厂本体系统" [ref=e285]
+  - generic
+    - heading "Command Palette" [level=2, ref=e257]
+    - paragraph
+      - StaticText "Search for a command to run..."

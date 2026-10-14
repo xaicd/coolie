@@ -1,0 +1,600 @@
+- generic [ref=e84] clickable [onclick]
+  - link "Skip to Main Content" [ref=e85]
+  - StaticText "RESTART REQUIRED"
+  - paragraph
+    - StaticText "backend files changed since this server booted · updated 17m ago"
+  - StaticText "Changed: "
+  - StaticText "server/${PAPERCLIP_SCRATCH_DIR:-/tmp}/r15-comment.md"
+  - StaticText "Restart "
+  - code
+    - StaticText "pnpm dev:once"
+  - StaticText " after the active work is safe to interrupt"
+  - button "Restart now" [ref=e86]
+    - StaticText "Restart now"
+  - generic
+    - generic
+      - complementary
+        - button "Open Coolie 本地施工总社 organization switcher" [expanded=false, ref=e98]
+          - StaticText "C"
+          - StaticText "Coolie 本地施工总社"
+        - navigation
+          - button "新建任务" [ref=e193]
+            - StaticText "新建任务"
+          - link "搜索" [ref=e194]
+            - StaticText "搜索"
+          - link "仪表盘 4 live" [ref=e195]
+            - StaticText "仪表盘"
+            - StaticText "4"
+            - StaticText " live"
+          - link "收件箱 10" [ref=e196]
+            - StaticText "收件箱"
+            - StaticText "10"
+          - link "会议室" [ref=e197]
+            - StaticText "会议室"
+          - generic
+            - button "Collapse 工作" [expanded=true, ref=e238]
+            - StaticText "工作"
+          - link "任务" [ref=e239]
+            - StaticText "任务"
+          - link "项目" [ref=e240]
+            - StaticText "项目"
+          - link "例行任务" [ref=e241]
+            - StaticText "例行任务"
+          - link "产物" [ref=e242]
+            - StaticText "产物"
+          - link "Ontology" [ref=e243]
+            - StaticText "Ontology"
+          - link "架构治理" [ref=e244]
+            - StaticText "架构治理"
+          - generic
+            - button "Collapse 组织" [expanded=true, ref=e245]
+            - StaticText "组织"
+          - link "智能体" [ref=e246]
+            - StaticText "智能体"
+          - link "技能" [ref=e247]
+            - StaticText "技能"
+          - link "连接器" [ref=e248]
+            - StaticText "连接器"
+          - link "审计" [ref=e249]
+            - StaticText "审计"
+      - button "Open account menu" [expanded=false, ref=e90]
+        - StaticText "BO"
+        - StaticText "Board"
+      - link "Share feedback" [ref=e91]
+    - separator "Resize sidebar" [ref=e88] focusable [tabindex]: 240
+  - heading "任务" [level=1, ref=e87]
+  - main
+    - toolbar "Task controls"
+      - button "New Task" [ref=e99]
+        - StaticText "New Task"
+      - textbox "Search tasks" [ref=e100]
+      - group "View mode"
+        - button "List view" [ref=e101]
+        - button "Project group view" [ref=e102]
+        - button "Board view" [ref=e103]
+      - button "Disable parent-child nesting" [ref=e92]
+      - button "Columns" [expanded=false, ref=e93]
+      - button "Filter" [expanded=false, ref=e94]
+      - button "Filter by project" [expanded=false, ref=e95]
+        - StaticText "Project"
+      - button "Sort" [expanded=false, ref=e96]
+      - button "Group" [expanded=false, ref=e97]
+    - generic
+      - separator "Today"
+        - StaticText "TODAY"
+      - generic
+        - link "Open COOA-176: [交付主线例行巡检] 示范项目" [ref=e104]
+          - StaticText "Open "
+          - StaticText "COOA-176"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e105] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e198]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-176"
+        - StaticText "35m ago"
+      - generic
+        - link "Open COOA-175: [交付主线例行巡检] 示范项目" [ref=e106]
+          - StaticText "Open "
+          - StaticText "COOA-175"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e107] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e199]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-175"
+        - StaticText "1h ago"
+      - generic
+        - link "Open COOA-174: [交付主线例行巡检] 示范项目" [ref=e108]
+          - StaticText "Open "
+          - StaticText "COOA-174"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e109] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e200]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-174"
+        - StaticText "2h ago"
+      - generic
+        - link "Open COOA-173: [交付主线例行巡检] 示范项目" [ref=e110]
+          - StaticText "Open "
+          - StaticText "COOA-173"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e111] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e201]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-173"
+        - StaticText "3h ago"
+      - generic
+        - link "Open COOA-172: [交付主线例行巡检] 示范项目" [ref=e112]
+          - StaticText "Open "
+          - StaticText "COOA-172"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e113] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e202]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-172"
+        - StaticText "4h ago"
+      - generic
+        - link "Open COOA-171: [交付主线例行巡检] 示范项目" [ref=e114]
+          - StaticText "Open "
+          - StaticText "COOA-171"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e115] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e203]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-171"
+        - StaticText "5h ago"
+      - generic
+        - link "Open COOA-170: [交付主线例行巡检] 示范项目" [ref=e116]
+          - StaticText "Open "
+          - StaticText "COOA-170"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e117] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e204]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-170"
+        - StaticText "6h ago"
+      - generic
+        - link "Open COOA-169: [交付主线例行巡检] 示范项目" [ref=e118]
+          - StaticText "Open "
+          - StaticText "COOA-169"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e119] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e205]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-169"
+        - StaticText "7h ago"
+      - generic
+        - link "Open COOA-168: [交付主线例行巡检] 示范项目" [ref=e120]
+          - StaticText "Open "
+          - StaticText "COOA-168"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e121] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e206]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-168"
+        - StaticText "8h ago"
+      - generic
+        - link "Open COOA-167: [交付主线例行巡检] 示范项目" [ref=e122]
+          - StaticText "Open "
+          - StaticText "COOA-167"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e123] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e207]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-167"
+        - StaticText "9h ago"
+      - generic
+        - link "Open COOA-166: [交付主线例行巡检] 示范项目" [ref=e124]
+          - StaticText "Open "
+          - StaticText "COOA-166"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e125] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e208]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-166"
+        - StaticText "10h ago"
+      - generic
+        - link "Open COOA-163: [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [ref=e126]
+          - StaticText "Open "
+          - StaticText "COOA-163"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - generic [ref=e127] clickable [onclick]
+          - button "Change status (current: In Progress)" [expanded=false, ref=e209]
+            - image "In Progress"
+        - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - StaticText "Live"
+        - StaticText "COOA-163"
+        - StaticText "11h ago"
+      - generic
+        - link "Open COOA-165: [交付主线例行巡检] 示范项目" [ref=e128]
+          - StaticText "Open "
+          - StaticText "COOA-165"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e129] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e210]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-165"
+        - StaticText "11h ago"
+      - generic
+        - link "Open COOA-164: [交付主线例行巡检] 示范项目" [ref=e130]
+          - StaticText "Open "
+          - StaticText "COOA-164"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e131] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e211]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-164"
+        - StaticText "12h ago"
+      - generic
+        - link "Open COOA-162: [交付主线例行巡检] 示范项目" [ref=e132]
+          - StaticText "Open "
+          - StaticText "COOA-162"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e133] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e212]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-162"
+        - StaticText "13h ago"
+      - generic
+        - link "Open COOA-158: [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [ref=e134]
+          - StaticText "Open "
+          - StaticText "COOA-158"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - generic [ref=e135] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e213]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - status "Recovery needed — retries used up"
+          - StaticText "Recovery needed"
+        - StaticText "COOA-158"
+        - StaticText "14h ago"
+      - generic
+        - link "Open COOA-161: [交付主线例行巡检] 示范项目" [ref=e136]
+          - StaticText "Open "
+          - StaticText "COOA-161"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e137] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e214]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-161"
+        - StaticText "14h ago"
+      - generic
+        - link "Open COOA-160: 【微信·老板·wave286】--probe-tool-status" [ref=e138]
+          - StaticText "Open "
+          - StaticText "COOA-160"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave286】--probe-tool-status"
+        - generic [ref=e139] clickable [onclick]
+          - button "Change status (current: Done)" [expanded=false, ref=e215]
+            - image "Done"
+        - StaticText "【微信·老板·wave286】--probe-tool-status"
+        - StaticText "COOA-160"
+        - StaticText "14h ago"
+      - generic
+        - link "Open COOA-159: [交付主线例行巡检] 示范项目" [ref=e140]
+          - StaticText "Open "
+          - StaticText "COOA-159"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e141] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e216]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-159"
+        - StaticText "15h ago"
+      - generic
+        - link "Open COOA-157: [交付主线例行巡检] 示范项目" [ref=e142]
+          - StaticText "Open "
+          - StaticText "COOA-157"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e143] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e217]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-157"
+        - StaticText "16h ago"
+      - generic
+        - link "Open COOA-153: [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [ref=e144]
+          - StaticText "Open "
+          - StaticText "COOA-153"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - generic [ref=e145] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e218]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - StaticText "COOA-153"
+        - StaticText "16h ago"
+      - generic
+        - link "Open COOA-156: [交付主线例行巡检] 示范项目" [ref=e146]
+          - StaticText "Open "
+          - StaticText "COOA-156"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e147] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e219]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-156"
+        - StaticText "17h ago"
+      - generic
+        - link "Open COOA-155: [交付主线例行巡检] 示范项目" [ref=e148]
+          - StaticText "Open "
+          - StaticText "COOA-155"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e149] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e220]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-155"
+        - StaticText "18h ago"
+      - generic
+        - link "Open COOA-151: [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [ref=e150]
+          - StaticText "Open "
+          - StaticText "COOA-151"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - generic [ref=e151] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e221]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - status "Recovery needed — retries used up"
+          - StaticText "Recovery needed"
+        - StaticText "COOA-151"
+        - StaticText "19h ago"
+      - generic
+        - link "Open COOA-154: [交付主线例行巡检] 示范项目" [ref=e152]
+          - StaticText "Open "
+          - StaticText "COOA-154"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e153] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e222]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-154"
+        - StaticText "19h ago"
+      - generic
+        - link "Open COOA-152: [交付主线例行巡检] 示范项目" [ref=e154]
+          - StaticText "Open "
+          - StaticText "COOA-152"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e155] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e223]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-152"
+        - StaticText "20h ago"
+      - generic
+        - link "Open COOA-144: 【微信·老板·wave286】派门神立即接手 COOA-134 Stage 5 Expo App 移动端 i18n 与 Web 端 zh-CN/en 契约对齐，跑真机验收" [ref=e156]
+          - StaticText "Open "
+          - StaticText "COOA-144"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave286】派门神立即接手 COOA-134 Stage 5 Expo App 移动端 i18n 与 Web 端 zh-CN/en 契约对齐，跑真机验收"
+        - generic [ref=e157] clickable [onclick]
+          - button "Change status (current: Done)" [expanded=false, ref=e224]
+            - image "Done"
+        - StaticText "【微信·老板·wave286】派门神立即接手 COOA-134 Stage 5 Expo App 移动端 i18n 与 Web 端 zh-CN/en 契约对齐，跑真机验收"
+        - StaticText "COOA-144"
+        - StaticText "21h ago"
+      - generic
+        - link "Open COOA-150: [交付主线例行巡检] 示范项目" [ref=e158]
+          - StaticText "Open "
+          - StaticText "COOA-150"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] 示范项目"
+        - generic [ref=e159] clickable [onclick]
+          - button "Change status (current: Blocked · manually marked (no active blockers))" [expanded=false, ref=e225]
+            - image "Blocked · manually marked (no active blockers)"
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "COOA-150"
+        - StaticText "21h ago"
+      - separator "Yesterday"
+        - StaticText "YESTERDAY"
+      - generic
+        - link "Open COOA-145: 【微信·老板·wave286】派兑底渊立即接手 COOA-135 服务端错误码 / 状态机 / 枚举 i18n 字典落地" [ref=e160]
+          - StaticText "Open "
+          - StaticText "COOA-145"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave286】派兑底渊立即接手 COOA-135 服务端错误码 / 状态机 / 枚举 i18n 字典落地"
+        - generic [ref=e161] clickable [onclick]
+          - button "Change status (current: Done)" [expanded=false, ref=e226]
+            - image "Done"
+        - StaticText "【微信·老板·wave286】派兑底渊立即接手 COOA-135 服务端错误码 / 状态机 / 枚举 i18n 字典落地"
+        - StaticText "COOA-145"
+        - StaticText "22h ago"
+      - generic
+        - link "Open COOA-149: [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [ref=e162]
+          - StaticText "Open "
+          - StaticText "COOA-149"
+          - StaticText ": "
+          - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - generic [ref=e163] clickable [onclick]
+          - button "Change status (current: In Progress)" [expanded=false, ref=e227]
+            - image "In Progress"
+        - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - StaticText "COOA-149"
+        - StaticText "just now"
+      - generic
+        - link "Open COOA-143: 【微信·老板·wave286】派铁匠真修 patches/acpx@0.13.1.patch：用 prefix-match 改写 shouldSkipKeyRule 让 acpx.session_options.env 在任意 record 顶层前缀下都不做 snake_case key 校验。修完跑 packages/adapter-utils 下 vitest 全套验证，commit + push" [ref=e164]
+          - StaticText "Open "
+          - StaticText "COOA-143"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave286】派铁匠真修 patches/acpx@0.13.1.patch：用 prefix-match 改写 shouldSkipKeyRule 让 acpx.session_options.env 在任意 record 顶层前缀下都不做 snake_case key 校验。修完跑 packages/adapter-utils 下 vitest 全套验证，commit + push"
+        - generic [ref=e165] clickable [onclick]
+          - button "Change status (current: Done)" [expanded=false, ref=e228]
+            - image "Done"
+        - StaticText "【微信·老板·wave286】派铁匠真修 patches/acpx@0.13.1.patch：用 prefix-match 改写 shouldSkipKeyRule 让 acpx.session_options.env 在任意 record 顶层前缀下都不做 snake_case key 校验。修完跑 packages/adapter-utils 下 vitest 全套验证，commit + push"
+        - StaticText "COOA-143"
+        - StaticText "22h ago"
+      - generic
+        - link "Open COOA-114: [主线长任务] Coolie 工坊全生命周期持续研发与能力升级 (Continuous Evolution)" [ref=e166]
+          - StaticText "Open "
+          - StaticText "COOA-114"
+          - StaticText ": "
+          - StaticText "[主线长任务] Coolie 工坊全生命周期持续研发与能力升级 (Continuous Evolution)"
+        - button "Collapse sub-tasks" [ref=e167]
+        - generic [ref=e168] clickable [onclick]
+          - button "Change status (current: In Progress)" [expanded=false, ref=e229]
+            - image "In Progress"
+        - StaticText "[主线长任务] Coolie 工坊全生命周期持续研发与能力升级 (Continuous Evolution)"
+        - StaticText "3"
+        - StaticText " live below"
+        - StaticText "COOA-114"
+        - StaticText "14m ago"
+      - separator "Today"
+        - StaticText "TODAY"
+      - separator "Yesterday"
+        - StaticText "YESTERDAY"
+      - generic
+        - link "Open COOA-116: [主线研发] Paperclip 上游功能全量国际化与本地化支持 (Full i18n & Localization)" [ref=e169]
+          - StaticText "Open "
+          - StaticText "COOA-116"
+          - StaticText ": "
+          - StaticText "[主线研发] Paperclip 上游功能全量国际化与本地化支持 (Full i18n & Localization)"
+        - button "Collapse sub-tasks" [ref=e170]
+        - generic [ref=e171] clickable [onclick]
+          - button "Change status (current: Todo)" [expanded=false, ref=e230]
+            - image "Todo"
+        - StaticText "[主线研发] Paperclip 上游功能全量国际化与本地化支持 (Full i18n & Localization)"
+        - StaticText "临时"
+        - StaticText "COOA-116"
+        - StaticText "23h ago"
+      - separator "Today"
+        - StaticText "TODAY"
+      - separator "Yesterday"
+        - StaticText "YESTERDAY"
+      - generic
+        - link "Open COOA-118: [COOA-117] Stage 3+4 - 核心业务页面去硬编码转译" [ref=e172]
+          - StaticText "Open "
+          - StaticText "COOA-118"
+          - StaticText ": "
+          - StaticText "[COOA-117] Stage 3+4 - 核心业务页面去硬编码转译"
+        - button "Collapse sub-tasks" [ref=e173]
+        - generic [ref=e174] clickable [onclick]
+          - button "Change status (current: Done)" [expanded=false, ref=e231]
+            - image "Done"
+        - StaticText "[COOA-117] Stage 3+4 - 核心业务页面去硬编码转译"
+        - StaticText "临时"
+        - StaticText "COOA-118"
+        - StaticText "23h ago"
+      - separator "Earlier"
+        - StaticText "EARLIER"
+      - generic
+        - link "Open COOA-110: 【微信·老板·wave286】运营对账平账看下" [ref=e175]
+          - StaticText "Open "
+          - StaticText "COOA-110"
+          - StaticText ": "
+          - StaticText "【微信·老板·wave286】运营对账平账看下"
+        - button "Collapse sub-tasks" [ref=e176]
+        - generic [ref=e177] clickable [onclick]
+          - button "Change status (current: Done)" [expanded=false, ref=e232]
+            - image "Done"
+        - StaticText "【微信·老板·wave286】运营对账平账看下"
+        - StaticText "COOA-110"
+        - StaticText "2d ago"
+      - generic
+        - link "Open b9faf330: [CMMI·审计] SPC 统计过程控制与缺陷预防 (CAR 5-Whys)" [ref=e178]
+          - StaticText "Open "
+          - StaticText "b9faf330"
+          - StaticText ": "
+          - StaticText "[CMMI·审计] SPC 统计过程控制与缺陷预防 (CAR 5-Whys)"
+        - button "Collapse sub-tasks" [ref=e179]
+        - generic [ref=e180] clickable [onclick]
+          - button "Change status (current: Done)" [expanded=false, ref=e233]
+            - image "Done"
+        - StaticText "[CMMI·审计] SPC 统计过程控制与缺陷预防 (CAR 5-Whys)"
+        - StaticText "b9faf330"
+        - StaticText "3d ago"
+      - generic
+        - link "Open 15151664: [G6·SRE] SLO/SLI 度量矩阵与高可用容灾保障" [ref=e181]
+          - StaticText "Open "
+          - StaticText "15151664"
+          - StaticText ": "
+          - StaticText "[G6·SRE] SLO/SLI 度量矩阵与高可用容灾保障"
+        - button "Collapse sub-tasks" [ref=e182]
+        - generic [ref=e183] clickable [onclick]
+          - button "Change status (current: Done)" [expanded=false, ref=e234]
+            - image "Done"
+        - StaticText "[G6·SRE] SLO/SLI 度量矩阵与高可用容灾保障"
+        - StaticText "15151664"
+        - StaticText "3d ago"
+      - generic
+        - link "Open 5d7d6f5f: [G4·验收] 四态真机测试验收报告 (Test Report)" [ref=e184]
+          - StaticText "Open "
+          - StaticText "5d7d6f5f"
+          - StaticText ": "
+          - StaticText "[G4·验收] 四态真机测试验收报告 (Test Report)"
+        - button "Collapse sub-tasks" [ref=e185]
+        - generic [ref=e186] clickable [onclick]
+          - button "Change status (current: Done)" [expanded=false, ref=e235]
+            - image "Done"
+        - StaticText "[G4·验收] 四态真机测试验收报告 (Test Report)"
+        - StaticText "5d7d6f5f"
+        - StaticText "3d ago"
+      - generic
+        - link "Open COOA-96: 构建: 社区生活服务商用中台" [ref=e187]
+          - StaticText "Open "
+          - StaticText "COOA-96"
+          - StaticText ": "
+          - StaticText "构建: 社区生活服务商用中台"
+        - button "Collapse sub-tasks" [ref=e188]
+        - generic [ref=e189] clickable [onclick]
+          - button "Change status (current: Done)" [expanded=false, ref=e236]
+            - image "Done"
+        - StaticText "构建: 社区生活服务商用中台"
+        - StaticText "COOA-96"
+        - StaticText "3d ago"
+      - generic
+        - link "Open COOA-85: [Spec·core] 产融商业保理与供应链金融智能体系统 初始工程地基与规范基线" [ref=e190]
+          - StaticText "Open "
+          - StaticText "COOA-85"
+          - StaticText ": "
+          - StaticText "[Spec·core] 产融商业保理与供应链金融智能体系统 初始工程地基与规范基线"
+        - button "Collapse sub-tasks" [ref=e191]
+        - generic [ref=e192] clickable [onclick]
+          - button "Change status (current: Done)" [expanded=false, ref=e237]
+            - image "Done"
+        - StaticText "[Spec·core] 产融商业保理与供应链金融智能体系统 初始工程地基与规范基线"
+        - StaticText "COOA-85"
+        - StaticText "3d ago"
+    - paragraph
+      - StaticText "Scroll to load more tasks"
+  - generic
+    - heading "Command Palette" [level=2, ref=e89]
+    - paragraph
+      - StaticText "Search for a command to run..."

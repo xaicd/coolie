@@ -1,0 +1,141 @@
+- generic [ref=e1209] clickable [onclick]
+  - link "Skip to Main Content" [ref=e1210]
+  - StaticText "RESTART REQUIRED"
+  - paragraph
+    - StaticText "backend files changed since this server booted · updated 18m ago"
+  - StaticText "Changed: "
+  - StaticText "server/${PAPERCLIP_SCRATCH_DIR:-/tmp}/r15-comment.md"
+  - StaticText "Restart "
+  - code
+    - StaticText "pnpm dev:once"
+  - StaticText " after the active work is safe to interrupt"
+  - button "Restart now" [ref=e1211]
+    - StaticText "Restart now"
+  - generic
+    - generic
+      - complementary
+        - button "Open Coolie 本地施工总社 organization switcher" [expanded=false, ref=e1234]
+          - StaticText "C"
+          - StaticText "Coolie 本地施工总社"
+        - navigation
+          - button "新建任务" [ref=e1238]
+            - StaticText "新建任务"
+          - link "搜索" [ref=e1239]
+            - StaticText "搜索"
+          - link "仪表盘 4 live" [ref=e1240]
+            - StaticText "仪表盘"
+            - StaticText "4"
+            - StaticText " live"
+          - link "收件箱 10" [ref=e1241]
+            - StaticText "收件箱"
+            - StaticText "10"
+          - link "会议室" [ref=e1242]
+            - StaticText "会议室"
+          - generic
+            - button "Collapse 工作" [expanded=true, ref=e1252]
+            - StaticText "工作"
+          - link "任务" [ref=e1253]
+            - StaticText "任务"
+          - link "项目" [ref=e1254]
+            - StaticText "项目"
+          - link "例行任务" [ref=e1255]
+            - StaticText "例行任务"
+          - link "产物" [ref=e1256]
+            - StaticText "产物"
+          - link "Ontology" [ref=e1257]
+            - StaticText "Ontology"
+          - link "架构治理" [ref=e1258]
+            - StaticText "架构治理"
+          - generic
+            - button "Collapse 组织" [expanded=true, ref=e1259]
+            - StaticText "组织"
+          - link "智能体" [ref=e1260]
+            - StaticText "智能体"
+          - link "技能" [ref=e1261]
+            - StaticText "技能"
+          - link "连接器" [ref=e1262]
+            - StaticText "连接器"
+          - link "审计" [ref=e1263]
+            - StaticText "审计"
+      - button "Open account menu" [expanded=false, ref=e1224]
+        - StaticText "BO"
+        - StaticText "Board"
+      - link "Share feedback" [ref=e1225]
+    - separator "Resize sidebar" [ref=e1213] focusable [tabindex]: 240
+  - heading "例行任务" [level=1, ref=e1212]
+  - main
+    - heading "例行任务" [level=1, ref=e1214]
+    - paragraph
+      - StaticText "routines.subtitle"
+    - link "routines.viewAllRuns" [ref=e1215]
+    - button "routines.createRoutine" [ref=e1216]
+    - paragraph
+      - StaticText "routines.routineCount"
+    - button "routines.sort" [expanded=false, ref=e1217]
+      - StaticText "routines.sort"
+    - button "routines.group" [expanded=false, ref=e1218]
+      - StaticText "routines.group"
+    - button "routines.select" [ref=e1219]
+    - navigation "routines folders" [ref=e1220]
+      - StaticText "FOLDERS"
+      - button "New folder" [ref=e1226]
+      - button "All routines 3" [ref=e1227]
+        - StaticText "All routines"
+        - StaticText "3"
+      - button "coolie-all" [ref=e1228]
+        - StaticText "coolie-all"
+      - StaticText "1"
+      - button "Folder actions for coolie-all" [expanded=false, ref=e1229]
+      - StaticText "SYSTEM"
+      - button "Unfiled 2" [ref=e1230]
+        - StaticText "Unfiled"
+        - StaticText "2"
+    - StaticText "All routines"
+    - StaticText "3"
+    - StaticText " routine"
+    - StaticText "s"
+    - button "coolie-all" [expanded=true, ref=e1221]
+      - StaticText "coolie-all"
+    - StaticText "1"
+    - link "Coolie 工坊持续研发与版本升级守护调度器 (Foundry Evolution Routine) paused Coolie 工坊 AI 原生交付工厂本体系统 Hermes 2026/10/13 20:00:14 · issue created Run now Enable Coolie 工坊持续研发与版本升级守护调度器 (Foundry Evolution Routine) Off More actions for Coolie 工坊持续研发与版本升级守护调度器 (Foundry Evolution Routine)" [ref=e1231]
+      - StaticText "Coolie 工坊持续研发与版本升级守护调度器 (Foundry Evolution Routine)"
+      - StaticText "paused"
+      - StaticText "Coolie 工坊 AI 原生交付工厂本体系统"
+      - StaticText "Hermes"
+      - StaticText "2026/10/13 20:00:14"
+      - StaticText " · issue created"
+      - generic [ref=e1235] clickable [cursor:pointer, onclick]
+        - button "Run now" [ref=e1243]
+        - switch "Enable Coolie 工坊持续研发与版本升级守护调度器 (Foundry Evolution Routine)" [checked=false, ref=e1244]
+        - StaticText "Off"
+        - button "More actions for Coolie 工坊持续研发与版本升级守护调度器 (Foundry Evolution Routine)" [expanded=false, ref=e1245]
+    - button "routines.groupUnfiled" [expanded=true, ref=e1222]
+      - StaticText "routines.groupUnfiled"
+    - StaticText "2"
+    - generic
+      - link "[交付主线例行巡检] 示范项目 示范项目 墨斗 2026/10/14 21:00:28 · issue created Run now Disable [交付主线例行巡检] 示范项目 On More actions for [交付主线例行巡检] 示范项目" [ref=e1232]
+        - StaticText "[交付主线例行巡检] 示范项目"
+        - StaticText "示范项目"
+        - StaticText "墨斗"
+        - StaticText "2026/10/14 21:00:28"
+        - StaticText " · issue created"
+        - generic [ref=e1236] clickable [cursor:pointer, onclick]
+          - button "Run now" [ref=e1246]
+          - switch "Disable [交付主线例行巡检] 示范项目" [checked=true, ref=e1247]
+          - StaticText "On"
+          - button "More actions for [交付主线例行巡检] 示范项目" [expanded=false, ref=e1248]
+      - link "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统 Coolie 工坊 AI 原生交付工厂本体系统 Hermes 2026/10/14 21:00:28 · coalesced Run now Disable [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统 On More actions for [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [ref=e1233]
+        - StaticText "[交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统"
+        - StaticText "Coolie 工坊 AI 原生交付工厂本体系统"
+        - StaticText "Hermes"
+        - StaticText "2026/10/14 21:00:28"
+        - StaticText " · coalesced"
+        - generic [ref=e1237] clickable [cursor:pointer, onclick]
+          - button "Run now" [ref=e1249]
+          - switch "Disable [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [checked=true, ref=e1250]
+          - StaticText "On"
+          - button "More actions for [交付主线例行巡检] Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1251]
+  - generic
+    - heading "Command Palette" [level=2, ref=e1223]
+    - paragraph
+      - StaticText "Search for a command to run..."

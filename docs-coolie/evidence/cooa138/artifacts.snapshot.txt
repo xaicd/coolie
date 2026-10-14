@@ -1,0 +1,429 @@
+- generic [ref=e303] clickable [onclick]
+  - link "Skip to Main Content" [ref=e304]
+  - StaticText "RESTART REQUIRED"
+  - paragraph
+    - StaticText "backend files changed since this server booted · updated 17m ago"
+  - StaticText "Changed: "
+  - StaticText "server/${PAPERCLIP_SCRATCH_DIR:-/tmp}/r15-comment.md"
+  - StaticText "Restart "
+  - code
+    - StaticText "pnpm dev:once"
+  - StaticText " after the active work is safe to interrupt"
+  - button "Restart now" [ref=e305]
+    - StaticText "Restart now"
+  - generic
+    - generic
+      - complementary
+        - button "Open Coolie 本地施工总社 organization switcher" [expanded=false, ref=e350]
+          - StaticText "C"
+          - StaticText "Coolie 本地施工总社"
+        - navigation
+          - button "新建任务" [ref=e381]
+            - StaticText "新建任务"
+          - link "搜索" [ref=e382]
+            - StaticText "搜索"
+          - link "仪表盘 4 live" [ref=e383]
+            - StaticText "仪表盘"
+            - StaticText "4"
+            - StaticText " live"
+          - link "收件箱 10" [ref=e384]
+            - StaticText "收件箱"
+            - StaticText "10"
+          - link "会议室" [ref=e385]
+            - StaticText "会议室"
+          - generic
+            - button "Collapse 工作" [expanded=true, ref=e386]
+            - StaticText "工作"
+          - link "任务" [ref=e387]
+            - StaticText "任务"
+          - link "项目" [ref=e388]
+            - StaticText "项目"
+          - link "例行任务" [ref=e389]
+            - StaticText "例行任务"
+          - link "产物" [ref=e390]
+            - StaticText "产物"
+          - link "Ontology" [ref=e391]
+            - StaticText "Ontology"
+          - link "架构治理" [ref=e392]
+            - StaticText "架构治理"
+          - generic
+            - button "Collapse 组织" [expanded=true, ref=e393]
+            - StaticText "组织"
+          - link "智能体" [ref=e394]
+            - StaticText "智能体"
+          - link "技能" [ref=e395]
+            - StaticText "技能"
+          - link "连接器" [ref=e396]
+            - StaticText "连接器"
+          - link "审计" [ref=e397]
+            - StaticText "审计"
+      - button "Open account menu" [expanded=false, ref=e311]
+        - StaticText "BO"
+        - StaticText "Board"
+      - link "Share feedback" [ref=e312]
+    - separator "Resize sidebar" [ref=e307] focusable [tabindex]: 240
+  - heading "ARTIFACTS" [level=1, ref=e306]
+  - main
+    - textbox "Search artifacts" [ref=e313]
+    - button "Filter artifacts by project (currently All projects)" [expanded=false, ref=e308]
+      - StaticText "All projects"
+    - button "Group artifacts (currently Task)" [expanded=false, ref=e309]
+    - tablist "Filter artifacts by type"
+      - tab "All" [selected, ref=e314]
+      - tab "Images" [ref=e315]
+      - tab "Videos" [ref=e316]
+      - tab "Documents" [ref=e317]
+      - tab "Text" [ref=e318]
+      - tab "Files" [ref=e319]
+    - link "COOA 160 — 老板直通工具池状态探测 ( probe tool status) 验证存证 Wave : wave286 (COOA 160) 日期 : 2026 10 13 CST 角色 : 铁匠 / core swe (forge core swe) · 工具 agy 仓库 : /Users/mac/workspace/xaicd/coolie · 分支 main 0. 老板原话与本波定性 老板原话 (微信直通) : probe tool status 问题真因 : 老板在微信直发该标志位, hermes boss intent disp... 2 COOA-160 【微信·老板·wave286】--probe-tool-status 2 artifacts · Updated Oct 14, 2026" [ref=e320]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "COOA 160 — 老板直通工具池状态探测 ( probe tool status) 验证存证 Wave : wave286 (COOA 160) 日期 : 2026 10 13 CST 角色 : 铁匠 / core swe (forge core swe) · 工具 agy 仓库 : /Users/mac/workspace/xaicd/coolie · 分支 main 0. 老板原话与本波定性 老板原话 (微信直通) : probe tool status 问题真因 : 老板在微信直发该标志位, hermes boss intent disp..."
+        - StaticText "2"
+      - StaticText "COOA-160"
+      - heading "【微信·老板·wave286】--probe-tool-status" [level=3, ref=e351]
+      - StaticText "2 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 14, 2026"
+    - link "COOA 144 Stage 5 Expo App i18n 真机验收 — 重复件复核与归档存证 工单: COOA 144 【微信·老板·wave286】派门神立即接手 COOA 134 Stage 5 Expo App 移动端 i18n 与 Web 端 zh CN/en 契约对齐，跑真机验收 员工: 兑底渊 (PRE SRE / 8a288a46 8598 4c68 b52e 545360e11929) 结论: 重复件 (duplicate) — 真实验收已由 COOA 131/132/133 三件套闭环，本件归档 done 1. Echo ·... 2 COOA-144 【微信·老板·wave286】派门神立即接手 COOA-134 Stage 5 Expo App 移动端 i18n 与 Web 端 zh-CN/en 契约对齐，跑真机验收 2 artifacts · Updated Oct 14, 2026" [ref=e321]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "COOA 144 Stage 5 Expo App i18n 真机验收 — 重复件复核与归档存证 工单: COOA 144 【微信·老板·wave286】派门神立即接手 COOA 134 Stage 5 Expo App 移动端 i18n 与 Web 端 zh CN/en 契约对齐，跑真机验收 员工: 兑底渊 (PRE SRE / 8a288a46 8598 4c68 b52e 545360e11929) 结论: 重复件 (duplicate) — 真实验收已由 COOA 131/132/133 三件套闭环，本件归档 done 1. Echo ·..."
+        - StaticText "2"
+      - StaticText "COOA-144"
+      - heading "【微信·老板·wave286】派门神立即接手 COOA-134 Stage 5 Expo App 移动端 i18n 与 Web 端 zh-CN/en 契约对齐，跑真机验收" [level=3, ref=e352]
+      - StaticText "2 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 14, 2026"
+    - link "FILE 1 COOA-145 【微信·老板·wave286】派兑底渊立即接手 COOA-135 服务端错误码 / 状态机 / 枚举 i18n 字典落地 1 artifact · Updated Oct 13, 2026" [ref=e322]
+      - generic
+        - StaticText "FILE"
+        - StaticText "1"
+      - StaticText "COOA-145"
+      - heading "【微信·老板·wave286】派兑底渊立即接手 COOA-135 服务端错误码 / 状态机 / 枚举 i18n 字典落地" [level=3, ref=e353]
+      - StaticText "1 artifact"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 13, 2026"
+    - link "COOA 143 · ACPX shouldSkipKeyRule 前缀匹配 (prefix match) 加固 来源: 📱 微信 (老板直接发话) — Hermes 派发 员工: 铁匠 (claude local) 梯次: L2 标准功能 · CMMI 门禁: Phase 4.1 编码 日期: 2026 10 13 1. 业务阻碍与交付 Outcome ACPX 会话持久化用 assertPersistedKeyPolicy 强制 蛇形命名 (snake case) 键校验。 acpx.session options.env 是任意环境变量名... 2 COOA-143 【微信·老板·wave286】派铁匠真修 patches/acpx@0.13.1.patch：用 prefix-match 改写 shouldSkipKeyRule 让 acpx.session_options.env 在任意 record 顶层前缀下都不做 snake_case key 校验。修完跑 packages/adapter-utils 下 vitest 全套验证，commit + push 2 artifacts · Updated Oct 13, 2026" [ref=e323]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "COOA 143 · ACPX shouldSkipKeyRule 前缀匹配 (prefix match) 加固 来源: 📱 微信 (老板直接发话) — Hermes 派发 员工: 铁匠 (claude local) 梯次: L2 标准功能 · CMMI 门禁: Phase 4.1 编码 日期: 2026 10 13 1. 业务阻碍与交付 Outcome ACPX 会话持久化用 assertPersistedKeyPolicy 强制 蛇形命名 (snake case) 键校验。 acpx.session options.env 是任意环境变量名..."
+        - StaticText "2"
+      - StaticText "COOA-143"
+      - heading "【微信·老板·wave286】派铁匠真修 patches/acpx@0.13.1.patch：用 prefix-match 改写 shouldSkipKeyRule 让 acpx.session_options.env 在任意 record 顶层前缀下都不做 snake_case key 校验。修完跑 packages/adapter-utils 下 vitest 全套验证，commit + push" [level=3, ref=e354]
+      - StaticText "2 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 13, 2026"
+    - link "set u + set o pipefail 下,create issue on dev 函数体内 local builtin 访问全局变量触发 unbound 报错,导致整个派工链路 100% 失败。本 fix 修通后,dry run 派墨斗整理 wiki 成功建出 COOA 121 工单。commit 7eb270ce9 1 COOA-116 [主线研发] Paperclip 上游功能全量国际化与本地化支持 (Full i18n & Localization) 1 artifact · Updated Oct 13, 2026" [ref=e324]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "set u + set o pipefail 下,create issue on dev 函数体内 local builtin 访问全局变量触发 unbound 报错,导致整个派工链路 100% 失败。本 fix 修通后,dry run 派墨斗整理 wiki 成功建出 COOA 121 工单。commit 7eb270ce9"
+        - StaticText "1"
+      - StaticText "COOA-116"
+      - heading "[主线研发] Paperclip 上游功能全量国际化与本地化支持 (Full i18n & Localization)" [level=3, ref=e355]
+      - StaticText "1 artifact"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 13, 2026"
+    - link "COOA 133 · Stage 5 Expo App i18n 语言包对齐 — 真机单测验收存证 验收人: 兑底渊 (agent 8a288a46 8598 4c68 b52e 545360e11929) 时间: 2026 10 13 (wave380) 派单来源: Hermes ← 📱 老板微信直通 分级: L2 标准功能 · CMMI 门禁 Phase 5.1 1. Echo · 核心业务阻碍与 Outcome 阻碍 : Expo 原生端与 Web 控制面的词库此前各自为政 —— Web 端 ui/src/i18n/locales 持续扩充... 2 COOA-133 【微信·老板·wave380】真机单测验收 Stage 5 Expo App i18n 语言包对齐 — 与 Web 端 zh-CN en 契约同步消除中英文混杂 2 artifacts · Updated Oct 13, 2026" [ref=e325]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "COOA 133 · Stage 5 Expo App i18n 语言包对齐 — 真机单测验收存证 验收人: 兑底渊 (agent 8a288a46 8598 4c68 b52e 545360e11929) 时间: 2026 10 13 (wave380) 派单来源: Hermes ← 📱 老板微信直通 分级: L2 标准功能 · CMMI 门禁 Phase 5.1 1. Echo · 核心业务阻碍与 Outcome 阻碍 : Expo 原生端与 Web 控制面的词库此前各自为政 —— Web 端 ui/src/i18n/locales 持续扩充..."
+        - StaticText "2"
+      - StaticText "COOA-133"
+      - heading "【微信·老板·wave380】真机单测验收 Stage 5 Expo App i18n 语言包对齐 — 与 Web 端 zh-CN en 契约同步消除中英文混杂" [level=3, ref=e356]
+      - StaticText "2 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 13, 2026"
+    - link "COOA-132 真机走查 · 390x844 移动视口 4 COOA-132 【微信·老板·wave380】验收金标: Stage 5 Expo App 移动端 i18n 与 Web 端 zh-CN/en 契约对齐 — 跑真机走查消除中英文混杂 4 artifacts · Updated Oct 13, 2026" [ref=e326]
+      - generic
+        - image "COOA-132 真机走查 · 390x844 移动视口"
+        - StaticText "4"
+      - StaticText "COOA-132"
+      - heading "【微信·老板·wave380】验收金标: Stage 5 Expo App 移动端 i18n 与 Web 端 zh-CN/en 契约对齐 — 跑真机走查消除中英文混杂" [level=3, ref=e357]
+      - StaticText "4 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 13, 2026"
+    - link "COOA 129 · wave380 smoke test 存证 工单 : 【微信·老板·wave380】smoke test 派工是否正常 验收目标 : 验证「派工链路 + adapter 三件套修复」是否打通 结论 : ✅ 全部通过 (派工链路 100% 健康, adapter 三件套修复生效) 时间 : 2026 10 13 1. 派工链路健康 (dispatch chain) 本工单由 Hermes 从老板微信/终端直通派发, 命中 issue assigned 唤醒。 铁匠 (agent 02cab729 ...336a) 唤醒 → ch... 2 COOA-129 【微信·老板·wave380】smoke test 派工是否正常 2 artifacts · Updated Oct 13, 2026" [ref=e327]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "COOA 129 · wave380 smoke test 存证 工单 : 【微信·老板·wave380】smoke test 派工是否正常 验收目标 : 验证「派工链路 + adapter 三件套修复」是否打通 结论 : ✅ 全部通过 (派工链路 100% 健康, adapter 三件套修复生效) 时间 : 2026 10 13 1. 派工链路健康 (dispatch chain) 本工单由 Hermes 从老板微信/终端直通派发, 命中 issue assigned 唤醒。 铁匠 (agent 02cab729 ...336a) 唤醒 → ch..."
+        - StaticText "2"
+      - StaticText "COOA-129"
+      - heading "【微信·老板·wave380】smoke test 派工是否正常" [level=3, ref=e358]
+      - StaticText "2 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 13, 2026"
+    - link "COOA 115 Routine 心跳 1 落盘的 SOP 脚本: 规范化更新 COOA 114 主线长任务与 COOA 116 Full i18n 子工单描述。 1 COOA-115 Coolie 工坊持续研发与版本升级守护调度器 (Foundry Evolution Routine) 1 artifact · Updated Oct 13, 2026" [ref=e328]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "COOA 115 Routine 心跳 1 落盘的 SOP 脚本: 规范化更新 COOA 114 主线长任务与 COOA 116 Full i18n 子工单描述。"
+        - StaticText "1"
+      - StaticText "COOA-115"
+      - heading "Coolie 工坊持续研发与版本升级守护调度器 (Foundry Evolution Routine)" [level=3, ref=e359]
+      - StaticText "1 artifact"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 13, 2026"
+    - link "COOA 110 · 运营对账平账 · DS 业务主审核验报告 工单 : COOA 110 【微信·老板·wave286】运营对账平账看下 责任数字员工 : 百晓生 (Sage · DS · 用户视角主审官 / G7 运营负责人) 审查对象 : CMMI 09 operations (G7 持续商业运营) 三方对账与资金轧差平账能力 权威 SOP : docs/09 operations/tenant governance.md §四 持续对账与资金平账台账 驱动 Skill : .agents/skills/financial reconcili... 2 COOA-110 【微信·老板·wave286】运营对账平账看下 2 artifacts · Updated Oct 11, 2026" [ref=e329]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "COOA 110 · 运营对账平账 · DS 业务主审核验报告 工单 : COOA 110 【微信·老板·wave286】运营对账平账看下 责任数字员工 : 百晓生 (Sage · DS · 用户视角主审官 / G7 运营负责人) 审查对象 : CMMI 09 operations (G7 持续商业运营) 三方对账与资金轧差平账能力 权威 SOP : docs/09 operations/tenant governance.md §四 持续对账与资金平账台账 驱动 Skill : .agents/skills/financial reconcili..."
+        - StaticText "2"
+      - StaticText "COOA-110"
+      - heading "【微信·老板·wave286】运营对账平账看下" [level=3, ref=e360]
+      - StaticText "2 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 11, 2026"
+    - link "收件箱-复原态(未读0) 6 COOA-109 【微信·老板·wave286】测试一下已读未读 6 artifacts · Updated Oct 11, 2026" [ref=e330]
+      - generic
+        - image "收件箱-复原态(未读0)"
+        - StaticText "6"
+      - StaticText "COOA-109"
+      - heading "【微信·老板·wave286】测试一下已读未读" [level=3, ref=e361]
+      - StaticText "6 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 11, 2026"
+    - link "COOA 108 · CAPA 实施与闭环报告 控制面执行锁生命周期治理 + 适配器执行边界韧性 所属系统 : 社区生活服务商用中台 · 项目 2288f08d 349d 46b0 abf4 5d4d7502f79a 上游审计 : [CMMI·审计] SPC 统计过程控制与缺陷预防 (CAR 5 Whys) · b9faf330 5ac4 4988 94e7 6b1f3e4da152 实施工单 : COOA 108 · owner 铁匠 (core swe) 实施日期 : 2026 10 11 保留红线 : 「无工件即未完工」 · 「无真实运行验证... 2 COOA-108 CAPA 实施: 控制面执行锁生命周期治理 + 适配器执行边界韧性 (源自 SPC/CAR 审计) 2 artifacts · Updated Oct 11, 2026" [ref=e331]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "COOA 108 · CAPA 实施与闭环报告 控制面执行锁生命周期治理 + 适配器执行边界韧性 所属系统 : 社区生活服务商用中台 · 项目 2288f08d 349d 46b0 abf4 5d4d7502f79a 上游审计 : [CMMI·审计] SPC 统计过程控制与缺陷预防 (CAR 5 Whys) · b9faf330 5ac4 4988 94e7 6b1f3e4da152 实施工单 : COOA 108 · owner 铁匠 (core swe) 实施日期 : 2026 10 11 保留红线 : 「无工件即未完工」 · 「无真实运行验证..."
+        - StaticText "2"
+      - StaticText "COOA-108"
+      - heading "CAPA 实施: 控制面执行锁生命周期治理 + 适配器执行边界韧性 (源自 SPC/CAR 审计)" [level=3, ref=e362]
+      - StaticText "2 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 11, 2026"
+    - link "图 B · 每日运行缺陷比例 p 控制图 4 b9faf330-5ac4-4988-94e7-6b1f3e4da152 [CMMI·审计] SPC 统计过程控制与缺陷预防 (CAR 5-Whys) 4 artifacts · Updated Oct 11, 2026" [ref=e332]
+      - generic
+        - image "图 B · 每日运行缺陷比例 p 控制图"
+        - StaticText "4"
+      - StaticText "b9faf330-5ac4-4988-94e7-6b1f3e4da152"
+      - heading "[CMMI·审计] SPC 统计过程控制与缺陷预防 (CAR 5-Whys)" [level=3, ref=e363]
+      - StaticText "4 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 11, 2026"
+    - link "TEXT 6 8608ba27-5a6c-4587-b80e-3d9b85ca477b [G5·投产] 不可变制品指纹、部署与秒级回滚 SOP 6 artifacts · Updated Oct 11, 2026" [ref=e333]
+      - generic
+        - StaticText "TEXT"
+        - StaticText "6"
+      - StaticText "8608ba27-5a6c-4587-b80e-3d9b85ca477b"
+      - heading "[G5·投产] 不可变制品指纹、部署与秒级回滚 SOP" [level=3, ref=e364]
+      - StaticText "6 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 11, 2026"
+    - link "社区生活服务商用中台 · CMMI G4 四态真机测试与集成验收报告 (Test Report) 所属业务系统 : 社区生活服务商用中台 (Community Life Service Commercial Hub) 系统代码 : COOA 101 / SYS COMMUNITY LIFE 归属门禁 : CMMI G4 全栈验收 (gate g4 eval) 测试标准 : ISO/IEC/IEEE 29119:2022 + CMMI V2.0 VER/VAL 责任工程师 : Hermes (PM 掌柜 / FDSE 评审) · 铁匠 (G3 实施交... 2 COOA-106 [G4-Supplemental] Hermes 真机四态验收报告 (Virtual Co-Pilot Verifier) 2 artifacts · Updated Oct 11, 2026" [ref=e334]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "社区生活服务商用中台 · CMMI G4 四态真机测试与集成验收报告 (Test Report) 所属业务系统 : 社区生活服务商用中台 (Community Life Service Commercial Hub) 系统代码 : COOA 101 / SYS COMMUNITY LIFE 归属门禁 : CMMI G4 全栈验收 (gate g4 eval) 测试标准 : ISO/IEC/IEEE 29119:2022 + CMMI V2.0 VER/VAL 责任工程师 : Hermes (PM 掌柜 / FDSE 评审) · 铁匠 (G3 实施交..."
+        - StaticText "2"
+      - StaticText "COOA-106"
+      - heading "[G4-Supplemental] Hermes 真机四态验收报告 (Virtual Co-Pilot Verifier)" [level=3, ref=e365]
+      - StaticText "2 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 11, 2026"
+    - link "社区生活服务商用中台 · 领域 Facade 单向依赖与防腐边界详细设计说明书 系统代码 : CS ARCH FACADE 001 · 版本: v1.0 (基线版) 责任架构师 : 墨斗 (Inkstick · modou fda · 前线架构师 FDA) 归属门禁 : CMMI G3 PRE 详细设计与静态契约门禁 (gate g3 contract) 技术基座 : Yudao Cloud (Spring Boot 3.5 + Spring Cloud Alibaba 2025 + MyBatis Plus) 映射工程物理路径 : docs/03... 2 de674d5f-9421-4a9a-8dc7-e5dabdbe4817 [G3-PRE·契约] 详细设计说明书与接口契约 (LLD + ERD) 2 artifacts · Updated Oct 11, 2026" [ref=e335]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "社区生活服务商用中台 · 领域 Facade 单向依赖与防腐边界详细设计说明书 系统代码 : CS ARCH FACADE 001 · 版本: v1.0 (基线版) 责任架构师 : 墨斗 (Inkstick · modou fda · 前线架构师 FDA) 归属门禁 : CMMI G3 PRE 详细设计与静态契约门禁 (gate g3 contract) 技术基座 : Yudao Cloud (Spring Boot 3.5 + Spring Cloud Alibaba 2025 + MyBatis Plus) 映射工程物理路径 : docs/03..."
+        - StaticText "2"
+      - StaticText "de674d5f-9421-4a9a-8dc7-e5dabdbe4817"
+      - heading "[G3-PRE·契约] 详细设计说明书与接口契约 (LLD + ERD)" [level=3, ref=e366]
+      - StaticText "2 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 11, 2026"
+    - link "COOA 99 编码实现 · 社区生活服务商用中台 构建环节: impl (3/5) · 负责类型: dev / 研发 基线: yudao cloud trimmed (5 底座 + gateway/server/framework) + 3 自研业务模块 交付范围 模块 承载实体 状态 yudao module house OBJ 03 房东资质 / OBJ 04 房源 / OBJ 05 看房预约 修复至可编译 yudao module housekeeping OBJ 06 服务商 / OBJ 07 服务项目 / OBJ 08 家政订单 / O... 3 COOA-99 编码实现: 社区生活服务商用中台 3 artifacts · Updated Oct 11, 2026" [ref=e336]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "COOA 99 编码实现 · 社区生活服务商用中台 构建环节: impl (3/5) · 负责类型: dev / 研发 基线: yudao cloud trimmed (5 底座 + gateway/server/framework) + 3 自研业务模块 交付范围 模块 承载实体 状态 yudao module house OBJ 03 房东资质 / OBJ 04 房源 / OBJ 05 看房预约 修复至可编译 yudao module housekeeping OBJ 06 服务商 / OBJ 07 服务项目 / OBJ 08 家政订单 / O..."
+        - StaticText "3"
+      - StaticText "COOA-99"
+      - heading "编码实现: 社区生活服务商用中台" [level=3, ref=e367]
+      - StaticText "3 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 11, 2026"
+    - link "CMMI DAR 技术选型加权决策分析报告 (DAR 003) 项目名称 : 社区生活服务商用中台 (Community Life Service Commercial Hub) CMMI 过程域 : Decision Analysis and Resolution (DAR, 决策分析与解决) / Risk Management (RSKM, 风险管理) 门禁归属 : G2 架构设计门禁 (gate g2 arch) 责任架构师 : 墨斗 (Inkstick · modou fda · 前线架构师 FDA) 决策依据 : 老板在 COOA 97... 6 COOA-98 方案设计: 社区生活服务商用中台 6 artifacts · Updated Oct 10, 2026" [ref=e337]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "CMMI DAR 技术选型加权决策分析报告 (DAR 003) 项目名称 : 社区生活服务商用中台 (Community Life Service Commercial Hub) CMMI 过程域 : Decision Analysis and Resolution (DAR, 决策分析与解决) / Risk Management (RSKM, 风险管理) 门禁归属 : G2 架构设计门禁 (gate g2 arch) 责任架构师 : 墨斗 (Inkstick · modou fda · 前线架构师 FDA) 决策依据 : 老板在 COOA 97..."
+        - StaticText "6"
+      - StaticText "COOA-98"
+      - heading "方案设计: 社区生活服务商用中台" [level=3, ref=e368]
+      - StaticText "6 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 10, 2026"
+    - link "领域 Facade 单向依赖规范 (Domain Facade Unidirectional Dependency) 字段 值 WBS 编码 3.2 CMMI 阶段 03 — Detailed Design 文档版本 1.0 配套契约 docs/03 design/interface contracts/api definitions.md, docs/03 design/erd/database erd.md 架构范式 DDD + Clean Architecture + Hexagonal (Ports & Adapters) 状态 Draft... 6 b729b2ff-4838-40a9-b7bd-87be1d3499e7 [G3-PRE·契约] 详细设计说明书与接口契约 (LLD + ERD) 6 artifacts · Updated Oct 10, 2026" [ref=e338]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "领域 Facade 单向依赖规范 (Domain Facade Unidirectional Dependency) 字段 值 WBS 编码 3.2 CMMI 阶段 03 — Detailed Design 文档版本 1.0 配套契约 docs/03 design/interface contracts/api definitions.md, docs/03 design/erd/database erd.md 架构范式 DDD + Clean Architecture + Hexagonal (Ports & Adapters) 状态 Draft..."
+        - StaticText "6"
+      - StaticText "b729b2ff-4838-40a9-b7bd-87be1d3499e7"
+      - heading "[G3-PRE·契约] 详细设计说明书与接口契约 (LLD + ERD)" [level=3, ref=e369]
+      - StaticText "6 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 10, 2026"
+    - link "COOA 97 · 社区生活服务商用中台 · 软件需求规格说明书 (SRS v1.1 · 老板拍板版) 报告人: Hermes (PM 掌柜 / 业务战略总控) 报告日期: 2026 10 10(初版 v1.0)/ 2026 10 10 v1.1 老板拍板修订 适用于: 某单位社区生活服务平台采购项目(询比采购,第二次) 阶段归属: COOA 97 requirements (1/5) — 需求梳理环节 上游上下文: 墨斗 wave368《60/90天交付估算与架构全维度严肃评审报告》(doc/plans/2026 10 10 wave368 co... 5 COOA-97 需求梳理: 社区生活服务商用中台 5 artifacts · Updated Oct 10, 2026" [ref=e339]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "COOA 97 · 社区生活服务商用中台 · 软件需求规格说明书 (SRS v1.1 · 老板拍板版) 报告人: Hermes (PM 掌柜 / 业务战略总控) 报告日期: 2026 10 10(初版 v1.0)/ 2026 10 10 v1.1 老板拍板修订 适用于: 某单位社区生活服务平台采购项目(询比采购,第二次) 阶段归属: COOA 97 requirements (1/5) — 需求梳理环节 上游上下文: 墨斗 wave368《60/90天交付估算与架构全维度严肃评审报告》(doc/plans/2026 10 10 wave368 co..."
+        - StaticText "5"
+      - StaticText "COOA-97"
+      - heading "需求梳理: 社区生活服务商用中台" [level=3, ref=e370]
+      - StaticText "5 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 10, 2026"
+    - link "概要架构设计说明书（HLD） CMMI G2·架构门禁法定交付物 项目：真实流水线因果递进项目 ｜ WBS：3.1 ｜ 阶段：03 Design 文档版本：v1.0 ｜ 状态：Ready for Gate Review 编制：铁匠 (claude local) ｜ 审批门：G2 Architecture 0. 文档元信息 字段 值 文档编号 DOC HLD 3.1 001 关联 WBS 3.1 (G2·架构) 关联 WBS 子项 3.1.1 领域建模、3.1.2 多租户隔离、3.1.3 选型决策、3.1.4 决策记录 适用阶段 CMMI Level... 2 b5194eb3-afc2-4c7a-8d18-9d0cccc342e4 [G2·架构] 概要架构设计与选型 (HLD + DAR) 2 artifacts · Updated Oct 10, 2026" [ref=e340]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "概要架构设计说明书（HLD） CMMI G2·架构门禁法定交付物 项目：真实流水线因果递进项目 ｜ WBS：3.1 ｜ 阶段：03 Design 文档版本：v1.0 ｜ 状态：Ready for Gate Review 编制：铁匠 (claude local) ｜ 审批门：G2 Architecture 0. 文档元信息 字段 值 文档编号 DOC HLD 3.1 001 关联 WBS 3.1 (G2·架构) 关联 WBS 子项 3.1.1 领域建模、3.1.2 多租户隔离、3.1.3 选型决策、3.1.4 决策记录 适用阶段 CMMI Level..."
+        - StaticText "2"
+      - StaticText "b5194eb3-afc2-4c7a-8d18-9d0cccc342e4"
+      - heading "[G2·架构] 概要架构设计与选型 (HLD + DAR)" [level=3, ref=e371]
+      - StaticText "2 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 10, 2026"
+    - link "社区生活服务商用中台 · 需求规格说明书 (SRS) Issue: COOA 91 · 构建: COOA 90 (1/5 requirements) · 阶段: requirements · 负责: PM/产品 (Hermes) · 评审态: 待老板冻结 版本: v0.9 草稿 · 日期: 2026 10 10 · 配套 EARS 验收: §10 0. 文档控制 字段 值 文档标识 SRS CLS 2026 10 10 v0.9 业务领域 社区生活服务（家政 / 维修 / 团购 / 跑腿 / 便民增值） 上游构建 COOA 90 构建: 社区生活服... 3 COOA-91 社区生活服务商用中台需求规格说明书 3 artifacts · Updated Oct 10, 2026" [ref=e341]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "社区生活服务商用中台 · 需求规格说明书 (SRS) Issue: COOA 91 · 构建: COOA 90 (1/5 requirements) · 阶段: requirements · 负责: PM/产品 (Hermes) · 评审态: 待老板冻结 版本: v0.9 草稿 · 日期: 2026 10 10 · 配套 EARS 验收: §10 0. 文档控制 字段 值 文档标识 SRS CLS 2026 10 10 v0.9 业务领域 社区生活服务（家政 / 维修 / 团购 / 跑腿 / 便民增值） 上游构建 COOA 90 构建: 社区生活服..."
+        - StaticText "3"
+      - StaticText "COOA-91"
+      - heading "社区生活服务商用中台需求规格说明书" [level=3, ref=e372]
+      - StaticText "3 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 10, 2026"
+    - link "[G1·需求] 智能客服微服务系统 SRS 需求规格说明书 + RTM 追踪矩阵 执行计划 1. 计划目标 依据立项基线 (COOA 61) 及老板原话，由墨斗 (FDA / Requirements Capture) 牵头制定《智能客服微服务系统 软件需求规格说明书 (SRS)》及双向跟踪矩阵 (RTM)，作为后续 G2 架构定界与 G3 核心编码的唯一需求基线。 2. 交付里程碑与门禁状态 门禁里程碑 责任角色 交付成果 验收状态 G1 需求门禁 (本工单) 墨斗 (@modou) SRS 规格说明书 (42条 EARS 句式) + RTM 跟... 5 COOA-62 [G1·需求] 智能客服微服务系统 SRS 需求规格说明书 + RTM 追踪矩阵 5 artifacts · Updated Oct 10, 2026" [ref=e342]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "[G1·需求] 智能客服微服务系统 SRS 需求规格说明书 + RTM 追踪矩阵 执行计划 1. 计划目标 依据立项基线 (COOA 61) 及老板原话，由墨斗 (FDA / Requirements Capture) 牵头制定《智能客服微服务系统 软件需求规格说明书 (SRS)》及双向跟踪矩阵 (RTM)，作为后续 G2 架构定界与 G3 核心编码的唯一需求基线。 2. 交付里程碑与门禁状态 门禁里程碑 责任角色 交付成果 验收状态 G1 需求门禁 (本工单) 墨斗 (@modou) SRS 规格说明书 (42条 EARS 句式) + RTM 跟..."
+        - StaticText "5"
+      - StaticText "COOA-62"
+      - heading "[G1·需求] 智能客服微服务系统 SRS 需求规格说明书 + RTM 追踪矩阵" [level=3, ref=e373]
+      - StaticText "5 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 10, 2026"
+    - link "Inverse sweep 审计 — server 注册但零客户端调用的路由 (2026 10 04) 方向 : 前几轮审计都是 client→server (客户端调的都活着)。本轮反向: server 注册的 933 条路由里, 哪些 没有任何客户端调用 — 即「建成但不可达」的产品面 (InboxScreen 型孤儿的服务端镜像)。 复跑方式: python3 docs coolie/audits/inverse sweep.py (纯静态, 无需起服务)。 客户端面 (6) : api client SDK / ui (web, 含 ui/... 2 COOA-4 【Dogfooding】本地团队真实工单驱动平台成熟度闭环 2 artifacts · Updated Oct 10, 2026" [ref=e343]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "Inverse sweep 审计 — server 注册但零客户端调用的路由 (2026 10 04) 方向 : 前几轮审计都是 client→server (客户端调的都活着)。本轮反向: server 注册的 933 条路由里, 哪些 没有任何客户端调用 — 即「建成但不可达」的产品面 (InboxScreen 型孤儿的服务端镜像)。 复跑方式: python3 docs coolie/audits/inverse sweep.py (纯静态, 无需起服务)。 客户端面 (6) : api client SDK / ui (web, 含 ui/..."
+        - StaticText "2"
+      - StaticText "COOA-4"
+      - heading "【Dogfooding】本地团队真实工单驱动平台成熟度闭环" [level=3, ref=e374]
+      - StaticText "2 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 10, 2026"
+    - link "wave366 产融供应链 (SCF) 前线架构模型说明书：包含 Echo 业务价值定义、Palantir Living Ontology 四大核心业务实体与四大闭环业务动词状态机、Palantir Delta 四层物理隔离与数据边界、CMMI DAR 加权决策研判、80/95/99 生产级工程防退化设计与 Bob McGrew 投入衰减度量承诺。 1 COOA-80 [wave366] 设计产融供应链前线架构模型 1 artifact · Updated Oct 9, 2026" [ref=e344]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "wave366 产融供应链 (SCF) 前线架构模型说明书：包含 Echo 业务价值定义、Palantir Living Ontology 四大核心业务实体与四大闭环业务动词状态机、Palantir Delta 四层物理隔离与数据边界、CMMI DAR 加权决策研判、80/95/99 生产级工程防退化设计与 Bob McGrew 投入衰减度量承诺。"
+        - StaticText "1"
+      - StaticText "COOA-80"
+      - heading "[wave366] 设计产融供应链前线架构模型" [level=3, ref=e375]
+      - StaticText "1 artifact"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 9, 2026"
+    - link "evidence/delta verify.log: 4 服务启动 + 6 curl 用例 (chat knowledge hit / chat refund escalate / chat escalate human / chat cold fallback / ticket create / healthz) 真实 HTTP 输出 6 COOA-76 [wave358] 立项一个智能客服微服务系统 6 artifacts · Updated Oct 8, 2026" [ref=e345]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "evidence/delta verify.log: 4 服务启动 + 6 curl 用例 (chat knowledge hit / chat refund escalate / chat escalate human / chat cold fallback / ticket create / healthz) 真实 HTTP 输出"
+        - StaticText "6"
+      - StaticText "COOA-76"
+      - heading "[wave358] 立项一个智能客服微服务系统" [level=3, ref=e376]
+      - StaticText "6 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 8, 2026"
+    - link "生产构建 next start 下 curl /api/board/chat/stream 原始 SSE：178 个 stream.delta、proposal.attached 真实意图转译提案、stream.done 收束 4 COOA-73 [G3·契约与实现] 工坊双端组件对齐、提案卡片落地与 0 编译报错守卫 (LLD) 4 artifacts · Updated Oct 8, 2026" [ref=e346]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "生产构建 next start 下 curl /api/board/chat/stream 原始 SSE：178 个 stream.delta、proposal.attached 真实意图转译提案、stream.done 收束"
+        - StaticText "4"
+      - StaticText "COOA-73"
+      - heading "[G3·契约与实现] 工坊双端组件对齐、提案卡片落地与 0 编译报错守卫 (LLD)" [level=3, ref=e377]
+      - StaticText "4 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 8, 2026"
+    - link "FILE 3 COOA-61 [wave358] 帮我立项一个智能客服微服务系统 3 artifacts · Updated Oct 8, 2026" [ref=e347]
+      - generic
+        - StaticText "FILE"
+        - StaticText "3"
+      - StaticText "COOA-61"
+      - heading "[wave358] 帮我立项一个智能客服微服务系统" [level=3, ref=e378]
+      - StaticText "3 artifacts"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 8, 2026"
+    - link "G5 业务终审 — 交付计划 验收标准 1. 需求说明书 §1 四件事逐项走查通过：智能问答优先/人工坐席兜底/工单闭环/数据看板。 2. 高管 Outcome 四指标（机器人解决率/人工接管率/首答时长/工单关闭率）在真实环境可见可读，截图存证。 3. 终审报告（含未达项与整改建议）落档为本工单附件/work product。 里程碑 2026 11 19（项目 targetDate，proposed，老板确认后可调）。 交付风险 灰度期指标波动：终审口径区分灰度数据与稳态数据。 单一句话需求的理解偏差：以需求说明书 v1 + G1 定界双基线为准绳。 1 COOA-66 [智能客服][G5 业务终审] 业务验收与 Outcome 走查 1 artifact · Updated Oct 8, 2026" [ref=e348]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "G5 业务终审 — 交付计划 验收标准 1. 需求说明书 §1 四件事逐项走查通过：智能问答优先/人工坐席兜底/工单闭环/数据看板。 2. 高管 Outcome 四指标（机器人解决率/人工接管率/首答时长/工单关闭率）在真实环境可见可读，截图存证。 3. 终审报告（含未达项与整改建议）落档为本工单附件/work product。 里程碑 2026 11 19（项目 targetDate，proposed，老板确认后可调）。 交付风险 灰度期指标波动：终审口径区分灰度数据与稳态数据。 单一句话需求的理解偏差：以需求说明书 v1 + G1 定界双基线为准绳。"
+        - StaticText "1"
+      - StaticText "COOA-66"
+      - heading "[智能客服][G5 业务终审] 业务验收与 Outcome 走查" [level=3, ref=e379]
+      - StaticText "1 artifact"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 8, 2026"
+    - link "G4 发布核验 — 交付计划 验收标准 1. 六服务部署启动核验：启动命令与结果存证。 2. 端到端真实链路跑通并留真机快照：Web 组件发起会话 → 机器人应答 → 升级人工接管 → 工单闭环 → 看板数据可见。 3. 防退化守卫固化：CI 检查 + 关键回归测试入库，守卫命令 0 报错。 4. 核验报告与快照以本工单附件/work product 落档。 里程碑 2026 11 15 前完成（前置：G3 COOA 64 完成）。 交付风险 环境配置周期不可控：提前冻结部署清单。 真实链路依赖外部模型服务：准备降级桩以保链路可验证。 1 COOA-65 [智能客服][G4 发布核验] 部署验证与防退化守卫 1 artifact · Updated Oct 8, 2026" [ref=e349]
+      - generic
+        - generic
+          - paragraph
+            - StaticText "G4 发布核验 — 交付计划 验收标准 1. 六服务部署启动核验：启动命令与结果存证。 2. 端到端真实链路跑通并留真机快照：Web 组件发起会话 → 机器人应答 → 升级人工接管 → 工单闭环 → 看板数据可见。 3. 防退化守卫固化：CI 检查 + 关键回归测试入库，守卫命令 0 报错。 4. 核验报告与快照以本工单附件/work product 落档。 里程碑 2026 11 15 前完成（前置：G3 COOA 64 完成）。 交付风险 环境配置周期不可控：提前冻结部署清单。 真实链路依赖外部模型服务：准备降级桩以保链路可验证。"
+        - StaticText "1"
+      - StaticText "COOA-65"
+      - heading "[智能客服][G4 发布核验] 部署验证与防退化守卫" [level=3, ref=e380]
+      - StaticText "1 artifact"
+      - StaticText "·"
+      - StaticText "Updated "
+      - StaticText "Oct 8, 2026"
+  - generic
+    - heading "Command Palette" [level=2, ref=e310]
+    - paragraph
+      - StaticText "Search for a command to run..."

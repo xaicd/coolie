@@ -1,0 +1,201 @@
+- generic [ref=e1571] clickable [onclick]
+  - link "Skip to Main Content" [ref=e1572]
+  - StaticText "RESTART REQUIRED"
+  - paragraph
+    - StaticText "backend files changed since this server booted · updated just now"
+  - StaticText "Changed: "
+  - StaticText "server/${PAPERCLIP_SCRATCH_DIR:-/tmp}/r15-comment.md, server/src/services/heartbeat-run-idle-heartbeat.ts, server/src/services/heartbeat.ts"
+  - StaticText "Restart "
+  - code
+    - StaticText "pnpm dev:once"
+  - StaticText " after the active work is safe to interrupt"
+  - button "Restart now" [ref=e1573]
+    - StaticText "Restart now"
+  - generic
+    - generic
+      - complementary
+        - button "Open Coolie 本地施工总社 organization switcher" [expanded=false, ref=e1582]
+          - StaticText "C"
+          - StaticText "Coolie 本地施工总社"
+        - navigation
+          - button "新建任务" [ref=e1600]
+            - StaticText "新建任务"
+          - link "搜索" [ref=e1601]
+            - StaticText "搜索"
+          - link "仪表盘 4 live" [ref=e1602]
+            - StaticText "仪表盘"
+            - StaticText "4"
+            - StaticText " live"
+          - link "收件箱 10" [ref=e1603]
+            - StaticText "收件箱"
+            - StaticText "10"
+          - link "会议室" [ref=e1604]
+            - StaticText "会议室"
+          - generic
+            - button "Collapse 工作" [expanded=true, ref=e1608]
+            - StaticText "工作"
+          - link "任务" [ref=e1609]
+            - StaticText "任务"
+          - link "项目" [ref=e1610]
+            - StaticText "项目"
+          - link "例行任务" [ref=e1611]
+            - StaticText "例行任务"
+          - link "产物" [ref=e1612]
+            - StaticText "产物"
+          - link "Ontology" [ref=e1613]
+            - StaticText "Ontology"
+          - link "架构治理" [ref=e1614]
+            - StaticText "架构治理"
+          - generic
+            - button "Collapse 组织" [expanded=true, ref=e1615]
+            - StaticText "组织"
+          - link "智能体" [ref=e1616]
+            - StaticText "智能体"
+          - link "技能" [ref=e1617]
+            - StaticText "技能"
+          - link "连接器" [ref=e1618]
+            - StaticText "连接器"
+          - link "审计" [ref=e1619]
+            - StaticText "审计"
+          - StaticText "RECENT TASKS"
+          - generic
+            - link "[主线研发] 商业交付全流程拟真对抗走查与 CMMI 终验核销闭环 1 live" [ref=e1620]
+              - StaticText "[主线研发] 商业交付全流程拟真对抗走查与 CMMI 终验核销闭环"
+              - StaticText "1"
+              - StaticText " live"
+            - button "More actions for [主线研发] 商业交付全流程拟真对抗走查与 CMMI 终验核销闭环" [expanded=false, ref=e1621]
+      - button "Open account menu" [expanded=false, ref=e1580]
+        - StaticText "BO"
+        - StaticText "Board"
+      - link "Share feedback" [ref=e1581]
+    - separator "Resize sidebar" [ref=e1574] focusable [tabindex]: 240
+  - generic
+    - navigation "breadcrumb" [ref=e1575]
+      - list
+        - listitem [level=1]
+          - link "TASKS" [ref=e1605]
+        - listitem [level=1]
+          - link "In Progress [主线研发] 商业交付全流程拟真对抗走查与 CMMI 终验核销闭环 COOA-138" [disabled, ref=e1606]
+            - image "In Progress"
+            - StaticText "[主线研发] 商业交付全流程拟真对抗走查与 CMMI 终验核销闭环"
+            - StaticText "COOA-138"
+    - button "Hide properties" [ref=e1576]
+  - main
+    - tabpanel [ref=e1577] focusable [tabindex]
+      - generic
+        - button "Change status (current: In Progress)" [expanded=false, ref=e1629]
+          - image "In Progress"
+        - heading "[主线研发] 商业交付全流程拟真对抗走查与 CMMI 终验核销闭环" [level=2, ref=e1627] clickable [cursor:pointer, onclick]
+        - StaticText "COOA-138"
+        - StaticText "Live"
+        - link "Coolie 工坊 AI 原生交付工厂本体系统" [ref=e1628]
+          - StaticText "Coolie 工坊 AI 原生交付工厂本体系统"
+        - generic "Task people"
+          - generic "Assignee: 百晓生" [ref=e1630] clickable [onclick]
+          - generic "Originating: Board" [ref=e1631] clickable [onclick]
+            - StaticText "BO"
+        - button "More task actions" [expanded=false, ref=e1632]
+      - paragraph
+        - StaticText "主线 D 商业闭环专项：百晓生 (DS) 模拟企业客户真实场景端到端拟真走查 (持有一票否决权)、变异测试打假与杀灭假 Mock、G1~G5 阶段物理资产挂载守卫与客户终验核销单自动生成。"
+      - StaticText "20:35"
+      - paragraph
+        - StaticText "【掌柜指令 · 激活主线验收】激活 "
+        - link "Issue COOA-138: [主线研发] 商业交付全流程拟真对抗走查与 CMMI 终验核销闭环" [expanded=false, ref=e1633]
+          - image "In Progress"
+          - StaticText "COOA-138"
+        - StaticText " 全流程拟真对抗走查：指派百晓生 (DS) 进场，负责全业务旅程拟真对抗走查与 CMMI 终验核销闭环，做完必须生成活体本体对象并挂载不可变证据！"
+      - StaticText "21:32"
+      - StaticText "Working"
+      - StaticText "for 9 minutes"
+      - StaticText "Waiting for transcript..."
+      - generic
+        - textbox "editable markdown" [ref=e1634]: 
+
+          - paragraph
+            - LineBreak "\n"
+        - paragraph
+          - StaticText "给 百晓生 派发任务，输入 @ 提及员工…"
+      - button "添加附件" [ref=e1622]
+      - button "自动" [expanded=false, ref=e1623]
+      - button "百晓生" [expanded=false, ref=e1624]
+        - StaticText "百晓生"
+      - button "停止" [ref=e1625]
+  - complementary
+    - separator "Resize panel"
+    - region "Side panel" [ref=e1578]
+      - sectionheader
+        - generic [ref=e1583] clickable [onclick]
+          - tablist
+            - generic
+              - tab "Properties" [selected, ref=e1635]
+                - StaticText "Properties"
+              - button "Close Properties" [ref=e1636]
+            - generic
+              - tab "Tasks" [ref=e1637]
+                - StaticText "Tasks"
+              - button "Close Tasks" [ref=e1638]
+            - status
+          - button "Open a new tab" [expanded=false, ref=e1626]
+        - button "Maximize side panel" [ref=e1584]
+        - button "Close side panel" [ref=e1585]
+      - tabpanel "Properties"
+        - StaticText "WORK"
+        - StaticText "Status"
+        - button "Change status (current: In Progress)" [expanded=false, ref=e1586]
+          - image "In Progress"
+          - StaticText "In Progress"
+        - StaticText "Assignee"
+        - button "Assignee: None" [expanded=false, ref=e1587]
+          - StaticText "百晓生"
+        - link [ref=e1588]
+        - StaticText "Project"
+        - button "Project: Coolie 工坊 AI 原生交付工厂本体系统" [expanded=false, ref=e1589]
+          - StaticText "Coolie 工坊 AI 原生交付工厂本体系统"
+        - link [ref=e1590]
+        - StaticText "Labels"
+        - button "Labels: None" [expanded=false, ref=e1591]
+          - StaticText "None"
+        - StaticText "RELATIONSHIPS"
+        - StaticText "Parent"
+        - link "Task COOA-114: [主线长任务] Coolie 工坊全生命周期持续研发与能力升级 (Continuous Evolution)" [ref=e1592]
+          - image "In Progress"
+          - StaticText "COOA-114"
+        - button "Edit parent" [expanded=false, ref=e1593]
+        - StaticText "Blocked by"
+        - button "Blocked by: None" [expanded=false, ref=e1594]
+          - StaticText "None"
+        - StaticText "Blocking"
+        - StaticText "None"
+        - StaticText "Subtasks"
+        - button "Subtasks: None" [expanded=false, ref=e1595]
+          - StaticText "None"
+        - StaticText "EXECUTION"
+        - StaticText "Reviewers"
+        - button "Reviewers: None" [expanded=false, ref=e1596]
+          - StaticText "None"
+        - StaticText "Approvers"
+        - button "Approvers: None" [expanded=false, ref=e1597]
+          - StaticText "None"
+        - StaticText "Monitor"
+        - button "Monitor: None" [expanded=false, ref=e1598]
+          - generic [ref=e1607] clickable [cursor:pointer, onclick]
+            - StaticText "None"
+        - StaticText "Watchdog"
+        - button "Watchdog: None" [expanded=false, ref=e1599]
+          - StaticText "None"
+        - StaticText "ABOUT"
+        - StaticText "Originating"
+        - generic
+          - StaticText "BO"
+          - StaticText "Board"
+        - StaticText "Started"
+        - StaticText "Oct 14, 2026, 9:32 PM"
+        - StaticText "Created"
+        - StaticText "Oct 13, 2026, 8:35 PM"
+        - StaticText "Updated"
+        - StaticText "8m ago"
+      - sectionfooter
+  - generic
+    - heading "Command Palette" [level=2, ref=e1579]
+    - paragraph
+      - StaticText "Search for a command to run..."
