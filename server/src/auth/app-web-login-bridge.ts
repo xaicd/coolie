@@ -214,7 +214,7 @@ export async function buildAppWebLoginBridgeCookie(input: {
     `${name}=${encodeURIComponent(value)}`,
     "Path=/",
     "HttpOnly",
-    "SameSite=None",
+    input.secure ? "SameSite=None" : "SameSite=Lax",
     "Max-Age=604800",
   ];
   if (input.secure) attributes.push("Secure");

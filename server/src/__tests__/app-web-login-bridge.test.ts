@@ -227,6 +227,7 @@ describe.sequential("app-web-login-bridge cookie format", () => {
     process.env.PAPERCLIP_INSTANCE_ID = "default";
     const cookie = await buildAppWebLoginBridgeCookie({ token: TOKEN, secure: false });
     expect(cookie.startsWith(`paperclip-default.session_token=${TOKEN}; `)).toBe(true);
+    expect(cookie).toContain("SameSite=Lax");
     expect(cookie).not.toContain("__Secure-");
     expect(cookie).not.toMatch(/;\s*Secure(?:\b|$)/);
   });
