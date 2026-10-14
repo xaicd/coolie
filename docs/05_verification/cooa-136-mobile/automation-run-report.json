@@ -56,9 +56,16 @@
     },
     "2.2.2_safe_area": { "headerTopY": 128, "statusBarHeightPx": 128, "pass": true },
     "2.2.3_keyboard_avoid": {
-      "pass": null,
-      "status": "not_verifiable_in_env",
-      "reason": "AVD InputMethod window mHasSurface=false isVisible=false (hardware keyboard suppresses soft IME); no fabricated result"
+      "pass": true,
+      "round": 3,
+      "method": "default IME switched to com.google.android.inputmethod.latin (LatinIME); focused TaskDetail composer; measured IME touchableRegion vs composer bounds via dumpsys window + agent-device rects",
+      "keyboardTopY": 1517,
+      "composerBottomY": 1307,
+      "clearancePx": 210,
+      "softInputMode": "ADJUST_RESIZE",
+      "sendButtonEnabledWithText": true,
+      "sendButtonDisabledWhenEmpty": true,
+      "screenshots": ["73-round3-taskdetail-keyboard-real.png", "74-round3-keyboard-send-enabled.png"]
     },
     "2.2.4_lifo_back": { "pass": true, "depth": 3 },
     "2.2.5_two_word_buttons": { "pass": true, "sampled": ["管理","配置","检查","清理","探测","发送","返回","停用","重置"] },
@@ -85,6 +92,8 @@
     "63-tab-assets.png",
     "70-320-tasks.png",
     "71-taskdetail-nokeyboard.png",
-    "72-taskdetail-keyboard.png"
+    "72-taskdetail-keyboard.png",
+    "73-round3-taskdetail-keyboard-real.png",
+    "74-round3-keyboard-send-enabled.png"
   ]
 }
