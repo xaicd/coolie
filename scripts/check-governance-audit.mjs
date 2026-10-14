@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { execSync } from 'node:child_process';
 import { collectExpoI18nChecks } from './check-expo-i18n.mjs';
 import { collectServerI18nChecks } from './check-server-i18n.mjs';
+import { collectUiI18nRefChecks } from './check-ui-i18n-refs.mjs';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -792,6 +793,14 @@ assertRule(
   bossIntentContent.includes('--probe-tool-status') && bossIntentContent.includes('cron-team-status.sh'),
   'hermes-boss-intent-dispatcher.sh 未识别 --probe-tool-status, 老板微信指令被误派为编码任务',
 );
+
+// -----------------------------------------------------------------------------
+// 23. Web (ui/) i18n 引用-定义一致性守卫 (COOA-178 · 杜绝原始键外泄)
+// -----------------------------------------------------------------------------
+console.log('\n🧭 23. Web i18n 引用-定义一致性守卫 (COOA-178):');
+for (const check of collectUiI18nRefChecks()) {
+  assertRule(check.name, check.ok, check.detail);
+}
 
 console.log('\n========================================================================');
 if (failed) {
