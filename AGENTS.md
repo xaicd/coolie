@@ -285,7 +285,7 @@ A change is done when all are true:
    - **自研默认架构 (Default Monorepo)**：自研及全栈商业项目默认采用 **PNPM workspace monorepo** 架构（根目录配置 `pnpm-workspace.yaml`，子包划分 `packages/`、`apps/` 或 `server/`、`ui/`、`clients/`）；
    - **两大核心底座生态位与语言规范对齐 (Two Core Blueprints in Different Languages)**：
      - **`yudao-quad-terminal` (芋道四位一体多端基座)**：**Java (JDK 17/21 LTS) + Spring Boot 3 + Spring Cloud Alibaba 微服务/单体 + Vue 3 / Element Plus (Web中台) + Uni-App (微信小程序) + Expo SDK 52 / React Native (原生移动 App)**。内建 19 大垂直行业域（ERP/MES/CRM/BPM/支付/会员等），覆盖 PC + 小程序 + 原生 App + 微服务中台全渠道闭环；
-     - **`ruoyi-all-next` (现代化全栈轻量级基座)**：**TypeScript (Node 24 / Next.js 15) + React 19 + Tailwind CSS + Prisma / SQLite / PostgreSQL**。全栈同构、极度敏捷，开箱即用支持 3200 端口沙箱实时极速预览，极低 Token 消耗与秒级热更；
+     - **`ruoyi-all-next` (现代化全栈轻量级基座)**：**TypeScript (Node 24 / Next.js 16.3.6) + React 19 + Tailwind CSS + Prisma / SQLite / PostgreSQL**。全栈同构、极度敏捷，开箱即用支持 3200 端口沙箱实时极速预览，极低 Token 消耗与秒级热更；
    - **AI Agent 接单自动选型决策漏斗 (Automated Selection Heuristics)**：
      - 工坊 AI Agent 接到正式业务需求时，必须根据**需求完整度**与**具体实际的项目技术规范要求**选择底座：
        1. **终端覆盖要求（一票命中）**：业务明确要求包含**原生手机 App (iOS/Android) 与微信小程序** ➜ **必选 `yudao-quad-terminal`**；仅需 Web 管理端与响应式 H5 ➜ 优选 `ruoyi-all-next`；

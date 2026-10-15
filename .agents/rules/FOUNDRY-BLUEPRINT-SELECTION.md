@@ -9,7 +9,7 @@
 | 维度指标 | 芋道四位一体多端基座 (`yudao-quad-terminal`) | 现代轻量全栈基座 (`ruoyi-all-next`) |
 | :--- | :--- | :--- |
 | **主要编程语言** | **Java (JDK 17/21 LTS) + TypeScript** | **TypeScript (Node 24 / Next.js) + SQL** |
-| **后端架构栈** | Spring Boot 3.5 + Spring Cloud Alibaba 微服务/单体 | Next.js 15 App Router + Prisma / SQLite / PostgreSQL |
+| **后端架构栈** | Spring Boot 3.5 + Spring Cloud Alibaba 微服务/单体 | Next.js 16 (16.3.6) App Router + Prisma / SQLite / PostgreSQL |
 | **前端中台栈** | Vue 3 + Vite + Pinia + Element Plus (管理后台) | React 19 + Tailwind CSS + Radix UI / shadcn |
 | **移动与终端形态** | **四位一体原生覆盖**：<br>1. PC Web 管理中台<br>2. 微信小程序 (Uni-App Vue3)<br>3. 原生手机 App (Expo SDK 52 / React Native)<br>4. 微服务 API 网关 | **轻终端与现代 Web 全栈**：<br>1. 响应式 PC Web 端<br>2. 移动端 H5 极简单手卡片流<br>3. 原生支持 3200 端口沙箱实时预览 |
 | **内置业务域资产** | **19 大垂直行业域** (ERP, MES, CRM, BPM 流程引擎, 商城, 会员, 微信/支付宝支付, 多租户行级隔离) | **极简核心底座** (组织权限, 动态数据模型, 工作台, 敏捷 API 契约, 轻量多企业隔离) |
