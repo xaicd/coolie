@@ -795,7 +795,13 @@ export function BoardChatScreen({
 
   const copyToClipboard = useCallback((text: string) => {
     Clipboard.setString(text);
-    Alert.alert("已复制", "消息已复制到剪贴板");
+    // 复制是轻量确认, 用非阻塞 Toast 收尾 (6 寸屏不打断阅读、无需额外点关闭)。
+    // iOS 无原生 Toast, 回退到系统提示。
+    if (Platform.OS === "android") {
+      ToastAndroid.show("已复制到剪贴板", ToastAndroid.SHORT);
+    } else {
+      Alert.alert("已复制", "消息已复制到剪贴板");
+    }
   }, []);
 
   /**
