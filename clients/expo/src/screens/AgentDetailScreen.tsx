@@ -227,6 +227,14 @@ export function AgentDetailScreen({
           <StatusDot status={STATUS_DOT[agent.status] ?? "idle"} size={9} pulse={agent.status === "active"} />
         </View>
 
+        {/* wave381 — 老板拍"看 coolie-dev 员工": 员工 error 时直接暴露真因, 不再只显示"异常". */}
+        {agent.status === "error" && agent.errorReason ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorBoxLabel}>异常原因</Text>
+            <Text style={styles.errorBoxText}>{agent.errorReason}</Text>
+          </View>
+        ) : null}
+
         <AppCard padding={16} style={styles.card}>
           <KeyValueRow label="角色 (role)" value={agent.role || "general"} />
           {/* wave65 — boss 25:00 '工坊 5 角色员工 描述都去掉' — 删除 '头衔' 行. */}
@@ -399,6 +407,16 @@ const styles = StyleSheet.create({
   name: { color: C.ink, fontSize: 20, fontWeight: "600", letterSpacing: -0.3 },
   headMeta: { color: C.ink3, fontSize: 12 },
   card: { gap: 12 },
+  errorBox: {
+    backgroundColor: "rgba(239, 68, 68, 0.10)",
+    borderColor: "rgba(239, 68, 68, 0.30)",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    gap: 4,
+  },
+  errorBoxLabel: { color: C.err, fontSize: 12, fontWeight: "600" },
+  errorBoxText: { color: C.ink2, fontSize: 12, lineHeight: 17 },
   section: { gap: 8 },
   row: { gap: 10 },
   rowTitle: { color: C.ink, fontSize: 14, fontWeight: "500", flex: 1 },

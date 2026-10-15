@@ -181,6 +181,14 @@ function AgentDetailSheet({
           />
         </View>
 
+        {/* wave381 — 老板拍"看 coolie-dev 员工": 员工 error 时直接暴露真因, 不再只显示"异常". */}
+        {agent.status === "error" && agent.errorReason ? (
+          <View style={styles.errorBox}>
+            <Text style={styles.errorBoxLabel}>异常原因</Text>
+            <Text style={styles.errorBoxText}>{agent.errorReason}</Text>
+          </View>
+        ) : null}
+
         {cost ? (
           <AppCard variant="surface" style={{ marginBottom: 6 }}>
             <Text style={styles.costTitle}>Token 用量（累计）</Text>
@@ -565,6 +573,17 @@ const styles = StyleSheet.create({
   statusPause: { borderWidth: 1, borderColor: C.warn },
   statusBtnText: { fontSize: 14, fontWeight: "600" },
   hint: { color: C.ink4, fontSize: 11, marginTop: 8 },
+  errorBox: {
+    backgroundColor: "rgba(239, 68, 68, 0.10)",
+    borderColor: "rgba(239, 68, 68, 0.30)",
+    borderWidth: 1,
+    borderRadius: 10,
+    padding: 12,
+    marginBottom: 8,
+    gap: 4,
+  },
+  errorBoxLabel: { color: C.err, fontSize: 12, fontWeight: "600" },
+  errorBoxText: { color: C.ink2, fontSize: 12, lineHeight: 17 },
   infoCard: {
     backgroundColor: C.surface,
     borderRadius: 12,

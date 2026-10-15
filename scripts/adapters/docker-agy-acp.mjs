@@ -9,7 +9,7 @@
  *   3) Fallback host-exec
  */
 
-import * as acp from "@agentclientprotocol/sdk";
+import { createRequire } from "node:module";
 import { Readable, Writable } from "node:stream";
 import { spawn, execSync } from "node:child_process";
 import fs from "node:fs";
@@ -18,6 +18,37 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const repoRoot = path.resolve(__dirname, "../..");
+const req = createRequire(import.meta.url);
+
+// wave381 — 老板拍"看 coolie-dev 员工": 墨斗 (agy_local) 状态 error 真因是这里
+// 顶层静态 `import "@agentclientprotocol/sdk"` 在仓库根解析不到该包 (pnpm 未把它
+// 提升到根 node_modules), 进程在 initialize 前就 ERR_MODULE_NOT_FOUND 退出。
+// 与 cmd-acp.mjs / claude-profile-acp.mjs 保持一致: 懒加载 + 候选路径回退。
+let acp;
+try {
+  acp = await import("@agentclientprotocol/sdk");
+} catch {
+  const candidatePaths = [
+    path.join(repoRoot, "packages/paperclip-runner"),
+    path.join(repoRoot, "packages/adapters/claude-local"),
+    path.join(repoRoot, "packages/adapters/codex-local"),
+    path.join(repoRoot, "node_modules/.pnpm/node_modules"),
+    repoRoot,
+  ];
+  let resolvedPath = null;
+  for (const p of candidatePaths) {
+    try {
+      resolvedPath = req.resolve("@agentclientprotocol/sdk", { paths: [p] });
+      if (resolvedPath) break;
+    } catch {
+      // try next candidate path
+    }
+  }
+  if (!resolvedPath) {
+    throw new Error("Cannot find @agentclientprotocol/sdk in candidate paths");
+  }
+  acp = await import(resolvedPath);
+}
 
 class AgyAcpAgent {
   sessions = new Map();

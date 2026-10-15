@@ -263,6 +263,13 @@ export interface Agent {
    * 是 skills, 得区分了". Card shows 1-3 chips; detail sheet shows the full list.
    */
   tools?: string[] | null;
+  /**
+   * Coolie fork — wave381: 最近一次失败原因 (server `agents.error_reason`,
+   * 见 `server/src/routes/agents.ts` 的 agent detail 响应). status === "error"
+   * 时由员工详情屏以红色「异常原因」呈现, 让掌柜一眼看到真因, 不必翻服务端日志.
+   * 与 web 端 `AgentProperties` 的 `agent.errorReason` 同一字段 (单一真源).
+   */
+  errorReason?: string | null;
 }
 
 /**
