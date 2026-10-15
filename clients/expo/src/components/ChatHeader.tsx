@@ -2,6 +2,7 @@ import React from "react";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { C } from "../coolie";
+import { RADIUS, SPACING } from "../ui/tokens";
 import { StatusDot } from "./StatusDot";
 import { formatTime } from "../utils/format";
 
@@ -24,6 +25,13 @@ export interface ChatHeaderProps {
   timestamp?: string | null;
   /** wave148: 当前对话标题, 显示在头部 */
   title?: string | null;
+  /**
+   * wave383: 当前工坊锁定的项目名 (老板拍: 生产 coolie 工坊是对外项目建设)。
+   * 与 onOpenProjects 一起构成顶栏「项目上下文」行。
+   */
+  projectName?: string | null;
+  /** wave383: 打开项目切换抽屉 (ProjectPickerSheet)。 */
+  onOpenProjects?: () => void;
   /** 是否处于嵌入模式 (Workspace Tab) — 嵌入时不显示返回 + 清空 + 对话入口 */
   embedded?: boolean;
   onBack?: () => void;
@@ -39,6 +47,8 @@ export function ChatHeader({
   subtitle,
   timestamp,
   title,
+  projectName,
+  onOpenProjects,
   embedded = false,
   onBack,
   onRequestClear,
@@ -46,6 +56,7 @@ export function ChatHeader({
   onNewConversation,
 }: ChatHeaderProps) {
   const showConversationControls = !embedded;
+  const showProjectRow = Boolean(onOpenProjects) || Boolean(projectName && projectName.trim());
   return (
     <View style={styles.topBar}>
       <View style={styles.topLeft}>
@@ -69,6 +80,27 @@ export function ChatHeader({
           <Text style={styles.titleText} numberOfLines={1}>
             {title && title.trim() ? title : "工坊协同会话"}
           </Text>
+          {showProjectRow ? (
+            <Pressable
+              onPress={onOpenProjects}
+              disabled={!onOpenProjects}
+              hitSlop={6}
+              accessibilityRole="button"
+              accessibilityLabel="切换项目"
+              style={({ pressed }) => [
+                styles.projectChip,
+                pressed && onOpenProjects ? styles.projectChipPressed : null,
+              ]}
+            >
+              <Ionicons name="folder-outline" size={12} color={C.accent} />
+              <Text style={styles.projectChipText} numberOfLines={1}>
+                {projectName && projectName.trim() ? projectName : "选择项目"}
+              </Text>
+              {onOpenProjects ? (
+                <Ionicons name="chevron-down" size={12} color={C.ink3} />
+              ) : null}
+            </Pressable>
+          ) : null}
           {subtitle || thinking ? (
             <View style={styles.subtitleRow}>
               <StatusDot
@@ -149,6 +181,28 @@ const styles = StyleSheet.create({
     color: C.ink,
     fontSize: 14,
     fontWeight: "600",
+  },
+  projectChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    alignSelf: "flex-start",
+    maxWidth: "100%",
+    marginTop: 3,
+    paddingVertical: 1,
+    paddingHorizontal: SPACING.sm,
+    borderRadius: RADIUS.sm,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+    backgroundColor: "rgba(255,255,255,0.04)",
+  },
+  projectChipPressed: {
+    backgroundColor: "rgba(255,255,255,0.08)",
+  },
+  projectChipText: {
+    color: C.ink2,
+    fontSize: 11,
+    flexShrink: 1,
   },
   subtitleRow: {
     flexDirection: "row",

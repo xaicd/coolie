@@ -1715,9 +1715,48 @@ export function routineService(
   }) {
     const projectId = input.projectId ?? input.routine.projectId ?? null;
     const projectWorkspaceId = input.projectWorkspaceId ?? null;
-    const assigneeAgentId = input.assigneeAgentId ?? input.routine.assigneeAgentId ?? null;
+    let assigneeAgentId = input.assigneeAgentId ?? input.routine.assigneeAgentId ?? null;
     if (!assigneeAgentId) {
-      throw unprocessable("Default agent required");
+      if (input.routine.projectId) {
+        const project = await db
+          .select({ leadAgentId: projects.leadAgentId })
+          .from(projects)
+          .where(eq(projects.id, input.routine.projectId))
+          .then((rows) => rows[0] ?? null);
+        if (project?.leadAgentId) {
+          assigneeAgentId = project.leadAgentId;
+        }
+      }
+      if (!assigneeAgentId) {
+        const fallbackAgent = await db
+          .select({ id: agents.id })
+          .from(agents)
+          .where(
+            and(
+              eq(agents.companyId, input.routine.companyId),
+              ne(agents.status, "terminated"),
+            ),
+          )
+          .orderBy(
+            sql`CASE WHEN ${agents.status} IN ('idle', 'running') THEN 0 ELSE 1 END`,
+            asc(agents.createdAt),
+          )
+          .then((rows) => rows[0] ?? null);
+        if (fallbackAgent?.id) {
+          assigneeAgentId = fallbackAgent.id;
+        }
+      }
+      if (assigneeAgentId && input.routine.id) {
+        try {
+          await db
+            .update(routines)
+            .set({ assigneeAgentId, updatedAt: new Date() })
+            .where(eq(routines.id, input.routine.id));
+        } catch {}
+      }
+      if (!assigneeAgentId) {
+        throw unprocessable("Default agent required");
+      }
     }
     await assertAssignableAgent(db, input.routine.companyId, assigneeAgentId, { kind: "routine" });
     const automaticVariables: Record<string, string | number | boolean> = {};

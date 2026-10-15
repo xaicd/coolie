@@ -36,6 +36,12 @@ import { useRecorder } from "../useRecorder";
 import { StatusDot } from "../components/StatusDot";
 import { ChatHeader } from "../components/ChatHeader";
 import { ChatInput, type StagedAttachment } from "../components/ChatInput";
+import { ProjectPickerSheet } from "../components/ProjectPickerSheet";
+import {
+  getLastProjectId,
+  pickDefaultProject,
+  setLastProjectId,
+} from "../lib/project-context";
 import { TypingBubbleText } from "../components/TypingDots";
 import {
   approvalTypeLabel,
@@ -557,39 +563,155 @@ export function BoardChatScreen({
     }
   }, [company.id]);
 
-  // wave148: 公司切换 — 清空对话状态, 拉列表并选中最新一个 (没有就让 loadHistory
-  // 去服务端创建默认的 "Board Operations")。
-  useEffect(() => {
-    setConversations([]);
-    setActiveConversationId(null);
-    setMessages([WELCOME_MESSAGE]);
-    setBoardIssueId(null);
-    setHistoryReady(false);
-    void (async () => {
-      const list = await refreshConversations();
-      if (Array.isArray(list) && list.length > 0) {
-        if (initialProjectId) {
-          const match = list.find((c) => c.projectId === initialProjectId);
-          if (match?.id) {
-            setActiveConversationId(match.id);
-            return;
-          }
-        }
-        if (list[0]?.id) {
-          setActiveConversationId(list[0].id);
-        }
+  /**
+   * wave383: 确保某项目拥有专属工坊会话 (服务端幂等建「[项目名] 工坊」)。
+   *
+   * 直接打带 projectId 的会话列表端点 —— 服务端在返回前会 `ensureProjectBoardConversation`,
+   * 命中即返回既有会话, 缺失即原子建会话 + 锚定 issue。回执并入本地会话列表 (按
+   * lastMessageAt 倒序), 返回该项目最新会话供调用方选中。
+   */
+  const ensureProjectConversation = useCallback(
+    async (projectId: string): Promise<BoardConversation | null> => {
+      try {
+        const list = await coolie.request<BoardConversation[]>(
+          "GET",
+          `/api/companies/${encodeURIComponent(company.id)}/board/conversations?projectId=${encodeURIComponent(projectId)}`,
+        );
+        const safe = Array.isArray(list) ? list.filter((c) => c && c.id) : [];
+        if (safe.length === 0) return null;
+        setConversations((prev) => {
+          const map = new Map(prev.map((c) => [c.id, c] as const));
+          for (const c of safe) map.set(c.id, c);
+          return [...map.values()].sort(
+            (a, b) =>
+              new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime(),
+          );
+        });
+        return safe[0] ?? null;
+      } catch {
+        return null;
       }
-    })();
-  }, [company.id, refreshConversations, initialProjectId]);
+    },
+    [company.id],
+  );
 
+  /** wave383: 顶栏「项目上下文」选中态 + 切换抽屉。 */
+  const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [projectSwitchBusy, setProjectSwitchBusy] = useState(false);
+  /** 上一次解析所属公司 —— 只有公司切换才清空会话/历史, 避免 App 补种 initialProjectId 时整屏重置。 */
+  const resolvedCompanyRef = useRef<string | null>(null);
+
+  // wave148 + wave383: 公司切换 / 项目卡带入 (initialProjectId) 时的工坊落地。
+  //
+  // 老板拍: 生产 coolie 工坊是对外项目建设, 不是建设自己 —— 工坊 tab MUST 自动锁定
+  // 「对客户」的项目上下文, 而不是落到最近一次对话或没有项目的通用会话。
+  //
+  // 目标项目 fallback 链 (先命中先用):
+  //   initialProjectId (项目卡带入 / App 按「最近活动项目」补种)
+  //   → 本机记住的最近活动项目 (lastProjectId, 冷启动延续上一回上下文)
+  //   → 最优对外项目 (pickDefaultProject: 排除 Coolie 工坊本体项目, 优先进行中)
+  // 命中后确保该项目有专属工坊会话 (服务端幂等建「[项目名] 工坊」) 并选中它。
   useEffect(() => {
-    if (initialProjectId && conversations.length > 0) {
-      const match = conversations.find((c) => c.projectId === initialProjectId);
-      if (match?.id && match.id !== activeConversationId) {
-        setActiveConversationId(match.id);
-      }
+    const companyChanged = resolvedCompanyRef.current !== company.id;
+    resolvedCompanyRef.current = company.id;
+    let cancelled = false;
+
+    if (companyChanged) {
+      setConversations([]);
+      setActiveConversationId(null);
+      setMessages([WELCOME_MESSAGE]);
+      setBoardIssueId(null);
+      setHistoryReady(false);
+      setSelectedProjectId(null);
     }
-  }, [initialProjectId, conversations, activeConversationId]);
+
+    void (async () => {
+      // 1. 公司全量活跃对话 (会话列表 / 兜底都用)
+      const list = await refreshConversations();
+      if (cancelled) return;
+
+      // 2. 解析目标项目
+      const projectList = await coolie
+        .listProjects(company.id)
+        .catch(() => [] as Project[]);
+      if (cancelled) return;
+      const safeProjects = Array.isArray(projectList) ? projectList : [];
+      setProjects(safeProjects);
+
+      const knownIds = new Set(safeProjects.map((p) => p.id));
+      const remembered = await getLastProjectId(company.id);
+      if (cancelled) return;
+
+      const byId = (id: string | null | undefined) =>
+        id && knownIds.has(id) ? safeProjects.find((p) => p.id === id) ?? null : null;
+
+      const target =
+        byId(initialProjectId) ?? byId(remembered) ?? pickDefaultProject(safeProjects);
+
+      if (!target?.id) {
+        // 公司还没有任何项目: 退回旧行为 (选最近一个对话, 或由 loadHistory 建默认会话)
+        if (list[0]?.id) setActiveConversationId((prev) => prev ?? list[0]!.id);
+        return;
+      }
+
+      setSelectedProjectId((prev) => (prev === target.id ? prev : target.id));
+      void setLastProjectId(company.id, target.id);
+
+      // 3. 该项目已有专属工坊会话 → 直接选中
+      const bound = list.find((c) => c.projectId === target.id);
+      if (bound?.id) {
+        setActiveConversationId((prev) => (prev === bound.id ? prev : bound.id));
+        return;
+      }
+
+      // 4. 没有 → 让服务端幂等建一个项目专属会话再选中
+      const ensured = await ensureProjectConversation(target.id);
+      if (cancelled) return;
+      const nextId = ensured?.id ?? list[0]?.id ?? null;
+      if (nextId) setActiveConversationId((prev) => (prev === nextId ? prev : nextId));
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [company.id, refreshConversations, initialProjectId, ensureProjectConversation]);
+
+  // wave383: 顶栏项目名 / 本机记忆跟随「当前激活对话」的真实项目上下文 —— 手动切换对话
+  // 或新建项目对话后同步更新, 保证顶栏显示的就是工坊真正在谈的项目。
+  useEffect(() => {
+    const projectId =
+      conversations.find((c) => c && c.id === activeConversationId)?.projectId ?? null;
+    if (!projectId) return;
+    setSelectedProjectId((prev) => (prev === projectId ? prev : projectId));
+    void setLastProjectId(company.id, projectId);
+  }, [activeConversationId, conversations, company.id]);
+
+  /**
+   * wave383: 顶栏切换项目 —— 选中该项目专属工坊会话 (无则服务端幂等新建), 并记住为
+   * 最近活动项目。已是当前项目则仅收起抽屉。
+   */
+  const handleSelectProject = useCallback(
+    async (projectId: string) => {
+      setProjectPickerOpen(false);
+      if (!projectId || projectId === selectedProjectId) return;
+      setProjectSwitchBusy(true);
+      try {
+        setSelectedProjectId(projectId);
+        void setLastProjectId(company.id, projectId);
+        const bound = conversations.find((c) => c.projectId === projectId);
+        if (bound?.id) {
+          setActiveConversationId(bound.id);
+          return;
+        }
+        const ensured = await ensureProjectConversation(projectId);
+        if (ensured?.id) setActiveConversationId(ensured.id);
+      } finally {
+        setProjectSwitchBusy(false);
+      }
+    },
+    [company.id, conversations, selectedProjectId, ensureProjectConversation],
+  );
 
   // 加载当前对话的持久化历史。activeConversationId 为空时由服务端解析默认对话
   // (全新公司会被创建出 "Board Operations"), 解析结果回填到 activeConversationId,
@@ -1778,6 +1900,13 @@ export function BoardChatScreen({
     [conversations, activeConversationId],
   );
 
+  /** wave383: 顶栏显示的项目名 (当前激活对话的项目, 或已选中的默认项目)。 */
+  const headerProjectName = useMemo(() => {
+    const id = activeConversationProjectId ?? selectedProjectId;
+    if (!id) return null;
+    return projects.find((p) => p.id === id)?.name ?? null;
+  }, [activeConversationProjectId, selectedProjectId, projects]);
+
 
   /**
    * 构建进度卡点击某环节 -> 打开对应任务详情。
@@ -1974,9 +2103,21 @@ export function BoardChatScreen({
           timestamp={latestAssistantTimestamp}
           embedded={embedded}
           title={displayConvTitle(activeConversation?.title)}
+          projectName={headerProjectName}
+          onOpenProjects={() => setProjectPickerOpen(true)}
           onRequestClear={() => setConfirmClear(true)}
           onOpenConversations={() => setConversationsOpen(true)}
           onNewConversation={openNewConversation}
+        />
+
+        {/* wave383: 顶栏切换项目抽屉 (无则服务端幂等建「[项目名] 工坊」会话) */}
+        <ProjectPickerSheet
+          visible={projectPickerOpen}
+          projects={projects}
+          selectedProjectId={activeConversationProjectId ?? selectedProjectId}
+          busy={projectSwitchBusy}
+          onSelect={(projectId) => void handleSelectProject(projectId)}
+          onClose={() => setProjectPickerOpen(false)}
         />
 
         {/* 五大数字员工协同流水线横幅 */}

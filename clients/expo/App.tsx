@@ -55,6 +55,7 @@ import { LoadingState } from "./src/ui/LoadingState";
 import { ScreenHeader } from "./src/ui/ScreenHeader";
 import { Sheet } from "./src/ui/Sheet";
 import { initExpoI18n } from "./src/i18n";
+import { getLastProjectId } from "./src/lib/project-context";
 import { performStartupSecurityAudit } from "./src/services/securityGuard";
 import { DashboardScreen } from "./src/screens/DashboardScreen";
 import { InboxScreen } from "./src/screens/InboxScreen";
@@ -733,6 +734,22 @@ function HomeScreen({
   useEffect(() => {
     void loadNotifications(company.id, { silent: true });
   }, [company.id, loadNotifications]);
+
+  // wave383 — 工坊 tab 默认项目上下文 (老板拍: 生产 coolie 工坊是对外项目建设, 不是建设自己)。
+  // 未从项目卡带入时, 用本机记住的「最近活动项目」给工坊补种 initialProjectId; 真正按真实
+  // 项目列表裁决 (对外项目优先 + 排除 Coolie 工坊本体项目) 由 BoardChatScreen 兜底完成。
+  // 公司切换时先清空, 避免带上一家公司的陈旧项目; 补种用函数式更新, 不覆盖项目卡的显式选择。
+  useEffect(() => {
+    let cancelled = false;
+    setChatInitialProjectId(null);
+    void getLastProjectId(company.id).then((projectId) => {
+      if (cancelled || !projectId) return;
+      setChatInitialProjectId((prev) => prev ?? projectId);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [company.id]);
 
   // wave153 — 客户首接触。公司还没有员工 (全新账号) 且本机未完成过引导时, 自动
   // 打开 web 端既有 onboarding 向导 (`/<issuePrefix>/onboarding`), 让客户先建好
