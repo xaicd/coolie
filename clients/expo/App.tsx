@@ -1321,6 +1321,8 @@ function HomeScreen({
             <ArtifactsScreen
               company={company}
               whoami={whoami}
+              initialProjectId={chatInitialProjectId}
+              onBack={() => setTab("chat")}
               onOpenSandbox={(url, service, wp, scope) =>
                 setSandboxContext({ url, service, workProduct: wp, scope })
               }

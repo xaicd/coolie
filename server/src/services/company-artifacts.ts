@@ -508,7 +508,10 @@ export function companyArtifactsService(db: Db, storage?: StorageService) {
           workProductConditions.push(workProductKind);
         }
         if (query.projectId) {
-          const projectCondition = eq(issues.projectId, query.projectId);
+          const projectCondition = eq(
+            sql`coalesce(${issueWorkProducts.projectId}, ${issues.projectId})`,
+            query.projectId,
+          );
           workProductBaseConditions.push(projectCondition);
           workProductConditions.push(projectCondition);
         }
@@ -561,7 +564,7 @@ export function companyArtifactsService(db: Db, storage?: StorageService) {
           .leftJoin(
             projects,
             and(
-              eq(issues.projectId, projects.id),
+              eq(sql`coalesce(${issueWorkProducts.projectId}, ${issues.projectId})`, projects.id),
               eq(projects.companyId, issueWorkProducts.companyId),
             ),
           )

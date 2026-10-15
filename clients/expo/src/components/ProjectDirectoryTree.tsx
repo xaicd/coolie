@@ -9,28 +9,6 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import type { CompanyArtifact, Project } from "@coolie/api-client";
 import { C, COOLIE_BASE_URL } from "../coolie";
-import {
-  YUNNAN_SERVER_CODE,
-  YUNNAN_CONFIG_CODE,
-  YUNNAN_SCHEMA_CODE,
-  YUNNAN_DB_CLIENT_CODE,
-  YUNNAN_BOSS_RECONCILE_CODE,
-  YUNNAN_ANTI_FRAUD_CODE,
-  YUNNAN_GRID_DISPATCH_CODE,
-  YUNNAN_FTTR_MARKETING_CODE,
-  YUNNAN_WECOM_CRYPTO_CODE,
-  JIUXIA_SERVER_CODE,
-  JIUXIA_CONFIG_CODE,
-  JIUXIA_SCHEMA_CODE,
-  JIUXIA_DB_CLIENT_CODE,
-  JIUXIA_CUTTING_STOCK_CODE,
-  JIUXIA_BOM_EXTRACTOR_CODE,
-  JIUXIA_COLLATERAL_LOCK_CODE,
-  SCM_WMS_INVENTORY_CODE,
-  SCM_PURCHASE_ORDER_CODE,
-  SCM_FIFO_COST_CODE,
-  SCM_PROJECT_INIT_CODE,
-} from "./ProjectSourceCodeCache";
 
 export interface ProjectFileNode {
   name: string;
@@ -360,6 +338,8 @@ export function ProjectDirectoryTree({
       "docs/specs",
       "src",
       "deploy",
+      "deliverables",
+      "media",
     ])
   );
 
@@ -375,26 +355,6 @@ export function ProjectDirectoryTree({
     });
   };
 
-  const isYunnan = useMemo(() => {
-    const text = `${project.name} ${project.description ?? ""}`.toLowerCase();
-    return text.includes("云南") || text.includes("wecom") || text.includes("移动");
-  }, [project]);
-
-  const isJiuxia = useMemo(() => {
-    const text = `${project.name} ${project.description ?? ""}`.toLowerCase();
-    return text.includes("智居") || text.includes("九夏") || text.includes("板材") || text.includes("开料");
-  }, [project]);
-
-  const isScm = useMemo(() => {
-    if (isJiuxia) return false;
-    const text = `${project.name} ${project.description ?? ""}`.toLowerCase();
-    return text.includes("进销存") || text.includes("scm") || text.includes("ruoyi") || text.includes("供应链");
-  }, [project, isJiuxia]);
-
-  const isYudao = useMemo(() => {
-    const text = `${project.name} ${project.description ?? ""}`.toLowerCase();
-    return text.includes("四位一体") || text.includes("yudao") || text.includes("芋道");
-  }, [project]);
 
   // 将当前项目的真实产物按 CMMI 01~09 及工程子目录进行智能分类
   const categorizedArtifacts = useMemo(() => {
@@ -797,214 +757,36 @@ export function ProjectDirectoryTree({
           },
         ];
 
-    // 11. 【src/】核心源码目录 (根据当前项目特性与代码工件智能组织)
-    const srcNodes: ProjectFileNode[] = [];
+    // 11. 【src/】核心源码目录 (仅展示当前项目真实已归档的代码与契约工件，严禁虚构伪造模板源码)
     const codeArtifacts = categorizedArtifacts.src;
+    const srcNodes: ProjectFileNode[] = codeArtifacts.map((art, idx) =>
+      artifactToFileNode(art, "src", idx)
+    );
 
-    if (codeArtifacts.length > 0) {
-      // 优先装载该项目专属归档的真实代码产物
-      codeArtifacts.forEach((art, idx) => {
-        srcNodes.push(artifactToFileNode(art, "src", idx));
-      });
-    }
+    // 12. 【deploy/】交付制品目录 (仅展示当前项目已归档的物理制品，绝不混淆或伪造历史数据)
+    const deployArtifacts = artifacts.filter((a) => {
+      const p = (a.openPath || a.contentPath || a.downloadPath || "").toLowerCase();
+      const t = (a.title || "").toLowerCase();
+      const ct = (a.contentType || "").toLowerCase();
+      return (
+        p.includes("deploy") ||
+        t.includes("deploy") ||
+        t.includes("apk") ||
+        p.includes("apk") ||
+        ct.includes("android.package-archive") ||
+        t.endsWith(".apk") ||
+        p.endsWith(".apk") ||
+        t.endsWith(".tar.gz") ||
+        t.endsWith(".zip") ||
+        t.includes("docker") ||
+        t.includes("编排") ||
+        t.includes("镜像")
+      );
+    });
 
-    if (isYunnan) {
-      srcNodes.push({
-        name: "server.mjs",
-        relativePath: "src/server.mjs",
-        type: "file",
-        fileKind: "code",
-        sizeText: "2.1 KB",
-        badge: "网关入口",
-        description: "Node.js/Express 网关服务，路由分发与审计日志",
-        actionText: "查看",
-        content: YUNNAN_SERVER_CODE,
-        language: "javascript",
-      });
-      srcNodes.push({
-        name: "config.mjs",
-        relativePath: "src/config.mjs",
-        type: "file",
-        fileKind: "config",
-        sizeText: "1.9 KB",
-        badge: "全局配置",
-        description: "BOSS 计费总线、企微网关加解密与反诈熔断阈值",
-        actionText: "查看",
-        content: YUNNAN_CONFIG_CODE,
-        language: "javascript",
-      });
-      srcNodes.push({
-        name: "services",
-        relativePath: "src/services",
-        type: "directory",
-        badge: "核心服务",
-        description: "电信平账、AI反诈与网格调度业务引擎",
-        children: [
-          {
-            name: "boss-reconcile.mjs",
-            relativePath: "src/services/boss-reconcile.mjs",
-            type: "file",
-            fileKind: "code",
-            sizeText: "4.8 KB",
-            badge: "核心平账",
-            description: "云南移动核心 BOSS 双向流水对账平账计算引擎",
-            actionText: "查看",
-            content: YUNNAN_BOSS_RECONCILE_CODE,
-            language: "javascript",
-          },
-          {
-            name: "anti-fraud.mjs",
-            relativePath: "src/services/anti-fraud.mjs",
-            type: "file",
-            fileKind: "code",
-            sizeText: "3.2 KB",
-            badge: "AI 反诈",
-            description: "电信级 AI 反诈敏感词实时拦截与语义检测模块",
-            actionText: "查看",
-            content: YUNNAN_ANTI_FRAUD_CODE,
-            language: "javascript",
-          },
-        ],
-      });
-    } else if (isJiuxia) {
-      srcNodes.push({
-        name: "server.mjs",
-        relativePath: "src/server.mjs",
-        type: "file",
-        fileKind: "code",
-        sizeText: "1.8 KB",
-        badge: "MES 网关",
-        description: "Node.js 智能制造 MES 与 2D 排样运筹微服务入口",
-        actionText: "查看",
-        content: JIUXIA_SERVER_CODE,
-        language: "javascript",
-      });
-      srcNodes.push({
-        name: "config.mjs",
-        relativePath: "src/config.mjs",
-        type: "file",
-        fileKind: "config",
-        sizeText: "1.7 KB",
-        badge: "工艺标准",
-        description: "ENF 环保大板规格、4.2mm锯路损耗与 92% 出材率红线",
-        actionText: "查看",
-        content: JIUXIA_CONFIG_CODE,
-        language: "javascript",
-      });
-      srcNodes.push({
-        name: "solvers",
-        relativePath: "src/solvers",
-        type: "directory",
-        badge: "运筹求解器",
-        description: "列生成与正交切割 2D 排样优化引擎",
-        children: [
-          {
-            name: "cutting-stock-solver.mjs",
-            relativePath: "src/solvers/cutting-stock-solver.mjs",
-            type: "file",
-            fileKind: "code",
-            sizeText: "3.6 KB",
-            badge: "开料求解器",
-            description: "ENF 板材开料二维排样启发式求解器",
-            actionText: "查看",
-            content: JIUXIA_CUTTING_STOCK_CODE,
-            language: "javascript",
-          },
-        ],
-      });
-    } else if (isScm) {
-      srcNodes.push({
-        name: "wms-inventory.mjs",
-        relativePath: "src/warehouse/wms-inventory.mjs",
-        type: "file",
-        fileKind: "code",
-        sizeText: "2.8 KB",
-        badge: "WMS仓储",
-        description: "库位容积计算、批次盘点与货位锁定状态机",
-        actionText: "查看",
-        content: SCM_WMS_INVENTORY_CODE,
-        language: "javascript",
-      });
-      srcNodes.push({
-        name: "purchase-order.mjs",
-        relativePath: "src/warehouse/purchase-order.mjs",
-        type: "file",
-        fileKind: "code",
-        sizeText: "3.1 KB",
-        badge: "采购流转",
-        description: "采购到货三单匹配校验与多级审批动作",
-        actionText: "查看",
-        content: SCM_PURCHASE_ORDER_CODE,
-        language: "javascript",
-      });
-    } else if (isYudao) {
-      srcNodes.push({
-        name: "YudaoServerApplication.java",
-        relativePath: "src/main/java/YudaoServerApplication.java",
-        type: "file",
-        fileKind: "code",
-        sizeText: "1.5 KB",
-        badge: "Spring Boot",
-        description: "Spring Boot 3.5 + Spring Cloud 微服务主启动类",
-        actionText: "查看",
-        content: `package cn.iocoder.yudao.server;\n\nimport org.springframework.boot.SpringApplication;\nimport org.springframework.boot.autoconfigure.SpringBootApplication;\n\n@SpringBootApplication\npublic class YudaoServerApplication {\n    public static void main(String[] args) {\n        SpringApplication.run(YudaoServerApplication.class, args);\n    }\n}`,
-        language: "java",
-      });
-    } else {
-      // 通用业务交付工程规范微服务骨架
-      srcNodes.push({
-        name: "server.mjs",
-        relativePath: "src/server.mjs",
-        type: "file",
-        fileKind: "code",
-        sizeText: "1.9 KB",
-        badge: "微服务网关",
-        description: `《${projectName}》核心后端微服务网关与 RESTful 路由入口`,
-        actionText: "查看",
-        content: `/**\n * ${projectName} · 核心网关微服务\n */\nimport express from "express";\n\nconst app = express();\napp.use(express.json());\n\napp.get("/health", (req, res) => {\n  res.json({ status: "UP", project: "${projectName}", timestamp: new Date().toISOString() });\n});\n\nexport function start(port = 3000) {\n  return app.listen(port, () => console.log("${projectName} service running on port " + port));\n}`,
-        language: "javascript",
-      });
-      srcNodes.push({
-        name: "config.mjs",
-        relativePath: "src/config.mjs",
-        type: "file",
-        fileKind: "config",
-        sizeText: "1.2 KB",
-        badge: "全局配置",
-        description: `《${projectName}》环境配置、微服务地址与数据库连接池参数`,
-        actionText: "查看",
-        content: `export const CONFIG = {\n  projectName: "${projectName}",\n  version: "1.0.0",\n  env: process.env.NODE_ENV || "development",\n  db: { poolMin: 2, poolMax: 10 },\n};`,
-        language: "javascript",
-      });
-      srcNodes.push({
-        name: "schema.sql",
-        relativePath: "src/db/schema.sql",
-        type: "file",
-        fileKind: "code",
-        sizeText: "2.5 KB",
-        badge: "数据模型",
-        description: `《${projectName}》物理数据模型 DDL 与审计跟踪字段`,
-        actionText: "查看",
-        content: `-- ${projectName} 业务实体模型 DDL\nCREATE TABLE IF NOT EXISTS sys_biz_record (\n    id VARCHAR(64) PRIMARY KEY,\n    project_name VARCHAR(128) NOT NULL DEFAULT '${projectName}',\n    status VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',\n    created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),\n    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()\n);`,
-        language: "sql",
-      });
-    }
-
-    // 12. 【deploy/】交付制品目录
-    const deployNodes: ProjectFileNode[] = [
-      {
-        name: "docker-compose.yml",
-        relativePath: "deploy/docker-compose.yml",
-        type: "file",
-        fileKind: "config",
-        sizeText: "编排配置",
-        badge: "生产编排",
-        description: `《${projectName}》生产环境轻量化容器编排与服务编组`,
-        actionText: "查看",
-        content: `version: "3.8"\nservices:\n  app:\n    image: ${projectName.toLowerCase()}-app:latest\n    restart: always\n    ports:\n      - "8080:8080"\n    environment:\n      - NODE_ENV=production`,
-        language: "yaml",
-      },
-    ];
+    const deployNodes: ProjectFileNode[] = deployArtifacts.map((a, i) =>
+      artifactToFileNode(a, "deploy", i)
+    );
 
     // 装配 CMMI 01~09 规范目录
     const cmmiDocFolders: ProjectFileNode[] = [
@@ -1100,23 +882,29 @@ export function ProjectDirectoryTree({
         children: wikiNodes,
       },
       ...cmmiDocFolders,
-      {
+    ];
+
+    if (srcNodes.length > 0) {
+      rootList.push({
         name: "src",
         relativePath: "src",
         type: "directory",
-        badge: codeArtifacts.length > 0 ? `源码·${codeArtifacts.length}个工件` : "核心源码",
+        badge: `源码·${srcNodes.length}个工件`,
         description: "核心算法求解器、业务网关与后端微服务物理全栈实现",
         children: srcNodes,
-      },
-      {
+      });
+    }
+
+    if (deployNodes.length > 0) {
+      rootList.push({
         name: "deploy",
         relativePath: "deploy",
         type: "directory",
-        badge: "交付制品",
-        description: "不可变生产镜像编排、发布指纹与在线沙箱",
+        badge: `制品·${deployNodes.length}个物理制品`,
+        description: "不可变生产镜像编排、发布指纹与物理交付制品",
         children: deployNodes,
-      },
-    ];
+      });
+    }
 
     // 如果该项目有额外的未分类真产物或媒体资源，单独挂载
     if (categorizedArtifacts.media.length > 0) {
@@ -1146,7 +934,7 @@ export function ProjectDirectoryTree({
     }
 
     return rootList;
-  }, [project, categorizedArtifacts, isYunnan, isJiuxia, isScm, isYudao]);
+  }, [project, categorizedArtifacts, artifacts]);
 
   // 统计当前项目的覆盖度与真实文件总数
   const summaryStats = useMemo(() => {

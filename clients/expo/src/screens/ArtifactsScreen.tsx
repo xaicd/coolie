@@ -27,6 +27,7 @@ import type {
   WorkspaceRuntimeService,
 } from "@coolie/api-client";
 import { C, COOLIE_BASE_URL, coolie, getAuthToken, getSessionCookieHeaderValue } from "../coolie";
+import { getLastProjectId } from "../lib/project-context";
 import { CodeViewerWebView } from "../components/CodeViewerWebView";
 import { openInExternalApp } from "../utils/openExternalApp";
 import { downloadAndShareFile } from "../utils/fileDownloader";
@@ -210,6 +211,7 @@ export function ArtifactsScreen({
   onOpenPrototypeSandbox,
   onOpenDiff,
 }: ArtifactsScreenProps) {
+  const companyId = company.id;
   const [artifacts, setArtifacts] = useState<CompanyArtifact[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -218,6 +220,21 @@ export function ArtifactsScreen({
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(
     initialProjectId ?? null,
   );
+
+  useEffect(() => {
+    if (initialProjectId && initialProjectId !== selectedProjectId) {
+      setSelectedProjectId(initialProjectId);
+    }
+  }, [initialProjectId]);
+
+  useEffect(() => {
+    if (!selectedProjectId) {
+      void getLastProjectId(companyId).then((id) => {
+        if (id) setSelectedProjectId(id);
+      });
+    }
+  }, [companyId, selectedProjectId]);
+
   const [viewMode, setViewMode] = useState<"tree" | "cards">("tree");
 
   useEffect(() => {
@@ -244,8 +261,6 @@ export function ArtifactsScreen({
    * 只接受最新一次请求的响应 (seq === 当前值), 过期响应直接丢弃。
    */
   const reqSeqRef = useRef(0);
-
-  const companyId = company.id;
 
   useEffect(() => {
     void getAuthToken().then(setAuthToken);
@@ -296,7 +311,14 @@ export function ArtifactsScreen({
   useEffect(() => {
     void coolie
       .listProjects(companyId)
-      .then(setProjects)
+      .then((projList) => {
+        setProjects(projList);
+        setSelectedProjectId((prev) => {
+          if (prev) return prev;
+          const activeProj = projList.find((p) => p.status === "in_progress") || projList[0];
+          return activeProj ? activeProj.id : null;
+        });
+      })
       .catch(() => setProjects([]));
   }, [companyId]);
 
@@ -715,7 +737,7 @@ export function ArtifactsScreen({
                 }
               }
               artifacts={artifacts.filter(
-                (a) => !a.project || a.project.id === selectedProjectId
+                (a) => a.project?.id === selectedProjectId
               )}
               onResetProject={() => setSelectedProjectId(null)}
               onOpenFile={({ title, path, content, language, artifact }) => {
