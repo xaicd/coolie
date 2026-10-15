@@ -485,7 +485,7 @@ export function companyArtifactsService(db: Db, storage?: StorageService) {
         const workProductContentType = sql<string>`coalesce(${issueWorkProducts.metadata}->>'contentType', '')`;
         const workProductBaseConditions: SQL[] = [
           eq(issueWorkProducts.companyId, companyId),
-          eq(issueWorkProducts.type, "artifact"),
+          inArray(issueWorkProducts.type, ["artifact", "deliverable"]),
           eq(issueWorkProducts.provider, "paperclip"),
           ...issueConditions,
         ];

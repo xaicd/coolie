@@ -149,6 +149,7 @@ docs-coolie/evidence/e2e/**/artifacts/
 # Client delivery project workspaces (independent git repos / isolated workspaces managed by Paperclip)
 projects/sys-jiuxia-smart/
 projects/sys-yunnan-wecom/
+projects/residential-plan-service
 
 /ontology/
 /out/

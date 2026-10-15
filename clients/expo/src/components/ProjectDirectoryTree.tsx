@@ -217,8 +217,13 @@ function getArtifactCategory(artifact: CompanyArtifact): string {
 
   // Code files
   if (
-    artifact.source === "work_product" &&
-    (t.endsWith(".ts") ||
+    (artifact.source === "work_product" || artifact.source === "document") &&
+    (p.startsWith("src/") ||
+      p.includes("/src/") ||
+      t.includes("源码") ||
+      t.includes("server.js") ||
+      t.includes("mcp-cli") ||
+      t.endsWith(".ts") ||
       t.endsWith(".tsx") ||
       t.endsWith(".js") ||
       t.endsWith(".mjs") ||
@@ -921,16 +926,43 @@ export function ProjectDirectoryTree({
     }
 
     if (categorizedArtifacts.deliverables.length > 0) {
-      rootList.push({
-        name: "deliverables",
-        relativePath: "deliverables",
-        type: "directory",
-        badge: `任务工件·${categorizedArtifacts.deliverables.length}`,
-        description: "经数字员工审核并验收归档的业务任务交付物与附件",
-        children: categorizedArtifacts.deliverables.map((a, i) =>
-          artifactToFileNode(a, "deliverables", i)
-        ),
-      });
+      // 区分工程阶段验收工件与运行期空间设计样本 (如 222 件户型图全屋 3D/提案册)
+      const sampleItems = categorizedArtifacts.deliverables.filter(
+        (a) =>
+          a.issue?.title?.includes("空间交付") ||
+          a.title.includes("全屋 WebGL") ||
+          a.title.includes("出版级住宅") ||
+          a.title.includes("空间结构化")
+      );
+      const regularDeliverables = categorizedArtifacts.deliverables.filter(
+        (a) => !sampleItems.includes(a)
+      );
+
+      if (regularDeliverables.length > 0) {
+        rootList.push({
+          name: "deliverables",
+          relativePath: "deliverables",
+          type: "directory",
+          badge: `工程交付·${regularDeliverables.length}`,
+          description: "经数字员工审核并验收归档的商业工程任务交付物与附件",
+          children: regularDeliverables.map((a, i) =>
+            artifactToFileNode(a, "deliverables", i)
+          ),
+        });
+      }
+
+      if (sampleItems.length > 0) {
+        rootList.push({
+          name: "sample-data",
+          relativePath: "sample-data",
+          type: "directory",
+          badge: `空间样本·${sampleItems.length}件`,
+          description: "空间规划与收纳交付服务运行期生成的户型方案交付样本库",
+          children: sampleItems.map((a, i) =>
+            artifactToFileNode(a, "sample-data", i)
+          ),
+        });
+      }
     }
 
     return rootList;
