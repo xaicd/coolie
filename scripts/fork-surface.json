@@ -494,6 +494,12 @@
       "maxTotalLines": 120
     },
     {
+      "path": "packages/mcp-server/src/config.ts",
+      "maxNetLines": 30,
+      "reason": "wave380: PAPERCLIP_MCP_TOKEN_TYPE (default `agent`; `board`/`user` accepted) so the MCP client can declare which credential `apiKey` holds. Upstream has no token-type concept and always reads PAPERCLIP_API_KEY as an agent bearer; declaring the type lets a board/operator token be presented on the fork's board channel instead of the agent bearer, where an unrecognized value is a hard 401. Resolution at a merge: keep the tokenType field, PaperclipMcpTokenType and parseTokenType; upstream's apiUrl/apiKey/companyId/agentId/runId reads are otherwise unchanged.",
+      "maxTotalLines": 30
+    },
+    {
       "path": "packages/mcp-server/src/client.ts",
       "maxNetLines": 80,
       "reason": "wave128C: adds requestMultipart for the upload endpoints (issue attachments, project requirement documents, analyze-document), which are multipart/form-data and cannot be reached through the JSON-only requestJson. Shares one buildHeaders so the fork's dual credential (Authorization Bearer AND X-Paperclip-Api-Key, from commit 731fd0207) and the run-id header are applied identically to both shapes. Resolution at a merge: keep requestMultipart and the extracted helpers; upstream's requestJson body is otherwise unchanged.",
@@ -682,8 +688,8 @@
     {
       "path": "server/src/middleware/auth.ts",
       "maxNetLines": 40,
-      "reason": "wave134: the loopback board-concierge actor's userId now comes from the shared PAPERCLIP_CONCIERGE_USER_ID constant in services/responsible-user.ts instead of a bare literal, so the id that responsible-user resolution must special-case can never drift out of sync with the middleware that mints it.",
-      "maxTotalLines": 60
+      "reason": "wave134: the loopback board-concierge actor's userId now comes from the shared PAPERCLIP_CONCIERGE_USER_ID constant in services/responsible-user.ts instead of a bare literal, so the id that responsible-user resolution must special-case can never drift out of sync with the middleware that mints it. wave380: also resolve a real board key presented on the fork's board channel `x-paperclip-api-key` (the MCP client declares it with PAPERCLIP_MCP_TOKEN_TYPE=board|user) to a full-control board actor, so a board token reaches operator context without being forced down the agent-bearer path where an unrecognized value is a hard 401. Only consulted when no bearer is present; a value matching no board key is ignored, never a 401. Resolution at a merge: keep the block; upstream's authenticated-mode bearer resolution is otherwise unchanged.",
+      "maxTotalLines": 100
     },
     {
       "path": "server/src/services/heartbeat.ts",

@@ -299,6 +299,41 @@ export function actorMiddleware(db: Db, opts: ActorMiddlewareOptions): RequestHa
       }
     }
 
+    // Fork board channel: `x-paperclip-api-key` may carry a real board key (the
+    // MCP client declares that with PAPERCLIP_MCP_TOKEN_TYPE=board|user), not
+    // only the loopback concierge key handled above. A board credential is
+    // full-control operator context (upstream AGENTS.md §8), so the store the
+    // token lives in decides the actor. Consulted only when no bearer is
+    // present — with a bearer, that path resolves board keys itself. A value
+    // that matches no board key is ignored and never a 401: this header is not
+    // an agent credential and must not fail an otherwise valid request.
+    if (!bearerCandidate) {
+      const headerApiKey = normalizeOptionalString(req.header("x-paperclip-api-key"));
+      if (headerApiKey) {
+        const headerBoardKey = await boardAuth.findBoardApiKeyByToken(headerApiKey);
+        if (headerBoardKey) {
+          const access = await boardAuth.resolveBoardAccess(headerBoardKey.userId);
+          if (access.user) {
+            await boardAuth.touchBoardApiKey(headerBoardKey.id);
+            req.actor = {
+              type: "board",
+              userId: headerBoardKey.userId,
+              userName: access.user?.name ?? null,
+              userEmail: access.user?.email ?? null,
+              companyIds: access.companyIds,
+              memberships: access.memberships,
+              isInstanceAdmin: access.isInstanceAdmin,
+              keyId: headerBoardKey.id,
+              runId: runIdHeader || undefined,
+              source: "board_key",
+            };
+            next();
+            return;
+          }
+        }
+      }
+    }
+
     if (queryToken && !req.header("cookie")) {
       req.headers["cookie"] = `__Secure-paperclip-default.session_token=${encodeURIComponent(queryToken)}; paperclip-default.session_token=${encodeURIComponent(queryToken)}`;
     }

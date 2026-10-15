@@ -76,14 +76,31 @@ export class PaperclipApiClient {
   }
 
   /**
-   * Auth + run-scoped headers shared by every request shape. The fork's board
-   * channel reads `X-Paperclip-Api-Key` while agent runs read `Authorization`,
-   * so both are always sent (see the fork-surface entry for this file).
+   * Auth headers shared by every request shape, chosen by the declared token
+   * type (PAPERCLIP_MCP_TOKEN_TYPE, default `agent`).
+   *
+   * - `agent`: agent keys and agent JWTs resolve from `Authorization`, so the
+   *   bearer is authoritative. The fork's board channel reads
+   *   `X-Paperclip-Api-Key`, so both are sent (see the fork-surface entry for
+   *   this file).
+   * - `board` / `user`: the token is a board/operator credential, which the
+   *   server resolves from `x-paperclip-api-key`. Presenting it there — and
+   *   NOT as a bearer — keeps a board-only credential out of the agent-JWT
+   *   path, where an unrecognized bearer is a hard 401.
    */
-  private buildHeaders(method: string, options: JsonRequestOptions, jsonBody: boolean): Record<string, string> {
-    const headers: Record<string, string> = {
+  private authHeaders(): Record<string, string> {
+    if (this.config.tokenType === "board" || this.config.tokenType === "user") {
+      return { "X-Paperclip-Api-Key": this.config.apiKey };
+    }
+    return {
       Authorization: `Bearer ${this.config.apiKey}`,
       "X-Paperclip-Api-Key": this.config.apiKey,
+    };
+  }
+
+  private buildHeaders(method: string, options: JsonRequestOptions, jsonBody: boolean): Record<string, string> {
+    const headers: Record<string, string> = {
+      ...this.authHeaders(),
       Accept: "application/json",
     };
     if (jsonBody) {
