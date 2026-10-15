@@ -31,7 +31,7 @@
 所谓的 `claude-glm`、`claude-mm` 与 `claude-ds`，实质是**同一个 `claude` CLI 通过切换宿主机 `~/.claude/settings.json` 软链接（symlink）所指向的不同提供商配置文件**！
 
 ```
-                      ┌───> settings.jsonglm ───> 智谱 BigModel API (glm-5.3[1m])
+                      ┌───> settings.jsonglm ───> 智谱 BigModel API (glm-5)
                       │
 ~/.claude/settings.json ───> settings.jsonmm  ───> MiniMax API (MiniMax-M3)
   (符号链接 symlink)    │
@@ -42,8 +42,8 @@
 
 | 工具名称 (`--tool`) | 软链接目标文件 | 服务商与 API 基础端点 | 核心模型规格 | 配置亮点与适用场景 |
 |---|---|---|---|---|
-| **`claude-glm`** | `~/.claude/settings.jsonglm` | **智谱 BigModel**<br>`https://open.bigmodel.cn/api/anthropic` | `glm-5.3[1m]`<br>(Haiku: `glm-5-turbo`) | **铁匠 (Core SWE) 主力工具**。<br>拥有 1M 超长上下文，自动压缩窗口 1048576，长上下文工程代码与架构重构极其稳定。 |
-| **`claude-mm`** | `~/.claude/settings.jsonmm` | **MiniMax 官方**<br>`https://api.minimaxi.com/anthropic` | `MiniMax-M3` | **铁匠贰号 (Core SWE 兜底) / 百晓生 (DS 备用)**。<br>最大输出支持 32000 tokens，挂载 `rtk hook claude`，长期按量充裕，抗高并发。 |
+| **`claude-glm`** | `~/.claude/settings.jsonglm` | **智谱 BigModel**<br>`https://open.bigmodel.cn/api/anthropic` | `glm-5`<br>(Haiku: `glm-5-turbo`) | **铁匠 (Core SWE) 主力工具**。<br>拥有 1M 超长上下文，自动压缩窗口 1048576，挂载 `rtk hook claude`，最大输出 32000，长上下文工程代码与架构重构极其稳定。 |
+| **`claude-mm`** | `~/.claude/settings.jsonmm` | **MiniMax 官方**<br>`https://api.minimaxi.com/anthropic` | `MiniMax-M3`<br>(Haiku: `MiniMax-M2.7`) | **铁匠贰号 (Core SWE 兜底) / 百晓生 (DS 备用)**。<br>自动压缩窗口 1048576，最大输出 32000 tokens，挂载 `rtk hook claude`，长期按量充裕，抗高并发。 |
 | **`claude-ds`** | `~/.claude/settings.jsonds` | **DeepSeek 官方**<br>`https://api.deepseek.com/anthropic` | `deepseek-v4-pro` | **应急备选**（已退出日常 7 工具池，配置文件就绪留底）。 |
 
 ### 1.3 宿主机真实配置内容拆解
@@ -57,9 +57,25 @@
     "API_TIMEOUT_MS": "3000000",
     "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": 1,
     "ANTHROPIC_DEFAULT_HAIKU_MODEL": "glm-5-turbo",
-    "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5.3[1m]",
-    "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5.3[1m]",
-    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1048576"
+    "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5",
+    "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1048576",
+    "ANTHROPIC_MODEL": "glm-5",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "glm-5",
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "32000"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rtk hook claude"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -73,9 +89,11 @@
     "ANTHROPIC_MODEL": "MiniMax-M3",
     "ANTHROPIC_DEFAULT_OPUS_MODEL": "MiniMax-M3",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "MiniMax-M3",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "MiniMax-M3",
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "MiniMax-M2.7",
     "CLAUDE_CODE_SUBAGENT_MODEL": "MiniMax-M3",
-    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "32000"
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "32000",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1048576",
+    "API_TIMEOUT_MS": "3000000"
   },
   "permissions": {
     "allow": [],
@@ -118,7 +136,7 @@ claude -p "$PROMPT" --dangerously-skip-permissions < /dev/null
 # 调 GLM
 ANTHROPIC_BASE_URL="https://open.bigmodel.cn/api/anthropic" \
 ANTHROPIC_AUTH_TOKEN="f111499a79a6407eb9ebe2a89bfab50d.tzbjj1u9u3PF4BIi" \
-ANTHROPIC_DEFAULT_SONNET_MODEL="glm-5.3[1m]" \
+ANTHROPIC_DEFAULT_SONNET_MODEL="glm-5" \
 claude -p "$PROMPT" --dangerously-skip-permissions < /dev/null
 ```
 

@@ -127,7 +127,7 @@ lookup_tool() {
       if [[ "$name" == "claude-glm" ]]; then
         echo "  物理本质: Mac 宿主机 /opt/homebrew/bin/claude (Anthropic 官方 CLI)"
         echo "  配置文件: ~/.claude/settings.jsonglm"
-        echo "  模型与端点: 智谱 BigModel glm-5.3[1m] (https://open.bigmodel.cn/api/anthropic)"
+        echo "  模型与端点: 智谱 BigModel glm-5 (https://open.bigmodel.cn/api/anthropic)"
         echo "  切换机制: ln -sf ~/.claude/settings.jsonglm ~/.claude/settings.json"
         echo "  CLI 调用: ln -sf ~/.claude/settings.jsonglm ~/.claude/settings.json && claude -p \"\$PROMPT\" --dangerously-skip-permissions < /dev/null"
         echo "  ACP 驱动: scripts/adapters/claude-glm-acp.sh -> acpx claude \"\$PROMPT\""

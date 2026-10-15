@@ -79,7 +79,22 @@ if [[ ! -f "$HOME/.claude/settings.jsonglm" ]]; then
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "glm-5",
     "ANTHROPIC_DEFAULT_OPUS_MODEL": "glm-5",
     "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1048576",
-    "ANTHROPIC_MODEL": "glm-5"
+    "ANTHROPIC_MODEL": "glm-5",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "glm-5",
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "32000"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rtk hook claude"
+          }
+        ]
+      }
+    ]
   }
 }
 EOF
@@ -94,8 +109,24 @@ if [[ ! -f "$HOME/.claude/settings.jsonmm" ]]; then
     "ANTHROPIC_MODEL": "MiniMax-M3",
     "ANTHROPIC_DEFAULT_OPUS_MODEL": "MiniMax-M3",
     "ANTHROPIC_DEFAULT_SONNET_MODEL": "MiniMax-M3",
-    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "MiniMax-M3",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "MiniMax-M3"
+    "ANTHROPIC_DEFAULT_HAIKU_MODEL": "MiniMax-M2.7",
+    "CLAUDE_CODE_SUBAGENT_MODEL": "MiniMax-M3",
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "32000",
+    "CLAUDE_CODE_AUTO_COMPACT_WINDOW": "1048576",
+    "API_TIMEOUT_MS": "3000000"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "rtk hook claude"
+          }
+        ]
+      }
+    ]
   }
 }
 EOF
