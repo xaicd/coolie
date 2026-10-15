@@ -1242,6 +1242,15 @@ export function createToolDefinitions(client: PaperclipApiClient): ToolDefinitio
         });
       },
     ),
+    makeTool(
+      "paperclipListCompanies",
+      "List companies the current actor can see (board key sees the directory), optionally scope=accessible to return only the caller's company memberships; used to discover the companyId that every company-scoped write needs",
+      z.object({ scope: z.enum(["accessible"]).optional() }),
+      async ({ scope }) => {
+        const qs = scope ? `?scope=${encodeURIComponent(scope)}` : "";
+        return client.requestJson("GET", `/companies${qs}`);
+      },
+    ),
   ];
 }
 

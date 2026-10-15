@@ -827,3 +827,34 @@ describe("spec-driven MCP tools (wave147)", () => {
   });
 });
 
+describe("company discovery MCP tool (wave379)", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("lists companies without needing a company scope", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockJsonResponse([{ id: COMPANY_A, name: "Coolie 本地施工总社" }]),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipListCompanies").execute({});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/companies");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Coolie 本地施工总社");
+  });
+
+  it("passes scope=accessible through to the company list", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await getTool("paperclipListCompanies").execute({ scope: "accessible" });
+
+    const [url] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/companies?scope=accessible");
+  });
+});
+

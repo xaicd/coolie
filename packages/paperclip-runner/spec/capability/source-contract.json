@@ -87,7 +87,8 @@
     "paperclipExecutePluginTool",
     "spec_create",
     "spec_tree",
-    "spec_template_apply"
+    "spec_template_apply",
+    "paperclipListCompanies"
   ],
   "evalGroups": {
     "hb": ["control_plane_owned", "control_plane_invariant", "get_task_context", "active_task_context"],
