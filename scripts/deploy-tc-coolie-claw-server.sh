@@ -50,6 +50,7 @@ rsync -az --delete \
   --exclude '/out' \
   --exclude 'target' \
   --exclude '/ui' \
+  --exclude '/projects' \
   ./ "$SSH_TARGET:$REMOTE_DIR/"
 
 COMMIT_SHA="$(git rev-parse HEAD 2>/dev/null || echo '')"
