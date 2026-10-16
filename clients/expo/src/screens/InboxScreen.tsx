@@ -486,6 +486,11 @@ export function InboxScreen({
           setMineIssues(mineResp.length > 0 ? mineResp : mergedNextIssues);
           setMentions(feed.mentionedBy ?? []);
           setApprovals(feed.pendingApprovals ?? []);
+          // COOA-247 device-verify hook: confirm the data path that drives the
+          // 审批 Tab (Inbox + Screen approval list) really hits /api/inbox and
+          // parses pendingApprovals. Empty array was hiding the bug.
+          // eslint-disable-next-line no-console
+          console.log("[inbox-load]", JSON.stringify({ pending: (feed.pendingApprovals ?? []).length, failures: (feed.failures ?? []).length, mentions: (feed.mentionedBy ?? []).length, sampleTitle: (feed.pendingApprovals ?? [])[0]?.title ?? null }));
           setFailures(
             feed.failedRuns?.length
               ? feed.failedRuns

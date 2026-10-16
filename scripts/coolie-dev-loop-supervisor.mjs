@@ -142,6 +142,8 @@ export async function runSupervisorCycle() {
       '架构': '09af00a0-f1cd-4a17-8ef5-3a8bcba381d7',
       backend: '02cab729-c5b7-4a14-9ce9-5a34885c336a',  // 铁匠 (Core SWE)
       '后端': '02cab729-c5b7-4a14-9ce9-5a34885c336a',
+      dev: '02cab729-c5b7-4a14-9ce9-5a34885c336a',
+      '研发': '02cab729-c5b7-4a14-9ce9-5a34885c336a',
       frontend: '58dc794d-ae28-47f4-9e6e-5e798ef55df2', // 门神 (FDSE)
       '前端': '58dc794d-ae28-47f4-9e6e-5e798ef55df2',
       qa: '8a288a46-8598-4c68-b52e-545360e11929',       // 兑底渊 (PRE-SRE)
