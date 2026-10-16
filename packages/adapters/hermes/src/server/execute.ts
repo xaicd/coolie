@@ -448,8 +448,8 @@ export async function execute(
   const useQuiet = cfgBoolean(config.quiet) === true; // default false
   let queryFilePath: string | null = null;
   const args: string[] = ["chat"];
-  // When prompt is very large (> 64KB), pass via --query-file to avoid POSIX spawn E2BIG (ARG_MAX exceeded)
-  if (prompt && prompt.length > 65536) {
+  // When prompt is large (> 4KB), pass via --query-file to avoid POSIX spawn E2BIG (ARG_MAX exceeded)
+  if (prompt && prompt.length > 4096) {
     queryFilePath = path.join(
       os.tmpdir(),
       `hermes-query-${ctx.runId || Date.now()}-${Math.random().toString(36).slice(2, 8)}.txt`,
