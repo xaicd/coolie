@@ -788,10 +788,17 @@ export {
 } from "./recovery/service.js";
 export const ACTIVE_RUN_OUTPUT_PROGRESS_FLUSH_INTERVAL_MS = 60 * 1000;
 export const ACTIVE_RUN_LOG_RUNTIME_STATUS_REFRESH_INTERVAL_MS = 5 * 1000;
+// Two rungs, not more: `legacyExecutionNeedsReconciliation` refuses any legacy
+// retry once `executionFailureRetryCount(run) >= 2`, so this length must stay
+// aligned with that boundary. Lengthening it would make the scheduler return
+// `not_scheduled` (reconciliation) at the rung boundary instead of reaching the
+// exhaustion branch, silently disabling both the exhaustion event and the
+// COOA-42 resurrection below. The growth + jitter below is the safe part of the
+// backoff enhancement: attempt 1 waits 30s, attempt 2 grows to 2m.
 export const BOUNDED_TRANSIENT_HEARTBEAT_RETRY_DELAYS_MS = [
-  30_000, 30_000,
+  30_000, 120_000,
 ] as const;
-const BOUNDED_TRANSIENT_HEARTBEAT_RETRY_JITTER_RATIO = 0;
+const BOUNDED_TRANSIENT_HEARTBEAT_RETRY_JITTER_RATIO = 0.2;
 const BOUNDED_TRANSIENT_HEARTBEAT_RETRY_REASON = "transient_failure";
 const BOUNDED_TRANSIENT_HEARTBEAT_RETRY_WAKE_REASON = "transient_failure_retry";
 function isTransientWorkspaceGitScanCode(code: string | null | undefined): boolean {
@@ -799,6 +806,35 @@ function isTransientWorkspaceGitScanCode(code: string | null | undefined): boole
 }
 const BOUNDED_TRANSIENT_HEARTBEAT_RETRY_MAX_ATTEMPTS =
   BOUNDED_TRANSIENT_HEARTBEAT_RETRY_DELAYS_MS.length;
+// COOA-42: when the bounded transient ladder is exhausted on an issue-bound
+// run, escalate instead of going silent. A delayed resurrection wake walks a
+// fixed ladder (5m -> 15m -> 60m) so the assignee is re-woken without a human
+// noticing the stalled run; the ladder is capped so a wedged agent cannot be
+// resurrected forever, and the orphan-liveness watchdog (rule 4) remains the
+// downstream safety net once the ladder is capped.
+export const RETRY_EXHAUSTION_RESURRECTION_RETRY_REASON =
+  "retry_exhausted_resurrection";
+export const RETRY_EXHAUSTION_RESURRECTION_WAKE_REASON =
+  "retry_exhausted_resurrection";
+export const RETRY_EXHAUSTION_RESURRECTION_DELAYS_MS = [
+  5 * 60_000, 15 * 60_000, 60 * 60_000,
+] as const;
+export const RETRY_EXHAUSTION_RESURRECTION_MAX_ATTEMPTS =
+  RETRY_EXHAUSTION_RESURRECTION_DELAYS_MS.length;
+// Resurrections older than this do not count against the ladder: a genuine
+// new failure a day later earns a fresh ladder.
+const RETRY_EXHAUSTION_RESURRECTION_LOOKBACK_MS = 24 * 60 * 60_000;
+// Named result type for the scheduled branch of `scheduleBoundedRetryForRun`.
+// Annotating the resurrection helper with it breaks the mutual recursion between
+// the two functions so neither infers `any`.
+type ScheduledBoundedRetryResult = {
+  outcome: "scheduled";
+  run: typeof heartbeatRuns.$inferSelect;
+  dueAt: Date;
+  attempt: number;
+  maxAttempts: number;
+  reusedExisting?: boolean;
+};
 export {
   INTERACTION_CONTINUATION_INFRA_RETRY_REASON,
   INTERACTION_CONTINUATION_INFRA_WAKE_REASON,
@@ -15316,6 +15352,8 @@ export function heartbeatService(
       wakeReason?: string;
       maxAttempts?: number;
       delayMs?: number;
+      /** Explicit attempt index for the next retry; skips the derived counters. */
+      nextAttempt?: number;
     },
   ) {
     const now = opts?.now ?? new Date();
@@ -15330,11 +15368,12 @@ export function heartbeatService(
       ),
     );
     const nextAttempt =
-      (retryReason === WORKSPACE_BUSY_RETRY_REASON ||
+      opts?.nextAttempt ??
+      ((retryReason === WORKSPACE_BUSY_RETRY_REASON ||
       retryReason === AI_CONNECTION_BUSY_RETRY_REASON ||
       retryReason === MAX_TURN_CONTINUATION_RETRY_REASON
         ? (run.scheduledRetryAttempt ?? 0)
-        : executionFailureRetryCount(run)) + 1;
+        : executionFailureRetryCount(run)) + 1);
     const computedBaseSchedule =
       opts?.delayMs != null
         ? nextAttempt <= maxAttempts
@@ -15400,6 +15439,26 @@ export function heartbeatService(
             "failed to escalate exhausted plan-approval resume failure",
           );
         });
+      } else if (issueId && !hasConversationContinuationPolicy(run.resultJson)) {
+        // COOA-42: an issue-bound run that exhausts its bounded retries would
+        // otherwise go silent until a human notices. Escalate once more via the
+        // capped resurrection ladder (5m/15m/60m) so the assignee is re-woken.
+        // Productive conversation continuations are excluded: their exhaustion
+        // deliberately releases the task for a fresh explicit request, and
+        // re-waking would fight that invariant.
+        const resurrection = await scheduleRetryExhaustionResurrection(run, agent, {
+          now,
+          random: opts?.random,
+          issueId,
+          exhaustedRetryReason: retryReason,
+        }).catch((error) => {
+          logger.warn(
+            { err: error, runId: run.id, issueId },
+            "failed to schedule retry-exhaustion resurrection",
+          );
+          return null;
+        });
+        if (resurrection) return resurrection;
       }
       return {
         outcome: "retry_exhausted" as const,
@@ -15408,7 +15467,16 @@ export function heartbeatService(
       };
     }
 
-    if (legacyExecutionNeedsReconciliation(run)) {
+    // The resurrection is exempt from the legacy reconciliation hold: that hold
+    // exists to stop replaying a possibly-unfinished provider session, while the
+    // resurrection is the deliberate terminal-state escalation that wakes the
+    // assignee precisely because automatic retry was refused. Without this
+    // exemption the reconciliation guard would swallow the resurrection and the
+    // issue would stay silent.
+    if (
+      retryReason !== RETRY_EXHAUSTION_RESURRECTION_RETRY_REASON &&
+      legacyExecutionNeedsReconciliation(run)
+    ) {
       return {
         outcome: "not_scheduled" as const,
         reason:
@@ -16184,6 +16252,142 @@ export function heartbeatService(
       attempt: schedule.attempt,
       maxAttempts: schedule.maxAttempts,
     };
+  }
+
+  // COOA-42: schedules one delayed resurrection wake after an issue-bound run
+  // exhausts its bounded retries. It reuses the bounded-retry transaction (issue
+  // + execution-lock handling, wake admission, idempotent predecessor claim) by
+  // delegating to `scheduleBoundedRetryForRun` with an explicit ladder delay and
+  // a single attempt, so a duplicate exhaustion can never stack wakes. Returns
+  // null (leaving the caller to report `retry_exhausted`) when the issue is not
+  // resurrectable or the ladder is capped.
+  async function scheduleRetryExhaustionResurrection(
+    run: typeof heartbeatRuns.$inferSelect,
+    agent: typeof agents.$inferSelect,
+    input: {
+      now: Date;
+      random?: () => number;
+      issueId: string;
+      exhaustedRetryReason: string;
+    },
+  ): Promise<ScheduledBoundedRetryResult | null> {
+    const issue = await db
+      .select({
+        id: issues.id,
+        status: issues.status,
+        assigneeAgentId: issues.assigneeAgentId,
+      })
+      .from(issues)
+      .where(
+        and(
+          eq(issues.companyId, run.companyId),
+          eq(issues.id, input.issueId),
+        ),
+      )
+      .then((rows) => rows[0] ?? null);
+    if (!issue) return null;
+
+    // Never resurrect a terminal or reassigned issue: a delayed wake against a
+    // done/cancelled task is exactly the stale-run state-revert family the
+    // resurrection net must not widen.
+    const isResurrectable =
+      (issue.status === "todo" ||
+        issue.status === "in_progress" ||
+        issue.status === "in_review") &&
+      issue.assigneeAgentId === run.agentId;
+
+    const priorResurrections = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(heartbeatRuns)
+      .where(
+        and(
+          eq(heartbeatRuns.companyId, run.companyId),
+          eq(
+            heartbeatRuns.scheduledRetryReason,
+            RETRY_EXHAUSTION_RESURRECTION_RETRY_REASON,
+          ),
+          sql`${heartbeatRuns.contextSnapshot} ->> 'issueId' = ${input.issueId}`,
+          gte(
+            heartbeatRuns.createdAt,
+            new Date(
+              input.now.getTime() - RETRY_EXHAUSTION_RESURRECTION_LOOKBACK_MS,
+            ),
+          ),
+        ),
+      )
+      .then((rows) => rows[0]?.count ?? 0);
+
+    const recordExhaustionActivity = (
+      resurrected: boolean,
+      reason: string,
+      details: Record<string, unknown> = {},
+    ) =>
+      logActivity(db, {
+        companyId: run.companyId,
+        actorType: "system",
+        actorId: "heartbeat",
+        agentId: run.agentId,
+        runId: run.id,
+        action: "issue.heartbeat_retry_exhausted",
+        entityType: "issue",
+        entityId: input.issueId,
+        issueId: input.issueId,
+        details: {
+          retryReason: input.exhaustedRetryReason,
+          exhaustedRunId: run.id,
+          resurrected,
+          reason,
+          ...details,
+        },
+      });
+
+    if (!isResurrectable) {
+      await recordExhaustionActivity(false, "issue_not_resurrectable", {
+        issueStatus: issue.status,
+        assigneeAgentId: issue.assigneeAgentId,
+      });
+      return null;
+    }
+
+    if (priorResurrections >= RETRY_EXHAUSTION_RESURRECTION_MAX_ATTEMPTS) {
+      await recordExhaustionActivity(false, "resurrection_ladder_capped", {
+        priorResurrections,
+        maxResurrections: RETRY_EXHAUSTION_RESURRECTION_MAX_ATTEMPTS,
+      });
+      await appendRunEvent(run, {
+        eventType: "lifecycle",
+        stream: "system",
+        level: "warn",
+        message: `Retry-exhaustion resurrection capped at ${RETRY_EXHAUSTION_RESURRECTION_MAX_ATTEMPTS} attempts; leaving the orphan-liveness watchdog to report the stalled task`,
+        payload: {
+          retryReason: input.exhaustedRetryReason,
+          resurrectionCapped: true,
+          priorResurrections,
+          maxResurrections: RETRY_EXHAUSTION_RESURRECTION_MAX_ATTEMPTS,
+        },
+      });
+      return null;
+    }
+
+    const rung = priorResurrections + 1;
+    const delayMs = RETRY_EXHAUSTION_RESURRECTION_DELAYS_MS[priorResurrections];
+    await recordExhaustionActivity(true, "resurrection_scheduled", {
+      rung,
+      maxRungs: RETRY_EXHAUSTION_RESURRECTION_MAX_ATTEMPTS,
+      resumeInMs: delayMs,
+    });
+
+    const scheduled = await scheduleBoundedRetryForRun(run, agent, {
+      now: input.now,
+      random: input.random,
+      delayMs,
+      maxAttempts: 1,
+      nextAttempt: 1,
+      retryReason: RETRY_EXHAUSTION_RESURRECTION_RETRY_REASON,
+      wakeReason: RETRY_EXHAUSTION_RESURRECTION_WAKE_REASON,
+    });
+    if (scheduled.outcome !== "scheduled") return null;
+    return scheduled;
   }
 
   // Finds a running heartbeat run (other than the caller's) whose context

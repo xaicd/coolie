@@ -62,8 +62,13 @@ import {
   INTERACTION_CONTINUATION_INFRA_WAKE_REASON,
   MAX_TURN_CONTINUATION_RETRY_REASON,
   MAX_TURN_CONTINUATION_WAKE_REASON,
+  RETRY_EXHAUSTION_RESURRECTION_DELAYS_MS,
+  RETRY_EXHAUSTION_RESURRECTION_MAX_ATTEMPTS,
+  RETRY_EXHAUSTION_RESURRECTION_RETRY_REASON,
+  RETRY_EXHAUSTION_RESURRECTION_WAKE_REASON,
   heartbeatService,
 } from "../services/heartbeat.ts";
+import { isThrottleCandidateIssueRewake } from "../services/issue-rewake-throttle.js";
 
 const mockedAppendHeartbeatRunEvent = vi.mocked(appendHeartbeatRunEvent);
 
@@ -2443,5 +2448,141 @@ describeEmbeddedPostgres("heartbeat bounded retry scheduling", () => {
       expect(resultIds.has(dueRunIds[50])).toBe(false);
       expect(resultIds.has(dueRunIds[51])).toBe(false);
     });
+  });
+
+  // COOA-42: after an issue-bound run exhausts its bounded retries, the server
+  // must escalate with a capped resurrection wake instead of going silent.
+  it("schedules a delayed resurrection wake when an issue-bound run exhausts its retries", async () => {
+    const runId = randomUUID(), companyId = randomUUID(), agentId = randomUUID(), issueId = randomUUID();
+    const now = new Date("2026-04-20T12:00:00.000Z");
+    await seedRetryFixture({ runId, companyId, agentId, now, errorCode: "adapter_failed" });
+    await db.insert(issues).values({
+      id: issueId,
+      companyId,
+      title: "Stalled task",
+      status: "in_progress",
+      priority: "medium",
+      responsibleUserId: "responsible-user",
+      assigneeAgentId: agentId,
+      executionRunId: runId,
+      executionAgentNameKey: "codexcoder",
+      executionLockedAt: now,
+      issueNumber: 1,
+      identifier: `T${companyId.replace(/-/g, "").slice(0, 6).toUpperCase()}-1`,
+    });
+    await db.update(heartbeatRuns).set({
+      scheduledRetryAttempt: BOUNDED_TRANSIENT_HEARTBEAT_RETRY_DELAYS_MS.length,
+      scheduledRetryReason: "transient_failure",
+      contextSnapshot: { issueId, wakeReason: "issue_assigned" },
+    }).where(eq(heartbeatRuns.id, runId));
+
+    const revived = await heartbeat.scheduleBoundedRetry(runId, { now, random: () => 0.5 });
+    expect(revived).toMatchObject({ outcome: "scheduled", attempt: 1, maxAttempts: 1 });
+    if (revived.outcome !== "scheduled") throw new Error("Expected a resurrection retry");
+
+    const resurrectionRun = await db.select().from(heartbeatRuns)
+      .where(eq(heartbeatRuns.id, revived.run!.id)).then((rows) => rows[0] ?? null);
+    expect(resurrectionRun).toMatchObject({
+      status: "scheduled_retry",
+      retryOfRunId: runId,
+      scheduledRetryReason: RETRY_EXHAUSTION_RESURRECTION_RETRY_REASON,
+      scheduledRetryAttempt: 1,
+    });
+    const expectedDueAt = new Date(now.getTime() + RETRY_EXHAUSTION_RESURRECTION_DELAYS_MS[0]);
+    expect(resurrectionRun?.scheduledRetryAt?.toISOString()).toBe(expectedDueAt.toISOString());
+
+    const exhaustionActivity = await db.select().from(activityLog).where(and(
+      eq(activityLog.companyId, companyId),
+      eq(activityLog.action, "issue.heartbeat_retry_exhausted"),
+    )).then((rows) => rows[0] ?? null);
+    expect(exhaustionActivity).toMatchObject({ entityType: "issue", entityId: issueId });
+    expect(exhaustionActivity?.details).toMatchObject({
+      resurrected: true,
+      rung: 1,
+      resumeInMs: RETRY_EXHAUSTION_RESURRECTION_DELAYS_MS[0],
+    });
+  });
+
+  it("caps the resurrection ladder and leaves the issue for the liveness watchdog", async () => {
+    const runId = randomUUID(), companyId = randomUUID(), agentId = randomUUID(), issueId = randomUUID();
+    const now = new Date("2026-04-20T12:00:00.000Z");
+    await seedRetryFixture({ runId, companyId, agentId, now, errorCode: "adapter_failed" });
+    await db.insert(issues).values({
+      id: issueId,
+      companyId,
+      title: "Stalled task",
+      status: "in_progress",
+      priority: "medium",
+      responsibleUserId: "responsible-user",
+      assigneeAgentId: agentId,
+      executionRunId: runId,
+      executionAgentNameKey: "codexcoder",
+      executionLockedAt: now,
+      issueNumber: 1,
+      identifier: `T${companyId.replace(/-/g, "").slice(0, 6).toUpperCase()}-1`,
+    });
+    await db.update(heartbeatRuns).set({
+      scheduledRetryAttempt: BOUNDED_TRANSIENT_HEARTBEAT_RETRY_DELAYS_MS.length,
+      scheduledRetryReason: "transient_failure",
+      contextSnapshot: { issueId, wakeReason: "issue_assigned" },
+    }).where(eq(heartbeatRuns.id, runId));
+    // The ladder already spent its full budget for this issue.
+    for (let i = 0; i < RETRY_EXHAUSTION_RESURRECTION_MAX_ATTEMPTS; i += 1) {
+      await db.insert(heartbeatRuns).values({
+        id: randomUUID(),
+        companyId,
+        agentId,
+        invocationSource: "automation",
+        status: "failed",
+        scheduledRetryAttempt: 1,
+        scheduledRetryReason: RETRY_EXHAUSTION_RESURRECTION_RETRY_REASON,
+        contextSnapshot: { issueId, wakeReason: RETRY_EXHAUSTION_RESURRECTION_WAKE_REASON },
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+
+    const result = await heartbeat.scheduleBoundedRetry(runId, { now, random: () => 0.5 });
+    expect(result).toMatchObject({ outcome: "retry_exhausted" });
+    const resurrectionRuns = await db.select().from(heartbeatRuns).where(and(
+      eq(heartbeatRuns.companyId, companyId),
+      eq(heartbeatRuns.scheduledRetryReason, RETRY_EXHAUSTION_RESURRECTION_RETRY_REASON),
+    ));
+    expect(resurrectionRuns).toHaveLength(RETRY_EXHAUSTION_RESURRECTION_MAX_ATTEMPTS);
+
+    const cappedEvent = await db.select().from(heartbeatRunEvents)
+      .where(eq(heartbeatRunEvents.runId, runId))
+      .orderBy(sql`${heartbeatRunEvents.id} desc`)
+      .then((rows) => rows.find((row) => (row.message ?? "").includes("resurrection capped")) ?? null);
+    expect(cappedEvent).not.toBeNull();
+  });
+
+  it("leaves non-issue-bound exhaustion unchanged and keeps the resurrection wake out of the rewake throttle", async () => {
+    expect(isThrottleCandidateIssueRewake({
+      reason: RETRY_EXHAUSTION_RESURRECTION_WAKE_REASON,
+      wakeCommentId: null,
+      forceFreshSession: false,
+      hasExplicitResume: false,
+    })).toBe(false);
+
+    const runId = randomUUID(), companyId = randomUUID(), agentId = randomUUID();
+    const now = new Date("2026-04-20T12:00:00.000Z");
+    await seedRetryFixture({ runId, companyId, agentId, now, errorCode: "adapter_failed" });
+    await db.update(heartbeatRuns).set({
+      scheduledRetryAttempt: BOUNDED_TRANSIENT_HEARTBEAT_RETRY_DELAYS_MS.length,
+      scheduledRetryReason: "transient_failure",
+      contextSnapshot: { wakeReason: "transient_failure_retry" },
+    }).where(eq(heartbeatRuns.id, runId));
+
+    expect(await heartbeat.scheduleBoundedRetry(runId, { now, random: () => 0.5 }))
+      .toMatchObject({ outcome: "retry_exhausted" });
+    expect(await db.select().from(heartbeatRuns).where(and(
+      eq(heartbeatRuns.companyId, companyId),
+      eq(heartbeatRuns.scheduledRetryReason, RETRY_EXHAUSTION_RESURRECTION_RETRY_REASON),
+    ))).toHaveLength(0);
+    expect(await db.select().from(activityLog).where(and(
+      eq(activityLog.companyId, companyId),
+      eq(activityLog.action, "issue.heartbeat_retry_exhausted"),
+    ))).toHaveLength(0);
   });
 });

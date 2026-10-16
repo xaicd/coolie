@@ -693,9 +693,15 @@
     },
     {
       "path": "server/src/services/heartbeat.ts",
-      "maxNetLines": 80,
-      "reason": "wave134: run responsible-user resolution substitutes the synthetic loopback-concierge principal with the company's real default. resolveResponsibleUserIdForRunSeed is now a thin wrapper over deriveResponsibleUserIdForRunSeed that normalizes the result, resolveResponsibleUserIdForRun ignores a concierge explicit-operator identity, and dispatch rewrites heartbeat_runs.responsible_user_id to the resolved identity (the row is created at wake time, before the identity is known). Non-member responsible users are deliberately preserved (external commenters); only the one id that can never be a member is rewritten.",
-      "maxTotalLines": 120
+      "maxNetLines": 240,
+      "reason": "wave134: run responsible-user resolution substitutes the synthetic loopback-concierge principal with the company's real default. resolveResponsibleUserIdForRunSeed is now a thin wrapper over deriveResponsibleUserIdForRunSeed that normalizes the result, resolveResponsibleUserIdForRun ignores a concierge explicit-operator identity, and dispatch rewrites heartbeat_runs.responsible_user_id to the resolved identity (the row is created at wake time, before the identity is known). Non-member responsible users are deliberately preserved (external commenters); only the one id that can never be a member is rewritten. COOA-42 raises the budget: the retry-exhaustion resurrection ladder (5m/15m/60m, capped) and the exponential bounded-retry ladder live in the exhaustion branch of scheduleBoundedRetryForRun, where the issue+execution-lock transaction and wake admission already are, so the escalation cannot be lifted out without re-plumbing that transaction. The logic is one bounded helper (scheduleRetryExhaustionResurrection) plus the ladder constants and one extra scheduleBoundedRetryForRun option.",
+      "maxTotalLines": 300
+    },
+    {
+      "path": "server/src/__tests__/heartbeat-retry-scheduling.test.ts",
+      "maxNetLines": 200,
+      "reason": "COOA-42: embedded-Postgres coverage for the retry-exhaustion resurrection ladder (exhaustion schedules the first 5m wake, the ladder caps and leaves the task to the liveness watchdog, non-issue-bound exhaustion is unchanged and the resurrection wake stays out of the rewake throttle), plus the two existing tests updated for the 4-attempt exponential bounded-retry ladder.",
+      "maxTotalLines": 240
     },
     {
       "path": "server/src/services/routines.ts",
