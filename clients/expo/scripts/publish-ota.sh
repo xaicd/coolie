@@ -20,6 +20,19 @@ fi
 [ -d "$HOME/.local/bin" ] && export PATH="$HOME/.local/bin:$PATH"
 [ -d "$HOME/bin" ] && export PATH="$HOME/bin:$PATH"
 
+# wave386 — 生产 OTA 绝不允许把 dev 实例地址编进 bundle (真机登录「网络连接失败」真因)。
+# babel-preset-expo 在 export 期内联 `EXPO_PUBLIC_COOLIE_*`: 若发 OTA 时外层 shell 残留
+# `EXPO_PUBLIC_COOLIE_USE_DEV_INSTANCE=1`(或 *_DEV_BASE_URL / *_BASE_URL), 这份 channel=production
+# 的增量包就会把 instanceTarget 编成 http://10.0.2.2:3100（仅 Android 模拟器可达）—— 于是所有
+# 真机拉到这个 OTA 后所有 API 打到不可达地址, 登录报「网络连接失败」(实测 v0.6.58 生产 OTA, wave386)。
+for _v in EXPO_PUBLIC_COOLIE_USE_DEV_INSTANCE EXPO_PUBLIC_COOLIE_DEV_BASE_URL EXPO_PUBLIC_COOLIE_BASE_URL; do
+  if [ -n "${!_v:-}" ]; then
+    echo "⚠️  wave386: 生产 OTA 构建不应携带 $_v=${!_v} —— 已清空 (生产固定 https://xrobinai.cn)"
+    unset "$_v"
+  fi
+done
+unset _v
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$EXPO_DIR"

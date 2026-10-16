@@ -66,6 +66,20 @@ fi
 [ -d "$HOME/.local/bin" ] && export PATH="$HOME/.local/bin:$PATH"
 [ -d "$HOME/bin" ] && export PATH="$HOME/bin:$PATH"
 
+# wave386 — 生产发版绝不允许把 dev 实例地址编进 bundle (登录「网络连接失败」真因)。
+# 根因: 发版时外层 shell 若残留 `EXPO_PUBLIC_COOLIE_USE_DEV_INSTANCE=1`
+# (或 *_DEV_BASE_URL / *_BASE_URL), babel-preset-expo 会在 build 期把它内联进
+# instanceTarget, 于是 APK / OTA 在真机上一律指向 http://10.0.2.2:3100（仅 Android
+# 模拟器可达的 dev 地址）→ 登录 fetch 抛错 → 界面报「网络连接失败」，而同域名在手机
+# 浏览器里 200（实测 v0.6.58 生产 OTA bundle，wave386）。生产构建强制清空这几个 env。
+for _v in EXPO_PUBLIC_COOLIE_USE_DEV_INSTANCE EXPO_PUBLIC_COOLIE_DEV_BASE_URL EXPO_PUBLIC_COOLIE_BASE_URL; do
+  if [ -n "${!_v:-}" ]; then
+    echo "⚠️  wave386: 生产构建不应携带 $_v=${!_v} —— 已清空 (生产固定 https://xrobinai.cn)"
+    unset "$_v"
+  fi
+done
+unset _v
+
 DRY_RUN=0
 SKIP_SERVER_DEPLOY=0
 WITH_4_GUARD=0
