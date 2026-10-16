@@ -51,8 +51,8 @@ flowchart TD
 
 1. **控制面中枢 (Paperclip Backbone)**：  
    单一人负责人原子签出锁、实时 Token 与花费硬熔断、原生协同文档 (`documents`)、不可变工件总线 (`issue_work_products`) 与全链路活动审计账本。
-2. **认知与决策 (Palantir Living Ontology)**：  
-   以业务实体 (Object Types) 与业务动词 (Action Types) 为双核，项目进厂即建本体域，任务施工挂载动词因果血缘，代码与真机快照作为不可篡改证据沉淀。
+2. **认知与决策 (Palantir Living Ontology & AI 新 SOA 语义底座)**：  
+   以业务实体 (Object Types) 与业务动词 (Action Types) 为双核，吸收新 SOA 11 大活体模型思想（M1对象、M2行为、M3规则、ME事件、M4场景、M5主体、M6补偿、M7质量、MM数据映射、MU界面调用链、MI接口契约）；推行“接口契约、数据结构、界面行为”三路系统蒸馏，项目进厂即建本体域，任务施工挂载动词因果血缘，支持跨模型变更影响面分析。
 3. **过程与质量 (CMMI 5 High Maturity Engineering)**：  
    全面落实从 0 到 1 商业软件工程资产化：
    - `G1` 需求规格 (SRS + EARS + RTM 追溯矩阵)；
@@ -70,8 +70,8 @@ flowchart TD
    - **高信噪比极简文案**：核心操作统一收敛为凝练的两字按钮（如“同意”、“驳回”、“立项”、“派单”）；
    - **经典绝对对称底栏**：保持黄金 5 槽位绝对对称（`Overview` / `Tasks` / `[+]` / `Studio` / `Assets`）；
    - **无感就地导航**：严格保持 LIFO 调用栈，就地浮层覆盖，杜绝跨 Tab 乱跳。
-6. **算力与调度中枢 (Flat Digital Employee Fleet)**：  
-   以 Hermes 为交付工厂调度决策中枢，统领底层 7 大工具池（`agy`, `claude-glm`, `claude-mm`, `cmd`, `copilot`, `kiro-cli`, `hermes`），后台免交互授权（`--dangerously-skip-permissions` / `--yolo`），依托 Tailscale Mesh 网络在多机矩阵（Mac、cwall、aja-pc、tc-coolie-claw）之间实现透明穿透调度。
+6. **算力与调度中枢 (Flat Digital Employee Fleet & 场景配方语义编排)**：  
+   以 Hermes 为交付工厂调度决策中枢，统领底层 7 大工具池（`agy`, `claude-glm`, `claude-mm`, `cmd`, `copilot`, `kiro-cli`, `hermes`），后台免交互授权；全面落地**“配方优先、AI补充”**编排哲学：80% 成熟交付流程固化为场景配方 (Recipe)，20% 探索场景走动态 DAG 规划并执行严格的输入类型静态预检、步骤级最小版本化结构体上下文、检查点增量恢复与高危写操作两阶段调用 (Prepare/Commit 2PC) 保护。
 
 ---
 

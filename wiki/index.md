@@ -71,6 +71,7 @@
 - [Dev 施工总社与 Prod 生产交付绝对物理隔离](architecture/dev-prod-isolation.md)
 - [Coolie 工坊 AI 活体业务本体全面图谱 (M1~M7+MU)](architecture/coolie-foundry-ai-ontology.md)
 - [外部前沿知识持续动态吸收与滚动演进闭环](architecture/knowledge-absorption-and-continuous-evolution.md)
+- [新 SOA 架构体系与本体驱动的语义编排](architecture/new-soa-and-semantic-orchestration.md)
 
 ---
 

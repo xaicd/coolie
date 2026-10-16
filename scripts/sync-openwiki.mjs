@@ -105,6 +105,7 @@ function buildIndexMd() {
 - [Dev 施工总社与 Prod 生产交付绝对物理隔离](architecture/dev-prod-isolation.md)
 - [Coolie 工坊 AI 活体业务本体全面图谱 (M1~M7+MU)](architecture/coolie-foundry-ai-ontology.md)
 - [外部前沿知识持续动态吸收与滚动演进闭环](architecture/knowledge-absorption-and-continuous-evolution.md)
+- [新 SOA 架构体系与本体驱动的语义编排](architecture/new-soa-and-semantic-orchestration.md)
 
 ---
 
@@ -451,6 +452,27 @@ function buildArchitecture() {
   - 数字员工进入 24x7 滚动心跳循环，依循 1 Task = 1 Commit、四态真机验伪与不可变证据存证逐项攻坚。
 - **经验沉淀与反向反哺 (Experience Distillation & Feedback Loop)**：
   - 每次施工与事故复盘自动沉淀为自动化守卫断言（SPC/CAR 根本原因防退化），系统持续抗熵自愈。
+`,
+    },
+    {
+      file: "new-soa-and-semantic-orchestration.md",
+      title: "新 SOA 架构体系与本体驱动的语义编排",
+      content: `# 架构支柱：新 SOA 架构体系与本体驱动的语义编排
+
+- **消灭 Agent 孤岛**：
+  - 杜绝为一个场景做一个垂直 Agent（Dify/Coze 孤岛模式），回归 SOA“能力组件化、组件服务化、服务可编排化”不变内核；
+  - 通用 Agent 作为编排中枢，自下而上依托 Harness 技术底座、活体本体模型与标准能力注册表。
+- **业务系统三路蒸馏**：
+  1. 接口契约蒸馏 (OpenAPI/RPC 契约与频控)；
+  2. 数据结构蒸馏 (DB 元数据映射，强制置信度标注)；
+  3. 界面与行为逆向蒸馏 (从前端 UI 逆向推导“界面操作 ➔ 聚合对象 ➔ 业务规则 ➔ 数据库”完整调用链)。
+- **配方优先与混合编排**：
+  - 80% 成熟交付流程固化为场景配方 (Recipe)，大模型仅做意图匹配与参数提取；
+  - 20% 探索场景走 AI 动态 DAG 规划，并辅以静态输入输出校验与预算门禁；
+  - 运行成功的计划经评审后自动沉淀为新配方。
+- **两阶段写操作治理 (2PC)**：
+  - 写操作强制遵循“Prepare（只读预检、算影响面、返回确认摘要与令牌）➔ Commit（带确认令牌与幂等键落盘写入）”；
+  - 引擎间传递版本化最小输入结构体，杜绝聊天历史滚雪球膨胀。
 `,
     },
   ];
