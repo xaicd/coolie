@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import fs from "node:fs";
 import http from "node:http";
+import os from "node:os";
 import path from "node:path";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
@@ -13,10 +15,19 @@ import {
   roleForRoutine,
   summarizeRoutine,
   summarizeInbox,
+  summarizeQueue,
+  queueLineCounts,
+  canonicalSnapshot,
+  snapshotSignature,
+  diffSnapshots,
+  readState,
+  writeState,
   parseArgs,
   collectSnapshot,
   renderText,
+  renderBrief,
   INBOX_BUCKETS,
+  QUEUE_BUCKETS,
   REPO_ROOT,
 } from "../hermes-heartbeat-snapshot.mjs";
 
@@ -261,7 +272,7 @@ test("CLI produces a real snapshot against a live companies-scoped list endpoint
 
   try {
     // 故意给裸 origin: 归一化必须自己补 /api (心法 #159/#161 回归)
-    const { stdout } = await execFileAsync("node", [SCRIPT, "--json", "--issue", ISSUE.id], {
+    const { stdout } = await execFileAsync("node", [SCRIPT, "--json", "--issue", ISSUE.id, "--no-state"], {
       env: { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" },
     });
     const snapshot = JSON.parse(stdout);
@@ -297,7 +308,7 @@ test("CLI falls back to the single-routine endpoint when the list endpoint is de
   try {
     const { stdout } = await execFileAsync(
       "node",
-      [SCRIPT, "--json", "--issue", ISSUE.id, "--routine-ids", singleId, "--skip-inbox"],
+      [SCRIPT, "--json", "--issue", ISSUE.id, "--routine-ids", singleId, "--skip-inbox", "--no-state"],
       { env: { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" } }
     );
     const snapshot = JSON.parse(stdout);
@@ -321,7 +332,7 @@ test("CLI reports routines as unavailable (never fabricates) when list dies and 
   });
 
   try {
-    const { stdout } = await execFileAsync("node", [SCRIPT, "--issue", ISSUE.id, "--skip-inbox"], {
+    const { stdout } = await execFileAsync("node", [SCRIPT, "--issue", ISSUE.id, "--skip-inbox", "--no-state"], {
       env: { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" },
     });
     assert.match(stdout, /routines: unavailable/);
