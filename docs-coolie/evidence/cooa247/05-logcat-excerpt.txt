@@ -1,0 +1,6 @@
+10-16 16:23:30.698 29745 29795 I ReactNativeJS: [OTA] listener setup: runtimeVersion=0.6.60 channel=production updateId=8e1c0bd6-6c25-4435-a367-1d3462b95844
+10-16 16:23:30.884 29745 29795 I ReactNativeJS: [OTA] check manifest runtimeVersion=0.6.60 vs installedApp=0.6.60 → match
+10-16 16:23:48.200 29745 29795 I ReactNativeJS: '[inbox-load:start]', '{"companyId":"4cafeb9a-22c9-48db-ae2e-70ad0dfbfc1e","companyName":"xrobinai","baseUrl":"https://xrobinai.cn","originHeader":"https://xrobinai.cn","authedUserAgent":"rn"}'
+10-16 16:23:48.368 29745 29795 I ReactNativeJS: '[inbox-load]', '{"pending":0,"failures":0,"mentions":4,"failedRuns":0,"sampleTitle":null,"sampleMentionAuthor":"墨斗","feedKeys":["pendingApprovals","failures","mentionedBy","joinRequests","failedRuns"]}'
+10-16 16:24:30.750 29745 29795 I ReactNativeJS: [OTA] check manifest runtimeVersion=0.6.60 vs installedApp=0.6.60 → match
+10-16 16:25:30.784 29745 29795 I ReactNativeJS: [OTA] check manifest runtimeVersion=0.6.60 vs installedApp=0.6.60 → match
