@@ -93,7 +93,44 @@ flowchart TD
 
 ---
 
-## 五、战略里程碑规划 (Strategic Milestones)
+## 五、外部前沿知识持续动态吸收与滚动演进闭环 (External Knowledge Dynamic Absorption & Continuous Rolling Loop)
+
+工坊产品不是固化的代码静态切片，而是具备高频新陈代谢能力的有机生命体。AI Agent 技术与开源基座生态日新月异，闭门造车必将迅速落后。工坊必须建立像呼吸与新陈代谢一样自然流转的**「外部知识动态吸收消化引擎 (Knowledge Ingestion & Rolling Loop Engine)」**：
+
+```mermaid
+flowchart LR
+    Scout["1. 全球雷达探查<br/>SOTA Agent协议 · 开源基座 · CMMI标准"] --> Digest["2. 高保真消化<br/>OpenWiki · MADR ADR · 门禁断言"]
+    Digest --> Tasking["3. 自主转化立项<br/>WBS 工单生成 · EARS 需求规格 · 角色派单"]
+    Tasking --> Loop["4. 滚动施工验伪<br/>1 Task = 1 Commit · 四态真实验伪 · 反哺自愈"]
+    Loop --> Scout
+```
+
+### 1. 四阶段动态知识代谢流水线 (4-Stage Knowledge Metabolism Pipeline)
+1. **阶段一：全球雷达探查与前沿摄取 (Global Scouting & SOTA Ingestion)**：
+   - 持续对标全球前沿数字员工范式（Google DeepMind Antigravity, Palantir Foundry, Paperclip, Devin, Anthropic ACP/Computer Use）；
+   - 持续吸纳主流工业级开源基座体系（芋道 Yudao-Cloud 19 域微服务/单体、若依 RuoYi-All-Next Next.js 16/React 19 轻量基座、MedusaJS v2 可逆 Saga 工作流、Supabase 极速开发）；
+   - 持续追踪 CMMI 5 级高成熟度度量体系、Google SRE 稳定性标准与 Strix 红队渗透安全规范。
+2. **阶段二：高保真消化与活体本体化 (Digestion & Living Ontologization)**：
+   - 外部前沿知识进入工坊后，第一时间进行语义对齐与最小侵入性转译，沉淀为三类工程资产：
+     - **OpenWiki 词条 (`wiki/`)**：为 LLM 知识大脑提供高内聚双向链接的索引词条，消除全盘盲搜；
+     - **MADR 架构决策记录 (`docs/03_design/adr/`)**：记录方案选型理由、替代方案、契约变动与潜在影响；
+     - **数字员工行动军规 (`.agents/rules/`)**：转化为可被编译器、测试套件与预提交脚本机检的硬约束。
+3. **阶段三：自主转化工程工单与立项排期 (Autonomous Issue Generation & WBS Plan)**：
+   - 将消化后的外部最佳实践，自动转译为平台自身演进或商业交付的具体 WBS 工单 (`COOA-xxx`)；
+   - 严格遵循 EARS 严谨规格，明确负责数字员工角色（Hermes / 墨斗 / 铁匠 / 门神 / 兜底渊），杜绝口头悬空。
+4. **阶段四：持续滚动施工、验伪反哺与抗退化固化 (Rolling Execution, Verification & Feedback Loop)**：
+   - 数字员工依托后台守护中枢 (`coolie-dev-loop-supervisor`) 保持 24x7 持续滚动 loop；
+   - 严格恪守 1 Task = 1 Commit、Clean Working Tree，每一阶段以实质性物理工程资产结项；
+   - 施工中的踩坑与经验自动反哺至 OpenWiki 踩坑指南 (`wiki/gotchas/`) 与预提交门禁中，形成永不衰退的正向自进化飞轮。
+
+### 2. 知识吸收与演进三大铁律 (Three Iron Laws of Knowledge Ingestion)
+1. **实事求是，实证为王 (RFC 2119 & Ground-Truth)**：严禁未经真实代码、测试用例或真机走查验证的虚浮概念入库；
+2. **零特性污染与向后兼容 (Zero Feature Pollution & Backwards Compatibility)**：外部技术引入必须保持现有 263 张物理表、Paperclip 控制面主线与客户端 6 寸屏界面的 100% 契约稳定；
+3. **单向演进与抗退化门禁 (One-Way Evolution & Automated Regression Guard)**：每一次演进必须固化至少一道自动化测试或预提交守卫，杜绝历史缺陷卷土重来。
+
+---
+
+## 六、战略里程碑规划 (Strategic Milestones)
 
 ```mermaid
 flowchart LR
@@ -105,6 +142,7 @@ flowchart LR
 - [x] **任务断流与假死治理**：完成 `COOA-42` 阶梯复活机制与 dev-server 热重载；
 - [x] **自主巡检 Loop 机制**：建立分钟级守护进程与保活 Keeper，实现 100% 自动解卡与超时 Routine 收口；
 - [x] **移动端边缘屏与结构性死屏清理**：完成 `COOA-234` 与 `COOA-237`，审批流闭环，Inbox Zero 达成；
+- [x] **知识吸收与自主演进滚动 Loop 闭环**：通过 Antigravity 持续调度与守护进程，实现外部知识从摄取 ➔ 消化 ➔ 立项 ➔ 施工 ➔ 验伪的全流程自动化自愈；
 - [ ] **全端体验一致性**：Web 控制台、移动原生 App 与 72 工具池状态全面对齐。
 
 ### Phase 2: 工业量产 (Standardized Foundry & Customer Delivery)
@@ -118,7 +156,7 @@ flowchart LR
 
 ---
 
-## 六、不可逾越的工程底线 (Non-Negotiable Axiomatic Guardrails)
+## 七、不可逾越的工程底线 (Non-Negotiable Axiomatic Guardrails)
 
 全体数字员工、协作者与掌柜在执行任何任务时，必须严格遵守五大铁律：
 

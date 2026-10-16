@@ -18,6 +18,13 @@
  */
 
 import http from 'node:http';
+import fs from 'node:fs';
+import path from 'node:path';
+import { execSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const API_BASE = process.env.COOLIE_API_BASE || 'http://127.0.0.1:3100/api';
 const COMPANY_ID = 'da2e705c-c80a-411b-b2ae-e39372b1251f'; // Coolie 本地施工总社
@@ -227,6 +234,24 @@ export async function runSupervisorCycle() {
         identifier: mainline.identifier,
         status: mainline.status,
       });
+    }
+
+    // 3.5 外部前沿知识持续吸收与自主演进巡检 (Evolution & OpenWiki Drift Keeper)
+    try {
+      const syncScript = path.join(__dirname, 'sync-openwiki.mjs');
+      if (fs.existsSync(syncScript)) {
+        execSync(`node "${syncScript}" --check`, { stdio: 'pipe' });
+        report.wikiInSync = true;
+      }
+    } catch {
+      console.log('[Supervisor] 检测到 OpenWiki 知识大脑存在漂移，自动执行自愈同步...');
+      try {
+        const syncScript = path.join(__dirname, 'sync-openwiki.mjs');
+        execSync(`node "${syncScript}"`, { stdio: 'pipe' });
+        report.wikiHealed = true;
+      } catch (healErr) {
+        console.error('[Supervisor] OpenWiki 自愈同步失败:', healErr.message);
+      }
     }
 
   } catch (err) {

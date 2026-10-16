@@ -70,6 +70,7 @@
 - [ACP 标准调度协议栈与免交互自主授权](architecture/acp-agent-protocol.md)
 - [Dev 施工总社与 Prod 生产交付绝对物理隔离](architecture/dev-prod-isolation.md)
 - [Coolie 工坊 AI 活体业务本体全面图谱 (M1~M7+MU)](architecture/coolie-foundry-ai-ontology.md)
+- [外部前沿知识持续动态吸收与滚动演进闭环](architecture/knowledge-absorption-and-continuous-evolution.md)
 
 ---
 

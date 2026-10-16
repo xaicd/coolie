@@ -84,6 +84,7 @@
 - **最新拍板原话 (2026-10-16)**:
   - *"mac 宿主机专门用来建设工坊产品... residential-plan-service 跟工坊平台无关系"* ➜ 锁定本地施工队定位，商业项目与平台主客体正交物理隔离。
   - *"生产 APP 登录不上了, 是不是 APP APK 包有问题"* ➜ 根除构建期 .env.local 污染 + 三层防回环门禁 + 生产纯净 OTA 增量包下发生效。
+  - *"工坊产品深度进化,需要不停吸收外部的知识,滚动 loop"* ➜ GOALS.md 四阶段知识代谢 + goal.md Agent Loop 演进法典 + OpenWiki 持续自愈。
 - **详见账本**: [docs/sprint-prod/10/16.md](docs/sprint-prod/10/16.md)
 
 ## 8. 维护规则

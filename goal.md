@@ -94,10 +94,33 @@ flowchart TD
 
 ---
 
-## 五、快速行动守则口诀 (Agent Cheat Sheet)
+## 五、外部前沿知识持续动态吸收与自主滚动演进机制 (Continuous Knowledge Absorption & Rolling Evolution Protocol)
+
+为了确保 Coolie 工坊产品保持深度进化，全体 Agent 在自主心跳循环中必须遵循知识吸收与滚动演进法典：
+
+### 1. 施工期知识对齐准则 (In-Task Knowledge Alignment)
+- 接单施工时，**严禁闭门造车或手写低级反模式**；
+- 优先检索 OpenWiki (`wiki/`)、已沉淀架构模式（如 Yudao 多租户行级隔离、RuoYi 同构敏捷组件、MedusaJS 可逆长事务工作流）与官方 Agent 协议（ACP/Paperclip 原生 API）；
+- 以业界 SOTA 最高成熟度工程标准指导当前任务的精准施工。
+
+### 2. 空闲期自主进化巡检机制 (Idle Evolution Keeper)
+- 当当前施工队列中暂无待办任务，或处于周期性心跳巡检时，Agent **切勿干坐或盲目等待**：
+- 自动启动**“知识吸收与产品进化 (Evolution Keeper)”**模式：
+  1. **架构与基线审计**：检查是否有 OpenWiki 漂移（`node scripts/sync-openwiki.mjs --check`）、是否有门禁需加强、是否有废弃代码需清理；
+  2. **前沿对齐与差距分析**：比对业界最新标杆（如 6 寸屏无感就地浮层、微服务优雅降级、MCP 工具编排），识别工坊产品体验瓶颈；
+  3. **自发立项提单**：通过控制面原生 API (`paperclipCreateIssue`) 或提案机制，提出清晰的重构与优化工单，推进工坊产品向高成熟度演进。
+
+### 3. 收工期经验沉淀法则 (Post-Task Distillation Law)
+- 任务标为 `done` 前，若解决了复杂踩坑或发现了架构规律：
+- 严格遵循《严谨沉淀经验与精准增量更新铁律》，将踩坑记录提炼至 `wiki/gotchas/` 或 `.agents/rules/`，做到“打赢一仗，沉淀一策，全员共享”。
+
+---
+
+## 六、快速行动守则口诀 (Agent Cheat Sheet)
 
 - **进场看大盘**：先读 `MEMORY.md` 与当前工单，不瞎猜；
 - **动工先抢锁**：工单 Checkout 锁 + 模拟器 Device 锁，不冲突；
 - **写码守契约**：严格 1 Task = 1 Commit，0 编译报错，不造假；
 - **交活挂工件**：截图、报告、Commit SHA 三位一体，无工件不 Done；
+- **空闲思进化**：吸收外部前沿知识，持续滚动 OpenWiki 与自愈门禁；
 - **退场理干净**：释放锁，清空 dirty，工作树保持 100% 洁净。
