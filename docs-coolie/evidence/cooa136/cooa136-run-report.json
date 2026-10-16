@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "issue": "COOA-136",
+  "date": "2026-10-16",
+  "kind": "fdse-independent-reverify",
+  "agent": { "id": "58dc794d-ae28-47f4-9e6e-5e798ef55df2", "name": "门神", "role": "fdse" },
+  "run": "7ed2f925-5786-4022-a47b-361359ab7a99",
+  "wakeReason": "issue_blockers_resolved",
+  "environment": {
+    "device": "emulator-5554",
+    "deviceAlias": "coolie-test",
+    "app": "cloud.coolie.app",
+    "physicalSize": "1080x2400",
+    "density": 420,
+    "logicalDp": "411x914",
+    "driver": "agent-device 0.21.1 + adb (mac host, direct)",
+    "deviceLock": "scripts/device-claim.sh acquire --owner 门神:COOA-136 --ttl 1800",
+    "appState": "logged-in (prior login blocker resolved)"
+  },
+  "dimensions": [
+    {
+      "id": "2.2.1",
+      "name": "极限视口防撑爆",
+      "method": "adb shell wm size 840x2400 (320dp) then a11y rect scan",
+      "result": "pass",
+      "maxRightEdgePx": 840,
+      "viewportPx": 840,
+      "overflowPx": 0,
+      "screens": ["Studio", "Tasks"],
+      "tabBarWithinViewport": true,
+      "evidence": ["w320.png", "w320-tasks.png"]
+    },
+    {
+      "id": "2.2.3",
+      "name": "软键盘几何避让",
+      "method": "switch to real IME (Gboard), focus chat input, measure reflow",
+      "result": "pass",
+      "imeBefore": "com.callstack.agentdevice.imehelper/.TestInputMethodService (headless test IME, no visible keyboard)",
+      "imeAfter": "com.google.android.inputmethod.latin/com.android.inputmethod.latin.LatinIME",
+      "inputBottomBefore": 2143,
+      "inputBottomAfter": 1323,
+      "tabBarBottomAfter": 1499,
+      "keyboardTop": 1517,
+      "imeInsetBottom": 883,
+      "clearancePx": 194,
+      "occluded": false,
+      "evidence": ["kb-real.png"]
+    },
+    {
+      "id": "2.2.4",
+      "name": "全局路由 LIFO",
+      "method": "task detail -> tap 返回 -> settle diff",
+      "result": "pass",
+      "landedOn": "Inbox (parent screen)",
+      "jumpedToRoot": false,
+      "evidence": ["current.png"]
+    },
+    {
+      "id": "tabbar",
+      "name": "黄金 5 槽位底栏",
+      "result": "consistent",
+      "slots": ["汇览", "任务", "+", "工坊", "资产"],
+      "note": "labels render in en locale (device en-US); structure matches TabBar.tsx:67 contract"
+    }
+  ],
+  "methodologyFinding": {
+    "id": "test-ime-masks-keyboard-avoidance",
+    "detail": "agent-device defaults to a headless test IME on emulators (mInputShown=true, no visible keyboard, no reflow). Any keyboard-avoidance assertion MUST use the real IME or open --no-test-ime, else the result is invalid.",
+    "severity": "medium",
+    "action": "recorded as operating lesson"
+  },
+  "structuralFindings": [
+    {
+      "id": "dead-screens",
+      "detail": "PipelinesScreen/PlansScreen have zero setXxxOpen(true) call sites; TasksScreen is a dead import (App.tsx:78). Independently confirmed by grep.",
+      "severity": "medium",
+      "carriedBy": "COOA-234"
+    }
+  ],
+  "environmentBlockerResolved": {
+    "previous": "walkthrough device stranded at login with 账号或密码错误",
+    "now": "mCurrentFocus=cloud.coolie.app/.MainActivity, logged-in and drivable"
+  },
+  "residuals": [
+    { "id": "codediff-screen", "reason": "no diff-bearing work product reachable", "gated": "data" },
+    { "id": "register-weblogin", "reason": "pre-auth; would strand shared device", "gated": "dedicated-device-session" },
+    { "id": "approval-signoff", "reason": "instance pending approvals = 0", "gated": "data" },
+    { "id": "mid-stream-un-anchor-frame", "reason": "needs a >5s stream to swipe within", "gated": "timing" },
+    { "id": "archive-undo-restore", "reason": "disclosed by COOA-228 §3.2", "gated": "per-user-state" }
+  ]
+}
