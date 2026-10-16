@@ -17,6 +17,7 @@ import * as FileSystem from "expo-file-system";
 
 type ModuleShared = {
   recording: Audio.Recording | null;
+  recordingStartedAt: number;
   startPromise: Promise<Audio.Recording | null> | null;
   listeners: Set<(isRecording: boolean) => void>;
   watchdogTimer: ReturnType<typeof setTimeout> | null;
@@ -25,6 +26,7 @@ type ModuleShared = {
 
 const moduleShared: ModuleShared = {
   recording: null,
+  recordingStartedAt: 0,
   startPromise: null,
   listeners: new Set(),
   watchdogTimer: null,
@@ -95,6 +97,7 @@ export function useRecorder() {
         const rec = localRef.current;
         moduleShared.activeSessionId += 1;
         moduleShared.recording = null;
+        moduleShared.recordingStartedAt = 0;
         moduleShared.startPromise = null;
         clearWatchdog();
         localRef.current = null;
@@ -136,7 +139,7 @@ export function useRecorder() {
         throw new Error("麦克风权限未授予");
       }
 
-      // 快速检查：如果请求权限期间用户已经取消/松手，直接中止
+      // 快速检查：如果请求权限期间用户已经取消/强杀，直接中止
       if (moduleShared.activeSessionId !== sessionId) {
         await resetAudioMode();
         return null;
@@ -161,7 +164,7 @@ export function useRecorder() {
         throw e;
       }
 
-      // 核心防线：如果录音机异步初始化完成期间，外部已经调用 stop() 或 forceStop()，立刻就地释放，绝不能让孤儿录音机在后台无限空转！
+      // 核心防线：如果录音机异步初始化完成期间，外部已经调用 forceStop()，立刻就地释放
       if (moduleShared.activeSessionId !== sessionId) {
         void safeUnload(rec).finally(() => {
           void resetAudioMode();
@@ -170,6 +173,7 @@ export function useRecorder() {
       }
 
       moduleShared.recording = rec;
+      moduleShared.recordingStartedAt = Date.now();
       localRef.current = rec;
       broadcastRecording(true);
 
@@ -181,6 +185,7 @@ export function useRecorder() {
         const currentRec = moduleShared.recording;
         moduleShared.recording = null;
         moduleShared.startPromise = null;
+        moduleShared.recordingStartedAt = 0;
         clearWatchdog();
         broadcastRecording(false);
         void safeUnload(currentRec).finally(() => {
@@ -209,8 +214,6 @@ export function useRecorder() {
    * transcription attempt fails, instead of silently losing the recording.
    */
   const stop = useCallback(async (): Promise<{ base64: string; format: "m4a"; uri: string | null }> => {
-    // 递增 sessionId 使任何正在 pending 的 start() 在完成后直接自我销毁
-    moduleShared.activeSessionId += 1;
     clearWatchdog();
 
     // 立即广播 UI 退出录音状态
@@ -231,23 +234,58 @@ export function useRecorder() {
 
     if (!rec) {
       // 没有正在录制的句柄，直接平稳返回空并复位
+      moduleShared.recordingStartedAt = 0;
       await resetAudioMode();
       return { base64: "", format: "m4a", uri: null };
     }
 
+    // Android StagefrightRecorder 防御:
+    // 如果录制时间少于 350ms，调用 stopAndUnloadAsync 会触发 "stop called in an invalid state: 1"
+    const startedAt = moduleShared.recordingStartedAt;
+    moduleShared.recordingStartedAt = 0;
+    if (startedAt > 0) {
+      const elapsed = Date.now() - startedAt;
+      if (elapsed < 350) {
+        await new Promise((r) => setTimeout(r, 350 - elapsed));
+      }
+    }
+
     let uri: string | null = null;
+    try {
+      uri = rec.getURI();
+    } catch {
+      // ignore
+    }
+
     try {
       await Promise.race([
         rec.stopAndUnloadAsync(),
-        new Promise((r) => setTimeout(r, 3000)),
+        new Promise((r) => setTimeout(r, 4000)),
       ]).catch((err) => {
         console.warn("[useRecorder] stopAndUnloadAsync warning:", err);
       });
+    } catch (err) {
+      console.warn("[useRecorder] stop error:", err);
+    }
 
-      uri = rec.getURI();
-      if (!uri) {
-        console.warn("[useRecorder] rec.getURI() is null");
-        return { base64: "", format: "m4a", uri: null };
+    if (!uri) {
+      try {
+        uri = rec.getURI();
+      } catch {}
+    }
+
+    if (!uri) {
+      console.warn("[useRecorder] rec.getURI() is null");
+      await resetAudioMode();
+      return { base64: "", format: "m4a", uri: null };
+    }
+
+    try {
+      const fileInfo = await FileSystem.getInfoAsync(uri);
+      if (!fileInfo.exists || fileInfo.size === 0) {
+        console.warn("[useRecorder] recorded file is empty or missing:", uri, fileInfo);
+        await resetAudioMode();
+        return { base64: "", format: "m4a", uri };
       }
 
       const base64 = await FileSystem.readAsStringAsync(uri, {
@@ -271,6 +309,7 @@ export function useRecorder() {
     const rec = moduleShared.recording;
     moduleShared.recording = null;
     moduleShared.startPromise = null;
+    moduleShared.recordingStartedAt = 0;
     localRef.current = null;
     broadcastRecording(false);
     if (rec) {

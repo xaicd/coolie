@@ -1048,7 +1048,7 @@ export function BoardChatScreen({
     voicePressRef.current.promise = (async () => {
       try {
         await startRecording();
-        setVoiceStatus("🎤 录音中… (松开发送 · 左滑取消 · 上滑/右滑转文字)");
+        setVoiceStatus("🎤 录音中… (松开转文字 · 左滑取消)");
         return true;
       } catch (e) {
         const msg = String((e as Error)?.message ?? e);
@@ -1104,8 +1104,18 @@ export function BoardChatScreen({
     }
     voicePressRef.current.promise = null;
 
+    // 点按误触拦截 (< 200ms)
+    const holdDuration = Date.now() - press.startedAt;
+    if (holdDuration < 200) {
+      await forceStop();
+      setVoiceBusy(false);
+      setVoiceStatus(null);
+      reportVoiceFailure("按住时间太短，请长按说话（至少 0.3 秒）");
+      return;
+    }
+
     setVoiceBusy(true);
-    setVoiceStatus(action === "send" ? "识别发送中…" : "识别转文字中…");
+    setVoiceStatus("识别转文字中…");
     // wave388: 保住本次录音的 m4a, 任何转写失败都能回退成附件手动重发。
     let recordedUri: string | null = null;
     try {
@@ -1125,10 +1135,10 @@ export function BoardChatScreen({
       recordedUri = uri;
       if (!base64) {
         // 真因一: 没采到有效声音 (权限被系统静默拒绝 / 麦克风被占用 / 录音文件为空)
-        reportVoiceFailure("没有采集到声音（录音为空）——请确认已允许麦克风权限, 靠近麦克风再说一次");
+        reportVoiceFailure("没有采集到声音（录音为空）——请确认已允许麦克风权限, 靠近麦克风重试");
         return;
       }
-      if (Date.now() - press.startedAt < MIN_VOICE_HOLD_MS) {
+      if (holdDuration < MIN_VOICE_HOLD_MS) {
         // 真因二: 说话太短
         reportVoiceFailure("说话太短 —— 请按住多说一会儿再松开（至少 0.3 秒）");
         return;
@@ -1144,20 +1154,11 @@ export function BoardChatScreen({
       const text = (res.text ?? res.transcription?.text ?? "").trim();
       if (text) {
         setVoiceError(null);
-        if (action === "send") {
-          // 居中松开: 直接发送给 Hermes！
-          if (handleSendRef.current) {
-            await handleSendRef.current(text);
-          } else {
-            setInput(text);
-          }
-        } else {
-          // 右滑松开: 转为文字填入输入框，让用户编辑确认
-          setInput((prev) => (prev ? `${prev} ${text}` : text));
-          pushSystemEcho(`🎤 已转为文字: ${text}`);
-          if (Platform.OS === "android") {
-            ToastAndroid.show("已转文字并填入输入框", ToastAndroid.SHORT);
-          }
+        // 豆包式交互：无论是居中还是滑动手势，识别后均可靠转文字填入输入框，由用户确认或编辑后再发，杜绝未经确认盲目发送
+        setInput((prev) => (prev ? `${prev} ${text}` : text));
+        pushSystemEcho(`🎤 已转为文字: ${text}`);
+        if (Platform.OS === "android") {
+          ToastAndroid.show("已转文字并填入输入框", ToastAndroid.SHORT);
         }
       } else {
         // 真因三: 服务端 201 但识别为空 (没听清)

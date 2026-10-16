@@ -356,13 +356,10 @@ export function ChatInput({
           if (finalMode === "cancel") {
             // 左滑松手: 彻底取消
             onMicCancel?.();
-          } else if (finalMode === "transcribe") {
-            // 上滑/右滑松手: 立即转文字并填入输入框，切回键盘模式
+          } else {
+            // 无论是居中松手还是右滑松手: 统一转文字填入输入框，切回键盘模式供用户确认与编辑
             onMicPressOut?.("transcribe");
             setInputMode("text");
-          } else {
-            // 居中松手: 直接发送！
-            onMicPressOut?.("send");
           }
         },
         onPanResponderTerminate: () => {
@@ -371,11 +368,11 @@ export function ChatInput({
           const finalMode = gestureModeRef.current;
           gestureModeRef.current = "send";
           setGestureMode("send");
-          if (finalMode === "transcribe") {
+          if (finalMode === "cancel") {
+            onMicCancel?.();
+          } else {
             onMicPressOut?.("transcribe");
             setInputMode("text");
-          } else {
-            onMicCancel?.();
           }
         },
       }),
@@ -469,10 +466,8 @@ export function ChatInput({
                 ]}
               >
                 {gestureMode === "cancel"
-                  ? "⚠️ 松开手指，取消发送"
-                  : gestureMode === "transcribe"
-                  ? "✏️ 松开手指，转文字并预览"
-                  : "松开 发送 (←左滑取消 · 上滑/右滑转文字→)"}
+                  ? "⚠️ 松开手指，取消输入"
+                  : "松开 转文字 (←左滑取消)"}
               </Text>
             </View>
 
@@ -666,7 +661,7 @@ export function ChatInput({
                       recording && styles.holdToTalkTextRecording,
                     ]}
                   >
-                    {recording ? "松开 发送 (滑动选择)" : "按住 说话"}
+                    {recording ? "松开 转文字 (左滑取消)" : "按住 说话 转文字"}
                   </Text>
                 </View>
               )}
