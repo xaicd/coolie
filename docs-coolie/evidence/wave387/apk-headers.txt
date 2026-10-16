@@ -2,13 +2,13 @@ HTTP/1.1 200 Connection established
 
 HTTP/1.1 200 OK
 Content-Type: application/vnd.android.package-archive
-Content-Length: 81280178
+Content-Length: 81283606
 Connection: keep-alive
 Accept-Ranges: bytes
-Date: Fri, 16 Oct 2026 01:07:46 GMT
-ETag: "e9e3da47ad31352b217f5abbeb0da81d-3"
-Last-Modified: Fri, 16 Oct 2026 01:02:48 GMT
+Date: Fri, 16 Oct 2026 04:15:22 GMT
+ETag: "a4d25fa4aa58c5ceb11ec0c1e49b5766-3"
+Last-Modified: Fri, 16 Oct 2026 04:13:39 GMT
 Server: tencent-cos
-x-cos-hash-crc64ecma: 8830199228625431512
-x-cos-request-id: NmFkMTc4ZTJfOTE4ZDIwMDlfMTg2MTRfMWNiNzEwZA==
+x-cos-hash-crc64ecma: 14527281124846098069
+x-cos-request-id: NmFkMWE0ZGFfN2NmNzRjMGJfMjhmZTdfMWNiYjEzMQ==
 

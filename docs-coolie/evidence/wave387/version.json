@@ -1,12 +1,12 @@
 {
-  "version": "0.6.59",
-  "versionCode": 659,
-  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.59/coolie-release.apk",
-  "apkSha256": "4a970bdaebd923a81fb9670ddad06df06274f00149f0d4fa9ca09970d76dcbba",
+  "version": "0.6.60",
+  "versionCode": 660,
+  "downloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.60/coolie-release.apk",
+  "apkSha256": "3499bf7c72ca535fe2cd967b45c12ca2b33eef6ae82610e9cc94fc32cf6c7302",
   "iosDownloadUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
   "iosBundleId": "cn.xrobinai.app",
   "iosSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
   "iosTestFlightUrl": null,
-  "releaseNotes": "登录 4 类错误清晰归类 (wave386 真因 v0.6.58 代码 bug)",
-  "commitSha": "94c76813c2d397b03416b1da412e46dbe6dcfb98"
+  "releaseNotes": "wave386 登录 4 类 + wave388 录音 STT 修 (老板拍 持续汇报 + 不能说完就忘)",
+  "commitSha": "bb187541af71c67f3c23c99bac088db5bd7a8417"
 }
