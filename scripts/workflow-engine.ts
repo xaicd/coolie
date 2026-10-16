@@ -53,11 +53,15 @@ interface WorkflowStep {
   dependsOn?: string[];
   gate?: string;
   autoCommand?: string;
+  phase?: "prepare" | "commit";
+  doc?: string;
 }
 
 interface WorkflowRecipe {
   name: string;
   description: string;
+  category?: string;
+  version?: string;
   inputs: Record<string, WorkflowInputDef | string>;
   steps: WorkflowStep[];
 }
@@ -82,16 +86,41 @@ interface WorkflowRunRecord {
 // ----------------------------------------------------------------------------
 // 工具函数
 // ----------------------------------------------------------------------------
+function findWorkflowFiles(dir: string): string[] {
+  if (!fs.existsSync(dir)) return [];
+  const entries = fs.readdirSync(dir, { withFileTypes: true });
+  const results: string[] = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...findWorkflowFiles(fullPath));
+    } else if (entry.isFile() && (entry.name.endsWith(".workflow.json") || entry.name.endsWith(".workflow.yaml"))) {
+      results.push(fullPath);
+    }
+  }
+  return results;
+}
+
 function loadRecipe(recipeName: string, projectCode?: string): { recipe: WorkflowRecipe; filePath: string } {
   const dir = getWorkflowsDir(projectCode);
   const cleanName = recipeName.replace(/\.workflow\.(json|yaml)$/, "");
-  const jsonPath = path.join(dir, `${cleanName}.workflow.json`);
-  if (!fs.existsSync(jsonPath)) {
-    throw new Error(`找不到工作流配方: ${jsonPath}`);
+  const directPath = path.join(dir, `${cleanName}.workflow.json`);
+  if (fs.existsSync(directPath)) {
+    const raw = fs.readFileSync(directPath, "utf8");
+    const recipe = JSON.parse(raw) as WorkflowRecipe;
+    return { recipe, filePath: directPath };
   }
-  const raw = fs.readFileSync(jsonPath, "utf8");
-  const recipe = JSON.parse(raw) as WorkflowRecipe;
-  return { recipe, filePath: jsonPath };
+  // 递归检索支持子目录 (如 business-recipes/ 等)
+  const allFiles = findWorkflowFiles(dir);
+  for (const file of allFiles) {
+    const base = path.basename(file).replace(/\.workflow\.(json|yaml)$/, "");
+    if (base === cleanName || file.endsWith(recipeName) || file.endsWith(`${cleanName}.workflow.json`)) {
+      const raw = fs.readFileSync(file, "utf8");
+      const recipe = JSON.parse(raw) as WorkflowRecipe;
+      return { recipe, filePath: file };
+    }
+  }
+  throw new Error(`找不到工作流配方: ${cleanName} (搜索路径: ${dir})`);
 }
 
 function parseCliArgs(): { command: string; flags: Record<string, string>; positional: string[] } {
@@ -160,30 +189,39 @@ function handleList(flags: Record<string, string>) {
     process.exit(1);
   }
 
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".workflow.json") || f.endsWith(".workflow.yaml"));
-  console.log(`\n📋 SDD & Coolie 多智能体工作流配方清单 (${dir})`);
+  const files = findWorkflowFiles(dir);
+  const targetCategory = flags.category || flags.cat;
+  console.log(`\n📋 SDD & Coolie 多智能体工作流配方清单 (${dir}${targetCategory ? ` [筛选分类: ${targetCategory}]` : ""})`);
   console.log("=".repeat(78));
 
-  for (const file of files) {
+  let matchedCount = 0;
+  for (const full of files) {
     try {
-      const full = path.join(dir, file);
       const data = JSON.parse(fs.readFileSync(full, "utf8")) as WorkflowRecipe;
-      console.log(`\n⚡ 配方名称: \x1b[36m${data.name}\x1b[0m (${file})`);
+      const category = data.category || "general";
+      if (targetCategory && category !== targetCategory) {
+        continue;
+      }
+      matchedCount++;
+      const relPath = path.relative(dir, full);
+      const catBadge = data.category ? ` \x1b[35m[${data.category}]\x1b[0m` : "";
+      console.log(`\n⚡ 配方名称: \x1b[36m${data.name}\x1b[0m (${relPath})${catBadge}`);
       console.log(`   说明: ${data.description}`);
       const inputKeys = Object.keys(data.inputs || {});
       console.log(`   必需入参: ${inputKeys.length > 0 ? inputKeys.join(", ") : "(无)"}`);
       console.log(`   步骤链:`);
       for (const [idx, step] of (data.steps || []).entries()) {
         const depStr = step.dependsOn && step.dependsOn.length > 0 ? ` [依赖: ${step.dependsOn.join(", ")}]` : "";
+        const phaseStr = step.phase ? ` \x1b[35m[2PC:${step.phase}]\x1b[0m` : "";
         const fleetRole = resolveFleetRole(step.agent);
-        console.log(`     ${idx + 1}. [${step.id}] \x1b[33m@${step.agent}\x1b[0m (${fleetRole})${depStr}`);
+        console.log(`     ${idx + 1}. [${step.id}] \x1b[33m@${step.agent}\x1b[0m (${fleetRole})${phaseStr}${depStr}`);
       }
     } catch (e: any) {
-      console.error(`   ❌ 解析失败 ${file}: ${e.message}`);
+      console.error(`   ❌ 解析失败 ${full}: ${e.message}`);
     }
   }
   console.log("\n" + "=".repeat(78));
-  console.log(`运行 \x1b[32mnpm run workflow:dry-run -- --recipe <name> [args...]\x1b[0m 预览执行拓扑。`);
+  console.log(`共 ${matchedCount} 个配方。运行 \x1b[32mnpm run workflow:dry-run -- --recipe <name> [args...]\x1b[0m 预览执行拓扑。`);
 }
 
 // ----------------------------------------------------------------------------
@@ -196,18 +234,18 @@ function handleCheck(flags: Record<string, string>): boolean {
     return false;
   }
 
-  const files = fs.readdirSync(dir).filter((f) => f.endsWith(".workflow.json") || f.endsWith(".workflow.yaml"));
+  const files = findWorkflowFiles(dir);
   console.log(`\n🔍 开始工作流配方静态与依赖门禁扫描 (${files.length} 个配方)...`);
 
   let hasError = false;
 
-  for (const file of files) {
-    const fullPath = path.join(dir, file);
+  for (const fullPath of files) {
+    const relPath = path.relative(dir, fullPath);
     let recipe: WorkflowRecipe;
     try {
       recipe = JSON.parse(fs.readFileSync(fullPath, "utf8"));
     } catch (e: any) {
-      console.error(`❌ [${file}] JSON 语法错误: ${e.message}`);
+      console.error(`❌ [${relPath}] JSON 语法错误: ${e.message}`);
       hasError = true;
       continue;
     }
@@ -228,6 +266,9 @@ function handleCheck(flags: Record<string, string>): boolean {
 
       if (!step.agent) errors.push(`步骤 ${step.id} 未声明 agent 角色`);
       if (!step.prompt) errors.push(`步骤 ${step.id} 未提供 prompt 指令`);
+      if (step.phase && !["prepare", "commit"].includes(step.phase)) {
+        errors.push(`步骤 ${step.id} 的 phase 必须为 "prepare" 或 "commit" (当前为: ${step.phase})`);
+      }
 
       adj.set(step.id, step.dependsOn || []);
     }
@@ -262,11 +303,12 @@ function handleCheck(flags: Record<string, string>): boolean {
     }
 
     if (errors.length > 0) {
-      console.error(`❌ [${file}] 校验不通过:`);
+      console.error(`❌ [${relPath}] 校验不通过:`);
       errors.forEach((e) => console.error(`     - ${e}`));
       hasError = true;
     } else {
-      console.log(`✅ [${file}] 校验通过 (Step: ${recipe.steps.length}, Inputs: ${Object.keys(recipe.inputs).length})`);
+      const catStr = recipe.category ? ` [${recipe.category}]` : "";
+      console.log(`✅ [${relPath}]${catStr} 校验通过 (Step: ${recipe.steps.length}, Inputs: ${Object.keys(recipe.inputs).length})`);
     }
   }
 
@@ -325,12 +367,16 @@ function handleDryRun(flags: Record<string, string>, positional: string[]) {
   console.log("📋 步骤展开详情 (Step Execution Details):");
   for (const [idx, step] of recipe.steps.entries()) {
     const depStr = step.dependsOn && step.dependsOn.length > 0 ? ` (前置依赖: ${step.dependsOn.join(", ")})` : " (根起始节点)";
+    const phaseStr = step.phase ? ` \x1b[35m[2PC: ${step.phase.toUpperCase()}]\x1b[0m` : "";
     const promptSub = interpolate(step.prompt, vars);
     const fleetRole = resolveFleetRole(step.agent);
-    console.log(`\n--- 步骤 ${idx + 1}: \x1b[32m[${step.id}]\x1b[0m -> 智能体: \x1b[33m@${step.agent}\x1b[0m (${fleetRole})${depStr} ---`);
+    console.log(`\n--- 步骤 ${idx + 1}: \x1b[32m[${step.id}]\x1b[0m${phaseStr} -> 智能体: \x1b[33m@${step.agent}\x1b[0m (${fleetRole})${depStr} ---`);
     console.log(`【Agent 任务指令】:\n${promptSub.trim()}`);
     if (step.gate) {
       console.log(`【卡点门禁】: ${step.gate}`);
+    }
+    if (step.doc) {
+      console.log(`【产出工件】: \x1b[36m${step.doc}\x1b[0m`);
     }
   }
   console.log("\n" + "=".repeat(78));
@@ -586,19 +632,22 @@ async function handleAdvance(flags: Record<string, string>, positional: string[]
 // ----------------------------------------------------------------------------
 function handleHelp() {
   console.log(`
-⚡ SDD 多智能体工作流执行引擎 (Workflow Engine CLI)
+⚡ SDD & 新 SOA 多智能体工作流执行引擎 (Workflow Engine CLI)
 
 命令列表:
-  list       列出全量可用工作流配方清单
-  check      静态语法、必填项与 DAG 依赖无环性门禁扫描
-  dry-run    参数模拟展开、渲染 Mermaid 编排图与 Agent 执行指令
+  list       列出全量可用工作流配方清单 (支持 --category <cat> 筛选，如 business / cmmi)
+  check      静态语法、必填项与 DAG 依赖无环性门禁扫描 (含 2PC phase 校验)
+  dry-run    参数模拟展开、渲染 Mermaid 编排图、Agent 执行指令与产出工件路径
   run        真实驱动工作流执行（自动脚手架 + 步骤分发 + 记录落盘）
   advance    因果推进工作流步骤（自动同步项目本地文档 + 联动 Coolie 创建任务 + 打印 8 要素简报）
   new        创建新的工作流配方模板 (.agents/workflows/)
 
 示例用法:
   npm run workflow:list
+  npm run workflow:list -- --category business
   npm run workflow:check
+  npm run workflow:dry-run -- --recipe commercial-backend-module --name points-mall --domain trade --title "积分商城微服务"
+  npm run workflow:dry-run -- --recipe quad-terminal-feature --name refund-flow --domain mall --title "全渠道退款仲裁特性"
   npm run workflow:dry-run -- --recipe cmmi-full-lifecycle --name mall --domain mall --title "商城主线"
   npm run workflow:advance -- --recipe cmmi-full-lifecycle --gate gate_g1_spec --company <id> --project <id>
   npm run workflow:run -- --recipe bugfix --name fix-pay-lock --domain pay --title "修复支付回调死锁"

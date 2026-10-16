@@ -1,0 +1,87 @@
+{
+  "name": "quad-terminal-feature",
+  "category": "business",
+  "version": "1.0.0",
+  "description": "四位一体全渠道端到端特性交付配方: EARS需求收敛 -> 四端架构设计 -> 后端微服务契约 -> Vue3中台实现 -> 微信小程序开发 -> Expo原生移动端适配 -> 四端拟真人真机走查",
+  "inputs": {
+    "name": {
+      "description": "特性英文字符标识 (如 points-exchange, order-refund-flow)",
+      "type": "string",
+      "required": true
+    },
+    "domain": {
+      "description": "业务领域标识 (如 mall, trade, member)",
+      "type": "string",
+      "required": true
+    },
+    "title": {
+      "description": "特性中文业务全称",
+      "type": "string",
+      "required": true
+    }
+  },
+  "steps": [
+    {
+      "type": "step",
+      "id": "ears-spec-intake",
+      "agent": "wf-planner",
+      "gate": "gate_g1_spec",
+      "doc": "docs/02_requirements/software-requirements.md",
+      "prompt": "【阶段1·EARS严谨需求收敛】由 Hermes / 百晓生 (DS) 驱动。收敛 '{{inputs.name}}' 特性的全渠道业务诉求，编写符合 EARS 5态语法的软件需求规格说明书 (SRS) 与双向需求跟踪矩阵 (RTM)，消除歧义，明确四端（Web中台/小程序/原生App/后端）验收准则。"
+    },
+    {
+      "type": "step",
+      "id": "quad-architecture-hld",
+      "agent": "wf-architect",
+      "dependsOn": ["ears-spec-intake"],
+      "gate": "gate_g2_arch",
+      "doc": "docs/03_design/architecture-design-hld.md",
+      "prompt": "【阶段2·四端统一架构概要设计】由 墨斗 (前线架构师 FDA) 驱动。设计涵盖 Spring Boot 3 后端、Vue 3 Element Plus 中台、Uni-App 微信小程序与 Expo SDK 52 原生 App 的四位一体端到端拓扑架构。明确跨端事件协议、状态机扭转与分布式会话边界。"
+    },
+    {
+      "type": "step",
+      "id": "backend-contract-delivery",
+      "agent": "wf-coder",
+      "dependsOn": ["quad-architecture-hld"],
+      "gate": "gate_g3_compile",
+      "doc": "docs/03_design/interface-contracts/api-definitions.md",
+      "prompt": "【阶段3·后端微服务与OpenAPI契约交付】由 铁匠 (平台核心研发 Core SWE) 驱动。实现核心业务逻辑微服务接口，配置 Knife4j / OpenAPI 契约，落实多租户行级数据隔离，生成多端强类型 API SDK。"
+    },
+    {
+      "type": "step",
+      "id": "vue3-admin-quad",
+      "agent": "wf-coder",
+      "dependsOn": ["backend-contract-delivery"],
+      "gate": "gate_g3_vue3",
+      "doc": "docs/03_design/ui-specs/vue3-admin.md",
+      "prompt": "【阶段4·Vue 3 运营管理中台交付】由 铁匠 (平台核心研发 Core SWE) 驱动。基于 Vue 3 + Element Plus 实现运营后台管理页，遵循极简两字 UI 规范，实现表格批量操作、状态筛选与表单提交防抖防御。"
+    },
+    {
+      "type": "step",
+      "id": "uniapp-miniapp",
+      "agent": "wf-coder",
+      "dependsOn": ["backend-contract-delivery"],
+      "gate": "gate_g3_uniapp",
+      "doc": "docs/03_design/ui-specs/uniapp-miniapp.md",
+      "prompt": "【阶段5·Uni-App 微信小程序交付】由 铁匠 (平台核心研发 Core SWE) 驱动。基于 Uni-App Vue 3 实现 C 端/商户端小程序页面，优化分包体积严格 ≤ 2MB，适配微信支付与底部安全区。"
+    },
+    {
+      "type": "step",
+      "id": "expo-native-app",
+      "agent": "wf-coder",
+      "dependsOn": ["backend-contract-delivery"],
+      "gate": "gate_g3_expo",
+      "doc": "docs/03_design/ui-specs/expo-app.md",
+      "prompt": "【阶段6·Expo 原生移动端交付】由 铁匠 (平台核心研发 Core SWE) 驱动。基于 React Native / Expo SDK 52 实现原生移动端界面，严格适配 6 寸屏单手可达防撑爆，维持底栏黄金 5 槽位绝对对称与就地浮层交互。"
+    },
+    {
+      "type": "step",
+      "id": "quad-humanlike-e2e",
+      "agent": "wf-tester",
+      "dependsOn": ["vue3-admin-quad", "uniapp-miniapp", "expo-native-app"],
+      "gate": "gate_g4_eval",
+      "doc": "docs/05_verification/test-summary-report.md",
+      "prompt": "【阶段7·四端拟真人全栈验收走查】由 门神 (真机验收 FDSE) 驱动。在真实双模拟器 (Android/iOS) 与真实 Web 浏览器中执行拟真人 E2E 走查，检查四态界面与死穴按钮，固化端到端真机截图不可变证据，提交验收核销单。"
+    }
+  ]
+}

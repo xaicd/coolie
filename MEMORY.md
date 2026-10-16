@@ -85,7 +85,7 @@
   - *"mac 宿主机专门用来建设工坊产品... residential-plan-service 跟工坊平台无关系"* ➜ 锁定本地施工队定位，商业项目与平台主客体正交物理隔离。
   - *"生产 APP 登录不上了, 是不是 APP APK 包有问题"* ➜ 根除构建期 .env.local 污染 + 三层防回环门禁 + 生产纯净 OTA 增量包下发生效。
   - *"工坊产品深度进化,需要不停吸收外部的知识,滚动 loop"* ➜ GOALS.md 固化四阶段知识代谢 + goal.md Agent Loop 演进法典 + OpenWiki 持续自愈。
-  - *"结合自己产品功能深入定位差距,向内探索,循环提升"* ➜ wave380 新SOA研报入库 + 三路系统蒸馏 + 场景配方优先 + 两阶段写操作(2PC)。
+  - *"结合自己产品功能深入定位差距,向内探索,循环提升"* ➜ 新SOA研报入库 + 落地商业场景配方库 (.agents/workflows/business-recipes/) 与 2PC 契约。
 - **详见账本**: [docs/sprint-prod/10/16.md](docs/sprint-prod/10/16.md)
 
 ## 8. 维护规则

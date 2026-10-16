@@ -84,6 +84,7 @@
     "spec:archive": "node scripts/speckit.cjs archive",
     "task:verify": "node scripts/speckit.cjs tasks",
     "workflow:list": "node scripts/workflow-engine.cjs list",
+    "workflow:business-list": "node scripts/workflow-engine.cjs list --category business",
     "workflow:check": "node scripts/workflow-engine.cjs check",
     "workflow:dry-run": "node scripts/workflow-engine.cjs dry-run",
     "workflow:run": "node scripts/workflow-engine.cjs run",

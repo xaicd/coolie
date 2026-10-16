@@ -1,0 +1,80 @@
+{
+  "name": "commercial-backend-module",
+  "category": "business",
+  "version": "1.0.0",
+  "description": "商用微服务后端模块标准交付配方: 活体本体建模 -> 两阶段契约预检 (2PC) -> 微服务编码 -> 跨端契约转译 -> 变异测试打假 -> 不可变验收签收",
+  "inputs": {
+    "name": {
+      "description": "模块英文字符标识 (如 points-mall, member-wallet, order-dispatch)",
+      "type": "string",
+      "required": true
+    },
+    "domain": {
+      "description": "业务领域标识 (如 trade, member, goods, dispatch)",
+      "type": "string",
+      "required": true
+    },
+    "title": {
+      "description": "模块中文业务全称",
+      "type": "string",
+      "required": true
+    }
+  },
+  "steps": [
+    {
+      "type": "step",
+      "id": "domain-modeling",
+      "agent": "wf-architect",
+      "gate": "gate_g2_arch",
+      "doc": "docs/03_design/architecture-design-hld.md",
+      "prompt": "【阶段1·活体本体建模】由 墨斗 (前线架构师 FDA) 驱动。基于领域边界，完成 '{{inputs.name}}' 模块的活体本体对象 (Object Types) 与业务动词 (Action Types) 建模。设计 MySQL DDL 迁移脚本，严格包含 8 大审计字段与 tenant_id 租户物理隔离字段；设计 BaseMapper、QueryWrapper 与 Domain Facade 抽象边界。"
+    },
+    {
+      "type": "step",
+      "id": "contract-prepare-2pc",
+      "agent": "wf-reviewer",
+      "dependsOn": ["domain-modeling"],
+      "gate": "gate_g3_prepare",
+      "phase": "prepare",
+      "doc": "docs/03_design/interface-contracts/api-definitions.md",
+      "prompt": "【阶段2·两阶段契约预检 (2PC Prepare)】由 兜底渊 (投产守卫 PRE-SRE) 驱动。对 '{{inputs.name}}' 模块的 DTO 契约与数据库实体变更执行非破坏性预检：验证与全盘 263 表无字段类型冲突、无破坏性字段变更、RBAC 权限守恒与向后兼容性。输出影响面摘要与预检签名令牌 (prepareToken)。"
+    },
+    {
+      "type": "step",
+      "id": "service-implementation",
+      "agent": "wf-coder",
+      "dependsOn": ["contract-prepare-2pc"],
+      "gate": "gate_g3_compile",
+      "phase": "commit",
+      "doc": "docs/03_design/interface-contracts/service-impl.md",
+      "prompt": "【阶段3·微服务研发实现 (2PC Commit)】由 铁匠 (平台核心研发 Core SWE) 驱动。携带 prepareToken 进行正式业务逻辑编码，严格落实 1 Task = 1 Commit 原则。实现 Service、Controller 与 Mapper，消除重复 CRUD，杜绝假 Mock 与未处理 Promise，保障全栈增量编译 0 Error。"
+    },
+    {
+      "type": "step",
+      "id": "contract-sync",
+      "agent": "wf-coder",
+      "dependsOn": ["service-implementation"],
+      "gate": "gate_g3_sync",
+      "doc": "docs/03_design/interface-contracts/contract-sync.md",
+      "prompt": "【阶段4·跨端契约自动转译】由 铁匠 (平台核心研发 Core SWE) 驱动。运行契约同步生成器，从后端 Java / OpenAPI 契约自动转译生成前端 TypeScript 类型定义与强类型客户端 SDK，保障 Vue3 / Uni-App / Expo 多端类型绝对吻合、0 漂移。"
+    },
+    {
+      "type": "step",
+      "id": "mutation-testing",
+      "agent": "wf-tester",
+      "dependsOn": ["contract-sync"],
+      "gate": "gate_g4_eval",
+      "doc": "docs/05_verification/test-summary-report.md",
+      "prompt": "【阶段5·变异测试打假与全栈验证】由 门神 (真机验收 FDSE) 驱动。执行变异测试 (Mutation Testing) 扫描，杀灭全部存活突变体与假断言；运行集成测试用例集，验证边界状态机、多租户隔离与死穴防御，出具合格测试报告。"
+    },
+    {
+      "type": "step",
+      "id": "immutable-signoff",
+      "agent": "wf-reviewer",
+      "dependsOn": ["mutation-testing"],
+      "gate": "gate_g5_release",
+      "doc": "docs/07_release/system-deployment-sop.md",
+      "prompt": "【阶段6·不可变制品与交付核销】由 兜底渊 (投产守卫 PRE-SRE) 协同 Hermes 驱动。提取构建制品不可变哈希指纹，落盘部署回滚 SOP，挂载物理工程资产（No Artifact, No Done），正式签署阶段验收核销单。"
+    }
+  ]
+}
