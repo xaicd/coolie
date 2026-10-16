@@ -137,7 +137,10 @@ clients/*/replays/evidence/
 docs-coolie/evidence/**/*.png
 docs-coolie/QA/**/*.png
 docs-coolie/evidence/**/*.webm
+docs-coolie/evidence/**/*.mp4
 docs-coolie/evidence/**/*.zip
+docs-coolie/evidence/**/nodes/
+docs-coolie/evidence/**/*Credentials*
 docs-coolie/evidence/e2e/**/html-report/
 docs-coolie/evidence/e2e/**/artifacts/
 
