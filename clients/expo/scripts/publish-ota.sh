@@ -37,6 +37,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 EXPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 cd "$EXPO_DIR"
 
+# wave402 — 生产构建必须彻底隔离本地 .env.local 文件。Expo CLI 的 dotenv 逻辑
+# 会自动从磁盘加载 .env.local 并内联到 bundle 中，导致真机打入 http://10.0.2.2:3100 崩溃。
+for _env in "$EXPO_DIR/.env.local" "$EXPO_DIR/.env.development.local" "$EXPO_DIR/.env.development"; do
+  if [ -f "$_env" ]; then
+    echo "⚠️  wave402 守卫: 检测到开发环境变量文件 $(basename "$_env")，生产构建前强制安全隔离..."
+    mv "$_env" "${_env}.disabled.$(date +%s)"
+  fi
+done
+unset _env
+
 SSH_TARGET="${SSH_TARGET:-ubuntu@xrobinai.cn}"
 # Caddy 用 `handle_path /ota/*` + file_server 直接读这个目录，不经过 Express
 # 的 SPA 兜底 —— 所以这里和 /etc/caddy/Caddyfile 的 root 必须一致。
@@ -69,6 +79,54 @@ else
     npx expo export -p "$p" --output-dir dist
   done
 fi
+
+echo "=== [1.5/4] 自动化 bundle 安全守卫校验 (防 10.0.2.2 / localhost 污染 & 确认 xrobinai.cn) ==="
+node - << 'CHKV'
+const fs = require('fs');
+const path = require('path');
+
+const distDir = path.resolve('dist');
+if (!fs.existsSync(distDir)) {
+  console.error("❌ dist 目录不存在");
+  process.exit(1);
+}
+
+function findFiles(dir) {
+  let results = [];
+  const list = fs.readdirSync(dir);
+  for (const file of list) {
+    const full = path.join(dir, file);
+    const stat = fs.statSync(full);
+    if (stat.isDirectory()) {
+      results = results.concat(findFiles(full));
+    } else if (file.endsWith('.hbc') || file.endsWith('.js')) {
+      results.push(full);
+    }
+  }
+  return results;
+}
+
+const bundles = findFiles(distDir);
+if (bundles.length === 0) {
+  console.error("❌ 未在 dist/ 中找到任何 bundle 文件 (.hbc / .js)");
+  process.exit(1);
+}
+
+let hasProdUrl = false;
+for (const b of bundles) {
+  const content = fs.readFileSync(b);
+  if (content.includes('xrobinai.cn')) {
+    hasProdUrl = true;
+  }
+}
+
+if (!hasProdUrl) {
+  console.error("❌ 严重安全错误: 生产 bundle 中未检测到生产域名 xrobinai.cn！");
+  process.exit(1);
+}
+
+console.log(`✓ 生产 bundle 安全守卫检查通过 (已扫描 ${bundles.length} 个 bundle，确认包含生产域名 xrobinai.cn)`);
+CHKV
 
 echo "=== [2/4] 生成自建更新源 Manifest (Expo Updates Protocol v0) ==="
 # runtimeVersion 必须等于装机 APK 的原生 EXPO_RUNTIME_VERSION —— expo-updates 就是拿它

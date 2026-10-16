@@ -79,13 +79,11 @@
 
 ## 7. 当前 Sprint 动态记忆与掌柜最新原话
 
-- **当前 Sprint**: `2026-sprint-10-13-foundry-context-and-paperclip-governance`
-- **最新拍板原话 (2026-10-13)**:
-  - *"不能再造轮子"* ➜ 回归原生管理；*"6寸屏沉淀APP技能"* ➜ `yudao-expo-app` §4。
-  - *"标准流程全覆盖"* ➜ 8 环节 SOP；*"底座选型"* ➜ 4 级法典；*"本体存量接入"* ➜ REA 逆向。
-  - *"循环输出验收清单持续提要求, 验收人对标顶级竞品定位差距"* ➜ 8 域 32 项清单与 Web 对标雷达。
-  - *"sre监控影响主线要修理"* ➜ SRE 幽灵心跳自愈；*"记录所有输入持续沉淀用户taste, 严禁随意新建文档"* ➜ 100% 归属当日日结。
-- **详见账本**: [docs/sprint-prod/10/13.md](docs/sprint-prod/10/13.md)
+- **当前 Sprint**: `2026-sprint-10-16-mobile-foundry-and-login-isolation`
+- **最新拍板原话 (2026-10-16)**:
+  - *"mac 宿主机专门用来建设工坊产品... residential-plan-service 跟工坊平台无关系"* ➜ 锁定本地施工队定位，商业项目与平台主客体正交物理隔离。
+  - *"生产 APP 登录不上了, 是不是 APP APK 包有问题"* ➜ 根除构建期 .env.local 污染 + 三层防回环门禁 + 生产纯净 OTA 增量包下发生效。
+- **详见账本**: [docs/sprint-prod/10/16.md](docs/sprint-prod/10/16.md)
 
 ## 8. 维护规则
 

@@ -26,6 +26,7 @@
  * the inliner from matching the member expression.
  */
 declare const process: { env?: Record<string, string | undefined> } | undefined;
+declare const __DEV__: boolean | undefined;
 
 const inlinedBaseUrl =
   typeof process !== "undefined" && process.env
@@ -70,6 +71,28 @@ export const DEV_INSTANCE_BASE_URL = "http://10.0.2.2:3100";
  *   3. production — the unchanged default.
  */
 export function detectApiBaseUrl(): string {
+  const isDev = typeof __DEV__ !== "undefined" ? __DEV__ : false;
+
+  // 生产/非开发构建硬防御：
+  // 严禁任何回环/局域网模拟器地址 (10.0.2.2 / localhost / 127.0.0.1) 污染正式包
+  if (!isDev) {
+    if (inlinedBaseUrl) {
+      if (
+        inlinedBaseUrl.includes("10.0.2.2") ||
+        inlinedBaseUrl.includes("localhost") ||
+        inlinedBaseUrl.includes("127.0.0.1")
+      ) {
+        console.warn(
+          `⚠️ [Safety Guard] 非开发环境构建检测到本地/模拟器回环地址 ${inlinedBaseUrl}，生产包硬熔断自动回退到 ${PROD_INSTANCE_BASE_URL}`,
+        );
+        return PROD_INSTANCE_BASE_URL;
+      }
+      return inlinedBaseUrl;
+    }
+    return PROD_INSTANCE_BASE_URL;
+  }
+
+  // 开发环境 (Dev) 下按常规优先级探测
   if (inlinedBaseUrl) return inlinedBaseUrl;
   if (inlinedUseDevInstance === "1" || inlinedUseDevInstance === "true") {
     return inlinedDevBaseUrl ?? DEV_INSTANCE_BASE_URL;

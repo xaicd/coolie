@@ -80,6 +80,16 @@ for _v in EXPO_PUBLIC_COOLIE_USE_DEV_INSTANCE EXPO_PUBLIC_COOLIE_DEV_BASE_URL EX
 done
 unset _v
 
+# wave402 — 生产构建必须彻底隔离本地 .env.local 文件。Expo CLI 的 dotenv 逻辑
+# 会自动从磁盘加载 .env.local 并内联到 bundle 中，导致真机打入 http://10.0.2.2:3100 崩溃。
+for _env in "$EXPO_DIR/.env.local" "$EXPO_DIR/.env.development.local" "$EXPO_DIR/.env.development"; do
+  if [ -f "$_env" ]; then
+    echo "⚠️  wave402 守卫: 检测到开发环境变量文件 $(basename "$_env")，生产构建前强制安全隔离..."
+    mv "$_env" "${_env}.disabled.$(date +%s)"
+  fi
+done
+unset _env
+
 DRY_RUN=0
 SKIP_SERVER_DEPLOY=0
 WITH_4_GUARD=0
@@ -331,6 +341,24 @@ APK_SHA256="$(shasum -a 256 "$APK_SRC" 2>/dev/null | awk '{print $1}')"
 [ -n "$APK_SHA256" ] || die "算不出 APK SHA256: $APK_SRC"
 echo "   ✓ APK SHA256: $APK_SHA256"
 echo "   ✓ 产物就绪: $APK_SRC"
+
+# wave402: 机检硬门禁 — 解包检查 APK 内置 bundle，确保生产域名 xrobinai.cn 就绪
+# 且严禁内联 10.0.2.2 导致真机脱网崩溃
+if ! dry; then
+  echo "   [wave402 守卫] 校验 APK 内嵌 bundle 目标实例..."
+  TMP_APK_BUNDLE="$(mktemp -t coolie-apk-bundle.XXXXXX)"
+  unzip -p "$APK_SRC" "assets/index.android.bundle" > "$TMP_APK_BUNDLE" 2>/dev/null || true
+  if [ -s "$TMP_APK_BUNDLE" ]; then
+    if ! grep -q "xrobinai.cn" "$TMP_APK_BUNDLE"; then
+      rm -f "$TMP_APK_BUNDLE"
+      echo "构建失败，回退发版 commit 到 ${COMMIT_BEFORE:0:12}"
+      git reset --hard "$COMMIT_BEFORE"
+      die "❌ 致命错误: APK 内嵌 bundle 缺少生产域名 xrobinai.cn！"
+    fi
+    echo "   ✓ APK 内嵌 bundle 验证通过 (已绑定 https://xrobinai.cn)"
+  fi
+  rm -f "$TMP_APK_BUNDLE"
+fi
 
 step "[7/9] 上传 APK 到 COS ($COS_OBJECT)"
 run_sh "no_proxy=.myqcloud.com coscli cp '$APK_SRC' '$COS_OBJECT'"
