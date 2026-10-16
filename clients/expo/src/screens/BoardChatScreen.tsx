@@ -132,6 +132,21 @@ const FOUNDRY_ACTIONS: FoundryActionItem[] = [
 const MIN_VOICE_HOLD_MS = 300;
 
 /**
+ * wave389: 给录音链路里任何可能永久挂起的异步步骤加硬超时。
+ *
+ * `useRecorder` 的录音机是模块级单例: 一次异常的 `start()`/`stopAndUnloadAsync`
+ * 若永不 settle, 会一直挂在共享的 `startPromise` 上, 后续每次长按都 await 同一
+ * 条死承诺 —— 界面永远停在「识别处理中…」、`voiceBusy` 永久为 true, 语音彻底不可用
+ * 直到重启 App。超时后强制收场并把真因显性上报, 杜绝这种静默死锁。
+ */
+function withVoiceTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(label)), ms)),
+  ]);
+}
+
+/**
  * wave144: 首 token 超时。SSE 连上后这么久还没吐出任何 token, 就认为这次发问
  * 卡住了 (服务端子进程 hung, 或被中间层吞掉的连接), 主动 abort 并把状态变成
  * 「可重试」的错误气泡 —— 而不是让老板一直看着转圈。服务端自己的 first-token
@@ -518,6 +533,16 @@ export function BoardChatScreen({
   const { recording, start: startRecording, stop: stopRecording, forceStop } = useRecorder();
   const [voiceBusy, setVoiceBusy] = useState(false);
   const [voiceStatus, setVoiceStatus] = useState<string | null>(null);
+  /**
+   * wave389: 语音链路失败的可视化真因 (老板拍「v0.6.60 工坊语音还是不行」)。
+   *
+   * 生产实证: 老板 v0.6.60 期间的每一次「按住说话」都**没有到达服务端**
+   * (线上 mm_transcriptions 无对应记录, 服务端已修好且自测 201)。也就是失败发生在
+   * 客户端录音/采集这一步, 而此前这些早期 return 只推一条易被忽略的聊天气泡。
+   * 现在把真因 (权限 / 没采到声音 / 太短 / 转写失败 / 超时) 落到输入区上方的
+   * 常驻横幅 + Android Toast, 直到下一次尝试才清除, 一眼可见、可截图回传。
+   */
+  const [voiceError, setVoiceError] = useState<string | null>(null);
   /** 一次长按期间的录音启动承诺 + 按下时刻 (用于算长按时长、规避 onPressOut 早于 start 的竞态) */
   const voicePressRef = useRef<{ promise: Promise<boolean> | null; startedAt: number }>({
     promise: null,
@@ -982,6 +1007,24 @@ export function BoardChatScreen({
     [appendEcho],
   );
 
+  /**
+   * wave389: 语音失败统一上报 —— 三处同时落地, 确保老板不会「按了没反应还以为卡死」:
+   *   1) 输入区上方常驻横幅 `voiceError` (最醒目, 可截图回传);
+   *   2) 聊天流系统气泡 (留痕在会话历史里);
+   *   3) Android 原生 Toast (即便聊天屏不在视野也会弹出)。
+   * 横幅直到下一次长按/取消才清除, 不闪一下就消失。
+   */
+  const reportVoiceFailure = useCallback(
+    (text: string) => {
+      setVoiceError(text);
+      pushSystemEcho(`🎤 ${text}`);
+      if (Platform.OS === "android") {
+        ToastAndroid.show(text, ToastAndroid.LONG);
+      }
+    },
+    [pushSystemEcho],
+  );
+
   const handleSendRef = useRef<((textToSend?: string) => Promise<void>) | null>(null);
 
   /**
@@ -991,6 +1034,8 @@ export function BoardChatScreen({
    * - 左滑取消 (handleMicCancel): 彻底切断丢弃录音。
    */
   const handleMicPressIn = useCallback(() => {
+    // 新手势开始 —— 清掉上一轮的失败横幅
+    setVoiceError(null);
     // 保护: 如果已经在录音中，再次按下代表用户希望强制停止卡死的录音
     if (recording) {
       void forceStop();
@@ -1008,17 +1053,18 @@ export function BoardChatScreen({
       } catch (e) {
         const msg = String((e as Error)?.message ?? e);
         if (/权限/.test(msg)) {
+          reportVoiceFailure("需要麦克风权限：请在系统设置中允许 Coolie 使用麦克风");
           Alert.alert("需要麦克风权限", "请在系统设置中允许 Coolie 使用麦克风, 然后重试。", [
             { text: "取消", style: "cancel" },
             { text: "去设置", onPress: () => { void Linking.openSettings(); } },
           ]);
         } else {
-          Alert.alert("录音失败", msg);
+          reportVoiceFailure(`录音启动失败：${msg}`);
         }
         return false;
       }
     })();
-  }, [recording, forceStop, voiceBusy, sending, startRecording]);
+  }, [recording, forceStop, voiceBusy, sending, startRecording, reportVoiceFailure]);
 
   /**
    * wave388: 转写失败时保住录音 —— 把 m4a 复制到持久目录并作为附件 staging,
@@ -1063,20 +1109,28 @@ export function BoardChatScreen({
     // wave388: 保住本次录音的 m4a, 任何转写失败都能回退成附件手动重发。
     let recordedUri: string | null = null;
     try {
-      const started = await press.promise;
+      // wave389: 录音启动/结束都加硬超时 —— 单例录音机一旦挂起, 旧代码会永远停在
+      // 「识别处理中…」且 voiceBusy 永不清零, 语音从此彻底不可用。超时即收场并上报。
+      const started = await withVoiceTimeout(press.promise, 8000, "录音启动超时");
       if (!started) {
         await forceStop();
         return;
       }
 
-      const { base64, format, uri } = await stopRecording();
+      const { base64, format, uri } = await withVoiceTimeout(
+        stopRecording(),
+        8000,
+        "录音结束超时",
+      );
       recordedUri = uri;
       if (!base64) {
-        pushSystemEcho("🎤 未采集到有效声音, 请长按说话");
+        // 真因一: 没采到有效声音 (权限被系统静默拒绝 / 麦克风被占用 / 录音文件为空)
+        reportVoiceFailure("没有采集到声音（录音为空）——请确认已允许麦克风权限, 靠近麦克风再说一次");
         return;
       }
       if (Date.now() - press.startedAt < MIN_VOICE_HOLD_MS) {
-        pushSystemEcho("🎤 说话时间太短, 请长按说话");
+        // 真因二: 说话太短
+        reportVoiceFailure("说话太短 —— 请按住多说一会儿再松开（至少 0.3 秒）");
         return;
       }
 
@@ -1089,6 +1143,7 @@ export function BoardChatScreen({
 
       const text = (res.text ?? res.transcription?.text ?? "").trim();
       if (text) {
+        setVoiceError(null);
         if (action === "send") {
           // 居中松开: 直接发送给 Hermes！
           if (handleSendRef.current) {
@@ -1105,31 +1160,31 @@ export function BoardChatScreen({
           }
         }
       } else {
+        // 真因三: 服务端 201 但识别为空 (没听清)
         const kept = await preserveFailedVoice(recordedUri);
-        pushSystemEcho(
-          kept ? "🎤 没听清 · 录音已存为附件, 可点发送重发" : "🎤 没听清, 请再说一次",
+        reportVoiceFailure(
+          kept ? "没听清 · 录音已存为附件, 可点发送重发" : "没听清, 请再说一次",
         );
-        if (Platform.OS === "android") {
-          ToastAndroid.show(kept ? "未识别到文字，录音已存为附件" : "未识别到文字，请重试", ToastAndroid.SHORT);
-        }
       }
     } catch (e) {
       const kept = await preserveFailedVoice(recordedUri);
       const suffix = kept ? " · 录音已存为附件, 可点发送重发" : "";
+      const msg = String((e as Error)?.message ?? e);
       if (isAsrNotConfigured(e)) {
-        pushSystemEcho(`🎤 语音未配置: 该实例尚未配置腾讯 ASR 凭据, 请改用文字输入${suffix}`);
-        if (Platform.OS === "android") {
-          ToastAndroid.show("语音未配置，请打字输入", ToastAndroid.SHORT);
-        }
+        // 真因四: 该实例未配置腾讯 ASR 凭据 (服务端返回 501)
+        reportVoiceFailure(`语音未配置：该实例尚未配置腾讯 ASR 凭据, 请改用文字输入${suffix}`);
+      } else if (/超时/.test(msg)) {
+        reportVoiceFailure(`录音超时（录音机无响应）—— 请重试${suffix}`);
       } else {
-        pushSystemEcho(`🎤 转写失败: ${String((e as Error)?.message ?? e)}${suffix}`);
+        // 真因五: 转写请求失败 (网络 / 服务端 5xx / 其它)
+        reportVoiceFailure(`转写失败：${msg}${suffix}`);
       }
     } finally {
       await forceStop().catch(() => null);
       setVoiceBusy(false);
       setVoiceStatus(null);
     }
-  }, [recording, forceStop, company.id, stopRecording, pushSystemEcho, preserveFailedVoice]);
+  }, [recording, forceStop, company.id, stopRecording, pushSystemEcho, preserveFailedVoice, reportVoiceFailure]);
 
   /** 向左滑动取消录音 */
   const handleMicCancel = useCallback(async () => {
@@ -1137,6 +1192,7 @@ export function BoardChatScreen({
     await forceStop();
     setVoiceBusy(false);
     setVoiceStatus(null);
+    setVoiceError(null);
     pushSystemEcho("🎤 录音已取消");
   }, [forceStop, pushSystemEcho]);
 
@@ -2337,6 +2393,31 @@ export function BoardChatScreen({
           }
         />
 
+        {/* wave389: 语音失败真因常驻横幅 —— 持久可见, 直到下一次长按 / 左滑取消 / 主动关闭 */}
+        {voiceError ? (
+          <View
+            testID="BoardChatScreen__voiceErrorBar"
+            accessibilityViewIsModal
+            style={styles.voiceErrorBar}
+          >
+            <Ionicons name="mic-off-outline" size={14} color={C.err} />
+            <Text
+              style={styles.voiceErrorText}
+              numberOfLines={3}
+              ellipsizeMode="tail"
+            >
+              {voiceError}
+            </Text>
+            <Pressable
+              testID="BoardChatScreen__voiceErrorDismiss"
+              hitSlop={10}
+              onPress={() => setVoiceError(null)}
+            >
+              <Ionicons name="close" size={14} color={C.ink2} />
+            </Pressable>
+          </View>
+        ) : null}
+
         {/* 语音派发状态条 */}
         {voiceStatus ? (
           <View style={styles.voiceStatusBar}>
@@ -3198,6 +3279,27 @@ const styles = StyleSheet.create({
   voiceStatusText: {
     color: C.ink2,
     fontSize: 12,
+  },
+  /**
+   * wave389: 语音失败真因常驻横幅 —— 强提示, 不被聊天流刷掉, 不会闪一下就消失。
+   * 老板 v0.6.60 实证: 语音问题如果只推一条易被忽略的聊天气泡, 老板会以为「按了没反应
+   * 」「卡死」, 直接去拍 Hermes。这里强制一个不可滚走的常驻条 + 关闭按钮 + testID。
+   */
+  voiceErrorBar: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    backgroundColor: C.panel,
+    borderTopWidth: 1,
+    borderTopColor: C.err,
+  },
+  voiceErrorText: {
+    flex: 1,
+    color: C.err,
+    fontSize: 12,
+    lineHeight: 16,
   },
   micBtn: {
     width: 36,
