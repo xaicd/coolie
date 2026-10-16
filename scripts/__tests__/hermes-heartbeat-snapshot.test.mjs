@@ -18,6 +18,8 @@ import {
   summarizeQueue,
   queueLineCounts,
   queueKeyOf,
+  summarizeLiveness,
+  livenessSummaryText,
   canonicalSnapshot,
   lockStateOf,
   statePathFor,
@@ -463,6 +465,8 @@ test("queueKeyOf falls back to a uuid prefix when identifier is null", () => {
 // 8. 盘面指纹 + delta (心法 #176: 无变化就只发一行)
 // ---------------------------------------------------------------------------
 
+const FIXTURE_NOW = Date.parse("2026-10-16T13:39:00.000Z");
+
 function makeSnapshot({
   routines = ROUTINES,
   issues = ISSUES,
@@ -487,6 +491,7 @@ function makeSnapshot({
     routines: { source: "companies-list", unavailableReason: null, items: routines.map(summarizeRoutine) },
     inbox: summarizeInbox(inboxPayload),
     queue: summarizeQueue(issues),
+    liveness: summarizeLiveness(issues, { now: FIXTURE_NOW }),
   };
 }
 
@@ -634,7 +639,11 @@ test("diffSnapshots caps the delta list instead of flooding the comment", () => 
   const deltas = diffSnapshots({ canonical: canonicalSnapshot(before) }, after);
   assert.equal(deltas.length, 13, "12 lines + 1 fold counter");
   assert.match(deltas.at(-1), /另有 \d+ 条变化/);
-  assert.match(deltas.at(-1), /另有 21 条变化/, "30 queue adds + 3 inbox moves, folded after 12");
+  assert.match(
+    deltas.at(-1),
+    /另有 51 条变化/,
+    "30 queue adds + 3 inbox moves + 30 活路 adds (每条第 0 个 blocked 且零 blocker 边 = dead_letter), folded after 12"
+  );
 });
 
 test("readState / writeState round-trip, and degrade on missing or corrupt files", () => {
@@ -847,5 +856,135 @@ test("end to end: a baseline written by another issue is reported as a fresh bas
   } finally {
     server.close();
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 12. 活路 (liveness) 并入心跳
+// 大盘四桶只回答"有几条", 活路回答"还回不回得来". 这两件事分开数,
+// 就会把"永不自动恢复"的工单读成"已知稳态"——本仓实测吃过一次 (6 条 blocked
+// 既无 blocker 边、又无解阻责任人, 每轮巡检都报成正常)。
+// ---------------------------------------------------------------------------
+
+/** 带时间戳的工单行: idleHours 只有在有 updatedAt 时才成立 */
+function agedIssue(identifier, status, hoursAgo, extra = {}) {
+  return {
+    identifier,
+    status,
+    priority: "high",
+    checkoutRunId: null,
+    updatedAt: new Date(FIXTURE_NOW - hoursAgo * 3600 * 1000).toISOString(),
+    ...extra,
+  };
+}
+
+test("summarizeLiveness counts every verdict and sorts attention by identifier", () => {
+  const lx = summarizeLiveness(ISSUES, { now: FIXTURE_NOW });
+  assert.equal(lx.openCount, 6, "cancelled 不算开放工单");
+  assert.equal(lx.counts.live, 1, "COOA-114 有 active run");
+  assert.equal(lx.counts.stalled_in_progress, 1, "COOA-4 in_progress 无 run");
+  assert.equal(lx.counts.review_no_monitor, 1, "COOA-278 in_review 无 monitor");
+  assert.equal(lx.counts.dead_letter, 1, "COOA-44 blocked 且零 blocker 边 / 零 descriptor");
+  assert.equal(lx.counts.orphan, 2, "COOA-1 + COOA-253 零指派");
+  assert.equal(lx.counts.queued, 0);
+  assert.equal(lx.attentionCount, 5, "五类需出手之和");
+  assert.deepEqual(
+    lx.attention.map((a) => a.identifier),
+    ["COOA-1", "COOA-253", "COOA-278", "COOA-4", "COOA-44"],
+    "attention 必须按 identifier 排序: 扫描器内部按 idle 倒序, 轮次间会抖动"
+  );
+  assert.ok(lx.attention.every((a) => typeof a.reason === "string" && a.reason.length > 0));
+});
+
+test("summarizeLiveness never invents data from garbage input", () => {
+  const lx = summarizeLiveness(null, { now: FIXTURE_NOW });
+  assert.equal(lx.openCount, 0);
+  assert.equal(lx.attentionCount, 0);
+  assert.deepEqual(lx.attention, []);
+  assert.equal(summarizeLiveness([]).attentionCount, 0);
+});
+
+test("idle growth must not move the signature — only (identifier:verdict) is fingerprinted", () => {
+  const rows = [agedIssue("COOA-4", "in_progress", 6), agedIssue("COOA-1", "todo", 30)];
+  const early = summarizeLiveness(rows, { now: FIXTURE_NOW });
+  const later = summarizeLiveness(rows, { now: FIXTURE_NOW + 5 * 3600 * 1000 });
+  const idleOf = (lx) => lx.attention.find((a) => a.identifier === "COOA-4")?.idleHours;
+  assert.equal(idleOf(early), 6);
+  assert.equal(idleOf(later), 11, "idle 时长确实在长");
+  const sig = (lx) => snapshotSignature({ ...makeSnapshot({ issues: rows }), liveness: lx });
+  assert.equal(sig(early), sig(later), "否则心跳每轮都会 CHANGED (同 phase-null / run-id 轮转那类坑)");
+});
+
+test("a工单 losing its liveness path must move the signature", () => {
+  const healthy = [agedIssue("COOA-5", "in_progress", 0, { checkoutRunId: "run-live" })];
+  const stalled = [agedIssue("COOA-5", "in_progress", 6)];
+  const sig = (rows) =>
+    snapshotSignature({ ...makeSnapshot({ issues: rows }), liveness: summarizeLiveness(rows, { now: FIXTURE_NOW }) });
+  assert.notEqual(sig(healthy), sig(stalled), "有活路 -> 假活着 是最该被看见的信号");
+});
+
+test("diffSnapshots reports 工单 entering and leaving the attention set", () => {
+  const healthyRows = [agedIssue("COOA-5", "in_progress", 0, { checkoutRunId: "run-live" })];
+  const stalledRows = [agedIssue("COOA-5", "in_progress", 6)];
+  const before = {
+    ...makeSnapshot({ issues: healthyRows }),
+    liveness: summarizeLiveness(healthyRows, { now: FIXTURE_NOW }),
+  };
+  const after = {
+    ...makeSnapshot({ issues: stalledRows }),
+    liveness: summarizeLiveness(stalledRows, { now: FIXTURE_NOW }),
+  };
+  const deltas = diffSnapshots({ canonical: canonicalSnapshot(before) }, after);
+  assert.ok(
+    deltas.some((d) => d.includes("+ 活路: COOA-5:stalled_in_progress")),
+    `expected a liveness delta, got: ${JSON.stringify(deltas)}`
+  );
+  const back = diffSnapshots({ canonical: canonicalSnapshot(after) }, before);
+  assert.ok(back.some((d) => d.includes("- 活路: COOA-5:stalled_in_progress")));
+});
+
+test("renderBrief carries the lx segment, and says (ok) when nothing needs a human", () => {
+  const line = renderBrief({ ...makeSnapshot(), signature: "abc", changed: false });
+  assert.match(line, /lx 5\/6 \(dead=1 stall=1 nomon=1 orphan=2\)/);
+  assert.equal(livenessSummaryText(null), "lx null");
+  assert.equal(
+    livenessSummaryText({ attentionCount: 0, openCount: 4, counts: { live: 4 } }),
+    "lx 0/4 (ok)",
+    "全零不能渲染成空括号"
+  );
+});
+
+test("renderText lists each attention 工单 with its verdict and reason", () => {
+  const text = renderText(makeSnapshot());
+  assert.match(text, /liveness: lx 5\/6/);
+  assert.match(text, /COOA-4 stalled_in_progress in_progress .*无 active run/);
+  assert.match(text, /COOA-1 orphan todo .*零指派/);
+});
+
+test("end to end: the CLI reports liveness on a real board (live fixture server)", async () => {
+  const board = [
+    { ...agedIssue("COOA-4", "in_progress", 7), id: "11111111-1111-1111-1111-111111111111" },
+    {
+      ...agedIssue("COOA-114", "in_progress", 0, { checkoutRunId: "run-self" }),
+      id: "179c5dfe-e531-48ac-8e29-fcfb2db2d74b",
+    },
+  ];
+  const { server, baseUrl } = await startFixtureServer((req, res) => {
+    res.setHeader("content-type", "application/json");
+    if (req.url === `/api/issues/${ISSUE.id}`) return res.end(JSON.stringify(ISSUE));
+    if (req.url === `/api/companies/${ISSUE.companyId}/routines`) return res.end(JSON.stringify(ROUTINES));
+    if (req.url === `/api/companies/${ISSUE.companyId}/issues?limit=400`) return res.end(JSON.stringify(board));
+    if (req.url === `/api/inbox?companyId=${ISSUE.companyId}`) {
+      return res.end(JSON.stringify({ pendingApprovals: [], failures: [], mentionedBy: [], joinRequests: [] }));
+    }
+    res.statusCode = 404;
+    res.end(JSON.stringify({ error: "API route not found" }));
+  });
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" };
+  try {
+    const { stdout } = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--no-state"], { env });
+    assert.match(stdout, /lx 1\/2 \(stall=1\)/, `brief must carry liveness, got: ${stdout}`);
+  } finally {
+    server.close();
   }
 });

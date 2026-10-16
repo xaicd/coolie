@@ -48,6 +48,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
+import { scanIssues, VERDICTS, ATTENTION_VERDICTS } from "./hermes-open-issue-liveness-scan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(HERE, "..");
@@ -258,6 +259,44 @@ export function queueKeyOf(item) {
 }
 
 /**
+ * 活路汇总 (与 liveness 扫描器同源, 不重复实现分类逻辑).
+ *
+ * 巡检要回答的不只是"有几条 blocked", 而是"这些工单还回不回得来"。
+ * 这里把 liveness 扫描器的判定结果压成心跳要用的最小集:
+ *   - counts: 各 verdict 计数 (对齐 VERDICTS 全集, 缺失记 0, 便于跨轮比对)
+ *   - attention: 需要掌柜出手的 (identifier, verdict, reason)
+ *
+ * 刻意**不含 idleHours**: 它每轮都在增长, 一旦进指纹 changed 就恒为 true,
+ * 把真信号淹没 —— 与 canonicalSnapshot 里 phase-null 同一类坑。
+ * 同理 attention 按 identifier 排序, 但扫描器内部按 idle 倒序 (轮次间会抖动)。
+ */
+export function summarizeLiveness(issues, options = {}) {
+  const scan = scanIssues(issues, options);
+  const counts = {};
+  for (const verdict of VERDICTS) counts[verdict] = scan.counts[verdict] ?? 0;
+  const attention = [];
+  for (const verdict of ATTENTION_VERDICTS) {
+    for (const row of scan.byVerdict[verdict] ?? []) {
+      attention.push({
+        identifier: row.identifier ?? row.shortId ?? null,
+        verdict,
+        status: row.status ?? null,
+        priority: row.priority ?? null,
+        idleHours: row.idleHours ?? null,
+        reason: row.reasons?.[row.reasons.length - 1] ?? null,
+      });
+    }
+  }
+  attention.sort((a, b) => String(a.identifier).localeCompare(String(b.identifier)));
+  return {
+    openCount: scan.openCount,
+    attentionCount: scan.attentionCount,
+    counts,
+    attention,
+  };
+}
+
+/**
  * 当前 issue 的锁状态等价类 (指纹用), 不是 run id 字面量.
  * 心跳每轮都由 harness 重新签出本 issue → checkoutRunId 必然换新;
  * 把 run id 放进指纹会让每一轮都恒为 changed, "无变化就只发一行"直接失效.
@@ -300,7 +339,14 @@ export function canonicalSnapshot(snapshot) {
         (s.queue.buckets?.[b.key] ?? []).map((i) => `${queueKeyOf(i)}:${i.status}`),
       ])
     : null;
-  return { issue, routines, inbox, queue };
+  // 活路: 只记"需出手"的 (identifier, verdict) 对与计数 —— 不含 idleHours (每轮都在长)
+  const liveness = s.liveness
+    ? [
+        s.liveness.attentionCount ?? null,
+        (s.liveness.attention ?? []).map((a) => `${a.identifier}:${a.verdict}`).sort(),
+      ]
+    : null;
+  return { issue, routines, inbox, queue, liveness };
 }
 
 /** 盘面指纹 (16 hex); 同盘面必同指纹, 与回包顺序无关 */
@@ -352,6 +398,14 @@ export function diffSnapshots(previous, current) {
   for (const [bucket, count] of after.inbox ?? []) {
     const prior = oldInbox.has(bucket) ? oldInbox.get(bucket) : null;
     if (prior !== count) deltas.push(`~ inbox ${bucket} ${prior ?? "null"} -> ${count ?? "null"}`);
+  }
+
+  // 活路变化: 一条工单从"有活路"掉进"需出手"(或反向回来) 是最该被看见的信号
+  if (JSON.stringify(before.liveness ?? null) !== JSON.stringify(after.liveness ?? null)) {
+    const oldLive = new Set((before.liveness?.[1] ?? []).map(String));
+    const newLive = new Set((after.liveness?.[1] ?? []).map(String));
+    for (const entry of newLive) if (!oldLive.has(entry)) deltas.push(`+ 活路: ${entry}`);
+    for (const entry of oldLive) if (!newLive.has(entry)) deltas.push(`- 活路: ${entry}`);
   }
 
   const oldQueue = new Map((before.queue ?? []).map(([k, ids]) => [k, new Set(ids ?? [])]));
@@ -499,6 +553,13 @@ const HELP = `hermes-heartbeat-snapshot — Paperclip routine 心跳确定性快
                  同仓并发跑多个心跳 (COOA-114 与心祖执行 issue) 时互不覆盖基线.
                  默认 scripts/.hermes-tmp/heartbeat-snapshot-state.json.
   --no-state     只读盘面, 不写比对状态 (适合一次性排查).
+
+活路 (liveness):
+  大盘只回答"有几条", 不回答"还回不回得来". 本工具复用
+  hermes-open-issue-liveness-scan 的判定, 在同一份 issues 回包上算出
+  dead_letter / stalled_in_progress / review_no_monitor / orphan / queued_stale
+  五类"需出手"工单, 汇总为一行 lx N/M. 只列非零项; 全零显示 lx N/M (ok).
+  指纹只含 (identifier:verdict), 不含 idle 时长 —— 否则 changed 恒为 true.
 `;
 
 /** 默认状态路径可用 env 覆盖 (跨机复刻时不必改代码) */
@@ -533,6 +594,7 @@ export async function collectSnapshot(config) {
     routineIds = [],
     skipInbox = false,
     skipQueue = false,
+    livenessNow = Date.now(),
     fetchImpl = globalThis.fetch,
   } = config;
 
@@ -545,6 +607,7 @@ export async function collectSnapshot(config) {
     inbox: null,
     queue: null,
     queueUnavailableReason: null,
+    liveness: null,
   };
 
   // 1. issue 真值 + companyId 反查 (心法 #148: env 未注入 companyId 时走 issue 反查)
@@ -617,18 +680,26 @@ export async function collectSnapshot(config) {
   }
 
   // 5. 工单大盘四桶 (心法 #56/#144: list 是初盘, 真值以单条 API 为终判)
+  let boardRows = [];
   if (!skipQueue && snapshot.companyId) {
     const issues = await getJson(`${apiBase}/companies/${snapshot.companyId}/issues?limit=400`, {
       apiKey,
       runId,
       fetchImpl,
     });
-    const rows = pickIssues(issues.body);
-    if (rows.length > 0) {
-      snapshot.queue = summarizeQueue(rows);
+    boardRows = pickIssues(issues.body);
+    if (boardRows.length > 0) {
+      snapshot.queue = summarizeQueue(boardRows);
     } else {
       snapshot.queueUnavailableReason = apiErrorOf(issues.body) ?? `HTTP ${issues.status}`;
     }
+  }
+
+  // 6. 活路判定: 复用上面同一份 rows —— 零额外请求, 且"巡检"与"检测"口径永远同源.
+  //    分开两处数一次大盘, 迟早会漂移成两个说法 (本仓已有过一次: 4 桶 blocked=6 与
+  //    liveness dead=6 各说各话, 谁也没说这两组是不是同一批工单).
+  if (boardRows.length > 0) {
+    snapshot.liveness = summarizeLiveness(boardRows, { now: livenessNow });
   }
 
   snapshot.generatedAt = new Date().toISOString();
@@ -687,11 +758,37 @@ export function renderText(snapshot) {
   } else if (snapshot.queueUnavailableReason) {
     lines.push(`queue   : unavailable (${snapshot.queueUnavailableReason})`);
   }
+  // 活路: "还回不回得来" 与 "有几条" 是两件事, 只报桶数会把永不恢复的工单读成已知稳态
+  if (snapshot.liveness) {
+    lines.push(`liveness: ${livenessSummaryText(snapshot.liveness)}`);
+    for (const a of snapshot.liveness.attention ?? []) {
+      lines.push(
+        `  ${a.identifier} ${a.verdict} ${a.status ?? "?"} idle=${a.idleHours ?? "?"}h — ${a.reason ?? ""}`
+      );
+    }
+  }
   if (snapshot.signature) {
     lines.push(`changed : ${snapshot.changed === true} sig=${snapshot.signature} prev=${snapshot.previousSignature ?? "null"}`);
     for (const delta of snapshot.deltas ?? []) lines.push(`  ${delta}`);
   }
   return lines.join("\n");
+}
+
+/** 活路短码: 让一行里塞得下四五个 verdict 计数 */
+const LIVENESS_SHORT = {
+  dead_letter: "dead",
+  stalled_in_progress: "stall",
+  review_no_monitor: "nomon",
+  orphan: "orphan",
+  queued_stale: "qstale",
+};
+
+/** "lx 6/13 (stall=1 nomon=1 orphan=4)" — 只列非零项; 全零显示 ok */
+export function livenessSummaryText(liveness) {
+  if (!liveness) return "lx null";
+  const parts = ATTENTION_VERDICTS.map((v) => [v, liveness.counts?.[v] ?? 0]).filter(([, n]) => n > 0);
+  const inner = parts.length === 0 ? "ok" : parts.map(([v, n]) => `${LIVENESS_SHORT[v] ?? v}=${n}`).join(" ");
+  return `lx ${liveness.attentionCount ?? "?"}/${liveness.openCount ?? "?"} (${inner})`;
 }
 
 /**
@@ -714,7 +811,7 @@ export function renderBrief(snapshot) {
   const state = snapshot.signature ? (snapshot.changed ? "CHANGED" : "no-change") : "no-baseline";
   const head =
     `HB ${stamp} ${state} sig=${snapshot.signature ?? "null"} · ${issue} · ${routines} · ` +
-    `queue ${counts} · ${inbox}`;
+    `queue ${counts} · ${inbox} · ${livenessSummaryText(snapshot.liveness)}`;
   return [head, ...(snapshot.deltas ?? []).map((d) => `  ${d}`)].join("\n");
 }
 
