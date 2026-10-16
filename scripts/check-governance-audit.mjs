@@ -863,6 +863,29 @@ assertRule(
   `device-claim 单测未全绿: ${deviceClaimTestDetail.split('\n').filter((l) => /^not ok|# fail/.test(l)).join(' | ') || 'no summary'}`,
 );
 
+// -----------------------------------------------------------------------------
+// 25. 新 SOA 场景配方驾驶舱、2PC 契约与 HLD/原型防退化守卫 (COOA-265)
+// -----------------------------------------------------------------------------
+console.log('\n📐 25. 新 SOA 场景配方驾驶舱、2PC 契约与 HLD/原型防退化守卫 (COOA-265):');
+let wave286VerifyOk = false;
+let wave286Detail = '';
+try {
+  wave286Detail = execSync('node scripts/verify-wave286-new-soa-prototype.mjs', {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  wave286VerifyOk = wave286Detail.includes('全部 32/32 项 Delta 真实验证通过');
+} catch (e) {
+  wave286VerifyOk = false;
+  wave286Detail = `${e?.stdout ?? ''}${e?.stderr ?? ''}`;
+}
+
+assertRule(
+  '新 SOA 架构与原型 Delta 全量契约守卫: node scripts/verify-wave286-new-soa-prototype.mjs 必须通过 (32/32 PASS)',
+  wave286VerifyOk,
+  `wave286 Delta 验证未通过: ${wave286Detail.slice(0, 300)}`,
+);
+
 console.log('\n========================================================================');
 if (failed) {
   console.error('🚫 全面管局审计未通过！存在不符合高管治理规范的阻断项，请修复后重试。');

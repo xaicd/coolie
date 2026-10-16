@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Coolie 工坊 · 新 SOA 场景配方驾驶舱与 2PC 两阶段高保真原型</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif; }
+    .safe-bottom { padding-bottom: env(safe-area-inset-bottom, 20px); }
+    .thumb-touch { min-height: 44px; min-width: 44px; }
+    .drawer-overlay { background: rgba(0, 0, 0, 0.65); backdrop-filter: blur(4px); }
+    /* 隐藏滚动条 */
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="bg-slate-950 text-slate-100 min-h-screen flex flex-col items-center justify-center p-0 md:p-6 select-none">
+
+  <!-- 顶部视口切换条 (桌面端调试辅助) -->
+  <aside aria-label="调试控制" class="w-full max-w-4xl hidden md:flex items-center justify-between bg-slate-900 border border-slate-800 rounded-xl px-4 py-2.5 mb-4 text-xs">
+    <div class="flex items-center gap-2">
+      <span class="inline-block w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+      <span class="font-bold text-slate-200">Coolie 工坊 · 新 SOA 场景配方驾驶舱 (wave286 / modou-fda)</span>
+      <span class="px-2 py-0.5 rounded bg-blue-900/60 text-blue-300 font-mono">CMMI Phase 1.4/3.1 原型</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <span class="text-slate-400">视口切换:</span>
+      <button onclick="setViewport('mobile')" id="btn-vp-mobile" class="px-3 py-1 rounded bg-blue-600 text-white font-medium hover:bg-blue-500 transition">📱 6寸屏手机</button>
+      <button onclick="setViewport('desktop')" id="btn-vp-desktop" class="px-3 py-1 rounded bg-slate-800 text-slate-300 font-medium hover:bg-slate-700 transition">💻 宽屏驾驶舱</button>
+    </div>
+  </aside>
+
+  <!-- 原型容器 (可自适应切换手机与宽屏) -->
+  <div id="prototype-container" class="w-full max-w-[390px] h-[844px] bg-slate-900 border border-slate-800 md:rounded-[40px] md:shadow-2xl md:ring-1 md:ring-slate-700/50 flex flex-col relative overflow-hidden transition-all duration-300">
+    
+    <!-- 1. 移动端状态栏模拟 -->
+    <header class="w-full pt-3 px-6 pb-2 flex justify-between items-center text-xs font-semibold text-slate-400 z-10">
+      <span>09:41</span>
+      <div class="flex items-center gap-1.5">
+        <span>5G</span>
+        <div class="w-5 h-2.5 border border-slate-400 rounded-sm p-0.5 flex items-center">
+          <div class="w-full h-full bg-emerald-400 rounded-2xs"></div>
+        </div>
+      </div>
+    </header>
+
+    <!-- 2. 顶栏导航与态势横幅 -->
+    <div class="px-4 py-2 border-b border-slate-800/80 bg-slate-900/90 backdrop-blur flex items-center justify-between">
+      <div class="flex items-center gap-2">
+        <div class="w-7 h-7 rounded-lg bg-blue-600/30 border border-blue-500/40 flex items-center justify-center text-blue-400 font-bold text-sm">
+          📐
+        </div>
+        <div>
+          <h1 class="text-sm font-bold text-slate-100 flex items-center gap-1.5">
+            场景编排
+            <span class="text-[10px] px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/30">新SOA</span>
+          </h1>
+          <p class="text-[10px] text-slate-400">配方优先 · 2PC两阶段守卫</p>
+        </div>
+      </div>
+      <div class="flex gap-1.5">
+        <button onclick="openContextSlicerDrawer()" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-medium text-slate-300 border border-slate-700/60">
+          ✂️ 切片
+        </button>
+        <button onclick="openOntologyDrawer('M1_Merchant')" class="px-2 py-1 rounded bg-slate-800 hover:bg-slate-700 text-[11px] font-medium text-blue-300 border border-slate-700/60">
+          ⬡ 本体
+        </button>
+      </div>
+    </div>
+
+    <!-- 3. 主内容滚动区域 -->
+    <main class="flex-1 overflow-y-auto px-4 py-3 space-y-3 no-scrollbar pb-24">
+      
+      <!-- 态势横幅卡片 -->
+      <section aria-label="编排态势概览" class="bg-gradient-to-r from-blue-950/60 via-slate-800/60 to-indigo-950/60 border border-blue-900/40 rounded-2xl p-3 shadow-sm">
+        <div class="flex justify-between items-center mb-1.5">
+          <span class="text-xs font-semibold text-blue-200 flex items-center gap-1">
+            ⚡ 编排态势概览
+          </span>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-mono">2PC 已就绪</span>
+        </div>
+        <div class="grid grid-cols-3 gap-2 text-center pt-1">
+          <div class="bg-slate-900/60 rounded-xl p-1.5 border border-slate-800/60">
+            <div class="text-[10px] text-slate-400">标准配方</div>
+            <div class="text-sm font-bold text-slate-100">8 款</div>
+          </div>
+          <div class="bg-slate-900/60 rounded-xl p-1.5 border border-slate-800/60">
+            <div class="text-[10px] text-slate-400">场景命中</div>
+            <div class="text-sm font-bold text-emerald-400">92.4%</div>
+          </div>
+          <div class="bg-slate-900/60 rounded-xl p-1.5 border border-slate-800/60">
+            <div class="text-[10px] text-slate-400">上下文裁剪</div>
+            <div class="text-sm font-bold text-indigo-400">93.6%</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 分类标签过滤器 -->
+      <nav aria-label="场景分类过滤" class="flex gap-2 overflow-x-auto no-scrollbar py-0.5 text-xs">
+        <button onclick="filterCategory('all')" id="tab-all" class="px-3 py-1 rounded-full bg-blue-600 text-white font-medium whitespace-nowrap">全部 (8)</button>
+        <button onclick="filterCategory('commercial')" id="tab-commercial" class="px-3 py-1 rounded-full bg-slate-800 text-slate-400 hover:text-slate-200 font-medium whitespace-nowrap">商业交付 (2)</button>
+        <button onclick="filterCategory('dev')" id="tab-dev" class="px-3 py-1 rounded-full bg-slate-800 text-slate-400 hover:text-slate-200 font-medium whitespace-nowrap">基础研发 (4)</button>
+        <button onclick="filterCategory('ops')" id="tab-ops" class="px-3 py-1 rounded-full bg-slate-800 text-slate-400 hover:text-slate-200 font-medium whitespace-nowrap">运维投产 (2)</button>
+      </nav>
+
+      <!-- 配方卡片 1: 商用后端微服务模块交付 (2PC 重点演示) -->
+      <article data-category="commercial" class="recipe-card bg-slate-800/80 border border-slate-700/60 rounded-2xl p-3.5 space-y-2.5 shadow hover:border-blue-500/40 transition">
+        <div class="flex justify-between items-start">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-400 flex items-center justify-center text-base border border-amber-500/30">
+              🧱
+            </div>
+            <div>
+              <h2 class="text-xs font-bold text-slate-100">commercial-backend-module</h2>
+              <p class="text-[10px] text-slate-400">商用后端微服务模块交付配方 · 6步流水线</p>
+            </div>
+          </div>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 font-medium">商业交付</span>
+        </div>
+
+        <div class="text-[11px] text-slate-300 bg-slate-900/60 rounded-xl p-2 border border-slate-800/80 space-y-1">
+          <div class="flex items-center justify-between text-slate-400 text-[10px]">
+            <span>DAG 链路</span>
+            <span>责任人: 墨斗 ➔ 铁匠 ➔ 门神</span>
+          </div>
+          <div class="text-slate-200 font-mono text-[10px] flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <span class="text-blue-400">活体本体</span> ➔ 
+            <span class="text-amber-400 font-bold bg-amber-950/60 px-1 rounded">[2PC预检]</span> ➔ 
+            <span>微服务</span> ➔ 
+            <span>跨端转译</span> ➔ 
+            <span class="text-emerald-400">不可变核销</span>
+          </div>
+        </div>
+
+        <!-- 两字操作按钮组 -->
+        <div class="grid grid-cols-2 gap-2 pt-0.5">
+          <button onclick="triggerAssemble('commercial-backend-module')" class="thumb-touch rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-xs font-bold text-white transition flex items-center justify-center gap-1 shadow-sm">
+            <span>装配</span>
+          </button>
+          <button onclick="open2PcDrawer('商户清分规则核心写入', 'M2_UpdateSettlementRule', 'cls_merchant_rules', 'HIGH')" class="thumb-touch rounded-xl bg-amber-600 hover:bg-amber-500 active:scale-[0.98] text-xs font-bold text-white transition flex items-center justify-center gap-1 shadow-sm">
+            <span>预检</span>
+          </button>
+        </div>
+      </article>
+
+      <!-- 配方卡片 2: 四位一体全渠道特性交付 -->
+      <article data-category="commercial" class="recipe-card bg-slate-800/80 border border-slate-700/60 rounded-2xl p-3.5 space-y-2.5 shadow hover:border-blue-500/40 transition">
+        <div class="flex justify-between items-start">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-base border border-emerald-500/30">
+              📱
+            </div>
+            <div>
+              <h2 class="text-xs font-bold text-slate-100">quad-terminal-feature</h2>
+              <p class="text-[10px] text-slate-400">四位一体全渠道端到端交付 · 7步流水线</p>
+            </div>
+          </div>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-medium">全渠道</span>
+        </div>
+
+        <div class="text-[11px] text-slate-300 bg-slate-900/60 rounded-xl p-2 border border-slate-800/80 space-y-1">
+          <div class="flex items-center justify-between text-slate-400 text-[10px]">
+            <span>全栈终端覆盖</span>
+            <span>责任人: 墨斗 ➔ 门神 ➔ 百晓生</span>
+          </div>
+          <div class="text-slate-200 font-mono text-[10px] flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <span>EARS规格</span> ➔ <span>四端HLD</span> ➔ <span>Vue3运营</span> ➔ <span>小程序</span> ➔ <span class="text-emerald-400 font-bold">Expo原生</span>
+          </div>
+        </div>
+
+        <!-- 两字操作按钮组 -->
+        <div class="grid grid-cols-2 gap-2 pt-0.5">
+          <button onclick="triggerAssemble('quad-terminal-feature')" class="thumb-touch rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-xs font-bold text-white transition flex items-center justify-center gap-1 shadow-sm">
+            <span>装配</span>
+          </button>
+          <button onclick="triggerDryRun('quad-terminal-feature')" class="thumb-touch rounded-xl bg-slate-700 hover:bg-slate-600 active:scale-[0.98] text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1 shadow-sm">
+            <span>试跑</span>
+          </button>
+        </div>
+      </article>
+
+      <!-- 配方卡片 3: 生产发布与 OTA 增量同步 -->
+      <article data-category="ops" class="recipe-card bg-slate-800/80 border border-slate-700/60 rounded-2xl p-3.5 space-y-2.5 shadow hover:border-blue-500/40 transition">
+        <div class="flex justify-between items-start">
+          <div class="flex items-center gap-2">
+            <div class="w-8 h-8 rounded-xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center text-base border border-indigo-500/30">
+              🚀
+            </div>
+            <div>
+              <h2 class="text-xs font-bold text-slate-100">app-release-pipeline</h2>
+              <p class="text-[10px] text-slate-400">移动端与控制面投产流水线 · 4步门禁</p>
+            </div>
+          </div>
+          <span class="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-medium">运维投产</span>
+        </div>
+
+        <div class="text-[11px] text-slate-300 bg-slate-900/60 rounded-xl p-2 border border-slate-800/80 space-y-1">
+          <div class="flex items-center justify-between text-slate-400 text-[10px]">
+            <span>投产防护</span>
+            <span>责任人: 兑底渊 (PRE-SRE)</span>
+          </div>
+          <div class="text-slate-200 font-mono text-[10px] flex items-center gap-1 overflow-x-auto no-scrollbar">
+            <span>7处一致</span> ➔ <span>.env隔离</span> ➔ <span>APK/OTA</span> ➔ <span class="text-indigo-400 font-bold">健康拨测</span>
+          </div>
+        </div>
+
+        <!-- 两字操作按钮组 -->
+        <div class="grid grid-cols-2 gap-2 pt-0.5">
+          <button onclick="open2PcDrawer('生产OTA增量热更新发布', 'Act_PublishOtaBundle', 'release_manifest', 'CRITICAL')" class="thumb-touch rounded-xl bg-indigo-600 hover:bg-indigo-500 active:scale-[0.98] text-xs font-bold text-white transition flex items-center justify-center gap-1 shadow-sm">
+            <span>预检</span>
+          </button>
+          <button onclick="triggerAssemble('app-release-pipeline')" class="thumb-touch rounded-xl bg-slate-700 hover:bg-slate-600 active:scale-[0.98] text-xs font-bold text-slate-200 transition flex items-center justify-center gap-1 shadow-sm">
+            <span>派单</span>
+          </button>
+        </div>
+      </article>
+
+    </main>
+
+    <!-- 4. 黄金对称 5 槽位底栏 (严格守恒) -->
+    <nav aria-label="移动底部主导航" class="absolute bottom-0 left-0 right-0 h-16 bg-slate-900/95 border-t border-slate-800 flex items-center justify-around px-2 z-20 safe-bottom backdrop-blur">
+      <button onclick="selectTab(0)" class="nav-tab flex-1 flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition">
+        <span class="text-base">📊</span>
+        <span class="text-[10px] mt-0.5 font-medium">汇览</span>
+      </button>
+      <button onclick="selectTab(1)" class="nav-tab flex-1 flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition">
+        <span class="text-base">📋</span>
+        <span class="text-[10px] mt-0.5 font-medium">任务</span>
+      </button>
+      <!-- 中间核心操作加号 -->
+      <div class="flex-1 flex justify-center -mt-4">
+        <button onclick="triggerCreateIntent()" class="w-12 h-12 rounded-full bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-500/30 flex items-center justify-center text-white text-xl font-bold active:scale-95 transition border-2 border-slate-900">
+          ＋
+        </button>
+      </div>
+      <button onclick="selectTab(3)" class="nav-tab flex-1 flex flex-col items-center justify-center text-slate-400 hover:text-slate-200 transition">
+        <span class="text-base">💬</span>
+        <span class="text-[10px] mt-0.5 font-medium">工坊</span>
+      </button>
+      <button onclick="selectTab(4)" class="nav-tab flex-1 flex flex-col items-center justify-center text-blue-400 transition">
+        <span class="text-base">⬡</span>
+        <span class="text-[10px] mt-0.5 font-bold">资产●</span>
+      </button>
+    </nav>
+
+    <!-- 5. 2PC 两阶段写操作预检抽屉 (Drawer) -->
+    <aside id="drawer-2pc" aria-label="2PC 写操作安全预检" class="hidden absolute inset-0 z-30 drawer-overlay flex flex-col justify-end transition-all">
+      <div class="w-full bg-slate-900 border-t border-slate-700/80 rounded-t-3xl p-4 space-y-3 max-h-[85%] overflow-y-auto shadow-2xl animate-in slide-in-from-bottom duration-200">
+        <!-- 抽屉拖拽手柄 -->
+        <div class="w-12 h-1.5 bg-slate-700 rounded-full mx-auto -mt-1 mb-1"></div>
+        
+        <div class="flex justify-between items-start">
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-base">🛡️</span>
+              <h2 class="text-xs font-bold text-slate-100">2PC 写操作安全预检 (Phase 1)</h2>
+            </div>
+            <p id="2pc-action-title" class="text-[11px] text-amber-400 font-semibold mt-0.5">商户清分规则核心写入</p>
+          </div>
+          <button onclick="closeDrawer('drawer-2pc')" class="w-7 h-7 rounded-full bg-slate-800 text-slate-400 hover:text-slate-200 flex items-center justify-center text-xs">✕</button>
+        </div>
+
+        <!-- 影响面与风险评估 -->
+        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 text-xs space-y-1.5">
+          <div class="flex justify-between text-[11px]">
+            <span class="text-slate-400">受影响物理表:</span>
+            <span id="2pc-tables" class="text-slate-200 font-mono font-semibold">3 张 (settle_rule, tenant, audit)</span>
+          </div>
+          <div class="flex justify-between text-[11px]">
+            <span class="text-slate-400">受影响接口契约:</span>
+            <span class="text-slate-200 font-mono">2 个 (/app-api/settle, /admin)</span>
+          </div>
+          <div class="flex justify-between text-[11px]">
+            <span class="text-slate-400">风险等级:</span>
+            <span id="2pc-risk" class="px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold">⚠️ HIGH (资金规则)</span>
+          </div>
+        </div>
+
+        <!-- 变更 Diff 摘要 -->
+        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 space-y-1">
+          <div class="text-[10px] text-slate-400 font-medium">变更差异 (Patch Abstract):</div>
+          <pre class="text-[10px] font-mono text-emerald-400 bg-black/40 p-2 rounded overflow-x-auto leading-relaxed">
++ settle_ratio: 0.0065 -> 0.0050 (商户费率调降)
++ failover_strategy: FAIL_CLOSED (故障强阻断)
++ audit_token_required: true</pre>
+        </div>
+
+        <!-- 安全确认令牌 -->
+        <div class="bg-blue-950/40 border border-blue-900/60 rounded-xl p-2.5 flex items-center justify-between text-xs">
+          <div>
+            <div class="text-[10px] text-blue-300 font-medium">SHA-256 确认令牌 (Token)</div>
+            <div id="2pc-token-val" class="font-mono text-slate-300 text-[10px]">8f4c2e71...b971a04d</div>
+          </div>
+          <span class="text-[10px] text-emerald-400 font-medium bg-emerald-950/60 px-1.5 py-0.5 rounded border border-emerald-800/60">有效 9m42s</span>
+        </div>
+
+        <!-- 两字操作裁决手柄 -->
+        <div class="grid grid-cols-2 gap-2 pt-1 safe-bottom">
+          <button onclick="commit2Pc()" class="thumb-touch rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-[0.98] text-xs font-bold text-white transition flex items-center justify-center gap-1 shadow-md shadow-emerald-900/30">
+            <span>核准</span>
+          </button>
+          <button onclick="abort2Pc()" class="thumb-touch rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-xs font-bold text-slate-300 transition flex items-center justify-center gap-1 border border-slate-700/60">
+            <span>驳回</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 6. 11类活体本体局部一跳抽屉 (Ontology Drawer) -->
+    <aside id="drawer-ontology" aria-label="活体业务对象局部一跳因果链" class="hidden absolute inset-0 z-30 drawer-overlay flex flex-col justify-end transition-all">
+      <div class="w-full bg-slate-900 border-t border-slate-700/80 rounded-t-3xl p-4 space-y-3 max-h-[85%] overflow-y-auto shadow-2xl">
+        <div class="w-12 h-1.5 bg-slate-700 rounded-full mx-auto -mt-1 mb-1"></div>
+        
+        <div class="flex justify-between items-start">
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-base">⬡</span>
+              <h2 class="text-xs font-bold text-slate-100">活体业务对象: M1_Merchant (商户)</h2>
+            </div>
+            <p class="text-[10px] text-slate-400 mt-0.5">单真理源: cls_merchant • 记录: 142 • 状态: 活跃</p>
+          </div>
+          <button onclick="closeDrawer('drawer-ontology')" class="w-7 h-7 rounded-full bg-slate-800 text-slate-400 hover:text-slate-200 flex items-center justify-center text-xs">✕</button>
+        </div>
+
+        <!-- 局部一跳因果链 -->
+        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 text-xs space-y-1.5">
+          <div class="text-[10px] text-blue-300 font-semibold">🔗 局部一跳因果血缘 (1-Hop Provenance):</div>
+          <div class="flex items-center justify-between text-[11px] font-mono text-slate-200 bg-slate-900 p-2 rounded border border-slate-800">
+            <span class="text-purple-400">[前驱 M5] 企业</span> ➔ 
+            <span class="text-blue-400 font-bold bg-blue-950 px-1 rounded">[当前 M1] 商户</span> ➔ 
+            <span class="text-emerald-400">[后继 M1] 订单</span>
+          </div>
+        </div>
+
+        <!-- 绑定行为与规则 -->
+        <div class="grid grid-cols-2 gap-2 text-xs">
+          <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-2 space-y-1">
+            <div class="text-[10px] text-amber-300 font-medium">⚡ 绑定行为 (M2)</div>
+            <div class="text-[10px] text-slate-300 font-mono space-y-0.5">
+              <div>• Act_Enroll (入驻)</div>
+              <div>• Act_Freeze (冻结)</div>
+            </div>
+          </div>
+          <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-2 space-y-1">
+            <div class="text-[10px] text-emerald-300 font-medium">🛡️ 守恒规则 (M3)</div>
+            <div class="text-[10px] text-slate-300 font-mono space-y-0.5">
+              <div>• 租户隔离 (闭环阻断)</div>
+              <div>• 账户借贷必须守恒</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 两字操作手柄 -->
+        <div class="grid grid-cols-2 gap-2 pt-1 safe-bottom">
+          <button onclick="alert('已检视实体底层 263 物理表字段映射')" class="thumb-touch rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-xs font-bold text-white transition flex items-center justify-center gap-1">
+            <span>检视</span>
+          </button>
+          <button onclick="alert('已穿透追溯历史审计不可变账本')" class="thumb-touch rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-xs font-bold text-slate-300 transition flex items-center justify-center gap-1 border border-slate-700/60">
+            <span>溯源</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 7. 上下文切片检视抽屉 (Context Slicer Drawer) -->
+    <aside id="drawer-context" aria-label="步骤级最小上下文切片检视" class="hidden absolute inset-0 z-30 drawer-overlay flex flex-col justify-end transition-all">
+      <div class="w-full bg-slate-900 border-t border-slate-700/80 rounded-t-3xl p-4 space-y-3 max-h-[85%] overflow-y-auto shadow-2xl">
+        <div class="w-12 h-1.5 bg-slate-700 rounded-full mx-auto -mt-1 mb-1"></div>
+        
+        <div class="flex justify-between items-start">
+          <div>
+            <div class="flex items-center gap-1.5">
+              <span class="text-base">✂️</span>
+              <h2 class="text-xs font-bold text-slate-100">步骤级最小上下文切片 (Context Slicer)</h2>
+            </div>
+            <p class="text-[10px] text-emerald-400 mt-0.5">体积缩减: 120KB ➔ 7.6KB (裁剪率 93.6%)</p>
+          </div>
+          <button onclick="closeDrawer('drawer-context')" class="w-7 h-7 rounded-full bg-slate-800 text-slate-400 hover:text-slate-200 flex items-center justify-center text-xs">✕</button>
+        </div>
+
+        <div class="bg-slate-950/80 border border-slate-800 rounded-xl p-2.5 space-y-1.5 text-xs">
+          <div class="text-[10px] text-blue-300 font-semibold">📦 注入当前步骤的必要资产:</div>
+          <ul class="text-[10px] font-mono text-slate-300 space-y-1">
+            <li class="flex items-center gap-1 text-emerald-400">✓ spec://business-recipes/commercial-backend-module.json</li>
+            <li class="flex items-center gap-1 text-emerald-400">✓ entity://cls_merchant_rules/v2.1</li>
+            <li class="flex items-center gap-1 text-emerald-400">✓ diff://patch-004-settle-rule.diff (42 lines)</li>
+          </ul>
+        </div>
+
+        <div class="bg-red-950/30 border border-red-900/40 rounded-xl p-2.5 space-y-1.5 text-xs">
+          <div class="text-[10px] text-rose-300 font-semibold">🚫 已彻底剥离的历史死重 (Stripped Weights):</div>
+          <ul class="text-[10px] font-mono text-slate-400 space-y-1">
+            <li class="line-through text-slate-500">✕ 历史 34 轮闲聊对话 (压缩为 1 行 Abstract)</li>
+            <li class="line-through text-slate-500">✕ 18 个非关联构建日志 (已排除)</li>
+          </ul>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2 pt-1 safe-bottom">
+          <button onclick="alert('已复制最小版本结构体切片 JSON')" class="thumb-touch rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-[0.98] text-xs font-bold text-white transition flex items-center justify-center gap-1">
+            <span>导出</span>
+          </button>
+          <button onclick="closeDrawer('drawer-context')" class="thumb-touch rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-[0.98] text-xs font-bold text-slate-300 transition flex items-center justify-center gap-1 border border-slate-700/60">
+            <span>关闭</span>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+  </div>
+
+  <script>
+    // 视口切换逻辑 (移动端 vs 宽屏桌面)
+    function setViewport(mode) {
+      const container = document.getElementById('prototype-container');
+      const btnMobile = document.getElementById('btn-vp-mobile');
+      const btnDesktop = document.getElementById('btn-vp-desktop');
+
+      if (mode === 'desktop') {
+        container.classList.remove('max-w-[390px]', 'h-[844px]', 'md:rounded-[40px]');
+        container.classList.add('max-w-4xl', 'h-[750px]', 'rounded-2xl');
+        btnDesktop.classList.replace('bg-slate-800', 'bg-blue-600');
+        btnDesktop.classList.replace('text-slate-300', 'text-white');
+        btnMobile.classList.replace('bg-blue-600', 'bg-slate-800');
+        btnMobile.classList.replace('text-white', 'text-slate-400');
+      } else {
+        container.classList.remove('max-w-4xl', 'h-[750px]', 'rounded-2xl');
+        container.classList.add('max-w-[390px]', 'h-[844px]', 'md:rounded-[40px]');
+        btnMobile.classList.replace('bg-slate-800', 'bg-blue-600');
+        btnMobile.classList.replace('text-slate-400', 'text-white');
+        btnDesktop.classList.replace('bg-blue-600', 'bg-slate-800');
+        btnDesktop.classList.replace('text-white', 'text-slate-300');
+      }
+    }
+
+    // 分类过滤
+    function filterCategory(cat) {
+      const tabs = ['all', 'commercial', 'dev', 'ops'];
+      tabs.forEach(t => {
+        const btn = document.getElementById('tab-' + t);
+        if (t === cat) {
+          btn.className = "px-3 py-1 rounded-full bg-blue-600 text-white font-medium whitespace-nowrap";
+        } else {
+          btn.className = "px-3 py-1 rounded-full bg-slate-800 text-slate-400 hover:text-slate-200 font-medium whitespace-nowrap";
+        }
+      });
+
+      const cards = document.querySelectorAll('.recipe-card');
+      cards.forEach(card => {
+        if (cat === 'all' || card.getAttribute('data-category') === cat) {
+          card.classList.remove('hidden');
+        } else {
+          card.classList.add('hidden');
+        }
+      });
+    }
+
+    // 抽屉开闭控制
+    function open2PcDrawer(title, action, table, risk) {
+      document.getElementById('2pc-action-title').innerText = title + ' (' + action + ')';
+      document.getElementById('2pc-tables').innerText = '3 张 (' + table + ', tenant, audit)';
+      document.getElementById('2pc-risk').innerText = '⚠️ ' + risk + ' (核心业务契约)';
+      document.getElementById('2pc-token-val').innerText = 'token_' + Math.random().toString(36).substring(2, 10) + '...sha256';
+      document.getElementById('drawer-2pc').classList.remove('hidden');
+    }
+
+    function openOntologyDrawer(type) {
+      document.getElementById('drawer-ontology').classList.remove('hidden');
+    }
+
+    function openContextSlicerDrawer() {
+      document.getElementById('drawer-context').classList.remove('hidden');
+    }
+
+    function closeDrawer(id) {
+      document.getElementById(id).classList.add('hidden');
+    }
+
+    // 2PC 提交与驳回
+    function commit2Pc() {
+      closeDrawer('drawer-2pc');
+      showToast('✅ 2PC [核准] 成功！令牌已消费，物理原子变更已落盘生效！');
+    }
+
+    function abort2Pc() {
+      closeDrawer('drawer-2pc');
+      showToast('🛡️ 2PC [驳回] 成功！预检令牌已作废，0 物理副作用。');
+    }
+
+    function triggerAssemble(recipe) {
+      showToast('⚡ 配方 [' + recipe + '] 装配完成！已生成标准 WBS 任务树');
+    }
+
+    function triggerDryRun(recipe) {
+      showToast('🧪 配方 [' + recipe + '] 试跑通过：DAG 静态检查 100% 绿灯');
+    }
+
+    function triggerCreateIntent() {
+      showToast('💬 请在工坊输入老板意图，Hermes 将自动匹配场景配方');
+    }
+
+    function selectTab(idx) {
+      const names = ['汇览', '任务', '＋', '工坊', '资产●'];
+      showToast('切换至底栏槽位: ' + names[idx]);
+    }
+
+    function showToast(msg) {
+      const toast = document.createElement('div');
+      toast.className = 'absolute top-14 left-4 right-4 bg-slate-800 border border-slate-700 text-slate-100 text-xs px-3 py-2 rounded-xl shadow-xl z-50 flex items-center gap-2 animate-in fade-in duration-200';
+      toast.innerHTML = '<span>⚡</span><span class="flex-1">' + msg + '</span>';
+      document.getElementById('prototype-container').appendChild(toast);
+      setTimeout(() => { toast.remove(); }, 2500);
+    }
+  </script>
+</body>
+</html>
