@@ -13,6 +13,7 @@ import { accessApi } from "../api/access";
 import { useCompany } from "../context/CompanyContext";
 import { useBreadcrumbs } from "../context/BreadcrumbContext";
 import { useToastActions } from "../context/ToastContext";
+import { useTranslation } from "@/i18n";
 import { buildMarkdownMentionOptions } from "../lib/company-members";
 import { cn } from "../lib/utils";
 import { queryKeys } from "../lib/queryKeys";
@@ -317,6 +318,7 @@ function RoutineSectionHeader({
 }
 
 export function Routines() {
+  const { t } = useTranslation();
   const { selectedCompanyId } = useCompany();
   const { setBreadcrumbs } = useBreadcrumbs();
   const queryClient = useQueryClient();
@@ -816,7 +818,7 @@ export function Routines() {
         </div>
         <Button onClick={openCreateRoutine}>
           <Plus className="mr-2 h-4 w-4" />
-          Create routine
+          {t("routines.createRoutine")}
         </Button>
       </div>
 
@@ -926,7 +928,7 @@ export function Routines() {
               <FolderChip
                 result={railFolderResult}
                 selection={folderSelection}
-                allLabel="All routines"
+                allLabel={t("routines.allRoutines")}
                 onClick={() => setMobileFoldersOpen(true)}
               />
             </div>
@@ -1158,7 +1160,7 @@ export function Routines() {
                 <CollapsibleContent className="pt-3">
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <p className="text-xs font-medium uppercase tracking-(--tracking-caps) text-muted-foreground">Concurrency</p>
+                      <p className="text-xs font-medium uppercase tracking-(--tracking-caps) text-muted-foreground">{t("routines.concurrencyPolicy")}</p>
                       <Select
                         value={draft.concurrencyPolicy}
                         onValueChange={(concurrencyPolicy) => setDraft((current) => ({ ...current, concurrencyPolicy }))}
@@ -1175,7 +1177,7 @@ export function Routines() {
                       <p className="text-xs text-muted-foreground">{concurrencyPolicyDescriptions[draft.concurrencyPolicy]}</p>
                     </div>
                     <div className="space-y-2">
-                      <p className="text-xs font-medium uppercase tracking-(--tracking-caps) text-muted-foreground">Catch-up</p>
+                      <p className="text-xs font-medium uppercase tracking-(--tracking-caps) text-muted-foreground">{t("routines.catchUpLabel")}</p>
                       <Select
                         value={draft.catchUpPolicy}
                         onValueChange={(catchUpPolicy) => setDraft((current) => ({ ...current, catchUpPolicy }))}
@@ -1199,7 +1201,7 @@ export function Routines() {
 
           <div className="shrink-0 flex flex-col gap-3 border-t border-border/60 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
             <div className="text-sm text-muted-foreground">
-              After creation, Paperclip takes you straight to trigger setup. Draft routines stay paused until you add a default agent.
+              {t("routines.creationFooterNote")}
             </div>
             <div className="flex flex-col gap-2 sm:items-end">
               <Button
@@ -1210,11 +1212,11 @@ export function Routines() {
                 }
               >
                 <Plus className="mr-2 h-4 w-4" />
-                {createRoutine.isPending ? "Creating..." : "Create routine"}
+                {createRoutine.isPending ? t("routines.creating") : t("routines.createRoutine")}
               </Button>
               {createRoutine.isError ? (
                 <p className="text-sm text-destructive">
-                  {createRoutine.error instanceof Error ? createRoutine.error.message : "Failed to create routine"}
+                  {createRoutine.error instanceof Error ? createRoutine.error.message : t("routines.createFailed")}
                 </p>
               ) : null}
             </div>
@@ -1225,7 +1227,7 @@ export function Routines() {
       {error ? (
         <Card>
           <CardContent className="pt-6 text-sm text-destructive">
-            {error instanceof Error ? error.message : "Failed to load routines"}
+            {error instanceof Error ? error.message : t("routines.loadFailed")}
           </CardContent>
         </Card>
       ) : null}
@@ -1236,7 +1238,7 @@ export function Routines() {
             <FolderRail
               result={railFolderResult}
               selection={folderSelection}
-              allLabel="All routines"
+              allLabel={t("routines.allRoutines")}
               itemLabelPlural="routines"
               loading={foldersLoading}
               onSelect={setFolderSelection}
@@ -1252,11 +1254,11 @@ export function Routines() {
           <div className="min-w-0 flex-1">
           {routineViewState.groupBy === "folder" && hasRoutineFolders ? (
             <div className="mb-3 flex flex-wrap items-center gap-2">
-              {folderSelection === "all" ? <FolderIconHeader label="All routines" count={sortedRoutines.length} /> : (
+              {folderSelection === "all" ? <FolderIconHeader label={t("routines.allRoutines")} count={sortedRoutines.length} /> : (
                 <div className="flex min-w-0 items-center gap-2 text-sm">
                   <FolderSwatch color={activeFolder?.color} />
-                  <span className="truncate font-medium">{folderSelection === "unfiled" ? "Unfiled" : activeFolder?.name ?? "Folder"}</span>
-                  <span className="text-muted-foreground">{sortedRoutines.length} routine{sortedRoutines.length === 1 ? "" : "s"}</span>
+                  <span className="truncate font-medium">{folderSelection === "unfiled" ? t("routines.groupUnfiled") : activeFolder?.name ?? t("routines.groupFolder")}</span>
+                  <span className="text-muted-foreground">{t("routines.routineCount", { count: sortedRoutines.length })}</span>
                 </div>
               )}
             </div>
@@ -1285,7 +1287,7 @@ export function Routines() {
             <div className="py-12">
               <EmptyState
                 icon={Repeat}
-                message="No active routines. Use Create routine to define the first recurring workflow."
+                message={t("routines.emptyActiveRoutines")}
               />
             </div>
           ) : sortedRoutines.length === 0 ? (
@@ -1412,7 +1414,7 @@ export function Routines() {
         onOpenChange={setMobileFoldersOpen}
         result={railFolderResult}
         selection={folderSelection}
-        allLabel="All routines"
+        allLabel={t("routines.allRoutines")}
         itemLabelPlural="Routines"
         onSelect={setFolderSelection}
         onCreate={() => openCreateFolder()}
