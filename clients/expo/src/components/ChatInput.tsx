@@ -7,6 +7,7 @@ import {
   PanResponder,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -17,6 +18,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
 import { C } from "../coolie";
 import { ELEVATION, RADIUS, SPACING } from "../ui/tokens";
+import { FLEET_MEMBERS, type FleetEmployee } from "./FleetPipelineStrip";
 
 /**
  * ChatInput — 工坊对话框底部输入区 (wave71 抽出 + wave362 动态语音手势重构)
@@ -77,6 +79,33 @@ export function ChatInput({
 }: ChatInputProps) {
   // 模式切换: "text" (文字输入) vs "voice" (全宽按住说话长条)
   const [inputMode, setInputMode] = useState<"text" | "voice">("text");
+
+  // wave372: 输入 @ 时实时唤起数字员工候选浮层 (Mention Dropdown)
+  const mentionMatch = useMemo(() => {
+    if (inputMode !== "text") return null;
+    const match = /(?:^|\s)@([^\s]*)$/.exec(value);
+    if (!match) return null;
+    const query = match[1].toLowerCase();
+    const filtered = FLEET_MEMBERS.filter(
+      (m) =>
+        !query ||
+        m.name.toLowerCase().includes(query) ||
+        m.title.toLowerCase().includes(query) ||
+        m.roleDescription.toLowerCase().includes(query),
+    );
+    return { query, employees: filtered };
+  }, [value, inputMode]);
+
+  const handleSelectMention = useCallback(
+    (emp: FleetEmployee) => {
+      const nextValue = value.replace(/(?:^|\s)@([^\s]*)$/, (match) => {
+        const prefix = match.startsWith(" ") ? " " : "";
+        return `${prefix}@${emp.name} `;
+      });
+      onChangeText(nextValue);
+    },
+    [value, onChangeText],
+  );
 
   // 录音中的实时三态: "send" (居中发送) | "cancel" (左滑取消) | "transcribe" (右滑/上滑转文字)
   const [gestureMode, setGestureMode] = useState<"send" | "cancel" | "transcribe">("send");
@@ -510,6 +539,41 @@ export function ChatInput({
         </View>
       ) : null}
 
+      {/* ── wave372: 输入 @ 时实时唤起数字员工候选浮层 ── */}
+      {mentionMatch && mentionMatch.employees.length > 0 ? (
+        <View style={styles.mentionOverlay}>
+          <View style={styles.mentionCard}>
+            <View style={styles.mentionHeaderRow}>
+              <Text style={styles.mentionHeaderTitle}>提到数字员工</Text>
+              <Text style={styles.mentionHeaderSub}>轻点直接插入</Text>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.mentionList}
+              keyboardShouldPersistTaps="always"
+            >
+              {mentionMatch.employees.map((emp) => (
+                <Pressable
+                  key={emp.id}
+                  style={({ pressed }) => [
+                    styles.mentionChip,
+                    pressed && styles.mentionChipPressed,
+                  ]}
+                  onPress={() => handleSelectMention(emp)}
+                >
+                  <Text style={styles.mentionAvatar}>{emp.avatar}</Text>
+                  <View style={styles.mentionTextCol}>
+                    <Text style={styles.mentionName}>{emp.name}</Text>
+                    <Text style={styles.mentionStage}>{emp.stage} · {emp.title}</Text>
+                  </View>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      ) : null}
+
       {/* ── 底部输入操作栏 ── */}
       <View style={styles.row}>
         {/* 1. [+] 附件按钮 */}
@@ -938,6 +1002,81 @@ const styles = StyleSheet.create({
     height: 12,
     backgroundColor: C.err,
     borderRadius: 2,
+  },
+
+  /* @ 员工候选悬浮条 */
+  mentionOverlay: {
+    position: "absolute",
+    bottom: 52,
+    left: 8,
+    right: 8,
+    zIndex: 998,
+  },
+  mentionCard: {
+    backgroundColor: C.panel,
+    borderRadius: RADIUS.lg,
+    borderWidth: 1,
+    borderColor: C.lineSubtle,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 8,
+    gap: 6,
+  },
+  mentionHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 2,
+  },
+  mentionHeaderTitle: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: C.ink2,
+    letterSpacing: 0.5,
+  },
+  mentionHeaderSub: {
+    fontSize: 10,
+    color: C.ink3,
+  },
+  mentionList: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingVertical: 2,
+  },
+  mentionChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: C.surface,
+    borderColor: C.line,
+    borderWidth: 1,
+    borderRadius: RADIUS.md,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    gap: 6,
+  },
+  mentionChipPressed: {
+    backgroundColor: "rgba(113, 112, 255, 0.15)",
+    borderColor: C.accent,
+  },
+  mentionAvatar: {
+    fontSize: 16,
+  },
+  mentionTextCol: {
+    justifyContent: "center",
+  },
+  mentionName: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: C.ink,
+  },
+  mentionStage: {
+    fontSize: 9,
+    color: C.ink2,
   },
 });
 

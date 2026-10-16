@@ -26,7 +26,7 @@ export interface FleetEmployee {
   statusText: string;
 }
 
-const FLEET_MEMBERS: FleetEmployee[] = [
+export const FLEET_MEMBERS: FleetEmployee[] = [
   {
     id: "hermes",
     name: "Hermes",

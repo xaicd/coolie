@@ -290,20 +290,48 @@ async function detectAndExecuteDirectAction(
     };
 
     // 0. 新建并指派工单（支持 Palantir AIP Bootcamp 风格 Time-Box 倒计时时间盒派单）
-    // 例: "让铁匠在 30 分钟内搞定退款接口", "派墨斗在 1 小时内输出架构设计", "安排门神跑一遍真机快照测试", "让百晓生做竞品调研"
-    const dispatchMatch = text.match(
-      /^(?:请|帮我)?\s*(?:让|派|叫|安排)\s*([^\s,，。!！?？]+?)\s*(?:在\s*(\d+)\s*(分钟|小时|分|h|min|m)内)?\s*(?:去|来|执行|搞定|完成|做|跑|输出|编写|进行)?\s*(.+)$/i,
-    );
-    if (dispatchMatch && !text.includes("改派给") && !text.includes("转交给") && !text.includes("的工具")) {
-      const agentQuery = dispatchMatch[1];
-      const targetAgent = resolveAgent(agentQuery);
-      const rawTaskTitle = dispatchMatch[4].trim().replace(/^[，,。.!！\s]+/, "");
+    // 语法 1 (祈使句): "让铁匠在 30 分钟内搞定退款接口", "派墨斗在 1 小时内输出架构设计", "安排门神跑一遍真机快照测试"
+    // 语法 2 (@ 派单): "@铁匠 在 30 分钟内搞定退款接口", "@墨斗: 输出架构设计", "@门神 跑一遍真机快照测试", "@铁匠 登录页面开发"
+    let dispatchAgentQuery: string | null = null;
+    let dispatchTimeboxNum: string | null = null;
+    let dispatchTimeboxUnit: string | null = null;
+    let dispatchTaskTitle: string | null = null;
 
-      if (targetAgent && rawTaskTitle.length >= 2 && !/[?？]$/.test(rawTaskTitle)) {
+    if (!text.includes("改派给") && !text.includes("转交给") && !text.includes("的工具")) {
+      const atMatch = text.match(
+        /^(?:请|帮我)?\s*@([^\s,，。!！?？:：]+)[:：\s]*(?:在\s*(\d+)\s*(分钟|小时|分|h|min|m)内)?\s*(?:去|来|执行|搞定|完成|做|跑|输出|编写|进行|请)?\s*(.+)$/i,
+      );
+      if (atMatch) {
+        dispatchAgentQuery = atMatch[1];
+        dispatchTimeboxNum = atMatch[2] ?? null;
+        dispatchTimeboxUnit = atMatch[3] ?? null;
+        dispatchTaskTitle = atMatch[4];
+      } else {
+        const imperativeMatch = text.match(
+          /^(?:请|帮我)?\s*(?:让|派|叫|安排)\s*([^\s,，。!！?？:：]+?)(?=(?:在\s*\d|\s*(?:去|来|执行|搞定|完成|做|跑|输出|编写|进行)|\s+|$))\s*(?:在\s*(\d+)\s*(分钟|小时|分|h|min|m)内)?\s*(?:去|来|执行|搞定|完成|做|跑|输出|编写|进行)?\s*(.+)$/i,
+        );
+        if (imperativeMatch) {
+          dispatchAgentQuery = imperativeMatch[1];
+          dispatchTimeboxNum = imperativeMatch[2] ?? null;
+          dispatchTimeboxUnit = imperativeMatch[3] ?? null;
+          dispatchTaskTitle = imperativeMatch[4];
+        }
+      }
+    }
+
+    if (dispatchAgentQuery && dispatchTaskTitle) {
+      const targetAgent = resolveAgent(dispatchAgentQuery);
+      const rawTaskTitle = dispatchTaskTitle.trim().replace(/^[，,。.!！:：\s]+/, "");
+      // 排除疑问句与纯咨询句（如以？结尾，或“如何/怎么/为什么/什么是/介绍一下”等），避免拦截普通问答
+      const isQuestionOrConsult =
+        /[?？]$/.test(rawTaskTitle) ||
+        /^(?:怎么|如何|为什么|什么是|介绍下|介绍一下|你能|你可以|能否|可以吗)/.test(rawTaskTitle);
+
+      if (targetAgent && rawTaskTitle.length >= 2 && !isQuestionOrConsult) {
         let timeboxMinutes: number | null = null;
-        if (dispatchMatch[2]) {
-          const rawNum = parseInt(dispatchMatch[2], 10);
-          const unit = dispatchMatch[3]?.toLowerCase() || "";
+        if (dispatchTimeboxNum) {
+          const rawNum = parseInt(dispatchTimeboxNum, 10);
+          const unit = dispatchTimeboxUnit?.toLowerCase() || "";
           if (unit.includes("小") || unit === "h") {
             timeboxMinutes = rawNum * 60;
           } else {
