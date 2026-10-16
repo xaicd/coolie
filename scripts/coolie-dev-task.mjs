@@ -63,7 +63,8 @@ async function main() {
         console.log(`🔥 正在进行中 (${inProgress.length} 项):`);
         inProgress.forEach(i => {
           const assignee = agentMap[i.assigneeAgentId] || "未指派";
-          console.log(`  • [${i.identifier}] ${i.title} (负责人: ${assignee})`);
+          const idDisplay = i.identifier || i.id.slice(0, 8);
+          console.log(`  • [${idDisplay}] ${i.title} (负责人: ${assignee})`);
         });
         console.log("");
       }
@@ -72,7 +73,8 @@ async function main() {
         console.log(`👀 等拍板 / 审批中 (${inReview.length} 项):`);
         inReview.forEach(i => {
           const assignee = agentMap[i.assigneeAgentId] || "未指派";
-          console.log(`  • [${i.identifier}] ${i.title} (负责人: ${assignee})`);
+          const idDisplay = i.identifier || i.id.slice(0, 8);
+          console.log(`  • [${idDisplay}] ${i.title} (负责人: ${assignee})`);
         });
         console.log("");
       }
@@ -81,7 +83,8 @@ async function main() {
         console.log(`🚧 阻塞中 (${blocked.length} 项):`);
         blocked.forEach(i => {
           const assignee = agentMap[i.assigneeAgentId] || "未指派";
-          console.log(`  • [${i.identifier}] ${i.title} (负责人: ${assignee})`);
+          const idDisplay = i.identifier || i.id.slice(0, 8);
+          console.log(`  • [${idDisplay}] ${i.title} (负责人: ${assignee})`);
         });
         console.log("");
       }
@@ -90,7 +93,8 @@ async function main() {
         console.log(`⏳ 待办队列 (${todo.length} 项):`);
         todo.forEach(i => {
           const assignee = agentMap[i.assigneeAgentId] || "待认领";
-          console.log(`  • [${i.identifier}] ${i.title} (${assignee})`);
+          const idDisplay = i.identifier || i.id.slice(0, 8);
+          console.log(`  • [${idDisplay}] ${i.title} (${assignee})`);
         });
       }
 
