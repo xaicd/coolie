@@ -802,6 +802,67 @@ for (const check of collectUiI18nRefChecks()) {
   assertRule(check.name, check.ok, check.detail);
 }
 
+// -----------------------------------------------------------------------------
+// 24. 真机设备串行化锁守卫 (COOA-232 · 两并发一成一败 / 僵尸 TTL 可回收)
+// -----------------------------------------------------------------------------
+console.log('\n📵 24. 真机设备串行化锁 (device-claim) 守卫 (COOA-232):');
+const deviceClaimPath = 'scripts/device-claim.sh';
+const deviceClaimContent = fs.existsSync(deviceClaimPath) ? fs.readFileSync(deviceClaimPath, 'utf8') : '';
+assertRule(
+  '设备串行化锁实体守卫: scripts/device-claim.sh 必须存在且实现 acquire/release/status/reap/run 五个子命令',
+  fs.existsSync(deviceClaimPath) &&
+    ['acquire)', 'release)', 'status)', 'reap)', 'run)'].every((arm) => deviceClaimContent.includes(`  ${arm}`)),
+  'scripts/device-claim.sh 缺失或子命令不全',
+);
+
+assertRule(
+  '原子文件锁守卫: 锁必须经 mkdir 原子创建目录实现, 记录 owner/pid/host/TTL, 且默认 TTL 为 900s (15min)',
+  deviceClaimContent.includes('mkdir "$cdir"') &&
+    ['owner=', 'pid=', 'host=', 'startedAtEpoch=', 'ttlSeconds='].every((k) => deviceClaimContent.includes(`'${k}`)) &&
+    deviceClaimContent.includes('DEVICE_CLAIM_TTL:-900'),
+  'device-claim.sh 丢失 mkdir 原子锁 / owner+TTL 元数据 / 15min 默认租约',
+);
+
+const deviceWrapPath = 'scripts/agent-device-locked.sh';
+assertRule(
+  'agent-device 驱动包装守卫: scripts/agent-device-locked.sh 必须存在并委派 device-claim.sh run',
+  fs.existsSync(deviceWrapPath) &&
+    fs.readFileSync(deviceWrapPath, 'utf8').includes('device-claim.sh" run'),
+  'agent-device 驱动包装缺失或未委派 device-claim run',
+);
+
+const deviceSkillPath = '.agents/skills/agent-device-browser-automation/SKILL.md';
+const deviceSkillContent = fs.existsSync(deviceSkillPath) ? fs.readFileSync(deviceSkillPath, 'utf8') : '';
+assertRule(
+  "技能法典守卫: agent-device-browser-automation/SKILL.md 必须增补「驱动前必须 acquire」一节并引用 device-claim.sh",
+  deviceSkillContent.includes('驱动真机前必须 acquire') && deviceSkillContent.includes('device-claim.sh'),
+  'SKILL.md 未增补设备串行化锁章节',
+);
+
+assertRule(
+  'CLI 快捷指令守卫: package.json 必须配置 test:device-claim 单测入口',
+  Boolean(pkgJson.scripts && pkgJson.scripts['test:device-claim']),
+  'package.json 缺失 test:device-claim 脚本',
+);
+
+let deviceClaimTestOk = false;
+let deviceClaimTestDetail = '';
+try {
+  deviceClaimTestDetail = execSync(
+    'node --test --test-reporter=tap scripts/__tests__/device-claim.test.mjs',
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  deviceClaimTestOk = /^# fail 0\b/m.test(deviceClaimTestDetail) && /^# pass \d+/m.test(deviceClaimTestDetail);
+} catch (error) {
+  deviceClaimTestOk = false;
+  deviceClaimTestDetail = `${error?.stdout ?? ''}${error?.stderr ?? ''}`;
+}
+assertRule(
+  '设备串行化锁并发竞争单测守卫: node --test scripts/__tests__/device-claim.test.mjs 必须全绿 (两并发一成一败 / 僵尸 TTL 回收 / 释放归属)',
+  deviceClaimTestOk,
+  `device-claim 单测未全绿: ${deviceClaimTestDetail.split('\n').filter((l) => /^not ok|# fail/.test(l)).join(' | ') || 'no summary'}`,
+);
+
 console.log('\n========================================================================');
 if (failed) {
   console.error('🚫 全面管局审计未通过！存在不符合高管治理规范的阻断项，请修复后重试。');

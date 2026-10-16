@@ -18,10 +18,61 @@ description: 驱动移动真机/模拟器 (agent-device) 与 Web 浏览器 (agen
 - 完整核查条目：[《自动化测试、真实验证与常态化运营规范清单》](./references/verification-checklist.md)
 - 规则底座法典：[《Agent-Device & Agent-Browser 验证铁律》](../../rules/AGENT-DEVICE-BROWSER-VERIFICATION.md)
 - 既有测试工作流：[comprehensive-testing-workflow](../comprehensive-testing-workflow/SKILL.md) · [qa-humanlike-e2e](../qa-humanlike-e2e/SKILL.md)
+- 设备串行化锁（驱动真机前必读）：本文 §1《驱动真机前必须 acquire 设备串行化锁》
 
 ---
 
-## 1. 核心架构与多环境调用拓扑
+## 1. 铁律：驱动真机前必须 acquire 设备串行化锁（COOA-232 强制前置）
+
+> **触发根因**：COOA-117-S5 与 COOA-228(e1283cba) 同时驱动 `emulator-5554`，互抢设备导致双方截图/录屏证据互相污染。
+> **铁律**：任何数字员工在驱动共享真机/模拟器**之前**，`MUST` 先经 `scripts/device-claim.sh` 取得该设备的独占锁；驱动结束 `MUST` 释放；驱动进程崩溃或被 SIGKILL 时，超过 TTL（默认 15 分钟）的僵尸 claim 由下一次竞争或 `reap` 自动回收。
+
+### 1.1 锁语义
+
+- **原子获取**：锁由 `mkdir` 创建目录实现（POSIX 原子），并发竞争中**有且只有一个**胜出，其余立即以退出码 `3` 失败（除非显式 `--wait`）。
+- **持有者与租约**：持有者在 `<claim>/meta` 记录 `owner` / `pid` / `host` / `startedAtEpoch` / `ttlSeconds`（默认 `900` 秒 = 15 分钟）。
+- **僵尸自动回收**：`startedAtEpoch + ttlSeconds` 已过期的 claim 视为 stale，下一次 `acquire` 会原子接管（`mv` 抢占，仅一个竞争者成功）；`reap` 可主动清理。
+- **owner 归属**：`owner` 默认取 `DEVICE_CLAIM_OWNER` → `PAPERCLIP_AGENT_ID` → `$USER`；`release` 必须由 owner 本人执行，否则退出码 `4`（`--force` 兜底）。
+
+### 1.2 退出码
+
+| 码 | 含义 |
+| :--- | :--- |
+| `0` | 成功（acquire 成功 / release 完成 / status 空闲或 stale / reap 完成 / `run` 内命令退出 0） |
+| `2` | 用法错误 |
+| `3` | 设备忙（acquire 被拒；`status` 时仍有活跃 claim） |
+| `4` | release 被拒（调用方非 owner 且未 `--force`） |
+| `N` | `run`：被包裹命令自身的退出码 |
+
+### 1.3 标准用法
+
+```bash
+# 推荐：run 包装器一次性 acquire → 驱动 → 释放（非零退出与 SIGINT/SIGTERM 亦释放）
+scripts/device-claim.sh run -- host-exec "agent-device open --appId com.x"
+scripts/device-claim.sh run -- host-exec "agent-device screenshot --output /tmp/s.png"
+
+# 等价驱动包装器（默认设备 emulator-5554）
+scripts/agent-device-locked.sh -- host-exec "agent-device open --appId com.x"
+
+# 长时序手动作业：手动持有 + 显式释放
+scripts/device-claim.sh acquire --owner "门神:COOA-117-S5" --ttl 1800
+#   ... 驱动真机 ...
+scripts/device-claim.sh release --owner "门神:COOA-117-S5"
+
+# 竞争与诊断
+scripts/device-claim.sh status          # 空闲/stale → 退出 0；被占用 → 退出 3
+scripts/device-claim.sh status --json   # 机器可读
+scripts/device-claim.sh acquire --wait 120 --owner me   # 等待最多 120s 再获取
+scripts/device-claim.sh reap            # 清理僵尸 claim
+```
+
+**契约要求**：驱动真机的脚本与流程 `MUST NOT` 直接裸调 `host-exec "agent-device ..."`；`SHALL` 统一经由 `run` 包装器或先 `acquire`。获取失败（退出码 `3`）时 `MUST` 向 PM/老板回报「设备忙、被谁占用、剩余 TTL」，不得静默重试或强行并驱。
+
+防退化守卫：`scripts/__tests__/device-claim.test.mjs`（并发一成一败 / 僵尸回收 / 释放归属）+ `pnpm check:governance` 第 24 节。
+
+---
+
+## 2. 核心架构与多环境调用拓扑
 
 数字员工体系运行于多机混合拓扑中，必须严格按照物理通道调用，杜绝环境错位：
 
@@ -56,7 +107,7 @@ description: 驱动移动真机/模拟器 (agent-device) 与 Web 浏览器 (agen
 
 ---
 
-## 2. 两大阶段 10 大标准化 Playbook 执行矩阵
+## 3. 两大阶段 10 大标准化 Playbook 执行矩阵
 
 统一依托平台标准自动化引擎 `scripts/run-persona-automation.sh`（底层映射 `packages/agent-automation`）：
 
@@ -76,11 +127,15 @@ description: 驱动移动真机/模拟器 (agent-device) 与 Web 浏览器 (agen
 
 ---
 
-## 3. 四步标准作业程序 (SOP)
+## 4. 四步标准作业程序 (SOP)
 
 ### 第一步：前置探活与环境握手 (Pre-flight Check)
 在执行任何用例前，必须确认底层工具链与设备在线状态：
 ```bash
+# 0. 真机/模拟器用例必须先取得设备独占锁 (详见 §1)
+scripts/device-claim.sh acquire --owner "$PAPERCLIP_AGENT_ID"   # 或直接用 run 包装器驱动
+scripts/device-claim.sh status                                   # 空闲 → 0；被占用 → 3
+
 # 1. 检查 Mac 宿主机移动端模拟器/设备状态
 host-exec "adb devices -l"
 host-exec "agent-device status" || host-exec "agent-device --help"
@@ -143,7 +198,7 @@ curl -fsS http://localhost:3100/api/health
 
 ---
 
-## 4. 快捷指令与诊断备忘
+## 5. 快捷指令与诊断备忘
 
 ```bash
 # 1. 查看所有可用自动化 Playbook 清单
