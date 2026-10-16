@@ -50,36 +50,8 @@ try {
   acp = await import(resolvedPath);
 }
 
-const MAX_ARG_BYTES = 100 * 1024; // 100KB safe margin under Linux 128KB (MAX_ARG_STRLEN) limit
+import { clampPromptForArgv, MAX_ARG_BYTES } from "./prompt-clamp.mjs";
 
-function clampPromptForArgv(prompt, adapterName = "agy") {
-  if (Buffer.byteLength(prompt, "utf8") <= MAX_ARG_BYTES) {
-    return prompt;
-  }
-  const lines = prompt.split("\n");
-  let headLines = [];
-  let headBytes = 0;
-  let i = 0;
-  while (i < lines.length && headBytes < 45 * 1024) {
-    headBytes += Buffer.byteLength(lines[i] + "\n", "utf8");
-    headLines.push(lines[i]);
-    i++;
-  }
-
-  let tailLines = [];
-  let tailBytes = 0;
-  let j = lines.length - 1;
-  while (j >= i && tailBytes < 45 * 1024) {
-    tailBytes += Buffer.byteLength(lines[j] + "\n", "utf8");
-    tailLines.unshift(lines[j]);
-    j--;
-  }
-
-  const prunedBytes = Buffer.byteLength(prompt, "utf8") - headBytes - tailBytes;
-  const notice = `\n[... Note: Historical context/receipts (~${Math.round(prunedBytes / 1024)} KB) pruned by ${adapterName} adapter to adhere to Linux 128KB argv limit ...]\n`;
-
-  return headLines.join("\n") + notice + tailLines.join("\n");
-}
 
 class AgyAcpAgent {
   sessions = new Map();
