@@ -129,12 +129,82 @@ export async function runSupervisorCycle() {
       }
     }
 
-    // 3.2 清理已失活/卡死的例行巡检工单 (routine_execution 超过 20 分钟仍处于 in_progress)
+    // 3.2 识别并链式推进 build_plan 构建计划工单 (Build Plan Progression)
+    const buildPlanIssues = allIssues.filter(i => i.originKind === 'build_plan' && i.originId);
+    const plansByOrigin = new Map();
+    for (const issue of buildPlanIssues) {
+      if (!plansByOrigin.has(issue.originId)) plansByOrigin.set(issue.originId, []);
+      plansByOrigin.get(issue.originId).push(issue);
+    }
+
+    const ROLE_MAP = {
+      arch: '09af00a0-f1cd-4a17-8ef5-3a8bcba381d7',     // 墨斗 (FDA)
+      '架构': '09af00a0-f1cd-4a17-8ef5-3a8bcba381d7',
+      backend: '02cab729-c5b7-4a14-9ce9-5a34885c336a',  // 铁匠 (Core SWE)
+      '后端': '02cab729-c5b7-4a14-9ce9-5a34885c336a',
+      frontend: '58dc794d-ae28-47f4-9e6e-5e798ef55df2', // 门神 (FDSE)
+      '前端': '58dc794d-ae28-47f4-9e6e-5e798ef55df2',
+      qa: '8a288a46-8598-4c68-b52e-545360e11929',       // 兑底渊 (PRE-SRE)
+      '测试': '8a288a46-8598-4c68-b52e-545360e11929',
+      sre: '8a288a46-8598-4c68-b52e-545360e11929',
+      '运维': '8a288a46-8598-4c68-b52e-545360e11929',
+    };
+
+    for (const [originId, issues] of plansByOrigin.entries()) {
+      // 解析每道工序序号: 构建环节: xxx (step/total)
+      const parsed = issues.map(iss => {
+        const match = (iss.description || '').match(/构建环节:\s*(\w+)\s*\((\d+)\/(\d+)\)/);
+        const roleMatch = (iss.description || '').match(/负责类型:\s*([^\n\r]+)/);
+        const step = match ? parseInt(match[2], 10) : 0;
+        const total = match ? parseInt(match[3], 10) : 0;
+        const roleKey = roleMatch ? roleMatch[1].trim().split(/[\s/]+/)[0].toLowerCase() : null;
+        return { issue: iss, step, total, roleKey };
+      }).sort((a, b) => a.step - b.step);
+
+      for (let idx = 0; idx < parsed.length; idx++) {
+        const item = parsed[idx];
+        if (item.issue.status === 'done' || item.issue.status === 'cancelled') continue;
+
+        // 检查前序所有工序是否已完工
+        const prevSteps = parsed.slice(0, idx);
+        const allPrevsDone = prevSteps.every(p => p.issue.status === 'done');
+
+        if (allPrevsDone && item.issue.status === 'blocked') {
+          console.log(`[Supervisor] 前序工序已完成，链式解阻构建计划工单: ${item.issue.identifier || item.issue.id} (第 ${item.step}/${item.total} 步)`);
+          const targetAssignee = item.issue.assigneeAgentId || (item.roleKey ? ROLE_MAP[item.roleKey] : null);
+          const patchBody = { status: 'todo' };
+          if (targetAssignee && !item.issue.assigneeAgentId) {
+            patchBody.assigneeAgentId = targetAssignee;
+          }
+
+          await request(`/issues/${item.issue.id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(patchBody),
+          });
+
+          await request(`/issues/${item.issue.id}/comments`, {
+            method: 'POST',
+            body: JSON.stringify({
+              body: `🤖 [Antigravity Loop Keeper 自动解卡] 前序阶段全部完工。构建计划流水线自动解除阻断转为 todo${targetAssignee ? '，并派单给对应角色匠人' : ''}。`
+            }),
+          });
+
+          report.unblockedIssues.push({
+            identifier: item.issue.identifier,
+            title: item.issue.title,
+            reason: `build_plan_step_${item.step}_predecessors_done`,
+          });
+        }
+        break; // 只处理当前停滞的最前沿未完成工序
+      }
+    }
+
+    // 3.3 清理已失活/卡死的例行巡检工单 (routine_execution 超过 20 分钟仍处于 in_progress 或 blocked)
     const now = Date.now();
     const staleRoutines = allIssues.filter(i => {
-      const isRoutineTitle = i.title && i.title.includes('交付主线例行巡检');
+      const isRoutine = (i.title && i.title.includes('交付主线例行巡检')) || i.originKind === 'routine_execution';
       const isStuck = i.status === 'in_progress' || i.status === 'blocked';
-      if (!isRoutineTitle || !isStuck) return false;
+      if (!isRoutine || !isStuck) return false;
       const createdAt = new Date(i.createdAt).getTime();
       return (now - createdAt) > 20 * 60 * 1000;
     });
@@ -148,7 +218,7 @@ export async function runSupervisorCycle() {
       report.settledRoutines.push(routine.identifier || routine.id);
     }
 
-    // 3.3 检查主线任务进展
+    // 3.4 检查主线任务进展
     const mainline = projectIssues.find(i => i.title && i.title.includes('[主线长任务]'));
     if (mainline) {
       report.mainlineProgress.push({
