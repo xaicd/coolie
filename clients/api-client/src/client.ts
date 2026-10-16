@@ -144,6 +144,39 @@ export class CoolieApiError extends Error {
 }
 
 /**
+ * 登录失败的 4 类可读文案 (wave386)。
+ *
+ * 老板实测: 手机浏览器能开 `https://xrobinai.cn`，App 登录却报「网络连接失败」，
+ * 无从下手 —— 因为 `send()` 把**一切** fetch 层失败笼统归成 status 0 的网络错，
+ * 到底是被拒 (401)、服务端炸 (500) 还是真断网，看文案分不出来。
+ *
+ * 这个纯函数按 `CoolieApiError.status` 把登录失败拆成 4 类，返回 `undefined`
+ * 表示「不是这 4 类，保留服务端原文」。分类依据与 `send()` 的归一保持一致:
+ *   - 0   —— fetch 未拿到响应 (飞行模式 / DNS / TLS / 明文被拦)：真网络层失败;
+ *   - 401 —— 实例明确拒绝该邮箱密码 (Better Auth `INVALID_EMAIL_OR_PASSWORD`);
+ *   - 500 —— 服务端内部异常;
+ *   - 503 —— 服务维护 / 暂不可用。
+ *
+ * 纯函数 (无 this、无 IO)，供登录路径直接调用并被单测钉住。
+ */
+export function signInErrorMessage(status: number, isZh: boolean): string | undefined {
+  switch (status) {
+    case 0:
+      return isZh
+        ? "网络连接失败，请检查网络后重试"
+        : "Network unreachable — check your connection and retry";
+    case 401:
+      return isZh ? "账号或密码错误" : "Incorrect email or password";
+    case 500:
+      return isZh ? "服务器异常，请稍后重试" : "Server error — please try again later";
+    case 503:
+      return isZh ? "服务维护中，请稍后重试" : "Service under maintenance — please try again later";
+    default:
+      return undefined;
+  }
+}
+
+/**
  * Result of the `seed-samples` plugin action — the instance nodes/edges planted
  * in one ontology domain. The route wraps the worker's return value as
  * `{ data }`; `seedDomainSamples` unwraps it before handing this back.
@@ -418,9 +451,28 @@ export class CoolieClient {
   async signInEmail(
     input: { email: string; password: string },
   ): Promise<{ token: string | null; cookieName: string | null; user: { id: string; email?: string | null; name?: string | null; image?: string | null } }> {
-    const { body, headers } = await this.requestWithHeaders<{
-      user?: { id?: string; email?: string | null; name?: string | null; image?: string | null };
-    }>("POST", "/api/auth/sign-in/email", input, { auth: false });
+    let signedIn: { body: { user?: { id?: string; email?: string | null; name?: string | null; image?: string | null } }; headers: Headers };
+    try {
+      signedIn = await this.requestWithHeaders<{
+        user?: { id?: string; email?: string | null; name?: string | null; image?: string | null };
+      }>("POST", "/api/auth/sign-in/email", input, { auth: false });
+    } catch (err) {
+      // 登录是唯一会被用户直接盯着看的失败点，老板实测「浏览器能开实例却报
+      // 网络连接失败」时无从下手。这里 (a) 打一行设备 logcat 可取的诊断日志
+      // (url / status / 响应主体)，(b) 把失败拆成 4 类可读中文，让用户看到的
+      // 是「账号或密码错误 / 服务器异常 / 服务维护中 / 请检查网络」，而不是把
+      // 一切 fetch 失败的笼统「网络连接失败」当成真因。
+      if (err instanceof CoolieApiError) {
+        const bodyText = err.body != null ? JSON.stringify(err.body).slice(0, 200) : "<no-response>";
+        console.log(
+          `[signIn] url=${this.baseUrl}/api/auth/sign-in/email status=${err.status} body=${bodyText}`,
+        );
+        const classified = signInErrorMessage(err.status, this.resolveLocale().startsWith("zh"));
+        if (classified) throw new CoolieApiError(err.status, classified, err.code, err.body);
+      }
+      throw err;
+    }
+    const { body, headers } = signedIn;
 
     const userId = body?.user?.id;
     if (!userId) {

@@ -25,7 +25,7 @@
 | 交付底座 | 核心语言与架构栈 | 终端形态与场景 | 适用需求与客户规范 |
 |---|---|---|---|
 | **`yudao-quad-terminal`** | Java 17/21 + Spring Boot 3 + Vue3 + Uni-App + Expo | **四位一体**：PC中台 + 小程序 + 原生App + 网关 (19域) | 完备商用需求、指定 Java/信创、涵盖原生 App/小程序 |
-| **`ruoyi-all-next`** | TypeScript + Next.js 15 + React 19 + Prisma | **轻全栈**：响应式Web + 移动H5 + 3200沙箱秒级预览 | 敏捷POC/极速打样、指定 TS/Node、纯 Web/轻终端 |
+| **`ruoyi-all-next`** | TypeScript + Next.js 16 + React 19 + Prisma | **轻全栈**：响应式Web + 移动H5 + 3200沙箱秒级预览 | 敏捷POC/极速打样、指定 TS/Node、纯 Web/轻终端 |
 
 > 💡 **决策漏斗**: 需原生App/小程序或Java信创 ➜ 必选 `yudao`；纯Web/快速打样 ➜ 优选 `ruoyi`。详见 `.agents/rules/FOUNDRY-BLUEPRINT-SELECTION.md`。
 
