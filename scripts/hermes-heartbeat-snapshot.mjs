@@ -25,17 +25,28 @@
  *   5. `--routine-ids` 回退      — list 端点死掉时按已知 routine id 走单条端点
  *                                  (心法 #184/#188 端点反漂移)
  *
+ *   6. `summarizeQueue()`        — issues 列表 → 四桶工单大盘 (进行中 / 等拍板 / 阻塞 / 待办),
+ *                                  todo 与 backlog 合并计 (与 scripts/coolie-dev-task.sh 同口径)
+ *   7. `snapshotSignature()`     — 盘面**规范化指纹**: 排序后的 issue/routines/inbox/queue 元组做 sha256,
+ *                                  与上一轮保存的指纹比对 → `changed: true|false` + 人读 delta 行.
+ *                                  心跳在盘面无变化时只需发一行, 不再重贴 12KB 样板
+ *   8. `--brief`                 — 一行心脏起搏 (无变化一行, 有变化一行 + delta 行)
+ *
  * 用法:
  *   node scripts/hermes-heartbeat-snapshot.mjs                 # 人读紧凑快照
+ *   node scripts/hermes-heartbeat-snapshot.mjs --brief         # 一行心脏起搏 (心跳默认用这个)
  *   node scripts/hermes-heartbeat-snapshot.mjs --json          # 机器读 JSON
  *   node scripts/hermes-heartbeat-snapshot.mjs --issue <uuid> --company <cid>
+ *   node scripts/hermes-heartbeat-snapshot.mjs --no-state      # 只读盘面, 不写比对状态
  *
  * 环境变量: PAPERCLIP_API_URL / PAPERCLIP_API_KEY / PAPERCLIP_RUN_ID / PAPERCLIP_TASK_ID
  *
  * 退出码: 0 = 已产出快照 (含"部分字段不可用"的诚实降级); 2 = 连 API base / key 都没有.
  */
 
+import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -179,10 +190,166 @@ export function summarizeInbox(payload) {
   return out;
 }
 
+/** 工单大盘四桶 (与 scripts/coolie-dev-task.sh 同口径: todo 与 backlog 合并计) */
+export const QUEUE_BUCKETS = [
+  { key: "in_progress", label: "进行中", statuses: ["in_progress"] },
+  { key: "in_review", label: "等拍板", statuses: ["in_review"] },
+  { key: "blocked", label: "阻塞中", statuses: ["blocked"] },
+  { key: "todo", label: "待办", statuses: ["todo", "backlog"] },
+];
+
+/**
+ * issues 列表 → 四桶工单大盘.
+ * 只保留稳定标识/状态字段 (identifier/status/priority/checkoutRunId),
+ * 并按 identifier 排序 —— 这样指纹不会因回包顺序抖动而误报"变化".
+ */
+export function summarizeQueue(issues) {
+  const rows = Array.isArray(issues) ? issues : pickRoutines({ issues });
+  const byBucket = Object.fromEntries(QUEUE_BUCKETS.map((b) => [b.key, []]));
+  let unscoped = 0;
+  for (const raw of rows) {
+    if (!raw || typeof raw !== "object") continue;
+    const bucket = QUEUE_BUCKETS.find((b) => b.statuses.includes(raw.status));
+    if (!bucket) {
+      unscoped += 1;
+      continue;
+    }
+    byBucket[bucket.key].push({
+      identifier: raw.identifier ?? null,
+      title: raw.title ?? null,
+      status: raw.status ?? null,
+      priority: raw.priority ?? null,
+      checkoutRunId: raw.checkoutRunId ?? null,
+    });
+  }
+  for (const bucket of QUEUE_BUCKETS) {
+    byBucket[bucket.key].sort((a, b) => String(a.identifier).localeCompare(String(b.identifier)));
+  }
+  return { total: rows.length, unscoped, buckets: byBucket };
+}
+
+/** 工单大盘一行摘要: `2/1/6/4` (进行中/等拍板/阻塞/待办) */
+export function queueLineCounts(queue) {
+  if (!queue) return null;
+  return QUEUE_BUCKETS.map((b) => queue.buckets[b.key]?.length ?? 0).join("/");
+}
+
+/**
+ * 盘面规范化: 只取"变了才值得知道"的维度, 且全部排序 → 可做稳定 sha256.
+ * 字段阶段态 (phase-null) 刻意不进指纹: 它每轮都在 null 与实值之间摆,
+ * 进指纹会让 changed 长期恒为 true, 反而淹没真信号.
+ */
+export function canonicalSnapshot(snapshot) {
+  const s = snapshot ?? {};
+  const issue =
+    s.issue && !s.issue.error
+      ? [s.issue.identifier, s.issue.status, s.issue.priority, s.issue.checkoutRunId ?? null]
+      : null;
+  const routines = (s.routines?.items ?? [])
+    .map((r) => [
+      r.id ?? null,
+      r.role ?? null,
+      r.status ?? null,
+      r.fingerprint ?? null,
+      r.linkedIssue?.identifier ?? null,
+      r.linkedIssue?.status ?? null,
+    ])
+    .sort((a, b) => String(a[0]).localeCompare(String(b[0])));
+  const inbox = s.inbox ? INBOX_BUCKETS.map((b) => [b, s.inbox[b] ?? null]) : null;
+  const queue = s.queue
+    ? QUEUE_BUCKETS.map((b) => [
+        b.key,
+        (s.queue.buckets?.[b.key] ?? []).map((i) => `${i.identifier}:${i.status}`),
+      ])
+    : null;
+  return { issue, routines, inbox, queue };
+}
+
+/** 盘面指纹 (16 hex); 同盘面必同指纹, 与回包顺序无关 */
+export function snapshotSignature(snapshot) {
+  return createHash("sha256").update(JSON.stringify(canonicalSnapshot(snapshot))).digest("hex").slice(0, 16);
+}
+
+/** 两轮盘面的差异 → 人读 delta 行 (最多 12 条, 超出折叠计数) */
+export function diffSnapshots(previous, current) {
+  if (!previous) return ["(无上一轮状态, 本轮为基线)"];
+  const before = previous.canonical ?? canonicalSnapshot(previous);
+  const after = canonicalSnapshot(current);
+  const deltas = [];
+
+  if (JSON.stringify(before.issue) !== JSON.stringify(after.issue)) {
+    const fmt = (i) => (i ? `${i[0]} ${i[1]} ${i[2]} run=${String(i[3] ?? "null").slice(0, 8)}` : "unavailable");
+    deltas.push(`~ issue: ${fmt(before.issue)} -> ${fmt(after.issue)}`);
+  }
+
+  const byId = (list) => new Map((list ?? []).map((r) => [String(r[0]), r]));
+  const oldRoutines = byId(before.routines);
+  const newRoutines = byId(after.routines);
+  for (const [id, next] of newRoutines) {
+    const prev = oldRoutines.get(id);
+    if (!prev) {
+      deltas.push(`+ routine ${next[1] ?? id} 出现 (status=${next[2]}, fp=${String(next[3] ?? "null").slice(0, 12)})`);
+      continue;
+    }
+    if (prev[3] !== next[3]) {
+      deltas.push(`~ ${next[1] ?? id} fp ${String(prev[3] ?? "null").slice(0, 12)} -> ${String(next[3] ?? "null").slice(0, 12)}`);
+    }
+    const oldLink = `${prev[4] ?? "null"} ${prev[5] ?? "null"}`;
+    const newLink = `${next[4] ?? "null"} ${next[5] ?? "null"}`;
+    if (oldLink !== newLink) deltas.push(`~ ${next[1] ?? id} linkedIssue ${oldLink} -> ${newLink}`);
+  }
+  for (const [id, prev] of oldRoutines) {
+    if (!newRoutines.has(id)) deltas.push(`- routine ${prev[1] ?? id} 消失`);
+  }
+
+  const oldInbox = new Map((before.inbox ?? []).map(([k, v]) => [k, v]));
+  for (const [bucket, count] of after.inbox ?? []) {
+    const prior = oldInbox.has(bucket) ? oldInbox.get(bucket) : null;
+    if (prior !== count) deltas.push(`~ inbox ${bucket} ${prior ?? "null"} -> ${count ?? "null"}`);
+  }
+
+  const oldQueue = new Map((before.queue ?? []).map(([k, ids]) => [k, new Set(ids ?? [])]));
+  for (const [bucket, ids] of after.queue ?? []) {
+    const prior = oldQueue.get(bucket) ?? new Set();
+    const now = new Set(ids ?? []);
+    for (const id of now) if (!prior.has(id)) deltas.push(`+ ${bucket}: ${id}`);
+    for (const id of prior) if (!now.has(id)) deltas.push(`- ${bucket}: ${id}`);
+  }
+
+  if (deltas.length === 0) return [];
+  if (deltas.length <= 12) return deltas;
+  return [...deltas.slice(0, 12), `... 另有 ${deltas.length - 12} 条变化`];
+}
+
+/** 默认比对状态文件位置 (scripts/.hermes-tmp 已在 .gitignore 中) */
+export const DEFAULT_STATE_PATH = path.join(HERE, ".hermes-tmp", "heartbeat-snapshot-state.json");
+
+/** 读上一轮状态; 任何损坏/缺失都退化为 null (首轮无基线, 不是异常) */
+export function readState(statePath = DEFAULT_STATE_PATH) {
+  try {
+    const raw = fs.readFileSync(statePath, "utf8");
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+/** 写本轮状态; 写不进去也不影响心跳 (返回 false, 不抛错) */
+export function writeState(state, statePath = DEFAULT_STATE_PATH) {
+  try {
+    fs.mkdirSync(path.dirname(statePath), { recursive: true });
+    fs.writeFileSync(statePath, `${JSON.stringify(state, null, 2)}\n`);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 /** 命令行参数解析 (可测) */
 export function parseArgs(argv = []) {
-  const flags = { json: false, help: false, skipInbox: false };
-  const options = { issue: null, company: null, apiBase: null, routineIds: [] };
+  const flags = { json: false, help: false, skipInbox: false, skipQueue: false, brief: false, noState: false };
+  const options = { issue: null, company: null, apiBase: null, routineIds: [], state: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     const next = () => argv[++i];
@@ -197,6 +364,15 @@ export function parseArgs(argv = []) {
       case "--skip-inbox":
         flags.skipInbox = true;
         break;
+      case "--brief":
+        flags.brief = true;
+        break;
+      case "--no-state":
+        flags.noState = true;
+        break;
+      case "--skip-queue":
+        flags.skipQueue = true;
+        break;
       case "--issue":
         options.issue = next() ?? null;
         break;
@@ -205,6 +381,9 @@ export function parseArgs(argv = []) {
         break;
       case "--api-base":
         options.apiBase = next() ?? null;
+        break;
+      case "--state":
+        options.state = next() ?? null;
         break;
       case "--routine-ids":
         options.routineIds = (next() ?? "").split(",").map((s) => s.trim()).filter(Boolean);
@@ -218,6 +397,8 @@ export function parseArgs(argv = []) {
           options.company = arg.slice("--company=".length);
         } else if (arg.startsWith("--api-base=")) {
           options.apiBase = arg.slice("--api-base=".length);
+        } else if (arg.startsWith("--state=")) {
+          options.state = arg.slice("--state=".length);
         }
         break;
     }
@@ -228,13 +409,19 @@ export function parseArgs(argv = []) {
 const HELP = `hermes-heartbeat-snapshot — Paperclip routine 心跳确定性快照
 
 用法:
-  node scripts/hermes-heartbeat-snapshot.mjs [--json] [--issue <id|key>] [--company <cid>]
-                                            [--routine-ids a,b,c] [--skip-inbox] [--api-base <url>]
+  node scripts/hermes-heartbeat-snapshot.mjs [--brief|--json] [--issue <id|key>] [--company <cid>]
+                                            [--routine-ids a,b,c] [--skip-inbox] [--skip-queue]
+                                            [--state <path>] [--no-state] [--api-base <url>]
 
 说明:
   --routine-ids  当 companies-scoped list 端点不可用时, 按已知 routine id 走单条端点回退.
                  不传则诚实标注 routines: unavailable, 不编造数据.
+  --brief        一行心脏起搏: 无变化一行, 有变化一行 + delta 行.
+  --state        与上一轮比对用的状态文件 (默认 scripts/.hermes-tmp/heartbeat-snapshot-state.json).
+  --no-state     只读盘面, 不写比对状态 (适合一次性排查).
 `;
+
+/** 默认状态路径可用 env 覆盖 (跨机复刻时不必改代码) */
 
 async function getJson(url, { apiKey, runId, fetchImpl = globalThis.fetch } = {}) {
   const headers = { Accept: "application/json" };
@@ -265,6 +452,7 @@ export async function collectSnapshot(config) {
     company = null,
     routineIds = [],
     skipInbox = false,
+    skipQueue = false,
     fetchImpl = globalThis.fetch,
   } = config;
 
@@ -274,6 +462,8 @@ export async function collectSnapshot(config) {
     companyId: company,
     routines: { source: null, unavailableReason: null, items: [] },
     inbox: null,
+    queue: null,
+    queueUnavailableReason: null,
   };
 
   // 1. issue 真值 + companyId 反查 (心法 #148: env 未注入 companyId 时走 issue 反查)
@@ -345,6 +535,21 @@ export async function collectSnapshot(config) {
     }
   }
 
+  // 5. 工单大盘四桶 (心法 #56/#144: list 是初盘, 真值以单条 API 为终判)
+  if (!skipQueue && snapshot.companyId) {
+    const issues = await getJson(`${apiBase}/companies/${snapshot.companyId}/issues?limit=400`, {
+      apiKey,
+      runId,
+      fetchImpl,
+    });
+    const rows = Array.isArray(issues.body) ? issues.body : pickRoutines(issues.body);
+    if (rows.length > 0) {
+      snapshot.queue = summarizeQueue(rows);
+    } else {
+      snapshot.queueUnavailableReason = apiErrorOf(issues.body) ?? `HTTP ${issues.status}`;
+    }
+  }
+
   snapshot.generatedAt = new Date().toISOString();
   return snapshot;
 }
@@ -391,7 +596,45 @@ export function renderText(snapshot) {
     const counts = INBOX_BUCKETS.map((b) => `${b}=${inbox[b] ?? "null"}`).join(" ");
     lines.push(`inbox   : ${counts}${inbox.error ? ` error="${inbox.error}"` : ""}`);
   }
+  if (snapshot.queue) {
+    lines.push(`queue   : ${queueLineCounts(snapshot.queue)} 总计 ${snapshot.queue.total} (进行中/等拍板/阻塞/待办)`);
+    for (const bucket of QUEUE_BUCKETS) {
+      const items = snapshot.queue.buckets[bucket.key] ?? [];
+      if (items.length === 0) continue;
+      lines.push(`  ${bucket.label}: ${items.map((i) => i.identifier).join(" ")}`);
+    }
+  } else if (snapshot.queueUnavailableReason) {
+    lines.push(`queue   : unavailable (${snapshot.queueUnavailableReason})`);
+  }
+  if (snapshot.signature) {
+    lines.push(`changed : ${snapshot.changed === true} sig=${snapshot.signature} prev=${snapshot.previousSignature ?? "null"}`);
+    for (const delta of snapshot.deltas ?? []) lines.push(`  ${delta}`);
+  }
   return lines.join("\n");
+}
+
+/**
+ * 一行心脏起搏: 盘面无变化时只输出一行 (不再重贴 12KB 样板),
+ * 有变化时追加 delta 行. 这是心跳的默认输出形态.
+ */
+export function renderBrief(snapshot) {
+  const stamp = snapshot.generatedAt ?? "";
+  const issue =
+    snapshot.issue && !snapshot.issue.error
+      ? `${snapshot.issue.identifier} ${snapshot.issue.status}`
+      : "issue unavailable";
+  const routines = snapshot.routines?.source
+    ? `${snapshot.routines.items.filter((r) => r.status === "active").length}/${snapshot.routines.items.length} active`
+    : "routines unavailable";
+  const counts = queueLineCounts(snapshot.queue) ?? "null";
+  const inbox = snapshot.inbox
+    ? `pa=${snapshot.inbox.pendingApprovals ?? "null"} f=${snapshot.inbox.failures ?? "null"} fr=${snapshot.inbox.failedRuns ?? "null"}`
+    : "inbox=null";
+  const state = snapshot.signature ? (snapshot.changed ? "CHANGED" : "no-change") : "no-baseline";
+  const head =
+    `HB ${stamp} ${state} sig=${snapshot.signature ?? "null"} · ${issue} · ${routines} · ` +
+    `queue ${counts} · ${inbox}`;
+  return [head, ...(snapshot.deltas ?? []).map((d) => `  ${d}`)].join("\n");
 }
 
 export async function main(argv = process.argv.slice(2), env = process.env) {
@@ -424,11 +667,35 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     company: options.company ?? env.PAPERCLIP_COMPANY_ID ?? null,
     routineIds,
     skipInbox: flags.skipInbox,
+    skipQueue: flags.skipQueue,
   });
 
-  process.stdout.write(
-    flags.json ? `${JSON.stringify(snapshot, null, 2)}\n` : `${renderText(snapshot)}\n`
-  );
+  // 与上一轮比对: 只在完整盘面 (未跳过任何区块) 上做, 避免半盘面污染基线
+  const statePath = options.state ?? env.HERMES_HEARTBEAT_STATE ?? DEFAULT_STATE_PATH;
+  const fullBoard = !flags.skipInbox && !flags.skipQueue;
+  if (!flags.noState && fullBoard) {
+    const previous = readState(statePath);
+    snapshot.signature = snapshotSignature(snapshot);
+    snapshot.previousSignature = previous?.signature ?? null;
+    snapshot.changed = snapshot.previousSignature !== snapshot.signature;
+    snapshot.deltas = snapshot.changed ? diffSnapshots(previous, snapshot) : [];
+    snapshot.statePath = statePath;
+    writeState(
+      {
+        signature: snapshot.signature,
+        savedAt: snapshot.generatedAt,
+        canonical: canonicalSnapshot(snapshot),
+      },
+      statePath
+    );
+  }
+
+  const output = flags.brief
+    ? renderBrief(snapshot)
+    : flags.json
+      ? JSON.stringify(snapshot, null, 2)
+      : renderText(snapshot);
+  process.stdout.write(`${output}\n`);
   return 0;
 }
 
