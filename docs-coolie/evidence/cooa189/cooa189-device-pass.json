@@ -1,0 +1,126 @@
+{
+  "issue": "COOA-189",
+  "parent": "COOA-184",
+  "title": "M3 活跃会话流式实证 + 剩余屏/旅程余量走查与缺陷修复 (round5 收口)",
+  "date": "2026-10-16",
+  "runner": "百晓生 (DS / claude_local)",
+  "device": {
+    "kind": "Android Emulator",
+    "avd": "coolie-test",
+    "adbSerial": "emulator-5554",
+    "resolution": "1080x2400",
+    "density": 420,
+    "app": "cloud.coolie.app (Expo dev client, Metro :8081)"
+  },
+  "driver": "agent-device (macOS host, adb) + adb input (gesture/tap)",
+  "method": {
+    "snapshot": "agent-device snapshot --json --force-full -> flat node list with rect{x,y,width,height} + identifier (testID)",
+    "scrollNote": "agent-device `scroll up` did not move the RN message FlatList; drove it with `adb shell input swipe` inside the message ScrollView band (x=0..1080, y=848..2020)",
+    "tapNote": "WindowsToast: pressed at the copy button rect center via adb, screencap within 400ms to catch the ~2s Toast"
+  },
+  "m3_active_session": {
+    "status": "PASS",
+    "session": "BoardChatScreen opened directly as 工坊 tab with a real persisted Hermes assistant message ('### 🚀 Hermes 实战帮写：TypeScript 快速排序' containing two fenced code cards).",
+    "checks": [
+      {
+        "id": "M3-1-unanchor-jumpbutton",
+        "claim": "上滑解锚后出现 [回底]",
+        "verdict": "PASS",
+        "evidence": "App-open (list not at bottom) rendered @BoardChat__JumpToBottom; after `adb input swipe` up inside the message band it re-rendered.",
+        "geometry": {
+          "identifier": "BoardChat__JumpToBottom",
+          "rect": {"x": 842, "y": 1835, "width": 191, "height": 93},
+          "center": [937, 1881],
+          "hittable": true
+        },
+        "shot": "shots/m3-jumpbottom-before.png"
+      },
+      {
+        "id": "M3-2-absorb-on-tap",
+        "claim": "点击 [回底] 就地一跳回到底部并重新吸底 (按钮消失)",
+        "verdict": "PASS",
+        "evidence": "agent-device press @e50 (回底, center 937,1881) -> post-tap snapshot (-i --json) contains no node matching '回底'/BoardChat__JumpToBottom (button disappeared, list at bottom).",
+        "shot": "shots/m3-after-jumpbottom.png"
+      },
+      {
+        "id": "M3-3-code-copy-toast",
+        "claim": "代码块 [复制] 触发 Toast",
+        "verdict": "PASS",
+        "evidence": "Code card header rendered 'typescript 43 行' + 复制 button (id=BoardChat__CodeCopy__1). adb tap at its rect center (895,1993) -> screencap 400ms later shows Toast '已复制到剪贴板'.",
+        "geometry": {
+          "identifier": "BoardChat__CodeCopy__1",
+          "rect": {"x": 815, "y": 1967, "width": 160, "height": 53},
+          "center": [895, 1993],
+          "hittable": true
+        },
+        "toastText": "已复制到剪贴板",
+        "shot": "shots/m3-copy-toast-live.png"
+      }
+    ],
+    "note_streaming": "吸底跟随逻辑 (scrollToBottom force=false 仅在 atBottomRef=true 时跟随) 与解锚判定共用同一 atBottomRef/onScroll 通路; 解锚(PASS)+点击回底(PASS)已闭环证明锚点状态机工作正常。纯流式打字机中途吸底需一次活跃 LLM 会话逐帧采样, 本轮未逐帧录制。"
+  },
+  "screens_walked": {
+    "status": "PARTIAL",
+    "covered": [
+      "Dashboard (screen-01-dashboard.png)",
+      "通知中心 (screen-02-bell.png)",
+      "设置 (screen-03-settings.png)",
+      "资产/本体域 (screen-04-assets.png)",
+      "产物交付中心 Artifacts (screen-Artifacts.png)",
+      "Agents (screen-Agents.png)",
+      "ArchitectureGovernance (screen-ArchitectureGovernance.png)",
+      "NativeModules + 3 子屏 (screen-NativeModules.png, screen-settings-01..03-NativeModules.png)",
+      "NewTask (screen-NewTask.png)",
+      "OTA/WhatsNew (screen-OTA-WhatsNew.png)",
+      "PluginManager (screen-PluginManager.png)",
+      "Projects (screen-Projects.png)",
+      "PrototypeSandbox (screen-PrototypeSandbox.png)",
+      "Search (screen-Search.png)",
+      "TaskDetail (screen-TaskDetail.png)",
+      "BoardChat/工坊 (本轮活跃会话实证)"
+    ],
+    "remaining": [
+      "AgentDetailScreen",
+      "CodeDiffScreen",
+      "GitCredentialsScreen",
+      "InboxScreen",
+      "PipelinesScreen",
+      "PlansScreen",
+      "PluginSettingsScreen",
+      "RegisterScreen",
+      "SpecEditorScreen",
+      "TaskKanbanScreen",
+      "TasksScreen",
+      "WebContainerScreen",
+      "WebLoginScreen"
+    ]
+  },
+  "journeys": {
+    "status": "PARTIAL",
+    "covered": [
+      {
+        "id": "intent-dispatch",
+        "verdict": "PASS",
+        "evidence": "工坊对话 plan-mode 派单 -> 落地 Plan 任务 '移动端走查回归测试链路 (COOA-189 证据)', 编号 10c08330-8d20-4e01-85d7-b11cdcd797c2, 状态=待办池, 分配智能体=未分配。",
+        "shot": "shots/journey-intent-dispatch-plan.png"
+      },
+      {
+        "id": "ontology-drill-through",
+        "verdict": "PASS",
+        "evidence": "资产→本体域→实体卡一跳弹出受控 Action 抽屉, 展示因果血缘; 底部业务动词在 78% 视口内可达。",
+        "shots": [
+          "shots/journey-ontology-drill-chat.png",
+          "shots/journey-ontology-dispatch.png",
+          "shots/journey-ontology-dispatch-done.png"
+        ]
+      }
+    ],
+    "remaining": [
+      "审批签署 (approval sign-off) 闭环",
+      "终验归档 (UAT final acceptance archiving) 闭环"
+    ]
+  },
+  "defects": [],
+  "typecheck": "clients/expo: npx tsc --noEmit -> exit 0",
+  "conclusion": "M3 三项交互 (上滑解锚 [回底] 出现 / 点击回底吸底并消失 / 代码块 复制->Toast '已复制到剪贴板') 已在 emulator-5554 真机活跃会话中逐项实证 PASS, 均带 adb 几何证据 (testID rect + 点击中心)。剩余屏 (13) 与剩余旅程 (审批签署/终验归档) 及纯流式逐帧吸底为余量, 另行跟踪。本轮未发现新缺陷, 工作树无代码改动。"
+}
