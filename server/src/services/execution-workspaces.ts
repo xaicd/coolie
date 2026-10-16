@@ -2611,17 +2611,18 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
       };
 
       for (const workspace of candidates) {
-        const executionWorkspace = toExecutionWorkspace(workspace);
-        const { git, statusInspectionSucceeded } = await inspectGitCloseReadiness(executionWorkspace);
-        if (!statusInspectionSucceeded) {
-          result.skippedUndelivered += 1;
-          continue;
-        }
-        const assessment = await assessDelivery(workspace, git);
+        // Fast-path: check issue tree terminal status before invoking expensive git subprocesses.
+        // If the source issue or any of its subtree issues are still open/in-progress, the workspace
+        // cannot be reaped anyway, so skip git inspection entirely.
+        const issueTree = await listWorkspaceIssueTree(workspace);
+        const sourceIssue = issueTree.find((issue) => issue.id === workspace.sourceIssueId) ?? null;
+        const sourceIssueTerminal = Boolean(sourceIssue && TERMINAL_ISSUE_STATUSES.has(sourceIssue.status));
+        const subtreeTerminal = Boolean(sourceIssue && issueTree.every((issue) => TERMINAL_ISSUE_STATUSES.has(issue.status)));
         const reopenPending = metadataHasReopenPendingConsumption(
           workspace.metadata as Record<string, unknown> | null,
         );
-        if (!assessment.sourceIssueTerminal || !assessment.subtreeTerminal) {
+
+        if (!sourceIssueTerminal || !subtreeTerminal) {
           if (reopenPending) {
             // The source issue left the terminal state, so the reopen transition
             // committed. Clear the reopen-pending flag under the lifecycle lock so
@@ -2637,6 +2638,14 @@ export function executionWorkspaceService(db: Db, opts: ExecutionWorkspaceServic
           result.skippedNonTerminalTree += 1;
           continue;
         }
+
+        const executionWorkspace = toExecutionWorkspace(workspace);
+        const { git, statusInspectionSucceeded } = await inspectGitCloseReadiness(executionWorkspace);
+        if (!statusInspectionSucceeded) {
+          result.skippedUndelivered += 1;
+          continue;
+        }
+        const assessment = await assessDelivery(workspace, git);
         if (assessment.workspaceDirty) {
           result.skippedUndelivered += 1;
           continue;

@@ -1359,8 +1359,15 @@ async function startServerWithDatabaseTeardown(
     // The throttle keeps the 30s cadence from flooding the log.
     let lastTerminalWorkspaceSkipLogAt = 0;
     const terminalWorkspaceSkipLogIntervalMs = 10 * 60 * 1000;
-    const scheduleTerminalWorkspaceSweep = () => {
+    let lastTerminalWorkspaceSweepAt = 0;
+    const terminalWorkspaceSweepIntervalMs = 5 * 60 * 1000;
+    const scheduleTerminalWorkspaceSweep = (force = false) => {
       if (heartbeatSchedulerStopped) return;
+      const nowMs = Date.now();
+      if (!force && nowMs - lastTerminalWorkspaceSweepAt < terminalWorkspaceSweepIntervalMs) {
+        return;
+      }
+      lastTerminalWorkspaceSweepAt = nowMs;
       trackHeartbeatSchedulerWork(terminalWorkspaces
         .sweepTerminalWorkspaces()
         .then((result) => {

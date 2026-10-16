@@ -4241,6 +4241,24 @@ export function recoveryService(
           .from(issues).where(and(eq(issues.companyId, issue.companyId), eq(issues.id, issue.id)));
         if (current?.externalConversationState === "waiting") { result.skipped += 1; continue; }
       }
+      if (issue.originKind === "routine_execution") {
+        const lastRun = await getLatestIssueRun(issue.companyId, issue.id);
+        if (lastRun?.status === "succeeded") {
+          // Routine executions are driven on schedule (e.g. hourly cron). Once a run
+          // succeeds, settle the execution issue to done so stranded continuation recovery
+          // does not thrash it every 30 seconds.
+          await db
+            .update(issues)
+            .set({
+              status: "done",
+              completedAt: new Date(),
+              updatedAt: new Date(),
+            })
+            .where(eq(issues.id, issue.id));
+          result.skipped += 1;
+          continue;
+        }
+      }
       if (issue.conversationAgentId) {
         const lastRun = await getLatestIssueRun(issue.companyId, issue.id);
         if (lastRun?.status === "succeeded") {
