@@ -34,6 +34,12 @@
  *   9. `summarizeWaiting()`      — 本 issue **自己的挂起交互** (等人类回复的卡片).
  *                                  大盘回答"工单还回不回得来", 这一节回答"我还在等谁":
  *                                  挂起卡片不进指纹 (年龄每轮都在长), 只记 (计数, kinds 集合)
+ *  10. `summarizeGit()`          — 本地仓库的**交付状态**: 本机 HEAD 有没有真的落到远端.
+ *                                  前三问都不覆盖这一格 —— 工单可以标 done、评论可以写"已交付",
+ *                                  而那个 commit 只活在本地 HEAD 上 (axiom: No Artifact, No Done).
+ *                                  同仓还有并发提交进程替心跳落盘 commit, 手工 `rev-list` 每轮重敲.
+ *                                  进指纹的只有 delivery 等价类 (synced/unpushed/behind),
+ *                                  head sha 与脏文件数只作人读字段 (每轮都在变, 进指纹会让 changed 恒为 true)
  *
  * 用法:
  *   node scripts/hermes-heartbeat-snapshot.mjs                 # 人读紧凑快照
@@ -49,6 +55,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import {
@@ -376,6 +383,117 @@ export function lockStateOf(issue, selfRunId = null) {
   return run === selfRunId ? "self" : "other";
 }
 
+/** 交付状态等价类 —— 只有这四类进指纹 (数值细节会每轮摆动) */
+export const GIT_DELIVERIES = ["synced", "unpushed", "behind", "no-upstream", "unavailable"];
+
+/** 默认 git 执行器: 与心跳同仓 (REPO_ROOT), 只读命令, 失败抛错由调用方捕获 */
+function defaultRunGit(args, cwd = REPO_ROOT) {
+  return execFileSync("git", args, {
+    cwd,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+    maxBuffer: 8 * 1024 * 1024,
+  }).trim();
+}
+
+/**
+ * 本地仓库交付状态 —— 心跳要回答的第四个问题: "我这轮交付真的到远端了吗".
+ *
+ * 为什么单开一格: 工单可以标 done、评论可以写"已交付", 而 commit 只活在本地 HEAD 上;
+ * 同仓还常驻并发提交进程 (替心跳落盘 commit) —— 交付是否落地只能问 git, 不能问记忆.
+ *
+ * 进指纹的只有 `delivery` 等价类:
+ *   - head sha: 每有一次提交就变 (并发提交进程随时落盘) → 进了指纹 changed 恒为 true
+ *   - 脏文件数: 共享工作区里长期非零 → 同样会让 changed 失去意义
+ * 两者只作为人读字段输出, 不进指纹 (与 idleHours / phase-null 同一类坑).
+ *
+ * git 不可用 / 不是仓库 / 无 upstream 时诚实降级 (`unavailable` / `no-upstream`),
+ * 绝不假装 synced —— 假 synced 比不报更坏: 它会把未推送的交付读成已落地.
+ */
+export function summarizeGit(options = {}) {
+  const upstream = options.upstream ?? "origin/main";
+  const cwd = options.cwd ?? REPO_ROOT;
+  const runGit = options.runGit ?? ((args) => defaultRunGit(args, cwd));
+  const read = (args) => {
+    try {
+      return { ok: true, value: runGit(args) };
+    } catch (error) {
+      return { ok: false, value: null, error: String(error?.message ?? error) };
+    }
+  };
+
+  const branch = read(["rev-parse", "--abbrev-ref", "HEAD"]);
+  const head = read(["rev-parse", "--short", "HEAD"]);
+  if (!branch.ok || !head.ok) {
+    const detail = branch.error ?? head.error ?? "git unavailable";
+    return {
+      checked: false,
+      error: detail.split("\n")[0].slice(0, 120),
+      branch: null,
+      head: null,
+      upstream,
+      ahead: null,
+      behind: null,
+      dirtyFiles: null,
+      untrackedFiles: null,
+      delivery: "unavailable",
+    };
+  }
+
+  const counts = read(["rev-list", "--left-right", "--count", `${upstream}...HEAD`]);
+  let ahead = null;
+  let behind = null;
+  if (counts.ok) {
+    const match = String(counts.value).match(/^(\d+)\s+(\d+)$/);
+    if (match) {
+      behind = Number(match[1]);
+      ahead = Number(match[2]);
+    }
+  }
+
+  const status = read(["status", "--porcelain"]);
+  let dirtyFiles = null;
+  let untrackedFiles = null;
+  if (status.ok) {
+    const lines = String(status.value).split("\n").filter((line) => line.trim().length > 0);
+    untrackedFiles = lines.filter((line) => line.startsWith("??")).length;
+    dirtyFiles = lines.length - untrackedFiles;
+  }
+
+  const delivery =
+    ahead === null ? "no-upstream" : ahead > 0 ? "unpushed" : behind > 0 ? "behind" : "synced";
+
+  return {
+    checked: true,
+    error: null,
+    branch: branch.value || null,
+    head: head.value || null,
+    upstream,
+    ahead,
+    behind,
+    dirtyFiles,
+    untrackedFiles,
+    delivery,
+  };
+}
+
+/**
+ * "git=synced" / "git=UNPUSHED ahead=1" — 一行说清交付落没落地:
+ *   - `git=skip` : 没查 (--skip-git)
+ *   - `git=?`    : 查了但 git 不可用 —— 不假装已推送
+ *   - `git=synced`          : HEAD 已全部在 upstream 上
+ *   - `git=UNPUSHED ahead=1`: 有 1 个 commit 只在本地 —— 必须推送才能算交付 (大写以示需出手)
+ */
+export function gitDeliveryText(git) {
+  if (!git) return "git=skip";
+  if (git.checked === false) return "git=?";
+  if (git.delivery === "synced") return "git=synced";
+  if (git.delivery === "unpushed") return `git=UNPUSHED ahead=${git.ahead ?? "?"}`;
+  if (git.delivery === "behind") return `git=behind=${git.behind ?? "?"}`;
+  if (git.delivery === "no-upstream") return `git=no-upstream`;
+  return `git=${git.delivery ?? "?"}`;
+}
+
 /**
  * 盘面规范化: 只取"变了才值得知道"的维度, 且全部排序 → 可做稳定 sha256.
  * 字段阶段态 (phase-null) 刻意不进指纹: 它每轮都在 null 与实值之间摆,
@@ -416,7 +534,10 @@ export function canonicalSnapshot(snapshot) {
   const waiting = s.waiting
     ? [s.waiting.pendingCount ?? null, (s.waiting.kinds ?? []).slice().sort()]
     : null;
-  return { issue, routines, inbox, queue, liveness, waiting };
+  // 交付: 只记 delivery 等价类 —— head sha 每有提交就变, 脏文件数在共享工作区长期非零,
+  // 两者进指纹都会让 changed 恒为 true (与 idleHours / phase-null 同一类坑)
+  const git = s.git ? (s.git.delivery ?? null) : null;
+  return { issue, routines, inbox, queue, liveness, waiting, git };
 }
 
 /** 盘面指纹 (16 hex); 同盘面必同指纹, 与回包顺序无关 */
@@ -486,6 +607,15 @@ export function diffSnapshots(previous, current) {
     deltas.push(`~ 挂起卡片: ${fmtWaiting(beforeWaiting)} -> ${fmtWaiting(afterWaiting)}`);
   }
 
+  // 交付状态变化: "本地 HEAD 有 commit 没推到远端" 是最该被看见的一格
+  // (未推送的交付 = 远端拿不到 = 工单标 done 也不成立)
+  const beforeGit = before.git ?? null;
+  const afterGit = after.git ?? null;
+  if (JSON.stringify(beforeGit) !== JSON.stringify(afterGit)) {
+    const fmtGit = (g) => (g === null ? "未记录" : String(g ?? "null"));
+    deltas.push(`~ 交付: ${fmtGit(beforeGit)} -> ${fmtGit(afterGit)}`);
+  }
+
   const oldQueue = new Map((before.queue ?? []).map(([k, ids]) => [k, new Set(ids ?? [])]));
   for (const [bucket, ids] of after.queue ?? []) {
     const prior = oldQueue.get(bucket) ?? new Set();
@@ -551,7 +681,7 @@ export function writeState(state, statePath = DEFAULT_STATE_PATH) {
 
 /** 命令行参数解析 (可测) */
 export function parseArgs(argv = []) {
-  const flags = { json: false, help: false, skipInbox: false, skipQueue: false, skipWaiting: false, brief: false, noState: false };
+  const flags = { json: false, help: false, skipInbox: false, skipQueue: false, skipWaiting: false, skipGit: false, brief: false, noState: false };
   const options = { issue: null, company: null, apiBase: null, routineIds: [], state: null, stateBase: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -578,6 +708,9 @@ export function parseArgs(argv = []) {
         break;
       case "--skip-waiting":
         flags.skipWaiting = true;
+        break;
+      case "--skip-git":
+        flags.skipGit = true;
         break;
       case "--issue":
         options.issue = next() ?? null;
@@ -622,7 +755,7 @@ const HELP = `hermes-heartbeat-snapshot — Paperclip routine 心跳确定性快
 用法:
   node scripts/hermes-heartbeat-snapshot.mjs [--brief|--json] [--issue <id|key>] [--company <cid>]
                                             [--routine-ids a,b,c] [--skip-inbox] [--skip-queue]
-                                            [--skip-waiting] [--state <path> | --state-base <path>]
+                                            [--skip-waiting] [--skip-git] [--state <path> | --state-base <path>]
                                             [--no-state] [--api-base <url>]
 
 说明:
@@ -647,6 +780,12 @@ const HELP = `hermes-heartbeat-snapshot — Paperclip routine 心跳确定性快
   还是在等 routine 自驱. wait=0p 就是没人可等, wait=1p/23m 就是有一张挂了 23 分钟.
   指纹只含 (计数, kinds), 不含年龄 —— 同样是为了不让 changed 恒为 true.
   --skip-waiting 跳过这一节 (跳过时不做基线比对, 避免半盘面污染基线).
+
+交付 (git):
+  一行回答"我这轮交付真的到远端了吗": git=synced 表示 HEAD 已全在 upstream;
+  git=UNPUSHED ahead=1 表示有 1 个 commit 只在本地 —— 远端拿不到, 工单标 done 也不成立.
+  指纹只含 delivery 等价类; head sha 与脏文件数只作人读字段 (每轮都在变).
+  --skip-git 跳过这一节 (git 不可用时也会自动降级为 git=?).
 `;
 
 /** 默认状态路径可用 env 覆盖 (跨机复刻时不必改代码) */
@@ -853,6 +992,16 @@ export function renderText(snapshot) {
       );
     }
   }
+  if (snapshot.git) {
+    const g = snapshot.git;
+    lines.push(
+      g.checked === false
+        ? `git     : unavailable (${g.error})`
+        : `git     : ${g.branch ?? "?"}@${g.head ?? "?"} delivery=${g.delivery ?? "?"} ` +
+            `ahead=${g.ahead ?? "?"} behind=${g.behind ?? "?"} dirty=${g.dirtyFiles ?? "?"} ` +
+            `untracked=${g.untrackedFiles ?? "?"} upstream=${g.upstream}`
+    );
+  }
   if (snapshot.queue) {
     lines.push(`queue   : ${queueLineCounts(snapshot.queue)} 总计 ${snapshot.queue.total} (进行中/等拍板/阻塞/待办)`);
     for (const bucket of QUEUE_BUCKETS) {
@@ -933,7 +1082,8 @@ export function renderBrief(snapshot) {
   const state = snapshot.signature ? (snapshot.changed ? "CHANGED" : "no-change") : "no-baseline";
   const head =
     `HB ${stamp} ${state} sig=${snapshot.signature ?? "null"} · ${issue} · ${routines} · ` +
-    `queue ${counts} · ${inbox} · ${livenessSummaryText(snapshot.liveness)} · ${waitingSummaryText(snapshot.waiting)}`;
+    `queue ${counts} · ${inbox} · ${livenessSummaryText(snapshot.liveness)} · ${waitingSummaryText(snapshot.waiting)} · ` +
+    `${gitDeliveryText(snapshot.git)}`;
   return [head, ...(snapshot.deltas ?? []).map((d) => `  ${d}`)].join("\n");
 }
 
@@ -973,13 +1123,17 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     skipWaiting: flags.skipWaiting,
   });
 
+  // 交付状态: 本机 git 只读查询 (本地事实, 不占 API 请求); --skip-git 或 git 不可用时诚实降级
+  // HERMES_HEARTBEAT_GIT_CWD 让测试指向确定性 fixture 仓库 (真实仓库的交付状态每分钟都在变)
+  if (!flags.skipGit) snapshot.git = summarizeGit({ cwd: env.HERMES_HEARTBEAT_GIT_CWD || REPO_ROOT });
+
   // 与上一轮比对: 只在完整盘面 (未跳过任何区块) 上做, 避免半盘面污染基线
   // 默认状态文件按 issue 分文件: 同仓并发心跳不互相覆盖基线
   // 键优先用解析出的 identifier (人类可读, 与传 uuid 还是传 key 无关)
   const stateKey = snapshot.issue && !snapshot.issue.error ? (snapshot.issue.identifier ?? issueParam) : issueParam;
   const stateBase = options.stateBase ?? env.HERMES_HEARTBEAT_STATE_BASE ?? DEFAULT_STATE_PATH;
   const statePath = options.state ?? env.HERMES_HEARTBEAT_STATE ?? statePathFor(stateKey, stateBase);
-  const fullBoard = !flags.skipInbox && !flags.skipQueue && !flags.skipWaiting;
+  const fullBoard = !flags.skipInbox && !flags.skipQueue && !flags.skipWaiting && !flags.skipGit;
   if (!flags.noState && fullBoard) {
     const previous = readState(statePath);
     const comparable = isSameIssue(previous, snapshot);

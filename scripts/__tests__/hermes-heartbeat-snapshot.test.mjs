@@ -4,7 +4,7 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -20,6 +20,9 @@ import {
   queueKeyOf,
   summarizeLiveness,
   summarizeWaiting,
+  summarizeGit,
+  gitDeliveryText,
+  GIT_DELIVERIES,
   livenessSummaryText,
   waitingSummaryText,
   canonicalSnapshot,
@@ -41,6 +44,41 @@ import {
 
 const execFileAsync = promisify(execFile);
 const SCRIPT = path.join(REPO_ROOT, "scripts", "hermes-heartbeat-snapshot.mjs");
+
+// ---------------------------------------------------------------------------
+// 0. 交付状态 fixture 仓库
+//     CLI 现在会一并报本地 git 交付状态; 真实仓库的 ahead/behind 每分钟都在变,
+//     直接拿真实仓库跑端到端会让"同一盘面连跑两次 = no-change"偶发失败.
+//     这里造一个确定性仓库 (干净工作树 + upstream 已指到 HEAD), 端到端只认它.
+//     没有 git 的环境里返回 null → 不注入 cwd, 由 summarizeGit 自己诚实降级.
+// ---------------------------------------------------------------------------
+function makeFixtureRepo() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-git-fixture-"));
+  const git = (args) =>
+    execFileSync("git", args, { cwd: dir, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
+  git(["init", "-q"]);
+  git(["config", "user.email", "hb-fixture@example.com"]);
+  git(["config", "user.name", "hb-fixture"]);
+  return { dir, git };
+}
+
+const GIT_FIXTURE = (() => {
+  try {
+    const repo = makeFixtureRepo();
+    fs.writeFileSync(path.join(repo.dir, "README.md"), "fixture\n");
+    repo.git(["add", "-A"]);
+    repo.git(["commit", "-q", "-m", "fixture"]);
+    // upstream 指到 HEAD → ahead=0/behind=0 → delivery=synced, 与时间无关
+    repo.git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
+    process.on("exit", () => fs.rmSync(repo.dir, { recursive: true, force: true }));
+    return repo.dir;
+  } catch {
+    return null;
+  }
+})();
+
+/** 端到端 env: fixture 仓库存在时注入, 保证交付段确定 */
+const GIT_FIXTURE_ENV = GIT_FIXTURE ? { HERMES_HEARTBEAT_GIT_CWD: GIT_FIXTURE } : {};
 
 // ---------------------------------------------------------------------------
 // 1. API base 归一 (心法 #84/#159/#161: 裸 origin / 尾斜杠 / 已带 /api 三种形态)
@@ -480,6 +518,7 @@ function makeSnapshot({
     joinRequests: [],
   },
   waiting = null,
+  git = null,
 } = {}) {
   return {
     apiBase: "http://127.0.0.1:3100/api",
@@ -496,6 +535,7 @@ function makeSnapshot({
     queue: summarizeQueue(issues),
     liveness: summarizeLiveness(issues, { now: FIXTURE_NOW }),
     waiting,
+    git,
   };
 }
 
@@ -733,7 +773,7 @@ test("end to end: first --brief run is a baseline, the second on the same board 
   const { server, baseUrl } = await startHeartbeatFixture();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-brief-"));
   const statePath = path.join(dir, "state.json");
-  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" };
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key", ...GIT_FIXTURE_ENV };
   try {
     const first = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
     assert.match(first.stdout, /CHANGED sig=[0-9a-f]{16}/);
@@ -761,7 +801,7 @@ test("end to end: a new blocked issue shows up as a delta line on the next heart
   const { server, baseUrl } = await startHeartbeatFixture();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-brief2-"));
   const statePath = path.join(dir, "state.json");
-  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" };
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key", ...GIT_FIXTURE_ENV };
   try {
     await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
     E2E_ISSUES.push({ identifier: "COOA-297", status: "blocked", priority: "high", checkoutRunId: null });
@@ -782,7 +822,7 @@ test("end to end: rotating PAPERCLIP_RUN_ID between heartbeats keeps the board n
   const { server, baseUrl } = await startHeartbeatFixture();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-runid-"));
   const statePath = path.join(dir, "state.json");
-  const base = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" };
+  const base = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key", ...GIT_FIXTURE_ENV };
   try {
     const first = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], {
       env: { ...base, PAPERCLIP_RUN_ID: "run-9d9ca1fa-0ea0-4bc4-b26d-1e82c2c77553" },
@@ -805,7 +845,7 @@ test("end to end: the default baseline file is per issue, so concurrent heartbea
   const { server, baseUrl } = await startHeartbeatFixture();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-perissue-"));
   const baseState = path.join(dir, "state.json");
-  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" };
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key", ...GIT_FIXTURE_ENV };
   try {
     await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state-base", baseState], { env });
     assert.ok(fs.existsSync(path.join(dir, "state.COOA-114.json")), "baseline must land in an issue-scoped file");
@@ -851,7 +891,7 @@ test("end to end: a baseline written by another issue is reported as a fresh bas
   const { server, baseUrl } = await startTwoIssueFixture();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-crossissue-"));
   const statePath = path.join(dir, "shared-state.json");
-  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" };
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key", ...GIT_FIXTURE_ENV };
   try {
     await execFileAsync("node", [SCRIPT, "--brief", "--issue", OTHER_ISSUE.id, "--state", statePath], { env });
     const other = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
@@ -984,7 +1024,7 @@ test("end to end: the CLI reports liveness on a real board (live fixture server)
     res.statusCode = 404;
     res.end(JSON.stringify({ error: "API route not found" }));
   });
-  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" };
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key", ...GIT_FIXTURE_ENV };
   try {
     const { stdout } = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--no-state"], { env });
     assert.match(stdout, /lx 1\/2 \(stall=1\)/, `brief must carry liveness, got: ${stdout}`);
@@ -1112,7 +1152,7 @@ test("end to end: the brief shows the open card, then flags it when the card is 
   });
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-wait-"));
   const statePath = path.join(dir, "state.json");
-  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" };
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key", ...GIT_FIXTURE_ENV };
   try {
     const first = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
     assert.match(first.stdout, /wait=1p\/5m ask_user_questions/, `brief must show the open card, got: ${first.stdout}`);
@@ -1125,5 +1165,164 @@ test("end to end: the brief shows the open card, then flags it when the card is 
   } finally {
     server.close();
     fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 11. 交付状态 (summarizeGit: "我这轮交付真的到远端了吗")
+//     工单可以标 done、评论可以写"已交付", 而 commit 只活在本地 HEAD 上;
+//     同仓还常驻并发提交进程 —— 交付落没落地只能问 git (axiom: No Artifact, No Done).
+// ---------------------------------------------------------------------------
+
+/** 假 git: 按命令回放输出 —— 不碰真仓库, 只测分类/降级/不抛错 */
+function fakeGit({ branch = "main", head = "abc1234", counts = "0\t0", status = "", failOn = null } = {}) {
+  return (args) => {
+    const key = args.join(" ");
+    if (failOn && key.startsWith(failOn)) throw new Error(`fatal: not a git repository (${failOn})`);
+    if (key === "rev-parse --abbrev-ref HEAD") return branch;
+    if (key === "rev-parse --short HEAD") return head;
+    if (key.startsWith("rev-list --left-right --count")) return counts;
+    if (key === "status --porcelain") return status;
+    throw new Error(`unexpected git call: ${key}`);
+  };
+}
+
+test("summarizeGit classifies synced / unpushed / behind / no-upstream", () => {
+  assert.equal(summarizeGit({ runGit: fakeGit() }).delivery, "synced");
+  assert.equal(summarizeGit({ runGit: fakeGit({ counts: "0\t3" }) }).delivery, "unpushed");
+  assert.equal(summarizeGit({ runGit: fakeGit({ counts: "2\t0" }) }).delivery, "behind");
+  // upstream 分支不存在 → rev-list 失败 → 绝不假装 synced
+  assert.equal(summarizeGit({ runGit: fakeGit({ failOn: "rev-list" }) }).delivery, "no-upstream");
+});
+
+test("summarizeGit splits dirty vs untracked and reports ahead/behind numbers", () => {
+  const git = summarizeGit({
+    runGit: fakeGit({ head: "deadbee", counts: "1\t2", status: " M server/a.ts\n?? notes.md\n?? deploy/\n" }),
+  });
+  assert.equal(git.checked, true);
+  assert.equal(git.branch, "main");
+  assert.equal(git.head, "deadbee");
+  assert.equal(git.behind, 1);
+  assert.equal(git.ahead, 2);
+  assert.equal(git.dirtyFiles, 1);
+  assert.equal(git.untrackedFiles, 2);
+});
+
+test("summarizeGit degrades honestly when git is unusable — never claims synced", () => {
+  const git = summarizeGit({
+    runGit: () => {
+      throw new Error("command not found: git");
+    },
+  });
+  assert.equal(git.checked, false);
+  assert.equal(git.delivery, "unavailable");
+  assert.equal(git.ahead, null);
+  assert.equal(git.untrackedFiles, null);
+  assert.equal(gitDeliveryText(git), "git=?");
+});
+
+test("head sha and dirty-tree churn must not move the signature — only the delivery class does", () => {
+  const clean = makeSnapshot({ git: summarizeGit({ runGit: fakeGit({ head: "aaaaaaa", status: "" }) }) });
+  const churned = makeSnapshot({
+    git: summarizeGit({ runGit: fakeGit({ head: "bbbbbbb", status: " M x.ts\n?? y.md\n" }) }),
+  });
+  assert.equal(
+    snapshotSignature(clean),
+    snapshotSignature(churned),
+    "sha 与脏文件数每轮都在变, 进指纹会让 changed 恒为 true"
+  );
+
+  const unpushed = makeSnapshot({ git: summarizeGit({ runGit: fakeGit({ counts: "0\t1" }) }) });
+  assert.notEqual(snapshotSignature(clean), snapshotSignature(unpushed), "未推送的交付必须让指纹动");
+});
+
+test("交付 delta: pushing the local commit must print a readable line", () => {
+  const unpushed = makeSnapshot({ git: summarizeGit({ runGit: fakeGit({ counts: "0\t1" }) }) });
+  const synced = makeSnapshot({ git: summarizeGit({ runGit: fakeGit() }) });
+  const deltas = diffSnapshots({ canonical: canonicalSnapshot(unpushed) }, synced);
+  assert.ok(
+    deltas.some((d) => d.includes("交付") && d.includes("unpushed") && d.includes("synced")),
+    `expected a delivery delta, got ${JSON.stringify(deltas)}`
+  );
+});
+
+test("renderBrief carries the git segment and renderText spells out the unpushed delivery", () => {
+  const unpushed = summarizeGit({ runGit: fakeGit({ counts: "0\t1", status: " M a.ts\n" }) });
+  const brief = renderBrief({ ...makeSnapshot({ git: unpushed }), signature: "abc", changed: false });
+  assert.match(brief, /git=UNPUSHED ahead=1/);
+
+  const text = renderText(makeSnapshot({ git: unpushed }));
+  assert.match(
+    text,
+    /git     : main@abc1234 delivery=unpushed ahead=1 behind=0 dirty=1 untracked=0 upstream=origin\/main/
+  );
+
+  assert.equal(gitDeliveryText(null), "git=skip");
+  assert.equal(gitDeliveryText(summarizeGit({ runGit: fakeGit() })), "git=synced");
+  assert.equal(gitDeliveryText(summarizeGit({ runGit: fakeGit({ counts: "4\t0" }) })), "git=behind=4");
+});
+
+test("parseArgs understands --skip-git", () => {
+  assert.equal(parseArgs(["--skip-git"]).flags.skipGit, true);
+  assert.equal(parseArgs([]).flags.skipGit, false);
+});
+
+test("summarizeGit reads a real repository (fixture) and never throws", (t) => {
+  if (!GIT_FIXTURE) return t.skip("no git available in this environment");
+  const git = summarizeGit({ cwd: GIT_FIXTURE });
+  assert.equal(git.checked, true, `fixture repo must be readable: ${git.error}`);
+  assert.equal(git.delivery, "synced", "fixture upstream is pinned to HEAD");
+  assert.equal(git.dirtyFiles, 0);
+  assert.match(String(git.head), /^[0-9a-f]{7,}$/);
+});
+
+test("summarizeGit flips to unpushed on a real local commit, then back to synced", (t) => {
+  if (!GIT_FIXTURE) return t.skip("no git available in this environment");
+  const repo = makeFixtureRepo();
+  try {
+    fs.writeFileSync(path.join(repo.dir, "README.md"), "v1\n");
+    repo.git(["add", "-A"]);
+    repo.git(["commit", "-q", "-m", "v1"]);
+    repo.git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
+    assert.equal(summarizeGit({ cwd: repo.dir }).delivery, "synced");
+
+    fs.writeFileSync(path.join(repo.dir, "README.md"), "v2\n");
+    repo.git(["add", "-A"]);
+    repo.git(["commit", "-q", "-m", "v2"]);
+    const local = summarizeGit({ cwd: repo.dir });
+    assert.equal(local.delivery, "unpushed", "本地新 commit 未推 upstream 必须报 unpushed");
+    assert.equal(local.ahead, 1);
+    assert.equal(gitDeliveryText(local), "git=UNPUSHED ahead=1");
+
+    repo.git(["update-ref", "refs/remotes/origin/main", "HEAD"]);
+    assert.equal(summarizeGit({ cwd: repo.dir }).delivery, "synced", "推上去之后必须回到 synced");
+  } finally {
+    fs.rmSync(repo.dir, { recursive: true, force: true });
+  }
+});
+
+test("end to end: the CLI reports the local delivery state, and --skip-git says git=skip", async () => {
+  const { server, baseUrl } = await startHeartbeatFixture();
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key", ...GIT_FIXTURE_ENV };
+  try {
+    const withGit = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--no-state"], { env });
+    assert.match(
+      withGit.stdout,
+      /git=(synced|UNPUSHED ahead=\d+|behind=\d+|no-upstream|\?)/,
+      `brief must carry the delivery segment, got: ${withGit.stdout}`
+    );
+
+    const skipped = await execFileAsync(
+      "node",
+      [SCRIPT, "--brief", "--issue", ISSUE.id, "--skip-git", "--no-state"],
+      { env }
+    );
+    assert.match(skipped.stdout, /git=skip/);
+
+    const json = await execFileAsync("node", [SCRIPT, "--json", "--issue", ISSUE.id, "--no-state"], { env });
+    const payload = JSON.parse(json.stdout);
+    assert.ok(GIT_DELIVERIES.includes(payload.git.delivery), `unexpected delivery ${payload.git.delivery}`);
+  } finally {
+    server.close();
   }
 });
