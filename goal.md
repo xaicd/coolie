@@ -121,11 +121,33 @@ flowchart TD
 
 ---
 
-## 六、快速行动守则口诀 (Agent Cheat Sheet)
+## 六、全工厂 MCP 原生化与统一复用法典 (Universal MCP Fabric & Reuse Law)
+
+平台所有业务实体、测试走查、运营管控必须全面并轨为标准 MCP (Model Context Protocol)，严禁写死碎粒度 ad-hoc 脚本：
+
+1. **接口的活体本体动词化 (Action Types as MCP Tools)**：
+   - 严禁把底层的 200+ REST CRUD 接口机械 1:1 照搬为微型工具，杜绝工具爆炸 (Tool Clutter)；
+   - 必须以 Palantir 活体本体动词为准绳，将业务能力封装为闭环、原子、带状态机检查的高阶动词（如 `deliver_milestone`, `apply_recon_adjustment`）。
+2. **自动化测试全面消费 MCP (QA as Autonomous MCP Consumer)**：
+   - 测试员工（门神/QA）不再编写死板脆弱的选择器脚本，统一使用 `coolie-dev` MCP 结合 `agent-device` / `agent-browser`；
+   - 执行“环境初始化 ➔ 拟真人操作 ➔ 跨层因果断言 (UI + DB + 账本) ➔ 不可变截图存证 (No Artifact, No Done)”闭环；
+   - 通过网关 MCP 动态注入故障（Chaos Testing），验证客户端四态（Normal/Loading/Empty/Error）与保底降级逻辑，杀灭假 Mock。
+3. **数字化运营一句话意图驱动 (Intent-to-MCP & 2-Word Approval)**：
+   - 运营人员无需翻找后台菜单，通过 Web/移动端一句话或语音输入意图；
+   - Hermes 自动将意图编排为 MCP 调用并生成结构化 Proposal 卡片，移动端 🔔 弹出两字审批卡；
+   - 严格落实 Maker-Checker 互斥原则（发起者不得自批），高危操作双人授权，全量调用写入 `activity_log` 不可篡改账本。
+4. **双环境对称 MCP 节点镜像复用 (Dual-Environment Parity)**：
+   - 本地施工使用 `coolie-dev` MCP，云端生产使用 `coolie-prod` MCP；
+   - 底层 100% 共享 `packages/mcp-server` 契约，彻底淘汰历史散落的临时 CLI 与脚本。
+
+---
+
+## 七、快速行动守则口诀 (Agent Cheat Sheet)
 
 - **进场看大盘**：先读 `MEMORY.md` 与当前工单，不瞎猜；
 - **动工先抢锁**：工单 Checkout 锁 + 模拟器 Device 锁，不冲突；
 - **写码守契约**：严格 1 Task = 1 Commit，0 编译报错，不造假；
 - **交活挂工件**：截图、报告、Commit SHA 三位一体，无工件不 Done；
+- **全栈走协议**：接口测试运营统一走标准 MCP，不造轮子；
 - **空闲思进化**：吸收外部前沿知识，持续滚动 OpenWiki 与自愈门禁；
 - **退场理干净**：释放锁，清空 dirty，工作树保持 100% 洁净。

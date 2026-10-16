@@ -72,6 +72,8 @@ flowchart TD
    - **无感就地导航**：严格保持 LIFO 调用栈，就地浮层覆盖，杜绝跨 Tab 乱跳。
 6. **算力与调度中枢 (Flat Digital Employee Fleet & 场景配方语义编排)**：  
    以 Hermes 为交付工厂调度决策中枢，统领底层 7 大工具池（`agy`, `claude-glm`, `claude-mm`, `cmd`, `copilot`, `kiro-cli`, `hermes`），后台免交互授权；全面落地**“配方优先、AI补充”**编排哲学：80% 成熟交付流程固化为场景配方 (Recipe)，20% 探索场景走动态 DAG 规划并执行严格的输入类型静态预检、步骤级最小版本化结构体上下文、检查点增量恢复与高危写操作两阶段调用 (Prepare/Commit 2PC) 保护。
+7. **统一协议与全栈连接 (Universal MCP Fabric & Unified Ecosystem)**：  
+   将控制面 72 工具池、活体业务本体 Action Types、拟真人测试驱动（`agent-device`/`agent-browser`）与运营治理全面并轨为标准 MCP (Model Context Protocol)。确立 `coolie-dev`（本地施工总社）与 `coolie-prod`（云端生产中枢）双环境对称 MCP 节点镜像复用；测试员工通过 MCP 实现环境配置、真机手势驱动、跨层因果断言与不可变存证闭环；运营掌柜通过自然语言/语音一句话直通 MCP 生成结构化 Proposal 卡片并经掌上两字审批原子落盘。
 
 ---
 
