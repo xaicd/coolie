@@ -21,6 +21,12 @@
  *       (ask_user_questions / request_confirmation, continuationPolicy=wake_assignee),
  *       对方一回复就唤醒指派 — 这也是活路, 不是"等回复(无表)"
  *
+ *   挂起交互复核 (默认开启): 对**准备判死**的工单 (stalled_in_progress / dead_letter /
+ *   review_no_monitor / queued_stale) 多查一次 `GET /api/issues/{id}/interactions`,
+ *   若挂着 continuationPolicy=wake_assignee(_on_accept) 的 pending 交互 ⇒ 改判 `live`.
+ *   实测主线 COOA-114 (in_progress / 零 run / 零 monitor) 正是这一形态, 旧口径每 15
+ *   分钟报一次"假活着"假警报. 用 `--no-interaction-probe` 可关闭.
+ *
  *   判定结果 (verdict):
  *     live                  — 有活着的 run / monitor / 执行策略待办人
  *     blocked_with_path     — 阻塞但 blocker 边未解 (解阻后 issue_blockers_resolved 自动唤醒)
@@ -49,7 +55,7 @@
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { normalizeApiBase, pickIssues } from "./hermes-heartbeat-snapshot.mjs";
+import { apiErrorOf, normalizeApiBase, pickIssues } from "./hermes-heartbeat-snapshot.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(HERE, "..");
@@ -85,6 +91,65 @@ export const DEFAULT_STALE_QUEUED_HOURS = 48;
 
 /** run 刚落幕的交接宽限窗口 (分钟) — 窗口内不判"假活着", 避免误报主线 */ 
 export const DEFAULT_HANDOFF_GRACE_MINUTES = 10;
+
+/**
+ * 会唤醒待办人的交互续跑策略 (控制面 `continuationPolicy`).
+ * 挂在这类交互上的工单**不是死信**: 对方一回复就唤醒指派 (与 reviewAttention 同源口径).
+ */
+export const WAKE_CONTINUATION_POLICIES = ["wake_assignee", "wake_assignee_on_accept"];
+
+/**
+ * 值得多花一次 API 去查挂起交互的判决 (准备判死时才取证, 不为健康工单付代价).
+ * 实测: 主线 COOA-114 处于 in_progress 且零 run / 零 monitor, 但它挂着一条
+ * `ask_user_questions` (continuationPolicy=wake_assignee) —— 旧口径把它报成
+ * "假活着", 每 15 分钟一条假警报, 把真死信淹在噪音里 (与 reviewAttention 同一类误报).
+ */
+export const PROBE_VERDICTS = ["stalled_in_progress", "dead_letter", "review_no_monitor", "queued_stale"];
+
+/** 交互列表回包自适应: 数组 / {interactions:[]} / 错误体都接得住 */
+export function pickInteractions(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === "object" && Array.isArray(payload.interactions)) return payload.interactions;
+  return [];
+}
+
+/** 挂起且**回复即唤醒**的交互 (其余 pending 交互不算活路) */
+export function pendingWakeInteractions(payload) {
+  return pickInteractions(payload).filter(
+    (item) => item && item.status === "pending" && WAKE_CONTINUATION_POLICIES.includes(item.continuationPolicy),
+  );
+}
+
+/**
+ * 用挂起交互真值复核一条待判死的扫描行 (原地改写 row, 返回同一对象).
+ *
+ * - 查到 wake 类挂起交互 ⇒ 判决改判 `live`, 理由写明在维对象与唤醒策略
+ * - 没查到 / 查询失败 ⇒ 保留原判决, 但在 `interactionProbe` 上留痕 (降级不崩)
+ */
+export function applyInteractionProbe(row, payload) {
+  if (!row || !PROBE_VERDICTS.includes(row.verdict)) return row;
+  const error = typeof payload === "string" ? "unparsable response" : apiErrorOf(payload);
+  if (error) {
+    row.interactionProbe = { checked: false, error };
+    return row;
+  }
+  const wake = pendingWakeInteractions(payload);
+  row.interactionProbe = {
+    checked: true,
+    pendingWakeCount: wake.length,
+    kinds: [...new Set(wake.map((item) => item.kind ?? "interaction"))],
+  };
+  if (wake.length > 0) {
+    const lead = wake[0];
+    row.verdict = "live";
+    row.reasons = [
+      `挂在挂起交互上 (${lead.kind ?? "interaction"}${lead.resolverPolicy ? ` → ${lead.resolverPolicy}` : ""}, ${
+        lead.continuationPolicy
+      }) — 对方回复即唤醒`,
+    ];
+  }
+  return row;
+}
 
 const VERDICT_BADGE = {
   dead_letter: "❌ 无活路",
@@ -305,6 +370,30 @@ export function scanRow(
   };
 }
 
+/** 扫描行 → 分组报告 (判决被改判后可用同一口径重建, 单一口径源) */
+export function regroupScan(rows, { now = Date.now() } = {}) {
+  const list = Array.isArray(rows) ? rows : [];
+  const byVerdict = new Map(VERDICTS.map((v) => [v, []]));
+  for (const row of list) {
+    if (!byVerdict.has(row.verdict)) byVerdict.set(row.verdict, []);
+    byVerdict.get(row.verdict).push(row);
+  }
+  for (const group of byVerdict.values()) {
+    group.sort((a, b) => (b.idleHours ?? -1) - (a.idleHours ?? -1));
+  }
+  const counts = {};
+  for (const [verdict, group] of byVerdict) counts[verdict] = group.length;
+  const attention = ATTENTION_VERDICTS.reduce((sum, v) => sum + (counts[v] || 0), 0);
+  return {
+    generatedAt: new Date(now).toISOString(),
+    openCount: list.length,
+    counts,
+    attentionCount: attention,
+    byVerdict: Object.fromEntries(byVerdict),
+    rows: list,
+  };
+}
+
 /** 全量扫描: 开放工单 → 分组 */
 export function scanIssues(
   issues,
@@ -316,25 +405,7 @@ export function scanIssues(
 ) {
   const open = (Array.isArray(issues) ? issues : []).filter(isOpenIssue);
   const rows = open.map((issue) => scanRow(issue, { now, queuedStaleHours, handoffGraceMinutes }));
-  const byVerdict = new Map(VERDICTS.map((v) => [v, []]));
-  for (const row of rows) {
-    if (!byVerdict.has(row.verdict)) byVerdict.set(row.verdict, []);
-    byVerdict.get(row.verdict).push(row);
-  }
-  for (const list of byVerdict.values()) {
-    list.sort((a, b) => (b.idleHours ?? -1) - (a.idleHours ?? -1));
-  }
-  const counts = {};
-  for (const [verdict, list] of byVerdict) counts[verdict] = list.length;
-  const attention = ATTENTION_VERDICTS.reduce((sum, v) => sum + (counts[v] || 0), 0);
-  return {
-    generatedAt: new Date(now).toISOString(),
-    openCount: rows.length,
-    counts,
-    attentionCount: attention,
-    byVerdict: Object.fromEntries(byVerdict),
-    rows,
-  };
+  return regroupScan(rows, { now });
 }
 
 export function labelOf(row) {
@@ -385,12 +456,14 @@ export function parseArgs(argv = []) {
     limit: 500,
     staleQueuedHours: DEFAULT_STALE_QUEUED_HOURS,
     handoffGraceMinutes: DEFAULT_HANDOFF_GRACE_MINUTES,
+    probeInteractions: true,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--json") flags.json = true;
     else if (arg === "--brief") flags.brief = true;
     else if (arg === "--dead-letter-only") flags.deadLetterOnly = true;
+    else if (arg === "--no-interaction-probe") options.probeInteractions = false;
     else if (arg === "--help" || arg === "-h") flags.help = true;
     else if (arg === "--issue") options.issue = argv[++i] || null;
     else if (arg === "--company") options.company = argv[++i] || null;
@@ -409,6 +482,7 @@ const HELP = `hermes-open-issue-liveness-scan — 开放工单活路扫描
   --json                       机器读 JSON
   --brief                      一行心脏起搏
   --dead-letter-only           只看无活路工单; 存在时退出码 3 (可当门禁)
+  --no-interaction-probe       关掉挂起交互复核 (默认开启: 只在准备判死的工单上多查一次)
   --issue <uuid>               用该工单解析 companyId (心法 #148)
   --company <cid>              指定 companyId (默认取 PAPERCLIP_COMPANY_ID)
   --limit <n>                  工单列表条数上限 (默认 500)
@@ -472,11 +546,22 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const payload = await getJson(`${apiBase}/companies/${companyId}/issues?limit=${options.limit}`, {
     apiKey,
   });
-  const scan = scanIssues(pickIssues(payload), {
+  let scan = scanIssues(pickIssues(payload), {
     now: Date.now(),
     queuedStaleHours: options.staleQueuedHours,
     handoffGraceMinutes: options.handoffGraceMinutes,
   });
+
+  // 准备判死的工单才值得多花一次 API: 复核它是否挂在一条"回复即唤醒"的挂起交互上.
+  // 实测 COOA-114 (in_progress / 零 run / 零 monitor) 挂着 ask_user_questions 被误报"假活着".
+  if (options.probeInteractions) {
+    const candidates = scan.rows.filter((row) => PROBE_VERDICTS.includes(row.verdict));
+    for (const row of candidates) {
+      const interactions = await getJson(`${apiBase}/issues/${row.id}/interactions`, { apiKey });
+      applyInteractionProbe(row, interactions);
+    }
+    scan = regroupScan(scan.rows, { now: Date.now() });
+  }
 
   if (flags.json) console.log(JSON.stringify(scan, null, 2));
   else if (flags.brief) console.log(renderBrief(scan));

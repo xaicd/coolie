@@ -6,9 +6,15 @@ import {
   OPEN_STATUSES,
   VERDICTS,
   ATTENTION_VERDICTS,
+  WAKE_CONTINUATION_POLICIES,
+  PROBE_VERDICTS,
   classifyIssue,
   idleHours,
   isOpenIssue,
+  pickInteractions,
+  pendingWakeInteractions,
+  applyInteractionProbe,
+  regroupScan,
   scanRow,
   scanIssues,
   renderText,
@@ -188,13 +194,15 @@ test("reviewAttention 畸形输入只退化, 不抛错也不误判活路", () =>
   }
 });
 
-test("in_progress 即使有挂起交互也照旧报假活着 (review 活路只对 in_review 成立)", () => {
+test("in_progress 只认 run/monitor 活路 (review 活路只对 in_review 成立); 挂起交互由 --interaction-probe 层补判", () => {
   assert.equal(
     classifyIssue(
       issue({ status: "in_progress", reviewAttention: { state: "covered", paths: [{ label: "x" }] } }),
     ).verdict,
     "stalled_in_progress",
   );
+  // 纯函数层不查交互表 (零网络); main 会在待判死判决上补一次挂起交互复核,
+  // 见下方 applyInteractionProbe / regroupScan 用例.
 });
 
 test("todo/backlog: 零指派 ⇒ orphan ; 有指派 ⇒ queued", () => {
@@ -430,4 +438,183 @@ test("main 端到端: 桩 fetch 驱动扫描并打印简报", async () => {
 test("REPO_ROOT 指向仓库根 (脚本可被任意 cwd 调用)", () => {
   assert.ok(path.isAbsolute(REPO_ROOT));
   assert.equal(path.basename(REPO_ROOT), "coolie");
+});
+
+// ── 挂起交互复核 (COOA-114 主线假警报根治) ──────────────────────────────────
+
+test("WAKE_CONTINUATION_POLICIES 认两类唤醒策略, PROBE_VERDICTS 只覆盖待判死判决", () => {
+  assert.deepEqual(WAKE_CONTINUATION_POLICIES, ["wake_assignee", "wake_assignee_on_accept"]);
+  assert.deepEqual(PROBE_VERDICTS, ["stalled_in_progress", "dead_letter", "review_no_monitor", "queued_stale"]);
+  for (const verdict of PROBE_VERDICTS) assert.ok(ATTENTION_VERDICTS.includes(verdict));
+  assert.ok(!PROBE_VERDICTS.includes("live"));
+  assert.ok(!PROBE_VERDICTS.includes("orphan"), "零指派工单没有交互面, 不为它付 API 代价");
+});
+
+test("pickInteractions 接三种回包形态", () => {
+  assert.deepEqual(pickInteractions([{ id: "i1" }]), [{ id: "i1" }]);
+  assert.deepEqual(pickInteractions({ interactions: [{ id: "i2" }] }), [{ id: "i2" }]);
+  assert.deepEqual(pickInteractions({ error: "API route not found" }), []);
+  assert.deepEqual(pickInteractions(null), []);
+  assert.deepEqual(pickInteractions("boom"), []);
+});
+
+test("pendingWakeInteractions 只认 pending + wake 类续跑策略", () => {
+  const payload = [
+    { id: "a", kind: "ask_user_questions", status: "pending", continuationPolicy: "wake_assignee" },
+    { id: "b", kind: "request_confirmation", status: "pending", continuationPolicy: "wake_assignee_on_accept" },
+    { id: "c", kind: "suggest_tasks", status: "pending", continuationPolicy: null },
+    { id: "d", kind: "ask_user_questions", status: "resolved", continuationPolicy: "wake_assignee" },
+    { id: "e", kind: "ask_user_questions", status: "cancelled", continuationPolicy: "wake_assignee" },
+  ];
+  assert.deepEqual(
+    pendingWakeInteractions(payload).map((item) => item.id),
+    ["a", "b"],
+  );
+});
+
+test("applyInteractionProbe: 挂在 wake 类挂起交互上 ⇒ stalled_in_progress 改判 live", () => {
+  const row = scanRow(issue({ status: "in_progress", identifier: "COOA-114", updatedAt: iso(0.3), lastActivityAt: iso(0.3) }), {
+    now: NOW,
+    handoffGraceMinutes: 0,
+  });
+  assert.equal(row.verdict, "stalled_in_progress", "前置: 零 run 零 monitor 时确实先被判假活着");
+  applyInteractionProbe(row, [
+    { id: "f2a695e7", kind: "ask_user_questions", status: "pending", resolverPolicy: "anyone", continuationPolicy: "wake_assignee" },
+  ]);
+  assert.equal(row.verdict, "live");
+  assert.equal(row.reasons.length, 1);
+  assert.match(row.reasons[0], /挂起交互/);
+  assert.match(row.reasons[0], /回复即唤醒/);
+  assert.deepEqual(row.interactionProbe, { checked: true, pendingWakeCount: 1, kinds: ["ask_user_questions"] });
+});
+
+test("applyInteractionProbe: 只有非 wake 的 pending 交互 ⇒ 判决不变, 但留痕", () => {
+  const row = scanRow(issue({ status: "in_progress" }), { now: NOW, handoffGraceMinutes: 0 });
+  const before = row.verdict;
+  applyInteractionProbe(row, [{ id: "c", kind: "suggest_tasks", status: "pending", continuationPolicy: null }]);
+  assert.equal(row.verdict, before);
+  assert.equal(row.interactionProbe.checked, true);
+  assert.equal(row.interactionProbe.pendingWakeCount, 0);
+});
+
+test("applyInteractionProbe: 查询失败/404 体 ⇒ 降级留痕, 不改判决 (不崩)", () => {
+  const row = scanRow(issue({ status: "in_progress" }), { now: NOW, handoffGraceMinutes: 0 });
+  const before = row.verdict;
+  applyInteractionProbe(row, { error: "API route not found" });
+  assert.equal(row.verdict, before);
+  assert.equal(row.interactionProbe.checked, false);
+  assert.equal(row.interactionProbe.error, "API route not found");
+});
+
+test("applyInteractionProbe: 非待判死判决完全不碰 (不付 API 代价也不添字段)", () => {
+  const row = { id: "x", verdict: "queued", reasons: ["排队中"] };
+  applyInteractionProbe(row, [{ status: "pending", continuationPolicy: "wake_assignee" }]);
+  assert.equal(row.verdict, "queued");
+  assert.equal(row.interactionProbe, undefined);
+  assert.equal(applyInteractionProbe(null, []), null);
+});
+
+test("regroupScan: 改判后重建分组与计数 (同一口径源)", () => {
+  const rows = [
+    scanRow(issue({ status: "in_progress", identifier: "COOA-114" }), { now: NOW, handoffGraceMinutes: 0 }),
+    scanRow(issue({ status: "todo", assigneeAgentId: null, identifier: "COOA-1" }), { now: NOW }),
+  ];
+  const before = regroupScan(rows, { now: NOW });
+  assert.equal(before.counts.stalled_in_progress, 1);
+  assert.equal(before.attentionCount, 2);
+
+  applyInteractionProbe(rows[0], [{ status: "pending", continuationPolicy: "wake_assignee" }]);
+  const after = regroupScan(rows, { now: NOW });
+  assert.equal(after.counts.stalled_in_progress, 0);
+  assert.equal(after.counts.live, 1);
+  assert.equal(after.attentionCount, 1);
+  assert.equal(after.openCount, 2);
+  assert.equal(after.byVerdict.live[0].identifier, "COOA-114");
+});
+
+test("regroupScan 容错非数组输入", () => {
+  const scan = regroupScan(null, { now: NOW });
+  assert.deepEqual(scan.rows, []);
+  assert.equal(scan.openCount, 0);
+});
+
+test("parseArgs 默认开启交互复核, --no-interaction-probe 可关", () => {
+  assert.equal(parseArgs([]).options.probeInteractions, true);
+  assert.equal(parseArgs(["--no-interaction-probe"]).options.probeInteractions, false);
+});
+
+test("main 端到端: 主线挂起交互被复核后不计入假活着 (stall 1→0)", async () => {
+  const realFetch = globalThis.fetch;
+  const realLog = console.log;
+  const printed = [];
+  const urls = [];
+  globalThis.fetch = async (url) => {
+    urls.push(url);
+    if (/\/interactions/.test(url)) {
+      return {
+        ok: true,
+        status: 200,
+        text: async () =>
+          JSON.stringify([
+            { id: "f2a695e7", kind: "ask_user_questions", status: "pending", resolverPolicy: "anyone", continuationPolicy: "wake_assignee" },
+          ]),
+      };
+    }
+    return {
+      ok: true,
+      status: 200,
+      text: async () =>
+        JSON.stringify({
+          issues: [
+            issue({ status: "in_progress", identifier: "COOA-114", updatedAt: iso(0.5), lastActivityAt: iso(0.5) }),
+          ],
+        }),
+    };
+  };
+  console.log = (line) => printed.push(line);
+  try {
+    const code = await main(["--brief", "--handoff-grace-minutes", "0"], {
+      PAPERCLIP_API_URL: "http://127.0.0.1:3100",
+      PAPERCLIP_API_KEY: "test-key",
+      PAPERCLIP_COMPANY_ID: "c-test",
+    });
+    assert.equal(code, 0);
+    const line = printed.join("\n");
+    assert.match(line, /stall=0/);
+    assert.match(line, /live=1/);
+    assert.ok(urls.some((url) => /\/issues\/[\w-]+\/interactions/.test(url)), "确实对候选工单查了交互");
+    assert.equal(urls.filter((url) => /\/interactions/.test(url)).length, 1, "只对候选工单查, 不扫全表");
+  } finally {
+    globalThis.fetch = realFetch;
+    console.log = realLog;
+  }
+});
+
+test("main 端到端: --no-interaction-probe 时不为任何工单查交互", async () => {
+  const realFetch = globalThis.fetch;
+  const realLog = console.log;
+  const printed = [];
+  const urls = [];
+  globalThis.fetch = async (url) => {
+    urls.push(url);
+    return {
+      ok: true,
+      status: 200,
+      text: async () => JSON.stringify({ issues: [issue({ status: "in_progress", identifier: "COOA-114" })] }),
+    };
+  };
+  console.log = (line) => printed.push(line);
+  try {
+    const code = await main(["--brief", "--no-interaction-probe", "--handoff-grace-minutes", "0"], {
+      PAPERCLIP_API_URL: "http://127.0.0.1:3100",
+      PAPERCLIP_API_KEY: "test-key",
+      PAPERCLIP_COMPANY_ID: "c-test",
+    });
+    assert.equal(code, 0);
+    assert.equal(urls.filter((url) => /\/interactions/.test(url)).length, 0);
+    assert.match(printed.join("\n"), /stall=1/);
+  } finally {
+    globalThis.fetch = realFetch;
+    console.log = realLog;
+  }
 });
