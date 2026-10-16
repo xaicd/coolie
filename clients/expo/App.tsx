@@ -125,8 +125,8 @@ type TabKey = "dashboard" | "agents" | "chat" | "tasks" | "artifacts" | "assets"
  * wave354 — 本体原生视图 (ontology tab / SchemaEditor / 图谱工作台) 真全删;
  * 资产→本体 只留极简占位, 本体查看与演进收敛到工坊对话 (§18 北极星)。
  *
- * 任务页本体 (列表 / 看板 / 分组) 已迁到 src/screens/TasksScreen.tsx +
- * src/components/IssuesList.tsx (wave18, 对齐 Coolie Web Tasks 页)。
+ * 任务页本体 (看板 / 分组) 在 src/screens/TaskKanbanScreen.tsx +
+ * src/components/IssuesList.tsx (对齐 Coolie Web Tasks 页)。
  */
 
 /**
@@ -817,7 +817,7 @@ function HomeScreen({
     /** wave138c — 入口任务快照(空态「查看任务」需要完整 Issue 才能落到任务详情)。 */
     issue?: Issue | null;
   } | null>(null);
-  /** 递增后让 TasksScreen 重新拉列表 (中央 "+" 浮层建了任务)。 */
+  /** 递增后让任务看板 (TaskKanbanScreen) 重新拉列表 (中央 "+" 浮层建了任务)。 */
   const [tasksRefreshToken, setTasksRefreshToken] = useState(0);
 
   const companyId = company.id;
