@@ -46,12 +46,14 @@ async function main() {
         return;
       }
 
-      const validIssues = issues.filter(i => 
-        i.status !== "cancelled" && 
-        i.status !== "done" && 
+      const validIssues = issues.filter(i =>
+        i.status !== "cancelled" &&
+        i.status !== "done" &&
         !i.title.includes("Board Operations")
       );
       const inProgress = validIssues.filter(i => i.status === "in_progress");
+      const inReview = validIssues.filter(i => i.status === "in_review");
+      const blocked = validIssues.filter(i => i.status === "blocked");
       const todo = validIssues.filter(i => i.status === "todo" || i.status === "backlog");
 
       console.log("📋 【Coolie Dev Server · 实时待办大盘】");
@@ -66,6 +68,24 @@ async function main() {
         console.log("");
       }
 
+      if (inReview.length > 0) {
+        console.log(`👀 等拍板 / 审批中 (${inReview.length} 项):`);
+        inReview.forEach(i => {
+          const assignee = agentMap[i.assigneeAgentId] || "未指派";
+          console.log(`  • [${i.identifier}] ${i.title} (负责人: ${assignee})`);
+        });
+        console.log("");
+      }
+
+      if (blocked.length > 0) {
+        console.log(`🚧 阻塞中 (${blocked.length} 项):`);
+        blocked.forEach(i => {
+          const assignee = agentMap[i.assigneeAgentId] || "未指派";
+          console.log(`  • [${i.identifier}] ${i.title} (负责人: ${assignee})`);
+        });
+        console.log("");
+      }
+
       if (todo.length > 0) {
         console.log(`⏳ 待办队列 (${todo.length} 项):`);
         todo.forEach(i => {
@@ -74,7 +94,7 @@ async function main() {
         });
       }
 
-      if (inProgress.length === 0 && todo.length === 0) {
+      if (inProgress.length === 0 && inReview.length === 0 && blocked.length === 0 && todo.length === 0) {
         console.log("🎉 当前无任何待办任务，全员等派活！");
       }
       console.log("────────────────────────────────────────");
