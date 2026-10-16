@@ -13,6 +13,7 @@ import {
   pickAgents,
   isOpenIssue,
   isUnassigned,
+  isParkedUnassigned,
   bucketKeyOf,
   labelOf,
   issueRow,
@@ -311,6 +312,105 @@ test("门禁不误报: 有人空转但无零指派工单 ⇒ 不算派单缺口"
   assert.deepEqual(ledger.idleAgents, ["门神"]);
 });
 
+// ── 口径: 零指派 backlog = 结构性搁置 (2026-10-16 修正) ──────────────────────
+// 建单默认 `status = hasAssignee ? "todo" : "backlog"`, 且状态机只允许 backlog -> todo
+// ⇒ 无主 backlog 是系统默认静止态, 计入门禁 = 门禁对默认态长期 FAIL.
+
+test("isParkedUnassigned 只认零指派 backlog", () => {
+  assert.equal(isParkedUnassigned(issue({ assigneeAgentId: null, status: "backlog" })), true);
+  assert.equal(isParkedUnassigned(issue({ assigneeAgentId: null, status: "todo" })), false);
+  assert.equal(isParkedUnassigned(issue({ assigneeAgentId: null, status: "in_progress" })), false);
+  assert.equal(isParkedUnassigned(issue({ assigneeAgentId: MOBSTER, status: "backlog" })), false);
+  assert.equal(isParkedUnassigned(issue({ assigneeAgentId: null, status: "done" })), false);
+});
+
+test("口径: 零指派 backlog 只登记不门禁", () => {
+  const ledger = buildLedger(
+    { agents: [agent()], issues: [issue({ assigneeAgentId: null, status: "backlog", identifier: "COOA-P" })] },
+    NOW,
+  );
+  assert.equal(ledger.parked.length, 1);
+  assert.equal(ledger.actionable.length, 0);
+  assert.equal(ledger.unassigned.length, 1); // 仍与 liveness orphan 同源, 只作对照
+  assert.deepEqual(ledger.gate.reasons, []);
+  assert.equal(ledger.gate.failed, false);
+  assert.deepEqual(ledger.gate.parkedLabels, ["COOA-P"]);
+  assert.deepEqual(ledger.gate.unassignedLabels, []);
+});
+
+test("口径: 空转 + 只有搁置 backlog ⇒ 不算 idle_capacity_gap", () => {
+  const ledger = buildLedger(
+    {
+      agents: [agent(), agent({ id: DOOR_GOD, name: "门神" })],
+      issues: [issue({ assigneeAgentId: null, status: "backlog" })],
+    },
+    NOW,
+  );
+  assert.equal(ledger.gate.failed, false);
+  assert.deepEqual([...ledger.idleAgents].sort(), ["墨斗", "门神"].sort());
+});
+
+test("口径: 搁置与待派混排时只门禁待派那条 (2026-10-16 实盘回放)", () => {
+  // 实盘: COOA-191 / COOA-253 零指派 backlog (已有搁置记录), COOA-211 零指派 todo (待派)
+  const ledger = buildLedger(
+    {
+      agents: [agent(), agent({ id: DOOR_GOD, name: "门神" })],
+      issues: [
+        issue({ id: "i-191", identifier: "COOA-191", assigneeAgentId: null, status: "backlog", updatedAt: agoHours(31) }),
+        issue({ id: "i-253", identifier: "COOA-253", assigneeAgentId: null, status: "backlog", updatedAt: agoHours(6) }),
+        issue({ id: "i-211", identifier: "COOA-211", assigneeAgentId: null, status: "todo", updatedAt: agoHours(25) }),
+      ],
+    },
+    NOW,
+  );
+  assert.deepEqual(ledger.gate.reasons, ["unassigned_open", "idle_capacity_gap"]);
+  assert.deepEqual(ledger.gate.unassignedLabels, ["COOA-211"]); // 只点名待派那条
+  assert.deepEqual([...ledger.gate.parkedLabels].sort(), ["COOA-191", "COOA-253"]);
+  assert.equal(ledger.actionable.length, 1);
+  assert.equal(ledger.parked.length, 2);
+  assert.equal(ledger.unassigned.length, 3); // 对照 liveness orphan=3
+  assert.equal(ledger.parked[0].label, "COOA-191"); // 搁置按 idle 降序 (31h 在前)
+});
+
+test("renderBrief 一行含待派/搁置拆分 (搁置也在场时 gate 仍 OK)", () => {
+  const ledger = buildLedger(
+    { agents: [agent()], issues: [issue({ assigneeAgentId: null, status: "backlog" })] },
+    NOW,
+  );
+  const line = renderBrief(ledger);
+  assert.ok(!line.includes("\n"));
+  assert.match(line, /unassigned=1 \(待派0\/搁置1\)/);
+  assert.match(line, /gate=OK/);
+});
+
+test("renderText 把待派与搁置分两块渲染, 搁置块标注非门禁", () => {
+  const ledger = buildLedger(
+    {
+      agents: [agent()],
+      issues: [
+        issue({ id: "i-1", identifier: "COOA-211", assigneeAgentId: null, status: "todo" }),
+        issue({ id: "i-2", identifier: "COOA-253", assigneeAgentId: null, status: "backlog" }),
+      ],
+    },
+    NOW,
+  );
+  const text = renderText(ledger);
+  assert.match(text, /待派: 零指派且已进入待办\/执行态的开放工单 1 条/);
+  assert.match(text, /搁置: 零指派 backlog 1 条 \(非门禁/);
+  assert.match(text, /COOA-211/);
+  assert.match(text, /COOA-253/);
+  assert.match(text, /零指派开放工单合计 2 条/);
+});
+
+test("main --gate 只对搁置 backlog 放行 (退出码 0)", async () => {
+  const code = await main(
+    ["--gate", "--brief"],
+    { PAPERCLIP_API_URL: "http://127.0.0.1:3100", PAPERCLIP_API_KEY: "k", PAPERCLIP_COMPANY_ID: "c-test" },
+    { fetchImpl: stubFetch([agent()], [issue({ assigneeAgentId: null, status: "backlog" })]), now: NOW },
+  );
+  assert.equal(code, 0);
+});
+
 test("buildLedger 容错空输入", () => {
   const ledger = buildLedger({}, NOW);
   assert.deepEqual(ledger.agents, []);
@@ -358,7 +458,7 @@ test("renderBrief 空名册也不炸", () => {
   assert.match(renderBrief(buildLedger({}, NOW)), /^FLEET .* agents=0 /);
 });
 
-test("renderText 人读台账含门禁行/球权行/无人认领段", () => {
+test("renderText 人读台账含门禁行/球权行/待派段", () => {
   const ledger = buildLedger(
     { agents: [agent()], issues: [issue({ assigneeAgentId: null, status: "todo", identifier: "COOA-77" })] },
     NOW,
@@ -367,13 +467,14 @@ test("renderText 人读台账含门禁行/球权行/无人认领段", () => {
   assert.match(text, /舰队负载与球权台账/);
   assert.match(text, /门禁: ❌ FAIL/);
   assert.match(text, /💤 空转/);
-  assert.match(text, /无人认领的开放工单 1 条/);
+  assert.match(text, /待派: 零指派且已进入待办\/执行态的开放工单 1 条/);
   assert.match(text, /COOA-77/);
 });
 
 test("renderText 无零指派时明写 (无)", () => {
   const text = renderText(buildLedger({ agents: [agent()], issues: [issue({ status: "in_progress" })] }, NOW));
-  assert.match(text, /无人认领的开放工单 0 条/);
+  assert.match(text, /待派: 零指派且已进入待办\/执行态的开放工单 0 条/);
+  assert.match(text, /搁置: 零指派 backlog 0 条/);
   assert.match(text, /\(无\)/);
 });
 

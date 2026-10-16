@@ -22,8 +22,17 @@
  *   unknown_agent   — 开放工单指派的 agentId 不在公司名册 ⇒ 数据面漂移, 单列不猜
  *
  * 门禁 (--gate, 退出码 3) 只认两类**派单缺口**, 不重复 liveness 的逐单死信判定:
- *   unassigned_open    — 存在零指派的开放工单 (没人会认领; 与 liveness 的 orphan 同源, 此处作聚合)
- *   idle_capacity_gap  — 有空转员工 **且** 存在零指派开放工单 ⇒ 有人没事干 + 有事没人干
+ *   unassigned_open    — 存在**待派**的零指派开放工单 (todo / 已启动却无主)
+ *   idle_capacity_gap  — 有空转员工 **且** 存在待派工单 ⇒ 有人没事干 + 有事没人干
+ *
+ * **零指派 backlog 是结构性搁置, 不是派单缺口 (2026-10-16 口径修正)**. 控制面真值:
+ * 建单默认 `status = hasAssignee ? "todo" : "backlog"`, 且状态机只允许 `backlog -> todo`
+ * ⇒ 「无人认领的 backlog」是系统对无主工单的**默认静止态**, 计入即让门禁长期 FAIL.
+ * 实测代价: 门禁连响后 sibling run 把两条**已记明搁置**的 backlog 件 (COOA-253 本单
+ * 「保留于 backlog, routine/老板触发时接管」; COOA-191 为 plan 件) 也强行派了 owner,
+ * 正是 skill 明令「plan 件 / 常驻会话单 / 有治理决定的 backlog 件不动」的反例.
+ * 口径因此拆两层且都在报告里: `unassigned` (与 liveness orphan 同源, 仅对照) =
+ * `parked` (零指派 backlog, 非门禁, 只登记 + 报 idle) + `actionable` (待派, 门禁口径).
  *
  * 用法:
  *   node scripts/hermes-fleet-load-ledger.mjs            # 人读台账
@@ -105,6 +114,22 @@ export function isOpenIssue(issue) {
 export function isUnassigned(issue) {
   if (!isOpenIssue(issue)) return false;
   return !issue.assigneeAgentId && !issue.assigneeUserId;
+}
+
+/**
+ * 结构性搁置: 零指派 **且** status=backlog.
+ *
+ * 控制面真值 (不是时间近似、不是标题正则):
+ *   - `packages/shared/src/validators/issue.ts` 建单默认 `status = hasAssignee ? "todo" : "backlog"`
+ *     ⇒ 无主工单的**默认静止态**就是 backlog;
+ *   - `doc/SPEC-implementation.md` 的状态机只允许 `backlog -> todo` (先提升, 再排期/认领).
+ *
+ * 因此「零指派 backlog」等的是所属 wave, 不是 owner ⇒ 登记在报告里, 但不构成派单缺口.
+ * 把它计进门禁会让门禁对着系统默认态长期 FAIL, 并逼出对既有搁置件 (plan 件 / 常驻会话单 /
+ * 已记明"保留在 backlog"的 wave 入口件) 的错误派单.
+ */
+export function isParkedUnassigned(issue) {
+  return isUnassigned(issue) && issue.status === "backlog";
 }
 
 export function bucketKeyOf(status) {
@@ -233,18 +258,26 @@ export function buildLedger(input = {}, now = Date.now(), opts = {}) {
   for (const verdict of LEDGER_VERDICTS) counts[verdict] = 0;
   for (const row of rows) counts[row.verdict] = (counts[row.verdict] ?? 0) + 1;
 
-  const unassigned = all
-    .filter(isUnassigned)
-    .map((issue) => issueRow(issue, now))
-    .sort((a, b) => (b.idleHours ?? -1) - (a.idleHours ?? -1));
+  // 零指派工单拆两层 (2026-10-16 口径修正, 见文件头):
+  //   parked      — status=backlog = 控制面对无主工单的**默认静止态** (建单即 backlog),
+  //                 等的是所属 wave, 不是 owner ⇒ 只登记 + 报 idle, **不门禁**
+  //   actionable  — todo / 已启动却无主 = 待派 ⇒ 这才是派单缺口
+  //   unassigned  — 两者之和, 与 liveness 的 orphan 同源, 仅供对照报告
+  const unassignedIssues = all.filter(isUnassigned);
+  const parked = unassignedIssues.filter(isParkedUnassigned).map((issue) => issueRow(issue, now));
+  const actionable = unassignedIssues.filter((issue) => !isParkedUnassigned(issue)).map((issue) => issueRow(issue, now));
+  const byIdleDesc = (a, b) => (b.idleHours ?? -1) - (a.idleHours ?? -1);
+  parked.sort(byIdleDesc);
+  actionable.sort(byIdleDesc);
+  const unassigned = [...parked, ...actionable].sort(byIdleDesc);
 
   const idleAgents = rows.filter((row) => row.verdict === "idle").map((row) => row.name ?? row.id);
   const handTotal = rows.reduce((sum, row) => sum + row.counts.carrying, 0);
   const openTotal = all.filter(isOpenIssue).length;
 
   const gateReasons = [];
-  if (unassigned.length > 0) gateReasons.push("unassigned_open");
-  if (unassigned.length > 0 && idleAgents.length > 0) gateReasons.push("idle_capacity_gap");
+  if (actionable.length > 0) gateReasons.push("unassigned_open");
+  if (actionable.length > 0 && idleAgents.length > 0) gateReasons.push("idle_capacity_gap");
 
   return {
     generatedAt: new Date(now).toISOString(),
@@ -252,13 +285,16 @@ export function buildLedger(input = {}, now = Date.now(), opts = {}) {
     counts,
     idleAgents,
     unassigned,
+    parked,
+    actionable,
     openTotal,
     handTotal,
     overloadThreshold,
     gate: {
       failed: gateReasons.length > 0,
       reasons: gateReasons,
-      unassignedLabels: unassigned.map((row) => row.label),
+      unassignedLabels: actionable.map((row) => row.label),
+      parkedLabels: parked.map((row) => row.label),
       idleAgents,
     },
   };
@@ -271,7 +307,7 @@ export function renderBrief(ledger) {
     LEDGER_VERDICTS.filter((v) => ledger.counts[v] > 0)
       .map((v) => `${v}=${ledger.counts[v]}`)
       .join(" ") +
-    ` · unassigned=${ledger.unassigned.length} · open=${ledger.openTotal} · gate=${ledger.gate.failed ? `FAIL(${ledger.gate.reasons.join(",")})` : "OK"}`;
+    ` · unassigned=${ledger.unassigned.length} (待派${ledger.actionable.length}/搁置${ledger.parked.length}) · open=${ledger.openTotal} · gate=${ledger.gate.failed ? `FAIL(${ledger.gate.reasons.join(",")})` : "OK"}`;
 
   const body = ledger.agents
     .map((row) => {
@@ -317,15 +353,26 @@ export function renderText(ledger) {
     lines.push("");
   }
 
-  lines.push(`无人认领的开放工单 ${ledger.unassigned.length} 条 (零指派 ⇒ 没有心跳会认领它):`);
-  if (ledger.unassigned.length === 0) lines.push("  (无)");
-  for (const row of ledger.unassigned) {
-    lines.push(
-      `  ${row.label.padEnd(12)} ${String(row.status).padEnd(11)} ${String(row.priority ?? "-").padEnd(7)} idle=${
-        row.idleHours === null ? "?" : `${row.idleHours}h`
-      }  ${String(row.title).slice(0, 44)}`,
-    );
-  }
+  const rowLine = (row) =>
+    `  ${row.label.padEnd(12)} ${String(row.status).padEnd(11)} ${String(row.priority ?? "-").padEnd(7)} idle=${
+      row.idleHours === null ? "?" : `${row.idleHours}h`
+    }  ${String(row.title).slice(0, 44)}`;
+
+  lines.push(
+    `待派: 零指派且已进入待办/执行态的开放工单 ${ledger.actionable.length} 条 (门禁口径 ⇒ 没有心跳会认领它):`,
+  );
+  if (ledger.actionable.length === 0) lines.push("  (无)");
+  for (const row of ledger.actionable) lines.push(rowLine(row));
+
+  lines.push("");
+  lines.push(
+    `搁置: 零指派 backlog ${ledger.parked.length} 条 (非门禁 — 等的是所属 wave, 不是 owner):`,
+  );
+  if (ledger.parked.length === 0) lines.push("  (无)");
+  for (const row of ledger.parked) lines.push(rowLine(row));
+  lines.push(
+    `  └ 零指派开放工单合计 ${ledger.unassigned.length} 条 (待派 + 搁置, 与 liveness 的 orphan 同源, 仅供对照)`,
+  );
   return lines.join("\n");
 }
 
@@ -358,7 +405,7 @@ const HELP = `hermes-fleet-load-ledger — 数字员工舰队负载与球权台�
 
   --brief                        一行台账 (心跳专用)
   --json                         机器读 JSON
-  --gate                         门禁: 存在 unassigned_open / idle_capacity_gap 时退出码 3
+  --gate                         门禁: 存在 unassigned_open / idle_capacity_gap 时退出码 3 (待派口径, 零指派 backlog 属搁置不计入)
   --issue <uuid>                 用该工单解析 companyId (心法 #148)
   --company <cid>                指定 companyId (默认取 PAPERCLIP_COMPANY_ID)
   --limit <n>                    工单列表条数上限 (默认 ${DEFAULT_ISSUE_LIMIT})
