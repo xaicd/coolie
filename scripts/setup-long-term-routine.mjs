@@ -110,6 +110,23 @@ async function main() {
       scheduleTrigger = patched.trigger || patched;
     } else {
       console.log(`✅ Schedule Trigger 已 enabled: ${scheduleTrigger.id} (${scheduleTrigger.cronExpression})`);
+
+      // 心法 #50: "active + enabled 但 lastTriggeredAt 长期不更新" 静默退化检测
+      // 场景: Routine 调度器因为 Race / DB migration / 运维误操作导致状态正常但 cron 不再 fire
+      // 判据: */15 频率下 lastTriggeredAt 超过 90 分钟未动,强制 re-enable 一次重排 nextRunAt
+      const lastFired = scheduleTrigger.lastFiredAt ? new Date(scheduleTrigger.lastFiredAt).getTime() : 0;
+      const ageMin = lastFired ? (Date.now() - lastFired) / 60000 : Infinity;
+      if (ageMin > 90) {
+        console.log(`⚠️  Trigger enabled 但 lastFired 已 ${Math.round(ageMin)} 分钟无 fire (>90 min), 幂等 re-enable 重排 nextRunAt (心法 #50)`);
+        const rePatched = await request(`/routine-triggers/${scheduleTrigger.id}`, {
+          method: 'PATCH',
+          body: JSON.stringify({ enabled: true }),
+        });
+        scheduleTrigger = rePatched.trigger || rePatched;
+        console.log(`✅ 已重排 nextRunAt = ${scheduleTrigger.nextRunAt}`);
+      } else {
+        console.log(`ℹ️  lastFired age = ${Math.round(ageMin)} min, 健康 (< 90 min 阈值)`);
+      }
     }
   } else {
     console.log('正在为 Routine 添加每 15 分钟定时触发器 (*/15 * * * *)...');
