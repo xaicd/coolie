@@ -59,11 +59,11 @@ scripts/device-claim.sh acquire --owner "门神:COOA-117-S5" --ttl 1800
 #   ... 驱动真机 ...
 scripts/device-claim.sh release --owner "门神:COOA-117-S5"
 
-# 竞争与诊断
-scripts/device-claim.sh status          # 空闲/stale → 退出 0；被占用 → 退出 3
-scripts/device-claim.sh status --json   # 机器可读
+# 竞争与诊断（<serial> 为位置参数，缺省 emulator-5554；亦可用 --device <serial>）
+scripts/device-claim.sh status emulator-5554   # 空闲/stale → 退出 0；被占用 → 退出 3
+scripts/device-claim.sh status --json          # 机器可读
 scripts/device-claim.sh acquire --wait 120 --owner me   # 等待最多 120s 再获取
-scripts/device-claim.sh reap            # 清理僵尸 claim
+scripts/device-claim.sh reap emulator-5554     # 清理僵尸 claim
 ```
 
 **契约要求**：驱动真机的脚本与流程 `MUST NOT` 直接裸调 `host-exec "agent-device ..."`；`SHALL` 统一经由 `run` 包装器或先 `acquire`。获取失败（退出码 `3`）时 `MUST` 向 PM/老板回报「设备忙、被谁占用、剩余 TTL」，不得静默重试或强行并驱。

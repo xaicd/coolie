@@ -13,11 +13,14 @@
 # driver that is SIGKILLed cannot wedge the device forever.
 #
 # Usage:
-#   device-claim.sh acquire [--device <serial>] [--owner <id>] [--ttl <sec>] [--wait <sec>] [--json]
-#   device-claim.sh release [--device <serial>] [--owner <id>] [--force] [--json]
-#   device-claim.sh status  [--device <serial>] [--json]
-#   device-claim.sh reap    [--device <serial>] [--json]
+#   device-claim.sh acquire [<serial>] [--owner <id>] [--ttl <sec>] [--wait <sec>] [--json]
+#   device-claim.sh release [<serial>] [--owner <id>] [--force] [--json]
+#   device-claim.sh status  [<serial>] [--json]
+#   device-claim.sh reap    [<serial>] [--json]
 #   device-claim.sh run     [--device <serial>] [--owner <id>] [--ttl <sec>] [--wait <sec>] -- <command...>
+#
+# `<serial>` is positional for acquire|release|status|reap (default: emulator-5554);
+# it is equivalent to `--device <serial>`, which `run` also accepts.
 #
 # `run` is the driver wrapper: it acquires before the wrapped command starts and
 # releases when the command exits (including non-zero exits and SIGINT/SIGTERM).
@@ -69,6 +72,9 @@ esac
 usage() {
   cat <<'EOF'
 usage: scripts/device-claim.sh <acquire|release|status|reap|run> [options]
+
+  <serial> is positional for acquire|release|status|reap (default: emulator-5554);
+  it is equivalent to --device <serial> (which run also accepts).
 
   acquire   Take the device lock (fails with exit 3 when held).
   release   Drop the device lock (owner must match unless --force).
@@ -369,6 +375,23 @@ while [ $# -gt 0 ]; do
       CMD+=("$1"); shift ;;
   esac
 done
+
+# Positional `<serial>` form for acquire/release/status/reap (COOA-231 contract:
+# `device-claim.sh acquire|release|status <serial>`). `run` keeps its positional
+# args as the wrapped command, exactly as documented.
+case "$ACTION" in
+  acquire | release | status | reap)
+    if [ "${#CMD[@]}" -gt 1 ]; then
+      printf '[device-claim] %s: at most one positional <serial> is accepted (got %s)\n' "$ACTION" "${#CMD[@]}" >&2
+      usage >&2
+      exit $EXIT_USAGE
+    fi
+    if [ "${#CMD[@]}" -eq 1 ]; then
+      DEVICE="${CMD[0]}"
+      CMD=()
+    fi
+    ;;
+esac
 
 case "${TTL:-}" in ''|*[!0-9]*) printf '[device-claim] invalid --ttl: %s\n' "$TTL" >&2; exit $EXIT_USAGE ;; esac
 case "${WAIT:-}" in ''|*[!0-9]*) printf '[device-claim] invalid --wait: %s\n' "$WAIT" >&2; exit $EXIT_USAGE ;; esac

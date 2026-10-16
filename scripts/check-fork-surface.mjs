@@ -85,6 +85,13 @@ export const OWNED_PREFIXES = [
   "scripts/e2e-local.sh",
   "scripts/deploy-tc-coolie-claw.sh",
   "scripts/capture-ds-workbench.mjs",
+  // Shared-device serialization lock (COOA-231/COOA-232). Upstream has no file
+  // at any of these three paths (`git ls-tree origin/master -- scripts/device-claim.sh`
+  // is empty), and they exist under scripts/ only because that is where the
+  // agent-device driving entry points are wired.
+  "scripts/device-claim.sh",
+  "scripts/agent-device-locked.sh",
+  "scripts/__tests__/device-claim.test.mjs",
   "version.json",
 ];
 

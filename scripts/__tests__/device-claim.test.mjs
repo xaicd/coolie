@@ -253,3 +253,23 @@ test("usage errors exit 2 (bad device serial, bad TTL, unknown action)", () => {
   assert.equal(runClaim(["bogus"], dir).status, 2);
   assert.equal(runClaim([], dir).status, 2);
 });
+
+test("positional <serial> form selects the device for acquire/status/release", () => {
+  const dir = makeLockDir();
+  const other = "emulator-5556";
+
+  const acquired = runClaim(["acquire", other, "--owner", "P"], dir);
+  assert.equal(acquired.status, 0, acquired.stderr);
+  assert.ok(
+    fs.existsSync(path.join(dir, `${other}.claim`)),
+    "positional serial must select the claim directory",
+  );
+
+  assert.equal(runClaim(["status", other], dir).status, 3, "positional status reports the held device");
+
+  const released = runClaim(["release", other, "--owner", "P"], dir);
+  assert.equal(released.status, 0, released.stderr);
+  assert.ok(!fs.existsSync(path.join(dir, `${other}.claim`)));
+
+  assert.equal(runClaim(["acquire", "a", "b"], dir).status, 2, "two positionals is a usage error");
+});
