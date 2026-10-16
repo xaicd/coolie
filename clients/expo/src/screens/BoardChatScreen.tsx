@@ -548,6 +548,8 @@ export function BoardChatScreen({
     promise: null,
     startedAt: 0,
   });
+  /** 录音操作互斥锁 (防重入与并发自杀) */
+  const voiceBusyRef = useRef(false);
   /** 录音中的 mic 脉冲动画 */
   const micPulse = useRef(new Animated.Value(1)).current;
 
@@ -1041,9 +1043,11 @@ export function BoardChatScreen({
       void forceStop();
       setVoiceBusy(false);
       setVoiceStatus(null);
+      voiceBusyRef.current = false;
       return;
     }
-    if (voiceBusy || sending) return;
+    if (voiceBusy || voiceBusyRef.current || sending) return;
+    voiceBusyRef.current = false;
     voicePressRef.current.startedAt = Date.now();
     voicePressRef.current.promise = (async () => {
       try {
@@ -1092,24 +1096,31 @@ export function BoardChatScreen({
   }, []);
 
   const handleMicPressOut = useCallback(async (action: "send" | "transcribe" = "send") => {
-    const press = voicePressRef.current;
-    if (!press.promise) {
+    if (voiceBusyRef.current) return;
+    voiceBusyRef.current = true;
+
+    const startPromise = voicePressRef.current.promise;
+    const startedAt = voicePressRef.current.startedAt;
+    voicePressRef.current.promise = null;
+
+    if (!startPromise) {
       // 容错: 如果当前还在录音但 promise 丢了，强制切断
       if (recording) {
         await forceStop();
         setVoiceBusy(false);
         setVoiceStatus(null);
       }
+      voiceBusyRef.current = false;
       return;
     }
-    voicePressRef.current.promise = null;
 
     // 点按误触拦截 (< 200ms)
-    const holdDuration = Date.now() - press.startedAt;
+    const holdDuration = Date.now() - startedAt;
     if (holdDuration < 200) {
       await forceStop();
       setVoiceBusy(false);
       setVoiceStatus(null);
+      voiceBusyRef.current = false;
       reportVoiceFailure("按住时间太短，请长按说话（至少 0.3 秒）");
       return;
     }
@@ -1118,10 +1129,11 @@ export function BoardChatScreen({
     setVoiceStatus("识别转文字中…");
     // wave388: 保住本次录音的 m4a, 任何转写失败都能回退成附件手动重发。
     let recordedUri: string | null = null;
+    let recordedSuccess = false;
     try {
       // wave389: 录音启动/结束都加硬超时 —— 单例录音机一旦挂起, 旧代码会永远停在
       // 「识别处理中…」且 voiceBusy 永不清零, 语音从此彻底不可用。超时即收场并上报。
-      const started = await withVoiceTimeout(press.promise, 8000, "录音启动超时");
+      const started = await withVoiceTimeout(startPromise, 8000, "录音启动超时");
       if (!started) {
         await forceStop();
         return;
@@ -1132,6 +1144,7 @@ export function BoardChatScreen({
         8000,
         "录音结束超时",
       );
+      recordedSuccess = true;
       recordedUri = uri;
       if (!base64) {
         // 真因一: 没采到有效声音 (权限被系统静默拒绝 / 麦克风被占用 / 录音文件为空)
@@ -1181,14 +1194,18 @@ export function BoardChatScreen({
         reportVoiceFailure(`转写失败：${msg}${suffix}`);
       }
     } finally {
-      await forceStop().catch(() => null);
+      if (!recordedSuccess) {
+        await forceStop().catch(() => null);
+      }
       setVoiceBusy(false);
       setVoiceStatus(null);
+      voiceBusyRef.current = false;
     }
   }, [recording, forceStop, company.id, stopRecording, pushSystemEcho, preserveFailedVoice, reportVoiceFailure]);
 
   /** 向左滑动取消录音 */
   const handleMicCancel = useCallback(async () => {
+    voiceBusyRef.current = false;
     voicePressRef.current.promise = null;
     await forceStop();
     setVoiceBusy(false);

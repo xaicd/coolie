@@ -16,11 +16,13 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 INPUT="${*:-}"
 
-if [[ -z "$INPUT" ]]; then
+# 0. 帮助指令与空输入直接拦截退出 (COOA-312): 严禁 --help / -h / help 进入 dispatcher 派单全链路起假 Issue
+if [[ -z "$INPUT" || "$INPUT" == "--help" || "$INPUT" == "-h" || "$INPUT" == "help" ]]; then
   cat <<'EOF'
 用法:
   bash scripts/hermes-boss-intent-dispatcher.sh "<老板一句话需求>"
   bash scripts/hermes-boss-intent-dispatcher.sh --expert "<老板的一句话反思/管理痛点>"
+  bash scripts/hermes-boss-intent-dispatcher.sh --help
 
 核心能力:
   1. 0.5s 极速语义提取: 动词 + 宾语 + 约束
@@ -44,6 +46,23 @@ for arg in "$@"; do
       ;;
     --execute)
       EXECUTE_FLAG="--execute"
+      ;;
+    --help|-h|help)
+      cat <<'EOF'
+用法:
+  bash scripts/hermes-boss-intent-dispatcher.sh "<老板一句话需求>"
+  bash scripts/hermes-boss-intent-dispatcher.sh --expert "<老板的一句话反思/管理痛点>"
+  bash scripts/hermes-boss-intent-dispatcher.sh --help
+
+核心能力:
+  1. 0.5s 极速语义提取: 动词 + 宾语 + 约束
+  2. 自动匹配 CMMI 25 任务表与 6 员工 × 7 工具池
+  3. 自动同步在 Coolie Dev Server (本地施工总社) 创建 Issue 任务
+  4. 自动补齐 7 要素 Brief 并调用 dispatch-local-employee.sh 生成 Receipt
+  5. 秒级输出三元组反馈: 【谁 · 用什么工具 · 做什么】+ Dev Server 任务卡链接
+  6. 遇到管理/技术咨询自动走 5 步专家法 (隐含真因/拆解/不够/升级/落地)
+EOF
+      exit 0
       ;;
     *)
       POSITIONAL_ARGS+=("$arg")

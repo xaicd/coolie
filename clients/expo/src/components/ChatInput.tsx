@@ -287,6 +287,9 @@ export function ChatInput({
     return "send";
   }, []);
 
+  // 跟踪当前手势是否处于活动状态，彻底杜绝 onPanResponderRelease 与 onPanResponderTerminate 重入双触发
+  const isGestureActiveRef = useRef(false);
+
   const panResponder = useMemo(
     () =>
       PanResponder.create({
@@ -294,6 +297,7 @@ export function ChatInput({
         onMoveShouldSetPanResponder: () => canEdit && !voiceBusy,
         onPanResponderTerminationRequest: () => false,
         onPanResponderGrant: () => {
+          isGestureActiveRef.current = true;
           gestureModeRef.current = "send";
           setGestureMode("send");
           cancelScaleAnim.setValue(1);
@@ -342,6 +346,8 @@ export function ChatInput({
           }
         },
         onPanResponderRelease: (_, gestureState) => {
+          if (!isGestureActiveRef.current) return;
+          isGestureActiveRef.current = false;
           const { dx, dy } = gestureState;
           cancelScaleAnim.setValue(1);
           transcribeScaleAnim.setValue(1);
@@ -363,6 +369,8 @@ export function ChatInput({
           }
         },
         onPanResponderTerminate: () => {
+          if (!isGestureActiveRef.current) return;
+          isGestureActiveRef.current = false;
           cancelScaleAnim.setValue(1);
           transcribeScaleAnim.setValue(1);
           const finalMode = gestureModeRef.current;

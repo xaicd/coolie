@@ -795,6 +795,12 @@ assertRule(
   'hermes-boss-intent-dispatcher.sh 未识别 --probe-tool-status, 老板微信指令被误派为编码任务',
 );
 
+assertRule(
+  '帮助指令拦截守卫: hermes-boss-intent-dispatcher.sh 必须拦截 --help|-h|help 打印 usage 退出 (杜绝假任务进流水线 COOA-312)',
+  bossIntentContent.includes('--help') && bossIntentContent.includes('-h') && bossIntentContent.includes('help'),
+  'hermes-boss-intent-dispatcher.sh 缺失 --help/-h/help 拦截逻辑, 容易将帮助指令误派为真实开发工单',
+);
+
 // -----------------------------------------------------------------------------
 // 23. Web (ui/) i18n 引用-定义一致性守卫 (COOA-178 · 杜绝原始键外泄)
 // -----------------------------------------------------------------------------
