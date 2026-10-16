@@ -1,0 +1,55 @@
+{
+  "schemaVersion": 1,
+  "issue": "COOA-228",
+  "date": "2026-10-16",
+  "agent": { "id": "58bb5a96-c241-4b35-babb-1cc1771d5dd5", "name": "百晓生", "role": "ds" },
+  "run": "3ce21006-4c92-4bf4-89e8-91efe0057271",
+  "environment": {
+    "device": "emulator-5554",
+    "app": "cloud.coolie.app",
+    "resolution": "1080x2400",
+    "driver": "agent-device 0.21.1 + adb",
+    "deviceLock": "scripts/device-claim.sh acquire (COOA-232), owner=$PAPERCLIP_AGENT_ID, ttl=1500"
+  },
+  "screenMatrix": [
+    { "screen": "AgentDetailScreen", "result": "pass", "evidence": "01-AgentDetail" },
+    { "screen": "CodeDiffScreen", "result": "not-exercised", "reason": "no diff-bearing work product reachable" },
+    { "screen": "GitCredentialsScreen", "result": "pass", "state": "empty", "evidence": "03-GitCredentials" },
+    { "screen": "InboxScreen", "result": "pass", "evidence": "04-Inbox" },
+    { "screen": "PipelinesScreen", "result": "unreachable", "reason": "no setPipelinesOpen(true) call site" },
+    { "screen": "PlansScreen", "result": "unreachable", "reason": "no setPlansOpen(true) call site" },
+    { "screen": "PluginSettingsScreen", "result": "pass", "evidence": "07-PluginSettings" },
+    { "screen": "RegisterScreen", "result": "not-exercised", "reason": "pre-auth; would strand shared device logged out" },
+    { "screen": "SpecEditorScreen", "result": "pass", "evidence": "09-SpecEditor" },
+    { "screen": "TaskKanbanScreen", "result": "pass", "views": ["list", "board", "grouped"], "evidence": "13-TaskKanban-*" },
+    { "screen": "TasksScreen", "result": "unreachable", "reason": "dead import (App.tsx:78), no render site" },
+    { "screen": "WebContainerScreen", "result": "pass", "evidence": "12-WebContainer" },
+    { "screen": "WebLoginScreen", "result": "not-exercised", "reason": "pre-auth; would strand shared device logged out" }
+  ],
+  "journeys": {
+    "approvalSignOff": { "result": "entry+empty-state-pass", "pendingApprovals": 0, "evidence": "04-Inbox-Approvals" },
+    "uatArchiving": {
+      "result": "archive-fired; undo-window-lapsed",
+      "endpoint": "POST /api/issues/:id/inbox-archive (per-user inbox preference)",
+      "disclosure": "5s undo window lapsed before restore; item hidden for the operating user; reversible via DELETE /api/issues/:id/inbox-archive",
+      "evidence": ["04-Inbox-swipe", "04-Inbox-archived"]
+    }
+  },
+  "streamingAbase": {
+    "result": "pass",
+    "method": "live LLM session; send WITHOUT --settle; rapid adb screencap + agent-device snapshot; mid-stream swipe-up",
+    "frames": [
+      { "frame": "a3", "phase": "streaming", "textLen": 178, "msgBottomY": 2012, "note": "老板 + cursor + stop button; pinned to input" },
+      { "frame": "a4", "phase": "streaming", "textLen": 350, "msgBottomY": 2012 },
+      { "frame": "a5", "phase": "complete", "textLen": 349, "msgBottomY": 1980 },
+      { "frame": "b1..b8", "phase": "post-un-anchor", "textLen": 349, "msgBottomY": 1917, "note": "held constant; no yank-back" }
+    ],
+    "inputY": 2043,
+    "residual": "un-anchor happened ~2s after stream end; no same-frame mid-stream un-anchor capture; 回底 float not shown (scroll 63px below threshold)",
+    "evidence": ["stream2/stream2.mp4", "stream2/a3.png", "stream2/a5.png"]
+  },
+  "structuralFindings": [
+    { "id": "dead-screens", "detail": "PipelinesScreen/PlansScreen have no navigation entry; TasksScreen is a dead import", "severity": "medium", "childIssue": "pending" },
+    { "id": "testid-gap", "detail": "12 of 13 target screens have zero testID (only SpecEditorScreen has 15)", "severity": "low" }
+  ]
+}

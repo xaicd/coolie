@@ -1,0 +1,1833 @@
+{
+  "success": true,
+  "data": {
+    "nodes": [
+      {
+        "index": 0,
+        "type": "android.widget.TextView",
+        "label": "1:35 ",
+        "value": "1:35 ",
+        "identifier": "com.android.systemui:id/clock",
+        "bundleId": "com.android.systemui",
+        "rect": {
+          "x": 50,
+          "y": 1,
+          "width": 113,
+          "height": 127
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 0,
+        "ref": "e1"
+      },
+      {
+        "index": 1,
+        "type": "android.widget.ImageView",
+        "label": "Security & privacy notification: Set a screen lock",
+        "bundleId": "com.android.systemui",
+        "rect": {
+          "x": 163,
+          "y": 1,
+          "width": 58,
+          "height": 127
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 0,
+        "ref": "e2"
+      },
+      {
+        "index": 2,
+        "type": "android.widget.ImageView",
+        "label": "Android System notification: Serial console enabled",
+        "bundleId": "com.android.systemui",
+        "rect": {
+          "x": 221,
+          "y": 1,
+          "width": 58,
+          "height": 127
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 0,
+        "ref": "e3"
+      },
+      {
+        "index": 3,
+        "type": "android.widget.FrameLayout",
+        "label": "Phone signal full.",
+        "identifier": "com.android.systemui:id/mobile_combo",
+        "bundleId": "com.android.systemui",
+        "rect": {
+          "x": 866,
+          "y": 35,
+          "width": 104,
+          "height": 58
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 0,
+        "ref": "e4"
+      },
+      {
+        "index": 4,
+        "type": "android.widget.ImageView",
+        "label": "3G",
+        "identifier": "com.android.systemui:id/mobile_type",
+        "bundleId": "com.android.systemui",
+        "rect": {
+          "x": 866,
+          "y": 43,
+          "width": 65,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 1,
+        "parentIndex": 3,
+        "ref": "e5"
+      },
+      {
+        "index": 5,
+        "type": "android.widget.ImageView",
+        "identifier": "com.android.systemui:id/mobile_signal",
+        "bundleId": "com.android.systemui",
+        "rect": {
+          "x": 931,
+          "y": 44,
+          "width": 39,
+          "height": 39
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 1,
+        "parentIndex": 3,
+        "ref": "e6"
+      },
+      {
+        "index": 6,
+        "type": "android.widget.LinearLayout",
+        "label": "Battery 100 percent.",
+        "identifier": "com.android.systemui:id/battery",
+        "bundleId": "com.android.systemui",
+        "rect": {
+          "x": 986,
+          "y": 1,
+          "width": 20,
+          "height": 127
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 0,
+        "ref": "e7"
+      },
+      {
+        "index": 7,
+        "type": "android.widget.ImageView",
+        "bundleId": "com.android.systemui",
+        "rect": {
+          "x": 986,
+          "y": 47,
+          "width": 20,
+          "height": 34
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 1,
+        "parentIndex": 6,
+        "ref": "e8"
+      },
+      {
+        "index": 8,
+        "type": "android.widget.FrameLayout",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2400
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 0,
+        "ref": "e9"
+      },
+      {
+        "index": 9,
+        "type": "android.widget.LinearLayout",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2337
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 1,
+        "parentIndex": 8,
+        "ref": "e10"
+      },
+      {
+        "index": 10,
+        "type": "android.widget.FrameLayout",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2337
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 2,
+        "parentIndex": 9,
+        "ref": "e11"
+      },
+      {
+        "index": 11,
+        "type": "android.widget.LinearLayout",
+        "identifier": "cloud.coolie.app:id/action_bar_root",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2337
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 3,
+        "parentIndex": 10,
+        "ref": "e12"
+      },
+      {
+        "index": 12,
+        "type": "android.widget.FrameLayout",
+        "identifier": "android:id/content",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2337
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 4,
+        "parentIndex": 11,
+        "ref": "e13"
+      },
+      {
+        "index": 13,
+        "type": "android.widget.FrameLayout",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2337
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 5,
+        "parentIndex": 12,
+        "ref": "e14"
+      },
+      {
+        "index": 14,
+        "type": "android.view.ViewGroup",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2337
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 6,
+        "parentIndex": 13,
+        "ref": "e15"
+      },
+      {
+        "index": 15,
+        "type": "android.view.ViewGroup",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 0,
+          "y": 0,
+          "width": 1080,
+          "height": 2337
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 7,
+        "parentIndex": 14,
+        "ref": "e16"
+      },
+      {
+        "index": 16,
+        "type": "android.widget.ImageView",
+        "label": "Coolie Logo",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 121,
+          "y": 174,
+          "width": 52,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 8,
+        "parentIndex": 15,
+        "ref": "e17"
+      },
+      {
+        "index": 17,
+        "type": "android.widget.TextView",
+        "label": "Coolie工坊",
+        "value": "Coolie工坊",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 189,
+          "y": 163,
+          "width": 272,
+          "height": 74
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 8,
+        "parentIndex": 15,
+        "ref": "e18"
+      },
+      {
+        "index": 18,
+        "type": "android.view.ViewGroup",
+        "label": "",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 774,
+          "y": 157,
+          "width": 85,
+          "height": 86
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "hittable": true,
+        "depth": 8,
+        "parentIndex": 15,
+        "ref": "e19"
+      },
+      {
+        "index": 19,
+        "type": "android.widget.TextView",
+        "label": "",
+        "value": "",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 789,
+          "y": 172,
+          "width": 53,
+          "height": 55
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 9,
+        "parentIndex": 18,
+        "ref": "e20"
+      },
+      {
+        "index": 20,
+        "type": "android.view.ViewGroup",
+        "label": "",
+        "identifier": "AppBar__Bell__ClearBtn",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 864,
+          "y": 157,
+          "width": 84,
+          "height": 86
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "hittable": true,
+        "depth": 8,
+        "parentIndex": 15,
+        "ref": "e21"
+      },
+      {
+        "index": 21,
+        "type": "android.widget.TextView",
+        "label": "",
+        "value": "",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 879,
+          "y": 172,
+          "width": 53,
+          "height": 55
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 9,
+        "parentIndex": 20,
+        "ref": "e22"
+      },
+      {
+        "index": 22,
+        "type": "android.view.ViewGroup",
+        "label": "",
+        "identifier": "AppBar__Settings__OpenBtn",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 954,
+          "y": 157,
+          "width": 84,
+          "height": 86
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "hittable": true,
+        "depth": 8,
+        "parentIndex": 15,
+        "ref": "e23"
+      },
+      {
+        "index": 23,
+        "type": "android.widget.TextView",
+        "label": "",
+        "value": "",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 969,
+          "y": 172,
+          "width": 53,
+          "height": 55
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 9,
+        "parentIndex": 22,
+        "ref": "e24"
+      },
+      {
+        "index": 24,
+        "type": "android.view.ViewGroup",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 0,
+          "y": 275,
+          "width": 1080,
+          "height": 1894
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 8,
+        "parentIndex": 15,
+        "ref": "e25"
+      },
+      {
+        "index": 25,
+        "type": "android.widget.ScrollView",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 0,
+          "y": 275,
+          "width": 1080,
+          "height": 1894
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "hittable": true,
+        "depth": 9,
+        "parentIndex": 24,
+        "hiddenContentBelow": true,
+        "ref": "e26"
+      },
+      {
+        "index": 26,
+        "type": "android.view.ViewGroup",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 0,
+          "y": 275,
+          "width": 1080,
+          "height": 1894
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 10,
+        "parentIndex": 25,
+        "ref": "e27"
+      },
+      {
+        "index": 27,
+        "type": "android.widget.TextView",
+        "label": "仪表盘",
+        "value": "仪表盘",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 42,
+          "y": 317,
+          "width": 182,
+          "height": 83
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e28"
+      },
+      {
+        "index": 28,
+        "type": "android.widget.ImageView",
+        "label": "Coolie Logo",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 71,
+          "y": 442,
+          "width": 37,
+          "height": 37
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e29"
+      },
+      {
+        "index": 29,
+        "type": "android.widget.TextView",
+        "label": "xrobinai",
+        "value": "xrobinai",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 186,
+          "y": 434,
+          "width": 136,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e30"
+      },
+      {
+        "index": 30,
+        "type": "android.widget.TextView",
+        "label": "效能总览",
+        "value": "效能总览",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 353,
+          "y": 434,
+          "width": 170,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e31"
+      },
+      {
+        "index": 31,
+        "type": "android.view.ViewGroup",
+        "label": "紧急熔断: 停掉所有派单",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 795,
+          "y": 536,
+          "width": 243,
+          "height": 88
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "hittable": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e32"
+      },
+      {
+        "index": 32,
+        "type": "android.widget.TextView",
+        "label": "",
+        "value": "",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 821,
+          "y": 560,
+          "width": 37,
+          "height": 39
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 12,
+        "parentIndex": 31,
+        "ref": "e33"
+      },
+      {
+        "index": 33,
+        "type": "android.widget.TextView",
+        "label": "🚨 熔断",
+        "value": "🚨 熔断",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 868,
+          "y": 551,
+          "width": 143,
+          "height": 56
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 12,
+        "parentIndex": 31,
+        "ref": "e34"
+      },
+      {
+        "index": 34,
+        "type": "android.widget.TextView",
+        "label": "7",
+        "value": "7",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 263,
+          "y": 720,
+          "width": 40,
+          "height": 93
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e35"
+      },
+      {
+        "index": 35,
+        "type": "android.widget.TextView",
+        "label": "已启用员工",
+        "value": "已启用员工",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 188,
+          "y": 823,
+          "width": 190,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e36"
+      },
+      {
+        "index": 36,
+        "type": "android.widget.TextView",
+        "label": "0",
+        "value": "0",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 777,
+          "y": 720,
+          "width": 40,
+          "height": 93
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e37"
+      },
+      {
+        "index": 37,
+        "type": "android.widget.TextView",
+        "label": "执行中任务",
+        "value": "执行中任务",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 702,
+          "y": 823,
+          "width": 190,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e38"
+      },
+      {
+        "index": 38,
+        "type": "android.view.ViewGroup",
+        "label": "¥0.00, 本月花费 ›",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 42,
+          "y": 947,
+          "width": 482,
+          "height": 234
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "hittable": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e39"
+      },
+      {
+        "index": 39,
+        "type": "android.widget.TextView",
+        "label": "¥0.00",
+        "value": "¥0.00",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 194,
+          "y": 986,
+          "width": 177,
+          "height": 93
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 12,
+        "parentIndex": 38,
+        "ref": "e40"
+      },
+      {
+        "index": 40,
+        "type": "android.widget.TextView",
+        "label": "本月花费 ›",
+        "value": "本月花费 ›",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 197,
+          "y": 1089,
+          "width": 172,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 12,
+        "parentIndex": 38,
+        "ref": "e41"
+      },
+      {
+        "index": 41,
+        "type": "android.view.ViewGroup",
+        "label": "0, 待审批",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 556,
+          "y": 947,
+          "width": 482,
+          "height": 234
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "hittable": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e42"
+      },
+      {
+        "index": 42,
+        "type": "android.widget.TextView",
+        "label": "0",
+        "value": "0",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 777,
+          "y": 986,
+          "width": 40,
+          "height": 93
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 12,
+        "parentIndex": 41,
+        "ref": "e43"
+      },
+      {
+        "index": 43,
+        "type": "android.widget.TextView",
+        "label": "待审批",
+        "value": "待审批",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 740,
+          "y": 1089,
+          "width": 114,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 12,
+        "parentIndex": 41,
+        "ref": "e44"
+      },
+      {
+        "index": 44,
+        "type": "android.widget.TextView",
+        "label": "任务进度",
+        "value": "任务进度",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 81,
+          "y": 1257,
+          "width": 184,
+          "height": 62
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e45"
+      },
+      {
+        "index": 45,
+        "type": "android.widget.TextView",
+        "label": "134 个任务",
+        "value": "134 个任务",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 812,
+          "y": 1262,
+          "width": 186,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e46"
+      },
+      {
+        "index": 46,
+        "type": "android.widget.TextView",
+        "label": "完成率 97.8%",
+        "value": "完成率 97.8%",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 81,
+          "y": 1388,
+          "width": 918,
+          "height": 56
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e47"
+      },
+      {
+        "index": 47,
+        "type": "android.widget.TextView",
+        "label": "已完成 131",
+        "value": "已完成 131",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 107,
+          "y": 1460,
+          "width": 186,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e48"
+      },
+      {
+        "index": 48,
+        "type": "android.widget.TextView",
+        "label": "进行中 0",
+        "value": "进行中 0",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 346,
+          "y": 1460,
+          "width": 144,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e49"
+      },
+      {
+        "index": 49,
+        "type": "android.widget.TextView",
+        "label": "阻塞 0",
+        "value": "阻塞 0",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 542,
+          "y": 1460,
+          "width": 106,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e50"
+      },
+      {
+        "index": 50,
+        "type": "android.widget.TextView",
+        "label": "待办 3",
+        "value": "待办 3",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 701,
+          "y": 1460,
+          "width": 106,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e51"
+      },
+      {
+        "index": 51,
+        "type": "android.widget.TextView",
+        "label": "近 7 天运行活动",
+        "value": "近 7 天运行活动",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 81,
+          "y": 1627,
+          "width": 324,
+          "height": 62
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e52"
+      },
+      {
+        "index": 52,
+        "type": "android.widget.TextView",
+        "label": "18.7 任务/天",
+        "value": "18.7 任务/天",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 786,
+          "y": 1632,
+          "width": 212,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e53"
+      },
+      {
+        "index": 53,
+        "type": "android.widget.TextView",
+        "label": "10-10",
+        "value": "10-10",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 101,
+          "y": 1860,
+          "width": 77,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e54"
+      },
+      {
+        "index": 54,
+        "type": "android.widget.TextView",
+        "label": "10-11",
+        "value": "10-11",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 234,
+          "y": 1860,
+          "width": 77,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e55"
+      },
+      {
+        "index": 55,
+        "type": "android.widget.TextView",
+        "label": "10-12",
+        "value": "10-12",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 368,
+          "y": 1860,
+          "width": 77,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e56"
+      },
+      {
+        "index": 56,
+        "type": "android.widget.TextView",
+        "label": "10-13",
+        "value": "10-13",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 501,
+          "y": 1860,
+          "width": 77,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e57"
+      },
+      {
+        "index": 57,
+        "type": "android.widget.TextView",
+        "label": "10-14",
+        "value": "10-14",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 634,
+          "y": 1860,
+          "width": 77,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e58"
+      },
+      {
+        "index": 58,
+        "type": "android.widget.TextView",
+        "label": "10-15",
+        "value": "10-15",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 767,
+          "y": 1860,
+          "width": 77,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e59"
+      },
+      {
+        "index": 59,
+        "type": "android.widget.TextView",
+        "label": "10-16",
+        "value": "10-16",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 901,
+          "y": 1860,
+          "width": 77,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e60"
+      },
+      {
+        "index": 60,
+        "type": "android.widget.TextView",
+        "label": "6",
+        "value": "6",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 131,
+          "y": 1910,
+          "width": 17,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e61"
+      },
+      {
+        "index": 61,
+        "type": "android.widget.TextView",
+        "label": "0",
+        "value": "0",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 264,
+          "y": 1910,
+          "width": 17,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e62"
+      },
+      {
+        "index": 62,
+        "type": "android.widget.TextView",
+        "label": "1",
+        "value": "1",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 398,
+          "y": 1910,
+          "width": 17,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e63"
+      },
+      {
+        "index": 63,
+        "type": "android.widget.TextView",
+        "label": "9",
+        "value": "9",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 531,
+          "y": 1910,
+          "width": 17,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e64"
+      },
+      {
+        "index": 64,
+        "type": "android.widget.TextView",
+        "label": "0",
+        "value": "0",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 664,
+          "y": 1910,
+          "width": 17,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e65"
+      },
+      {
+        "index": 65,
+        "type": "android.widget.TextView",
+        "label": "69",
+        "value": "69",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 788,
+          "y": 1910,
+          "width": 34,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e66"
+      },
+      {
+        "index": 66,
+        "type": "android.widget.TextView",
+        "label": "36",
+        "value": "36",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 922,
+          "y": 1910,
+          "width": 34,
+          "height": 42
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e67"
+      },
+      {
+        "index": 67,
+        "type": "android.widget.TextView",
+        "label": "成功",
+        "value": "成功",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 442,
+          "y": 1983,
+          "width": 76,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e68"
+      },
+      {
+        "index": 68,
+        "type": "android.widget.TextView",
+        "label": "失败",
+        "value": "失败",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 587,
+          "y": 1983,
+          "width": 76,
+          "height": 52
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e69"
+      },
+      {
+        "index": 69,
+        "type": "android.widget.TextView",
+        "label": "31",
+        "value": "31",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 166,
+          "y": 2145,
+          "width": 66,
+          "height": 24
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e70"
+      },
+      {
+        "index": 70,
+        "type": "android.widget.TextView",
+        "label": "131",
+        "value": "131",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 490,
+          "y": 2145,
+          "width": 99,
+          "height": 24
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e71"
+      },
+      {
+        "index": 71,
+        "type": "android.widget.TextView",
+        "label": "0.0%",
+        "value": "0.0%",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 819,
+          "y": 2145,
+          "width": 124,
+          "height": 24
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 11,
+        "parentIndex": 26,
+        "ref": "e72"
+      },
+      {
+        "index": 72,
+        "type": "android.view.ViewGroup",
+        "label": ", Overview",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 21,
+          "y": 2190,
+          "width": 218,
+          "height": 129
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "hittable": true,
+        "depth": 8,
+        "parentIndex": 15,
+        "ref": "e73"
+      },
+      {
+        "index": 73,
+        "type": "android.widget.TextView",
+        "label": "",
+        "value": "",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 98,
+          "y": 2190,
+          "width": 63,
+          "height": 65
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 9,
+        "parentIndex": 72,
+        "ref": "e74"
+      },
+      {
+        "index": 74,
+        "type": "android.widget.TextView",
+        "label": "Overview",
+        "value": "Overview",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 34,
+          "y": 2265,
+          "width": 191,
+          "height": 54
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 9,
+        "parentIndex": 72,
+        "ref": "e75"
+      },
+      {
+        "index": 75,
+        "type": "android.view.ViewGroup",
+        "label": ", Tasks",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 239,
+          "y": 2190,
+          "width": 217,
+          "height": 129
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "hittable": true,
+        "depth": 8,
+        "parentIndex": 15,
+        "ref": "e76"
+      },
+      {
+        "index": 76,
+        "type": "android.widget.TextView",
+        "label": "",
+        "value": "",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 316,
+          "y": 2190,
+          "width": 63,
+          "height": 65
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 9,
+        "parentIndex": 75,
+        "ref": "e77"
+      },
+      {
+        "index": 77,
+        "type": "android.widget.TextView",
+        "label": "Tasks",
+        "value": "Tasks",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 287,
+          "y": 2265,
+          "width": 121,
+          "height": 54
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 9,
+        "parentIndex": 75,
+        "ref": "e78"
+      },
+      {
+        "index": 78,
+        "type": "android.view.ViewGroup",
+        "label": "新建任务",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 480,
+          "y": 2175,
+          "width": 120,
+          "height": 120
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "hittable": true,
+        "depth": 8,
+        "parentIndex": 15,
+        "ref": "e79"
+      },
+      {
+        "index": 79,
+        "type": "android.widget.TextView",
+        "label": "",
+        "value": "",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 505,
+          "y": 2199,
+          "width": 69,
+          "height": 71
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 9,
+        "parentIndex": 78,
+        "ref": "e80"
+      },
+      {
+        "index": 80,
+        "type": "android.view.ViewGroup",
+        "label": ", Studio",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 624,
+          "y": 2190,
+          "width": 218,
+          "height": 129
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "hittable": true,
+        "depth": 8,
+        "parentIndex": 15,
+        "ref": "e81"
+      },
+      {
+        "index": 81,
+        "type": "android.widget.TextView",
+        "label": "",
+        "value": "",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 701,
+          "y": 2190,
+          "width": 63,
+          "height": 65
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 9,
+        "parentIndex": 80,
+        "ref": "e82"
+      },
+      {
+        "index": 82,
+        "type": "android.widget.TextView",
+        "label": "Studio",
+        "value": "Studio",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 667,
+          "y": 2265,
+          "width": 130,
+          "height": 54
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 9,
+        "parentIndex": 80,
+        "ref": "e83"
+      },
+      {
+        "index": 83,
+        "type": "android.view.ViewGroup",
+        "label": ", Assets",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 842,
+          "y": 2190,
+          "width": 217,
+          "height": 129
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "hittable": true,
+        "depth": 8,
+        "parentIndex": 15,
+        "ref": "e84"
+      },
+      {
+        "index": 84,
+        "type": "android.widget.TextView",
+        "label": "",
+        "value": "",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 919,
+          "y": 2190,
+          "width": 63,
+          "height": 65
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 9,
+        "parentIndex": 83,
+        "ref": "e85"
+      },
+      {
+        "index": 85,
+        "type": "android.widget.TextView",
+        "label": "Assets",
+        "value": "Assets",
+        "bundleId": "cloud.coolie.app",
+        "rect": {
+          "x": 880,
+          "y": 2265,
+          "width": 141,
+          "height": 54
+        },
+        "enabled": true,
+        "editable": false,
+        "password": false,
+        "hintShowing": false,
+        "visibleToUser": true,
+        "depth": 9,
+        "parentIndex": 83,
+        "ref": "e86"
+      }
+    ],
+    "truncated": false,
+    "appName": "cloud.coolie.app",
+    "appBundleId": "cloud.coolie.app",
+    "visibility": {
+      "partial": true,
+      "visibleNodeCount": 86,
+      "totalNodeCount": 86,
+      "reasons": [
+        "scroll-hidden-below"
+      ]
+    },
+    "androidSnapshot": {
+      "backend": "android-helper",
+      "helperVersion": "0.21.1",
+      "helperApiVersion": "2",
+      "helperTransport": "persistent-session",
+      "helperSessionReused": true,
+      "installReason": "current",
+      "waitForIdleTimeoutMs": 500,
+      "waitForIdleQuietMs": 100,
+      "timeoutMs": 2000,
+      "maxDepth": 128,
+      "maxNodes": 5000,
+      "rootPresent": true,
+      "captureMode": "interactive-windows",
+      "windowCount": 2,
+      "nodeCount": 165,
+      "helperTruncated": false,
+      "elapsedMs": 225
+    },
+    "snapshotQuality": {
+      "state": "healthy",
+      "backend": "android-helper"
+    },
+    "snapshotDiagnostics": {
+      "stats": {
+        "count": 297,
+        "p50Ms": 152,
+        "p95Ms": 514,
+        "maxMs": 2000,
+        "slowThresholdMs": 1500,
+        "platform": "android",
+        "backends": {
+          "android": 297
+        }
+      }
+    },
+    "refsGeneration": 132889
+  }
+}
