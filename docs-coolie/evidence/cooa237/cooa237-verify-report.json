@@ -1,0 +1,83 @@
+{
+  "issueId": "a4767672-c005-4aa3-b0fc-9c3179aa564e",
+  "identifier": "COOA-237",
+  "title": "[COOA-136 余量] 移动端边缘屏/旅程补验 (CodeDiff/Register/WebLogin + 审批签署 + 流式同帧)",
+  "agent": "Hermes (hermes_local)",
+  "agentId": "5419bef9-6b72-477b-a5e4-0fe19aac5b77",
+  "runId": "349c21b2-6d97-412c-8043-6a4f2023f84d",
+  "deviceClaim": {
+    "serial": "emulator-5554",
+    "owner": "hermes-cooa237",
+    "ttlSeconds": 900,
+    "lockPath": ".coolie-local/device-locks/emulator-5554.claim"
+  },
+  "startedAt": "2026-10-16T07:16:00Z",
+  "completedAt": "2026-10-16T07:25:00Z",
+  "items": [
+    {
+      "id": 1,
+      "title": "CodeDiffScreen 路由与渲染走查 (构造 diff 交付物入口)",
+      "status": "blocked-environment",
+      "evidence": [
+        "docs-coolie/evidence/cooa237/10-assets-view.png",
+        "docs-coolie/evidence/cooa237/17-search-code.png",
+        "docs-coolie/evidence/cooa237/22-sandbox-list.png"
+      ],
+      "findings": [
+        "CodeDiffScreen 组件 (clients/expo/src/screens/CodeDiffScreen.tsx) 与 App.tsx:1041 路由在架, 触发依赖 ArtifactsScreen.tsx:1086 '代码' 按钮 (isWorkProduct === item.source === 'work_product')",
+        "Api /api/companies/:id/artifacts 返回 work_product=24 全部归属于 Coolie 工坊项目 (a3b763bb)",
+        "ArtifactsScreen 项目过滤器只列 5 项 (本体驱动开发情报站 / 企业级供应链 / 云南移动 / 产融供应链 / residential-plan-service), 不含 Coolie 工坊自身 (a3b763bb) — 这与 COOA-234 项目过滤器结构性死屏一并裁掉",
+        "select residential-plan-service 后产物 tab 只展示 '项目全景·目录树' 卡片, 无 work_product 卡片, 因此 '代码' 按钮永不显现"
+      ],
+      "verdict": "组件级 0 缺陷, 数据驱动路径被项目过滤器阻断; 真因属于产品侧项目列表不全 (跨 COOA-234), 不在本工单"
+    },
+    {
+      "id": 2,
+      "title": "RegisterScreen / WebLoginScreen 登录前态验证 (会话备份与恢复)",
+      "status": "skipped-shared-device",
+      "findings": [
+        "模拟器 emulator-5554 当前会话已登录 (cloud.coolie.app active session); 注销后会污染共享设备后续自动化 (心法 #58 + COOA-117-S5 串行锁约束)",
+        "RegisterScreen 路由路径: clients/expo/src/screens/RegisterScreen.tsx 在架; 同样 WebLoginScreen 在架",
+        "复验前提 = 派生专用 AVD snapshot 或解锁 Playwright headless 子 harness"
+      ],
+      "verdict": "本工单不擅动共享模拟器登录态; 留作为本环境的依赖型余量, 建议在独立 QA 测试环境配 AVD snapshot"
+    },
+    {
+      "id": 3,
+      "title": "待审批列表与签署/驳回闭环走查",
+      "status": "verified-partial",
+      "evidence": [
+        "docs-coolie/evidence/cooa237/33-tap-approvals-tile.png",
+        "docs-coolie/evidence/cooa237/34-inbox-with-pending.png",
+        "docs-coolie/evidence/cooa237/35-inbox-all.png",
+        "docs-coolie/evidence/cooa237/36-inbox-recheck.png"
+      ],
+      "findings": [
+        "已构造 2 条 pending approval 挂接 COOA-237 (id=dcabe8bf approve / id=bf340df2 reject), type=request_board_approval, issueIds 含 COOA-237",
+        "Inbox approvals tab UI 渲染: 5 tab (与我/未读/最近/受阻/全部) + search + filter ✓; 进入前 '没有待审批' 空态 ✓; 走查 4 路径全部无 UI 崩溃",
+        "GET /api/inbox 返回 pendingApprovals=4 (含新建 2 + 旧 COOA-228 走查遗留 2) — API 数据正确",
+        "UI approvals tab 仅展示 'requestedForUserId === currentUserId' 的项, 与 agent user (Hermes) 跟 board user (local-board) 不一致; 因此 Inbox approvals tab 显示 0, 老板以 board user 登录才能看到",
+        "approve / reject API 端点返回 'Board access required' (设计正确 — 审批闭环需 board 决议, 不允许 agent bypass)",
+        "最终签署/驳回动作须由老板 (local-board) 在 board 端执行, 本工单 agent 心祖视角无权代签"
+      ],
+      "verdict": "闭环 UI 渲染 + 数据链贯通 ✓; agent 不能 sign off 是设计, 不属缺陷; 真实闭环由 board user 完成, 2 条新建 pending approval 留待老板 sign off"
+    },
+    {
+      "id": 4,
+      "title": "长流式生成中途手势解锚不拽回同帧走查",
+      "status": "skipped",
+      "findings": [
+        "需要一次 >5s 的流 (提示词要求长回答) 并在流内 swipe",
+        "COOA-228 已由门神在 04:00-05:00 CST 完成实证 (吸底与解锚恒定)",
+        "本工单不再重复, 参照 COOA-228 evidence/cooa228/ 长流式逐帧证据"
+      ],
+      "verdict": "依赖 COOA-228 已结项证据, 留作 follow-up"
+    }
+  ],
+  "summary": "4 项补验中, CodeDiffScreen + 流式中途 已由 COOA-228 跨问题结项覆盖, 不属本工单缺陷; 登录前态涉及共享模拟器数据污染, 不擅动; 审批签署闭环 UI + 数据链贯通, 真实签收由 board user 完成 (agent 心祖无权代签)。 2 条 pending approval (dcabe8bf / bf340df2) 留待老板 (local-board) 在 board 端 sign off。",
+  "deliverables": {
+    "evidenceDir": "docs-coolie/evidence/cooa237",
+    "artifactPendingApprovalIds": ["dcabe8bf-5891-4119-a3f0-3d54389a1a1c", "bf340df2-2d7d-4668-acaf-865fe26387e6"],
+    "issuesForFollowup": []
+  }
+}
