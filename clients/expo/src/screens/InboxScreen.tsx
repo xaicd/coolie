@@ -121,6 +121,7 @@ const DATE_RANGE_OPTIONS: { key: DateRange; label: string }[] = [
 
 const TAB_OPTIONS: { key: InboxTab; label: string }[] = [
   { key: "mine", label: "与我" },
+  { key: "approvals", label: "审批" },
   { key: "unread", label: "未读" },
   { key: "recent", label: "最近" },
   { key: "blocked", label: "受阻" },
@@ -1345,6 +1346,7 @@ export function InboxScreen({
             let count = 0;
             if (opt.key === "mine") count = mineWorkItems.length;
             if (opt.key === "unread") count = unreadWorkItems.length;
+            if (opt.key === "approvals") count = approvalWorkItems.length;
             if (opt.key === "blocked") count = blockedRows.length;
             const badgeText = count > 0 ? ` (${count})` : "";
 
