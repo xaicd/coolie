@@ -93,6 +93,7 @@ const ALLOWED_ROOT_FILES = new Set([
   'LICENSE',
   'README.md',
   'ROADMAP.md',
+  'GOALS.md',
   'SECURITY.md',
   'TERMINOLOGY.md',
   'ecosystem.config.cjs',

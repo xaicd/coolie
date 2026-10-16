@@ -11,11 +11,12 @@
 - **核心**: PostgreSQL (PGlite / 原生 PG) + 263 物理表 + 活体业务本体 (Living Ontology)
 - **多机拓扑**: `mac` (指挥/模拟器/Node24) · `cwall` (4090/376G算力) · `aja-pc` (业务中台) · `tc-coolie-claw` (生产服务器)
 
-## 2. 4 个核心入口 (5 秒读完)
+## 2. 5 个核心入口 (5 秒读完)
 
 | 优先级 | 文件 | 核心用途 |
 |---|---|---|
 | ★ | **MEMORY.md** (本文件, ≤8KB) | 进场第一秒全貌与记忆中枢 |
+| ★★ | [GOALS.md](GOALS.md) | 北极星愿景、战略使命与工程目标大纲 |
 | ★★ | [docs/CURRENT-SPRINT.md](docs/CURRENT-SPRINT.md) | Sprint 任务大盘与掌柜原话 |
 | ★★ | [docs/intent-router.md](docs/intent-router.md) | 客户口语意图路由器 (7大类 30+ 原话反查) |
 | ★★ | [AGENTS.md](AGENTS.md) (45KB) | 平台公理体系与最高工程法典 |
