@@ -17,9 +17,9 @@
  *     - executionRunId / activeRun.id / checkoutRunId  — 有活着的 run
  *     - monitorNextCheckAt                             — 有排定的 monitor 唤醒
  *     - executionState.currentParticipant              — 有执行策略待办人
- *     - blockerAttention.unresolvedBlockerCount > 0    — 有第一方 blocker 边
- *       (或 blockingTreeLive=true, blocker 树自身还在跑)
- *     - unblockDescriptor                              — 有具名解阻 owner + action
+ *     - reviewAttention.state=covered / paths 非空     — review 挂在一条 pending 交互上
+ *       (ask_user_questions / request_confirmation, continuationPolicy=wake_assignee),
+ *       对方一回复就唤醒指派 — 这也是活路, 不是"等回复(无表)"
  *
  *   判定结果 (verdict):
  *     live                  — 有活着的 run / monitor / 执行策略待办人
@@ -27,7 +27,7 @@
  *     blocked_with_descriptor — 阻塞且写了具名解阻 owner + action
  *     dead_letter           — **阻塞但零 blocker / 零 descriptor / 零 monitor ⇒ 永不自动恢复**
  *     stalled_in_progress   — in_progress 但无 run 无 monitor (假活着)
- *     review_no_monitor     — in_review 但无 run 无 monitor (只能等对方主动回复)
+ *     review_no_monitor     — in_review 且 run / monitor / 挂起交互三无 (只能等对方主动回复)
  *     waiting_human         — in_review 且已指派给人类用户 (等老板)
  *     orphan                — todo/backlog 且零指派 (没人会认领)
  *     queued_stale          — todo/backlog 有指派但超阈值无 run (唤醒可能未送达)
@@ -105,6 +105,33 @@ function blockerAttentionOf(issue) {
   return attn && typeof attn === "object" ? attn : {};
 }
 
+/**
+ * review 面的 attention 真值 (控制面 reviewAttention)。
+ *
+ * 实测 COOA-44 / COOA-278: 都是 `in_review` + 零 run + 零 monitor, 但各自挂着一条
+ * `pending` 交互 (ask_user_questions / request_confirmation, continuationPolicy=wake_assignee)。
+ * 只看 run/monitor 会把"球已经递出去了"读成"等回复(无表)", 于是每轮巡检都对这两条
+ * 报假警报 —— 假警报一多, 真死路 (COOA-4 那种) 就淹在噪音里, 这正是本脚本存在的理由。
+ */
+function reviewAttentionOf(issue) {
+  const attn = issue && issue.reviewAttention;
+  return attn && typeof attn === "object" ? attn : {};
+}
+
+/** reviewAttention.paths 里的待办路径 (畸形行直接剔除, 不猜) */
+function reviewPathsOf(attn) {
+  const paths = attn && Array.isArray(attn.paths) ? attn.paths : [];
+  return paths.filter((p) => p && typeof p === "object");
+}
+
+/** "Pending ask user questions → Board" 这种人读摘要 */
+function describeReviewPaths(paths) {
+  const labels = paths
+    .map((p) => [p.label, p.responder].filter(Boolean).join(" → "))
+    .filter(Boolean);
+  return labels.length > 0 ? [...new Set(labels)].join(" / ") : "state=covered";
+}
+
 function runIdOf(issue) {
   return (
     (issue && issue.executionRunId) ||
@@ -167,6 +194,9 @@ export function classifyIssue(
   const monitor = issue && issue.monitorNextCheckAt;
   const stage = stageParticipantOf(issue);
   const attn = blockerAttentionOf(issue);
+  const reviewAttn = reviewAttentionOf(issue);
+  const reviewPaths = reviewPathsOf(reviewAttn);
+  const reviewLive = reviewPaths.length > 0 || reviewAttn.state === "covered";
   const unresolved = Number.isFinite(attn.unresolvedBlockerCount) ? attn.unresolvedBlockerCount : null;
   const treeLive = attn.blockingTreeLive === true;
   const descriptor = issue && issue.unblockDescriptor;
@@ -198,7 +228,11 @@ export function classifyIssue(
       reasons.push(`已指派人类 owner ${humanOwner}`);
       return { verdict: "waiting_human", reasons };
     }
-    reasons.push("in_review 但无 monitor / 无 active run — 只能等对方主动回复");
+    if (reviewLive) {
+      reasons.push(`review 挂在挂起交互上 (${describeReviewPaths(reviewPaths)}) — 对方回复即唤醒`);
+      return { verdict: "live", reasons };
+    }
+    reasons.push("in_review 但无 monitor / 无 active run / 无挂起交互 — 只能等对方主动回复");
     return { verdict: "review_no_monitor", reasons };
   }
 

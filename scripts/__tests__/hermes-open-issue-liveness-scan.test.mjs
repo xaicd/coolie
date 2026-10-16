@@ -38,6 +38,7 @@ function issue(overrides = {}) {
     unblockDescriptor: null,
     executionState: null,
     blockerAttention: null,
+    reviewAttention: null,
     lastActivityAt: iso(1),
     updatedAt: iso(1),
     ...overrides,
@@ -127,6 +128,72 @@ test("in_review: 无 monitor ⇒ review_no_monitor ; 指派人类 ⇒ waiting_hu
   assert.equal(
     classifyIssue(issue({ status: "in_review", assigneeUserId: "user-1", assigneeAgentId: null })).verdict,
     "waiting_human",
+  );
+});
+
+// 实测 (2026-10-16): COOA-44 与 COOA-278 都报"⚠️ 等回复(无表)", 实际各自挂着一条
+// pending 交互 (ask_user_questions / request_confirmation, wake_assignee)。
+// 假警报会把真死路 (COOA-4 假活着) 淹掉 —— 这两条必须判 live。
+test("in_review + reviewAttention.paths 非空 ⇒ live (球已递出, 回复即唤醒)", () => {
+  const { verdict, reasons } = classifyIssue(
+    issue({
+      status: "in_review",
+      reviewAttention: {
+        state: "covered",
+        reason: "Review has a maintained action path.",
+        paths: [
+          {
+            kind: "interaction",
+            label: "Pending ask user questions",
+            responder: "Board",
+            since: iso(0.1),
+            ref: "bc44f8a9-906c-4c97-9c76-8bdcae30a1bb",
+          },
+        ],
+      },
+    }),
+  );
+  assert.equal(verdict, "live");
+  assert.match(reasons.join(" "), /挂起交互/);
+  assert.match(reasons.join(" "), /Board/);
+});
+
+test("in_review + reviewAttention.state=covered 但零 paths ⇒ 仍算活路", () => {
+  assert.equal(
+    classifyIssue(issue({ status: "in_review", reviewAttention: { state: "covered", paths: [] } }))
+      .verdict,
+    "live",
+  );
+});
+
+test("in_review + reviewAttention=uncovered/none ⇒ 照旧报 review_no_monitor", () => {
+  assert.equal(
+    classifyIssue(issue({ status: "in_review", reviewAttention: { state: "uncovered", paths: [] } }))
+      .verdict,
+    "review_no_monitor",
+  );
+  assert.equal(
+    classifyIssue(issue({ status: "in_review", reviewAttention: { state: "none", paths: [] } })).verdict,
+    "review_no_monitor",
+  );
+});
+
+test("reviewAttention 畸形输入只退化, 不抛错也不误判活路", () => {
+  for (const bad of ["covered", 7, [], { paths: "covered" }, { paths: [null, 7, "x"] }]) {
+    assert.equal(
+      classifyIssue(issue({ status: "in_review", reviewAttention: bad })).verdict,
+      "review_no_monitor",
+      `畸形 reviewAttention 不得被当成活路: ${JSON.stringify(bad)}`,
+    );
+  }
+});
+
+test("in_progress 即使有挂起交互也照旧报假活着 (review 活路只对 in_review 成立)", () => {
+  assert.equal(
+    classifyIssue(
+      issue({ status: "in_progress", reviewAttention: { state: "covered", paths: [{ label: "x" }] } }),
+    ).verdict,
+    "stalled_in_progress",
   );
 });
 
