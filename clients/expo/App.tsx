@@ -75,13 +75,9 @@ import { RegisterScreen } from "./src/screens/RegisterScreen";
 import { AgentDetailScreen } from "./src/screens/AgentDetailScreen";
 import { TaskDetailScreen } from "./src/screens/TaskDetailScreen";
 import { SpecEditorScreen } from "./src/screens/SpecEditorScreen";
-import { TasksScreen } from "./src/screens/TasksScreen";
 import { TaskKanbanScreen } from "./src/screens/TaskKanbanScreen";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
-import { PipelinesScreen } from "./src/screens/PipelinesScreen";
-import { PlansScreen } from "./src/screens/PlansScreen";
 import { GitCredentialsScreen } from "./src/screens/GitCredentialsScreen";
-import { ProjectsScreen } from "./src/screens/ProjectsScreen";
 import { WebContainerScreen } from "./src/screens/WebContainerScreen";
 import { WebLoginScreen } from "./src/screens/WebLoginScreen";
 import { SettingsScreen } from "./src/screens/SettingsScreen";
@@ -695,10 +691,6 @@ function HomeScreen({
   const [inboxInitialTab, setInboxInitialTab] = useState<"all" | "mine" | "approvals" | "blocked">("all");
   const [assetsTab, setAssetsTab] = useState<OrgAssetTab>("ontology");
   const [agentDetail, setAgentDetail] = useState<AgentRow | null>(null);
-  // 任务页顶部编排按钮组 (wave20) 的落地屏: Pipeline 列表 / Plan 列表 / 项目中心
-  const [pipelinesOpen, setPipelinesOpen] = useState(false);
-  const [plansOpen, setPlansOpen] = useState(false);
-  const [projectsOpen, setProjectsOpen] = useState(false);
   /** 项目卡「创建任务」带过来的项目 id —— 非空即打开建单弹窗并预选该项目。 */
   const [createTaskProjectId, setCreateTaskProjectId] = useState<string | null>(null);
   /** 项目卡「查看任务」带过来的项目 id —— 任务页落地时套用为项目筛选。 */
@@ -892,9 +884,6 @@ function HomeScreen({
     if (agentDetail) return setAgentDetail(null), true;
     if (searchOpen) return setSearchOpen(false), true;
     if (notificationsOpen) return setNotificationsOpen(false), true;
-    if (pipelinesOpen) return setPipelinesOpen(false), true;
-    if (plansOpen) return setPlansOpen(false), true;
-    if (projectsOpen) return setProjectsOpen(false), true;
     if (gitCredentialsOpen) return setGitCredentialsOpen(false), true;
     // 插件层级: 插件设置(最上层) 必须先于 插件管理 出栈, 才能逐级 LIFO 返回
     // (COOA-136 FDSE 真机走查: 修复「返回键跳级」)。
@@ -989,9 +978,6 @@ function HomeScreen({
       agentDetail ||
       searchOpen ||
       notificationsOpen ||
-      pipelinesOpen ||
-      plansOpen ||
-      projectsOpen ||
       gitCredentialsOpen ||
       pluginSettingsId !== null ||
       pluginManagerOpen ||
@@ -1112,40 +1098,6 @@ function HomeScreen({
               }}
               onOpenWorkshop={() => {
                 setNotificationsOpen(false);
-                navigateTab("chat");
-              }}
-            />
-          ) : pipelinesOpen ? (
-            <PipelinesScreen
-              company={company}
-              onBack={() => setPipelinesOpen(false)}
-              onOpenWeb={(path, title) =>
-                setWebContainerTarget({ path, title: title ?? "流水线" })
-              }
-            />
-          ) : plansOpen ? (
-            <PlansScreen
-              company={company}
-              onBack={() => setPlansOpen(false)}
-              onOpenPlan={(issue) => {
-                handleOpenIssue(issue);
-              }}
-            />
-          ) : projectsOpen ? (
-            <ProjectsScreen
-              company={company}
-              onBack={() => setProjectsOpen(false)}
-              onOpenWebProjects={(subPath?: string, title?: string) =>
-                setWebContainerTarget({ path: subPath || "/projects", title: title || "项目中心" })
-              }
-              onOpenProjectTasks={(project) => {
-                setProjectsOpen(false);
-                setTasksFilterProjectId(project.id);
-                navigateTab("tasks");
-              }}
-              onOpenProjectChat={(project) => {
-                setProjectsOpen(false);
-                setChatInitialProjectId(project.id);
                 navigateTab("chat");
               }}
             />
@@ -1359,9 +1311,6 @@ function HomeScreen({
             // 切 tab 时重置子页面，直达所选 tab 根界面 (boss: APP 底部导航要固定起来的)
             setComposeOpen(false);
             setSelected(null);
-            setProjectsOpen(false);
-            setPipelinesOpen(false);
-            setPlansOpen(false);
             setAgentDetail(null);
             setGitCredentialsOpen(false);
             setPluginManagerOpen(false);
