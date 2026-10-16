@@ -115,6 +115,7 @@
     "test:adapter-prompt-clamp": "node --test scripts/__tests__/adapter-prompt-clamp.test.mjs",
     "test:hermes-heartbeat": "node --test scripts/__tests__/hermes-heartbeat-snapshot.test.mjs",
     "test:hermes-liveness": "node --test scripts/__tests__/hermes-open-issue-liveness-scan.test.mjs",
+    "test:hermes-scheduler": "node --test scripts/__tests__/hermes-scheduler-health-check.test.mjs",
     "test:workflow-engine": "node --test scripts/__tests__/workflow-engine.test.mjs",
     "test:fork-surface": "node scripts/check-fork-surface.mjs --cumulative",
     "test:install-sh-docker": "./scripts/test-install-sh-docker.sh",
