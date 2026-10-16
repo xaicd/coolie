@@ -258,15 +258,30 @@ export function queueKeyOf(item) {
 }
 
 /**
+ * 当前 issue 的锁状态等价类 (指纹用), 不是 run id 字面量.
+ * 心跳每轮都由 harness 重新签出本 issue → checkoutRunId 必然换新;
+ * 把 run id 放进指纹会让每一轮都恒为 changed, "无变化就只发一行"直接失效.
+ * 只区分: null(无锁) / self(本 run 持锁) / other(他人 run 持锁) / locked(不知道 self).
+ */
+export function lockStateOf(issue, selfRunId = null) {
+  if (!issue || issue.error) return null;
+  const run = issue.checkoutRunId ?? null;
+  if (!run) return null;
+  if (!selfRunId) return "locked";
+  return run === selfRunId ? "self" : "other";
+}
+
+/**
  * 盘面规范化: 只取"变了才值得知道"的维度, 且全部排序 → 可做稳定 sha256.
  * 字段阶段态 (phase-null) 刻意不进指纹: 它每轮都在 null 与实值之间摆,
  * 进指纹会让 changed 长期恒为 true, 反而淹没真信号.
+ * 同理: 本 issue 的 checkoutRunId 每轮换新, 指纹里只记 lockStateOf 等价类.
  */
 export function canonicalSnapshot(snapshot) {
   const s = snapshot ?? {};
   const issue =
     s.issue && !s.issue.error
-      ? [s.issue.identifier, s.issue.status, s.issue.priority, s.issue.checkoutRunId ?? null]
+      ? [s.issue.identifier, s.issue.status, s.issue.priority, lockStateOf(s.issue, s.selfRunId ?? null)]
       : null;
   const routines = (s.routines?.items ?? [])
     .map((r) => [
@@ -301,8 +316,16 @@ export function diffSnapshots(previous, current) {
   const deltas = [];
 
   if (JSON.stringify(before.issue) !== JSON.stringify(after.issue)) {
-    const fmt = (i) => (i ? `${i[0]} ${i[1]} ${i[2]} run=${String(i[3] ?? "null").slice(0, 8)}` : "unavailable");
-    deltas.push(`~ issue: ${fmt(before.issue)} -> ${fmt(after.issue)}`);
+    const fmt = (i) => (i ? i.join(" ") : "unavailable");
+    const onlyLock =
+      before.issue &&
+      after.issue &&
+      JSON.stringify(before.issue.slice(0, 3)) === JSON.stringify(after.issue.slice(0, 3));
+    deltas.push(
+      onlyLock
+        ? `~ issue ${after.issue[0]}: lock=${before.issue[3] ?? "null"} -> ${after.issue[3] ?? "null"}`
+        : `~ issue: ${fmt(before.issue)} -> ${fmt(after.issue)}`
+    );
   }
 
   const byId = (list) => new Map((list ?? []).map((r) => [String(r[0]), r]));
@@ -347,6 +370,31 @@ export function diffSnapshots(previous, current) {
 /** 默认比对状态文件位置 (scripts/.hermes-tmp 已在 .gitignore 中) */
 export const DEFAULT_STATE_PATH = path.join(HERE, ".hermes-tmp", "heartbeat-snapshot-state.json");
 
+/**
+ * 基线状态文件按 issue 分文件.
+ * 同仓可能同时跑多个心跳 (COOA-114 与心祖自己的执行 issue), 共用一个状态文件会互相覆盖基线,
+ * 表现就是每轮都报 CHANGED 并刷一屏 "- routine 消失" 的假 delta.
+ * 未知 issue 时退化为 "shared", 至少自洽.
+ */
+export function statePathFor(issueKey, base = DEFAULT_STATE_PATH) {
+  const key = issueKey ? String(issueKey).replace(/[^A-Za-z0-9._-]/g, "_").slice(0, 64) : "shared";
+  return path.join(path.dirname(base), `${path.basename(base, ".json")}.${key}.json`);
+}
+
+/**
+ * 上一轮基线是否属于同一个 issue.
+ * 不是同一 issue (或任一盘面处于退化态) 时不能做 deltas 比对, 只能当新基线 ——
+ * 否则会把两个不同 issue 的盘面差当成"变化"刷出来.
+ */
+export function isSameIssue(previous, snapshot) {
+  if (!previous) return true; // 首轮无基线 → 正常走基线路径
+  const prevId = previous?.canonical?.issue?.[0] ?? null;
+  if (!prevId) return false; // 上一轮基线自身是退化盘面, 不可比
+  const current = snapshot?.issue;
+  if (!current || current.error) return false; // 本轮盘面退化, 不拿它当基线
+  return prevId === (current.identifier ?? null);
+}
+
 /** 读上一轮状态; 任何损坏/缺失都退化为 null (首轮无基线, 不是异常) */
 export function readState(statePath = DEFAULT_STATE_PATH) {
   try {
@@ -372,7 +420,7 @@ export function writeState(state, statePath = DEFAULT_STATE_PATH) {
 /** 命令行参数解析 (可测) */
 export function parseArgs(argv = []) {
   const flags = { json: false, help: false, skipInbox: false, skipQueue: false, brief: false, noState: false };
-  const options = { issue: null, company: null, apiBase: null, routineIds: [], state: null };
+  const options = { issue: null, company: null, apiBase: null, routineIds: [], state: null, stateBase: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     const next = () => argv[++i];
@@ -408,6 +456,9 @@ export function parseArgs(argv = []) {
       case "--state":
         options.state = next() ?? null;
         break;
+      case "--state-base":
+        options.stateBase = next() ?? null;
+        break;
       case "--routine-ids":
         options.routineIds = (next() ?? "").split(",").map((s) => s.trim()).filter(Boolean);
         break;
@@ -422,6 +473,8 @@ export function parseArgs(argv = []) {
           options.apiBase = arg.slice("--api-base=".length);
         } else if (arg.startsWith("--state=")) {
           options.state = arg.slice("--state=".length);
+        } else if (arg.startsWith("--state-base=")) {
+          options.stateBase = arg.slice("--state-base=".length);
         }
         break;
     }
@@ -434,13 +487,17 @@ const HELP = `hermes-heartbeat-snapshot — Paperclip routine 心跳确定性快
 用法:
   node scripts/hermes-heartbeat-snapshot.mjs [--brief|--json] [--issue <id|key>] [--company <cid>]
                                             [--routine-ids a,b,c] [--skip-inbox] [--skip-queue]
-                                            [--state <path>] [--no-state] [--api-base <url>]
+                                            [--state <path> | --state-base <path>] [--no-state]
+                                            [--api-base <url>]
 
 说明:
   --routine-ids  当 companies-scoped list 端点不可用时, 按已知 routine id 走单条端点回退.
                  不传则诚实标注 routines: unavailable, 不编造数据.
   --brief        一行心脏起搏: 无变化一行, 有变化一行 + delta 行.
-  --state        与上一轮比对用的状态文件 (默认 scripts/.hermes-tmp/heartbeat-snapshot-state.json).
+  --state        与上一轮比对用的状态文件 (精确覆盖, 不做分 issue 派生).
+  --state-base   基线文件的基准路径; 实际写 <base 同目录>/<stem>.<issue>.json ——
+                 同仓并发跑多个心跳 (COOA-114 与心祖执行 issue) 时互不覆盖基线.
+                 默认 scripts/.hermes-tmp/heartbeat-snapshot-state.json.
   --no-state     只读盘面, 不写比对状态 (适合一次性排查).
 `;
 
@@ -481,6 +538,7 @@ export async function collectSnapshot(config) {
 
   const snapshot = {
     apiBase,
+    selfRunId: runId,
     issue: null,
     companyId: company,
     routines: { source: null, unavailableReason: null, items: [] },
@@ -593,7 +651,7 @@ export function renderText(snapshot) {
     lines.push(
       i.error
         ? `issue   : unavailable (${i.error})`
-        : `issue   : ${i.identifier} ${i.status} ${i.priority} run=${(i.checkoutRunId ?? "null").slice(0, 8)}`
+        : `issue   : ${i.identifier} ${i.status} ${i.priority} run=${(i.checkoutRunId ?? "null").slice(0, 8)} lock=${lockStateOf(i, snapshot.selfRunId)}`
     );
   }
   lines.push(`company : ${snapshot.companyId ?? "null"}`);
@@ -682,11 +740,13 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
       ? options.routineIds
       : (env.HERMES_ROUTINE_IDS ?? "").split(",").map((s) => s.trim()).filter(Boolean);
 
+  const issueParam = options.issue ?? env.PAPERCLIP_TASK_ID ?? null;
+
   const snapshot = await collectSnapshot({
     apiBase,
     apiKey,
     runId: env.PAPERCLIP_RUN_ID ?? null,
-    issue: options.issue ?? env.PAPERCLIP_TASK_ID ?? null,
+    issue: issueParam,
     company: options.company ?? env.PAPERCLIP_COMPANY_ID ?? null,
     routineIds,
     skipInbox: flags.skipInbox,
@@ -694,14 +754,23 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   });
 
   // 与上一轮比对: 只在完整盘面 (未跳过任何区块) 上做, 避免半盘面污染基线
-  const statePath = options.state ?? env.HERMES_HEARTBEAT_STATE ?? DEFAULT_STATE_PATH;
+  // 默认状态文件按 issue 分文件: 同仓并发心跳不互相覆盖基线
+  // 键优先用解析出的 identifier (人类可读, 与传 uuid 还是传 key 无关)
+  const stateKey = snapshot.issue && !snapshot.issue.error ? (snapshot.issue.identifier ?? issueParam) : issueParam;
+  const stateBase = options.stateBase ?? env.HERMES_HEARTBEAT_STATE_BASE ?? DEFAULT_STATE_PATH;
+  const statePath = options.state ?? env.HERMES_HEARTBEAT_STATE ?? statePathFor(stateKey, stateBase);
   const fullBoard = !flags.skipInbox && !flags.skipQueue;
   if (!flags.noState && fullBoard) {
     const previous = readState(statePath);
+    const comparable = isSameIssue(previous, snapshot);
     snapshot.signature = snapshotSignature(snapshot);
-    snapshot.previousSignature = previous?.signature ?? null;
+    snapshot.previousSignature = comparable ? (previous?.signature ?? null) : null;
     snapshot.changed = snapshot.previousSignature !== snapshot.signature;
-    snapshot.deltas = snapshot.changed ? diffSnapshots(previous, snapshot) : [];
+    snapshot.deltas = comparable
+      ? snapshot.changed
+        ? diffSnapshots(previous, snapshot)
+        : []
+      : ["(无上一轮状态, 本轮为基线)"];
     snapshot.statePath = statePath;
     writeState(
       {

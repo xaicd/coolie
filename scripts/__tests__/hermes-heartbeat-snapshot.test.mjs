@@ -19,6 +19,9 @@ import {
   queueLineCounts,
   queueKeyOf,
   canonicalSnapshot,
+  lockStateOf,
+  statePathFor,
+  isSameIssue,
   snapshotSignature,
   diffSnapshots,
   readState,
@@ -515,6 +518,81 @@ test("snapshotSignature ignores phase-null churn but reacts to real state change
   assert.notEqual(snapshotSignature(moved), baseSig);
 });
 
+// 心跳每轮 harness 都会重新签出本 issue → checkoutRunId 必然换新.
+// 这是实测 bug: 心跳 #142 报 CHANGED 却只有 `~ issue: ... run=9d9ca1fa -> run=2fa53594` 一条 delta,
+// 即指纹被"每分钟必变"的字段污染, no-change 模式永远不可能触发.
+test("signature survives the per-heartbeat checkout run id rotation", () => {
+  const first = { ...makeSnapshot(), selfRunId: "run-aaaa" };
+  const second = { ...makeSnapshot(), selfRunId: "run-bbbb" };
+  first.issue = { ...first.issue, checkoutRunId: "run-aaaa" };
+  second.issue = { ...second.issue, checkoutRunId: "run-bbbb" };
+
+  assert.equal(snapshotSignature(first), snapshotSignature(second), "self run id rotation must not move the signature");
+  assert.deepEqual(diffSnapshots({ canonical: canonicalSnapshot(first) }, second), []);
+  assert.equal(snapshotSignature({ ...first, selfRunId: "run-aaaa" }), snapshotSignature(first));
+});
+
+test("signature still moves on real lock transitions (unlock / foreign run)", () => {
+  const self = { ...makeSnapshot(), selfRunId: "run-aaaa" };
+  self.issue = { ...self.issue, checkoutRunId: "run-aaaa" };
+  const baseSig = snapshotSignature(self);
+
+  const unlocked = { ...self, issue: { ...self.issue, checkoutRunId: null } };
+  assert.notEqual(snapshotSignature(unlocked), baseSig, "losing the lock must move the signature");
+  assert.match(diffSnapshots({ canonical: canonicalSnapshot(self) }, unlocked)[0], /lock=self -> null/);
+
+  const foreign = { ...self, issue: { ...self.issue, checkoutRunId: "someone-else" } };
+  assert.notEqual(snapshotSignature(foreign), baseSig, "a foreign run holding the lock must move the signature");
+  assert.match(diffSnapshots({ canonical: canonicalSnapshot(self) }, foreign)[0], /lock=self -> other/);
+
+  // 无 selfRunId 时退化为稳定的 "locked", 不会随 run id 抖动
+  const unknownA = { ...makeSnapshot(), issue: { ...makeSnapshot().issue, checkoutRunId: "run-x" } };
+  const unknownB = { ...makeSnapshot(), issue: { ...makeSnapshot().issue, checkoutRunId: "run-y" } };
+  assert.equal(snapshotSignature(unknownA), snapshotSignature(unknownB));
+  assert.equal(lockStateOf(makeSnapshot().issue, null), "locked");
+});
+
+test("lockStateOf covers null / error / self / other", () => {
+  assert.equal(lockStateOf(null, "r"), null);
+  assert.equal(lockStateOf({ error: "HTTP 500" }, "r"), null);
+  assert.equal(lockStateOf({ checkoutRunId: null }, "r"), null);
+  assert.equal(lockStateOf({ checkoutRunId: "r" }, "r"), "self");
+  assert.equal(lockStateOf({ checkoutRunId: "z" }, "r"), "other");
+});
+
+// 同仓会并发跑多个心跳 (COOA-114 与心祖自己的执行 issue). 共用一个状态文件时,
+// 后者会覆盖前者的基线 → 每轮都 CHANGED 并刷一屏假 delta.
+test("statePathFor scopes the baseline per issue instead of sharing one file", () => {
+  const a = statePathFor("COOA-114");
+  const b = statePathFor("COOA-296");
+  assert.notEqual(a, b, "different issues must not share a baseline file");
+  assert.match(a, /heartbeat-snapshot-state\.COOA-114\.json$/);
+  assert.match(statePathFor(null), /heartbeat-snapshot-state\.shared\.json$/);
+  assert.match(statePathFor("uuid/with:bad chars"), /heartbeat-snapshot-state\.uuid_with_bad_chars\.json$/);
+  assert.equal(path.dirname(a), path.dirname(statePathFor("x", a)), "sibling files stay in one directory");
+});
+
+test("isSameIssue refuses to diff baselines across issues or degenerate boards", () => {
+  const current = makeSnapshot();
+  assert.equal(isSameIssue(null, current), true, "first run has no baseline to compare, still a baseline run");
+  assert.equal(
+    isSameIssue({ canonical: canonicalSnapshot({ ...current, issue: { ...current.issue, identifier: "COOA-296" } }) }, current),
+    false,
+    "a baseline from another issue must not be diffed"
+  );
+  assert.equal(isSameIssue({ canonical: canonicalSnapshot(current) }, current), true);
+  assert.equal(
+    isSameIssue({ canonical: { issue: null } }, current),
+    false,
+    "a degenerate stored baseline must not be treated as comparable"
+  );
+  assert.equal(
+    isSameIssue({ canonical: canonicalSnapshot(current) }, { ...current, issue: { error: "HTTP 401" } }),
+    false,
+    "a degenerate current board must not be stored as a diffable baseline"
+  );
+});
+
 test("diffSnapshots reports routine / inbox / queue / issue changes as readable lines", () => {
   const before = makeSnapshot();
   const after = makeSnapshot({
@@ -601,6 +679,8 @@ test("parseArgs understands the new heartbeat flags", () => {
   assert.equal(flags.skipQueue, true);
   assert.equal(options.state, "/tmp/s.json");
   assert.equal(parseArgs(["--state", "/tmp/x.json"]).options.state, "/tmp/x.json");
+  assert.equal(parseArgs(["--state-base", "/tmp/base.json"]).options.stateBase, "/tmp/base.json");
+  assert.equal(parseArgs(["--state-base=/tmp/base2.json"]).options.stateBase, "/tmp/base2.json");
 });
 
 // ---------------------------------------------------------------------------
@@ -678,6 +758,93 @@ test("end to end: a new blocked issue shows up as a delta line on the next heart
     assert.match(after.stdout, /queue 2\/0\/2\/1/);
   } finally {
     E2E_ISSUES.pop();
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// 回归: 真实心跳里每次 run 的 PAPERCLIP_RUN_ID 都不同 —— 只有 run id 在转时, 下一轮必须仍是
+// 单行 no-change (bug 现象: 指纹被 run id 污染, 每轮恒 CHANGED 且 delta 只有一行 run=...).
+test("end to end: rotating PAPERCLIP_RUN_ID between heartbeats keeps the board no-change", async () => {
+  const { server, baseUrl } = await startHeartbeatFixture();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-runid-"));
+  const statePath = path.join(dir, "state.json");
+  const base = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" };
+  try {
+    const first = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], {
+      env: { ...base, PAPERCLIP_RUN_ID: "run-9d9ca1fa-0ea0-4bc4-b26d-1e82c2c77553" },
+    });
+    assert.match(first.stdout, /CHANGED sig=[0-9a-f]{16}/);
+
+    const second = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], {
+      env: { ...base, PAPERCLIP_RUN_ID: "run-2fa53594-c256-44d1-b30e-4cda21289a6e" },
+    });
+    assert.match(second.stdout, /no-change/, "a new run id alone must not count as a board change");
+    assert.equal(second.stdout.trim().split("\n").length, 1, "run id rotation must stay a single line");
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// 回归: 默认状态文件按 issue 分文件 —— 第二个心跳不该读到第一个心跳的基线
+test("end to end: the default baseline file is per issue, so concurrent heartbeats do not clobber each other", async () => {
+  const { server, baseUrl } = await startHeartbeatFixture();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-perissue-"));
+  const baseState = path.join(dir, "state.json");
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" };
+  try {
+    await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state-base", baseState], { env });
+    assert.ok(fs.existsSync(path.join(dir, "state.COOA-114.json")), "baseline must land in an issue-scoped file");
+
+    const second = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state-base", baseState], { env });
+    assert.match(second.stdout, /no-change/);
+    assert.equal(second.stdout.trim().split("\n").length, 1);
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// 回归: 显式共用同一个 --state 文件时, 换 issue 只当"新基线", 不把两个 issue 的盘面差刷成 delta
+const OTHER_ISSUE = {
+  id: "other-issue-id-0000",
+  identifier: "COOA-296",
+  title: "Coolie 工坊持续研发与版本升级守护调度器",
+  status: "in_progress",
+  priority: "high",
+  checkoutRunId: null,
+  companyId: ISSUE.companyId,
+};
+
+function startTwoIssueFixture() {
+  return startFixtureServer((req, res) => {
+    res.setHeader("content-type", "application/json");
+    if (req.url === `/api/issues/${ISSUE.id}`) return res.end(JSON.stringify(ISSUE));
+    if (req.url === `/api/issues/${OTHER_ISSUE.id}`) return res.end(JSON.stringify(OTHER_ISSUE));
+    if (req.url === `/api/companies/${ISSUE.companyId}/routines`) return res.end(JSON.stringify(ROUTINES));
+    if (req.url === `/api/companies/${ISSUE.companyId}/issues?limit=400`) return res.end(JSON.stringify(E2E_ISSUES));
+    if (req.url === `/api/inbox?companyId=${ISSUE.companyId}`) {
+      return res.end(
+        JSON.stringify({ pendingApprovals: [], failures: [], failedRuns: [], mentionedBy: [], joinRequests: [] })
+      );
+    }
+    res.statusCode = 404;
+    res.end(JSON.stringify({ error: "API route not found" }));
+  });
+}
+
+test("end to end: a baseline written by another issue is reported as a fresh baseline, not a fake delta flood", async () => {
+  const { server, baseUrl } = await startTwoIssueFixture();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-crossissue-"));
+  const statePath = path.join(dir, "shared-state.json");
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" };
+  try {
+    await execFileAsync("node", [SCRIPT, "--brief", "--issue", OTHER_ISSUE.id, "--state", statePath], { env });
+    const other = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
+    assert.match(other.stdout, /\(无上一轮状态, 本轮为基线\)/);
+    assert.doesNotMatch(other.stdout, /- routine 心祖 消失/, "a foreign baseline must not fabricate deltas");
+  } finally {
     server.close();
     fs.rmSync(dir, { recursive: true, force: true });
   }
