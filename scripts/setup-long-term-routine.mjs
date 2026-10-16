@@ -65,7 +65,16 @@ async function main() {
   let targetRoutine = routines.find(r => r.title === routineTitle);
 
   if (targetRoutine) {
-    console.log(`已存在 Routine: ${targetRoutine.id} - 状态: ${targetRoutine.status}`);
+    // 幂等 resume: 不论当前 status 是什么,都强制拉回 active,避免 routine 调度器 paused 后静默停摆 (心法 #49)
+    if (targetRoutine.status !== 'active') {
+      console.log(`⚠️  Routine 当前 status=${targetRoutine.status}, 幂等 resume → active`);
+      targetRoutine = await request(`/routines/${targetRoutine.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'active' }),
+      });
+    } else {
+      console.log(`✅ Routine 已是 active: ${targetRoutine.id}`);
+    }
   } else {
     console.log('未找到常驻 Routine 调度器，正在创建...');
     targetRoutine = await request(`/companies/${COMPANY_ID}/routines`, {
@@ -85,13 +94,23 @@ async function main() {
     console.log(`成功创建 Routine: ${targetRoutine.id}`);
   }
 
-  console.log('\n=== [3/4] 检查并配置 Schedule 触发器 ===');
+  console.log('\n=== [3/4] 检查并幂等 resume Schedule 触发器 ===');
   const routineDetail = await request(`/routines/${targetRoutine.id}`);
   const triggers = routineDetail.triggers || [];
   let scheduleTrigger = triggers.find(t => t.kind === 'schedule');
 
   if (scheduleTrigger) {
-    console.log(`已存在 Schedule Trigger: ${scheduleTrigger.id} (${scheduleTrigger.cronExpression})`);
+    // 幂等 resume trigger: 不论 enabled 是 true/false 都强制 enable 并重排 nextRunAt
+    if (!scheduleTrigger.enabled) {
+      console.log(`⚠️  Trigger 当前 enabled=${scheduleTrigger.enabled}, 幂等 re-enable`);
+      const patched = await request(`/routine-triggers/${scheduleTrigger.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ enabled: true }),
+      });
+      scheduleTrigger = patched.trigger || patched;
+    } else {
+      console.log(`✅ Schedule Trigger 已 enabled: ${scheduleTrigger.id} (${scheduleTrigger.cronExpression})`);
+    }
   } else {
     console.log('正在为 Routine 添加每 15 分钟定时触发器 (*/15 * * * *)...');
     const triggerRes = await request(`/routines/${targetRoutine.id}/triggers`, {
