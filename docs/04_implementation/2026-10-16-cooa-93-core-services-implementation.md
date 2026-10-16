@@ -3,7 +3,7 @@
 > **工单**: COOA-93 (构建环节 impl 3/5) · **负责工匠**: 铁匠 (Core SWE)
 > **上游设计**: CS-HLD-002 / CS-API-002 / CS-DB-002 (COOA-92 墨斗 FDA)
 > **交付仓库**: `projects/cls-core-services/` (独立交付工作区，已建独立 trunk)
-> **主干提交**: `922413d` (branch `main`) · **日期**: 2026-10-16
+> **主干提交**: tag `cooa-93-impl` (branch `main`) · **日期**: 2026-10-16
 
 ---
 
