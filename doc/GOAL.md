@@ -1,4 +1,7 @@
-# Paperclip
+# Paperclip & Coolie
+
+> **Coolie Agent Loop 专用执行守则**: 数字员工执行心跳循环请优先遵循 [**`goal.md`**](../goal.md) 与 [**`GOALS.md`**](../GOALS.md)。  
+> **核心原则**: 进场即行动，单人原子锁，一工单一提交 (1 Task = 1 Commit)，真机验伪，无工件不完工 (No Artifact, No Done)。
 
 **Paperclip is the backbone of the autonomous economy.** We are building the infrastructure that autonomous AI companies run on. Our goal is for Paperclip-powered companies to collectively generate economic output that rivals the GDP of the world's largest countries. Every decision we make should serve that: make autonomous companies more capable, more governable, more scalable, and more real.
 
