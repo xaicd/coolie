@@ -31,6 +31,9 @@
  *                                  与上一轮保存的指纹比对 → `changed: true|false` + 人读 delta 行.
  *                                  心跳在盘面无变化时只需发一行, 不再重贴 12KB 样板
  *   8. `--brief`                 — 一行心脏起搏 (无变化一行, 有变化一行 + delta 行)
+ *   9. `summarizeWaiting()`      — 本 issue **自己的挂起交互** (等人类回复的卡片).
+ *                                  大盘回答"工单还回不回得来", 这一节回答"我还在等谁":
+ *                                  挂起卡片不进指纹 (年龄每轮都在长), 只记 (计数, kinds 集合)
  *
  * 用法:
  *   node scripts/hermes-heartbeat-snapshot.mjs                 # 人读紧凑快照
@@ -48,7 +51,13 @@ import fs from "node:fs";
 import path from "node:path";
 import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { scanIssues, VERDICTS, ATTENTION_VERDICTS } from "./hermes-open-issue-liveness-scan.mjs";
+import {
+  scanIssues,
+  VERDICTS,
+  ATTENTION_VERDICTS,
+  WAKE_CONTINUATION_POLICIES,
+  pickInteractions,
+} from "./hermes-open-issue-liveness-scan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(HERE, "..");
@@ -297,6 +306,63 @@ export function summarizeLiveness(issues, options = {}) {
 }
 
 /**
+ * 挂起卡片的年龄 (分钟, 取整); 时间戳缺失/不可解析 → null, 不猜.
+ */
+function ageMinutesOf(createdAt, now) {
+  const stamp = Date.parse(createdAt ?? "");
+  if (!Number.isFinite(stamp)) return null;
+  return Math.max(0, Math.round((now - stamp) / 60000));
+}
+
+/**
+ * 本 issue **自己**挂着的交互卡片 —— 心跳要回答的第三个问题: "我还在等谁".
+ *
+ * 前两问 ("大盘有几条" / "还回不回得来") 都不覆盖这一格: 主线 4/4 主轴已 done、
+ * 盘面无死信, 而我本人正等着一封没人回复的卡片 —— 那是我唯一的等待路径, 却一直
+ * 只活在评论的散文里. 这里把它变成可度量的一格:
+ *   - pendingCount / kinds / oldestAgeMinutes: 卡片真值 (人读)
+ *   - wakeCount: 其中"对方回复即唤醒本 run"的条数 (与 liveness 扫描器同源口径)
+ *   - wakesAssignee 只作为**展示**字段, 不进指纹
+ *
+ * 进指纹的只有 (pendingCount, kinds 集合): 年龄每轮都在长, 进指纹会让 changed 恒为
+ * true —— 与 canonicalSnapshot 里 idleHours / phase-null 同一类坑.
+ * 查询失败/畸形回包只登记 checked=false + error, 不打断心跳.
+ */
+export function summarizeWaiting(payload, options = {}) {
+  const now = options.now ?? Date.now();
+  if (typeof payload === "string") {
+    return { checked: false, error: "unparsable response", pendingCount: null, wakeCount: null, kinds: [], oldestAgeMinutes: null, items: [] };
+  }
+  const shapeOk = Array.isArray(payload) || (payload && typeof payload === "object" && Array.isArray(payload.interactions));
+  const error = apiErrorOf(payload) ?? (shapeOk ? null : "unrecognized interactions payload");
+  if (error) {
+    return { checked: false, error, pendingCount: null, wakeCount: null, kinds: [], oldestAgeMinutes: null, items: [] };
+  }
+  const items = pickInteractions(payload)
+    .filter((item) => item && item.status === "pending")
+    .map((item) => ({
+      id: item.id ?? null,
+      kind: item.kind ?? "interaction",
+      continuationPolicy: item.continuationPolicy ?? null,
+      resolverPolicy: item.resolverPolicy ?? null,
+      createdAt: item.createdAt ?? null,
+      ageMinutes: ageMinutesOf(item.createdAt, now),
+      wakesAssignee: WAKE_CONTINUATION_POLICIES.includes(item.continuationPolicy),
+    }))
+    .sort((a, b) => String(a.kind).localeCompare(String(b.kind)) || String(a.id).localeCompare(String(b.id)));
+  const ages = items.map((item) => item.ageMinutes).filter((value) => typeof value === "number");
+  return {
+    checked: true,
+    error: null,
+    pendingCount: items.length,
+    wakeCount: items.filter((item) => item.wakesAssignee).length,
+    kinds: [...new Set(items.map((item) => item.kind))].sort(),
+    oldestAgeMinutes: ages.length > 0 ? Math.max(...ages) : null,
+    items,
+  };
+}
+
+/**
  * 当前 issue 的锁状态等价类 (指纹用), 不是 run id 字面量.
  * 心跳每轮都由 harness 重新签出本 issue → checkoutRunId 必然换新;
  * 把 run id 放进指纹会让每一轮都恒为 changed, "无变化就只发一行"直接失效.
@@ -346,7 +412,11 @@ export function canonicalSnapshot(snapshot) {
         (s.liveness.attention ?? []).map((a) => `${a.identifier}:${a.verdict}`).sort(),
       ]
     : null;
-  return { issue, routines, inbox, queue, liveness };
+  // 挂起卡片: 只记 (计数, kinds) —— 年龄每轮都在长, 进指纹会让 changed 恒为 true
+  const waiting = s.waiting
+    ? [s.waiting.pendingCount ?? null, (s.waiting.kinds ?? []).slice().sort()]
+    : null;
+  return { issue, routines, inbox, queue, liveness, waiting };
 }
 
 /** 盘面指纹 (16 hex); 同盘面必同指纹, 与回包顺序无关 */
@@ -406,6 +476,14 @@ export function diffSnapshots(previous, current) {
     const newLive = new Set((after.liveness?.[1] ?? []).map(String));
     for (const entry of newLive) if (!oldLive.has(entry)) deltas.push(`+ 活路: ${entry}`);
     for (const entry of oldLive) if (!newLive.has(entry)) deltas.push(`- 活路: ${entry}`);
+  }
+
+  // 挂起卡片变化: "我在等谁" 的转变 (卡片被答/被撤/新挂一张) 值得一行 —— 它决定我下一轮还回不回得来
+  const beforeWaiting = before.waiting ?? null;
+  const afterWaiting = after.waiting ?? null;
+  if (JSON.stringify(beforeWaiting) !== JSON.stringify(afterWaiting)) {
+    const fmtWaiting = (w) => (w === null ? "未记录" : `${w[0] ?? "?"} pending ${JSON.stringify(w[1] ?? [])}`);
+    deltas.push(`~ 挂起卡片: ${fmtWaiting(beforeWaiting)} -> ${fmtWaiting(afterWaiting)}`);
   }
 
   const oldQueue = new Map((before.queue ?? []).map(([k, ids]) => [k, new Set(ids ?? [])]));
@@ -473,7 +551,7 @@ export function writeState(state, statePath = DEFAULT_STATE_PATH) {
 
 /** 命令行参数解析 (可测) */
 export function parseArgs(argv = []) {
-  const flags = { json: false, help: false, skipInbox: false, skipQueue: false, brief: false, noState: false };
+  const flags = { json: false, help: false, skipInbox: false, skipQueue: false, skipWaiting: false, brief: false, noState: false };
   const options = { issue: null, company: null, apiBase: null, routineIds: [], state: null, stateBase: null };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -497,6 +575,9 @@ export function parseArgs(argv = []) {
         break;
       case "--skip-queue":
         flags.skipQueue = true;
+        break;
+      case "--skip-waiting":
+        flags.skipWaiting = true;
         break;
       case "--issue":
         options.issue = next() ?? null;
@@ -541,8 +622,8 @@ const HELP = `hermes-heartbeat-snapshot — Paperclip routine 心跳确定性快
 用法:
   node scripts/hermes-heartbeat-snapshot.mjs [--brief|--json] [--issue <id|key>] [--company <cid>]
                                             [--routine-ids a,b,c] [--skip-inbox] [--skip-queue]
-                                            [--state <path> | --state-base <path>] [--no-state]
-                                            [--api-base <url>]
+                                            [--skip-waiting] [--state <path> | --state-base <path>]
+                                            [--no-state] [--api-base <url>]
 
 说明:
   --routine-ids  当 companies-scoped list 端点不可用时, 按已知 routine id 走单条端点回退.
@@ -560,6 +641,12 @@ const HELP = `hermes-heartbeat-snapshot — Paperclip routine 心跳确定性快
   dead_letter / stalled_in_progress / review_no_monitor / orphan / queued_stale
   五类"需出手"工单, 汇总为一行 lx N/M. 只列非零项; 全零显示 lx N/M (ok).
   指纹只含 (identifier:verdict), 不含 idle 时长 —— 否则 changed 恒为 true.
+
+挂起卡片 (waiting):
+  本 issue 自己挂着的交互卡片 —— 一行回答"我还在等谁", 便于判断主线是在等人类回复
+  还是在等 routine 自驱. wait=0p 就是没人可等, wait=1p/23m 就是有一张挂了 23 分钟.
+  指纹只含 (计数, kinds), 不含年龄 —— 同样是为了不让 changed 恒为 true.
+  --skip-waiting 跳过这一节 (跳过时不做基线比对, 避免半盘面污染基线).
 `;
 
 /** 默认状态路径可用 env 覆盖 (跨机复刻时不必改代码) */
@@ -594,6 +681,7 @@ export async function collectSnapshot(config) {
     routineIds = [],
     skipInbox = false,
     skipQueue = false,
+    skipWaiting = false,
     livenessNow = Date.now(),
     fetchImpl = globalThis.fetch,
   } = config;
@@ -608,6 +696,7 @@ export async function collectSnapshot(config) {
     queue: null,
     queueUnavailableReason: null,
     liveness: null,
+    waiting: null,
   };
 
   // 1. issue 真值 + companyId 反查 (心法 #148: env 未注入 companyId 时走 issue 反查)
@@ -628,6 +717,13 @@ export async function collectSnapshot(config) {
     } else {
       snapshot.issue = { error: apiErrorOf(result.body) ?? `HTTP ${result.status}`, text: result.text.slice(0, 200) };
     }
+  }
+
+  // 1.5 本 issue 自己的挂起交互 ("我还在等谁") —— 只查本 issue, 不扫全盘
+  if (!skipWaiting && snapshot.issue && !snapshot.issue.error && snapshot.issue.id) {
+    const list = await getJson(`${apiBase}/issues/${snapshot.issue.id}/interactions`, { apiKey, runId, fetchImpl });
+    const payload = list.ok ? list.body : (apiErrorOf(list.body) ?? `HTTP ${list.status}`);
+    snapshot.waiting = summarizeWaiting(payload, { now: livenessNow });
   }
 
   // 2. routines: companies-scoped list 是唯一真值源 (心法 #78/#155), 死掉时按 id 回退 (心法 #184/#188)
@@ -748,6 +844,15 @@ export function renderText(snapshot) {
     const counts = INBOX_BUCKETS.map((b) => `${b}=${inbox[b] ?? "null"}`).join(" ");
     lines.push(`inbox   : ${counts}${inbox.error ? ` error="${inbox.error}"` : ""}`);
   }
+  if (snapshot.waiting) {
+    lines.push(`waiting : ${waitingSummaryText(snapshot.waiting)}`);
+    for (const item of snapshot.waiting.items ?? []) {
+      lines.push(
+        `  ${item.kind} ${item.id ?? "?"} pending ${item.ageMinutes ?? "?"}m ` +
+          `policy=${item.continuationPolicy ?? "null"}${item.wakesAssignee ? " (回复即唤醒)" : ""}`
+      );
+    }
+  }
   if (snapshot.queue) {
     lines.push(`queue   : ${queueLineCounts(snapshot.queue)} 总计 ${snapshot.queue.total} (进行中/等拍板/阻塞/待办)`);
     for (const bucket of QUEUE_BUCKETS) {
@@ -792,6 +897,23 @@ export function livenessSummaryText(liveness) {
 }
 
 /**
+ * "wait=1p/23m ask_user_questions" — 一行说清我在等谁:
+ *   - `wait=skip` : 没查 (--skip-waiting / 没传 issue)
+ *   - `wait=?`    : 查了但端点不可用 —— 不假装"没人在等"
+ *   - `wait=0p`   : 确实没有挂起卡片 (别等我)
+ *   - `wait=1p/23m ask_user_questions`: 1 张挂起卡片, 最老 23 分钟, 是问人的卡片
+ */
+export function waitingSummaryText(waiting) {
+  if (!waiting) return "wait=skip";
+  if (waiting.checked === false) return "wait=?";
+  const count = waiting.pendingCount ?? 0;
+  if (count === 0) return "wait=0p";
+  const age = typeof waiting.oldestAgeMinutes === "number" ? `${waiting.oldestAgeMinutes}m` : "?m";
+  const kinds = (waiting.kinds ?? []).join("/");
+  return `wait=${count}p/${age}${kinds ? ` ${kinds}` : ""}`;
+}
+
+/**
  * 一行心脏起搏: 盘面无变化时只输出一行 (不再重贴 12KB 样板),
  * 有变化时追加 delta 行. 这是心跳的默认输出形态.
  */
@@ -811,7 +933,7 @@ export function renderBrief(snapshot) {
   const state = snapshot.signature ? (snapshot.changed ? "CHANGED" : "no-change") : "no-baseline";
   const head =
     `HB ${stamp} ${state} sig=${snapshot.signature ?? "null"} · ${issue} · ${routines} · ` +
-    `queue ${counts} · ${inbox} · ${livenessSummaryText(snapshot.liveness)}`;
+    `queue ${counts} · ${inbox} · ${livenessSummaryText(snapshot.liveness)} · ${waitingSummaryText(snapshot.waiting)}`;
   return [head, ...(snapshot.deltas ?? []).map((d) => `  ${d}`)].join("\n");
 }
 
@@ -848,6 +970,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     routineIds,
     skipInbox: flags.skipInbox,
     skipQueue: flags.skipQueue,
+    skipWaiting: flags.skipWaiting,
   });
 
   // 与上一轮比对: 只在完整盘面 (未跳过任何区块) 上做, 避免半盘面污染基线
@@ -856,7 +979,7 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const stateKey = snapshot.issue && !snapshot.issue.error ? (snapshot.issue.identifier ?? issueParam) : issueParam;
   const stateBase = options.stateBase ?? env.HERMES_HEARTBEAT_STATE_BASE ?? DEFAULT_STATE_PATH;
   const statePath = options.state ?? env.HERMES_HEARTBEAT_STATE ?? statePathFor(stateKey, stateBase);
-  const fullBoard = !flags.skipInbox && !flags.skipQueue;
+  const fullBoard = !flags.skipInbox && !flags.skipQueue && !flags.skipWaiting;
   if (!flags.noState && fullBoard) {
     const previous = readState(statePath);
     const comparable = isSameIssue(previous, snapshot);

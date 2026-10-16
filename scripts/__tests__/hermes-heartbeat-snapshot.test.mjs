@@ -19,7 +19,9 @@ import {
   queueLineCounts,
   queueKeyOf,
   summarizeLiveness,
+  summarizeWaiting,
   livenessSummaryText,
+  waitingSummaryText,
   canonicalSnapshot,
   lockStateOf,
   statePathFor,
@@ -477,6 +479,7 @@ function makeSnapshot({
     mentionedBy: [],
     joinRequests: [],
   },
+  waiting = null,
 } = {}) {
   return {
     apiBase: "http://127.0.0.1:3100/api",
@@ -492,6 +495,7 @@ function makeSnapshot({
     inbox: summarizeInbox(inboxPayload),
     queue: summarizeQueue(issues),
     liveness: summarizeLiveness(issues, { now: FIXTURE_NOW }),
+    waiting,
   };
 }
 
@@ -986,5 +990,140 @@ test("end to end: the CLI reports liveness on a real board (live fixture server)
     assert.match(stdout, /lx 1\/2 \(stall=1\)/, `brief must carry liveness, got: ${stdout}`);
   } finally {
     server.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 10. 挂起卡片 (waiting): 心跳要回答的第三问 —— 我还在等谁
+//     背景: 主线盘面无死信、routine 全绿, 而我本人正等着一张没人回复的卡片 ——
+//     这一格此前只活在散文里, 每轮都得靠人读评论才知道在等谁.
+// ---------------------------------------------------------------------------
+
+const WAITING_NOW = Date.parse("2026-10-16T14:20:00.000Z");
+
+test("summarizeWaiting only counts pending cards and measures the oldest one", () => {
+  const waiting = summarizeWaiting(
+    [
+      { id: "a", kind: "ask_user_questions", status: "pending", continuationPolicy: "wake_assignee", createdAt: "2026-10-16T13:57:00.000Z" },
+      { id: "b", kind: "request_confirmation", status: "pending", continuationPolicy: "wake_assignee_on_accept", createdAt: "2026-10-16T14:05:00.000Z" },
+      { id: "c", kind: "ask_user_questions", status: "cancelled", createdAt: "2026-10-16T12:00:00.000Z" },
+    ],
+    { now: WAITING_NOW }
+  );
+  assert.equal(waiting.checked, true);
+  assert.equal(waiting.pendingCount, 2, "cancelled 卡片不是等待路径");
+  assert.equal(waiting.wakeCount, 2, "两张都声明了回复即唤醒");
+  assert.deepEqual(waiting.kinds, ["ask_user_questions", "request_confirmation"]);
+  assert.equal(waiting.oldestAgeMinutes, 23, "最老一张 13:57 挂到现在");
+  assert.deepEqual(
+    waiting.items.map((i) => i.id),
+    ["a", "b"],
+    "排序稳定 → 回包顺序不影响指纹"
+  );
+});
+
+test("summarizeWaiting degrades honestly instead of inventing zero cards", () => {
+  for (const bad of [{ error: "API route not found" }, "not json", null, 42, {}]) {
+    const waiting = summarizeWaiting(bad);
+    assert.equal(waiting.checked, false, `must not claim a clean wait state for ${JSON.stringify(bad)}`);
+    assert.equal(waiting.pendingCount, null, "查不到时不能假装 0 张卡");
+    assert.deepEqual(waiting.items, []);
+  }
+  for (const empty of [[], { interactions: [] }]) {
+    const waiting = summarizeWaiting(empty);
+    assert.equal(waiting.checked, true);
+    assert.equal(waiting.pendingCount, 0);
+    assert.equal(waiting.oldestAgeMinutes, null);
+  }
+  const noStamp = summarizeWaiting([{ id: "x", kind: "ask_user_questions", status: "pending" }], { now: WAITING_NOW });
+  assert.equal(noStamp.pendingCount, 1);
+  assert.equal(noStamp.oldestAgeMinutes, null, "createdAt 不可解析 → 年龄留 null, 不猜");
+});
+
+test("a waiting card aging must not move the signature — only (count, kinds) is fingerprinted", () => {
+  const card = { id: "a", kind: "ask_user_questions", status: "pending", continuationPolicy: "wake_assignee", createdAt: "2026-10-16T14:19:00.000Z" };
+  const young = summarizeWaiting([card], { now: Date.parse("2026-10-16T14:20:00.000Z") });
+  const old = summarizeWaiting([card], { now: Date.parse("2026-10-16T20:20:00.000Z") });
+  assert.equal(young.oldestAgeMinutes, 1);
+  assert.equal(old.oldestAgeMinutes, 361);
+  assert.equal(
+    snapshotSignature(makeSnapshot({ waiting: young })),
+    snapshotSignature(makeSnapshot({ waiting: old })),
+    "年龄每轮都在长, 进指纹会让 changed 恒为 true"
+  );
+});
+
+test("a card leaving the waiting set must move the signature and print a delta line", () => {
+  const one = makeSnapshot({
+    waiting: summarizeWaiting([{ id: "a", kind: "ask_user_questions", status: "pending", createdAt: "2026-10-16T13:58:00.000Z" }], { now: WAITING_NOW }),
+  });
+  const none = makeSnapshot({
+    waiting: summarizeWaiting([{ id: "a", kind: "ask_user_questions", status: "cancelled", createdAt: "2026-10-16T13:58:00.000Z" }], { now: WAITING_NOW }),
+  });
+  assert.notEqual(snapshotSignature(one), snapshotSignature(none), "被答复/撤回的卡片必须让指纹动");
+  const deltas = diffSnapshots({ canonical: canonicalSnapshot(one) }, none);
+  assert.ok(
+    deltas.some((d) => d.includes("挂起卡片") && d.includes("1 pending") && d.includes("0 pending")),
+    `expected a waiting delta, got ${JSON.stringify(deltas)}`
+  );
+});
+
+test("renderBrief carries the wait segment and renderText lists each pending card", () => {
+  const waiting = summarizeWaiting(
+    [{ id: "f2a695e7", kind: "ask_user_questions", status: "pending", continuationPolicy: "wake_assignee", createdAt: "2026-10-16T13:58:00.000Z" }],
+    { now: WAITING_NOW }
+  );
+  const brief = renderBrief({ ...makeSnapshot({ waiting }), signature: "abc", changed: false });
+  assert.match(brief, /wait=1p\/22m ask_user_questions/);
+  const text = renderText(makeSnapshot({ waiting }));
+  assert.match(text, /waiting : wait=1p\/22m ask_user_questions/);
+  assert.match(text, /ask_user_questions f2a695e7 pending 22m policy=wake_assignee \(回复即唤醒\)/);
+  assert.equal(waitingSummaryText(null), "wait=skip");
+  assert.equal(waitingSummaryText(summarizeWaiting({ error: "API route not found" })), "wait=?");
+  assert.equal(waitingSummaryText(summarizeWaiting([])), "wait=0p");
+});
+
+test("parseArgs understands --skip-waiting", () => {
+  assert.equal(parseArgs(["--skip-waiting"]).flags.skipWaiting, true);
+  assert.equal(parseArgs([]).flags.skipWaiting, false);
+});
+
+test("end to end: the brief shows the open card, then flags it when the card is answered", async () => {
+  let cards = [
+    {
+      id: "f2a695e7-e5c1-4438-bd54-45fb6dfd1293",
+      kind: "ask_user_questions",
+      status: "pending",
+      continuationPolicy: "wake_assignee",
+      createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    },
+  ];
+  const { server, baseUrl } = await startFixtureServer((req, res) => {
+    res.setHeader("content-type", "application/json");
+    if (req.url === `/api/issues/${ISSUE.id}`) return res.end(JSON.stringify(ISSUE));
+    if (req.url === `/api/issues/${ISSUE.id}/interactions`) return res.end(JSON.stringify(cards));
+    if (req.url === `/api/companies/${ISSUE.companyId}/routines`) return res.end(JSON.stringify(ROUTINES));
+    if (req.url === `/api/companies/${ISSUE.companyId}/issues?limit=400`) return res.end(JSON.stringify(E2E_ISSUES));
+    if (req.url === `/api/inbox?companyId=${ISSUE.companyId}`) {
+      return res.end(JSON.stringify({ pendingApprovals: [], failures: [], failedRuns: [], mentionedBy: [], joinRequests: [] }));
+    }
+    res.statusCode = 404;
+    res.end(JSON.stringify({ error: "API route not found" }));
+  });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-wait-"));
+  const statePath = path.join(dir, "state.json");
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" };
+  try {
+    const first = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
+    assert.match(first.stdout, /wait=1p\/5m ask_user_questions/, `brief must show the open card, got: ${first.stdout}`);
+
+    cards = [{ ...cards[0], status: "answered" }];
+    const second = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
+    assert.match(second.stdout, /CHANGED/);
+    assert.match(second.stdout, /挂起卡片: 1 pending .* -> 0 pending/);
+    assert.match(second.stdout, /wait=0p/);
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
