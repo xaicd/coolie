@@ -7,6 +7,7 @@ import {
   Clipboard,
   FlatList,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   SafeAreaView,
@@ -33,6 +34,7 @@ import type {
 } from "@coolie/api-client";
 import { C, coolie } from "../coolie";
 import { useRecorder } from "../useRecorder";
+import { preserveVoiceRecording } from "../services/voiceDraft";
 import { StatusDot } from "../components/StatusDot";
 import { ChatHeader } from "../components/ChatHeader";
 import { ChatInput, type StagedAttachment } from "../components/ChatInput";
@@ -1004,11 +1006,44 @@ export function BoardChatScreen({
         setVoiceStatus("🎤 录音中… (松开发送 · 左滑取消 · 上滑/右滑转文字)");
         return true;
       } catch (e) {
-        Alert.alert("录音失败", String((e as Error)?.message ?? e));
+        const msg = String((e as Error)?.message ?? e);
+        if (/权限/.test(msg)) {
+          Alert.alert("需要麦克风权限", "请在系统设置中允许 Coolie 使用麦克风, 然后重试。", [
+            { text: "取消", style: "cancel" },
+            { text: "去设置", onPress: () => { void Linking.openSettings(); } },
+          ]);
+        } else {
+          Alert.alert("录音失败", msg);
+        }
         return false;
       }
     })();
   }, [recording, forceStop, voiceBusy, sending, startRecording]);
+
+  /**
+   * wave388: 转写失败时保住录音 —— 把 m4a 复制到持久目录并作为附件 staging,
+   * 用户可点发送手动重发, 录音不再随临时缓存被丢弃 (老板拍: 转文字失败应保留录音)。
+   * 返回是否成功保住。
+   */
+  const preserveFailedVoice = useCallback(async (uri: string | null): Promise<boolean> => {
+    const draft = await preserveVoiceRecording(uri);
+    if (!draft) return false;
+    setStagedAttachments((prev) =>
+      prev.some((entry) => entry.uri === draft.uri)
+        ? prev
+        : [
+            ...prev,
+            {
+              id: `voice-${draft.uri}`,
+              name: draft.name,
+              mimeType: draft.mimeType,
+              size: null,
+              uri: draft.uri,
+            },
+          ],
+    );
+    return true;
+  }, []);
 
   const handleMicPressOut = useCallback(async (action: "send" | "transcribe" = "send") => {
     const press = voicePressRef.current;
@@ -1025,6 +1060,8 @@ export function BoardChatScreen({
 
     setVoiceBusy(true);
     setVoiceStatus(action === "send" ? "识别发送中…" : "识别转文字中…");
+    // wave388: 保住本次录音的 m4a, 任何转写失败都能回退成附件手动重发。
+    let recordedUri: string | null = null;
     try {
       const started = await press.promise;
       if (!started) {
@@ -1032,7 +1069,8 @@ export function BoardChatScreen({
         return;
       }
 
-      const { base64, format } = await stopRecording();
+      const { base64, format, uri } = await stopRecording();
+      recordedUri = uri;
       if (!base64) {
         pushSystemEcho("🎤 未采集到有效声音, 请长按说话");
         return;
@@ -1067,26 +1105,31 @@ export function BoardChatScreen({
           }
         }
       } else {
-        pushSystemEcho("🎤 没听清, 请再说一次");
+        const kept = await preserveFailedVoice(recordedUri);
+        pushSystemEcho(
+          kept ? "🎤 没听清 · 录音已存为附件, 可点发送重发" : "🎤 没听清, 请再说一次",
+        );
         if (Platform.OS === "android") {
-          ToastAndroid.show("未识别到文字，请重试", ToastAndroid.SHORT);
+          ToastAndroid.show(kept ? "未识别到文字，录音已存为附件" : "未识别到文字，请重试", ToastAndroid.SHORT);
         }
       }
     } catch (e) {
+      const kept = await preserveFailedVoice(recordedUri);
+      const suffix = kept ? " · 录音已存为附件, 可点发送重发" : "";
       if (isAsrNotConfigured(e)) {
-        pushSystemEcho("🎤 语音未配置: 该实例尚未配置腾讯 ASR 凭据, 请改用文字输入");
+        pushSystemEcho(`🎤 语音未配置: 该实例尚未配置腾讯 ASR 凭据, 请改用文字输入${suffix}`);
         if (Platform.OS === "android") {
           ToastAndroid.show("语音未配置，请打字输入", ToastAndroid.SHORT);
         }
       } else {
-        pushSystemEcho(`🎤 转写失败: ${String((e as Error)?.message ?? e)}`);
+        pushSystemEcho(`🎤 转写失败: ${String((e as Error)?.message ?? e)}${suffix}`);
       }
     } finally {
       await forceStop().catch(() => null);
       setVoiceBusy(false);
       setVoiceStatus(null);
     }
-  }, [recording, forceStop, company.id, stopRecording, pushSystemEcho]);
+  }, [recording, forceStop, company.id, stopRecording, pushSystemEcho, preserveFailedVoice]);
 
   /** 向左滑动取消录音 */
   const handleMicCancel = useCallback(async () => {

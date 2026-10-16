@@ -134,20 +134,23 @@ describe("multimodal worker — transcribe-only mode", () => {
     );
   });
 
-  it("correctly maps VoiceFormat to integer enum per Tencent protocol", async () => {
+  it("maps VoiceFormat to the string enum Tencent SentenceRecognition requires", async () => {
     const { buildPayload, resolveTencentVoiceFormat } = await import("../src/asr/tencent.js");
-    expect(resolveTencentVoiceFormat("m4a")).toBe(10);
-    expect(resolveTencentVoiceFormat("mp3")).toBe(8);
-    expect(resolveTencentVoiceFormat("wav")).toBe(1);
-    expect(resolveTencentVoiceFormat("aac")).toBe(9);
-    expect(resolveTencentVoiceFormat("ogg-opus")).toBe(16);
-    expect(resolveTencentVoiceFormat(10)).toBe(10);
+    // Tencent rejects a numeric VoiceFormat ("input type should be string"),
+    // so every value must serialize as the format name.
+    expect(resolveTencentVoiceFormat("m4a")).toBe("m4a");
+    expect(resolveTencentVoiceFormat("mp3")).toBe("mp3");
+    expect(resolveTencentVoiceFormat("wav")).toBe("wav");
+    expect(resolveTencentVoiceFormat("aac")).toBe("aac");
+    expect(resolveTencentVoiceFormat("ogg-opus")).toBe("ogg-opus");
+    // Legacy numeric codes still resolve to their string form.
+    expect(resolveTencentVoiceFormat(10)).toBe("m4a");
 
     const payload = buildPayload({
       audioBase64: Buffer.from("test").toString("base64"),
       format: "m4a",
     });
-    expect(payload.VoiceFormat).toBe(10);
-    expect(typeof payload.VoiceFormat).toBe("number");
+    expect(payload.VoiceFormat).toBe("m4a");
+    expect(typeof payload.VoiceFormat).toBe("string");
   });
 });

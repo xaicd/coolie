@@ -31,49 +31,66 @@ export interface TencentAsrCredentials {
 export interface TencentSentencePayload {
   EngSerViceType: string;
   SourceType: number;
-  VoiceFormat: number;
+  VoiceFormat: string;
   Data: string;
   DataLen: number;
 }
 
 /**
- * Tencent Cloud SentenceRecognition VoiceFormat values:
- * 1: wav
- * 4: spx (speex)
- * 6: silk
- * 8: mp3
- * 9: aac
- * 10: m4a (16k_zh supported)
- * 16: ogg-opus
+ * Tencent Cloud SentenceRecognition `VoiceFormat` is a **string**, not the
+ * numeric code some older samples implied. The live API rejects a number with
+ * `InvalidParameter: The value type of parameter 'VoiceFormat' is not valid,
+ * input type should be 'string'` — which failed every recording. Accepted
+ * values: `wav`, `pcm`, `ogg-opus`, `speex`, `silk`, `mp3`, `m4a`, `aac`,
+ * `amr`.
+ *
+ * @see https://cloud.tencent.com/document/api/1093/35646
  */
-export const TENCENT_VOICE_FORMAT_MAP: Record<string, number> = {
-  wav: 1,
-  pcm: 1,
-  spx: 4,
-  speex: 4,
-  silk: 6,
-  mp3: 8,
-  aac: 9,
-  m4a: 10,
-  opus: 16,
-  "ogg-opus": 16,
-  ogg: 16,
+export const TENCENT_VOICE_FORMAT_MAP: Record<string, string> = {
+  wav: "wav",
+  pcm: "pcm",
+  spx: "speex",
+  speex: "speex",
+  spk: "speex",
+  silk: "silk",
+  mp3: "mp3",
+  aac: "aac",
+  m4a: "m4a",
+  opus: "ogg-opus",
+  "ogg-opus": "ogg-opus",
+  ogg: "ogg-opus",
+  amr: "amr",
 };
 
-export function resolveTencentVoiceFormat(format: string | number): number {
+/**
+ * Legacy numeric codes (the historical VoiceFormat numbering) still resolve to
+ * their string form so older callers keep working after the type fix.
+ */
+const TENCENT_VOICE_FORMAT_LEGACY: Record<number, string> = {
+  1: "wav",
+  4: "speex",
+  6: "silk",
+  8: "mp3",
+  9: "aac",
+  10: "m4a",
+  16: "ogg-opus",
+};
+
+export function resolveTencentVoiceFormat(format: string | number): string {
   if (typeof format === "number" && Number.isFinite(format)) {
-    return format;
+    return TENCENT_VOICE_FORMAT_LEGACY[format] ?? "m4a";
   }
   const clean = String(format).toLowerCase().trim();
   const mapped = TENCENT_VOICE_FORMAT_MAP[clean];
   if (mapped !== undefined) {
     return mapped;
   }
-  if (clean.includes("m4a")) return 10;
-  if (clean.includes("aac")) return 9;
-  if (clean.includes("wav")) return 1;
-  if (clean.includes("opus")) return 16;
-  return 10; // Default to m4a (mobile recorder standard)
+  if (clean.includes("m4a")) return "m4a";
+  if (clean.includes("aac")) return "aac";
+  if (clean.includes("wav")) return "wav";
+  if (clean.includes("opus")) return "ogg-opus";
+  if (clean.includes("amr")) return "amr";
+  return "m4a"; // Default to m4a (mobile recorder standard)
 }
 
 /**

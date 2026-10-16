@@ -201,8 +201,14 @@ export function useRecorder() {
     }
   }, []);
 
-  /** Stop and return { base64, format }. */
-  const stop = useCallback(async (): Promise<{ base64: string; format: "m4a" }> => {
+  /**
+   * Stop and return { base64, format, uri }.
+   *
+   * `uri` is the on-disk m4a the recorder produced. It is handed back so the
+   * caller can preserve the audio (copy it out of the transient cache) when a
+   * transcription attempt fails, instead of silently losing the recording.
+   */
+  const stop = useCallback(async (): Promise<{ base64: string; format: "m4a"; uri: string | null }> => {
     // 递增 sessionId 使任何正在 pending 的 start() 在完成后直接自我销毁
     moduleShared.activeSessionId += 1;
     clearWatchdog();
@@ -226,9 +232,10 @@ export function useRecorder() {
     if (!rec) {
       // 没有正在录制的句柄，直接平稳返回空并复位
       await resetAudioMode();
-      return { base64: "", format: "m4a" };
+      return { base64: "", format: "m4a", uri: null };
     }
 
+    let uri: string | null = null;
     try {
       await Promise.race([
         rec.stopAndUnloadAsync(),
@@ -237,20 +244,20 @@ export function useRecorder() {
         console.warn("[useRecorder] stopAndUnloadAsync warning:", err);
       });
 
-      const uri = rec.getURI();
+      uri = rec.getURI();
       if (!uri) {
         console.warn("[useRecorder] rec.getURI() is null");
-        return { base64: "", format: "m4a" };
+        return { base64: "", format: "m4a", uri: null };
       }
 
       const base64 = await FileSystem.readAsStringAsync(uri, {
         encoding: FileSystem.EncodingType.Base64,
       });
 
-      return { base64: base64 ?? "", format: "m4a" };
+      return { base64: base64 ?? "", format: "m4a", uri };
     } catch (err) {
       console.warn("[useRecorder] stop read error:", err);
-      return { base64: "", format: "m4a" };
+      return { base64: "", format: "m4a", uri };
     } finally {
       if (localRef.current === rec) localRef.current = null;
       await resetAudioMode();
