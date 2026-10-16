@@ -30,7 +30,8 @@
  *     review_no_monitor     — in_review 但无 run 无 monitor (只能等对方主动回复)
  *     waiting_human         — in_review 且已指派给人类用户 (等老板)
  *     orphan                — todo/backlog 且零指派 (没人会认领)
- *     queued                — todo/backlog 且有指派 (正常排队)
+ *     queued_stale          — todo/backlog 有指派但超阈值无 run (唤醒可能未送达)
+ *     queued                — todo/backlog 且有指派并在阈值内 (正常排队)
  *
  * 用法:
  *   node scripts/hermes-open-issue-liveness-scan.mjs            # 人读分组报告
@@ -62,6 +63,7 @@ export const VERDICTS = [
   "stalled_in_progress",
   "review_no_monitor",
   "orphan",
+  "queued_stale",
   "blocked_with_descriptor",
   "blocked_with_path",
   "waiting_human",
@@ -69,19 +71,27 @@ export const VERDICTS = [
   "queued",
 ];
 
-/** 需要掌柜出手的分组 (人读报告里标 ❌ / ⏸ / 👻 / ⚠️) */
+/** 需要掌柜出手的分组 (人读报告里标 ❌ / ⏸ / 👻 / ⚠️ / 🐌) */
 export const ATTENTION_VERDICTS = [
   "dead_letter",
   "stalled_in_progress",
   "review_no_monitor",
   "orphan",
+  "queued_stale",
 ];
+
+/** 指派在册但长期无 run 的排队工单阈值 (小时) */
+export const DEFAULT_STALE_QUEUED_HOURS = 48;
+
+/** run 刚落幕的交接宽限窗口 (分钟) — 窗口内不判"假活着", 避免误报主线 */ 
+export const DEFAULT_HANDOFF_GRACE_MINUTES = 10;
 
 const VERDICT_BADGE = {
   dead_letter: "❌ 无活路",
   stalled_in_progress: "⏸ 假活着",
   review_no_monitor: "⚠️ 等回复(无表)",
   orphan: "👻 无人认领",
+  queued_stale: "🐌 排队超期",
   blocked_with_descriptor: "🧷 阻塞(有 owner)",
   blocked_with_path: "🔗 阻塞(有 blocker 边)",
   waiting_human: "🧑 等老板",
@@ -143,7 +153,14 @@ export function isOpenIssue(issue) {
  * 单条工单活路判定 — 纯函数, 无网络无副作用。
  * 返回 { verdict, reasons } ; reasons 是人读的"为什么这么判"。
  */
-export function classifyIssue(issue) {
+export function classifyIssue(
+  issue,
+  {
+    now = Date.now(),
+    queuedStaleHours = DEFAULT_STALE_QUEUED_HOURS,
+    handoffGraceMinutes = DEFAULT_HANDOFF_GRACE_MINUTES,
+  } = {},
+) {
   const reasons = [];
   const status = issue && issue.status;
   const runId = runIdOf(issue);
@@ -164,6 +181,13 @@ export function classifyIssue(issue) {
 
   if (status === "in_progress") {
     if (hasLiveWake) return { verdict: "live", reasons };
+    const hours = idleHours(issue, now);
+    if (hours !== null && hours * 60 < handoffGraceMinutes) {
+      reasons.push(
+        `run 刚落幕 (${Math.round(hours * 60)}min < ${handoffGraceMinutes}min 交接窗口)`,
+      );
+      return { verdict: "live", reasons };
+    }
     reasons.push("in_progress 但无 active run / 无 monitor");
     return { verdict: "stalled_in_progress", reasons };
   }
@@ -202,6 +226,15 @@ export function classifyIssue(issue) {
       reasons.push("零指派 — 没有心跳会认领它");
       return { verdict: "orphan", reasons };
     }
+    if (!hasLiveWake) {
+      const hours = idleHours(issue, now);
+      if (hours !== null && hours >= queuedStaleHours) {
+        reasons.push(
+          `指派在册但 ${Math.round(hours)}h 无 run (阈值 ${queuedStaleHours}h) — 唤醒可能未送达`,
+        );
+        return { verdict: "queued_stale", reasons };
+      }
+    }
     reasons.push(`排队中 (owner ${String(agentOwner || humanOwner).slice(0, 8)})`);
     return { verdict: "queued", reasons };
   }
@@ -211,8 +244,15 @@ export function classifyIssue(issue) {
 }
 
 /** 把一条 issue 压成扫描行 */
-export function scanRow(issue, { now = Date.now() } = {}) {
-  const { verdict, reasons } = classifyIssue(issue);
+export function scanRow(
+  issue,
+  {
+    now = Date.now(),
+    queuedStaleHours = DEFAULT_STALE_QUEUED_HOURS,
+    handoffGraceMinutes = DEFAULT_HANDOFF_GRACE_MINUTES,
+  } = {},
+) {
+  const { verdict, reasons } = classifyIssue(issue, { now, queuedStaleHours, handoffGraceMinutes });
   const hours = idleHours(issue, now);
   return {
     id: issue.id,
@@ -232,9 +272,16 @@ export function scanRow(issue, { now = Date.now() } = {}) {
 }
 
 /** 全量扫描: 开放工单 → 分组 */
-export function scanIssues(issues, { now = Date.now() } = {}) {
+export function scanIssues(
+  issues,
+  {
+    now = Date.now(),
+    queuedStaleHours = DEFAULT_STALE_QUEUED_HOURS,
+    handoffGraceMinutes = DEFAULT_HANDOFF_GRACE_MINUTES,
+  } = {},
+) {
   const open = (Array.isArray(issues) ? issues : []).filter(isOpenIssue);
-  const rows = open.map((issue) => scanRow(issue, { now }));
+  const rows = open.map((issue) => scanRow(issue, { now, queuedStaleHours, handoffGraceMinutes }));
   const byVerdict = new Map(VERDICTS.map((v) => [v, []]));
   for (const row of rows) {
     if (!byVerdict.has(row.verdict)) byVerdict.set(row.verdict, []);
@@ -293,12 +340,18 @@ export function renderText(scan) {
 /** 一行心脏起搏 */
 export function renderBrief(scan) {
   const c = scan.counts;
-  return `LIVENESS ${scan.generatedAt} open=${scan.openCount} dead=${c.dead_letter || 0} stall=${c.stalled_in_progress || 0} orphan=${c.orphan || 0} review=${c.review_no_monitor || 0} live=${c.live || 0}`;
+  return `LIVENESS ${scan.generatedAt} open=${scan.openCount} dead=${c.dead_letter || 0} stall=${c.stalled_in_progress || 0} orphan=${c.orphan || 0} qstale=${c.queued_stale || 0} review=${c.review_no_monitor || 0} live=${c.live || 0}`;
 }
 
 export function parseArgs(argv = []) {
   const flags = { json: false, brief: false, deadLetterOnly: false, help: false };
-  const options = { issue: null, company: null, limit: 500 };
+  const options = {
+    issue: null,
+    company: null,
+    limit: 500,
+    staleQueuedHours: DEFAULT_STALE_QUEUED_HOURS,
+    handoffGraceMinutes: DEFAULT_HANDOFF_GRACE_MINUTES,
+  };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === "--json") flags.json = true;
@@ -308,6 +361,10 @@ export function parseArgs(argv = []) {
     else if (arg === "--issue") options.issue = argv[++i] || null;
     else if (arg === "--company") options.company = argv[++i] || null;
     else if (arg === "--limit") options.limit = Number(argv[++i]) || 500;
+    else if (arg === "--stale-queued-hours")
+      options.staleQueuedHours = Number(argv[++i]) || DEFAULT_STALE_QUEUED_HOURS;
+    else if (arg === "--handoff-grace-minutes")
+      options.handoffGraceMinutes = Number(argv[++i]) || DEFAULT_HANDOFF_GRACE_MINUTES;
     else throw new Error(`未知参数: ${arg}`);
   }
   return { flags, options };
@@ -315,12 +372,14 @@ export function parseArgs(argv = []) {
 
 const HELP = `hermes-open-issue-liveness-scan — 开放工单活路扫描
 
-  --json               机器读 JSON
-  --brief              一行心脏起搏
-  --dead-letter-only   只看无活路工单; 存在时退出码 3 (可当门禁)
-  --issue <uuid>       用该工单解析 companyId (心法 #148)
-  --company <cid>      指定 companyId (默认取 PAPERCLIP_COMPANY_ID)
-  --limit <n>          工单列表条数上限 (默认 500)
+  --json                       机器读 JSON
+  --brief                      一行心脏起搏
+  --dead-letter-only           只看无活路工单; 存在时退出码 3 (可当门禁)
+  --issue <uuid>               用该工单解析 companyId (心法 #148)
+  --company <cid>              指定 companyId (默认取 PAPERCLIP_COMPANY_ID)
+  --limit <n>                  工单列表条数上限 (默认 500)
+  --stale-queued-hours <n>     排队超期阈值小时数 (默认 ${DEFAULT_STALE_QUEUED_HOURS})
+  --handoff-grace-minutes <n>  run 落幕交接宽限分钟数 (默认 ${DEFAULT_HANDOFF_GRACE_MINUTES})
 `;
 
 async function getJson(url, { apiKey, fetchImpl = globalThis.fetch } = {}) {
@@ -379,7 +438,11 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
   const payload = await getJson(`${apiBase}/companies/${companyId}/issues?limit=${options.limit}`, {
     apiKey,
   });
-  const scan = scanIssues(pickIssues(payload), { now: Date.now() });
+  const scan = scanIssues(pickIssues(payload), {
+    now: Date.now(),
+    queuedStaleHours: options.staleQueuedHours,
+    handoffGraceMinutes: options.handoffGraceMinutes,
+  });
 
   if (flags.json) console.log(JSON.stringify(scan, null, 2));
   else if (flags.brief) console.log(renderBrief(scan));

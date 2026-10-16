@@ -138,6 +138,68 @@ test("todo/backlog: 零指派 ⇒ orphan ; 有指派 ⇒ queued", () => {
   assert.equal(classifyIssue(issue({ status: "backlog" })).verdict, "queued");
 });
 
+// ── 排队超期 (复活后唤醒未送达的兜底探测) ───────────────────────────────────
+
+test("指派在册但超过阈值无 run ⇒ queued_stale (唤醒可能未送达)", () => {
+  const { verdict, reasons } = classifyIssue(issue({ status: "todo", updatedAt: iso(60) }), {
+    now: NOW,
+  });
+  assert.equal(verdict, "queued_stale");
+  assert.match(reasons.join(" "), /唤醒可能未送达/);
+});
+
+test("排队未超阈值仍算 queued; 阈值可调", () => {
+  assert.equal(classifyIssue(issue({ status: "todo", updatedAt: iso(10) }), { now: NOW }).verdict, "queued");
+  assert.equal(
+    classifyIssue(issue({ status: "todo", updatedAt: iso(10) }), { now: NOW, queuedStaleHours: 6 })
+      .verdict,
+    "queued_stale",
+  );
+});
+
+test("排队超期但有 monitor ⇒ 仍有活路, 不算超期", () => {
+  const { verdict } = classifyIssue(
+    issue({ status: "todo", updatedAt: iso(200), monitorNextCheckAt: iso(-1) }),
+    { now: NOW },
+  );
+  assert.equal(verdict, "queued");
+});
+
+test("queued_stale 计入待出手数", () => {
+  const scan = scanIssues(
+    [
+      issue({ identifier: "COOA-X", status: "todo", updatedAt: iso(60) }),
+      issue({ identifier: "COOA-Y", status: "todo", updatedAt: iso(1) }),
+    ],
+    { now: NOW },
+  );
+  assert.equal(scan.counts.queued_stale, 1);
+  assert.equal(scan.counts.queued, 1);
+  assert.equal(scan.attentionCount, 1);
+  assert.match(renderBrief(scan), /qstale=1/);
+});
+
+test("in_progress 有一 run 或刚落幕: 交接窗口内不报假活着, 窗口可调", () => {
+  // run 刚落幕 3min ⇒ 交接窗口 (默认 10min)
+  assert.equal(
+    classifyIssue(issue({ status: "in_progress", updatedAt: iso(0.05) }), { now: NOW }).verdict,
+    "live",
+  );
+  // 空转 30min ⇒ 超窗口, 判假活着
+  assert.equal(
+    classifyIssue(issue({ status: "in_progress", updatedAt: iso(0.5) }), { now: NOW }).verdict,
+    "stalled_in_progress",
+  );
+  // 放宽窗口 ⇒ 30min 也算交接中
+  assert.equal(
+    classifyIssue(issue({ status: "in_progress", updatedAt: iso(0.5) }), {
+      now: NOW,
+      handoffGraceMinutes: 60,
+    }).verdict,
+    "live",
+  );
+});
+
 // ── 空转时长 ────────────────────────────────────────────────────────────────
 
 test("idleHours 以 updatedAt 为准 (lastActivityAt 会被 attention 巡检刷成当下)", () => {
