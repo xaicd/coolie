@@ -190,6 +190,17 @@ export function summarizeInbox(payload) {
   return out;
 }
 
+/** issues 列表回包形态自适应: 数组 / `{issues:[...]}` / `{data:[...]}` (心法 #78 同族坑) */
+export function pickIssues(payload) {
+  if (Array.isArray(payload)) return payload;
+  if (payload && typeof payload === "object") {
+    if (Array.isArray(payload.issues)) return payload.issues;
+    const viaRoutines = pickRoutines(payload);
+    if (viaRoutines.length > 0) return viaRoutines;
+  }
+  return [];
+}
+
 /** 工单大盘四桶 (与 scripts/coolie-dev-task.sh 同口径: todo 与 backlog 合并计) */
 export const QUEUE_BUCKETS = [
   { key: "in_progress", label: "进行中", statuses: ["in_progress"] },
@@ -204,7 +215,7 @@ export const QUEUE_BUCKETS = [
  * 并按 identifier 排序 —— 这样指纹不会因回包顺序抖动而误报"变化".
  */
 export function summarizeQueue(issues) {
-  const rows = Array.isArray(issues) ? issues : pickRoutines({ issues });
+  const rows = pickIssues(issues);
   const byBucket = Object.fromEntries(QUEUE_BUCKETS.map((b) => [b.key, []]));
   let unscoped = 0;
   for (const raw of rows) {
@@ -215,6 +226,7 @@ export function summarizeQueue(issues) {
       continue;
     }
     byBucket[bucket.key].push({
+      id: raw.id ?? null,
       identifier: raw.identifier ?? null,
       title: raw.title ?? null,
       status: raw.status ?? null,
@@ -223,7 +235,7 @@ export function summarizeQueue(issues) {
     });
   }
   for (const bucket of QUEUE_BUCKETS) {
-    byBucket[bucket.key].sort((a, b) => String(a.identifier).localeCompare(String(b.identifier)));
+    byBucket[bucket.key].sort((a, b) => queueKeyOf(a).localeCompare(queueKeyOf(b)));
   }
   return { total: rows.length, unscoped, buckets: byBucket };
 }
@@ -232,6 +244,17 @@ export function summarizeQueue(issues) {
 export function queueLineCounts(queue) {
   if (!queue) return null;
   return QUEUE_BUCKETS.map((b) => queue.buckets[b.key]?.length ?? 0).join("/");
+}
+
+/**
+ * 大盘里的稳定显示键: 有 identifier 用 identifier, 没有就用 id 前 8 位.
+ * (实测: 部分受限工单 identifier 为 null 只有 uuid, 不兜底就会渲染成空串)
+ */
+export function queueKeyOf(item) {
+  if (!item) return "?";
+  if (item.identifier) return item.identifier;
+  if (item.id) return String(item.id).slice(0, 8);
+  return "?";
 }
 
 /**
@@ -259,7 +282,7 @@ export function canonicalSnapshot(snapshot) {
   const queue = s.queue
     ? QUEUE_BUCKETS.map((b) => [
         b.key,
-        (s.queue.buckets?.[b.key] ?? []).map((i) => `${i.identifier}:${i.status}`),
+        (s.queue.buckets?.[b.key] ?? []).map((i) => `${queueKeyOf(i)}:${i.status}`),
       ])
     : null;
   return { issue, routines, inbox, queue };
@@ -542,7 +565,7 @@ export async function collectSnapshot(config) {
       runId,
       fetchImpl,
     });
-    const rows = Array.isArray(issues.body) ? issues.body : pickRoutines(issues.body);
+    const rows = pickIssues(issues.body);
     if (rows.length > 0) {
       snapshot.queue = summarizeQueue(rows);
     } else {
@@ -601,7 +624,7 @@ export function renderText(snapshot) {
     for (const bucket of QUEUE_BUCKETS) {
       const items = snapshot.queue.buckets[bucket.key] ?? [];
       if (items.length === 0) continue;
-      lines.push(`  ${bucket.label}: ${items.map((i) => i.identifier).join(" ")}`);
+      lines.push(`  ${bucket.label}: ${items.map((i) => queueKeyOf(i)).join(" ")}`);
     }
   } else if (snapshot.queueUnavailableReason) {
     lines.push(`queue   : unavailable (${snapshot.queueUnavailableReason})`);

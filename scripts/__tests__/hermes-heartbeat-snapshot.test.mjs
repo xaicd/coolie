@@ -17,6 +17,7 @@ import {
   summarizeInbox,
   summarizeQueue,
   queueLineCounts,
+  queueKeyOf,
   canonicalSnapshot,
   snapshotSignature,
   diffSnapshots,
@@ -432,6 +433,29 @@ test("summarizeQueue tolerates garbage rows and {issues:[...]} wrappers", () => 
   assert.equal(summarizeQueue({ issues: ISSUES }).buckets.blocked.length, 1);
 });
 
+test("queueKeyOf falls back to a uuid prefix when identifier is null", () => {
+  assert.equal(queueKeyOf({ identifier: "COOA-4" }), "COOA-4");
+  assert.equal(queueKeyOf({ id: "d6277389-1234-4567-89ab-cdef01234567" }), "d6277389");
+  assert.equal(queueKeyOf({ identifier: null, id: null }), "?");
+  assert.equal(queueKeyOf(null), "?");
+  // 实测: blocked 桶里 3 条受限工单 identifier=null, 只靠 identifier 渲染会变空串
+  const queue = summarizeQueue([
+    { id: "d6277389-aaaa", status: "blocked" },
+    { identifier: "COOA-44", status: "blocked" },
+  ]);
+  assert.equal(queue.buckets.blocked.length, 2);
+  assert.deepEqual(
+    queue.buckets.blocked.map((i) => queueKeyOf(i)),
+    ["COOA-44", "d6277389"],
+    "sorted by display key, so identifier-less rows keep a stable position"
+  );
+  assert.notEqual(
+    canonicalSnapshot({ queue }).queue[2][1][0],
+    canonicalSnapshot({ queue }).queue[2][1][1],
+    "two identifier-less issues must not collapse into one signature entry"
+  );
+});
+
 // ---------------------------------------------------------------------------
 // 8. 盘面指纹 + delta (心法 #176: 无变化就只发一行)
 // ---------------------------------------------------------------------------
@@ -530,8 +554,9 @@ test("diffSnapshots caps the delta list instead of flooding the comment", () => 
     inboxPayload: { pendingApprovals: [], failures: [], failedRuns: [], mentionedBy: [], joinRequests: [] },
   });
   const deltas = diffSnapshots({ canonical: canonicalSnapshot(before) }, after);
-  assert.equal(deltas.length, 13);
-  assert.match(deltas.at(-1), /另有 18 条变化/);
+  assert.equal(deltas.length, 13, "12 lines + 1 fold counter");
+  assert.match(deltas.at(-1), /另有 \d+ 条变化/);
+  assert.match(deltas.at(-1), /另有 21 条变化/, "30 queue adds + 3 inbox moves, folded after 12");
 });
 
 test("readState / writeState round-trip, and degrade on missing or corrupt files", () => {
