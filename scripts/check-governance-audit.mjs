@@ -468,6 +468,7 @@ const ALLOWED_ROOT_DIRS = new Set([
   'templates',
   'patches',
   'docker',
+  'deploy',
   'design',
   'releases',
   'announcements',

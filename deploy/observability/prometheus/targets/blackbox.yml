@@ -1,0 +1,25 @@
+# 拨测目标 (Blackbox Exporter) — 公网 + 内网双视角
+# 公网主域 xrobinai.cn 对外可用性; 内网 /api/health 探针反映容器与 DB 真实健康。
+- targets:
+    - https://xrobinai.cn/
+  labels:
+    probe: public-home
+    view: public
+
+- targets:
+    - https://xrobinai.cn/api/health
+  labels:
+    probe: public-health
+    view: public
+
+- targets:
+    - http://host.docker.internal:3100/api/health
+  labels:
+    probe: internal-health
+    view: internal
+
+- targets:
+    - http://host.docker.internal:48080/api/health
+  labels:
+    probe: cls-gateway-health
+    view: internal

@@ -1,0 +1,7 @@
+# 社区生活服务商用中台数据层采集目标 (mysqld_exporter)
+# 中台生产库 MySQL 8.0 一主多从 (见 DISASTER-RECOVERY-PLAN.md §2)。
+- targets:
+    - mysqld-exporter:9104
+  labels:
+    instance_name: community-life-mysql
+    role: primary

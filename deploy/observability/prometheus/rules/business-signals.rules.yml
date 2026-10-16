@@ -1,0 +1,102 @@
+#==============================================================================
+# 业务信号告警: 5xx / 支付 / 资金守恒 / 订单 / 库存超卖
+# 指标契约 (由社区生活服务商用中台 Micrometer 暴露, 见
+#   docs/08_sre/03_monitoring/MONITORING-OBSERVABILITY-BASELINE.md §3 指标契约):
+#   http_server_requests_seconds_count{status,uri,method}  — 全站请求 (含 5xx)
+#   business_payment_callback_total{result="success|failure"}
+#   business_order_created_total{result="success|failure"}
+#   business_fund_conservation_diff_yuan  (gauge, 账务资金流水双写轧差, 绝对守恒=0)
+#   business_activity_stock_oversell_total (counter, 超卖计数必须恒为 0 增量)
+#==============================================================================
+groups:
+  - name: cls-business-signals
+    rules:
+      # ── 5xx 突发 (绝对量, 补足燃烧率只反映比例的盲区) ──────────────────────
+      - alert: Http5xxBurstHigh
+        expr: sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) > 5
+        for: 5m
+        labels:
+          severity: P1
+          channel: wecom-sms
+          domain: 5xx
+        annotations:
+          summary: "5xx 突发: 近 5 分钟错误请求 > 5 req/s"
+          description: "当前 {{ $value | humanize }} req/s。检查网关/下游依赖与最近发版。"
+
+      - alert: Http5xxElevatedPerUri
+        expr: |
+          topk(1,
+            sum by (uri) (rate(http_server_requests_seconds_count{status=~"5.."}[10m]))
+            / clamp_min(sum by (uri) (rate(http_server_requests_seconds_count[10m])), 1)
+          ) > 0.05
+        for: 10m
+        labels:
+          severity: P2
+          channel: ticket
+          domain: 5xx
+        annotations:
+          summary: "单接口 5xx 比例 > 5%: 定位到具体 URI"
+          description: "高错误率接口见 instance 标签。"
+
+      # ── 支付回调 (SLO 99.99%, 允许失败率 0.0001) ──────────────────────────
+      - alert: PaymentCallbackFailureRateHigh
+        expr: |
+          sum(rate(business_payment_callback_total{result="failure"}[15m]))
+          / clamp_min(sum(rate(business_payment_callback_total[15m])), 1) > 0.0001
+        for: 15m
+        labels:
+          severity: P1
+          channel: wecom-sms
+          domain: payment
+        annotations:
+          summary: "支付回调失败率超 SLO 99.99%"
+          description: "15m 失败率 {{ $value | humanizePercentage }}。核查微信支付签名/证书与回调链路 (F-05 熔断)。"
+
+      - alert: PaymentNoTraffic
+        expr: sum(rate(business_payment_callback_total[30m])) == 0
+        for: 30m
+        labels:
+          severity: P2
+          channel: ticket
+          domain: payment
+        annotations:
+          summary: "支付回调 30 分钟零流量: 可能支付通道中断或埋点失效"
+          description: "确认非低峰时段后排查通道与埋点。"
+
+      # ── 订单创建履约 ──────────────────────────────────────────────────────
+      - alert: OrderCreateFailureRateHigh
+        expr: |
+          sum(rate(business_order_created_total{result="failure"}[15m]))
+          / clamp_min(sum(rate(business_order_created_total[15m])), 1) > 0.0001
+        for: 15m
+        labels:
+          severity: P1
+          channel: wecom-sms
+          domain: order
+        annotations:
+          summary: "订单创建失败率超 SLO 99.99%"
+          description: "15m 失败率 {{ $value | humanizePercentage }}。核查库存/支付前置校验与状态机。"
+
+      # ── 资金守恒 (0 容忍) ─────────────────────────────────────────────────
+      - alert: FundConservationViolated
+        expr: business_fund_conservation_diff_yuan != 0
+        for: 5m
+        labels:
+          severity: P0
+          channel: voice
+          domain: fund-conservation
+        annotations:
+          summary: "资金守恒被破坏: 账务流水双写轧差 ≠ 0"
+          description: "轧差 {{ $value }} 元。立即冻结相关清分/结算写入并人工核查 (DR-4 不变量)。"
+
+      # ── 社区活动并发扣减超卖 (0 容忍) ─────────────────────────────────────
+      - alert: ActivityStockOversell
+        expr: increase(business_activity_stock_oversell_total[10m]) > 0
+        for: 1m
+        labels:
+          severity: P1
+          channel: wecom-sms
+          domain: inventory
+        annotations:
+          summary: "社区活动名额超卖: 并发扣减未保证原子性"
+          description: "10m 内超卖 {{ $value }} 次。核查 Redis 原子计数与库存 CAS。"

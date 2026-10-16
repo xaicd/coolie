@@ -1,0 +1,101 @@
+#==============================================================================
+# COOA-270 [G6·发布-B] · Prometheus 主配置
+# 观测采集拓扑对齐 docs/08_sre/01_slo_sli_metrics/SLO-SLI-ERROR-BUDGET-MATRIX.md §6
+#
+# 设计要点:
+#  - 动态目标全部走 file_sd (targets/*.yml), 运维改目标不动主配置、无需改版镜像;
+#  - 业务 SLI 采集点: 网关/business-server /actuator/prometheus (Micrometer);
+#  - 中间件: postgres_exporter / mysqld_exporter / redis_exporter / node_exporter;
+#  - 拨测: blackbox_exporter 双视角 (公网 https://xrobinai.cn + 内网 /api/health);
+#  - 告警规则按错误预算多窗口燃烧率 (P0~P3) + 5xx/支付/资金守恒/备份 DR。
+#==============================================================================
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: tc-coolie-claw
+    env: prod
+    site: coolie
+
+rule_files:
+  - /etc/prometheus/rules/*.rules.yml
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ["alertmanager:9093"]
+      timeout: 10s
+
+scrape_configs:
+  # ── 自监控 ──────────────────────────────────────────────────────────────
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: alertmanager
+    static_configs:
+      - targets: ["alertmanager:9093"]
+
+  # ── 主机 ────────────────────────────────────────────────────────────────
+  - job_name: node
+    file_sd_configs:
+      - files: [/etc/prometheus/targets/node.yml]
+
+  # ── 数据与中间件 exporter ────────────────────────────────────────────────
+  - job_name: postgres
+    file_sd_configs:
+      - files: [/etc/prometheus/targets/postgres.yml]
+
+  - job_name: mysql
+    file_sd_configs:
+      - files: [/etc/prometheus/targets/mysql.yml]
+
+  - job_name: redis
+    file_sd_configs:
+      - files: [/etc/prometheus/targets/redis.yml]
+
+  # ── 业务应用 (Spring Boot Actuator /actuator/prometheus) ────────────────
+  # 社区生活服务商用中台: 网关 + business-server
+  - job_name: community-life-service
+    metrics_path: /actuator/prometheus
+    file_sd_configs:
+      - files: [/etc/prometheus/targets/apps.yml]
+    relabel_configs:
+      - source_labels: [app]
+        regex: "(.+)"
+        target_label: service
+    metric_relabel_configs:
+      # 丢弃高基数/无用指标，保护 TSDB 容量
+      - source_labels: [__name__]
+        regex: "jvm_(classes|buffer|memory_pool).*|tomcat_(sessions|global).*|system_cpu_count"
+        action: drop
+
+  # ── 拨测 (Blackbox) — 公网与内网双视角 ──────────────────────────────────
+  - job_name: blackbox-http
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    file_sd_configs:
+      - files: [/etc/prometheus/targets/blackbox.yml]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  - job_name: blackbox-tcp
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    file_sd_configs:
+      - files: [/etc/prometheus/targets/blackbox.yml]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115

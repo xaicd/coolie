@@ -1,0 +1,126 @@
+#==============================================================================
+# 错误预算多窗口燃烧率告警 (Multi-Window Multi-Burn-Rate Alerts)
+# 权威口径: docs/08_sre/01_slo_sli_metrics/SLO-SLI-ERROR-BUDGET-MATRIX.md §3 §4
+#
+# 全站综合可用性 SLO = 99.95%  => 允许错误率 allowed_error_ratio = 0.0005
+# 短窗口用于"确认中", 长窗口用于"触发", 两者同时命中方升级 (消灭瞬时跳刺误报)。
+#
+#   级别   燃烧率    阈值(错误率)   判定窗口(短/长)   响应
+#   P0     14.4x     0.0072        2m  / 1h          ≤5 分钟
+#   P1     6.0x      0.0030        15m / 6h          ≤15 分钟
+#   P2     2.0x      0.0010        1h  / 24h         ≤2 小时
+#   P3     1.0x      0.0005        6h  / 3d          ≤24 小时
+#==============================================================================
+groups:
+  - name: cls-sli-recording
+    interval: 30s
+    rules:
+      # Micrometer 源指标: http_server_requests_seconds_count{status,uri,method,...}
+      # 归一化成功/失败请求速率, 供燃烧率与大盘复用。
+      - record: cls:http_error_ratio_2m
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[2m]))
+          / clamp_min(sum(rate(http_server_requests_seconds_count[2m])), 1)
+      - record: cls:http_error_ratio_5m
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+          / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1)
+      - record: cls:http_error_ratio_15m
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[15m]))
+          / clamp_min(sum(rate(http_server_requests_seconds_count[15m])), 1)
+      - record: cls:http_error_ratio_1h
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[1h]))
+          / clamp_min(sum(rate(http_server_requests_seconds_count[1h])), 1)
+      - record: cls:http_error_ratio_6h
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[6h]))
+          / clamp_min(sum(rate(http_server_requests_seconds_count[6h])), 1)
+      - record: cls:http_error_ratio_24h
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[24h]))
+          / clamp_min(sum(rate(http_server_requests_seconds_count[24h])), 1)
+      - record: cls:http_error_ratio_3d
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[3d]))
+          / clamp_min(sum(rate(http_server_requests_seconds_count[3d])), 1)
+      # 30 天滚动错误预算已消耗比例 (0~1+), 供 §5 冻结/刹车机制联动
+      - record: cls:error_budget_consumed_ratio_30d
+        expr: |
+          clamp_max(
+            sum(rate(http_server_requests_seconds_count{status=~"5.."}[30d]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count[30d])), 1)
+            / 0.0005,
+            2
+          )
+
+  - name: cls-sla-burn-rate
+    rules:
+      - alert: SLABurnRateP0
+        expr: cls:http_error_ratio_2m > (14.4 * 0.0005) and cls:http_error_ratio_1h > (14.4 * 0.0005)
+        for: 2m
+        labels:
+          severity: P0
+          channel: voice
+          sli: availability
+        annotations:
+          summary: "P0 紧急: 全站可用性燃烧率 14.4x (1 小时将消耗 2% 错误预算)"
+          description: "2m 错误率 {{ $value | humanizePercentage }} 且 1h 错误率同超阈, 立即人工介入并触发网关降级。"
+          runbook: "docs/08_sre/05_disaster_recovery/DISASTER-RECOVERY-PLAN.md§4"
+
+      - alert: SLABurnRateP1
+        expr: cls:http_error_ratio_15m > (6.0 * 0.0005) and cls:http_error_ratio_6h > (6.0 * 0.0005)
+        for: 5m
+        labels:
+          severity: P1
+          channel: wecom-sms
+          sli: availability
+        annotations:
+          summary: "P1 严重: 全站可用性燃烧率 6.0x (6 小时将消耗 5% 错误预算)"
+          description: "15m 与 6h 错误率同超阈, 企微群 @ 全员 + 短信告警。"
+
+      - alert: SLABurnRateP2
+        expr: cls:http_error_ratio_1h > (2.0 * 0.0005) and cls:http_error_ratio_24h > (2.0 * 0.0005)
+        for: 15m
+        labels:
+          severity: P2
+          channel: ticket
+          sli: availability
+        annotations:
+          summary: "P2 关注: 全站可用性燃烧率 2.0x (24 小时将消耗 10% 错误预算)"
+          description: "内部工单通知 + 邮件摘要。"
+
+      - alert: SLABurnRateP3
+        expr: cls:http_error_ratio_6h > (1.0 * 0.0005) and cls:http_error_ratio_3d > (1.0 * 0.0005)
+        for: 1h
+        labels:
+          severity: P3
+          channel: review
+          sli: availability
+        annotations:
+          summary: "P3 隐患漂移: 全站可用性燃烧率 1.0x (3 天将消耗 10% 错误预算)"
+          description: "每日 SRE 晨会大盘自动通报。"
+
+      # §5 错误预算冻结与发布刹车: 与 G5 走查清单联动, 达人级预算消耗触发发布冻结提示
+      - alert: ErrorBudgetFreezeWarning
+        expr: cls:error_budget_consumed_ratio_30d >= 0.8
+        for: 30m
+        labels:
+          severity: P1
+          channel: wecom-sms
+          sli: error_budget
+        annotations:
+          summary: "错误预算消耗 ≥80%: 全面冻结特性发版, 仅允许 P0 缺陷修复与稳定性补丁上线"
+          description: "30 天滚动已消耗 {{ $value | humanizePercentage }}, 联动 docs/07_release/release-verification-checklist.md 置 ⛔。"
+
+      - alert: ErrorBudgetFrozen
+        expr: cls:error_budget_consumed_ratio_30d >= 1.0
+        for: 10m
+        labels:
+          severity: P0
+          channel: voice
+          sli: error_budget
+        annotations:
+          summary: "错误预算耗尽: 强制熔断停工, 全部研发转入稳定性攻坚与 SRE 复盘"
+          description: "30 天滚动已消耗 {{ $value | humanizePercentage }}。"

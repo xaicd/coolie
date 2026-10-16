@@ -1,0 +1,164 @@
+#==============================================================================
+# 基础设施 + 备份/容灾告警
+# 备份指标来自备份脚本写出的 node_exporter textfile collector (见
+#   scripts/backup/postgres-wal-to-oss.sh + deploy/observability/README.md §4):
+#   coolie_backup_last_success_timestamp_seconds{job="postgres-wal"}  上次成功时间戳
+#   coolie_backup_last_size_bytes{job="postgres-wal"}                 上次产物字节数
+#   coolie_backup_last_duration_seconds{job="postgres-wal"}           上次耗时
+#   coolie_backup_runs_total{job,result="success|failure"}            运行计数
+#==============================================================================
+groups:
+  - name: cls-infra-and-backup
+    rules:
+      # ── 数据/中间件存活 ───────────────────────────────────────────────────
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 2m
+        labels:
+          severity: P0
+          channel: voice
+          component: postgres
+        annotations:
+          summary: "Postgres 不可达 (pg_up=0)"
+          description: "实例 {{ $labels.instance }}。核查容器/连接串/磁盘。"
+
+      - alert: MysqlDown
+        expr: mysql_up == 0
+        for: 2m
+        labels:
+          severity: P0
+          channel: voice
+          component: mysql
+        annotations:
+          summary: "MySQL 不可达 (mysql_up=0)"
+          description: "触发 DR 预案 F-02 主从切换评估。"
+
+      - alert: RedisDown
+        expr: redis_up == 0
+        for: 2m
+        labels:
+          severity: P1
+          channel: wecom-sms
+          component: redis
+        annotations:
+          summary: "Redis 不可达 (redis_up=0)"
+          description: "触发 DR 预案 F-03 哨兵选举评估。"
+
+      - alert: PostgresConnectionSaturation
+        expr: |
+          sum(pg_stat_activity_count{state="active"})
+          / clamp_min(max(pg_settings_max_connections), 1) > 0.8
+        for: 10m
+        labels:
+          severity: P2
+          channel: ticket
+          component: postgres
+        annotations:
+          summary: "Postgres 活跃连接 > 80% 上限"
+          description: "连接池水位 {{ $value | humanizePercentage }}，排查慢查询/连接泄漏。"
+
+      # ── 主机容量 ──────────────────────────────────────────────────────────
+      - alert: HostDiskLow
+        expr: |
+          node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}
+          / clamp_min(node_filesystem_size_bytes{fstype!~"tmpfs|overlay"}, 1) < 0.15
+        for: 10m
+        labels:
+          severity: P1
+          channel: wecom-sms
+          component: host
+        annotations:
+          summary: "主机磁盘可用 < 15%"
+          description: "挂载点 {{ $labels.mountpoint }} 剩余 {{ $value | humanizePercentage }}。"
+
+      - alert: HostDiskWillFillIn4h
+        expr: predict_linear(node_filesystem_avail_bytes{fstype!~"tmpfs|overlay"}[6h], 4*3600) < 0
+        for: 30m
+        labels:
+          severity: P1
+          channel: wecom-sms
+          component: host
+        annotations:
+          summary: "主机磁盘预计 4 小时内写满"
+          description: "挂载点 {{ $labels.mountpoint }} 按 6h 趋势外推。"
+
+      # ── 公网拨测 ──────────────────────────────────────────────────────────
+      - alert: PublicEndpointDown
+        expr: probe_success{view="public"} == 0
+        for: 2m
+        labels:
+          severity: P0
+          channel: voice
+          component: edge
+        annotations:
+          summary: "公网端点拨测失败: {{ $labels.instance }}"
+          description: "对外主域不可用，立即核查 DNS/Caddy/TLS/后端。"
+
+      - alert: InternalHealthDown
+        expr: probe_success{view="internal"} == 0
+        for: 2m
+        labels:
+          severity: P1
+          channel: wecom-sms
+          component: health
+        annotations:
+          summary: "内网 /api/health 探针失败: {{ $labels.instance }}"
+          description: "容器或 DB 探针异常。"
+
+      - alert: TlsCertExpiringSoon
+        expr: (probe_ssl_earliest_cert_expiry - time()) < 14 * 86400
+        for: 1h
+        labels:
+          severity: P2
+          channel: ticket
+          component: tls
+        annotations:
+          summary: "TLS 证书 14 天内到期"
+          description: "{{ $labels.instance }} 剩余 {{ $value | humanizeDuration }}。"
+
+      # ── 备份与异地灾备 ────────────────────────────────────────────────────
+      - alert: PostgresBackupStale
+        expr: time() - coolie_backup_last_success_timestamp_seconds{job="postgres-wal"} > 129600
+        for: 10m
+        labels:
+          severity: P0
+          channel: voice
+          component: backup
+        annotations:
+          summary: "Postgres WAL/全量备份超过 36 小时未成功"
+          description: "RPO 目标 (≤5min) 已失守，立即检查 03:00 定时任务与对象存储连通性。"
+
+      - alert: PostgresBackupFailed
+        expr: increase(coolie_backup_runs_total{job="postgres-wal",result="failure"}[1d]) > 0
+        for: 5m
+        labels:
+          severity: P1
+          channel: wecom-sms
+          component: backup
+        annotations:
+          summary: "Postgres 备份 24 小时内出现失败"
+          description: "查看失败标记与备份日志。"
+
+      - alert: PostgresBackupSizeAnomaly
+        expr: |
+          coolie_backup_last_size_bytes{job="postgres-wal"}
+          < 0.5 * avg_over_time(coolie_backup_last_size_bytes{job="postgres-wal"}[7d])
+        for: 30m
+        labels:
+          severity: P1
+          channel: wecom-sms
+          component: backup
+        annotations:
+          summary: "备份产物体积骤降 > 50%: 疑似截断/损坏"
+          description: "当前 {{ $value | humanize1024 }}B，核查备份完整性与磁盘空间。"
+
+      - alert: PostgresWalArchiveFailing
+        expr: increase(pg_stat_archiver_failed_count[15m]) > 0
+        for: 5m
+        labels:
+          severity: P0
+          channel: voice
+          component: backup
+        annotations:
+          summary: "Postgres WAL 归档失败 (archive_command 报错)"
+          description: "归档失败将阻塞 WAL 回收并撑爆磁盘，立即核查对象存储凭证与网络。"

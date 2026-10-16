@@ -94,6 +94,7 @@ import {
   localVersion,
   type RemoteVersionInfo,
 } from "./src/AppVersion";
+import { resolveUpdatePresentation } from "./src/updatePolicy";
 import {
   WhatsNewScreen,
   markWhatsNewSeen,
@@ -221,6 +222,47 @@ function AppUpdateCard({ info, onClose }: { info: RemoteVersionInfo; onClose: ()
 }
 
 
+
+/**
+ * 强更门禁 (强制升级)：远端 version.json 的 minSupportedVersionCode 高于本机原生
+ * versionCode 时, 说明发生原生断代, expo-updates 热更无法覆盖 —— 只能以整包升级收口。
+ *
+ * 与可关闭的 AppUpdateCard 不同, 本门禁不可关闭、不可绕过 (无「稍后」路径), 只保留
+ * 一个两字动作【升级】。协议契约见 docs/09_operations/ota-version-protocol.md。
+ */
+function ForceUpdateGate({ info }: { info: RemoteVersionInfo }) {
+  const [downloading, setDownloading] = useState(false);
+  return (
+    <View style={styles.forceOverlay} testID="App__ForceUpdate__Gate">
+      <View style={styles.forceCard}>
+        <Ionicons name="arrow-up-circle" size={44} color={C.brand} />
+        <Text style={styles.forceTitle}>需要升级</Text>
+        <Text style={styles.forceVersion}>
+          v{localVersion()} → v{info.version}
+        </Text>
+        <Text style={styles.forceReason}>当前版本已停止支持，升级后即可继续使用。</Text>
+        {info.releaseNotes ? (
+          <Text style={styles.forceNotes} numberOfLines={3}>
+            {info.releaseNotes}
+          </Text>
+        ) : null}
+        <Pressable
+          testID="App__ForceUpdate__UpgradeBtn"
+          style={[styles.updateBtn, styles.forceBtn, downloading && styles.btnDisabled]}
+          disabled={downloading}
+          onPress={async () => {
+            setDownloading(true);
+            const ok = await downloadApk(info.downloadUrl);
+            setDownloading(false);
+            if (!ok) Alert.alert("打开失败", "无法打开下载页，请稍后重试");
+          }}
+        >
+          <Text style={styles.updateBtnText}>{downloading ? "拉起中…" : "升级"}</Text>
+        </Pressable>
+      </View>
+    </View>
+  );
+}
 
 export default function App() {
   const [credential, setCredential] = useState<Credential | null | undefined>(undefined);
@@ -686,6 +728,9 @@ function HomeScreen({
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [boardView, setBoardView] = useState(false);
   const [appUpdate, setAppUpdate] = useState<RemoteVersionInfo | null>(null);
+  // 强更门禁 (g7): 远端 version.json 的 minSupportedVersionCode 高于本机原生 versionCode
+  // 时, 说明发生原生断代, OTA 热更无法覆盖 —— 只能整包升级。此处状态非空即弹不可关闭门禁。
+  const [forcedUpdate, setForcedUpdate] = useState<RemoteVersionInfo | null>(null);
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [inboxInitialTab, setInboxInitialTab] = useState<"all" | "mine" | "approvals" | "blocked">("all");
@@ -718,7 +763,12 @@ function HomeScreen({
 
   useEffect(() => {
     void checkAppVersion().then((r) => {
-      if (r.updateAvailable && r.info) setAppUpdate(r.info);
+      if (!r.info) return;
+      // 强更 / 可选升级 / 静默 三分流 (契约见 docs/09_operations/ota-version-protocol.md):
+      // gate=强更门禁(不可关闭) / banner=可关闭提示 / none=静默(热更已由 OTA 接管或已最新)
+      const mode = resolveUpdatePresentation(r);
+      if (mode === "gate") setForcedUpdate(r.info);
+      else if (mode === "banner") setAppUpdate(r.info);
     });
   }, []);
 
@@ -1351,6 +1401,8 @@ function HomeScreen({
           navigateTab("tasks");
         }}
       />
+      {/* 强更门禁: 置于壳内最后一层, 高 zIndex 覆盖顶栏/内容/底栏, 不可关闭 */}
+      {forcedUpdate ? <ForceUpdateGate info={forcedUpdate} /> : null}
     </SafeAreaView>
     </GestureHandlerRootView>
     );
@@ -1497,6 +1549,33 @@ const styles = StyleSheet.create({
   updateIosHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
   updateIosActions: { flexDirection: "row", gap: 8, marginTop: 10 },
   updateBtnGhost: { backgroundColor: C.panel, borderWidth: 1, borderColor: C.line },
+
+  // 强更门禁 (g7): 全屏压暗遮罩 + 居中卡片, 覆盖顶栏/内容/底栏 (zIndex 200 > composeOverlay 110)
+  forceOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: "rgba(8,9,10,0.96)",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: 24,
+    zIndex: 200,
+  },
+  forceCard: {
+    width: "100%",
+    maxWidth: 360,
+    alignItems: "center",
+    gap: 8,
+    backgroundColor: C.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: C.line,
+    paddingVertical: 28,
+    paddingHorizontal: 20,
+  },
+  forceTitle: { color: C.ink, fontSize: 18, fontWeight: "600", marginTop: 4 },
+  forceVersion: { color: C.ink3, fontSize: 13 },
+  forceReason: { color: C.ink3, fontSize: 12, textAlign: "center" },
+  forceNotes: { color: C.ink4, fontSize: 11, textAlign: "center" },
+  forceBtn: { marginTop: 16, paddingVertical: 12, paddingHorizontal: 40 },
 
   composeOverlay: {
     ...StyleSheet.absoluteFillObject,

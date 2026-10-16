@@ -157,6 +157,7 @@ class CmdAcpAgent {
       });
 
       session.activeProcess = proc;
+      let stderrAccum = "";
 
       proc.stdout.on("data", async (chunk) => {
         const text = chunk.toString("utf8");
@@ -178,6 +179,7 @@ class CmdAcpAgent {
 
       proc.stderr.on("data", async (chunk) => {
         const text = chunk.toString("utf8");
+        stderrAccum += text;
         try {
           await cx.notify(acp.methods.client.session.update, {
             sessionId: params.sessionId,
@@ -199,8 +201,166 @@ class CmdAcpAgent {
         reject(err);
       });
 
+      proc.on("close", async (code) => {
+        session.activeProcess = null;
+        if (code !== 0 && (code === 10 || stderrAccum.includes("额度不足") || stderrAccum.includes("quota"))) {
+          try {
+            const fallbackResult = await this.runAgyFallback(session, params, cx, promptText, workingDir);
+            return resolve(fallbackResult);
+          } catch (fbErr) {
+            try {
+              await cx.notify(acp.methods.client.session.update, {
+                sessionId: params.sessionId,
+                update: {
+                  sessionUpdate: "agent_message_chunk",
+                  content: {
+                    type: "text",
+                    text: `\n[降级失败] Antigravity 兜底执行异常: ${fbErr?.message || fbErr}\n`,
+                  },
+                },
+              });
+            } catch {}
+            return resolve({
+              stopReason: "error",
+            });
+          }
+        }
+        resolve({
+          stopReason: code === 0 ? "end_turn" : "error",
+        });
+      });
+    });
+  }
+
+  async runAgyFallback(session, params, cx, promptText, workingDir) {
+    try {
+      await cx.notify(acp.methods.client.session.update, {
+        sessionId: params.sessionId,
+        update: {
+          sessionUpdate: "agent_message_chunk",
+          content: {
+            type: "text",
+            text: "\n\n🤖 [自愈降级] 检测到 Command Code 额度不足 (exit code 10)，自动无缝切换至 Antigravity (agy-gemini) 兜底执行...\n\n",
+          },
+        },
+      });
+    } catch {}
+
+    const repoRootDir = path.resolve(__dirname, "../..");
+    let bin = "";
+    let args = [];
+    let promptFilePath = null;
+
+    if (fs.existsSync("/root/.local/bin/agy")) {
+      bin = "/root/.local/bin/agy";
+      args = ["-p", promptText, "--dangerously-skip-permissions"];
+    } else {
+      let dockerRunning = false;
+      try {
+        const out = execSync("docker inspect -f '{{.State.Running}}' agy-ubuntu-container 2>/dev/null", { encoding: "utf8" }).trim();
+        dockerRunning = (out === "true");
+      } catch {
+        dockerRunning = false;
+      }
+
+      if (dockerRunning) {
+        bin = "docker";
+        const repoTmpDir = path.resolve(repoRootDir, ".coolie-local/tmp");
+        if (!fs.existsSync(repoTmpDir)) {
+          try { fs.mkdirSync(repoTmpDir, { recursive: true }); } catch {}
+        }
+        promptFilePath = path.join(repoTmpDir, `agy-fallback-prompt-${params.sessionId}.md`);
+        fs.writeFileSync(promptFilePath, promptText, "utf8");
+
+        const containerRepoRoot = repoRootDir.replace(/^\/Users\/mac\/workspace/, "/host-workspace");
+        const containerPromptFile = path.join(containerRepoRoot, ".coolie-local/tmp", `agy-fallback-prompt-${params.sessionId}.md`);
+
+        const hostCwd = process.cwd();
+        let containerCwd = containerRepoRoot;
+        if (hostCwd.startsWith("/Users/mac/workspace")) {
+          containerCwd = hostCwd.replace(/^\/Users\/mac\/workspace/, "/host-workspace");
+        }
+
+        const envFlags = [
+          "-e", "LANG=C.UTF-8",
+          "-e", "LC_ALL=C.UTF-8",
+        ];
+        for (const [k, v] of Object.entries(process.env)) {
+          if (k.startsWith("PAPERCLIP_") || k === "DATABASE_URL") {
+            envFlags.push("-e", `${k}=${v}`);
+          }
+        }
+
+        const timeoutArg = process.env.AGY_TIMEOUT ? `--print-timeout "${process.env.AGY_TIMEOUT}"` : `--print-timeout 0s`;
+        const continueFlag = (promptText.includes("【断点接力续跑】") || promptText.includes("【断点续跑】")) ? "-c" : "";
+
+        args = [
+          "exec",
+          "-i",
+          ...envFlags,
+          "agy-ubuntu-container",
+          "bash",
+          "-c",
+          `cd "${containerCwd}" 2>/dev/null || cd "${containerRepoRoot}"; exec /root/.local/bin/agy ${continueFlag} ${timeoutArg} -p "$(< "${containerPromptFile}")" --dangerously-skip-permissions`
+        ];
+      } else {
+        throw new Error("Neither local agy nor agy-ubuntu-container is available for fallback");
+      }
+    }
+
+    return new Promise((resolve, reject) => {
+      const proc = spawn(bin, args, {
+        stdio: ["ignore", "pipe", "pipe"],
+        cwd: workingDir,
+      });
+
+      session.activeProcess = proc;
+
+      proc.stdout.on("data", async (chunk) => {
+        const text = chunk.toString("utf8");
+        try {
+          await cx.notify(acp.methods.client.session.update, {
+            sessionId: params.sessionId,
+            update: {
+              sessionUpdate: "agent_message_chunk",
+              content: {
+                type: "text",
+                text,
+              },
+            },
+          });
+        } catch {}
+      });
+
+      proc.stderr.on("data", async (chunk) => {
+        const text = chunk.toString("utf8");
+        try {
+          await cx.notify(acp.methods.client.session.update, {
+            sessionId: params.sessionId,
+            update: {
+              sessionUpdate: "agent_message_chunk",
+              content: {
+                type: "text",
+                text: `[stderr] ${text}`,
+              },
+            },
+          });
+        } catch {}
+      });
+
+      proc.on("error", (err) => {
+        session.activeProcess = null;
+        if (promptFilePath && fs.existsSync(promptFilePath)) {
+          try { fs.unlinkSync(promptFilePath); } catch {}
+        }
+        reject(err);
+      });
+
       proc.on("close", (code) => {
         session.activeProcess = null;
+        if (promptFilePath && fs.existsSync(promptFilePath)) {
+          try { fs.unlinkSync(promptFilePath); } catch {}
+        }
         resolve({
           stopReason: code === 0 ? "end_turn" : "error",
         });

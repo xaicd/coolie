@@ -1,0 +1,8 @@
+# 主机采集目标 (node_exporter)
+# 生产: tc-coolie-claw 上 node_exporter 监听 0.0.0.0:9100, 由 prometheus 容器经 host.docker.internal 访问。
+# 本文件为静态目标清单, 改目标无需改 prometheus.yml。
+- targets:
+    - host.docker.internal:9100
+  labels:
+    instance_name: tc-coolie-claw
+    role: prod-host

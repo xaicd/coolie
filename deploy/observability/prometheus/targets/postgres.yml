@@ -1,0 +1,7 @@
+# Postgres 采集目标 (postgres_exporter)
+# COOA-270 明确交付: Postgres 业务的 WAL/物理备份 → OSS; 此 exporter 提供库级健康与容量指标。
+- targets:
+    - postgres-exporter:9187
+  labels:
+    instance_name: coolie-postgres
+    role: primary

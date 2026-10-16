@@ -1,0 +1,6 @@
+# Redis 采集目标 (redis_exporter)
+- targets:
+    - redis-exporter:9121
+  labels:
+    instance_name: community-life-redis
+    role: master

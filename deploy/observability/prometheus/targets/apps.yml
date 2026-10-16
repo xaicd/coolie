@@ -1,0 +1,14 @@
+# 业务应用采集目标 (Spring Boot Actuator /actuator/prometheus, 指标由 Micrometer 暴露)
+# 社区生活服务商用中台主链路: Spring Cloud Gateway + business-server。
+# 生产部署在 tc-coolie-claw, 由 prometheus 容器经 host.docker.internal 访问宿主端口。
+- targets:
+    - host.docker.internal:48080
+  labels:
+    app: cls-gateway
+    instance_name: cls-gateway
+
+- targets:
+    - host.docker.internal:48081
+  labels:
+    app: cls-business-server
+    instance_name: cls-business-server
