@@ -113,6 +113,7 @@
     "test:defenses:full": "node scripts/check-testing-defenses.mjs --instance --e2e",
     "test:device-claim": "node --test scripts/__tests__/device-claim.test.mjs",
     "test:adapter-prompt-clamp": "node --test scripts/__tests__/adapter-prompt-clamp.test.mjs",
+    "test:workflow-engine": "node --test scripts/__tests__/workflow-engine.test.mjs",
     "test:fork-surface": "node scripts/check-fork-surface.mjs --cumulative",
     "test:install-sh-docker": "./scripts/test-install-sh-docker.sh",
     "test:hermes-gateway-smoke": "node --test scripts/smoke/hermes-gateway-smoke.test.mjs",
