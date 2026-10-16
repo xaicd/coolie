@@ -394,3 +394,266 @@ test("renderText prints a compact, non-duplicated snapshot", () => {
   assert.match(text, /pendingApprovals=0 failures=6/);
   assert.ok(text.split("\n").length < 15, "snapshot must stay one-screen small");
 });
+
+// ---------------------------------------------------------------------------
+// 7. 工单大盘四桶 (与 scripts/coolie-dev-task.sh 同口径)
+// ---------------------------------------------------------------------------
+
+const ISSUES = [
+  { identifier: "COOA-4", status: "in_progress", priority: "high", checkoutRunId: null },
+  { identifier: "COOA-114", status: "in_progress", priority: "high", checkoutRunId: "run-1" },
+  { identifier: "COOA-278", status: "in_review", priority: "low", checkoutRunId: null },
+  { identifier: "COOA-44", status: "blocked", priority: "low", checkoutRunId: null },
+  { identifier: "COOA-1", status: "todo", priority: "medium", checkoutRunId: null },
+  { identifier: "COOA-253", status: "backlog", priority: "medium", checkoutRunId: null },
+  { identifier: "COOA-99", status: "cancelled", priority: "low", checkoutRunId: null },
+];
+
+test("summarizeQueue maps statuses to the 4 buckets and merges todo+backlog", () => {
+  const queue = summarizeQueue(ISSUES);
+  assert.equal(queue.total, ISSUES.length);
+  assert.equal(queueLineCounts(queue), "2/1/1/2");
+  assert.deepEqual(
+    queue.buckets.in_progress.map((i) => i.identifier),
+    ["COOA-114", "COOA-4"],
+    "sorted by identifier so the signature never jitters on response order"
+  );
+  assert.deepEqual(queue.buckets.todo.map((i) => i.identifier), ["COOA-1", "COOA-253"]);
+  assert.equal(queue.unscoped, 1, "cancelled falls outside the 4 buckets but stays visible as unscoped");
+  assert.deepEqual(
+    QUEUE_BUCKETS.map((b) => b.key),
+    ["in_progress", "in_review", "blocked", "todo"]
+  );
+});
+
+test("summarizeQueue tolerates garbage rows and {issues:[...]} wrappers", () => {
+  assert.equal(summarizeQueue(null).total, 0);
+  assert.equal(summarizeQueue([null, 7, "x"]).total, 3);
+  assert.equal(summarizeQueue({ issues: ISSUES }).buckets.blocked.length, 1);
+});
+
+// ---------------------------------------------------------------------------
+// 8. 盘面指纹 + delta (心法 #176: 无变化就只发一行)
+// ---------------------------------------------------------------------------
+
+function makeSnapshot({
+  routines = ROUTINES,
+  issues = ISSUES,
+  inboxPayload = {
+    pendingApprovals: [{ id: "a" }, { id: "b" }],
+    failures: new Array(6).fill({ id: "f" }),
+    failedRuns: new Array(20).fill({ id: "r" }),
+    mentionedBy: [],
+    joinRequests: [],
+  },
+} = {}) {
+  return {
+    apiBase: "http://127.0.0.1:3100/api",
+    companyId: ISSUE.companyId,
+    generatedAt: "2026-10-16T13:39:00.000Z",
+    issue: {
+      identifier: ISSUE.identifier,
+      status: ISSUE.status,
+      priority: ISSUE.priority,
+      checkoutRunId: ISSUE.checkoutRunId,
+    },
+    routines: { source: "companies-list", unavailableReason: null, items: routines.map(summarizeRoutine) },
+    inbox: summarizeInbox(inboxPayload),
+    queue: summarizeQueue(issues),
+  };
+}
+
+test("snapshotSignature is stable against response order", () => {
+  const a = makeSnapshot();
+  const b = makeSnapshot({ routines: [...ROUTINES].reverse(), issues: [...ISSUES].reverse() });
+  assert.equal(snapshotSignature(a), snapshotSignature(b));
+  assert.match(snapshotSignature(a), /^[0-9a-f]{16}$/);
+});
+
+test("snapshotSignature ignores phase-null churn but reacts to real state changes", () => {
+  const base = makeSnapshot();
+  const baseSig = snapshotSignature(base);
+
+  // 字段阶段态: trigger 时间戳整片变 null —— 不进指纹, 否则 changed 恒为 true
+  const phaseNull = makeSnapshot({
+    routines: ROUTINES.map((r) => ({ ...r, triggers: [{ cronExpression: r.triggers?.[0]?.cronExpression }] })),
+  });
+  assert.equal(snapshotSignature(phaseNull), baseSig, "phase-null churn must not move the signature");
+
+  // 真变化: 心祖 linkedIssue 换人
+  const moved = makeSnapshot({
+    routines: ROUTINES.map((r) =>
+      r.id === ROUTINES[0].id
+        ? { ...r, lastRun: { ...r.lastRun, linkedIssue: { identifier: "COOA-296", status: "in_progress", updatedAt: "2026-10-16T13:45:00.000Z" } } }
+        : r
+    ),
+  });
+  assert.notEqual(snapshotSignature(moved), baseSig);
+});
+
+test("diffSnapshots reports routine / inbox / queue / issue changes as readable lines", () => {
+  const before = makeSnapshot();
+  const after = makeSnapshot({
+    issues: [
+      ...ISSUES,
+      { identifier: "COOA-296", status: "in_progress", priority: "high", checkoutRunId: "run-2" },
+    ],
+    inboxPayload: {
+      pendingApprovals: [{ id: "a" }],
+      failures: new Array(7).fill({ id: "f" }),
+      failedRuns: [],
+      mentionedBy: [],
+      joinRequests: [],
+    },
+    routines: ROUTINES.map((r) =>
+      r.id === ROUTINES[0].id
+        ? { ...r, lastRun: { ...r.lastRun, linkedIssue: { identifier: "COOA-296", status: "in_progress", updatedAt: "2026-10-16T13:45:00.000Z" } } }
+        : r
+    ),
+  });
+
+  const state = { signature: snapshotSignature(before), canonical: canonicalSnapshot(before) };
+  const deltas = diffSnapshots(state, after).join("\n");
+  assert.match(deltas, /心祖 linkedIssue COOA-295 done -> COOA-296 in_progress/);
+  assert.match(deltas, /\+ in_progress: COOA-296/);
+  assert.match(deltas, /~ inbox pendingApprovals 2 -> 1/);
+  assert.match(deltas, /~ inbox failures 6 -> 7/);
+
+  assert.deepEqual(diffSnapshots(state, before), [], "identical board yields no delta lines");
+  assert.deepEqual(diffSnapshots(null, before), ["(无上一轮状态, 本轮为基线)"]);
+});
+
+test("diffSnapshots caps the delta list instead of flooding the comment", () => {
+  const before = makeSnapshot({ issues: [] });
+  const after = makeSnapshot({
+    issues: Array.from({ length: 30 }, (_, i) => ({ identifier: `COOA-9${i}`, status: "blocked", priority: "low" })),
+    inboxPayload: { pendingApprovals: [], failures: [], failedRuns: [], mentionedBy: [], joinRequests: [] },
+  });
+  const deltas = diffSnapshots({ canonical: canonicalSnapshot(before) }, after);
+  assert.equal(deltas.length, 13);
+  assert.match(deltas.at(-1), /另有 18 条变化/);
+});
+
+test("readState / writeState round-trip, and degrade on missing or corrupt files", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-state-"));
+  const file = path.join(dir, "nested", "state.json");
+  try {
+    assert.equal(readState(file), null, "missing file is a first run, not an error");
+    const snapshot = makeSnapshot();
+    assert.equal(
+      writeState({ signature: snapshotSignature(snapshot), canonical: canonicalSnapshot(snapshot) }, file),
+      true
+    );
+    assert.equal(readState(file).signature, snapshotSignature(snapshot));
+
+    fs.writeFileSync(file, "{ this is not json");
+    assert.equal(readState(file), null, "corrupt state must not break the heartbeat");
+    assert.equal(writeState({ signature: "x" }, path.join(dir, "\u0000bad")), false, "unwritable path returns false");
+  } finally {
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("renderBrief prints one line when the board is unchanged and adds deltas when it moved", () => {
+  const stable = { ...makeSnapshot(), signature: "abc123abc123abcd", previousSignature: "abc123abc123abcd", changed: false, deltas: [] };
+  const brief = renderBrief(stable);
+  assert.equal(brief.split("\n").length, 1);
+  assert.match(brief, /no-change/);
+  assert.match(brief, /COOA-114 in_progress/);
+  assert.match(brief, /queue 2\/1\/1\/2/);
+  assert.match(brief, /pa=2 f=6 fr=20/);
+
+  const moved = { ...makeSnapshot(), signature: "ffff0000ffff0000", previousSignature: "abc123abc123abcd", changed: true, deltas: ["+ in_progress: COOA-296"] };
+  const movedBrief = renderBrief(moved);
+  assert.match(movedBrief.split("\n")[0], /CHANGED sig=ffff0000ffff0000/);
+  assert.equal(movedBrief.split("\n").length, 2);
+});
+
+test("parseArgs understands the new heartbeat flags", () => {
+  const { flags, options } = parseArgs(["--brief", "--no-state", "--skip-queue", "--state=/tmp/s.json"]);
+  assert.equal(flags.brief, true);
+  assert.equal(flags.noState, true);
+  assert.equal(flags.skipQueue, true);
+  assert.equal(options.state, "/tmp/s.json");
+  assert.equal(parseArgs(["--state", "/tmp/x.json"]).options.state, "/tmp/x.json");
+});
+
+// ---------------------------------------------------------------------------
+// 9. 端到端: 同一盘面连跑两次 → 第二次必须 no-change (一行心脏起搏)
+// ---------------------------------------------------------------------------
+
+const E2E_ISSUES = [
+  { identifier: "COOA-4", status: "in_progress", priority: "high", checkoutRunId: null },
+  { identifier: "COOA-114", status: "in_progress", priority: "high", checkoutRunId: ISSUE.checkoutRunId },
+  { identifier: "COOA-44", status: "blocked", priority: "low", checkoutRunId: null },
+  { identifier: "COOA-1", status: "todo", priority: "medium", checkoutRunId: null },
+];
+
+function startHeartbeatFixture() {
+  return startFixtureServer((req, res) => {
+    res.setHeader("content-type", "application/json");
+    if (req.url === `/api/issues/${ISSUE.id}`) return res.end(JSON.stringify(ISSUE));
+    if (req.url === `/api/companies/${ISSUE.companyId}/routines`) return res.end(JSON.stringify(ROUTINES));
+    if (req.url === `/api/companies/${ISSUE.companyId}/issues?limit=400`) return res.end(JSON.stringify(E2E_ISSUES));
+    if (req.url === `/api/inbox?companyId=${ISSUE.companyId}`) {
+      return res.end(
+        JSON.stringify({
+          pendingApprovals: [{ id: "a" }, { id: "b" }],
+          failures: new Array(6).fill({ id: "f" }),
+          failedRuns: new Array(20).fill({ id: "r" }),
+          mentionedBy: [],
+          joinRequests: [],
+        })
+      );
+    }
+    res.statusCode = 404;
+    res.end(JSON.stringify({ error: "API route not found" }));
+  });
+}
+
+test("end to end: first --brief run is a baseline, the second on the same board is one line of no-change", async () => {
+  const { server, baseUrl } = await startHeartbeatFixture();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-brief-"));
+  const statePath = path.join(dir, "state.json");
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" };
+  try {
+    const first = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
+    assert.match(first.stdout, /CHANGED sig=[0-9a-f]{16}/);
+    assert.match(first.stdout, /queue 2\/0\/1\/1/);
+    assert.match(first.stdout, /\(无上一轮状态, 本轮为基线\)/);
+    assert.ok(fs.existsSync(statePath), "state must be persisted for the next heartbeat");
+
+    const second = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
+    assert.match(second.stdout, /no-change/);
+    assert.equal(second.stdout.trim().split("\n").length, 1, "unchanged board must stay a single line");
+
+    // --json 仍然可用, 且带上比对结论
+    const third = await execFileAsync("node", [SCRIPT, "--json", "--issue", ISSUE.id, "--state", statePath], { env });
+    const payload = JSON.parse(third.stdout);
+    assert.equal(payload.changed, false);
+    assert.equal(payload.queue.buckets.in_progress.length, 2);
+    assert.equal(payload.signature, payload.previousSignature);
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("end to end: a new blocked issue shows up as a delta line on the next heartbeat", async () => {
+  const { server, baseUrl } = await startHeartbeatFixture();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-brief2-"));
+  const statePath = path.join(dir, "state.json");
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key" };
+  try {
+    await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
+    E2E_ISSUES.push({ identifier: "COOA-297", status: "blocked", priority: "high", checkoutRunId: null });
+    const after = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
+    assert.match(after.stdout, /CHANGED/);
+    assert.match(after.stdout, /\+ blocked: COOA-297/);
+    assert.match(after.stdout, /queue 2\/0\/2\/1/);
+  } finally {
+    E2E_ISSUES.pop();
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
