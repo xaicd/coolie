@@ -128,22 +128,20 @@ export function AssigneeOptionsPanel({
                     ]}
                   >
                     <Text style={[styles.laneText, active && styles.laneTextActive]}>
-                      {value === "primary" ? "Primary" : "Custom"}
+                      {t(value === "primary" ? "mobile.composer.lanePrimary" : "mobile.composer.laneCustom")}
                     </Text>
                   </Pressable>
                 );
               })}
             </View>
             <Text style={styles.hint}>
-              {lane === "primary"
-                ? "Runs on the agent's primary model."
-                : "Override the model and effort for this task only."}
+              {t(lane === "primary" ? "mobile.composer.hintPrimary" : "mobile.composer.hintCustom")}
             </Text>
           </View>
 
           {lane === "custom" ? (
             <View style={styles.group}>
-              <Text style={styles.groupLabel}>Model</Text>
+              <Text style={styles.groupLabel}>{t("mobile.composer.modelLane")}</Text>
               <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}

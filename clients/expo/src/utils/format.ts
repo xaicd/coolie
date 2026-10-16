@@ -1,3 +1,5 @@
+import { t } from "../i18n";
+
 const MINUTE = 60_000;
 const HOUR = 60 * MINUTE;
 const DAY = 24 * HOUR;
@@ -59,10 +61,10 @@ export function formatRelativeShort(iso?: string | number | Date | null): string
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
   const diff = Date.now() - date.getTime();
-  if (diff < MINUTE) return "just now";
-  if (diff < HOUR) return `${Math.floor(diff / MINUTE)}m ago`;
-  if (diff < DAY) return `${Math.floor(diff / HOUR)}h ago`;
-  return `${Math.floor(diff / DAY)}d ago`;
+  if (diff < MINUTE) return t("mobile.time.justNow");
+  if (diff < HOUR) return t("mobile.time.minutesAgo", { vars: { count: Math.floor(diff / MINUTE) } });
+  if (diff < DAY) return t("mobile.time.hoursAgo", { vars: { count: Math.floor(diff / HOUR) } });
+  return t("mobile.time.daysAgo", { vars: { count: Math.floor(diff / DAY) } });
 }
 
 /** 日期时间: 2026-09-20 14:05 */

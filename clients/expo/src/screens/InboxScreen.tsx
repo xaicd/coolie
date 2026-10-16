@@ -40,6 +40,7 @@ import { Pill } from "../ui/Pill";
 import { ELEVATION, RADIUS, SPACING } from "../ui/tokens";
 import { formatRelativeShort, formatRelativeTime } from "../utils/format";
 import { isWakePayloadText } from "../utils/sanitize";
+import { t } from "../i18n";
 import {
   ISSUE_PRIORITIES,
   ISSUE_STATUSES,
@@ -205,9 +206,10 @@ function buildDateSections<T>(
   }
 
   const sections: DateSection<T>[] = [];
-  if (todayItems.length > 0) sections.push({ title: "TODAY", data: todayItems });
-  if (yesterdayItems.length > 0) sections.push({ title: "YESTERDAY", data: yesterdayItems });
-  if (earlierItems.length > 0) sections.push({ title: "EARLIER", data: earlierItems });
+  if (todayItems.length > 0) sections.push({ title: t("issues.list.dateToday"), data: todayItems });
+  if (yesterdayItems.length > 0)
+    sections.push({ title: t("issues.list.dateYesterday"), data: yesterdayItems });
+  if (earlierItems.length > 0) sections.push({ title: t("issues.list.dateEarlier"), data: earlierItems });
   return sections;
 }
 

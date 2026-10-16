@@ -1470,10 +1470,17 @@
       "thinkingEffort": "思考力度",
       "executionWorkspace": "执行空间",
       "noWatchdog": "无监工员工",
-      "watchdogPromptPlaceholder": "监工要盯什么？如何持续推进？"
+      "watchdogPromptPlaceholder": "监工要盯什么？如何持续推进？",
+      "lanePrimary": "主模型",
+      "laneCustom": "自定义",
+      "hintPrimary": "使用该员工的主模型运行。",
+      "hintCustom": "仅对本任务覆盖模型与思考力度。"
     },
     "git": {
-      "accessToken": "访问令牌"
+      "accessToken": "访问令牌",
+      "helpPat": "个人访问令牌 (PAT)",
+      "helpProjectToken": "项目 / 个人访问令牌",
+      "helpPrivateToken": "私人令牌"
     },
     "web": {
       "title": "Coolie 网页"
@@ -1483,6 +1490,12 @@
       "language": "语言",
       "langZh": "中文",
       "langEn": "EN"
+    },
+    "time": {
+      "justNow": "刚刚",
+      "minutesAgo": "{{count}} 分钟前",
+      "hoursAgo": "{{count}} 小时前",
+      "daysAgo": "{{count}} 天前"
     }
   }
 }

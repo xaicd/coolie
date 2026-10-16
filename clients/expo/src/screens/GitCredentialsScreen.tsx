@@ -28,12 +28,12 @@ import { useTranslation } from "../i18n";
  * 创建表单为内嵌弹层, 避免新增 4 个路由占位符; token 字段只在内存存活,
  * POST 成功后只存 server 的 metadata 行.
  */
-const PROVIDER_OPTIONS: { key: GitProvider; label: string; help: string }[] = [
-  { key: "github", label: "GitHub", help: "Personal access token (PAT)" },
-  { key: "gitlab", label: "GitLab", help: "Project / personal access token" },
-  { key: "gitee", label: "Gitee", help: "私人令牌" },
-  { key: "codeup", label: "Codeup (阿里云)", help: "Access token" },
-  { key: "cnb", label: "CNB", help: "Access token" },
+const PROVIDER_OPTIONS: { key: GitProvider; label: string; helpKey: string }[] = [
+  { key: "github", label: "GitHub", helpKey: "mobile.git.helpPat" },
+  { key: "gitlab", label: "GitLab", helpKey: "mobile.git.helpProjectToken" },
+  { key: "gitee", label: "Gitee", helpKey: "mobile.git.helpPrivateToken" },
+  { key: "codeup", label: "Codeup (阿里云)", helpKey: "mobile.git.accessToken" },
+  { key: "cnb", label: "CNB", helpKey: "mobile.git.accessToken" },
 ];
 
 export function GitCredentialsScreen({
@@ -297,7 +297,7 @@ function CreateCredentialSheet({
             })}
           </View>
           <Text style={styles.fieldHint}>
-            {PROVIDER_OPTIONS.find((o) => o.key === provider)?.help}
+            {t(PROVIDER_OPTIONS.find((o) => o.key === provider)?.helpKey ?? "mobile.git.helpPat")}
           </Text>
 
           <Text style={styles.fieldLabel}>{t("mobile.git.accessToken")}</Text>

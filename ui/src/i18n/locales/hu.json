@@ -1445,10 +1445,17 @@
       "thinkingEffort": "Thinking effort",
       "executionWorkspace": "Execution workspace",
       "noWatchdog": "No watchdog agent",
-      "watchdogPromptPlaceholder": "What should the watchdog watch for and how should it keep work moving?"
+      "watchdogPromptPlaceholder": "What should the watchdog watch for and how should it keep work moving?",
+      "lanePrimary": "Primary",
+      "laneCustom": "Custom",
+      "hintPrimary": "Runs on the agent's primary model.",
+      "hintCustom": "Override the model and effort for this task only."
     },
     "git": {
-      "accessToken": "Access Token"
+      "accessToken": "Access Token",
+      "helpPat": "Personal access token (PAT)",
+      "helpProjectToken": "Project / personal access token",
+      "helpPrivateToken": "Private token"
     },
     "web": {
       "title": "Coolie Web"
@@ -1458,6 +1465,12 @@
       "language": "Language",
       "langZh": "中文",
       "langEn": "EN"
+    },
+    "time": {
+      "justNow": "just now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago"
     }
   },
   "folders": {

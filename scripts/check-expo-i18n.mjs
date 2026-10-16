@@ -119,6 +119,9 @@ function walkFiles(dir, out = []) {
 const JSX_PROP_RE = /(?:title|label|placeholder|accessibilityLabel)\s*=\s*"([^"]+)"/g;
 const JSX_TITLE_RE = /title\s*=\s*"([^"]+)"/g;
 const JSX_TEXT_RE = />\s*([A-Za-z][A-Za-z0-9 ,.'!?&/:-]{4,}?)\s*</g;
+/** 对象字面量形式的 UI 文案 (如 `{ title: "TODAY" }` / `help: "..."`)。 */
+const OBJ_TITLE_RE = /(?:title|subtitle)\s*:\s*"([^"]+)"/g;
+const OBJ_PROP_RE = /(?:label|placeholder|accessibilityLabel|help|hint|message)\s*:\s*"([^"]+)"/g;
 
 /** `title=` 必须是本地化文案:单个纯英文单词同样视为残留 (如 "Pipeline"/"Plan")。 */
 function looksLikeEnglishTitle(value) {
@@ -138,6 +141,8 @@ function scanEnglishCopy() {
     for (const [regex, kind, predicate] of [
       [JSX_PROP_RE, 'prop', looksLikeEnglishCopy],
       [JSX_TITLE_RE, 'title', looksLikeEnglishTitle],
+      [OBJ_TITLE_RE, 'obj-title', looksLikeEnglishTitle],
+      [OBJ_PROP_RE, 'obj-prop', looksLikeEnglishCopy],
       [JSX_TEXT_RE, 'text', looksLikeEnglishCopy],
     ]) {
       regex.lastIndex = 0;
@@ -244,10 +249,10 @@ export function collectExpoI18nChecks() {
     driftNamespaces.slice(0, 8).join(', '),
   );
 
-  // R6 — 源码无残留英文 UI 文案
+  // R6 — 源码无残留英文 UI 文案 (JSX 属性/文本 + 对象字面量形式)
   const englishCopy = scanEnglishCopy();
   add(
-    'R6 Expo 源码无残留英文 UI 文案 (中英混杂归零)',
+    'R6 Expo 源码无残留英文 UI 文案 (JSX + 对象字面量, 中英混杂归零)',
     englishCopy.length === 0,
     englishCopy.slice(0, 10).join(' | '),
   );
