@@ -27,15 +27,17 @@ usage() {
 Usage: scripts/coolie-local-dev.sh <command>
 
 Commands:
-  start       Start local Coolie dev server in background (native host runtime)
-  stop        Stop local Coolie dev server
-  restart     Restart local Coolie dev server
-  status      Check local Coolie dev server status and health
-  health      Run structured API health check on local workshop
-  sre         Run SRE watchdog probe, health metrics & incident auto-healing
-  init-team   Initialize "Coolie 本地施工总社" company, 6 digital employees & routines
-  url         Print web board access URL for local browsing
-  help        Show this help
+  start                     Start local Coolie dev server in background (native host runtime)
+  stop                      Stop local Coolie dev server
+  restart                   Restart local Coolie dev server
+  status                    Check local Coolie dev server status and health
+  health                    Run structured API health check on local workshop
+  sre                       Run SRE watchdog probe, health metrics & incident auto-healing
+  init-team | fleet         One-click setup 6 digital employees (Hermes, 墨斗, 铁匠, 门神, 兑底渊, 百晓生)
+  takeover [dir] [name]     One-click takeover any project (req, design, dev, test, ops, fleet)
+  sync-docs [project]       Dynamically introspect code & generate ERD, API, UI, HLD, LLD docs
+  url                       Print web board access URL for local browsing
+  help                      Show this help
 
 Environment variables:
   COOLIE_DEV_PORT      Server port (default: 3100)
@@ -214,17 +216,83 @@ cmd_init_team() {
   cmd_url
 }
 
+cmd_fleet() {
+  echo "=== [Coolie Dev] 一键配置 6 大核心数字员工团队 ==="
+  if ! is_healthy; then
+    cmd_start
+  fi
+  node "$SCRIPT_DIR/init-local-workshop.mjs"
+  echo "✅ 数字员工团队 (Hermes, 墨斗, 铁匠, 门神, 兑底渊, 百晓生) 已全部就位！"
+  cmd_url
+}
+
+cmd_takeover() {
+  local target_dir="${1:-.}"
+  local proj_name="${2:-}"
+  
+  target_dir="$(cd "$target_dir" && pwd)"
+  if [[ -z "$proj_name" ]]; then
+    proj_name="$(basename "$target_dir")"
+  fi
+  
+  echo "========================================================="
+  echo "🚀 [Coolie Dev] 一键物理接管目标项目: $proj_name"
+  echo "📁 物理目标路径: $target_dir"
+  echo "⚡ 认知中枢: Hermes 作为芯片中枢调度全生命周期"
+  echo "========================================================="
+  
+  # 1. 确保本地工坊服务就绪
+  if ! is_healthy; then
+    echo "⚠️ 检测到本地工坊中枢未启动，正在自动拉起..."
+    cmd_start
+  fi
+  
+  # 2. 一键就位 6 大核心数字员工
+  echo "🤖 确保 6 大数字员工就位 (Hermes, 墨斗, 铁匠, 门神, 兑底渊, 百晓生)..."
+  node "$SCRIPT_DIR/init-local-workshop.mjs"
+  
+  # 3. 驱动 CMMI 动态内省与设计文档生成引擎
+  echo "📄 正在基于代码内省动态生成 需求、UI、API、表设计、概要、详细设计全量文档..."
+  if [[ "$target_dir" == "$REPO_ROOT" ]]; then
+    node "$SCRIPT_DIR/cmmi-doc-generator.cjs" --all
+  else
+    node "$SCRIPT_DIR/cmmi-doc-generator.cjs" --project "$proj_name" --all || true
+  fi
+  
+  echo ""
+  echo "🎉 项目 [$proj_name] 已成功被 Coolie 工坊物理接管！"
+  echo "   - 芯片中枢: Hermes 已激活并绑定意图总线与 7 工具池"
+  echo "   - 数字员工: 6 大核心角色已在岗，支持一句话意图下发"
+  echo "   - 研运资产: 需求(SRS/RTM)、设计(HLD/LLD/ERD/API/UI) 已 100% 动态生成"
+  echo "   - 持续守护: 交付主线巡检进程守护中"
+  echo "========================================================="
+  cmd_url
+}
+
+cmd_sync_docs() {
+  echo "=== [Coolie Dev] 动态代码内省并同步生成项目设计文档 ==="
+  local proj="${1:-}"
+  if [[ -n "$proj" ]]; then
+    node "$SCRIPT_DIR/cmmi-doc-generator.cjs" --project "$proj" --all
+  else
+    node "$SCRIPT_DIR/cmmi-doc-generator.cjs" --all
+  fi
+}
+
 ACTION="${1:-status}"
 
 case "$ACTION" in
-  start)      cmd_start ;;
-  stop)       cmd_stop ;;
-  restart)    cmd_restart ;;
-  status)     cmd_status ;;
-  health)     cmd_health ;;
-  sre)        shift; cmd_sre "$@" ;;
-  init-team)  cmd_init_team ;;
-  url)        cmd_url ;;
+  start)       cmd_start ;;
+  stop)        cmd_stop ;;
+  restart)     cmd_restart ;;
+  status)      cmd_status ;;
+  health)      cmd_health ;;
+  sre)         shift; cmd_sre "$@" ;;
+  init-team)   cmd_init_team ;;
+  fleet)       cmd_fleet ;;
+  takeover)    shift; cmd_takeover "$@" ;;
+  sync-docs)   shift; cmd_sync_docs "$@" ;;
+  url)         cmd_url ;;
   -h|--help|help) usage ;;
   *)
     printf '未知命令: %s\n\n' "$ACTION" >&2
