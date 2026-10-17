@@ -1,0 +1,26 @@
+{
+  "name": "SubmitDeliverable",
+  "title": "交付成果与挂载凭据",
+  "description": "数字员工提交实质工程资产，写入 issue_work_products，并通过 No Artifact 校验后结项",
+  "actor": "数字员工 (墨斗/铁匠/门神/兜底渊/百晓生)",
+  "preconditions": [
+    "issueId 处于 in_progress 状态且操作者持有排他锁",
+    "提供实质工程产物路径或 URL"
+  ],
+  "inputs": [
+    { "name": "issueId", "type": "uuid", "required": true },
+    { "name": "kind", "type": "string", "required": true },
+    { "name": "title", "type": "string", "required": true },
+    { "name": "resourceRef", "type": "json", "required": true }
+  ],
+  "effects": [
+    "在 issue_work_products 插入不可变凭据记录",
+    "执行可验证结项准则校验 (No Artifact, No Done 拦截)",
+    "更新 issue.status 为 done 并释放排他锁"
+  ],
+  "postEvents": [
+    "DeliverableSubmitted",
+    "TaskCompleted",
+    "DownstreamTasksUnblocked"
+  ]
+}

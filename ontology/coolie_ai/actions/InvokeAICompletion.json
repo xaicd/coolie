@@ -1,0 +1,26 @@
+{
+  "name": "InvokeAICompletion",
+  "title": "员工发起 LLM 推理调用",
+  "description": "数字员工调用一次 LLM 推理，原子落 AIInvocationLog 与 AIRoutingDecision（INV-AI-1 强制）",
+  "actor": "任意数字员工 (Hermes/墨斗/铁匠/门神/兑底渊/百晓生)",
+  "preconditions": [
+    "agentRuntime.status ∈ {active, idle}",
+    "对应 AIQuotaPolicy 状态为 healthy 或 warning（breached 拒绝）",
+    "primaryModel.status = active"
+  ],
+  "inputs": [
+    { "name": "agentId", "type": "uuid", "required": true },
+    { "name": "issueId", "type": "uuid", "required": false },
+    { "name": "promptBody", "type": "text", "required": true },
+    { "name": "requestedModelId", "type": "uuid", "required": false },
+    { "name": "toolNames", "type": "array", "required": false, "default": [] }
+  ],
+  "effects": [
+    "调用 AIRouteAIModel 选定最终 modelId",
+    "同步生成 AIInvocationLog 草稿 (startedAt, isImmutable=true)",
+    "调用 LLM Provider，串联 AIToolCall 记录",
+    "完成时更新 AIInvocationLog (tokensIn/Out, costCents, finishedAt, latencyMs, resultHash, outcome)",
+    "原子累加 AIQuotaPolicy.currentSpendCents 与 AIModel.quotaRemainingCents"
+  ],
+  "postEvents": ["AIInvocationCompleted", "AITokensAccumulated"]
+}

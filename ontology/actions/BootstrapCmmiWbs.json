@@ -1,0 +1,23 @@
+{
+  "name": "BootstrapCmmiWbs",
+  "title": "CMMI 10 大任务伴生",
+  "description": "立项事务内伴生 G1~G5 门禁任务并挂载 Primary Work Product 相对路径",
+  "actor": "Hermes (调度中枢) / 系统内核",
+  "preconditions": [
+    "projectId 对应项目已创建",
+    "所属租户具备默认项目工单前缀"
+  ],
+  "inputs": [
+    { "name": "projectId", "type": "uuid", "required": true },
+    { "name": "companyId", "type": "uuid", "required": true }
+  ],
+  "effects": [
+    "按阶段生成 10 条标准 CMMI WBS 工单",
+    "各工单在事务内自动挂载对应的 Primary Work Product 相对路径",
+    "设置首要任务 (Charter) 状态为 todo，后续依赖任务就绪"
+  ],
+  "postEvents": [
+    "CmmiWbsCreated",
+    "WorkProductsRegistered"
+  ]
+}

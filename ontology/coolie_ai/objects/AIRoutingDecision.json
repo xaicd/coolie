@@ -1,0 +1,18 @@
+{
+  "name": "AIRoutingDecision",
+  "title": "AI 路由决策",
+  "physicalTable": "ai_routing_decisions",
+  "description": "每次 LLM 调用的模型路由决策快照（cheapest/fastest/fallback）及命中原因",
+  "properties": [
+    { "name": "id", "type": "uuid", "required": true, "primaryKey": true },
+    { "name": "invocationId", "type": "uuid", "required": true },
+    { "name": "selectedModelId", "type": "uuid", "required": true },
+    { "name": "strategy", "type": "string", "enum": ["cheapest", "fastest", "fallback", "round_robin", "manual"], "required": true },
+    { "name": "reason", "type": "string", "required": false },
+    { "name": "decidedAt", "type": "timestamp", "required": true }
+  ],
+  "relations": [
+    { "type": "belongsTo", "target": "AIInvocationLog", "foreignKey": "invocationId" },
+    { "type": "belongsTo", "target": "AIModel", "foreignKey": "selectedModelId" }
+  ]
+}

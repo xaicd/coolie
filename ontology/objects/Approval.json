@@ -1,0 +1,20 @@
+{
+  "name": "Approval",
+  "title": "掌柜卡片式审批",
+  "physicalTable": "approvals",
+  "description": "治理门禁与关键动作裁决实体（提额、雇佣、发版、本体演进提案），一键两字处置",
+  "properties": [
+    { "name": "id", "type": "uuid", "required": true, "primaryKey": true },
+    { "name": "companyId", "type": "uuid", "required": true },
+    { "name": "type", "type": "string", "enum": ["hire_agent", "budget_increase", "release", "ontology_proposal"], "required": true },
+    { "name": "status", "type": "string", "enum": ["pending", "approved", "rejected"], "default": "pending" },
+    { "name": "payload", "type": "json", "required": true },
+    { "name": "decisionNote", "type": "string", "required": false },
+    { "name": "decidedByUserId", "type": "uuid", "required": false },
+    { "name": "createdAt", "type": "timestamp", "required": true },
+    { "name": "decidedAt", "type": "timestamp", "required": false }
+  ],
+  "relations": [
+    { "type": "belongsTo", "target": "Company", "foreignKey": "companyId" }
+  ]
+}

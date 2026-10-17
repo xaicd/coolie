@@ -1,0 +1,27 @@
+{
+  "name": "ApproveProposal",
+  "title": "两字确认本体提案",
+  "description": "掌柜在移动端点击【确认】，原子生效本体、生成 DDL 迁移、展开 SDD 规格并派单",
+  "actor": "掌柜 (CEO)",
+  "preconditions": [
+    "approvalId 存在且状态为 pending",
+    "操作者具备掌柜裁决权限"
+  ],
+  "inputs": [
+    { "name": "approvalId", "type": "uuid", "required": true },
+    { "name": "decision", "type": "string", "enum": ["approved", "rejected"], "required": true }
+  ],
+  "effects": [
+    "更新 approvals 表状态为 approved",
+    "调用 ontology-ops.cjs apply 原子升版 domain.json 并落盘实体改动",
+    "自动生成 SQL DDL 迁移脚本并归档至 migrations/",
+    "派生 Kiro SDD 敏捷规格全息包 (brief, reqs, design, tasks)",
+    "自动通过 spec-ops sync 在 Paperclip 建立对应 Epic 与履约子工单"
+  ],
+  "postEvents": [
+    "OntologyEvolved",
+    "DdlGenerated",
+    "SpecCreated",
+    "IssuesCreated"
+  ]
+}

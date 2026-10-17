@@ -1,0 +1,121 @@
+# ==============================================================================
+# M1: 业务对象模型 (Object Types)
+# ==============================================================================
+model: M1_OBJECTS
+version: 1.0.0
+domain: coolie-foundry
+description: Coolie 工坊产品本体 M1 业务对象模型定义 (8 大核心业务实体)
+
+objects:
+  - id: Company
+    name: 交付企业/租户
+    table: companies
+    primaryKey: id
+    description: 多租户逻辑顶层隔离实体，定义企业名称、硬预算上限与成员集合
+    properties:
+      id: { type: uuid, primaryKey: true, required: true }
+      name: { type: string, required: true }
+      issuePrefix: { type: string, unique: true, required: true }
+      budgetMonthlyCents: { type: integer, default: 0, required: true }
+      spentMonthlyCents: { type: integer, default: 0, required: true }
+      status: { type: enum, values: [active, paused, archived], default: active }
+
+  - id: Project
+    name: 交付工程项目
+    table: projects
+    primaryKey: id
+    description: 商业软件交付工厂中的项目工程实体，立项原子伴生 Domain 与 CMMI 01~09 WBS 骨架
+    properties:
+      id: { type: uuid, primaryKey: true, required: true }
+      companyId: { type: uuid, required: true, references: companies.id }
+      name: { type: string, required: true }
+      description: { type: string, required: false }
+      status: { type: enum, values: [planning, active, completed, archived], default: active }
+      leadAgentId: { type: uuid, required: false }
+
+  - id: Domain
+    name: 活体业务本体域
+    table: ontology_domains
+    primaryKey: id
+    description: 现实业务世界在控制面中的数字孪生本体域，承载 ObjectTypes、ActionTypes 与不变量守卫
+    properties:
+      id: { type: uuid, primaryKey: true, required: true }
+      companyId: { type: uuid, required: true, references: companies.id }
+      projectId: { type: uuid, required: false, references: projects.id }
+      name: { type: string, required: true }
+      slug: { type: string, required: true }
+      version: { type: string, default: "1.0.0", required: true }
+      status: { type: enum, values: [draft, active, deprecated], default: active }
+
+  - id: Issue
+    name: 原子履约任务工单
+    table: issues
+    primaryKey: id
+    description: 控制面任务调度单元，单一人/Agent排他签出锁，挂载验收标准与工程资产凭据
+    properties:
+      id: { type: uuid, primaryKey: true, required: true }
+      companyId: { type: uuid, required: true, references: companies.id }
+      projectId: { type: uuid, required: false, references: projects.id }
+      title: { type: string, required: true }
+      identifier: { type: string, required: true }
+      status: { type: enum, values: [backlog, todo, in_progress, in_review, done, blocked, canceled], default: todo }
+      priority: { type: enum, values: [low, medium, high, urgent], default: medium }
+      assigneeAgentId: { type: uuid, required: false, references: agents.id }
+      specKind: { type: string, required: false }
+
+  - id: Document
+    name: 原生协同文档
+    table: documents
+    primaryKey: id
+    description: 控制面原生富文本文档事实源（如 plan、srs、hld、review），支持版本审计与多人协同
+    properties:
+      id: { type: uuid, primaryKey: true, required: true }
+      companyId: { type: uuid, required: true, references: companies.id }
+      title: { type: string, required: true }
+      latestBody: { type: string, required: true }
+      format: { type: string, default: markdown }
+
+  - id: WorkProduct
+    name: 不可变工程工件
+    table: issue_work_products
+    primaryKey: id
+    description: 任务产出的物理工程资产凭据（代码 PR、在线快照、SOP 文档、机器测试证据），结项法定依据
+    properties:
+      id: { type: uuid, primaryKey: true, required: true }
+      issueId: { type: uuid, required: true, references: issues.id }
+      title: { type: string, required: true }
+      type: { type: enum, values: [pr, branch, document, artifact, preview, snapshot, evidence], required: true }
+      url: { type: string, required: false }
+      metadata: { type: json, required: false }
+
+  - id: Approval
+    name: 掌柜卡片式审批
+    table: approvals
+    primaryKey: id
+    description: 治理门禁与关键动作裁决实体（提额、雇佣、发版、本体演进提案），一键两字处置
+    properties:
+      id: { type: uuid, primaryKey: true, required: true }
+      companyId: { type: uuid, required: true, references: companies.id }
+      type: { type: enum, values: [hire_agent, budget_increase, release, ontology_proposal], required: true }
+      status: { type: enum, values: [pending, approved, rejected], default: pending }
+      payload: { type: json, required: true }
+
+  - id: Agent
+    name: 数字员工 / 智能体
+    table: agents
+    primaryKey: id
+    description: Paperclip 原生智能体/数字员工实体（Hermes、墨斗、铁匠、门神、兜底渊、百晓生），具备独立角色、双字技能、CLI 工具池与成本预算
+    properties:
+      id: { type: uuid, primaryKey: true, required: true }
+      companyId: { type: uuid, required: true, references: companies.id }
+      name: { type: string, required: true }
+      role: { type: enum, values: [pm, fda, core-swe, fdse, pre-sre, ds, general], required: true }
+      roleLabel: { type: string, required: false }
+      title: { type: string, required: false }
+      responsibilities: { type: array, required: false }
+      skills: { type: array, required: false }
+      tools: { type: array, required: false }
+      adapterType: { type: string, required: true }
+      budgetMonthlyCents: { type: integer, default: 0, required: true }
+      spentMonthlyCents: { type: integer, default: 0, required: true }
+      status: { type: enum, values: [idle, active, busy, paused, error], default: idle }

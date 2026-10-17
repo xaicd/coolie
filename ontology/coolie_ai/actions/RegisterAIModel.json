@@ -1,0 +1,27 @@
+{
+  "name": "RegisterAIModel",
+  "title": "注册 AI 模型到额度池",
+  "description": "将外部 LLM 模型（Claude/Gemini/GLM/Copilot 等）纳入 coolie_ai 额度池，统一计费与配额观测",
+  "actor": "Hermes (调度中枢) / 墨斗 (FDA)",
+  "preconditions": [
+    "companyId 对应租户处于 active 状态",
+    "modelId 与 provider 在白名单内",
+    "quotaHardCapCents > 0"
+  ],
+  "inputs": [
+    { "name": "companyId", "type": "uuid", "required": true },
+    { "name": "provider", "type": "string", "required": true },
+    { "name": "modelId", "type": "string", "required": true },
+    { "name": "displayName", "type": "string", "required": true },
+    { "name": "contextWindow", "type": "integer", "required": true, "default": 8192 },
+    { "name": "inputPricePerMillionCents", "type": "integer", "required": true },
+    { "name": "outputPricePerMillionCents", "type": "integer", "required": true },
+    { "name": "quotaHardCapCents", "type": "integer", "required": true }
+  ],
+  "effects": [
+    "在 ai_models 表插入新记录",
+    "默认 status=active 且 quotaRemainingCents = quotaHardCapCents",
+    "挂载 default AIModel Quota Policy (scope=model)"
+  ],
+  "postEvents": ["AIModelRegistered", "AIQuotaPolicyInitialized"]
+}

@@ -1,0 +1,32 @@
+# ==============================================================================
+# M7: 度量指标与统计过程控制模型 (Metrics & SPC)
+# ==============================================================================
+model: M7_METRICS_SPC
+version: 1.0.0
+domain: coolie-foundry
+description: Coolie 工坊 CMMI 5 高成熟度度量指标与统计过程控制模型
+
+metrics:
+  - id: GATE_PASS_RATE
+    name: CMMI G1~G5 门禁通关率
+    target: "100%"
+    formula: "(通过门禁任务数 / 触发门禁任务总数) * 100%"
+    frequency: 每次提交与结项
+
+  - id: SPC_DURATION_DEV
+    name: SPC 任务周期偏差
+    target: "处于 UCL 与 LCL 控制上下限内 (3-Sigma)"
+    formula: "|实际耗时 - 均值| <= 3 * 标准差"
+    frequency: 日终批处理
+
+  - id: MUTATION_KILL_RATE
+    name: 变异测试杀灭率 (MSI)
+    target: ">= 85.0%"
+    formula: "(杀灭变异体数 / (总变异体数 - 等价变异体数)) * 100%"
+    frequency: G4 全栈验收必须执行
+
+  - id: RTM_COVERAGE
+    name: 需求跟踪矩阵覆盖率
+    target: "100%"
+    formula: "(有对应测试用例与工件的需求数 / SRS 需求总数) * 100%"
+    frequency: G1 与 G4 阶段核验

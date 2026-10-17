@@ -1,0 +1,39 @@
+{
+  "domain": "coolie-foundry",
+  "version": "2.0.0",
+  "auditedAt": "2026-10-17T14:23:16.104Z",
+  "overallStatus": "PASS",
+  "selfHealed": false,
+  "fixedCount": 0,
+  "stats": {
+    "auditedEntities": 8,
+    "auditedActions": 8,
+    "totalFindings": 0,
+    "fatalCount": 0,
+    "errorCount": 0,
+    "warningCount": 0,
+    "gates": {
+      "metaSchema": {
+        "passed": 17,
+        "failed": 0
+      },
+      "codeReflection": {
+        "passed": 75,
+        "failed": 0
+      },
+      "topology": {
+        "passed": 38,
+        "failed": 0
+      },
+      "actionComputability": {
+        "passed": 32,
+        "failed": 0
+      },
+      "invariants": {
+        "passed": 5,
+        "failed": 0
+      }
+    }
+  },
+  "findings": []
+}

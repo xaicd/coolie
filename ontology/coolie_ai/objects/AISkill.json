@@ -1,0 +1,19 @@
+{
+  "name": "AISkill",
+  "title": "AI 技能 / Skill",
+  "physicalTable": "ai_skills",
+  "description": "AI 员工可装载的技能（prompt + tools + scripts 组合），内置或自定义；启用需掌柜审批（INV-AI-3）",
+  "properties": [
+    { "name": "id", "type": "uuid", "required": true, "primaryKey": true },
+    { "name": "name", "type": "string", "required": true },
+    { "name": "version", "type": "string", "required": true },
+    { "name": "source", "type": "string", "enum": ["builtin", "custom", "marketplace"], "required": true },
+    { "name": "skillMdPath", "type": "string", "required": false },
+    { "name": "requiresApproval", "type": "boolean", "required": true, "default": true },
+    { "name": "enabledForAgents", "type": "array", "required": false, "default": [] },
+    { "name": "riskLevel", "type": "string", "enum": ["safe", "moderate", "destructive"], "default": "moderate" },
+    { "name": "createdAt", "type": "timestamp", "required": true },
+    { "name": "updatedAt", "type": "timestamp", "required": true }
+  ],
+  "relations": []
+}

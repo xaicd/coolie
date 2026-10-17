@@ -1,0 +1,33 @@
+{
+  "slug": "coolie-foundry",
+  "name": "Coolie 商业软件交付工厂与控制面中枢",
+  "description": "全流程 AI 原生数字员工全自主驱动的商业软件交付工厂、六位一体超级集成体控制面与活体业务本体中枢",
+  "version": "1.0.0",
+  "invariants": [
+    {
+      "name": "INV-1 (No Artifact, No Done)",
+      "rule": "结项必须挂载不可变实质物理工程资产凭证 (代码 PR、真机快照、规格文档、机器证据库)，无资产凭证绝对禁止流转至 done",
+      "enforcementLevel": "FATAL"
+    },
+    {
+      "name": "INV-2 (Single-Assignee Exclusive Lock)",
+      "rule": "每一条工单/任务在任何时刻仅允许唯一单一人/数字员工负责人原子签出互斥锁定，杜绝并发修改与责任漂移",
+      "enforcementLevel": "CRITICAL"
+    },
+    {
+      "name": "INV-3 (Two-Letter Cockpit Actions)",
+      "rule": "移动驾驶舱 6 寸屏核心高管/前线操作按钮 100% 严格收敛为纯两字，杜绝长文案与技术细节泄露",
+      "enforcementLevel": "CRITICAL"
+    },
+    {
+      "name": "INV-4 (Budget Hard Stop Auto-Pause)",
+      "rule": "租户与数字员工成本花销一旦触碰硬停上限阈值，控制面原子触发全局或单体停工熔断，必须掌柜审批提额后方可复工",
+      "enforcementLevel": "FATAL"
+    },
+    {
+      "name": "INV-5 (Dev/Prod Absolute Isolation)",
+      "rule": "Dev 专事工坊自身建设，Prod 专事实体交付与客户中台运行，数据物理绝对隔离，禁止跨库混写",
+      "enforcementLevel": "FATAL"
+    }
+  ]
+}

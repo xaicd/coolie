@@ -1,0 +1,93 @@
+# ==============================================================================
+# M6: 端到端业务旅程模型 (E2E Journeys)
+# ==============================================================================
+model: M6_E2E_JOURNEYS
+version: 1.0.0
+domain: coolie-foundry
+description: Coolie 工坊两大核心端到端闭环业务旅程 (新项目0-1与生产期本体驱动演进)
+
+journeys:
+  - id: journey-delivery-0-to-1
+    title: 商业客户需求从 0 到 1 建设交付与终验结项
+    flow:
+      - step: 1
+        name: 需求进厂与立项
+        action: HatchProject
+        actors: [掌柜, Hermes]
+        gates: [G1]
+        deliverable: "docs/01_management/project-charter.md"
+
+      - step: 2
+        name: 需求规格收敛
+        action: CheckoutTask
+        actors: [百晓生, Hermes]
+        gates: [G1]
+        deliverable: "docs/02_requirements/software-requirements.md (EARS 语法)"
+
+      - step: 3
+        name: 概要架构设计
+        action: CheckoutTask
+        actors: [墨斗]
+        gates: [G2]
+        deliverable: "docs/03_design/architecture-design-hld.md & DAR-001.md"
+
+      - step: 4
+        name: 契约编码与实现
+        action: CheckoutTask
+        actors: [铁匠]
+        gates: [G3]
+        deliverable: "0 编译报错代码包 & docs/03_design/interface-contracts/"
+
+      - step: 5
+        name: 变异测试与全栈验收
+        action: SubmitDeliverable
+        actors: [门神, 百晓生]
+        gates: [G4]
+        deliverable: "docs/05_verification/test-summary-report.md (MSI >= 85%)"
+
+      - step: 6
+        name: 不可变生产投产
+        action: SubmitDeliverable
+        actors: [兜底渊]
+        gates: [G5]
+        deliverable: "docs/07_release/system-deployment-sop.md & 指纹校验"
+
+      - step: 7
+        name: 客户终验与商业结项
+        action: SignOffUat
+        actors: [掌柜, 甲方代表]
+        gates: [商业闭环]
+        deliverable: "docs/05_verification/uat-acceptance-certificate.md"
+
+  - id: journey-ontology-driven-evolution
+    title: 交付项目生产期活体本体驱动增量演进闭环
+    flow:
+      - step: 1
+        name: 掌柜/现场一句话提诉求
+        action: ProposeOntologyEvolution
+        actors: [掌柜, Hermes]
+        deliverable: "FoundryProposalCard (审批卡片)"
+
+      - step: 2
+        name: 掌柜两字点击【确认】
+        action: ApproveProposal
+        actors: [掌柜]
+        deliverable: "审批通过记录"
+
+      - step: 3
+        name: 原子升级本体与生成 DDL
+        action: SystemKernel
+        actors: [系统内核, 墨斗]
+        deliverable: "domain.json 升版 & migrations/V1_0_1__*.sql"
+
+      - step: 4
+        name: 展开 SDD 规格并派工 Paperclip
+        action: SystemKernel
+        actors: [Hermes, 铁匠]
+        deliverable: "docs/specs/<domain>/<feature>/ & Paperclip Issue Epic + 子工单"
+
+      - step: 5
+        name: 编码、验收与秒级热更
+        action: SubmitDeliverable
+        actors: [铁匠, 门神, 兜底渊]
+        deliverable: "OTA 静默热更补丁 / 容器镜像更新"

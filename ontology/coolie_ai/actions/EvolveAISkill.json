@@ -1,0 +1,23 @@
+{
+  "name": "EvolveAISkill",
+  "title": "Skill 版本演进与审批",
+  "description": "对 AISkill 进行版本升级、回滚或废止，每次演进必须经过掌柜审批并留下 AIPromptTemplate 快照",
+  "actor": "Hermes (调度中枢) / 墨斗 (FDA)",
+  "preconditions": [
+    "源 skillId 存在",
+    "新版本号遵循 semver 且大于当前 version",
+    "approvalId 必填"
+  ],
+  "inputs": [
+    { "name": "skillId", "type": "uuid", "required": true },
+    { "name": "newVersion", "type": "string", "required": true },
+    { "name": "changeNote", "type": "string", "required": true },
+    { "name": "approvalId", "type": "uuid", "required": true }
+  ],
+  "effects": [
+    "在 ai_skills 表写入新 version 记录（保留旧版可回滚）",
+    "关联 AIPromptTemplate 沉淀新 systemPrompt 快照",
+    "审计日志写 decision-log"
+  ],
+  "postEvents": ["AISkillVersioned", "AISkillEvolutionLogged"]
+}

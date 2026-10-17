@@ -476,6 +476,7 @@ const ALLOWED_ROOT_DIRS = new Set([
   'report',
   'skills-releases',
   'projects',
+  'ontology',
   '.agents',
   '.claude',
   '.codex',

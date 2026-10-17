@@ -1,0 +1,70 @@
+{
+  "name": "Company",
+  "title": "交付企业/租户",
+  "physicalTable": "companies",
+  "description": "多租户逻辑顶层隔离实体，定义企业名称、硬预算上限与成员集合",
+  "properties": [
+    {
+      "name": "id",
+      "type": "uuid",
+      "required": true,
+      "primaryKey": true
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "issuePrefix",
+      "type": "string",
+      "required": true,
+      "unique": true,
+      "description": "企业工单前缀标识 (原 slug 物理归宿)"
+    },
+    {
+      "name": "budgetMonthlyCents",
+      "type": "integer",
+      "required": true,
+      "default": 0
+    },
+    {
+      "name": "spentMonthlyCents",
+      "type": "integer",
+      "required": true,
+      "default": 0
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "enum": [
+        "active",
+        "paused",
+        "archived"
+      ],
+      "default": "active"
+    },
+    {
+      "name": "createdAt",
+      "type": "timestamp",
+      "required": true
+    },
+    {
+      "name": "updatedAt",
+      "type": "timestamp",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "type": "hasMany",
+      "target": "Project",
+      "foreignKey": "companyId"
+    },
+    {
+      "type": "hasMany",
+      "target": "Agent",
+      "foreignKey": "companyId"
+    }
+  ]
+}

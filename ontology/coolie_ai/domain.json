@@ -1,0 +1,29 @@
+{
+  "slug": "coolie_ai",
+  "name": "Coolie 工坊 AI 原生交付工厂本体系统",
+  "description": "AI 原生交付工厂的活体业务本体：建模模型、运行时、额度、调用流水、技能、提示词模板与路由决策，承接控制面中枢 coolie-foundry 的 AI 治理与可观测诉求",
+  "version": "1.0.0",
+  "parentDomain": "coolie-foundry",
+  "invariants": [
+    {
+      "name": "INV-AI-1 (No Invocation Log, No Done)",
+      "rule": "任何 LLM 推理调用必须产生不可变 AIInvocationLog 物理工件，缺失则关联 Issue 禁止流转至 done",
+      "enforcementLevel": "FATAL"
+    },
+    {
+      "name": "INV-AI-2 (Quota Hard Breach Auto-Pause)",
+      "rule": "AI 调用累计 costCents 一旦触碰 AIQuotaPolicy.hardLimitCents，控制面原子触发 HaltAIQuotaBreach，相关 Agent 立即 paused，需掌柜两字【确认】提额方可复工",
+      "enforcementLevel": "FATAL"
+    },
+    {
+      "name": "INV-AI-3 (Skill Enablement Requires Approval)",
+      "rule": "员工私有 systemPrompt 变更与 AISkill 启用必须经过掌柜 Approval.type=ontology_proposal 审批，否则禁止生效",
+      "enforcementLevel": "CRITICAL"
+    },
+    {
+      "name": "INV-AI-4 (Cost Atomic Accumulation, No Estimation)",
+      "rule": "AI 调用成本按 costCents 原子累加，禁止事后回填、估算或批量平账；所有计算必须基于 AIInvocationLog 实际流水",
+      "enforcementLevel": "CRITICAL"
+    }
+  ]
+}

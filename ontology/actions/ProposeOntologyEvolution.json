@@ -1,0 +1,23 @@
+{
+  "name": "ProposeOntologyEvolution",
+  "title": "提取本体演进提案",
+  "description": "Hermes 与墨斗根据业务对话意图，自动分析影响面并生成结构化提议卡片",
+  "actor": "Hermes / 墨斗 (FDA)",
+  "preconditions": [
+    "对话中明确了业务意图或变更诉求",
+    "目标项目本体 Domain 处于 active 状态"
+  ],
+  "inputs": [
+    { "name": "projectSlug", "type": "string", "required": true },
+    { "name": "proposalName", "type": "string", "required": true },
+    { "name": "intent", "type": "string", "required": true }
+  ],
+  "effects": [
+    "解析目标业务实体并计算影响面 (新增字段、状态、校验规则)",
+    "生成 FoundryProposalCard 数据结构并写入 approvals 表 (type=ontology_proposal)"
+  ],
+  "postEvents": [
+    "OntologyProposalCreated",
+    "CockpitApprovalPushed"
+  ]
+}

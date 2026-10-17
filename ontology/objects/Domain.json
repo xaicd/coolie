@@ -1,0 +1,21 @@
+{
+  "name": "Domain",
+  "title": "活体业务本体域",
+  "physicalTable": "ontology_domains",
+  "description": "现实业务世界在控制面中的数字孪生本体域，承载 ObjectTypes、ActionTypes 与不变量守卫",
+  "properties": [
+    { "name": "id", "type": "uuid", "required": true, "primaryKey": true },
+    { "name": "companyId", "type": "uuid", "required": true },
+    { "name": "projectId", "type": "uuid", "required": false },
+    { "name": "name", "type": "string", "required": true },
+    { "name": "slug", "type": "string", "required": true },
+    { "name": "version", "type": "string", "required": true, "default": "1.0.0" },
+    { "name": "status", "type": "string", "enum": ["draft", "active", "deprecated"], "default": "active" },
+    { "name": "createdAt", "type": "timestamp", "required": true },
+    { "name": "updatedAt", "type": "timestamp", "required": true }
+  ],
+  "relations": [
+    { "type": "belongsTo", "target": "Company", "foreignKey": "companyId" },
+    { "type": "belongsTo", "target": "Project", "foreignKey": "projectId" }
+  ]
+}

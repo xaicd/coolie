@@ -1,0 +1,112 @@
+{
+  "name": "Issue",
+  "title": "原子履约任务工单",
+  "physicalTable": "issues",
+  "description": "控制面任务调度单元，单一人/Agent排他签出锁，挂载验收标准与工程资产凭据",
+  "properties": [
+    {
+      "name": "id",
+      "type": "uuid",
+      "required": true,
+      "primaryKey": true
+    },
+    {
+      "name": "companyId",
+      "type": "uuid",
+      "required": true
+    },
+    {
+      "name": "projectId",
+      "type": "uuid",
+      "required": false
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "identifier",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "enum": [
+        "backlog",
+        "todo",
+        "in_progress",
+        "in_review",
+        "done",
+        "blocked",
+        "canceled"
+      ],
+      "default": "todo"
+    },
+    {
+      "name": "priority",
+      "type": "string",
+      "enum": [
+        "low",
+        "medium",
+        "high",
+        "urgent"
+      ],
+      "default": "medium"
+    },
+    {
+      "name": "assigneeAgentId",
+      "type": "uuid",
+      "required": false
+    },
+    {
+      "name": "assigneeUserId",
+      "type": "uuid",
+      "required": false
+    },
+    {
+      "name": "specKind",
+      "type": "string",
+      "required": false,
+      "description": "规格类型/绑定动作语义"
+    },
+    {
+      "name": "createdAt",
+      "type": "timestamp",
+      "required": true
+    },
+    {
+      "name": "updatedAt",
+      "type": "timestamp",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "type": "belongsTo",
+      "target": "Company",
+      "foreignKey": "companyId"
+    },
+    {
+      "type": "belongsTo",
+      "target": "Project",
+      "foreignKey": "projectId"
+    },
+    {
+      "type": "belongsTo",
+      "target": "Agent",
+      "foreignKey": "assigneeAgentId"
+    },
+    {
+      "type": "hasMany",
+      "target": "WorkProduct",
+      "foreignKey": "issueId"
+    },
+    {
+      "type": "hasMany",
+      "target": "Document",
+      "foreignKey": "issueId"
+    }
+  ]
+}

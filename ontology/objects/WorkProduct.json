@@ -1,0 +1,66 @@
+{
+  "name": "WorkProduct",
+  "title": "不可变工程工件",
+  "physicalTable": "issue_work_products",
+  "description": "任务产出的物理工程资产凭据（代码 PR、在线快照、SOP 文档、机器测试证据），结项法定依据",
+  "properties": [
+    {
+      "name": "id",
+      "type": "uuid",
+      "required": true,
+      "primaryKey": true
+    },
+    {
+      "name": "issueId",
+      "type": "uuid",
+      "required": true
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "type",
+      "type": "string",
+      "enum": [
+        "pr",
+        "branch",
+        "document",
+        "artifact",
+        "preview",
+        "snapshot",
+        "evidence"
+      ],
+      "required": true,
+      "description": "不可变工件类别 (pr, preview, snapshot, evidence 等)"
+    },
+    {
+      "name": "url",
+      "type": "string",
+      "required": false
+    },
+    {
+      "name": "metadata",
+      "type": "json",
+      "required": false
+    },
+    {
+      "name": "createdAt",
+      "type": "timestamp",
+      "required": true
+    },
+    {
+      "name": "updatedAt",
+      "type": "timestamp",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "type": "belongsTo",
+      "target": "Issue",
+      "foreignKey": "issueId"
+    }
+  ]
+}

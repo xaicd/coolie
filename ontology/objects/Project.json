@@ -1,0 +1,78 @@
+{
+  "name": "Project",
+  "title": "交付工程项目",
+  "physicalTable": "projects",
+  "description": "商业软件交付工厂中的项目工程实体，立项原子伴生 Domain 与 CMMI 01~09 WBS 骨架",
+  "properties": [
+    {
+      "name": "id",
+      "type": "uuid",
+      "required": true,
+      "primaryKey": true
+    },
+    {
+      "name": "companyId",
+      "type": "uuid",
+      "required": true
+    },
+    {
+      "name": "name",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "description",
+      "type": "string",
+      "required": true,
+      "description": "项目详细描述"
+    },
+    {
+      "name": "status",
+      "type": "string",
+      "enum": [
+        "planning",
+        "active",
+        "completed",
+        "archived"
+      ],
+      "default": "active"
+    },
+    {
+      "name": "leadAgentId",
+      "type": "uuid",
+      "required": false
+    },
+    {
+      "name": "createdAt",
+      "type": "timestamp",
+      "required": true
+    },
+    {
+      "name": "updatedAt",
+      "type": "timestamp",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "type": "belongsTo",
+      "target": "Company",
+      "foreignKey": "companyId"
+    },
+    {
+      "type": "hasOne",
+      "target": "Domain",
+      "foreignKey": "projectId"
+    },
+    {
+      "type": "hasMany",
+      "target": "Issue",
+      "foreignKey": "projectId"
+    },
+    {
+      "type": "hasMany",
+      "target": "Document",
+      "foreignKey": "projectId"
+    }
+  ]
+}

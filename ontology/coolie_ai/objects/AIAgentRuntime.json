@@ -1,0 +1,22 @@
+{
+  "name": "AIAgentRuntime",
+  "title": "数字员工 AI 运行时",
+  "physicalTable": "ai_agent_runtimes",
+  "description": "数字员工的 AI 运行时上下文，绑定主模型、系统提示词 token 占用与心跳活跃度",
+  "properties": [
+    { "name": "id", "type": "uuid", "required": true, "primaryKey": true },
+    { "name": "agentId", "type": "uuid", "required": true },
+    { "name": "primaryModelId", "type": "uuid", "required": true },
+    { "name": "fallbackModelIds", "type": "array", "required": false, "default": [] },
+    { "name": "systemPromptTokenCount", "type": "integer", "required": true, "default": 0 },
+    { "name": "conversationTurns", "type": "integer", "required": true, "default": 0 },
+    { "name": "lastHeartbeatAt", "type": "timestamp", "required": false },
+    { "name": "status", "type": "string", "enum": ["booting", "idle", "active", "paused", "halted", "error"], "default": "booting" },
+    { "name": "createdAt", "type": "timestamp", "required": true },
+    { "name": "updatedAt", "type": "timestamp", "required": true }
+  ],
+  "relations": [
+    { "type": "belongsTo", "target": "Agent", "foreignKey": "agentId" },
+    { "type": "belongsTo", "target": "AIModel", "foreignKey": "primaryModelId" }
+  ]
+}

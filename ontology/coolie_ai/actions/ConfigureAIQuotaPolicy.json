@@ -1,0 +1,24 @@
+{
+  "name": "ConfigureAIQuotaPolicy",
+  "title": "配置 AI 额度策略",
+  "description": "为租户/员工/模型/项目四个作用域设置软/硬限与自动停工开关",
+  "actor": "Hermes (调度中枢) / 掌柜 (CEO)",
+  "preconditions": [
+    "scopeRefId 实体存在",
+    "hardLimitCents >= softLimitCents",
+    "硬限变更需经过 Approval.type=quota_raise 审批"
+  ],
+  "inputs": [
+    { "name": "scope", "type": "string", "enum": ["company", "agent", "model", "project"], "required": true },
+    { "name": "scopeRefId", "type": "uuid", "required": true },
+    { "name": "softLimitCents", "type": "integer", "required": true },
+    { "name": "hardLimitCents", "type": "integer", "required": true },
+    { "name": "autoPauseEnabled", "type": "boolean", "default": true },
+    { "name": "windowType", "type": "string", "enum": ["monthly", "weekly", "daily", "rolling24h"], "default": "monthly" }
+  ],
+  "effects": [
+    "在 ai_quota_policies 表 upsert 策略记录",
+    "重新计算 currentSpendCents = SUM(AIInvocationLog.costCents WHERE scope 范围内 AND windowType 内)"
+  ],
+  "postEvents": ["AIQuotaPolicyConfigured", "AIQuotaSoftWarningOrBreach"]
+}

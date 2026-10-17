@@ -1,0 +1,27 @@
+{
+  "name": "Agent",
+  "title": "数字员工 / 智能体",
+  "physicalTable": "agents",
+  "description": "Paperclip 原生智能体/数字员工实体（Hermes、墨斗、铁匠、门神、兜底渊、百晓生），拥有独立角色、双字技能、CLI 工具池与成本预算",
+  "properties": [
+    { "name": "id", "type": "uuid", "required": true, "primaryKey": true },
+    { "name": "companyId", "type": "uuid", "required": true },
+    { "name": "name", "type": "string", "required": true },
+    { "name": "role", "type": "string", "enum": ["pm", "fda", "core-swe", "fdse", "pre-sre", "ds", "general"], "required": true },
+    { "name": "roleLabel", "type": "string", "required": false },
+    { "name": "title", "type": "string", "required": false },
+    { "name": "responsibilities", "type": "array", "required": false },
+    { "name": "skills", "type": "array", "required": false },
+    { "name": "tools", "type": "array", "required": false },
+    { "name": "adapterType", "type": "string", "required": true },
+    { "name": "budgetMonthlyCents", "type": "integer", "required": true, "default": 0 },
+    { "name": "spentMonthlyCents", "type": "integer", "required": true, "default": 0 },
+    { "name": "status", "type": "string", "enum": ["idle", "active", "busy", "paused", "error"], "default": "idle" },
+    { "name": "createdAt", "type": "timestamp", "required": true },
+    { "name": "updatedAt", "type": "timestamp", "required": true }
+  ],
+  "relations": [
+    { "type": "belongsTo", "target": "Company", "foreignKey": "companyId" },
+    { "type": "hasMany", "target": "Issue", "foreignKey": "assigneeAgentId" }
+  ]
+}

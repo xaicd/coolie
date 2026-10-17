@@ -1,0 +1,20 @@
+{
+  "name": "AuthorizeAISkill",
+  "title": "授权启用 AI 技能",
+  "description": "为某个 Agent 启用 AISkill，需通过掌柜 Approval.type=ontology_proposal（INV-AI-3）",
+  "actor": "Hermes (调度中枢) / 掌柜 (CEO)",
+  "preconditions": [
+    "skill.requiresApproval = true 时必须关联 pending Approval",
+    "目标 Agent.status ≠ error"
+  ],
+  "inputs": [
+    { "name": "skillId", "type": "uuid", "required": true },
+    { "name": "agentId", "type": "uuid", "required": true },
+    { "name": "approvalId", "type": "uuid", "required": false }
+  ],
+  "effects": [
+    "将 skillId 加入 agentRuntime.enabledForAgents",
+    "在 AIPromptTemplate 沉淀当前 systemPrompt 快照"
+  ],
+  "postEvents": ["AISkillEnabled", "AIPromptSnapshotTaken"]
+}

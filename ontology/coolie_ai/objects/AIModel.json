@@ -1,0 +1,25 @@
+{
+  "name": "AIModel",
+  "title": "AI 模型",
+  "physicalTable": "ai_models",
+  "description": "AI 原生交付工厂纳管的 LLM 模型资产（Claude / Gemini / GLM / Copilot 等），承载额度余量与硬上限",
+  "properties": [
+    { "name": "id", "type": "uuid", "required": true, "primaryKey": true },
+    { "name": "companyId", "type": "uuid", "required": true },
+    { "name": "provider", "type": "string", "enum": ["anthropic", "google", "zhipu", "openai", "minimax", "github-copilot", "custom"], "required": true },
+    { "name": "modelId", "type": "string", "required": true },
+    { "name": "displayName", "type": "string", "required": true },
+    { "name": "contextWindow", "type": "integer", "required": true, "default": 8192 },
+    { "name": "inputPricePerMillionCents", "type": "integer", "required": true, "default": 0 },
+    { "name": "outputPricePerMillionCents", "type": "integer", "required": true, "default": 0 },
+    { "name": "quotaRemainingCents", "type": "integer", "required": true, "default": 0 },
+    { "name": "quotaHardCapCents", "type": "integer", "required": true, "default": 0 },
+    { "name": "status", "type": "string", "enum": ["active", "degraded", "exhausted", "retired"], "default": "active" },
+    { "name": "registeredAt", "type": "timestamp", "required": true },
+    { "name": "updatedAt", "type": "timestamp", "required": true }
+  ],
+  "relations": [
+    { "type": "belongsTo", "target": "Company", "foreignKey": "companyId" },
+    { "type": "hasMany", "target": "AIInvocationLog", "foreignKey": "modelId" }
+  ]
+}

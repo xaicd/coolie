@@ -1,0 +1,20 @@
+{
+  "name": "AIQuotaPolicy",
+  "title": "AI 额度策略",
+  "physicalTable": "ai_quota_policies",
+  "description": "租户/员工级 AI 额度软硬限与自动停工开关，软熔断为预警，硬熔断立即触发 HaltAIQuotaBreach",
+  "properties": [
+    { "name": "id", "type": "uuid", "required": true, "primaryKey": true },
+    { "name": "scope", "type": "string", "enum": ["company", "agent", "model", "project"], "required": true },
+    { "name": "scopeRefId", "type": "uuid", "required": true },
+    { "name": "softLimitCents", "type": "integer", "required": true, "default": 0 },
+    { "name": "hardLimitCents", "type": "integer", "required": true, "default": 0 },
+    { "name": "autoPauseEnabled", "type": "boolean", "required": true, "default": true },
+    { "name": "currentSpendCents", "type": "integer", "required": true, "default": 0 },
+    { "name": "windowType", "type": "string", "enum": ["monthly", "weekly", "daily", "rolling24h"], "default": "monthly" },
+    { "name": "status", "type": "string", "enum": ["healthy", "warning", "breached", "halted"], "default": "healthy" },
+    { "name": "createdAt", "type": "timestamp", "required": true },
+    { "name": "updatedAt", "type": "timestamp", "required": true }
+  ],
+  "relations": []
+}

@@ -1,0 +1,25 @@
+{
+  "name": "HatchProject",
+  "title": "项目进厂立项派生",
+  "description": "立项并原子绑定专属 Domain 与 CMMI 01~09 WBS 骨架",
+  "actor": "Hermes (调度中枢) / 掌柜 (CEO)",
+  "preconditions": [
+    "输入包含 projectName 与 projectSlug",
+    "租户状态为 active 且预算未超限"
+  ],
+  "inputs": [
+    { "name": "projectName", "type": "string", "required": true },
+    { "name": "projectSlug", "type": "string", "required": true },
+    { "name": "baseTemplate", "type": "string", "default": "ruoyi-all-next" }
+  ],
+  "effects": [
+    "在 projects 表插入新工程记录",
+    "在同一事务内创建 ontology_domains 绑定所有权",
+    "在同一事务内初始化 10 条 CMMI WBS 任务并挂载 WorkProducts"
+  ],
+  "postEvents": [
+    "ProjectCreated",
+    "OntologyDomainInitialized",
+    "CmmiWbsBootstrapped"
+  ]
+}

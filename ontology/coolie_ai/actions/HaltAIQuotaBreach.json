@@ -1,0 +1,20 @@
+{
+  "name": "HaltAIQuotaBreach",
+  "title": "AI 额度硬熔断",
+  "description": "INV-AI-2 强制：触碰 hardLimitCents 时原子触发，关联 Agent 立即 paused，需掌柜两字【确认】提额方可复工",
+  "actor": "控制面自动 (Hermes 编排)",
+  "preconditions": [
+    "AIQuotaPolicy.currentSpendCents >= hardLimitCents",
+    "status ≠ halted"
+  ],
+  "inputs": [
+    { "name": "policyId", "type": "uuid", "required": true }
+  ],
+  "effects": [
+    "AIQuotaPolicy.status → halted",
+    "scope 范围内的所有 Agent.status → paused",
+    "创建 Approval.type=quota_raise 等待掌柜两字【确认】",
+    "挂载 Paperclip Notification 至问题工单"
+  ],
+  "postEvents": ["AIQuotaHalted", "AgentPausedByQuota", "QuotaRaiseApprovalRequested"]
+}

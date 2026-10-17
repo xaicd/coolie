@@ -1,0 +1,66 @@
+# ==============================================================================
+# M4: 状态机与生命周期模型 (State Machines)
+# ==============================================================================
+model: M4_STATE_MACHINES
+version: 1.0.0
+domain: coolie-foundry
+description: Coolie 工坊核心实体状态机模型 (Issue 任务、Proposal 提案、Approval 审批)
+
+stateMachines:
+  - entity: Issue
+    initial: todo
+    states:
+      - name: backlog
+        description: 需求待规划阶段
+      - name: todo
+        description: 任务就绪，等待数字员工抢单或派单
+      - name: in_progress
+        description: 数字员工持有原子锁施工中
+      - name: in_review
+        description: 提交审查中
+      - name: done
+        description: 凭据完备结项 (受 No Artifact 守卫保护)
+      - name: blocked
+        description: 前置依赖未满足或发生异常挂起
+      - name: canceled
+        description: 废弃或关闭
+    transitions:
+      - from: [backlog, todo]
+        to: in_progress
+        action: CheckoutTask
+        guard: "独占原子排他锁生效"
+      - from: in_progress
+        to: in_review
+        action: SubmitDeliverable
+        guard: "已挂载初版工程资产"
+      - from: [in_progress, in_review]
+        to: done
+        action: SubmitDeliverable
+        guard: "INV-1: 必挂载不可变实质物理工程资产凭证"
+      - from: [todo, in_progress]
+        to: blocked
+        action: HaltBudgetBreach
+        guard: "预算熔断或前置门禁未过"
+      - from: blocked
+        to: todo
+        action: ApproveProposal
+        guard: "掌柜提额或前置门禁解除"
+
+  - entity: Approval
+    initial: pending
+    states:
+      - name: pending
+        description: 审批卡片推送到掌柜驾驶舱，等待两字处置
+      - name: approved
+        description: 掌柜点击【确认】，触发下游原子执行
+      - name: rejected
+        description: 掌柜驳回提案
+    transitions:
+      - from: pending
+        to: approved
+        action: ApproveProposal
+        guard: "掌柜授权"
+      - from: pending
+        to: rejected
+        action: RejectProposal
+        guard: "掌柜驳回"

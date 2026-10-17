@@ -1,0 +1,50 @@
+# ==============================================================================
+# M3: 业务规则与系统硬不变量 (System Invariants)
+# ==============================================================================
+model: M3_INVARIANTS
+version: 1.0.0
+domain: coolie-foundry
+description: Coolie 工坊产品本体 M3 业务规则与系统硬不变量 (5 大不可逾越底线)
+
+invariants:
+  - id: INV-1
+    name: No Artifact, No Done
+    enforcementLevel: FATAL
+    scope: [Issue, WorkProduct]
+    description: 结项必须挂载不可变实质物理工程资产凭证 (代码 PR、真机快照、规格文档、机器证据库)，无资产凭证绝对禁止流转至 done
+    verification:
+      checkCommand: "node scripts/check-governance-audit.mjs"
+      enforcedAt: "server/src/routes/issues.ts (PATCH /api/issues/:id)"
+
+  - id: INV-2
+    name: Single-Assignee Exclusive Lock
+    enforcementLevel: CRITICAL
+    scope: [Issue, Agent]
+    description: 每一条工单/任务在任何时刻仅允许唯一单一人/数字员工负责人原子签出互斥锁定，杜绝并发修改与责任漂移
+    verification:
+      enforcedAt: "server/src/services/heartbeat.ts"
+
+  - id: INV-3
+    name: Two-Letter Cockpit Actions
+    enforcementLevel: CRITICAL
+    scope: [Approval, UI]
+    description: 移动驾驶舱 6 寸屏核心高管/前线操作按钮 100% 严格收敛为纯两字（【创建】、【查看】、【沙箱】、【确认】），杜绝长文案与技术细节泄露
+    verification:
+      checkCommand: "node scripts/check-governance-audit.mjs (Gate 4)"
+      enforcedAt: "clients/expo/src/components/"
+
+  - id: INV-4
+    name: Budget Hard Stop Auto-Pause
+    enforcementLevel: FATAL
+    scope: [Company, Agent]
+    description: 租户与数字员工成本花销一旦触碰硬停上限阈值，控制面原子触发全局或单体停工熔断，必须掌柜审批提额后方可复工
+    verification:
+      enforcedAt: "server/src/services/heartbeat.ts (budget check)"
+
+  - id: INV-5
+    name: Dev/Prod Absolute Isolation
+    enforcementLevel: FATAL
+    scope: [Company, Project, Environment]
+    description: Dev 专事工坊自身建设，Prod 专事实体交付与客户中台运行，数据物理绝对隔离，禁止跨库混写
+    verification:
+      checkCommand: "node scripts/check-governance-audit.mjs (Gate 10)"

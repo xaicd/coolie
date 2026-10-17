@@ -1,0 +1,26 @@
+{
+  "name": "SignOffUat",
+  "title": "客户终验核销单签署",
+  "description": "甲方客户与掌柜在真实生产环境中签署 UAT 核销单，商业交付法定结项与回款触发",
+  "actor": "掌柜 (CEO) / 甲方负责人",
+  "preconditions": [
+    "全部 10 项 CMMI 任务均已流转至 done 且工程资产完备",
+    "G4 测试验收报告 (test-summary-report.md) 通过且变异杀灭率 MSI >= 85%",
+    "生产部署割接 SOP (07_release) 验证无误"
+  ],
+  "inputs": [
+    { "name": "projectId", "type": "uuid", "required": true },
+    { "name": "clientSigner", "type": "string", "required": true },
+    { "name": "certificateUrl", "type": "string", "required": true }
+  ],
+  "effects": [
+    "在 docs/05_verification/ 生成并锁定 uat-acceptance-certificate.md",
+    "在 issue_work_products 挂载终验核销单快照",
+    "更新 project.status 为 completed 并触发财务对账结算"
+  ],
+  "postEvents": [
+    "ProjectCompleted",
+    "UatSignedOff",
+    "CommercialRevenueRecognized"
+  ]
+}

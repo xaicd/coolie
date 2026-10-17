@@ -79,6 +79,7 @@ const ALLOWED_ROOT_DIRS = new Set([
   'releases',
   'announcements',
   'projects', // 支持历史既有在制项目受管目录 (如 projects/sys-chanrong-agent)
+  'ontology', // 活体业务本体资产目录
   '.agents',
   '.github',
   '.kiro',
@@ -259,6 +260,18 @@ try {
   console.log('  ✅ [PASS] 管局审计守卫通过');
 } catch {
   console.error('  ❌ [FAIL] check-governance-audit 审计未完全通过！');
+  hasError = true;
+}
+
+// -----------------------------------------------------------------------------
+// 4.1 活体业务本体零人工介入自动化机器审计守卫 (Living Ontology Machine Audit Guard)
+// -----------------------------------------------------------------------------
+console.log('\n🌐 Gate 4.1: 活体业务本体形式化与代码双向反射守卫');
+try {
+  execSync('node scripts/harness-ontology-audit.mjs', { stdio: 'inherit', env: sandboxSafeEnv });
+  console.log('  ✅ [PASS] 活体业务本体 4 大门禁与 5 大不变量全部守卫在位');
+} catch {
+  console.error('  ❌ [FAIL] harness-ontology-audit 审计未通过！存在本体漂移或拓扑缺陷！');
   hasError = true;
 }
 

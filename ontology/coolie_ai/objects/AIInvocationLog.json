@@ -1,0 +1,30 @@
+{
+  "name": "AIInvocationLog",
+  "title": "AI 不可变调用流水",
+  "physicalTable": "ai_invocation_logs",
+  "description": "每一次 LLM 推理调用的不可变物理工件（INV-AI-1 来源）：入/出 token、成本分、起止时间、结果哈希、关联 Issue/Agent",
+  "properties": [
+    { "name": "id", "type": "uuid", "required": true, "primaryKey": true },
+    { "name": "companyId", "type": "uuid", "required": true },
+    { "name": "agentId", "type": "uuid", "required": false },
+    { "name": "issueId", "type": "uuid", "required": false },
+    { "name": "modelId", "type": "uuid", "required": true },
+    { "name": "routingDecisionId", "type": "uuid", "required": false },
+    { "name": "tokensIn", "type": "integer", "required": true, "default": 0 },
+    { "name": "tokensOut", "type": "integer", "required": true, "default": 0 },
+    { "name": "costCents", "type": "integer", "required": true, "default": 0 },
+    { "name": "startedAt", "type": "timestamp", "required": true },
+    { "name": "finishedAt", "type": "timestamp", "required": false },
+    { "name": "latencyMs", "type": "integer", "required": false },
+    { "name": "resultHash", "type": "string", "required": false },
+    { "name": "outcome", "type": "string", "enum": ["success", "rate_limited", "timeout", "error", "halted_quota"], "required": true },
+    { "name": "errorCode", "type": "string", "required": false },
+    { "name": "isImmutable", "type": "boolean", "required": true, "default": true }
+  ],
+  "relations": [
+    { "type": "belongsTo", "target": "Company", "foreignKey": "companyId" },
+    { "type": "belongsTo", "target": "Agent", "foreignKey": "agentId" },
+    { "type": "belongsTo", "target": "Issue", "foreignKey": "issueId" },
+    { "type": "belongsTo", "target": "AIModel", "foreignKey": "modelId" }
+  ]
+}

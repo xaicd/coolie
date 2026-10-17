@@ -1,0 +1,23 @@
+{
+  "name": "CheckoutTask",
+  "title": "原子签出排他锁",
+  "description": "数字员工原子抢单或派单，设置单一人独占锁与 checkoutRunId",
+  "actor": "数字员工 (墨斗/铁匠/门神/兜底渊/百晓生)",
+  "preconditions": [
+    "issueId 对应工单状态为 todo 或 backlog",
+    "工单未被其他 Run 原子锁定"
+  ],
+  "inputs": [
+    { "name": "issueId", "type": "uuid", "required": true },
+    { "name": "agentId", "type": "uuid", "required": true }
+  ],
+  "effects": [
+    "更新 issue.status 为 in_progress",
+    "设置 issue.assigneeAgentId = agentId",
+    "写入 heartbeat_runs 锁定记录并获取排他锁"
+  ],
+  "postEvents": [
+    "TaskCheckedOut",
+    "RunStarted"
+  ]
+}

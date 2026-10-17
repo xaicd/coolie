@@ -1,0 +1,19 @@
+{
+  "name": "AIPromptTemplate",
+  "title": "AI 提示词模板",
+  "physicalTable": "ai_prompt_templates",
+  "description": "可复用的提示词模板与版本快照，绑定所属 Agent 与渲染时的 token 占用",
+  "properties": [
+    { "name": "id", "type": "uuid", "required": true, "primaryKey": true },
+    { "name": "name", "type": "string", "required": true },
+    { "name": "version", "type": "string", "required": true },
+    { "name": "body", "type": "text", "required": true },
+    { "name": "ownerAgentId", "type": "uuid", "required": false },
+    { "name": "tags", "type": "array", "required": false, "default": [] },
+    { "name": "createdAt", "type": "timestamp", "required": true },
+    { "name": "updatedAt", "type": "timestamp", "required": true }
+  ],
+  "relations": [
+    { "type": "belongsTo", "target": "Agent", "foreignKey": "ownerAgentId" }
+  ]
+}

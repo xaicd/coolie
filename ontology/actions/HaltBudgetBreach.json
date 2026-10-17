@@ -1,0 +1,23 @@
+{
+  "name": "HaltBudgetBreach",
+  "title": "花销硬熔断自动停工",
+  "description": "租户或员工月度花销触碰 budgetMonthlyCents 阈值，内核强制停机防穿底",
+  "actor": "系统内核 / 财务守卫 (Finance Guard)",
+  "preconditions": [
+    "spentMonthlyCents >= budgetMonthlyCents",
+    "status 仍为 active"
+  ],
+  "inputs": [
+    { "name": "targetId", "type": "uuid", "required": true },
+    { "name": "targetType", "type": "string", "enum": ["company", "agent"], "required": true }
+  ],
+  "effects": [
+    "更新 target.status 为 paused",
+    "中断该租户或员工当前正在运行的 heartbeat_runs",
+    "向掌柜移动驾驶舱推送提额审批卡片"
+  ],
+  "postEvents": [
+    "WorkHalted",
+    "ApprovalRequested"
+  ]
+}

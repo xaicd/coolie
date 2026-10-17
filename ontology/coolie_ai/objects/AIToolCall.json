@@ -1,0 +1,20 @@
+{
+  "name": "AIToolCall",
+  "title": "AI 工具调用记录",
+  "physicalTable": "ai_tool_calls",
+  "description": "AI 推理过程中的工具/技能/MCP 调用明细，args/result/errorCode/latency 全量留痕",
+  "properties": [
+    { "name": "id", "type": "uuid", "required": true, "primaryKey": true },
+    { "name": "invocationId", "type": "uuid", "required": true },
+    { "name": "toolName", "type": "string", "required": true },
+    { "name": "args", "type": "json", "required": false },
+    { "name": "result", "type": "json", "required": false },
+    { "name": "errorCode", "type": "string", "required": false },
+    { "name": "latencyMs", "type": "integer", "required": false },
+    { "name": "startedAt", "type": "timestamp", "required": true },
+    { "name": "finishedAt", "type": "timestamp", "required": false }
+  ],
+  "relations": [
+    { "type": "belongsTo", "target": "AIInvocationLog", "foreignKey": "invocationId" }
+  ]
+}

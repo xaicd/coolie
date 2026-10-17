@@ -57,6 +57,8 @@
     "openwiki:check": "node scripts/sync-openwiki.mjs --check",
     "ontology:ops": "node scripts/ontology-ops.cjs",
     "ontology:inspect": "node scripts/ontology-ops.cjs inspect",
+    "ontology:check": "node scripts/harness-ontology-audit.mjs",
+    "ontology:fix": "node scripts/harness-ontology-audit.mjs --fix",
     "mcp:call": "node scripts/mcp-call.mjs",
     "wechat:monitor": "node scripts/hermes-wechat-monitor.mjs",
     "wechat:watch": "node scripts/hermes-wechat-monitor.mjs --watch",

@@ -167,7 +167,7 @@
     const DATA = {
   "domain": "Coolie Integrated Foundry",
   "version": "2.0",
-  "generatedAt": "2026-10-10T15:23:23.185Z",
+  "generatedAt": "2026-10-17T14:06:09.560Z",
   "screens": [
     {
       "id": "SCR_FRAUD_DUAL_APPROVAL",
@@ -298,7 +298,7 @@
       "alias": "init-baseline",
       "domain": "core",
       "spec": "init-baseline",
-      "description": "完成 产融商业保理与供应链金融智能体系统 系统的工程地基搭建与全生命周期规范初始化",
+      "description": "在 0→1 阶段把产融智能体系统的工程地基（多企业隔离持久化层、统一 API 契约、离线私有化运行时门禁、管理面/编排面物理边界、不可篡改审计链）与 CMMI 01~09 规范基线一次性立死，使后续 G1→G5 阶段有唯一可断言的真源。",
       "lifecycle": [
         "草稿",
         "进行中",
@@ -520,7 +520,32 @@
     },
     {
       "id": "ACTION_init_baseline_3",
-      "name": "配置端到端集成测试套件与自动化门禁",
+      "name": "划定管理面 / 编排面运行时边界并落地离",
+      "ownerEntity": "AGG-CORE-INIT-BASELINE",
+      "domain": "core",
+      "spec": "init-baseline",
+      "behaviorType": "COMMAND",
+      "triggerType": "USER_ACTION",
+      "preconditions": [
+        "前置业务状态合规",
+        "租户权限已通过校验"
+      ],
+      "postconditions": [
+        {
+          "field": "status",
+          "setValue": "处理中"
+        }
+      ],
+      "appliedRules": [
+        "RULE_INIT_BASELINE_GUARD"
+      ],
+      "requiredPermissions": [
+        "PERM_CORE_OPERATE"
+      ]
+    },
+    {
+      "id": "ACTION_init_baseline_4",
+      "name": "配置端到端集成测试套件与自动化门禁（真实",
       "ownerEntity": "AGG-CORE-INIT-BASELINE",
       "domain": "core",
       "spec": "init-baseline",
@@ -725,7 +750,7 @@
       "domain": "core",
       "spec": "init-baseline",
       "ruleType": "VALIDATION",
-      "description": "多租户隔离：严禁跨企业租户数据穿透。",
+      "description": "多租户隔离：严禁跨企业租户数据穿透，客户端租户标识永不可信。",
       "expression": "assert_multi_tenant_isolation(company_id) == true",
       "reusedBy": [
         "ACTION_init_baseline_1"
@@ -737,7 +762,19 @@
       "domain": "core",
       "spec": "init-baseline",
       "ruleType": "VALIDATION",
-      "description": "反假 Mock：必须使用真实数据库 WAL 事务测试。",
+      "description": "反假 Mock：必须使用真实数据库事务测试，禁止伪造业务数据。",
+      "expression": "assert_multi_tenant_isolation(company_id) == true",
+      "reusedBy": [
+        "ACTION_init_baseline_1"
+      ]
+    },
+    {
+      "id": "RULE_INIT_BASELINE_3",
+      "name": "约束规则 3",
+      "domain": "core",
+      "spec": "init-baseline",
+      "ruleType": "VALIDATION",
+      "description": "极简人机：核心操作按钮 ≤2 汉字，底栏 5 槽位绝对对称。",
       "expression": "assert_multi_tenant_isolation(company_id) == true",
       "reusedBy": [
         "ACTION_init_baseline_1"

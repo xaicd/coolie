@@ -1,0 +1,58 @@
+{
+  "name": "Document",
+  "title": "原生协同文档",
+  "physicalTable": "documents",
+  "description": "控制面原生富文本文档事实源（如 plan、srs、hld、review），支持版本审计与多人协同",
+  "properties": [
+    {
+      "name": "id",
+      "type": "uuid",
+      "required": true,
+      "primaryKey": true
+    },
+    {
+      "name": "companyId",
+      "type": "uuid",
+      "required": true
+    },
+    {
+      "name": "title",
+      "type": "string",
+      "required": true
+    },
+    {
+      "name": "latestBody",
+      "type": "string",
+      "required": true,
+      "description": "协同文档最新正文内容"
+    },
+    {
+      "name": "format",
+      "type": "string",
+      "default": "markdown",
+      "description": "文档格式 (markdown)"
+    },
+    {
+      "name": "createdAt",
+      "type": "timestamp",
+      "required": true
+    },
+    {
+      "name": "updatedAt",
+      "type": "timestamp",
+      "required": true
+    }
+  ],
+  "relations": [
+    {
+      "type": "belongsTo",
+      "target": "Company",
+      "foreignKey": "companyId"
+    },
+    {
+      "type": "belongsTo",
+      "target": "Project",
+      "foreignKey": "projectId"
+    }
+  ]
+}

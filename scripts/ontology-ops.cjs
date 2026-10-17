@@ -327,10 +327,21 @@ function handleApply() {
   console.log(`   从现实意图 -> 活体本体扩充 -> DDL迁移 -> SDD规格 -> Paperclip工单总线 闭环全线贯通！`);
 }
 
+function handleCheck() {
+  const auditScript = path.join(ROOT, "scripts", "harness-ontology-audit.mjs");
+  const forwardArgs = args.slice(1);
+  const res = spawnSync(process.execPath, [auditScript, ...forwardArgs], { stdio: "inherit", cwd: ROOT });
+  process.exit(res.status ?? 0);
+}
+
 // 调度
 switch (command) {
   case "inspect":
     handleInspect();
+    break;
+  case "check":
+  case "audit":
+    handleCheck();
     break;
   case "propose":
     handlePropose();
@@ -345,11 +356,14 @@ switch (command) {
 
 命令列表:
   inspect     检视指定商业交付项目的活体本体健康态与拓扑
+  check       零人工介入的本体全自动机器审计、Drizzle 物理双向反射与拓扑门禁 (--fix 可自愈)
   propose     根据客户自然语言诉求，计算影响面并生成极简提案卡片
   apply       掌柜两字确认后，原子应用提案并触发 DDL、SDD 与 Paperclip 派单
 
 示例:
-  node scripts/ontology-ops.cjs inspect --project sys-yunnan-wecom
+  node scripts/ontology-ops.cjs inspect --project self
+  node scripts/ontology-ops.cjs check
+  node scripts/ontology-ops.cjs check --fix
   node scripts/ontology-ops.cjs propose --project sys-yunnan-wecom --name fraud-dual-approval --title "高危反诈双人会签" --intent "增加双人复核流程"
   node scripts/ontology-ops.cjs apply --project sys-yunnan-wecom --proposal fraud-dual-approval
 `);

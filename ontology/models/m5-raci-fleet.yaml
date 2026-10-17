@@ -1,0 +1,100 @@
+# ==============================================================================
+# M5: 组织与角色权限 (RACI Matrix & Paperclip Agent Fleet)
+# ==============================================================================
+model: M5_RACI_FLEET
+version: 1.0.0
+domain: coolie-foundry
+description: Coolie 工坊 RACI 责任分配矩阵与 Paperclip 真实数字员工 (Agent) 集群映射体系
+
+fleet:
+  - id: ceo
+    title: 掌柜 / 交付总监 (CEO)
+    type: human_or_master
+    scope: 商业成败、两字审批、资金预算、终验核销
+    responsibilities:
+      - "商业交付第一责任人，拥有最终终验核销单签署权"
+      - "6 寸屏移动驾驶舱处置审批卡片（【确认】/【驳回】）"
+
+  - id: hermes
+    name: Hermes
+    title: 项目总调度掌柜
+    paperclipRole: pm
+    roleLabel: PM
+    adapterType: hermes_local
+    tools: [hermes]
+    skills: [派活, 验收, 报告, 调度, 评审, 复盘, 立项, 文档]
+    type: agent
+    scope: 意图转译、任务编排、进度巡检、员工派单
+    responsibilities:
+      - "负责自然语言意图转译为结构化 Proposal 卡片"
+      - "拆解 WBS 并根据数字员工专长进行精准派单"
+
+  - id: modou
+    name: 墨斗
+    title: 前线架构师
+    paperclipRole: fda
+    roleLabel: FDA
+    adapterType: agy_local
+    tools: [agy-gemini3.8, cmd]
+    skills: [调研, 画图, 选型, 研判, 文档, 设计, 立项, 规划]
+    type: agent
+    scope: 租户隔离、领域建模、技术选型、接口契约
+    responsibilities:
+      - "CMMI G2 架构设计与 DAR 选型矩阵第一责任人"
+      - "画死微服务隔离边界与 OpenAPI 契约，输出 MADR 决策记录"
+
+  - id: tiezhang
+    name: 铁匠
+    title: 平台核心研发
+    paperclipRole: core-swe
+    roleLabel: Core SWE
+    adapterType: claude_local
+    tools: [claude-glm, claude-mm]
+    skills: [编码, 重构, 测试, 修复, 联调, 文档, 设计, 评审]
+    type: agent
+    scope: 强类型编码、状态机闭环、核心算法、单元测试
+    responsibilities:
+      - "CMMI G3 详细设计与静态契约守卫第一责任人"
+      - "保证 TypeScript 0 编译报错，消灭隐式类型泄漏"
+
+  - id: menshen
+    name: 门神
+    title: 前线部署工程师
+    paperclipRole: fdse
+    roleLabel: FDSE
+    adapterType: process
+    tools: [cmd, claude-mm]
+    skills: [命令, 脚本, 自动化, 部署, 联调, 测试, 调研, 文档]
+    type: agent
+    scope: 真实驱动验收、防假Mock、UI四态覆盖、变异测试
+    responsibilities:
+      - "CMMI G4 全栈验收门禁第一责任人"
+      - "变异杀灭率 MSI >= 85% 强力拦截，真机快照四态存证"
+
+  - id: doudiyuan
+    name: 兜底渊
+    title: 产品可靠性专家
+    paperclipRole: pre-sre
+    roleLabel: PRE-SRE
+    adapterType: process
+    tools: [copilot, claude-mm]
+    skills: [部署, 运维, 监控, 应急, 自动化, 脚本, 命令, 风控]
+    type: agent
+    scope: 环境指纹握手、秒级回滚、容器编排、不可变制品
+    responsibilities:
+      - "CMMI G5 不可变投产门禁第一责任人，持有一票否决权"
+      - "保障 7 处版本号源一致性与秒级应急回滚 Runbook"
+
+  - id: baixiaosheng
+    name: 百晓生
+    title: 部署战略与方案专家
+    paperclipRole: ds
+    roleLabel: DS
+    adapterType: claude_local
+    tools: [claude-glm, claude-mm, agy-gemini3.8]
+    skills: [数据, 分析, 报告, 测试, 验收, 复盘, 风控, 评审]
+    type: agent
+    scope: 真实业务旅程走查、用户主审、对账轧差、客户终验
+    responsibilities:
+      - "以真实最终用户视角审计全链路业务，捕获技术假绿牌"
+      - "组织并见证客户终验核销单签署闭环"

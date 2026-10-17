@@ -1,0 +1,147 @@
+# ==============================================================================
+# M2: 行为动词模型 (Action Types)
+# ==============================================================================
+model: M2_ACTIONS
+version: 1.0.0
+domain: coolie-foundry
+description: Coolie 工坊产品本体 M2 行为动词模型定义 (8 大核心业务动词与闭环因果)
+
+actions:
+  - id: HatchProject
+    name: 项目进厂立项派生
+    actor: "Hermes (调度中枢) / 掌柜 (CEO)"
+    targetObject: Project
+    description: 立项并原子绑定专属 Domain 与 CMMI 01~09 WBS 骨架
+    preconditions:
+      - "projectName 与 projectSlug 必填且非空"
+      - "租户状态为 active 且当月预算未熔断"
+    inputs:
+      projectName: { type: string, required: true }
+      projectSlug: { type: string, required: true }
+      baseTemplate: { type: string, default: "ruoyi-all-next" }
+    effects:
+      - "INSERT INTO projects"
+      - "INSERT INTO ontology_domains (同事务内绑定)"
+      - "INSERT INTO issues (伴生 10 条 CMMI WBS 工单并挂载 Primary WorkProducts)"
+    postEvents: [ProjectCreated, OntologyDomainInitialized, CmmiWbsBootstrapped]
+
+  - id: ProposeOntologyEvolution
+    name: 提取本体演进提案
+    actor: "Hermes / 墨斗 (FDA)"
+    targetObject: Domain
+    description: Hermes 与墨斗根据业务对话意图，自动分析影响面并生成结构化提议卡片
+    preconditions:
+      - "会话中识别出确切的实体增删改或业务规则意图"
+      - "目标项目本体处于 active 状态"
+    inputs:
+      projectSlug: { type: string, required: true }
+      proposalName: { type: string, required: true }
+      intent: { type: string, required: true }
+    effects:
+      - "解析目标业务实体属性与校验规则变更"
+      - "生成 FoundryProposalCard 数据并写入 approvals (type=ontology_proposal)"
+    postEvents: [OntologyProposalCreated, CockpitApprovalPushed]
+
+  - id: ApproveProposal
+    name: 两字确认本体提案
+    actor: "掌柜 (CEO)"
+    targetObject: Approval
+    description: 掌柜在移动端点击【确认】，原子生效本体、生成 DDL 迁移、展开 SDD 规格并派单
+    preconditions:
+      - "approval.status == 'pending'"
+      - "操作者具备掌柜决策权限"
+    inputs:
+      approvalId: { type: uuid, required: true }
+      decision: { type: enum, values: [approved, rejected], required: true }
+    effects:
+      - "UPDATE approvals SET status = 'approved'"
+      - "原子更新 domain.json 升级 patch 版本"
+      - "自动生成 SQL DDL 迁移脚本并归档至 migrations/"
+      - "派生 docs/specs/ 敏捷全息包并通过 spec-ops sync 建立 Paperclip 工单"
+    postEvents: [OntologyEvolved, DdlGenerated, SpecCreated, IssuesCreated]
+
+  - id: BootstrapCmmiWbs
+    name: CMMI 10 大任务伴生
+    actor: "系统内核 / Hermes"
+    targetObject: Issue
+    description: 立项事务内伴生 G1~G5 门禁任务并挂载 Primary Work Product 相对路径
+    preconditions:
+      - "project 处于 active 或 planning 状态"
+    inputs:
+      projectId: { type: uuid, required: true }
+      companyId: { type: uuid, required: true }
+    effects:
+      - "批量生成 10 条 CMMI WBS 标准履约工单"
+      - "在同一事务内将 docs/ 相对路径挂载至 issue_work_products"
+    postEvents: [CmmiWbsCreated, WorkProductsRegistered]
+
+  - id: CheckoutTask
+    name: 原子签出排他锁
+    actor: "数字员工 (墨斗/铁匠/门神/兜底渊/百晓生)"
+    targetObject: Issue
+    description: 数字员工原子抢单或派单，设置单一人独占锁与 checkoutRunId
+    preconditions:
+      - "issue.status in ['todo', 'backlog']"
+      - "未被其他 active heartbeat_runs 锁定"
+    inputs:
+      issueId: { type: uuid, required: true }
+      agentId: { type: uuid, required: true }
+    effects:
+      - "UPDATE issues SET status = 'in_progress', assignee_agent_id = agentId"
+      - "INSERT INTO heartbeat_runs 记录持有排他锁"
+    postEvents: [TaskCheckedOut, RunStarted]
+
+  - id: SubmitDeliverable
+    name: 交付成果与挂载凭据
+    actor: "数字员工 (墨斗/铁匠/门神/兜底渊/百晓生)"
+    targetObject: WorkProduct
+    description: 数字员工提交实质工程资产，写入 issue_work_products，并通过 No Artifact 校验后结项
+    preconditions:
+      - "issue.status == 'in_progress'"
+      - "当前数字员工持有有效原子签出锁"
+    inputs:
+      issueId: { type: uuid, required: true }
+      kind: { type: enum, values: [pr, branch, document, artifact, preview, snapshot, evidence], required: true }
+      title: { type: string, required: true }
+      resourceRef: { type: json, required: true }
+    effects:
+      - "INSERT INTO issue_work_products"
+      - "执行 No Artifact, No Done 硬门禁校验"
+      - "UPDATE issues SET status = 'done' 并释放排他锁"
+    postEvents: [DeliverableSubmitted, TaskCompleted, DownstreamTasksUnblocked]
+
+  - id: SignOffUat
+    name: 客户终验核销单签署
+    actor: "掌柜 (CEO) / 甲方客户"
+    targetObject: Project
+    description: 甲方客户与掌柜在真实生产环境中签署 UAT 核销单，商业交付法定结项与回款触发
+    preconditions:
+      - "全部 10 项 CMMI WBS 工单均流转至 done 且工程资产完备"
+      - "G4 全栈测试验收通过且变异杀灭率 MSI >= 85%"
+      - "生产部署割接 SOP 演练通过"
+    inputs:
+      projectId: { type: uuid, required: true }
+      clientSigner: { type: string, required: true }
+      certificateUrl: { type: string, required: true }
+    effects:
+      - "生成 docs/05_verification/uat-acceptance-certificate.md"
+      - "挂载终验快照工件至 issue_work_products"
+      - "UPDATE projects SET status = 'completed'"
+    postEvents: [ProjectCompleted, UatSignedOff, CommercialRevenueRecognized]
+
+  - id: HaltBudgetBreach
+    name: 花销硬熔断自动停工
+    actor: "系统内核 / 财务守卫"
+    targetObject: Company
+    description: 租户或员工月度花销触碰 budgetMonthlyCents 阈值，内核强制停机防穿底
+    preconditions:
+      - "spentMonthlyCents >= budgetMonthlyCents"
+      - "status == 'active'"
+    inputs:
+      targetId: { type: uuid, required: true }
+      targetType: { type: enum, values: [company, agent], required: true }
+    effects:
+      - "UPDATE status = 'paused'"
+      - "强制终止当前运行中的 heartbeat_runs"
+      - "向掌柜推送提额审批卡片"
+    postEvents: [WorkHalted, ApprovalRequested]

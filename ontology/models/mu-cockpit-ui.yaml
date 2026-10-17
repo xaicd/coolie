@@ -1,0 +1,28 @@
+# ==============================================================================
+# MU: 极简人机工程与驾驶舱模型 (Cockpit UI Model)
+# ==============================================================================
+model: MU_COCKPIT_UI
+version: 1.0.0
+domain: coolie-foundry
+description: Coolie 工坊 6 寸屏移动掌柜驾驶舱人机交互模型
+
+uiDesignRules:
+  - id: TWO_LETTER_BUTTONS
+    name: 纯两字按钮契约
+    rule: "核心操作按钮必须且仅能为两个汉字（如【创建】、【查看】、【沙箱】、【确认】、【驳回】、【稍后】、【重启】）"
+    enforcedAt: "clients/expo/src/components/"
+
+  - id: SYMMETRIC_BOTTOM_BAR
+    name: 黄金 2+1+2 对称底栏
+    rule: "严格保持 [汇览] [任务] [+] [工坊] [资产] 5 槽位绝对居中对称，严禁偏置"
+    enforcedAt: "clients/expo/src/navigation/RootNavigator.tsx"
+
+  - id: IN_PLACE_DRAWER
+    name: 实体就地浮层检视 (Inspect In-Place)
+    rule: "实体详情统一作为全局顶层抽屉就地弹出，保持调用方上下文、筛选条件与滚动位置完整无损"
+    enforcedAt: "clients/expo/src/components/TaskDetailScreen.tsx"
+
+  - id: LIFO_NAVIGATION_STACK
+    name: 严格后进先出调用栈
+    rule: "返回操作严格逆序弹出当前上下文，杜绝界面跨 Tab 乱跳与孤儿死路由"
+    enforcedAt: "clients/expo/src/utils/navigation.ts"

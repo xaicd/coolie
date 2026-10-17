@@ -1,0 +1,19 @@
+{
+  "name": "RouteAIModel",
+  "title": "按策略自动选模型",
+  "description": "依据 cheapest/fastest/fallback/round_robin 策略选择最终调用模型，落 AIRoutingDecision 工件",
+  "actor": "Hermes (调度中枢)",
+  "preconditions": [
+    "至少一个候选 model.status = active 且 quotaRemainingCents > 0"
+  ],
+  "inputs": [
+    { "name": "agentId", "type": "uuid", "required": true },
+    { "name": "strategy", "type": "string", "enum": ["cheapest", "fastest", "fallback", "round_robin", "manual"], "required": true },
+    { "name": "requestedModelId", "type": "uuid", "required": false }
+  ],
+  "effects": [
+    "从 candidate pool (AIAgentRuntime.primaryModelId + fallbackModelIds) 中按策略筛选",
+    "插入 AIRoutingDecision 记录 (invocationId 占位，调用 completed 时回填)"
+  ],
+  "postEvents": ["AIRoutingDecisionRecorded"]
+}
