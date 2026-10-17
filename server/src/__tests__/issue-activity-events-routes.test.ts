@@ -599,6 +599,95 @@ describe("issue activity event routes", () => {
     });
   });
 
+  it("logs successful_run_handoff_resolved when an escalated handoff is closed by a real status decision", async () => {
+    const issue = { ...makeIssue(), status: "in_progress" };
+    mockIssueService.getById.mockResolvedValue(issue);
+    mockIssueService.update.mockImplementation(async (_id: string, patch: Record<string, unknown>) => ({
+      ...issue,
+      ...patch,
+      updatedAt: new Date(),
+    }));
+
+    const escalatedActivityRow = {
+      entityId: issue.id,
+      action: "issue.successful_run_handoff_escalated",
+      agentId: issue.assigneeAgentId,
+      runId: "run-3",
+      details: {},
+      createdAt: new Date("2026-05-01T00:00:00.000Z"),
+    };
+    const dbMock = {
+      transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback({}),
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            orderBy: async () => [escalatedActivityRow],
+          }),
+        }),
+      }),
+    };
+
+    const res = await request(await createApp(dbMock))
+      .patch(`/api/issues/${issue.id}`)
+      .send({ status: "in_review" });
+
+    expect(res.status).toBe(200);
+    await vi.waitFor(() => {
+      expect(mockLogActivity).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.objectContaining({
+          action: "issue.successful_run_handoff_resolved",
+          entityId: issue.id,
+          details: expect.objectContaining({
+            identifier: "PAP-580",
+            sourceRunId: "run-3",
+            resolvedByStatus: "in_review",
+            resolvedFromState: "escalated",
+          }),
+        }),
+      );
+    });
+  });
+
+  it("does not re-log successful_run_handoff_resolved when the handoff is already resolved", async () => {
+    const issue = { ...makeIssue(), status: "in_progress" };
+    mockIssueService.getById.mockResolvedValue(issue);
+    mockIssueService.update.mockImplementation(async (_id: string, patch: Record<string, unknown>) => ({
+      ...issue,
+      ...patch,
+      updatedAt: new Date(),
+    }));
+
+    const resolvedActivityRow = {
+      entityId: issue.id,
+      action: "issue.successful_run_handoff_resolved",
+      agentId: issue.assigneeAgentId,
+      runId: "run-4",
+      details: { resolvedByStatus: "in_review" },
+      createdAt: new Date("2026-05-01T00:00:00.000Z"),
+    };
+    const dbMock = {
+      transaction: async (callback: (tx: unknown) => Promise<unknown>) => callback({}),
+      select: () => ({
+        from: () => ({
+          where: () => ({
+            orderBy: async () => [resolvedActivityRow],
+          }),
+        }),
+      }),
+    };
+
+    const res = await request(await createApp(dbMock))
+      .patch(`/api/issues/${issue.id}`)
+      .send({ status: "done" });
+
+    expect(res.status).toBe(200);
+    expect(mockLogActivity).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ action: "issue.successful_run_handoff_resolved" }),
+    );
+  });
+
   it("does not log successful_run_handoff_resolved when status stays in_progress", async () => {
     const issue = { ...makeIssue(), status: "in_progress" };
     mockIssueService.getById.mockResolvedValue(issue);

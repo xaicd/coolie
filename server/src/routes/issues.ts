@@ -14254,7 +14254,15 @@ export function issueRoutes(
         })
           .then(async (handoffStates) => {
             const handoff = handoffStates.get(issue.id);
-            if (handoff?.state !== "required") return;
+            // `escalated` is not terminal: it means the platform handed the
+            // disposition back to the board because an earlier run left no
+            // decision. Once a real decision lands (any status leaving
+            // in_progress), the escalation has served its purpose and must be
+            // closed too — otherwise the issue keeps reporting
+            // `state: "escalated"` forever and every board/UI surface reads a
+            // healthy issue as still needing intervention.
+            if (handoff?.state !== "required" && handoff?.state !== "escalated")
+              return;
             await logActivity(db, {
               companyId: issue.companyId,
               actorType: actor.actorType,
@@ -14270,6 +14278,7 @@ export function issueRoutes(
                 sourceRunId: handoff.sourceRunId,
                 correctiveRunId: handoff.correctiveRunId,
                 resolvedByStatus: issue.status,
+                resolvedFromState: handoff.state,
               },
             });
           })
