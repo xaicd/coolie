@@ -259,7 +259,7 @@ export async function runSupervisorCycle() {
     try {
       const unlinkedMainlines = allIssues.filter(i => {
         if (i.goalId) return false;
-        return (i.title && (i.title.includes('[主线长任务]') || i.title.includes('交付主线例行巡检') || i.title.includes('每日开工')));
+        return (i.title && (i.title.includes('[主线长任务]') || i.title.includes('交付主线例行巡检') || i.title.includes('每日开工') || i.title.includes('守护调度器')));
       });
       if (unlinkedMainlines.length > 0) {
         const goals = await request(`/companies/${COMPANY_ID}/goals`);
