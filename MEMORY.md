@@ -17,7 +17,7 @@
 |---|---|---|
 | ★ | **MEMORY.md** (本文件, ≤8KB) | 进场第一秒全貌与记忆中枢 |
 | ★★ | [GOALS.md](GOALS.md) | 北极星愿景、战略使命与工程目标大纲 |
-| ★★ | [docs/CURRENT-SPRINT.md](docs/CURRENT-SPRINT.md) | Sprint 任务大盘与掌柜原话 |
+| ★★ | [docs/MASTER-PILLARS-AND-GOVERNANCE.md](docs/MASTER-PILLARS-AND-GOVERNANCE.md) | 架构、标准CI/CD发版与CMMI5规范真理源 |
 | ★★ | [docs/intent-router.md](docs/intent-router.md) | 客户口语意图路由器 (7大类 30+ 原话反查) |
 | ★★ | [AGENTS.md](AGENTS.md) (45KB) | 平台公理体系与最高工程法典 |
 
@@ -80,12 +80,10 @@
 
 ## 7. 当前 Sprint 动态记忆与掌柜最新原话
 
-- **当前 Sprint**: `2026-sprint-10-16-mobile-foundry-and-login-isolation`
-- **最新拍板原话 (2026-10-16)**:
-  - *"mac 宿主机专门用来建设工坊产品... residential-plan-service 跟工坊平台无关系"* ➜ 锁定本地施工队定位，商业项目与平台主客体正交物理隔离。
-  - *"生产 APP 登录不上了, 是不是 APP APK 包有问题"* ➜ 根除构建期 .env.local 污染 + 三层防回环门禁 + 生产纯净 OTA 增量包下发生效。
-  - *"工坊产品深度进化,需要不停吸收外部的知识,滚动 loop"* ➜ GOALS.md 固化四阶段知识代谢 + goal.md Agent Loop 演进法典 + OpenWiki 持续自愈。
-  - *"结合自己产品功能深入定位差距,向内探索,循环提升"* ➜ 新SOA研报入库 + 落地商业场景配方库 (.agents/workflows/business-recipes/) 与 2PC 契约。
+- **当前 Sprint**: `2026-sprint-10-17-test-to-ops-and-doc-deflation`
+- **最新拍板原话**:
+  - *"100% MCP 自动化测试全覆盖, 运营是真实用户"* ➜ 95项工具全量测试 + 跑通测试向运营握手与真实用户闭环。
+  - *"文档是否太多重复了, 同时确保标准CICD流程信息/架构/规范等都在"* ➜ 启动文档降熵脱水，固化 `docs/MASTER-PILLARS-AND-GOVERNANCE.md` 三大命脉真理源。
 - **详见账本**: [docs/sprint-prod/10/16.md](docs/sprint-prod/10/16.md)
 
 ## 8. 维护规则
