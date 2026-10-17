@@ -21,6 +21,7 @@ data/
 .paperclip/
 .pnpm-store/
 .local/
+\$PAPERCLIP_RUN_SCRATCH_DIR/
 tmp-*
 cli/tmp/
 
