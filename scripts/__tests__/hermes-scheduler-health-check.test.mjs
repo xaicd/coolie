@@ -7,12 +7,19 @@ import {
   GATE_VERDICTS,
   DEFAULT_GRACE_MINUTES,
   DEFAULT_STALE_PERIODS,
+  DEFAULT_CADENCE_WINDOW_HOURS,
+  DEFAULT_CADENCE_GRACE_MINUTES,
+  CADENCE_RUNS_LIMIT,
+  CADENCE_VERDICTS,
+  CADENCE_BADGE,
   FALLBACK_PERIOD_MINUTES,
   VERDICT_BADGE,
   triggerOf,
   parseCronIntervalMinutes,
   minutesSince,
   evaluateRoutine,
+  pickRuns,
+  auditCadence,
   checkRoutines,
   renderBrief,
   renderText,
@@ -329,15 +336,127 @@ test("renderText 人读报告含徽章/门禁行/执行单", () => {
   assert.match(text, /执行单=COOA-300/);
 });
 
+// ── 起搏缺跳审计 (cadence gap) ───────────────────────────────────────────────
+
+const runAt = (minutesAgo) => ({ triggeredAt: iso(minutesAgo), status: "completed" });
+const ROUTINE_ID = "b35ff456-cad2-42ef-9880-0fe3626beb70";
+
+test("pickRuns 兼容数组 / {runs} / {data} 三种回包 (缺省回空数组)", () => {
+  const rows = [runAt(1), runAt(2)];
+  assert.deepEqual(pickRuns(rows), rows);
+  assert.deepEqual(pickRuns({ runs: rows }), rows);
+  assert.deepEqual(pickRuns({ data: rows }), rows);
+  assert.deepEqual(pickRuns(null), []);
+  assert.deepEqual(pickRuns({}), []);
+});
+
+test("CADENCE_VERDICTS 五态齐备且徽章同键", () => {
+  assert.deepEqual(CADENCE_VERDICTS, [
+    "cadence_stalled",
+    "cadence_skipped",
+    "cadence_ok",
+    "cadence_missing_data",
+    "cadence_unsupported",
+  ]);
+  for (const verdict of CADENCE_VERDICTS) assert.ok(CADENCE_BADGE[verdict], `缺徽章: ${verdict}`);
+});
+
+test("auditCadence: 逐跳对齐 ⇒ cadence_ok 不门禁", () => {
+  const runs = [0, 15, 30, 45, 60, 75, 90].map(runAt);
+  const cad = auditCadence({ runs, now: NOW, periodMinutes: 15 });
+  assert.equal(cad.verdict, "cadence_ok");
+  assert.equal(cad.missedFires, 0);
+  assert.equal(cad.gate, false);
+  assert.equal(cad.fires, 7);
+});
+
+test("auditCadence: 45 分钟空洞 (实测 COOA-472 形态) ⇒ 缺 2 跳, advisory 不门禁", () => {
+  // 2026-10-17T16:45:29Z → 17:30:30Z 真实空洞: 16:45 / 17:30 两跳之间少了 17:00 与 17:15
+  const runs = [115, 100, 85, 70, 25, 10].map(runAt);
+  const cad = auditCadence({ runs, now: NOW, periodMinutes: 15 });
+  assert.equal(cad.verdict, "cadence_skipped");
+  assert.equal(cad.missedFires, 2);
+  assert.equal(cad.maxGapMinutes, 45);
+  assert.equal(cad.gate, false);
+  assert.equal(cad.gaps.length, 1);
+  assert.equal(cad.gaps[0].missedTicks, 2);
+  assert.equal(cad.gaps[0].from, iso(70));
+  assert.equal(cad.gaps[0].to, iso(25));
+});
+
+test("auditCadence: 缺 ≥ stalePeriods 跳 ⇒ cadence_stalled 且门禁", () => {
+  const cad = auditCadence({ runs: [120, 60].map(runAt), now: NOW, periodMinutes: 15, stalePeriods: 3 });
+  assert.equal(cad.verdict, "cadence_stalled");
+  assert.equal(cad.missedFires, 3);
+  assert.equal(cad.gate, true);
+});
+
+test("auditCadence: 同刻重复行只算一跳, 窗口外 runs 不计", () => {
+  const runs = [
+    runAt(0),
+    runAt(0), // 重试/重放同刻多行
+    runAt(15),
+    { triggeredAt: iso(600), status: "completed" }, // 6h 窗口外
+  ];
+  const cad = auditCadence({ runs, now: NOW, periodMinutes: 15 });
+  assert.equal(cad.fires, 2);
+  assert.equal(cad.missedFires, 0);
+  assert.equal(cad.verdict, "cadence_ok");
+});
+
+test("auditCadence: 周期未知 / 跳数不足 ⇒ 只报不判 (不误报)", () => {
+  const unsupported = auditCadence({ runs: [0, 15].map(runAt), now: NOW, periodMinutes: null });
+  assert.equal(unsupported.verdict, "cadence_unsupported");
+  assert.equal(unsupported.gate, false);
+
+  const thin = auditCadence({ runs: [runAt(5)], now: NOW, periodMinutes: 15 });
+  assert.equal(thin.verdict, "cadence_missing_data");
+  assert.equal(thin.gate, false);
+
+  const empty = auditCadence({ runs: [], now: NOW, periodMinutes: 1440 });
+  assert.equal(empty.verdict, "cadence_missing_data");
+});
+
+test("checkRoutines 挂 cadence 并把 cadence_stalled 计入门禁", () => {
+  const stalled = checkRoutines([routine()], NOW, {
+    runsById: { [ROUTINE_ID]: [120, 60].map(runAt) },
+  });
+  assert.equal(stalled.routines[0].cadence.verdict, "cadence_stalled");
+  assert.equal(stalled.gate.failed, true);
+  assert.deepEqual(stalled.gate.verdicts, ["cadence_stalled"]);
+  assert.deepEqual(stalled.gate.ids, [ROUTINE_ID]);
+});
+
+test("checkRoutines 无 runsById 时不挂 cadence (向后兼容单点体检)", () => {
+  const report = checkRoutines([routine()], NOW);
+  assert.equal(report.routines[0].cadence, undefined);
+  assert.equal(report.gate.failed, false);
+});
+
+test("renderBrief 在缺跳时打出 ⚠️ 缺跳(N跳/Gm), ok 时不占字", () => {
+  const skipped = renderBrief(checkRoutines([routine()], NOW, {
+    runsById: { [ROUTINE_ID]: [115, 100, 85, 70, 25, 10].map(runAt) },
+  }));
+  assert.match(skipped, /⚠️ 缺跳\(2跳\/45m\)/);
+
+  const ok = renderBrief(checkRoutines([routine()], NOW, {
+    runsById: { [ROUTINE_ID]: [0, 15, 30].map(runAt) },
+  }));
+  assert.doesNotMatch(ok, /缺跳/);
+});
+
 // ── CLI 参数 ────────────────────────────────────────────────────────────────
 
 test("parseArgs 默认值", () => {
   const { flags, options } = parseArgs([]);
-  assert.deepEqual(flags, { json: false, brief: false, gate: false, help: false });
+  assert.deepEqual(flags, { json: false, brief: false, gate: false, help: false, noCadence: false });
   assert.equal(options.graceMinutes, DEFAULT_GRACE_MINUTES);
   assert.equal(options.stalePeriods, DEFAULT_STALE_PERIODS);
   assert.equal(options.company, null);
   assert.equal(options.issue, null);
+  assert.equal(options.cadenceWindowHours, DEFAULT_CADENCE_WINDOW_HOURS);
+  assert.equal(options.cadenceGraceMinutes, DEFAULT_CADENCE_GRACE_MINUTES);
+  assert.equal(options.runsLimit, CADENCE_RUNS_LIMIT);
 });
 
 test("parseArgs 认 --brief/--json/--gate/--company/--issue 与阈值覆盖", () => {
