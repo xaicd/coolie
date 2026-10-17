@@ -108,6 +108,7 @@
     "cmmi:templates": "node scripts/cmmi-asset-scaffold.cjs export-templates",
     "cmmi:list": "node scripts/cmmi-asset-scaffold.cjs list",
     "cmmi:check": "node scripts/cmmi-asset-scaffold.cjs check",
+    "cmmi:reverse-audit": "node scripts/cmmi-reverse-audit.mjs",
     "coolie:dev": "bash scripts/coolie-local-dev.sh",
     "coolie:intent": "bash scripts/hermes-boss-intent-dispatcher.sh",
     "coolie:dispatch": "bash scripts/dispatch-local-employee.sh",

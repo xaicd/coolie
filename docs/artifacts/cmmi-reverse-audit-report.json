@@ -1,0 +1,10 @@
+{
+  "auditedAt": "2026-10-17T14:59:22.608Z",
+  "rtmPath": "docs/02_requirements/requirements-traceability-matrix.md",
+  "requirementsCount": 14,
+  "passedChecks": 33,
+  "failedChecks": 0,
+  "complianceRate": "100.0%",
+  "status": "PASS",
+  "findings": []
+}

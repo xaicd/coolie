@@ -170,6 +170,9 @@ case "${ACTION}" in
   cmmi-check)
     node scripts/cmmi-asset-scaffold.cjs check "${@:2}"
     ;;
+  cmmi-reverse-audit|reverse-audit)
+    node scripts/cmmi-reverse-audit.mjs "${@:2}"
+    ;;
   build)
     run_build
     ;;
@@ -181,7 +184,7 @@ case "${ACTION}" in
     ;;
   *)
     echo "未知指令: ${ACTION}"
-    echo "可用指令: env | arch-audit | ontology-audit | cmmi-batch | cmmi-check | build | test | full-audit"
+    echo "可用指令: env | arch-audit | ontology-audit | cmmi-batch | cmmi-check | cmmi-reverse-audit | build | test | full-audit"
     exit 2
     ;;
 esac
