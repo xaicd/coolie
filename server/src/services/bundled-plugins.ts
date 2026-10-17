@@ -128,6 +128,11 @@ export const BUNDLED_PLUGIN_CATALOG: readonly BundledPluginCatalogEntry[] = [
     pluginKey: "paperclip.workspace-diff",
     relativePath: "plugin-workspace-diff",
   },
+  {
+    key: "multimodal",
+    pluginKey: "paperclipai.plugin-multimodal",
+    relativePath: "plugin-multimodal",
+  },
 ];
 
 /**
@@ -141,6 +146,7 @@ export const SELF_HOSTED_AUTO_INSTALL_KEYS: readonly string[] = [
   "governance",
   "chat",
   "workspace-diff",
+  "multimodal",
 ];
 
 /**
