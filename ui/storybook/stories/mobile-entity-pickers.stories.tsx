@@ -42,17 +42,25 @@ const meta = {
   title: "Components/Entity pickers/Mobile",
   parameters: {
     layout: "fullscreen",
-    viewport: { defaultViewport: "mobile1" },
   },
 } satisfies Meta;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
+// Storybook 10: the mobile viewport is selected through `globals.viewport.value`
+// (definitions live in `.storybook/preview.tsx` parameters.viewport.options).
+// The legacy `parameters.viewport.defaultViewport` key was silently ignored, so
+// these two stories rendered desktop-width even though they are the only
+// coverage for the 6-inch picker sheet.
+const mobileViewport = { viewport: { value: "mobile1", isRotated: false } } as const;
+
 export const AssigneePicker: Story = {
   render: () => <OpenPicker kind="Assignee" options={assignees} />,
+  globals: mobileViewport,
 };
 
 export const ProjectPicker: Story = {
   render: () => <OpenPicker kind="Project" options={projects} />,
+  globals: mobileViewport,
 };

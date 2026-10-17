@@ -70,6 +70,41 @@ function cleanup(sandbox) {
   rmSync(sandbox.dir, { recursive: true, force: true });
 }
 
+// Stage a fake `crontab` inside the sandbox PATH.
+//
+// Without this stub the scripts under test talk to the *real* user crontab:
+// `crontab -l` succeeds whenever the machine has any cron entry, so the
+// "no existing crontab" branch never runs on a developer box (the test failed
+// on macOS for exactly this reason), and a machine that happens to hold a
+// `# wave228-copilot-reset` line would have it silently deleted by the test.
+// The stub keeps every cron mutation inside the sandbox HOME.
+function stageFakeCrontab(sandbox, initialLines = null) {
+  const state = path.join(sandbox.fakeHome, ".fake-crontab");
+  if (initialLines !== null) writeFileSync(state, initialLines);
+  const stub = path.join(sandbox.fakeBin, "crontab");
+  writeFileSync(
+    stub,
+    [
+      "#!/bin/sh",
+      'state="$HOME/.fake-crontab"',
+      'case "$1" in',
+      "  -l)",
+      '    if [ -f "$state" ]; then cat "$state"; exit 0; fi',
+      '    echo "no crontab for fake user" >&2',
+      "    exit 1",
+      "    ;;",
+      "  -r) rm -f \"$state\"; exit 0 ;;",
+      "  -*) echo \"fake crontab: unsupported flag $1\" >&2; exit 1 ;;",
+      '  "") echo "fake crontab: missing argument" >&2; exit 1 ;;',
+      '  *) cp "$1" "$state"; exit 0 ;;',
+      "esac",
+      "",
+    ].join("\n"),
+  );
+  spawnSync("chmod", ["+x", stub]);
+  return state;
+}
+
 // ---------------------------------------------------------------------------
 // T1: bash syntax check on all four scripts
 // ---------------------------------------------------------------------------
@@ -291,9 +326,28 @@ test("cron-copilot-reset.sh --unregister: no existing crontab is safe", () => {
   const sandbox = makeSandbox();
   try {
     // crontab -l may fail with no existing crontab; the script handles that.
+    // The fake crontab keeps the assertion independent of the host crontab.
+    stageFakeCrontab(sandbox);
     const r = run("cron-copilot-reset.sh", ["--unregister"], sandbox);
     assert.equal(r.status, 0, `stderr=${r.stderr}`);
     assert.match(r.stdout, /无现有 crontab/);
+  } finally {
+    cleanup(sandbox);
+  }
+});
+
+test("cron-copilot-reset.sh --unregister drops only the tagged line", () => {
+  const sandbox = makeSandbox();
+  try {
+    const state = stageFakeCrontab(
+      sandbox,
+      "*/5 * * * * echo keep-me\n1 8 1 * * /tmp/copilot-reset.sh --to gpt5-sol # wave228-copilot-reset\n",
+    );
+    const r = run("cron-copilot-reset.sh", ["--unregister"], sandbox);
+    assert.equal(r.status, 0, `stderr=${r.stderr}`);
+    assert.match(r.stdout, /已撤销 wave228 cron 行/);
+    const remaining = readFileSync(state, "utf8");
+    assert.equal(remaining, "*/5 * * * * echo keep-me\n");
   } finally {
     cleanup(sandbox);
   }

@@ -5,17 +5,16 @@ import {
   createWriteStream,
   existsSync,
   mkdirSync,
-  mkdtempSync,
   readdirSync,
   readFileSync,
   rmSync,
   statSync,
 } from "node:fs";
-import { tmpdir } from "node:os";
 import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { writeDeterministicTarGz } from "./lib/deterministic-tar.mjs";
 
 const repoRoot = resolve(fileURLToPath(new URL("..", import.meta.url)));
 const defaultManifestPath = join(repoRoot, "tests", "storybook-visual", "baseline-manifest.json");
@@ -162,33 +161,11 @@ async function pack() {
     flags.get("out") ?? join(repoRoot, "tests", "storybook-visual", "baseline-review", "snapshots.tgz"),
   );
   mkdirSync(dirname(out), { recursive: true });
-  const tempDir = mkdtempSync(join(tmpdir(), "storybook-visual-pack-"));
-  const tempArchive = join(tempDir, "snapshots.tgz");
-  try {
-    run(
-      "tar",
-      [
-        "--sort=name",
-        "--mtime=@0",
-        "--owner=0",
-        "--group=0",
-        "--numeric-owner",
-        "--use-compress-program=gzip -n",
-        "-cf",
-        tempArchive,
-        "-C",
-        sourceDir,
-        ".",
-      ],
-      "pack deterministic baseline archive",
-    );
-    rmSync(out, { force: true });
-    run("cp", [tempArchive, out], "write packed archive");
-  } finally {
-    rmSync(tempDir, { recursive: true, force: true });
-  }
-  const sha256 = sha256File(out);
-  const byteSize = statSync(out).size;
+  // Deterministic pack without system tar: GNU-only flags (`--sort=name`,
+  // `--mtime=@0`, `--use-compress-program="gzip -n"`) are rejected by the
+  // bsdtar that ships with macOS, which silently made this command
+  // Linux-only. See scripts/lib/deterministic-tar.mjs.
+  const { sha256, byteSize } = writeDeterministicTarGz({ sourceDir, outFile: out });
   const publicUrl = flags.get("public-url") ?? process.env.STORYBOOK_VISUAL_PUBLIC_URL ?? "";
   const objectKey = `baselines/storybook-visual/${sha256}/snapshots.tgz`;
   console.log(`Packed ${count} PNG snapshots into ${relative(repoRoot, out)}`);
