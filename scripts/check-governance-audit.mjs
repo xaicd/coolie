@@ -591,7 +591,9 @@ assertRule('CMMI 标准资产反造假扫描守卫: node scripts/cmmi-asset-scaf
 // -----------------------------------------------------------------------------
 // 16.1 运营对账平账 (G7 / Phase 09) 三方对账能力与零假基线守卫 (wave286-COOA-110)
 // -----------------------------------------------------------------------------
-const reconSopPath = 'docs/09_operations/tenant-governance.md';
+const reconSopPath = fs.existsSync('projects/cls-core-services/docs/09_operations/tenant-governance.md')
+  ? 'projects/cls-core-services/docs/09_operations/tenant-governance.md'
+  : 'docs/09_operations/tenant-governance.md';
 const reconSopContent = fs.existsSync(reconSopPath) ? fs.readFileSync(reconSopPath, 'utf8') : '';
 const reconSopHasSources = ['hk_orders', 'pay_orders', '对账单'].every((k) => reconSopContent.includes(k));
 const reconSopHasInvariants =
@@ -602,7 +604,7 @@ assertRule(
   'G7 运营 SOP 缺失三方对账数据源或复式记账 / 无对账不放款不变量',
 );
 
-const reconRoots = ['docs', 'projects/sys-yunnan-wecom/docs', 'projects/sys-chanrong-agent/docs', 'projects/sys-jiuxia-smart/docs'];
+const reconRoots = ['docs', 'projects/sys-yunnan-wecom/docs', 'projects/sys-chanrong-agent/docs', 'projects/sys-jiuxia-smart/docs', 'projects/cls-core-services/docs'];
 const reconFakeFiles = [];
 for (const reconRoot of reconRoots) {
   const reconDir = path.join(reconRoot, '09_operations/02_financial_reconciliation');
