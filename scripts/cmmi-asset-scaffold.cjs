@@ -352,8 +352,18 @@ flowchart TD
       },
       "contracts": {
         file: "03_design/interface-contracts.md",
-        title: "跨端契约与动词化接口定义说明书 (LLD)",
-        template: () => `# 跨端契约与动词化接口定义说明书 (LLD)\n`,
+        title: "统一对外接口契约与 API 规范说明书",
+        template: () => `# 统一对外接口契约与 API 规范说明书\n`,
+      },
+      "lld": {
+        file: "03_design/low-level-design.md",
+        title: "系统详细设计与核心服务规范说明书 (LLD)",
+        template: () => `# 系统详细设计与核心服务规范说明书 (LLD)\n`,
+      },
+      "ui-spec": {
+        file: "03_design/ui-design-prototype-spec.md",
+        title: "UI 设计与前端原型交互规范说明书",
+        template: () => `# UI 设计与前端原型交互规范说明书\n`,
       },
       "screenshot-spec": {
         file: "03_design/screenshot-automation-spec.md",
@@ -1024,7 +1034,7 @@ function handleBatch(opts) {
   const BASELINE_TYPES = {
     "01": ["charter", "risk", "plan"],
     "02": ["srs", "rtm", "nfr"],
-    "03": ["hld", "dar-selection", "erd", "contracts", "api-spec", "screenshot-spec"],
+    "03": ["hld", "lld", "dar-selection", "erd", "contracts", "ui-spec", "api-spec", "screenshot-spec"],
     "04": ["code-review"],
     "05": ["test-plan", "test-summary", "uat"],
     "06": ["audit"],

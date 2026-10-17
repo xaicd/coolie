@@ -1,8 +1,8 @@
-# Coolie AI 原生商业软件交付工厂控制面平台 · 系统概要设计说明书 (HLD)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 系统总体架构概要设计说明书 (HLD)
 
-> **文档代号**: COOA-HLD-v2.0.0  
-> **项目全称**: Coolie AI 原生商业软件交付工厂控制面平台 (AI 原生端到端商业软件交付工厂控制面平台)  
-> **基线版本**: v2.0.0 (生产冻结稳定版)  
+> **文档代号**: COOLIE-FOUNDRY-HLD-2.0.0  
+> **项目全称**: Coolie AI 原生商业软件交付工厂控制面平台 (端到端数字员工全自主软件制造与交付中枢)  
+> **基线版本**: 2.0.0 (生产冻结稳定版)  
 > **制定日期**: 2026-10-17  
 > **归属规范**: CMMI 03_design (TS) / IEEE 1016-2009 / GB/T 8567-2006 (HLD) / .agents/skills/cmmi-tech-solution  
 
@@ -21,21 +21,52 @@ Coolie AI 原生商业软件交付工厂控制面平台 定位为全流程由 AI
 
 ## 2. 总体 4+1 架构全景视图 (4+1 Architectural View Model)
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                   1. 逻辑视图 (Logical View)                           │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ 驾驶舱层: Web 控制台 (React 19) + 移动端 (Expo SDK 52 / 6寸屏防御) │  │
-│  ├──────────────────────────────────────────────────────────────────┤  │
-│  │ 控制面层: Express.js 5 REST API + 单人签出锁 + 预算硬熔断 + 审批流 │  │
-│  ├──────────────────────────────────────────────────────────────────┤  │
-│  │ 活体本体层: Palantir 双核 (8 实体 + 8 动词 + 5 不变量) 反射 263 表 │  │
-│  ├──────────────────────────────────────────────────────────────────┤  │
-│  │ 数据持久层: Drizzle ORM (PostgreSQL 生产 / PGlite 本地脱机)       │  │
-│  ├──────────────────────────────────────────────────────────────────┤  │
-│  │ 调度算力层: Hermes 调度中枢 + 7 工具池 + Tailscale 多主机 Mesh     │  │
-│  └──────────────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────┘
+```mermaid
+flowchart TD
+    subgraph Client["极简人机交互层 (Minimalist UI)"]
+        Web["Web 运维控制台 (React 19)"]
+        Mobile["Expo 移动驾驶舱 (6寸屏防御)"]
+    end
+
+    subgraph Gateway["控制面 API 与安全网关 (Control Plane Gateway)"]
+        Router["Express 5 REST 路由网关"]
+        Auth["Bearer Token / 租户物理边界隔离"]
+        Mutex["单人负责人原子签出互斥锁"]
+    end
+
+    subgraph Services["核心业务编排服务矩阵 (Foundry Services)"]
+        HeartbeatSvc["心跳调度与看门狗 (heartbeat.ts)"]
+        IssuesSvc["任务工单与流水流转 (issues.ts)"]
+        CostsSvc["实时成本核算与硬熔断 (costs.ts)"]
+        ApprovalsSvc["卡片审批与双人治理 (approvals.ts)"]
+        RoutineSvc["交付主线常驻保活 (routines.ts)"]
+    end
+
+    subgraph Ontology["活体业务本体中枢 (Living Ontology Engine)"]
+        Domain["业务实体 (8 Object Types)"]
+        Actions["闭环动词 (8 Action Types)"]
+        Invariants["系统硬底线 (5 Invariants)"]
+    end
+
+    subgraph Persistence["数据持久化底座 (Persistence Layer)"]
+        Drizzle["Drizzle ORM 强类型层"]
+        PG[("PostgreSQL 17 生产环境")]
+        PGlite[("内嵌式 PGlite 本地脱机")]
+    end
+
+    subgraph Fleet["数字员工制造工程流水线 (Digital Employee Fleet)"]
+        Hermes["Hermes 调度中枢"]
+        Modou["墨斗 (FDA 架构建模)"]
+        Tiejiang["铁匠 (Core SWE 契约编码)"]
+        Menshen["门神 (FDSE 真机快照走查)"]
+        Baixiaosheng["百晓生 (DS 需求收敛主审)"]
+    end
+
+    Client --> Gateway
+    Gateway --> Services
+    Services <--> Ontology
+    Services --> Persistence
+    Services <--> Fleet
 ```
 
 ### 2.1 逻辑视图 (Logical View)
@@ -43,10 +74,10 @@ Coolie AI 原生商业软件交付工厂控制面平台 定位为全流程由 AI
   - Web 端：基于 React 19 + Vite 6 + Tailwind CSS 4 构建，支持大盘看板、工单管理与协同文档；
   - 移动端：基于 React Native + Expo SDK 52 构建（`clients/expo/`），严格执行 320dp 几何防撑爆、黄金 5 槽位绝对对称底栏、两字动词按钮与就地防遮挡浮层。
 - **控制面编排服务层 (Control Plane Server)**：
-  - 基于 Node.js 24.11.0 + Express 5，以 Company 为边界实施行级租户隔离；
+  - 基于 Node.js 24 LTS + Express 5，以 Company 为边界实施行级租户隔离；
   - 核心服务包括心跳调度 (`heartbeat.ts`)、工单原子签出 (`issues.ts`)、实时费用统计与硬熔断 (`costs.ts`)、卡片式审批流 (`approvals.ts`)、交付主线巡检守护 (`routines.ts`)。
 - **活体业务本体中枢 (Living Ontology Engine)**：
-  - 独立根目录 `/ontology/`，基于 Palantir 活体本体理念构建，定义实体 (Object Types)、动词 (Action Types) 与系统不变量 (Invariants)，对 Drizzle 263 张物理表实施 100% 自动化双向反射审计。
+  - 独立根目录 `/ontology/`，基于 Palantir 活体本体理念构建，定义实体 (Object Types)、动词 (Action Types) 与系统不变量 (Invariants)，对 Drizzle 225 张物理表实施 100% 自动化双向反射审计。
 - **数据持久化层 (Persistence Layer)**：
   - 基于 Drizzle ORM，自动适配双模运行：生产环境直连 PostgreSQL 17，本地脱机开发与单测直连内嵌 WebAssembly PGlite。
 
@@ -56,12 +87,27 @@ Coolie AI 原生商业软件交付工厂控制面平台 定位为全流程由 AI
 - 移动端与 Web 端通过 WebSocket / Server-Sent Events 实现长任务心跳与非阻塞状态同步。
 
 ### 2.3 开发与工程视图 (Development & Monorepo View)
-- 根目录采用 PNPM Workspaces 架构：`server/`, `ui/`, `clients/expo/`, `clients/h5/`, `packages/db/`, `packages/shared/`, `scripts/`；
-- 100% 契约驱动：接口契约与 TypeScript 类型强校验，增量编译 0 报错拦截。
+全栈仓库采用 PNPM Workspaces 单体多包工程架构：
+
+| 子包标识 | 架构分层 | 核心职责与业务能力 | 技术选型与运行环境 | 源码物理路径 |
+| :--- | :--- | :--- | :--- | :--- |
+| **`server`** | 控制面服务层 | REST API 网关、单人原子签出、实时成本计算、审批引擎、心跳监控 | Node.js 24 + Express 5 | `server/` |
+| **`ui`** | Web 驾驶舱层 | 交付总监大盘看板、工单协作、知识库文档、活体本体可视化图谱 | React 19 + Vite 6 + Tailwind CSS | `ui/` |
+| **`clients/expo`** | 移动端驾驶舱 | 掌柜随身看板、一句话自然语言派单、卡片式审批决策、6寸屏物理防御 | React Native + Expo SDK 52 | `clients/expo/` |
+| **`packages/db`** | 数据持久化层 | Drizzle ORM Schema、数据库迁移、PostgreSQL 17 / PGlite 双模驱动 | Drizzle ORM + PG / PGlite | `packages/db/` |
+| **`packages/shared`** | 跨端契约共享 | 共享 TypeScript 类型定义、统一错误码、OpenAPI 契约、常量枚举 | TypeScript 5.8 | `packages/shared/` |
+| **`packages/adapters`** | 智能体适配层 | Claude, Codex, Cursor 等 7 工具池智能体协议桥接与执行隔离 | TypeScript + Process Isolation | `packages/adapters/` |
+| **`cli`** | 终端命令行工具 | `paperclipai` 官方发布 CLI 工具链与运维命令套件 | Node.js Executable | `cli/` |
 
 ### 2.4 物理部署视图 (Deployment & Topology View)
-- 多机网络拓扑：通过 Tailscale Mesh 连接 `mac` (驾驶舱/模拟器), `cwall` (GPU算力), `aja-pc` (交付中台), `tc-coolie-claw` (生产服务)；
-- 宿主机穿透调用：全局 `host-exec` 自动映射物理工作区。
+全平台数字员工体系运行于多机混合拓扑中，依托 Tailscale Mesh 网状网络与 SSH 互联互通：
+
+| 节点标识 | 物理主机类型与架构 | 核心独占硬件与运行环境 | Tailscale 网状网络 IP | 承担职责与服务角色 |
+| :--- | :--- | :--- | :--- | :--- |
+| **`mac`** | Mac Studio (M-Series ARM64) | Android / iOS 原生模拟器, Xcode, Node 24 | `100.84.124.71` | 前线指挥驾驶舱、移动端截屏存证、本地沙箱验证 |
+| **`cwall`** | Ubuntu 24.04 x86_64 | NVIDIA RTX 4090 GPU, 376GB 内存 | `100.118.232.61` | 高性能算力节点、重型模型推理与容器化构建集群 |
+| **`aja-pc`** | Ubuntu 24.04 x86_64 | 专有交付测试环境 | `100.101.22.109` | 商业交付业务中台与预发布集成验证中心 |
+| **`tc-coolie-claw`** | Ubuntu 24.04 x86_64 | 生产高可用 Linux 服务器 | `62.234.59.180` | 生产控制面服务、PostgreSQL 17 主库与 Caddy 网关 |
 
 ### 2.5 核心用例场景视图 (Use Case Scenario View)
-- 掌柜自然语言一句话进厂 ➔ Hermes 解析转译排期 Issue ➔ 墨斗 FDA 架构建模 ➔ 铁匠 Core SWE 契约编码 ➔ 门神 FDSE 真机快照走查 ➔ 掌柜手机卡片两字【审批】➔ 自动割接上线。
+掌柜自然语言一句话进厂 ➔ Hermes 解析转译排期 Issue ➔ 墨斗 FDA 架构建模 ➔ 铁匠 Core SWE 契约编码 ➔ 门神 FDSE 真机快照走查 ➔ 掌柜手机卡片两字【审批】➔ 自动割接上线。

@@ -4,11 +4,11 @@
 类型: 系统总体架构概要设计说明书 (HLD)
 归属: CMMI Phase 03 (03_design)
 注意: 本文件为纯净空白母本，严禁直接填写项目业务数据！
-      使用 node scripts/cmmi-asset-scaffold.cjs batch 或 generate 派生到各项目 docs/ 中。
+      使用 node scripts/cmmi-doc-generator.cjs --type hld 或 --all 动态派生落盘。
 ==========================================================================
 -->
 
-# {{PROJECT_TITLE}} · 系统概要设计说明书 (HLD)
+# {{PROJECT_TITLE}} · 系统总体架构概要设计说明书 (HLD)
 
 > **文档代号**: {{SYSTEM_CODE}}-HLD-{{VERSION}}  
 > **项目全称**: {{PROJECT_TITLE}} ({{PROJECT_SUBTITLE}})  
@@ -31,22 +31,7 @@
 
 ## 2. 总体 4+1 架构全景视图 (4+1 Architectural View Model)
 
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│                   1. 逻辑视图 (Logical View)                           │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ 驾驶舱层: Web 控制台 (React 19) + 移动端 (Expo SDK 52 / 6寸屏防御) │  │
-│  ├──────────────────────────────────────────────────────────────────┤  │
-│  │ 控制面层: Express.js 5 REST API + 单人签出锁 + 预算硬熔断 + 审批流 │  │
-│  ├──────────────────────────────────────────────────────────────────┤  │
-│  │ 活体本体层: Palantir 双核 (8 实体 + 8 动词 + 5 不变量) 反射 {{DATABASE_TABLES_COUNT}} 表 │  │
-│  ├──────────────────────────────────────────────────────────────────┤  │
-│  │ 数据持久层: Drizzle ORM (PostgreSQL 生产 / PGlite 本地脱机)       │  │
-│  ├──────────────────────────────────────────────────────────────────┤  │
-│  │ 调度算力层: Hermes 调度中枢 + 7 工具池 + Tailscale 多主机 Mesh     │  │
-│  └──────────────────────────────────────────────────────────────────┘  │
-└────────────────────────────────────────────────────────────────────────┘
-```
+{{HLD_MERMAID_ARCHITECTURE}}
 
 ### 2.1 逻辑视图 (Logical View)
 - **极简人机交互层 (Minimalist UI)**：
@@ -66,12 +51,14 @@
 - 移动端与 Web 端通过 WebSocket / Server-Sent Events 实现长任务心跳与非阻塞状态同步。
 
 ### 2.3 开发与工程视图 (Development & Monorepo View)
-- 根目录采用 PNPM Workspaces 架构：`server/`, `ui/`, `clients/expo/`, `clients/h5/`, `packages/db/`, `packages/shared/`, `scripts/`；
-- 100% 契约驱动：接口契约与 TypeScript 类型强校验，增量编译 0 报错拦截。
+全栈仓库采用 PNPM Workspaces 单体多包工程架构：
+
+{{HLD_WORKSPACE_PACKAGES_TABLE}}
 
 ### 2.4 物理部署视图 (Deployment & Topology View)
-- 多机网络拓扑：通过 Tailscale Mesh 连接 `mac` (驾驶舱/模拟器), `cwall` (GPU算力), `aja-pc` (交付中台), `{{DEPLOY_HOST}}` (生产服务)；
-- 宿主机穿透调用：全局 `host-exec` 自动映射物理工作区。
+全平台数字员工体系运行于多机混合拓扑中，依托 Tailscale Mesh 网状网络与 SSH 互联互通：
+
+{{HLD_DEPLOYMENT_TOPOLOGY}}
 
 ### 2.5 核心用例场景视图 (Use Case Scenario View)
-- 掌柜自然语言一句话进厂 ➔ Hermes 解析转译排期 Issue ➔ 墨斗 FDA 架构建模 ➔ 铁匠 Core SWE 契约编码 ➔ 门神 FDSE 真机快照走查 ➔ 掌柜手机卡片两字【审批】➔ 自动割接上线。
+掌柜自然语言一句话进厂 ➔ Hermes 解析转译排期 Issue ➔ 墨斗 FDA 架构建模 ➔ 铁匠 Core SWE 契约编码 ➔ 门神 FDSE 真机快照走查 ➔ 掌柜手机卡片两字【审批】➔ 自动割接上线。

@@ -1,7 +1,7 @@
 # Coolie AI 原生商业软件交付工厂控制面平台 · 需求双向跟踪矩阵 (Requirements Traceability Matrix - RTM)
 
-> **文档代号**: COOA-RTM-v2.0.0  
-> **基线版本**: v2.0.0  
+> **文档代号**: COOLIE-FOUNDRY-RTM-2.0.0  
+> **基线版本**: 2.0.0  
 > **编制日期**: 2026-10-17  
 > **归属规范**: CMMI 02_requirements (RDM / REQM) / GB/T 8567-2006 / .agents/skills/cmmi-req-spec  
 
@@ -14,9 +14,9 @@
 | 需求编号 (SRS) | 需求名称与核心特征 | 架构设计章节 (HLD/LLD) | 物理代码实现模块 (Source Code) | 对应接口契约 (OpenAPI) | 验证门禁与自动化测试 (Verification Gate) | 当前状态 |
 | :--- | :--- | :--- | :--- | :--- | :--- | :---: |
 | **REQ-SYS-001** | 单人原子签出锁 | HLD §3 控制面中枢 | `server/src/services/heartbeat.ts`<br>`packages/db/src/schema/issues.ts` | `POST /api/issues/:id/checkout`<br>`POST /api/issues/:id/release` | Pre-commit Gate 0<br>`pnpm test` (issue checkout tests) | **100% 覆盖** |
-| **REQ-SYS-002** | 活体本体双核并轨 | HLD §4 活体本体架构 | `ontology/`<br>`scripts/harness-ontology-audit.mjs` | `GET /api/companies/:id/ontology/graph`<br>本体 MCP 工具集 | Pre-commit Gate 4.1<br>Ontology 4 大门禁 + 5 大不变量 | **100% 覆盖** |
-| **REQ-SYS-003** | 极简两字 UI 契约 | HLD §5 极简人机交互 | `ui/src/components/`<br>`clients/expo/src/components/` | N/A (前端组件层) | Pre-commit Gate 16 (两字规范)<br>Gate 24 (移动端真机截屏) | **100% 覆盖** |
-| **REQ-SYS-004** | 25道预提交硬门禁 | HLD §6 质量与门禁体系 | `scripts/pre-commit-check.mjs`<br>`scripts/check-governance-audit.mjs` | N/A (本地自动化 CI/CD) | `node scripts/pre-commit-check.mjs`<br>25/25 PASS 断言 | **100% 覆盖** |
+| **REQ-SYS-002** | 活体本体双核并轨 | HLD §4 活体本体架构 | `ontology/domain.json`<br>`scripts/harness-ontology-audit.mjs` | `GET /api/companies/:id/ontology/graph` | Pre-commit Gate 4.1<br>Ontology 4 大门禁 + 5 大不变量 | **100% 覆盖** |
+| **REQ-SYS-003** | 极简两字 UI 契约 | HLD §5 极简人机交互 | `ui/src/components`<br>`clients/expo/App.tsx` | N/A (前端交互层) | Pre-commit Gate 16 (两字规范)<br>Gate 24 (真机截屏走查) | **100% 覆盖** |
+| **REQ-SYS-004** | 25道预提交硬门禁 | HLD §6 质量与门禁体系 | `scripts/pre-commit-check.mjs` | N/A (本地自动化 CI/CD) | `node scripts/pre-commit-check.mjs`<br>25/25 PASS 断言 | **100% 覆盖** |
 | **REQ-EVT-001** | 自然语言意图进厂 | HLD §7 调度与意图路由 | `scripts/hermes-boss-intent-dispatcher.sh`<br>`server/src/routes/issues.ts` | `POST /api/companies/:id/issues` | Pre-commit Gate 22 (直通派单)<br>意图口语评测集 | **100% 覆盖** |
 | **REQ-EVT-002** | 预算熔断自动硬停 | HLD §3 控制面中枢 | `server/src/services/costs.ts`<br>`packages/db/src/schema/agents.ts` | `GET /api/companies/:id/costs`<br>`POST /api/companies/:id/budgets` | `pnpm test` (budget hard-stop suite) | **100% 覆盖** |
 | **REQ-EVT-003** | 实质工件资产核销 | HLD §6 交付物履约体系 | `server/src/services/issues.ts`<br>`packages/db/src/schema/issue_work_products.ts` | `POST /api/issues/:id/work-products`<br>`PATCH /api/issues/:id` | Pre-commit Gate 16 (No Artifact No Done 校验) | **100% 覆盖** |

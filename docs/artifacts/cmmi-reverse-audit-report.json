@@ -1,8 +1,8 @@
 {
-  "auditedAt": "2026-10-17T15:41:17.325Z",
+  "auditedAt": "2026-10-17T16:05:23.663Z",
   "rtmPath": "docs/02_requirements/requirements-traceability-matrix.md",
   "requirementsCount": 14,
-  "passedChecks": 33,
+  "passedChecks": 32,
   "failedChecks": 0,
   "complianceRate": "100.0%",
   "status": "PASS",

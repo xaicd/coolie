@@ -4,7 +4,7 @@
 类型: 软件需求规格说明书 (SRS - EARS 5态精准规格)
 归属: CMMI Phase 02 (02_requirements)
 注意: 本文件为纯净空白母本，严禁直接填写项目业务数据！
-      使用 node scripts/cmmi-asset-scaffold.cjs batch 或 generate 派生到各项目 docs/ 中。
+      使用 node scripts/cmmi-doc-generator.cjs --type req 或 --all 动态派生落盘。
 ==========================================================================
 -->
 
@@ -26,39 +26,7 @@
 
 ## 2. EARS 5态精准句式需求规格清单 (EARS Requirements Catalog)
 
-### 2.1 普遍全时需求 (Ubiquitous Requirements)
-> **句式模板**: 系统[全时]应当具备: `The system shall <action>.`
-
-- **REQ-SYS-001 [单人原子签出]**: 系统全时应当实施单任务单负责人（Single-Assignee）原子签出锁机制，同一工单在同一时间仅允许单一智能体或操作者持有签出锁并写入代码。
-- **REQ-SYS-002 [活体本体并轨]**: 系统全时应当以 {{DATABASE_TABLES_COUNT}} 张物理表为底座维持业务实体 (Object Types) 与业务动词 (Action Types) 的因果血缘网络，任何任务施工必须明确挂载对应的业务动词。
-- **REQ-SYS-003 [极简两字 UI]**: 系统全时在 Web 与移动端界面中，所有核心交互动作按钮文案长度应当严格收敛为 $\le 2$ 个汉字（如【派活】、【通过】、【驳回】、【签出】、【提额】），底栏保持黄金 5 槽位绝对对称。
-- **REQ-SYS-004 [物理门禁守卫]**: 系统全时在执行 Git 提交前，应当通过预提交守卫强制通过包括架构拓扑、本体反射、增量编译、多语言对称在内的 {{GATES_COUNT}} 道物理硬门禁。
-
-### 2.2 事件驱动需求 (Event-Driven Requirements)
-> **句式模板**: 当[触发事件发生]时，系统应当: `WHEN <trigger>, the system shall <action>.`
-
-- **REQ-EVT-001 [自然语言意图进厂]**: 当掌柜或交付总监在控制台、移动端或微信端输入一句话自然语言意图时，Hermes 调度中枢应当在 1 秒内完成意图语法解析并在控制面创建正规排期的 Issue 工单，禁止脱幅私跑代码。
-- **REQ-EVT-002 [预算熔断硬停]**: 当智能体在当前项目累计产生的 API 费用达到设定的预算硬停止上限时，系统应当立即挂起该智能体的签出锁与执行权限，并向掌柜发送 🔔 审批通知卡片。
-- **REQ-EVT-003 [实质工件资产核销]**: 当智能体将工单状态变更为 `done` 时，控制面服务应当强制校验该工单是否已挂载实质性工程资产（有效的 Git Commit SHA、已推送的远端 PR、在线预览或测试快照），若未挂载则应当拒绝变更并报错 `422 Unprocessable Entity (No Artifact, No Done)`。
-
-### 2.3 状态驱动需求 (State-Driven Requirements)
-> **句式模板**: 当处于[指定状态]时，系统应当: `WHILE <state>, the system shall <action>.`
-
-- **REQ-STA-001 [交付主线例行保活]**: 当项目处于进行中 (`in_progress`) 状态时，控制面后台常驻巡检守护程序 (`coolie-dev-loop-supervisor`) 应当持续保持小时级心跳与巡检，主动推进阻塞任务，直至项目正式终验完成 (`completed`) 或取消 (`cancelled`)。
-- **REQ-STA-002 [移动端 6 寸屏几何防御]**: 当应用在宽度为 320dp 至 430dp 的移动端视口中渲染时，系统应当强制实施无横向溢出滚动条防御，所有浮层与模态框应当就地居中或全屏覆盖，严禁遮挡底部核心导航栏。
-
-### 2.4 异常分支需求 (Unwanted Behaviour Requirements)
-> **句式模板**: 如果[非法/异常条件成立]，那么系统应当: `IF <condition>, THEN the system shall <action>.`
-
-- **REQ-ERR-001 [工作树脏污阻断]**: 如果当前物理工作树存在未提交的变更 (`dirty`) 或未跟踪的文件 (`untracked`)，那么预提交门禁应当立即阻断提交，严禁将代码推入 `git stash` 掩埋。
-- **REQ-ERR-002 [本体物理字段漂移自愈]**: 如果物理 Drizzle Schema 与本体元模型存在列名或类型不一致，那么本体审计引擎应当判定门禁失败，并在启用 `--fix` 时原地自动同步更新本体定义。
-- **REQ-ERR-003 [多租户越权阻断]**: 如果客户端发起的操作所携带的资源 ID 不属于其 Token 所属的企业租户，那么系统网关与领域服务应当立即抛出 `403 Forbidden` 并写入安全审计日志。
-
-### 2.5 可选特性需求 (Optional Feature Requirements)
-> **句式模板**: 当启用[可选配置]时，系统应当: `WHERE <feature is enabled>, the system shall <action>.`
-
-- **REQ-OPT-001 [本地脱机 PGlite 数据库]**: 当环境变量未设置 `DATABASE_URL` 时，系统应当自动启用内嵌式 WebAssembly PGlite 数据库，提供免外部依赖的本地自闭环研发与测试环境。
-- **REQ-OPT-002 [微信多模态图片实时同步]**: 当启用微信监控服务 (`pnpm wechat:watch`) 时，系统应当穿透读取宿主机 Hermes 活跃会话并自动将图片附件秒级同步到工作区供视觉多模态校验。
+{{SRS_REQUIREMENTS_LIST}}
 
 ---
 
