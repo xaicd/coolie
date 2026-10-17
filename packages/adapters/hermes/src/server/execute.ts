@@ -610,7 +610,16 @@ export async function execute(
     model,
   };
 
-  if (parsed.errorMessage) {
+  const outputText = (result.stdout || "") + "\n" + (result.stderr || "");
+  const isIterationBudgetReached = /iteration budget reached/i.test(outputText);
+
+  if (isIterationBudgetReached && parsed.response && (result.exitCode === 1 || result.exitCode === 0)) {
+    // Hermes Python CLI exits with code 1 when max_turns/iteration budget is reached,
+    // even though it completed all turns and provided a valid response/summary.
+    // Treat as successful turn completion so Paperclip doesn't flag it as fatal crash.
+    await ctx.onLog("stdout", `[hermes] Note: Iteration budget reached with valid response; marking turn as completed.\n`);
+    executionResult.exitCode = 0;
+  } else if (parsed.errorMessage) {
     executionResult.errorMessage = parsed.errorMessage;
   } else if (!result.timedOut && typeof result.exitCode === "number" && result.exitCode !== 0) {
     executionResult.errorMessage = `Hermes exited with code ${result.exitCode}`;
