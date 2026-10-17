@@ -1,8 +1,8 @@
 # Coolie AI 原生商业软件交付工厂控制面平台 · 生产部署与割接标准作业程序 (System Deployment SOP)
 
-> **文档代号**: COOA-SOP-v2.0.0  
-> **基线版本**: v2.0.0  
-> **生效日期**: 2026-10-17  
+> **文档代号**: COOA-SOP (rev.2)  
+> **适用基线**: v0.6.61 (versionCode 661) — 由 `bash scripts/VERSION-CONSISTENCY-CHECK.sh` 实测 7/7 一致  
+> **生效日期**: 2026-10-17 (rev.2 复核 2026-10-18)  
 > **归属规范**: CMMI 07_release (TRANS) / .agents/skills/sre-release-and-deploy / .agents/skills/deploy-workspace-symlinks  
 
 ---
@@ -18,6 +18,13 @@
    node scripts/pre-commit-check.mjs
    git verify-commit HEAD
    ```
+3. **制品不可变指纹对账 (G5 唯一凭证)**: 逐件比对本地制品 sha256 与线上声明指纹，并核验 OTA bundle 哈希，结果落 `docs/07_release/artifact-fingerprints.json`：
+   ```bash
+   cat docs/07_release/artifact-fingerprints.json | jq '.verdict'
+   ```
+   - `android` = `PASS`：APK 本地 sha256 与 `version.json.apkSha256` 逐位一致；
+   - `ota` = `PASS`：launch asset 下载后 sha256(base64) 与 `ota/manifest.hash` 一致；
+   - `ios` = 任何非 `PASS` 值即视为**红线**：说明商店/下载链路声明的制品不可达或哈希不符，禁止发布并在发布前修复。
 
 ---
 
@@ -51,10 +58,11 @@ ssh tc-coolie-claw 'sudo systemctl restart coolie.service'
 
 ## 3. 生产发布后健康拨测与业务验证 (Post-Deployment Health Probe)
 
-1. **健康检查端点探测**:
+1. **健康检查端点探测** (生产唯一入口 `xrobinai.cn`, 无 `api.coolie.ai` 域):
    ```bash
-   curl -f -s https://api.coolie.ai/api/health | jq .
-   # 预期输出: {"status":"ok","version":"v2.0.0"}
+   curl -f -s https://xrobinai.cn/api/health | jq '{status,deploymentMode,commit}'
+   # 实测输出 (2026-10-18 02:03 CST): {"status":"ok","deploymentMode":"authenticated","commit":"1fb55f362b478f4b45eb8ddc763313c5d6ed17a5"}
+   # 断言: status == "ok" 且 commit == 本次发布的目标 commit
    ```
 2. **系统服务运行日志核查**:
    ```bash

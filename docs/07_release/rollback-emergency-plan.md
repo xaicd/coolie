@@ -1,8 +1,8 @@
 # Coolie AI 原生商业软件交付工厂控制面平台 · 生产秒级回滚应急操作手册 (Rollback Emergency Plan)
 
-> **文档代号**: COOA-ROLLBACK-v2.0.0  
-> **基线版本**: v2.0.0  
-> **制定日期**: 2026-10-17  
+> **文档代号**: COOA-ROLLBACK (rev.2)  
+> **适用基线**: v0.6.61 (versionCode 661) / 回滚目标 = 上一个已通过 7 源一致性校验的 tag  
+> **制定日期**: 2026-10-17 (rev.2 复核 2026-10-18)  
 > **归属规范**: CMMI 07_release (TRANS / RSKM) / .agents/skills/cmmi-immutable-release  
 
 ---
@@ -43,5 +43,5 @@ bash scripts/publish-ota.sh --rollback-to-last-stable
 ---
 
 ## 3. 回滚后止血验证与通知通报 (Post-Rollback Verification)
-1. **健康检查验证**: 验证 `curl -f https://api.coolie.ai/api/health` 恢复为上一基线版本；
+1. **健康检查验证**: `curl -f -s https://xrobinai.cn/api/health | jq '{status,commit}'` 恢复 `status=="ok"` 且 `commit` == 回滚目标 commit（**唯一生产域名 `xrobinai.cn`；`api.coolie.ai` 不存在**）；
 2. **事故免责复盘登记**: 在 24 小时内依据 Google SRE 规范沉淀 `docs/08_sre/02_postmortem/` 事故复盘文档并固化防退化测试用例。

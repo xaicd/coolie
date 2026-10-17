@@ -1,0 +1,133 @@
+{
+  "schema": "coolie.artifact-fingerprints/v1",
+  "generatedAt": "2026-10-17T18:04:00Z",
+  "generatedBy": {
+    "agent": "Hermes",
+    "agentId": "5419bef9-6b72-477b-a5e4-0fe19aac5b77",
+    "runId": "7b18802a-c40a-416b-a1f6-08d296954cf9",
+    "routineIssue": "COOA-467",
+    "wbsTask": "7.1 [G5·投产] 不可变制品指纹、部署与秒级回滚 SOP",
+    "repoHead": "af15f752c744f38d1ff483a771d9dde88a9e431c"
+  },
+  "method": {
+    "hash": "sha256",
+    "localArtifacts": "shasum -a 256 <file>",
+    "remotePublished": "curl -sSI (HTTP status + Content-Length) + declared hash compare",
+    "otaBundle": "download launch asset, sha256 -> base64 (expo-updates uses unpadded base64 of sha256 digest)",
+    "versionSources": "bash scripts/VERSION-CONSISTENCY-CHECK.sh (7 sources)"
+  },
+  "verdict": {
+    "android": "PASS",
+    "ota": "PASS",
+    "versionConsistency": "PASS",
+    "ios": "FAIL",
+    "summary": "Android APK / OTA bundle / 7 处版本源全部实测一致; iOS 发布元数据指向 404 死链, 无对应制品"
+  },
+  "artifacts": [
+    {
+      "channel": "android",
+      "status": "PASS",
+      "local": {
+        "path": "clients/expo/android/app/build/outputs/apk/release/app-release.apk",
+        "bytes": 81282582,
+        "sha256": "6fdbbce39747895d323ee2c2260189c68d8e0172b9248a45c62bb77294db76d7"
+      },
+      "published": {
+        "url": "https://dls.xrobinai.cn/coolie/app/0.6.61/coolie-release.apk",
+        "httpStatus": 200,
+        "contentLength": 81282582,
+        "lastModified": "Fri, 16 Oct 2026 13:47:10 GMT",
+        "declaredSha256": "6fdbbce39747895d323ee2c2260189c68d8e0172b9248a45c62bb77294db76d7"
+      },
+      "checks": [
+        "local sha256 == version.json apkSha256 (bit-identical)",
+        "remote Content-Length == local bytes",
+        "remote HTTP 200"
+      ]
+    },
+    {
+      "channel": "ota-android",
+      "status": "PASS",
+      "manifest": {
+        "url": "https://xrobinai.cn/ota/manifest",
+        "id": "f3499864-48bc-4781-bc8f-540aad40d6e6",
+        "createdAt": "2026-10-17T07:36:13.862Z",
+        "runtimeVersion": "0.6.61",
+        "launchAssetUrl": "https://xrobinai.cn/ota/_expo/static/js/android/index-9b9a3b5591c681e81a0a3b44f24a831a.hbc",
+        "declaredHash": "6bv8dYUeo4BdbmqawWObo42miChwUZ8itwunx6oL8NE",
+        "declaredBytes": 5680950
+      },
+      "recomputed": {
+        "bytes": 5680950,
+        "sha256Hex": "e9bbfc75851ea3805d6e6a9ac1639ba38da6882870519f22b70ba7c7aa0bf0d1",
+        "sha256Base64": "6bv8dYUeo4BdbmqawWObo42miChwUZ8itwunx6oL8NE"
+      },
+      "checks": [
+        "downloaded launch asset sha256(base64) == manifest.hash",
+        "downloaded bytes == manifest.fileSize"
+      ]
+    },
+    {
+      "channel": "ios",
+      "status": "FAIL",
+      "local": {
+        "path": "clients/expo/ios/build/ipa/cn.xrobinai.app.ipa",
+        "bytes": 14286676,
+        "sha256": "2e7d63c06857dfb115f318e36ece2945b0f4cd4259b13fea0a009a9cf6e6b4c0",
+        "mtime": "2026-09-30T15:34 (CST)",
+        "note": "本地 IPA 为 18 天前旧构建, 与当前 0.6.61 基线不可对应"
+      },
+      "published": {
+        "declaredUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+        "httpStatus": 404,
+        "declaredSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
+        "resolvedArtifact": null,
+        "testFlightUrl": null
+      },
+      "probedUrls": [
+        {"url": "https://dls.xrobinai.cn/coolie/app/0.6.61/coolie-release-ios.ipa", "httpStatus": 404},
+        {"url": "https://dls.xrobinai.cn/coolie/app/0.6.60/coolie-release-ios.ipa", "httpStatus": 404},
+        {"url": "https://dls.xrobinai.cn/coolie/app/0.6.59/coolie-release-ios.ipa", "httpStatus": 404},
+        {"url": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa", "httpStatus": 404}
+      ],
+      "defect": "version.json 的 iosDownloadUrl/iosSha256 为 0.6.2 时代残留字段, 指向死链; 声明哈希无任何可达制品与之对应; iosTestFlightUrl 为 null —— iOS 分发链路实际不可用",
+      "ownerAction": "兑底渊 (PRE-SRE) 清理/回填 iOS 发布元数据; iOS 重新出包需老板 Apple 签名发版窗口"
+    },
+    {
+      "channel": "control-plane-prod",
+      "status": "PASS",
+      "published": {
+        "url": "https://xrobinai.cn/api/health",
+        "httpStatus": 200,
+        "status": "ok",
+        "deploymentMode": "authenticated",
+        "commit": "1fb55f362b478f4b45eb8ddc763313c5d6ed17a5",
+        "bootstrapStatus": "ready",
+        "databaseBackup": {"enabled": true, "status": "ok", "warnings": []}
+      }
+    }
+  ],
+  "versionConsistency": {
+    "expected": "0.6.61",
+    "versionCode": 661,
+    "sources": [
+      {"id": 1, "source": "clients/expo/app.json", "result": "PASS", "value": "expo.version=0.6.61, android.versionCode=661"},
+      {"id": 2, "source": "clients/expo/package.json", "result": "PASS", "value": "0.6.61"},
+      {"id": 3, "source": "clients/expo/android/app/build.gradle", "result": "PASS", "value": "versionName=0.6.61, versionCode=661"},
+      {"id": 4, "source": "clients/expo/CHANGELOG.md", "result": "PASS", "value": "v0.6.61"},
+      {"id": 5, "source": "https://xrobinai.cn/version.json", "result": "PASS", "value": "0.6.61 / 661"},
+      {"id": 6, "source": "https://xrobinai.cn/ota/manifest", "result": "PASS", "value": "runtimeVersion=0.6.61"},
+      {"id": 7, "source": "git tag v0.6.61", "result": "PASS", "value": "-> 3ca281793"}
+    ],
+    "verdict": "7/7 PASS",
+    "command": "bash scripts/VERSION-CONSISTENCY-CHECK.sh"
+  },
+  "reproduce": [
+    "bash scripts/VERSION-CONSISTENCY-CHECK.sh",
+    "shasum -a 256 clients/expo/android/app/build/outputs/apk/release/app-release.apk",
+    "curl -sS https://xrobinai.cn/version.json",
+    "curl -sS https://xrobinai.cn/ota/manifest",
+    "curl -sSI https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
+    "curl -sS https://xrobinai.cn/api/health"
+  ]
+}
