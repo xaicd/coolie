@@ -132,6 +132,7 @@ screenshots/
 # capture artifacts (binary screenshots, .gitkeep only) never enter commits.
 clients/*/replays/evidence/
 **/replays/evidence/
+evidence/
 
 # P0 e2e capture artifacts — local only, same fork policy as above. A Playwright
 # run emits megabytes of binary per run (`.png` / `.webm` / `trace.zip`) plus an

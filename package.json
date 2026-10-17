@@ -59,6 +59,8 @@
     "ontology:inspect": "node scripts/ontology-ops.cjs inspect",
     "mcp:call": "node scripts/mcp-call.mjs",
     "check:testability": "node scripts/check-testability-and-ops-gates.mjs",
+    "test:mcp": "node --test scripts/mcp-call.test.mjs",
+    "test:mcp:e2e": "node scripts/qa-mcp-e2e-suite.mjs",
     "tools:install": "bash scripts/install-all-cli-tools.sh",
     "tools:check": "bash scripts/install-all-cli-tools.sh --check",
     "speckit": "node scripts/speckit.cjs",

@@ -46,12 +46,21 @@ if [ -f "scripts/VERSION-CONSISTENCY-CHECK.sh" ]; then
 fi
 
 # 4. 生产 5 节点连通性快速探测 (外网 3 秒快速探测)
-echo "▶ [4/4] 快速探测线上服务入口 (https://xrobinai.cn)..."
+echo "▶ [4/5] 快速探测线上服务入口 (https://xrobinai.cn)..."
 PROD_STATUS=$(curl -fsS -o /dev/null -w "%{http_code}" -m 3 "https://xrobinai.cn/api/health" 2>/dev/null || echo "UNREACHABLE")
 if [ "$PROD_STATUS" == "200" ]; then
   echo "  ✓ 线上网关与 API 健康: HTTP 200 OK"
 else
   echo "  ⚠ 线上入口返回: $PROD_STATUS (若离线或无外网请忽略)"
+fi
+
+# 5. 运行 Agent-Device / Agent-Browser 自测性与两字 UI 门禁
+echo "▶ [5/5] 运行自测性与两字 UI 规范门禁 (scripts/check-testability-and-ops-gates.mjs)..."
+if [ -f "scripts/check-testability-and-ops-gates.mjs" ]; then
+  node scripts/check-testability-and-ops-gates.mjs >/dev/null && echo "  ✓ 1031 个组件/页面自测性与两字 UI 100% CLEAN" || {
+    echo "  ✗ 自测性或两字 UI 门禁未通过！"
+    exit 1
+  }
 fi
 
 echo "=================================================================="

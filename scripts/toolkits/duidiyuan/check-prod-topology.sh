@@ -15,6 +15,18 @@ ssh -o BatchMode=yes -o ConnectTimeout=5 "$SSH_TARGET" "
   curl -s -m 3 http://127.0.0.1:3100/api/health | head -c 100; echo
 " || echo "  ⚠️ 远端应用层探测失败或不可达"
 
+echo "=== [2.5/5] 探测控制面 MCP 协议服务 (opsMetricsTelemetry) ==="
+if [ -f "scripts/mcp-call.mjs" ]; then
+  node scripts/mcp-call.mjs opsMetricsTelemetry 2>/dev/null | node -e "
+    try {
+      const d = JSON.parse(fs.readFileSync(0, 'utf8'));
+      console.log('  MCP 遥测: 健康=' + d.result.healthStatus + ', 工单=' + d.result.totalIssues);
+    } catch(e) {
+      console.log('  ⚠️ MCP 服务离线或跳过');
+    }
+  " || true
+fi
+
 echo "=== [3/5] 探测数据层 (Postgres 数据库连通性) ==="
 ssh -o BatchMode=yes -o ConnectTimeout=5 "$SSH_TARGET" "
   sudo -u postgres psql coolie -tAc 'SELECT 1;' >/dev/null && echo '  PostgreSQL DB: OK (连通正常)' || echo '  PostgreSQL DB: FAIL'

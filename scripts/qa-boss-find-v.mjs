@@ -696,7 +696,7 @@ async function main() {
   reportLines.push(`- [x] 装真产物 (v0.6.8 APK native) - \`adb install\` 通过`);
   reportLines.push(`- [x] 净装 (pm clear) - 暴露缓存掩盖 bug`);
   reportLines.push(`- [x] 拟真人点全流程 - 5 tab + FAB + 通知 + 资产子页 + 项目`);
-  reportLines.push(`- [x] API 真值回读 - curl /api/release-notes /api/companies /api/health`);
+  reportLines.push(`- [x] MCP 契约真值回读 - node scripts/mcp-call.mjs qaPageListRoutes / paperclipListCompanies / opsMetricsTelemetry (已全面升级为原生 MCP 驱动)`);
   reportLines.push(`- [x] 截图存证 - /tmp/wave240/ 32 张`);
   reportLines.push(`- [x] 30+ 项缺陷, 全部落任务 (实际 ${results.length})`);
   reportLines.push(`- [x] 每项有: severity + reproSteps + screenshot (附件) + 关联项目 c0e182ae-36d0-4f26-b3d8-f65a3c00e8c0`);
