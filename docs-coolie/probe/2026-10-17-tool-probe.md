@@ -5,7 +5,7 @@
 > 才算 OK; 超时 30s = FAIL. 替换 wave277 静态 --version.
 > 真值表见 [docs-coolie/TOOLS.md](../TOOLS.md) §2.
 
-- 探测时间: `2026-10-17 08:00:01 CST`
+- 探测时间: `2026-10-17 08:05:58 CST`
 - 探测脚本: `scripts/daily-tool-probe.sh` (wave279)
 - 探测方式: 真跑 `-p '回复 OK'`
 - 超时: 30s/工具; 性能 OK 阈值: <5s
@@ -14,53 +14,29 @@
 
 | 工具 | 路径 | 真跑探测 | 响应时间 | 响应结果 | 状态 |
 |---|---|---|---|---|---|
-| agy-gemini3.8 | `docker:agy-ubuntu-container` | `docker exec agy-ubuntu-container agy -p '回复 OK'` | - | FAIL 容器未运行 (inspect=) | **FAIL** |
-| claude-mm | `(not in PATH)` | `claude -p '回复 OK'` | - | FAIL binary not in PATH | **FAIL** |
-| claude-glm | `(not in PATH)` | `claude --settings ~/.claude/settings.jsonglm -p '回复 OK'` | - | FAIL binary not in PATH | **FAIL** |
-| cmd | `(not in PATH)` | `cmd -p '回复 OK'` | - | FAIL binary not in PATH | **FAIL** |
-| copilot | `(not in PATH)` | `copilot -p '回复 OK'` | - | FAIL binary not in PATH | **FAIL** |
+| agy-gemini3.8 | `docker:agy-ubuntu-container (容器内 agy-gemini3.8)` | `docker exec agy-ubuntu-container agy -p '回复 OK'` | 16s | OK OK | **OK** |
+| claude-mm | `/opt/homebrew/bin/claude` | `claude --settings ~/.claude/settings.jsonmm -p '回复 OK'` | 6s | OK [claude-code:unrecognized_model] {"model | **OK** |
+| claude-glm | `/opt/homebrew/bin/claude` | `claude --settings ~/.claude/settings.jsonglm -p '回复 OK'` | 10s | OK [claude-code:unrecognized_model] {"model | **OK** |
+| cmd | `/opt/homebrew/bin/cmd` | `cmd -p '回复 OK'` | 3s | FAIL Error: Command Code 额度不足。 | **FAIL** |
+| copilot | `/opt/homebrew/bin/copilot` | `copilot -p '回复 OK'` | 2s | FAIL Error: No authentication information fou | **FAIL** |
 | Hermes | `Hermes (PM 主调度中枢, 人即工具)` | `调度脚本 (dispatch-local-employee.sh)` | <1s | OK Hermes 调度中枢在线 | **OK** |
 
 ## 2. 失败修法 (按工具)
 
-### agy-gemini3.8 → FAIL
-
-- 路径: `docker:agy-ubuntu-container`
-- 真跑探测: `docker exec agy-ubuntu-container agy -p '回复 OK'`
-- 响应时间: -
-- 响应结果: FAIL 容器未运行 (inspect=)
-  → 修法: docker start agy-ubuntu-container; 或 docker run -d --name agy-ubuntu-container chw717/ai-agy:latest-arm64
-
-### claude-mm → FAIL
-
-- 路径: `(not in PATH)`
-- 真跑探测: `claude -p '回复 OK'`
-- 响应时间: -
-- 响应结果: FAIL binary not in PATH
-  → 修法: brew install --cask claude-code 或重装 /opt/homebrew/bin/claude; 检查 ANTHROPIC_API_KEY
-
-### claude-glm → FAIL
-
-- 路径: `(not in PATH)`
-- 真跑探测: `claude --settings ~/.claude/settings.jsonglm -p '回复 OK'`
-- 响应时间: -
-- 响应结果: FAIL binary not in PATH
-  → 修法: brew install --cask claude-code 或重装 /opt/homebrew/bin/claude; 检查 ANTHROPIC_API_KEY
-
 ### cmd → FAIL
 
-- 路径: `(not in PATH)`
+- 路径: `/opt/homebrew/bin/cmd`
 - 真跑探测: `cmd -p '回复 OK'`
-- 响应时间: -
-- 响应结果: FAIL binary not in PATH
+- 响应时间: 3s
+- 响应结果: FAIL Error: Command Code 额度不足。
   → 修法: npm i -g @commandcode/ai 或重装 /opt/homebrew/bin/cmd
 
 ### copilot → FAIL
 
-- 路径: `(not in PATH)`
+- 路径: `/opt/homebrew/bin/copilot`
 - 真跑探测: `copilot -p '回复 OK'`
-- 响应时间: -
-- 响应结果: FAIL binary not in PATH
+- 响应时间: 2s
+- 响应结果: FAIL Error: No authentication information fou
   → 修法: brew install copilot-cli 或 npm i -g @github/copilot; 月度配额跑 scripts/cron-copilot-reset.sh
 
 ## 3. 关联
