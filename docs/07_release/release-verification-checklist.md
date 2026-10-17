@@ -24,6 +24,7 @@
 - [ ] **Pre-Commit 门禁全绿**: `node scripts/pre-commit-check.mjs` 期望 25/25 PASS；
 - [ ] **活体本体形式化证明**: `node scripts/harness-ontology-audit.mjs` 期望 4 门禁 + 5 不变量全 PASS；
 - [ ] **CMMI 资产反向穿透对账**: `pnpm cmmi:reverse-audit` 期望 33 处物理路径全部存在且可达。
+- [ ] **iOS 分发字段死链/契约机检**: `pnpm check:ios-links`（`node scripts/check-ios-distribution-links.mjs`）→ 若 `version.json` 声明了 `ios*` 下载字段则对应 URL 必须 200/206，且不得残留 App 端不消费的嵌套 `ios` 对象（COOA-470 守卫；`scripts/release-ios-cos.sh --register` 已内置调用）。
 
 ---
 
@@ -46,6 +47,6 @@
 | Android OTA | PASS | launch asset 哈希与 manifest 逐位一致 |
 | 7 处版本源 | PASS | 7/7 = 0.6.61 / 661 |
 | 控制面生产 | PASS | health ok，DB 备份 ok |
-| iOS 分发 | **REMEDIATED** | COOA-468 清除指向 404 的残留声明；暂无可达制品属诚实空态 |
+| iOS 分发 | **REMEDIATED** | COOA-468 清除指向 404 的残留声明；暂无可达制品属诚实空态。COOA-470 统一 `release-ios-cos.sh --register` 与 App 的 `version.json` 契约（顶层扁平 `ios*` 字段），并内置死链/契约机检守卫 `scripts/check-ios-distribution-links.mjs` |
 
 结论：Android 侧 G5 指纹链完整可信；iOS 侧历史残留死链声明已由 COOA-468 清除（生产与仓库 `version.json` 现均无 `iosDownloadUrl`/`iosSha256`，`iosTestFlightUrl=null`）。iOS 暂无对外可用制品属诚实空态，**不得据此宣称 iOS 交付完成**，待 Apple 签名窗口重出包后回填复核。

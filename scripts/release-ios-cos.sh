@@ -12,8 +12,10 @@
 #   --version <v>   必填，版本号 (进对象键 $COS_PREFIX/$VERSION/coolie-release-ios.ipa)
 #   --ipa <path>    安装包路径，默认 ios/build/ipa/coolie-<ver>-ios.ipa (退 <ver>-ios-unsigned.ipa)
 #   --verify        上传前 file / codesign -dvv / sha256 校验
-#   --register      上传后生成 manifest.plist + QR，回填 version.json 的 ios 字段 (保留 android)，
-#                   scp 到生产并公网校验
+#   --register      上传后生成 manifest.plist + QR，回填 version.json 的**顶层扁平** ios* 字段
+#                   (iosDownloadUrl/iosSha256/iosBundleId + manifest/install/qr, 保留 android 与
+#                   iosTestFlightUrl)，scp 到生产并公网校验
+#                   契约唯一真源: scripts/lib/ios-version-json.mjs (App 端只读扁平字段, COOA-470)
 #   --guardrails    4 项护栏断言: version.json / ota manifest / ios manifest / health 各 200
 #   --dry-run       只打印将执行的命令，不真正上传/写远端
 #
@@ -48,7 +50,7 @@ set +a
 COS_BUCKET="${COS_BUCKET:-}"; COS_PREFIX="${COS_PREFIX:-coolie/app}"
 COS_PUBLIC_BASE="${COS_PUBLIC_BASE:-}"; PUBLIC_ORIGIN="${PUBLIC_ORIGIN:-https://xrobinai.cn}"
 SSH_TARGET="${SSH_TARGET:-tc-coolie-claw}"; REMOTE_VERSION_JSON="${REMOTE_VERSION_JSON:-/opt/coolie/ui/dist/version.json}"
-APPLE_BUNDLE_ID="${APPLE_BUNDLE_ID:-cn.xrobinai.cn}"
+APPLE_BUNDLE_ID="${APPLE_BUNDLE_ID:-cn.xrobinai.app}"
 COSCLI_CONFIG="${COSCLI_CONFIG:-$HOME/.cos.yaml}"
 
 # ── 1. 参数 ──────────────────────────────────────────────────────────────
@@ -61,7 +63,7 @@ while [ $# -gt 0 ]; do
     --register) REGISTER=1; shift ;;
     --guardrails) GUARDRAILS=1; shift ;;
     --dry-run) DRY=1; shift ;;
-    -h|--help) sed -n '3,24p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '3,26p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "未知参数: $1" ;;
   esac
 done
@@ -199,29 +201,20 @@ fi
 if [ "$REGISTER" -eq 1 ]; then
   step "[4/5] 回填 version.json (加 ios 字段) + 上线"
   if [ "$DRY" -eq 1 ]; then
-    info "[dry-run] 拉取 $PUBLIC_ORIGIN/version.json → 合并 ios 字段 → scp $SSH_TARGET:$REMOTE_VERSION_JSON"
+    info "[dry-run] 拉取 $PUBLIC_ORIGIN/version.json → 合并顶层扁平 ios* 字段 → scp $SSH_TARGET:$REMOTE_VERSION_JSON"
   else
     TMP_JSON="$(mktemp)"
     curl -sS -m 15 "$PUBLIC_ORIGIN/version.json" -o "$TMP_JSON" || die "拉取线上 version.json 失败"
-    python3 - "$TMP_JSON" "$VERSION" "$IPA_URL" "$MANIFEST_URL" "$QR_URL" "$INSTALL_URL" "$SHA256" "$SIZE" <<'PY'
-import json, sys
-path, version, ipa, manifest, qr, install, sha, size = sys.argv[1:9]
-with open(path, encoding="utf-8") as h:
-    data = json.load(h)
-data["ios"] = {
-    "version": version,
-    "downloadUrl": ipa,
-    "manifestUrl": manifest,
-    "qrUrl": qr,
-    "installUrl": install,
-    "sha256": sha,
-    "sizeBytes": int(size),
-}
-with open(path, "w", encoding="utf-8") as h:
-    json.dump(data, h, indent=2, ensure_ascii=False)
-    h.write("\n")
-print(json.dumps(data, ensure_ascii=False, indent=2))
-PY
+    # 顶层扁平 ios* 字段 (App 端只认扁平字段, 见 clients/expo/src/AppVersion.ts)。
+    # 契约唯一真源在 scripts/lib/ios-version-json.mjs, 顺便清除历史遗留的嵌套 ios 对象。
+    node "$REPO_ROOT/scripts/lib/ios-version-json.mjs" merge "$TMP_JSON" \
+      --download-url "$IPA_URL" \
+      --sha256 "$SHA256" \
+      --bundle-id "$APPLE_BUNDLE_ID" \
+      --manifest-url "$MANIFEST_URL" \
+      --install-url "$INSTALL_URL" \
+      --qr-url "$QR_URL" \
+      --size-bytes "$SIZE"
     scp "$TMP_JSON" "$SSH_TARGET:$REMOTE_VERSION_JSON"
     ssh "$SSH_TARGET" "chmod 644 '$REMOTE_VERSION_JSON'"
     cp "$TMP_JSON" "$REPO_ROOT/version.json"
@@ -246,6 +239,12 @@ if [ "$GUARDRAILS" -eq 1 ] || [ "$REGISTER" -eq 1 ]; then
   check "ota/manifest" "$PUBLIC_ORIGIN/ota/manifest"
   check "ios/manifest" "$MANIFEST_URL"
   check "health"       "$PUBLIC_ORIGIN/api/health"
+  # COOA-470: version.json 声明的 ios* 下载字段必须真能 200, 且不得残留嵌套 ios 对象
+  # (死链声明 + 契约错位机检守卫)。
+  if ! node "$REPO_ROOT/scripts/check-ios-distribution-links.mjs" --url "$PUBLIC_ORIGIN/version.json"; then
+    info "ios 分发字段守卫 ✗  (见上)"
+    FAIL=1
+  fi
   [ "$FAIL" -eq 0 ] || die "护栏未全绿"
   fi
 fi
