@@ -85,7 +85,7 @@
 - **最新拍板原话**:
   - *"监控宿主机Hermes微信会话/看内容清晰"* ➜ `pnpm wechat:monitor` 提取掌柜原话与 3 张直播截图落地。
   - *"验证coolie-dev具备OPC能力/解决脚本不顺畅"* ➜ Polyglot Shebang 双模自愈 + 写的人不查自己双五步。
-  - *"100% MCP 自动化测试全覆盖, 运营是真实用户"* ➜ 95项工具全量测试 + 跑通测试向运营握手闭环。
+  - *"底座模板合理性重构 (开始吧)"* ➜ Yudao底座三级规格阶梯落地，Expo原生端源码与MySQL/Redis自闭环。
 - **详见账本**: [docs/sprint-prod/10/17.md](docs/sprint-prod/10/17.md)
 
 ## 8. 维护规则

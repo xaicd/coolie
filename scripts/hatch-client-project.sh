@@ -29,7 +29,12 @@ function show_help() {
   echo "  bash scripts/hatch-client-project.sh <目标目录> [选项]"
   echo ""
   echo "选项:"
-  echo "  --profile <name>   基座规格: base (默认, 平台底座), minimal (底座+低代码/AI), standard (全量 17 域与客户端), quad-terminal (四位一体: Yudao微服务+Admin-Vue3+UniApp小程序+Expo原生App)"
+  echo "  --profile <name>   基座规格阶梯:"
+  echo "                     • yudao-minimal / minimal: Yudao极简核心 (仅System+Infra, ~40MB, 极速启动)"
+  echo "                     • yudao-standard: Yudao标准商用 (System+Infra+Pay+Member+Report 5大核心域, ~150MB)"
+  echo "                     • quad-terminal / yudao-full: Yudao四位一体全量19域 (PC后台+小程序+原生App+微服务)"
+  echo "                     • ruoyi-minimal / base: Ruoyi-Next轻全栈 (Next.js 16 + React 19 + Prisma + SQLite)"
+  echo "                     • ruoyi-standard: Ruoyi-Next标准中台 (全功能RBAC与多租户)"
   echo "  --jdk <version>    JDK 目标版本: 17 (默认 LTS 推荐), 8 (政企旧环境兼容), 21 (LTS 虚拟线程高并发)"
   echo "  --title <text>     项目中文全称 (如: \"云南移动企业微信智能营销平台\")"
   echo "  --source <repo>    上游模板源 (默认: xaicd/ruoyi-all-next#main 或本地检测)"
@@ -495,6 +500,193 @@ node-linker=hoisted
 auto-install-peers=true
 strict-peer-dependencies=false
 NPMRC
+
+  ensure_app_source_code "$PROJECT_DIR"
+  ensure_docker_compose_fix "$PROJECT_DIR"
+}
+
+function trim_yudao_modules() {
+  local target_dir="$1"
+  local mode="$2"
+  local backend_dir="$target_dir/apps/backend"
+  local admin_dir="$target_dir/apps/admin"
+
+  if [[ ! -d "$backend_dir" ]]; then
+    return 0
+  fi
+
+  local domains_to_remove=()
+  if [[ "$mode" == "minimal" || "$mode" == "yudao-minimal" ]]; then
+    echo "✂️ [2.5/4] 按规格阶梯 (yudao-minimal) 实施 Yudao 业务域精准裁剪 (保留 System+Infra)..."
+    domains_to_remove=(
+      "ai" "bpm" "crm" "erp" "fms" "hrm" "im" "iot" "mall"
+      "member" "mes" "mp" "oa" "pay" "pms" "report" "wms"
+    )
+  elif [[ "$mode" == "standard" || "$mode" == "yudao-standard" ]]; then
+    echo "✂️ [2.5/4] 按规格阶梯 (yudao-standard) 实施 Yudao 业务域裁剪 (保留 System+Infra+Pay+Member+Report)..."
+    domains_to_remove=(
+      "ai" "bpm" "crm" "erp" "fms" "hrm" "im" "iot" "mall"
+      "mes" "mp" "oa" "pms" "wms"
+    )
+  fi
+
+  if [[ ${#domains_to_remove[@]} -gt 0 ]]; then
+    for domain in "${domains_to_remove[@]}"; do
+      local mod="yudao-module-$domain"
+      # 1. 裁剪后端模块目录与 pom.xml
+      if [[ -d "$backend_dir/$mod" ]]; then
+        rm -rf "$backend_dir/$mod"
+        sed -i "/<module>$mod<\/module>/d" "$backend_dir/pom.xml" 2>/dev/null || true
+        sed -i "/<artifactId>$mod<\/artifactId>/,/<\/dependency>/d" "$backend_dir/yudao-server/pom.xml" 2>/dev/null || true
+        sed -i "/<artifactId>$mod-server<\/artifactId>/,/<\/dependency>/d" "$backend_dir/yudao-server/pom.xml" 2>/dev/null || true
+      fi
+      # 2. 裁剪前端中台无用视图与 API
+      if [[ -d "$admin_dir/src/views/$domain" ]]; then
+        rm -rf "$admin_dir/src/views/$domain"
+      fi
+      if [[ -d "$admin_dir/src/api/$domain" ]]; then
+        rm -rf "$admin_dir/src/api/$domain"
+      fi
+    done
+    echo "  ✅ 裁剪完成，已收敛后端及前端无关模块与路由。"
+  fi
+}
+
+function ensure_app_source_code() {
+  local target_dir="$1"
+  local app_dir="$target_dir/apps/app"
+  if [[ -d "$app_dir" && ! -f "$app_dir/App.tsx" ]]; then
+    echo "📱 [2.6/4] 注入 Expo 原生移动端核心组件 (App.tsx + index.ts + 极简两字 UI)..."
+    mkdir -p "$app_dir/src"
+    cat <<'INDEX_TS' > "$app_dir/index.ts"
+import { registerRootComponent } from 'expo';
+import App from './App';
+registerRootComponent(App);
+INDEX_TS
+
+    cat <<'APP_TSX' > "$app_dir/App.tsx"
+import React, { useState } from 'react';
+import {
+  SafeAreaView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  View,
+  TouchableOpacity,
+  ScrollView,
+  Dimensions,
+} from 'react-native';
+
+const { width } = Dimensions.get('window');
+
+export default function App() {
+  const [status, setStatus] = useState<string>('正常');
+  const [count, setCount] = useState<number>(0);
+
+  return (
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+      <ScrollView contentContainerStyle={styles.scrollContent}>
+        <View style={styles.header}>
+          <Text style={styles.title}>商业交付终端</Text>
+          <Text style={styles.subtitle}>Yudao Quad-Terminal 原生移动中枢</Text>
+        </View>
+
+        <View style={styles.card}>
+          <Text style={styles.cardTitle}>服务态势</Text>
+          <View style={styles.row}>
+            <Text style={styles.label}>网关状态:</Text>
+            <Text style={styles.badge}>{status}</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>已核销任务:</Text>
+            <Text style={styles.value}>{count} 件</Text>
+          </View>
+          <View style={styles.row}>
+            <Text style={styles.label}>视口宽度:</Text>
+            <Text style={styles.value}>{Math.round(width)} dp (防撑爆)</Text>
+          </View>
+        </View>
+
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.button, styles.primaryButton]}
+            onPress={() => setCount((prev) => prev + 1)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.primaryButtonText}>核销</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.secondaryButton]}
+            onPress={() => setStatus((prev) => (prev === '正常' ? '巡检' : '正常'))}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.secondaryButtonText}>刷新</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+      <View style={styles.bottomNav}>
+        {['首页', '待办', '工坊', '运营', '我的'].map((tab, idx) => (
+          <TouchableOpacity key={tab} style={styles.navItem} activeOpacity={0.7}>
+            <Text style={[styles.navText, idx === 0 && styles.navTextActive]}>
+              {tab}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1, backgroundColor: '#F8FAFC' },
+  scrollContent: { padding: 16, paddingBottom: 80 },
+  header: { marginTop: 12, marginBottom: 20 },
+  title: { fontSize: 22, fontWeight: '700', color: '#0F172A' },
+  subtitle: { fontSize: 13, color: '#64748B', marginTop: 4 },
+  card: { backgroundColor: '#FFFFFF', borderRadius: 12, padding: 16, marginBottom: 20, borderWidth: 1, borderColor: '#E2E8F0' },
+  cardTitle: { fontSize: 16, fontWeight: '600', color: '#1E293B', marginBottom: 12 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#F1F5F9' },
+  label: { fontSize: 14, color: '#64748B' },
+  value: { fontSize: 14, fontWeight: '500', color: '#0F172A' },
+  badge: { fontSize: 12, color: '#059669', backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 2, borderRadius: 4, overflow: 'hidden', fontWeight: '600' },
+  actionRow: { flexDirection: 'row', justifyContent: 'space-between', gap: 12, marginBottom: 20 },
+  button: { flex: 1, height: 44, borderRadius: 8, justifyContent: 'center', alignItems: 'center' },
+  primaryButton: { backgroundColor: '#2563EB' },
+  primaryButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '600' },
+  secondaryButton: { backgroundColor: '#E2E8F0' },
+  secondaryButtonText: { color: '#334155', fontSize: 15, fontWeight: '600' },
+  bottomNav: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 56, backgroundColor: '#FFFFFF', borderTopWidth: 1, borderTopColor: '#E2E8F0', flexDirection: 'row', justifyContent: 'space-around', alignItems: 'center' },
+  navItem: { flex: 1, alignItems: 'center', justifyContent: 'center', height: '100%' },
+  navText: { fontSize: 13, color: '#94A3B8', fontWeight: '500' },
+  navTextActive: { color: '#2563EB', fontWeight: '600' },
+});
+APP_TSX
+
+    cat <<'TSCONFIG' > "$app_dir/tsconfig.json"
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true
+  }
+}
+TSCONFIG
+  fi
+}
+
+function ensure_docker_compose_fix() {
+  local target_dir="$1"
+  local compose_file="$target_dir/docker-compose.local.yml"
+  if [[ -f "$compose_file" ]]; then
+    echo "🐳 [2.7/4] 校验与加固本地开发中间件配置 (docker-compose.local.yml)..."
+    sed -i 's|\./apps/backend/scripts/sql/init-schema.sql|\./apps/backend/sql/mysql/ruoyi-vue-pro.sql|g' "$compose_file" 2>/dev/null || true
+    sed -i 's|container_name: yudao-mysql-dev|container_name: ${COMPOSE_PROJECT_NAME:-yudao}-mysql-dev|g' "$compose_file" 2>/dev/null || true
+    sed -i 's|container_name: yudao-redis-dev|container_name: ${COMPOSE_PROJECT_NAME:-yudao}-redis-dev|g' "$compose_file" 2>/dev/null || true
+    sed -i 's|"3306:3306"|"${MYSQL_PORT:-33066}:3306"|g' "$compose_file" 2>/dev/null || true
+    sed -i 's|"6379:6379"|"${REDIS_PORT:-63799}:6379"|g' "$compose_file" 2>/dev/null || true
+  fi
 }
 
 
@@ -607,12 +799,22 @@ echo "  - 目标路径: $PROJECT_DIR"
 echo "  - 项目标识: $PROJECT_NAME"
 echo "  - 系统标题: $TITLE"
 echo "  - 规格模式: $PROFILE"
-if [[ "$PROFILE" == "quad-terminal" || "$PROFILE" == "yudao" || "$PROFILE" == "yudao-quad" ]]; then
-  echo "  - JDK 版本: $JDK_TITLE (分支: $JDK_BRANCH)"
+IS_YUDAO=false
+case "$PROFILE" in
+  quad-terminal|yudao|yudao-*|quad*)
+    IS_YUDAO=true
+    ;;
+esac
+
+BLUEPRINT_NAME="ruoyi-all-next"
+if [[ "$IS_YUDAO" == true ]]; then
+  BLUEPRINT_NAME="yudao-quad-terminal"
+  echo "  - 底座架构: 芋道四位一体多端基座 ($JDK_TITLE)"
+  echo "  - JDK 分支: $JDK_BRANCH"
 fi
 
 # 检查本地是否有 ruoyi-all-next 或 yudao-quad-terminal 模板可复用，或通过 degit
-if [[ "$PROFILE" == "quad-terminal" || "$PROFILE" == "yudao" || "$PROFILE" == "yudao-quad" ]]; then
+if [[ "$IS_YUDAO" == true ]]; then
   LOCAL_YUDAO_PATH=""
   if [[ -d "/host-workspace/xaicd/yudao-quad-terminal" ]]; then
     LOCAL_YUDAO_PATH="/host-workspace/xaicd/yudao-quad-terminal"
@@ -639,6 +841,11 @@ if [[ "$PROFILE" == "quad-terminal" || "$PROFILE" == "yudao" || "$PROFILE" == "y
       }
     }
   fi
+
+  # 无论何种源抽取，均执行规格阶梯裁剪、真实移动端源码加固与中间件配置修正
+  trim_yudao_modules "$PROJECT_DIR" "$PROFILE"
+  ensure_app_source_code "$PROJECT_DIR"
+  ensure_docker_compose_fix "$PROJECT_DIR"
 else
   LOCAL_RUOYI_PATH=""
   if [[ -d "/host-workspace/xaicd/ruoyi-all-next" ]]; then
@@ -704,6 +911,25 @@ touch "$PROJECT_DIR/docs/09_operations/01_biz_ops/.gitkeep"
 touch "$PROJECT_DIR/docs/09_operations/02_data_ops/.gitkeep"
 touch "$PROJECT_DIR/docs/09_operations/03_inspection/.gitkeep"
 touch "$PROJECT_DIR/docs/09_operations/04_agent_ops/.gitkeep"
+
+# 0. 【00_manifest】底座架构指纹与元数据资产
+cat <<MANIFEST_JSON > "$PROJECT_DIR/docs/artifacts/blueprint-manifest.json"
+{
+  "project": "$PROJECT_NAME",
+  "title": "$TITLE",
+  "profile": "$PROFILE",
+  "blueprint": "$BLUEPRINT_NAME",
+  "jdkVersion": "$JAVA_VERSION",
+  "hatchedAt": "$(date -u +"%Y-%m-%dT%H:%M:%SZ")",
+  "hatchMethod": "zero-git-history",
+  "cmmiVersion": "cmmi-v3-maturity-level-5",
+  "architecture": {
+    "monorepo": true,
+    "terminals": $(if [[ "$IS_YUDAO" == true ]]; then echo '["web-admin", "miniapp", "native-app", "microservices-backend"]'; else echo '["web-next", "mobile-h5", "sandbox-3200"]'; fi),
+    "modulesTrimmed": $(if [[ "$IS_YUDAO" == true && ("$PROFILE" == *"minimal"* || "$PROFILE" == *"standard"*) ]]; then echo "true"; else echo "false"; fi)
+  }
+}
+MANIFEST_JSON
 
 # 1. 【01_management】项目管理与立项策划 (PLAN / MC / DAR)
 cat <<EOF > "$PROJECT_DIR/docs/01_management/project-charter.md"
@@ -1040,7 +1266,7 @@ fi
 if [[ "$INIT_GIT" == true ]]; then
   echo "🔒 [4/4] 初始化独立 Git 仓库与首提交 (Zero-Git-History)..."
   if [[ ! -d "$PROJECT_DIR/.git" ]]; then
-    (cd "$PROJECT_DIR" && git init -q && git add . && git commit -q -m "chore: initial project hatch from ruoyi-all-next zero-git-history ($PROFILE)")
+    (cd "$PROJECT_DIR" && git init -q && git add . && git commit -q -m "chore: initial project hatch from $BLUEPRINT_NAME zero-git-history ($PROFILE)")
     echo "  ✅ 独立全新 Git 仓库初始化完成，首提交已生成。"
   else
     echo "  ℹ️ 目标目录已是 Git 仓库，跳过 git init。"
