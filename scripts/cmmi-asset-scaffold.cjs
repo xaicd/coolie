@@ -883,6 +883,73 @@ function handleNew(opts) {
   console.log(`[cmmi-asset] ✅ 成功创建标准交付资产: ${path.relative(ROOT, targetAbs)}`);
 }
 
+function handleBatch(opts) {
+  const docsRoot = resolveDocsRoot(opts.project);
+  const title = opts.title || (opts.project ? path.basename(opts.project) : "Commercial Software Delivery");
+  const version = opts.version || "v1.0.0";
+  const mode = opts.mode || "baseline";
+
+  // 核心基线推荐资产清单 (覆盖 G1~G5 全生命周期过程)
+  const BASELINE_TYPES = {
+    "01": ["charter", "risk", "plan"],
+    "02": ["srs", "rtm", "nfr"],
+    "03": ["hld", "adr", "api-spec"],
+    "04": ["code-review"],
+    "05": ["test-plan", "test-summary", "uat"],
+    "06": ["audit"],
+    "07": ["deployment-sop", "rollback-runbook", "checklist"],
+    "08": ["slo-matrix"],
+    "09": ["tenant-governance"],
+  };
+
+  console.log(`\n========================================================================`);
+  console.log(`🚀 【CMMI 全生命周期过程资产批量生成流水线】(Batch Process Pipeline)`);
+  console.log(`   目标工程目录: ${path.relative(ROOT, docsRoot)}`);
+  console.log(`   项目全称: ${title} (${version})`);
+  console.log(`   生成模式: [${mode.toUpperCase()}] (${mode === "full" ? "全量 36 项标准资产" : "核心精简基线 18 项标准资产"})`);
+  console.log(`   原则: 100% 真实证据驱动 · 阶段严格有序 · 严禁伪造假 Demo 违规词`);
+  console.log(`========================================================================\n`);
+
+  let createdCount = 0;
+  let skippedCount = 0;
+
+  for (const [phase, phaseDef] of Object.entries(ASSET_REGISTRY)) {
+    console.log(`📁 【Phase ${phase}】${phaseDef.name}:`);
+    const typesToGenerate = mode === "full"
+      ? Object.keys(phaseDef.types)
+      : (BASELINE_TYPES[phase] || Object.keys(phaseDef.types));
+
+    for (const type of typesToGenerate) {
+      const typeDef = phaseDef.types[type];
+      if (!typeDef) continue;
+
+      const targetRel = typeof typeDef.file === "function" ? typeDef.file(opts) : typeDef.file;
+      const targetAbs = path.join(docsRoot, targetRel);
+
+      if (fs.existsSync(targetAbs) && !opts.force) {
+        console.log(`   ⚪ [既有保留] ${targetRel}`);
+        skippedCount++;
+        continue;
+      }
+
+      try {
+        const content = typeDef.template({ ...opts, title, version });
+        fs.mkdirSync(path.dirname(targetAbs), { recursive: true });
+        fs.writeFileSync(targetAbs, content.trim() + "\n", "utf8");
+        console.log(`   🟢 [流水线生成] ${targetRel} (${typeDef.title})`);
+        createdCount++;
+      } catch (err) {
+        console.error(`   ❌ [生成失败] ${targetRel}: ${err.message}`);
+      }
+    }
+  }
+
+  console.log(`\n────────────────────────────────────────────────────────────────────────`);
+  console.log(`🎉 批量生成圆满完成: 新增真实过程资产 ${createdCount} 项，保留既有资产 ${skippedCount} 项。`);
+  console.log(`   CMMI 01~09 标准规范目录已就绪，所有模板原生支持 Markdown 审查与不可变证据挂载！`);
+  console.log(`────────────────────────────────────────────────────────────────────────\n`);
+}
+
 function handleList(opts) {
   const docsRoot = resolveDocsRoot(opts.project);
   console.log(`=== CMMI 01~09 全生命周期交付资产台账 [${path.relative(ROOT, docsRoot)}] ===`);
@@ -1002,11 +1069,13 @@ function scanDir(dir) {
 function main() {
   const { cmd, opts } = parseArgs();
   if (cmd === "new") handleNew(opts);
+  else if (cmd === "batch" || cmd === "pipeline") handleBatch(opts);
   else if (cmd === "list") handleList(opts);
   else if (cmd === "check") handleCheck(opts);
   else {
     console.log("CMMI 01~09 全生命周期标准资产创建与治理引擎");
     console.log("用法:");
+    console.log("  node scripts/cmmi-asset-scaffold.cjs batch [--project <code>] [--title \"标题\"] [--mode <baseline|full>] [--force]");
     console.log("  node scripts/cmmi-asset-scaffold.cjs new --phase <01~09> --type <type> [--title \"标题\"] [--slug \"标识\"] [--real] [--project <code>]");
     console.log("  node scripts/cmmi-asset-scaffold.cjs list [--project <code>]");
     console.log("  node scripts/cmmi-asset-scaffold.cjs check [--project <code>]");

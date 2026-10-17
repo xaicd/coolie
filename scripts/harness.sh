@@ -164,6 +164,12 @@ case "${ACTION}" in
   ontology-audit)
     run_ontology_audit
     ;;
+  cmmi-batch|cmmi-scaffold)
+    node scripts/cmmi-asset-scaffold.cjs batch "${@:2}"
+    ;;
+  cmmi-check)
+    node scripts/cmmi-asset-scaffold.cjs check "${@:2}"
+    ;;
   build)
     run_build
     ;;
@@ -175,7 +181,7 @@ case "${ACTION}" in
     ;;
   *)
     echo "未知指令: ${ACTION}"
-    echo "可用指令: env | arch-audit | ontology-audit | build | test | full-audit"
+    echo "可用指令: env | arch-audit | ontology-audit | cmmi-batch | cmmi-check | build | test | full-audit"
     exit 2
     ;;
 esac
