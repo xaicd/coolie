@@ -51,6 +51,7 @@
 | 调外部系统 / 配 MCP 工具 | `coolie-mcp-orchestration` | 72核心工具池、本体MCP与第三方网关 |
 | 招数字员工 / 调整岗位技能 | `hr-agent-onboarding` | 招入员工、配置5大角色契约与专属预算 |
 | 跨端契约同步 / TS 类型生成 | `yudao-contract-sync` | Knife4j转强类型TS SDK，多端零漂移 |
+| 看微信会话 / 查截图 / 多模感知 | `pnpm wechat:monitor` | 毫秒级提取宿主机Hermes微信对话与图片 |
 
 > 💡 **全景反查**: 检视全库 96 个技能完整口语反查大纲: [docs/skills-spoken-index.md](docs/skills-spoken-index.md)
 
@@ -82,9 +83,10 @@
 
 - **当前 Sprint**: `2026-sprint-10-17-test-to-ops-and-doc-deflation`
 - **最新拍板原话**:
-  - *"100% MCP 自动化测试全覆盖, 运营是真实用户"* ➜ 95项工具全量测试 + 跑通测试向运营握手与真实用户闭环。
-  - *"文档是否太多重复了, 同时确保标准CICD流程信息/架构/规范等都在"* ➜ 启动文档降熵脱水，固化 `docs/MASTER-PILLARS-AND-GOVERNANCE.md` 三大命脉真理源。
-- **详见账本**: [docs/sprint-prod/10/16.md](docs/sprint-prod/10/16.md)
+  - *"监控宿主机Hermes微信会话/看内容清晰"* ➜ `pnpm wechat:monitor` 提取掌柜原话与 3 张直播截图落地。
+  - *"验证coolie-dev具备OPC能力/解决脚本不顺畅"* ➜ Polyglot Shebang 双模自愈 + 写的人不查自己双五步。
+  - *"100% MCP 自动化测试全覆盖, 运营是真实用户"* ➜ 95项工具全量测试 + 跑通测试向运营握手闭环。
+- **详见账本**: [docs/sprint-prod/10/17.md](docs/sprint-prod/10/17.md)
 
 ## 8. 维护规则
 

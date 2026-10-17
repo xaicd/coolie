@@ -39,6 +39,15 @@
 5. **极简人机驾驶舱 (Minimalist Cockpit)**：6 寸屏 320dp 几何防撑爆、黄金 5 槽位绝对对称底栏、两字极简 UI、LIFO 就地调用栈；
 6. **算力与调度中枢 (Flat Agent Fleet)**：Hermes 统筹调度 7 大免交互工具池（`agy`, `claude-glm`, `claude-mm`, `cmd`, `copilot`, `kiro-cli`, `hermes`）。
 
+### 4. 感知中枢与 OPC 自愈 Harness (Sensing & Self-Healing Harness)
+- **微信多模会话与高清截图实时监控通道**:
+  - 穿透宿主机直接读取 `~/.hermes/state.db` 活跃会话 (`agent:main:weixin:dm:...`)；
+  - 自动嗅探会话中的图片附件并秒级同步到工作区 `.coolie-local/wechat-monitor/images/`；
+  - 快捷指令: `pnpm wechat:monitor` (单次大盘) / `pnpm wechat:watch` (持续监听看门狗)；
+- **Polyglot Shebang 双模自愈架构**:
+  - 核心脚本 (`coolie-dev-task.mjs`, `mcp-call.mjs`, `hermes-wechat-monitor.mjs` 等) 统一采用 `#!/bin/sh \n // 2>/dev/null; exec /usr/bin/env node "$0" "$@"` 架构，无论被 bash、sh 还是 node 执行均 100% 自动透明拉起 node，彻底消灭解释器歧义与语法暴毙；
+- **总分闭环与统一入口**: 对外只与总控对话，内部闭环复杂度，对外交付三件套（结果、下一步、模型建议）。
+
 ---
 
 ## 🚀 命脉二：标准 CI/CD 流程与发版全景 (Standard CI/CD Pipelines & SOPs)
@@ -124,6 +133,22 @@ G1 需求规格 (SRS) ──> G2 架构设计 (HLD) ──> G3 静态契约 (LLD
 4. **极简两字 UI 契约**：移动端所有核心操作按钮文案严格 `≤ 2 字`（如“同意”、“驳回”、“新建”、“查询”、“核销”）；
 5. **6 寸屏极限物理视口防御**：必须严格适配 `320px~332px` 极限窄视口，底部触控组件遮挡率 `≤ 5.0%`。
 
+### 3. 双五步工作流与“写的人不查自己”铁律 (Two 5-Step Workflows & Peer Audit)
+- **研发阶段 · 五步闭环 (写的人不查自己)**:
+  1. 架构设计 ➜ 【架构方案】
+  2. **架构设计审计 (独立角色复查，E2 门禁)** ➜ 【审计意见】
+  3. 前后端开发 (接口先行，并行推进) ➜ 【可运行代码】
+  4. 测试与提交 (用例覆盖，提交留档) ➜ 【测试报告】
+  5. **完整审计 (全链路复核，E5 门禁)** ➜ 【交付确认】
+  > 📌 **铁律**: 第 2 步和第 5 步强制由独立角色（如百晓生/DS 或门神/QA）执行审计，杜绝“自己写自己审”。
+- **需求阶段 · 五步闭环 (跳过评审开工是最大浪费)**:
+  1. 需求分析 ➜ 【分析结论】
+  2. 需求文档 ➜ 【需求文档】
+  3. 产品文档 ➜ 【产品文档】
+  4. Spec 文档 ➜ 【Technical Spec】
+  5. **需求评审 (交叉闭合检查)** ➜ 【评审通过】
+  > 📌 **铁律**: 严禁跳过评审直接开工，四份文档必须闭合。
+
 ---
 
 ## 🧭 权威导航索引总表 (Quick Links)
@@ -136,4 +161,5 @@ G1 需求规格 (SRS) ──> G2 架构设计 (HLD) ──> G3 静态契约 (LLD
 | **架构 HLD** | [`docs/03_design/architecture-design-hld.md`](file:///host-workspace/xaicd/coolie/docs/03_design/architecture-design-hld.md) | `node scripts/check-module-boundaries.mjs` |
 | **标准 CI/CD** | [`docs/07_release/system-deployment-sop.md`](file:///host-workspace/xaicd/coolie/docs/07_release/system-deployment-sop.md) | [`scripts/release.sh`](file:///host-workspace/xaicd/coolie/scripts/release.sh) / [`scripts/release-app.sh`](file:///host-workspace/xaicd/coolie/scripts/release-app.sh) |
 | **MCP 四轨验证**| [`docs-coolie/specs/2026-10-17-full-stack-api-and-page-mcp-inventory.md`](file:///host-workspace/xaicd/coolie/docs-coolie/specs/2026-10-17-full-stack-api-and-page-mcp-inventory.md) | [`scripts/run-mcp-tests.mjs`](file:///host-workspace/xaicd/coolie/scripts/run-mcp-tests.mjs) (`pnpm test:mcp:all`) |
+| **微信多模感知**| [`doc/plans/2026-10-17-opc-harness-and-wechat-multimodal-sensing.md`](file:///host-workspace/xaicd/coolie/doc/plans/2026-10-17-opc-harness-and-wechat-multimodal-sensing.md) | [`scripts/hermes-wechat-monitor.mjs`](file:///host-workspace/xaicd/coolie/scripts/hermes-wechat-monitor.mjs) (`pnpm wechat:monitor`) |
 | **运营履约** | [`.agents/rules/TEST-TO-OPS-AUTONOMOUS-USER-STANDARD.md`](file:///host-workspace/xaicd/coolie/.agents/rules/TEST-TO-OPS-AUTONOMOUS-USER-STANDARD.md) | [`scripts/ops-autonomous-user-engine.mjs`](file:///host-workspace/xaicd/coolie/scripts/ops-autonomous-user-engine.mjs) |
