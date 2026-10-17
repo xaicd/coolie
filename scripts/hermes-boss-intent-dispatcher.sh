@@ -14,6 +14,11 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Dev Server 基址 (可被 COOLIE_DEV_SERVER_URL 覆盖, 供单测指向 mock 服务器, 不碰真实 3100).
+DEV_SERVER_BASE="${COOLIE_DEV_SERVER_URL:-http://127.0.0.1:3100}"
+# COOA-486 幂等去重窗口 (分钟): 命中近 N 分钟内同题 open 工单即复用, 不新建.
+DEDUP_WINDOW_MIN="${COOLIE_DISPATCH_DEDUP_WINDOW_MIN:-10}"
+
 INPUT="${*:-}"
 
 # 0. 帮助指令与空输入直接拦截退出 (COOA-312): 严禁 --help / -h / help 进入 dispatcher 派单全链路起假 Issue
@@ -37,6 +42,7 @@ fi
 
 EXPERT_MODE=0
 EXECUTE_FLAG=""
+REVIEW_PROBE=0
 POSITIONAL_ARGS=()
 
 for arg in "$@"; do
@@ -46,6 +52,10 @@ for arg in "$@"; do
       ;;
     --execute)
       EXECUTE_FLAG="--execute"
+      ;;
+    --review-probe)
+      # COOA-486: 巡检/缺陷查询的**专用旗标**; 显式走探活拦截, 杜绝把巡检当派单.
+      REVIEW_PROBE=1
       ;;
     --help|-h|help)
       cat <<'EOF'
@@ -85,19 +95,27 @@ if [[ "${INPUT:-}" == "--probe-tool-status" || "$INPUT" == "--probe-tool" || "$I
   exec bash "$SCRIPT_DIR/cron-team-status.sh" --probe-tool-status
 fi
 
-# 0.06 Hermes 探活前缀拦截门禁 (wave286 经验 · COOA-480 误触沉淀)
+# 0.01 干跑门禁 (COOA-485): 供自动化测试与预演使用, 严禁触碰 Dev Server 建单与本地派单两条写路径.
+# 缺少它时 §0.06 回归用例会真在 3100 上建出假 Issue (巡检单风暴的二级来源).
+DRY_RUN="${COOLIE_DISPATCH_DRY_RUN:-0}"
+
+# 0.06 Hermes 探活前缀拦截门禁 (wave286 经验 · COOA-480 误触沉淀 · COOA-485/486 补缺)
 # 掌柜自己用 dispatcher 探活时容易把探活文本当真指令派出去 (心法 #190)。
-# 凡含「探活 / probe-only / dry-probe / 巡检hourly / hourly routine / routine test / 探针」关键词
-# 的指令直接 echo 拒绝, 提示走专用探针旗标, 严禁再误判为默认 forge-core-swe 派单.
-if [[ "${INPUT:-}" =~ (探活|probe-only|dry-probe|巡检hourly|hourly[[:space:]]?routine|routine[[:space:]]?test|探针) ]]; then
+# 凡含「探活 / probe-only / dry-probe / 巡检hourly / hourly routine / routine test / 探针」关键词,
+# 或「主线巡检 / 缺陷…巡检 / 巡检…缺陷 / 本轮…缺陷 / 这轮…缺陷 / 看看…缺陷」这类裸巡检缺陷查询语,
+# 或显式 --review-probe 旗标, dispatcher 均不予派单, 提示走专用探针/巡检旗标或直读巡检单,
+# 严禁再误判为默认 forge-core-swe 派单 (COOA-486: 一句探活原话曾裂变 5 张工单)。
+# 说明: 只拦「巡检…缺陷 / 看看…缺陷」查询语, 保留 `业务巡检` 等真实 DS 派单路由 (§1 分流) 不被误伤。
+if [[ "${REVIEW_PROBE:-0}" == "1" || "${INPUT:-}" =~ (探活|probe-only|dry-probe|巡检hourly|hourly[[:space:]]?routine|routine[[:space:]]?test|探针|主线巡检|缺陷[^[:space:]]*巡检|巡检[^[:space:]]*缺陷|本轮[^[:space:]]*缺陷|这轮[^[:space:]]*缺陷|看看[^[:space:]]*缺陷) ]]; then
   cat <<EOF
-【Hermes · 探活前缀拦截 (wave286)】
-掌柜, 检测到您的指令「${INPUT:-}」含探活/巡检前缀, dispatcher 不予派单, 避免误触给他人起假 Issue。
-请改用专用探针旗标:
-  --probe-tool-status      真跑工具池健康探针
-  --expert "<反思/痛点>"   走 5 步专家法不走派单
-  bash scripts/coolie-dev-task.mjs list     直通待办大盘
-或直接发送具体业务指令 (含明确动词+宾语)。
+【Hermes · 探活/巡检查询拦截 (wave286 · COOA-485/486)】
+掌柜, 检测到您的指令「${INPUT:-}」属探活或巡检缺陷查询, dispatcher 不予派单, 避免重复误建假 Issue (心法 #190 已踩 2 次)。
+要看本轮主线巡检缺陷: 直接看小时级「交付主线」routine 最近一张巡检单的评论 (含本轮真缺陷清单), 无需再派单。
+要显式标记巡检查询: --review-probe "<巡检/缺陷查询语>"  (等效于本拦截, 不派单)
+要真跑探针:      --probe-tool-status
+要走反思解读:    --expert "<反思/痛点>"
+要看待办大盘:    bash scripts/coolie-dev-task.mjs list
+要派真业务活:    直接发含明确动词+宾语的具体指令 (例如“修一下工单审批流卡死”)。
 EOF
   exit 0
 fi
@@ -165,6 +183,46 @@ if [[ "${INPUT:-}" =~ ^(继续|接着干|继续做|继续跑|接着跑|继续干
   echo "微信 5 字段实时状态:"
   echo "$PREV_EMPLOYEE: $PREV_WAVE / 0m / $PREV_TOOL / 跑 (接力续跑中)"
   exit 0
+fi
+
+# 0.07 派单幂等去重门禁 (COOA-486 · 源自 wave286 D1: 一句原话裂变 5 张工单)
+# 同一掌柜原话在窗口期 (默认 1800s) 内重复进入 dispatcher 时, 命中最近一次凭据即拒绝重复建单/派单.
+# 与 dispatch-local-employee.sh §wave358 的区别: 那里只在已有 done 凭据时去重, 且在建单之后;
+# 这里在建单之前按「规范化原话」跨凭据去重, 从源头掐断巡检/探活原话的裂变风暴.
+# 窗口可用 COOLIE_DISPATCH_DEDUP_WINDOW_SEC 覆盖 (0 = 关闭去重, 供测试与强制复跑).
+DEDUP_WINDOW_SEC="${COOLIE_DISPATCH_DEDUP_WINDOW_SEC:-1800}"
+if [[ "$DEDUP_WINDOW_SEC" != "0" ]]; then
+  DISPATCH_DIR_FOR_DEDUP="${COOLIE_LOCAL_DIR:-$REPO_ROOT/.coolie-local}/dispatch"
+  DEDUP_HIT="$(node -e '
+    const fs = require("fs"), path = require("path");
+    const dir = process.argv[1], input = process.argv[2], win = Number(process.argv[3]) * 1000;
+    const norm = (s) => String(s || "").replace(/[\s\u3000]+/g, "").toLowerCase();
+    const key = norm(input);
+    if (!key || !fs.existsSync(dir)) process.exit(0);
+    const now = Date.now();
+    let best = null;
+    for (const f of fs.readdirSync(dir)) {
+      if (!f.endsWith(".json")) continue;
+      const p = path.join(dir, f);
+      let d; try { d = JSON.parse(fs.readFileSync(p, "utf8")); } catch (e) { continue; }
+      const ts = Date.parse(d.createdAt || "") || fs.statSync(p).mtimeMs;
+      if (now - ts > win) continue;
+      if (norm(d.bossInput) === key || norm(d.task) === key) {
+        if (!best || ts > best.ts) best = { id: d.id || f, ts: new Date(ts).toISOString(), status: d.status, employee: d.employee };
+      }
+    }
+    if (best) console.log(JSON.stringify(best));
+  ' "$DISPATCH_DIR_FOR_DEDUP" "$INPUT" "$DEDUP_WINDOW_SEC" 2>/dev/null || true)"
+
+  if [[ -n "$DEDUP_HIT" ]]; then
+    cat <<EOF
+【Hermes · 派单幂等去重 (COOA-486)】
+掌柜, 同一句指令在 ${DEDUP_WINDOW_SEC}s 内重复派单, 已命中最近一次凭据, 不再重复建单/派单 (杜绝一句原话裂变多张工单):
+  $(printf '%s' "$DEDUP_HIT")
+如需强制复跑: 设 COOLIE_DISPATCH_DEDUP_WINDOW_SEC=0, 或改用含明确新动作的具体指令。
+EOF
+    exit 0
+  fi
 fi
 
 # 1. 意图分类与特征提取
@@ -296,9 +354,16 @@ echo "────────────────────────�
 DEV_COMPANY_ID="da2e705c-c80a-411b-b2ae-e39372b1251f" # Coolie 本地施工总社
 ISSUE_IDENTIFIER=""
 ISSUE_URL=""
+ISSUE_REUSED=0
 
 create_issue_on_dev() {
   set +u  # 函数体内嵌 local + 全局变量访问,关闭 -u 防止 unbound-variable 误报
+  if [[ "${DRY_RUN:-0}" == "1" ]]; then
+    echo "🧪 DRY_RUN (COOLIE_DISPATCH_DRY_RUN=1): 跳过 Dev Server 建单, 仅回显解析结果。"
+    ISSUE_IDENTIFIER=""
+    set -u
+    return 0
+  fi
   local _wave="${LATEST_WAVE:-wave286}"
   local _task="${SAFE_TASK:-未命名任务}"
   local _employee="${EMPLOYEE:-未指派}"
@@ -324,7 +389,22 @@ create_issue_on_dev() {
 - 【Dev 反向传播】: ${_devprop}
 - 守卫军规:
 ${_rules}"
-  
+
+  # ═══ COOA-486 幂等门禁: POST 建单前先查「近 N 分钟内同题 open 工单」, 命中即复用 ═══
+  # 掌柜一句原话在 §3 每次无条件 POST 下裂变成多张重单 (COOA-481~485).
+  # 复用路径 MUST NOT 建新 Issue, 外层亦 MUST NOT 再写新 Receipt.
+  local _issues_json="" _dedup_json="" _hit_ident=""
+  _issues_json="$(curl -fsS "$DEV_SERVER_BASE/api/companies/$DEV_COMPANY_ID/issues?limit=50" 2>/dev/null || true)"
+  _dedup_json="$(printf '%s' "$_issues_json" | node "$SCRIPT_DIR/lib/dispatcher-intent-dedup.mjs" --input "$_task" --wave "$_wave" --window "$DEDUP_WINDOW_MIN" 2>/dev/null || true)"
+  _hit_ident="$(printf '%s' "$_dedup_json" | node -e 'try{const o=JSON.parse(require("fs").readFileSync(0,"utf8"));process.stdout.write((o.hit&&o.hit.identifier)||"")}catch(e){}' 2>/dev/null || true)"
+  if [[ -n "$_hit_ident" ]]; then
+    ISSUE_IDENTIFIER="$_hit_ident"
+    ISSUE_URL="$DEV_SERVER_BASE/issues/$_hit_ident"
+    ISSUE_REUSED=1
+    set -u
+    return 0
+  fi
+
   local json_payload
   json_payload="$(node -e '
     console.log(JSON.stringify({
@@ -337,18 +417,18 @@ ${_rules}"
   ' "$title" "$desc" "$AGENT_ID")"
 
   local res=""
-  if curl -fsS "http://127.0.0.1:3100/api/health" >/dev/null 2>&1; then
-    res="$(printf '%s' "$json_payload" | curl -fsS -X POST "http://127.0.0.1:3100/api/companies/$DEV_COMPANY_ID/issues" -H 'Content-Type: application/json' -d @- 2>/dev/null || true)"
+  if curl -fsS "$DEV_SERVER_BASE/api/health" >/dev/null 2>&1; then
+    res="$(printf '%s' "$json_payload" | curl -fsS -X POST "$DEV_SERVER_BASE/api/companies/$DEV_COMPANY_ID/issues" -H 'Content-Type: application/json' -d @- 2>/dev/null || true)"
   elif [[ -x "$SCRIPT_DIR/host-exec.sh" ]]; then
     local b64_payload
     b64_payload="$(printf '%s' "$json_payload" | base64 | tr -d '\r\n')"
-    res="$("$SCRIPT_DIR/host-exec.sh" "echo '$b64_payload' | base64 -d | curl -fsS -X POST http://127.0.0.1:3100/api/companies/$DEV_COMPANY_ID/issues -H 'Content-Type: application/json' -d @-" 2>/dev/null || true)"
+    res="$("$SCRIPT_DIR/host-exec.sh" "echo '$b64_payload' | base64 -d | curl -fsS -X POST $DEV_SERVER_BASE/api/companies/$DEV_COMPANY_ID/issues -H 'Content-Type: application/json' -d @-" 2>/dev/null || true)"
   fi
 
   if [[ -n "$res" ]]; then
     ISSUE_IDENTIFIER="$(node -e 'try { console.log(JSON.parse(process.argv[1]).identifier || ""); } catch(e){}' "$res")"
     if [[ -n "$ISSUE_IDENTIFIER" ]]; then
-      ISSUE_URL="http://127.0.0.1:3100/issues/$ISSUE_IDENTIFIER"
+      ISSUE_URL="$DEV_SERVER_BASE/issues/$ISSUE_IDENTIFIER"
     fi
   fi
 
@@ -357,11 +437,28 @@ ${_rules}"
 
 create_issue_on_dev || true
 
-if [[ -n "$ISSUE_IDENTIFIER" ]]; then
+if [[ "${ISSUE_REUSED:-0}" == "1" ]]; then
+  echo "♻️ Dev Server 幂等复用既有工单: $ISSUE_IDENTIFIER (未新建 Issue · COOA-486)"
+  echo "🔗 任务卡片链接: $ISSUE_URL"
+elif [[ -n "$ISSUE_IDENTIFIER" ]]; then
   echo "📋 Dev Server 已建任务: $ISSUE_IDENTIFIER (分配给: $EMPLOYEE)"
   echo "🔗 任务卡片链接: $ISSUE_URL"
 else
-  echo "⚠️ Dev Server (3100) 任务同步未完成 (仅落本地 Receipt)"
+  echo "⚠️ Dev Server (${DEV_SERVER_BASE}) 任务同步未完成 (仅落本地 Receipt)"
+fi
+
+# 4.9 干跑收尾 (COOA-485): 解析结果已回显, 严禁再落本地 Receipt 与派单, 保证预演/测试零写副作用.
+if [[ "${DRY_RUN:-0}" == "1" ]]; then
+  echo "🧪 DRY_RUN 结束: 未建 Dev Server 任务, 未生成 Receipt, 未派单。"
+  exit 0
+fi
+
+# 4.95 幂等复用收尾 (COOA-486): 命中既有 open 工单 → 不新建 Issue, 不再写新 Receipt.
+if [[ "${ISSUE_REUSED:-0}" == "1" ]]; then
+  echo "⏭️ 幂等收尾: 复用既有工单 $ISSUE_IDENTIFIER, 未新建 Issue / 未写新 Receipt。"
+  echo "微信 5 字段实时状态:"
+  echo "$EMPLOYEE: $LATEST_WAVE / 0m / $TOOL / 跑 (复用既有工单)"
+  exit 0
 fi
 
 # 5. 调用本地派单脚本，生成 Receipt
@@ -374,6 +471,12 @@ DISPATCH_ARGS=(
   --wave "$LATEST_WAVE"
   --tool "$TOOL"
 )
+
+# COOA-486: Receipt 带去重键 (掌柜原话归一化哈希), 重复调用 dispatch 时同键未终结 receipt 跳过新增.
+DEDUP_KEY="$(node "$SCRIPT_DIR/lib/dispatcher-intent-dedup.mjs" --input "$SAFE_TASK" --print-key 2>/dev/null || true)"
+if [[ -n "$DEDUP_KEY" ]]; then
+  DISPATCH_ARGS+=(--dedup-key "$DEDUP_KEY")
+fi
 
 if [[ -n "$EXECUTE_FLAG" ]]; then
   # 显式传参 --execute: 人工强制本地直跑

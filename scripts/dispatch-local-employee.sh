@@ -42,6 +42,8 @@ UPDATE_LEDGER=""
 NO_CONTEXT=0
 HANDOVER_NOTE=""
 MAX_TURNS="${COOLIE_MAX_TURNS:-}"
+# COOA-486: 掌柜原话归一化哈希去重键; 非空时启用 receipt 级幂等 (同键未终结 receipt 跳过新增).
+DEDUP_KEY=""
 
 usage() {
   cat <<'EOF'
@@ -60,6 +62,7 @@ Options:
   --print              print prompt only; do not record
   --no-context         do not inject upstream context bus into prompt
   --note <text>        handover note for context bus
+  --dedup-key <key>    boss-input dedup key; skip if a non-terminal receipt shares it (COOA-486)
   --list               list recent receipts in .coolie-local/dispatch/
   --queued             list only queued (pending) receipts
   --show <id>          show details of a specific receipt
@@ -107,6 +110,7 @@ while [[ $# -gt 0 ]]; do
     --ledger) UPDATE_LEDGER="${2:-}"; shift 2 ;;
     --no-context) NO_CONTEXT=1; shift ;;
     --note) HANDOVER_NOTE="${2:-}"; shift 2 ;;
+    --dedup-key) DEDUP_KEY="${2:-}"; shift 2 ;;
     --max-turns|--max-steps) MAX_TURNS="${2:-}"; shift 2 ;;
     -h|--help) usage; exit 0 ;;
     *) printf 'unknown arg: %s\n' "$1" >&2; usage >&2; exit 2 ;;
@@ -430,6 +434,7 @@ const data = {
   verification: [],
   evidence: [],
   blockedReason: argv[18] || null,
+  dedupKey: argv[22] || null,
 };
 fs.writeFileSync(argv[19], JSON.stringify(data, null, 2), "utf8");
 ' \
@@ -453,7 +458,8 @@ fs.writeFileSync(argv[19], JSON.stringify(data, null, 2), "utf8");
     "$p_reason" \
     "$json_file" \
     "$PM_DISPLAY" \
-    "$PM_IDENTITY"
+    "$PM_IDENTITY" \
+    "$DEDUP_KEY"
 }
 
 if [[ "$PRINT_ONLY" -eq 1 ]]; then
@@ -476,6 +482,23 @@ if [[ "$FORCE" -eq 0 ]]; then
       printf '[dispatch] ⏭️  入队去重: 同 (wave=%s agent=%s task=%s) 已存在 done receipt=%s commit=%s\n' \
         "$WAVE" "$AGENT" "$TASK" "$dedup_id" "${dedup_commit:-无}"
       printf '[dispatch]    跳过重复派单; 如需复跑请加 --force。\n'
+      exit 0
+    fi
+  fi
+fi
+
+# ═══ COOA-486: receipt 级幂等去重键 (bossInput 归一化哈希) ═══
+# 掌柜原话去重: 非空 --dedup-key 时, 若已存在同 (dedupKey, agent) 且未终结
+# (queued/running) 的 receipt, 直接跳过新增 (echo 复用) —— 与上面的 wave358 去重互补:
+# 后者认 done (已交付) 的重复, 这里认**未终结**的重复, 从本地账本层杜绝一句原话裂变多份 Receipt。
+# --force 覆盖此守护。
+if [[ -n "$DEDUP_KEY" && "$FORCE" -eq 0 ]]; then
+  KEY_DEDUP_NODE="${KEY_DEDUP_NODE:-$SCRIPT_DIR/lib/dispatch-dedup-key-check.mjs}"
+  if [[ -f "$KEY_DEDUP_NODE" ]]; then
+    key_hit="$(node "$KEY_DEDUP_NODE" "$dispatch_dir" "$DEDUP_KEY" "$AGENT" 2>/dev/null || true)"
+    if [[ -n "$key_hit" ]]; then
+      key_hit_id="$(printf '%s' "$key_hit" | node -e 'try{const o=JSON.parse(require("fs").readFileSync(0,"utf8"));process.stdout.write(o.id||"")}catch(e){}' 2>/dev/null)"
+      printf '[dispatch] ⏭️  幂等去重: 同 dedupKey=%s 已有未终结 receipt=%s, 跳过新增 (COOA-486)。\n' "$DEDUP_KEY" "${key_hit_id:-unknown}"
       exit 0
     fi
   fi

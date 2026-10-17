@@ -139,6 +139,7 @@
     "test:hermes-routine-audit": "node --test scripts/__tests__/hermes-routine-execution-audit.test.mjs",
     "test:hermes-fleet": "node --test scripts/__tests__/hermes-fleet-load-ledger.test.mjs",
     "test:hermes-issue-scan": "node --test scripts/__tests__/paperclip-issue-scan.test.mjs",
+    "test:hermes-dispatcher-idempotency": "node --test scripts/__tests__/hermes-dispatcher-idempotency.test.mjs",
     "test:workflow-engine": "node --test scripts/__tests__/workflow-engine.test.mjs",
     "test:fork-surface": "node scripts/check-fork-surface.mjs --cumulative",
     "test:install-sh-docker": "./scripts/test-install-sh-docker.sh",

@@ -824,6 +824,55 @@ assertRule(
   'hermes-boss-intent-dispatcher.sh 缺失 §0.07 派单幂等去重门禁, 巡检/探活原话会裂变多张重单 (COOA-486)',
 );
 
+assertRule(
+  '裸巡检语义拦截守卫: hermes-boss-intent-dispatcher.sh §0.06 必须扩展拦截「缺陷…巡检 / 巡检…缺陷 / 看看…缺陷」裸巡检语义 (或走 --review-probe 旗标, COOA-486)',
+  bossIntentContent.includes('看看[^[:space:]]*缺陷') &&
+    bossIntentContent.includes('缺陷[^[:space:]]*巡检') &&
+    bossIntentContent.includes('--review-probe'),
+  'hermes-boss-intent-dispatcher.sh §0.06 未拦截裸巡检缺陷语义或缺失 --review-probe 旗标, 探活原话仍会被当派单 (COOA-486)',
+);
+
+assertRule(
+  'Dev Server 既有 open 工单复用守卫: hermes-boss-intent-dispatcher.sh 建单前必须查近期同题 open 工单并复用 (不新建 Issue/不写新 Receipt, COOA-486)',
+  bossIntentContent.includes('dispatcher-intent-dedup') &&
+    bossIntentContent.includes('ISSUE_REUSED') &&
+    bossIntentContent.includes('COOLIE_DEV_SERVER_URL'),
+  'hermes-boss-intent-dispatcher.sh 缺失「既有 open 工单复用」幂等门禁 (COOA-486)',
+);
+
+assertRule(
+  'Receipt 去重键守卫: 派单必须给 dispatch-local-employee.sh 传 --dedup-key 且 receipt 落库 dedupKey (COOA-486)',
+  bossIntentContent.includes('--dedup-key') &&
+    dispatchScriptContent.includes('DEDUP_KEY') &&
+    dispatchScriptContent.includes('dedupKey'),
+  'dispatch-local-employee.sh 缺失 receipt 级 dedupKey 幂等键 (COOA-486)',
+);
+
+const dispatcherIdempotencyTest = 'scripts/__tests__/hermes-dispatcher-idempotency.test.mjs';
+assertRule(
+  '派单幂等防退化单测落盘守卫: scripts/__tests__/hermes-dispatcher-idempotency.test.mjs 必须存在',
+  fs.existsSync(dispatcherIdempotencyTest),
+  '缺少 dispatcher 幂等防退化单测, 一句原话裂变 5 张工单的缺陷无法被机检拦截 (COOA-486)',
+);
+
+let dispatcherIdempotencyOk = false;
+let dispatcherIdempotencyDetail = '';
+try {
+  dispatcherIdempotencyDetail = execSync(
+    `node --test --test-reporter=tap ${dispatcherIdempotencyTest}`,
+    { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] },
+  );
+  dispatcherIdempotencyOk = /^# fail 0\b/m.test(dispatcherIdempotencyDetail) && /^# pass \d+/m.test(dispatcherIdempotencyDetail);
+} catch (error) {
+  dispatcherIdempotencyOk = false;
+  dispatcherIdempotencyDetail = `${error?.stdout ?? ''}${error?.stderr ?? ''}`;
+}
+assertRule(
+  '派单幂等单测全绿守卫: node --test scripts/__tests__/hermes-dispatcher-idempotency.test.mjs 必须全绿 (连调两次不裂变 / 裸巡检 0 派单, COOA-486)',
+  dispatcherIdempotencyOk,
+  `dispatcher 幂等单测未全绿: ${dispatcherIdempotencyDetail.split('\n').filter((l) => /^not ok|# fail/.test(l)).join(' | ') || 'no summary'}`,
+);
+
 // -----------------------------------------------------------------------------
 // 23. Web (ui/) i18n 引用-定义一致性守卫 (COOA-178 · 杜绝原始键外泄)
 // -----------------------------------------------------------------------------
