@@ -14244,11 +14244,16 @@ export function issueRoutes(
           },
         });
 
-      if (
-        existing.status === "in_progress" &&
-        issue.status !== existing.status &&
-        issue.status !== "in_progress"
-      ) {
+      // A handoff decision has "landed" whenever this request settles the issue
+      // outside in_progress. That covers both the classic in_progress → review/done
+      // transition and the stale case where the escalation was recorded while the
+      // issue was already parked in a non-in_progress status (escalations used to
+      // be terminal, so such issues keep advertising "board decision required").
+      const handoffDecisionLanded =
+        issue.status !== "in_progress" &&
+        (existing.status !== issue.status ||
+          typeof req.body.status === "string");
+      if (handoffDecisionLanded) {
         await listSuccessfulRunHandoffStates(db, issue.companyId, [issue.id], {
           hydrateLiveness: false,
         })
