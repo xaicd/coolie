@@ -859,3 +859,156 @@ describe("company discovery MCP tool (wave379)", () => {
   });
 });
 
+describe("QA automation MCP tools", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("lists navigable routes via qaPageListRoutes", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockJsonResponse({ total: 2, routes: [{ id: "inbox" }, { id: "projects" }] }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("qaPageListRoutes").execute({ platform: "mobile" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toContain(`/companies/${COMPANY_A}/automation/routes?platform=mobile`);
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("inbox");
+  });
+
+  it("inspects page elements via qaPageInspectElements", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockJsonResponse({ total: 1, elements: [{ testId: "tab-inbox", role: "button" }] }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("qaPageInspectElements").execute({ role: "button" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/inspect-elements`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("tab-inbox");
+  });
+
+  it("triggers 4-state visual snapshot via qaQuadSnapshot", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockJsonResponse({ passedAllStates: true, routeName: "StudioScreen" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("qaQuadSnapshot").execute({ routeName: "StudioScreen" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/quad-snapshot`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("passedAllStates");
+  });
+
+  it("asserts geometric occlusion via qaOcclusionAssert", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockJsonResponse({ passed: true, occlusionRatio: 0.02 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("qaOcclusionAssert").execute({ targetId: "action-confirm" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/occlusion-assert`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("passed");
+  });
+
+  it("audits minimalist two-letter UI via qaTwoLetterAudit", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockJsonResponse({ allPassed: true, totalAudited: 5 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("qaTwoLetterAudit").execute({});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/two-letter-audit`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("allPassed");
+  });
+});
+
+describe("Ops Cockpit MCP tools", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("translates boss oral voice to proposal via opsVoiceToProposal", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockJsonResponse({ proposalId: "prop-123", actionType: "gate_approval", title: "门禁裁决" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("opsVoiceToProposal").execute({
+      utterance: "板材利用率超85%，通过G4门禁",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/voice-to-proposal`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("prop-123");
+  });
+
+  it("fetches real-time telemetry via opsMetricsTelemetry", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockJsonResponse({ totalIssues: 120, activeAgents: 4, healthStatus: "HEALTHY_FOUNDRY" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("opsMetricsTelemetry").execute({ timeRange: "today" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/metrics-telemetry`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("HEALTHY_FOUNDRY");
+  });
+
+  it("executes daily reconciliation via opsTriggerReconciliation", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockJsonResponse({ balanced: true, immutableSeal: "sha256:abc123" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("opsTriggerReconciliation").execute({ date: "2026-10-17" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/reconciliation-settle`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("sha256:abc123");
+  });
+
+  it("controls emergency killswitch via opsEmergencyKillswitch", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      mockJsonResponse({ effectiveStatus: "EMERGENCY_STOPPED" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("opsEmergencyKillswitch").execute({
+      action: "trigger",
+      reason: "Budget risk alert",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/killswitch`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("EMERGENCY_STOPPED");
+  });
+});
+
+

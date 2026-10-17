@@ -93,6 +93,8 @@ import { workProductsRoutes } from "./routes/work-products.js";
 import { sandboxesRoutes } from "./routes/sandboxes.js";
 import { cycleTimeRoutes } from "./routes/cycle-time.js";
 import { milestonesRoutes } from "./routes/milestones.js";
+import { automationRoutes } from "./routes/automation.js";
+
 import {
   chatChannelRoutes,
   chatWebhookRoutes,
@@ -887,6 +889,8 @@ export async function createApp(
   api.use(sandboxesRoutes(db));
   api.use(cycleTimeRoutes(db));
   api.use(milestonesRoutes(db));
+  api.use(automationRoutes(db));
+
   api.use(fileResourceRoutes(db));
   api.use(routineRoutes(db, { pluginWorkerManager: workerManager }));
   api.use(pipelineRoutes(db));

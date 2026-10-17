@@ -59,3 +59,5 @@ export { workProductsRoutes } from "./work-products.js";
 export { sandboxesRoutes } from "./sandboxes.js";
 export { cycleTimeRoutes } from "./cycle-time.js";
 export { milestonesRoutes } from "./milestones.js";
+export { automationRoutes } from "./automation.js";
+

@@ -22,7 +22,7 @@ import {
   suggestTasksPayloadSchema,
   updateIssueSchema,
   upsertIssueDocumentSchema,
-  linkIssueApprovalSchema,
+  linkIssueApprovalSchema, pageListRoutesSchema, pageGetActiveStateSchema, pageInspectElementsSchema, pageTapSchema, pageTypeSchema, pageScrollSchema, qaQuadSnapshotSchema, qaOcclusionAssertSchema, qaTwoLetterAuditSchema, qaDetectBlankScreenSchema, opsVoiceToProposalSchema, opsHighlightElementSchema, opsCaptureChartSchema, opsModalConfirmSchema, opsMetricsTelemetrySchema, opsTriggerReconciliationSchema, opsEmergencyKillswitchSchema, opsRoutineDispatchSchema,
 } from "@paperclipai/shared";
 import { PaperclipApiClient } from "./client.js";
 import { formatErrorResponse, formatTextResponse } from "./format.js";
@@ -1251,7 +1251,174 @@ export function createToolDefinitions(client: PaperclipApiClient): ToolDefinitio
         return client.requestJson("GET", `/companies${qs}`);
       },
     ),
+    makeTool(
+      "qaPageListRoutes",
+      "List all navigable application routes across Web and Native Mobile platforms with role access and layout specs for automated testing",
+      pageListRoutesSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, platform, includeHidden }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        const qs = new URLSearchParams();
+        if (platform) qs.set("platform", platform);
+        if (includeHidden) qs.set("includeHidden", "true");
+        return client.requestJson("GET", `/companies/${encodeURIComponent(resolved)}/automation/routes?${qs.toString()}`);
+      },
+    ),
+    makeTool(
+      "qaPageGetActiveState",
+      "Get active viewport/page state, route params, loading status, and viewport dimensions for automated testing",
+      pageGetActiveStateSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, sessionId }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        const qs = sessionId ? `?sessionId=${encodeURIComponent(sessionId)}` : "";
+        return client.requestJson("GET", `/companies/${encodeURIComponent(resolved)}/automation/active-state${qs}`);
+      },
+    ),
+    makeTool(
+      "qaPageInspectElements",
+      "Inspect elements on current page/viewport (A11y tree, testId, bounding box, text, visibility) to verify UI and locate targets",
+      pageInspectElementsSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/inspect-elements`, { body });
+      },
+    ),
+    makeTool(
+      "qaPageTap",
+      "Simulate tapping / clicking a target element by testId, text, or coordinates, asserting navigation or state changes",
+      pageTapSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/tap`, { body });
+      },
+    ),
+    makeTool(
+      "qaPageType",
+      "Simulate typing text into an input field or textarea identified by testId, placeholder, or selector",
+      pageTypeSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/type`, { body });
+      },
+    ),
+    makeTool(
+      "qaPageScroll",
+      "Simulate scrolling within the viewport or container in specified direction (up/down/left/right)",
+      pageScrollSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/scroll`, { body });
+      },
+    ),
+    makeTool(
+      "qaQuadSnapshot",
+      "Capture and register 4-state visual evidence snapshots (Normal / Empty / Loading / Error) for a route, attaching to CMMI G4 test records",
+      qaQuadSnapshotSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/quad-snapshot`, { body });
+      },
+    ),
+    makeTool(
+      "qaOcclusionAssert",
+      "Assert geometric occlusion between a target UI component and dangerous safe zones (bottom 5-slot navigation bar, gesture inset) on 320dp small screens",
+      qaOcclusionAssertSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/occlusion-assert`, { body });
+      },
+    ),
+    makeTool(
+      "qaTwoLetterAudit",
+      "Machine-check compliance with Coolie minimalist two-letter UI rule (buttons must be <= 2 characters, english words <= 1)",
+      qaTwoLetterAuditSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/two-letter-audit`, { body });
+      },
+    ),
+    makeTool(
+      "qaDetectBlankScreen",
+      "Detect blank, frozen, or empty screens with threshold monitoring and memory inspection",
+      qaDetectBlankScreenSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/detect-blank-screen`, { body });
+      },
+    ),
+    makeTool(
+      "opsVoiceToProposal",
+      "Translate boss oral or voice utterance into structured proposal card with two-letter actionable buttons and WBS alignment",
+      opsVoiceToProposalSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/voice-to-proposal`, { body });
+      },
+    ),
+    makeTool(
+      "opsHighlightElement",
+      "Spotlight or focus a specific UI component on the screen for guided operator walk-through",
+      opsHighlightElementSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/highlight-element`, { body });
+      },
+    ),
+    makeTool(
+      "opsCaptureChart",
+      "Capture chart or metric card snapshot for executive reporting and CMMI audit evidence",
+      opsCaptureChartSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/capture-chart`, { body });
+      },
+    ),
+    makeTool(
+      "opsModalConfirm",
+      "Execute two-letter confirmation or rejection on an operational approval or proposal",
+      opsModalConfirmSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/modal-confirm`, { body });
+      },
+    ),
+    makeTool(
+      "opsMetricsTelemetry",
+      "Retrieve real-time delivery factory and business operations telemetry metrics (gates passed, active agents, budget, issues)",
+      opsMetricsTelemetrySchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/metrics-telemetry`, { body });
+      },
+    ),
+    makeTool(
+      "opsTriggerReconciliation",
+      "Trigger daily reconciliation of financial flows, work products, and ledger balances with immutable SHA-256 seal",
+      opsTriggerReconciliationSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/reconciliation-settle`, { body });
+      },
+    ),
+    makeTool(
+      "opsEmergencyKillswitch",
+      "Trigger or lift emergency hard stop on company operations to prevent runaway tasks or budget overflow",
+      opsEmergencyKillswitchSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/killswitch`, { body });
+      },
+    ),
+    makeTool(
+      "opsRoutineDispatch",
+      "Dispatch or trigger a project delivery routine keeper or inspection cycle",
+      opsRoutineDispatchSchema.extend({ companyId: companyIdOptional }),
+      async ({ companyId, ...body }) => {
+        const resolved = client.resolveCompanyId(companyId);
+        return client.requestJson("POST", `/companies/${encodeURIComponent(resolved)}/automation/routine-dispatch`, { body });
+      },
+    ),
   ];
+
 }
 
 const ontologyGraphToolSchema = z.object({

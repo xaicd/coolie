@@ -88,8 +88,27 @@
     "spec_create",
     "spec_tree",
     "spec_template_apply",
-    "paperclipListCompanies"
+    "paperclipListCompanies",
+    "qaPageListRoutes",
+    "qaPageGetActiveState",
+    "qaPageInspectElements",
+    "qaPageTap",
+    "qaPageType",
+    "qaPageScroll",
+    "qaQuadSnapshot",
+    "qaOcclusionAssert",
+    "qaTwoLetterAudit",
+    "qaDetectBlankScreen",
+    "opsVoiceToProposal",
+    "opsHighlightElement",
+    "opsCaptureChart",
+    "opsModalConfirm",
+    "opsMetricsTelemetry",
+    "opsTriggerReconciliation",
+    "opsEmergencyKillswitch",
+    "opsRoutineDispatch"
   ],
+
   "evalGroups": {
     "hb": ["control_plane_owned", "control_plane_invariant", "get_task_context", "active_task_context"],
     "co": ["control_plane_owned", "control_plane_invariant", "atomic_checkout", "checkout_decision"],
