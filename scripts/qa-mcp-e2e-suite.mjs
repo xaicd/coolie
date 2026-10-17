@@ -130,6 +130,37 @@ async function runSuite() {
   const reportPath = path.join(EVIDENCE_DIR, 'mcp-automation-run-report.json');
   fs.writeFileSync(reportPath, JSON.stringify(suiteReport, null, 2), 'utf8');
 
+  // 生成自动化测试到自动化运营的现场状态握手协议 (Test-to-Ops Handshake Protocol)
+  const opsHandshake = {
+    contractVersion: 'coolie.test-to-ops.v1',
+    generatedAt: new Date().toISOString(),
+    qaEvidenceHash: reportHash,
+    readyForOpsExecution: suiteReport.summary.failedChecks === 0,
+    metrics: {
+      totalChecks: suiteReport.summary.totalChecks,
+      passedChecks: suiteReport.summary.passedChecks,
+      failedChecks: suiteReport.summary.failedChecks,
+      passRate: (suiteReport.summary.passedChecks / suiteReport.summary.totalChecks) * 100,
+      durationMs: suiteReport.summary.durationMs,
+    },
+    verifiedSurfaces: {
+      webRoutesCount: webRoutes.total,
+      mobileRoutesCount: mobileRoutes.total,
+      sampleRoutes: suiteReport.routesChecked.map(r => ({ route: r.route, status: r.status })),
+      safeTouchTargets: suiteReport.occlusionChecks.filter(o => o.passed).map(o => o.targetId),
+      twoLetterAuditCompliant: suiteReport.twoLetterAudit.allPassed,
+      blankScreenDetected: suiteReport.blankScreenChecks.some(b => b.isBlank),
+    },
+    actionableDirectives: {
+      canSignOffMilestones: suiteReport.summary.failedChecks === 0,
+      canApprovePendingG4: suiteReport.summary.failedChecks === 0,
+      requiresEmergencyStop: suiteReport.blankScreenChecks.some(b => b.isBlank),
+      recommendedOpsAction: suiteReport.summary.failedChecks === 0 ? 'PROCEED_STAGE_GATE_APPROVAL' : 'CREATE_DEFECT_AND_HOLD',
+    }
+  };
+  const handshakePath = path.join(EVIDENCE_DIR, 'test-to-ops-state-handshake.json');
+  fs.writeFileSync(handshakePath, JSON.stringify(opsHandshake, null, 2), 'utf8');
+
   console.log('\n========================================================================');
   console.log(' 🎉 E2E 走查全部完成！统计概览:');
   console.log(`   - 总测试项: ${suiteReport.summary.totalChecks}`);
@@ -137,6 +168,7 @@ async function runSuite() {
   console.log(`   - 失败项:   ${suiteReport.summary.failedChecks}`);
   console.log(`   - 耗时:     ${suiteReport.summary.durationMs}ms`);
   console.log(`   - 存证文件: evidence/mcp-automation-run-report.json`);
+  console.log(`   - 运营握手: evidence/test-to-ops-state-handshake.json`);
   console.log(`   - 证据哈希: SHA-256 [${reportHash.slice(0, 16)}...]`);
   console.log('========================================================================\n');
 }

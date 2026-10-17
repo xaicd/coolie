@@ -1011,4 +1011,749 @@ describe("Ops Cockpit MCP tools", () => {
   });
 });
 
+describe("Full-spectrum MCP Tools 100% Coverage (95/95)", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("searches connection intents via connections_search", async () => {
+    process.env.PAPERCLIP_RUNTIME_TOOLS_CONNECTIONS_SEARCH_URL = "http://runtime-tools/search";
+    process.env.PAPERCLIP_RUNTIME_TOOLS_TOKEN = "token-test";
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ results: [] }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("connections_search").execute({ query: "slack" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://runtime-tools/search");
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("results");
+  });
+
+  it("requests connection intent via connection_request", async () => {
+    process.env.PAPERCLIP_RUNTIME_TOOLS_CONNECTION_REQUEST_URL = "http://runtime-tools/request";
+    process.env.PAPERCLIP_RUNTIME_TOOLS_TOKEN = "token-test";
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ status: "requested" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("connection_request").execute({ service: "github" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://runtime-tools/request");
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("requested");
+  });
+
+  it("gets current actor details via paperclipMe", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "agent-1", name: "Hermes" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipMe").execute({});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/agents/me");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Hermes");
+  });
+
+  it("gets inbox-lite assignment list via paperclipInboxLite", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ id: "issue-1", title: "Task 1" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipInboxLite").execute({});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/agents/me/inbox-lite");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Task 1");
+  });
+
+  it("lists company agents via paperclipListAgents", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ id: "agent-1", name: "Core SWE" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipListAgents").execute({});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/agents`);
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Core SWE");
+  });
+
+  it("gets single agent via paperclipGetAgent", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "agent-1", role: "core-swe" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipGetAgent").execute({ agentId: "agent-1" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/agents/agent-1");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("core-swe");
+  });
+
+  it("gets single issue via paperclipGetIssue", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "issue-123", title: "Issue 123" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipGetIssue").execute({ issueId: "issue-123" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Issue 123");
+  });
+
+  it("gets heartbeat context via paperclipGetHeartbeatContext", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ issue: { id: "issue-123" } }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipGetHeartbeatContext").execute({ issueId: "issue-123" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/heartbeat-context");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("issue-123");
+  });
+
+  it("lists issue comments via paperclipListComments", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ id: "c-1", body: "Hello" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipListComments").execute({ issueId: "issue-123" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/comments");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Hello");
+  });
+
+  it("gets specific comment via paperclipGetComment", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "c-1", body: "Specific comment" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipGetComment").execute({
+      issueId: "issue-123",
+      commentId: "33333333-3333-3333-3333-333333333333",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/comments/33333333-3333-3333-3333-333333333333");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Specific comment");
+  });
+
+  it("lists issue approvals via paperclipListIssueApprovals", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ id: "app-1", status: "pending" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipListIssueApprovals").execute({ issueId: "issue-123" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/approvals");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("pending");
+  });
+
+  it("lists issue documents via paperclipListDocuments", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ key: "srs", title: "SRS" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipListDocuments").execute({ issueId: "issue-123" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/documents");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("srs");
+  });
+
+  it("gets one issue document via paperclipGetDocument", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ key: "plan", content: "# Plan" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipGetDocument").execute({ issueId: "issue-123", key: "plan" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/documents/plan");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Plan");
+  });
+
+  it("lists document revisions via paperclipListDocumentRevisions", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ id: "rev-1", revisionNumber: 1 }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipListDocumentRevisions").execute({ issueId: "issue-123", key: "plan" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/documents/plan/revisions");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("rev-1");
+  });
+
+  it("lists projects via paperclipListProjects", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ id: "proj-1", name: "Project Alpha" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipListProjects").execute({});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/projects`);
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Project Alpha");
+  });
+
+  it("gets project via paperclipGetProject", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "proj-1", name: "Project Alpha" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipGetProject").execute({ projectId: "proj-1" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/projects/proj-1");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Project Alpha");
+  });
+
+  it("updates project via paperclipUpdateProject", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "proj-1", name: "Renamed Project" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipUpdateProject").execute({ projectId: "proj-1", name: "Renamed Project" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/projects/proj-1");
+    expect(init.method).toBe("PATCH");
+    expect(response.content[0]?.text).toContain("Renamed Project");
+  });
+
+  it("lists project workspaces via paperclipListProjectWorkspaces", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ id: "ws-1", name: "workspace-a" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipListProjectWorkspaces").execute({ projectId: "proj-1" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/projects/proj-1/workspaces");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("workspace-a");
+  });
+
+  it("creates project workspace via paperclipCreateProjectWorkspace", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "ws-1", name: "main-ws" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipCreateProjectWorkspace").execute({
+      projectId: "proj-1",
+      name: "main-ws",
+      sourceType: "git_repo",
+      repoUrl: "https://github.com/xaicd/ruoyi-all-next.git",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/projects/proj-1/workspaces");
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("main-ws");
+  });
+
+  it("controls project workspace runtime via paperclipControlProjectWorkspaceRuntime", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ status: "started" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipControlProjectWorkspaceRuntime").execute({
+      projectId: "proj-1",
+      workspaceId: "ws-1",
+      action: "start",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/projects/proj-1/workspaces/ws-1/runtime-services/start");
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("started");
+  });
+
+  it("gets issue workspace runtime via paperclipGetIssueWorkspaceRuntime", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({
+      currentExecutionWorkspace: { id: "ws-1", runtimeServices: [] },
+    }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipGetIssueWorkspaceRuntime").execute({ issueId: "issue-123" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/heartbeat-context");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("ws-1");
+  });
+
+  it("lists goals via paperclipListGoals", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ id: "goal-1", title: "Goal 1" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipListGoals").execute({});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/goals`);
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Goal 1");
+  });
+
+  it("gets goal by id via paperclipGetGoal", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "55555555-5555-5555-5555-555555555555", title: "Target" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipGetGoal").execute({ goalId: "55555555-5555-5555-5555-555555555555" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/goals/55555555-5555-5555-5555-555555555555");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Target");
+  });
+
+  it("lists approvals via paperclipListApprovals", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ id: "app-1", title: "App 1" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipListApprovals").execute({});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/approvals`);
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("App 1");
+  });
+
+  it("gets approval by id via paperclipGetApproval", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "66666666-6666-6666-6666-666666666666", title: "Approve deploy" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipGetApproval").execute({ approvalId: "66666666-6666-6666-6666-666666666666" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/approvals/66666666-6666-6666-6666-666666666666");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Approve deploy");
+  });
+
+  it("lists issues linked to approval via paperclipGetApprovalIssues", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ id: "issue-1" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipGetApprovalIssues").execute({ approvalId: "66666666-6666-6666-6666-666666666666" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/approvals/66666666-6666-6666-6666-666666666666/issues");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("issue-1");
+  });
+
+  it("lists approval comments via paperclipListApprovalComments", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ id: "ac-1", body: "Approved by Boss" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipListApprovalComments").execute({ approvalId: "66666666-6666-6666-6666-666666666666" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/approvals/66666666-6666-6666-6666-666666666666/comments");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Approved by Boss");
+  });
+
+  it("releases issue checkout via paperclipReleaseIssue", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "issue-123", status: "open" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipReleaseIssue").execute({ issueId: "issue-123" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/release");
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("open");
+  });
+
+  it("adds comment to issue via paperclipAddComment", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "c-1", body: "New note" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipAddComment").execute({ issueId: "issue-123", body: "New note" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/comments");
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("New note");
+  });
+
+  it("creates ask user questions interaction via paperclipAskUserQuestions", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "int-1", type: "ask_user_questions" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipAskUserQuestions").execute({
+      issueId: "issue-123",
+      payload: {
+        version: 1,
+        questions: [{ id: "env", prompt: "Target env?", selectionMode: "single", required: true, options: [{ id: "dev", label: "Dev" }] }],
+        questionSet: { schema: "paperclip.question_set.v1", questions: [{ id: "env", prompt: "Target env?", answerMode: "single_select", required: true, options: [{ id: "dev", label: "Dev" }] }] },
+      },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/interactions");
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("ask_user_questions");
+  });
+
+  it("restores document revision via paperclipRestoreIssueDocumentRevision", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "doc-1", restored: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipRestoreIssueDocumentRevision").execute({
+      issueId: "issue-123",
+      key: "srs",
+      revisionId: "77777777-7777-7777-7777-777777777777",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/documents/srs/revisions/77777777-7777-7777-7777-777777777777/restore");
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("restored");
+  });
+
+  it("links approval to issue via paperclipLinkIssueApproval", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ linked: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipLinkIssueApproval").execute({
+      issueId: "issue-123",
+      approvalId: "88888888-8888-8888-8888-888888888888",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/approvals");
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("linked");
+  });
+
+  it("unlinks approval from issue via paperclipUnlinkIssueApproval", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ unlinked: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipUnlinkIssueApproval").execute({
+      issueId: "issue-123",
+      approvalId: "88888888-8888-8888-8888-888888888888",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/approvals/88888888-8888-8888-8888-888888888888");
+    expect(init.method).toBe("DELETE");
+    expect(response.content[0]?.text).toContain("unlinked");
+  });
+
+  it("submits approval decision via paperclipApprovalDecision", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ status: "approved" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipApprovalDecision").execute({
+      approvalId: "88888888-8888-8888-8888-888888888888",
+      action: "approve",
+      decisionNote: "Passed all gates",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/approvals/88888888-8888-8888-8888-888888888888/approve");
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("approved");
+  });
+
+  it("adds approval comment via paperclipAddApprovalComment", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "com-1", body: "LGTM" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipAddApprovalComment").execute({
+      approvalId: "88888888-8888-8888-8888-888888888888",
+      body: "LGTM",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/approvals/88888888-8888-8888-8888-888888888888/comments");
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("LGTM");
+  });
+
+  it("lists issue attachments via paperclipListIssueAttachments", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ id: "att-1", name: "spec.pdf" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipListIssueAttachments").execute({ issueId: "issue-123" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/attachments");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("spec.pdf");
+  });
+
+  it("lists work products via paperclipListWorkProducts", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ id: "wp-1", title: "Build Report" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipListWorkProducts").execute({ issueId: "issue-123" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/issues/issue-123/work-products");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("Build Report");
+  });
+
+  it("lists project documents via paperclipListProjectDocuments", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ id: "doc-1", title: "SRS" }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipListProjectDocuments").execute({ projectId: "proj-1" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/projects/proj-1/documents`);
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("SRS");
+  });
+
+  it("uploads project document via paperclipUploadProjectDocument", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ id: "doc-up-1", title: "Uploaded SRS" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipUploadProjectDocument").execute({
+      projectId: "proj-1",
+      filePath: "/fake/path/srs.md",
+      title: "Uploaded SRS",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/projects/proj-1/documents`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("Uploaded SRS");
+  });
+
+  it("gets cost summary via paperclipGetCostsSummary", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ totalCostCents: 15000 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipGetCostsSummary").execute({});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/costs/summary`);
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("15000");
+  });
+
+  it("gets cost by agent via paperclipGetCostsByAgent", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse([{ agentId: "a-1", costCents: 5000 }]));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipGetCostsByAgent").execute({});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/costs/by-agent`);
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("5000");
+  });
+
+  it("gets budgets overview via paperclipGetBudgetsOverview", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ totalBudgetCents: 100000 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipGetBudgetsOverview").execute({});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/budgets/overview`);
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("100000");
+  });
+
+  it("updates agent budget via paperclipUpdateAgentBudget", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ updated: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipUpdateAgentBudget").execute({
+      agentId: "agent-1",
+      budgetMonthlyCents: 20000,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/agents/agent-1/budgets");
+    expect(init.method).toBe("PATCH");
+    expect(response.content[0]?.text).toContain("updated");
+  });
+
+  it("gets agent runtime state via paperclipGetAgentRuntimeState", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ state: "active", totalRuns: 10 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("paperclipGetAgentRuntimeState").execute({ agentId: "agent-1" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe("http://localhost:3100/api/agents/agent-1/runtime-state");
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("active");
+  });
+
+  it("gets active page state via qaPageGetActiveState", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ currentRoute: "StudioScreen", isInteractive: true }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("qaPageGetActiveState").execute({});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/active-state`);
+    expect(init.method).toBe("GET");
+    expect(response.content[0]?.text).toContain("StudioScreen");
+  });
+
+  it("simulates tap via qaPageTap", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ success: true, targetId: "action-confirm" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("qaPageTap").execute({ target: { testId: "action-confirm" } });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/tap`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("success");
+  });
+
+  it("simulates typing via qaPageType", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ success: true, typedLength: 12 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("qaPageType").execute({ target: { testId: "input-task-title" }, text: "New Task Title" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/type`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("typedLength");
+  });
+
+  it("simulates scroll via qaPageScroll", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ scrolled: true, direction: "down" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("qaPageScroll").execute({ direction: "down", distancePx: 200 });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/scroll`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("scrolled");
+  });
+
+  it("detects blank screen via qaDetectBlankScreen", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ isBlank: false, colorVariance: 0.85 }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("qaDetectBlankScreen").execute({});
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/detect-blank-screen`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("colorVariance");
+  });
+
+  it("highlights element via opsHighlightElement", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ highlighted: true, targetId: "btn-submit" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("opsHighlightElement").execute({ componentId: "btn-submit", tooltip: "spotlight" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/highlight-element`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("highlighted");
+  });
+
+  it("captures chart snapshot via opsCaptureChart", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ chartId: "c-1", snapshotUrl: "http://img/c1.png" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("opsCaptureChart").execute({ chartSelector: "#chart-1", title: "Burndown" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/capture-chart`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("snapshotUrl");
+  });
+
+  it("executes modal confirm via opsModalConfirm", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ confirmed: true, action: "approve" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("opsModalConfirm").execute({ approvalId: "app-1", decision: "approve" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/modal-confirm`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("confirmed");
+  });
+
+  it("dispatches routine keeper via opsRoutineDispatch", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(mockJsonResponse({ dispatched: true, routineId: "rout-1" }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const response = await getTool("opsRoutineDispatch").execute({ projectId: "proj-1", routineType: "inspection" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(String(url)).toBe(`http://localhost:3100/api/companies/${COMPANY_A}/automation/routine-dispatch`);
+    expect(init.method).toBe("POST");
+    expect(response.content[0]?.text).toContain("dispatched");
+  });
+});
+
+
 
