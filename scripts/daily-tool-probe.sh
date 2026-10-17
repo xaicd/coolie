@@ -57,6 +57,16 @@ set -euo pipefail
 _resolved="$(readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || python3 -c 'import os,sys;print(os.path.realpath(sys.argv[1]))' "${BASH_SOURCE[0]}")"
 REPO_ROOT="$(cd "$(dirname "$_resolved")/.." && pwd)"
 
+# wave380 — crontab 的 PATH 不含 /opt/homebrew/bin 与 ~/.local/bin, 所有工具
+# binary 都在那里; 工具自身报告 binary not in PATH FAIL = 误报. 探测脚本自
+# 举: 把这两个常用工具池目录 prepend 到 PATH (幂等: 已存在则不重复 prepend)
+for _tool_dir in /opt/homebrew/bin /opt/homebrew/sbin /Users/mac/.local/bin /Users/mac/.hermes/bin; do
+  if [[ -d "$_tool_dir" ]] && [[ ":$PATH:" != *":$_tool_dir:"* ]]; then
+    PATH="$_tool_dir:$PATH"
+  fi
+done
+export PATH
+
 # 智能感知环境
 if [[ -f "$REPO_ROOT/scripts/lib/env-detector.sh" ]]; then
   # shellcheck source=scripts/lib/env-detector.sh
