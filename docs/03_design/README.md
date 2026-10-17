@@ -19,3 +19,7 @@
 | [`adr/ADR-001-base-selection.md`](./adr/ADR-001-base-selection.md) | 架构决策记录 001 | 采用 Yudao-Cloud JDK17 5 模块裁剪定制版作为生活服务中台基座 |
 | [`adr/ADR-002-tenant-isolation.md`](./adr/ADR-002-tenant-isolation.md) | 架构决策记录 002 | 服务端网关解析 JWT 与 MyBatis-Plus AST 语法树层级强制多租户隔离 |
 | [`adr/ADR-003-transaction-and-reconciliation.md`](./adr/ADR-003-transaction-and-reconciliation.md) | 架构决策记录 003 | 家政履约状态机、分布式事务补偿与双向对账守恒断言 |
+| [`adr/ADR-004-clearing-and-settlement.md`](./adr/ADR-004-clearing-and-settlement.md) | 架构决策记录 004 | 交易结算引擎与资金轧差自动化对账流水线 |
+| [`adr/ADR-005-yudao-quad-terminal-microservices-and-outbox.md`](./adr/ADR-005-yudao-quad-terminal-microservices-and-outbox.md) | 架构决策记录 005 | Yudao 四位一体多端微服务与可靠消息最终一致性 (Transactional Outbox) |
+| [`adr/ADR-006-living-ontology-and-cmmi-gates.md`](./adr/ADR-006-living-ontology-and-cmmi-gates.md) | 架构决策记录 006 | 采用活体业务本体 (Living Ontology) 与 CMMI 5 物理反向审计守卫作为交付中枢 |
+
