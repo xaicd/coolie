@@ -301,9 +301,47 @@ for (const f of stagedFiles) {
   }
 }
 
-if (affectedFilters.size > 0) {
-  console.log(`  🔎 受影响包增量编译: ${Array.from(affectedFilters).join(', ')}`);
-  for (const filter of affectedFilters) {
+// Gate 5 fallback: working-tree 改动 + untracked TS/TSX 也必须扫, 防止
+// `git commit -a` 在未 `git add` 时把 .tsx 漏过增量编译 (修 COOA-478 trap ⑨)。
+let workingTreeTsDelta = [];
+try {
+  const wtStdout = execSync(
+    'git -c core.quotepath=false diff --name-only --diff-filter=ACMRTUXB' +
+      '; echo __SEP__' +
+      '; git -c core.quotepath=false ls-files --others --exclude-standard',
+    { encoding: 'utf8', env: sandboxSafeEnv },
+  );
+  const [modified, untracked] = wtStdout.split('__SEP__');
+  workingTreeTsDelta = [...modified.split('\n'), ...(untracked || '').split('\n')]
+    .map((f) => f.trim().replace(/^"(.*)"$/, '$1'))
+    .filter(Boolean);
+} catch {
+  // 非 git 仓库或异常: 沿用纯暂存判断, 不阻断
+}
+
+const fallbackFilters = new Set();
+for (const f of workingTreeTsDelta) {
+  if (/\.(ts|tsx)$/.test(f)) {
+    for (const item of PACKAGE_MAP) {
+      if (f.startsWith(item.prefix)) {
+        fallbackFilters.add(item.filter);
+        break;
+      }
+    }
+  }
+}
+
+const allFilters = new Set([...affectedFilters, ...fallbackFilters]);
+
+if (allFilters.size > 0) {
+  console.log(`  🔎 受影响包增量编译: ${Array.from(allFilters).join(', ')}`);
+  if (affectedFilters.size === 0 && fallbackFilters.size > 0) {
+    console.log(
+      '  ⚠️  [WARN] 暂存区为空但工作区存在 TS/TSX 改动，' +
+        'Gate 5 fallback 强制扫描 (防 `git commit -a` 漏过)',
+    );
+  }
+  for (const filter of allFilters) {
     try {
       console.log(`  ⏳ 检查 ${filter} 类型完整性...`);
       runPlatformCmd(`pnpm --filter ${filter} typecheck`);
