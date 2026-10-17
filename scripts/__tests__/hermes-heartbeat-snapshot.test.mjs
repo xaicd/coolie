@@ -21,6 +21,7 @@ import {
   summarizeLiveness,
   summarizeWaiting,
   dispositionRiskOf,
+  handoffEscalationOf,
   summarizeGit,
   gitDeliveryText,
   GIT_DELIVERIES,
@@ -521,6 +522,7 @@ function makeSnapshot({
   waiting = null,
   git = null,
   disposition = null,
+  handoff = null,
 } = {}) {
   return {
     apiBase: "http://127.0.0.1:3100/api",
@@ -539,6 +541,7 @@ function makeSnapshot({
     waiting,
     git,
     disposition,
+    handoff,
   };
 }
 
@@ -1421,6 +1424,103 @@ test("end to end: 卡片被答后 brief 从 disp=guarded 翻成 disp=risk", asyn
     const second = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
     assert.match(second.stdout, /disp=risk/, `卡片被答后必须报 risk, got: ${second.stdout}`);
     assert.match(second.stdout, /处置风险: guarded -> risk/);
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 13. 成功跑交接 (handoffEscalationOf: "平台是不是正把这张工单挂成 board decision required")
+//     真实事故: 交接 escalated 之后旧代码永不写 resolved → 陈旧 escalated 跟着 issue 漂在面板上,
+//     而 status 仍是 in_review → dispositionRiskOf 照样报 ok, 唯一的异常信号被"处置态合法"掩盖.
+// ---------------------------------------------------------------------------
+
+test("handoffEscalationOf: escalated 必须单独成格, 不许被 disp=ok 藏掉", () => {
+  assert.equal(handoffEscalationOf(null), null, "没查 issue 就不判定");
+  assert.equal(handoffEscalationOf({ error: "HTTP 404" }), "unavailable");
+  assert.equal(handoffEscalationOf({ handoffState: null }), "clear");
+  assert.equal(handoffEscalationOf({ handoffState: "resolved" }), "clear");
+  assert.equal(handoffEscalationOf({ handoffState: "required" }), "required");
+  assert.equal(handoffEscalationOf({ handoffState: "escalated" }), "escalated");
+
+  // 关键交叉验证: in_review + 挂起卡片 → disposition 合法(ok), 但交接仍 escalated.
+  // 两格各说各话, 正是本仓空转环里最难看见的那种状态.
+  const staleEscalation = { identifier: "COOA-114", status: "in_review", handoffState: "escalated" };
+  assert.equal(dispositionRiskOf(staleEscalation, { checked: true, pendingCount: 1 }), "ok");
+  assert.equal(handoffEscalationOf(staleEscalation), "escalated");
+});
+
+test("成功跑交接: escalated 进指纹并单独报一行, required 视为 clear 不抖", () => {
+  const clear = makeSnapshot({ handoff: "clear" });
+  const required = makeSnapshot({ handoff: "required" });
+  const escalated = makeSnapshot({ handoff: "escalated" });
+
+  assert.equal(
+    snapshotSignature(clear),
+    snapshotSignature(required),
+    "required 是 corrective run 之前的瞬时态, 进指纹会让 changed 恒为 true"
+  );
+  assert.notEqual(snapshotSignature(clear), snapshotSignature(escalated), "escalated 必须移动指纹");
+
+  const deltas = diffSnapshots({ canonical: canonicalSnapshot(clear) }, escalated);
+  assert.ok(
+    deltas.some((d) => d.includes("成功跑交接") && d.includes("clear -> escalated")),
+    `expected a handoff delta, got ${JSON.stringify(deltas)}`
+  );
+
+  const brief = renderBrief({ ...escalated, signature: "abc", changed: false });
+  assert.match(brief, /esc=escalated/);
+  assert.doesNotMatch(renderBrief({ ...clear, signature: "abc", changed: false }), /esc=/);
+
+  const text = renderText(escalated);
+  assert.match(text, /handoff : escalated — .*board decision required/);
+  assert.match(text, /lastStatusDecisionId=null/);
+});
+
+test("end to end: 陈旧 escalated 在 brief 里现形, 清掉后打一行 delta", async () => {
+  let handoffState = "escalated";
+  const issueBody = () => ({
+    ...ISSUE,
+    status: "in_review",
+    checkoutRunId: null,
+    lastStatusDecisionId: null,
+    successfulRunHandoff: { state: handoffState, required: false, hasLiveContinuation: true },
+  });
+  const cards = [
+    {
+      id: "414854c8-b7b9-4887-a94a-c280d1f6a2f4",
+      kind: "ask_user_questions",
+      status: "pending",
+      continuationPolicy: "wake_assignee",
+      createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    },
+  ];
+  const { server, baseUrl } = await startFixtureServer((req, res) => {
+    res.setHeader("content-type", "application/json");
+    if (req.url === `/api/issues/${ISSUE.id}`) return res.end(JSON.stringify(issueBody()));
+    if (req.url === `/api/issues/${ISSUE.id}/interactions`) return res.end(JSON.stringify(cards));
+    if (req.url === `/api/companies/${ISSUE.companyId}/routines`) return res.end(JSON.stringify(ROUTINES));
+    if (req.url === `/api/companies/${ISSUE.companyId}/issues?limit=400`) return res.end(JSON.stringify(E2E_ISSUES));
+    if (req.url === `/api/inbox?companyId=${ISSUE.companyId}`) {
+      return res.end(JSON.stringify({ pendingApprovals: [], failures: [], failedRuns: [], mentionedBy: [], joinRequests: [] }));
+    }
+    res.statusCode = 404;
+    res.end(JSON.stringify({ error: "API route not found" }));
+  });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-handoff-"));
+  const statePath = path.join(dir, "state.json");
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key", ...GIT_FIXTURE_ENV };
+  try {
+    const first = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
+    assert.match(first.stdout, /disp=ok/, `in_review 是合法处置态, got: ${first.stdout}`);
+    assert.match(first.stdout, /esc=escalated/, `陈旧 escalated 必须现形, got: ${first.stdout}`);
+
+    // 陈旧升级被处置后, esc 段落消失并单独打一行
+    handoffState = "resolved";
+    const second = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
+    assert.doesNotMatch(second.stdout, /esc=escalated/, `清掉后不许再报, got: ${second.stdout}`);
+    assert.match(second.stdout, /成功跑交接: escalated -> clear/, `必须打一行交接 delta, got: ${second.stdout}`);
   } finally {
     server.close();
     fs.rmSync(dir, { recursive: true, force: true });

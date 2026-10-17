@@ -408,6 +408,32 @@ export function dispositionRiskOf(issue, waiting) {
   return (waiting.pendingCount ?? 0) > 0 ? "guarded" : "risk";
 }
 
+/**
+ * 成功跑交接 (successfulRunHandoff) 等价类 —— 心跳要回答的第六个问题:
+ * "平台是不是正把这张工单挂成 board decision required".
+ *
+ * 真实事故 (本仓): 交接被升级成 `escalated` 之后, 旧代码里没有任何路径会写 `resolved`
+ * (见 e108fb4e7 之前的 `successful-run-handoff-state.ts`), 于是 issue 会带着一条陈旧
+ * `escalated` 长期漂在面板上, 恢复扫描与 Loop Keeper 都据此反复拉起。
+ *
+ * 这类陈旧态**完全不改 status** —— 工单停在 in_review 时 `dispositionRiskOf` 照样报 ok,
+ * 于是唯一的异常信号被"处置态合法"掩盖。必须单独一格, 否则永远看不见。
+ *
+ * 返回: `escalated` (已升级, 面板确实在等 board) / `required` (等本轮决策, 收到前会补跑 corrective) /
+ *      `clear` (无未终结交接) / `unavailable` (issue 不可读) / null (没查 issue)
+ *
+ * 只有 `escalated` 进指纹: `required` 是 corrective run 之前的瞬时态, 进指纹会每轮抖
+ * (与 phase-null / idleHours 同一类坑)。
+ */
+export function handoffEscalationOf(issue) {
+  if (!issue) return null;
+  if (issue.error) return "unavailable";
+  const state = issue.handoffState ?? null;
+  if (state === "escalated") return "escalated";
+  if (state === "required") return "required";
+  return "clear";
+}
+
 /** 交付状态等价类 —— 只有这四类进指纹 (数值细节会每轮摆动) */
 export const GIT_DELIVERIES = ["synced", "unpushed", "behind", "no-upstream", "unavailable"];
 
@@ -564,7 +590,10 @@ export function canonicalSnapshot(snapshot) {
   const git = s.git ? (s.git.delivery ?? null) : null;
   // 处置风险: 只记等价类 —— risk 与 guarded 的翻转本身就是信号
   const disposition = s.disposition ?? null;
-  return { issue, routines, inbox, queue, liveness, waiting, git, disposition };
+  // 成功跑交接: 只记 escalated —— 它是"面板确实在等 board"且旧代码永不写 resolved 的那一格;
+  // required / clear 一律折叠成 clear, 否则 corrective run 前后的瞬时态会让 changed 恒为 true
+  const handoff = s.handoff == null ? null : s.handoff === "escalated" ? "escalated" : "clear";
+  return { issue, routines, inbox, queue, liveness, waiting, git, disposition, handoff };
 }
 
 /** 盘面指纹 (16 hex); 同盘面必同指纹, 与回包顺序无关 */
@@ -648,6 +677,14 @@ export function diffSnapshots(previous, current) {
   const afterDisp = after.disposition ?? null;
   if (beforeDisp !== afterDisp) {
     deltas.push(`~ 处置风险: ${beforeDisp ?? "未记录"} -> ${afterDisp ?? "null"}`);
+  }
+
+  // 成功跑交接: 升级 = 面板确实在等 board; 清掉 = 那条陈旧 escalation 终于被处置。
+  // 它不体现在 status 里, 不单独一行就永远看不见 (旧代码只认 required, escalated 永不 resolved)
+  const beforeHandoff = before.handoff ?? null;
+  const afterHandoff = after.handoff ?? null;
+  if (beforeHandoff !== afterHandoff) {
+    deltas.push(`~ 成功跑交接: ${beforeHandoff ?? "未记录"} -> ${afterHandoff ?? "null"}`);
   }
 
   const oldQueue = new Map((before.queue ?? []).map(([k, ids]) => [k, new Set(ids ?? [])]));
@@ -825,6 +862,12 @@ const HELP = `hermes-heartbeat-snapshot — Paperclip routine 心跳确定性快
     disp=?        卡片没查到 (--skip-waiting / 端点退化), 不假装安全
   指纹只含这个等价类; risk 与 guarded 的翻转会单独打一行 delta.
 
+成功跑交接 (esc):
+  "平台是不是正把这张工单挂成 board decision required". 交接被升级为 escalated 后,
+  旧代码没有任何路径写 resolved(e108fb4e7 之前), 于是陈旧 escalated 会长期漂在面板上,
+  而 status 完全不变 —— disp 照样报 ok. brief 里只有这一格出现时才打 esc=escalated;
+  指纹只含 escalated(required 是 corrective run 前的瞬时态), 升级/清掉单独打一行 delta.
+
 交付 (git):
   一行回答"我这轮交付真的到远端了吗": git=synced 表示 HEAD 已全在 upstream;
   git=UNPUSHED ahead=1 表示有 1 个 commit 只在本地 —— 远端拿不到, 工单标 done 也不成立.
@@ -881,6 +924,7 @@ export async function collectSnapshot(config) {
     liveness: null,
     waiting: null,
     disposition: null,
+    handoff: null,
   };
 
   // 1. issue 真值 + companyId 反查 (心法 #148: env 未注入 companyId 时走 issue 反查)
@@ -896,6 +940,8 @@ export async function collectSnapshot(config) {
         checkoutRunId: result.body.checkoutRunId ?? null,
         executionRunId: result.body.executionRunId ?? null,
         companyId: result.body.companyId ?? null,
+        handoffState: result.body.successfulRunHandoff?.state ?? null,
+        lastStatusDecisionId: result.body.lastStatusDecisionId ?? null,
       };
       if (!snapshot.companyId && result.body.companyId) snapshot.companyId = result.body.companyId;
     } else {
@@ -911,6 +957,8 @@ export async function collectSnapshot(config) {
   }
   // 1.6 处置风险等价类: in_progress + 无挂起卡片 = 会被判 missing disposition 的那一格 (本仓真实空转 11 轮)
   snapshot.disposition = dispositionRiskOf(snapshot.issue, snapshot.waiting);
+  // 1.7 成功跑交接: escalated 陈旧态完全不改 status, 只能从 successfulRunHandoff.state 读
+  snapshot.handoff = handoffEscalationOf(snapshot.issue);
 
   // 2. routines: companies-scoped list 是唯一真值源 (心法 #78/#155), 死掉时按 id 回退 (心法 #184/#188)
   if (snapshot.companyId) {
@@ -1017,6 +1065,19 @@ export function renderText(snapshot) {
       unavailable: "issue 不可读",
     }[snapshot.disposition];
     lines.push(`disp    : ${snapshot.disposition}${explain ? ` — ${explain}` : ""}`);
+  }
+  if (snapshot.handoff) {
+    const explain = {
+      escalated: "平台已把本单升级为 board decision required (陈旧升级: 旧代码只认 required, 永不写 resolved)",
+      required: "等本轮落状态决策, 否则平台会先补跑一次 corrective run",
+      clear: "无未终结的交接事件",
+      unavailable: "issue 不可读",
+    }[snapshot.handoff];
+    const decision =
+      snapshot.issue && !snapshot.issue.error
+        ? ` lastStatusDecisionId=${snapshot.issue.lastStatusDecisionId ?? "null"}`
+        : "";
+    lines.push(`handoff : ${snapshot.handoff}${explain ? ` — ${explain}` : ""}${decision}`);
   }
   if (snapshot.routines.source) {
     lines.push(`routines: ${snapshot.routines.items.length} via ${snapshot.routines.source}`);
@@ -1140,7 +1201,7 @@ export function renderBrief(snapshot) {
   const head =
     `HB ${stamp} ${state} sig=${snapshot.signature ?? "null"} · ${issue} · ${routines} · ` +
     `queue ${counts} · ${inbox} · ${livenessSummaryText(snapshot.liveness)} · ${waitingSummaryText(snapshot.waiting)} · ` +
-    `disp=${snapshot.disposition ?? "?"} · ${gitDeliveryText(snapshot.git)}`;
+    `disp=${snapshot.disposition ?? "?"}${snapshot.handoff === "escalated" ? " esc=escalated" : ""} · ${gitDeliveryText(snapshot.git)}`;
   return [head, ...(snapshot.deltas ?? []).map((d) => `  ${d}`)].join("\n");
 }
 
