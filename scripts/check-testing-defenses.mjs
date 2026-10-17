@@ -63,7 +63,7 @@ const LINES = [
       { label: "guard specs: ops console scope and read shape", cmd: "pnpm --filter @paperclipai/plugin-ops-console test" },
       // Repo-wide, so it runs unscoped: how much of this change lands on files
       // upstream also owns, and therefore has to be reconciled at the next merge.
-      { label: "fork surface: upstream-owned files this fork changes", cmd: "node --test scripts/check-fork-surface.test.mjs && node scripts/check-fork-surface.mjs --cumulative" },
+      { label: "fork surface: upstream-owned files this fork changes", cmd: "pnpm exec node --test scripts/check-fork-surface.test.mjs && pnpm exec node scripts/check-fork-surface.mjs --cumulative" },
     ],
   },
   {
