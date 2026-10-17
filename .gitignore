@@ -38,6 +38,8 @@ check-*.mjs
 new-agent*.json
 newcompany.json
 seed-*.mjs
+!scripts/seed-company-strategic-goals.mjs
+!scripts/seed-client-project-goals.mjs
 server/check-*.mjs
 server/seed-*.mjs
 packages/db/seed-*.mjs

@@ -60,6 +60,7 @@ export async function runSupervisorCycle() {
     unblockedIssues: [],
     settledRoutines: [],
     mainlineProgress: [],
+    goalsLinked: 0,
     metrics: {},
   };
 
@@ -252,6 +253,31 @@ export async function runSupervisorCycle() {
       } catch (healErr) {
         console.error('[Supervisor] OpenWiki 自愈同步失败:', healErr.message);
       }
+    }
+
+    // 3.6 战略 Goal 体系活体对齐与外键守卫 (Strategic Goals Keeper)
+    try {
+      const unlinkedMainlines = allIssues.filter(i => {
+        if (i.goalId) return false;
+        return (i.title && (i.title.includes('[主线长任务]') || i.title.includes('交付主线例行巡检') || i.title.includes('每日开工')));
+      });
+      if (unlinkedMainlines.length > 0) {
+        const goals = await request(`/companies/${COMPANY_ID}/goals`);
+        const loopGoal = goals.find(g => g.title && g.title.includes('自主巡检 Loop 机制'));
+        const mcpGoal = goals.find(g => g.title && g.title.includes('全端体验一致性与全栈 MCP 并轨'));
+        for (const issue of unlinkedMainlines) {
+          const target = (issue.title && issue.title.includes('[主线长任务]')) ? mcpGoal : loopGoal;
+          if (target) {
+            await request(`/issues/${issue.id}`, {
+              method: 'PATCH',
+              body: JSON.stringify({ goalId: target.id }),
+            });
+            report.goalsLinked = (report.goalsLinked || 0) + 1;
+          }
+        }
+      }
+    } catch (goalErr) {
+      console.error('[Supervisor] Goal 对齐巡检微报错:', goalErr.message);
     }
 
   } catch (err) {
