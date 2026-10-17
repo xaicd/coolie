@@ -34,11 +34,11 @@
 - [x] **控制面 API 健康探测**: `curl -s https://xrobinai.cn/api/health` → 实测 `{"status":"ok","deploymentMode":"authenticated","commit":"1fb55f362b478f4b45eb8ddc763313c5d6ed17a5","databaseBackup":{"enabled":true,"status":"ok"}}`（2026-10-18 02:03 CST）；
 - [x] **移动端 OTA 版本核实**: `curl -s https://xrobinai.cn/ota/manifest` → `runtimeVersion=0.6.61`，launch asset 哈希与字节数实测一致（5680950 bytes）；
 - [ ] **Android 下载链路**: `curl -sI https://dls.xrobinai.cn/coolie/app/0.6.61/coolie-release.apk` == 200 且 `Content-Length` == 81282582（实测 200 / 81282582，待发布后复核 Last-Modified 推进）；
-- [ ] **iOS 下载链路（当前红线）**: `version.json.iosDownloadUrl` 指向 `…/0.6.2/coolie-release-ios.ipa` → 实测 **HTTP 404**，`iosSha256` 无任何可达制品对应，`iosTestFlightUrl = null`。**iOS 链路不通即禁止对外宣称双端可下载**，修复后方可勾选。
+- [x] **iOS 下载链路（COOA-468 已清零 404 声明）**: 旧 `version.json.iosDownloadUrl`（`…/0.6.2/coolie-release-ios.ipa`）实测 **HTTP 404** —— 已于 2026-10-18 02:08 CST 从生产 `https://xrobinai.cn/version.json` 与仓库根 `version.json` **移除** `iosDownloadUrl`/`iosSha256`，`iosTestFlightUrl` 保持 `null`。App 端按「暂无 iOS 包」兜底隐藏下载按钮。**iOS 仍无可达制品，禁止对外宣称双端可下载**；待 Apple 签名窗口重出 0.6.61 IPA 后回填并复核。
 
 ---
 
-## 3. 复核结论 (Verdict 2026-10-18 02:04 CST)
+## 3. 复核结论 (Verdict 2026-10-18 02:08 CST · COOA-468 修复后)
 
 | 通道 | 结论 | 依据 |
 |---|---|---|
@@ -46,6 +46,6 @@
 | Android OTA | PASS | launch asset 哈希与 manifest 逐位一致 |
 | 7 处版本源 | PASS | 7/7 = 0.6.61 / 661 |
 | 控制面生产 | PASS | health ok，DB 备份 ok |
-| iOS 分发 | **FAIL** | 声明 URL 404，无对应制品（已另立缺陷单） |
+| iOS 分发 | **REMEDIATED** | COOA-468 清除指向 404 的残留声明；暂无可达制品属诚实空态 |
 
-结论：Android 侧 G5 指纹链完整可信；iOS 侧发布元数据为历史残留死链，属**阻断级**缺陷，不得据此宣称 iOS 交付完成。
+结论：Android 侧 G5 指纹链完整可信；iOS 侧历史残留死链声明已由 COOA-468 清除（生产与仓库 `version.json` 现均无 `iosDownloadUrl`/`iosSha256`，`iosTestFlightUrl=null`）。iOS 暂无对外可用制品属诚实空态，**不得据此宣称 iOS 交付完成**，待 Apple 签名窗口重出包后回填复核。

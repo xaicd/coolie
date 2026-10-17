@@ -9,6 +9,13 @@
     "wbsTask": "7.1 [G5·投产] 不可变制品指纹、部署与秒级回滚 SOP",
     "repoHead": "af15f752c744f38d1ff483a771d9dde88a9e431c"
   },
+  "remediatedBy": {
+    "agent": "兑底渊 (PRE-SRE)",
+    "agentId": "8a288a46-8598-4c68-b52e-545360e11929",
+    "issue": "COOA-468",
+    "at": "2026-10-18T02:08:00Z",
+    "summary": "清理 version.json 指向 404 的 iOS 残留声明 (iosDownloadUrl/iosSha256), iosTestFlightUrl 保持 null"
+  },
   "method": {
     "hash": "sha256",
     "localArtifacts": "shasum -a 256 <file>",
@@ -20,8 +27,8 @@
     "android": "PASS",
     "ota": "PASS",
     "versionConsistency": "PASS",
-    "ios": "FAIL",
-    "summary": "Android APK / OTA bundle / 7 处版本源全部实测一致; iOS 发布元数据指向 404 死链, 无对应制品"
+    "ios": "REMEDIATED",
+    "summary": "Android APK / OTA bundle / 7 处版本源全部实测一致; iOS 指向 404 的死链声明已由 COOA-468 清除, 当前无可达 iOS 制品 (诚实空态, 非 FAIL)"
   },
   "artifacts": [
     {
@@ -69,29 +76,41 @@
     },
     {
       "channel": "ios",
-      "status": "FAIL",
+      "status": "REMEDIATED",
       "local": {
         "path": "clients/expo/ios/build/ipa/cn.xrobinai.app.ipa",
         "bytes": 14286676,
         "sha256": "2e7d63c06857dfb115f318e36ece2945b0f4cd4259b13fea0a009a9cf6e6b4c0",
         "mtime": "2026-09-30T15:34 (CST)",
-        "note": "本地 IPA 为 18 天前旧构建, 与当前 0.6.61 基线不可对应"
+        "note": "本地 IPA 为 0.6.2 世代旧构建, 与当前 0.6.61 基线不可对应; 本窗口无 Apple 签名发版窗口, 不出 iOS 包"
       },
       "published": {
+        "declaredUrl": null,
+        "httpStatus": null,
+        "declaredSha256": null,
+        "resolvedArtifact": null,
+        "testFlightUrl": null,
+        "note": "COOA-468 修复后状态: version.json 已无 iosDownloadUrl/iosSha256, iosTestFlightUrl=null; App 端按「暂无 iOS 包」隐藏下载按钮, 不再消费死链"
+      },
+      "historicalDefect": {
         "declaredUrl": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa",
         "httpStatus": 404,
         "declaredSha256": "89133dc8f8e45a9fa7889f599a2d98586b1953157088ab66ca3221eb3390cf4d",
-        "resolvedArtifact": null,
-        "testFlightUrl": null
+        "probedUrls": [
+          {"url": "https://dls.xrobinai.cn/coolie/app/0.6.61/coolie-release-ios.ipa", "httpStatus": 404},
+          {"url": "https://dls.xrobinai.cn/coolie/app/0.6.60/coolie-release-ios.ipa", "httpStatus": 404},
+          {"url": "https://dls.xrobinai.cn/coolie/app/0.6.59/coolie-release-ios.ipa", "httpStatus": 404},
+          {"url": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa", "httpStatus": 404}
+        ]
       },
-      "probedUrls": [
-        {"url": "https://dls.xrobinai.cn/coolie/app/0.6.61/coolie-release-ios.ipa", "httpStatus": 404},
-        {"url": "https://dls.xrobinai.cn/coolie/app/0.6.60/coolie-release-ios.ipa", "httpStatus": 404},
-        {"url": "https://dls.xrobinai.cn/coolie/app/0.6.59/coolie-release-ios.ipa", "httpStatus": 404},
-        {"url": "https://dls.xrobinai.cn/coolie/app/0.6.2/coolie-release-ios.ipa", "httpStatus": 404}
-      ],
-      "defect": "version.json 的 iosDownloadUrl/iosSha256 为 0.6.2 时代残留字段, 指向死链; 声明哈希无任何可达制品与之对应; iosTestFlightUrl 为 null —— iOS 分发链路实际不可用",
-      "ownerAction": "兑底渊 (PRE-SRE) 清理/回填 iOS 发布元数据; iOS 重新出包需老板 Apple 签名发版窗口"
+      "remediation": {
+        "issue": "COOA-468",
+        "fix": "移除 version.json 顶层 iosDownloadUrl / iosSha256 两个死链声明; iosTestFlightUrl 置 null",
+        "shippedTo": "https://xrobinai.cn/version.json (Caddy root /opt/coolie/ui/dist) + 仓库根 version.json",
+        "verifiedAt": "2026-10-18T02:08:00Z",
+        "liveAssert": "curl -s https://xrobinai.cn/version.json -> iosDownloadUrl/iosSha256 均不存在, iosTestFlightUrl=null; 断言脚本 PASS"
+      },
+      "remainingGap": "iOS 对外分发仍无可达制品 (诚实空态)。需老板 Apple 签名发版窗口重出 0.6.61 IPA 后, 走 scripts/release-ios-cos.sh 回填并重新对账。"
     },
     {
       "channel": "control-plane-prod",
