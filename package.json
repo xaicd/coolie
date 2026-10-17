@@ -104,6 +104,8 @@
     "workflow:new": "node scripts/workflow-engine.cjs new",
     "cmmi:asset": "node scripts/cmmi-asset-scaffold.cjs",
     "cmmi:new": "node scripts/cmmi-asset-scaffold.cjs new",
+    "cmmi:batch": "node scripts/cmmi-asset-scaffold.cjs batch",
+    "cmmi:templates": "node scripts/cmmi-asset-scaffold.cjs export-templates",
     "cmmi:list": "node scripts/cmmi-asset-scaffold.cjs list",
     "cmmi:check": "node scripts/cmmi-asset-scaffold.cjs check",
     "coolie:dev": "bash scripts/coolie-local-dev.sh",
