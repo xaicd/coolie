@@ -2912,6 +2912,9 @@ span.paperclip-mention-chip[data-mention-kind="external-object"] {
    * allow ui/src/pages/ProjectWorkspaceDetail.test.tsx — mock project color fixture
    * allow ui/src/pages/Projects.test.tsx — mock project color fixture
    * allow ui/src/pages/Routines.test.tsx — mock routine/label color fixtures
+   * allow ui/src/components/FleetPipelineStrip.tsx — foundry pipeline micro badges with dense font styling
+   * allow ui/src/components/FoundryProposalCard.tsx — boss cockpit compact proposal cards with bounded title truncation
+   * allow ui/src/pages/BoardChat.tsx — cockpit chat inline metadata timestamps and status pills
    ── end allowlist ── */
 
 /* Agent settings composition, shared with Storybook. */

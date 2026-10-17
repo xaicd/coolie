@@ -57,6 +57,8 @@
     "openwiki:check": "node scripts/sync-openwiki.mjs --check",
     "ontology:ops": "node scripts/ontology-ops.cjs",
     "ontology:inspect": "node scripts/ontology-ops.cjs inspect",
+    "mcp:call": "node scripts/mcp-call.mjs",
+    "check:testability": "node scripts/check-testability-and-ops-gates.mjs",
     "tools:install": "bash scripts/install-all-cli-tools.sh",
     "tools:check": "bash scripts/install-all-cli-tools.sh --check",
     "speckit": "node scripts/speckit.cjs",
