@@ -88,7 +88,7 @@ test("does not accept partially emitted output while another compiler holds the 
   await until(() => fs.existsSync(path.join(f.root, "packages/plugins/sdk/dist/index.js")));
   const second = await f.launch().done;
   assert.equal(second.code, 0, second.output);
-  assert.match(second.output, /Waiting for another workspace build/);
+  assert.match(second.output, /\[paperclip\] Waiting for another workspace build/);
   assert.equal(fs.existsSync(path.join(f.root, "packages/plugins/sdk/dist/complete")), true);
   assert.equal((await first.done).code, 0);
 });
