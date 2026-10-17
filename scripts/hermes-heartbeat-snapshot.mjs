@@ -383,6 +383,31 @@ export function lockStateOf(issue, selfRunId = null) {
   return run === selfRunId ? "self" : "other";
 }
 
+/**
+ * 本 issue 的**处置风险**等价类 —— 心跳要回答的第五个问题: "我这轮结束时还会被判 missing disposition 吗".
+ *
+ * 背景 (真实事故): 平台对"run succeeded 但 issue 没有任何下一步决策"会先补跑一次 corrective run,
+ * 再失败就 escalate → issue 被打回 blocked → Loop Keeper 自动解卡 → 又跑一轮 → 又只写散文 →
+ * 再 escalate. COOA-114 在这个环里空转了 11 轮 (#257~#267), 每轮 2 分钟被拉起一次.
+ *
+ * 读 `server/src/services/recovery/successful-run-handoff.ts` 的判定顺序可知:
+ *   (a) `issue.status !== "in_progress"` → 直接 skip (in_review/done/blocked 都是合法处置)
+ *   (b) `hasPendingInteractionOrApproval` / persisted monitor / 显式 blocker → skip
+ * 所以**风险态只有一种**: `in_progress` + 没有任何挂起卡片 (也没有 monitor / blocker).
+ * 这时本轮结束时若只用评论写"状态: in_progress", 平台读不到决策 → 必然重演升级环.
+ *
+ * 只作为等价类进指纹 (ok / guarded / risk / ? / unavailable): 它本身极稳, 不会让 changed 恒为 true,
+ * 但一旦从 risk 翻到 guarded (或反向) 必须被看见 —— 那正是空转环的入口与出口.
+ */
+export function dispositionRiskOf(issue, waiting) {
+  if (!issue) return null;
+  if (issue.error) return "unavailable";
+  if ((issue.status ?? null) !== "in_progress") return "ok";
+  // 挂起卡片没查到 (--skip-waiting / 端点退化) 时不能假装安全
+  if (!waiting || waiting.checked === false) return "?";
+  return (waiting.pendingCount ?? 0) > 0 ? "guarded" : "risk";
+}
+
 /** 交付状态等价类 —— 只有这四类进指纹 (数值细节会每轮摆动) */
 export const GIT_DELIVERIES = ["synced", "unpushed", "behind", "no-upstream", "unavailable"];
 
@@ -537,7 +562,9 @@ export function canonicalSnapshot(snapshot) {
   // 交付: 只记 delivery 等价类 —— head sha 每有提交就变, 脏文件数在共享工作区长期非零,
   // 两者进指纹都会让 changed 恒为 true (与 idleHours / phase-null 同一类坑)
   const git = s.git ? (s.git.delivery ?? null) : null;
-  return { issue, routines, inbox, queue, liveness, waiting, git };
+  // 处置风险: 只记等价类 —— risk 与 guarded 的翻转本身就是信号
+  const disposition = s.disposition ?? null;
+  return { issue, routines, inbox, queue, liveness, waiting, git, disposition };
 }
 
 /** 盘面指纹 (16 hex); 同盘面必同指纹, 与回包顺序无关 */
@@ -614,6 +641,13 @@ export function diffSnapshots(previous, current) {
   if (JSON.stringify(beforeGit) !== JSON.stringify(afterGit)) {
     const fmtGit = (g) => (g === null ? "未记录" : String(g ?? "null"));
     deltas.push(`~ 交付: ${fmtGit(beforeGit)} -> ${fmtGit(afterGit)}`);
+  }
+
+  // 处置风险翻转: risk→guarded 是"补上了等待路径", guarded→risk 是"卡片没了, 下一轮会被判 missing"
+  const beforeDisp = before.disposition ?? null;
+  const afterDisp = after.disposition ?? null;
+  if (beforeDisp !== afterDisp) {
+    deltas.push(`~ 处置风险: ${beforeDisp ?? "未记录"} -> ${afterDisp ?? "null"}`);
   }
 
   const oldQueue = new Map((before.queue ?? []).map(([k, ids]) => [k, new Set(ids ?? [])]));
@@ -781,6 +815,16 @@ const HELP = `hermes-heartbeat-snapshot — Paperclip routine 心跳确定性快
   指纹只含 (计数, kinds), 不含年龄 —— 同样是为了不让 changed 恒为 true.
   --skip-waiting 跳过这一节 (跳过时不做基线比对, 避免半盘面污染基线).
 
+处置风险 (disp):
+  "我这轮结束时还会被判 missing disposition 吗". 平台对 in_progress 且无下一步决策的
+  succeeded run 会补跑一次 → escalate → blocked → Loop Keeper 解卡 → 又一轮 (COOA-114
+  在这个环里空转 11 轮, 每 2 分钟被拉起一次). 判定只有一格:
+    disp=ok       status 非 in_progress (in_review/done/blocked 都是合法处置)
+    disp=guarded  in_progress 但有挂起卡片 → 平台按 pending interaction 跳过, 安全
+    disp=risk     in_progress 且零挂起卡片 → 本轮必须落状态决策或挂卡片, 否则必重演空转
+    disp=?        卡片没查到 (--skip-waiting / 端点退化), 不假装安全
+  指纹只含这个等价类; risk 与 guarded 的翻转会单独打一行 delta.
+
 交付 (git):
   一行回答"我这轮交付真的到远端了吗": git=synced 表示 HEAD 已全在 upstream;
   git=UNPUSHED ahead=1 表示有 1 个 commit 只在本地 —— 远端拿不到, 工单标 done 也不成立.
@@ -836,6 +880,7 @@ export async function collectSnapshot(config) {
     queueUnavailableReason: null,
     liveness: null,
     waiting: null,
+    disposition: null,
   };
 
   // 1. issue 真值 + companyId 反查 (心法 #148: env 未注入 companyId 时走 issue 反查)
@@ -864,6 +909,8 @@ export async function collectSnapshot(config) {
     const payload = list.ok ? list.body : (apiErrorOf(list.body) ?? `HTTP ${list.status}`);
     snapshot.waiting = summarizeWaiting(payload, { now: livenessNow });
   }
+  // 1.6 处置风险等价类: in_progress + 无挂起卡片 = 会被判 missing disposition 的那一格 (本仓真实空转 11 轮)
+  snapshot.disposition = dispositionRiskOf(snapshot.issue, snapshot.waiting);
 
   // 2. routines: companies-scoped list 是唯一真值源 (心法 #78/#155), 死掉时按 id 回退 (心法 #184/#188)
   if (snapshot.companyId) {
@@ -961,6 +1008,16 @@ export function renderText(snapshot) {
     );
   }
   lines.push(`company : ${snapshot.companyId ?? "null"}`);
+  if (snapshot.disposition) {
+    const explain = {
+      ok: "status 非 in_progress = 平台认可的处置态",
+      guarded: "in_progress 但有挂起卡片/monitor = 不会被判 missing",
+      risk: "in_progress 且无挂起卡片 = 本轮结束会被判 missing disposition, 必须落状态决策或挂卡片",
+      "?": "挂起卡片未查到, 不假装安全",
+      unavailable: "issue 不可读",
+    }[snapshot.disposition];
+    lines.push(`disp    : ${snapshot.disposition}${explain ? ` — ${explain}` : ""}`);
+  }
   if (snapshot.routines.source) {
     lines.push(`routines: ${snapshot.routines.items.length} via ${snapshot.routines.source}`);
     for (const r of snapshot.routines.items) {
@@ -1083,7 +1140,7 @@ export function renderBrief(snapshot) {
   const head =
     `HB ${stamp} ${state} sig=${snapshot.signature ?? "null"} · ${issue} · ${routines} · ` +
     `queue ${counts} · ${inbox} · ${livenessSummaryText(snapshot.liveness)} · ${waitingSummaryText(snapshot.waiting)} · ` +
-    `${gitDeliveryText(snapshot.git)}`;
+    `disp=${snapshot.disposition ?? "?"} · ${gitDeliveryText(snapshot.git)}`;
   return [head, ...(snapshot.deltas ?? []).map((d) => `  ${d}`)].join("\n");
 }
 

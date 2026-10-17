@@ -20,6 +20,7 @@ import {
   queueKeyOf,
   summarizeLiveness,
   summarizeWaiting,
+  dispositionRiskOf,
   summarizeGit,
   gitDeliveryText,
   GIT_DELIVERIES,
@@ -519,6 +520,7 @@ function makeSnapshot({
   },
   waiting = null,
   git = null,
+  disposition = null,
 } = {}) {
   return {
     apiBase: "http://127.0.0.1:3100/api",
@@ -536,6 +538,7 @@ function makeSnapshot({
     liveness: summarizeLiveness(issues, { now: FIXTURE_NOW }),
     waiting,
     git,
+    disposition,
   };
 }
 
@@ -1324,5 +1327,102 @@ test("end to end: the CLI reports the local delivery state, and --skip-git says 
     assert.ok(GIT_DELIVERIES.includes(payload.git.delivery), `unexpected delivery ${payload.git.delivery}`);
   } finally {
     server.close();
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 12. 处置风险 (dispositionRiskOf: "我这轮结束时还会被判 missing disposition 吗")
+//     真实事故: run succeeded 但 issue 只有"散文状态" → 平台补跑 corrective → 仍无决策 →
+//     escalate → blocked → Loop Keeper 解卡 → 又跑一轮 … COOA-114 空转 11 轮, 每 2 分钟一次.
+//     风险态只有一种: in_progress + 没有任何挂起卡片.
+
+test("dispositionRiskOf: 只有 in_progress 且零挂起卡片才是 risk", () => {
+  const issue = (status) => ({ identifier: "COOA-114", status });
+  const waitingOf = (pendingCount, checked = true) => ({ checked, pendingCount, kinds: [] });
+
+  assert.equal(dispositionRiskOf(null, null), null, "没有 issue 就没有风险判定");
+  assert.equal(dispositionRiskOf({ error: "HTTP 404" }, null), "unavailable");
+  assert.equal(dispositionRiskOf(issue("in_review"), waitingOf(0)), "ok", "in_review 是平台认可的处置态");
+  assert.equal(dispositionRiskOf(issue("done"), waitingOf(0)), "ok");
+  assert.equal(dispositionRiskOf(issue("blocked"), waitingOf(0)), "ok");
+  assert.equal(dispositionRiskOf(issue("in_progress"), waitingOf(1)), "guarded", "有卡片 = 不会被判 missing");
+  assert.equal(dispositionRiskOf(issue("in_progress"), waitingOf(0)), "risk", "无卡片 = 空转环入口");
+  assert.equal(dispositionRiskOf(issue("in_progress"), waitingOf(0, false)), "?", "查不到卡片不许假装安全");
+  assert.equal(dispositionRiskOf(issue("in_progress"), null), "?", "--skip-waiting 时也不假装安全");
+});
+
+test("处置风险翻转必须让指纹动, 卡片年龄不能", () => {
+  const guarded = makeSnapshot({
+    disposition: "guarded",
+    waiting: summarizeWaiting(
+      [{ id: "414854c8", kind: "ask_user_questions", status: "pending", createdAt: "2026-10-17T17:36:00.000Z" }],
+      { now: WAITING_NOW }
+    ),
+  });
+  const risk = makeSnapshot({
+    disposition: "risk",
+    waiting: summarizeWaiting([{ id: "414854c8", kind: "ask_user_questions", status: "answered", createdAt: "2026-10-17T17:36:00.000Z" }], { now: WAITING_NOW }),
+  });
+  assert.notEqual(snapshotSignature(guarded), snapshotSignature(risk));
+  const deltas = diffSnapshots({ canonical: canonicalSnapshot(guarded) }, risk);
+  assert.ok(
+    deltas.some((d) => d.includes("处置风险") && d.includes("guarded -> risk")),
+    `expected a disposition delta, got ${JSON.stringify(deltas)}`
+  );
+
+  const sameThingLater = makeSnapshot({
+    disposition: "guarded",
+    waiting: summarizeWaiting(
+      [{ id: "414854c8", kind: "ask_user_questions", status: "pending", createdAt: "2026-10-17T17:36:00.000Z" }],
+      { now: WAITING_NOW + 3 * 60 * 60 * 1000 }
+    ),
+  });
+  assert.equal(snapshotSignature(guarded), snapshotSignature(sameThingLater), "卡片变老不许让 changed 恒为 true");
+});
+
+test("renderBrief/renderText 带 disp 段, risk 时说明后果", () => {
+  const brief = renderBrief({ ...makeSnapshot({ disposition: "risk" }), signature: "abc", changed: false });
+  assert.match(brief, /disp=risk/);
+  const text = renderText(makeSnapshot({ disposition: "risk" }));
+  assert.match(text, /disp    : risk — .*missing disposition/);
+  assert.match(renderBrief(makeSnapshot({ disposition: "ok" })), /disp=ok/);
+});
+
+test("end to end: 卡片被答后 brief 从 disp=guarded 翻成 disp=risk", async () => {
+  let cards = [
+    {
+      id: "414854c8-b7b9-4887-a94a-c280d1f6a2f4",
+      kind: "ask_user_questions",
+      status: "pending",
+      continuationPolicy: "wake_assignee",
+      createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    },
+  ];
+  const { server, baseUrl } = await startFixtureServer((req, res) => {
+    res.setHeader("content-type", "application/json");
+    if (req.url === `/api/issues/${ISSUE.id}`) return res.end(JSON.stringify(ISSUE));
+    if (req.url === `/api/issues/${ISSUE.id}/interactions`) return res.end(JSON.stringify(cards));
+    if (req.url === `/api/companies/${ISSUE.companyId}/routines`) return res.end(JSON.stringify(ROUTINES));
+    if (req.url === `/api/companies/${ISSUE.companyId}/issues?limit=400`) return res.end(JSON.stringify(E2E_ISSUES));
+    if (req.url === `/api/inbox?companyId=${ISSUE.companyId}`) {
+      return res.end(JSON.stringify({ pendingApprovals: [], failures: [], failedRuns: [], mentionedBy: [], joinRequests: [] }));
+    }
+    res.statusCode = 404;
+    res.end(JSON.stringify({ error: "API route not found" }));
+  });
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "hb-disp-"));
+  const statePath = path.join(dir, "state.json");
+  const env = { ...process.env, PAPERCLIP_API_URL: baseUrl, PAPERCLIP_API_KEY: "test-key", ...GIT_FIXTURE_ENV };
+  try {
+    const first = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
+    assert.match(first.stdout, /disp=guarded/, `in_progress + 挂起卡片 必须是 guarded, got: ${first.stdout}`);
+
+    cards = [{ ...cards[0], status: "answered" }];
+    const second = await execFileAsync("node", [SCRIPT, "--brief", "--issue", ISSUE.id, "--state", statePath], { env });
+    assert.match(second.stdout, /disp=risk/, `卡片被答后必须报 risk, got: ${second.stdout}`);
+    assert.match(second.stdout, /处置风险: guarded -> risk/);
+  } finally {
+    server.close();
+    fs.rmSync(dir, { recursive: true, force: true });
   }
 });
