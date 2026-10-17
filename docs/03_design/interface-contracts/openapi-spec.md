@@ -1,6 +1,6 @@
-# Coolie 工坊控制面统一接口契约说明书 (OpenAPI Specification)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 控制面统一接口契约说明书 (OpenAPI Specification)
 
-> **文档代号**: COOA-API-v2.0  
+> **文档代号**: COOA-API-v2.0.0  
 > **基线版本**: v2.0.0  
 > **制定日期**: 2026-10-17  
 > **适用规范**: OpenAPI 3.1.0 / CMMI 03_design (TS / LLD) / .agents/skills/cmmi-detailed-contracts  
@@ -61,13 +61,12 @@
 ```yaml
 openapi: 3.1.0
 info:
-  title: Coolie Control Plane API
-  version: 2.0.0
-  description: AI-Native Commercial Software Delivery Foundry REST API
+  title: Coolie AI 原生商业软件交付工厂控制面平台 API
+  version: v2.0.0
 paths:
   /api/issues/{id}/checkout:
     post:
-      summary: 原子签出任务 (获取排他写锁)
+      summary: 原子签出工单
       parameters:
         - name: id
           in: path
@@ -75,40 +74,9 @@ paths:
           schema:
             type: string
             format: uuid
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              type: object
-              required: [agentId]
-              properties:
-                agentId:
-                  type: string
-                  format: uuid
       responses:
         '200':
-          description: 签出成功
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/IssueCheckoutResult'
+          description: 签出成功并返回锁标识
         '409':
-          description: 冲突: 任务已被其他智能体签出
-
-components:
-  schemas:
-    IssueCheckoutResult:
-      type: object
-      properties:
-        issueId:
-          type: string
-        lockedBy:
-          type: string
-        lockedAt:
-          type: string
-          format: date-time
-        leaseExpiresAt:
-          type: string
-          format: date-time
+          description: 签出竞争冲突，已被其他智能体持有
 ```

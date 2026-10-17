@@ -1,7 +1,7 @@
-# Coolie 工坊平台软件需求规格说明书 (SRS - EARS 5态精准规格)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 软件需求规格说明书 (SRS - EARS 5态精准规格)
 
-> **文档代号**: COOA-SRS-v2.0  
-> **项目全称**: Coolie AI-Native Commercial Software Delivery Foundry  
+> **文档代号**: COOA-SRS-v2.0.0  
+> **项目全称**: Coolie AI 原生商业软件交付工厂控制面平台  
 > **基线版本**: v2.0.0 (生产冻结基线)  
 > **制定日期**: 2026-10-17  
 > **适用标准**: ISO/IEC/IEEE 29148:2018 / GB/T 8567-2006 (SRS) / EARS 规范 / .agents/skills/cmmi-req-spec  
@@ -10,7 +10,7 @@
 
 ## 1. 业务上下文与系统定位 (System Overview & Context)
 
-Coolie 是由 AI 数字员工全自主驱动的商业软件交付工厂控制面。为消除需求二义性、确保大模型编码准确度与代码质量抗退化，本系统全量功能需求强制使用 **EARS (Easy Approach to Requirements Syntax) 5 态精准句式** 定义，严禁使用“尽量”、“高效”、“大概”等不可机检的修饰词。
+Coolie AI 原生商业软件交付工厂控制面平台 是由 AI 数字员工全自主驱动的商业软件交付工厂控制面。为消除需求二义性、确保大模型编码准确度与代码质量抗退化，本系统全量功能需求强制使用 **EARS (Easy Approach to Requirements Syntax) 5 态精准句式** 定义，严禁使用“尽量”、“高效”、“大概”等不可机检的修饰词。
 
 ---
 

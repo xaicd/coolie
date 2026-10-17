@@ -1,6 +1,6 @@
-# Coolie 工坊控制面站点可靠性保障基线与 SLO/SLI 度量矩阵 (SLO/SLI Matrix)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 站点可靠性保障基线与 SLO/SLI 度量矩阵 (SLO/SLI Matrix)
 
-> **系统代号**: `COOLIE-FOUNDRY-CORE` (Coolie AI-Native Foundry Control Plane)  
+> **系统代号**: `COOLIE-FOUNDRY-CORE` (Coolie AI 原生商业软件交付工厂控制面平台)  
 > **CMMI 阶段**: `08_sre` (SCON / CAM / SRE) · 资产类型 `slo-matrix`  
 > **归属门禁**: G6 站点可靠性保障门禁 (`gate_g6_sre`)  
 > **责任数字员工**: 兑底渊 (PRE-SRE · 稳定性负责人) / 百晓生 (DS 业务主审) / 掌柜 (CEO)  

@@ -1,6 +1,6 @@
-# Coolie 工坊平台生产部署与割接标准作业程序 (System Deployment SOP)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 生产部署与割接标准作业程序 (System Deployment SOP)
 
-> **文档代号**: COOA-SOP-v2.0  
+> **文档代号**: COOA-SOP-v2.0.0  
 > **基线版本**: v2.0.0  
 > **生效日期**: 2026-10-17  
 > **归属规范**: CMMI 07_release (TRANS) / .agents/skills/sre-release-and-deploy / .agents/skills/deploy-workspace-symlinks  
@@ -44,7 +44,7 @@ ssh tc-coolie-claw 'bash /root/workspace/coolie/scripts/ensure-workspace-symlink
 ### 2.3 数据库安全迁移与服务优雅重启
 ```bash
 ssh tc-coolie-claw 'cd /root/workspace/coolie && pnpm db:migrate'
-ssh tc-coolie-claw 'sudo systemctl restart coolie'
+ssh tc-coolie-claw 'sudo systemctl restart coolie.service'
 ```
 
 ---
@@ -54,21 +54,11 @@ ssh tc-coolie-claw 'sudo systemctl restart coolie'
 1. **健康检查端点探测**:
    ```bash
    curl -f -s https://api.coolie.ai/api/health | jq .
-   # 预期输出: {"status":"ok","version":"2.0.0"}
+   # 预期输出: {"status":"ok","version":"v2.0.0"}
    ```
 2. **系统服务运行日志核查**:
    ```bash
-   ssh tc-coolie-claw 'sudo journalctl -u coolie -n 50 --no-pager'
+   ssh tc-coolie-claw 'journalctl -u coolie.service -n 50 --no-pager'
    ```
-3. **关键业务旅程端到端走查**:
-   - 登录控制台验证企业列表与当前项目大盘；
-   - 验证移动端应用连接状态；
-   - 确认无异常 500 报错与数据库连接池告警。
-
----
-
-## 4. 异常触发条件与秒级回滚接火点
-若生产发布后出现以下任意情况，立即终止割接并启动《秒级回滚应急操作手册》：
-- `/api/health` 连续 3 次拨测超时或返回 5xx 状态码；
-- 生产日志中出现数据库死锁或未处理的 Unhandled Exception；
-- 移动端发生普遍性闪退或白屏。
+3. **交付主线例行保活验证**:
+   确认 `coolie-dev-loop-supervisor.mjs` 正常发起第一轮心跳打点。

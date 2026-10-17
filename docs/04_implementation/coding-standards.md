@@ -1,6 +1,6 @@
-# Coolie 工坊平台工程编码规范与防死穴守则 (Coding Standards)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 工程编码规范与防死穴守则 (Coding Standards)
 
-> **文档代号**: COOA-STD-v2.0  
+> **文档代号**: COOA-STD-v2.0.0  
 > **基线版本**: v2.0.0  
 > **生效日期**: 2026-10-17  
 > **归属规范**: CMMI 04_implementation (VER / TS) / .agents/skills/core-swe  
@@ -10,7 +10,7 @@
 ## 1. 架构选型与 Monorepo 代码组织规范
 
 1. **工程组织**: 平台本体与自研全栈工程统一采用 **PNPM Monorepo** 架构：
-   - `server/`: 基于 Express / Node 24 的核心 REST API 与任务编排调度服务；
+   - `server/`: 基于 Express / Node 24.11.0 的核心 REST API 与任务编排调度服务；
    - `ui/`: 基于 React 19 + Vite + Tailwind CSS 的交付大盘 Web 管理端；
    - `clients/expo/`: 基于 React Native / Expo SDK 52 的原生移动驾驶舱客户端；
    - `clients/h5/`: 基于 H5 的移动端轻量驾驶舱；

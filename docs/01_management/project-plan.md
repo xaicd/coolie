@@ -1,7 +1,7 @@
-# Coolie 工坊平台综合研发管理计划与里程碑 (Project Master Plan)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 综合研发管理计划与里程碑 (Project Master Plan)
 
-> **文档代号**: COOA-PLAN-v2.0  
-> **项目全称**: Coolie AI-Native Commercial Software Delivery Foundry  
+> **文档代号**: COOA-PLAN-v2.0.0  
+> **项目全称**: Coolie AI 原生商业软件交付工厂控制面平台  
 > **基线版本**: v2.0.0 (生产与交付稳定版)  
 > **制定日期**: 2026-10-17  
 > **归属规范**: CMMI 01_management (PLAN / PP) / .agents/skills/cmmi-wbs-milestone  
@@ -10,7 +10,7 @@
 
 ## 1. 研发阶段里程碑与质量门禁主线 (WBS Milestones & Gate Keepers)
 
-为彻底阻断“伪完工”与“带病投产”，Coolie 平台研发全生命周期遵循严格的 G1~G5 递进式门禁流水线：
+为彻底阻断“伪完工”与“带病投产”，Coolie AI 原生商业软件交付工厂控制面平台研发全生命周期遵循严格的 G1~G5 递进式门禁流水线：
 
 ```mermaid
 flowchart LR

@@ -1,6 +1,6 @@
-# Coolie 工坊全生命周期合规与不可变履约审计账本 (Audit Trail)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 全生命周期合规与不可变履约审计账本 (Audit Trail)
 
-> **文档代号**: COOA-AUDIT-v2.0  
+> **文档代号**: COOA-AUDIT-v2.0.0  
 > **基线版本**: v2.0.0 (不可变履约归档)  
 > **审计基准**: CMMI V2.0 / V3.0 (Level 5 高成熟度) / GB/T 8567-2006  
 > **审计日期**: 2026-10-17  
@@ -16,7 +16,7 @@
 | **G2 架构契约门禁** | 2026-10-17 20:00 | 4+1 架构分层 HLD, OpenAPI 3.1 契约, MADR 记录 | 契约与 Drizzle 实体 100% 对账，无接口漂移 | **APPROVED** | FDA (@modou) |
 | **G3 静态编译门禁** | 2026-10-17 22:00 | Monorepo 全量源码、增量编译检查 | `pnpm -r typecheck` 0 报错，工作树 0 dirty | **APPROVED** | Core SWE (@tiejiang) |
 | **G4 物理验证门禁** | 2026-10-17 22:30 | 25 道物理预提交门禁、本体双向反射报告 | `pre-commit-check.mjs` 25/25 PASS | **APPROVED** | FDSE (@menshen) |
-| **G5 投产准备门禁** | 2026-10-17 22:32 | 不可变发布制品、生产部署 SOP、秒级回滚预案 | Git Tag 指向 Commit `47d8709a55`，7 处版本一致 | **APPROVED** | SRE (@sre) / 掌柜 |
+| **G5 投产准备门禁** | 2026-10-17 22:32 | 不可变发布制品、生产部署 SOP、秒级回滚预案 | Git Tag 指向稳定发版 Commit，7 处版本一致 | **APPROVED** | SRE (@sre) / 掌柜 |
 
 ---
 

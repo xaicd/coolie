@@ -1,0 +1,16 @@
+{
+  "name": "platform",
+  "PROJECT_TITLE": "Coolie AI 原生商业软件交付工厂控制面平台",
+  "PROJECT_SUBTITLE": "AI 原生端到端商业软件交付工厂控制面平台",
+  "SYSTEM_CODE": "COOA",
+  "VERSION": "v2.0.0",
+  "DATE": "2026-10-17",
+  "DATABASE_TABLES_COUNT": "263",
+  "TESTS_COUNT": "486",
+  "GATES_COUNT": "25",
+  "NODE_VERSION": "24.11.0",
+  "EXPO_SDK": "52",
+  "DEPLOY_HOST": "tc-coolie-claw",
+  "DEPLOY_IP": "62.234.59.180",
+  "SERVICE_NAME": "coolie.service"
+}

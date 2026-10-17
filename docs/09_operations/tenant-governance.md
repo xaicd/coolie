@@ -1,7 +1,7 @@
-# Coolie 工坊平台控制面多企业租户开通治理与数据隔离管理规范 (G7 运营 SOP)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 控制面多企业租户开通治理与数据隔离管理规范 (G7 运营 SOP)
 
-> **文档代号**: COOA-OPS-TENANT-v2.0  
-> **系统代号**: `COOLIE-FOUNDRY-CORE` (Coolie AI-Native Foundry Control Plane)  
+> **文档代号**: COOA-OPS-TENANT-v2.0.0  
+> **系统代号**: `COOLIE-FOUNDRY-CORE` (Coolie AI 原生商业软件交付工厂控制面平台)  
 > **CMMI 阶段**: `09_operations` (CMMI-SVC / BizOps)  
 > **归属门禁**: G7 持续商业运营门禁 (`gate_g7_ops`)  
 > **责任数字员工**: 百晓生 (DS · 部署战略与业务主审) / 掌柜 (CEO)  
@@ -13,7 +13,7 @@
 ## 1. 目标、范围与租户隔离原则
 
 ### 1.1 治理目标
-为 Coolie 平台上的多客户、多交付主体（Company 实体）提供端到端生命周期治理：企业开通、组织隔离、智能体 API 密钥准入、预算配额与硬停熔断。
+为 Coolie AI 原生商业软件交付工厂控制面平台上的多客户、多交付主体（Company 实体）提供端到端生命周期治理：企业开通、组织隔离、智能体 API 密钥准入、预算配额与硬停熔断。
 
 ### 1.2 核心隔离不变量 (Tenant Invariants)
 | 编号 | 核心不变量 | 落地实现与校验锚点 |

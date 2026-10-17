@@ -1,6 +1,6 @@
-# Coolie 工坊系统测试总结与验证确认报告 (STR / VAL)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 系统测试总结与验证确认报告 (STR / VAL)
 
-> **文档代号**: COOA-STR-v2.0  
+> **文档代号**: COOA-STR-v2.0.0  
 > **基线版本**: v2.0.0 (生产准入版)  
 > **报告日期**: 2026-10-17  
 > **适用规范**: ISO/IEC/IEEE 29119:2022 / GB/T 8567-2006 (STR) / .agents/skills/cmmi-ver-val  

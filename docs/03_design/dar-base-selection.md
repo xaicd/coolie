@@ -1,7 +1,7 @@
-# Coolie 工坊平台控制面技术底座选型与决策分析矩阵 (CMMI DAR)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 技术底座选型与决策分析矩阵 (CMMI DAR)
 
-> **文档代号**: COOA-DAR-v2.0  
-> **项目全称**: Coolie AI-Native Commercial Software Delivery Foundry (AI 原生端到端商业软件交付工厂控制面平台)  
+> **文档代号**: COOA-DAR-v2.0.0  
+> **项目全称**: Coolie AI 原生商业软件交付工厂控制面平台 (AI 原生端到端商业软件交付工厂控制面平台)  
 > **制定日期**: 2026-10-17  
 > **归属规范**: CMMI 03_design (DAR / TS) / .agents/skills/dar-decision-matrix  
 
@@ -19,7 +19,7 @@
 
 ## 2. 考虑的候选方案 (Candidate Options)
 
-- **方案 A (采纳)**: **Paperclip 现代化分层架构 + Node.js 24 / Express 5 + React 19 + Expo SDK 52 + Drizzle ORM + PGlite / PostgreSQL + Palantir 活体本体**。
+- **方案 A (采纳)**: **Paperclip 现代化分层架构 + Node.js 24.11.0 / Express 5 + React 19 + Expo SDK 52 + Drizzle ORM + PGlite / PostgreSQL + Palantir 活体本体**。
 - **方案 B**: **Java 企业级微服务 + 重型 BPM 工作流 (Spring Boot 3 + Flowable / Camunda + Vue3)**。
 - **方案 C**: **Python 全栈框架 (FastAPI + LangGraph / AutoGen + PostgreSQL + Streamlit)**。
 - **方案 D**: **传统项目管理平台二次开发 (Jira / GitLab / Redmine API)**。
@@ -43,10 +43,10 @@
 
 ## 4. 裁定结论与落地路径 (Decision Outcome)
 
-**正式裁定：采纳方案 A 作为 Coolie AI 原生商业软件交付工厂控制面的唯一官方技术底座！**
+**正式裁定：采纳方案 A 作为 Coolie AI 原生商业软件交付工厂控制面平台的唯一官方技术底座！**
 
 - **实施落地**:
-  - 服务端统一收拢至 `server/` (Node.js 24 + Express 5)；
+  - 服务端统一收拢至 `server/` (Node.js 24.11.0 + Express 5)；
   - 数据层采用 Drizzle ORM，开发环境自动启用 PGlite，生产环境直连 PostgreSQL 17；
   - 移动端统一采用 `clients/expo/`，严格实施 320dp 几何防撑爆与两字 UI；
   - 核心业务实体与动词通过 `ontology/` 实现形式化守护与 25 道安全门禁。

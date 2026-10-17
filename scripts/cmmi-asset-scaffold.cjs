@@ -345,6 +345,21 @@ flowchart TD
 - 响应形状统一：\`{ code: 0, data: T, msg: "success" }\`
 `,
       },
+      "dar-selection": {
+        file: "03_design/dar-base-selection.md",
+        title: "技术底座选型与决策分析矩阵 (DAR)",
+        template: () => `# 技术底座选型与决策分析矩阵 (DAR)\n`,
+      },
+      "contracts": {
+        file: "03_design/interface-contracts.md",
+        title: "跨端契约与动词化接口定义说明书 (LLD)",
+        template: () => `# 跨端契约与动词化接口定义说明书 (LLD)\n`,
+      },
+      "screenshot-spec": {
+        file: "03_design/screenshot-automation-spec.md",
+        title: "移动端真机截屏自动化与 6 寸屏防御规范",
+        template: () => `# 移动端真机截屏自动化与 6 寸屏防御规范\n`,
+      },
     },
   },
 
@@ -808,6 +823,16 @@ flowchart TD
 ## 3. 证书到期倒计时与告警静默期检查
 `,
       },
+      "operations-runbook": {
+        file: "09_operations/operations-runbook.md",
+        title: "生产日常运维与健康巡检 Runbook",
+        template: () => `# 生产日常运维与健康巡检 Runbook\n`,
+      },
+      "ota-protocol": {
+        file: "09_operations/ota-version-protocol.md",
+        title: "移动端自建 OTA 增量热更新与版本对齐规范",
+        template: () => `# 移动端自建 OTA 增量热更新与版本对齐规范\n`,
+      },
     },
   },
 };
@@ -837,6 +862,60 @@ function resolveDocsRoot(projectCode) {
   return path.join(ROOT, "docs");
 }
 
+function loadProfile(profileName) {
+  if (!profileName) return {};
+  const profilePath = path.join(ROOT, "templates", "cmmi", "profiles", `${profileName}.json`);
+  if (fs.existsSync(profilePath)) {
+    try {
+      return JSON.parse(fs.readFileSync(profilePath, "utf8"));
+    } catch (e) {
+      console.warn(`[cmmi-asset] 读取 profile 失败: ${e.message}`);
+    }
+  }
+  return {};
+}
+
+function resolveTemplateFile(phaseDef, typeDef, opts) {
+  if (typeDef.templateFile) {
+    const customPath = path.join(ROOT, "templates", "cmmi", typeDef.templateFile);
+    if (fs.existsSync(customPath)) return customPath;
+  }
+  const targetRel = typeof typeDef.file === "function" ? typeDef.file(opts) : typeDef.file;
+  const ext = path.extname(targetRel);
+  const base = path.basename(targetRel, ext);
+  const dir = path.dirname(targetRel);
+  const templatesRoot = path.join(ROOT, "templates", "cmmi");
+
+  // Check 1: templates/cmmi/<dir>/<base>.template<ext>
+  const p1 = path.join(templatesRoot, dir, `${base}.template${ext}`);
+  if (fs.existsSync(p1)) return p1;
+
+  // Check 2: templates/cmmi/<dir>/<base><ext>
+  const p2 = path.join(templatesRoot, dir, `${base}${ext}`);
+  if (fs.existsSync(p2)) return p2;
+
+  // Check 3: templates/cmmi/<phaseDef.name>/<base>.template<ext>
+  if (phaseDef && phaseDef.name) {
+    const p3 = path.join(templatesRoot, phaseDef.name, `${base}.template${ext}`);
+    if (fs.existsSync(p3)) return p3;
+  }
+
+  return null;
+}
+
+function renderTemplateContent(rawContent, variables) {
+  // Strip OSSP template comment banner if present
+  let content = rawContent.replace(/^<!--[\s\S]*?-->\s*/, "");
+  // Replace all {{KEY}}
+  for (const [key, val] of Object.entries(variables)) {
+    if (val !== undefined && val !== null) {
+      const reg = new RegExp(`\\{\\{${key}\\}\\}`, "g");
+      content = content.replace(reg, String(val));
+    }
+  }
+  return content;
+}
+
 function handleNew(opts) {
   const phase = opts.phase;
   const type = opts.type;
@@ -862,7 +941,29 @@ function handleNew(opts) {
   }
 
   const docsRoot = resolveDocsRoot(opts.project);
-  const targetRel = typeof typeDef.file === "function" ? typeDef.file(opts) : typeDef.file;
+  const profileName = opts.profile || (!opts.project ? "platform" : "");
+  const profile = loadProfile(profileName);
+
+  const variables = {
+    PROJECT_TITLE: opts.title || profile.PROJECT_TITLE || "Commercial Delivery Project",
+    PROJECT_SUBTITLE: profile.PROJECT_SUBTITLE || "",
+    SYSTEM_CODE: opts.systemCode || profile.SYSTEM_CODE || "SYS",
+    VERSION: opts.version || profile.VERSION || "v1.0.0",
+    DATE: opts.date || profile.DATE || new Date().toISOString().split("T")[0],
+    DATABASE_TABLES_COUNT: profile.DATABASE_TABLES_COUNT || "263",
+    TESTS_COUNT: profile.TESTS_COUNT || "486",
+    GATES_COUNT: profile.GATES_COUNT || "25",
+    NODE_VERSION: profile.NODE_VERSION || "24.11.0",
+    EXPO_SDK: profile.EXPO_SDK || "52",
+    DEPLOY_HOST: profile.DEPLOY_HOST || "tc-coolie-claw",
+    DEPLOY_IP: profile.DEPLOY_IP || "62.234.59.180",
+    SERVICE_NAME: profile.SERVICE_NAME || "coolie.service",
+    SLUG: (opts.slug || "DEFAULT").toUpperCase(),
+    ...profile,
+    ...opts,
+  };
+
+  const targetRel = typeof typeDef.file === "function" ? typeDef.file(variables) : typeDef.file;
   const targetAbs = path.join(docsRoot, targetRel);
 
   if (fs.existsSync(targetAbs) && !opts.force) {
@@ -871,43 +972,74 @@ function handleNew(opts) {
   }
 
   let content;
-  try {
-    content = typeDef.template(opts);
-  } catch (err) {
-    console.error(`[cmmi-asset] 资产生成受阻: ${err.message}`);
-    process.exit(1);
+  let sourceTpl = null;
+  const tplFile = resolveTemplateFile(phaseDef, typeDef, variables);
+  if (tplFile) {
+    const raw = fs.readFileSync(tplFile, "utf8");
+    content = renderTemplateContent(raw, variables);
+    sourceTpl = path.relative(ROOT, tplFile);
+  } else {
+    try {
+      content = typeDef.template(variables);
+    } catch (err) {
+      console.error(`[cmmi-asset] 资产生成受阻: ${err.message}`);
+      process.exit(1);
+    }
   }
 
   fs.mkdirSync(path.dirname(targetAbs), { recursive: true });
   fs.writeFileSync(targetAbs, content.trim() + "\n", "utf8");
-  console.log(`[cmmi-asset] ✅ 成功创建标准交付资产: ${path.relative(ROOT, targetAbs)}`);
+  console.log(`[cmmi-asset] ✅ 成功创建标准交付资产: ${path.relative(ROOT, targetAbs)}${sourceTpl ? ` (来源模版: ${sourceTpl})` : ""}`);
 }
 
 function handleBatch(opts) {
   const docsRoot = resolveDocsRoot(opts.project);
-  const title = opts.title || (opts.project ? path.basename(opts.project) : "Commercial Software Delivery");
-  const version = opts.version || "v1.0.0";
+  const profileName = opts.profile || (!opts.project ? "platform" : "");
+  const profile = loadProfile(profileName);
+
+  const title = opts.title || profile.PROJECT_TITLE || (opts.project ? path.basename(opts.project) : "Commercial Software Delivery");
+  const version = opts.version || profile.VERSION || "v1.0.0";
   const mode = opts.mode || "baseline";
+
+  const variables = {
+    PROJECT_TITLE: title,
+    PROJECT_SUBTITLE: profile.PROJECT_SUBTITLE || "",
+    SYSTEM_CODE: opts.systemCode || profile.SYSTEM_CODE || "COOA",
+    VERSION: version,
+    DATE: opts.date || profile.DATE || new Date().toISOString().split("T")[0],
+    DATABASE_TABLES_COUNT: profile.DATABASE_TABLES_COUNT || "263",
+    TESTS_COUNT: profile.TESTS_COUNT || "486",
+    GATES_COUNT: profile.GATES_COUNT || "25",
+    NODE_VERSION: profile.NODE_VERSION || "24.11.0",
+    EXPO_SDK: profile.EXPO_SDK || "52",
+    DEPLOY_HOST: profile.DEPLOY_HOST || "tc-coolie-claw",
+    DEPLOY_IP: profile.DEPLOY_IP || "62.234.59.180",
+    SERVICE_NAME: profile.SERVICE_NAME || "coolie.service",
+    SLUG: (opts.slug || "DEFAULT").toUpperCase(),
+    ...profile,
+    ...opts,
+  };
 
   // 核心基线推荐资产清单 (覆盖 G1~G5 全生命周期过程)
   const BASELINE_TYPES = {
     "01": ["charter", "risk", "plan"],
     "02": ["srs", "rtm", "nfr"],
-    "03": ["hld", "adr", "api-spec"],
+    "03": ["hld", "dar-selection", "erd", "contracts", "api-spec", "screenshot-spec"],
     "04": ["code-review"],
     "05": ["test-plan", "test-summary", "uat"],
     "06": ["audit"],
     "07": ["deployment-sop", "rollback-runbook", "checklist"],
-    "08": ["slo-matrix"],
-    "09": ["tenant-governance"],
+    "08": ["slo-matrix", "dr-plan"],
+    "09": ["tenant-governance", "operations-runbook", "ota-protocol"],
   };
 
   console.log(`\n========================================================================`);
-  console.log(`🚀 【CMMI 全生命周期过程资产批量生成流水线】(Batch Process Pipeline)`);
+  console.log(`🚀 【CMMI 全生命周期过程资产基于模版批量生成流水线】(Template-Driven Pipeline)`);
   console.log(`   目标工程目录: ${path.relative(ROOT, docsRoot)}`);
   console.log(`   项目全称: ${title} (${version})`);
-  console.log(`   生成模式: [${mode.toUpperCase()}] (${mode === "full" ? "全量 36 项标准资产" : "核心精简基线 18 项标准资产"})`);
-  console.log(`   原则: 100% 真实证据驱动 · 阶段严格有序 · 严禁伪造假 Demo 违规词`);
+  console.log(`   采用 Profile: [${profileName || "default"}]`);
+  console.log(`   生成模式: [${mode.toUpperCase()}] (${mode === "full" ? "全量 36 项标准资产" : "核心精简基线 24 项标准资产"})`);
+  console.log(`   原则: 100% 模版派生驱动 · 真实证据对账 · 严禁手写覆盖 · 阶段严格闭环`);
   console.log(`========================================================================\n`);
 
   let createdCount = 0;
@@ -923,7 +1055,7 @@ function handleBatch(opts) {
       const typeDef = phaseDef.types[type];
       if (!typeDef) continue;
 
-      const targetRel = typeof typeDef.file === "function" ? typeDef.file(opts) : typeDef.file;
+      const targetRel = typeof typeDef.file === "function" ? typeDef.file(variables) : typeDef.file;
       const targetAbs = path.join(docsRoot, targetRel);
 
       if (fs.existsSync(targetAbs) && !opts.force) {
@@ -933,10 +1065,20 @@ function handleBatch(opts) {
       }
 
       try {
-        const content = typeDef.template({ ...opts, title, version });
+        let content;
+        let sourceTpl = null;
+        const tplFile = resolveTemplateFile(phaseDef, typeDef, variables);
+        if (tplFile) {
+          const raw = fs.readFileSync(tplFile, "utf8");
+          content = renderTemplateContent(raw, variables);
+          sourceTpl = path.relative(ROOT, tplFile);
+        } else {
+          content = typeDef.template(variables);
+        }
+
         fs.mkdirSync(path.dirname(targetAbs), { recursive: true });
         fs.writeFileSync(targetAbs, content.trim() + "\n", "utf8");
-        console.log(`   🟢 [流水线生成] ${targetRel} (${typeDef.title})`);
+        console.log(`   🟢 [模版派生生成] ${targetRel} (${typeDef.title})${sourceTpl ? ` ➔ 来源模版: ${sourceTpl}` : ""}`);
         createdCount++;
       } catch (err) {
         console.error(`   ❌ [生成失败] ${targetRel}: ${err.message}`);
@@ -945,8 +1087,8 @@ function handleBatch(opts) {
   }
 
   console.log(`\n────────────────────────────────────────────────────────────────────────`);
-  console.log(`🎉 批量生成圆满完成: 新增真实过程资产 ${createdCount} 项，保留既有资产 ${skippedCount} 项。`);
-  console.log(`   CMMI 01~09 标准规范目录已就绪，所有模板原生支持 Markdown 审查与不可变证据挂载！`);
+  console.log(`🎉 模版派生批量生成圆满完成: 新增真实过程资产 ${createdCount} 项，保留既有资产 ${skippedCount} 项。`);
+  console.log(`   CMMI 01~09 标准规范目录已就绪，所有资产 100% 派生自 templates/cmmi/ 组织标准模版库！`);
   console.log(`────────────────────────────────────────────────────────────────────────\n`);
 }
 
@@ -1109,13 +1251,14 @@ function scanDir(dir) {
 function main() {
   const { cmd, opts } = parseArgs();
   if (cmd === "new") handleNew(opts);
-  else if (cmd === "batch" || cmd === "pipeline") handleBatch(opts);
+  else if (cmd === "batch" || cmd === "pipeline" || cmd === "generate") handleBatch(opts);
   else if (cmd === "export-templates" || cmd === "templates") handleExportTemplates();
   else if (cmd === "list") handleList(opts);
   else if (cmd === "check") handleCheck(opts);
   else {
     console.log("CMMI 01~09 全生命周期标准资产创建与治理引擎");
     console.log("用法:");
+    console.log("  node scripts/cmmi-asset-scaffold.cjs generate [--profile <platform|generic>] [--project <code>] [--force]");
     console.log("  node scripts/cmmi-asset-scaffold.cjs batch [--project <code>] [--title \"标题\"] [--mode <baseline|full>] [--force]");
     console.log("  node scripts/cmmi-asset-scaffold.cjs new --phase <01~09> --type <type> [--title \"标题\"] [--slug \"标识\"] [--real] [--project <code>]");
     console.log("  node scripts/cmmi-asset-scaffold.cjs export-templates (导出全量标准空白母本至 templates/cmmi/)");

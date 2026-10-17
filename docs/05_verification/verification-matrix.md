@@ -1,6 +1,6 @@
-# Coolie 工坊软件测试总计划与覆盖矩阵 (Verification Matrix - VV)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 软件测试总计划与覆盖矩阵 (Verification Matrix - VV)
 
-> **文档代号**: COOA-VM-v2.0  
+> **文档代号**: COOA-VM-v2.0.0  
 > **基线版本**: v2.0.0 (生产准入版)  
 > **制定日期**: 2026-10-17  
 > **归属规范**: CMMI 05_verification (VER / VAL) / ISO/IEC/IEEE 29119:2022 / .agents/skills/cmmi-ver-val  
@@ -9,7 +9,7 @@
 
 ## 1. 四层金字塔测试策略 (Four-Tier Testing Pyramid)
 
-Coolie 工坊实施四层立体化测试保障体系，彻底杀灭假 Mock 与空洞测试：
+Coolie AI 原生商业软件交付工厂控制面平台实施四层立体化测试保障体系，彻底杀灭假 Mock 与空洞测试：
 
 ```
        ▲  [L4: 真机 E2E 旅程与截屏] (Pixel 7 模拟器 + Android/Web 端到端四态走查)

@@ -1,6 +1,6 @@
-# Coolie 工坊核心风险跟踪管理台账 (Risk Register - RSKM)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 核心风险跟踪管理台账 (Risk Register - RSKM)
 
-> **文档代号**: COOA-RSKM-v2.0  
+> **文档代号**: COOA-RSKM-v2.0.0  
 > **基线版本**: v2.0.0  
 > **编制日期**: 2026-10-17  
 > **归属规范**: CMMI 01_management (RSKM) / ISO 31000 / .agents/skills/cmmi-asset-authoring  

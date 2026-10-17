@@ -1,6 +1,6 @@
-# Coolie 工坊需求双向跟踪矩阵 (Requirements Traceability Matrix - RTM)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 需求双向跟踪矩阵 (Requirements Traceability Matrix - RTM)
 
-> **文档代号**: COOA-RTM-v2.0  
+> **文档代号**: COOA-RTM-v2.0.0  
 > **基线版本**: v2.0.0  
 > **编制日期**: 2026-10-17  
 > **归属规范**: CMMI 02_requirements (RDM / REQM) / GB/T 8567-2006 / .agents/skills/cmmi-req-spec  

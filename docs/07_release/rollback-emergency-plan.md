@@ -1,57 +1,47 @@
-# Coolie 工坊平台控制面生产秒级回滚与应急预案 (Rollback Emergency Plan)
+# Coolie AI 原生商业软件交付工厂控制面平台 · 生产秒级回滚应急操作手册 (Rollback Emergency Plan)
 
-> **文档代号**: COOA-REL-ROL-v2.0  
-> **系统代号**: `COOLIE-FOUNDRY-CORE` (Coolie AI-Native Foundry Control Plane)  
-> **基线版本**: v2.0.0 (生产准入版)  
+> **文档代号**: COOA-ROLLBACK-v2.0.0  
+> **基线版本**: v2.0.0  
 > **制定日期**: 2026-10-17  
-> **归属规范**: CMMI 07_release (TRANS / RSKM) / .agents/skills/sre-release-and-deploy  
+> **归属规范**: CMMI 07_release (TRANS / RSKM) / .agents/skills/cmmi-immutable-release  
 
 ---
 
-## 1. 触发回滚的黄金判据 (Rollback Triggers)
+## 1. 回滚触发条件与决策红线 (Rollback Triggers & SLA)
 
-生产环境割接上线后 15 分钟内，若触碰以下任一阈值红线，一律触发**秒级无条件回滚**：
-1. **健康检查死穴**: `curl http://127.0.0.1:3100/api/health` 连续 3 次探测失败或超时（> 2000ms）；
-2. **核心业务状态机死锁**: 工单签出锁 (`/api/issues/:id/checkout`) 失败率超过 1%；
-3. **数据库连接池枯竭**: PostgreSQL 连接池耗尽或 Drizzle ORM 查询异常率 > 0.05%；
-4. **移动端 Crash 激增**: Expo 客户端冷启动崩溃率超过 0.1%。
+任何生产发布完成后，在 15 分钟观测期内满足以下任一条件时，SRE 持有一票否决权立即启动回滚：
+1. **API 错误率激增**: 核心控制面 5xx 错误率超过 0.5% 持续超过 2 分钟；
+2. **P95 延迟暴涨**: 接口 P95 响应耗时超过 200ms；
+3. **单人签出锁或预算硬停失灵**: 发现并发多写或费用穿透；
+4. **数据库数据损坏或不可逆锁表**。
+
+**回滚时效承诺 (RTO)**: $\le 5$ 分钟完成秒级回滚与止血。
 
 ---
 
-## 2. 生产服务端秒级回滚 SOP (Server Rollback SOP)
+## 2. 60 秒一键自动化回滚操作步骤 (Rollback Execution Steps)
 
-生产节点: `tc-coolie-claw` (`62.234.59.180`)
-
-### 2.1 软链接秒切与代码回滚 (Symlink Rollback)
-生产环境发布目录预留 `current` 软链接与 `previous` 备份目录：
+### 2.1 服务端历史安全版本回切 (Server Rollback)
 ```bash
-# 登录生产宿主机
-ssh tc-coolie-claw
+# 1. 登录生产服务器切换至上一稳定版本软链接
+ssh tc-coolie-claw 'cd /root/workspace/coolie && bash scripts/rollback-to-previous.sh'
 
-# 1. 秒级切换至上一版本物理目录
-cd /root/workspace/coolie
-ln -sfn releases/previous current
-
-# 2. 重启控制面托管服务
-systemctl restart coolie
-
-# 3. 探活验证
-curl -sSf http://127.0.0.1:3100/api/health
+# 2. 立即重启系统守护进程
+ssh tc-coolie-claw 'sudo systemctl restart coolie.service'
 ```
 
-### 2.2 数据库迁移逆向回滚规程 (Database Migration Rollback)
-若本次上线包含破坏性 Drizzle Schema 变更，执行向前兼容或回滚补丁：
-- 数据表字段只增不减（向前兼容原则）；
-- 若必须回滚，在受控事务中执行对应回滚 SQL 脚本，严禁直接 DROP 产生物理数据丢失。
+### 2.2 移动端 Expo OTA 纯 JS 补丁秒级回滚 (Mobile OTA Rollback)
+若移动端发布存在 UI 崩溃或白屏缺陷，通过自建 OTA 立即发布上一个稳定 bundle：
+```bash
+# 在 Mac 宿主机或发布节点执行 OTA 紧急回滚
+bash scripts/publish-ota.sh --rollback-to-last-stable
+```
+
+### 2.3 数据库向下兼容与回滚 (Database Rollback)
+所有 Schema 变更严格执行“向前兼容三步走（加列 ➔ 迁移 ➔ 删旧列）”，回滚阶段无需下线物理列，确保服务无缝切回。
 
 ---
 
-## 3. 移动端 Expo OTA 增量补丁回退 SOP (Client OTA Rollback)
-
-若移动端存在严重 UI 遮挡或白屏异常，由 PRE-SRE 触发纯 JS 增量回滚：
-1. **指定上一个稳定 release manifest hash**；
-2. 执行 OTA 回退指令：
-   ```bash
-   bash scripts/publish-ota.sh --rollback-to <PREVIOUS_COMMIT_SHA>
-   ```
-3. 客户端在下一次心跳轮询中将自动下载并加载稳定版 Bundle，无需重新走各大应用商店审核。
+## 3. 回滚后止血验证与通知通报 (Post-Rollback Verification)
+1. **健康检查验证**: 验证 `curl -f https://api.coolie.ai/api/health` 恢复为上一基线版本；
+2. **事故免责复盘登记**: 在 24 小时内依据 Google SRE 规范沉淀 `docs/08_sre/02_postmortem/` 事故复盘文档并固化防退化测试用例。
