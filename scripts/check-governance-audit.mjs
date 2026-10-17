@@ -804,6 +804,26 @@ assertRule(
   'hermes-boss-intent-dispatcher.sh 缺失 --help/-h/help 拦截逻辑, 容易将帮助指令误派为真实开发工单',
 );
 
+assertRule(
+  '巡检查询误派拦截守卫: hermes-boss-intent-dispatcher.sh §0.06 必须拦截「主线巡检/巡检…缺陷/本轮…缺陷/这轮…缺陷」查询语 (杜绝一次探活连起多张重单 COOA-485)',
+  bossIntentContent.includes('主线巡检') && bossIntentContent.includes('本轮[^[:space:]]*缺陷') && bossIntentContent.includes('这轮[^[:space:]]*缺陷'),
+  'hermes-boss-intent-dispatcher.sh §0.06 未拦截巡检缺陷查询语, 掌柜探活原话会连起多张假单 (COOA-485)',
+);
+
+assertRule(
+  '干跑零写守卫: hermes-boss-intent-dispatcher.sh 必须支持 COOLIE_DISPATCH_DRY_RUN 干跑 (巡检单测严禁真在 Dev Server 建单/落 Receipt, 防自造工单风暴 COOA-485)',
+  bossIntentContent.includes('COOLIE_DISPATCH_DRY_RUN'),
+  'hermes-boss-intent-dispatcher.sh 缺失 COOLIE_DISPATCH_DRY_RUN 干跑门禁, 巡检单元测试会真在 Dev Server 建单',
+);
+
+assertRule(
+  '派单幂等去重守卫: hermes-boss-intent-dispatcher.sh §0.07 必须按规范化原话窗口去重 (杜绝一句原话裂变多张工单 COOA-486)',
+  bossIntentContent.includes('COOLIE_DISPATCH_DEDUP_WINDOW_SEC') &&
+    bossIntentContent.includes('派单幂等去重') &&
+    bossIntentContent.includes('DEDUP_WINDOW_SEC'),
+  'hermes-boss-intent-dispatcher.sh 缺失 §0.07 派单幂等去重门禁, 巡检/探活原话会裂变多张重单 (COOA-486)',
+);
+
 // -----------------------------------------------------------------------------
 // 23. Web (ui/) i18n 引用-定义一致性守卫 (COOA-178 · 杜绝原始键外泄)
 // -----------------------------------------------------------------------------
@@ -894,6 +914,48 @@ assertRule(
   '新 SOA 架构与原型 Delta 全量契约守卫: node scripts/verify-wave286-new-soa-prototype.mjs 必须通过 (32/32 PASS)',
   wave286VerifyOk,
   `wave286 Delta 验证未通过: ${wave286Detail.slice(0, 300)}`,
+);
+
+// -----------------------------------------------------------------------------
+// 26. 技能口语评测产物 hermetic 化与计数漂移守卫 (COOA-487 · 源自 wave286 缺陷巡检)
+// -----------------------------------------------------------------------------
+console.log('\n🔒 26. 技能口语评测产物 hermetic 化与计数漂移守卫 (COOA-487):');
+const skillEvalLibPath = 'scripts/lib/skill-spoken-intent-eval.mjs';
+const skillEvalTestPath = 'scripts/__tests__/skill-spoken-intent-evaluation.test.mjs';
+const skillEvalLibContent = fs.existsSync(skillEvalLibPath) ? fs.readFileSync(skillEvalLibPath, 'utf8') : '';
+const skillEvalTestContent = fs.existsSync(skillEvalTestPath) ? fs.readFileSync(skillEvalTestPath, 'utf8') : '';
+assertRule(
+  '评测单测 hermetic 契约守卫: 单测默认 MUST NOT 直接写盘 (写盘仅经 SKILL_EVAL_WRITE=1 或独立生成器)',
+  fs.existsSync('scripts/generate-skill-spoken-intent-eval.mjs') &&
+    skillEvalLibContent.includes('computeReport') &&
+    skillEvalTestContent.includes('SKILL_EVAL_WRITE') &&
+    !skillEvalTestContent.includes('fs.writeFileSync') &&
+    skillEvalTestContent.includes('gitStatusPorcelain'),
+  '评测单测仍直接写盘或缺 hermetic 前后对拍, 违背 hermetic 契约 (COOA-487)',
+);
+
+assertRule(
+  '评测产物确定性守卫: 核心引擎 MUST NOT 含易变时间戳 (new Date / toISOString)',
+  skillEvalLibContent.includes('fingerprint') && !/new Date\(/.test(skillEvalLibContent),
+  '评测引擎仍含易变时间戳, committed 证据无法确定性重生成',
+);
+
+let skillEvalFreshOk = false;
+let skillEvalFreshDetail = '';
+try {
+  skillEvalFreshDetail = execSync('node scripts/check-skill-eval-freshness.mjs', {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  skillEvalFreshOk = skillEvalFreshDetail.includes('[PASS]');
+} catch (e) {
+  skillEvalFreshOk = false;
+  skillEvalFreshDetail = `${e?.stdout ?? ''}${e?.stderr ?? ''}`;
+}
+assertRule(
+  '评测产物零漂移守卫: node scripts/check-skill-eval-freshness.mjs 必须通过 (确定性重生成 == committed 证据)',
+  skillEvalFreshOk,
+  `技能评测证据存在漂移或缺失: ${skillEvalFreshDetail.split('\n').filter(Boolean).slice(-3).join(' | ')}`,
 );
 
 console.log('\n========================================================================');

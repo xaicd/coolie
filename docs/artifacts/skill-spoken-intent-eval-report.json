@@ -1,12 +1,10 @@
 {
-  "timestamp": "2026-10-13T08:14:44.048Z",
   "engine": "BM25 (k1=1.5, b=0.75) + Spoken-Ngram-Matcher",
-  "totalSkillsIndexed": 96,
+  "totalSkillsIndexed": 97,
   "totalCasesTested": 37,
   "metrics": {
     "precisionAt1": "100.0%",
-    "recallAt3": "100.0%",
-    "avgLatencyMs": 0.539
+    "recallAt3": "100.0%"
   },
   "gateStatus": "PASSED",
   "results": [
@@ -24,10 +22,9 @@
         "cmmi-req-spec",
         "ears-spec-writer"
       ],
-      "top1Score": "35.65",
+      "top1Score": "35.85",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "1.317"
+      "isTop3Hit": true
     },
     {
       "category": "01_需求工程",
@@ -42,10 +39,9 @@
         "cmmi-req-spec",
         "requirements-capture"
       ],
-      "top1Score": "29.76",
+      "top1Score": "29.90",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "1.089"
+      "isTop3Hit": true
     },
     {
       "category": "01_需求工程",
@@ -60,10 +56,9 @@
         "dar-decision-matrix",
         "cmmi-tech-solution"
       ],
-      "top1Score": "23.64",
+      "top1Score": "23.77",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.859"
+      "isTop3Hit": true
     },
     {
       "category": "02_架构设计",
@@ -78,10 +73,9 @@
         "system-design-spec",
         "dar-decision-matrix"
       ],
-      "top1Score": "38.87",
+      "top1Score": "39.05",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "1.146"
+      "isTop3Hit": true
     },
     {
       "category": "02_架构设计",
@@ -95,10 +89,9 @@
         "fdse",
         "check-pr"
       ],
-      "top1Score": "23.81",
+      "top1Score": "23.93",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.819"
+      "isTop3Hit": true
     },
     {
       "category": "02_架构设计",
@@ -112,10 +105,9 @@
         "paperclip-dev-workspace-run-verify-fix",
         "cmmi-tech-solution"
       ],
-      "top1Score": "28.02",
+      "top1Score": "28.05",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.949"
+      "isTop3Hit": true
     },
     {
       "category": "02_架构设计",
@@ -129,10 +121,9 @@
         "cmmi-asset-authoring",
         "coolie-boss-decision-log"
       ],
-      "top1Score": "27.90",
+      "top1Score": "28.04",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.717"
+      "isTop3Hit": true
     },
     {
       "category": "03_详细契约",
@@ -147,10 +138,9 @@
         "core-swe",
         "paperclip-evals"
       ],
-      "top1Score": "28.21",
+      "top1Score": "27.85",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.897"
+      "isTop3Hit": true
     },
     {
       "category": "03_详细契约",
@@ -164,10 +154,9 @@
         "cmmi-detailed-contracts",
         "yudao-backend-dev"
       ],
-      "top1Score": "56.89",
+      "top1Score": "57.06",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.880"
+      "isTop3Hit": true
     },
     {
       "category": "04_研发编码",
@@ -182,10 +171,9 @@
         "model-catalog-check",
         "bug-fix-flow"
       ],
-      "top1Score": "16.98",
+      "top1Score": "17.07",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.754"
+      "isTop3Hit": true
     },
     {
       "category": "04_研发编码",
@@ -200,10 +188,9 @@
         "prepare-paperclip-pr",
         "spec-driven-dev"
       ],
-      "top1Score": "12.57",
+      "top1Score": "12.63",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.842"
+      "isTop3Hit": true
     },
     {
       "category": "04_研发编码",
@@ -218,10 +205,9 @@
         "product-project-intake",
         "speckit-workflow"
       ],
-      "top1Score": "23.86",
+      "top1Score": "23.97",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.512"
+      "isTop3Hit": true
     },
     {
       "category": "05_移动端",
@@ -235,10 +221,9 @@
         "paperclip-dev-workspace-run-verify-fix",
         "swe-delivery-flow"
       ],
-      "top1Score": "44.17",
+      "top1Score": "44.38",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.400"
+      "isTop3Hit": true
     },
     {
       "category": "05_移动端",
@@ -252,10 +237,9 @@
         "agent-device-browser-automation",
         "minimalist-ui-and-cmmi-governance"
       ],
-      "top1Score": "36.73",
+      "top1Score": "36.90",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.375"
+      "isTop3Hit": true
     },
     {
       "category": "05_移动端",
@@ -269,10 +253,9 @@
         "pptx",
         "add-runner-eval"
       ],
-      "top1Score": "28.45",
+      "top1Score": "28.58",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.343"
+      "isTop3Hit": true
     },
     {
       "category": "05_移动端",
@@ -286,10 +269,9 @@
         "paperclip-create-plugin",
         "speckit-workflow"
       ],
-      "top1Score": "41.73",
+      "top1Score": "41.91",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.339"
+      "isTop3Hit": true
     },
     {
       "category": "06_测试打假",
@@ -304,10 +286,9 @@
         "qa-humanlike-e2e",
         "cmmi-ver-val"
       ],
-      "top1Score": "25.59",
+      "top1Score": "25.71",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.417"
+      "isTop3Hit": true
     },
     {
       "category": "06_测试打假",
@@ -321,10 +302,9 @@
         "yudao-cmmi-gatekeeper",
         "comprehensive-testing-workflow"
       ],
-      "top1Score": "37.74",
+      "top1Score": "37.92",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.344"
+      "isTop3Hit": true
     },
     {
       "category": "06_测试打假",
@@ -339,10 +319,9 @@
         "spec-driven-dev",
         "core-swe"
       ],
-      "top1Score": "30.36",
+      "top1Score": "30.54",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.368"
+      "isTop3Hit": true
     },
     {
       "category": "06_测试打假",
@@ -356,10 +335,9 @@
         "pr-report",
         "product-project-intake"
       ],
-      "top1Score": "42.44",
+      "top1Score": "42.65",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.360"
+      "isTop3Hit": true
     },
     {
       "category": "07_投产发布",
@@ -375,10 +353,9 @@
         "release",
         "create-paperclip-bundled-skill"
       ],
-      "top1Score": "35.00",
+      "top1Score": "35.18",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.398"
+      "isTop3Hit": true
     },
     {
       "category": "07_投产发布",
@@ -393,10 +370,9 @@
         "sre-release-and-deploy",
         "deploy-workspace-symlinks"
       ],
-      "top1Score": "27.15",
+      "top1Score": "27.27",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.359"
+      "isTop3Hit": true
     },
     {
       "category": "07_投产发布",
@@ -411,10 +387,9 @@
         "sre-release-and-deploy",
         "app-release-pipeline"
       ],
-      "top1Score": "47.53",
+      "top1Score": "47.74",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.363"
+      "isTop3Hit": true
     },
     {
       "category": "07_投产发布",
@@ -428,10 +403,9 @@
         "release-changelog-discord-message",
         "yudao-contract-sync"
       ],
-      "top1Score": "63.44",
+      "top1Score": "63.63",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.377"
+      "isTop3Hit": true
     },
     {
       "category": "08_大盘运营",
@@ -445,10 +419,9 @@
         "finance-budget-guard",
         "ops-task-orchestration"
       ],
-      "top1Score": "50.30",
+      "top1Score": "50.57",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.394"
+      "isTop3Hit": true
     },
     {
       "category": "08_大盘运营",
@@ -462,10 +435,9 @@
         "ceo-company-ops",
         "qa-humanlike-e2e"
       ],
-      "top1Score": "46.17",
+      "top1Score": "46.41",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.418"
+      "isTop3Hit": true
     },
     {
       "category": "08_大盘运营",
@@ -479,10 +451,9 @@
         "xlsx",
         "finance-budget-guard"
       ],
-      "top1Score": "44.49",
+      "top1Score": "44.68",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.348"
+      "isTop3Hit": true
     },
     {
       "category": "08_大盘运营",
@@ -496,10 +467,9 @@
         "cmmi-car-spc-metrics",
         "sre-release-and-deploy"
       ],
-      "top1Score": "31.38",
+      "top1Score": "31.52",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.354"
+      "isTop3Hit": true
     },
     {
       "category": "08_大盘运营",
@@ -513,10 +483,9 @@
         "postmortem-analyzer",
         "cmmi-immutable-release"
       ],
-      "top1Score": "49.86",
+      "top1Score": "50.08",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.350"
+      "isTop3Hit": true
     },
     {
       "category": "09_控制面",
@@ -531,10 +500,9 @@
         "hr-agent-onboarding",
         "ceo-company-ops"
       ],
-      "top1Score": "29.69",
+      "top1Score": "29.83",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.373"
+      "isTop3Hit": true
     },
     {
       "category": "09_控制面",
@@ -548,10 +516,9 @@
         "create-issue-interaction-ui",
         "ops-task-orchestration"
       ],
-      "top1Score": "33.09",
+      "top1Score": "33.26",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.400"
+      "isTop3Hit": true
     },
     {
       "category": "09_控制面",
@@ -565,10 +532,9 @@
         "release-changelog-discord-message",
         "internal-comms"
       ],
-      "top1Score": "58.70",
+      "top1Score": "58.93",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.341"
+      "isTop3Hit": true
     },
     {
       "category": "09_控制面",
@@ -583,10 +549,9 @@
         "coolie-mcp-orchestration",
         "cmmi-detailed-contracts"
       ],
-      "top1Score": "42.09",
+      "top1Score": "42.08",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.331"
+      "isTop3Hit": true
     },
     {
       "category": "10_办公文档",
@@ -601,10 +566,9 @@
         "financial-reconciliation-agent",
         "docx"
       ],
-      "top1Score": "21.55",
+      "top1Score": "21.65",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.332"
+      "isTop3Hit": true
     },
     {
       "category": "10_办公文档",
@@ -619,10 +583,9 @@
         "product-project-intake",
         "ears-spec-writer"
       ],
-      "top1Score": "48.88",
+      "top1Score": "49.01",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.420"
+      "isTop3Hit": true
     },
     {
       "category": "10_办公文档",
@@ -636,10 +599,9 @@
         "paperclip-dev-workspace-run-verify-fix",
         "paperclip-evals"
       ],
-      "top1Score": "19.60",
+      "top1Score": "19.68",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.324"
+      "isTop3Hit": true
     },
     {
       "category": "10_办公文档",
@@ -654,10 +616,10 @@
         "requirements-capture",
         "paperclip-page"
       ],
-      "top1Score": "15.90",
+      "top1Score": "15.98",
       "isTop1Hit": true,
-      "isTop3Hit": true,
-      "latencyMs": "0.331"
+      "isTop3Hit": true
     }
-  ]
+  ],
+  "fingerprint": "4f9d4f102576358d193454625fb95258299fafcc1489875f01956e7e03bc7fff"
 }
