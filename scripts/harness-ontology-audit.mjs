@@ -378,7 +378,39 @@ const report = {
 const artifactsDir = path.join(REPO_ROOT, 'docs/artifacts');
 fs.mkdirSync(artifactsDir, { recursive: true });
 const reportPath = path.join(artifactsDir, 'ontology-audit-report.json');
-fs.writeFileSync(reportPath, JSON.stringify(report, null, 2), 'utf8');
+
+// 幂等写盘 (Idempotent Persist): 纯时间戳漂移不入库。
+// 理由: 本审计被 pre-commit Gate 4.1 与 15min 巡检反复调用, 若无实质结论变化
+// 仍刷新 auditedAt, 就会在"刚刚通过门禁的工作树上"制造永久 dirty 文件,
+// 反噬 1 Task = 1 Commit & Clean Working Tree 铁律。
+// 契约: 除 auditedAt 外全部字段完全一致 -> 沿用上轮时间戳, 且不重写文件。
+let previousReport = null;
+try {
+  previousReport = JSON.parse(fs.readFileSync(reportPath, 'utf8'));
+} catch {
+  previousReport = null;
+}
+if (previousReport && previousReport.auditedAt) {
+  const strip = (o) => {
+    const { auditedAt, ...rest } = o;
+    return JSON.stringify(rest);
+  };
+  if (strip(previousReport) === strip(report)) {
+    report.auditedAt = previousReport.auditedAt;
+  }
+}
+
+const serializedReport = JSON.stringify(report, null, 2);
+let previousRaw = null;
+try {
+  previousRaw = fs.readFileSync(reportPath, 'utf8');
+} catch {
+  previousRaw = null;
+}
+const reportChanged = previousRaw !== serializedReport;
+if (reportChanged) {
+  fs.writeFileSync(reportPath, serializedReport, 'utf8');
+}
 
 // -----------------------------------------------------------------------------
 // 7. 控制台输出
