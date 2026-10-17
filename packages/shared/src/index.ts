@@ -2908,3 +2908,6 @@ export {
   onboardingStepSchema,
   type OnboardingStepInput,
 } from "./validators/company-onboarding.js";
+
+// Full-Stack Automation Testing & Ops MCP Matrix (Wave 2026-10-17)
+export * from "./validators/mcp-automation-ops.js";
