@@ -12,7 +12,8 @@
 1. **工程组织**: 平台本体与自研全栈工程统一采用 **PNPM Monorepo** 架构：
    - `server/`: 基于 Express / Node 24 的核心 REST API 与任务编排调度服务；
    - `ui/`: 基于 React 19 + Vite + Tailwind CSS 的交付大盘 Web 管理端；
-   - `expo/`: 基于 React Native / Expo SDK 52 的原生移动驾驶舱客户端；
+   - `clients/expo/`: 基于 React Native / Expo SDK 52 的原生移动驾驶舱客户端；
+   - `clients/h5/`: 基于 H5 的移动端轻量驾驶舱；
    - `packages/db/`: 基于 Drizzle ORM 的统一数据层与数据库迁移脚本；
    - `packages/shared/`: 全平台共享的 TypeScript 类型、常量与契约验证器；
    - `scripts/`: 本地自动化工具链、Harness 调度器与 25 道预提交门禁；
