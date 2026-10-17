@@ -1,4 +1,5 @@
-#!/usr/bin/env node
+#!/bin/sh
+// 2>/dev/null; exec /usr/bin/env node "$0" "$@"
 // scripts/coolie-dev-task.mjs
 // Coolie Dev Server (本地施工总社) 任务查询与管理工具
 
