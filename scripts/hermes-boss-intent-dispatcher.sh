@@ -73,23 +73,40 @@ done
 INPUT="${POSITIONAL_ARGS[*]:-}"
 
 # 0. 待办查询直接直通 Coolie Dev Server 任务大盘
-if [[ "$INPUT" =~ (待办|有哪些任务|任务列表|工单列表|未完成|有啥活|还有什么活|看下任务) ]]; then
+if [[ "${INPUT:-}" =~ (待办|有哪些任务|任务列表|工单列表|未完成|有啥活|还有什么活|看下任务) ]]; then
   exec node "$SCRIPT_DIR/coolie-dev-task.mjs" list
 fi
 
 # 0.05 工具状态探测直通 (wave286 · 老板原话 "--probe-tool-status")
 # 老板微信直发该标志位 = 真跑工具池健康探针并回传一屏状态, 直通 cron-team-status.sh,
 # 严禁再误判为默认编码任务派给铁匠.
-if [[ "$INPUT" == "--probe-tool-status" || "$INPUT" == "--probe-tool" || "$INPUT" == "--probe-tools" || "$INPUT" == "--tool-status" ]]; then
+if [[ "${INPUT:-}" == "--probe-tool-status" || "$INPUT" == "--probe-tool" || "$INPUT" == "--probe-tools" || "$INPUT" == "--tool-status" ]]; then
   echo "【Hermes 微信直通 · 工具池状态探测 (--probe-tool-status)】"
   exec bash "$SCRIPT_DIR/cron-team-status.sh" --probe-tool-status
 fi
 
+# 0.06 Hermes 探活前缀拦截门禁 (wave286 经验 · COOA-480 误触沉淀)
+# 掌柜自己用 dispatcher 探活时容易把探活文本当真指令派出去 (心法 #190)。
+# 凡含「探活 / probe-only / dry-probe / 巡检hourly / hourly routine / routine test / 探针」关键词
+# 的指令直接 echo 拒绝, 提示走专用探针旗标, 严禁再误判为默认 forge-core-swe 派单.
+if [[ "${INPUT:-}" =~ (探活|probe-only|dry-probe|巡检hourly|hourly[[:space:]]?routine|routine[[:space:]]?test|探针) ]]; then
+  cat <<EOF
+【Hermes · 探活前缀拦截 (wave286)】
+掌柜, 检测到您的指令「${INPUT:-}」含探活/巡检前缀, dispatcher 不予派单, 避免误触给他人起假 Issue。
+请改用专用探针旗标:
+  --probe-tool-status      真跑工具池健康探针
+  --expert "<反思/痛点>"   走 5 步专家法不走派单
+  bash scripts/coolie-dev-task.mjs list     直通待办大盘
+或直接发送具体业务指令 (含明确动词+宾语)。
+EOF
+  exit 0
+fi
+
 # 0.1 模糊意图检测与 Echo 澄清追问门禁 (Palantir Echo Clarification Gate)
-if [[ "$INPUT" =~ ^(修一下|改改|改一下|看下|弄下|加个|处理下|搞一下|修|改|看)$ ]]; then
+if [[ "${INPUT:-}" =~ ^(修一下|改改|改一下|看下|弄下|加个|处理下|搞一下|修|改|看)$ ]]; then
   cat <<EOF
 【Hermes · Echo 意图澄清追问】
-掌柜，您的指令「$INPUT」范围较模糊，请直接回复序号或补充上下文：
+掌柜，您的指令「${INPUT:-}」范围较模糊，请直接回复序号或补充上下文：
   [1] 移动端原生体验修复（两字按钮/底栏/布局塌陷）
   [2] 后台服务与控制面逻辑修复（审批流/多租户/数据库）
   [3] 生产发布与 OTA 增量同步问题（版本号/Caddy/缓存）
@@ -99,7 +116,7 @@ EOF
 fi
 
 # 0.2 长任务 18-20 分钟断点续接门禁 (Long-Running Task Continuation & Baton Relay)
-if [[ "$INPUT" =~ ^(继续|接着干|继续做|继续跑|接着跑|继续干|未完继续|断点续跑)$ ]]; then
+if [[ "${INPUT:-}" =~ ^(继续|接着干|继续做|继续跑|接着跑|继续干|未完继续|断点续跑)$ ]]; then
   DISPATCH_DIR="${COOLIE_LOCAL_DIR:-$REPO_ROOT/.coolie-local}/dispatch"
   LATEST_RECEIPT="$(ls -t "$DISPATCH_DIR"/*.json 2>/dev/null | head -1 || true)"
   
@@ -159,30 +176,30 @@ CMMI_PHASE="Phase 4.1 编码"
 AGENT_ID="02cab729-c5b7-4a14-9ce9-5a34885c336a"
 
 # 关键词规则扫描
-if [[ "$EXPERT_MODE" -eq 1 ]] || [[ "$INPUT" =~ (为什么.*慢|为什么.*乱|为什么这样|怎么回事|感觉.*没理解|你觉得呢|给个建议) ]]; then
+if [[ "$EXPERT_MODE" -eq 1 ]] || [[ "${INPUT:-}" =~ (为什么.*慢|为什么.*乱|为什么这样|怎么回事|感觉.*没理解|你觉得呢|给个建议) ]]; then
   CATEGORY="expert"
-elif [[ "$INPUT" =~ (原型|选型|调研|架构|画图|设计|spec|SRS|选.*vs) ]]; then
+elif [[ "${INPUT:-}" =~ (原型|选型|调研|架构|画图|设计|spec|SRS|选.*vs) ]]; then
   AGENT="modou-fda"
   EMPLOYEE="墨斗"
   TOOL="agy-gemini3.8"
   CATEGORY="arch"
   CMMI_PHASE="Phase 1.4 选型研判 / Phase 3.1 系统设计"
   AGENT_ID="09af00a0-f1cd-4a17-8ef5-3a8bcba381d7"
-elif [[ "$INPUT" =~ (部署|发版|OTA|上线|运维|manifest|tag|重启) ]]; then
+elif [[ "${INPUT:-}" =~ (部署|发版|OTA|上线|运维|manifest|tag|重启) ]]; then
   AGENT="duidiyuan-pre-sre"
   EMPLOYEE="兑底渊"
   TOOL="copilot"
   CATEGORY="ops"
   CMMI_PHASE="Phase 5.1 部署执行"
   AGENT_ID="8a288a46-8598-4c68-b52e-545360e11929"
-elif [[ "$INPUT" =~ (审查|review|金标|真机|验收金标|紧急跑|单测|端到端|测试用例|压测) ]]; then
+elif [[ "${INPUT:-}" =~ (审查|review|金标|真机|验收金标|紧急跑|单测|端到端|测试用例|压测) ]]; then
   AGENT="menshen-fdse"
   EMPLOYEE="门神"
   TOOL="claude-mm"
   CATEGORY="qa-gate"
   CMMI_PHASE="Phase 4.3 代码审查 / 5.3 验收金标"
   AGENT_ID="58dc794d-ae28-47f4-9e6e-5e798ef55df2"
-elif [[ "$INPUT" =~ (验收|监控|告警|风控|数据分析|测试|撞机|走查|复盘|回归|运营|对账|平账|多租户开通|业务巡检) ]]; then
+elif [[ "${INPUT:-}" =~ (验收|监控|告警|风控|数据分析|测试|撞机|走查|复盘|回归|运营|对账|平账|多租户开通|业务巡检) ]]; then
   AGENT="baixiaosheng-ds"
   EMPLOYEE="百晓生"
   TOOL="claude-mm"
@@ -209,11 +226,11 @@ ECHO_OUTCOME="明确解决的核心业务阻碍与高管交付 Outcome"
 DELTA_VERIFY="必须在真实模拟器/Web 或生产接口跑通，提供真机快照或命令结果存证"
 DEV_BACKPROP="完工前必须通过 pnpm check:governance 并固化防退化自动化守卫"
 
-if [[ "$INPUT" =~ (文案|改下字|单点|错别字|微调|查日志|看下状态) ]]; then
+if [[ "${INPUT:-}" =~ (文案|改下字|单点|错别字|微调|查日志|看下状态) ]]; then
   TASK_LEVEL="L1-快车道(轻量)"
   TOKEN_ESTIMATE="极低 (~3k-8k Tokens, 单兵直出)"
   DISCIPLINE_RULES="【L1 轻量铁律】单兵直出，先跑 scripts/check-governance-audit.sh 自检，严禁冗长上下文。"
-elif [[ "$INPUT" =~ (重构|新系统|多租户|架构重写|商业闭环) ]]; then
+elif [[ "${INPUT:-}" =~ (重构|新系统|多租户|架构重写|商业闭环) ]]; then
   TASK_LEVEL="L3-重大架构(全量CMMI)"
   TOKEN_ESTIMATE="高 (严格阶段门禁 G1-G5)"
   DISCIPLINE_RULES="【L3 架构铁律】严格遵从工业级标准与多租户隔离防线，产出完整 SRS 与 LLD。"
