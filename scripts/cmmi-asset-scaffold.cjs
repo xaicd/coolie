@@ -988,6 +988,46 @@ function handleList(opts) {
   console.log(`\n统计: 真实工程资产 ${realCount} 项，留空占位 ${emptyCount} 项（坚守零假 Demo 原则）。`);
 }
 
+function handleExportTemplates() {
+  const templatesRoot = path.join(ROOT, "templates", "cmmi");
+  console.log(`\n========================================================================`);
+  console.log(`📦 【CMMI 组织标准过程资产模板库 (OSSP) 同步与导出】`);
+  console.log(`   目标模板库目录: ${path.relative(ROOT, templatesRoot)}`);
+  console.log(`   原则: 模版与真实交付物绝对物理隔离 · 纯净空白母本`);
+  console.log(`========================================================================\n`);
+
+  let count = 0;
+  for (const [phase, phaseDef] of Object.entries(ASSET_REGISTRY)) {
+    console.log(`📁 【Phase ${phase}】${phaseDef.name}:`);
+    for (const [type, typeDef] of Object.entries(phaseDef.types)) {
+      let targetRel = typeof typeDef.file === "function" ? typeDef.file({ version: "{{VERSION}}", title: "{{PROJECT_TITLE}}", slug: "{{SLUG}}" }) : typeDef.file;
+      const ext = path.extname(targetRel);
+      const base = path.basename(targetRel, ext);
+      const dir = path.dirname(targetRel);
+      const templateFilename = `${base}.template${ext}`;
+      const targetAbs = path.join(templatesRoot, dir, templateFilename);
+
+      try {
+        let content;
+        try {
+          content = typeDef.template({ title: "{{PROJECT_TITLE}}", version: "{{VERSION}}", slug: "{{SLUG}}", real: true });
+        } catch (e) {
+          content = `# {{PROJECT_TITLE}} (${typeDef.title})\n\n> 归属规范: CMMI Phase ${phase} (${phaseDef.name})\n`;
+        }
+        const banner = `<!--\n==========================================================================\n【组织标准过程资产模版 (OSSP Template)】\n类型: ${typeDef.title} (${type})\n归属: CMMI Phase ${phase} (${phaseDef.name})\n注意: 本文件为纯净空白母本，严禁直接填写项目业务数据！\n      使用 node scripts/cmmi-asset-scaffold.cjs batch 派生到各项目 docs/ 中。\n==========================================================================\n-->\n\n`;
+        fs.mkdirSync(path.dirname(targetAbs), { recursive: true });
+        fs.writeFileSync(targetAbs, banner + content.trim() + "\n", "utf8");
+        console.log(`   🟢 [导出模版] ${path.join(dir, templateFilename)} (${typeDef.title})`);
+        count++;
+      } catch (err) {
+        console.error(`   ❌ [导出失败] ${targetRel}: ${err.message}`);
+      }
+    }
+  }
+  console.log(`\n🎉 模板库同步导出完成: 共固化 ${count} 项标准过程资产母本！\n`);
+}
+
+
 function handleCheck(opts) {
   const targetRoots = [];
   if (opts.project) {
@@ -1070,6 +1110,7 @@ function main() {
   const { cmd, opts } = parseArgs();
   if (cmd === "new") handleNew(opts);
   else if (cmd === "batch" || cmd === "pipeline") handleBatch(opts);
+  else if (cmd === "export-templates" || cmd === "templates") handleExportTemplates();
   else if (cmd === "list") handleList(opts);
   else if (cmd === "check") handleCheck(opts);
   else {
@@ -1077,6 +1118,7 @@ function main() {
     console.log("用法:");
     console.log("  node scripts/cmmi-asset-scaffold.cjs batch [--project <code>] [--title \"标题\"] [--mode <baseline|full>] [--force]");
     console.log("  node scripts/cmmi-asset-scaffold.cjs new --phase <01~09> --type <type> [--title \"标题\"] [--slug \"标识\"] [--real] [--project <code>]");
+    console.log("  node scripts/cmmi-asset-scaffold.cjs export-templates (导出全量标准空白母本至 templates/cmmi/)");
     console.log("  node scripts/cmmi-asset-scaffold.cjs list [--project <code>]");
     console.log("  node scripts/cmmi-asset-scaffold.cjs check [--project <code>]");
     process.exit(0);

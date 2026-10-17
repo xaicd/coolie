@@ -1,0 +1,18 @@
+<!--
+==========================================================================
+【组织标准过程资产模版 (OSSP Template)】
+类型: 20 道质量门禁数字指纹记录 (gate-trace)
+归属: CMMI Phase 06 (06_cmmi_audit)
+注意: 本文件为纯净空白母本，严禁直接填写项目业务数据！
+      使用 node scripts/cmmi-asset-scaffold.cjs batch 派生到各项目 docs/ 中。
+==========================================================================
+-->
+
+{
+  "schema": "https://schema.coolie.ai/gate-evidence-trace-v1.json",
+  "auditedAt": "2026-10-17T14:44:29.163Z",
+  "status": "PASSED",
+  "gatesCount": 20,
+  "invariants": "High-Order Inverse Thinking & Rule 0",
+  "verifiedBy": "@compliance-auditor"
+}
