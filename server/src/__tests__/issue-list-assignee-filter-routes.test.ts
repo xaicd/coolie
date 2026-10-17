@@ -449,6 +449,86 @@ describeEmbeddedPostgres("issue list routes assigneeAgentId filter", () => {
     });
   });
 
+  it("logs resolved when a valid-path skip closes an escalated handoff", async () => {
+    const companyId = randomUUID();
+    const agentId = randomUUID();
+    const issueId = randomUUID();
+    const resolverRunId = randomUUID();
+    const sourceRunId = randomUUID();
+
+    await db.insert(companies).values({
+      id: companyId,
+      name: "Paperclip",
+      issuePrefix: uniqueIssuePrefix(),
+      requireBoardApprovalForNewAgents: false,
+    });
+    await db.insert(agents).values({
+      id: agentId,
+      companyId,
+      name: "Assignee",
+      role: "engineer",
+      status: "active",
+      adapterType: "codex_local",
+      adapterConfig: {},
+      runtimeConfig: {},
+      permissions: {},
+    });
+    await db.insert(heartbeatRuns).values({
+      id: resolverRunId,
+      companyId,
+      agentId,
+      status: "succeeded",
+      contextSnapshot: { issueId },
+    });
+    await db.insert(issues).values({
+      id: issueId,
+      companyId,
+      identifier: `${uniqueIssuePrefix()}-1`,
+      title: "Escalated handoff still open",
+      status: "in_review",
+      priority: "medium",
+      assigneeAgentId: agentId,
+    });
+    await db.insert(activityLog).values({
+      companyId,
+      actorType: "system",
+      actorId: "heartbeat",
+      action: "issue.successful_run_handoff_escalated",
+      entityType: "issue",
+      entityId: issueId,
+      agentId,
+      details: { sourceRunId },
+      createdAt: new Date("2026-07-01T00:00:00.000Z"),
+    });
+
+    // A later run that continues down a valid path (here: a pending interaction the
+    // board must answer) proves the escalation is no longer actionable; it must be
+    // closed instead of advertising "board decision required" forever.
+    await expect(resolveRequiredSuccessfulRunHandoffOnValidPath(db, {
+      companyId,
+      issueId,
+      issueIdentifier: "PAP-2",
+      agentId,
+      runId: resolverRunId,
+      skipReason: "pending interaction awaits board input",
+    })).resolves.toBe(true);
+
+    const resolved = await db
+      .select()
+      .from(activityLog)
+      .where(eq(activityLog.entityId, issueId))
+      .then((rows) => rows.find((row) => row.action === "issue.successful_run_handoff_resolved"));
+    expect(resolved).toMatchObject({
+      runId: resolverRunId,
+      details: {
+        sourceRunId,
+        resolvedByRunId: resolverRunId,
+        resolvedBySkipReason: "pending interaction awaits board input",
+        resolvedFromState: "escalated",
+      },
+    });
+  });
+
   it("returns 304 for unchanged compact issue list ETags", async () => {
     const companyId = randomUUID();
     const issueId = randomUUID();

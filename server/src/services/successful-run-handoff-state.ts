@@ -99,7 +99,18 @@ export async function resolveRequiredSuccessfulRunHandoffOnValidPath(
     .orderBy(desc(activityLog.createdAt), desc(activityLog.id))
     .limit(1)
     .then((rows) => rows[0] ?? null);
-  if (latestHandoff?.action !== "issue.successful_run_handoff_required") return false;
+  // `escalated` is not terminal either: it means the platform already handed the
+  // disposition back to the board because an earlier run left no decision. When a
+  // later run continues down a valid path (pending interaction, monitor, routine
+  // continuation, ...), the escalation has served its purpose and must be closed —
+  // otherwise the issue keeps advertising `state: "escalated"` (i.e. "board
+  // decision required") even though a live continuation path already exists.
+  const handoffState = latestHandoff?.action === "issue.successful_run_handoff_escalated"
+    ? "escalated"
+    : latestHandoff?.action === "issue.successful_run_handoff_required"
+      ? "required"
+      : null;
+  if (handoffState === null) return false;
 
   const details = latestHandoff.details && typeof latestHandoff.details === "object"
     ? latestHandoff.details as Record<string, unknown>
@@ -121,6 +132,7 @@ export async function resolveRequiredSuccessfulRunHandoffOnValidPath(
       sourceRunId,
       resolvedByRunId: input.runId,
       resolvedBySkipReason: input.skipReason,
+      resolvedFromState: handoffState,
       issue: { id: input.issueId, identifier: input.issueIdentifier },
     },
   });
