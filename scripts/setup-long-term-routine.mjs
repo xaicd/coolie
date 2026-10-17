@@ -1,7 +1,17 @@
+import {
+  decideRoutineResume,
+  describeRoutineResumeDecision,
+} from './lib/routine-pause-authority.mjs';
+
 const API_BASE = 'http://127.0.0.1:3100/api';
 const COMPANY_ID = 'da2e705c-c80a-411b-b2ae-e39372b1251f'; // Coolie 本地施工总社
 const PROJECT_ID = 'a3b763bb-f751-4cdb-ac60-0c58a0c907cf'; // Coolie 工坊 AI 原生交付工厂本体系统
 const HERMES_AGENT_ID = '5419bef9-6b72-477b-a5e4-0fe19aac5b77'; // Hermes
+
+/** --force: 忽略"人工暂停"保护, 强行把 routine 拉回 active。 */
+const forceResume = process.argv.includes('--force');
+/** 本轮是否因"存在明确的暂停记录"而整体跳过 resume(含 trigger 强制 re-enable)。 */
+let pauseRespected = false;
 
 async function request(path, options = {}) {
   const url = `${API_BASE}${path}`;
@@ -65,13 +75,29 @@ async function main() {
   let targetRoutine = routines.find(r => r.title === routineTitle);
 
   if (targetRoutine) {
-    // 幂等 resume: 不论当前 status 是什么,都强制拉回 active,避免 routine 调度器 paused 后静默停摆 (心法 #49)
-    if (targetRoutine.status !== 'active') {
-      console.log(`⚠️  Routine 当前 status=${targetRoutine.status}, 幂等 resume → active`);
+    // 幂等 resume — 但**不许覆盖人的暂停**。
+    // 旧行为(心法 #49): "不论当前 status 是什么, 都强制拉回 active"。
+    // 真事故 (2026-10-17): 掌柜 00:49 CST 亲手把心祖 routine 停掉 (revision 9, local-board),
+    // 心跳按这条规则 PATCH 回 active, 之后 15 分钟一跳跑了一整夜 (COOA-463~472), 人的决定被静默撤销。
+    // 现口径: 最近一次 revision 是人写的且写成非 active ⇒ 人工暂停, 尊重, 不 resume (需 --force 覆盖)。
+    const revisions = await request(`/routines/${targetRoutine.id}/revisions`).catch(() => []);
+    const decision = decideRoutineResume({
+      routineStatus: targetRoutine.status,
+      revisions,
+      force: forceResume,
+    });
+    console.log(describeRoutineResumeDecision(decision));
+
+    if (decision.action === 'resume') {
       targetRoutine = await request(`/routines/${targetRoutine.id}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: 'active' }),
       });
+      console.log(`✅ 已恢复 active: ${targetRoutine.id}`);
+    } else if (decision.action === 'skip_paused') {
+      pauseRespected = true;
+      console.log('⏸  已记录为主动暂停 —— 本轮不再 resume routine, 也不再强制 re-enable trigger;');
+      console.log('   如确需覆盖, 重跑并加 --force。');
     } else {
       console.log(`✅ Routine 已是 active: ${targetRoutine.id}`);
     }
@@ -99,7 +125,9 @@ async function main() {
   const triggers = routineDetail.triggers || [];
   let scheduleTrigger = triggers.find(t => t.kind === 'schedule');
 
-  if (scheduleTrigger) {
+  if (pauseRespected) {
+    console.log('⏸  已记录为主动暂停 —— 跳过 trigger 强制 re-enable (尊重暂停决定, 保留人工控制权)。');
+  } else if (scheduleTrigger) {
     // 幂等 resume trigger: 不论 enabled 是 true/false 都强制 enable 并重排 nextRunAt
     if (!scheduleTrigger.enabled) {
       console.log(`⚠️  Trigger 当前 enabled=${scheduleTrigger.enabled}, 幂等 re-enable`);
