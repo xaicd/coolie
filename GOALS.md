@@ -145,7 +145,7 @@ flowchart LR
 - [x] **自主巡检 Loop 机制**：建立分钟级守护进程与保活 Keeper，实现 100% 自动解卡与超时 Routine 收口；
 - [x] **移动端边缘屏与结构性死屏清理**：完成 `COOA-234` 与 `COOA-237`，审批流闭环，Inbox Zero 达成；
 - [x] **知识吸收与自主演进滚动 Loop 闭环**：通过 Antigravity 持续调度与守护进程，实现外部知识从摄取 ➔ 消化 ➔ 立项 ➔ 施工 ➔ 验伪的全流程自动化自愈；
-- [ ] **全端体验一致性**：Web 控制台、移动原生 App 与 72 工具池状态全面对齐。
+- [ ] **全端体验一致性与全栈 MCP 双模并轨 (里程碑 1.5)**：确立接口 MCP 与页面 MCP 双模矩阵（`docs-coolie/specs/2026-10-17-full-stack-api-and-page-mcp-inventory.md`），涵盖页面拓扑路由感知、拟真人手势交互、四态快照打假、320dp 几何防遮挡断言、极简两字 UI 机检与运营语音直通掌上审批，全面补强自动化测试与运营能力。
 
 ### Phase 2: 工业量产 (Standardized Foundry & Customer Delivery)
 - [ ] **两大底座秒级派生**：`yudao-quad-terminal` 与 `ruoyi-all-next` 脚手架派生流水线秒级初始化；

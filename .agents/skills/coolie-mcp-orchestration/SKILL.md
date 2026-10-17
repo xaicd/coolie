@@ -63,7 +63,14 @@ Coolie 平台具备从控制面核心、活体业务本体、高管治理网关�
 - `apply_proposal`: 掌柜两字确认后，原子落盘生效。
 - `explain_diff`: 解释物理数据库与现实世界业务语义的差异。
 
-### 3. 本地执行与端到端自动化 MCP (Stdio Tools)
+### 3. 页面与视口交互感知 MCP (Page & Viewport MCPs) —— 自动化测试与运营核心武器
+让数字员工像真实人类一样“看见屏幕、触碰组件、打假防遮挡、掌上直通”：
+- **页面拓扑与上下文 (Topology & Context)**: `page_list_registered_routes` (全量已注册路由与层级树), `page_get_active_context` (当前活动路由/Tab/Modal), `page_inspect_a11y_tree` (无障碍语义树语义定位), `page_get_viewport_metrics` (320dp~390dp 物理分辨率与安全区).
+- **拟真人手势与交互 (Human-like Interaction)**: `page_navigate` (遵循 LIFO 严格调用栈防乱跳), `page_tap_component` (轻触/点击目标组件与反馈嗅探), `page_type_input` (键盘模拟输入与防抖验证), `page_swipe_scroll` (平滑滚动/上滑触底/下拉刷新), `page_trigger_action_card` (提议卡片两字决策).
+- **自动化测试打假 (QA Verification)**: `page_capture_quad_state` (一键捕获正常/为空/加载/错误四态快照), `page_assert_geometry_occlusion` (320dp 视口下底栏与手势条几何防遮挡断言), `page_audit_two_letter_ui` (极简两字 UI 规范机检), `page_detect_blank_or_freeze` (白屏/崩溃/卡死嗅探).
+- **运营看板与驾驶舱 (Ops Cockpit)**: `ops_voice_intent_to_action` (语音意图直通提议卡片), `ops_highlight_viewport_element` (视口组件动态轮廓高亮), `ops_capture_chart_deliverable` (图表高清截取并生成汇报卡片), `ops_trigger_daily_reconciliation` (运营日结三方流水对账平账).
+
+### 4. 本地执行与端到端自动化 Stdio 适配池 (Stdio Tools)
 - `agent-browser`: Playwright 驱动的无头浏览器端到端自动化旅程。
 - `agent-device`: ADB / iOS 驱动的真机模拟器点击、输入、截图与物理遮挡嗅探。
 - `ds-mcp`: 部署战略专家 (DS) 专用全景业务旅程主审。
@@ -166,3 +173,21 @@ Coolie 平台具备从控制面核心、活体业务本体、高管治理网关�
 3. **工坊语音与意图派发 (`[工坊]`)**:
    - 麦克风语音输入或快捷气泡（如“员工都在忙啥”、“有哪些待审批”），直接驱动后台 MCP 工具调度；
    - 验证截图存证：`screenshots/evidence-app-workshop-screen.png`。
+
+---
+
+## 五、自动化测试与运营使用 MCP 规范与实战闭环 (QA & Ops SOP)
+
+### 1. 自动化测试 (QA 门神) 作战闭环
+1. **真实视口探测**: 通过 `mcp_page_get_viewport_metrics` 锁定 320dp 极限视口；
+2. **结构化语义走查**: 通过 `mcp_page_inspect_a11y_tree` 嗅探交互要素，杜绝死按钮；
+3. **几何物理防遮挡**: 通过 `mcp_qa_assert_geometry_occlusion` 严防悬浮条与底部手势条遮挡两字操作；
+4. **四态快照存证**: 通过 `mcp_qa_capture_quad_state` 捕获正常、为空、加载、错误四态真机快照；
+5. **工件资产闭环**: 通过 `mcp_work_product_create` 挂载测试快照证据，达成 "No Artifact, No Done"。
+
+### 2. 运营人员与掌柜驾驶舱作战闭环
+1. **口语意图直通**: 掌柜输入语音或自然语言，通过 `mcp_ops_voice_intent_to_action` 解析为结构化提议；
+2. **页面精准穿透**: 通过 `mcp_page_navigate` 定位目标报表，调用 `mcp_ops_capture_chart_deliverable` 截取指标；
+3. **掌上两字审批**: 提议卡片弹出两字按钮【同意】/【驳回】，轻触触发 `mcp_approval_decide`；
+4. **原子落盘与对账**: 审批生效后通过 `mcp_ops_trigger_daily_reconciliation` 轧差平账，完成全链路商业闭环。
+
