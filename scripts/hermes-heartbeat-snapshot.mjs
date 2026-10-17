@@ -65,6 +65,7 @@ import {
   WAKE_CONTINUATION_POLICIES,
   pickInteractions,
 } from "./hermes-open-issue-liveness-scan.mjs";
+import { scanAllIssues } from "./lib/paperclip-issue-scan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(HERE, "..");
@@ -910,6 +911,7 @@ export async function collectSnapshot(config) {
     skipWaiting = false,
     livenessNow = Date.now(),
     fetchImpl = globalThis.fetch,
+    pageLimit = undefined,
   } = config;
 
   const snapshot = {
@@ -1010,18 +1012,28 @@ export async function collectSnapshot(config) {
   }
 
   // 5. 工单大盘四桶 (心法 #56/#144: list 是初盘, 真值以单条 API 为终判)
+  //    必须翻页: 单枪 `?limit=400` 会静默截断 (469 条时漏 69, 含 3 张等拍板),
+  //    四桶与活路判定同时被喂短名单 —— 见 fetchAllIssues 注释.
   let boardRows = [];
   if (!skipQueue && snapshot.companyId) {
-    const issues = await getJson(`${apiBase}/companies/${snapshot.companyId}/issues?limit=400`, {
+    const scan = await fetchAllIssues(snapshot.companyId, {
+      apiBase,
       apiKey,
       runId,
       fetchImpl,
+      ...(pageLimit ? { pageLimit } : {}),
     });
-    boardRows = pickIssues(issues.body);
+    boardRows = scan.rows;
+    snapshot.issueScan = {
+      rows: scan.rows.length,
+      pages: scan.pages,
+      truncated: scan.truncated === true,
+      error: scan.error ?? null,
+    };
     if (boardRows.length > 0) {
       snapshot.queue = summarizeQueue(boardRows);
     } else {
-      snapshot.queueUnavailableReason = apiErrorOf(issues.body) ?? `HTTP ${issues.status}`;
+      snapshot.queueUnavailableReason = scan.error ?? "empty issue list";
     }
   }
 
@@ -1034,6 +1046,41 @@ export async function collectSnapshot(config) {
 
   snapshot.generatedAt = new Date().toISOString();
   return snapshot;
+}
+
+/**
+ * 单页工单上限 / 翻页止损 —— 复用 `scripts/lib/paperclip-issue-scan.mjs`.
+ * 直接一枪打全量是**静默截断**: 公司 469 条工单时 `?limit=400` 只回 400 条,
+ * 实测漏掉 69 条, 其中 3 条是 in_review 等拍板 (COOA-44 / COOA-191 / COOA-278) —
+ * 于是"等拍板"桶报 1 实际 4, 老板的决策待办被藏掉 3 张.
+ */
+export { ISSUES_PAGE_LIMIT, ISSUES_PAGE_MAX } from "./lib/paperclip-issue-scan.mjs";
+
+/**
+ * keyset 翻页拉全量工单 (`sortField=id&sortDir=asc&afterId=<lastId>`).
+ *
+ * 返回 `{ rows, pages, truncated, error }` —— 失败时绝不返回"看起来正常"的短列表:
+ * `error` 有值 = 这轮大盘不可信, 由渲染层印出来 (心法: 不假装没人在等).
+ */
+export async function fetchAllIssues(
+  companyId,
+  { apiBase, apiKey = null, runId = null, fetchImpl = globalThis.fetch, pageLimit = undefined } = {}
+) {
+  const scan = await scanAllIssues({
+    ...(pageLimit ? { pageLimit } : {}),
+    loadPage: async (params) => {
+      const res = await getJson(
+        `${apiBase}/companies/${companyId}/issues?${params.toString()}`,
+        { apiKey, runId, fetchImpl }
+      );
+      return {
+        rows: pickIssues(res.body),
+        ok: res.ok,
+        error: res.ok ? null : apiErrorOf(res.body) ?? `HTTP ${res.status}`,
+      };
+    },
+  });
+  return { rows: scan.rows, pages: scan.pages, truncated: scan.truncated, error: scan.error };
 }
 
 function shortTime(value) {
@@ -1121,7 +1168,14 @@ export function renderText(snapshot) {
     );
   }
   if (snapshot.queue) {
-    lines.push(`queue   : ${queueLineCounts(snapshot.queue)} 总计 ${snapshot.queue.total} (进行中/等拍板/阻塞/待办)`);
+    const scanNote =
+      snapshot.issueScan && (snapshot.issueScan.truncated || snapshot.issueScan.error)
+        ? `  ⚠ scan=${snapshot.issueScan.rows}行/${snapshot.issueScan.pages}页` +
+          `${snapshot.issueScan.truncated ? " TRUNCATED" : ""}` +
+          `${snapshot.issueScan.error ? ` (${snapshot.issueScan.error})` : ""}`
+        : "";
+    lines.push(`queue   : ${queueLineCounts(snapshot.queue)} 总计 ${snapshot.queue.total} (进行中/等拍板/阻塞/待办)${scanNote}`);
+
     for (const bucket of QUEUE_BUCKETS) {
       const items = snapshot.queue.buckets[bucket.key] ?? [];
       if (items.length === 0) continue;

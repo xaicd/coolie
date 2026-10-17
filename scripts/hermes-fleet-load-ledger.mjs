@@ -51,6 +51,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { normalizeApiBase, pickIssues } from "./hermes-heartbeat-snapshot.mjs";
+import { scanAllIssues } from "./lib/paperclip-issue-scan.mjs";
 import { OPEN_STATUSES, idleHours, resolveCompanyId } from "./hermes-open-issue-liveness-scan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -462,12 +463,14 @@ export async function main(argv = process.argv.slice(2), env = process.env, deps
 
   // 心法 #155: 名册与工单都走 `GET /api/companies/{cid}/{resource}` (单条 issue 才走 root)
   const agentsPayload = await getJson(`${apiBase}/companies/${companyId}/agents`, { apiKey, fetchImpl });
-  const issuesPayload = await getJson(`${apiBase}/companies/${companyId}/issues?limit=${options.limit}`, {
-    apiKey,
-    fetchImpl,
+  // 必须翻页: 单枪 `?limit=N` 会静默截断 — 负载台账漏工单 = 漏负载. 见 scripts/lib/paperclip-issue-scan.mjs
+  const issuesScan = await scanAllIssues({
+    loadPage: async (params) =>
+      pickIssues(await getJson(`${apiBase}/companies/${companyId}/issues?${params.toString()}`, { apiKey, fetchImpl })),
+    pageLimit: options.limit,
   });
   const ledger = buildLedger(
-    { agents: pickAgents(agentsPayload), issues: pickIssues(issuesPayload) },
+    { agents: pickAgents(agentsPayload), issues: issuesScan.rows },
     now,
     { overloadThreshold: options.overloadThreshold },
   );

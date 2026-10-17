@@ -399,6 +399,54 @@ test("CLI refuses to run without an API key instead of silently returning empty 
   );
 });
 
+test("collectSnapshot paginates the issue list instead of silently truncating at one page", async () => {
+  // 回归: 单枪 `?limit=N` 会截断. 用 > 单页上限的假盘面, 断言四桶读到全部工单,
+  // 且 in_review 等拍板工单不会因为"排在第 2 页"就从大盘里消失.
+  const pageLimit = 3;
+  const reply = (status, body) => ({
+    ok: status >= 200 && status < 300,
+    status,
+    text: async () => JSON.stringify(body),
+    json: async () => body,
+  });
+  const all = Array.from({ length: 7 }, (_, i) => ({
+    id: `00000000-0000-4000-8000-${String(i + 1).padStart(12, "0")}`,
+    identifier: `COOA-${i + 1}`,
+    status: i === 5 ? "in_review" : "done",
+    updatedAt: `2026-10-16T10:0${i}:00.000Z`,
+  }));
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(url);
+    if (url.includes("/routines")) return reply(200, []);
+    if (url.includes("/inbox")) return reply(200, { pendingApprovals: [] });
+    if (url.includes("/issues?")) {
+      // 只模拟一页: limit 参数就是页大小, afterId 决定起点
+      const u = new URL(url);
+      const limit = Number(u.searchParams.get("limit") ?? pageLimit);
+      const afterId = u.searchParams.get("afterId");
+      const start = afterId ? all.findIndex((r) => r.id === afterId) + 1 : 0;
+      return reply(200, all.slice(start, start + Math.min(limit, pageLimit)));
+    }
+    return reply(404, { error: "not found" });
+  };
+
+  const snapshot = await collectSnapshot({
+    apiBase: "http://x/api",
+    apiKey: "k",
+    company: "cid",
+    fetchImpl,
+    pageLimit,
+  });
+
+  assert.equal(snapshot.queue.total, 7, "7 条工单必须全部入盘, 不能只有第一页 3 条");
+  assert.equal(snapshot.queue.buckets.in_review.length, 1, "第 2 页上的等拍板工单不能被藏掉");
+  assert.equal(snapshot.queue.buckets.in_review[0].identifier, "COOA-6");
+  assert.equal(snapshot.issueScan.truncated, false);
+  assert.equal(snapshot.issueScan.rows, 7);
+  assert.ok(calls.some((u) => u.includes("afterId=")), "必须带 afterId 翻页");
+});
+
 test("collectSnapshot resolves a missing linkedIssue.identifier via the linked issue lookup", async () => {
   const raw = {
     id: "b35ff456",
@@ -758,7 +806,7 @@ function startHeartbeatFixture() {
     res.setHeader("content-type", "application/json");
     if (req.url === `/api/issues/${ISSUE.id}`) return res.end(JSON.stringify(ISSUE));
     if (req.url === `/api/companies/${ISSUE.companyId}/routines`) return res.end(JSON.stringify(ROUTINES));
-    if (req.url === `/api/companies/${ISSUE.companyId}/issues?limit=400`) return res.end(JSON.stringify(E2E_ISSUES));
+    if (req.url.startsWith(`/api/companies/${ISSUE.companyId}/issues?`)) return res.end(JSON.stringify(E2E_ISSUES));
     if (req.url === `/api/inbox?companyId=${ISSUE.companyId}`) {
       return res.end(
         JSON.stringify({
@@ -882,7 +930,7 @@ function startTwoIssueFixture() {
     if (req.url === `/api/issues/${ISSUE.id}`) return res.end(JSON.stringify(ISSUE));
     if (req.url === `/api/issues/${OTHER_ISSUE.id}`) return res.end(JSON.stringify(OTHER_ISSUE));
     if (req.url === `/api/companies/${ISSUE.companyId}/routines`) return res.end(JSON.stringify(ROUTINES));
-    if (req.url === `/api/companies/${ISSUE.companyId}/issues?limit=400`) return res.end(JSON.stringify(E2E_ISSUES));
+    if (req.url.startsWith(`/api/companies/${ISSUE.companyId}/issues?`)) return res.end(JSON.stringify(E2E_ISSUES));
     if (req.url === `/api/inbox?companyId=${ISSUE.companyId}`) {
       return res.end(
         JSON.stringify({ pendingApprovals: [], failures: [], failedRuns: [], mentionedBy: [], joinRequests: [] })
@@ -1023,7 +1071,7 @@ test("end to end: the CLI reports liveness on a real board (live fixture server)
     res.setHeader("content-type", "application/json");
     if (req.url === `/api/issues/${ISSUE.id}`) return res.end(JSON.stringify(ISSUE));
     if (req.url === `/api/companies/${ISSUE.companyId}/routines`) return res.end(JSON.stringify(ROUTINES));
-    if (req.url === `/api/companies/${ISSUE.companyId}/issues?limit=400`) return res.end(JSON.stringify(board));
+    if (req.url.startsWith(`/api/companies/${ISSUE.companyId}/issues?`)) return res.end(JSON.stringify(board));
     if (req.url === `/api/inbox?companyId=${ISSUE.companyId}`) {
       return res.end(JSON.stringify({ pendingApprovals: [], failures: [], mentionedBy: [], joinRequests: [] }));
     }
@@ -1149,7 +1197,7 @@ test("end to end: the brief shows the open card, then flags it when the card is 
     if (req.url === `/api/issues/${ISSUE.id}`) return res.end(JSON.stringify(ISSUE));
     if (req.url === `/api/issues/${ISSUE.id}/interactions`) return res.end(JSON.stringify(cards));
     if (req.url === `/api/companies/${ISSUE.companyId}/routines`) return res.end(JSON.stringify(ROUTINES));
-    if (req.url === `/api/companies/${ISSUE.companyId}/issues?limit=400`) return res.end(JSON.stringify(E2E_ISSUES));
+    if (req.url.startsWith(`/api/companies/${ISSUE.companyId}/issues?`)) return res.end(JSON.stringify(E2E_ISSUES));
     if (req.url === `/api/inbox?companyId=${ISSUE.companyId}`) {
       return res.end(JSON.stringify({ pendingApprovals: [], failures: [], failedRuns: [], mentionedBy: [], joinRequests: [] }));
     }
@@ -1406,7 +1454,7 @@ test("end to end: 卡片被答后 brief 从 disp=guarded 翻成 disp=risk", asyn
     if (req.url === `/api/issues/${ISSUE.id}`) return res.end(JSON.stringify(ISSUE));
     if (req.url === `/api/issues/${ISSUE.id}/interactions`) return res.end(JSON.stringify(cards));
     if (req.url === `/api/companies/${ISSUE.companyId}/routines`) return res.end(JSON.stringify(ROUTINES));
-    if (req.url === `/api/companies/${ISSUE.companyId}/issues?limit=400`) return res.end(JSON.stringify(E2E_ISSUES));
+    if (req.url.startsWith(`/api/companies/${ISSUE.companyId}/issues?`)) return res.end(JSON.stringify(E2E_ISSUES));
     if (req.url === `/api/inbox?companyId=${ISSUE.companyId}`) {
       return res.end(JSON.stringify({ pendingApprovals: [], failures: [], failedRuns: [], mentionedBy: [], joinRequests: [] }));
     }
@@ -1501,7 +1549,7 @@ test("end to end: 陈旧 escalated 在 brief 里现形, 清掉后打一行 delta
     if (req.url === `/api/issues/${ISSUE.id}`) return res.end(JSON.stringify(issueBody()));
     if (req.url === `/api/issues/${ISSUE.id}/interactions`) return res.end(JSON.stringify(cards));
     if (req.url === `/api/companies/${ISSUE.companyId}/routines`) return res.end(JSON.stringify(ROUTINES));
-    if (req.url === `/api/companies/${ISSUE.companyId}/issues?limit=400`) return res.end(JSON.stringify(E2E_ISSUES));
+    if (req.url.startsWith(`/api/companies/${ISSUE.companyId}/issues?`)) return res.end(JSON.stringify(E2E_ISSUES));
     if (req.url === `/api/inbox?companyId=${ISSUE.companyId}`) {
       return res.end(JSON.stringify({ pendingApprovals: [], failures: [], failedRuns: [], mentionedBy: [], joinRequests: [] }));
     }

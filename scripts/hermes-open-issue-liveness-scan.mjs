@@ -56,6 +56,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { apiErrorOf, normalizeApiBase, pickIssues } from "./hermes-heartbeat-snapshot.mjs";
+import { scanAllIssues } from "./lib/paperclip-issue-scan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(HERE, "..");
@@ -543,10 +544,14 @@ export async function main(argv = process.argv.slice(2), env = process.env) {
     return 2;
   }
 
-  const payload = await getJson(`${apiBase}/companies/${companyId}/issues?limit=${options.limit}`, {
-    apiKey,
+  // 必须翻页: 单枪 `?limit=N` 会静默截断 (469 条时漏 69, 含 3 张等拍板) —
+  // 活路判定被喂短名单就会把"看不见"读成"有活路". 见 scripts/lib/paperclip-issue-scan.mjs
+  const scanRows = await scanAllIssues({
+    loadPage: async (params) =>
+      pickIssues(await getJson(`${apiBase}/companies/${companyId}/issues?${params.toString()}`, { apiKey })),
+    pageLimit: options.limit,
   });
-  let scan = scanIssues(pickIssues(payload), {
+  let scan = scanIssues(scanRows.rows, {
     now: Date.now(),
     queuedStaleHours: options.staleQueuedHours,
     handoffGraceMinutes: options.handoffGraceMinutes,

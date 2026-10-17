@@ -51,6 +51,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { normalizeApiBase, pickRoutines, pickIssues, roleForRoutine } from "./hermes-heartbeat-snapshot.mjs";
+import { scanAllIssues } from "./lib/paperclip-issue-scan.mjs";
 import { resolveCompanyId, OPEN_STATUSES } from "./hermes-open-issue-liveness-scan.mjs";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -674,11 +675,16 @@ export async function main(argv = process.argv.slice(2), env = process.env, deps
 
   // 心法 #66: `/companies/{cid}/routines` 是唯一返回 routine 数据的路由
   const routinesPayload = await getJson(`${apiBase}/companies/${companyId}/routines`, { apiKey, fetchImpl });
-  const issuesPayload = await getJson(`${apiBase}/companies/${companyId}/issues?limit=${options.limit}`, { apiKey, fetchImpl });
+  // 必须翻页: 单枪 `?limit=N` 会静默截断 — 审计漏工单 = 漏判 routine 泄漏. 见 scripts/lib/paperclip-issue-scan.mjs
+  const issuesScan = await scanAllIssues({
+    loadPage: async (params) =>
+      pickIssues(await getJson(`${apiBase}/companies/${companyId}/issues?${params.toString()}`, { apiKey, fetchImpl })),
+    pageLimit: options.limit,
+  });
 
   const audit = auditExecutions({
     routines: routinesPayload,
-    issues: issuesPayload,
+    issues: issuesScan.rows,
     now,
     opts: {
       currentIssueId: options.current || env.PAPERCLIP_TASK_ID || null,

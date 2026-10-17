@@ -415,8 +415,8 @@ test("main 端到端: 桩 fetch 驱动扫描并打印简报", async () => {
     text: async () =>
       JSON.stringify({
         issues: [
-          issue({ identifier: "COOA-77", blockerAttention: { unresolvedBlockerCount: 0 } }),
-          issue({ status: "in_progress", identifier: "COOA-114", executionRunId: "run-live" }),
+          issue({ id: "11111111-2222-3333-4444-555555555551", identifier: "COOA-77", blockerAttention: { unresolvedBlockerCount: 0 } }),
+          issue({ id: "11111111-2222-3333-4444-555555555552", status: "in_progress", identifier: "COOA-114", executionRunId: "run-live" }),
         ],
       }),
   });
