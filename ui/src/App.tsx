@@ -9,7 +9,7 @@ export const WEB_ROUTER_INSPECTION_TARGETS = Object.freeze({
   screenName: "AppRouter",
   perspective: "SWE_FDSE",
   baselineFeatures: Object.freeze([
-    "routerLiftoGuard",
+    "routerLifoGuard",
     "streamlinedUiDualMode",
     "lazyRouteSuspense",
     "companyPrefixEnforcement",

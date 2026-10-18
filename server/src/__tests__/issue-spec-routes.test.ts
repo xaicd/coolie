@@ -2,7 +2,7 @@ import { randomUUID } from "node:crypto";
 import express from "express";
 import request from "supertest";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { activityLog, companies, createDb, issues } from "@paperclipai/db";
+import { activityLog, companies, createDb, documents, issueDocuments, issues } from "@paperclipai/db";
 import {
   getEmbeddedPostgresTestSupport,
   startEmbeddedPostgresTestDatabase,
@@ -51,6 +51,8 @@ describeEmbeddedPostgres("issue spec routes (wave147)", () => {
   }, 30_000);
 
   afterEach(async () => {
+    await db.delete(issueDocuments);
+    await db.delete(documents);
     await db.delete(activityLog);
     await db.delete(issues);
     await db.delete(companies);
@@ -156,5 +158,41 @@ describeEmbeddedPostgres("issue spec routes (wave147)", () => {
       .post(`/api/issues/${issueId}/spec?draft=1`)
       .send({ kind: "design", parentSpecId: issueId, design: { approach: "x" } });
     expect(selfParent.status).toBe(422);
+  });
+
+  it("dual-writes spec to official issue_documents and reads back fallback when issue.spec is empty", async () => {
+    const companyId = await seedCompany();
+    const issueId = randomUUID();
+    await db.insert(issues).values({
+      id: issueId,
+      companyId,
+      title: "Official issue doc bridge test",
+      status: "backlog",
+      priority: "medium",
+    });
+
+    const writeRes = await request(app)
+      .post(`/api/issues/${issueId}/spec`)
+      .send({
+        kind: "requirement",
+        requirement: {
+          body: "Official bridge requirement text",
+          acceptanceCriteria: ["AC1: dual write works"],
+        },
+      });
+    expect(writeRes.status).toBe(200);
+
+    const officialDocs = await db.select().from(issueDocuments);
+    const specDoc = officialDocs.find((d) => d.issueId === issueId && d.key === "spec");
+    expect(specDoc).toBeDefined();
+
+    // Clear legacy issue.spec and issue.specKind to simulate upstream pure state
+    await db.update(issues).set({ specKind: null, spec: null });
+
+    // Verify GET /api/issues/:id/spec falls back to official issue_documents
+    const readRes = await request(app).get(`/api/issues/${issueId}/spec`);
+    expect(readRes.status).toBe(200);
+    expect(readRes.body.specKind).toBe("requirement");
+    expect(readRes.body.spec.requirement.body).toContain("Official bridge requirement text");
   });
 });

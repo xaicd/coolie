@@ -2,15 +2,15 @@
  * 工坊产品全功能验收大盘 (COOA-498 / [T2]) — Web IssueDetail 详情页机器可读验收清单。
  *
  * 对齐 docs/05_verification/WORKSHOP-FULL-SYSTEM-VERIFICATION-MATRIX.md 第三节
- * WEB-07 IssueDetail 条目 (审批/文档/工件/规格 4 个 tab + LIFO 抽屉 + 两字按钮互锁)。
+ * WEB-04 IssueDetail 条目 (文档/Spec/工件/审批/事件流 Tabs + LIFO 抽屉 + 两字按钮互锁)。
  */
 export const WEB_ISSUE_DETAIL_INSPECTION_TARGETS = Object.freeze({
-  screenId: "WEB-07",
+  screenId: "WEB-04",
   screenName: "IssueDetail",
   perspective: "CPO",
   baselineFeatures: Object.freeze([
     "tabbedSubPanels",
-    "liftoDrawerPreserveScroll",
+    "lifoDrawerPreserveScroll",
     "twoLetterButtonMutex",
     "quadStateExhaustion",
     "executionBlockerNotice",

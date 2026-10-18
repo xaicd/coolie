@@ -17,6 +17,7 @@ import {
 } from "@paperclipai/shared";
 import { notFound, unprocessable } from "../errors.js";
 import { issueService, logActivity } from "../services/index.js";
+import { documentService } from "../services/documents.js";
 import { assertCompanyAccess, getAccessibleResource, getActorInfo } from "./authz.js";
 import { recordAudit } from "../middleware/audit.js";
 
@@ -26,6 +27,54 @@ const SPEC_TITLES: Record<IssueSpecKind, string> = {
   design: "设计：待填写",
   task: "任务：待填写",
 };
+
+function specToMarkdown(title: string, spec: IssueSpec): string {
+  const kind = spec.kind;
+  let md = `# ${title}\n\n`;
+  md += `> 规格类型: \`${kind}\`\n\n`;
+  if (kind === "requirement" && spec.requirement) {
+    md += `## 需求描述\n${spec.requirement.body || ""}\n\n`;
+    if (Array.isArray(spec.requirement.acceptanceCriteria) && spec.requirement.acceptanceCriteria.length > 0) {
+      md += `## 验收准则 (Acceptance Criteria)\n`;
+      for (const ac of spec.requirement.acceptanceCriteria) {
+        md += `- [ ] ${ac}\n`;
+      }
+      md += `\n`;
+    }
+  } else if (kind === "bugfix" && spec.bugfix) {
+    md += `## 复现步骤\n${spec.bugfix.reproSteps || ""}\n\n`;
+    md += `## 预期行为\n${spec.bugfix.expectedBehavior || ""}\n\n`;
+    md += `## 实际行为\n${spec.bugfix.actualBehavior || ""}\n\n`;
+  } else if (kind === "design" && spec.design) {
+    md += `## 方案说明\n${spec.design.approach || ""}\n\n`;
+    if (Array.isArray(spec.design.tradeoffs) && spec.design.tradeoffs.length > 0) {
+      md += `## 方案权衡 (Trade-offs)\n`;
+      for (const t of spec.design.tradeoffs) {
+        md += `- ${t}\n`;
+      }
+      md += `\n`;
+    }
+    if (spec.design.apiSurface) {
+      md += `## 接口契约与边界 (API Surface)\n\`\`\`\n${spec.design.apiSurface}\n\`\`\`\n\n`;
+    }
+  } else if (kind === "task" && spec.task) {
+    if (Array.isArray(spec.task.files) && spec.task.files.length > 0) {
+      md += `## 涉及文件白名单\n`;
+      for (const f of spec.task.files) {
+        md += `- \`${f}\`\n`;
+      }
+      md += `\n`;
+    }
+    if (Array.isArray(spec.task.steps) && spec.task.steps.length > 0) {
+      md += `## 执行步骤\n`;
+      for (const s of spec.task.steps) {
+        md += `- [ ] ${s}\n`;
+      }
+      md += `\n`;
+    }
+  }
+  return md;
+}
 
 /**
  * Spec-driven development routes (wave147).
@@ -40,6 +89,7 @@ const SPEC_TITLES: Record<IssueSpecKind, string> = {
 export function issueSpecRoutes(db: Db) {
   const router = Router();
   const issueSvc = issueService(db);
+  const docSvc = documentService(db);
 
   function readSpecRow(id: string) {
     return db
@@ -59,11 +109,40 @@ export function issueSpecRoutes(db: Db) {
       .then((rows) => rows[0] ?? null);
   }
 
-  async function writeSpec(issueId: string, spec: IssueSpec): Promise<void> {
+  async function writeSpec(
+    issueId: string,
+    spec: IssueSpec,
+    title?: string,
+    actor?: ReturnType<typeof getActorInfo>,
+  ): Promise<void> {
     await db
       .update(issueRows)
       .set({ specKind: spec.kind, spec, updatedAt: new Date() })
       .where(eq(issueRows.id, issueId));
+
+    try {
+      const issueTitle =
+        title ||
+        (await db
+          .select({ title: issueRows.title })
+          .from(issueRows)
+          .where(eq(issueRows.id, issueId))
+          .then((r) => r[0]?.title)) ||
+        "未命名规格";
+      await docSvc.upsertIssueDocument({
+        issueId,
+        key: "spec",
+        title: `[Spec] ${issueTitle}`,
+        format: "markdown",
+        body: specToMarkdown(issueTitle, spec),
+        changeSummary: `Dual-write sync to official issue_documents (kind: ${spec.kind})`,
+        createdByAgentId: actor?.agentId ?? null,
+        createdByUserId: actor?.actorType === "user" ? actor.actorId : null,
+        createdByRunId: actor?.runId ?? null,
+      });
+    } catch (err) {
+      console.warn(`[issue-specs] Failed to mirror spec to official issue_documents for issue ${issueId}:`, err);
+    }
   }
 
   router.get("/issues/:id/spec", async (req, res) => {
@@ -74,10 +153,32 @@ export function issueSpecRoutes(db: Db) {
     }
     const issue = await getAccessibleResource(req, res, readSpecRow(id), "Issue not found");
     if (!issue) return;
+
+    let specKind = issue.specKind ?? null;
+    let spec = (issue.spec as IssueSpec | null) ?? null;
+
+    if (!spec) {
+      try {
+        const doc = await docSvc.getIssueDocumentByKey(id, "spec");
+        if (doc?.body) {
+          specKind = "requirement";
+          spec = {
+            kind: "requirement",
+            requirement: {
+              body: doc.body,
+              acceptanceCriteria: [],
+            },
+          };
+        }
+      } catch {
+        // ignore and fallback
+      }
+    }
+
     res.json({
       issueId: issue.id,
-      specKind: issue.specKind ?? null,
-      spec: (issue.spec as IssueSpec | null) ?? null,
+      specKind,
+      spec,
     });
   });
 
@@ -111,9 +212,9 @@ export function issueSpecRoutes(db: Db) {
     }
 
     const stored = { ...(parsed as IssueSpec), kind, parentSpecId };
-    await writeSpec(issue.id, stored);
-
     const actor = getActorInfo(req);
+    await writeSpec(issue.id, stored, issue.title, actor);
+
     await logActivity(db, {
       companyId: issue.companyId,
       actorType: actor.actorType,
@@ -205,9 +306,9 @@ export function issueSpecRoutes(db: Db) {
     if (!created) throw notFound("Issue not created");
 
     const stored: IssueSpec = { ...spec, kind, parentSpecId: parentIssueId };
-    await writeSpec(created.id, stored);
-
     const actor = getActorInfo(req);
+    await writeSpec(created.id, stored, created.title, actor);
+
     await logActivity(db, {
       companyId,
       actorType: actor.actorType,

@@ -19,15 +19,22 @@ CMMI（G1–G5）是**软件工程资产治理层**——管 0-1 阶段门与物
 
 模板：`templates/spec-driven/{requirement,bugfix,design,task,workflow}.md`。
 
-## 怎么落
+## 怎么落（回归 Paperclip 官方方案与双轨并轨）
 
-- 写入一条 spec：`POST /api/issues/:id/spec`（body 就是 spec 对象）。
-  草稿可以 `?draft=1`，字段可缺。
-- 一键起：`POST /api/companies/:companyId/specs/from-template`，`{kind, parentIssueId?, title?}`。
-- 读回：`GET /api/issues/:id/spec`；整棵树：`GET /api/companies/:companyId/specs/tree`。
-- 网页端：issue 的 **Spec** 页；MCP：`spec_create` / `spec_tree` / `spec_template_apply`。
+1. **统一官方方案优先 (Git + Paperclip Native issue_documents)**：
+   - **代码与规格单一真理源**：物理真理源 100% 收归本地 Git（`docs/specs/<slug>/` 与 CMMI `docs/01~09/`）。
+   - **控制面协同载体**：控制面 Issue 100% 采用 Paperclip 官方原生 **`issue_documents`**（Markdown 协同文档，`key: "spec"` 与 `key: "plan"`），废弃在 DB 中侵入自定义 JSONB 的方式。
+   - **一键双向同步**：`node scripts/speckit.cjs sync --spec <slug>` 自动创建/关联工单并原子挂载 `issue_documents` (`key: 'spec'`, `key: 'plan'`) 以及 Primary Work Product。
+   - **存量迁移指令**：`node scripts/speckit.cjs official-migrate` 可一键将所有历史库内 spec 字段迁移至官方 `issue_documents`。
 
-链靠 `parentSpecId`（父 spec 所在 **issue 的 id**）：task → design → requirement/bugfix。
+2. **接口向后兼容与双写桥接 (Dual-Write Bridge)**：
+   - 写入 spec：`POST /api/issues/:id/spec`（body 为 spec 对象，支持 `?draft=1`），后端自动双写至官方 `issue_documents` (`key: "spec"`)。
+   - 模板起骨架：`POST /api/companies/:companyId/specs/from-template`，自动双写并挂载官方文档。
+   - 读回：`GET /api/issues/:id/spec`（若未设独立 spec 字段，自动从官方 `issue_documents` 回退反推）；整棵树：`GET /api/companies/:companyId/specs/tree`。
+   - 官方原生端点：`PUT /api/issues/:id/documents/spec`，`GET /api/issues/:id/documents/spec`。
+   - 网页端：原生 Documents 协同与审批；MCP：`paperclipUpsertIssueDocument` / `paperclipGetDocument`。
+
+链靠 `parentSpecId`（父 spec 所在 **issue 的 id**）或 Issue 原生 `parentId`：task → design → requirement/bugfix。
 
 ## 统一 CLI 驱动 (Spec-Kit SDD Engine)
 

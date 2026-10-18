@@ -10,7 +10,7 @@ export const TASKDETAIL_SCREEN_INSPECTION_TARGETS = Object.freeze({
   perspective: "CPO",
   baselineFeatures: Object.freeze([
     "inPlaceDrawer",
-    "liftoStackGuard",
+    "lifoStackGuard",
     "twoLetterButtonMutex",
     "quadStateExhaustion",
     "screenHeaderBack",

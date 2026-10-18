@@ -81,7 +81,7 @@ export const BOARDCHAT_SCREEN_INSPECTION_TARGETS = Object.freeze({
   baselineFeatures: Object.freeze([
     "fullWidthVoiceBar",
     "fiveBucketSymmetricTabBar",
-    "liftoInPlaceDrawer",
+    "lifoInPlaceDrawer",
     "voiceThreeStateGesture",
     "fiveEmployeeFleetStrip",
   ]),

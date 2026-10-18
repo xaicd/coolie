@@ -10,7 +10,7 @@ export const APP_LIFO_INSPECTION_TARGETS = Object.freeze({
   perspective: "SWE_FDSE",
   baselineFeatures: Object.freeze([
     "hardwareBackMapsToInApp",
-    "liftoInProcessSheet",
+    "lifoInProcessSheet",
     "doubleBackExitGuard",
     "fiveBucketTabBarStable",
     "edgeSwipeGuard",

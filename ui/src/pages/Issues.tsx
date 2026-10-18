@@ -24,10 +24,10 @@ import { useTranslation } from "@/i18n";
  * 工坊产品全功能验收大盘 (COOA-498 / [T2]) — Web Issues 列表页机器可读验收清单。
  *
  * 对齐 docs/05_verification/WORKSHOP-FULL-SYSTEM-VERIFICATION-MATRIX.md 第三节
- * WEB-06 Issues 列表条目 (公司路由前缀 + 两字按钮契约 + 四态穷举)。
+ * WEB-03 Issues 列表条目 (全量工单工作台 + 公司路由前缀 + 两字按钮契约 + 四态穷举)。
  */
 export const WEB_ISSUES_INSPECTION_TARGETS = Object.freeze({
-  screenId: "WEB-06",
+  screenId: "WEB-03",
   screenName: "Issues",
   perspective: "CPO",
   baselineFeatures: Object.freeze([
