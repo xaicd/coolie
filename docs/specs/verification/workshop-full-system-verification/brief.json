@@ -1,0 +1,257 @@
+{
+  "name": "workshop-full-system-verification",
+  "domain": "verification",
+  "title": "工坊产品全功能自动化测试与运营全域验收大盘",
+  "type": "feature",
+  "goal": "以 5 大专家视角 (CEO/CPO/FDA/SWE/SRE)、全端 27 个移动屏幕与 42 个 Web 控制台页面逐页验收、42 全域两字操作按钮五态状态机、95 项 MCP 工具协议契约与真实用户 6 大运营闭环，建立机器可验证、不可篡改的工业级全生命周期自动化验收体系。",
+  "roles": [
+    {
+      "role": "掌柜与商业交付总控 (Boss / CEO)",
+      "can": "一句话口语极速立项、查看 80/20 开源基座对标、掌控项目毛利与 Token 预算硬熔断、签署法定客户终验单"
+    },
+    {
+      "role": "极简人机与移动驾驶舱总监 (CPO)",
+      "can": "体验 ChatInput 宽语音条与三态手势分流、享受 5 槽位居中对称底栏、无感 LIFO 抽屉出栈与 320dp 零遮挡"
+    },
+    {
+      "role": "活体业务本体总架构师 (FDA)",
+      "can": "实现 8 核心业务实体与 Drizzle 263 物理表反射对账、动词因果求值、会话即提议与 WBS DAG 拓扑无环"
+    },
+    {
+      "role": "平台核心研发与前线全栈 (Core SWE & FDSE)",
+      "can": "保证 Monorepo 增量编译 0 报错与 0 as any、单人原子排他签出锁、3200 沙箱保活自愈与 1 Task = 1 Commit"
+    },
+    {
+      "role": "部署战略与拟真人走查主审 (DS, PRE-SRE & QA)",
+      "can": "覆盖全量 95 项 MCP 工具、拟真人 150~300ms 物理触控走查、7 处版本一致性、OTA 热更与真实用户运营履约"
+    }
+  ],
+  "stories": [
+    {
+      "priority": "P0",
+      "text": "作为出资人，要求工坊立项在 30 秒内完成基座选型与 WBS 拆解，单工单 Token 消耗锁定在 500k 内，超额毫秒级硬停"
+    },
+    {
+      "priority": "P0",
+      "text": "作为掌柜，要求在 6 寸手机上使用横跨屏幕宽语音条单手操作，三态手势明确，任务详情在当前 Tab 内就地抽屉展开，底栏永不丢失"
+    },
+    {
+      "priority": "P0",
+      "text": "作为架构师，要求 8 核心实体与 Drizzle 263 物理表 100% 对齐，核心实体禁止物理硬删除，复合行动具备逆向补偿 Saga"
+    },
+    {
+      "priority": "P0",
+      "text": "作为核心研发，要求 Monorepo 增量编译 0 报错，工单签出具备行级排他锁，移动真机具备设备锁，完工工作区必须 0 dirty"
+    },
+    {
+      "priority": "P0",
+      "text": "作为 SRE 主管，要求全量 95 项 MCP 工具回归 100% 通过，16 条路由四态快照视觉比对差异 < 0.5%，白屏率严格为 0"
+    },
+    {
+      "priority": "P1",
+      "text": "作为运营主管，要求全自动履约 G4 资产挂载、代客签单、口语转提案、财务日结平账、主线巡检守护与缺陷秒级自愈 6 大闭环"
+    },
+    {
+      "priority": "P1",
+      "text": "作为测试工程师，要求覆盖全端 27 个移动屏与 42 个 Web 控制台页面，建立 42 全域两字操作按钮五态物理状态机矩阵"
+    }
+  ],
+  "constraints": [
+    "AI 原生商业软件交付工厂：全体数字员工统一站在交付总架构师视角，交付商业真资产并挂载不可变机器证据。",
+    "1 Task = 1 Commit & Clean Working Tree：工单标记 Done 时必须绑定真实 Git 提交 SHA，工作树 0 dirty、0 untracked。",
+    "No Artifact, No Done：工单完工状态强制校验物理工程资产 (PR、在线预览、快照、规格文档或机器证据)。",
+    "两字按钮契约：掌柜与用户核心操作动作 100% 收敛为两字规范，严禁任何三字或拖泥带水文案。",
+    "263 物理表跨租户行级隔离：所有 SQL 读写查询强制校验 company_id，杜绝不同客户数据越权与泄露。"
+  ],
+  "acceptance": [
+    {
+      "check": "node scripts/workshop-full-system-verify-loop.mjs --loop 1 执行全部 5 批次 100% PASS"
+    },
+    {
+      "check": "evidence/workshop-full-system-acceptance-ledger.json 成功生成并加盖 SHA-256 电子签章"
+    },
+    {
+      "check": "5 大专家视角 115 项深度工业级点检项全部机检通过"
+    },
+    {
+      "check": "全端 27 个移动屏与 42 个 Web 控制台页面逐页验收清单覆盖率 100%"
+    },
+    {
+      "check": "36 全域两字操作按钮五态物理状态机矩阵覆盖率 100%"
+    },
+    {
+      "check": "node scripts/speckit.cjs health 检查规格体系 0 污染、0 散落文件"
+    },
+    {
+      "check": "bash scripts/VERSION-CONSISTENCY-CHECK.sh 7 处版本号严格物理一致"
+    }
+  ],
+  "nonGoals": [
+    "不开发破坏底层控制面单人签出锁与真实预算熔断机制的旁路接口",
+    "不在前端界面引入破坏 64dp 黄金 5 槽位居中对称底栏的冗余 Tab 项",
+    "不将生产环境客户专有代码与业务数据上报至公网不可控公有模型"
+  ],
+  "architecture": "移动端 React Native (Expo SDK 52) + Web端 React 19 / Vite + 服务端 Express Monorepo + 活体本体 Drizzle ORM 263表 + 7工具池 (Hermes/墨斗/铁匠/门神/兜底渊) + 双向同步总线",
+  "entities": [
+    {
+      "table": "projects",
+      "note": "商业客户项目主体，原子绑定专属 ontology_domains 活体本体域"
+    },
+    {
+      "table": "issues",
+      "note": "WBS 任务工单，支持行级排他锁 FOR UPDATE NOWAIT 与单负责人原子签出"
+    },
+    {
+      "table": "agents",
+      "note": "数字员工花名册，配置角色职责、模型选型、技能包与预算上限"
+    },
+    {
+      "table": "approvals",
+      "note": "高管审批流决裁单据，控制工单门禁与不可篡改审计履约"
+    },
+    {
+      "table": "documents",
+      "note": "全生命周期活体工程文档，支持 Markdown 实时协作与版本演进链"
+    },
+    {
+      "table": "issue_work_products",
+      "note": "不可变交付工件总线，绑定物理 Git Commit、在线预览与测试报告"
+    },
+    {
+      "table": "costs",
+      "note": "复式记账法 Token 消耗与算力成本，毫秒级预算硬熔断"
+    },
+    {
+      "table": "routines",
+      "note": "在制项目小时级例行主线巡检守护器，防项目停工冷寂"
+    }
+  ],
+  "invariants": [
+    {
+      "name": "单负责人原子签出锁排他性",
+      "how": "数据库 FOR UPDATE NOWAIT 事务锁，并发签出同一工单仅允许一人成功，其余返回 409 Conflict"
+    },
+    {
+      "name": "预算超标毫秒级硬熔断",
+      "how": "server/src/services/budget.ts 实时记账，达到上限立即将 Agent 标记为 paused 并阻断后续派单"
+    },
+    {
+      "name": "物理完工真资产挂载硬门禁",
+      "how": "工单更新为 done 时，强制校验关联的 issue_work_products 存在有效物理资产与 Git 提交"
+    },
+    {
+      "name": "WBS 依赖有向无环图 DAG 无死锁",
+      "how": "Tarjan 强连通分量算法拓扑检测，强连通分量恒为 0，拓扑排序计算 < 15ms"
+    },
+    {
+      "name": "263 物理表跨租户绝对行级隔离",
+      "how": "所有 SQL 查询强制 WHERE company_id = ?，水平越权安全渗透检出率恒为 0.000%"
+    }
+  ],
+  "ui": [
+    "移动原生 APP 27 屏幕：BoardChatScreen, DashboardScreen, TaskKanbanScreen, TaskDetailScreen, PrototypeSandboxScreen, ArtifactsScreen, InboxScreen, AgentsScreen, AgentDetailScreen, SpecEditorScreen, CodeDiffScreen, ProjectsScreen, SettingsScreen, GitCredentialsScreen, WebContainerScreen, WhatsNewScreen, SearchScreen, PluginManagerScreen, PluginSettingsScreen, NotificationsScreen, OrgAssetsScreen, NativeModulesScreen, ArchitectureGovernanceScreen, AssetOntologyScreen, NewTaskPage, RegisterScreen, WebLoginScreen",
+    "Web 控制台 42 页面：Dashboard, BoardChat, Issues, IssueDetail, Projects, ProjectDetail, Agents, AgentDetail, Approvals, ApprovalDetail, Routines, RoutineDetail, Costs, CompanySettings, CompanyEnvironments, CompanySkills, Secrets, ExecutionWorkspaceDetail, Workspaces, OntologyGraphPage, SpecTreePage, AuditHub, CompanyActivity, Inbox, WhatNeedsMe, DecisionQueuePage, DesignGuide, PluginManager, PluginSettings, AdapterManager, CompanyAccess, CompanyImport, CompanyExport, CompanyOnboardingPage, IssueSpecPage, Artifacts, Goals, GoalDetail, PipelineSettings, Pipelines, UserProfile, InstanceGeneralSettings"
+  ],
+  "ops": [
+    "scripts/workshop-full-system-verify-loop.mjs 多批次循环批量验收流水线",
+    "scripts/VERSION-CONSISTENCY-CHECK.sh 7 处版本一致性守卫",
+    "scripts/device-claim.sh 移动真机模拟器排他设备锁 (900s TTL)",
+    "scripts/speckit.cjs 全生命周期 SDD 规格与 CMMI 资产健康巡视",
+    "evidence/workshop-full-system-acceptance-ledger.json 不可变交付账本加盖 SHA-256 签名"
+  ],
+  "risks": [
+    {
+      "risk": "录音硬件假死导致 voiceBusy 永久死锁",
+      "mitigation": "在 BoardChatScreen 注入 withVoiceTimeout 10 秒硬超时熔断并重置状态"
+    },
+    {
+      "risk": "Android 边缘滑动手势意外退出 App",
+      "mitigation": "App.tsx 接入 swipeBack 严格 LIFO 调用栈与 2000ms 双击返回退出防线"
+    },
+    {
+      "risk": "生产 Caddy 误将 OTA Manifest 兜底路由为 HTML",
+      "mitigation": "Caddy 专用 API 块与 curl 自动化拨测断言 Content-Type 必须为 application/json"
+    }
+  ],
+  "screens": [
+    {
+      "name": "工坊掌柜中枢 (BoardChatScreen.tsx)",
+      "wireframe": "[ 顶栏: 公司切换 · 项目切换 · 🔔消息 ]\n[ 五员工管网状态条: Hermes·墨斗·铁匠·门神·兜底渊 ]\n[ 会话气泡流: 语音气泡 · 提案卡片 · 构建进度 · 待批卡片 ]\n[ 底部 ChatInput: 横跨全宽语音条 · 5频呼吸音浪 · 00:03秒表 ]\n[ 手势三态 HUD: 居中发送 · 右滑转文字 · 左滑取消 ]"
+    },
+    {
+      "name": "WBS 任务详情抽屉 (TaskDetailScreen.tsx)",
+      "wireframe": "[ 顶部导航: ‹ 返回 · 任务状态徽标 · 优先级圆点 ]\n[ 任务主体: 标题 · Markdown描述 · 负责人头像 ]\n[ 标签栏: 规格 Spec · 交付工件 · 关联文档 · 审批流 · 评论 ]\n[ 底部操作栏: 【签出】/【释放】·【完成】(门禁互锁) ]"
+    }
+  ],
+  "interactions": [
+    "语音长按手势：按压唤醒 5 频波形，居中松开发送，右滑松开转文字，左滑松开取消，<300ms 丢弃防误触",
+    "任务卡片点击：在当前 Tab 就地滑出抽屉层，底栏 5 Tab 始终可见，返回手势恢复看板精准滚动偏移",
+    "两字按钮交互：按下 0.96 缩放与触感微震，点击进入 Loading 单飞锁，网络完成弹出吐司反馈"
+  ],
+  "states": [
+    "加载中：流光骨架屏占位，消除突兀布局跳动 (CLS ≤ 0.05)。",
+    "空数据：保留顶部筛选与搜索栏，呈现精美空态插画与引导操作按钮。",
+    "出错：错误边界优雅拦截，展示显性报错日志、错误码与【重试】两字按钮。",
+    "成功：正常展示完整内容，卡片与列表惯性滑动 60fps 丝滑稳定。"
+  ],
+  "candidates": [
+    {
+      "name": "芋道四位一体多端基座 (yudao-quad-terminal)",
+      "type": "Java微服务/单体+Vue3中台+UniApp小程序+Expo原生App",
+      "license": "MIT",
+      "risk": "架构较重，适合政企/金融/大型全渠道项目"
+    },
+    {
+      "name": "若依全栈轻量级基座 (ruoyi-all-next)",
+      "type": "Next.js 16+React 19+Tailwind CSS+Prisma/PostgreSQL",
+      "license": "MIT",
+      "risk": "极轻量、秒级热更，3200端口极速预览，适合敏捷交付与POC打样"
+    }
+  ],
+  "benchmarks": [
+    "Palantir Foundry: 活体业务本体数字孪生与动词因果求值模型",
+    "Apple Human Interface Guidelines: 6寸屏极简人机工程与触控热区 Fitts 定律",
+    "Google SRE: 错误预算燃烧率、无责复盘与分布式链路追踪标准",
+    "CMMI Level 5: 软件工程全生命周期质量保障与不可变机器凭证核销"
+  ],
+  "scan": [
+    "根据终端覆盖要求与客户语言约束自动裁决底座选型，实现 80/20 高效杠杆复用"
+  ],
+  "licenseConclusion": "全部引入组件与基座均为商业友好的 MIT/Apache-2.0 协议，无 GPL 强传染闭源风险",
+  "tasks": [
+    {
+      "id": "T1",
+      "parent": "main",
+      "title": "建立 Spec-Kit 规格骨架并全面对齐 115 项专家点检与 42 全域两字操作按钮五态状态机",
+      "files": [
+        "docs/specs/verification/workshop-full-system-verification/**",
+        "docs/05_verification/WORKSHOP-FULL-SYSTEM-VERIFICATION-MATRIX.md"
+      ]
+    },
+    {
+      "id": "T2",
+      "parent": "T1",
+      "title": "编排全端 27 个移动屏幕与 42 个 Web 控制台页面逐页验收清单与 LIFO 调用栈守卫",
+      "files": [
+        "clients/expo/App.tsx",
+        "clients/expo/src/screens/BoardChatScreen.tsx",
+        "clients/expo/src/screens/TaskDetailScreen.tsx",
+        "clients/expo/src/screens/PrototypeSandboxScreen.tsx",
+        "ui/src/App.tsx",
+        "ui/src/pages/Issues.tsx",
+        "ui/src/pages/IssueDetail.tsx"
+      ]
+    },
+    {
+      "id": "T3",
+      "parent": "main",
+      "title": "执行全系统 5 批次循环批量验收流水线并签署不可变 SHA-256 履约账本",
+      "files": [
+        "scripts/workshop-full-system-verify-loop.mjs",
+        "evidence/workshop-full-system-acceptance-ledger.json"
+      ]
+    }
+  ],
+  "dependencies": "T1 → T2 → T3",
+  "windowMinutes": 10
+}
