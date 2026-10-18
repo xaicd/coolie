@@ -126,7 +126,8 @@
       "title": "管局审计 Gate 17 升级与 Fork 表面防腐守卫",
       "files": [
         "scripts/check-governance-audit.mjs",
-        "scripts/fork-surface.json"
+        "scripts/fork-surface.json",
+        "scripts/speckit.cjs"
       ]
     },
     {

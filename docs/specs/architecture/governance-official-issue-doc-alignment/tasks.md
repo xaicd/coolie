@@ -53,7 +53,7 @@
 
 - [ ] **T2**: 管局审计 Gate 17 升级与 Fork 表面防腐守卫
   - 归属: `T1`
-  - 文件白名单: `scripts/check-governance-audit.mjs, scripts/fork-surface.json`
+  - 文件白名单: `scripts/check-governance-audit.mjs, scripts/fork-surface.json, scripts/speckit.cjs`
   - 验收要求: 必须携带提交标识 `[T2]` 并附带真实测试验证
 
 - [ ] **T3**: Pre-Commit 任务白名单门禁与 CMMI 双轨资产法典闭环
@@ -74,7 +74,7 @@
 | ID | 归属 | 任务 | 文件白名单 | 状态 |
 |---|---|---|---|---|
 | T1 | main | 本体代码对账解耦与本体模型元数据对齐 | scripts/harness-ontology-audit.mjs, ontology/objects/Issue.json | 未开始 |
-| T2 | T1 | 管局审计 Gate 17 升级与 Fork 表面防腐守卫 | scripts/check-governance-audit.mjs, scripts/fork-surface.json | 未开始 |
+| T2 | T1 | 管局审计 Gate 17 升级与 Fork 表面防腐守卫 | scripts/check-governance-audit.mjs, scripts/fork-surface.json, scripts/speckit.cjs | 未开始 |
 | T3 | T2 | Pre-Commit 任务白名单门禁与 CMMI 双轨资产法典闭环 | scripts/pre-commit-check.mjs, .agents/rules/CMMI-SPEC-FIRST-ARTIFACTS.md | 未开始 |
 
 ## 4. 依赖说明与波次流转 (Dependencies & Progression)

@@ -726,6 +726,38 @@ try {
 }
 assertRule('全仓规格防污染扫描守卫: node scripts/speckit.cjs health 必须通过 (0 散落、0 污染)', specHealthOk, 'speckit health 扫描发现不合规项');
 
+const speckitContent = fs.readFileSync('scripts/speckit.cjs', 'utf8');
+const speckitHasOfficialDocsSync =
+  speckitContent.includes('/documents/spec') &&
+  speckitContent.includes('/documents/plan') &&
+  speckitContent.includes('official-migrate');
+assertRule(
+  '官方 issue_documents 协同守卫: scripts/speckit.cjs 必须实现向官方 /documents/spec 与 /documents/plan 挂载并提供 official-migrate 迁移指令',
+  speckitHasOfficialDocsSync,
+  'speckit.cjs 缺失向官方 issue_documents 协同通道同步或迁移能力',
+);
+
+const issueSpecsRouteContent = fs.readFileSync('server/src/routes/issue-specs.ts', 'utf8');
+const issueSpecsHasDualWrite =
+  issueSpecsRouteContent.includes('documentService') &&
+  issueSpecsRouteContent.includes('upsertIssueDocument') &&
+  issueSpecsRouteContent.includes('getIssueDocumentByKey');
+assertRule(
+  'Issue-Specs 官方双写与回退守卫: server/src/routes/issue-specs.ts 必须集成 documentService 实现官方 issue_documents 双写镜像与读取 fallback',
+  issueSpecsHasDualWrite,
+  'server/src/routes/issue-specs.ts 缺失官方 issue_documents 双写或回退逻辑',
+);
+
+const forkSurfaceContent = fs.readFileSync('scripts/fork-surface.json', 'utf8');
+const forkSurfaceHasDeprecation =
+  forkSurfaceContent.includes('DEPRECATED - GRAINFUL DRAIN') &&
+  forkSurfaceContent.includes('9008_add_issue_spec.sql');
+assertRule(
+  'Fork Issue 表面防腐守卫: scripts/fork-surface.json 必须明确标记 9008_add_issue_spec.sql 为渐进淘汰中，冻结私有字段扩张',
+  forkSurfaceHasDeprecation,
+  'scripts/fork-surface.json 未标记 9008_add_issue_spec.sql 为 DEPRECATED',
+);
+
 // -----------------------------------------------------------------------------
 // 18. OpenMuse Sentinel 零信任看门狗与全 Agent 驱动守卫 (Sentinel & Sovereign Gate)
 // -----------------------------------------------------------------------------

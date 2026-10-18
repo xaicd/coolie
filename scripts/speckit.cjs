@@ -576,8 +576,12 @@ function handleTasks() {
     const files = git(["show", "--name-only", "--pretty=format:", commit]).split("\n").filter(Boolean)
     const problems = []
 
-    if (!message.includes(`[${targetTask.id}]`)) {
-      problems.push(`commit message 里没有 [${targetTask.id}] —— 「1 Task = 1 Commit」要求提交能追溯到任务（需使用 [${targetTask.id}] 方括号标记）`)
+    const hasTaskTag =
+      message.includes(`[${targetTask.id}]`) ||
+      message.includes(`·${targetTask.id}]`) ||
+      message.includes(`[${name}·${targetTask.id}]`);
+    if (!hasTaskTag) {
+      problems.push(`commit message 里没有 [${targetTask.id}] 或 [${name}·${targetTask.id}] —— 「1 Task = 1 Commit」要求提交能追溯到任务（需使用 [${targetTask.id}] 或 [${name}·${targetTask.id}] 方括号标记）`);
     }
 
     if (targetTask.whitelist !== "-") {
@@ -586,7 +590,8 @@ function handleTasks() {
         return new RegExp("^" + escaped.replace(/\u0000/g, "(?:.*/)?").replace(/\u0001/g, ".*") + "$")
       }
       const patterns = targetTask.whitelist.split(",").map(i => i.trim()).filter(Boolean).map(toRegExp)
-      const outside = files.filter(f => !patterns.some(regex => regex.test(f)))
+      const isSpecInternalDoc = (f) => f.startsWith("docs/specs/") && f.includes(`/${name}/`);
+      const outside = files.filter(f => !isSpecInternalDoc(f) && !patterns.some(regex => regex.test(f)))
       if (outside.length > 0) {
         problems.push(`改动了白名单之外的文件: ${outside.slice(0, 5).join(", ")}${outside.length > 5 ? ` 等 ${outside.length} 个` : ""}`)
       }

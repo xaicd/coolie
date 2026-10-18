@@ -989,13 +989,13 @@
       "path": "packages/db/src/migrations/9008_add_issue_spec.sql",
       "maxNetLines": 60,
       "maxTotalLines": 80,
-      "reason": "wave147: hand-written fork migration adding issues.spec_kind/spec plus the (company_id, spec_kind) index. No upstream counterpart; the 9000 range is where fork migrations live."
+      "reason": "wave147 [DEPRECATED - GRAINFUL DRAIN]: hand-written fork migration adding issues.spec_kind/spec. Deprecated in favor of Paperclip upstream official issue_documents (keys: 'spec', 'plan') and Git Markdown specs. Kept for historical DB migration compatibility only; frozen from further expansion."
     },
     {
       "path": "server/src/routes/issue-specs.ts",
       "maxNetLines": 300,
-      "maxTotalLines": 360,
-      "reason": "wave147: new route module for GET/POST /issues/:id/spec, GET /companies/:id/specs/tree and POST /companies/:id/specs/from-template. No upstream counterpart."
+      "maxTotalLines": 500,
+      "reason": "wave147: route module for GET/POST /issues/:id/spec with dual-write bridge to Paperclip official issue_documents and backwards-compatible read fallback. No upstream counterpart."
     },
     {
       "path": "server/src/routes/index.ts",
@@ -1006,8 +1006,8 @@
     {
       "path": "server/src/__tests__/issue-spec-routes.test.ts",
       "maxNetLines": 240,
-      "maxTotalLines": 280,
-      "reason": "wave147: embedded-Postgres integration test driving the spec chain through the real routes. No upstream counterpart."
+      "maxTotalLines": 320,
+      "reason": "wave147: embedded-Postgres integration test driving the spec chain through the real routes and verifying official issue_documents dual-write and fallback. No upstream counterpart."
     },
     {
       "path": "ui/src/api/specs.ts",
