@@ -46,17 +46,17 @@
 
 ## 2. 交互式任务清单 (Interactive Execution Tasks)
 
-- [ ] **T1**: 建立 Spec-Kit 规格骨架并全面对齐 115 项专家点检与 42 全域两字操作按钮五态状态机
+- [x] **T1**: 建立 Spec-Kit 规格骨架并全面对齐 115 项专家点检与 42 全域两字操作按钮五态状态机
   - 归属: `main`
   - 文件白名单: `docs/specs/verification/workshop-full-system-verification/**, docs/05_verification/WORKSHOP-FULL-SYSTEM-VERIFICATION-MATRIX.md`
   - 验收要求: 必须携带提交标识 `[T1]` 并附带真实测试验证
 
-- [ ] **T2**: 编排全端 27 个移动屏幕与 42 个 Web 控制台页面逐页验收清单与 LIFO 调用栈守卫
+- [x] **T2**: 编排全端 27 个移动屏幕与 42 个 Web 控制台页面逐页验收清单与 LIFO 调用栈守卫
   - 归属: `T1`
   - 文件白名单: `clients/expo/App.tsx, clients/expo/src/screens/BoardChatScreen.tsx, clients/expo/src/screens/TaskDetailScreen.tsx, clients/expo/src/screens/PrototypeSandboxScreen.tsx, ui/src/App.tsx, ui/src/pages/Issues.tsx, ui/src/pages/IssueDetail.tsx`
   - 验收要求: 必须携带提交标识 `[T2]` 并附带真实测试验证
 
-- [ ] **T3**: 执行全系统 5 批次循环批量验收流水线并签署不可变 SHA-256 履约账本
+- [x] **T3**: 执行全系统 5 批次循环批量验收流水线并签署不可变 SHA-256 履约账本
   - 归属: `main`
   - 文件白名单: `scripts/workshop-full-system-verify-loop.mjs, evidence/workshop-full-system-acceptance-ledger.json`
   - 验收要求: 必须携带提交标识 `[T3]` 并附带真实测试验证
@@ -73,9 +73,9 @@
 
 | ID | 归属 | 任务 | 文件白名单 | 状态 |
 |---|---|---|---|---|
-| T1 | main | 建立 Spec-Kit 规格骨架并全面对齐 115 项专家点检与 42 全域两字操作按钮五态状态机 | docs/specs/verification/workshop-full-system-verification/**, docs/05_verification/WORKSHOP-FULL-SYSTEM-VERIFICATION-MATRIX.md | 未开始 |
-| T2 | T1 | 编排全端 27 个移动屏幕与 42 个 Web 控制台页面逐页验收清单与 LIFO 调用栈守卫 | clients/expo/App.tsx, clients/expo/src/screens/BoardChatScreen.tsx, clients/expo/src/screens/TaskDetailScreen.tsx, clients/expo/src/screens/PrototypeSandboxScreen.tsx, ui/src/App.tsx, ui/src/pages/Issues.tsx, ui/src/pages/IssueDetail.tsx | 未开始 |
-| T3 | main | 执行全系统 5 批次循环批量验收流水线并签署不可变 SHA-256 履约账本 | scripts/workshop-full-system-verify-loop.mjs, evidence/workshop-full-system-acceptance-ledger.json | 未开始 |
+| T1 | main | 建立 Spec-Kit 规格骨架并全面对齐 115 项专家点检与 42 全域两字操作按钮五态状态机 | docs/specs/verification/workshop-full-system-verification/**, docs/05_verification/WORKSHOP-FULL-SYSTEM-VERIFICATION-MATRIX.md | 已完成 |
+| T2 | T1 | 编排全端 27 个移动屏幕与 42 个 Web 控制台页面逐页验收清单与 LIFO 调用栈守卫 | clients/expo/App.tsx, clients/expo/src/screens/BoardChatScreen.tsx, clients/expo/src/screens/TaskDetailScreen.tsx, clients/expo/src/screens/PrototypeSandboxScreen.tsx, ui/src/App.tsx, ui/src/pages/Issues.tsx, ui/src/pages/IssueDetail.tsx | 已完成 |
+| T3 | main | 执行全系统 5 批次循环批量验收流水线并签署不可变 SHA-256 履约账本 | scripts/workshop-full-system-verify-loop.mjs, evidence/workshop-full-system-acceptance-ledger.json | 已完成 |
 
 ## 4. 依赖说明与波次流转 (Dependencies & Progression)
 
