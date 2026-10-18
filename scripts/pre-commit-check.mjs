@@ -228,6 +228,37 @@ if (oversizedFiles.length > 0) {
 }
 
 // -----------------------------------------------------------------------------
+// 1.5 Spec-Kit SDD 规格完备性与双轨资产守卫
+// -----------------------------------------------------------------------------
+console.log('\n📋 Gate 1.5: Spec-Kit SDD 规格完备性与双轨资产守卫');
+const specDirsTouched = new Set();
+for (const f of stagedFiles) {
+  const match = f.match(/^docs\/specs\/([^/]+)\/([^/]+)/);
+  if (match) {
+    specDirsTouched.add(`docs/specs/${match[1]}/${match[2]}`);
+  }
+}
+
+for (const specDir of specDirsTouched) {
+  const briefPath = path.join(specDir, 'brief.json');
+  if (fs.existsSync(briefPath)) {
+    try {
+      const brief = JSON.parse(fs.readFileSync(briefPath, 'utf8'));
+      if (!brief.title || !brief.domain || !brief.goal || (brief.tasks ?? []).length === 0) {
+        console.error(`  ❌ [FAIL] 规格 ${specDir}/brief.json 关键字段缺失或 tasks 为空！`);
+        hasError = true;
+      }
+    } catch (e) {
+      console.error(`  ❌ [FAIL] 规格 ${briefPath} JSON 格式损坏: ${e.message}`);
+      hasError = true;
+    }
+  }
+}
+if (!hasError) {
+  console.log('  ✅ [PASS] 暂存规格包结构与双轨资产完备');
+}
+
+// -----------------------------------------------------------------------------
 // 2. 禁用标记与敏感 Token 守卫
 // -----------------------------------------------------------------------------
 console.log('\n🔍 Gate 2: 禁用标记与敏感 Token 守卫');

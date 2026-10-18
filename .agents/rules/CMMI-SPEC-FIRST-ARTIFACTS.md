@@ -249,3 +249,10 @@
 - **事实基准**：本产品 COOLIE 工坊本身就是由宿主机 `COOLIE DEV` 本地 AI AGENT 团队（Hermes、墨斗、铁匠、门神、兑底渊、百晓生）基于本平台完全自主建设与迭代；
 - **自验证要求**：本产品自身的从 0 到 1 全部工程过程、门禁、任务与交付资产，就是检验本产品是否真正达到“活体本体中枢、控制面主线、CMMI 5 质量门禁、极简人机驾驶舱”的终极活体证据！
 
+### 4. 机器结项硬门禁与三位一体不可变交付凭据 (Machine Verifiable Done Gate)
+- **不可变完工三要素 (Three Elements of Done)**：
+  1. **Git 物理真资产 (Git Asset)**：代码已提交至 Git，Commit 信息包含 `[T<ID>]` 或 `[<spec>·T<ID>]`，改动文件严格落在任务白名单内，工作区 0 dirty、0 uncommitted；
+  2. **控制面官方协同文档 (Official issue_documents)**：工单必须通过官方 `PUT /api/issues/:id/documents/spec` 或 `plan` 挂载原生 Markdown 协同文档；
+  3. **不可变工件账本 (Immutable Work Product / Attachment)**：必须挂载至少一项有效 Work Product（OpenAPI 契约、真机快照、回归测试报告或构建制品）。
+- **物理门禁守卫**：未同时满足上述三要素，控制面与数字员工严禁将任务流转至 `done`，彻底杜绝口头完工与代码悬空！
+
