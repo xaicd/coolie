@@ -433,8 +433,11 @@ wait_for_npm_package_versions() {
   # rest of its budget. The subshell also keeps this trap from clobbering
   # the caller's cleanup trap.
   (
-    local status_dir
-    local pids=()
+    # status_dir and pids are deliberately subshell-scoped rather than `local`:
+    # bash 3.2 cannot see `local` variables from an EXIT/INT/TERM trap invoked in
+    # a subshell, which left the cleanup trap reading an unbound $status_dir.
+    status_dir=
+    pids=()
     local specs=()
     local failures=()
     local index=0

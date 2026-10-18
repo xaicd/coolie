@@ -2,7 +2,9 @@
 import { readFileSync } from "node:fs";
 import { isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import ts from "typescript";
+// The repo's root `typescript` (7.x) is the native compiler and does not export
+// the classic JS compiler API this extractor builds on, so pin the classic API.
+import ts from "typescript-classic";
 
 export const PROPOSED_TELEMETRY_SCHEMA_VERSION = "proposed-telemetry-extractor.v2";
 

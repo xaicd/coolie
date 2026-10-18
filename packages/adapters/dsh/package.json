@@ -1,7 +1,6 @@
 {
   "name": "@paperclipai/adapter-dsh",
   "version": "0.1.0",
-  "private": true,
   "license": "MIT",
   "type": "module",
   "description": "DSH (DeepSeek Harness) adapter — a DeepSeek-backed MCP gateway. Exposes the ontology MCP tool catalogue to DeepSeek models (deepseek-chat / deepseek-reasoner) and runs the tool-calling loop.",

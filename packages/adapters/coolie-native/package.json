@@ -1,7 +1,6 @@
 {
   "name": "@paperclipai/adapter-coolie-native",
   "version": "0.1.0",
-  "private": true,
   "license": "MIT",
   "type": "module",
   "description": "Coolie native coding-engine adapter (P2 skeleton). Runs the in-house ReAct engine as a Paperclip adapter.",

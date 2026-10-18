@@ -1,7 +1,6 @@
 {
   "name": "@paperclipai/ontology-core",
   "version": "0.1.0",
-  "private": true,
   "type": "module",
   "description": "The ontology's host-free core: schema, facts, mapping and query services over the ontology tables.",
   "exports": {

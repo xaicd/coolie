@@ -5,6 +5,11 @@
     "publishFromCi": true
   },
   {
+    "dir": "packages/ontology-core",
+    "name": "@paperclipai/ontology-core",
+    "publishFromCi": true
+  },
+  {
     "dir": "packages/adapters/claude-local",
     "name": "@paperclipai/adapter-claude-local",
     "publishFromCi": true
@@ -12,6 +17,11 @@
   {
     "dir": "packages/adapters/codex-local",
     "name": "@paperclipai/adapter-codex-local",
+    "publishFromCi": true
+  },
+  {
+    "dir": "packages/adapters/coolie-native",
+    "name": "@paperclipai/adapter-coolie-native",
     "publishFromCi": true
   },
   {
@@ -25,8 +35,18 @@
     "publishFromCi": true
   },
   {
+    "dir": "packages/adapters/dsh",
+    "name": "@paperclipai/adapter-dsh",
+    "publishFromCi": true
+  },
+  {
     "dir": "packages/adapters/gemini-local",
     "name": "@paperclipai/adapter-gemini-local",
+    "publishFromCi": true
+  },
+  {
+    "dir": "packages/adapters/git-ops",
+    "name": "@paperclipai/adapter-git-ops",
     "publishFromCi": true
   },
   {
@@ -77,6 +97,16 @@
   {
     "dir": "packages/teams-catalog",
     "name": "@paperclipai/teams-catalog",
+    "publishFromCi": true
+  },
+  {
+    "dir": "packages/agents",
+    "name": "@paperclipai/agents",
+    "publishFromCi": true
+  },
+  {
+    "dir": "packages/templates",
+    "name": "@paperclipai/templates",
     "publishFromCi": true
   },
   {

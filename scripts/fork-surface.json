@@ -400,8 +400,38 @@
     {
       "path": "scripts/check-governance-audit.mjs",
       "maxNetLines": 220,
-      "reason": "Fork script: wave298 全面管局 governance auditor (两字按钮/对称底栏/CMMI/扁平化契约). wave302 adds section 8 anti-regression guards for the constitution art.2 项目进厂即本体域 invariant (route hook, caller-tx atomicity, owner resource link, guard tests). No upstream counterpart.",
-      "maxTotalLines": 260
+      "reason": "Fork script: wave298 全面管局 governance auditor (两字按钮/对称底栏/CMMI/扁平化契约). wave302 adds section 8 anti-regression guards for the constitution art.2 项目进厂即本体域 invariant (route hook, caller-tx atomicity, owner resource link, guard tests). wave286/COOA-496 adds sections 27-28: the telemetry extractor's classic-TS pin and the release-package-map structural guard. No upstream counterpart.",
+      "maxTotalLines": 340
+    },
+    {
+      "path": "scripts/extract-proposed-events.mjs",
+      "maxNetLines": 40,
+      "reason": "Upstream telemetry extractor (PR #9544) builds on the classic TS JS compiler API (ts.createSourceFile / ScriptTarget / ScriptKind), but the repo root now depends on typescript@7.x, whose native compiler exports no such API, so ts.ScriptTarget is undefined. Import typescript-classic instead (COOA-496, from COOA-488).",
+      "maxTotalLines": 40
+    },
+    {
+      "path": "scripts/extract-proposed-events.test.mjs",
+      "maxNetLines": 40,
+      "reason": "Test must resolve the same classic TS API as the extractor above, or it throws on ts.ScriptTarget.Latest before asserting anything (COOA-496).",
+      "maxTotalLines": 40
+    },
+    {
+      "path": "scripts/release-lib.sh",
+      "maxNetLines": 60,
+      "reason": "wait_for_npm_package_versions runs its cleanup trap inside a subshell, and bash 3.2 (the macOS system bash) cannot see `local` variables from a trap there, leaving $status_dir unbound. Declare status_dir/pids subshell-scoped rather than `local` (COOA-496).",
+      "maxTotalLines": 60
+    },
+    {
+      "path": "scripts/release-package-manifest.json",
+      "maxNetLines": 60,
+      "reason": "Enroll the fork's own packages in the release surface so published @paperclipai/server has no unpublishable workspace edges: @paperclipai/adapter-git-ops (public but missing from the manifest) plus adapter-coolie-native, adapter-dsh, agents, templates and their transitive ontology-core, which server depends on (COOA-496, from COOA-488).",
+      "maxTotalLines": 90
+    },
+    {
+      "path": "scripts/__tests__/ensure-plugin-build-deps.test.mjs",
+      "maxNetLines": 60,
+      "reason": "The lock-race case raced a fixed BUILD_DELAY against a partial build, so it flaked under full-suite concurrency. Synchronise on the live lock + compiler-active + partial-output state instead of timing (COOA-496).",
+      "maxTotalLines": 60
     },
     {
       "path": "ui/src/App.tsx",

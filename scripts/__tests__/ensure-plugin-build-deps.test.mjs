@@ -84,8 +84,18 @@ test("concurrent startups recover a dead owner and build only once", async (t) =
 
 test("does not accept partially emitted output while another compiler holds the lock", async (t) => {
   const f = fixture(t);
-  const first = f.launch({ BUILD_DELAY: "200" });
-  await until(() => fs.existsSync(path.join(f.root, "packages/plugins/sdk/dist/index.js")));
+  const first = f.launch({ BUILD_DELAY: "500" });
+  // Synchronise on the partial SDK build state: the live lock owner holds
+  // the directory, the compiler is running, and its completion marker has
+  // not yet been written. Spawning second under this exact state guarantees
+  // the product side will hit the acquireLock wait loop instead of racing
+  // through a no-op early exit.
+  await until(
+    () => fs.existsSync(f.lock)
+      && fs.existsSync(path.join(f.root, "compiler-active"))
+      && fs.existsSync(path.join(f.root, "packages/plugins/sdk/dist/index.js"))
+      && !fs.existsSync(path.join(f.root, "packages/plugins/sdk/dist/complete")),
+  );
   const second = await f.launch().done;
   assert.equal(second.code, 0, second.output);
   assert.match(second.output, /\[paperclip\] Waiting for another workspace build/);
@@ -99,7 +109,15 @@ test("preserves a live compiler's lock even when its parent has exited", async (
   fs.mkdirSync(f.lock, { recursive: true });
   fs.writeFileSync(path.join(f.lock, `owner-${dead}-old.json`), JSON.stringify({ pid: dead, childPid: process.pid }));
   const run = f.launch();
-  await sleep(200);
+  // Synchronise on the wait banner: the helper prints it only after it has
+  // installed its SIGTERM/SIGINT handlers and decided the lock owner's child
+  // is still live. A fixed sleep raced process start under full-suite
+  // concurrency, so SIGTERM sometimes landed before the handler existed and
+  // the child died by signal (exit code null) instead of exiting 143.
+  let seen = "";
+  run.child.stdout.on("data", (data) => { seen += data; });
+  run.child.stderr.on("data", (data) => { seen += data; });
+  await until(() => seen.includes("Waiting for another workspace build"));
   assert.equal(fs.existsSync(path.join(f.root, "builds")), false);
   run.child.kill("SIGTERM");
   assert.equal((await run.done).code, 143);

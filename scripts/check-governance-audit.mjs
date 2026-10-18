@@ -1007,6 +1007,53 @@ assertRule(
   `技能评测证据存在漂移或缺失: ${skillEvalFreshDetail.split('\n').filter(Boolean).slice(-3).join(' | ')}`,
 );
 
+// -----------------------------------------------------------------------------
+// 27. telemetry 提案提取器 TS7 防退化守卫 (COOA-496 · 源自 COOA-488 巡检)
+// -----------------------------------------------------------------------------
+console.log('\n🧪 27. telemetry 提案提取器 TS7 防退化守卫 (COOA-496):');
+const extractorTest = 'scripts/extract-proposed-events.test.mjs';
+let extractorOk = false;
+let extractorDetail = '';
+try {
+  extractorDetail = execSync(`node --test --test-reporter=tap ${extractorTest}`, {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  extractorOk = /^# fail 0\b/m.test(extractorDetail) && /^# pass \d+/m.test(extractorDetail);
+} catch (e) {
+  extractorOk = false;
+  extractorDetail = `${e?.stdout ?? ''}${e?.stderr ?? ''}`;
+}
+assertRule(
+  '提取器 TS7 契约守卫: 根 typescript 7.x 为 native 编译器不导出 classic API; scripts/extract-proposed-events.mjs 必须经 typescript-classic 载入且单测全绿',
+  extractorOk &&
+    fs.readFileSync('scripts/extract-proposed-events.mjs', 'utf8').includes('from "typescript-classic"') &&
+    Boolean(pkgJson.devDependencies?.['typescript-classic']),
+  `提取器单测未全绿或缺 classic-TS 解析路径: ${extractorDetail.split('\n').filter((l) => /^not ok|# fail/.test(l)).join(' | ') || 'no summary'}`,
+);
+
+// -----------------------------------------------------------------------------
+// 28. release-package-map 结构性防退化守卫 (COOA-496 · 源自 COOA-488 巡检)
+// -----------------------------------------------------------------------------
+console.log('\n🧪 28. release-package-map 结构性防退化守卫 (COOA-496):');
+let releaseMapOk = false;
+let releaseMapDetail = '';
+try {
+  releaseMapDetail = execSync('node --test --test-reporter=tap scripts/release-package-map.test.mjs', {
+    encoding: 'utf8',
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+  releaseMapOk = /^# fail 0\b/m.test(releaseMapDetail) && /^# pass \d+/m.test(releaseMapDetail);
+} catch (e) {
+  releaseMapOk = false;
+  releaseMapDetail = `${e?.stdout ?? ''}${e?.stderr ?? ''}`;
+}
+assertRule(
+  '发布面包结构守卫: scripts/release-package-manifest.json 必须覆盖全部公共包且无「已发布包依赖未发布 workspace 包」悬空边 (node --test scripts/release-package-map.test.mjs 全绿)',
+  releaseMapOk,
+  `发布面包结构红: ${releaseMapDetail.split('\n').filter((l) => /^not ok|# fail/.test(l)).join(' | ') || 'no summary'}`,
+);
+
 console.log('\n========================================================================');
 if (failed) {
   console.error('🚫 全面管局审计未通过！存在不符合高管治理规范的阻断项，请修复后重试。');

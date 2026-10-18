@@ -3,7 +3,8 @@ import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
-import ts from "typescript";
+// Must match the extractor's classic-API import (root `typescript` is 7.x).
+import ts from "typescript-classic";
 
 import {
   PROPOSED_TELEMETRY_SCHEMA_VERSION,
