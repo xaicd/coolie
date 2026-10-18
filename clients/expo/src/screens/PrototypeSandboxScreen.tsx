@@ -1,4 +1,31 @@
 /**
+ * 工坊产品全功能验收大盘 (COOA-498 / [T2]) — PrototypeSandboxScreen 机器可读验收清单。
+ *
+ * 对齐 docs/05_verification/WORKSHOP-FULL-SYSTEM-VERIFICATION-MATRIX.md 第二节
+ * APP-05 屏幕逐页验收条目 (列表/预览双视图、3200 沙箱保活自愈、WEB-41 一致性)。
+ */
+export const PROTOTYPE_SANDBOX_INSPECTION_TARGETS = Object.freeze({
+  screenId: "APP-05",
+  screenName: "PrototypeSandboxScreen",
+  perspective: "SWE_FDSE",
+  baselineFeatures: Object.freeze([
+    "listAndPreviewDualMode",
+    "sandboxSelfHealingOn3200",
+    "segmentedViewSwitch",
+    "refreshRetryAction",
+    "externalOpenSheet",
+  ]),
+  fiveStateMachine: Object.freeze([
+    "Normal",
+    "Pressed",
+    "Loading",
+    "Disabled",
+    "Error",
+  ]),
+  twoLetterActions: Object.freeze(["列表", "预览", "刷新", "打开", "返回"]),
+} as const);
+
+/**
  * Coolie工坊 原型交互沙箱 — wave138c
  *
  * 在 wave136 真渲染通道之上叠加「文件列表视图」:

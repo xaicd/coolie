@@ -1,3 +1,30 @@
+/**
+ * 工坊产品全功能验收大盘 (COOA-498 / [T2]) — TaskDetailScreen 机器可读验收清单。
+ *
+ * 对齐 docs/05_verification/WORKSHOP-FULL-SYSTEM-VERIFICATION-MATRIX.md 第二节
+ * APP-04 屏幕逐页验收条目 (任务详情就地抽屉 + LIFO 出栈 + 两字按钮互锁)。
+ */
+export const TASKDETAIL_SCREEN_INSPECTION_TARGETS = Object.freeze({
+  screenId: "APP-04",
+  screenName: "TaskDetailScreen",
+  perspective: "CPO",
+  baselineFeatures: Object.freeze([
+    "inPlaceDrawer",
+    "liftoStackGuard",
+    "twoLetterButtonMutex",
+    "quadStateExhaustion",
+    "screenHeaderBack",
+  ]),
+  fiveStateMachine: Object.freeze([
+    "Normal",
+    "Pressed",
+    "Loading",
+    "Disabled",
+    "Error",
+  ]),
+  twoLetterActions: Object.freeze(["签出", "释放", "完成", "取消", "返回"]),
+} as const);
+
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   ActivityIndicator,

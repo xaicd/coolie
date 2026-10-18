@@ -1,3 +1,30 @@
+/**
+ * 工坊产品全功能验收大盘 (COOA-498 / [T2]) — Web IssueDetail 详情页机器可读验收清单。
+ *
+ * 对齐 docs/05_verification/WORKSHOP-FULL-SYSTEM-VERIFICATION-MATRIX.md 第三节
+ * WEB-07 IssueDetail 条目 (审批/文档/工件/规格 4 个 tab + LIFO 抽屉 + 两字按钮互锁)。
+ */
+export const WEB_ISSUE_DETAIL_INSPECTION_TARGETS = Object.freeze({
+  screenId: "WEB-07",
+  screenName: "IssueDetail",
+  perspective: "CPO",
+  baselineFeatures: Object.freeze([
+    "tabbedSubPanels",
+    "liftoDrawerPreserveScroll",
+    "twoLetterButtonMutex",
+    "quadStateExhaustion",
+    "executionBlockerNotice",
+  ]),
+  fiveStateMachine: Object.freeze([
+    "Normal",
+    "Pressed",
+    "Loading",
+    "Disabled",
+    "Error",
+  ]),
+  twoLetterActions: Object.freeze(["签出", "释放", "完成", "评论", "返回"]),
+} as const);
+
 import { AgentAvatar } from "@/components/AgentAvatar";
 import { AgentIdentity } from "@/components/AgentIdentity";
 import { clearLegacyChatMessageRequests } from "@/lib/chat-message-request";

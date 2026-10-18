@@ -67,6 +67,34 @@ import {
   type FoundryProposalData,
 } from "../components/FoundryProposalCard";
 
+/**
+ * 工坊产品全功能验收大盘 (COOA-498 / [T2]) — BoardChatScreen 机器可读验收清单。
+ *
+ * 对齐 docs/05_verification/WORKSHOP-FULL-SYSTEM-VERIFICATION-MATRIX.md 第二节
+ * APP-01 屏幕逐页验收条目。导出常量供自动化测试扫描与 4 态走查机器断言调用，
+ * 不参与运行时 UI 渲染。
+ */
+export const BOARDCHAT_SCREEN_INSPECTION_TARGETS = Object.freeze({
+  screenId: "APP-01",
+  screenName: "BoardChatScreen",
+  perspective: "CPO",
+  baselineFeatures: Object.freeze([
+    "fullWidthVoiceBar",
+    "fiveBucketSymmetricTabBar",
+    "liftoInPlaceDrawer",
+    "voiceThreeStateGesture",
+    "fiveEmployeeFleetStrip",
+  ]),
+  fiveStateMachine: Object.freeze([
+    "Normal",
+    "Pressed",
+    "Loading",
+    "Disabled",
+    "Error",
+  ]),
+  twoLetterActions: Object.freeze(["确认", "取消", "发送", "刷新", "返回"]),
+} as const);
+
 export interface BoardChatScreenProps {
   company: Company;
   whoami?: string;

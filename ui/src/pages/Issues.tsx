@@ -20,6 +20,33 @@ import type { Issue } from "@paperclipai/shared";
 import { useStreamlinedUiEnabled } from "../hooks/useStreamlinedUiEnabled";
 import { useTranslation } from "@/i18n";
 
+/**
+ * 工坊产品全功能验收大盘 (COOA-498 / [T2]) — Web Issues 列表页机器可读验收清单。
+ *
+ * 对齐 docs/05_verification/WORKSHOP-FULL-SYSTEM-VERIFICATION-MATRIX.md 第三节
+ * WEB-06 Issues 列表条目 (公司路由前缀 + 两字按钮契约 + 四态穷举)。
+ */
+export const WEB_ISSUES_INSPECTION_TARGETS = Object.freeze({
+  screenId: "WEB-06",
+  screenName: "Issues",
+  perspective: "CPO",
+  baselineFeatures: Object.freeze([
+    "infiniteScrollLoadMore",
+    "streamlinedUiDualMode",
+    "companyPrefixEnforcement",
+    "breadcrumbBackStack",
+    "sharedPollingHeartbeat",
+  ]),
+  fiveStateMachine: Object.freeze([
+    "Normal",
+    "Pressed",
+    "Loading",
+    "Disabled",
+    "Error",
+  ]),
+  twoLetterActions: Object.freeze(["刷新", "派单", "筛选", "导出", "返回"]),
+} as const);
+
 const WORKSPACE_FILTER_ISSUE_LIMIT = 1000;
 const ISSUES_PAGE_SIZE = 100;
 export const ISSUES_ROW_PRESENTATION = "task" as const;

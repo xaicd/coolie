@@ -1,3 +1,30 @@
+/**
+ * 工坊产品全功能验收大盘 (COOA-498 / [T2]) — Web 顶层路由 LIFO 调用栈守卫机器可读清单。
+ *
+ * 对齐 docs/05_verification/WORKSHOP-FULL-SYSTEM-VERIFICATION-MATRIX.md 第三节
+ * Web 控制台 42 页路由守卫 (严格路由表 + Streamlined UI 双形态 + Lazy Suspense)。
+ */
+export const WEB_ROUTER_INSPECTION_TARGETS = Object.freeze({
+  screenId: "WEB-ROOT",
+  screenName: "AppRouter",
+  perspective: "SWE_FDSE",
+  baselineFeatures: Object.freeze([
+    "routerLiftoGuard",
+    "streamlinedUiDualMode",
+    "lazyRouteSuspense",
+    "companyPrefixEnforcement",
+    "deepLinkPreserveFilter",
+  ]),
+  fiveStateMachine: Object.freeze([
+    "Normal",
+    "Pressed",
+    "Loading",
+    "Disabled",
+    "Error",
+  ]),
+  twoLetterActions: Object.freeze(["返回", "刷新", "重试", "确认", "取消"]),
+} as const);
+
 import { lazy, Suspense, type ReactNode } from "react";
 import type { ToolConnectionCredentialSource } from "@paperclipai/shared";
 import { Navigate, Outlet, Route, Routes, useActiveCompanyPrefix, useLocation, useParams } from "@/lib/router";

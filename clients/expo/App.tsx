@@ -1,3 +1,30 @@
+/**
+ * 工坊产品全功能验收大盘 (COOA-498 / [T2]) — App 顶层 LIFO 调用栈守卫机器可读清单。
+ *
+ * 对齐 docs/05_verification/WORKSHOP-FULL-SYSTEM-VERIFICATION-MATRIX.md 第二节
+ * APP-01 全局守卫条目 (硬件透出 + LIFO 出栈 + 双击退出防线)。
+ */
+export const APP_LIFO_INSPECTION_TARGETS = Object.freeze({
+  screenId: "APP-ROOT",
+  screenName: "App",
+  perspective: "SWE_FDSE",
+  baselineFeatures: Object.freeze([
+    "hardwareBackMapsToInApp",
+    "liftoInProcessSheet",
+    "doubleBackExitGuard",
+    "fiveBucketTabBarStable",
+    "edgeSwipeGuard",
+  ]),
+  fiveStateMachine: Object.freeze([
+    "Normal",
+    "Pressed",
+    "Loading",
+    "Disabled",
+    "Error",
+  ]),
+  twoLetterActions: Object.freeze(["返回", "关闭", "取消", "退出", "登录"]),
+} as const);
+
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ActivityIndicator,
