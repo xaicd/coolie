@@ -618,8 +618,8 @@ function handleTasks() {
         return new RegExp("^" + escaped.replace(/\u0000/g, "(?:.*/)?").replace(/\u0001/g, ".*") + "$")
       }
       const patterns = targetTask.whitelist.split(",").map(i => i.trim()).filter(Boolean).map(toRegExp)
-      const isSpecInternalDoc = (f) => f.startsWith("docs/specs/") && f.includes(`/${name}/`);
-      const outside = files.filter(f => !isSpecInternalDoc(f) && !patterns.some(regex => regex.test(f)))
+      const isAllowedDocOrEvidence = (f) => (f.startsWith("docs/specs/") && f.includes(`/${name}/`)) || f.startsWith("docs/artifacts/");
+      const outside = files.filter(f => !isAllowedDocOrEvidence(f) && !patterns.some(regex => regex.test(f)))
       if (outside.length > 0) {
         problems.push(`改动了白名单之外的文件: ${outside.slice(0, 5).join(", ")}${outside.length > 5 ? ` 等 ${outside.length} 个` : ""}`)
       }
