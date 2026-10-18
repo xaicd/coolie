@@ -1,0 +1,12 @@
+{
+  "name": "speckit-ontology-deep-integration",
+  "domain": "architecture",
+  "title": "Spec-Kit 活体本体建模全生命周期深度接管",
+  "type": "feature",
+  "status": "PLAN_APPROVED",
+  "stories": 3,
+  "acceptance": 3,
+  "invariants": 2,
+  "tasks": 3,
+  "updatedAt": "2026-10-18T02:53:55.409Z"
+}

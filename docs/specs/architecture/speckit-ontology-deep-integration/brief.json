@@ -1,0 +1,134 @@
+{
+  "name": "speckit-ontology-deep-integration",
+  "domain": "architecture",
+  "title": "Spec-Kit 活体本体建模全生命周期深度接管",
+  "type": "feature",
+  "goal": "将 ODD 七模型活体业务本体建模深度编织入 Spec-Kit SDD 全生命周期：立项即具备本体 YAML 骨架、编译即自动融合 Mermaid 架构图、自检与提交即通过零死穴机器审计，实现业务规格与活体本体 100% 同构闭环。",
+  "roles": [
+    {
+      "role": "前线架构师 (FDA / Core SWE)",
+      "can": "通过 CLI 免配置快速建立具备七模型完备约束的规格与本体资产，并自动编译生成领域架构图。"
+    },
+    {
+      "role": "交付与质量总监 (QA / PRE)",
+      "can": "依托机器静态审计拦截死按钮、孤立动词与越权状态跳变，实现免人工零缺陷准入。"
+    }
+  ],
+  "stories": [
+    {
+      "priority": "P0",
+      "text": "运行 speckit new 时支持 --ontology 自动生成符合规范的七模型 YAML 骨架，并支持 speckit ontology 完整子命令族 (init/lint/mermaid/inspect/callchain)"
+    },
+    {
+      "priority": "P0",
+      "text": "运行 speckit build 时系统自动提取 spec 目录下的 ontology/ 编译 Mermaid ER 图、状态机图与 M2 动词契约表注入 design.md 与 plan.md"
+    },
+    {
+      "priority": "P0",
+      "text": "运行 speckit check / health 以及 Git pre-commit 提交时，系统自动执行反死穴与零孤岛静态审计，拦截 DEAD_UI_BUTTON 与 ILLEGAL_STATE_TRANSITION"
+    }
+  ],
+  "constraints": [
+    "符合本体驱动建模框架 v9.0：统一采用 M1 (Objects), M2 (Behaviors), M3 (Rules), M5 (Actors), M6 (Flows), MU (Views) 声明式标准。",
+    "零外网依赖与确定性：所有图表生成与静态审计均为纯本地算法，0 外部网络调用与零假 Mock。",
+    "物理交付硬门禁：1 Task = 1 Commit，严格贯彻白名单挂锁与不可变工件闭环。"
+  ],
+  "acceptance": [
+    {
+      "check": "node scripts/speckit.cjs ontology lint 成功对全域规格执行反死穴审计"
+    },
+    {
+      "check": "node scripts/speckit.cjs build 在存在 ontology/ 时自动生成 Mermaid ER/状态图并注入 design.md"
+    },
+    {
+      "check": "node scripts/pre-commit-check.mjs Gate 1.5 拦截存在死按钮或语法缺陷的本体变更"
+    }
+  ],
+  "nonGoals": [
+    "不在本次任务中改动 Postgres 物理表结构",
+    "不侵入 Paperclip 上游数据流，继续采用官方 issue_documents 承载协同"
+  ],
+  "architecture": "flowchart TD\n  SpecNew[\"speckit new --ontology\"] --> OntologyYaml[\"七模型声明 YAML (ontology/)\"]\n  OntologyYaml --> SpecBuild[\"speckit build (spec-ontology-driver)\"]\n  SpecBuild --> DesignMd[\"design.md (注入 Mermaid ER + M2 契约表)\"]\n  OntologyYaml --> SpecLint[\"speckit check / ontology lint\"]\n  SpecLint --> DeadButtonGuard{\"反死穴/零孤岛审计\"}\n  DeadButtonGuard -->|通过| PreCommitGate[\"pre-commit Gate 1.5 挂锁\"]\n  PreCommitGate --> GitCommit[\"1 Task = 1 Commit 不可变凭据\"]",
+  "entities": [
+    {
+      "table": "ontology_manifest",
+      "note": "七模型版本框架与模型清单"
+    },
+    {
+      "table": "ontology_seven_models",
+      "note": "M1 (Objects), M2 (Behaviors), M3 (Rules), M5 (Actors), M6 (Flows), MU (Views)"
+    }
+  ],
+  "invariants": [
+    {
+      "name": "反死按钮不变量 (INV_NO_DEAD_BUTTON)",
+      "how": "界面 actionPoints 引用的 behaviorRef 必须在 M2 behaviors 中完全存在"
+    },
+    {
+      "name": "状态跃迁守恒不变量 (INV_LIFECYCLE_BOUND)",
+      "how": "M2 behavior postconditions 变更的状态必须在 M1 lifecycle 允许枚举内"
+    }
+  ],
+  "ui": [
+    "CLI 控制台: speckit ontology [inspect|callchain|init|lint|mermaid]",
+    "Web/APP 工作台: docs/artifacts/ontology-callchain-workbench.html"
+  ],
+  "ops": [
+    "node scripts/speckit.cjs ontology inspect",
+    "node scripts/speckit.cjs ontology lint",
+    "node scripts/pre-commit-check.mjs"
+  ],
+  "risks": [
+    {
+      "risk": "旧规格缺少 ontology/ 导致 build 失败",
+      "mitigation": "设计为自适应检测：存在 ontology/ 则增强注入，不存在则保留原有扁平实体生成"
+    }
+  ],
+  "screens": [
+    {
+      "name": "CLI 帮助屏幕与本体工作台",
+      "wireframe": "+--------------------------------------------------------+\n| speckit ontology [inspect|callchain|init|lint|mermaid] |\n+--------------------------------------------------------+"
+    }
+  ],
+  "interactions": [
+    "speckit new --name <slug> --ontology 自动生成骨架",
+    "speckit build 自动注入 Mermaid 架构图"
+  ],
+  "states": [
+    "加载中：扫描 specs 与 models 拓扑",
+    "空数据：提示运行 speckit ontology init",
+    "出错：明确打印 DEAD_UI_BUTTON 与位置",
+    "成功：全时序因果链可验证通过"
+  ],
+  "tasks": [
+    {
+      "id": "T1",
+      "parent": "main",
+      "title": "脚手架与专用指令接管：speckit new 联动本体骨架初始化与 speckit ontology 完整指令集",
+      "files": [
+        "scripts/speckit.cjs",
+        "scripts/lib/spec-ontology-driver.cjs"
+      ]
+    },
+    {
+      "id": "T2",
+      "parent": "T1",
+      "title": "编译与自检深度闭环：speckit build 自动融合本体图表与 speckit check/health 反死穴硬门禁",
+      "files": [
+        "scripts/speckit.cjs"
+      ]
+    },
+    {
+      "id": "T3",
+      "parent": "main",
+      "title": "Pre-commit门禁挂锁与法典技能同步：全面保障本体零死穴提交与开发操作法典更新",
+      "files": [
+        "scripts/pre-commit-check.mjs",
+        ".agents/skills/speckit-workflow/SKILL.md",
+        "docs/specs/architecture/speckit-ontology-deep-integration/ontology/**"
+      ]
+    }
+  ],
+  "dependencies": "T1 → T2 → T3",
+  "windowMinutes": 15
+}

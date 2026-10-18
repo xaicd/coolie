@@ -1,0 +1,32 @@
+model_type: FLOW
+version: '1.0'
+domain: architecture
+flows:
+  - id: FLOW_SPECKIT_ONTOLOGY_DEEP_INTEGRATION_APPROVAL
+    name: Spec-Kit 活体本体建模全生命周期深度接管 审批协同流
+    flowType: APPROVAL
+    ownerEntity: AGG_ARCHITECTURE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION
+    startState: 草稿
+    endStates:
+      - 生效中
+      - 已废弃
+    activities:
+      - id: ACT_01
+        name: 经办人提交
+        activityType: USER_TASK
+        roleRef: ROLE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION_OPERATOR
+        behaviorRef: speckit-ontology-deep-integration_submit
+        next:
+          - ACT_GATE_01
+      - id: ACT_GATE_01
+        name: 提审完整性网关
+        activityType: GATEWAY
+        ruleRef: RULE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION_SUBMIT_CHECK
+        next:
+          - ACT_02
+      - id: ACT_02
+        name: 掌柜/总监复核
+        activityType: USER_TASK
+        roleRef: ROLE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION_APPROVER
+        next:
+          - END

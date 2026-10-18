@@ -1,0 +1,54 @@
+model_type: OBJECT
+version: '1.0'
+domain: architecture
+aggregates:
+  - id: AGG_ARCHITECTURE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION
+    name: Spec-Kit 活体本体建模全生命周期深度接管
+    alias: speckit-ontology-deep-integration
+    aggregateType: AGGREGATE_ROOT
+    description: Spec-Kit 活体本体建模全生命周期深度接管 核心业务聚合根
+    lifecycle:
+      - 草稿
+      - 待审批
+      - 生效中
+      - 已结项
+      - 已废弃
+    tags:
+      - 业务核心
+      - architecture
+    attributes:
+      - name: id
+        label: 主键 ID
+        type: String
+        required: true
+        unique: true
+      - name: company_id
+        label: 租户企业 ID
+        type: String
+        required: true
+      - name: biz_no
+        label: 业务单号
+        type: String
+        required: true
+        unique: true
+      - name: status
+        label: 生命周期状态
+        type: String
+        required: true
+      - name: title
+        label: 标题说明
+        type: String
+        required: true
+      - name: amount
+        label: 结算金额
+        type: Decimal
+        required: false
+      - name: created_at
+        label: 创建时间
+        type: DateTime
+        required: true
+      - name: updated_at
+        label: 更新时间
+        type: DateTime
+        required: true
+    relations: []

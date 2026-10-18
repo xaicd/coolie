@@ -1,0 +1,20 @@
+model_type: ACTOR
+version: '1.0'
+domain: architecture
+roles:
+  - id: ROLE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION_OPERATOR
+    name: 前线业务经办人
+    code: architecture_operator
+    roleType: INTERNAL
+    permissions:
+      - perm:architecture:speckit-ontology-deep-integration:create
+      - perm:architecture:speckit-ontology-deep-integration:submit
+    dataScope: SELF
+  - id: ROLE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION_APPROVER
+    name: 交付总监/掌柜审批官
+    code: architecture_approver
+    roleType: INTERNAL
+    permissions:
+      - perm:architecture:speckit-ontology-deep-integration:approve
+      - perm:architecture:speckit-ontology-deep-integration:reject
+    dataScope: ALL

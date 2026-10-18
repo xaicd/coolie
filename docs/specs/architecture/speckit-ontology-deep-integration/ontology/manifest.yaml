@@ -1,0 +1,13 @@
+model_type: MANIFEST
+version: '1.0'
+domain: architecture
+project: speckit-ontology-deep-integration
+title: Spec-Kit 活体本体建模全生命周期深度接管
+framework: ontology_modeling_framework_v9.md
+model_files:
+  - m1-objects.yaml
+  - m2-behaviors.yaml
+  - m3-rules.yaml
+  - m5-actors.yaml
+  - m6-flows.yaml
+  - mu-views.yaml

@@ -257,6 +257,17 @@ function handleNew() {
   fs.mkdirSync(path.join(dir, "assets"), { recursive: true })
   fs.mkdirSync(path.join(dir, "prototypes"), { recursive: true })
 
+  const withOntology = !hasFlag("--no-ontology") && (hasFlag("--ontology") || hasFlag("--with-ontology") || specType === "feature" || specType === "enhancement")
+  if (withOntology) {
+    try {
+      const { initOntologyYaml } = require("./lib/spec-ontology-driver.cjs")
+      initOntologyYaml(dir, domain, name, title)
+      console.log(`   📜 活体本体: ${path.relative(ROOT, path.join(dir, "ontology"))}/ (ODD 七模型 YAML 骨架就绪)`)
+    } catch (err) {
+      console.warn(`   ⚠️ 本体脚手架初始化提示: ${err.message}`)
+    }
+  }
+
   console.log(`\n✨ [speckit] 成功创建 ${specType} 规格骨架: ${path.relative(ROOT, dir)}/`)
   console.log(`   📄 声明真源: ${path.relative(ROOT, path.join(dir, "brief.json"))} (<500 Tokens，防样板浪费)`)
   console.log(`   🚀 下一步: 编辑 brief.json，然后执行:`)
@@ -1241,6 +1252,8 @@ Spec-Kit 原生与企业扩展命令:
   health      扫描全域规格健康度与防认知污染规则
   cmmi        CMMI 01~09 全生命周期过程资产创建与健康守卫 (new | list | check)
   workflows   查看与校验 Kiro 原生工作流配方 (.agents/workflows/)
+  ontology    活体本体七模型全生命周期治理 (inspect | callchain | init | lint | mermaid)
+  harness     五位一体 Harness 工程安全带与总调度中枢 (full-audit | ontology-audit | arch-audit | test)
 
 示例:
   node scripts/speckit.cjs init
@@ -1255,6 +1268,12 @@ Spec-Kit 原生与企业扩展命令:
   node scripts/speckit.cjs list
   node scripts/speckit.cjs archive --name fix-pay-lock
   node scripts/speckit.cjs cmmi check
+  node scripts/speckit.cjs ontology inspect
+  node scripts/speckit.cjs ontology lint [--spec <名>]
+  node scripts/speckit.cjs ontology mermaid --spec <名>
+  node scripts/speckit.cjs ontology init --spec <名>
+  node scripts/speckit.cjs harness full-audit
+  node scripts/speckit.cjs harness ontology-audit
 `)
 }
 
@@ -1319,14 +1338,27 @@ switch (command) {
   case "ontology":
     handleOntology()
     break
+  case "harness":
+    handleHarness()
+    break
   case "help":
   default:
     handleHelp()
     break
 }
 
+function handleHarness() {
+  const harnessScript = path.join(ROOT, "scripts/harness.sh")
+  const harnessArgs = process.argv.slice(3)
+  const action = harnessArgs[0] || "full-audit"
+  console.log(`\n🛡️ [speckit harness] 调用 Harness 安全带调度器 (${action})...\n`)
+  const res = spawnSync("bash", [harnessScript, ...harnessArgs], { stdio: "inherit" })
+  process.exit(res.status || 0)
+}
+
 function handleOntology() {
   const { extractSevenModels, generateCallChainHtml } = require("./lib/ontology-callchain-engine.cjs")
+  const { initOntologyYaml, lintOntologyYaml, buildOntologyMermaid } = require("./lib/spec-ontology-driver.cjs")
   const subAction = args[1] || "callchain"
 
   if (subAction === "inspect") {
@@ -1338,6 +1370,121 @@ function handleOntology() {
     console.log(`- 行为指令 (M2): ${registry.behaviors.length}`)
     console.log(`- 业务规则 (M3): ${registry.rules.length}`)
     console.log(`- 协同流程 (M6): ${registry.flows.length}`)
+    return
+  }
+
+  if (subAction === "init") {
+    const specName = getArg("--spec") || getArg("--name")
+    if (!specName) {
+      console.error("❌ 用法错误: node scripts/speckit.cjs ontology init --spec <规格名> [--domain <域>] [--title \"<标题>\"]")
+      process.exit(2)
+    }
+    const dir = resolveSpecDir(specName)
+    if (!dir) {
+      console.error(`❌ [speckit ontology init] 找不到规格: ${specName}`)
+      process.exit(2)
+    }
+    let domain = getArg("--domain")
+    let title = getArg("--title")
+    const briefPath = path.join(dir, "brief.json")
+    if (fs.existsSync(briefPath)) {
+      try {
+        const brief = JSON.parse(fs.readFileSync(briefPath, "utf8"))
+        domain = domain || brief.domain
+        title = title || brief.title
+      } catch {}
+    }
+    domain = domain || "core"
+    title = title || specName
+
+    const outDir = initOntologyYaml(dir, domain, specName, title)
+    console.log(`\n✨ [speckit ontology init] 成功初始化本体七模型骨架: ${path.relative(ROOT, outDir)}/`)
+    console.log(`   📄 包含: manifest.yaml, m1-objects.yaml, m2-behaviors.yaml, m3-rules.yaml, m5-actors.yaml, m6-flows.yaml, mu-views.yaml`)
+    return
+  }
+
+  if (subAction === "lint") {
+    const specName = getArg("--spec") || getArg("--name")
+    let targets = []
+    if (specName) {
+      const dir = resolveSpecDir(specName)
+      if (!dir) {
+        console.error(`❌ [speckit ontology lint] 找不到规格: ${specName}`)
+        process.exit(2)
+      }
+      targets.push({ name: specName, dir: path.join(dir, "ontology") })
+    } else {
+      const allSpecs = listAllSpecs()
+      for (const s of allSpecs) {
+        const specDir = s.path || s.dir
+        if (!specDir) continue
+        const ontDir = path.join(specDir, "ontology")
+        if (fs.existsSync(ontDir)) {
+          targets.push({ name: s.name, dir: ontDir })
+        }
+      }
+    }
+
+    if (targets.length === 0) {
+      console.log(`\nℹ️ [speckit ontology lint] 当前未发现包含 ontology/ 目录的规格。`)
+      return
+    }
+
+    console.log(`\n🔍 [speckit ontology lint] 正在对 ${targets.length} 个规格的本体模型进行静态反死穴审计...`)
+    let totalErrors = 0
+    let totalWarnings = 0
+
+    for (const target of targets) {
+      if (!fs.existsSync(target.dir)) {
+        console.warn(`   ⚠️ 规格 [${target.name}] 未找到 ontology/ 目录，跳过。`)
+        continue
+      }
+      const findings = lintOntologyYaml(target.dir)
+      const errors = findings.filter((f) => f.severity === "error")
+      const warnings = findings.filter((f) => f.severity === "warning")
+      totalErrors += errors.length
+      totalWarnings += warnings.length
+
+      if (findings.length === 0) {
+        console.log(`   ✅ [PASS] 规格 [${target.name}]: 零死按钮、零孤岛动词、状态机闭环 (100% PASS)`)
+      } else {
+        const badge = errors.length > 0 ? "❌ [FAIL]" : "⚠️ [WARN]"
+        console.log(`   ${badge} 规格 [${target.name}]: 发现 ${errors.length} 处错误, ${warnings.length} 处告警:`)
+        for (const f of findings) {
+          const icon = f.severity === "error" ? "🚨" : "🔸"
+          console.log(`      ${icon} [${f.code}] ${f.message}`)
+        }
+      }
+    }
+
+    if (totalErrors > 0) {
+      console.error(`\n❌ [speckit ontology lint] 门禁阻断: 共发现 ${totalErrors} 处严重本体语法/死穴缺陷，请修复后再提交！\n`)
+      process.exit(1)
+    } else {
+      console.log(`\n🎉 [speckit ontology lint] 审计通过！全域本体模型无死按钮、无非法跃迁！\n`)
+    }
+    return
+  }
+
+  if (subAction === "mermaid") {
+    const specName = getArg("--spec") || getArg("--name")
+    if (!specName) {
+      console.error("❌ 用法错误: node scripts/speckit.cjs ontology mermaid --spec <规格名>")
+      process.exit(2)
+    }
+    const dir = resolveSpecDir(specName)
+    if (!dir) {
+      console.error(`❌ [speckit ontology mermaid] 找不到规格: ${specName}`)
+      process.exit(2)
+    }
+    const ontologyDir = path.join(dir, "ontology")
+    if (!fs.existsSync(ontologyDir)) {
+      console.error(`❌ [speckit ontology mermaid] 规格 [${specName}] 缺少 ontology/ 目录`)
+      process.exit(2)
+    }
+    const mermaidMarkdown = buildOntologyMermaid(ontologyDir)
+    console.log(`\n=== 规格 [${specName}] 活体本体 Mermaid 架构拓扑 ===\n`)
+    console.log(mermaidMarkdown)
     return
   }
 

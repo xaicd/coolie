@@ -7,7 +7,16 @@
 
 const fs = require("node:fs");
 const path = require("node:path");
-const yaml = require("js-yaml");
+let yaml;
+try {
+  yaml = require("js-yaml");
+} catch {
+  try {
+    yaml = require(path.resolve(__dirname, "../../node_modules/.pnpm/js-yaml@4.3.1/node_modules/js-yaml"));
+  } catch (err) {
+    // Lazy fallback
+  }
+}
 
 const ROOT = path.resolve(__dirname, "../..");
 

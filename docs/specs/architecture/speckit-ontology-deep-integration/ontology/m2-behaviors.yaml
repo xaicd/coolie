@@ -1,0 +1,44 @@
+model_type: BEHAVIOR
+version: '1.0'
+domain: architecture
+behaviors:
+  - id: speckit-ontology-deep-integration_save_draft
+    name: 保存草稿
+    ownerEntity: AGG_ARCHITECTURE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION
+    behaviorType: COMMAND
+    triggerType: USER_ACTION
+    summary: 经办人暂存业务单据草稿
+    apiContract:
+      httpMethod: POST
+      routePath: /api/v1/architecture/speckit-ontology-deep-integration/draft
+    preconditions:
+      - status in ('草稿', '已驳回')
+    postconditions:
+      - field: status
+        setValue: 草稿
+    appliedRules:
+      - RULE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION_MULTI_TENANT_ISOLATION
+    requiredPermissions:
+      - perm:architecture:speckit-ontology-deep-integration:create
+    syncTriggers: []
+  - id: speckit-ontology-deep-integration_submit
+    name: 提交审批
+    ownerEntity: AGG_ARCHITECTURE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION
+    behaviorType: COMMAND
+    triggerType: USER_ACTION
+    summary: 提交单据进入跨角色审批流
+    apiContract:
+      httpMethod: POST
+      routePath: /api/v1/architecture/speckit-ontology-deep-integration/submit
+    preconditions:
+      - status == '草稿'
+      - title != null && title != ''
+    postconditions:
+      - field: status
+        setValue: 待审批
+    appliedRules:
+      - RULE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION_MULTI_TENANT_ISOLATION
+      - RULE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION_SUBMIT_CHECK
+    requiredPermissions:
+      - perm:architecture:speckit-ontology-deep-integration:submit
+    syncTriggers: []

@@ -1,0 +1,21 @@
+model_type: UI
+version: '1.0'
+domain: architecture
+screens:
+  - id: SCR_SPECKIT_ONTOLOGY_DEEP_INTEGRATION_CONSOLE
+    name: Spec-Kit 活体本体建模全生命周期深度接管 移动/Web 极简工作台
+    routePath: /architecture/speckit-ontology-deep-integration
+    targetEntity: AGG_ARCHITECTURE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION
+    screenType: FORM_EDIT
+    actionPoints:
+      - id: btn_save
+        label: 保存
+        behaviorRef: speckit-ontology-deep-integration_save_draft
+        style: SECONDARY
+        isDraftOrSubmit: true
+      - id: btn_submit
+        label: 提交
+        behaviorRef: speckit-ontology-deep-integration_submit
+        style: PRIMARY
+        confirmPrompt: 确认提交进入审批流？
+        isDraftOrSubmit: true
