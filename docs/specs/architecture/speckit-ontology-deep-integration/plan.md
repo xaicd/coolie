@@ -23,6 +23,42 @@ flowchart TD
   DeadButtonGuard -->|通过| PreCommitGate["pre-commit Gate 1.5 挂锁"]
   PreCommitGate --> GitCommit["1 Task = 1 Commit 不可变凭据"]
 
+## 活体本体七模型架构设计 (Living Ontology Topology)
+
+### 1. 领域实体模型 (M1 Object ER Diagram)
+```mermaid
+erDiagram
+    speckit_ontology_deep_integration {
+        String id "主键 ID"
+        String company_id "租户企业 ID"
+        String biz_no "业务单号"
+        String status "生命周期状态"
+        String title "标题说明"
+        Decimal amount "结算金额"
+        DateTime created_at "创建时间"
+        DateTime updated_at "更新时间"
+    }
+```
+
+### 2. 状态机生命周期跃迁 (State Transition Diagram)
+#### 实体 [Spec-Kit 活体本体建模全生命周期深度接管] 生命周期图
+```mermaid
+stateDiagram-v2
+    [*] --> 草稿
+    草稿 --> 待审批
+    待审批 --> 生效中
+    生效中 --> 已结项
+    已结项 --> 已废弃
+```
+
+### 3. 核心业务动词契约清单 (M2 Action Contract Table)
+| 行为 ID | 动词名称 | 触发类型 | 前置条件 | 跃迁状态 | 规则守卫 |
+| :--- | :--- | :--- | :--- | :--- | :--- |
+| `speckit-ontology-deep-integration_save_draft` | **保存草稿** | `USER_ACTION` | status in ('草稿', '已驳回') | `status=草稿` | RULE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION_MULTI_TENANT_ISOLATION |
+| `speckit-ontology-deep-integration_submit` | **提交审批** | `USER_ACTION` | status == '草稿'; title != null && title != '' | `status=待审批` | RULE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION_MULTI_TENANT_ISOLATION, RULE_SPECKIT_ONTOLOGY_DEEP_INTEGRATION_SUBMIT_CHECK |
+
+
+
 ### 核心业务时序图 (Archify Mermaid Flow)
 ```mermaid
 sequenceDiagram

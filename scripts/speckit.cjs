@@ -403,6 +403,23 @@ function handleBuild() {
     subtypeSection = `\n### 架构债务与异味分析 (Debt Analysis)\n\n${brief.debtAnalysis ?? "消除重复耦合代码"}\n\n### 目标整洁架构形态 (Target Architecture)\n\n${brief.targetArchitecture ?? "整洁分层与 Facade 隔离"}\n`
   }
 
+  const ontologyDir = path.join(dir, "ontology")
+  let ontologyMermaidSection = ""
+  if (fs.existsSync(ontologyDir)) {
+    try {
+      const { buildOntologyMermaid } = require("./lib/spec-ontology-driver.cjs")
+      ontologyMermaidSection = buildOntologyMermaid(ontologyDir)
+      console.log(`   📜 自动融合活体本体架构拓扑 (Mermaid ER/状态机/动词契约) -> design.md`)
+    } catch (e) {
+      console.warn(`   ⚠️ 无法编译本体 Mermaid 图: ${e.message}`)
+    }
+  }
+
+  let finalArchOverview = brief.architecture ?? "采用 Clean Architecture 分层架构与 Facade 隔离"
+  if (ontologyMermaidSection) {
+    finalArchOverview += `\n\n## 活体本体七模型架构设计 (Living Ontology Topology)\n\n${ontologyMermaidSection}`
+  }
+
   const templateVars = {
     TITLE: brief.title,
     NAME: name,
@@ -416,7 +433,7 @@ function handleBuild() {
     ACCEPTANCE_CRITERIA: acceptanceText,
     CONSTRAINTS: constraintsText,
     NON_GOALS: nonGoalsText,
-    ARCHITECTURE_OVERVIEW: brief.architecture ?? "采用 Clean Architecture 分层架构与 Facade 隔离",
+    ARCHITECTURE_OVERVIEW: finalArchOverview,
     ENTITIES_SECTION: entitiesText,
     API_CONTRACTS_SECTION: `- **HTTP 路由**: \`/api/v1/${brief.domain}/${name}\`\n- **权限标识**: \`${brief.domain}:${name}:manage\``,
     STATES_SECTION: statesText,
@@ -997,10 +1014,38 @@ function handleCheck() {
     }
   }
 
+  const ontologyDir = path.join(dir, "ontology")
+  if (fs.existsSync(ontologyDir)) {
+    console.log(`\n🔍 正在对规格 [${specName}] 执行活体本体静态反死穴审计...`)
+    try {
+      const { lintOntologyYaml } = require("./lib/spec-ontology-driver.cjs")
+      const findings = lintOntologyYaml(ontologyDir)
+      const errors = findings.filter((f) => f.severity === "error")
+      const warnings = findings.filter((f) => f.severity === "warning")
+      if (errors.length > 0) {
+        console.log(`❌ 活体本体反死穴审计未通过: 发现 ${errors.length} 处严重死穴缺陷:`)
+        for (const e of errors) {
+          console.log(`   🚨 [${e.code}] ${e.message}`)
+        }
+        allOk = false
+      } else if (warnings.length > 0) {
+        console.log(`⚠️ 活体本体审计通过，但有 ${warnings.length} 处告警:`)
+        for (const w of warnings) {
+          console.log(`   🔸 [${w.code}] ${w.message}`)
+        }
+      } else {
+        console.log(`✅ 活体本体反死穴审计: 100% PASS (零死按钮 / 零孤岛动词 / 状态机闭环)`)
+      }
+    } catch (err) {
+      console.log(`⚠️ 活体本体审计跳过: ${err.message}`)
+    }
+  }
+
   if (allOk) {
     console.log(`\n🎉 规格 [${specName}] 核心产物完备！`)
   } else {
-    console.log(`\n⚠️  请补齐缺失文件后再次运行检查: node scripts/speckit.cjs build --name ${specName}`)
+    console.log(`\n⚠️  请补齐缺失文件或修复死穴后再次运行检查: node scripts/speckit.cjs build --name ${specName}`)
+    process.exit(1)
   }
 }
 
@@ -1028,7 +1073,46 @@ function handleHealth() {
     stdio: "inherit",
     cwd: ROOT,
   })
-  process.exit(result.status || 0)
+  if (result.status !== 0) {
+    process.exit(result.status || 1)
+  }
+
+  // 联动全域活体本体静态反死穴审计
+  console.log("\n🌐 联动全域 Spec-Kit 声明式活体本体 (ODD 七模型) 静态反死穴扫描:")
+  try {
+    const { listAllSpecs } = require("./lib/spec-resolver.cjs")
+    const { lintOntologyYaml } = require("./lib/spec-ontology-driver.cjs")
+    const allSpecs = listAllSpecs()
+    let ontologyErrors = 0
+    let scanned = 0
+    for (const spec of allSpecs) {
+      const specDir = spec.path || spec.dir
+      if (!specDir) continue
+      const ontDir = path.join(specDir, "ontology")
+      if (fs.existsSync(ontDir)) {
+        scanned++
+        const findings = lintOntologyYaml(ontDir)
+        const errors = findings.filter((f) => f.severity === "error")
+        if (errors.length > 0) {
+          ontologyErrors += errors.length
+          console.error(`  ❌ [FAIL] 规格 [${spec.name}] 发现 ${errors.length} 处本体死穴缺陷`)
+          for (const e of errors) {
+            console.error(`     🚨 [${e.code}] ${e.message}`)
+          }
+        } else {
+          console.log(`  ✅ [PASS] 规格 [${spec.name}] 活体本体 100% 合规`)
+        }
+      }
+    }
+    if (ontologyErrors > 0) {
+      console.error(`\n❌ [speckit health] 全域共发现 ${ontologyErrors} 处本体严重死穴缺陷，阻断通过！\n`)
+      process.exit(1)
+    } else {
+      console.log(`  🎉 [PASS] 已扫描 ${scanned} 个具备本体模型的规格，全部通过零死穴审计！\n`)
+    }
+  } catch (err) {
+    console.warn(`  ⚠️ 活体本体健康扫描跳过: ${err.message}`)
+  }
 }
 
 // ============================================================================
