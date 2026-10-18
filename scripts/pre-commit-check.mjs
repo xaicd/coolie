@@ -108,6 +108,7 @@ const ALLOWED_ROOT_FILES = new Set([
   'version.json',
   'MEMORY.md',
   'CLAUDE.md',
+  'HARNESS.md',
   'vitest.config.ts',
   '.cursorrules',
   '.gitignore',

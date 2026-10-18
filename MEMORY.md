@@ -11,11 +11,12 @@
 - **核心**: PostgreSQL (PGlite / 原生 PG) + 263 物理表 + 活体业务本体 (Living Ontology)
 - **多机拓扑**: `mac` (指挥/模拟器/Node24) · `cwall` (4090/376G算力) · `aja-pc` (业务中台) · `tc-coolie-claw` (生产服务器)
 
-## 2. 5 个核心入口 (5 秒读完)
+## 2. 6 个核心入口 (5 秒读完)
 
 | 优先级 | 文件 | 核心用途 |
 |---|---|---|
 | ★ | **MEMORY.md** (本文件, ≤8KB) | 进场第一秒全貌与记忆中枢 |
+| ★ | [HARNESS.md](HARNESS.md) | 五位一体Harness规范、活体本体与日常工作法典 |
 | ★★ | [GOALS.md](GOALS.md) | 北极星愿景、战略使命与工程目标大纲 |
 | ★★ | [docs/MASTER-PILLARS-AND-GOVERNANCE.md](docs/MASTER-PILLARS-AND-GOVERNANCE.md) | 架构、标准CI/CD发版与CMMI5规范真理源 |
 | ★★ | [docs/intent-router.md](docs/intent-router.md) | 客户口语意图路由器 (7大类 30+ 原话反查) |
@@ -81,14 +82,13 @@
 
 ## 7. 当前 Sprint 动态记忆与掌柜最新原话
 
-- **当前 Sprint**: `2026-sprint-10-17-test-to-ops-and-doc-deflation`
+- **当前 Sprint**: `2026-sprint-10-18-harness-speckit-dispatch`
 - **最新拍板原话**:
-  - *"监控宿主机Hermes微信会话/看内容清晰"* ➜ `pnpm wechat:monitor` 提取掌柜原话与 3 张直播截图落地。
-  - *"验证coolie-dev具备OPC能力/解决脚本不顺畅"* ➜ Polyglot Shebang 双模自愈 + 写的人不查自己双五步。
-  - *"底座模板合理性重构 (开始吧)"* ➜ Yudao底座三级规格阶梯落地，Expo原生端源码与MySQL/Redis自闭环。
-  - *"本体模型核对/零人工机器审计/Harness集成"* ➜ `harness-ontology-audit.mjs` + Drizzle物理反射 + `harness.sh`。
-- **详见账本**: [docs/sprint-prod/10/17.md](docs/sprint-prod/10/17.md)
+  - *"全量审计影响范围/全部spec-kit接管/作为harness核心工具"* ➜ Spec-Kit SDD 全局治理 + 活体本体反死穴门禁。
+  - *"Hermes gateway 以及 APP原生 都能 派活 用上 spec-kit"* ➜ 微信/QQ派单 + 移动端CreateTaskModal规约闭环。
+  - *"所有AI工具打开项目都得能知道harness/本体/工作方式"* ➜ 统一根目录 `HARNESS.md`，同步各端指令。
+- **详见账本**: [docs/sprint-prod/10/18.md](docs/sprint-prod/10/18.md)
 
 ## 8. 维护规则
 
-- **严格 ≤ 8KB (8192 字节)**；不重复 Skill 全文，仅做“路径 + 1 行能力”；新决策记入 `docs/sprint-prod/MM/DD.md`。
+- **严格 ≤ 8KB (8192 字节)**；不重复全文，仅做“路径 + 1 行能力”；新决策记入 `docs/sprint-prod/MM/DD.md`。

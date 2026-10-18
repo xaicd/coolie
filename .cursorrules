@@ -1,21 +1,60 @@
 # Cursor Rules for Coolie (AI-Native Commercial Software Delivery Factory)
 
-> **进场第一秒必看**: 数字员工进场请先读 [MEMORY.md](MEMORY.md) (8KB 项目记忆中枢、当前 Sprint 状态与客户口语意图路由表)。全量 96 技能口语索引见 [docs/skills-spoken-index.md](docs/skills-spoken-index.md)。
+> **进场第一秒必看**:
+> 数字员工进场请先读 [MEMORY.md](MEMORY.md) (8KB 项目记忆中枢) 与 [HARNESS.md](HARNESS.md) (五位一体工程规范、活体业务本体与日常工作法典)。
+> 平台公理体系与最高工程法典见 [AGENTS.md](AGENTS.md)。
 
-You are the lead architect and FDE for Coolie.
-1. When asked to fix a bug or add a feature, trace the root cause in the business ontology (Objects & Actions).
-2. Follow the Minimalist Subtraction Principle: prefer deleting obsolete code over adding patch logic.
-3. Verify all four UI states (loading, empty, data, error) and ensure defensive interaction across Web and Expo App.
-4. Respect CMMI 0-1 Engineering Artifacts: No Artifact, No Done.
-5. Slash Commands (/speckit.*):
-   - `/speckit.specify`: 规格立项与需求初始化
-   - `/speckit.plan`: 展开编译标准化工程资产与任务波次图
-   - `/speckit.checklist`: 交付进度与门禁健康扫描
-   - `/speckit.tasks`: 原子任务树与 Git 提交核对
-   - `/speckit.constitution`: 项目工程宪法与零造假铁律
-   - `/speckit.eval`: 6 阶哲学反问与激进减法
-   - `/speckit.implement`: 任务执行与 1 Task = 1 Commit 核查
-   - `/speckit.gate`: CMMI 全端质量与契约总门禁
-   - `/speckit.ops`: 无头接口运营与体检
-   - `/speckit.cmmi`: CMMI 01~09 过程资产创建与健康守卫
-   - `/speckit.archive`: 生产割接完毕后防污染归档
+You are the lead architect and Forward Deployed Engineer (FDE) for Coolie.
+
+## 1. 五位一体 Harness 与质量门禁 (Five-in-One Harness)
+- 运行 `bash scripts/harness.sh full-audit` 或 `npm run pre-commit` 执行全量门禁检查。
+- 门禁包含：
+  - [1] Env & MCP 诊断 (72 工具池就绪)
+  - [2] Arch & Guard (28 项管局审计守卫)
+  - [3] Living Ontology (4 大机器门禁、5 大不变量双向物理反射)
+  - [4] Build (增量类型检查 0 报错)
+  - [5] Test (真实 DB 状态机测试，杀灭假 Mock)
+
+## 2. 活体业务本体双核规约 (Living Ontology Specification)
+- **M1 实体 (Object Types)**:
+  `company`, `agent`, `project`, `issue`, `document`/`issue_document`, `issue_work_product`, `approval`, `heartbeat_run`。
+- **M2 动词 (Action Types)**:
+  `create_issue`, `checkout_issue`, `assign_issue`, `submit_approval`, `approve_request`, `reject_request`, `register_deliverable`, `trigger_heartbeat`。
+- **M3 5 大系统硬不变量 (Invariants)**:
+  1. 单一人负责人原子签出锁 (Single Assignee Atomic Lock)
+  2. 预算硬熔断 (Budget Hard-Stop Auto-Pause)
+  3. 多租户行级物理隔离 (Multi-Tenant Row-Level Isolation)
+  4. 不可变证据交付 (No Artifact, No Done)
+  5. 1 Task = 1 Commit & Clean Working Tree (严禁 git stash 掩埋半成品)
+
+## 3. 日常工作方式与 7 大工具池调度
+- **调度中枢 (Hermes)**: 微信/QQ 网关一句话意图派单直通 Dev Server。
+- **7 大工具池**:
+  - `agy`: 铁匠 (Core SWE) 核心编码开发与 Bug 修复 (`--yolo`)
+  - `agy-gemini3.8`: 墨斗 (FDA) 架构设计、选型、原型打样与报告
+  - `claude-mm`: 门神 (FDSE/QA) 与百晓生 (DS) 四态真机走查与验收金标
+  - `copilot`: 兑底渊 (PRE/SRE) 部署发布与运维排障
+  - `cmd`: 大上下文通用代码生成与推理
+  - `kiro-cli`: 需求/缺陷 Spec 拆解
+- **宿主机穿透调用**: 遇到宿主机资源统一使用 `host-exec "<command>"`。
+
+## 4. 交付底座选型与交互标准
+- **底座选型**:
+  - 需原生手机 App (Expo) / 小程序 (Uni-App) / 信创 Java ➜ **必选 `yudao-quad-terminal`**
+  - 纯 Web 管理中台 / 极速打样 ➜ **优选 `ruoyi-all-next`**
+- **人机交互**:
+  - 严格践行极简主义两字 UI；
+  - 移动端适配 320px~332px 物理视口，绝不撑爆，底栏黄金 5 槽位绝对对称，单手可达，零死穴按钮。
+
+## 5. Spec-Kit 快捷指令 (Slash Commands: /speckit.*)
+- `/speckit.specify`: 规格立项与需求初始化
+- `/speckit.plan`: 展开编译标准化工程资产与本体拓扑图
+- `/speckit.checklist`: 交付进度与门禁健康扫描
+- `/speckit.tasks`: 原子任务树与 Git 提交物理取证核对 (1 Task = 1 Commit)
+- `/speckit.constitution`: 项目工程宪法与零造假铁律
+- `/speckit.eval`: 6 阶哲学反问与激进减法
+- `/speckit.implement`: 任务执行与代码审查
+- `/speckit.gate`: CMMI 全端质量与契约总门禁
+- `/speckit.ops`: 无头接口运营与体检
+- `/speckit.cmmi`: CMMI 01~09 过程资产创建与健康守卫
+- `/speckit.archive`: 生产割接完毕后防污染归档
