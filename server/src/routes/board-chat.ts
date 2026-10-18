@@ -11,6 +11,7 @@ import { createBoardConversationSchema, updateBoardConversationSchema } from "@p
 import { companies, issueAttachments, issueComments, issues, chatConversations, assets, boardConversations, projects, agents, ontologyTypes, issueWorkProducts } from "@paperclipai/db";
 import { and, desc, eq, inArray, isNull, lt, or, sql } from "drizzle-orm";
 import { heartbeatService, instanceSettingsService, issueService } from "../services/index.js";
+import { resolveDispatchIssuePriority } from "../services/dispatch-priority.js";
 import { queueIssueAssignmentWakeup } from "../services/issue-assignment-wakeup.js";
 import { recordCommentRelation } from "../services/ontology-graph.js";
 import { assertCompanyAccess, getActorInfo } from "./authz.js";
@@ -457,7 +458,7 @@ async function detectAndExecuteDirectAction(
           projectId: targetProjectId,
           assigneeAgentId: targetAgent.id,
           status: "todo",
-          priority: timeboxMinutes ? "high" : "normal",
+          priority: resolveDispatchIssuePriority(timeboxMinutes),
           specKit: {
             enabled: true,
             type: specType,
