@@ -3,10 +3,11 @@
   "domain": "architecture",
   "title": "Spec-Kit 活体本体建模全生命周期深度接管",
   "type": "feature",
-  "status": "PLAN_APPROVED",
+  "status": "ACCEPTED",
   "stories": 3,
   "acceptance": 3,
   "invariants": 2,
   "tasks": 3,
-  "updatedAt": "2026-10-18T02:58:58.007Z"
+  "updatedAt": "2026-10-18T02:58:58.007Z",
+  "completedAt": "2026-10-18T03:03:35.150Z"
 }
