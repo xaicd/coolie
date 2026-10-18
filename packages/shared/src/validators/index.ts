@@ -422,6 +422,7 @@ export {
 export {
   createIssueSchema,
   createIssueInputSchema,
+  issueSpecKitConfigSchema,
   createChildIssueSchema,
   createAcceptedPlanDecompositionSchema,
   resolveCreateIssueStatusDefault,
@@ -499,6 +500,7 @@ export {
   restoreIssueDocumentRevisionSchema,
   upsertIssueWatchdogSchema,
   type CreateIssue,
+  type IssueSpecKitConfig,
   type CreateChildIssue,
   type CreateAcceptedPlanDecomposition,
   type CreateIssueLabel,

@@ -1,0 +1,16 @@
+model_type: RULE
+version: '1.0'
+domain: governance
+rules:
+  - id: RULE_HERMES_AND_NATIVE_APP_SPECKIT_DISPATCH_MULTI_TENANT_ISOLATION
+    name: 多企业租户物理隔离规则
+    ruleType: VALIDATION
+    ownerEntity: AGG_GOVERNANCE_HERMES_AND_NATIVE_APP_SPECKIT_DISPATCH
+    conditionExpression: current_company_id == record.company_id
+    errorMessage: 越权访问：禁止跨企业操作业务实体
+  - id: RULE_HERMES_AND_NATIVE_APP_SPECKIT_DISPATCH_SUBMIT_CHECK
+    name: 提审完整性与前置校验
+    ruleType: GATE
+    ownerEntity: AGG_GOVERNANCE_HERMES_AND_NATIVE_APP_SPECKIT_DISPATCH
+    conditionExpression: record.title != null && record.title.length >= 2
+    errorMessage: 单据提交失败：标题不能为空且长度须不少于2个字

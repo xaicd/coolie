@@ -1,0 +1,12 @@
+{
+  "name": "hermes-and-native-app-speckit-dispatch",
+  "domain": "governance",
+  "title": "Hermes网关与APP原生派活全流程接入Spec-Kit",
+  "type": "feature",
+  "status": "PLAN_APPROVED",
+  "stories": 4,
+  "acceptance": 5,
+  "invariants": 1,
+  "tasks": 3,
+  "updatedAt": "2026-10-18T03:14:05.916Z"
+}

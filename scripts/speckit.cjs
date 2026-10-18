@@ -24,14 +24,34 @@ const fs = require("node:fs")
 const path = require("node:path")
 const { spawnSync } = require("node:child_process")
 
-const ROOT = path.resolve(__dirname, "..")
+function findProjectRoot(startDir) {
+  let curr = path.resolve(startDir)
+  for (let i = 0; i < 6; i++) {
+    if (fs.existsSync(path.join(curr, "package.json")) || fs.existsSync(path.join(curr, ".specify")) || fs.existsSync(path.join(curr, ".git"))) {
+      return curr
+    }
+    const parent = path.dirname(curr)
+    if (parent === curr) break
+    curr = parent
+  }
+  return path.resolve(startDir, "..")
+}
+const ROOT = findProjectRoot(__dirname)
+
+const libDir = fs.existsSync(path.join(__dirname, "lib/spec-resolver.cjs"))
+  ? path.join(__dirname, "lib")
+  : fs.existsSync(path.join(__dirname, "scripts/lib/spec-resolver.cjs"))
+  ? path.join(__dirname, "scripts/lib")
+  : fs.existsSync(path.join(__dirname, "../scripts/lib/spec-resolver.cjs"))
+  ? path.join(__dirname, "../scripts/lib")
+  : path.join(ROOT, "scripts/lib")
 
 // 引入统一规格解析器
 const {
   resolveSpecDir,
   getTargetSpecDir,
   listAllSpecs,
-} = require("./lib/spec-resolver.cjs")
+} = require(path.join(libDir, "spec-resolver.cjs"))
 
 // 参数解析助手
 const args = process.argv.slice(2)
@@ -58,15 +78,16 @@ const hasFlag = (flag) => args.includes(flag)
 // ============================================================================
 // 1. 命令：speckit new (创建规格骨架)
 // ============================================================================
-function handleNew() {
-  const name = getArg("--name")
-  const domain = getArg("--domain")
-  const title = getArg("--title") ?? name
-  const specType = getArg("--type") ?? "feature"
-  const isForce = hasFlag("--force")
-  const isLegacy = hasFlag("--legacy")
+function handleNew(opts) {
+  const name = opts?.name ?? getArg("--name")
+  const domain = opts?.domain ?? getArg("--domain")
+  const title = opts?.title ?? getArg("--title") ?? name
+  const specType = opts?.type ?? getArg("--type") ?? "feature"
+  const isForce = opts?.force ?? hasFlag("--force")
+  const isLegacy = opts?.legacy ?? hasFlag("--legacy")
 
   if (!name || !domain) {
+    if (opts) throw new Error("缺少规格名称或领域: name and domain are required")
     console.error("❌ 用法错误: node scripts/speckit.cjs new --name <名称> --domain <域名> --title \"<标题>\" [--type feature|bugfix|enhancement|refactor|security]")
     process.exit(2)
   }
@@ -257,10 +278,10 @@ function handleNew() {
   fs.mkdirSync(path.join(dir, "assets"), { recursive: true })
   fs.mkdirSync(path.join(dir, "prototypes"), { recursive: true })
 
-  const withOntology = !hasFlag("--no-ontology") && (hasFlag("--ontology") || hasFlag("--with-ontology") || specType === "feature" || specType === "enhancement")
+  const withOntology = !hasFlag("--no-ontology") && (hasFlag("--ontology") || hasFlag("--with-ontology") || specType === "feature" || specType === "enhancement" || opts?.withOntology)
   if (withOntology) {
     try {
-      const { initOntologyYaml } = require("./lib/spec-ontology-driver.cjs")
+      const { initOntologyYaml } = require(path.join(libDir, "spec-ontology-driver.cjs"))
       initOntologyYaml(dir, domain, name, title)
       console.log(`   📜 活体本体: ${path.relative(ROOT, path.join(dir, "ontology"))}/ (ODD 七模型 YAML 骨架就绪)`)
     } catch (err) {
@@ -272,22 +293,25 @@ function handleNew() {
   console.log(`   📄 声明真源: ${path.relative(ROOT, path.join(dir, "brief.json"))} (<500 Tokens，防样板浪费)`)
   console.log(`   🚀 下一步: 编辑 brief.json，然后执行:`)
   console.log(`      node scripts/speckit.cjs build --name ${name}`)
+  return { dir, specRelDir: path.relative(ROOT, dir), brief, name, domain, title, specType }
 }
 
 // ============================================================================
 // 2. 命令：speckit build (展开生成规格文档)
 // ============================================================================
-function handleBuild() {
-  const name = getArg("--name") || getArg("--spec")
-  const checkOnly = hasFlag("--check")
+function handleBuild(opts) {
+  const name = opts?.name ?? (getArg("--name") || getArg("--spec"))
+  const checkOnly = opts?.check ?? hasFlag("--check")
 
   if (!name) {
+    if (opts) throw new Error("缺少规格名: name is required")
     console.error("❌ 用法错误: node scripts/speckit.cjs build --name <规格名> [--check]")
     process.exit(2)
   }
 
   const dir = resolveSpecDir(name)
   if (!dir) {
+    if (opts) throw new Error(`找不到规格: ${name}`)
     console.error(`❌ [speckit] 找不到规格: ${name}（请先运行 node scripts/speckit.cjs new 创建）`)
     process.exit(2)
   }
@@ -529,6 +553,7 @@ function handleBuild() {
   console.log(`\n✅ [speckit] 规格展开编译成功: 共生成 ${count} 份工程文档 -> ${path.relative(ROOT, dir)}/`)
   console.log(`   📋 包含: ${Object.keys(files).join(", ")}`)
   console.log(`   🔍 进度检查: node scripts/speckit.cjs check --spec ${name}`)
+  return { dir, specRelDir: path.relative(ROOT, dir), brief, files }
 }
 
 // ============================================================================
@@ -1362,73 +1387,75 @@ Spec-Kit 原生与企业扩展命令:
 }
 
 // 主调度派发器
-switch (command) {
-  case "init":
-    handleInit()
-    break
-  case "constitution":
-    handleConstitution()
-    break
-  case "specify":
-  case "new":
-  case "create":
-    handleNew()
-    break
-  case "plan":
-  case "build":
-    handleBuild()
-    break
-  case "tasks":
-  case "task":
-    handleTasks()
-    break
-  case "sync":
-    handleSync().catch((err) => {
-      console.error("❌ [speckit sync] 执行异常:", err.message)
-      process.exit(1)
-    })
-    break
-  case "official-migrate":
-  case "migrate-to-official":
-    handleMigrateToOfficial().catch((err) => {
-      console.error("❌ [speckit official-migrate] 执行异常:", err.message)
-      process.exit(1)
-    })
-    break
-  case "list":
-  case "ls":
-    handleList()
-    break
-  case "archive":
-    handleArchive()
-    break
-  case "check":
-    handleCheck()
-    break
-  case "health":
-    handleHealth()
-    break
-  case "cmmi": {
-    const cmmiScript = path.join(__dirname, "cmmi-asset-scaffold.cjs")
-    const cmmiArgs = process.argv.slice(3)
-    const res = spawnSync(process.execPath, [cmmiScript, ...cmmiArgs], { stdio: "inherit" })
-    process.exit(res.status || 0)
-    break
+function runCli() {
+  switch (command) {
+    case "init":
+      handleInit()
+      break
+    case "constitution":
+      handleConstitution()
+      break
+    case "specify":
+    case "new":
+    case "create":
+      handleNew()
+      break
+    case "plan":
+    case "build":
+      handleBuild()
+      break
+    case "tasks":
+    case "task":
+      handleTasks()
+      break
+    case "sync":
+      handleSync().catch((err) => {
+        console.error("❌ [speckit sync] 执行异常:", err.message)
+        process.exit(1)
+      })
+      break
+    case "official-migrate":
+    case "migrate-to-official":
+      handleMigrateToOfficial().catch((err) => {
+        console.error("❌ [speckit official-migrate] 执行异常:", err.message)
+        process.exit(1)
+      })
+      break
+    case "list":
+    case "ls":
+      handleList()
+      break
+    case "archive":
+      handleArchive()
+      break
+    case "check":
+      handleCheck()
+      break
+    case "health":
+      handleHealth()
+      break
+    case "cmmi": {
+      const cmmiScript = path.join(__dirname, "cmmi-asset-scaffold.cjs")
+      const cmmiArgs = process.argv.slice(3)
+      const res = spawnSync(process.execPath, [cmmiScript, ...cmmiArgs], { stdio: "inherit" })
+      process.exit(res.status || 0)
+      break
+    }
+    case "workflows":
+    case "workflow":
+      handleWorkflows()
+      break
+    case "ontology":
+      handleOntology()
+      break
+    case "harness":
+      handleHarness()
+      break
+    case "help":
+    default:
+      handleHelp()
+      break
   }
-  case "workflows":
-  case "workflow":
-    handleWorkflows()
-    break
-  case "ontology":
-    handleOntology()
-    break
-  case "harness":
-    handleHarness()
-    break
-  case "help":
-  default:
-    handleHelp()
-    break
 }
 
 function handleHarness() {
@@ -1585,5 +1612,19 @@ function handleOntology() {
   console.log(`   📄 交付物路径: ${outFile}`)
   console.log(`   💡 覆盖: ${registry.screens.length} 个交互入口, ${registry.behaviors.length} 个行为指令, ${registry.rules.length} 条业务规则, ${registry.aggregates.length} 个实体模型, ${registry.flows.length} 个流程时序。`)
   console.log(`   🚀 双击该文件即可直接在本地浏览器或 Web/APP 工作台中全时序穿透查看！\n`)
+}
+
+if (require.main === module) {
+  runCli()
+}
+
+module.exports = {
+  handleNew,
+  handleBuild,
+  handleSync,
+  resolveSpecDir,
+  getTargetSpecDir,
+  listAllSpecs,
+  ROOT,
 }
 

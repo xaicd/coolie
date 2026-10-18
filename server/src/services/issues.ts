@@ -7,7 +7,8 @@ import { executionProjectionsForRuns } from "./execution-projection.js";
 import { resolveArtifactVersion } from "./work-product-versions.js";
 import { auditService } from "./audit.js";
 import { DEFECT_PLAYBOOK_THRESHOLD, defectFingerprint, defectKbService } from "./defect-kb.js";
-import type { ExecutionProjection } from "@paperclipai/shared";
+import { speckitDispatchService } from "./speckit-dispatch.js";
+import type { ExecutionProjection, IssueSpecKitConfig } from "@paperclipai/shared";
 import { Buffer } from "node:buffer";
 import { createHash, randomUUID } from "node:crypto";
 import {
@@ -1954,6 +1955,8 @@ async function assertExecutionTaskParent(db: Db, companyId: string, parentId?: s
 type DbTransaction = Parameters<Parameters<Db["transaction"]>[0]>[0];
 type IssueCreateInput = Omit<typeof issues.$inferInsert, "companyId"> & {
   initialPlan?: string | null;
+  initialSpec?: string | null;
+  specKit?: IssueSpecKitConfig | null;
   labelIds?: string[];
   blockedByIssueIds?: string[];
   inheritExecutionWorkspaceFromIssueId?: string | null;
@@ -9865,6 +9868,8 @@ export function issueService(db: Db) {
     ) => {
       const {
         initialPlan,
+        initialSpec,
+        specKit,
         labelIds: inputLabelIds,
         blockedByIssueIds,
         inheritExecutionWorkspaceFromIssueId,
@@ -10332,6 +10337,32 @@ export function issueService(db: Db) {
             createdByAgentId: issueData.createdByAgentId, createdByUserId: issueData.createdByUserId,
             createdByRunId: actorRunId,
           });
+        }
+        if (initialSpec?.trim()) {
+          await documentService(tx as unknown as Db).upsertIssueDocument({
+            issueId: issue.id, key: "spec", title: "Specification", format: "markdown", body: initialSpec,
+            createdByAgentId: issueData.createdByAgentId, createdByUserId: issueData.createdByUserId,
+            createdByRunId: actorRunId,
+          });
+        }
+        if (specKit && specKit.enabled !== false) {
+          try {
+            await speckitDispatchService(tx as unknown as Db).scaffoldAndBindSpec({
+              issueId: issue.id,
+              issueIdentifier: issue.identifier,
+              title: issue.title,
+              companyId,
+              projectId: issue.projectId,
+              specKitConfig: specKit,
+              actor: {
+                agentId: issueData.createdByAgentId,
+                userId: issueData.createdByUserId,
+                runId: actorRunId,
+              },
+            });
+          } catch (e) {
+            console.warn(`[speckit-dispatch] Auto-scaffold error: ${(e as Error).message}`);
+          }
         }
         const [enriched] = await withIssueLabels(tx, [issue]);
         const [withRelations] = await withIssueRelationSummaries(

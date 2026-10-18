@@ -733,8 +733,25 @@ const issueMilestoneSchema = z
 
 export type IssueMilestoneInput = z.infer<typeof issueMilestoneSchema>;
 
+/** Spec-Kit SDD 规格驱动配置 (Hermes Gateway / APP原生 / Web 统一接入) */
+export const issueSpecKitConfigSchema = z
+  .object({
+    enabled: z.boolean().optional().default(true),
+    type: z
+      .enum(["feature", "bugfix", "refactor", "security", "enhancement"])
+      .optional()
+      .default("feature"),
+    domain: z.string().trim().max(100).optional().nullable(),
+    name: z.string().trim().max(100).optional().nullable(),
+    brief: z.record(z.string(), z.unknown()).optional().nullable(),
+  })
+  .strict();
+
+export type IssueSpecKitConfig = z.infer<typeof issueSpecKitConfigSchema>;
+
 const createIssueBaseSchema = z.object({
   projectId: z.string().guid().optional().nullable(),
+  specKit: issueSpecKitConfigSchema.optional().nullable(),
   projectWorkspaceId: z.string().guid().optional().nullable(),
   goalId: z.string().guid().optional().nullable(),
   parentId: z.string().guid().optional().nullable(),
@@ -822,6 +839,7 @@ function requireBlockedStatusForUnblockDescriptor(
 
 const createIssueDuplicateGuardSchema = {
   initialPlan: z.string().min(1).max(200000).optional().nullable(),
+  initialSpec: multilineTextSchema.optional().nullable(),
   idempotencyKey: z.string().trim().min(1).max(255).optional().nullable(),
   allowDuplicate: z
     .boolean()

@@ -1,0 +1,21 @@
+model_type: UI
+version: '1.0'
+domain: governance
+screens:
+  - id: SCR_HERMES_AND_NATIVE_APP_SPECKIT_DISPATCH_CONSOLE
+    name: Hermes网关与APP原生派活全流程接入Spec-Kit 移动/Web 极简工作台
+    routePath: /governance/hermes-and-native-app-speckit-dispatch
+    targetEntity: AGG_GOVERNANCE_HERMES_AND_NATIVE_APP_SPECKIT_DISPATCH
+    screenType: FORM_EDIT
+    actionPoints:
+      - id: btn_save
+        label: 保存
+        behaviorRef: hermes-and-native-app-speckit-dispatch_save_draft
+        style: SECONDARY
+        isDraftOrSubmit: true
+      - id: btn_submit
+        label: 提交
+        behaviorRef: hermes-and-native-app-speckit-dispatch_submit
+        style: PRIMARY
+        confirmPrompt: 确认提交进入审批流？
+        isDraftOrSubmit: true

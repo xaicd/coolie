@@ -1,0 +1,13 @@
+model_type: MANIFEST
+version: '1.0'
+domain: governance
+project: hermes-and-native-app-speckit-dispatch
+title: Hermes网关与APP原生派活全流程接入Spec-Kit
+framework: ontology_modeling_framework_v9.md
+model_files:
+  - m1-objects.yaml
+  - m2-behaviors.yaml
+  - m3-rules.yaml
+  - m5-actors.yaml
+  - m6-flows.yaml
+  - mu-views.yaml

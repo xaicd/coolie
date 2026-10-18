@@ -1,0 +1,20 @@
+model_type: ACTOR
+version: '1.0'
+domain: governance
+roles:
+  - id: ROLE_HERMES_AND_NATIVE_APP_SPECKIT_DISPATCH_OPERATOR
+    name: 前线业务经办人
+    code: governance_operator
+    roleType: INTERNAL
+    permissions:
+      - perm:governance:hermes-and-native-app-speckit-dispatch:create
+      - perm:governance:hermes-and-native-app-speckit-dispatch:submit
+    dataScope: SELF
+  - id: ROLE_HERMES_AND_NATIVE_APP_SPECKIT_DISPATCH_APPROVER
+    name: 交付总监/掌柜审批官
+    code: governance_approver
+    roleType: INTERNAL
+    permissions:
+      - perm:governance:hermes-and-native-app-speckit-dispatch:approve
+      - perm:governance:hermes-and-native-app-speckit-dispatch:reject
+    dataScope: ALL

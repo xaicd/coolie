@@ -375,6 +375,25 @@ if (fs.existsSync(bridgePluginSrc)) {
   }
 }
 
+// 5.2.4 拷贝 Spec-Kit 规格驱动开发 (SDD) 统一 CLI 与配套拓扑 (Hermes/全端派单核心规范)
+const speckitSrc = path.resolve(repoRoot, "scripts/speckit.cjs");
+const scriptsLibSrc = path.resolve(repoRoot, "scripts/lib");
+if (fs.existsSync(speckitSrc)) {
+  const targetSpeckit = path.join(stageDir, "bin/speckit");
+  fs.copyFileSync(speckitSrc, targetSpeckit);
+  fs.chmodSync(targetSpeckit, 0o755);
+  const targetScriptsLib = path.join(stageDir, "bin/lib");
+  fs.mkdirSync(targetScriptsLib, { recursive: true });
+  if (fs.existsSync(scriptsLibSrc)) {
+    for (const f of fs.readdirSync(scriptsLibSrc)) {
+      const srcFile = path.join(scriptsLibSrc, f);
+      if (fs.statSync(srcFile).isFile()) {
+        fs.copyFileSync(srcFile, path.join(targetScriptsLib, f));
+      }
+    }
+  }
+}
+
 // 5.3 生成自包含生产级 CLI 启动脚本 bin/coolie-dev
 const launcherScript = `#!/usr/bin/env bash
 # ==============================================================================

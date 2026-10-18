@@ -1,0 +1,161 @@
+{
+  "name": "hermes-and-native-app-speckit-dispatch",
+  "domain": "governance",
+  "title": "Hermes网关与APP原生派活全流程接入Spec-Kit",
+  "type": "feature",
+  "goal": "打通 Hermes Gateway (QQ/微信/意图解析器) 与 Expo APP 原生移动端的任务派发全链路，统一接入 Spec-Kit SDD (规格驱动开发)，实现从一句话派单到物理规格骨架、官方协同文档与活体本体全流程闭环。",
+  "roles": [
+    {
+      "role": "掌柜/交付总监 (CEO/FDE)",
+      "can": "通过微信/QQ网关、工坊会话或手机原生APP发起任务，系统自动生成合规的 Spec-Kit 规格与官方 issue_documents 文档"
+    },
+    {
+      "role": "数字员工 (Hermes/铁匠/墨斗)",
+      "can": "接单即可获得规范的 EARS 需求规格 (spec)、Wave 任务分解 (plan) 与物理规格目录，杜绝无规格假开工"
+    }
+  ],
+  "stories": [
+    {
+      "priority": "P0",
+      "text": "封闭发行包构建脚本 package-coolie-dev-bundle.mjs 正式封装 speckit.cjs 与 scripts/lib/ 到 bin/speckit，提供生产级开箱即用 CLI。"
+    },
+    {
+      "priority": "P0",
+      "text": "控制面 shared 契约与 server issue 服务扩展支持 specKit 与 initialSpec，在原子建单时自动脚手架生成规格物理资产并挂载官方 issue_documents。"
+    },
+    {
+      "priority": "P0",
+      "text": "Hermes Gateway (create-coolie-task.mjs、hermes-boss-intent-dispatcher.sh、board-chat.ts) 派单全流程接入 spec-kit。"
+    },
+    {
+      "priority": "P0",
+      "text": "Expo 原生移动端 CreateTaskModal 升级 Spec-Kit 规范类型 (feature/bugfix/refactor/security)，建单直通 Spec-Kit 规格总线。"
+    }
+  ],
+  "constraints": [
+    "1 Task = 1 Commit：每个子任务独立提交，工作树保持 0 dirty 0 untracked。",
+    "双轨一致性：代码仓库物理 Markdown 资产为真理源，控制面 issue_documents 原生协同。",
+    "零破坏性：平滑兼容既有无 spec 派单与旧版 saveIssueSpec 接口。"
+  ],
+  "acceptance": [
+    {
+      "check": "`node scripts/speckit.cjs check --spec hermes-and-native-app-speckit-dispatch` exit=0"
+    },
+    {
+      "check": "package-coolie-dev-bundle.mjs 包含 bin/speckit 打包逻辑"
+    },
+    {
+      "check": "create-coolie-task.mjs 支持 --speckit 派单并成功生成物理规格与工单文档"
+    },
+    {
+      "check": "hermes-boss-intent-dispatcher.sh 解析意图时自动挂载 Spec-Kit 规格"
+    },
+    {
+      "check": "Expo CreateTaskModal 支持 Spec-Kit 类型选择并在建单时透传 specKit"
+    }
+  ],
+  "nonGoals": [
+    "不修改 Paperclip 官方 issue 表核心字段结构，全面继承 issue_documents 原生模型",
+    "不破坏现有非 Spec 派单的极简直发通道"
+  ],
+  "architecture": "Hermes Gateway (QQ/微信/意图解析) / Expo Native App ➔ POST /api/companies/:id/issues (携带 specKit 配置) ➔ server/src/services/speckit-dispatch.ts (触发 scaffold & build) ➔ 物理 docs/specs/ 资产 + 官方 issue_documents (spec/plan) + issue_work_products ➔ 数字员工基于 SDD 规范实施 1 Task = 1 Commit",
+  "entities": [
+    {
+      "table": "issues",
+      "note": "承载任务基础信息与工单标识"
+    },
+    {
+      "table": "issue_documents",
+      "note": "官方原生文档表，存储 key: 'spec' 与 key: 'plan' 的 Markdown 内容"
+    },
+    {
+      "table": "issue_work_products",
+      "note": "工件总线表，挂载 docs/specs/ 物理规格文件资源引用"
+    }
+  ],
+  "invariants": [
+    {
+      "name": "规格原子性",
+      "how": "带有 specKit 的建单请求必须保证物理目录脚手架与 issue_documents 文档初始化一致，失败则记录降级日志但不中断任务创建"
+    }
+  ],
+  "ui": [
+    "Expo 移动端 CreateTaskModal：增加 Spec-Kit 规格类型选择芯片与状态展示",
+    "Hermes Gateway / 工坊 Chat：派单回执卡片展示 Spec-Kit 物理路径与 EARS 规格状态"
+  ],
+  "ops": [
+    "封闭归档包：out/coolie-dev-1.0.0-linux-x64.tar.gz 自带 bin/speckit 可执行入口",
+    "生产部署：rsync 保持 scripts/speckit.cjs 实时同步"
+  ],
+  "risks": [
+    {
+      "risk": "离线环境或权限不足导致脚手架生成失败",
+      "mitigation": "speckit-dispatch 采用 try-catch 软降级，保留任务核心生命周期不受阻"
+    }
+  ],
+  "screens": [
+    {
+      "name": "CreateTaskModal (APP原生)",
+      "wireframe": "[标题输入框] -> [项目预选] -> [Spec-Kit类型: 需求/缺陷/重构/安全] -> [指派员工] -> [创建任务]"
+    }
+  ],
+  "interactions": [
+    "一键切换 Spec 类型，实时联动预填 EARS 规格模板",
+    "微信/QQ 意图解析秒级回传 Spec 规格卡片链接"
+  ],
+  "states": [
+    "加载中：建单加载指示器。",
+    "空数据：默认无 Spec 模式可秒级提交。",
+    "出错：Toast 明确提示并降级落单。",
+    "成功：弹出回执并跳转工单详情。"
+  ],
+  "candidates": [
+    {
+      "name": "Spec-Kit SDD 内核",
+      "type": "自研",
+      "license": "MIT",
+      "risk": "无"
+    }
+  ],
+  "benchmarks": [
+    "Kiro CLI 规格驱动开发、Palantir Foundry Action Provenance"
+  ],
+  "scan": [
+    "复用 scripts/speckit.cjs 核心引擎，零增加第三方重型依赖"
+  ],
+  "licenseConclusion": "自研架构无授权风险",
+  "tasks": [
+    {
+      "id": "T1",
+      "parent": "main",
+      "title": "封闭发行包构建脚本增加 speckit 打包并扩展 shared 与 server 端 specKit 建单引擎",
+      "files": [
+        "scripts/package-coolie-dev-bundle.mjs",
+        "packages/shared/src/validators/issue.ts",
+        "server/src/services/speckit-dispatch.ts",
+        "server/src/services/issues.ts"
+      ]
+    },
+    {
+      "id": "T2",
+      "parent": "T1",
+      "title": "Hermes Gateway (create-coolie-task、boss-intent-dispatcher、board-chat) 派单全流程接入 Spec-Kit",
+      "files": [
+        "scripts/create-coolie-task.mjs",
+        "scripts/hermes-boss-intent-dispatcher.sh",
+        "server/src/routes/board-chat.ts"
+      ]
+    },
+    {
+      "id": "T3",
+      "parent": "T2",
+      "title": "Expo 原生移动端 CreateTaskModal 接入 Spec-Kit 规格派单与全链路走查验证",
+      "files": [
+        "clients/expo/src/components/CreateTaskModal.tsx",
+        "clients/expo/src/components/composer/useComposerFields.ts"
+      ]
+    }
+  ],
+  "dependencies": "T1 → T2 → T3",
+  "windowMinutes": 15
+}

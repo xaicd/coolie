@@ -1,0 +1,44 @@
+model_type: BEHAVIOR
+version: '1.0'
+domain: governance
+behaviors:
+  - id: hermes-and-native-app-speckit-dispatch_save_draft
+    name: 保存草稿
+    ownerEntity: AGG_GOVERNANCE_HERMES_AND_NATIVE_APP_SPECKIT_DISPATCH
+    behaviorType: COMMAND
+    triggerType: USER_ACTION
+    summary: 经办人暂存业务单据草稿
+    apiContract:
+      httpMethod: POST
+      routePath: /api/v1/governance/hermes-and-native-app-speckit-dispatch/draft
+    preconditions:
+      - status in ('草稿', '已驳回')
+    postconditions:
+      - field: status
+        setValue: 草稿
+    appliedRules:
+      - RULE_HERMES_AND_NATIVE_APP_SPECKIT_DISPATCH_MULTI_TENANT_ISOLATION
+    requiredPermissions:
+      - perm:governance:hermes-and-native-app-speckit-dispatch:create
+    syncTriggers: []
+  - id: hermes-and-native-app-speckit-dispatch_submit
+    name: 提交审批
+    ownerEntity: AGG_GOVERNANCE_HERMES_AND_NATIVE_APP_SPECKIT_DISPATCH
+    behaviorType: COMMAND
+    triggerType: USER_ACTION
+    summary: 提交单据进入跨角色审批流
+    apiContract:
+      httpMethod: POST
+      routePath: /api/v1/governance/hermes-and-native-app-speckit-dispatch/submit
+    preconditions:
+      - status == '草稿'
+      - title != null && title != ''
+    postconditions:
+      - field: status
+        setValue: 待审批
+    appliedRules:
+      - RULE_HERMES_AND_NATIVE_APP_SPECKIT_DISPATCH_MULTI_TENANT_ISOLATION
+      - RULE_HERMES_AND_NATIVE_APP_SPECKIT_DISPATCH_SUBMIT_CHECK
+    requiredPermissions:
+      - perm:governance:hermes-and-native-app-speckit-dispatch:submit
+    syncTriggers: []
