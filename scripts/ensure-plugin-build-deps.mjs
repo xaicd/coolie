@@ -8,7 +8,11 @@ import { createHash, randomUUID } from "node:crypto";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const rootDir = path.resolve(scriptDir, "..");
+// PAPERCLIP_BUILD_ROOT lets tests and CI point the lock + outputs at a
+// scratch directory; production falls back to the script's repo root.
+const rootDir = process.env.PAPERCLIP_BUILD_ROOT
+  ? path.resolve(process.env.PAPERCLIP_BUILD_ROOT)
+  : path.resolve(scriptDir, "..");
 const tscCliPath = path.join(rootDir, "node_modules", "typescript", "bin", "tsc");
 const lockDir = path.join(rootDir, "node_modules", ".cache", "paperclip-plugin-build-deps.lock");
 const lockTimeoutMs = 60_000;

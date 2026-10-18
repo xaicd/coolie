@@ -40,7 +40,7 @@ setTimeout(() => {
   const lock = path.join(root, "node_modules/.cache/paperclip-plugin-build-deps.lock");
   const launch = (env = {}) => {
     const child = spawn(process.execPath, ["scripts/ensure-plugin-build-deps.mjs"], {
-      cwd: root, env: { ...process.env, ...env }, stdio: ["ignore", "pipe", "pipe"],
+      cwd: root, env: { ...process.env, PAPERCLIP_BUILD_ROOT: root, ...env }, stdio: ["ignore", "pipe", "pipe"],
     });
     let output = "";
     child.stdout.on("data", (data) => { output += data; });
