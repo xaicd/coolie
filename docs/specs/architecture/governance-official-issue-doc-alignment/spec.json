@@ -1,0 +1,12 @@
+{
+  "name": "governance-official-issue-doc-alignment",
+  "domain": "architecture",
+  "title": "全量架构治理门禁回归 Paperclip 官方 issue_documents 对齐改造",
+  "type": "refactor",
+  "status": "PLAN_APPROVED",
+  "stories": 3,
+  "acceptance": 3,
+  "invariants": 1,
+  "tasks": 3,
+  "updatedAt": "2026-10-18T02:22:42.650Z"
+}

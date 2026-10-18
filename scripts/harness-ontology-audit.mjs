@@ -214,15 +214,10 @@ for (const obj of objects) {
               recordFinding('WARNING', 'codeReflection', 'COLUMN_DRIFT', `实体 [${objName}] 声明了 'kind'，物理表 '${table}' 对应真实列为 'type'`, `${obj._fileName}:kind`);
               updatedProps.push(prop);
             }
-          } else if (table === 'issues' && prop.name === 'actionType') {
-            if (shouldFix) {
-              updatedProps.push({ ...prop, name: 'specKind', description: '规格类型/绑定动作语义' });
-              drifted = true;
-              fixedCount++;
-            } else {
-              recordFinding('WARNING', 'codeReflection', 'COLUMN_DRIFT', `实体 [${objName}] 声明了 'actionType'，物理表 '${table}' 对应真实列为 'specKind'`, `${obj._fileName}:actionType`);
-              updatedProps.push(prop);
-            }
+          } else if (table === 'issues' && (prop.name === 'actionType' || prop.name === 'specKind')) {
+            // 回归 Paperclip 官方主线：actionType / specKind 为兼容过渡属性，主线规格与动词协同由 Document 原生实体承载
+            pass('codeReflection');
+            updatedProps.push(prop);
           } else {
             recordFinding('WARNING', 'codeReflection', 'UNKNOWN_COLUMN', `实体 [${objName}] 的属性 '${prop.name}' 未在物理表 '${table}' 中找到对应列`, `${obj._fileName}:${prop.name}`);
             updatedProps.push(prop);

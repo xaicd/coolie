@@ -1,0 +1,144 @@
+{
+  "name": "governance-official-issue-doc-alignment",
+  "domain": "architecture",
+  "title": "全量架构治理门禁回归 Paperclip 官方 issue_documents 对齐改造",
+  "type": "refactor",
+  "goal": "全面改造与对齐平台全量架构治理门禁（活体本体对账、管局审计 Gate 17/28、Fork 表面防腐、Pre-Commit 白名单物理核销与 CMMI 双轨资产门禁），使之 100% 吻合 Paperclip 官方原生 issue_documents 协同架构与 Git 物理真理源双轨法典，消除历史私有字段技术债与伪漂移报警。",
+  "debtAnalysis": "Wave 147 历史实现将 Spec 强耦合在 issues.spec / specKind 私有 JSONB 字段中，导致本体对账 (harness-ontology-audit) 硬编码映射 specKind、管局审计未防腐拦截私有字段膨胀、Pre-commit 未对 SDD 白名单物理挂锁，存在规则与官方主线脱节的技术债。",
+  "targetArchitecture": "Git Markdown 资产 (docs/specs/ 与 docs/01~09/) 为物理单一真理源，控制面 100% 使用 Paperclip 原生 issue_documents 协同；本体模型对齐原生 Document 关联，管局审计守卫防腐拦截，Pre-Commit 物理核销 1 Task = 1 Commit 与白名单，CMMI 双轨资产结项闭环。",
+  "roles": [
+    {
+      "role": "平台架构师 (FDA)",
+      "can": "确立回归官方主线后的全套机器门禁与防腐屏障，防止私有字段死灰复燃"
+    },
+    {
+      "role": "质量与交付总监 (CMMI)",
+      "can": "依托编译器级门禁与机器证据库，确保每一次提交严格遵循 1 Task = 1 Commit 与双轨真资产结项"
+    }
+  ],
+  "stories": [
+    {
+      "priority": "P0",
+      "text": "作为架构师，我希望活体本体对账脚本解除对 issues.specKind 私有列的硬编码依赖，转向官方 issue_documents 关联，消除 COLUMN_DRIFT 伪报警。"
+    },
+    {
+      "priority": "P0",
+      "text": "作为交付总监，我希望管局审计包含官方 issue_documents 对齐守卫并冻结 Fork issues 表面，确保所有同步工单挂载官方原生 Markdown 文档。"
+    },
+    {
+      "priority": "P1",
+      "text": "作为研发工程师，我希望 Pre-Commit 与 CMMI 规则自动核验 1 Task = 1 Commit 和文件白名单，杜绝口头规范与虚假完工。"
+    }
+  ],
+  "constraints": [
+    "功能等价与历史兼容：老端点 (/api/issues/:id/spec 等) 保持平滑双写与读取回退，存量数据 0 丢失。",
+    "0 假门禁与 100% 自动化：所有门禁必须能经由自动化脚本 (node scripts/...) 独立执行，严禁口头打勾。"
+  ],
+  "acceptance": [
+    {
+      "check": "node scripts/harness-ontology-audit.mjs 运行全绿，0 COLUMN_DRIFT 伪报警"
+    },
+    {
+      "check": "node scripts/check-governance-audit.mjs 运行全绿，官方 issue_documents 守卫通过"
+    },
+    {
+      "check": "node scripts/speckit.cjs health 运行通过，0 散落、0 污染"
+    }
+  ],
+  "nonGoals": [
+    "本次不对业务页面 UI 进行非必要的视觉重构，仅聚焦于架构治理与自动化门禁体系的升级收口"
+  ],
+  "architecture": "flowchart TD\n  GitSpec[\"Git 单一真理源 (docs/specs/)\"] -->|speckit sync| IssueDocs[\"Paperclip 官方 issue_documents\"]\n  IssueDocs --> OntologyAudit[\"本体对账门禁 (harness-ontology-audit)\"]\n  IssueDocs --> GovAudit[\"管局审计 Gate 28 (check-governance-audit)\"]\n  GitSpec --> PreCommit[\"Pre-Commit 任务白名单门禁\"]\n  PreCommit --> GitCommit[\"1 Task = 1 Commit 不可变凭据\"]",
+  "entities": [
+    {
+      "table": "documents",
+      "note": "Paperclip 官方原生富文本文档表，承载 spec 与 plan 协同"
+    },
+    {
+      "table": "issue_documents",
+      "note": "工单与文档的多对多关联桥接表 (key: 'spec', 'plan')"
+    },
+    {
+      "table": "issues",
+      "note": "工单主表，spec 与 specKind 标记为渐进淘汰，主架构回归官方纯净结构"
+    }
+  ],
+  "invariants": [
+    {
+      "name": "官方主线零侵入",
+      "how": "控制面协同完全走官方 issue_documents 路由与数据模型，不向 upstream issues 表强塞私有字段"
+    }
+  ],
+  "ui": [
+    "保持既有 UI 页面结构，控制面原生 Documents 标签页自然承载官方 Markdown 规格"
+  ],
+  "ops": [
+    "通过 node scripts/speckit.cjs official-migrate 持续支持历史数据双向无损迁移"
+  ],
+  "risks": [
+    {
+      "risk": "存量历史脚本或测试可能依赖已废弃字段",
+      "mitigation": "双写桥接与向后回退机制保障老接口在过渡期内 100% 兼容返回"
+    }
+  ],
+  "screens": [
+    {
+      "name": "架构治理大盘",
+      "wireframe": "命令行 CLI 与管局自动化体检看板"
+    }
+  ],
+  "interactions": [
+    "命令行工具链即时阻断违规提交并给出明确修复建议"
+  ],
+  "states": [
+    "检查中：打印各 Gate 进度。",
+    "通过：输出绿色 PASS 标记。",
+    "阻断：输出红色 FAIL 标记并非零退出。"
+  ],
+  "candidates": [
+    {
+      "name": "Paperclip Upstream Native Documents",
+      "type": "官方原生",
+      "license": "MIT",
+      "risk": "无"
+    }
+  ],
+  "benchmarks": [
+    "CMMI 5 高成熟度度量与 Google SRE 防退化守卫标准"
+  ],
+  "scan": [
+    "全仓 scripts/ 自动化守卫与 .agents/rules/ 治理规则"
+  ],
+  "licenseConclusion": "无外部依赖许可风险",
+  "tasks": [
+    {
+      "id": "T1",
+      "parent": "main",
+      "title": "本体代码对账解耦与本体模型元数据对齐",
+      "files": [
+        "scripts/harness-ontology-audit.mjs",
+        "ontology/objects/Issue.json"
+      ]
+    },
+    {
+      "id": "T2",
+      "parent": "T1",
+      "title": "管局审计 Gate 17 升级与 Fork 表面防腐守卫",
+      "files": [
+        "scripts/check-governance-audit.mjs",
+        "scripts/fork-surface.json"
+      ]
+    },
+    {
+      "id": "T3",
+      "parent": "T2",
+      "title": "Pre-Commit 任务白名单门禁与 CMMI 双轨资产法典闭环",
+      "files": [
+        "scripts/pre-commit-check.mjs",
+        ".agents/rules/CMMI-SPEC-FIRST-ARTIFACTS.md"
+      ]
+    }
+  ],
+  "dependencies": "T1 → T2 → T3",
+  "windowMinutes": 30
+}

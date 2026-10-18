@@ -69,7 +69,7 @@
       "name": "specKind",
       "type": "string",
       "required": false,
-      "description": "规格类型/绑定动作语义"
+      "description": "规格类型/动作语义 (兼容过渡属性，主线规格协同已全面归宿于 Document 原生关联)"
     },
     {
       "name": "createdAt",
