@@ -10,6 +10,7 @@ import {
   projects,
   activityLog,
 } from "@paperclipai/db";
+import { ISSUE_PRIORITIES, type IssuePriority } from "@paperclipai/shared";
 import { eq } from "drizzle-orm";
 import {
   getEmbeddedPostgresTestSupport,
@@ -183,5 +184,70 @@ describeEmbeddedPostgres("dispatch routes (wave215 POST + wave237 GET)", () => {
       .get(`/api/companies/${companyId}/dispatch`)
       .query({ limit: 500 });
     expect(res.status).toBe(400);
+  });
+
+  /**
+   * COOA-528 anti-regression guards: the priority persisted to `issues.priority`
+   * MUST be an `ISSUE_PRIORITIES` member (`critical | high | medium | low`).
+   * Pre-COOA-528, the route's zod enum accepted the non-members `"normal"` /
+   * `"urgent"` and the fallback floor hard-coded `"normal"` — both slipped past
+   * the text column silently and broke every priority label, sort, and rollup.
+   */
+  it("persists an ISSUE_PRIORITIES member when priority is omitted (no more literal 'normal')", async () => {
+    const res = await request(app)
+      .post(`/api/companies/${companyId}/dispatch`)
+      .send({ title: "Default priority task", assigneeAgentId: agentId });
+    expect(res.status).toBe(201);
+    expect(ISSUE_PRIORITIES).toContain(res.body.priority);
+    expect(res.body.priority).not.toBe("normal");
+    // Floor must be a valid member; resolveDispatchIssuePriority() returns "medium".
+    expect(res.body.priority).toBe("medium");
+  });
+
+  it("collapses the legacy alias 'urgent' to 'critical' (still accepts the old token)", async () => {
+    const res = await request(app)
+      .post(`/api/companies/${companyId}/dispatch`)
+      .send({ title: "Legacy urgent task", assigneeAgentId: agentId, priority: "urgent" });
+    expect(res.status).toBe(201);
+    expect(res.body.priority).toBe("critical");
+    expect(ISSUE_PRIORITIES).toContain(res.body.priority);
+  });
+
+  it("collapses the legacy alias 'normal' to 'medium' (still accepts the old token)", async () => {
+    const res = await request(app)
+      .post(`/api/companies/${companyId}/dispatch`)
+      .send({ title: "Legacy normal task", assigneeAgentId: agentId, priority: "normal" });
+    expect(res.status).toBe(201);
+    expect(res.body.priority).toBe("medium");
+    expect(ISSUE_PRIORITIES).toContain(res.body.priority);
+  });
+
+  it("accepts every ISSUE_PRIORITIES member verbatim and rejects any non-member", async () => {
+    for (const priority of ISSUE_PRIORITIES) {
+      const res = await request(app)
+        .post(`/api/companies/${companyId}/dispatch`)
+        .send({ title: `Priority ${priority}`, assigneeAgentId: agentId, priority });
+      expect(res.status).toBe(201);
+      expect(res.body.priority).toBe(priority);
+    }
+    // A value that was never valid (and is still not a legacy alias) must 400.
+    const bogus = await request(app)
+      .post(`/api/companies/${companyId}/dispatch`)
+      .send({ title: "Bogus priority", assigneeAgentId: agentId, priority: "super-bad" });
+    expect(bogus.status).toBe(400);
+  });
+
+  it("the persisted row carries an ISSUE_PRIORITIES member in the database column", async () => {
+    const res = await request(app)
+      .post(`/api/companies/${companyId}/dispatch`)
+      .send({ title: "DB column check", assigneeAgentId: agentId });
+    expect(res.status).toBe(201);
+    const stored = await db
+      .select({ priority: issues.priority })
+      .from(issues)
+      .where(eq(issues.id, res.body.issueId))
+      .then((rows) => rows[0]?.priority as string | undefined);
+    expect(stored).toBeDefined();
+    expect(ISSUE_PRIORITIES).toContain(stored as IssuePriority);
   });
 });

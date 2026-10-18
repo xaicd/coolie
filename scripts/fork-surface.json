@@ -1202,6 +1202,18 @@
       "reason": "COOA-525: 派单优先级防退化守卫 — 断言 resolveDispatchIssuePriority 恒为 ISSUE_PRIORITIES 成员, 且不再返回 'normal'. No upstream counterpart."
     },
     {
+      "path": "server/src/routes/dispatch.ts",
+      "maxNetLines": 220,
+      "maxTotalLines": 230,
+      "reason": "wave215 + COOA-528: 老板派活 (boss dispatch) endpoint (POST + GET list) — only used by Coolie 工坊 board concierge and the boss App '派活' action; not in upstream Paperclip. COOA-528 collapses the zod `priority` enum to ISSUE_PRIORITIES, accepts the legacy aliases `urgent`→`critical` / `normal`→`medium` via `.preprocess()`, and the priority floor (`body.priority ?? \"normal\"`) is now `body.priority ?? resolveDispatchIssuePriority()` so the persisted value is guaranteed to be an ISSUE_PRIORITIES member (the text column accepted invalid values silently)."
+    },
+    {
+      "path": "server/src/__tests__/dispatch-routes.test.ts",
+      "maxNetLines": 280,
+      "maxTotalLines": 320,
+      "reason": "wave215 + wave237 + COOA-528: dispatch POST + GET list end-to-end test (embedded Postgres). COOA-528 added 5 priority guards: omitted priority lands as ISSUE_PRIORITIES member (not 'normal'); legacy 'urgent'/'normal' aliases collapse to 'critical'/'medium'; every ISSUE_PRIORITIES member accepted verbatim; bogus values 400; DB column carries an ISSUE_PRIORITIES member. No upstream counterpart (wave215 route is fork-only)."
+    },
+    {
       "path": "packages/db/src/migrations/9022_delete_13_digital_employees.sql",
       "maxNetLines": 30,
       "maxTotalLines": 30,

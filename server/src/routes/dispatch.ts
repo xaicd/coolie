@@ -3,7 +3,9 @@ import { z } from "zod";
 import { and, desc, eq, isNotNull, or } from "drizzle-orm";
 import type { Db } from "@paperclipai/db";
 import { issues as issuesTable } from "@paperclipai/db";
+import { ISSUE_PRIORITIES, type IssuePriority } from "@paperclipai/shared";
 import { issueService, logActivity } from "../services/index.js";
+import { resolveDispatchIssuePriority } from "../services/dispatch-priority.js";
 import { getActorInfo } from "./authz.js";
 import { assertCompanyAccess } from "./authz.js";
 import { badRequest, HttpError } from "../errors.js";
@@ -22,7 +24,45 @@ import { recordAudit } from "../middleware/audit.js";
  * Auth: company-scoped (board + agent key allowed) — the boss concierge calls
  * this via `x-paperclip-api-key` (board actor) and the wave156 audit gate requires
  * the call be traceable to a known actor.
+ *
+ * COOA-528: `priority` is collapsed to `ISSUE_PRIORITIES` ("critical" | "high" |
+ * "medium" | "low"). The pre-COOA-528 schema accepted `["low","normal","high","urgent"]`
+ * but the database column is plain text, so the non-members "normal" / "urgent"
+ * slipped into `issues.priority` and broke every UI label, sort, and rollup.
+ * We still accept the legacy aliases (`urgent` → `critical`, `normal` → `medium`)
+ * via `.preprocess()` so existing callers (boss concierge, agent api keys) keep
+ * working while every persisted value is guaranteed to be an ISSUE_PRIORITIES
+ * member.
  */
+const LEGACY_PRIORITY_ALIASES: Record<string, IssuePriority> = {
+  urgent: "critical",
+  normal: "medium",
+};
+const ISSUE_PRIORITY_SET = new Set<string>(ISSUE_PRIORITIES);
+
+function normalizePriority(value: unknown): IssuePriority | undefined {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "string") return undefined;
+  const normalized = value.trim().toLowerCase();
+  const aliased = LEGACY_PRIORITY_ALIASES[normalized] ?? normalized;
+  return ISSUE_PRIORITY_SET.has(aliased) ? (aliased as IssuePriority) : undefined;
+}
+
+const prioritySchema = z
+  .string()
+  .optional()
+  .superRefine((value, ctx) => {
+    if (value === undefined) return;
+    const normalized = normalizePriority(value);
+    if (!normalized) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `priority must be one of ISSUE_PRIORITIES: ${ISSUE_PRIORITIES.join(", ")}`,
+      });
+    }
+  })
+  .transform((value) => (value === undefined ? undefined : normalizePriority(value)));
+
 const dispatchSchema = z
   .object({
     title: z.string().trim().min(1).max(500),
@@ -30,7 +70,7 @@ const dispatchSchema = z
     projectId: z.string().uuid().optional().nullable(),
     assigneeAgentId: z.string().uuid().optional().nullable(),
     assigneeUserId: z.string().uuid().optional().nullable(),
-    priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
+    priority: prioritySchema,
     labels: z.array(z.string().trim().min(1).max(64)).max(20).optional(),
     wake: z.boolean().optional().default(true),
   })
@@ -68,7 +108,7 @@ export function dispatchRoutes(db: Db) {
         projectId: body.projectId ?? null,
         assigneeAgentId: body.assigneeAgentId ?? null,
         assigneeUserId: body.assigneeUserId ?? null,
-        priority: body.priority ?? "normal",
+        priority: body.priority ?? resolveDispatchIssuePriority(),
         status: "todo",
       });
     } catch (err) {
