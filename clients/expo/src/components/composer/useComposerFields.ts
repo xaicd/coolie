@@ -155,6 +155,14 @@ export function useComposerFields(companyId: string, agents: AgentRow[] = []) {
           | null;
         reproSteps?: string | null;
       } | null;
+      /** Spec-Kit SDD 规约配置 (Hermes / Native App / Web 统一接入). */
+      specKit?: {
+        enabled?: boolean;
+        type?: "feature" | "bugfix" | "refactor" | "security" | "enhancement";
+        domain?: string;
+        name?: string;
+        brief?: string | Record<string, unknown>;
+      } | null;
     }): Promise<{ issue: Issue; failedUploads: string[] }> => {
       const assigneeAdapterOverrides = buildAssigneeAdapterOverrides({
         adapterType: assigneeAdapterType,
@@ -180,6 +188,7 @@ export function useComposerFields(companyId: string, agents: AgentRow[] = []) {
         priority: fields.priority,
         status,
         workMode,
+        ...(fields.specKit ? { specKit: fields.specKit } : {}),
         ...(fields.defect ? { defect: fields.defect } : {}),
         ...(fields.description ? { description: fields.description } : {}),
         ...(projectId ? { projectId } : {}),

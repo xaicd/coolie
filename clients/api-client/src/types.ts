@@ -497,6 +497,14 @@ export interface CreateIssueInput {
   executionWorkspaceSettings?: Record<string, unknown> | null;
   /** Watchdog agent + instructions. */
   watchdog?: { agentId: string; instructions?: string | null } | null;
+  /** Spec-Kit SDD 规约配置 (Hermes / Native App / Web 统一接入). */
+  specKit?: {
+    enabled?: boolean;
+    type?: "feature" | "bugfix" | "refactor" | "security" | "enhancement";
+    domain?: string;
+    name?: string;
+    brief?: string | Record<string, unknown>;
+  } | null;
 }
 
 export type AudioFormat = "mp3" | "wav" | "m4a" | "pcm" | "flac" | "ogg-opus";

@@ -26,23 +26,23 @@ import { matchIntentToAgent } from "../utils/intentMatcher";
 /** 单选用「空 value」表示清除 (自动派发 / 无项目)。 */
 const NONE = "";
 
-/** spec-driven chain (wave147)。骨架内容与 `packages/shared/src/spec-templates.ts` 对应。 */
-type SpecKind = "requirement" | "bugfix" | "design" | "task";
-const SPEC_KINDS: SpecKind[] = ["requirement", "bugfix", "design", "task"];
+/** Spec-Kit SDD 规约驱动 (wave368)。对齐 Spec-Kit 规格类型。 */
+type SpecKind = "feature" | "bugfix" | "refactor" | "security";
+const SPEC_KINDS: SpecKind[] = ["feature", "bugfix", "refactor", "security"];
 const SPEC_KIND_LABEL: Record<SpecKind, string> = {
-  requirement: "需求",
+  feature: "需求规格",
   bugfix: "缺陷修复",
-  design: "设计",
-  task: "任务",
+  refactor: "架构重构",
+  security: "安全加固",
 };
 function specSkeleton(kind: SpecKind): Record<string, unknown> {
   const todo = "（待填写）";
   switch (kind) {
-    case "requirement":
+    case "feature":
       return {
         kind,
-        requirement: {
-          body: `${todo}描述要做什么 —— 1~3 句话。`,
+        feature: {
+          summary: `${todo}需求简述 —— 1~3 句话。`,
           acceptanceCriteria: [`${todo}一条可判定的验收条件。`],
         },
       };
@@ -55,21 +55,20 @@ function specSkeleton(kind: SpecKind): Record<string, unknown> {
           actualBehavior: `${todo}实际行为。`,
         },
       };
-    case "design":
+    case "refactor":
       return {
         kind,
-        design: {
-          approach: `${todo}怎么做：接口 / 数据 / 边界。`,
+        refactor: {
+          approach: `${todo}重构思路：接口 / 数据 / 边界。`,
           tradeoffs: [`${todo}权衡 1。`],
-          apiSurface: `${todo}接口或数据结构（可留空）。`,
         },
       };
-    case "task":
+    case "security":
       return {
         kind,
-        task: {
-          files: [`${todo}path/to/file.ts`],
-          steps: [`${todo}改动点 1。`],
+        security: {
+          vulnerability: `${todo}安全漏洞或防线风险。`,
+          mitigation: `${todo}加固方案。`,
         },
       };
   }
@@ -120,7 +119,7 @@ export function CreateTaskModal({
   // 缺陷记录到任务 (wave132): 类型 任务/缺陷 + 严重度 P0-P3。
   const [issueKind, setIssueKind] = useState<"task" | "defect">("task");
   const [severity, setSeverity] = useState<"P0" | "P1" | "P2" | "P3">("P1");
-  // spec-driven chain (wave147): 选定后建单成功即把该类型的 spec 骨架写进任务。
+  // spec-driven chain (wave147/wave368): 选定后建单成功即把该类型的 spec 骨架写进任务。
   const [specKind, setSpecKind] = useState<SpecKind | "">("");
   const [busy, setBusy] = useState(false);
   const [assigneeOpen, setAssigneeOpen] = useState(false);
@@ -184,8 +183,17 @@ export function CreateTaskModal({
         ...(issueKind === "defect"
           ? { defect: { severity, source: null, reproSteps: null } }
           : {}),
+        ...(specKind
+          ? {
+              specKit: {
+                enabled: true,
+                type: specKind,
+                brief: description.trim() || trimmed,
+              },
+            }
+          : {}),
       });
-      // spec-driven chain (wave147): 建单成功后补写 spec 骨架（失败不阻塞建单）。
+      // spec-driven chain (wave147/wave368): 建单成功后补写 spec 骨架（失败不阻塞建单）。
       if (specKind) {
         try {
           await coolie.saveIssueSpec(issue.id, specSkeleton(specKind));
@@ -413,11 +421,11 @@ export function CreateTaskModal({
               </View>
 
               <View style={styles.priorityBlock}>
-                <Text style={styles.fieldLabel}>Spec 类型</Text>
+                <Text style={styles.fieldLabel}>📐 Spec-Kit 规格</Text>
                 <View style={styles.chipRow}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="无 Spec"
+                    accessibilityLabel="无规格"
                     accessibilityState={{ selected: specKind === "" }}
                     disabled={busy}
                     onPress={() => setSpecKind("")}
@@ -435,7 +443,7 @@ export function CreateTaskModal({
                     <Pressable
                       key={kind}
                       accessibilityRole="button"
-                      accessibilityLabel={`Spec ${SPEC_KIND_LABEL[kind]}`}
+                      accessibilityLabel={`规格 ${SPEC_KIND_LABEL[kind]}`}
                       accessibilityState={{ selected: specKind === kind }}
                       disabled={busy}
                       onPress={() => setSpecKind(kind)}
