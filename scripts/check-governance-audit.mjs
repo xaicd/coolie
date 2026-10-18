@@ -566,6 +566,39 @@ assertRule(
   'projects/sys-jiuxia-smart 缺失 01~09 目录或旧 cmmi/ 未清退',
 );
 
+const hatchHasAiHarness = hatchScriptContent.includes('bootstrap-client-project-harness.mjs');
+assertRule(
+  '商业项目孵化器 AI 规范全覆盖守卫: hatch-client-project.sh 必须自动生成 HARNESS/MEMORY/CLAUDE/AGENTS/copilot 等 6 大规范与 harness.sh',
+  hatchHasAiHarness,
+  'hatch-client-project.sh 缺失 AI 规范与 Harness 自动注入引擎调用',
+);
+
+const ynAiSpecsOk =
+  fs.existsSync('projects/sys-yunnan-wecom/HARNESS.md') &&
+  fs.existsSync('projects/sys-yunnan-wecom/MEMORY.md') &&
+  fs.existsSync('projects/sys-yunnan-wecom/CLAUDE.md') &&
+  fs.existsSync('projects/sys-yunnan-wecom/.cursorrules') &&
+  fs.existsSync('projects/sys-yunnan-wecom/AGENTS.md') &&
+  fs.existsSync('projects/sys-yunnan-wecom/scripts/harness.sh');
+assertRule(
+  '在制商业项目 AI 规范守卫 (云南移动企微): 必须具备完整 HARNESS/MEMORY/CLAUDE/AGENTS 等规范与 harness.sh',
+  ynAiSpecsOk,
+  'projects/sys-yunnan-wecom 缺失 AI 规范文件或 harness.sh',
+);
+
+const jxAiSpecsOk =
+  fs.existsSync('projects/sys-jiuxia-smart/HARNESS.md') &&
+  fs.existsSync('projects/sys-jiuxia-smart/MEMORY.md') &&
+  fs.existsSync('projects/sys-jiuxia-smart/CLAUDE.md') &&
+  fs.existsSync('projects/sys-jiuxia-smart/.cursorrules') &&
+  fs.existsSync('projects/sys-jiuxia-smart/AGENTS.md') &&
+  fs.existsSync('projects/sys-jiuxia-smart/scripts/harness.sh');
+assertRule(
+  '在制商业项目 AI 规范守卫 (九夏智居中台): 必须具备完整 HARNESS/MEMORY/CLAUDE/AGENTS 等规范与 harness.sh',
+  jxAiSpecsOk,
+  'projects/sys-jiuxia-smart 缺失 AI 规范文件或 harness.sh',
+);
+
 const cmmiScaffoldExists = fs.existsSync('scripts/cmmi-asset-scaffold.cjs');
 assertRule('CMMI 资产脚手架引擎守卫: scripts/cmmi-asset-scaffold.cjs 必须存在且支持 01~09 阶段 26 种标准资产', cmmiScaffoldExists, 'scripts/cmmi-asset-scaffold.cjs 缺失');
 

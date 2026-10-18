@@ -1262,6 +1262,12 @@ if [[ -f "$PROJECT_DIR/scripts/speckit.cjs" ]]; then
   (cd "$PROJECT_DIR" && node scripts/speckit.cjs init >/dev/null 2>&1 || true)
 fi
 
+# 12. 注入五位一体工程安全带 Harness 与全 AI 规范矩阵 (HARNESS/MEMORY/CLAUDE/AGENTS/.cursorrules)
+echo "🛡️ [3.8/4] 注入五位一体工程安全带 Harness 与全 AI 规范矩阵..."
+if [[ -f "$SCRIPT_DIR/bootstrap-client-project-harness.mjs" ]]; then
+  node "$SCRIPT_DIR/bootstrap-client-project-harness.mjs" "$PROJECT_DIR"
+fi
+
 
 if [[ "$INIT_GIT" == true ]]; then
   echo "🔒 [4/4] 初始化独立 Git 仓库与首提交 (Zero-Git-History)..."

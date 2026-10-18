@@ -139,6 +139,19 @@ flowchart TD
 | **`yudao-quad-terminal`** | Java 17/21 + Spring Boot 3 + Vue 3 + Uni-App + Expo | **四位一体**：PC中台 + 小程序 + 原生手机App + 微服务中台 | 需原生手机App或小程序、政企信创/金融/大型ERP、多租户行级隔离 |
 | **`ruoyi-all-next`** | TypeScript + Next.js 16 + React 19 + Prisma | **轻全栈**：响应式Web + 移动H5 + 3200沙箱极速预览 | 敏捷POC、纯Web管理中台、轻量打样、秒级热更 |
 
+### 4.5 工坊商业交付项目 AI 规范与自适应安全带 (Client Project AI Harness)
+
+工坊孵化或接管的所有外部商业软件项目（`projects/*`）必须具备与平台母本完全对称的分形 AI 认知规范矩阵：
+- **每个商业项目自带独立 7 大工程资产**:
+  1. `HARNESS.md`: 业务项目专用的五位一体 Harness 实施指南与机器审计法典；
+  2. `MEMORY.md`: ≤8KB 业务项目记忆中枢、本体双核速查与口语意图路由表；
+  3. `CLAUDE.md`: Claude Code 专用指南、高频命令与业务红线；
+  4. `.cursorrules`: Cursor/Windsurf 规则、高阶反向思维与 `/speckit.*` 指令集；
+  5. `.github/copilot-instructions.md`: GitHub Copilot 专属工程法典；
+  6. `AGENTS.md`: 商业项目工程宪法、CMMI 5 大门禁 (G1~G5) 与终验核销准则；
+  7. `scripts/harness.sh`: 自包含五位一体 Harness 执行器 (`env`, `arch-audit`, `ontology-audit`, `build`, `test`, `full-audit`)。
+- **零人工介入孵化**: `scripts/hatch-client-project.sh` 在秒级生成纯净工程地基时，自动调用 `scripts/bootstrap-client-project-harness.mjs` 注入全套规范，一出厂天生自备全套安全带与 `npm run pre-commit` 门禁。
+
 ---
 
 ## 5. 标准研发交付 4 步作业法 (Standard 4-Step Cycle)

@@ -1,0 +1,13 @@
+{
+  "project": "sys-chanrong-agent",
+  "title": "sys-chanrong-agent",
+  "timestamp": "2026-10-18T04:29:18Z",
+  "status": "HEALTHY",
+  "audit": {
+    "env": "PASS",
+    "arch": "PASS",
+    "ontology": "PASS",
+    "build": "PASS",
+    "test": "PASS"
+  }
+}
