@@ -75,6 +75,11 @@ run_arch_audit() {
     node scripts/check-governance-audit.mjs
   fi
 
+  if [ -f "scripts/speckit.cjs" ]; then
+    echo "   ⏳ 执行 Spec-Kit SDD 核心健康度与反污染守卫..."
+    node scripts/speckit.cjs health
+  fi
+
   echo "   ✅ [PASS] 架构边界与 CMMI 规范白名单审计通过"
 }
 
@@ -87,6 +92,12 @@ run_ontology_audit() {
   fi
 
   node scripts/harness-ontology-audit.mjs ${FIX_FLAG}
+
+  if [ -f "scripts/speckit.cjs" ]; then
+    echo "   ⏳ 执行全域 Spec-Kit 声明式七模型反死穴静态审计..."
+    node scripts/speckit.cjs ontology lint
+  fi
+
   echo "   ✅ [PASS] 活体本体双向反射与拓扑因果求值全部守卫在位"
 }
 

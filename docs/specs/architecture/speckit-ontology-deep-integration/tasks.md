@@ -58,7 +58,7 @@
 
 - [ ] **T3**: Pre-commit门禁挂锁与法典技能同步：全面保障本体零死穴提交与开发操作法典更新
   - 归属: `main`
-  - 文件白名单: `scripts/pre-commit-check.mjs, .agents/skills/speckit-workflow/SKILL.md, docs/specs/architecture/speckit-ontology-deep-integration/ontology/**`
+  - 文件白名单: `scripts/pre-commit-check.mjs, scripts/harness.sh, .agents/skills/speckit-workflow/SKILL.md, docs/specs/architecture/speckit-ontology-deep-integration/ontology/**`
   - 验收要求: 必须携带提交标识 `[T3]` 并附带真实测试验证
 
 
@@ -75,7 +75,7 @@
 |---|---|---|---|---|
 | T1 | main | 脚手架与专用指令接管：speckit new 联动本体骨架初始化与 speckit ontology 完整指令集 | scripts/speckit.cjs, scripts/lib/spec-ontology-driver.cjs | 未开始 |
 | T2 | T1 | 编译与自检深度闭环：speckit build 自动融合本体图表与 speckit check/health 反死穴硬门禁 | scripts/speckit.cjs | 未开始 |
-| T3 | main | Pre-commit门禁挂锁与法典技能同步：全面保障本体零死穴提交与开发操作法典更新 | scripts/pre-commit-check.mjs, .agents/skills/speckit-workflow/SKILL.md, docs/specs/architecture/speckit-ontology-deep-integration/ontology/** | 未开始 |
+| T3 | main | Pre-commit门禁挂锁与法典技能同步：全面保障本体零死穴提交与开发操作法典更新 | scripts/pre-commit-check.mjs, scripts/harness.sh, .agents/skills/speckit-workflow/SKILL.md, docs/specs/architecture/speckit-ontology-deep-integration/ontology/** | 未开始 |
 
 ## 4. 依赖说明与波次流转 (Dependencies & Progression)
 

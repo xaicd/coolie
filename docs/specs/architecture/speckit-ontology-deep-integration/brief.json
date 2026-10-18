@@ -124,6 +124,7 @@
       "title": "Pre-commit门禁挂锁与法典技能同步：全面保障本体零死穴提交与开发操作法典更新",
       "files": [
         "scripts/pre-commit-check.mjs",
+        "scripts/harness.sh",
         ".agents/skills/speckit-workflow/SKILL.md",
         "docs/specs/architecture/speckit-ontology-deep-integration/ontology/**"
       ]

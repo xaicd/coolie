@@ -253,9 +253,31 @@ for (const specDir of specDirsTouched) {
       hasError = true;
     }
   }
+
+  // 1.5.1 活体本体 (ODD 七模型) 静态反死穴门禁守卫
+  const ontDir = path.join(specDir, 'ontology');
+  if (fs.existsSync(ontDir)) {
+    try {
+      const { createRequire } = await import('node:module');
+      const require = createRequire(import.meta.url);
+      const { lintOntologyYaml } = require('./lib/spec-ontology-driver.cjs');
+      const findings = lintOntologyYaml(ontDir);
+      const errors = findings.filter((f) => f.severity === 'error');
+      if (errors.length > 0) {
+        console.error(`  ❌ [FAIL] 规格 ${specDir}/ontology 发现 ${errors.length} 处严重死穴缺陷！`);
+        for (const err of errors) {
+          console.error(`     🚨 [${err.code}] ${err.message}`);
+        }
+        hasError = true;
+      }
+    } catch (e) {
+      console.error(`  ❌ [FAIL] 规格 ${specDir}/ontology 静态审计异常: ${e.message}`);
+      hasError = true;
+    }
+  }
 }
 if (!hasError) {
-  console.log('  ✅ [PASS] 暂存规格包结构与双轨资产完备');
+  console.log('  ✅ [PASS] 暂存规格包结构、双轨资产与活体本体 100% 合规通过');
 }
 
 // -----------------------------------------------------------------------------

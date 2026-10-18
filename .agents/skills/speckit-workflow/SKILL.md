@@ -51,18 +51,40 @@ node scripts/speckit.cjs check --spec <feature-slug>
 # 8. 归档已交付完毕的规格
 node scripts/speckit.cjs archive --name <feature-slug>
 
-# 9. CMMI 全生命周期资产巡检
-node scripts/speckit.cjs cmmi check
+# 10. 活体本体七模型建模与反死穴审计
+node scripts/speckit.cjs ontology inspect
+node scripts/speckit.cjs ontology lint [--spec <feature-slug>]
+node scripts/speckit.cjs ontology mermaid --spec <feature-slug>
+node scripts/speckit.cjs ontology init --spec <feature-slug>
+node scripts/speckit.cjs ontology callchain
+
+# 11. 五位一体 Harness 工程安全带与总调度中枢
+node scripts/speckit.cjs harness full-audit
+node scripts/speckit.cjs harness ontology-audit
+node scripts/speckit.cjs harness arch-audit
+node scripts/speckit.cjs harness test
 ```
 
 ---
 
-## 三、工坊与数字员工分工矩阵
+## 三、活体本体 (ODD 七模型) 闭环驱动
+
+Spec-Kit 深度整合《本体驱动软件建模框架 v9.0》，实现业务语义向技术管网的 100% 形式化映射：
+
+1. **立项即建模 (`ontology/`)**：`speckit new` 自动初始化 `manifest.yaml`、`m1-objects.yaml`、`m2-behaviors.yaml`、`m3-rules.yaml`、`m5-actors.yaml`、`m6-flows.yaml`、`mu-views.yaml` 七大声明式 YAML；
+2. **编译即拓扑 (`design.md`)**：`speckit build` 自动融合 Mermaid 领域实体 ER 图、状态机跃迁图与 M2 核心业务动词契约清单；
+3. **自检即门禁 (`speckit check` / Git Pre-Commit)**：静态拦截 `DEAD_UI_BUTTON`（死按钮）、`UNREFERENCED_USER_ACTION`（孤立动词）、`ILLEGAL_STATE_TRANSITION`（越权状态跃迁）与规则/角色悬空边；
+4. **Harness 核心中枢 (`speckit harness`)**：Spec-Kit 成为本地母港与 Harness 五位一体（环境、架构、活体本体、构建、测试）的统一核心入口。
+
+---
+
+## 四、工坊与数字员工分工矩阵
 
 | 阶段 / 步骤 | 主责数字员工 | Spec-Kit 指令 | 产物输出 |
 | :--- | :--- | :--- | :--- |
-| **G1 需求立项** | Hermes / 墨斗 (FDA) | `speckit new` | `brief.json`, `requirements.md` |
-| **G2 架构设计** | 墨斗 (FDA) | `speckit build` | `design.md`, DAR 技术选型表 |
-| **G3 契约编码** | 铁匠 (Core SWE) | `speckit tasks`, `speckit sync` | `tasks.md`, Git 独立提交, 契约 LLD |
-| **G4 真实验收** | 门神 (FDSE) | `speckit check` | `evidence.json`, 真机快照凭证 |
-| **G5 投产归档** | 兑底渊 (PRE-SRE) | `speckit archive` | `runbook.json`, 归档归档区 |
+| **G1 需求立项** | Hermes / 墨斗 (FDA) | `speckit new`, `speckit ontology init` | `brief.json`, `ontology/*.yaml` 七模型骨架 |
+| **G2 架构设计** | 墨斗 (FDA) | `speckit build` | `design.md` (含 Mermaid ER 与动词契约表) |
+| **G3 契约编码** | 铁匠 (Core SWE) | `speckit tasks`, `speckit sync` | `tasks.md`, Git 独立提交, 官方 `issue_documents` |
+| **G4 真实验收** | 门神 (FDSE) | `speckit check`, `speckit ontology lint` | `evidence.json`, 零死穴审计报告 |
+| **G5 投产安全带** | 兑底渊 (PRE-SRE) | `speckit harness full-audit`, `speckit archive` | `harness-report.json`, 归档区归档 |
+
