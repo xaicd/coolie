@@ -12,7 +12,15 @@ import {
   View,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import type { Issue, IssuePriority } from "@coolie/api-client";
+import {
+  SPEC_DOC_KIND_FOR_SPEC_KIT_TYPE,
+  SPEC_KIT_TYPE_LABEL,
+  SPEC_KIT_TYPES,
+  specDocSkeleton,
+  type Issue,
+  type IssuePriority,
+  type SpecKitType,
+} from "@coolie/api-client";
 import { C, coolie, type AgentRow } from "../coolie";
 import { ELEVATION, RADIUS, SPACING } from "../ui/tokens";
 import { Dropdown, type DropdownOption } from "../ui/Dropdown";
@@ -26,53 +34,12 @@ import { matchIntentToAgent } from "../utils/intentMatcher";
 /** 单选用「空 value」表示清除 (自动派发 / 无项目)。 */
 const NONE = "";
 
-/** Spec-Kit SDD 规约驱动 (wave368)。对齐 Spec-Kit 规格类型。 */
-type SpecKind = "feature" | "bugfix" | "refactor" | "security";
-const SPEC_KINDS: SpecKind[] = ["feature", "bugfix", "refactor", "security"];
-const SPEC_KIND_LABEL: Record<SpecKind, string> = {
-  feature: "需求规格",
-  bugfix: "缺陷修复",
-  refactor: "架构重构",
-  security: "安全加固",
-};
-function specSkeleton(kind: SpecKind): Record<string, unknown> {
-  const todo = "（待填写）";
-  switch (kind) {
-    case "feature":
-      return {
-        kind,
-        feature: {
-          summary: `${todo}需求简述 —— 1~3 句话。`,
-          acceptanceCriteria: [`${todo}一条可判定的验收条件。`],
-        },
-      };
-    case "bugfix":
-      return {
-        kind,
-        bugfix: {
-          reproSteps: `${todo}复现步骤 1、2、3…`,
-          expectedBehavior: `${todo}预期行为。`,
-          actualBehavior: `${todo}实际行为。`,
-        },
-      };
-    case "refactor":
-      return {
-        kind,
-        refactor: {
-          approach: `${todo}重构思路：接口 / 数据 / 边界。`,
-          tradeoffs: [`${todo}权衡 1。`],
-        },
-      };
-    case "security":
-      return {
-        kind,
-        security: {
-          vulnerability: `${todo}安全漏洞或防线风险。`,
-          mitigation: `${todo}加固方案。`,
-        },
-      };
-  }
-}
+/**
+ * Spec-Kit SDD 规约驱动 (wave368 / COOA-521)。芯片词表与收敛映射来自
+ * `@coolie/api-client` 的 `spec-kit` 模块: 建单写 spec 骨架前先经
+ * `SPEC_DOC_KIND_FOR_SPEC_KIT_TYPE` 映射到 wave147 kind, 否则
+ * feature / refactor / security 会被 `POST /issues/:id/spec` 400 拒收 (COOA-525)。
+ */
 
 /**
  * 新建任务弹窗 —— **两张卡** (主要内容 + 指派) + [放弃]/[创建任务]。
@@ -120,7 +87,7 @@ export function CreateTaskModal({
   const [issueKind, setIssueKind] = useState<"task" | "defect">("task");
   const [severity, setSeverity] = useState<"P0" | "P1" | "P2" | "P3">("P1");
   // spec-driven chain (wave147/wave368): 选定后建单成功即把该类型的 spec 骨架写进任务。
-  const [specKind, setSpecKind] = useState<SpecKind | "">("");
+  const [specKind, setSpecKind] = useState<SpecKitType | "">("");
   const [busy, setBusy] = useState(false);
   const [assigneeOpen, setAssigneeOpen] = useState(false);
 
@@ -196,7 +163,10 @@ export function CreateTaskModal({
       // spec-driven chain (wave147/wave368): 建单成功后补写 spec 骨架（失败不阻塞建单）。
       if (specKind) {
         try {
-          await coolie.saveIssueSpec(issue.id, specSkeleton(specKind));
+          await coolie.saveIssueSpec(
+            issue.id,
+            specDocSkeleton(SPEC_DOC_KIND_FOR_SPEC_KIT_TYPE[specKind]),
+          );
         } catch {
           // 任务已存在；spec 写失败不改建单结果。
         }
@@ -439,11 +409,11 @@ export function CreateTaskModal({
                       无
                     </Text>
                   </Pressable>
-                  {SPEC_KINDS.map((kind) => (
+                  {SPEC_KIT_TYPES.map((kind) => (
                     <Pressable
                       key={kind}
                       accessibilityRole="button"
-                      accessibilityLabel={`规格 ${SPEC_KIND_LABEL[kind]}`}
+                      accessibilityLabel={`规格 ${SPEC_KIT_TYPE_LABEL[kind]}`}
                       accessibilityState={{ selected: specKind === kind }}
                       disabled={busy}
                       onPress={() => setSpecKind(kind)}
@@ -454,7 +424,7 @@ export function CreateTaskModal({
                       ]}
                     >
                       <Text style={[styles.priorityText, specKind === kind && styles.priorityTextActive]}>
-                        {SPEC_KIND_LABEL[kind]}
+                        {SPEC_KIT_TYPE_LABEL[kind]}
                       </Text>
                     </Pressable>
                   ))}

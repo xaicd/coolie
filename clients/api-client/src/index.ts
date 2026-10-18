@@ -19,6 +19,14 @@ export {
 } from "./work-modes";
 export type { IssueWorkMode, WorkModeMeta } from "./work-modes";
 export {
+  SPEC_DOC_KINDS,
+  SPEC_DOC_KIND_FOR_SPEC_KIT_TYPE,
+  SPEC_KIT_TYPES,
+  SPEC_KIT_TYPE_LABEL,
+  specDocSkeleton,
+} from "./spec-kit";
+export type { SpecKitType } from "./spec-kit";
+export {
   assigneeValueFromSelection,
   currentUserAssigneeOption,
   isAgentTaskTarget,

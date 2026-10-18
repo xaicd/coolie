@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import { ISSUE_SPEC_KINDS } from "../constants.js";
+import { specTemplateSkeleton } from "../spec-templates.js";
 import {
   createSpecFromTemplateSchema,
   issueSpecDraftSchema,
@@ -92,5 +94,24 @@ describe("createSpecFromTemplateSchema", () => {
   it("requires a kind and defaults nothing unexpected", () => {
     expect(createSpecFromTemplateSchema.safeParse({}).success).toBe(false);
     expect(createSpecFromTemplateSchema.safeParse({ kind: "bugfix" }).success).toBe(true);
+  });
+});
+
+/**
+ * COOA-525 guard: every seeded spec skeleton must satisfy the write contract.
+ *
+ * A client that writes a skeleton whose `kind` (and its payload key) is outside
+ * `ISSUE_SPEC_KINDS` — e.g. the native App once wrote `{kind:"feature"}` from the
+ * Spec-Kit type vocabulary — gets a silent 400 from `POST /issues/:id/spec`
+ * (`issueSpecSchema`). Pin the shared source of truth so that cannot recur.
+ */
+describe("specTemplateSkeleton ↔ issueSpecSchema", () => {
+  it("produces a schema-valid skeleton for every spec kind", () => {
+    for (const kind of ISSUE_SPEC_KINDS) {
+      const skeleton = specTemplateSkeleton(kind);
+      const parsed = issueSpecSchema.safeParse(skeleton);
+      expect(parsed.success, `"${kind}" skeleton must satisfy issueSpecSchema`).toBe(true);
+      expect(skeleton.kind).toBe(kind);
+    }
   });
 });
