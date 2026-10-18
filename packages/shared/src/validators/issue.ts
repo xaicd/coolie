@@ -743,7 +743,7 @@ export const issueSpecKitConfigSchema = z
       .default("feature"),
     domain: z.string().trim().max(100).optional().nullable(),
     name: z.string().trim().max(100).optional().nullable(),
-    brief: z.record(z.string(), z.unknown()).optional().nullable(),
+    brief: z.union([z.string().trim().max(10000), z.record(z.string(), z.unknown())]).optional().nullable(),
   })
   .strict();
 

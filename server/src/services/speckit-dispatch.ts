@@ -129,12 +129,15 @@ export function speckitDispatchService(db: Db) {
             const dir = newRes.dir;
 
             // 1.1 若入参提供了自定义 brief，增量合并
-            if (specKitConfig?.brief && typeof specKitConfig.brief === "object") {
+            if (specKitConfig?.brief) {
               const briefPath = path.join(dir, "brief.json");
               if (fs.existsSync(briefPath)) {
                 try {
                   const existingBrief = JSON.parse(fs.readFileSync(briefPath, "utf8"));
-                  const merged = { ...existingBrief, ...specKitConfig.brief, name: slug, domain };
+                  const briefUpdate = typeof specKitConfig.brief === "string"
+                    ? { summary: specKitConfig.brief }
+                    : specKitConfig.brief;
+                  const merged = { ...existingBrief, ...briefUpdate, name: slug, domain };
                   fs.writeFileSync(briefPath, JSON.stringify(merged, null, 2) + "\n", "utf8");
                 } catch {}
               }

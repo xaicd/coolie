@@ -51,7 +51,11 @@ function parseArgs() {
     desc: "",
     priority: "medium",
     assignee: "tiejiang",
-    project: "wenlv-next"
+    project: "wenlv-next",
+    speckit: true,
+    specType: null,
+    domain: null,
+    specName: null
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -68,6 +72,16 @@ function parseArgs() {
       result.assignee = args[++i];
     } else if (arg === "--project") {
       result.project = args[++i];
+    } else if (arg === "--speckit") {
+      result.speckit = true;
+    } else if (arg === "--no-speckit") {
+      result.speckit = false;
+    } else if (arg === "--spec-type" || arg === "--type") {
+      result.specType = args[++i];
+    } else if (arg === "--domain") {
+      result.domain = args[++i];
+    } else if (arg === "--spec-name" || arg === "--name") {
+      result.specName = args[++i];
     }
   }
   return result;
@@ -192,6 +206,16 @@ async function main() {
     assigneeAgentId: targetAgent ? targetAgent.id : undefined
   };
 
+  if (args.speckit) {
+    issuePayload.specKit = {
+      enabled: true,
+      type: args.specType || undefined,
+      domain: args.domain || undefined,
+      name: args.specName || undefined,
+      brief: args.desc || finalTitle,
+    };
+  }
+
   const createdIssue = await request(`/companies/${company.id}/issues`, {
     method: "POST",
     body: issuePayload
@@ -212,6 +236,7 @@ async function main() {
     status: createdIssue.status,
     assignee: targetAgent ? `${targetAgent.name} (${targetAgent.title})` : "未分配",
     source: args.source,
+    speckit: args.speckit ? (createdIssue.specKit || issuePayload.specKit) : false,
     url: `http://${uiHost}:3100/${company.id}/issues/${createdIssue.identifier}`
   };
 

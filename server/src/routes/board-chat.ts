@@ -440,6 +440,16 @@ async function detectAndExecuteDirectAction(
         const timeboxTag = timeboxMinutes ? `·⏱️${timeboxMinutes}m` : "";
         const formattedTitle = `【${channelTag}·${sender}${timeboxTag}】${rawTaskTitle}`;
 
+        let specType: "feature" | "bugfix" | "refactor" | "security" = "feature";
+        const lowerRaw = rawTaskTitle.toLowerCase();
+        if (/bug|修复|报错|崩溃|失败|异常|死循环|缺陷|issue/.test(lowerRaw)) {
+          specType = "bugfix";
+        } else if (/重构|清理|优化|解耦|refactor/.test(lowerRaw)) {
+          specType = "refactor";
+        } else if (/安全|漏洞|防护|权限|防线|security/.test(lowerRaw)) {
+          specType = "security";
+        }
+
         const issuesApi = issueService(db);
         const created = await issuesApi.create(companyId, {
           title: formattedTitle,
@@ -448,6 +458,12 @@ async function detectAndExecuteDirectAction(
           assigneeAgentId: targetAgent.id,
           status: "todo",
           priority: timeboxMinutes ? "high" : "normal",
+          specKit: {
+            enabled: true,
+            type: specType,
+            domain: "governance",
+            brief: rawTaskTitle,
+          },
         });
 
         let deadlineStr = "";
@@ -493,13 +509,14 @@ async function detectAndExecuteDirectAction(
           `| **工单编号** | \`${created.identifier}\` (${created.title}) |\n` +
           `| **派单来源** | 📱 **${channelTag}** (${sender} 发起) |\n` +
           `| **受派匠人** | 👤 **${targetAgent.name}** (\`${targetAgent.roleLabel || targetAgent.role}\`) |\n` +
+          `| **规格体系** | 📐 **Spec-Kit SDD** (\`${specType}\` 自动脚手架 \`docs/specs/\` 与 issue_documents) |\n` +
           (timeboxMinutes
             ? `| **时间盒 (Time-Box)** | ⏱️ **${timeboxMinutes} 分钟** (预计截止 ${deadlineStr}) |\n` +
               `| **熔断机制** | Palantir AIP Bootcamp: 倒计时结束硬熔断留存证据 (Time to Truth) |\n`
             : `| **执行模式** | 🚀 敏捷推进 |\n`) +
           `| **调度通道** | 心跳队列 (\`heartbeat_runs\`) 优先级即刻唤醒 |\n` +
           `| **工单状态** | \`todo\` ➔ \`in_progress\` |\n\n` +
-          `> 平台已在底层数据库原子建单${timeboxMinutes ? `并锁定 ${timeboxMinutes} 分钟时间盒` : ""}，**${targetAgent.name}** 即刻认领并执行该工单。`;
+          `> 平台已在底层数据库原子建单并启动 Spec-Kit SDD 规约体系${timeboxMinutes ? `，锁定 ${timeboxMinutes} 分钟时间盒` : ""}，**${targetAgent.name}** 即刻认领并执行该工单。`;
 
         return {
           handled: true,

@@ -232,6 +232,7 @@ TOOL="agy"
 CATEGORY="dev"
 CMMI_PHASE="Phase 4.1 编码"
 AGENT_ID="02cab729-c5b7-4a14-9ce9-5a34885c336a"
+SPEC_TYPE="feature"
 
 # 关键词规则扫描
 if [[ "$EXPERT_MODE" -eq 1 ]] || [[ "${INPUT:-}" =~ (为什么.*慢|为什么.*乱|为什么这样|怎么回事|感觉.*没理解|你觉得呢|给个建议) ]]; then
@@ -272,6 +273,14 @@ else
   CATEGORY="dev"
   CMMI_PHASE="Phase 4.1 编码"
   AGENT_ID="02cab729-c5b7-4a14-9ce9-5a34885c336a"
+fi
+
+if [[ "${INPUT:-}" =~ (bug|修复|崩溃|报错|异常|死循环|缺陷) ]]; then
+  SPEC_TYPE="bugfix"
+elif [[ "${INPUT:-}" =~ (重构|解耦|清理|优化|抽取|refactor) ]]; then
+  SPEC_TYPE="refactor"
+elif [[ "${INPUT:-}" =~ (安全|权限|防线|红队|渗透|漏洞|security) ]]; then
+  SPEC_TYPE="security"
 fi
 
 # 1.1 梯次分流与 Token 控制判定 (L1 / L2 / L3)
@@ -340,6 +349,7 @@ echo "【Hermes 微信秒级接单】"
 echo "────────────────────────────────────────"
 echo "👤 责任员工: $EMPLOYEE ($AGENT)"
 echo "🛠️ 推荐工具: $TOOL"
+echo "📐 规格类型: Spec-Kit ($SPEC_TYPE)"
 echo "🚦 梯次分流: $TASK_LEVEL"
 echo "💰 算力预估: $TOKEN_ESTIMATE"
 echo "📌 CMMI 映射: $CMMI_PHASE"
@@ -412,9 +422,15 @@ ${_rules}"
       description: process.argv[2],
       priority: "high",
       status: "todo",
-      assigneeAgentId: process.argv[3]
+      assigneeAgentId: process.argv[3],
+      specKit: {
+        enabled: true,
+        type: process.argv[4] || "feature",
+        domain: "governance",
+        brief: process.argv[5]
+      }
     }));
-  ' "$title" "$desc" "$AGENT_ID")"
+  ' "$title" "$desc" "$AGENT_ID" "${SPEC_TYPE:-feature}" "$_task")"
 
   local res=""
   if curl -fsS "$DEV_SERVER_BASE/api/health" >/dev/null 2>&1; then
@@ -442,6 +458,7 @@ if [[ "${ISSUE_REUSED:-0}" == "1" ]]; then
   echo "🔗 任务卡片链接: $ISSUE_URL"
 elif [[ -n "$ISSUE_IDENTIFIER" ]]; then
   echo "📋 Dev Server 已建任务: $ISSUE_IDENTIFIER (分配给: $EMPLOYEE)"
+  echo "📐 Spec-Kit 规格: SDD 脚手架已启动 (${SPEC_TYPE:-feature} · docs/specs/)"
   echo "🔗 任务卡片链接: $ISSUE_URL"
 else
   echo "⚠️ Dev Server (${DEV_SERVER_BASE}) 任务同步未完成 (仅落本地 Receipt)"
