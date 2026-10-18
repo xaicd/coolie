@@ -18,6 +18,10 @@
 8. **0-1 软件工程交付资产与 No Artifact, No Done 铁律 (Spec-First Artifacts)**：严禁口头声明完工；每个特性必须基于 8 要素 Brief 派发，且必须产出 7 类物理工程资产（SRS/RTM、OpenAPI 契约、0 报错源码、真实 DB 状态机单测报告、生产回滚 SOP、SRE 稳定性基线、持续运营对账单）。
 9. **单一真源与全生命周期过程资产防污染铁律 (Single Source of Truth & Anti-Pollution)**：技能唯一真源为 `.agents/skills/<name>/SKILL.md`；指令唯一真源为 `.agents/commands/`；业务规格按域隔离于 `docs/specs/<domain>/<name>/`（支持 feature/bugfix/enhancement/refactor/security 五态）并支持自动归档。
 10. **全能力 AI Agent 驱动公理 (All Capabilities Must Be AI Agent Driven)**：系统内的一切能力（需求立项、代码实现、API 契约、页面交互、接口运营、自动化测试、容器发版、故障自愈）必须具备 **100% 机器可读与 AI Agent 闭环驱动能力**。
+11. **全项目文档 Spec-Kit 规范化书写与 CMMI 01~09 / docs/specs 双轨法定归宿铁律 (Unified Spec-Kit & Dual-Track CMMI Law)**：全仓所有工程、管理、架构、测试与运维文档，严禁无规范自由手写与随意散落。所有文档必须统一由 Spec-Kit 规范引擎 (`scripts/speckit.cjs`) 驱动书写，遵循模板化插值、IEEE 29148 / EARS 句式、不可篡改元数据头与 1 Task = 1 Commit 物理取证。物理路径必须严格落盘于法定双轨目录：
+    - **宏观项目全生命周期资产轨**：严格归属 `docs/01_management/` 到 `docs/09_operations/` (CMMI 01~09 组织级过程资产)；
+    - **微观特性全息规格包轨**：严格归属 `docs/specs/<domain>/<feature-slug>/` (Spec-Kit 15 资产包)；
+    任何散落在根目录或其他未经登记目录的 markdown 文件，一律由 `speckit health` 视为非法污染并阻断门禁！
 
 ---
 

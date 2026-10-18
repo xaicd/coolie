@@ -292,9 +292,10 @@ A change is done when all are true:
        2. **客户语言与技术栈约束**：政企/电信/金融指定 **Java / Spring Boot 3 / 信创微服务** ➜ **必选 `yudao-quad-terminal`**；客户指定 **TypeScript / Next.js / 极速云原生** ➜ **选用 `ruoyi-all-next`**；
        3. **需求完整度与交付周期**：需求高度完备且涉及复杂支付/BPM流程/多租户行级隔离 ➜ 选 `yudao-quad-terminal`（借力 19 域成熟资产）；需求处于早期 POC / 极速打样 ➜ 选 `ruoyi-all-next`（极轻量、改动成本低）；
    - **开源基座自适应与极速骨架派生 (Zero-Git-History Hatching)**：确定选型后，**100% 保持开源基座原生目录结构**；通过 `bash scripts/hatch-client-project.sh <path> --profile quad-terminal` 或 `degit xaicd/ruoyi-all-next#main` 极速派生，按需选用 `base` (~50MB 纯白板)、`minimal` (低代码+AI)、`standard` (全量 17 域) 与 `quad-terminal` (Java 微服务 + Vue3 管理端 + Uni-App 小程序 + Expo 原生 App) 规范阶梯，秒级完成工程初始化并建立独立 git 首提交。详见 [`.agents/rules/FOUNDRY-BLUEPRINT-SELECTION.md`](.agents/rules/FOUNDRY-BLUEPRINT-SELECTION.md)。
-3. **控制面第一公民与全生命周期工程文档物理归宿 (`docs/01_management` ~ `09_operations` & `docs/specs/`)**：
+3. **全项目文档 Spec-Kit 规范化书写与 CMMI 01~09 / docs/specs 双轨法定归宿铁律 (Spec-Kit Document Standard & Dual-Track Topology)**：
+   - **全文档 Spec-Kit 规范化书写铁律 (All Documents in Spec-Kit Way)**：严禁大模型无规范自由手写 Markdown 文档；全项目所有技术、管理、架构、测试与运维文档，**必须统一由 Spec-Kit 规范引擎 (`scripts/speckit.cjs`) 驱动并按规范标准书写**（结构化元数据 `brief.json` / profile 驱动、标准模板库插值展开、IEEE 29148 / EARS 严谨无二义性语法、波次任务依赖拆解、1 Task = 1 Commit 物理取证、统一元数据审计头部）；
    - **控制面第一真理源 (Paperclip Control-Plane Primacy)**：软件交付的过程规格、测试凭证与结项资产，第一法定宿主统一为 Paperclip 控制面原生实体（`issue_documents`、`issue_work_products`、`attachments`），支持富文本在线批注、版本流转与审批门禁；
-   - **彻底弃用 `.coolie/cmmi` 隐藏目录与单文件方案**：单文件 `01-srs.md` 无法支持多会话、多特性的增量敏捷迭代。全面对齐 `ruoyi-all-next`，工程级资产必须严格落盘于标准 CMMI 01~09 目录：
+   - **彻底弃用 `.coolie/cmmi` 隐藏目录与单文件方案**：单文件 `01-srs.md` 无法支持多会话、多特性的增量敏捷迭代。全面对齐 `ruoyi-all-next`，工程级资产必须严格落盘于标准 CMMI 01~09 目录与 docs/specs 目录：
      - `docs/01_management/`：项目范围、立项章程、WBS 字典与风险台账 (RSKM)；
      - `docs/02_requirements/`：EARS 语法软件需求规格说明书 (SRS: software-requirements.md)、用户需求 (URS) 与双向需求跟踪矩阵 (RTM)；
      - `docs/03_design/`：概要架构设计 (HLD: architecture-design-hld.md)、DAR 选型矩阵、接口契约 (interface-contracts/) 与数据模型 (ERD)；

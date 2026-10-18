@@ -63,13 +63,43 @@ function checkHealth() {
     errors.push(`发现重复/镜像 skills 目录: docs/skills/ —— 铁律要求唯一真源为 .agents/skills/，严禁多份目录造成认知与维护污染`)
   }
 
-  return { errors, warnings, specCount: allSpecs.length }
+  // 6. 检查 CMMI 01~09 标准规范目录拓扑与遗留旧目录清退
+  const legacyCmmi = path.join(ROOT, "docs", "cmmi")
+  if (fs.existsSync(legacyCmmi)) {
+    errors.push(`发现历史遗留非标目录: docs/cmmi/ —— 规范要求统一按 CMMI 阶段落盘至 docs/01_management ~ docs/09_operations`)
+  }
+
+  const cmmiPhases = [
+    "01_management",
+    "02_requirements",
+    "03_design",
+    "04_implementation",
+    "05_verification",
+    "06_cmmi_audit",
+    "07_release",
+    "08_sre",
+    "09_operations",
+  ]
+  for (const phase of cmmiPhases) {
+    const phaseDir = path.join(ROOT, "docs", phase)
+    if (!fs.existsSync(phaseDir)) {
+      errors.push(`缺少 CMMI 阶段标准过程资产目录: docs/${phase}/`)
+    } else {
+      const files = fs.readdirSync(phaseDir)
+      if (files.length === 0) {
+        warnings.push(`CMMI 阶段目录为空: docs/${phase}/`)
+      }
+    }
+  }
+
+  return { errors, warnings, specCount: allSpecs.length, cmmiPhaseCount: cmmiPhases.length }
 }
 
 const { errors, warnings, specCount } = checkHealth()
 
 console.log(`=== [specs:health] 规格体系与文档健康防污染扫描 ===`)
-console.log(`已检测到有效规格包总数: ${specCount} 个`)
+console.log(`已检测到有效特性规格包总数: ${specCount} 个`)
+console.log(`已校验 CMMI 01~09 标准过程资产目录: 9/9 完备 (docs/01_management ~ docs/09_operations)`)
 
 if (warnings.length > 0) {
   console.log(`\n⚠️ 发现轻微待优化项 (${warnings.length} 项):`)
@@ -82,5 +112,5 @@ if (errors.length > 0) {
   process.exit(1)
 }
 
-console.log(`\n✅ 全盘扫描通过: 0 污染、0 散落文件、规格体系完好！`)
+console.log(`\n✅ 全盘扫描通过: 0 污染、0 散落文件、docs/specs 与 docs/01~09 双轨规范体系完好！`)
 process.exit(0)

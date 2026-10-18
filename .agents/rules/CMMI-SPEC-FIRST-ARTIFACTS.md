@@ -28,11 +28,12 @@
 
 ---
 
-## 二、 商业交付全生命周期工程资产标准 (CMMI 01~09 & docs/specs 体系)
+## 二、 商业交付全生命周期工程资产标准 (Spec-Kit 规范书写与 CMMI 01~09 & docs/specs 双轨体系)
 
+> **最高工程铁律**：**全项目所有文档必须由 Spec-Kit 规范方式书写！**  
+> 严禁大模型无规范自由手写 Markdown 文档；全项目所有技术、管理、架构、测试与运维文档，必须统一由 Spec-Kit 规范引擎 (`scripts/speckit.cjs`) 驱动并按规范标准书写（结构化元数据 `brief.json` / profile 驱动、标准模板库插值展开、IEEE 29148 / EARS 严谨无二义性语法、波次任务依赖拆解、1 Task = 1 Commit 物理取证、统一元数据审计头部）。  
 > **重大架构决议**：**彻底弃用 `.coolie/cmmi` 隐藏单文件目录！**  
-> **根因追溯**：静态单文件（如单个 `01-srs.md`）是典型的瀑布单体思维，在真实敏捷交付中，每次工坊会话 (Conversation) 新增功能需求、演进特性或缺陷修复时，单文件结构无法承载多会话、多特性的增量演进。  
-> **对齐标准**：全面吸收 `ruoyi-all-next` 现代软件工程标准，将过程文档全面迁移为**规范化的 CMMI `docs/01_management` ~ `docs/09_operations` 全生命周期资产目录**（含架构设计 `docs/architecture/` 与 `docs/03_design/`）、**敏捷全息特性包 `docs/specs/<domain>/<feature-slug>/`** 与 **机器证据库 `docs/artifacts/`**，支持多次会话、多个环境的多文档增量并存与持续演进！
+> **法定双轨落盘拓扑**：工程级资产必须严格落盘于规范化的 CMMI `docs/01_management` ~ `docs/09_operations` 全生命周期资产目录（含架构设计 `docs/architecture/` 与 `docs/03_design/`）与敏捷全息特性包 `docs/specs/<domain>/<feature-slug>/`（支持多次会话、多个环境的多文档增量并存与持续演进），严禁在项目根目录或非标路径随意散落。
 
 数字员工在执行 WBS 任务与全生命周期交付时，必须标准交付以下工程资产与机器证据库（26 类标准工程资产）：
 
