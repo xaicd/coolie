@@ -782,6 +782,67 @@ async function handleSync() {
     })
   }
 
+  // --------------------------------------------------------------------------
+  // 回归官方方案：使用 Paperclip 原生 issue_documents 承载规格与计划协同文档
+  // --------------------------------------------------------------------------
+  let specMarkdown = ""
+  if (fs.existsSync(path.join(dir, "README.md"))) {
+    specMarkdown = fs.readFileSync(path.join(dir, "README.md"), "utf8")
+  } else if (fs.existsSync(path.join(dir, "spec.md"))) {
+    specMarkdown = fs.readFileSync(path.join(dir, "spec.md"), "utf8")
+  } else {
+    specMarkdown = `# ${brief.title}\n\n`
+    specMarkdown += `> 业务领域: \`${brief.domain}\` | 类型: \`${brief.type || "feature"}\` | 状态: \`${brief.status || "active"}\`\n\n`
+    specMarkdown += `## 1. 业务目标\n${brief.goal}\n\n`
+    if (fs.existsSync(path.join(dir, "requirements.md"))) {
+      specMarkdown += `## 2. 需求规格说明 (SRS)\n${fs.readFileSync(path.join(dir, "requirements.md"), "utf8")}\n\n`
+    }
+    if (fs.existsSync(path.join(dir, "design.md"))) {
+      specMarkdown += `## 3. 技术方案与架构 (Design)\n${fs.readFileSync(path.join(dir, "design.md"), "utf8")}\n\n`
+    }
+    if (fs.existsSync(path.join(dir, "tasks.md"))) {
+      specMarkdown += `## 4. 任务波次拆解 (Tasks)\n${fs.readFileSync(path.join(dir, "tasks.md"), "utf8")}\n\n`
+    }
+  }
+
+  if (specMarkdown.trim()) {
+    console.log(`   📄 同步 Paperclip 官方 Issue Document (key: 'spec')...`)
+    const specDocRes = await api(`/api/issues/${epicIssue.id}/documents/spec`, {
+      method: "PUT",
+      body: JSON.stringify({
+        title: `[Spec] ${brief.title}`,
+        format: "markdown",
+        body: specMarkdown,
+        changeSummary: `Spec-Kit SDD sync v${brief.version || 1} from ${specRelDir}`,
+      }),
+    })
+    if (specDocRes.ok) {
+      console.log(`      └─ 官方 Issue Document [spec] 同步就绪 (版本: ${specDocRes.body.latestRevisionNumber || 1})`)
+    } else {
+      console.warn(`      ⚠️ 官方 Issue Document [spec] 同步提示: ${specDocRes.status}`)
+    }
+  }
+
+  let tasksMdContent = fs.existsSync(path.join(dir, "tasks.md"))
+    ? fs.readFileSync(path.join(dir, "tasks.md"), "utf8")
+    : ""
+
+  if (tasksMdContent.trim()) {
+    console.log(`   📋 同步 Paperclip 官方 Issue Document (key: 'plan')...`)
+    const planDocRes = await api(`/api/issues/${epicIssue.id}/documents/plan`, {
+      method: "PUT",
+      body: JSON.stringify({
+        title: `[Plan] ${brief.title} 任务计划`,
+        format: "markdown",
+        body: tasksMdContent,
+        changeSummary: `Spec-Kit tasks sync from ${specRelDir}`,
+      }),
+    })
+    if (planDocRes.ok) {
+      console.log(`      └─ 官方 Issue Document [plan] 同步就绪`)
+    }
+  }
+
   const tasks = brief.tasks || []
   const childIssues = existingIssues.filter((i) => i.parentId === epicIssue.id || (i.title && i.title.startsWith(`[${brief.name}·`)))
   const childMap = new Map()
@@ -789,10 +850,6 @@ async function handleSync() {
     const m = (ci.title || "").match(/\[[^·]+·(T\d+)\]/)
     if (m) childMap.set(m[1], ci)
   }
-
-  let tasksMdContent = fs.existsSync(path.join(dir, "tasks.md"))
-    ? fs.readFileSync(path.join(dir, "tasks.md"), "utf8")
-    : ""
 
   let updatedTasksMd = false
   let allDone = tasks.length > 0
@@ -1021,7 +1078,145 @@ function handleConstitution() {
 }
 
 // ============================================================================
-// 10. 帮助菜单 (Help Menu)
+// 10. 官方回归数据迁移命令：speckit official-migrate
+// ============================================================================
+async function handleMigrateToOfficial() {
+  let host = getArg("--host") || process.env.PAPERCLIP_HOST || "http://localhost:3100"
+  let companyId = getArg("--company") || process.env.PAPERCLIP_COMPANY_ID
+
+  async function api(pathname, options = {}) {
+    const url = `${host.replace(/\/$/, "")}${pathname.startsWith("/") ? "" : "/"}${pathname}`
+    const res = await globalThis.fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+    })
+    const text = await res.text()
+    let body
+    try {
+      body = JSON.parse(text)
+    } catch {
+      body = text
+    }
+    return { ok: res.ok, status: res.statusCode || res.status, body }
+  }
+
+  console.log(`\n📦 [speckit official-migrate] 扫描存量 In-DB Spec 并平滑迁移为 Paperclip 官方 Issue Document...`)
+
+  if (!companyId) {
+    const compRes = await api("/api/companies")
+    if (compRes.ok && Array.isArray(compRes.body) && compRes.body.length > 0) {
+      const match = compRes.body.find((c) => c.name.includes("Coolie") || c.name.includes("本地")) || compRes.body[0]
+      companyId = match.id
+      console.log(`   🏢 自动匹配公司: ${match.name} (${companyId})`)
+    } else {
+      console.error("❌ 无法获取公司列表，请通过 --company 显式指定")
+      process.exit(1)
+    }
+  }
+
+  const specTreeRes = await api(`/api/companies/${companyId}/specs/tree`)
+  if (!specTreeRes.ok || !specTreeRes.body || !Array.isArray(specTreeRes.body.roots)) {
+    console.log(`   ℹ️ 当前公司无存量 In-DB 规格树，或端点已下线。`)
+    return
+  }
+
+  const allSpecNodes = []
+  function traverse(nodes) {
+    for (const node of nodes) {
+      allSpecNodes.push(node)
+      if (Array.isArray(node.children)) traverse(node.children)
+    }
+  }
+  traverse(specTreeRes.body.roots)
+
+  console.log(`   🔍 发现 ${allSpecNodes.length} 条存量 In-DB 规格记录。正在执行官方 Issue Document 映射...`)
+
+  let migratedCount = 0
+  for (const node of allSpecNodes) {
+    const issueId = node.issueId
+    const spec = node.spec || {}
+    const kind = node.specKind || spec.kind || "requirement"
+
+    const docListRes = await api(`/api/issues/${issueId}/documents`)
+    const docs = Array.isArray(docListRes.body) ? docListRes.body : []
+    const hasSpecDoc = docs.some((d) => d.key === "spec")
+
+    if (hasSpecDoc) {
+      console.log(`   • [${node.identifier || issueId}] 已存在官方 'spec' 文档，跳过`)
+      continue
+    }
+
+    let docBody = `# ${node.title}\n\n`
+    docBody += `> 规格类型: \`${kind}\` | 状态: \`${node.status}\` | 标识: \`${node.identifier || issueId}\`\n\n`
+
+    if (kind === "requirement" && spec.requirement) {
+      docBody += `## 需求描述\n${spec.requirement.body}\n\n`
+      if (Array.isArray(spec.requirement.acceptanceCriteria) && spec.requirement.acceptanceCriteria.length > 0) {
+        docBody += `## 验收准则 (Acceptance Criteria)\n`
+        for (const ac of spec.requirement.acceptanceCriteria) {
+          docBody += `- [ ] ${ac}\n`
+        }
+        docBody += `\n`
+      }
+    } else if (kind === "bugfix" && spec.bugfix) {
+      docBody += `## 复现步骤\n${spec.bugfix.reproSteps}\n\n`
+      docBody += `## 预期行为\n${spec.bugfix.expectedBehavior}\n\n`
+      docBody += `## 实际行为\n${spec.bugfix.actualBehavior}\n\n`
+    } else if (kind === "design" && spec.design) {
+      docBody += `## 方案说明\n${spec.design.approach}\n\n`
+      if (Array.isArray(spec.design.tradeoffs) && spec.design.tradeoffs.length > 0) {
+        docBody += `## 方案权衡 (Trade-offs)\n`
+        for (const t of spec.design.tradeoffs) {
+          docBody += `- ${t}\n`
+        }
+        docBody += `\n`
+      }
+      if (spec.design.apiSurface) {
+        docBody += `## 接口契约与边界 (API Surface)\n\`\`\`\n${spec.design.apiSurface}\n\`\`\`\n\n`
+      }
+    } else if (kind === "task" && spec.task) {
+      if (Array.isArray(spec.task.files) && spec.task.files.length > 0) {
+        docBody += `## 涉及文件白名单\n`
+        for (const f of spec.task.files) {
+          docBody += `- \`${f}\`\n`
+        }
+        docBody += `\n`
+      }
+      if (Array.isArray(spec.task.steps) && spec.task.steps.length > 0) {
+        docBody += `## 执行步骤\n`
+        for (const s of spec.task.steps) {
+          docBody += `- [ ] ${s}\n`
+        }
+        docBody += `\n`
+      }
+    }
+
+    const upsertRes = await api(`/api/issues/${issueId}/documents/spec`, {
+      method: "PUT",
+      body: JSON.stringify({
+        title: `[Spec] ${node.title}`,
+        format: "markdown",
+        body: docBody,
+        changeSummary: `Auto-migrated from legacy In-DB issues.spec by speckit official-migrate`,
+      }),
+    })
+
+    if (upsertRes.ok) {
+      migratedCount++
+      console.log(`   ✅ 成功迁移 [${node.identifier || issueId}] -> issue_documents (key: 'spec')`)
+    } else {
+      console.warn(`   ⚠️ 迁移 [${node.identifier || issueId}] 失败: ${JSON.stringify(upsertRes.body)}`)
+    }
+  }
+
+  console.log(`\n🎉 [speckit official-migrate] 迁移完成！共迁移 ${migratedCount} 条规格到官方 issue_documents 体系。\n`)
+}
+
+// ============================================================================
+// 11. 帮助菜单 (Help Menu)
 // ============================================================================
 function handleHelp() {
   console.log(`
@@ -1034,6 +1229,7 @@ Spec-Kit 原生与企业扩展命令:
   plan/build  从 brief.json 展开编译生成完备 Markdown 规格与任务波次图
   tasks/task  查看任务大盘、波次依赖与基于真实 Git 历史核实 1 Task = 1 Commit
   sync        双向同步规格文档到 Paperclip 控制面工单、子任务与工件总线
+  official-migrate 自动将历史数据库中的 In-DB spec 平滑迁移为官方原生 issue_documents
   check       检查规格交付进度与门禁完成度
   list        列出全域所有规格状态与路径
   archive     将交付完毕的规格移动到季度历史归档区
@@ -1049,6 +1245,7 @@ Spec-Kit 原生与企业扩展命令:
   node scripts/speckit.cjs tasks --spec fix-pay-lock
   node scripts/speckit.cjs tasks --spec fix-pay-lock --task T1
   node scripts/speckit.cjs sync --spec fix-pay-lock
+  node scripts/speckit.cjs official-migrate
   node scripts/speckit.cjs check --spec fix-pay-lock
   node scripts/speckit.cjs list
   node scripts/speckit.cjs archive --name fix-pay-lock
@@ -1080,6 +1277,13 @@ switch (command) {
   case "sync":
     handleSync().catch((err) => {
       console.error("❌ [speckit sync] 执行异常:", err.message)
+      process.exit(1)
+    })
+    break
+  case "official-migrate":
+  case "migrate-to-official":
+    handleMigrateToOfficial().catch((err) => {
+      console.error("❌ [speckit official-migrate] 执行异常:", err.message)
       process.exit(1)
     })
     break

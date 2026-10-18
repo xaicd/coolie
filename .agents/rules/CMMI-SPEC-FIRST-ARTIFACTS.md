@@ -222,9 +222,10 @@
 
 站在 **Paperclip 总产品架构师** 与 **交付工厂总架构师** 的高度，交付资产必须遵循**控制面第一公民优先，代码工作区无侵入映射**的双轨闭环铁律：
 
-### 1. 控制面原生实体第一原则 (Primary Control-Plane Entities)
-- **过程规格文档**：优先通过 Paperclip 控制面原生文档接口（`POST /api/issues/:id/documents`）挂载为 `issue_documents`（`key: "plan"`、`key: "srs"`、`key: "hld"`、`key: "lld"`）。
+### 1. 控制面原生实体第一原则与回归官方铁律 (Primary Control-Plane Entities & Return to Upstream Law)
+- **过程规格文档**：优先通过 Paperclip 控制面原生文档接口（`PUT /api/issues/:id/documents/:key`）挂载为 `issue_documents`（`key: "spec"`、`key: "plan"`、`key: "srs"`、`key: "hld"`、`key: "lld"`）。
   - **高管体验**：Web 端与移动端直接原生预览，支持高管在线逐行划线批注、评审打回，沙箱销毁依然持久存在；
+  - **双核并轨与主线回归**：规格的物理单一真理源始终是代码仓库中的 **Spec-Kit Markdown 资产**（`docs/specs/` 与 CMMI 01~09），控制面则 100% 采用官方原生 `issue_documents` 承载协同与评审。全面废弃 Wave 147 的 `issues.spec` / `issues.spec_kind` 侵入式 JSONB 字段，控制面 `issues` 表物理结构逐步向上游主干完全对齐，彻底消除 Fork 分歧面！
 - **测试证据与不可变产物**：100% 通过 `register_deliverable` 或 `skills/paperclip/scripts/paperclip-upload-artifact.sh` 上传为持久化 Attachment，点亮任务 **Artifacts 标签页**，保证离线可看、销毁不丢。
 
 ### 2. 代码工作区无侵入映射 (Secondary Workspace Mapping)

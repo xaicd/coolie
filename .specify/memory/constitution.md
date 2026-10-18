@@ -22,6 +22,10 @@
     - **宏观项目全生命周期资产轨**：严格归属 `docs/01_management/` 到 `docs/09_operations/` (CMMI 01~09 组织级过程资产)；
     - **微观特性全息规格包轨**：严格归属 `docs/specs/<domain>/<feature-slug>/` (Spec-Kit 15 资产包)；
     任何散落在根目录或其他未经登记目录的 markdown 文件，一律由 `speckit health` 视为非法污染并阻断门禁！
+12. **控制面 Issue 架构向 Paperclip 官方主线全面回归与双核并轨铁律 (Return to Paperclip Upstream Law)**：
+    - **单一物理真理源**：本地代码仓库内的 **Spec-Kit Markdown 资产**（`docs/specs/` 与 CMMI 01~09）是规格与设计唯一的版本化真理源，贯彻“代码即文档，1 Task = 1 Commit”；
+    - **控制面原生协同载体**：控制面 Issue 100% 采用 Paperclip 官方原生 **`issue_documents`**（Markdown 协同文档，`key: 'spec'` 与 `'plan'`），原生享受版本历史（`document_revisions`）、实时行级标注（`document_annotation_threads`）、排他锁与差异比对；
+    - **自研 In-DB 字段降级与平滑解耦**：全面淘汰并停止扩展 Wave 147 遗留的 `issues.spec` / `issues.spec_kind` 数据库私有 JSONB 字段。统一由 `node scripts/speckit.cjs sync` 自动将本地 Git 规格无缝推送到官方 `issue_documents`，并通过 `official-migrate` 确保历史数据零丢失。控制面 `issues` 表物理结构逐步向上游主干完全对齐，彻底消除 Fork 分歧面！
 
 ---
 
